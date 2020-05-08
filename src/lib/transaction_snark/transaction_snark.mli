@@ -28,7 +28,7 @@ module Pending_coinbase_stack_state : sig
 
   module Stable : sig
     module V1 : sig
-      type t = Pending_coinbase.Stack.Stable.V1.t Poly.Stable.V1.t
+      type t = Pending_coinbase.Stack_versioned.Stable.V1.t Poly.Stable.V1.t
       [@@deriving bin_io, compare, eq, hash, sexp, version, yojson]
     end
 
@@ -75,7 +75,7 @@ module Statement : sig
       type t =
         ( Frozen_ledger_hash.Stable.V1.t
         , Currency.Amount.Stable.V1.t
-        , Pending_coinbase.Stack.Stable.V1.t
+        , Pending_coinbase.Stack_versioned.Stable.V1.t
         , ( Currency.Amount.Stable.V1.t
           , Sgn.Stable.V1.t )
           Currency.Signed_poly.Stable.V1.t
@@ -94,7 +94,7 @@ module Statement : sig
         type t =
           ( Frozen_ledger_hash.Stable.V1.t
           , Currency.Amount.Stable.V1.t
-          , Pending_coinbase.Stack.Stable.V1.t
+          , Pending_coinbase.Stack_versioned.Stable.V1.t
           , ( Currency.Amount.Stable.V1.t
             , Sgn.Stable.V1.t )
             Currency.Signed_poly.Stable.V1.t
@@ -210,6 +210,8 @@ val generate_transaction_witness :
 
 module type S = sig
   include Verification.S
+
+  val cache_handle : Pickles.Cache_handle.t
 
   val of_transaction :
        sok_digest:Sok_message.Digest.t

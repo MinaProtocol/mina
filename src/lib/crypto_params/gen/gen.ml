@@ -21,7 +21,7 @@ let group_map_params =
 
 let group_map_params_structure ~loc =
   let module T = struct
-    type t = Snarky_bn382_backend.Fp.t Group_map.Params.t [@@deriving bin_io]
+    type t = Snarky_bn382_backend.Fp.Stable.Latest.t Group_map.Params.Stable.Latest.t [@@deriving bin_io_unversioned]
   end in
   let module E = Ppxlib.Ast_builder.Make (struct
     let loc = loc
@@ -30,8 +30,8 @@ let group_map_params_structure ~loc =
   [%str
     let params =
       let module T = struct
-        type t = Snarky_bn382_backend.Fp.t Group_map.Params.t
-        [@@deriving bin_io]
+        type t = Snarky_bn382_backend.Fp.Stable.Latest.t Group_map.Params.t
+        [@@deriving bin_io_unversioned]
       end in
       Binable.of_string
         (module T)

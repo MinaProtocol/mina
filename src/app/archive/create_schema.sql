@@ -15,15 +15,18 @@ CREATE INDEX idx_snarked_ledger_hashes_value ON snarked_ledger_hashes(value);
 CREATE TYPE user_command_type AS ENUM ('payment', 'delegation');
 
 CREATE TABLE user_commands
-( id          serial            PRIMARY KEY
-, type        user_command_type NOT NULL
-, sender_id   int               NOT NULL REFERENCES public_keys(id)
-, receiver_id int               NOT NULL REFERENCES public_keys(id)
-, nonce       bigint            NOT NULL
-, amount      bigint
-, fee         bigint            NOT NULL
-, memo        text              NOT NULL
-, hash        text              NOT NULL UNIQUE
+( id           serial            PRIMARY KEY
+, type         user_command_type NOT NULL
+, fee_payer_id int               NOT NULL REFERENCES public_keys(id)
+, source_id    int               NOT NULL REFERENCES public_keys(id)
+, receiver_id  int               NOT NULL REFERENCES public_keys(id)
+, fee_token    text              NOT NULL
+, token        text              NOT NULL
+, nonce        bigint            NOT NULL
+, amount       bigint
+, fee          bigint            NOT NULL
+, memo         text              NOT NULL
+, hash         text              NOT NULL UNIQUE
 );
 
 CREATE TYPE internal_command_type AS ENUM ('fee_transfer', 'coinbase');

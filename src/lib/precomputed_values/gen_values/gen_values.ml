@@ -65,19 +65,21 @@ module Make_real () = struct
 
   open E
 
-  let t0 = Time.now ()
-
   module T = Transaction_snark.Make ()
-
-  let t1 = Time.now ()
-
-  let () =
-    printf "%s: %s\n%!" "Transaction_snark.Make"
-      (Time.Span.to_string_hum (Time.diff t1 t0))
-
   module B = Blockchain_snark.Blockchain_snark_state.Make (T)
 
   let key_hashes = hashes
+
+  let protocol_state_with_hash =
+    Lazy.force Genesis_protocol_state.compile_time_genesis
+
+  let compiled_values =
+    Genesis_proof.create_values
+      (module B)
+      { genesis_constants= Genesis_constants.compiled
+      ; genesis_ledger= (module Test_genesis_ledger)
+      ; protocol_state_with_hash
+      }
 
   let transaction_verification =
     [%expr
@@ -107,52 +109,12 @@ module Make_real () = struct
       in
       fun () -> Lazy.force t]
 
-  let t2 = Time.now ()
-
-  let () =
-    printf "%s: %s\n%!" "Blockchain_snark.Make"
-      (Time.Span.to_string_hum (Time.diff t2 t1))
-
-  let loc = Ppxlib.Location.none
-
-  let protocol_state_with_hash = Genesis_protocol_state.compile_time_genesis ()
-
   let base_proof_expr =
-    let prev_state =
-      Protocol_state.negative_one ~genesis_ledger:Test_genesis_ledger.t
-    in
-    let curr = protocol_state_with_hash.data in
-    let dummy_txn_stmt : Transaction_snark.Statement.With_sok.t =
-      { sok_digest= Coda_base.Sok_message.Digest.default
-      ; source=
-          Blockchain_state.snarked_ledger_hash
-            (Protocol_state.blockchain_state prev_state)
-      ; target=
-          Blockchain_state.snarked_ledger_hash
-            (Protocol_state.blockchain_state curr)
-      ; supply_increase= Currency.Amount.zero
-      ; fee_excess= Currency.Amount.Signed.zero
-      ; pending_coinbase_stack_state=
-          { source= Coda_base.Pending_coinbase.Stack.empty
-          ; target= Coda_base.Pending_coinbase.Stack.empty } }
-    in
-    let dummy = Coda_base.Proof.dummy in
-    let proof =
-      B.step
-        ~handler:
-          (Consensus.Data.Prover_state.precomputed_handler
-             ~genesis_ledger:Test_genesis_ledger.t)
-        { transition=
-            Snark_transition.genesis ~genesis_ledger:Test_genesis_ledger.t
-        ; prev_state }
-        [(prev_state, dummy); (dummy_txn_stmt, dummy)]
-        protocol_state_with_hash.data
-    in
     [%expr
       Core.Binable.of_string
         (module Coda_base.Proof.Stable.V1)
         [%e
-          estring (Binable.to_string (module Coda_base.Proof.Stable.V1) proof)]]
+          estring (Binable.to_string (module Coda_base.Proof.Stable.V1) compiled_values.genesis_proof)]]
 end
 
 open Async
@@ -166,7 +128,32 @@ let main () =
   in
   let structure =
     [%str
-      let base_proof = [%e M.base_proof_expr]
+      module T = Genesis_proof.T
+      include T
+
+      let compiled_base_proof = [%e M.base_proof_expr]
+
+      let compiled =
+        lazy
+          (let protocol_state_with_hash =
+             Lazy.force Coda_state.Genesis_protocol_state.compile_time_genesis
+           in
+           { genesis_constants= Genesis_constants.compiled
+           ; genesis_ledger= (module Test_genesis_ledger)
+           ; protocol_state_with_hash
+           ; genesis_proof= compiled_base_proof })
+
+      let unit_test_base_proof = Coda_base.Proof.dummy
+
+      let for_unit_tests =
+        lazy
+          (let protocol_state_with_hash =
+             Lazy.force Coda_state.Genesis_protocol_state.compile_time_genesis
+           in
+           { genesis_constants= Genesis_constants.for_unit_tests
+           ; genesis_ledger= Genesis_ledger.for_unit_tests
+           ; protocol_state_with_hash
+           ; genesis_proof= unit_test_base_proof })
 
       let key_hashes = [%e M.key_hashes]
 

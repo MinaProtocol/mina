@@ -103,9 +103,9 @@ let createApplicationMenu = () => {
 
 // We need this handler here to prevent the application from exiting on all
 // windows closed. Keep in mind, we have the tray.
-App.on(`WindowAllClosed, () => ());
+BsElectron.App.on(`WindowAllClosed, () => ());
 
-let initialTask = Task.uncallbackifyValue(App.on(`Ready));
+let initialTask = Task.uncallbackifyValue(BsElectron.App.on(`Ready));
 
 let run = () =>
   Task.attempt(
@@ -129,7 +129,7 @@ let run = () =>
       dispatch := Application.Store.apply((), store);
       let dispatch = dispatch^;
 
-      App.on(`WillQuit, () => dispatch(Action.ControlCoda(None)));
+      BsElectron.App.on(`WillQuit, () => dispatch(Action.ControlCoda(None)));
       createTray(dispatch);
       createApplicationMenu();
 

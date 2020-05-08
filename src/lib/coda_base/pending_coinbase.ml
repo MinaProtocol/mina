@@ -78,6 +78,9 @@ module Coinbase_data = struct
 end
 
 module Stack_id : sig
+  (* using %%versioned: here results in unused variable errors for versions,
+     deserialize_binary_opt
+  *)
   module Stable : sig
     module V1 : sig
       type t [@@deriving bin_io, sexp, to_yojson, compare, version]
@@ -86,7 +89,6 @@ module Stack_id : sig
     module Latest = V1
   end
 
-  (* bin_io, version omitted *)
   type t = Stable.Latest.t [@@deriving sexp, compare, eq, to_yojson]
 
   val of_int : int -> t
@@ -120,17 +122,8 @@ end = struct
     if t2 < t1 then Or_error.error_string "Stack_id overflow" else Ok t2
 end
 
-module type Data_hash_binable_intf = sig
+module type Data_hash_intf = sig
   type t = private Field.t [@@deriving sexp, compare, eq, yojson, hash]
-
-  module Stable : sig
-    module V1 : sig
-      type nonrec t = t
-      [@@deriving bin_io, sexp, compare, eq, yojson, hash, version]
-    end
-
-    module Latest = V1
-  end
 
   type var
 
@@ -149,16 +142,37 @@ module type Data_hash_binable_intf = sig
   val gen : t Quickcheck.Generator.t
 end
 
-module Data_hash_binable = struct
-  include Data_hash.Make_full_size ()
-end
-
 (* a coinbase stack has two components, data and a state_hash
    we create modules for each component
 *)
 
 module Coinbase_stack_data = struct
-  include Data_hash_binable
+  include Data_hash.Make_full_size (struct
+    let description = "Coinbase stack data"
+
+    let version_byte = Base58_check.Version_bytes.coinbase_stack_data
+  end)
+
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type t = Field.t [@@deriving sexp, compare, hash, version {asserted}]
+      end
+
+      include T
+
+      let to_latest = Core.Fn.id
+
+      [%%define_from_scope
+      to_yojson, of_yojson]
+
+      include Comparable.Make (T)
+      include Hashable.Make_binable (T)
+    end
+  end]
+
+  type _unused = unit constraint t = Stable.Latest.t
 
   let push (h : t) cb =
     let coinbase = Coinbase_data.of_coinbase cb in
@@ -187,7 +201,34 @@ module Coinbase_stack_data = struct
 end
 
 module Stack_hash = struct
-  include Data_hash_binable
+  include Data_hash.Make_full_size (struct
+    let description = "Coinbase stack hash"
+
+    let version_byte = Base58_check.Version_bytes.coinbase_stack_hash
+  end)
+
+  (* Data hash versioned boilerplate below *)
+
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type t = Field.t [@@deriving sexp, compare, hash, version {asserted}]
+      end
+
+      include T
+
+      let to_latest = Core.Fn.id
+
+      [%%define_from_scope
+      to_yojson, of_yojson]
+
+      include Comparable.Make (T)
+      include Hashable.Make_binable (T)
+    end
+  end]
+
+  type _unused = unit constraint t = Stable.Latest.t
 
   let dummy = of_hash Outside_hash_image.t
 end
@@ -303,7 +344,34 @@ end
 
 (* Pending coinbase hash *)
 module Hash_builder = struct
-  include Data_hash_binable
+  include Data_hash.Make_full_size (struct
+    let description = "Pending coinbase hash builder"
+
+    let version_byte = Base58_check.Version_bytes.receipt_chain_hash
+  end)
+
+  (* Data hash versioned boilerplate below *)
+
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type t = Field.t [@@deriving sexp, compare, hash, version {asserted}]
+      end
+
+      include T
+
+      let to_latest = Fn.id
+
+      [%%define_from_scope
+      to_yojson, of_yojson]
+
+      include Comparable.Make (T)
+      include Hashable.Make_binable (T)
+    end
+  end]
+
+  type _unused = unit constraint t = Stable.Latest.t
 
   let merge ~height (h1 : t) (h2 : t) =
     Random_oracle.hash
@@ -409,6 +477,79 @@ end
    modules for Hash and Stack.
  *)
 
+module Stack_versioned = struct
+  module Poly = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type ('data_stack, 'state_stack) t =
+          {data: 'data_stack; state: 'state_stack}
+        [@@deriving eq, yojson, hash, sexp, compare]
+      end
+    end]
+
+    type ('data_stack, 'state_stack) t =
+          ('data_stack, 'state_stack) Stable.Latest.t =
+      {data: 'data_stack; state: 'state_stack}
+    [@@deriving yojson, hash, sexp, compare]
+  end
+
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t =
+        ( Coinbase_stack_data.Stable.V1.t
+        , Coinbase_stack_state.Stable.V1.t )
+        Poly.Stable.V1.t
+      [@@deriving eq, yojson, hash, sexp, compare]
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  type t = Stable.Latest.t [@@deriving yojson, eq, compare, sexp, hash]
+end
+
+module Hash_versioned = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t = Hash_builder.Stable.V1.t
+      [@@deriving eq, compare, sexp, yojson, hash]
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  type t = Stable.Latest.t [@@deriving eq, compare, sexp, yojson, hash]
+end
+
+module Merkle_tree_versioned = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t =
+        ( Hash_versioned.Stable.V1.t
+        , Stack_id.Stable.V1.t
+        , Stack_versioned.Stable.V1.t )
+        Sparse_ledger_lib.Sparse_ledger.T.Stable.V1.t
+      [@@deriving sexp, to_yojson]
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  type t = Stable.Latest.t [@@deriving sexp, to_yojson]
+
+  type _unused = unit
+    constraint
+      t =
+      ( Hash_versioned.t
+      , Stack_id.t
+      , Stack_versioned.t )
+      Sparse_ledger_lib.Sparse_ledger.T.t
+end
+
 module Make (Depth : sig
   val depth : int
 end) =
@@ -420,36 +561,16 @@ struct
 
   module Stack = struct
     module Poly = struct
-      [%%versioned
-      module Stable = struct
-        module V1 = struct
-          type ('data_stack, 'state_stack) t =
-            {data: 'data_stack; state: 'state_stack}
-          [@@deriving eq, yojson, hash, sexp, compare]
-        end
-      end]
-
       type ('data_stack, 'state_stack) t =
-            ('data_stack, 'state_stack) Stable.Latest.t =
+            ('data_stack, 'state_stack) Stack_versioned.Poly.t =
         {data: 'data_stack; state: 'state_stack}
       [@@deriving yojson, hash, sexp, compare]
     end
 
-    [%%versioned
-    module Stable = struct
-      module V1 = struct
-        type t =
-          ( Coinbase_stack_data.Stable.V1.t
-          , Coinbase_stack_state.Stable.V1.t )
-          Poly.Stable.V1.t
-        [@@deriving eq, yojson, hash, sexp, compare]
+    type t = Stack_versioned.t [@@deriving yojson, eq, compare, sexp, hash]
 
-        let to_latest = Fn.id
-      end
-    end]
-
-    (* bin_io, version omitted *)
-    type t = Stable.Latest.t [@@deriving yojson, eq, compare, sexp, hash]
+    type _unused = unit
+      constraint t = (Coinbase_stack_data.t, Coinbase_stack_state.t) Poly.t
 
     type var = (Coinbase_stack_data.var, Coinbase_stack_state.var) Poly.t
 
@@ -580,30 +701,16 @@ struct
   end
 
   module Hash = struct
-    [%%versioned
-    module Stable = struct
-      module V1 = struct
-        type t = Hash_builder.Stable.V1.t
-        [@@deriving eq, compare, sexp, yojson, hash]
+    type t = Hash_builder.t [@@deriving eq, compare, sexp, yojson, hash]
 
-        type var = Hash_builder.var
+    type _unused = unit constraint t = Hash_versioned.t
 
-        let to_latest = Fn.id
-
-        let merge = Hash_builder.merge
-      end
-    end]
-
-    type t = Stable.Latest.t [@@deriving eq, compare, sexp, yojson, hash]
-
-    type var = Stable.Latest.var
-
-    [%%define_locally
-    Stable.Latest.(merge)]
+    type var = Hash_builder.var
 
     [%%define_locally
     Hash_builder.
       ( of_digest
+      , merge
       , empty_hash
       , gen
       , to_bits
@@ -615,24 +722,13 @@ struct
       , typ )]
   end
 
-  (* the arguments to Sparse_ledger.Make are all versioned; a particular choice of those
-     versions yields a version of the result
-   *)
-
   module Merkle_tree = struct
-    [%%versioned
-    module Stable = struct
-      module V1 = struct
-        type t =
-          ( Hash.Stable.V1.t
-          , Stack_id.Stable.V1.t
-          , Stack.Stable.V1.t )
-          Sparse_ledger_lib.Sparse_ledger.T.Stable.V1.t
-        [@@deriving sexp, to_yojson]
+    type t = Merkle_tree_versioned.t [@@deriving sexp, to_yojson]
 
-        let to_latest = Fn.id
-      end
-    end]
+    type _unused = unit
+      constraint
+        t =
+        (Hash.t, Stack_id.t, Stack.t) Sparse_ledger_lib.Sparse_ledger.T.t
 
     module M = Sparse_ledger_lib.Sparse_ledger.Make (Hash) (Stack_id) (Stack)
 
@@ -648,7 +744,7 @@ struct
   end
 
   module Checked = struct
-    type var = Hash.Stable.V1.var
+    type var = Hash.var
 
     module Merkle_tree =
       Snarky.Merkle_tree.Checked
@@ -857,30 +953,12 @@ struct
   end
 
   module Poly = struct
-    [%%versioned
-    module Stable = struct
-      module V1 = struct
-        type ('tree, 'stack_id) t =
-          {tree: 'tree; pos_list: 'stack_id list; new_pos: 'stack_id}
-        [@@deriving sexp, to_yojson]
-      end
-    end]
-
-    type ('tree, 'stack_id) t = ('tree, 'stack_id) Stable.Latest.t =
+    type ('tree, 'stack_id) t =
       {tree: 'tree; pos_list: 'stack_id list; new_pos: 'stack_id}
+    [@@deriving sexp, to_yojson]
   end
 
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type t = (Merkle_tree.Stable.V1.t, Stack_id.Stable.V1.t) Poly.Stable.V1.t
-      [@@deriving sexp, to_yojson]
-
-      let to_latest = Fn.id
-    end
-  end]
-
-  type t = Stable.Latest.t [@@deriving sexp, to_yojson]
+  type t = (Merkle_tree.t, Stack_id.t) Poly.t [@@deriving sexp, to_yojson]
 
   let init_hash = Stack.data_hash Stack.empty
 
@@ -889,7 +967,7 @@ struct
     List.fold
       (List.init depth ~f:(fun i -> i + 1))
       ~init:([(0, init_hash)], init_hash)
-      ~f:(fun (hashes, (cur_hash : Data_hash_binable.t)) height ->
+      ~f:(fun (hashes, (cur_hash : Hash.t)) height ->
         let (merged : Hash.t) =
           Hash.merge ~height:(height - 1) cur_hash cur_hash
         in
@@ -1111,10 +1189,38 @@ struct
 end
 
 module T = Make (struct
-  let depth = Snark_params.pending_coinbase_depth
+  let depth = Coda_compile_config.pending_coinbase_depth
 end)
 
 include T
+
+module Poly_versioned = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type ('tree, 'stack_id) t = ('tree, 'stack_id) T.Poly.t =
+        {tree: 'tree; pos_list: 'stack_id list; new_pos: 'stack_id}
+      [@@deriving sexp, to_yojson]
+    end
+  end]
+end
+
+[%%versioned
+module Stable = struct
+  module V1 = struct
+    type t =
+      ( Merkle_tree_versioned.Stable.V1.t
+      , Stack_id.Stable.V1.t )
+      Poly_versioned.Stable.V1.t
+    [@@deriving sexp, to_yojson]
+
+    let to_latest = Fn.id
+
+    type _unused = unit constraint t = T.t
+  end
+end]
+
+type _unused = unit constraint Stable.Latest.t = t
 
 let%test_unit "add stack + remove stack = initial tree " =
   let pending_coinbases = ref (create () |> Or_error.ok_exn) in

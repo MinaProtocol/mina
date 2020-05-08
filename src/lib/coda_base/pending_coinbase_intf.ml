@@ -55,17 +55,8 @@ module type S = sig
     val var_of_t : t -> var
   end
 
-  module type Data_hash_binable_intf = sig
+  module type Data_hash_intf = sig
     type t = private Field.t [@@deriving sexp, compare, eq, yojson, hash]
-
-    module Stable : sig
-      module V1 : sig
-        type nonrec t = t
-        [@@deriving bin_io, sexp, compare, eq, yojson, version, hash]
-      end
-
-      module Latest = V1
-    end
 
     type var
 
@@ -85,7 +76,7 @@ module type S = sig
   end
 
   module rec Hash : sig
-    include Data_hash_binable_intf
+    include Data_hash_intf
 
     val merge : height:int -> t -> t -> t
 
@@ -94,15 +85,31 @@ module type S = sig
     val of_digest : Random_oracle.Digest.t -> t
   end
 
-  and Stack : sig
+  module Hash_versioned : sig
     [%%versioned:
     module Stable : sig
       module V1 : sig
-        type t [@@deriving sexp, compare, eq, yojson, hash]
+        type nonrec t = Hash.t [@@deriving sexp, compare, eq, yojson, hash]
       end
     end]
 
-    type t = Stable.Latest.t [@@deriving sexp, compare, eq, yojson, hash]
+    type nonrec t = Stable.Latest.t
+    [@@deriving sexp, compare, eq, yojson, hash]
+  end
+
+  module Stack_versioned : sig
+    type t [@@deriving sexp, compare, eq, yojson, hash]
+
+    [%%versioned:
+    module Stable : sig
+      module V1 : sig
+        type nonrec t = t [@@deriving sexp, compare, eq, yojson, hash]
+      end
+    end]
+  end
+
+  module Stack : sig
+    type t = Stack_versioned.t [@@deriving sexp, compare, eq, yojson, hash]
 
     type var
 

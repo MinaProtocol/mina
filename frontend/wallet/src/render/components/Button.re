@@ -93,8 +93,14 @@ module Styles = {
             color(hoverColor(mode)),
             cursor(`pointer),
           ]),
-          focus([backgroundColor(hoverBgColor(mode))]),
-          active([backgroundColor(hoverBgColor(mode))]),
+          focus([
+            backgroundColor(hoverBgColor(mode)),
+            color(hoverColor(mode)),
+          ]),
+          active([
+            backgroundColor(hoverBgColor(mode)),
+            color(hoverColor(mode)),
+          ]),
         ]),
       ]);
   };

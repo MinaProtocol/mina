@@ -1,10 +1,6 @@
-[%%import
-"/src/config.mlh"]
-
 open Core_kernel
 open Bitstring_lib
 open Snark_bits
-module Scan_state_constants = Scan_state_constants
 
 module Make_snarkable (Impl : Snarky.Snark_intf.S) = struct
   open Impl
@@ -238,11 +234,6 @@ module Tick = struct
 
   let make_checked c = with_state (As_prover.return ()) (Run.make_checked c)
 end
-
-[%%inject
-"ledger_depth", ledger_depth]
-
-let pending_coinbase_depth = Scan_state_constants.pending_coinbase_depth
 
 (* Let n = Tick.Field.size_in_bits.
    Let k = n - 3.

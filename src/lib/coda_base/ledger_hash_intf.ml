@@ -1,4 +1,4 @@
-open Import
+open Core
 open Snark_params
 open Snarky
 open Tick
@@ -6,13 +6,26 @@ open Tick
 module type S = sig
   include Data_hash.Full_size
 
+  [%%versioned:
+  module Stable : sig
+    module V1 : sig
+      type t = Field.t [@@deriving sexp, compare, hash, yojson]
+
+      val to_latest : t -> t
+
+      include Comparable.S with type t := t
+
+      include Hashable_binable with type t := t
+    end
+  end]
+
   type path = Random_oracle.Digest.t list
 
   type _ Request.t +=
     | Get_path : Account.Index.t -> path Request.t
     | Get_element : Account.Index.t -> (Account.t * path) Request.t
     | Set : Account.Index.t * Account.t -> unit Request.t
-    | Find_index : Public_key.Compressed.t -> Account.Index.t Request.t
+    | Find_index : Account_id.t -> Account.Index.t Request.t
 
   val get : var -> Account.Index.Unpacked.var -> (Account.var, _) Checked.t
 
@@ -29,7 +42,7 @@ module type S = sig
 
   val modify_account_send :
        var
-    -> Public_key.Compressed.var
+    -> Account_id.var
     -> is_writeable:Boolean.var
     -> f:(   is_empty_and_writeable:Boolean.var
           -> Account.var
@@ -38,7 +51,7 @@ module type S = sig
 
   val modify_account_recv :
        var
-    -> Public_key.Compressed.var
+    -> Account_id.var
     -> f:(   is_empty_and_writeable:Boolean.var
           -> Account.var
           -> (Account.var, 's) Checked.t)

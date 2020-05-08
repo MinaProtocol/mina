@@ -26,20 +26,6 @@ module Input = Input
 let params : Field.t Sponge.Params.t =
   Sponge.Params.(map bn382_p ~f:Field.of_string)
 
-let pack_input ~project {Input.field_elements; bitstrings} =
-  let packed_bits =
-    let xs, final, len_final =
-      Array.fold bitstrings ~init:([], [], 0)
-        ~f:(fun (acc, curr, n) bitstring ->
-          let k = List.length bitstring in
-          let n' = k + n in
-          if n' >= Field.size_in_bits then (project curr :: acc, bitstring, k)
-          else (acc, bitstring @ curr, n') )
-    in
-    if len_final = 0 then xs else project final :: xs
-  in
-  Array.append field_elements (Array.of_list_rev packed_bits)
-
 module Inputs = struct
   module Field = Field
 
@@ -160,14 +146,15 @@ module Checked = struct
         hash ?init:(Option.map init ~f:(State.map ~f:constant)) params xs )
 
   let pack_input =
-    pack_input ~project:Pickles.Impls.Pairing_based.Field.project
+    Input.pack_to_fields ~size_in_bits:Field.size_in_bits ~pack:Field.Var.pack
 
   let digest xs = xs.(0)
 end
 
 [%%endif]
 
-let pack_input = pack_input ~project:Field.project
+let pack_input =
+  Input.pack_to_fields ~size_in_bits:Field.size_in_bits ~pack:Field.project
 
 let prefix_to_field (s : string) =
   let bits_per_character = 8 in

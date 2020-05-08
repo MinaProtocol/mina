@@ -106,14 +106,7 @@ let%snarkydef step ~(logger : Logger.t)
       Protocol_state.create_var ~previous_state_hash ~genesis_state_hash
         ~blockchain_state:(Snark_transition.blockchain_state transition)
         ~consensus_state
-    in
-    let%bind () =
-      as_prover
-        As_prover.(
-          let%map t = read Protocol_state.typ t in
-          Core.printf
-            !"new state in snark %{sexp:Protocol_state.Value.t}\n%!"
-            t)
+        ~constants:(Protocol_state.constants previous_state)
     in
     let%map () =
       let%bind h, _ = Protocol_state.hash_checked t in

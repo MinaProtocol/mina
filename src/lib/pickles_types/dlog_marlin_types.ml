@@ -2,21 +2,28 @@ open Tuple_lib
 open Core_kernel
 
 module Evals = struct
-  type 'a t =
-    { w_hat: 'a
-    ; z_hat_a: 'a
-    ; z_hat_b: 'a
-    ; h_1: 'a
-    ; h_2: 'a
-    ; h_3: 'a
-    ; row: 'a Abc.t
-    ; col: 'a Abc.t
-    ; value: 'a Abc.t
-    ; rc: 'a Abc.t
-    ; g_1: 'a
-    ; g_2: 'a
-    ; g_3: 'a }
-  [@@deriving fields, bin_io, sexp, compare, yojson]
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type 'a t =
+        { w_hat: 'a
+        ; z_hat_a: 'a
+        ; z_hat_b: 'a
+        ; h_1: 'a
+        ; h_2: 'a
+        ; h_3: 'a
+        ; row: 'a Abc.Stable.V1.t
+        ; col: 'a Abc.Stable.V1.t
+        ; value: 'a Abc.Stable.V1.t
+        ; rc: 'a Abc.Stable.V1.t
+        ; g_1: 'a
+        ; g_2: 'a
+        ; g_3: 'a }
+      [@@deriving fields, bin_io, version, sexp, compare, yojson]
+    end
+  end]
+
+  include Stable.Latest
 
   let to_vectors
       { w_hat
@@ -98,10 +105,16 @@ end
 
 module Openings = struct
   module Bulletproof = struct
-    type ('fq, 'g) t =
-      {lr: ('g * 'g) array; z_1: 'fq; z_2: 'fq; delta: 'g; sg: 'g}
-    [@@deriving bin_io, sexp, compare, yojson]
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type ('fq, 'g) t =
+          {lr: ('g * 'g) array; z_1: 'fq; z_2: 'fq; delta: 'g; sg: 'g}
+        [@@deriving bin_io, version, sexp, compare, yojson]
+      end
+    end]
 
+    include Stable.Latest
     open Snarky.H_list
 
     let to_hlist {lr; z_1; z_2; delta; sg} = [lr; z_1; z_2; delta; sg]
@@ -119,10 +132,17 @@ module Openings = struct
 
   open Evals
 
-  type 'a triple = 'a * 'a * 'a [@@deriving bin_io, sexp, compare, yojson]
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type ('fq, 'g) t =
+        { proof: ('fq, 'g) Bulletproof.Stable.V1.t
+        ; evals: 'fq Evals.Stable.V1.t * 'fq Evals.Stable.V1.t * 'fq Evals.Stable.V1.t }
+      [@@deriving bin_io, version, sexp, compare, yojson]
+    end
+  end]
 
-  type ('fq, 'g) t = {proof: ('fq, 'g) Bulletproof.t; evals: 'fq Evals.t triple}
-  [@@deriving bin_io, sexp, compare, yojson]
+  include Stable.Latest
 
   let to_hlist {proof; evals} = Snarky.H_list.[proof; evals]
 
@@ -136,3 +156,4 @@ module Openings = struct
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
 end
+

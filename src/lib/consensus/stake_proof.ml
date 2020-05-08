@@ -22,7 +22,7 @@ end]
 *)
 type t = Stable.Latest.t =
   { delegator: Account.Index.t
-  ; ledger: Sparse_ledger.Stable.V1.t
+  ; ledger: Sparse_ledger.t
   ; private_key: Signature_lib.Private_key.t
   ; public_key: Signature_lib.Public_key.t }
 [@@deriving to_yojson, sexp]

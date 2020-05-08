@@ -21,6 +21,7 @@ val create :
   -> base_hash:Frontier_hash.t
   -> consensus_local_state:Consensus.Data.Local_state.t
   -> max_length:int
+  -> genesis_constants:Genesis_constants.t
   -> t
 
 val close : t -> unit

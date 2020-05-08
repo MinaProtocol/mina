@@ -3,22 +3,28 @@ module H_list = Snarky.H_list
 module Typ = Snarky.Typ
 
 module Evals = struct
-  type 'a t =
-    { w_hat: 'a
-    ; z_hat_a: 'a
-    ; z_hat_b: 'a
-    ; g_1: 'a
-    ; h_1: 'a
-    ; g_2: 'a
-    ; h_2: 'a
-    ; g_3: 'a
-    ; h_3: 'a
-    ; row: 'a Abc.t
-    ; col: 'a Abc.t
-    ; value: 'a Abc.t
-    ; rc: 'a Abc.t }
-  [@@deriving fields, bin_io, sexp, compare, yojson]
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type 'a t =
+        { w_hat: 'a
+        ; z_hat_a: 'a
+        ; z_hat_b: 'a
+        ; g_1: 'a
+        ; h_1: 'a
+        ; g_2: 'a
+        ; h_2: 'a
+        ; g_3: 'a
+        ; h_3: 'a
+        ; row: 'a Abc.t
+        ; col: 'a Abc.t
+        ; value: 'a Abc.t
+        ; rc: 'a Abc.t }
+      [@@deriving fields, version, bin_io, sexp, compare, yojson]
+    end
+  end]
 
+  include Stable.Latest
   open Vector
 
   (* This is just the order used for iterating when absorbing the evaluations
@@ -223,7 +229,15 @@ module Accumulator = struct
         type 'a t = (int * 'a) list [@@deriving yojson]
       end
 
-      type 'a t = 'a Shift.Map.t [@@deriving sexp, bin_io, compare]
+      [%%versioned
+      module Stable = struct
+        module V1 = struct
+          type 'a t = 'a Shift.Map.t
+          [@@deriving sexp, version {asserted}, bin_io, compare]
+        end
+      end]
+
+      include Stable.Latest
 
       let to_yojson f t = Alist.to_yojson f (Map.to_alist t)
 
@@ -237,9 +251,16 @@ module Accumulator = struct
             Error (sprintf "Duplicate key %d" k)
     end
 
-    type ('g, 'unshifted) t =
-      {shifted_accumulator: 'g; unshifted_accumulators: 'unshifted}
-    [@@deriving fields, bin_io, sexp, yojson, compare]
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type ('g, 'unshifted) t =
+          {shifted_accumulator: 'g; unshifted_accumulators: 'unshifted}
+        [@@deriving fields, version, bin_io, sexp, yojson, compare]
+      end
+    end]
+
+    include Stable.Latest
 
     let to_hlist {shifted_accumulator; unshifted_accumulators} =
       H_list.[shifted_accumulator; unshifted_accumulators]
@@ -305,8 +326,15 @@ module Accumulator = struct
 
        e(f - [v] + z pi, H) = e(pi, beta*H)
     *)
-    type 'g t = {r_f_minus_r_v_plus_rz_pi: 'g; r_pi: 'g}
-    [@@deriving fields, bin_io, sexp, compare, yojson]
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type 'g t = {r_f_minus_r_v_plus_rz_pi: 'g; r_pi: 'g}
+        [@@deriving fields, version, bin_io, sexp, compare, yojson]
+      end
+    end]
+
+    include Stable.Latest
 
     let to_hlist {r_f_minus_r_v_plus_rz_pi; r_pi} =
       H_list.[r_f_minus_r_v_plus_rz_pi; r_pi]
@@ -332,10 +360,17 @@ module Accumulator = struct
       ; r_pi= f t1.r_pi t2.r_pi }
   end
 
-  type ('g, 'unshifted) t =
-    { opening_check: 'g Opening_check.t
-    ; degree_bound_checks: ('g, 'unshifted) Degree_bound_checks.t }
-  [@@deriving fields, bin_io, sexp, compare, yojson]
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type ('g, 'unshifted) t =
+        { opening_check: 'g Opening_check.t
+        ; degree_bound_checks: ('g, 'unshifted) Degree_bound_checks.t }
+      [@@deriving fields, version, bin_io, sexp, compare, yojson]
+    end
+  end]
+
+  include Stable.Latest
 
   let to_hlist {opening_check; degree_bound_checks} =
     H_list.[opening_check; degree_bound_checks]
@@ -373,8 +408,15 @@ module Accumulator = struct
 end
 
 module Opening = struct
-  type ('proof, 'values) t = {proof: 'proof; values: 'values}
-  [@@deriving fields, bin_io]
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type ('proof, 'values) t = {proof: 'proof; values: 'values}
+      [@@deriving fields, version, bin_io]
+    end
+  end]
+
+  include Stable.Latest
 
   let to_hlist {proof; values} = H_list.[proof; values]
 
@@ -388,8 +430,16 @@ end
 module Openings = struct
   open Evals
 
-  type ('proof, 'fp) t = {proofs: 'proof Tuple_lib.Triple.t; evals: 'fp Evals.t}
-  [@@deriving bin_io]
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type ('proof, 'fp) t =
+        {proofs: 'proof * 'proof * 'proof; evals: 'fp Evals.t}
+      [@@deriving version, bin_io]
+    end
+  end]
+
+  include Stable.Latest
 
   let to_hlist {proofs; evals} = H_list.[proofs; evals]
 
@@ -404,17 +454,33 @@ module Openings = struct
 end
 
 module Messages = struct
-  type 'pc degree_bounded = 'pc * 'pc
-  [@@deriving bin_io, sexp, compare, yojson]
+  module Degree_bounded = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type 'pc t = 'pc * 'pc
+        [@@deriving version, bin_io, sexp, compare, yojson]
+      end
+    end]
 
-  type ('pc, 'fp) t =
-    { w_hat: 'pc
-    ; z_hat_a: 'pc
-    ; z_hat_b: 'pc
-    ; gh_1: 'pc degree_bounded * 'pc
-    ; sigma_gh_2: 'fp * ('pc degree_bounded * 'pc)
-    ; sigma_gh_3: 'fp * ('pc degree_bounded * 'pc) }
-  [@@deriving fields, bin_io, sexp, compare, yojson]
+    include Stable.Latest
+  end
+
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type ('pc, 'fp) t =
+        { w_hat: 'pc
+        ; z_hat_a: 'pc
+        ; z_hat_b: 'pc
+        ; gh_1: 'pc Degree_bounded.Stable.V1.t * 'pc
+        ; sigma_gh_2: 'fp * ('pc Degree_bounded.Stable.V1.t * 'pc)
+        ; sigma_gh_3: 'fp * ('pc Degree_bounded.Stable.V1.t * 'pc) }
+      [@@deriving fields, version, bin_io, sexp, compare, yojson]
+    end
+  end]
+
+  include Stable.Latest
 
   let to_hlist {w_hat; z_hat_a; z_hat_b; gh_1; sigma_gh_2; sigma_gh_3} =
     H_list.[w_hat; z_hat_a; z_hat_b; gh_1; sigma_gh_2; sigma_gh_3]
@@ -434,11 +500,16 @@ module Messages = struct
 end
 
 module Proof = struct
-  type ('pc, 'fp, 'openings) t =
-    {messages: ('pc, 'fp) Messages.t; openings: 'openings}
-  [@@(* ('proof, 'fp) Openings.t} *)
-    deriving
-    fields, bin_io, sexp, compare, yojson]
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type ('pc, 'fp, 'openings) t =
+        {messages: ('pc, 'fp) Messages.t; openings: 'openings}
+      [@@deriving fields, version, bin_io, sexp, compare, yojson]
+    end
+  end]
+
+  include Stable.Latest
 
   let to_hlist {messages; openings} = H_list.[messages; openings]
 
@@ -451,3 +522,4 @@ module Proof = struct
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
 end
+

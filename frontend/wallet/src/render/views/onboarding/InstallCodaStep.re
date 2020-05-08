@@ -20,66 +20,93 @@ module Styles = {
       style([color(white), whiteSpace(`nowrap)]),
     ]);
   let downloaderSubtext =
+    merge([downloaderText, style([marginTop(`zero), fontSize(`px(13))])]);
+  let downloaderLink =
     merge([
-      downloaderText,
-      style([
-        textDecoration(`underline),
-        marginTop(`zero),
-        fontSize(`px(13)),
-        hover([cursor(`pointer)]),
-      ]),
+      downloaderSubtext,
+      style([textDecoration(`underline), hover([cursor(`pointer)])]),
     ]);
 };
-[@bs.scope "window"] [@bs.val] external openExternal: string => unit = "";
+[@bs.scope "window"] [@bs.val]
+external openExternal: string => unit = "openExternal";
+
+type state =
+  | Init
+  | Downloading
+  | Starting
+  | Error(string)
+  | Finished;
 
 module InstallProgress = {
   [@react.component]
-  let make = (~setFinished, ~finished) =>
+  let make = (~setState, ~installerState) =>
     <div className=Styles.installer>
       <div className=Styles.downloader>
         <Downloader
-          keyName="keys-temporary_hack-testnet_postake.tar.bz2"
-          onFinish={_ => setFinished(_ => true)}
-          finished
+          onFinish={result =>
+            switch (result) {
+            | Belt.Result.Ok(_) =>
+              Js.log("Install complete...");
+              Bindings.LocalStorage.setItem(~key=`Installed, ~value="true");
+              setState(_ => Finished);
+            | Belt.Result.Error(err) => setState(_ => Error(err))
+            }
+          }
+          finished={installerState === Finished}
+          error={
+            switch (installerState) {
+            | Error(_) => true
+            | _ => false
+            }
+          }
         />
-        {finished
-           ? <p className=Styles.downloaderText>
-               {React.string("Installation Complete!")}
+        {switch (installerState) {
+         | Finished =>
+           <p className=Styles.downloaderText>
+             {React.string("Installation Complete!")}
+           </p>
+         | Error(err) =>
+           <>
+             <p className=Styles.installingText>
+               {React.string("Installation Error")}
              </p>
-           : <>
-               <p className=Styles.installingText>
-                 {React.string("Installing Coda")}
-               </p>
-               <a
-                 onClick={_ =>
-                   openExternal(
-                     "https://codaprotocol.com/docs/troubleshooting",
-                   )
-                 }
-                 target="_blank"
-                 className=Styles.downloaderSubtext>
-                 {React.string({j|Having problems installing Coda?|j})}
-               </a>
-             </>}
+             <p className=Styles.downloaderSubtext> {React.string(err)} </p>
+           </>
+         | _ =>
+           <>
+             <p className=Styles.installingText>
+               {React.string("Installing Coda")}
+             </p>
+             <a
+               onClick={_ =>
+                 openExternal("https://codaprotocol.com/docs/troubleshooting")
+               }
+               target="_blank"
+               className=Styles.downloaderLink>
+               {React.string({j|Having problems installing Coda?|j})}
+             </a>
+           </>
+         }}
       </div>
     </div>;
 };
 
 [@react.component]
 let make = (~prevStep, ~nextStep) => {
-  let (finished, setFinished) = React.useState(() => false);
+  let (installerState, setInstallerState) = React.useState(() => Init);
+
   <OnboardingTemplate
     heading="Installing Coda"
     description={
       <p>
         {React.string(
-           "Coda is being installed and configured on your system.",
+           "Coda is being installed and configured on your system. This should take 1-2 min depending on your internet speed.",
          )}
       </p>
     }
     miscLeft=
       <>
-        <Spacer height=4. />
+        <Spacer height=2. />
         <div className=OnboardingTemplate.Styles.buttonRow>
           <Button
             label="Go Back"
@@ -91,9 +118,15 @@ let make = (~prevStep, ~nextStep) => {
             label="Continue"
             style=Button.HyperlinkBlue3
             onClick={_ => nextStep()}
+            disabled={
+              switch (installerState) {
+              | Finished => false
+              | _ => true
+              }
+            }
           />
         </div>
       </>
-    miscRight={<InstallProgress setFinished finished />}
+    miscRight={<InstallProgress setState=setInstallerState installerState />}
   />;
 };
