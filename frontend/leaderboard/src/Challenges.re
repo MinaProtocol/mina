@@ -14,70 +14,81 @@ let encodeMetric = (metricType, metric) => {
   (Types.Metrics.stringOfMetric(metricType), metric);
 };
 
+let calculateProperty = (f, blocks) => {
+  blocks
+  |> Array.fold_left((map, block) => {f(map, block)}, StringMap.empty);
+};
+
+let updateMapValue = (key, map) => {
+  map
+  |> StringMap.update(key, value => {
+       switch (value) {
+       | Some(valueCount) => Some(valueCount + 1)
+       | None => Some(1)
+       }
+     });
+};
+
 let calculateBlocksCreated = blocks => {
-  Array.fold_left(
-    (map, block: Types.NewBlock.t) => {
-      StringMap.update(
-        block.data.newBlock.creatorAccount.publicKey,
-        value =>
-          switch (value) {
-          | Some(blockCount) => Some(blockCount + 1)
-          | None => Some(1)
-          },
-        map,
-      )
-    },
-    StringMap.empty,
-    blocks,
-  );
+  blocks
+  |> Array.fold_left(
+       (map, block: Types.NewBlock.t) => {
+         updateMapValue(block.data.newBlock.creatorAccount.publicKey, map)
+       },
+       StringMap.empty,
+     );
+};
+
+let calculateTransactionCount = (map, block: Types.NewBlock.t) => {
+  block.data.newBlock.transactions.userCommands
+  |> Array.fold_left(
+       (transactionMap, userCommand: Types.NewBlock.userCommands) => {
+         updateMapValue(userCommand.fromAccount.publicKey, transactionMap)
+       },
+       map,
+     );
 };
 
 let calculateTransactionSent = blocks => {
-  Array.fold_left(
-    (map, block: Types.NewBlock.t) => {
-      Array.fold_left(
-        (map, userCommand: Types.NewBlock.userCommands) => {
-          StringMap.update(
-            userCommand.fromAccount.publicKey,
-            value =>
-              switch (value) {
-              | Some(transaction) => Some(transaction + 1)
-              | None => Some(1)
-              },
-            map,
-          )
-        },
-        map,
-        block.data.newBlock.transactions.userCommands,
-      )
-    },
-    StringMap.empty,
-    blocks,
-  );
+  blocks |> calculateProperty(calculateTransactionCount);
+};
+
+let calculateSnarkWorkCount = (map, block: Types.NewBlock.t) => {
+  block.data.newBlock.snarkJobs
+  |> Array.fold_left(
+       (snarkMap, snarkJob: Types.NewBlock.snarkJobs) => {
+         updateMapValue(snarkJob.prover, snarkMap)
+       },
+       map,
+     );
 };
 
 let calculateSnarkWorkCreated = blocks => {
-  Array.fold_left(
-    (map, block: Types.NewBlock.t) => {
-      Array.fold_left(
-        (map, snarkJob: Types.NewBlock.snarkJobs) => {
-          StringMap.update(
-            snarkJob.prover,
-            value =>
+  blocks |> calculateProperty(calculateSnarkWorkCount);
+};
+
+let combineMetrics = (metricsMap, metrics) => {
+  let (metricName, metricData) = metrics;
+
+  metricsMap
+  |> StringMap.fold(
+       (publicKey, metricCount, map) => {
+         map
+         |> StringMap.update(publicKey, value =>
               switch (value) {
-              | Some(snarkWork) => Some(snarkWork + 1)
-              | None => Some(1)
-              },
-            map,
-          )
-        },
-        map,
-        block.data.newBlock.snarkJobs,
-      )
-    },
-    StringMap.empty,
-    blocks,
-  );
+              | Some(currentMetrics) =>
+                Some(
+                  Array.append(
+                    [|(metricName, metricCount)|],
+                    currentMetrics,
+                  ),
+                )
+              | None => Some([|(metricName, metricCount)|])
+              }
+            )
+       },
+       metricData,
+     );
 };
 
 /*
@@ -93,58 +104,34 @@ let calculateSnarkWorkCreated = blocks => {
 
  */
 let mergeMetrics = metricsList => {
-  Array.fold_left(
-    (map, result) => {
-      let (metricName, metricData) = result;
+  metricsList
+  |> Array.fold_left(
+       (metricsMap, metrics) => {combineMetrics(metricsMap, metrics)},
+       StringMap.empty,
+     );
+};
 
-      StringMap.fold(
-        (publicKey, metricCount, map) => {
-          StringMap.update(
-            publicKey,
-            value =>
-              switch (value) {
-              | Some(currentMetrics) =>
-                Some(
-                  Array.append(
-                    [|(metricName, metricCount)|],
-                    currentMetrics,
-                  ),
-                )
-              | None => Some([|(metricName, metricCount)|])
-              },
-            map,
-          )
-        },
-        metricData,
-        map,
-      );
-    },
-    StringMap.empty,
-    metricsList,
+let delegateMetrics = (metric, blocks) => {
+  Types.Metrics.(
+    switch (metric) {
+    | BlocksCreated =>
+      blocks |> calculateBlocksCreated |> encodeMetric(Some(BlocksCreated))
+    | TransactionsSent =>
+      blocks
+      |> calculateTransactionSent
+      |> encodeMetric(Some(TransactionsSent))
+    | SnarkWorkCreated =>
+      blocks
+      |> calculateSnarkWorkCreated
+      |> encodeMetric(Some(SnarkWorkCreated))
+    }
   );
 };
 
+let processMetrics = (blocks, metrics) => {
+  metrics |> Array.map(metric => {delegateMetrics(metric, blocks)});
+};
+
 let handleMetrics = (metrics, blocks) => {
-  Types.Metrics.(
-    Array.map(
-      metric => {
-        switch (metric) {
-        | BlocksCreated =>
-          blocks
-          |> calculateBlocksCreated
-          |> encodeMetric(Some(BlocksCreated))
-        | TransactionsSent =>
-          blocks
-          |> calculateTransactionSent
-          |> encodeMetric(Some(TransactionsSent))
-        | SnarkWorkCreated =>
-          blocks
-          |> calculateSnarkWorkCreated
-          |> encodeMetric(Some(SnarkWorkCreated))
-        }
-      },
-      metrics,
-    )
-    |> mergeMetrics
-  );
+  metrics |> processMetrics(blocks) |> mergeMetrics |> printMap;
 };

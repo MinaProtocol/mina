@@ -15,7 +15,9 @@ let blocks =
   );
 
 let results =
-  Challenges.handleMetrics(
-    [|BlocksCreated, TransactionsSent, SnarkWorkCreated|],
-    blocks,
-  );
+  blocks
+  |> Challenges.handleMetrics([|
+       BlocksCreated,
+       TransactionsSent,
+       SnarkWorkCreated,
+     |]);
