@@ -10,16 +10,12 @@ let printMap = map => {
   );
 };
 
-let encodeMetric = (metricType, metric) => {
-  (Types.Metrics.stringOfMetric(metricType), metric);
-};
-
 let calculateProperty = (f, blocks) => {
   blocks
   |> Array.fold_left((map, block) => {f(map, block)}, StringMap.empty);
 };
 
-let updateMapValue = (key, map) => {
+let incrementMapValue = (key, map) => {
   map
   |> StringMap.update(key, value => {
        switch (value) {
@@ -32,18 +28,18 @@ let updateMapValue = (key, map) => {
 let getBlocksCreatedByUser = blocks => {
   blocks
   |> Array.fold_left(
-       (map, block: Types.NewBlock.t) => {
-         updateMapValue(block.data.newBlock.creatorAccount.publicKey, map)
+       (map, block: Types.NewBlock.data) => {
+         incrementMapValue(block.creatorAccount.publicKey, map)
        },
        StringMap.empty,
      );
 };
 
-let calculateTransactionSent = (map, block: Types.NewBlock.t) => {
-  block.data.newBlock.transactions.userCommands
+let calculateTransactionSent = (map, block: Types.NewBlock.data) => {
+  block.transactions.userCommands
   |> Array.fold_left(
        (transactionMap, userCommand: Types.NewBlock.userCommands) => {
-         updateMapValue(userCommand.fromAccount.publicKey, transactionMap)
+         incrementMapValue(userCommand.fromAccount.publicKey, transactionMap)
        },
        map,
      );
@@ -53,11 +49,11 @@ let getTransactionSentByUser = blocks => {
   blocks |> calculateProperty(calculateTransactionSent);
 };
 
-let calculateSnarkWorkCount = (map, block: Types.NewBlock.t) => {
-  block.data.newBlock.snarkJobs
+let calculateSnarkWorkCount = (map, block: Types.NewBlock.data) => {
+  block.snarkJobs
   |> Array.fold_left(
        (snarkMap, snarkJob: Types.NewBlock.snarkJobs) => {
-         updateMapValue(snarkJob.prover, snarkMap)
+         incrementMapValue(snarkJob.prover, snarkMap)
        },
        map,
      );
@@ -67,71 +63,27 @@ let getSnarkWorkCreatedByUser = blocks => {
   blocks |> calculateProperty(calculateSnarkWorkCount);
 };
 
-let mapMetricsToUser = (metricsMap, metrics) => {
-  let (metricName, metricData) = metrics;
-
-  metricsMap
-  |> StringMap.fold(
-       (publicKey, metricCount, map) => {
-         map
-         |> StringMap.update(publicKey, value =>
-              switch (value) {
-              | Some(currentMetrics) =>
-                Some(
-                  Array.append(
-                    [|(metricName, metricCount)|],
-                    currentMetrics,
-                  ),
-                )
-              | None => Some([|(metricName, metricCount)|])
-              }
-            )
-       },
-       metricData,
-     );
-};
-
-/*
-     Returns a map that contains a publicKey and an array of tuples representing it's data.
-     The tuple is a pair of metric name and the metric value.
-
-     The final output should be of the form:
-       [
-         publicKey1: [(blocks_created, 2), (transactions_sent, 5)]
-         publicKey2: [(blocks_created, 1))]
-         ...
-       ]
-
- */
-let mergeMetrics = metricsList => {
-  metricsList
-  |> Array.fold_left(
-       (metricsMap, metrics) => {mapMetricsToUser(metricsMap, metrics)},
-       StringMap.empty,
-     );
-};
-
-let delegateMetricsByType = (metric, blocks) => {
-  Types.Metrics.(
-    switch (metric) {
-    | BlocksCreated =>
-      blocks |> getBlocksCreatedByUser |> encodeMetric(Some(BlocksCreated))
-    | TransactionsSent =>
-      blocks
-      |> getTransactionSentByUser
-      |> encodeMetric(Some(TransactionsSent))
-    | SnarkWorkCreated =>
-      blocks
-      |> getSnarkWorkCreatedByUser
-      |> encodeMetric(Some(SnarkWorkCreated))
-    }
+let calculateAllUsers = metrics => {
+  List.fold_left(
+    StringMap.merge((_, _, _) => {Some()}),
+    StringMap.empty,
+    metrics,
   );
 };
 
-let processMetrics = (blocks, metrics) => {
-  metrics |> Array.map(metric => {delegateMetricsByType(metric, blocks)});
-};
+let calculateMetrics = blocks => {
+  let blocksCreated = blocks |> getBlocksCreatedByUser;
+  let transactionSent = blocks |> getTransactionSentByUser;
+  let snarkWorkCreated = blocks |> getSnarkWorkCreatedByUser;
+  let users = calculateAllUsers([blocksCreated, transactionSent]);
 
-let handleMetrics = (metrics, blocks) => {
-  metrics |> processMetrics(blocks) |> mergeMetrics;
+  StringMap.mapi(
+    (key, _) =>
+      {
+        Types.Metrics.blocksCreated: StringMap.find_opt(key, blocksCreated),
+        transactionSent: StringMap.find_opt(key, transactionSent),
+        snarkWorkCreated: StringMap.find_opt(key, snarkWorkCreated),
+      },
+    users,
+  );
 };

@@ -25,6 +25,12 @@ module Metrics = {
     | TransactionsSent
     | SnarkWorkCreated;
 
+  type metricRecord = {
+    blocksCreated: option(int),
+    transactionSent: option(int),
+    snarkWorkCreated: option(int),
+  };
+
   let stringOfMetric = metric => {
     switch (metric) {
     | Some(BlocksCreated) => "blocks_created"
