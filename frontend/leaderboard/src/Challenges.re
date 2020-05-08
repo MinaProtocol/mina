@@ -29,7 +29,7 @@ let updateMapValue = (key, map) => {
      });
 };
 
-let calculateBlocksCreated = blocks => {
+let getBlocksCreatedByUser = blocks => {
   blocks
   |> Array.fold_left(
        (map, block: Types.NewBlock.t) => {
@@ -39,7 +39,7 @@ let calculateBlocksCreated = blocks => {
      );
 };
 
-let calculateTransactionCount = (map, block: Types.NewBlock.t) => {
+let calculateTransactionSent = (map, block: Types.NewBlock.t) => {
   block.data.newBlock.transactions.userCommands
   |> Array.fold_left(
        (transactionMap, userCommand: Types.NewBlock.userCommands) => {
@@ -49,8 +49,8 @@ let calculateTransactionCount = (map, block: Types.NewBlock.t) => {
      );
 };
 
-let calculateTransactionSent = blocks => {
-  blocks |> calculateProperty(calculateTransactionCount);
+let getTransactionSentByUser = blocks => {
+  blocks |> calculateProperty(calculateTransactionSent);
 };
 
 let calculateSnarkWorkCount = (map, block: Types.NewBlock.t) => {
@@ -63,11 +63,11 @@ let calculateSnarkWorkCount = (map, block: Types.NewBlock.t) => {
      );
 };
 
-let calculateSnarkWorkCreated = blocks => {
+let getSnarkWorkCreatedByUser = blocks => {
   blocks |> calculateProperty(calculateSnarkWorkCount);
 };
 
-let combineMetrics = (metricsMap, metrics) => {
+let mapMetricsToUser = (metricsMap, metrics) => {
   let (metricName, metricData) = metrics;
 
   metricsMap
@@ -106,32 +106,32 @@ let combineMetrics = (metricsMap, metrics) => {
 let mergeMetrics = metricsList => {
   metricsList
   |> Array.fold_left(
-       (metricsMap, metrics) => {combineMetrics(metricsMap, metrics)},
+       (metricsMap, metrics) => {mapMetricsToUser(metricsMap, metrics)},
        StringMap.empty,
      );
 };
 
-let delegateMetrics = (metric, blocks) => {
+let delegateMetricsByType = (metric, blocks) => {
   Types.Metrics.(
     switch (metric) {
     | BlocksCreated =>
-      blocks |> calculateBlocksCreated |> encodeMetric(Some(BlocksCreated))
+      blocks |> getBlocksCreatedByUser |> encodeMetric(Some(BlocksCreated))
     | TransactionsSent =>
       blocks
-      |> calculateTransactionSent
+      |> getTransactionSentByUser
       |> encodeMetric(Some(TransactionsSent))
     | SnarkWorkCreated =>
       blocks
-      |> calculateSnarkWorkCreated
+      |> getSnarkWorkCreatedByUser
       |> encodeMetric(Some(SnarkWorkCreated))
     }
   );
 };
 
 let processMetrics = (blocks, metrics) => {
-  metrics |> Array.map(metric => {delegateMetrics(metric, blocks)});
+  metrics |> Array.map(metric => {delegateMetricsByType(metric, blocks)});
 };
 
 let handleMetrics = (metrics, blocks) => {
-  metrics |> processMetrics(blocks) |> mergeMetrics |> printMap;
+  metrics |> processMetrics(blocks) |> mergeMetrics;
 };
