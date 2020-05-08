@@ -57,8 +57,8 @@ let Result =
 in
 
 let targetToAgent = \(target : Size) ->
-  merge { Large = [ { mapKey = "size", mapValue = "large" } ],
-          Small = [ { mapKey = "size", mapValue = "small" } ]
+  merge { Large = toMap { size = "large" },
+          Small = toMap { size = "size" }
         }
         target
 
@@ -69,9 +69,7 @@ let build : Config.Type -> Result.Type = \(c : Config.Type) ->
       let agents = targetToAgent c.target in
       if Prelude.List.null (Map.Entry Text Text) agents then None (Map.Type Text Text) else Some agents,
     plugins =
-      [ { mapKey = "docker#v3.5.0"
-      , mapValue = Docker.build c.docker
-      } ]
+      toMap { `docker#v3.5.0` = Docker.build c.docker }
   }
 
 in {Config = Config, build = build} /\ Result
