@@ -1,21 +1,7 @@
-[%%import
-"/src/config.mlh"]
-
 open Core_kernel
 open Currency
 open Signature_lib
 open Coda_base
-
-[%%inject
-"ledger_depth", ledger_depth]
-
-[%%inject
-"fake_accounts_target", fake_accounts_target]
-
-let _ =
-  if Base.Int.(fake_accounts_target > pow 2 ledger_depth) then
-    failwith "Genesis_ledger: fake_accounts_target >= 2**ledger_depth"
-
 module Intf = Intf
 
 module Private_accounts (Accounts : Intf.Private_accounts.S) = struct
@@ -61,14 +47,22 @@ module Balances (Balances : Intf.Named_balances_intf) = struct
   end)
 end
 
-module Make (Accounts : Intf.Accounts_intf) : Intf.S = struct
-  include Accounts
+module Make (Inputs : Intf.Ledger_input_intf) : Intf.S = struct
+  include Inputs
 
   (* TODO: #1488 compute this at compile time instead of lazily *)
   let t =
     let open Lazy.Let_syntax in
     let%map accounts = accounts in
-    let ledger = Ledger.create_ephemeral () in
+    let ledger =
+      match directory with
+      | `Ephemeral ->
+          Ledger.create_ephemeral ~depth ()
+      | `New ->
+          Ledger.create ~depth ()
+      | `Path directory_name ->
+          Ledger.create ~directory_name ~depth ()
+    in
     List.iter accounts ~f:(fun (_, account) ->
         Ledger.create_new_account_exn ledger
           (Account.identifier account)
@@ -120,6 +114,8 @@ module Packed = struct
 
   let t ((module L) : t) = L.t
 
+  let depth ((module L) : t) = L.depth
+
   let accounts ((module L) : t) = L.accounts
 
   let find_account_record_exn ((module L) : t) = L.find_account_record_exn
@@ -138,6 +134,8 @@ end
 
 module Of_ledger (T : sig
   val t : Ledger.t Lazy.t
+
+  val depth : int
 end) : Intf.S = struct
   include T
 
@@ -203,7 +201,14 @@ end))
 module Test = Register (Balances (Test_ledger))
 module Fuzz = Register (Balances (Fuzz_ledger))
 module Release = Register (Balances (Release_ledger))
-module Unit_test_ledger = Make (Test)
+
+module Unit_test_ledger = Make (struct
+  include Test
+
+  let directory = `Ephemeral
+
+  let depth = Genesis_constants.ledger_depth_for_unit_tests
+end)
 
 let for_unit_tests : Packed.t = (module Unit_test_ledger)
 
