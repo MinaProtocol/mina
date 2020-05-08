@@ -34,7 +34,7 @@ in Pipeline.build Pipeline.Config::{
       label = "Monorepo triage",
       key = "cmds",
       target = Size.Small,
-      docker = Docker.Config::{ image = "codaprotocol/ci-toolchain-base" }
+      docker = Docker.Config::{ image = (./Constants/ContainerImages.dhall).toolchainBase }
     }
   ]
 }

@@ -13,7 +13,7 @@ Pipeline.build
         command = [ "echo \"hello\"" ],
         label = "Test Echo", key = "hello",
         target = Size.Small,
-        docker = Docker.Config::{ image = "codaprotocol/ci-toolchain-base" }
+        docker = Docker.Config::{ image = (../../Constants/ContainerImages.dhall).toolchainBase }
       }
     ]
   }
