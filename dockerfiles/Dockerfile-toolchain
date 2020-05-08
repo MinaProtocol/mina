@@ -14,6 +14,10 @@ ARG EXTERNAL_PKG_DIR=$CODA_DIR/src/external
 ARG OPAMKEEPBUILDDIR=false
 ARG OPAMREUSEBUILDDIR=false
 
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+RUN export PATH="$PATH:$HOME/.cargo/bin"
+RUN echo 'export PATH="$PATH:$HOME/.cargo/bin"' >> /home/opam/.bashrc
+
 # OS package dependencies
 RUN sudo apt-get update && sudo apt-get install --yes \
     cmake \
