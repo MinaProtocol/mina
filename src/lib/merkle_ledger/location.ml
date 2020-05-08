@@ -27,25 +27,6 @@ module Bigstring = struct
   include Hashable.Make (Stable.Latest)
 end
 
-module T = struct
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type ('bigstring, 'addr) t =
-        | Generic of 'bigstring
-        | Account of 'addr
-        | Hash of 'addr
-      [@@deriving hash, sexp, compare, eq]
-    end
-  end]
-
-  type ('bigstring, 'addr) t = ('bigstring, 'addr) Stable.Latest.t =
-    | Generic of 'bigstring
-    | Account of 'addr
-    | Hash of 'addr
-  [@@deriving hash, sexp, compare, eq]
-end
-
 module Make (Depth : Intf.Depth) = struct
   (* Locations are a bitstring prefixed by a byte. In the case of accounts, the prefix
    * byte is 0xfe. In the case of a hash node in the merkle tree, the prefix is between

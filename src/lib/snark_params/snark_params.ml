@@ -54,8 +54,7 @@ let%test_unit "group-map test" =
   let params =
     Group_map.Params.create
       (module Tick0.Field)
-      ~a:Tick_backend.Inner_curve.Coefficients.a
-      ~b:Tick_backend.Inner_curve.Coefficients.b
+      Tick_backend.Inner_curve.Coefficients.{a; b}
   in
   let module M = Snarky.Snark.Run.Make (Tick_backend) (Unit) in
   Quickcheck.test ~trials:3 Tick0.Field.gen ~f:(fun t ->

@@ -8,24 +8,22 @@ module Ledger_inner = struct
     let depth = Coda_compile_config.ledger_depth
   end
 
-  module Location0 : Merkle_ledger.Location_intf.S =
+  module Location_at_depth : Merkle_ledger.Location_intf.S =
     Merkle_ledger.Location.Make (Depth)
-
-  module Location_at_depth = Location0
 
   module Location_binable = struct
     module Arg = struct
       type t = Location_at_depth.t =
         | Generic of Location.Bigstring.Stable.Latest.t
-        | Account of Location0.Addr.Stable.Latest.t
-        | Hash of Location0.Addr.Stable.Latest.t
+        | Account of Location_at_depth.Addr.Stable.Latest.t
+        | Hash of Location_at_depth.Addr.Stable.Latest.t
       [@@deriving bin_io_unversioned, hash, sexp, compare]
     end
 
     type t = Arg.t =
       | Generic of Location.Bigstring.t
-      | Account of Location0.Addr.t
-      | Hash of Location0.Addr.t
+      | Account of Location_at_depth.Addr.t
+      | Hash of Location_at_depth.Addr.t
     [@@deriving hash, sexp, compare]
 
     include Hashable.Make_binable (Arg) [@@deriving
