@@ -582,9 +582,6 @@ jobs:
             - run:
                   name: Running test -- test_postake_bootstrap:coda-bootstrap-test
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_bootstrap:coda-bootstrap-test"'
-            - run:
-                  name: Running test -- test_postake_bootstrap:coda-long-fork -num-block-producers 2
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_bootstrap:coda-long-fork -num-block-producers 2"'
             - store_artifacts:
                   path: test_output/artifacts
     test--test_postake_catchup:

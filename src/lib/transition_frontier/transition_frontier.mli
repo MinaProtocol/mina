@@ -75,6 +75,7 @@ module For_tests : sig
 
   val gen_genesis_breadcrumb :
        ?logger:Logger.t
+    -> proof_level:Genesis_constants.Proof_level.t
     -> ?verifier:Verifier.t
     -> precomputed_values:Precomputed_values.t
     -> unit
@@ -82,19 +83,26 @@ module For_tests : sig
 
   val gen_persistence :
        ?logger:Logger.t
+    -> proof_level:Genesis_constants.Proof_level.t
+    -> ledger_depth:int
     -> ?verifier:Verifier.t
     -> unit
     -> (Persistent_root.t * Persistent_frontier.t) Quickcheck.Generator.t
 
   val gen :
        ?logger:Logger.t
+    -> proof_level:Genesis_constants.Proof_level.t
     -> ?verifier:Verifier.t
     -> ?trust_system:Trust_system.t
     -> ?consensus_local_state:Consensus.Data.Local_state.t
     -> precomputed_values:Precomputed_values.t
     -> ?root_ledger_and_accounts:Ledger.t
                                  * (Private_key.t option * Account.t) list
-    -> ?gen_root_breadcrumb:Breadcrumb.t Quickcheck.Generator.t
+    -> ?gen_root_breadcrumb:( Breadcrumb.t
+                            * ( Coda_base.State_hash.t
+                              * Coda_state.Protocol_state.value )
+                              list )
+                            Quickcheck.Generator.t
     -> max_length:int
     -> size:int
     -> unit
@@ -102,13 +110,18 @@ module For_tests : sig
 
   val gen_with_branch :
        ?logger:Logger.t
+    -> proof_level:Genesis_constants.Proof_level.t
     -> ?verifier:Verifier.t
     -> ?trust_system:Trust_system.t
     -> ?consensus_local_state:Consensus.Data.Local_state.t
     -> precomputed_values:Precomputed_values.t
     -> ?root_ledger_and_accounts:Ledger.t
                                  * (Private_key.t option * Account.t) list
-    -> ?gen_root_breadcrumb:Breadcrumb.t Quickcheck.Generator.t
+    -> ?gen_root_breadcrumb:( Breadcrumb.t
+                            * ( Coda_base.State_hash.t
+                              * Coda_state.Protocol_state.value )
+                              list )
+                            Quickcheck.Generator.t
     -> ?get_branch_root:(t -> Breadcrumb.t)
     -> max_length:int
     -> frontier_size:int
