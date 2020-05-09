@@ -166,6 +166,7 @@ let make = (~currentSlug) => {
           <Page title="Repository Structure" slug="directory-structure" />
           <Page title="Code Reviews" slug="code-reviews" />
           <Page title="Style Guide" slug="style-guide" />
+          <Page title="Sandbox Node" slug="sandbox-node" />
           <Page title="GraphQL API" slug="graphql-api" />
         </Folder>
         <Folder title="Coda Protocol Architecture" slug="architecture">
@@ -173,6 +174,7 @@ let make = (~currentSlug) => {
           <Page title="Lifecycle of a Payment" slug="lifecycle-payment" />
           <Page title="Consensus" slug="consensus" />
           <Page title="Proof of Stake" slug="proof-of-stake" />
+          <Page title="Snark Workers" slug="snark-workers" />
         </Folder>
         <Folder title="SNARKs" slug="snarks">
           <Page title="SNARKs Overview" slug="" />

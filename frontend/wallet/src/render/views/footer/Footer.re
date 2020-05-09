@@ -11,7 +11,7 @@ module Styles = {
       right(`zero),
       display(`flex),
       height(Theme.Spacing.footerHeight),
-      justifyContent(`spaceBetween),
+      justifyContent(`flexEnd),
       alignItems(`center),
       padding2(~v=`zero, ~h=`rem(1.25)),
       borderTop(`px(1), `solid, Theme.Colors.borderColor),
@@ -89,7 +89,6 @@ module AccountQuery = ReasonApollo.CreateQuery(Accounts);
 let make = () => {
   let (modalState, setModalState) = React.useState(() => false);
   <div className=Styles.footer>
-    <StakingSwitch />
     <div className=Styles.footerButtons>
       <AccountQuery partialRefetch=true>
         {response =>
@@ -99,7 +98,7 @@ let make = () => {
            | Data(data) =>
              <>
                <Button
-                 label="request"
+                 label="Request"
                  style=Button.Gray
                  onClick={_ => setModalState(_ => true)}
                />

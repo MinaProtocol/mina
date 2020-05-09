@@ -28,6 +28,7 @@ module Config = struct
     ; logger: Logger.t
     ; unsafe_no_trust_ip: bool
     ; trust_system: Trust_system.t
+    ; flood: bool
     ; keypair: Coda_net2.Keypair.t option }
   [@@deriving make]
 end
@@ -92,7 +93,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
       let conf_dir = config.conf_dir ^/ "coda_net2" in
       let%bind () = Unix.mkdir ~p:() conf_dir in
       match%bind
-        Monitor.try_with (fun () ->
+        Monitor.try_with ~rest:`Raise (fun () ->
             trace "coda_net2" (fun () ->
                 Coda_net2.create ~logger:config.logger ~conf_dir ) )
       with
@@ -120,10 +121,13 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
             ~location:__LOC__ ~module_:__MODULE__
             ~metadata:[("peer_id", `String my_peer_id)] ;
           let ctr = ref 0 in
+          let throttle =
+            Throttle.create ~max_concurrent_jobs:1 ~continue_on_error:true
+          in
           let initializing_libp2p_result : _ Deferred.Or_error.t =
             let open Deferred.Or_error.Let_syntax in
             let%bind () =
-              configure net2 ~me ~maddrs:[]
+              configure net2 ~me ~maddrs:[] ~flood:config.flood
                 ~external_maddr:
                   (Multiaddr.of_string
                      (sprintf "/ip4/%s/tcp/%d"
@@ -137,12 +141,17 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                   Ivar.fill_if_empty first_peer_ivar () ;
                   if !ctr < 4 then incr ctr
                   else Ivar.fill_if_empty high_connectivity_ivar () ;
-                  don't_wait_for
-                    (let open Deferred.Let_syntax in
-                    let%map peers = peers net2 in
-                    Coda_metrics.(
-                      Gauge.set Network.peers
-                        (List.length peers |> Int.to_float))) )
+                  if Throttle.num_jobs_waiting_to_start throttle = 0 then
+                    don't_wait_for
+                      (Throttle.enqueue throttle (fun () ->
+                           let open Deferred.Let_syntax in
+                           let%bind peers = peers net2 in
+                           Coda_metrics.(
+                             Gauge.set Network.peers
+                               (List.length peers |> Int.to_float)) ;
+                           after (Time.Span.of_sec 2.)
+                           (* don't spam the helper with peer fetches, only try update it every 2 seconds *)
+                       )) )
             in
             let implementation_list =
               List.bind rpc_handlers ~f:create_rpc_implementations
@@ -242,7 +251,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                              (envelope, Ivar.fill valid_ivar))
                           ~f:(fun () -> Ivar.read valid_ivar)
                       else Deferred.return true )
-                ~bin_prot:Message.V1.T.bin_msg
+                ~bin_prot:Message.Latest.T.bin_msg
                 ~on_decode_failure:
                   (`Call
                     (fun envelope (err : Error.t) ->
@@ -267,7 +276,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
             don't_wait_for
               (Strict_pipe.Reader.iter
                  (Coda_net2.Pubsub.Subscription.message_pipe subscription)
-                 ~f:(Fn.const Deferred.unit)) ;
+                 ~f:(fun _envelope -> Deferred.unit)) ;
             let%map _ =
               (* XXX: this ALWAYS needs to be AFTER handle_protocol/subscribe
                 or it is possible to miss connections! *)

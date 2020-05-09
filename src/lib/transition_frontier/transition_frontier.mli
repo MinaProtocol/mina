@@ -21,7 +21,7 @@ include Frontier_intf.S
 (* This is the max length which is used when the transition frontier is initialized
  * via `load`. In other words, this will always be the max length of the transition
  * frontier as long as the `For_tests.load_with_max_length` is not used *)
-val global_max_length : int
+val global_max_length : Genesis_constants.t -> int
 
 val load :
      ?retry_with_fresh_db:bool
@@ -30,9 +30,7 @@ val load :
   -> consensus_local_state:Consensus.Data.Local_state.t
   -> persistent_root:Persistent_root.t
   -> persistent_frontier:Persistent_frontier.t
-  -> genesis_state_hash:State_hash.t
-  -> genesis_ledger:Ledger.t Lazy.t
-  -> ?base_proof:Coda_base.Proof.t
+  -> precomputed_values:Precomputed_values.t
   -> unit
   -> ( t
      , [> `Failure of string
@@ -67,15 +65,20 @@ module For_tests : sig
     -> consensus_local_state:Consensus.Data.Local_state.t
     -> persistent_root:Persistent_root.t
     -> persistent_frontier:Persistent_frontier.t
-    -> genesis_state_hash:State_hash.t
-    -> genesis_ledger:Ledger.t Lazy.t
-    -> ?base_proof:Coda_base.Proof.t
+    -> precomputed_values:Precomputed_values.t
     -> unit
     -> ( t
        , [> `Failure of string
          | `Bootstrap_required
          | `Persistent_frontier_malformed ] )
        Deferred.Result.t
+
+  val gen_genesis_breadcrumb :
+       ?logger:Logger.t
+    -> ?verifier:Verifier.t
+    -> precomputed_values:Precomputed_values.t
+    -> unit
+    -> Breadcrumb.t Quickcheck.Generator.t
 
   val gen_persistence :
        ?logger:Logger.t
@@ -88,6 +91,7 @@ module For_tests : sig
     -> ?verifier:Verifier.t
     -> ?trust_system:Trust_system.t
     -> ?consensus_local_state:Consensus.Data.Local_state.t
+    -> precomputed_values:Precomputed_values.t
     -> ?root_ledger_and_accounts:Ledger.t
                                  * (Private_key.t option * Account.t) list
     -> ?gen_root_breadcrumb:Breadcrumb.t Quickcheck.Generator.t
@@ -101,6 +105,7 @@ module For_tests : sig
     -> ?verifier:Verifier.t
     -> ?trust_system:Trust_system.t
     -> ?consensus_local_state:Consensus.Data.Local_state.t
+    -> precomputed_values:Precomputed_values.t
     -> ?root_ledger_and_accounts:Ledger.t
                                  * (Private_key.t option * Account.t) list
     -> ?gen_root_breadcrumb:Breadcrumb.t Quickcheck.Generator.t

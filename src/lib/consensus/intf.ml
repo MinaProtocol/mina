@@ -5,44 +5,25 @@ open Currency
 open Signature_lib
 open Coda_base
 
-(** Constants are defined with a single letter (latin or greek) based on
- * their usage in the Ouroboros suite of papers *)
 module type Constants = sig
-  (** The timestamp for the genesis block *)
-  val genesis_state_timestamp : Block_time.t
+  [%%versioned:
+  module Stable : sig
+    module V1 : sig
+      type t
+    end
+  end]
 
-  (** [k] is the number of blocks required to reach finality *)
-  val k : int
+  type t = Stable.Latest.t
 
-  (** The amount of money minted and given to the block producer whenever a
-      block is created *)
-  val coinbase : Currency.Amount.t
+  val create : protocol_constants:Genesis_constants.Protocol.t -> t
 
-  val block_window_duration_ms : int
-
-  (** The window duration in which blocks are created *)
-  val block_window_duration : Block_time.Span.t
-
-  (** [delta] is the number of slots in the valid window for receiving blocks over the network *)
-  val delta : int
-
-  (** [c] is the number of slots in which we can probalistically expect at least 1
-   * block. In sig, it's exactly 1 as blocks should be produced every slot. *)
-  val c : int
-
-  val inactivity_ms : int
-
-  val sub_windows_per_window : Unsigned.UInt32.t
-
-  val slots_per_sub_window : Unsigned.UInt32.t
-
-  val slots_per_window : Unsigned.UInt32.t
-
-  (** Number of slots in one epoch *)
-  val slots_per_epoch : Unsigned.UInt32.t
-
-  (** The names and values of all constants. *)
-  val all_constants : Yojson.Safe.json
+  val gc_parameters :
+       t
+    -> [`Acceptable_network_delay of Length.t]
+       * [`Gc_width of Length.t]
+       * [`Gc_width_epoch of Length.t]
+       * [`Gc_width_slot of Length.t]
+       * [`Gc_interval of Length.t]
 end
 
 module type Blockchain_state = sig
@@ -120,13 +101,17 @@ module type Protocol_state = sig
       [%%versioned:
       module Stable : sig
         module V1 : sig
-          type ('state_hash, 'blockchain_state, 'consensus_state) t
+          type ('state_hash, 'blockchain_state, 'consensus_state, 'constants) t
           [@@deriving sexp]
         end
       end]
 
-      type ('state_hash, 'blockchain_state, 'consensus_state) t =
-        ('state_hash, 'blockchain_state, 'consensus_state) Stable.Latest.t
+      type ('state_hash, 'blockchain_state, 'consensus_state, 'constants) t =
+        ( 'state_hash
+        , 'blockchain_state
+        , 'consensus_state
+        , 'constants )
+        Stable.Latest.t
       [@@deriving sexp]
     end
 
@@ -135,7 +120,11 @@ module type Protocol_state = sig
       module Stable : sig
         module V1 : sig
           type t =
-            (State_hash.t, blockchain_state, consensus_state) Poly.Stable.V1.t
+            ( State_hash.t
+            , blockchain_state
+            , consensus_state
+            , Protocol_constants_checked.Value.Stable.V1.t )
+            Poly.Stable.V1.t
           [@@deriving sexp, to_yojson]
         end
       end]
@@ -144,7 +133,8 @@ module type Protocol_state = sig
     type var =
       ( State_hash.var
       , blockchain_state_var
-      , consensus_state_var )
+      , consensus_state_var
+      , Protocol_constants_checked.var )
       Poly.Stable.Latest.t
   end
 
@@ -167,6 +157,7 @@ module type Protocol_state = sig
     -> genesis_state_hash:State_hash.t
     -> blockchain_state:blockchain_state
     -> consensus_state:consensus_state
+    -> constants:Protocol_constants_checked.Value.t
     -> Value.t
 
   val previous_state_hash : ('state_hash, _) Poly.t -> 'state_hash
@@ -174,13 +165,15 @@ module type Protocol_state = sig
   val body : (_, 'body) Poly.t -> 'body
 
   val blockchain_state :
-    (_, (_, 'blockchain_state, _) Body.Poly.t) Poly.t -> 'blockchain_state
+    (_, (_, 'blockchain_state, _, _) Body.Poly.t) Poly.t -> 'blockchain_state
 
   val genesis_state_hash :
     ?state_hash:State_hash.t option -> Value.t -> State_hash.t
 
   val consensus_state :
-    (_, (_, _, 'consensus_state) Body.Poly.t) Poly.t -> 'consensus_state
+    (_, (_, _, 'consensus_state, _) Body.Poly.t) Poly.t -> 'consensus_state
+
+  val constants : (_, (_, _, _, 'constants) Body.Poly.t) Poly.t -> 'constants
 
   val hash : Value.t -> State_hash.t
 end
@@ -287,15 +280,29 @@ module type S = sig
     * This is mostly useful for PoStake and other consensus mechanisms that have their own
     * notions of time.
   *)
-  val time_hum : Coda_base.Block_time.t -> string
+  val time_hum : constants:Constants.t -> Block_time.t -> string
 
-  module Constants : Constants
-
-  (** from postake *)
-  val epoch_size : int
+  module Constants = Constants
 
   module Configuration : sig
-    type t =
+    [%%versioned:
+    module Stable : sig
+      module V1 : sig
+        type t =
+          { delta: int
+          ; k: int
+          ; c: int
+          ; c_times_k: int
+          ; slots_per_epoch: int
+          ; slot_duration: int
+          ; epoch_duration: int
+          ; genesis_state_timestamp: Block_time.Stable.V1.t
+          ; acceptable_network_delay: int }
+        [@@deriving yojson, fields]
+      end
+    end]
+
+    type t = Stable.Latest.t =
       { delta: int
       ; k: int
       ; c: int
@@ -303,10 +310,11 @@ module type S = sig
       ; slots_per_epoch: int
       ; slot_duration: int
       ; epoch_duration: int
+      ; genesis_state_timestamp: Block_time.t
       ; acceptable_network_delay: int }
-    [@@deriving yojson, bin_io, fields]
+    [@@deriving yojson, fields]
 
-    val t : t
+    val t : protocol_constants:Genesis_constants.Protocol.t -> t
   end
 
   module Data : sig
@@ -335,9 +343,10 @@ module type S = sig
       (** Swap in a new set of block production keys and invalidate and/or
           recompute cached data *)
       val block_production_keys_swap :
-           t
+           constants:Constants.t
+        -> t
         -> Signature_lib.Public_key.Compressed.Set.t
-        -> Coda_base.Block_time.t
+        -> Block_time.t
         -> unit
     end
 
@@ -387,18 +396,24 @@ module type S = sig
 
       type t = Stable.Latest.t [@@deriving compare, sexp, yojson]
 
-      val graphql_type : unit -> ('ctx, t option) Graphql_async.Schema.typ
-
       val to_string_hum : t -> string
 
-      val to_time : t -> Block_time.t
+      val to_time : constants:Constants.t -> t -> Block_time.t
 
-      val of_time_exn : Block_time.t -> t
+      val of_time_exn : constants:Constants.t -> Block_time.t -> t
 
       (** Gets the corresponding a reasonable consensus time that is considered to be "old" and not accepted by other peers by the consensus mechanism *)
-      val get_old : t -> t
+      val get_old : constants:Constants.t -> t -> t
 
       val to_uint32 : t -> Unsigned.UInt32.t
+
+      val epoch : t -> Unsigned.UInt32.t
+
+      val slot : t -> Unsigned.UInt32.t
+
+      val start_time : constants:Constants.t -> t -> Block_time.t
+
+      val end_time : constants:Constants.t -> t -> Block_time.t
     end
 
     module Consensus_state : sig
@@ -422,17 +437,22 @@ module type S = sig
 
       include Snark_params.Tick.Snarkable.S with type value := Value.t
 
-      val negative_one : genesis_ledger:Ledger.t Lazy.t -> Value.t
+      val negative_one :
+           genesis_ledger:Ledger.t Lazy.t
+        -> protocol_constants:Genesis_constants.Protocol.t
+        -> Value.t
 
       val create_genesis_from_transition :
            negative_one_protocol_state_hash:Coda_base.State_hash.t
         -> consensus_transition:Consensus_transition.Value.t
         -> genesis_ledger:Ledger.t Lazy.t
+        -> protocol_constants:Genesis_constants.Protocol.t
         -> Value.t
 
       val create_genesis :
            negative_one_protocol_state_hash:Coda_base.State_hash.t
         -> genesis_ledger:Ledger.t Lazy.t
+        -> protocol_constants:Genesis_constants.Protocol.t
         -> Value.t
 
       open Snark_params.Tick
@@ -445,8 +465,6 @@ module type S = sig
       val to_lite : (Value.t -> Lite_base.Consensus_state.t) option
 
       val display : Value.t -> display
-
-      val network_delay : Configuration.t -> int
 
       val consensus_time : Value.t -> Consensus_time.t
 
@@ -490,13 +508,14 @@ module type S = sig
     end
 
     (* Check whether we are in the genesis epoch *)
-    val is_genesis : Coda_base.Block_time.t -> bool
+    val is_genesis_epoch : constants:Constants.t -> Block_time.t -> bool
 
     (**
      * Check that a consensus state was received at a valid time.
     *)
     val received_at_valid_time :
-         Consensus_state.Value.t
+         constants:Constants.t
+      -> Consensus_state.Value.t
       -> time_received:Unix_timestamp.t
       -> (unit, [`Too_early | `Too_late of int64]) result
 
@@ -525,7 +544,8 @@ module type S = sig
      * future.
      *)
     val next_producer_timing :
-         Unix_timestamp.t
+         constants:Constants.t
+      -> Unix_timestamp.t
       -> Consensus_state.Value.t
       -> local_state:Local_state.t
       -> keypairs:Signature_lib.Keypair.And_compressed_pk.Set.t
@@ -546,13 +566,15 @@ module type S = sig
      * Indicator of when we should bootstrap
      *)
     val should_bootstrap :
-         existing:Consensus_state.Value.t
+         constants:Constants.t
+      -> existing:Consensus_state.Value.t
       -> candidate:Consensus_state.Value.t
       -> logger:Logger.t
       -> bool
 
     val get_epoch_ledger :
-         consensus_state:Consensus_state.Value.t
+         constants:Constants.t
+      -> consensus_state:Consensus_state.Value.t
       -> local_state:Local_state.t
       -> Coda_base.Sparse_ledger.t
 
@@ -563,7 +585,8 @@ module type S = sig
      * Predicate indicating whether or not the local state requires synchronization.
      *)
     val required_local_state_sync :
-         consensus_state:Consensus_state.Value.t
+         constants:Constants.t
+      -> consensus_state:Consensus_state.Value.t
       -> local_state:Local_state.t
       -> local_state_sync Non_empty_list.t option
 

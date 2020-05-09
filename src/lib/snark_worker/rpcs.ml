@@ -111,7 +111,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
 
         type response = unit [@@deriving bin_io, version {rpc}]
 
-        let query_of_caller_model = Fn.id
+        let query_of_caller_model : Master.Caller.query -> query = Fn.id
 
         let callee_model_of_query = Fn.id
 

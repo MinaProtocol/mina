@@ -11,7 +11,7 @@ open Signature_lib
    of currency, but a made up number will do for the testnets at least. See
    issue #2385.
 *)
-let replace_fee : Currency.Fee.t = Currency.Fee.of_int 5
+let replace_fee : Currency.Fee.t = Currency.Fee.of_int 5_000_000_000
 
 (* Invariants, maintained whenever a t is exposed from this module:
    * Iff a command is in all_by_fee it is also in all_by_sender.
@@ -30,10 +30,11 @@ type t =
         (** Transactions valid against the current ledger, indexed by fee. *)
   ; all_by_sender:
       (User_command.With_valid_signature.t F_sequence.t * Currency.Amount.t)
-      Public_key.Compressed.Map.t
+      Account_id.Map.t
         (** All pending transactions along with the total currency required to
-      execute them, indexed by sender account. Ordered by nonce inside the
-      accounts. *)
+            execute them -- plus any currency spent from this account by
+            transactions from other accounts -- indexed by sender account.
+            Ordered by nonce inside the accounts. *)
   ; all_by_fee: User_command.With_valid_signature.Set.t Currency.Fee.Map.t
         (** All transactions in the pool indexed by fee. *)
   ; size: int }
@@ -51,8 +52,15 @@ let currency_consumed :
     fee_amt
     +
     match cmd'.payload.body with
-    | Payment {amount; _} ->
-        amount
+    | Payment ({amount; _} as payload) ->
+        if
+          Token_id.equal cmd'.payload.common.fee_token
+            (Payment_payload.token payload)
+        then
+          (* The fee-payer is also the sender account, include the amount. *)
+          amount
+        else (* The payment won't affect the balance of this account. *)
+          zero
     | Stake_delegation _ ->
         zero)
 
@@ -85,18 +93,18 @@ module For_tests = struct
             let unchecked = User_command.forget_check tx in
             [%test_eq: Currency.Fee.t] key (User_command.fee unchecked) ;
             let tx' =
-              Map.find_exn all_by_sender (User_command.sender unchecked)
+              Map.find_exn all_by_sender (User_command.fee_payer unchecked)
               |> Tuple2.get1 |> F_sequence.head_exn
             in
             [%test_eq: User_command.With_valid_signature.t] tx tx' ;
             assert_all_by_fee tx ) ) ;
     Map.iteri all_by_sender
-      ~f:(fun ~key:sender ~data:(tx_seq, currency_reserved) ->
+      ~f:(fun ~key:fee_payer ~data:(tx_seq, currency_reserved) ->
         assert (F_sequence.length tx_seq > 0) ;
         let check_consistent tx =
-          [%test_eq: Public_key.Compressed.t]
-            (User_command.forget_check tx |> User_command.sender)
-            sender ;
+          [%test_eq: Account_id.t]
+            (User_command.forget_check tx |> User_command.fee_payer)
+            fee_payer ;
           assert_all_by_fee tx
         in
         let applicable, inapplicables =
@@ -132,7 +140,7 @@ module For_tests = struct
             let unchecked = User_command.forget_check tx in
             [%test_eq: Currency.Fee.t] fee (User_command.fee unchecked) ;
             let sender_txs, _currency_reserved =
-              Map.find_exn all_by_sender (User_command.sender unchecked)
+              Map.find_exn all_by_sender (User_command.fee_payer unchecked)
             in
             let applicable, _inapplicables =
               Option.value_exn (F_sequence.uncons sender_txs)
@@ -161,7 +169,7 @@ end
 
 let empty : t =
   { applicable_by_fee= Currency.Fee.Map.empty
-  ; all_by_sender= Public_key.Compressed.Map.empty
+  ; all_by_sender= Account_id.Map.empty
   ; all_by_fee= Currency.Fee.Map.empty
   ; size= 0 }
 
@@ -180,10 +188,10 @@ let member : t -> User_command.With_valid_signature.t -> bool =
   | Some cmds_at_fee ->
       Set.mem cmds_at_fee cmd
 
-let all_from_user :
-    t -> Public_key.Compressed.t -> User_command.With_valid_signature.t list =
- fun {all_by_sender; _} public_key ->
-  Option.value_map ~default:[] (Map.find all_by_sender public_key)
+let all_from_account :
+    t -> Account_id.t -> User_command.With_valid_signature.t list =
+ fun {all_by_sender; _} account_id ->
+  Option.value_map ~default:[] (Map.find all_by_sender account_id)
     ~f:(fun (user_commands, _) ->
       Sequence.to_list @@ F_sequence.to_seq user_commands )
 
@@ -210,7 +218,7 @@ let remove_with_dependents_exn :
     -> User_command.With_valid_signature.t Sequence.t * t =
  fun t cmd ->
   let unchecked = User_command.forget_check cmd in
-  let sender = User_command.sender unchecked in
+  let sender = User_command.fee_payer unchecked in
   let sender_queue, reserved_currency = Map.find_exn t.all_by_sender sender in
   assert (not @@ F_sequence.is_empty sender_queue) ;
   let first_cmd = F_sequence.head_exn sender_queue in
@@ -291,7 +299,7 @@ let drop_until_sufficient_balance :
 *)
 let revalidate :
        t
-    -> (Public_key.Compressed.t -> Account_nonce.t * Currency.Amount.t)
+    -> (Account_id.t -> Account_nonce.t * Currency.Amount.t)
     -> t * User_command.With_valid_signature.t Sequence.t =
  fun t f ->
   Map.fold t.all_by_sender ~init:(t, Sequence.empty)
@@ -344,16 +352,18 @@ let revalidate :
 let handle_committed_txn :
        t
     -> User_command.With_valid_signature.t
-    -> Currency.Amount.t
+    -> fee_payer_balance:Currency.Amount.t
+    -> source_balance:Currency.Amount.t
     -> ( t * User_command.With_valid_signature.t Sequence.t
        , [ `Queued_txns_by_sender of
            string * User_command.With_valid_signature.t Sequence.t ] )
        Result.t =
- fun t committed current_balance ->
-  let committed' = (committed :> User_command.t) in
-  let sender = User_command.sender committed' in
+ fun t committed ~fee_payer_balance ~source_balance ->
+  let committed' = User_command.forget_check committed in
+  let fee_payer = User_command.fee_payer committed' in
+  let source = User_command.source committed' in
   let nonce_to_remove = User_command.nonce committed' in
-  match Map.find t.all_by_sender sender with
+  match Map.find t.all_by_sender fee_payer with
   | None ->
       Ok (t, Sequence.empty)
   | Some (cmds, currency_reserved) ->
@@ -378,7 +388,7 @@ let handle_committed_txn :
           Option.value_exn
             Currency.Amount.(currency_reserved - first_cmd_consumed)
         in
-        let t' =
+        let t1 =
           t
           |> Fn.flip remove_applicable_exn first_cmd
           |> Fn.flip remove_all_by_fee_exn first_cmd
@@ -386,35 +396,71 @@ let handle_committed_txn :
         let new_queued_cmds, currency_reserved'', dropped_cmds =
           drop_until_sufficient_balance
             (rest_cmds, currency_reserved')
-            current_balance
+            fee_payer_balance
         in
-        let t'' =
-          Sequence.fold dropped_cmds ~init:t' ~f:remove_all_by_fee_exn
+        let t2 =
+          Sequence.fold dropped_cmds ~init:t1 ~f:remove_all_by_fee_exn
+        in
+        let set_all_by_sender account_id commands currency_reserved t =
+          match F_sequence.uncons commands with
+          | None ->
+              {t with all_by_sender= Map.remove t.all_by_sender account_id}
+          | Some (head_cmd, _) ->
+              { t with
+                all_by_sender=
+                  Map.set t.all_by_sender ~key:account_id
+                    ~data:(commands, currency_reserved)
+              ; applicable_by_fee=
+                  Map_set.insert
+                    (module User_command.With_valid_signature)
+                    t.applicable_by_fee
+                    (head_cmd |> User_command.forget_check |> User_command.fee)
+                    head_cmd }
+        in
+        let t3 =
+          set_all_by_sender fee_payer new_queued_cmds currency_reserved'' t2
+        in
+        let t4, source_dropped_cmds =
+          if Account_id.equal source fee_payer then (t3, Sequence.empty)
+          else
+            match Map.find t.all_by_sender source with
+            | None ->
+                (t3, Sequence.empty)
+            | Some (source_cmds, currency_reserved) ->
+                (* The command may have decreased the balance of the source
+                   account, drop any commands that no longer have sufficient
+                   balance to execute.
+                *)
+                let new_queued_cmds, currency_reserved, dropped_cmds =
+                  drop_until_sufficient_balance
+                    (source_cmds, currency_reserved)
+                    source_balance
+                in
+                let t3' =
+                  if F_sequence.is_empty new_queued_cmds then t3
+                  else
+                    let first_cmd = F_sequence.head_exn source_cmds in
+                    t3
+                    |> Fn.flip remove_applicable_exn first_cmd
+                    |> Fn.flip remove_all_by_fee_exn first_cmd
+                in
+                let t3'' =
+                  Sequence.fold dropped_cmds ~init:t3' ~f:remove_all_by_fee_exn
+                in
+                ( set_all_by_sender source new_queued_cmds currency_reserved
+                    t3''
+                , dropped_cmds )
         in
         Ok
-          ( { t'' with
-              all_by_sender=
-                ( if F_sequence.is_empty new_queued_cmds then
-                  Map.remove t.all_by_sender sender
-                else
-                  Map.set t.all_by_sender ~key:sender
-                    ~data:(new_queued_cmds, currency_reserved'') )
-            ; applicable_by_fee=
-                ( match F_sequence.uncons new_queued_cmds with
-                | None ->
-                    t''.applicable_by_fee
-                | Some (head_cmd, _) ->
-                    Map_set.insert
-                      (module User_command.With_valid_signature)
-                      t''.applicable_by_fee
-                      ( head_cmd |> User_command.forget_check
-                      |> User_command.fee )
-                      head_cmd ) }
+          ( t4
           , Sequence.append
-              ( if User_command.With_valid_signature.equal committed first_cmd
-              then Sequence.empty
-              else Sequence.singleton first_cmd )
-              dropped_cmds )
+              (Sequence.append
+                 ( if
+                   User_command.With_valid_signature.equal committed first_cmd
+                 then Sequence.empty
+                 else Sequence.singleton first_cmd )
+                 dropped_cmds)
+              source_dropped_cmds )
 
 let remove_lowest_fee : t -> User_command.With_valid_signature.t Sequence.t * t
     =
@@ -460,14 +506,14 @@ let rec add_from_gossip_exn :
  fun t cmd current_nonce balance ->
   let unchecked = User_command.forget_check cmd in
   let fee = User_command.fee unchecked in
-  let sender = User_command.sender unchecked in
+  let fee_payer = User_command.fee_payer unchecked in
   let nonce = User_command.nonce unchecked in
   (* Result errors indicate problems with the command, while assert failures
      indicate bugs in Coda. *)
   let open Result.Let_syntax in
   let%bind consumed = currency_consumed' cmd in
   (* C4 *)
-  match Map.find t.all_by_sender (User_command.sender unchecked) with
+  match Map.find t.all_by_sender fee_payer with
   | None ->
       (* nothing queued for this sender *)
       let%bind () =
@@ -488,7 +534,7 @@ let rec add_from_gossip_exn :
                 (module User_command.With_valid_signature)
                 t.applicable_by_fee fee cmd
           ; all_by_sender=
-              Map.set t.all_by_sender ~key:sender
+              Map.set t.all_by_sender ~key:fee_payer
                 ~data:(F_sequence.singleton cmd, consumed)
           ; all_by_fee=
               Map_set.insert
@@ -519,7 +565,7 @@ let rec add_from_gossip_exn :
         Result.Ok
           ( { t with
               all_by_sender=
-                Map.set t.all_by_sender ~key:sender
+                Map.set t.all_by_sender ~key:fee_payer
                   ~data:(F_sequence.snoc queued_cmds cmd, reserved_currency')
             ; all_by_fee=
                 Map_set.insert
@@ -594,18 +640,16 @@ let rec add_from_gossip_exn :
 let add_from_backtrack : t -> User_command.With_valid_signature.t -> t =
  fun t cmd ->
   let unchecked = User_command.forget_check cmd in
-  let sender = User_command.sender unchecked in
+  let fee_payer = User_command.fee_payer unchecked in
   let fee = User_command.fee unchecked in
   let consumed = Option.value_exn (currency_consumed cmd) in
-  match Map.find t.all_by_sender sender with
+  match Map.find t.all_by_sender fee_payer with
   | None ->
       { all_by_sender=
-          Map.add_exn t.all_by_sender
-            ~key:
-              sender
-              (* If the command comes from backtracking, then we know it doesn't
+          (* If the command comes from backtracking, then we know it doesn't
              cause overflow, so it's OK to throw here.
           *)
+          Map.add_exn t.all_by_sender ~key:fee_payer
             ~data:(F_sequence.singleton cmd, consumed)
       ; all_by_fee=
           Map_set.insert
@@ -640,7 +684,7 @@ let add_from_backtrack : t -> User_command.With_valid_signature.t -> t =
             (module User_command.With_valid_signature)
             t'.all_by_fee fee cmd
       ; all_by_sender=
-          Map.set t'.all_by_sender ~key:sender
+          Map.set t'.all_by_sender ~key:fee_payer
             ~data:
               ( F_sequence.cons cmd queue
               , Option.value_exn Currency.Amount.(currency_reserved + consumed)
@@ -728,10 +772,12 @@ let%test_module _ =
                 ()
             | cmd :: rest -> (
                 let unchecked = User_command.forget_check cmd in
+                let account_id = User_command.fee_payer unchecked in
+                let pk = Account_id.public_key account_id in
                 let add_res =
                   add_from_gossip_exn !pool cmd
-                    (Hashtbl.find_exn nonces (User_command.sender unchecked))
-                    (Hashtbl.find_exn balances (User_command.sender unchecked))
+                    (Hashtbl.find_exn nonces pk)
+                    (Hashtbl.find_exn balances pk)
                 in
                 match add_res with
                 | Ok (pool', dropped) ->
@@ -765,7 +811,7 @@ let%test_module _ =
           Quickcheck.Generator.map ~f:Account_nonce.of_int
           @@ Int.gen_incl 0 1000
         in
-        let init_balance = Currency.Amount.of_int 100_000 in
+        let init_balance = Currency.Amount.of_int 100_000_000_000_000 in
         let%bind size = Quickcheck.Generator.size in
         let%bind amounts =
           Quickcheck.Generator.map ~f:Array.of_list
@@ -790,11 +836,12 @@ let%test_module _ =
             in
             let modified_payload : User_command.Payload.t =
               match cmd.payload.body with
-              | Payment {receiver; amount= _amount_unused} ->
+              | Payment payment_payload ->
                   { common=
                       {cmd.payload.common with fee= Currency.Amount.to_fee fee}
-                  ; body= User_command.Payload.Body.Payment {receiver; amount}
-                  }
+                  ; body=
+                      User_command.Payload.Body.Payment
+                        {payment_payload with amount} }
               | _ ->
                   failwith "generated user command that wasn't a payment"
             in
@@ -831,7 +878,9 @@ let%test_module _ =
           { replace_cmd_skeleton.payload with
             common=
               { replace_cmd_skeleton.payload.common with
-                fee= Currency.Fee.of_int (10 + (5 * (size + 1))) } }
+                fee=
+                  Currency.Fee.of_int ((10 + (5 * (size + 1))) * 1_000_000_000)
+              } }
         in
         let replace_cmd =
           User_command.For_tests.fake_sign sender replace_cmd_payload

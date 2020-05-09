@@ -147,5 +147,3 @@ val all_work_pairs :
      One_or_two.t
      list
      Or_error.t
-
-module Constants : Snark_params.Scan_state_constants.S

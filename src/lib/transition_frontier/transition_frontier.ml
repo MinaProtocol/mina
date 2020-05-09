@@ -14,7 +14,8 @@ module Extensions = Extensions
 module Persistent_root = Persistent_root
 module Persistent_frontier = Persistent_frontier
 
-let global_max_length = Consensus.Constants.k
+let global_max_length (genesis_constants : Genesis_constants.t) =
+  genesis_constants.protocol.k
 
 type t =
   { logger: Logger.t
@@ -28,16 +29,16 @@ type t =
   ; extensions: Extensions.t
   ; genesis_state_hash: State_hash.t }
 
-let genesis_root_data ~genesis_ledger ~base_proof =
+let genesis_root_data ~precomputed_values =
   let open Root_data.Limited.Stable.Latest in
-  let transition = External_transition.genesis ~genesis_ledger ~base_proof in
+  let transition = External_transition.genesis ~precomputed_values in
   let scan_state = Staged_ledger.Scan_state.empty () in
   let pending_coinbase = Or_error.ok_exn (Pending_coinbase.create ()) in
   {transition; scan_state; pending_coinbase}
 
 let load_from_persistence_and_start ~logger ~verifier ~consensus_local_state
     ~max_length ~persistent_root ~persistent_root_instance ~persistent_frontier
-    ~persistent_frontier_instance ~genesis_state_hash
+    ~persistent_frontier_instance ~precomputed_values
     ignore_consensus_local_state =
   let open Deferred.Result.Let_syntax in
   let root_identifier =
@@ -85,7 +86,9 @@ let load_from_persistence_and_start ~logger ~verifier ~consensus_local_state
          persistent_frontier_instance ~max_length
          ~root_ledger:
            (Persistent_root.Instance.snarked_ledger persistent_root_instance)
-         ~consensus_local_state ~ignore_consensus_local_state)
+         ~consensus_local_state ~ignore_consensus_local_state
+         ~genesis_constants:
+           (Precomputed_values.genesis_constants precomputed_values))
       ~f:
         (Result.map_error ~f:(function
           | `Sync_cannot_be_running ->
@@ -113,7 +116,8 @@ let load_from_persistence_and_start ~logger ~verifier ~consensus_local_state
   ; persistent_frontier
   ; persistent_frontier_instance
   ; extensions
-  ; genesis_state_hash }
+  ; genesis_state_hash=
+      Precomputed_values.genesis_state_hash precomputed_values }
 
 let rec load_with_max_length :
        max_length:int
@@ -123,9 +127,7 @@ let rec load_with_max_length :
     -> consensus_local_state:Consensus.Data.Local_state.t
     -> persistent_root:Persistent_root.t
     -> persistent_frontier:Persistent_frontier.t
-    -> genesis_state_hash:State_hash.t
-    -> genesis_ledger:Ledger.t Lazy.t
-    -> ?base_proof:Proof.t
+    -> precomputed_values:Precomputed_values.t
     -> unit
     -> ( t
        , [> `Bootstrap_required
@@ -134,8 +136,7 @@ let rec load_with_max_length :
        Deferred.Result.t =
  fun ~max_length ?(retry_with_fresh_db = true) ~logger ~verifier
      ~consensus_local_state ~persistent_root ~persistent_frontier
-     ~genesis_state_hash ~genesis_ledger
-     ?(base_proof = Precomputed_values.base_proof) () ->
+     ~precomputed_values () ->
   let open Deferred.Let_syntax in
   (* TODO: #3053 *)
   let continue persistent_frontier_instance ~ignore_consensus_local_state =
@@ -145,7 +146,7 @@ let rec load_with_max_length :
     match%bind
       load_from_persistence_and_start ~logger ~verifier ~consensus_local_state
         ~max_length ~persistent_root ~persistent_root_instance
-        ~persistent_frontier ~persistent_frontier_instance ~genesis_state_hash
+        ~persistent_frontier ~persistent_frontier_instance ~precomputed_values
         ignore_consensus_local_state
     with
     | Ok _ as result ->
@@ -166,11 +167,10 @@ let rec load_with_max_length :
     in
     let%bind () =
       Persistent_frontier.reset_database_exn persistent_frontier
-        ~root_data:(genesis_root_data ~genesis_ledger ~base_proof)
+        ~root_data:(genesis_root_data ~precomputed_values)
     in
     let%bind () =
-      Persistent_root.reset_to_genesis_exn persistent_root ~genesis_ledger
-        ~genesis_state_hash
+      Persistent_root.reset_to_genesis_exn persistent_root ~precomputed_values
     in
     continue
       (Persistent_frontier.create_instance_exn persistent_frontier)
@@ -206,8 +206,7 @@ let rec load_with_max_length :
         in
         load_with_max_length ~max_length ~logger ~verifier
           ~consensus_local_state ~persistent_root ~persistent_frontier
-          ~retry_with_fresh_db:false () ~genesis_state_hash ~genesis_ledger
-          ~base_proof
+          ~retry_with_fresh_db:false () ~precomputed_values
         >>| Result.map_error ~f:(function
               | `Persistent_frontier_malformed ->
                   `Failure
@@ -219,7 +218,14 @@ let rec load_with_max_length :
   | Ok () ->
       continue persistent_frontier_instance ~ignore_consensus_local_state:true
 
-let load = load_with_max_length ~max_length:global_max_length
+let load ?(retry_with_fresh_db = true) ~logger ~verifier ~consensus_local_state
+    ~persistent_root ~persistent_frontier ~precomputed_values () =
+  let max_length =
+    global_max_length (Precomputed_values.genesis_constants precomputed_values)
+  in
+  load_with_max_length ~max_length ~retry_with_fresh_db ~logger ~verifier
+    ~consensus_local_state ~persistent_root ~persistent_frontier
+    ~precomputed_values ()
 
 (* The persistent root and persistent frontier as safe to ignore here
  * because their lifecycle is longer than the transition frontier's *)
@@ -348,6 +354,8 @@ include struct
 
   let find = proxy1 find
 
+  let genesis_constants = proxy1 genesis_constants
+
   (* TODO: find -> option externally, find_exn internally *)
   let find_exn = proxy1 find_exn
 
@@ -404,7 +412,8 @@ module For_tests = struct
   *)
 
   (* a helper quickcheck generator which always returns the genesis breadcrumb *)
-  let gen_genesis_breadcrumb ?(logger = Logger.null ()) ?verifier () =
+  let gen_genesis_breadcrumb ?(logger = Logger.null ()) ?verifier
+      ~precomputed_values () =
     let verifier =
       match verifier with
       | Some x ->
@@ -416,10 +425,11 @@ module For_tests = struct
     in
     Quickcheck.Generator.create (fun ~size:_ ~random:_ ->
         let genesis_transition =
-          External_transition.genesis ~genesis_ledger:Test_genesis_ledger.t
-            ~base_proof:Precomputed_values.base_proof
+          External_transition.For_tests.genesis ~precomputed_values
         in
-        let genesis_ledger = Lazy.force Test_genesis_ledger.t in
+        let genesis_ledger =
+          Lazy.force (Precomputed_values.genesis_ledger precomputed_values)
+        in
         let genesis_staged_ledger =
           Or_error.ok_exn
             (Async.Thread_safe.block_on_async_exn (fun () ->
@@ -488,16 +498,16 @@ module For_tests = struct
         (persistent_root, persistent_frontier) )
 
   let gen ?(logger = Logger.null ()) ?verifier ?trust_system
-      ?consensus_local_state
+      ?consensus_local_state ~precomputed_values
       ?(root_ledger_and_accounts =
-        ( Lazy.force Test_genesis_ledger.t
-        , Lazy.force Test_genesis_ledger.accounts ))
-      ?(gen_root_breadcrumb = gen_genesis_breadcrumb ~logger ?verifier ())
+        ( Lazy.force (Precomputed_values.genesis_ledger precomputed_values)
+        , Lazy.force (Precomputed_values.accounts precomputed_values) ))
+      ?(gen_root_breadcrumb =
+        gen_genesis_breadcrumb ~logger ?verifier ~precomputed_values ())
       ~max_length ~size () =
     let open Quickcheck.Generator.Let_syntax in
     let genesis_state_hash =
-      Coda_state.Genesis_protocol_state.t ~genesis_ledger:Test_genesis_ledger.t
-      |> With_hash.hash
+      Precomputed_values.genesis_state_hash precomputed_values
     in
     let verifier =
       match verifier with
@@ -515,7 +525,8 @@ module For_tests = struct
       Option.value consensus_local_state
         ~default:
           (Consensus.Data.Local_state.create
-             ~genesis_ledger:Test_genesis_ledger.t
+             ~genesis_ledger:
+               (Precomputed_values.genesis_ledger precomputed_values)
              Public_key.Compressed.Set.empty)
     in
     let root_snarked_ledger, root_ledger_accounts = root_ledger_and_accounts in
@@ -551,9 +562,7 @@ module For_tests = struct
       Async.Thread_safe.block_on_async_exn (fun () ->
           load_with_max_length ~max_length ~retry_with_fresh_db:false ~logger
             ~verifier ~consensus_local_state ~persistent_root
-            ~persistent_frontier ~genesis_state_hash
-            ~genesis_ledger:(lazy root_snarked_ledger)
-            () )
+            ~persistent_frontier ~precomputed_values () )
     in
     let frontier =
       let fail msg = failwith ("failed to load transition frontier: " ^ msg) in
@@ -573,15 +582,17 @@ module For_tests = struct
     frontier
 
   let gen_with_branch ?logger ?verifier ?trust_system ?consensus_local_state
+      ~precomputed_values
       ?(root_ledger_and_accounts =
-        ( Lazy.force Test_genesis_ledger.t
-        , Lazy.force Test_genesis_ledger.accounts )) ?gen_root_breadcrumb
-      ?(get_branch_root = root) ~max_length ~frontier_size ~branch_size () =
+        ( Lazy.force (Precomputed_values.genesis_ledger precomputed_values)
+        , Lazy.force (Precomputed_values.accounts precomputed_values) ))
+      ?gen_root_breadcrumb ?(get_branch_root = root) ~max_length ~frontier_size
+      ~branch_size () =
     let open Quickcheck.Generator.Let_syntax in
     let%bind frontier =
       gen ?logger ?verifier ?trust_system ?consensus_local_state
-        ?gen_root_breadcrumb ~root_ledger_and_accounts ~max_length
-        ~size:frontier_size ()
+        ~precomputed_values ?gen_root_breadcrumb ~root_ledger_and_accounts
+        ~max_length ~size:frontier_size ()
     in
     let%map make_branch =
       Breadcrumb.For_tests.gen_seq ?logger ?verifier ?trust_system

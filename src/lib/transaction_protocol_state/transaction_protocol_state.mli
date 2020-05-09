@@ -37,6 +37,11 @@ end
 module Stable : sig
   module V1 : sig
     type 'a t = 'a Poly.Stable.V1.t [@@deriving sexp]
+
+    val to_latest : ('a -> 'b) -> 'a t -> 'b t
+
+    val of_latest :
+      ('a -> ('b, 'err) Result.t) -> 'a t -> ('b t, 'err) Result.t
   end
 end]
 

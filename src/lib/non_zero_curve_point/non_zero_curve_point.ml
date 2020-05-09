@@ -199,7 +199,7 @@ module Uncompressed = struct
 
   let compress = Compressed.compress
 
-  [%%versioned_asserted
+  [%%versioned_binable
   module Stable = struct
     module V1 = struct
       type t = Field.t * Field.t [@@deriving eq, compare, hash]
@@ -247,40 +247,6 @@ module Uncompressed = struct
 
       let t_of_sexp sexp =
         Option.value_exn (decompress @@ Compressed.t_of_sexp sexp)
-    end
-
-    module Tests = struct
-      [%%if
-      curve_size = 298]
-
-      let%test "nonzero_curve_point v1" =
-        let point =
-          Quickcheck.random_value
-            ~seed:(`Deterministic "nonzero_curve_point-seed") V1.gen
-        in
-        let known_good_hash =
-          "\x9F\x36\xA5\x8E\xF2\x0F\x58\xFA\x79\xA4\x47\x18\x79\x43\xE0\x38\xC2\x6B\x6B\x7E\xD3\xF5\xE2\x45\x4E\x20\x19\x64\x62\xCF\x63\x75"
-        in
-        Serialization.check_serialization (module V1) point known_good_hash
-
-      [%%elif
-      curve_size = 753]
-
-      let%test "nonzero_curve_point v1" =
-        let point =
-          Quickcheck.random_value
-            ~seed:(`Deterministic "nonzero_curve_point-seed") V1.gen
-        in
-        let known_good_hash =
-          "\xE2\x8A\xF9\x55\x41\x07\x54\x1F\xF4\x90\x09\x94\xE8\xA5\x7C\x0E\xD3\xED\x8C\xC1\xC9\x1F\x05\x3E\x2C\x39\x28\x9F\x9C\xF1\x10\xCC"
-        in
-        Serialization.check_serialization (module V1) point known_good_hash
-
-      [%%else]
-
-      let%test "nonzero_curve_point_v1" = failwith "Unknown curve size"
-
-      [%%endif]
     end
   end]
 

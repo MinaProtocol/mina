@@ -24,6 +24,14 @@ module Poly = struct
     module V1 = struct
       type 'a t = {transaction: 'a; block_data: Block_data.Stable.V1.t}
       [@@deriving sexp]
+
+      let to_latest a_latest {transaction; block_data} =
+        {transaction= a_latest transaction; block_data}
+
+      let of_latest a_latest {transaction; block_data} =
+        let open Result.Let_syntax in
+        let%map transaction = a_latest transaction in
+        {transaction; block_data}
     end
   end]
 
@@ -35,6 +43,10 @@ end
 module Stable = struct
   module V1 = struct
     type 'a t = 'a Poly.Stable.V1.t [@@deriving sexp]
+
+    let to_latest = Poly.Stable.V1.to_latest
+
+    let of_latest = Poly.Stable.V1.of_latest
   end
 end]
 

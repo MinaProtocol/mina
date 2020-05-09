@@ -2,8 +2,8 @@ module Style = {
   open Css;
   let header =
     style([
-      display(`flex),
       marginTop(rem(2.)),
+      textAlign(`left),
       marginBottom(`rem(0.5)),
       color(Theme.Colors.denimTwo),
       hover([selector(".headerlink", [display(`inlineBlock)])]),
@@ -40,6 +40,9 @@ module Wrap = (C: Component) => {
   let make = props => {
     ReasonReact.cloneElement(C.element, ~props, [||]);
   };
+
+  [@bs.obj]
+  external makeProps: (~children: 'a, unit) => {. "children": 'a} = "";
 };
 
 module WrapHeader = (C: Component) => {
@@ -70,8 +73,8 @@ module H1 =
     let element =
       <h1
         className={merge([
-          Style.header,
           Theme.H1.hero,
+          Style.header,
           style([alignItems(`baseline), fontWeight(`light)]),
         ])}
       />;
@@ -82,8 +85,8 @@ module H2 =
     let element =
       <h2
         className={merge([
-          Style.header,
           Theme.H2.basic,
+          Style.header,
           style([alignItems(`baseline), fontWeight(`light)]),
         ])}
       />;
@@ -92,10 +95,10 @@ module H2 =
 module H3 =
   WrapHeader({
     let element =
-      <h2
+      <h3
         className={merge([
-          Style.header,
           Theme.H3.basic,
+          Style.header,
           style([alignItems(`center), fontWeight(`medium)]),
         ])}
       />;
@@ -103,7 +106,7 @@ module H3 =
 
 module H4 =
   WrapHeader({
-    let element = <h2 className={merge([Style.header, Theme.H4.basic])} />;
+    let element = <h4 className={merge([Theme.H4.basic, Style.header])} />;
   });
 
 module P =
@@ -138,25 +141,15 @@ module Strong =
 external writeText: string => Js.Promise.t(unit) = "writeText";
 
 module Pre = {
-  let make = props => {
+  [@react.component]
+  let make = (~children) => {
     let text =
       Js.String.trim(
         Js.String.make(
-          {
-            let props =
-              ReactExt.Children.only(props##children) |> ReactExt.props;
-            props##children;
-          },
+          (ReactExt.Children.only(children) |> ReactExt.props)##children,
         ),
       );
-    <pre
-      className={style([
-        backgroundColor(Theme.Colors.slateAlpha(0.05)),
-        borderRadius(`px(9)),
-        padding2(~v=`rem(0.5), ~h=`rem(1.)),
-        overflow(`scroll),
-        position(`relative),
-      ])}>
+    <div className={style([position(`relative)])}>
       <div
         className={style([
           position(`absolute),
@@ -181,8 +174,17 @@ module Pre = {
           |> Promise.iter(() => {Js.log("copied")})
         }}
       />
-      {props##children}
-    </pre>;
+      <pre
+        className={style([
+          backgroundColor(Theme.Colors.slateAlpha(0.05)),
+          borderRadius(`px(9)),
+          padding2(~v=`rem(0.5), ~h=`rem(1.)),
+          overflow(`scroll),
+          selector("code", [Theme.Typeface.pragmataPro]),
+        ])}>
+        children
+      </pre>
+    </div>;
   };
 };
 
@@ -206,3 +208,39 @@ module Ol =
   Wrap({
     let element = <ol className=Style.list />;
   });
+
+module Img =
+  Wrap({
+    let element = <img width="100%" />;
+  });
+
+module DaemonCommandExample = {
+  let defaultArgs = ["coda daemon", "-peer $SEED1", "-peer $SEED2"];
+  [@react.component]
+  let make = (~args: array(string)=[||]) => {
+    let allArgs = defaultArgs @ Array.to_list(args);
+    let argsLength =
+      List.fold_left((a, e) => a + String.length(e), 0, allArgs);
+    let sep = argsLength > 60 ? " \\\n    " : " ";
+    let processedArgs =
+      String.concat(sep, defaultArgs @ Array.to_list(args));
+    <Pre> <Code> {React.string(processedArgs)} </Code> </Pre>;
+  };
+};
+
+let allComponents = () => {
+  "Alert": Alert.make,
+  "DaemonCommandExample": DaemonCommandExample.make,
+  "h1": H1.make,
+  "h2": H2.make,
+  "h3": H3.make,
+  "h4": H4.make,
+  "p": P.make,
+  "a": A.make,
+  "strong": Strong.make,
+  "pre": Pre.make,
+  "code": Code.make,
+  "ul": Ul.make,
+  "ol": Ol.make,
+  "img": Img.make,
+};

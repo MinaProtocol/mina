@@ -45,7 +45,8 @@
     "@babel/core": "^7.4.3",
     "@next/bundle-analyzer": "^9.1.4",
     "bs-platform": "7.0.0-dev.1",
-    "concurrently": "^4.1.0"
+    "concurrently": "^4.1.0",
+    "rehype-highlight": "^3.1.0"
   },
   "resolutions": {
     "serialize-javascript": "^2.1.1"

@@ -96,8 +96,8 @@ module Helper = struct
     ; decode: string -> 'a Or_error.t
     ; write_pipe:
         ( 'a Envelope.Incoming.t
-        , Strict_pipe.crash Strict_pipe.buffered
-        , unit )
+        , Strict_pipe.synchronous
+        , unit Deferred.t )
         Strict_pipe.Writer.t
     ; read_pipe: 'a Envelope.Incoming.t Strict_pipe.Reader.t }
 
@@ -231,7 +231,8 @@ module Helper = struct
         ; ifaces: string list
         ; external_maddr: string
         ; network_id: string
-        ; unsafe_no_trust_ip: bool }
+        ; unsafe_no_trust_ip: bool
+        ; flood: bool }
       [@@deriving yojson]
 
       type output = string [@@deriving yojson]
@@ -941,8 +942,8 @@ module Pubsub = struct
       ; decode: string -> 'a Or_error.t
       ; write_pipe:
           ( 'a Envelope.Incoming.t
-          , Strict_pipe.crash Strict_pipe.buffered
-          , unit )
+          , Strict_pipe.synchronous
+          , unit Deferred.t )
           Strict_pipe.Writer.t
       ; read_pipe: 'a Envelope.Incoming.t Strict_pipe.Reader.t }
 
@@ -973,9 +974,8 @@ module Pubsub = struct
       ~encode ~decode ~on_decode_failure =
     let subscription_idx = Helper.genseq net in
     let read_pipe, write_pipe =
-      Strict_pipe.create
-        ~name:(sprintf "subscription to topic «%s»" topic)
-        Strict_pipe.(Buffered (`Capacity 64, `Overflow Crash))
+      Strict_pipe.(
+        create ~name:(sprintf "subscription to topic «%s»" topic) Synchronous)
     in
     let sub =
       { Subscription.net
@@ -1063,7 +1063,7 @@ let list_peers net =
       []
 
 let configure net ~me ~external_maddr ~maddrs ~network_id ~on_new_peer
-    ~unsafe_no_trust_ip =
+    ~unsafe_no_trust_ip ~flood =
   match%map
     Helper.do_rpc net
       (module Helper.Rpcs.Configure)
@@ -1072,7 +1072,8 @@ let configure net ~me ~external_maddr ~maddrs ~network_id ~on_new_peer
       ; ifaces= List.map ~f:Multiaddr.to_string maddrs
       ; external_maddr= Multiaddr.to_string external_maddr
       ; network_id
-      ; unsafe_no_trust_ip }
+      ; unsafe_no_trust_ip
+      ; flood }
   with
   | Ok "configure success" ->
       Ivar.fill net.me_keypair me ;
@@ -1375,12 +1376,12 @@ let%test_module "coda network tests" =
       let%bind kp_b = Keypair.random a in
       let maddrs = ["/ip4/127.0.0.1/tcp/0"] in
       let%bind () =
-        configure a ~external_maddr:(List.hd_exn maddrs) ~me:kp_a ~maddrs
-          ~network_id ~on_new_peer:Fn.ignore ~unsafe_no_trust_ip:true
+        configure a ~flood:false ~external_maddr:(List.hd_exn maddrs) ~me:kp_a
+          ~maddrs ~network_id ~on_new_peer:Fn.ignore ~unsafe_no_trust_ip:true
         >>| Or_error.ok_exn
       and () =
-        configure b ~external_maddr:(List.hd_exn maddrs) ~me:kp_b ~maddrs
-          ~network_id ~on_new_peer:Fn.ignore ~unsafe_no_trust_ip:true
+        configure b ~flood:false ~external_maddr:(List.hd_exn maddrs) ~me:kp_b
+          ~maddrs ~network_id ~on_new_peer:Fn.ignore ~unsafe_no_trust_ip:true
         >>| Or_error.ok_exn
       in
       let%bind a_advert = begin_advertising a

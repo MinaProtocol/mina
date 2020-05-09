@@ -29,19 +29,19 @@ The Coda testnet's goal is to improve Coda's stability, improve the software thr
 
 Head over to the [testnet landing page](/testnet.html) to learn more and get started.
 
-#### My  daemon crashed -- where should I share the error log?
+#### My daemon crashed -- where should I share the error log?
 
 First, check out [Github issues](https://github.com/codaprotocol/coda/issues) to see if this is a known issue. If the error you experienced is a new issue, file a Github issue with the appropriate tags (daemon, bug). Coda developers will triage the issue and fix it in a future sprint -- thanks for your help!
 
 #### How can I report other issues / get in touch with the development team?
 
-- The Coda community's live discussion channel is the Discord server: [https://discord.gg/ShKhA7J](https://discord.gg/ShKhA7J)
-- You can also create Github issues: [https://github.com/codaprotocol/coda/issues](https://github.com/codaprotocol/coda/issues)
+- The Coda community's live discussion channel is the [Discord server](https://bit.ly/CodaDiscord)
+- You can also create Github issues: https://github.com/codaprotocol/coda/issues
 - If you need to get in touch privately, you can email: contact@codaprotocol.org
 
 #### Is there a block explorer?
 
-Yes, check out the block explorer here: [https://codaexplorer.garethtdavies.com/](https://codaexplorer.garethtdavies.com/).
+Yes, check out the block explorer here: https://codaexplorer.garethtdavies.com/
 
 ## General Questions
 
@@ -72,6 +72,10 @@ Coda does not support smart contracts currently. The development team is looking
 #### Does Coda support shielded transactions, like in Zcash?
 
 No, Coda does not natively implement privacy features at the moment. However, privacy is key consideration for cryptocurrencies, and is also on the development roadmap.
+#
+#### Can I run the Coda daemon as a service
+
+[See here](/docs/node-operator#running-coda-as-a-service) for information about using launchd or systemd with coda.
 
 ## SNARKs and Snark Workers
 
@@ -79,9 +83,14 @@ No, Coda does not natively implement privacy features at the moment. However, pr
 
 Block producers (the validators who add new blocks to the blockchain) are required to buy SNARKs from the network (or from what we call the Snarketplace) and will pay out some of their block reward as fees to the snark workers who generated SNARKs. This creates a secondary incentive mechanism in the network to reward nodes that help compress transactions.
 
-#### Are Snark Workers like Proof-of-Work (PoW) miners?
+#### Is generating SNARKs similar to Proof-of-Work (PoW) mining?
 
-The only way in which Snark workers are similar to PoW miners is that both snark proving and mining (generating hashes) are parallelizable tasks, meaning that they are optimized for GPUs. However, beyond that, producing SNARKs is not similar to PoW mining. Given the same hardware and proving algorithm, producing Snark proofs always consumes a fixed amount of resources, regardless of how many other nodes are generating SNARKs. This is unlike PoW mining algorithms where the target difficulty increases as more participants join, and the cost of mining increases as a result. In addition, SNARK research is advancing quickly, and we anticipate that SNARK proving will only become cheaper over time as hardware and algorithms get more efficient. Of course, similar to PoW mining, snark worker nodes will receive coda when their snark work is purchased.
+No, they are different in several ways:
+
+- SNARK work is deterministic, while PoW mining requires randomly calculating hashes to try and solve a puzzle. There is no luck element in SNARK work — if a snark worker wants to generate a SNARK of a transaction, they only need to generate the proof once. This means SNARK work is much less expensive and environmentally wasteful, as the compute is all spent towards a productive goal.
+- There is no difficulty increase for SNARK work, as there is with PoW mining. In fact, as SNARK constructions, and proof generation times improve, the difficulty may actually decrease.
+- SNARK work is not directly involved in consensus. Snark workers play no role in determining the next state of the blockchain. Their role is to simply generate SNARKs of transactions observed in the network
+- As a snark worker, there is no requirement for uptime. PoW miners need to run their rigs non-stop to ensure they don't miss out on a potential block. Snark workers can come online and offline as they please — it is more like Uber, where there will always be work to be done, and it is nobody needs to say head of of time when they want to work.
 
 #### Will Snark Workers require more storage and computing power over time? What about compared to Coda full nodes?
 
@@ -89,10 +98,37 @@ Snark workers will not need more storage or computing power over time. Snark wor
 
 If we are comparing Snark worker nodes with full nodes on Coda, then yes Snark workers will benefit from specialized hardware as generating SNARK proofs is currently compute intensive. Again, however, with the explosion of SNARK research, this is likely to change and become more accessible to consumer hardware.
 
+#### What is the difference between a SNARK, a SNARK proof, and snark work?
+
+SNARKs are a very overloaded term currently — when you read **SNARK**, it could be referring to the concept of succinct non-interactive proof systems (eg. SNARKs vs Bulletproofs), the specific technical implementation of the proof system (eg. the construction, the circuit, or the prover), or the individual instance of the proof itself (eg. the blockchain SNARK). 
+
+When we speak about it, we will try to adhere to using:
+
+- SNARK: as the general concept of succinct, non-interactive zero-knowledge proofs
+- SNARK circuit: the specific circuit and prover, as pertaining to an app
+- SNARK proof: an individual proof that is generated by a SNARK prover
+- snark work: a Coda protocol data structure that is a wrapper around one or two SNARK proofs and a price to be paid to the snark worker that generated the proof(s). This is made unforgeable by a Signature of Knowledge scheme that will be detailed in another section.
+
+#### Is there any concern about a single large snark worker [dumping](https://en.wikipedia.org/wiki/Dumping_(pricing_policy)) work in the snarketplace, and then raising prices after monopolizing the market?
+
+In economics, there is a pricing strategy called predatory pricing (or dumping) where one supplier of a product seeks to exhaust competing suppliers in the market by undercutting the market price. The supplier prices their goods much cheaper than the market rate, in order to drive out competitors, even if it means incurring short-term losses. Once the market has been cleared, the dominant supplier then increases prices [above competitive market rates](https://en.wikipedia.org/wiki/Supracompetitive_pricing), as competition has been extinguished.
+
+However, this strategy is only effective in markets where there are high barriers to entry. Meaning, competitors who were crowded out in the predation stage are unable to rejoin the market. 
+
+This is not the case for snark work, as the barriers to entry are low. Anyone who has spare compute can join the snarketplace and produce as little as one snark work, and profit on that unit of work. The only barrier to entry is the initial capital expense on hardware, but we anticipate hardware requirements to be low, such that users with spare equipment can come online and participate. If any snark worker succeeds in driving out the market and increases prices, it is anticipated that newcomers would reappear and drive prices back down.
+
+#### Does speed of producing snarks matter? If my computer is slower, will I be at a disadvantage?
+
+No, provided that the snark work produced is still required by block producers, it doesn't matter who produced it first — only the price matters in the block producers' eyes. The caveat here is that earlier inclusion into the snark mempool is obviously beneficial, as block producers are likely to "see" the work earlier.
+
+One could however envision a scenario where a set of snark workers are favored because they produced the most number of snark works that are profitable, and buying proofs from as few entities as possible would allow for more transactions to be included in any block.
+
+There is also a threshold at which time becomes a factor, but this would only apply to very underpowered devices. We will follow up with detailed benchmarks, when we have run more tests.
+
 #### Will a full node need to store all intermediate SNARK proofs? Eg. Will the storage requirements grow linearly with blocks?
 
-Nope -- when a new block is generated, Coda computes the proof recursively over the prior proof and the new block. This is the advantage of recursive composition -- at any given time, nodes only need to store the most recent proof. Intermediate proofs are not needed. See this talk for more clarity on how this architecture emerged: [https://www.youtube.com/watch?v=eWVGATxEB6M](https://www.youtube.com/watch?v=eWVGATxEB6M).
+Nope -- when a new block is generated, Coda computes the proof recursively over the prior proof and the new block. This is the advantage of recursive composition -- at any given time, nodes only need to store the most recent proof. Intermediate proofs are not needed. See this talk for more clarity on how this architecture emerged: https://www.youtube.com/watch?v=eWVGATxEB6M
 
 #### How do you control or limit the number of cores Snark Workers use?
 
-See the [section on running a Snark Worker](../node-operator/#producing-snarks-in-the-coda-network) in the Node Operator docs. TLDR; You can set an environmental variable (eg. `export OMP_NUM_THREAD=4`) to limit the number of threads Snark Workers use.
+You can use the `-snark-worker-parallelism` flag when starting up `coda daemon`.

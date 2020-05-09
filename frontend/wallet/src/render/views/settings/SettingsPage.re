@@ -118,7 +118,7 @@ module Version = {
              (
                switch (response.result) {
                | Loading => "..."
-               | Error(err) => err##message
+               | Error((err: ReasonApolloTypes.apolloError)) => err.message
                | Data(data) =>
                  data##version
                  |> Option.map(~f=prettyVersion)
@@ -131,13 +131,6 @@ module Version = {
     </div>;
   };
 };
-
-type ownedAccounts =
-  Account.t = {
-    locked: option(bool),
-    publicKey: PublicKey.t,
-    balance: {. "total": int64},
-  };
 
 module AccountSettingsItem = {
   [@react.component]
@@ -165,9 +158,7 @@ module AccountSettingsItem = {
       </span>
       {showModal
          ? <UnlockModal
-             account={
-               account##publicKey;
-             }
+             account={account##publicKey}
              onClose={() => setModalOpen(_ => false)}
              onSuccess={() => {
                setModalOpen(_ => false);
@@ -182,7 +173,7 @@ module AccountSettingsItem = {
 module AccountsQueryString = [%graphql
   {|
     query getWallets {
-      ownedWallets {
+      trackedAccounts {
         locked
         publicKey @bsDecoder(fn: "Apollo.Decoders.publicKey")
       }
@@ -206,14 +197,14 @@ let make = () => {
     </div>
     <Spacer height=0.5 />
     <div className=Styles.accountSettings>
-      <AccountsQuery>
+      <AccountsQuery fetchPolicy="network-only">
         {({result}) =>
            switch (result) {
            | Loading =>
              <div className=Styles.emptyAccountSettings> <Loader /> </div>
            | Error(_) => React.null
            | Data(data) =>
-             data##ownedWallets
+             data##trackedAccounts
              |> Array.map(~f=account => <AccountSettingsItem account />)
              |> React.array
            }}

@@ -51,13 +51,15 @@ let%test_module "Full_frontier tests" =
       let root_data =
         let open Root_data in
         { transition=
-            External_transition.genesis ~genesis_ledger:Test_genesis_ledger.t
-              ~base_proof:Precomputed_values.base_proof
+            External_transition.For_tests.genesis
+              ~precomputed_values:
+                (Lazy.force Precomputed_values.for_unit_tests)
         ; staged_ledger= Staged_ledger.create_exn ~ledger:root_ledger }
       in
       Full_frontier.create ~logger ~root_data
         ~root_ledger:(Ledger.Any_ledger.cast (module Ledger) root_ledger)
         ~base_hash ~consensus_local_state ~max_length
+        ~genesis_constants:Genesis_constants.compiled
 
     let%test_unit "Should be able to find a breadcrumbs after adding them" =
       Quickcheck.test gen_breadcrumb ~trials:4 ~f:(fun make_breadcrumb ->
