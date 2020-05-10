@@ -15,6 +15,7 @@ const Path = require("path");
 const CODA_GRAPHQL_HOST = process.env["CODA_GRAPHQL_HOST"] || "localhost";
 const CODA_GRAPHQL_PORT = process.env["CODA_GRAPHQL_PORT"] || 3085;
 const CODA_GRAPHQL_PATH = process.env["CODA_GRAPHQL_PATH"] || "/graphql";
+const CODA_TESTNET_NAME = process.env["CODA_TESTNET_NAME"] || "unknown";
 
 const API_KEY_SECRET = process.env["GOOGLE_CLOUD_STORAGE_API_KEY"];
 if (!API_KEY_SECRET) {
@@ -73,7 +74,7 @@ function uploadFile(result) {
       : "block-error-" + Date.now() + ".json";
 
   const bucket = storage.bucket(bucketName);
-  const file = bucket.file("32b/" + filename);
+  const file = bucket.file("32b-" + CODA_TESTNET_NAME + "/" + filename);
 
   const buffer = Buffer.from(JSON.stringify(result), "utf8");
   const readable = new Readable();
@@ -105,6 +106,9 @@ function uploadFile(result) {
 const SUBSCRIPTION = `
 subscription Blocks {
   newBlock {
+    creatorAccount {
+      publicKey
+    }
     protocolState {
       previousStateHash
       consensusState {

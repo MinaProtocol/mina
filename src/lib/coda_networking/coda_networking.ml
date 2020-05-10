@@ -38,7 +38,10 @@ module Rpcs = struct
         type query = State_hash.t
 
         type response =
-          (Staged_ledger.Scan_state.t * Ledger_hash.t * Pending_coinbase.t)
+          ( Staged_ledger.Scan_state.t
+          * Ledger_hash.t
+          * Pending_coinbase.t
+          * Coda_state.Protocol_state.value list )
           option
       end
 
@@ -62,7 +65,8 @@ module Rpcs = struct
         type response =
           ( Staged_ledger.Scan_state.Stable.V1.t
           * Ledger_hash.Stable.V1.t
-          * Pending_coinbase.Stable.V1.t )
+          * Pending_coinbase.Stable.V1.t
+          * Coda_state.Protocol_state.Value.Stable.V1.t list )
           option
         [@@deriving bin_io, version {rpc}]
 
@@ -1040,11 +1044,11 @@ let create (config : Config.t)
                   ] ;
             let diff' =
               List.filter diff ~f:(fun cmd ->
-                  if User_command.is_trivial cmd then (
+                  if User_command.has_insufficient_fee cmd then (
                     Logger.debug config.logger ~module_:__MODULE__
                       ~location:__LOC__
-                      "Filtering trivial user command in transaction-pool \
-                       diff $cmd from $sender"
+                      "Filtering user command with insufficient fee from \
+                       transaction-pool diff $cmd from $sender"
                       ~metadata:
                         [ ("cmd", User_command.to_yojson cmd)
                         ; ( "sender"

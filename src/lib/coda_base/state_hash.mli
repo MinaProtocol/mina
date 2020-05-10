@@ -2,6 +2,8 @@
 
 [%%import "/src/config.mlh"]
 
+open Core_kernel
+
 [%%ifdef consensus_mechanism]
 
 open Snark_params.Tick
@@ -26,3 +28,16 @@ val dummy : t
 val zero : Field.t
 
 val to_decimal_string : t -> string
+
+[%%versioned:
+module Stable : sig
+  module V1 : sig
+    type t = Field.t [@@deriving sexp, compare, hash, yojson]
+
+    val to_latest : t -> t
+
+    include Comparable.S with type t := t
+
+    include Hashable_binable with type t := t
+  end
+end]

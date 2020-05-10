@@ -87,11 +87,11 @@ struct
     account |> Account.identifier
     |> Visualization.display_short_sexp (module Account_id)
 
-  let empty_hashes =
-    Empty_hashes.cache (module Hash) ~init_hash:Hash.empty_account Ledger.depth
-    |> Immutable_array.to_list
+  let empty_hash =
+    Empty_hashes.extensible_cache (module Hash) ~init_hash:Hash.empty_account
 
   let visualize t ~(initial_address : Ledger.Addr.t) =
+    let ledger_depth = Inputs.Ledger.depth t in
     let rec bfs ~(edges : merkle_tree_edge list) ~accounts jobs =
       match Queue.dequeue jobs with
       | None ->
@@ -101,7 +101,7 @@ struct
           let parent_hash =
             Ledger.get_inner_hash_at_addr_exn t parent_address
           in
-          if Addr.is_leaf address then
+          if Addr.is_leaf ~ledger_depth address then
             match Ledger.get t (Location.Account address) with
             | Some new_account ->
                 (* let public_key = Account.public_key new_account in
@@ -125,11 +125,14 @@ struct
               if
                 not
                 @@ Hash_set.mem
-                     (empty_hashes |> Hash.Hash_set.of_list)
+                     ( List.init ~f:empty_hash ledger_depth
+                     |> Hash.Hash_set.of_list )
                      current_hash
               then (
-                Queue.enqueue jobs (Addr.child_exn address Direction.Left) ;
-                Queue.enqueue jobs (Addr.child_exn address Direction.Right) ;
+                Queue.enqueue jobs
+                  (Addr.child_exn ~ledger_depth address Direction.Left) ;
+                Queue.enqueue jobs
+                  (Addr.child_exn ~ledger_depth address Direction.Right) ;
                 Hash current_hash )
               else Empty_hash
             in
@@ -139,8 +142,8 @@ struct
       bfs ~edges:[]
         ~accounts:(Set.empty (module Account))
         (Queue.of_list
-           [ Addr.child_exn initial_address Direction.Left
-           ; Addr.child_exn initial_address Direction.Right ])
+           [ Addr.child_exn ~ledger_depth initial_address Direction.Left
+           ; Addr.child_exn ~ledger_depth initial_address Direction.Right ])
     in
     let edges =
       List.folding_map edges ~init:(0, 0)
