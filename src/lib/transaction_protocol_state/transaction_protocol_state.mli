@@ -17,7 +17,9 @@ module Block_data : sig
 
   type var
 
-  val typ : (var, t) Typ.t
+  val typ :
+       constraint_constants:Genesis_constants.Constraint_constants.t
+    -> (var, t) Typ.t
 end
 
 module Poly : sig

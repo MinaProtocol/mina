@@ -105,16 +105,18 @@ module Body = struct
          [genesis_state_hash; blockchain_state; consensus_state; constants] ->
     {genesis_state_hash; blockchain_state; consensus_state; constants}
 
-  let data_spec =
+  let data_spec ~constraint_constants =
     Data_spec.
       [ State_hash.typ
       ; Blockchain_state.typ
-      ; Consensus.Data.Consensus_state.typ
+      ; Consensus.Data.Consensus_state.typ ~constraint_constants
       ; Protocol_constants_checked.typ ]
 
-  let typ =
-    Typ.of_hlistable data_spec ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
-      ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+  let typ ~constraint_constants =
+    Typ.of_hlistable
+      (data_spec ~constraint_constants)
+      ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
+      ~value_of_hlist:of_hlist
 
   let to_input
       { Poly.genesis_state_hash: State_hash.t
@@ -227,11 +229,14 @@ let to_hlist {Poly.Stable.Latest.previous_state_hash; body} =
 let of_hlist : (unit, 'psh -> 'body -> unit) H_list.t -> ('psh, 'body) Poly.t =
  fun H_list.[previous_state_hash; body] -> {previous_state_hash; body}
 
-let data_spec = Data_spec.[State_hash.typ; Body.typ]
+let data_spec ~constraint_constants =
+  Data_spec.[State_hash.typ; Body.typ ~constraint_constants]
 
-let typ =
-  Typ.of_hlistable data_spec ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
-    ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+let typ ~constraint_constants =
+  Typ.of_hlistable
+    (data_spec ~constraint_constants)
+    ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
+    ~value_of_hlist:of_hlist
 
 let hash_checked ({previous_state_hash; body} : var) =
   let%bind body = Body.hash_checked body in
@@ -278,7 +283,7 @@ let hash s =
 
 [%%endif]
 
-let negative_one ~genesis_ledger ~protocol_constants =
+let negative_one ~genesis_ledger ~constraint_constants ~protocol_constants =
   { Poly.Stable.Latest.previous_state_hash=
       State_hash.of_hash Snark_params.Tick.Pedersen.zero_hash
   ; body=
@@ -290,6 +295,6 @@ let negative_one ~genesis_ledger ~protocol_constants =
           State_hash.of_hash Snark_params.Tick.Pedersen.zero_hash
       ; consensus_state=
           Consensus.Data.Consensus_state.negative_one ~genesis_ledger
-            ~protocol_constants
+            ~constraint_constants ~protocol_constants
       ; constants= Protocol_constants_checked.value_of_t protocol_constants }
   }

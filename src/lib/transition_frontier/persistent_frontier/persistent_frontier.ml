@@ -179,7 +179,7 @@ module Instance = struct
       Error `Bootstrap_required )
 
   let load_full_frontier t ~root_ledger ~consensus_local_state ~max_length
-      ~ignore_consensus_local_state ~genesis_constants =
+      ~ignore_consensus_local_state ~constraint_constants ~genesis_constants =
     let open Deferred.Result.Let_syntax in
     let downgrade_transition transition genesis_state_hash :
         ( External_transition.Almost_validated.t
@@ -252,7 +252,8 @@ module Instance = struct
               List.map protocol_states ~f:(fun s -> (Protocol_state.hash s, s))
           }
         ~root_ledger:(Ledger.Any_ledger.cast (module Ledger.Db) root_ledger)
-        ~consensus_local_state ~max_length ~genesis_constants
+        ~consensus_local_state ~max_length ~constraint_constants
+        ~genesis_constants
     in
     let%bind extensions =
       Deferred.map

@@ -1275,7 +1275,7 @@ module Base = struct
    such that
    H(l1, l2, pending_coinbase_stack_state.source, pending_coinbase_stack_state.target, fee_excess, supply_increase) = top_hash,
    applying [t] to ledger with merkle hash [l1] results in ledger with merkle hash [l2]. *)
-  let%snarkydef main top_hash =
+  let%snarkydef main ~constraint_constants top_hash =
     let%bind (module Shifted) = Tick.Inner_curve.Checked.Shifted.create () in
     let%bind root_before =
       exists' Frozen_ledger_hash.typ ~f:Prover_state.state1
@@ -1293,7 +1293,9 @@ module Base = struct
           (Prover_state.pending_coinbase_stack_state s).target )
     in
     let%bind state_body =
-      exists' Coda_state.Protocol_state.Body.typ ~f:Prover_state.state_body
+      exists'
+        (Coda_state.Protocol_state.Body.typ ~constraint_constants)
+        ~f:Prover_state.state_body
     in
     let%bind root_after, fee_excess, supply_increase =
       apply_tagged_transaction
@@ -1324,6 +1326,9 @@ module Base = struct
            >>= Field.Checked.Assert.equal top_hash ))
     in
     ()
+
+  let main =
+    main ~constraint_constants:Genesis_constants.Constraint_constants.compiled
 
   let create_keys () = generate_keypair main ~exposing:(tick_input ())
 
@@ -2260,8 +2265,10 @@ let%test_module "transaction_snark" =
 
     type wallet = {private_key: Private_key.t; account: Account.t}
 
-    let random_wallets
-        ?(n = min (Int.pow 2 Coda_compile_config.ledger_depth) (1 lsl 10)) () =
+    let ledger_depth =
+      Genesis_constants.Constraint_constants.for_unit_tests.ledger_depth
+
+    let random_wallets ?(n = min (Int.pow 2 ledger_depth) (1 lsl 10)) () =
       let random_wallet () : wallet =
         let private_key = Private_key.create () in
         let public_key =
@@ -2410,8 +2417,7 @@ let%test_module "transaction_snark" =
       let txn_in_block =
         {Transaction_protocol_state.Poly.transaction; block_data= state_body}
       in
-      Ledger.with_ledger ~depth:Genesis_constants.ledger_depth_for_unit_tests
-        ~f:(fun ledger ->
+      Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
           Ledger.create_new_account_exn ledger producer_id
             (Account.create receiver_id Balance.zero) ;
           let sparse_ledger =
@@ -2439,9 +2445,7 @@ let%test_module "transaction_snark" =
     let%test_unit "new_account" =
       Test_util.with_randomness 123456789 (fun () ->
           let wallets = random_wallets () in
-          Ledger.with_ledger
-            ~depth:Genesis_constants.ledger_depth_for_unit_tests
-            ~f:(fun ledger ->
+          Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               Array.iter
                 (Array.sub wallets ~pos:1 ~len:(Array.length wallets - 1))
                 ~f:(fun {account; private_key= _} ->
@@ -2587,9 +2591,7 @@ let%test_module "transaction_snark" =
               (Test_util.arbitrary_string
                  ~len:User_command_memo.max_digestible_string_length)
           in
-          Ledger.with_ledger
-            ~depth:Genesis_constants.ledger_depth_for_unit_tests
-            ~f:(fun ledger ->
+          Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               let _, ucs =
                 let receivers =
                   List.fold ~init:receivers
@@ -2631,9 +2633,7 @@ let%test_module "transaction_snark" =
           let receivers = random_wallets ~n:3 () |> Array.to_list in
           let txns_per_receiver = 3 in
           let fee = 8_000_000_000 in
-          Ledger.with_ledger
-            ~depth:Genesis_constants.ledger_depth_for_unit_tests
-            ~f:(fun ledger ->
+          Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               let fts =
                 let receivers =
                   List.fold ~init:receivers
@@ -2671,9 +2671,7 @@ let%test_module "transaction_snark" =
           let fee = Fee.to_int Coda_compile_config.account_creation_fee in
           let coinbase_count = 3 in
           let ft_count = 2 in
-          Ledger.with_ledger
-            ~depth:Genesis_constants.ledger_depth_for_unit_tests
-            ~f:(fun ledger ->
+          Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               let _, cbs =
                 let fts =
                   List.map (List.init ft_count ~f:Fn.id) ~f:(fun _ ->
@@ -2714,9 +2712,7 @@ let%test_module "transaction_snark" =
           let wallets = random_wallets () in
           let state_body = Lazy.force state_body in
           let state_body_hash = Lazy.force state_body_hash in
-          Ledger.with_ledger
-            ~depth:Genesis_constants.ledger_depth_for_unit_tests
-            ~f:(fun ledger ->
+          Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               Array.iter wallets ~f:(fun {account; private_key= _} ->
                   Ledger.create_new_account_exn ledger
                     (Account.identifier account)
@@ -2819,9 +2815,7 @@ let%test_module "transaction_snark" =
           let wallets = random_wallets () in
           let state_body = Lazy.force state_body in
           let state_body_hash = Lazy.force state_body_hash in
-          Ledger.with_ledger
-            ~depth:Genesis_constants.ledger_depth_for_unit_tests
-            ~f:(fun ledger ->
+          Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               Array.iter wallets ~f:(fun {account; private_key= _} ->
                   Ledger.create_new_account_exn ledger
                     (Account.identifier account)
@@ -2830,6 +2824,8 @@ let%test_module "transaction_snark" =
                 Coda_state.Protocol_state.negative_one
                   ~genesis_ledger:(lazy ledger)
                   ~protocol_constants:Genesis_constants.compiled.protocol
+                  ~constraint_constants:
+                    Genesis_constants.Constraint_constants.compiled
                 |> Coda_state.Protocol_state.body
               in
               let state_body_hash0 =
@@ -2954,9 +2950,7 @@ let%test_module "transaction_snark" =
 
     let%test_unit "transfer non-default tokens to a new account" =
       Test_util.with_randomness 123456789 (fun () ->
-          Ledger.with_ledger
-            ~depth:Genesis_constants.ledger_depth_for_unit_tests
-            ~f:(fun ledger ->
+          Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               let wallets = random_wallets ~n:2 () in
               let signer =
                 Keypair.of_private_key_exn wallets.(0).private_key
@@ -3027,9 +3021,7 @@ let%test_module "transaction_snark" =
 
     let%test_unit "transfer non-default tokens to an existing account" =
       Test_util.with_randomness 123456789 (fun () ->
-          Ledger.with_ledger
-            ~depth:Genesis_constants.ledger_depth_for_unit_tests
-            ~f:(fun ledger ->
+          Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               let wallets = random_wallets ~n:2 () in
               let signer =
                 Keypair.of_private_key_exn wallets.(0).private_key
@@ -3101,9 +3093,7 @@ let%test_module "transaction_snark" =
     let%test_unit "insufficient account creation fee for non-default token \
                    transfer" =
       Test_util.with_randomness 123456789 (fun () ->
-          Ledger.with_ledger
-            ~depth:Genesis_constants.ledger_depth_for_unit_tests
-            ~f:(fun ledger ->
+          Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               let wallets = random_wallets ~n:2 () in
               let signer =
                 Keypair.of_private_key_exn wallets.(0).private_key
@@ -3164,9 +3154,7 @@ let%test_module "transaction_snark" =
     let%test_unit "insufficient source balance for non-default token transfer"
         =
       Test_util.with_randomness 123456789 (fun () ->
-          Ledger.with_ledger
-            ~depth:Genesis_constants.ledger_depth_for_unit_tests
-            ~f:(fun ledger ->
+          Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               let wallets = random_wallets ~n:2 () in
               let signer =
                 Keypair.of_private_key_exn wallets.(0).private_key
@@ -3224,9 +3212,7 @@ let%test_module "transaction_snark" =
 
     let%test_unit "transfer non-existing source" =
       Test_util.with_randomness 123456789 (fun () ->
-          Ledger.with_ledger
-            ~depth:Genesis_constants.ledger_depth_for_unit_tests
-            ~f:(fun ledger ->
+          Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               let wallets = random_wallets ~n:2 () in
               let signer =
                 Keypair.of_private_key_exn wallets.(0).private_key
@@ -3279,9 +3265,7 @@ let%test_module "transaction_snark" =
 
     let%test_unit "payment predicate failure" =
       Test_util.with_randomness 123456789 (fun () ->
-          Ledger.with_ledger
-            ~depth:Genesis_constants.ledger_depth_for_unit_tests
-            ~f:(fun ledger ->
+          Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               let wallets = random_wallets ~n:3 () in
               let signer =
                 Keypair.of_private_key_exn wallets.(0).private_key
@@ -3339,9 +3323,7 @@ let%test_module "transaction_snark" =
 
     let%test_unit "delegation predicate failure" =
       Test_util.with_randomness 123456789 (fun () ->
-          Ledger.with_ledger
-            ~depth:Genesis_constants.ledger_depth_for_unit_tests
-            ~f:(fun ledger ->
+          Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               let wallets = random_wallets ~n:3 () in
               let signer =
                 Keypair.of_private_key_exn wallets.(0).private_key
@@ -3399,9 +3381,7 @@ let%test_module "transaction_snark" =
 
     let%test_unit "delegation delegatee does not exist" =
       Test_util.with_randomness 123456789 (fun () ->
-          Ledger.with_ledger
-            ~depth:Genesis_constants.ledger_depth_for_unit_tests
-            ~f:(fun ledger ->
+          Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               let wallets = random_wallets ~n:2 () in
               let signer =
                 Keypair.of_private_key_exn wallets.(0).private_key
@@ -3455,9 +3435,7 @@ let%test_module "transaction_snark" =
 
     let%test_unit "delegation delegator does not exist" =
       Test_util.with_randomness 123456789 (fun () ->
-          Ledger.with_ledger
-            ~depth:Genesis_constants.ledger_depth_for_unit_tests
-            ~f:(fun ledger ->
+          Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               let wallets = random_wallets ~n:3 () in
               let signer =
                 Keypair.of_private_key_exn wallets.(0).private_key
@@ -3538,9 +3516,7 @@ let%test_module "transaction_snark" =
                      balance ~initial_minimum_balance ~cliff_time
                      ~vesting_period ~vesting_increment }
           in
-          Ledger.with_ledger
-            ~depth:Genesis_constants.ledger_depth_for_unit_tests
-            ~f:(fun ledger ->
+          Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               let _, ucs =
                 let receiver_ids =
                   List.init (List.length receivers) ~f:(( + ) 1)

@@ -106,8 +106,10 @@ module Configuration = struct
     ; acceptable_network_delay: int }
   [@@deriving yojson, fields]
 
-  let t ~protocol_constants =
-    let constants = Constants.create ~protocol_constants in
+  let t ~constraint_constants ~protocol_constants =
+    let constants =
+      Constants.create ~constraint_constants ~protocol_constants
+    in
     let of_int32 = UInt32.to_int in
     let of_span = Fn.compose Int64.to_int Block_time.Span.to_ms in
     { delta= of_int32 constants.delta
@@ -1892,9 +1894,10 @@ module Data = struct
       ; next_epoch_data
       ; has_ancestor_in_same_checkpoint_window }
 
-    let data_spec =
+    let data_spec
+        ~(constraint_constants : Genesis_constants.Constraint_constants.t) =
       let open Snark_params.Tick.Data_spec in
-      let sub_windows_per_window = Coda_compile_config.c in
+      let sub_windows_per_window = constraint_constants.c in
       [ Length.typ
       ; Length.typ
       ; Length.typ
@@ -1906,9 +1909,10 @@ module Data = struct
       ; Epoch_data.Next.typ
       ; Boolean.typ ]
 
-    let typ : (var, Value.t) Typ.t =
-      Snark_params.Tick.Typ.of_hlistable data_spec ~var_to_hlist:to_hlist
-        ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
+    let typ ~constraint_constants : (var, Value.t) Typ.t =
+      Snark_params.Tick.Typ.of_hlistable
+        (data_spec ~constraint_constants)
+        ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
         ~value_of_hlist:of_hlist
 
     let to_input
@@ -2088,9 +2092,11 @@ module Data = struct
     let same_checkpoint_window ~constants ~prev ~next =
       make_checked (fun () -> same_checkpoint_window ~constants ~prev ~next)
 
-    let negative_one ~genesis_ledger
+    let negative_one ~genesis_ledger ~constraint_constants
         ~(protocol_constants : Genesis_constants.Protocol.t) =
-      let constants = Constants.create ~protocol_constants in
+      let constants =
+        Constants.create ~constraint_constants ~protocol_constants
+      in
       let max_sub_window_density = constants.slots_per_sub_window in
       let max_window_density = constants.slots_per_window in
       { Poly.blockchain_length= Length.zero
@@ -2109,7 +2115,8 @@ module Data = struct
       ; has_ancestor_in_same_checkpoint_window= false }
 
     let create_genesis_from_transition ~negative_one_protocol_state_hash
-        ~consensus_transition ~genesis_ledger ~protocol_constants : Value.t =
+        ~consensus_transition ~genesis_ledger ~constraint_constants
+        ~protocol_constants : Value.t =
       let producer_vrf_result =
         let _, sk = Vrf.Precomputed.genesis_winner in
         Vrf.eval ~private_key:sk
@@ -2123,19 +2130,21 @@ module Data = struct
       in
       Or_error.ok_exn
         (update
-           ~constants:(Constants.create ~protocol_constants)
+           ~constants:
+             (Constants.create ~constraint_constants ~protocol_constants)
            ~producer_vrf_result
            ~previous_consensus_state:
-             (negative_one ~genesis_ledger ~protocol_constants)
+             (negative_one ~genesis_ledger ~constraint_constants
+                ~protocol_constants)
            ~previous_protocol_state_hash:negative_one_protocol_state_hash
            ~consensus_transition ~supply_increase:Currency.Amount.zero
            ~snarked_ledger_hash)
 
     let create_genesis ~negative_one_protocol_state_hash ~genesis_ledger
-        ~protocol_constants : Value.t =
+        ~constraint_constants ~protocol_constants : Value.t =
       create_genesis_from_transition ~negative_one_protocol_state_hash
         ~consensus_transition:Consensus_transition.genesis ~genesis_ledger
-        ~protocol_constants
+        ~constraint_constants ~protocol_constants
 
     (* Check that both epoch and slot are zero.
     *)
@@ -2155,10 +2164,12 @@ module Data = struct
         (previous_protocol_state_hash : Coda_base.State_hash.var)
         ~(supply_increase : Currency.Amount.var)
         ~(previous_blockchain_state_ledger_hash :
-           Coda_base.Frozen_ledger_hash.var)
+           Coda_base.Frozen_ledger_hash.var) ~constraint_constants
         ~(protocol_constants : Coda_base.Protocol_constants_checked.var) =
       let open Snark_params.Tick in
-      let%bind constants = Constants.Checked.create protocol_constants in
+      let%bind constants =
+        Constants.Checked.create ~constraint_constants ~protocol_constants
+      in
       let {Poly.curr_global_slot= prev_global_slot; _} = previous_state in
       let next_global_slot =
         Global_slot.Checked.of_slot_number ~constants transition_data
@@ -3081,10 +3092,14 @@ module Hooks = struct
     |> Unix_timestamp.of_int64
 
   let%test "Receive a valid consensus_state with a bit of delay" =
+    let constraint_constants =
+      Genesis_constants.Constraint_constants.for_unit_tests
+    in
+    let protocol_constants = Genesis_constants.for_unit_tests.protocol in
     let curr_epoch, curr_slot =
       Consensus_state.curr_epoch_and_slot
         (Consensus_state.negative_one ~genesis_ledger:Test_genesis_ledger.t
-           ~protocol_constants:Genesis_constants.for_unit_tests.protocol)
+           ~constraint_constants ~protocol_constants)
     in
     let constants = Constants.for_unit_tests in
     let delay = UInt32.(div constants.delta (of_int 2)) in
@@ -3092,13 +3107,16 @@ module Hooks = struct
     let time_received = Epoch.slot_start_time ~constants curr_epoch new_slot in
     received_at_valid_time ~constants
       (Consensus_state.negative_one ~genesis_ledger:Test_genesis_ledger.t
-         ~protocol_constants:Genesis_constants.for_unit_tests.protocol)
+         ~constraint_constants ~protocol_constants)
       ~time_received:(to_unix_timestamp time_received)
     |> Result.is_ok
 
   let%test "Receive an invalid consensus_state" =
     let epoch = Epoch.of_int 5 in
     let constants = Constants.for_unit_tests in
+    let constraint_constants =
+      Genesis_constants.Constraint_constants.for_unit_tests
+    in
     let protocol_constants = Genesis_constants.for_unit_tests.protocol in
     let start_time = Epoch.start_time ~constants epoch in
     let ((curr_epoch, curr_slot) as curr) =
@@ -3106,7 +3124,7 @@ module Hooks = struct
     in
     let consensus_state =
       { (Consensus_state.negative_one ~genesis_ledger:Test_genesis_ledger.t
-           ~protocol_constants)
+           ~constraint_constants ~protocol_constants)
         with
         curr_global_slot= Global_slot.of_epoch_and_slot ~constants curr }
     in
@@ -3115,7 +3133,7 @@ module Hooks = struct
       Epoch.start_time ~constants
         (Consensus_state.curr_slot
            (Consensus_state.negative_one ~genesis_ledger:Test_genesis_ledger.t
-              ~protocol_constants))
+              ~constraint_constants ~protocol_constants))
     in
     let too_late =
       let delay = UInt32.(mul constants.delta (of_int 2)) in
@@ -3176,12 +3194,13 @@ module Hooks = struct
 
     let generate_transition ~(previous_protocol_state : Protocol_state.Value.t)
         ~blockchain_state ~current_time ~(block_data : Block_data.t)
-        ~transactions:_ ~snarked_ledger_hash ~supply_increase ~logger =
+        ~transactions:_ ~snarked_ledger_hash ~supply_increase ~logger
+        ~constraint_constants =
       let previous_consensus_state =
         Protocol_state.consensus_state previous_protocol_state
       in
       let constants =
-        Constants.create
+        Constants.create ~constraint_constants
           ~protocol_constants:
             ( Protocol_state.constants previous_protocol_state
             |> Coda_base.Protocol_constants_checked.t_of_value )
@@ -3218,10 +3237,11 @@ module Hooks = struct
       (protocol_state, consensus_transition)
 
     include struct
-      let%snarkydef next_state_checked ~(prev_state : Protocol_state.var)
+      let%snarkydef next_state_checked ~constraint_constants
+          ~(prev_state : Protocol_state.var)
           ~(prev_state_hash : Coda_base.State_hash.var) transition
           supply_increase =
-        Consensus_state.update_var
+        Consensus_state.update_var ~constraint_constants
           (Protocol_state.consensus_state prev_state)
           (Snark_transition.consensus_transition transition)
           prev_state_hash ~supply_increase
@@ -3317,10 +3337,13 @@ let%test_module "Proof of stake tests" =
           (Ledger.merkle_root (Lazy.force Test_genesis_ledger.t))
       in
       let previous_protocol_state_hash = State_hash.(of_hash zero) in
+      let constraint_constants =
+        Genesis_constants.Constraint_constants.for_unit_tests
+      in
       let previous_consensus_state =
         Consensus_state.create_genesis
           ~negative_one_protocol_state_hash:previous_protocol_state_hash
-          ~genesis_ledger:Test_genesis_ledger.t
+          ~genesis_ledger:Test_genesis_ledger.t ~constraint_constants
           ~protocol_constants:Genesis_constants.for_unit_tests.protocol
       in
       let constants = Constants.for_unit_tests in
@@ -3377,7 +3400,9 @@ let%test_module "Proof of stake tests" =
         let open Snark_params.Tick in
         (* work in Checked monad *)
         let%bind previous_state =
-          exists typ ~compute:(As_prover.return previous_consensus_state)
+          exists
+            (typ ~constraint_constants)
+            ~compute:(As_prover.return previous_consensus_state)
         in
         let%bind transition_data =
           exists Consensus_transition.typ
@@ -3404,7 +3429,7 @@ let%test_module "Proof of stake tests" =
         let result =
           update_var previous_state transition_data
             previous_protocol_state_hash ~supply_increase
-            ~previous_blockchain_state_ledger_hash
+            ~previous_blockchain_state_ledger_hash ~constraint_constants
             ~protocol_constants:constants_checked
         in
         (* setup handler *)
@@ -3423,7 +3448,7 @@ let%test_module "Proof of stake tests" =
               {Pending_coinbase_witness.pending_coinbases; is_new_stack= true}
         in
         let%map `Success _, var = Snark_params.Tick.handle result handler in
-        As_prover.read typ var
+        As_prover.read (typ ~constraint_constants) var
       in
       let (), checked_value =
         Or_error.ok_exn

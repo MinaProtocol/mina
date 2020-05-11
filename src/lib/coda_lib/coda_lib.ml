@@ -702,6 +702,7 @@ let staking_ledger t =
   let open Option.Let_syntax in
   let consensus_constants =
     Consensus.Constants.create
+      ~constraint_constants:t.config.constraint_constants
       ~protocol_constants:
         (Precomputed_values.protocol_constants t.config.precomputed_values)
   in
@@ -759,15 +760,17 @@ let start t =
     ~frontier_reader:t.components.transition_frontier
     ~transition_writer:t.pipes.producer_transition_writer
     ~log_block_creation:t.config.log_block_creation
+    ~constraint_constants:t.config.constraint_constants
     ~genesis_constants:
       (Precomputed_values.genesis_constants t.config.precomputed_values) ;
   Snark_worker.start t
 
-let create (config : Config.t) ~precomputed_values =
+let create (config : Config.t) =
   let consensus_constants =
     Consensus.Constants.create
+      ~constraint_constants:config.constraint_constants
       ~protocol_constants:
-        (Precomputed_values.protocol_constants precomputed_values)
+        (Precomputed_values.protocol_constants config.precomputed_values)
   in
   let monitor = Option.value ~default:(Monitor.create ()) config.monitor in
   Async.Scheduler.within' ~monitor (fun () ->
@@ -784,8 +787,9 @@ let create (config : Config.t) ~precomputed_values =
               (fun () ->
                 trace "prover" (fun () ->
                     Prover.create ~logger:config.logger
-                      ~proof_level:config.proof_level ~pids:config.pids
-                      ~conf_dir:config.conf_dir ) )
+                      ~proof_level:config.proof_level
+                      ~constraint_constants:config.constraint_constants
+                      ~pids:config.pids ~conf_dir:config.conf_dir ) )
             >>| Result.ok_exn
           in
           let%bind verifier =
@@ -1047,7 +1051,8 @@ let create (config : Config.t) ~precomputed_values =
           let ((most_recent_valid_block_reader, _) as most_recent_valid_block)
               =
             Broadcast_pipe.create
-              ( External_transition.genesis ~precomputed_values
+              ( External_transition.genesis
+                  ~precomputed_values:config.precomputed_values
               |> External_transition.Validated.to_initial_validated )
           in
           let valid_transitions, initialization_finish_signal =
@@ -1106,7 +1111,9 @@ let create (config : Config.t) ~precomputed_values =
                                @@ External_transition.Validation
                                   .forget_validation et ) ;
                          breadcrumb ))
-                  ~most_recent_valid_block ~precomputed_values )
+                  ~most_recent_valid_block
+                  ~constraint_constants:config.constraint_constants
+                  ~precomputed_values:config.precomputed_values )
           in
           let ( valid_transitions_for_network
               , valid_transitions_for_api
