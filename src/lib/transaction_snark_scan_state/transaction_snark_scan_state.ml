@@ -656,10 +656,11 @@ let fill_work_and_enqueue_transactions t transactions work =
   in
   (result_opt, updated_scan_state)
 
-let required_state_hashes _t =
-  (* TODO: when merging into #4244
-  List.map (Parallel_scan.pending_data t) ~f:(fun (t : Transaction_with_witness.t) -> ...*)
-  State_hash.Set.empty
+let required_state_hashes t =
+  List.fold ~init:State_hash.Set.empty
+    ~f:(fun acc (t : Transaction_with_witness.t) ->
+      Set.add acc (fst t.state_hash) )
+    (Parallel_scan.pending_data t)
 
 let check_required_protocol_states t ~protocol_states =
   let open Or_error.Let_syntax in
