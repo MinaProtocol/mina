@@ -28,7 +28,7 @@ module type S = sig
   module Addr = Location.Addr
 
   (** create a mask with no parent *)
-  val create : unit -> t
+  val create : depth:int -> unit -> t
 
   val get_uuid : t -> Uuid.t
 

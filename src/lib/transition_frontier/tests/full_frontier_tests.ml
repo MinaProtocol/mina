@@ -19,6 +19,8 @@ let%test_module "Full_frontier tests" =
     let constraint_constants =
       Genesis_constants.Constraint_constants.for_unit_tests
 
+    let ledger_depth = Genesis_constants.ledger_depth_for_unit_tests
+
     let accounts_with_secret_keys = Lazy.force Test_genesis_ledger.accounts
 
     let max_length = 5
@@ -51,7 +53,7 @@ let%test_module "Full_frontier tests" =
         Or_error.ok_exn
           (Transfer.transfer_accounts
              ~src:(Lazy.force Test_genesis_ledger.t)
-             ~dest:(Ledger.create ()))
+             ~dest:(Ledger.create ~depth:ledger_depth ()))
       in
       let root_data =
         let open Root_data in

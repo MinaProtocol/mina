@@ -7,11 +7,12 @@ let files = blockDirectory |> Node.Fs.readdirSync;
 let blocks =
   Array.map(
     file => {
-      Node.Fs.readFileAsUtf8Sync(blockDirectory ++ file)
-      |> Js.Json.parseExn
-      |> Types.NewBlock.unsafeJSONToNewBlock
+      let fileContents = Node.Fs.readFileAsUtf8Sync(blockDirectory ++ file);
+      let blockData = Js.Json.parseExn(fileContents);
+      let block = Types.NewBlock.unsafeJSONToNewBlock(blockData);
+      block.data.newBlock;
     },
     files,
   );
 
-let results = Challenges.handleMetrics([|BlocksCreated|], blocks);
+let results = Challenges.calculateMetrics(blocks);

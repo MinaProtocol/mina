@@ -23,6 +23,9 @@ module T = struct
 
   let protocol_constants t = (genesis_constants t).protocol
 
+  let ledger_depth {genesis_ledger; _} =
+    Genesis_ledger.Packed.depth genesis_ledger
+
   let genesis_ledger {genesis_ledger; _} =
     Genesis_ledger.Packed.t genesis_ledger
 

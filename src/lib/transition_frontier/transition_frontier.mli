@@ -86,6 +86,7 @@ module For_tests : sig
   val gen_persistence :
        ?logger:Logger.t
     -> proof_level:Genesis_constants.Proof_level.t
+    -> ledger_depth:int
     -> ?verifier:Verifier.t
     -> unit
     -> (Persistent_root.t * Persistent_frontier.t) Quickcheck.Generator.t

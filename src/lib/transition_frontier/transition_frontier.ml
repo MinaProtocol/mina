@@ -452,7 +452,8 @@ module For_tests = struct
         in
         Breadcrumb.create genesis_transition genesis_staged_ledger )
 
-  let gen_persistence ?(logger = Logger.null ()) ~proof_level ?verifier () =
+  let gen_persistence ?(logger = Logger.null ()) ~proof_level ~ledger_depth
+      ?verifier () =
     let open Core in
     let verifier =
       match verifier with
@@ -488,7 +489,7 @@ module For_tests = struct
         Unix.mkdir root_dir ;
         Unix.mkdir frontier_dir ;
         let persistent_root =
-          Persistent_root.create ~logger ~directory:root_dir
+          Persistent_root.create ~logger ~directory:root_dir ~ledger_depth
         in
         let persistent_frontier =
           Persistent_frontier.create ~logger ~verifier
@@ -571,7 +572,9 @@ module For_tests = struct
         ~protocol_states
     in
     let%map persistent_root, persistent_frontier =
-      gen_persistence ~logger ~proof_level ()
+      gen_persistence ~logger ~proof_level
+        ~ledger_depth:(Precomputed_values.ledger_depth precomputed_values)
+        ()
     in
     Async.Thread_safe.block_on_async_exn (fun () ->
         Persistent_frontier.reset_database_exn persistent_frontier ~root_data

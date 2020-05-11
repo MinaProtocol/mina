@@ -10,55 +10,80 @@ let printMap = map => {
   );
 };
 
-let getUsers = blocks => {
-  Array.map(
-    (block: Types.NewBlock.t) => block.data.newBlock.creatorAccount.publicKey,
-    blocks,
-  );
+let calculateProperty = (f, blocks) => {
+  blocks
+  |> Array.fold_left((map, block) => {f(map, block)}, StringMap.empty);
 };
 
-let calculateBlocksCreated = blocks => {
-  Array.fold_left(
-    (map, block: Types.NewBlock.t) => {
-      StringMap.update(
-        block.data.newBlock.creatorAccount.publicKey,
-        value =>
-          switch (value) {
-          | Some(blockCount) => Some(blockCount + 1)
-          | None => Some(1)
-          },
-        map,
-      )
-    },
+let incrementMapValue = (key, map) => {
+  map
+  |> StringMap.update(key, value => {
+       switch (value) {
+       | Some(valueCount) => Some(valueCount + 1)
+       | None => Some(1)
+       }
+     });
+};
+
+let getBlocksCreatedByUser = blocks => {
+  blocks
+  |> Array.fold_left(
+       (map, block: Types.NewBlock.data) => {
+         incrementMapValue(block.creatorAccount.publicKey, map)
+       },
+       StringMap.empty,
+     );
+};
+
+let calculateTransactionSent = (map, block: Types.NewBlock.data) => {
+  block.transactions.userCommands
+  |> Array.fold_left(
+       (transactionMap, userCommand: Types.NewBlock.userCommands) => {
+         incrementMapValue(userCommand.fromAccount.publicKey, transactionMap)
+       },
+       map,
+     );
+};
+
+let getTransactionSentByUser = blocks => {
+  blocks |> calculateProperty(calculateTransactionSent);
+};
+
+let calculateSnarkWorkCount = (map, block: Types.NewBlock.data) => {
+  block.snarkJobs
+  |> Array.fold_left(
+       (snarkMap, snarkJob: Types.NewBlock.snarkJobs) => {
+         incrementMapValue(snarkJob.prover, snarkMap)
+       },
+       map,
+     );
+};
+
+let getSnarkWorkCreatedByUser = blocks => {
+  blocks |> calculateProperty(calculateSnarkWorkCount);
+};
+
+let calculateAllUsers = metrics => {
+  List.fold_left(
+    StringMap.merge((_, _, _) => {Some()}),
     StringMap.empty,
-    blocks,
+    metrics,
   );
 };
 
-let calculateTransactionSent = blocks => {
-  Js.log("calculateTransactionSent");
-};
+let calculateMetrics = blocks => {
+  let blocksCreated = blocks |> getBlocksCreatedByUser;
+  let transactionSent = blocks |> getTransactionSentByUser;
+  let snarkWorkCreated = blocks |> getSnarkWorkCreatedByUser;
+  let users = calculateAllUsers([blocksCreated, transactionSent]);
 
-let calculateSnarkWorkCreated = blocks => {
-  Js.log("calculateSnarkWorkCreated");
-};
-
-// Expected Output
-// {
-//       "pk1": {"block_count": 1, "transactions_sent": 134, "snark_jobs": 11}
-//       "pk2": {"block_count": 4, "transactions_sent": 55, "snark_jobs": 3}
-//       "pk3": {"block_count": 0, "transactions_sent": 3, "snark_jobs": 8}
-//}
-let handleMetrics = (metrics, blocks) => {
-  Types.Metrics.(
-    Array.map(
-      metric => {
-        switch (metric) {
-        | BlocksCreated => blocks |> calculateBlocksCreated
-        | _ => StringMap.empty
-        }
+  StringMap.mapi(
+    (key, _) =>
+      {
+        Types.Metrics.blocksCreated: StringMap.find_opt(key, blocksCreated),
+        transactionSent: StringMap.find_opt(key, transactionSent),
+        snarkWorkCreated: StringMap.find_opt(key, snarkWorkCreated),
       },
-      metrics,
-    )
+    users,
   );
 };

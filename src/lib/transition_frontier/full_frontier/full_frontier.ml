@@ -402,7 +402,10 @@ let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
     if Breadcrumb.just_emitted_a_proof new_root_node.breadcrumb then (
       let s = t.root_ledger in
       (* STEP 4 *)
-      let mt = Ledger.Maskable.register_mask s (Ledger.Mask.create ()) in
+      let mt =
+        Ledger.Maskable.register_mask s
+          (Ledger.Mask.create ~depth:(Ledger.Any_ledger.M.depth s) ())
+      in
       (* STEP 5 *)
       Non_empty_list.iter
         (Option.value_exn
