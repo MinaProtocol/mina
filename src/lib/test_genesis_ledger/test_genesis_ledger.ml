@@ -12,7 +12,8 @@ include Genesis_ledger.Make (struct
 
   let directory = `Ephemeral
 
-  let depth = Genesis_constants.ledger_depth_for_unit_tests
+  let depth =
+    Genesis_constants.Constraint_constants.for_unit_tests.ledger_depth
 end)
 
 [%%else]

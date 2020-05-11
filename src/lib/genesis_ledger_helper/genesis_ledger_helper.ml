@@ -107,7 +107,8 @@ module Ledger = struct
           | None ->
               `New
 
-        let depth = Genesis_constants.ledger_depth
+        let depth =
+          Genesis_constants.Constraint_constants.compiled.ledger_depth
       end) )
     in
     packed |> Genesis_ledger.Packed.t |> Lazy.force |> Ledger.commit ;
@@ -115,7 +116,7 @@ module Ledger = struct
 
   let load directory_name : Genesis_ledger.Packed.t =
     ( module Genesis_ledger.Of_ledger (struct
-      let depth = Genesis_constants.ledger_depth
+      let depth = Genesis_constants.Constraint_constants.compiled.ledger_depth
 
       let t = lazy (Ledger.create ~depth ~directory_name ())
     end) )

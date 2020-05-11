@@ -1532,6 +1532,9 @@ let%test_module "test" =
 
     let proof_level = Genesis_constants.Proof_level.Check
 
+    let ledger_depth =
+      Genesis_constants.Constraint_constants.for_unit_tests.ledger_depth
+
     (* Functor for testing with different instantiated staged ledger modules. *)
     let create_and_apply_with_state_body_hash state_body_hash sl logger pids
         txns stmt_to_work =
@@ -1575,8 +1578,7 @@ let%test_module "test" =
       *)
     let async_with_ledgers ledger_init_state
         (f : Sl.t ref -> Ledger.Mask.Attached.t -> unit Deferred.t) =
-      Ledger.with_ephemeral_ledger
-        ~depth:Genesis_constants.ledger_depth_for_unit_tests ~f:(fun ledger ->
+      Ledger.with_ephemeral_ledger ~depth:ledger_depth ~f:(fun ledger ->
           Ledger.apply_initial_ledger_state ledger ledger_init_state ;
           let casted = Ledger.Any_ledger.cast (module Ledger) ledger in
           let test_mask =
