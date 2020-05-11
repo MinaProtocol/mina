@@ -13,10 +13,11 @@ let rough_domains : Domains.t =
   let d = Domain.Pow_2_roots_of_unity 17 in
   {h= d; k= d; x= Pow_2_roots_of_unity 6}
 
-let domains (type field a)
+let domains (type field a b)
     (module Impl : Snarky.Snark_intf.Run
       with type field = field
-       and type R1CS_constraint_system.t = a
+       and type R1CS_constraint_system.t = ( a
+                                           , b )
                                            Snarky_bn382_backend
                                            .R1cs_constraint_system
                                            .t) (Spec.ETyp.T (typ, conv)) main =
