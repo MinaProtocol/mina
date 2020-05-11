@@ -300,15 +300,12 @@ let get_protocol_state t state_hash =
       (Broadcast_pipe.Reader.peek t.components.transition_frontier)
       ~error_string:"Could not retrieve transition frontier"
   in
-  let%map breadcrumb =
-    to_or_error
-      (Transition_frontier.find frontier state_hash)
-      ~error_string:
-        (sprintf
-           !"Protocol state with hash %{sexp: State_hash.t} not found"
-           state_hash)
-  in
-  Transition_frontier.Breadcrumb.protocol_state breadcrumb
+  to_or_error
+    (Transition_frontier.find_protocol_state frontier state_hash)
+    ~error_string:
+      (sprintf
+         !"Protocol state with hash %{sexp: State_hash.t} not found"
+         state_hash)
 
 let compose_of_option f =
   Fn.compose
