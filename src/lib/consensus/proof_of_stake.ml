@@ -2301,6 +2301,9 @@ module Data = struct
     let curr_global_slot_var (t : var) =
       Global_slot.slot_number t.curr_global_slot
 
+    let curr_global_slot (t : Value.t) =
+      Global_slot.slot_number t.curr_global_slot
+
     let consensus_time (t : Value.t) = t.curr_global_slot
 
     [%%define_locally

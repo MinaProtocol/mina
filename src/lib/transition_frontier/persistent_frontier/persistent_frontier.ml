@@ -8,7 +8,8 @@ module Database = Database
 
 exception Invalid_genesis_state_hash of External_transition.Validated.t
 
-let construct_staged_ledger_at_root ~root_ledger ~root_transition ~root =
+let construct_staged_ledger_at_root ~root_ledger ~root_transition ~root
+    ~protocol_states ~logger =
   let open Deferred.Or_error.Let_syntax in
   let open Root_data.Minimal in
   let snarked_ledger_hash =
@@ -17,23 +18,45 @@ let construct_staged_ledger_at_root ~root_ledger ~root_transition ~root =
   in
   let scan_state = scan_state root in
   let pending_coinbase = pending_coinbase root in
-  let%bind transactions =
-    Deferred.return (Staged_ledger.Scan_state.staged_transactions scan_state)
+  let protocol_states_map =
+    List.fold protocol_states ~init:State_hash.Map.empty
+      ~f:(fun acc protocol_state ->
+        Map.add_exn acc
+          ~key:(Protocol_state.hash protocol_state)
+          ~data:protocol_state )
+  in
+  let get_state hash =
+    match Map.find protocol_states_map hash with
+    | None ->
+        Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+          ~metadata:[("state_hash", State_hash.to_yojson hash)]
+          "Protocol state (for scan state transactions) for $state_hash not \
+           found when loading persisted transition frontier" ;
+        Or_error.errorf
+          !"Protocol state (for scan state transactions) for \
+            %{sexp:State_hash.t} not found when loading persisted transition \
+            frontier"
+          hash
+    | Some protocol_state ->
+        Ok protocol_state
+  in
+  let%bind transactions_with_protocol_state =
+    Deferred.return
+      (Staged_ledger.Scan_state.staged_transactions_with_protocol_states
+         scan_state ~get_state)
   in
   let mask = Ledger.of_database root_ledger in
-  let current_global_slot =
-    External_transition.Validated.protocol_state root_transition
-    |> Protocol_state.consensus_state
-    |> Consensus.Data.Consensus_state.curr_slot
-  in
-  (*Deepthi: with protocol states*)
   let%bind () =
     Deferred.return
-      (List.fold transactions ~init:(Or_error.return ()) ~f:(fun acc txn ->
+      (List.fold transactions_with_protocol_state ~init:(Or_error.return ())
+         ~f:(fun acc (txn, protocol_state) ->
            let open Or_error.Let_syntax in
            let%bind () = acc in
            let%map _ =
-             Ledger.apply_transaction mask ~txn_global_slot:current_global_slot
+             Ledger.apply_transaction mask
+               ~txn_global_slot:
+                 ( Protocol_state.consensus_state protocol_state
+                 |> Consensus.Data.Consensus_state.curr_global_slot )
                txn
            in
            () ))
@@ -211,6 +234,7 @@ module Instance = struct
       let open Deferred.Let_syntax in
       match%map
         construct_staged_ledger_at_root ~root_ledger ~root_transition ~root
+          ~protocol_states ~logger:t.factory.logger
       with
       | Error err ->
           Error (`Failure (Error.to_string_hum err))

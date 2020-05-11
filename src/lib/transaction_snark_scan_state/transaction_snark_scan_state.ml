@@ -488,7 +488,7 @@ let staged_transactions t =
   @@ Parallel_scan.pending_data t
   |> Or_error.all
 
-let staged_transactions_with_protocol_state t
+let staged_transactions_with_protocol_states t
     ~(get_state : State_hash.t -> Coda_state.Protocol_state.value Or_error.t) =
   let open Or_error.Let_syntax in
   List.map ~f:(fun (t : Transaction_with_witness.t) ->

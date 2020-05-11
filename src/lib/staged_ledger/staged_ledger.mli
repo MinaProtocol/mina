@@ -36,7 +36,7 @@ module Scan_state : sig
 
   val staged_transactions : t -> Transaction.t list Or_error.t
 
-  val staged_transactions_with_protocol_state :
+  val staged_transactions_with_protocol_states :
        t
     -> get_state:(State_hash.t -> Coda_state.Protocol_state.value Or_error.t)
     -> (Transaction.t * Coda_state.Protocol_state.value) list Or_error.t

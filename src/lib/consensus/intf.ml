@@ -477,6 +477,8 @@ module type S = sig
 
       val curr_slot : Value.t -> Slot.t
 
+      val curr_global_slot : Value.t -> Coda_numbers.Global_slot.t
+
       val is_genesis_state : Value.t -> bool
 
       val is_genesis_state_var : var -> (Boolean.var, _) Checked.t

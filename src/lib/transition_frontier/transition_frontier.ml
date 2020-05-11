@@ -434,7 +434,13 @@ module For_tests = struct
         let genesis_ledger =
           Lazy.force (Precomputed_values.genesis_ledger precomputed_values)
         in
-        (*DEEPTHI: pass the function to get protocol states which would be empty since the scan state is empty*)
+        (*scan state is empty so no protocol state should be required*)
+        let get_state hash =
+          Or_error.errorf
+            !"Protocol state (for scan state transactions) for \
+              %{sexp:State_hash.t} not found when"
+            hash
+        in
         let genesis_staged_ledger =
           Or_error.ok_exn
             (Async.Thread_safe.block_on_async_exn (fun () ->
@@ -442,7 +448,7 @@ module For_tests = struct
                  .of_scan_state_pending_coinbases_and_snarked_ledger ~logger
                    ~verifier
                    ~scan_state:(Staged_ledger.Scan_state.empty ())
-                   ~current_global_slot:Coda_numbers.Global_slot.zero
+                   ~get_state
                    ~pending_coinbases:
                      (Or_error.ok_exn @@ Pending_coinbase.create ())
                    ~snarked_ledger:genesis_ledger

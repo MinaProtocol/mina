@@ -235,15 +235,19 @@ module T = struct
     let snarked_frozen_ledger_hash =
       Frozen_ledger_hash.of_ledger_hash snarked_ledger_hash
     in
-    let%bind txs =
-      Scan_state.staged_transactions_with_protocol_state scan_state ~get_state
+    let%bind txs_with_protocol_state =
+      Scan_state.staged_transactions_with_protocol_states scan_state ~get_state
       |> Deferred.return
     in
     let%bind () =
-      Deferred.List.fold txs ~init:(Ok ()) ~f:(fun acc tx ->
+      Deferred.List.fold txs_with_protocol_state ~init:(Ok ())
+        ~f:(fun acc (tx, protocol_state) ->
           Deferred.map (Async.Scheduler.yield ()) ~f:(fun () ->
               Or_error.bind acc ~f:(fun () ->
-                  Ledger.apply_transaction ~txn_global_slot:current_global_slot
+                  Ledger.apply_transaction
+                    ~txn_global_slot:
+                      ( Coda_state.Protocol_state.consensus_state protocol_state
+                      |> Consensus.Data.Consensus_state.curr_global_slot )
                     snarked_ledger tx
                   |> Or_error.ignore ) ) )
     in
