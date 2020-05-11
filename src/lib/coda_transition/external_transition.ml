@@ -49,7 +49,6 @@ module Stable = struct
         ; validation_callback= _ } =
       `Assoc
         [ ("protocol_state", Protocol_state.value_to_yojson protocol_state)
-        ; ("state_hash", Protocol_state.hash protocol_state)
         ; ("protocol_state_proof", `String "<opaque>")
         ; ("staged_ledger_diff", `String "<opaque>")
         ; ("delta_transition_chain_proof", `String "<opaque>")
@@ -360,6 +359,8 @@ module Validation = struct
         failwith "why can't this be refuted?"
 
   let forget_validation (t, _) = With_hash.data t
+
+  let forget_validation_with_hash (t, _) = t
 
   module Unsafe = struct
     let set_valid_time_received :

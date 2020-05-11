@@ -223,6 +223,17 @@ module type S = sig
          , 'protocol_versions )
          with_transition
       -> external_transition
+
+    val forget_validation_with_hash :
+         ( 'time_received
+         , 'genesis_state
+         , 'proof
+         , 'delta_transition_chain
+         , 'frontier_dependencies
+         , 'staged_ledger_diff
+         , 'protocol_versions )
+         with_transition
+      -> (external_transition, State_hash.t) With_hash.t
   end
 
   module Initial_validated : sig
