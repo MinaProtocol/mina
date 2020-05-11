@@ -49,6 +49,7 @@ module Stable = struct
         ; validation_callback= _ } =
       `Assoc
         [ ("protocol_state", Protocol_state.value_to_yojson protocol_state)
+        ; ("state_hash", Protocol_state.hash protocol_state)
         ; ("protocol_state_proof", `String "<opaque>")
         ; ("staged_ledger_diff", `String "<opaque>")
         ; ("delta_transition_chain_proof", `String "<opaque>")
