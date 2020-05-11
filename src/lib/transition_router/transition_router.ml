@@ -385,6 +385,7 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~time_controller
       let persistent_root =
         Transition_frontier.Persistent_root.create ~logger
           ~directory:persistent_root_location
+          ~ledger_depth:(Precomputed_values.ledger_depth precomputed_values)
       in
       upon
         (initialize ~logger ~network ~is_seed ~verifier ~trust_system

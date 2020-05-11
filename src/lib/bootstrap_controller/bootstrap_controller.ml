@@ -200,7 +200,10 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
     in
     let%bind staged_ledger_aux_result =
       let open Deferred.Or_error.Let_syntax in
-      let%bind scan_state, expected_merkle_root, pending_coinbases =
+      let%bind ( scan_state
+               , expected_merkle_root
+               , pending_coinbases
+               , protocol_states ) =
         Coda_networking.get_staged_ledger_aux_and_pending_coinbases_at_hash
           t.network sender_peer_id hash
       in
@@ -229,7 +232,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
       (* Construct the staged ledger before constructing the transition
        * frontier in order to verify the scan state we received.
        * TODO: reorganize the code to avoid doing this twice (#3480)  *)
-      let%map _ =
+      let%bind _ =
         let open Deferred.Let_syntax in
         let temp_mask = Ledger.of_database temp_snarked_ledger in
         let%map result =
@@ -241,7 +244,12 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
         ignore (Ledger.Maskable.unregister_mask_exn temp_mask) ;
         result
       in
-      (scan_state, pending_coinbases, new_root)
+      let%map protocol_states =
+        Staged_ledger.Scan_state.check_required_protocol_states scan_state
+          ~protocol_states
+        |> Deferred.return
+      in
+      (scan_state, pending_coinbases, new_root, protocol_states)
     in
     Transition_frontier.Persistent_root.Instance.destroy
       temp_persistent_root_instance ;
@@ -268,7 +276,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
            bootstrap" ;
         Writer.close sync_ledger_writer ;
         loop ()
-    | Ok (scan_state, pending_coinbase, new_root) -> (
+    | Ok (scan_state, pending_coinbase, new_root, protocol_states) -> (
         let%bind () =
           Trust_system.(
             record t.trust_system t.logger sender_host
@@ -329,7 +337,8 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
         | Ok () ->
             (* Close the old frontier and reload a new on from disk. *)
             let new_root_data : Transition_frontier.Root_data.Limited.t =
-              {transition= new_root; scan_state; pending_coinbase}
+              Transition_frontier.Root_data.Limited.create ~transition:new_root
+                ~scan_state ~pending_coinbase ~protocol_states
             in
             let%bind () =
               Transition_frontier.Persistent_frontier.reset_database_exn
@@ -419,6 +428,8 @@ let%test_module "Bootstrap_controller tests" =
 
     let logger = Logger.create ()
 
+    let proof_level = Genesis_constants.Proof_level.Check
+
     let trust_system = Trust_system.null ()
 
     let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
@@ -444,7 +455,7 @@ let%test_module "Bootstrap_controller tests" =
     let make_non_running_bootstrap ~genesis_root ~network =
       let verifier =
         Async.Thread_safe.block_on_async_exn (fun () ->
-            Verifier.create ~logger ~conf_dir:None ~pids )
+            Verifier.create ~logger ~proof_level ~conf_dir:None ~pids )
       in
       let transition =
         genesis_root
@@ -467,11 +478,11 @@ let%test_module "Bootstrap_controller tests" =
         (* we only need one node for this test, but we need more than one peer so that coda_networking does not throw an error *)
         let%bind fake_network =
           Fake_network.Generator.(
-            gen ~precomputed_values ~max_frontier_length
+            gen ~proof_level ~precomputed_values ~max_frontier_length
               [fresh_peer; fresh_peer])
         in
         let%map make_branch =
-          Transition_frontier.Breadcrumb.For_tests.gen_seq
+          Transition_frontier.Breadcrumb.For_tests.gen_seq ~proof_level
             ~accounts_with_secret_keys:
               (Lazy.force Test_genesis_ledger.accounts)
             branch_size
@@ -532,7 +543,7 @@ let%test_module "Bootstrap_controller tests" =
       let open Fake_network in
       let verifier =
         Async.Thread_safe.block_on_async_exn (fun () ->
-            Verifier.create ~conf_dir:None ~logger ~pids )
+            Verifier.create ~conf_dir:None ~proof_level ~logger ~pids )
       in
       let time_controller = Block_time.Controller.basic ~logger in
       let persistent_root =
@@ -585,7 +596,7 @@ let%test_module "Bootstrap_controller tests" =
     let%test_unit "sync with one node after receiving a transition" =
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
-          gen ~precomputed_values ~max_frontier_length
+          gen ~proof_level ~precomputed_values ~max_frontier_length
             [ fresh_peer
             ; peer_with_branch
                 ~frontier_branch_size:((max_frontier_length * 2) + 2) ])
@@ -624,7 +635,7 @@ let%test_module "Bootstrap_controller tests" =
     let%test_unit "reconstruct staged_ledgers using \
                    of_scan_state_and_snarked_ledger" =
       Quickcheck.test ~trials:1
-        (Transition_frontier.For_tests.gen ~precomputed_values
+        (Transition_frontier.For_tests.gen ~proof_level ~precomputed_values
            ~max_length:max_frontier_length ~size:max_frontier_length ())
         ~f:(fun frontier ->
           Thread_safe.block_on_async_exn
@@ -646,7 +657,7 @@ let%test_module "Bootstrap_controller tests" =
                 Staged_ledger.pending_coinbase_collection staged_ledger
               in
               let%bind verifier =
-                Verifier.create ~conf_dir:None ~logger ~pids
+                Verifier.create ~conf_dir:None ~proof_level ~logger ~pids
               in
               (*DEEPTHI: pass the protocol states that the peer sent us*)
               let%map actual_staged_ledger =

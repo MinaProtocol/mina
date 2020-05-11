@@ -13,7 +13,7 @@ end
 
 let create_ledger_and_transactions num_transitions =
   let num_accounts = 4 in
-  let ledger = Ledger.create () in
+  let ledger = Ledger.create ~depth:Genesis_constants.ledger_depth () in
   let keys =
     Array.init num_accounts ~f:(fun _ -> Signature_lib.Keypair.create ())
   in

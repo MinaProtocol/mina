@@ -13,7 +13,8 @@ module type Inputs_intf = sig
   module Worker_state : sig
     type t
 
-    val create : unit -> t Deferred.t
+    val create :
+      proof_level:Genesis_constants.Proof_level.t -> unit -> t Deferred.t
 
     val worker_wait_time : float
   end
@@ -83,7 +84,8 @@ module type S = sig
   val command : Command.t
 
   val arguments :
-       daemon_address:Host_and_port.t
+       proof_level:Genesis_constants.Proof_level.t
+    -> daemon_address:Host_and_port.t
     -> shutdown_on_disconnect:bool
     -> string list
 end

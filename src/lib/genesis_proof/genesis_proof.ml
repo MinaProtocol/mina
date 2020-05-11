@@ -23,6 +23,9 @@ module T = struct
 
   let protocol_constants t = (genesis_constants t).protocol
 
+  let ledger_depth {genesis_ledger; _} =
+    Genesis_ledger.Packed.depth genesis_ledger
+
   let genesis_ledger {genesis_ledger; _} =
     Genesis_ledger.Packed.t genesis_ledger
 
@@ -65,7 +68,7 @@ let wrap ~keys:(module Keys : Keys_lib.Keys.S) hash proof =
   assert (Tock.verify proof (Tock.Keypair.vk Wrap.keys) Wrap.input input) ;
   proof
 
-let base_proof ?(logger = Logger.create ())
+let base_proof ?(logger = Logger.create ()) ~proof_level
     ~keys:((module Keys : Keys_lib.Keys.S) as keys) (t : Inputs.t) =
   let genesis_ledger = Genesis_ledger.Packed.t t.genesis_ledger in
   let protocol_constants = t.genesis_constants.protocol in
@@ -80,7 +83,8 @@ let base_proof ?(logger = Logger.create ())
     ; update= Snark_transition.genesis ~genesis_ledger }
   in
   let main x =
-    Tick.handle (Keys.Step.main ~logger x)
+    Tick.handle
+      (Keys.Step.main ~logger ~proof_level x)
       (Consensus.Data.Prover_state.precomputed_handler ~genesis_ledger)
   in
   let tick =
@@ -94,9 +98,9 @@ let base_proof ?(logger = Logger.create ())
       (Keys.Step.input ()) t.base_hash ) ;
   wrap ~keys t.base_hash tick
 
-let create_values ?logger ~keys (t : Inputs.t) =
+let create_values ?logger ~proof_level ~keys (t : Inputs.t) =
   { genesis_constants= t.genesis_constants
   ; genesis_ledger= t.genesis_ledger
   ; protocol_state_with_hash= t.protocol_state_with_hash
   ; base_hash= t.base_hash
-  ; genesis_proof= base_proof ?logger ~keys t }
+  ; genesis_proof= base_proof ?logger ~proof_level ~keys t }

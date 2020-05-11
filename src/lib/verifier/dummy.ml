@@ -5,7 +5,12 @@ type t = unit
 
 type ledger_proof = Ledger_proof.Debug.t
 
-let create ~logger:_ ~pids:_ ~conf_dir:_ = Deferred.return ()
+let create ~logger:_ ~proof_level ~pids:_ ~conf_dir:_ =
+  match proof_level with
+  | Genesis_constants.Proof_level.Full ->
+      failwith "Unable to handle proof-level=Full"
+  | Check | None ->
+      Deferred.return ()
 
 let verify_blockchain_snark _ _ = Deferred.Or_error.return true
 

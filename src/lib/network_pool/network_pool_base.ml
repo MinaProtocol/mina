@@ -27,16 +27,17 @@ end)
 
   let apply_and_broadcast t (pool_diff, valid_cb, result_cb) =
     let rebroadcast (diff', rejected) =
-      valid_cb true ;
       result_cb (Ok (diff', rejected)) ;
       if Resource_pool.Diff.is_empty diff' then (
         Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
           "Refusing to rebroadcast. Pool diff apply feedback: empty diff" ;
+        valid_cb false ;
         Deferred.unit )
       else (
         Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
           "Broadcasting %s"
           (Resource_pool.Diff.summary diff') ;
+        valid_cb true ;
         Linear_pipe.write t.write_broadcasts diff' )
     in
     match%bind Resource_pool.Diff.unsafe_apply t.resource_pool pool_diff with

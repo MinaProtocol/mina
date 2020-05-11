@@ -13,16 +13,7 @@ module Test_inputs = struct
   end
 
   module Ledger_proof = struct
-    module T = struct
-      type t = Fee.t [@@deriving hash, compare, sexp]
-
-      let of_binable = Fee.of_int
-
-      let to_binable = Fee.to_int
-    end
-
-    include Binable.Of_binable (Core_kernel.Int.Stable.V1) (T)
-    include T
+    type t = Fee.t [@@deriving hash, compare, sexp]
   end
 
   module Transaction_snark_work = struct

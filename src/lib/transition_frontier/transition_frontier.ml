@@ -30,11 +30,13 @@ type t =
   ; genesis_state_hash: State_hash.t }
 
 let genesis_root_data ~precomputed_values =
-  let open Root_data.Limited.Stable.Latest in
+  let open Root_data.Limited in
   let transition = External_transition.genesis ~precomputed_values in
   let scan_state = Staged_ledger.Scan_state.empty () in
+  (*if scan state is empty the protocol states required is also empty*)
+  let protocol_states = [] in
   let pending_coinbase = Or_error.ok_exn (Pending_coinbase.create ()) in
-  {transition; scan_state; pending_coinbase}
+  create ~transition ~scan_state ~pending_coinbase ~protocol_states
 
 let load_from_persistence_and_start ~logger ~verifier ~consensus_local_state
     ~max_length ~persistent_root ~persistent_root_instance ~persistent_frontier
@@ -367,6 +369,8 @@ include struct
 
   let best_tip_path_length_exn = proxy1 best_tip_path_length_exn
 
+  let find_protocol_state = proxy1 find_protocol_state
+
   (* why can't this one be proxied? *)
   let path_map {full_frontier; _} breadcrumb ~f =
     path_map full_frontier breadcrumb ~f
@@ -412,7 +416,7 @@ module For_tests = struct
   *)
 
   (* a helper quickcheck generator which always returns the genesis breadcrumb *)
-  let gen_genesis_breadcrumb ?(logger = Logger.null ()) ?verifier
+  let gen_genesis_breadcrumb ?(logger = Logger.null ()) ~proof_level ?verifier
       ~precomputed_values () =
     let verifier =
       match verifier with
@@ -420,7 +424,7 @@ module For_tests = struct
           x
       | None ->
           Async.Thread_safe.block_on_async_exn (fun () ->
-              Verifier.create ~logger ~conf_dir:None
+              Verifier.create ~logger ~proof_level ~conf_dir:None
                 ~pids:(Child_processes.Termination.create_pid_table ()) )
     in
     Quickcheck.Generator.create (fun ~size:_ ~random:_ ->
@@ -446,7 +450,8 @@ module For_tests = struct
         in
         Breadcrumb.create genesis_transition genesis_staged_ledger )
 
-  let gen_persistence ?(logger = Logger.null ()) ?verifier () =
+  let gen_persistence ?(logger = Logger.null ()) ~proof_level ~ledger_depth
+      ?verifier () =
     let open Core in
     let verifier =
       match verifier with
@@ -454,7 +459,7 @@ module For_tests = struct
           x
       | None ->
           Async.Thread_safe.block_on_async_exn (fun () ->
-              Verifier.create ~logger ~conf_dir:None
+              Verifier.create ~logger ~proof_level ~conf_dir:None
                 ~pids:(Child_processes.Termination.create_pid_table ()) )
     in
     let root_dir = "/tmp/coda_unit_test" in
@@ -482,7 +487,7 @@ module For_tests = struct
         Unix.mkdir root_dir ;
         Unix.mkdir frontier_dir ;
         let persistent_root =
-          Persistent_root.create ~logger ~directory:root_dir
+          Persistent_root.create ~logger ~directory:root_dir ~ledger_depth
         in
         let persistent_frontier =
           Persistent_frontier.create ~logger ~verifier
@@ -498,14 +503,25 @@ module For_tests = struct
             clean_temp_dirs x ) ;
         (persistent_root, persistent_frontier) )
 
-  let gen ?(logger = Logger.null ()) ?verifier ?trust_system
+  let gen_genesis_breadcrumb_with_protocol_states ~logger ~proof_level
+      ?verifier ~precomputed_values () =
+    let open Quickcheck.Generator.Let_syntax in
+    let%map root =
+      gen_genesis_breadcrumb ~logger ~proof_level ?verifier ~precomputed_values
+        ()
+    in
+    (* List of protocol states required to prove transactions in the scan state; empty scan state at genesis*)
+    let protocol_states = [] in
+    (root, protocol_states)
+
+  let gen ?(logger = Logger.null ()) ~proof_level ?verifier ?trust_system
       ?consensus_local_state ~precomputed_values
       ?(root_ledger_and_accounts =
         ( Lazy.force (Precomputed_values.genesis_ledger precomputed_values)
         , Lazy.force (Precomputed_values.accounts precomputed_values) ))
       ?(gen_root_breadcrumb =
-        gen_genesis_breadcrumb ~logger ?verifier ~precomputed_values ())
-      ~max_length ~size () =
+        gen_genesis_breadcrumb_with_protocol_states ~logger ~proof_level
+          ?verifier ~precomputed_values ()) ~max_length ~size () =
     let open Quickcheck.Generator.Let_syntax in
     let genesis_state_hash =
       Precomputed_values.genesis_state_hash precomputed_values
@@ -516,7 +532,7 @@ module For_tests = struct
           x
       | None ->
           Async.Thread_safe.block_on_async_exn (fun () ->
-              Verifier.create ~logger ~conf_dir:None
+              Verifier.create ~logger ~proof_level ~conf_dir:None
                 ~pids:(Child_processes.Termination.create_pid_table ()) )
     in
     let trust_system =
@@ -532,22 +548,31 @@ module For_tests = struct
     in
     let root_snarked_ledger, root_ledger_accounts = root_ledger_and_accounts in
     (* TODO: ensure that rose_tree cannot be longer than k *)
-    let%bind (Rose_tree.T (root, branches)) =
-      Quickcheck.Generator.with_size ~size
-        (Quickcheck_lib.gen_imperative_rose_tree gen_root_breadcrumb
-           (Breadcrumb.For_tests.gen_non_deferred ~logger ~verifier
-              ~trust_system ~accounts_with_secret_keys:root_ledger_accounts))
+    let%bind root, branches, protocol_states =
+      let%bind root, protocol_states = gen_root_breadcrumb in
+      let%map (Rose_tree.T (root, branches)) =
+        Quickcheck.Generator.with_size ~size
+          (Quickcheck_lib.gen_imperative_rose_tree
+             (Quickcheck.Generator.return root)
+             (Breadcrumb.For_tests.gen_non_deferred ~logger ~proof_level
+                ~verifier ~trust_system
+                ~accounts_with_secret_keys:root_ledger_accounts))
+      in
+      (root, branches, protocol_states)
     in
     let root_data =
-      { Root_data.Limited.Stable.Latest.transition=
-          Breadcrumb.validated_transition root
-      ; scan_state= Breadcrumb.staged_ledger root |> Staged_ledger.scan_state
-      ; pending_coinbase=
-          Breadcrumb.staged_ledger root
-          |> Staged_ledger.pending_coinbase_collection }
+      Root_data.Limited.create
+        ~transition:(Breadcrumb.validated_transition root)
+        ~scan_state:(Breadcrumb.staged_ledger root |> Staged_ledger.scan_state)
+        ~pending_coinbase:
+          ( Breadcrumb.staged_ledger root
+          |> Staged_ledger.pending_coinbase_collection )
+        ~protocol_states
     in
     let%map persistent_root, persistent_frontier =
-      gen_persistence ~logger ()
+      gen_persistence ~logger ~proof_level
+        ~ledger_depth:(Precomputed_values.ledger_depth precomputed_values)
+        ()
     in
     Async.Thread_safe.block_on_async_exn (fun () ->
         Persistent_frontier.reset_database_exn persistent_frontier ~root_data
@@ -555,7 +580,8 @@ module For_tests = struct
     Persistent_root.with_instance_exn persistent_root ~f:(fun instance ->
         Persistent_root.Instance.set_root_state_hash instance
           ~genesis_state_hash
-          (External_transition.Validated.state_hash root_data.transition) ;
+          (External_transition.Validated.state_hash
+             (Root_data.Limited.transition root_data)) ;
         ignore
         @@ Ledger_transfer.transfer_accounts ~src:root_snarked_ledger
              ~dest:(Persistent_root.Instance.snarked_ledger instance) ) ;
@@ -582,8 +608,8 @@ module For_tests = struct
           ~f:(deferred_rose_tree_iter ~f:(add_breadcrumb_exn frontier)) ) ;
     frontier
 
-  let gen_with_branch ?logger ?verifier ?trust_system ?consensus_local_state
-      ~precomputed_values
+  let gen_with_branch ?logger ~proof_level ?verifier ?trust_system
+      ?consensus_local_state ~precomputed_values
       ?(root_ledger_and_accounts =
         ( Lazy.force (Precomputed_values.genesis_ledger precomputed_values)
         , Lazy.force (Precomputed_values.accounts precomputed_values) ))
@@ -591,12 +617,12 @@ module For_tests = struct
       ~branch_size () =
     let open Quickcheck.Generator.Let_syntax in
     let%bind frontier =
-      gen ?logger ?verifier ?trust_system ?consensus_local_state
+      gen ?logger ~proof_level ?verifier ?trust_system ?consensus_local_state
         ~precomputed_values ?gen_root_breadcrumb ~root_ledger_and_accounts
         ~max_length ~size:frontier_size ()
     in
     let%map make_branch =
-      Breadcrumb.For_tests.gen_seq ?logger ?verifier ?trust_system
+      Breadcrumb.For_tests.gen_seq ?logger ~proof_level ?verifier ?trust_system
         ~accounts_with_secret_keys:(snd root_ledger_and_accounts)
         branch_size
     in

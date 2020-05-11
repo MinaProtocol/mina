@@ -66,8 +66,8 @@ module Hashless_ledger = struct
 
   let create l = {base= l; overlay= Hashtbl.create (module Account_id)}
 
-  let with_ledger ~f =
-    Ledger.with_ledger ~f:(fun l ->
+  let with_ledger ~depth ~f =
+    Ledger.with_ledger ~depth ~f:(fun l ->
         let t = create l in
         f t )
 end

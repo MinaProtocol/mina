@@ -24,7 +24,7 @@ module type Ledger_intf = sig
 
   val merkle_root : t -> Ledger_hash.t
 
-  val with_ledger : f:(t -> 'a) -> 'a
+  val with_ledger : depth:int -> f:(t -> 'a) -> 'a
 end
 
 module Undo = struct

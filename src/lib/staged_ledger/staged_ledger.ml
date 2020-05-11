@@ -263,7 +263,7 @@ module T = struct
       ~scan_state ~pending_coinbase_collection:pending_coinbases
 
   let copy {scan_state; ledger; pending_coinbase_collection} =
-    let new_mask = Ledger.Mask.create () in
+    let new_mask = Ledger.Mask.create ~depth:(Ledger.depth ledger) () in
     { scan_state
     ; ledger= Ledger.register_mask ledger new_mask
     ; pending_coinbase_collection }
@@ -640,7 +640,7 @@ module T = struct
       ( Int.min (Scan_state.free_space t.scan_state) max_throughput
       , List.length jobs )
     in
-    let new_mask = Ledger.Mask.create () in
+    let new_mask = Ledger.Mask.create ~depth:(Ledger.depth t.ledger) () in
     let new_ledger = Ledger.register_mask t.ledger new_mask in
     let transactions, works, user_commands_count, coinbases = pre_diff_info in
     let%bind is_new_stack, data, stack_update_in_snark, stack_update =
@@ -1549,6 +1549,8 @@ let%test_module "test" =
       Quickcheck.random_value ~seed:(`Deterministic "receiver_pk")
         Public_key.Compressed.gen
 
+    let proof_level = Genesis_constants.Proof_level.Check
+
     (* Functor for testing with different instantiated staged ledger modules. *)
     let create_and_apply_with_state_body_hash current_global_slot
         state_and_body_hash sl logger pids txns stmt_to_work =
@@ -1559,7 +1561,9 @@ let%test_module "test" =
           ~coinbase_receiver:(`Other coinbase_receiver)
       in
       let diff' = Staged_ledger_diff.forget diff in
-      let%bind verifier = Verifier.create ~logger ~pids ~conf_dir:None in
+      let%bind verifier =
+        Verifier.create ~logger ~proof_level ~pids ~conf_dir:None
+      in
       let%map ( `Hash_after_applying hash
               , `Ledger_proof ledger_proof
               , `Staged_ledger sl'
@@ -1594,11 +1598,13 @@ let%test_module "test" =
       *)
     let async_with_ledgers ledger_init_state
         (f : Sl.t ref -> Ledger.Mask.Attached.t -> unit Deferred.t) =
-      Ledger.with_ephemeral_ledger ~f:(fun ledger ->
+      Ledger.with_ephemeral_ledger
+        ~depth:Genesis_constants.ledger_depth_for_unit_tests ~f:(fun ledger ->
           Ledger.apply_initial_ledger_state ledger ledger_init_state ;
           let casted = Ledger.Any_ledger.cast (module Ledger) ledger in
           let test_mask =
-            Ledger.Maskable.register_mask casted (Ledger.Mask.create ())
+            Ledger.Maskable.register_mask casted
+              (Ledger.Mask.create ~depth:(Ledger.depth ledger) ())
           in
           let sl = ref @@ Sl.create_exn ~ledger in
           Async.Thread_safe.block_on_async_exn (fun () -> f sl test_mask) ;
@@ -2097,7 +2103,7 @@ let%test_module "test" =
                         work_done partitions
                     in
                     let%bind verifier =
-                      Verifier.create ~logger ~pids ~conf_dir:None
+                      Verifier.create ~logger ~proof_level ~pids ~conf_dir:None
                     in
                     let%bind apply_res =
                       Sl.apply !sl diff ~logger ~verifier
