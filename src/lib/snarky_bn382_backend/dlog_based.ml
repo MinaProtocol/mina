@@ -168,11 +168,16 @@ module Keypair = struct
       [On_disk {directory= "/home/izzy/pickles-new/"; should_write= true}]
 
   let create
-      { R1cs_constraint_system.public_input_size
-      ; auxiliary_input_size
-      ; m= {a; b; c}
-      ; weight } =
+      ({ public_input_size
+       ; stats
+       ; plonk
+       ; auxiliary_input_size
+       ; m= {a; b; c}
+       ; weight } :
+        R1CS_constraint_system.t) =
     let vars = 1 + public_input_size + auxiliary_input_size in
+    Core.printf !"dlog stats: %{sexp:R1cs_constraint_system.Stats.t}\n%!" stats ;
+    Core.printf "dlog plonk size: %d\n%!" plonk.n ;
     Core.printf "dlog weight %d\n%!"
       (R1cs_constraint_system.Weight.norm weight) ;
     Fq_index.create a b c
