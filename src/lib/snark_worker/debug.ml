@@ -23,5 +23,3 @@ module Inputs = struct
         , Coda_base.Sok_message.digest message )
       , Time.Span.zero )
 end
-
-module Worker = Functor.Make (Inputs)

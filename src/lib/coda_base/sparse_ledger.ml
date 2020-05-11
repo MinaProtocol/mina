@@ -109,7 +109,8 @@ let%test_unit "of_ledger_subset_exn with keys that don't exist works" =
     let privkey = Private_key.create () in
     (privkey, Public_key.of_private_key_exn privkey |> Public_key.compress)
   in
-  Ledger.with_ledger ~depth:Genesis_constants.ledger_depth_for_unit_tests
+  Ledger.with_ledger
+    ~depth:Genesis_constants.Constraint_constants.for_unit_tests.ledger_depth
     ~f:(fun ledger ->
       let _, pub1 = keygen () in
       let _, pub2 = keygen () in
