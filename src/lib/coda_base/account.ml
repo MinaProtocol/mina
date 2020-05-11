@@ -38,20 +38,18 @@ module Index = struct
     end
   end]
 
-  let ledger_depth = Coda_compile_config.ledger_depth
-
   type t = Stable.Latest.t [@@deriving to_yojson, sexp]
 
   let to_int = Int.to_int
 
-  let gen = Int.gen_incl 0 ((1 lsl ledger_depth) - 1)
+  let gen ~ledger_depth = Int.gen_incl 0 ((1 lsl ledger_depth) - 1)
 
   module Table = Int.Table
 
   module Vector = struct
     include Int
 
-    let length = ledger_depth
+    let length = Coda_compile_config.ledger_depth
 
     let empty = zero
 

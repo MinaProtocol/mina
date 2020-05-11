@@ -558,11 +558,11 @@ module Data = struct
                    (Random_oracle.Checked.pack_input input)) )
       end
 
-      let gen =
+      let gen ~ledger_depth =
         let open Quickcheck.Let_syntax in
         let%map global_slot = Global_slot.gen
         and seed = Epoch_seed.gen
-        and delegator = Coda_base.Account.Index.gen in
+        and delegator = Coda_base.Account.Index.gen ~ledger_depth in
         {global_slot; seed; delegator}
     end
 
@@ -649,7 +649,10 @@ module Data = struct
         in
         let gen_message_and_curve_point =
           let open Quickcheck.Generator.Let_syntax in
-          let%map msg = Message.gen and g = gen_inner_curve_point in
+          let%map msg =
+            Message.gen
+              ~ledger_depth:Genesis_constants.ledger_depth_for_unit_tests
+          and g = gen_inner_curve_point in
           (msg, g)
         in
         Quickcheck.test ~trials:10 gen_message_and_curve_point
