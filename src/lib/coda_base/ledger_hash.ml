@@ -116,7 +116,8 @@ let get ~depth t addr =
 let%snarkydef modify_account ~depth t aid
     ~(filter : Account.var -> ('a, _) Checked.t) ~f =
   let%bind addr =
-    request_witness Account.Index.Unpacked.typ
+    request_witness
+      (Account.Index.Unpacked.typ ~ledger_depth:depth)
       As_prover.(map (read Account_id.typ aid) ~f:(fun s -> Find_index s))
   in
   handle

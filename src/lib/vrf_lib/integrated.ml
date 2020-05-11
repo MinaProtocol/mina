@@ -41,7 +41,7 @@ module Make
 
       type var
 
-      val hash_to_group : value -> Group.value
+      val hash_to_group : ledger_depth:int -> value -> Group.value
 
       module Checked : sig
         val hash_to_group : var -> (Group.var, _) Impl.Checked.t
@@ -51,13 +51,17 @@ module Make
 
       type var
 
-      val hash : Message.value -> Group.value -> value
+      val hash : ledger_depth:int -> Message.value -> Group.value -> value
 
       module Checked : sig
         val hash : Message.var -> Group.var -> (var, _) Impl.Checked.t
       end
     end) : sig
-  val eval : private_key:Scalar.value -> Message.value -> Output_hash.value
+  val eval :
+       ledger_depth:int
+    -> private_key:Scalar.value
+    -> Message.value
+    -> Output_hash.value
 
   module Checked : sig
     val eval :
@@ -76,10 +80,10 @@ module Make
 end = struct
   open Impl
 
-  let eval ~private_key m =
-    let h = Message.hash_to_group m in
+  let eval ~ledger_depth ~private_key m =
+    let h = Message.hash_to_group ~ledger_depth m in
     let u = Group.scale h private_key in
-    Output_hash.hash m u
+    Output_hash.hash ~ledger_depth m u
 
   module Checked = struct
     open Let_syntax

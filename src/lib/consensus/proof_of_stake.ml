@@ -506,11 +506,11 @@ module Data = struct
         , Coda_base.Account.Index.Unpacked.var )
         t
 
-      let to_input ({global_slot; seed; delegator} : value) =
+      let to_input ~ledger_depth ({global_slot; seed; delegator} : value) =
         { Random_oracle.Input.field_elements= [|(seed :> Tick.field)|]
         ; bitstrings=
             [| Global_slot.Bits.to_bits global_slot
-             ; Coda_base.Account.Index.to_bits delegator |] }
+             ; Coda_base.Account.Index.to_bits ~ledger_depth delegator |] }
 
       let to_hlist {global_slot; seed; delegator} =
         Coda_base.H_list.[global_slot; seed; delegator]
@@ -523,19 +523,21 @@ module Data = struct
        fun Coda_base.H_list.[global_slot; seed; delegator] ->
         {global_slot; seed; delegator}
 
-      let data_spec =
+      let data_spec ~ledger_depth =
         let open Tick.Data_spec in
-        [Global_slot.typ; Epoch_seed.typ; Coda_base.Account.Index.Unpacked.typ]
+        [ Global_slot.typ
+        ; Epoch_seed.typ
+        ; Coda_base.Account.Index.Unpacked.typ ~ledger_depth ]
 
-      let typ : (var, value) Typ.t =
-        Tick.Typ.of_hlistable data_spec ~var_to_hlist:to_hlist
+      let typ ~ledger_depth : (var, value) Typ.t =
+        Tick.Typ.of_hlistable (data_spec ~ledger_depth) ~var_to_hlist:to_hlist
           ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
           ~value_of_hlist:of_hlist
 
-      let hash_to_group msg =
+      let hash_to_group ~ledger_depth msg =
         Group_map.to_group
           (Random_oracle.hash ~init:Coda_base.Hash_prefix.vrf_message
-             (Random_oracle.pack_input (to_input msg)))
+             (Random_oracle.pack_input (to_input ~ledger_depth msg)))
         |> Tick.Inner_curve.of_affine
 
       module Checked = struct
@@ -615,11 +617,13 @@ module Data = struct
         Random_oracle.Digest.to_bits ~length:Truncated.length_in_bits x
         |> Array.of_list |> Blake2.bits_to_string
 
-      let hash msg g =
+      let hash ~ledger_depth msg g =
         let x, y = Non_zero_curve_point.of_inner_curve_exn g in
         let input =
           Random_oracle.Input.(
-            append (Message.to_input msg) (field_elements [|x; y|]))
+            append
+              (Message.to_input ~ledger_depth msg)
+              (field_elements [|x; y|]))
         in
         let open Random_oracle in
         hash ~init:Hash_prefix_states.vrf_output (pack_input input)
@@ -642,6 +646,7 @@ module Data = struct
       end
 
       let%test_unit "hash unchecked vs. checked equality" =
+        let ledger_depth = Genesis_constants.ledger_depth_for_unit_tests in
         let gen_inner_curve_point =
           let open Quickcheck.Generator.Let_syntax in
           let%map compressed = Non_zero_curve_point.gen in
@@ -649,9 +654,7 @@ module Data = struct
         in
         let gen_message_and_curve_point =
           let open Quickcheck.Generator.Let_syntax in
-          let%map msg =
-            Message.gen
-              ~ledger_depth:Genesis_constants.ledger_depth_for_unit_tests
+          let%map msg = Message.gen ~ledger_depth
           and g = gen_inner_curve_point in
           (msg, g)
         in
@@ -659,10 +662,10 @@ module Data = struct
           ~f:
             (Test_util.test_equal ~equal:Field.equal
                Snark_params.Tick.Typ.(
-                 Message.typ * Snark_params.Tick.Inner_curve.typ)
+                 Message.typ ~ledger_depth * Snark_params.Tick.Inner_curve.typ)
                typ
                (fun (msg, g) -> Checked.hash msg g)
-               (fun (msg, g) -> hash msg g))
+               (fun (msg, g) -> hash ~ledger_depth msg g))
     end
 
     module Threshold = struct
@@ -800,7 +803,8 @@ module Data = struct
           ~(epoch_ledger : Epoch_ledger.var) ~global_slot ~seed =
         let open Snark_params.Tick in
         let%bind winner_addr =
-          request_witness Coda_base.Account.Index.Unpacked.typ
+          request_witness
+            (Coda_base.Account.Index.Unpacked.typ ~ledger_depth)
             (As_prover.return Winner_address)
         in
         let%bind result, my_stake =
@@ -876,7 +880,8 @@ module Data = struct
             |> Option.value ~default:(Core_kernel.Int.Table.create ()) )
             ~f:(fun ~key:delegator ~data:account ->
               let vrf_result =
-                T.eval ~private_key {global_slot; seed; delegator}
+                T.eval ~ledger_depth:epoch_snapshot.ledger.depth ~private_key
+                  {global_slot; seed; delegator}
               in
               let truncated_vrf_result = Output.truncate vrf_result in
               Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
@@ -2107,7 +2112,9 @@ module Data = struct
         ~consensus_transition ~genesis_ledger ~protocol_constants : Value.t =
       let producer_vrf_result =
         let _, sk = Vrf.Precomputed.genesis_winner in
-        Vrf.eval ~private_key:sk
+        Vrf.eval
+          ~ledger_depth:(Coda_base.Ledger.depth @@ Lazy.force genesis_ledger)
+          ~private_key:sk
           { Vrf.Message.global_slot= consensus_transition
           ; seed= Epoch_seed.initial
           ; delegator= 0 }
@@ -3357,7 +3364,7 @@ let%test_module "Proof of stake tests" =
             previous_consensus_state.next_epoch_data.seed
           else previous_consensus_state.staking_epoch_data.seed
         in
-        Vrf.eval ~private_key
+        Vrf.eval ~ledger_depth ~private_key
           {global_slot= Global_slot.slot_number global_slot; seed; delegator}
       in
       let next_consensus_state =
