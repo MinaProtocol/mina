@@ -73,6 +73,9 @@ let%test_module "transaction_status" =
 
     let proof_level = Genesis_constants.Proof_level.Check
 
+    let constraint_constants =
+      Genesis_constants.Constraint_constants.for_unit_tests
+
     let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
 
     let trust_system = Trust_system.null ()
@@ -92,7 +95,8 @@ let%test_module "transaction_status" =
 
     let gen_frontier =
       Transition_frontier.For_tests.gen ~logger ~proof_level
-        ~precomputed_values ~trust_system ~max_length ~size:frontier_size ()
+        ~constraint_constants ~precomputed_values ~trust_system ~max_length
+        ~size:frontier_size ()
 
     let gen_user_command =
       User_command.Gen.payment ~sign_type:`Real ~max_amount:100 ~max_fee:10

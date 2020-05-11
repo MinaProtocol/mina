@@ -16,6 +16,9 @@ let%test_module "Full_frontier tests" =
 
     let proof_level = Genesis_constants.Proof_level.Check
 
+    let constraint_constants =
+      Genesis_constants.Constraint_constants.for_unit_tests
+
     let ledger_depth = Genesis_constants.ledger_depth_for_unit_tests
 
     let accounts_with_secret_keys = Lazy.force Test_genesis_ledger.accounts
@@ -69,7 +72,7 @@ let%test_module "Full_frontier tests" =
     let%test_unit "Should be able to find a breadcrumbs after adding them" =
       Quickcheck.test gen_breadcrumb ~trials:4 ~f:(fun make_breadcrumb ->
           Async.Thread_safe.block_on_async_exn (fun () ->
-              let frontier = create_frontier () in
+              let frontier = create_frontier ~constraint_constants () in
               let root = Full_frontier.root frontier in
               let%map breadcrumb = make_breadcrumb root in
               add_breadcrumb frontier breadcrumb ;
@@ -89,7 +92,7 @@ let%test_module "Full_frontier tests" =
       Quickcheck.test gen_branches ~trials:4
         ~f:(fun (make_short_branch, make_long_branch) ->
           Async.Thread_safe.block_on_async_exn (fun () ->
-              let frontier = create_frontier () in
+              let frontier = create_frontier ~constraint_constants () in
               let test_best_tip ?message breadcrumb =
                 [%test_eq: State_hash.t] ?message
                   (Breadcrumb.state_hash breadcrumb)
@@ -128,7 +131,7 @@ let%test_module "Full_frontier tests" =
         ~trials:4
         ~f:(fun make_seq ->
           Async.Thread_safe.block_on_async_exn (fun () ->
-              let frontier = create_frontier () in
+              let frontier = create_frontier ~constraint_constants () in
               let root = Full_frontier.root frontier in
               let%map seq = make_seq root in
               ignore
@@ -155,7 +158,7 @@ let%test_module "Full_frontier tests" =
         ~trials:2
         ~f:(fun make_seq ->
           Async.Thread_safe.block_on_async_exn (fun () ->
-              let frontier = create_frontier () in
+              let frontier = create_frontier ~constraint_constants () in
               let root = Full_frontier.root frontier in
               let%map rest = make_seq root in
               List.iter rest ~f:(fun breadcrumb ->
@@ -179,7 +182,7 @@ let%test_module "Full_frontier tests" =
       in
       Quickcheck.test gen ~trials:4 ~f:(fun make_seq ->
           Async.Thread_safe.block_on_async_exn (fun () ->
-              let frontier = create_frontier () in
+              let frontier = create_frontier ~constraint_constants () in
               let root = Full_frontier.root frontier in
               let%map breadcrumbs = make_seq root in
               List.iter breadcrumbs ~f:(fun b ->
@@ -206,7 +209,7 @@ let%test_module "Full_frontier tests" =
       Quickcheck.test gen ~trials:4
         ~f:(fun (make_ancestors, make_branch_a, make_branch_b) ->
           Async.Thread_safe.block_on_async_exn (fun () ->
-              let frontier = create_frontier () in
+              let frontier = create_frontier ~constraint_constants () in
               let root = Full_frontier.root frontier in
               let%bind ancestors = make_ancestors root in
               let youngest_ancestor = List.last_exn ancestors in
