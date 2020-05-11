@@ -35,8 +35,46 @@ end
 
 module Hash = Core.Md5
 
-type 'a t =
+module Stats = struct
+  open Core_kernel
+
+  type 'a histogram = ('a, int) Hashtbl.t
+
+  let sexp_of_histogram f h =
+    List.Assoc.sexp_of_t f Int.sexp_of_t (Hashtbl.to_alist h)
+
+  module Int_set = struct
+    module T = struct
+      type t = Int.Set.t [@@deriving sexp, compare]
+
+      module L = struct
+        type t = int list [@@deriving hash]
+      end
+
+      let hash t = L.hash (Int.Set.to_list t)
+    end
+
+    include Hashable.Make_and_derive_hash_fold_t (T)
+  end
+
+  type t =
+    { boolean: int histogram
+    ; equal_total_vars: int histogram
+    ; r1cs_weights: Int.Set.t histogram
+    ; r1cs_total_vars: int histogram }
+  [@@deriving sexp_of]
+
+  let create () =
+    { boolean= Int.Table.create ()
+    ; equal_total_vars= Int.Table.create ()
+    ; r1cs_weights= Int_set.Table.create ()
+    ; r1cs_total_vars= Int.Table.create () }
+end
+
+type ('a, 'plonk) t =
   { m: 'a abc
+  ; stats: Stats.t
+  ; plonk: 'plonk
   ; mutable hash: Hash_state.t
   ; mutable constraints: int
   ; mutable weight: Weight.t
@@ -53,6 +91,11 @@ end)
 (Mat : Constraint_matrix_intf with module Field := Fp) =
 struct
   open Core
+  module Plonk = Plonk_constraint_system.Make (Fp)
+
+  type nonrec t = (Mat.t, Plonk.t) t
+
+  let digest = digest
 
   module Hash_state = struct
     include Hash_state
@@ -78,10 +121,10 @@ struct
     let empty = H.empty
   end
 
-  type nonrec t = Mat.t t
-
   let create () =
     { public_input_size= 0
+    ; plonk= Plonk.create ()
+    ; stats= Stats.create ()
     ; hash= Hash_state.empty
     ; constraints= 0
     ; auxiliary_input_size= 0
@@ -98,8 +141,6 @@ struct
   let set_auxiliary_input_size t x = t.auxiliary_input_size <- x
 
   let set_primary_input_size t x = t.public_input_size <- x
-
-  let digest = digest
 
   let finalize = ignore
 
@@ -225,6 +266,7 @@ struct
 
   let add_constraint ?label:_ t
       (constr : Fp.t Snarky.Cvar.t Snarky.Constraint.basic) =
+    Plonk.add_constraint t.plonk constr ;
     let var = canonicalize in
     let var_exn t = Option.value_exn (var t) in
     let choose_best opts terms =
@@ -239,6 +281,8 @@ struct
         let x_minus_1_weight =
           x_weight + if x_has_constant_term then 0 else 1
         in
+        Hashtbl.incr t.stats.boolean
+          (x_weight - if x_has_constant_term then 1 else 0) ;
         choose_best
           (* x * x = x
              x * (x - 1) = 0 *)
@@ -254,8 +298,8 @@ struct
          y * 1 = x
         (x - y) * 1 = 0
       *)
-        let x_terms, x_weight, _ = var_exn x in
-        let y_terms, y_weight, _ = var_exn y in
+        let x_terms, x_weight, x_has_constant_term = var_exn x in
+        let y_terms, y_weight, y_has_constant_term = var_exn y in
         let x_minus_y_weight =
           merge_terms ~init:0 ~f:(fun acc _ _ -> acc + 1) x_terms y_terms
         in
@@ -265,6 +309,9 @@ struct
           ; (`x_minus_y_1_zero, (x_minus_y_weight, 1, 0)) ]
         in
         let one = [(Fp.one, 0)] in
+        Hashtbl.incr t.stats.equal_total_vars
+          ( x_minus_y_weight
+          - if x_has_constant_term || y_has_constant_term then 1 else 0 ) ;
         choose_best options (function
           | `x_1_y ->
               (x_terms, one, y_terms)
@@ -275,10 +322,22 @@ struct
     | Square (x, z) ->
         let x, x_weight, _ = var_exn x in
         let z, z_weight, _ = var_exn z in
+        let total_vars =
+          let t = sub_terms x z in
+          let k = List.length t in
+          match t with (_, 0) :: _ -> k - 1 | _ -> k
+        in
+        Hashtbl.incr t.stats.r1cs_total_vars total_vars ;
         choose_best [((), (x_weight, x_weight, z_weight))] (fun () -> (x, x, z))
     | R1CS (a, b, c) ->
         let a, a_weight, _ = var_exn a in
         let b, b_weight, _ = var_exn b in
         let c, c_weight, _ = var_exn c in
+        let total_vars =
+          let t = sub_terms (sub_terms a b) c in
+          let k = List.length t in
+          match t with (_, 0) :: _ -> k - 1 | _ -> k
+        in
+        Hashtbl.incr t.stats.r1cs_total_vars total_vars ;
         choose_best [((), (a_weight, b_weight, c_weight))] (fun () -> (a, b, c))
 end
