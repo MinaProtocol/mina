@@ -99,7 +99,11 @@ module Worker_state = struct
                  in
                  let main x =
                    Tick.handle
-                     (Keys.Step.main ~logger ~proof_level x)
+                     (Keys.Step.main ~logger ~proof_level
+                        ~ledger_depth:
+                          (Consensus.Data.Prover_state.ledger_depth
+                             state_for_handler)
+                        x)
                      (Consensus.Data.Prover_state.handler state_for_handler
                         ~pending_coinbase)
                  in
@@ -150,7 +154,11 @@ module Worker_state = struct
                  in
                  let main x =
                    Tick.handle
-                     (Keys.Step.main ~logger ~proof_level x)
+                     (Keys.Step.main ~logger ~proof_level
+                        ~ledger_depth:
+                          (Consensus.Data.Prover_state.ledger_depth
+                             state_for_handler)
+                        x)
                      (Consensus.Data.Prover_state.handler state_for_handler
                         ~pending_coinbase)
                  in

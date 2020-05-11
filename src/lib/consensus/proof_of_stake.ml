@@ -761,7 +761,7 @@ module Data = struct
       | Private_key : Scalar.value Snarky.Request.t
       | Public_key : Public_key.t Snarky.Request.t
 
-    let%snarkydef get_vrf_evaluation shifted ~ledger ~message =
+    let%snarkydef get_vrf_evaluation ~ledger_depth shifted ~ledger ~message =
       let open Coda_base in
       let open Snark_params.Tick in
       let%bind private_key =
@@ -772,7 +772,8 @@ module Data = struct
       in
       let staker_addr = message.Message.delegator in
       let%bind account =
-        with_label __LOC__ (Frozen_ledger_hash.get ledger staker_addr)
+        with_label __LOC__
+          (Frozen_ledger_hash.get ~depth:ledger_depth ledger staker_addr)
       in
       let%bind () =
         [%with_label "Account is for the default token"]
@@ -792,15 +793,15 @@ module Data = struct
       (evaluation, account.balance)
 
     module Checked = struct
-      let%snarkydef check shifted ~(epoch_ledger : Epoch_ledger.var)
-          ~global_slot ~seed =
+      let%snarkydef check ~ledger_depth shifted
+          ~(epoch_ledger : Epoch_ledger.var) ~global_slot ~seed =
         let open Snark_params.Tick in
         let%bind winner_addr =
           request_witness Coda_base.Account.Index.Unpacked.typ
             (As_prover.return Winner_address)
         in
         let%bind result, my_stake =
-          get_vrf_evaluation shifted ~ledger:epoch_ledger.hash
+          get_vrf_evaluation ~ledger_depth shifted ~ledger:epoch_ledger.hash
             ~message:{Message.global_slot; seed; delegator= winner_addr}
         in
         let%bind truncated_result = Output.Checked.truncate result in
@@ -2141,7 +2142,7 @@ module Data = struct
 
     let is_genesis_state_var (t : var) = is_genesis t.curr_global_slot
 
-    let%snarkydef update_var (previous_state : var)
+    let%snarkydef update_var ~ledger_depth (previous_state : var)
         (transition_data : Consensus_transition.var)
         (previous_protocol_state_hash : Coda_base.State_hash.var)
         ~(supply_increase : Currency.Amount.var)
@@ -2173,7 +2174,7 @@ module Data = struct
       in
       let%bind threshold_satisfied, vrf_result, truncated_vrf_result =
         let%bind (module M) = Inner_curve.Checked.Shifted.create () in
-        Vrf.Checked.check
+        Vrf.Checked.check ~ledger_depth
           (module M)
           ~epoch_ledger:staking_epoch_data.ledger
           ~global_slot:(Global_slot.slot_number next_global_slot)
@@ -2413,6 +2414,8 @@ module Data = struct
                  (Snarky.Request.Handler.run handlers
                     ["Ledger Handler"; "Pending Coinbase Handler"]
                     request))
+
+    let ledger_depth {ledger; _} = ledger.depth
   end
 end
 
@@ -3203,10 +3206,11 @@ module Hooks = struct
       (protocol_state, consensus_transition)
 
     include struct
-      let%snarkydef next_state_checked ~(prev_state : Protocol_state.var)
+      let%snarkydef next_state_checked ~ledger_depth
+          ~(prev_state : Protocol_state.var)
           ~(prev_state_hash : Coda_base.State_hash.var) transition
           supply_increase =
-        Consensus_state.update_var
+        Consensus_state.update_var ~ledger_depth
           (Protocol_state.consensus_state prev_state)
           (Snark_transition.consensus_transition transition)
           prev_state_hash ~supply_increase
@@ -3294,6 +3298,8 @@ let%test_module "Proof of stake tests" =
     open Coda_base
     open Data
     open Consensus_state
+
+    let ledger_depth = Genesis_constants.ledger_depth_for_unit_tests
 
     let%test_unit "update, update_var agree starting from same genesis state" =
       (* build pieces needed to apply "update" *)
@@ -3387,7 +3393,7 @@ let%test_module "Proof of stake tests" =
                     Genesis_constants.for_unit_tests.protocol))
         in
         let result =
-          update_var previous_state transition_data
+          update_var ~ledger_depth previous_state transition_data
             previous_protocol_state_hash ~supply_increase
             ~previous_blockchain_state_ledger_hash
             ~protocol_constants:constants_checked

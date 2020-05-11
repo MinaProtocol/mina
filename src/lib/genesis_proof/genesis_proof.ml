@@ -84,7 +84,9 @@ let base_proof ?(logger = Logger.create ()) ~proof_level
   in
   let main x =
     Tick.handle
-      (Keys.Step.main ~logger ~proof_level x)
+      (Keys.Step.main ~logger ~proof_level
+         ~ledger_depth:(Ledger.depth @@ Lazy.force genesis_ledger)
+         x)
       (Consensus.Data.Prover_state.precomputed_handler ~genesis_ledger)
   in
   let tick =

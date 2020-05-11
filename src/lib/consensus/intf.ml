@@ -250,7 +250,8 @@ module type State_hooks = sig
    * a given consensus state and snark transition.
   *)
   val next_state_checked :
-       prev_state:protocol_state_var
+       ledger_depth:int
+    -> prev_state:protocol_state_var
     -> prev_state_hash:Coda_base.State_hash.var
     -> snark_transition_var
     -> Currency.Amount.var
@@ -367,6 +368,8 @@ module type S = sig
            t
         -> pending_coinbase:Coda_base.Pending_coinbase_witness.t
         -> Snark_params.Tick.Handler.t
+
+      val ledger_depth : t -> int
     end
 
     module Consensus_transition : sig

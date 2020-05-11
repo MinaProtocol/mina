@@ -11,6 +11,7 @@ module type Update_intf = sig
     val update :
          logger:Logger.t
       -> proof_level:Genesis_constants.Proof_level.t
+      -> ledger_depth:int
       -> State_hash.var * State_body_hash.var * Protocol_state.var
       -> Snark_transition.var
       -> ( State_hash.var * Protocol_state.var * [`Success of Boolean.var]
@@ -48,7 +49,7 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
       | _ ->
           fun _ _ _ _ _ _ _ -> Checked.return Boolean.true_
 
-    let%snarkydef update ~(logger : Logger.t) ~proof_level
+    let%snarkydef update ~(logger : Logger.t) ~proof_level ~ledger_depth
         ((previous_state_hash, previous_state_body_hash, previous_state) :
           State_hash.var * State_body_hash.var * Protocol_state.var)
         (transition : Snark_transition.var) :
@@ -58,8 +59,9 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
       let supply_increase = Snark_transition.supply_increase transition in
       let%bind `Success updated_consensus_state, consensus_state =
         with_label __LOC__
-          (Consensus_state_hooks.next_state_checked ~prev_state:previous_state
-             ~prev_state_hash:previous_state_hash transition supply_increase)
+          (Consensus_state_hooks.next_state_checked ~ledger_depth
+             ~prev_state:previous_state ~prev_state_hash:previous_state_hash
+             transition supply_increase)
       in
       let prev_pending_coinbase_root =
         previous_state |> Protocol_state.blockchain_state

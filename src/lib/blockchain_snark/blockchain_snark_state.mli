@@ -7,6 +7,7 @@ module type Update_intf = sig
     val update :
          logger:Logger.t
       -> proof_level:Genesis_constants.Proof_level.t
+      -> ledger_depth:int
       -> State_hash.var * State_body_hash.var * Protocol_state.var
       -> Snark_transition.var
       -> ( State_hash.var * Protocol_state.var * [`Success of Boolean.var]

@@ -143,7 +143,8 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
         let state_body_hash_opt = Some state_body_hash in
         let span, proof =
           time (fun () ->
-              T.of_transaction ?preeval ~sok_digest:Sok_message.Digest.default
+              T.of_transaction ?preeval ~ledger_depth:sparse_ledger.depth
+                ~sok_digest:Sok_message.Digest.default
                 ~source:(Sparse_ledger.merkle_root sparse_ledger)
                 ~target:(Sparse_ledger.merkle_root sparse_ledger')
                 ~pending_coinbase_stack_state:
@@ -192,7 +193,8 @@ let check_base_snarks sparse_ledger0 (transitions : Transaction.t list) preeval
         in
         let state_body_hash_opt = Some state_body_hash in
         let () =
-          Transaction_snark.check_transaction ?preeval ~sok_message
+          Transaction_snark.check_transaction ?preeval
+            ~ledger_depth:sparse_ledger.depth ~sok_message
             ~source:(Sparse_ledger.merkle_root sparse_ledger)
             ~target:(Sparse_ledger.merkle_root sparse_ledger')
             ~pending_coinbase_stack_state:
@@ -223,7 +225,8 @@ let generate_base_snarks_witness sparse_ledger0
         in
         let state_body_hash_opt = Some state_body_hash in
         let () =
-          Transaction_snark.generate_transaction_witness ?preeval ~sok_message
+          Transaction_snark.generate_transaction_witness ?preeval
+            ~ledger_depth:sparse_ledger.depth ~sok_message
             ~source:(Sparse_ledger.merkle_root sparse_ledger)
             ~target:(Sparse_ledger.merkle_root sparse_ledger')
             { Transaction_snark.Pending_coinbase_stack_state.source=

@@ -738,8 +738,7 @@ end
 module Make_maskable_and_mask_with_depth (Depth : Depth_S) = struct
   let depth = Depth.depth
 
-  module Location : Merkle_ledger.Location_intf.S =
-    Merkle_ledger.Location.T
+  module Location : Merkle_ledger.Location_intf.S = Merkle_ledger.Location.T
 
   module Location_binable = struct
     module Arg = struct

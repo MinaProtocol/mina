@@ -95,7 +95,8 @@ module Inputs = struct
                 (input, t, (w : Transaction_witness.t)) ->
                 process (fun () ->
                     Or_error.try_with (fun () ->
-                        M.of_transaction ~sok_digest
+                        M.of_transaction ~ledger_depth:w.ledger.depth
+                          ~sok_digest
                           ~source:input.Transaction_snark.Statement.source
                           ~target:input.target t
                           ~pending_coinbase_stack_state:
