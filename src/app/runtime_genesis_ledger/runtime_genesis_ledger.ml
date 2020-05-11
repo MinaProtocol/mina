@@ -70,6 +70,7 @@ let main accounts_json_file dir num_accounts proof_level constants_file =
   let top_dir = Option.value ~default:Cache_dir.autogen_path dir in
   let genesis_dirname =
     Cache_dir.genesis_dir_name ~genesis_constants:Genesis_constants.compiled
+      ~constraint_constants:Genesis_constants.Constraint_constants.compiled
       ~proof_level:Genesis_constants.Proof_level.compiled
   in
   let%bind genesis_dir =
@@ -104,6 +105,8 @@ let main accounts_json_file dir num_accounts proof_level constants_file =
         in
         let%bind _base_hash, base_proof =
           Genesis_ledger_helper.Genesis_proof.generate ~proof_level ~ledger
+            ~constraint_constants:
+              Genesis_constants.Constraint_constants.compiled
             ~genesis_constants
         in
         Deferred.Or_error.ok_exn

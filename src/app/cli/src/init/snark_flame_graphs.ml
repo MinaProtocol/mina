@@ -19,7 +19,11 @@ let main () =
   let logs =
     [ ( "step"
       , L_Tick.log
-          (log (M.Step_base.main ~logger ~proof_level:Full) Tick.Field.typ) )
+          (log
+             (M.Step_base.main ~logger ~proof_level:Full
+                ~constraint_constants:
+                  Genesis_constants.Constraint_constants.compiled)
+             Tick.Field.typ) )
     ; ("wrap", L_Tock.log (log W.main Crypto_params.Wrap_input.typ)) ]
   in
   List.iter logs ~f:(fun (name, log) ->
