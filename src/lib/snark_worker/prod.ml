@@ -131,5 +131,3 @@ module Inputs = struct
                  ~proof:Precomputed_values.unit_test_base_proof
              , Time.Span.zero )
 end
-
-module Worker = Functor.Make (Inputs)

@@ -3,7 +3,7 @@ open Async
 open Coda_base
 
 module Make (Inputs : Intf.Inputs_intf) :
-  Intf.S with type ledger_proof := Inputs.Ledger_proof.t = struct
+  Intf.S0 with type ledger_proof := Inputs.Ledger_proof.t = struct
   open Inputs
   module Rpcs = Rpcs.Make (Inputs)
 
@@ -93,7 +93,10 @@ module Make (Inputs : Intf.Inputs_intf) :
               "Base SNARK generated in $time"
               ~metadata:[("time", `String (Time.Span.to_string_hum total))] )
 
-  let main ~logger ~proof_level daemon_address shutdown_on_disconnect =
+  let main
+      (module Rpcs_versioned : Intf.Rpcs_versioned_S
+        with type Work.ledger_proof = Inputs.Ledger_proof.t) ~logger
+      ~proof_level daemon_address shutdown_on_disconnect =
     let%bind state = Worker_state.create ~proof_level () in
     let wait ?(sec = 0.5) () = after (Time.Span.of_sec sec) in
     (* retry interval with jitter *)
@@ -119,7 +122,7 @@ module Make (Inputs : Intf.Inputs_intf) :
     in
     let rec go () =
       match%bind
-        dispatch Rpcs.Get_work.Latest.rpc shutdown_on_disconnect ()
+        dispatch Rpcs_versioned.Get_work.Latest.rpc shutdown_on_disconnect ()
           daemon_address
       with
       | Error e ->
@@ -151,8 +154,8 @@ module Make (Inputs : Intf.Inputs_intf) :
                     , `String (Host_and_port.to_string daemon_address) ) ] ;
               let rec submit_work () =
                 match%bind
-                  dispatch Rpcs.Submit_work.Latest.rpc shutdown_on_disconnect
-                    result daemon_address
+                  dispatch Rpcs_versioned.Submit_work.Latest.rpc
+                    shutdown_on_disconnect result daemon_address
                 with
                 | Error e ->
                     log_and_retry "submitting work" e (retry_pause 10.)
@@ -164,7 +167,9 @@ module Make (Inputs : Intf.Inputs_intf) :
     in
     go ()
 
-  let command =
+  let command_from_rpcs
+      (module Rpcs_versioned : Intf.Rpcs_versioned_S
+        with type Work.ledger_proof = Inputs.Ledger_proof.t) =
     Command.async ~summary:"Snark worker"
       (let open Command.Let_syntax in
       let%map_open daemon_port =
@@ -189,7 +194,9 @@ module Make (Inputs : Intf.Inputs_intf) :
               !"Received signal to terminate. Aborting snark worker process"
               ~module_:__MODULE__ ~location:__LOC__ ;
             Core.exit 0 ) ;
-        main ~logger ~proof_level daemon_port
+        main
+          (module Rpcs_versioned)
+          ~logger ~proof_level daemon_port
           (Option.value ~default:true shutdown_on_disconnect))
 
   let arguments ~proof_level ~daemon_address ~shutdown_on_disconnect =
