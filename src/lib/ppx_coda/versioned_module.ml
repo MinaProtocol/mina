@@ -63,21 +63,34 @@ let rec add_deriving ~loc ~version_option attributes =
             Ast_pattern.(
               pexp_apply (pexp_ident (lident (string "version"))) __)
           in
-          if
+          let has_version =
             List.exists args ~f:(fun arg ->
                 match parse_opt special_version loc arg (fun _ -> Some ()) with
                 | None ->
                     false
                 | Some () ->
                     true )
-          then
-            (* [version] is already present, add [bin_io] and stop recursing. *)
-            modify_attr_payload attr (payload ([%expr bin_io] :: args))
-            :: attributes
-          else
-            modify_attr_payload attr
-              (payload ([%expr bin_io] :: version_expr :: args))
-            :: attributes )
+          in
+          let needs_bin_io =
+            match version_option with
+            | No_version_option | Asserted ->
+                true
+            | Binable ->
+                false
+          in
+          let extra_payload_args =
+            match (has_version, needs_bin_io) with
+            | false, false ->
+                [version_expr]
+            | false, true ->
+                [[%expr bin_io]; version_expr]
+            | true, false ->
+                []
+            | true, true ->
+                [[%expr bin_io]]
+          in
+          modify_attr_payload attr (payload (extra_payload_args @ args))
+          :: attributes )
 
 let version_type ~version_option version stri =
   let loc = stri.pstr_loc in
