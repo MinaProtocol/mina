@@ -19,7 +19,7 @@ let%test_module "Full_frontier tests" =
     let constraint_constants =
       Genesis_constants.Constraint_constants.for_unit_tests
 
-    let ledger_depth = Genesis_constants.ledger_depth_for_unit_tests
+    let ledger_depth = constraint_constants.ledger_depth
 
     let accounts_with_secret_keys = Lazy.force Test_genesis_ledger.accounts
 
