@@ -42,7 +42,7 @@ let protocol_state_body = salt protocol_state_body
 let merkle_tree =
   let f i = salt (merkle_tree i) in
   (* Cache up to the compiled ledger depth. *)
-  let cached = ref (Array.init ~f Genesis_constants.ledger_depth) in
+  let cached = ref [||] in
   fun i ->
     let len = Array.length !cached in
     if i >= len then
