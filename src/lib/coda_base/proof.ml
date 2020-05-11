@@ -12,7 +12,6 @@ module T = Pickles.Proof.Make (Nat.N2) (Nat.N2)
 [%%versioned_binable
 module Stable = struct
   module V1 = struct
-
     type t = T.t [@@deriving sexp, bin_io, version {asserted}, yojson, compare]
 
     let to_latest = Fn.id
