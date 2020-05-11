@@ -34,7 +34,7 @@ module Make () = struct
       let to_latest = Fn.id
 
       module Arg = struct
-        type t = T1.t
+        type nonrec t = t
 
         [%%define_locally T1.(to_string, of_string)]
       end
