@@ -1,5 +1,6 @@
 module StringMap = Map.Make(String);
 
+// Helper functions for gathering metrics
 let printMap = map => {
   StringMap.mapi(
     (key, value) => {
@@ -25,6 +26,7 @@ let incrementMapValue = (key, map) => {
      });
 };
 
+// Gather metrics
 let getBlocksCreatedByUser = blocks => {
   blocks
   |> Array.fold_left(
@@ -63,6 +65,79 @@ let getSnarkWorkCreatedByUser = blocks => {
   blocks |> calculateProperty(calculateSnarkWorkCount);
 };
 
+module SnarkFeesCollectedMap = Map.Make(String);
+
+let snarkFeesCollected = blocks => {
+  Array.fold_left(
+    (map, block: Types.NewBlock.t) => {
+      Array.fold_left(
+        (map, snarkJob: Types.NewBlock.snarkJobs) => {
+          SnarkFeesCollectedMap.update(
+            snarkJob.prover,
+            feeCount =>
+              switch (feeCount) {
+              | Some(feeCount) => Some(Int64.add(feeCount, snarkJob.fee))
+              | None => Some(snarkJob.fee)
+              },
+            map,
+          )
+        },
+        map,
+        block.data.newBlock.snarkJobs,
+      )
+    },
+    SnarkFeesCollectedMap.empty,
+    blocks,
+  );
+};
+
+let max = (a, b) => {
+  a > b ? a : b;
+};
+
+let highestSnarkFeeCollected = blocks => {
+  Array.fold_left(
+    (map, block: Types.NewBlock.t) => {
+      Array.fold_left(
+        (map, snarkJob: Types.NewBlock.snarkJobs) => {
+          SnarkFeesCollectedMap.update(
+            snarkJob.prover,
+            feeCount =>
+              switch (feeCount) {
+              | Some(feeCount) => Some(max(feeCount, snarkJob.fee))
+              | None => Some(snarkJob.fee)
+              },
+            map,
+          )
+        },
+        map,
+        block.data.newBlock.snarkJobs,
+      )
+    },
+    SnarkFeesCollectedMap.empty,
+    blocks,
+  );
+};
+
+let transactionsSentToAddress = blocks => {
+  Array.fold_left(
+    (map, block: Types.NewBlock.t) => {
+      StringMap.update(
+        block.data.newBlock.transactions.feeTransfer.recipient,
+        value =>
+          switch (value) {
+          | Some(transactionCount) => Some(transactionCount + 1)
+          | None => Some(1)
+          },
+        map,
+      )
+    },
+    StringMap.empty,
+    blocks,
+  );
+};
+
+// Calculate users and metrics
 let calculateAllUsers = metrics => {
   List.fold_left(
     StringMap.merge((_, _, _) => {Some()}),
