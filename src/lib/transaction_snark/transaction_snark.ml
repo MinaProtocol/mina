@@ -3523,8 +3523,8 @@ let%test_module "transaction_snark" =
               (Test_util.arbitrary_string
                  ~len:User_command_memo.max_digestible_string_length)
           in
-          let balance = Balance.of_int 100_000 in
-          let initial_minimum_balance = Balance.of_int 80_000 in
+          let balance = Balance.of_int 100_000_000_000_000 in
+          let initial_minimum_balance = Balance.of_int 80_000_000_000_000 in
           let cliff_time = Global_slot.of_int 1000 in
           let vesting_period = Global_slot.of_int 10 in
           let vesting_increment = Amount.of_int 1 in
