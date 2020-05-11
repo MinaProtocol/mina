@@ -3,12 +3,12 @@ open Core_kernel
 [%%versioned
 module Stable = struct
   module V1 = struct
-    type 'a t = {a: 'a; b: 'a; c: 'a} [@@deriving fields, sexp, bin_io, compare, yojson]
+    type 'a t = {a: 'a; b: 'a; c: 'a}
+    [@@deriving fields, sexp, bin_io, compare, yojson]
   end
 end]
 
 include Stable.Latest
-
 module H_list = Snarky.H_list
 
 let to_hlist {a; b; c} = H_list.[a; b; c]

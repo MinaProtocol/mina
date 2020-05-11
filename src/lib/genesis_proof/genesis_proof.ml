@@ -6,8 +6,7 @@ module Inputs = struct
     { genesis_constants: Genesis_constants.t
     ; genesis_ledger: Genesis_ledger.Packed.t
     ; protocol_state_with_hash:
-        (Protocol_state.value, State_hash.t) With_hash.t
-    }
+        (Protocol_state.value, State_hash.t) With_hash.t }
 end
 
 module T = struct
@@ -52,12 +51,12 @@ end
 
 include T
 
-let base_proof (module B : Blockchain_snark.Blockchain_snark_state.S) (t : Inputs.t) =
+let base_proof (module B : Blockchain_snark.Blockchain_snark_state.S)
+    (t : Inputs.t) =
   let genesis_ledger = Genesis_ledger.Packed.t t.genesis_ledger in
   let protocol_constants = t.genesis_constants.protocol in
   let prev_state =
-    Protocol_state.negative_one ~genesis_ledger
-      ~protocol_constants
+    Protocol_state.negative_one ~genesis_ledger ~protocol_constants
   in
   let curr = t.protocol_state_with_hash.data in
   let dummy_txn_stmt : Transaction_snark.Statement.With_sok.t =
@@ -78,9 +77,8 @@ let base_proof (module B : Blockchain_snark.Blockchain_snark_state.S) (t : Input
   B.step
     ~handler:
       (Consensus.Data.Prover_state.precomputed_handler
-          ~genesis_ledger:Test_genesis_ledger.t)
-    { transition=
-        Snark_transition.genesis ~genesis_ledger:Test_genesis_ledger.t
+         ~genesis_ledger:Test_genesis_ledger.t)
+    { transition= Snark_transition.genesis ~genesis_ledger:Test_genesis_ledger.t
     ; prev_state }
     [(prev_state, dummy); (dummy_txn_stmt, dummy)]
     t.protocol_state_with_hash.data

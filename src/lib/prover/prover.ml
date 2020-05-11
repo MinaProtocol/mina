@@ -151,9 +151,7 @@ module Worker_state = struct
 
                let extend_blockchain _chain next_state _block _ledger_proof
                    _state_for_handler _pending_coinbase =
-                 Ok
-                   { Blockchain.proof= Coda_base.Proof.dummy
-                   ; state= next_state }
+                 Ok {Blockchain.proof= Coda_base.Proof.dummy; state= next_state}
 
                let verify _ _ = true
              end

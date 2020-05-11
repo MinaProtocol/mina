@@ -82,7 +82,7 @@ end
 module Provers : module type of H3_2.T (Prover)
 
 module Dirty : sig
-  type t = [ `Cache_hit | `Generated_something | `Locally_generated ]
+  type t = [`Cache_hit | `Generated_something | `Locally_generated]
 
   val ( + ) : t -> t -> t
 end

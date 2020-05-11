@@ -21,7 +21,9 @@ let group_map_params =
 
 let group_map_params_structure ~loc =
   let module T = struct
-    type t = Snarky_bn382_backend.Fp.Stable.Latest.t Group_map.Params.Stable.Latest.t [@@deriving bin_io_unversioned]
+    type t =
+      Snarky_bn382_backend.Fp.Stable.Latest.t Group_map.Params.Stable.Latest.t
+    [@@deriving bin_io_unversioned]
   end in
   let module E = Ppxlib.Ast_builder.Make (struct
     let loc = loc

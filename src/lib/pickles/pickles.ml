@@ -2601,7 +2601,7 @@ let verify (type a n) (module Max_branching : Nat.Intf with type n = n)
        key.index
 
 module Dirty = struct
-  type t = [ `Cache_hit | `Generated_something | `Locally_generated ]
+  type t = [`Cache_hit | `Generated_something | `Locally_generated]
 
   let ( + ) x y =
     match (x, y) with
@@ -2614,11 +2614,11 @@ module Dirty = struct
 end
 
 module Cache_handle = struct
-  type t = [ `Cache_hit | `Locally_generated | `Generated_something ] Lazy.t
+  type t = [`Cache_hit | `Locally_generated | `Generated_something] Lazy.t
 
-  let generate_or_load (t: t) = Lazy.force t
+  let generate_or_load (t : t) = Lazy.force t
 
-  let (+) t1 t2 = lazy (Dirty.(Lazy.force t1 + Lazy.force t2))
+  let ( + ) t1 t2 = lazy Dirty.(Lazy.force t1 + Lazy.force t2)
 end
 
 module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
@@ -2683,8 +2683,9 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
         | Ok (pk, dirty) ->
             Common.time "step keypair create" (fun () ->
                 return
-                  (Keypair.create ~pk
-                     ~vk:(Snarky_bn382_backend.Pairing_based.Keypair.vk pk), dirty) )
+                  ( Keypair.create ~pk
+                      ~vk:(Snarky_bn382_backend.Pairing_based.Keypair.vk pk)
+                  , dirty ) )
         | Error _e ->
             Timer.clock __LOC__ ;
             let r = generate_keypair ~exposing:[typ] main in
@@ -2723,12 +2724,13 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
          match%bind Key_cache.read cache s_p k with
          | Ok (pk, d) ->
              return
-               (Keypair.create ~pk
-                  ~vk:(Snarky_bn382_backend.Dlog_based.Keypair.vk pk), d)
+               ( Keypair.create ~pk
+                   ~vk:(Snarky_bn382_backend.Dlog_based.Keypair.vk pk)
+               , d )
          | Error _e ->
              let r = generate_keypair ~exposing:[typ] main in
              let%map _ = Key_cache.write cache s_p k (Keypair.pk r) in
-             (r, `Generated_something) )
+             (r, `Generated_something))
     in
     let vk =
       let k_v = Lazy.force k_v in
@@ -2742,7 +2744,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
         | Ok (vk, _) ->
             return vk
         | Error _e ->
-            let%bind (kp, _dirty) = Lazy.force pk in
+            let%bind kp, _dirty = Lazy.force pk in
             let vk = Keypair.vk kp in
             let pk = Keypair.pk kp in
             let vk : Vk.t =
@@ -2770,7 +2772,9 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
 
   module Lazy_keys = struct
     type t =
-      (Impls.Pairing_based.Keypair.t * [ `Cache_hit | `Generated_something | `Locally_generated ]) Lazy.t
+      ( Impls.Pairing_based.Keypair.t
+      * [`Cache_hit | `Generated_something | `Locally_generated] )
+      Lazy.t
       * Snarky_bn382.Fp_verifier_index.t Lazy.t
   end
 
@@ -2872,9 +2876,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
     check_step_domains step_domains ;
     Timer.clock __LOC__ ;
     let cache_handle = ref (Lazy.return `Cache_hit) in
-    let accum_dirty t =
-      cache_handle := Cache_handle.(!cache_handle + t)
-    in
+    let accum_dirty t = cache_handle := Cache_handle.(!cache_handle + t) in
     let step_keypairs =
       let disk_keys =
         Option.map disk_keys ~f:(fun (xs, _) -> Vector.to_array xs)
@@ -2907,7 +2909,9 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
                       (let x, y, z = Lazy.force k_p in
                        (x, y, R1CS_constraint_system.digest z))
               in
-              let (pk, _) as res = step_read_or_generate cache k_p k_v typ main in
+              let ((pk, _) as res) =
+                step_read_or_generate cache k_p k_v typ main
+              in
               accum_dirty (Lazy.map pk ~f:snd) ;
               res
           end)
@@ -2997,8 +3001,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
           let wrap_vk = Lazy.force wrap_vk in
           S.f ?handler branch_data next_state ~self ~step_domains
             ~self_dlog_marlin_index:wrap_vk.commitments
-            (Impls.Pairing_based.Keypair.pk
-               (fst (Lazy.force step_pk)))
+            (Impls.Pairing_based.Keypair.pk (fst (Lazy.force step_pk)))
             wrap_vk.index prevs
         in
         let pairing_vk = Lazy.force step_vk in
@@ -3099,7 +3102,7 @@ let compile
                    , a_value )
                    H4_2.T(Inductive_rule).t)
     -> (a_var, a_value, max_branching, branches) Tag.t
-      * Cache_handle.t
+       * Cache_handle.t
        * (module Proof_intf
             with type t = (max_branching, max_branching) Proof.t
              and type statement = a_value)

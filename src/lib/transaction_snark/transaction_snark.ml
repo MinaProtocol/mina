@@ -35,8 +35,7 @@ module Pending_coinbase_stack_state = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t =
-        Pending_coinbase.Stack_versioned.Stable.V1.t Poly.Stable.V1.t
+      type t = Pending_coinbase.Stack_versioned.Stable.V1.t Poly.Stable.V1.t
       [@@deriving sexp, hash, compare, eq, yojson]
 
       let to_latest = Fn.id
@@ -87,7 +86,7 @@ module Statement = struct
     ; target: 'lh
     ; supply_increase: 'amt
     ; pending_coinbase_stack_state:
-              'pc Pending_coinbase_stack_state.Poly.Stable.Latest.t
+        'pc Pending_coinbase_stack_state.Poly.Stable.Latest.t
     ; fee_excess: 'signed_amt
     ; sok_digest: 'sok }
 
@@ -265,12 +264,13 @@ end
 
 module Proof = struct
   open Pickles_types
-
   module T = Pickles.Proof.Make (Nat.N2) (Nat.N2)
 
-  [%%versioned module Stable = struct
+  [%%versioned
+  module Stable = struct
     module V1 = struct
-      type t = T.t [@@deriving version {asserted}, yojson, bin_io, compare, sexp]
+      type t = T.t
+      [@@deriving version {asserted}, yojson, bin_io, compare, sexp]
 
       let to_latest = Fn.id
     end

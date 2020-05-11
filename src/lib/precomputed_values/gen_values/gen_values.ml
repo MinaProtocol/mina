@@ -66,6 +66,7 @@ module Make_real () = struct
   open E
 
   module T = Transaction_snark.Make ()
+
   module B = Blockchain_snark.Blockchain_snark_state.Make (T)
 
   let key_hashes = hashes
@@ -78,8 +79,7 @@ module Make_real () = struct
       (module B)
       { genesis_constants= Genesis_constants.compiled
       ; genesis_ledger= (module Test_genesis_ledger)
-      ; protocol_state_with_hash
-      }
+      ; protocol_state_with_hash }
 
   let transaction_verification =
     [%expr
@@ -114,7 +114,10 @@ module Make_real () = struct
       Core.Binable.of_string
         (module Coda_base.Proof.Stable.V1)
         [%e
-          estring (Binable.to_string (module Coda_base.Proof.Stable.V1) compiled_values.genesis_proof)]]
+          estring
+            (Binable.to_string
+               (module Coda_base.Proof.Stable.V1)
+               compiled_values.genesis_proof)]]
 end
 
 open Async

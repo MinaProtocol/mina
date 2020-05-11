@@ -137,7 +137,10 @@ module Openings = struct
     module V1 = struct
       type ('fq, 'g) t =
         { proof: ('fq, 'g) Bulletproof.Stable.V1.t
-        ; evals: 'fq Evals.Stable.V1.t * 'fq Evals.Stable.V1.t * 'fq Evals.Stable.V1.t }
+        ; evals:
+            'fq Evals.Stable.V1.t
+            * 'fq Evals.Stable.V1.t
+            * 'fq Evals.Stable.V1.t }
       [@@deriving bin_io, version, sexp, compare, yojson]
     end
   end]
@@ -156,4 +159,3 @@ module Openings = struct
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
 end
-

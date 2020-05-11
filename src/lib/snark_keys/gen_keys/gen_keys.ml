@@ -108,8 +108,8 @@ let handle_dirty dirty =
                pull-request is from an external contributor.@ Using the local \
                keys@."
         | `Cache_hit ->
-          (* Excluded above. *)
-          assert false );
+            (* Excluded above. *)
+            assert false ) ;
         Deferred.unit
     | Some _, Some profile
       when String.is_substring ~substring:"testnet" profile ->
@@ -118,21 +118,25 @@ let handle_dirty dirty =
         *
         * Exit code is 0xc1 for "CI" *)
         exit 0xc1
-    | Some _, Some _ | _, None | None, _ -> Deferred.unit )
-  | `Cache_hit -> Deferred.unit
+    | Some _, Some _ | _, None | None, _ ->
+        Deferred.unit )
+  | `Cache_hit ->
+      Deferred.unit
 
 let str ~loc =
   let module T = Transaction_snark.Make () in
   let module B = Blockchain_snark.Blockchain_snark_state.Make (T) in
   let%map () =
-    handle_dirty 
+    handle_dirty
       Pickles.(
-        List.map [T.cache_handle; B.cache_handle] ~f:Cache_handle.generate_or_load
-        |> List.reduce_exn ~f:Dirty.(+))
+        List.map
+          [T.cache_handle; B.cache_handle]
+          ~f:Cache_handle.generate_or_load
+        |> List.reduce_exn ~f:Dirty.( + ))
   in
   str ~loc
-    ~transaction_snark:((from_disk_expr ~loc (Lazy.force T.id)))
-    ~blockchain_snark:((from_disk_expr ~loc (Lazy.force  B.Proof.id)))
+    ~transaction_snark:(from_disk_expr ~loc (Lazy.force T.id))
+    ~blockchain_snark:(from_disk_expr ~loc (Lazy.force B.Proof.id))
 
 [%%else]
 
