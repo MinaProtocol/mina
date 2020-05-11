@@ -71,6 +71,7 @@ let main accounts_json_file dir num_accounts proof_level constants_file =
   let genesis_dirname =
     Cache_dir.genesis_dir_name ~genesis_constants:Genesis_constants.compiled
       ~proof_level:Genesis_constants.Proof_level.compiled
+      ~ledger_depth:Genesis_constants.ledger_depth
   in
   let%bind genesis_dir =
     let dir = top_dir ^/ genesis_dirname in

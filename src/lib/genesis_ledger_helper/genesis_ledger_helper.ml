@@ -203,6 +203,7 @@ let retrieve_genesis_state dir_opt ~logger ~conf_dir ~daemon_conf :
   let genesis_dir_name =
     Cache_dir.genesis_dir_name ~genesis_constants:Genesis_constants.compiled
       ~proof_level:Genesis_constants.Proof_level.compiled
+      ~ledger_depth:Genesis_constants.ledger_depth
   in
   let tar_filename = genesis_dir_name ^ ".tar.gz" in
   Logger.info logger ~module_:__MODULE__ ~location:__LOC__
