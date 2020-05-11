@@ -40,6 +40,11 @@ module Scan_state : sig
 
   val staged_transactions : t -> Transaction.t list Or_error.t
 
+  val staged_transactions_with_protocol_state :
+       t
+    -> get_state:(State_hash.t -> Coda_state.Protocol_state.value Or_error.t)
+    -> (Transaction.t * Coda_state.Protocol_state.value) list Or_error.t
+
   val all_work_statements_exn : t -> Transaction_snark_work.Statement.t list
 
   val work_statements_for_new_diff :
@@ -151,7 +156,7 @@ val of_scan_state_pending_coinbases_and_snarked_ledger :
   -> snarked_ledger:Ledger.t
   -> expected_merkle_root:Ledger_hash.t
   -> pending_coinbases:Pending_coinbase.t
-  -> current_global_slot:Coda_numbers.Global_slot.t
+  -> get_state:(State_hash.t -> Coda_state.Protocol_state.value Or_error.t)
   -> t Or_error.t Deferred.t
 
 val all_work_pairs :

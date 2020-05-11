@@ -229,14 +229,15 @@ module T = struct
 
   let of_scan_state_pending_coinbases_and_snarked_ledger ~logger ~verifier
       ~scan_state ~snarked_ledger ~expected_merkle_root ~pending_coinbases
-      ~current_global_slot =
+      ~get_state =
     let open Deferred.Or_error.Let_syntax in
     let snarked_ledger_hash = Ledger.merkle_root snarked_ledger in
     let snarked_frozen_ledger_hash =
       Frozen_ledger_hash.of_ledger_hash snarked_ledger_hash
     in
     let%bind txs =
-      Scan_state.staged_transactions scan_state |> Deferred.return
+      Scan_state.staged_transactions_with_protocol_state scan_state ~get_state
+      |> Deferred.return
     in
     let%bind () =
       Deferred.List.fold txs ~init:(Ok ()) ~f:(fun acc tx ->

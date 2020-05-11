@@ -430,6 +430,7 @@ module For_tests = struct
         let genesis_ledger =
           Lazy.force (Precomputed_values.genesis_ledger precomputed_values)
         in
+        (*DEEPTHI: pass the function to get protocol states which would be empty since the scan state is empty*)
         let genesis_staged_ledger =
           Or_error.ok_exn
             (Async.Thread_safe.block_on_async_exn (fun () ->

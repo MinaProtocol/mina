@@ -109,6 +109,12 @@ val target_merkle_root : t -> Frozen_ledger_hash.t option
 (** All the transactions in the order in which they were applied*)
 val staged_transactions : t -> Transaction.t list Or_error.t
 
+(** All the transactions with parent protocol state of the block in which they were included in the order in which they were applied*)
+val staged_transactions_with_protocol_state :
+     t
+  -> get_state:(State_hash.t -> Coda_state.Protocol_state.value Or_error.t)
+  -> (Transaction.t * Coda_state.Protocol_state.value) list Or_error.t
+
 (** Available space and the corresponding required work-count in one and/or two trees (if the slots to be occupied are in two different trees)*)
 val partition_if_overflowing : t -> Space_partition.t
 

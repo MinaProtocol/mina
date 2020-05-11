@@ -113,7 +113,7 @@ let rec pair_up = function
 
 let state_body =
   Coda_state.(
-    Lazy.map (Lazy.from_fun Genesis_protocol_state.compile_time_genesis)
+    Lazy.map Genesis_protocol_state.compile_time_genesis
       ~f:(fun compile_time_genesis ->
         compile_time_genesis.data |> Protocol_state.body ))
 

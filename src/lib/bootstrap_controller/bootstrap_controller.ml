@@ -648,11 +648,13 @@ let%test_module "Bootstrap_controller tests" =
               let%bind verifier =
                 Verifier.create ~conf_dir:None ~logger ~pids
               in
+              (*DEEPTHI: pass the protocol states that the peer sent us*)
               let%map actual_staged_ledger =
                 Staged_ledger
                 .of_scan_state_pending_coinbases_and_snarked_ledger ~scan_state
                   ~logger ~verifier ~snarked_ledger ~expected_merkle_root
                   ~pending_coinbases
+                  ~current_global_slot:Coda_numbers.Global_slot.zero
                 |> Deferred.Or_error.ok_exn
               in
               assert (

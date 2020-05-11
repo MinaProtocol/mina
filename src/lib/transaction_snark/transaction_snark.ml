@@ -2523,7 +2523,10 @@ let%test_module "transaction_snark" =
                   ~previous_state_hash:(previous_state_hash state)
                   ~genesis_state_hash:(genesis_state_hash state)
                   ~blockchain_state:(blockchain_state state)
-                  ~consensus_state:consensus_state_at_slot)
+                  ~consensus_state:consensus_state_at_slot
+                  ~constants:
+                    (Protocol_constants_checked.value_of_t
+                       Genesis_constants.compiled.protocol))
                 .body
             in
             let state_body_hash =
@@ -2704,7 +2707,8 @@ let%test_module "transaction_snark" =
           let state_body_hash = Lazy.force state_body_hash in
           Ledger.with_ledger ~f:(fun ledger ->
               Array.iter wallets ~f:(fun {account; private_key= _} ->
-                  Ledger.create_new_account_exn ledger account.public_key
+                  Ledger.create_new_account_exn ledger
+                    (Account.identifier account)
                     account ) ;
               let memo =
                 User_command_memo.create_by_digesting_string_exn
@@ -2712,13 +2716,17 @@ let%test_module "transaction_snark" =
                      ~len:User_command_memo.max_digestible_string_length)
               in
               let t1 =
-                user_command wallets.(0) wallets.(1) 8
-                  (Fee.of_int (Random.int 20))
+                user_command_with_wallet wallets ~sender:0 ~receiver:1
+                  8_000_000_000
+                  (Fee.of_int (Random.int 20 * 1_000_000_000))
+                  ~fee_token:Token_id.default ~token:Token_id.default
                   Account.Nonce.zero memo
               in
               let t2 =
-                user_command wallets.(1) wallets.(2) 3
-                  (Fee.of_int (Random.int 20))
+                user_command_with_wallet wallets ~sender:1 ~receiver:2
+                  8_000_000_000
+                  (Fee.of_int (Random.int 20 * 1_000_000_000))
+                  ~fee_token:Token_id.default ~token:Token_id.default
                   Account.Nonce.zero memo
               in
               let sok_digest =
@@ -2808,6 +2816,7 @@ let%test_module "transaction_snark" =
               let state_body0 =
                 Coda_state.Protocol_state.negative_one
                   ~genesis_ledger:(lazy ledger)
+                  ~protocol_constants:Genesis_constants.compiled.protocol
                 |> Coda_state.Protocol_state.body
               in
               let state_body_hash0 =
@@ -3472,18 +3481,17 @@ let%test_module "transaction_snark" =
 
     let%test_unit "timed account - transactions" =
       Test_util.with_randomness 123456789 (fun () ->
-          let wallets = random_wallets ~n:3 () |> Array.to_list in
-          let sender = List.hd_exn wallets in
-          let receivers = List.tl_exn wallets in
+          let wallets = random_wallets ~n:3 () in
+          let sender = wallets.(0) in
+          let receivers = Array.to_list wallets |> List.tl_exn in
           let txns_per_receiver = 2 in
-          let amount = 8 in
-          let txn_fee = 2 in
+          let amount = 8_000_000_000 in
+          let txn_fee = 2_000_000_000 in
           let memo =
             User_command_memo.create_by_digesting_string_exn
               (Test_util.arbitrary_string
                  ~len:User_command_memo.max_digestible_string_length)
           in
-          let pk = sender.account.public_key in
           let balance = Balance.of_int 100_000 in
           let initial_minimum_balance = Balance.of_int 80_000 in
           let cliff_time = Global_slot.of_int 1000 in
@@ -3494,25 +3502,32 @@ let%test_module "transaction_snark" =
             { sender with
               account=
                 Or_error.ok_exn
-                @@ Account.create_timed pk balance ~initial_minimum_balance
-                     ~cliff_time ~vesting_period ~vesting_increment }
+                @@ Account.create_timed
+                     (Account.identifier sender.account)
+                     balance ~initial_minimum_balance ~cliff_time
+                     ~vesting_period ~vesting_increment }
           in
           Ledger.with_ledger ~f:(fun ledger ->
               let _, ucs =
+                let receiver_ids =
+                  List.init (List.length receivers) ~f:(( + ) 1)
+                in
                 let receivers =
-                  List.fold ~init:receivers
+                  List.fold ~init:receiver_ids
                     (List.init (txns_per_receiver - 1) ~f:Fn.id)
-                    ~f:(fun acc _ -> receivers @ acc)
+                    ~f:(fun acc _ -> receiver_ids @ acc)
                 in
                 List.fold receivers ~init:(Account.Nonce.zero, [])
                   ~f:(fun (nonce, txns) receiver ->
                     let uc =
-                      user_command sender receiver amount (Fee.of_int txn_fee)
-                        nonce memo
+                      user_command_with_wallet wallets ~sender:0 ~receiver
+                        amount (Fee.of_int txn_fee) ~fee_token:Token_id.default
+                        ~token:Token_id.default nonce memo
                     in
                     (Account.Nonce.succ nonce, txns @ [uc]) )
               in
-              Ledger.create_new_account_exn ledger sender.account.public_key
+              Ledger.create_new_account_exn ledger
+                (Account.identifier sender.account)
                 sender.account ;
               let () =
                 List.iter ucs ~f:(fun uc ->
@@ -3520,10 +3535,12 @@ let%test_module "transaction_snark" =
                       (Transaction.User_command uc) )
               in
               List.iter receivers ~f:(fun receiver ->
-                  check_balance receiver.account.public_key
+                  check_balance
+                    (Account.identifier receiver.account)
                     ((amount * txns_per_receiver) - account_fee)
                     ledger ) ;
-              check_balance sender.account.public_key
+              check_balance
+                (Account.identifier sender.account)
                 ( Balance.to_int sender.account.balance
                 - (amount + txn_fee) * txns_per_receiver
                   * List.length receivers )

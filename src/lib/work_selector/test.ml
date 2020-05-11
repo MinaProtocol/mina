@@ -18,8 +18,7 @@ struct
          Int.quickcheck_generator Fee.gen
 
   let compile_time_genesis =
-    Core_kernel.Lazy.from_fun
-      Coda_state.Genesis_protocol_state.compile_time_genesis
+    Coda_state.Genesis_protocol_state.compile_time_genesis
 
   let%test_unit "Workspec chunk doesn't send same things again" =
     Backtrace.elide := false ;

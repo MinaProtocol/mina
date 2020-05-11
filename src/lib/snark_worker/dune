@@ -5,7 +5,7 @@
  (inline_tests)
  (libraries core async cli_lib currency snark_work_lib coda_base
    blockchain_snark transaction_snark keys_lib perf_histograms
-   core_kernel.hash_heap sparse_ledger_lib ledger_proof)
+   core_kernel.hash_heap sparse_ledger_lib ledger_proof transaction_witness)
  (preprocess (pps
    ppx_coda -lint-version-syntax-warnings ppx_sexp_conv ppx_optcomp
    ppx_sexp_conv ppx_bin_prot ppx_let ppx_custom_printf

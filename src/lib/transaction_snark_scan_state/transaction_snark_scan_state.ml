@@ -488,6 +488,16 @@ let staged_transactions t =
   @@ Parallel_scan.pending_data t
   |> Or_error.all
 
+let staged_transactions_with_protocol_state t
+    ~(get_state : State_hash.t -> Coda_state.Protocol_state.value Or_error.t) =
+  let open Or_error.Let_syntax in
+  List.map ~f:(fun (t : Transaction_with_witness.t) ->
+      let%bind txn = t.transaction_with_info |> Ledger.Undo.transaction in
+      let%map protocol_state = get_state (fst t.state_hash) in
+      (txn, protocol_state) )
+  @@ Parallel_scan.pending_data t
+  |> Or_error.all
+
 (*All the staged transactions in the reverse order of their application (Latest first)*)
 let staged_undos t : Staged_undos.t =
   List.map

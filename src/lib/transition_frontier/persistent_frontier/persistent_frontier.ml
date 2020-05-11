@@ -25,6 +25,7 @@ let construct_staged_ledger_at_root ~root_ledger ~root_transition ~root =
     |> Protocol_state.consensus_state
     |> Consensus.Data.Consensus_state.curr_slot
   in
+  (*Deepthi: with protocol states*)
   let%bind () =
     Deferred.return
       (List.fold transactions ~init:(Or_error.return ()) ~f:(fun acc txn ->
