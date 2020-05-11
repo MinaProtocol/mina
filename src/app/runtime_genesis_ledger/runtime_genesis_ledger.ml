@@ -152,7 +152,7 @@ let () =
                    If the number of accounts in the account file, say x, is \
                    less than n then the tool will generate (n-x) fake \
                    accounts (default: x)."
-                  (Int.pow 2 Coda_compile_config.ledger_depth))
+                  (Int.pow 2 Genesis_constants.ledger_depth))
              (optional int)
          and constants =
            flag "constants"
@@ -171,7 +171,7 @@ let () =
              ~doc:"full|check|none"
          in
          fun () ->
-           let max = Int.pow 2 Coda_compile_config.ledger_depth in
+           let max = Int.pow 2 Genesis_constants.ledger_depth in
            let n = Option.value ~default:0 n in
            let proof_level =
              Option.value ~default:Genesis_constants.Proof_level.compiled

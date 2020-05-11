@@ -19,7 +19,7 @@ module Merkle_tree =
       let merge ~height h1 h2 =
         Tick.make_checked (fun () ->
             Random_oracle.Checked.hash
-              ~init:Hash_prefix.merkle_tree.(height)
+              ~init:(Hash_prefix.merkle_tree height)
               [|h1; h2|] )
 
       let assert_equal h1 h2 = Field.Checked.Assert.equal h1 h2
@@ -64,7 +64,7 @@ type _unused = unit constraint t = Stable.Latest.t
 (* End boilerplate *)
 let merge ~height (h1 : t) (h2 : t) =
   Random_oracle.hash
-    ~init:Hash_prefix.merkle_tree.(height)
+    ~init:(Hash_prefix.merkle_tree height)
     [|(h1 :> field); (h2 :> field)|]
   |> of_hash
 
