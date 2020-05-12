@@ -1,9 +1,5 @@
 open Bindings;
 
-let clientId = "";
-let clientSecret = "";
-let redirectURI = "";
-
 let tokenPath = "token.json";
 let scopes = [|"https://www.googleapis.com/auth/spreadsheets.readonly"|];
 
