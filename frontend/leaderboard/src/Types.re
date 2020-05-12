@@ -37,11 +37,15 @@ module Metrics = {
   type t =
     | BlocksCreated
     | TransactionsSent
-    | SnarkWorkCreated;
+    | SnarkWorkCreated
+    | SnarkFeesCollected
+    | HighestSnarkFeeCollected;
 
   type metricRecord = {
     blocksCreated: option(int),
     transactionSent: option(int),
     snarkWorkCreated: option(int),
+    snarkFeesCollected: option(int64),
+    highestSnarkFeeCollected: option(int64),
   };
 };

@@ -65,14 +65,12 @@ let getSnarkWorkCreatedByUser = blocks => {
   blocks |> calculateProperty(calculateSnarkWorkCount);
 };
 
-module SnarkFeesCollectedMap = Map.Make(String);
-
-let snarkFeesCollected = blocks => {
+let getSnarkFeesCollected = blocks => {
   Array.fold_left(
-    (map, block: Types.NewBlock.t) => {
+    (map, block: Types.NewBlock.data) => {
       Array.fold_left(
         (map, snarkJob: Types.NewBlock.snarkJobs) => {
-          SnarkFeesCollectedMap.update(
+          StringMap.update(
             snarkJob.prover,
             feeCount =>
               switch (feeCount) {
@@ -83,10 +81,10 @@ let snarkFeesCollected = blocks => {
           )
         },
         map,
-        block.data.newBlock.snarkJobs,
+        block.snarkJobs,
       )
     },
-    SnarkFeesCollectedMap.empty,
+    StringMap.empty,
     blocks,
   );
 };
@@ -95,12 +93,12 @@ let max = (a, b) => {
   a > b ? a : b;
 };
 
-let highestSnarkFeeCollected = blocks => {
+let getHighestSnarkFeeCollected = blocks => {
   Array.fold_left(
-    (map, block: Types.NewBlock.t) => {
+    (map, block: Types.NewBlock.data) => {
       Array.fold_left(
         (map, snarkJob: Types.NewBlock.snarkJobs) => {
-          SnarkFeesCollectedMap.update(
+          StringMap.update(
             snarkJob.prover,
             feeCount =>
               switch (feeCount) {
@@ -111,16 +109,14 @@ let highestSnarkFeeCollected = blocks => {
           )
         },
         map,
-        block.data.newBlock.snarkJobs,
+        block.snarkJobs,
       )
     },
-    SnarkFeesCollectedMap.empty,
+    StringMap.empty,
     blocks,
   );
 };
 
-// Loop through the transactions in each block
-// fold left and increment map with the public key and when a transaction's toAccount is the same as address
 let calculateTransactionsSentToAddress = (blocks, address) => {
   blocks
   |> Array.fold_left((map, block: Types.NewBlock.data) => {
@@ -150,6 +146,8 @@ let calculateMetrics = blocks => {
   let transactionSent = blocks |> getTransactionSentByUser;
   let snarkWorkCreated = blocks |> getSnarkWorkCreatedByUser;
   let users = calculateAllUsers([blocksCreated, transactionSent]);
+  let snarkFeesCollected = blocks |> getSnarkFeesCollected;
+  let highestSnarkFeeCollected = blocks |> getHighestSnarkFeeCollected;
 
   StringMap.mapi(
     (key, _) =>
@@ -157,6 +155,9 @@ let calculateMetrics = blocks => {
         Types.Metrics.blocksCreated: StringMap.find_opt(key, blocksCreated),
         transactionSent: StringMap.find_opt(key, transactionSent),
         snarkWorkCreated: StringMap.find_opt(key, snarkWorkCreated),
+        snarkFeesCollected: StringMap.find_opt(key, snarkFeesCollected),
+        highestSnarkFeeCollected:
+          StringMap.find_opt(key, highestSnarkFeeCollected),
       },
     users,
   );
