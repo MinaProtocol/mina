@@ -151,7 +151,7 @@ module G = struct
   module Scaling_precomputation = struct
     include T.Scaling_precomputation
 
-    let create t = create ~unrelated_base:(unrelated_g t) t
+(*     let create t = create ~unrelated_base:(unrelated_g t) t *)
   end
 
   let ( + ) = T.add_exn

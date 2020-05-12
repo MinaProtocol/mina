@@ -233,6 +233,7 @@ struct
       t.weight <- new_weight ;
       add_r1cs t constr
     in
+    let open Snarky.Constraint in
     match constr with
     | Boolean x ->
         let x, x_weight, x_has_constant_term = var_exn x in
@@ -281,4 +282,5 @@ struct
         let b, b_weight, _ = var_exn b in
         let c, c_weight, _ = var_exn c in
         choose_best [((), (a_weight, b_weight, c_weight))] (fun () -> (a, b, c))
+    | _ -> failwith "Unsupported constraint"
 end
