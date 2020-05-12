@@ -12,6 +12,6 @@
     init)
   (preprocessor_deps ../../../../config.mlh)
   (preprocess (pps
-    ppx_coda -lint-version-syntax-warnings
+    ppx_coda
     ppx_optcomp ppx_bin_prot ppx_let
     ppx_custom_printf)))
