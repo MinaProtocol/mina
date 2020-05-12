@@ -679,7 +679,7 @@ let%test_module "Bootstrap_controller tests" =
                 | None ->
                     Or_error.errorf
                       !"Protocol state (for scan state transactions) for \
-                        %{sexp:State_hash.t} not found when"
+                        %{sexp:State_hash.t} not found"
                       hash
               in
               let pending_coinbases =

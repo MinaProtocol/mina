@@ -442,7 +442,7 @@ module For_tests = struct
         let get_state hash =
           Or_error.errorf
             !"Protocol state (for scan state transactions) for \
-              %{sexp:State_hash.t} not found when"
+              %{sexp:State_hash.t} not found"
             hash
         in
         let genesis_staged_ledger =
