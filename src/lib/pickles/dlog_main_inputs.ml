@@ -32,7 +32,8 @@ end
 
 let group_map_fq =
   let params =
-    Group_map.Params.create (module Fq) ~a:Fq.zero ~b:(Fq.of_int 14)
+    Group_map.Params.create (module Fq)
+      {a=Fq.zero;b=(Fq.of_int 14)}
   in
   fun x -> Group_map.to_group (module Fq) ~params x
 

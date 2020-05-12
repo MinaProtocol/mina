@@ -4,7 +4,7 @@ open Core_kernel
 module Stable = struct
   module V1 = struct
     type 'a t = {a: 'a; b: 'a; c: 'a}
-    [@@deriving fields, sexp, bin_io, compare, yojson]
+    [@@deriving fields, version, bin_io, sexp, compare, yojson]
   end
 end]
 

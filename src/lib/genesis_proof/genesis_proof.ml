@@ -21,6 +21,9 @@ module T = struct
 
   let protocol_constants t = (genesis_constants t).protocol
 
+  let ledger_depth {genesis_ledger; _} =
+    Genesis_ledger.Packed.depth genesis_ledger
+
   let genesis_ledger {genesis_ledger; _} =
     Genesis_ledger.Packed.t genesis_ledger
 
@@ -51,12 +54,13 @@ end
 
 include T
 
-let base_proof (module B : Blockchain_snark.Blockchain_snark_state.S)
+let base_proof ~proof_level:(_ : Genesis_constants.Proof_level.t) ~constraint_constants
+    (module B : Blockchain_snark.Blockchain_snark_state.S)
     (t : Inputs.t) =
   let genesis_ledger = Genesis_ledger.Packed.t t.genesis_ledger in
   let protocol_constants = t.genesis_constants.protocol in
   let prev_state =
-    Protocol_state.negative_one ~genesis_ledger ~protocol_constants
+    Protocol_state.negative_one ~constraint_constants ~genesis_ledger ~protocol_constants
   in
   let curr = t.protocol_state_with_hash.data in
   let dummy_txn_stmt : Transaction_snark.Statement.With_sok.t =
@@ -83,8 +87,10 @@ let base_proof (module B : Blockchain_snark.Blockchain_snark_state.S)
     [(prev_state, dummy); (dummy_txn_stmt, dummy)]
     t.protocol_state_with_hash.data
 
-let create_values b (t : Inputs.t) =
+let create_values ~proof_level ~constraint_constants b
+    (t : Inputs.t) =
   { genesis_constants= t.genesis_constants
   ; genesis_ledger= t.genesis_ledger
   ; protocol_state_with_hash= t.protocol_state_with_hash
-  ; genesis_proof= base_proof b t }
+  ; genesis_proof=
+      base_proof ~proof_level ~constraint_constants b t }

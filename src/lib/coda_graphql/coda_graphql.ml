@@ -137,6 +137,8 @@ module Types = struct
             ~resolve:(fun {ctx= coda; _} global_slot ->
               let constants =
                 Consensus.Constants.create
+                  ~constraint_constants:
+                    (Coda_lib.config coda).constraint_constants
                   ~protocol_constants:
                     (Coda_lib.config coda).precomputed_values.genesis_constants
                       .protocol
@@ -147,6 +149,8 @@ module Types = struct
             ~resolve:(fun {ctx= coda; _} global_slot ->
               let constants =
                 Consensus.Constants.create
+                  ~constraint_constants:
+                    (Coda_lib.config coda).constraint_constants
                   ~protocol_constants:
                     (Coda_lib.config coda).precomputed_values.genesis_constants
                       .protocol
@@ -169,6 +173,8 @@ module Types = struct
             ~resolve:(fun {ctx= coda; _} ->
               let consensus_constants =
                 Consensus.Constants.create
+                  ~constraint_constants:
+                    (Coda_lib.config coda).constraint_constants
                   ~protocol_constants:
                     (Coda_lib.config coda).precomputed_values.genesis_constants
                       .protocol

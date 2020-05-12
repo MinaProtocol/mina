@@ -115,7 +115,7 @@ let replace_block_production_keypairs t kps =
   Agent.update t.block_production_keypairs kps
 
 module Snark_worker = struct
-  let run_process ~logger client_port kill_ivar num_threads =
+  let run_process ~logger ~proof_level client_port kill_ivar num_threads =
     let env =
       Option.map
         ~f:(fun num -> `Extend [("OMP_NUM_THREADS", string_of_int num)])
@@ -126,7 +126,7 @@ module Snark_worker = struct
       Process.create_exn () ~prog:our_binary ?env
         ~args:
           ( "internal" :: Snark_worker.Intf.command_name
-          :: Snark_worker.arguments
+          :: Snark_worker.arguments ~proof_level
                ~daemon_address:
                  (Host_and_port.create ~host:"127.0.0.1" ~port:client_port)
                ~shutdown_on_disconnect:false )
@@ -181,7 +181,7 @@ module Snark_worker = struct
           !"Starting snark worker process"
           ~module_:__MODULE__ ~location:__LOC__ ;
         let%map snark_worker_process =
-          run_process ~logger:t.config.logger
+          run_process ~logger:t.config.logger ~proof_level:t.config.proof_level
             t.config.gossip_net_params.addrs_and_ports.client_port kill_ivar
             t.config.snark_worker_config.num_threads
         in
@@ -556,14 +556,16 @@ let root_diff t =
                       Deferred.unit
                   | Transition_frontier.Diff.Full.With_mutant.E
                       (Root_transitioned {new_root; _}, _) ->
+                      let root_hash =
+                        Transition_frontier.Root_data.Limited.hash new_root
+                      in
                       let new_root_breadcrumb =
-                        Transition_frontier.find_exn frontier new_root.hash
+                        Transition_frontier.(find_exn frontier root_hash)
                       in
                       Strict_pipe.Writer.write root_diff_writer
                         { user_commands=
                             Transition_frontier.Breadcrumb.user_commands
-                              (Transition_frontier.find_exn frontier
-                                 new_root.hash)
+                              new_root_breadcrumb
                         ; root_length= length_of_breadcrumb new_root_breadcrumb
                         } ;
                       Deferred.unit )) ) ) ;
@@ -667,6 +669,7 @@ let staking_ledger t =
   let open Option.Let_syntax in
   let consensus_constants =
     Consensus.Constants.create
+      ~constraint_constants:t.config.constraint_constants
       ~protocol_constants:
         (Precomputed_values.protocol_constants t.config.precomputed_values)
   in
@@ -724,15 +727,17 @@ let start t =
     ~frontier_reader:t.components.transition_frontier
     ~transition_writer:t.pipes.producer_transition_writer
     ~log_block_creation:t.config.log_block_creation
+    ~constraint_constants:t.config.constraint_constants
     ~genesis_constants:
       (Precomputed_values.genesis_constants t.config.precomputed_values) ;
   Snark_worker.start t
 
-let create (config : Config.t) ~precomputed_values =
+let create (config : Config.t) =
   let consensus_constants =
     Consensus.Constants.create
+      ~constraint_constants:config.constraint_constants
       ~protocol_constants:
-        (Precomputed_values.protocol_constants precomputed_values)
+        (Precomputed_values.protocol_constants config.precomputed_values)
   in
   let monitor = Option.value ~default:(Monitor.create ()) config.monitor in
   Async.Scheduler.within' ~monitor (fun () ->
@@ -748,8 +753,10 @@ let create (config : Config.t) ~precomputed_values =
                       ~metadata:[("exn", `String (Exn.to_string_mach exn))] ))
               (fun () ->
                 trace "prover" (fun () ->
-                    Prover.create ~logger:config.logger ~pids:config.pids
-                      ~conf_dir:config.conf_dir ) )
+                    Prover.create ~logger:config.logger
+                      ~proof_level:config.proof_level
+                      ~constraint_constants:config.constraint_constants
+                      ~pids:config.pids ~conf_dir:config.conf_dir ) )
             >>| Result.ok_exn
           in
           let%bind verifier =
@@ -764,7 +771,8 @@ let create (config : Config.t) ~precomputed_values =
                       ~metadata:[("exn", `String (Exn.to_string_mach exn))] ))
               (fun () ->
                 trace "verifier" (fun () ->
-                    Verifier.create ~logger:config.logger ~pids:config.pids
+                    Verifier.create ~logger:config.logger
+                      ~proof_level:config.proof_level ~pids:config.pids
                       ~conf_dir:(Some config.conf_dir) ) )
             >>| Result.ok_exn
           in
@@ -900,8 +908,10 @@ let create (config : Config.t) ~precomputed_values =
                     let%bind frontier =
                       Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
                     in
-                    let%map scan_state, expected_merkle_root, pending_coinbases
-                        =
+                    let%map ( scan_state
+                            , expected_merkle_root
+                            , pending_coinbases
+                            , protocol_states ) =
                       Sync_handler
                       .get_staged_ledger_aux_and_pending_coinbases_at_hash
                         ~frontier input
@@ -918,7 +928,10 @@ let create (config : Config.t) ~precomputed_values =
                           , Staged_ledger_hash.to_yojson staged_ledger_hash )
                         ]
                       "sending scan state and pending coinbase" ;
-                    (scan_state, expected_merkle_root, pending_coinbases) ) )
+                    ( scan_state
+                    , expected_merkle_root
+                    , pending_coinbases
+                    , protocol_states ) ) )
               ~answer_sync_ledger_query:(fun query_env ->
                 let open Deferred.Or_error.Let_syntax in
                 trace_recurring "answer_sync_ledger_query" (fun () ->
@@ -1005,7 +1018,8 @@ let create (config : Config.t) ~precomputed_values =
           let ((most_recent_valid_block_reader, _) as most_recent_valid_block)
               =
             Broadcast_pipe.create
-              ( External_transition.genesis ~precomputed_values
+              ( External_transition.genesis
+                  ~precomputed_values:config.precomputed_values
               |> External_transition.Validated.to_initial_validated )
           in
           let valid_transitions, initialization_finish_signal =
@@ -1064,7 +1078,9 @@ let create (config : Config.t) ~precomputed_values =
                                @@ External_transition.Validation
                                   .forget_validation et ) ;
                          breadcrumb ))
-                  ~most_recent_valid_block ~precomputed_values )
+                  ~most_recent_valid_block
+                  ~constraint_constants:config.constraint_constants
+                  ~precomputed_values:config.precomputed_values )
           in
           let ( valid_transitions_for_network
               , valid_transitions_for_api

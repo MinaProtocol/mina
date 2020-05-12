@@ -84,5 +84,5 @@ let bits_to_bytes bits =
   |> String.of_char_list
 
 let group_map m ~a ~b =
-  let params = Group_map.Params.create m ~a ~b in
+  let params = Group_map.Params.create m {a; b} in
   stage (fun x -> Group_map.to_group m ~params x)

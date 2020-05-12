@@ -52,7 +52,12 @@ module Worker_state = struct
   end
 
   (* bin_io required by rpc_parallel *)
-  type init_arg = {conf_dir: string; logger: Logger.Stable.Latest.t}
+  type init_arg =
+    { conf_dir: string
+    ; logger: Logger.Stable.Latest.t
+    ; proof_level: Genesis_constants.Proof_level.Stable.Latest.t
+    ; constraint_constants:
+        Genesis_constants.Constraint_constants.Stable.Latest.t }
   [@@deriving bin_io_unversioned]
 
   type t = (module S)
@@ -76,11 +81,11 @@ module Worker_state = struct
               ; target= Pending_coinbase.Stack.empty } }
         , Proof.dummy )
 
-  let create {logger; _} : t Deferred.t =
+  let create {logger; proof_level; constraint_constants; _} : t Deferred.t =
     Deferred.return
       (let m =
-         match Coda_compile_config.proof_level with
-         | "full" ->
+         match proof_level with
+         | Genesis_constants.Proof_level.Full ->
              ( module struct
                module T = Transaction_snark.Make ()
 
@@ -115,7 +120,7 @@ module Worker_state = struct
                let verify state proof = B.Proof.verify [(state, proof)]
              end
              : S )
-         | "check" ->
+         | Check ->
              ( module struct
                module Transaction_snark = Transaction_snark
 
@@ -126,6 +131,7 @@ module Worker_state = struct
                  let t, _proof = ledger_proof_opt chain next_state t in
                  let res =
                    Blockchain_snark.Blockchain_snark_state.check
+                      ~proof_level ~constraint_constants
                      {transition= block; prev_state= chain.state}
                      ~handler:
                        (Consensus.Data.Prover_state.handler state_for_handler
@@ -145,7 +151,7 @@ module Worker_state = struct
                let verify _state _proof = true
              end
              : S )
-         | "none" ->
+         | None ->
              ( module struct
                module Transaction_snark = Transaction_snark
 
@@ -156,8 +162,6 @@ module Worker_state = struct
                let verify _ _ = true
              end
              : S )
-         | _ ->
-             failwith "unknown proof_level set in compile config"
        in
        Memory_stats.log_memory_stats logger ~process:"prover" ;
        m)
@@ -231,7 +235,8 @@ module Worker = struct
         ; extend_blockchain= f extend_blockchain
         ; verify_blockchain= f verify_blockchain }
 
-      let init_worker_state Worker_state.{conf_dir; logger} =
+      let init_worker_state
+          Worker_state.{conf_dir; logger; proof_level; constraint_constants} =
         let max_size = 256 * 1024 * 512 in
         Logger.Consumer_registry.register ~id:"default"
           ~processor:(Logger.Processor.raw ())
@@ -240,7 +245,8 @@ module Worker = struct
                ~log_filename:"coda-prover.log" ~max_size) ;
         Logger.info logger ~module_:__MODULE__ ~location:__LOC__
           "Prover started" ;
-        Worker_state.create {conf_dir; logger}
+        Worker_state.create
+          {conf_dir; logger; proof_level; constraint_constants}
 
       let init_connection_state ~connection:_ ~worker_state:_ () =
         Deferred.unit
@@ -252,7 +258,7 @@ end
 
 type t = {connection: Worker.Connection.t; process: Process.t; logger: Logger.t}
 
-let create ~logger ~pids ~conf_dir =
+let create ~logger ~pids ~conf_dir ~proof_level ~constraint_constants =
   let on_failure err =
     Logger.error logger ~module_:__MODULE__ ~location:__LOC__
       "Prover process failed with error $err"
@@ -263,7 +269,7 @@ let create ~logger ~pids ~conf_dir =
     (* HACK: Need to make connection_timeout long since creating a prover can take a long time*)
     Worker.spawn_in_foreground_exn ~connection_timeout:(Time.Span.of_min 1.)
       ~on_failure ~shutdown_on:Disconnect ~connection_state_init_arg:()
-      {conf_dir; logger}
+      {conf_dir; logger; proof_level; constraint_constants}
   in
   Logger.info logger ~module_:__MODULE__ ~location:__LOC__
     "Daemon started process of kind $process_kind with pid $prover_pid"

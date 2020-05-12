@@ -6,6 +6,7 @@ let name = "coda-transitive-peers-test"
 let main () =
   let consensus_constants =
     Consensus.Constants.create
+      ~constraint_constants:Genesis_constants.Constraint_constants.compiled
       ~protocol_constants:Genesis_constants.compiled.protocol
   in
   let%bind program_dir = Unix.getcwd () in

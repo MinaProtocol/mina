@@ -101,9 +101,10 @@ end = struct
     t.timeout <- Some timeout
 end
 
-let generate_next_state ~previous_protocol_state ~time_controller
-    ~staged_ledger ~transactions ~get_completed_work ~logger ~coinbase_receiver
-    ~(keypair : Keypair.t) ~block_data ~scheduled_time ~log_block_creation =
+let generate_next_state ~constraint_constants ~previous_protocol_state
+    ~time_controller ~staged_ledger ~transactions ~get_completed_work ~logger
+    ~coinbase_receiver ~(keypair : Keypair.t) ~block_data ~scheduled_time
+    ~log_block_creation =
   let open Interruptible.Let_syntax in
   let self = Public_key.compress keypair.public_key in
   let previous_protocol_state_body_hash =
@@ -207,7 +208,7 @@ let generate_next_state ~previous_protocol_state ~time_controller
                       .user_commands diff
                       :> User_command.t list )
                   ~snarked_ledger_hash:previous_ledger_hash ~supply_increase
-                  ~logger ) )
+                  ~logger ~constraint_constants ) )
       in
       lift_sync (fun () ->
           measure "making Snark and Internal transitions" (fun () ->
@@ -242,11 +243,11 @@ let generate_next_state ~previous_protocol_state ~time_controller
 let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
     ~transaction_resource_pool ~time_controller ~keypairs ~coinbase_receiver
     ~consensus_local_state ~frontier_reader ~transition_writer
-    ~set_next_producer_timing ~log_block_creation
+    ~set_next_producer_timing ~log_block_creation ~constraint_constants
     ~(genesis_constants : Genesis_constants.t) =
   trace "block_producer" (fun () ->
       let consensus_constants =
-        Consensus.Constants.create
+        Consensus.Constants.create ~constraint_constants
           ~protocol_constants:genesis_constants.protocol
       in
       let log_bootstrap_mode () =
@@ -287,8 +288,9 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
               Interruptible.lift (Deferred.return ()) (Ivar.read ivar)
             in
             let%bind next_state_opt =
-              generate_next_state ~scheduled_time ~coinbase_receiver
-                ~block_data ~previous_protocol_state ~time_controller
+              generate_next_state ~constraint_constants ~scheduled_time
+                ~coinbase_receiver ~block_data ~previous_protocol_state
+                ~time_controller
                 ~staged_ledger:(Breadcrumb.staged_ledger crumb)
                 ~transactions ~get_completed_work ~logger ~keypair
                 ~log_block_creation

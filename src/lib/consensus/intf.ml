@@ -244,6 +244,7 @@ module type State_hooks = sig
     -> snarked_ledger_hash:Coda_base.Frozen_ledger_hash.t
     -> supply_increase:Currency.Amount.t
     -> logger:Logger.t
+    -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> protocol_state * consensus_transition
 
   (**
@@ -251,7 +252,8 @@ module type State_hooks = sig
    * a given consensus state and snark transition.
   *)
   val next_state_checked :
-       prev_state:protocol_state_var
+       constraint_constants:Genesis_constants.Constraint_constants.t
+    -> prev_state:protocol_state_var
     -> prev_state_hash:Coda_base.State_hash.var
     -> snark_transition_var
     -> Currency.Amount.var
@@ -315,7 +317,10 @@ module type S = sig
       ; acceptable_network_delay: int }
     [@@deriving yojson, fields]
 
-    val t : protocol_constants:Genesis_constants.Protocol.t -> t
+    val t :
+         constraint_constants:Genesis_constants.Constraint_constants.t
+      -> protocol_constants:Genesis_constants.Protocol.t
+      -> t
   end
 
   module Data : sig
@@ -432,10 +437,15 @@ module type S = sig
 
       type display [@@deriving yojson]
 
-      include Snark_params.Tick.Snarkable.S with type value := Value.t
+      type var
+
+      val typ :
+           constraint_constants:Genesis_constants.Constraint_constants.t
+        -> (var, Value.t) Snark_params.Tick.Typ.t
 
       val negative_one :
            genesis_ledger:Ledger.t Lazy.t
+        -> constraint_constants:Genesis_constants.Constraint_constants.t
         -> protocol_constants:Genesis_constants.Protocol.t
         -> Value.t
 
@@ -443,12 +453,14 @@ module type S = sig
            negative_one_protocol_state_hash:Coda_base.State_hash.t
         -> consensus_transition:Consensus_transition.Value.t
         -> genesis_ledger:Ledger.t Lazy.t
+        -> constraint_constants:Genesis_constants.Constraint_constants.t
         -> protocol_constants:Genesis_constants.Protocol.t
         -> Value.t
 
       val create_genesis :
            negative_one_protocol_state_hash:Coda_base.State_hash.t
         -> genesis_ledger:Ledger.t Lazy.t
+        -> constraint_constants:Genesis_constants.Constraint_constants.t
         -> protocol_constants:Genesis_constants.Protocol.t
         -> Value.t
 

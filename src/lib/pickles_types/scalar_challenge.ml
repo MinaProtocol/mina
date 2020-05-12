@@ -1,5 +1,14 @@
-type 'f t = Scalar_challenge of 'f
-[@@deriving bin_io, sexp, compare, eq, yojson]
+open Core_kernel
+
+[%%versioned
+module Stable = struct
+  module V1 = struct
+    type 'f t = Scalar_challenge of 'f
+    [@@deriving bin_io, version, sexp, compare, eq, yojson]
+  end
+end]
+
+include Stable.Latest
 
 let create t = Scalar_challenge t
 

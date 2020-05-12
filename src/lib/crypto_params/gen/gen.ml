@@ -17,7 +17,7 @@ module Group = Snarky_bn382_backend.G
 let group_map_params =
   Group_map.Params.create
     (module Snarky_bn382_backend.Fp)
-    ~a:Snarky_bn382_backend.G.Params.a ~b:Snarky_bn382_backend.G.Params.a
+    Snarky_bn382_backend.G.Params.{a; b}
 
 let group_map_params_structure ~loc =
   let module T = struct

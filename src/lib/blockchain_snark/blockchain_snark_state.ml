@@ -63,6 +63,8 @@ let with_handler k w ?handler =
         new consensus state is a function of the old consensus state
 *)
 let%snarkydef step ~(logger : Logger.t)
+      ~(proof_level:Genesis_constants.Proof_level.t)
+      ~(constraint_constants:Genesis_constants.Constraint_constants.t)
     Hlist.HlistId.
       [ previous_state_hash
       ; (txn_snark : Transaction_snark.Statement.With_sok.Checked.t) ]
@@ -76,7 +78,7 @@ let%snarkydef step ~(logger : Logger.t)
   let%bind previous_state, previous_state_body_hash =
     let%bind t =
       with_label __LOC__
-        (exists Protocol_state.typ ~request:(As_prover.return Prev_state))
+        (exists (Protocol_state.typ ~constraint_constants) ~request:(As_prover.return Prev_state))
     in
     Core.printf "step %s\n%!" __LOC__ ;
     let%bind h, body = Protocol_state.hash_checked t in
@@ -87,7 +89,7 @@ let%snarkydef step ~(logger : Logger.t)
   in
   let%bind `Success updated_consensus_state, consensus_state =
     with_label __LOC__
-      (Consensus_state_hooks.next_state_checked ~prev_state:previous_state
+      (Consensus_state_hooks.next_state_checked ~constraint_constants ~prev_state:previous_state
          ~prev_state_hash:previous_state_hash transition
          txn_snark.supply_increase)
   in
@@ -215,14 +217,24 @@ let%snarkydef step ~(logger : Logger.t)
     in
     (transaction_snark_should_verifiy, result)
   in
+  let txn_snark_should_verify =
+    match proof_level with
+    | Check | None -> Boolean.false_
+    | Full -> txn_snark_should_verify
+  in
   let%bind is_base_case =
     Protocol_state.consensus_state new_state
     |> Consensus.Data.Consensus_state.is_genesis_state_var
   in
+  let prev_should_verify =
+    match proof_level with
+    | Check | None-> Boolean.false_
+    | Full -> Boolean.not is_base_case
+  in
   let%map () = Boolean.Assert.any [is_base_case; success] in
-  (Boolean.not is_base_case, txn_snark_should_verify)
+  (prev_should_verify, txn_snark_should_verify)
 
-let check w ?handler txn_snark new_state_hash : unit Or_error.t =
+let check w ?handler ~proof_level ~constraint_constants txn_snark new_state_hash : unit Or_error.t =
   let open Tick in
   check
     (Fn.flip handle (wrap_handler handler w)
@@ -235,15 +247,15 @@ let check w ?handler txn_snark new_state_hash : unit Or_error.t =
           exists Transaction_snark.Statement.With_sok.typ
             ~compute:(As_prover.return txn_snark)
         in
-        step ~logger:(Logger.create ()) [prev; txn_snark] curr))
+        step ~proof_level ~constraint_constants ~logger:(Logger.create ()) [prev; txn_snark] curr))
     ()
 
-let rule transaction_snark self : _ Pickles.Inductive_rule.t =
+let rule ~proof_level ~constraint_constants transaction_snark self : _ Pickles.Inductive_rule.t =
   { prevs= [self; transaction_snark]
   ; main=
       (fun [x1; x2] x ->
         let b1, b2 =
-          Run.run_checked (step ~logger:(Logger.create ()) [x1; x2] x)
+          Run.run_checked (step ~proof_level ~constraint_constants ~logger:(Logger.create ()) [x1; x2] x)
         in
         [b1; b2] )
   ; main_value=
@@ -316,6 +328,9 @@ module Make (T : sig
   val tag : Transaction_snark.tag
 end) =
 struct
+  let proof_level= Genesis_constants.Proof_level.compiled
+  let constraint_constants = Genesis_constants.Constraint_constants.compiled
+
   let tag, cache_handle, p, Pickles.Provers.[step] =
     Pickles.compile ~cache:Cache_dir.cache
       (module Statement_var)
@@ -324,7 +339,8 @@ struct
       ~branches:(module Nat.N1)
       ~max_branching:(module Nat.N2)
       ~name:"blockchain-snark"
-      ~choices:(fun ~self -> [rule T.tag self])
+      ~choices:(fun ~self -> [rule ~proof_level ~constraint_constants
+T.tag self])
 
   let step = with_handler step
 
@@ -339,7 +355,11 @@ let constraint_system_digests () =
            let open Tick in
            let%bind x1 = exists Coda_base.State_hash.typ in
            let%bind x2 = exists Transaction_snark.Statement.With_sok.typ in
-           let%map _ = step ~logger:(Logger.create ()) [x1; x2] x in
+           let%map _ = step
+               ~proof_level:Genesis_constants.Proof_level.compiled
+               ~constraint_constants:
+                 Genesis_constants.Constraint_constants.compiled
+               ~logger:(Logger.create ()) [x1; x2] x in
            ()
          in
          Tick.constraint_system ~exposing:[Coda_base.State_hash.typ] main) ) ]

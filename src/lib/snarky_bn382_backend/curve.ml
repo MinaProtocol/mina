@@ -48,9 +48,13 @@ module type Input_intf = sig
 end
 
 module type Field_intf = sig
-  type t [@@deriving bin_io, sexp, compare, yojson]
+  module Stable : sig
+    module Latest : sig
+      type t [@@deriving bin_io, sexp, compare, yojson]
+    end
+  end
 
-  include Type_with_delete with type t := t
+  include Type_with_delete with type t = Stable.Latest.t
 
   val ( + ) : t -> t -> t
 
@@ -77,8 +81,16 @@ module Make
           and module ScalarField := ScalarField) =
 struct
   module Affine = struct
-    type t = BaseField.t * BaseField.t
-    [@@deriving bin_io, sexp, compare, yojson]
+    module Stable = struct
+      module V1 = struct
+        type t = BaseField.Stable.Latest.t * BaseField.Stable.Latest.t
+        [@@deriving version {asserted}, bin_io, sexp, compare, yojson]
+      end
+
+      module Latest = V1
+    end
+
+    include Stable.Latest
 
     let to_backend (x, y) =
       let t = C.Affine.create x y in

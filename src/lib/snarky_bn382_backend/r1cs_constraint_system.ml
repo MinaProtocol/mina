@@ -1,11 +1,11 @@
 module type Constraint_matrix_intf = sig
-  module Field : Field.S
+  type field_vector
 
   type t
 
   val create : unit -> t
 
-  val append_row : t -> Snarky_bn382.Usize_vector.t -> Field.Vector.t -> unit
+  val append_row : t -> Snarky_bn382.Usize_vector.t -> field_vector -> unit
 end
 
 type 'a abc = {a: 'a; b: 'a; c: 'a} [@@deriving sexp]
@@ -50,7 +50,7 @@ module Make (Fp : sig
 
   val to_bigint_raw_noalloc : t -> Bigint.R.t
 end)
-(Mat : Constraint_matrix_intf with module Field := Fp) =
+(Mat : Constraint_matrix_intf with type field_vector := Fp.Vector.t) =
 struct
   open Core
 

@@ -1,11 +1,23 @@
+open Core_kernel
 open Pickles_types
 
-type t =
-  ( G1.Affine.t
-  , Fp.t
-  , (G1.Affine.t, Fp.t) Pairing_marlin_types.Openings.t )
-  Pairing_marlin_types.Proof.t
-[@@deriving bin_io]
+[%%versioned
+module Stable = struct
+  module V1 = struct
+    type t =
+      ( G1.Affine.Stable.V1.t
+      , Fp.Stable.V1.t
+      , ( G1.Affine.Stable.V1.t
+        , Fp.Stable.V1.t )
+        Pairing_marlin_types.Openings.Stable.V1.t )
+      Pairing_marlin_types.Proof.Stable.V1.t
+    [@@deriving version, bin_io]
+
+    let to_latest = Fn.id
+  end
+end]
+
+include Stable.Latest
 
 let to_backend primary_input
     ({ messages=
@@ -34,7 +46,7 @@ let to_backend primary_input
       t) =
   let primary_input =
     let v = Fp.Vector.create () in
-    List.iter (Fp.Vector.emplace_back v) primary_input ;
+    List.iter ~f:(Fp.Vector.emplace_back v) primary_input ;
     v
   in
   let g (a, b) =

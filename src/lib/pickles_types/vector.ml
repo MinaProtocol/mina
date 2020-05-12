@@ -127,10 +127,8 @@ let rec of_list_and_length_exn : type a n. a list -> n nat -> (a, n) t =
 let of_list_and_length xs n =
   Core_kernel.Option.try_with (fun () -> of_list_and_length_exn xs n)
 
-let reverse (t : ('a, 'n) t) : ('a, 'n) t =
+let reverse t =
   let (T xs) = of_list (List.rev (to_list t)) in
-  (* Would need to build GADT witnesses with for the length argument to be
-     correct, so we just magic. *)
   Obj.magic xs
 
 let rec take_from_list : type a n. a list -> n nat -> (a, n) t =

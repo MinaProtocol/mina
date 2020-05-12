@@ -3,6 +3,8 @@ open Core
 module type Inputs_intf = sig
   module Location : Location_intf.S
 
+  module Location_binable : Hashable.S_binable with type t := Location.t
+
   module Key : Intf.Key
 
   module Token_id : Intf.Token_id
@@ -19,8 +21,6 @@ module type Inputs_intf = sig
 
   module Hash : Intf.Hash with type account := Account.t
 
-  module Depth : Intf.Depth
-
   module Base : sig
     type t
 
@@ -34,6 +34,8 @@ module type Inputs_intf = sig
   val location_of_account_addr : Location.Addr.t -> Location.t
 
   val location_of_hash_addr : Location.Addr.t -> Location.t
+
+  val ledger_depth : Base.t -> int
 
   val set_raw_hash_batch : Base.t -> (Location.t * Hash.t) list -> unit
 
@@ -67,8 +69,11 @@ end = struct
   let get_all_accounts_rooted_at_exn t address =
     let open Inputs in
     let result =
-      Location.Addr.Range.fold (Location.Addr.Range.subtree_range address)
-        ~init:[] ~f:(fun bit_index acc ->
+      Location.Addr.Range.fold
+        (Location.Addr.Range.subtree_range
+           ~ledger_depth:(Inputs.ledger_depth t) address)
+        ~init:[]
+        ~f:(fun bit_index acc ->
           let account = Base.get t (location_of_account_addr bit_index) in
           (bit_index, account) :: acc )
     in
@@ -79,12 +84,15 @@ end = struct
           Some (addr, account) )
 
   let rec compute_affected_locations_and_hashes t locations_and_hashes acc =
+    let ledger_depth = Inputs.ledger_depth t in
     let locations, _ = List.unzip locations_and_hashes in
     if not @@ List.is_empty locations then
-      let height = Inputs.Location.height @@ List.hd_exn locations in
-      if height < Inputs.Depth.depth then
+      let height =
+        Inputs.Location.height ~ledger_depth @@ List.hd_exn locations
+      in
+      if height < ledger_depth then
         let location_to_hash_table =
-          Inputs.Location.Table.of_alist_exn locations_and_hashes
+          Inputs.Location_binable.Table.of_alist_exn locations_and_hashes
         in
         let _, parent_locations_and_hashes =
           List.fold locations_and_hashes ~init:([], [])
@@ -127,6 +135,7 @@ end = struct
     |> Non_empty_list.max_elt ~compare:Int.compare
 
   let set_raw_addresses t addresses_and_accounts =
+    let ledger_depth = Inputs.ledger_depth t in
     Option.iter (Non_empty_list.of_list_opt addresses_and_accounts)
       ~f:(fun nonempty_addresses_and_accounts ->
         let key_locations =
@@ -149,7 +158,8 @@ end = struct
             Option.value_map current_last_index ~default:foreign_last_index
               ~f:(fun max_index -> Int.max max_index foreign_last_index)
           in
-          Inputs.Location.(Account (Addr.of_int_exn max_index_in_all_accounts))
+          Inputs.Location.(
+            Account (Addr.of_int_exn ~ledger_depth max_index_in_all_accounts))
         in
         let last_location = new_last_location in
         Inputs.set_location_batch ~last_location t key_locations )
@@ -171,7 +181,9 @@ end = struct
 
   let set_all_accounts_rooted_at_exn t address accounts =
     let addresses =
-      Sequence.to_list @@ Inputs.Location.Addr.Range.subtree_range_seq address
+      Sequence.to_list
+      @@ Inputs.Location.Addr.Range.subtree_range_seq
+           ~ledger_depth:(Inputs.ledger_depth t) address
     in
     let num_accounts = List.length accounts in
     List.(zip_exn (take addresses num_accounts) accounts)
