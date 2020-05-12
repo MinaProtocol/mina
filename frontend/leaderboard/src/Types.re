@@ -6,7 +6,10 @@ module NewBlock = {
     fee: int64,
   };
 
-  type userCommands = {fromAccount: account};
+  type userCommands = {
+    fromAccount: account,
+    toAccount: account,
+  };
 
   type feeTransfer = {
     fee: int64,
@@ -14,7 +17,7 @@ module NewBlock = {
   };
   type transactions = {
     userCommands: array(userCommands),
-    feeTransfer,
+    feeTransfer: array(feeTransfer),
   };
 
   type data = {
