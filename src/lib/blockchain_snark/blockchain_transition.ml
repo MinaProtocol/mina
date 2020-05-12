@@ -248,7 +248,8 @@ module Make (T : Transaction_snark.Verification.S) = struct
           (Tick.constraint_system ~exposing:(Step_base.input ())
              (Step_base.main ~logger:(Logger.null ())
                 ~proof_level:Genesis_constants.Proof_level.compiled
-                ~ledger_depth:Genesis_constants.ledger_depth))
+                ~constraint_constants:
+                  Genesis_constants.Constraint_constants.compiled))
 
     let cached () =
       let open Cached.Deferred_with_track_generated.Let_syntax in
@@ -330,6 +331,7 @@ let constraint_system_digests () =
           Tick.constraint_system ~exposing:(input ())
             (main ~logger:(Logger.null ())
                ~proof_level:Genesis_constants.Proof_level.compiled
-               ~ledger_depth:Genesis_constants.ledger_depth)) )
+               ~constraint_constants:
+                 Genesis_constants.Constraint_constants.compiled)) )
   ; ("blockchain-wrap", digest' W.(Tock.constraint_system ~exposing:input main))
   ]

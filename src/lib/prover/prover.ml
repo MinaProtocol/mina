@@ -54,12 +54,14 @@ module Worker_state = struct
   type init_arg =
     { conf_dir: string
     ; logger: Logger.Stable.Latest.t
-    ; proof_level: Genesis_constants.Proof_level.Stable.Latest.t }
+    ; proof_level: Genesis_constants.Proof_level.Stable.Latest.t
+    ; constraint_constants:
+        Genesis_constants.Constraint_constants.Stable.Latest.t }
   [@@deriving bin_io_unversioned]
 
   type t = (module S) Deferred.t
 
-  let create {logger; proof_level; _} : t Deferred.t =
+  let create {logger; proof_level; constraint_constants; _} : t Deferred.t =
     Deferred.return
       (let%map (module Keys) = Keys_lib.Keys.create () in
        let module Transaction_snark =
@@ -99,10 +101,7 @@ module Worker_state = struct
                  in
                  let main x =
                    Tick.handle
-                     (Keys.Step.main ~logger ~proof_level
-                        ~ledger_depth:
-                          (Consensus.Data.Prover_state.ledger_depth
-                             state_for_handler)
+                     (Keys.Step.main ~logger ~proof_level ~constraint_constants
                         x)
                      (Consensus.Data.Prover_state.handler state_for_handler
                         ~pending_coinbase)
@@ -154,10 +153,7 @@ module Worker_state = struct
                  in
                  let main x =
                    Tick.handle
-                     (Keys.Step.main ~logger ~proof_level
-                        ~ledger_depth:
-                          (Consensus.Data.Prover_state.ledger_depth
-                             state_for_handler)
+                     (Keys.Step.main ~logger ~proof_level ~constraint_constants
                         x)
                      (Consensus.Data.Prover_state.handler state_for_handler
                         ~pending_coinbase)
@@ -263,7 +259,8 @@ module Worker = struct
         ; extend_blockchain= f extend_blockchain
         ; verify_blockchain= f verify_blockchain }
 
-      let init_worker_state Worker_state.{conf_dir; logger; proof_level} =
+      let init_worker_state
+          Worker_state.{conf_dir; logger; proof_level; constraint_constants} =
         let max_size = 256 * 1024 * 512 in
         Logger.Consumer_registry.register ~id:"default"
           ~processor:(Logger.Processor.raw ())
@@ -272,7 +269,8 @@ module Worker = struct
                ~log_filename:"coda-prover.log" ~max_size) ;
         Logger.info logger ~module_:__MODULE__ ~location:__LOC__
           "Prover started" ;
-        Worker_state.create {conf_dir; logger; proof_level}
+        Worker_state.create
+          {conf_dir; logger; proof_level; constraint_constants}
 
       let init_connection_state ~connection:_ ~worker_state:_ () =
         Deferred.unit
@@ -284,7 +282,7 @@ end
 
 type t = {connection: Worker.Connection.t; process: Process.t; logger: Logger.t}
 
-let create ~logger ~pids ~conf_dir ~proof_level =
+let create ~logger ~pids ~conf_dir ~proof_level ~constraint_constants =
   let on_failure err =
     Logger.error logger ~module_:__MODULE__ ~location:__LOC__
       "Prover process failed with error $err"
@@ -295,7 +293,7 @@ let create ~logger ~pids ~conf_dir ~proof_level =
     (* HACK: Need to make connection_timeout long since creating a prover can take a long time*)
     Worker.spawn_in_foreground_exn ~connection_timeout:(Time.Span.of_min 1.)
       ~on_failure ~shutdown_on:Disconnect ~connection_state_init_arg:()
-      {conf_dir; logger; proof_level}
+      {conf_dir; logger; proof_level; constraint_constants}
   in
   Logger.info logger ~module_:__MODULE__ ~location:__LOC__
     "Daemon started process of kind $process_kind with pid $prover_pid"

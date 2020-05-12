@@ -49,5 +49,6 @@ type t =
         [@default None]
   ; demo_mode: bool [@default false]
   ; log_block_creation: bool [@default false]
+  ; constraint_constants: Genesis_constants.Constraint_constants.t
   ; precomputed_values: Precomputed_values.t }
 [@@deriving make]

@@ -13,7 +13,10 @@ end
 
 let create_ledger_and_transactions num_transitions =
   let num_accounts = 4 in
-  let ledger = Ledger.create ~depth:Genesis_constants.ledger_depth () in
+  let ledger =
+    Ledger.create
+      ~depth:Genesis_constants.Constraint_constants.compiled.ledger_depth ()
+  in
   let keys =
     Array.init num_accounts ~f:(fun _ -> Signature_lib.Keypair.create ())
   in
@@ -143,7 +146,9 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
         let state_body_hash_opt = Some state_body_hash in
         let span, proof =
           time (fun () ->
-              T.of_transaction ?preeval ~ledger_depth:sparse_ledger.depth
+              T.of_transaction ?preeval
+                ~constraint_constants:
+                  Genesis_constants.Constraint_constants.compiled
                 ~sok_digest:Sok_message.Digest.default
                 ~source:(Sparse_ledger.merkle_root sparse_ledger)
                 ~target:(Sparse_ledger.merkle_root sparse_ledger')
@@ -194,7 +199,8 @@ let check_base_snarks sparse_ledger0 (transitions : Transaction.t list) preeval
         let state_body_hash_opt = Some state_body_hash in
         let () =
           Transaction_snark.check_transaction ?preeval
-            ~ledger_depth:sparse_ledger.depth ~sok_message
+            ~constraint_constants:
+              Genesis_constants.Constraint_constants.compiled ~sok_message
             ~source:(Sparse_ledger.merkle_root sparse_ledger)
             ~target:(Sparse_ledger.merkle_root sparse_ledger')
             ~pending_coinbase_stack_state:
@@ -226,7 +232,8 @@ let generate_base_snarks_witness sparse_ledger0
         let state_body_hash_opt = Some state_body_hash in
         let () =
           Transaction_snark.generate_transaction_witness ?preeval
-            ~ledger_depth:sparse_ledger.depth ~sok_message
+            ~constraint_constants:
+              Genesis_constants.Constraint_constants.compiled ~sok_message
             ~source:(Sparse_ledger.merkle_root sparse_ledger)
             ~target:(Sparse_ledger.merkle_root sparse_ledger')
             { Transaction_snark.Pending_coinbase_stack_state.source=

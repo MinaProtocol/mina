@@ -70,8 +70,8 @@ let main accounts_json_file dir num_accounts proof_level constants_file =
   let top_dir = Option.value ~default:Cache_dir.autogen_path dir in
   let genesis_dirname =
     Cache_dir.genesis_dir_name ~genesis_constants:Genesis_constants.compiled
+      ~constraint_constants:Genesis_constants.Constraint_constants.compiled
       ~proof_level:Genesis_constants.Proof_level.compiled
-      ~ledger_depth:Genesis_constants.ledger_depth
   in
   let%bind genesis_dir =
     let dir = top_dir ^/ genesis_dirname in
@@ -105,6 +105,8 @@ let main accounts_json_file dir num_accounts proof_level constants_file =
         in
         let%bind _base_hash, base_proof =
           Genesis_ledger_helper.Genesis_proof.generate ~proof_level ~ledger
+            ~constraint_constants:
+              Genesis_constants.Constraint_constants.compiled
             ~genesis_constants
         in
         Deferred.Or_error.ok_exn
@@ -120,6 +122,9 @@ let main accounts_json_file dir num_accounts proof_level constants_file =
   File_system.remove_dir genesis_dir
 
 let () =
+  let compiled_ledger_depth =
+    Genesis_constants.Constraint_constants.compiled.ledger_depth
+  in
   Command.run
     (Command.async
        ~summary:
@@ -153,7 +158,7 @@ let () =
                    If the number of accounts in the account file, say x, is \
                    less than n then the tool will generate (n-x) fake \
                    accounts (default: x)."
-                  (Int.pow 2 Genesis_constants.ledger_depth))
+                  (Int.pow 2 compiled_ledger_depth))
              (optional int)
          and constants =
            flag "constants"
@@ -172,7 +177,7 @@ let () =
              ~doc:"full|check|none"
          in
          fun () ->
-           let max = Int.pow 2 Genesis_constants.ledger_depth in
+           let max = Int.pow 2 compiled_ledger_depth in
            let n = Option.value ~default:0 n in
            let proof_level =
              Option.value ~default:Genesis_constants.Proof_level.compiled

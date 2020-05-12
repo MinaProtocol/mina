@@ -175,7 +175,7 @@ end
 
 val check_transaction :
      ?preeval:bool
-  -> ledger_depth:int
+  -> constraint_constants:Genesis_constants.Constraint_constants.t
   -> sok_message:Sok_message.t
   -> source:Frozen_ledger_hash.t
   -> target:Frozen_ledger_hash.t
@@ -185,7 +185,7 @@ val check_transaction :
   -> unit
 
 val check_user_command :
-     ledger_depth:int
+     constraint_constants:Genesis_constants.Constraint_constants.t
   -> sok_message:Sok_message.t
   -> source:Frozen_ledger_hash.t
   -> target:Frozen_ledger_hash.t
@@ -196,7 +196,7 @@ val check_user_command :
 
 val generate_transaction_witness :
      ?preeval:bool
-  -> ledger_depth:int
+  -> constraint_constants:Genesis_constants.Constraint_constants.t
   -> sok_message:Sok_message.t
   -> source:Frozen_ledger_hash.t
   -> target:Frozen_ledger_hash.t
@@ -210,7 +210,7 @@ module type S = sig
 
   val of_transaction :
        ?preeval:bool
-    -> ledger_depth:int
+    -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> sok_digest:Sok_message.Digest.t
     -> source:Frozen_ledger_hash.t
     -> target:Frozen_ledger_hash.t
@@ -220,7 +220,7 @@ module type S = sig
     -> t
 
   val of_user_command :
-       ledger_depth:int
+       constraint_constants:Genesis_constants.Constraint_constants.t
     -> sok_digest:Sok_message.Digest.t
     -> source:Frozen_ledger_hash.t
     -> target:Frozen_ledger_hash.t
@@ -230,7 +230,7 @@ module type S = sig
     -> t
 
   val of_fee_transfer :
-       ledger_depth:int
+       constraint_constants:Genesis_constants.Constraint_constants.t
     -> sok_digest:Sok_message.Digest.t
     -> source:Frozen_ledger_hash.t
     -> target:Frozen_ledger_hash.t

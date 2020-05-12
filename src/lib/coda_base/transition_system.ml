@@ -34,7 +34,9 @@ module type S = sig
 
     type value [@@deriving sexp]
 
-    val typ : (var, value) Typ.t
+    val typ :
+         constraint_constants:Genesis_constants.Constraint_constants.t
+      -> (var, value) Typ.t
 
     module Checked : sig
       val hash : var -> (Hash.var * Body_hash.var, _) Checked.t
@@ -44,7 +46,7 @@ module type S = sig
       val update :
            logger:Logger.t
         -> proof_level:Genesis_constants.Proof_level.t
-        -> ledger_depth:int
+        -> constraint_constants:Genesis_constants.Constraint_constants.t
         -> Hash.var * Body_hash.var * var
            (*Previous state hash, previous state body hash, previous state*)
         -> Update.var
@@ -150,16 +152,17 @@ struct
 
     let exists' typ ~f = exists typ ~compute:As_prover.(map get_state ~f)
 
-    let%snarkydef main ~(logger : Logger.t) ~proof_level ~ledger_depth
+    let%snarkydef main ~constraint_constants ~(logger : Logger.t) ~proof_level
         (top_hash : Digest.Tick.Packed.var) =
-      let%bind prev_state = exists' State.typ ~f:Prover_state.prev_state
+      let%bind prev_state =
+        exists' (State.typ ~constraint_constants) ~f:Prover_state.prev_state
       and update = exists' Update.typ ~f:Prover_state.update in
       let%bind prev_state_hash, prev_state_body_hash =
         State.Checked.hash prev_state
       in
       let%bind next_state_hash, next_state, `Success success =
         with_label __LOC__
-          (State.Checked.update ~logger ~proof_level ~ledger_depth
+          (State.Checked.update ~logger ~proof_level ~constraint_constants
              (prev_state_hash, prev_state_body_hash, prev_state)
              update)
       in
@@ -182,7 +185,9 @@ struct
               let%bind prover_state = get_state in
               match Prover_state.expected_next_state prover_state with
               | Some expected_next_state ->
-                  let%bind in_snark_next_state = read State.typ next_state in
+                  let%bind in_snark_next_state =
+                    read (State.typ ~constraint_constants) next_state
+                  in
                   let%bind next_top_hash = read Field.typ next_top_hash in
                   let%bind top_hash = read Field.typ top_hash in
                   let updated = State.sexp_of_value in_snark_next_state in

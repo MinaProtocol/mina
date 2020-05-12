@@ -37,7 +37,7 @@ module type S = sig
     val main :
          logger:Logger.t
       -> proof_level:Genesis_constants.Proof_level.t
-      -> ledger_depth:int
+      -> constraint_constants:Genesis_constants.Constraint_constants.t
       -> Tick.Field.Var.t
       -> (unit, Prover_state.t) Tick.Checked.t
   end
@@ -112,7 +112,7 @@ let create () : (module S) Async.Deferred.t =
               (Blockchain_snark.Blockchain_transition.instance_hash
                  (Tock.Keypair.vk Wrap.keys))
 
-          let main ~logger ~proof_level ~ledger_depth x =
+          let main ~logger ~proof_level ~constraint_constants x =
             let there
                 { Prover_state.wrap_vk
                 ; prev_proof
@@ -145,7 +145,7 @@ let create () : (module S) Async.Deferred.t =
             with_state
               ~and_then:(fun s -> As_prover.set_state (back s))
               As_prover.(map get_state ~f:there)
-              (main ~logger ~proof_level ~ledger_depth x)
+              (main ~logger ~proof_level ~constraint_constants x)
         end
 
         module Wrap = struct

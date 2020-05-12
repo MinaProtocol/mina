@@ -34,6 +34,46 @@ module Proof_level = struct
   let compiled = of_string compiled
 end
 
+(** Constants that affect the constraint systems for proofs (and thus also key
+    generation).
+
+    Care must be taken to ensure that these match against the proving/
+    verification keys when [proof_level=Full], otherwise generated proofs will
+    be invalid.
+*)
+module Constraint_constants = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t = {c: int; ledger_depth: int}
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  type t = Stable.Latest.t = {c: int; ledger_depth: int}
+
+  [%%ifdef
+  consensus_mechanism]
+
+  [%%inject
+  "c", c]
+
+  [%%else]
+
+  (* Invalid value, this should not be used by nonconsensus nodes. *)
+  let c = -1
+
+  [%%endif]
+
+  [%%inject
+  "ledger_depth", ledger_depth]
+
+  let compiled = {c; ledger_depth}
+
+  let for_unit_tests = compiled
+end
+
 (*Constants that can be specified for generating the base proof (that are not required for key-generation) in runtime_genesis_ledger.exe and that can be configured at runtime.
 The types are defined such that this module doesn't depend on any of the coda libraries (except blake2 and module_version) to avoid dependency cycles.
 TODO: #4659 move key generation to runtime_genesis_ledger.exe to include scan_state constants, consensus constants (c and  block_window_duration) and ledger depth here*)
@@ -169,11 +209,6 @@ include T
 
 [%%inject
 "pool_max_size", pool_max_size]
-
-[%%inject
-"ledger_depth", ledger_depth]
-
-let ledger_depth_for_unit_tests = ledger_depth
 
 let compiled : t =
   { protocol=

@@ -41,7 +41,10 @@ module Make
 
       type var
 
-      val hash_to_group : ledger_depth:int -> value -> Group.value
+      val hash_to_group :
+           constraint_constants:Genesis_constants.Constraint_constants.t
+        -> value
+        -> Group.value
 
       module Checked : sig
         val hash_to_group : var -> (Group.var, _) Impl.Checked.t
@@ -51,14 +54,18 @@ module Make
 
       type var
 
-      val hash : ledger_depth:int -> Message.value -> Group.value -> value
+      val hash :
+           constraint_constants:Genesis_constants.Constraint_constants.t
+        -> Message.value
+        -> Group.value
+        -> value
 
       module Checked : sig
         val hash : Message.var -> Group.var -> (var, _) Impl.Checked.t
       end
     end) : sig
   val eval :
-       ledger_depth:int
+       constraint_constants:Genesis_constants.Constraint_constants.t
     -> private_key:Scalar.value
     -> Message.value
     -> Output_hash.value
@@ -80,10 +87,10 @@ module Make
 end = struct
   open Impl
 
-  let eval ~ledger_depth ~private_key m =
-    let h = Message.hash_to_group ~ledger_depth m in
+  let eval ~constraint_constants ~private_key m =
+    let h = Message.hash_to_group ~constraint_constants m in
     let u = Group.scale h private_key in
-    Output_hash.hash ~ledger_depth m u
+    Output_hash.hash ~constraint_constants m u
 
   module Checked = struct
     open Let_syntax

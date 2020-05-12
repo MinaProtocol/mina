@@ -1103,14 +1103,19 @@ let fill_first_received_message_signal {first_received_message_signal; _} =
   Ivar.fill_if_empty first_received_message_signal ()
 
 (* TODO: Have better pushback behavior *)
-let broadcast t msg =
+let broadcast ?(extra_metadata = []) t msg =
   Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
-    ~metadata:[("message", Gossip_net.Message.msg_to_yojson msg)]
+    ~metadata:
+      (("message", Gossip_net.Message.msg_to_yojson msg) :: extra_metadata)
     !"Broadcasting %s over gossip net"
     (Gossip_net.Message.summary msg) ;
   Gossip_net.Any.broadcast t.gossip_net msg
 
-let broadcast_state t state = broadcast t (Gossip_net.Message.New_state state)
+let broadcast_state t state =
+  broadcast t
+    (Gossip_net.Message.New_state (With_hash.data state))
+    ~extra_metadata:
+      [("state_hash", With_hash.hash state |> State_hash.to_yojson)]
 
 let broadcast_transaction_pool_diff t diff =
   broadcast t (Gossip_net.Message.Transaction_pool_diff diff)

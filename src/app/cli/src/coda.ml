@@ -397,7 +397,10 @@ let daemon logger =
          in
          let%bind precomputed_values =
            let protocol_state_with_hash =
-             Coda_state.Genesis_protocol_state.t ~genesis_constants
+             Coda_state.Genesis_protocol_state.t
+               ~constraint_constants:
+                 Genesis_constants.Constraint_constants.compiled
+               ~genesis_constants
                ~genesis_ledger:(Genesis_ledger.Packed.t genesis_ledger)
            in
            let%map base_hash =
@@ -666,7 +669,10 @@ let daemon logger =
          let trust_system = Trust_system.create trust_dir in
          trace_database_initialization "trust_system" __LOC__ trust_dir ;
          let genesis_state_hash =
-           Coda_state.Genesis_protocol_state.t ~genesis_constants
+           Coda_state.Genesis_protocol_state.t
+             ~constraint_constants:
+               Genesis_constants.Constraint_constants.compiled
+             ~genesis_constants
              ~genesis_ledger:(Genesis_ledger.Packed.t genesis_ledger)
            |> With_hash.hash
          in
@@ -842,8 +848,10 @@ let daemon logger =
                 ~consensus_local_state ~transaction_database
                 ~external_transition_database ~is_archive_rocksdb
                 ~work_reassignment_wait ~archive_process_location
-                ~log_block_creation ~precomputed_values ~proof_level ())
-             ~precomputed_values
+                ~log_block_creation
+                ~constraint_constants:
+                  Genesis_constants.Constraint_constants.compiled
+                ~precomputed_values ~proof_level ())
          in
          {Coda_initialization.coda; client_trustlist; rest_server_port}
        in
@@ -976,6 +984,8 @@ let internal_commands =
                  let%bind prover =
                    Prover.create ~logger
                      ~proof_level:Genesis_constants.Proof_level.compiled
+                     ~constraint_constants:
+                       Genesis_constants.Constraint_constants.compiled
                      ~pids:(Pid.Table.create ()) ~conf_dir
                  in
                  Prover.prove_from_input_sexp prover sexp >>| ignore

@@ -21,7 +21,8 @@ let main () =
       , L_Tick.log
           (log
              (M.Step_base.main ~logger ~proof_level:Full
-                ~ledger_depth:Genesis_constants.ledger_depth)
+                ~constraint_constants:
+                  Genesis_constants.Constraint_constants.compiled)
              Tick.Field.typ) )
     ; ("wrap", L_Tock.log (log W.main Crypto_params.Wrap_input.typ)) ]
   in
