@@ -17,6 +17,12 @@ type authUrlConfig = {
   scope: array(string),
 };
 
+type clientConfig = {
+  clientId: string,
+  clientSecret: string,
+  redirectURI: string,
+};
+
 [@bs.scope ("google", "auth")] [@bs.new] [@bs.module "googleapis"]
 external oAuth2:
   (~clientId: string, ~clientSecret: string, ~redirectURI: string) => client =
@@ -36,7 +42,11 @@ external setCredentials: (~client: client, ~token: token) => unit =
 
 [@bs.send]
 external getToken:
-  (~client: client, ~code: string, (~error: string, ~token: token) => unit) =>
+  (
+    ~client: client,
+    ~code: string,
+    (~error: Js.Nullable.t(string), ~token: token) => unit
+  ) =>
   unit =
   "getToken";
 
@@ -47,7 +57,20 @@ external get:
   (
     ~sheets: sheets,
     ~sheetsQuery: sheetsQuery,
-    (~error: string, ~res: res) => unit
+    (~error: Js.Nullable.t(string), ~res: res) => unit
   ) =>
   unit =
   "get";
+
+type interface;
+
+[@bs.deriving abstract]
+type interfaceOptions = {input: in_channel};
+
+[@bs.module "readline"]
+external createInterface: interfaceOptions => interface = "createInterface";
+
+[@bs.send]
+external question: (interface, string, string => unit) => unit = "question";
+
+[@bs.send] external close: interface => unit = "close";

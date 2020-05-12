@@ -2,54 +2,92 @@ open SheetsBinding;
 
 let clientId = "";
 let clientSecret = "";
-let code = "";
+let redirectURI = "";
 let tokenPath = "token.json";
 let scopes = [|"https://www.googleapis.com/auth/spreadsheets.readonly"|];
 
-let client =
-  oAuth2(~clientId, ~clientSecret, ~redirectURI="http://google.com");
-
-let sheets = sheets({version: "v4", auth: client});
-
-let authUrlConfig = {access_type: "offline", scope: scopes};
-
-let sheetsQuery = {
-  spreadsheetId: "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms",
-  range: "Class Data!A2:E",
-};
-
-let getSheets = token => {
-  setCredentials(~client, ~token);
-  get(
-    ~sheets,
-    ~sheetsQuery,
-    (~error, ~res) => {
-      Js.log(error);
-      Js.log(res.data.values);
-    },
-  );
-};
-
-let createToken = () => {
-  getToken(
-    ~client,
-    ~code,
-    (~error, ~token) => {
-      Js.log(error);
-      setCredentials(~client, ~token);
-      Js.Json.stringify(token) |> Node.Fs.writeFileAsUtf8Sync(tokenPath);
-    },
-  );
-};
-
-let printSheets = () => {
+let readAndParseToken = () => {
   switch (Node.Fs.readFileAsUtf8Sync(tokenPath)) {
-  | token => token |> Js.Json.parseExn |> getSheets
-  | exception (Js.Exn.Error(_)) => createToken()
+  | token => Some(Js.Json.parseExn(token))
+  | exception (Js.Exn.Error(_)) => None
   };
 };
 
-// uncomment to get a valid code
-//Js.log(generateAuthUrl(~client, ~authUrlConfig));
+let requestURICode = (client, cb) => {
+  let authUrlConfig = {access_type: "offline", scope: scopes};
+  let authUrl = generateAuthUrl(~client, ~authUrlConfig);
+  Js.log("Authorize this app by visiting this url: " ++ authUrl);
 
-printSheets();
+  let readLine =
+    createInterface(interfaceOptions(~input=[%raw "process.stdin"]));
+
+  question(
+    readLine,
+    "Enter the code from that page here: ",
+    code => {
+      switch (code) {
+      | "" => cb(Error(code))
+      | _ => cb(Ok(code))
+      };
+      close(readLine);
+    },
+  );
+};
+
+let createToken = (client, code, cb) => {
+  getToken(~client, ~code, (~error, ~token) => {
+    switch (Js.Nullable.toOption(error)) {
+    | Some(error) => cb(Error(error))
+    | None =>
+      setCredentials(~client, ~token);
+      Js.Json.stringify(token) |> Node.Fs.writeFileAsUtf8Sync(tokenPath);
+      Js.log("Token stored too: " ++ tokenPath);
+      cb(Ok());
+    }
+  });
+};
+
+let getRange = (client, sheetsQuery, cb) => {
+  let sheets = sheets({version: "v4", auth: client});
+
+  get(~sheets, ~sheetsQuery, (~error, ~res) => {
+    switch (Js.Nullable.toOption(error)) {
+    | None => cb(Ok(res.data.values))
+    | Some(error) =>
+      Js.log("get() returned an error: " ++ error);
+      cb(Error(error));
+    }
+  });
+};
+
+let createClient = (clientCredentials, cb) => {
+  let {clientId, clientSecret, redirectURI} = clientCredentials;
+  let client = oAuth2(~clientId, ~clientSecret, ~redirectURI);
+
+  switch (readAndParseToken()) {
+  | Some(token) =>
+    setCredentials(~client, ~token);
+    cb(Ok(client));
+  | None =>
+    Js.log("Error loading client token file");
+    requestURICode(
+      client,
+      fun
+      | Ok(code) => {
+          createToken(
+            client,
+            code,
+            fun
+            | Ok () => cb(Ok(client))
+            | Error(error) => {
+                Js.log(
+                  "Error while trying to retrieve access token: " ++ error,
+                );
+                cb(Error(client));
+              },
+          );
+        }
+      | Error(_) => cb(Error(client)),
+    );
+  };
+};
