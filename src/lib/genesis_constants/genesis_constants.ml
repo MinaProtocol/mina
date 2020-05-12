@@ -45,13 +45,13 @@ module Constraint_constants = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = {c: int}
+      type t = {c: int; ledger_depth: int}
 
       let to_latest = Fn.id
     end
   end]
 
-  type t = Stable.Latest.t = {c: int}
+  type t = Stable.Latest.t = {c: int; ledger_depth: int}
 
   [%%ifdef
   consensus_mechanism]
@@ -66,7 +66,10 @@ module Constraint_constants = struct
 
   [%%endif]
 
-  let compiled = {c}
+  [%%inject
+  "ledger_depth", ledger_depth]
+
+  let compiled = {c; ledger_depth}
 
   let for_unit_tests = compiled
 end
@@ -206,11 +209,6 @@ include T
 
 [%%inject
 "pool_max_size", pool_max_size]
-
-[%%inject
-"ledger_depth", ledger_depth]
-
-let ledger_depth_for_unit_tests = ledger_depth
 
 let compiled : t =
   { protocol=

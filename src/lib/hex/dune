@@ -1,0 +1,8 @@
+(library
+  (inline_tests)
+  (name hex)
+  (public_name hex)
+  (preprocess (pps ppx_coda ppx_inline_test))
+  (libraries core_kernel ))
+
+

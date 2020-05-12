@@ -360,6 +360,8 @@ module Validation = struct
 
   let forget_validation (t, _) = With_hash.data t
 
+  let forget_validation_with_hash (t, _) = t
+
   module Unsafe = struct
     let set_valid_time_received :
            ( [`Time_received] * unit Truth.false_t

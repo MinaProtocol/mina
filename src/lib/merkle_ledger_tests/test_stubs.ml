@@ -4,11 +4,11 @@ module Balance = Currency.Balance
 
 module Account = struct
   (* want bin_io, not available with Account.t *)
-  type t = Coda_base.Account.Stable.V1.t
-  [@@deriving bin_io, sexp, eq, compare, hash, yojson]
+  type t = Coda_base.Account.Stable.Latest.t
+  [@@deriving bin_io_unversioned, sexp, eq, compare, hash, yojson]
 
-  type key = Coda_base.Account.Key.Stable.V1.t
-  [@@deriving bin_io, sexp, eq, compare, hash]
+  type key = Coda_base.Account.Key.Stable.Latest.t
+  [@@deriving bin_io_unversioned, sexp, eq, compare, hash]
 
   (* use Account items needed *)
   let empty = Coda_base.Account.empty
@@ -55,15 +55,16 @@ module Balance_not_used = struct
 end
 
 module Account_not_used = struct
-  type key = string [@@deriving sexp, show, bin_io, eq, compare, hash]
+  type key = string
+  [@@deriving sexp, show, bin_io_unversioned, eq, compare, hash]
 
   type t =
     { public_key: key
-    ; balance: Balance.Stable.V1.t
+    ; balance: Balance.Stable.Latest.t
           [@printer
             fun fmt balance ->
               Format.pp_print_string fmt (Balance.to_string balance)] }
-  [@@deriving bin_io, eq, show, fields]
+  [@@deriving bin_io_unversioned, eq, show, fields]
 
   let sexp_of_t {public_key; balance} =
     [%sexp_of: string * string] (public_key, Balance.to_string balance)
@@ -95,7 +96,7 @@ module Receipt = Coda_base.Receipt
 
 module Hash = struct
   module T = struct
-    type t = Md5.t [@@deriving sexp, hash, compare, bin_io, eq]
+    type t = Md5.t [@@deriving sexp, hash, compare, bin_io_unversioned, eq]
 
     let to_string = Md5.to_hex
 
@@ -183,13 +184,15 @@ module Storage_locations : Intf.Storage_locations = struct
 end
 
 module Key = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = Account.key [@@deriving sexp, bin_io, eq, compare, hash]
-    end
+      type t = Coda_base.Account.Key.Stable.V1.t
+      [@@deriving sexp, eq, compare, hash]
 
-    module Latest = V1
-  end
+      let to_latest = Fn.id
+    end
+  end]
 
   type t = Stable.Latest.t [@@deriving sexp, compare, hash]
 
@@ -214,7 +217,7 @@ module Account_id = struct
   module Stable = struct
     module V1 = struct
       type t = Coda_base.Account_id.Stable.V1.t
-      [@@deriving sexp, bin_io, eq, compare, hash]
+      [@@deriving sexp, eq, compare, hash]
 
       let to_latest = Fn.id
     end
