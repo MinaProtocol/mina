@@ -97,6 +97,9 @@ let find_protocol_state (t : t) hash =
 
 let root t = find_exn t t.root
 
+let protocol_states_for_root_scan_state t =
+  t.protocol_states_for_root_scan_state
+
 let best_tip t = find_exn t t.best_tip
 
 let close t =
@@ -406,9 +409,14 @@ let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
         Ledger.Maskable.register_mask s
           (Ledger.Mask.create ~depth:(Ledger.Any_ledger.M.depth s) ())
       in
-      let current_global_slot =
-        Breadcrumb.consensus_state new_root_node.breadcrumb
-        |> Consensus.Data.Consensus_state.curr_slot
+      let txn_global_slot =
+        (*Transactions are currently validated against the parent of the block they are in*)
+        let parent_protocol_state =
+          Breadcrumb.parent_hash new_root_node.breadcrumb
+          |> find_protocol_state t |> Option.value_exn
+        in
+        Protocol_state.consensus_state parent_protocol_state
+        |> Consensus.Data.Consensus_state.curr_global_slot
       in
       (* STEP 5 *)
       Non_empty_list.iter
@@ -417,9 +425,8 @@ let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
               (Breadcrumb.staged_ledger new_root_node.breadcrumb)))
         ~f:(fun txn ->
           ignore
-            (Or_error.ok_exn
-               (Ledger.apply_transaction ~txn_global_slot:current_global_slot
-                  mt txn)) ) ;
+            (Or_error.ok_exn (Ledger.apply_transaction ~txn_global_slot mt txn))
+          ) ;
       (* STEP 6 *)
       Ledger.commit mt ;
       (* STEP 7 *)
