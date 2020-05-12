@@ -1820,6 +1820,7 @@ module Mutations = struct
   let commands =
     [ add_wallet
     ; create_account
+    ; create_hd_account
     ; unlock_account
     ; unlock_wallet
     ; lock_account
