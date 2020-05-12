@@ -235,6 +235,10 @@ let daemon logger =
      and disable_telemetry =
        flag "disable-telemetry" no_arg
          ~doc:"Disable reporting telemetry to other nodes"
+     and proof_level =
+       flag "proof-level"
+         (optional (Arg_type.create Genesis_constants.Proof_level.of_string))
+         ~doc:"full|check|none"
      in
      fun () ->
        let open Deferred.Let_syntax in
@@ -365,6 +369,27 @@ let daemon logger =
        let time_controller =
          Block_time.Controller.create @@ Block_time.Controller.basic ~logger
        in
+       let proof_level =
+         match (proof_level, Genesis_constants.Proof_level.compiled) with
+         | Some (Full as proof_level), _
+         | Some (Check as proof_level), Check
+         | Some (None as proof_level), None ->
+             proof_level
+         | None, compiled ->
+             compiled
+         | Some proof_level, compiled ->
+             let str = Genesis_constants.Proof_level.to_string in
+             Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+               "Proof level $proof_level is not compatible with compile-time \
+                proof level $compiled_proof_level"
+               ~metadata:
+                 [ ("proof_level", `String (str proof_level))
+                 ; ("compiled_proof_level", `String (str compiled)) ] ;
+             failwithf
+               "Proof level %s is not compatible with compile-time proof \
+                level %s"
+               (str proof_level) (str compiled) ()
+       in
        let coda_initialization_deferred () =
          let%bind genesis_ledger, base_proof, genesis_constants =
            Genesis_ledger_helper.retrieve_genesis_state genesis_ledger_dir_flag
@@ -372,7 +397,10 @@ let daemon logger =
          in
          let%bind precomputed_values =
            let protocol_state_with_hash =
-             Coda_state.Genesis_protocol_state.t ~genesis_constants
+             Coda_state.Genesis_protocol_state.t
+               ~constraint_constants:
+                 Genesis_constants.Constraint_constants.compiled
+               ~genesis_constants
                ~genesis_ledger:(Genesis_ledger.Packed.t genesis_ledger)
            in
            let%map base_hash =
@@ -641,7 +669,10 @@ let daemon logger =
          let trust_system = Trust_system.create trust_dir in
          trace_database_initialization "trust_system" __LOC__ trust_dir ;
          let genesis_state_hash =
-           Coda_state.Genesis_protocol_state.t ~genesis_constants
+           Coda_state.Genesis_protocol_state.t
+             ~constraint_constants:
+               Genesis_constants.Constraint_constants.compiled
+             ~genesis_constants
              ~genesis_ledger:(Genesis_ledger.Packed.t genesis_ledger)
            |> With_hash.hash
          in
@@ -817,8 +848,10 @@ let daemon logger =
                 ~consensus_local_state ~transaction_database
                 ~external_transition_database ~is_archive_rocksdb
                 ~work_reassignment_wait ~archive_process_location
-                ~log_block_creation ~precomputed_values ())
-             ~precomputed_values
+                ~log_block_creation
+                ~constraint_constants:
+                  Genesis_constants.Constraint_constants.compiled
+                ~precomputed_values ~proof_level ())
          in
          {Coda_initialization.coda; client_trustlist; rest_server_port}
        in
@@ -949,7 +982,11 @@ let internal_commands =
                  Logger.info logger "Prover state being logged to %s" conf_dir
                    ~module_:__MODULE__ ~location:__LOC__ ;
                  let%bind prover =
-                   Prover.create ~logger ~pids:(Pid.Table.create ()) ~conf_dir
+                   Prover.create ~logger
+                     ~proof_level:Genesis_constants.Proof_level.compiled
+                     ~constraint_constants:
+                       Genesis_constants.Constraint_constants.compiled
+                     ~pids:(Pid.Table.create ()) ~conf_dir
                  in
                  Prover.prove_from_input_sexp prover sexp >>| ignore
              | `Eof ->

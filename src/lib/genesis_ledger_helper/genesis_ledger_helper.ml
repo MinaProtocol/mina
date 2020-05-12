@@ -87,7 +87,6 @@ module Ledger = struct
 
   let generate ?directory_name (accounts : Account_config.t) :
       Genesis_ledger.Packed.t =
-    let ledger = Ledger.create ?directory_name () in
     let accounts =
       List.map accounts ~f:(fun {pk; sk; balance; delegate} ->
           let account =
@@ -95,50 +94,62 @@ module Ledger = struct
             let base_acct = Account.create account_id balance in
             {base_acct with delegate= Option.value ~default:pk delegate}
           in
-          Ledger.create_new_account_exn ledger
-            (Account.identifier account)
-            account ;
           (sk, account) )
     in
-    Ledger.commit ledger ;
-    ( module struct
-      include Genesis_ledger.Make (struct
+    let (packed : Genesis_ledger.Packed.t) =
+      ( module Genesis_ledger.Make (struct
         let accounts = lazy accounts
-      end)
 
-      let t = lazy ledger
-    end )
+        let directory =
+          match directory_name with
+          | Some directory_name ->
+              `Path directory_name
+          | None ->
+              `New
+
+        let depth =
+          Genesis_constants.Constraint_constants.compiled.ledger_depth
+      end) )
+    in
+    packed |> Genesis_ledger.Packed.t |> Lazy.force |> Ledger.commit ;
+    packed
 
   let load directory_name : Genesis_ledger.Packed.t =
     ( module Genesis_ledger.Of_ledger (struct
-      let t = lazy (Ledger.create ~directory_name ())
+      let depth = Genesis_constants.Constraint_constants.compiled.ledger_depth
+
+      let t = lazy (Ledger.create ~depth ~directory_name ())
     end) )
 end
 
 module Genesis_proof = struct
   let path ~root = root ^/ "genesis_proof"
 
-  let generate ~ledger ~(genesis_constants : Genesis_constants.t) =
+  let generate ~proof_level ~ledger ~constraint_constants
+      ~(genesis_constants : Genesis_constants.t) =
     (* TODO(4829): Runtime proof-level. *)
-    if Coda_compile_config.proof_level = "full" then
-      let%map ((module Keys) as keys) = Keys_lib.Keys.create () in
-      let protocol_state_with_hash =
-        Coda_state.Genesis_protocol_state.t
-          ~genesis_ledger:(Genesis_ledger.Packed.t ledger)
-          ~genesis_constants
-      in
-      let base_hash = Keys.Step.instance_hash protocol_state_with_hash.data in
-      let computed_values =
-        Genesis_proof.create_values ~keys
-          { genesis_ledger= ledger
-          ; protocol_state_with_hash
-          ; base_hash
-          ; genesis_constants }
-      in
-      (base_hash, computed_values.genesis_proof)
-    else
-      return
-        (Snark_params.Tick.Field.zero, Dummy_values.Tock.Bowe_gabizon18.proof)
+    match proof_level with
+    | Genesis_constants.Proof_level.Full ->
+        let%map ((module Keys) as keys) = Keys_lib.Keys.create () in
+        let protocol_state_with_hash =
+          Coda_state.Genesis_protocol_state.t
+            ~genesis_ledger:(Genesis_ledger.Packed.t ledger)
+            ~constraint_constants ~genesis_constants
+        in
+        let base_hash =
+          Keys.Step.instance_hash protocol_state_with_hash.data
+        in
+        let computed_values =
+          Genesis_proof.create_values ~constraint_constants ~proof_level ~keys
+            { genesis_ledger= ledger
+            ; protocol_state_with_hash
+            ; base_hash
+            ; genesis_constants }
+        in
+        (base_hash, computed_values.genesis_proof)
+    | _ ->
+        return
+          (Snark_params.Tick.Field.zero, Dummy_values.Tock.Bowe_gabizon18.proof)
 
   let store ~filename proof =
     (* TODO: Use [Writer.write_bin_prot]. *)
@@ -191,7 +202,10 @@ let retrieve_genesis_state dir_opt ~logger ~conf_dir ~daemon_conf :
     (Genesis_ledger.Packed.t * Proof.t * Genesis_constants.t) Deferred.t =
   let open Cache_dir in
   let genesis_dir_name =
-    Cache_dir.genesis_dir_name Genesis_constants.compiled
+    Cache_dir.genesis_dir_name
+      ~constraint_constants:Genesis_constants.Constraint_constants.compiled
+      ~genesis_constants:Genesis_constants.compiled
+      ~proof_level:Genesis_constants.Proof_level.compiled
   in
   let tar_filename = genesis_dir_name ^ ".tar.gz" in
   Logger.info logger ~module_:__MODULE__ ~location:__LOC__

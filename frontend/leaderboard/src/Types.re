@@ -1,14 +1,28 @@
 module NewBlock = {
-  type creatorAccount = {publicKey: string};
+  type account = {publicKey: string};
 
-  type snarkJobs = {prover: string};
+  type snarkJobs = {
+    prover: string,
+    fee: int64,
+  };
 
-  type userCommands = {fromAccount: string};
-  type transactions = {transactions: userCommands};
+  type userCommands = {
+    fromAccount: account,
+    toAccount: account,
+  };
+
+  type feeTransfer = {
+    fee: int64,
+    recipient: string,
+  };
+  type transactions = {
+    userCommands: array(userCommands),
+    feeTransfer: array(feeTransfer),
+  };
 
   type data = {
-    creatorAccount,
-    userCommands,
+    creatorAccount: account,
+    snarkJobs: array(snarkJobs),
     transactions,
   };
 
@@ -23,13 +37,17 @@ module Metrics = {
   type t =
     | BlocksCreated
     | TransactionsSent
-    | SnarkWorkCreated;
+    | SnarkWorkCreated
+    | SnarkFeesCollected
+    | HighestSnarkFeeCollected
+    | TransactionsReceivedByEcho;
 
-  let stringOfMetric = metric => {
-    switch (metric) {
-    | BlocksCreated => "blocks_created"
-    | TransactionsSent => "transactions_sent"
-    | SnarkWorkCreated => "snarkwork_created"
-    };
+  type metricRecord = {
+    blocksCreated: option(int),
+    transactionSent: option(int),
+    snarkWorkCreated: option(int),
+    snarkFeesCollected: option(int64),
+    highestSnarkFeeCollected: option(int64),
+    transactionsReceivedByEcho: option(int),
   };
 };

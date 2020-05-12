@@ -15,16 +15,10 @@ module Currency = Currency_nonconsensus.Currency
 *)
 
 [%%inject
-"proof_level", proof_level]
-
-[%%inject
 "coinbase_string", coinbase]
 
 [%%inject
 "curve_size", curve_size]
-
-[%%inject
-"fake_accounts_target", fake_accounts_target]
 
 [%%inject
 "genesis_ledger", genesis_ledger]
@@ -41,8 +35,14 @@ module Currency = Currency_nonconsensus.Currency
 [%%inject
 "default_snark_worker_fee_string", default_snark_worker_fee]
 
+[%%inject
+"minimum_user_command_fee_string", minimum_user_command_fee]
+
 let account_creation_fee =
   Currency.Fee.of_formatted_string account_creation_fee_string
+
+let minimum_user_command_fee =
+  Currency.Fee.of_formatted_string minimum_user_command_fee_string
 
 let coinbase = Currency.Amount.of_formatted_string coinbase_string
 
@@ -102,16 +102,6 @@ let transaction_capacity_log_2 =
 let pending_coinbase_depth =
   Core_kernel.Int.ceil_log2
     (((transaction_capacity_log_2 + 1) * (work_delay + 1)) + 1)
-
-[%%ifdef
-consensus_mechanism]
-
-(** Consensus constants *)
-
-[%%inject
-"c", c]
-
-[%%endif]
 
 (* This is a bit of a hack, see #3232. *)
 let inactivity_ms = block_window_duration_ms * 8

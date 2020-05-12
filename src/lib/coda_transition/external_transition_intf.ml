@@ -223,6 +223,17 @@ module type S = sig
          , 'protocol_versions )
          with_transition
       -> external_transition
+
+    val forget_validation_with_hash :
+         ( 'time_received
+         , 'genesis_state
+         , 'proof
+         , 'delta_transition_chain
+         , 'frontier_dependencies
+         , 'staged_ledger_diff
+         , 'protocol_versions )
+         with_transition
+      -> (external_transition, State_hash.t) With_hash.t
   end
 
   module Initial_validated : sig
@@ -310,7 +321,8 @@ module type S = sig
        Validation.with_transition
 
   val validate_time_received :
-       ( [`Time_received] * unit Truth.false_t
+       constraint_constants:Genesis_constants.Constraint_constants.t
+    -> ( [`Time_received] * unit Truth.false_t
        , 'genesis_state
        , 'proof
        , 'delta_transition_chain

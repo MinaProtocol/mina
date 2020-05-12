@@ -73,8 +73,14 @@ module Metadata = struct
 
   let extend (t : t) alist =
     List.fold_left alist ~init:t ~f:(fun acc (key, data) ->
-        String.Map.add_exn acc ~key ~data )
+        String.Map.set acc ~key ~data )
 end
+
+let global_metadata = ref []
+
+(* List.append isn't tail-recursive (recurses over first arg), so hopefully it doesn't get too big! *)
+let append_to_global_metadata l =
+  global_metadata := List.append !global_metadata l
 
 module Message = struct
   type t =
@@ -332,7 +338,8 @@ let make_message (t : t) ~level ~module_ ~location ~metadata ~message =
   ; level
   ; source= Some (Source.create ~module_ ~location)
   ; message
-  ; metadata= Metadata.extend t.metadata metadata }
+  ; metadata=
+      Metadata.extend (Metadata.extend t.metadata metadata) !global_metadata }
 
 let raw ({id; _} as t) msg =
   if t.null then ()

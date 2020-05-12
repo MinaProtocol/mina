@@ -59,6 +59,7 @@ WB19: Riad S. Wahby and Dan Boneh, Fast and simple constant-time hashing to the 
 
 open Core_kernel
 module Field_intf = Field_intf
+module Bw19 = Bw19
 
 let ( = ) = `Don't_use_polymorphic_compare
 
@@ -71,6 +72,47 @@ struct
   module type S = sig
     val to_group : F.t -> F.t * F.t
   end
+end
+
+module type S = sig
+  module Spec : sig
+    type _ t
+  end
+
+  module Params : sig
+    [%%versioned:
+    module Stable : sig
+      module V1 : sig
+        type _ t [@@deriving bin_io]
+      end
+    end]
+
+    type 'f t = 'f Stable.Latest.t
+
+    val map : 'a t -> f:('a -> 'b) -> 'b t
+
+    val spec : 'f t -> 'f Spec.t
+
+    val create :
+      (module Field_intf.S_unchecked with type t = 'f) -> 'f Spec.t -> 'f t
+  end
+
+  module Make
+      (Constant : Field_intf.S) (F : sig
+          include Field_intf.S
+
+          val constant : Constant.t -> t
+      end) (Params : sig
+        val params : Constant.t Params.t
+      end) : sig
+    val potential_xs : F.t -> F.t * F.t * F.t
+  end
+
+  val to_group :
+       (module Field_intf.S_unchecked with type t = 'f)
+    -> params:'f Params.t
+    -> 'f
+    -> 'f * 'f
 end
 
 module Conic = struct
@@ -100,6 +142,17 @@ module V = struct
   type 'f t = 'f * 'f * 'f * 'f
 end
 
+module Spec = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type 'f t = {a: 'f; b: 'f} [@@deriving fields, bin_io, version]
+    end
+  end]
+
+  include Stable.Latest
+end
+
 module Params = struct
   [%%versioned
   module Stable = struct
@@ -109,9 +162,8 @@ module Params = struct
         ; u_over_2: 'f
         ; projection_point: 'f Conic.Stable.V1.t
         ; conic_c: 'f
-        ; a: 'f
-        ; b: 'f }
-      [@@deriving fields]
+        ; spec: 'f Spec.Stable.V1.t }
+      [@@deriving fields, version]
     end
   end]
 
@@ -120,17 +172,15 @@ module Params = struct
     ; u_over_2: 'f
     ; projection_point: 'f Conic.t
     ; conic_c: 'f
-    ; a: 'f
-    ; b: 'f }
+    ; spec: 'f Spec.t }
   [@@deriving fields]
 
-  let map {u; u_over_2; projection_point; conic_c; a; b} ~f =
+  let map {u; u_over_2; projection_point; conic_c; spec= {a; b}} ~f =
     { u= f u
     ; u_over_2= f u_over_2
     ; projection_point= Conic.map ~f projection_point
     ; conic_c= f conic_c
-    ; a= f a
-    ; b= f b }
+    ; spec= {a= f a; b= f b} }
 
   (* A deterministic function for constructing a valid choice of parameters for a
      given field.
@@ -143,8 +193,8 @@ module Params = struct
      since there are two square roots.
   *)
 
-  let create (type t) (module F : Field_intf.S_unchecked with type t = t) ~a ~b
-      =
+  let create (type t) (module F : Field_intf.S_unchecked with type t = t)
+      ({Spec.a; b} as spec) =
     let open F in
     let first_map f =
       let rec go i = match f i with Some x -> x | None -> go (i + one) in
@@ -177,7 +227,7 @@ module Params = struct
           let z2 = conic_d - (conic_c * y * y) in
           if F.is_square z2 then Some {Conic.z= F.sqrt z2; y} else None )
     in
-    {u; u_over_2= u / of_int 2; conic_c; projection_point; a; b}
+    {u; u_over_2= u / of_int 2; conic_c; projection_point; spec}
 end
 
 module Make
@@ -212,9 +262,9 @@ struct
   (* This is here for explanatory purposes. See s_to_v_truncated. *)
   let _s_to_v {S.u; v; y} : _ V.t =
     let curve_eqn x =
-      (x * x * x) + (constant P.params.a * x) + constant P.params.b
+      (x * x * x) + (constant P.params.spec.a * x) + constant P.params.spec.b
     in
-    let h = (u * u) + (u * v) + (v * v) + constant P.params.a in
+    let h = (u * u) + (u * v) + (v * v) + constant P.params.spec.a in
     (v, negate (u + v), u + (y * y), curve_eqn (u + (y * y)) * h / y)
 
   (* from (13) *)
@@ -241,8 +291,7 @@ let to_group (type t) (module F : Field_intf.S_unchecked with type t = t)
         let params = params
       end)
   in
-  let a = params.a in
-  let b = params.b in
+  let {Spec.a; b} = params.spec in
   let try_decode x =
     let f x = F.((x * x * x) + (a * x) + b) in
     let y = f x in
@@ -327,9 +376,9 @@ let%test_module "test" =
 
       open F
 
-      let params = Params.create (module F) ~a ~b
+      let params = Params.create (module F) {a; b}
 
-      let curve_eqn u = (u * u * u) + (params.a * u) + params.b
+      let curve_eqn u = (u * u * u) + (params.spec.a * u) + params.spec.b
 
       let conic_d =
         let open F in
