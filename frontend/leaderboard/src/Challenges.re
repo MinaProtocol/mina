@@ -121,19 +121,19 @@ let highestSnarkFeeCollected = blocks => {
 
 // Loop through the transactions in each block
 // fold left and increment map with the public key and when a transaction's toAccount is the same as address
-let calculateTransactionsSentToAddress =
-    (map, block: Types.NewBlock.data, address) => {
-  block.transactions.userCommands
-  |> Array.fold_left(
-       (transactionMap, userCommand: Types.NewBlock.userCommands) =>
-         userCommand.toAccount === address
-           ? incrementMapValue(
-               userCommand.fromAccount.publicKey,
-               transactionMap,
-             )
-           : transactionMap,
-       map,
-     );
+let calculateTransactionsSentToAddress = (blocks, address) => {
+  blocks
+  |> Array.fold_left((map, block: Types.NewBlock.data) => {
+       block.transactions.userCommands
+       |> Array.fold_left(
+            (map, userCommand: Types.NewBlock.userCommands) => {
+              userCommand.toAccount.publicKey === address
+                ? incrementMapValue(userCommand.fromAccount.publicKey, map)
+                : map
+            },
+            map,
+          )
+     });
 };
 
 // Calculate users and metrics
