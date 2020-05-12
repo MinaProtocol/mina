@@ -118,18 +118,21 @@ let getHighestSnarkFeeCollected = blocks => {
 };
 
 let calculateTransactionsSentToAddress = (blocks, address) => {
-  blocks
-  |> Array.fold_left((map, block: Types.NewBlock.data) => {
-       block.transactions.userCommands
-       |> Array.fold_left(
-            (map, userCommand: Types.NewBlock.userCommands) => {
-              userCommand.toAccount.publicKey === address
-                ? incrementMapValue(userCommand.fromAccount.publicKey, map)
-                : map
-            },
-            map,
-          )
-     });
+  Array.fold_left(
+    (map, block: Types.NewBlock.data) => {
+      block.transactions.userCommands
+      |> Array.fold_left(
+           (map, userCommand: Types.NewBlock.userCommands) => {
+             userCommand.toAccount.publicKey === address
+               ? incrementMapValue(userCommand.fromAccount.publicKey, map)
+               : map
+           },
+           map,
+         )
+    },
+    StringMap.empty,
+    blocks,
+  );
 };
 
 // Calculate users and metrics
@@ -141,6 +144,7 @@ let calculateAllUsers = metrics => {
   );
 };
 
+let echoBotPublicKey = "4vsRCVNep7JaFhtySu6vZCjnArvoAhkRscTy5TQsGTsKM4tJcYVc3uNUMRxQZAwVzSvkHDGWBmvhFpmCeiPASGnByXqvKzmHt4aR5uAWAQf3kqhwDJ2ZY3Hw4Dzo6awnJkxY338GEp12LE4x";
 let calculateMetrics = blocks => {
   let blocksCreated = blocks |> getBlocksCreatedByUser;
   let transactionSent = blocks |> getTransactionSentByUser;
@@ -148,6 +152,8 @@ let calculateMetrics = blocks => {
   let users = calculateAllUsers([blocksCreated, transactionSent]);
   let snarkFeesCollected = blocks |> getSnarkFeesCollected;
   let highestSnarkFeeCollected = blocks |> getHighestSnarkFeeCollected;
+  let transactionsReceivedByEcho =
+    calculateTransactionsSentToAddress(blocks, echoBotPublicKey);
 
   StringMap.mapi(
     (key, _) =>
@@ -158,6 +164,8 @@ let calculateMetrics = blocks => {
         snarkFeesCollected: StringMap.find_opt(key, snarkFeesCollected),
         highestSnarkFeeCollected:
           StringMap.find_opt(key, highestSnarkFeeCollected),
+        transactionsReceivedByEcho:
+          StringMap.find_opt(key, transactionsReceivedByEcho),
       },
     users,
   );
