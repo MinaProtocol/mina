@@ -1106,7 +1106,7 @@ let create (config : Config.t) =
                              if v then
                                Coda_networking.broadcast_state net
                                @@ External_transition.Validation
-                                  .forget_validation et ) ;
+                                  .forget_validation_with_hash et ) ;
                          breadcrumb ))
                   ~most_recent_valid_block
                   ~constraint_constants:config.constraint_constants

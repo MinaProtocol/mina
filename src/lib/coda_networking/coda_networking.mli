@@ -220,7 +220,8 @@ val transaction_pool_diffs :
      * (bool -> unit) )
      Strict_pipe.Reader.t
 
-val broadcast_state : t -> External_transition.t -> unit
+val broadcast_state :
+  t -> (External_transition.t, State_hash.t) With_hash.t -> unit
 
 val broadcast_snark_pool_diff : t -> Snark_pool.Resource_pool.Diff.t -> unit
 
