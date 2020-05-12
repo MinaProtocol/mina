@@ -4,7 +4,11 @@ open Async
 let name = "coda-peers-test"
 
 let main () =
-  let consensus_constants = Consensus.Constants.compiled in
+  let consensus_constants =
+    Consensus.Constants.create
+      ~constraint_constants:Genesis_constants.Constraint_constants.compiled
+      ~protocol_constants:Genesis_constants.compiled.protocol
+  in
   let%bind program_dir = Unix.getcwd () in
   let n = 3 in
   let logger = Logger.create () in

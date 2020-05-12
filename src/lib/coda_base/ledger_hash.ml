@@ -34,22 +34,36 @@ module Merkle_tree =
 
 let depth = Coda_compile_config.ledger_depth
 
-include Data_hash.Make_full_size ()
-
-module T = struct
-  type t = Stable.Latest.t [@@deriving bin_io]
-
+include Data_hash.Make_full_size (struct
   let description = "Ledger hash"
 
   let version_byte = Base58_check.Version_bytes.ledger_hash
-end
+end)
 
-module Base58_check = Codable.Make_base58_check (T)
+(* Data hash versioned boilerplate below *)
 
-let to_string t = Base58_check.String_ops.to_string t
+[%%versioned
+module Stable = struct
+  module V1 = struct
+    module T = struct
+      type t = Field.t [@@deriving sexp, compare, hash, version {asserted}]
+    end
 
-let of_string s = Base58_check.String_ops.of_string s
+    include T
 
+    let to_latest = Core.Fn.id
+
+    [%%define_from_scope
+    to_yojson, of_yojson]
+
+    include Comparable.Make (T)
+    include Hashable.Make_binable (T)
+  end
+end]
+
+type _unused = unit constraint t = Stable.Latest.t
+
+(* End boilerplate *)
 let merge ~height (h1 : t) (h2 : t) =
   Random_oracle.hash
     ~init:Hash_prefix.merkle_tree.(height)

@@ -83,7 +83,7 @@ module Message = struct
 end
 
 module Schnorr =
-  Signature_lib_nonconsensus.Checked.Schnorr
+  Signature_lib_nonconsensus.Schnorr.Make
     (Snark_params_nonconsensus)
     (Snark_params_nonconsensus.Inner_curve)
     (Message)

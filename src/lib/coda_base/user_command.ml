@@ -78,9 +78,9 @@ let fee = Fn.compose Payload.fee payload
 let nonce = Fn.compose Payload.nonce payload
 
 (* for filtering *)
-let minimum_fee = Fee.of_int 2_000_000_000
+let minimum_fee = Coda_compile_config.minimum_user_command_fee
 
-let is_trivial t = Fee.(fee t < minimum_fee)
+let has_insufficient_fee t = Fee.(fee t < minimum_fee)
 
 let signer {Poly.signer; _} = signer
 
@@ -110,10 +110,17 @@ let tag ({payload; _} : t) = Payload.tag payload
 
 let tag_string t = Transaction_union_tag.to_string (tag t)
 
+let to_input (payload : Payload.t) =
+  Transaction_union_payload.(to_input (of_user_command_payload payload))
+
+let sign_payload (private_key : Signature_lib.Private_key.t)
+    (payload : Payload.t) : Signature.t =
+  Signature_lib.Schnorr.sign private_key (to_input payload)
+
 let sign (kp : Signature_keypair.t) (payload : Payload.t) : t =
   { payload
   ; signer= kp.public_key
-  ; signature= Schnorr.sign kp.private_key payload }
+  ; signature= sign_payload kp.private_key payload }
 
 module For_tests = struct
   (* Pretend to sign a command. Much faster than actually signing. *)
@@ -341,16 +348,16 @@ let check_signature _ = true
 consensus_mechanism]
 
 let check_signature ({payload; signer; signature} : t) =
-  Schnorr.verify signature
+  Signature_lib.Schnorr.verify signature
     (Snark_params.Tick.Inner_curve.of_affine signer)
-    payload
+    (to_input payload)
 
 [%%else]
 
 let check_signature ({payload; signer; signature} : t) =
-  Schnorr.verify signature
+  Signature_lib_nonconsensus.Schnorr.verify signature
     (Snark_params_nonconsensus.Inner_curve.of_affine signer)
-    payload
+    (to_input payload)
 
 [%%endif]
 
@@ -363,9 +370,12 @@ let create_with_signature_checked signature signer payload =
   Option.some_if (check_signature t) t
 
 let gen_test =
-  let keys = Array.init 2 ~f:(fun _ -> Signature_keypair.create ()) in
-  Gen.payment_with_random_participants ~sign_type:`Real ~keys ~max_amount:10000
-    ~max_fee:1000 ()
+  let open Quickcheck.Let_syntax in
+  let%bind keys =
+    Quickcheck.Generator.list_with_length 2 Signature_keypair.gen
+  in
+  Gen.payment_with_random_participants ~sign_type:`Real
+    ~keys:(Array.of_list keys) ~max_amount:10000 ~max_fee:1000 ()
 
 let%test_unit "completeness" =
   Quickcheck.test ~trials:20 gen_test ~f:(fun t -> assert (check_signature t))
