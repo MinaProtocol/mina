@@ -1,0 +1,4 @@
+(library
+ (name runtime_config)
+ (public_name coda_runtime_config)
+ (preprocess (pps ppx_deriving_yojson)))
