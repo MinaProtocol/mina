@@ -399,11 +399,6 @@ let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
         m0
     in
     Ledger.remove_and_reparent_exn m1 m1 ;
-    (*Update the protocol states required for scan state at the new root*)
-    let new_protocol_states_map =
-      State_hash.Map.of_alist_exn new_root_protocol_states
-    in
-    t.protocol_states_for_root_scan_state <- new_protocol_states_map ;
     (* STEPS 4-7 *)
     (* we need to perform steps 4-7 iff there was a proof emitted in the scan
      * state we are transitioning to *)
@@ -420,7 +415,7 @@ let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
            (Staged_ledger.proof_txns_with_state_hashes
               (Breadcrumb.staged_ledger new_root_node.breadcrumb)))
         ~f:(fun (txn, state_hash) ->
-          (*Validate transactions against the parent protocol state of the block they were included in*)
+          (*Validate transactions against the protocol state associated with the transaction*)
           let txn_global_slot =
             find_protocol_state t state_hash
             |> Option.value_exn |> Protocol_state.consensus_state
@@ -441,6 +436,15 @@ let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
       (Breadcrumb.validated_transition new_root_node.breadcrumb)
       new_staged_ledger
   in
+  (*Update the protocol states required for scan state at the new root.
+  Note: this should be after applying the transactions to the snarked ledger (Step 5)
+  because the protocol states corresponding to those transactions won't be part
+  of the new_root_protocol_states since those transactions would have been
+  deleted from the scan state after emitting the proof*)
+  let new_protocol_states_map =
+    State_hash.Map.of_alist_exn new_root_protocol_states
+  in
+  t.protocol_states_for_root_scan_state <- new_protocol_states_map ;
   let new_root_node = {new_root_node with breadcrumb= new_root_breadcrumb} in
   (* update the new root breadcrumb in the frontier *)
   Hashtbl.set t.table ~key:new_root_hash ~data:new_root_node ;
