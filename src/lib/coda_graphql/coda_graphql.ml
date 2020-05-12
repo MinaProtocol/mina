@@ -880,7 +880,12 @@ module Types = struct
             ~doc:"Amount of coda granted to the producer of this block"
             ~args:Arg.[]
             ~resolve:(fun _ {coinbase; _} -> Currency.Amount.to_uint64 coinbase)
-        ] )
+        ; field "coinbaseReceiverAccount"
+            ~typ:(non_null AccountObj.account)
+            ~doc:"Account to which the coinbase for this block was granted"
+            ~args:Arg.[]
+            ~resolve:(fun {ctx= coda; _} {coinbase_receiver; _} ->
+              AccountObj.get_best_ledger_account coda coinbase_receiver ) ] )
 
   let protocol_state_proof : (Coda_lib.t, Proof.t option) typ =
     let display_g1_elem (g1 : Crypto_params.Tick_backend.Inner_curve.t) =
