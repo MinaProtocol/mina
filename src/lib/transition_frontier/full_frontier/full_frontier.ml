@@ -399,6 +399,11 @@ let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
         m0
     in
     Ledger.remove_and_reparent_exn m1 m1 ;
+    (*Update the protocol states required for scan state at the new root*)
+    let new_protocol_states_map =
+      State_hash.Map.of_alist_exn new_root_protocol_states
+    in
+    t.protocol_states_for_root_scan_state <- new_protocol_states_map ;
     (* STEPS 4-7 *)
     (* we need to perform steps 4-7 iff there was a proof emitted in the scan
      * state we are transitioning to *)
@@ -409,21 +414,18 @@ let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
         Ledger.Maskable.register_mask s
           (Ledger.Mask.create ~depth:(Ledger.Any_ledger.M.depth s) ())
       in
-      let txn_global_slot =
-        (*Transactions are currently validated against the parent of the block they are in*)
-        let parent_protocol_state =
-          Breadcrumb.parent_hash new_root_node.breadcrumb
-          |> find_protocol_state t |> Option.value_exn
-        in
-        Protocol_state.consensus_state parent_protocol_state
-        |> Consensus.Data.Consensus_state.curr_global_slot
-      in
       (* STEP 5 *)
       Non_empty_list.iter
         (Option.value_exn
-           (Staged_ledger.proof_txns
+           (Staged_ledger.proof_txns_with_state_hashes
               (Breadcrumb.staged_ledger new_root_node.breadcrumb)))
-        ~f:(fun txn ->
+        ~f:(fun (txn, state_hash) ->
+          (*Validate transactions against the parent protocol state of the block they were included in*)
+          let txn_global_slot =
+            find_protocol_state t state_hash
+            |> Option.value_exn |> Protocol_state.consensus_state
+            |> Consensus.Data.Consensus_state.curr_global_slot
+          in
           ignore
             (Or_error.ok_exn (Ledger.apply_transaction ~txn_global_slot mt txn))
           ) ;
@@ -439,11 +441,6 @@ let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
       (Breadcrumb.validated_transition new_root_node.breadcrumb)
       new_staged_ledger
   in
-  (*Update the protocol states required for scan state at the new root*)
-  let new_protocol_states_map =
-    State_hash.Map.of_alist_exn new_root_protocol_states
-  in
-  t.protocol_states_for_root_scan_state <- new_protocol_states_map ;
   let new_root_node = {new_root_node with breadcrumb= new_root_breadcrumb} in
   (* update the new root breadcrumb in the frontier *)
   Hashtbl.set t.table ~key:new_root_hash ~data:new_root_node ;

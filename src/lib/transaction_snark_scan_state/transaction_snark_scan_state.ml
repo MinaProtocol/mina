@@ -457,8 +457,12 @@ let extract_txns txns_with_witnesses =
   (* TODO: This type checks, but are we actually pulling the inverse txn here? *)
   List.map txns_with_witnesses
     ~f:(fun (txn_with_witness : Transaction_with_witness.t) ->
-      Ledger.Undo.transaction txn_with_witness.transaction_with_info
-      |> Or_error.ok_exn )
+      let txn =
+        Ledger.Undo.transaction txn_with_witness.transaction_with_info
+        |> Or_error.ok_exn
+      in
+      let state_hash = fst txn_with_witness.state_hash in
+      (txn, state_hash) )
 
 let latest_ledger_proof t =
   let open Option.Let_syntax in

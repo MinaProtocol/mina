@@ -147,7 +147,7 @@ module T = struct
     ; pending_coinbase_collection: Pending_coinbase.t }
   [@@deriving sexp]
 
-  let proof_txns t =
+  let proof_txns_with_state_hashes t =
     Scan_state.latest_ledger_proof t.scan_state
     |> Option.bind ~f:(Fn.compose Non_empty_list.of_list_opt snd)
 
@@ -1791,7 +1791,7 @@ let%test_module "test" =
 
     (* Fee excess at top level ledger proofs should always be zero *)
     let assert_fee_excess :
-        (Ledger_proof.t * Transaction.t list) option -> unit =
+        (Ledger_proof.t * (Transaction.t * _) list) option -> unit =
      fun proof_opt ->
       let fee_excess =
         Option.value_map ~default:Fee.Signed.zero proof_opt ~f:(fun proof ->

@@ -93,10 +93,13 @@ val fill_work_and_enqueue_transactions :
      t
   -> Transaction_with_witness.t list
   -> Transaction_snark_work.t list
-  -> ((Ledger_proof.t * Transaction.t list) option * t) Or_error.t
+  -> ((Ledger_proof.t * (Transaction.t * State_hash.t) list) option * t)
+     Or_error.t
 
 val latest_ledger_proof :
-  t -> (Ledger_proof_with_sok_message.t * Transaction.t list) option
+     t
+  -> (Ledger_proof_with_sok_message.t * (Transaction.t * State_hash.t) list)
+     option
 
 val free_space : t -> int
 

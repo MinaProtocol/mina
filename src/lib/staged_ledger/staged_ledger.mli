@@ -98,7 +98,8 @@ val of_scan_state_and_ledger_unchecked :
 
 val replace_ledger_exn : t -> Ledger.t -> t
 
-val proof_txns : t -> Transaction.t Non_empty_list.t option
+val proof_txns_with_state_hashes :
+  t -> (Transaction.t * State_hash.t) Non_empty_list.t option
 
 val copy : t -> t
 
@@ -112,7 +113,8 @@ val apply :
   -> current_global_slot:Coda_numbers.Global_slot.t
   -> state_and_body_hash:State_hash.t * State_body_hash.t
   -> ( [`Hash_after_applying of Staged_ledger_hash.t]
-       * [`Ledger_proof of (Ledger_proof.t * Transaction.t list) option]
+       * [ `Ledger_proof of
+           (Ledger_proof.t * (Transaction.t * State_hash.t) list) option ]
        * [`Staged_ledger of t]
        * [ `Pending_coinbase_data of
            bool * Currency.Amount.t * Pending_coinbase.Update.Action.t ]
@@ -125,7 +127,8 @@ val apply_diff_unchecked :
   -> current_global_slot:Coda_numbers.Global_slot.t
   -> state_and_body_hash:State_hash.t * State_body_hash.t
   -> ( [`Hash_after_applying of Staged_ledger_hash.t]
-       * [`Ledger_proof of (Ledger_proof.t * Transaction.t list) option]
+       * [ `Ledger_proof of
+           (Ledger_proof.t * (Transaction.t * State_hash.t) list) option ]
        * [`Staged_ledger of t]
        * [ `Pending_coinbase_data of
            bool * Currency.Amount.t * Pending_coinbase.Update.Action.t ]
