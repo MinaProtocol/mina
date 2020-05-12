@@ -27,7 +27,9 @@ module Generator : sig
   open Quickcheck
 
   type peer_config =
-       precomputed_values:Precomputed_values.t
+       proof_level:Genesis_constants.Proof_level.t
+    -> constraint_constants:Genesis_constants.Constraint_constants.t
+    -> precomputed_values:Precomputed_values.t
     -> max_frontier_length:int
     -> peer_state Generator.t
 
@@ -36,7 +38,9 @@ module Generator : sig
   val peer_with_branch : frontier_branch_size:int -> peer_config
 
   val gen :
-       precomputed_values:Precomputed_values.t
+       proof_level:Genesis_constants.Proof_level.t
+    -> constraint_constants:Genesis_constants.Constraint_constants.t
+    -> precomputed_values:Precomputed_values.t
     -> max_frontier_length:int
     -> (peer_config, 'n num_peers) Vect.t
     -> 'n num_peers t Generator.t

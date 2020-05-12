@@ -37,8 +37,7 @@ let main () =
     Coda_worker_testnet.Restarts.trigger_bootstrap testnet ~logger
       ~node:bootstrapping_node
   in
-  let%bind () = after (Time.Span.of_sec 180.) in
-  (* TODO: one of the previous_statuses should be `Bootstrap. The broadcast pip 
+  (* TODO: one of the previous_statuses should be `Bootstrap. The broadcast pip
     coda.transition_frontier never gets set to None *)
   assert (Hash_set.mem previous_status `Synced) ;
   Coda_worker_testnet.Api.teardown testnet ~logger

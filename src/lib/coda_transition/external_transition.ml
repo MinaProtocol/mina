@@ -360,6 +360,8 @@ module Validation = struct
 
   let forget_validation (t, _) = With_hash.data t
 
+  let forget_validation_with_hash (t, _) = t
+
   module Unsafe = struct
     let set_valid_time_received :
            ( [`Time_received] * unit Truth.false_t
@@ -614,10 +616,11 @@ let skip_genesis_protocol_state_validation
     `This_transition_was_generated_internally (t, validation) =
   (t, Validation.Unsafe.set_valid_genesis_state validation)
 
-let validate_time_received (t, validation) ~time_received =
+let validate_time_received ~constraint_constants (t, validation) ~time_received
+    =
   let protocol_state = With_hash.data t |> protocol_state in
   let constants =
-    Consensus.Constants.create
+    Consensus.Constants.create ~constraint_constants
       ~protocol_constants:
         ( Protocol_state.constants protocol_state
         |> Protocol_constants_checked.t_of_value )

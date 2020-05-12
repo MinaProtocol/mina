@@ -20,11 +20,11 @@ module Make (Inputs : Inputs_intf) : sig
      and type root_hash := Inputs.Hash.t
      and type account := Inputs.Account.t
 
-  val create : unit -> t
+  val create : depth:int -> unit -> t
 end = struct
   open Inputs
 
-  type t = Uuid.t [@@deriving sexp_of]
+  type t = {uuid: Uuid.t; depth: int} [@@deriving sexp_of]
 
   let t_of_sexp _ = failwith "t_of_sexp unimplemented"
 
@@ -37,29 +37,16 @@ end = struct
 
   module Addr = Location.Addr
 
-  let create () = Uuid_unix.create ()
+  let create ~depth () = {uuid= Uuid_unix.create (); depth}
 
   let remove_accounts_exn _t keys =
     if List.is_empty keys then ()
     else failwith "remove_accounts_exn: null ledgers cannot be mutated"
 
-  let empty_hash_at_heights depth =
-    let empty_hash_at_heights =
-      Array.create ~len:(depth + 1) Hash.empty_account
-    in
-    let rec go i =
-      if i <= depth then (
-        let h = empty_hash_at_heights.(i - 1) in
-        empty_hash_at_heights.(i) <- Hash.merge ~height:(i - 1) h h ;
-        go (i + 1) )
-    in
-    go 1 ; empty_hash_at_heights
+  let empty_hash_at_height =
+    Empty_hashes.extensible_cache (module Hash) ~init_hash:Hash.empty_account
 
-  let memoized_empty_hash_at_height = empty_hash_at_heights Depth.depth
-
-  let empty_hash_at_height d = memoized_empty_hash_at_height.(d)
-
-  let merkle_path _t location =
+  let merkle_path t location =
     let location =
       if Location.is_account location then
         Location.Hash (Location.to_path_exn location)
@@ -67,8 +54,8 @@ end = struct
     in
     assert (Location.is_hash location) ;
     let rec loop k =
-      let h = Location.height k in
-      if h >= Depth.depth then []
+      let h = Location.height ~ledger_depth:t.depth k in
+      if h >= t.depth then []
       else
         let sibling_dir = Location.last_direction (Location.to_path_exn k) in
         let hash = empty_hash_at_height h in
@@ -77,12 +64,12 @@ end = struct
     in
     loop location
 
-  let merkle_root _t = empty_hash_at_height Depth.depth
+  let merkle_root t = empty_hash_at_height t.depth
 
   let merkle_path_at_addr_exn t addr = merkle_path t (Location.Hash addr)
 
   let merkle_path_at_index_exn t index =
-    merkle_path_at_addr_exn t (Addr.of_int_exn index)
+    merkle_path_at_addr_exn t (Addr.of_int_exn ~ledger_depth:t.depth index)
 
   let index_of_account_exn _t =
     failwith "index_of_account_exn: null ledgers are empty"
@@ -98,7 +85,7 @@ end = struct
 
   let get _t _loc = None
 
-  let get_uuid t = t
+  let get_uuid t = t.uuid
 
   let last_filled _t = None
 
@@ -132,14 +119,20 @@ end = struct
 
   let make_space_for _t _tot = ()
 
-  let get_all_accounts_rooted_at_exn _t addr =
-    let first_node, last_node = Addr.Range.subtree_range addr in
+  let get_all_accounts_rooted_at_exn t addr =
+    let first_node, last_node =
+      Addr.Range.subtree_range ~ledger_depth:t.depth addr
+    in
     let first_index = Addr.to_int first_node in
     let last_index = Addr.to_int last_node in
     List.(
       zip_exn
-        (map ~f:Addr.of_int_exn (range first_index last_index))
-        (init (1 lsl Addr.height addr) ~f:(Fn.const Account.empty)))
+        (map
+           ~f:(Addr.of_int_exn ~ledger_depth:t.depth)
+           (range first_index last_index))
+        (init
+           (1 lsl Addr.height ~ledger_depth:t.depth addr)
+           ~f:(Fn.const Account.empty)))
 
   let set_all_accounts_rooted_at_exn _t =
     failwith "set_all_accounts_rooted_at_exn: null ledgers cannot be mutated"
@@ -150,10 +143,10 @@ end = struct
   let set_inner_hash_at_addr_exn _t =
     failwith "set_inner_hash_at_addr_exn: null ledgers cannot be mutated"
 
-  let get_inner_hash_at_addr_exn _t addr =
-    empty_hash_at_height (Addr.height addr)
+  let get_inner_hash_at_addr_exn t addr =
+    empty_hash_at_height (Addr.height ~ledger_depth:t.depth addr)
 
   let num_accounts _t = 0
 
-  let depth = Depth.depth
+  let depth t = t.depth
 end
