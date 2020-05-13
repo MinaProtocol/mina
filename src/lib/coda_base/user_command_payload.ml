@@ -177,7 +177,6 @@ module Common = struct
 
   [%%endif]
 end
-[@@warning "-27"]
 
 module Body = struct
   [%%versioned
