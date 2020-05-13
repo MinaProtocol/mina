@@ -127,7 +127,6 @@ module Poly = struct
     ; timing: 'timing }
   [@@deriving sexp, eq, compare, hash, yojson, fields]
 end
-[@@warning "-27"]
 
 module Key = struct
   [%%versioned
