@@ -14,10 +14,10 @@ crate-type = ["staticlib"]
 ################################# Dependencies ################################
 
 [dependencies]
-groupmap = { git = "https://github.com/o1-labs/zexe/" }
+groupmap = { path = "../groupmap" }
 libc = { version = "0.2.0" }
-algebra = { git = "https://github.com/o1-labs/zexe/" }
-ff-fft = { git = "https://github.com/o1-labs/zexe/" }
+algebra = { path = "../algebra" }
+ff-fft = { path = "../ff-fft" }
 rand = { version = "0.7" }
 num-bigint = { version = "0.2.3" }
 sprs = { version = "0.7.1" }
