@@ -172,20 +172,68 @@ let calculateMetrics = blocks => {
     calculateTransactionsSentToAddress(blocks, echoBotPublicKey);
 
   // TODO: Calculate users for all metrics
-  let users = calculateAllUsers([blocksCreated, transactionSent]);
+  let users =
+    calculateAllUsers([
+      blocksCreated,
+      transactionSent,
+      snarkWorkCreated,
+      transactionsReceivedByEcho,
+    ]);
 
-  StringMap.mapi(
-    (key, _) =>
-      {
-        Types.Metrics.blocksCreated: StringMap.find_opt(key, blocksCreated),
-        transactionSent: StringMap.find_opt(key, transactionSent),
-        snarkWorkCreated: StringMap.find_opt(key, snarkWorkCreated),
-        snarkFeesCollected: StringMap.find_opt(key, snarkFeesCollected),
-        highestSnarkFeeCollected:
-          StringMap.find_opt(key, highestSnarkFeeCollected),
-        transactionsReceivedByEcho:
-          StringMap.find_opt(key, transactionsReceivedByEcho),
-      },
-    users,
-  );
+  let metricsMap =
+    StringMap.mapi(
+      (key, _) =>
+        {
+          Types.Metrics.blocksCreated: StringMap.find_opt(key, blocksCreated),
+          transactionSent: StringMap.find_opt(key, transactionSent),
+          snarkWorkCreated: StringMap.find_opt(key, snarkWorkCreated),
+          snarkFeesCollected: StringMap.find_opt(key, snarkFeesCollected),
+          highestSnarkFeeCollected:
+            StringMap.find_opt(key, highestSnarkFeeCollected),
+          transactionsReceivedByEcho:
+            StringMap.find_opt(key, transactionsReceivedByEcho),
+        },
+      users,
+    );
+
+  // Get 500 pts if you send txn to the echo service
+  let echoTransactionPoints =
+    addPointsToUsersWithAtleastN(
+      (metricRecord: Types.Metrics.metricRecord) =>
+        metricRecord.transactionsReceivedByEcho,
+      1,
+      500,
+      metricsMap,
+    );
+
+  // Earn 3 fees by producing and selling zk-SNARKs on the snarketplace: 1000 pts*
+  let zkSnark3FeesPoints =
+    addPointsToUsersWithAtleastN(
+      (metricRecord: Types.Metrics.metricRecord) =>
+        metricRecord.snarkFeesCollected,
+      3,
+      1000,
+      metricsMap,
+    );
+
+  // Anyone who earned 50 fees will be rewarded with an additional 1000 pts
+  let zkSnark50FeesPoints =
+    addPointsToUsersWithAtleastN(
+      (metricRecord: Types.Metrics.metricRecord) =>
+        metricRecord.snarkFeesCollected,
+      50,
+      1000,
+      metricsMap,
+    );
+
+  // Producing at least 3 blocks will earn an additional 1000 pts
+  let blocksCreatedPoints =
+    addPointsToUsersWithAtleastN(
+      (metricRecord: Types.Metrics.metricRecord) =>
+        metricRecord.blocksCreated,
+      3,
+      1000,
+      metricsMap,
+    );
+  ();
 };
