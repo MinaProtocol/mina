@@ -164,16 +164,21 @@ let is_versioned_module_ident id =
   | _ ->
       false
 
-let is_versioned_type_lident = function
-  | Ldot (Ldot (prefix, vn), "t")
+let is_versioned_module_lident = function
+  | Ldot (prefix, vn)
     when is_version_module vn
          && (not @@ is_jane_street_prefix prefix)
          && is_stable_prefix prefix ->
       true
+  | _ ->
+      false
+
+let is_versioned_type_lident = function
+  | Ldot (Ldot (prefix, vn), "t")
+    when is_versioned_module_lident (Ldot (prefix, vn)) ->
+      true
   | Ldot (Ldot (Ldot (prefix, vn), "T"), "t")
-    when is_version_module vn
-         && (not @@ is_jane_street_prefix prefix)
-         && is_stable_prefix prefix ->
+    when is_versioned_module_lident (Ldot (prefix, vn)) ->
       (* this case goes away when all versioned types use %%versioned *)
       true
   | _ ->
@@ -193,7 +198,7 @@ and get_core_type_versioned_type_misuses core_type =
       if is_versioned_type_lident lident.txt then
         let err =
           ( lident.loc
-          , "Versioned type used in a non-versioned type declaration" )
+          , "Versioned type used outside a versioned type declaration" )
         in
         err :: core_type_errors
       else core_type_errors
@@ -289,6 +294,15 @@ let in_stable_versioned_module module_path =
 let lint_ast =
   object (self)
     inherit [accumulator] Ast_traverse.fold as super
+
+    method! expression expr acc =
+      match expr.pexp_desc with
+      | Pexp_extension (_, PTyp core_type) ->
+          (* misuses like [%bin_type_class: Foo.Stable.V1.t] *)
+          let errs = get_core_type_versioned_type_misuses core_type in
+          acc_with_errors acc errs
+      | _ ->
+          super#expression expr acc
 
     method! module_expr expr acc =
       let acc' =
