@@ -52,7 +52,7 @@ coda-network keypair create [--nickname <NAME>]
 
 Keysets are simply a collection of keypairs. We use these for categorizing different groups of keys that will be used in the lifecycle of a network. For each keypair in a keyset, we MAY or MAY NOT have the corresponding private keys. For each keyset, we may want to allocate a different amount of funds to their corresponding accounts in a genesis ledger.
 
-The datastructure for a given keyset is much simpler since it's essentially a list public keys. As such we can simply maintain a simple CSV style document that contains all the public keys included in a given keyset using the name of the keyset for the filename.
+The datastructure for a given keyset is much simpler since it's essentially a list public keys. As such we can simply maintain a simple JSON document that contains all the public keys included in a given keyset using the name of the keyset for the filename.
 
 ```
 coda-network keyset create <NAME> [--count <NUMBER>]
@@ -74,12 +74,6 @@ This command would remove the public key(s) from a keyset.
 
 ```
 coda-network keyset [ls|list]
-```
-
-This command will show all keysets that are stored locally in addition to the keysets that are available in remote storage.
-
-```
-coda-network keyset import <KEYSET_NAME> <CSV_FILENAME>
 ```
 
 Keysets and their corresponding keypairs can also be individually uploaded / downloaded which will also sync any keypairs that we have.
@@ -112,7 +106,7 @@ This command will prompt the user for the keysets which should be included in th
 
 Additionally we can output an annotated ledger file with additional fields such as `nickname`, `discord_username` etc for use with testnet challenges.
 
-Again this can be uploaded to S3 for sharing.
+Again this can be uploaded to Google Cloud Storage for sharing.
 
 ```
 coda-network genesis upload <VERSION>
