@@ -3,9 +3,13 @@
    - "deriving bin_io" and "deriving version" never appear in types defined inside functor bodies
    - otherwise, "bin_io" may appear in a "deriving" attribute only if "version" also appears in that extension
    - versioned types only appear in versioned type definitions
+   - versioned type definitions appear only in %%versioned... extensions
+   - packaged modules, like "(module Foo)", may not be stable-versioned (but allowed inside %%versioned for
+       legitimate uses)
    - the constructs "include Stable.Latest" and "include Stable.Vn" are prohibited
    - uses of Binable.Of... and Bin_prot.Utils.Make_binable functors are always in stable-versioned modules,
        and always as an argument to "include"
+   - restrictions are not enforced in inline tests and inline test modules
 *)
 
 open Core_kernel
@@ -301,6 +305,16 @@ let lint_ast =
           (* misuses like [%bin_type_class: Foo.Stable.V1.t] *)
           let errs = get_core_type_versioned_type_misuses core_type in
           acc_with_accum_errors acc errs
+      | Pexp_pack mod_expr -> (
+        (* misuses like (module Foo.Stable.V1) *)
+        match mod_expr.pmod_desc with
+        | Pmod_ident id
+          when (not acc.in_versioned_ext) && is_versioned_module_lident id.txt
+          ->
+            let err = (id.loc, "Versioned module cannot be packaged") in
+            acc_with_accum_errors acc [err]
+        | _ ->
+            acc )
       | _ ->
           super#expression expr acc
 
@@ -459,7 +473,9 @@ let lint_ast =
           in
           {acc' with in_versioned_ext= false}
       | Pstr_extension ((name, _payload), _attrs)
-        when String.equal name.txt "test_module" ->
+        when List.mem
+               ["test"; "test_unit"; "test_module"]
+               name.txt ~equal:String.equal ->
           (* don't check for errors in test code *)
           acc
       | Pstr_include inc_decl when is_versioned_module_inc_decl inc_decl ->
