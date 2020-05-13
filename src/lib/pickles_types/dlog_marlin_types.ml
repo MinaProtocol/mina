@@ -1,4 +1,3 @@
-open Tuple_lib
 open Core_kernel
 
 module Evals = struct
@@ -129,8 +128,6 @@ module Openings = struct
         ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
         ~value_of_hlist:of_hlist
   end
-
-  open Evals
 
   [%%versioned
   module Stable = struct
