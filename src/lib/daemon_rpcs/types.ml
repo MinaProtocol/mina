@@ -57,7 +57,7 @@ module Status = struct
   module Rpc_timings = struct
     module Rpc_pair = struct
       type 'a t = {dispatch: 'a; impl: 'a}
-      [@@deriving to_yojson, bin_io, fields]
+      [@@deriving to_yojson, bin_io_unversioned, fields]
     end
 
     type t =
@@ -66,7 +66,7 @@ module Status = struct
       ; get_ancestry: Perf_histograms.Report.t option Rpc_pair.t
       ; get_transition_chain_proof: Perf_histograms.Report.t option Rpc_pair.t
       ; get_transition_chain: Perf_histograms.Report.t option Rpc_pair.t }
-    [@@deriving to_yojson, bin_io, fields]
+    [@@deriving to_yojson, bin_io_unversioned, fields]
 
     let to_text s =
       let entries =
@@ -109,7 +109,7 @@ module Status = struct
       ; accepted_transition_remote_latency: Perf_histograms.Report.t option
       ; snark_worker_transition_time: Perf_histograms.Report.t option
       ; snark_worker_merge_time: Perf_histograms.Report.t option }
-    [@@deriving to_yojson, bin_io, fields]
+    [@@deriving to_yojson, bin_io_unversioned, fields]
 
     let to_text s =
       let entries =
@@ -219,15 +219,41 @@ module Status = struct
 
     let sync_status = map_entry "Sync status" ~f:Sync_status.to_string
 
-    let propose_pubkeys = list_entry "Block producers running" ~to_string:Fn.id
+    let block_production_keys =
+      list_entry "Block producers running" ~to_string:Fn.id
 
     let histograms = option_entry "Histograms" ~f:Histograms.to_text
 
-    let consensus_time_best_tip = string_option_entry "Best tip consensus time"
+    let next_block_production =
+      option_entry "Next block will be produced in" ~f:(fun producer_timing ->
+          let str time =
+            let open Block_time in
+            let current_time =
+              (* TODO: We will temporarily have to create a time controller
+                  until the inversion relationship between GraphQL and the RPC code inverts *)
+              Block_time.now
+              @@ Block_time.Controller.basic ~logger:(Logger.create ())
+            in
+            let diff = diff time current_time in
+            if Span.(zero < diff) then
+              sprintf "in %s" (Span.to_string_hum diff)
+            else "Producing a block now..."
+          in
+          match producer_timing with
+          | `Check_again time ->
+              sprintf "None this epoch… checking at %s" (str time)
+          | `Produce producing_time ->
+              str producing_time
+          | `Produce_now ->
+              "Now" )
 
-    let next_proposal = string_option_entry "Next proposal"
+    let consensus_time_best_tip =
+      option_entry "Best tip consensus time"
+        ~f:Consensus.Data.Consensus_time.to_string_hum
 
-    let consensus_time_now = string_entry "Consensus time now"
+    let consensus_time_now =
+      map_entry "Consensus time now"
+        ~f:Consensus.Data.Consensus_time.to_string_hum
 
     let consensus_mechanism = string_entry "Consensus mechanism"
 
@@ -235,6 +261,7 @@ module Status = struct
       let ms_to_string i =
         float_of_int i |> Time.Span.of_ms |> Time.Span.to_string
       in
+      let time_to_string = Fn.compose Time.to_string Block_time.to_time in
       let render conf =
         let fmt_field name op field = (name, op (Field.get field conf)) in
         Consensus.Configuration.Fields.to_list
@@ -247,6 +274,8 @@ module Status = struct
           ~epoch_duration:(fmt_field "Epoch duration" ms_to_string)
           ~acceptable_network_delay:
             (fmt_field "Acceptable network delay" ms_to_string)
+          ~genesis_state_timestamp:
+            (fmt_field "Genesis state timestamp" time_to_string)
         |> List.map ~f:(fun (s, v) -> ("\t" ^ s, v))
         |> digest_entries ~title:""
       in
@@ -254,20 +283,24 @@ module Status = struct
 
     let addrs_and_ports =
       let render conf =
-        let fmt_field name op field = (name, op (Field.get field conf)) in
-        Kademlia.Node_addrs_and_ports.Display.Stable.V1.Fields.to_list
+        let fmt_field name op field = [(name, op (Field.get field conf))] in
+        Node_addrs_and_ports.Display.Stable.V1.Fields.to_list
           ~external_ip:(fmt_field "External IP" Fn.id)
           ~bind_ip:(fmt_field "Bind IP" Fn.id)
-          ~discovery_port:(fmt_field "Haskell Kademlia port" string_of_int)
           ~client_port:(fmt_field "Client port" string_of_int)
-          ~libp2p_port:(fmt_field "Discovery (libp2p) port" string_of_int)
-          ~communication_port:(fmt_field "External port" string_of_int)
+          ~libp2p_port:(fmt_field "Libp2p port" string_of_int)
+          ~peer:(fun field ->
+            let peer = Field.get field conf in
+            match peer with
+            | Some peer ->
+                [("Libp2p PeerID", peer.peer_id)]
+            | None ->
+                [] )
+        |> List.concat
         |> List.map ~f:(fun (s, v) -> ("\t" ^ s, v))
         |> digest_entries ~title:""
       in
       map_entry "Addresses and ports" ~f:render
-
-    let libp2p_peer_id = string_entry "Libp2p PeerID"
   end
 
   type t =
@@ -277,23 +310,27 @@ module Status = struct
     ; uptime_secs: int
     ; ledger_merkle_root: string option
     ; state_hash: string option
-    ; commit_id: Git_sha.Stable.V1.t
+    ; commit_id: Git_sha.Stable.Latest.t
     ; conf_dir: string
     ; peers: string list
     ; user_commands_sent: int
     ; snark_worker: string option
     ; snark_work_fee: int
-    ; sync_status: Sync_status.Stable.V1.t
-    ; propose_pubkeys: string list
+    ; sync_status: Sync_status.Stable.Latest.t
+    ; block_production_keys: string list
     ; histograms: Histograms.t option
-    ; consensus_time_best_tip: string option
-    ; next_proposal: string option
-    ; consensus_time_now: string
+    ; consensus_time_best_tip:
+        Consensus.Data.Consensus_time.Stable.Latest.t option
+    ; next_block_production:
+        [ `Check_again of Block_time.Stable.Latest.t
+        | `Produce of Block_time.Stable.Latest.t
+        | `Produce_now ]
+        option
+    ; consensus_time_now: Consensus.Data.Consensus_time.Stable.Latest.t
     ; consensus_mechanism: string
-    ; consensus_configuration: Consensus.Configuration.t
-    ; addrs_and_ports: Kademlia.Node_addrs_and_ports.Display.Stable.V1.t
-    ; libp2p_peer_id: string }
-  [@@deriving to_yojson, bin_io, fields]
+    ; consensus_configuration: Consensus.Configuration.Stable.Latest.t
+    ; addrs_and_ports: Node_addrs_and_ports.Display.Stable.Latest.t }
+  [@@deriving to_yojson, bin_io_unversioned, fields]
 
   let entries (s : t) =
     let module M = Make_entries (struct
@@ -305,9 +342,9 @@ module Status = struct
     Fields.to_list ~sync_status ~num_accounts ~blockchain_length
       ~highest_block_length_received ~uptime_secs ~ledger_merkle_root
       ~state_hash ~commit_id ~conf_dir ~peers ~user_commands_sent ~snark_worker
-      ~propose_pubkeys ~histograms ~consensus_time_best_tip ~consensus_time_now
-      ~consensus_mechanism ~consensus_configuration ~next_proposal
-      ~snark_work_fee ~addrs_and_ports ~libp2p_peer_id
+      ~block_production_keys ~histograms ~consensus_time_best_tip
+      ~consensus_time_now ~consensus_mechanism ~consensus_configuration
+      ~next_block_production ~snark_work_fee ~addrs_and_ports
     |> List.filter_map ~f:Fn.id
 
   let to_text (t : t) =

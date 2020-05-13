@@ -1,6 +1,7 @@
 open Async
 open Core
 open Otp_lib
+open Coda_base
 open Frontier_base
 
 module Worker = struct
@@ -30,6 +31,7 @@ module Worker = struct
       [ `New_root_transition
       | `Old_root_transition
       | `Parent_transition
+      | `Arcs of State_hash.t
       | `Best_tip ] ]
 
   let apply_diff_error_internal_to_string = function
@@ -41,6 +43,8 @@ module Worker = struct
         "parent transition not found"
     | `Not_found `Best_tip ->
         "best tip not found"
+    | `Not_found (`Arcs hash) ->
+        Printf.sprintf "arcs not found for %s" (State_hash.to_string hash)
 
   let apply_diff (type mutant) (t : t) (diff : mutant Diff.Lite.t) :
       (mutant, apply_diff_error) Result.t =

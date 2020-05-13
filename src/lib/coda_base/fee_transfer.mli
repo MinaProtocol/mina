@@ -16,6 +16,15 @@ module Single : sig
   include Comparable.S with type t := t
 
   include Codable.Base58_check_intf with type t := t
+
+  val receiver : t -> Public_key.Compressed.t
+
+  val fee : t -> Currency.Fee.t
+
+  module Gen : sig
+    val with_random_receivers :
+      keys:Signature_keypair.t array -> max_fee:int -> t Quickcheck.Generator.t
+  end
 end
 
 module Stable : sig
@@ -35,3 +44,5 @@ include Comparable.S with type t := t
 val fee_excess : t -> Currency.Fee.Signed.t Or_error.t
 
 val receivers : t -> Public_key.Compressed.t One_or_two.t
+
+val receiver_ids : t -> Account_id.t One_or_two.t

@@ -26,6 +26,17 @@ type t =
       Optional_public_key.Table.t
   ; mutable reorganization_subscription: [`Changed] reader_and_writer list }
 
+(* idempotent *)
+let add_new_subscription (t : t) ~pk =
+  (* add a new subscribed block user for this pk if we're not already tracking it *)
+  Optional_public_key.Table.find_or_add t.subscribed_block_users (Some pk)
+    ~default:(fun () -> [Pipe.create ()])
+  |> ignore ;
+  (* add a new payment user if we're not already tracking it *)
+  Public_key.Compressed.Table.find_or_add t.subscribed_payment_users pk
+    ~default:Pipe.create
+  |> ignore
+
 let create ~logger ~wallets ~time_controller ~external_transition_database
     ~new_blocks ~transition_frontier ~is_storing_all =
   let subscribed_block_users =
@@ -113,7 +124,7 @@ let create ~logger ~wallets ~time_controller ~external_transition_database
                 {With_hash.hash; data= filtered_external_transition}
               in
               let participants =
-                Filtered_external_transition.participants
+                Filtered_external_transition.participant_pks
                   filtered_external_transition
               in
               let block_time = Block_time.now time_controller in
@@ -126,15 +137,14 @@ let create ~logger ~wallets ~time_controller ~external_transition_database
                 verified_transactions participants ;
               Deferred.unit
           | Error e ->
-              Logger.error logger
-                "Staged ledger had error with transactions in block for state \
-                 $state_hash: $error"
-                ~module_:__MODULE__ ~location:__LOC__
+              Logger.error logger ~module_:__MODULE__ ~location:__LOC__
                 ~metadata:
                   [ ( "error"
                     , `String (Staged_ledger.Pre_diff_info.Error.to_string e)
                     )
-                  ; ("state_hash", State_hash.to_yojson hash) ] ;
+                  ; ("state_hash", State_hash.to_yojson hash) ]
+                "Staged ledger had error with transactions in block for state \
+                 $state_hash: $error" ;
               Deferred.unit ) ) ;
   let reorganization_subscription = [] in
   let reader, writer =

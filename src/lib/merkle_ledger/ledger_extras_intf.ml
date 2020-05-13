@@ -7,9 +7,9 @@ module type S = sig
 
   val set_at_addr_exn : t -> Addr.t -> account -> unit
 
-  val key_of_index : t -> index -> key option
+  val account_id_of_index : t -> index -> account_id option
 
-  val key_of_index_exn : t -> index -> key
+  val account_id_of_index_exn : t -> index -> account_id
 
   val recompute_tree : t -> unit
 end

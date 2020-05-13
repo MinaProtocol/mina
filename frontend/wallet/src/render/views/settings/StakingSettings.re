@@ -8,7 +8,7 @@ module Styles = {
       Theme.Text.Body.semiBold,
       style([color(Theme.Colors.midnight), marginBottom(`rem(0.5))]),
     ]);
-    
+
   let fields = style([maxWidth(`rem(40.))]);
 };
 
@@ -73,7 +73,7 @@ module AccountInfo = [%graphql
 module AccountInfoQuery = ReasonApollo.CreateQuery(AccountInfo);
 
 [@react.component]
-let make = (~publicKey, ~stakingActive=false) => {
+let make = (~publicKey, ~stakingActive as _=false) => {
   // Form state
   let (state, changeState) =
     React.useState(() => {delegate: None, fee: DefaultAmount});
@@ -121,13 +121,8 @@ let make = (~publicKey, ~stakingActive=false) => {
     ...{({result}) =>
       switch (result) {
       | Loading => <Loader />
-      | Error(err) =>
-        <Alert
-          kind=`Danger
-          message={
-            err##message;
-          }
-        />
+      | Error((err: ReasonApolloTypes.apolloError)) =>
+        <Alert kind=`Danger defaultMessage={err.message} />
       | Data(accountInfo) =>
         <EnableStakingMutation>
           (
@@ -136,7 +131,8 @@ let make = (~publicKey, ~stakingActive=false) => {
                 {switch (result) {
                  | NotCalled
                  | Loading => React.null
-                 | Error(err) => <Alert kind=`Danger message=err##message />
+                 | Error((err: ReasonApolloTypes.apolloError)) =>
+                   <Alert kind=`Danger defaultMessage={err.message} />
                  | Data(_) =>
                    goBack();
                    React.null;
@@ -160,8 +156,7 @@ let make = (~publicKey, ~stakingActive=false) => {
                        <div className=Styles.label>
                          {React.string("Transaction fee")}
                        </div>
-                       <div
-                         className=Styles.fields>
+                       <div className=Styles.fields>
                          <ToggleButton
                            options=[|"Standard: 5 Coda", "Custom Amount"|]
                            selected=feeSelectedValue

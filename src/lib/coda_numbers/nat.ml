@@ -1,11 +1,24 @@
+[%%import
+"/src/config.mlh"]
+
 open Core_kernel
-open Snark_bits
 open Fold_lib
 include Intf
 module Intf = Intf
 
+[%%ifdef
+consensus_mechanism]
+
+open Snark_bits
+
 let zero_checked =
   Snarky_integer.Integer.constant ~m:Snark_params.Tick.m Bigint.zero
+
+[%%else]
+
+open Snark_bits_nonconsensus
+
+[%%endif]
 
 module Make (N : sig
   type t [@@deriving sexp, compare, hash]
@@ -23,6 +36,9 @@ struct
   include Comparable.Make (N)
 
   include (N : module type of N with type t := t)
+
+  [%%ifdef
+  consensus_mechanism]
 
   module Checked = struct
     open Bitstring_lib
@@ -42,10 +58,16 @@ struct
         (sprintf "to_bits: %s" __LOC__)
         (make_checked (fun () -> Integer.to_bits ~length:N.length_in_bits ~m t))
 
+    let to_input t =
+      Checked.map (to_bits t) ~f:(fun bits ->
+          Random_oracle.Input.bitstring
+            (Bitstring_lib.Bitstring.Lsb_first.to_list bits) )
+
     let constant n =
       Integer.constant ~length:N.length_in_bits ~m
         (Bignum_bigint.of_int (N.to_int n))
 
+    (* warning: this typ does not work correctly with the generic if_ *)
     let typ : (field Integer.t, t) Typ.t =
       let typ = Typ.list ~length:N.length_in_bits Boolean.typ in
       let of_bits bs = of_bits (Bitstring.Lsb_first.of_list bs) in
@@ -114,13 +136,22 @@ struct
     let zero = zero_checked
   end
 
+  (* warning: this typ does not work correctly with the generic if_ *)
   let typ = Checked.typ
+
+  let var_to_bits var =
+    Snarky_integer.Integer.to_bits ~length:N.length_in_bits
+      ~m:Snark_params.Tick.m var
+
+  [%%endif]
 
   module Bits = Bits
 
   let to_bits = Bits.to_bits
 
   let of_bits = Bits.of_bits
+
+  let to_input t = Random_oracle.Input.bitstring (to_bits t)
 
   let fold t = Fold.group3 ~default:false (Bits.fold t)
 

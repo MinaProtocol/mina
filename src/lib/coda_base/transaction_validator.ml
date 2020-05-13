@@ -1,10 +1,10 @@
 open Base
-open Signature_lib
 
 module Hashless_ledger = struct
-  type t = {base: Ledger.t; overlay: (Account.key, Account.t) Hashtbl.t}
+  type t =
+    {base: Ledger.t; overlay: (Account.Identifier.t, Account.t) Hashtbl.t}
 
-  type location = Ours of Account.key | Theirs of Ledger.Location.t
+  type location = Ours of Account.Identifier.t | Theirs of Ledger.Location.t
 
   let msg s =
     s
@@ -16,7 +16,7 @@ module Hashless_ledger = struct
     | Theirs loc -> (
       match Ledger.get t.base loc with
       | Some a -> (
-        match Hashtbl.find t.overlay (Account.public_key a) with
+        match Hashtbl.find t.overlay (Account.identifier a) with
         | None ->
             Some a
         | s ->
@@ -24,12 +24,14 @@ module Hashless_ledger = struct
       | None ->
           failwith (msg "get") )
 
-  let location_of_key t key =
+  let location_of_account t key =
     match Hashtbl.find t.overlay key with
     | Some _ ->
         Some (Ours key)
     | None ->
-        Option.map ~f:(fun d -> Theirs d) (Ledger.location_of_key t.base key)
+        Option.map
+          ~f:(fun d -> Theirs d)
+          (Ledger.location_of_account t.base key)
 
   let set t loc acct =
     match loc with
@@ -38,27 +40,23 @@ module Hashless_ledger = struct
     | Theirs loc -> (
       match Ledger.get t.base loc with
       | Some a ->
-          Hashtbl.set t.overlay ~key:(Account.public_key a) ~data:acct
+          Hashtbl.set t.overlay ~key:(Account.identifier a) ~data:acct
       | None ->
           failwith (msg "set") )
 
   let get_or_create_account_exn t key account =
-    match location_of_key t key with
+    match location_of_account t key with
     | None ->
         set t (Ours key) account ;
         (`Added, Ours key)
     | Some loc ->
         (`Existed, loc)
 
-  let get_or_create ledger key =
-    let key, loc =
-      match get_or_create_account_exn ledger key (Account.initialize key) with
-      | `Existed, loc ->
-          ([], loc)
-      | `Added, loc ->
-          ([key], loc)
+  let get_or_create ledger aid =
+    let action, loc =
+      get_or_create_account_exn ledger aid (Account.initialize aid)
     in
-    (key, Option.value_exn (get ledger loc), loc)
+    (action, Option.value_exn (get ledger loc), loc)
 
   let remove_accounts_exn _t =
     failwith "hashless_ledger: bug in transaction_logic, who is calling undo?"
@@ -66,11 +64,10 @@ module Hashless_ledger = struct
   (* Without undo validating that the hashes match, Transaction_logic doesn't really care what this is. *)
   let merkle_root _t = Ledger_hash.empty_hash
 
-  let create l =
-    {base= l; overlay= Hashtbl.create (module Public_key.Compressed)}
+  let create l = {base= l; overlay= Hashtbl.create (module Account_id)}
 
-  let with_ledger ~f =
-    Ledger.with_ledger ~f:(fun l ->
+  let with_ledger ~depth ~f =
+    Ledger.with_ledger ~depth ~f:(fun l ->
         let t = create l in
         f t )
 end

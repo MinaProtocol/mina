@@ -4,6 +4,7 @@ open Pipe_lib
 open Cache_lib
 open Coda_base
 open Coda_transition
+open Network_peer
 
 module type Transition_handler_validator_intf = sig
   type unprocessed_transition_cache
@@ -79,7 +80,7 @@ module type Transition_handler_processor_intf = sig
                                  , State_hash.t )
                                  Cached.t
                                  Strict_pipe.Reader.t
-    -> proposer_transition_reader:transition_frontier_breadcrumb
+    -> producer_transition_reader:transition_frontier_breadcrumb
                                   Strict_pipe.Reader.t
     -> clean_up_catchup_scheduler:unit Ivar.t
     -> catchup_job_writer:( State_hash.t
@@ -110,7 +111,10 @@ module type Transition_handler_processor_intf = sig
                                   , Strict_pipe.crash Strict_pipe.buffered
                                   , unit )
                                   Strict_pipe.Writer.t
-    -> processed_transition_writer:( External_transition.Validated.t
+    -> processed_transition_writer:( [ `Transition of
+                                       External_transition.Validated.t ]
+                                     * [ `Source of
+                                         [`Gossip | `Catchup | `Internal] ]
                                    , Strict_pipe.crash Strict_pipe.buffered
                                    , unit )
                                    Strict_pipe.Writer.t
@@ -168,6 +172,7 @@ module type Best_tip_prover_intf = sig
 
   val verify :
        verifier:Verifier.t
+    -> genesis_constants:Genesis_constants.t
     -> ( External_transition.t
        , State_body_hash.t list * External_transition.t )
        Proof_carrying_data.t
@@ -194,6 +199,7 @@ module type Consensus_best_tip_prover_intf = sig
   val verify :
        logger:Logger.t
     -> verifier:Verifier.t
+    -> genesis_constants:Genesis_constants.t
     -> Consensus.Data.Consensus_state.Value.t
     -> ( External_transition.t
        , State_body_hash.t list * External_transition.t )
@@ -217,7 +223,10 @@ module type Sync_handler_intf = sig
   val get_staged_ledger_aux_and_pending_coinbases_at_hash :
        frontier:transition_frontier
     -> State_hash.t
-    -> (Staged_ledger.Scan_state.t * Ledger_hash.t * Pending_coinbase.t)
+    -> ( Staged_ledger.Scan_state.t
+       * Ledger_hash.t
+       * Pending_coinbase.t
+       * Coda_state.Protocol_state.value list )
        Option.t
 
   val get_transition_chain :
@@ -230,46 +239,6 @@ module type Sync_handler_intf = sig
   module Root :
     Consensus_best_tip_prover_intf
     with type transition_frontier := transition_frontier
-
-  (** Allows a node to ask peers for their best tip in order to help them
-      bootstrap *)
-  module Bootstrappable_best_tip : sig
-    include
-      Consensus_best_tip_prover_intf
-      with type transition_frontier := transition_frontier
-
-    module For_tests : sig
-      val prove :
-           logger:Logger.t
-        -> should_select_tip:(   existing:Consensus.Data.Consensus_state.Value.t
-                              -> candidate:Consensus.Data.Consensus_state.Value
-                                           .t
-                              -> logger:Logger.t
-                              -> bool)
-        -> frontier:transition_frontier
-        -> Consensus.Data.Consensus_state.Value.t
-        -> ( External_transition.t
-           , State_body_hash.t list * External_transition.t )
-           Proof_carrying_data.t
-           option
-
-      val verify :
-           logger:Logger.t
-        -> should_select_tip:(   existing:Consensus.Data.Consensus_state.Value.t
-                              -> candidate:Consensus.Data.Consensus_state.Value
-                                           .t
-                              -> logger:Logger.t
-                              -> bool)
-        -> verifier:Verifier.t
-        -> Consensus.Data.Consensus_state.Value.t
-        -> ( External_transition.t
-           , State_body_hash.t list * External_transition.t )
-           Proof_carrying_data.t
-        -> ( [`Root of External_transition.Initial_validated.t]
-           * [`Best_tip of External_transition.Initial_validated.t] )
-           Deferred.Or_error.t
-    end
-  end
 end
 
 module type Transition_chain_prover_intf = sig
@@ -303,6 +272,9 @@ module type Bootstrap_controller_intf = sig
     -> persistent_root:persistent_root
     -> persistent_frontier:persistent_frontier
     -> initial_root_transition:External_transition.Validated.t
+    -> genesis_state_hash:State_hash.t
+    -> genesis_ledger:Ledger.t Lazy.t
+    -> genesis_constants:Genesis_constants.t
     -> ( transition_frontier
        * External_transition.Initial_validated.t Envelope.Incoming.t list )
        Deferred.t
@@ -328,7 +300,7 @@ module type Transition_frontier_controller_intf = sig
     -> network_transition_reader:External_transition.Initial_validated.t
                                  Envelope.Incoming.t
                                  Strict_pipe.Reader.t
-    -> proposer_transition_reader:breadcrumb Strict_pipe.Reader.t
+    -> producer_transition_reader:breadcrumb Strict_pipe.Reader.t
     -> clear_reader:[`Clear] Strict_pipe.Reader.t
     -> External_transition.Validated.t Strict_pipe.Reader.t
 end
@@ -343,7 +315,8 @@ module type Initial_validator_intf = sig
     -> trust_system:Trust_system.t
     -> transition_reader:( [ `Transition of
                              external_transition Envelope.Incoming.t ]
-                         * [`Time_received of Block_time.t] )
+                         * [`Time_received of Block_time.t]
+                         * [`Valid_cb of bool -> unit] )
                          Strict_pipe.Reader.t
     -> valid_transition_writer:( [ `Transition of
                                    external_transition_with_initial_validation
@@ -352,6 +325,8 @@ module type Initial_validator_intf = sig
                                , Strict_pipe.crash Strict_pipe.buffered
                                , unit )
                                Strict_pipe.Writer.t
+    -> genesis_state_hash:State_hash.t
+    -> genesis_constants:Genesis_constants.t
     -> unit
 end
 
@@ -371,10 +346,11 @@ module type Transition_router_intf = sig
     -> trust_system:Trust_system.t
     -> verifier:Verifier.t
     -> network:network
+    -> is_seed:bool
     -> time_controller:Block_time.Controller.t
     -> consensus_local_state:Consensus.Data.Local_state.t
-    -> persistent_root:transition_frontier_persistent_root
-    -> persistent_frontier:transition_frontier_persistent_frontier
+    -> persistent_root_location:string
+    -> persistent_frontier_location:string
     -> frontier_broadcast_pipe:transition_frontier option
                                Pipe_lib.Broadcast_pipe.Reader.t
                                * transition_frontier option
@@ -382,10 +358,18 @@ module type Transition_router_intf = sig
     -> network_transition_reader:( [ `Transition of
                                      External_transition.t Envelope.Incoming.t
                                    ]
-                                 * [`Time_received of Block_time.t] )
+                                 * [`Time_received of Block_time.t]
+                                 * [`Valid_cb of bool -> unit] )
                                  Strict_pipe.Reader.t
-    -> proposer_transition_reader:breadcrumb Strict_pipe.Reader.t
-    -> most_recent_valid_block:External_transition.t Broadcast_pipe.Reader.t
-                               * External_transition.t Broadcast_pipe.Writer.t
-    -> External_transition.Validated.t Strict_pipe.Reader.t
+    -> producer_transition_reader:breadcrumb Strict_pipe.Reader.t
+    -> most_recent_valid_block:External_transition.Initial_validated.t
+                               Broadcast_pipe.Reader.t
+                               * External_transition.Initial_validated.t
+                                 Broadcast_pipe.Writer.t
+    -> constraint_constants:Genesis_constants.Constraint_constants.t
+    -> precomputed_values:Precomputed_values.t
+    -> ( [`Transition of External_transition.Validated.t]
+       * [`Source of [`Gossip | `Catchup | `Internal]] )
+       Strict_pipe.Reader.t
+       * unit Ivar.t
 end

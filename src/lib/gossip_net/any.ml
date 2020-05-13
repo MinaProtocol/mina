@@ -42,8 +42,6 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
 
   let initial_peers (Any ((module M), t)) = M.initial_peers t
 
-  let peers_by_ip (Any ((module M), t)) = M.peers_by_ip t
-
   let random_peers (Any ((module M), t)) = M.random_peers t
 
   let random_peers_except (Any ((module M), t)) = M.random_peers_except t
@@ -52,9 +50,9 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
 
   let query_random_peers (Any ((module M), t)) = M.query_random_peers t
 
-  let broadcast (Any ((module M), t)) = M.broadcast t
+  let ip_for_peer (Any ((module M), t)) = M.ip_for_peer t
 
-  let broadcast_all (Any ((module M), t)) = M.broadcast_all t
+  let broadcast (Any ((module M), t)) = M.broadcast t
 
   let on_first_connect (Any ((module M), t)) = M.on_first_connect t
 

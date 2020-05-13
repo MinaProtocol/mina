@@ -24,11 +24,13 @@ RUN sudo apt-get update && sudo apt-get install --yes \
     libgmp-dev \
     libgmp3-dev \
     libjemalloc-dev \
+    libpq-dev \
     libprocps-dev \
     libsodium-dev \
     libssl-dev \
     lsb \
     m4 \
+    nodejs \
     pandoc \
     patchelf \
     python \
@@ -36,11 +38,14 @@ RUN sudo apt-get update && sudo apt-get install --yes \
     pkg-config \
     python-jinja2 \
     python-pip \
+    python3-pip \
     rubygems \
     zlib1g-dev \
     libbz2-dev
 
-RUN sudo pip install sexpdata awscli
+RUN sudo pip install awscli readchar
+
+RUN sudo pip3 install sexpdata
 
 RUN sudo gem install deb-s3
 
@@ -54,6 +59,12 @@ RUN export CLOUD_SDK_REPO="cloud-sdk-$(lsb_release -c -s)" && \
     echo "deb http://packages.cloud.google.com/apt $CLOUD_SDK_REPO main" | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list && \
     curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add - && \
     sudo apt-get update -y && sudo apt-get install google-cloud-sdk -y
+
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs -o /tmp/rust_install.sh
+RUN chmod +x /tmp/rust_install.sh
+RUN /tmp/rust_install.sh -y
+RUN export PATH="$PATH:$HOME/.cargo/bin"
+RUN echo 'export PATH="$PATH:$HOME/.cargo/bin"' >> /home/opam/.bashrc
 
 # Source copy of rocksdb
 RUN sudo git clone https://github.com/facebook/rocksdb -b v5.17.2 /rocksdb
@@ -87,22 +98,9 @@ RUN opam update -y && opam upgrade -y
 # install vanilla OCaml compiler
 RUN opam switch create $OCAML_VERSION
 
-# install, use spacetime OCaml compiler
-RUN opam switch create $OCAML_VERSION+spacetime
-RUN eval $(opam env)
-
-# Install OPAM packages for spacetime compiler; use ulimited stack for camlp4 build
-ADD /src/opam.export .
-RUN ulimit -s unlimited && opam switch import opam.export
-
 # Remove .git files for submodules
 RUN for pkg in async_kernel digestif graphql_ppx ocaml-extlib rpc_parallel ; do \
       sudo rm -f $EXTERNAL_PKG_DIR/$pkg/.git ; \
-    done
-
-# Pin packages for spacetime compiler
-RUN for pkg in ocaml-sodium rpc_parallel ocaml-extlib digestif async_kernel coda_base58 graphql_ppx ; do \
-      cd $EXTERNAL_PKG_DIR/$pkg && opam pin -y add . ; \
     done
 
 # use vanilla OCaml compiler
@@ -110,6 +108,7 @@ RUN opam switch $OCAML_VERSION
 RUN eval $(opam env)
 
 # Install OPAM packages for vanilla compiler
+ADD /src/opam.export .
 RUN opam switch import opam.export ; rm opam.export
 
 # Pin packages for vanilla compiler
@@ -117,14 +116,27 @@ RUN for pkg in ocaml-sodium rpc_parallel ocaml-extlib digestif async_kernel coda
       cd $EXTERNAL_PKG_DIR/$pkg && opam pin -y add . ; \
     done
 
-# repo no longer needed
-RUN sudo rm -rf /coda
+# Install nix
 
-# Get coda-kademlia from packages repo
-RUN sudo apt-get install --yes apt-transport-https ca-certificates && \
-      echo "deb [trusted=yes] https://packages.o1test.net unstable main" | sudo tee -a /etc/apt/sources.list.d/coda.list && \
-      sudo apt-get update && \
-      sudo apt-get install --yes coda-discovery
+RUN mkdir --mode=700 /home/opam/.gnupg
+RUN echo "disable-ipv6" >> /home/opam/.gnupg/dirmngr.conf
+
+RUN sudo apt-get install gnupg2 && curl -o install-nix-2.3.2 https://releases.nixos.org/nix/nix-2.3.3/install && \
+    curl -o install-nix-2.3.2.asc https://releases.nixos.org/nix/nix-2.3.3/install.asc && \
+    gpg2 --import < $CODA_DIR/.nix-key.gpg.asc && \
+    gpg2 --recv-keys B541D55301270E0BCF15CA5D8170B4726D7198DE && \
+    gpg2 --verify ./install-nix-2.3.2.asc && \
+    sh ./install-nix-2.3.2 && \
+    USER=opam . ~/.nix-profile/etc/profile.d/nix.sh && \
+    nix-env --option sandbox false -iA cachix -f https://cachix.org/api/v1/install
+
+# we used to delete the repo here
+# we now leave it intact, in case updating OPAM in CI requires pinned package sources
+
+# TEMP HACK (for libp2p_helper nixless builds)
+RUN sudo apt-get install --yes wget 
+RUN cd /usr/lib && sudo wget https://dl.google.com/go/go1.13.10.linux-amd64.tar.gz && sudo tar -xvf go1.13.10.linux-amd64.tar.gz && sudo rm go1.13.10.linux-amd64.tar.gz
+RUN echo 'export PATH="$PATH:/usr/lib/go/bin"' >> /home/opam/.bashrc
 
 # The Ocaml images are set to London time for reason. UTC makes reading the logs
 # easier.

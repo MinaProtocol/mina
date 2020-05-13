@@ -18,7 +18,13 @@ open Core_kernel
 module type S = sig
   type key
 
-  type key_set
+  type token_id
+
+  type token_id_set
+
+  type account_id
+
+  type account_id_set
 
   type account
 
@@ -35,7 +41,10 @@ module type S = sig
     with module Addr = Location.Addr
     with module Location = Location
     with type key := key
-     and type key_set := key_set
+     and type token_id := token_id
+     and type token_id_set := token_id_set
+     and type account_id := account_id
+     and type account_id_set := account_id_set
      and type hash := hash
      and type root_hash := hash
      and type account := account
@@ -55,8 +64,11 @@ module Make_base (Inputs : Inputs_intf) :
   S
   with module Location = Inputs.Location
   with type key := Inputs.Key.t
+   and type token_id := Inputs.Token_id.t
+   and type token_id_set := Inputs.Token_id.Set.t
+   and type account_id := Inputs.Account_id.t
    and type hash := Inputs.Hash.t
-   and type key_set := Inputs.Key.Set.t
+   and type account_id_set := Inputs.Account_id.Set.t
    and type account := Inputs.Account.t = struct
   open Inputs
   module Location = Location
@@ -65,8 +77,11 @@ module Make_base (Inputs : Inputs_intf) :
     Base_ledger_intf.S
     with module Addr = Location.Addr
     with module Location = Location
-    with type key := Key.t
-     and type key_set := Key.Set.t
+    with type key := Inputs.Key.t
+     and type token_id := Inputs.Token_id.t
+     and type token_id_set := Inputs.Token_id.Set.t
+     and type account_id := Account_id.t
+     and type account_id_set := Account_id.Set.t
      and type hash := Hash.t
      and type root_hash := Hash.t
      and type account := Account.t
@@ -107,7 +122,8 @@ module Make_base (Inputs : Inputs_intf) :
 
     let merkle_root (T ((module Base), t)) = Base.merkle_root t
 
-    let index_of_key_exn (T ((module Base), t)) = Base.index_of_key_exn t
+    let index_of_account_exn (T ((module Base), t)) =
+      Base.index_of_account_exn t
 
     let set_at_index_exn (T ((module Base), t)) = Base.set_at_index_exn t
 
@@ -131,19 +147,25 @@ module Make_base (Inputs : Inputs_intf) :
     let get_or_create_account (T ((module Base), t)) =
       Base.get_or_create_account t
 
-    let location_of_key (T ((module Base), t)) = Base.location_of_key t
+    let location_of_account (T ((module Base), t)) = Base.location_of_account t
 
     let fold_until (T ((module Base), t)) = Base.fold_until t
 
-    let keys (T ((module Base), t)) = Base.keys t
+    let accounts (T ((module Base), t)) = Base.accounts t
+
+    let token_owner (T ((module Base), t)) tid = Base.token_owner t tid
+
+    let tokens (T ((module Base), t)) pk = Base.tokens t pk
+
+    let token_owners (T ((module Base), t)) = Base.token_owners t
 
     let iteri (T ((module Base), t)) = Base.iteri t
 
     (* ignored_keys must be Base.Keys.Set.t, but that isn't necessarily the same as Keys.Set.t for the
        Keys passed to this functor; as long as we use the same Keys for all ledgers, this should work
      *)
-    let foldi_with_ignored_keys (T ((module Base), t)) =
-      Base.foldi_with_ignored_keys t
+    let foldi_with_ignored_accounts (T ((module Base), t)) =
+      Base.foldi_with_ignored_accounts t
 
     let foldi (T ((module Base), t)) = Base.foldi t
 
@@ -172,6 +194,6 @@ module Make_base (Inputs : Inputs_intf) :
 
     (* This better be the same depth inside Base or you're going to have a bad
      * time *)
-    let depth = Depth.depth
+    let depth (T ((module Base), t)) = Base.depth t
   end
 end

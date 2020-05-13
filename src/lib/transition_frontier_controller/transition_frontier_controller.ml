@@ -5,7 +5,8 @@ open O1trace
 
 let run ~logger ~trust_system ~verifier ~network ~time_controller
     ~collected_transitions ~frontier ~network_transition_reader
-    ~proposer_transition_reader ~clear_reader =
+    ~producer_transition_reader ~clear_reader ~constraint_constants
+    ~genesis_constants =
   let valid_transition_pipe_capacity = 30 in
   let valid_transition_reader, valid_transition_writer =
     Strict_pipe.create ~name:"valid transitions"
@@ -30,12 +31,6 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
     Strict_pipe.create ~name:"catchup breadcrumbs"
       (Buffered (`Capacity 30, `Overflow Crash))
   in
-  let proposer_transition_reader_copy, proposer_transition_writer_copy =
-    Strict_pipe.create ~name:"block producer transition copy" Synchronous
-  in
-  Strict_pipe.transfer_while_writer_alive proposer_transition_reader
-    proposer_transition_writer_copy ~f:Fn.id
-  |> don't_wait_for ;
   let unprocessed_transition_cache =
     Transition_handler.Unprocessed_transition_cache.create ~logger
   in
@@ -55,9 +50,9 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
   |> don't_wait_for ;
   let clean_up_catchup_scheduler = Ivar.create () in
   trace_recurring "processor" (fun () ->
-      Transition_handler.Processor.run ~logger ~time_controller ~trust_system
-        ~verifier ~frontier ~primary_transition_reader
-        ~proposer_transition_reader:proposer_transition_reader_copy
+      Transition_handler.Processor.run ~logger ~constraint_constants
+        ~genesis_constants ~time_controller ~trust_system ~verifier ~frontier
+        ~primary_transition_reader ~producer_transition_reader
         ~clean_up_catchup_scheduler ~catchup_job_writer
         ~catchup_breadcrumbs_reader ~catchup_breadcrumbs_writer
         ~processed_transition_writer ) ;
@@ -72,7 +67,6 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
       kill processed_transition_writer ;
       kill catchup_job_writer ;
       kill catchup_breadcrumbs_writer ;
-      kill proposer_transition_writer_copy ;
       Ivar.fill clean_up_catchup_scheduler () )
   |> don't_wait_for ;
   processed_transition_reader

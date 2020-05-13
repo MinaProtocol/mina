@@ -3,91 +3,32 @@ open Core
 
 open Coda_base
 
-module type Numeric_intf = sig
+module Make_numeric (Input : sig
   type t
 
-  val num_bits : int
+  val of_string : string -> t
 
-  val zero : t
+  val to_string : t -> string
 
-  val one : t
+  val of_int : int -> t
+end) : sig
+  type t = Input.t
 
-  val ( lsl ) : t -> int -> t
+  val serialize : t -> Yojson.Basic.json
 
-  val ( lsr ) : t -> int -> t
-
-  val ( land ) : t -> t -> t
-
-  val ( lor ) : t -> t -> t
-
-  val ( = ) : t -> t -> bool
-end
-
-module type Binary_intf = sig
-  type t
-
-  val to_bits : t -> bool list
-
-  val of_bits : bool list -> t
-end
-
-module Bitstring : sig
-  type t = private string
-
-  val of_numeric : (module Numeric_intf with type t = 'a) -> 'a -> t
-
-  val to_numeric : (module Numeric_intf with type t = 'a) -> t -> 'a
-
-  val to_bitstring : (module Binary_intf with type t = 'a) -> 'a -> t
-
-  val of_bitstring : (module Binary_intf with type t = 'a) -> t -> 'a
-
-  val to_yojson : t -> Yojson.Basic.json
-
-  val of_yojson : Yojson.Basic.json -> t
+  val deserialize : Yojson.Basic.json -> t
 end = struct
-  type t = string
+  open Input
 
-  let to_string =
-    Fn.compose String.of_char_list
-      (List.map ~f:(fun bit -> if bit then '1' else '0'))
+  type nonrec t = t
 
-  let of_string_exn : t -> bool list =
-    Fn.compose
-      (List.map ~f:(function
-        | '1' ->
-            true
-        | '0' ->
-            false
-        | bad_char ->
-            failwithf !"Unexpected char: %c" bad_char () ))
-      String.to_list
+  let serialize (t : t) = `String (to_string t)
 
-  let to_bitstring (type t) (module Binary : Binary_intf with type t = t)
-      (value : t) =
-    to_string @@ Binary.to_bits value
-
-  let of_bitstring (type t) (module Binary : Binary_intf with type t = t) bits
-      =
-    Binary.of_bits @@ of_string_exn bits
-
-  let of_numeric (type t) (module Numeric : Numeric_intf with type t = t)
-      (value : t) =
-    let open Numeric in
-    to_string @@ List.init num_bits ~f:(fun i -> (value lsr i) land one = one)
-
-  let to_numeric (type num) (module Numeric : Numeric_intf with type t = num)
-      (bitstring : t) =
-    let open Numeric in
-    of_string_exn bitstring
-    |> List.fold_right ~init:Numeric.zero ~f:(fun bool acc_num ->
-           (acc_num lsl 1) lor if bool then one else zero )
-
-  let to_yojson t = `String t
-
-  let of_yojson = function
-    | `String value ->
-        value
+  let deserialize = function
+    | `String (value : string) ->
+        of_string value
+    | `Int (value : int) ->
+        of_int value
     | _ ->
         failwith "Expected Yojson string"
 end
@@ -110,31 +51,19 @@ module User_command_type = struct
         raise (Invalid_argument "Unexpected input to decode user command type")
 end
 
-module Make_Bitstring_converters (Bit : Binary_intf) = struct
-  open Bitstring
+module Fee = Make_numeric (Currency.Fee)
+module Amount = Make_numeric (Currency.Amount)
+module Nonce = Make_numeric (Account.Nonce)
+module Length = Make_numeric (Coda_numbers.Length)
 
-  let serialize amount = to_yojson @@ to_bitstring (module Bit) amount
+module Block_time = Make_numeric (struct
+  type t = Block_time.t
 
-  let deserialize yojson = of_bitstring (module Bit) @@ of_yojson yojson
-end
+  let to_string = Block_time.to_string
 
-module Fee = Make_Bitstring_converters (Currency.Fee)
-module Amount = Make_Bitstring_converters (Currency.Amount)
-module Nonce = Make_Bitstring_converters (Account.Nonce)
-module Length = Make_Bitstring_converters (Coda_numbers.Length)
+  let of_string = Block_time.of_string_exn
 
-module Block_time = struct
-  let serialize value =
-    Bitstring.to_yojson
-    @@ Bitstring.of_numeric (module Int64)
-    @@ Block_time.to_int64 value
+  let of_int = Fn.compose Block_time.of_int64 Int64.of_int
+end)
 
-  let deserialize value =
-    Block_time.of_int64
-    @@ Bitstring.to_numeric (module Int64)
-    @@ Bitstring.of_yojson value
-end
-
-let deserialize_optional_block_time = Option.map ~f:Bitstring.of_yojson
-
-let decode_optional_block_time = Option.map ~f:Block_time.deserialize
+let deserialize_optional_block_time = Option.map ~f:Block_time.deserialize

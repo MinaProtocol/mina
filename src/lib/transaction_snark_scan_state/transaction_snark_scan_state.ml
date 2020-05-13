@@ -1,7 +1,5 @@
 open Core_kernel
 open Coda_base
-open Module_version
-module Constants = Snark_params.Scan_state_constants
 
 let option lab =
   Option.value_map ~default:(Or_error.error_string lab) ~f:(fun x -> Ok x)
@@ -34,9 +32,10 @@ module Transaction_with_witness = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)
       type t =
-        { transaction_with_info: Transaction_logic.Undo.Stable.V1.t
+        { transaction_with_info:
+            Transaction_logic.Undo.Stable.V1.t
+            Transaction_protocol_state.Stable.V1.t
         ; statement: Transaction_snark.Statement.Stable.V1.t
         ; witness: Transaction_witness.Stable.V1.t sexp_opaque }
       [@@deriving sexp]
@@ -45,8 +44,9 @@ module Transaction_with_witness = struct
     end
   end]
 
+  (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)
   type t = Stable.Latest.t =
-    { transaction_with_info: Ledger.Undo.t
+    { transaction_with_info: Ledger.Undo.t Transaction_protocol_state.t
     ; statement: Transaction_snark.Statement.t
     ; witness: Transaction_witness.t sexp_opaque }
   [@@deriving sexp]
@@ -125,18 +125,20 @@ end
 
 type job = Available_job.t [@@deriving sexp]
 
+[%%versioned
 module Stable = struct
   module V1 = struct
-    module T = struct
-      type t =
-        ( Ledger_proof_with_sok_message.Stable.V1.t
-        , Transaction_with_witness.Stable.V1.t )
-        Parallel_scan.State.Stable.V1.t
-      [@@deriving sexp, bin_io, version]
-    end
+    type t =
+      ( Ledger_proof_with_sok_message.Stable.V1.t
+      , Transaction_with_witness.Stable.V1.t )
+      Parallel_scan.State.Stable.V1.t
+    [@@deriving sexp]
 
-    include T
-    include Registration.Make_latest_version (T)
+    let to_latest = Fn.id
+
+    (* TODO: Review this. The version bytes for the underlying types are
+       included in the hash, so it can never be stable between versions.
+    *)
 
     let hash t =
       let state_hash =
@@ -146,29 +148,8 @@ module Stable = struct
       in
       Staged_ledger_hash.Aux_hash.of_bytes
         (state_hash |> Digestif.SHA256.to_raw_string)
-
-    include Binable.Of_binable
-              (T)
-              (struct
-                type nonrec t = t
-
-                let to_binable = Fn.id
-
-                let of_binable = Fn.id
-              end)
   end
-
-  module Latest = V1
-
-  module Module_decl = struct
-    let name = "transaction_snark_scan_state"
-
-    type latest = Latest.t
-  end
-
-  module Registrar = Registration.Make (Module_decl)
-  module Registered_V1 = Registrar.Register (V1)
-end
+end]
 
 type t = Stable.Latest.t [@@deriving sexp]
 
@@ -184,7 +165,9 @@ let create_expected_statement
     Frozen_ledger_hash.of_ledger_hash
     @@ Sparse_ledger.merkle_root witness.ledger
   in
-  let%bind transaction = Ledger.Undo.transaction transaction_with_info in
+  let%bind transaction =
+    Ledger.Undo.transaction transaction_with_info.transaction
+  in
   let%bind after =
     Or_error.try_with (fun () ->
         Sparse_ledger.apply_transaction_exn witness.ledger transaction )
@@ -196,11 +179,17 @@ let create_expected_statement
     statement.pending_coinbase_stack_state.source
   in
   let pending_coinbase_after =
+    let pending_coinbase_with_state =
+      Option.value_map transaction_with_info.block_data
+        ~f:(fun sbh ->
+          Pending_coinbase.Stack.push_state sbh pending_coinbase_before )
+        ~default:pending_coinbase_before
+    in
     match transaction with
     | Coinbase c ->
-        Pending_coinbase.Stack.push pending_coinbase_before c
+        Pending_coinbase.Stack.push_coinbase c pending_coinbase_with_state
     | _ ->
-        pending_coinbase_before
+        pending_coinbase_with_state
   in
   let%bind fee_excess = Transaction.fee_excess transaction in
   let%map supply_increase = Transaction.supply_increase transaction in
@@ -347,7 +336,12 @@ struct
                   acc_statement transaction.statement
               else
                 M.return
-                @@ Or_error.error_string (write_error "Bad base statement") )
+                @@ Or_error.error_string
+                     (sprintf
+                        !"Bad base statement expected: \
+                          %{sexp:Transaction_snark.Statement.t} got: \
+                          %{sexp:Transaction_snark.Statement.t}"
+                        transaction.statement expected_statement) )
     in
     let res =
       Fold.fold_chronological_until tree ~init:None
@@ -457,14 +451,15 @@ let create ~work_delay ~transaction_capacity_log_2 =
   Parallel_scan.empty ~delay:work_delay ~max_base_jobs:k
 
 let empty () =
-  let open Constants in
-  create ~work_delay ~transaction_capacity_log_2
+  create ~work_delay:Coda_compile_config.work_delay
+    ~transaction_capacity_log_2:Coda_compile_config.transaction_capacity_log_2
 
 let extract_txns txns_with_witnesses =
   (* TODO: This type checks, but are we actually pulling the inverse txn here? *)
   List.map txns_with_witnesses
     ~f:(fun (txn_with_witness : Transaction_with_witness.t) ->
-      Ledger.Undo.transaction txn_with_witness.transaction_with_info
+      Ledger.Undo.transaction
+        txn_with_witness.transaction_with_info.transaction
       |> Or_error.ok_exn )
 
 let latest_ledger_proof t =
@@ -491,7 +486,7 @@ let target_merkle_root t =
 (*All the transactions in the order in which they were applied*)
 let staged_transactions t =
   List.map ~f:(fun (t : Transaction_with_witness.t) ->
-      t.transaction_with_info |> Ledger.Undo.transaction )
+      t.transaction_with_info.transaction |> Ledger.Undo.transaction )
   @@ Parallel_scan.pending_data t
   |> Or_error.all
 
@@ -499,7 +494,8 @@ let staged_transactions t =
 let staged_undos t : Staged_undos.t =
   List.map
     (Parallel_scan.pending_data t |> List.rev)
-    ~f:(fun (t : Transaction_with_witness.t) -> t.transaction_with_info)
+    ~f:(fun (t : Transaction_with_witness.t) ->
+      t.transaction_with_info.transaction )
 
 let partition_if_overflowing t =
   let bundle_count work_count = (work_count + 1) / 2 in
@@ -571,10 +567,11 @@ let all_work_pairs_exn t =
     match extract_from_job job with
     | First (transaction_with_info, statement, witness) ->
         let transaction =
-          Or_error.ok_exn @@ Ledger.Undo.transaction transaction_with_info
+          Or_error.ok_exn
+          @@ Ledger.Undo.transaction transaction_with_info.transaction
         in
         Snark_work_lib.Work.Single.Spec.Transition
-          (statement, transaction, witness)
+          (statement, {transaction_with_info with transaction}, witness)
     | Second (p1, p2) ->
         let merged =
           Transaction_snark.Statement.merge
@@ -626,3 +623,38 @@ let fill_work_and_enqueue_transactions t transactions work =
         else Or_error.error_string "Unexpected ledger proof emitted" )
   in
   (result_opt, updated_scan_state)
+
+let required_state_hashes _t =
+  (* TODO: when merging into #4244
+  List.map (Parallel_scan.pending_data t) ~f:(fun (t : Transaction_with_witness.t) -> ...*)
+  State_hash.Set.empty
+
+let check_required_protocol_states t ~protocol_states =
+  let open Or_error.Let_syntax in
+  let required_state_hashes = required_state_hashes t in
+  let check_length states =
+    let required = State_hash.Set.length required_state_hashes in
+    let received = List.length states in
+    if required = received then Or_error.return ()
+    else
+      Or_error.errorf
+        !"Required %d protocol states but received %d"
+        required received
+  in
+  (*Don't check further if the lengths dont match*)
+  let%bind () = check_length protocol_states in
+  let received_state_map =
+    List.fold protocol_states ~init:Coda_base.State_hash.Map.empty
+      ~f:(fun m ps ->
+        State_hash.Map.set m ~key:(Coda_state.Protocol_state.hash ps) ~data:ps
+    )
+  in
+  let protocol_states_assoc =
+    List.filter_map (State_hash.Set.to_list required_state_hashes)
+      ~f:(fun hash ->
+        let open Option.Let_syntax in
+        let%map state = State_hash.Map.find received_state_map hash in
+        (hash, state) )
+  in
+  let%map () = check_length protocol_states_assoc in
+  protocol_states_assoc

@@ -47,6 +47,8 @@ module Schema = struct
     | Root : Root_data.Minimal.t t
     | Best_tip : State_hash.t t
     | Frontier_hash : Frontier_hash.t t
+    | Protocol_states_for_root_scan_state
+        : Coda_state.Protocol_state.value list t
 
   let to_string : type a. a t -> string = function
     | Db_version ->
@@ -61,20 +63,24 @@ module Schema = struct
         "Best_tip"
     | Frontier_hash ->
         "Frontier_hash"
+    | Protocol_states_for_root_scan_state ->
+        "Protocol_states_for_root_scan_state"
 
   let binable_data_type (type a) : a t -> a Bin_prot.Type_class.t = function
     | Db_version ->
         [%bin_type_class: int]
     | Transition _ ->
-        [%bin_type_class: External_transition.Stable.V1.t]
+        [%bin_type_class: External_transition.Stable.Latest.t]
     | Arcs _ ->
-        [%bin_type_class: State_hash.Stable.V1.t list]
+        [%bin_type_class: State_hash.Stable.Latest.t list]
     | Root ->
-        [%bin_type_class: Root_data.Minimal.Stable.V1.t]
+        [%bin_type_class: Root_data.Minimal.Stable.Latest.t]
     | Best_tip ->
-        [%bin_type_class: State_hash.Stable.V1.t]
+        [%bin_type_class: State_hash.Stable.Latest.t]
     | Frontier_hash ->
-        [%bin_type_class: Frontier_hash.Stable.V1.t]
+        [%bin_type_class: Frontier_hash.Stable.Latest.t]
+    | Protocol_states_for_root_scan_state ->
+        [%bin_type_class: Coda_state.Protocol_state.Value.Stable.Latest.t list]
 
   (* HACK: a simple way to derive Bin_prot.Type_class.t for each case of a GADT *)
   let gadt_input_type_class (type data a) :
@@ -109,12 +115,12 @@ module Schema = struct
           ~of_gadt:(fun Db_version -> "db_version")
     | Transition _ ->
         gadt_input_type_class
-          (module Keys.Prefixed_state_hash.Stable.V1)
+          (module Keys.Prefixed_state_hash.Stable.Latest)
           ~to_gadt:(fun (_, hash) -> Transition hash)
           ~of_gadt:(fun (Transition hash) -> ("transition", hash))
     | Arcs _ ->
         gadt_input_type_class
-          (module Keys.Prefixed_state_hash.Stable.V1)
+          (module Keys.Prefixed_state_hash.Stable.Latest)
           ~to_gadt:(fun (_, hash) -> Arcs hash)
           ~of_gadt:(fun (Arcs hash) -> ("arcs", hash))
     | Root ->
@@ -132,6 +138,12 @@ module Schema = struct
           (module Keys.String)
           ~to_gadt:(fun _ -> Frontier_hash)
           ~of_gadt:(fun Frontier_hash -> "frontier_hash")
+    | Protocol_states_for_root_scan_state ->
+        gadt_input_type_class
+          (module Keys.String)
+          ~to_gadt:(fun _ -> Protocol_states_for_root_scan_state)
+          ~of_gadt:(fun Protocol_states_for_root_scan_state ->
+            "protocol_states_in_root_scan_state" )
 end
 
 module Error = struct
@@ -145,7 +157,8 @@ module Error = struct
     | `New_root_transition
     | `Old_root_transition
     | `Transition of State_hash.t
-    | `Arcs of State_hash.t ]
+    | `Arcs of State_hash.t
+    | `Protocol_states_for_root_scan_state ]
 
   type not_found = [`Not_found of not_found_member]
 
@@ -174,6 +187,8 @@ module Error = struct
           ("transition", Some hash)
       | `Arcs hash ->
           ("arcs", Some hash)
+      | `Protocol_states_for_root_scan_state ->
+          ("protocol states in root scan state", None)
     in
     let additional_context =
       Option.map member_id ~f:(fun id ->
@@ -211,80 +226,115 @@ let get_if_exists db ~default ~key =
 let get db ~key ~error =
   match get db ~key with Some x -> Ok x | None -> Error error
 
-(* TODO: batch reads might be nice *)
+(* TODO: check that best tip is connected to root *)
+(* TODO: check for garbage *)
 let check t =
-  match get_if_exists t.db ~key:Db_version ~default:0 with
-  | 0 ->
-      Error `Not_initialized
-  | v when v = version ->
-      let%bind root =
-        get t.db ~key:Root ~error:(`Corrupt (`Not_found `Root))
-      in
-      let%bind best_tip =
-        get t.db ~key:Best_tip ~error:(`Corrupt (`Not_found `Best_tip))
-      in
-      let%bind _ =
-        get t.db ~key:Frontier_hash
-          ~error:(`Corrupt (`Not_found `Frontier_hash))
-      in
-      let%bind _ =
-        get t.db ~key:(Transition root.hash)
-          ~error:(`Corrupt (`Not_found `Root_transition))
-      in
-      let%map _ =
-        get t.db ~key:(Transition best_tip)
-          ~error:(`Corrupt (`Not_found `Best_tip_transition))
-      in
-      (* TODO: crawl from root and validate tree structure is not malformed (#3737) *)
-      ()
-  | _ ->
-      Error `Invalid_version
+  let check_version () =
+    match get_if_exists t.db ~key:Db_version ~default:0 with
+    | 0 ->
+        Error `Not_initialized
+    | v when v = version ->
+        Ok ()
+    | _ ->
+        Error `Invalid_version
+  in
+  (* checks the pointers, frontier hash, and checks pointer references *)
+  let check_base () =
+    let%bind root = get t.db ~key:Root ~error:(`Corrupt (`Not_found `Root)) in
+    let root_hash = Root_data.Minimal.hash root in
+    let%bind best_tip =
+      get t.db ~key:Best_tip ~error:(`Corrupt (`Not_found `Best_tip))
+    in
+    let%bind _ =
+      get t.db ~key:Frontier_hash ~error:(`Corrupt (`Not_found `Frontier_hash))
+    in
+    let%bind _ =
+      get t.db ~key:(Transition root_hash)
+        ~error:(`Corrupt (`Not_found `Root_transition))
+    in
+    let%bind _ =
+      get t.db ~key:Protocol_states_for_root_scan_state
+        ~error:(`Corrupt (`Not_found `Protocol_states_for_root_scan_state))
+    in
+    let%map _ =
+      get t.db ~key:(Transition best_tip)
+        ~error:(`Corrupt (`Not_found `Best_tip_transition))
+    in
+    root_hash
+  in
+  let rec check_arcs pred_hash =
+    let%bind successors =
+      get t.db ~key:(Arcs pred_hash)
+        ~error:(`Corrupt (`Not_found (`Arcs pred_hash)))
+    in
+    List.fold successors ~init:(Ok ()) ~f:(fun acc succ_hash ->
+        let%bind () = acc in
+        let%bind _ =
+          get t.db ~key:(Transition succ_hash)
+            ~error:(`Corrupt (`Not_found (`Transition succ_hash)))
+        in
+        check_arcs succ_hash )
+  in
+  let%bind () = check_version () in
+  let%bind root_hash = check_base () in
+  check_arcs root_hash
 
 let initialize t ~root_data ~base_hash =
-  let open Root_data.Limited.Stable.Latest in
+  let open Root_data.Limited in
   let {With_hash.hash= root_state_hash; data= root_transition}, _ =
-    External_transition.Validated.erase root_data.transition
+    External_transition.Validated.erase (transition root_data)
   in
   Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
-    ~metadata:[("root_state_hash", State_hash.to_yojson root_state_hash)]
-    "Initializing persistent frontier database with $minimal_root_data" ;
+    ~metadata:
+      [ ("root_data", Root_data.Limited.to_yojson root_data)
+      ; ("frontier_hash", Frontier_hash.to_yojson base_hash) ]
+    "Initializing persistent frontier database with $root_data and \
+     $frontier_hash" ;
   Batch.with_batch t.db ~f:(fun batch ->
       Batch.set batch ~key:Db_version ~data:version ;
       Batch.set batch ~key:(Transition root_state_hash) ~data:root_transition ;
       Batch.set batch ~key:(Arcs root_state_hash) ~data:[] ;
       Batch.set batch ~key:Root ~data:(Root_data.Minimal.of_limited root_data) ;
       Batch.set batch ~key:Best_tip ~data:root_state_hash ;
-      Batch.set batch ~key:Frontier_hash ~data:base_hash )
+      Batch.set batch ~key:Frontier_hash ~data:base_hash ;
+      Batch.set batch ~key:Protocol_states_for_root_scan_state
+        ~data:(List.unzip (protocol_states root_data) |> snd) )
 
 let add t ~transition =
   let parent_hash = External_transition.Validated.parent_hash transition in
   let {With_hash.hash; data= raw_transition}, _ =
     External_transition.Validated.erase transition
   in
-  let%map () =
+  let%bind () =
     Result.ok_if_true
       (mem t.db ~key:(Transition parent_hash))
       ~error:(`Not_found `Parent_transition)
   in
-  let parent_arcs = get_if_exists t.db ~key:(Arcs parent_hash) ~default:[] in
+  let%map parent_arcs =
+    get t.db ~key:(Arcs parent_hash) ~error:(`Not_found (`Arcs parent_hash))
+  in
   Batch.with_batch t.db ~f:(fun batch ->
       Batch.set batch ~key:(Transition hash) ~data:raw_transition ;
+      Batch.set batch ~key:(Arcs hash) ~data:[] ;
       Batch.set batch ~key:(Arcs parent_hash) ~data:(hash :: parent_arcs) )
 
 let move_root t ~new_root ~garbage =
-  let open Root_data.Minimal.Stable.V1 in
+  let open Root_data.Limited in
   let%bind () =
     Result.ok_if_true
-      (mem t.db ~key:(Transition new_root.hash))
+      (mem t.db ~key:(Transition (hash new_root)))
       ~error:(`Not_found `New_root_transition)
   in
   let%map old_root =
     get t.db ~key:Root ~error:(`Not_found `Old_root_transition)
   in
+  let old_root_hash = Root_data.Minimal.hash old_root in
   (* TODO: Result compatible rocksdb batch transaction *)
   Batch.with_batch t.db ~f:(fun batch ->
-      Batch.set batch ~key:Root ~data:new_root ;
-      List.iter (old_root.hash :: garbage) ~f:(fun node_hash ->
+      Batch.set batch ~key:Root ~data:(Root_data.Minimal.of_limited new_root) ;
+      Batch.set batch ~key:Protocol_states_for_root_scan_state
+        ~data:(List.map ~f:snd (protocol_states new_root)) ;
+      List.iter (old_root_hash :: garbage) ~f:(fun node_hash ->
           (* because we are removing entire forks of the tree, there is
            * no need to have extra logic to any remove arcs to the node
            * we are deleting since there we are deleting all of a node's
@@ -292,7 +342,7 @@ let move_root t ~new_root ~garbage =
            *)
           Batch.remove batch ~key:(Transition node_hash) ;
           Batch.remove batch ~key:(Arcs node_hash) ) ) ;
-  old_root.hash
+  old_root_hash
 
 let get_transition t hash =
   let%map transition =
@@ -309,9 +359,13 @@ let get_arcs t hash =
 
 let get_root t = get t.db ~key:Root ~error:(`Not_found `Root)
 
+let get_protocol_states_for_root_scan_state t =
+  get t.db ~key:Protocol_states_for_root_scan_state
+    ~error:(`Not_found `Protocol_states_for_root_scan_state)
+
 let get_root_hash t =
   let%map root = get_root t in
-  root.hash
+  Root_data.Minimal.hash root
 
 let get_best_tip t = get t.db ~key:Best_tip ~error:(`Not_found `Best_tip)
 

@@ -4,3 +4,8 @@ build: [
   ["dune" "build" "--only" "src" "--root" "." "-j" jobs "@install"]
 ]
 
+depends: [
+  "caqti"
+  "caqti-async"
+  "caqti-driver-postgresql"
+]

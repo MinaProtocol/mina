@@ -12,7 +12,10 @@ module type Inputs_intf = sig
      and type location := Location.t
      and type hash := Hash.t
      and type key := Key.t
-     and type key_set := Key.Set.t
+     and type token_id := Token_id.t
+     and type token_id_set := Token_id.Set.t
+     and type account_id := Account_id.t
+     and type account_id_set := Account_id.Set.t
      and type parent := Base.t
 
   val mask_to_base : Mask.Attached.t -> Base.t
@@ -145,19 +148,15 @@ module Make (Inputs : Inputs_intf) = struct
     Uuid.Table.add_multi registered_masks ~key:(get_uuid t) ~data:attached_mask ;
     attached_mask
 
-  let rec unregister_mask_exn ?(grandchildren = `Check) (t : t)
+  let rec unregister_mask_exn ?(grandchildren = `Check)
       (mask : Mask.Attached.t) : Mask.unattached =
-    let t_uuid = get_uuid t in
+    let parent_uuid = Mask.Attached.get_parent mask |> get_uuid in
     let error_msg suffix =
       sprintf "Couldn't unregister mask with UUID %s from parent %s, %s"
         (Mask.Attached.get_uuid mask |> Uuid.to_string_hum)
-        (get_uuid t |> Uuid.to_string_hum)
+        (Uuid.to_string_hum parent_uuid)
         suffix
     in
-    [%test_result: Uuid.t]
-      ~message:"parent in param should be parent in data structure"
-      ~expect:t_uuid
-      (Mask.Attached.get_parent mask |> get_uuid) ;
     ( match grandchildren with
     | `Check -> (
       match Hashtbl.find registered_masks (Mask.Attached.get_uuid mask) with
@@ -173,16 +172,15 @@ module Make (Inputs : Inputs_intf) = struct
         ()
     | `Recursive ->
         (* You must not retain any references to children of the mask we're
-         unregistering if you pass `Recursive, so this is only used in
-         with_ephemeral_ledger. *)
+           unregistering if you pass `Recursive, so this is only used in
+           with_ephemeral_ledger. *)
         List.iter
           ( Hashtbl.find registered_masks (Mask.Attached.get_uuid mask)
           |> Option.value ~default:[] )
           ~f:(fun child_mask ->
-            ignore
-            @@ unregister_mask_exn ~grandchildren:`Recursive
-                 (mask_to_base mask) child_mask ) ) ;
-    match Uuid.Table.find registered_masks t_uuid with
+            ignore @@ unregister_mask_exn ~grandchildren:`Recursive child_mask
+            ) ) ;
+    match Uuid.Table.find registered_masks parent_uuid with
     | None ->
         failwith @@ error_msg "parent not in registered_masks"
     | Some masks ->
@@ -197,10 +195,10 @@ module Make (Inputs : Inputs_intf) = struct
             match good with
             | [] ->
                 (* no other masks for this maskable *)
-                Uuid.Table.remove registered_masks t_uuid
+                Uuid.Table.remove registered_masks parent_uuid
             | other_masks ->
-                Uuid.Table.set registered_masks ~key:t_uuid ~data:other_masks )
-        ) ;
+                Uuid.Table.set registered_masks ~key:parent_uuid
+                  ~data:other_masks ) ) ;
         Mask.Attached.unset_parent mask
 
   (** a set calls the Base implementation set, notifies registered mask childen *)
@@ -224,9 +222,9 @@ module Make (Inputs : Inputs_intf) = struct
     let dangling_masks =
       List.map children ~f:(fun c ->
           unregister_mask_exn
-            ~grandchildren:`I_promise_I_am_reparenting_this_mask t c )
+            ~grandchildren:`I_promise_I_am_reparenting_this_mask c )
     in
-    ignore (unregister_mask_exn parent t_as_mask) ;
+    ignore (unregister_mask_exn t_as_mask) ;
     List.iter dangling_masks ~f:(fun m -> ignore (register_mask parent m))
 
   let batch_notify_mask_children t accounts =

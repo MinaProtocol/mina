@@ -1,4 +1,4 @@
-open Signature_lib
+open Coda_base
 
 module type Pagination = sig
   type time
@@ -9,16 +9,20 @@ module type Pagination = sig
 
   type t
 
-  (** [get_total_values t public_key] returns all values that pertains to
-      [public_key] if [public_key] is some value. Otherwise, it will return
+  (** [get_total_values t account_id] returns all values that pertains to
+      [account_id] if [account_id] is some value. Otherwise, it will return
       all values in the pagination data structure if none are provided *)
-  val get_all_values : t -> Public_key.Compressed.t option -> value list
+  val get_all_values : t -> Account_id.t option -> value list
 
-  (** [get_total_values t public_key] returns the number of values that
-      pertains to [public_key] if [public_key] is some value. Otherwise, it
+  (** [get_total_values t account_id] returns the number of values that
+      pertains to [account_id] if [account_id] is some value. Otherwise, it
       will return the number of total values in the pagination data structure
       if none are provided *)
-  val get_total_values : t -> Public_key.Compressed.t option -> int option
+  val get_total_values : t -> Account_id.t option -> int option
+
+  (** [get_value t cursor] returns the value corresponding with the provided
+      cursor, if it can be found *)
+  val get_value : t -> cursor -> value option
 
   (** [query t pk cursor n] makes a pagination query based on different inputs.
       If [cursor] is some value and the underlying pagination data structure
@@ -43,7 +47,7 @@ module type Pagination = sig
        t
     -> navigation:[`Earlier | `Later]
     -> cursor:cursor option
-    -> value_filter_specification:[`All | `User_only of Public_key.Compressed.t]
+    -> value_filter_specification:[`All | `User_only of Account_id.t]
     -> num_items:int option
     -> value list * [`Has_earlier_page of bool] * [`Has_later_page of bool]
 end

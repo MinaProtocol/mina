@@ -11,7 +11,7 @@ end
 type t = Stable.V1.t
 
 module Level : sig
-  type t = Trace | Debug | Info | Warn | Error | Faulty_peer | Fatal
+  type t = Spam | Trace | Debug | Info | Warn | Error | Faulty_peer | Fatal
   [@@deriving sexp, compare, yojson, show {with_path= false}, enumerate]
 
   val of_string : string -> (t, string) result
@@ -52,7 +52,7 @@ module Message : sig
   type t =
     { timestamp: Time.t
     ; level: Level.t
-    ; source: Source.t
+    ; source: Source.t option
     ; message: string
     ; metadata: Metadata.t }
   [@@deriving yojson]
@@ -64,7 +64,7 @@ end
 module Processor : sig
   type t
 
-  val raw : unit -> t
+  val raw : ?log_level:Level.t -> unit -> t
 
   val pretty : log_level:Level.t -> config:Logproc_lib.Interpolator.config -> t
 end
@@ -81,7 +81,7 @@ module Transport : sig
     (** Dumb_logrotate is a Transport which persists logs
      *  to the file system by using 2 log files. This
      *  Transport will rotate the 2 logs, ensuring that
-     *  each log file is less than some maximum size 
+     *  each log file is less than some maximum size
      *  before writing to it. When the logs reach max
      *  size, the old log is deleted and a new log is
      *  started. *)
@@ -132,8 +132,17 @@ val warn : _ log_function
 
 val error : _ log_function
 
+(** spam is a special log level that omits location information *)
+val spam :
+     t
+  -> ?metadata:(string, Yojson.Safe.json) List.Assoc.t
+  -> ('a, unit, string, unit) format4
+  -> 'a
+
 val faulty_peer : _ log_function [@@deprecated "use Trust_system.record"]
 
 val faulty_peer_without_punishment : _ log_function
 
 val fatal : _ log_function
+
+val append_to_global_metadata : (string * Yojson.Safe.json) list -> unit

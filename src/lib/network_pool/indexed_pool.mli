@@ -7,7 +7,6 @@ open Core
 
 open Coda_base
 open Coda_numbers
-open Signature_lib
 
 val replace_fee : Currency.Fee.t
 
@@ -43,8 +42,12 @@ val get_highest_fee : t -> User_command.With_valid_signature.t option
 val handle_committed_txn :
      t
   -> User_command.With_valid_signature.t
-  -> Currency.Amount.t (** Current balance of sender account. *)
-  -> t * User_command.With_valid_signature.t Sequence.t
+  -> fee_payer_balance:Currency.Amount.t
+  -> source_balance:Currency.Amount.t
+  -> ( t * User_command.With_valid_signature.t Sequence.t
+     , [ `Queued_txns_by_sender of
+         string * User_command.With_valid_signature.t Sequence.t ] )
+     Result.t
 
 (** Add a command to the pool. Pass the current nonce for the account and
     its current balance. Throws if the contents of the pool before adding the
@@ -58,9 +61,9 @@ val add_from_gossip_exn :
   -> Account_nonce.t
   -> Currency.Amount.t
   -> ( t * User_command.With_valid_signature.t Sequence.t
-     , [ `Invalid_nonce
+     , [> `Invalid_nonce
        | `Insufficient_funds
-       | (* NOTE: don't punish for this, attackers can induce nodes to blacklist
+       | (* NOTE: don't punish for this, attackers can induce nodes to banlist
           each other that way! *)
          `Insufficient_replace_fee
        | `Overflow ] )
@@ -76,16 +79,16 @@ val add_from_backtrack : t -> User_command.With_valid_signature.t -> t
 (** Check whether a command is in the pool *)
 val member : t -> User_command.With_valid_signature.t -> bool
 
-(* Get all the user commands sent by a user with a particular public key *)
-val all_from_user :
-  t -> Public_key.Compressed.t -> User_command.With_valid_signature.t list
+(* Get all the user commands sent by a user with a particular account *)
+val all_from_account :
+  t -> Account_id.t -> User_command.With_valid_signature.t list
 
 (** Check the contents of the pool are valid against the current ledger. Call
     this whenever the transition frontier is (re)created.
 *)
 val revalidate :
      t
-  -> (Public_key.Compressed.t -> Account_nonce.t * Currency.Amount.t)
+  -> (Account_id.t -> Account_nonce.t * Currency.Amount.t)
      (** Lookup an account in the new ledger *)
   -> t * User_command.With_valid_signature.t Sequence.t
 

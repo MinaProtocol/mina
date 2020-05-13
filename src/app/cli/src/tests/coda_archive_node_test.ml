@@ -8,20 +8,20 @@ let name = "coda-archive-node-test"
 let main () =
   let logger = Logger.create () in
   let largest_account_keypair =
-    Genesis_ledger.largest_account_keypair_exn ()
+    Test_genesis_ledger.largest_account_keypair_exn ()
   in
   let largest_account_public_key =
     Public_key.compress largest_account_keypair.public_key
   in
   let n = 2 in
-  let proposers i = if i = 0 then Some i else None in
+  let block_production_keys i = if i = 0 then Some i else None in
   let snark_work_public_keys i =
     if i = 0 then Some largest_account_public_key else None
   in
   let is_archive_rocksdb i = i = 1 in
   let%bind testnet =
-    Coda_worker_testnet.test logger n proposers snark_work_public_keys
-      Cli_lib.Arg_type.Work_selection_method.Sequence
+    Coda_worker_testnet.test ~name logger n block_production_keys
+      snark_work_public_keys Cli_lib.Arg_type.Work_selection_method.Sequence
       ~max_concurrent_connections:None ~is_archive_rocksdb
   in
   let%bind new_block_pipe =
@@ -40,7 +40,7 @@ let main () =
   let observed_hashset = State_hash.Hash_set.of_list observed_hashes in
   let%bind stored_transitions =
     Coda_worker_testnet.Api.get_all_transitions testnet 1
-      largest_account_public_key
+      (Account_id.create largest_account_public_key Token_id.default)
   in
   let stored_state_hashes =
     State_hash.Hash_set.of_list

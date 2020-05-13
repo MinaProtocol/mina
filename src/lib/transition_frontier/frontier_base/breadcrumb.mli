@@ -9,6 +9,7 @@ open Signature_lib
 open Coda_base
 open Coda_state
 open Coda_transition
+open Network_peer
 
 type t [@@deriving sexp, eq, compare, to_yojson]
 
@@ -55,7 +56,7 @@ val state_hash : t -> State_hash.t
 
 val parent_hash : t -> State_hash.t
 
-val proposer : t -> Signature_lib.Public_key.Compressed.t
+val block_producer : t -> Signature_lib.Public_key.Compressed.t
 
 val user_commands : t -> User_command.t list
 
@@ -72,6 +73,7 @@ val name : t -> string
 module For_tests : sig
   val gen :
        ?logger:Logger.t
+    -> proof_level:Genesis_constants.Proof_level.t
     -> ?verifier:Verifier.t
     -> ?trust_system:Trust_system.t
     -> accounts_with_secret_keys:(Private_key.t option * Account.t) list
@@ -79,6 +81,7 @@ module For_tests : sig
 
   val gen_non_deferred :
        ?logger:Logger.t
+    -> proof_level:Genesis_constants.Proof_level.t
     -> ?verifier:Verifier.t
     -> ?trust_system:Trust_system.t
     -> accounts_with_secret_keys:(Private_key.t option * Account.t) list
@@ -86,6 +89,7 @@ module For_tests : sig
 
   val gen_seq :
        ?logger:Logger.t
+    -> proof_level:Genesis_constants.Proof_level.t
     -> ?verifier:Verifier.t
     -> ?trust_system:Trust_system.t
     -> accounts_with_secret_keys:(Private_key.t option * Account.t) list

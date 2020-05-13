@@ -5,11 +5,12 @@ open Snark_bits
 
 type t = private Field.t [@@deriving sexp, eq, compare]
 
+[%%versioned:
 module Stable : sig
   module V1 : sig
-    type nonrec t = t [@@deriving bin_io, sexp, eq, compare]
+    type nonrec t = t [@@deriving sexp, eq, compare]
   end
-end
+end]
 
 val bit_length : int
 

@@ -21,7 +21,7 @@ include Frontier_intf.S
 (* This is the max length which is used when the transition frontier is initialized
  * via `load`. In other words, this will always be the max length of the transition
  * frontier as long as the `For_tests.load_with_max_length` is not used *)
-val global_max_length : int
+val global_max_length : Genesis_constants.t -> int
 
 val load :
      ?retry_with_fresh_db:bool
@@ -30,6 +30,8 @@ val load :
   -> consensus_local_state:Consensus.Data.Local_state.t
   -> persistent_root:Persistent_root.t
   -> persistent_frontier:Persistent_frontier.t
+  -> constraint_constants:Genesis_constants.Constraint_constants.t
+  -> precomputed_values:Precomputed_values.t
   -> unit
   -> ( t
      , [> `Failure of string
@@ -49,6 +51,8 @@ val root_snarked_ledger : t -> Ledger.Db.t
 
 val extensions : t -> Extensions.t
 
+val genesis_state_hash : t -> State_hash.t
+
 module For_tests : sig
   open Signature_lib
 
@@ -62,6 +66,8 @@ module For_tests : sig
     -> consensus_local_state:Consensus.Data.Local_state.t
     -> persistent_root:Persistent_root.t
     -> persistent_frontier:Persistent_frontier.t
+    -> constraint_constants:Genesis_constants.Constraint_constants.t
+    -> precomputed_values:Precomputed_values.t
     -> unit
     -> ( t
        , [> `Failure of string
@@ -69,20 +75,37 @@ module For_tests : sig
          | `Persistent_frontier_malformed ] )
        Deferred.Result.t
 
+  val gen_genesis_breadcrumb :
+       ?logger:Logger.t
+    -> proof_level:Genesis_constants.Proof_level.t
+    -> ?verifier:Verifier.t
+    -> precomputed_values:Precomputed_values.t
+    -> unit
+    -> Breadcrumb.t Quickcheck.Generator.t
+
   val gen_persistence :
        ?logger:Logger.t
+    -> proof_level:Genesis_constants.Proof_level.t
+    -> ledger_depth:int
     -> ?verifier:Verifier.t
     -> unit
     -> (Persistent_root.t * Persistent_frontier.t) Quickcheck.Generator.t
 
   val gen :
        ?logger:Logger.t
+    -> proof_level:Genesis_constants.Proof_level.t
     -> ?verifier:Verifier.t
     -> ?trust_system:Trust_system.t
     -> ?consensus_local_state:Consensus.Data.Local_state.t
+    -> constraint_constants:Genesis_constants.Constraint_constants.t
+    -> precomputed_values:Precomputed_values.t
     -> ?root_ledger_and_accounts:Ledger.t
                                  * (Private_key.t option * Account.t) list
-    -> ?gen_root_breadcrumb:Breadcrumb.t Quickcheck.Generator.t
+    -> ?gen_root_breadcrumb:( Breadcrumb.t
+                            * ( Coda_base.State_hash.t
+                              * Coda_state.Protocol_state.value )
+                              list )
+                            Quickcheck.Generator.t
     -> max_length:int
     -> size:int
     -> unit
@@ -90,12 +113,19 @@ module For_tests : sig
 
   val gen_with_branch :
        ?logger:Logger.t
+    -> proof_level:Genesis_constants.Proof_level.t
     -> ?verifier:Verifier.t
     -> ?trust_system:Trust_system.t
     -> ?consensus_local_state:Consensus.Data.Local_state.t
+    -> constraint_constants:Genesis_constants.Constraint_constants.t
+    -> precomputed_values:Precomputed_values.t
     -> ?root_ledger_and_accounts:Ledger.t
                                  * (Private_key.t option * Account.t) list
-    -> ?gen_root_breadcrumb:Breadcrumb.t Quickcheck.Generator.t
+    -> ?gen_root_breadcrumb:( Breadcrumb.t
+                            * ( Coda_base.State_hash.t
+                              * Coda_state.Protocol_state.value )
+                              list )
+                            Quickcheck.Generator.t
     -> ?get_branch_root:(t -> Breadcrumb.t)
     -> max_length:int
     -> frontier_size:int

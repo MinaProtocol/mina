@@ -40,22 +40,28 @@ asynchronous and post-hoc. In the background, once per minute it checks the
 connection count. If it is above the "high water mark", it will close
 ("trim") eligible connections until it reaches the "low water mark". All
 connections start with a "grace period" where they won't be closed. Peer IDs
-can be marked as "protected" which prevents them being trimmed. This is
-vulnerable to resource exhaustion by opening many new connections.
+can be marked as "protected" which prevents them being trimmed. Ember believes this
+is vulnerable to resource exhaustion by opening many new connections.
 
 *)
 
+open Base
 open Async
 open Pipe_lib
+open Network_peer
 
 (** Handle to all network functionality. *)
 type net
 
-(** Essentially a hash of a public key. *)
-type peer_id
-
 module Keypair : sig
-  type t
+  [%%versioned:
+  module Stable : sig
+    module V1 : sig
+      type t
+    end
+  end]
+
+  type t = Stable.Latest.t
 
   (** Securely generate a new keypair. *)
   val random : net -> t Deferred.t
@@ -69,7 +75,7 @@ module Keypair : sig
     keypair data is corrupt. *)
   val of_string : string -> t Core.Or_error.t
 
-  val to_peerid : t -> peer_id
+  val to_peer_id : t -> Peer.Id.t
 end
 
 (** A "multiaddr" is libp2p's extensible encoding for network addresses.
@@ -92,20 +98,12 @@ module Multiaddr : sig
   val of_string : string -> t
 end
 
-module PeerID : sig
-  type t = peer_id
-
-  val to_string : t -> string
-
-  val of_keypair : Keypair.t -> t
-end
-
-type discovered_peer = {id: PeerID.t; maddrs: Multiaddr.t list}
+type discovered_peer = {id: Peer.Id.t; maddrs: Multiaddr.t list}
 
 module Pubsub : sig
   (** A subscription to a pubsub topic. *)
   module Subscription : sig
-    type t
+    type 'a t
 
     (** Publish a message to this pubsub topic.
     *
@@ -113,16 +111,16 @@ module Pubsub : sig
     * This function continues to work even if [unsubscribe t] has been called.
     * It is exactly [Pubsub.publish] with the topic this subscription was
     * created for, and fails in the same way. *)
-    val publish : t -> string -> unit Deferred.t
+    val publish : 'a t -> 'a -> unit Deferred.t
 
     (** Unsubscribe from this topic, closing the write pipe.
     *
     * Returned deferred is resolved once the unsubscription is complete.
     * This can fail if already unsubscribed. *)
-    val unsubscribe : t -> unit Deferred.Or_error.t
+    val unsubscribe : _ t -> unit Deferred.Or_error.t
 
     (** The pipe of messages received about this topic. *)
-    val message_pipe : t -> string Envelope.Incoming.t Strict_pipe.Reader.t
+    val message_pipe : 'a t -> 'a Envelope.Incoming.t Strict_pipe.Reader.t
   end
 
   (** Publish a message to a topic.
@@ -146,10 +144,29 @@ module Pubsub : sig
   val subscribe :
        net
     -> string
-    -> should_forward_message:(   sender:PeerID.t
-                               -> data:string
-                               -> bool Deferred.t)
-    -> Subscription.t Deferred.Or_error.t
+    -> should_forward_message:(string Envelope.Incoming.t -> bool Deferred.t)
+    -> string Subscription.t Deferred.Or_error.t
+
+  (** Like [subscribe], but knows how to stringify/destringify
+    *
+    * Fails if already subscribed. If it succeeds, incoming messages for that
+    * topic will be written to the [Subscription.message_pipe t]. Returned deferred
+    * is resolved with [Ok sub] as soon as the subscription is enqueued.
+    *
+    * [should_forward_message] will be called once per new message, and will
+    * not be called again until the deferred it returns is resolved. The helper
+    * process waits 5 seconds for the result of [should_forward_message] to be
+    * reported, otherwise it will not forward it.
+    *)
+  val subscribe_encode :
+       net
+    -> string
+    -> should_forward_message:('a Envelope.Incoming.t -> bool Deferred.t)
+    -> bin_prot:'a Bin_prot.Type_class.t
+    -> on_decode_failure:[ `Ignore
+                         | `Call of
+                           string Envelope.Incoming.t -> Error.t -> unit ]
+    -> 'a Subscription.t Deferred.Or_error.t
 end
 
 (** [create ~logger ~conf_dir] starts a new [net] storing its state in [conf_dir]
@@ -165,7 +182,10 @@ val create : logger:Logger.t -> conf_dir:string -> net Deferred.Or_error.t
   * Listens on each address in [maddrs].
   *
   * This will only connect to peers that share the same [network_id]. [on_new_peer], if present,
-  * will be called for each peer we discover.
+  * will be called for each peer we discover. [unsafe_no_trust_ip], if true, will not attempt to
+  * report trust actions for the IPs of observed connections.
+  *
+  * If [flood] is true, all valid gossip will be forwarded to every node. This is expensive.
   *
   * This fails if initializing libp2p fails for any reason.
 *)
@@ -176,17 +196,21 @@ val configure :
   -> maddrs:Multiaddr.t list
   -> network_id:string
   -> on_new_peer:(discovered_peer -> unit)
+  -> unsafe_no_trust_ip:bool
+  -> flood:bool
   -> unit Deferred.Or_error.t
 
 (** The keypair the network was configured with.
   *
-  * If configuration hasn't taken place or didn't succeed,
-  * this will be [None].
+  * Resolved once configuration succeeds.
   *)
-val me : net -> Keypair.t option
+val me : net -> Keypair.t Deferred.t
 
 (** List of all peers we know about. *)
-val peers : net -> PeerID.t list Deferred.t
+val peers : net -> Peer.t list Deferred.t
+
+(** Try to connect to a peer ID, returning a [Peer.t]. *)
+val lookup_peerid : net -> Peer.Id.t -> Peer.t Deferred.Or_error.t
 
 (** An open stream.
 
@@ -215,9 +239,7 @@ module Stream : sig
     *)
   val reset : t -> unit Deferred.Or_error.t
 
-  val remote_addr : t -> Multiaddr.t
-
-  val remote_peerid : t -> PeerID.t
+  val remote_peer : t -> Peer.t
 end
 
 (** [Protocol_handler.t] is the rough equivalent to [Tcp.Server.t].
@@ -251,7 +273,7 @@ end
   protocol, and probably for other reasons.
  *)
 val open_stream :
-  net -> protocol:string -> PeerID.t -> Stream.t Deferred.Or_error.t
+  net -> protocol:string -> Peer.Id.t -> Stream.t Deferred.Or_error.t
 
 (** Handle incoming streams for a protocol.
 
@@ -299,3 +321,18 @@ val begin_advertising : net -> unit Deferred.Or_error.t
 
 (** Stop listening, close all connections and subscription pipes, and kill the subprocess. *)
 val shutdown : net -> unit Deferred.t
+
+(** Ban an IP from connecting to the helper.
+
+    This ban is in place until [unban_ip] is called or the helper restarts.
+    After the deferred resolves, no new incoming streams will involve that IP.
+    TODO: does this forbid explicitly dialing them? *)
+val ban_ip :
+  net -> Unix.Inet_addr.t -> [`Ok | `Already_banned] Deferred.Or_error.t
+
+(** Unban an IP, allowing connections from it. *)
+val unban_ip :
+  net -> Unix.Inet_addr.t -> [`Ok | `Not_banned] Deferred.Or_error.t
+
+(** List of currently banned IPs. *)
+val banned_ips : net -> Unix.Inet_addr.t list Deferred.t

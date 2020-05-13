@@ -64,10 +64,27 @@ type t = Stable.Latest.t =
 
 let participants {transactions= {user_commands; fee_transfers; _}; creator; _}
     =
-  let open Public_key.Compressed.Set in
+  let open Account_id.Set in
   let user_command_set =
     List.fold user_commands ~init:empty ~f:(fun set user_command ->
         union set (of_list @@ User_command.accounts_accessed user_command) )
+  in
+  let fee_transfer_participants =
+    List.fold fee_transfers ~init:empty ~f:(fun set (pk, _) ->
+        add set (Account_id.create pk Token_id.default) )
+  in
+  add
+    (union user_command_set fee_transfer_participants)
+    (Account_id.create creator Token_id.default)
+
+let participant_pks
+    {transactions= {user_commands; fee_transfers; _}; creator; _} =
+  let open Public_key.Compressed.Set in
+  let user_command_set =
+    List.fold user_commands ~init:empty ~f:(fun set user_command ->
+        union set @@ of_list
+        @@ List.map ~f:Account_id.public_key
+        @@ User_command.accounts_accessed user_command )
   in
   let fee_transfer_participants =
     List.fold fee_transfers ~init:empty ~f:(fun set (pk, _) -> add set pk)
@@ -86,7 +103,7 @@ let validate_transactions external_transition =
 let of_transition external_transition tracked_participants
     (calculated_transactions : Transaction.t list) =
   let open External_transition.Validated in
-  let creator = proposer external_transition in
+  let creator = block_producer external_transition in
   let protocol_state =
     { Protocol_state.previous_state_hash= parent_hash external_transition
     ; blockchain_state=
@@ -103,9 +120,10 @@ let of_transition external_transition tracked_participants
       | User_command checked_user_command -> (
           let user_command = User_command.forget_check checked_user_command in
           let should_include_transaction user_command participants =
-            List.exists
-              (User_command.accounts_accessed user_command)
-              ~f:(Public_key.Compressed.Set.mem participants)
+            List.exists (User_command.accounts_accessed user_command)
+              ~f:(fun account_id ->
+                Public_key.Compressed.Set.mem participants
+                  (Account_id.public_key account_id) )
           in
           match tracked_participants with
           | `Some interested_participants

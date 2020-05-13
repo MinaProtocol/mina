@@ -1,5 +1,5 @@
 [%%import
-"../../../config.mlh"]
+"/src/config.mlh"]
 
 open Ppxlib
 open Asttypes
@@ -201,13 +201,57 @@ let gen_keys () =
     , Transaction_snark_keys.Verification.key_location ~loc
         tx_keys_location.verification )
   in
+  if Array.mem ~equal:String.equal Sys.argv "--generate-keys-only" then
+    Stdlib.exit 0 ;
   match dirty with
-  | `Generated_something -> (
-    (* TODO: Check if circleci and die *)
+  | `Generated_something | `Locally_generated -> (
+    (* If we generated any keys, then we need to make sure to upload these keys
+     * to some central store to keep our builds compatible with one-another.
+     *
+     * We used to have a process where we manually upload keys whenever we want
+     * to persist a new change. This is an attempt to make that process
+     * automatic.
+     *
+     * We don't want to force an upload on every change as during development
+     * you could churn on changes. Instead, we force uploads on CI jobs that
+     * build testnet artifacts (as these are the binaries we want to make sure
+     * we can retrieve keys for).
+     * Uploads occur out-of-process in CI.
+     *
+     * See the background section of https://bkase.dev/posts/ocaml-writer
+     * for more info on how this system works.
+     *
+     * NOTE: This behaviour is overriden or external contributors, because they
+     * cannot upload new keys if they have modified the snark. See branch
+     * referencing "CIRCLE_PR_USERNAME" below.
+     *)
     match (Sys.getenv "CI", Sys.getenv "DUNE_PROFILE") with
+    | Some _, Some _ when Option.is_some (Sys.getenv "CIRCLE_PR_USERNAME") ->
+        (* External contributors cannot upload new keys to AWS, but we would
+           still like to run CI for their pull requests if they have modified the
+           snark.
+        *)
+        ( match dirty with
+        | `Generated_something ->
+            Format.eprintf
+              "No keys were found in the cache, but this pull-request is from \
+               an external contributor.@ Generated fresh keys for this \
+               build.@."
+        | `Locally_generated ->
+            Format.eprintf
+              "Only locally-generated keys were found in the cache, but this \
+               pull-request is from an external contributor.@ Using the local \
+               keys@."
+        | `Cache_hit ->
+            (* Excluded above. *) assert false ) ;
+        return acc
     | Some _, Some profile
       when String.is_substring ~substring:"testnet" profile ->
-        exit 0xc1 (* exit with code 0xc1, get it "CI" *)
+        (* We are intentionally aborting the build here with a special error code
+        * because we do not want builds to succeed if keys are not uploaded.
+        *
+        * Exit code is 0xc1 for "CI" *)
+        exit 0xc1
     | Some _, Some _ | _, None | None, _ ->
         return acc )
   | `Cache_hit ->

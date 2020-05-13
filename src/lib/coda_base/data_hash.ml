@@ -1,65 +1,48 @@
-(* TODO: rename length_in_bits -> bit_length *)
+(* data_hash.ml *)
 
-open Core
-open Util
+[%%import
+"/src/config.mlh"]
+
+open Core_kernel
+
+[%%ifdef
+consensus_mechanism]
+
 open Snark_params.Tick
 open Bitstring_lib
-open Fold_lib
-open Module_version
 
-module type Basic = Data_hash_intf.Basic
+[%%else]
+
+open Snark_params_nonconsensus
+module Random_oracle = Random_oracle_nonconsensus.Random_oracle
+
+[%%endif]
 
 module type Full_size = Data_hash_intf.Full_size
-
-module type Small = Data_hash_intf.Small
 
 module Make_basic (M : sig
   val length_in_bits : int
 end) =
 struct
-  module Stable = struct
-    module V1 = struct
-      module T = struct
-        type t = Pedersen.Digest.Stable.V1.t
-        [@@deriving bin_io, sexp, compare, hash, yojson, version]
-      end
+  type t = Field.t [@@deriving sexp, compare, hash]
 
-      include T
-
-      let version_byte = Base58_check.Version_bytes.data_hash
-
-      include Registration.Make_latest_version (T)
-      include Hashable.Make_binable (T)
-      include Comparable.Make (T)
-    end
-
-    module Latest = V1
-
-    module Module_decl = struct
-      let name = "data_hash_basic"
-
-      type latest = Latest.t
-    end
-
-    module Registrar = Registration.Make (Module_decl)
-    module Registered_V1 = Registrar.Register (V1)
-  end
-
-  type t = Stable.Latest.t [@@deriving sexp, compare, hash, yojson]
-
-  include Comparable.Make (Stable.Latest)
-  include Hashable.Make (Stable.Latest)
-
-  let to_decimal_string (t : Pedersen.Digest.t) =
-    Crypto_params.Tick0.Field.to_string t
+  let to_decimal_string (t : Field.t) = Field.to_string t
 
   let to_bytes t =
-    Fold_lib.Fold.bool_t_to_string (Fold.of_list (Field.unpack t))
+    Fold_lib.(Fold.bool_t_to_string (Fold.of_list (Field.unpack t)))
 
   let length_in_bits = M.length_in_bits
 
   let () = assert (Int.(length_in_bits <= Field.size_in_bits))
 
+  let to_input t = Random_oracle.Input.field t
+
+  [%%ifdef
+  consensus_mechanism]
+
+  (* this is in consensus code, because Bigint comes
+     from snarky functors
+  *)
   let gen : t Quickcheck.Generator.t =
     let m =
       if Int.(length_in_bits = Field.size_in_bits) then
@@ -69,8 +52,6 @@ struct
     Quickcheck.Generator.map
       Bignum_bigint.(gen_incl zero m)
       ~f:(fun x -> Bigint.(to_field (of_bignum_bigint x)))
-
-  let ( = ) = Stable.Latest.equal
 
   type var =
     { digest: Pedersen.Checked.Digest.var
@@ -112,9 +93,10 @@ struct
 
   let var_to_input (t : var) = Random_oracle.Input.field t.digest
 
+  (* TODO : use Random oracle.Digest to satisfy Bits_intf.S, move out of
+     consensus_mechanism guard
+  *)
   include Pedersen.Digest.Bits
-
-  let to_input t = Random_oracle.Input.field t
 
   let assert_equal x y = Field.Checked.Assert.equal x.digest y.digest
 
@@ -151,44 +133,113 @@ struct
         ~f:Boolean.typ.check
     in
     {store; read; alloc; check}
+
+  [%%endif]
 end
 
-module Make_full_size () = struct
-  include Make_basic (struct
+module T0 = struct
+  [%%versioned_binable
+  module Stable = struct
+    module V1 = struct
+      type t = Field.t [@@deriving sexp, compare, hash]
+
+      let to_latest = Fn.id
+
+      module Arg = struct
+        type nonrec t = t
+
+        [%%define_locally Field.(to_string, of_string)]
+      end
+
+      include Binable.Of_stringable (Arg)
+    end
+  end]
+
+  module Tests = struct
+    (* these test the stability of the serialization derived from the
+       string representation of Field.t, not the direct serialization of
+       Field.t
+    *)
+
+    let field =
+      Quickcheck.random_value ~seed:(`Deterministic "Data_hash.T0 tests")
+        Field.gen
+
+    [%%if
+    curve_size = 298]
+
+    let%test "Binable from stringable V1" =
+      let known_good_hash =
+        "\x6D\xB1\xAB\x5F\x4C\xA2\x8F\xBA\xF5\x31\x2D\xE9\xEB\x07\xD1\x78\x1F\x20\xD5\x22\xA6\x9F\x5E\x0B\x77\xE0\x00\x07\x78\x85\x90\x8B"
+      in
+      Module_version.Serialization.check_serialization
+        (module Stable.V1)
+        field known_good_hash
+
+    [%%elif
+    curve_size = 753]
+
+    let%test "Binable from stringable V1" =
+      let known_good_hash =
+        "\x68\xDA\x30\x2C\xD0\xE5\x71\x3C\xAB\x42\x02\x8B\x31\xC1\x2E\x93\xE3\xC0\x99\x6B\xF6\xAA\xE2\x11\xF4\x2F\x88\x97\x3C\xC2\xA2\xF0"
+      in
+      Module_version.Serialization.check_serialization
+        (module Stable.V1)
+        field known_good_hash
+
+    [%%else]
+
+    let%test "Binable from stringable V1" =
+      failwith "No test for this curve size"
+
+    [%%endif]
+  end
+end
+
+module Make_full_size (B58_data : Data_hash_intf.Data_hash_descriptor) = struct
+  module Basic = Make_basic (struct
     let length_in_bits = Field.size_in_bits
   end)
 
-  let var_of_hash_packed digest = {digest; bits= None}
+  include Basic
+
+  module Base58_check = Codable.Make_base58_check (struct
+    include T0.Stable.Latest
+
+    (* the serialization here is only used for the hash impl which is only
+       used for hashtbl, it's ok to disagree with the "real" serialization *)
+    include Hashable.Make_binable (T0.Stable.Latest)
+    include B58_data
+  end)
+
+  [%%define_locally
+  Base58_check.(to_base58_check, of_base58_check, of_base58_check_exn)]
+
+  [%%define_locally
+  Base58_check.String_ops.(to_string, of_string)]
+
+  [%%define_locally
+  Base58_check.(to_yojson, of_yojson)]
+
+  module T = struct
+    type t = Field.t [@@deriving sexp, compare, hash]
+  end
+
+  include Comparable.Make (T)
+  include Hashable.Make (T)
 
   let of_hash = Fn.id
+
+  [%%ifdef
+  consensus_mechanism]
+
+  let var_of_hash_packed digest = {digest; bits= None}
 
   let if_ cond ~then_ ~else_ =
     let%map digest =
       Field.Checked.if_ cond ~then_:then_.digest ~else_:else_.digest
     in
     {digest; bits= None}
-end
 
-module Make_small (M : sig
-  val length_in_bits : int
-end) =
-struct
-  let () = assert (M.length_in_bits < Field.size_in_bits)
-
-  include Make_basic (M)
-
-  let var_of_hash_packed digest =
-    let%map bits = unpack digest in
-    {digest; bits= Some (Bitstring.Lsb_first.of_list bits)}
-
-  let max_size = Bignum_bigint.(two_to_the length_in_bits - one)
-
-  let of_hash x =
-    if Bignum_bigint.( <= ) Bigint.(to_bignum_bigint (of_field x)) max_size
-    then Ok x
-    else
-      Or_error.errorf
-        !"Data_hash.of_hash: %{sexp:Pedersen.Digest.t} > \
-          %{sexp:Bignum_bigint.t}"
-        x max_size
+  [%%endif]
 end

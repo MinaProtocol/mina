@@ -10,6 +10,8 @@ module type Update_intf = sig
   module Checked : sig
     val update :
          logger:Logger.t
+      -> proof_level:Genesis_constants.Proof_level.t
+      -> constraint_constants:Genesis_constants.Constraint_constants.t
       -> State_hash.var * State_body_hash.var * Protocol_state.var
       -> Snark_transition.var
       -> ( State_hash.var * Protocol_state.var * [`Success of Boolean.var]
@@ -40,14 +42,15 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
             transition consensus data is valid
             new consensus state is a function of the old consensus state
     *)
-    let verify_complete_merge =
-      match Coda_compile_config.proof_level with
-      | "full" ->
+    let verify_complete_merge ~proof_level =
+      match proof_level with
+      | Genesis_constants.Proof_level.Full ->
           T.verify_complete_merge
       | _ ->
           fun _ _ _ _ _ _ _ -> Checked.return Boolean.true_
 
-    let%snarkydef update ~(logger : Logger.t)
+    let%snarkydef update ~(logger : Logger.t) ~proof_level
+        ~constraint_constants
         ((previous_state_hash, previous_state_body_hash, previous_state) :
           State_hash.var * State_body_hash.var * Protocol_state.var)
         (transition : Snark_transition.var) :
@@ -56,8 +59,10 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
         Tick.Checked.t =
       let supply_increase = Snark_transition.supply_increase transition in
       let%bind `Success updated_consensus_state, consensus_state =
-        Consensus_state_hooks.next_state_checked ~prev_state:previous_state
-          ~prev_state_hash:previous_state_hash transition supply_increase
+        with_label __LOC__
+          (Consensus_state_hooks.next_state_checked ~constraint_constants
+             ~prev_state:previous_state ~prev_state_hash:previous_state_hash
+             transition supply_increase)
       in
       let prev_pending_coinbase_root =
         previous_state |> Protocol_state.blockchain_state
@@ -82,19 +87,16 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
           in
           (*If snarked ledger hash did not change (no new ledger proof) then pop_coinbases should be a no-op*)
           let%bind no_coinbases_popped =
-            let%bind check =
-              Pending_coinbase.Hash.equal_var root_after_delete
-                prev_pending_coinbase_root
-            in
-            Boolean.if_ ledger_hash_didn't_change ~then_:check
-              ~else_:Boolean.true_
+            Pending_coinbase.Hash.equal_var root_after_delete
+              prev_pending_coinbase_root
           in
           (*new stack or update one*)
           let%map new_root =
             with_label __LOC__
               (Pending_coinbase.Checked.add_coinbase root_after_delete
-                 ( Snark_transition.proposer transition
-                 , Snark_transition.coinbase_amount transition
+                 ( Snark_transition.pending_coinbase_action transition
+                 , ( Snark_transition.coinbase_receiver transition
+                   , Snark_transition.coinbase_amount transition )
                  , previous_state_body_hash ))
           in
           (new_root, deleted_stack, no_coinbases_popped)
@@ -113,17 +115,21 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
           in
           Pending_coinbase.Hash.equal_var new_pending_coinbase_hash new_root
         in
+        let pending_coinbase_source_stack =
+          Pending_coinbase.Stack.Checked.create_with deleted_stack
+        in
         let%bind correct_transaction_snark =
-          verify_complete_merge
-            (Snark_transition.sok_digest transition)
-            ( previous_state |> Protocol_state.blockchain_state
-            |> Blockchain_state.snarked_ledger_hash )
-            ( transition |> Snark_transition.blockchain_state
-            |> Blockchain_state.snarked_ledger_hash )
-            Pending_coinbase.Stack.Checked.empty deleted_stack supply_increase
-            (As_prover.return
-               (Option.value ~default:Tock.Proof.dummy
-                  (Snark_transition.ledger_proof transition)))
+          with_label __LOC__
+            (verify_complete_merge ~proof_level
+               (Snark_transition.sok_digest transition)
+               ( previous_state |> Protocol_state.blockchain_state
+               |> Blockchain_state.snarked_ledger_hash )
+               ( transition |> Snark_transition.blockchain_state
+               |> Blockchain_state.snarked_ledger_hash )
+               pending_coinbase_source_stack deleted_stack supply_increase
+               (As_prover.return
+                  (Option.value ~default:Tock.Proof.dummy
+                     (Snark_transition.ledger_proof transition))))
         in
         let%bind correct_snark =
           Boolean.(correct_transaction_snark || nothing_changed)
@@ -165,10 +171,16 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
         in
         result
       in
+      let%bind genesis_state_hash =
+        (*get the genesis state hash from previous state unless previous state is the genesis state itslef*)
+        Protocol_state.genesis_state_hash_checked
+          ~state_hash:previous_state_hash previous_state
+      in
       let new_state =
-        Protocol_state.create_var ~previous_state_hash
+        Protocol_state.create_var ~previous_state_hash ~genesis_state_hash
           ~blockchain_state:(Snark_transition.blockchain_state transition)
           ~consensus_state
+          ~constants:(Protocol_state.constants previous_state)
       in
       let%map state_hash, _ = Protocol_state.hash_checked new_state in
       (state_hash, new_state, `Success success)
@@ -176,11 +188,9 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
 end
 
 module Checked = struct
-  let%snarkydef is_base_hash h =
-    Field.Checked.equal
-      (Field.Var.constant
-         ((Lazy.force Genesis_protocol_state.t).hash :> Field.t))
-      (State_hash.var_to_hash_packed h)
+  let%snarkydef is_base_case state =
+    Protocol_state.consensus_state state
+    |> Consensus.Data.Consensus_state.is_genesis_state_var
 
   let%snarkydef hash (t : Protocol_state.var) = Protocol_state.hash_checked t
 end

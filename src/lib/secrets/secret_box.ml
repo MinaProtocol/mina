@@ -25,27 +25,23 @@ module BytesWr = struct
         Error "Bytes.of_yojson needs a string"
 end
 
-module Stable = struct
-  module V1 = struct
-    type t =
-      { box_primitive: string
-      ; pw_primitive: string
-      ; nonce: Bytes.t
-      ; pwsalt: Bytes.t
-      ; pwdiff: Int64.t * int
-      ; ciphertext: Bytes.t }
-    [@@deriving sexp]
-  end
-
-  module Latest = V1
+module T = struct
+  type t =
+    { box_primitive: string
+    ; pw_primitive: string
+    ; nonce: Bytes.t
+    ; pwsalt: Bytes.t
+    ; pwdiff: Int64.t * int
+    ; ciphertext: Bytes.t }
+  [@@deriving sexp]
 end
 
 module Json : sig
   type t [@@deriving yojson]
 
-  val of_stable : Stable.V1.t -> t
+  val of_stable : T.t -> t
 
-  val to_stable : t -> Stable.V1.t
+  val to_stable : t -> T.t
 end = struct
   type t =
     { box_primitive: string
@@ -57,16 +53,15 @@ end = struct
   [@@deriving yojson]
 
   let of_stable
-      {Stable.V1.box_primitive; pw_primitive; nonce; pwsalt; pwdiff; ciphertext}
-      =
+      {T.box_primitive; pw_primitive; nonce; pwsalt; pwdiff; ciphertext} =
     {box_primitive; pw_primitive; nonce; pwsalt; pwdiff; ciphertext}
 
   let to_stable {box_primitive; pw_primitive; nonce; pwsalt; pwdiff; ciphertext}
       =
-    {Stable.V1.box_primitive; pw_primitive; nonce; pwsalt; pwdiff; ciphertext}
+    {T.box_primitive; pw_primitive; nonce; pwsalt; pwdiff; ciphertext}
 end
 
-type t = Stable.Latest.t =
+type t = T.t =
   { box_primitive: string
   ; pw_primitive: string
   ; nonce: Bytes.t
@@ -98,7 +93,7 @@ let encrypt ~(password : Bytes.t) ~(plaintext : Bytes.t) =
   ; ciphertext }
 
 (** warning: this will zero [password] *)
-let decrypt ~(password : Bytes.t)
+let decrypt ~(password : Bytes.t) ~which
     { box_primitive
     ; pw_primitive
     ; nonce
@@ -108,15 +103,17 @@ let decrypt ~(password : Bytes.t)
   if box_primitive <> Secret_box.primitive then
     Error
       (`Corrupted_privkey
-        (Error.createf
-           !"don't know how to handle a %s secret_box"
-           box_primitive))
+        ( Error.createf
+            !"don't know how to handle a %s secret_box"
+            box_primitive
+        , which ))
   else if pw_primitive <> Password_hash.primitive then
     Error
       (`Corrupted_privkey
-        (Error.createf
-           !"don't know how to handle a %s password_hash"
-           pw_primitive))
+        ( Error.createf
+            !"don't know how to handle a %s password_hash"
+            pw_primitive
+        , which ))
   else
     let nonce = Secret_box.Bytes.to_nonce nonce in
     let salt = Password_hash.Bytes.to_salt pwsalt in
@@ -135,7 +132,9 @@ let%test_unit "successful roundtrip" =
     ~trials:4
     ~f:(fun (password, plaintext) ->
       let enc = encrypt ~password:(Bytes.copy password) ~plaintext in
-      let dec = Option.value_exn (decrypt enc ~password |> Result.ok) in
+      let dec =
+        Option.value_exn (decrypt enc ~password ~which:"test" |> Result.ok)
+      in
       [%test_eq: Bytes.t] dec plaintext )
 
 let%test "bad password fails" =
@@ -143,4 +142,5 @@ let%test "bad password fails" =
     encrypt ~password:(Bytes.of_string "foobar")
       ~plaintext:(Bytes.of_string "yo")
   in
-  Result.is_error (decrypt ~password:(Bytes.of_string "barfoo") enc)
+  Result.is_error
+    (decrypt ~password:(Bytes.of_string "barfoo") ~which:"test" enc)

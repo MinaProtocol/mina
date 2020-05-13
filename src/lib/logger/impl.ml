@@ -2,7 +2,7 @@ open Core
 open Async
 
 module Level = struct
-  type t = Trace | Debug | Info | Warn | Error | Faulty_peer | Fatal
+  type t = Spam | Trace | Debug | Info | Warn | Error | Faulty_peer | Fatal
   [@@deriving sexp, compare, show {with_path= false}, enumerate]
 
   let of_string str =
@@ -32,37 +32,34 @@ module Source = struct
 end
 
 module Metadata = struct
+  [%%versioned_binable
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t = Yojson.Safe.json String.Map.t [@@deriving version {asserted}]
+      type t = Yojson.Safe.json String.Map.t
 
-        let to_yojson t = `Assoc (String.Map.to_alist t)
+      let to_latest = Fn.id
 
-        let of_yojson = function
-          | `Assoc alist ->
-              Ok (String.Map.of_alist_exn alist)
-          | _ ->
-              Error "Unexpected object"
+      let to_yojson t = `Assoc (String.Map.to_alist t)
 
-        include Binable.Of_binable
-                  (String)
-                  (struct
-                    type nonrec t = t
+      let of_yojson = function
+        | `Assoc alist ->
+            Ok (String.Map.of_alist_exn alist)
+        | _ ->
+            Error "Unexpected object"
 
-                    let to_binable t = to_yojson t |> Yojson.Safe.to_string
+      include Binable.Of_binable
+                (Core_kernel.String.Stable.V1)
+                (struct
+                  type nonrec t = t
 
-                    let of_binable (t : string) : t =
-                      Yojson.Safe.from_string t |> of_yojson |> Result.ok
-                      |> Option.value_exn
-                  end)
-      end
+                  let to_binable t = to_yojson t |> Yojson.Safe.to_string
 
-      include T
+                  let of_binable (t : string) : t =
+                    Yojson.Safe.from_string t |> of_yojson |> Result.ok
+                    |> Option.value_exn
+                end)
     end
-
-    module Latest = V1
-  end
+  end]
 
   let empty = String.Map.empty
 
@@ -76,16 +73,26 @@ module Metadata = struct
 
   let extend (t : t) alist =
     List.fold_left alist ~init:t ~f:(fun acc (key, data) ->
-        String.Map.add_exn acc ~key ~data )
+        String.Map.set acc ~key ~data )
 end
+
+let global_metadata = ref []
+
+(* List.append isn't tail-recursive (recurses over first arg), so hopefully it doesn't get too big! *)
+let append_to_global_metadata l =
+  global_metadata := List.append !global_metadata l
 
 module Message = struct
   type t =
     { timestamp: Time.t
     ; level: Level.t
-    ; source: Source.t
+    ; source: Source.t option
     ; message: string
     ; metadata: Metadata.t }
+  [@@deriving yojson]
+
+  type without_source =
+    {timestamp: Time.t; level: Level.t; message: string; metadata: Metadata.t}
   [@@deriving yojson]
 
   let escape_string str =
@@ -93,7 +100,19 @@ module Message = struct
     |> List.bind ~f:(function '"' -> ['\\'; '"'] | c -> [c])
     |> String.of_char_list
 
-  let to_yojson m = to_yojson {m with message= escape_string m.message}
+  let of_yojson json =
+    match without_source_of_yojson json with
+    | Ok {timestamp; level; message; metadata} ->
+        Ok {timestamp; level; message; metadata; source= None}
+    | Error _ ->
+        of_yojson json
+
+  let to_yojson ({timestamp; level; source; message; metadata} as m) =
+    match source with
+    | Some _ ->
+        to_yojson {m with message= escape_string m.message}
+    | None ->
+        without_source_to_yojson {timestamp; level; message; metadata}
 
   let metadata_interpolation_regex = Re2.create_exn {|\$(\[a-zA-Z_]+)|}
 
@@ -104,7 +123,7 @@ module Message = struct
     | Error _ ->
         []
 
-  let check_invariants t =
+  let check_invariants (t : t) =
     let refs = metadata_references t.message in
     List.for_all refs ~f:(Metadata.mem t.metadata)
 end
@@ -119,11 +138,23 @@ module Processor = struct
   type t = T : (module S with type t = 't) * 't -> t
 
   module Raw = struct
-    type t = unit
+    type t = Level.t
 
-    let create () = ()
+    let create ~log_level = log_level
 
-    let process () msg = Some (Yojson.Safe.to_string (Message.to_yojson msg))
+    let process log_level (msg : Message.t) =
+      if msg.level < log_level then None
+      else
+        let msg_json_fields =
+          Message.to_yojson msg |> Yojson.Safe.Util.to_assoc
+        in
+        let json =
+          if Level.compare msg.level Level.Spam = 0 then
+            `Assoc
+              (List.filter msg_json_fields ~f:(fun (k, _) -> k <> "source"))
+          else `Assoc msg_json_fields
+        in
+        Some (Yojson.Safe.to_string json)
   end
 
   module Pretty = struct
@@ -131,7 +162,7 @@ module Processor = struct
 
     let create ~log_level ~config = {log_level; config}
 
-    let process {log_level; config} msg =
+    let process {log_level; config} (msg : Message.t) =
       let open Message in
       if msg.level < log_level then None
       else
@@ -139,7 +170,9 @@ module Processor = struct
           Logproc_lib.Interpolator.interpolate config msg.message msg.metadata
         with
         | Error err ->
-            Core.printf "logproc interpolation error: %s\n" err ;
+            Option.iter msg.source ~f:(fun source ->
+                Core.printf "logproc interpolation error in %s: %s\n"
+                  source.location err ) ;
             None
         | Ok (str, extra) ->
             let formatted_extra =
@@ -156,7 +189,7 @@ module Processor = struct
               ^ formatted_extra )
   end
 
-  let raw () = T ((module Raw), Raw.create ())
+  let raw ?(log_level = Level.Spam) () = T ((module Raw), Raw.create ~log_level)
 
   let pretty ~log_level ~config =
     T ((module Pretty), Pretty.create ~log_level ~config)
@@ -276,18 +309,14 @@ module Consumer_registry = struct
             () )
 end
 
+[%%versioned
 module Stable = struct
   module V1 = struct
-    module T = struct
-      type t = {null: bool; metadata: Metadata.Stable.V1.t; id: string}
-      [@@deriving bin_io, version]
-    end
+    type t = {null: bool; metadata: Metadata.Stable.V1.t; id: string}
 
-    include T
+    let to_latest = Fn.id
   end
-
-  module Latest = V1
-end
+end]
 
 type t = Stable.Latest.t = {null: bool; metadata: Metadata.t; id: string}
 
@@ -307,9 +336,10 @@ let change_id {null; metadata; id= _} ~id = {null; metadata; id}
 let make_message (t : t) ~level ~module_ ~location ~metadata ~message =
   { Message.timestamp= Time.now ()
   ; level
-  ; source= Source.create ~module_ ~location
+  ; source= Some (Source.create ~module_ ~location)
   ; message
-  ; metadata= Metadata.extend t.metadata metadata }
+  ; metadata=
+      Metadata.extend (Metadata.extend t.metadata metadata) !global_metadata }
 
 let raw ({id; _} as t) msg =
   if t.null then ()
@@ -344,6 +374,8 @@ let error = log ~level:Error
 let fatal = log ~level:Fatal
 
 let faulty_peer_without_punishment = log ~level:Faulty_peer
+
+let spam = log ~level:Spam ~module_:"" ~location:""
 
 (* deprecated, use Trust_system.record instead *)
 let faulty_peer = faulty_peer_without_punishment

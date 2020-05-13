@@ -90,8 +90,7 @@ type t =
     example, when there are three slots and maximum number of provers), in which case,
     we simply add one coinbase as part of the second prediff.
   *)
-let create_coinbase coinbase_parts (proposer : Public_key.Compressed.t)
-    (state_body_hash : State_body_hash.t) =
+let create_coinbase coinbase_parts ~(receiver : Public_key.Compressed.t) =
   let open Result.Let_syntax in
   let coinbase = Coda_compile_config.coinbase in
   let coinbase_or_error = function
@@ -100,33 +99,31 @@ let create_coinbase coinbase_parts (proposer : Public_key.Compressed.t)
     | Error e ->
         Error (Error.Coinbase_error (Core.Error.to_string_hum e))
   in
-  let overflow_err a1 a2 =
+  let underflow_err a1 a2 =
     Option.value_map
       ~default:
         (Error
            (Error.Coinbase_error
               (sprintf
-                 !"overflow when splitting coinbase: Minuend: %{sexp: \
+                 !"underflow when splitting coinbase: Minuend: %{sexp: \
                    Currency.Amount.t} Subtrahend: %{sexp: Currency.Amount.t} \n"
                  a1 a2)))
       (Currency.Amount.sub a1 a2)
       ~f:(fun x -> Ok x)
   in
-  let two_parts amt (ft1 : Fee_transfer.Single.t option) ft2 =
-    let%bind rem_coinbase = overflow_err coinbase amt in
+  let two_parts amt ft1 (ft2 : Coinbase.Fee_transfer.t option) =
+    let%bind rem_coinbase = underflow_err coinbase amt in
     let%bind _ =
-      overflow_err rem_coinbase
-        (Option.value_map ~default:Currency.Amount.zero ft2 ~f:(fun single ->
-             Currency.Amount.of_fee (snd single) ))
+      underflow_err rem_coinbase
+        (Option.value_map ~default:Currency.Amount.zero ft2 ~f:(fun {fee; _} ->
+             Currency.Amount.of_fee fee ))
     in
     let%bind cb1 =
       coinbase_or_error
-        (Coinbase.create ~amount:amt ~proposer ~fee_transfer:ft1
-           ~state_body_hash)
+        (Coinbase.create ~amount:amt ~receiver ~fee_transfer:ft1)
     in
     let%map cb2 =
-      Coinbase.create ~amount:rem_coinbase ~proposer ~fee_transfer:ft2
-        ~state_body_hash
+      Coinbase.create ~amount:rem_coinbase ~receiver ~fee_transfer:ft2
       |> coinbase_or_error
     in
     [cb1; cb2]
@@ -136,15 +133,32 @@ let create_coinbase coinbase_parts (proposer : Public_key.Compressed.t)
       return []
   | `One x ->
       let%map cb =
-        Coinbase.create ~amount:coinbase ~proposer ~fee_transfer:x
-          ~state_body_hash
+        Coinbase.create ~amount:coinbase ~receiver ~fee_transfer:x
         |> coinbase_or_error
       in
       [cb]
   | `Two None ->
-      two_parts (Currency.Amount.of_int 1) None None
-  | `Two (Some (ft1, ft2)) ->
-      two_parts (Currency.Amount.of_fee (snd ft1)) (Some ft1) ft2
+      two_parts
+        (Currency.Amount.of_fee Coda_compile_config.account_creation_fee)
+        None None
+  | `Two (Some (({Coinbase.Fee_transfer.fee; _} as ft1), ft2)) ->
+      let%bind amount =
+        let%map fee =
+          Currency.Fee.add Coda_compile_config.account_creation_fee fee
+          |> Option.value_map
+               ~default:
+                 (Error
+                    (Error.Coinbase_error
+                       (sprintf
+                          !"Overflow when trying to add account_creation_fee \
+                            %{sexp: Currency.Fee.t} to a fee transfer %{sexp: \
+                            Currency.Fee.t}"
+                          Coda_compile_config.account_creation_fee fee)))
+               ~f:(fun v -> Ok v)
+        in
+        Currency.Amount.of_fee fee
+      in
+      two_parts amount (Some ft1) ft2
 
 let sum_fees xs ~f =
   with_return (fun {return} ->
@@ -196,44 +210,44 @@ let create_fee_transfers completed_works delta public_key coinbase_fts =
   in
   (* deduct the coinbase work fee from the singles_map. It is already part of the coinbase *)
   Or_error.try_with (fun () ->
-      List.fold coinbase_fts ~init:singles_map ~f:(fun accum single ->
-          match Public_key.Compressed.Map.find accum (fst single) with
+      List.fold coinbase_fts ~init:singles_map
+        ~f:(fun accum {Coinbase.Fee_transfer.receiver_pk; fee= cb_fee} ->
+          match Public_key.Compressed.Map.find accum receiver_pk with
           | None ->
               accum
           | Some fee ->
-              let new_fee =
-                Option.value_exn (Currency.Fee.sub fee (snd single))
-              in
+              let new_fee = Option.value_exn (Currency.Fee.sub fee cb_fee) in
               if new_fee > Currency.Fee.zero then
-                Public_key.Compressed.Map.update accum (fst single)
-                  ~f:(fun _ -> new_fee)
-              else Public_key.Compressed.Map.remove accum (fst single) )
+                Public_key.Compressed.Map.update accum receiver_pk ~f:(fun _ ->
+                    new_fee )
+              else Public_key.Compressed.Map.remove accum receiver_pk )
       (* TODO: This creates a weird incentive to have a small public_key *)
       |> Map.to_alist ~key_order:`Increasing
       |> One_or_two.group_list )
   |> to_staged_ledger_or_error
 
-let get_individual_info coinbase_parts proposer user_commands completed_works
-    state_body_hash =
+let get_individual_info coinbase_parts ~receiver user_commands completed_works
+    =
   let open Result.Let_syntax in
   let%bind coinbase_parts =
     O1trace.measure "create_coinbase" (fun () ->
-        create_coinbase coinbase_parts proposer state_body_hash )
+        create_coinbase coinbase_parts ~receiver )
   in
   let coinbase_fts =
-    List.concat_map coinbase_parts ~f:(fun cb ->
-        Option.value_map cb.fee_transfer ~default:[] ~f:(fun ft -> [ft]) )
+    List.concat_map coinbase_parts ~f:(fun cb -> Option.to_list cb.fee_transfer)
   in
-  let coinbase_work_fees = sum_fees coinbase_fts ~f:snd |> Or_error.ok_exn in
+  let coinbase_work_fees =
+    sum_fees ~f:Coinbase.Fee_transfer.fee coinbase_fts |> Or_error.ok_exn
+  in
   let txn_works_others =
     List.filter completed_works ~f:(fun {Transaction_snark_work.prover; _} ->
-        not (Public_key.Compressed.equal proposer prover) )
+        not (Public_key.Compressed.equal receiver prover) )
   in
   let%bind delta =
     fee_remainder user_commands txn_works_others coinbase_work_fees
   in
   let%map fee_transfers =
-    create_fee_transfers txn_works_others delta proposer coinbase_fts
+    create_fee_transfers txn_works_others delta receiver coinbase_fts
   in
   let transactions =
     List.map user_commands ~f:(fun t -> Transaction.User_command t)
@@ -261,8 +275,8 @@ let check_coinbase (diff : With_valid_signatures.diff) =
         (Error.Coinbase_error
            (sprintf
               !"Invalid coinbase value in staged ledger prediffs \
-                %{sexp:Fee_transfer.Single.t At_most_two.t} and \
-                %{sexp:Fee_transfer.Single.t At_most_one.t}"
+                %{sexp:Coinbase.Fee_transfer.t At_most_two.t} and \
+                %{sexp:Coinbase.Fee_transfer.t At_most_one.t}"
               x y))
 
 let get' (t : With_valid_signatures.t) =
@@ -277,16 +291,16 @@ let get' (t : With_valid_signatures.t) =
       | Two x ->
           `Two x
     in
-    get_individual_info coinbase_parts t.creator t1.user_commands
-      t1.completed_works t.state_body_hash
+    get_individual_info coinbase_parts ~receiver:t.coinbase_receiver
+      t1.user_commands t1.completed_works
   in
   let apply_pre_diff_with_at_most_one
       (t2 : With_valid_signatures.pre_diff_with_at_most_one_coinbase) =
     let coinbase_added =
       match t2.coinbase with Zero -> `Zero | One x -> `One x
     in
-    get_individual_info coinbase_added t.creator t2.user_commands
-      t2.completed_works t.state_body_hash
+    get_individual_info coinbase_added ~receiver:t.coinbase_receiver
+      t2.user_commands t2.completed_works
   in
   let open Result.Let_syntax in
   let%bind () = check_coinbase t.diff in

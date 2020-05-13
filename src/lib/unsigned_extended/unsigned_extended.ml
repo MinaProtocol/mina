@@ -1,6 +1,22 @@
+(* unsigned_extended.ml *)
+
+[%%import
+"/src/config.mlh"]
+
 open Core_kernel
-open Snark_params
 include Intf
+
+[%%ifdef
+consensus_mechanism]
+
+open Snark_params
+open Tick
+
+[%%else]
+
+open Snark_params_nonconsensus
+
+[%%endif]
 
 module type Unsigned_intf = Unsigned.S
 
@@ -9,7 +25,7 @@ module Extend
         val length : int
     end) : S with type t = Unsigned.t = struct
   ;;
-  assert (M.length < Tick.Field.size_in_bits - 3)
+  assert (M.length < Field.size_in_bits - 3)
 
   let length_in_bits = M.length
 
@@ -60,9 +76,12 @@ module UInt64 = struct
         let length = 64
       end)
 
+  [%%versioned_binable
   module Stable = struct
     module V1 = struct
-      type t = Unsigned.UInt64.t [@@deriving version {of_binable}]
+      type t = Unsigned.UInt64.t
+
+      let to_latest = Fn.id
 
       (* these are defined in the Extend functor, rather than derived, so import them *)
       [%%define_locally
@@ -86,9 +105,7 @@ module UInt64 = struct
         let of_binable = Unsigned.UInt64.of_int64
       end)
     end
-
-    module Latest = V1
-  end
+  end]
 
   include M
 
@@ -105,9 +122,12 @@ module UInt32 = struct
         let length = 32
       end)
 
+  [%%versioned_binable
   module Stable = struct
     module V1 = struct
-      type t = Unsigned.UInt32.t [@@deriving version {of_binable}]
+      type t = Unsigned.UInt32.t
+
+      let to_latest = Fn.id
 
       (* these are defined in the Extend functor, rather than derived, so import them *)
       [%%define_locally
@@ -131,9 +151,7 @@ module UInt32 = struct
         let of_binable = Unsigned.UInt32.of_int32
       end)
     end
-
-    module Latest = V1
-  end
+  end]
 
   include M
 
@@ -145,23 +163,19 @@ end
 (* check that serializations don't change *)
 let%test_module "Unsigned serializations" =
   ( module struct
-    let run_test (type t) (module M : Bin_prot.Binable.S with type t = t)
-        known_good_serialization (value : t) =
-      let buff = Bin_prot.Common.create_buf 256 in
-      let len = M.bin_write_t buff ~pos:0 value in
-      let bytes = Bytes.create len in
-      Bin_prot.Common.blit_buf_bytes buff bytes ~len ;
-      Bytes.equal bytes known_good_serialization
+    open Module_version.Serialization
 
     let%test "UInt32 V1 serialization" =
       let uint32 = UInt32.of_int 9775 in
-      let known_good_serialization = Bytes.of_string "\xFE\x2F\x26" in
-      run_test (module UInt32.Stable.V1) known_good_serialization uint32
+      let known_good_hash =
+        "\xE1\x66\x83\x04\x30\x8D\x3E\xE0\x50\xBF\x3E\xFF\x2C\xA5\x64\x8C\xF8\x5A\x58\x38\xED\xFA\xE4\xE2\x52\xE0\x84\xF6\xBA\x6A\xEC\x90"
+      in
+      check_serialization (module UInt32.Stable.V1) uint32 known_good_hash
 
     let%test "UInt64 V1 serialization" =
       let uint64 = UInt64.of_int64 191797697848L in
-      let known_good_serialization =
-        Bytes.of_string "\xFC\x38\x9D\x08\xA8\x2C\x00\x00\x00"
+      let known_good_hash =
+        "\x26\xA8\x3E\xB9\xCA\x2A\xDE\x52\xD3\xB7\x95\x36\x61\xAD\xCB\xA8\x1C\x71\x50\xE9\xAC\x07\xE8\xD9\x50\x5B\x8F\x36\x8D\x6E\xAE\x27"
       in
-      run_test (module UInt64.Stable.V1) known_good_serialization uint64
+      check_serialization (module UInt64.Stable.V1) uint64 known_good_hash
   end )

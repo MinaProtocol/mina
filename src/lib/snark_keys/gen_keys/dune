@@ -4,5 +4,5 @@
    transaction_snark blockchain_snark async core)
  (preprocessor_deps ../../../config.mlh)
  (preprocess
-  (pps ppx_jane ppxlib.metaquot ppxlib.runner))
+  (pps ppx_coda ppx_optcomp ppx_let ppxlib.metaquot))
  (modes native))

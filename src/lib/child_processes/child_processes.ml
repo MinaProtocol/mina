@@ -135,26 +135,32 @@ let maybe_kill_and_unlock : string -> Filename.t -> Logger.t -> unit Deferred.t
                   name pid_str ;
                 Deferred.unit )
       in
-      match%bind try_with (fun () -> Sys.remove lockpath) with
-      | Ok () ->
+      match%bind Sys.file_exists lockpath with
+      | `Yes ->
           Deferred.unit
-      | Error exn ->
-          Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
-            !"Couldn't delete lock file for %s (pid $childPid) after killing \
-              it. If another Coda daemon was already running it may have \
-              cleaned it up for us. ($exn)"
-            name
-            ~metadata:
-              [ ("childPid", `Int (Pid.to_int pid))
-              ; ("exn", `String (Exn.to_string exn)) ] ;
-          Deferred.unit )
+      | `Unknown | `No -> (
+          match%bind try_with (fun () -> Sys.remove lockpath) with
+          | Ok () ->
+              Deferred.unit
+          | Error exn ->
+              Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+                !"Couldn't delete lock file for %s (pid $childPid) after \
+                  killing it. If another Coda daemon was already running it \
+                  may have cleaned it up for us. ($exn)"
+                name
+                ~metadata:
+                  [ ("childPid", `Int (Pid.to_int pid))
+                  ; ("exn", `String (Exn.to_string exn)) ] ;
+              Deferred.unit ) )
   | `Unknown | `No ->
       Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
         "No PID file for %s" name ;
       Deferred.unit
 
 type output_handling =
-  [`Log of Logger.Level.t | `Don't_log] * [`Pipe | `No_pipe]
+  [`Log of Logger.Level.t | `Don't_log]
+  * [`Pipe | `No_pipe]
+  * [`Keep_empty | `Filter_empty]
 
 (** Given a Reader.t coming from a process output, optionally log the lines
     coming from it and return a strict pipe that will get the lines if the
@@ -165,7 +171,7 @@ let reader_to_strict_pipe_with_logging :
     -> output_handling
     -> Logger.t
     -> string Strict_pipe.Reader.t =
- fun reader name (log, pipe) logger ->
+ fun reader name (log, pipe, filter_empty) logger ->
   let master_r, master_w =
     Strict_pipe.create ~name
       (Strict_pipe.Buffered (`Capacity 100, `Overflow Crash))
@@ -173,7 +179,12 @@ let reader_to_strict_pipe_with_logging :
   let lines_js_pipe = Reader.lines reader in
   don't_wait_for
     ( Pipe.iter_without_pushback lines_js_pipe ~f:(fun line ->
-          Strict_pipe.Writer.write master_w line )
+          match filter_empty with
+          | `Keep_empty ->
+              Strict_pipe.Writer.write master_w line
+          | `Filter_empty ->
+              if not (String.equal line "") then
+                Strict_pipe.Writer.write master_w line )
     >>= fun () ->
     Strict_pipe.Writer.close master_w ;
     Deferred.unit ) ;
@@ -187,9 +198,14 @@ let reader_to_strict_pipe_with_logging :
                  { Logger.Message.timestamp= Time.now ()
                  ; level
                  ; source=
-                     Logger.Source.create ~module_:__MODULE__ ~location:__LOC__
-                 ; message= sprintf "Output from process %s: %s" name line
-                 ; metadata= Logger.metadata logger }
+                     Some
+                       (Logger.Source.create ~module_:__MODULE__
+                          ~location:__LOC__)
+                 ; message= "Output from process $child_name: $line"
+                 ; metadata=
+                     String.Map.set ~key:"child_name" ~data:(`String name)
+                       (String.Map.set ~key:"line" ~data:(`String line)
+                          (Logger.metadata logger)) }
              in
              match
                Option.try_with (fun () -> Yojson.Safe.from_string line)
@@ -248,12 +264,15 @@ let start_custom :
     "Starting custom child process %s with args $args" name
     ~metadata:[("args", `List (List.map args ~f:(fun a -> `String a)))] ;
   let%bind coda_binary_path = get_coda_binary () in
+  let relative_to_root =
+    get_project_root ()
+    |> Option.map ~f:(fun root -> root ^/ git_root_relative_path)
+  in
   let%bind process =
     keep_trying
       (List.filter_opt
          [ Unix.getenv @@ "CODA_" ^ String.uppercase name ^ "_PATH"
-         ; get_project_root ()
-           |> Option.map ~f:(fun root -> root ^/ git_root_relative_path)
+         ; relative_to_root
          ; Some (Filename.dirname coda_binary_path ^/ name)
          ; Some ("coda-" ^ name) ])
       ~f:(fun prog -> Process.create ~prog ~args ())
@@ -288,9 +307,13 @@ let start_custom :
   don't_wait_for
     (let open Deferred.Let_syntax in
     let%bind termination_status = Process.wait process in
-    let%bind () = Writer.close @@ Process.stdin process in
-    let%bind () = Reader.close @@ Process.stdout process in
-    let%bind () = Reader.close @@ Process.stderr process in
+    Logger.trace logger "child process %s died" name ~module_:__MODULE__
+      ~location:__LOC__ ;
+    don't_wait_for
+      (let%bind () = after (Time.Span.of_sec 1.) in
+       let%bind () = Writer.close @@ Process.stdin process in
+       let%bind () = Reader.close @@ Process.stdout process in
+       Reader.close @@ Process.stderr process) ;
     let%bind () = Sys.remove lock_path in
     Ivar.fill terminated_ivar termination_status ;
     let log_bad_termination () =
@@ -339,7 +362,7 @@ let kill : t -> Unix.Exit_or_signal.t Deferred.Or_error.t =
 
 let%test_module _ =
   ( module struct
-    let logger = Logger.null ()
+    let logger = Logger.create ()
 
     let async_with_temp_dir f =
       Async.Thread_safe.block_on_async_exn (fun () ->
@@ -351,14 +374,16 @@ let%test_module _ =
 
     let git_root_relative_path = "src/lib/child_processes/tester.sh"
 
+    let process_wait_timeout = Time.Span.of_sec 2.1
+
     let%test_unit "can launch and get stdout" =
       async_with_temp_dir (fun conf_dir ->
           let open Deferred.Let_syntax in
           let%bind process =
             start_custom ~logger ~name ~git_root_relative_path ~conf_dir
               ~args:["exit"]
-              ~stdout:(`Log Logger.Level.Debug, `Pipe)
-              ~stderr:(`Log Logger.Level.Error, `No_pipe)
+              ~stdout:(`Log Logger.Level.Debug, `Pipe, `Keep_empty)
+              ~stderr:(`Log Logger.Level.Error, `No_pipe, `Keep_empty)
               ~termination:`Raise_on_failure
             |> Deferred.map ~f:Or_error.ok_exn
           in
@@ -369,7 +394,7 @@ let%test_module _ =
           in
           (* Pipe will be closed before the ivar is filled, so we need to wait a
              bit. *)
-          let%bind () = after @@ Time.Span.of_sec 0.1 in
+          let%bind () = after process_wait_timeout in
           [%test_eq: Unix.Exit_or_signal.t option] (Some (Ok ()))
             (termination_status process) ;
           Deferred.unit )
@@ -380,8 +405,8 @@ let%test_module _ =
           let%bind process =
             start_custom ~logger ~name ~git_root_relative_path ~conf_dir
               ~args:["loop"]
-              ~stdout:(`Don't_log, `Pipe)
-              ~stderr:(`Don't_log, `No_pipe)
+              ~stdout:(`Don't_log, `Pipe, `Keep_empty)
+              ~stderr:(`Don't_log, `No_pipe, `Keep_empty)
               ~termination:`Always_raise
             |> Deferred.map ~f:Or_error.ok_exn
           in
@@ -408,7 +433,7 @@ let%test_module _ =
           in
           let%bind () = go () in
           [%test_eq: string list] !output (List.init 10 ~f:(fun _ -> "hello")) ;
-          let%bind () = after @@ Time.Span.of_sec 0.1 in
+          let%bind () = after process_wait_timeout in
           assert (Option.is_none @@ termination_status process) ;
           let%bind kill_res = kill process in
           let%bind () = assert_lock_does_not_exist () in
@@ -424,8 +449,8 @@ let%test_module _ =
           let mk_process () =
             start_custom ~logger ~name ~git_root_relative_path ~conf_dir
               ~args:["loop"]
-              ~stdout:(`Don't_log, `No_pipe)
-              ~stderr:(`Don't_log, `No_pipe)
+              ~stdout:(`Don't_log, `No_pipe, `Keep_empty)
+              ~stderr:(`Don't_log, `No_pipe, `Keep_empty)
               ~termination:`Ignore
           in
           let%bind process1 =
@@ -434,6 +459,7 @@ let%test_module _ =
           let%bind process2 =
             mk_process () |> Deferred.map ~f:Or_error.ok_exn
           in
+          let%bind () = after process_wait_timeout in
           [%test_eq: Unix.Exit_or_signal.t option]
             (termination_status process1)
             (Some (Error (`Signal Core.Signal.term))) ;

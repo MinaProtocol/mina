@@ -20,18 +20,20 @@ Currently, Coda builds/runs on Linux & macOS. MacOS may have some issues that yo
 The short version:
 
  1. Start with Ubuntu 18 or run it in a [virtual machine](https://www.osboxes.org/ubuntu/)
- 2. Pull in our submodules: `git submodule update --init`. This might fail with
-    `git@github.com: Permission denied (publickey).`, if that happens it means
+ 2. Set github repos to pull and push over ssh: `git config --global url.ssh://git@github.com/.insteadOf https://github.com/`
+     - To push branches to repos in the CodaProtocol or o1-labs organisations, you must complete this step. These repositories do not accept the password authentication used by the https URLs.
+ 3. Pull in our submodules: `git submodule update --init`
+     - This might fail with `git@github.com: Permission denied (publickey).`. If that happens it means
     you need to [set up SSH keys on your machine](https://help.github.com/en/articles/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent).
- 3. Install Docker, GNU make, and bash
- 4. `make USEDOCKER=TRUE dev`
- 5. `make USEDOCKER=TRUE deb`
+ 4. Install Docker, GNU make, and bash
+ 5. `make USEDOCKER=TRUE dev`
+ 6. `make USEDOCKER=TRUE deb`
 
 Now you'll have a `src/_build/codaclient.deb` ready to install on Ubuntu or Debian!
 
 You should also run:
 
- 6. `git config --local --add submodule.recurse true`
+ 7. `git config --local --add submodule.recurse true`
 
 so that the submodules get updated automatically when updating your local copy
 of the repo.
@@ -57,7 +59,7 @@ of the repo.
 
 * Pull down developer container image  (~2GB download, go stretch your legs)
 
-`docker pull codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e`
+`docker pull codaprotocol/coda:toolchain-eb73e64d524c906384e9dbb23e9d0b8ae2be9e9e`
 
 * Create local builder image
 
@@ -126,12 +128,12 @@ You should probably use `USEDOCKER=TRUE` unless you've done the [building withou
 
 These are the most important `make` targets:
 
-* `kademlia`: build the kademlia helper
 * `build`: build everything
 * `docker`: build the container
 * `container`: restart the development container (or start it if it's not yet)
 * `dev`: does `docker`, `container`, and `build`
 * `test`: run the tests
+* `libp2p_helper`: build the libp2p helper
 * `web`: build the website, including the state explorer
 
 We use the [dune](https://github.com/ocaml/dune/) buildsystem for our OCaml code.
@@ -150,10 +152,15 @@ you need, you run `opam switch import src/opam.export`.
 Some of our dependencies aren't taken from `opam`, and aren't integrated
 with `dune`, so you need to add them manually, by running `scripts/pin-external-packages.sh`.
 
+You will need to install [Nix](https://nixos.org/nix/download.html) and also
+[cachix](https://cachix.org) with `nix-env -iA cachix -f
+https://cachix.org/api/v1/install`.
+
 There are a variety of C libraries we expect to be available in the system.
 These are also listed in the dockerfiles. Unlike most of the C libraries,
 which are installed using `apt` in the dockerfiles, the libraries for RocksDB are
-installed via the script `src/external/ocaml-rocksdb/install_rocksdb.sh`.
+automatically installed when building Coda via a `dune` rule in the library
+ocaml-rocksdb.
 
 ## Steps for adding a new dependency
 
@@ -207,3 +214,48 @@ Container Stages:
 * Stage 0: Initial Image [ocaml/opam2:debian-9-ocaml-4.07](https://hub.docker.com/r/ocaml/opam2/) (opam community image, ~880MB)
 * Stage 1: [coda toolchain](https://github.com/CodaProtocol/coda/blob/master/dockerfiles/Dockerfile-toolchain) (built by us, stored on docker hub, ~2GB compressed)
 * Stage 2: [codabuilder](https://github.com/CodaProtocol/coda/blob/master/dockerfiles/Dockerfile) (built with `make codabuilder`, used with `make build`, ~2GB compressed)
+
+
+## Overriding Genesis Constants
+
+Coda genesis constants consists of constants for the consensus algorithm, sizes for various data structures like transaction pool, scan state, ledger etc.
+All the constants can be set at compile-time. A subset of the compile-time constants can be overriden when generating the genesis state using `runtime_genesis_ledger.exe`, and a subset of those can again be overridden at runtime by passing the new values to the daemon.
+
+The constants at compile-time are set for different configurations using optional compilation. This is how integration tests/builds with multiple configurations are run.
+Currently some of these constants (defined [here](src/lib/coda_compile_config/coda_compile_config.ml)) cannot be changed after building and would require creating a new build profile (*.mlh files) for any change in the values.
+
+<b> 1. Constants that can be overridden when generating the genesis state are:</b>
+
+* k (consensus constant)
+* delta (consensus constant)
+* genesis_state_timestamp
+* transaction pool max size
+
+To override the above listed constants, pass a json file to `runtime_genesis_ledger.exe` with the format:
+
+```json
+{
+    "k": 10,
+    "delta": 3,
+    "txpool_max_size": 3000,
+    "genesis_state_timestamp": "2020-04-20 11:00:00-07:00"
+}
+```
+
+The exe will then package the overriden constants along with the genesis ledger and the genesis proof for the daemon to consume.
+
+<b> 2. Constants that can be overriden at runtime are:</b>
+
+* genesis_state_timestamp
+* transaction pool max size
+
+To do this, pass a json file to the daemon using the flag `genesis-constants` with the format:
+
+```json
+{
+    "txpool_max_size": 3000,
+    "genesis_state_timestamp": "2020-04-20 11:00:00-07:00"
+}
+```
+
+The daemon logs should reflect these changes. Also, `coda client status` displays some of the constants.

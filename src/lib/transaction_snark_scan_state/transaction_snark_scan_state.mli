@@ -18,7 +18,7 @@ module Stable :
 module Transaction_with_witness : sig
   (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)
   type t =
-    { transaction_with_info: Ledger.Undo.t
+    { transaction_with_info: Ledger.Undo.t Transaction_protocol_state.t
     ; statement: Transaction_snark.Statement.t
     ; witness: Transaction_witness.t }
   [@@deriving sexp]
@@ -134,14 +134,21 @@ val next_on_new_tree : t -> bool
 (**update scan state metrics*)
 val update_metrics : t -> unit Or_error.t
 
+(** Hashes of the protocol states required for proving transactions*)
+val required_state_hashes : t -> State_hash.Set.t
+
+(** Validate protocol states required for proving the transactions. Returns an association list of state_hash and the corresponding state*)
+val check_required_protocol_states :
+     t
+  -> protocol_states:Coda_state.Protocol_state.value list
+  -> (State_hash.t * Coda_state.Protocol_state.value) list Or_error.t
+
 (** All the proof bundles for snark workers*)
 val all_work_pairs_exn :
      t
-  -> ( Transaction.t
+  -> ( Transaction.t Transaction_protocol_state.t
      , Transaction_witness.t
      , Ledger_proof.t )
      Snark_work_lib.Work.Single.Spec.t
      One_or_two.t
      list
-
-module Constants : Snark_params.Scan_state_constants.S

@@ -3,7 +3,7 @@ open Ppxlib
 open Versioned_util
 
 (* option to `deriving version' *)
-type version_option = No_version_option | Asserted
+type version_option = No_version_option | Asserted | Binable
 
 let parse_opt = Ast_pattern.parse ~on_error:(fun () -> None)
 
@@ -25,10 +25,25 @@ let rec add_deriving ~loc ~version_option attributes =
     let payload = Ast_builder.(pstr_eval (pexp_tuple idents) []) in
     PStr [payload]
   in
+  let version_expr =
+    match version_option with
+    | No_version_option ->
+        [%expr version]
+    | Asserted ->
+        [%expr version {asserted}]
+    | Binable ->
+        [%expr version {binable}]
+  in
   match attributes with
   | [] ->
       let attr_name = mk_loc ~loc "deriving" in
-      let attr_payload = payload [[%expr bin_io]; [%expr version]] in
+      let attr_payload =
+        match version_option with
+        | No_version_option | Asserted ->
+            payload [[%expr bin_io]; version_expr]
+        | Binable ->
+            payload [version_expr]
+      in
       [create_attr ~loc attr_name attr_payload]
   | attr :: attributes -> (
       let idents =
@@ -48,51 +63,70 @@ let rec add_deriving ~loc ~version_option attributes =
             Ast_pattern.(
               pexp_apply (pexp_ident (lident (string "version"))) __)
           in
-          if
+          let has_version =
             List.exists args ~f:(fun arg ->
                 match parse_opt special_version loc arg (fun _ -> Some ()) with
                 | None ->
                     false
                 | Some () ->
                     true )
-          then
-            (* [version] is already present, add [bin_io] and stop recursing. *)
-            modify_attr_payload attr (payload ([%expr bin_io] :: args))
-            :: attributes
-          else
-            let version_expr =
-              match version_option with
-              | No_version_option ->
-                  [%expr version]
-              | Asserted ->
-                  [%expr version {asserted}]
-            in
-            modify_attr_payload attr
-              (payload ([%expr bin_io] :: version_expr :: args))
-            :: attributes )
+          in
+          let needs_bin_io =
+            match version_option with
+            | No_version_option | Asserted ->
+                true
+            | Binable ->
+                false
+          in
+          let extra_payload_args =
+            match (has_version, needs_bin_io) with
+            | false, false ->
+                [version_expr]
+            | false, true ->
+                [[%expr bin_io]; version_expr]
+            | true, false ->
+                []
+            | true, true ->
+                [[%expr bin_io]]
+          in
+          modify_attr_payload attr (payload (extra_payload_args @ args))
+          :: attributes )
 
 let version_type ~version_option version stri =
   let loc = stri.pstr_loc in
   let t, params =
-    (* NOTE: Can't use [Ast_pattern] here; it rejects attributes attached to
-       types..
-    *)
+    let subst_type stri =
+      (* NOTE: Can't use [Ast_pattern] here; it rejects attributes attached to
+         types..
+      *)
+      match stri.pstr_desc with
+      | Pstr_type
+          ( rec_flag
+          , [({ptype_name= {txt= "t"; _}; ptype_private= Public; _} as typ)] )
+        ->
+          let params = typ.ptype_params in
+          let typ =
+            { typ with
+              ptype_attributes=
+                add_deriving ~loc:typ.ptype_loc ~version_option
+                  typ.ptype_attributes }
+          in
+          let t = {stri with pstr_desc= Pstr_type (rec_flag, [typ])} in
+          (t, params)
+      | _ ->
+          (* TODO: Handle rpc types. *)
+          Location.raise_errorf ~loc:stri.pstr_loc
+            "Expected a single public type t."
+    in
     match stri.pstr_desc with
-    | Pstr_type
-        ( rec_flag
-        , [({ptype_name= {txt= "t"; _}; ptype_private= Public; _} as typ)] ) ->
-        let params = typ.ptype_params in
-        let typ =
-          { typ with
-            ptype_attributes=
-              add_deriving ~loc:typ.ptype_loc ~version_option
-                typ.ptype_attributes }
-        in
-        let t = {stri with pstr_desc= Pstr_type (rec_flag, [typ])} in
-        (t, params)
+    | Pstr_type _ ->
+        subst_type stri
+    | Pstr_module {pmb_expr= {pmod_desc= Pmod_structure (stri :: _); _}; _} ->
+        subst_type stri
     | _ ->
         (* TODO: Handle rpc types. *)
-        Location.raise_errorf ~loc "Expected a single public type t."
+        Location.raise_errorf ~loc:stri.pstr_loc
+          "Expected a single public type t, or a module T."
   in
   let (module Ast_builder) = Ast_builder.make loc in
   let with_version =
@@ -248,7 +282,22 @@ let version_type ~version_option version stri =
           , bin_writer_t
           , bin_t )] ]
   in
-  (List.is_empty params, t :: with_version :: bin_io_shadows)
+  match stri.pstr_desc with
+  | Pstr_type _ ->
+      (List.is_empty params, [t], with_version :: bin_io_shadows)
+  | Pstr_module
+      ( {pmb_expr= {pmod_desc= Pmod_structure (stri :: str); _} as pmod; _} as
+      pmb ) ->
+      ( List.is_empty params
+      , [ { stri with
+            pstr_desc=
+              Pstr_module
+                { pmb with
+                  pmb_expr= {pmod with pmod_desc= Pmod_structure (t :: str)} }
+          } ]
+      , with_version :: bin_io_shadows )
+  | _ ->
+      assert false
 
 let convert_module_stri ~version_option last_version stri =
   let module_pattern =
@@ -278,10 +327,17 @@ let convert_module_stri ~version_option last_version stri =
     | [] ->
         Location.raise_errorf ~loc:str.loc
           "Expected a type declaration in this structure."
+    | ({pstr_desc= Pstr_module {pmb_name= {txt= "T"; _}; _}; _} as type_stri)
+      :: ( { pstr_desc=
+               Pstr_include
+                 {pincl_mod= {pmod_desc= Pmod_ident {txt= Lident "T"; _}; _}; _}
+           ; _ }
+           :: _ as str ) ->
+        (type_stri, str)
     | type_stri :: str ->
         (type_stri, str)
   in
-  let should_convert, type_versioning_str =
+  let should_convert, type_str, with_version_bin_io_shadows =
     version_type ~version_option version type_stri
   in
   (* TODO: If [should_convert] then look for [to_latest]. *)
@@ -289,7 +345,9 @@ let convert_module_stri ~version_option last_version stri =
   ( version
   , pstr_module ~loc
       (module_binding ~loc ~name
-         ~expr:(pmod_structure ~loc:str.loc (type_versioning_str @ str_rest)))
+         ~expr:
+           (pmod_structure ~loc:str.loc
+              (type_str @ str_rest @ with_version_bin_io_shadows)))
   , should_convert )
 
 let convert_modbody ~loc ~version_option body =
@@ -314,6 +372,8 @@ let convert_modbody ~loc ~version_option body =
               Location.raise_errorf ~loc:tests_str_item.pstr_loc
                 "Expected a module named Tests" ) ;
           (vns, tests)
+    | Binable ->
+        (body, [])
   in
   let _, rev_str, convs =
     List.fold ~init:(None, [], []) body
@@ -562,6 +622,11 @@ let () =
       declare "versioned_asserted" Context.structure_item module_ast_pattern
         (version_module ~version_option:Asserted))
   in
+  let module_extension_binable =
+    Extension.(
+      declare "versioned_binable" Context.structure_item module_ast_pattern
+        (version_module ~version_option:Binable))
+  in
   let module_decl_ast_pattern =
     Ast_pattern.(
       psig
@@ -577,6 +642,11 @@ let () =
   let module_rule_asserted =
     Context_free.Rule.extension module_extension_asserted
   in
+  let module_rule_binable =
+    Context_free.Rule.extension module_extension_binable
+  in
   let module_decl_rule = Context_free.Rule.extension module_decl_extension in
-  let rules = [module_rule; module_rule_asserted; module_decl_rule] in
+  let rules =
+    [module_rule; module_rule_asserted; module_rule_binable; module_decl_rule]
+  in
   Driver.register_transformation "ppx_coda/versioned_module" ~rules

@@ -1,6 +1,3 @@
-[%%import
-"../../config.mlh"]
-
 open Core_kernel
 open Bitstring_lib
 open Snark_bits
@@ -8,7 +5,6 @@ module Tick_backend = Crypto_params.Tick_backend
 module Tock_backend = Crypto_params.Tock_backend
 module Snarkette_tick = Crypto_params.Snarkette_tick
 module Snarkette_tock = Crypto_params.Snarkette_tock
-module Scan_state_constants = Scan_state_constants
 
 module Make_snarkable (Impl : Snarky.Snark_intf.S) = struct
   open Impl
@@ -58,8 +54,7 @@ let%test_unit "group-map test" =
   let params =
     Group_map.Params.create
       (module Tick0.Field)
-      ~a:Tick_backend.Inner_curve.Coefficients.a
-      ~b:Tick_backend.Inner_curve.Coefficients.b
+      Tick_backend.Inner_curve.Coefficients.{a; b}
   in
   let module M = Snarky.Snark.Run.Make (Tick_backend) (Unit) in
   Quickcheck.test ~trials:3 Tick0.Field.gen ~f:(fun t ->
@@ -773,21 +768,6 @@ let embed (x : Tick.Field.t) : Tock.Field.t =
 
 (** enable/disable use of chunk table in Pedersen hashing *)
 let set_chunked_hashing b = Tick.Pedersen.State.set_chunked_fold b
-
-[%%inject
-"ledger_depth", ledger_depth]
-
-let scan_state_transaction_capacity_log_2 =
-  Scan_state_constants.transaction_capacity_log_2
-
-let scan_state_work_delay = Scan_state_constants.work_delay
-
-(*Log of maximum number of trees in the parallel scan state*)
-let pending_coinbase_depth =
-  Int.ceil_log2
-    ( (scan_state_transaction_capacity_log_2 + 1)
-      * (scan_state_work_delay + 1)
-    + 1 )
 
 (* Let n = Tick.Field.size_in_bits.
    Let k = n - 3.

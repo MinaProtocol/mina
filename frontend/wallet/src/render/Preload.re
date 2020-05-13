@@ -10,13 +10,16 @@ let downloadKey = (keyName, chunkCb, doneCb) =>
     doneCb,
   );
 
+let downloadCoda = (version, chunkCb, doneCb) =>
+  DownloadLogic.downloadCoda(version, chunkCb, doneCb);
+
 [@bs.module "electron"] [@bs.scope "shell"] [@bs.val]
-external showItemInFolder: string => unit = "";
+external showItemInFolder: string => unit = "showItemInFolder";
 
 let showItemInFolder = showItemInFolder;
 
 [@bs.module "electron"] [@bs.scope "shell"] [@bs.val]
-external openExternal: string => unit = "";
+external openExternal: string => unit = "openExternal";
 
 let openExternal = openExternal;
 
@@ -24,10 +27,18 @@ let isFaker =
   Js.Dict.get(Bindings.ChildProcess.Process.env, "GRAPHQL_BACKEND")
   == Some("faker");
 
+let getTranslation = name =>
+  Bindings.Fs.readFileSync(
+    "./public/translations/" ++ name ++ ".json",
+    "utf8",
+  );
+
 [%bs.raw "window.isFaker = isFaker"];
 [%bs.raw "window.downloadKey = downloadKey"];
+[%bs.raw "window.downloadCoda = downloadCoda"];
 [%bs.raw "window.showItemInFolder = showItemInFolder"];
 [%bs.raw "window.openExternal = openExternal"];
 [%bs.raw
   "window.fileRoot = require(\"path\").dirname(window.location.pathname)"
 ];
+[%bs.raw "window.getTranslation = getTranslation"];

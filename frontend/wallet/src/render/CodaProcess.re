@@ -30,7 +30,7 @@ let reduce = (acc, action) =>
     )
   };
 
-let defaultNetwork = "testnet.codaprotocol.com";
+let defaultNetwork = "wallet.o1test.net";
 let getLocalStorageNetwork = () => {
   Bindings.(
     switch (Js.Nullable.toOption(LocalStorage.getItem(`Network))) {
@@ -59,17 +59,20 @@ let useHook = () => {
   let (_state, dispatch) =
     Hooks.Reducer.useReducer(reduce, {State.args: [], mode: Stable});
 
-  // let () ÷=
-  // React.useEffect0(() => {
-  // let token = MainCommunication.listen();
-  // let args = None;
-  //   switch (getLocalStorageNetwork()) {
-  //   | "" => []
-  //   | s => ["-peer", s]
-  //   };
-  // dispatch(Action.StartCoda(args));
-  // Some(() => MainCommunication.stopListening(token));
-  // });
-
   dispatch;
+};
+
+let useStartEffect = optDispatch => {
+  React.useEffect0(() => {
+    let token = MainCommunication.listen();
+    let args = defaultArgs;
+
+    switch (optDispatch) {
+    | Some(dispatch) => dispatch(Action.StartCoda(args))
+    | None => ()
+    };
+
+    // Passback a handler to cancel the listener.
+    Some(() => MainCommunication.stopListening(token));
+  });
 };

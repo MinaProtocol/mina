@@ -35,7 +35,7 @@ module Pre_diff_two : sig
   type ('a, 'b) t =
     { completed_works: 'a list
     ; user_commands: 'b list
-    ; coinbase: Fee_transfer.Single.t At_most_two.t }
+    ; coinbase: Coinbase.Fee_transfer.t At_most_two.t }
   [@@deriving sexp, to_yojson]
 
   module Stable :
@@ -51,7 +51,7 @@ module Pre_diff_one : sig
   type ('a, 'b) t =
     { completed_works: 'a list
     ; user_commands: 'b list
-    ; coinbase: Fee_transfer.Single.t At_most_one.t }
+    ; coinbase: Coinbase.Fee_transfer.t At_most_one.t }
   [@@deriving sexp, to_yojson]
 
   module Stable :
@@ -91,8 +91,8 @@ end
 
 module Diff : sig
   type t =
-    Pre_diff_with_at_most_two_coinbase.Stable.V1.t
-    * Pre_diff_with_at_most_one_coinbase.Stable.V1.t option
+    Pre_diff_with_at_most_two_coinbase.t
+    * Pre_diff_with_at_most_one_coinbase.t option
   [@@deriving sexp, to_yojson]
 
   module Stable :
@@ -107,7 +107,7 @@ end
 type t =
   { diff: Diff.t
   ; creator: Public_key.Compressed.t
-  ; state_body_hash: State_body_hash.Stable.V1.t }
+  ; coinbase_receiver: Public_key.Compressed.t }
 [@@deriving sexp, to_yojson, fields]
 
 module Stable :
@@ -116,7 +116,7 @@ module Stable :
       type t =
         { diff: Diff.t
         ; creator: Public_key.Compressed.t
-        ; state_body_hash: State_body_hash.Stable.V1.t }
+        ; coinbase_receiver: Public_key.Compressed.t }
       [@@deriving sexp, to_yojson, bin_io, version]
     end
 
@@ -145,7 +145,7 @@ module With_valid_signatures_and_proofs : sig
   type t =
     { diff: diff
     ; creator: Public_key.Compressed.t
-    ; state_body_hash: State_body_hash.t }
+    ; coinbase_receiver: Public_key.Compressed.t }
   [@@deriving sexp, to_yojson]
 
   val user_commands : t -> User_command.With_valid_signature.t list
@@ -172,7 +172,7 @@ module With_valid_signatures : sig
   type t =
     { diff: diff
     ; creator: Public_key.Compressed.t
-    ; state_body_hash: State_body_hash.t }
+    ; coinbase_receiver: Public_key.Compressed.t }
   [@@deriving sexp, to_yojson]
 end
 

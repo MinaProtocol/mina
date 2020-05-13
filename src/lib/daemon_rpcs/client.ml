@@ -6,19 +6,17 @@ open Async
 let print_rpc_error error =
   eprintf "RPC connection error: %s\n" (Error.to_string_hum error)
 
-let dispatch rpc query port =
-  Tcp.with_connection
-    (Tcp.Where_to_connect.of_host_and_port (Cli_lib.Port.of_local port))
-    ~timeout:(Time.Span.of_sec 1.)
-    (fun _ r w ->
+let dispatch rpc query (host_and_port : Host_and_port.t) =
+  Tcp.with_connection (Tcp.Where_to_connect.of_host_and_port host_and_port)
+    ~timeout:(Time.Span.of_sec 1.) (fun _ r w ->
       let open Deferred.Let_syntax in
       match%bind Rpc.Connection.create r w ~connection_state:(fun _ -> ()) with
       | Error exn ->
           return
             (Or_error.errorf
-               !"Error connecting to the daemon on port %d using the RPC \
-                 call, %s,: %s"
-               port (Rpc.Rpc.name rpc) (Exn.to_string exn))
+               !"Error connecting to the daemon on %{sexp:Host_and_port.t} \
+                 using the RPC call, %s,: %s"
+               host_and_port (Rpc.Rpc.name rpc) (Exn.to_string exn))
       | Ok conn ->
           Rpc.Rpc.dispatch rpc conn query )
 

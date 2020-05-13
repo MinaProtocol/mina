@@ -1,3 +1,4 @@
+open ReactIntl;
 open Tc;
 
 module Styles = {
@@ -38,6 +39,7 @@ module Styles = {
       style([
         margin2(~v=`rem(0.5), ~h=`zero),
         color(Theme.Colors.midnight),
+        textTransform(`capitalize),
       ]),
     ]);
 
@@ -106,7 +108,8 @@ module Version = {
 
     <div className=Styles.versionText>
       <span className=Css.(style([color(Theme.Colors.slateAlpha(0.3))]))>
-        {React.string("Version:")}
+        <FormattedMessage id="version" defaultMessage="Version" />
+        {React.string(":")}
       </span>
       <Spacer width=0.5 />
       <span className=Css.(style([color(Theme.Colors.slateAlpha(0.7))]))>
@@ -115,7 +118,7 @@ module Version = {
              (
                switch (response.result) {
                | Loading => "..."
-               | Error(err) => err##message
+               | Error((err: ReasonApolloTypes.apolloError)) => err.message
                | Data(data) =>
                  data##version
                  |> Option.map(~f=prettyVersion)
@@ -128,13 +131,6 @@ module Version = {
     </div>;
   };
 };
-
-type ownedAccounts =
-  Account.t = {
-    locked: option(bool),
-    publicKey: PublicKey.t,
-    balance: {. "total": int64},
-  };
 
 module AccountSettingsItem = {
   [@react.component]
@@ -162,9 +158,7 @@ module AccountSettingsItem = {
       </span>
       {showModal
          ? <UnlockModal
-             account={
-               account##publicKey;
-             }
+             account={account##publicKey}
              onClose={() => setModalOpen(_ => false)}
              onSuccess={() => {
                setModalOpen(_ => false);
@@ -179,7 +173,7 @@ module AccountSettingsItem = {
 module AccountsQueryString = [%graphql
   {|
     query getWallets {
-      ownedWallets {
+      trackedAccounts {
         locked
         publicKey @bsDecoder(fn: "Apollo.Decoders.publicKey")
       }
@@ -193,19 +187,24 @@ module AccountsQuery = ReasonApollo.CreateQuery(AccountsQueryString);
 let make = () => {
   <div className=Styles.container>
     <div className=Styles.headerContainer>
-      <div className=Styles.label> {React.string("Account Settings")} </div>
-     <Version />
+      <div className=Styles.label>
+        <FormattedMessage
+          id="account-settings"
+          defaultMessage="Account Settings"
+        />
+      </div>
+      <Version />
     </div>
     <Spacer height=0.5 />
     <div className=Styles.accountSettings>
-      <AccountsQuery>
+      <AccountsQuery fetchPolicy="network-only">
         {({result}) =>
            switch (result) {
            | Loading =>
              <div className=Styles.emptyAccountSettings> <Loader /> </div>
            | Error(_) => React.null
            | Data(data) =>
-             data##ownedWallets
+             data##trackedAccounts
              |> Array.map(~f=account => <AccountSettingsItem account />)
              |> React.array
            }}

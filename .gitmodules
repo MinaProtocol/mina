@@ -1,24 +1,30 @@
 [submodule "src/lib/snarky"]
 	path = src/lib/snarky
-	url = git@github.com:o1-labs/snarky
+	url = https://github.com/o1-labs/snarky
 [submodule "src/external/ppx_optcomp"]
 	path = src/external/ppx_optcomp
-	url = git@github.com:CodaProtocol/ppx_optcomp
+	url = https://github.com/CodaProtocol/ppx_optcomp
 [submodule "src/external/async_kernel"]
 	path = src/external/async_kernel
-	url = git@github.com:CodaProtocol/async_kernel
+	url = https://github.com/CodaProtocol/async_kernel
 [submodule "src/external/ocaml-extlib"]
 	path = src/external/ocaml-extlib
-	url = git@github.com:CodaProtocol/ocaml-extlib.git
+	url = https://github.com/CodaProtocol/ocaml-extlib.git
 [submodule "src/external/rpc_parallel"]
 	path = src/external/rpc_parallel
-	url = git@github.com:CodaProtocol/rpc_parallel.git
+	url = https://github.com/CodaProtocol/rpc_parallel.git
 [submodule "src/external/digestif"]
 	path = src/external/digestif
-	url = git@github.com:CodaProtocol/digestif.git
+	url = https://github.com/CodaProtocol/digestif.git
 [submodule "frontend/wallet/tablecloth"]
 	path = frontend/wallet/tablecloth
 	url = https://github.com/bkase/tablecloth
 [submodule "src/external/graphql_ppx"]
 	path = src/external/graphql_ppx
-	url = git@github.com:o1-labs/graphql_ppx.git
+	url = https://github.com/o1-labs/graphql_ppx.git
+[submodule "src/lib/zexe"]
+	path = src/lib/zexe
+	url = https://github.com/o1-labs/zexe.git
+[submodule "src/lib/marlin"]
+	path = src/lib/marlin
+	url = https://github.com/o1-labs/marlin.git

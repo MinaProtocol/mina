@@ -4,17 +4,26 @@ import argparse
 import collections
 import jinja2
 import os
+import re
+import shutil
 import subprocess
 import sys
 import time
+from glob import glob
 from itertools import chain
+from readchar import readchar
+
+
+#################
+# CONFIGURATION #
+#################
+
 
 build_artifact_profiles = [
-    'testnet_postake_medium_curves',
-    'net_10k'
+    'testnet_postake_medium_curves'
 ]
 
-unit_test_profiles = ['test_postake_snarkless_unittest', 'dev']
+unit_test_profiles = ['dev']
 
 unit_test_profiles_medium_curves = ['dev_medium_curves']
 
@@ -27,9 +36,8 @@ integration_tests = [
     'coda-peers-test',
     'coda-transitive-peers-test',
     'coda-block-production-test',
-    'coda-shared-prefix-test -who-proposes 0',
-    'coda-shared-prefix-test -who-proposes 1',
-    'coda-restart-node-test',
+    'coda-shared-prefix-test -who-produces 0',
+    'coda-shared-prefix-test -who-produces 1',
     'coda-change-snark-worker-test',
     'coda-archive-node-test'
 ]
@@ -44,53 +52,57 @@ small_curves_tests = {
     'test_postake_split_snarkless':
     integration_tests,
     'test_postake_split':
-    ['coda-shared-prefix-multiproposer-test -num-proposers 2'],
+    ['coda-shared-prefix-multiproducer-test -num-block-producers 2'],
     'test_postake':
     simple_tests,
     'test_postake_catchup': ['coda-restart-node-test'],
     'test_postake_bootstrap':
-    ['coda-bootstrap-test', 'coda-long-fork -num-proposers 2'],
-    'test_postake_three_proposers': ['coda-txns-and-restart-non-proposers'],
-    'test_postake_holy_grail': ['coda-restarts-and-txns-holy-grail -num-proposers 5'],
+    ['coda-bootstrap-test'],
+    'test_postake_three_producers': ['coda-txns-and-restart-non-producers'],
     'test_postake_delegation': ['coda-delegation-test'],
     'test_postake_txns': ['coda-shared-state-test', 'coda-batch-payment-test'],
-    'test_postake_five_even_snarkless':
-    ['coda-shared-prefix-multiproposer-test -num-proposers 5'],
     'test_postake_five_even_txns':
-    ['coda-shared-prefix-multiproposer-test -num-proposers 5 -payments'],
+    ['coda-shared-prefix-multiproducer-test -num-block-producers 5 -payments'],
 }
 
-medium_curves_tests = {
+medium_curves_and_other_tests = {
     'test_postake_medium_curves':
     simple_tests,
     'test_postake_snarkless_medium_curves':
     simple_tests,
     'test_postake_split_medium_curves':
-    ['coda-shared-prefix-multiproposer-test -num-proposers 2'],
+    ['coda-shared-prefix-multiproducer-test -num-block-producers 2'],
+    'test_postake_full_epoch': ['full-test'],
+}
+
+archive_processor_test = {
+    'test_archive_processor': ['coda-archive-processor-test'],
 }
 
 medium_curve_profiles_full = [
     'test_postake_medium_curves', 'testnet_postake_medium_curves',
-    'testnet_postake_many_proposers_medium_curves'
+    'testnet_postake_many_producers_medium_curves'
 ]
 
-ci_blacklist = [
+ci_excludes = [
     "ci/circleci: lint-opt",
 ]
 
-# of all the generated CI jobs, allow these specific ones to fail (extra blacklist on top of ci_blacklist)
-required_blacklist = [
-    'test_postake_five_even_snarkless:*',
+# of all the generated CI jobs, allow these specific ones to fail (extra excludes on top of ci_excludes)
+required_excludes = [
     'test_postake_catchup:*',
-    'test_postake_holy_grail:*',
+    'test_postake_three_producers:*',
+    'test_postake_split_snarkless:*'
 ]
 
 # these extra jobs are not filters, they are full status check names
 extra_required_status_checks = [
     "ci/circleci: lint",
     "ci/circleci: tracetool",
-    "ci/circleci: build-auxiliary",
     "ci/circleci: build-wallet",
+    "ci/circleci: compare-test-signatures",
+    "ci/circleci: build-client-sdk",
+    "ci/circleci: test-unit--nonconsensus_medium_curves",
 ]
 
 # these are full status check names. they will not be required to succeed.
@@ -99,15 +111,43 @@ not_required_status_checks = [
 ]
 
 
-def fail(msg):
+#########
+# UTILS #
+#########
+
+
+def panic(msg):
     print('ERROR: %s' % msg)
     exit(1)
 
 
-def fail_with_log(msg, log):
-    with open(log, 'r') as file:
-        print(file.read())
-    fail(msg)
+class TempWorkingDirectory:
+    def __init__(self, path):
+        self.path = path
+        self.prev_path = None
+
+    def __enter__(self):
+        if self.prev_path:
+            panic('cannot enter TempWorkingDirectory in a nested fashion')
+        self.prev_path = os.getcwd()
+        os.chdir(self.path)
+
+    def __exit__(self, type, value, tb):
+        if not self.prev_path:
+            panic('cannot exit TempWorkingDirectory that has not been entered')
+        os.chdir(self.prev_path)
+        self.prev_path = None
+        return False
+
+
+def relative_glob(root_dir, pattern):
+    with TempWorkingDirectory(root_dir):
+        return glob(pattern)
+
+
+###############################
+# TEST PATTERNS AND FILTERING #
+###############################
 
 
 def test_pattern(pattern, string):
@@ -122,31 +162,31 @@ def parse_filter(pattern_src):
     else:
         parts = pattern_src.split(':')
         if len(parts) != 2:
-            fail('invalid filter syntax')
+            panic('invalid filter syntax')
         [profile, test] = parts
         return (profile, test)
 
 
 def filter_tests(tests,
-                 whitelist_filters,
-                 blacklist_filters,
+                 includes_filters,
+                 excludes_filters,
                  permutations=None):
     if permutations is None:
         permutations = tests
 
-    whitelist_patterns = list(map(parse_filter, whitelist_filters))
-    blacklist_patterns = list(map(parse_filter, blacklist_filters))
+    includes_patterns = list(map(parse_filter, includes_filters))
+    excludes_patterns = list(map(parse_filter, excludes_filters))
 
     def keep(profile, test):
-        whitelisted = all(
+        included = all(
             test_pattern(profile_pat, profile)
             and test_pattern(test_pat, test)
-            for (profile_pat, test_pat) in whitelist_patterns)
-        blacklisted = any(
+            for (profile_pat, test_pat) in includes_patterns)
+        excluded = any(
             test_pattern(profile_pat, profile)
             and test_pattern(test_pat, test)
-            for (profile_pat, test_pat) in blacklist_patterns)
-        return whitelisted and not (blacklisted)
+            for (profile_pat, test_pat) in excludes_patterns)
+        return included and not excluded
 
     result = collections.defaultdict(list)
     for (profile, tests) in permutations.items():
@@ -156,104 +196,259 @@ def filter_tests(tests,
     return result
 
 
-def run(args):
-    # wraps a "wet" action, printing if dry run is set, executing otherwise
-    def wet(msg, f):
-        if args.dry_run:
-            print(msg)
+#######################
+# ARTIFACT COLLECTION #
+#######################
+
+
+class ArtifactCollector:
+    def __init__(self, root_dir, context):
+        self.root_dir = root_dir
+        self.context = context
+
+    def resolve_source_path(self, path):
+        return os.path.join(self.root_dir, path)
+
+    def decorate_target_path(self, target_path):
+        dirname = os.path.dirname(target_path)
+        old_basename = os.path.basename(target_path)
+        new_basename = '%s--%s' % (self.context, target_path)
+        return os.path.join(dirname, new_basename)
+
+
+class SingleArtifactCollector(ArtifactCollector):
+    def __init__(self, root_dir, context, src_name, dst_name=None):
+        ArtifactCollector.__init__(self, root_dir, context)
+        self.src_name = src_name
+        self.dst_name = dst_name
+
+    def collect(self, destination):
+        src = self.resolve_source_path(self.src_name)
+        dst_name = self.dst_name if self.dst_name else os.path.basename(self.src_name)
+        shutil.copyfile(src, os.path.join(destination, self.decorate_target_path(dst_name)))
+
+
+class BatchArtifactCollector(ArtifactCollector):
+    def __init__(self, root_dir, context, pattern):
+        ArtifactCollector.__init__(self, root_dir, context)
+        self.pattern = pattern
+
+    def collect(self, destination):
+        for artifact in relative_glob(self.root_dir, self.pattern):
+            name = self.decorate_target_path(artifact.replace('/', '--'))
+            location = os.path.join(self.root_dir, artifact)
+            shutil.copyfile(location, os.path.join(destination, name))
+
+
+#############
+# EXECUTIVE #
+#############
+
+
+# The Executive oversees the execution of the integration test runner,
+# providing a single layer where we implement the logic for how to
+# execute a test in adherence with arguments provided from the CLI.
+class Executive:
+    def __init__(self, args, artifact_directory):
+        self.is_dry = args.dry_run
+        self.non_interactive = args.non_interactive
+        self.force_yes = args.yes
+        self.should_collect_artifacts = args.collect_artifacts
+        self.artifact_directory = artifact_directory
+        self.artifact_collectors = []
+
+    def do(self, name, f):
+        if self.is_dry:
+            print(name)
         else:
             f()
 
-    def run_cmd(cmd, on_failure):
-        def do():
-            if subprocess.call(['bash', '-c', cmd],
-                               stdout=sys.stdout,
-                               stderr=sys.stderr) != 0:
-                on_failure()
+    def run_cmd(self, cmd, directory='.', log=None):
+        def action():
+            with TempWorkingDirectory(directory):
+                if subprocess.call(['bash', '-c', cmd], stdout=sys.stdout, stderr=sys.stderr) != 0:
+                    if log:
+                        with open(log, 'r') as file:
+                            lines = file.readlines()
+                            for line in lines[-200:]:
+                                sys.stdout.write(line)
+                    self.fail('command failed: %s' % cmd)
+        self.do('$ %s' % cmd, action)
 
-        wet('$ ' + cmd, do)
-
-    logproc_filter = '.level in ["Warn", "Error", "Fatal", "Faulty_peer"]'
-    coda_build_path = './_build/default'
-
-    coda_app_path = 'app' if os.path.exists('dune-project') else 'src/app'
-    coda_exe_path = os.path.join(coda_app_path, 'cli/src/coda.exe')
-    coda_exe = os.path.join(coda_build_path, coda_exe_path)
-
-    with open(os.devnull, 'w') as null:
-        if subprocess.call(['which', 'logproc'], stdout=null,
-                           stderr=null) == 0:
-            logproc_exe = 'logproc'
-            build_targets = coda_exe
+    def prompt(self, msg, default):
+        if self.force_yes:
+            return True
+        elif self.non_interactive:
+            return default
         else:
-            logproc_exe_path = os.path.join(coda_app_path,
-                                            'logproc/logproc.exe')
-            logproc_exe = os.path.join(coda_build_path, logproc_exe_path)
-            build_targets = '%s %s' % (coda_exe, logproc_exe)
+            while True:
+                sys.stdout.write('%s [y/n] ' % msg)
+                sys.stdout.flush()
+                c = readchar()
+                print()
+                if c == 'y' or c == 'Y':
+                    return True
+                elif c == 'n' or c == 'N':
+                    return False
+                else:
+                    print('  invalid input')
 
+    def reserve_file(self, path):
+        if os.path.exists(path):
+            if self.prompt('"%s" already exits. Should it be overwritten?' % path, False):
+                self.remove_directory(path, 'old test logs')
+            else:
+                self.fail('Refusing to overwrite "%s"' % path)
+
+    def remove_directory(self, directory, context=None):
+        if context:
+            context += ' '
+        self.do('remove %sdirectory' % context, lambda: os.remove(directory) if os.path.exists(directory) else None)
+
+    def make_directory(self, directory, context=None):
+        if context:
+            context += ' '
+        self.do('make %sdirectory' % context, lambda: os.makedirs(directory) if not os.path.exists(directory) else None)
+
+    def register_artifact_collector(self, collector):
+        self.artifact_collectors.append(collector)
+
+    def collect_artifacts(self):
+        def action():
+            for collector in self.artifact_collectors:
+                collector.collect(self.artifact_directory)
+        if self.should_collect_artifacts:
+            self.do('collect artifacts', action)
+
+    def fail(self, msg):
+        self.collect_artifacts()
+        panic(msg)
+
+
+################
+# CODA PROJECT #
+################
+
+# A CodaProject is a thin wrapper around interacting the Coda source code.
+# It is responsible for dispatching builds and tests.
+class CodaProject:
+    logproc_exe_path = 'src/app/logproc/logproc.exe'
+    coda_exe_path = 'src/app/cli/src/coda.exe'
+
+    def __init__(self, executive, root='.'):
+        self.executive = executive
+        self.root = root
+        self.build_path = os.path.join(root, '_build/default')
+        self.current_profile = None
+
+    def build(self, build_log, profile='dev'):
+        cmd = 'dune build --display=progress --profile=%s %s %s 2> %s' % (profile, self.coda_exe_path, self.logproc_exe_path, build_log)
+        self.executive.run_cmd(cmd, directory=self.root, log=build_log)
+        self.current_profile = profile
+
+    def run_test(self, test, test_log):
+        if self.current_profile == None:
+            self.executive.fail('run_test initiated without building')
+
+        cmd_template = (
+            'set -o pipefail '
+            '&& {{coda}} integration-test {{test}} 2>&1 '
+            '| tee \'{{log}}\' '
+            '| {{logproc}} -f \'.level in ["Warn", "Error", "Fatal", "Faulty_peer"]\''
+        )
+        cmd = jinja2.Template(cmd_template).render(
+            log=test_log,
+            coda=self.coda_exe(),
+            logproc=self.logproc_exe(),
+            test=test
+        )
+        self.executive.run_cmd(cmd, log=test_log)
+
+    def coda_exe(self):
+        return os.path.join(self.build_path, self.coda_exe_path)
+
+    def logproc_exe(self):
+        return os.path.join(self.build_path, self.logproc_exe_path)
+
+
+###########
+# ACTIONS #
+###########
+
+
+# Initializes and maps the output directory structure for running tests.
+class OutDirectory:
+    def __init__(self, root):
+        self.root = root
+        self.build_logs = os.path.join(self.root, 'build_logs')
+        self.test_logs = os.path.join(self.root, 'test_logs')
+        self.test_configs = os.path.join(self.root, 'test_configs')
+        self.artifacts = os.path.join(self.root, 'artifacts')
+        self.all_directories = [
+            self.root,
+            self.build_logs,
+            self.test_logs,
+            self.test_configs,
+            self.artifacts
+        ]
+
+    def initialize(self, executive):
+        for dir in self.all_directories:
+            executive.make_directory(dir)
+
+
+def run(args):
     all_tests = small_curves_tests
-    all_tests.update(medium_curves_tests)
-    all_tests = filter_tests(all_tests, args.whitelist_patterns,
-                             args.blacklist_patterns)
+    all_tests.update(medium_curves_and_other_tests)
+    all_tests.update(archive_processor_test)
+    all_tests = filter_tests(all_tests, args.includes_patterns, args.excludes_patterns)
     if len(all_tests) == 0:
-        # TODO: support direct test dispatching
-        if args.whitelist_patterns != ['*']:
-            fail(
-                'no tests were selected -- whitelist pattern did not match any known tests'
-            )
+        if args.includes_patterns != ['*']:
+            panic('no tests were selected -- includes pattern did not match any known tests')
         else:
-            fail('no tests were selected -- blacklist is too restrictive')
+            panic('no tests were selected -- excludes is too restrictive')
+
+    out_dir = OutDirectory(args.out_dir)
+    executive = Executive(args, out_dir.artifacts)
+    project = CodaProject(executive)
+    out_dir.initialize(executive)
+    os.environ['CODA_INTEGRATION_TEST_DIR'] = os.path.join(os.getcwd(), out_dir.test_configs)
 
     print('Preparing to run the following tests:')
     for (profile, tests) in all_tests.items():
         print('- %s:' % profile)
         for test in tests:
             print('  - %s' % test)
-
-    timestamp = int(time.time())
     print('======================================')
-    print('============= %d =============' % timestamp)
+    print('============= %d =============' % int(time.time()))
     print('======================================')
-
-    log_dir = os.path.join('test_logs', str(timestamp))
-
-    def make_log_dir():
-        if os.path.exists(log_dir):
-            fail('test log directory already exists -- how???')
-        os.makedirs(log_dir)
-
-    wet('make new directory: ' + log_dir, make_log_dir)
 
     for profile in all_tests.keys():
-        profile_dir = os.path.join(log_dir, profile)
-        wet('make directory: ' + profile_dir, lambda: os.mkdir(profile_dir))
-
         print('- %s:' % profile)
-        build_log = os.path.join(profile_dir, 'build.log')
-        run_cmd(
-            'dune build --display=progress --profile=%s %s 2> %s' %
-            (profile, build_targets, build_log),
-            lambda: fail_with_log('building %s failed' % profile, build_log))
+        build_log_name = '%s.log' % profile
+        build_log = os.path.join(out_dir.build_logs, build_log_name)
+        executive.reserve_file(build_log)
+        executive.register_artifact_collector(SingleArtifactCollector(out_dir.build_logs, 'build', build_log_name))
+        project.build(build_log, profile)
 
         for test in all_tests[profile]:
             print('  - %s' % test)
-            log = os.path.join(profile_dir, '%s.log' % test)
-            cmd = 'set -o pipefail && %s integration-test %s 2>&1 ' % (
-                coda_exe, test)
-            cmd += '| tee \'%s\' | %s -f \'%s\' ' % (log, logproc_exe,
-                                                     logproc_filter)
-            cmd += '&& ./scripts/link-subprocess-logs.sh \'%s\' ' % profile_dir
-            print('Running: %s' % (cmd))
-            run_cmd(cmd, lambda: fail('Test "%s:%s" failed' % (profile, test)))
+            test_log_name = '%s--%s.log' % (profile, test)
+            test_log = os.path.join(out_dir.test_logs, test_log_name)
+            executive.reserve_file(test_log)
+            executive.register_artifact_collector(SingleArtifactCollector(out_dir.test_logs, 'test-main', test_log_name))
+            executive.register_artifact_collector(BatchArtifactCollector(out_dir.test_configs, 'test-node--%s--%s' % (profile, test), '**/*.log'))
+            project.run_test(test, test_log)
 
+    executive.collect_artifacts()
     print('Testing successful')
 
 
 def get_required_status():
     tests = filter_tests(small_curves_tests, ['*'],
-                         required_blacklist,
+                         required_excludes,
                          permutations=filter_tests(small_curves_tests, ['*'],
-                                                   ci_blacklist))
+                                                   ci_excludes))
     return list(
         filter(
             lambda el: el not in not_required_status_checks,
@@ -277,7 +472,7 @@ def render(args):
     (output_file, ext) = os.path.splitext(args.circle_jinja_file)
     assert ext == '.jinja'
 
-    tests = filter_tests(small_curves_tests, ['*'], ci_blacklist)
+    tests = filter_tests(small_curves_tests, ['*'], ci_excludes)
 
     env = jinja2.Environment(
         loader=jinja2.FileSystemLoader(circle_ci_conf_dir), autoescape=False)
@@ -287,7 +482,7 @@ def render(args):
         unit_test_profiles=unit_test_profiles,
         unit_test_profiles_medium_curves=unit_test_profiles_medium_curves,
         small_curves_tests=tests,
-        medium_curves_tests=medium_curves_tests,
+        medium_curves_and_other_tests=medium_curves_and_other_tests,
         medium_curve_profiles=medium_curve_profiles_full)
 
     if args.check:
@@ -321,73 +516,113 @@ def render(args):
 
 def list_tests(_args):
     all_tests = small_curves_tests
-    all_tests.update(medium_curves_tests)
+    all_tests.update(medium_curves_and_other_tests)
     for profile in all_tests.keys():
         print('- ' + profile)
         for test in small_curves_tests[profile]:
             print('  - ' + test)
 
 
-def main():
-    actions = {
-        'run': run,
-        'render': render,
-        'list': list_tests,
-        'required-status': required_status
-    }
+actions = {
+    'run': run,
+    'render': render,
+    'list': list_tests,
+    'required-status': required_status
+}
 
-    root_parser = argparse.ArgumentParser(
-        description='Coda integration test runner/configurator.')
+
+#######
+# CLI #
+#######
+
+
+def main():
+
+    root_parser = argparse.ArgumentParser(description='Coda integration test runner/configurator.')
     subparsers = root_parser.add_subparsers(help='subcommands')
 
-    run_parser = subparsers.add_parser('run',
-                                       description='''
+    run_parser = subparsers.add_parser(
+        'run',
+        description='''
             Build and run integration tests. Filters can be provided for
             selecting tests. Filters are specified in the form
             "<profile>:<test>". On either side, a "*" may be provided as
             a wildcard. For shorthand, a filter of "*" expands to "*:*".
-        ''')
+        '''
+    )
     run_parser.set_defaults(action='run')
+    run_parser.add_argument(
+        '--non-interactive',
+        action='store_true',
+        help='Run in non-interactive mode (make default decisions at interactive prompts).'
+    )
+    run_parser.add_argument(
+        '--yes',
+        action='store_true',
+        help='Automatically say yes to all interactive prompts.'
+    )
+    run_parser.add_argument(
+        '--out-dir',
+        action='store',
+        type=str,
+        default='test_output',
+        help='Set the directory where build logs, test logs, and configs will be stored. Default is "test_output".'
+    )
+    run_parser.add_argument(
+        '--collect-artifacts',
+        action='store_true',
+        help='Collect test artifacts together (for CI).'
+    )
     run_parser.add_argument(
         '-d',
         '--dry-run',
         action='store_true',
         help='Do not perform any side effects, only print what the program would do.'
     )
-    run_parser.add_argument('-b',
-                            '--blacklist-pattern',
-                            action='append',
-                            type=str,
-                            default=[],
-                            dest='blacklist_patterns',
-                            help='''
+    run_parser.add_argument(
+        '-b',
+        '--excludes-pattern',
+        action='append',
+        type=str,
+        default=[],
+        dest='excludes_patterns',
+        help='''
             Specify a pattern of tests to exclude from running. This flag can be
             provided multiple times to specify a series of patterns'
-        ''')
+        '''
+    )
     run_parser.add_argument(
-        'whitelist_patterns',
+        'includes_patterns',
         nargs='*',
         type=str,
         default=['*'],
-        help='The pattern(s) of tests you want to run. Defaults to "*".')
+        help='The pattern(s) of tests you want to run. Defaults to "*".'
+    )
 
     render_parser = subparsers.add_parser(
-        'render', description='Render circle CI configuration.')
+        'render',
+        description='Render circle CI configuration.'
+    )
     render_parser.set_defaults(action='render')
     render_parser.add_argument(
         '-c',
         '--check',
         action='store_true',
-        help='Check that CI configuration was rendered properly.')
+        help='Check that CI configuration was rendered properly.'
+    )
     render_parser.add_argument('circle_jinja_file')
     render_parser.add_argument('mergify_jinja_file')
 
-    list_parser = subparsers.add_parser('list',
-                                        description='List available tests.')
+    list_parser = subparsers.add_parser(
+        'list',
+        description='List available tests.'
+    )
     list_parser.set_defaults(action='list')
 
     required_status_parser = subparsers.add_parser(
-        'required-status', description='Print required status checks')
+        'required-status',
+        description='Print required status checks'
+    )
     required_status_parser.set_defaults(action='required-status')
 
     args = root_parser.parse_args()

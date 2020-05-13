@@ -3,8 +3,7 @@ module Params : sig
 
   val create :
        (module Group_map.Field_intf.S_unchecked with type t = 'f)
-    -> a:'f
-    -> b:'f
+    -> 'f Group_map.Spec.t
     -> 'f t
 end
 

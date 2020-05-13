@@ -26,7 +26,8 @@ module Error : sig
     | `New_root_transition
     | `Old_root_transition
     | `Transition of State_hash.t
-    | `Arcs of State_hash.t ]
+    | `Arcs of State_hash.t
+    | `Protocol_states_for_root_scan_state ]
 
   type not_found = [`Not_found of not_found_member]
 
@@ -52,7 +53,10 @@ val check :
             | `Best_tip_transition
             | `Frontier_hash
             | `Root
-            | `Root_transition ] ] ] )
+            | `Root_transition
+            | `Transition of State_hash.t
+            | `Arcs of State_hash.t
+            | `Protocol_states_for_root_scan_state ] ] ] )
      Result.t
 
 val initialize :
@@ -61,11 +65,13 @@ val initialize :
 val add :
      t
   -> transition:External_transition.Validated.t
-  -> (unit, [> `Not_found of [> `Parent_transition]]) Result.t
+  -> ( unit
+     , [> `Not_found of [> `Parent_transition | `Arcs of State_hash.t]] )
+     Result.t
 
 val move_root :
      t
-  -> new_root:Root_data.Minimal.t
+  -> new_root:Root_data.Limited.t
   -> garbage:State_hash.t list
   -> ( State_hash.t
      , [> `Not_found of [> `New_root_transition | `Old_root_transition]] )
@@ -84,6 +90,12 @@ val get_arcs :
   -> (State_hash.t list, [> `Not_found of [> `Arcs of State_hash.t]]) Result.t
 
 val get_root : t -> (Root_data.Minimal.t, [> `Not_found of [> `Root]]) Result.t
+
+val get_protocol_states_for_root_scan_state :
+     t
+  -> ( Coda_state.Protocol_state.value list
+     , [> `Not_found of [> `Protocol_states_for_root_scan_state]] )
+     Result.t
 
 val get_root_hash : t -> (State_hash.t, [> `Not_found of [> `Root]]) Result.t
 

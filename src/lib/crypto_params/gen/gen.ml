@@ -1,5 +1,5 @@
 [%%import
-"../../../config.mlh"]
+"/src/config.mlh"]
 
 open Ppxlib
 open Asttypes
@@ -103,13 +103,12 @@ let params_ast affine_params ~loc =
 let group_map_params =
   Group_map.Params.create
     (module Curve_choice.Tick0.Field)
-    ~a:Curve_choice.Tick_backend.Inner_curve.Coefficients.a
-    ~b:Curve_choice.Tick_backend.Inner_curve.Coefficients.b
+    Curve_choice.Tick_backend.Inner_curve.Coefficients.{a; b}
 
 let group_map_params_structure ~loc =
   let module T = struct
-    type t = Curve_choice.Tick_backend.Field.t Group_map.Params.t
-    [@@deriving bin_io]
+    type t = Curve_choice.Tick_backend.Field.t Group_map.Params.Stable.Latest.t
+    [@@deriving bin_io_unversioned]
   end in
   let module E = Ppxlib.Ast_builder.Make (struct
     let loc = loc
@@ -119,7 +118,7 @@ let group_map_params_structure ~loc =
     let params =
       let module T = struct
         type t = Curve_choice.Tick_backend.Field.t Group_map.Params.t
-        [@@deriving bin_io]
+        [@@deriving bin_io_unversioned]
       end in
       Binable.of_string
         (module T)

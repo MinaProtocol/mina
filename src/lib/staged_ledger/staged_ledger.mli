@@ -34,16 +34,18 @@ module Scan_state : sig
 
   val snark_job_list_json : t -> string
 
-  val partition_if_overflowing : t -> Space_partition.t
-
-  val target_merkle_root : t -> Frozen_ledger_hash.t option
-
   val staged_transactions : t -> Transaction.t list Or_error.t
 
   val all_work_statements : t -> Transaction_snark_work.Statement.t list
 
-  val work_statements_for_new_diff :
-    t -> Transaction_snark_work.Statement.t list
+  (** Hashes of the protocol states required for proving pending transactions*)
+  val required_state_hashes : t -> State_hash.Set.t
+
+  (** Validate protocol states required for proving the transactions. Returns an association list of state_hash and the corresponding state*)
+  val check_required_protocol_states :
+       t
+    -> protocol_states:Coda_state.Protocol_state.value list
+    -> (State_hash.t * Coda_state.Protocol_state.value) list Or_error.t
 end
 
 module Pre_diff_info : Pre_diff_info.S
@@ -82,6 +84,13 @@ val of_scan_state_and_ledger :
   -> pending_coinbase_collection:Pending_coinbase.t
   -> t Or_error.t Deferred.t
 
+val of_scan_state_and_ledger_unchecked :
+     snarked_ledger_hash:Frozen_ledger_hash.t
+  -> ledger:Ledger.t
+  -> scan_state:Scan_state.t
+  -> pending_coinbase_collection:Pending_coinbase.t
+  -> t Or_error.t Deferred.t
+
 val replace_ledger_exn : t -> Ledger.t -> t
 
 val proof_txns : t -> Transaction.t Non_empty_list.t option
@@ -95,20 +104,24 @@ val apply :
   -> Staged_ledger_diff.t
   -> logger:Logger.t
   -> verifier:Verifier.t
+  -> state_body_hash:State_body_hash.t
   -> ( [`Hash_after_applying of Staged_ledger_hash.t]
        * [`Ledger_proof of (Ledger_proof.t * Transaction.t list) option]
        * [`Staged_ledger of t]
-       * [`Pending_coinbase_data of bool * Currency.Amount.t]
+       * [ `Pending_coinbase_data of
+           bool * Currency.Amount.t * Pending_coinbase.Update.Action.t ]
      , Staged_ledger_error.t )
      Deferred.Result.t
 
 val apply_diff_unchecked :
      t
   -> Staged_ledger_diff.With_valid_signatures_and_proofs.t
+  -> state_body_hash:State_body_hash.t
   -> ( [`Hash_after_applying of Staged_ledger_hash.t]
        * [`Ledger_proof of (Ledger_proof.t * Transaction.t list) option]
        * [`Staged_ledger of t]
-       * [`Pending_coinbase_data of bool * Currency.Amount.t]
+       * [ `Pending_coinbase_data of
+           bool * Currency.Amount.t * Pending_coinbase.Update.Action.t ]
      , Staged_ledger_error.t )
      Deferred.Result.t
 
@@ -117,13 +130,14 @@ val current_ledger_proof : t -> Ledger_proof.t option
 (* This should memoize the snark verifications *)
 
 val create_diff :
-     t
+     ?log_block_creation:bool
+  -> t
   -> self:Public_key.Compressed.t
+  -> coinbase_receiver:[`Producer | `Other of Public_key.Compressed.t]
   -> logger:Logger.t
   -> transactions_by_fee:User_command.With_valid_signature.t Sequence.t
   -> get_completed_work:(   Transaction_snark_work.Statement.t
                          -> Transaction_snark_work.Checked.t option)
-  -> state_body_hash:State_body_hash.t
   -> Staged_ledger_diff.With_valid_signatures_and_proofs.t
 
 val statement_exn :
@@ -140,7 +154,7 @@ val of_scan_state_pending_coinbases_and_snarked_ledger :
 
 val all_work_pairs_exn :
      t
-  -> ( Transaction.t
+  -> ( Transaction.t Transaction_protocol_state.t
      , Transaction_witness.t
      , Ledger_proof.t )
      Snark_work_lib.Work.Single.Spec.t

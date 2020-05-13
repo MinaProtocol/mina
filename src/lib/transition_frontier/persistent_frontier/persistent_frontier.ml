@@ -6,17 +6,19 @@ open Coda_transition
 open Frontier_base
 module Database = Database
 
-let construct_staged_ledger_at_root ~logger ~verifier ~root_ledger
-    ~root_transition ~root =
+exception Invalid_genesis_state_hash of External_transition.Validated.t
+
+let construct_staged_ledger_at_root ~root_ledger ~root_transition ~root =
   let open Deferred.Or_error.Let_syntax in
-  let open Root_data.Minimal.Stable.Latest in
+  let open Root_data.Minimal in
   let snarked_ledger_hash =
     External_transition.Validated.blockchain_state root_transition
     |> Blockchain_state.snarked_ledger_hash
   in
+  let scan_state = scan_state root in
+  let pending_coinbase = pending_coinbase root in
   let%bind transactions =
-    Deferred.return
-      (Staged_ledger.Scan_state.staged_transactions root.scan_state)
+    Deferred.return (Staged_ledger.Scan_state.staged_transactions scan_state)
   in
   let mask = Ledger.of_database root_ledger in
   let%bind () =
@@ -27,9 +29,8 @@ let construct_staged_ledger_at_root ~logger ~verifier ~root_ledger
            let%map _ = Ledger.apply_transaction mask txn in
            () ))
   in
-  Staged_ledger.of_scan_state_and_ledger ~logger ~verifier ~snarked_ledger_hash
-    ~ledger:mask ~scan_state:root.scan_state
-    ~pending_coinbase_collection:root.pending_coinbase
+  Staged_ledger.of_scan_state_and_ledger_unchecked ~snarked_ledger_hash
+    ~ledger:mask ~scan_state ~pending_coinbase_collection:pending_coinbase
 
 module rec Instance_type : sig
   type t =
@@ -125,7 +126,8 @@ module Instance = struct
     let%bind root =
       lift_error (Database.get_root t.db) "failed to get root hash"
     in
-    if State_hash.equal root.hash target_root.state_hash then
+    let root_hash = Root_data.Minimal.hash root in
+    if State_hash.equal root_hash target_root.state_hash then
       (* If the target hash is already the root hash, no fast forward required, but we should check the frontier hash. *)
       let%bind frontier_hash =
         lift_error
@@ -138,47 +140,68 @@ module Instance = struct
     else (
       Logger.warn t.factory.logger ~module_:__MODULE__ ~location:__LOC__
         ~metadata:
-          [ ("current_root", State_hash.to_yojson root.hash)
+          [ ("current_root", State_hash.to_yojson root_hash)
           ; ("target_root", State_hash.to_yojson target_root.state_hash) ]
         "Cannot fast forward persistent frontier's root: bootstrap is \
          required ($current_root --> $target_root)" ;
       Error `Bootstrap_required )
 
   let load_full_frontier t ~root_ledger ~consensus_local_state ~max_length
-      ~ignore_consensus_local_state =
+      ~ignore_consensus_local_state ~constraint_constants ~genesis_constants =
     let open Deferred.Result.Let_syntax in
-    let downgrade_transition transition :
-        External_transition.Almost_validated.t =
+    let downgrade_transition transition genesis_state_hash :
+        ( External_transition.Almost_validated.t
+        , [`Invalid_genesis_protocol_state] )
+        Result.t =
+      let open Result.Let_syntax in
       let transition, _ = External_transition.Validated.erase transition in
-      External_transition.Validation.wrap transition
-      |> External_transition.skip_time_received_validation
-           `This_transition_was_not_received_via_gossip
-      |> External_transition.skip_proof_validation
-           `This_transition_was_generated_internally
+      let%map t =
+        External_transition.Validation.wrap transition
+        |> External_transition.skip_time_received_validation
+             `This_transition_was_not_received_via_gossip
+        |> External_transition.validate_genesis_protocol_state
+             ~genesis_state_hash
+      in
+      External_transition.skip_proof_validation
+        `This_transition_was_generated_internally t
       |> External_transition.skip_delta_transition_chain_validation
            `This_transition_was_not_received_via_gossip
       |> External_transition.skip_frontier_dependencies_validation
            `This_transition_was_loaded_from_persistence
+      |> External_transition.skip_protocol_versions_validation
+           `This_transition_has_valid_protocol_versions
     in
     let%bind () = Deferred.return (assert_no_sync t) in
     (* read basic information from the database *)
-    let%bind root, root_transition, best_tip, base_hash =
+    let%bind ( root
+             , root_transition
+             , best_tip
+             , base_hash
+             , protocol_states
+             , root_hash ) =
       (let open Result.Let_syntax in
       let%bind root = Database.get_root t.db in
-      let%bind root_transition = Database.get_transition t.db root.hash in
+      let root_hash = Root_data.Minimal.hash root in
+      let%bind root_transition = Database.get_transition t.db root_hash in
       let%bind best_tip = Database.get_best_tip t.db in
+      let%bind protocol_states =
+        Database.get_protocol_states_for_root_scan_state t.db
+      in
       let%map base_hash = Database.get_frontier_hash t.db in
-      (root, root_transition, best_tip, base_hash))
+      (root, root_transition, best_tip, base_hash, protocol_states, root_hash))
       |> Result.map_error ~f:(fun err ->
              `Failure (Database.Error.not_found_message err) )
       |> Deferred.return
+    in
+    let root_genesis_state_hash =
+      External_transition.Validated.protocol_state root_transition
+      |> Protocol_state.genesis_state_hash
     in
     (* construct the root staged ledger in memory *)
     let%bind root_staged_ledger =
       let open Deferred.Let_syntax in
       match%map
-        construct_staged_ledger_at_root ~logger:t.factory.logger
-          ~verifier:t.factory.verifier ~root_ledger ~root_transition ~root
+        construct_staged_ledger_at_root ~root_ledger ~root_transition ~root
       with
       | Error err ->
           Error (`Failure (Error.to_string_hum err))
@@ -189,9 +212,15 @@ module Instance = struct
     let frontier =
       Full_frontier.create ~logger:t.factory.logger ~base_hash
         ~root_data:
-          {transition= root_transition; staged_ledger= root_staged_ledger}
+          { transition= root_transition
+          ; staged_ledger= root_staged_ledger
+          ; protocol_states=
+              (*TODO: store the hashes as well?*)
+              List.map protocol_states ~f:(fun s -> (Protocol_state.hash s, s))
+          }
         ~root_ledger:(Ledger.Any_ledger.cast (module Ledger.Db) root_ledger)
-        ~consensus_local_state ~max_length
+        ~consensus_local_state ~max_length ~constraint_constants
+        ~genesis_constants
     in
     let%bind extensions =
       Deferred.map
@@ -199,22 +228,31 @@ module Instance = struct
         ~f:Result.return
     in
     let apply_diff diff =
-      let (`New_root _) =
+      let (`New_root_and_diffs_with_mutants (_, diffs_with_mutants)) =
         Full_frontier.apply_diffs frontier [diff] ~ignore_consensus_local_state
       in
-      Extensions.notify extensions ~frontier ~diffs:[diff]
+      Extensions.notify extensions ~frontier ~diffs_with_mutants
       |> Deferred.map ~f:Result.return
     in
     (* crawl through persistent frontier and load transitions into in memory frontier *)
     let%bind () =
       Deferred.map
-        (Database.crawl_successors t.db root.hash
+        (Database.crawl_successors t.db root_hash
            ~init:(Full_frontier.root frontier) ~f:(fun parent transition ->
+             let%bind transition =
+               match
+                 downgrade_transition transition root_genesis_state_hash
+               with
+               | Ok t ->
+                   Deferred.Result.return t
+               | Error `Invalid_genesis_protocol_state ->
+                   Error (`Fatal_error (Invalid_genesis_state_hash transition))
+                   |> Deferred.return
+             in
              let%bind breadcrumb =
                Breadcrumb.build ~logger:t.factory.logger
                  ~verifier:t.factory.verifier
-                 ~trust_system:(Trust_system.null ()) ~parent
-                 ~transition:(downgrade_transition transition)
+                 ~trust_system:(Trust_system.null ()) ~parent ~transition
                  ~sender:None
              in
              let%map () = apply_diff Diff.(E (New_node (Full breadcrumb))) in
@@ -268,14 +306,14 @@ let with_instance_exn t ~f =
   x
 
 let reset_database_exn t ~root_data =
-  let open Root_data.Limited.Stable.Latest in
+  let open Root_data.Limited in
   let open Deferred.Let_syntax in
   Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
     ~metadata:
       [ ( "state_hash"
         , State_hash.to_yojson
-            (External_transition.Validated.state_hash root_data.transition) )
-      ]
+            (External_transition.Validated.state_hash (transition root_data))
+        ) ]
     "Resetting transition frontier database to new root" ;
   let%bind () = destroy_database_exn t in
   with_instance_exn t ~f:(fun instance ->

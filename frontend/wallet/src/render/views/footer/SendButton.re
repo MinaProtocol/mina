@@ -20,6 +20,7 @@ let make = () => {
   <>
     <Button
       label="Send"
+      style=Button.LightBlue
       onClick={_ => setModalOpen(_ => true)}
       disabled={!Option.isSome(activeAccount)}
     />

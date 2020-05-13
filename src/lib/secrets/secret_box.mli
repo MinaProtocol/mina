@@ -16,20 +16,15 @@ open Core_kernel
 
 type t [@@deriving sexp, yojson]
 
-module Stable : sig
-  module V1 : sig
-    type nonrec t = t [@@deriving sexp]
-  end
-end
-
 (** Password-protect some plaintext. *)
 val encrypt : password:Bytes.t -> plaintext:Bytes.t -> t
 
 (** Decrypt some bytes with a password *)
 val decrypt :
      password:Bytes.t
+  -> which:string
   -> t
   -> ( Bytes.t
-     , [> `Corrupted_privkey of Error.t
+     , [> `Corrupted_privkey of Error.t * string
        | `Incorrect_password_or_corrupted_privkey ] )
      Result.t

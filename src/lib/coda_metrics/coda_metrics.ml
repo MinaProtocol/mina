@@ -1,12 +1,12 @@
 [%%import
-"../../config.mlh"]
+"/src/config.mlh"]
 
-(* textformat serialization and runtime metrics taken from github.com/mirage/prometheus:/app/prometheus_app.ml *)
 open Core_kernel
 open Prometheus
+open Namespace
+open Metric_generators
 
-let namespace = "Coda"
-
+(* textformat serialization and runtime metrics taken from github.com/mirage/prometheus:/app/prometheus_app.ml *)
 module TextFormat_0_0_4 = struct
   let re_unquoted_escapes = Re.compile @@ Re.set "\\\n"
 
@@ -91,34 +91,6 @@ module TextFormat_0_0_4 = struct
           metric_type
           (LabelSetMap.pp ~sep:Fmt.nop (output_metric ~name ~label_names))
           samples )
-end
-
-module Moving_average (Spec : sig
-  val tick_interval : Core.Time.Span.t
-
-  val rolling_interval : Core.Time.Span.t
-
-  val display : Float.t -> Float.t
-end) =
-struct
-  open Async
-
-  let total = ref 0.
-
-  let create () ~name ~subsystem ~namespace ~help =
-    let gauge = Gauge.v name ~subsystem ~namespace ~help in
-    let rec tick () =
-      upon (after Spec.tick_interval) (fun () ->
-          Gauge.set gauge (Spec.display !total) ;
-          tick () )
-    in
-    tick ()
-
-  let update datum =
-    total := !total +. datum ;
-    upon (after Spec.rolling_interval) (fun () -> total := !total -. datum)
-
-  let clear () = total := 0.
 end
 
 module Runtime = struct
@@ -450,42 +422,6 @@ end
 module Scan_state_metrics = struct
   let subsystem = "Scan_state"
 
-  (*duplicating Snark_params.Scan_state_constants because of a dependency cycle*)
-  module Scan_state_constants = struct
-    [%%inject
-    "work_delay", scan_state_work_delay]
-
-    [%%if
-    scan_state_with_tps_goal]
-
-    open Core_kernel
-
-    [%%inject
-    "tps_goal_x10", scan_state_tps_goal_x10]
-
-    [%%inject
-    "block_window_duration", block_window_duration]
-
-    let max_coinbases = 2
-
-    (* block_window_duration is in milliseconds, so divide by 1000
-       divide by 10 again because we have tps * 10
-     *)
-    let max_user_commands_per_block =
-      tps_goal_x10 * block_window_duration / (1000 * 10)
-
-    let transaction_capacity_log_2 =
-      1
-      + Core_kernel.Int.ceil_log2 (max_user_commands_per_block + max_coinbases)
-
-    [%%else]
-
-    [%%inject
-    "transaction_capacity_log_2", scan_state_transaction_capacity_log_2]
-
-    [%%endif]
-  end
-
   module Metric = struct
     type t = Gauge.t
 
@@ -501,10 +437,6 @@ module Scan_state_metrics = struct
   let slots_available_map = Gauge_metric_map.of_alist_exn []
 
   let merge_snark_required_map = Gauge_metric_map.of_alist_exn []
-
-  let max_trees =
-    let open Scan_state_constants in
-    ((transaction_capacity_log_2 + 1) * (work_delay + 1)) + 1
 
   let scan_state_available_space ~name : Gauge.t =
     let help = "# of slots available" in
@@ -574,27 +506,36 @@ module Consensus = struct
     Gauge.v "stake_delegators" ~help ~namespace ~subsystem
 end
 
-module Proposer = struct
-  let subsystem = "Proposer"
+module Block_producer = struct
+  let subsystem = "Block_producer"
 
   let slots_won : Counter.t =
     let help =
-      "slots which the proposer has won (does not represent that a proposer \
-       actually proposed)"
+      "slots which the loaded block production keys have won (does not \
+       represent that a block was actually produced)"
     in
     Counter.v "slots_won" ~help ~namespace ~subsystem
 
-  let blocks_proposed : Counter.t =
-    let help = "blocks produced and submitted by the proposer" in
-    Counter.v "blocks_proposed" ~help ~namespace ~subsystem
+  let blocks_produced : Counter.t =
+    let help = "blocks produced and submitted by the daemon" in
+    Counter.v "blocks_produced" ~help ~namespace ~subsystem
 end
 
 module Transition_frontier = struct
   let subsystem = "Transition_frontier"
 
-  let max_blocklength_observed : Gauge.t =
+  let max_blocklength_observed = ref 0
+
+  let max_blocklength_observed_metrics : Gauge.t =
     let help = "max blocklength observed by the system" in
     Gauge.v "max_blocklength_observed" ~help ~namespace ~subsystem
+
+  let update_max_blocklength_observed : int -> unit =
+   fun blockchain_length ->
+    if blockchain_length > !max_blocklength_observed then (
+      Gauge.set max_blocklength_observed_metrics
+      @@ Int.to_float blockchain_length ;
+      max_blocklength_observed := blockchain_length )
 
   let slot_fill_rate : Gauge.t =
     let help = "number of blocks / total slots since genesis" in
@@ -620,22 +561,27 @@ module Transition_frontier = struct
     let help = "total # of staged txns that have been finalized" in
     Counter.v "finalized_staged_txns" ~help ~namespace ~subsystem
 
-  module TPS_30min = Moving_average (struct
-    let tick_interval = Core.Time.Span.of_min 3.
+  module TPS_30min =
+    Moving_bucketed_average (struct
+        let bucket_interval = Core.Time.Span.of_min 3.0
 
-    let rolling_interval = Core.Time.Span.of_min 30.
+        let num_buckets = 10
 
-    let display total_txns =
-      total_txns /. Core.Time.Span.to_sec rolling_interval
-  end)
+        let render_average buckets =
+          let total =
+            List.fold buckets ~init:0.0 ~f:(fun acc (n, _) -> acc +. n)
+          in
+          total /. Core.Time.Span.(of_min 30.0 |> to_sec)
 
-  let tps_30min =
-    let name = "tps_30min" in
-    let help =
-      "moving average for transaction per second, the rolling interval is set \
-       to 30 min"
-    in
-    TPS_30min.create ~name ~help ~namespace ~subsystem ()
+        let subsystem = subsystem
+
+        let name = "tps_30min"
+
+        let help =
+          "moving average for transaction per second, the rolling interval is \
+           set to 30 min"
+      end)
+      ()
 
   let recently_finalized_staged_txns : Gauge.t =
     let help =
@@ -704,14 +650,80 @@ module Transition_frontier_controller = struct
     Counter.v "breadcrumbs_built_by_builder" ~help ~namespace ~subsystem
 end
 
+(* these block latency metrics are recomputed every half a slot, and the averages span 20 slots *)
+module Block_latency = struct
+  let subsystem = "Block_latency"
+
+  [%%inject
+  "block_window_duration", block_window_duration]
+
+  module Latency_time_spec = struct
+    let tick_interval =
+      Core.Time.Span.of_ms (Int.to_float (block_window_duration / 2))
+
+    let rolling_interval =
+      Core.Time.Span.of_ms (Int.to_float (block_window_duration * 20))
+  end
+
+  module Gossip_slots =
+    Moving_bucketed_average (struct
+        let bucket_interval =
+          Core.Time.Span.of_ms (Int.to_float (block_window_duration / 2))
+
+        let num_buckets = 40
+
+        let subsystem = subsystem
+
+        let name = "gossip_slots"
+
+        let help =
+          "average delay, in slots, after which produced blocks are received"
+
+        let render_average buckets =
+          let total_sum, count_sum =
+            List.fold buckets ~init:(0.0, 0)
+              ~f:(fun (total_sum, count_sum) (total, count) ->
+                (total_sum +. total, count_sum + count) )
+          in
+          total_sum /. Float.of_int count_sum
+      end)
+      ()
+
+  module Gossip_time =
+    Moving_time_sec_average (struct
+        include Latency_time_spec
+
+        let subsystem = subsystem
+
+        let name = "gossip_time"
+
+        let help =
+          "average delay, in seconds, after which produced blocks are received"
+      end)
+      ()
+
+  module Inclusion_time =
+    Moving_time_sec_average (struct
+        include Latency_time_spec
+
+        let subsystem = subsystem
+
+        let name = "inclusion_time"
+
+        let help =
+          "average delay, in seconds, after which produced blocks are \
+           included into our frontier"
+      end)
+      ()
+end
+
 let server ~port ~logger =
   let open Cohttp in
   let open Cohttp_async in
   let handle_error _ exn =
     Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-      !"ecountered error while handling request to prometheus server: %{sexp: \
-        Error.t}"
-      (Error.of_exn exn)
+      ~metadata:[("error", `String (Exn.to_string exn))]
+      "Encountered error while handling request to prometheus server: $error"
   in
   let callback ~body:_ _ req =
     let uri = Request.uri req in

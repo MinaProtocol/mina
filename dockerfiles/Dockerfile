@@ -1,4 +1,4 @@
-FROM codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
+FROM codaprotocol/coda:toolchain-eb73e64d524c906384e9dbb23e9d0b8ae2be9e9e
 
 # same as in Dockerfile-toolchain
 ARG OCAML_VERSION=4.07.1

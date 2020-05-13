@@ -8,19 +8,23 @@ GITLONGHASH = $(shell git rev-parse HEAD)
 MYUID = $(shell id -u)
 DOCKERNAME = codabuilder-$(MYUID)
 
-# Unique signature of kademlia code tree
-KADEMLIA_SIG = $(shell cd src/app/kademlia-haskell ; find . -type f -print0  | xargs -0 sha1sum | sort | sha1sum | cut -f 1 -d ' ')
+# Unique signature of libp2p code tree
 LIBP2P_HELPER_SIG = $(shell cd src/app/libp2p_helper ; find . -type f -print0  | xargs -0 sha1sum | sort | sha1sum | cut -f 1 -d ' ')
 
 ifeq ($(DUNE_PROFILE),)
 DUNE_PROFILE := dev
 endif
 
+ifeq ($(GO),)
+GO := go
+endif
+
+TMPDIR ?= /tmp
+
 ifeq ($(USEDOCKER),TRUE)
  $(info INFO Using Docker Named $(DOCKERNAME))
  WRAP = docker exec -it $(DOCKERNAME)
  WRAPAPP = docker exec --workdir /home/opam/app -t $(DOCKERNAME)
- WRAPSRC = docker exec --workdir /home/opam/app/src -t $(DOCKERNAME)
 else
  $(info INFO Not using Docker)
  WRAP =
@@ -57,27 +61,58 @@ all: clean codabuilder containerstart build
 
 clean:
 	$(info Removing previous build artifacts)
-	@rm -rf src/_build
+	@rm -rf _build
 	@rm -rf src/$(COVERAGE_DIR)
 
-kademlia:
-	@# FIXME: Bash wrap here is awkward but required to get nix-env
-	bash -c "source ~/.profile && cd src/app/kademlia-haskell && nix-build release2.nix"
-
+# TEMP HACK (for circle-ci)
+ifeq ($(LIBP2P_NIXLESS),1)
 libp2p_helper:
-	bash -c "source ~/.profile && cd src/app/libp2p_helper && nix-build default.nix"
+	$(WRAPAPP) bash -c "set -e && cd src/app/libp2p_helper && rm -rf result && mkdir -p result/bin && cd src && $(GO) mod download && cd .. && for f in generate_methodidx libp2p_helper; do cd src/\$$f && $(GO) build; cp \$$f ../../result/bin/\$$f; cd ../../; done"
+else
+libp2p_helper:
+	$(WRAPAPP) bash -c "set -o pipefail ; if [ -z \"$${USER}\" ]; then export USER=opam ; fi && source ~/.nix-profile/etc/profile.d/nix.sh && (if [ -z \"$${CACHIX_SIGNING_KEY+x}\" ]; then cd src/app/libp2p_helper && nix-build $${EXTRA_NIX_ARGS} default.nix;  else cachix use codaprotocol && cd src/app/libp2p_helper && nix-build $${EXTRA_NIX_ARGS} default.nix | cachix push codaprotocol ; fi)"
+endif
 
-# Alias
-dht: kademlia libp2p_helper
 
-build: git_hooks reformat-diff
+
+GENESIS_DIR := $(TMPDIR)/coda_cache_dir
+
+# generate the actual ledger and store in a tar
+genesis_tar:
+	@GENESIS_FILE=$(GENESIS_DIR)/$(shell cat _build/default/src/app/runtime_genesis_ledger/genesis_filename.txt).tar.gz && \
+	if [ ! -f $$GENESIS_FILE ] || [ _build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -nt $$GENESIS_FILE ]; then \
+		./_build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe ; \
+	fi
+
+# compile the tool and write the filename to `genesis_filename.txt`
+genesis_ledger:
+	$(info Building runtime_genesis_ledger)
+	ulimit -s 65532 && (ulimit -n 10240 || true) && $(WRAPAPP) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build --profile=$(DUNE_PROFILE) src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe src/app/runtime_genesis_ledger/genesis_filename.txt && make genesis_tar
+	$(info Genesis ledger and genesis proof generated)
+
+build: git_hooks reformat-diff libp2p_helper
 	$(info Starting Build)
-	ulimit -s 65532 && (ulimit -n 10240 || true) && cd src && $(WRAPSRC) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build app/logproc/logproc.exe app/cli/src/coda.exe  --profile=$(DUNE_PROFILE)
+	ulimit -s 65532 && (ulimit -n 10240 || true) && $(WRAPAPP) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build src/app/logproc/logproc.exe src/app/cli/src/coda.exe --profile=$(DUNE_PROFILE) && make genesis_ledger
 	$(info Build complete)
 
 build_archive: git_hooks reformat-diff
 	$(info Starting Build)
-	ulimit -s 65532 && (ulimit -n 10240 || true) && cd src && dune build app/archive/archive.exe --profile=$(DUNE_PROFILE)
+	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/archive/archive.exe --profile=$(DUNE_PROFILE)
+	$(info Build complete)
+
+client_sdk :
+	$(info Starting Build)
+	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/client_sdk/client_sdk.bc.js --profile=nonconsensus_medium_curves
+	$(info Build complete)
+
+client_sdk_test_sigs :
+	$(info Starting Build)
+	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/client_sdk/tests/test_signatures.exe --profile=testnet_postake_medium_curves
+	$(info Build complete)
+
+client_sdk_test_sigs_nonconsensus :
+	$(info Starting Build)
+	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/client_sdk/tests/test_signatures_nonconsensus.exe --profile=nonconsensus_medium_curves
 	$(info Build complete)
 
 dev: codabuilder containerstart build
@@ -89,8 +124,9 @@ update-opam:
 macos-portable:
 	@rm -rf _build/coda-daemon-macos/
 	@rm -rf _build/coda-daemon-macos.zip
-	@./scripts/macos-portable.sh src/_build/default/app/cli/src/coda.exe src/app/kademlia-haskell/result/bin/kademlia _build/coda-daemon-macos
-	@zip -r _build/coda-daemon-macos.zip _build/coda-daemon-macos/
+	@./scripts/macos-portable.sh _build/default/src/app/cli/src/coda.exe src/app/libp2p_helper/result/bin/libp2p_helper _build/coda-daemon-macos
+	@cp -a package/keys/. _build/coda-daemon-macos/keys/
+	@cd _build/coda-daemon-macos && zip -r ../coda-daemon-macos.zip .
 	@echo Find coda-daemon-macos.zip inside _build/
 
 update-graphql:
@@ -101,13 +137,13 @@ update-graphql:
 ## Lint
 
 reformat: git_hooks
-	cd src; $(WRAPSRC) dune exec --profile=$(DUNE_PROFILE) app/reformat/reformat.exe -- -path .
+	$(WRAPAPP) dune exec --profile=$(DUNE_PROFILE) src/app/reformat/reformat.exe -- -path .
 
 reformat-diff:
 	ocamlformat --doc-comments=before --inplace $(shell git status -s | cut -c 4- | grep '\.mli\?$$' | while IFS= read -r f; do stat "$$f" >/dev/null 2>&1 && echo "$$f"; done) || true
 
 check-format:
-	cd src; $(WRAPSRC) dune exec --profile=$(DUNE_PROFILE) app/reformat/reformat.exe -- -path . -check
+	$(WRAPAPP) dune exec --profile=$(DUNE_PROFILE) src/app/reformat/reformat.exe -- -path . -check
 
 check-snarky-submodule:
 	./scripts/check-snarky-submodule.sh
@@ -161,15 +197,6 @@ docker-toolchain-rust:
 		echo "Repo has uncommited changes, commit first to set hash." ;\
 	fi
 
-# All in one step to build toolchain and binary for kademlia
-# TODO: Rename to docker-toolchain-discovery
-docker-toolchain-haskell:
-	@echo "Building codaprotocol/coda:toolchain-haskell-$(KADEMLIA_SIG)" ;\
-    docker build --file dockerfiles/Dockerfile-toolchain-haskell --tag codaprotocol/coda:toolchain-haskell-$(KADEMLIA_SIG) . ;\
-    echo  'Extracting deb package' ;\
-    mkdir -p src/_build ;\
-    docker run --rm --entrypoint cat codaprotocol/coda:toolchain-haskell-$(KADEMLIA_SIG) /src/coda-discovery.deb > src/_build/coda-discovery.deb
-
 update-deps:
 	./scripts/update-toolchain-references.sh $(GITLONGHASH)
 	make render-circleci
@@ -195,8 +222,13 @@ publish-macos:
 deb:
 	$(WRAP) ./scripts/rebuild-deb.sh
 	@mkdir -p /tmp/artifacts
-	@cp src/_build/coda*.deb /tmp/artifacts/.
-	@cp src/_build/coda_pvkeys_* /tmp/artifacts/.
+	@cp _build/coda*.deb /tmp/artifacts/.
+	@cp _build/coda_pvkeys_* /tmp/artifacts/.
+
+build_pv_keys:
+	$(info Building keys)
+	ulimit -s 65532 && (ulimit -n 10240 || true) && $(WRAPAPP) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune exec --profile=$(DUNE_PROFILE) src/lib/snark_keys/gen_keys/gen_keys.exe -- --generate-keys-only
+	$(info Keys built)
 
 publish_deb:
 	@./scripts/publish-deb.sh
@@ -205,12 +237,12 @@ publish_debs: publish_deb
 
 genesiskeys:
 	@mkdir -p /tmp/artifacts
-	@cp src/_build/default/lib/coda_base/sample_keypairs.ml /tmp/artifacts/.
-	@cp src/_build/default/lib/coda_base/sample_keypairs.json /tmp/artifacts/.
+	@cp _build/default/src/lib/coda_base/sample_keypairs.ml /tmp/artifacts/.
+	@cp _build/default/src/lib/coda_base/sample_keypairs.json /tmp/artifacts/.
 
 codaslim:
 	@# FIXME: Could not reference .deb file in the sub-dir in the docker build
-	@cp src/_build/coda.deb .
+	@cp _build/coda.deb .
 	@./scripts/rebuild-docker.sh codaslim dockerfiles/Dockerfile-codaslim
 	@rm coda.deb
 
@@ -237,7 +269,7 @@ web:
 ## Benchmarks
 
 benchmarks:
-	cd src && dune build app/benchmarks/main.exe
+	dune build app/benchmarks/main.exe
 
 
 ########################################
@@ -245,54 +277,60 @@ benchmarks:
 
 test-coverage: SHELL := /bin/bash
 test-coverage:
-	source scripts/test_all.sh ; cd src ; run_unit_tests_with_coverage
+	source scripts/test_all.sh ; run_unit_tests_with_coverage
 
 # we don't depend on test-coverage, which forces a run of all unit tests
 coverage-html:
-ifeq ($(shell find src/_build/default -name bisect\*.out),"")
+ifeq ($(shell find _build/default -name bisect\*.out),"")
 	echo "No coverage output; run make test-coverage"
 else
-	cd src && bisect-ppx-report -I _build/default/ -html $(COVERAGE_DIR) `find . -name bisect\*.out`
+	bisect-ppx-report -I _build/default/ -html $(COVERAGE_DIR) `find . -name bisect\*.out`
 endif
 
 coverage-text:
-ifeq ($(shell find src/_build/default -name bisect\*.out),"")
+ifeq ($(shell find _build/default -name bisect\*.out),"")
 	echo "No coverage output; run make test-coverage"
 else
-	cd src && bisect-ppx-report -I _build/default/ -text $(COVERAGE_DIR)/coverage.txt `find . -name bisect\*.out`
+	bisect-ppx-report -I _build/default/ -text $(COVERAGE_DIR)/coverage.txt `find . -name bisect\*.out`
 endif
 
 coverage-coveralls:
-ifeq ($(shell find src/_build/default -name bisect\*.out),"")
+ifeq ($(shell find _build/default -name bisect\*.out),"")
 	echo "No coverage output; run make test-coverage"
 else
-	cd src && bisect-ppx-report -I _build/default/ -coveralls $(COVERAGE_DIR)/coveralls.json `find . -name bisect\*.out`
+	bisect-ppx-report -I _build/default/ -coveralls $(COVERAGE_DIR)/coveralls.json `find . -name bisect\*.out`
 endif
 
 ########################################
 # Diagrams for documentation
 
-docs/res/%.dot.png: docs/res/%.dot
+%.dot.png: %.dot
 	dot -Tpng $< > $@
 
-docs/res/%.tex.pdf: docs/res/%.tex
-	cd docs/res && pdflatex $(notdir $<)
+%.tex.pdf: %.tex
+	cd $(dir $@) && pdflatex -halt-on-error $(notdir $<)
 	cp $(@:.tex.pdf=.pdf) $@
 
-docs/res/%.tex.png: docs/res/%.tex.pdf
+%.tex.png: %.tex.pdf
 	convert -density 600x600 $< -quality 90 -resize 1080x1080 $@
 
-doc_diagrams: $(addsuffix .png,$(wildcard docs/res/*.tex) $(wildcard docs/res/*.dot))
+%.conv.tex.png: %.conv.tex
+	cd $(dir $@) && pdflatex -halt-on-error -shell-escape $(notdir $<)
+
+doc_diagram_sources=$(addprefix docs/res/,*.dot *.tex *.conv.tex)
+doc_diagram_sources+=$(addprefix rfcs/res/,*.dot *.tex *.conv.tex)
+doc_diagrams: $(addsuffix .png,$(wildcard $(doc_diagram_sources)))
 
 ########################################
 # Generate odoc documentation
 
 ml-docs:
-	cd src; $(WRAPSRC) dune build --profile=$(DUNE_PROFILE) @doc
+	$(WRAPAPP) dune build --profile=$(DUNE_PROFILE) @doc
 
 ########################################
 # To avoid unintended conflicts with file names, always add to .PHONY
 # unless there is a reason not to.
 # https://www.gnu.org/software/make/manual/html_node/Phony-Targets.html
 # HACK: cat Makefile | egrep '^\w.*' | sed 's/:/ /' | awk '{print $1}' | grep -v myprocs | sort | xargs
-.PHONY: all base-docker base-googlecloud base-minikube build check-format ci-base-docker clean codaslim containerstart deb dev codabuilder kademlia coda-docker coda-googlecloud coda-minikube ocaml407-googlecloud pull-ocaml407-googlecloud reformat test test-all test-coda-block-production-sig test-coda-block-production-stake test-codapeers-sig test-codapeers-stake test-full-sig test-full-stake test-runtest test-transaction-snark-profiler-sig test-transaction-snark-profiler-stake update-deps render-circleci check-render-circleci docker-toolchain-rust toolchains doc_diagrams ml-docs macos-setup macos-setup-download macos-setup-compile
+
+.PHONY: all base-docker base-googlecloud base-minikube build check-format ci-base-docker clean client_sdk client_sdk_test_sigs codaslim containerstart deb dev codabuilder coda-docker coda-googlecloud coda-minikube ocaml407-googlecloud pull-ocaml407-googlecloud reformat test test-all test-coda-block-production-sig test-coda-block-production-stake test-codapeers-sig test-codapeers-stake test-full-sig test-full-stake test-runtest test-transaction-snark-profiler-sig test-transaction-snark-profiler-stake update-deps render-circleci check-render-circleci docker-toolchain-rust toolchains doc_diagrams ml-docs macos-setup macos-setup-download macos-setup-compile libp2p_helper

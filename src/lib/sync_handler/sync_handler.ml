@@ -2,6 +2,8 @@ open Core_kernel
 open Async
 open Coda_base
 open Coda_transition
+open Frontier_base
+open Network_peer
 
 module type Inputs_intf = sig
   module Transition_frontier : module type of Transition_frontier
@@ -23,6 +25,13 @@ module Make (Inputs : Inputs_intf) :
     in
     Root_history.lookup root_history state_hash
 
+  let protocol_states_in_root_history frontier state_hash =
+    let open Transition_frontier.Extensions in
+    let root_history =
+      get_extension (Transition_frontier.extensions frontier) Root_history
+    in
+    Root_history.protocol_states_for_scan_state root_history state_hash
+
   let get_ledger_by_hash ~frontier ledger_hash =
     let root_ledger =
       Ledger.Any_ledger.cast (module Ledger.Db)
@@ -32,14 +41,7 @@ module Make (Inputs : Inputs_intf) :
       Ledger_hash.equal ledger_hash
         (Ledger.Any_ledger.M.merkle_root root_ledger)
     then Some root_ledger
-    else
-      let open Transition_frontier.Extensions in
-      let ledger_table =
-        get_extension (Transition_frontier.extensions frontier) Ledger_table
-      in
-      Option.map
-        (Ledger_table.lookup ledger_table ledger_hash)
-        ~f:(Ledger.Any_ledger.cast (module Ledger))
+    else None
 
   let answer_query :
          frontier:Inputs.Transition_frontier.t
@@ -62,24 +64,49 @@ module Make (Inputs : Inputs_intf) :
   let get_staged_ledger_aux_and_pending_coinbases_at_hash ~frontier state_hash
       =
     let open Option.Let_syntax in
-    Option.merge
-      (let%map breadcrumb = Transition_frontier.find frontier state_hash in
-       let staged_ledger =
-         Transition_frontier.Breadcrumb.staged_ledger breadcrumb
-       in
-       let scan_state = Staged_ledger.scan_state staged_ledger in
-       let merkle_root =
-         Staged_ledger.hash staged_ledger |> Staged_ledger_hash.ledger_hash
-       in
-       let pending_coinbase =
-         Staged_ledger.pending_coinbase_collection staged_ledger
-       in
-       (scan_state, merkle_root, pending_coinbase))
-      (let%map root = find_in_root_history frontier state_hash in
-       ( root.scan_state
-       , root.staged_ledger_target_ledger_hash
-       , root.pending_coinbase ))
-      ~f:Fn.const
+    let protocol_states scan_state =
+      Staged_ledger.Scan_state.required_state_hashes scan_state
+      |> State_hash.Set.to_list
+      |> List.fold_until ~init:(Some [])
+           ~f:(fun acc hash ->
+             match
+               Option.map2
+                 (Transition_frontier.find_protocol_state frontier hash)
+                 acc ~f:List.cons
+             with
+             | None ->
+                 Stop None
+             | Some acc' ->
+                 Continue (Some acc') )
+           ~finish:Fn.id
+    in
+    match
+      let%bind breadcrumb = Transition_frontier.find frontier state_hash in
+      let staged_ledger =
+        Transition_frontier.Breadcrumb.staged_ledger breadcrumb
+      in
+      let scan_state = Staged_ledger.scan_state staged_ledger in
+      let merkle_root =
+        Staged_ledger.hash staged_ledger |> Staged_ledger_hash.ledger_hash
+      in
+      let%map scan_state_protocol_states = protocol_states scan_state in
+      let pending_coinbase =
+        Staged_ledger.pending_coinbase_collection staged_ledger
+      in
+      (scan_state, merkle_root, pending_coinbase, scan_state_protocol_states)
+    with
+    | Some res ->
+        Some res
+    | None ->
+        let open Root_data.Historical in
+        let%bind root = find_in_root_history frontier state_hash in
+        let%map scan_state_protocol_states =
+          protocol_states_in_root_history frontier state_hash
+        in
+        ( scan_state root
+        , staged_ledger_target_ledger_hash root
+        , pending_coinbase root
+        , scan_state_protocol_states )
 
   let get_transition_chain ~frontier hashes =
     let open Option.Let_syntax in
@@ -89,7 +116,8 @@ module Make (Inputs : Inputs_intf) :
              Option.merge
                Transition_frontier.(
                  find frontier hash >>| Breadcrumb.validated_transition)
-               (find_in_root_history frontier hash >>| fun x -> x.transition)
+               ( find_in_root_history frontier hash
+               >>| fun x -> Root_data.Historical.transition x )
                ~f:Fn.const
            in
            External_transition.Validation.forget_validation
@@ -113,11 +141,11 @@ module Make (Inputs : Inputs_intf) :
       let%map () = Option.some_if is_tip_better () in
       best_tip_with_witness
 
-    let verify ~logger ~verifier observed_state peer_root =
+    let verify ~logger ~verifier ~genesis_constants observed_state peer_root =
       let open Deferred.Result.Let_syntax in
       let%bind ( (`Root _, `Best_tip (best_tip_transition, _)) as
                verified_witness ) =
-        Best_tip_prover.verify ~verifier peer_root
+        Best_tip_prover.verify ~verifier ~genesis_constants peer_root
       in
       let is_before_best_tip candidate =
         Consensus.Hooks.select
@@ -138,55 +166,6 @@ module Make (Inputs : Inputs_intf) :
                   best_tip_transition.hash))
       in
       verified_witness
-  end
-
-  module Bootstrappable_best_tip = struct
-    let prove ~logger ~should_select_tip ~frontier clients_consensus_state =
-      let open Option.Let_syntax in
-      let%bind best_tip_with_witness =
-        Best_tip_prover.prove ~logger frontier
-      in
-      let%map () =
-        Option.some_if
-          (should_select_tip ~existing:clients_consensus_state
-             ~candidate:
-               (External_transition.consensus_state best_tip_with_witness.data)
-             ~logger:
-               (Logger.extend logger
-                  [ ( "selection_context"
-                    , `String "Bootstrappable_best_tip.prove" ) ]))
-          ()
-      in
-      best_tip_with_witness
-
-    let verify ~logger ~should_select_tip ~verifier existing_state
-        ( {Proof_carrying_data.data= best_tip; proof= _merkle_list, _root} as
-        peer_best_tip ) =
-      let open Deferred.Or_error.Let_syntax in
-      let%bind () =
-        Deferred.return
-          (Result.ok_if_true
-             ~error:
-               (Error.of_string
-                  "Peer's best tip did not cause you to bootstrap")
-             (should_select_tip ~existing:existing_state
-                ~candidate:(External_transition.consensus_state best_tip)
-                ~logger:
-                  (Logger.extend logger
-                     [ ( "selection_context"
-                       , `String "Bootstrappable_best_tip.verify" ) ])))
-      in
-      Best_tip_prover.verify ~verifier peer_best_tip
-
-    module For_tests = struct
-      let prove = prove
-
-      let verify = verify
-    end
-
-    let prove = prove ~should_select_tip:Consensus.Hooks.should_bootstrap
-
-    let verify = verify ~should_select_tip:Consensus.Hooks.should_bootstrap
   end
 end
 
@@ -219,7 +198,7 @@ let%test_module "Sync_handler" =
           Thread_safe.block_on_async_exn (fun () ->
               print_heartbeat hb_logger |> don't_wait_for ;
               let%bind frontier =
-                create_root_frontier ~logger ~pids Genesis_ledger.accounts
+                create_root_frontier ~logger ~pids Test_genesis_ledger.accounts
               in
               let source_ledger =
                 Transition_frontier.For_tests.root_snarked_ledger frontier
@@ -272,14 +251,14 @@ let%test_module "Sync_handler" =
       Thread_safe.block_on_async_exn (fun () ->
           print_heartbeat hb_logger |> don't_wait_for ;
           let%bind frontier =
-            create_root_frontier ~logger ~pids Genesis_ledger.accounts
+            create_root_frontier ~logger ~pids Test_genesis_ledger.accounts
           in
           let%bind () =
             build_frontier_randomly frontier
               ~gen_root_breadcrumb_builder:
                 (gen_linear_breadcrumbs ~logger ~pids ~trust_system
                    ~size:num_breadcrumbs
-                   ~accounts_with_secret_keys:Genesis_ledger.accounts)
+                   ~accounts_with_secret_keys:Test_genesis_ledger.accounts)
           in
           let seen_transition =
             Transition_frontier.(
@@ -310,45 +289,5 @@ let%test_module "Sync_handler" =
                  (With_hash.data best_tip_transition)
                  (to_external_transition
                     (Transition_frontier.best_tip frontier))) )
-
-    let%test "a node that is synced to the network should be able to provide \
-              its best tip to an offline node" =
-      let num_breadcrumbs_to_cause_bootstrap =
-        (2 * max_length) + Consensus.Constants.delta + 1
-      in
-      heartbeat_flag := true ;
-      Thread_safe.block_on_async_exn (fun () ->
-          print_heartbeat hb_logger |> don't_wait_for ;
-          let%bind frontier =
-            create_root_frontier ~logger ~pids Genesis_ledger.accounts
-          in
-          let root_breadcrumb = Transition_frontier.root frontier in
-          let root_transition =
-            Transition_frontier.Breadcrumb.validated_transition root_breadcrumb
-          in
-          let%bind () =
-            build_frontier_randomly frontier
-              ~gen_root_breadcrumb_builder:
-                (gen_linear_breadcrumbs ~logger ~pids ~trust_system
-                   ~size:num_breadcrumbs_to_cause_bootstrap
-                   ~accounts_with_secret_keys:Genesis_ledger.accounts)
-          in
-          let root_consensus_state =
-            External_transition.Validated.consensus_state root_transition
-          in
-          let peer_best_tip_with_witness =
-            Option.value_exn
-              (Sync_handler.Bootstrappable_best_tip.prove ~logger ~frontier
-                 root_consensus_state)
-          in
-          let%bind verify =
-            f_with_verifier ~f:Sync_handler.Bootstrappable_best_tip.verify
-              ~logger ~pids
-          in
-          let%map verification_result =
-            verify root_consensus_state peer_best_tip_with_witness
-          in
-          heartbeat_flag := false ;
-          Result.is_ok verification_result )
   end )
 *)

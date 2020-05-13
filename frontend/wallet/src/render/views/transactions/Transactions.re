@@ -1,3 +1,4 @@
+open ReactIntl;
 open Tc;
 
 module Styles = {
@@ -39,7 +40,7 @@ module Styles = {
 module TransactionsQueryString = [%graphql
   {|
     query transactions($after: String, $publicKey: PublicKey!) {
-      blocks(first: 5, after: $after, filter: { relatedTo: $publicKey }) {
+      blocks(last: 5, before: $after, filter: { relatedTo: $publicKey }) {
         nodes {
           creator @bsDecoder(fn: "Apollo.Decoders.publicKey")
           protocolState {
@@ -145,6 +146,7 @@ let extractTransactions: Js.t('a) => extractedResponse =
 [@react.component]
 let make = () => {
   let activeAccount = Hooks.useActiveAccount();
+  let zeroState = Hooks.useAsset("ZeroState.png");
 
   let updateQuery: ReasonApolloQuery.updateQueryT = [%bs.raw
     {| function (prevResult, { fetchMoreResult }) {
@@ -165,30 +167,21 @@ let make = () => {
   ];
 
   <div className=Styles.container>
-    <div className=Styles.headerRow>
-      <span className=Css.(style([display(`flex), alignItems(`center)]))>
-        {React.string("Sender")}
-        <span className=Styles.icon> <Icon kind=Icon.BentArrow /> </span>
-        {React.string("recipient")}
-      </span>
-      <span> {ReasonReact.string("Memo")} </span>
-      <span className=Css.(style([textAlign(`right)]))>
-        {ReasonReact.string("Date / Amount")}
-      </span>
-    </div>
     {switch (activeAccount) {
      | Some(pubkey) =>
-       let transactionQuery =
-         TransactionsQueryString.make(
-           ~publicKey=Apollo.Encoders.publicKey(pubkey),
-           (),
-         );
-       <TransactionsQuery variables=transactionQuery##variables>
+       let variables =
+         Js.Dict.fromList([
+           ("publicKey", Apollo.Encoders.publicKey(pubkey)),
+           ("after", Js.Json.null),
+         ])
+         |> Js.Json.object_;
+       <TransactionsQuery variables fetchPolicy="network-only">
          (
            response =>
              switch (response.result) {
              | Loading => <Loader.Page> <Loader /> </Loader.Page>
-             | Error(err) => React.string(err##message) /* TODO format this error message */
+             | Error((err: ReasonApolloTypes.apolloError)) =>
+               React.string(err.message) /* TODO format this error message */
              | Data(data) =>
                let {blocks, pending} = extractTransactions(data);
                let transactions = Array.concatenate(blocks);
@@ -197,43 +190,74 @@ let make = () => {
                    ~default="",
                    data##blocks##pageInfo##lastCursor,
                  );
-               switch (Array.length(transactions), Array.length(pending)) {
-               | (0, 0) =>
-                 <div className=Styles.alertContainer>
-                   <Alert
-                     kind=`Info
-                     message="You don't have any transactions related to this account."
-                   />
+               <BlockListener
+                 refetch={() =>
+                   response.refetch(Some(variables))
+                 }
+                 subscribeToMore={response.subscribeToMore}>
+                 <div className=Styles.headerRow>
+                   <span
+                     className=Css.(
+                       style([display(`flex), alignItems(`center)])
+                     )>
+                     <FormattedMessage id="sender" defaultMessage="sender" />
+                     <span className=Styles.icon>
+                       <Icon kind=Icon.BentArrow />
+                     </span>
+                     <FormattedMessage
+                       id="recipient"
+                       defaultMessage="recipient"
+                     />
+                   </span>
+                   <span>
+                     <FormattedMessage id="memo" defaultMessage="memo" />
+                   </span>
+                   <span className=Css.(style([textAlign(`right)]))>
+                     <FormattedMessage
+                       id="transactions.date/amount"
+                       defaultMessage="date / amount"
+                     />
+                   </span>
                  </div>
-               | (_, _) =>
-                 <TransactionsList
-                   pending
-                   transactions
-                   hasNextPage=data##blocks##pageInfo##hasNextPage
-                   onLoadMore={() => {
-                     let moreTransactions =
-                       TransactionsQueryString.make(
-                         ~publicKey=Apollo.Encoders.publicKey(pubkey),
-                         ~after=lastCursor,
-                         (),
-                       );
+                 {switch (Array.length(transactions), Array.length(pending)) {
+                  | (0, 0) =>
+                    <div className=Styles.alertContainer>
+                      <Alert
+                        kind=`Info
+                        defaultMessage="You don't have any transactions related to this account."
+                      />
+                    </div>
+                  | (_, _) =>
+                    <TransactionsList
+                      pending
+                      transactions
+                      hasNextPage=data##blocks##pageInfo##hasNextPage
+                      onLoadMore={() => {
+                        let moreTransactions =
+                          TransactionsQueryString.make(
+                            ~publicKey=Apollo.Encoders.publicKey(pubkey),
+                            ~after=lastCursor,
+                            (),
+                          );
 
-                     response.fetchMore(
-                       ~variables=moreTransactions##variables,
-                       ~updateQuery,
-                       (),
-                     );
-                   }}
-                 />
-               };
+                        response.fetchMore(
+                          ~variables=Some(moreTransactions##variables),
+                          ~updateQuery,
+                          (),
+                        );
+                      }}
+                    />
+                  }}
+               </BlockListener>;
              }
          )
        </TransactionsQuery>;
      | None =>
        <div className=Styles.alertContainer>
-         <Alert
-           message="Select an account from the side bar to view related transactions."
-           kind=`Info
+         <img
+           width="608px"
+           src=zeroState
+           alt="Join the revolution on Discord"
          />
        </div>
      }}
