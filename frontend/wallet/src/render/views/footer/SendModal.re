@@ -103,7 +103,7 @@ module SendForm = {
   open ModalState.Unvalidated;
 
   [@react.component]
-  let make = (~onSubmit, ~onClose) => {
+  let make = (~onSubmit, ~onClose, ~loading, ~error) => {
     let activeAccount = Hooks.useActiveAccount();
     let (addressBook, _) = React.useContext(AddressBookProvider.context);
     let (sendState, setModalState) =
@@ -127,14 +127,16 @@ module SendForm = {
           )
         };
       }}>
-      {switch (errorOpt) {
-       | None => React.null
-       | Some(err) => <Alert kind=`Danger defaultMessage=err />
+      {switch (error, errorOpt) {
+       | (None, None) => React.null
+       | (Some(err), _)
+       | (_, Some(err)) => <Alert kind=`Danger defaultMessage=err />
        }}
       spacer
       // Disable dropdown, only show active Account
       <TextField
         label="From"
+        mono=true
         value={AccountName.getName(
           Option.getExn(fromStr) |> PublicKey.ofStringExn,
           addressBook,
@@ -162,7 +164,7 @@ module SendForm = {
         label="Fee"
         onChange={value => setModalState(s => {...s, feeStr: value})}
         value=feeStr
-        placeholder="0"
+        placeholder="0.1"
       />
       spacer
       {switch (memoOpt) {
@@ -187,9 +189,19 @@ module SendForm = {
       <Spacer height=1.0 />
       //Disable Modal button if no active wallet
       <div className=Css.(style([display(`flex)]))>
-        <Button label="Cancel" style=Button.Gray onClick={_ => onClose()} />
+        <Button
+          disabled=loading
+          label="Cancel"
+          style=Button.Gray
+          onClick={_ => onClose()}
+        />
         <Spacer width=1. />
-        <Button label="Send" style=Button.Green type_="submit" />
+        <Button
+          disabled=loading
+          label="Send"
+          style=Button.Green
+          type_="submit"
+        />
       </div>
     </form>;
   };
@@ -199,22 +211,33 @@ module SendForm = {
 let make = (~onClose) => {
   <Modal title="Send Coda" onRequestClose={_ => onClose()}>
     <SendPaymentMutation>
-      {(mutation, _) =>
+      {(mutation, {result}) =>
          <SendForm
            onClose
+           loading={result === Loading}
+           error={
+             switch (result) {
+             | Error(err) => Some(err.message)
+             | _ => None
+             }
+           }
            onSubmit={(
              {from, to_, amountFormatted, feeFormatted, memoOpt}: ModalState.Validated.t,
              afterSubmit,
            ) => {
              let variables =
-               SendPayment.make(
-                 ~from=Apollo.Encoders.publicKey(from),
-                 ~to_=Apollo.Encoders.publicKey(to_),
-                 ~amount=Apollo.Encoders.currency(amountFormatted),
-                 ~fee=Apollo.Encoders.currency(feeFormatted),
-                 ~memo=?memoOpt,
-                 (),
-               )##variables;
+               Js.Dict.fromList([
+                 ("from", Apollo.Encoders.publicKey(from)),
+                 ("to_", Apollo.Encoders.publicKey(to_)),
+                 ("amount", Apollo.Encoders.currency(amountFormatted)),
+                 ("fee", Apollo.Encoders.currency(feeFormatted)),
+                 (
+                   "memo",
+                   Tc.Option.map(~f=Js.Json.string, memoOpt)
+                   ->Tc.Option.withDefault(~default=Js.Json.null),
+                 ),
+               ])
+               |> Js.Json.object_;
              let performMutation =
                Task.liftPromise(() =>
                  mutation(~variables, ~refetchQueries=[|"transactions"|], ())

@@ -4,16 +4,18 @@ module Balance = Currency.Balance
 
 module Account = struct
   (* want bin_io, not available with Account.t *)
-  type t = Coda_base.Account.Stable.V1.t
-  [@@deriving bin_io, sexp, eq, compare, hash, yojson]
+  type t = Coda_base.Account.Stable.Latest.t
+  [@@deriving bin_io_unversioned, sexp, eq, compare, hash, yojson]
 
-  type key = Coda_base.Account.Key.Stable.V1.t
-  [@@deriving bin_io, sexp, eq, compare, hash]
+  type key = Coda_base.Account.Key.Stable.Latest.t
+  [@@deriving bin_io_unversioned, sexp, eq, compare, hash]
 
   (* use Account items needed *)
   let empty = Coda_base.Account.empty
 
   let public_key = Coda_base.Account.public_key
+
+  let identifier = Coda_base.Account.identifier
 
   let key_gen = Coda_base.Account.key_gen
 
@@ -53,15 +55,16 @@ module Balance_not_used = struct
 end
 
 module Account_not_used = struct
-  type key = string [@@deriving sexp, show, bin_io, eq, compare, hash]
+  type key = string
+  [@@deriving sexp, show, bin_io_unversioned, eq, compare, hash]
 
   type t =
     { public_key: key
-    ; balance: Balance.Stable.V1.t
+    ; balance: Balance.Stable.Latest.t
           [@printer
             fun fmt balance ->
               Format.pp_print_string fmt (Balance.to_string balance)] }
-  [@@deriving bin_io, eq, show, fields]
+  [@@deriving bin_io_unversioned, eq, show, fields]
 
   let sexp_of_t {public_key; balance} =
     [%sexp_of: string * string] (public_key, Balance.to_string balance)
@@ -93,7 +96,7 @@ module Receipt = Coda_base.Receipt
 
 module Hash = struct
   module T = struct
-    type t = Md5.t [@@deriving sexp, hash, compare, bin_io, eq]
+    type t = Md5.t [@@deriving sexp, hash, compare, bin_io_unversioned, eq]
 
     let to_string = Md5.to_hex
 
@@ -187,13 +190,15 @@ module Storage_locations : Intf.Storage_locations = struct
 end
 
 module Key = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = Account.key [@@deriving sexp, bin_io, eq, compare, hash]
-    end
+      type t = Coda_base.Account.Key.Stable.V1.t
+      [@@deriving sexp, eq, compare, hash]
 
-    module Latest = V1
-  end
+      let to_latest = Fn.id
+    end
+  end]
 
   type t = Stable.Latest.t [@@deriving sexp, compare, hash]
 
@@ -201,7 +206,7 @@ module Key = struct
 
   let gen = Account.key_gen
 
-  let empty = Account.empty.public_key
+  let empty : t = Account.empty.public_key
 
   let gen_keys num_keys =
     Quickcheck.random_value
@@ -211,8 +216,45 @@ module Key = struct
   include Comparable.Make (Stable.Latest)
 end
 
+module Token_id = Coda_base.Token_id
+
+module Account_id = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t = Coda_base.Account_id.Stable.V1.t
+      [@@deriving sexp, eq, compare, hash]
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  type t = Coda_base.Account_id.t [@@deriving sexp, compare, hash]
+
+  include Hashable.Make_binable (Stable.Latest)
+  include Comparable.Make (Stable.Latest)
+
+  let create = Coda_base.Account_id.create
+
+  let token_id = Coda_base.Account_id.token_id
+
+  let public_key = Coda_base.Account_id.public_key
+
+  (* TODO: Non-default tokens *)
+  let gen =
+    let open Quickcheck.Generator.Let_syntax in
+    let%map pk = Key.gen in
+    create pk Token_id.default
+
+  let gen_accounts num_accounts =
+    Quickcheck.random_value
+      (Quickcheck.Generator.list_with_length num_accounts gen)
+end
+
 module Base_inputs = struct
   module Key = Key
+  module Account_id = Account_id
+  module Token_id = Token_id
   module Balance = Balance
   module Account = Account
   module Hash = Hash

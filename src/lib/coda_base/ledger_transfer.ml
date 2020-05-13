@@ -1,11 +1,13 @@
 open Core_kernel
-open Signature_lib
 
 module type Base_ledger_intf =
   Merkle_ledger.Base_ledger_intf.S
   with type account := Account.t
-   and type key := Public_key.Compressed.t
-   and type key_set := Public_key.Compressed.Set.t
+   and type key := Signature_lib.Public_key.Compressed.t
+   and type token_id := Token_id.t
+   and type token_id_set := Token_id.Set.t
+   and type account_id := Account_id.t
+   and type account_id_set := Account_id.Set.t
    and type hash := Ledger_hash.t
    and type root_hash := Ledger_hash.t
 
@@ -20,7 +22,7 @@ end = struct
              Source.Addr.compare addr1 addr2 )
     in
     List.iter sorted ~f:(fun (_addr, account) ->
-        let key = Account.public_key account in
+        let key = Account.identifier account in
         ignore (Dest.get_or_create_account_exn dest key account) ) ;
     let src_hash = Source.merkle_root src in
     let dest_hash = Dest.merkle_root dest in
@@ -38,8 +40,8 @@ module From_sparse_ledger (Dest : Base_ledger_intf) : sig
 end = struct
   let transfer_accounts ~src ~dest =
     Sparse_ledger.iteri src ~f:(fun _idx account ->
-        let key = Account.public_key account in
-        ignore (Dest.get_or_create_account_exn dest key account) ) ;
+        let id = Account.identifier account in
+        ignore (Dest.get_or_create_account_exn dest id account) ) ;
     let src_hash = Sparse_ledger.merkle_root src in
     let dest_hash = Dest.merkle_root dest in
     if not (Ledger_hash.equal src_hash dest_hash) then

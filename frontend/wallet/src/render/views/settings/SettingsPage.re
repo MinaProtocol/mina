@@ -197,7 +197,7 @@ let make = () => {
     </div>
     <Spacer height=0.5 />
     <div className=Styles.accountSettings>
-      <AccountsQuery>
+      <AccountsQuery fetchPolicy="network-only">
         {({result}) =>
            switch (result) {
            | Loading =>

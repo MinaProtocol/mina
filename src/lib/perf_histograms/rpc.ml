@@ -16,7 +16,7 @@ let decorate_dispatch ~name (dispatch : ('q, 'r) Intf.dispatch) :
     Gauge.set (Network.rpc_latency_ms ~name) (Time.Span.to_ms span)) ;
   r
 
-let deocorate_impl ~name (impl : ('q, 'r, 'state) Intf.impl) :
+let decorate_impl ~name (impl : ('q, 'r, 'state) Intf.impl) :
     ('q, 'r, 'state) Intf.impl =
  fun state ~version q ->
   let open Deferred.Let_syntax in
@@ -40,13 +40,9 @@ module Plain = struct
 
     let implement_multi ?log_not_previously_seen_version f =
       implement_multi ?log_not_previously_seen_version
-        (f |> deocorate_impl ~name)
+        (f |> decorate_impl ~name)
   end
 
-  (* Since currently we are using the same version of data type for all the
-     nodes in the testnet, so the sizes of decoding and encoding should be
-     the same. If in the future, we have different versions, we need to make
-     the metrics record sizes of decoding and encoding separately. *)
   module Decorate_bin_io (M : Intf.Rpc.S) (Rpc : Intf.Versioned_rpc(M).S) =
   struct
     include Rpc
@@ -55,7 +51,7 @@ module Plain = struct
       let response = bin_read_response buf ~pos_ref in
       Coda_metrics.(
         Network.Rpc_size_histogram.observe
-          (Network.rpc_size_bytes ~name:M.name)
+          (Network.rpc_size_bytes ~name:(M.name ^ "_read_response"))
           (bin_size_response response |> Float.of_int)) ;
       response
 
@@ -66,7 +62,7 @@ module Plain = struct
     let bin_write_response buf ~pos response =
       Coda_metrics.(
         Network.Rpc_size_histogram.observe
-          (Network.rpc_size_bytes ~name:M.name)
+          (Network.rpc_size_bytes ~name:(M.name ^ "_write_response"))
           (bin_size_response response |> Float.of_int)) ;
       bin_write_response buf ~pos response
 

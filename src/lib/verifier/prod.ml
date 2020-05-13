@@ -1,20 +1,11 @@
 (* prod.ml *)
 
-[%%import
-"/src/config.mlh"]
-
 open Core_kernel
 open Async
 open Coda_base
 open Coda_state
 open Blockchain_snark
-
-[%%ifdef
-consensus_mechanism]
-
 open Snark_params
-
-[%%endif]
 
 type ledger_proof = Ledger_proof.Prod.t
 
@@ -26,51 +17,67 @@ module Worker_state = struct
       Transaction_snark.t -> message:Sok_message.t -> bool
   end
 
-  type init_arg = {conf_dir: string option; logger: Logger.Stable.Latest.t}
-  [@@deriving bin_io]
+  (* bin_io required by rpc_parallel *)
+  type init_arg =
+    { conf_dir: string option
+    ; logger: Logger.Stable.Latest.t
+    ; proof_level: Genesis_constants.Proof_level.Stable.Latest.t }
+  [@@deriving bin_io_unversioned]
 
   type t = (module S) Deferred.t
 
-  let create {logger; _} : t Deferred.t =
+  let create {logger; proof_level; _} : t Deferred.t =
     Memory_stats.log_memory_stats logger ~process:"verifier" ;
-    Deferred.return
-      (let%map bc_vk = Snark_keys.blockchain_verification ()
-       and tx_vk = Snark_keys.transaction_verification () in
-       let module T = Transaction_snark.Verification.Make (struct
-         let keys = tx_vk
-       end) in
-       let module M = struct
-         let instance_hash =
-           unstage (Blockchain_transition.instance_hash bc_vk.wrap)
+    match proof_level with
+    | Full ->
+        Deferred.return
+          (let%map bc_vk = Snark_keys.blockchain_verification ()
+           and tx_vk = Snark_keys.transaction_verification () in
+           let module T = Transaction_snark.Verification.Make (struct
+             let keys = tx_vk
+           end) in
+           let module M = struct
+             let instance_hash =
+               unstage (Blockchain_transition.instance_hash bc_vk.wrap)
 
-         let verify_wrap state proof =
-           match
-             Or_error.try_with (fun () ->
-                 Tock.verify proof bc_vk.wrap
-                   Tock.Data_spec.[Wrap_input.typ]
-                   (Wrap_input.of_tick_field (instance_hash state)) )
-           with
-           | Ok result ->
-               result
-           | Error e ->
-               Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-                 ~metadata:[("error", `String (Error.to_string_hum e))]
-                 "Verifier threw an exception while verifying blockchain snark" ;
-               failwith "Verifier crashed"
+             let verify_wrap state proof =
+               match
+                 Or_error.try_with (fun () ->
+                     Tock.verify proof bc_vk.wrap
+                       Tock.Data_spec.[Wrap_input.typ]
+                       (Wrap_input.of_tick_field (instance_hash state)) )
+               with
+               | Ok result ->
+                   result
+               | Error e ->
+                   Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+                     ~metadata:[("error", `String (Error.to_string_hum e))]
+                     "Verifier threw an exception while verifying blockchain \
+                      snark" ;
+                   failwith "Verifier crashed"
 
-         let verify_transaction_snark ledger_proof ~message =
-           match
-             Or_error.try_with (fun () -> T.verify ledger_proof ~message)
-           with
-           | Ok result ->
-               result
-           | Error e ->
-               Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-                 ~metadata:[("error", `String (Error.to_string_hum e))]
-                 "Verifier threw an exception while verifying transaction snark" ;
-               failwith "Verifier crashed"
-       end in
-       (module M : S))
+             let verify_transaction_snark ledger_proof ~message =
+               match
+                 Or_error.try_with (fun () -> T.verify ledger_proof ~message)
+               with
+               | Ok result ->
+                   result
+               | Error e ->
+                   Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+                     ~metadata:[("error", `String (Error.to_string_hum e))]
+                     "Verifier threw an exception while verifying transaction \
+                      snark" ;
+                   failwith "Verifier crashed"
+           end in
+           (module M : S))
+    | Check | None ->
+        Deferred.return @@ Deferred.return
+        @@ ( module struct
+             let verify_wrap _ _ = true
+
+             let verify_transaction_snark _ ~message:_ = true
+           end
+           : S )
 
   let get = Fn.id
 end
@@ -87,7 +94,8 @@ module Worker = struct
     module Worker_state = Worker_state
 
     module Connection_state = struct
-      type init_arg = unit [@@deriving bin_io]
+      (* bin_io required by rpc_parallel *)
+      type init_arg = unit [@@deriving bin_io_unversioned]
 
       type t = unit
     end
@@ -98,24 +106,12 @@ module Worker = struct
               and type connection_state := Connection_state.t) =
     struct
       let verify_blockchain (w : Worker_state.t) (chain : Blockchain.t) =
-        match Coda_compile_config.proof_level with
-        | "full" ->
-            let%map (module M) = Worker_state.get w in
-            M.verify_wrap chain.state chain.proof
-        | "check" | "none" ->
-            Deferred.return true
-        | _ ->
-            failwith "unknown proof_level"
+        let%map (module M) = Worker_state.get w in
+        M.verify_wrap chain.state chain.proof
 
       let verify_transaction_snark (w : Worker_state.t) (p, message) =
-        match Coda_compile_config.proof_level with
-        | "full" ->
-            let%map (module M) = Worker_state.get w in
-            M.verify_transaction_snark p ~message
-        | "check" | "none" ->
-            Deferred.return true
-        | _ ->
-            failwith "unknown proof_level"
+        let%map (module M) = Worker_state.get w in
+        M.verify_transaction_snark p ~message
 
       let functions =
         let f (i, o, f) =
@@ -132,7 +128,7 @@ module Worker = struct
               , Bool.bin_t
               , verify_transaction_snark ) }
 
-      let init_worker_state Worker_state.{conf_dir; logger} =
+      let init_worker_state Worker_state.{conf_dir; logger; proof_level} =
         ( if Option.is_some conf_dir then
           let max_size = 256 * 1024 * 512 in
           Logger.Consumer_registry.register ~id:"default"
@@ -143,7 +139,7 @@ module Worker = struct
                  ~log_filename:"coda-verifier.log" ~max_size) ) ;
         Logger.info logger ~module_:__MODULE__ ~location:__LOC__
           "Verifier started" ;
-        Worker_state.create {conf_dir; logger}
+        Worker_state.create {conf_dir; logger; proof_level}
 
       let init_connection_state ~connection:_ ~worker_state:_ () =
         Deferred.unit
@@ -156,7 +152,7 @@ end
 type t = Worker.Connection.t
 
 (* TODO: investigate why conf_dir wasn't being used *)
-let create ~logger ~pids ~conf_dir =
+let create ~logger ~proof_level ~pids ~conf_dir =
   let on_failure err =
     Logger.error logger ~module_:__MODULE__ ~location:__LOC__
       "Verifier process failed with error $err"
@@ -166,7 +162,7 @@ let create ~logger ~pids ~conf_dir =
   let%map connection, process =
     Worker.spawn_in_foreground_exn ~connection_timeout:(Time.Span.of_min 1.)
       ~on_failure ~shutdown_on:Disconnect ~connection_state_init_arg:()
-      {conf_dir; logger}
+      {conf_dir; logger; proof_level}
   in
   Logger.info logger ~module_:__MODULE__ ~location:__LOC__
     "Daemon started process of kind $process_kind with pid $verifier_pid"
@@ -191,7 +187,7 @@ let create ~logger ~pids ~conf_dir =
          return
          @@ Logger.error logger ~module_:__MODULE__ ~location:__LOC__
               "Verifier stderr: $stderr"
-              ~metadata:[("stdout", `String stderr)] ) ;
+              ~metadata:[("stderr", `String stderr)] ) ;
   connection
 
 let verify_blockchain_snark t chain =

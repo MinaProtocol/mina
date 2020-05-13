@@ -55,7 +55,7 @@ module Answer = struct
 end
 
 module type Inputs_intf = sig
-  module Addr : Merkle_address.S
+  module Addr : module type of Merkle_address
 
   module Account : sig
     type t [@@deriving bin_io, sexp, yojson]
@@ -243,6 +243,7 @@ end = struct
         t -> query Envelope.Incoming.t -> answer option Deferred.t =
      fun {mt; f; logger; trust_system} query_envelope ->
       let open Trust_system in
+      let ledger_depth = MT.depth mt in
       let sender = Envelope.Incoming.sender query_envelope in
       let query = Envelope.Incoming.data query_envelope in
       f query ;
@@ -251,8 +252,8 @@ end = struct
         | What_child_hashes a -> (
           match
             let open Or_error.Let_syntax in
-            let%bind lchild = Addr.child a Direction.Left in
-            let%bind rchild = Addr.child a Direction.Right in
+            let%bind lchild = Addr.child ~ledger_depth a Direction.Left in
+            let%bind rchild = Addr.child ~ledger_depth a Direction.Right in
             Or_error.try_with (fun () ->
                 Answer.Child_hashes_are
                   ( MT.get_inner_hash_at_addr_exn mt lchild
@@ -272,7 +273,7 @@ end = struct
                     ( "invalid address $addr in What_child_hashes request"
                     , [("addr", Addr.to_yojson a)] ) ) )
         | What_contents a ->
-            if Addr.height a > account_subtree_height then
+            if Addr.height ~ledger_depth a > account_subtree_height then
               Either.Second
                 ( Actions.Violated_protocol
                 , Some
@@ -328,8 +329,9 @@ end = struct
             let height = Int.ceil_log2 len in
             (* FIXME: bug when height=0 https://github.com/o1-labs/nanobit/issues/365 *)
             let content_root_addr =
-              funpow (MT.depth - height)
-                (fun a -> Addr.child_exn a Direction.Left)
+              funpow
+                (MT.depth mt - height)
+                (fun a -> Addr.child_exn ~ledger_depth a Direction.Left)
                 (Addr.root ())
             in
             Either.First
@@ -430,12 +432,13 @@ end = struct
            (** Hash check failed, peer lied. First parameter expected, second parameter actual. *)
          ] =
    fun t parent_addr lh rh ->
+    let ledger_depth = MT.depth t.tree in
     let la, ra =
       Option.value_exn ~message:"Tried to fetch a leaf as if it was a node"
         ( Or_error.ok
         @@ Or_error.both
-             (Addr.child parent_addr Direction.Left)
-             (Addr.child parent_addr Direction.Right) )
+             (Addr.child ~ledger_depth parent_addr Direction.Left)
+             (Addr.child ~ledger_depth parent_addr Direction.Right) )
     in
     let expected =
       Option.value_exn ~message:"Forgot to wait for a node"
@@ -444,7 +447,7 @@ end = struct
     let merged_hash =
       (* Height here is the height of the things we're merging, so one less than
          the parent height. *)
-      Hash.merge ~height:(MT.depth - Addr.depth parent_addr - 1) lh rh
+      Hash.merge ~height:(ledger_depth - Addr.depth parent_addr - 1) lh rh
     in
     if Hash.equal merged_hash expected then (
       (* Fetch the children of a node if the hash in the underlying ledger
@@ -489,7 +492,7 @@ end = struct
       the children.
   *)
   let handle_node t addr exp_hash =
-    if Addr.depth addr >= MT.depth - account_subtree_height then (
+    if Addr.depth addr >= MT.depth t.tree - account_subtree_height then (
       expect_content t addr exp_hash ;
       Linear_pipe.write_without_pushback_if_open t.queries
         (desired_root_exn t, What_contents addr) )
@@ -506,7 +509,7 @@ end = struct
     let rh = Root_hash.to_hash (desired_root_exn t) in
     let height = Int.ceil_log2 n in
     (* FIXME: bug when height=0 https://github.com/o1-labs/nanobit/issues/365 *)
-    let actual = complete_with_empties content_hash height MT.depth in
+    let actual = complete_with_empties content_hash height (MT.depth t.tree) in
     if Hash.equal actual rh then (
       MT.make_space_for t.tree n ;
       Addr.Table.clear t.waiting_parents ;
@@ -537,7 +540,9 @@ end = struct
       let sender = Envelope.Incoming.sender env in
       let answer = Envelope.Incoming.data env in
       Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
-        ~metadata:[("root_hash", Root_hash.to_yojson root_hash)]
+        ~metadata:
+          [ ("root_hash", Root_hash.to_yojson root_hash)
+          ; ("query", Query.to_yojson Addr.to_yojson query) ]
         "Handle answer for $root_hash" ;
       if not (Root_hash.equal root_hash (desired_root_exn t)) then (
         Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__

@@ -137,28 +137,36 @@ module Api = struct
     let open Deferred.Option.Let_syntax in
     let worker = t.workers.(i) in
     let pk_of_sk = Public_key.of_private_key_exn sk |> Public_key.compress in
-    let%bind nonce = Coda_process.get_nonce_exn worker pk_of_sk in
-    let payload =
-      User_command.Payload.create ~fee ~nonce ~memo:User_command_memo.dummy
-        ~valid_until ~body
+    let user_command_input =
+      User_command_input.create ~signer:pk_of_sk ~fee
+        ~fee_token:Token_id.default ~fee_payer_pk:pk_of_sk
+        ~memo:User_command_memo.dummy ~valid_until ~body
+        ~sign_choice:
+          (User_command_input.Sign_choice.Keypair
+             (Keypair.of_private_key_exn sk))
+        ()
     in
-    let user_cmd =
-      ( User_command.sign (Keypair.of_private_key_exn sk) payload
-        :> User_command.t )
-    in
-    let%map _receipt =
-      Coda_process.process_user_command_exn worker user_cmd
+    let%map user_cmd, _receipt =
+      Coda_process.process_user_command_exn worker user_command_input
       |> Deferred.map ~f:Or_error.ok
     in
     user_cmd
 
   let delegate_stake t i delegator_sk delegate_pk fee valid_until =
+    let delegator =
+      Public_key.compress @@ Public_key.of_private_key_exn delegator_sk
+    in
     run_user_command t i delegator_sk fee valid_until
-      ~body:(Stake_delegation (Set_delegate {new_delegate= delegate_pk}))
+      ~body:
+        (Stake_delegation (Set_delegate {delegator; new_delegate= delegate_pk}))
 
   let send_payment t i sender_sk receiver_pk amount fee valid_until =
+    let source_pk =
+      Public_key.compress @@ Public_key.of_private_key_exn sender_sk
+    in
     run_user_command t i sender_sk fee valid_until
-      ~body:(Payment {receiver= receiver_pk; amount})
+      ~body:
+        (Payment {source_pk; receiver_pk; token_id= Token_id.default; amount})
 
   (* TODO: resulting_receipt should be replaced with the sender's pk so that we prove the
      merkle_list of receipts up to the current state of a sender's receipt_chain hash for some blockchain.
@@ -205,6 +213,25 @@ module Api = struct
     let signal = Ivar.create () in
     t.restart_signals.(i) <- Some (`Catchup, signal) ;
     signal
+end
+
+let consensus_constants =
+  Consensus.Constants.create
+    ~constraint_constants:Genesis_constants.Constraint_constants.compiled
+    ~protocol_constants:Genesis_constants.compiled.protocol
+
+module Constants = struct
+  let to_int = Unsigned.UInt32.to_int
+
+  let k = to_int consensus_constants.k
+
+  let c = to_int consensus_constants.c
+
+  let delta = to_int consensus_constants.delta
+
+  let block_window_duration_ms =
+    Block_time.Span.to_ms consensus_constants.block_window_duration_ms
+    |> Int64.to_int_exn
 end
 
 (** the prefix check keeps track of the "best path" for each worker. the
@@ -289,8 +316,7 @@ let start_prefix_check logger workers events testnet ~acceptable_delay =
               < Time.Span.to_sec acceptable_delay
                 +. epsilon
                 +. Int.to_float
-                     ( (Consensus.Constants.c - 1)
-                     * Consensus.Constants.block_window_duration_ms )
+                     ((Constants.c - 1) * Constants.block_window_duration_ms)
                    /. 1000. )
        then (
          Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
@@ -321,8 +347,7 @@ let start_payment_check logger root_pipe (testnet : Api.t) =
   don't_wait_for
     (Linear_pipe.iter root_pipe ~f:(function
          | `Root
-             ( worker_id
-             , {Coda_lib.Root_diff.Stable.V1.user_commands; root_length} )
+             (worker_id, ({user_commands; root_length} : Coda_lib.Root_diff.t))
          ->
          ( match testnet.status.(worker_id) with
          | `On (`Synced user_cmds_under_inspection) ->
@@ -332,9 +357,8 @@ let start_payment_check logger root_pipe (testnet : Api.t) =
                    ()
                | Some (`Bootstrap, signal) ->
                    if
-                     testnet.root_lengths.(i)
-                     + (2 * Consensus.Constants.k)
-                     + Consensus.Constants.delta
+                     testnet.root_lengths.(i) + (2 * Constants.k)
+                     + Constants.delta
                      < root_length - 2
                    then (
                      Ivar.fill signal () ;
@@ -342,7 +366,7 @@ let start_payment_check logger root_pipe (testnet : Api.t) =
                    else ()
                | Some (`Catchup, signal) ->
                    if
-                     testnet.root_lengths.(i) + (Consensus.Constants.k / 2)
+                     testnet.root_lengths.(i) + (Constants.k / 2)
                      < root_length - 1
                    then (
                      Logger.info logger !"Filled catchup ivar"
@@ -409,7 +433,7 @@ let events workers start_reader =
                  >>= Linear_pipe.read >>| ignore
                in
                let ms_to_sync =
-                 Consensus.Constants.(delta * block_window_duration_ms) + 6_000
+                 (Constants.delta * Constants.block_window_duration_ms) + 6_000
                  |> Float.of_int
                in
                let%map () = after (Time.Span.of_ms ms_to_sync) in
@@ -449,12 +473,10 @@ let test ?archive_process_location ?is_archive_rocksdb ~name logger n
     block_production_keys snark_work_public_keys work_selection_method
     ~max_concurrent_connections =
   let logger = Logger.extend logger [("worker_testnet", `Bool true)] in
-  let block_production_interval =
-    Consensus.Constants.block_window_duration_ms
-  in
+  let block_production_interval = Constants.block_window_duration_ms in
   let acceptable_delay =
     Time.Span.of_ms
-      (block_production_interval * Consensus.Constants.delta |> Float.of_int)
+      (block_production_interval * Constants.delta |> Float.of_int)
   in
   let%bind program_dir = Unix.getcwd () in
   Coda_processes.init () ;
@@ -502,8 +524,7 @@ end = struct
               let passed_root = Ivar.create () in
               Hashtbl.add_exn user_cmds_under_inspection ~key:user_cmd
                 ~data:
-                  { expected_deadline=
-                      root_length + Consensus.Constants.k + delay
+                  { expected_deadline= root_length + Constants.k + delay
                   ; passed_root } ;
               Option.return passed_root
           | _ ->
@@ -573,7 +594,7 @@ end = struct
                           (Hashtbl.add user_cmds_under_inspection ~key:user_cmd
                              ~data:
                                { expected_deadline=
-                                   root_length + Consensus.Constants.k + delay
+                                   root_length + Constants.k + delay
                                ; passed_root }) ;
                         Option.return passed_root
                     | _ ->
@@ -654,8 +675,8 @@ end = struct
       List.map expected_payments ~f:(fun user_command ->
           match user_command.payload.body with
           | Payment payment_payload ->
-              ( Public_key.compress user_command.sender
-              , payment_payload.receiver )
+              ( Public_key.compress user_command.signer
+              , payment_payload.receiver_pk )
           | Stake_delegation _ ->
               failwith "Expected a list of payments" )
       |> List.unzip
