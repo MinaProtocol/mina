@@ -144,16 +144,31 @@ let calculateAllUsers = metrics => {
   );
 };
 
+let addPointsToUsersWithAtleastN =
+    (getMetricValue, threshold, pointsToReward, metricsMap) => {
+  StringMap.fold(
+    (key, metric, map) => {
+      Belt.Option.getExn(getMetricValue(metric)) >= threshold
+        ? StringMap.add(key, pointsToReward, map)
+        : StringMap.add(key, 0, map)
+    },
+    metricsMap,
+    StringMap.empty,
+  );
+};
+
 let echoBotPublicKey = "4vsRCVNep7JaFhtySu6vZCjnArvoAhkRscTy5TQsGTsKM4tJcYVc3uNUMRxQZAwVzSvkHDGWBmvhFpmCeiPASGnByXqvKzmHt4aR5uAWAQf3kqhwDJ2ZY3Hw4Dzo6awnJkxY338GEp12LE4x";
 let calculateMetrics = blocks => {
-  let blocksCreated = blocks |> getBlocksCreatedByUser;
-  let transactionSent = blocks |> getTransactionSentByUser;
-  let snarkWorkCreated = blocks |> getSnarkWorkCreatedByUser;
-  let users = calculateAllUsers([blocksCreated, transactionSent]);
-  let snarkFeesCollected = blocks |> getSnarkFeesCollected;
-  let highestSnarkFeeCollected = blocks |> getHighestSnarkFeeCollected;
+  let blocksCreated = getBlocksCreatedByUser(blocks);
+  let transactionSent = getTransactionSentByUser(blocks);
+  let snarkWorkCreated = getSnarkWorkCreatedByUser(blocks);
+  let snarkFeesCollected = getSnarkFeesCollected(blocks);
+  let highestSnarkFeeCollected = getHighestSnarkFeeCollected(blocks);
   let transactionsReceivedByEcho =
     calculateTransactionsSentToAddress(blocks, echoBotPublicKey);
+
+  // TODO: Calculate users for all metrics
+  let users = calculateAllUsers([blocksCreated, transactionSent]);
 
   StringMap.mapi(
     (key, _) =>
