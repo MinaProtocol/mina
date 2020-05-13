@@ -300,7 +300,7 @@ let lint_ast =
       | Pexp_extension (_, PTyp core_type) ->
           (* misuses like [%bin_type_class: Foo.Stable.V1.t] *)
           let errs = get_core_type_versioned_type_misuses core_type in
-          acc_with_errors acc errs
+          acc_with_accum_errors acc errs
       | _ ->
           super#expression expr acc
 
