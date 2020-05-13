@@ -2772,19 +2772,6 @@ pub extern "C" fn camlsnark_bn382_fq_proof_create(
     return Box::into_raw(Box::new(proof));
 }
 
-// TODO: Batch verify across different indexes
-#[no_mangle]
-pub extern "C" fn camlsnark_bn382_fq_proof_batch_verify(
-    index: *const DlogVerifierIndex<GAffine>,
-    proofs: *const Vec<DlogProof<GAffine>>,
-) -> bool {
-    let index = unsafe { &(*index) };
-    let proofs = unsafe { &(*proofs) };
-
-    DlogProof::<GAffine>::verify::<DefaultFqSponge<Bn_382GParameters>, DefaultFrSponge<Fq> >(
-        proofs, index, &mut rand_core::OsRng)
-}
-
 #[no_mangle]
 pub extern "C" fn camlsnark_bn382_fq_proof_verify(
     index: *const DlogVerifierIndex<GAffine>,
