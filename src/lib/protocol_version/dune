@@ -1,8 +1,8 @@
 (library
- (name fork_id)
- (public_name fork_id)
+ (name protocol_version)
+ (public_name protocol_version)
  (library_flags -linkall)
  (libraries core_kernel)
  (preprocess
   (pps ppx_coda ppx_bin_prot ppx_sexp_conv ppx_deriving.eq))
- (synopsis "Fork ID representation"))
+ (synopsis "Protocol version representation"))

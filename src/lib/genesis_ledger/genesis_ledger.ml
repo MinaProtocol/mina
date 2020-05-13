@@ -1,21 +1,7 @@
-[%%import
-"/src/config.mlh"]
-
 open Core_kernel
 open Currency
 open Signature_lib
 open Coda_base
-
-[%%inject
-"ledger_depth", ledger_depth]
-
-[%%inject
-"fake_accounts_target", fake_accounts_target]
-
-let _ =
-  if Base.Int.(fake_accounts_target > pow 2 ledger_depth) then
-    failwith "Genesis_ledger: fake_accounts_target >= 2**ledger_depth"
-
 module Intf = Intf
 
 module Private_accounts (Accounts : Intf.Private_accounts.S) = struct
@@ -61,14 +47,22 @@ module Balances (Balances : Intf.Named_balances_intf) = struct
   end)
 end
 
-module Make (Accounts : Intf.Accounts_intf) : Intf.S = struct
-  include Accounts
+module Make (Inputs : Intf.Ledger_input_intf) : Intf.S = struct
+  include Inputs
 
   (* TODO: #1488 compute this at compile time instead of lazily *)
   let t =
     let open Lazy.Let_syntax in
     let%map accounts = accounts in
-    let ledger = Ledger.create_ephemeral () in
+    let ledger =
+      match directory with
+      | `Ephemeral ->
+          Ledger.create_ephemeral ~depth ()
+      | `New ->
+          Ledger.create ~depth ()
+      | `Path directory_name ->
+          Ledger.create ~directory_name ~depth ()
+    in
     List.iter accounts ~f:(fun (_, account) ->
         Ledger.create_new_account_exn ledger
           (Account.identifier account)
@@ -120,6 +114,8 @@ module Packed = struct
 
   let t ((module L) : t) = L.t
 
+  let depth ((module L) : t) = L.depth
+
   let accounts ((module L) : t) = L.accounts
 
   let find_account_record_exn ((module L) : t) = L.find_account_record_exn
@@ -134,6 +130,45 @@ module Packed = struct
 
   let keypair_of_account_record_exn ((module L) : t) =
     L.keypair_of_account_record_exn
+end
+
+module Of_ledger (T : sig
+  val t : Ledger.t Lazy.t
+
+  val depth : int
+end) : Intf.S = struct
+  include T
+
+  let accounts =
+    Lazy.map t
+      ~f:(Ledger.foldi ~init:[] ~f:(fun _loc accs acc -> (None, acc) :: accs))
+
+  let find_account_record_exn ~f =
+    List.find_exn (Lazy.force accounts) ~f:(fun (_, account) -> f account)
+
+  let find_new_account_record_exn old_account_pks =
+    find_account_record_exn ~f:(fun new_account ->
+        not
+          (List.exists old_account_pks ~f:(fun old_account_pk ->
+               Public_key.equal
+                 (Public_key.decompress_exn (Account.public_key new_account))
+                 old_account_pk )) )
+
+  let keypair_of_account_record_exn _ =
+    failwith "cannot access genesis ledger account private key"
+
+  let largest_account_exn =
+    let error_msg =
+      "cannot calculate largest account in genesis ledger: "
+      ^ "genesis ledger has no accounts"
+    in
+    Memo.unit (fun () ->
+        List.max_elt (Lazy.force accounts) ~compare:(fun (_, a) (_, b) ->
+            Balance.compare a.Account.Poly.balance b.Account.Poly.balance )
+        |> Option.value_exn ?here:None ?error:None ~message:error_msg )
+
+  let largest_account_keypair_exn () =
+    failwith "cannot access genesis ledger account private key"
 end
 
 let fetch_ledger, register_ledger =
@@ -166,7 +201,15 @@ end))
 module Test = Register (Balances (Test_ledger))
 module Fuzz = Register (Balances (Fuzz_ledger))
 module Release = Register (Balances (Release_ledger))
-module Unit_test_ledger = Make (Test)
+
+module Unit_test_ledger = Make (struct
+  include Test
+
+  let directory = `Ephemeral
+
+  let depth =
+    Genesis_constants.Constraint_constants.for_unit_tests.ledger_depth
+end)
 
 let for_unit_tests : Packed.t = (module Unit_test_ledger)
 

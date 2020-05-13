@@ -165,13 +165,16 @@ module Constants_checked :
 
   let of_time = Fn.compose (Integer.of_bits ~m) Block_time.Unpacked.var_to_bits
 
-  let to_time = Fn.compose Block_time.Unpacked.var_of_bits (Integer.to_bits ~m)
+  let to_time =
+    Fn.compose Block_time.Unpacked.var_of_bits
+      (Integer.to_bits ~m ~length:Block_time.Unpacked.size_in_bits)
 
   let of_timespan =
     Fn.compose (Integer.of_bits ~m) Block_time.Span.Unpacked.var_to_bits
 
   let to_timespan =
-    Fn.compose Block_time.Span.Unpacked.var_of_bits (Integer.to_bits ~m)
+    Fn.compose Block_time.Span.Unpacked.var_of_bits
+      (Integer.to_bits ~length:Block_time.Span.Unpacked.size_in_bits ~m)
 
   let ( / ) (t : t) (t' : t) = Integer.div_mod ~m t t' |> fst
 
@@ -183,10 +186,11 @@ let create' (type a b c)
       with type length = a
        and type time = b
        and type timespan = c)
+    ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     ~(protocol_constants : (a, a, b) Genesis_constants.Protocol.Poly.t) :
     (a, b, c) Poly.t =
   let open M in
-  let c = constant Coda_compile_config.c in
+  let c = constant constraint_constants.c in
   let block_window_duration_ms =
     constant Coda_compile_config.block_window_duration_ms
   in
@@ -228,11 +232,14 @@ let create' (type a b c)
   in
   res
 
-let create ~(protocol_constants : Genesis_constants.Protocol.t) : t =
+let create ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+    ~(protocol_constants : Genesis_constants.Protocol.t) : t =
   let protocol_constants =
     Coda_base.Protocol_constants_checked.value_of_t protocol_constants
   in
-  let constants = create' (module Constants_UInt32) ~protocol_constants in
+  let constants =
+    create' (module Constants_UInt32) ~constraint_constants ~protocol_constants
+  in
   let checkpoint_window_slots_per_year, checkpoint_window_size_in_slots =
     let per_year = 12 in
     let slots_per_year =
@@ -251,7 +258,9 @@ let create ~(protocol_constants : Genesis_constants.Protocol.t) : t =
   ; checkpoint_window_slots_per_year }
 
 let for_unit_tests =
-  create ~protocol_constants:Genesis_constants.for_unit_tests.protocol
+  create
+    ~constraint_constants:Genesis_constants.Constraint_constants.for_unit_tests
+    ~protocol_constants:Genesis_constants.for_unit_tests.protocol
 
 let to_hlist
     ({ k
@@ -423,12 +432,15 @@ module Checked = struct
           ; delta_duration
           ; genesis_state_timestamp |])
 
-  let create ~(protocol_constants : Coda_base.Protocol_constants_checked.var) :
+  let create ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+      ~(protocol_constants : Coda_base.Protocol_constants_checked.var) :
       (var, _) Checked.t =
     let open Snarky_integer in
     let%bind constants =
       make_checked (fun () ->
-          create' (module Constants_checked) ~protocol_constants )
+          create'
+            (module Constants_checked)
+            ~constraint_constants ~protocol_constants )
     in
     let%map checkpoint_window_slots_per_year, checkpoint_window_size_in_slots =
       let constant c = Integer.constant ~m (Bignum_bigint.of_int c) in
@@ -461,11 +473,15 @@ end
 let%test_unit "checked = unchecked" =
   let open Coda_base in
   let for_unit_tests = Genesis_constants.for_unit_tests.protocol in
+  let constraint_constants =
+    Genesis_constants.Constraint_constants.for_unit_tests
+  in
   let test =
     Test_util.test_equal Protocol_constants_checked.typ typ
-      (fun protocol_constants -> Checked.create ~protocol_constants)
       (fun protocol_constants ->
-        create
+        Checked.create ~constraint_constants ~protocol_constants )
+      (fun protocol_constants ->
+        create ~constraint_constants
           ~protocol_constants:
             (Protocol_constants_checked.t_of_value protocol_constants) )
   in

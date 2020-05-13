@@ -59,6 +59,7 @@ let local_configs ?block_production_interval
   let args = List.zip_exn addrs_and_ports_list peers in
   let consensus_constants =
     Consensus.Constants.create
+      ~constraint_constants:Genesis_constants.Constraint_constants.compiled
       ~protocol_constants:Genesis_constants.compiled.protocol
   in
   let configs =

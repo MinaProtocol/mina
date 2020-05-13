@@ -34,7 +34,9 @@ module type S = sig
 
     type value [@@deriving sexp]
 
-    val typ : (var, value) Typ.t
+    val typ :
+         constraint_constants:Genesis_constants.Constraint_constants.t
+      -> (var, value) Typ.t
 
     module Checked : sig
       val hash : var -> (Hash.var * Body_hash.var, _) Checked.t
@@ -43,6 +45,8 @@ module type S = sig
 
       val update :
            logger:Logger.t
+        -> proof_level:Genesis_constants.Proof_level.t
+        -> constraint_constants:Genesis_constants.Constraint_constants.t
         -> Hash.var * Body_hash.var * var
            (*Previous state hash, previous state body hash, previous state*)
         -> Update.var
@@ -120,9 +124,10 @@ struct
             update ~state:wrap_vk_state [|State.Hash.var_to_field state_hash|]
             |> digest) )
 
-    let%snarkydef prev_state_valid wrap_vk_section wrap_vk prev_state_hash =
-      match Coda_compile_config.proof_level with
-      | "full" ->
+    let%snarkydef prev_state_valid ~proof_level wrap_vk_section wrap_vk
+        prev_state_hash =
+      match proof_level with
+      | Genesis_constants.Proof_level.Full ->
           (* TODO: Should build compositionally on the prev_state hash (instead of converting to bits) *)
           let%bind prev_top_hash =
             compute_top_hash wrap_vk_section prev_state_hash
@@ -142,23 +147,22 @@ struct
           in
           (* true if not with_snark *)
           Verifier.verify wrap_vk precomp prev_top_hash proof
-      | "check" | "none" ->
+      | Check | None ->
           return Boolean.true_
-      | _ ->
-          failwith "unknown proof_level"
 
     let exists' typ ~f = exists typ ~compute:As_prover.(map get_state ~f)
 
-    let%snarkydef main (logger : Logger.t) (top_hash : Digest.Tick.Packed.var)
-        =
-      let%bind prev_state = exists' State.typ ~f:Prover_state.prev_state
+    let%snarkydef main ~constraint_constants ~(logger : Logger.t) ~proof_level
+        (top_hash : Digest.Tick.Packed.var) =
+      let%bind prev_state =
+        exists' (State.typ ~constraint_constants) ~f:Prover_state.prev_state
       and update = exists' Update.typ ~f:Prover_state.update in
       let%bind prev_state_hash, prev_state_body_hash =
         State.Checked.hash prev_state
       in
       let%bind next_state_hash, next_state, `Success success =
         with_label __LOC__
-          (State.Checked.update ~logger
+          (State.Checked.update ~logger ~proof_level ~constraint_constants
              (prev_state_hash, prev_state_body_hash, prev_state)
              update)
       in
@@ -181,7 +185,9 @@ struct
               let%bind prover_state = get_state in
               match Prover_state.expected_next_state prover_state with
               | Some expected_next_state ->
-                  let%bind in_snark_next_state = read State.typ next_state in
+                  let%bind in_snark_next_state =
+                    read (State.typ ~constraint_constants) next_state
+                  in
                   let%bind next_top_hash = read Field.typ next_top_hash in
                   let%bind top_hash = read Field.typ top_hash in
                   let updated = State.sexp_of_value in_snark_next_state in
@@ -212,7 +218,7 @@ struct
         with_label __LOC__ Field.Checked.Assert.(equal next_top_hash top_hash)
       in
       let%bind prev_state_valid =
-        prev_state_valid wrap_vk_section wrap_vk prev_state_hash
+        prev_state_valid ~proof_level wrap_vk_section wrap_vk prev_state_hash
       in
       let%bind inductive_case_passed =
         with_label __LOC__ Boolean.(prev_state_valid && success)
