@@ -206,26 +206,6 @@ let calculateMetrics = blocks => {
       metricsMap,
     );
 
-  // Earn 3 fees by producing and selling zk-SNARKs on the snarketplace: 1000 pts*
-  let zkSnark3FeesPoints =
-    addPointsToUsersWithAtleastN(
-      (metricRecord: Types.Metrics.metricRecord) =>
-        metricRecord.snarkFeesCollected,
-      3,
-      1000,
-      metricsMap,
-    );
-
-  // Anyone who earned 50 fees will be rewarded with an additional 1000 pts
-  let zkSnark50FeesPoints =
-    addPointsToUsersWithAtleastN(
-      (metricRecord: Types.Metrics.metricRecord) =>
-        metricRecord.snarkFeesCollected,
-      50,
-      1000,
-      metricsMap,
-    );
-
   // Producing at least 3 blocks will earn an additional 1000 pts
   let blocksCreatedPoints =
     addPointsToUsersWithAtleastN(
