@@ -148,9 +148,13 @@ let addPointsToUsersWithAtleastN =
     (getMetricValue, threshold, pointsToReward, metricsMap) => {
   StringMap.fold(
     (key, metric, map) => {
-      Belt.Option.getExn(getMetricValue(metric)) >= threshold
-        ? StringMap.add(key, pointsToReward, map)
-        : StringMap.add(key, 0, map)
+      switch (getMetricValue(metric)) {
+      | Some(metricValue) =>
+        metricValue >= threshold
+          ? StringMap.add(key, pointsToReward, map)
+          : StringMap.add(key, 0, map)
+      | None => StringMap.add(key, 0, map)
+      }
     },
     metricsMap,
     StringMap.empty,
