@@ -7,9 +7,8 @@ Summary: add support for Bazel build system.
 ## Motivation
 [motivation]: #motivation
 
-The current build system is complex and unreliable.  It does not work
-"out-of-the-box", at least not for on the Mac.  It involves multiple build
-tools and languages:
+The current build system is complex and fragile.  It involves multiple
+build tools and languages:
 
 - Make
 - CMake
@@ -213,7 +212,7 @@ Specific tasks:
         patches, it might nonethelss be advisable to maintain
         bazelized mirrors, as insurance against the possibility that
         to original repository dissappears. It could happen.
-    * In the meantime, and "external" build strategy can be used. This
+    * In the meantime, an "external" build strategy can be used. This
       involves Bazel BUILD files that are maintained locally, but
       control the build of downloaded libraries.  They will look just
       like the BUILD files that build a local copy, so the additional
