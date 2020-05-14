@@ -44,21 +44,20 @@ The nodes are configured to restart upon crash for some of the known issues (#42
 3. Query the logs to confirm that the nodes are creating and/or receiving blocks and that the blocks include proofs and transactions.
 Some strings to look for: `Received a block`, `apply_diff block info`, `Number of proofs ready for purchase:`, `Detailed diff creation log:`
 
-4. Connect an external node to the network and check if it syncs
-(TODO: to automate these checks)
+4. Connect an external node to the network and check if it syncs.
 
-Publish the peer ids of the seed nodes on `#QA-net details` channel for the rest of the team to connect to the QA-net.
+Publish the multiaddresses of the seed nodes on `#QA-net details` channel for the rest of the team to connect to the QA-net.
 Seeds nodes can be looked up here: https://console.cloud.google.com/compute. Usually there are two seed nodes per tesnet, click on the seed node instance to go to the page that has details about the instance required to ssh into it.
 <img src="res/gcloud_ssh.png" alt="ssh info" width="300"/>
 
-`docker exec -it <container> /bin/bash` into coda-daemon container and follow [this](#peer-ids) to get the peer id. These peer ids are published on the website (https://codaprotocol.com/docs/getting-started) for users to connect to the testnet.
+`docker exec -it <container> /bin/bash` into coda-daemon container and follow [this](#multiaddress) to get the multiaddress of the node. These are then published on the website (https://codaprotocol.com/docs/getting-started) for users to connect to the testnet.
 
-Alternatively, peer ids of the seed nodes can be obtained from the daemon command of other nodes in the testnet which use them as initial peers. Retrieve the daemon command using: 
+Alternatively, multiaddresses of seed nodes can be obtained from the daemon command of other nodes in the testnet which use them as initial peers (using `-peer` flag). Retrieve the daemon command using: 
 `kubectl exec -it <pod-id> --namespace <namespace> -c <container-name> cat /proc/10/cmdline`
 
- Any other node in the testnet can also be used as an initial peer to connect to the testnet. To obtain the peer id for non-seed nodes that are running on kubernetes, run `kubectl exec -it <pod-id> /bin/bash --namespace <namespace> -c <container-name>` and follow [this](#peer-ids).
+ Any other node in the testnet can also be used as an initial peer to connect to the testnet. To obtain the multiaddress of non-seed nodes that are running on kubernetes, run `kubectl exec -it <pod-id> /bin/bash --namespace <namespace> -c <container-name>` and follow [this](#multiaddress).
 
-##### Peer Ids
+##### Multiaddress
 
 Run `coda client status` to get the IP address [IPADDR], Libp2p port [PORT] and peer id [PEERID]  and combine them in the following format:
     `/ip4/IPADDR/tcp/PORT/ipfs/PEERID`
@@ -67,10 +66,11 @@ For example: `/ip4/104.196.41.236/tcp/10001/ipfs/12D3KooWAFFq2yEQFFzhU5dt64AWqaw
 ##### Complete the challenges for the release
 
 Connect to the QA-net from your machine and complete the protocol/product related challenges for the release. This is to test the features required for the challenges are working and also, may help the testnet guardian prepare for the kind of questions the community may have after the release.
+Note: Any challenge that is resource intensive like "make most snark works" should ideally be part of the QA-net configuration. For example: run multiple snark workers with different keys and fees to verify if they have been included. Alternatively, the guardian could run a snark worker locally for a couple of hours and check how many of them were included.
 
 ##### Check docs
 
-Verify that online docs https://codaprotocol.com/docs/getting-started are updated and user journeys are consistent with the release
+Verify that online docs https://codaprotocol.com/docs/getting-started are updated and user journeys are consistent with the release.
 
 ##### Monitor the QA-net and report status
 
@@ -80,7 +80,7 @@ Monitor the health of the QA-net by checking the logs (https://console.cloud.goo
 3. Expected TPS
 4. Blocks being produced consistently
 
-Report the status of the network and testing to the rest of the team on `#qa-net-discussion` channel
+Report the status of the network and testing to the rest of the team on `#qa-net-discussion` channel.
 
 On completing the QA-net phase successfully, let the infrastructure team know the same and tear down the QA-net before the release.
 
@@ -122,6 +122,7 @@ To update brew package,
         1. update the url with the location of the new tarball
         2. update the hash. The file containing the hash is uploaded to gcloud as well, for example `gs://network-debug/382998/build/homebrew-coda.tar.gz.sha256`
         3. increment the revision number
+        4. Update peer1 and peer2 with multiaddresses of the seed nodes of the new testnet
 
 ##### Update apt package
  1. Create an annotated tag for the latest commit on release branch. For example: `git tag -m "release 0.0.13" 0.0.13`
@@ -133,7 +134,7 @@ To update brew package,
     ```
 
 
-The testnet guardian would also work with community relations and dev ops to be the community point of contact during working hours (being on top of and answering questions/help troubleshooting on discord)
+The testnet guardian would also work with community relations and dev ops to be the community point of contact during working hours (being on top of and answering questions/help troubleshooting on discord).
 
 Following is the list of events that could occur after the release
 
