@@ -45,10 +45,16 @@ module Make (Inputs : Inputs_intf) :
 
   type path = Path.t
 
-  type t = {uuid: Uuid.Stable.V1.t; kvdb: Kvdb.t sexp_opaque; depth: int}
+  type t =
+    { uuid: Uuid.Stable.V1.t
+    ; kvdb: Kvdb.t sexp_opaque
+    ; depth: int
+    ; directory: string }
   [@@deriving sexp]
 
   let get_uuid t = t.uuid
+
+  let get_directory t = Some t.directory
 
   let depth t = t.depth
 
@@ -64,9 +70,9 @@ module Make (Inputs : Inputs_intf) :
     in
     Unix.mkdir_p directory ;
     let kvdb = Kvdb.create directory in
-    {uuid; kvdb; depth}
+    {uuid; kvdb; depth; directory}
 
-  let close {kvdb; uuid= _; depth= _} = Kvdb.close kvdb
+  let close {kvdb; uuid= _; depth= _; directory= _} = Kvdb.close kvdb
 
   let with_ledger ~depth ~f =
     let t = create ~depth () in

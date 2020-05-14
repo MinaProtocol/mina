@@ -295,7 +295,8 @@ jobs:
                     mkdir -p package/keys
                     echo 'keys and genesis'
                     cp /tmp/s3_cache_dir/* package/keys/. ||:
-                    cp $TMPDIR/coda_cache_dir/coda_genesis_*.tar.gz package/keys/.
+                    cp $TMPDIR/coda_cache_dir/genesis_ledger_*.tar.gz package/keys/.
+                    cp $TMPDIR/coda_cache_dir/genesis_proof_* package/keys/.
                     echo 'coda'
                     cp _build/default/src/app/cli/src/coda.exe package/coda
                     echo 'libp2p_helper'
