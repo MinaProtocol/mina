@@ -19,7 +19,8 @@ let t ~genesis_ledger ~constraint_constants
     Protocol_state.create_value
       ~genesis_state_hash:negative_one_protocol_state_hash
       ~previous_state_hash:negative_one_protocol_state_hash
-      ~blockchain_state:(Blockchain_state.genesis ~genesis_ledger_hash)
+      ~blockchain_state:
+        (Blockchain_state.genesis ~constraint_constants ~genesis_ledger_hash)
       ~consensus_state:genesis_consensus_state
       ~constants:(Protocol_constants_checked.value_of_t protocol_constants)
   in

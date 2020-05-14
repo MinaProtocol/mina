@@ -821,9 +821,10 @@ module Data = struct
       let genesis_winner = keypairs.(0)
 
       let handler :
-             genesis_ledger:Coda_base.Ledger.t Lazy.t
+             constraint_constants:Genesis_constants.Constraint_constants.t
+          -> genesis_ledger:Coda_base.Ledger.t Lazy.t
           -> Snark_params.Tick.Handler.t =
-       fun ~genesis_ledger ->
+       fun ~constraint_constants ~genesis_ledger ->
         let pk, sk = genesis_winner in
         let dummy_sparse_ledger =
           Coda_base.Sparse_ledger.of_ledger_subset_exn
@@ -831,15 +832,18 @@ module Data = struct
             [Coda_base.(Account_id.create pk Token_id.default)]
         in
         let empty_pending_coinbase =
-          Coda_base.Pending_coinbase.create () |> Or_error.ok_exn
+          Coda_base.Pending_coinbase.create
+            ~depth:constraint_constants.pending_coinbase_depth ()
+          |> Or_error.ok_exn
         in
         let ledger_handler =
           unstage (Coda_base.Sparse_ledger.handler dummy_sparse_ledger)
         in
         let pending_coinbase_handler =
           unstage
-            (Coda_base.Pending_coinbase.handler empty_pending_coinbase
-               ~is_new_stack:true)
+            (Coda_base.Pending_coinbase.handler
+               ~depth:constraint_constants.pending_coinbase_depth
+               empty_pending_coinbase ~is_new_stack:true)
         in
         let handlers =
           Snarky.Request.Handler.(
@@ -2397,12 +2401,15 @@ module Data = struct
     let precomputed_handler = Vrf.Precomputed.handler
 
     let handler {delegator; ledger; private_key; public_key}
+        ~(constraint_constants : Genesis_constants.Constraint_constants.t)
         ~pending_coinbase:{ Coda_base.Pending_coinbase_witness.pending_coinbases
                           ; is_new_stack } : Snark_params.Tick.Handler.t =
       let ledger_handler = unstage (Coda_base.Sparse_ledger.handler ledger) in
       let pending_coinbase_handler =
         unstage
-          (Coda_base.Pending_coinbase.handler pending_coinbases ~is_new_stack)
+          (Coda_base.Pending_coinbase.handler
+             ~depth:constraint_constants.pending_coinbase_depth
+             pending_coinbases ~is_new_stack)
       in
       let handlers =
         Snarky.Request.Handler.(
@@ -3315,6 +3322,9 @@ let%test_module "Proof of stake tests" =
     open Data
     open Consensus_state
 
+    let constraint_constants =
+      Genesis_constants.Constraint_constants.for_unit_tests
+
     let%test_unit "update, update_var agree starting from same genesis state" =
       (* build pieces needed to apply "update" *)
       let snarked_ledger_hash =
@@ -3322,9 +3332,6 @@ let%test_module "Proof of stake tests" =
           (Ledger.merkle_root (Lazy.force Test_genesis_ledger.t))
       in
       let previous_protocol_state_hash = State_hash.(of_hash zero) in
-      let constraint_constants =
-        Genesis_constants.Constraint_constants.for_unit_tests
-      in
       let previous_consensus_state =
         Consensus_state.create_genesis
           ~negative_one_protocol_state_hash:previous_protocol_state_hash
@@ -3346,7 +3353,11 @@ let%test_module "Proof of stake tests" =
       (* choose largest account as most likely to produce a block *)
       let ledger_data = Lazy.force Test_genesis_ledger.t in
       let ledger = Ledger.Any_ledger.cast (module Ledger) ledger_data in
-      let pending_coinbases = Pending_coinbase.create () |> Or_error.ok_exn in
+      let pending_coinbases =
+        Pending_coinbase.create
+          ~depth:constraint_constants.pending_coinbase_depth ()
+        |> Or_error.ok_exn
+      in
       let maybe_sk, account = Test_genesis_ledger.largest_account_exn () in
       let private_key = Option.value_exn maybe_sk in
       let public_key_compressed = Account.public_key account in
@@ -3427,7 +3438,7 @@ let%test_module "Proof of stake tests" =
         in
         let public_key = Public_key.decompress_exn public_key_compressed in
         let handler =
-          Prover_state.handler
+          Prover_state.handler ~constraint_constants
             {delegator; ledger= sparse_ledger; private_key; public_key}
             ~pending_coinbase:
               {Pending_coinbase_witness.pending_coinbases; is_new_stack= true}
