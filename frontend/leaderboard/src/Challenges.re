@@ -5,7 +5,7 @@ let printMap = map => {
   StringMap.mapi(
     (key, value) => {
       Js.log(key);
-      Js.log(value);
+      Js.log(Int64.to_string(value));
     },
     map,
   );
@@ -20,8 +20,8 @@ let incrementMapValue = (key, map) => {
   map
   |> StringMap.update(key, value => {
        switch (value) {
-       | Some(valueCount) => Some(valueCount + 1)
-       | None => Some(1)
+       | Some(valueCount) => Some(Int64.add(valueCount, Int64.one))
+       | None => Some(Int64.one)
        }
      });
 };
@@ -152,13 +152,56 @@ let addPointsToUsersWithAtleastN =
       | Some(metricValue) =>
         metricValue >= threshold
           ? StringMap.add(key, pointsToReward, map)
-          : StringMap.add(key, 0, map)
-      | None => StringMap.add(key, 0, map)
+          : StringMap.add(key, Int64.zero, map)
+      | None => StringMap.add(key, Int64.zero, map)
       }
     },
     metricsMap,
     StringMap.empty,
   );
+};
+
+let calculatePoints = metricsMap => {
+  // Get 500 pts if you send txn to the echo service
+  let echoTransactionPoints =
+    addPointsToUsersWithAtleastN(
+      (metricRecord: Types.Metrics.metricRecord) =>
+        metricRecord.transactionsReceivedByEcho,
+      1L,
+      500L,
+      metricsMap,
+    );
+
+  // Earn 3 fees by producing and selling zk-SNARKs on the snarketplace: 1000 pts*
+  let zkSnark3FeesPoints =
+    addPointsToUsersWithAtleastN(
+      (metricRecord: Types.Metrics.metricRecord) =>
+        metricRecord.snarkFeesCollected,
+      3L,
+      1000L,
+      metricsMap,
+    );
+
+  // Anyone who earned 50 fees will be rewarded with an additional 1000 pts
+  let zkSnark50FeesPoints =
+    addPointsToUsersWithAtleastN(
+      (metricRecord: Types.Metrics.metricRecord) =>
+        metricRecord.snarkFeesCollected,
+      50L,
+      1000L,
+      metricsMap,
+    );
+
+  // Producing at least 3 blocks will earn an additional 1000 pts
+  let blocksCreatedPoints =
+    addPointsToUsersWithAtleastN(
+      (metricRecord: Types.Metrics.metricRecord) =>
+        metricRecord.blocksCreated,
+      3L,
+      1000L,
+      metricsMap,
+    );
+  ();
 };
 
 let echoBotPublicKey = "4vsRCVNep7JaFhtySu6vZCjnArvoAhkRscTy5TQsGTsKM4tJcYVc3uNUMRxQZAwVzSvkHDGWBmvhFpmCeiPASGnByXqvKzmHt4aR5uAWAQf3kqhwDJ2ZY3Hw4Dzo6awnJkxY338GEp12LE4x";
@@ -171,49 +214,25 @@ let calculateMetrics = blocks => {
   let transactionsReceivedByEcho =
     calculateTransactionsSentToAddress(blocks, echoBotPublicKey);
 
-  // TODO: Calculate users for all metrics
-  let users =
-    calculateAllUsers([
-      blocksCreated,
-      transactionSent,
-      snarkWorkCreated,
-      transactionsReceivedByEcho,
-    ]);
-
-  let metricsMap =
-    StringMap.mapi(
-      (key, _) =>
-        {
-          Types.Metrics.blocksCreated: StringMap.find_opt(key, blocksCreated),
-          transactionSent: StringMap.find_opt(key, transactionSent),
-          snarkWorkCreated: StringMap.find_opt(key, snarkWorkCreated),
-          snarkFeesCollected: StringMap.find_opt(key, snarkFeesCollected),
-          highestSnarkFeeCollected:
-            StringMap.find_opt(key, highestSnarkFeeCollected),
-          transactionsReceivedByEcho:
-            StringMap.find_opt(key, transactionsReceivedByEcho),
-        },
-      users,
-    );
-
-  // Get 500 pts if you send txn to the echo service
-  let echoTransactionPoints =
-    addPointsToUsersWithAtleastN(
-      (metricRecord: Types.Metrics.metricRecord) =>
-        metricRecord.transactionsReceivedByEcho,
-      1,
-      500,
-      metricsMap,
-    );
-
-  // Producing at least 3 blocks will earn an additional 1000 pts
-  let blocksCreatedPoints =
-    addPointsToUsersWithAtleastN(
-      (metricRecord: Types.Metrics.metricRecord) =>
-        metricRecord.blocksCreated,
-      3,
-      1000,
-      metricsMap,
-    );
-  ();
+  calculateAllUsers([
+    blocksCreated,
+    transactionSent,
+    snarkWorkCreated,
+    snarkFeesCollected,
+    highestSnarkFeeCollected,
+    transactionsReceivedByEcho,
+  ])
+  |> StringMap.mapi((key, _) =>
+       {
+         Types.Metrics.blocksCreated: StringMap.find_opt(key, blocksCreated),
+         transactionSent: StringMap.find_opt(key, transactionSent),
+         snarkWorkCreated: StringMap.find_opt(key, snarkWorkCreated),
+         snarkFeesCollected: StringMap.find_opt(key, snarkFeesCollected),
+         highestSnarkFeeCollected:
+           StringMap.find_opt(key, highestSnarkFeeCollected),
+         transactionsReceivedByEcho:
+           StringMap.find_opt(key, transactionsReceivedByEcho),
+       }
+     )
+  |> calculatePoints;
 };

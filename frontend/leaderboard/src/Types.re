@@ -43,11 +43,11 @@ module Metrics = {
     | TransactionsReceivedByEcho;
 
   type metricRecord = {
-    blocksCreated: option(int),
-    transactionSent: option(int),
-    snarkWorkCreated: option(int),
+    blocksCreated: option(int64),
+    transactionSent: option(int64),
+    snarkWorkCreated: option(int64),
     snarkFeesCollected: option(int64),
     highestSnarkFeeCollected: option(int64),
-    transactionsReceivedByEcho: option(int),
+    transactionsReceivedByEcho: option(int64),
   };
 };
