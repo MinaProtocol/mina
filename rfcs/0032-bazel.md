@@ -8,7 +8,7 @@ Summary: add support for Bazel build system.
 [motivation]: #motivation
 
 The current build system is complex and unreliable.  It does not work
-"out-of-the-box", at least not on the Mac.  It involves multiple build
+"out-of-the-box", at least not for on the Mac.  It involves multiple build
 tools and languages:
 
 - Make
@@ -99,6 +99,11 @@ What counts as just working in general:
 
 Bazel has builtin support for test targets.
 
+#### Cross-platform builds
+
+- Linux target from Mac host is in scope.  This is needed in order to
+  create docker images on the mac.
+
 #### Remote caching and execution
 
 Bazel supports both of these, but they are outside the scope of this
@@ -124,12 +129,41 @@ introduce new build tools.
 [detailed-design]: #detailed-design
 
 Platform support:
-  * Linux - required, I presume
-  * MacOS - my development environment
-  * Windows - this is a policy decision.  I can design for
-    portability, but I do not have a Windows machine so I cannot test
-    Windows support.  I do have a copy of Parallels, so if somebody
-    can provide me with a licensed copy of Windows I can support it.
+  * Linux - Required.
+  * MacOS - Required.
+  * Windows - Out of scope for this proposal.
+  * Docker - design of docker containers is out of scope, but support
+    for docker on Linux and Mac is in scope; this implies support
+    cross-platform builds on a Mac host targeting Linux.
+  * Cross-platform build support
+    * Mac to Linux - a requirement for me, if not for the o(1)
+      team. Since I already have the code for this from a previous
+      project it won't absorb a lot of effort.
+    * Mobile targets (Android, iOS) - out of scope (but I might give
+      it a shot anyway, just for fun). The C/C++ part is definitely
+      doable, but the amount of effort required to cross-build the
+      OCaml and Go parts is not known.
+    * Constrained targets (Raspberry Pi, Beaglebone, etc.) - out of
+      scope. Same considerations as for Mobile targets.
+
+Language support: the Coda codebase uses or will use code, libraries,
+and tools written in the following languages.  All except OCaml and
+Rust are officially supported by Bazel; Rust is quasi-supported (the
+Bazel sources contain Rust rules).
+
+- OCaml
+- C/C++
+- Golang
+- Javascript
+- Rust
+- Shell
+- Python
+
+**IMPORTANT** The goal here is to use Bazel to build the Coda product;
+it is _not_ to produce a production-quality `rules_ocaml` Bazel
+library, since that would require covering all possible use cases,
+which would well take us far astray from the requirements of building
+Coda.
 
 ### Tasks
 
@@ -147,13 +181,15 @@ General:
       setting the compile command for each platform, but in some cases
       additional options should or must be specified.
   * Bazel does not have `./configure` functionality; it cannot detect
-    environment features, at least not out of the box.  Such
-    functionality could be implemented in Bazel's Starlark language,
-    but that is outside the scope of this proposal.  In the meantime,
-    Bazel works well with `./configure`; if we need feature detection
-    (e.g. to support all three major platforms), a configure script
-    can be written to do this, just as in the case of a Make-based
-    system.
+    environment features, at least not out of the box.  Feature
+    detection routines can be implemented in Bazel's Starlark
+    language, but so far as I know there is no library of such
+    routines corresponding to the autoconf library of macros
+    (e.g. AC_FUNC_ALLOCA, AC_STRUCT_TM, etc.).  Such feature detection
+    is out-of-scope for this project.  If it turns out that we need
+    such functionality, standard autoconf tools will be used to
+    complement the Bazel build logic.  If appropriate a proposal to
+    implement feature tests in Starlark can be drafted.
 * Toolchains.
   * Bazel detects and uses a standard set of commonly used toolchains; no effort required.
   * For toolchains not covered by Bazel out of the box, as well as for
@@ -173,16 +209,25 @@ Specific tasks:
     * I have forked the dependencies on github and added Bazel support
       to each (about 90% complete).  The ideal is to get the
       maintainers to accept the Bazel-enabling patches.
-    * For Coda this approach may or may not be desirable.  The
-      alternative is to use the same standard approach as used by the
-      other external libs, namely an external BUILD file.
+      * In the event that the maintainers do not want to accept the
+        patches, it might nonethelss be advisable to maintain
+        bazelized mirrors, as insurance against the possibility that
+        to original repository dissappears. It could happen.
+    * In the meantime, and "external" build strategy can be used. This
+      involves Bazel BUILD files that are maintained locally, but
+      control the build of downloaded libraries.  They will look just
+      like the BUILD files that build a local copy, so the additional
+      cost of this is close to nil.
   * Internal C/C++ code.  The Code codebase contains some OCaml code
     that generates C/C++ code which it then compiles.  The task is to
     convert this to C/C++ code and let Bazel handle any customizations
-    needed.
-  * CUDA.  Coda contains a little bit of CUDA code.  I assume Bazel
-    will easily handle this, but I do not have a GPU, and have never
-    worked with CUDA.
+    needed.  See:
+    * src/lib/snarky/src/dune
+    * src/lib/snarky/src/camlsnark_c/dune
+    * src/lib/snarky/src/camlsnark_c/camlsnark_ctypes_stubs.ml
+    * src/lib/snarky/src/camlsnark_c/camlsnark_linker_flags_gen.ml
+  * CUDA.  Coda contains a little bit of CUDA code, but it is not
+    fully integrated and so is out of scope for the moment.
   * Cross-compile toolchains.  I've got a minimal example working
     using a crosstool-NG toolchain on a Mac. The task is to polish it
     and port it to Linux and possibly Windows.
@@ -192,6 +237,12 @@ Specific tasks:
   * Analyze existing Bazel libraries supporting OCaml
     * https://github.com/jin/rules_ocaml
     * https://github.com/ostera/rules_reason
+  * In order to keep the focus on build logic, start with "Hello World"
+    class examples before proceeding to the Coda codebase.
+      * Simple Hello World app
+      * Same, with deps on some OCaml libraries
+      * Same, with dependency on a C/C++ library
+      * Same, cross-compiling
   * develop `rules_ocaml`
     * Option 1: Integrate Bazel and Dune
       * Analyze `rules_foreign_cc` to see how it handles integration of
@@ -247,8 +298,8 @@ C/C++
 Notes:
 
 1. External libs:
-  * Assumption: what works on the mac will require little or no effort to work on Linux and Windows
-  * libpq (Postgresql) won't build (possible bug in Bazel); workaround is to just install it manually
+  * Assumption: what works on the mac will require little or no effort to work on Linux.
+  * libpq (Postgresql) won't build (possible bug in Bazel); workaround is to just install it manually.
 
 **OCaml**
 
@@ -256,18 +307,29 @@ Notes:
 | -- | ----------- | ----------- | ------ | ---------- | ---------------|
 | 10 | all | OCaml/Dune learning curve | 4 | ongoing |  I can usually fake it, since all languages are alike, but darnit, sometimes I have to sit down and actually learn something. |
 | 11 | all | Analyze existing Bazel/OCaml libs | 4 | ongoing | |
-| 12 | all | Develop rules_ocaml | 12 |Sun 5/31 |
-| 13 | all | Implement Bazel support for Coda OCaml code | 16 | Sun 5/31 |
+| 12 | all | Minimal Proof-of-Concept | 4 | Tue 5/26 | Hello World stuff: app, app with libs, C/C++ interop, cross-build |
+| 13 | all | Develop rules_ocaml | 12 |Sun 5/31 |
+| 14 | all | Implement Bazel support for Coda OCaml code | 16 | Fri 6/5 |
 
 **Golang, CUDA**
 
 | | Platform | Task | Effort | Due | Notes |
 | -- | ----------- | ----------- | ------ | ---------- | ---------------|
-| 14 | all | go-libp2p | 4 | W 5/27  |
-| 15 | all | CUDA code in Coda | 1 | TBD | cuda-fixnum, cuda-prover, etc. |
+| 15 | all | go-libp2p | 4 | W 5/27  | Assumption: it won't be necessary to spend much time learning enough Go to get the build working |
+| 16 | all | CUDA code in Coda | 1 | TBD | Out of scope until further notice |
 
-Note: I don't have a GPU, and I'm not sure if I can compile CUDA code
-without one.  If I can, task 15 will be completed by end of month.
+**Rust**
+
+It is expected that some Rust libraries will be incorporated into Coda
+in the not-too-distant future.  Rust is not listed as an [officially
+supported
+language](https://docs.bazel.build/versions/master/rules.html) on the
+Bazel website, but the Bazel repository does contain Bazel rules for
+Rust, so we have reason to believe that integrating Rust libraries
+into a Bazel-based system is feasible.
+
+Rust suport is out-of-scope for this proposal; it can be proposed as a
+separate project at the appropriate time.
 
 ## Drawbacks
 [drawbacks]: #drawbacks
@@ -339,6 +401,9 @@ was (in my opinion) quite successful.
   * Distributed builds ([Remote Execution](https://docs.bazel.build/versions/master/remote-execution.html))
   * [Remote caching](https://docs.bazel.build/versions/master/remote-caching.html)
   * Implementation of feature-testing in Starlark.
+  * Cross-platform builds targeting Mobile devices.
+  * Cross-platform builds targeting constrained devices.
+  * Productizing rules_ocaml and officially supporting it
 
 #### Known Unknowns
 
@@ -349,8 +414,13 @@ was (in my opinion) quite successful.
   build tool, instead of mashing up multiple specialized tools?  Bazel
   is a kind of meta-tool that orchestrates other tools. It has good
   support for integrating shell scripts and other tools into a build
-  flow.  And it will always be possible to fall back to some other
-  solution for particular tasks, should Bazel prove inapproprite.
+  flow.  Furthermore, Bazel is quite strict about ensuring
+  standards-conformant, reproducible builds, which may lead to
+  exposure of problems in build tools (and code) that would otherwise
+  go undetected - for example, it will barf if you try to use angle
+  brackets for C/C++ include directives where quotes should be used.
+  And it will always be possible to fall back to some other solution
+  for particular tasks, should Bazel prove inapproprite.
 
 #### Unknown Unknowns
 
