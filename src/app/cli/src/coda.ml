@@ -225,16 +225,6 @@ let daemon logger =
            "true|false Generate a new genesis proof for the current \
             configuration if none is found (default: true)"
          (optional bool)
-     (*and genesis_runtime_constants =
-       flag "genesis-constants"
-         ~doc:
-           (sprintf
-              "PATH path to the runtime-configurable constants. (default: \
-               compiled constants) For example: %s"
-              ( Genesis_constants.(
-                  Daemon_config.(of_genesis_constants compiled |> to_yojson))
-              |> Yojson.Safe.to_string ))
-         (optional string)*)
      and disable_telemetry =
        flag "disable-telemetry" no_arg
          ~doc:"Disable reporting telemetry to other nodes"
