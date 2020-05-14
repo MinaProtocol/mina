@@ -311,7 +311,7 @@ module Accumulator = struct
                 Some (add x y)
             | `Left x ->
                 Some x
-            | `Right y ->
+            | `Right _y ->
                 failwith "shift not present in accumulating map" ) }
   end
 
@@ -428,8 +428,6 @@ module Opening = struct
 end
 
 module Openings = struct
-  open Evals
-
   [%%versioned
   module Stable = struct
     module V1 = struct
