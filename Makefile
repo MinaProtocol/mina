@@ -92,7 +92,7 @@ genesis_ledger:
 
 build: git_hooks reformat-diff libp2p_helper
 	$(info Starting Build)
-	ulimit -s 65532 && (ulimit -n 10240 || true) && $(WRAPAPP) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build src/app/logproc/logproc.exe src/app/cli/src/coda.exe --profile=$(DUNE_PROFILE) && make genesis_ledger
+	ulimit -s 65532 && (ulimit -n 10240 || true) && $(WRAPAPP) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build src/app/logproc/logproc.exe src/app/cli/src/coda.exe --profile=$(DUNE_PROFILE)
 	$(info Build complete)
 
 build_archive: git_hooks reformat-diff
