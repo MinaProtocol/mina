@@ -38,6 +38,7 @@ module Evals = struct
     ; col: 'a Abc.t
     ; value: 'a Abc.t
     ; rc: 'a Abc.t }
+  [@@deriving fields, sexp, compare, yojson]
 
   open Vector
 
@@ -251,7 +252,7 @@ module Accumulator = struct
         end
       end]
 
-      type 'a t = 'a Stable.Latest.t
+      type 'a t = 'a Stable.Latest.t [@@deriving sexp, compare]
 
       let to_yojson f t = Alist.to_yojson f (Map.to_alist t)
 
