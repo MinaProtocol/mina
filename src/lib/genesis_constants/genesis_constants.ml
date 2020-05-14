@@ -45,13 +45,13 @@ module Constraint_constants = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = {c: int}
+      type t = {c: int; pending_coinbase_depth: int}
 
       let to_latest = Fn.id
     end
   end]
 
-  type t = Stable.Latest.t = {c: int}
+  type t = Stable.Latest.t = {c: int; pending_coinbase_depth: int}
 
   [%%ifdef
   consensus_mechanism]
@@ -66,7 +66,8 @@ module Constraint_constants = struct
 
   [%%endif]
 
-  let compiled = {c}
+  let compiled =
+    {c; pending_coinbase_depth= Coda_compile_config.pending_coinbase_depth}
 
   let for_unit_tests = compiled
 end

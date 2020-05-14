@@ -559,10 +559,8 @@ module Make (Depth : sig
   val depth : int
 end) =
 struct
-  include Depth
-
   (* Total number of stacks *)
-  let max_coinbase_stack_count = Int.pow 2 depth
+  let max_coinbase_stack_count ~depth = Int.pow 2 depth
 
   module Stack = struct
     module Poly = struct
@@ -785,8 +783,6 @@ struct
 
     module Address = struct
       include Merkle_tree.Address
-
-      let typ = typ ~depth
     end
 
     type _ Request.t +=
@@ -811,16 +807,16 @@ struct
       | _ ->
           unhandled
 
-    let get t addr =
+    let get ~depth t addr =
       handle
         (Merkle_tree.get_req ~depth (Hash.var_to_hash_packed t) addr)
         reraise_merkle_requests
 
-    let%snarkydef add_coinbase t
+    let%snarkydef add_coinbase ~depth t
         ((action : Update.Action.var), (pk, amount), state_body_hash) =
       let%bind addr1, addr2 =
         request_witness
-          Typ.(Address.typ * Address.typ)
+          Typ.(Address.typ ~depth * Address.typ ~depth)
           As_prover.(
             map (read Update.Action.typ action) ~f:(fun act ->
                 Find_index_of_newest_stacks act ))
@@ -922,16 +918,18 @@ struct
       in
       Hash.var_of_hash_packed root
 
-    let%snarkydef pop_coinbases t ~proof_emitted =
+    let%snarkydef pop_coinbases ~depth t ~proof_emitted =
       let%bind addr =
-        request_witness Address.typ
+        request_witness (Address.typ ~depth)
           As_prover.(map (return ()) ~f:(fun _ -> Find_index_of_oldest_stack))
       in
       let%bind prev, prev_path =
         request_witness
           Typ.(Stack.typ * Path.typ ~depth)
           As_prover.(
-            map (read Address.typ addr) ~f:(fun a -> Get_coinbase_stack a))
+            map
+              (read (Address.typ ~depth) addr)
+              ~f:(fun a -> Get_coinbase_stack a))
       in
       let stack_hash = Stack.hash_var in
       let%bind prev_entry_hash = stack_hash prev in
@@ -947,7 +945,7 @@ struct
         perform
           (let open As_prover in
           let open Let_syntax in
-          let%map addr = read Address.typ addr
+          let%map addr = read (Address.typ ~depth) addr
           and next = read Stack.typ next in
           Set_oldest_coinbase_stack (addr, next))
       in
@@ -967,25 +965,27 @@ struct
 
   let init_hash = Stack.data_hash Stack.empty
 
-  (* this calculation doesn't depend on any inputs *)
-  let hash_on_level, root_hash =
-    List.fold
-      (List.init depth ~f:(fun i -> i + 1))
-      ~init:([(0, init_hash)], init_hash)
-      ~f:(fun (hashes, (cur_hash : Hash.t)) height ->
-        let (merged : Hash.t) =
-          Hash.merge ~height:(height - 1) cur_hash cur_hash
-        in
-        ((height, merged) :: hashes, merged) )
+  let hash_at_level =
+    let cached = ref [|init_hash|] in
+    fun i ->
+      let len = Array.length !cached in
+      ( if i >= len then
+        let cur_hash = ref (Array.last !cached) in
+        cached :=
+          Array.concat !cached
+            (Array.init
+               (i + 1 - len)
+               ~f:(fun i ->
+                 cur_hash :=
+                   Hash.merge ~height:(i + len - 1) !cur_hash !cur_hash ;
+                 !prev_hash )) ) ;
+      !cached.(i)
 
-  let create_exn' () =
+  let create_exn' ~depth () =
     let rec create_path height path key =
       if height < 0 then path
       else
-        let hash =
-          Option.value_exn
-            (List.Assoc.find ~equal:Int.equal hash_on_level height)
-        in
+        let hash = hash_at_level height in
         create_path (height - 1)
           ((if key mod 2 = 0 then `Left hash else `Right hash) :: path)
           (key / 2)
@@ -998,6 +998,7 @@ struct
           (Merkle_tree.add_path t path key Stack.empty)
           (Or_error.ok_exn (Stack_id.incr_by_one key))
     in
+    let root_hash = hash_at_level depth in
     { Poly.tree= make_tree (Merkle_tree.of_hash ~depth root_hash) Stack_id.zero
     ; pos_list= []
     ; new_pos= Stack_id.zero }
@@ -1018,9 +1019,10 @@ struct
   let find_index (t : t) key =
     try_with (fun () -> Merkle_tree.find_index_exn t.tree key)
 
-  let next_index (t : t) =
+  let next_index ~depth (t : t) =
     if
-      Stack_id.equal t.new_pos (Stack_id.of_int (max_coinbase_stack_count - 1))
+      Stack_id.equal t.new_pos
+        (Stack_id.of_int (max_coinbase_stack_count ~depth - 1))
     then Ok Stack_id.zero
     else Stack_id.incr_by_one t.new_pos
 
