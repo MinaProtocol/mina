@@ -27,53 +27,98 @@ module Accounts = struct
 end
 
 module Ledger = struct
+  type custom_name = {name: string; newer_than: string}
+
   type base =
     | Named of string  (** One of the named ledgers in [Genesis_ledger] *)
-    | Accounts of Accounts.t  (** A ledger generated from the given accounts *)
+    | Accounts of Accounts.t * custom_name option
+        (** A ledger generated from the given accounts *)
     | Hash of string  (** The ledger with the given root hash *)
 
   type t = {base: base; num_accounts: int option; hash: string option}
 
-  let base_to_yojson_field = function
+  let base_to_yojson_fields = function
     | Named name ->
-        ("named", `String name)
-    | Accounts accounts ->
-        ("accounts", Accounts.to_yojson accounts)
+        [("named", `String name)]
+    | Accounts (accounts, None) ->
+        [("accounts", Accounts.to_yojson accounts)]
+    | Accounts (accounts, Some {name; newer_than}) ->
+        (* {accounts: [], name: {custom: "", newer_than: ""}} *)
+        [ ("accounts", Accounts.to_yojson accounts)
+        ; ( "name"
+          , `Assoc
+              [("custom", `String name); ("newer_than", `String newer_than)] )
+        ]
     | Hash hash ->
-        ("hash", `String hash)
+        [("hash", `String hash)]
 
   let base_of_yojson_fields l =
+    let member fld_name l ~f =
+      List.find_map l ~f:(fun (fld, value) ->
+          if String.equal fld fld_name then Some (f value) else None )
+    in
     List.find_map_exn
       ~f:(fun f -> f l)
-      [ List.find_map ~f:(fun (fld, value) ->
-            if String.equal fld "accounts" then
-              Some
-                (Result.map
-                   ~f:(fun accounts -> Accounts accounts)
-                   (Accounts.of_yojson value))
-            else None )
-      ; List.find_map ~f:(fun (fld, value) ->
-            if String.equal fld "name" then
-              match value with
-              | `String name ->
-                  Some (Ok (Named name))
+      [ (fun l ->
+          let open Option.Let_syntax in
+          (* {accounts: [], name: {custom: "", newer_than: ""}} *)
+          let%map accounts = member "accounts" ~f:Accounts.of_yojson l in
+          let open Result.Let_syntax in
+          let%bind accounts = accounts in
+          let custom_name =
+            member "name" l ~f:(function
+              | `Assoc l -> (
+                  let name =
+                    member "custom" l ~f:(function
+                      | `String name ->
+                          Ok name
+                      | _ ->
+                          Error
+                            "Runtime_config.Ledger.of_yojson: Expected the \
+                             field 'custom' to contain a string" )
+                  in
+                  let newer_than =
+                    member "newer_than" l ~f:(function
+                      | `String newer_than ->
+                          Ok newer_than
+                      | _ ->
+                          Error
+                            "Runtime_config.Ledger.of_yojson: Expected the \
+                             field 'newer_than' to contain a string" )
+                  in
+                  match (name, newer_than) with
+                  | Some (Error err), _ | _, Some (Error err) ->
+                      Error err
+                  | Some (Ok name), Some (Ok newer_than) ->
+                      Ok (Some {name; newer_than})
+                  | None, _ | _, None ->
+                      Error
+                        "Runtime_config.Ledger.of_yojson: Expected the field \
+                         'name' to contain fields 'custom' and 'newer_than'" )
               | _ ->
-                  Some
-                    (Error
-                       "Runtime_config.Ledger.of_yojson: Expected the field \
-                        'name' to contain a string")
-            else None )
-      ; List.find_map ~f:(fun (fld, value) ->
-            if String.equal fld "hash" then
-              match value with
-              | `String name ->
-                  Some (Ok (Hash name))
-              | _ ->
-                  Some
-                    (Error
-                       "Runtime_config.Ledger.of_yojson: Expected the field \
-                        'hash' to contain a string")
-            else None )
+                  Error
+                    "Runtime_config.Ledger.of_yojson: Expected a JSON object \
+                     in field 'name'" )
+          in
+          let%map custom_name =
+            (* Monad jenga. *)
+            Option.value ~default:(Ok None) custom_name
+          in
+          Accounts (accounts, custom_name) )
+      ; member "name" ~f:(function
+          | `String name ->
+              Ok (Named name)
+          | _ ->
+              Error
+                "Runtime_config.Ledger.of_yojson: Expected the field 'name' \
+                 to contain a string" )
+      ; member "hash" ~f:(function
+          | `String name ->
+              Ok (Hash name)
+          | _ ->
+              Error
+                "Runtime_config.Ledger.of_yojson: Expected the field 'hash' \
+                 to contain a string" )
       ; (fun _ ->
           Some
             (Error
@@ -91,7 +136,7 @@ module Ledger = struct
               | _ ->
                   Some ("hash", `String hash) ) ]
     in
-    `Assoc (base_to_yojson_field base :: fields)
+    `Assoc (base_to_yojson_fields base @ fields)
 
   let of_yojson = function
     | `Assoc l ->
