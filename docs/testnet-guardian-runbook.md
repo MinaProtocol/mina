@@ -10,7 +10,7 @@ The role of a testnet guardian for a release begins after the code-freeze. The f
 
 ### Release branch
 
-Cut a release branch after the code-freeze(The naming convention for beta-testnets is `release/0.0.<release_number>-beta`. For example, `release/0.0.13-beta`)
+Confirm with the protocol and the product team that all the required PRs are in. Cut a release branch after the code-freeze(The naming convention for beta-testnets is `release/0.0.<release_number>-beta`. For example, `release/0.0.13-beta`)
 
 ### Build
 
