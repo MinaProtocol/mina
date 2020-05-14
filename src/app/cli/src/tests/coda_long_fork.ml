@@ -4,7 +4,11 @@ open Async
 let name = "coda-long-fork"
 
 let main n waiting_time () =
-  let consensus_constants = Consensus.Constants.compiled in
+  let consensus_constants =
+    Consensus.Constants.create
+      ~constraint_constants:Genesis_constants.Constraint_constants.compiled
+      ~protocol_constants:Genesis_constants.compiled.protocol
+  in
   let logger = Logger.create () in
   let keypairs =
     List.map

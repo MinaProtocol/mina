@@ -73,10 +73,12 @@ GITBRANCH=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD |  sed 's!/!-!;
 DEBS3='deb-s3 upload --s3-region=us-west-2 --bucket packages.o1test.net --preserve-versions --cache-control=max-age=120'
 
 # check for AWS Creds
+set +u
 if [ -z "$AWS_ACCESS_KEY_ID" ]; then
     echo "WARNING: AWS_ACCESS_KEY_ID not set, publish commands not run"
     exit 0
 else
+    set -u
     # Determine deb repo to use
     case $GITBRANCH in
         master)

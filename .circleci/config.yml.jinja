@@ -52,7 +52,7 @@ jobs:
     test-archive:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-09d02f71dedfa6db06164eb07b11e54c1a6bb405
+            - image: codaprotocol/coda:toolchain-eb73e64d524c906384e9dbb23e9d0b8ae2be9e9e
               environment:
                 CODA_DOCKER: true
             - image: postgres:12
@@ -83,7 +83,7 @@ jobs:
     build-archive:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-09d02f71dedfa6db06164eb07b11e54c1a6bb405
+            - image: codaprotocol/coda:toolchain-eb73e64d524c906384e9dbb23e9d0b8ae2be9e9e
               environment:
                 CODA_DOCKER: true
                 HASURA_PORT: 8080
@@ -129,7 +129,7 @@ jobs:
                   command: ./scripts/archive/build-release-archives.sh
     lint:
         docker:
-            - image: codaprotocol/coda:toolchain-09d02f71dedfa6db06164eb07b11e54c1a6bb405
+            - image: codaprotocol/coda:toolchain-eb73e64d524c906384e9dbb23e9d0b8ae2be9e9e
         steps:
             - checkout
             - run:
@@ -158,7 +158,7 @@ jobs:
                   command: ./scripts/require-ppx-coda.py
     lint-opt:
         docker:
-            - image: codaprotocol/coda:toolchain-09d02f71dedfa6db06164eb07b11e54c1a6bb405
+            - image: codaprotocol/coda:toolchain-eb73e64d524c906384e9dbb23e9d0b8ae2be9e9e
         steps:
             - checkout
             - run:
@@ -178,7 +178,7 @@ jobs:
                   command: ./scripts/compare_ci_diff_binables.sh
     compare-test-signatures:
         docker:
-            - image: codaprotocol/coda:toolchain-09d02f71dedfa6db06164eb07b11e54c1a6bb405
+            - image: codaprotocol/coda:toolchain-eb73e64d524c906384e9dbb23e9d0b8ae2be9e9e
         steps:
             - checkout
             - run:
@@ -196,7 +196,7 @@ jobs:
         steps:
             - run:
                 name: Install dependencies
-                command: pip install --user requests jinja2
+                command: pip install --user requests jinja2 readchar
             - checkout
             - run:
                   name: Update branch protection rule from test configuration
@@ -324,11 +324,11 @@ jobs:
             - run:
                 name: Decode Apple Certificates
                 context: org-global
-                command: base64 -D -o frontend/wallet/Certificates.p12 <<< $APPLE_CERTIFICATES
+                command: bash -c '[ -z $APPLE_CERTIFICATES ] || base64 -D -o frontend/wallet/Certificates.p12 <<< $APPLE_CERTIFICATES'
             - run:
                 name: Fastlane
                 context: org-global
-                command: cd frontend/wallet && bundle exec fastlane ci && cd ../..
+                command: bash -c '[ -z $APPLE_CERTIFICATES ] || (cd frontend/wallet && bundle exec fastlane ci && cd ../..)'
             - run:
                 name: Build portable binary
                 command: |
@@ -343,7 +343,7 @@ jobs:
     build-client-sdk:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-09d02f71dedfa6db06164eb07b11e54c1a6bb405
+            - image: codaprotocol/coda:toolchain-eb73e64d524c906384e9dbb23e9d0b8ae2be9e9e
         steps:
             - checkout
             - run:
@@ -367,7 +367,7 @@ jobs:
     build-artifacts--{{profile}}:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-09d02f71dedfa6db06164eb07b11e54c1a6bb405
+            - image: codaprotocol/coda:toolchain-eb73e64d524c906384e9dbb23e9d0b8ae2be9e9e
         steps:
             - checkout
             - run:
@@ -469,7 +469,7 @@ jobs:
     test-unit--{{profile}}:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-09d02f71dedfa6db06164eb07b11e54c1a6bb405
+            - image: codaprotocol/coda:toolchain-eb73e64d524c906384e9dbb23e9d0b8ae2be9e9e
         steps:
             - checkout
             - run: ulimit -c unlimited
@@ -495,7 +495,7 @@ jobs:
     test-unit--nonconsensus_medium_curves:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-09d02f71dedfa6db06164eb07b11e54c1a6bb405
+            - image: codaprotocol/coda:toolchain-eb73e64d524c906384e9dbb23e9d0b8ae2be9e9e
         steps:
             - checkout
             - run: ulimit -c unlimited
@@ -520,7 +520,7 @@ jobs:
     test-unit--{{profile}}:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-09d02f71dedfa6db06164eb07b11e54c1a6bb405
+            - image: codaprotocol/coda:toolchain-eb73e64d524c906384e9dbb23e9d0b8ae2be9e9e
         steps:
             - checkout
             - run: ulimit -c unlimited
@@ -546,7 +546,7 @@ jobs:
     test--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-09d02f71dedfa6db06164eb07b11e54c1a6bb405
+            - image: codaprotocol/coda:toolchain-eb73e64d524c906384e9dbb23e9d0b8ae2be9e9e
         steps:
             - checkout
             - run:
@@ -568,7 +568,7 @@ jobs:
     test--{{profile}}:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-09d02f71dedfa6db06164eb07b11e54c1a6bb405
+            - image: codaprotocol/coda:toolchain-eb73e64d524c906384e9dbb23e9d0b8ae2be9e9e
         steps:
             - checkout
             - run:

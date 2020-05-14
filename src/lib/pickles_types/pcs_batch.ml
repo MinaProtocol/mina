@@ -5,7 +5,7 @@ type ('a, 'n, 'm) t =
 
 let map t ~f = {t with with_degree_bound= Vector.map t.with_degree_bound ~f}
 
-let pow ~one ~mul ~add x n =
+let pow ~one ~mul ~add:_ x n =
   let k = Int.ceil_log2 n in
   let rec go acc i =
     if i < 0 then acc
@@ -22,7 +22,7 @@ let pow ~one ~mul ~add x n =
 let create ~without_degree_bound ~with_degree_bound =
   {without_degree_bound; with_degree_bound}
 
-let combine_commitments t ~scale ~add ~xi (type n)
+let combine_commitments _t ~scale ~add ~xi (type n)
     (without_degree_bound : (_, n) Vector.t) with_degree_bound =
   match without_degree_bound with
   | [] ->
@@ -36,8 +36,8 @@ let combine_commitments t ~scale ~add ~xi (type n)
       List.fold_left polys ~init ~f:(fun acc p -> add p (scale acc xi))
 
 let combine_evaluations' (type a n m)
-    ({without_degree_bound; with_degree_bound} : (a, n Nat.s, m) t)
-    ~shifted_pow ~mul ~add ~one ~evaluation_point ~xi
+    ({without_degree_bound= _; with_degree_bound} : (a, n Nat.s, m) t)
+    ~shifted_pow ~mul ~add ~one:_ ~evaluation_point ~xi
     (init :: evals0 : (_, n Nat.s) Vector.t) (evals1 : (_, m) Vector.t) =
   let evals =
     Vector.to_list evals0

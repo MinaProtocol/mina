@@ -80,8 +80,10 @@ let setup (type n) ?(logger = Logger.null ())
                   let input = Envelope.Incoming.data query_env in
                   Deferred.return
                     (let open Option.Let_syntax in
-                    let%map scan_state, expected_merkle_root, pending_coinbases
-                        =
+                    let%map ( scan_state
+                            , expected_merkle_root
+                            , pending_coinbases
+                            , protocol_states ) =
                       Sync_handler
                       .get_staged_ledger_aux_and_pending_coinbases_at_hash
                         ~frontier input
@@ -97,9 +99,25 @@ let setup (type n) ?(logger = Logger.null ())
                           , Staged_ledger_hash.to_yojson staged_ledger_hash )
                         ]
                       "sending scan state and pending coinbase" ;
-                    (scan_state, expected_merkle_root, pending_coinbases)) )
-                ~answer_sync_ledger_query:(fun _ ->
-                  failwith "Answer_sync_ledger_query unimplemented" )
+                    ( scan_state
+                    , expected_merkle_root
+                    , pending_coinbases
+                    , protocol_states )) )
+                ~answer_sync_ledger_query:(fun query_env ->
+                  let ledger_hash, _ = Envelope.Incoming.data query_env in
+                  Sync_handler.answer_query ~frontier ledger_hash
+                    (Envelope.Incoming.map ~f:Tuple2.get2 query_env)
+                    ~logger:(Logger.create ())
+                    ~trust_system:(Trust_system.null ())
+                  |> Deferred.map
+                     (* begin error string prefix so we can pattern-match *)
+                       ~f:
+                         (Result.of_option
+                            ~error:
+                              (Error.createf
+                                 !"%s for ledger_hash: %{sexp:Ledger_hash.t}"
+                                 Coda_networking.refused_answer_query_string
+                                 ledger_hash)) )
                 ~get_ancestry:(fun query_env ->
                   Deferred.return
                     (Sync_handler.Root.prove ~logger ~frontier
@@ -124,26 +142,41 @@ module Generator = struct
   open Quickcheck
   open Generator.Let_syntax
 
-  type peer_config = max_frontier_length:int -> peer_state Generator.t
+  type peer_config =
+       proof_level:Genesis_constants.Proof_level.t
+    -> constraint_constants:Genesis_constants.Constraint_constants.t
+    -> precomputed_values:Precomputed_values.t
+    -> max_frontier_length:int
+    -> peer_state Generator.t
 
-  let fresh_peer ~max_frontier_length =
+  let fresh_peer ~proof_level ~constraint_constants ~precomputed_values
+      ~max_frontier_length =
+    let genesis_ledger =
+      Precomputed_values.genesis_ledger precomputed_values
+    in
     let consensus_local_state =
       Consensus.Data.Local_state.create Public_key.Compressed.Set.empty
-        ~genesis_ledger:Test_genesis_ledger.t
+        ~genesis_ledger
     in
     let%map frontier =
-      Transition_frontier.For_tests.gen ~consensus_local_state
+      Transition_frontier.For_tests.gen ~proof_level ~constraint_constants
+        ~precomputed_values ~consensus_local_state
         ~max_length:max_frontier_length ~size:0 ()
     in
     {frontier; consensus_local_state}
 
-  let peer_with_branch ~frontier_branch_size ~max_frontier_length =
+  let peer_with_branch ~frontier_branch_size ~proof_level ~constraint_constants
+      ~precomputed_values ~max_frontier_length =
+    let genesis_ledger =
+      Precomputed_values.genesis_ledger precomputed_values
+    in
     let consensus_local_state =
       Consensus.Data.Local_state.create Public_key.Compressed.Set.empty
-        ~genesis_ledger:Test_genesis_ledger.t
+        ~genesis_ledger
     in
     let%map frontier, branch =
-      Transition_frontier.For_tests.gen_with_branch
+      Transition_frontier.For_tests.gen_with_branch ~proof_level
+        ~constraint_constants ~precomputed_values
         ~max_length:max_frontier_length ~frontier_size:0
         ~branch_size:frontier_branch_size ~consensus_local_state ()
     in
@@ -152,11 +185,13 @@ module Generator = struct
           ~f:(Transition_frontier.add_breadcrumb_exn frontier) ) ;
     {frontier; consensus_local_state}
 
-  let gen ~max_frontier_length configs =
+  let gen ~proof_level ~constraint_constants ~precomputed_values
+      ~max_frontier_length configs =
     let open Quickcheck.Generator.Let_syntax in
     let%map states =
       Vect.Quickcheck_generator.map configs ~f:(fun config ->
-          config ~max_frontier_length )
+          config ~proof_level ~constraint_constants ~precomputed_values
+            ~max_frontier_length )
     in
     setup states
 end

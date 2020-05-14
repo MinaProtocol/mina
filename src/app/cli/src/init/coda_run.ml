@@ -46,7 +46,7 @@ let get_lite_chain :
               (Lite_compat.account (Option.value_exn (Ledger.get ledger loc)))
             )
           ~init:
-            (Lite_lib.Sparse_ledger.of_hash ~depth:Ledger.depth
+            (Lite_lib.Sparse_ledger.of_hash ~depth:(Ledger.depth ledger)
                (Lite_compat.digest
                   ( Ledger.merkle_root ledger
                     :> Snark_params.Tick.Pedersen.Digest.t )))
@@ -67,63 +67,136 @@ let get_lite_chain :
       let proof = Lite_compat.proof proof in
       {Lite_base.Lite_chain.proof; ledger; protocol_state} )
 
-let get_current_fork_id ~compile_time_current_fork_id ~conf_dir ~logger =
-  let current_fork_id_file = conf_dir ^/ "current_fork_id" in
-  let read_fork_id () =
+(* create reader, writer for protocol versions, but really for any one-line item in conf_dir *)
+let make_conf_dir_item_io ~conf_dir ~filename =
+  let item_file = conf_dir ^/ filename in
+  let read_item () =
     let open Stdlib in
-    let inp = open_in current_fork_id_file in
+    let inp = open_in item_file in
     let res = input_line inp in
     close_in inp ; res
   in
-  let write_fork_id fork_id =
+  let write_item item =
     let open Stdlib in
-    let outp = open_out current_fork_id_file in
-    output_string outp (fork_id ^ "\n") ;
+    let outp = open_out item_file in
+    output_string outp (item ^ "\n") ;
     close_out outp
+  in
+  (read_item, write_item)
+
+let get_current_protocol_version ~compile_time_current_protocol_version
+    ~conf_dir ~logger =
+  let read_protocol_version, write_protocol_version =
+    make_conf_dir_item_io ~conf_dir ~filename:"current_protocol_version"
   in
   function
   | None -> (
     try
       (* not provided on command line, try to read from config dir *)
-      let fork_id = read_fork_id () in
+      let protocol_version = read_protocol_version () in
       Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-        "Setting current fork ID to $fork_id from config"
-        ~metadata:[("fork_id", `String fork_id)] ;
-      fork_id
+        "Setting current protocol version to $protocol_version from config"
+        ~metadata:[("protocol_version", `String protocol_version)] ;
+      Protocol_version.of_string_exn protocol_version
     with Sys_error _ ->
       (* not on command-line, not in config dir, use compile-time value *)
       Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-        "Setting current fork ID to $fork_id from compile-time config"
-        ~metadata:[("fork_id", `String compile_time_current_fork_id)] ;
-      compile_time_current_fork_id )
-  | Some fork_id -> (
+        "Setting current protocol version to $protocol_version from \
+         compile-time config"
+        ~metadata:
+          [("protocol_version", `String compile_time_current_protocol_version)] ;
+      Protocol_version.of_string_exn compile_time_current_protocol_version )
+  | Some protocol_version -> (
     try
       (* it's an error if the command line value disagrees with the value in the config *)
-      let config_fork_id = read_fork_id () in
-      if String.equal config_fork_id fork_id then (
+      let config_protocol_version = read_protocol_version () in
+      if String.equal config_protocol_version protocol_version then (
         Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-          "Using current fork ID $fork_id from command line, which matches \
-           the one in the config"
-          ~metadata:[("fork_id", `String fork_id)] ;
-        config_fork_id )
+          "Using current protocol version $protocol_version from command \
+           line, which matches the one in the config"
+          ~metadata:[("protocol_version", `String protocol_version)] ;
+        Protocol_version.of_string_exn config_protocol_version )
       else (
         Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
-          "Current fork ID $fork_id from the command line disagrees with \
-           $config_fork_id from the Coda config"
+          "Current protocol version $protocol_version from the command line \
+           disagrees with $config_protocol_version from the Coda config"
           ~metadata:
-            [ ("fork_id", `String fork_id)
-            ; ("config_fork_id", `String config_fork_id) ] ;
+            [ ("protocol_version", `String protocol_version)
+            ; ("config_protocol_version", `String config_protocol_version) ] ;
         failwith
-          "Current fork ID from command line disagrees with fork ID in Coda \
-           config; please delete your Coda config if you wish to use a new \
-           fork ID" )
-    with Sys_error _ ->
-      (* use value provided on command line, write to config dir, possibly overwriting existing entry *)
-      write_fork_id fork_id ;
+          "Current protocol version from command line disagrees with protocol \
+           version in Coda config; please delete your Coda config if you wish \
+           to use a new protocol version" )
+    with Sys_error _ -> (
+      (* use value provided on command line, write to config dir *)
+      match Protocol_version.of_string_opt protocol_version with
+      | None ->
+          Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+            "Protocol version provided on command line is invalid"
+            ~metadata:[("protocol_version", `String protocol_version)] ;
+          failwith "Protocol version from command line is invalid"
+      | Some pv ->
+          write_protocol_version protocol_version ;
+          Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+            "Using current protocol_version $protocol_version from command \
+             line, writing to config"
+            ~metadata:[("protocol_version", `String protocol_version)] ;
+          pv ) )
+
+let get_proposed_protocol_version_opt ~conf_dir ~logger =
+  let read_protocol_version, write_protocol_version =
+    make_conf_dir_item_io ~conf_dir ~filename:"proposed_protocol_version"
+  in
+  function
+  | None -> (
+    try
+      (* not provided on command line, try to read from config dir *)
+      let protocol_version = read_protocol_version () in
       Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-        "Using current fork ID $fork_id from command line, writing to config"
-        ~metadata:[("fork_id", `String fork_id)] ;
-      fork_id )
+        "Setting proposed protocol version to $protocol_version from config"
+        ~metadata:[("protocol_version", `String protocol_version)] ;
+      Some (Protocol_version.of_string_exn protocol_version)
+    with Sys_error _ ->
+      (* not on command-line, not in config dir, there's no proposed protocol version *)
+      None )
+  | Some protocol_version -> (
+      let validate_cli_protocol_version protocol_version =
+        if Option.is_none (Protocol_version.of_string_opt protocol_version)
+        then (
+          Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+            "Proposed protocol version provided on command line is invalid"
+            ~metadata:[("proposed_protocol_version", `String protocol_version)] ;
+          failwith "Proposed protocol version from command line is invalid" )
+      in
+      try
+        (* overwrite if the command line value disagrees with the value in the config *)
+        let config_protocol_version = read_protocol_version () in
+        if String.equal config_protocol_version protocol_version then (
+          Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+            "Using proposed protocol version $protocol_version from command \
+             line, which matches the one in the config"
+            ~metadata:[("protocol_version", `String protocol_version)] ;
+          Some (Protocol_version.of_string_exn config_protocol_version) )
+        else (
+          validate_cli_protocol_version protocol_version ;
+          write_protocol_version protocol_version ;
+          Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+            "Overwriting Coda config proposed protocol version \
+             $config_proposed_protocol_version with proposed protocol version \
+             $protocol_version from the command line"
+            ~metadata:
+              [ ( "config_proposed_protocol_version"
+                , `String config_protocol_version )
+              ; ("proposed_protocol_version", `String protocol_version) ] ;
+          Some (Protocol_version.of_string_exn protocol_version) )
+      with Sys_error _ ->
+        (* use value provided on command line, write to config dir *)
+        validate_cli_protocol_version protocol_version ;
+        write_protocol_version protocol_version ;
+        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+          "Using proposed protocol version from command line, writing to config"
+          ~metadata:[("protocol_version", `String protocol_version)] ;
+        Some (Protocol_version.of_string_exn protocol_version) )
 
 (*TODO check deferred now and copy theose files to the temp directory*)
 let log_shutdown ~conf_dir ~top_logger coda_ref =
@@ -375,7 +448,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
     ]
   in
   let snark_worker_impls =
-    [ implement Snark_worker.Rpcs.Get_work.Latest.rpc (fun () () ->
+    [ implement Snark_worker.Rpcs_versioned.Get_work.Latest.rpc (fun () () ->
           Deferred.return
             (let open Option.Let_syntax in
             let%bind snark_worker_key = Coda_lib.snark_worker_key coda in
@@ -388,7 +461,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
               "responding to a Get_work request with some new work" ;
             Coda_metrics.(Counter.inc_one Snark_work.snark_work_assigned_rpc) ;
             (r, snark_worker_key)) )
-    ; implement Snark_worker.Rpcs.Submit_work.Latest.rpc
+    ; implement Snark_worker.Rpcs_versioned.Submit_work.Latest.rpc
         (fun () (work : Snark_worker.Work.Result.t) ->
           Coda_metrics.(
             Counter.inc_one Snark_work.completed_snark_work_received_rpc) ;

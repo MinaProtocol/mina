@@ -215,7 +215,10 @@ module Api = struct
     signal
 end
 
-let consensus_constants = Consensus.Constants.compiled
+let consensus_constants =
+  Consensus.Constants.create
+    ~constraint_constants:Genesis_constants.Constraint_constants.compiled
+    ~protocol_constants:Genesis_constants.compiled.protocol
 
 module Constants = struct
   let to_int = Unsigned.UInt32.to_int
