@@ -16,6 +16,11 @@ open Random_oracle
 
 val signature : Field.t State.t
 
+(** [merkle_tree depth] gives the hash prefix for the given node depth.
+
+    This function performs caching: all prefixes up to the given depth will be
+    computed, and subsequent calls will retrieve them with negligible cost.
+*)
 val merkle_tree : int -> Field.t State.t
 
 val coinbase_merkle_tree : Field.t State.t array
