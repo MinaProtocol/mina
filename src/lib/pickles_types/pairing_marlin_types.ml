@@ -16,10 +16,10 @@ module Evals = struct
         ; h_2: 'a
         ; g_3: 'a
         ; h_3: 'a
-        ; row: 'a Abc.t
-        ; col: 'a Abc.t
-        ; value: 'a Abc.t
-        ; rc: 'a Abc.t }
+        ; row: 'a Abc.Stable.V1.t
+        ; col: 'a Abc.Stable.V1.t
+        ; value: 'a Abc.Stable.V1.t
+        ; rc: 'a Abc.Stable.V1.t }
       [@@deriving fields, sexp, compare, yojson]
     end
   end]
