@@ -145,7 +145,8 @@ let calculateAllUsers = metrics => {
 };
 
 let echoBotPublicKey = "4vsRCVNep7JaFhtySu6vZCjnArvoAhkRscTy5TQsGTsKM4tJcYVc3uNUMRxQZAwVzSvkHDGWBmvhFpmCeiPASGnByXqvKzmHt4aR5uAWAQf3kqhwDJ2ZY3Hw4Dzo6awnJkxY338GEp12LE4x";
-let calculateMetrics = blocks => {
+
+let metricsMap = blocks => {
   let blocksCreated = blocks |> getBlocksCreatedByUser;
   let transactionSent = blocks |> getTransactionSentByUser;
   let snarkWorkCreated = blocks |> getSnarkWorkCreatedByUser;
@@ -169,4 +170,37 @@ let calculateMetrics = blocks => {
       },
     users,
   );
+};
+
+// Awards x points for top N
+let applyTopNPoints = (n, pointsToGive, metricsMap, getMetricValue) => {
+  let metricsArray = Array.of_list(StringMap.bindings(metricsMap));
+  let f = ((_, metricValue1), (_, metricValue2)) => {
+    compare(getMetricValue(metricValue1), getMetricValue(metricValue2));
+  };
+  Array.sort(f, metricsArray);
+  let topNArray =
+    Array.sub(metricsArray, 0, min(n, Array.length(metricsArray)));
+  let topNArrayWithPoints =
+    Array.map(((user, _)) => {(user, pointsToGive)}, topNArray);
+
+  Array.fold_left(
+    (map, (userPublicKey, userPoints)) => {
+      StringMap.add(userPublicKey, userPoints, map)
+    },
+    StringMap.empty,
+    topNArrayWithPoints,
+  );
+};
+
+// Awards x points for nth place
+let applyPlacingPoints =
+    (placeToAward, pointsToGive, metricsMap, getMetricValue) => {
+  let metricsArray = Array.of_list(StringMap.bindings(metricsMap));
+  let f = ((_, metricValue1), (_, metricValue2)) => {
+    compare(getMetricValue(metricValue1), getMetricValue(metricValue2));
+  };
+  Array.sort(f, metricsArray);
+  let (winner, _) = metricsArray[placeToAward - 1];
+  StringMap.add(winner, pointsToGive, StringMap.empty);
 };

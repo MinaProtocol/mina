@@ -15,4 +15,4 @@ let blocks =
     files,
   );
 
-let results = Challenges.calculateMetrics(blocks);
+let results = Challenges.metricsMap(blocks);
