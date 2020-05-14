@@ -83,7 +83,6 @@ module Accounts = struct
           | None ->
               None
         in
-        let balance = Currency.Balance.of_uint64 balance in
         let delegate =
           Option.map ~f:Public_key.Compressed.of_base58_check_exn delegate
         in

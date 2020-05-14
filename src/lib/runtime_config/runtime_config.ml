@@ -15,7 +15,7 @@ module Accounts = struct
   type single =
     { pk: string option [@default None]
     ; sk: string option [@default None]
-    ; balance: Unsigned_extended.UInt64.t
+    ; balance: Currency.Balance.t
     ; delegate: string option [@default None] }
   [@@deriving yojson]
 
@@ -192,11 +192,11 @@ end
       , "accounts":
           [ { pk: "public_key"
             , sk: "secret_key"
-            , balance: 50
+            , balance: "0.000600000"
             , delegate: "public_key" }
           , { pk: "public_key"
             , sk: "secret_key"
-            , balance: 0
+            , balance: "0.000000000"
             , delegate: "public_key" } ]
       , "hash": "root_hash"
       , "num_accounts": 10 } }
