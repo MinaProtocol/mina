@@ -140,10 +140,7 @@ module Ledger = struct
 
   let find_tar ~logger ~constraint_constants (config : Runtime_config.Ledger.t)
       =
-    let search_paths =
-      Cache_dir.
-        [autogen_path; manual_install_path; brew_install_path; s3_install_path]
-    in
+    let search_paths = Cache_dir.possible_paths "" in
     let file_exists filename path =
       let filename = path ^/ filename in
       if%map file_exists ~follow_symlinks:true filename then (
@@ -405,10 +402,7 @@ module Genesis_proof = struct
     "genesis_proof_" ^ hash
 
   let find_file ~logger ~base_hash =
-    let search_paths =
-      Cache_dir.
-        [autogen_path; manual_install_path; brew_install_path; s3_install_path]
-    in
+    let search_paths = Cache_dir.possible_paths "" in
     let file_exists filename path =
       let filename = path ^/ filename in
       if%map file_exists ~follow_symlinks:true filename then (
