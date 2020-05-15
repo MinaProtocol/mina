@@ -1,5 +1,10 @@
 # WARNING: config.yml file is generated from config.yml.jinja
 ---
+
+# this defines how to initialize all the opam deps on linux.
+# the build-archive job is responsible for updating the cache!
+# why that one? ¯\_(ツ)_/¯ seemed convenient
+
 {% set opam_init_linux %}
             - run:
                   name: Update Submodules
@@ -116,17 +121,17 @@ jobs:
         steps:
             - checkout
             {{ opam_init_linux }}
+            - save_cache:
+                name: Save cache - opam
+                key: opam-linux-v0-{{'{{'}} checksum "opam_ci_cache.sig" {{'}}'}}
+                paths:
+                    - "/home/opam/.opam"
+                no_output_timeout: 1h
             - run:
                   name: Build Archive Process
                   command:  bash -c 'eval `opam config env` && LIBP2P_NIXLESS=1 make build_archive'
                   environment:
                     DUNE_PROFILE: testnet_postake_medium_curves
-            #- save_cache:
-            #    name: Save cache - opam
-            #    key: opam-linux-v0-{{'{{'}} checksum "opam_ci_cache.sig" {{'}}'}}
-            #    paths:
-            #        - "/home/opam/.opam"
-            #    no_output_timeout: 1h
             # NOTE: If we were using a machine executor we would be able to mount the sql file in
             # as a volume for the container to seed itself, this is the workaround.
             # Ideally this DB setup step would be handled by the archive process itself.
