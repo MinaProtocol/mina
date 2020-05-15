@@ -40,10 +40,10 @@ let () =
          let open Let_syntax in
          let open Command.Param in
          let%map config_file =
-           flag "config-file" ~doc:"PATH path to the JSON configuration file"
+           flag "--config-file" ~doc:"PATH path to the JSON configuration file"
              (optional string)
          and genesis_dir =
-           flag "genesis-dir"
+           flag "--genesis-dir"
              ~doc:
                (sprintf
                   "Dir where the genesis ledger and genesis proof is to be \
@@ -51,7 +51,7 @@ let () =
                   Cache_dir.autogen_path)
              (optional string)
          and proof_level =
-           flag "proof-level"
+           flag "--proof-level"
              (optional
                 (Arg_type.create Genesis_constants.Proof_level.of_string))
              ~doc:"full|check|none"
