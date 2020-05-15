@@ -194,42 +194,41 @@ module Proof_keys = struct
 end
 
 module Genesis = struct
-  type t = {k: int option [@default None]; delta: int option [@default None]}
-  [@@deriving yojson]
-
-  let of_yojson json =
-    of_yojson @@ yojson_strip_fields ~fields:[|"k"; "delta"|] json
-
-  let combine t1 t2 =
-    { k= opt_fallthrough ~default:t1.k t2.k
-    ; delta= opt_fallthrough ~default:t1.delta t2.delta }
-end
-
-module Daemon = struct
   type t =
-    { txpool_max_size: int option [@default None]
+    { k: int option [@default None]
+    ; delta: int option [@default None]
     ; genesis_state_timestamp: string option [@default None] }
   [@@deriving yojson]
 
   let of_yojson json =
     of_yojson
     @@ yojson_strip_fields
-         ~fields:[|"txpool_max_size"; "genesis_state_timestamp"|]
+         ~fields:[|"k"; "delta"; "genesis_state_timestamp"|]
          json
 
   let combine t1 t2 =
-    { txpool_max_size=
-        opt_fallthrough ~default:t1.txpool_max_size t2.txpool_max_size
+    { k= opt_fallthrough ~default:t1.k t2.k
+    ; delta= opt_fallthrough ~default:t1.delta t2.delta
     ; genesis_state_timestamp=
         opt_fallthrough ~default:t1.genesis_state_timestamp
           t2.genesis_state_timestamp }
 end
 
+module Daemon = struct
+  type t = {txpool_max_size: int option [@default None]} [@@deriving yojson]
+
+  let of_yojson json =
+    of_yojson @@ yojson_strip_fields ~fields:[|"txpool_max_size"|] json
+
+  let combine t1 t2 =
+    { txpool_max_size=
+        opt_fallthrough ~default:t1.txpool_max_size t2.txpool_max_size }
+end
+
 (** JSON representation:
 
   { "daemon":
-      { "txpool_max_size": 1
-      , "genesis_state_timestamp": "2000-00-00 12:00:00+0100" }
+      { "txpool_max_size": 1 }
   , "genesis": { "k": 1, "delta": 1 }
   , "proof": { }
   , "ledger":
