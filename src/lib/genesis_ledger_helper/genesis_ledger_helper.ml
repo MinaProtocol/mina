@@ -513,8 +513,8 @@ module Genesis_proof = struct
            generate a new genesis proof"
           ~metadata:[("base_hash", Ledger_hash.to_yojson inputs.base_hash)] ;
         Deferred.Or_error.errorf
-          "No genesis proof file was found for and not allowed to generate a \
-           new genesis proof"
+          "No genesis proof file was found and not allowed to generate a new \
+           genesis proof"
 end
 
 let make_genesis_constants ~logger ~(default : Genesis_constants.t)
