@@ -21,7 +21,7 @@ module type S = sig
     [%%versioned:
     module Stable : sig
       module V1 : sig
-        type _ t [@@deriving bin_io]
+        type _ t
       end
     end]
 
