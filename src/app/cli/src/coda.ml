@@ -223,7 +223,7 @@ let daemon logger =
        flag "generate-genesis-proof"
          ~doc:
            "true|false Generate a new genesis proof for the current \
-            configuration if none is found (default: true)"
+            configuration if none is found (default: false)"
          (optional bool)
      and disable_telemetry =
        flag "disable-telemetry" no_arg
@@ -383,7 +383,7 @@ let daemon logger =
                 level %s"
                (str proof_level) (str compiled) ()
        in
-       let may_generate = Option.value ~default:true may_generate in
+       let may_generate = Option.value ~default:false may_generate in
        let coda_initialization_deferred () =
          let%bind config_json =
            match config_file with
