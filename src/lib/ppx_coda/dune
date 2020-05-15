@@ -4,4 +4,4 @@
  (kind ppx_deriver)
  (libraries compiler-libs.common ppxlib ppx_deriving.api ppx_bin_prot core_kernel)
  (preprocessor_deps ../../config.mlh)
- (preprocess (pps ppxlib.metaquot ppx_optcomp)))
+ (preprocess (pps ppx_version ppxlib.metaquot ppx_optcomp)))
