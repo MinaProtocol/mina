@@ -271,7 +271,7 @@ module Ledger = struct
           | Named name -> (
             match Genesis_ledger.fetch_ledger name with
             | Some (module M) ->
-                Logger.error ~module_:__MODULE__ ~location:__LOC__ logger
+                Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
                   "Found genesis ledger with name $ledger_name"
                   ~metadata:[("ledger_name", `String name)] ;
                 return (Some M.accounts)
