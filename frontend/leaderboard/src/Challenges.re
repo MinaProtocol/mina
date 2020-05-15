@@ -155,7 +155,6 @@ let metricsMap = blocks => {
   let highestSnarkFeeCollected = blocks |> getHighestSnarkFeeCollected;
   let transactionsReceivedByEcho =
     calculateTransactionsSentToAddress(blocks, echoBotPublicKey);
-
   StringMap.mapi(
     (key, _) =>
       {
@@ -191,16 +190,4 @@ let applyTopNPoints = (n, pointsToGive, metricsMap, getMetricValue) => {
     StringMap.empty,
     topNArrayWithPoints,
   );
-};
-
-// Awards x points for nth place
-let applyPlacingPoints =
-    (placeToAward, pointsToGive, metricsMap, getMetricValue) => {
-  let metricsArray = Array.of_list(StringMap.bindings(metricsMap));
-  let f = ((_, metricValue1), (_, metricValue2)) => {
-    compare(getMetricValue(metricValue1), getMetricValue(metricValue2));
-  };
-  Array.sort(f, metricsArray);
-  let (winner, _) = metricsArray[placeToAward - 1];
-  StringMap.add(winner, pointsToGive, StringMap.empty);
 };
