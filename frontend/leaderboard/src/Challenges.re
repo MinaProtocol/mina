@@ -7,8 +7,7 @@ let addPointsToUsersWithAtleastN =
       switch (getMetricValue(metric)) {
       | Some(metricValue) =>
         metricValue >= threshold
-          ? StringMap.add(key, pointsToReward, map)
-          : StringMap.add(key, 0, map)
+          ? StringMap.add(key, pointsToReward, map) : map
       | None => map
       }
     },

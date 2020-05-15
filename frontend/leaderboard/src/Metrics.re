@@ -136,11 +136,7 @@ let calculateTransactionsSentToAddress = (blocks, address) => {
 };
 
 let throwAwayValues = metric => {
-  StringMap.fold(
-    (key, _, map) => {StringMap.add(key, Some(), map)},
-    metric,
-    StringMap.empty,
-  );
+  StringMap.map(_ => {()}, metric);
 };
 
 let calculateAllUsers = metrics => {
