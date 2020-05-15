@@ -22,9 +22,6 @@ let%test_module "Command line tests" =
      *)
     let coda_exe = "../../app/cli/src/coda.exe"
 
-    let runtime_genesis_ledger_exe =
-      "../../app/runtime_genesis_ledger/runtime_genesis_ledger.exe"
-
     let start_daemon config_dir genesis_ledger_dir port =
       let%bind working_dir = Sys.getcwd () in
       Core.printf "Starting daemon inside %s\n" working_dir ;
@@ -111,15 +108,10 @@ let%test_module "Command line tests" =
               Error.raise err )
 
     let%test "The coda daemon works in background mode" =
-      match
-        (Core.Sys.is_file coda_exe, Core.Sys.is_file runtime_genesis_ledger_exe)
-      with
-      | `Yes, `Yes ->
+      match Core.Sys.is_file coda_exe with
+      | `Yes ->
           Async.Thread_safe.block_on_async_exn test_background_daemon
       | _ ->
-          printf
-            !"Please build coda.exe and runtime_genesis_ledger.exe in order \
-              to run this test\n\
-              %!" ;
+          printf !"Please build coda.exe in order to run this test\n%!" ;
           false
   end )
