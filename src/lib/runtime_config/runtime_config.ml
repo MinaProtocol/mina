@@ -198,7 +198,8 @@ end
             , balance: "0.000000000"
             , delegate: "public_key" } ]
       , "hash": "root_hash"
-      , "num_accounts": 10 } }
+      , "num_accounts": 10
+      , "genesis_state_timestamp": "2000-00-00 12:00:00+0100" } }
 
   All fields are optional *except*:
   * each account in [ledger.accounts] must have a [balance] field
