@@ -70,17 +70,17 @@ module Schema = struct
     | Db_version ->
         [%bin_type_class: int]
     | Transition _ ->
-        [%bin_type_class: External_transition.Stable.V1.t]
+        [%bin_type_class: External_transition.Stable.Latest.t]
     | Arcs _ ->
-        [%bin_type_class: State_hash.Stable.V1.t list]
+        [%bin_type_class: State_hash.Stable.Latest.t list]
     | Root ->
-        [%bin_type_class: Root_data.Minimal.Stable.V1.t]
+        [%bin_type_class: Root_data.Minimal.Stable.Latest.t]
     | Best_tip ->
-        [%bin_type_class: State_hash.Stable.V1.t]
+        [%bin_type_class: State_hash.Stable.Latest.t]
     | Frontier_hash ->
-        [%bin_type_class: Frontier_hash.Stable.V1.t]
+        [%bin_type_class: Frontier_hash.Stable.Latest.t]
     | Protocol_states_for_root_scan_state ->
-        [%bin_type_class: Coda_state.Protocol_state.Value.Stable.V1.t list]
+        [%bin_type_class: Coda_state.Protocol_state.Value.Stable.Latest.t list]
 
   (* HACK: a simple way to derive Bin_prot.Type_class.t for each case of a GADT *)
   let gadt_input_type_class (type data a) :
@@ -115,12 +115,12 @@ module Schema = struct
           ~of_gadt:(fun Db_version -> "db_version")
     | Transition _ ->
         gadt_input_type_class
-          (module Keys.Prefixed_state_hash.Stable.V1)
+          (module Keys.Prefixed_state_hash.Stable.Latest)
           ~to_gadt:(fun (_, hash) -> Transition hash)
           ~of_gadt:(fun (Transition hash) -> ("transition", hash))
     | Arcs _ ->
         gadt_input_type_class
-          (module Keys.Prefixed_state_hash.Stable.V1)
+          (module Keys.Prefixed_state_hash.Stable.Latest)
           ~to_gadt:(fun (_, hash) -> Arcs hash)
           ~of_gadt:(fun (Arcs hash) -> ("arcs", hash))
     | Root ->
