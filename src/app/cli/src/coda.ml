@@ -443,6 +443,56 @@ let daemon logger =
                YJ.Util.(to_option Fn.id (YJ.Util.member "daemon" config_json))
            )
          in
+         let%bind daemon_config_file =
+           let configpath = conf_dir ^/ "daemon.json" in
+           match%map
+             Monitor.try_with_or_error ~extract_exn:true (fun () ->
+                 let%bind r = Reader.open_file configpath in
+                 Pipe.to_list (Reader.lines r)
+                 >>| fun ss -> String.concat ~sep:"\n" ss )
+           with
+           | Error e ->
+               Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+                 "No daemon.json found at $configpath: $error"
+                 ~metadata:
+                   [ ("error", `String (Error.to_string_mach e))
+                   ; ("configpath", `String configpath) ] ;
+               None
+           | Ok contents -> (
+             try
+               let json = YJ.from_string ~fname:"daemon.json" contents in
+               Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                 "Using daemon.json config found at $configpath"
+                 ~metadata:[("configpath", `String configpath)] ;
+               match json with
+               | `Assoc _ ->
+                   Some json
+               | _ ->
+                   Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+                     "Invalid JSON at $configpath: expected a JSON object"
+                     ~metadata:[("configpath", `String configpath)] ;
+                   None
+             with Yojson.Json_error e ->
+               Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+                 "Error parsing daemon.json at $configpath: $error"
+                 ~metadata:
+                   [("error", `String e); ("configpath", `String configpath)] ;
+               None )
+         in
+         let daemon_config =
+           match (daemon_config, daemon_config_file) with
+           | Some daemon_config, Some daemon_config_file ->
+               (* Both a configuration file and daemon.json are presesnt.
+                  We combine them to choose settings from both, giving priority
+                  to the values in the configuration file.
+               *)
+               (* TODO: Is there any value in having multiple config files? *)
+               Some (YJ.Util.combine daemon_config daemon_config_file)
+           | Some daemon_config, None | None, Some daemon_config ->
+               Some daemon_config
+           | None, None ->
+               None
+         in
          let maybe_from_config (type a) (f : YJ.json -> a option)
              (keyname : string) (actual_value : a option) : a option =
            let open Option.Let_syntax in
