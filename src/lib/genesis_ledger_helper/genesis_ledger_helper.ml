@@ -229,6 +229,10 @@ module Ledger = struct
       "Loading genesis ledger from $path"
       ~metadata:[("path", `String filename)] ;
     let dirname = Uuid.to_string (Uuid_unix.create ()) in
+    (* Unpack the ledger in the autogen directory, since we know that we have
+       write permissions there.
+    *)
+    let dirname = Cache_dir.autogen_path ^/ dirname in
     let%bind () = Unix.mkdir ~p:() dirname in
     let open Deferred.Or_error.Let_syntax in
     let%map () = Tar.extract ~root:dirname ~file:filename () in

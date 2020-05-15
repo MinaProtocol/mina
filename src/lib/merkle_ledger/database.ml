@@ -64,7 +64,10 @@ module Make (Inputs : Inputs_intf) :
     let directory =
       match directory_name with
       | None ->
-          Uuid.to_string uuid
+          (* Create in the autogen path, where we know we have write
+             permissions.
+          *)
+          Cache_dir.autogen_path ^/ Uuid.to_string uuid
       | Some name ->
           name
     in
