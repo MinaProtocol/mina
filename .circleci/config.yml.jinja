@@ -1,5 +1,24 @@
 # WARNING: config.yml file is generated from config.yml.jinja
 ---
+{% set opam_init_linux %}
+            - run:
+                  name: Update Submodules
+                  command: git submodule sync && git submodule update --init --recursive
+            - run:
+                name: Create opam cache signature file including a year/date stamp to ensure occasional rebuilds
+                command: |
+                    cat scripts/macos-setup-opam.sh > opam_ci_cache.sig
+                    cat src/opam.export >> opam_ci_cache.sig
+                    date +%Y-%m >> opam_ci_cache.sig
+            - restore_cache:
+                name: Restore cache - opam
+                keys:
+                    - opam-linux-v0-{{'{{'}} checksum "opam_ci_cache.sig" {{'}}'}}
+            - run:
+                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make macos-setup-compile
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make macos-setup-compile'
+{%endset%}
+
 version: 3
 jobs:
     tracetool:
@@ -62,12 +81,7 @@ jobs:
                 POSTGRES_DB: archiver
         steps:
             - checkout
-            - run:
-                  name: Update Submodules
-                  command: git submodule sync && git submodule update --init --recursive
-            - run:
-                  name: Update OPAM
-                  command: ./scripts/update-opam-in-docker.sh
+            {{ opam_init_linux }}
             - run:
                 name: Build libp2p_helper
                 command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
@@ -101,17 +115,18 @@ jobs:
                 HASURA_GRAPHQL_ENABLED_LOG_TYPES: startup, http-log, webhook-log, websocket-log, query-log
         steps:
             - checkout
-            - run:
-                  name: Update Submodules
-                  command: git submodule sync && git submodule update --init --recursive
-            - run:
-                  name: Update OPAM
-                  command: ./scripts/update-opam-in-docker.sh
+            {{ opam_init_linux }}
             - run:
                   name: Build Archive Process
                   command:  bash -c 'eval `opam config env` && LIBP2P_NIXLESS=1 make build_archive'
                   environment:
                     DUNE_PROFILE: testnet_postake_medium_curves
+            #- save_cache:
+            #    name: Save cache - opam
+            #    key: opam-linux-v0-{{'{{'}} checksum "opam_ci_cache.sig" {{'}}'}}
+            #    paths:
+            #        - "/home/opam/.opam"
+            #    no_output_timeout: 1h
             # NOTE: If we were using a machine executor we would be able to mount the sql file in
             # as a volume for the container to seed itself, this is the workaround.
             # Ideally this DB setup step would be handled by the archive process itself.
@@ -132,9 +147,7 @@ jobs:
             - image: codaprotocol/coda:toolchain-eb73e64d524c906384e9dbb23e9d0b8ae2be9e9e
         steps:
             - checkout
-            - run:
-                  name: Update OPAM
-                  command: ./scripts/update-opam-in-docker.sh
+            {{ opam_init_linux }}
             - run:
                   name: Check circle CI configuration rendering
                   command: ./scripts/test.py render --check .circleci/config.yml.jinja .mergify.yml.jinja
@@ -164,12 +177,7 @@ jobs:
             - run:
                 name: Show USER
                 command: echo $USER
-            - run:
-                  name: Update Submodules
-                  command: git submodule sync && git submodule update --init --recursive
-            - run:
-                  name: Update OPAM
-                  command: ./scripts/update-opam-in-docker.sh
+            {{ opam_init_linux }}
             - run:
                   name: Compare versioned types in PR
                   command: ./scripts/compare_ci_diff_types.sh
@@ -181,12 +189,7 @@ jobs:
             - image: codaprotocol/coda:toolchain-eb73e64d524c906384e9dbb23e9d0b8ae2be9e9e
         steps:
             - checkout
-            - run:
-                  name: Update Submodules
-                  command: git submodule sync && git submodule update --init --recursive
-            - run:
-                  name: Update OPAM
-                  command: ./scripts/update-opam-in-docker.sh
+            {{ opam_init_linux }}
             - run:
                   name: Compare test signatures for consensus, nonconsensus code
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'eval `opam config env` && ./scripts/compare_test_signatures.sh'
@@ -350,12 +353,7 @@ jobs:
                   name: Artifacts Path
                   command: |
                       mkdir -p /tmp/artifacts
-            - run:
-                  name: Update OPAM
-                  command: ./scripts/update-opam-in-docker.sh
-            - run:
-                  name: Pin external packages
-                  command: ./scripts/pin-external-packages.sh
+            {{ opam_init_linux }}
             - run:
                   name: Build client SDK for Javascript
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; eval `opam config env` && LIBP2P_NIXLESS=1 make client_sdk 2>&1 | tee /tmp/artifacts/buildclientsdk.log'
@@ -374,12 +372,7 @@ jobs:
                   name: Artifacts Path
                   command: |
                       mkdir -p /tmp/artifacts
-            - run:
-                  name: Update OPAM
-                  command: ./scripts/update-opam-in-docker.sh
-            - run:
-                  name: Pin external packages
-                  command: ./scripts/pin-external-packages.sh
+            {{ opam_init_linux }}
             - run:
                 name: Build libp2p_helper
                 command: GO=/usr/lib/go/bin/go LIBP2P_NIXLESS=1 make libp2p_helper
@@ -473,9 +466,7 @@ jobs:
         steps:
             - checkout
             - run: ulimit -c unlimited
-            - run:
-                  name: Update OPAM
-                  command: ./scripts/update-opam-in-docker.sh
+            {{ opam_init_linux }}
             - run:
                 name: Build libp2p_helper
                 command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
@@ -499,9 +490,7 @@ jobs:
         steps:
             - checkout
             - run: ulimit -c unlimited
-            - run:
-                  name: Update OPAM
-                  command: ./scripts/update-opam-in-docker.sh
+            {{ opam_init_linux }}
             - run:
                 name: Build libp2p_helper
                 command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
@@ -524,9 +513,7 @@ jobs:
         steps:
             - checkout
             - run: ulimit -c unlimited
-            - run:
-                  name: Update OPAM
-                  command: ./scripts/update-opam-in-docker.sh
+            {{ opam_init_linux }}
             - run:
                 name: Build libp2p_helper
                 command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
@@ -549,9 +536,7 @@ jobs:
             - image: codaprotocol/coda:toolchain-eb73e64d524c906384e9dbb23e9d0b8ae2be9e9e
         steps:
             - checkout
-            - run:
-                  name: Update OPAM
-                  command: ./scripts/update-opam-in-docker.sh
+            {{ opam_init_linux }}
             - run:
                 name: Build libp2p_helper
                 command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
@@ -571,9 +556,7 @@ jobs:
             - image: codaprotocol/coda:toolchain-eb73e64d524c906384e9dbb23e9d0b8ae2be9e9e
         steps:
             - checkout
-            - run:
-                  name: Update OPAM
-                  command: ./scripts/update-opam-in-docker.sh
+            {{ opam_init_linux }}
             - run:
                 name: Build libp2p_helper
                 command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
