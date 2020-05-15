@@ -146,11 +146,11 @@ module Spec = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type 'f t = {a: 'f; b: 'f} [@@deriving fields, bin_io, version]
+      type 'f t = {a: 'f; b: 'f} [@@deriving fields]
     end
   end]
 
-  include Stable.Latest
+  type 'f t = 'f Stable.Latest.t = {a: 'f; b: 'f} [@@deriving fields]
 end
 
 module Params = struct
