@@ -115,7 +115,8 @@ module Accounts = struct
 end
 
 module Ledger = struct
-  let hash_filename hash = "genesis_ledger_" ^ hash ^ ".tar.gz"
+  let hash_filename hash =
+    "genesis_ledger_" ^ Blake2.to_hex (Blake2.digest_string hash) ^ ".tar.gz"
 
   let named_filename
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
@@ -379,7 +380,11 @@ module Ledger = struct
 end
 
 module Genesis_proof = struct
-  let filename ~base_hash = "genesis_proof_" ^ Ledger_hash.to_string base_hash
+  let filename ~base_hash =
+    let hash =
+      Ledger_hash.to_string base_hash |> Blake2.digest_string |> Blake2.to_hex
+    in
+    "genesis_proof_" ^ hash
 
   let find_file ~logger ~base_hash =
     let search_paths =
