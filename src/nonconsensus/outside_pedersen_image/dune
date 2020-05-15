@@ -3,7 +3,7 @@
   (public_name outside_pedersen_image_nonconsensus)
   (libraries snark_params_nonconsensus)
   (preprocess
-    (pps ppx_coda ppx_optcomp ppxlib.metaquot)))
+    (pps ppx_version ppx_optcomp ppxlib.metaquot)))
 
 (rule
   (targets outside_pedersen_image.ml)

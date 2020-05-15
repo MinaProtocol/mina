@@ -10,8 +10,8 @@ fi
 git clean -dfx
 rm -rf base
 
-# build run_ppx_coda, then run Python script to compare versioned types in a pull request
+# build print_versioned_types, then run Python script to compare versioned types in a pull request
 
 source ~/.profile && \
-    (dune build --profile=print_versioned_types src/lib/ppx_coda/run_ppx_coda.exe) && \
+    (dune build --profile=dev src/lib/ppx_coda/print_versioned_types.exe) && \
     ./scripts/compare_pr_diff_types.py ${CIRCLE_PULL_REQUEST}

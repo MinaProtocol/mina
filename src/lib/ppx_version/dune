@@ -1,0 +1,17 @@
+(library
+ (name ppx_version)
+ (public_name ppx_version)
+ (kind ppx_deriver)
+ (modules (:standard \ print_versioned_types print_binable_functors))
+ (libraries compiler-libs.common ppxlib ppx_deriving.api ppx_bin_prot core_kernel)
+ (preprocess (pps ppxlib.metaquot)))
+
+(executable
+ (name print_versioned_types)
+ (modules print_versioned_types)
+ (libraries ppx_version))
+
+(executable
+ (name print_binable_functors)
+ (modules print_binable_functors)
+ (libraries ppx_version))

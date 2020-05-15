@@ -8,45 +8,45 @@
 ;; expiration
 (library
   (name unexpired)
-  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
+  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_version))
   (modules unexpired))
 
 ;; version syntax
 (library
   (name good_version_syntax)
-  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
+  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_version))
   (libraries core_kernel)
   (modules good_version_syntax))
 
 ;; versioning
 (library
   (name versioned_good)
-  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
+  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_version))
   (libraries core_kernel)
   (modules versioned_good))
 
 ;; define locally
 (library
   (name define_locally_good)
-  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
+  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_version))
   (modules define_locally_good))
 
 ;; define from scope
 (library
   (name define_from_scope_good)
-  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
+  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_version))
   (modules define_from_scope_good))
 
 ;; module versioning
 (executable
   (name versioned_module_good)
-  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
+  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_version))
   (libraries core_kernel)
   (modules versioned_module_good))
 
 (executable
   (name versioned_sig_good)
-  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
+  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_version))
   (libraries core_kernel)
   (modules versioned_sig_good))
 
@@ -55,58 +55,58 @@
 ;; expiration
 (library
   (name expired)
-  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
+  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_version))
   (modules expired))
 
 (library
   (name expiry_in_module)
-  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
+  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_version))
   (modules expiry_in_module))
 
 (library
   (name expiry_invalid_date)
-  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
+  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_version))
   (modules expiry_invalid_date))
 
 (library
   (name expiry_invalid_format)
-  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
+  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_version))
   (modules expiry_invalid_format))
 
 ;; version syntax
 
 (library
   (name bad_version_syntax_missing_version)
-  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
+  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_version))
   (libraries core_kernel)
   (modules bad_version_syntax_missing_version))
 
 (library
   (name bad_version_syntax_bin_io_in_functor)
-  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
+  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_version))
   (libraries core_kernel)
   (modules bad_version_syntax_bin_io_in_functor))
 
 (library
   (name bad_version_syntax_version_in_functor)
-  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
+  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_version))
   (libraries core_kernel)
   (modules bad_version_syntax_version_in_functor))
 
 (library
   (name bad_version_syntax_versioned_in_functor)
-  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
+  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_version))
   (modules bad_version_syntax_versioned_in_functor))
 
 (library
   (name bad_version_syntax_bin_io_in_nested_functor)
-  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
+  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_version))
   (libraries core_kernel)
   (modules bad_version_syntax_bin_io_in_nested_functor))
 
 (library
   (name bad_version_syntax_multiple_errors)
-  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
+  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_version))
   (libraries core_kernel)
   (modules bad_version_syntax_multiple_errors))
 
@@ -114,92 +114,92 @@
 
 (library
  (name versioned_bad_module_structure)
- (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
+ (preprocess (pps ppx_jane ppx_deriving_yojson ppx_version))
  (modules versioned_bad_module_structure))
 
 (library
   (name versioned_bad_unnumbered)
-  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
+  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_version))
   (libraries core_kernel)
   (modules versioned_bad_unnumbered))
 
 (library
  (name versioned_bad_wrapped_module_structure)
- (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
+ (preprocess (pps ppx_jane ppx_deriving_yojson ppx_version))
  (modules versioned_bad_wrapped_module_structure))
 
 (library
  (name versioned_bad_module_name)
- (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
+ (preprocess (pps ppx_jane ppx_deriving_yojson ppx_version))
  (modules versioned_bad_module_name))
 
 (library
  (name versioned_bad_version_name)
- (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
+ (preprocess (pps ppx_jane ppx_deriving_yojson ppx_version))
  (modules versioned_bad_version_name))
 
 (library
   (name versioned_bad_type_name)
-  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
+  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_version))
   (modules versioned_bad_type_name))
 
 (library
   (name versioned_bad_option)
-  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
+  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_version))
   (libraries core_kernel)
   (modules versioned_bad_option))
 
 (library
   (name versioned_bad_contained_types)
-  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
+  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_version))
   (libraries core_kernel)
   (modules versioned_bad_contained_types))
 
 (library
   (name versioned_bad_type_parameters)
-  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
+  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_version))
   (libraries core_kernel)
   (modules versioned_bad_type_parameters))
 
 (library
   (name versioned_bad_gadt)
-  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
+  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_version))
   (libraries core_kernel)
   (modules versioned_bad_gadt))
 
 (library
   (name versioned_bad_gadt_results)
-  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
+  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_version))
   (libraries core_kernel)
   (modules versioned_bad_gadt_results))
 
 ;; module versioning
 (library
   (name versioned_module_bad_stable_name)
-  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
+  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_version))
   (libraries core_kernel)
   (modules versioned_module_bad_stable_name))
 
 (library
   (name versioned_module_bad_version_name)
-  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
+  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_version))
   (libraries core_kernel)
   (modules versioned_module_bad_version_name))
 
 (library
   (name versioned_module_bad_missing_type)
-  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
+  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_version))
   (libraries core_kernel)
   (modules versioned_module_bad_missing_type))
 
 (library
   (name versioned_module_bad_version_order)
-  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
+  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_version))
   (libraries core_kernel)
   (modules versioned_module_bad_version_order))
 
 (library
   (name versioned_module_bad_missing_to_latest)
-  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
+  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_version))
   (libraries core_kernel)
   (modules versioned_module_bad_missing_to_latest))
