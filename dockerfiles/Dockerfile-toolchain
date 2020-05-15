@@ -75,6 +75,10 @@ RUN cd /rocksdb && sudo make static_lib PORTABLE=1 -j$(nproc) && sudo cp librock
 
 RUN sudo git clone https://github.com/CodaProtocol/coda $CODA_DIR
 
+# OPAM dependencies
+RUN git -C /home/opam/opam-repository pull
+RUN opam update -y && opam upgrade -y
+
 #
 ## use HTTPS git clone for submodules
 #RUN cd $CODA_DIR && sudo sed --in-place s+git@github.com:+https://github.com/+g .gitmodules
@@ -93,9 +97,6 @@ RUN sudo git clone https://github.com/CodaProtocol/coda $CODA_DIR
 #      cd $CODA_DIR && sudo bash -c "git log --format=oneline -n 1 src/external/$pkg | awk '{print \$1}' > ~opam/opam-repository/$pkg.commit" ; \
 #    done
 #
-## OPAM dependencies
-#RUN git -C /home/opam/opam-repository pull
-#RUN opam update -y && opam upgrade -y
 #
 ## install vanilla OCaml compiler
 #RUN opam switch create $OCAML_VERSION
