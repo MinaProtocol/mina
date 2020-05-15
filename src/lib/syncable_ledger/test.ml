@@ -6,9 +6,9 @@ open Network_peer
 module type Ledger_intf = sig
   include Merkle_ledger.Syncable_intf.S
 
-  type key
+  type account_id
 
-  val load_ledger : int -> int -> t * key list
+  val load_ledger : int -> int -> t * account_id list
 end
 
 module type Input_intf = sig
@@ -21,7 +21,7 @@ module type Input_intf = sig
   module Ledger :
     Ledger_intf
     with type root_hash := Root_hash.t
-     and type key := Merkle_ledger_tests.Test_stubs.Key.t
+     and type account_id := Merkle_ledger_tests.Test_stubs.Account_id.t
 
   module Sync_ledger :
     Syncable_ledger.S
@@ -187,10 +187,32 @@ module Db = struct
       let to_hash = Fn.id
     end
 
+    module Location = Merkle_ledger.Location.Make (Depth)
+
+    module Location_binable = struct
+      module Arg = struct
+        type t = Location.t =
+          | Generic of Merkle_ledger.Location.Bigstring.Stable.Latest.t
+          | Account of Location.Addr.Stable.Latest.t
+          | Hash of Location.Addr.Stable.Latest.t
+        [@@deriving bin_io_unversioned, hash, sexp, compare]
+      end
+
+      type t = Arg.t =
+        | Generic of Merkle_ledger.Location.Bigstring.t
+        | Account of Location.Addr.t
+        | Hash of Location.Addr.t
+      [@@deriving hash, sexp, compare]
+
+      include Hashable.Make_binable (Arg) [@@deriving
+                                            sexp, compare, hash, yojson]
+    end
+
     module Base_ledger_inputs = struct
       include Base_ledger_inputs
       module Depth = Depth
-      module Location = Merkle_ledger.Location.Make (Depth)
+      module Location = Location
+      module Location_binable = Location_binable
       module Kvdb = In_memory_kvdb
     end
 
@@ -204,13 +226,13 @@ module Db = struct
       type addr = Addr.t
 
       let load_ledger num_accounts (balance : int) =
-        let ledger = create () in
-        let keys = Key.gen_keys num_accounts in
+        let ledger = create ~depth:Base_ledger_inputs.Depth.depth () in
+        let account_ids = Account_id.gen_accounts num_accounts in
         let currency_balance = Currency.Balance.of_int balance in
-        List.iter keys ~f:(fun key ->
-            let account = Account.create key currency_balance in
-            get_or_create_account_exn ledger key account |> ignore ) ;
-        (ledger, keys)
+        List.iter account_ids ~f:(fun aid ->
+            let account = Account.create aid currency_balance in
+            get_or_create_account_exn ledger aid account |> ignore ) ;
+        (ledger, account_ids)
     end
 
     module Syncable_ledger_inputs = struct
@@ -300,22 +322,22 @@ module Mask = struct
          `balance`. For all of the accounts of a mask at layer n with balance
          `b`, all of the accounts at layer n + 1 will have a balance of `2 * b` *)
       let load_ledger num_accounts (balance : int) : t * 'a =
-        let db = Base_db.create () in
+        let db = Base_db.create ~depth:Input.depth () in
         let maskable = Any_base.cast (module Base_db) db in
-        let keys = Key.gen_keys num_accounts in
+        let account_ids = Account_id.gen_accounts num_accounts in
         let initial_balance_multiplier =
           Int.pow 2 Input.mask_layers * balance
         in
-        List.iter keys ~f:(fun key ->
+        List.iter account_ids ~f:(fun account_id ->
             let account =
-              Account.create key
+              Account.create account_id
                 (Currency.Balance.of_int (initial_balance_multiplier * 2))
             in
             let action, _ =
-              Maskable.get_or_create_account_exn maskable key account
+              Maskable.get_or_create_account_exn maskable account_id account
             in
             assert (action = `Added) ) ;
-        let mask = Mask.create () in
+        let mask = Mask.create ~depth:Input.depth () in
         let attached_mask = Maskable.register_mask maskable mask in
         (* On the mask, all the children will have different values *)
         let rec construct_layered_masks iter child_balance parent_mask =
@@ -326,17 +348,18 @@ module Mask = struct
             let parent_base =
               Any_base.cast (module Mask.Attached) parent_mask
             in
-            let child_mask = Mask.create () in
+            let child_mask = Mask.create ~depth:Input.depth () in
             let attached_mask =
               Maskable.register_mask parent_base child_mask
             in
-            List.iter keys ~f:(fun key ->
+            List.iter account_ids ~f:(fun account_id ->
                 let account =
-                  Account.create key (Currency.Balance.of_int child_balance)
+                  Account.create account_id
+                    (Currency.Balance.of_int child_balance)
                 in
                 let action, location =
-                  Mask.Attached.get_or_create_account_exn attached_mask key
-                    account
+                  Mask.Attached.get_or_create_account_exn attached_mask
+                    account_id account
                 in
                 match action with
                 | `Existed ->
@@ -348,7 +371,7 @@ module Mask = struct
         in
         ( construct_layered_masks Input.mask_layers initial_balance_multiplier
             attached_mask
-        , keys )
+        , account_ids )
 
       type addr = Addr.t
 

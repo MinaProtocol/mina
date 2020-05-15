@@ -149,6 +149,7 @@ let make = (~prevStep, ~closeOnboarding) => {
         <div className=OnboardingTemplate.Styles.buttonRow>
           <Button
             style=Button.HyperlinkBlue2
+            width=9.
             label="Go Back"
             onClick={_ => prevStep()}
           />
@@ -156,6 +157,7 @@ let make = (~prevStep, ~closeOnboarding) => {
           <Button
             label="Take me to My Account"
             style=Button.HyperlinkBlue3
+            width=15.
             onClick={_ => closeOnboarding()}
           />
         </div>

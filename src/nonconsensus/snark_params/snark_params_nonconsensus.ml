@@ -80,9 +80,8 @@ module Inner_curve = struct
   module Scalar = struct
     (* though we have bin_io, not versioned here; this type exists for Private_key.t,
        where it is versioned-asserted and its serialization tested
-       we make linter error a warning
      *)
-    type t = Mnt4.Fq.t [@@deriving bin_io, sexp]
+    type t = Mnt4.Fq.t [@@deriving bin_io_unversioned, sexp]
 
     type _unused = unit constraint t = Tock.Field.t
 
@@ -116,11 +115,18 @@ module Inner_curve = struct
       , ( + )
       , ( - )
       , ( * )
-      , gen
-      , gen_uniform
       , gen_uniform_incl
       , negate
       , hash_fold_t )]
+
+    (* Mnt4.Fq.gen uses the interval starting at zero
+       here we follow the gen in Snark_params.Make_inner_curve_scalar, using
+         an interval starting at one
+    *)
+
+    let gen = Mnt4.Fq.(gen_incl one (size - one))
+
+    let gen_uniform = gen_uniform_incl one (size - one)
 
     let of_bits bits = Tock.Field.project bits
   end

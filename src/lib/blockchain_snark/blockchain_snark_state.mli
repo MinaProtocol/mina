@@ -6,6 +6,8 @@ module type Update_intf = sig
   module Checked : sig
     val update :
          logger:Logger.t
+      -> proof_level:Genesis_constants.Proof_level.t
+      -> constraint_constants:Genesis_constants.Constraint_constants.t
       -> State_hash.var * State_body_hash.var * Protocol_state.var
       -> Snark_transition.var
       -> ( State_hash.var * Protocol_state.var * [`Success of Boolean.var]

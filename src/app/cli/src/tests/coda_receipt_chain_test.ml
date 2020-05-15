@@ -13,6 +13,11 @@ let restart_node worker ~config ~logger =
   Coda_process.spawn_exn config
 
 let main () =
+  let consensus_constants =
+    Consensus.Constants.create
+      ~constraint_constants:Genesis_constants.Constraint_constants.compiled
+      ~protocol_constants:Genesis_constants.compiled.protocol
+  in
   let open Keypair in
   let logger = Logger.create () in
   let largest_account_keypair =
@@ -24,11 +29,14 @@ let main () =
     |> Test_genesis_ledger.keypair_of_account_record_exn
   in
   let block_production_interval =
-    Consensus.Constants.block_window_duration_ms
+    consensus_constants.block_window_duration_ms |> Block_time.Span.to_ms
+    |> Int64.to_int_exn
   in
   let acceptable_delay =
     Time.Span.of_ms
-      (block_production_interval * Consensus.Constants.delta |> Float.of_int)
+      ( block_production_interval
+        * Unsigned.UInt32.to_int consensus_constants.delta
+      |> Float.of_int )
   in
   let n = 2 in
   let receiver_pk = Public_key.compress another_account_keypair.public_key in
@@ -54,7 +62,7 @@ let main () =
     Coda_process.send_user_command_exn worker sender_sk receiver_pk send_amount
       fee User_command_memo.dummy
   in
-  let receipt_chain_hash = Or_error.ok_exn receipt_chain_hash in
+  let _user_cmd, receipt_chain_hash = Or_error.ok_exn receipt_chain_hash in
   let%bind restarted_worker = restart_node ~config worker ~logger in
   let%bind (initial_receipt, _) : Receipt.Chain_hash.t * User_command.t list =
     Coda_process.prove_receipt_exn restarted_worker receipt_chain_hash

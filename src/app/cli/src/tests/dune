@@ -6,12 +6,12 @@
     async core
     ; libs
     coda_base coda_graphql coda_lib coda_state coda_net2
-    coda_transition coda_version parallel node_addrs_and_ports
-    transition_frontier
+    coda_transition coda_version parallel protocol_version
+    node_addrs_and_ports transition_frontier
     ; internal deps
     init)
   (preprocessor_deps ../../../../config.mlh)
   (preprocess (pps
-    ppx_coda -lint-version-syntax-warnings
+    ppx_coda
     ppx_optcomp ppx_bin_prot ppx_let
     ppx_custom_printf)))

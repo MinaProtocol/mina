@@ -58,7 +58,7 @@ module Ft = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = Fee_transfer.Single.Stable.V1.t [@@deriving sexp, to_yojson]
+      type t = Coinbase.Fee_transfer.Stable.V1.t [@@deriving sexp, to_yojson]
 
       let to_latest = Fn.id
     end

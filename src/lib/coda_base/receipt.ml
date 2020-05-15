@@ -4,6 +4,7 @@
 "/src/config.mlh"]
 
 open Core_kernel
+module B58_lib = Base58_check
 
 [%%ifdef
 consensus_mechanism]
@@ -18,27 +19,34 @@ module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 [%%endif]
 
 module Chain_hash = struct
-  include Data_hash.Make_full_size ()
-
-  module Base58_check = Base58_check.Make (struct
+  include Data_hash.Make_full_size (struct
     let description = "Receipt chain hash"
 
     let version_byte = Base58_check.Version_bytes.receipt_chain_hash
   end)
 
-  let to_string t =
-    Binable.to_string (module Stable.Latest) t |> Base58_check.encode
+  (* Data hash versioned boilerplate below *)
 
-  let of_string s =
-    Base58_check.decode_exn s |> Binable.of_string (module Stable.Latest)
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type t = Field.t [@@deriving sexp, compare, hash, version {asserted}]
+      end
 
-  include Codable.Make_of_string (struct
-    type nonrec t = t
+      include T
 
-    let to_string = to_string
+      let to_latest = Fn.id
 
-    let of_string = of_string
-  end)
+      [%%define_from_scope
+      to_yojson, of_yojson]
+
+      include Comparable.Make (T)
+      include Hashable.Make_binable (T)
+    end
+  end]
+
+  type _unused = unit constraint t = Stable.Latest.t
 
   let empty = of_hash Random_oracle.(salt "CodaReceiptEmpty" |> digest)
 
@@ -97,7 +105,8 @@ module Chain_hash = struct
 
   let%test_unit "json" =
     Quickcheck.test ~trials:20 gen ~sexp_of:sexp_of_t ~f:(fun t ->
-        assert (For_tests.check_encoding ~equal t) )
+        assert (Codable.For_tests.check_encoding (module Stable.V1) ~equal t)
+    )
 
   [%%endif]
 end

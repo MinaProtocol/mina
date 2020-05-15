@@ -64,7 +64,7 @@ end
 module Processor : sig
   type t
 
-  val raw : unit -> t
+  val raw : ?log_level:Level.t -> unit -> t
 
   val pretty : log_level:Level.t -> config:Logproc_lib.Interpolator.config -> t
 end
@@ -144,3 +144,5 @@ val faulty_peer : _ log_function [@@deprecated "use Trust_system.record"]
 val faulty_peer_without_punishment : _ log_function
 
 val fatal : _ log_function
+
+val append_to_global_metadata : (string * Yojson.Safe.json) list -> unit

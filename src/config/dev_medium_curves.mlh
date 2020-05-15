@@ -7,6 +7,8 @@
 [%%import "/src/config/proof_level/check.mlh"]
 [%%import "/src/config/txpool_size.mlh"]
 [%%import "/src/config/account_creation_fee/high.mlh"]
+[%%import "/src/config/amount_defaults/standard.mlh"]
+[%%import "/src/config/protocol_version/current.mlh"]
 
 [%%define time_offsets false]
 [%%define fake_hash false]
@@ -24,4 +26,3 @@
 
 [%%define daemon_expiry "never"]
 [%%define test_full_epoch false]
-
