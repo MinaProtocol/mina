@@ -130,6 +130,13 @@ module Ledger = struct
     ^ Blake2.(to_hex (digest_string str))
     ^ ".tar.gz"
 
+  let accounts_name accounts =
+    let hash =
+      Runtime_config.Accounts.to_yojson accounts
+      |> Yojson.Safe.to_string |> Blake2.digest_string
+    in
+    "accounts_" ^ Blake2.to_hex hash
+
   let find_tar ~logger ~constraint_constants (config : Runtime_config.Ledger.t)
       =
     let search_paths =
@@ -185,8 +192,12 @@ module Ledger = struct
       | Hash hash ->
           assert (Some hash = config.hash) ;
           return None
-      | Accounts _accounts ->
-          return None
+      | Accounts accounts ->
+          let named_filename =
+            named_filename ~constraint_constants
+              ~num_accounts:config.num_accounts (accounts_name accounts)
+          in
+          Deferred.List.find_map ~f:(file_exists named_filename) search_paths
       | Named name ->
           let named_filename =
             named_filename ~constraint_constants
@@ -327,8 +338,17 @@ module Ledger = struct
                   hash= Some (State_hash.to_string @@ Ledger.merkle_root ledger)
                 }
               in
-              match (tar_path, config.base) with
-              | Ok tar_path, Named name ->
+              let name =
+                match config.base with
+                | Named name ->
+                    Some name
+                | Accounts accounts ->
+                    Some (accounts_name accounts)
+                | Hash _ ->
+                    None
+              in
+              match (tar_path, name) with
+              | Ok tar_path, Some name ->
                   let link_name =
                     genesis_dir
                     ^/ named_filename ~constraint_constants
@@ -342,7 +362,7 @@ module Ledger = struct
                       [ ("tar_path", `String tar_path)
                       ; ("named_tar_path", `String link_name) ] ;
                   Ok (packed, config, link_name)
-              | Ok tar_path, _ ->
+              | Ok tar_path, None ->
                   return (Ok (packed, config, tar_path))
               | Error err, _ ->
                   let root_hash =
