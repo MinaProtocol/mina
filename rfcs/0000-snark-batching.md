@@ -1,7 +1,7 @@
 ## Summary
 [summary]: #summary
 
-Complect the SNARK pool so that it can do "batch verification" - verification of several proofs at once.
+Complicate the SNARK pool so that it can do "batch verification" - verification of several proofs at once.
 
 ## Motivation
 [motivation]: #motivation
