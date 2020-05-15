@@ -2797,13 +2797,9 @@
               "description": "Account to which the coinbase for this block was granted",
               "args": [],
               "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "Account",
-                  "ofType": null
-                }
+                "kind": "OBJECT",
+                "name": "Account",
+                "ofType": null
               },
               "isDeprecated": false,
               "deprecationReason": null

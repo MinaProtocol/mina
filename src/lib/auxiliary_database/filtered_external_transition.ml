@@ -11,7 +11,7 @@ module Transactions = struct
         { user_commands: User_command.Stable.V1.t list
         ; fee_transfers: Fee_transfer.Single.Stable.V1.t list
         ; coinbase: Currency.Amount.Stable.V1.t
-        ; coinbase_receiver: Public_key.Compressed.Stable.V1.t }
+        ; coinbase_receiver: Public_key.Compressed.Stable.V1.t option }
 
       let to_latest = Fn.id
     end
@@ -21,7 +21,7 @@ module Transactions = struct
     { user_commands: User_command.t list
     ; fee_transfers: Fee_transfer.Single.t list
     ; coinbase: Currency.Amount.t
-    ; coinbase_receiver: Public_key.Compressed.t }
+    ; coinbase_receiver: Public_key.Compressed.t option }
 end
 
 module Protocol_state = struct
@@ -119,8 +119,7 @@ let of_transition external_transition tracked_participants
         { Transactions.user_commands= []
         ; fee_transfers= []
         ; coinbase= Currency.Amount.zero
-        ; coinbase_receiver= Public_key.Compressed.empty }
-      ~f:(fun acc_transactions -> function
+        ; coinbase_receiver= None } ~f:(fun acc_transactions -> function
       | User_command checked_user_command -> (
           let user_command = User_command.forget_check checked_user_command in
           let should_include_transaction user_command participants =
@@ -164,7 +163,7 @@ let of_transition external_transition tracked_participants
           in
           { acc_transactions with
             fee_transfers
-          ; coinbase_receiver= receiver
+          ; coinbase_receiver= Some receiver
           ; coinbase=
               Currency.Amount.(
                 Option.value_exn (add amount acc_transactions.coinbase)) } )
