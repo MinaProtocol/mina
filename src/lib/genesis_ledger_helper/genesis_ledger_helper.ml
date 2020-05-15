@@ -205,7 +205,7 @@ module Ledger = struct
           in
           Deferred.List.find_map ~f:(file_exists named_filename) search_paths )
 
-  let load_from_tar ~logger
+  let load_from_tar ?(genesis_dir = Cache_dir.autogen_path) ~logger
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ?accounts filename =
     Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
@@ -215,7 +215,7 @@ module Ledger = struct
     (* Unpack the ledger in the autogen directory, since we know that we have
        write permissions there.
     *)
-    let dirname = Cache_dir.autogen_path ^/ dirname in
+    let dirname = genesis_dir ^/ dirname in
     let%bind () = Unix.mkdir ~p:() dirname in
     let open Deferred.Or_error.Let_syntax in
     let%map () = Tar.extract ~root:dirname ~file:filename () in
@@ -295,7 +295,8 @@ module Ledger = struct
         match tar_path with
         | Some tar_path -> (
             match%map
-              load_from_tar ~logger ~constraint_constants ?accounts tar_path
+              load_from_tar ~genesis_dir ~logger ~constraint_constants
+                ?accounts tar_path
             with
             | Ok ledger ->
                 Ok (ledger, config, tar_path)
