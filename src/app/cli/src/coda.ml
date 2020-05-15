@@ -87,6 +87,12 @@ let daemon logger =
             producing blocks). If not provided, coinbase rewards will be sent \
             to the producer of a block."
          (optional public_key_compressed)
+     and genesis_dir =
+       flag "genesis-ledger-dir"
+         ~doc:
+           "DIR Directory that contains the genesis ledger and the genesis \
+            blockchain proof (default: <config-dir>/genesis-ledger)"
+         (optional string)
      and run_snark_worker_flag =
        flag "run-snark-worker"
          ~doc:"PUBLICKEY Run the SNARK worker with this public key"
@@ -424,8 +430,8 @@ let daemon logger =
          in
          let%bind precomputed_values =
            match%map
-             Genesis_ledger_helper.init_from_config_file ~logger ~may_generate
-               ~constraint_constants ~proof_level
+             Genesis_ledger_helper.init_from_config_file ?genesis_dir ~logger
+               ~may_generate ~constraint_constants ~proof_level
                ~genesis_constants:Genesis_constants.compiled config
            with
            | Ok (precomputed_values, _) ->
