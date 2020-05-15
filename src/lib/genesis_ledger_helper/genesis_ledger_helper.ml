@@ -263,19 +263,37 @@ module Ledger = struct
       (config : Runtime_config.Ledger.t) =
     Monitor.try_with_join_or_error (fun () ->
         let open Deferred.Or_error.Let_syntax in
+        let genesis_winner_account () =
+          let pk, _ = Coda_state.Consensus_state_hooks.genesis_winner in
+          Format.eprintf
+            !"Creating genesis winner account for pk %{sexp: \
+              Public_key.Compressed.t}@."
+            pk ;
+          ( None
+          , Account.create
+              (Account_id.create pk Token_id.default)
+              (Currency.Balance.of_int 1000) )
+        in
         let%bind accounts =
           match config.base with
           | Hash _ ->
               return None
           | Accounts accounts ->
-              return (Some (lazy (Accounts.to_full accounts)))
+              return
+                (Some
+                   ( lazy
+                     (genesis_winner_account () :: Accounts.to_full accounts)
+                     ))
           | Named name -> (
             match Genesis_ledger.fetch_ledger name with
             | Some (module M) ->
                 Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
                   "Found genesis ledger with name $ledger_name"
                   ~metadata:[("ledger_name", `String name)] ;
-                return (Some M.accounts)
+                return
+                  (Some
+                     (Lazy.map M.accounts ~f:(fun accounts ->
+                          genesis_winner_account () :: accounts )))
             | None ->
                 Logger.error ~module_:__MODULE__ ~location:__LOC__ logger
                   "Could not find a genesis ledger named $ledger_name"
