@@ -185,36 +185,8 @@ module Ledger = struct
       | Hash hash ->
           assert (Some hash = config.hash) ;
           return None
-      | Accounts (_accounts, None) ->
+      | Accounts _accounts ->
           return None
-      | Accounts (_accounts, Some {name; newer_than}) ->
-          let newer_than =
-            Genesis_constants.validate_time (Some newer_than)
-            |> Result.map_error ~f:(fun str ->
-                   Error.of_string ("Could not parse 'newer_than': " ^ str) )
-            |> Or_error.ok_exn
-          in
-          let named_filename =
-            named_filename ~constraint_constants
-              ~num_accounts:config.num_accounts ("custom_" ^ name)
-          in
-          Deferred.List.find_map search_paths ~f:(fun path ->
-              match%bind file_exists named_filename path with
-              | None ->
-                  return None
-              | Some filename ->
-                  let%map {mtime; _} = Unix.stat filename in
-                  if Time.(mtime >= newer_than) then Some filename
-                  else (
-                    Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
-                      "Not using ledger file $path, because it was modified \
-                       at $modification_time, before $desired_time"
-                      ~metadata:
-                        [ ("path", `String filename)
-                        ; ("modification_time", `String (Time.to_string mtime))
-                        ; ("desired_time", `String (Time.to_string newer_than))
-                        ] ;
-                    None ) )
       | Named name ->
           let named_filename =
             named_filename ~constraint_constants
@@ -283,7 +255,7 @@ module Ledger = struct
           match config.base with
           | Hash _ ->
               return None
-          | Accounts (accounts, _) ->
+          | Accounts accounts ->
               return (Some (lazy (Accounts.to_full accounts)))
           | Named name -> (
             match Genesis_ledger.fetch_ledger name with
@@ -355,17 +327,8 @@ module Ledger = struct
                   hash= Some (State_hash.to_string @@ Ledger.merkle_root ledger)
                 }
               in
-              let ledger_name =
-                match config.base with
-                | Named name ->
-                    Some name
-                | Accounts (_, Some {name; _}) ->
-                    Some ("custom_" ^ name)
-                | _ ->
-                    None
-              in
-              match (tar_path, ledger_name) with
-              | Ok tar_path, Some name ->
+              match (tar_path, config.base) with
+              | Ok tar_path, Named name ->
                   let link_name =
                     genesis_dir
                     ^/ named_filename ~constraint_constants
@@ -379,7 +342,7 @@ module Ledger = struct
                       [ ("tar_path", `String tar_path)
                       ; ("named_tar_path", `String link_name) ] ;
                   Ok (packed, config, link_name)
-              | Ok tar_path, None ->
+              | Ok tar_path, _ ->
                   return (Ok (packed, config, tar_path))
               | Error err, _ ->
                   let root_hash =
