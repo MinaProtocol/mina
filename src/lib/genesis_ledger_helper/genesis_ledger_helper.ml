@@ -603,13 +603,28 @@ let init_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
     Genesis_proof.generate_inputs ~proof_level ~ledger:genesis_ledger
       ~constraint_constants ~genesis_constants
   in
-  let open Deferred.Or_error.Let_syntax in
-  let%map values, proof_file =
-    Genesis_proof.load_or_generate ~genesis_dir ~logger ~may_generate
-      ~proof_level ~constraint_constants proof_inputs
+  let protocol_state_hash = proof_inputs.protocol_state_with_hash.hash in
+  let compiled_protocol_state_hash =
+    Precomputed_values.(genesis_state_hash (Lazy.force compiled))
   in
-  Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
-    "Loaded ledger from $ledger_file and genesis proof from $proof_file"
-    ~metadata:
-      [("ledger_file", `String ledger_file); ("proof_file", `String proof_file)] ;
-  (values, config)
+  if Ledger_hash.equal protocol_state_hash compiled_protocol_state_hash then (
+    Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
+      "Protocol state hash $computed_hash matches compile-time \
+       $compiled_hash, using precomputed genesis proof"
+      ~metadata:
+        [ ("computed_hash", Ledger_hash.to_yojson protocol_state_hash)
+        ; ("compiled_hash", Ledger_hash.to_yojson compiled_protocol_state_hash)
+        ] ;
+    Deferred.Or_error.return (Lazy.force Precomputed_values.compiled, config) )
+  else
+    let open Deferred.Or_error.Let_syntax in
+    let%map values, proof_file =
+      Genesis_proof.load_or_generate ~genesis_dir ~logger ~may_generate
+        ~proof_level ~constraint_constants proof_inputs
+    in
+    Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
+      "Loaded ledger from $ledger_file and genesis proof from $proof_file"
+      ~metadata:
+        [ ("ledger_file", `String ledger_file)
+        ; ("proof_file", `String proof_file) ] ;
+    (values, config)
