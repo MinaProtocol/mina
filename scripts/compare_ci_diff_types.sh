@@ -5,6 +5,8 @@ if [ ! "$CI" = "true" ] || [ ! -f /.dockerenv ]; then
     exit 1
 fi
 
+set -e
+
 # cleanup if needed
 
 git clean -dfx

@@ -9,9 +9,31 @@
 (executable
  (name print_versioned_types)
  (modules print_versioned_types)
- (libraries ppx_version))
+ (libraries ppx_version
+            ; every deriver we might encounter
+            ppx_bin_prot
+            lens.ppx_deriving
+            ppx_deriving.api
+            ppx_deriving.std
+            ppx_sexp_conv
+            ppx_compare
+            ppx_enumerate
+            ppx_fields_conv
+            ppx_hash
+            ppx_deriving_yojson))
 
 (executable
  (name print_binable_functors)
  (modules print_binable_functors)
- (libraries ppx_version))
+ (libraries ppx_version
+            ; every deriver we might encounter
+            ppx_bin_prot
+            lens.ppx_deriving
+            ppx_deriving.api
+            ppx_deriving.std
+            ppx_sexp_conv
+            ppx_compare
+            ppx_enumerate
+            ppx_fields_conv
+            ppx_hash
+            ppx_deriving_yojson))
