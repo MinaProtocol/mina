@@ -82,7 +82,7 @@ jobs:
             - restore_cache:
                 name: Restore cache - opam
                 keys:
-                    - opam-linux-v0-{{ checksum "opam_ci_cache.sig" }}
+                    - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
                 name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make macos-setup-compile
                 command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make macos-setup-compile'
@@ -133,7 +133,7 @@ jobs:
             - restore_cache:
                 name: Restore cache - opam
                 keys:
-                    - opam-linux-v0-{{ checksum "opam_ci_cache.sig" }}
+                    - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
                 name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make macos-setup-compile
                 command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make macos-setup-compile'
@@ -182,7 +182,7 @@ jobs:
             - restore_cache:
                 name: Restore cache - opam
                 keys:
-                    - opam-linux-v0-{{ checksum "opam_ci_cache.sig" }}
+                    - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
                 name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make macos-setup-compile
                 command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make macos-setup-compile'
@@ -229,7 +229,7 @@ jobs:
             - restore_cache:
                 name: Restore cache - opam
                 keys:
-                    - opam-linux-v0-{{ checksum "opam_ci_cache.sig" }}
+                    - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
                 name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make macos-setup-compile
                 command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make macos-setup-compile'
@@ -258,7 +258,7 @@ jobs:
             - restore_cache:
                 name: Restore cache - opam
                 keys:
-                    - opam-linux-v0-{{ checksum "opam_ci_cache.sig" }}
+                    - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
                 name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make macos-setup-compile
                 command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make macos-setup-compile'
@@ -439,7 +439,7 @@ jobs:
             - restore_cache:
                 name: Restore cache - opam
                 keys:
-                    - opam-linux-v0-{{ checksum "opam_ci_cache.sig" }}
+                    - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
                 name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make macos-setup-compile
                 command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make macos-setup-compile'
@@ -473,7 +473,7 @@ jobs:
             - restore_cache:
                 name: Restore cache - opam
                 keys:
-                    - opam-linux-v0-{{ checksum "opam_ci_cache.sig" }}
+                    - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
                 name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make macos-setup-compile
                 command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make macos-setup-compile'
@@ -579,7 +579,7 @@ jobs:
             - restore_cache:
                 name: Restore cache - opam
                 keys:
-                    - opam-linux-v0-{{ checksum "opam_ci_cache.sig" }}
+                    - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
                 name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make macos-setup-compile
                 command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make macos-setup-compile'
@@ -619,7 +619,7 @@ jobs:
             - restore_cache:
                 name: Restore cache - opam
                 keys:
-                    - opam-linux-v0-{{ checksum "opam_ci_cache.sig" }}
+                    - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
                 name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make macos-setup-compile
                 command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make macos-setup-compile'
@@ -657,7 +657,7 @@ jobs:
             - restore_cache:
                 name: Restore cache - opam
                 keys:
-                    - opam-linux-v0-{{ checksum "opam_ci_cache.sig" }}
+                    - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
                 name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make macos-setup-compile
                 command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make macos-setup-compile'
@@ -694,7 +694,7 @@ jobs:
             - restore_cache:
                 name: Restore cache - opam
                 keys:
-                    - opam-linux-v0-{{ checksum "opam_ci_cache.sig" }}
+                    - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
                 name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make macos-setup-compile
                 command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make macos-setup-compile'
@@ -726,7 +726,7 @@ jobs:
             - restore_cache:
                 name: Restore cache - opam
                 keys:
-                    - opam-linux-v0-{{ checksum "opam_ci_cache.sig" }}
+                    - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
                 name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make macos-setup-compile
                 command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make macos-setup-compile'
@@ -761,7 +761,7 @@ jobs:
             - restore_cache:
                 name: Restore cache - opam
                 keys:
-                    - opam-linux-v0-{{ checksum "opam_ci_cache.sig" }}
+                    - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
                 name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make macos-setup-compile
                 command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make macos-setup-compile'
@@ -793,7 +793,7 @@ jobs:
             - restore_cache:
                 name: Restore cache - opam
                 keys:
-                    - opam-linux-v0-{{ checksum "opam_ci_cache.sig" }}
+                    - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
                 name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make macos-setup-compile
                 command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make macos-setup-compile'
@@ -825,7 +825,7 @@ jobs:
             - restore_cache:
                 name: Restore cache - opam
                 keys:
-                    - opam-linux-v0-{{ checksum "opam_ci_cache.sig" }}
+                    - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
                 name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make macos-setup-compile
                 command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make macos-setup-compile'
@@ -857,7 +857,7 @@ jobs:
             - restore_cache:
                 name: Restore cache - opam
                 keys:
-                    - opam-linux-v0-{{ checksum "opam_ci_cache.sig" }}
+                    - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
                 name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make macos-setup-compile
                 command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make macos-setup-compile'
@@ -889,7 +889,7 @@ jobs:
             - restore_cache:
                 name: Restore cache - opam
                 keys:
-                    - opam-linux-v0-{{ checksum "opam_ci_cache.sig" }}
+                    - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
                 name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make macos-setup-compile
                 command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make macos-setup-compile'
@@ -924,7 +924,7 @@ jobs:
             - restore_cache:
                 name: Restore cache - opam
                 keys:
-                    - opam-linux-v0-{{ checksum "opam_ci_cache.sig" }}
+                    - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
                 name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make macos-setup-compile
                 command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make macos-setup-compile'
@@ -956,7 +956,7 @@ jobs:
             - restore_cache:
                 name: Restore cache - opam
                 keys:
-                    - opam-linux-v0-{{ checksum "opam_ci_cache.sig" }}
+                    - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
                 name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make macos-setup-compile
                 command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make macos-setup-compile'
@@ -1006,7 +1006,7 @@ jobs:
             - restore_cache:
                 name: Restore cache - opam
                 keys:
-                    - opam-linux-v0-{{ checksum "opam_ci_cache.sig" }}
+                    - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
                 name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make macos-setup-compile
                 command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make macos-setup-compile'
@@ -1038,7 +1038,7 @@ jobs:
             - restore_cache:
                 name: Restore cache - opam
                 keys:
-                    - opam-linux-v0-{{ checksum "opam_ci_cache.sig" }}
+                    - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
                 name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make macos-setup-compile
                 command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make macos-setup-compile'
@@ -1073,7 +1073,7 @@ jobs:
             - restore_cache:
                 name: Restore cache - opam
                 keys:
-                    - opam-linux-v0-{{ checksum "opam_ci_cache.sig" }}
+                    - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
                 name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make macos-setup-compile
                 command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make macos-setup-compile'
@@ -1105,7 +1105,7 @@ jobs:
             - restore_cache:
                 name: Restore cache - opam
                 keys:
-                    - opam-linux-v0-{{ checksum "opam_ci_cache.sig" }}
+                    - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
                 name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make macos-setup-compile
                 command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make macos-setup-compile'
@@ -1142,7 +1142,7 @@ jobs:
             - restore_cache:
                 name: Restore cache - opam
                 keys:
-                    - opam-linux-v0-{{ checksum "opam_ci_cache.sig" }}
+                    - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
                 name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make macos-setup-compile
                 command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make macos-setup-compile'
@@ -1177,7 +1177,7 @@ jobs:
             - restore_cache:
                 name: Restore cache - opam
                 keys:
-                    - opam-linux-v0-{{ checksum "opam_ci_cache.sig" }}
+                    - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
                 name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make macos-setup-compile
                 command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make macos-setup-compile'
