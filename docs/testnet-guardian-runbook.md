@@ -30,6 +30,8 @@ Deploy a QA-net (currently a 200-node network) with the new binaries. Ensure gos
 
 Instructions for configuring and deploying a QA-net is roughly documented here: https://www.notion.so/codaprotocol/Testnet-deployment-notes-c1fbf8b8be9343b480f644c22d61ad85
 
+Run the program `scripts/minichaos.py` after starting the network. It destroys random kubernetes pods, which one restarting tries to bootstrap/catchup to the network. Make sure to run it shortly (perhaps after most of the nodes are synced) after starting the network to test bootstrap/catchup during the first epoch.
+
 ### Test
 
 After the QA-net is deployed, perform the following sanity-check:
@@ -77,7 +79,7 @@ Verify that online docs https://codaprotocol.com/docs/getting-started are update
 Monitor the health of the QA-net by checking the logs (https://console.cloud.google.com/kubernetes), grafana dashboard (https://o1testnet.grafana.net), telemetry and other tools. Check for
 1. Crashes
 2. Forks
-3. Expected TPS
+3. Expected transactions per second(TPS): TPS is currently a compile time configuration and all the compile-time constants for the testnet/qa-net are defined in `src/config/testnet_postake_medium_curves.mlh`. The file consists of configuration for TPS such as `[%%import "/src/config/scan_state/point2tps.mlh"]` or `[%%import "/src/config/scan_state/point5tps.mlh"]`. Each of these files define maximum TPS (`scan_state_tps_goal_x10`) that can be achieved. Verify this against the observed value on the grafana dashboard.
 4. Blocks being produced consistently
 
 Report the status of the network and testing to the rest of the team on `#qa-net-discussion` channel.
@@ -93,9 +95,9 @@ Maybe not, sometimes there could be unintended twists in the story and the testn
 |1| Unsuccessful build jobs. (We shouldn't be merging hotfixes before all the CI jobs are successful).| Sometimes rerunning the build job fixes it. For example, at times docker upload fails and passes on rerun. But if there are other code/ci config related issues then the QA-net cannot continue until the issue is either reverted or fixed. In the case of a hotfix for issues encountered during QA-net, the fix should be reverted| Blocker| |
 |2| Configuration/infra issues when deploying a QA-net | There are some troubleshooting notes in the notion document for the instructions to deploy a network. If that doesn't help then contact the any of the members listed in owners column for help | Blocker | Conner, Ahmad, Nathan|
 | 3| Unstable Testnet* (criteria for an unstable testnet is listed below)| Create an issue describing the observed behavior. The protocol team would need to investigate the problem and provide a hotfix before proceeding further with the release | Blocker | Aneesha |
-| 4| Errors when completing the challenges| Create an issue describing the observed behavior. Might have to exclude the challenge that causes the error if it cannot be patched and tested within the QA-net phase. Let the marketing and communications team know? | Major | Aneesha, Brandon, Christine|
+| 4| Errors when completing the challenges| Create an issue describing the observed behavior. Might have to exclude the challenge that causes the error if it cannot be patched and tested within the QA-net phase. Let the marketing and communications team know | Major | Aneesha, Brandon, Christine|
 | 5 | Other errors/suspicious behavior observed when monitoring. These don't destabilize the testnet or affect the challenges | Create an issue describing the behavior | Minor | |
-| 6 | Patch/hotfix | On receiving hotfix(es) on release and master(required for updating apt package) branch, destroy the existing   QA-net, repeat the [build](#build) and [deploy](#deploy) steps. Perform the [sanity checks](#sanity-check) and verify the fix | | |
+| 6 | Patch/hotfix | On receiving hotfix(es) on release and master(required for updating apt package) branch, destroy the existing   QA-net, repeat the [build](#build) and [deploy](#deploy) steps. Perform the [sanity checks](#sanity-check) and verify the fix. After verifying, merge the fix back into develop | | |
 | 7 | Hotfix doesn't work or causes other issues | Revert the fix and let the owners for the event type (for which the fix was issued) know |
 
 *Criteria for an unstable testnet:
