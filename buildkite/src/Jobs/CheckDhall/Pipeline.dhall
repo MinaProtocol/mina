@@ -10,7 +10,7 @@ Pipeline.build
     spec = ./Spec.dhall,
     steps = [
       Command.Config::{
-        commands = [ "cd .buildkite && make check" ],
+        commands = [ "cd buildkite && make check" ],
         label = "Check all CI Dhall entrypoints",
         key = "check",
         target = Size.Small,

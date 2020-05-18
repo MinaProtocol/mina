@@ -23,7 +23,7 @@ let Config = {
 let build : Config.Type -> Pipeline/Type = \(c : Config.Type) ->
   let name = c.spec.name
   let buildCommand = \(c : Command.Config.Type) ->
-    Command.build c // { key = Some "$${name}-${c.key}" }
+    Command.build c // { key = Some "_${name}-${c.key}" }
   in
   { steps = List/map Command.Config.Type Command.Type buildCommand c.steps }
 
