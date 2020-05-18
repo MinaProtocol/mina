@@ -1,11 +1,11 @@
 let Prelude = ./External/Prelude.dhall
 
-let Command = ./Lib/Command.dhall
-let Docker = ./Lib/Docker.dhall
-let JobSpec = ./Lib/JobSpec.dhall
-let Pipeline = ./Lib/Pipeline.dhall
-let Size = ./Lib/Size.dhall
-let triggerCommand = ./Lib/TriggerCommand.dhall
+let Command = ./Command/Dsl.dhall
+let Docker = ./Command/Docker/Dsl.dhall
+let JobSpec = ./Pipeline/JobSpec.dhall
+let Pipeline = ./Pipeline/Dsl.dhall
+let Size = ./Command/Size.dhall
+let triggerCommand = ./Pipeline/TriggerCommand.dhall
 
 let jobs : List JobSpec.Type = ./gen/Jobs.dhall
 
@@ -30,7 +30,7 @@ in Pipeline.build Pipeline.Config::{
   },
   steps = [
     Command.Config::{
-      command = commands,
+      commands = commands,
       label = "Monorepo triage",
       key = "cmds",
       target = Size.Small,

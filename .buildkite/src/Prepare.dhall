@@ -1,12 +1,12 @@
 -- Autogenerates any pre-reqs for monorepo triage execution
 -- Keep these rules lean! They have to run unconditionally.
 
-let Command = ./Lib/Command.dhall
-let Docker = ./Lib/Docker.dhall
-let JobSpec = ./Lib/JobSpec.dhall
-let Pipeline = ./Lib/Pipeline.dhall
-let Size = ./Lib/Size.dhall
-let triggerCommand = ./Lib/TriggerCommand.dhall
+let Command = ./Command/Dsl.dhall
+let Docker = ./Command/Docker/Dsl.dhall
+let JobSpec = ./Pipeline/JobSpec.dhall
+let Pipeline = ./Pipeline/Dsl.dhall
+let Size = ./Command/Size.dhall
+let triggerCommand = ./Pipeline/TriggerCommand.dhall
 
 let config : Pipeline.Config.Type = Pipeline.Config::{
   spec = JobSpec::{
@@ -16,7 +16,7 @@ let config : Pipeline.Config.Type = Pipeline.Config::{
   },
   steps = [
     Command.Config::{
-      command = [
+      commands = [
         "./.buildkite/scripts/generate-jobs.sh > .buildkite/src/gen/Jobs.dhall",
         triggerCommand "src/Monorepo.dhall"
       ],

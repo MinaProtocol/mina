@@ -1,7 +1,7 @@
-let Pipeline = ../../Lib/Pipeline.dhall
-let Command = ../../Lib/Command.dhall
-let Docker = ../../Lib/Docker.dhall
-let Size = ../../Lib/Size.dhall
+let Pipeline = ../../Pipeline/Dsl.dhall
+let Command = ../../Command/Dsl.dhall
+let Docker = ../../Command/Docker/Dsl.dhall
+let Size = ../../Command/Size.dhall
 
 in
 
@@ -10,7 +10,7 @@ Pipeline.build
     spec = ./Spec.dhall,
     steps = [
       Command.Config::{
-        command = [ "echo \"hello2\"" ],
+        commands = [ "echo \"hello2\"" ],
         label = "Test Echo2", key = "hello2",
         target = Size.Small,
         docker = Docker.Config::{ image = (../../Constants/ContainerImages.dhall).toolchainBase }
