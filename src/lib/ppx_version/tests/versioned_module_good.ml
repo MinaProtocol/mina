@@ -148,30 +148,36 @@ module M4 = struct
   type t = Stable.Latest.t = {a: bool; b: int}
 end
 
-module Not = struct
-  module Versioned = struct
-    type t = bool
+(* Allow binable functor *)
+module M5 = struct
+  [%%versioned_binable
+  module Stable = struct
+    module V1 = struct
+      type t = bool
 
-    module Arg = struct
-      type nonrec t = t
+      let to_latest = Fn.id
 
-      let to_binable = Fn.id
+      module Arg = struct
+        type nonrec t = t
 
-      let of_binable = Fn.id
+        let to_binable = Fn.id
+
+        let of_binable = Fn.id
+      end
+
+      include Binable.Of_binable (Core_kernel.Bool.Stable.V1) (Arg)
     end
-
-    include Binable.Of_binable (Bool) (Arg)
-  end
+  end]
 end
 
 (* Test that a version annotation is accepted, and the standard version
    annotation isn't also added.
 *)
-module M5 = struct
+module M6 = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = Not.Versioned.t [@@deriving version {asserted}]
+      type t = Bool.t [@@deriving version {asserted}]
 
       let to_latest = Fn.id
     end
@@ -180,7 +186,7 @@ module M5 = struct
   type t = Stable.Latest.t
 end
 
-module M6 = struct
+module M7 = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
@@ -195,22 +201,22 @@ end
 
 (* Test that types applied to parameters are properly versioned. *)
 let () =
-  let x : M6.Stable.V1.t = {a= 15; b= 20} in
+  let x : M7.Stable.V1.t = {a= 15; b= 20} in
   let buf = Bigstring.create 20 in
   (* Test writing given version. *)
-  ignore (M6.Stable.V1.bin_write_t buf ~pos:0 x) ;
+  ignore (M7.Stable.V1.bin_write_t buf ~pos:0 x) ;
   (* Test that reads are compatible with [With_version]. *)
-  let y : M6.Stable.V1.With_version.t =
-    M6.Stable.V1.With_version.bin_read_t buf ~pos_ref:(ref 0)
+  let y : M7.Stable.V1.With_version.t =
+    M7.Stable.V1.With_version.bin_read_t buf ~pos_ref:(ref 0)
   in
   assert (y.version = 1) ;
   assert (y.t = x) ;
   (* Test that what was read is what was written. *)
-  let z = M6.Stable.V1.bin_read_t buf ~pos_ref:(ref 0) in
+  let z = M7.Stable.V1.bin_read_t buf ~pos_ref:(ref 0) in
   assert (z = x)
 
 (* Test that modules may have other contents besides the type declarations. *)
-module M7 = struct
+module M8 = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
