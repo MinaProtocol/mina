@@ -357,7 +357,7 @@ let propose_block_onto_chain ~logger ~keys
           , `Pending_coinbase_data
               (is_new_stack, coinbase_amount, pending_coinbase_action) ) =
     let%map res =
-      Staged_ledger.apply_diff_unchecked previous_staged_ledger
+      Staged_ledger.apply_diff_unchecked previous_staged_ledger ~logger
         staged_ledger_diff ~state_body_hash:previous_protocol_state_body_hash
     in
     res

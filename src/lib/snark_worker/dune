@@ -9,6 +9,6 @@
  (preprocess (pps
    ppx_coda ppx_sexp_conv ppx_optcomp
    ppx_sexp_conv ppx_bin_prot ppx_let ppx_custom_printf
-   ppx_inline_test bisect_ppx -- -conditional))
+   ppx_inline_test bisect_ppx ppx_deriving_yojson -- -conditional))
  (preprocessor_deps "../../config.mlh")
  (synopsis "Lib powering the snark_worker interactions with the daemon"))

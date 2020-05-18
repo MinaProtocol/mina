@@ -7,11 +7,11 @@ module Stable : sig
       { ledger: Coda_base.Sparse_ledger.Stable.V1.t
       ; protocol_state_body: Coda_state.Protocol_state.Body.Value.Stable.V1.t
       }
-    [@@deriving sexp]
+    [@@deriving sexp, to_yojson]
   end
 end]
 
 type t = Stable.Latest.t =
   { ledger: Coda_base.Sparse_ledger.Stable.V1.t
   ; protocol_state_body: Coda_state.Protocol_state.Body.Value.Stable.V1.t }
-[@@deriving sexp]
+[@@deriving sexp, to_yojson]

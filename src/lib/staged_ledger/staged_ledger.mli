@@ -124,6 +124,7 @@ val apply :
 val apply_diff_unchecked :
      t
   -> Staged_ledger_diff.With_valid_signatures_and_proofs.t
+  -> logger:Logger.t
   -> current_global_slot:Coda_numbers.Global_slot.t
   -> state_and_body_hash:State_hash.t * State_body_hash.t
   -> ( [`Hash_after_applying of Staged_ledger_hash.t]

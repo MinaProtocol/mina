@@ -292,7 +292,7 @@ module For_tests = struct
                , `Staged_ledger _
                , `Pending_coinbase_data _ ) =
         match%bind
-          Staged_ledger.apply_diff_unchecked parent_staged_ledger
+          Staged_ledger.apply_diff_unchecked parent_staged_ledger ~logger
             staged_ledger_diff ~current_global_slot ~state_and_body_hash
         with
         | Ok r ->

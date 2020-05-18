@@ -130,7 +130,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
               ~log_block_creation )
       in
       match%map
-        Staged_ledger.apply_diff_unchecked staged_ledger diff
+        Staged_ledger.apply_diff_unchecked staged_ledger diff ~logger
           ~current_global_slot:previous_global_slot
           ~state_and_body_hash:
             (previous_protocol_state_hash, previous_protocol_state_body_hash)

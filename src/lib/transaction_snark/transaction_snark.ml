@@ -31,13 +31,29 @@ module Proof_type = struct
 end
 
 module Pending_coinbase_stack_state = struct
+  module Init_stack = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = Base of Pending_coinbase.Stack_versioned.Stable.V1.t | Merge
+        [@@deriving sexp, hash, compare, eq, yojson]
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    type t = Stable.Latest.t = Base of Pending_coinbase.Stack.t | Merge
+    [@@deriving sexp, hash, compare, yojson]
+  end
+
   (* State of the coinbase stack for the current transaction snark *)
   [%%versioned
   module Stable = struct
     module V1 = struct
       type t =
         { source: Pending_coinbase.Stack_versioned.Stable.V1.t
-        ; target: Pending_coinbase.Stack_versioned.Stable.V1.t }
+        ; target: Pending_coinbase.Stack_versioned.Stable.V1.t
+        ; init_stack: Init_stack.Stable.V1.t }
       [@@deriving sexp, hash, compare, eq, fields, yojson]
 
       let to_latest = Fn.id
@@ -45,7 +61,9 @@ module Pending_coinbase_stack_state = struct
   end]
 
   type t = Stable.Latest.t =
-    {source: Pending_coinbase.Stack.t; target: Pending_coinbase.Stack.t}
+    { source: Pending_coinbase.Stack.t
+    ; target: Pending_coinbase.Stack.t
+    ; init_stack: Init_stack.t }
   [@@deriving sexp, hash, compare, yojson]
 
   include Hashable.Make_binable (Stable.Latest)
@@ -101,14 +119,15 @@ module Statement = struct
     ; supply_increase
     ; pending_coinbase_stack_state=
         { source= s1.pending_coinbase_stack_state.source
-        ; target= s2.pending_coinbase_stack_state.target } }
+        ; target= s2.pending_coinbase_stack_state.target
+        ; init_stack= Merge } }
 
   include Hashable.Make_binable (Stable.Latest)
   include Comparable.Make (Stable.Latest)
 
   let gen =
     let open Quickcheck.Generator.Let_syntax in
-    let%map source = Frozen_ledger_hash.gen
+    let%bind source = Frozen_ledger_hash.gen
     and target = Frozen_ledger_hash.gen
     and fee_excess = Currency.Fee.Signed.gen
     and supply_increase = Currency.Amount.gen
@@ -117,13 +136,29 @@ module Statement = struct
     and proof_type =
       Bool.quickcheck_generator >>| fun b -> if b then `Merge else `Base
     in
+    let%map init_stack =
+      match proof_type with
+      | `Merge ->
+          Quickcheck.Generator.return
+            Pending_coinbase_stack_state.Init_stack.Merge
+      | `Base ->
+          Bool.quickcheck_generator
+          >>| fun b ->
+          if b then
+            Pending_coinbase_stack_state.Init_stack.Base
+              pending_coinbase_before
+          else
+            Pending_coinbase_stack_state.Init_stack.Base pending_coinbase_after
+    in
     { source
     ; target
     ; fee_excess
     ; proof_type
     ; supply_increase
     ; pending_coinbase_stack_state=
-        {source= pending_coinbase_before; target= pending_coinbase_after} }
+        { source= pending_coinbase_before
+        ; target= pending_coinbase_after
+        ; init_stack } }
 end
 
 [%%versioned
@@ -720,7 +755,8 @@ module Base = struct
 
   let%snarkydef apply_tagged_transaction (type shifted)
       (shifted : (module Inner_curve.Checked.Shifted.S with type t = shifted))
-      root pending_coinbase_stack_before pending_coinbase_after state_body
+      root pending_coinbase_stack_init pending_coinbase_stack_before
+      pending_coinbase_after state_body
       ({signer; signature; payload} as txn : Transaction_union.var) =
     let tag = payload.body.tag in
     let is_user_command = Transaction_union.Tag.Unpacked.is_user_command tag in
@@ -788,7 +824,7 @@ module Base = struct
          in
          let%bind pending_coinbase_stack_with_state =
            Pending_coinbase.Stack.Checked.push_state state_body_hash
-             pending_coinbase_stack_before
+             pending_coinbase_stack_init
          in
          let%bind computed_pending_coinbase_stack_after =
            let coinbase =
@@ -802,11 +838,23 @@ module Base = struct
              ~else_:pending_coinbase_stack_with_state
          in
          [%with_label "Check coinbase stack"]
-           (let%bind correct_coinbase_stack =
+           (let%bind correct_coinbase_target_stack =
               Pending_coinbase.Stack.equal_var
                 computed_pending_coinbase_stack_after pending_coinbase_after
             in
-            Boolean.Assert.is_true correct_coinbase_stack))
+            let%bind valid_init_state =
+              let%bind equal_source =
+                Pending_coinbase.Stack.equal_var pending_coinbase_stack_init
+                  pending_coinbase_stack_before
+              in
+              let%bind equal_source_with_state =
+                Pending_coinbase.Stack.equal_var
+                  pending_coinbase_stack_with_state
+                  pending_coinbase_stack_before
+              in
+              Boolean.(equal_source || equal_source_with_state)
+            in
+            Boolean.Assert.all [correct_coinbase_target_stack; valid_init_state]))
     in
     (* Interrogate failure cases. This value is created without constraints;
        the failures should be checked against potential failures to ensure
@@ -1292,6 +1340,15 @@ module Base = struct
       exists' Pending_coinbase.Stack.typ ~f:(fun s ->
           (Prover_state.pending_coinbase_stack_state s).target )
     in
+    let%bind pending_coinbase_init =
+      exists' Pending_coinbase.Stack.typ ~f:(fun s ->
+          match (Prover_state.pending_coinbase_stack_state s).init_stack with
+          | Base stack ->
+              stack
+          | Merge ->
+              raise
+                (Invalid_argument "Pending_coinbase_stack_state.Init_stack") )
+    in
     let%bind state_body =
       exists'
         (Coda_state.Protocol_state.Body.typ ~constraint_constants)
@@ -1300,7 +1357,8 @@ module Base = struct
     let%bind root_after, fee_excess, supply_increase =
       apply_tagged_transaction
         (module Shifted)
-        root_before pending_coinbase_before pending_coinbase_after state_body t
+        root_before pending_coinbase_init pending_coinbase_before
+        pending_coinbase_after state_body t
     in
     let%map () =
       [%with_label "Check that the computed hash matches the input hash"]
@@ -1962,7 +2020,8 @@ struct
         ~pending_coinbase_stack_state:
           Pending_coinbase_stack_state.Stable.Latest.
             { source= transition12.pending_coinbase_stack_state.source
-            ; target= transition23.pending_coinbase_stack_state.target }
+            ; target= transition23.pending_coinbase_stack_state.target
+            ; init_stack= Merge }
         ~fee_excess ~supply_increase
     in
     let prover_state =
@@ -2072,7 +2131,8 @@ struct
     ; supply_increase
     ; pending_coinbase_stack_state=
         { source= t1.pending_coinbase_stack_state.source
-        ; target= t2.pending_coinbase_stack_state.target }
+        ; target= t2.pending_coinbase_stack_state.target
+        ; init_stack= Merge }
     ; proof_type= `Merge
     ; proof= wrap `Merge proof input }
 end
@@ -2363,7 +2423,8 @@ let%test_module "transaction_snark" =
       in
       let pending_coinbase_stack_state =
         { Pending_coinbase_stack_state.source= pending_coinbase_stack
-        ; target= pending_coinbase_stack_target }
+        ; target= pending_coinbase_stack_target
+        ; init_stack= Base pending_coinbase_stack }
       in
       let user_command_in_block =
         { Transaction_protocol_state.Poly.transaction= user_command
@@ -2436,7 +2497,8 @@ let%test_module "transaction_snark" =
                   (apply_transaction_exn sparse_ledger txn_in_block.transaction))
             ~pending_coinbase_stack_state:
               { source= pending_coinbase_init
-              ; target= pending_coinbase_stack_target } )
+              ; target= pending_coinbase_stack_target
+              ; init_stack= Base pending_coinbase_init } )
 
     let%test_unit "coinbase with state body hash" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -2489,7 +2551,8 @@ let%test_module "transaction_snark" =
               in
               let pending_coinbase_stack_state =
                 { Pending_coinbase_stack_state.source= pending_coinbase_stack
-                ; target= pending_coinbase_stack_target }
+                ; target= pending_coinbase_stack_target
+                ; init_stack= Base pending_coinbase_stack }
               in
               check_user_command ~sok_message
                 ~source:(Ledger.merkle_root ledger)
@@ -2574,7 +2637,8 @@ let%test_module "transaction_snark" =
       check_transaction ~sok_message ~source ~target
         ~pending_coinbase_stack_state:
           { Pending_coinbase_stack_state.source= pending_coinbase_stack
-          ; target= pending_coinbase_stack_target }
+          ; target= pending_coinbase_stack_target
+          ; init_stack= Base pending_coinbase_stack_target }
         {transaction= txn; block_data= state_body}
         (unstage @@ Sparse_ledger.handler sparse_ledger)
 
@@ -2780,7 +2844,8 @@ let%test_module "transaction_snark" =
               let pending_coinbase_stack_state =
                 Pending_coinbase_stack_state.Stable.Latest.
                   { source= Pending_coinbase.Stack.empty
-                  ; target= pending_coinbase_stack_target }
+                  ; target= pending_coinbase_stack_target
+                  ; init_stack= Base pending_coinbase_stack_target }
               in
               Ledger.apply_user_command ledger
                 ~txn_global_slot:current_global_slot t2
@@ -2895,7 +2960,8 @@ let%test_module "transaction_snark" =
               let pending_coinbase_stack_state =
                 Pending_coinbase_stack_state.Stable.Latest.
                   { source= Pending_coinbase.Stack.empty
-                  ; target= pending_coinbase_stack_target }
+                  ; target= pending_coinbase_stack_target
+                  ; init_stack= Base pending_coinbase_stack_target }
               in
               Ledger.apply_user_command ledger
                 ~txn_global_slot:current_global_slot t2

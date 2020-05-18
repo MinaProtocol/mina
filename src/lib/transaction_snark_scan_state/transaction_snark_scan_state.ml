@@ -88,7 +88,10 @@ module Job_view = struct
         ; ("Source", hash_yojson s.source)
         ; ("Target", hash_yojson s.target)
         ; ("Fee Excess", Currency.Fee.Signed.to_yojson s.fee_excess)
-        ; ("Supply Increase", Currency.Amount.to_yojson s.supply_increase) ]
+        ; ("Supply Increase", Currency.Amount.to_yojson s.supply_increase)
+        ; ( "Pending coinbase stack"
+          , Transaction_snark.Pending_coinbase_stack_state.to_yojson
+              s.pending_coinbase_stack_state ) ]
     in
     let job_to_yojson =
       match value with
@@ -176,8 +179,14 @@ let create_expected_statement
   let target =
     Frozen_ledger_hash.of_ledger_hash @@ Sparse_ledger.merkle_root after
   in
-  let pending_coinbase_before =
-    statement.pending_coinbase_stack_state.source
+  let%bind pending_coinbase_before =
+    match statement.pending_coinbase_stack_state.init_stack with
+    | Base source ->
+        Ok source
+    | Merge ->
+        Or_error.errorf
+          !"Invalid init stack in Pending coinbase stack state . Expected \
+            Base found Merge"
   in
   let pending_coinbase_after =
     let state_body_hash = snd state_hash in
@@ -197,9 +206,8 @@ let create_expected_statement
   ; fee_excess
   ; supply_increase
   ; pending_coinbase_stack_state=
-      { Transaction_snark.Pending_coinbase_stack_state.source=
-          pending_coinbase_before
-      ; target= pending_coinbase_after }
+      { statement.pending_coinbase_stack_state with
+        target= pending_coinbase_after }
   ; proof_type= `Base }
 
 let completed_work_to_scanable_work (job : job) (fee, current_proof, prover) :
@@ -219,6 +227,12 @@ let completed_work_to_scanable_work (job : job) (fee, current_proof, prover) :
       and supply_increase =
         Currency.Amount.add s.supply_increase s'.supply_increase
         |> option "Error adding supply_increases"
+      and _valid_pending_coinbase_stack =
+        if
+          Pending_coinbase.Stack.equal s.pending_coinbase_stack_state.target
+            s'.pending_coinbase_stack_state.source
+        then Ok ()
+        else Or_error.error_string "Invalid pending coinbase stack state"
       in
       let statement =
         { Transaction_snark.Statement.source= s.source
@@ -226,7 +240,8 @@ let completed_work_to_scanable_work (job : job) (fee, current_proof, prover) :
         ; supply_increase
         ; pending_coinbase_stack_state=
             { source= s.pending_coinbase_stack_state.source
-            ; target= s'.pending_coinbase_stack_state.target }
+            ; target= s'.pending_coinbase_stack_state.target
+            ; init_stack= Merge }
         ; fee_excess
         ; proof_type= `Merge }
       in
@@ -441,7 +456,8 @@ let statement_of_job : job -> Transaction_snark.Statement.t option = function
       ; supply_increase
       ; pending_coinbase_stack_state=
           { source= stmt1.pending_coinbase_stack_state.source
-          ; target= stmt2.pending_coinbase_stack_state.target }
+          ; target= stmt2.pending_coinbase_stack_state.target
+          ; init_stack= Merge }
       ; fee_excess
       ; proof_type= `Merge }
 

@@ -332,8 +332,9 @@ module T = struct
   let push_state current_stack state_body_hash =
     Pending_coinbase.Stack.push_state state_body_hash current_stack
 
-  let apply_transaction_and_get_statement ledger current_stack s
-      txn_global_slot state_body_hash =
+  let apply_transaction_and_get_statement ledger
+      (pending_coinbase_stack_state :
+        Transaction_snark.Pending_coinbase_stack_state.t) s txn_global_slot =
     let open Result.Let_syntax in
     let%bind fee_excess = Transaction.fee_excess s |> to_staged_ledger_or_error
     and supply_increase =
@@ -342,12 +343,16 @@ module T = struct
     let source =
       Ledger.merkle_root ledger |> Frozen_ledger_hash.of_ledger_hash
     in
-    let pending_coinbase_with_coinbase = push_coinbase current_stack s in
-    (* Each transaction will have the state updated so as to constrain the
-       protocol state in the transaction snark.
-    *)
-    let pending_coinbase_after =
-      push_state pending_coinbase_with_coinbase state_body_hash
+    let pending_coinbase_target =
+      push_coinbase pending_coinbase_stack_state.target s
+    in
+    let new_init_stack =
+      match pending_coinbase_stack_state.init_stack with
+      | Transaction_snark.Pending_coinbase_stack_state.Init_stack.Base stack ->
+          Transaction_snark.Pending_coinbase_stack_state.Init_stack.Base
+            (push_coinbase stack s)
+      | Merge ->
+          Merge
     in
     let%map undo =
       Ledger.apply_transaction ~txn_global_slot ledger s
@@ -359,12 +364,15 @@ module T = struct
       ; fee_excess
       ; supply_increase
       ; pending_coinbase_stack_state=
-          {source= current_stack; target= pending_coinbase_after}
+          {pending_coinbase_stack_state with target= pending_coinbase_target}
       ; proof_type= `Base }
-    , pending_coinbase_with_coinbase )
+    , { Transaction_snark.Pending_coinbase_stack_state.source=
+          pending_coinbase_target
+      ; target= pending_coinbase_target
+      ; init_stack= new_init_stack } )
 
-  let apply_transaction_and_get_witness ledger current_stack s txn_global_slot
-      state_and_body_hash =
+  let apply_transaction_and_get_witness ledger pending_coinbase_stack_state s
+      txn_global_slot state_and_body_hash =
     let open Deferred.Let_syntax in
     let public_keys = function
       | Transaction.Fee_transfer t ->
@@ -386,39 +394,47 @@ module T = struct
     let%bind () = Async.Scheduler.yield () in
     let r =
       measure "apply+stmt" (fun () ->
-          apply_transaction_and_get_statement ledger current_stack s
-            txn_global_slot (snd state_and_body_hash) )
+          apply_transaction_and_get_statement ledger
+            pending_coinbase_stack_state s txn_global_slot )
     in
     let%map () = Async.Scheduler.yield () in
     let open Result.Let_syntax in
-    let%map undo, statement, updated_coinbase_stack = r in
+    let%map undo, statement, updated_pending_coinbase_stack_state = r in
     ( { Scan_state.Transaction_with_witness.transaction_with_info= undo
       ; state_hash= state_and_body_hash
       ; ledger_witness
       ; statement }
-    , updated_coinbase_stack )
+    , updated_pending_coinbase_stack_state )
 
   let update_ledger_and_get_statements ledger current_stack ts
       current_global_slot state_and_body_hash =
     let open Deferred.Result.Let_syntax in
-    let rec go coinbase_stack acc = function
+    let current_stack_with_state =
+      push_state current_stack (snd state_and_body_hash)
+    in
+    let rec go pending_coinbase_stack_state acc = function
       | [] ->
-          Deferred.return (Ok (List.rev acc, coinbase_stack))
+          Deferred.return (Ok (List.rev acc, pending_coinbase_stack_state))
       | t :: ts -> (
           let open Deferred.Let_syntax in
           match%bind
-            apply_transaction_and_get_witness ledger coinbase_stack t
-              current_global_slot state_and_body_hash
+            apply_transaction_and_get_witness ledger
+              pending_coinbase_stack_state t current_global_slot
+              state_and_body_hash
           with
-          | Ok (res, updated_coinbase_stack) ->
-              (*Push the state body hash to the pending coinbase stack once per diff*)
-              go updated_coinbase_stack (res :: acc) ts
+          | Ok (res, updated_pending_coinbase_stack_state) ->
+              go updated_pending_coinbase_stack_state (res :: acc) ts
           | Error e ->
               return (Error e) )
     in
-    (*Push the state body hash to the pending coinbase stack once per diff per stack*)
-    let%map res, updated_stack_with_coinbase = go current_stack [] ts in
-    (res, push_state updated_stack_with_coinbase (snd state_and_body_hash))
+    let%map res, updated_pending_coinbase_stack_state =
+      go
+        { Transaction_snark.Pending_coinbase_stack_state.source= current_stack
+        ; target= current_stack_with_state
+        ; init_stack= Base current_stack }
+        [] ts
+    in
+    (res, updated_pending_coinbase_stack_state.target)
 
   let check_completed_works ~logger ~verifier scan_state
       (completed_works : Transaction_snark_work.t list) =
@@ -634,7 +650,7 @@ module T = struct
              (Pre_diff_info.Error.Coinbase_error "More than two coinbase parts"))
 
   let apply_diff ~logger t pre_diff_info ~current_global_slot
-      ~state_and_body_hash =
+      ~state_and_body_hash ~log_prefix =
     let open Deferred.Result.Let_syntax in
     let max_throughput =
       Int.pow 2 Coda_compile_config.transaction_capacity_log_2
@@ -689,11 +705,11 @@ module T = struct
             ~metadata:
               [ ( "scan_state"
                 , `String (Scan_state.snark_job_list_json t.scan_state) )
-              ; ("data", data_json) ]
-            !"Unexpected error when applying diff data $data to the \
-              scan_state $scan_state: %s\n\
-              %!"
-            (Error.to_string_hum e) ) ;
+              ; ("data", data_json)
+              ; ("error", `String (Error.to_string_hum e))
+              ; ("prefix", `String log_prefix) ]
+            !"$prefix: Unexpected error when applying diff data $data to the \
+              scan_state $scan_state: $error" ) ;
       Deferred.return (to_staged_ledger_or_error r)
     in
     let%bind updated_pending_coinbase_collection' =
@@ -717,8 +733,10 @@ module T = struct
         ; ("coinbase_count", `Int (List.length coinbases))
         ; ("spots_available", `Int spots_available)
         ; ("proof_bundles_waiting", `Int proofs_waiting)
-        ; ("work_count", `Int (List.length works)) ]
-      "apply_diff block info: No of transactions included:$user_command_count\n\
+        ; ("work_count", `Int (List.length works))
+        ; ("prefix", `String log_prefix) ]
+      "$prefix: apply_diff block info: No of transactions \
+       included:$user_command_count\n\
       \      Coinbase parts:$coinbase_count Spots\n\
       \      available:$spots_available Pending work in the \
        scan-state:$proof_bundles_waiting Work included:$work_count" ;
@@ -765,6 +783,7 @@ module T = struct
     in
     let%map ((_, _, `Staged_ledger new_staged_ledger, __) as res) =
       apply_diff t prediff ~logger ~current_global_slot ~state_and_body_hash
+        ~log_prefix:"apply_diff"
     in
     let () =
       Or_error.iter_error (update_metrics new_staged_ledger witness)
@@ -777,7 +796,7 @@ module T = struct
     res
 
   let apply_diff_unchecked t
-      (sl_diff : Staged_ledger_diff.With_valid_signatures_and_proofs.t)
+      (sl_diff : Staged_ledger_diff.With_valid_signatures_and_proofs.t) ~logger
       ~current_global_slot ~state_and_body_hash =
     let open Deferred.Result.Let_syntax in
     let%bind prediff =
@@ -785,8 +804,8 @@ module T = struct
       @@ Pre_diff_info.get_unchecked sl_diff
       |> Deferred.return
     in
-    apply_diff t prediff ~logger:(Logger.null ()) ~current_global_slot
-      ~state_and_body_hash
+    apply_diff t prediff ~logger ~current_global_slot ~state_and_body_hash
+      ~log_prefix:"apply_diff_unchecked"
 
   module Resources = struct
     module Discarded = struct
