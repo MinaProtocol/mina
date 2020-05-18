@@ -3,7 +3,7 @@
  (public_name vrf_lib)
  (flags :standard -short-paths)
  (library_flags -linkall)
- (libraries core snarky snarky_curves test_util)
+ (libraries core genesis_constants snarky snarky_curves test_util)
  (preprocess
   (pps ppx_coda ppx_jane ppx_bench ppx_deriving.eq bisect_ppx -- -conditional))
  (modules integrated standalone)
