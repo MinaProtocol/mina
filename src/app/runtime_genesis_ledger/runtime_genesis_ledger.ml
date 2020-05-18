@@ -30,6 +30,9 @@ let main ~config_file ~genesis_dir ~proof_level () =
        ~proof_level ~genesis_constants:Genesis_constants.compiled config
 
 let () =
+  let compiled_ledger_depth =
+    Genesis_constants.Constraint_constants.compiled.ledger_depth
+  in
   Command.run
     (Command.async
        ~summary:

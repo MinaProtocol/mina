@@ -16,7 +16,7 @@ let genesis_dir_name
     let str =
       ( List.map
           [ Coda_compile_config.curve_size
-          ; Coda_compile_config.ledger_depth
+          ; constraint_constants.ledger_depth
           ; Option.value ~default:0 genesis_constants.num_accounts
           ; constraint_constants.c
           ; genesis_constants.protocol.k ]

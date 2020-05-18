@@ -109,6 +109,8 @@ let is_versioned_module_inc_decl inc_decl =
 let versioned_in_functor_error loc =
   (loc, "Cannot use versioned extension within a functor body")
 
+let include_stable_latest_error loc = (loc, "Cannot include Stable.Latest")
+
 type accumulator =
   { in_functor: bool
   ; in_include: bool
@@ -136,6 +138,13 @@ let is_version_module vn =
   && String.for_all (String.sub vn ~pos:1 ~len:(len - 1)) ~f:Char.is_digit
 
 let is_stable_prefix = is_longident_with_id "Stable"
+
+let is_stable_latest_inc_decl inc_decl =
+  match inc_decl.pincl_mod.pmod_desc with
+  | Pmod_ident {txt= Ldot (Lident "Stable", "Latest"); _} ->
+      true
+  | _ ->
+      false
 
 let is_jane_street_prefix prefix =
   match Longident.flatten_exn prefix with
@@ -478,6 +487,8 @@ let lint_ast =
                name.txt ~equal:String.equal ->
           (* don't check for errors in test code *)
           acc
+      | Pstr_include inc_decl when is_stable_latest_inc_decl inc_decl ->
+          acc_with_errors acc [include_stable_latest_error str.pstr_loc]
       | Pstr_include inc_decl when is_versioned_module_inc_decl inc_decl ->
           acc_with_errors acc [include_versioned_module_error str.pstr_loc]
       | Pstr_include inc_decl ->
