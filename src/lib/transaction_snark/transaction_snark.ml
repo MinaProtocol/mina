@@ -815,10 +815,27 @@ module Base = struct
             current_global_slot <= payload.common.valid_until)
         >>= Boolean.Assert.is_true )
     in
-    (* Check coinbase stack. *)
+    (* Check coinbase stack. Protocol state body is pushed into the Pending coinbase stack once per block. For example, consider any two transactions in a block. Their pending coinbase stacks would be:
+      transaction1: s1 -> t1 = s1+ protocol_state_body + maybe_coinbase
+      transaction2: t1 -> t1 + maybe_another_coinbase (Note: protocol_state_body is not pushed again)
+
+    However, for each transaction, we need to constrain the protoccol state body. The way this is done is by having the stack (init_stack) without the current protocol state body, pushing the state body to it in every transaction snark and checking if it matches the target. We also need to constrain the source for the merges to work correctly. Basically,
+      init_stack + protocol_state_body + maybe_coinbase = target
+      AND
+      init_stack = source || init_stack + protocol_state_body = source *)
+
+    (* These are all the possible cases:
+
+       Init_stack     Source                 Target 
+      --------------------------------------------------------------
+        i               i                       i + state
+        i               i                       i + state + coinbase
+        i               i + state               i + state
+        i               i + state               i + state + coinbase
+        i + coinbase    i + state + coinbase    i + state + coinbase
+    *)
     let%bind () =
       [%with_label "Compute coinbase stack"]
-        (*push state for any transaction*)
         (let%bind state_body_hash =
            Coda_state.Protocol_state.Body.hash_checked state_body
          in
@@ -2406,8 +2423,8 @@ let%test_module "transaction_snark" =
       let acc = Ledger.get ledger loc |> Option.value_exn in
       [%test_eq: Balance.t] acc.balance (Balance.of_int balance)
 
-    let of_user_command' sok_digest ledger user_command pending_coinbase_stack
-        state_body_hash state_body handler =
+    let of_user_command' sok_digest ledger user_command
+        pending_coinbase_stack_state state_body handler =
       let source = Ledger.merkle_root ledger in
       let current_global_slot =
         Coda_state.Protocol_state.Body.consensus_state state_body
@@ -2417,22 +2434,12 @@ let%test_module "transaction_snark" =
         Ledger.merkle_root_after_user_command_exn ledger
           ~txn_global_slot:current_global_slot user_command
       in
-      let pending_coinbase_stack_target =
-        pending_coinbase_stack_target (User_command user_command)
-          state_body_hash pending_coinbase_stack
-      in
-      let pending_coinbase_stack_state =
-        { Pending_coinbase_stack_state.source= pending_coinbase_stack
-        ; target= pending_coinbase_stack_target
-        ; init_stack= Base pending_coinbase_stack }
-      in
       let user_command_in_block =
         { Transaction_protocol_state.Poly.transaction= user_command
         ; block_data= state_body }
       in
-      ( of_user_command ~sok_digest ~source ~target
-          ~pending_coinbase_stack_state user_command_in_block handler
-      , pending_coinbase_stack_target )
+      of_user_command ~sok_digest ~source ~target ~pending_coinbase_stack_state
+        user_command_in_block handler
 
     (*
                 ~proposer:
@@ -2448,7 +2455,7 @@ let%test_module "transaction_snark" =
                        ; is_odd= true }
        *)
 
-    let coinbase_test state_body =
+    let coinbase_test state_body ~carryforward =
       let mk_pubkey () =
         Public_key.(compress (of_private_key_exn (Private_key.create ())))
       in
@@ -2471,6 +2478,12 @@ let%test_module "transaction_snark" =
         |> Or_error.ok_exn
       in
       let transaction = Transaction.Coinbase cb in
+      let source_stack =
+        if carryforward then
+          Pending_coinbase.Stack.(
+            push_state state_body_hash pending_coinbase_init)
+        else pending_coinbase_init
+      in
       let pending_coinbase_stack_target =
         pending_coinbase_stack_target transaction state_body_hash
           pending_coinbase_init
@@ -2496,13 +2509,17 @@ let%test_module "transaction_snark" =
                 merkle_root
                   (apply_transaction_exn sparse_ledger txn_in_block.transaction))
             ~pending_coinbase_stack_state:
-              { source= pending_coinbase_init
+              { source= source_stack
               ; target= pending_coinbase_stack_target
               ; init_stack= Base pending_coinbase_init } )
 
-    let%test_unit "coinbase with state body hash" =
+    let%test_unit "coinbase with new state body hash" =
       Test_util.with_randomness 123456789 (fun () ->
-          coinbase_test (Lazy.force state_body) )
+          coinbase_test (Lazy.force state_body) ~carryforward:false )
+
+    let%test_unit "coinbase with carry-forward state body hash" =
+      Test_util.with_randomness 123456789 (fun () ->
+          coinbase_test (Lazy.force state_body) ~carryforward:true )
 
     let%test_unit "new_account" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -2638,7 +2655,7 @@ let%test_module "transaction_snark" =
         ~pending_coinbase_stack_state:
           { Pending_coinbase_stack_state.source= pending_coinbase_stack
           ; target= pending_coinbase_stack_target
-          ; init_stack= Base pending_coinbase_stack_target }
+          ; init_stack= Base pending_coinbase_stack }
         {transaction= txn; block_data= state_body}
         (unstage @@ Sparse_ledger.handler sparse_ledger)
 
@@ -2771,11 +2788,14 @@ let%test_module "transaction_snark" =
                 (Account.identifier other.account)
                 (fees - account_fee) ledger ) )
 
-    let%test "base_and_merge" =
+    let test_base_and_merge ~state_hash_and_body1 ~state_hash_and_body2
+        ~carryforward1 ~carryforward2 =
       Test_util.with_randomness 123456789 (fun () ->
           let wallets = random_wallets () in
-          let state_body = Lazy.force state_body in
-          let state_body_hash = Lazy.force state_body_hash in
+          (*let state_body = Lazy.force state_body in
+      let state_body_hash = Lazy.force state_body_hash in*)
+          let state_body_hash1, state_body1 = state_hash_and_body1 in
+          let state_body_hash2, state_body2 = state_hash_and_body2 in
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               Array.iter wallets ~f:(fun {account; private_key= _} ->
                   Ledger.create_new_account_exn ledger
@@ -2813,9 +2833,24 @@ let%test_module "transaction_snark" =
                        User_command.accounts_accessed (t :> User_command.t) )
                      [t1; t2])
               in
-              let proof12, _ =
+              let pending_coinbase_stack_state1 =
+                (*No coinbase to add to the stack*)
+                let stack_with_state =
+                  Pending_coinbase.Stack.(
+                    push_state state_body_hash1 Pending_coinbase.Stack.empty)
+                in
+                (*Since protocol state body is added once per block, the source would already have the state if carryforward=true from the previous transaction in the sequence of transactions in a block. We add state to init_stack and then check if it is equal to the target*)
+                let source_stack, target_stack =
+                  if carryforward1 then (stack_with_state, stack_with_state)
+                  else (Pending_coinbase.Stack.empty, stack_with_state)
+                in
+                { Pending_coinbase_stack_state.source= source_stack
+                ; target= target_stack
+                ; init_stack= Base Pending_coinbase.Stack.empty }
+              in
+              let proof12 =
                 of_user_command' sok_digest ledger t1
-                  Pending_coinbase.Stack.empty state_body_hash state_body
+                  pending_coinbase_stack_state1 state_body1
                   (unstage @@ Sparse_ledger.handler sparse_ledger)
               in
               let sparse_ledger =
@@ -2823,8 +2858,34 @@ let%test_module "transaction_snark" =
                   (t1 :> User_command.t)
               in
               let current_global_slot =
-                Coda_state.Protocol_state.Body.consensus_state state_body
+                Coda_state.Protocol_state.Body.consensus_state state_body1
                 |> Consensus.Data.Consensus_state.curr_slot
+              in
+              let pending_coinbase_stack_state2, state_body2 =
+                let previous_stack = pending_coinbase_stack_state1.target in
+                let stack_with_state2 =
+                  Pending_coinbase.Stack.(
+                    push_state state_body_hash2 previous_stack)
+                in
+                (*No coinbase to add*)
+                let source_stack, target_stack, init_stack, state_body2 =
+                  if carryforward2 then
+                    (*Source and target already have the protocol state, init_stack will be such that init_stack + state_body_hash1 = target = source *)
+                    ( previous_stack
+                    , previous_stack
+                    , pending_coinbase_stack_state1.init_stack
+                    , state_body1 )
+                  else
+                    (*Add the new state such that previous_stack + state_body_hash2 = init_stack + state_body_hash2 = target*)
+                    ( previous_stack
+                    , stack_with_state2
+                    , Base previous_stack
+                    , state_body2 )
+                in
+                ( { Pending_coinbase_stack_state.source= source_stack
+                  ; target= target_stack
+                  ; init_stack }
+                , state_body2 )
               in
               Ledger.apply_user_command ledger
                 ~txn_global_slot:current_global_slot t1
@@ -2832,136 +2893,24 @@ let%test_module "transaction_snark" =
               [%test_eq: Frozen_ledger_hash.t]
                 (Ledger.merkle_root ledger)
                 (Sparse_ledger.merkle_root sparse_ledger) ;
-              let proof23, pending_coinbase_stack_target =
+              let proof23 =
                 of_user_command' sok_digest ledger t2
-                  Pending_coinbase.Stack.empty state_body_hash state_body
+                  pending_coinbase_stack_state2 state_body2
                   (unstage @@ Sparse_ledger.handler sparse_ledger)
               in
               let sparse_ledger =
                 Sparse_ledger.apply_user_command_exn sparse_ledger
                   (t2 :> User_command.t)
               in
-              let pending_coinbase_stack_state =
+              let pending_coinbase_stack_state_merge =
                 Pending_coinbase_stack_state.Stable.Latest.
-                  { source= Pending_coinbase.Stack.empty
-                  ; target= pending_coinbase_stack_target
-                  ; init_stack= Base pending_coinbase_stack_target }
-              in
-              Ledger.apply_user_command ledger
-                ~txn_global_slot:current_global_slot t2
-              |> Or_error.ok_exn |> ignore ;
-              [%test_eq: Frozen_ledger_hash.t]
-                (Ledger.merkle_root ledger)
-                (Sparse_ledger.merkle_root sparse_ledger) ;
-              let total_fees =
-                let open Amount in
-                let magnitude =
-                  of_fee
-                    (User_command_payload.fee (t1 :> User_command.t).payload)
-                  + of_fee
-                      (User_command_payload.fee (t2 :> User_command.t).payload)
-                  |> Option.value_exn
-                in
-                Signed.create ~magnitude ~sgn:Sgn.Pos
-              in
-              let state3 = Sparse_ledger.merkle_root sparse_ledger in
-              let proof13 =
-                merge ~sok_digest proof12 proof23 |> Or_error.ok_exn
-              in
-              Tock.verify proof13.proof keys.verification.wrap wrap_input
-                (Wrap_input.of_tick_field
-                   (merge_top_hash ~sok_digest ~state1 ~state2:state3
-                      ~supply_increase:Amount.zero ~fee_excess:total_fees
-                      ~pending_coinbase_stack_state wrap_vk_state)) ) )
-
-    (*Merge transitions from two different protocol states*)
-    let%test "base_and_merge- transactions in different blocks" =
-      Test_util.with_randomness 123456789 (fun () ->
-          let wallets = random_wallets () in
-          let state_body = Lazy.force state_body in
-          let state_body_hash = Lazy.force state_body_hash in
-          Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
-              Array.iter wallets ~f:(fun {account; private_key= _} ->
-                  Ledger.create_new_account_exn ledger
-                    (Account.identifier account)
-                    account ) ;
-              let state_body0 =
-                Coda_state.Protocol_state.negative_one
-                  ~genesis_ledger:(lazy ledger)
-                  ~protocol_constants:Genesis_constants.compiled.protocol
-                  ~constraint_constants:
-                    Genesis_constants.Constraint_constants.compiled
-                |> Coda_state.Protocol_state.body
-              in
-              let state_body_hash0 =
-                Coda_state.Protocol_state.Body.hash state_body0
-              in
-              let t1 =
-                user_command_with_wallet wallets ~sender:0 ~receiver:1
-                  8_000_000_000
-                  (Fee.of_int (Random.int 20 * 1_000_000_000))
-                  ~fee_token:Token_id.default ~token:Token_id.default
-                  Account.Nonce.zero
-                  (User_command_memo.create_by_digesting_string_exn
-                     (Test_util.arbitrary_string
-                        ~len:User_command_memo.max_digestible_string_length))
-              in
-              let t2 =
-                user_command_with_wallet wallets ~sender:1 ~receiver:2
-                  3_000_000_000
-                  (Fee.of_int (Random.int 20 * 1_000_000_000))
-                  ~fee_token:Token_id.default ~token:Token_id.default
-                  Account.Nonce.zero
-                  (User_command_memo.create_by_digesting_string_exn
-                     (Test_util.arbitrary_string
-                        ~len:User_command_memo.max_digestible_string_length))
-              in
-              let sok_digest =
-                Sok_message.create ~fee:Fee.zero
-                  ~prover:wallets.(0).account.public_key
-                |> Sok_message.digest
-              in
-              let state1 = Ledger.merkle_root ledger in
-              let sparse_ledger =
-                Sparse_ledger.of_ledger_subset_exn ledger
-                  (List.concat_map
-                     ~f:(fun t ->
-                       User_command.accounts_accessed (t :> User_command.t) )
-                     [t1; t2])
-              in
-              let proof12, pending_coinbase_stack_next =
-                of_user_command' sok_digest ledger t1
-                  Pending_coinbase.Stack.empty state_body_hash0 state_body0
-                  (unstage @@ Sparse_ledger.handler sparse_ledger)
-              in
-              let sparse_ledger =
-                Sparse_ledger.apply_user_command_exn sparse_ledger
-                  (User_command.forget_check t1)
+                  { source= pending_coinbase_stack_state1.source
+                  ; target= pending_coinbase_stack_state2.target
+                  ; init_stack= Merge }
               in
               let current_global_slot =
-                Coda_state.Protocol_state.Body.consensus_state state_body
+                Coda_state.Protocol_state.Body.consensus_state state_body2
                 |> Consensus.Data.Consensus_state.curr_slot
-              in
-              Ledger.apply_user_command ledger
-                ~txn_global_slot:current_global_slot t1
-              |> Or_error.ok_exn |> ignore ;
-              [%test_eq: Frozen_ledger_hash.t]
-                (Ledger.merkle_root ledger)
-                (Sparse_ledger.merkle_root sparse_ledger) ;
-              let proof23, pending_coinbase_stack_target =
-                of_user_command' sok_digest ledger t2
-                  pending_coinbase_stack_next state_body_hash state_body
-                  (unstage @@ Sparse_ledger.handler sparse_ledger)
-              in
-              let sparse_ledger =
-                Sparse_ledger.apply_user_command_exn sparse_ledger
-                  (t2 :> User_command.t)
-              in
-              let pending_coinbase_stack_state =
-                Pending_coinbase_stack_state.Stable.Latest.
-                  { source= Pending_coinbase.Stack.empty
-                  ; target= pending_coinbase_stack_target
-                  ; init_stack= Base pending_coinbase_stack_target }
               in
               Ledger.apply_user_command ledger
                 ~txn_global_slot:current_global_slot t2
@@ -2988,7 +2937,76 @@ let%test_module "transaction_snark" =
                 (Wrap_input.of_tick_field
                    (merge_top_hash ~sok_digest ~state1 ~state2:state3
                       ~supply_increase:Amount.zero ~fee_excess:total_fees
-                      ~pending_coinbase_stack_state wrap_vk_state)) ) )
+                      ~pending_coinbase_stack_state:
+                        pending_coinbase_stack_state_merge wrap_vk_state)) ) )
+
+    let%test "base_and_merge: transactions in one block (t1,t2 in b1), \
+              carryforward the state from a previous transaction t0 in b1" =
+      let state_hash_and_body1 =
+        (Lazy.force state_body_hash, Lazy.force state_body)
+      in
+      test_base_and_merge ~state_hash_and_body1
+        ~state_hash_and_body2:state_hash_and_body1 ~carryforward1:true
+        ~carryforward2:true
+
+    (* No new state body, carryforward the stack from the previous transaction*)
+
+    let%test "base_and_merge: transactions in one block (t1,t2 in b1), don't \
+              carryforward the state from a previous transaction t0 in b1" =
+      let state_hash_and_body1 =
+        (Lazy.force state_body_hash, Lazy.force state_body)
+      in
+      test_base_and_merge ~state_hash_and_body1
+        ~state_hash_and_body2:state_hash_and_body1 ~carryforward1:false
+        ~carryforward2:true
+
+    let%test "base_and_merge: transactions in two different blocks (t1,t2 in \
+              b1, b2 resp.), carryforward the state from a previous \
+              transaction t0 in b1" =
+      let state_hash_and_body1 =
+        let state_body0 =
+          Coda_state.Protocol_state.negative_one
+            ~genesis_ledger:Test_genesis_ledger.t
+            ~protocol_constants:Genesis_constants.compiled.protocol
+            ~constraint_constants:
+              Genesis_constants.Constraint_constants.compiled
+          |> Coda_state.Protocol_state.body
+        in
+        let state_body_hash0 =
+          Coda_state.Protocol_state.Body.hash state_body0
+        in
+        (state_body_hash0, state_body0)
+      in
+      let state_hash_and_body2 =
+        (Lazy.force state_body_hash, Lazy.force state_body)
+      in
+      test_base_and_merge ~state_hash_and_body1 ~state_hash_and_body2
+        ~carryforward1:true ~carryforward2:false
+
+    (*t2 is in a new state, therefore do not carryforward the previous state*)
+
+    let%test "base_and_merge: transactions in two different blocks (t1,t2 in \
+              b1, b2 resp.), don't carryforward the state from a previous \
+              transaction t0 in b1" =
+      let state_hash_and_body1 =
+        let state_body0 =
+          Coda_state.Protocol_state.negative_one
+            ~genesis_ledger:Test_genesis_ledger.t
+            ~protocol_constants:Genesis_constants.compiled.protocol
+            ~constraint_constants:
+              Genesis_constants.Constraint_constants.compiled
+          |> Coda_state.Protocol_state.body
+        in
+        let state_body_hash0 =
+          Coda_state.Protocol_state.Body.hash state_body0
+        in
+        (state_body_hash0, state_body0)
+      in
+      let state_hash_and_body2 =
+        (Lazy.force state_body_hash, Lazy.force state_body)
+      in
+      test_base_and_merge ~state_hash_and_body1 ~state_hash_and_body2
+        ~carryforward1:false ~carryforward2:false
 
     let test_user_command_with_accounts ~ledger ~accounts ~signer ~fee
         ~fee_payer_pk ~fee_token ?memo ~valid_until ~nonce body =
