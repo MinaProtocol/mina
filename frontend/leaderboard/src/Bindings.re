@@ -2,6 +2,8 @@ module GoogleSheets = {
   type client;
   type sheets;
   type token = Js.Json.t;
+  type data = {values: array(array(string))};
+  type res = {data};
 
   type clientConfig = {
     clientId: string,
@@ -22,6 +24,15 @@ module GoogleSheets = {
   type sheetsQuery = {
     spreadsheetId: string,
     range: string,
+  };
+
+  type sheetsQueryData = {values: array(array(string))};
+
+  type sheetsUpdate = {
+    spreadsheetId: string,
+    range: string,
+    valueInputOption: string,
+    resource: sheetsQueryData,
   };
 
   [@bs.scope ("google", "auth")] [@bs.new] [@bs.module "googleapis"]
@@ -49,8 +60,6 @@ module GoogleSheets = {
     unit =
     "getToken";
 
-  type data = {values: array(array(string))};
-  type res = {data};
   [@bs.scope ("spreadsheets", "values")] [@bs.send]
   external get:
     (
@@ -60,6 +69,16 @@ module GoogleSheets = {
     ) =>
     unit =
     "get";
+
+  [@bs.scope ("spreadsheets", "values")] [@bs.send]
+  external update:
+    (
+      sheets,
+      sheetsUpdate,
+      (~error: Js.Nullable.t(string), ~res: res) => unit
+    ) =>
+    unit =
+    "update";
 };
 
 module Readline = {
