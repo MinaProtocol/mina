@@ -491,6 +491,8 @@ let lint_ast =
           acc_with_errors acc [include_stable_latest_error str.pstr_loc]
       | Pstr_include inc_decl when is_versioned_module_inc_decl inc_decl ->
           acc_with_errors acc [include_versioned_module_error str.pstr_loc]
+      | Pstr_include inc_decl when is_stable_latest_inc_decl inc_decl ->
+          acc_with_errors acc [include_stable_latest_error str.pstr_loc]
       | Pstr_include inc_decl ->
           let acc' =
             self#module_expr inc_decl.pincl_mod {acc with in_include= true}

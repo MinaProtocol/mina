@@ -649,4 +649,4 @@ let () =
   let rules =
     [module_rule; module_rule_asserted; module_rule_binable; module_decl_rule]
   in
-  Driver.register_transformation "ppx_coda/versioned_module" ~rules
+  Driver.register_transformation "ppx_version/versioned_module" ~rules
