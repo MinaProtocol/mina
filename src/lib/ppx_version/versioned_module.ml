@@ -207,7 +207,12 @@ let version_type ~version_option version stri =
                       buf ~pos_ref
                   in
                   (* sanity check *)
-                  assert (Core_kernel.Int.equal read_version version) ;
+                  if not (Core_kernel.Int.equal read_version version) then
+                    failwith
+                      (Core_kernel.sprintf
+                         "bin_read_t: version read %d does not match expected \
+                          version %d"
+                         read_version version) ;
                   t]]]
     ; [%stri
         let __bin_read_t__ =
@@ -220,7 +225,12 @@ let version_type ~version_option version stri =
                       buf ~pos_ref i
                   in
                   (* sanity check *)
-                  assert (Core_kernel.Int.equal read_version version) ;
+                  if not (Core_kernel.Int.equal read_version version) then
+                    failwith
+                      (Core_kernel.sprintf
+                         "__bin_read_t__: version read %d does not match \
+                          expected version %d"
+                         read_version version) ;
                   t]]]
     ; [%stri
         let bin_size_t =
