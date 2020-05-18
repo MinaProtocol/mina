@@ -10,7 +10,7 @@ module type S = sig
 
     val account : Unsigned.UInt8.t
 
-    val hash : int -> Unsigned.UInt8.t
+    val hash : ledger_depth:int -> int -> Unsigned.UInt8.t
   end
 
   type t = Generic of Bigstring.t | Account of Addr.t | Hash of Addr.t
@@ -30,7 +30,7 @@ module type S = sig
 
   val build_generic : Bigstring.t -> t
 
-  val parse : Bigstring.t -> (t, unit) Result.t
+  val parse : ledger_depth:int -> Bigstring.t -> (t, unit) Result.t
 
   val prefix_bigstring : Unsigned.UInt8.t -> Bigstring.t -> Bigstring.t
 

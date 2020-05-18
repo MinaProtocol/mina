@@ -27,9 +27,10 @@ module Inputs = struct
     type t =
       { m: (module S)
       ; cache: Cache.t
-      ; proof_level: Genesis_constants.Proof_level.t }
+      ; proof_level: Genesis_constants.Proof_level.t
+      ; constraint_constants: Genesis_constants.Constraint_constants.t }
 
-    let create ~proof_level () =
+    let create ~proof_level ~constraint_constants () =
       let%map proving, verification =
         match proof_level with
         | Genesis_constants.Proof_level.Full ->
@@ -45,7 +46,8 @@ module Inputs = struct
           end)
           : S )
       ; cache= Cache.create ()
-      ; proof_level }
+      ; proof_level
+      ; constraint_constants }
 
     let worker_wait_time = 5.
   end
@@ -58,8 +60,9 @@ module Inputs = struct
   [@@deriving sexp]
 
   (* TODO: Use public_key once SoK is implemented *)
-  let perform_single ({m= (module M); cache; proof_level} : Worker_state.t)
-      ~message =
+  let perform_single
+      ({m= (module M); cache; proof_level; constraint_constants} :
+        Worker_state.t) ~message =
     let open Snark_work_lib in
     let sok_digest = Coda_base.Sok_message.digest message in
     fun (single : single_spec) ->
@@ -95,7 +98,7 @@ module Inputs = struct
                 (input, t, (w : Transaction_witness.t)) ->
                 process (fun () ->
                     Or_error.try_with (fun () ->
-                        M.of_transaction ~sok_digest
+                        M.of_transaction ~constraint_constants ~sok_digest
                           ~source:input.Transaction_snark.Statement.source
                           ~target:input.target
                           { Transaction_protocol_state.Poly.transaction= t

@@ -616,9 +616,9 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                 let next_producer_timing =
                   measure "asking consensus what to do" (fun () ->
                       Consensus.Hooks.next_producer_timing
-                        ~constants:consensus_constants (time_to_ms now)
-                        consensus_state ~local_state:consensus_local_state
-                        ~keypairs ~logger )
+                        ~constraint_constants ~constants:consensus_constants
+                        (time_to_ms now) consensus_state
+                        ~local_state:consensus_local_state ~keypairs ~logger )
                 in
                 set_next_producer_timing next_producer_timing ;
                 match next_producer_timing with

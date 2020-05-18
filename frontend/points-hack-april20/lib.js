@@ -146,6 +146,9 @@ subscription Blocks {
     }
     transactions {
       coinbase
+      coinbaseReceiverAccount {
+        publicKey
+      }
       feeTransfer {
         fee
         recipient
