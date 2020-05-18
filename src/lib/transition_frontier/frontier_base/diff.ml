@@ -64,7 +64,7 @@ module Node_list = struct
       end
     end]
 
-    include Stable.Latest
+    type t = Stable.Latest.t
   end
 end
 
@@ -124,7 +124,7 @@ module Root_transition = struct
       end
     end]
 
-    include Stable.Latest
+    type t = Stable.Latest.t
   end
 end
 
