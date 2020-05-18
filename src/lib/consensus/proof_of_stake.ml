@@ -508,11 +508,15 @@ module Data = struct
         , Coda_base.Account.Index.Unpacked.var )
         t
 
-      let to_input ({global_slot; seed; delegator} : value) =
+      let to_input
+          ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+          ({global_slot; seed; delegator} : value) =
         { Random_oracle.Input.field_elements= [|(seed :> Tick.field)|]
         ; bitstrings=
             [| Global_slot.Bits.to_bits global_slot
-             ; Coda_base.Account.Index.to_bits delegator |] }
+             ; Coda_base.Account.Index.to_bits
+                 ~ledger_depth:constraint_constants.ledger_depth delegator |]
+        }
 
       let to_hlist {global_slot; seed; delegator} =
         Coda_base.H_list.[global_slot; seed; delegator]
@@ -525,19 +529,24 @@ module Data = struct
        fun Coda_base.H_list.[global_slot; seed; delegator] ->
         {global_slot; seed; delegator}
 
-      let data_spec =
+      let data_spec
+          ~(constraint_constants : Genesis_constants.Constraint_constants.t) =
         let open Tick.Data_spec in
-        [Global_slot.typ; Epoch_seed.typ; Coda_base.Account.Index.Unpacked.typ]
+        [ Global_slot.typ
+        ; Epoch_seed.typ
+        ; Coda_base.Account.Index.Unpacked.typ
+            ~ledger_depth:constraint_constants.ledger_depth ]
 
-      let typ : (var, value) Typ.t =
-        Tick.Typ.of_hlistable data_spec ~var_to_hlist:to_hlist
-          ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
-          ~value_of_hlist:of_hlist
+      let typ ~constraint_constants : (var, value) Typ.t =
+        Tick.Typ.of_hlistable
+          (data_spec ~constraint_constants)
+          ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
+          ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
-      let hash_to_group msg =
+      let hash_to_group ~constraint_constants msg =
         Group_map.to_group
           (Random_oracle.hash ~init:Coda_base.Hash_prefix.vrf_message
-             (Random_oracle.pack_input (to_input msg)))
+             (Random_oracle.pack_input (to_input ~constraint_constants msg)))
         |> Tick.Inner_curve.of_affine
 
       module Checked = struct
@@ -560,11 +569,15 @@ module Data = struct
                    (Random_oracle.Checked.pack_input input)) )
       end
 
-      let gen =
+      let gen
+          ~(constraint_constants : Genesis_constants.Constraint_constants.t) =
         let open Quickcheck.Let_syntax in
         let%map global_slot = Global_slot.gen
         and seed = Epoch_seed.gen
-        and delegator = Coda_base.Account.Index.gen in
+        and delegator =
+          Coda_base.Account.Index.gen
+            ~ledger_depth:constraint_constants.ledger_depth
+        in
         {global_slot; seed; delegator}
     end
 
@@ -617,11 +630,13 @@ module Data = struct
         Random_oracle.Digest.to_bits ~length:Truncated.length_in_bits x
         |> Array.of_list |> Blake2.bits_to_string
 
-      let hash msg g =
+      let hash ~constraint_constants msg g =
         let x, y = Non_zero_curve_point.of_inner_curve_exn g in
         let input =
           Random_oracle.Input.(
-            append (Message.to_input msg) (field_elements [|x; y|]))
+            append
+              (Message.to_input ~constraint_constants msg)
+              (field_elements [|x; y|]))
         in
         let open Random_oracle in
         hash ~init:Hash_prefix_states.vrf_output (pack_input input)
@@ -644,6 +659,9 @@ module Data = struct
       end
 
       let%test_unit "hash unchecked vs. checked equality" =
+        let constraint_constants =
+          Genesis_constants.Constraint_constants.for_unit_tests
+        in
         let gen_inner_curve_point =
           let open Quickcheck.Generator.Let_syntax in
           let%map compressed = Non_zero_curve_point.gen in
@@ -651,17 +669,19 @@ module Data = struct
         in
         let gen_message_and_curve_point =
           let open Quickcheck.Generator.Let_syntax in
-          let%map msg = Message.gen and g = gen_inner_curve_point in
+          let%map msg = Message.gen ~constraint_constants
+          and g = gen_inner_curve_point in
           (msg, g)
         in
         Quickcheck.test ~trials:10 gen_message_and_curve_point
           ~f:
             (Test_util.test_equal ~equal:Field.equal
                Snark_params.Tick.Typ.(
-                 Message.typ * Snark_params.Tick.Inner_curve.typ)
+                 Message.typ ~constraint_constants
+                 * Snark_params.Tick.Inner_curve.typ)
                typ
                (fun (msg, g) -> Checked.hash msg g)
-               (fun (msg, g) -> hash msg g))
+               (fun (msg, g) -> hash ~constraint_constants msg g))
     end
 
     module Threshold = struct
@@ -763,7 +783,9 @@ module Data = struct
       | Private_key : Scalar.value Snarky.Request.t
       | Public_key : Public_key.t Snarky.Request.t
 
-    let%snarkydef get_vrf_evaluation shifted ~ledger ~message =
+    let%snarkydef get_vrf_evaluation
+        ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+        shifted ~ledger ~message =
       let open Coda_base in
       let open Snark_params.Tick in
       let%bind private_key =
@@ -774,7 +796,9 @@ module Data = struct
       in
       let staker_addr = message.Message.delegator in
       let%bind account =
-        with_label __LOC__ (Frozen_ledger_hash.get ledger staker_addr)
+        with_label __LOC__
+          (Frozen_ledger_hash.get ~depth:constraint_constants.ledger_depth
+             ledger staker_addr)
       in
       let%bind () =
         [%with_label "Account is for the default token"]
@@ -794,15 +818,19 @@ module Data = struct
       (evaluation, account.balance)
 
     module Checked = struct
-      let%snarkydef check shifted ~(epoch_ledger : Epoch_ledger.var)
-          ~global_slot ~seed =
+      let%snarkydef check
+          ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+          shifted ~(epoch_ledger : Epoch_ledger.var) ~global_slot ~seed =
         let open Snark_params.Tick in
         let%bind winner_addr =
-          request_witness Coda_base.Account.Index.Unpacked.typ
+          request_witness
+            (Coda_base.Account.Index.Unpacked.typ
+               ~ledger_depth:constraint_constants.ledger_depth)
             (As_prover.return Winner_address)
         in
         let%bind result, my_stake =
-          get_vrf_evaluation shifted ~ledger:epoch_ledger.hash
+          get_vrf_evaluation ~constraint_constants shifted
+            ~ledger:epoch_ledger.hash
             ~message:{Message.global_slot; seed; delegator= winner_addr}
         in
         let%bind truncated_result = Output.Checked.truncate result in
@@ -863,7 +891,7 @@ module Data = struct
                       request))
     end
 
-    let check ~global_slot ~seed ~private_key ~public_key
+    let check ~constraint_constants ~global_slot ~seed ~private_key ~public_key
         ~public_key_compressed ~total_stake ~logger ~epoch_snapshot =
       let open Message in
       let open Local_state in
@@ -874,7 +902,8 @@ module Data = struct
             |> Option.value ~default:(Core_kernel.Int.Table.create ()) )
             ~f:(fun ~key:delegator ~data:account ->
               let vrf_result =
-                T.eval ~private_key {global_slot; seed; delegator}
+                T.eval ~constraint_constants ~private_key
+                  {global_slot; seed; delegator}
               in
               let truncated_vrf_result = Output.truncate vrf_result in
               Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
@@ -2110,7 +2139,7 @@ module Data = struct
         ~protocol_constants : Value.t =
       let producer_vrf_result =
         let _, sk = Vrf.Precomputed.genesis_winner in
-        Vrf.eval ~private_key:sk
+        Vrf.eval ~constraint_constants ~private_key:sk
           { Vrf.Message.global_slot= consensus_transition
           ; seed= Epoch_seed.initial
           ; delegator= 0 }
@@ -2184,7 +2213,7 @@ module Data = struct
       in
       let%bind threshold_satisfied, vrf_result, truncated_vrf_result =
         let%bind (module M) = Inner_curve.Checked.Shifted.create () in
-        Vrf.Checked.check
+        Vrf.Checked.check ~constraint_constants
           (module M)
           ~epoch_ledger:staking_epoch_data.ledger
           ~global_slot:(Global_slot.slot_number next_global_slot)
@@ -2424,6 +2453,8 @@ module Data = struct
                  (Snarky.Request.Handler.run handlers
                     ["Ledger Handler"; "Pending Coinbase Handler"]
                     request))
+
+    let ledger_depth {ledger; _} = ledger.depth
   end
 end
 
@@ -2901,7 +2932,7 @@ module Hooks = struct
     | `Produce_now of Signature_lib.Keypair.t * Block_data.t
     | `Produce of Unix_timestamp.t * Signature_lib.Keypair.t * Block_data.t ]
 
-  let next_producer_timing ~(constants : Constants.t) now
+  let next_producer_timing ~constraint_constants ~(constants : Constants.t) now
       (state : Consensus_state.Value.t) ~local_state ~keypairs ~logger =
     let info_if_producing =
       if Keypair.And_compressed_pk.Set.is_empty keypairs then Logger.debug
@@ -2980,7 +3011,7 @@ module Hooks = struct
                   [ ("epoch", `Int (Epoch.to_int epoch))
                   ; ("slot", `Int (Slot.to_int slot)) ] ;
               match
-                Vrf.check
+                Vrf.check ~constraint_constants
                   ~global_slot:(Global_slot.slot_number global_slot)
                   ~seed:epoch_data.seed ~epoch_snapshot
                   ~private_key:keypair.private_key
@@ -3315,6 +3346,11 @@ let%test_module "Proof of stake tests" =
     open Data
     open Consensus_state
 
+    let constraint_constants =
+      Genesis_constants.Constraint_constants.for_unit_tests
+
+    let ledger_depth = constraint_constants.ledger_depth
+
     let%test_unit "update, update_var agree starting from same genesis state" =
       (* build pieces needed to apply "update" *)
       let snarked_ledger_hash =
@@ -3322,9 +3358,6 @@ let%test_module "Proof of stake tests" =
           (Ledger.merkle_root (Lazy.force Test_genesis_ledger.t))
       in
       let previous_protocol_state_hash = State_hash.(of_hash zero) in
-      let constraint_constants =
-        Genesis_constants.Constraint_constants.for_unit_tests
-      in
       let previous_consensus_state =
         Consensus_state.create_genesis
           ~negative_one_protocol_state_hash:previous_protocol_state_hash
@@ -3371,7 +3404,7 @@ let%test_module "Proof of stake tests" =
             previous_consensus_state.next_epoch_data.seed
           else previous_consensus_state.staking_epoch_data.seed
         in
-        Vrf.eval ~private_key
+        Vrf.eval ~constraint_constants ~private_key
           {global_slot= Global_slot.slot_number global_slot; seed; delegator}
       in
       let next_consensus_state =
