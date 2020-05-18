@@ -12,5 +12,5 @@
       test_genesis_ledger
       lite_compat_algebra
     )
-   (preprocess (pps ppx_coda ppx_jane))
+   (preprocess (pps ppx_version ppx_jane))
    (modes native))

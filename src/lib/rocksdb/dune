@@ -5,5 +5,5 @@
  (inline_tests)
  (libraries core rocks key_value_database file_system)
  (preprocess
-  (pps ppx_coda ppx_jane))
+  (pps ppx_version ppx_jane))
  (synopsis "RocksDB Database module"))
