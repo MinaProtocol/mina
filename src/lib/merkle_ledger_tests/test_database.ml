@@ -517,7 +517,7 @@ let%test_module "test functor on in memory databases" =
     Make (struct
       let depth = Depth.depth
 
-      module Location = Merkle_ledger.Location.Make (Depth)
+      module Location = Merkle_ledger.Location.T
 
       module Location_binable = struct
         module Arg = struct
@@ -544,7 +544,6 @@ let%test_module "test functor on in memory databases" =
         module Location_binable = Location_binable
         module Kvdb = In_memory_kvdb
         module Storage_locations = Storage_locations
-        module Depth = Depth
       end
 
       module MT = Database.Make (Inputs)

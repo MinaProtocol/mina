@@ -1,7 +1,7 @@
 (library
   (name lite_precomputed_values)
   (public_name lite_precomputed_values)
-  (preprocess (pps ppx_jane ppx_deriving.eq ppx_coda))
+  (preprocess (pps ppx_jane ppx_deriving.eq ppx_version))
   (libraries lite_base snarkette core_kernel base58_check))
 
 (rule

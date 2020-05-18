@@ -1,6 +1,3 @@
-[%%import
-"/src/config.mlh"]
-
 (* print_binable_functors.ml *)
 
 (* print out applications of functors Binable.Of... or Bin_prot.Utils.Make_binable
@@ -12,6 +9,7 @@
 
 open Core_kernel
 open Ppxlib
+open Ppx_version
 
 let name = "print_binable_functors"
 
@@ -80,7 +78,9 @@ let traverse_ast =
                {module_path= pmb_name.txt :: acc.module_path}) ;
           acc
       | Pstr_extension ((name, _payload), _attrs)
-        when String.equal name.txt "test_module" ->
+        when List.mem
+               ["test"; "test_unit"; "test_module"]
+               name.txt ~equal:String.equal ->
           (* don't print functors in test code *)
           acc
       | Pstr_include inc_decl when is_included_binable_functor_app inc_decl ->
@@ -95,8 +95,5 @@ let preprocess_impl str =
   str
 
 let () =
-  match Sys.getenv_opt "CODA_PRINT_BINABLE_FUNCTORS" with
-  | Some "true" ->
-      Ppxlib.Driver.register_transformation name ~preprocess_impl
-  | _ ->
-      ()
+  Ppxlib.Driver.register_transformation name ~preprocess_impl ;
+  Ppxlib.Driver.standalone ()
