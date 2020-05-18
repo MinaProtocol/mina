@@ -19,6 +19,8 @@ module type S = sig
        logger:Logger.t
     -> pids:Child_processes.Termination.t
     -> conf_dir:string
+    -> proof_level:Genesis_constants.Proof_level.t
+    -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> t Deferred.t
 
   val initialized : t -> [`Initialized] Deferred.Or_error.t
@@ -28,6 +30,7 @@ module type S = sig
     -> Blockchain.t
     -> Protocol_state.Value.t
     -> Snark_transition.value
+    -> Ledger_proof.t option
     -> Consensus.Data.Prover_state.t
     -> Pending_coinbase_witness.t
     -> Blockchain.t Deferred.Or_error.t

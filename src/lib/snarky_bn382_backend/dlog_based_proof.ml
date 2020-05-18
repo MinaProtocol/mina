@@ -1,9 +1,38 @@
 open Core_kernel
 open Pickles_types
 
-type message = (Fq.t, G.Affine.t) Dlog_marlin_types.Challenge_polynomial.t list
+module Challenge_polynomial = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t =
+        {challenges: Fq.Stable.V1.t array; commitment: G.Affine.Stable.V1.t}
+      [@@deriving version, bin_io, sexp, compare, yojson]
 
-type t = (G.Affine.t, Fq.t, Fq.t array) Dlog_marlin_types.Proof.t [@@deriving bin_io]
+      let to_latest = Fn.id
+    end
+  end]
+
+  include Stable.Latest
+end
+
+type message = Challenge_polynomial.t list
+
+[%%versioned
+module Stable = struct
+  module V1 = struct
+    type t =
+      ( G.Affine.Stable.V1.t
+      , Fq.Stable.V1.t
+      , Fq.Stable.V1.t array )
+      Dlog_marlin_types.Proof.Stable.V1.t
+    [@@deriving bin_io, version, compare, sexp, yojson]
+
+    let to_latest = Fn.id
+  end
+end]
+
+include Stable.Latest
 
 let g t f = G.Affine.of_backend (f t)
 

@@ -36,3 +36,11 @@ These flags are supported in the config file:
 - `log-txn-pool-gossip` bool
 - `log-snark-work-gossip` bool
 - `log-block-creation` bool
+
+## Environment variables
+
+The daemon will read some environment variables on startup.
+
+`CODA_CLIENT_TRUSTLIST` is a comma-separated list of CIDR masks, for example `10.0.0.0/8,172.16.0.0/12,192.168.0.0/16` would allow any client on an RFC1918 private network to control the daemon. This list can be edited with `coda advanced client-trustlist` commands.
+
+There are other environment variables, but they aren't documented yet.

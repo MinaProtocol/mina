@@ -133,15 +133,23 @@ module type Signed_intf = sig
 
     val of_unsigned : magnitude_var -> var
 
+    val negate : var -> var
+
     val if_ : Boolean.var -> then_:var -> else_:var -> (var, _) Checked.t
 
     val to_input : var -> (_, Boolean.var) Random_oracle.Input.t
 
     val add : var -> var -> (var, _) Checked.t
 
+    val assert_equal : var -> var -> (unit, _) Checked.t
+
+    val equal : var -> var -> (Boolean.var, _) Checked.t
+
     val ( + ) : var -> var -> (var, _) Checked.t
 
     val to_field_var : var -> (Field.Var.t, _) Checked.t
+
+    val scale : Field.Var.t -> var -> (var, _) Checked.t
 
     val cswap :
          Boolean.var
@@ -182,6 +190,12 @@ module type Checked_arithmetic_intf = sig
   val ( - ) : var -> var -> (var, _) Checked.t
 
   val add_signed : var -> signed_var -> (var, _) Checked.t
+
+  val assert_equal : var -> var -> (unit, _) Checked.t
+
+  val equal : var -> var -> (Boolean.var, _) Checked.t
+
+  val scale : Field.Var.t -> var -> (var, _) Checked.t
 end
 
 [%%endif]

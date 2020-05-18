@@ -36,7 +36,7 @@ module Checked : sig
 end
 
 (** typ representation *)
-val typ : (Checked.t, t) Curve_choice.Tick0.Typ.t
+val typ : (Checked.t, t) Typ.t
 
 [%%endif]
 

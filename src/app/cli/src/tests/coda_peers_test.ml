@@ -4,15 +4,23 @@ open Async
 let name = "coda-peers-test"
 
 let main () =
+  let consensus_constants =
+    Consensus.Constants.create
+      ~constraint_constants:Genesis_constants.Constraint_constants.compiled
+      ~protocol_constants:Genesis_constants.compiled.protocol
+  in
   let%bind program_dir = Unix.getcwd () in
   let n = 3 in
   let logger = Logger.create () in
   let block_production_interval =
-    Consensus.Constants.block_window_duration_ms
+    consensus_constants.block_window_duration_ms |> Block_time.Span.to_ms
+    |> Int64.to_int_exn
   in
   let acceptable_delay =
     Time.Span.of_ms
-      (block_production_interval * Consensus.Constants.delta |> Float.of_int)
+      ( block_production_interval
+        * Unsigned.UInt32.to_int consensus_constants.delta
+      |> Float.of_int )
   in
   let work_selection_method =
     Cli_lib.Arg_type.Work_selection_method.Sequence
@@ -36,8 +44,13 @@ let main () =
            in
            let%map peers = Coda_process.peers_exn worker in
            Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-             !"got peers %{sexp: Network_peer.Peer.t list} %{sexp: int list}\n"
-             peers expected_peer_ports ;
+             ~metadata:
+               [ ( "peers"
+                 , `List (List.map ~f:Network_peer.Peer.to_yojson peers) )
+               ; ( "expected_ports"
+                 , `List (List.map ~f:(fun n -> `Int n) expected_peer_ports) )
+               ]
+             "got peers $peers $expected_ports" ;
            let module S = Int.Set in
            assert (
              S.is_subset

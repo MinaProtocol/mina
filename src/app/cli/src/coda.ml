@@ -30,17 +30,21 @@ let maybe_sleep _ = Deferred.unit
 
 [%%endif]
 
-let chain_id ~genesis_state_hash =
+let chain_id ~genesis_state_hash ~genesis_constants =
   let genesis_state_hash = State_hash.to_base58_check genesis_state_hash in
-  let all_snark_keys = String.concat ~sep:"" Snark_keys.key_hashes in
-  let b2 = Blake2.digest_string (genesis_state_hash ^ all_snark_keys) in
+  let genesis_constants_hash = Genesis_constants.hash genesis_constants in
+  let all_snark_keys = String.concat ~sep:"" Precomputed_values.key_hashes in
+  let b2 =
+    Blake2.digest_string
+      (genesis_state_hash ^ all_snark_keys ^ genesis_constants_hash)
+  in
   Blake2.to_hex b2
 
 [%%inject
 "daemon_expiry", daemon_expiry]
 
 [%%inject
-"compile_time_current_fork_id", current_fork_id]
+"compile_time_current_protocol_version", current_protocol_version]
 
 let daemon logger =
   let open Command.Let_syntax in
@@ -144,7 +148,7 @@ let daemon logger =
            (sprintf
               "FEE Amount a worker wants to get compensated for generating a \
                snark proof (default: %d)"
-              (Currency.Fee.to_int Cli_lib.Default.snark_worker_fee))
+              (Currency.Fee.to_int Coda_compile_config.default_snark_worker_fee))
          (optional txn_fee)
      and work_reassignment_wait =
        flag "work-reassignment-wait" (optional int)
@@ -197,19 +201,44 @@ let daemon logger =
            "KEYFILE Keypair (generated from `coda advanced \
             generate-libp2p-keypair`) to use with libp2p discovery (default: \
             generate per-run temporary keypair)"
+     and is_seed = flag "seed" ~doc:"Start the node as a seed node" no_arg
+     and enable_flooding =
+       flag "enable-flooding"
+         ~doc:
+           "Enable pubsub flooding, gossiping every message to every peer \
+            (uses lots of bandwidth! default: false)"
+         no_arg
      and libp2p_peers_raw =
        flag "peer"
          ~doc:
            "/ip4/IPADDR/tcp/PORT/ipfs/PEERID initial \"bootstrap\" peers for \
             discovery"
          (listed string)
-     and curr_fork_id =
-       flag "current-fork-id" (optional string)
+     and curr_protocol_version =
+       flag "current-protocol-version" (optional string)
+         ~doc:
+           "NN.NN.NN Current protocol version, only blocks with the same \
+            version accepted"
+     and proposed_protocol_version =
+       flag "proposed-protocol-version" (optional string)
+         ~doc:"NN.NN.NN Proposed protocol version to signal other nodes"
+     and genesis_runtime_constants =
+       flag "genesis-constants"
          ~doc:
            (sprintf
-              "HEX-STRING (%d characters) Current fork ID for this node, only \
-               blocks with the same ID accepted"
-              Fork_id.required_length)
+              "PATH path to the runtime-configurable constants. (default: \
+               compiled constants) For example: %s"
+              ( Genesis_constants.(
+                  Daemon_config.(of_genesis_constants compiled |> to_yojson))
+              |> Yojson.Safe.to_string ))
+         (optional string)
+     and disable_telemetry =
+       flag "disable-telemetry" no_arg
+         ~doc:"Disable reporting telemetry to other nodes"
+     and proof_level =
+       flag "proof-level"
+         (optional (Arg_type.create Genesis_constants.Proof_level.of_string))
+         ~doc:"full|check|none"
      in
      fun () ->
        let open Deferred.Let_syntax in
@@ -251,7 +280,7 @@ let daemon logger =
            "Daemon will expire at $exp"
            ~metadata:[("exp", `String daemon_expiry)] ;
          let tm =
-           (* same approach as in Consensus.Constants.genesis_state_timestamp *)
+           (* same approach as in Genesis_constants.genesis_state_timestamp *)
            let default_timezone = Core.Time.Zone.of_utc_offset ~hours:(-8) in
            Core.Time.of_string_gen
              ~if_no_timezone:(`Use_this_one default_timezone) daemon_expiry
@@ -337,11 +366,53 @@ let daemon logger =
          type ('a, 'b, 'c) t =
            {coda: 'a; client_trustlist: 'b; rest_server_port: 'c}
        end in
+       let time_controller =
+         Block_time.Controller.create @@ Block_time.Controller.basic ~logger
+       in
+       let proof_level =
+         match (proof_level, Genesis_constants.Proof_level.compiled) with
+         | Some (Full as proof_level), _
+         | Some (Check as proof_level), Check
+         | Some (None as proof_level), None ->
+             proof_level
+         | None, compiled ->
+             compiled
+         | Some proof_level, compiled ->
+             let str = Genesis_constants.Proof_level.to_string in
+             Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+               "Proof level $proof_level is not compatible with compile-time \
+                proof level $compiled_proof_level"
+               ~metadata:
+                 [ ("proof_level", `String (str proof_level))
+                 ; ("compiled_proof_level", `String (str compiled)) ] ;
+             failwithf
+               "Proof level %s is not compatible with compile-time proof \
+                level %s"
+               (str proof_level) (str compiled) ()
+       in
        let coda_initialization_deferred () =
-         let%bind genesis_ledger, base_proof =
+         let%bind genesis_ledger, base_proof, genesis_constants =
            Genesis_ledger_helper.retrieve_genesis_state genesis_ledger_dir_flag
-             ~logger ~conf_dir
+             ~logger ~conf_dir ~daemon_conf:genesis_runtime_constants
          in
+         let precomputed_values =
+           let protocol_state_with_hash =
+             Coda_state.Genesis_protocol_state.t
+               ~constraint_constants:
+                 Genesis_constants.Constraint_constants.compiled
+               ~genesis_constants
+               ~genesis_ledger:(Genesis_ledger.Packed.t genesis_ledger)
+           in
+           { Precomputed_values.genesis_constants
+           ; genesis_ledger
+           ; protocol_state_with_hash
+           ; genesis_proof= base_proof }
+         in
+         Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+           "Initializing with genesis constants $genesis_constants"
+           ~metadata:
+             [ ( "genesis_constants"
+               , Genesis_constants.to_yojson genesis_constants ) ] ;
          let%bind config =
            let configpath = conf_dir ^/ "daemon.json" in
            match%map
@@ -407,7 +478,8 @@ let daemon logger =
              YJ.Util.to_int_option json |> Option.map ~f:Currency.Fee.of_int
            in
            or_from_config json_to_currency_fee_option "snark-worker-fee"
-             ~default:Cli_lib.Default.snark_worker_fee snark_work_fee
+             ~default:Coda_compile_config.default_snark_worker_fee
+             snark_work_fee
          in
          (* FIXME #4095: pass this through to Gossip_net.Libp2p *)
          let _max_concurrent_connections =
@@ -540,8 +612,19 @@ let daemon logger =
          let%bind client_trustlist =
            Reader.load_sexp
              (conf_dir ^/ "client_trustlist")
-             [%of_sexp: Unix.Inet_addr.Blocking_sexp.t list]
+             [%of_sexp: Unix.Cidr.t list]
            >>| Or_error.ok
+         in
+         let client_trustlist =
+           match Unix.getenv "CODA_CLIENT_TRUSTLIST" with
+           | Some envstr ->
+               let cidrs =
+                 String.split ~on:',' envstr |> List.map ~f:Unix.Cidr.of_string
+               in
+               Some
+                 (List.append cidrs (Option.value ~default:[] client_trustlist))
+           | None ->
+               client_trustlist
          in
          Stream.iter
            (Async.Scheduler.long_cycles
@@ -577,25 +660,27 @@ let daemon logger =
              ~location typ
          in
          let trust_dir = conf_dir ^/ "trust" in
-         let () = Snark_params.set_chunked_hashing true in
          let%bind () = Async.Unix.mkdir ~p:() trust_dir in
          let trust_system = Trust_system.create trust_dir in
          trace_database_initialization "trust_system" __LOC__ trust_dir ;
          let genesis_state_hash =
-           Coda_state.Genesis_protocol_state.t ~genesis_ledger
+           Coda_state.Genesis_protocol_state.t
+             ~constraint_constants:
+               Genesis_constants.Constraint_constants.compiled
+             ~genesis_constants
+             ~genesis_ledger:(Genesis_ledger.Packed.t genesis_ledger)
            |> With_hash.hash
          in
          let genesis_ledger_hash =
-           Lazy.force genesis_ledger |> Ledger.merkle_root
-         in
-         let time_controller =
-           Block_time.Controller.create @@ Block_time.Controller.basic ~logger
+           genesis_ledger |> Genesis_ledger.Packed.t |> Lazy.force
+           |> Ledger.merkle_root
          in
          let initial_block_production_keypairs =
            block_production_keypair |> Option.to_list |> Keypair.Set.of_list
          in
          let consensus_local_state =
-           Consensus.Data.Local_state.create ~genesis_ledger
+           Consensus.Data.Local_state.create
+             ~genesis_ledger:(Genesis_ledger.Packed.t genesis_ledger)
              ( Option.map block_production_keypair ~f:(fun keypair ->
                    let open Keypair in
                    Public_key.compress keypair.public_key )
@@ -613,17 +698,22 @@ let daemon logger =
                     "peers" None ~default:[] ]
          in
          if enable_tracing then Coda_tracing.start conf_dir |> don't_wait_for ;
-         let is_seed = List.is_empty initial_peers in
+         if is_seed then
+           Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+             "Starting node as a seed node"
+         else if List.is_empty initial_peers then
+           failwith "no seed or initial peer flags passed" ;
          let gossip_net_params =
            Gossip_net.Libp2p.Config.
              { timeout= Time.Span.of_sec 3.
              ; logger
              ; conf_dir
-             ; chain_id= chain_id ~genesis_state_hash
+             ; chain_id= chain_id ~genesis_state_hash ~genesis_constants
              ; unsafe_no_trust_ip= false
              ; initial_peers
              ; addrs_and_ports
              ; trust_system
+             ; flood= enable_flooding
              ; keypair= libp2p_keypair }
          in
          let net_config =
@@ -664,6 +754,8 @@ let daemon logger =
            Auxiliary_database.External_transition_database.create ~logger
              external_transition_database_dir
          in
+         trace_database_initialization "external_transition_database" __LOC__
+           external_transition_database_dir ;
          (* log terminated child processes *)
          (* FIXME adapt to new system, move into child_processes lib *)
          let pids = Child_processes.Termination.create_pid_table () in
@@ -718,16 +810,22 @@ let daemon logger =
            Option.value_map coinbase_receiver_flag ~default:`Producer
              ~f:(fun pk -> `Other pk)
          in
-         let current_fork_id =
-           Coda_run.get_current_fork_id ~compile_time_current_fork_id ~conf_dir
-             ~logger curr_fork_id
-           |> Fork_id.create_exn
+         let current_protocol_version =
+           Coda_run.get_current_protocol_version
+             ~compile_time_current_protocol_version ~conf_dir ~logger
+             curr_protocol_version
+         in
+         let proposed_protocol_version_opt =
+           Coda_run.get_proposed_protocol_version_opt ~conf_dir ~logger
+             proposed_protocol_version
          in
          let%map coda =
            Coda_lib.create
              (Coda_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
-                ~demo_mode ~coinbase_receiver ~net_config ~gossip_net_params
-                ~initial_fork_id:current_fork_id
+                ~is_seed ~disable_telemetry ~demo_mode ~coinbase_receiver
+                ~net_config ~gossip_net_params
+                ~initial_protocol_version:current_protocol_version
+                ~proposed_protocol_version_opt
                 ~work_selection_method:
                   (Cli_lib.Arg_type.work_selection_method_to_module
                      work_selection_method)
@@ -745,14 +843,17 @@ let daemon logger =
                 ~consensus_local_state ~transaction_database
                 ~external_transition_database ~is_archive_rocksdb
                 ~work_reassignment_wait ~archive_process_location
-                ~genesis_state_hash ~log_block_creation ())
-             ~genesis_ledger ~base_proof
+                ~log_block_creation
+                ~constraint_constants:
+                  Genesis_constants.Constraint_constants.compiled
+                ~precomputed_values ~proof_level ())
          in
          {Coda_initialization.coda; client_trustlist; rest_server_port}
        in
        (* Breaks a dependency cycle with monitor initilization and coda *)
        let coda_ref : Coda_lib.t option ref = ref None in
-       Coda_run.handle_shutdown ~monitor ~conf_dir ~top_logger:logger coda_ref ;
+       Coda_run.handle_shutdown ~monitor ~time_controller ~conf_dir
+         ~top_logger:logger coda_ref ;
        Async.Scheduler.within' ~monitor
        @@ fun () ->
        let%bind {Coda_initialization.coda; client_trustlist; rest_server_port}
@@ -761,8 +862,6 @@ let daemon logger =
        in
        coda_ref := Some coda ;
        let%bind () = maybe_sleep 3. in
-       let web_service = Web_pipe.get_service () in
-       Web_pipe.run_service coda web_service ~conf_dir ~logger ;
        Coda_run.setup_local_server ?client_trustlist ~rest_server_port
          ~insecure_rest_server coda ;
        let%bind () = Coda_lib.start coda in
@@ -849,6 +948,9 @@ let ensure_testnet_id_still_good _ = Deferred.unit
 [%%endif]
 
 let snark_hashes =
+  let module Hashes = struct
+    type t = string list [@@deriving to_yojson]
+  end in
   let open Command.Let_syntax in
   Command.basic ~summary:"List hashes of proving and verification keys"
     [%map_open
@@ -858,8 +960,8 @@ let snark_hashes =
         if json then
           print
             (Yojson.Safe.to_string
-               (Snark_keys.key_hashes_to_yojson Snark_keys.key_hashes))
-        else List.iter Snark_keys.key_hashes ~f:print]
+               (Hashes.to_yojson Precomputed_values.key_hashes))
+        else List.iter Precomputed_values.key_hashes ~f:print]
 
 let internal_commands =
   [ (Snark_worker.Intf.command_name, Snark_worker.command)
@@ -876,7 +978,11 @@ let internal_commands =
                  Logger.info logger "Prover state being logged to %s" conf_dir
                    ~module_:__MODULE__ ~location:__LOC__ ;
                  let%bind prover =
-                   Prover.create ~logger ~pids:(Pid.Table.create ()) ~conf_dir
+                   Prover.create ~logger
+                     ~proof_level:Genesis_constants.Proof_level.compiled
+                     ~constraint_constants:
+                       Genesis_constants.Constraint_constants.compiled
+                     ~pids:(Pid.Table.create ()) ~conf_dir
                  in
                  Prover.prove_from_input_sexp prover sexp >>| ignore
              | `Eof ->
@@ -889,7 +995,6 @@ let coda_commands logger =
   ; ("advanced", Client.advanced)
   ; ("internal", Command.group ~summary:"Internal commands" internal_commands)
   ; (Parallel.worker_command_name, Parallel.worker_command)
-  ; (Snark_flame_graphs.name, Snark_flame_graphs.command)
   ; ("transaction-snark-profiler", Transaction_snark_profiler.command) ]
 
 [%%if
@@ -924,7 +1029,6 @@ let coda_commands logger =
         ; (module Coda_change_snark_worker_test)
         ; (module Full_test)
         ; (module Transaction_snark_profiler)
-        ; (module Snark_flame_graphs)
         ; (module Coda_archive_node_test)
         ; (module Coda_archive_processor_test) ]
         : (module Integration_test) list )

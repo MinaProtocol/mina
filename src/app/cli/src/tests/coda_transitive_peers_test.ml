@@ -4,15 +4,23 @@ open Async
 let name = "coda-transitive-peers-test"
 
 let main () =
+  let consensus_constants =
+    Consensus.Constants.create
+      ~constraint_constants:Genesis_constants.Constraint_constants.compiled
+      ~protocol_constants:Genesis_constants.compiled.protocol
+  in
   let%bind program_dir = Unix.getcwd () in
   let n = 3 in
   let logger = Logger.create () in
   let block_production_interval =
-    Consensus.Constants.block_window_duration_ms
+    consensus_constants.block_window_duration_ms |> Block_time.Span.to_ms
+    |> Int64.to_int_exn
   in
   let acceptable_delay =
     Time.Span.of_ms
-      (block_production_interval * Consensus.Constants.delta |> Float.of_int)
+      ( block_production_interval
+        * Unsigned.UInt32.to_int consensus_constants.delta
+      |> Float.of_int )
   in
   let work_selection_method =
     Cli_lib.Arg_type.Work_selection_method.Sequence
@@ -43,11 +51,12 @@ let main () =
     !"connecting to peers %{sexp: string list}\n"
     peers ;
   let config =
-    Coda_process.local_config ~peers ~addrs_and_ports ~acceptable_delay
-      ~chain_id:name ~libp2p_keypair ~net_configs ~snark_worker_key:None
-      ~block_production_key:None ~program_dir ~work_selection_method ~trace_dir
-      ~offset:Time.Span.zero () ~max_concurrent_connections
-      ~is_archive_rocksdb:false ~archive_process_location:None
+    Coda_process.local_config ~is_seed:true ~peers ~addrs_and_ports
+      ~acceptable_delay ~chain_id:name ~libp2p_keypair ~net_configs
+      ~snark_worker_key:None ~block_production_key:None ~program_dir
+      ~work_selection_method ~trace_dir ~offset:Time.Span.zero ()
+      ~max_concurrent_connections ~is_archive_rocksdb:false
+      ~archive_process_location:None
   in
   let%bind worker = Coda_process.spawn_exn config in
   let%bind _ = after (Time.Span.of_sec 10.) in

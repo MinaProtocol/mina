@@ -10,6 +10,12 @@ module type Input_intf = sig
 
   val of_bigint : B.R.t -> t
 
+  val to_bigint_raw : t -> B.R.t
+
+  val to_bigint_raw_noalloc : t -> B.R.t
+
+  val of_bigint_raw : B.R.t -> t
+
   val of_int : Unsigned.UInt64.t -> t
 
   val add : t -> t -> t
@@ -46,13 +52,24 @@ module type Input_intf = sig
 
   val copy : t -> t -> unit
 
-  module Vector : Snarky.Vector.S with type elt := t
+  module Vector :
+    Snarky.Vector.S with type elt := t and type t = unit Ctypes.ptr
 end
 
 module type S = sig
-  type t [@@deriving sexp, bin_io]
+  module Stable : sig
+    module V1 : sig
+      type t [@@deriving version, sexp, bin_io, compare, yojson]
+    end
+
+    module Latest = V1
+  end
+
+  type t = Stable.Latest.t [@@deriving sexp, compare, yojson, bin_io]
 
   val to_bigint : t -> B.R.t
+
+  val to_bigint_raw_noalloc : t -> B.R.t
 
   val of_bigint : B.R.t -> t
 
@@ -123,7 +140,7 @@ module type S = sig
   module Vector : sig
     type elt = t
 
-    type t = elt Snarky.Vector.t
+    type t = unit Ctypes.ptr
 
     val typ : t Ctypes.typ
 
@@ -141,10 +158,8 @@ module type S = sig
   end
 end
 
-module Make (F : Input_intf) : S with type t = F.t = struct
+module Make (F : Input_intf) : S with type Stable.V1.t = F.t = struct
   open F
-
-  type t = F.t sexp_opaque [@@deriving sexp]
 
   let gc2 op x1 x2 =
     let r = op x1 x2 in
@@ -161,16 +176,52 @@ module Make (F : Input_intf) : S with type t = F.t = struct
 
   let of_bigint = gc1 of_bigint
 
-  (* TODO: Don't allocate the bigint when writing and reading *)
-  include Binable.Of_binable
-            (B.R)
-            (struct
-              type nonrec t = t
+  let of_bigint_raw = gc1 of_bigint_raw
 
-              let to_binable = to_bigint
+  let to_bigint_raw_noalloc = to_bigint_raw_noalloc
 
-              let of_binable = of_bigint
-            end)
+  module Stable = struct
+    module V1 = struct
+      type t = F.t [@@deriving version {asserted}]
+
+      (* TODO: Don't allocate the bigint when writing and reading *)
+      include Binable.Of_binable
+                (B.R)
+                (struct
+                  type nonrec t = t
+
+                  let to_binable = to_bigint_raw_noalloc
+
+                  let of_binable = of_bigint_raw
+                end)
+
+      include Sexpable.Of_sexpable
+                (B.R)
+                (struct
+                  type nonrec t = t
+
+                  let to_sexpable = to_bigint
+
+                  let of_sexpable = of_bigint
+                end)
+
+      let compare t1 t2 = B.R.compare (to_bigint t1) (to_bigint t2)
+
+      let to_yojson t : Yojson.Safe.json =
+        `String (B.R.to_hex_string (to_bigint t))
+
+      let of_yojson j =
+        match j with
+        | `String h ->
+            Ok (of_bigint (B.R.of_hex_string h))
+        | _ ->
+            Error "expected hex string"
+    end
+
+    module Latest = V1
+  end
+
+  include Stable.Latest
 
   let of_int = gc1 (Fn.compose of_int Unsigned.UInt64.of_int)
 
@@ -211,6 +262,10 @@ module Make (F : Input_intf) : S with type t = F.t = struct
   let print = print
 
   let random = gc1 random
+
+  let%test_unit "sexp round trip" =
+    let t = random () in
+    assert (equal t (t_of_sexp (sexp_of_t t)))
 
   let negate = gc1 negate
 

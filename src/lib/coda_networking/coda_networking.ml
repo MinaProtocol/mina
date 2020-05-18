@@ -38,7 +38,10 @@ module Rpcs = struct
         type query = State_hash.t
 
         type response =
-          (Staged_ledger.Scan_state.t * Ledger_hash.t * Pending_coinbase.t)
+          ( Staged_ledger.Scan_state.t
+          * Ledger_hash.t
+          * Pending_coinbase.t
+          * Coda_state.Protocol_state.value list )
           option
       end
 
@@ -62,7 +65,8 @@ module Rpcs = struct
         type response =
           ( Staged_ledger.Scan_state.Stable.V1.t
           * Ledger_hash.Stable.V1.t
-          * Pending_coinbase.Stable.V1.t )
+          * Pending_coinbase.Stable.V1.t
+          * Coda_state.Protocol_state.Value.Stable.V1.t list )
           option
         [@@deriving bin_io, version {rpc}]
 
@@ -433,7 +437,8 @@ module Rpcs = struct
       module Stable = struct
         module V1 = struct
           type t =
-            { node: Core.Unix.Inet_addr.Stable.V1.t
+            { node_ip_addr: Core.Unix.Inet_addr.Stable.V1.t
+            ; node_peer_id: Network_peer.Peer.Id.Stable.V1.t
             ; peers: Network_peer.Peer.Stable.V1.t list
             ; block_producers:
                 Signature_lib.Public_key.Compressed.Stable.V1.t list
@@ -449,7 +454,9 @@ module Rpcs = struct
            *)
           let to_yojson t =
             `Assoc
-              [ ("node", `String (Unix.Inet_addr.to_string t.node))
+              [ ( "node_ip_addr"
+                , `String (Unix.Inet_addr.to_string t.node_ip_addr) )
+              ; ("node_peer_id", `String t.node_peer_id)
               ; ( "peers"
                 , `List
                     (List.map t.peers ~f:Network_peer.Peer.Stable.V1.to_yojson)
@@ -473,7 +480,8 @@ module Rpcs = struct
       end]
 
       type t = Stable.Latest.t =
-        { node: Unix.Inet_addr.t
+        { node_ip_addr: Unix.Inet_addr.t
+        ; node_peer_id: Network_peer.Peer.Id.t
         ; peers: Network_peer.Peer.t list
         ; block_producers: Signature_lib.Public_key.Compressed.t list
         ; protocol_state_hash: State_hash.t
@@ -655,7 +663,7 @@ type t =
 [@@deriving fields]
 
 let offline_time =
-  Block_time.Span.of_ms @@ Int64.of_int Consensus.Constants.inactivity_ms
+  Block_time.Span.of_ms @@ Int64.of_int Coda_compile_config.inactivity_ms
 
 let setup_timer time_controller sync_state_broadcaster =
   Block_time.Timeout.create time_controller offline_time ~f:(fun _ ->
@@ -724,23 +732,24 @@ let create (config : Config.t)
     in
     result
   in
-  let validate_fork_ids ~rpc_name sender external_transition =
+  let validate_protocol_versions ~rpc_name sender external_transition =
     let open Trust_system.Actions in
     let External_transition.{valid_current; valid_next; matches_daemon} =
-      External_transition.fork_id_status external_transition
+      External_transition.protocol_version_status external_transition
     in
     let%bind () =
       if valid_current then return ()
       else
         let actions =
-          ( Sent_invalid_fork_id
+          ( Sent_invalid_protocol_version
           , Some
-              ( "$rpc_name: external transition with invalid current fork ID"
+              ( "$rpc_name: external transition with invalid current protocol \
+                 version"
               , [ ("rpc_name", `String rpc_name)
-                ; ( "current_fork_id"
+                ; ( "current_protocol_version"
                   , `String
-                      (Fork_id.to_string
-                         (External_transition.current_fork_id
+                      (Protocol_version.to_string
+                         (External_transition.current_protocol_version
                             external_transition)) ) ] ) )
         in
         Trust_system.record_envelope_sender config.trust_system config.logger
@@ -750,15 +759,16 @@ let create (config : Config.t)
       if valid_next then return ()
       else
         let actions =
-          ( Sent_invalid_fork_id
+          ( Sent_invalid_protocol_version
           , Some
-              ( "$rpc_name: external transition with invalid next fork ID"
+              ( "$rpc_name: external transition with invalid proposed \
+                 protocol version"
               , [ ("rpc_name", `String rpc_name)
-                ; ( "next_fork_id"
+                ; ( "proposed_protocol_version"
                   , `String
-                      (Fork_id.to_string
+                      (Protocol_version.to_string
                          (Option.value_exn
-                            (External_transition.next_fork_id_opt
+                            (External_transition.proposed_protocol_version_opt
                                external_transition))) ) ] ) )
         in
         Trust_system.record_envelope_sender config.trust_system config.logger
@@ -768,18 +778,19 @@ let create (config : Config.t)
       if matches_daemon then return ()
       else
         let actions =
-          ( Sent_mismatched_fork_id
+          ( Sent_mismatched_protocol_version
           , Some
-              ( "$rpc_name: current fork ID in external transition does not \
-                 match daemon current fork ID"
+              ( "$rpc_name: current protocol version in external transition \
+                 does not match daemon current protocol version"
               , [ ("rpc_name", `String rpc_name)
-                ; ( "current_fork_id"
+                ; ( "current_protocol_version"
                   , `String
-                      (Fork_id.to_string
-                         (External_transition.current_fork_id
+                      (Protocol_version.to_string
+                         (External_transition.current_protocol_version
                             external_transition)) )
-                ; ( "daemon_current_fork_id"
-                  , `String Fork_id.(to_string @@ get_current ()) ) ] ) )
+                ; ( "daemon_current_protocol_version"
+                  , `String Protocol_version.(to_string @@ get_current ()) ) ]
+              ) )
         in
         Trust_system.record_envelope_sender config.trust_system config.logger
           sender actions
@@ -843,10 +854,10 @@ let create (config : Config.t)
     | None ->
         record_unknown_item result sender action_msg msg_args
     | Some {proof= _, ext_trans; _} ->
-        let%map valid_fork_ids =
-          validate_fork_ids ~rpc_name:"Get_ancestry" sender ext_trans
+        let%map valid_protocol_versions =
+          validate_protocol_versions ~rpc_name:"Get_ancestry" sender ext_trans
         in
-        if valid_fork_ids then result else None
+        if valid_protocol_versions then result else None
   in
   let get_best_tip_rpc conn ~version:_ query =
     Logger.debug config.logger ~module_:__MODULE__ ~location:__LOC__
@@ -861,15 +872,17 @@ let create (config : Config.t)
     | None ->
         record_unknown_item result sender action_msg msg_args
     | Some {data= data_ext_trans; proof= _, proof_ext_trans} ->
-        let%bind valid_data_fork_ids =
-          validate_fork_ids ~rpc_name:"Get_best_tip (data)" sender
+        let%bind valid_data_protocol_versions =
+          validate_protocol_versions ~rpc_name:"Get_best_tip (data)" sender
             data_ext_trans
         in
-        let%map valid_proof_fork_ids =
-          validate_fork_ids ~rpc_name:"Get_best_tip (proof)" sender
+        let%map valid_proof_protocol_versions =
+          validate_protocol_versions ~rpc_name:"Get_best_tip (proof)" sender
             proof_ext_trans
         in
-        if valid_data_fork_ids && valid_proof_fork_ids then result else None
+        if valid_data_protocol_versions && valid_proof_protocol_versions then
+          result
+        else None
   in
   let get_telemetry_data_rpc conn ~version:_ query =
     Logger.debug config.logger ~module_:__MODULE__ ~location:__LOC__
@@ -912,11 +925,14 @@ let create (config : Config.t)
     | None ->
         record_unknown_item result sender action_msg msg_args
     | Some ext_trans ->
-        let%map valid_fork_ids =
+        let%map valid_protocol_versions =
           Deferred.List.map ext_trans
-            ~f:(validate_fork_ids ~rpc_name:"Get_transition_chain" sender)
+            ~f:
+              (validate_protocol_versions ~rpc_name:"Get_transition_chain"
+                 sender)
         in
-        if List.for_all valid_fork_ids ~f:(Bool.equal true) then result
+        if List.for_all valid_protocol_versions ~f:(Bool.equal true) then
+          result
         else None
   in
   let ban_notify_rpc conn ~version:_ ban_until =
@@ -994,7 +1010,10 @@ let create (config : Config.t)
               Logger.debug config.logger ~module_:__MODULE__ ~location:__LOC__
                 "Received a block $block from $sender"
                 ~metadata:
-                  [ ("block", External_transition.to_yojson state)
+                  [ ("external_transition", External_transition.to_yojson state)
+                  ; ( "state_hash"
+                    , External_transition.state_hash state
+                      |> State_hash.to_yojson )
                   ; ( "sender"
                     , Envelope.(Sender.to_yojson (Incoming.sender envelope)) )
                   ] ;
@@ -1025,11 +1044,11 @@ let create (config : Config.t)
                   ] ;
             let diff' =
               List.filter diff ~f:(fun cmd ->
-                  if User_command.is_trivial cmd then (
+                  if User_command.has_insufficient_fee cmd then (
                     Logger.debug config.logger ~module_:__MODULE__
                       ~location:__LOC__
-                      "Filtering trivial user command in transaction-pool \
-                       diff $cmd from $sender"
+                      "Filtering user command with insufficient fee from \
+                       transaction-pool diff $cmd from $sender"
                       ~metadata:
                         [ ("cmd", User_command.to_yojson cmd)
                         ; ( "sender"
@@ -1295,7 +1314,9 @@ let glue_sync_ledger :
               Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
                 "Peer $peer didn't have enough information to answer \
                  ledger_hash query. See error for more details: $error"
-                ~metadata:[("error", `String (Error.to_string_hum e))] ;
+                ~metadata:
+                  [ ("error", `String (Error.to_string_hum e))
+                  ; ("peer", Peer.to_yojson peer) ] ;
               Hash_set.add peers_tried peer ;
               None
           | Connected {data= Error e; _} ->

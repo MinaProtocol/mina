@@ -2,21 +2,28 @@ open Tuple_lib
 open Core_kernel
 
 module Evals = struct
-  type 'a t =
-    { w_hat: 'a
-    ; z_hat_a: 'a
-    ; z_hat_b: 'a
-    ; h_1: 'a
-    ; h_2: 'a
-    ; h_3: 'a
-    ; row: 'a Abc.t
-    ; col: 'a Abc.t
-    ; value: 'a Abc.t
-    ; rc: 'a Abc.t
-    ; g_1: 'a
-    ; g_2: 'a
-    ; g_3: 'a }
-  [@@deriving fields, bin_io]
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type 'a t =
+        { w_hat: 'a
+        ; z_hat_a: 'a
+        ; z_hat_b: 'a
+        ; h_1: 'a
+        ; h_2: 'a
+        ; h_3: 'a
+        ; row: 'a Abc.Stable.V1.t
+        ; col: 'a Abc.Stable.V1.t
+        ; value: 'a Abc.Stable.V1.t
+        ; rc: 'a Abc.Stable.V1.t
+        ; g_1: 'a
+        ; g_2: 'a
+        ; g_3: 'a }
+      [@@deriving fields, bin_io, version, sexp, compare, yojson]
+    end
+  end]
+
+  include Stable.Latest
 
   let to_vectors
       { w_hat
@@ -101,10 +108,16 @@ end
 
 module Openings = struct
   module Bulletproof = struct
-    type ('g, 'fq) t =
-      {lr: ('g * 'g) array; z_1: 'fq; z_2: 'fq; delta: 'g; sg: 'g}
-    [@@deriving bin_io]
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type ('g, 'fq) t =
+          {lr: ('g * 'g) array; z_1: 'fq; z_2: 'fq; delta: 'g; sg: 'g}
+        [@@deriving bin_io, version, sexp, compare, yojson]
+      end
+    end]
 
+    include Stable.Latest
     open Snarky.H_list
 
     let to_hlist {lr; z_1; z_2; delta; sg} = [lr; z_1; z_2; delta; sg]
@@ -122,9 +135,20 @@ module Openings = struct
 
   open Evals
 
-  type ('g, 'fq, 'fqv) t =
-    {proof: ('g, 'fq) Bulletproof.t; evals: 'fqv Evals.t Triple.t}
-  [@@deriving bin_io]
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type ('g, 'fq, 'fqv) t =
+        { proof: ('g, 'fq) Bulletproof.Stable.V1.t
+        ; evals:
+            'fqv Evals.Stable.V1.t
+            * 'fqv Evals.Stable.V1.t
+            * 'fqv Evals.Stable.V1.t }
+      [@@deriving bin_io, version, sexp, compare, yojson]
+    end
+  end]
+
+  include Stable.Latest
 
   let to_hlist {proof; evals} = Snarky.H_list.[proof; evals]
 
@@ -143,7 +167,11 @@ end
 
 module Poly_comm = struct
   module With_degree_bound = struct
+    [%%versioned
+      module Stable = struct module V1 = struct
     type 'g t = {unshifted: 'g array; shifted: 'g} [@@deriving bin_io]
+  end end ]
+    include Stable.Latest
 
     let to_hlist {unshifted; shifted} = Snarky.H_list.[unshifted; shifted]
 
@@ -158,15 +186,20 @@ module Poly_comm = struct
   end
 
   module Without_degree_bound = struct
-    type 'g t = 'g array [@@deriving bin_io]
+    [%%versioned module Stable = struct module V1 = struct
+    type 'g t = 'g array [@@deriving bin_io] end end ]
+    include Stable.Latest
 
     let typ g ~length = Snarky.Typ.array ~length g
   end
 end
 
 module Challenge_polynomial = struct
+  [%%versioned module Stable = struct module V1 = struct
   type ('fq, 'g) t = {challenges: 'fq array; commitment: 'g}
   [@@deriving bin_io]
+end end ]
+    include Stable.Latest
 
   open Snarky.H_list
 
@@ -184,6 +217,7 @@ end
 module Messages = struct
   open Poly_comm
 
+  [%%versioned module Stable = struct module V1 = struct
   type ('g, 'fq) t =
     { w_hat: 'g Without_degree_bound.t
     ; z_hat_a: 'g Without_degree_bound.t
@@ -192,6 +226,8 @@ module Messages = struct
     ; sigma_gh_2: 'fq * ('g With_degree_bound.t * 'g Without_degree_bound.t)
     ; sigma_gh_3: 'fq * ('g With_degree_bound.t * 'g Without_degree_bound.t) }
   [@@deriving fields, bin_io]
+end end]
+  include Stable.Latest
 
   let to_hlist {w_hat; z_hat_a; z_hat_b; gh_1; sigma_gh_2; sigma_gh_3} =
     Snarky.H_list.[w_hat; z_hat_a; z_hat_b; gh_1; sigma_gh_2; sigma_gh_3]
@@ -220,9 +256,12 @@ module Messages = struct
 end
 
 module Proof = struct
+  [%%versioned module Stable = struct module V1 = struct
   type ('g, 'fq, 'fqv) t =
     {messages: ('g, 'fq) Messages.t; openings: ('g, 'fq, 'fqv) Openings.t}
   [@@deriving fields, bin_io]
+end end]
+  include Stable.Latest
 
   let to_hlist {messages; openings} = Snarky.H_list.[messages; openings]
 

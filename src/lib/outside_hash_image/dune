@@ -1,0 +1,8 @@
+(library
+  (name outside_hash_image)
+  (public_name outside_hash_image)
+  (libraries snark_params)
+  (preprocess
+    (pps ppx_coda ppx_jane ppxlib.metaquot))
+  (flags -w -40 -g)
+  (modes native))

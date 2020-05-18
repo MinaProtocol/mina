@@ -1,6 +1,15 @@
+open Core_kernel
 module H_list = Snarky.H_list
 
-type 'a t = {row: 'a; col: 'a; value: 'a; rc: 'a} [@@deriving bin_io, sexp]
+[%%versioned
+module Stable = struct
+  module V1 = struct
+    type 'a t = {row: 'a; col: 'a; value: 'a; rc: 'a}
+    [@@deriving version, bin_io, sexp]
+  end
+end]
+
+include Stable.Latest
 
 let to_hlist {row; col; value; rc} = H_list.[row; col; value; rc]
 

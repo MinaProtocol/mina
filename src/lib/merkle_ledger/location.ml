@@ -27,25 +27,6 @@ module Bigstring = struct
   include Hashable.Make (Stable.Latest)
 end
 
-module T = struct
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type ('bigstring, 'addr) t =
-        | Generic of 'bigstring
-        | Account of 'addr
-        | Hash of 'addr
-      [@@deriving hash, sexp, compare, eq]
-    end
-  end]
-
-  type ('bigstring, 'addr) t = ('bigstring, 'addr) Stable.Latest.t =
-    | Generic of 'bigstring
-    | Account of 'addr
-    | Hash of 'addr
-  [@@deriving hash, sexp, compare, eq]
-end
-
 module Make (Depth : Intf.Depth) = struct
   (* Locations are a bitstring prefixed by a byte. In the case of accounts, the prefix
    * byte is 0xfe. In the case of a hash node in the merkle tree, the prefix is between
@@ -56,7 +37,7 @@ module Make (Depth : Intf.Depth) = struct
    * any bitstring.
    *)
 
-  module Addr = Merkle_address.Make (Depth)
+  module Addr = Merkle_address
 
   module Prefix = struct
     let generic = UInt8.of_int 0xff
@@ -66,20 +47,8 @@ module Make (Depth : Intf.Depth) = struct
     let hash depth = UInt8.of_int (Depth.depth - depth)
   end
 
-  (* TODO : version *)
-  module T = struct
-    type t =
-      | Generic of Bigstring.Stable.V1.t
-          [@printer
-            fun fmt bstr ->
-              Format.pp_print_string fmt (Bigstring.to_string bstr)]
-      | Account of Addr.Stable.V1.t
-      | Hash of Addr.Stable.V1.t
-    [@@deriving hash, sexp, compare, eq, bin_io]
-  end
-
-  include T
-  include Hashable.Make_binable (T)
+  type t = Generic of Bigstring.t | Account of Addr.t | Hash of Addr.t
+  [@@deriving hash, sexp, compare, eq]
 
   let is_generic = function Generic _ -> true | _ -> false
 
@@ -87,13 +56,13 @@ module Make (Depth : Intf.Depth) = struct
 
   let is_hash = function Hash _ -> true | _ -> false
 
-  let height : t -> int = function
+  let height ~ledger_depth : t -> int = function
     | Generic _ ->
         raise (Invalid_argument "height: generic location has no height")
     | Account _ ->
         0
     | Hash path ->
-        Addr.height path
+        Addr.height ~ledger_depth path
 
   let root_hash : t = Hash (Addr.root ())
 
@@ -128,15 +97,17 @@ module Make (Depth : Intf.Depth) = struct
     | Generic _ ->
         raise (Invalid_argument "to_path_exn: generic does not have a path")
 
-  let serialize = function
+  let serialize ~ledger_depth = function
     | Generic data ->
         prefix_bigstring Prefix.generic data
     | Account path ->
         assert (Addr.depth path = Depth.depth) ;
-        prefix_bigstring Prefix.account (Addr.serialize path)
+        prefix_bigstring Prefix.account (Addr.serialize ~ledger_depth path)
     | Hash path ->
         assert (Addr.depth path <= Depth.depth) ;
-        prefix_bigstring (Prefix.hash (Addr.depth path)) (Addr.serialize path)
+        prefix_bigstring
+          (Prefix.hash (Addr.depth path))
+          (Addr.serialize ~ledger_depth path)
 
   let parent : t -> t = function
     | Generic _ ->

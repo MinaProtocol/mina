@@ -16,12 +16,6 @@ open Core_kernel
 
 type t [@@deriving sexp, yojson]
 
-module Stable : sig
-  module V1 : sig
-    type nonrec t = t [@@deriving sexp]
-  end
-end
-
 (** Password-protect some plaintext. *)
 val encrypt : password:Bytes.t -> plaintext:Bytes.t -> t
 

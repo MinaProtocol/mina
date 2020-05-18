@@ -172,6 +172,7 @@ module type Best_tip_prover_intf = sig
 
   val verify :
        verifier:Verifier.t
+    -> genesis_constants:Genesis_constants.t
     -> ( External_transition.t
        , State_body_hash.t list * External_transition.t )
        Proof_carrying_data.t
@@ -198,6 +199,7 @@ module type Consensus_best_tip_prover_intf = sig
   val verify :
        logger:Logger.t
     -> verifier:Verifier.t
+    -> genesis_constants:Genesis_constants.t
     -> Consensus.Data.Consensus_state.Value.t
     -> ( External_transition.t
        , State_body_hash.t list * External_transition.t )
@@ -221,7 +223,10 @@ module type Sync_handler_intf = sig
   val get_staged_ledger_aux_and_pending_coinbases_at_hash :
        frontier:transition_frontier
     -> State_hash.t
-    -> (Staged_ledger.Scan_state.t * Ledger_hash.t * Pending_coinbase.t)
+    -> ( Staged_ledger.Scan_state.t
+       * Ledger_hash.t
+       * Pending_coinbase.t
+       * Coda_state.Protocol_state.value list )
        Option.t
 
   val get_transition_chain :
@@ -269,6 +274,7 @@ module type Bootstrap_controller_intf = sig
     -> initial_root_transition:External_transition.Validated.t
     -> genesis_state_hash:State_hash.t
     -> genesis_ledger:Ledger.t Lazy.t
+    -> genesis_constants:Genesis_constants.t
     -> ( transition_frontier
        * External_transition.Initial_validated.t Envelope.Incoming.t list )
        Deferred.t
@@ -320,6 +326,7 @@ module type Initial_validator_intf = sig
                                , unit )
                                Strict_pipe.Writer.t
     -> genesis_state_hash:State_hash.t
+    -> genesis_constants:Genesis_constants.t
     -> unit
 end
 
@@ -339,6 +346,7 @@ module type Transition_router_intf = sig
     -> trust_system:Trust_system.t
     -> verifier:Verifier.t
     -> network:network
+    -> is_seed:bool
     -> time_controller:Block_time.Controller.t
     -> consensus_local_state:Consensus.Data.Local_state.t
     -> persistent_root_location:string
@@ -358,9 +366,8 @@ module type Transition_router_intf = sig
                                Broadcast_pipe.Reader.t
                                * External_transition.Initial_validated.t
                                  Broadcast_pipe.Writer.t
-    -> genesis_state_hash:State_hash.t
-    -> genesis_ledger:Ledger.t Lazy.t
-    -> base_proof:Coda_base.Proof.t
+    -> constraint_constants:Genesis_constants.Constraint_constants.t
+    -> precomputed_values:Precomputed_values.t
     -> ( [`Transition of External_transition.Validated.t]
        * [`Source of [`Gossip | `Catchup | `Internal]] )
        Strict_pipe.Reader.t

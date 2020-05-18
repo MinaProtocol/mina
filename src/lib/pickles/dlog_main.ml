@@ -103,10 +103,11 @@ let accumulate_opening_check ~add ~negate ~endo ~scale_generator ~r
   in
   {Accumulator.Opening_check.r_f_minus_r_v_plus_rz_pi; r_pi= r_pi + pi_term}
 
-module Make (Inputs : Inputs
-             with type Impl.field = Snarky_bn382_backend.Fq.t
-              and type G1.Constant.Scalar.t =Snarky_bn382_backend.Fp.t
-            ) = struct
+module Make
+    (Inputs : Inputs
+              with type Impl.field = Snarky_bn382_backend.Fq.t
+               and type G1.Constant.Scalar.t = Snarky_bn382_backend.Fp.t) =
+struct
   open Inputs
   open Impl
 
@@ -183,7 +184,7 @@ module Make (Inputs : Inputs
   module Fq = Field
   module Challenge = Challenge.Make (Impl)
   module Digest = D.Make (Impl)
-  module Scalar_challenge = SC.Make(Impl)(G1)(Challenge)(Endo.Pairing)
+  module Scalar_challenge = SC.Make (Impl) (G1) (Challenge) (Endo.Pairing)
 
   let product m f = List.reduce_exn (List.init m ~f) ~f:Field.( * )
 
@@ -205,8 +206,7 @@ module Make (Inputs : Inputs
       ~g1_to_field_elements:G1.to_field_elements ~pack_scalar:Fn.id ty t
 
   let squeeze_scalar sponge : Scalar_challenge.t =
-    Scalar_challenge
-      (Sponge.squeeze sponge ~length:Challenge.length)
+    Scalar_challenge (Sponge.squeeze sponge ~length:Challenge.length)
 
   let combined_commitment ~xi (polys : _ Vector.t) =
     let (p0 :: ps) = polys in
@@ -214,15 +214,12 @@ module Make (Inputs : Inputs
         G1.(p + scale acc xi) )
 
   let accumulate_degree_bound_checks =
-    accumulate_degree_bound_checks
-      ~add:G1.( + )
-      ~scale:Scalar_challenge.endo
+    accumulate_degree_bound_checks ~add:G1.( + ) ~scale:Scalar_challenge.endo
 
   let accumulate_opening_check =
     let open G1 in
     let g = G1.Scaling_precomputation.create Generators.g in
-    accumulate_opening_check ~add:( + ) ~negate
-      ~endo:Scalar_challenge.endo
+    accumulate_opening_check ~add:( + ) ~negate ~endo:Scalar_challenge.endo
       ~scale_generator:(fun bits -> G1.multiscale_known [|(bits, g)|])
 
   module One_hot_vector = One_hot_vector.Make (Impl)
@@ -347,18 +344,14 @@ module Make (Inputs : Inputs
     print_g1 "za" z_hat_a ;
     print_g1 "zb" z_hat_b ;
     List.iter
-      [ ("alpha", alpha)
-      ; ("eta_a", eta_a)
-      ; ("eta_b", eta_b)
-      ; ("eta_c", eta_c)
-      ] ~f:(fun (lab, x) -> print_chal lab x) ;
+      [("alpha", alpha); ("eta_a", eta_a); ("eta_b", eta_b); ("eta_c", eta_c)]
+      ~f:(fun (lab, x) -> print_chal lab x) ;
     let digest_before_evaluations =
       Sponge.squeeze sponge ~length:Digest.length
     in
     let open Vector in
     let combine_commitments t =
-      Pcs_batch.combine_commitments
-        ~scale:Scalar_challenge.endo ~add:G1.( + )
+      Pcs_batch.combine_commitments ~scale:Scalar_challenge.endo ~add:G1.( + )
         ~xi t
     in
     let pairing_acc =
@@ -411,8 +404,7 @@ module Make (Inputs : Inputs
               |> add step_k uk |> List.zip_exn keys |> Int.Map.of_alist_exn )
             degree_bound_checks ~r_h:r ~r_k g_1 g_2 g_3
       ; opening_check=
-          accumulate_opening_check opening_check
-            ~r ~r_xi_sum
+          accumulate_opening_check opening_check ~r ~r_xi_sum
             (f_1, beta_1, pi_1) (f_2, beta_2, pi_2) (f_3, beta_3, pi_3) }
     in
     let deferred =
@@ -428,15 +420,57 @@ module Make (Inputs : Inputs
     in
     (digest_before_evaluations, pairing_acc, deferred)
 
-  let combined_evaluation (type b b_plus_19) b_plus_19 ~shifted_pow ~xi
-      ~evaluation_point
-      ((without_degree_bound : (_, b_plus_19) Vector.t), with_degree_bound)
-      ~h_minus_1 ~k_minus_1 =
-    Pcs_batch.combine_split_evaluations'
-      (Common.dlog_pcs_batch b_plus_19 ~h_minus_1 ~k_minus_1)
-      ~shifted_pow ~mul:Fq.mul ~add:Fq.add ~one:Fq.one ~evaluation_point
-      ~xi
-      without_degree_bound with_degree_bound
+module Split_evaluations = struct
+  module Pseudo = Pseudo.Make (Impl)
+
+  let mask (type n)
+      ~(lengths : (int, n) Vector.t)
+      (choice : (Boolean.var, n) Vector.t)
+    : Boolean.var array
+    =
+    let max = Option.value_exn (List.max_elt ~compare:Int.compare (Vector.to_list lengths)) in
+    let length = Pseudo.choose (choice, lengths) ~f:Field.of_int in
+    let m = ref Boolean.false_ in
+    let res = Array.init max ~f:(fun _ -> Boolean.false_) in
+    for i = 0 to max - 1 do
+      m := Boolean.(!m || Field.equal (Field.of_int i) length) ;
+      res.(i) <- !m
+    done ;
+    res
+
+  let combine_split_evaluations' s =
+    Pcs_batch.combine_split_evaluations' s
+      ~mul:(fun (mask_out, x) (y : Field.t) -> 
+          (mask_out, Field.(y * x)))
+      ~mul_and_add:(fun ~acc ~xi (mask_out, fx) ->
+        Field.if_ mask_out
+          ~then_:acc
+          ~else_:Field.(fx + xi * acc) )
+      ~init:(fun (_, fx) -> fx)
+      ~shifted_pow:(Pseudo.Degree_bound.shifted_pow ~crs_max_degree)
+end
+
+let mask_evals (type n)
+  (lengths : (int, n) Vector.t Evals.t)
+  (choice : (Boolean.var, n) Vector.t)
+  (e : Field.t array Evals.t)
+  : (Boolean.var * Field.t) array Evals.t
+  =
+  Evals.map2 lengths e
+    ~f:(fun lengths e ->
+          Array.zip_exn
+            (Split_evaluations.mask ~lengths choice)
+            e )
+
+let combined_evaluation (type b b_plus_19) b_plus_19 ~xi
+    ~evaluation_point
+    ((without_degree_bound : (_, b_plus_19) Vector.t), with_degree_bound)
+    ~h_minus_1 ~k_minus_1
+  =
+  Split_evaluations.combine_split_evaluations'
+    (Common.dlog_pcs_batch b_plus_19 ~h_minus_1 ~k_minus_1)
+    ~evaluation_point ~xi
+    without_degree_bound with_degree_bound
 
   let sum' xs f = List.reduce_exn (List.map xs ~f) ~f:Fq.( + )
 
@@ -447,10 +481,7 @@ module Make (Inputs : Inputs
     let nonresidue = Fq.of_int 7 in
     Vector.map chals ~f:(fun {Bulletproof_challenge.prechallenge; is_square} ->
         let pre = scalar prechallenge in
-        let sq =
-          Fq.if_ is_square ~then_:pre
-            ~else_:Fq.(nonresidue * pre)
-        in
+        let sq = Fq.if_ is_square ~then_:pre ~else_:Fq.(nonresidue * pre) in
         Fq.sqrt sq )
 
   let b_poly = Fq.(b_poly ~add ~mul ~inv)
@@ -473,7 +504,8 @@ module Make (Inputs : Inputs
     in
     go Boolean.true_ 0 n
 
-  let pack_scalar_challenge (Pickles_types.Scalar_challenge.Scalar_challenge t) =
+  let pack_scalar_challenge (Pickles_types.Scalar_challenge.Scalar_challenge t)
+      =
     Field.pack (Challenge.to_bits t)
 
   let actual_evaluation 
@@ -493,8 +525,9 @@ module Make (Inputs : Inputs
     | [] -> failwith "empty list"
 
   let finalize_other_proof (type b)
-      (module Branching : Nat.Add.Intf with type n = b) ?actual_branching
-      ~shifted_pow ~domain_h ~domain_k ~input_domain ~h_minus_1 ~k_minus_1
+      (module Branching : Nat.Add.Intf with type n = b)
+      ?actual_branching
+      ~domain_h ~domain_k ~input_domain ~h_minus_1 ~k_minus_1
       ~sponge ~(old_bulletproof_challenges : (_, b) Vector.t)
       ({xi; r; combined_inner_product; bulletproof_challenges; b; marlin} :
         _ Types.Pairing_based.Proof_state.Deferred_values.t)
@@ -521,22 +554,18 @@ module Make (Inputs : Inputs
     absorb_evals x_hat1 beta_1_evals ;
     absorb_evals x_hat2 beta_2_evals ;
     absorb_evals x_hat3 beta_3_evals ;
-
     let xi_and_r_correct =
       let xi_actual = Sponge.squeeze sponge ~length:Challenge.length in
       let r_actual = Sponge.squeeze sponge ~length:Challenge.length in
       (* Sample new sg challenge point here *)
-      Boolean.all [equal (pack xi_actual) (pack_scalar_challenge xi); equal (pack r_actual) (pack_scalar_challenge r)]
+      Boolean.all
+        [ equal (pack xi_actual) (pack_scalar_challenge xi)
+        ; equal (pack r_actual) (pack_scalar_challenge r) ]
     in
-    let scalar =
-      SC.to_field_checked (module Impl)
-        ~endo:Endo.Dlog.scalar
-    in
+    let scalar = SC.to_field_checked (module Impl) ~endo:Endo.Dlog.scalar in
     let marlin =
       Types.Pairing_based.Proof_state.Deferred_values.Marlin.map_challenges
-        ~f:Field.pack
-        ~scalar
-        marlin
+        ~f:Field.pack ~scalar marlin
     in
     let xi = scalar xi in
     let r = scalar r in
@@ -561,7 +590,7 @@ module Make (Inputs : Inputs
                 Vector.map2 mask sg_olds ~f:(fun b f -> [|(b :> Field.t) * f pt|])
           in
           let v = Vector.append sg_evals ([|x_hat|] :: a) (snd pi) in
-          combined_evaluation pi ~shifted_pow ~xi ~evaluation_point:pt 
+          combined_evaluation pi ~xi ~evaluation_point:pt 
             (v, b)
             ~h_minus_1 ~k_minus_1
         in
@@ -573,7 +602,9 @@ module Make (Inputs : Inputs
       in
       equal combined_inner_product actual_combined_inner_product
     in
-    let bulletproof_challenges = compute_challenges ~scalar bulletproof_challenges in
+    let bulletproof_challenges =
+      compute_challenges ~scalar bulletproof_challenges
+    in
     let b_correct =
       let b_poly = b_poly (Vector.to_array bulletproof_challenges) in
       let b_actual =
@@ -662,7 +693,8 @@ module Make (Inputs : Inputs
           ~init:(map a ~f:(fun x -> Shifted.(add zero x)))
           ~f:(fun acc t -> map2 acc t ~f:Shifted.add)
         |> map ~f:Shifted.unshift_nonzero
-(* TODO
+
+  (* TODO
 
   let assert_eq_marlin
       (m1 :

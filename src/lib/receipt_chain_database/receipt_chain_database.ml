@@ -276,6 +276,6 @@ let%test_module "receipt_database" =
 
 module Rocksdb =
   Rocksdb.Serializable.Make
-    (Receipt.Chain_hash.Stable.V1)
-    (Tree_node.Stable.V1)
+    (Receipt.Chain_hash.Stable.Latest)
+    (Tree_node.Stable.Latest)
 include Make_ident (String) (Rocksdb)

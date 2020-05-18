@@ -12,10 +12,14 @@ val refused_answer_query_string : string
 
 module Rpcs : sig
   module Get_staged_ledger_aux_and_pending_coinbases_at_hash : sig
-    type query = State_hash.Stable.V1.t
+    type query = State_hash.t
 
     type response =
-      (Staged_ledger.Scan_state.t * Ledger_hash.t * Pending_coinbase.t) option
+      ( Staged_ledger.Scan_state.t
+      * Ledger_hash.t
+      * Pending_coinbase.t
+      * Coda_state.Protocol_state.value list )
+      option
   end
 
   module Answer_sync_ledger_query : sig
@@ -25,7 +29,7 @@ module Rpcs : sig
   end
 
   module Get_transition_chain : sig
-    type query = State_hash.Stable.V1.t list
+    type query = State_hash.t list
 
     type response = External_transition.t list option
   end
@@ -68,7 +72,8 @@ module Rpcs : sig
       module Stable : sig
         module V1 : sig
           type t =
-            { node: Core.Unix.Inet_addr.Stable.V1.t
+            { node_ip_addr: Core.Unix.Inet_addr.Stable.V1.t
+            ; node_peer_id: Peer.Id.Stable.V1.t
             ; peers: Network_peer.Peer.Stable.V1.t list
             ; block_producers:
                 Signature_lib.Public_key.Compressed.Stable.V1.t list
@@ -82,7 +87,8 @@ module Rpcs : sig
       end]
 
       type t = Stable.Latest.t =
-        { node: Unix.Inet_addr.t
+        { node_ip_addr: Unix.Inet_addr.t
+        ; node_peer_id: Peer.Id.t
         ; peers: Network_peer.Peer.t list
         ; block_producers: Signature_lib.Public_key.Compressed.t list
         ; protocol_state_hash: State_hash.t
@@ -195,7 +201,10 @@ val get_staged_ledger_aux_and_pending_coinbases_at_hash :
      t
   -> Peer.Id.t
   -> State_hash.t
-  -> (Staged_ledger.Scan_state.t * Ledger_hash.t * Pending_coinbase.t)
+  -> ( Staged_ledger.Scan_state.t
+     * Ledger_hash.t
+     * Pending_coinbase.t
+     * Coda_state.Protocol_state.value list )
      Deferred.Or_error.t
 
 val ban_notify : t -> Network_peer.Peer.t -> Time.t -> unit Deferred.Or_error.t

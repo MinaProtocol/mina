@@ -2,7 +2,6 @@ module D = Digest
 open Core_kernel
 open Pickles_types
 open Hlist
-
 module Sc = Pickles_types.Scalar_challenge
 
 module Basic = struct
@@ -32,7 +31,9 @@ type (_, _, _) Basic.t +=
 module rec T : sig
   type (_, _, _) t =
     | B : ('a, 'b, 'env) Basic.t -> ('a, 'b, 'env) t
-    | Scalar : ('a, 'b, < challenge1:'a; challenge2:'b; ..> as 'env) Basic.t -> ('a Sc.t, 'b Sc.t, 'env) t
+    | Scalar :
+        ('a, 'b, (< challenge1: 'a ; challenge2: 'b ; .. > as 'env)) Basic.t
+        -> ('a Sc.t, 'b Sc.t, 'env) t
     | Vector :
         ('t1, 't2, 'env) t * 'n Nat.t
         -> (('t1, 'n) Vector.t, ('t2, 'n) Vector.t, 'env) t
@@ -55,8 +56,8 @@ let rec pack : type t v env.
   | B spec ->
       p.pack spec t
   | Scalar chal ->
-    let Scalar_challenge t = t in
-    p.pack chal t
+      let (Scalar_challenge t) = t in
+      p.pack chal t
   | Vector (spec, _) ->
       Array.concat_map (Vector.to_array t) ~f:(pack p spec)
   | Struct [] ->
@@ -80,7 +81,7 @@ let rec typ : type f var value env.
     | B spec ->
         t.typ spec
     | Scalar chal ->
-      Sc.typ (t.typ chal)
+        Sc.typ (t.typ chal)
     | Vector (spec, n) ->
         Vector.typ (typ t spec) n
     | Array (spec, n) ->
@@ -121,8 +122,8 @@ let rec etyp : type f var value env.
     | B spec ->
         e.etyp spec
     | Scalar chal ->
-      let T (typ, f) = e.etyp chal in
-      T (Sc.typ typ, Sc.map ~f)
+        let (T (typ, f)) = e.etyp chal in
+        T (Sc.typ typ, Sc.map ~f)
     | Vector (spec, n) ->
         let (T (typ, f)) = etyp e spec in
         T (Vector.typ typ n, Vector.map ~f)
@@ -193,8 +194,8 @@ let pack_basic (type field other_field other_field_var)
     | Challenge ->
         [|Challenge.to_bits x|]
     | Bulletproof_challenge ->
-        let Scalar_challenge pre = x.prechallenge in
-        [| [x.is_square] ; Challenge.to_bits pre|]
+        let (Scalar_challenge pre) = x.prechallenge in
+        [|[x.is_square]; Challenge.to_bits pre|]
     | _ ->
         failwith "unknown basic spec"
   in
@@ -228,7 +229,8 @@ let typ_basic (type field other_field other_field_var)
         let back (prechallenge, is_square) =
           {Bulletproof_challenge.prechallenge; is_square}
         in
-        Typ.transport ~there ~back (Typ.tuple2 (Sc.typ Challenge.typ) Boolean.typ)
+        Typ.transport ~there ~back
+          (Typ.tuple2 (Sc.typ Challenge.typ) Boolean.typ)
         |> Typ.transport_var ~there ~back
     | _ ->
         failwith "unknown basic spec"
@@ -254,7 +256,7 @@ let packed_typ_basic (type field other_field other_field_var)
       ; challenge1: Challenge.Constant.t
       ; challenge2: (* Challenge.t *) Field.t
       ; bulletproof_challenge1:
-          ( Challenge.Constant.t Sc.t, bool) Bulletproof_challenge.t
+          (Challenge.Constant.t Sc.t, bool) Bulletproof_challenge.t
       ; bulletproof_challenge2:
           (Field.t Sc.t, Boolean.var) Bulletproof_challenge.t
       ; .. >
@@ -277,17 +279,19 @@ let packed_typ_basic (type field other_field other_field_var)
         T (Challenge.packed_typ, Fn.id)
     | Bulletproof_challenge ->
         let typ =
-          let there = fun {Bulletproof_challenge.prechallenge=Sc.Scalar_challenge pre; is_square} ->
-                (is_square, pre)  in
-          let back = fun (is_square, pre) ->
-                {Bulletproof_challenge.is_square
-                ; prechallenge= Sc.Scalar_challenge pre}  in
-          Typ.transport Typ.(Boolean.typ * Challenge.packed_typ)
-            ~there
-            ~back
+          let there
+              { Bulletproof_challenge.prechallenge= Sc.Scalar_challenge pre
+              ; is_square } =
+            (is_square, pre)
+          in
+          let back (is_square, pre) =
+            { Bulletproof_challenge.is_square
+            ; prechallenge= Sc.Scalar_challenge pre }
+          in
+          Typ.transport Typ.(Boolean.typ * Challenge.packed_typ) ~there ~back
           |> Typ.transport_var ~there ~back
         in
-        T (typ,           Fn.id)
+        T (typ, Fn.id)
     | _ ->
         failwith "etyp: unhandled variant"
   in

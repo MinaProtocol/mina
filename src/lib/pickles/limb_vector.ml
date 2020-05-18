@@ -11,16 +11,14 @@ module Constant = struct
            List.init 64 ~f:test_bit )
 
   module Make (N : Vector.Nat_intf) = struct
-    module A = struct
-      type 'a t = ('a, N.n sexp_opaque) Vector.t [@@deriving sexp_of]
-
-      include Vector.Binable (N)
-    end
+    module A = Vector.With_length (N)
 
     let length = 64 * Nat.to_int N.n
 
     module Hex64 = struct
-      include Int64
+      type t = Int64.t [@@deriving yojson]
+
+      include (Int64 : module type of Int64 with type t := t)
 
       let to_hex t =
         let mask = of_int 0xffffffff in
@@ -29,10 +27,23 @@ module Constant = struct
         in
         sprintf "%08x%08x" hi lo
 
+      let of_hex h =
+        let f s = Hex.of_string ("0x" ^ s) in
+        let hi, lo =
+          String.(f (sub h ~pos:0 ~len:8), f (sub h ~pos:8 ~len:8))
+        in
+        (hi lsl 32) lor lo
+
+      let%test_unit "int64 hex" =
+        Quickcheck.test (Int64.gen_incl zero max_value) ~f:(fun x ->
+            assert (equal x (of_hex (to_hex x))) )
+
       let sexp_of_t = Fn.compose String.sexp_of_t to_hex
+
+      let t_of_sexp = Fn.compose of_hex String.t_of_sexp
     end
 
-    type t = Hex64.t A.t [@@deriving bin_io, sexp_of]
+    type t = Hex64.t A.t [@@deriving bin_io, sexp, compare, yojson]
 
     let to_bits = to_bits
 
@@ -56,8 +67,7 @@ module Constant = struct
 
     let to_fq t = Snarky_bn382_backend.Fq.of_bits (to_bits t)
 
-    let dummy : t = 
-      Vector.init N.n ~f:(fun _ -> Int64.one)
+    let dummy : t = Vector.init N.n ~f:(fun _ -> Int64.one)
   end
 end
 

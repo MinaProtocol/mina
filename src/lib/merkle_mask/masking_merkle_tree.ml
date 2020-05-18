@@ -12,9 +12,9 @@ module Make (Inputs : Inputs_intf.S) = struct
 
   type hash = Hash.t
 
-  type key = Key.t
+  type account_id = Account_id.t
 
-  type key_set = Key.Set.t
+  type account_id_set = Account_id.Set.t
 
   type location = Location.t
 
@@ -25,47 +25,35 @@ module Make (Inputs : Inputs_intf.S) = struct
       attached one. We can capture this with a GADT but there's some annoying
       issues with bin_io to do so *)
   module Parent = struct
-    module T = struct
-      type t = Base.t option [@@deriving sexp]
-    end
-
-    include T
-
-    include Binable.Of_binable
-              (Unit)
-              (struct
-                include T
-
-                let to_binable = function
-                  | Some _ ->
-                      failwith "We can't serialize when we're an attached mask"
-                  | None ->
-                      ()
-
-                let of_binable () = None
-              end)
+    type t = Base.t option [@@deriving sexp]
   end
 
   type t =
     { uuid: Uuid.Stable.V1.t
-    ; account_tbl: Account.t Location.Table.t
+    ; account_tbl: Account.t Location_binable.Table.t
+    ; token_owners: Key.Stable.Latest.t Token_id.Table.t
     ; mutable parent: Parent.t
     ; hash_tbl: Hash.t Addr.Table.t
-    ; location_tbl: Location.t Key.Table.t
-    ; mutable current_location: Location.t option }
-  [@@deriving sexp, bin_io]
+    ; location_tbl: Location.t Account_id.Table.t
+    ; mutable current_location: Location.t option
+    ; depth: int }
+  [@@deriving sexp]
 
   type unattached = t [@@deriving sexp]
 
-  let create () =
+  let create ~depth () =
     { uuid= Uuid_unix.create ()
     ; parent= None
-    ; account_tbl= Location.Table.create ()
+    ; account_tbl= Location_binable.Table.create ()
+    ; token_owners= Token_id.Table.create ()
     ; hash_tbl= Addr.Table.create ()
-    ; location_tbl= Key.Table.create ()
-    ; current_location= None }
+    ; location_tbl= Account_id.Table.create ()
+    ; current_location= None
+    ; depth }
 
   let get_uuid {uuid; _} = uuid
+
+  let depth t = t.depth
 
   let with_ledger ~f =
     let mask = create () in
@@ -117,6 +105,8 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     let get_uuid t = assert_is_attached t ; t.uuid
 
+    let depth t = assert_is_attached t ; t.depth
+
     (* don't rely on a particular implementation *)
     let self_find_hash t address =
       assert_is_attached t ;
@@ -128,31 +118,31 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     let set_inner_hash_at_addr_exn t address hash =
       assert_is_attached t ;
-      assert (Addr.depth address <= Base.depth) ;
+      assert (Addr.depth address <= t.depth) ;
       self_set_hash t address hash
 
     (* don't rely on a particular implementation *)
-    let self_find_location t public_key =
+    let self_find_location t account_id =
       assert_is_attached t ;
-      Key.Table.find t.location_tbl public_key
+      Account_id.Table.find t.location_tbl account_id
 
-    let self_set_location t public_key location =
+    let self_set_location t account_id location =
       assert_is_attached t ;
-      Key.Table.set t.location_tbl ~key:public_key ~data:location
+      Account_id.Table.set t.location_tbl ~key:account_id ~data:location
 
     (* don't rely on a particular implementation *)
     let self_find_account t location =
       assert_is_attached t ;
-      Location.Table.find t.account_tbl location
+      Location_binable.Table.find t.account_tbl location
 
     let self_find_all_accounts t =
       assert_is_attached t ;
-      Location.Table.data t.account_tbl
+      Location_binable.Table.data t.account_tbl
 
     let self_set_account t location account =
       assert_is_attached t ;
-      Location.Table.set t.account_tbl ~key:location ~data:account ;
-      self_set_location t (Account.public_key account) location
+      Location_binable.Table.set t.account_tbl ~key:location ~data:account ;
+      self_set_location t (Account.identifier account) location
 
     (* a read does a lookup in the account_tbl; if that fails, delegate to
        parent *)
@@ -203,7 +193,7 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     let merkle_path_at_index_exn t index =
       assert_is_attached t ;
-      let address = Addr.of_int_exn index in
+      let address = Addr.of_int_exn ~ledger_depth:t.depth index in
       let parent_merkle_path =
         Base.merkle_path_at_addr_exn (get_parent t) address
       in
@@ -249,10 +239,10 @@ module Make (Inputs : Inputs_intf.S) = struct
       assert_is_attached t ;
       (* remove account and key from tables *)
       let account = Option.value_exn (self_find_account t location) in
-      Location.Table.remove t.account_tbl location ;
+      Location_binable.Table.remove t.account_tbl location ;
       (* TODO : use stack database to save unused location, which can be used
          when allocating a location *)
-      Key.Table.remove t.location_tbl (Account.public_key account) ;
+      Account_id.Table.remove t.location_tbl (Account.identifier account) ;
       (* reuse location if possible *)
       Option.iter t.current_location ~f:(fun curr_loc ->
           if Location.equal location curr_loc then
@@ -291,7 +281,7 @@ module Make (Inputs : Inputs_intf.S) = struct
        if the account in the parent is the same in the mask *)
     let parent_set_notify t account =
       assert_is_attached t ;
-      match self_find_location t (Account.public_key account) with
+      match self_find_location t (Account.identifier account) with
       | None ->
           ()
       | Some location -> (
@@ -337,9 +327,9 @@ module Make (Inputs : Inputs_intf.S) = struct
     let commit t =
       assert_is_attached t ;
       let old_root_hash = merkle_root t in
-      let account_data = Location.Table.to_alist t.account_tbl in
+      let account_data = Location_binable.Table.to_alist t.account_tbl in
       Base.set_batch (get_parent t) account_data ;
-      Location.Table.clear t.account_tbl ;
+      Location_binable.Table.clear t.account_tbl ;
       Addr.Table.clear t.hash_tbl ;
       Debug_assert.debug_assert (fun () ->
           [%test_result: Hash.t]
@@ -358,10 +348,12 @@ module Make (Inputs : Inputs_intf.S) = struct
     let copy t =
       { uuid= Uuid_unix.create ()
       ; parent= Some (get_parent t)
-      ; account_tbl= Location.Table.copy t.account_tbl
-      ; location_tbl= Key.Table.copy t.location_tbl
+      ; account_tbl= Location_binable.Table.copy t.account_tbl
+      ; token_owners= Token_id.Table.copy t.token_owners
+      ; location_tbl= Account_id.Table.copy t.location_tbl
       ; hash_tbl= Addr.Table.copy t.hash_tbl
-      ; current_location= t.current_location }
+      ; current_location= t.current_location
+      ; depth= t.depth }
 
     let last_filled t =
       assert_is_attached t ;
@@ -377,14 +369,13 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     include Merkle_ledger.Util.Make (struct
       module Location = Location
+      module Location_binable = Location_binable
       module Key = Key
+      module Token_id = Token_id
+      module Account_id = Account_id
       module Account = Account
       module Hash = Hash
       module Balance = Balance
-
-      module Depth = struct
-        let depth = Base.depth
-      end
 
       module Base = struct
         type nonrec t = t
@@ -393,6 +384,8 @@ module Make (Inputs : Inputs_intf.S) = struct
 
         let last_filled = last_filled
       end
+
+      let ledger_depth = depth
 
       let location_of_account_addr addr = Location.Account addr
 
@@ -405,10 +398,10 @@ module Make (Inputs : Inputs_intf.S) = struct
         List.iter locations_and_hashes ~f:(fun (location, hash) ->
             self_set_hash t (Location.to_path_exn location) hash )
 
-      let set_location_batch ~last_location t key_to_location_list =
+      let set_location_batch ~last_location t account_to_location_list =
         t.current_location <- Some last_location ;
-        Non_empty_list.iter key_to_location_list ~f:(fun (key, data) ->
-            Key.Table.set t.location_tbl ~key ~data )
+        Non_empty_list.iter account_to_location_list ~f:(fun (key, data) ->
+            Account_id.Table.set t.location_tbl ~key ~data )
 
       let set_raw_account_batch t locations_and_accounts =
         List.iter locations_and_accounts ~f:(fun (location, account) ->
@@ -425,28 +418,43 @@ module Make (Inputs : Inputs_intf.S) = struct
       set_all_accounts_rooted_at_exn t address accounts
 
     (* keys from this mask and all ancestors *)
-    let keys t =
+    let accounts t =
       assert_is_attached t ;
       let mask_keys =
-        Location.Table.data t.account_tbl
-        |> List.map ~f:Account.public_key
-        |> Key.Set.of_list
+        Location_binable.Table.data t.account_tbl
+        |> List.map ~f:Account.identifier
+        |> Account_id.Set.of_list
       in
-      let parent_keys = Base.keys (get_parent t) in
-      Key.Set.union parent_keys mask_keys
+      let parent_keys = Base.accounts (get_parent t) in
+      Account_id.Set.union parent_keys mask_keys
+
+    let token_owner t tid = Token_id.Table.find t.token_owners tid
+
+    let token_owners t =
+      Token_id.Table.to_alist t.token_owners
+      |> List.map ~f:(fun (tid, pk) -> Account_id.create pk tid)
+      |> Account_id.Set.of_list
+
+    let tokens t pk =
+      Account_id.Table.keys t.location_tbl
+      |> List.filter_map ~f:(fun aid ->
+             if Key.equal pk (Account_id.public_key aid) then
+               Some (Account_id.token_id aid)
+             else None )
+      |> Token_id.Set.of_list
 
     let num_accounts t =
       assert_is_attached t ;
-      keys t |> Key.Set.length
+      accounts t |> Account_id.Set.length
 
-    let location_of_key t key =
+    let location_of_account t account_id =
       assert_is_attached t ;
-      let mask_result = self_find_location t key in
+      let mask_result = self_find_location t account_id in
       match mask_result with
       | Some _ ->
           mask_result
       | None ->
-          Base.location_of_key (get_parent t) key
+          Base.location_of_account (get_parent t) account_id
 
     (* not needed for in-memory mask; in the database, it's currently a NOP *)
     let make_space_for t =
@@ -455,7 +463,7 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     let get_inner_hash_at_addr_exn t address =
       assert_is_attached t ;
-      assert (Addr.depth address <= Base.depth) ;
+      assert (Addr.depth address <= t.depth) ;
       get_hash t address |> Option.value_exn
 
     let remove_accounts_exn t keys =
@@ -494,31 +502,31 @@ module Make (Inputs : Inputs_intf.S) = struct
        as sometimes this is desired behavior *)
     let close t =
       assert_is_attached t ;
-      Location.Table.clear t.account_tbl ;
+      Location_binable.Table.clear t.account_tbl ;
       Addr.Table.clear t.hash_tbl ;
-      Key.Table.clear t.location_tbl
+      Account_id.Table.clear t.location_tbl
 
-    let index_of_key_exn t key =
+    let index_of_account_exn t key =
       assert_is_attached t ;
-      let location = location_of_key t key |> Option.value_exn in
+      let location = location_of_account t key |> Option.value_exn in
       let addr = Location.to_path_exn location in
       Addr.to_int addr
 
     let get_at_index_exn t index =
       assert_is_attached t ;
-      let addr = Addr.of_int_exn index in
+      let addr = Addr.of_int_exn ~ledger_depth:t.depth index in
       get t (Location.Account addr) |> Option.value_exn
 
     let set_at_index_exn t index account =
       assert_is_attached t ;
-      let addr = Addr.of_int_exn index in
+      let addr = Addr.of_int_exn ~ledger_depth:t.depth index in
       set t (Location.Account addr) account
 
     let to_list t =
       assert_is_attached t ;
-      keys t |> Set.to_list
+      accounts t |> Set.to_list
       |> List.map ~f:(fun key ->
-             let location = location_of_key t key |> Option.value_exn in
+             let location = location_of_account t key |> Option.value_exn in
              match location with
              | Account addr ->
                  (Addr.to_int addr, get t location |> Option.value_exn)
@@ -531,23 +539,29 @@ module Make (Inputs : Inputs_intf.S) = struct
     (* TODO *)
     let iteri _t ~f:_ = failwith "iteri not implemented on masks"
 
-    let foldi_with_ignored_keys t ignored_keys ~init ~f =
+    let foldi_with_ignored_accounts t ignored_accounts ~init ~f =
       assert_is_attached t ;
-      let locations_and_accounts = Location.Table.to_alist t.account_tbl in
-      (* parent should ignore keys in this mask *)
-      let mask_keys =
-        List.map locations_and_accounts ~f:(fun (_loc, acct) ->
-            Account.public_key acct )
+      let locations_and_accounts =
+        Location_binable.Table.to_alist t.account_tbl
       in
-      let mask_ignored_keys = Key.Set.of_list mask_keys in
-      let all_ignored_keys = Key.Set.union ignored_keys mask_ignored_keys in
-      (* in parent, ignore any passed-in ignored keys and keys in mask *)
+      (* parent should ignore accounts in this mask *)
+      let mask_accounts =
+        List.map locations_and_accounts ~f:(fun (_loc, acct) ->
+            Account.identifier acct )
+      in
+      let mask_ignored_accounts = Account_id.Set.of_list mask_accounts in
+      let all_ignored_accounts =
+        Account_id.Set.union ignored_accounts mask_ignored_accounts
+      in
+      (* in parent, ignore any passed-in ignored accounts and accounts in mask *)
       let parent_result =
-        Base.foldi_with_ignored_keys (get_parent t) all_ignored_keys ~init ~f
+        Base.foldi_with_ignored_accounts (get_parent t) all_ignored_accounts
+          ~init ~f
       in
       let f' accum (location, account) =
-        (* for mask, ignore just passed-in ignored keys *)
-        if Key.Set.mem ignored_keys (Account.public_key account) then accum
+        (* for mask, ignore just passed-in ignored accounts *)
+        if Account_id.Set.mem ignored_accounts (Account.identifier account)
+        then accum
         else
           let address = Location.to_path_exn location in
           f address accum account
@@ -556,7 +570,7 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     let foldi t ~init ~f =
       assert_is_attached t ;
-      foldi_with_ignored_keys t Key.Set.empty ~init ~f
+      foldi_with_ignored_accounts t Account_id.Set.empty ~init ~f
 
     (* we would want fold_until to combine results from the parent and the mask
        way (1): use the parent result as the init of the mask fold (or
@@ -581,10 +595,10 @@ module Make (Inputs : Inputs_intf.S) = struct
     end
 
     (* leftmost location *)
-    let first_location =
+    let first_location ~ledger_depth =
       Location.Account
         ( Addr.of_directions
-        @@ List.init Base.depth ~f:(fun _ -> Direction.Left) )
+        @@ List.init ledger_depth ~f:(fun _ -> Direction.Left) )
 
     let loc_max a b =
       let a' = Location.to_path_exn a in
@@ -592,12 +606,12 @@ module Make (Inputs : Inputs_intf.S) = struct
       if Location.Addr.compare a' b' > 0 then a else b
 
     (* NB: updates the mutable current_location field in t *)
-    let get_or_create_account t key account =
+    let get_or_create_account t account_id account =
       assert_is_attached t ;
-      match self_find_location t key with
+      match self_find_location t account_id with
       | None -> (
         (* not in mask, maybe in parent *)
-        match Base.location_of_key (get_parent t) key with
+        match Base.location_of_account (get_parent t) account_id with
         | Some location ->
             Ok (`Existed, location)
         | None -> (
@@ -605,7 +619,7 @@ module Make (Inputs : Inputs_intf.S) = struct
             let maybe_location =
               match last_filled t with
               | None ->
-                  Some first_location
+                  Some (first_location ~ledger_depth:t.depth)
               | Some loc ->
                   Location.next loc
             in
@@ -614,26 +628,25 @@ module Make (Inputs : Inputs_intf.S) = struct
                 Or_error.error_string "Db_error.Out_of_leaves"
             | Some location ->
                 set t location account ;
-                self_set_location t key location ;
+                self_set_location t account_id location ;
                 t.current_location <- Some location ;
                 Ok (`Added, location) ) )
       | Some location ->
           Ok (`Existed, location)
 
-    let get_or_create_account_exn t key account =
-      get_or_create_account t key account
+    let get_or_create_account_exn t account_id account =
+      get_or_create_account t account_id account
       |> Result.map_error ~f:(fun err -> raise (Error.to_exn err))
       |> Result.ok_exn
 
     let sexp_of_location = Location.sexp_of_t
 
     let location_of_sexp = Location.t_of_sexp
-
-    let depth = Base.depth
   end
 
   let set_parent t parent =
     assert (Option.is_none t.parent) ;
+    assert (Int.equal t.depth (Base.depth parent)) ;
     t.parent <- Some parent ;
     t.current_location <- Attached.last_filled t ;
     t

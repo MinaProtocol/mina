@@ -1,11 +1,11 @@
 module type Constraint_matrix_intf = sig
-  module Field : Field.S
+  type field_vector
 
   type t
 
   val create : unit -> t
 
-  val append_row : t -> Snarky_bn382.Usize_vector.t -> Field.Vector.t -> unit
+  val append_row : t -> Snarky_bn382.Usize_vector.t -> field_vector -> unit
 end
 
 type 'a abc = {a: 'a; b: 'a; c: 'a} [@@deriving sexp]
@@ -20,23 +20,69 @@ module Weight = struct
   let norm {a; b; c} = Int.(max a (max b c))
 end
 
+module Triple = struct
+  type 'a t = 'a * 'a * 'a
+end
+
+module Hash_state = struct
+  open Core_kernel
+  module H = Digestif.SHA256
+
+  type t = H.ctx
+
+  let digest t = Md5.digest_string H.(to_raw_string (get t))
+end
+
+module Hash = Core.Md5
+
 type 'a t =
   { m: 'a abc
+  ; mutable hash: Hash_state.t
   ; mutable constraints: int
   ; mutable weight: Weight.t
   ; mutable public_input_size: int
   ; mutable auxiliary_input_size: int }
 
-module Make
-    (Fp : Field.S)
-    (Mat : Constraint_matrix_intf with module Field := Fp) =
+let digest (t : _ t) = Hash_state.digest t.hash
+
+module Make (Fp : sig
+  include Field.S
+
+  val to_bigint_raw_noalloc : t -> Bigint.R.t
+end)
+(Mat : Constraint_matrix_intf with type field_vector := Fp.Vector.t) =
 struct
   open Core
+
+  module Hash_state = struct
+    include Hash_state
+    module B = Snarky_bn382.Bigint
+
+    let feed_constraint t (a, b, c) =
+      let n = Bigint.R.length_in_bytes in
+      let buf = Bytes.init (n + 8) ~f:(fun _ -> '\000') in
+      let one x t =
+        List.fold x ~init:t ~f:(fun acc (x, index) ->
+            let limbs = B.to_data (Fp.to_bigint_raw_noalloc x) in
+            for i = 0 to n - 1 do
+              Bytes.set buf i Ctypes.(!@(limbs +@ i))
+            done ;
+            for i = 0 to 7 do
+              Bytes.set buf (n + i)
+                (Char.of_int_exn ((index lsr (8 * i)) land 255))
+            done ;
+            H.feed_bytes acc buf )
+      in
+      t |> one a |> one b |> one c
+
+    let empty = H.empty
+  end
 
   type nonrec t = Mat.t t
 
   let create () =
     { public_input_size= 0
+    ; hash= Hash_state.empty
     ; constraints= 0
     ; auxiliary_input_size= 0
     ; weight= {a= 0; b= 0; c= 0}
@@ -53,8 +99,7 @@ struct
 
   let set_primary_input_size t x = t.public_input_size <- x
 
-  (* TODO *)
-  let digest _ = failwith "TODO"
+  let digest = digest
 
   let finalize = ignore
 
@@ -184,9 +229,11 @@ struct
     let var_exn t = Option.value_exn (var t) in
     let choose_best opts terms =
       let constr, new_weight = choose_best t.weight opts terms in
+      t.hash <- Hash_state.feed_constraint t.hash constr ;
       t.weight <- new_weight ;
       add_r1cs t constr
     in
+    let open Snarky.Constraint in
     match constr with
     | Boolean x ->
         let x, x_weight, x_has_constant_term = var_exn x in
@@ -235,4 +282,5 @@ struct
         let b, b_weight, _ = var_exn b in
         let c, c_weight, _ = var_exn c in
         choose_best [((), (a_weight, b_weight, c_weight))] (fun () -> (a, b, c))
+    | _ -> failwith "Unsupported constraint"
 end

@@ -3,12 +3,6 @@ open Common
 open Snarky_bn382_backend
 module Impl = Impls.Pairing_based
 
-(*
-let () =
-  Snarky_bn382_backend.Dlog_based.Keypair.set_urs_info
-    "/home/izzy/pickles/dlog-urs"
-
-*)
 let sponge_params_constant =
   Sponge.Params.(map bn382_p ~f:Impl.Field.Constant.of_string)
 
@@ -74,22 +68,22 @@ module Input_domain = struct
   let domain = Domain.Pow_2_roots_of_unity 5
 
   let lagrange_commitments =
-    let domain_size = Domain.size domain in
-    let u = Unsigned.Size_t.of_int in
+    lazy
+      (let domain_size = Domain.size domain in
+       let u = Unsigned.Size_t.of_int in
     assert (domain_size < dlog_crs_max_degree) ;
-    time "lagrange" (fun () ->
-        Array.init domain_size ~f:(fun i ->
-            let c =
-                Snarky_bn382.Fq_urs.lagrange_commitment
-                (Snarky_bn382_backend.Dlog_based.Keypair.load_urs ())
-                 (u domain_size) (u i)
-            in
-            let v = Snarky_bn382.Fq_poly_comm.unshifted c in
-            assert (G.Affine.Vector.length v = 1);
-            let g = G.Affine.Vector.get v 0 in
-            Snarky_bn382_backend.G.Affine.of_backend
-              g
-          ) )
+       time "lagrange" (fun () ->
+           Array.init domain_size ~f:(fun i ->
+               let v =
+                 (Snarky_bn382.Fq_urs.lagrange_commitment
+                    (Snarky_bn382_backend.Dlog_based.Keypair.load_urs ())
+                    (u domain_size) (u i)) 
+                |> Snarky_bn382.Fq_poly_comm.unshifted 
+               in
+               assert (G.Affine.Vector.length v = 1);
+               G.Affine.Vector.get v 0
+               |> Snarky_bn382_backend.G.Affine.of_backend
+             )))
 end
 
 module G = struct
@@ -136,7 +130,6 @@ module G = struct
 
     module Constant = struct
       include G.Affine
-
       module Scalar = Impls.Dlog_based.Field.Constant
 
       let scale (t : t) x : t = G.(to_affine_exn (scale (of_affine t) x))
@@ -165,7 +158,7 @@ module G = struct
   module Scaling_precomputation = struct
     include T.Scaling_precomputation
 
-    let create t = create ~unrelated_base:(unrelated_g t) t
+(*     let create t = create ~unrelated_base:(unrelated_g t) t *)
   end
 
   let ( + ) = T.add_exn
@@ -247,6 +240,8 @@ end
 
 module Generators = struct
   let h =
-    Snarky_bn382.Fq_urs.h (Snarky_bn382_backend.Dlog_based.Keypair.load_urs ())
-    |> Snarky_bn382_backend.G.Affine.of_backend
+    lazy
+      ( Snarky_bn382.Fq_urs.h
+          (Snarky_bn382_backend.Dlog_based.Keypair.load_urs ())
+      |> Snarky_bn382_backend.G.Affine.of_backend )
 end

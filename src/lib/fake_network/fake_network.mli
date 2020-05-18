@@ -1,5 +1,4 @@
 open Core
-open Coda_base
 open Gadt_lib
 
 (* There must be at least 2 peers to create a network *)
@@ -27,14 +26,22 @@ val setup :
 module Generator : sig
   open Quickcheck
 
-  type peer_config = max_frontier_length:int -> peer_state Generator.t
+  type peer_config =
+       proof_level:Genesis_constants.Proof_level.t
+    -> constraint_constants:Genesis_constants.Constraint_constants.t
+    -> precomputed_values:Precomputed_values.t
+    -> max_frontier_length:int
+    -> peer_state Generator.t
 
   val fresh_peer : peer_config
 
   val peer_with_branch : frontier_branch_size:int -> peer_config
 
   val gen :
-       max_frontier_length:int
+       proof_level:Genesis_constants.Proof_level.t
+    -> constraint_constants:Genesis_constants.Constraint_constants.t
+    -> precomputed_values:Precomputed_values.t
+    -> max_frontier_length:int
     -> (peer_config, 'n num_peers) Vect.t
     -> 'n num_peers t Generator.t
 end

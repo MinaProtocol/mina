@@ -257,6 +257,8 @@ end = struct
 
       let of_unsigned magnitude = {magnitude; sgn= Sgn.Checked.pos}
 
+      let negate {magnitude; sgn} = {magnitude; sgn= Sgn.Checked.negate sgn}
+
       let if_ cond ~then_ ~else_ =
         let%map sgn = Sgn.Checked.if_ cond ~then_:then_.sgn ~else_:else_.sgn
         and magnitude =
@@ -283,6 +285,25 @@ end = struct
         {magnitude; sgn}
 
       let ( + ) = add
+
+      let assert_equal (t1 : var) (t2 : var) =
+        let%map () =
+          Field.Checked.Assert.equal (pack_var t1.magnitude)
+            (pack_var t2.magnitude)
+        and () =
+          Field.Checked.Assert.equal
+            (t1.sgn :> Field.Var.t)
+            (t2.sgn :> Field.Var.t)
+        in
+        ()
+
+      let equal (t1 : var) (t2 : var) =
+        let%bind b1 =
+          Field.Checked.equal (pack_var t1.magnitude) (pack_var t2.magnitude)
+        and b2 =
+          Field.Checked.equal (t1.sgn :> Field.Var.t) (t2.sgn :> Field.Var.t)
+        in
+        Boolean.all [b1; b2]
 
       let cswap_field (b : Boolean.var) (x, y) =
         (* (x + b(y - x), y + b(x - y)) *)
@@ -312,6 +333,11 @@ end = struct
           (l, r)
         in
         ({sgn= l_sgn; magnitude= l_mag}, {sgn= r_sgn; magnitude= r_mag})
+
+      let scale (f : Field.Var.t) (t : var) =
+        let%bind x = Field.Checked.mul (pack_var t.magnitude) f in
+        let%map x = unpack_var x in
+        {sgn= t.sgn; magnitude= x}
     end
 
     [%%endif]
@@ -346,6 +372,10 @@ end = struct
       in
       (bits, `Underflow (Boolean.not no_underflow))
 
+    let assert_equal x y = Field.Checked.Assert.equal (pack_var x) (pack_var y)
+
+    let equal x y = Field.Checked.equal (pack_var x) (pack_var y)
+
     (* Unpacking protects against overflow *)
     let add (x : Unpacked.var) (y : Unpacked.var) =
       unpack_var (Field.Var.add (pack_var x) (pack_var y))
@@ -364,6 +394,10 @@ end = struct
     let add_signed (t : var) (d : Signed.var) =
       let%bind d = Signed.Checked.to_field_var d in
       Field.Var.add (pack_var t) d |> unpack_var
+
+    let scale (f : Field.Var.t) (t : var) =
+      let%bind x = Field.Checked.mul (pack_var t) f in
+      unpack_var x
 
     let%test_module "currency_test" =
       ( module struct
@@ -505,9 +539,8 @@ module Fee = struct
       type t = Unsigned_extended.UInt64.Stable.V1.t
       [@@deriving sexp, compare, hash, eq]
 
-      let to_yojson = to_yojson
-
-      let of_yojson = of_yojson
+      [%%define_from_scope
+      to_yojson, of_yojson]
 
       let to_latest = Fn.id
     end
@@ -546,9 +579,8 @@ module Amount = struct
       type t = Unsigned_extended.UInt64.Stable.V1.t
       [@@deriving sexp, compare, hash, eq, yojson]
 
-      let to_yojson = to_yojson
-
-      let of_yojson = of_yojson
+      [%%define_from_scope
+      to_yojson, of_yojson]
 
       let to_latest = Fn.id
     end
@@ -617,6 +649,10 @@ module Balance = struct
     let add_amount = Amount.Checked.add
 
     let sub_amount = Amount.Checked.sub
+
+    let add_amount_flagged = Amount.Checked.add_flagged
+
+    let sub_amount_flagged = Amount.Checked.sub_flagged
 
     let ( + ) = add_amount
 

@@ -1,7 +1,5 @@
 open Core_kernel
 open Coda_base
-open Module_version
-module Constants = Snark_params.Scan_state_constants
 
 let option lab =
   Option.value_map ~default:(Or_error.error_string lab) ~f:(fun x -> Ok x)
@@ -34,7 +32,6 @@ module Transaction_with_witness = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)
       type t =
         { transaction_with_info:
             Transaction_logic.Undo.Stable.V1.t
@@ -47,6 +44,7 @@ module Transaction_with_witness = struct
     end
   end]
 
+  (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)
   type t = Stable.Latest.t =
     { transaction_with_info: Ledger.Undo.t Transaction_protocol_state.t
     ; statement: Transaction_snark.Statement.t
@@ -89,7 +87,7 @@ module Job_view = struct
         [ ("Work_id", `Int (Transaction_snark.Statement.hash s))
         ; ("Source", hash_yojson s.source)
         ; ("Target", hash_yojson s.target)
-        ; ("Fee Excess", Currency.Fee.Signed.to_yojson s.fee_excess)
+        ; ("Fee Excess", Currency.Amount.Signed.to_yojson s.fee_excess)
         ; ("Supply Increase", Currency.Amount.to_yojson s.supply_increase) ]
     in
     let job_to_yojson =
@@ -127,18 +125,20 @@ end
 
 type job = Available_job.t [@@deriving sexp]
 
+[%%versioned
 module Stable = struct
   module V1 = struct
-    module T = struct
-      type t =
-        ( Ledger_proof_with_sok_message.Stable.V1.t
-        , Transaction_with_witness.Stable.V1.t )
-        Parallel_scan.State.Stable.V1.t
-      [@@deriving sexp, bin_io, version]
-    end
+    type t =
+      ( Ledger_proof_with_sok_message.Stable.V1.t
+      , Transaction_with_witness.Stable.V1.t )
+      Parallel_scan.State.Stable.V1.t
+    [@@deriving sexp]
 
-    include T
-    include Registration.Make_latest_version (T)
+    let to_latest = Fn.id
+
+    (* TODO: Review this. The version bytes for the underlying types are
+       included in the hash, so it can never be stable between versions.
+    *)
 
     let hash t =
       let state_hash =
@@ -148,29 +148,8 @@ module Stable = struct
       in
       Staged_ledger_hash.Aux_hash.of_bytes
         (state_hash |> Digestif.SHA256.to_raw_string)
-
-    include Binable.Of_binable
-              (T)
-              (struct
-                type nonrec t = t
-
-                let to_binable = Fn.id
-
-                let of_binable = Fn.id
-              end)
   end
-
-  module Latest = V1
-
-  module Module_decl = struct
-    let name = "transaction_snark_scan_state"
-
-    type latest = Latest.t
-  end
-
-  module Registrar = Registration.Make (Module_decl)
-  module Registered_V1 = Registrar.Register (V1)
-end
+end]
 
 type t = Stable.Latest.t [@@deriving sexp]
 
@@ -216,13 +195,14 @@ let create_expected_statement
   let%map supply_increase = Transaction.supply_increase transaction in
   { Transaction_snark.Statement.source
   ; target
-  ; fee_excess
+  ; fee_excess=
+      {fee_excess with magnitude= Currency.Amount.of_fee fee_excess.magnitude}
   ; supply_increase
   ; pending_coinbase_stack_state=
       { Transaction_snark.Pending_coinbase_stack_state.source=
           pending_coinbase_before
       ; target= pending_coinbase_after }
-  ; proof_type= `Base }
+  ; sok_digest= () }
 
 let completed_work_to_scanable_work (job : job) (fee, current_proof, prover) :
     'a Or_error.t =
@@ -236,7 +216,7 @@ let completed_work_to_scanable_work (job : job) (fee, current_proof, prover) :
       let s = Ledger_proof.statement p and s' = Ledger_proof.statement p' in
       let open Or_error.Let_syntax in
       let%map fee_excess =
-        Currency.Fee.Signed.add s.fee_excess s'.fee_excess
+        Currency.Amount.Signed.add s.fee_excess s'.fee_excess
         |> option "Error adding fees"
       and supply_increase =
         Currency.Amount.add s.supply_increase s'.supply_increase
@@ -250,7 +230,7 @@ let completed_work_to_scanable_work (job : job) (fee, current_proof, prover) :
             { source= s.pending_coinbase_stack_state.source
             ; target= s'.pending_coinbase_stack_state.target }
         ; fee_excess
-        ; proof_type= `Merge }
+        ; sok_digest= () }
       in
       ( Ledger_proof.create ~statement ~sok_digest ~proof
       , Sok_message.create ~fee ~prover )
@@ -412,7 +392,7 @@ struct
         ; target
         ; supply_increase= _
         ; pending_coinbase_stack_state= _ (*TODO: check pending coinbases?*)
-        ; proof_type= _ } ->
+        ; sok_digest= () } ->
         let open Or_error.Let_syntax in
         let%map () =
           Option.value_map ~default:(Ok ()) snarked_ledger_hash ~f:(fun hash ->
@@ -425,7 +405,8 @@ struct
             "incorrect statement target hash"
         and () =
           clarify_error
-            (Currency.Fee.Signed.equal Currency.Fee.Signed.zero fee_excess)
+            (Currency.Amount.Signed.equal Currency.Amount.Signed.zero
+               fee_excess)
             "nonzero fee excess"
         in
         ()
@@ -454,7 +435,7 @@ let statement_of_job : job -> Transaction_snark.Statement.t option = function
         Option.some_if (Frozen_ledger_hash.equal stmt1.target stmt2.source) ()
       in
       let%map fee_excess =
-        Currency.Fee.Signed.add stmt1.fee_excess stmt2.fee_excess
+        Currency.Amount.Signed.add stmt1.fee_excess stmt2.fee_excess
       and supply_increase =
         Currency.Amount.add stmt1.supply_increase stmt2.supply_increase
       in
@@ -465,15 +446,15 @@ let statement_of_job : job -> Transaction_snark.Statement.t option = function
           { source= stmt1.pending_coinbase_stack_state.source
           ; target= stmt2.pending_coinbase_stack_state.target }
       ; fee_excess
-      ; proof_type= `Merge }
+      ; sok_digest= () }
 
 let create ~work_delay ~transaction_capacity_log_2 =
   let k = Int.pow 2 transaction_capacity_log_2 in
   Parallel_scan.empty ~delay:work_delay ~max_base_jobs:k
 
 let empty () =
-  let open Constants in
-  create ~work_delay ~transaction_capacity_log_2
+  create ~work_delay:Coda_compile_config.work_delay
+    ~transaction_capacity_log_2:Coda_compile_config.transaction_capacity_log_2
 
 let extract_txns txns_with_witnesses =
   (* TODO: This type checks, but are we actually pulling the inverse txn here? *)
@@ -644,3 +625,38 @@ let fill_work_and_enqueue_transactions t transactions work =
         else Or_error.error_string "Unexpected ledger proof emitted" )
   in
   (result_opt, updated_scan_state)
+
+let required_state_hashes _t =
+  (* TODO: when merging into #4244
+  List.map (Parallel_scan.pending_data t) ~f:(fun (t : Transaction_with_witness.t) -> ...*)
+  State_hash.Set.empty
+
+let check_required_protocol_states t ~protocol_states =
+  let open Or_error.Let_syntax in
+  let required_state_hashes = required_state_hashes t in
+  let check_length states =
+    let required = State_hash.Set.length required_state_hashes in
+    let received = List.length states in
+    if required = received then Or_error.return ()
+    else
+      Or_error.errorf
+        !"Required %d protocol states but received %d"
+        required received
+  in
+  (*Don't check further if the lengths dont match*)
+  let%bind () = check_length protocol_states in
+  let received_state_map =
+    List.fold protocol_states ~init:Coda_base.State_hash.Map.empty
+      ~f:(fun m ps ->
+        State_hash.Map.set m ~key:(Coda_state.Protocol_state.hash ps) ~data:ps
+    )
+  in
+  let protocol_states_assoc =
+    List.filter_map (State_hash.Set.to_list required_state_hashes)
+      ~f:(fun hash ->
+        let open Option.Let_syntax in
+        let%map state = State_hash.Map.find received_state_map hash in
+        (hash, state) )
+  in
+  let%map () = check_length protocol_states_assoc in
+  protocol_states_assoc

@@ -1,12 +1,6 @@
 open Core_kernel
 open Common
 
-(*
-let () =
-  Snarky_bn382_backend.Pairing_based.Keypair.set_urs_info
-    "/home/izzy/pickles/urs"
-
-*)
 module type S = Intf.Dlog_main_inputs.S
 
 open Snarky_bn382_backend
@@ -38,7 +32,8 @@ end
 
 let group_map_fq =
   let params =
-    Group_map.Params.create (module Fq) ~a:Fq.zero ~b:(Fq.of_int 14)
+    Group_map.Params.create (module Fq)
+      {a=Fq.zero;b=(Fq.of_int 14)}
   in
   fun x -> Group_map.to_group (module Fq) ~params x
 
@@ -88,7 +83,6 @@ module G1 = struct
 
     module Constant = struct
       include G1.Affine
-
       module Scalar = Impls.Pairing_based.Field.Constant
 
       let scale (t : t) x : t = G1.(to_affine_exn (scale (of_affine t) x))
@@ -117,7 +111,7 @@ module G1 = struct
   module Scaling_precomputation = struct
     include T.Scaling_precomputation
 
-    let create t = create ~unrelated_base:(unrelated_g t) t
+(*     let create t = create ~unrelated_base:(unrelated_g t) t *)
   end
 
   let ( + ) = add_exn

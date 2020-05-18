@@ -9,6 +9,8 @@ let%test_module "network pool test" =
 
     let logger = Logger.null ()
 
+    let proof_level = Genesis_constants.Proof_level.Check
+
     module Mock_snark_pool = Snark_pool.Make (Mocks.Transition_frontier)
 
     let config verifier =
@@ -37,7 +39,7 @@ let%test_module "network pool test" =
       in
       Async.Thread_safe.block_on_async_exn (fun () ->
           let%bind verifier =
-            Verifier.create ~logger
+            Verifier.create ~logger ~proof_level
               ~pids:(Child_processes.Termination.create_pid_table ())
               ~conf_dir:None
           in
@@ -48,7 +50,7 @@ let%test_module "network pool test" =
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
           in
           let command =
-            Mock_snark_pool.Resource_pool.Diff.Stable.V1.Add_solved_work
+            Mock_snark_pool.Resource_pool.Diff.Add_solved_work
               (work, priced_proof)
           in
           don't_wait_for
@@ -76,7 +78,7 @@ let%test_module "network pool test" =
       in
       let per_reader = work_count / 2 in
       let create_work work =
-        Mock_snark_pool.Resource_pool.Diff.Stable.V1.Add_solved_work
+        Mock_snark_pool.Resource_pool.Diff.Add_solved_work
           ( work
           , Priced_proof.
               { proof=
@@ -106,7 +108,7 @@ let%test_module "network pool test" =
           Broadcast_pipe.create (Some (Mocks.Transition_frontier.create ()))
         in
         let%bind verifier =
-          Verifier.create ~logger
+          Verifier.create ~logger ~proof_level
             ~pids:(Child_processes.Termination.create_pid_table ())
             ~conf_dir:None
         in
@@ -121,8 +123,8 @@ let%test_module "network pool test" =
              ~f:(fun work_command ->
                let work =
                  match work_command with
-                 | Mock_snark_pool.Resource_pool.Diff.Stable.V1.Add_solved_work
-                     (work, _) ->
+                 | Mock_snark_pool.Resource_pool.Diff.Add_solved_work (work, _)
+                   ->
                      work
                in
                assert (List.mem works work ~equal:( = )) ;
