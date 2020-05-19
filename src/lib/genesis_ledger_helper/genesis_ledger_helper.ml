@@ -640,3 +640,65 @@ let init_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
         [ ("ledger_file", `String ledger_file)
         ; ("proof_file", `String proof_file) ] ;
     (values, config)
+
+let upgrade_old_config ~logger filename json =
+  match json with
+  | `Assoc fields ->
+      (* Fields previously part of daemon.json *)
+      let old_fields =
+        [ "client_port"
+        ; "libp2p-port"
+        ; "rest-port"
+        ; "block-producer-key"
+        ; "block-producer-pubkey"
+        ; "block-producer-password"
+        ; "coinbase-receiver"
+        ; "run-snark-worker"
+        ; "snark-worker-fee"
+        ; "peers"
+        ; "work-selection"
+        ; "work-reassignment-wait"
+        ; "log-received-blocks"
+        ; "log-txn-pool-gossip"
+        ; "log-snark-work-gossip"
+        ; "log-block-creation" ]
+      in
+      let found_daemon = ref false in
+      let old_fields, remaining_fields =
+        List.partition_tf fields ~f:(fun (key, _) ->
+            if String.equal key "daemon" then (
+              found_daemon := true ;
+              false )
+            else List.mem ~equal:String.equal old_fields key )
+      in
+      if List.is_empty old_fields then return json
+      else if !found_daemon then (
+        (* This file has already been upgraded, or was written for the new
+           format. Do not accept old-style fields.
+        *)
+        Logger.warn ~module_:__MODULE__ ~location:__LOC__ logger
+          "Ignoring old-format values $values from the config file $filename. \
+           These flags are now fields in the 'daemon' object of the config \
+           file."
+          ~metadata:
+            [("values", `Assoc old_fields); ("filename", `String filename)] ;
+        return (`Assoc remaining_fields) )
+      else (
+        (* This file was written for the old format. Upgrade it. *)
+        Logger.warn ~module_:__MODULE__ ~location:__LOC__ logger
+          "Automatically upgrading the config file $filename. The values \
+           $values have been moved to the 'daemon' object."
+          ~metadata:
+            [("filename", `String filename); ("values", `Assoc old_fields)] ;
+        let upgraded_json =
+          `Assoc (("daemon", `Assoc old_fields) :: remaining_fields)
+        in
+        let%map () =
+          Writer.with_file filename ~f:(fun w ->
+              Deferred.return
+              @@ Writer.write w (Yojson.Safe.pretty_to_string upgraded_json) )
+        in
+        upgraded_json )
+  | _ ->
+      (* This error will get handled properly elsewhere, do nothing here. *)
+      return json

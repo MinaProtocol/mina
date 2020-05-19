@@ -91,7 +91,7 @@ let daemon logger =
        flag "genesis-ledger-dir"
          ~doc:
            "DIR Directory that contains the genesis ledger and the genesis \
-            blockchain proof (default: <config-dir>/genesis-ledger)"
+            blockchain proof (default: <config-dir>)"
          (optional string)
      and run_snark_worker_flag =
        flag "run-snark-worker"
@@ -223,7 +223,10 @@ let daemon logger =
        flag "proposed-protocol-version" (optional string)
          ~doc:"NN.NN.NN Proposed protocol version to signal other nodes"
      and config_file =
-       flag "config-file" ~doc:"PATH path to the configuration file"
+       flag "config-file"
+         ~doc:
+           "PATH path to the configuration file (overrides CODA_CONFIG_FILE, \
+            default: <config_dir>/daemon.json)"
          (optional string)
      and may_generate =
        flag "generate-genesis-proof"
@@ -391,27 +394,50 @@ let daemon logger =
        in
        let may_generate = Option.value ~default:false may_generate in
        let coda_initialization_deferred () =
-         let%bind config_json =
+         let config_file, must_find_config_file =
            match config_file with
-           | Some config_file -> (
-               match%map
-                 Genesis_ledger_helper.load_config_json config_file
-               with
-               | Ok config ->
-                   Some config
-               | Error err ->
-                   Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
-                     "Failed reading configuration from $config_file: $error"
-                     ~metadata:
-                       [ ("config_file", `String config_file)
-                       ; ("error", `String (Error.to_string_hum err)) ] ;
-                   Error.raise err )
+           | Some config_file ->
+               (config_file, true)
+           | None -> (
+             match Sys.getenv "CODA_CONFIG_FILE" with
+             | Some config_file ->
+                 (config_file, false)
+             | None ->
+                 (conf_dir ^/ "daemon.json", false) )
+         in
+         let%bind config_json =
+           match%map Genesis_ledger_helper.load_config_json config_file with
+           | Ok config ->
+               Some config
+           | Error err when must_find_config_file ->
+               Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+                 "Failed reading configuration from $config_file: $error"
+                 ~metadata:
+                   [ ("config_file", `String config_file)
+                   ; ("error", `String (Error.to_string_hum err)) ] ;
+               Error.raise err
+           | Error err ->
+               Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+                 "Failed reading configuration from $config_file: $error"
+                 ~metadata:
+                   [ ("config_file", `String config_file)
+                   ; ("error", `String (Error.to_string_hum err)) ] ;
+               None
+         in
+         let%bind config_json =
+           match config_json with
+           | Some config_json ->
+               let%map config_json =
+                 Genesis_ledger_helper.upgrade_old_config ~logger config_file
+                   config_json
+               in
+               Some config_json
            | None ->
                return None
          in
          let config =
-           match (config_json, config_file) with
-           | Some config_json, Some config_file -> (
+           match config_json with
+           | Some config_json -> (
              match Runtime_config.of_yojson config_json with
              | Ok config ->
                  config
@@ -428,9 +454,10 @@ let daemon logger =
          let constraint_constants =
            Genesis_constants.Constraint_constants.compiled
          in
+         let genesis_dir = Option.value ~default:conf_dir genesis_dir in
          let%bind precomputed_values =
            match%map
-             Genesis_ledger_helper.init_from_config_file ?genesis_dir ~logger
+             Genesis_ledger_helper.init_from_config_file ~genesis_dir ~logger
                ~may_generate ~constraint_constants ~proof_level
                ~genesis_constants:Genesis_constants.compiled config
            with
@@ -448,56 +475,6 @@ let daemon logger =
            Option.bind config_json ~f:(fun config_json ->
                YJ.Util.(to_option Fn.id (YJ.Util.member "daemon" config_json))
            )
-         in
-         let%bind daemon_config_file =
-           let configpath = conf_dir ^/ "daemon.json" in
-           match%map
-             Monitor.try_with_or_error ~extract_exn:true (fun () ->
-                 let%bind r = Reader.open_file configpath in
-                 Pipe.to_list (Reader.lines r)
-                 >>| fun ss -> String.concat ~sep:"\n" ss )
-           with
-           | Error e ->
-               Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-                 "No daemon.json found at $configpath: $error"
-                 ~metadata:
-                   [ ("error", `String (Error.to_string_mach e))
-                   ; ("configpath", `String configpath) ] ;
-               None
-           | Ok contents -> (
-             try
-               let json = YJ.from_string ~fname:"daemon.json" contents in
-               Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-                 "Using daemon.json config found at $configpath"
-                 ~metadata:[("configpath", `String configpath)] ;
-               match json with
-               | `Assoc _ ->
-                   Some json
-               | _ ->
-                   Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-                     "Invalid JSON at $configpath: expected a JSON object"
-                     ~metadata:[("configpath", `String configpath)] ;
-                   None
-             with Yojson.Json_error e ->
-               Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-                 "Error parsing daemon.json at $configpath: $error"
-                 ~metadata:
-                   [("error", `String e); ("configpath", `String configpath)] ;
-               None )
-         in
-         let daemon_config =
-           match (daemon_config, daemon_config_file) with
-           | Some daemon_config, Some daemon_config_file ->
-               (* Both a configuration file and daemon.json are presesnt.
-                  We combine them to choose settings from both, giving priority
-                  to the values in the configuration file.
-               *)
-               (* TODO: Is there any value in having multiple config files? *)
-               Some (YJ.Util.combine daemon_config daemon_config_file)
-           | Some daemon_config, None | None, Some daemon_config ->
-               Some daemon_config
-           | None, None ->
-               None
          in
          let maybe_from_config (type a) (f : YJ.json -> a option)
              (keyname : string) (actual_value : a option) : a option =
