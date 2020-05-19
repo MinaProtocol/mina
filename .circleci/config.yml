@@ -76,7 +76,7 @@ jobs:
             - run:
                 name: Create opam cache signature file including a year/date stamp to ensure occasional rebuilds
                 command: |
-                    cat scripts/macos-setup-opam.sh > opam_ci_cache.sig
+                    cat scripts/setup-opam.sh > opam_ci_cache.sig
                     cat src/opam.export >> opam_ci_cache.sig
                     date +%Y-%m >> opam_ci_cache.sig
             - restore_cache:
@@ -84,8 +84,8 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make macos-setup-compile
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make macos-setup-compile'
+                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
 
             - run:
                 name: Build libp2p_helper
@@ -127,7 +127,7 @@ jobs:
             - run:
                 name: Create opam cache signature file including a year/date stamp to ensure occasional rebuilds
                 command: |
-                    cat scripts/macos-setup-opam.sh > opam_ci_cache.sig
+                    cat scripts/setup-opam.sh > opam_ci_cache.sig
                     cat src/opam.export >> opam_ci_cache.sig
                     date +%Y-%m >> opam_ci_cache.sig
             - restore_cache:
@@ -135,12 +135,12 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make macos-setup-compile
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make macos-setup-compile'
+                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
 
             - save_cache:
                 name: Save cache - opam
-                key: opam-linux-v0-{{ checksum "opam_ci_cache.sig" }}
+                key: opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
                 paths:
                     - "/home/opam/.opam"
                 no_output_timeout: 1h
@@ -176,7 +176,7 @@ jobs:
             - run:
                 name: Create opam cache signature file including a year/date stamp to ensure occasional rebuilds
                 command: |
-                    cat scripts/macos-setup-opam.sh > opam_ci_cache.sig
+                    cat scripts/setup-opam.sh > opam_ci_cache.sig
                     cat src/opam.export >> opam_ci_cache.sig
                     date +%Y-%m >> opam_ci_cache.sig
             - restore_cache:
@@ -184,8 +184,8 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make macos-setup-compile
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make macos-setup-compile'
+                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
 
             - run:
                   name: Check circle CI configuration rendering
@@ -223,7 +223,7 @@ jobs:
             - run:
                 name: Create opam cache signature file including a year/date stamp to ensure occasional rebuilds
                 command: |
-                    cat scripts/macos-setup-opam.sh > opam_ci_cache.sig
+                    cat scripts/setup-opam.sh > opam_ci_cache.sig
                     cat src/opam.export >> opam_ci_cache.sig
                     date +%Y-%m >> opam_ci_cache.sig
             - restore_cache:
@@ -231,8 +231,8 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make macos-setup-compile
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make macos-setup-compile'
+                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
 
             - run:
                   name: Compare versioned types in PR
@@ -252,7 +252,7 @@ jobs:
             - run:
                 name: Create opam cache signature file including a year/date stamp to ensure occasional rebuilds
                 command: |
-                    cat scripts/macos-setup-opam.sh > opam_ci_cache.sig
+                    cat scripts/setup-opam.sh > opam_ci_cache.sig
                     cat src/opam.export >> opam_ci_cache.sig
                     date +%Y-%m >> opam_ci_cache.sig
             - restore_cache:
@@ -260,8 +260,8 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make macos-setup-compile
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make macos-setup-compile'
+                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
 
             - run:
                   name: Compare test signatures for consensus, nonconsensus code
@@ -322,7 +322,7 @@ jobs:
             - run:
                 name: Create opam cache signature file including a year/date stamp to ensure occasional rebuilds
                 command: |
-                    cat scripts/macos-setup-opam.sh > opam_ci_cache.sig
+                    cat scripts/setup-opam.sh > opam_ci_cache.sig
                     cat src/opam.export >> opam_ci_cache.sig
                     date +%Y-%m >> opam_ci_cache.sig
             - restore_cache:
@@ -330,8 +330,8 @@ jobs:
                 keys:
                     - opam-v8-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install macos dependencies - opam -- LIBP2P_NIXLESS=1 make macos-setup-compile
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make macos-setup-compile'
+                name: Install macos dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
             - save_cache:
                 name: Save cache - opam
                 key: opam-v8-{{ checksum "opam_ci_cache.sig" }}
@@ -433,7 +433,7 @@ jobs:
             - run:
                 name: Create opam cache signature file including a year/date stamp to ensure occasional rebuilds
                 command: |
-                    cat scripts/macos-setup-opam.sh > opam_ci_cache.sig
+                    cat scripts/setup-opam.sh > opam_ci_cache.sig
                     cat src/opam.export >> opam_ci_cache.sig
                     date +%Y-%m >> opam_ci_cache.sig
             - restore_cache:
@@ -441,8 +441,8 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make macos-setup-compile
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make macos-setup-compile'
+                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
 
             - run:
                   name: Build client SDK for Javascript
@@ -467,7 +467,7 @@ jobs:
             - run:
                 name: Create opam cache signature file including a year/date stamp to ensure occasional rebuilds
                 command: |
-                    cat scripts/macos-setup-opam.sh > opam_ci_cache.sig
+                    cat scripts/setup-opam.sh > opam_ci_cache.sig
                     cat src/opam.export >> opam_ci_cache.sig
                     date +%Y-%m >> opam_ci_cache.sig
             - restore_cache:
@@ -475,8 +475,8 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make macos-setup-compile
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make macos-setup-compile'
+                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
 
             - run:
                 name: Build libp2p_helper
@@ -573,7 +573,7 @@ jobs:
             - run:
                 name: Create opam cache signature file including a year/date stamp to ensure occasional rebuilds
                 command: |
-                    cat scripts/macos-setup-opam.sh > opam_ci_cache.sig
+                    cat scripts/setup-opam.sh > opam_ci_cache.sig
                     cat src/opam.export >> opam_ci_cache.sig
                     date +%Y-%m >> opam_ci_cache.sig
             - restore_cache:
@@ -581,8 +581,8 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make macos-setup-compile
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make macos-setup-compile'
+                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
 
             - run:
                 name: Build libp2p_helper
@@ -613,7 +613,7 @@ jobs:
             - run:
                 name: Create opam cache signature file including a year/date stamp to ensure occasional rebuilds
                 command: |
-                    cat scripts/macos-setup-opam.sh > opam_ci_cache.sig
+                    cat scripts/setup-opam.sh > opam_ci_cache.sig
                     cat src/opam.export >> opam_ci_cache.sig
                     date +%Y-%m >> opam_ci_cache.sig
             - restore_cache:
@@ -621,8 +621,8 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make macos-setup-compile
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make macos-setup-compile'
+                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
 
             - run:
                 name: Build libp2p_helper
@@ -651,7 +651,7 @@ jobs:
             - run:
                 name: Create opam cache signature file including a year/date stamp to ensure occasional rebuilds
                 command: |
-                    cat scripts/macos-setup-opam.sh > opam_ci_cache.sig
+                    cat scripts/setup-opam.sh > opam_ci_cache.sig
                     cat src/opam.export >> opam_ci_cache.sig
                     date +%Y-%m >> opam_ci_cache.sig
             - restore_cache:
@@ -659,8 +659,8 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make macos-setup-compile
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make macos-setup-compile'
+                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
 
             - run:
                 name: Build libp2p_helper
@@ -688,7 +688,7 @@ jobs:
             - run:
                 name: Create opam cache signature file including a year/date stamp to ensure occasional rebuilds
                 command: |
-                    cat scripts/macos-setup-opam.sh > opam_ci_cache.sig
+                    cat scripts/setup-opam.sh > opam_ci_cache.sig
                     cat src/opam.export >> opam_ci_cache.sig
                     date +%Y-%m >> opam_ci_cache.sig
             - restore_cache:
@@ -696,8 +696,8 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make macos-setup-compile
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make macos-setup-compile'
+                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
 
             - run:
                 name: Build libp2p_helper
@@ -720,7 +720,7 @@ jobs:
             - run:
                 name: Create opam cache signature file including a year/date stamp to ensure occasional rebuilds
                 command: |
-                    cat scripts/macos-setup-opam.sh > opam_ci_cache.sig
+                    cat scripts/setup-opam.sh > opam_ci_cache.sig
                     cat src/opam.export >> opam_ci_cache.sig
                     date +%Y-%m >> opam_ci_cache.sig
             - restore_cache:
@@ -728,8 +728,8 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make macos-setup-compile
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make macos-setup-compile'
+                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
 
             - run:
                 name: Build libp2p_helper
@@ -755,7 +755,7 @@ jobs:
             - run:
                 name: Create opam cache signature file including a year/date stamp to ensure occasional rebuilds
                 command: |
-                    cat scripts/macos-setup-opam.sh > opam_ci_cache.sig
+                    cat scripts/setup-opam.sh > opam_ci_cache.sig
                     cat src/opam.export >> opam_ci_cache.sig
                     date +%Y-%m >> opam_ci_cache.sig
             - restore_cache:
@@ -763,8 +763,8 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make macos-setup-compile
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make macos-setup-compile'
+                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
 
             - run:
                 name: Build libp2p_helper
@@ -787,7 +787,7 @@ jobs:
             - run:
                 name: Create opam cache signature file including a year/date stamp to ensure occasional rebuilds
                 command: |
-                    cat scripts/macos-setup-opam.sh > opam_ci_cache.sig
+                    cat scripts/setup-opam.sh > opam_ci_cache.sig
                     cat src/opam.export >> opam_ci_cache.sig
                     date +%Y-%m >> opam_ci_cache.sig
             - restore_cache:
@@ -795,8 +795,8 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make macos-setup-compile
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make macos-setup-compile'
+                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
 
             - run:
                 name: Build libp2p_helper
@@ -819,7 +819,7 @@ jobs:
             - run:
                 name: Create opam cache signature file including a year/date stamp to ensure occasional rebuilds
                 command: |
-                    cat scripts/macos-setup-opam.sh > opam_ci_cache.sig
+                    cat scripts/setup-opam.sh > opam_ci_cache.sig
                     cat src/opam.export >> opam_ci_cache.sig
                     date +%Y-%m >> opam_ci_cache.sig
             - restore_cache:
@@ -827,8 +827,8 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make macos-setup-compile
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make macos-setup-compile'
+                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
 
             - run:
                 name: Build libp2p_helper
@@ -851,7 +851,7 @@ jobs:
             - run:
                 name: Create opam cache signature file including a year/date stamp to ensure occasional rebuilds
                 command: |
-                    cat scripts/macos-setup-opam.sh > opam_ci_cache.sig
+                    cat scripts/setup-opam.sh > opam_ci_cache.sig
                     cat src/opam.export >> opam_ci_cache.sig
                     date +%Y-%m >> opam_ci_cache.sig
             - restore_cache:
@@ -859,8 +859,8 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make macos-setup-compile
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make macos-setup-compile'
+                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
 
             - run:
                 name: Build libp2p_helper
@@ -883,7 +883,7 @@ jobs:
             - run:
                 name: Create opam cache signature file including a year/date stamp to ensure occasional rebuilds
                 command: |
-                    cat scripts/macos-setup-opam.sh > opam_ci_cache.sig
+                    cat scripts/setup-opam.sh > opam_ci_cache.sig
                     cat src/opam.export >> opam_ci_cache.sig
                     date +%Y-%m >> opam_ci_cache.sig
             - restore_cache:
@@ -891,8 +891,8 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make macos-setup-compile
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make macos-setup-compile'
+                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
 
             - run:
                 name: Build libp2p_helper
@@ -918,7 +918,7 @@ jobs:
             - run:
                 name: Create opam cache signature file including a year/date stamp to ensure occasional rebuilds
                 command: |
-                    cat scripts/macos-setup-opam.sh > opam_ci_cache.sig
+                    cat scripts/setup-opam.sh > opam_ci_cache.sig
                     cat src/opam.export >> opam_ci_cache.sig
                     date +%Y-%m >> opam_ci_cache.sig
             - restore_cache:
@@ -926,8 +926,8 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make macos-setup-compile
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make macos-setup-compile'
+                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
 
             - run:
                 name: Build libp2p_helper
@@ -950,7 +950,7 @@ jobs:
             - run:
                 name: Create opam cache signature file including a year/date stamp to ensure occasional rebuilds
                 command: |
-                    cat scripts/macos-setup-opam.sh > opam_ci_cache.sig
+                    cat scripts/setup-opam.sh > opam_ci_cache.sig
                     cat src/opam.export >> opam_ci_cache.sig
                     date +%Y-%m >> opam_ci_cache.sig
             - restore_cache:
@@ -958,8 +958,8 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make macos-setup-compile
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make macos-setup-compile'
+                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
 
             - run:
                 name: Build libp2p_helper
@@ -1000,7 +1000,7 @@ jobs:
             - run:
                 name: Create opam cache signature file including a year/date stamp to ensure occasional rebuilds
                 command: |
-                    cat scripts/macos-setup-opam.sh > opam_ci_cache.sig
+                    cat scripts/setup-opam.sh > opam_ci_cache.sig
                     cat src/opam.export >> opam_ci_cache.sig
                     date +%Y-%m >> opam_ci_cache.sig
             - restore_cache:
@@ -1008,8 +1008,8 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make macos-setup-compile
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make macos-setup-compile'
+                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
 
             - run:
                 name: Build libp2p_helper
@@ -1032,7 +1032,7 @@ jobs:
             - run:
                 name: Create opam cache signature file including a year/date stamp to ensure occasional rebuilds
                 command: |
-                    cat scripts/macos-setup-opam.sh > opam_ci_cache.sig
+                    cat scripts/setup-opam.sh > opam_ci_cache.sig
                     cat src/opam.export >> opam_ci_cache.sig
                     date +%Y-%m >> opam_ci_cache.sig
             - restore_cache:
@@ -1040,8 +1040,8 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make macos-setup-compile
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make macos-setup-compile'
+                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
 
             - run:
                 name: Build libp2p_helper
@@ -1067,7 +1067,7 @@ jobs:
             - run:
                 name: Create opam cache signature file including a year/date stamp to ensure occasional rebuilds
                 command: |
-                    cat scripts/macos-setup-opam.sh > opam_ci_cache.sig
+                    cat scripts/setup-opam.sh > opam_ci_cache.sig
                     cat src/opam.export >> opam_ci_cache.sig
                     date +%Y-%m >> opam_ci_cache.sig
             - restore_cache:
@@ -1075,8 +1075,8 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make macos-setup-compile
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make macos-setup-compile'
+                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
 
             - run:
                 name: Build libp2p_helper
@@ -1099,7 +1099,7 @@ jobs:
             - run:
                 name: Create opam cache signature file including a year/date stamp to ensure occasional rebuilds
                 command: |
-                    cat scripts/macos-setup-opam.sh > opam_ci_cache.sig
+                    cat scripts/setup-opam.sh > opam_ci_cache.sig
                     cat src/opam.export >> opam_ci_cache.sig
                     date +%Y-%m >> opam_ci_cache.sig
             - restore_cache:
@@ -1107,8 +1107,8 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make macos-setup-compile
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make macos-setup-compile'
+                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
 
             - run:
                 name: Build libp2p_helper
@@ -1136,7 +1136,7 @@ jobs:
             - run:
                 name: Create opam cache signature file including a year/date stamp to ensure occasional rebuilds
                 command: |
-                    cat scripts/macos-setup-opam.sh > opam_ci_cache.sig
+                    cat scripts/setup-opam.sh > opam_ci_cache.sig
                     cat src/opam.export >> opam_ci_cache.sig
                     date +%Y-%m >> opam_ci_cache.sig
             - restore_cache:
@@ -1144,8 +1144,8 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make macos-setup-compile
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make macos-setup-compile'
+                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
 
             - run:
                 name: Build libp2p_helper
@@ -1171,7 +1171,7 @@ jobs:
             - run:
                 name: Create opam cache signature file including a year/date stamp to ensure occasional rebuilds
                 command: |
-                    cat scripts/macos-setup-opam.sh > opam_ci_cache.sig
+                    cat scripts/setup-opam.sh > opam_ci_cache.sig
                     cat src/opam.export >> opam_ci_cache.sig
                     date +%Y-%m >> opam_ci_cache.sig
             - restore_cache:
@@ -1179,8 +1179,8 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make macos-setup-compile
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make macos-setup-compile'
+                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
 
             - run:
                 name: Build libp2p_helper
