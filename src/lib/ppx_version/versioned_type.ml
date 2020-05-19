@@ -19,23 +19,10 @@
 
     [@@deriving version { option }]
 
-  where option is one of "wrapped", "unnumbered", "rpc", or "asserted".
+  where option is one of "rpc", "asserted", or "binable".
 
   Without options (the common case), the type must be named "t", and its definition
   occurs in the module hierarchy "Stable.Vn.T", where n is a positive integer.
-
-  If "wrapped" is true, again, the type must be named "t", but the type
-  definition occurs in the hierarchy "Wrapped.Stable.Vn", where n is a positive
-  integer. TODO: Anything to say about registration, translation to a latest
-  version for wrapped types?
-
-  The "unnumbered" option prevents the generation of the value
-
-    let version = n
-
-  to prevent warnings or errors about an unused value. That's useful for versioned types in
-  modules that aren't registered. For types with type parameters, the version number is
-  not generated, so the "unnumbered" option is not needed.
 
   The "asserted" option asserts that the type is versioned, to allow compilation
   to proceed. The types referred to in the type are not checked for versioning
@@ -45,8 +32,6 @@
   The "binable" option is a synonym for "asserted". It assumes that the type
   will be serialized using a "Binable.Of_..." or "Make_binable" functors, which relies
   on the serialization of some other type.
-
-  The "for_test" option implies "asserted" and "unnumbered", for use in test code.
 
   If "rpc" is true, again, the type must be named "query", "response", or "msg",
   and the type definition occurs in the hierarchy "Vn.T".
@@ -152,7 +137,7 @@ end
 
 (* real derivers *)
 module Deriving = struct
-  type generation_kind = Plain | Wrapped | Rpc
+  type generation_kind = Plain | Rpc
 
   let validate_rpc_type_decl inner3_modules type_decl =
     match List.take inner3_modules 2 with
@@ -175,15 +160,6 @@ module Deriving = struct
           "Versioned type must be contained in module path Stable.Vn.T, for \
            some number n"
 
-  let validate_wrapped_type_decl inner3_modules type_decl =
-    match inner3_modules with
-    | [module_version; "Stable"; "Wrapped"] ->
-        validate_module_version module_version type_decl.ptype_loc
-    | _ ->
-        Location.raise_errorf ~loc:type_decl.ptype_loc
-          "Wrapped versioned type must be contained in module path \
-           Wrapped.Stable.Vn, for some number n"
-
   (* check that a versioned type occurs in valid module hierarchy and is named "t"
      (for RPC types, the name can be "query", "response", or "msg")
   *)
@@ -191,13 +167,6 @@ module Deriving = struct
     let name = type_decl.ptype_name.txt in
     let loc = type_decl.ptype_name.loc in
     match generation_kind with
-    | Wrapped ->
-        let valid_name = "t" in
-        if not (String.equal name valid_name) then
-          Location.raise_errorf ~loc
-            "Wrapped versioned type must be named \"%s\", got: \"%s\""
-            valid_name name ;
-        validate_wrapped_type_decl inner3_modules type_decl
     | Rpc ->
         let rpc_valid_names = ["query"; "response"; "msg"] in
         if
@@ -226,13 +195,6 @@ module Deriving = struct
     | _ ->
         failwith "module_name_from_plain_path: unexpected module path"
 
-  let module_name_from_wrapped_path inner3_modules =
-    match inner3_modules with
-    | [module_version; "Stable"; "Wrapped"] ->
-        module_version
-    | _ ->
-        failwith "module_name_from_wrapped_path: unexpected module path"
-
   let module_name_from_rpc_path inner3_modules =
     match List.take inner3_modules 2 with
     | ["T"; module_version] ->
@@ -251,8 +213,6 @@ module Deriving = struct
       match generation_kind with
       | Plain ->
           module_name_from_plain_path inner3_modules
-      | Wrapped ->
-          module_name_from_wrapped_path inner3_modules
       | Rpc ->
           module_name_from_rpc_path inner3_modules
     in
@@ -503,9 +463,6 @@ module Deriving = struct
     if asserted then [versioned_current]
     else
       match generation_kind with
-      | Wrapped ->
-          (* don't check whether contained types are versioned *)
-          [versioned_current]
       | Rpc ->
           (* check whether contained types are versioned,
            but don't assert versioned-ness of this type *)
@@ -554,38 +511,16 @@ module Deriving = struct
         (String.concat ~sep:"," valid)
 
   let generate_let_bindings_for_type_decl_str ~options ~path type_decls =
-    ignore
-      (validate_options
-         ["wrapped"; "unnumbered"; "rpc"; "asserted"; "binable"; "for_test"]
-         options) ;
+    ignore (validate_options ["rpc"; "asserted"; "binable"] options) ;
     let type_decl = get_type_decl_representative type_decls in
-    let wrapped = check_for_option "wrapped" options in
-    let unnumbered =
-      check_for_option "unnumbered" options
-      || check_for_option "for_test" options
-    in
     let asserted =
-      check_for_option "asserted" options
-      || check_for_option "binable" options
-      || check_for_option "for_test" options
+      check_for_option "asserted" options || check_for_option "binable" options
     in
     let rpc = check_for_option "rpc" options in
-    if asserted && (wrapped || rpc) then
+    if asserted && rpc then
       Ppx_deriving.raise_errorf ~loc:type_decl.ptype_loc
-        "Options \"asserted\" or \"for_test\" cannot be combined with \
-         \"wrapped\" or \"rpc\" options" ;
-    let generation_kind =
-      match (rpc, wrapped) with
-      | true, false ->
-          Rpc
-      | false, true ->
-          Wrapped
-      | false, false ->
-          Plain
-      | true, true ->
-          Ppx_deriving.raise_errorf ~loc:type_decl.ptype_loc
-            "RPC versioned type cannot also be wrapped"
-    in
+        "Options \"asserted\" and \"rpc\" cannot be combined" ;
+    let generation_kind = if rpc then Rpc else Plain in
     let inner3_modules = List.take (List.rev path) 3 in
     validate_type_decl inner3_modules generation_kind type_decl ;
     let versioned_decls =
@@ -595,8 +530,8 @@ module Deriving = struct
     (* generate version number for Rpc response, but not for query, so we
        don't get an unused value
     *)
-    if unnumbered || (generation_kind = Rpc && String.equal type_name "query")
-    then versioned_decls
+    if generation_kind = Rpc && String.equal type_name "query" then
+      versioned_decls
     else
       generate_version_number_decl inner3_modules type_decl.ptype_loc
         generation_kind
