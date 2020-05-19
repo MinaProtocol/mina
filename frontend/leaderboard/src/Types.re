@@ -20,10 +20,12 @@ module NewBlock = {
     feeTransfer: array(feeTransfer),
   };
 
+  type blockchainState = {date: string};
   type data = {
     creatorAccount: account,
     snarkJobs: array(snarkJobs),
     transactions,
+    protocolState: blockchainState,
   };
 
   type newBlock = {newBlock: data};
