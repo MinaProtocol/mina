@@ -17,7 +17,9 @@ def dune_paths_ok (dune) :
   path_prefix3 = path[1:3]
   return (not (path_prefix2 == ['_build'] or path_prefix2 == ['external'] or
                path_prefix3 == ['lib', 'zexe'] or
-               path_prefix3 == ['lib', 'snarky'] or path_prefix3 == ['lib', 'ppx_version']))
+               path_prefix3 == ['lib', 'snarky'] or
+               path_prefix3 == ['lib', 'ppx_version'] or
+               path_prefix3 == ['lib', 'ppx_coda']))
 
 dune_paths = list(filter(lambda s : len(s) > 0 and dune_paths_ok (s),dune_paths_raw))
 
