@@ -1,16 +1,20 @@
 open Core_kernel
 
-(* deriving version and bin_io both appear; OK outside functor body *)
+(* (generated) deriving version and bin_io both appear; OK outside functor body *)
 
+[%%versioned
 module Stable = struct
   module V1 = struct
-    module T = struct
-      type t = int [@@deriving bin_io, version]
-    end
-  end
-end
+    type t = int
 
-(* don't need invariants to hold inside test module *)
+    let to_latest = Fn.id
+  end
+end]
+
+(* deliberately unversioned *)
+type t = int [@@bin_io_unversioned]
+
+(* can omit %%versioned in test module *)
 
 let%test_module "bin_io only" =
   ( module struct

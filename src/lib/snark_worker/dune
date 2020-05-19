@@ -7,7 +7,7 @@
    blockchain_snark transaction_snark keys_lib perf_histograms
    core_kernel.hash_heap sparse_ledger_lib ledger_proof)
  (preprocess (pps
-   ppx_coda ppx_sexp_conv ppx_optcomp
+   ppx_version ppx_sexp_conv ppx_optcomp
    ppx_sexp_conv ppx_bin_prot ppx_let ppx_custom_printf
    ppx_inline_test bisect_ppx -- -conditional))
  (preprocessor_deps "../../config.mlh")

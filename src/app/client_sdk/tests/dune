@@ -6,7 +6,7 @@
   (modules test_signatures)
   (libraries core_kernel coda_base coda_numbers currency signature_lib snark_params)
   (preprocessor_deps ../../../config.mlh)
-  (preprocess (pps ppx_coda ppx_optcomp ppx_custom_printf))
+  (preprocess (pps ppx_version ppx_optcomp ppx_custom_printf))
   (flags -short-paths -g -w @a-4-29-40-41-42-44-45-48-58-59-60))
 
 (executable
@@ -17,5 +17,5 @@
   (modules test_signatures_nonconsensus)
   (libraries core_kernel coda_base_nonconsensus coda_numbers_nonconsensus currency_nonconsensus signature_lib_nonconsensus snark_params_nonconsensus)
   (preprocessor_deps ../../../config.mlh)
-  (preprocess (pps ppx_coda ppx_optcomp ppx_custom_printf))
+  (preprocess (pps ppx_version ppx_optcomp ppx_custom_printf))
   (flags -short-paths -g -w @a-4-29-40-41-42-44-45-48-58-59-60))
