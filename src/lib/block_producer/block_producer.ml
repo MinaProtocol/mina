@@ -115,13 +115,13 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
       (let open Deferred.Let_syntax in
       let diff =
         measure "create_diff" (fun () ->
-            Staged_ledger.create_diff staged_ledger ~self ~coinbase_receiver
-              ~logger ~transactions_by_fee:transactions ~get_completed_work
-              ~log_block_creation )
+            Staged_ledger.create_diff ~constraint_constants staged_ledger ~self
+              ~coinbase_receiver ~logger ~transactions_by_fee:transactions
+              ~get_completed_work ~log_block_creation )
       in
       match%map
-        Staged_ledger.apply_diff_unchecked staged_ledger diff
-          ~state_body_hash:previous_protocol_state_body_hash
+        Staged_ledger.apply_diff_unchecked ~constraint_constants staged_ledger
+          diff ~state_body_hash:previous_protocol_state_body_hash
       with
       | Ok
           ( `Hash_after_applying next_staged_ledger_hash
@@ -473,8 +473,9 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                             return ()
                         | Ok transition -> (
                             let%bind breadcrumb_result =
-                              Breadcrumb.build ~logger ~verifier ~trust_system
-                                ~parent:crumb ~transition ~sender:None
+                              Breadcrumb.build ~logger ~constraint_constants
+                                ~verifier ~trust_system ~parent:crumb
+                                ~transition ~sender:None
                             in
                             let exn name =
                               raise

@@ -250,7 +250,7 @@ module Instance = struct
                    |> Deferred.return
              in
              let%bind breadcrumb =
-               Breadcrumb.build ~logger:t.factory.logger
+               Breadcrumb.build ~constraint_constants ~logger:t.factory.logger
                  ~verifier:t.factory.verifier
                  ~trust_system:(Trust_system.null ()) ~parent ~transition
                  ~sender:None

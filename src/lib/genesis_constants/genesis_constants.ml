@@ -45,13 +45,17 @@ module Constraint_constants = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = {c: int; ledger_depth: int}
+      type t =
+        { c: int
+        ; ledger_depth: int
+        ; coinbase_amount: Currency.Amount.Stable.V1.t }
 
       let to_latest = Fn.id
     end
   end]
 
-  type t = Stable.Latest.t = {c: int; ledger_depth: int}
+  type t = Stable.Latest.t =
+    {c: int; ledger_depth: int; coinbase_amount: Currency.Amount.t}
 
   [%%ifdef
   consensus_mechanism]
@@ -69,7 +73,14 @@ module Constraint_constants = struct
   [%%inject
   "ledger_depth", ledger_depth]
 
-  let compiled = {c; ledger_depth}
+  [%%inject
+  "coinbase_amount_string", coinbase]
+
+  let compiled =
+    { c
+    ; ledger_depth
+    ; coinbase_amount=
+        Currency.Amount.of_formatted_string coinbase_amount_string }
 
   let for_unit_tests = compiled
 end

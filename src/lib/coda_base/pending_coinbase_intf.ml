@@ -264,7 +264,11 @@ module type S = sig
        - finds a coinbase stack in [t] at path [addr] and pushes the coinbase_data on to the stack
        - returns a root [t'] of the tree
     *)
-    val add_coinbase : var -> Update.var -> (var, 's) Tick.Checked.t
+    val add_coinbase :
+         constraint_constants:Genesis_constants.Constraint_constants.t
+      -> var
+      -> Update.var
+      -> (var, 's) Tick.Checked.t
 
     (**
        [pop_coinbases t pk updated_stack] implements the following spec:

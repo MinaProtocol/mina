@@ -479,7 +479,8 @@ let%test_module "Bootstrap_controller tests" =
               ~max_frontier_length [fresh_peer; fresh_peer])
         in
         let%map make_branch =
-          Transition_frontier.Breadcrumb.For_tests.gen_seq ~proof_level
+          Transition_frontier.Breadcrumb.For_tests.gen_seq
+            ~constraint_constants ~proof_level
             ~accounts_with_secret_keys:
               (Lazy.force Test_genesis_ledger.accounts)
             branch_size

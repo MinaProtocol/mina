@@ -13,10 +13,8 @@ end
 
 let create_ledger_and_transactions num_transitions =
   let num_accounts = 4 in
-  let ledger =
-    Ledger.create
-      ~depth:Genesis_constants.Constraint_constants.compiled.ledger_depth ()
-  in
+  let constraint_constants = Genesis_constants.Constraint_constants.compiled in
+  let ledger = Ledger.create ~depth:constraint_constants.ledger_depth () in
   let keys =
     Array.init num_accounts ~f:(fun _ -> Signature_lib.Keypair.create ())
   in
@@ -76,7 +74,7 @@ let create_ledger_and_transactions num_transitions =
         `One (Public_key.compress keys.(0).public_key, total_fee)
       in
       let coinbase =
-        Coinbase.create ~amount:Coda_compile_config.coinbase
+        Coinbase.create ~amount:constraint_constants.coinbase_amount
           ~receiver:(Public_key.compress keys.(0).public_key)
           ~fee_transfer:None
         |> Or_error.ok_exn

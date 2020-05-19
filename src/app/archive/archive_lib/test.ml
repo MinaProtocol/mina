@@ -10,6 +10,9 @@ let%test_module "Archive node unit tests" =
 
     let proof_level = Genesis_constants.Proof_level.None
 
+    let constraint_constants =
+      Genesis_constants.Constraint_constants.for_unit_tests
+
     let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
 
     let conn_lazy =
@@ -120,7 +123,8 @@ let%test_module "Archive node unit tests" =
              (Transition_frontier.For_tests.gen_genesis_breadcrumb ~proof_level
                 ~precomputed_values ())
              (Transition_frontier.Breadcrumb.For_tests.gen_non_deferred
-                ?logger:None ~proof_level ?verifier:None ?trust_system:None
+                ?logger:None ~proof_level ~constraint_constants ?verifier:None
+                ?trust_system:None
                 ~accounts_with_secret_keys:
                   (Lazy.force Test_genesis_ledger.accounts)) )
         ~f:(fun breadcrumbs ->
@@ -131,7 +135,7 @@ let%test_module "Archive node unit tests" =
               (Buffered (`Capacity 100, `Overflow Crash))
           in
           let processor_deferred_computation =
-            Processor.run conn reader ~logger
+            Processor.run ~constraint_constants conn reader ~logger
           in
           let diffs =
             List.map

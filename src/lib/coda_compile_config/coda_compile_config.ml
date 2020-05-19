@@ -15,9 +15,6 @@ module Currency = Currency_nonconsensus.Currency
 *)
 
 [%%inject
-"coinbase_string", coinbase]
-
-[%%inject
 "curve_size", curve_size]
 
 [%%inject
@@ -43,8 +40,6 @@ let account_creation_fee =
 
 let minimum_user_command_fee =
   Currency.Fee.of_formatted_string minimum_user_command_fee_string
-
-let coinbase = Currency.Amount.of_formatted_string coinbase_string
 
 let default_transaction_fee =
   Currency.Fee.of_formatted_string default_transaction_fee_string

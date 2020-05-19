@@ -1225,6 +1225,7 @@ let create (config : Config.t) =
                 archive_process_port ) ;
           let subscriptions =
             Coda_subscriptions.create ~logger:config.logger
+              ~constraint_constants:config.constraint_constants
               ~time_controller:config.time_controller ~new_blocks ~wallets
               ~external_transition_database:config.external_transition_database
               ~transition_frontier:frontier_broadcast_pipe_r
