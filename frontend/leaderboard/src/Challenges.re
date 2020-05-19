@@ -35,20 +35,6 @@ let applyTopNPoints = (n, points, metricsMap, getMetricValue) => {
   );
 };
 
-let filterBlocksByTimeWindow = (startTime, endTime, blocks) => {
-  let blocksList = Array.to_list(blocks);
-
-  let filteredBlocksList =
-    List.filter(
-      (block: Types.NewBlock.data) => {
-        endTime < block.protocolState.date
-        && block.protocolState.date > startTime
-      },
-      blocksList,
-    );
-  Array.of_list(filteredBlocksList);
-};
-
 // Examples of using the challenges
 let calculatePoints = metricsMap => {
   // Get 500 pts if you send txn to the echo service
