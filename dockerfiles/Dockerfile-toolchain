@@ -79,48 +79,6 @@ RUN sudo git clone https://github.com/CodaProtocol/coda $CODA_DIR
 RUN git -C /home/opam/opam-repository pull
 RUN opam update -y && opam upgrade -y
 
-#
-## use HTTPS git clone for submodules
-#RUN cd $CODA_DIR && sudo sed --in-place s+git@github.com:+https://github.com/+g .gitmodules
-#
-## init submodules for pinning
-#RUN cd $CODA_DIR && sudo git submodule update --init --recursive
-#
-## save submodule commits
-#RUN for pkg in async_kernel digestif graphql_ppx ocaml-extlib rpc_parallel ; do \
-#      # remove leading "-" indicating uninitialized
-#      cd $CODA_DIR && sudo bash -c "git submodule status src/external/$pkg | awk '{print \$1}' | sed s/-// > ~opam/opam-repository/$pkg.commit" ; \
-#    done
-#
-## save log commits for ocaml-sodium, coda_base58, which are not submodules
-#RUN for pkg in ocaml-sodium coda_base58 ; do \
-#      cd $CODA_DIR && sudo bash -c "git log --format=oneline -n 1 src/external/$pkg | awk '{print \$1}' > ~opam/opam-repository/$pkg.commit" ; \
-#    done
-#
-#
-## install vanilla OCaml compiler
-#RUN opam switch create $OCAML_VERSION
-#
-## Remove .git files for submodules
-#RUN for pkg in async_kernel digestif graphql_ppx ocaml-extlib rpc_parallel ; do \
-#      sudo rm -f $EXTERNAL_PKG_DIR/$pkg/.git ; \
-#    done
-#
-## use vanilla OCaml compiler
-#RUN opam switch $OCAML_VERSION
-#RUN eval $(opam env)
-#
-## Install OPAM packages for vanilla compiler
-#ADD /src/opam.export .
-#RUN opam switch import opam.export ; rm opam.export
-#
-## Pin packages for vanilla compiler
-#RUN for pkg in ocaml-sodium rpc_parallel ocaml-extlib digestif async_kernel coda_base58 graphql_ppx ; do \
-#      cd $EXTERNAL_PKG_DIR/$pkg && opam pin -y add . ; \
-#    done
-#
-# Install nix
-
 RUN mkdir --mode=700 /home/opam/.gnupg
 RUN echo "disable-ipv6" >> /home/opam/.gnupg/dirmngr.conf
 
