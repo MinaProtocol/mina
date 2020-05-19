@@ -1,7 +1,7 @@
 let Prelude = ./External/Prelude.dhall
 
 let Command = ./Command/Dsl.dhall
-let Docker = ./Command/Docker/Dsl.dhall
+let Docker = ./Command/Docker/Type.dhall
 let JobSpec = ./Pipeline/JobSpec.dhall
 let Pipeline = ./Pipeline/Dsl.dhall
 let Size = ./Command/Size.dhall
@@ -34,7 +34,7 @@ in Pipeline.build Pipeline.Config::{
       label = "Monorepo triage",
       key = "cmds",
       target = Size.Small,
-      docker = Docker.Config::{ image = (./Constants/ContainerImages.dhall).toolchainBase }
+      docker = Docker::{ image = (./Constants/ContainerImages.dhall).toolchainBase }
     }
   ]
 }

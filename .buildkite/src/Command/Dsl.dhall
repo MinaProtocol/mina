@@ -9,7 +9,6 @@ let Map = Prelude.Map
 let Docker = ./Docker/Type.dhall
 
 let Command/Base/Partial = ./Base.dhall
-let Command/Docker = ./Docker/Dsl.dhall
 let Size = ./Size.dhall
 
 -- We assume we're only using the Docker plugin for now
@@ -43,7 +42,7 @@ let Config =
       , label : Text
       , key : Text
       , target : Size
-      , docker : Command/Docker.Config.Type
+      , docker : Docker.Type
       }
   , default = {
       depends_on = [] : List Text
@@ -69,7 +68,7 @@ let build : Config.Type -> Command/Base.Type = \(c : Config.Type) ->
     key = Some c.key,
     label = Some c.label,
     plugins =
-      Some (B/Plugins.Plugins/Type (toMap { `docker#v3.5.0` = Command/Docker.build c.docker }))
+      Some (B/Plugins.Plugins/Type (toMap { `docker#v3.5.0` = c.docker }))
   }
 
 in {Config = Config, build = build, Type = Command/Base.Type}

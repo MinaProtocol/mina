@@ -1,4 +1,11 @@
--- This component hides the "useless" parts of the Buildkite command step bindings
+-- This component refines Buildkite's command step jsonschema bindings by
+-- categorizing the fields into three buckets:
+--
+-- 1. Those fields which are truly required by our currently required of
+--    Commands as we use them, `Config.Type ∖ Config.default`.
+-- 2. Those which we likely will eventually start using, but aren't yet,
+--    `Config.default`.
+-- 3. Those which we won't use, `B.Command ∖ Config.Type`.
 
 let Prelude = ../External/Prelude.dhall
 let Map = Prelude.Map

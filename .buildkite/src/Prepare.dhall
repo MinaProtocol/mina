@@ -2,7 +2,7 @@
 -- Keep these rules lean! They have to run unconditionally.
 
 let Command = ./Command/Dsl.dhall
-let Docker = ./Command/Docker/Dsl.dhall
+let Docker = ./Command/Docker/Type.dhall
 let JobSpec = ./Pipeline/JobSpec.dhall
 let Pipeline = ./Pipeline/Dsl.dhall
 let Size = ./Command/Size.dhall
@@ -23,7 +23,7 @@ let config : Pipeline.Config.Type = Pipeline.Config::{
       label = "Prepare monorepo triage",
       key = "monorepo",
       target = Size.Small,
-      docker = Docker.Config::{ image = (./Constants/ContainerImages.dhall).toolchainBase }
+      docker = Docker::{ image = (./Constants/ContainerImages.dhall).toolchainBase }
     }
   ]
 }

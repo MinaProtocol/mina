@@ -1,6 +1,6 @@
 let Pipeline = ../../Pipeline/Dsl.dhall
 let Command = ../../Command/Dsl.dhall
-let Docker = ../../Command/Docker/Dsl.dhall
+let Docker = ../../Command/Docker/Type.dhall
 let Size = ../../Command/Size.dhall
 
 in
@@ -13,7 +13,7 @@ Pipeline.build
         commands = [ "echo \"hello2\"" ],
         label = "Test Echo2", key = "hello2",
         target = Size.Small,
-        docker = Docker.Config::{ image = (../../Constants/ContainerImages.dhall).toolchainBase }
+        docker = Docker::{ image = (../../Constants/ContainerImages.dhall).toolchainBase }
         }
     ]
   }
