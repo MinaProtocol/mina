@@ -50,7 +50,7 @@ module Message = struct
     let%map state_hash = Coda_base.State_hash.gen in
     {state_hash}
 
-  let hash_to_group msg =
+  let hash_to_group ~constraint_constants:_ msg =
     let msg_hash_state =
       Snark_params.Tick.Pedersen.hash_fold
         (Snark_params.Tick.Pedersen.State.create ())
@@ -80,7 +80,7 @@ module Output_hash = struct
 
   let typ : (var, value) Snark_params.Tick.Typ.t = Snark_params.Tick.Field.typ
 
-  let hash ({Message.state_hash} : Message.value) g =
+  let hash ~constraint_constants:_ ({Message.state_hash} : Message.value) g =
     let x, y = Snark_params.Tick.Inner_curve.to_affine_exn g in
     Random_oracle.hash [|(state_hash :> Snark_params.Tick.Field.t); x; y|]
 
@@ -97,6 +97,9 @@ module Vrf =
   Vrf_lib.Integrated.Make (Tick) (Scalar) (Group) (Message) (Output_hash)
 
 let%test_unit "eval unchecked vs. checked equality" =
+  let constraint_constants =
+    Genesis_constants.Constraint_constants.for_unit_tests
+  in
   let gen =
     let open Quickcheck.Let_syntax in
     let%map pk = Private_key.gen and msg = Message.gen in
@@ -112,10 +115,14 @@ let%test_unit "eval unchecked vs. checked equality" =
            let open Tick.Checked in
            let%bind (module Shifted) = Group.Checked.Shifted.create () in
            Vrf.Checked.eval (module Shifted) ~private_key msg )
-         (fun (private_key, msg) -> Vrf.eval ~private_key msg))
+         (fun (private_key, msg) ->
+           Vrf.eval ~constraint_constants ~private_key msg ))
 
 let%bench_module "vrf bench module" =
   ( module struct
+    let constraint_constants =
+      Genesis_constants.Constraint_constants.for_unit_tests
+
     let gen =
       let open Quickcheck.Let_syntax in
       let%map pk = Private_key.gen and msg = Message.gen in
@@ -123,7 +130,7 @@ let%bench_module "vrf bench module" =
 
     let%bench_fun "vrf eval unchecked" =
       let private_key, msg = Quickcheck.random_value gen in
-      fun () -> Vrf.eval ~private_key msg
+      fun () -> Vrf.eval ~constraint_constants ~private_key msg
 
     let%bench_fun "vrf eval checked" =
       let private_key, msg = Quickcheck.random_value gen in

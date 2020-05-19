@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# In dune files, require preprocessing by ppx_coda, so that the version syntax linter is always run
+# In dune files, require preprocessing by ppx_version, so that the version syntax linter is always run
 
 import subprocess
 import string
@@ -17,7 +17,9 @@ def dune_paths_ok (dune) :
   path_prefix3 = path[1:3]
   return (not (path_prefix2 == ['_build'] or path_prefix2 == ['external'] or
                path_prefix3 == ['lib', 'zexe'] or
-               path_prefix3 == ['lib', 'snarky'] or path_prefix3 == ['lib', 'ppx_coda']))
+               path_prefix3 == ['lib', 'snarky'] or
+               path_prefix3 == ['lib', 'ppx_version'] or
+               path_prefix3 == ['lib', 'ppx_coda']))
 
 dune_paths = list(filter(lambda s : len(s) > 0 and dune_paths_ok (s),dune_paths_raw))
 
@@ -27,7 +29,7 @@ preprocess = sexpdata.loads ('preprocess')
 pps = sexpdata.loads ('pps')
 no_preprocessing = sexpdata.loads ('no_preprocessing')
 
-ppx_lint = sexpdata.loads ('ppx_coda')
+ppx_lint = sexpdata.loads ('ppx_version')
 
 exit_code = 0
 
