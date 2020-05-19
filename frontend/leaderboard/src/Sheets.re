@@ -69,24 +69,30 @@ let updateRange = (client, sheetsUpdate, cb) => {
   });
 };
 
-let convertPublicKeyToUsername = (pointsMap, sheetsData) => {
+let createPublickeyUsernameMap = (pointsMap, sheetsData) => {
   sheetsData
   |> Array.fold_left(
-       (map, user) =>
+       (map, user) => {
          // Check if the publickey exists in the pointsMap
-         if (StringMap.mem(user[0], pointsMap)) {
-           let binding = StringMap.find(user[0], pointsMap);
-           // Create a binding of the username and points
-           StringMap.add(user[1], binding, map);
-         } else {
-           // Ignore the user if they don't have points
-           map;
-         },
+         StringMap.mem(user[0], pointsMap)
+           ? StringMap.add(user[0], user[1], map) : map
+       },
        StringMap.empty,
      );
 };
 
-let convertPointsToSheetsData = pointsMap => {
+let createUsernamePointsMap = (pointsMap, pkUsernameMap) => {
+  StringMap.fold(
+    (pk, username, map) => {
+      StringMap.mem(pk, pointsMap)
+        ? StringMap.add(username, StringMap.find(pk, pointsMap), map) : map
+    },
+    pkUsernameMap,
+    StringMap.empty,
+  );
+};
+
+let convertPointsMapToSheetsData = pointsMap => {
   StringMap.fold(
     (key: string, value: int, array) => {
       Array.append([|[|key, string_of_int(value)|]|], array)

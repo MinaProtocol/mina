@@ -2,8 +2,8 @@ module GoogleSheets = {
   type client;
   type sheets;
   type token = Js.Json.t;
-  type data = {values: array(array(string))};
-  type res = {data};
+  type sheetsData = {values: array(array(string))};
+  type res = {data: sheetsData};
 
   type clientConfig = {
     clientId: string,
@@ -26,13 +26,11 @@ module GoogleSheets = {
     range: string,
   };
 
-  type sheetsQueryData = {values: array(array(string))};
-
   type sheetsUpdate = {
     spreadsheetId: string,
     range: string,
     valueInputOption: string,
-    resource: sheetsQueryData,
+    resource: sheetsData,
   };
 
   [@bs.scope ("google", "auth")] [@bs.new] [@bs.module "googleapis"]
