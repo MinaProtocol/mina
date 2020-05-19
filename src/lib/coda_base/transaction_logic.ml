@@ -954,13 +954,13 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           | User_command txn ->
               Or_error.map
                 (apply_user_command ~constraint_constants ledger txn)
-                ~f:(fun u -> Undo.Varying.User_command u)
+                ~f:(fun undo -> Undo.Varying.User_command undo)
           | Fee_transfer t ->
               Or_error.map (apply_fee_transfer ~constraint_constants ledger t)
-                ~f:(fun u -> Undo.Varying.Fee_transfer u)
+                ~f:(fun undo -> Undo.Varying.Fee_transfer undo)
           | Coinbase t ->
               Or_error.map (apply_coinbase ~constraint_constants ledger t)
-                ~f:(fun u -> Undo.Varying.Coinbase u) )
+                ~f:(fun undo -> Undo.Varying.Coinbase undo) )
           ~f:(fun varying -> {Undo.previous_hash; varying}) )
 
   let merkle_root_after_user_command_exn ~constraint_constants ledger payment =
