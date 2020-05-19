@@ -373,6 +373,8 @@ module type S = sig
            t
         -> pending_coinbase:Coda_base.Pending_coinbase_witness.t
         -> Snark_params.Tick.Handler.t
+
+      val ledger_depth : t -> int
     end
 
     module Consensus_transition : sig
@@ -551,7 +553,8 @@ module type S = sig
      * future.
      *)
     val next_producer_timing :
-         constants:Constants.t
+         constraint_constants:Genesis_constants.Constraint_constants.t
+      -> constants:Constants.t
       -> Unix_timestamp.t
       -> Consensus_state.Value.t
       -> local_state:Local_state.t

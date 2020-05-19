@@ -21,9 +21,6 @@ module Currency = Currency_nonconsensus.Currency
 "genesis_ledger", genesis_ledger]
 
 [%%inject
-"ledger_depth", ledger_depth]
-
-[%%inject
 "account_creation_fee_string", account_creation_fee_int]
 
 [%%inject
