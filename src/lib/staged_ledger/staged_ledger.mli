@@ -77,6 +77,7 @@ val create_exn : ledger:Ledger.t -> t
 
 val of_scan_state_and_ledger :
      logger:Logger.t
+  -> constraint_constants:Genesis_constants.Constraint_constants.t
   -> verifier:Verifier.t
   -> snarked_ledger_hash:Frozen_ledger_hash.t
   -> ledger:Ledger.t
@@ -85,7 +86,8 @@ val of_scan_state_and_ledger :
   -> t Or_error.t Deferred.t
 
 val of_scan_state_and_ledger_unchecked :
-     snarked_ledger_hash:Frozen_ledger_hash.t
+     constraint_constants:Genesis_constants.Constraint_constants.t
+  -> snarked_ledger_hash:Frozen_ledger_hash.t
   -> ledger:Ledger.t
   -> scan_state:Scan_state.t
   -> pending_coinbase_collection:Pending_coinbase.t
@@ -144,10 +146,13 @@ val create_diff :
   -> Staged_ledger_diff.With_valid_signatures_and_proofs.t
 
 val statement_exn :
-  t -> [`Non_empty of Transaction_snark.Statement.t | `Empty] Deferred.t
+     constraint_constants:Genesis_constants.Constraint_constants.t
+  -> t
+  -> [`Non_empty of Transaction_snark.Statement.t | `Empty] Deferred.t
 
 val of_scan_state_pending_coinbases_and_snarked_ledger :
      logger:Logger.t
+  -> constraint_constants:Genesis_constants.Constraint_constants.t
   -> verifier:Verifier.t
   -> scan_state:Scan_state.t
   -> snarked_ledger:Ledger.t

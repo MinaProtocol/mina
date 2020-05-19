@@ -121,7 +121,7 @@ let%test_module "Archive node unit tests" =
         ( Quickcheck.Generator.with_size ~size:10
         @@ Quickcheck_lib.gen_imperative_list
              (Transition_frontier.For_tests.gen_genesis_breadcrumb ~proof_level
-                ~precomputed_values ())
+                ~constraint_constants ~precomputed_values ())
              (Transition_frontier.Breadcrumb.For_tests.gen_non_deferred
                 ?logger:None ~proof_level ~constraint_constants ?verifier:None
                 ?trust_system:None

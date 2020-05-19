@@ -177,9 +177,12 @@ module T = struct
           ~error_prefix ~ledger_hash_end:ledger
           ~ledger_hash_begin:(Some (get_target proof))
 
-  let statement_exn t =
+  let statement_exn ~constraint_constants t =
     let open Deferred.Let_syntax in
-    match%map Statement_scanner.scan_statement t.scan_state ~verifier:() with
+    match%map
+      Statement_scanner.scan_statement ~constraint_constants t.scan_state
+        ~verifier:()
+    with
     | Ok s ->
         `Non_empty s
     | Error `Empty ->
@@ -191,15 +194,16 @@ module T = struct
       ~pending_coinbase_collection =
     {ledger; scan_state; pending_coinbase_collection}
 
-  let of_scan_state_and_ledger ~logger ~verifier ~snarked_ledger_hash ~ledger
-      ~scan_state ~pending_coinbase_collection =
+  let of_scan_state_and_ledger ~logger ~constraint_constants ~verifier
+      ~snarked_ledger_hash ~ledger ~scan_state ~pending_coinbase_collection =
     let open Deferred.Or_error.Let_syntax in
     let t =
       of_scan_state_and_ledger_unchecked ~ledger ~scan_state
         ~pending_coinbase_collection
     in
     let%bind () =
-      Statement_scanner_with_proofs.check_invariants scan_state
+      Statement_scanner_with_proofs.check_invariants ~constraint_constants
+        scan_state
         ~verifier:{Statement_scanner_proof_verifier.logger; verifier}
         ~error_prefix:"Staged_ledger.of_scan_state_and_ledger"
         ~ledger_hash_end:
@@ -208,21 +212,22 @@ module T = struct
     in
     return t
 
-  let of_scan_state_and_ledger_unchecked ~snarked_ledger_hash ~ledger
-      ~scan_state ~pending_coinbase_collection =
+  let of_scan_state_and_ledger_unchecked ~constraint_constants
+      ~snarked_ledger_hash ~ledger ~scan_state ~pending_coinbase_collection =
     let open Deferred.Or_error.Let_syntax in
     let t = {ledger; scan_state; pending_coinbase_collection} in
     let%bind () =
-      Statement_scanner.check_invariants scan_state ~verifier:()
-        ~error_prefix:"Staged_ledger.of_scan_state_and_ledger"
+      Statement_scanner.check_invariants ~constraint_constants scan_state
+        ~verifier:() ~error_prefix:"Staged_ledger.of_scan_state_and_ledger"
         ~ledger_hash_end:
           (Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root ledger))
         ~ledger_hash_begin:(Some snarked_ledger_hash)
     in
     return t
 
-  let of_scan_state_pending_coinbases_and_snarked_ledger ~logger ~verifier
-      ~scan_state ~snarked_ledger ~expected_merkle_root ~pending_coinbases =
+  let of_scan_state_pending_coinbases_and_snarked_ledger ~logger
+      ~constraint_constants ~verifier ~scan_state ~snarked_ledger
+      ~expected_merkle_root ~pending_coinbases =
     let open Deferred.Or_error.Let_syntax in
     let snarked_ledger_hash = Ledger.merkle_root snarked_ledger in
     let snarked_frozen_ledger_hash =
@@ -235,8 +240,9 @@ module T = struct
       Deferred.List.fold txs ~init:(Ok ()) ~f:(fun acc tx ->
           Deferred.map (Async.Scheduler.yield ()) ~f:(fun () ->
               Or_error.bind acc ~f:(fun () ->
-                  Ledger.apply_transaction snarked_ledger tx |> Or_error.ignore
-              ) ) )
+                  Ledger.apply_transaction ~constraint_constants snarked_ledger
+                    tx
+                  |> Or_error.ignore ) ) )
     in
     let%bind () =
       let staged_ledger_hash = Ledger.merkle_root snarked_ledger in
@@ -249,7 +255,7 @@ module T = struct
                   Got:%{sexp:Ledger_hash.t}"
                 expected_merkle_root staged_ledger_hash)
     in
-    of_scan_state_and_ledger ~logger ~verifier
+    of_scan_state_and_ledger ~logger ~constraint_constants ~verifier
       ~snarked_ledger_hash:snarked_frozen_ledger_hash ~ledger:snarked_ledger
       ~scan_state ~pending_coinbase_collection:pending_coinbases
 
@@ -321,8 +327,8 @@ module T = struct
     | _ ->
         stack_with_state
 
-  let apply_transaction_and_get_statement ledger current_stack s
-      state_body_hash_opt =
+  let apply_transaction_and_get_statement ~constraint_constants ledger
+      current_stack s state_body_hash_opt =
     let open Result.Let_syntax in
     let%bind fee_excess = Transaction.fee_excess s |> to_staged_ledger_or_error
     and supply_increase =
@@ -335,7 +341,8 @@ module T = struct
       push_coinbase_and_get_new_collection current_stack s state_body_hash_opt
     in
     let%map undo =
-      Ledger.apply_transaction ledger s |> to_staged_ledger_or_error
+      Ledger.apply_transaction ~constraint_constants ledger s
+      |> to_staged_ledger_or_error
     in
     ( undo
     , { Transaction_snark.Statement.source
@@ -347,8 +354,8 @@ module T = struct
       ; proof_type= `Base }
     , pending_coinbase_after )
 
-  let apply_transaction_and_get_witness ledger current_stack s
-      state_body_hash_opt =
+  let apply_transaction_and_get_witness ~constraint_constants ledger
+      current_stack s state_body_hash_opt =
     let open Deferred.Let_syntax in
     let public_keys = function
       | Transaction.Fee_transfer t ->
@@ -370,8 +377,8 @@ module T = struct
     let%bind () = Async.Scheduler.yield () in
     let r =
       measure "apply+stmt" (fun () ->
-          apply_transaction_and_get_statement ledger current_stack s
-            state_body_hash_opt )
+          apply_transaction_and_get_statement ~constraint_constants ledger
+            current_stack s state_body_hash_opt )
     in
     let%map () = Async.Scheduler.yield () in
     let open Result.Let_syntax in
@@ -382,16 +389,16 @@ module T = struct
       ; statement }
     , updated_coinbase_stack )
 
-  let update_ledger_and_get_statements ledger current_stack ts state_body_hash
-      =
+  let update_ledger_and_get_statements ~constraint_constants ledger
+      current_stack ts state_body_hash =
     let open Deferred.Let_syntax in
     let rec go coinbase_stack state_body_hash_opt acc = function
       | [] ->
           return (Ok (List.rev acc, coinbase_stack))
       | t :: ts -> (
           match%bind
-            apply_transaction_and_get_witness ledger coinbase_stack t
-              state_body_hash_opt
+            apply_transaction_and_get_witness ~constraint_constants ledger
+              coinbase_stack t state_body_hash_opt
           with
           | Ok (res, updated_coinbase_stack) ->
               (*Push the state body hash to the pending coinbase stack once per diff*)
@@ -465,8 +472,8 @@ module T = struct
       ~f:(fun _ -> check (List.drop data (fst partitions.first)) partitions)
       partitions.second
 
-  let update_coinbase_stack_and_get_data scan_state ledger
-      pending_coinbase_collection transactions state_body_hash =
+  let update_coinbase_stack_and_get_data ~constraint_constants scan_state
+      ledger pending_coinbase_collection transactions state_body_hash =
     let open Deferred.Result.Let_syntax in
     let coinbase_exists txns =
       List.fold_until ~init:false txns
@@ -493,8 +500,8 @@ module T = struct
             |> Deferred.return
           in
           let%map data, updated_stack =
-            update_ledger_and_get_statements ledger working_stack transactions
-              (Some state_body_hash)
+            update_ledger_and_get_statements ~constraint_constants ledger
+              working_stack transactions (Some state_body_hash)
           in
           ( is_new_stack
           , data
@@ -517,8 +524,8 @@ module T = struct
             |> Deferred.return
           in
           let%bind data1, updated_stack1 =
-            update_ledger_and_get_statements ledger working_stack1
-              txns_for_partition1 (Some state_body_hash)
+            update_ledger_and_get_statements ~constraint_constants ledger
+              working_stack1 txns_for_partition1 (Some state_body_hash)
           in
           let txns_for_partition2 = List.drop transactions slots in
           let working_stack2 =
@@ -526,8 +533,8 @@ module T = struct
           in
           (*Push the state body hash to the pending coinbase stack once per diff*)
           let%map data2, updated_stack2 =
-            update_ledger_and_get_statements ledger working_stack2
-              txns_for_partition2 None
+            update_ledger_and_get_statements ~constraint_constants ledger
+              working_stack2 txns_for_partition2 None
           in
           let second_has_data = List.length txns_for_partition2 > 0 in
           let pending_coinbase_action, stack_update =
@@ -615,7 +622,8 @@ module T = struct
           (Staged_ledger_error.Pre_diff
              (Pre_diff_info.Error.Coinbase_error "More than two coinbase parts"))
 
-  let apply_diff ~logger t pre_diff_info ~state_body_hash =
+  let apply_diff ~logger ~constraint_constants t pre_diff_info ~state_body_hash
+      =
     let open Deferred.Result.Let_syntax in
     let max_throughput =
       Int.pow 2 Coda_compile_config.transaction_capacity_log_2
@@ -629,8 +637,8 @@ module T = struct
     let new_ledger = Ledger.register_mask t.ledger new_mask in
     let transactions, works, user_commands_count, coinbases = pre_diff_info in
     let%bind is_new_stack, data, stack_update_in_snark, stack_update =
-      update_coinbase_stack_and_get_data t.scan_state new_ledger
-        t.pending_coinbase_collection transactions state_body_hash
+      update_coinbase_stack_and_get_data ~constraint_constants t.scan_state
+        new_ledger t.pending_coinbase_collection transactions state_body_hash
     in
     let slots = List.length data in
     let work_count = List.length works in
@@ -686,7 +694,7 @@ module T = struct
     in
     let%map () =
       Deferred.(
-        verify_scan_state_after_apply
+        verify_scan_state_after_apply ~constraint_constants
           (Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root new_ledger))
           scan_state'
         >>| to_staged_ledger_or_error)
@@ -743,7 +751,7 @@ module T = struct
       |> Deferred.return
     in
     let%map ((_, _, `Staged_ledger new_staged_ledger, __) as res) =
-      apply_diff t prediff ~logger ~state_body_hash
+      apply_diff ~constraint_constants t prediff ~logger ~state_body_hash
     in
     let () =
       Or_error.iter_error (update_metrics new_staged_ledger witness)
@@ -764,7 +772,8 @@ module T = struct
       @@ Pre_diff_info.get_unchecked ~constraint_constants sl_diff
       |> Deferred.return
     in
-    apply_diff t prediff ~logger:(Logger.null ()) ~state_body_hash
+    apply_diff ~constraint_constants t prediff ~logger:(Logger.null ())
+      ~state_body_hash
 
   module Resources = struct
     module Discarded = struct
@@ -840,7 +849,7 @@ module T = struct
         if is_coinbase_reciever_new then
           Currency.Amount.(
             sub coinbase_amount
-              (of_fee Coda_compile_config.account_creation_fee))
+              (of_fee constraint_constants.account_creation_fee))
         else Some coinbase_amount
       in
       let stmt = Transaction_snark_work.statement in
@@ -1414,8 +1423,9 @@ module T = struct
           let res = try_with_coinbase () in
           make_diff res None
 
-  let create_diff ~constraint_constants ?(log_block_creation = false) t ~self
-      ~coinbase_receiver ~logger
+  let create_diff
+      ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+      ?(log_block_creation = false) t ~self ~coinbase_receiver ~logger
       ~(transactions_by_fee : User_command.With_valid_signature.t Sequence.t)
       ~(get_completed_work :
             Transaction_snark_work.Statement.t
@@ -1451,7 +1461,8 @@ module T = struct
               if
                 Currency.Fee.(cw_checked.fee = zero)
                 || Currency.Fee.(
-                     cw_checked.fee >= Coda_compile_config.account_creation_fee)
+                     cw_checked.fee
+                     >= constraint_constants.account_creation_fee)
                 || not (is_new_account cw_checked.prover)
               then
                 Continue
@@ -1467,7 +1478,7 @@ module T = struct
                     ; ("snark_fee", Currency.Fee.to_yojson cw_checked.fee)
                     ; ( "account_creation_fee"
                       , Currency.Fee.to_yojson
-                          Coda_compile_config.account_creation_fee ) ]
+                          constraint_constants.account_creation_fee ) ]
                   !"Staged_ledger_diff creation: Snark fee $snark_fee \
                     insufficient to create the snark worker account" ;
                 Stop (seq, count) )
@@ -1489,8 +1500,8 @@ module T = struct
         ~f:(fun seq txn ->
           match
             O1trace.measure "validate txn" (fun () ->
-                Transaction_validator.apply_transaction validating_ledger
-                  (User_command txn) )
+                Transaction_validator.apply_transaction ~constraint_constants
+                  validating_ledger (User_command txn) )
           with
           | Error e ->
               let error_message =
@@ -1650,7 +1661,9 @@ let%test_module "test" =
         | [] ->
             return ()
         | cmd :: cmds ->
-            let%bind _ = Ledger.apply_user_command test_ledger cmd in
+            let%bind _ =
+              Ledger.apply_user_command ~constraint_constants test_ledger cmd
+            in
             apply_cmds cmds
       in
       Or_error.ok_exn @@ apply_cmds @@ List.take cmds_all cmds_used ;
@@ -1672,7 +1685,7 @@ let%test_module "test" =
         let%bind total_cost =
           if is_producer_acc_new then
             Currency.Fee.add coinbase_cost
-              Coda_compile_config.account_creation_fee
+              constraint_constants.account_creation_fee
           else Some coinbase_cost
         in
         let%bind reward =
@@ -1689,7 +1702,7 @@ let%test_module "test" =
         Currency.Balance.(
           new_producer_balance >= producer_balance_with_coinbase) )
 
-    let work_fee = Coda_compile_config.account_creation_fee
+    let work_fee = constraint_constants.account_creation_fee
 
     (* Deterministically compute a prover public key from a snark work statement. *)
     let stmt_to_prover :

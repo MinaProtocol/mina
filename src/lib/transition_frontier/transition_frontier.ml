@@ -420,8 +420,8 @@ module For_tests = struct
   *)
 
   (* a helper quickcheck generator which always returns the genesis breadcrumb *)
-  let gen_genesis_breadcrumb ?(logger = Logger.null ()) ~proof_level ?verifier
-      ~precomputed_values () =
+  let gen_genesis_breadcrumb ?(logger = Logger.null ()) ~proof_level
+      ~constraint_constants ?verifier ~precomputed_values () =
     let verifier =
       match verifier with
       | Some x ->
@@ -443,7 +443,7 @@ module For_tests = struct
             (Async.Thread_safe.block_on_async_exn (fun () ->
                  Staged_ledger
                  .of_scan_state_pending_coinbases_and_snarked_ledger ~logger
-                   ~verifier
+                   ~constraint_constants ~verifier
                    ~scan_state:(Staged_ledger.Scan_state.empty ())
                    ~pending_coinbases:
                      (Or_error.ok_exn @@ Pending_coinbase.create ())
@@ -506,11 +506,11 @@ module For_tests = struct
         (persistent_root, persistent_frontier) )
 
   let gen_genesis_breadcrumb_with_protocol_states ~logger ~proof_level
-      ?verifier ~precomputed_values () =
+      ~constraint_constants ?verifier ~precomputed_values () =
     let open Quickcheck.Generator.Let_syntax in
     let%map root =
-      gen_genesis_breadcrumb ~logger ~proof_level ?verifier ~precomputed_values
-        ()
+      gen_genesis_breadcrumb ~logger ~proof_level ~constraint_constants
+        ?verifier ~precomputed_values ()
     in
     (* List of protocol states required to prove transactions in the scan state; empty scan state at genesis*)
     let protocol_states = [] in
@@ -523,7 +523,8 @@ module For_tests = struct
         , Lazy.force (Precomputed_values.accounts precomputed_values) ))
       ?(gen_root_breadcrumb =
         gen_genesis_breadcrumb_with_protocol_states ~logger ~proof_level
-          ?verifier ~precomputed_values ()) ~max_length ~size () =
+          ~constraint_constants ?verifier ~precomputed_values ()) ~max_length
+      ~size () =
     let open Quickcheck.Generator.Let_syntax in
     let genesis_state_hash =
       Precomputed_values.genesis_state_hash precomputed_values

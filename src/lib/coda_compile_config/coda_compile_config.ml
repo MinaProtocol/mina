@@ -21,9 +21,6 @@ module Currency = Currency_nonconsensus.Currency
 "genesis_ledger", genesis_ledger]
 
 [%%inject
-"account_creation_fee_string", account_creation_fee_int]
-
-[%%inject
 "default_transaction_fee_string", default_transaction_fee]
 
 [%%inject
@@ -31,9 +28,6 @@ module Currency = Currency_nonconsensus.Currency
 
 [%%inject
 "minimum_user_command_fee_string", minimum_user_command_fee]
-
-let account_creation_fee =
-  Currency.Fee.of_formatted_string account_creation_fee_string
 
 let minimum_user_command_fee =
   Currency.Fee.of_formatted_string minimum_user_command_fee_string

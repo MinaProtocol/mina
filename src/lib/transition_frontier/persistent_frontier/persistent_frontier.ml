@@ -8,7 +8,8 @@ module Database = Database
 
 exception Invalid_genesis_state_hash of External_transition.Validated.t
 
-let construct_staged_ledger_at_root ~root_ledger ~root_transition ~root =
+let construct_staged_ledger_at_root ~constraint_constants ~root_ledger
+    ~root_transition ~root =
   let open Deferred.Or_error.Let_syntax in
   let open Root_data.Minimal in
   let snarked_ledger_hash =
@@ -26,11 +27,14 @@ let construct_staged_ledger_at_root ~root_ledger ~root_transition ~root =
       (List.fold transactions ~init:(Or_error.return ()) ~f:(fun acc txn ->
            let open Or_error.Let_syntax in
            let%bind () = acc in
-           let%map _ = Ledger.apply_transaction mask txn in
+           let%map _ =
+             Ledger.apply_transaction ~constraint_constants mask txn
+           in
            () ))
   in
-  Staged_ledger.of_scan_state_and_ledger_unchecked ~snarked_ledger_hash
-    ~ledger:mask ~scan_state ~pending_coinbase_collection:pending_coinbase
+  Staged_ledger.of_scan_state_and_ledger_unchecked ~constraint_constants
+    ~snarked_ledger_hash ~ledger:mask ~scan_state
+    ~pending_coinbase_collection:pending_coinbase
 
 module rec Instance_type : sig
   type t =
@@ -201,7 +205,8 @@ module Instance = struct
     let%bind root_staged_ledger =
       let open Deferred.Let_syntax in
       match%map
-        construct_staged_ledger_at_root ~root_ledger ~root_transition ~root
+        construct_staged_ledger_at_root ~constraint_constants ~root_ledger
+          ~root_transition ~root
       with
       | Error err ->
           Error (`Failure (Error.to_string_hum err))

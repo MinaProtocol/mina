@@ -145,12 +145,12 @@ let create_coinbase
       [cb]
   | `Two None ->
       two_parts
-        (Currency.Amount.of_fee Coda_compile_config.account_creation_fee)
+        (Currency.Amount.of_fee constraint_constants.account_creation_fee)
         None None
   | `Two (Some (({Coinbase.Fee_transfer.fee; _} as ft1), ft2)) ->
       let%bind amount =
         let%map fee =
-          Currency.Fee.add Coda_compile_config.account_creation_fee fee
+          Currency.Fee.add constraint_constants.account_creation_fee fee
           |> Option.value_map
                ~default:
                  (Error
@@ -159,7 +159,7 @@ let create_coinbase
                           !"Overflow when trying to add account_creation_fee \
                             %{sexp: Currency.Fee.t} to a fee transfer %{sexp: \
                             Currency.Fee.t}"
-                          Coda_compile_config.account_creation_fee fee)))
+                          constraint_constants.account_creation_fee fee)))
                ~f:(fun v -> Ok v)
         in
         Currency.Amount.of_fee fee

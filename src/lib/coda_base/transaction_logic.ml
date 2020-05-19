@@ -214,16 +214,28 @@ module type S = sig
   end
 
   val apply_user_command :
-       ledger
+       constraint_constants:Genesis_constants.Constraint_constants.t
+    -> ledger
     -> User_command.With_valid_signature.t
     -> Undo.User_command_undo.t Or_error.t
 
-  val apply_transaction : ledger -> Transaction.t -> Undo.t Or_error.t
+  val apply_transaction :
+       constraint_constants:Genesis_constants.Constraint_constants.t
+    -> ledger
+    -> Transaction.t
+    -> Undo.t Or_error.t
 
   val merkle_root_after_user_command_exn :
-    ledger -> User_command.With_valid_signature.t -> Ledger_hash.t
+       constraint_constants:Genesis_constants.Constraint_constants.t
+    -> ledger
+    -> User_command.With_valid_signature.t
+    -> Ledger_hash.t
 
-  val undo : ledger -> Undo.t -> unit Or_error.t
+  val undo :
+       constraint_constants:Genesis_constants.Constraint_constants.t
+    -> ledger
+    -> Undo.t
+    -> unit Or_error.t
 
   module For_tests : sig
     val validate_timing :
@@ -346,8 +358,10 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
   let sub_amount balance amount =
     error_opt "insufficient funds" (Balance.sub_amount balance amount)
 
-  let sub_account_creation_fee action amount =
-    let fee = Coda_compile_config.account_creation_fee in
+  let sub_account_creation_fee
+      ~(constraint_constants : Genesis_constants.Constraint_constants.t) action
+      amount =
+    let fee = constraint_constants.account_creation_fee in
     if action = `Added then
       error_opt
         (sprintf
@@ -357,8 +371,10 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         Amount.(sub amount (of_fee fee))
     else Ok amount
 
-  let add_account_creation_fee_bal action balance =
-    let fee = Coda_compile_config.account_creation_fee in
+  let add_account_creation_fee_bal
+      ~(constraint_constants : Genesis_constants.Constraint_constants.t) action
+      balance =
+    let fee = constraint_constants.account_creation_fee in
     if action = `Added then add_amount balance (Amount.of_fee fee)
     else Ok balance
 
@@ -400,7 +416,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
   (* someday: It would probably be better if we didn't modify the receipt chain hash
   in the case that the sender is equal to the receiver, but it complicates the SNARK, so
   we don't for now. *)
-  let apply_user_command_unchecked ledger
+  let apply_user_command_unchecked ~constraint_constants ledger
       ({payload; signer; signature= _} as user_command : User_command.t) =
     let open Or_error.Let_syntax in
     let signer_pk = Public_key.compress signer in
@@ -521,7 +537,10 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             | `New ->
                 if Token_id.equal fee_token token then
                   (* Subtract the creation fee from the transaction amount. *)
-                  let%map amount = sub_account_creation_fee `Added amount in
+                  let%map amount =
+                    sub_account_creation_fee ~constraint_constants `Added
+                      amount
+                  in
                   (amount, Amount.zero)
                 else
                   (* Charge the fee-payer for creating the account.
@@ -530,7 +549,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                  accepted value.
                *)
                   let account_creation_fee =
-                    Amount.of_fee Coda_compile_config.account_creation_fee
+                    Amount.of_fee constraint_constants.account_creation_fee
                   in
                   return (amount, account_creation_fee)
           in
@@ -614,9 +633,9 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         *)
         Error err
 
-  let apply_user_command ledger
+  let apply_user_command ~constraint_constants ledger
       (user_command : User_command.With_valid_signature.t) =
-    apply_user_command_unchecked ledger
+    apply_user_command_unchecked ~constraint_constants ledger
       (User_command.forget_check user_command)
 
   let process_fee_transfer t (transfer : Fee_transfer.t) ~modify_balance =
@@ -667,19 +686,19 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           set t l2 {a2 with balance= balance2} ;
           emptys1 @ emptys2
 
-  let apply_fee_transfer t transfer =
+  let apply_fee_transfer ~constraint_constants t transfer =
     let open Or_error.Let_syntax in
     let%map previous_empty_accounts =
       process_fee_transfer t transfer ~modify_balance:(fun action _ b f ->
           let%bind amount =
             let amount = Amount.of_fee f in
-            sub_account_creation_fee action amount
+            sub_account_creation_fee ~constraint_constants action amount
           in
           add_amount b amount )
     in
     Undo.Fee_transfer_undo.{fee_transfer= transfer; previous_empty_accounts}
 
-  let undo_fee_transfer t
+  let undo_fee_transfer ~constraint_constants t
       ({previous_empty_accounts; fee_transfer} : Undo.Fee_transfer_undo.t) =
     let open Or_error.Let_syntax in
     let%map _ =
@@ -690,13 +709,14 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             else `Existed
           in
           let%bind amount =
-            sub_account_creation_fee action (Amount.of_fee f)
+            sub_account_creation_fee ~constraint_constants action
+              (Amount.of_fee f)
           in
           sub_amount b amount )
     in
     remove_accounts_exn t previous_empty_accounts
 
-  let apply_coinbase t
+  let apply_coinbase ~constraint_constants t
       (* TODO: Better system needed for making atomic changes. Could use a monad. *)
       ({receiver; fee_transfer; amount= coinbase_amount} as cb : Coinbase.t) =
     let open Or_error.Let_syntax in
@@ -721,7 +741,9 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           in
           let emptys = previous_empty_accounts action transferee_id in
           let%map balance =
-            let%bind amount = sub_account_creation_fee action fee in
+            let%bind amount =
+              sub_account_creation_fee ~constraint_constants action fee
+            in
             add_amount transferee_account.balance amount
           in
           ( receiver_reward
@@ -738,7 +760,9 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     in
     let emptys2 = previous_empty_accounts action2 receiver_id in
     let%map receiver_balance =
-      let%bind amount = sub_account_creation_fee action2 receiver_reward in
+      let%bind amount =
+        sub_account_creation_fee ~constraint_constants action2 receiver_reward
+      in
       add_amount receiver_account.balance amount
     in
     set t receiver_location {receiver_account with balance= receiver_balance} ;
@@ -748,7 +772,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
 
   (* Don't have to be atomic here because these should never fail. In fact, none of
   the undo functions should ever return an error. This should be fixed in the types. *)
-  let undo_coinbase t
+  let undo_coinbase ~constraint_constants t
       Undo.Coinbase_undo.
         { coinbase= {receiver; fee_transfer; amount= coinbase_amount}
         ; previous_empty_accounts } =
@@ -774,7 +798,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               else `Existed
             in
             let amount =
-              sub_account_creation_fee action fee |> Or_error.ok_exn
+              sub_account_creation_fee ~constraint_constants action fee
+              |> Or_error.ok_exn
             in
             Option.value_exn
               (Balance.sub_amount transferee_account.balance amount)
@@ -797,14 +822,15 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         else `Existed
       in
       let amount =
-        sub_account_creation_fee action receiver_reward |> Or_error.ok_exn
+        sub_account_creation_fee ~constraint_constants action receiver_reward
+        |> Or_error.ok_exn
       in
       Option.value_exn (Balance.sub_amount receiver_account.balance amount)
     in
     set t receiver_location {receiver_account with balance= receiver_balance} ;
     remove_accounts_exn t previous_empty_accounts
 
-  let undo_user_command ledger
+  let undo_user_command ledger ~constraint_constants
       { Undo.User_command_undo.common=
           { user_command= {payload; signer= _; signature= _} as user_command
           ; previous_receipt_chain_hash }
@@ -857,7 +883,9 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               Token_id.equal fee_token token
               || List.is_empty previous_empty_accounts
             then return fee_payer_account.balance
-            else add_account_creation_fee_bal `Added fee_payer_account.balance
+            else
+              add_account_creation_fee_bal ~constraint_constants `Added
+                fee_payer_account.balance
           in
           {fee_payer_account with balance}
         in
@@ -897,42 +925,50 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     | _, _ ->
         failwith "Undo/command mismatch"
 
-  let undo : t -> Undo.t -> unit Or_error.t =
-   fun ledger undo ->
+  let undo :
+         constraint_constants:Genesis_constants.Constraint_constants.t
+      -> t
+      -> Undo.t
+      -> unit Or_error.t =
+   fun ~constraint_constants ledger undo ->
     let open Or_error.Let_syntax in
     let%map res =
       match undo.varying with
       | Fee_transfer u ->
-          undo_fee_transfer ledger u
+          undo_fee_transfer ~constraint_constants ledger u
       | User_command u ->
-          undo_user_command ledger u
+          undo_user_command ~constraint_constants ledger u
       | Coinbase c ->
-          undo_coinbase ledger c ; Ok ()
+          undo_coinbase ~constraint_constants ledger c ;
+          Ok ()
     in
     Debug_assert.debug_assert (fun () ->
         [%test_eq: Ledger_hash.t] undo.previous_hash (merkle_root ledger) ) ;
     res
 
-  let apply_transaction ledger (t : Transaction.t) =
+  let apply_transaction ~constraint_constants ledger (t : Transaction.t) =
     O1trace.measure "apply_transaction" (fun () ->
         let previous_hash = merkle_root ledger in
         Or_error.map
           ( match t with
           | User_command txn ->
-              Or_error.map (apply_user_command ledger txn) ~f:(fun u ->
-                  Undo.Varying.User_command u )
+              Or_error.map
+                (apply_user_command ~constraint_constants ledger txn)
+                ~f:(fun u -> Undo.Varying.User_command u)
           | Fee_transfer t ->
-              Or_error.map (apply_fee_transfer ledger t) ~f:(fun u ->
-                  Undo.Varying.Fee_transfer u )
+              Or_error.map (apply_fee_transfer ~constraint_constants ledger t)
+                ~f:(fun u -> Undo.Varying.Fee_transfer u)
           | Coinbase t ->
-              Or_error.map (apply_coinbase ledger t) ~f:(fun u ->
-                  Undo.Varying.Coinbase u ) )
+              Or_error.map (apply_coinbase ~constraint_constants ledger t)
+                ~f:(fun u -> Undo.Varying.Coinbase u) )
           ~f:(fun varying -> {Undo.previous_hash; varying}) )
 
-  let merkle_root_after_user_command_exn ledger payment =
-    let undo = Or_error.ok_exn (apply_user_command ledger payment) in
+  let merkle_root_after_user_command_exn ~constraint_constants ledger payment =
+    let undo =
+      Or_error.ok_exn (apply_user_command ~constraint_constants ledger payment)
+    in
     let root = merkle_root ledger in
-    Or_error.ok_exn (undo_user_command ledger undo) ;
+    Or_error.ok_exn (undo_user_command ~constraint_constants ledger undo) ;
     root
 
   module For_tests = struct

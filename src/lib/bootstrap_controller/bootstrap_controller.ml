@@ -231,8 +231,8 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
         let temp_mask = Ledger.of_database temp_snarked_ledger in
         let%map result =
           Staged_ledger.of_scan_state_pending_coinbases_and_snarked_ledger
-            ~logger ~verifier ~scan_state ~snarked_ledger:temp_mask
-            ~expected_merkle_root ~pending_coinbases
+            ~logger ~constraint_constants ~verifier ~scan_state
+            ~snarked_ledger:temp_mask ~expected_merkle_root ~pending_coinbases
         in
         ignore (Ledger.Maskable.unregister_mask_exn temp_mask) ;
         result
@@ -660,9 +660,9 @@ let%test_module "Bootstrap_controller tests" =
               in
               let%map actual_staged_ledger =
                 Staged_ledger
-                .of_scan_state_pending_coinbases_and_snarked_ledger ~scan_state
-                  ~logger ~verifier ~snarked_ledger ~expected_merkle_root
-                  ~pending_coinbases
+                .of_scan_state_pending_coinbases_and_snarked_ledger
+                  ~constraint_constants ~scan_state ~logger ~verifier
+                  ~snarked_ledger ~expected_merkle_root ~pending_coinbases
                 |> Deferred.Or_error.ok_exn
               in
               assert (
