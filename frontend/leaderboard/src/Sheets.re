@@ -69,14 +69,10 @@ let updateRange = (client, sheetsUpdate, cb) => {
   });
 };
 
-let createPublickeyUsernameMap = (pointsMap, sheetsData) => {
+let createPublickeyUsernameMap = sheetsData => {
   sheetsData
   |> Array.fold_left(
-       (map, user) => {
-         // Check if the publickey exists in the pointsMap
-         StringMap.mem(user[0], pointsMap)
-           ? StringMap.add(user[0], user[1], map) : map
-       },
+       (map, user) => {StringMap.add(user[0], user[1], map)},
        StringMap.empty,
      );
 };
