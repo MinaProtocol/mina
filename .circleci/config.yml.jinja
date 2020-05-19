@@ -154,8 +154,8 @@ jobs:
                   name: Check RFC ids
                   command: ./scripts/lint_rfcs.sh
             - run:
-                  name: Require ppx_coda preprocessing for linting
-                  command: ./scripts/require-ppx-coda.py
+                  name: Require ppx_version preprocessing for linting
+                  command: ./scripts/require-ppx-version.py
     lint-opt:
         docker:
             - image: codaprotocol/coda:toolchain-eb73e64d524c906384e9dbb23e9d0b8ae2be9e9e

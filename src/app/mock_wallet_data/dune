@@ -3,6 +3,6 @@
  (public_name mock_wallet_data)
  (package mock_wallet_data)
  (libraries core async auxiliary_database coda_base secrets base58_check)
- (preprocess (pps ppx_coda ppx_jane))
+ (preprocess (pps ppx_version ppx_jane))
  (modes native)
  )

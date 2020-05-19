@@ -43,8 +43,7 @@ module type S = sig
 
   type account
 
-  type t = (hash, account_id, account) T.Stable.V1.t
-  [@@deriving sexp, to_yojson]
+  type t = (hash, account_id, account) T.t [@@deriving sexp, to_yojson]
 
   val of_hash : depth:int -> hash -> t
 

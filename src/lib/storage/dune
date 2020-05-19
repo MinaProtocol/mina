@@ -5,5 +5,5 @@
  (library_flags -linkall)
  (libraries core async async_extra logger)
  (preprocess
-  (pps ppx_coda ppx_jane bisect_ppx -- -conditional))
+  (pps ppx_version ppx_jane bisect_ppx -- -conditional))
  (synopsis "Storage module checksums data and stores it"))

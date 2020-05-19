@@ -270,19 +270,18 @@ module Types = struct
                ~acceptable_network_delay:nn_int
                ~genesis_state_timestamp:nn_time )
 
-    let peer : (_, Network_peer.Peer.Display.Stable.V1.t option) typ =
+    let peer : (_, Network_peer.Peer.Display.t option) typ =
       obj "Peer" ~fields:(fun _ ->
           let open Reflection.Shorthand in
           List.rev
-          @@ Network_peer.Peer.Display.Stable.V1.Fields.fold ~init:[]
-               ~host:nn_string ~libp2p_port:nn_int ~peer_id:nn_string )
+          @@ Network_peer.Peer.Display.Fields.fold ~init:[] ~host:nn_string
+               ~libp2p_port:nn_int ~peer_id:nn_string )
 
-    let addrs_and_ports :
-        (_, Node_addrs_and_ports.Display.Stable.V1.t option) typ =
+    let addrs_and_ports : (_, Node_addrs_and_ports.Display.t option) typ =
       obj "AddrsAndPorts" ~fields:(fun _ ->
           let open Reflection.Shorthand in
           List.rev
-          @@ Node_addrs_and_ports.Display.Stable.V1.Fields.fold ~init:[]
+          @@ Node_addrs_and_ports.Display.Fields.fold ~init:[]
                ~external_ip:nn_string ~bind_ip:nn_string ~client_port:nn_int
                ~libp2p_port:nn_int ~peer:(id ~typ:peer) )
 
