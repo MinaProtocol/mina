@@ -26,11 +26,11 @@ let%test_module "Full_frontier tests" =
     let max_length = 5
 
     let gen_breadcrumb =
-      Breadcrumb.For_tests.gen ~logger ~proof_level ?verifier:None
+      Breadcrumb.For_tests.gen ~logger ~proof_level ~constraint_constants ?verifier:None
         ?trust_system:None ~accounts_with_secret_keys
 
     let gen_breadcrumb_seq =
-      Breadcrumb.For_tests.gen_seq ~logger ~proof_level ?verifier:None
+      Breadcrumb.For_tests.gen_seq ~logger ~proof_level ~constraint_constants ?verifier:None
         ?trust_system:None ~accounts_with_secret_keys
 
     module Transfer = Ledger_transfer.Make (Ledger) (Ledger)
