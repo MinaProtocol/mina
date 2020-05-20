@@ -8,11 +8,12 @@ defined genesis_ledger]
 "genesis_ledger", genesis_ledger]
 
 include Genesis_ledger.Make (struct
-  include (val Genesis_ledger.fetch_ledger genesis_ledger)
+  include (val Genesis_ledger.fetch_ledger_exn genesis_ledger)
 
   let directory = `Ephemeral
 
-  let depth = Genesis_constants.ledger_depth_for_unit_tests
+  let depth =
+    Genesis_constants.Constraint_constants.for_unit_tests.ledger_depth
 end)
 
 [%%else]

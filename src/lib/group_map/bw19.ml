@@ -17,11 +17,18 @@ module Params = struct
         ; sqrt_neg_three_u_squared: 'f
         ; inv_three_u_squared: 'f
         ; b: 'f }
-      [@@deriving fields, bin_io, version]
+      [@@deriving fields]
     end
   end]
 
-  include Stable.Latest
+  type 'f t = 'f Stable.Latest.t =
+    { u: 'f
+    ; fu: 'f
+    ; sqrt_neg_three_u_squared_minus_u_over_2: 'f
+    ; sqrt_neg_three_u_squared: 'f
+    ; inv_three_u_squared: 'f
+    ; b: 'f }
+  [@@deriving fields]
 
   let spec {b; _} = {Spec.b}
 

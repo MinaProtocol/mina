@@ -67,7 +67,7 @@ let get_lite_chain :
       let proof = Lite_compat.proof proof in
       {Lite_base.Lite_chain.proof; ledger; protocol_state} )
 
-(* create reader, writer for fork IDs, but really for any one-line item in conf_dir *)
+(* create reader, writer for protocol versions, but really for any one-line item in conf_dir *)
 let make_conf_dir_item_io ~conf_dir ~filename =
   let item_file = conf_dir ^/ filename in
   let read_item () =
@@ -448,7 +448,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
     ]
   in
   let snark_worker_impls =
-    [ implement Snark_worker.Rpcs.Get_work.Latest.rpc (fun () () ->
+    [ implement Snark_worker.Rpcs_versioned.Get_work.Latest.rpc (fun () () ->
           Deferred.return
             (let open Option.Let_syntax in
             let%bind snark_worker_key = Coda_lib.snark_worker_key coda in
@@ -461,7 +461,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
               "responding to a Get_work request with some new work" ;
             Coda_metrics.(Counter.inc_one Snark_work.snark_work_assigned_rpc) ;
             (r, snark_worker_key)) )
-    ; implement Snark_worker.Rpcs.Submit_work.Latest.rpc
+    ; implement Snark_worker.Rpcs_versioned.Submit_work.Latest.rpc
         (fun () (work : Snark_worker.Work.Result.t) ->
           Coda_metrics.(
             Counter.inc_one Snark_work.completed_snark_work_received_rpc) ;

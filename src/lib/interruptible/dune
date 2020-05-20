@@ -5,5 +5,5 @@
  (inline_tests)
  (libraries core async)
  (preprocess
-  (pps ppx_coda ppx_jane ppx_deriving.std bisect_ppx -- -conditional))
+  (pps ppx_version ppx_jane ppx_deriving.std bisect_ppx -- -conditional))
  (synopsis "Interruptible monad (deferreds, that can be triggered to cancel)"))

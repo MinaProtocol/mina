@@ -16,7 +16,7 @@ let genesis_dir_name
     let str =
       ( List.map
           [ Coda_compile_config.curve_size
-          ; Coda_compile_config.ledger_depth
+          ; constraint_constants.ledger_depth
           ; Option.value ~default:0 genesis_constants.num_accounts
           ; constraint_constants.c
           ; genesis_constants.protocol.k ]
@@ -63,7 +63,7 @@ let load_from_s3 s3_bucket_prefix s3_install_path ~logger =
            let open Deferred.Let_syntax in
            let%map result =
              Process.run_exn ~prog:"curl"
-               ~args:["-o"; file_path; uri_string]
+               ~args:["--fail"; "-o"; file_path; uri_string]
                ()
            in
            Logger.debug ~module_:__MODULE__ ~location:__LOC__ logger

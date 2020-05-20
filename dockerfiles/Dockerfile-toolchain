@@ -60,6 +60,12 @@ RUN export CLOUD_SDK_REPO="cloud-sdk-$(lsb_release -c -s)" && \
     curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add - && \
     sudo apt-get update -y && sudo apt-get install google-cloud-sdk -y
 
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs -o /tmp/rust_install.sh
+RUN chmod +x /tmp/rust_install.sh
+RUN /tmp/rust_install.sh -y
+RUN export PATH="$PATH:$HOME/.cargo/bin"
+RUN echo 'export PATH="$PATH:$HOME/.cargo/bin"' >> /home/opam/.bashrc
+
 # Source copy of rocksdb
 RUN sudo git clone https://github.com/facebook/rocksdb -b v5.17.2 /rocksdb
 # This builds and installs just the static lib for us

@@ -3,5 +3,5 @@
   (public_name key_value_database)
   (library_flags (-linkall))
   (libraries core_kernel)
-  (preprocess (pps ppx_coda ppx_jane))
+  (preprocess (pps ppx_version ppx_jane))
   (synopsis "Collection of key-value databases used in Coda"))
