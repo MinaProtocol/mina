@@ -34,6 +34,7 @@
 /src/lib/crs/ @CodaProtocol/crypto-eng-reviewers
 /src/lib/crypto_params/ @CodaProtocol/crypto-eng-reviewers
 /src/lib/dummy_values/ @CodaProtocol/crypto-eng-reviewers
+/src/lib/logging_events/ @CodaProtocol/crypto-eng-reviewers
 /src/lib/group_map/ @CodaProtocol/crypto-eng-reviewers
 /src/lib/hash_prefixes/ @CodaProtocol/crypto-eng-reviewers
 /src/lib/integers_stubs_js @CodaProtocol/crypto-eng-reviewers
