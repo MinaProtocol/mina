@@ -38,13 +38,17 @@ module Make_real (Keys : Keys_lib.Keys.S) = struct
   let loc = Ppxlib.Location.none
 
   let protocol_state_with_hash =
-    Lazy.force Genesis_protocol_state.compile_time_genesis
+    Genesis_protocol_state.t ~genesis_ledger:Test_genesis_ledger.t
+      ~constraint_constants:Genesis_constants.Constraint_constants.compiled
+      ~genesis_constants:Genesis_constants.compiled
 
   let base_hash = Keys.Step.instance_hash protocol_state_with_hash.data
 
   let compiled_values =
     Genesis_proof.create_values
       ~keys:(module Keys : Keys_lib.Keys.S)
+      ~proof_level:Full
+      ~constraint_constants:Genesis_constants.Constraint_constants.compiled
       { genesis_constants= Genesis_constants.compiled
       ; genesis_ledger= (module Test_genesis_ledger)
       ; protocol_state_with_hash
@@ -89,7 +93,8 @@ let main () =
       let for_unit_tests =
         lazy
           (let protocol_state_with_hash =
-             Lazy.force Coda_state.Genesis_protocol_state.compile_time_genesis
+             Lazy.force
+               Coda_state.Genesis_protocol_state.For_tests.genesis_state
            in
            { genesis_constants= Genesis_constants.for_unit_tests
            ; genesis_ledger= Genesis_ledger.for_unit_tests
@@ -104,7 +109,11 @@ let main () =
       let compiled =
         lazy
           (let protocol_state_with_hash =
-             Lazy.force Coda_state.Genesis_protocol_state.compile_time_genesis
+             Coda_state.Genesis_protocol_state.t
+               ~genesis_ledger:Test_genesis_ledger.t
+               ~constraint_constants:
+                 Genesis_constants.Constraint_constants.compiled
+               ~genesis_constants:Genesis_constants.compiled
            in
            { genesis_constants= Genesis_constants.compiled
            ; genesis_ledger= (module Test_genesis_ledger)

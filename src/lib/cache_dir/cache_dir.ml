@@ -7,20 +7,23 @@ let s3_install_path = "/tmp/s3_cache_dir"
 
 let manual_install_path = "/var/lib/coda"
 
-let genesis_dir_name (genesis_constants : Genesis_constants.t) =
+let genesis_dir_name
+    ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+    ~(genesis_constants : Genesis_constants.t) ~proof_level =
   let digest =
     (*include all the time constants that would affect the genesis
     ledger and the proof*)
     let str =
       ( List.map
           [ Coda_compile_config.curve_size
-          ; Coda_compile_config.ledger_depth
-          ; Coda_compile_config.fake_accounts_target
-          ; Coda_compile_config.c
+          ; constraint_constants.ledger_depth
+          ; Option.value ~default:0 genesis_constants.num_accounts
+          ; constraint_constants.c
           ; genesis_constants.protocol.k ]
           ~f:Int.to_string
       |> String.concat ~sep:"" )
-      ^ Coda_compile_config.proof_level ^ Coda_compile_config.genesis_ledger
+      ^ Genesis_constants.Proof_level.to_string proof_level
+      ^ Coda_compile_config.genesis_ledger
     in
     Blake2.digest_string str |> Blake2.to_hex
   in
@@ -60,7 +63,7 @@ let load_from_s3 s3_bucket_prefix s3_install_path ~logger =
            let open Deferred.Let_syntax in
            let%map result =
              Process.run_exn ~prog:"curl"
-               ~args:["-o"; file_path; uri_string]
+               ~args:["--fail"; "-o"; file_path; uri_string]
                ()
            in
            Logger.debug ~module_:__MODULE__ ~location:__LOC__ logger

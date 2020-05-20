@@ -137,6 +137,8 @@ module Make_base (Inputs : Inputs_intf) :
 
     let get_uuid (T ((module Base), t)) = Base.get_uuid t
 
+    let get_directory (T ((module Base), t)) = Base.get_directory t
+
     let last_filled (T ((module Base), t)) = Base.last_filled t
 
     let close (T ((module Base), t)) = Base.close t
@@ -194,6 +196,6 @@ module Make_base (Inputs : Inputs_intf) :
 
     (* This better be the same depth inside Base or you're going to have a bad
      * time *)
-    let depth = Depth.depth
+    let depth (T ((module Base), t)) = Base.depth t
   end
 end

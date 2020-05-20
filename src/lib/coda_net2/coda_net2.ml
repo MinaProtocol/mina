@@ -1483,6 +1483,9 @@ let%test_module "coda network tests" =
       in
       Async.Thread_safe.block_on_async_exn (fun () -> test_def)
 
+    (* NOTE: these tests are not relevant in the current libp2p setup
+             due to how validation is implemented (see #4796)
+
     let unwrap_eof = function
       | `Eof ->
           failwith "unexpected EOF"
@@ -1566,4 +1569,5 @@ let%test_module "coda network tests" =
           end )
       in
       Async.Thread_safe.block_on_async_exn (fun () -> test_def)
+    *)
   end )

@@ -1,21 +1,7 @@
-[%%import
-"/src/config.mlh"]
-
 open Core_kernel
 open Currency
 open Signature_lib
 open Coda_base
-
-[%%inject
-"ledger_depth", ledger_depth]
-
-[%%inject
-"fake_accounts_target", fake_accounts_target]
-
-let _ =
-  if Base.Int.(fake_accounts_target > pow 2 ledger_depth) then
-    failwith "Genesis_ledger: fake_accounts_target >= 2**ledger_depth"
-
 module Intf = Intf
 
 module Private_accounts (Accounts : Intf.Private_accounts.S) = struct
@@ -61,18 +47,26 @@ module Balances (Balances : Intf.Named_balances_intf) = struct
   end)
 end
 
-module Make (Accounts : Intf.Accounts_intf) : Intf.S = struct
-  include Accounts
+module Make (Inputs : Intf.Ledger_input_intf) : Intf.S = struct
+  include Inputs
 
   (* TODO: #1488 compute this at compile time instead of lazily *)
   let t =
     let open Lazy.Let_syntax in
-    let%map accounts = accounts in
-    let ledger = Ledger.create_ephemeral () in
-    List.iter accounts ~f:(fun (_, account) ->
-        Ledger.create_new_account_exn ledger
-          (Account.identifier account)
-          account ) ;
+    let%map ledger, insert_accounts =
+      match directory with
+      | `Ephemeral ->
+          lazy (Ledger.create_ephemeral ~depth (), true)
+      | `New ->
+          lazy (Ledger.create ~depth (), true)
+      | `Path directory_name ->
+          lazy (Ledger.create ~directory_name ~depth (), false)
+    in
+    if insert_accounts then
+      List.iter (Lazy.force accounts) ~f:(fun (_, account) ->
+          Ledger.create_new_account_exn ledger
+            (Account.identifier account)
+            account ) ;
     ledger
 
   let find_account_record_exn ~f =
@@ -120,6 +114,8 @@ module Packed = struct
 
   let t ((module L) : t) = L.t
 
+  let depth ((module L) : t) = L.depth
+
   let accounts ((module L) : t) = L.accounts
 
   let find_account_record_exn ((module L) : t) = L.find_account_record_exn
@@ -138,6 +134,8 @@ end
 
 module Of_ledger (T : sig
   val t : Ledger.t Lazy.t
+
+  val depth : int
 end) : Intf.S = struct
   include T
 
@@ -178,8 +176,10 @@ let fetch_ledger, register_ledger =
   let register_ledger ((module Ledger : Intf.Named_accounts_intf) as l) =
     ledgers := Map.add_exn !ledgers ~key:Ledger.name ~data:l
   in
-  let fetch_ledger name = Map.find_exn !ledgers name in
+  let fetch_ledger name = Map.find !ledgers name in
   (fetch_ledger, register_ledger)
+
+let fetch_ledger_exn name = Option.value_exn (fetch_ledger name)
 
 module Register (Accounts : Intf.Named_accounts_intf) :
   Intf.Named_accounts_intf = struct
@@ -203,7 +203,15 @@ end))
 module Test = Register (Balances (Test_ledger))
 module Fuzz = Register (Balances (Fuzz_ledger))
 module Release = Register (Balances (Release_ledger))
-module Unit_test_ledger = Make (Test)
+
+module Unit_test_ledger = Make (struct
+  include Test
+
+  let directory = `Ephemeral
+
+  let depth =
+    Genesis_constants.Constraint_constants.for_unit_tests.ledger_depth
+end)
 
 let for_unit_tests : Packed.t = (module Unit_test_ledger)
 

@@ -89,6 +89,7 @@ let run_test () : unit Deferred.t =
   let pids = Child_processes.Termination.create_pid_table () in
   let consensus_constants =
     Consensus.Constants.create
+      ~constraint_constants:Genesis_constants.Constraint_constants.compiled
       ~protocol_constants:Genesis_constants.compiled.protocol
   in
   setup_time_offsets consensus_constants ;
@@ -215,8 +216,10 @@ let run_test () : unit Deferred.t =
              ~time_controller ~receipt_chain_database ~snark_work_fee
              ~consensus_local_state ~transaction_database
              ~external_transition_database ~work_reassignment_wait:420000
-             ~precomputed_values ())
-          ~precomputed_values
+             ~precomputed_values
+             ~constraint_constants:
+               Genesis_constants.Constraint_constants.compiled
+             ~proof_level:Genesis_constants.Proof_level.compiled ())
       in
       don't_wait_for
         (Strict_pipe.Reader.iter_without_pushback

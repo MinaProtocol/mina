@@ -3,6 +3,7 @@
 let Prelude = ../External/Prelude.dhall
 let Map = Prelude.Map
 
+let Docker = ./Docker.dhall
 let Size = ./Size.dhall
 
 let Shared =
@@ -25,6 +26,7 @@ let Config =
     let Typ = Shared.Type //\\
         { target : Size
         , depends_on : List Text
+        , docker : Docker.Config.Type
         }
     let upcast : Typ -> Shared.Type =
       \(c : Typ) -> Shared::{
@@ -46,6 +48,7 @@ let Result =
   { Type = Shared.Type //\\
     { agents : Optional (Map.Type Text Text)
     , depends_on : Optional (List Text)
+    , plugins : Map.Type Text Docker.Type
     }
   , default = Shared.default /\ {
       depends_on = None (List Text)
@@ -54,17 +57,19 @@ let Result =
 in
 
 let targetToAgent = \(target : Size) ->
-  merge { Large = [ { mapKey = "size", mapValue = "large" } ],
-          Small = [ { mapKey = "size", mapValue = "small" } ]
+  merge { Large = toMap { size = "large" },
+          Small = toMap { size = "small" }
         }
         target
 
 let build : Config.Type -> Result.Type = \(c : Config.Type) ->
-  Config.upcast c /\ {
+  Config.upcast c // {
     depends_on = if Prelude.List.null Text c.depends_on then None (List Text) else Some c.depends_on,
     agents =
       let agents = targetToAgent c.target in
-      if Prelude.List.null (Map.Entry Text Text) agents then None (Map.Type Text Text) else Some agents
+      if Prelude.List.null (Map.Entry Text Text) agents then None (Map.Type Text Text) else Some agents,
+    plugins =
+      toMap { `docker#v3.5.0` = Docker.build c.docker }
   }
 
 in {Config = Config, build = build} /\ Result

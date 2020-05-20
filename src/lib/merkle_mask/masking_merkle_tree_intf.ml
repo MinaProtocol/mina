@@ -1,7 +1,7 @@
 (* masking_merkle_tree_intf.ml *)
 (* the type of a Merkle tree mask associated with a parent Merkle tree *)
 module type S = sig
-  type t [@@deriving bin_io]
+  type t
 
   type unattached = t
 
@@ -28,7 +28,7 @@ module type S = sig
   module Addr = Location.Addr
 
   (** create a mask with no parent *)
-  val create : unit -> t
+  val create : depth:int -> unit -> t
 
   val get_uuid : t -> Uuid.t
 

@@ -5,7 +5,8 @@ open O1trace
 
 let run ~logger ~trust_system ~verifier ~network ~time_controller
     ~collected_transitions ~frontier ~network_transition_reader
-    ~producer_transition_reader ~clear_reader ~genesis_constants =
+    ~producer_transition_reader ~clear_reader ~constraint_constants
+    ~genesis_constants =
   let valid_transition_pipe_capacity = 30 in
   let valid_transition_reader, valid_transition_writer =
     Strict_pipe.create ~name:"valid transitions"
@@ -49,8 +50,8 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
   |> don't_wait_for ;
   let clean_up_catchup_scheduler = Ivar.create () in
   trace_recurring "processor" (fun () ->
-      Transition_handler.Processor.run ~logger ~genesis_constants
-        ~time_controller ~trust_system ~verifier ~frontier
+      Transition_handler.Processor.run ~logger ~constraint_constants
+        ~genesis_constants ~time_controller ~trust_system ~verifier ~frontier
         ~primary_transition_reader ~producer_transition_reader
         ~clean_up_catchup_scheduler ~catchup_job_writer
         ~catchup_breadcrumbs_reader ~catchup_breadcrumbs_writer

@@ -1,14 +1,18 @@
-type newBlock = {protocolState: string};
+let blockDirectory =
+  ([%bs.node __dirname] |> Belt.Option.getExn |> Filename.dirname)
+  ++ "/src/blocks/";
 
-external unsafeJSONToNewBlock: Js.Json.t => newBlock = "%identity";
+let files = blockDirectory |> Node.Fs.readdirSync;
 
-let files = Node.Fs.readdirSync("blocks");
-Array.iter(
-  _file => {
-    let fileContents = Node.Fs.readFileAsUtf8Sync("block.json");
-    let blockDataJson = Js.Json.parseExn(fileContents);
-    let newBlock = unsafeJSONToNewBlock(blockDataJson);
-    print_endline(newBlock.protocolState);
-  },
-  files,
-);
+let blocks =
+  Array.map(
+    file => {
+      let fileContents = Node.Fs.readFileAsUtf8Sync(blockDirectory ++ file);
+      let blockData = Js.Json.parseExn(fileContents);
+      let block = Types.NewBlock.unsafeJSONToNewBlock(blockData);
+      block.data.newBlock;
+    },
+    files,
+  );
+
+let results = blocks |> Metrics.calculateMetrics |> Challenges.calculatePoints;

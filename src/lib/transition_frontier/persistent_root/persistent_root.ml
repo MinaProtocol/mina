@@ -47,7 +47,8 @@ and Factory_type : sig
   type t =
     { directory: string
     ; logger: Logger.t
-    ; mutable instance: Instance_type.t option }
+    ; mutable instance: Instance_type.t option
+    ; ledger_depth: int }
 end =
   Factory_type
 
@@ -59,7 +60,7 @@ module Instance = struct
 
   let create factory =
     let snarked_ledger =
-      Ledger.Db.create
+      Ledger.Db.create ~depth:factory.ledger_depth
         ~directory_name:(Locations.snarked_ledger factory.directory)
         ()
     in
@@ -111,7 +112,8 @@ end
 
 type t = Factory_type.t
 
-let create ~logger ~directory = {directory; logger; instance= None}
+let create ~logger ~directory ~ledger_depth =
+  {directory; logger; instance= None; ledger_depth}
 
 let create_instance_exn t =
   assert (t.instance = None) ;

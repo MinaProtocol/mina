@@ -80,9 +80,8 @@ module Inner_curve = struct
   module Scalar = struct
     (* though we have bin_io, not versioned here; this type exists for Private_key.t,
        where it is versioned-asserted and its serialization tested
-       we make linter error a warning
      *)
-    type t = Mnt4.Fq.t [@@deriving bin_io, sexp]
+    type t = Mnt4.Fq.t [@@deriving bin_io_unversioned, sexp]
 
     type _unused = unit constraint t = Tock.Field.t
 

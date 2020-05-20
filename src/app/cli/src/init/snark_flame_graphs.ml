@@ -17,7 +17,13 @@ let main () =
   let logger = Logger.create () in
   let log main typ = Snarky.Checked.(exists typ >>= main) in
   let logs =
-    [ ("step", L_Tick.log (log (M.Step_base.main logger) Tick.Field.typ))
+    [ ( "step"
+      , L_Tick.log
+          (log
+             (M.Step_base.main ~logger ~proof_level:Full
+                ~constraint_constants:
+                  Genesis_constants.Constraint_constants.compiled)
+             Tick.Field.typ) )
     ; ("wrap", L_Tock.log (log W.main Crypto_params.Wrap_input.typ)) ]
   in
   List.iter logs ~f:(fun (name, log) ->
