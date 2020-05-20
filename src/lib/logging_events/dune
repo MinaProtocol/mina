@@ -1,0 +1,6 @@
+(library
+ (name logging_events)
+ (public_name logging_events)
+ (preprocess (pps ppx_coda ppx_version))
+ (inline_tests)
+ (libraries core_kernel))
