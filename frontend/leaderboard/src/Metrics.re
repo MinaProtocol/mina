@@ -135,6 +135,20 @@ let calculateTransactionsSentToAddress = (blocks, address) => {
   );
 };
 
+let filterBlocksByTimeWindow = (startTime, endTime, blocks) => {
+  let blocksList = Array.to_list(blocks);
+
+  let filteredBlocksList =
+    List.filter(
+      (block: Types.NewBlock.data) => {
+        endTime < block.protocolState.date
+        && block.protocolState.date > startTime
+      },
+      blocksList,
+    );
+  Array.of_list(filteredBlocksList);
+};
+
 let throwAwayValues = metric => {
   StringMap.map(_ => {()}, metric);
 };

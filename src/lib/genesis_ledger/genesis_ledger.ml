@@ -53,20 +53,20 @@ module Make (Inputs : Intf.Ledger_input_intf) : Intf.S = struct
   (* TODO: #1488 compute this at compile time instead of lazily *)
   let t =
     let open Lazy.Let_syntax in
-    let%map accounts = accounts in
-    let ledger =
+    let%map ledger, insert_accounts =
       match directory with
       | `Ephemeral ->
-          Ledger.create_ephemeral ~depth ()
+          lazy (Ledger.create_ephemeral ~depth (), true)
       | `New ->
-          Ledger.create ~depth ()
+          lazy (Ledger.create ~depth (), true)
       | `Path directory_name ->
-          Ledger.create ~directory_name ~depth ()
+          lazy (Ledger.create ~directory_name ~depth (), false)
     in
-    List.iter accounts ~f:(fun (_, account) ->
-        Ledger.create_new_account_exn ledger
-          (Account.identifier account)
-          account ) ;
+    if insert_accounts then
+      List.iter (Lazy.force accounts) ~f:(fun (_, account) ->
+          Ledger.create_new_account_exn ledger
+            (Account.identifier account)
+            account ) ;
     ledger
 
   let find_account_record_exn ~f =
@@ -176,8 +176,10 @@ let fetch_ledger, register_ledger =
   let register_ledger ((module Ledger : Intf.Named_accounts_intf) as l) =
     ledgers := Map.add_exn !ledgers ~key:Ledger.name ~data:l
   in
-  let fetch_ledger name = Map.find_exn !ledgers name in
+  let fetch_ledger name = Map.find !ledgers name in
   (fetch_ledger, register_ledger)
+
+let fetch_ledger_exn name = Option.value_exn (fetch_ledger name)
 
 module Register (Accounts : Intf.Named_accounts_intf) :
   Intf.Named_accounts_intf = struct
