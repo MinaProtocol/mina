@@ -106,7 +106,9 @@ let memo = Fn.compose Payload.memo payload
 
 let valid_until = Fn.compose Payload.valid_until payload
 
-let is_payment = Fn.compose Payload.is_payment payload
+let tag ({payload; _} : t) = Payload.tag payload
+
+let tag_string t = Transaction_union_tag.to_string (tag t)
 
 let to_input (payload : Payload.t) =
   Transaction_union_payload.(to_input (of_user_command_payload payload))
