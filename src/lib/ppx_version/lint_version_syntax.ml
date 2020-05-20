@@ -3,9 +3,13 @@
    - "deriving bin_io" and "deriving version" never appear in types defined inside functor bodies
    - otherwise, "bin_io" may appear in a "deriving" attribute only if "version" also appears in that extension
    - versioned types only appear in versioned type definitions
+   - versioned type definitions appear only in %%versioned... extensions
+   - packaged modules, like "(module Foo)", may not be stable-versioned (but allowed inside %%versioned for
+       legitimate uses)
    - the constructs "include Stable.Latest" and "include Stable.Vn" are prohibited
    - uses of Binable.Of... and Bin_prot.Utils.Make_binable functors are always in stable-versioned modules,
        and always as an argument to "include"
+   - restrictions are not enforced in inline tests and inline test modules
 *)
 
 open Core_kernel
@@ -105,6 +109,8 @@ let is_versioned_module_inc_decl inc_decl =
 let versioned_in_functor_error loc =
   (loc, "Cannot use versioned extension within a functor body")
 
+let include_stable_latest_error loc = (loc, "Cannot include Stable.Latest")
+
 type accumulator =
   { in_functor: bool
   ; in_include: bool
@@ -132,6 +138,13 @@ let is_version_module vn =
   && String.for_all (String.sub vn ~pos:1 ~len:(len - 1)) ~f:Char.is_digit
 
 let is_stable_prefix = is_longident_with_id "Stable"
+
+let is_stable_latest_inc_decl inc_decl =
+  match inc_decl.pincl_mod.pmod_desc with
+  | Pmod_ident {txt= Ldot (Lident "Stable", "Latest"); _} ->
+      true
+  | _ ->
+      false
 
 let is_jane_street_prefix prefix =
   match Longident.flatten_exn prefix with
@@ -164,16 +177,21 @@ let is_versioned_module_ident id =
   | _ ->
       false
 
-let is_versioned_type_lident = function
-  | Ldot (Ldot (prefix, vn), "t")
+let is_versioned_module_lident = function
+  | Ldot (prefix, vn)
     when is_version_module vn
          && (not @@ is_jane_street_prefix prefix)
          && is_stable_prefix prefix ->
       true
+  | _ ->
+      false
+
+let is_versioned_type_lident = function
+  | Ldot (Ldot (prefix, vn), "t")
+    when is_versioned_module_lident (Ldot (prefix, vn)) ->
+      true
   | Ldot (Ldot (Ldot (prefix, vn), "T"), "t")
-    when is_version_module vn
-         && (not @@ is_jane_street_prefix prefix)
-         && is_stable_prefix prefix ->
+    when is_versioned_module_lident (Ldot (prefix, vn)) ->
       (* this case goes away when all versioned types use %%versioned *)
       true
   | _ ->
@@ -193,7 +211,7 @@ and get_core_type_versioned_type_misuses core_type =
       if is_versioned_type_lident lident.txt then
         let err =
           ( lident.loc
-          , "Versioned type used in a non-versioned type declaration" )
+          , "Versioned type used outside a versioned type declaration" )
         in
         err :: core_type_errors
       else core_type_errors
@@ -289,6 +307,25 @@ let in_stable_versioned_module module_path =
 let lint_ast =
   object (self)
     inherit [accumulator] Ast_traverse.fold as super
+
+    method! expression expr acc =
+      match expr.pexp_desc with
+      | Pexp_extension (_, PTyp core_type) ->
+          (* misuses like [%bin_type_class: Foo.Stable.V1.t] *)
+          let errs = get_core_type_versioned_type_misuses core_type in
+          acc_with_accum_errors acc errs
+      | Pexp_pack mod_expr -> (
+        (* misuses like (module Foo.Stable.V1) *)
+        match mod_expr.pmod_desc with
+        | Pmod_ident id
+          when (not acc.in_versioned_ext) && is_versioned_module_lident id.txt
+          ->
+            let err = (id.loc, "Versioned module cannot be packaged") in
+            acc_with_accum_errors acc [err]
+        | _ ->
+            acc )
+      | _ ->
+          super#expression expr acc
 
     method! module_expr expr acc =
       let acc' =
@@ -445,11 +482,17 @@ let lint_ast =
           in
           {acc' with in_versioned_ext= false}
       | Pstr_extension ((name, _payload), _attrs)
-        when String.equal name.txt "test_module" ->
+        when List.mem
+               ["test"; "test_unit"; "test_module"]
+               name.txt ~equal:String.equal ->
           (* don't check for errors in test code *)
           acc
+      | Pstr_include inc_decl when is_stable_latest_inc_decl inc_decl ->
+          acc_with_errors acc [include_stable_latest_error str.pstr_loc]
       | Pstr_include inc_decl when is_versioned_module_inc_decl inc_decl ->
           acc_with_errors acc [include_versioned_module_error str.pstr_loc]
+      | Pstr_include inc_decl when is_stable_latest_inc_decl inc_decl ->
+          acc_with_errors acc [include_stable_latest_error str.pstr_loc]
       | Pstr_include inc_decl ->
           let acc' =
             self#module_expr inc_decl.pincl_mod {acc with in_include= true}

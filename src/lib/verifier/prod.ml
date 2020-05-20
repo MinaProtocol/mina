@@ -124,7 +124,8 @@ module Worker = struct
         ; verify_transaction_snark=
             f
               ( [%bin_type_class:
-                  Transaction_snark.Stable.V1.t * Sok_message.Stable.V1.t]
+                  Transaction_snark.Stable.Latest.t
+                  * Sok_message.Stable.Latest.t]
               , Bool.bin_t
               , verify_transaction_snark ) }
 

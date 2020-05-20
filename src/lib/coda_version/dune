@@ -1,6 +1,6 @@
 (library
  (name coda_version)
- (preprocess (pps ppx_coda))
+ (preprocess (pps ppx_version))
  (public_name coda_version))
 
 (rule

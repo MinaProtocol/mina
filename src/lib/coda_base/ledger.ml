@@ -4,12 +4,8 @@ open Signature_lib
 open Merkle_ledger
 
 module Ledger_inner = struct
-  module Depth = struct
-    let depth = Coda_compile_config.ledger_depth
-  end
-
   module Location_at_depth : Merkle_ledger.Location_intf.S =
-    Merkle_ledger.Location.Make (Depth)
+    Merkle_ledger.Location.T
 
   module Location_binable = struct
     module Arg = struct
@@ -99,7 +95,6 @@ module Ledger_inner = struct
     module Balance = Currency.Balance
     module Account = Account.Stable.Latest
     module Hash = Hash.Stable.Latest
-    module Depth = Depth
     module Kvdb = Kvdb
     module Location = Location_at_depth
     module Location_binable = Location_binable
