@@ -1,7 +1,7 @@
 -- Autogenerates any pre-reqs for monorepo triage execution
 -- Keep these rules lean! They have to run unconditionally.
 
-let Command = ./Command/Dsl.dhall
+let Command = ./Command/Base.dhall
 let Docker = ./Command/Docker/Type.dhall
 let JobSpec = ./Pipeline/JobSpec.dhall
 let Pipeline = ./Pipeline/Dsl.dhall

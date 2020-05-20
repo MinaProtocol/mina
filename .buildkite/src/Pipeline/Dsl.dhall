@@ -6,7 +6,7 @@
 let Prelude = ../External/Prelude.dhall
 let List/map = Prelude.List.map
 
-let Command = ../Command/Dsl.dhall
+let Command = ../Command/Base.dhall
 let JobSpec = ./JobSpec.dhall
 let Pipeline/Type = ./Type.dhall
 

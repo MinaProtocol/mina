@@ -1,4 +1,4 @@
-let Command = ../Command/Dsl.dhall
+let Command = ../Command/Base.dhall
 in
 
 -- TODO: Union type with block steps

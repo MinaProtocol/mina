@@ -1,6 +1,6 @@
 let Prelude = ./External/Prelude.dhall
 
-let Command = ./Command/Dsl.dhall
+let Command = ./Command/Base.dhall
 let Docker = ./Command/Docker/Type.dhall
 let JobSpec = ./Pipeline/JobSpec.dhall
 let Pipeline = ./Pipeline/Dsl.dhall

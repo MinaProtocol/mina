@@ -1,5 +1,5 @@
 let Pipeline = ../../Pipeline/Dsl.dhall
-let Command = ../../Command/Dsl.dhall
+let Command = ../../Command/Base.dhall
 let Docker = ../../Command/Docker/Type.dhall
 let Size = ../../Command/Size.dhall
 
