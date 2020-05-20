@@ -27,6 +27,8 @@ module Fee : sig
 
   include Codable.S with type t := t
 
+  val scale : t -> int -> t option
+
   (* TODO: Get rid of signed fee, use signed amount *)
   [%%ifdef consensus_mechanism]
 
