@@ -164,12 +164,12 @@ let calculateAllUsers = metrics => {
 // Combines two maps of users to points and returns one map of users to points
 let sumPointsMaps = maps => {
   List.fold_left(
-    StringMap.merge((key, value, secondValue) => {
-      switch (key, value, secondValue) {
-      | (_, Some(value), Some(secondValue)) => Some(value + secondValue)
-      | (_, Some(value), None)
-      | (_, None, Some(value)) => Some(value)
-      | (_, None, None) => None
+    StringMap.merge((_, value, secondValue) => {
+      switch (value, secondValue) {
+      | (Some(value), Some(secondValue)) => Some(value + secondValue)
+      | (Some(value), None)
+      | (None, Some(value)) => Some(value)
+      | (None, None) => None
       }
     }),
     StringMap.empty,
