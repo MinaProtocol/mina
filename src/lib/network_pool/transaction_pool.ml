@@ -32,6 +32,76 @@ module type Transition_frontier_intf = sig
   val best_tip_diff_pipe : t -> best_tip_diff Broadcast_pipe.Reader.t
 end
 
+(* versioned type, outside of functors *)
+module Diff_versioned = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t = User_command.Stable.V1.t list [@@deriving sexp, yojson]
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  type t = User_command.t list [@@deriving sexp, yojson]
+
+  module Diff_error = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t =
+          | Insufficient_replace_fee
+          | Invalid_signature
+          | Duplicate
+          | Sender_account_does_not_exist
+          | Insufficient_amount_for_account_creation
+          | Delegate_not_found
+          | Invalid_nonce
+          | Insufficient_funds
+          | Insufficient_fee
+          | Overflow
+        [@@deriving sexp, yojson]
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    type t = Stable.Latest.t =
+      | Insufficient_replace_fee
+      | Invalid_signature
+      | Duplicate
+      | Sender_account_does_not_exist
+      | Insufficient_amount_for_account_creation
+      | Delegate_not_found
+      | Invalid_nonce
+      | Insufficient_funds
+      | Insufficient_fee
+      | Overflow
+    [@@deriving sexp, yojson]
+  end
+
+  module Rejected = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = (User_command.Stable.V1.t * Diff_error.Stable.V1.t) list
+        [@@deriving sexp, yojson]
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    type t = Stable.Latest.t [@@deriving sexp, yojson]
+  end
+
+  type rejected = Rejected.t [@@deriving sexp, yojson]
+
+  let summary t =
+    Printf.sprintf "Transaction diff of length %d" (List.length t)
+
+  let is_empty t = List.is_empty t
+end
+
 module type S = sig
   open Intf
 
@@ -42,18 +112,22 @@ module type S = sig
       Transaction_resource_pool_intf
       with type transition_frontier := transition_frontier
 
-    module Diff : Transaction_pool_diff_intf with type resource_pool := t
+    module Diff :
+      Transaction_pool_diff_intf
+      with type resource_pool := t
+       and type Diff_error.t = Diff_versioned.Diff_error.t
+       and type Rejected.t = Diff_versioned.Rejected.t
   end
 
   include
     Network_pool_base_intf
     with type resource_pool := Resource_pool.t
      and type transition_frontier := transition_frontier
-     and type resource_pool_diff := Resource_pool.Diff.t
+     and type resource_pool_diff := Diff_versioned.t
      and type config := Resource_pool.Config.t
      and type transition_frontier_diff :=
                 Resource_pool.transition_frontier_diff
-     and type rejected_diff := Resource_pool.Diff.rejected
+     and type rejected_diff := Diff_versioned.rejected
 end
 
 (* Functor over user command, base ledger and transaction validator for
@@ -68,8 +142,6 @@ module Make0 (Base_ledger : sig
   val location_of_account : t -> Account_id.t -> Location.t option
 
   val get : t -> Location.t -> Account.t option
-end) (Max_size : sig
-  val pool_max_size : int
 end) (Staged_ledger : sig
   type t
 
@@ -81,13 +153,19 @@ struct
   module Breadcrumb = Transition_frontier.Breadcrumb
 
   module Resource_pool = struct
-    include Max_size
-
     type transition_frontier_diff =
       Transition_frontier.best_tip_diff * Base_ledger.t
 
     module Config = struct
-      type t = {trust_system: Trust_system.t sexp_opaque}
+      type t =
+        { trust_system: Trust_system.t sexp_opaque
+        ; pool_max_size: int
+              (* note this value needs to be mostly the same across gossipping nodes, so
+      nodes with larger pools don't send nodes with smaller pools lots of
+      low fee transactions the smaller-pooled nodes consider useless and get
+      themselves banned.
+   *)
+        }
       [@@deriving sexp_of, make]
     end
 
@@ -150,9 +228,10 @@ struct
       |> Breadcrumb.staged_ledger |> Staged_ledger.ledger
 
     let drop_until_below_max_size :
-           Indexed_pool.t
+           pool_max_size:int
+        -> Indexed_pool.t
         -> Indexed_pool.t * User_command.With_valid_signature.t Sequence.t =
-     fun pool ->
+     fun ~pool_max_size pool ->
       let rec go pool' dropped =
         if Indexed_pool.size pool' > pool_max_size then (
           let dropped', pool'' = Indexed_pool.remove_lowest_fee pool' in
@@ -162,7 +241,7 @@ struct
       in
       go pool @@ Sequence.empty
 
-    let has_sufficient_fee pool cmd : bool =
+    let has_sufficient_fee ~pool_max_size pool cmd : bool =
       match Indexed_pool.min_fee pool with
       | None ->
           true
@@ -190,6 +269,7 @@ struct
          versa so those hashtables remain in sync with reality.
       *)
       t.best_tip_ledger <- Some best_tip_ledger ;
+      let pool_max_size = t.config.pool_max_size in
       Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
         ~metadata:
           [ ( "removed"
@@ -219,7 +299,8 @@ struct
                   ~data:time_added ) ;
             let pool', dropped_seq =
               drop_until_below_max_size
-              @@ Indexed_pool.add_from_backtrack pool cmd
+                (Indexed_pool.add_from_backtrack pool cmd)
+                ~pool_max_size
             in
             (pool', Sequence.append dropped_so_far dropped_seq) )
       in
@@ -340,7 +421,11 @@ struct
             remove_cmd ()
           in
           if not (Hashtbl.mem t.locally_generated_committed cmd) then
-            if not (has_sufficient_fee t.pool (User_command.forget_check cmd))
+            if
+              not
+                (has_sufficient_fee t.pool
+                   (User_command.forget_check cmd)
+                   ~pool_max_size)
             then (
               Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
                 "Not re-adding locally generated command $cmd to pool, \
@@ -491,39 +576,12 @@ struct
       t
 
     module Diff = struct
-      [%%versioned
-      module Stable = struct
-        module V1 = struct
-          type t = User_command.Stable.V1.t list [@@deriving sexp, yojson]
-
-          let to_latest = Fn.id
-        end
-      end]
-
       type t = User_command.t list [@@deriving sexp, yojson]
 
+      type _unused = unit constraint t = Diff_versioned.t
+
       module Diff_error = struct
-        [%%versioned
-        module Stable = struct
-          module V1 = struct
-            type t =
-              | Insufficient_replace_fee
-              | Invalid_signature
-              | Duplicate
-              | Sender_account_does_not_exist
-              | Insufficient_amount_for_account_creation
-              | Delegate_not_found
-              | Invalid_nonce
-              | Insufficient_funds
-              | Insufficient_fee
-              | Overflow
-            [@@deriving sexp, yojson]
-
-            let to_latest = Fn.id
-          end
-        end]
-
-        type t = Stable.Latest.t =
+        type t = Diff_versioned.Diff_error.t =
           | Insufficient_replace_fee
           | Invalid_signature
           | Duplicate
@@ -538,17 +596,9 @@ struct
       end
 
       module Rejected = struct
-        [%%versioned
-        module Stable = struct
-          module V1 = struct
-            type t = (User_command.Stable.V1.t * Diff_error.Stable.V1.t) list
-            [@@deriving sexp, yojson]
+        type t = (User_command.t * Diff_error.t) list [@@deriving sexp, yojson]
 
-            let to_latest = Fn.id
-          end
-        end]
-
-        type t = Stable.Latest.t [@@deriving sexp, yojson]
+        type _unused = unit constraint t = Diff_versioned.Rejected.t
       end
 
       type rejected = Rejected.t [@@deriving sexp, yojson]
@@ -556,12 +606,13 @@ struct
       let summary t =
         Printf.sprintf "Transaction diff of length %d" (List.length t)
 
-      let is_empty = List.is_empty
+      let is_empty t = List.is_empty t
 
       let apply t env =
         let txs = Envelope.Incoming.data env in
         let sender = Envelope.Incoming.sender env in
         let is_sender_local = Envelope.Sender.(equal sender Local) in
+        let pool_max_size = t.config.pool_max_size in
         match t.best_tip_ledger with
         | None ->
             Deferred.Or_error.error_string
@@ -600,7 +651,9 @@ struct
                           (Trust_system.Actions.Sent_old_gossip, None)
                       in
                       go txs'' pool
-                        (accepted, (tx, Diff_error.Duplicate) :: rejected)
+                        ( accepted
+                        , (tx, Diff_versioned.Diff_error.Duplicate) :: rejected
+                        )
                     else
                       let account ledger account_id =
                         Option.bind
@@ -618,10 +671,12 @@ struct
                           in
                           go txs'' pool
                             ( accepted
-                            , (tx, Diff_error.Sender_account_does_not_exist)
+                            , ( tx
+                              , Diff_versioned.Diff_error
+                                .Sender_account_does_not_exist )
                               :: rejected )
                       | Some sender_account ->
-                          if has_sufficient_fee pool tx then (
+                          if has_sufficient_fee pool tx ~pool_max_size then (
                             let validate_receiver =
                               match
                                 account ledger (User_command.receiver tx)
@@ -663,7 +718,7 @@ struct
                             let of_indexed_pool_error = function
                               | `Invalid_nonce (`Between (low, hi), nonce) ->
                                   let nonce_json = Account.Nonce.to_yojson in
-                                  ( Diff_error.Invalid_nonce
+                                  ( Diff_versioned.Diff_error.Invalid_nonce
                                   , [ ( "between"
                                       , `Assoc
                                           [ ("low", nonce_json low)
@@ -671,7 +726,7 @@ struct
                                     ; ("nonce", nonce_json nonce) ] )
                               | `Invalid_nonce (`Expected enonce, nonce) ->
                                   let nonce_json = Account.Nonce.to_yojson in
-                                  ( Diff_error.Invalid_nonce
+                                  ( Diff_versioned.Diff_error.Invalid_nonce
                                   , [ ("expected_nonce", nonce_json enonce)
                                     ; ("nonce", nonce_json nonce) ] )
                               | `Insufficient_funds (`Balance bal, amt) ->
@@ -727,6 +782,7 @@ struct
                                     ~data:(Time.now ()) ;
                                 let pool'', dropped_for_size =
                                   drop_until_below_max_size pool'
+                                    ~pool_max_size
                                 in
                                 let seq_cmd_to_yojson seq =
                                   `List
@@ -786,10 +842,10 @@ struct
                                 (`Insufficient_replace_fee
                                   (`Replace_fee rfee, fee)) ->
                                 (* We can't punish peers for this, since an
-                                   attacker can simultaneously send different
-                                   transactions at the same nonce to different
-                                   nodes, which will then naturally gossip them.
-                                *)
+                             attacker can simultaneously send different
+                             transactions at the same nonce to different
+                             nodes, which will then naturally gossip them.
+                          *)
                                 let f_log =
                                   if is_sender_local then Logger.error
                                   else Logger.debug
@@ -804,7 +860,9 @@ struct
                                     ; ("fee", Currency.Fee.to_yojson fee) ] ;
                                 go txs'' pool
                                   ( accepted
-                                  , (tx, Diff_error.Insufficient_replace_fee)
+                                  , ( tx
+                                    , Diff_versioned.Diff_error
+                                      .Insufficient_replace_fee )
                                     :: rejected )
                             | Error err ->
                                 let diff_err, err_extra =
@@ -818,7 +876,8 @@ struct
                                     ~metadata:
                                       [ ("cmd", User_command.to_yojson tx)
                                       ; ( "reason"
-                                        , Diff_error.to_yojson diff_err )
+                                        , Diff_versioned.Diff_error.to_yojson
+                                            diff_err )
                                       ; ("error_extra", `Assoc err_extra) ] ;
                                 let%bind _ =
                                   trust_record
@@ -845,8 +904,8 @@ struct
                             in
                             go txs'' pool
                               ( accepted
-                              , (tx, Diff_error.Insufficient_fee) :: rejected
-                              ) ) )
+                              , (tx, Diff_versioned.Diff_error.Insufficient_fee)
+                                :: rejected ) ) )
             in
             go txs t.pool ([], [])
 
@@ -907,22 +966,7 @@ end)
 (Transition_frontier : Transition_frontier_intf
                        with type staged_ledger := Staged_ledger.t) :
   S with type transition_frontier := Transition_frontier.t =
-  Make0
-    (Coda_base.Ledger)
-    (struct
-      (* note this value needs to be mostly the same across gossipping nodes, so
-       nodes with larger pools don't send nodes with smaller pools lots of
-       low fee transactions the smaller-pooled nodes consider useless and get
-       themselves banned.
-      *)
-      [%%import
-      "../../config.mlh"]
-
-      [%%inject
-      "pool_max_size", pool_max_size]
-    end)
-    (Staged_ledger)
-    (Transition_frontier)
+  Make0 (Coda_base.Ledger) (Staged_ledger) (Transition_frontier)
 
 (* TODO: defunctor or remove monkey patching (#3731) *)
 include Make
@@ -1000,13 +1044,9 @@ let%test_module _ =
     end
 
     module Test =
-      Make0
-        (Mock_base_ledger)
-        (struct
-          let pool_max_size = 25
-        end)
-        (Mock_staged_ledger)
-        (Mock_transition_frontier)
+      Make0 (Mock_base_ledger) (Mock_staged_ledger) (Mock_transition_frontier)
+
+    let pool_max_size = 25
 
     let _ =
       Core.Backtrace.elide := false ;
@@ -1047,7 +1087,9 @@ let%test_module _ =
       in
       let trust_system = Trust_system.null () in
       let logger = Logger.null () in
-      let config = Test.Resource_pool.make_config ~trust_system in
+      let config =
+        Test.Resource_pool.make_config ~trust_system ~pool_max_size
+      in
       let pool =
         Test.create ~config ~logger ~incoming_diffs:incoming_diff_r
           ~local_diffs:local_diff_r ~frontier_broadcast_pipe:tf_pipe_r
@@ -1278,7 +1320,9 @@ let%test_module _ =
           in
           let logger = Logger.null () in
           let trust_system = Trust_system.null () in
-          let config = Test.Resource_pool.make_config ~trust_system in
+          let config =
+            Test.Resource_pool.make_config ~trust_system ~pool_max_size
+          in
           let pool =
             Test.create ~config ~logger ~incoming_diffs:incoming_diff_r
               ~local_diffs:local_diff_r
@@ -1414,10 +1458,7 @@ let%test_module _ =
       Quickcheck.test ~trials:500
         (let open Quickcheck.Generator.Let_syntax in
         let%bind init_ledger_state = Ledger.gen_initial_ledger_state in
-        let%bind cmds_count =
-          Int.gen_incl Test.Resource_pool.pool_max_size
-            (Test.Resource_pool.pool_max_size * 2)
-        in
+        let%bind cmds_count = Int.gen_incl pool_max_size (pool_max_size * 2) in
         let%bind cmds =
           User_command.Gen.sequence ~sign_type:`Real ~length:cmds_count
             init_ledger_state
@@ -1454,16 +1495,13 @@ let%test_module _ =
                   ; removed_user_commands= []
                   ; reorg_best_tip= true }
               in
-              let cmds1, cmds2 =
-                List.split_n cmds Test.Resource_pool.pool_max_size
-              in
+              let cmds1, cmds2 = List.split_n cmds pool_max_size in
               let%bind apply_res1 =
                 Test.Resource_pool.Diff.unsafe_apply pool
                   (Envelope.Incoming.local cmds1)
               in
               assert (Result.is_ok apply_res1) ;
-              [%test_eq: int] Test.Resource_pool.pool_max_size
-                (Indexed_pool.size pool.pool) ;
+              [%test_eq: int] pool_max_size (Indexed_pool.size pool.pool) ;
               let%map _apply_res2 =
                 Test.Resource_pool.Diff.unsafe_apply pool
                   (Envelope.Incoming.local cmds2)
@@ -1474,9 +1512,7 @@ let%test_module _ =
                  commands have higher fee than the lowest one already in the
                  pool.
               *)
-              assert (
-                Indexed_pool.size pool.pool <= Test.Resource_pool.pool_max_size
-              ) ) )
+              assert (Indexed_pool.size pool.pool <= pool_max_size) ) )
 
     let assert_rebroadcastable pool cmds =
       let normalize = List.sort ~compare:User_command.compare in

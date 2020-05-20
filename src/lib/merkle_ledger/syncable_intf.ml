@@ -11,7 +11,7 @@ module type S = sig
 
   type path
 
-  val depth : int
+  val depth : t -> int
 
   val num_accounts : t -> int
 

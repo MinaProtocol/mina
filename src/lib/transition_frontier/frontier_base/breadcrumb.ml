@@ -223,7 +223,7 @@ module For_tests = struct
         in
         User_command.sign sender_keypair payload )
 
-  let gen ?(logger = Logger.null ()) ?verifier
+  let gen ?(logger = Logger.null ()) ~proof_level ?verifier
       ?(trust_system = Trust_system.null ()) ~accounts_with_secret_keys :
       (t -> t Deferred.t) Quickcheck.Generator.t =
     let open Quickcheck.Let_syntax in
@@ -233,7 +233,7 @@ module For_tests = struct
           verifier
       | None ->
           Async.Thread_safe.block_on_async_exn (fun () ->
-              Verifier.create ~logger ~conf_dir:None
+              Verifier.create ~logger ~proof_level ~conf_dir:None
                 ~pids:(Child_processes.Termination.create_pid_table ()) )
     in
     let gen_slot_advancement = Int.gen_incl 1 10 in
@@ -321,8 +321,9 @@ module For_tests = struct
       let protocol_state =
         Protocol_state.create_value ~genesis_state_hash ~previous_state_hash
           ~blockchain_state:next_blockchain_state ~consensus_state
+          ~constants:(Protocol_state.constants previous_protocol_state)
       in
-      Fork_id.(set_current empty) ;
+      Protocol_version.(set_current zero) ;
       let next_external_transition =
         External_transition.For_tests.create ~protocol_state
           ~protocol_state_proof:Proof.dummy
@@ -356,19 +357,22 @@ module For_tests = struct
       | Error (`Invalid_staged_ledger_hash e) ->
           failwithf !"Invalid staged ledger hash: %{sexp:Error.t}" e ()
 
-  let gen_non_deferred ?logger ?verifier ?trust_system
+  let gen_non_deferred ?logger ~proof_level ?verifier ?trust_system
       ~accounts_with_secret_keys =
     let open Quickcheck.Generator.Let_syntax in
     let%map make_deferred =
-      gen ?logger ?verifier ?trust_system ~accounts_with_secret_keys
+      gen ?logger ?verifier ~proof_level ?trust_system
+        ~accounts_with_secret_keys
     in
     fun x -> Async.Thread_safe.block_on_async_exn (fun () -> make_deferred x)
 
-  let gen_seq ?logger ?verifier ?trust_system ~accounts_with_secret_keys n =
+  let gen_seq ?logger ~proof_level ?verifier ?trust_system
+      ~accounts_with_secret_keys n =
     let open Quickcheck.Generator.Let_syntax in
     let gen_list =
       List.gen_with_length n
-        (gen ?logger ?verifier ?trust_system ~accounts_with_secret_keys)
+        (gen ?logger ~proof_level ?verifier ?trust_system
+           ~accounts_with_secret_keys)
     in
     let%map breadcrumbs_constructors = gen_list in
     fun root ->

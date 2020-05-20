@@ -71,7 +71,16 @@ let%test_module "transaction_status" =
 
     let logger = Logger.null ()
 
+    let proof_level = Genesis_constants.Proof_level.Check
+
+    let constraint_constants =
+      Genesis_constants.Constraint_constants.for_unit_tests
+
+    let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
+
     let trust_system = Trust_system.null ()
+
+    let pool_max_size = Genesis_constants.compiled.txpool_max_size
 
     let key_gen =
       let open Quickcheck.Generator in
@@ -85,7 +94,8 @@ let%test_module "transaction_status" =
           (Option.value_exn random_key_opt) )
 
     let gen_frontier =
-      Transition_frontier.For_tests.gen ~logger ~trust_system ~max_length
+      Transition_frontier.For_tests.gen ~logger ~proof_level
+        ~constraint_constants ~precomputed_values ~trust_system ~max_length
         ~size:frontier_size ()
 
     let gen_user_command =
@@ -100,7 +110,9 @@ let%test_module "transaction_status" =
       let local_reader, local_writer =
         Strict_pipe.(create ~name:"transaction_status local diff" Synchronous)
       in
-      let config = Transaction_pool.Resource_pool.make_config ~trust_system in
+      let config =
+        Transaction_pool.Resource_pool.make_config ~trust_system ~pool_max_size
+      in
       let transaction_pool =
         Transaction_pool.create ~config ~incoming_diffs:pool_reader ~logger
           ~local_diffs:local_reader ~frontier_broadcast_pipe

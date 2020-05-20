@@ -43,8 +43,8 @@ let balance : Currency.Balance.t -> Lite_base.Account.Balance.t =
 let voting_for : Coda_base.State_hash.t -> Lite_base.State_hash.t =
   Fn.compose Lite_base.State_hash.t_of_sexp Coda_base.State_hash.sexp_of_t
 
-let time : Coda_base.Block_time.t -> Lite_base.Block_time.t =
-  Fn.compose Lite_base.Block_time.t_of_sexp Coda_base.Block_time.sexp_of_t
+let time : Block_time.t -> Lite_base.Block_time.t =
+  Fn.compose Lite_base.Block_time.t_of_sexp Block_time.sexp_of_t
 
 let account (account : Coda_base.Account.value) : Lite_base.Account.t =
   { public_key= public_key account.public_key

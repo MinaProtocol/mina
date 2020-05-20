@@ -16,6 +16,9 @@ module type Test_intf = sig
      and type account := Account.t
      and type root_hash := Hash.t
      and type hash := Hash.t
+     and type key := Key.t
+     and type token_id := Token_id.t
+     and type token_id_set := Token_id.Set.t
      and type account_id := Account_id.t
      and type account_id_set := Account_id.Set.t
 
@@ -27,6 +30,9 @@ module type Test_intf = sig
      and type location := Location.t
      and type hash := Hash.t
      and type parent := Base.t
+     and type key := Key.t
+     and type token_id := Token_id.t
+     and type token_id_set := Token_id.Set.t
      and type account_id := Account_id.t
      and type account_id_set := Account_id.Set.t
 
@@ -40,6 +46,9 @@ module type Test_intf = sig
      and type unattached_mask := Mask.t
      and type attached_mask := Mask.Attached.t
      and type t := Base.t
+     and type key := Key.t
+     and type token_id := Token_id.t
+     and type token_id_set := Token_id.Set.t
      and type account_id := Account_id.t
      and type account_id_set := Account_id.Set.t
 
@@ -729,15 +738,33 @@ end
 module Make_maskable_and_mask_with_depth (Depth : Depth_S) = struct
   let depth = Depth.depth
 
-  module Location : Merkle_ledger.Location_intf.S =
-    Merkle_ledger.Location.Make (Depth)
+  module Location : Merkle_ledger.Location_intf.S = Merkle_ledger.Location.T
+
+  module Location_binable = struct
+    module Arg = struct
+      type t = Location.t =
+        | Generic of Merkle_ledger.Location.Bigstring.Stable.Latest.t
+        | Account of Location.Addr.Stable.Latest.t
+        | Hash of Location.Addr.Stable.Latest.t
+      [@@deriving bin_io_unversioned, hash, sexp, compare]
+    end
+
+    type t = Arg.t =
+      | Generic of Merkle_ledger.Location.Bigstring.t
+      | Account of Location.Addr.t
+      | Hash of Location.Addr.t
+    [@@deriving hash, sexp, compare]
+
+    include Hashable.Make_binable (Arg) [@@deriving
+                                          sexp, compare, hash, yojson]
+  end
 
   module Inputs = struct
     include Test_stubs.Base_inputs
     module Location = Location
+    module Location_binable = Location_binable
     module Kvdb = In_memory_kvdb
     module Storage_locations = Storage_locations
-    module Depth = Depth
   end
 
   (* underlying Merkle tree *)
@@ -748,6 +775,9 @@ module Make_maskable_and_mask_with_depth (Depth : Depth_S) = struct
      and type account := Account.t
      and type root_hash := Hash.t
      and type hash := Hash.t
+     and type key := Key.t
+     and type token_id := Token_id.t
+     and type token_id_set := Token_id.Set.t
      and type account_id := Account_id.t
      and type account_id_set := Account_id.Set.t =
     Database.Make (Inputs)
@@ -762,6 +792,9 @@ module Make_maskable_and_mask_with_depth (Depth : Depth_S) = struct
      and module Attached.Addr = Location.Addr
     with type account := Account.t
      and type location := Location.t
+     and type key := Key.t
+     and type token_id := Token_id.t
+     and type token_id_set := Token_id.Set.t
      and type account_id := Account_id.t
      and type account_id_set := Account_id.Set.t
      and type hash := Hash.t
@@ -776,6 +809,9 @@ module Make_maskable_and_mask_with_depth (Depth : Depth_S) = struct
     with module Addr = Location.Addr
      and module Location = Location
     with type account := Account.t
+     and type key := Key.t
+     and type token_id := Token_id.t
+     and type token_id_set := Token_id.Set.t
      and type account_id := Account_id.t
      and type account_id_set := Account_id.Set.t
      and type root_hash := Hash.t
@@ -792,11 +828,11 @@ module Make_maskable_and_mask_with_depth (Depth : Depth_S) = struct
 
   (* test runner *)
   let with_instances f =
-    let db = Base_db.create () in
+    let db = Base_db.create ~depth:Depth.depth () in
     [%test_result: Int.t] ~message:"Base_db num accounts should start at zero"
       ~expect:0 (Base_db.num_accounts db) ;
     let maskable = Any_base.cast (module Base_db) db in
-    let mask = Mask.create () in
+    let mask = Mask.create ~depth:Depth.depth () in
     f maskable mask
 
   let with_chain f =
@@ -805,7 +841,7 @@ module Make_maskable_and_mask_with_depth (Depth : Depth_S) = struct
         let attached1_as_base =
           Any_base.cast (module Mask.Attached) attached1
         in
-        let mask2 = Mask.create () in
+        let mask2 = Mask.create ~depth:Depth.depth () in
         let attached2 = Maskable.register_mask attached1_as_base mask2 in
         f maskable ~mask:attached1 ~mask_as_base:attached1_as_base
           ~mask2:attached2 )

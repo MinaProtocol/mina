@@ -9,6 +9,7 @@
     snarky_taylor
     core_kernel
     coda_base
+    block_time
     with_hash
     test_genesis_ledger
     snark_params
@@ -25,7 +26,7 @@
     coda_metrics
     graphql_lib)
    (preprocessor_deps "../../config.mlh")
-   (preprocess (pps ppx_base ppx_coda -lint-version-syntax-warnings ppx_let ppx_assert ppx_deriving.std ppx_deriving_yojson ppx_sexp_conv ppx_bin_prot ppx_custom_printf ppx_inline_test ppx_optcomp ppx_snarky ppx_deriving_yojson ppx_fields_conv bisect_ppx -conditional))
+   (preprocess (pps ppx_base ppx_coda ppx_version ppx_let ppx_assert ppx_deriving.std ppx_deriving_yojson ppx_sexp_conv ppx_bin_prot ppx_custom_printf ppx_inline_test ppx_optcomp ppx_snarky ppx_deriving_yojson ppx_fields_conv bisect_ppx -conditional))
    (synopsis "Consensus mechanisms"))
 
 (executable
@@ -33,4 +34,4 @@
   (modules proof_of_stake_fuzzer)
   (libraries core_kernel signature_lib coda_state coda_transition consensus prover blockchain_snark)
   (preprocessor_deps "../../config.mlh")
-  (preprocess (pps ppx_coda ppx_jane)))
+  (preprocess (pps ppx_version ppx_jane)))

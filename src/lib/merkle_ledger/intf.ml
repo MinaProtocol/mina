@@ -8,6 +8,8 @@ module type Key = sig
       module V1 : sig
         type t [@@deriving sexp, bin_io]
       end
+
+      module Latest = V1
     end
     with type V1.t = t
 
@@ -22,6 +24,22 @@ end
 
 module type Token_id = sig
   type t [@@deriving sexp]
+
+  module Stable :
+    sig
+      module Latest : sig
+        type t [@@deriving bin_io]
+      end
+    end
+    with type Latest.t = t
+
+  val default : t
+
+  val next : t -> t
+
+  include Hashable.S_binable with type t := t
+
+  include Comparable.S_binable with type t := t
 end
 
 module type Account_id = sig
@@ -41,6 +59,8 @@ module type Account_id = sig
   val public_key : t -> key
 
   val token_id : t -> token_id
+
+  val create : key -> token_id -> t
 
   include Hashable.S_binable with type t := t
 

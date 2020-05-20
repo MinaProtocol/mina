@@ -42,10 +42,11 @@ let verification_key =
       key)
 
 module Doc = struct
-  let date =
+  let date ?(extra = "") s =
     sprintf
       !"%s (stringified Unix time - number of milliseconds since January 1, \
-        1970)"
+        1970)%s"
+      s extra
 
   let bin_prot =
     sprintf !"%s (base58-encoded janestreet/bin_prot serialization)"
@@ -82,6 +83,11 @@ module Reflection = struct
     let bool a x = id ~typ:bool a x
 
     let nn_string a x = id ~typ:(non_null string) a x
+
+    let nn_time a x =
+      reflect
+        (fun t -> Block_time.to_time t |> Time.to_string)
+        ~typ:(non_null string) a x
 
     let string a x = id ~typ:string a x
 
@@ -130,21 +136,73 @@ module Types = struct
                 "The transaction has either been snarked, reached finality \
                  through consensus or has been dropped" ]
 
+  let consensus_time =
+    let module C = Consensus.Data.Consensus_time in
+    obj "ConsensusTime" ~fields:(fun _ ->
+        [ field "epoch" ~typ:(non_null uint32)
+            ~args:Arg.[]
+            ~resolve:(fun _ global_slot -> C.epoch global_slot)
+        ; field "slot" ~typ:(non_null uint32)
+            ~args:Arg.[]
+            ~resolve:(fun _ global_slot -> C.slot global_slot)
+        ; field "globalSlot" ~typ:(non_null uint32)
+            ~args:Arg.[]
+            ~resolve:(fun _ (global_slot : Consensus.Data.Consensus_time.t) ->
+              C.to_uint32 global_slot )
+        ; field "startTime" ~typ:(non_null string)
+            ~args:Arg.[]
+            ~resolve:(fun {ctx= coda; _} global_slot ->
+              let constants =
+                Consensus.Constants.create
+                  ~constraint_constants:
+                    (Coda_lib.config coda).constraint_constants
+                  ~protocol_constants:
+                    (Coda_lib.config coda).precomputed_values.genesis_constants
+                      .protocol
+              in
+              Block_time.to_string @@ C.start_time ~constants global_slot )
+        ; field "endTime" ~typ:(non_null string)
+            ~args:Arg.[]
+            ~resolve:(fun {ctx= coda; _} global_slot ->
+              let constants =
+                Consensus.Constants.create
+                  ~constraint_constants:
+                    (Coda_lib.config coda).constraint_constants
+                  ~protocol_constants:
+                    (Coda_lib.config coda).precomputed_values.genesis_constants
+                      .protocol
+              in
+              Block_time.to_string @@ C.end_time ~constants global_slot ) ] )
+
   let block_producer_timing :
       ( _
       , [`Check_again of Block_time.t | `Produce of Block_time.t | `Produce_now]
         option )
       typ =
     obj "BlockProducerTimings" ~fields:(fun _ ->
-        let of_time = Consensus.Data.Consensus_time.of_time_exn in
+        let of_time ~consensus_constants =
+          Consensus.Data.Consensus_time.of_time_exn
+            ~constants:consensus_constants
+        in
         [ field "times"
-            ~typ:
-              ( non_null @@ list @@ non_null
-              @@ Consensus.Data.Consensus_time.graphql_type () )
+            ~typ:(non_null @@ list @@ non_null consensus_time)
             ~args:Arg.[]
-            ~resolve:(fun {ctx= coda; _} -> function `Check_again _time -> []
-              | `Produce time -> [of_time time] | `Produce_now ->
-                  [ of_time
+            ~resolve:(fun {ctx= coda; _} ->
+              let consensus_constants =
+                Consensus.Constants.create
+                  ~constraint_constants:
+                    (Coda_lib.config coda).constraint_constants
+                  ~protocol_constants:
+                    (Coda_lib.config coda).precomputed_values.genesis_constants
+                      .protocol
+              in
+              function
+              | `Check_again _time ->
+                  []
+              | `Produce time ->
+                  [of_time time ~consensus_constants]
+              | `Produce_now ->
+                  [ of_time ~consensus_constants
                     @@ Block_time.now (Coda_lib.config coda).time_controller ]
               ) ] )
 
@@ -209,21 +267,21 @@ module Types = struct
           @@ Consensus.Configuration.Fields.fold ~init:[] ~delta:nn_int
                ~k:nn_int ~c:nn_int ~c_times_k:nn_int ~slots_per_epoch:nn_int
                ~slot_duration:nn_int ~epoch_duration:nn_int
-               ~acceptable_network_delay:nn_int )
+               ~acceptable_network_delay:nn_int
+               ~genesis_state_timestamp:nn_time )
 
-    let peer : (_, Network_peer.Peer.Display.Stable.V1.t option) typ =
+    let peer : (_, Network_peer.Peer.Display.t option) typ =
       obj "Peer" ~fields:(fun _ ->
           let open Reflection.Shorthand in
           List.rev
-          @@ Network_peer.Peer.Display.Stable.V1.Fields.fold ~init:[]
-               ~host:nn_string ~libp2p_port:nn_int ~peer_id:nn_string )
+          @@ Network_peer.Peer.Display.Fields.fold ~init:[] ~host:nn_string
+               ~libp2p_port:nn_int ~peer_id:nn_string )
 
-    let addrs_and_ports :
-        (_, Node_addrs_and_ports.Display.Stable.V1.t option) typ =
+    let addrs_and_ports : (_, Node_addrs_and_ports.Display.t option) typ =
       obj "AddrsAndPorts" ~fields:(fun _ ->
           let open Reflection.Shorthand in
           List.rev
-          @@ Node_addrs_and_ports.Display.Stable.V1.Fields.fold ~init:[]
+          @@ Node_addrs_and_ports.Display.Fields.fold ~init:[]
                ~external_ip:nn_string ~bind_ip:nn_string ~client_port:nn_int
                ~libp2p_port:nn_int ~peer:(id ~typ:peer) )
 
@@ -243,14 +301,8 @@ module Types = struct
                ~block_production_keys:
                  (id ~typ:Schema.(non_null @@ list (non_null string)))
                ~histograms:(id ~typ:histograms)
-               ~consensus_time_best_tip:
-                 (id ~typ:(Consensus.Data.Consensus_time.graphql_type ()))
-               ~consensus_time_now:
-                 (id
-                    ~typ:
-                      Schema.(
-                        non_null
-                          (Consensus.Data.Consensus_time.graphql_type ())))
+               ~consensus_time_best_tip:(id ~typ:consensus_time)
+               ~consensus_time_now:(id ~typ:Schema.(non_null consensus_time))
                ~consensus_mechanism:nn_string
                ~addrs_and_ports:(id ~typ:(non_null addrs_and_ports))
                ~consensus_configuration:
@@ -350,6 +402,20 @@ module Types = struct
             ~args:Arg.[]
             ~resolve:(fun _ {Coda_state.Blockchain_state.Poly.timestamp; _} ->
               Block_time.to_string timestamp )
+        ; field "utcDate" ~typ:(non_null string)
+            ~doc:
+              (Doc.date
+                 ~extra:
+                   ". Time offsets are adjusted to reflect true wall-clock \
+                    time instead of genesis time."
+                 "utcDate")
+            ~args:Arg.[]
+            ~resolve:
+              (fun {ctx= coda; _}
+                   {Coda_state.Blockchain_state.Poly.timestamp; _} ->
+              Block_time.to_string_system_time
+                (Coda_lib.time_controller coda)
+                timestamp )
         ; field "snarkedLedgerHash" ~typ:(non_null string)
             ~doc:"Base58Check-encoded hash of the snarked ledger"
             ~args:Arg.[]
@@ -813,7 +879,13 @@ module Types = struct
             ~doc:"Amount of coda granted to the producer of this block"
             ~args:Arg.[]
             ~resolve:(fun _ {coinbase; _} -> Currency.Amount.to_uint64 coinbase)
-        ] )
+        ; field "coinbaseReceiverAccount" ~typ:AccountObj.account
+            ~doc:"Account to which the coinbase for this block was granted"
+            ~args:Arg.[]
+            ~resolve:(fun {ctx= coda; _} {coinbase_receiver; _} ->
+              Option.map
+                ~f:(AccountObj.get_best_ledger_account coda)
+                coinbase_receiver ) ] )
 
   let protocol_state_proof : (Coda_lib.t, Proof.t option) typ =
     let display_g1_elem (g1 : Crypto_params.Tick_backend.Inner_curve.t) =
@@ -1748,6 +1820,7 @@ module Mutations = struct
   let commands =
     [ add_wallet
     ; create_account
+    ; create_hd_account
     ; unlock_account
     ; unlock_wallet
     ; lock_account

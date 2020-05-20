@@ -4,4 +4,4 @@
  (libraries snarkette snarky)
  (preprocessor_deps ../../config.mlh)
  (preprocess
-  (pps ppx_coda ppx_optcomp)))
+  (pps ppx_version ppx_optcomp ppx_sexp_conv ppx_deriving_yojson)))

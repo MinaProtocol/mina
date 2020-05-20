@@ -44,14 +44,18 @@ M.
   , merkle_root
   , iteri )]
 
-let of_root (h : Ledger_hash.t) =
-  of_hash ~depth:Ledger.depth (Ledger_hash.of_digest (h :> Pedersen.Digest.t))
+let of_root ~depth (h : Ledger_hash.t) =
+  of_hash ~depth (Ledger_hash.of_digest (h :> Pedersen.Digest.t))
 
-let of_ledger_root ledger = of_root (Ledger.merkle_root ledger)
+let of_ledger_root ledger =
+  of_root ~depth:(Ledger.depth ledger) (Ledger.merkle_root ledger)
 
 let of_any_ledger (ledger : Ledger.Any_ledger.witness) =
   Ledger.Any_ledger.M.foldi ledger
-    ~init:(of_root (Ledger.Any_ledger.M.merkle_root ledger))
+    ~init:
+      (of_root
+         ~depth:(Ledger.Any_ledger.M.depth ledger)
+         (Ledger.Any_ledger.M.merkle_root ledger))
     ~f:(fun _addr sparse_ledger account ->
       let loc =
         Option.value_exn
@@ -89,7 +93,10 @@ let of_ledger_subset_exn (oledger : Ledger.t) keys =
 
 let of_ledger_index_subset_exn (ledger : Ledger.Any_ledger.witness) indexes =
   List.fold indexes
-    ~init:(of_root (Ledger.Any_ledger.M.merkle_root ledger))
+    ~init:
+      (of_root
+         ~depth:(Ledger.Any_ledger.M.depth ledger)
+         (Ledger.Any_ledger.M.merkle_root ledger))
     ~f:(fun acc i ->
       let account = Ledger.Any_ledger.M.get_at_index_exn ledger i in
       add_path acc
@@ -102,7 +109,9 @@ let%test_unit "of_ledger_subset_exn with keys that don't exist works" =
     let privkey = Private_key.create () in
     (privkey, Public_key.of_private_key_exn privkey |> Public_key.compress)
   in
-  Ledger.with_ledger ~f:(fun ledger ->
+  Ledger.with_ledger
+    ~depth:Genesis_constants.Constraint_constants.for_unit_tests.ledger_depth
+    ~f:(fun ledger ->
       let _, pub1 = keygen () in
       let _, pub2 = keygen () in
       let aid1 = Account_id.create pub1 Token_id.default in
@@ -305,13 +314,13 @@ let apply_coinbase_exn t
     match fee_transfer with
     | None ->
         (coinbase_amount, t)
-    | Some (transferee, fee) ->
+    | Some ({receiver_pk= _; fee} as ft) ->
         let fee = Amount.of_fee fee in
         let reward =
           Amount.sub coinbase_amount fee
           |> Option.value_exn ?here:None ?message:None ?error:None
         in
-        let transferee_id = Account_id.create transferee Token_id.default in
+        let transferee_id = Coinbase.Fee_transfer.receiver ft in
         (reward, add_to_balance t transferee_id fee)
   in
   let receiver_id = Account_id.create receiver Token_id.default in

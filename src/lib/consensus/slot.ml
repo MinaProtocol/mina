@@ -7,48 +7,53 @@ module T = Coda_numbers.Nat.Make32 ()
 
 include (T : module type of T with module Checked := T.Checked)
 
-let in_seed_update_range (slot : t) =
-  let ck = Constants.(c * k |> UInt32.of_int) in
+let in_seed_update_range ~(constants : Constants.t) (slot : t) =
   let open UInt32.Infix in
+  let ck = constants.c * constants.k in
   ck <= slot && slot < ck * UInt32.of_int 2
 
 module Checked = struct
   include T.Checked
 
-  let in_seed_update_range (slot : var) =
-    let uint32_msb (x : UInt32.t) =
-      List.init 32 ~f:(fun i ->
-          let open UInt32 in
-          let open Infix in
-          let ( = ) x y = Core.Int.equal (compare x y) 0 in
-          (x lsr Int.sub 31 i) land UInt32.one = UInt32.one )
-      |> Bitstring_lib.Bitstring.Msb_first.of_list
-    in
+  let in_seed_update_range ~(constants : Constants.var) (slot : var) =
     let open Tick in
     let open Tick.Let_syntax in
-    let ( < ) = Bitstring_checked.lt_value in
-    let ck = Constants.(c * k) |> UInt32.of_int in
-    let ck_bitstring = uint32_msb ck
-    and ck_times_2 = uint32_msb UInt32.(Infix.(of_int 2 * ck)) in
-    let%bind slot_msb =
-      to_bits slot >>| Bitstring_lib.Bitstring.Msb_first.of_lsb_first
+    let open Snarky_integer in
+    let module Length = Coda_numbers.Length in
+    let integer_mul i i' = make_checked (fun () -> Integer.mul ~m i i') in
+    let to_integer = Length.Checked.to_integer in
+    let%bind ck =
+      integer_mul (to_integer constants.c) (to_integer constants.k)
     in
-    let%bind slot_gte_ck = slot_msb < ck_bitstring >>| Boolean.not
-    and slot_lt_ck_times_2 = slot_msb < ck_times_2 in
+    let two = Integer.constant ~m (Bignum_bigint.of_int 2) in
+    let%bind ck_times_2 = integer_mul ck two in
+    let slot_gte_ck = Integer.gte ~m (T.Checked.to_integer slot) ck in
+    let slot_lt_ck_times_2 =
+      Integer.lt ~m (T.Checked.to_integer slot) ck_times_2
+    in
     Boolean.(slot_gte_ck && slot_lt_ck_times_2)
 end
 
-let gen =
+let gen (constants : Constants.t) =
   let open Quickcheck.Let_syntax in
-  Core.Int.gen_incl 0 (Constants.(c * k) * 3) >>| UInt32.of_int
+  let ck3 =
+    UInt32.Infix.(constants.c * constants.k * UInt32.of_int 3) |> UInt32.to_int
+  in
+  Core.Int.gen_incl 0 ck3 >>| UInt32.of_int
 
 let%test_unit "in_seed_update_range unchecked vs. checked equality" =
-  let test =
-    Test_util.test_equal typ Tick.Boolean.typ Checked.in_seed_update_range
-      in_seed_update_range
+  let constants = Constants.for_unit_tests in
+  let module Length = Coda_numbers.Length in
+  let test x =
+    Test_util.test_equal
+      (Snarky.Typ.tuple2 Constants.typ typ)
+      Tick.Boolean.typ
+      (fun (c, x) -> Checked.in_seed_update_range ~constants:c x)
+      (fun (c, x) -> in_seed_update_range ~constants:c x)
+      (constants, x)
   in
-  let x = Constants.(c * k) in
+  let x = UInt32.mul constants.c constants.k |> UInt32.to_int in
   let examples =
     List.map ~f:UInt32.of_int [x; x - 1; x + 1; x * 2; (x * 2) - 1; (x * 2) + 1]
   in
-  Quickcheck.test ~trials:100 ~examples gen ~f:test
+  Quickcheck.test ~trials:100 ~examples (gen constants) ~f:test

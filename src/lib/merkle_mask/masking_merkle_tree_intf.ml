@@ -1,7 +1,7 @@
 (* masking_merkle_tree_intf.ml *)
 (* the type of a Merkle tree mask associated with a parent Merkle tree *)
 module type S = sig
-  type t [@@deriving bin_io]
+  type t
 
   type unattached = t
 
@@ -13,6 +13,12 @@ module type S = sig
 
   type hash
 
+  type key
+
+  type token_id
+
+  type token_id_set
+
   type account_id
 
   type account_id_set
@@ -22,7 +28,7 @@ module type S = sig
   module Addr = Location.Addr
 
   (** create a mask with no parent *)
-  val create : unit -> t
+  val create : depth:int -> unit -> t
 
   val get_uuid : t -> Uuid.t
 
@@ -34,6 +40,9 @@ module type S = sig
       with type account := account
        and type root_hash := hash
        and type hash := hash
+       and type key := key
+       and type token_id := token_id
+       and type token_id_set := token_id_set
        and type account_id := account_id
        and type account_id_set := account_id_set
 

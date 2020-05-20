@@ -101,57 +101,77 @@ let rec download = (filename, url, encoding, maxRedirects, chunkCb, doneCb) => {
           doneCb(Belt.Result.Error("Too many redirects."));
         }
       | 200 => handleResponse(response, filename, encoding, chunkCb, doneCb)
-      | _ => doneCb(Belt.Result.Error("Unable to download the daemon."))
+      | status =>
+        doneCb(
+          Belt.Result.Error(
+            "Unable to download the daemon. Status: " ++ string_of_int(status),
+          ),
+        )
       }
     );
   Https.Request.onError(request, e => doneCb(Error(e)));
 };
 
 // TODO: Make this an env var
-let codaRepo = "https://s3-us-west-2.amazonaws.com/wallet.o1test.net/daemon/";
+let codaRepo = "https://wallet-daemon.s3-us-west-1.amazonaws.com/";
 
 [@bs.module "electron"] [@bs.scope ("remote", "app")]
 external getPath: string => string = "getPath";
 
-let extractZip = (src, dest, doneCb, errorCb) => {
+let extractZip = (src, dest, doneCb) => {
   let extractArgs = {"path": dest};
 
   let _ =
     Bindings.Stream.Readable.create(src)
     ->(Bindings.Stream.Readable.pipe(Unzipper.extract(extractArgs)))
-    ->Bindings.Stream.Writable.onFinish(doneCb)
-    ->Bindings.Stream.Writable.onError(errorCb);
+    ->Bindings.Stream.Writable.onFinish(() => doneCb(Belt.Result.Ok()))
+    ->Bindings.Stream.Writable.onError(err =>
+        doneCb(
+          Belt.Result.Error(
+            "Error while unzipping the daemon bundle: "
+            ++ (
+              Js.Exn.message(err)
+              |> Tc.Option.withDefault(~default="an unknown error occured.")
+            ),
+          ),
+        )
+      );
 
   ();
 };
 
-/**
-  Unique helper to download and unzip a coda daemon executable.
- */
+let installCoda = (tempPath, doneCb) => {
+  let installPath = getPath("userData") ++ "/coda";
+  let keysPath = "/usr/local/var/coda/keys/";
+  let rec moveKeys = files =>
+    switch (files) {
+    | [] => ()
+    | [hd, ...rest] =>
+      Bindings.Fs.renameSync(installPath ++ "/keys/" ++ hd, keysPath ++ hd);
+      moveKeys(rest);
+    };
+  extractZip(tempPath, installPath, res =>
+    switch (res) {
+    | Belt.Result.Ok () =>
+      Bindings.Fs.chmodSync(installPath ++ "/coda.exe", 0o755);
+      Bindings.Fs.chmodSync(installPath ++ "/libp2p_helper", 0o755);
+      Bindings.Fs.readdirSync(installPath ++ "/keys")
+      |> Array.to_list
+      |> moveKeys;
+      doneCb(res);
+    | Belt.Result.Error(_) => doneCb(res)
+    }
+  );
+  ();
+};
+
 let downloadCoda = (version, chunkCb, doneCb) => {
-  let tempFilename = "coda-daemon-" ++ version ++ ".zip";
-  let installPath = getPath("userData") ++ "/daemon";
-  download(tempFilename, codaRepo ++ tempFilename, "binary", 1, chunkCb, res =>
+  let filename = "coda-daemon-" ++ version ++ ".zip";
+  let tempPath = getPath("temp") ++ "/" ++ filename;
+  download(tempPath, codaRepo ++ filename, "binary", 1, chunkCb, res =>
     switch (res) {
     | Belt.Result.Error(_) => doneCb(res)
-    | _ =>
-      extractZip(
-        tempFilename,
-        installPath,
-        () => doneCb(Belt.Result.Ok()),
-        err => {
-          doneCb(
-            Belt.Result.Error(
-              "Error while unzipping the daemon bundle: "
-              ++ Tc.Option.withDefault(
-                   ~default="an unknown error occured.",
-                   Js.Exn.message(err),
-                 ),
-            ),
-          )
-        },
-      );
-      ();
+    | _ => installCoda(tempPath, doneCb)
     }
   );
 };

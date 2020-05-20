@@ -13,5 +13,5 @@
      coda_state
      precomputed_values)
    (preprocessor_deps "../../../config.mlh")
-   (preprocess (pps ppx_optcomp ppx_let ppxlib.metaquot ppxlib.runner))
+   (preprocess (pps ppx_version ppx_optcomp ppx_let ppxlib.metaquot))
    (modes native))

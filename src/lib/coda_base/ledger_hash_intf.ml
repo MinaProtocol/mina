@@ -1,9 +1,23 @@
+open Core
 open Snark_params
 open Snarky
 open Tick
 
 module type S = sig
   include Data_hash.Full_size
+
+  [%%versioned:
+  module Stable : sig
+    module V1 : sig
+      type t = Field.t [@@deriving sexp, compare, hash, yojson]
+
+      val to_latest : t -> t
+
+      include Comparable.S with type t := t
+
+      include Hashable_binable with type t := t
+    end
+  end]
 
   type path = Pedersen.Digest.t list
 
@@ -13,7 +27,11 @@ module type S = sig
     | Set : Account.Index.t * Account.t -> unit Request.t
     | Find_index : Account_id.t -> Account.Index.t Request.t
 
-  val get : var -> Account.Index.Unpacked.var -> (Account.var, _) Checked.t
+  val get :
+       depth:int
+    -> var
+    -> Account.Index.Unpacked.var
+    -> (Account.var, _) Checked.t
 
   val merge : height:int -> t -> t -> t
 
@@ -27,7 +45,8 @@ module type S = sig
   val of_digest : Pedersen.Digest.t -> t
 
   val modify_account_send :
-       var
+       depth:int
+    -> var
     -> Account_id.var
     -> is_writeable:Boolean.var
     -> f:(   is_empty_and_writeable:Boolean.var
@@ -36,7 +55,8 @@ module type S = sig
     -> (var, 's) Checked.t
 
   val modify_account_recv :
-       var
+       depth:int
+    -> var
     -> Account_id.var
     -> f:(   is_empty_and_writeable:Boolean.var
           -> Account.var

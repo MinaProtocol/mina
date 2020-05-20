@@ -196,7 +196,7 @@ module H1 = struct
   end
 
   module To_vector (X : T0) = struct
-    let rec f : type e xs ys length.
+    let rec f : type xs length.
         (xs, length) Length.t -> xs T(E01(X)).t -> (X.t, length) Vector.t =
      fun l1 v ->
       match (l1, v) with Z, [] -> [] | S n1, x :: xs -> x :: f n1 xs
@@ -272,7 +272,7 @@ module H2 = struct
   end
 
   module Zip (F : T2) (G : T2) = struct
-    let rec f : type a b c.
+    let rec f : type a b.
         (a, b) T(F).t -> (a, b) T(G).t -> (a, b) T(Tuple2(F)(G)).t =
      fun xs ys ->
       match (xs, ys) with
@@ -543,7 +543,7 @@ module H3 = struct
           ('a1, 'a2, 'a3) F.t * ('b1, 'b2, 'b3) t
           -> ('a1 * 'b1, 'a2 * 'b2, 'a3 * 'b3) t
 
-    let rec length : type tail1 tail2 tail3 e.
+    let rec length : type tail1 tail2 tail3.
         (tail1, tail2, tail3) t -> tail1 Length.n = function
       | [] ->
           T (Z, Z)

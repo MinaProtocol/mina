@@ -125,7 +125,7 @@ module type S = sig
   (* for filtering *)
   val minimum_fee : Currency.Fee.t
 
-  val is_trivial : t -> bool
+  val has_insufficient_fee : t -> bool
 
   include Gen_intf with type t := t
 
@@ -147,6 +147,9 @@ module type S = sig
 
     include Comparable.S with type t := t
   end
+
+  val sign_payload :
+    Signature_lib.Private_key.t -> User_command_payload.t -> Signature.t
 
   val sign :
     Signature_keypair.t -> User_command_payload.t -> With_valid_signature.t

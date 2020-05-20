@@ -523,9 +523,8 @@ module Fee = struct
       type t = Unsigned_extended.UInt64.Stable.V1.t
       [@@deriving sexp, compare, hash, eq]
 
-      let to_yojson = to_yojson
-
-      let of_yojson = of_yojson
+      [%%define_from_scope
+      to_yojson, of_yojson]
 
       let to_latest = Fn.id
     end
@@ -564,9 +563,8 @@ module Amount = struct
       type t = Unsigned_extended.UInt64.Stable.V1.t
       [@@deriving sexp, compare, hash, eq, yojson]
 
-      let to_yojson = to_yojson
-
-      let of_yojson = of_yojson
+      [%%define_from_scope
+      to_yojson, of_yojson]
 
       let to_latest = Fn.id
     end
