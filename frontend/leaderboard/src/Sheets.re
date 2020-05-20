@@ -1,7 +1,8 @@
 open Bindings;
+module StringMap = Map.Make(String);
 
 let tokenPath = "token.json";
-let scopes = [|"https://www.googleapis.com/auth/spreadsheets.readonly"|];
+let scopes = [|"https://www.googleapis.com/auth/spreadsheets"|];
 
 let readAndParseToken = () => {
   switch (Node.Fs.readFileAsUtf8Sync(tokenPath)) {
@@ -55,6 +56,46 @@ let getRange = (client, sheetsQuery, cb) => {
     | Some(error) => cb(Error(error))
     }
   });
+};
+
+let updateRange = (client, sheetsUpdate, cb) => {
+  let sheets = GoogleSheets.sheets({version: "v4", auth: client});
+
+  GoogleSheets.update(sheets, sheetsUpdate, (~error, ~res) => {
+    switch (Js.Nullable.toOption(error)) {
+    | None => cb(Ok(res.data.values))
+    | Some(error) => cb(Error(error))
+    }
+  });
+};
+
+let createPublickeyUsernameMap = sheetsData => {
+  sheetsData
+  |> Array.fold_left(
+       (map, user) => {StringMap.add(user[0], user[1], map)},
+       StringMap.empty,
+     );
+};
+
+let createUsernamePointsMap = (pointsMap, pkUsernameMap) => {
+  StringMap.fold(
+    (pk, username, map) => {
+      StringMap.mem(pk, pointsMap)
+        ? StringMap.add(username, StringMap.find(pk, pointsMap), map) : map
+    },
+    pkUsernameMap,
+    StringMap.empty,
+  );
+};
+
+let convertPointsMapToSheetsData = pointsMap => {
+  StringMap.fold(
+    (key: string, value: int, array) => {
+      Array.append([|[|key, string_of_int(value)|]|], array)
+    },
+    pointsMap,
+    [||],
+  );
 };
 
 let createClient = (clientCredentials, cb) => {
