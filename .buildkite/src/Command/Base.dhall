@@ -55,7 +55,7 @@ let targetToAgent = \(target : Size) ->
         target
 
 let build : Config.Type -> B/Command.Type = \(c : Config.Type) ->
-  let local : Bool = Prelude.Optional.null Text (Some (env:LOCAL_BUILD as Text) ? None Text) in
+  let local : Bool = Prelude.Bool.not (Prelude.Optional.null Text (Some (env:LOCAL_BUILD as Text) ? None Text)) in
 
   B/Command::{
     agents =
