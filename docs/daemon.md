@@ -14,9 +14,10 @@ they are.
 ## Config file
 
 The daemon will look for a `$CONF_DIR/daemon.json` on startup. That file should
-be a single JSON object. These settings are overridden by their corresponding
-command-line flags. See `coda daemon -h` for more information about them.
-These flags are supported in the config file:
+be a single JSON object containing the field `daemon: {...}`. These settings
+are overridden by their corresponding command-line flags. See `coda daemon -h`
+for more information about them.
+These flags are supported in the `daemon` object of the config file:
 
 - `client-port` int
 - `libp2p-port` int
@@ -36,3 +37,11 @@ These flags are supported in the config file:
 - `log-txn-pool-gossip` bool
 - `log-snark-work-gossip` bool
 - `log-block-creation` bool
+
+## Environment variables
+
+The daemon will read some environment variables on startup.
+
+`CODA_CLIENT_TRUSTLIST` is a comma-separated list of CIDR masks, for example `10.0.0.0/8,172.16.0.0/12,192.168.0.0/16` would allow any client on an RFC1918 private network to control the daemon. This list can be edited with `coda advanced client-trustlist` commands.
+
+There are other environment variables, but they aren't documented yet.

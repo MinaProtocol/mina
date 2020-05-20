@@ -46,7 +46,6 @@ let expand ~loc ~path:_ override (module_name : longident) defs =
       raise_errorf ~loc "Must provide an identifier or tuple of identifiers"
 
 let ext =
-  (* TODO : separate entry point for defining from enclosing module *)
   Extension.declare name Extension.Context.structure_item
     Ast_pattern.(single_expr_payload (pexp_open __ __ __))
     expand

@@ -1,6 +1,0 @@
-(executable
- (name gen)
- (libraries core_kernel coda_version ppxlib yojson cache_dir)
- (preprocess
-  (pps ppx_jane ppxlib.metaquot ppxlib.runner))
- (modes native))

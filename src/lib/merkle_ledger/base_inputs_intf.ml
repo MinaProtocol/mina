@@ -14,6 +14,4 @@ module type S = sig
      and type balance := Balance.t
 
   module Hash : Intf.Hash with type account := Account.t
-
-  module Depth : Intf.Depth
 end

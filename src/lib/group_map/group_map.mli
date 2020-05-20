@@ -12,39 +12,51 @@ end) : sig
   end
 end
 
-module Params : sig
-  type 'f t
+module type S = sig
+  module Spec : sig
+    type _ t
+  end
 
-  [%%versioned:
-  module Stable : sig
-    module V1 : sig
-      type nonrec 'f t = 'f t
-    end
-  end]
+  module Params : sig
+    [%%versioned:
+    module Stable : sig
+      module V1 : sig
+        type _ t
+      end
+    end]
 
-  val map : 'a t -> f:('a -> 'b) -> 'b t
+    type 'f t = 'f Stable.Latest.t
 
-  val a : 'f t -> 'f
+    val map : 'a t -> f:('a -> 'b) -> 'b t
 
-  val b : 'f t -> 'f
+    val spec : 'f t -> 'f Spec.t
 
-  val create :
-    (module Field_intf.S_unchecked with type t = 'f) -> a:'f -> b:'f -> 'f t
+    val create :
+      (module Field_intf.S_unchecked with type t = 'f) -> 'f Spec.t -> 'f t
+  end
+
+  module Make
+      (Constant : Field_intf.S) (F : sig
+          include Field_intf.S
+
+          val constant : Constant.t -> t
+      end) (Params : sig
+        val params : Constant.t Params.t
+      end) : sig
+    val potential_xs : F.t -> F.t * F.t * F.t
+  end
+
+  val to_group :
+       (module Field_intf.S_unchecked with type t = 'f)
+    -> params:'f Params.t
+    -> 'f
+    -> 'f * 'f
 end
 
-module Make
-    (Constant : Field_intf.S) (F : sig
-        include Field_intf.S
+module Bw19 : S
 
-        val constant : Constant.t -> t
-    end) (Params : sig
-      val params : Constant.t Params.t
-    end) : sig
-  val potential_xs : F.t -> F.t * F.t * F.t
+module Spec : sig
+  type 'f t = {a: 'f; b: 'f} [@@deriving fields]
 end
 
-val to_group :
-     (module Field_intf.S_unchecked with type t = 'f)
-  -> params:'f Params.t
-  -> 'f
-  -> 'f * 'f
+include S with module Spec := Spec

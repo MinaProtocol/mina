@@ -19,7 +19,7 @@ module Make (Inputs : Inputs_intf) :
       get_extension (Transition_frontier.extensions frontier) Root_history
     in
     let%map root_data = Root_history.lookup root_history state_hash in
-    root_data.transition
+    Frontier_base.Root_data.Historical.transition root_data
 
   module Merkle_list = Merkle_list_prover.Make_ident (struct
     type value = External_transition.Validated.t

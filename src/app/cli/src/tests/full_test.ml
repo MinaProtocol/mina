@@ -51,17 +51,18 @@ let medium_curves = false
 [%%if
 time_offsets = true]
 
-let setup_time_offsets () =
+let setup_time_offsets consensus_constants =
   Unix.putenv ~key:"CODA_TIME_OFFSET"
     ~data:
-      ( Time.Span.to_int63_seconds_round_down_exn (force Coda_processes.offset)
+      ( Time.Span.to_int63_seconds_round_down_exn
+          (Coda_processes.offset consensus_constants)
       |> Int63.to_int
       |> Option.value_exn ?here:None ?message:None ?error:None
       |> Int.to_string )
 
 [%%else]
 
-let setup_time_offsets () = ()
+let setup_time_offsets _ = ()
 
 [%%endif]
 
@@ -83,13 +84,20 @@ let print_heartbeat logger =
 
 let run_test () : unit Deferred.t =
   let logger = Logger.create () in
+  let precomputed_values = Lazy.force Precomputed_values.compiled in
+  let (module Genesis_ledger) = precomputed_values.genesis_ledger in
   let pids = Child_processes.Termination.create_pid_table () in
-  setup_time_offsets () ;
+  let consensus_constants =
+    Consensus.Constants.create
+      ~constraint_constants:Genesis_constants.Constraint_constants.compiled
+      ~protocol_constants:Genesis_constants.compiled.protocol
+  in
+  setup_time_offsets consensus_constants ;
   print_heartbeat logger |> don't_wait_for ;
   Parallel.init_master () ;
   File_system.with_temp_dir (Filename.temp_dir_name ^/ "full_test_config")
     ~f:(fun temp_conf_dir ->
-      let keypair = Test_genesis_ledger.largest_account_keypair_exn () in
+      let keypair = Genesis_ledger.largest_account_keypair_exn () in
       let%bind () =
         match Unix.getenv "CODA_TRACING" with
         | Some trace_dir ->
@@ -133,7 +141,7 @@ let run_test () : unit Deferred.t =
       in
       let time_controller = Block_time.Controller.(create @@ basic ~logger) in
       let consensus_local_state =
-        Consensus.Data.Local_state.create ~genesis_ledger:Test_genesis_ledger.t
+        Consensus.Data.Local_state.create ~genesis_ledger:Genesis_ledger.t
           (Public_key.Compressed.Set.singleton
              (Public_key.compress keypair.public_key))
       in
@@ -145,6 +153,7 @@ let run_test () : unit Deferred.t =
           ; logger
           ; initial_peers= []
           ; unsafe_no_trust_ip= true
+          ; flood= false
           ; conf_dir= temp_conf_dir
           ; chain_id= "bogus chain id for testing"
           ; addrs_and_ports=
@@ -164,7 +173,7 @@ let run_test () : unit Deferred.t =
           ; consensus_local_state
           ; is_seed= true
           ; genesis_ledger_hash=
-              Ledger.merkle_root (Lazy.force Test_genesis_ledger.t)
+              Ledger.merkle_root (Lazy.force Genesis_ledger.t)
           ; log_gossip_heard=
               { snark_pool_diff= false
               ; transaction_pool_diff= false
@@ -177,7 +186,7 @@ let run_test () : unit Deferred.t =
       Core.Backtrace.elide := false ;
       Async.Scheduler.set_record_backtraces true ;
       let largest_account_keypair =
-        Test_genesis_ledger.largest_account_keypair_exn ()
+        Genesis_ledger.largest_account_keypair_exn ()
       in
       let fee = Currency.Fee.of_int in
       let snark_work_fee, transaction_fee =
@@ -187,7 +196,9 @@ let run_test () : unit Deferred.t =
         Coda_lib.create
           (Coda_lib.Config.make ~logger ~pids ~trust_system ~net_config
              ~coinbase_receiver:`Producer ~conf_dir:temp_conf_dir
-             ~gossip_net_params ~is_seed:true ~initial_fork_id:Fork_id.empty
+             ~gossip_net_params ~is_seed:true ~disable_telemetry:true
+             ~initial_protocol_version:Protocol_version.zero
+             ~proposed_protocol_version_opt:None
              ~work_selection_method:
                (module Work_selector.Selection_methods.Sequence)
              ~initial_block_production_keypairs:(Keypair.Set.singleton keypair)
@@ -205,12 +216,10 @@ let run_test () : unit Deferred.t =
              ~time_controller ~receipt_chain_database ~snark_work_fee
              ~consensus_local_state ~transaction_database
              ~external_transition_database ~work_reassignment_wait:420000
-             ~genesis_state_hash:
-               (Coda_state.Genesis_protocol_state.For_tests.genesis_state_hash
-                  ())
-             ~genesis_constants:Genesis_constants.compiled ())
-          ~genesis_ledger:Test_genesis_ledger.t
-          ~base_proof:Precomputed_values.base_proof
+             ~precomputed_values
+             ~constraint_constants:
+               Genesis_constants.Constraint_constants.compiled
+             ~proof_level:Genesis_constants.Proof_level.compiled ())
       in
       don't_wait_for
         (Strict_pipe.Reader.iter_without_pushback
@@ -413,20 +422,20 @@ let run_test () : unit Deferred.t =
         sending multiple payments*)
       let receiver_keypair =
         let receiver =
-          Test_genesis_ledger.find_new_account_record_exn
+          Genesis_ledger.find_new_account_record_exn
             [largest_account_keypair.public_key]
         in
-        Test_genesis_ledger.keypair_of_account_record_exn receiver
+        Genesis_ledger.keypair_of_account_record_exn receiver
       in
       let sender_keypair =
         let sender =
-          Test_genesis_ledger.find_new_account_record_exn
+          Genesis_ledger.find_new_account_record_exn
             [largest_account_keypair.public_key; receiver_keypair.public_key]
         in
-        Test_genesis_ledger.keypair_of_account_record_exn sender
+        Genesis_ledger.keypair_of_account_record_exn sender
       in
       let other_accounts =
-        List.filter (Lazy.force Test_genesis_ledger.accounts)
+        List.filter (Lazy.force Genesis_ledger.accounts)
           ~f:(fun (_, account) ->
             let reserved_public_keys =
               [ largest_account_keypair.public_key
@@ -439,7 +448,7 @@ let run_test () : unit Deferred.t =
                      (Public_key.decompress_exn @@ Account.public_key account)
                )) )
         |> List.map ~f:(fun (sk, account) ->
-               ( Test_genesis_ledger.keypair_of_account_record_exn (sk, account)
+               ( Genesis_ledger.keypair_of_account_record_exn (sk, account)
                , account ) )
       in
       let timeout_mins =
@@ -447,7 +456,6 @@ let run_test () : unit Deferred.t =
         else if with_snark then 15.
         else 7.
       in
-      let consensus_constants = Consensus.Constants.compiled in
       let wait_till_length =
         if medium_curves then Length.of_int 1
         else if test_full_epoch then

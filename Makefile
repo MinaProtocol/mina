@@ -15,6 +15,10 @@ ifeq ($(DUNE_PROFILE),)
 DUNE_PROFILE := dev
 endif
 
+ifeq ($(GO),)
+GO := go
+endif
+
 TMPDIR ?= /tmp
 
 ifeq ($(USEDOCKER),TRUE)
@@ -60,27 +64,27 @@ clean:
 	@rm -rf _build
 	@rm -rf src/$(COVERAGE_DIR)
 
+# TEMP HACK (for circle-ci)
+ifeq ($(LIBP2P_NIXLESS),1)
 libp2p_helper:
-	$(WRAPAPP) bash -c "if [ -z \"$${USER}\" ]; then export USER=opam ; fi && source ~/.nix-profile/etc/profile.d/nix.sh && (if [ -z \"$${CACHIX_SIGNING_KEY+x}\" ]; then cd src/app/libp2p_helper && nix-build $${EXTRA_NIX_ARGS} default.nix;  else cachix use codaprotocol && cd src/app/libp2p_helper && nix-build $${EXTRA_NIX_ARGS} default.nix | cachix push codaprotocol ; fi)"
+	$(WRAPAPP) bash -c "set -e && cd src/app/libp2p_helper && rm -rf result && mkdir -p result/bin && cd src && $(GO) mod download && cd .. && for f in generate_methodidx libp2p_helper; do cd src/\$$f && $(GO) build; cp \$$f ../../result/bin/\$$f; cd ../../; done"
+else
+libp2p_helper:
+	$(WRAPAPP) bash -c "set -o pipefail ; if [ -z \"$${USER}\" ]; then export USER=opam ; fi && source ~/.nix-profile/etc/profile.d/nix.sh && (if [ -z \"$${CACHIX_SIGNING_KEY+x}\" ]; then cd src/app/libp2p_helper && nix-build $${EXTRA_NIX_ARGS} default.nix;  else cachix use codaprotocol && cd src/app/libp2p_helper && nix-build $${EXTRA_NIX_ARGS} default.nix | cachix push codaprotocol ; fi)"
+endif
+
+
 
 GENESIS_DIR := $(TMPDIR)/coda_cache_dir
 
-# generate the actual ledger and store in a tar
-genesis_tar:
-	@GENESIS_FILE=$(GENESIS_DIR)/$(shell cat _build/default/src/app/runtime_genesis_ledger/genesis_filename.txt).tar.gz && \
-	if [ ! -f $$GENESIS_FILE ] || [ _build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -nt $$GENESIS_FILE ]; then \
-		./_build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe ; \
-	fi
-
-# compile the tool and write the filename to `genesis_filename.txt`
 genesis_ledger:
 	$(info Building runtime_genesis_ledger)
-	ulimit -s 65532 && (ulimit -n 10240 || true) && $(WRAPAPP) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build --profile=$(DUNE_PROFILE) src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe src/app/runtime_genesis_ledger/genesis_filename.txt && make genesis_tar
+	ulimit -s 65532 && (ulimit -n 10240 || true) && $(WRAPAPP) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune exec --profile=$(DUNE_PROFILE) src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -- --genesis-dir $(GENESIS_DIR)
 	$(info Genesis ledger and genesis proof generated)
 
 build: git_hooks reformat-diff libp2p_helper
 	$(info Starting Build)
-	ulimit -s 65532 && (ulimit -n 10240 || true) && $(WRAPAPP) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build src/app/logproc/logproc.exe src/app/cli/src/coda.exe --profile=$(DUNE_PROFILE) && make genesis_ledger
+	ulimit -s 65532 && (ulimit -n 10240 || true) && $(WRAPAPP) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build src/app/logproc/logproc.exe src/app/cli/src/coda.exe --profile=$(DUNE_PROFILE)
 	$(info Build complete)
 
 build_archive: git_hooks reformat-diff
@@ -113,7 +117,8 @@ macos-portable:
 	@rm -rf _build/coda-daemon-macos/
 	@rm -rf _build/coda-daemon-macos.zip
 	@./scripts/macos-portable.sh _build/default/src/app/cli/src/coda.exe src/app/libp2p_helper/result/bin/libp2p_helper _build/coda-daemon-macos
-	@zip -r -j _build/coda-daemon-macos.zip _build/coda-daemon-macos/
+	@cp -a package/keys/. _build/coda-daemon-macos/keys/
+	@cd _build/coda-daemon-macos && zip -r ../coda-daemon-macos.zip .
 	@echo Find coda-daemon-macos.zip inside _build/
 
 update-graphql:

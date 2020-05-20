@@ -24,7 +24,7 @@ module type Ledger_intf = sig
 
   val merkle_root : t -> Ledger_hash.t
 
-  val with_ledger : f:(t -> 'a) -> 'a
+  val with_ledger : depth:int -> f:(t -> 'a) -> 'a
 end
 
 module Undo = struct
@@ -704,9 +704,9 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       match fee_transfer with
       | None ->
           return (coinbase_amount, [], None)
-      | Some (transferee, fee) ->
+      | Some ({receiver_pk= transferee; fee} as ft) ->
           assert (not @@ Public_key.Compressed.equal transferee receiver) ;
-          let transferee_id = Account_id.create transferee Token_id.default in
+          let transferee_id = Coinbase.Fee_transfer.receiver ft in
           let fee = Amount.of_fee fee in
           let%bind receiver_reward =
             error_opt "Coinbase fee transfer too large"
@@ -756,9 +756,9 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       match fee_transfer with
       | None ->
           coinbase_amount
-      | Some (transferee, fee) ->
+      | Some ({receiver_pk= _; fee} as ft) ->
           let fee = Amount.of_fee fee in
-          let transferee_id = Account_id.create transferee Token_id.default in
+          let transferee_id = Coinbase.Fee_transfer.receiver ft in
           let transferee_location =
             Or_error.ok_exn (location_of_account' t "transferee" transferee_id)
           in

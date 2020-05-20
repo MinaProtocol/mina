@@ -223,7 +223,10 @@ module type Sync_handler_intf = sig
   val get_staged_ledger_aux_and_pending_coinbases_at_hash :
        frontier:transition_frontier
     -> State_hash.t
-    -> (Staged_ledger.Scan_state.t * Ledger_hash.t * Pending_coinbase.t)
+    -> ( Staged_ledger.Scan_state.t
+       * Ledger_hash.t
+       * Pending_coinbase.t
+       * Coda_state.Protocol_state.value list )
        Option.t
 
   val get_transition_chain :
@@ -363,10 +366,8 @@ module type Transition_router_intf = sig
                                Broadcast_pipe.Reader.t
                                * External_transition.Initial_validated.t
                                  Broadcast_pipe.Writer.t
-    -> genesis_state_hash:State_hash.t
-    -> genesis_ledger:Ledger.t Lazy.t
-    -> base_proof:Coda_base.Proof.t
-    -> genesis_constants:Genesis_constants.t
+    -> constraint_constants:Genesis_constants.Constraint_constants.t
+    -> precomputed_values:Precomputed_values.t
     -> ( [`Transition of External_transition.Validated.t]
        * [`Source of [`Gossip | `Catchup | `Internal]] )
        Strict_pipe.Reader.t
