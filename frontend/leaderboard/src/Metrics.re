@@ -167,8 +167,8 @@ let calculateTotalPointsFromTwoDifferentMaps = (map1, map2) => {
     (key, value, secondValue) => {
       switch (key, value, secondValue) {
       | (_, Some(value), Some(secondValue)) => Some(value + secondValue)
-      | (_, Some(value), None) => Some(value)
-      | (_, None, Some(secondValue)) => Some(secondValue)
+      | (_, Some(value), None)
+      | (_, None, Some(value)) => Some(value)
       | (_, None, None) => None
       }
     },
