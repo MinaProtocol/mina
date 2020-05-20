@@ -162,18 +162,18 @@ let calculateAllUsers = metrics => {
 };
 
 // Combines two maps of users to points and returns one map of users to points
-let calculateTotalPointsFromTwoDifferentMaps = (map1, map2) => {
-  StringMap.merge(
-    (key, value, secondValue) => {
+let sumPointsMaps = maps => {
+  List.fold_left(
+    StringMap.merge((key, value, secondValue) => {
       switch (key, value, secondValue) {
       | (_, Some(value), Some(secondValue)) => Some(value + secondValue)
       | (_, Some(value), None) => Some(value)
       | (_, None, Some(secondValue)) => Some(secondValue)
       | (_, None, None) => None
       }
-    },
-    map1,
-    map2,
+    }),
+    StringMap.empty,
+    maps,
   );
 };
 
