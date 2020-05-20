@@ -29,6 +29,8 @@ module Body : sig
     end
   end]
 
+  val tag : t -> Transaction_union_tag.t
+
   val receiver : t -> Account_id.t
 
   val token : t -> Token_id.t
@@ -187,5 +189,7 @@ val amount : t -> Currency.Amount.t option
 val is_payment : t -> bool
 
 val accounts_accessed : t -> Account_id.t list
+
+val tag : t -> Transaction_union_tag.t
 
 val gen : t Quickcheck.Generator.t
