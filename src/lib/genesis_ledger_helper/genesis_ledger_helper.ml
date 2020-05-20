@@ -485,6 +485,7 @@ module Genesis_proof = struct
 
   let load_or_generate ~genesis_dir ~logger ~may_generate ~proof_level
       ~constraint_constants (inputs : Genesis_proof.Inputs.t) =
+    let compiled = Precomputed_values.compiled in
     match%bind find_file ~logger ~base_hash:inputs.base_hash with
     | Some file -> (
         match%map load file with
@@ -503,6 +504,39 @@ module Genesis_proof = struct
                 [ ("path", `String file)
                 ; ("error", `String (Error.to_string_hum err)) ] ;
             Error err )
+    | None
+      when Ledger_hash.equal inputs.base_hash (Lazy.force compiled).base_hash
+      ->
+        let compiled = Lazy.force compiled in
+        Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
+          "Base hash $computed_hash matches compile-time $compiled_hash, \
+           using precomputed genesis proof"
+          ~metadata:
+            [ ("computed_hash", Ledger_hash.to_yojson inputs.base_hash)
+            ; ("compiled_hash", Ledger_hash.to_yojson compiled.base_hash) ] ;
+        let filename = genesis_dir ^/ filename ~base_hash:inputs.base_hash in
+        let values =
+          { Genesis_proof.genesis_constants= inputs.genesis_constants
+          ; genesis_ledger= inputs.genesis_ledger
+          ; protocol_state_with_hash= inputs.protocol_state_with_hash
+          ; base_hash= inputs.base_hash
+          ; genesis_proof= compiled.genesis_proof }
+        in
+        let%map () =
+          match%map store ~filename values.genesis_proof with
+          | Ok () ->
+              Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
+                "Compile-time genesis proof written to $path"
+                ~metadata:[("path", `String filename)]
+          | Error err ->
+              Logger.warn ~module_:__MODULE__ ~location:__LOC__ logger
+                "Compile-time genesis proof could not be written to $path: \
+                 $error"
+                ~metadata:
+                  [ ("path", `String filename)
+                  ; ("error", `String (Error.to_string_hum err)) ]
+        in
+        Ok (values, filename)
     | None when may_generate ->
         Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
           "No genesis proof file was found for $base_hash, generating a new \
@@ -615,31 +649,16 @@ let init_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
     Genesis_proof.generate_inputs ~proof_level ~ledger:genesis_ledger
       ~constraint_constants ~genesis_constants
   in
-  let protocol_state_hash = proof_inputs.protocol_state_with_hash.hash in
-  let compiled_protocol_state_hash =
-    Precomputed_values.(genesis_state_hash (Lazy.force compiled))
+  let open Deferred.Or_error.Let_syntax in
+  let%map values, proof_file =
+    Genesis_proof.load_or_generate ~genesis_dir ~logger ~may_generate
+      ~proof_level ~constraint_constants proof_inputs
   in
-  if Ledger_hash.equal protocol_state_hash compiled_protocol_state_hash then (
-    Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
-      "Protocol state hash $computed_hash matches compile-time \
-       $compiled_hash, using precomputed genesis proof"
-      ~metadata:
-        [ ("computed_hash", Ledger_hash.to_yojson protocol_state_hash)
-        ; ("compiled_hash", Ledger_hash.to_yojson compiled_protocol_state_hash)
-        ] ;
-    Deferred.Or_error.return (Lazy.force Precomputed_values.compiled, config) )
-  else
-    let open Deferred.Or_error.Let_syntax in
-    let%map values, proof_file =
-      Genesis_proof.load_or_generate ~genesis_dir ~logger ~may_generate
-        ~proof_level ~constraint_constants proof_inputs
-    in
-    Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
-      "Loaded ledger from $ledger_file and genesis proof from $proof_file"
-      ~metadata:
-        [ ("ledger_file", `String ledger_file)
-        ; ("proof_file", `String proof_file) ] ;
-    (values, config)
+  Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
+    "Loaded ledger from $ledger_file and genesis proof from $proof_file"
+    ~metadata:
+      [("ledger_file", `String ledger_file); ("proof_file", `String proof_file)] ;
+  (values, config)
 
 let upgrade_old_config ~logger filename json =
   match json with
