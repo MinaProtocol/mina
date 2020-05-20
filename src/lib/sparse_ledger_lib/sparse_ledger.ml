@@ -190,7 +190,7 @@ end = struct
                 " node"
           in
           failwithf
-            "Spare_ledger.get: Bad index %i. Expected a%s, but got a%s at \
+            "Sparse_ledger.get: Bad index %i. Expected a%s, but got a%s at \
              depth %i."
             idx expected_kind kind (depth - i) ()
     in
@@ -219,7 +219,7 @@ end = struct
                 " node"
           in
           failwithf
-            "Spare_ledger.set: Bad index %i. Expected a%s, but got a%s at \
+            "Sparse_ledger.set: Bad index %i. Expected a%s, but got a%s at \
              depth %i."
             idx expected_kind kind (t.depth - i) ()
     in
