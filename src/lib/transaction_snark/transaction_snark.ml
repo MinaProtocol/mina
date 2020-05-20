@@ -245,7 +245,7 @@ module Verification_keys = struct
         let known_good_hash =
           "\x1B\x95\x7B\x94\xF0\xC0\xD0\x74\x47\xFA\x69\x26\x31\xBC\x19\xA5\x2E\x09\xE8\x20\x43\xEB\x4C\xFA\xEB\x11\x6B\x9A\x2A\x9B\xA2\xBA"
         in
-        Module_version.Serialization.check_serialization
+        Ppx_version.Serialization.check_serialization
           (module V1)
           keys known_good_hash
     end

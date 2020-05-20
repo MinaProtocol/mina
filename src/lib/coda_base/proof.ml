@@ -3,7 +3,6 @@
 
 open Core_kernel
 open Snark_params
-open Module_version
 
 [%%versioned_binable
 module Stable = struct
@@ -71,7 +70,7 @@ let%test_module "proof-tests" =
       let known_good_hash =
         "\x22\x36\x54\x9F\x8A\x0A\xBC\x8C\x4E\x90\x22\x91\x30\x20\x4D\x4C\xE1\x11\x01\xD4\xBA\x6B\x38\xEE\x8B\x95\x51\x7E\x6C\x40\xA7\x88"
       in
-      Serialization.check_serialization
+      Ppx_version.Serialization.check_serialization
         (module Stable.V1)
         proof known_good_hash
 
@@ -83,7 +82,7 @@ let%test_module "proof-tests" =
       let known_good_hash =
         "\xA6\x52\x85\xCE\x46\xC0\xB9\x24\x99\xA2\x3C\x90\x54\xC8\xAE\x7B\x17\x3A\x99\x64\x94\x3A\xE7\x6C\x66\xD9\x48\x5E\x5D\xD4\x83\x3F"
       in
-      Serialization.check_serialization
+      Ppx_version.Serialization.check_serialization
         (module Stable.V1)
         proof known_good_hash
 
