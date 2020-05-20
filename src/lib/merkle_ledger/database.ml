@@ -45,10 +45,16 @@ module Make (Inputs : Inputs_intf) :
 
   type path = Path.t
 
-  type t = {uuid: Uuid.Stable.V1.t; kvdb: Kvdb.t sexp_opaque; depth: int}
+  type t =
+    { uuid: Uuid.Stable.V1.t
+    ; kvdb: Kvdb.t sexp_opaque
+    ; depth: int
+    ; directory: string }
   [@@deriving sexp]
 
   let get_uuid t = t.uuid
+
+  let get_directory t = Some t.directory
 
   let depth t = t.depth
 
@@ -58,15 +64,18 @@ module Make (Inputs : Inputs_intf) :
     let directory =
       match directory_name with
       | None ->
-          Uuid.to_string uuid
+          (* Create in the autogen path, where we know we have write
+             permissions.
+          *)
+          Cache_dir.autogen_path ^/ Uuid.to_string uuid
       | Some name ->
           name
     in
     Unix.mkdir_p directory ;
     let kvdb = Kvdb.create directory in
-    {uuid; kvdb; depth}
+    {uuid; kvdb; depth; directory}
 
-  let close {kvdb; uuid= _; depth= _} = Kvdb.close kvdb
+  let close {kvdb; uuid= _; depth= _; directory= _} = Kvdb.close kvdb
 
   let with_ledger ~depth ~f =
     let t = create ~depth () in
@@ -182,7 +191,7 @@ module Make (Inputs : Inputs_intf) :
       | None ->
           Error Db_error.Account_location_not_found
       | Some location_bin ->
-          Location.parse location_bin
+          Location.parse ~ledger_depth:mdb.depth location_bin
           |> Result.map_error ~f:(fun () -> Db_error.Malformed_database)
 
     let delete mdb key = delete_raw mdb (build_location key)
@@ -221,7 +230,7 @@ module Make (Inputs : Inputs_intf) :
             (Location.serialize ~ledger_depth first_location) ;
           Result.return first_location
       | Some prev_location -> (
-        match Location.parse prev_location with
+        match Location.parse ~ledger_depth:mdb.depth prev_location with
         | Error () ->
             Error Db_error.Malformed_database
         | Ok prev_account_location ->
@@ -240,7 +249,7 @@ module Make (Inputs : Inputs_intf) :
     let last_location_address mdb =
       match
         last_location_key () |> get_raw mdb |> Result.of_option ~error:()
-        |> Result.bind ~f:Location.parse
+        |> Result.bind ~f:(Location.parse ~ledger_depth:mdb.depth)
       with
       | Error () ->
           None
@@ -250,7 +259,7 @@ module Make (Inputs : Inputs_intf) :
     let last_location mdb =
       match
         last_location_key () |> get_raw mdb |> Result.of_option ~error:()
-        |> Result.bind ~f:Location.parse
+        |> Result.bind ~f:(Location.parse ~ledger_depth:mdb.depth)
       with
       | Error () ->
           None
