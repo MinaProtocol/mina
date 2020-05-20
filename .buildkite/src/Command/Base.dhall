@@ -55,9 +55,13 @@ let targetToAgent = \(target : Size) ->
         target
 
 let build : Config.Type -> B/Command.Type = \(c : Config.Type) ->
+  let local : Bool = Prelude.Optional.null Text (Some (env:LOCAL_BUILD as Text) ? None Text) in
+
   B/Command::{
     agents =
-      let agents = targetToAgent c.target in
+      let agents_ = targetToAgent c.target
+      let agents = if local then agents_ # toMap { local = "local" } else agents_
+      in
       if Prelude.List.null (Map.Entry Text Text) agents then None (Map.Type Text Text) else Some agents,
     commands = B.definitions/commandStep/properties/commands/Type.ListString c.commands,
     depends_on = if Prelude.List.null Text c.depends_on then
@@ -67,7 +71,11 @@ let build : Config.Type -> B/Command.Type = \(c : Config.Type) ->
     key = Some c.key,
     label = Some c.label,
     plugins =
-      Some (B/Plugins.Plugins/Type (toMap { `docker#v3.5.0` = c.docker }))
+      if local then
+        -- Assume the local environment is already configured to build all tests
+        None B/Plugins
+      else
+        Some (B/Plugins.Plugins/Type (toMap { `docker#v3.5.0` = c.docker }))
   }
 
 in {Config = Config, build = build, Type = B/Command.Type}
