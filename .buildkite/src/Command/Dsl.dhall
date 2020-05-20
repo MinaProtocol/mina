@@ -8,11 +8,10 @@ let Map = Prelude.Map
 
 let Docker = ./Docker/Type.dhall
 
-let Command/Base/Partial = ./Base.dhall
 let Size = ./Size.dhall
 
 -- We assume we're only using the Docker plugin for now
-let Command/Base = Command/Base/Partial Docker.Type
+let B/Command = B.definitions/commandStep/Type Text Text Docker.Type Docker.Type
 let B/Plugins = B/Plugins/Partial Docker.Type Docker.Type
 
 -- Depends on takes several layers of unions, but we can just choose the most
@@ -55,12 +54,12 @@ let targetToAgent = \(target : Size) ->
         }
         target
 
-let build : Config.Type -> Command/Base.Type = \(c : Config.Type) ->
-  Command/Base.build Command/Base.Config::{
+let build : Config.Type -> B/Command.Type = \(c : Config.Type) ->
+  B/Command::{
     agents =
       let agents = targetToAgent c.target in
       if Prelude.List.null (Map.Entry Text Text) agents then None (Map.Type Text Text) else Some agents,
-    commands = Some (B.definitions/commandStep/properties/commands/Type.ListString c.commands),
+    commands = B.definitions/commandStep/properties/commands/Type.ListString c.commands,
     depends_on = if Prelude.List.null Text c.depends_on then
         None B/DependsOn.Type
       else
@@ -71,5 +70,5 @@ let build : Config.Type -> Command/Base.Type = \(c : Config.Type) ->
       Some (B/Plugins.Plugins/Type (toMap { `docker#v3.5.0` = c.docker }))
   }
 
-in {Config = Config, build = build, Type = Command/Base.Type}
+in {Config = Config, build = build, Type = B/Command.Type}
 
