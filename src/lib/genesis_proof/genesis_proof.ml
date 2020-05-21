@@ -80,12 +80,13 @@ let base_proof ?(logger = Logger.create ()) ~proof_level ~constraint_constants
           ~protocol_constants
     ; genesis_state_hash= t.protocol_state_with_hash.hash
     ; expected_next_state= None
-    ; update= Snark_transition.genesis ~genesis_ledger }
+    ; update= Snark_transition.genesis ~constraint_constants ~genesis_ledger }
   in
   let main x =
     Tick.handle
       (Keys.Step.main ~logger ~proof_level ~constraint_constants x)
-      (Consensus.Data.Prover_state.precomputed_handler ~genesis_ledger)
+      (Consensus.Data.Prover_state.precomputed_handler ~constraint_constants
+         ~genesis_ledger)
   in
   let tick =
     Tick.prove

@@ -62,7 +62,8 @@ let%test_module "Full_frontier tests" =
       let root_data =
         let open Root_data in
         { transition= External_transition.For_tests.genesis ~precomputed_values
-        ; staged_ledger= Staged_ledger.create_exn ~ledger:root_ledger
+        ; staged_ledger=
+            Staged_ledger.create_exn ~constraint_constants ~ledger:root_ledger
         ; protocol_states= [] }
       in
       Full_frontier.create ~logger ~root_data

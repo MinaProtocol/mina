@@ -366,10 +366,13 @@ module type S = sig
       type t = Stable.Latest.t [@@deriving to_yojson, sexp]
 
       val precomputed_handler :
-        genesis_ledger:Coda_base.Ledger.t Lazy.t -> Snark_params.Tick.Handler.t
+           constraint_constants:Genesis_constants.Constraint_constants.t
+        -> genesis_ledger:Coda_base.Ledger.t Lazy.t
+        -> Snark_params.Tick.Handler.t
 
       val handler :
            t
+        -> constraint_constants:Genesis_constants.Constraint_constants.t
         -> pending_coinbase:Coda_base.Pending_coinbase_witness.t
         -> Snark_params.Tick.Handler.t
 
