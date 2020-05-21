@@ -75,8 +75,8 @@ module Make (Inputs : Intf.Ledger_input_intf) : Intf.S = struct
   let find_new_account_record_exn_ old_account_pks =
     find_account_record_exn ~f:(fun new_account ->
         not
-          (List.mem ~equal:Public_key.equal old_account_pks)
-          (Account.public_key new_account) )
+          (List.mem ~equal:Public_key.equal old_account_pks
+             (Account.public_key new_account)) )
 
   let find_new_account_record_exn old_account_pks =
     find_new_account_record_exn_

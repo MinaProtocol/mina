@@ -30,7 +30,8 @@ module For_tests = struct
 
   let genesis_state =
     lazy
-      (t ~genesis_ledger:Test_genesis_ledger.t
+      (t
+         ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
          ~constraint_constants:
            Genesis_constants.Constraint_constants.for_unit_tests
          ~genesis_constants:Genesis_constants.for_unit_tests)
