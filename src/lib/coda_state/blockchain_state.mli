@@ -61,9 +61,15 @@ val create_value :
   -> timestamp:Block_time.t
   -> Value.t
 
-val negative_one : genesis_ledger_hash:Ledger_hash.t -> Value.t
+val negative_one :
+     constraint_constants:Genesis_constants.Constraint_constants.t
+  -> genesis_ledger_hash:Ledger_hash.t
+  -> Value.t
 
-val genesis : genesis_ledger_hash:Ledger_hash.t -> Value.t
+val genesis :
+     constraint_constants:Genesis_constants.Constraint_constants.t
+  -> genesis_ledger_hash:Ledger_hash.t
+  -> Value.t
 
 val set_timestamp : ('a, 'b, 'c) Poly.t -> 'c -> ('a, 'b, 'c) Poly.t
 

@@ -40,11 +40,27 @@ let protocol_state = salt protocol_state
 let protocol_state_body = salt protocol_state_body
 
 let merkle_tree =
-  Array.init Coda_compile_config.ledger_depth ~f:(fun i -> salt (merkle_tree i))
+  let f i = salt (merkle_tree i) in
+  (* Cache up to the compiled ledger depth. *)
+  let cached = ref [||] in
+  fun i ->
+    let len = Array.length !cached in
+    if i >= len then
+      cached :=
+        Array.append !cached
+          (Array.init (i + 1 - len) ~f:(fun i -> f (i + len))) ;
+    !cached.(i)
 
 let coinbase_merkle_tree =
-  Array.init Coda_compile_config.pending_coinbase_depth ~f:(fun i ->
-      salt (coinbase_merkle_tree i) )
+  let f i = salt (coinbase_merkle_tree i) in
+  let cached = ref [||] in
+  fun i ->
+    let len = Array.length !cached in
+    if i >= len then
+      cached :=
+        Array.append !cached
+          (Array.init (i + 1 - len) ~f:(fun i -> f (i + len))) ;
+    !cached.(i)
 
 let vrf_message = salt vrf_message
 

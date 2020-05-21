@@ -100,48 +100,6 @@
         },
         {
           "kind": "INPUT_OBJECT",
-          "name": "CreateHDAccountInput",
-          "description": null,
-          "fields": [
-            {
-              "name": "index",
-              "description": "Index of the account in hardware wallet",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "UInt32",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": [
-            {
-              "name": "index",
-              "description": "Index of the account in hardware wallet",
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "UInt32",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            }
-          ],
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "INPUT_OBJECT",
           "name": "SetSnarkWorkFee",
           "description": null,
           "fields": [
@@ -1296,6 +1254,48 @@
         },
         {
           "kind": "INPUT_OBJECT",
+          "name": "CreateHDAccountInput",
+          "description": null,
+          "fields": [
+            {
+              "name": "index",
+              "description": "Index of the account in hardware wallet",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "UInt32",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": [
+            {
+              "name": "index",
+              "description": "Index of the account in hardware wallet",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "UInt32",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            }
+          ],
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "INPUT_OBJECT",
           "name": "AddAccountInput",
           "description": null,
           "fields": [
@@ -1428,6 +1428,37 @@
                     "ofType": {
                       "kind": "INPUT_OBJECT",
                       "name": "AddAccountInput",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": null
+                }
+              ],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "AddAccountPayload",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "createHDAccount",
+              "description": "Create an account with hardware wallet - this will let the hardware wallet generate a keypair corresponds to the HD-index you give and store this HD-index and the generated public key in the daemon. Calling this command with the same HD-index and the same hardware wallet will always generate the same keypair.",
+              "args": [
+                {
+                  "name": "input",
+                  "description": null,
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "INPUT_OBJECT",
+                      "name": "CreateHDAccountInput",
                       "ofType": null
                     }
                   },
@@ -1860,37 +1891,6 @@
                 "ofType": {
                   "kind": "OBJECT",
                   "name": "SetSnarkWorkFeePayload",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "createHDAccount",
-              "description": "Create an account with hardware wallet - this will let the hardware wallet generate a keypair corresponds to the HD-index you give and store this HD-index and the generated public key in the daemon. Calling this command with the same HD-index and the same hardware wallet will always generate the same keypair.",
-              "args": [
-                {
-                  "name": "input",
-                  "description": null,
-                  "type": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "INPUT_OBJECT",
-                      "name": "CreateHDAccountInput",
-                      "ofType": null
-                    }
-                  },
-                  "defaultValue": null
-                }
-              ],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "AddAccountPayload",
                   "ofType": null
                 }
               },
@@ -2791,6 +2791,18 @@
               },
               "isDeprecated": false,
               "deprecationReason": null
+            },
+            {
+              "name": "coinbaseReceiverAccount",
+              "description": "Account to which the coinbase for this block was granted",
+              "args": [],
+              "type": {
+                "kind": "OBJECT",
+                "name": "Account",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
             }
           ],
           "inputFields": null,
@@ -3365,6 +3377,22 @@
             {
               "name": "date",
               "description": "date (stringified Unix time - number of milliseconds since January 1, 1970)",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "utcDate",
+              "description": "utcDate (stringified Unix time - number of milliseconds since January 1, 1970). Time offsets are adjusted to reflect true wall-clock time instead of genesis time.",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -4128,16 +4156,6 @@
           "possibleTypes": null
         },
         {
-          "kind": "SCALAR",
-          "name": "Time",
-          "description": null,
-          "fields": null,
-          "inputFields": null,
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
           "kind": "OBJECT",
           "name": "ConsensusConfiguration",
           "description": null,
@@ -4263,7 +4281,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "Time",
+                  "name": "String",
                   "ofType": null
                 }
               },

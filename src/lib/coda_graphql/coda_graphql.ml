@@ -154,6 +154,8 @@ module Types = struct
             ~resolve:(fun {ctx= coda; _} global_slot ->
               let constants =
                 Consensus.Constants.create
+                  ~constraint_constants:
+                    (Coda_lib.config coda).constraint_constants
                   ~protocol_constants:
                     (Coda_lib.config coda).precomputed_values.genesis_constants
                       .protocol
@@ -164,6 +166,8 @@ module Types = struct
             ~resolve:(fun {ctx= coda; _} global_slot ->
               let constants =
                 Consensus.Constants.create
+                  ~constraint_constants:
+                    (Coda_lib.config coda).constraint_constants
                   ~protocol_constants:
                     (Coda_lib.config coda).precomputed_values.genesis_constants
                       .protocol
@@ -186,6 +190,8 @@ module Types = struct
             ~resolve:(fun {ctx= coda; _} ->
               let consensus_constants =
                 Consensus.Constants.create
+                  ~constraint_constants:
+                    (Coda_lib.config coda).constraint_constants
                   ~protocol_constants:
                     (Coda_lib.config coda).precomputed_values.genesis_constants
                       .protocol
@@ -264,19 +270,18 @@ module Types = struct
                ~acceptable_network_delay:nn_int
                ~genesis_state_timestamp:nn_time )
 
-    let peer : (_, Network_peer.Peer.Display.Stable.V1.t option) typ =
+    let peer : (_, Network_peer.Peer.Display.t option) typ =
       obj "Peer" ~fields:(fun _ ->
           let open Reflection.Shorthand in
           List.rev
-          @@ Network_peer.Peer.Display.Stable.V1.Fields.fold ~init:[]
-               ~host:nn_string ~libp2p_port:nn_int ~peer_id:nn_string )
+          @@ Network_peer.Peer.Display.Fields.fold ~init:[] ~host:nn_string
+               ~libp2p_port:nn_int ~peer_id:nn_string )
 
-    let addrs_and_ports :
-        (_, Node_addrs_and_ports.Display.Stable.V1.t option) typ =
+    let addrs_and_ports : (_, Node_addrs_and_ports.Display.t option) typ =
       obj "AddrsAndPorts" ~fields:(fun _ ->
           let open Reflection.Shorthand in
           List.rev
-          @@ Node_addrs_and_ports.Display.Stable.V1.Fields.fold ~init:[]
+          @@ Node_addrs_and_ports.Display.Fields.fold ~init:[]
                ~external_ip:nn_string ~bind_ip:nn_string ~client_port:nn_int
                ~libp2p_port:nn_int ~peer:(id ~typ:peer) )
 
@@ -874,7 +879,13 @@ module Types = struct
             ~doc:"Amount of coda granted to the producer of this block"
             ~args:Arg.[]
             ~resolve:(fun _ {coinbase; _} -> Currency.Amount.to_uint64 coinbase)
-        ] )
+        ; field "coinbaseReceiverAccount" ~typ:AccountObj.account
+            ~doc:"Account to which the coinbase for this block was granted"
+            ~args:Arg.[]
+            ~resolve:(fun {ctx= coda; _} {coinbase_receiver; _} ->
+              Option.map
+                ~f:(AccountObj.get_best_ledger_account coda)
+                coinbase_receiver ) ] )
 
   let protocol_state_proof : (Coda_lib.t, Proof.t option) typ =
     let display_g1_elem (g1 : Crypto_params.Tick_backend.Inner_curve.t) =
@@ -1809,6 +1820,7 @@ module Mutations = struct
   let commands =
     [ add_wallet
     ; create_account
+    ; create_hd_account
     ; unlock_account
     ; unlock_wallet
     ; lock_account

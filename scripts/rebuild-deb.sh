@@ -108,8 +108,8 @@ do
 done
 
 # Genesis Ledger Copy
-for f in /tmp/coda_cache_dir/coda_genesis*; do
-    cp /tmp/coda_cache_dir/coda_genesis* "${BUILDDIR}/var/lib/coda/."
+for f in /tmp/coda_cache_dir/genesis*; do
+    cp /tmp/coda_cache_dir/genesis* "${BUILDDIR}/var/lib/coda/."
 done
 
 # Bash autocompletion

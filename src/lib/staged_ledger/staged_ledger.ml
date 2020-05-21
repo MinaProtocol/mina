@@ -144,6 +144,7 @@ module T = struct
           (* Invariant: this is the ledger after having applied all the transactions in
      *the above state. *)
     ; ledger: Ledger.attached_mask sexp_opaque
+    ; pending_coinbase_depth: int
     ; pending_coinbase_collection: Pending_coinbase.t }
   [@@deriving sexp]
 
@@ -188,15 +189,15 @@ module T = struct
         failwithf !"statement_exn: %{sexp:Error.t}" e ()
 
   let of_scan_state_and_ledger_unchecked ~ledger ~scan_state
-      ~pending_coinbase_collection =
-    {ledger; scan_state; pending_coinbase_collection}
+      ~pending_coinbase_depth ~pending_coinbase_collection =
+    {ledger; scan_state; pending_coinbase_depth; pending_coinbase_collection}
 
   let of_scan_state_and_ledger ~logger ~verifier ~snarked_ledger_hash ~ledger
-      ~scan_state ~pending_coinbase_collection =
+      ~scan_state ~pending_coinbase_depth ~pending_coinbase_collection =
     let open Deferred.Or_error.Let_syntax in
     let t =
       of_scan_state_and_ledger_unchecked ~ledger ~scan_state
-        ~pending_coinbase_collection
+        ~pending_coinbase_depth ~pending_coinbase_collection
     in
     let%bind () =
       Statement_scanner_with_proofs.check_invariants scan_state
@@ -209,9 +210,11 @@ module T = struct
     return t
 
   let of_scan_state_and_ledger_unchecked ~snarked_ledger_hash ~ledger
-      ~scan_state ~pending_coinbase_collection =
+      ~scan_state ~pending_coinbase_depth ~pending_coinbase_collection =
     let open Deferred.Or_error.Let_syntax in
-    let t = {ledger; scan_state; pending_coinbase_collection} in
+    let t =
+      {ledger; scan_state; pending_coinbase_depth; pending_coinbase_collection}
+    in
     let%bind () =
       Statement_scanner.check_invariants scan_state ~verifier:()
         ~error_prefix:"Staged_ledger.of_scan_state_and_ledger"
@@ -222,6 +225,7 @@ module T = struct
     return t
 
   let of_scan_state_pending_coinbases_and_snarked_ledger ~logger ~verifier
+      ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ~scan_state ~snarked_ledger ~expected_merkle_root ~pending_coinbases =
     let open Deferred.Or_error.Let_syntax in
     let snarked_ledger_hash = Ledger.merkle_root snarked_ledger in
@@ -251,16 +255,24 @@ module T = struct
     in
     of_scan_state_and_ledger ~logger ~verifier
       ~snarked_ledger_hash:snarked_frozen_ledger_hash ~ledger:snarked_ledger
-      ~scan_state ~pending_coinbase_collection:pending_coinbases
+      ~scan_state
+      ~pending_coinbase_depth:constraint_constants.pending_coinbase_depth
+      ~pending_coinbase_collection:pending_coinbases
 
-  let copy {scan_state; ledger; pending_coinbase_collection} =
+  let copy
+      {scan_state; ledger; pending_coinbase_depth; pending_coinbase_collection}
+      =
     let new_mask = Ledger.Mask.create ~depth:(Ledger.depth ledger) () in
     { scan_state
     ; ledger= Ledger.register_mask ledger new_mask
+    ; pending_coinbase_depth
     ; pending_coinbase_collection }
 
-  let hash {scan_state; ledger; pending_coinbase_collection} :
-      Staged_ledger_hash.t =
+  let hash
+      { scan_state
+      ; ledger
+      ; pending_coinbase_depth= _
+      ; pending_coinbase_collection } : Staged_ledger_hash.t =
     Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
       (Scan_state.hash scan_state)
       (Ledger.merkle_root ledger)
@@ -277,11 +289,16 @@ module T = struct
 
   let ledger {ledger; _} = ledger
 
-  let create_exn ~ledger : t =
+  let create_exn
+      ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+      ~ledger : t =
     { scan_state= Scan_state.empty ()
     ; ledger
+    ; pending_coinbase_depth= constraint_constants.pending_coinbase_depth
     ; pending_coinbase_collection=
-        Pending_coinbase.create () |> Or_error.ok_exn }
+        Pending_coinbase.create
+          ~depth:constraint_constants.pending_coinbase_depth ()
+        |> Or_error.ok_exn }
 
   let current_ledger_proof t =
     Option.map
@@ -556,7 +573,7 @@ module T = struct
            (false, [], Pending_coinbase.Update.Action.Update_none, `Update_none))
 
   (*update the pending_coinbase tree with the updated/new stack and delete the oldest stack if a proof was emitted*)
-  let update_pending_coinbase_collection pending_coinbase_collection
+  let update_pending_coinbase_collection ~depth pending_coinbase_collection
       stack_update ~is_new_stack ~ledger_proof =
     let open Result.Let_syntax in
     (*Deleting oldest stack if proof emitted*)
@@ -564,7 +581,8 @@ module T = struct
       match ledger_proof with
       | Some (proof, _) ->
           let%bind oldest_stack, pending_coinbase_collection_updated1 =
-            Pending_coinbase.remove_coinbase_stack pending_coinbase_collection
+            Pending_coinbase.remove_coinbase_stack ~depth
+              pending_coinbase_collection
             |> to_staged_ledger_or_error
           in
           let ledger_proof_stack =
@@ -589,17 +607,17 @@ module T = struct
     | `Update_none ->
         Ok pending_coinbase_collection_updated1
     | `Update_one stack1 ->
-        Pending_coinbase.update_coinbase_stack
+        Pending_coinbase.update_coinbase_stack ~depth
           pending_coinbase_collection_updated1 stack1 ~is_new_stack
         |> to_staged_ledger_or_error
     | `Update_two (stack1, stack2) ->
         (*The case when some of the transactions go into the old tree and remaining on to the new tree*)
         let%bind update1 =
-          Pending_coinbase.update_coinbase_stack
+          Pending_coinbase.update_coinbase_stack ~depth
             pending_coinbase_collection_updated1 stack1 ~is_new_stack:false
           |> to_staged_ledger_or_error
         in
-        Pending_coinbase.update_coinbase_stack update1 stack2
+        Pending_coinbase.update_coinbase_stack ~depth update1 stack2
           ~is_new_stack:true
         |> to_staged_ledger_or_error
 
@@ -677,8 +695,9 @@ module T = struct
       Deferred.return (to_staged_ledger_or_error r)
     in
     let%bind updated_pending_coinbase_collection' =
-      update_pending_coinbase_collection t.pending_coinbase_collection
-        stack_update ~is_new_stack ~ledger_proof:res_opt
+      update_pending_coinbase_collection ~depth:t.pending_coinbase_depth
+        t.pending_coinbase_collection stack_update ~is_new_stack
+        ~ledger_proof:res_opt
       |> Deferred.return
     in
     let%bind coinbase_amount =
@@ -705,6 +724,7 @@ module T = struct
     let new_staged_ledger =
       { scan_state= scan_state'
       ; ledger= new_ledger
+      ; pending_coinbase_depth= t.pending_coinbase_depth
       ; pending_coinbase_collection= updated_pending_coinbase_collection' }
     in
     ( `Hash_after_applying (hash new_staged_ledger)
@@ -1532,6 +1552,9 @@ let%test_module "test" =
 
     let proof_level = Genesis_constants.Proof_level.Check
 
+    let constraint_constants =
+      Genesis_constants.Constraint_constants.for_unit_tests
+
     (* Functor for testing with different instantiated staged ledger modules. *)
     let create_and_apply_with_state_body_hash state_body_hash sl logger pids
         txns stmt_to_work =
@@ -1575,15 +1598,15 @@ let%test_module "test" =
       *)
     let async_with_ledgers ledger_init_state
         (f : Sl.t ref -> Ledger.Mask.Attached.t -> unit Deferred.t) =
-      Ledger.with_ephemeral_ledger
-        ~depth:Genesis_constants.ledger_depth_for_unit_tests ~f:(fun ledger ->
+      Ledger.with_ephemeral_ledger ~depth:constraint_constants.ledger_depth
+        ~f:(fun ledger ->
           Ledger.apply_initial_ledger_state ledger ledger_init_state ;
           let casted = Ledger.Any_ledger.cast (module Ledger) ledger in
           let test_mask =
             Ledger.Maskable.register_mask casted
               (Ledger.Mask.create ~depth:(Ledger.depth ledger) ())
           in
-          let sl = ref @@ Sl.create_exn ~ledger in
+          let sl = ref @@ Sl.create_exn ~constraint_constants ~ledger in
           Async.Thread_safe.block_on_async_exn (fun () -> f sl test_mask) ;
           ignore @@ Ledger.Maskable.unregister_mask_exn test_mask )
 
@@ -2507,13 +2530,15 @@ let%test_module "test" =
           if Option.is_some proof then Boolean.true_ else Boolean.false_
         in
         let%bind root_after_popping, _deleted_stack =
-          Pending_coinbase.Checked.pop_coinbases ~proof_emitted
+          Pending_coinbase.Checked.pop_coinbases
+            ~depth:constraint_constants.pending_coinbase_depth ~proof_emitted
             (Hash.var_of_t root_before)
         in
         let action = Update.Action.var_of_t pc_action in
         let coinbase_var = Coinbase_data.(var_of_t coinbase_data) in
         let state_body_hash_var = State_body_hash.var_of_t state_body_hash in
-        Pending_coinbase.Checked.add_coinbase root_after_popping
+        Pending_coinbase.Checked.add_coinbase
+          ~depth:constraint_constants.pending_coinbase_depth root_after_popping
           (action, coinbase_var, state_body_hash_var)
       in
       let checked_root_after_update =
@@ -2522,7 +2547,9 @@ let%test_module "test" =
         let comp =
           let%map result =
             handle f_pop_and_add
-              (unstage (handler pending_coinbase_before ~is_new_stack))
+              (unstage
+                 (handler ~depth:constraint_constants.pending_coinbase_depth
+                    pending_coinbase_before ~is_new_stack))
           in
           As_prover.read Hash.typ result
         in

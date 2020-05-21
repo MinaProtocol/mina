@@ -1,64 +1,87 @@
 module StringMap = Map.Make(String);
 
-let printMap = map => {
-  StringMap.mapi(
-    (key, value) => {
-      Js.log(key);
-      Js.log(value);
+let addPointsToUsersWithAtleastN =
+    (getMetricValue, threshold, points, metricsMap) => {
+  StringMap.fold(
+    (key, metric, map) => {
+      switch (getMetricValue(metric)) {
+      | Some(metricValue) =>
+        metricValue >= threshold ? StringMap.add(key, points, map) : map
+      | None => map
+      }
     },
-    map,
+    metricsMap,
+    StringMap.empty,
   );
 };
 
-let getUsers = blocks => {
-  Array.map(
-    (block: Types.NewBlock.t) => block.data.newBlock.creatorAccount.publicKey,
-    blocks,
-  );
-};
+let applyTopNPoints = (n, points, metricsMap, getMetricValue) => {
+  let metricsArray = Array.of_list(StringMap.bindings(metricsMap));
+  let f = ((_, metricValue1), (_, metricValue2)) => {
+    compare(getMetricValue(metricValue1), getMetricValue(metricValue2));
+  };
+  Array.sort(f, metricsArray);
+  let topNArray =
+    Array.sub(metricsArray, 0, min(n, Array.length(metricsArray)));
+  let topNArrayWithPoints =
+    Array.map(((user, _)) => {(user, points)}, topNArray);
 
-let calculateBlocksCreated = blocks => {
   Array.fold_left(
-    (map, block: Types.NewBlock.t) => {
-      StringMap.update(
-        block.data.newBlock.creatorAccount.publicKey,
-        value =>
-          switch (value) {
-          | Some(blockCount) => Some(blockCount + 1)
-          | None => Some(1)
-          },
-        map,
-      )
+    (map, (userPublicKey, userPoints)) => {
+      StringMap.add(userPublicKey, userPoints, map)
     },
     StringMap.empty,
-    blocks,
+    topNArrayWithPoints,
   );
 };
 
-let calculateTransactionSent = blocks => {
-  Js.log("calculateTransactionSent");
-};
+// Examples of using the challenges
+let calculatePoints = metricsMap => {
+  // Get 500 pts if you send txn to the echo service
+  let echoTransactionPoints =
+    addPointsToUsersWithAtleastN(
+      (metricRecord: Types.Metrics.metricRecord) =>
+        metricRecord.transactionsReceivedByEcho,
+      1,
+      500,
+      metricsMap,
+    );
 
-let calculateSnarkWorkCreated = blocks => {
-  Js.log("calculateSnarkWorkCreated");
-};
+  //Earn 3 fees by producing and selling zk-SNARKs on the snarketplace: 1000 pts*
+  let zkSnark3FeesPoints =
+    addPointsToUsersWithAtleastN(
+      (metricRecord: Types.Metrics.metricRecord) =>
+        metricRecord.snarkFeesCollected,
+      3L,
+      1000,
+      metricsMap,
+    );
 
-// Expected Output
-// {
-//       "pk1": {"block_count": 1, "transactions_sent": 134, "snark_jobs": 11}
-//       "pk2": {"block_count": 4, "transactions_sent": 55, "snark_jobs": 3}
-//       "pk3": {"block_count": 0, "transactions_sent": 3, "snark_jobs": 8}
-//}
-let handleMetrics = (metrics, blocks) => {
-  Types.Metrics.(
-    Array.map(
-      metric => {
-        switch (metric) {
-        | BlocksCreated => blocks |> calculateBlocksCreated
-        | _ => StringMap.empty
-        }
-      },
-      metrics,
-    )
-  );
+  //Anyone who earned 50 fees will be rewarded with an additional 1000 pts
+  let zkSnark50FeesPoints =
+    addPointsToUsersWithAtleastN(
+      (metricRecord: Types.Metrics.metricRecord) =>
+        metricRecord.snarkFeesCollected,
+      50L,
+      1000,
+      metricsMap,
+    );
+
+  // Producing at least 3 blocks will earn an additional 1000 pts
+  let blocksCreatedPoints =
+    addPointsToUsersWithAtleastN(
+      (metricRecord: Types.Metrics.metricRecord) =>
+        metricRecord.blocksCreated,
+      3,
+      1000,
+      metricsMap,
+    );
+
+  // Give Top 10 Block Producers 1500 pts
+  let topTenBlockProducerPoints =
+    applyTopNPoints(
+      10, 1500, metricsMap, (metricRecord: Types.Metrics.metricRecord) =>
+      metricRecord.blocksCreated
+    );
+  ();
 };

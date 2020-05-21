@@ -5,15 +5,14 @@ module type S = sig
 
   val digest_size_in_bytes : int
 
+  [%%versioned:
   module Stable : sig
     module V1 : sig
-      type t [@@deriving bin_io, version, sexp, compare, hash]
+      type t [@@deriving sexp, compare, hash]
     end
+  end]
 
-    module Latest = V1
-  end
-
-  type t = Stable.V1.t [@@deriving sexp, compare, hash]
+  type t = Stable.Latest.t [@@deriving sexp, compare, hash]
 
   include Hashable.S with type t := t
 

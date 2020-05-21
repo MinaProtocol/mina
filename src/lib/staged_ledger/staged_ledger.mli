@@ -73,7 +73,10 @@ val scan_state : t -> Scan_state.t
 
 val pending_coinbase_collection : t -> Pending_coinbase.t
 
-val create_exn : ledger:Ledger.t -> t
+val create_exn :
+     constraint_constants:Genesis_constants.Constraint_constants.t
+  -> ledger:Ledger.t
+  -> t
 
 val of_scan_state_and_ledger :
      logger:Logger.t
@@ -81,6 +84,7 @@ val of_scan_state_and_ledger :
   -> snarked_ledger_hash:Frozen_ledger_hash.t
   -> ledger:Ledger.t
   -> scan_state:Scan_state.t
+  -> pending_coinbase_depth:int
   -> pending_coinbase_collection:Pending_coinbase.t
   -> t Or_error.t Deferred.t
 
@@ -88,6 +92,7 @@ val of_scan_state_and_ledger_unchecked :
      snarked_ledger_hash:Frozen_ledger_hash.t
   -> ledger:Ledger.t
   -> scan_state:Scan_state.t
+  -> pending_coinbase_depth:int
   -> pending_coinbase_collection:Pending_coinbase.t
   -> t Or_error.t Deferred.t
 
@@ -146,6 +151,7 @@ val statement_exn :
 val of_scan_state_pending_coinbases_and_snarked_ledger :
      logger:Logger.t
   -> verifier:Verifier.t
+  -> constraint_constants:Genesis_constants.Constraint_constants.t
   -> scan_state:Scan_state.t
   -> snarked_ledger:Ledger.t
   -> expected_merkle_root:Ledger_hash.t

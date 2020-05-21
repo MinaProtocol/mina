@@ -1,16 +1,4 @@
-open Tuple_lib
 open Core_kernel
-
-module Triple = struct
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type 'a t = 'a * 'a * 'a
-    end
-  end]
-
-  type 'a t = 'a Stable.Latest.t
-end
 
 module Evals = struct
   [%%versioned
@@ -30,7 +18,7 @@ module Evals = struct
         ; g_1: 'a
         ; g_2: 'a
         ; g_3: 'a }
-      [@@deriving fields]
+      [@@deriving fields, sexp, compare, yojson]
     end
   end]
 
@@ -48,7 +36,7 @@ module Evals = struct
     ; g_1: 'a
     ; g_2: 'a
     ; g_3: 'a }
-  [@@deriving fields]
+  [@@deriving fields, sexp, compare, yojson]
 
   let to_vectors
       { w_hat
@@ -135,11 +123,13 @@ module Openings = struct
       module V1 = struct
         type ('fq, 'g) t =
           {lr: ('g * 'g) array; z_1: 'fq; z_2: 'fq; delta: 'g; sg: 'g}
+        [@@deriving sexp, compare, yojson]
       end
     end]
 
     type ('fq, 'g) t = ('fq, 'g) Stable.Latest.t =
       {lr: ('g * 'g) array; z_1: 'fq; z_2: 'fq; delta: 'g; sg: 'g}
+    [@@deriving sexp, compare, yojson]
 
     open Snarky.H_list
 
@@ -156,19 +146,23 @@ module Openings = struct
         ~value_of_hlist:of_hlist
   end
 
-  open Evals
-
   [%%versioned
   module Stable = struct
     module V1 = struct
       type ('fq, 'g) t =
         { proof: ('fq, 'g) Bulletproof.Stable.V1.t
-        ; evals: 'fq Evals.Stable.V1.t Triple.Stable.V1.t }
+        ; evals:
+            'fq Evals.Stable.V1.t
+            * 'fq Evals.Stable.V1.t
+            * 'fq Evals.Stable.V1.t }
+      [@@deriving sexp, compare, yojson]
     end
   end]
 
-  type ('fq, 'g) t = ('fq, 'g) Stable.Latest.t =
-    {proof: ('fq, 'g) Bulletproof.t; evals: 'fq Evals.t Triple.t}
+  type ('fq, 'g) t =
+    { proof: ('fq, 'g) Bulletproof.t
+    ; evals: 'fq Evals.t * 'fq Evals.t * 'fq Evals.t }
+  [@@deriving sexp, compare, yojson]
 
   let to_hlist {proof; evals} = Snarky.H_list.[proof; evals]
 

@@ -24,9 +24,6 @@ module Currency = Currency_nonconsensus.Currency
 "genesis_ledger", genesis_ledger]
 
 [%%inject
-"ledger_depth", ledger_depth]
-
-[%%inject
 "account_creation_fee_string", account_creation_fee_int]
 
 [%%inject
@@ -102,16 +99,6 @@ let transaction_capacity_log_2 =
 let pending_coinbase_depth =
   Core_kernel.Int.ceil_log2
     (((transaction_capacity_log_2 + 1) * (work_delay + 1)) + 1)
-
-[%%ifdef
-consensus_mechanism]
-
-(** Consensus constants *)
-
-[%%inject
-"c", c]
-
-[%%endif]
 
 (* This is a bit of a hack, see #3232. *)
 let inactivity_ms = block_window_duration_ms * 8
