@@ -39,7 +39,6 @@ let applyTopNPoints = (n, points, metricsMap, getMetricValue) => {
 let calculatePoints = (challengeID, metricsMap) => {
   switch (Js.String.match([%re "/\s*([a-zA-z\s*]+)\s*/"], challengeID)) {
   | Some(res) =>
-    Js.log(res[1]);
     switch (res[1]) {
     | "Blocks" =>
       addPointsToUsersWithAtleastN(
@@ -66,7 +65,7 @@ let calculatePoints = (challengeID, metricsMap) => {
         metricsMap,
       )
     | _ => StringMap.empty
-    };
+    }
   | None => StringMap.empty
   };
 };
