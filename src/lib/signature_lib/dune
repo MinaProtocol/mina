@@ -7,8 +7,8 @@
    blake2
    core
    hash_prefix_states
-   module_version
    non_zero_curve_point
+   ppx_version
    random_oracle
    snark_params
    snarky

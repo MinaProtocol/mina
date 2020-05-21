@@ -161,6 +161,22 @@ let calculateAllUsers = metrics => {
   );
 };
 
+// Combines two maps of users to points and returns one map of users to points
+let sumPointsMaps = maps => {
+  List.fold_left(
+    StringMap.merge((_, value, secondValue) => {
+      switch (value, secondValue) {
+      | (Some(value), Some(secondValue)) => Some(value + secondValue)
+      | (Some(value), None)
+      | (None, Some(value)) => Some(value)
+      | (None, None) => None
+      }
+    }),
+    StringMap.empty,
+    maps,
+  );
+};
+
 let echoBotPublicKey = "4vsRCVNep7JaFhtySu6vZCjnArvoAhkRscTy5TQsGTsKM4tJcYVc3uNUMRxQZAwVzSvkHDGWBmvhFpmCeiPASGnByXqvKzmHt4aR5uAWAQf3kqhwDJ2ZY3Hw4Dzo6awnJkxY338GEp12LE4x";
 let calculateMetrics = blocks => {
   let blocksCreated = getBlocksCreatedByUser(blocks);

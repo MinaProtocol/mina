@@ -7,33 +7,6 @@ let s3_install_path = "/tmp/s3_cache_dir"
 
 let manual_install_path = "/var/lib/coda"
 
-let genesis_dir_name
-    ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-    ~(genesis_constants : Genesis_constants.t) ~proof_level =
-  let digest =
-    (*include all the time constants that would affect the genesis
-    ledger and the proof*)
-    let str =
-      ( List.map
-          [ Coda_compile_config.curve_size
-          ; constraint_constants.ledger_depth
-          ; Option.value ~default:0 genesis_constants.num_accounts
-          ; constraint_constants.c
-          ; genesis_constants.protocol.k ]
-          ~f:Int.to_string
-      |> String.concat ~sep:"" )
-      ^ Genesis_constants.Proof_level.to_string proof_level
-      ^ Coda_compile_config.genesis_ledger
-    in
-    Blake2.digest_string str |> Blake2.to_hex
-  in
-  let digest_short =
-    let len = 16 in
-    if String.length digest - len <= 0 then digest
-    else String.sub digest ~pos:0 ~len
-  in
-  "coda_genesis" ^ "_" ^ Coda_version.commit_id_short ^ "_" ^ digest_short
-
 let brew_install_path =
   match
     let p = Core.Unix.open_process_in "brew --prefix 2>/dev/null" in

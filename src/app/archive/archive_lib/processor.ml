@@ -210,7 +210,7 @@ module User_command = struct
              "INSERT INTO user_commands (type, fee_payer_id, source_id, \
               receiver_id, fee_token, token, nonce, amount, fee, memo, hash) \
               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id")
-          { typ= (if User_command.is_payment t then "payment" else "delegation")
+          { typ= User_command.tag_string t
           ; fee_payer_id
           ; source_id
           ; receiver_id
