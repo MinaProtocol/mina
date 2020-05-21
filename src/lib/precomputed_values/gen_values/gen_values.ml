@@ -48,8 +48,8 @@ module Make_real (Keys : Keys_lib.Keys.S) = struct
     Genesis_proof.create_values
       ~keys:(module Keys : Keys_lib.Keys.S)
       ~proof_level:Full
-      ~constraint_constants:Genesis_constants.Constraint_constants.compiled
-      { genesis_constants= Genesis_constants.compiled
+      { constraint_constants= Genesis_constants.Constraint_constants.compiled
+      ; genesis_constants= Genesis_constants.compiled
       ; genesis_ledger= (module Test_genesis_ledger)
       ; protocol_state_with_hash
       ; base_hash }
@@ -96,7 +96,9 @@ let main () =
              Lazy.force
                Coda_state.Genesis_protocol_state.For_tests.genesis_state
            in
-           { genesis_constants= Genesis_constants.for_unit_tests
+           { constraint_constants=
+               Genesis_constants.Constraint_constants.for_unit_tests
+           ; genesis_constants= Genesis_constants.for_unit_tests
            ; genesis_ledger= Genesis_ledger.for_unit_tests
            ; protocol_state_with_hash
            ; base_hash= unit_test_base_hash
@@ -115,7 +117,9 @@ let main () =
                  Genesis_constants.Constraint_constants.compiled
                ~genesis_constants:Genesis_constants.compiled
            in
-           { genesis_constants= Genesis_constants.compiled
+           { constraint_constants=
+               Genesis_constants.Constraint_constants.compiled
+           ; genesis_constants= Genesis_constants.compiled
            ; genesis_ledger= (module Test_genesis_ledger)
            ; protocol_state_with_hash
            ; base_hash= compiled_base_hash

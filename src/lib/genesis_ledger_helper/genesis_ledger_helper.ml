@@ -450,21 +450,22 @@ module Genesis_proof = struct
       | _ ->
           return Snark_params.Tick.Field.zero
     in
-    { Genesis_proof.Inputs.genesis_ledger= ledger
+    { Genesis_proof.Inputs.constraint_constants
+    ; genesis_ledger= ledger
     ; protocol_state_with_hash
     ; base_hash
     ; genesis_constants }
 
-  let generate ~proof_level ~constraint_constants inputs =
+  let generate ~proof_level inputs =
     (* TODO(4829): Runtime proof-level. *)
     match proof_level with
     | Genesis_constants.Proof_level.Full ->
         let%map ((module Keys) as keys) = Keys_lib.Keys.create () in
-        Genesis_proof.create_values ~constraint_constants ~proof_level ~keys
-          inputs
+        Genesis_proof.create_values ~proof_level ~keys inputs
     | _ ->
         return
-          { Genesis_proof.genesis_constants= inputs.genesis_constants
+          { Genesis_proof.constraint_constants= inputs.constraint_constants
+          ; genesis_constants= inputs.genesis_constants
           ; genesis_ledger= inputs.genesis_ledger
           ; protocol_state_with_hash= inputs.protocol_state_with_hash
           ; base_hash= inputs.base_hash
@@ -484,14 +485,16 @@ module Genesis_proof = struct
         >>| Sexp.of_string >>| Proof.Stable.V1.t_of_sexp )
 
   let load_or_generate ~genesis_dir ~logger ~may_generate ~proof_level
-      ~constraint_constants (inputs : Genesis_proof.Inputs.t) =
+      (inputs : Genesis_proof.Inputs.t) =
     let compiled = Precomputed_values.compiled in
     match%bind find_file ~logger ~base_hash:inputs.base_hash with
     | Some file -> (
         match%map load file with
         | Ok genesis_proof ->
             Ok
-              ( { Genesis_proof.genesis_constants= inputs.genesis_constants
+              ( { Genesis_proof.constraint_constants=
+                    inputs.constraint_constants
+                ; genesis_constants= inputs.genesis_constants
                 ; genesis_ledger= inputs.genesis_ledger
                 ; protocol_state_with_hash= inputs.protocol_state_with_hash
                 ; base_hash= inputs.base_hash
@@ -516,7 +519,8 @@ module Genesis_proof = struct
             ; ("compiled_hash", Ledger_hash.to_yojson compiled.base_hash) ] ;
         let filename = genesis_dir ^/ filename ~base_hash:inputs.base_hash in
         let values =
-          { Genesis_proof.genesis_constants= inputs.genesis_constants
+          { Genesis_proof.constraint_constants= inputs.constraint_constants
+          ; genesis_constants= inputs.genesis_constants
           ; genesis_ledger= inputs.genesis_ledger
           ; protocol_state_with_hash= inputs.protocol_state_with_hash
           ; base_hash= inputs.base_hash
@@ -542,7 +546,7 @@ module Genesis_proof = struct
           "No genesis proof file was found for $base_hash, generating a new \
            genesis proof"
           ~metadata:[("base_hash", Ledger_hash.to_yojson inputs.base_hash)] ;
-        let%bind values = generate ~proof_level ~constraint_constants inputs in
+        let%bind values = generate ~proof_level inputs in
         let filename = genesis_dir ^/ filename ~base_hash:inputs.base_hash in
         let%map () =
           match%map store ~filename values.genesis_proof with
@@ -626,7 +630,7 @@ let load_config_file filename =
           Or_error.error_string err )
 
 let init_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
-    ~may_generate ~constraint_constants ~proof_level ~genesis_constants
+    ~may_generate ~proof_level ~genesis_constants ~constraint_constants
     (config : Runtime_config.t) =
   let open Deferred.Or_error.Let_syntax in
   let%bind genesis_ledger, ledger_config, ledger_file =
@@ -652,7 +656,7 @@ let init_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
   let open Deferred.Or_error.Let_syntax in
   let%map values, proof_file =
     Genesis_proof.load_or_generate ~genesis_dir ~logger ~may_generate
-      ~proof_level ~constraint_constants proof_inputs
+      ~proof_level proof_inputs
   in
   Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
     "Loaded ledger from $ledger_file and genesis proof from $proof_file"
