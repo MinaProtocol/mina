@@ -78,8 +78,8 @@ module For_tests : sig
   val gen_genesis_breadcrumb :
        ?logger:Logger.t
     -> proof_level:Genesis_constants.Proof_level.t
-    -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> ?verifier:Verifier.t
+    -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> precomputed_values:Precomputed_values.t
     -> unit
     -> Breadcrumb.t Quickcheck.Generator.t

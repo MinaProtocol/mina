@@ -73,7 +73,10 @@ val scan_state : t -> Scan_state.t
 
 val pending_coinbase_collection : t -> Pending_coinbase.t
 
-val create_exn : ledger:Ledger.t -> t
+val create_exn :
+     constraint_constants:Genesis_constants.Constraint_constants.t
+  -> ledger:Ledger.t
+  -> t
 
 val of_scan_state_and_ledger :
      logger:Logger.t

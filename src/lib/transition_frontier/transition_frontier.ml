@@ -29,13 +29,19 @@ type t =
   ; extensions: Extensions.t
   ; genesis_state_hash: State_hash.t }
 
-let genesis_root_data ~precomputed_values =
+let genesis_root_data
+    ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+    ~precomputed_values =
   let open Root_data.Limited in
   let transition = External_transition.genesis ~precomputed_values in
   let scan_state = Staged_ledger.Scan_state.empty () in
   (*if scan state is empty the protocol states required is also empty*)
   let protocol_states = [] in
-  let pending_coinbase = Or_error.ok_exn (Pending_coinbase.create ()) in
+  let pending_coinbase =
+    Or_error.ok_exn
+      (Pending_coinbase.create
+         ~depth:constraint_constants.pending_coinbase_depth ())
+  in
   create ~transition ~scan_state ~pending_coinbase ~protocol_states
 
 let load_from_persistence_and_start ~logger ~verifier ~consensus_local_state
@@ -171,7 +177,8 @@ let rec load_with_max_length :
     in
     let%bind () =
       Persistent_frontier.reset_database_exn persistent_frontier
-        ~root_data:(genesis_root_data ~precomputed_values)
+        ~root_data:
+          (genesis_root_data ~precomputed_values ~constraint_constants)
     in
     let%bind () =
       Persistent_root.reset_to_genesis_exn persistent_root ~precomputed_values
@@ -420,8 +427,8 @@ module For_tests = struct
   *)
 
   (* a helper quickcheck generator which always returns the genesis breadcrumb *)
-  let gen_genesis_breadcrumb ?(logger = Logger.null ()) ~proof_level
-      ~constraint_constants ?verifier ~precomputed_values () =
+  let gen_genesis_breadcrumb ?(logger = Logger.null ()) ~proof_level ?verifier
+      ~constraint_constants ~precomputed_values () =
     let verifier =
       match verifier with
       | Some x ->
@@ -443,10 +450,13 @@ module For_tests = struct
             (Async.Thread_safe.block_on_async_exn (fun () ->
                  Staged_ledger
                  .of_scan_state_pending_coinbases_and_snarked_ledger ~logger
-                   ~constraint_constants ~verifier
+                   ~verifier ~constraint_constants
                    ~scan_state:(Staged_ledger.Scan_state.empty ())
                    ~pending_coinbases:
-                     (Or_error.ok_exn @@ Pending_coinbase.create ())
+                     ( Or_error.ok_exn
+                     @@ Pending_coinbase.create
+                          ~depth:constraint_constants.pending_coinbase_depth ()
+                     )
                    ~snarked_ledger:genesis_ledger
                    ~expected_merkle_root:(Ledger.merkle_root genesis_ledger) ))
         in
@@ -506,7 +516,7 @@ module For_tests = struct
         (persistent_root, persistent_frontier) )
 
   let gen_genesis_breadcrumb_with_protocol_states ~logger ~proof_level
-      ~constraint_constants ?verifier ~precomputed_values () =
+      ?verifier ~constraint_constants ~precomputed_values () =
     let open Quickcheck.Generator.Let_syntax in
     let%map root =
       gen_genesis_breadcrumb ~logger ~proof_level ~constraint_constants

@@ -47,6 +47,7 @@ module Constraint_constants = struct
       type t =
         { c: int
         ; ledger_depth: int
+        ; pending_coinbase_depth: int
         ; coinbase_amount: Currency.Amount.Stable.V1.t
         ; account_creation_fee: Currency.Fee.Stable.V1.t }
 
@@ -57,6 +58,7 @@ module Constraint_constants = struct
   type t = Stable.Latest.t =
     { c: int
     ; ledger_depth: int
+    ; pending_coinbase_depth: int
     ; coinbase_amount: Currency.Amount.t
     ; account_creation_fee: Currency.Fee.t }
 
@@ -85,6 +87,7 @@ module Constraint_constants = struct
   let compiled =
     { c
     ; ledger_depth
+    ; pending_coinbase_depth= Coda_compile_config.pending_coinbase_depth
     ; coinbase_amount=
         Currency.Amount.of_formatted_string coinbase_amount_string
     ; account_creation_fee=

@@ -82,7 +82,8 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
         let%bind new_pending_coinbase_hash, deleted_stack, no_coinbases_popped
             =
           let%bind root_after_delete, deleted_stack =
-            Pending_coinbase.Checked.pop_coinbases prev_pending_coinbase_root
+            Pending_coinbase.Checked.pop_coinbases ~constraint_constants
+              prev_pending_coinbase_root
               ~proof_emitted:(Boolean.not ledger_hash_didn't_change)
           in
           (*If snarked ledger hash did not change (no new ledger proof) then pop_coinbases should be a no-op*)

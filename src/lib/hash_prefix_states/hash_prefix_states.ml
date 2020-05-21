@@ -52,8 +52,15 @@ let merkle_tree =
     !cached.(i)
 
 let coinbase_merkle_tree =
-  Array.init Coda_compile_config.pending_coinbase_depth ~f:(fun i ->
-      salt (coinbase_merkle_tree i) )
+  let f i = salt (coinbase_merkle_tree i) in
+  let cached = ref [||] in
+  fun i ->
+    let len = Array.length !cached in
+    if i >= len then
+      cached :=
+        Array.append !cached
+          (Array.init (i + 1 - len) ~f:(fun i -> f (i + len))) ;
+    !cached.(i)
 
 let vrf_message = salt vrf_message
 
