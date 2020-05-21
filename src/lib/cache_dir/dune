@@ -8,5 +8,6 @@
    ; libs
    blake2
    coda_compile_config
-   logger)
+   logger
+   ppx_version)
  (preprocess (pps ppx_coda ppx_let ppx_custom_printf)))
