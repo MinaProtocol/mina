@@ -716,28 +716,46 @@ struct
                                   )
                             in
                             let of_indexed_pool_error = function
-                              | `Invalid_nonce ->
-                                  Diff_versioned.Diff_error.Invalid_nonce
-                              | `Insufficient_funds ->
-                                  Insufficient_funds
-                              | `Insufficient_replace_fee ->
-                                  Insufficient_replace_fee
+                              | `Invalid_nonce (`Between (low, hi), nonce) ->
+                                  let nonce_json = Account.Nonce.to_yojson in
+                                  ( Diff_versioned.Diff_error.Invalid_nonce
+                                  , [ ( "between"
+                                      , `Assoc
+                                          [ ("low", nonce_json low)
+                                          ; ("hi", nonce_json hi) ] )
+                                    ; ("nonce", nonce_json nonce) ] )
+                              | `Invalid_nonce (`Expected enonce, nonce) ->
+                                  let nonce_json = Account.Nonce.to_yojson in
+                                  ( Diff_versioned.Diff_error.Invalid_nonce
+                                  , [ ("expected_nonce", nonce_json enonce)
+                                    ; ("nonce", nonce_json nonce) ] )
+                              | `Insufficient_funds (`Balance bal, amt) ->
+                                  let amt_json = Currency.Amount.to_yojson in
+                                  ( Insufficient_funds
+                                  , [ ("balance", amt_json bal)
+                                    ; ("amount", amt_json amt) ] )
+                              | `Insufficient_replace_fee
+                                  (`Replace_fee rfee, fee) ->
+                                  let fee_json = Currency.Fee.to_yojson in
+                                  ( Insufficient_replace_fee
+                                  , [ ("replace_fee", fee_json rfee)
+                                    ; ("fee", fee_json fee) ] )
                               | `Overflow ->
-                                  Overflow
+                                  (Overflow, [])
                               | `Delegate_not_found ->
-                                  Delegate_not_found
+                                  (Delegate_not_found, [])
                               | `Insufficient_amount_for_account_creation ->
-                                  Insufficient_amount_for_account_creation
+                                  (Insufficient_amount_for_account_creation, [])
                             in
                             let yojson_fail_reason =
                               Fn.compose
                                 (fun s -> `String s)
                                 (function
-                                  | `Invalid_nonce ->
+                                  | `Invalid_nonce _ ->
                                       "invalid nonce"
-                                  | `Insufficient_funds ->
+                                  | `Insufficient_funds _ ->
                                       "insufficient funds"
-                                  | `Insufficient_replace_fee ->
+                                  | `Insufficient_replace_fee _ ->
                                       "insufficient replace fee"
                                   | `Overflow ->
                                       "overflow"
@@ -820,7 +838,9 @@ struct
                                                  .to_yojson
                                                locally_generated_dropped) ) ] ;
                                 go txs'' pool'' (tx :: accepted, rejected)
-                            | Error `Insufficient_replace_fee ->
+                            | Error
+                                (`Insufficient_replace_fee
+                                  (`Replace_fee rfee, fee)) ->
                                 (* We can't punish peers for this, since an
                              attacker can simultaneously send different
                              transactions at the same nonce to different
@@ -833,8 +853,11 @@ struct
                                 f_log t.logger ~module_:__MODULE__
                                   ~location:__LOC__
                                   "rejecting $cmd because of insufficient \
-                                   replace fee"
-                                  ~metadata:[("cmd", User_command.to_yojson tx)] ;
+                                   replace fee ($rfee > $fee)"
+                                  ~metadata:
+                                    [ ("cmd", User_command.to_yojson tx)
+                                    ; ("rfee", Currency.Fee.to_yojson rfee)
+                                    ; ("fee", Currency.Fee.to_yojson fee) ] ;
                                 go txs'' pool
                                   ( accepted
                                   , ( tx
@@ -842,23 +865,29 @@ struct
                                       .Insufficient_replace_fee )
                                     :: rejected )
                             | Error err ->
-                                let diff_err = of_indexed_pool_error err in
+                                let diff_err, err_extra =
+                                  of_indexed_pool_error err
+                                in
                                 if is_sender_local then
                                   Logger.error t.logger ~module_:__MODULE__
                                     ~location:__LOC__
-                                    "rejecting $cmd because of $reason"
+                                    "rejecting $cmd because of $reason. \
+                                     ($error_extra)"
                                     ~metadata:
                                       [ ("cmd", User_command.to_yojson tx)
                                       ; ( "reason"
                                         , Diff_versioned.Diff_error.to_yojson
-                                            diff_err ) ] ;
+                                            diff_err )
+                                      ; ("error_extra", `Assoc err_extra) ] ;
                                 let%bind _ =
                                   trust_record
                                     ( Trust_system.Actions.Sent_useless_gossip
                                     , Some
-                                        ( "rejecting $cmd because of $reason"
+                                        ( "rejecting $cmd because of $reason. \
+                                           ($error_extra)"
                                         , [ ("cmd", User_command.to_yojson tx)
                                           ; ("reason", yojson_fail_reason err)
+                                          ; ("error_extra", `Assoc err_extra)
                                           ] ) )
                                 in
                                 go txs'' pool
