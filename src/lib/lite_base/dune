@@ -17,4 +17,4 @@
     snarkette
     bin_prot
     lite_params
-    module_version))
+    ppx_version))
