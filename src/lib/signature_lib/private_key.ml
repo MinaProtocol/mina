@@ -3,7 +3,6 @@
 
 open Core_kernel
 open Async_kernel
-open Module_version
 
 [%%ifdef
 consensus_mechanism]
@@ -63,7 +62,9 @@ module Stable = struct
       let known_good_hash =
         "\xB5\xFE\x88\xB3\x7E\xDD\x30\x25\xA2\xB5\x00\x69\xCA\x0E\xE3\xC4\xAC\x17\x57\x40\xAD\x85\x40\xBB\x55\xDE\x3C\xB6\x30\xAD\x52\x5B"
       in
-      Serialization.check_serialization (module V1) pk known_good_hash
+      Ppx_version.Serialization.check_serialization
+        (module V1)
+        pk known_good_hash
 
     [%%elif
     curve_size = 753]
@@ -76,7 +77,9 @@ module Stable = struct
       let known_good_hash =
         "\x61\xB5\xC7\xDD\x3F\x67\x72\xD4\x8F\x58\x59\xD9\xE2\x2B\x2C\x94\xDD\x09\x83\x50\x1E\x8E\x2E\x9E\xBD\x48\x94\x9D\xC9\x8B\x51\x0A"
       in
-      Serialization.check_serialization (module V1) pk known_good_hash
+      Ppx_version.Serialization.check_serialization
+        (module V1)
+        pk known_good_hash
 
     [%%else]
 

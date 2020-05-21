@@ -25,10 +25,10 @@
     lite_base
     merkle_ledger
     merkle_mask
-    module_version
     one_or_two
     o1trace
     outside_pedersen_image
+    ppx_version
     quickcheck_lib
     random_oracle
     rocksdb

@@ -3,4 +3,4 @@
  (public_name module_version)
  (preprocess (pps ppx_jane ppx_version -lint-version-syntax-warnings) )
  (inline_tests)
- (libraries bin_prot core_kernel coda_digestif))
+ (libraries bin_prot core_kernel))
