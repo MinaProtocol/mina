@@ -3,7 +3,7 @@
 
 # this defines how to initialize all the opam deps on linux.
 # the build-archive job is responsible for updating the cache!
-# why that one? ¯\_(ツ)_/¯ seemed convenient
+# why that one? `\_(.)_/` seemed convenient
 
 
 
