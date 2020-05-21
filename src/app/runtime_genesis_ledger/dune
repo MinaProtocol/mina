@@ -10,7 +10,6 @@
     coda_base
     coda_genesis_proof
     coda_state
-    coda_version
     genesis_ledger_helper
     keys_lib
     coda_runtime_config
