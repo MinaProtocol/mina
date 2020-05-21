@@ -253,11 +253,11 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
     ~transaction_resource_pool ~time_controller ~keypairs ~coinbase_receiver
     ~consensus_local_state ~frontier_reader ~transition_writer
     ~set_next_producer_timing ~log_block_creation ~constraint_constants
-    ~(genesis_constants : Genesis_constants.t) =
+    ~(precomputed_values : Precomputed_values.t) =
   trace "block_producer" (fun () ->
       let consensus_constants =
         Consensus.Constants.create ~constraint_constants
-          ~protocol_constants:genesis_constants.protocol
+          ~protocol_constants:precomputed_values.genesis_constants.protocol
       in
       let log_bootstrap_mode () =
         Logger.info logger ~module_:__MODULE__ ~location:__LOC__
@@ -473,8 +473,9 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                             return ()
                         | Ok transition -> (
                             let%bind breadcrumb_result =
-                              Breadcrumb.build ~logger ~verifier ~trust_system
-                                ~parent:crumb ~transition ~sender:None
+                              Breadcrumb.build ~logger ~precomputed_values
+                                ~verifier ~trust_system ~parent:crumb
+                                ~transition ~sender:None
                             in
                             let exn name =
                               raise

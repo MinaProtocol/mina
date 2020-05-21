@@ -1,7 +1,5 @@
 open Core
 open Async
-open Signature_lib
-open Coda_base
 
 let name = "coda-bootstrap-test"
 

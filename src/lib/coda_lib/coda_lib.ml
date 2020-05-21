@@ -728,8 +728,7 @@ let start t =
     ~transition_writer:t.pipes.producer_transition_writer
     ~log_block_creation:t.config.log_block_creation
     ~constraint_constants:t.config.constraint_constants
-    ~genesis_constants:
-      (Precomputed_values.genesis_constants t.config.precomputed_values) ;
+    ~precomputed_values:t.config.precomputed_values ;
   Snark_worker.start t
 
 let create (config : Config.t) =

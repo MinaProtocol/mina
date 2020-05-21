@@ -122,7 +122,8 @@ let%test_module "Archive node unit tests" =
              (Transition_frontier.For_tests.gen_genesis_breadcrumb ~proof_level
                 ~precomputed_values ())
              (Transition_frontier.Breadcrumb.For_tests.gen_non_deferred
-                ?logger:None ~proof_level ?verifier:None ?trust_system:None
+                ?logger:None ~proof_level ~precomputed_values ?verifier:None
+                ?trust_system:None
                 ~accounts_with_secret_keys:(Lazy.force Genesis_ledger.accounts))
         )
         ~f:(fun breadcrumbs ->

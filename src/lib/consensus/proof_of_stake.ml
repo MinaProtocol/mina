@@ -3112,7 +3112,7 @@ module Hooks = struct
       Genesis_constants.Constraint_constants.for_unit_tests
     in
     let protocol_constants = Genesis_constants.for_unit_tests.protocol in
-    let genesis_ledger = Precomputed_values.(genesis_ledger for_unit_tests) in
+    let genesis_ledger = Genesis_ledger.(Packed.t for_unit_tests) in
     let curr_epoch, curr_slot =
       Consensus_state.curr_epoch_and_slot
         (Consensus_state.negative_one ~genesis_ledger ~constraint_constants
@@ -3135,7 +3135,7 @@ module Hooks = struct
       Genesis_constants.Constraint_constants.for_unit_tests
     in
     let protocol_constants = Genesis_constants.for_unit_tests.protocol in
-    let genesis_ledger = Precomputed_values.(genesis_ledger for_unit_tests) in
+    let genesis_ledger = Genesis_ledger.(Packed.t for_unit_tests) in
     let start_time = Epoch.start_time ~constants epoch in
     let ((curr_epoch, curr_slot) as curr) =
       Epoch_and_slot.of_time_exn ~constants start_time
@@ -3353,11 +3353,7 @@ let%test_module "Proof of stake tests" =
 
     let ledger_depth = constraint_constants.ledger_depth
 
-    let precomputed_values = Precomputed_values.for_unit_tests
-
-    module Genesis_ledger = (val precomputed_values.genesis_ledger)
-
-    let genesis_ledger = Precomputed_values.(genesis_ledger for_unit_tests)
+    module Genesis_ledger = (val Genesis_ledger.for_unit_tests)
 
     let%test_unit "update, update_var agree starting from same genesis state" =
       (* build pieces needed to apply "update" *)

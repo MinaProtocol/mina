@@ -1,6 +1,5 @@
 open Core
 open Async
-open Signature_lib
 open Coda_base
 
 let name = "coda-archive-node-test"

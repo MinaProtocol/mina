@@ -1,7 +1,6 @@
 open Core
 open Async
 open Coda_base
-open Signature_lib
 
 let name = "coda-receipt-chain-test"
 
@@ -18,15 +17,14 @@ let main () =
       ~constraint_constants:Genesis_constants.Constraint_constants.compiled
       ~protocol_constants:Genesis_constants.compiled.protocol
   in
-  let open Keypair in
   let logger = Logger.create () in
   let sender_sk, largest_account =
-    Test_genesis_ledger.largest_account_keypair_exn ()
+    Test_genesis_ledger.largest_account_exn ()
   in
   let receiver_pk =
-    Test_genesis_ledger.find_new_account_record_exn
+    Test_genesis_ledger.find_new_account_record_exn_
       [Account.public_key largest_account]
-    |> Test_genesis_ledger.pk_of_account_record_exn
+    |> Test_genesis_ledger.pk_of_account_record
   in
   let block_production_interval =
     consensus_constants.block_window_duration_ms |> Block_time.Span.to_ms

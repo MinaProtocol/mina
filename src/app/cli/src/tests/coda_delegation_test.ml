@@ -30,7 +30,7 @@ let main () =
         | Some sk ->
             `String (Private_key.to_base58_check sk)
         | None ->
-            `Nil
+            `Null
       in
       Logger.info logger ~module_:__MODULE__ ~location:__LOC__
         "Account: $account_number"

@@ -86,7 +86,7 @@ let add_and_finalize ~logger ~frontier ~catchup_scheduler
 let process_transition ~logger ~trust_system ~verifier ~frontier
     ~catchup_scheduler ~processed_transition_writer ~time_controller
     ~transition:cached_initially_validated_transition ~constraint_constants
-    ~genesis_constants =
+    ~(precomputed_values : Precomputed_values.t) =
   let enveloped_initially_validated_transition =
     Cached.peek cached_initially_validated_transition
   in
@@ -153,7 +153,9 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
                   (Transition_frontier.find frontier
                      (Non_empty_list.head delta_state_hashes))
                   ~init:(Block_time.Span.of_ms 0L)
-                  ~f:(fun _ _ -> catchup_timeout_duration genesis_constants)
+                  ~f:(fun _ _ ->
+                    catchup_timeout_duration
+                      precomputed_values.genesis_constants )
               in
               Catchup_scheduler.watch catchup_scheduler ~timeout_duration
                 ~cached_transition:cached_initially_validated_transition ;
@@ -175,9 +177,10 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
     let%bind breadcrumb =
       cached_transform_deferred_result cached_initially_validated_transition
         ~transform_cached:(fun _ ->
-          Transition_frontier.Breadcrumb.build ~logger ~verifier ~trust_system
-            ~sender:(Some sender) ~parent:parent_breadcrumb
-            ~transition:mostly_validated_transition )
+          Transition_frontier.Breadcrumb.build ~logger ~precomputed_values
+            ~verifier ~trust_system ~sender:(Some sender)
+            ~parent:parent_breadcrumb ~transition:mostly_validated_transition
+          )
         ~transform_result:(function
           | Error (`Invalid_staged_ledger_hash error)
           | Error (`Invalid_staged_ledger_diff error) ->
@@ -210,9 +213,10 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
     Deferred.map ~f:Result.return
       (add_and_finalize ~logger ~frontier ~catchup_scheduler
          ~processed_transition_writer ~only_if_present:false ~time_controller
-         ~source:`Gossip breadcrumb ~constraint_constants ~genesis_constants))
+         ~source:`Gossip breadcrumb ~constraint_constants
+         ~genesis_constants:precomputed_values.genesis_constants))
 
-let run ~logger ~constraint_constants ~genesis_constants ~verifier
+let run ~logger ~constraint_constants ~precomputed_values ~verifier
     ~trust_system ~time_controller ~frontier
     ~(primary_transition_reader :
        ( External_transition.Initial_validated.t Envelope.Incoming.t
@@ -244,18 +248,19 @@ let run ~logger ~constraint_constants ~genesis_constants ~verifier
        , unit )
        Writer.t) ~processed_transition_writer =
   let catchup_scheduler =
-    Catchup_scheduler.create ~logger ~verifier ~trust_system ~frontier
-      ~time_controller ~catchup_job_writer ~catchup_breadcrumbs_writer
-      ~clean_up_signal:clean_up_catchup_scheduler
+    Catchup_scheduler.create ~logger ~precomputed_values ~verifier
+      ~trust_system ~frontier ~time_controller ~catchup_job_writer
+      ~catchup_breadcrumbs_writer ~clean_up_signal:clean_up_catchup_scheduler
   in
   let add_and_finalize =
     add_and_finalize ~frontier ~catchup_scheduler ~processed_transition_writer
-      ~time_controller ~constraint_constants ~genesis_constants
+      ~time_controller ~constraint_constants
+      ~genesis_constants:precomputed_values.genesis_constants
   in
   let process_transition =
     process_transition ~logger ~trust_system ~verifier ~frontier
       ~catchup_scheduler ~processed_transition_writer ~time_controller
-      ~constraint_constants ~genesis_constants
+      ~constraint_constants ~precomputed_values
   in
   ignore
     (Reader.Merge.iter
@@ -422,7 +427,7 @@ let%test_module "Transition_handler.Processor tests" =
                   ~producer_transition_reader ~catchup_job_writer
                   ~catchup_breadcrumbs_reader ~catchup_breadcrumbs_writer
                   ~processed_transition_writer ~constraint_constants
-                  ~genesis_constants:Genesis_constants.compiled ;
+                  ~precomputed_values ;
                 List.iter branch ~f:(fun breadcrumb ->
                     downcast_breadcrumb breadcrumb
                     |> Unprocessed_transition_cache.register_exn cache

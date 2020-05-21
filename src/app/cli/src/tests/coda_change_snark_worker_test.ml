@@ -1,5 +1,4 @@
 open Core
-open Coda_base
 open Coda_transition
 open Signature_lib
 open Async

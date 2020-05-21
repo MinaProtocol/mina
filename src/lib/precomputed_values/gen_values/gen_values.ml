@@ -93,8 +93,11 @@ let main () =
       let for_unit_tests =
         lazy
           (let protocol_state_with_hash =
-             Lazy.force
-               Coda_state.Genesis_protocol_state.For_tests.genesis_state
+             Coda_state.Genesis_protocol_state.t
+               ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
+               ~constraint_constants:
+                 Genesis_constants.Constraint_constants.for_unit_tests
+               ~genesis_constants:Genesis_constants.for_unit_tests
            in
            { genesis_constants= Genesis_constants.for_unit_tests
            ; genesis_ledger= Genesis_ledger.for_unit_tests

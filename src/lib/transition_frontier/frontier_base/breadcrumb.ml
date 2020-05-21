@@ -21,14 +21,14 @@ let to_yojson {validated_transition; staged_ledger= _; just_emitted_a_proof} =
 let create validated_transition staged_ledger =
   {validated_transition; staged_ledger; just_emitted_a_proof= false}
 
-let build ~logger ~verifier ~trust_system ~parent
+let build ~logger ~precomputed_values ~verifier ~trust_system ~parent
     ~transition:(transition_with_validation :
                   External_transition.Almost_validated.t) ~sender =
   O1trace.trace_recurring "Breadcrumb.build" (fun () ->
       let open Deferred.Let_syntax in
       match%bind
         External_transition.Staged_ledger_validation
-        .validate_staged_ledger_diff ~logger ~verifier
+        .validate_staged_ledger_diff ~logger ~precomputed_values ~verifier
           ~parent_staged_ledger:parent.staged_ledger
           ~parent_protocol_state:
             (External_transition.Validated.protocol_state
@@ -223,7 +223,7 @@ module For_tests = struct
         in
         User_command.sign sender_keypair payload )
 
-  let gen ?(logger = Logger.null ()) ~proof_level ?verifier
+  let gen ?(logger = Logger.null ()) ~proof_level ~precomputed_values ?verifier
       ?(trust_system = Trust_system.null ()) ~accounts_with_secret_keys :
       (t -> t Deferred.t) Quickcheck.Generator.t =
     let open Quickcheck.Let_syntax in
@@ -337,7 +337,8 @@ module For_tests = struct
         External_transition.Validated.create_unsafe next_external_transition
       in
       match%map
-        build ~logger ~trust_system ~verifier ~parent:parent_breadcrumb
+        build ~logger ~precomputed_values ~trust_system ~verifier
+          ~parent:parent_breadcrumb
           ~transition:
             (External_transition.Validation.reset_staged_ledger_diff_validation
                next_verified_external_transition)
@@ -357,21 +358,21 @@ module For_tests = struct
       | Error (`Invalid_staged_ledger_hash e) ->
           failwithf !"Invalid staged ledger hash: %{sexp:Error.t}" e ()
 
-  let gen_non_deferred ?logger ~proof_level ?verifier ?trust_system
-      ~accounts_with_secret_keys =
+  let gen_non_deferred ?logger ~proof_level ~precomputed_values ?verifier
+      ?trust_system ~accounts_with_secret_keys =
     let open Quickcheck.Generator.Let_syntax in
     let%map make_deferred =
-      gen ?logger ?verifier ~proof_level ?trust_system
+      gen ?logger ?verifier ~proof_level ~precomputed_values ?trust_system
         ~accounts_with_secret_keys
     in
     fun x -> Async.Thread_safe.block_on_async_exn (fun () -> make_deferred x)
 
-  let gen_seq ?logger ~proof_level ?verifier ?trust_system
+  let gen_seq ?logger ~proof_level ~precomputed_values ?verifier ?trust_system
       ~accounts_with_secret_keys n =
     let open Quickcheck.Generator.Let_syntax in
     let gen_list =
       List.gen_with_length n
-        (gen ?logger ~proof_level ?verifier ?trust_system
+        (gen ?logger ~proof_level ~precomputed_values ?verifier ?trust_system
            ~accounts_with_secret_keys)
     in
     let%map breadcrumbs_constructors = gen_list in

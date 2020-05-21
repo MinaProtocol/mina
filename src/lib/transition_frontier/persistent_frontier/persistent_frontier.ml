@@ -147,7 +147,8 @@ module Instance = struct
       Error `Bootstrap_required )
 
   let load_full_frontier t ~root_ledger ~consensus_local_state ~max_length
-      ~ignore_consensus_local_state ~constraint_constants ~genesis_constants =
+      ~ignore_consensus_local_state ~constraint_constants
+      ~(precomputed_values : Precomputed_values.t) =
     let open Deferred.Result.Let_syntax in
     let downgrade_transition transition genesis_state_hash :
         ( External_transition.Almost_validated.t
@@ -220,7 +221,7 @@ module Instance = struct
           }
         ~root_ledger:(Ledger.Any_ledger.cast (module Ledger.Db) root_ledger)
         ~consensus_local_state ~max_length ~constraint_constants
-        ~genesis_constants
+        ~genesis_constants:precomputed_values.genesis_constants
     in
     let%bind extensions =
       Deferred.map
@@ -250,7 +251,7 @@ module Instance = struct
                    |> Deferred.return
              in
              let%bind breadcrumb =
-               Breadcrumb.build ~logger:t.factory.logger
+               Breadcrumb.build ~logger:t.factory.logger ~precomputed_values
                  ~verifier:t.factory.verifier
                  ~trust_system:(Trust_system.null ()) ~parent ~transition
                  ~sender:None

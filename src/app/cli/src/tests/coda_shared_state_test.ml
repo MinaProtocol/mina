@@ -1,6 +1,5 @@
 open Core
 open Async
-open Signature_lib
 
 let name = "coda-shared-state-test"
 

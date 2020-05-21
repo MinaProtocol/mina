@@ -482,6 +482,7 @@ let%test_module "Bootstrap_controller tests" =
         in
         let%map make_branch =
           Transition_frontier.Breadcrumb.For_tests.gen_seq ~proof_level
+            ~precomputed_values
             ~accounts_with_secret_keys:(Lazy.force Genesis_ledger.accounts)
             branch_size
         in

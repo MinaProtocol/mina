@@ -33,7 +33,7 @@ let start_transition_frontier_controller ~logger ~trust_system ~verifier
     ~network ~time_controller ~producer_transition_reader
     ~verified_transition_writer ~clear_reader ~collected_transitions
     ~transition_reader_ref ~transition_writer_ref ~frontier_w
-    ~constraint_constants ~genesis_constants frontier =
+    ~constraint_constants ~precomputed_values frontier =
   Logger.info logger ~module_:__MODULE__ ~location:__LOC__
     "Starting Transition Frontier Controller phase" ;
   let ( transition_frontier_controller_reader
@@ -49,7 +49,7 @@ let start_transition_frontier_controller ~logger ~trust_system ~verifier
           ~network ~time_controller ~collected_transitions ~frontier
           ~network_transition_reader:!transition_reader_ref
           ~producer_transition_reader ~clear_reader ~constraint_constants
-          ~genesis_constants )
+          ~precomputed_values )
   in
   Strict_pipe.Reader.iter new_verified_transition_reader
     ~f:
@@ -86,10 +86,7 @@ let start_bootstrap_controller ~logger ~trust_system ~verifier ~network
             ~network ~time_controller ~producer_transition_reader
             ~verified_transition_writer ~clear_reader ~collected_transitions
             ~transition_reader_ref ~transition_writer_ref ~frontier_w
-            ~constraint_constants
-            ~genesis_constants:
-              (Precomputed_values.genesis_constants precomputed_values)
-            new_frontier ) )
+            ~constraint_constants ~precomputed_values new_frontier ) )
 
 let download_best_tip ~logger ~network ~verifier ~trust_system
     ~most_recent_valid_block_writer ~genesis_constants =
@@ -258,12 +255,13 @@ let initialize ~logger ~network ~is_seed ~verifier ~trust_system
            ~network ~time_controller ~producer_transition_reader
            ~verified_transition_writer ~clear_reader ~collected_transitions:[]
            ~transition_reader_ref ~transition_writer_ref ~frontier_w
-           ~constraint_constants ~genesis_constants frontier
+           ~constraint_constants ~precomputed_values frontier
   | Some best_tip, Some frontier ->
       if
         is_transition_for_bootstrap ~logger frontier
           (best_tip |> Envelope.Incoming.data)
-          ~constraint_constants ~genesis_constants
+          ~constraint_constants
+          ~genesis_constants:precomputed_values.genesis_constants
       then
         let initial_root_transition =
           Transition_frontier.(Breadcrumb.validated_transition (root frontier))
@@ -313,7 +311,7 @@ let initialize ~logger ~network ~is_seed ~verifier ~trust_system
           ~verified_transition_writer ~clear_reader
           ~collected_transitions:[best_tip] ~transition_reader_ref
           ~transition_writer_ref ~frontier_w ~constraint_constants
-          ~genesis_constants frontier
+          ~precomputed_values frontier
 
 let wait_till_genesis ~logger ~time_controller ~constraint_constants
     ~(genesis_constants : Genesis_constants.t) =
