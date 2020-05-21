@@ -3393,7 +3393,6 @@ let%test_module "Proof of stake tests" =
           ~depth:constraint_constants.pending_coinbase_depth ()
         |> Or_error.ok_exn
       in
-      let pending_coinbases = Pending_coinbase.create () |> Or_error.ok_exn in
       let maybe_sk, account = Genesis_ledger.largest_account_exn () in
       let private_key = Option.value_exn maybe_sk in
       let public_key_compressed = Account.public_key account in
