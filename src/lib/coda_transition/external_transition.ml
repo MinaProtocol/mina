@@ -1030,6 +1030,7 @@ module Staged_ledger_validation = struct
          , 'protocol_versions )
          Validation.with_transition
       -> logger:Logger.t
+      -> precomputed_values:Precomputed_values.t
       -> verifier:Verifier.t
       -> parent_staged_ledger:Staged_ledger.t
       -> parent_protocol_state:Protocol_state.value
@@ -1051,8 +1052,8 @@ module Staged_ledger_validation = struct
            | `Staged_ledger_application_failed of
              Staged_ledger.Staged_ledger_error.t ] )
          Deferred.Result.t =
-   fun (t, validation) ~logger ~verifier ~parent_staged_ledger
-       ~parent_protocol_state ->
+   fun (t, validation) ~logger ~precomputed_values ~verifier
+       ~parent_staged_ledger ~parent_protocol_state ->
     let open Deferred.Result.Let_syntax in
     let transition = With_hash.data t in
     let blockchain_state =
@@ -1077,8 +1078,9 @@ module Staged_ledger_validation = struct
             (Staged_ledger.current_ledger_proof transitioned_staged_ledger)
             ~f:target_hash_of_ledger_proof
             ~default:
-              (Frozen_ledger_hash.of_ledger_hash
-                 (Ledger.merkle_root (Lazy.force Test_genesis_ledger.t)))
+              ( Precomputed_values.genesis_ledger precomputed_values
+              |> Lazy.force |> Ledger.merkle_root
+              |> Frozen_ledger_hash.of_ledger_hash )
       | Some (proof, _) ->
           target_hash_of_ledger_proof proof
     in

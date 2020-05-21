@@ -8,15 +8,12 @@ include Heartbeat.Make ()
 
 let main () =
   let logger = Logger.create () in
-  let largest_account_keypair =
-    Test_genesis_ledger.largest_account_keypair_exn ()
-  in
+  let largest_account_pk = Test_genesis_ledger.largest_account_pk_exn () in
   Deferred.don't_wait_for (print_heartbeat logger) ;
   let n = 2 in
   let block_production_keys i = if i = 0 then Some i else None in
   let snark_work_public_keys i =
-    if i = 0 then Some (Public_key.compress largest_account_keypair.public_key)
-    else None
+    if i = 0 then Some largest_account_pk else None
   in
   let%bind testnet =
     Coda_worker_testnet.test ~name logger n block_production_keys

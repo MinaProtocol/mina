@@ -72,13 +72,15 @@ module Make (Inputs : Intf.Ledger_input_intf) : Intf.S = struct
   let find_account_record_exn ~f =
     List.find_exn (Lazy.force accounts) ~f:(fun (_, account) -> f account)
 
-  let find_new_account_record_exn old_account_pks =
+  let find_new_account_record_exn_ old_account_pks =
     find_account_record_exn ~f:(fun new_account ->
         not
-          (List.exists old_account_pks ~f:(fun old_account_pk ->
-               Public_key.equal
-                 (Public_key.decompress_exn (Account.public_key new_account))
-                 old_account_pk )) )
+          (List.mem ~equal:Public_key.equal old_account_pks)
+          (Account.public_key new_account) )
+
+  let find_new_account_record_exn old_account_pks =
+    find_new_account_record_exn_
+      (List.map ~f:Public_key.compress old_account_pks)
 
   let keypair_of_account_record_exn (private_key, account) =
     let open Account in
@@ -95,6 +97,10 @@ module Make (Inputs : Intf.Ledger_input_intf) : Intf.S = struct
     in
     {Keypair.public_key; private_key}
 
+  let id_of_account_record (_private_key, account) = Account.identifier account
+
+  let pk_of_account_record (_private_key, account) = Account.public_key account
+
   let largest_account_exn =
     let error_msg =
       "cannot calculate largest account in genesis ledger: "
@@ -104,6 +110,12 @@ module Make (Inputs : Intf.Ledger_input_intf) : Intf.S = struct
         List.max_elt (Lazy.force accounts) ~compare:(fun (_, a) (_, b) ->
             Balance.compare a.balance b.balance )
         |> Option.value_exn ?here:None ?error:None ~message:error_msg )
+
+  let largest_account_id_exn =
+    Memo.unit (fun () -> largest_account_exn () |> id_of_account_record)
+
+  let largest_account_pk_exn =
+    Memo.unit (fun () -> largest_account_exn () |> pk_of_account_record)
 
   let largest_account_keypair_exn =
     Memo.unit (fun () -> keypair_of_account_record_exn (largest_account_exn ()))
@@ -120,13 +132,20 @@ module Packed = struct
 
   let find_account_record_exn ((module L) : t) = L.find_account_record_exn
 
+  let find_new_account_record_exn_ ((module L) : t) =
+    L.find_new_account_record_exn_
+
   let find_new_account_record_exn ((module L) : t) =
     L.find_new_account_record_exn
 
-  let largest_account_exn ((module L) : t) = L.largest_account_exn
+  let largest_account_exn ((module L) : t) = L.largest_account_exn ()
+
+  let largest_account_id_exn ((module L) : t) = L.largest_account_id_exn ()
+
+  let largest_account_pk_exn ((module L) : t) = L.largest_account_pk_exn ()
 
   let largest_account_keypair_exn ((module L) : t) =
-    L.largest_account_keypair_exn
+    L.largest_account_keypair_exn ()
 
   let keypair_of_account_record_exn ((module L) : t) =
     L.keypair_of_account_record_exn

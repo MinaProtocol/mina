@@ -21,11 +21,13 @@ end
 module Make_broadcaster (Put_request : Web_request.Intf.S) = struct
   let get_block_producer_chain coda =
     let open Base in
-    let open Keypair in
     let get_lite_chain_exn = Option.value_exn Coda_run.get_lite_chain in
     (* HACK: we are just passing in the block producer path for this demo *)
-    let keypair = Test_genesis_ledger.largest_account_keypair_exn () in
-    let keys = [Public_key.compress keypair.public_key] in
+    let public_key =
+      Genesis_ledger.Packed.largest_account_pk_exn
+        (Coda_lib.config coda).precomputed_values.genesis_ledger
+    in
+    let keys = [public_key] in
     get_lite_chain_exn coda keys
 
   module Web_pipe =
@@ -113,7 +115,6 @@ let run_service coda ~conf_dir ~logger =
              (Coda_lib.validated_transitions coda)
              ~f:ignore)
     | `Local path ->
-        let open Keypair in
         Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
           "Saving chain locally at path %s" path ;
         store_verification_keys ~logger ~send:(fun _log vk_location ->
@@ -121,15 +122,17 @@ let run_service coda ~conf_dir ~logger =
             >>| Or_error.return )
         |> don't_wait_for ;
         let get_lite_chain = Option.value_exn Coda_run.get_lite_chain in
-        let keypair = Test_genesis_ledger.largest_account_keypair_exn () in
+        let public_key =
+          Genesis_ledger.Packed.largest_account_pk_exn
+            (Coda_lib.config coda).precomputed_values.genesis_ledger
+        in
         Strict_pipe.Reader.iter (Coda_lib.validated_transitions coda)
           ~f:(fun _ ->
             Writer.save (path ^/ "chain")
               ~contents:
                 (to_base58
                    (module Lite_base.Lite_chain)
-                   (get_lite_chain coda [Public_key.compress keypair.public_key]))
-        )
+                   (get_lite_chain coda [public_key])) )
         |> don't_wait_for
     | `S3 ->
         Logger.info logger ~module_:__MODULE__ ~location:__LOC__

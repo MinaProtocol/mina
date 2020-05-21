@@ -20,13 +20,13 @@ let main () =
   in
   let open Keypair in
   let logger = Logger.create () in
-  let largest_account_keypair =
+  let sender_sk, largest_account =
     Test_genesis_ledger.largest_account_keypair_exn ()
   in
-  let another_account_keypair =
+  let receiver_pk =
     Test_genesis_ledger.find_new_account_record_exn
-      [largest_account_keypair.public_key]
-    |> Test_genesis_ledger.keypair_of_account_record_exn
+      [Account.public_key largest_account]
+    |> Test_genesis_ledger.pk_of_account_record_exn
   in
   let block_production_interval =
     consensus_constants.block_window_duration_ms |> Block_time.Span.to_ms
@@ -39,8 +39,7 @@ let main () =
       |> Float.of_int )
   in
   let n = 2 in
-  let receiver_pk = Public_key.compress another_account_keypair.public_key in
-  let sender_sk = largest_account_keypair.private_key in
+  let sender_sk = Option.value_exn sender_sk in
   let send_amount = Currency.Amount.of_int 10 in
   let fee = User_command.minimum_fee in
   let%bind program_dir = Unix.getcwd () in

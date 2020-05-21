@@ -431,6 +431,8 @@ let%test_module "Bootstrap_controller tests" =
 
     let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
 
+    module Genesis_ledger = (val precomputed_values.genesis_ledger)
+
     let pids = Child_processes.Termination.create_pid_table ()
 
     let downcast_transition ~sender transition =
@@ -480,8 +482,7 @@ let%test_module "Bootstrap_controller tests" =
         in
         let%map make_branch =
           Transition_frontier.Breadcrumb.For_tests.gen_seq ~proof_level
-            ~accounts_with_secret_keys:
-              (Lazy.force Test_genesis_ledger.accounts)
+            ~accounts_with_secret_keys:(Lazy.force Genesis_ledger.accounts)
             branch_size
         in
         let [me; _] = fake_network.peer_networks in

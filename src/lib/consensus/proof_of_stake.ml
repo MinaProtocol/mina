@@ -3112,18 +3112,19 @@ module Hooks = struct
       Genesis_constants.Constraint_constants.for_unit_tests
     in
     let protocol_constants = Genesis_constants.for_unit_tests.protocol in
+    let genesis_ledger = Precomputed_values.(genesis_ledger for_unit_tests) in
     let curr_epoch, curr_slot =
       Consensus_state.curr_epoch_and_slot
-        (Consensus_state.negative_one ~genesis_ledger:Test_genesis_ledger.t
-           ~constraint_constants ~protocol_constants)
+        (Consensus_state.negative_one ~genesis_ledger ~constraint_constants
+           ~protocol_constants)
     in
     let constants = Constants.for_unit_tests in
     let delay = UInt32.(div constants.delta (of_int 2)) in
     let new_slot = UInt32.Infix.(curr_slot + delay) in
     let time_received = Epoch.slot_start_time ~constants curr_epoch new_slot in
     received_at_valid_time ~constants
-      (Consensus_state.negative_one ~genesis_ledger:Test_genesis_ledger.t
-         ~constraint_constants ~protocol_constants)
+      (Consensus_state.negative_one ~genesis_ledger ~constraint_constants
+         ~protocol_constants)
       ~time_received:(to_unix_timestamp time_received)
     |> Result.is_ok
 
@@ -3134,13 +3135,14 @@ module Hooks = struct
       Genesis_constants.Constraint_constants.for_unit_tests
     in
     let protocol_constants = Genesis_constants.for_unit_tests.protocol in
+    let genesis_ledger = Precomputed_values.(genesis_ledger for_unit_tests) in
     let start_time = Epoch.start_time ~constants epoch in
     let ((curr_epoch, curr_slot) as curr) =
       Epoch_and_slot.of_time_exn ~constants start_time
     in
     let consensus_state =
-      { (Consensus_state.negative_one ~genesis_ledger:Test_genesis_ledger.t
-           ~constraint_constants ~protocol_constants)
+      { (Consensus_state.negative_one ~genesis_ledger ~constraint_constants
+           ~protocol_constants)
         with
         curr_global_slot= Global_slot.of_epoch_and_slot ~constants curr }
     in
@@ -3148,8 +3150,8 @@ module Hooks = struct
       (* TODO: Does this make sense? *)
       Epoch.start_time ~constants
         (Consensus_state.curr_slot
-           (Consensus_state.negative_one ~genesis_ledger:Test_genesis_ledger.t
-              ~constraint_constants ~protocol_constants))
+           (Consensus_state.negative_one ~genesis_ledger ~constraint_constants
+              ~protocol_constants))
     in
     let too_late =
       let delay = UInt32.(mul constants.delta (of_int 2)) in
@@ -3351,17 +3353,23 @@ let%test_module "Proof of stake tests" =
 
     let ledger_depth = constraint_constants.ledger_depth
 
+    let precomputed_values = Precomputed_values.for_unit_tests
+
+    module Genesis_ledger = (val precomputed_values.genesis_ledger)
+
+    let genesis_ledger = Precomputed_values.(genesis_ledger for_unit_tests)
+
     let%test_unit "update, update_var agree starting from same genesis state" =
       (* build pieces needed to apply "update" *)
       let snarked_ledger_hash =
         Frozen_ledger_hash.of_ledger_hash
-          (Ledger.merkle_root (Lazy.force Test_genesis_ledger.t))
+          (Ledger.merkle_root (Lazy.force Genesis_ledger.t))
       in
       let previous_protocol_state_hash = State_hash.(of_hash zero) in
       let previous_consensus_state =
         Consensus_state.create_genesis
           ~negative_one_protocol_state_hash:previous_protocol_state_hash
-          ~genesis_ledger:Test_genesis_ledger.t ~constraint_constants
+          ~genesis_ledger:Genesis_ledger.t ~constraint_constants
           ~protocol_constants:Genesis_constants.for_unit_tests.protocol
       in
       let constants = Constants.for_unit_tests in
@@ -3377,10 +3385,10 @@ let%test_module "Proof of stake tests" =
       (* setup ledger, needed to compute producer_vrf_result here and handler below *)
       let open Coda_base in
       (* choose largest account as most likely to produce a block *)
-      let ledger_data = Lazy.force Test_genesis_ledger.t in
+      let ledger_data = Lazy.force Genesis_ledger.t in
       let ledger = Ledger.Any_ledger.cast (module Ledger) ledger_data in
       let pending_coinbases = Pending_coinbase.create () |> Or_error.ok_exn in
-      let maybe_sk, account = Test_genesis_ledger.largest_account_exn () in
+      let maybe_sk, account = Genesis_ledger.largest_account_exn () in
       let private_key = Option.value_exn maybe_sk in
       let public_key_compressed = Account.public_key account in
       let account_id =

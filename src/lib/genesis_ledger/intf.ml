@@ -62,10 +62,21 @@ module type S = sig
   val find_new_account_record_exn :
     Public_key.t list -> Private_key.t option * Account.t
 
+  val find_new_account_record_exn_ :
+    Public_key.Compressed.t list -> Private_key.t option * Account.t
+
   val largest_account_exn : unit -> Private_key.t option * Account.t
+
+  val largest_account_id_exn : unit -> Account_id.t
+
+  val largest_account_pk_exn : unit -> Account_id.t
 
   val largest_account_keypair_exn : unit -> Keypair.t
 
   val keypair_of_account_record_exn :
     Private_key.t option * Account.t -> Keypair.t
+
+  val id_of_account_record : Private_key.t option * Account.t -> Account_id.t
+
+  val pk_of_account_record : Private_key.t option * Account.t -> Public_key.t
 end

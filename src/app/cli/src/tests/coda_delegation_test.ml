@@ -24,15 +24,19 @@ let main () =
   (* keep CI alive *)
   Deferred.don't_wait_for (print_heartbeat logger) ;
   (* dump account info to log *)
-  List.iteri accounts ~f:(fun ndx ((_, acct) as record) ->
-      let keypair = Test_genesis_ledger.keypair_of_account_record_exn record in
+  List.iteri accounts ~f:(fun ndx (sk, acct) ->
+      let sk =
+        match sk with
+        | Some sk ->
+            `String (Private_key.to_base58_check sk)
+        | None ->
+            `Nil
+      in
       Logger.info logger ~module_:__MODULE__ ~location:__LOC__
         "Account: $account_number"
         ~metadata:
           [ ("account_number", `Int ndx)
-          ; ( "private_key"
-            , `String (Import.Private_key.to_base58_check keypair.private_key)
-            )
+          ; ("private_key", sk)
           ; ( "public_key"
             , `String
                 ( Public_key.Compressed.to_base58_check
