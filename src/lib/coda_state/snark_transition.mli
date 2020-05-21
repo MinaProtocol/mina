@@ -96,7 +96,10 @@ val create_value :
   -> unit
   -> Value.t
 
-val genesis : genesis_ledger:Ledger.t Lazy.t -> Value.t
+val genesis :
+     constraint_constants:Genesis_constants.Constraint_constants.t
+  -> genesis_ledger:Ledger.t Lazy.t
+  -> Value.t
 
 val blockchain_state :
   ('blockchain_state, _, _, _, _, _) Poly.t -> 'blockchain_state

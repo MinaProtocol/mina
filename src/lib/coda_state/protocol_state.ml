@@ -281,7 +281,7 @@ let negative_one ~genesis_ledger ~constraint_constants ~protocol_constants =
       State_hash.of_hash Snark_params.Tick.Pedersen.zero_hash
   ; body=
       { Body.Poly.blockchain_state=
-          Blockchain_state.negative_one
+          Blockchain_state.negative_one ~constraint_constants
             ~genesis_ledger_hash:
               (Coda_base.Ledger.merkle_root (Lazy.force genesis_ledger))
       ; genesis_state_hash=
