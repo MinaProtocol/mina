@@ -122,3 +122,82 @@ let createClient = (clientCredentials, cb) => {
     });
   };
 };
+
+let updatePointsColumns = (usernamePointsMap, sheetsData, columnIndex) => {
+  // Iterate through all the rows in the fetched Google Sheets data
+  Array.iter(
+    row => {
+      row
+      |> Array.iter(rowValue =>
+           if (StringMap.mem(rowValue, usernamePointsMap)) {
+             // Found a username, get the points to update
+             let pointsBinding = StringMap.find(rowValue, usernamePointsMap);
+             let pointsValue = int_of_string_opt(row[columnIndex]);
+
+             switch (pointsValue, pointsBinding) {
+             | (Some(sheetsValue), pointsBinding) =>
+               row[columnIndex] = string_of_int(sheetsValue + pointsBinding)
+             | (None, pointsBinding) =>
+               // If user as an empty cell, add new points
+               row[columnIndex] = string_of_int(pointsBinding)
+             };
+           }
+         )
+    },
+    Belt.Array.slice(sheetsData, ~offset=1, ~len=Array.length(sheetsData)),
+  );
+};
+
+let updatePoints = (sheetsData, metricsMap) => {
+  // Loop through the first column and calculate listed challenges
+  sheetsData[0]
+  |> Array.iteri((columnIndex, column) => {
+       let pointsMap = Challenges.calculatePoints(column, metricsMap);
+       let pkUsernameMap = createPublickeyUsernameMap(sheetsData);
+       let usernamePointsMap =
+         createUsernamePointsMap(pointsMap, pkUsernameMap);
+
+       // Challenge data detected
+       if (StringMap.cardinal(usernamePointsMap) > 0) {
+         updatePointsColumns(usernamePointsMap, sheetsData, columnIndex);
+       };
+     });
+};
+
+let uploadPoints = metricsMap => {
+  let clientId = "";
+  let clientSecret = "";
+  let redirectURI = "";
+  let spreadsheetId = "";
+
+  let sheetsQuery: GoogleSheets.sheetsQuery = {spreadsheetId, range: ""};
+
+  createClient({clientId, clientSecret, redirectURI}, client => {
+    switch (client) {
+    | Ok(client) =>
+      getRange(client, sheetsQuery, result => {
+        switch (result) {
+        | Ok(sheetsData) =>
+          updatePoints(sheetsData, metricsMap);
+
+          let resource: GoogleSheets.sheetsData = {values: sheetsData};
+          let sheetsUpdate: GoogleSheets.sheetsUpdate = {
+            spreadsheetId,
+            range: "",
+            valueInputOption: "USER_ENTERED",
+            resource,
+          };
+          updateRange(client, sheetsUpdate, result => {
+            switch (result) {
+            | Ok(_) => Js.log("Data uploaded")
+            | Error(error) => Js.log(error)
+            }
+          });
+          ();
+        | Error(error) => Js.log(error)
+        }
+      })
+    | Error(error) => Js.log(error)
+    }
+  });
+};

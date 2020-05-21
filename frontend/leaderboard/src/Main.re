@@ -15,4 +15,4 @@ let blocks =
     files,
   );
 
-let results = blocks |> Metrics.calculateMetrics |> Challenges.calculatePoints;
+let results = blocks |> Metrics.calculateMetrics |> Sheets.uploadPoints;
