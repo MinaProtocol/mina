@@ -18,7 +18,10 @@ val var_to_input : var -> (Field.Var.t, Boolean.var) Random_oracle.Input.t
 
 val to_input : t -> (Field.t, bool) Random_oracle.Input.t
 
-val genesis : genesis_ledger_hash:Ledger_hash.t -> t
+val genesis :
+     constraint_constants:Genesis_constants.Constraint_constants.t
+  -> genesis_ledger_hash:Ledger_hash.t
+  -> t
 
 module Stable : sig
   module V1 : sig
