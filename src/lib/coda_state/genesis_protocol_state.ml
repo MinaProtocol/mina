@@ -26,13 +26,15 @@ let t ~genesis_ledger ~constraint_constants
   in
   With_hash.of_data ~hash_data:Protocol_state.hash state
 
-let compile_time_genesis =
-  lazy
-    (t ~genesis_ledger:Test_genesis_ledger.t
-       ~constraint_constants:Genesis_constants.Constraint_constants.compiled
-       ~genesis_constants:Genesis_constants.compiled)
-
 module For_tests = struct
   (*Use test_ledger generated at compile time*)
-  let genesis_state_hash = Lazy.map ~f:With_hash.hash compile_time_genesis
+
+  let genesis_state =
+    lazy
+      (t ~genesis_ledger:Test_genesis_ledger.t
+         ~constraint_constants:
+           Genesis_constants.Constraint_constants.for_unit_tests
+         ~genesis_constants:Genesis_constants.for_unit_tests)
+
+  let genesis_state_hash = Lazy.map ~f:With_hash.hash genesis_state
 end
