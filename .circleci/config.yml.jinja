@@ -411,10 +411,17 @@ jobs:
 
                   no_output_timeout: 20m
             - run:
-                  name: Generate runtime ledger with 10k accounts
-                  command: |
-                    ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'eval `opam config env` && dune exec --profile={{profile}} src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -- --config-file genesis_ledgers/phase_three/config.json'
-                  no_output_timeout: 20m
+                name: Output compiled ledger and genesis proof
+                command: |
+                  ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'eval `opam config env` && dune exec --profile={{profile}} src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe'
+            - run:
+                name: Generate runtime ledger with 10k accounts
+                command: |
+                  ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'eval `opam config env` && dune exec --profile={{profile}} src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -- --config-file genesis_ledgers/phase_three/config.json'
+                no_output_timeout: 20m
+            - run:
+                name: Upload genesis data
+                command: ./scripts/upload-genesis.sh
             - run:
                   name: Build deb package with PV keys and PV key tar
                   command:  ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make deb'
