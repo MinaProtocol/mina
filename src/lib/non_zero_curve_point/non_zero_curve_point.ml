@@ -2,7 +2,6 @@
 "/src/config.mlh"]
 
 open Core_kernel
-open Module_version
 
 [%%ifdef
 consensus_mechanism]
@@ -95,7 +94,9 @@ module Compressed = struct
         let known_good_hash =
           "\xC3\x5E\x26\x42\xA5\x04\x4A\x9D\x00\x17\xD8\x3E\xED\x84\x08\xDB\xD1\xA0\xCE\x13\x13\x10\x28\x80\x74\xD4\xF1\x25\x6C\x87\x44\x04"
         in
-        Serialization.check_serialization (module V1) point known_good_hash
+        Ppx_version.Serialization.check_serialization
+          (module V1)
+          point known_good_hash
 
       [%%elif
       curve_size = 753]
@@ -108,7 +109,9 @@ module Compressed = struct
         let known_good_hash =
           "\x4C\x68\x08\xF4\xC0\xB7\xF1\x41\xFE\xDF\x43\x55\xDA\xB6\x13\xD4\x69\x46\x04\x51\x58\xF7\x92\x51\x02\x5B\x2B\x20\x3F\x6F\x2C\x11"
         in
-        Serialization.check_serialization (module V1) point known_good_hash
+        Ppx_version.Serialization.check_serialization
+          (module V1)
+          point known_good_hash
 
       [%%else]
 
