@@ -42,6 +42,21 @@ let encodeGoogleSheets = sheetsData => {
   );
 };
 
+let normalizeGoogleSheets = sheetsData => {
+  let headerLength = Array.length(sheetsData[0]);
+  Array.map(
+    row => {
+      let rowLength = Array.length(row);
+      if (rowLength < headerLength) {
+        Array.append(ArrayLabels.make(headerLength - rowLength, None), row);
+      } else {
+        row;
+      };
+    },
+    sheetsData,
+  );
+};
+
 let createPublickeyUsernameMap = sheetsData => {
   sheetsData
   |> Array.fold_left(
@@ -170,7 +185,8 @@ let uploadPoints = (fileCredentials, metricsMap) => {
             result => {
             switch (result) {
             | Ok(leaderboardData) =>
-              let decodedResult = decodeGoogleSheets(leaderboardData);
+              let decodedResult =
+                decodeGoogleSheets(leaderboardData) |> normalizeGoogleSheets;
               updatePoints(metricsMap, pkUsernameMap, decodedResult);
               let resource: Bindings.GoogleSheets.sheetsUploadData = {
                 values: encodeGoogleSheets(decodedResult),
