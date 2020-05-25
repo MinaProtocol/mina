@@ -1,5 +1,4 @@
 open Bindings;
-module StringMap = Map.Make(String);
 
 let tokenPath = "token.json";
 let scopes = [|"https://www.googleapis.com/auth/spreadsheets"|];
@@ -69,35 +68,6 @@ let updateRange = (client, sheetsUpdate, cb) => {
   });
 };
 
-let createPublickeyUsernameMap = sheetsData => {
-  sheetsData
-  |> Array.fold_left(
-       (map, user) => {StringMap.add(user[0], user[1], map)},
-       StringMap.empty,
-     );
-};
-
-let createUsernamePointsMap = (pointsMap, pkUsernameMap) => {
-  StringMap.fold(
-    (pk, username, map) => {
-      StringMap.mem(pk, pointsMap)
-        ? StringMap.add(username, StringMap.find(pk, pointsMap), map) : map
-    },
-    pkUsernameMap,
-    StringMap.empty,
-  );
-};
-
-let convertPointsMapToSheetsData = pointsMap => {
-  StringMap.fold(
-    (key: string, value: int, array) => {
-      Array.append([|[|key, string_of_int(value)|]|], array)
-    },
-    pointsMap,
-    [||],
-  );
-};
-
 let createClient = (clientCredentials, cb) => {
   let {GoogleSheets.clientId, clientSecret, redirectURI} = clientCredentials;
   let client = GoogleSheets.oAuth2(~clientId, ~clientSecret, ~redirectURI);
@@ -121,83 +91,4 @@ let createClient = (clientCredentials, cb) => {
       }
     });
   };
-};
-
-let updatePointsColumns = (usernamePointsMap, sheetsData, columnIndex) => {
-  // Iterate through all the rows in the fetched Google Sheets data
-  Array.iter(
-    row => {
-      row
-      |> Array.iter(rowValue =>
-           if (StringMap.mem(rowValue, usernamePointsMap)) {
-             // Found a username, get the points to update
-             let pointsBinding = StringMap.find(rowValue, usernamePointsMap);
-             let pointsValue = int_of_string_opt(row[columnIndex]);
-
-             switch (pointsValue, pointsBinding) {
-             | (Some(sheetsValue), pointsBinding) =>
-               row[columnIndex] = string_of_int(sheetsValue + pointsBinding)
-             | (None, pointsBinding) =>
-               // If user as an empty cell, add new points
-               row[columnIndex] = string_of_int(pointsBinding)
-             };
-           }
-         )
-    },
-    Belt.Array.slice(sheetsData, ~offset=1, ~len=Array.length(sheetsData)),
-  );
-};
-
-let updatePoints = (sheetsData, metricsMap) => {
-  // Loop through the first column and calculate listed challenges
-  sheetsData[0]
-  |> Array.iteri((columnIndex, column) => {
-       let pointsMap = Challenges.calculatePoints(column, metricsMap);
-       let pkUsernameMap = createPublickeyUsernameMap(sheetsData);
-       let usernamePointsMap =
-         createUsernamePointsMap(pointsMap, pkUsernameMap);
-
-       // Challenge data detected
-       if (StringMap.cardinal(usernamePointsMap) > 0) {
-         updatePointsColumns(usernamePointsMap, sheetsData, columnIndex);
-       };
-     });
-};
-
-let uploadPoints = metricsMap => {
-  let clientId = "";
-  let clientSecret = "";
-  let redirectURI = "";
-  let spreadsheetId = "";
-
-  let sheetsQuery: GoogleSheets.sheetsQuery = {spreadsheetId, range: ""};
-
-  createClient({clientId, clientSecret, redirectURI}, client => {
-    switch (client) {
-    | Ok(client) =>
-      getRange(client, sheetsQuery, result => {
-        switch (result) {
-        | Ok(sheetsData) =>
-          updatePoints(sheetsData, metricsMap);
-
-          let resource: GoogleSheets.sheetsData = {values: sheetsData};
-          let sheetsUpdate: GoogleSheets.sheetsUpdate = {
-            spreadsheetId,
-            range: "",
-            valueInputOption: "USER_ENTERED",
-            resource,
-          };
-          updateRange(client, sheetsUpdate, result => {
-            switch (result) {
-            | Ok(_) => Js.log("Data uploaded")
-            | Error(error) => Js.log(error)
-            }
-          });
-          ();
-        | Error(error) => Js.log(error)
-        }
-      })
-    | Error(error) => Js.log(error)
-    }
-  });
 };

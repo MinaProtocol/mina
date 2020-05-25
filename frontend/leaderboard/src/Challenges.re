@@ -41,31 +41,37 @@ let calculatePoints = (challengeID, metricsMap) => {
   | Some(res) =>
     switch (res[1]) {
     | "Blocks" =>
-      addPointsToUsersWithAtleastN(
-        (metricRecord: Types.Metrics.metricRecord) =>
-          metricRecord.blocksCreated,
-        1,
-        1000,
-        metricsMap,
+      Some(
+        addPointsToUsersWithAtleastN(
+          (metricRecord: Types.Metrics.metricRecord) =>
+            metricRecord.blocksCreated,
+          1,
+          1000,
+          metricsMap,
+        ),
       )
     | "Snark Fees" =>
-      addPointsToUsersWithAtleastN(
-        (metricRecord: Types.Metrics.metricRecord) =>
-          metricRecord.snarkFeesCollected,
-        3L,
-        1000,
-        metricsMap,
+      Some(
+        addPointsToUsersWithAtleastN(
+          (metricRecord: Types.Metrics.metricRecord) =>
+            metricRecord.snarkFeesCollected,
+          3L,
+          1000,
+          metricsMap,
+        ),
       )
     | "Echo Transaction" =>
-      addPointsToUsersWithAtleastN(
-        (metricRecord: Types.Metrics.metricRecord) =>
-          metricRecord.transactionsReceivedByEcho,
-        1,
-        500,
-        metricsMap,
+      Some(
+        addPointsToUsersWithAtleastN(
+          (metricRecord: Types.Metrics.metricRecord) =>
+            metricRecord.transactionsReceivedByEcho,
+          1,
+          500,
+          metricsMap,
+        ),
       )
-    | _ => StringMap.empty
+    | _ => None
     }
-  | None => StringMap.empty
+  | None => None
   };
 };
