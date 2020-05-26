@@ -5,14 +5,7 @@
 --
 -- TODO: Move volume to something in the cloud or artifacts from gcloud storage
 
-let Config = {
-  Type = {
-    image: Text
-  },
-  default = {=}
-}
-
-let Result = {
+{
   Type = {
      image: Text,
      `propagate-environment`: Bool,
@@ -25,11 +18,3 @@ let Result = {
     environment = [ "BUILDKITE_AGENT_ACCESS_TOKEN" ]
   }
 }
-
-let build : Config.Type -> Result.Type = \(c: Config.Type) ->
-  Result::{ image = c.image }
-
-in
-
-{Config = Config, build = build } /\ Result
-
