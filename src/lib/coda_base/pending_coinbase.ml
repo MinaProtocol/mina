@@ -1234,9 +1234,9 @@ let%test_unit "add stack + remove stack = initial tree " =
     Genesis_constants.Constraint_constants.for_unit_tests
   in
   let depth = constraint_constants.pending_coinbase_depth in
-  let coinbase_amount = constraint_constants.coinbase_amount in
   let coinbases_gen =
-    Quickcheck.Generator.list_non_empty (Coinbase.Gen.gen ~coinbase_amount)
+    Quickcheck.Generator.list_non_empty
+      (Coinbase.Gen.gen ~constraint_constants)
   in
   let pending_coinbases = ref (create ~depth () |> Or_error.ok_exn) in
   Quickcheck.test coinbases_gen ~trials:50 ~f:(fun cbs ->
@@ -1304,9 +1304,8 @@ let%test_unit "Checked_stack = Unchecked_stack" =
   let constraint_constants =
     Genesis_constants.Constraint_constants.for_unit_tests
   in
-  let coinbase_amount = constraint_constants.coinbase_amount in
   test ~trials:20
-    (Generator.tuple2 Stack.gen (Coinbase.Gen.gen ~coinbase_amount))
+    (Generator.tuple2 Stack.gen (Coinbase.Gen.gen ~constraint_constants))
     ~f:(fun (base, cb) ->
       let coinbase_data = Coinbase_data.of_coinbase cb in
       let unchecked = Stack.push_coinbase cb base in
@@ -1330,10 +1329,11 @@ let%test_unit "Checked_tree = Unchecked_tree" =
     Genesis_constants.Constraint_constants.for_unit_tests
   in
   let depth = constraint_constants.pending_coinbase_depth in
-  let coinbase_amount = constraint_constants.coinbase_amount in
   let pending_coinbases = create ~depth () |> Or_error.ok_exn in
   test ~trials:20
-    (Generator.tuple2 (Coinbase.Gen.gen ~coinbase_amount) State_body_hash.gen)
+    (Generator.tuple2
+       (Coinbase.Gen.gen ~constraint_constants)
+       State_body_hash.gen)
     ~f:(fun (coinbase, state_body_hash) ->
       let coinbase_data = Coinbase_data.of_coinbase coinbase in
       let is_new_stack, action =
@@ -1374,9 +1374,10 @@ let%test_unit "Checked_tree = Unchecked_tree after pop" =
     Genesis_constants.Constraint_constants.for_unit_tests
   in
   let depth = constraint_constants.pending_coinbase_depth in
-  let coinbase_amount = constraint_constants.coinbase_amount in
   test ~trials:20
-    (Generator.tuple2 (Coinbase.Gen.gen ~coinbase_amount) State_body_hash.gen)
+    (Generator.tuple2
+       (Coinbase.Gen.gen ~constraint_constants)
+       State_body_hash.gen)
     ~f:(fun (coinbase, state_body_hash) ->
       let pending_coinbases = create ~depth () |> Or_error.ok_exn in
       let coinbase_data = Coinbase_data.of_coinbase coinbase in
@@ -1446,7 +1447,6 @@ let%test_unit "push and pop multiple stacks" =
       pending_coinbase_depth= 3 }
   in
   let depth = constraint_constants.pending_coinbase_depth in
-  let coinbase_amount = constraint_constants.coinbase_amount in
   let t_of_coinbases t = function
     | [] ->
         let t' =
@@ -1520,7 +1520,7 @@ let%test_unit "push and pop multiple stacks" =
       list
         (list
            (Generator.tuple2
-              (Coinbase.Gen.gen ~coinbase_amount)
+              (Coinbase.Gen.gen ~constraint_constants)
               State_body_hash.gen)))
   in
   test ~trials:100 coinbase_lists_gen ~f:add_remove_check

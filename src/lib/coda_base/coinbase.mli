@@ -44,11 +44,9 @@ val supply_increase : t -> Currency.Amount.t Or_error.t
 val fee_excess : t -> Currency.Fee.Signed.t Or_error.t
 
 module Gen : sig
-  (** The [coinbase_amount] parameter should match the one defined in the
-      [Genesis_constants.Constraint_constants.t] used to run the tests.
-      Do NOT set it to other values.
-  *)
-  val gen : coinbase_amount:Currency.Amount.t -> t Quickcheck.Generator.t
+  val gen :
+       constraint_constants:Genesis_constants.Constraint_constants.t
+    -> t Quickcheck.Generator.t
 
   val with_random_receivers :
        keys:Signature_keypair.t array
