@@ -23,7 +23,7 @@ val signature : Field.t State.t
 *)
 val merkle_tree : int -> Field.t State.t
 
-val coinbase_merkle_tree : Field.t State.t array
+val coinbase_merkle_tree : int -> Field.t State.t
 
 val vrf_message : Field.t State.t
 

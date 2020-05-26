@@ -20,10 +20,12 @@ module NewBlock = {
     feeTransfer: array(feeTransfer),
   };
 
+  type blockchainState = {date: string};
   type data = {
     creatorAccount: account,
     snarkJobs: array(snarkJobs),
     transactions,
+    protocolState: blockchainState,
   };
 
   type newBlock = {newBlock: data};
@@ -50,4 +52,14 @@ module Metrics = {
     highestSnarkFeeCollected: option(int64),
     transactionsReceivedByEcho: option(int),
   };
+};
+
+module FileCredentials = {
+  type t = {
+    clientId: string,
+    clientSecret: string,
+    redirectURI: string,
+    spreadsheetId: string,
+  };
+  external unsafeJSONToFileCredentials: Js.Json.t => t = "%identity";
 };

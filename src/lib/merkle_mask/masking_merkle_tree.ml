@@ -105,6 +105,10 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     let get_uuid t = assert_is_attached t ; t.uuid
 
+    let get_directory t =
+      assert_is_attached t ;
+      Option.bind ~f:Base.get_directory t.parent
+
     let depth t = assert_is_attached t ; t.depth
 
     (* don't rely on a particular implementation *)

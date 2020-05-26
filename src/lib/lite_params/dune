@@ -1,7 +1,7 @@
 (library
   (name lite_params)
   (public_name lite_params)
-  (preprocess (pps ppx_jane ppx_deriving.eq ppx_coda))
+  (preprocess (pps ppx_jane ppx_deriving.eq ppx_version))
   (libraries pedersen_lib lite_curve_choice snarkette core_kernel))
 
 (rule

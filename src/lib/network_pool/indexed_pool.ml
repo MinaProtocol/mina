@@ -498,9 +498,14 @@ let rec add_from_gossip_exn :
     -> Account_nonce.t
     -> Currency.Amount.t
     -> ( t * User_command.With_valid_signature.t Sequence.t
-       , [> `Invalid_nonce
-         | `Insufficient_funds
-         | `Insufficient_replace_fee
+       , [> `Invalid_nonce of
+            [ `Expected of Account.Nonce.t
+            | `Between of Account.Nonce.t * Account.Nonce.t ]
+            * Account.Nonce.t
+         | `Insufficient_funds of
+           [`Balance of Currency.Amount.t] * Currency.Amount.t
+         | `Insufficient_replace_fee of
+           [`Replace_fee of Currency.Fee.t] * Currency.Fee.t
          | `Overflow ] )
        Result.t =
  fun t cmd current_nonce balance ->
@@ -519,13 +524,13 @@ let rec add_from_gossip_exn :
       let%bind () =
         Result.ok_if_true
           (Account_nonce.equal current_nonce nonce)
-          ~error:`Invalid_nonce
+          ~error:(`Invalid_nonce (`Expected current_nonce, nonce))
         (* C1/1a *)
       in
       let%bind () =
         Result.ok_if_true
           Currency.Amount.(consumed <= balance)
-          ~error:`Insufficient_funds
+          ~error:(`Insufficient_funds (`Balance balance, consumed))
         (* C2 *)
       in
       Result.Ok
@@ -559,7 +564,7 @@ let rec add_from_gossip_exn :
         let%bind () =
           Result.ok_if_true
             Currency.Amount.(balance >= reserved_currency')
-            ~error:`Insufficient_funds
+            ~error:(`Insufficient_funds (`Balance balance, reserved_currency'))
           (* C2 *)
         in
         Result.Ok
@@ -584,7 +589,9 @@ let rec add_from_gossip_exn :
           Result.ok_if_true
             (Account_nonce.between ~low:first_queued_nonce
                ~high:last_queued_nonce nonce)
-            ~error:`Invalid_nonce
+            ~error:
+              (`Invalid_nonce
+                (`Between (first_queued_nonce, last_queued_nonce), nonce))
           (* C1/C1b *)
         in
         assert (
@@ -604,21 +611,24 @@ let rec add_from_gossip_exn :
         (* We check the fee increase twice because we need to be sure the
            subtraction is safe. *)
         let%bind () =
+          let replace_fee = User_command.fee to_drop in
           Result.ok_if_true
-            Currency.Fee.(fee >= User_command.fee to_drop)
-            ~error:`Insufficient_replace_fee
+            Currency.Fee.(fee >= replace_fee)
+            ~error:(`Insufficient_replace_fee (`Replace_fee replace_fee, fee))
           (* C3 *)
         in
         let increment =
-          Currency.Fee.to_int
-          @@ Option.value_exn Currency.Fee.(fee - User_command.fee to_drop)
+          Option.value_exn Currency.Fee.(fee - User_command.fee to_drop)
         in
         let%bind () =
+          let replace_fee =
+            Option.value_exn
+              (Currency.Fee.scale replace_fee (F_sequence.length drop_queue))
+          in
           Result.ok_if_true
-            ( increment
-            >= Currency.Fee.to_int replace_fee * F_sequence.length drop_queue
-            )
-            ~error:`Insufficient_replace_fee
+            Currency.Fee.(increment >= replace_fee)
+            ~error:
+              (`Insufficient_replace_fee (`Replace_fee replace_fee, increment))
           (* C3 *)
         in
         let dropped, t' =
@@ -632,8 +642,8 @@ let rec add_from_gossip_exn :
             (* We've already removed them, so this should always be empty. *)
             assert (Sequence.is_empty dropped') ;
             Result.Ok (t'', dropped)
-        | Error `Insufficient_funds ->
-            Error `Insufficient_funds (* C2 *)
+        | Error (`Insufficient_funds _ as err) ->
+            Error err (* C2 *)
         | _ ->
             failwith "recursive add_exn failed" )
 
@@ -715,10 +725,10 @@ let%test_module _ =
             |> Currency.Amount.to_int > 500
           then
             match add_res with
-            | Error `Insufficient_funds ->
+            | Error (`Insufficient_funds _) ->
                 ()
             | _ ->
-                failwith "should've returned nsf"
+                failwith "should've returned insufficient_funds"
           else
             match add_res with
             | Ok (pool', dropped) ->
@@ -786,14 +796,30 @@ let%test_module _ =
                     assert_invariants pool' ;
                     pool := pool' ;
                     go rest
-                | Error `Invalid_nonce ->
-                    failwith "bad nonce"
-                | Error `Insufficient_funds ->
-                    failwith "insufficient funds"
-                | Error `Insufficient_replace_fee ->
-                    failwith "insufficient replace fee"
+                | Error (`Invalid_nonce (`Expected want, got)) ->
+                    failwithf
+                      !"Bad nonce. Expected: %{sexp: Account.Nonce.t}. Got: \
+                        %{sexp: Account.Nonce.t}"
+                      want got ()
+                | Error (`Invalid_nonce (`Between (low, high), got)) ->
+                    failwithf
+                      !"Bad nonce. Expected between %{sexp: Account.Nonce.t} \
+                        and %{sexp:Account.Nonce.t}. Got: %{sexp: \
+                        Account.Nonce.t}"
+                      low high got ()
+                | Error (`Insufficient_funds (`Balance bal, amt)) ->
+                    failwithf
+                      !"Insufficient funds. Balance: %{sexp: \
+                        Currency.Amount.t}. Amount: %{sexp: Currency.Amount.t}"
+                      bal amt ()
+                | Error (`Insufficient_replace_fee (`Replace_fee rfee, fee)) ->
+                    failwithf
+                      !"Insufficient fee for replacement. Needed at least \
+                        %{sexp: Currency.Fee.t} but got \
+                        %{sexp:Currency.Fee.t}."
+                      rfee fee ()
                 | Error `Overflow ->
-                    failwith "overflow" )
+                    failwith "Overflow." )
           in
           go cmds )
 
@@ -957,8 +983,8 @@ let%test_module _ =
                 failwith "adding command failed"
           else
             match add_res with
-            | Error `Insufficient_funds ->
+            | Error (`Insufficient_funds _) ->
                 ()
             | _ ->
-                failwith "should've returned nsf" )
+                failwith "should've returned insufficient_funds" )
   end )

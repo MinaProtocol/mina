@@ -135,6 +135,20 @@ let calculateTransactionsSentToAddress = (blocks, address) => {
   );
 };
 
+let filterBlocksByTimeWindow = (startTime, endTime, blocks) => {
+  let blocksList = Array.to_list(blocks);
+
+  let filteredBlocksList =
+    List.filter(
+      (block: Types.NewBlock.data) => {
+        endTime < block.protocolState.date
+        && block.protocolState.date > startTime
+      },
+      blocksList,
+    );
+  Array.of_list(filteredBlocksList);
+};
+
 let throwAwayValues = metric => {
   StringMap.map(_ => {()}, metric);
 };
@@ -144,6 +158,22 @@ let calculateAllUsers = metrics => {
     StringMap.merge((_, _, _) => {Some()}),
     StringMap.empty,
     metrics,
+  );
+};
+
+// Combines two maps of users to points and returns one map of users to points
+let sumPointsMaps = maps => {
+  List.fold_left(
+    StringMap.merge((_, value, secondValue) => {
+      switch (value, secondValue) {
+      | (Some(value), Some(secondValue)) => Some(value + secondValue)
+      | (Some(value), None)
+      | (None, Some(value)) => Some(value)
+      | (None, None) => None
+      }
+    }),
+    StringMap.empty,
+    maps,
   );
 };
 

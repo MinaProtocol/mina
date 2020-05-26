@@ -1,7 +1,7 @@
 open Bindings;
 
 let tokenPath = "token.json";
-let scopes = [|"https://www.googleapis.com/auth/spreadsheets.readonly"|];
+let scopes = [|"https://www.googleapis.com/auth/spreadsheets"|];
 
 let readAndParseToken = () => {
   switch (Node.Fs.readFileAsUtf8Sync(tokenPath)) {
@@ -50,6 +50,17 @@ let getRange = (client, sheetsQuery, cb) => {
   let sheets = GoogleSheets.sheets({version: "v4", auth: client});
 
   GoogleSheets.get(sheets, sheetsQuery, (~error, ~res) => {
+    switch (Js.Nullable.toOption(error)) {
+    | None => cb(Ok(res.data.values))
+    | Some(error) => cb(Error(error))
+    }
+  });
+};
+
+let updateRange = (client, sheetsUpdate, cb) => {
+  let sheets = GoogleSheets.sheets({version: "v4", auth: client});
+
+  GoogleSheets.update(sheets, sheetsUpdate, (~error, ~res) => {
     switch (Js.Nullable.toOption(error)) {
     | None => cb(Ok(res.data.values))
     | Some(error) => cb(Error(error))
