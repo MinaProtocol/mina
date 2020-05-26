@@ -8,53 +8,48 @@ let getCellType = v =>
   };
 
 let decodeGoogleSheets = sheetsData => {
-  Array.map(
-    row => {
-      Array.map(
-        cell => {
-          switch (getCellType(cell)) {
-          | `Float(float) => Some(Js.Float.toString(float))
-          | `String(string) => Some(string)
-          | _ => None
-          }
-        },
-        row,
-      )
-    },
-    sheetsData,
-  );
+  sheetsData
+  |> Array.map(row => {
+       Array.map(
+         cell => {
+           switch (getCellType(cell)) {
+           | `Float(float) => Some(Js.Float.toString(float))
+           | `String(string) => Some(string)
+           | _ => None
+           }
+         },
+         row,
+       )
+     });
 };
 
 let encodeGoogleSheets = sheetsData => {
-  Array.map(
-    row => {
-      Array.map(
-        cell => {
-          switch (cell) {
-          | Some(cell) => cell
-          | None => ""
-          }
-        },
-        row,
-      )
-    },
-    sheetsData,
-  );
+  sheetsData
+  |> Array.map(row => {
+       Array.map(
+         cell => {
+           switch (cell) {
+           | Some(cell) => cell
+           | None => ""
+           }
+         },
+         row,
+       )
+     });
 };
 
 let normalizeGoogleSheets = sheetsData => {
   let headerLength = Array.length(sheetsData[0]);
-  Array.map(
-    row => {
-      let rowLength = Array.length(row);
-      if (rowLength < headerLength) {
-        Array.append(ArrayLabels.make(headerLength - rowLength, None), row);
-      } else {
-        row;
-      };
-    },
-    sheetsData,
-  );
+
+  sheetsData
+  |> Array.map(row => {
+       let rowLength = Array.length(row);
+       if (rowLength < headerLength) {
+         Array.append(ArrayLabels.make(headerLength - rowLength, None), row);
+       } else {
+         row;
+       };
+     });
 };
 
 let createPublickeyUsernameMap = sheetsData => {
@@ -85,39 +80,37 @@ let createUsernamePointsMap = (pointsMap, pkUsernameMap) => {
 let updatePointsColumns =
     (usernamePointsMap, sheetsData, pointIndex, userNameIndex) => {
   // Iterate through all the rows in the fetched Google Sheets data
-  Array.iter(
-    row => {
-      let username =
-        switch (row[userNameIndex]) {
-        | Some(username) => username
-        | None => ""
-        };
+  Belt.Array.slice(sheetsData, ~offset=1, ~len=Array.length(sheetsData))
+  |> Array.iter(row => {
+       let username =
+         switch (row[userNameIndex]) {
+         | Some(username) => username
+         | None => ""
+         };
 
-      if (StringMap.mem(username, usernamePointsMap)) {
-        // Found a username, get the points to update
-        let pointsBinding = StringMap.find(username, usernamePointsMap);
-        let pointsValue =
-          switch (row[pointIndex]) {
-          | Some(points) => int_of_string_opt(points)
-          | None => None
-          };
+       if (StringMap.mem(username, usernamePointsMap)) {
+         // Found a username, get the points to update
+         let pointsBinding = StringMap.find(username, usernamePointsMap);
+         let pointsValue =
+           switch (row[pointIndex]) {
+           | Some(points) => int_of_string_opt(points)
+           | None => None
+           };
 
-        switch (pointsValue, pointsBinding) {
-        | (Some(sheetsValue), pointsBinding) =>
-          // Add points from sheets and challenge
-          row[pointIndex] = Some(string_of_int(sheetsValue + pointsBinding))
-        | (None, pointsBinding) =>
-          // If user as an empty cell, add points from challenge
-          row[pointIndex] = Some(string_of_int(pointsBinding))
-        };
-      } else {
-        // If username has no points for the challenge, wipe cell
-        row[pointIndex] =
-          None;
-      };
-    },
-    Belt.Array.slice(sheetsData, ~offset=1, ~len=Array.length(sheetsData)),
-  );
+         switch (pointsValue, pointsBinding) {
+         | (Some(sheetsValue), pointsBinding) =>
+           // Add points from sheets and challenge
+           row[pointIndex] = Some(string_of_int(sheetsValue + pointsBinding))
+         | (None, pointsBinding) =>
+           // If user as an empty cell, add points from challenge
+           row[pointIndex] = Some(string_of_int(pointsBinding))
+         };
+       } else {
+         // If username has no points for the challenge, wipe cell
+         row[pointIndex] =
+           None;
+       };
+     });
 };
 
 let getColumnIndex = (data, columnToFind) => {
@@ -128,18 +121,16 @@ let getColumnIndex = (data, columnToFind) => {
       == String.lowercase_ascii(columnToFind)
     | None => false
     }
-  )
-  |> Belt.Option.getExn;
+  );
 };
 
-let updatePoints = (metricsMap, pkUsernameMap, sheetsData) => {
-  let userNameIndex = getColumnIndex(sheetsData[0], "Name");
+let findChallenges = (metricsMap, pkUsernameMap, sheetsData, usernameIndex) => {
   // Loop through the first row which contains all challenge headers and calculate valid challenges
   sheetsData[0]
   |> Array.iteri((columnIndex, columnHeader) => {
        switch (columnHeader) {
-       | Some(columnHeader) =>
-         switch (Challenges.calculatePoints(columnHeader, metricsMap)) {
+       | Some(challengeHeader) =>
+         switch (Challenges.calculatePoints(challengeHeader, metricsMap)) {
          | Some(pointsMap) =>
            let usernamePointsMap =
              createUsernamePointsMap(pointsMap, pkUsernameMap);
@@ -147,13 +138,21 @@ let updatePoints = (metricsMap, pkUsernameMap, sheetsData) => {
              usernamePointsMap,
              sheetsData,
              columnIndex,
-             userNameIndex,
+             usernameIndex,
            );
          | None => ()
          }
        | None => ()
        }
      });
+};
+
+let updatePoints = (metricsMap, pkUsernameMap, sheetsData) => {
+  switch (getColumnIndex(sheetsData[0], "Name")) {
+  | Some(usernameIndex) =>
+    findChallenges(metricsMap, pkUsernameMap, sheetsData, usernameIndex)
+  | None => ()
+  };
 };
 
 let uploadPoints = (fileCredentials, metricsMap) => {
