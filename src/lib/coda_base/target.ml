@@ -4,7 +4,6 @@
 open Core_kernel
 open Snark_params
 open Snark_bits
-open Module_version
 
 [%%versioned_asserted
 module Stable = struct
@@ -29,7 +28,9 @@ module Stable = struct
       let known_good_hash =
         "\x37\xD5\xCC\x43\xEC\x44\xCB\x67\x2D\x85\x25\xC7\x61\xBD\x93\xD1\x57\x30\x95\x82\xBF\x1C\x1D\x08\x73\xA0\x8E\x4D\x7C\x25\x5B\x22"
       in
-      Serialization.check_serialization (module V1) target known_good_hash
+      Ppx_version.Serialization.check_serialization
+        (module V1)
+        target known_good_hash
 
     [%%elif
     curve_size = 753]
@@ -42,7 +43,9 @@ module Stable = struct
       let known_good_hash =
         "\x15\x32\x2E\x00\x93\xA0\x40\x03\xF3\x4F\xF0\x70\xAA\xA4\x71\x25\x57\x89\xE7\x42\x51\x3B\x14\x6E\xCE\x35\x3B\x40\xF8\x35\xA0\x2C"
       in
-      Serialization.check_serialization (module V1) target known_good_hash
+      Ppx_version.Serialization.check_serialization
+        (module V1)
+        target known_good_hash
 
     [%%else]
 
