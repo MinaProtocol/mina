@@ -321,7 +321,7 @@ module type S = sig
        Validation.with_transition
 
   val validate_time_received :
-       constraint_constants:Genesis_constants.Constraint_constants.t
+       precomputed_values:Precomputed_values.t
     -> ( [`Time_received] * unit Truth.false_t
        , 'genesis_state
        , 'proof

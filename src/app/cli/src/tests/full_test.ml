@@ -217,8 +217,6 @@ let run_test () : unit Deferred.t =
              ~consensus_local_state ~transaction_database
              ~external_transition_database ~work_reassignment_wait:420000
              ~precomputed_values
-             ~constraint_constants:
-               Genesis_constants.Constraint_constants.compiled
              ~proof_level:Genesis_constants.Proof_level.compiled ())
       in
       don't_wait_for

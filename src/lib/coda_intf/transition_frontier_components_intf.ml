@@ -366,7 +366,6 @@ module type Transition_router_intf = sig
                                Broadcast_pipe.Reader.t
                                * External_transition.Initial_validated.t
                                  Broadcast_pipe.Writer.t
-    -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> precomputed_values:Precomputed_values.t
     -> ( [`Transition of External_transition.Validated.t]
        * [`Source of [`Gossip | `Catchup | `Internal]] )
