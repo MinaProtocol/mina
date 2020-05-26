@@ -223,7 +223,7 @@ module For_tests = struct
         in
         User_command.sign sender_keypair payload )
 
-  let gen ?(logger = Logger.null ()) ~proof_level ?verifier
+  let gen ?(logger = Logger.null ()) ~proof_level ~precomputed_values ?verifier
       ?(trust_system = Trust_system.null ()) ~accounts_with_secret_keys :
       (t -> t Deferred.t) Quickcheck.Generator.t =
     let open Quickcheck.Let_syntax in
@@ -239,6 +239,7 @@ module For_tests = struct
     let gen_slot_advancement = Int.gen_incl 1 10 in
     let%map make_next_consensus_state =
       Consensus_state_hooks.For_tests.gen_consensus_state ~gen_slot_advancement
+        ~constants:precomputed_values.Precomputed_values.consensus_constants
     in
     fun parent_breadcrumb ->
       let open Deferred.Let_syntax in
@@ -357,21 +358,21 @@ module For_tests = struct
       | Error (`Invalid_staged_ledger_hash e) ->
           failwithf !"Invalid staged ledger hash: %{sexp:Error.t}" e ()
 
-  let gen_non_deferred ?logger ~proof_level ?verifier ?trust_system
-      ~accounts_with_secret_keys =
+  let gen_non_deferred ?logger ~proof_level ~precomputed_values ?verifier
+      ?trust_system ~accounts_with_secret_keys =
     let open Quickcheck.Generator.Let_syntax in
     let%map make_deferred =
-      gen ?logger ?verifier ~proof_level ?trust_system
+      gen ?logger ?verifier ~proof_level ~precomputed_values ?trust_system
         ~accounts_with_secret_keys
     in
     fun x -> Async.Thread_safe.block_on_async_exn (fun () -> make_deferred x)
 
-  let gen_seq ?logger ~proof_level ?verifier ?trust_system
+  let gen_seq ?logger ~proof_level ~precomputed_values ?verifier ?trust_system
       ~accounts_with_secret_keys n =
     let open Quickcheck.Generator.Let_syntax in
     let gen_list =
       List.gen_with_length n
-        (gen ?logger ~proof_level ?verifier ?trust_system
+        (gen ?logger ~proof_level ~precomputed_values ?verifier ?trust_system
            ~accounts_with_secret_keys)
     in
     let%map breadcrumbs_constructors = gen_list in

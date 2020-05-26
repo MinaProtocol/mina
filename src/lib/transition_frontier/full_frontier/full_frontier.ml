@@ -571,11 +571,7 @@ let apply_diffs t diffs ~ignore_consensus_local_state =
   Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
     "Applying %d diffs to full frontier (%s --> ?)" (List.length diffs)
     (Frontier_hash.to_string t.hash) ;
-  let consensus_constants =
-    Consensus.Constants.create
-      ~constraint_constants:t.precomputed_values.constraint_constants
-      ~protocol_constants:t.precomputed_values.genesis_constants.protocol
-  in
+  let consensus_constants = t.precomputed_values.consensus_constants in
   let local_state_was_synced_at_start =
     Consensus.Hooks.required_local_state_sync ~constants:consensus_constants
       ~consensus_state:(Breadcrumb.consensus_state (best_tip t))

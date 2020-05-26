@@ -667,12 +667,7 @@ let next_producer_timing t = t.next_producer_timing
 
 let staking_ledger t =
   let open Option.Let_syntax in
-  let consensus_constants =
-    Consensus.Constants.create
-      ~constraint_constants:t.config.precomputed_values.constraint_constants
-      ~protocol_constants:
-        (Precomputed_values.protocol_constants t.config.precomputed_values)
-  in
+  let consensus_constants = t.config.precomputed_values.consensus_constants in
   let%map transition_frontier =
     Broadcast_pipe.Reader.peek t.components.transition_frontier
   in
@@ -732,11 +727,7 @@ let start t =
 
 let create (config : Config.t) =
   let constraint_constants = config.precomputed_values.constraint_constants in
-  let consensus_constants =
-    Consensus.Constants.create ~constraint_constants
-      ~protocol_constants:
-        (Precomputed_values.protocol_constants config.precomputed_values)
-  in
+  let consensus_constants = config.precomputed_values.consensus_constants in
   let monitor = Option.value ~default:(Monitor.create ()) config.monitor in
   Async.Scheduler.within' ~monitor (fun () ->
       trace "coda" (fun () ->

@@ -87,11 +87,7 @@ let run_test () : unit Deferred.t =
   let precomputed_values = Lazy.force Precomputed_values.compiled in
   let (module Genesis_ledger) = precomputed_values.genesis_ledger in
   let pids = Child_processes.Termination.create_pid_table () in
-  let consensus_constants =
-    Consensus.Constants.create
-      ~constraint_constants:Genesis_constants.Constraint_constants.compiled
-      ~protocol_constants:Genesis_constants.compiled.protocol
-  in
+  let consensus_constants = precomputed_values.consensus_constants in
   setup_time_offsets consensus_constants ;
   print_heartbeat logger |> don't_wait_for ;
   Parallel.init_master () ;

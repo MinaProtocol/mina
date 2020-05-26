@@ -152,27 +152,15 @@ module Types = struct
         ; field "startTime" ~typ:(non_null string)
             ~args:Arg.[]
             ~resolve:(fun {ctx= coda; _} global_slot ->
-              let precomputed_values =
-                (Coda_lib.config coda).precomputed_values
-              in
               let constants =
-                Consensus.Constants.create
-                  ~constraint_constants:precomputed_values.constraint_constants
-                  ~protocol_constants:
-                    precomputed_values.genesis_constants.protocol
+                (Coda_lib.config coda).precomputed_values.consensus_constants
               in
               Block_time.to_string @@ C.start_time ~constants global_slot )
         ; field "endTime" ~typ:(non_null string)
             ~args:Arg.[]
             ~resolve:(fun {ctx= coda; _} global_slot ->
-              let precomputed_values =
-                (Coda_lib.config coda).precomputed_values
-              in
               let constants =
-                Consensus.Constants.create
-                  ~constraint_constants:precomputed_values.constraint_constants
-                  ~protocol_constants:
-                    precomputed_values.genesis_constants.protocol
+                (Coda_lib.config coda).precomputed_values.consensus_constants
               in
               Block_time.to_string @@ C.end_time ~constants global_slot ) ] )
 
@@ -190,14 +178,8 @@ module Types = struct
             ~typ:(non_null @@ list @@ non_null consensus_time)
             ~args:Arg.[]
             ~resolve:(fun {ctx= coda; _} ->
-              let precomputed_values =
-                (Coda_lib.config coda).precomputed_values
-              in
               let consensus_constants =
-                Consensus.Constants.create
-                  ~constraint_constants:precomputed_values.constraint_constants
-                  ~protocol_constants:
-                    precomputed_values.genesis_constants.protocol
+                (Coda_lib.config coda).precomputed_values.consensus_constants
               in
               function
               | `Check_again _time ->

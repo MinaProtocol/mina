@@ -621,11 +621,7 @@ let validate_time_received ~(precomputed_values : Precomputed_values.t)
   let consensus_state =
     With_hash.data t |> protocol_state |> Protocol_state.consensus_state
   in
-  let constants =
-    Consensus.Constants.create
-      ~constraint_constants:precomputed_values.constraint_constants
-      ~protocol_constants:precomputed_values.genesis_constants.protocol
-  in
+  let constants = precomputed_values.consensus_constants in
   let received_unix_timestamp =
     Block_time.to_span_since_epoch time_received |> Block_time.Span.to_ms
   in

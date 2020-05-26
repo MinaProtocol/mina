@@ -438,10 +438,14 @@ module Genesis_proof = struct
 
   let generate_inputs ~proof_level ~ledger ~constraint_constants
       ~(genesis_constants : Genesis_constants.t) =
+    let consensus_constants =
+      Consensus.Constants.create ~constraint_constants
+        ~protocol_constants:genesis_constants.protocol
+    in
     let protocol_state_with_hash =
       Coda_state.Genesis_protocol_state.t
         ~genesis_ledger:(Genesis_ledger.Packed.t ledger)
-        ~constraint_constants ~genesis_constants
+        ~constraint_constants ~consensus_constants
     in
     let%map base_hash =
       match proof_level with
@@ -452,6 +456,7 @@ module Genesis_proof = struct
     in
     { Genesis_proof.Inputs.constraint_constants
     ; genesis_ledger= ledger
+    ; consensus_constants
     ; protocol_state_with_hash
     ; base_hash
     ; genesis_constants }
@@ -467,6 +472,7 @@ module Genesis_proof = struct
           { Genesis_proof.constraint_constants= inputs.constraint_constants
           ; genesis_constants= inputs.genesis_constants
           ; genesis_ledger= inputs.genesis_ledger
+          ; consensus_constants= inputs.consensus_constants
           ; protocol_state_with_hash= inputs.protocol_state_with_hash
           ; base_hash= inputs.base_hash
           ; genesis_proof= Dummy_values.Tock.Bowe_gabizon18.proof }
@@ -496,6 +502,7 @@ module Genesis_proof = struct
                     inputs.constraint_constants
                 ; genesis_constants= inputs.genesis_constants
                 ; genesis_ledger= inputs.genesis_ledger
+                ; consensus_constants= inputs.consensus_constants
                 ; protocol_state_with_hash= inputs.protocol_state_with_hash
                 ; base_hash= inputs.base_hash
                 ; genesis_proof }
@@ -522,6 +529,7 @@ module Genesis_proof = struct
           { Genesis_proof.constraint_constants= inputs.constraint_constants
           ; genesis_constants= inputs.genesis_constants
           ; genesis_ledger= inputs.genesis_ledger
+          ; consensus_constants= inputs.consensus_constants
           ; protocol_state_with_hash= inputs.protocol_state_with_hash
           ; base_hash= inputs.base_hash
           ; genesis_proof= compiled.genesis_proof }

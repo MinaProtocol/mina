@@ -74,6 +74,7 @@ module For_tests : sig
   val gen :
        ?logger:Logger.t
     -> proof_level:Genesis_constants.Proof_level.t
+    -> precomputed_values:Precomputed_values.t
     -> ?verifier:Verifier.t
     -> ?trust_system:Trust_system.t
     -> accounts_with_secret_keys:(Private_key.t option * Account.t) list
@@ -82,6 +83,7 @@ module For_tests : sig
   val gen_non_deferred :
        ?logger:Logger.t
     -> proof_level:Genesis_constants.Proof_level.t
+    -> precomputed_values:Precomputed_values.t
     -> ?verifier:Verifier.t
     -> ?trust_system:Trust_system.t
     -> accounts_with_secret_keys:(Private_key.t option * Account.t) list
@@ -90,6 +92,7 @@ module For_tests : sig
   val gen_seq :
        ?logger:Logger.t
     -> proof_level:Genesis_constants.Proof_level.t
+    -> precomputed_values:Precomputed_values.t
     -> ?verifier:Verifier.t
     -> ?trust_system:Trust_system.t
     -> accounts_with_secret_keys:(Private_key.t option * Account.t) list

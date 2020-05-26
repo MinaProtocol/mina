@@ -256,10 +256,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
     ~(precomputed_values : Precomputed_values.t) =
   trace "block_producer" (fun () ->
       let constraint_constants = precomputed_values.constraint_constants in
-      let protocol_constants = precomputed_values.genesis_constants.protocol in
-      let consensus_constants =
-        Consensus.Constants.create ~constraint_constants ~protocol_constants
-      in
+      let consensus_constants = precomputed_values.consensus_constants in
       let log_bootstrap_mode () =
         Logger.info logger ~module_:__MODULE__ ~location:__LOC__
           "Pausing block production while bootstrapping"

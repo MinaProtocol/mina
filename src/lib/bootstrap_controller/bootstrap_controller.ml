@@ -286,10 +286,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
         match%bind
           match
             Consensus.Hooks.required_local_state_sync
-              ~constants:
-                (Consensus.Constants.create ~constraint_constants
-                   ~protocol_constants:
-                     (Precomputed_values.protocol_constants precomputed_values))
+              ~constants:precomputed_values.consensus_constants
               ~consensus_state ~local_state:consensus_local_state
           with
           | None ->
@@ -479,6 +476,7 @@ let%test_module "Bootstrap_controller tests" =
         in
         let%map make_branch =
           Transition_frontier.Breadcrumb.For_tests.gen_seq ~proof_level
+            ~precomputed_values
             ~accounts_with_secret_keys:
               (Lazy.force Test_genesis_ledger.accounts)
             branch_size

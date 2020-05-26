@@ -39,11 +39,7 @@ let add_and_finalize ~logger ~frontier ~catchup_scheduler
     if Cached.is_pure cached_breadcrumb then Cached.peek cached_breadcrumb
     else Cached.invalidate_with_success cached_breadcrumb
   in
-  let consensus_constants =
-    Consensus.Constants.create
-      ~constraint_constants:precomputed_values.constraint_constants
-      ~protocol_constants:precomputed_values.genesis_constants.protocol
-  in
+  let consensus_constants = precomputed_values.consensus_constants in
   let transition =
     Transition_frontier.Breadcrumb.validated_transition breadcrumb
   in

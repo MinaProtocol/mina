@@ -265,6 +265,7 @@ module type State_hooks = sig
   module For_tests : sig
     val gen_consensus_state :
          gen_slot_advancement:int Quickcheck.Generator.t
+      -> constants:Constants.t
       -> (   previous_protocol_state:( protocol_state
                                      , Coda_base.State_hash.t )
                                      With_hash.t
@@ -448,24 +449,21 @@ module type S = sig
         -> (var, Value.t) Snark_params.Tick.Typ.t
 
       val negative_one :
-           genesis_ledger:Ledger.t Lazy.t
-        -> constraint_constants:Genesis_constants.Constraint_constants.t
-        -> protocol_constants:Genesis_constants.Protocol.t
-        -> Value.t
+        genesis_ledger:Ledger.t Lazy.t -> constants:Constants.t -> Value.t
 
       val create_genesis_from_transition :
            negative_one_protocol_state_hash:Coda_base.State_hash.t
         -> consensus_transition:Consensus_transition.Value.t
         -> genesis_ledger:Ledger.t Lazy.t
         -> constraint_constants:Genesis_constants.Constraint_constants.t
-        -> protocol_constants:Genesis_constants.Protocol.t
+        -> constants:Constants.t
         -> Value.t
 
       val create_genesis :
            negative_one_protocol_state_hash:Coda_base.State_hash.t
         -> genesis_ledger:Ledger.t Lazy.t
         -> constraint_constants:Genesis_constants.Constraint_constants.t
-        -> protocol_constants:Genesis_constants.Protocol.t
+        -> constants:Constants.t
         -> Value.t
 
       open Snark_params.Tick

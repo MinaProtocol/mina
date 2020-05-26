@@ -217,9 +217,7 @@ let get_status ~flag t =
   let precomputed_values = config.precomputed_values in
   let protocol_constants = precomputed_values.genesis_constants.protocol in
   let constraint_constants = precomputed_values.constraint_constants in
-  let consensus_constants =
-    Consensus.Constants.create ~constraint_constants ~protocol_constants
-  in
+  let consensus_constants = precomputed_values.consensus_constants in
   let uptime_secs =
     Time_ns.diff (Time_ns.now ()) start_time
     |> Time_ns.Span.to_sec |> Int.of_float

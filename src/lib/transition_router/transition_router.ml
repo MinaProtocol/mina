@@ -18,11 +18,7 @@ let is_transition_for_bootstrap ~logger
   let new_state =
     External_transition.Initial_validated.protocol_state new_transition
   in
-  let constants =
-    Consensus.Constants.create
-      ~constraint_constants:precomputed_values.constraint_constants
-      ~protocol_constants:precomputed_values.genesis_constants.protocol
-  in
+  let constants = precomputed_values.consensus_constants in
   Consensus.Hooks.should_bootstrap ~constants
     ~existing:(Protocol_state.consensus_state root_state)
     ~candidate:(Protocol_state.consensus_state new_state)
@@ -275,11 +271,7 @@ let initialize ~logger ~network ~is_seed ~verifier ~trust_system
         let%map () =
           match
             Consensus.Hooks.required_local_state_sync
-              ~constants:
-                (Consensus.Constants.create
-                   ~constraint_constants:
-                     precomputed_values.constraint_constants
-                   ~protocol_constants:genesis_constants.protocol)
+              ~constants:precomputed_values.consensus_constants
               ~consensus_state:
                 (Transition_frontier.Breadcrumb.consensus_state root)
               ~local_state:consensus_local_state
@@ -314,11 +306,7 @@ let wait_till_genesis ~logger ~time_controller
     ~(precomputed_values : Precomputed_values.t) =
   let module Time = Block_time in
   let now = Time.now time_controller in
-  let consensus_constants =
-    Consensus.Constants.create
-      ~constraint_constants:precomputed_values.constraint_constants
-      ~protocol_constants:precomputed_values.genesis_constants.protocol
-  in
+  let consensus_constants = precomputed_values.consensus_constants in
   let genesis_state_timestamp = consensus_constants.genesis_state_timestamp in
   try
     Consensus.Hooks.is_genesis_epoch ~constants:consensus_constants now

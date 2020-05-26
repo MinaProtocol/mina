@@ -565,7 +565,7 @@ module For_tests = struct
           (Quickcheck_lib.gen_imperative_rose_tree
              (Quickcheck.Generator.return root)
              (Breadcrumb.For_tests.gen_non_deferred ~logger ~proof_level
-                ~verifier ~trust_system
+                ~precomputed_values ~verifier ~trust_system
                 ~accounts_with_secret_keys:root_ledger_accounts))
       in
       (root, branches, protocol_states)
@@ -632,7 +632,8 @@ module For_tests = struct
         ~max_length ~size:frontier_size ()
     in
     let%map make_branch =
-      Breadcrumb.For_tests.gen_seq ?logger ~proof_level ?verifier ?trust_system
+      Breadcrumb.For_tests.gen_seq ?logger ~proof_level ~precomputed_values
+        ?verifier ?trust_system
         ~accounts_with_secret_keys:(snd root_ledger_and_accounts)
         branch_size
     in

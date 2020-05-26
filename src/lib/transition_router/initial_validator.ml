@@ -90,11 +90,7 @@ module Duplicate_block_detector = struct
 
   (* every gc_interval blocks seen, discard blocks more than gc_width ago *)
   let table_gc ~(precomputed_values : Precomputed_values.t) t block =
-    let consensus_constants =
-      Consensus.Constants.create
-        ~constraint_constants:precomputed_values.constraint_constants
-        ~protocol_constants:precomputed_values.genesis_constants.protocol
-    in
+    let consensus_constants = precomputed_values.consensus_constants in
     let ( `Acceptable_network_delay _
         , `Gc_width _
         , `Gc_width_epoch _
