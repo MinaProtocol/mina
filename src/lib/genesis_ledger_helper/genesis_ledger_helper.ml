@@ -154,6 +154,20 @@ module Ledger = struct
           ~metadata:[("path", `String filename)] ;
         None )
     in
+    let load_from_s3 filename =
+      let s3_path = s3_bucket_prefix ^/ filename in
+      let local_path = Cache_dir.s3_install_path ^/ filename in
+      match%bind Cache_dir.load_from_s3 [s3_path] [local_path] ~logger with
+      | Ok () ->
+          file_exists filename Cache_dir.s3_install_path
+      | Error e ->
+          Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
+            "Could not download genesis ledger from $uri: $error"
+            ~metadata:
+              [ ("uri", `String s3_path)
+              ; ("error", `String (Error.to_string_hum e)) ] ;
+          return None
+    in
     let%bind hash_filename =
       match config.hash with
       | Some hash -> (
@@ -164,21 +178,8 @@ module Ledger = struct
           match tar_path with
           | Some _ ->
               return tar_path
-          | None -> (
-              let s3_path = s3_bucket_prefix ^/ hash_filename in
-              let local_path = Cache_dir.s3_install_path ^/ hash_filename in
-              match%bind
-                Cache_dir.load_from_s3 [s3_path] [local_path] ~logger
-              with
-              | Ok () ->
-                  file_exists hash_filename Cache_dir.s3_install_path
-              | Error e ->
-                  Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
-                    "Could not download genesis ledger from $uri: $error"
-                    ~metadata:
-                      [ ("uri", `String s3_path)
-                      ; ("error", `String (Error.to_string_hum e)) ] ;
-                  return None ) )
+          | None ->
+              load_from_s3 hash_filename )
       | None ->
           return None
     in
@@ -190,12 +191,18 @@ module Ledger = struct
       | Hash hash ->
           assert (Some hash = config.hash) ;
           return None
-      | Accounts accounts ->
+      | Accounts accounts -> (
           let named_filename =
             named_filename ~constraint_constants
               ~num_accounts:config.num_accounts (accounts_name accounts)
           in
-          Deferred.List.find_map ~f:(file_exists named_filename) search_paths
+          match%bind
+            Deferred.List.find_map ~f:(file_exists named_filename) search_paths
+          with
+          | Some path ->
+              return (Some path)
+          | None ->
+              load_from_s3 named_filename )
       | Named name ->
           let named_filename =
             named_filename ~constraint_constants
