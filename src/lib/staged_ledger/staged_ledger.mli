@@ -30,7 +30,8 @@ module Scan_state : sig
 
   val hash : t -> Staged_ledger_hash.Aux_hash.t
 
-  val empty : unit -> t
+  val empty :
+    constraint_constants:Genesis_constants.Constraint_constants.t -> unit -> t
 
   val snark_job_list_json : t -> string
 
@@ -84,7 +85,7 @@ val of_scan_state_and_ledger :
   -> snarked_ledger_hash:Frozen_ledger_hash.t
   -> ledger:Ledger.t
   -> scan_state:Scan_state.t
-  -> pending_coinbase_depth:int
+  -> constraint_constants:Genesis_constants.Constraint_constants.t
   -> pending_coinbase_collection:Pending_coinbase.t
   -> t Or_error.t Deferred.t
 
@@ -92,7 +93,7 @@ val of_scan_state_and_ledger_unchecked :
      snarked_ledger_hash:Frozen_ledger_hash.t
   -> ledger:Ledger.t
   -> scan_state:Scan_state.t
-  -> pending_coinbase_depth:int
+  -> constraint_constants:Genesis_constants.Constraint_constants.t
   -> pending_coinbase_collection:Pending_coinbase.t
   -> t Or_error.t Deferred.t
 

@@ -34,7 +34,7 @@ let genesis_root_data
     ~precomputed_values =
   let open Root_data.Limited in
   let transition = External_transition.genesis ~precomputed_values in
-  let scan_state = Staged_ledger.Scan_state.empty () in
+  let scan_state = Staged_ledger.Scan_state.empty ~constraint_constants () in
   (*if scan state is empty the protocol states required is also empty*)
   let protocol_states = [] in
   let pending_coinbase =
@@ -451,7 +451,8 @@ module For_tests = struct
                  Staged_ledger
                  .of_scan_state_pending_coinbases_and_snarked_ledger ~logger
                    ~verifier ~constraint_constants
-                   ~scan_state:(Staged_ledger.Scan_state.empty ())
+                   ~scan_state:
+                     (Staged_ledger.Scan_state.empty ~constraint_constants ())
                    ~pending_coinbases:
                      ( Or_error.ok_exn
                      @@ Pending_coinbase.create

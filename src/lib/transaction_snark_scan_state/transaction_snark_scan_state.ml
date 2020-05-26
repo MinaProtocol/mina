@@ -450,9 +450,10 @@ let create ~work_delay ~transaction_capacity_log_2 =
   let k = Int.pow 2 transaction_capacity_log_2 in
   Parallel_scan.empty ~delay:work_delay ~max_base_jobs:k
 
-let empty () =
-  create ~work_delay:Coda_compile_config.work_delay
-    ~transaction_capacity_log_2:Coda_compile_config.transaction_capacity_log_2
+let empty ~(constraint_constants : Genesis_constants.Constraint_constants.t) ()
+    =
+  create ~work_delay:constraint_constants.work_delay
+    ~transaction_capacity_log_2:constraint_constants.transaction_capacity_log_2
 
 let extract_txns txns_with_witnesses =
   (* TODO: This type checks, but are we actually pulling the inverse txn here? *)

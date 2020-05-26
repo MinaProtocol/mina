@@ -141,10 +141,11 @@ module T = struct
 
   type t =
     { scan_state: Scan_state.t
-          (* Invariant: this is the ledger after having applied all the transactions in
-     *the above state. *)
-    ; ledger: Ledger.attached_mask sexp_opaque
-    ; pending_coinbase_depth: int
+    ; ledger:
+        (* Invariant: this is the ledger after having applied all the
+           transactions in the above state. *)
+        Ledger.attached_mask sexp_opaque
+    ; constraint_constants: Genesis_constants.Constraint_constants.t
     ; pending_coinbase_collection: Pending_coinbase.t }
   [@@deriving sexp]
 
@@ -189,15 +190,15 @@ module T = struct
         failwithf !"statement_exn: %{sexp:Error.t}" e ()
 
   let of_scan_state_and_ledger_unchecked ~ledger ~scan_state
-      ~pending_coinbase_depth ~pending_coinbase_collection =
-    {ledger; scan_state; pending_coinbase_depth; pending_coinbase_collection}
+      ~constraint_constants ~pending_coinbase_collection =
+    {ledger; scan_state; constraint_constants; pending_coinbase_collection}
 
   let of_scan_state_and_ledger ~logger ~verifier ~snarked_ledger_hash ~ledger
-      ~scan_state ~pending_coinbase_depth ~pending_coinbase_collection =
+      ~scan_state ~constraint_constants ~pending_coinbase_collection =
     let open Deferred.Or_error.Let_syntax in
     let t =
       of_scan_state_and_ledger_unchecked ~ledger ~scan_state
-        ~pending_coinbase_depth ~pending_coinbase_collection
+        ~constraint_constants ~pending_coinbase_collection
     in
     let%bind () =
       Statement_scanner_with_proofs.check_invariants scan_state
@@ -210,10 +211,10 @@ module T = struct
     return t
 
   let of_scan_state_and_ledger_unchecked ~snarked_ledger_hash ~ledger
-      ~scan_state ~pending_coinbase_depth ~pending_coinbase_collection =
+      ~scan_state ~constraint_constants ~pending_coinbase_collection =
     let open Deferred.Or_error.Let_syntax in
     let t =
-      {ledger; scan_state; pending_coinbase_depth; pending_coinbase_collection}
+      {ledger; scan_state; constraint_constants; pending_coinbase_collection}
     in
     let%bind () =
       Statement_scanner.check_invariants scan_state ~verifier:()
@@ -255,24 +256,20 @@ module T = struct
     in
     of_scan_state_and_ledger ~logger ~verifier
       ~snarked_ledger_hash:snarked_frozen_ledger_hash ~ledger:snarked_ledger
-      ~scan_state
-      ~pending_coinbase_depth:constraint_constants.pending_coinbase_depth
+      ~scan_state ~constraint_constants
       ~pending_coinbase_collection:pending_coinbases
 
   let copy
-      {scan_state; ledger; pending_coinbase_depth; pending_coinbase_collection}
-      =
+      {scan_state; ledger; constraint_constants; pending_coinbase_collection} =
     let new_mask = Ledger.Mask.create ~depth:(Ledger.depth ledger) () in
     { scan_state
     ; ledger= Ledger.register_mask ledger new_mask
-    ; pending_coinbase_depth
+    ; constraint_constants
     ; pending_coinbase_collection }
 
   let hash
-      { scan_state
-      ; ledger
-      ; pending_coinbase_depth= _
-      ; pending_coinbase_collection } : Staged_ledger_hash.t =
+      {scan_state; ledger; constraint_constants= _; pending_coinbase_collection}
+      : Staged_ledger_hash.t =
     Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
       (Scan_state.hash scan_state)
       (Ledger.merkle_root ledger)
@@ -289,12 +286,10 @@ module T = struct
 
   let ledger {ledger; _} = ledger
 
-  let create_exn
-      ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-      ~ledger : t =
-    { scan_state= Scan_state.empty ()
+  let create_exn ~constraint_constants ~ledger : t =
+    { scan_state= Scan_state.empty ~constraint_constants ()
     ; ledger
-    ; pending_coinbase_depth= constraint_constants.pending_coinbase_depth
+    ; constraint_constants
     ; pending_coinbase_collection=
         Pending_coinbase.create
           ~depth:constraint_constants.pending_coinbase_depth ()
@@ -636,7 +631,7 @@ module T = struct
   let apply_diff ~logger t pre_diff_info ~state_body_hash =
     let open Deferred.Result.Let_syntax in
     let max_throughput =
-      Int.pow 2 Coda_compile_config.transaction_capacity_log_2
+      Int.pow 2 t.constraint_constants.transaction_capacity_log_2
     in
     let spots_available, proofs_waiting =
       let jobs = Scan_state.all_work_statements t.scan_state in
@@ -695,7 +690,8 @@ module T = struct
       Deferred.return (to_staged_ledger_or_error r)
     in
     let%bind updated_pending_coinbase_collection' =
-      update_pending_coinbase_collection ~depth:t.pending_coinbase_depth
+      update_pending_coinbase_collection
+        ~depth:t.constraint_constants.pending_coinbase_depth
         t.pending_coinbase_collection stack_update ~is_new_stack
         ~ledger_proof:res_opt
       |> Deferred.return
@@ -724,7 +720,7 @@ module T = struct
     let new_staged_ledger =
       { scan_state= scan_state'
       ; ledger= new_ledger
-      ; pending_coinbase_depth= t.pending_coinbase_depth
+      ; constraint_constants= t.constraint_constants
       ; pending_coinbase_collection= updated_pending_coinbase_collection' }
     in
     ( `Hash_after_applying (hash new_staged_ledger)
@@ -1791,7 +1787,7 @@ let%test_module "test" =
       assert (Fee.Signed.(equal fee_excess zero))
 
     let transaction_capacity =
-      Int.pow 2 Coda_compile_config.transaction_capacity_log_2
+      Int.pow 2 constraint_constants.transaction_capacity_log_2
 
     (* Abstraction for the pattern of taking a list of commands and applying it
        in chunks up to a given max size. *)
@@ -1894,8 +1890,8 @@ let%test_module "test" =
     (* How many blocks do we need to fully exercise the ledger
        behavior and produce one ledger proof *)
     let min_blocks_for_first_snarked_ledger_generic =
-      (Coda_compile_config.transaction_capacity_log_2 + 1)
-      * (Coda_compile_config.work_delay + 1)
+      (constraint_constants.transaction_capacity_log_2 + 1)
+      * (constraint_constants.work_delay + 1)
       + 1
 
     (* n-1 extra blocks for n ledger proofs since we are already producing one

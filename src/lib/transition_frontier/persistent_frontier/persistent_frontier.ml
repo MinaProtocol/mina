@@ -32,8 +32,7 @@ let construct_staged_ledger_at_root
            () ))
   in
   Staged_ledger.of_scan_state_and_ledger_unchecked ~snarked_ledger_hash
-    ~ledger:mask ~scan_state
-    ~pending_coinbase_depth:constraint_constants.pending_coinbase_depth
+    ~ledger:mask ~scan_state ~constraint_constants
     ~pending_coinbase_collection:pending_coinbase
 
 module rec Instance_type : sig
