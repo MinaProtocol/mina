@@ -1,8 +1,6 @@
 open Core
 open Async
 open Cli_lib
-open Archive_lib
-open Pipe_lib
 
 let command =
   let open Command.Let_syntax in
@@ -13,7 +11,9 @@ let command =
   fun () ->
     let logger = Logger.create () in
     Stdout_log.setup log_json log_level ;
-    Archive_lib.Processor.setup_server ~logger ~postgres_address:postgres.value
+    Archive_lib.Processor.setup_server ~logger
+      ~constraint_constants:Genesis_constants.Constraint_constants.compiled
+      ~postgres_address:postgres.value
       ~server_port:
         (Option.value server_port.value ~default:server_port.default)
 

@@ -53,7 +53,8 @@ module type Resource_pool_diff_intf = sig
   conincides with applying locally generated diffs or diffs from the network
   or diffs from transition frontier extensions.*)
   val unsafe_apply :
-       pool
+       constraint_constants:Genesis_constants.Constraint_constants.t
+    -> pool
     -> t Envelope.Incoming.t
     -> ( t * rejected
        , [`Locally_generated of t * rejected | `Other of Error.t] )
@@ -107,6 +108,7 @@ module type Network_pool_base_intf = sig
 
   val create :
        config:config
+    -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> incoming_diffs:(resource_pool_diff Envelope.Incoming.t * (bool -> unit))
                       Strict_pipe.Reader.t
     -> local_diffs:( resource_pool_diff
@@ -121,6 +123,7 @@ module type Network_pool_base_intf = sig
   val of_resource_pool_and_diffs :
        resource_pool
     -> logger:Logger.t
+    -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> incoming_diffs:(resource_pool_diff Envelope.Incoming.t * (bool -> unit))
                       Strict_pipe.Reader.t
     -> local_diffs:( resource_pool_diff
