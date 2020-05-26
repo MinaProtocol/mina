@@ -373,7 +373,7 @@ module Ledger = struct
                   in
                   (* Add a symlink from the named path to the hash path. *)
                   let%map () = Unix.symlink ~target:tar_path ~link_name in
-                  Logger.error ~module_:__MODULE__ ~location:__LOC__ logger
+                  Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
                     "Linking ledger file $tar_path to $named_tar_path"
                     ~metadata:
                       [ ("tar_path", `String tar_path)
