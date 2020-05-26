@@ -104,10 +104,10 @@ let create_value ?(sok_digest = Sok_message.Digest.default) ?ledger_proof
   ; coinbase_amount
   ; pending_coinbase_action }
 
-let genesis ~genesis_ledger : value =
+let genesis ~constraint_constants ~genesis_ledger : value =
   let genesis_ledger = Lazy.force genesis_ledger in
   { Poly.blockchain_state=
-      Blockchain_state.genesis
+      Blockchain_state.genesis ~constraint_constants
         ~genesis_ledger_hash:(Ledger.merkle_root genesis_ledger)
   ; consensus_transition= Consensus.Data.Consensus_transition.genesis
   ; supply_increase= Currency.Amount.zero

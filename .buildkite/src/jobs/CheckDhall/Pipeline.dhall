@@ -1,7 +1,7 @@
-let Pipeline = ../../Lib/Pipeline.dhall
-let Command = ../../Lib/Command.dhall
-let Docker = ../../Lib/Docker.dhall
-let Size = ../../Lib/Size.dhall
+let Pipeline = ../../Pipeline/Dsl.dhall
+let Command = ../../Command/Base.dhall
+let Docker = ../../Command/Docker/Type.dhall
+let Size = ../../Command/Size.dhall
 
 in
 
@@ -10,11 +10,11 @@ Pipeline.build
     spec = ./Spec.dhall,
     steps = [
       Command.Config::{
-        command = [ "cd .buildkite && make check" ],
+        commands = [ "cd .buildkite && make check" ],
         label = "Check all CI Dhall entrypoints",
         key = "check",
         target = Size.Small,
-        docker = Docker.Config::{ image = (../../Constants/ContainerImages.dhall).toolchainBase }
+        docker = Docker::{ image = (../../Constants/ContainerImages.dhall).toolchainBase }
       }
     ]
   }

@@ -2,7 +2,6 @@
 "/src/config.mlh"]
 
 open Core_kernel
-open Module_version
 
 module Proof_level = struct
   [%%versioned
@@ -45,13 +44,14 @@ module Constraint_constants = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = {c: int; ledger_depth: int}
+      type t = {c: int; ledger_depth: int; pending_coinbase_depth: int}
 
       let to_latest = Fn.id
     end
   end]
 
-  type t = Stable.Latest.t = {c: int; ledger_depth: int}
+  type t = Stable.Latest.t =
+    {c: int; ledger_depth: int; pending_coinbase_depth: int}
 
   [%%ifdef
   consensus_mechanism]
@@ -69,7 +69,10 @@ module Constraint_constants = struct
   [%%inject
   "ledger_depth", ledger_depth]
 
-  let compiled = {c; ledger_depth}
+  let compiled =
+    { c
+    ; ledger_depth
+    ; pending_coinbase_depth= Coda_compile_config.pending_coinbase_depth }
 
   let for_unit_tests = compiled
 end
@@ -173,7 +176,9 @@ module Protocol = struct
         let known_good_hash =
           "\x18\x3E\xF4\x11\xAC\x44\x83\xBF\x0E\x0F\x76\x5B\xF7\xE6\xFA\xE7\xEB\x24\xF6\xF7\xAA\xC8\x37\x71\xF7\xB9\x54\x66\xF6\x38\xB3\xF1"
         in
-        Serialization.check_serialization (module V1) t known_good_hash
+        Ppx_version.Serialization.check_serialization
+          (module V1)
+          t known_good_hash
     end
   end]
 
