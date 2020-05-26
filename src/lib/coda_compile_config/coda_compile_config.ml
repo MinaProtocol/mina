@@ -48,6 +48,3 @@ let default_transaction_fee =
 
 let default_snark_worker_fee =
   Currency.Fee.of_formatted_string default_snark_worker_fee_string
-
-[%%inject
-"block_window_duration_ms", block_window_duration]

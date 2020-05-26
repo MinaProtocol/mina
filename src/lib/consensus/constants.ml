@@ -192,7 +192,7 @@ let create' (type a b c)
   let open M in
   let c = constant constraint_constants.c in
   let block_window_duration_ms =
-    constant Coda_compile_config.block_window_duration_ms
+    constant constraint_constants.block_window_duration_ms
   in
   let k = of_length protocol_constants.k in
   let delta = of_length protocol_constants.delta in

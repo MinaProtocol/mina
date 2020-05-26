@@ -48,6 +48,7 @@ module Constraint_constants = struct
         { c: int
         ; ledger_depth: int
         ; work_delay: int
+        ; block_window_duration_ms: int
         ; transaction_capacity_log_2: int
         ; pending_coinbase_depth: int }
 
@@ -59,6 +60,7 @@ module Constraint_constants = struct
     { c: int
     ; ledger_depth: int
     ; work_delay: int
+    ; block_window_duration_ms: int
     ; transaction_capacity_log_2: int
     ; pending_coinbase_depth: int }
   [@@deriving sexp]
@@ -98,6 +100,9 @@ module Constraint_constants = struct
         [%%inject
         "work_delay", scan_state_work_delay]
 
+        [%%inject
+        "block_window_duration_ms", block_window_duration]
+
         [%%if
         scan_state_with_tps_goal]
 
@@ -110,8 +115,7 @@ module Constraint_constants = struct
            by 10 again because we have tps * 10
         *)
         let max_user_commands_per_block =
-          tps_goal_x10 * Coda_compile_config.block_window_duration_ms
-          / (1000 * 10)
+          tps_goal_x10 * block_window_duration_ms / (1000 * 10)
 
         (** Log of the capacity of transactions per transition.
             - 1 will only work if we don't have prover fees.
@@ -140,6 +144,7 @@ module Constraint_constants = struct
           { c
           ; ledger_depth
           ; work_delay
+          ; block_window_duration_ms
           ; transaction_capacity_log_2
           ; pending_coinbase_depth }
       end :

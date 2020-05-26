@@ -31,7 +31,8 @@ end
 let setup (type n) ?(logger = Logger.null ())
     ?(trust_system = Trust_system.null ())
     ?(time_controller = Block_time.Controller.basic ~logger)
-    (states : (peer_state, n num_peers) Vect.t) : n num_peers t =
+    ~constraint_constants (states : (peer_state, n num_peers) Vect.t) :
+    n num_peers t =
   let _, peers =
     Vect.fold_map states
       ~init:(Constants.init_ip, Constants.init_discovery_port)
@@ -59,6 +60,7 @@ let setup (type n) ?(logger = Logger.null ())
     ; is_seed= Vect.is_empty peers
     ; genesis_ledger_hash=
         Ledger.merkle_root (Lazy.force Test_genesis_ledger.t)
+    ; constraint_constants
     ; creatable_gossip_net=
         Gossip_net.Any.Creatable
           ( (module Gossip_net.Fake)
@@ -193,7 +195,7 @@ module Generator = struct
           config ~proof_level ~constraint_constants ~precomputed_values
             ~max_frontier_length )
     in
-    setup states
+    setup ~constraint_constants states
 end
 
 (*
