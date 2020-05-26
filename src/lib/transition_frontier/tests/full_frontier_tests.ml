@@ -16,7 +16,7 @@ let%test_module "Full_frontier tests" =
 
     let proof_level = Genesis_constants.Proof_level.Check
 
-    let precomputed_values = Precomputed_values.for_unit_tests
+    let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
 
     let constraint_constants = precomputed_values.constraint_constants
 
@@ -27,12 +27,12 @@ let%test_module "Full_frontier tests" =
     let max_length = 5
 
     let gen_breadcrumb =
-      Breadcrumb.For_tests.gen ~logger ~proof_level ?verifier:None
-        ?trust_system:None ~accounts_with_secret_keys
+      Breadcrumb.For_tests.gen ~logger ~proof_level ~precomputed_values
+        ?verifier:None ?trust_system:None ~accounts_with_secret_keys
 
     let gen_breadcrumb_seq =
-      Breadcrumb.For_tests.gen_seq ~logger ~proof_level ?verifier:None
-        ?trust_system:None ~accounts_with_secret_keys
+      Breadcrumb.For_tests.gen_seq ~logger ~proof_level ~precomputed_values
+        ?verifier:None ?trust_system:None ~accounts_with_secret_keys
 
     module Transfer = Ledger_transfer.Make (Ledger) (Ledger)
 
@@ -58,10 +58,7 @@ let%test_module "Full_frontier tests" =
       in
       let root_data =
         let open Root_data in
-        { transition=
-            External_transition.For_tests.genesis
-              ~precomputed_values:
-                (Lazy.force Precomputed_values.for_unit_tests)
+        { transition= External_transition.For_tests.genesis ~precomputed_values
         ; staged_ledger=
             Staged_ledger.create_exn ~constraint_constants ~ledger:root_ledger
         ; protocol_states= [] }
