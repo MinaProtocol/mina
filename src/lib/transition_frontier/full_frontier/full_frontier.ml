@@ -412,7 +412,10 @@ let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
            (Staged_ledger.proof_txns
               (Breadcrumb.staged_ledger new_root_node.breadcrumb)))
         ~f:(fun txn ->
-          ignore (Or_error.ok_exn (Ledger.apply_transaction mt txn)) ) ;
+          ignore
+            (Or_error.ok_exn
+               (Ledger.apply_transaction
+                  ~constraint_constants:t.constraint_constants mt txn)) ) ;
       (* STEP 6 *)
       Ledger.commit mt ;
       (* STEP 7 *)
