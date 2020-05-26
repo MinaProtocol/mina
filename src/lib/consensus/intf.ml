@@ -264,7 +264,8 @@ module type State_hooks = sig
 
   module For_tests : sig
     val gen_consensus_state :
-         gen_slot_advancement:int Quickcheck.Generator.t
+         constraint_constants:Genesis_constants.Constraint_constants.t
+      -> gen_slot_advancement:int Quickcheck.Generator.t
       -> (   previous_protocol_state:( protocol_state
                                      , Coda_base.State_hash.t )
                                      With_hash.t
