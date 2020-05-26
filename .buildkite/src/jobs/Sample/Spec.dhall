@@ -1,4 +1,4 @@
-let JobSpec = ../../Lib/JobSpec.dhall
+let JobSpec = ../../Pipeline/JobSpec.dhall
 
 in
 JobSpec::{
