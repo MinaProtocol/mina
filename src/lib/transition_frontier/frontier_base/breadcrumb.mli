@@ -25,6 +25,7 @@ val create : External_transition.Validated.t -> Staged_ledger.t -> t
 val build :
      logger:Logger.t
   -> verifier:Verifier.t
+  -> constraint_constants:Genesis_constants.Constraint_constants.t
   -> trust_system:Trust_system.t
   -> parent:t
   -> transition:External_transition.Almost_validated.t

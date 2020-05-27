@@ -2,6 +2,10 @@ let blockDirectory =
   ([%bs.node __dirname] |> Belt.Option.getExn |> Filename.dirname)
   ++ "/src/blocks/";
 
+let clientCredentials =
+  ([%bs.node __dirname] |> Belt.Option.getExn |> Filename.dirname)
+  ++ "/../../credentials.json";
+
 let files = blockDirectory |> Node.Fs.readdirSync;
 
 let blocks =
@@ -15,4 +19,14 @@ let blocks =
     files,
   );
 
-let results = blocks |> Metrics.calculateMetrics |> Challenges.calculatePoints;
+let sheetsCredentials = () => {
+  clientCredentials
+  |> Node.Fs.readFileAsUtf8Sync
+  |> Js.Json.parseExn
+  |> Types.FileCredentials.unsafeJSONToFileCredentials;
+};
+
+let results =
+  blocks
+  |> Metrics.calculateMetrics
+  |> Upload.uploadPoints(sheetsCredentials());

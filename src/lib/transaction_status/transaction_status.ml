@@ -110,8 +110,10 @@ let%test_module "transaction_status" =
         Transaction_pool.Resource_pool.make_config ~trust_system ~pool_max_size
       in
       let transaction_pool =
-        Transaction_pool.create ~config ~incoming_diffs:pool_reader ~logger
-          ~local_diffs:local_reader ~frontier_broadcast_pipe
+        Transaction_pool.create ~config
+          ~constraint_constants:precomputed_values.constraint_constants
+          ~incoming_diffs:pool_reader ~logger ~local_diffs:local_reader
+          ~frontier_broadcast_pipe
       in
       don't_wait_for
       @@ Linear_pipe.iter (Transaction_pool.broadcasts transaction_pool)

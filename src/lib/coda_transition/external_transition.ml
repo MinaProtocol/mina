@@ -88,9 +88,9 @@ module Stable = struct
     let block_producer {staged_ledger_diff; _} =
       Staged_ledger_diff.creator staged_ledger_diff
 
-    let transactions {staged_ledger_diff; _} =
+    let transactions ~constraint_constants {staged_ledger_diff; _} =
       let open Staged_ledger.Pre_diff_info in
-      match get_transactions staged_ledger_diff with
+      match get_transactions ~constraint_constants staged_ledger_diff with
       | Ok transactions ->
           transactions
       | Error e ->
@@ -739,7 +739,8 @@ module With_validation = struct
 
   let user_commands t = lift user_commands t
 
-  let transactions t = lift transactions t
+  let transactions ~constraint_constants t =
+    lift (transactions ~constraint_constants) t
 
   let payments t = lift payments t
 
@@ -1026,6 +1027,7 @@ module Staged_ledger_validation = struct
          , 'protocol_versions )
          Validation.with_transition
       -> logger:Logger.t
+      -> constraint_constants:Genesis_constants.Constraint_constants.t
       -> verifier:Verifier.t
       -> parent_staged_ledger:Staged_ledger.t
       -> parent_protocol_state:Protocol_state.value
@@ -1047,8 +1049,8 @@ module Staged_ledger_validation = struct
            | `Staged_ledger_application_failed of
              Staged_ledger.Staged_ledger_error.t ] )
          Deferred.Result.t =
-   fun (t, validation) ~logger ~verifier ~parent_staged_ledger
-       ~parent_protocol_state ->
+   fun (t, validation) ~logger ~constraint_constants ~verifier
+       ~parent_staged_ledger ~parent_protocol_state ->
     let open Deferred.Result.Let_syntax in
     let transition = With_hash.data t in
     let blockchain_state =
@@ -1059,8 +1061,8 @@ module Staged_ledger_validation = struct
              , `Ledger_proof proof_opt
              , `Staged_ledger transitioned_staged_ledger
              , `Pending_coinbase_data _ ) =
-      Staged_ledger.apply ~logger ~verifier parent_staged_ledger
-        staged_ledger_diff
+      Staged_ledger.apply ~constraint_constants ~logger ~verifier
+        parent_staged_ledger staged_ledger_diff
         ~state_body_hash:
           Protocol_state.(Body.hash @@ body parent_protocol_state)
       |> Deferred.Result.map_error ~f:(fun e ->

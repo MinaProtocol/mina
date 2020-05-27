@@ -3259,7 +3259,8 @@ module Hooks = struct
 
     module For_tests = struct
       let gen_consensus_state
-          ~(gen_slot_advancement : int Quickcheck.Generator.t) ~constants :
+          ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+          ~constants ~(gen_slot_advancement : int Quickcheck.Generator.t) :
           (   previous_protocol_state:( Protocol_state.Value.t
                                       , Coda_base.State_hash.t )
                                       With_hash.t
@@ -3286,7 +3287,8 @@ module Hooks = struct
           in
           let total_currency =
             Option.value_exn
-              (Amount.add prev.total_currency Coda_compile_config.coinbase)
+              (Amount.add prev.total_currency
+                 constraint_constants.coinbase_amount)
           in
           let prev_epoch, prev_slot =
             Consensus_state.curr_epoch_and_slot prev

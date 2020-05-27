@@ -132,7 +132,9 @@ let%test_module "Archive node unit tests" =
               (Buffered (`Capacity 100, `Overflow Crash))
           in
           let processor_deferred_computation =
-            Processor.run conn reader ~logger
+            Processor.run
+              ~constraint_constants:precomputed_values.constraint_constants
+              conn reader ~logger
           in
           let diffs =
             List.map

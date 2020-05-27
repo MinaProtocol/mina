@@ -2020,7 +2020,9 @@ module Queries = struct
             in
             let transactions =
               Coda_transition.External_transition.Validated.transactions
-                transition
+                ~constraint_constants:
+                  (Coda_lib.config coda).precomputed_values
+                    .constraint_constants transition
             in
             With_hash.Stable.Latest.
               { data=

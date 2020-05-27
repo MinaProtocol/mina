@@ -170,9 +170,11 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
     let%bind breadcrumb =
       cached_transform_deferred_result cached_initially_validated_transition
         ~transform_cached:(fun _ ->
-          Transition_frontier.Breadcrumb.build ~logger ~verifier ~trust_system
-            ~sender:(Some sender) ~parent:parent_breadcrumb
-            ~transition:mostly_validated_transition )
+          Transition_frontier.Breadcrumb.build ~logger
+            ~constraint_constants:precomputed_values.constraint_constants
+            ~verifier ~trust_system ~sender:(Some sender)
+            ~parent:parent_breadcrumb ~transition:mostly_validated_transition
+          )
         ~transform_result:(function
           | Error (`Invalid_staged_ledger_hash error)
           | Error (`Invalid_staged_ledger_diff error) ->
@@ -207,8 +209,8 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
          ~processed_transition_writer ~only_if_present:false ~time_controller
          ~source:`Gossip breadcrumb ~precomputed_values))
 
-let run ~logger ~precomputed_values ~verifier ~trust_system ~time_controller
-    ~frontier
+let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
+    ~trust_system ~time_controller ~frontier
     ~(primary_transition_reader :
        ( External_transition.Initial_validated.t Envelope.Incoming.t
        , State_hash.t )
@@ -239,9 +241,10 @@ let run ~logger ~precomputed_values ~verifier ~trust_system ~time_controller
        , unit )
        Writer.t) ~processed_transition_writer =
   let catchup_scheduler =
-    Catchup_scheduler.create ~logger ~verifier ~trust_system ~frontier
-      ~time_controller ~catchup_job_writer ~catchup_breadcrumbs_writer
-      ~clean_up_signal:clean_up_catchup_scheduler
+    Catchup_scheduler.create ~logger
+      ~constraint_constants:precomputed_values.constraint_constants ~verifier
+      ~trust_system ~frontier ~time_controller ~catchup_job_writer
+      ~catchup_breadcrumbs_writer ~clean_up_signal:clean_up_catchup_scheduler
   in
   let add_and_finalize =
     add_and_finalize ~frontier ~catchup_scheduler ~processed_transition_writer

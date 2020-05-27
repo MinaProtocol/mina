@@ -21,14 +21,14 @@ let to_yojson {validated_transition; staged_ledger= _; just_emitted_a_proof} =
 let create validated_transition staged_ledger =
   {validated_transition; staged_ledger; just_emitted_a_proof= false}
 
-let build ~logger ~verifier ~trust_system ~parent
+let build ~logger ~verifier ~constraint_constants ~trust_system ~parent
     ~transition:(transition_with_validation :
                   External_transition.Almost_validated.t) ~sender =
   O1trace.trace_recurring "Breadcrumb.build" (fun () ->
       let open Deferred.Let_syntax in
       match%bind
         External_transition.Staged_ledger_validation
-        .validate_staged_ledger_diff ~logger ~verifier
+        .validate_staged_ledger_diff ~logger ~constraint_constants ~verifier
           ~parent_staged_ledger:parent.staged_ledger
           ~parent_protocol_state:
             (External_transition.Validated.protocol_state
@@ -239,7 +239,9 @@ module For_tests = struct
     let gen_slot_advancement = Int.gen_incl 1 10 in
     let%map make_next_consensus_state =
       Consensus_state_hooks.For_tests.gen_consensus_state ~gen_slot_advancement
-        ~constants:precomputed_values.Precomputed_values.consensus_constants
+        ~constraint_constants:
+          precomputed_values.Precomputed_values.constraint_constants
+        ~constants:precomputed_values.consensus_constants
     in
     fun parent_breadcrumb ->
       let open Deferred.Let_syntax in
@@ -268,6 +270,7 @@ module For_tests = struct
       in
       let staged_ledger_diff =
         Staged_ledger.create_diff parent_staged_ledger ~logger
+          ~constraint_constants:precomputed_values.constraint_constants
           ~coinbase_receiver:`Producer ~self:largest_account_public_key
           ~transactions_by_fee:transactions ~get_completed_work
       in
@@ -278,6 +281,7 @@ module For_tests = struct
         match%bind
           Staged_ledger.apply_diff_unchecked parent_staged_ledger
             staged_ledger_diff
+            ~constraint_constants:precomputed_values.constraint_constants
             ~state_body_hash:
               ( validated_transition parent_breadcrumb
               |> External_transition.Validated.protocol_state
@@ -338,7 +342,9 @@ module For_tests = struct
         External_transition.Validated.create_unsafe next_external_transition
       in
       match%map
-        build ~logger ~trust_system ~verifier ~parent:parent_breadcrumb
+        build ~logger
+          ~constraint_constants:precomputed_values.constraint_constants
+          ~trust_system ~verifier ~parent:parent_breadcrumb
           ~transition:
             (External_transition.Validation.reset_staged_ledger_diff_validation
                next_verified_external_transition)
