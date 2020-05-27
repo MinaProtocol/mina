@@ -2,9 +2,8 @@ let blockDirectory =
   ([%bs.node __dirname] |> Belt.Option.getExn |> Filename.dirname)
   ++ "/src/blocks/";
 
-let clientCredentials =
-  ([%bs.node __dirname] |> Belt.Option.getExn |> Filename.dirname)
-  ++ "/../../credentials.json";
+[@bs.val]
+external credentials: string = "process.env.GOOGLE_APPLICATION_CREDENTIALS";
 
 let files = blockDirectory |> Node.Fs.readdirSync;
 
@@ -19,14 +18,27 @@ let blocks =
     files,
   );
 
-let sheetsCredentials = () => {
-  clientCredentials
-  |> Node.Fs.readFileAsUtf8Sync
-  |> Js.Json.parseExn
-  |> Types.FileCredentials.unsafeJSONToFileCredentials;
+let setSheetsCredentials = () => {
+  switch (Js.Types.classify(credentials)) {
+  | JSString(validCredentials) =>
+    Node.Fs.writeFileAsUtf8Sync(
+      "./google_sheets_credentials.json",
+      validCredentials,
+    );
+    Node.Process.putEnvVar(
+      "GOOGLE_APPLICATION_CREDENTIALS",
+      "./google_sheets_credentials.json",
+    );
+    Ok();
+  | _ => Error("Invalid environment variable")
+  };
 };
 
-let results =
-  blocks
-  |> Metrics.calculateMetrics
-  |> Upload.uploadPoints(sheetsCredentials());
+let main = () => {
+  switch (setSheetsCredentials()) {
+  | Ok () => blocks |> Metrics.calculateMetrics |> Upload.uploadPoints
+  | Error(error) => failwith(error)
+  };
+};
+
+main();
