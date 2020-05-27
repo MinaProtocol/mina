@@ -986,6 +986,7 @@ let create (config : Config.t) =
           in
           let transaction_pool =
             Network_pool.Transaction_pool.create ~config:txn_pool_config
+              ~constraint_constants:config.constraint_constants
               ~logger:config.logger
               ~incoming_diffs:(Coda_networking.transaction_pool_diffs net)
               ~local_diffs:local_txns_reader
@@ -1186,6 +1187,7 @@ let create (config : Config.t) =
           in
           let%bind snark_pool =
             Network_pool.Snark_pool.load ~config:snark_pool_config
+              ~constraint_constants:config.constraint_constants
               ~logger:config.logger
               ~disk_location:config.snark_pool_disk_location
               ~incoming_diffs:(Coda_networking.snark_pool_diffs net)
@@ -1225,6 +1227,7 @@ let create (config : Config.t) =
                 archive_process_port ) ;
           let subscriptions =
             Coda_subscriptions.create ~logger:config.logger
+              ~constraint_constants:config.constraint_constants
               ~time_controller:config.time_controller ~new_blocks ~wallets
               ~external_transition_database:config.external_transition_database
               ~transition_frontier:frontier_broadcast_pipe_r

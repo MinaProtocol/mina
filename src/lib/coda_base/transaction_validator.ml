@@ -76,8 +76,8 @@ include Transaction_logic.Make (Hashless_ledger)
 
 let create = Hashless_ledger.create
 
-let apply_user_command l uc =
-  Result.map ~f:(Fn.const ()) (apply_user_command l uc)
+let apply_user_command ~constraint_constants l uc =
+  Result.ignore (apply_user_command ~constraint_constants l uc)
 
-let apply_transaction l txn =
-  Result.map ~f:(Fn.const ()) (apply_transaction l txn)
+let apply_transaction ~constraint_constants l txn =
+  Result.ignore (apply_transaction ~constraint_constants l txn)
