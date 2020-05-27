@@ -50,7 +50,9 @@ module Constraint_constants = struct
         ; work_delay: int
         ; block_window_duration_ms: int
         ; transaction_capacity_log_2: int
-        ; pending_coinbase_depth: int }
+        ; pending_coinbase_depth: int
+        ; coinbase_amount: Currency.Amount.Stable.V1.t
+        ; account_creation_fee: Currency.Fee.Stable.V1.t }
 
       let to_latest = Fn.id
     end
@@ -62,7 +64,9 @@ module Constraint_constants = struct
     ; work_delay: int
     ; block_window_duration_ms: int
     ; transaction_capacity_log_2: int
-    ; pending_coinbase_depth: int }
+    ; pending_coinbase_depth: int
+    ; coinbase_amount: Currency.Amount.t
+    ; account_creation_fee: Currency.Fee.t }
   [@@deriving sexp]
 
   (* Generate the compile-time constraint constants, using a signature to hide
@@ -85,6 +89,12 @@ module Constraint_constants = struct
 
         [%%inject
         "ledger_depth", ledger_depth]
+
+        [%%inject
+        "coinbase_amount_string", coinbase]
+
+        [%%inject
+        "account_creation_fee_string", account_creation_fee_int]
 
         (** All the proofs before the last [work_delay] blocks must be
             completed to add transactions. [work_delay] is the minimum number
@@ -146,7 +156,11 @@ module Constraint_constants = struct
           ; work_delay
           ; block_window_duration_ms
           ; transaction_capacity_log_2
-          ; pending_coinbase_depth }
+          ; pending_coinbase_depth
+          ; coinbase_amount=
+              Currency.Amount.of_formatted_string coinbase_amount_string
+          ; account_creation_fee=
+              Currency.Fee.of_formatted_string account_creation_fee_string }
       end :
       sig
         val compiled : t

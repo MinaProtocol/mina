@@ -88,10 +88,7 @@ let run_test () : unit Deferred.t =
   let constraint_constants = Genesis_constants.Constraint_constants.compiled in
   let (module Genesis_ledger) = precomputed_values.genesis_ledger in
   let pids = Child_processes.Termination.create_pid_table () in
-  let consensus_constants =
-    Consensus.Constants.create ~constraint_constants
-      ~protocol_constants:Genesis_constants.compiled.protocol
-  in
+  let consensus_constants = precomputed_values.consensus_constants in
   setup_time_offsets consensus_constants ;
   print_heartbeat logger |> don't_wait_for ;
   Parallel.init_master () ;
@@ -217,7 +214,7 @@ let run_test () : unit Deferred.t =
              ~time_controller ~receipt_chain_database ~snark_work_fee
              ~consensus_local_state ~transaction_database
              ~external_transition_database ~work_reassignment_wait:420000
-             ~precomputed_values ~constraint_constants
+             ~precomputed_values
              ~proof_level:Genesis_constants.Proof_level.compiled ())
       in
       don't_wait_for

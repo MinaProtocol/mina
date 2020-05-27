@@ -29,7 +29,6 @@ module Generator : sig
 
   type peer_config =
        proof_level:Genesis_constants.Proof_level.t
-    -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> precomputed_values:Precomputed_values.t
     -> max_frontier_length:int
     -> peer_state Generator.t
@@ -40,7 +39,6 @@ module Generator : sig
 
   val gen :
        proof_level:Genesis_constants.Proof_level.t
-    -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> precomputed_values:Precomputed_values.t
     -> max_frontier_length:int
     -> (peer_config, 'n num_peers) Vect.t

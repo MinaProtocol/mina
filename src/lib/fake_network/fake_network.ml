@@ -146,13 +146,11 @@ module Generator = struct
 
   type peer_config =
        proof_level:Genesis_constants.Proof_level.t
-    -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> precomputed_values:Precomputed_values.t
     -> max_frontier_length:int
     -> peer_state Generator.t
 
-  let fresh_peer ~proof_level ~constraint_constants ~precomputed_values
-      ~max_frontier_length =
+  let fresh_peer ~proof_level ~precomputed_values ~max_frontier_length =
     let genesis_ledger =
       Precomputed_values.genesis_ledger precomputed_values
     in
@@ -161,14 +159,13 @@ module Generator = struct
         ~genesis_ledger
     in
     let%map frontier =
-      Transition_frontier.For_tests.gen ~proof_level ~constraint_constants
-        ~precomputed_values ~consensus_local_state
-        ~max_length:max_frontier_length ~size:0 ()
+      Transition_frontier.For_tests.gen ~proof_level ~precomputed_values
+        ~consensus_local_state ~max_length:max_frontier_length ~size:0 ()
     in
     {frontier; consensus_local_state}
 
-  let peer_with_branch ~frontier_branch_size ~proof_level ~constraint_constants
-      ~precomputed_values ~max_frontier_length =
+  let peer_with_branch ~frontier_branch_size ~proof_level ~precomputed_values
+      ~max_frontier_length =
     let genesis_ledger =
       Precomputed_values.genesis_ledger precomputed_values
     in
@@ -178,8 +175,7 @@ module Generator = struct
     in
     let%map frontier, branch =
       Transition_frontier.For_tests.gen_with_branch ~proof_level
-        ~constraint_constants ~precomputed_values
-        ~max_length:max_frontier_length ~frontier_size:0
+        ~precomputed_values ~max_length:max_frontier_length ~frontier_size:0
         ~branch_size:frontier_branch_size ~consensus_local_state ()
     in
     Async.Thread_safe.block_on_async_exn (fun () ->
@@ -187,15 +183,15 @@ module Generator = struct
           ~f:(Transition_frontier.add_breadcrumb_exn frontier) ) ;
     {frontier; consensus_local_state}
 
-  let gen ~proof_level ~constraint_constants ~precomputed_values
-      ~max_frontier_length configs =
+  let gen ~proof_level ~precomputed_values ~max_frontier_length configs =
     let open Quickcheck.Generator.Let_syntax in
     let%map states =
       Vect.Quickcheck_generator.map configs ~f:(fun config ->
-          config ~proof_level ~constraint_constants ~precomputed_values
-            ~max_frontier_length )
+          config ~proof_level ~precomputed_values ~max_frontier_length )
     in
-    setup ~constraint_constants states
+    setup
+      ~constraint_constants:
+        precomputed_values.Precomputed_values.constraint_constants states
 end
 
 (*

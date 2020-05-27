@@ -267,7 +267,10 @@ module type S = sig
        - returns a root [t'] of the tree
     *)
     val add_coinbase :
-      depth:int -> var -> Update.var -> (var, 's) Tick.Checked.t
+         constraint_constants:Genesis_constants.Constraint_constants.t
+      -> var
+      -> Update.var
+      -> (var, 's) Tick.Checked.t
 
     (**
        [pop_coinbases t pk updated_stack] implements the following spec:
@@ -277,7 +280,7 @@ module type S = sig
        - returns a root [t'] of the tree
     *)
     val pop_coinbases :
-         depth:int
+         constraint_constants:Genesis_constants.Constraint_constants.t
       -> var
       -> proof_emitted:Boolean.var
       -> (var * Stack.var, 's) Tick.Checked.t
