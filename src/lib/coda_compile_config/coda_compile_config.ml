@@ -15,16 +15,10 @@ module Currency = Currency_nonconsensus.Currency
 *)
 
 [%%inject
-"coinbase_string", coinbase]
-
-[%%inject
 "curve_size", curve_size]
 
 [%%inject
 "genesis_ledger", genesis_ledger]
-
-[%%inject
-"account_creation_fee_string", account_creation_fee_int]
 
 [%%inject
 "default_transaction_fee_string", default_transaction_fee]
@@ -35,13 +29,8 @@ module Currency = Currency_nonconsensus.Currency
 [%%inject
 "minimum_user_command_fee_string", minimum_user_command_fee]
 
-let account_creation_fee =
-  Currency.Fee.of_formatted_string account_creation_fee_string
-
 let minimum_user_command_fee =
   Currency.Fee.of_formatted_string minimum_user_command_fee_string
-
-let coinbase = Currency.Amount.of_formatted_string coinbase_string
 
 let default_transaction_fee =
   Currency.Fee.of_formatted_string default_transaction_fee_string
@@ -51,6 +40,3 @@ let default_snark_worker_fee =
 
 [%%inject
 "block_window_duration_ms", block_window_duration]
-
-(* This is a bit of a hack, see #3232. *)
-let inactivity_ms = block_window_duration_ms * 8

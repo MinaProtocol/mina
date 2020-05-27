@@ -73,14 +73,11 @@ let%test_module "transaction_status" =
 
     let proof_level = Genesis_constants.Proof_level.Check
 
-    let constraint_constants =
-      Genesis_constants.Constraint_constants.for_unit_tests
-
     let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
 
     let trust_system = Trust_system.null ()
 
-    let pool_max_size = Genesis_constants.compiled.txpool_max_size
+    let pool_max_size = precomputed_values.genesis_constants.txpool_max_size
 
     let key_gen =
       let open Quickcheck.Generator in
@@ -95,8 +92,7 @@ let%test_module "transaction_status" =
 
     let gen_frontier =
       Transition_frontier.For_tests.gen ~logger ~proof_level
-        ~constraint_constants ~precomputed_values ~trust_system ~max_length
-        ~size:frontier_size ()
+        ~precomputed_values ~trust_system ~max_length ~size:frontier_size ()
 
     let gen_user_command =
       User_command.Gen.payment ~sign_type:`Real ~max_amount:100 ~max_fee:10
@@ -114,8 +110,10 @@ let%test_module "transaction_status" =
         Transaction_pool.Resource_pool.make_config ~trust_system ~pool_max_size
       in
       let transaction_pool =
-        Transaction_pool.create ~config ~incoming_diffs:pool_reader ~logger
-          ~local_diffs:local_reader ~frontier_broadcast_pipe
+        Transaction_pool.create ~config
+          ~constraint_constants:precomputed_values.constraint_constants
+          ~incoming_diffs:pool_reader ~logger ~local_diffs:local_reader
+          ~frontier_broadcast_pipe
       in
       don't_wait_for
       @@ Linear_pipe.iter (Transaction_pool.broadcasts transaction_pool)
