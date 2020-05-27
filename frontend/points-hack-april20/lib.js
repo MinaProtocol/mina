@@ -78,7 +78,7 @@ function uploadFile(result) {
       : "block-error-" + Date.now() + ".json";
 
   const bucket = storage.bucket(bucketName);
-  const file = bucket.file("32b-" + CODA_TESTNET_NAME + "/" + filename);
+  const file = bucket.file("v1/32b-" + CODA_TESTNET_NAME + "/" + filename);
 
   const buffer = Buffer.from(JSON.stringify(result), "utf8");
   const readable = new Readable();
