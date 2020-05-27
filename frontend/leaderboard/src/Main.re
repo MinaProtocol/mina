@@ -3,24 +3,22 @@ let blockDirectory =
   ++ "/src/blocks/";
 
 [@bs.val]
-external credentials: string = "process.env.GOOGLE_APPLICATION_CREDENTIALS";
-
-let files = blockDirectory |> Node.Fs.readdirSync;
+external credentials: Js.Undefined.t(string) =
+  "process.env.GOOGLE_APPLICATION_CREDENTIALS";
 
 let blocks =
-  Array.map(
-    file => {
-      let fileContents = Node.Fs.readFileAsUtf8Sync(blockDirectory ++ file);
-      let blockData = Js.Json.parseExn(fileContents);
-      let block = Types.NewBlock.unsafeJSONToNewBlock(blockData);
-      block.data.newBlock;
-    },
-    files,
-  );
+  blockDirectory
+  |> Node.Fs.readdirSync
+  |> Array.map(file => {
+       let fileContents = Node.Fs.readFileAsUtf8Sync(blockDirectory ++ file);
+       let blockData = Js.Json.parseExn(fileContents);
+       let block = Types.NewBlock.unsafeJSONToNewBlock(blockData);
+       block.data.newBlock;
+     });
 
 let setSheetsCredentials = () => {
-  switch (Js.Types.classify(credentials)) {
-  | JSString(validCredentials) =>
+  switch (Js.undefinedToOption(credentials)) {
+  | Some(validCredentials) =>
     Node.Fs.writeFileAsUtf8Sync(
       "./google_sheets_credentials.json",
       validCredentials,
@@ -30,7 +28,7 @@ let setSheetsCredentials = () => {
       "./google_sheets_credentials.json",
     );
     Ok();
-  | _ => Error("Invalid environment variable")
+  | None => Error("Invalid environment variable")
   };
 };
 
