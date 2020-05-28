@@ -45,7 +45,7 @@ let calculatePoints = (challengeID, metricsMap) => {
         addPointsToUsersWithAtleastN(
           (metricRecord: Types.Metrics.metricRecord) =>
             metricRecord.blocksCreated,
-          1,
+          3,
           1000,
           metricsMap,
         ),

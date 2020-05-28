@@ -53,13 +53,3 @@ module Metrics = {
     transactionsReceivedByEcho: option(int),
   };
 };
-
-module FileCredentials = {
-  type t = {
-    clientId: string,
-    clientSecret: string,
-    redirectURI: string,
-    spreadsheetId: string,
-  };
-  external unsafeJSONToFileCredentials: Js.Json.t => t = "%identity";
-};
