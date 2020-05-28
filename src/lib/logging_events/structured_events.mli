@@ -2,17 +2,14 @@
 
 (** extend this type using `deriving register_event`
 
-   a type extension must be a constructor that takes a
-    record argument
+   a type extension must be a constructor, either with a
+    flat record argument, or no argument
 
-   each field type in the record must have a type
-    that is either an OCaml built-in (like string, int)
-    or a type `t` from some module, where the module
-    also contains functions {to,from}_yojson
+   example extensions:
 
-   example extension:
+     t += Ctor1 of {a:int; b:string; c:M.t} [@@deriving register_event]
 
-     t += Ctor of {a:int; b:string; c:M.t} [@@deriving register_event]
+     t += Ctor2 [@@deriving register_event]
 
  *)
 type t = ..
@@ -31,7 +28,7 @@ val id_of_string : string -> id
 (** shouldn't need to call this explicitly; `deriving register_event` should
    call this automatically
 *)
-val register_constructor : id -> repr -> unit
+val register_constructor : repr -> unit
 
 (** calls logger in some `repr` instance
 
