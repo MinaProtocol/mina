@@ -149,6 +149,23 @@ let filterBlocksByTimeWindow = (startTime, endTime, blocks) => {
   Array.of_list(filteredBlocksList);
 };
 
+let calculateCoinbaseReceiverChallenge = blocks => {
+  Array.fold_left(
+    (map, block: Types.NewBlock.data) => {
+      let coinbaseReceiver =
+        block.transactions.coinbaseReceiverAccount.publicKey;
+      let creatorAccount = block.creatorAccount.publicKey;
+      StringMap.update(
+        block.creatorAccount.publicKey,
+        _ => Some(coinbaseReceiver !== creatorAccount),
+        map,
+      );
+    },
+    StringMap.empty,
+    blocks,
+  );
+};
+
 let throwAwayValues = metric => {
   StringMap.map(_ => {()}, metric);
 };

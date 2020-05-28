@@ -18,9 +18,11 @@ module NewBlock = {
   type transactions = {
     userCommands: array(userCommands),
     feeTransfer: array(feeTransfer),
+    coinbaseReceiverAccount: account,
   };
 
   type blockchainState = {date: string};
+  
   type data = {
     creatorAccount: account,
     snarkJobs: array(snarkJobs),
