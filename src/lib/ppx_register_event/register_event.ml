@@ -12,11 +12,40 @@ let hash name =
   let ctx1 = feed_string ctx0 name in
   get ctx1 |> to_raw_string
 
-(* we omit an explicit `Core_kernel`, because the Ppx_deriving_yojson functions
-   generate uses of `Result` without it, so that module will need to be opened in
-   any case
-*)
-let core_kernel_result f = String.concat ["Result"; f] ~sep:"."
+let check_interpolations ~loc msg label_names =
+  match msg.pexp_desc with
+  | Pexp_constant (Pconst_string (s, _)) ->
+      (* check that every interpolation point $foo in msg has a matching label;
+       OK to have extra labels not mentioned in message
+    *)
+      let len = String.length s in
+      let interpolates =
+        let re = Str.regexp "\\$[a-z]\\([a-z]\\|[0-9]\\)*" in
+        let rec loop start acc =
+          if start >= len then acc
+          else
+            try
+              let offs = Str.search_forward re s start in
+              let s = Str.matched_string s in
+              let s_len = String.length s in
+              loop (offs + s_len) (String.sub s ~pos:1 ~len:(s_len - 1) :: acc)
+            with _ ->
+              (* wild-card match; actual match is deprecated Not_found *)
+              acc
+        in
+        loop 0 []
+      in
+      List.iter interpolates ~f:(fun interp ->
+          if not (List.mem label_names interp ~equal:String.equal) then
+            Location.raise_errorf ~loc
+              (Scanf.format_from_string
+                 (sprintf
+                    "The msg contains interpolation point \"$%s\" which is \
+                     not a field in the record"
+                    interp)
+                 "") )
+  | _ ->
+      ()
 
 let type_ext_str ~options ~path (ty_ext : type_extension) =
   let add_module_qualifier s = String.concat ~sep:"." [module_name; s] in
@@ -40,58 +69,28 @@ let type_ext_str ~options ~path (ty_ext : type_extension) =
     List.map label_decls ~f:(fun {pld_name= {txt; _}; _} -> txt)
   in
   let has_record_arg = not @@ List.is_empty label_names in
-  let msg, msg_loc =
+  let (module Ast_builder) = Ast_builder.make ty_ext.ptyext_path.loc in
+  let open Ast_builder in
+  let (msg : expression), msg_loc =
     match List.Assoc.find options "msg" ~equal:String.equal with
-    | Some expr -> (
-      match expr.pexp_desc with
-      | Pexp_constant (Pconst_string (s, _)) ->
-          (s, expr.pexp_loc)
-      | _ ->
-          Location.raise_errorf ~loc:expr.pexp_loc
-            "The msg option must be a string constant" )
+    | Some expr ->
+        (expr, expr.pexp_loc)
     | None ->
-        if has_record_arg then
-          let fields =
-            List.map label_names ~f:(fun label -> sprintf "%s=$%s" label label)
-          in
-          ( sprintf "%s {%s}" ctor (String.concat ~sep:"; " fields)
-          , Location.none )
-        else (sprintf "%s" ctor, Location.none)
+        let s =
+          if has_record_arg then
+            let fields =
+              List.map label_names ~f:(fun label ->
+                  sprintf "%s=$%s" label label )
+            in
+            sprintf "%s {%s}" ctor (String.concat ~sep:"; " fields)
+          else sprintf "%s" ctor
+        in
+        (estring s, Location.none)
   in
-  (* check that every interpolation point $foo in msg has a matching label;
-     OK to have extra labels not mentioned in message
-  *)
-  let len = String.length msg in
-  let interpolates =
-    let re = Str.regexp "\\$[a-z]\\([a-z]\\|[0-9]\\)*" in
-    let rec loop start acc =
-      if start >= len then acc
-      else
-        try
-          let offs = Str.search_forward re msg start in
-          let s = Str.matched_string msg in
-          let s_len = String.length s in
-          loop (offs + s_len) (String.sub s ~pos:1 ~len:(s_len - 1) :: acc)
-        with _ ->
-          (* wild-card match; actual match is deprecated Not_found *)
-          acc
-    in
-    loop 0 []
-  in
-  List.iter interpolates ~f:(fun interp ->
-      if not (List.mem label_names interp ~equal:String.equal) then
-        Location.raise_errorf ~loc:msg_loc
-          (Scanf.format_from_string
-             (sprintf
-                "The msg contains interpolation point \"$%s\" which is not a \
-                 field in the record"
-                interp)
-             "") ) ;
+  check_interpolations ~loc:msg_loc msg label_names ;
   let event_name = String.lowercase ctor in
   let identifying = String.concat (path @ (event_name :: label_names)) in
   let id_string = hash identifying in
-  let (module Ast_builder) = Ast_builder.make ty_ext.ptyext_path.loc in
-  let open Ast_builder in
   let core_type_of_string s =
     ptyp_constr {txt= Longident.parse s; loc= Location.none} []
   in
@@ -131,13 +130,11 @@ let type_ext_str ~options ~path (ty_ext : type_extension) =
   let equal_id = evar (add_module_qualifier "equal_id") in
   let repr_type = core_type_of_string (add_module_qualifier "repr") in
   let wrap_in_result_binds expr =
-    let return = evar (core_kernel_result "return") in
-    let bind = evar (core_kernel_result "bind") in
     List.fold_right label_decls
-      ~init:[%expr [%e return] [%e expr]]
+      ~init:[%expr Result.return [%e expr]]
       ~f:(fun decl acc ->
         [%expr
-          [%e bind]
+          Result.bind
             ([%e Ppx_deriving_yojson.desu_expr_of_typ ~path decl.pld_type]
                [%e evar decl.pld_name.txt])
             ~f:(fun [%p pvar decl.pld_name.txt] -> [%e acc])] )
@@ -174,8 +171,7 @@ let type_ext_str ~options ~path (ty_ext : type_extension) =
         { log=
             (function
             | [%p args_pattern] ->
-                Some
-                  ([%e estring msg], [%e evar id_name], [%e elist json_pairs])
+                Some ([%e msg], [%e evar id_name], [%e elist json_pairs])
             | _ ->
                 None )
         ; parse=
