@@ -32,17 +32,14 @@ type t =
 let genesis_root_data ~precomputed_values =
   let open Root_data.Limited in
   let transition = External_transition.genesis ~precomputed_values in
-  let scan_state =
-    Staged_ledger.Scan_state.empty
-      ~constraint_constants:precomputed_values.constraint_constants ()
-  in
+  let constraint_constants = precomputed_values.constraint_constants in
+  let scan_state = Staged_ledger.Scan_state.empty ~constraint_constants () in
   (*if scan state is empty the protocol states required is also empty*)
   let protocol_states = [] in
   let pending_coinbase =
     Or_error.ok_exn
       (Pending_coinbase.create
-         ~depth:precomputed_values.constraint_constants.pending_coinbase_depth
-         ())
+         ~depth:constraint_constants.pending_coinbase_depth ())
   in
   create ~transition ~scan_state ~pending_coinbase ~protocol_states
 
@@ -428,10 +425,8 @@ module For_tests = struct
 
   (* a helper quickcheck generator which always returns the genesis breadcrumb *)
   let gen_genesis_breadcrumb ?(logger = Logger.null ()) ~proof_level ?verifier
-      ~precomputed_values () =
-    let constraint_constants =
-      precomputed_values.Precomputed_values.constraint_constants
-    in
+      ~(precomputed_values : Precomputed_values.t) () =
+    let constraint_constants = precomputed_values.constraint_constants in
     let verifier =
       match verifier with
       | Some x ->
