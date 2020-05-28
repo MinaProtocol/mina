@@ -69,12 +69,33 @@ let type_ext_str ~options ~path (ty_ext : type_extension) =
     List.map label_decls ~f:(fun {pld_name= {txt; _}; _} -> txt)
   in
   let has_record_arg = not @@ List.is_empty label_names in
-  let deriver_attr =
+  let deriver_loc =
     (* succeeds, because we're calling this deriver *)
-    List.find_exn ty_ext.ptyext_attributes ~f:(fun ({txt; _}, _) ->
-        String.equal txt deriver )
+    let find_deriver = function
+      | { pstr_desc=
+            Pstr_eval ({pexp_desc= Pexp_ident {txt= Lident id; loc}; _}, _)
+        ; _ }
+      | { pstr_desc=
+            Pstr_eval
+              ( { pexp_desc=
+                    Pexp_apply
+                      ({pexp_desc= Pexp_ident {txt= Lident id; loc}; _}, _)
+                ; _ }
+              , _ )
+        ; _ }
+        when String.equal id deriver ->
+          Some loc
+      | _ ->
+          failwith
+            (sprintf "Expected structure item in payload for %s" deriver)
+    in
+    List.find_map_exn ty_ext.ptyext_attributes ~f:(fun (_, payload) ->
+        match payload with
+        | PStr stris ->
+            Some (List.find_map_exn stris ~f:find_deriver)
+        | _ ->
+            failwith (sprintf "Expected structure payload for %s" deriver) )
   in
-  let deriver_loc = match deriver_attr with {loc; _}, _ -> loc in
   let (module Ast_builder) = Ast_builder.make deriver_loc in
   let open Ast_builder in
   let (msg : expression), msg_loc =
@@ -141,7 +162,10 @@ let type_ext_str ~options ~path (ty_ext : type_extension) =
       ~f:(fun decl acc ->
         [%expr
           Result.bind
-            ([%e Ppx_deriving_yojson.desu_expr_of_typ ~path decl.pld_type]
+            ([%e
+               Ppx_deriving_yojson.desu_expr_of_typ
+                 ~path:(path @ [ctor; decl.pld_name.txt])
+                 decl.pld_type]
                [%e evar decl.pld_name.txt])
             ~f:(fun [%p pvar decl.pld_name.txt] -> [%e acc])] )
   in
