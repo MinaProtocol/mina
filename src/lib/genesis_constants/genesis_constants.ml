@@ -191,7 +191,8 @@ module T = struct
           [t.protocol.k; t.protocol.delta; t.txpool_max_size]
           ~f:Int.to_string
       |> String.concat ~sep:"" )
-      ^ Core.Time.to_string_abs ~zone:Time.Zone.utc t.protocol.genesis_state_timestamp
+      ^ Core.Time.to_string_abs ~zone:Time.Zone.utc
+          t.protocol.genesis_state_timestamp
     in
     Blake2.digest_string str |> Blake2.to_hex
 end
