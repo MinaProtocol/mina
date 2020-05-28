@@ -614,8 +614,8 @@ workflows:
             - test--{{profile}}
             {%- endfor %}
             - build-macos
-	      requires:
-	        - build-artifacts--testnet_postake_medium_curves
+              requires:
+                - build-artifacts--testnet_postake_medium_curves
 
     daily:
         triggers:
