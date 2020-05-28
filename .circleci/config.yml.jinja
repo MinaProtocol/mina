@@ -613,9 +613,9 @@ workflows:
             {%- for profile in small_curves_tests.keys() | sort %}
             - test--{{profile}}
             {%- endfor %}
-            - build-macos
-              requires:
-                - build-artifacts--testnet_postake_medium_curves
+            - build-macos:
+                requires:
+                    - build-artifacts--testnet_postake_medium_curves
 
     daily:
         triggers:

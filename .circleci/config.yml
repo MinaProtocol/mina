@@ -1231,9 +1231,9 @@ workflows:
             - test--test_postake_split_snarkless
             - test--test_postake_three_producers
             - test--test_postake_txns
-            - build-macos
-              requires:
-                - build-artifacts--testnet_postake_medium_curves
+            - build-macos:
+                requires:
+                    - build-artifacts--testnet_postake_medium_curves
 
     daily:
         triggers:
