@@ -88,9 +88,9 @@ module Stable = struct
     let block_producer {staged_ledger_diff; _} =
       Staged_ledger_diff.creator staged_ledger_diff
 
-    let transactions {staged_ledger_diff; _} =
+    let transactions ~constraint_constants {staged_ledger_diff; _} =
       let open Staged_ledger.Pre_diff_info in
-      match get_transactions staged_ledger_diff with
+      match get_transactions ~constraint_constants staged_ledger_diff with
       | Ok transactions ->
           transactions
       | Error e ->
@@ -616,16 +616,12 @@ let skip_genesis_protocol_state_validation
     `This_transition_was_generated_internally (t, validation) =
   (t, Validation.Unsafe.set_valid_genesis_state validation)
 
-let validate_time_received ~constraint_constants (t, validation) ~time_received
-    =
-  let protocol_state = With_hash.data t |> protocol_state in
-  let constants =
-    Consensus.Constants.create ~constraint_constants
-      ~protocol_constants:
-        ( Protocol_state.constants protocol_state
-        |> Protocol_constants_checked.t_of_value )
+let validate_time_received ~(precomputed_values : Precomputed_values.t)
+    (t, validation) ~time_received =
+  let consensus_state =
+    With_hash.data t |> protocol_state |> Protocol_state.consensus_state
   in
-  let consensus_state = Protocol_state.consensus_state protocol_state in
+  let constants = precomputed_values.consensus_constants in
   let received_unix_timestamp =
     Block_time.to_span_since_epoch time_received |> Block_time.Span.to_ms
   in
@@ -743,7 +739,8 @@ module With_validation = struct
 
   let user_commands t = lift user_commands t
 
-  let transactions t = lift transactions t
+  let transactions ~constraint_constants t =
+    lift (transactions ~constraint_constants) t
 
   let payments t = lift payments t
 
@@ -1030,6 +1027,7 @@ module Staged_ledger_validation = struct
          , 'protocol_versions )
          Validation.with_transition
       -> logger:Logger.t
+      -> constraint_constants:Genesis_constants.Constraint_constants.t
       -> verifier:Verifier.t
       -> parent_staged_ledger:Staged_ledger.t
       -> parent_protocol_state:Protocol_state.value
@@ -1051,8 +1049,8 @@ module Staged_ledger_validation = struct
            | `Staged_ledger_application_failed of
              Staged_ledger.Staged_ledger_error.t ] )
          Deferred.Result.t =
-   fun (t, validation) ~logger ~verifier ~parent_staged_ledger
-       ~parent_protocol_state ->
+   fun (t, validation) ~logger ~constraint_constants ~verifier
+       ~parent_staged_ledger ~parent_protocol_state ->
     let open Deferred.Result.Let_syntax in
     let transition = With_hash.data t in
     let blockchain_state =
@@ -1063,8 +1061,8 @@ module Staged_ledger_validation = struct
              , `Ledger_proof proof_opt
              , `Staged_ledger transitioned_staged_ledger
              , `Pending_coinbase_data _ ) =
-      Staged_ledger.apply ~logger ~verifier parent_staged_ledger
-        staged_ledger_diff
+      Staged_ledger.apply ~constraint_constants ~logger ~verifier
+        parent_staged_ledger staged_ledger_diff
         ~state_body_hash:
           Protocol_state.(Body.hash @@ body parent_protocol_state)
       |> Deferred.Result.map_error ~f:(fun e ->
