@@ -413,10 +413,9 @@ let%test_module "Ledger_catchup tests" =
 
     let proof_level = Genesis_constants.Proof_level.Check
 
-    let constraint_constants =
-      Genesis_constants.Constraint_constants.for_unit_tests
-
     let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
+
+    let constraint_constants = precomputed_values.constraint_constants
 
     let trust_system = Trust_system.null ()
 
@@ -454,7 +453,7 @@ let%test_module "Ledger_catchup tests" =
           * [`Catchup_scheduler | `Ledger_catchup of unit Ivar.t] )
           Strict_pipe.Reader.t }
 
-    let run_catchup ~constraint_constants ~network ~frontier =
+    let run_catchup ~network ~frontier =
       let catchup_job_reader, catchup_job_writer =
         Strict_pipe.create ~name:(__MODULE__ ^ __LOC__)
           (Buffered (`Capacity 10, `Overflow Crash))
@@ -477,9 +476,8 @@ let%test_module "Ledger_catchup tests" =
       ; job_writer= catchup_job_writer
       ; breadcrumbs_reader= catchup_breadcrumbs_reader }
 
-    let run_catchup_with_target ~constraint_constants ~network ~frontier
-        ~target_breadcrumb =
-      let%map test = run_catchup ~constraint_constants ~network ~frontier in
+    let run_catchup_with_target ~network ~frontier ~target_breadcrumb =
+      let%map test = run_catchup ~network ~frontier in
       let parent_hash =
         Transition_frontier.Breadcrumb.parent_hash target_breadcrumb
       in
@@ -495,7 +493,7 @@ let%test_module "Ledger_catchup tests" =
       let open Fake_network in
       let target_breadcrumb = List.last_exn target_best_tip_path in
       let%bind `Test {breadcrumbs_reader; _}, _ =
-        run_catchup_with_target ~constraint_constants ~network:my_net.network
+        run_catchup_with_target ~network:my_net.network
           ~frontier:my_net.state.frontier ~target_breadcrumb
       in
       (* TODO: expose Strict_pipe.read *)
@@ -540,8 +538,7 @@ let%test_module "Ledger_catchup tests" =
           let%bind peer_branch_size =
             Int.gen_incl (max_frontier_length / 2) (max_frontier_length - 1)
           in
-          gen ~proof_level ~constraint_constants ~precomputed_values
-            ~max_frontier_length
+          gen ~proof_level ~precomputed_values ~max_frontier_length
             [ fresh_peer
             ; peer_with_branch ~frontier_branch_size:peer_branch_size ])
         ~f:(fun network ->
@@ -560,8 +557,7 @@ let%test_module "Ledger_catchup tests" =
                    in the frontier" =
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
-          gen ~proof_level ~constraint_constants ~precomputed_values
-            ~max_frontier_length
+          gen ~proof_level ~precomputed_values ~max_frontier_length
             [fresh_peer; peer_with_branch ~frontier_branch_size:1])
         ~f:(fun network ->
           let open Fake_network in
@@ -575,8 +571,7 @@ let%test_module "Ledger_catchup tests" =
     let%test_unit "catchup fails if one of the parent transitions fail" =
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
-          gen ~proof_level ~constraint_constants ~precomputed_values
-            ~max_frontier_length
+          gen ~proof_level ~precomputed_values ~max_frontier_length
             [ fresh_peer
             ; peer_with_branch ~frontier_branch_size:(max_frontier_length * 2)
             ])
@@ -601,9 +596,8 @@ let%test_module "Ledger_catchup tests" =
           in
           Thread_safe.block_on_async_exn (fun () ->
               let%bind `Test {cache; _}, `Cached_transition cached_transition =
-                run_catchup_with_target ~constraint_constants
-                  ~network:my_net.network ~frontier:my_net.state.frontier
-                  ~target_breadcrumb
+                run_catchup_with_target ~network:my_net.network
+                  ~frontier:my_net.state.frontier ~target_breadcrumb
               in
               let cached_failing_transition =
                 Transition_handler.Unprocessed_transition_cache.register_exn

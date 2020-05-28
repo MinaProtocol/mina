@@ -42,7 +42,7 @@ let gen (constants : Constants.t) =
   Core.Int.gen_incl 0 ck3 >>| UInt32.of_int
 
 let%test_unit "in_seed_update_range unchecked vs. checked equality" =
-  let constants = Constants.for_unit_tests in
+  let constants = Lazy.force Constants.for_unit_tests in
   let module Length = Coda_numbers.Length in
   let test x =
     Test_util.test_equal

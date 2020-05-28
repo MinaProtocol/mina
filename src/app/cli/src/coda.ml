@@ -878,8 +878,7 @@ let daemon logger =
                 ~consensus_local_state ~transaction_database
                 ~external_transition_database ~is_archive_rocksdb
                 ~work_reassignment_wait ~archive_process_location
-                ~log_block_creation ~constraint_constants ~precomputed_values
-                ~proof_level ())
+                ~log_block_creation ~precomputed_values ~proof_level ())
          in
          {Coda_initialization.coda; client_trustlist; rest_server_port}
        in
