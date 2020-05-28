@@ -519,7 +519,7 @@ jobs:
                 no_output_timeout: 20m
             - run:
                 name: Upload genesis data
-                command: ./scripts/upload-genesis.sh
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c './scripts/upload-genesis.sh'
             - run:
                   name: Build deb package with PV keys and PV key tar
                   command:  ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make deb'
