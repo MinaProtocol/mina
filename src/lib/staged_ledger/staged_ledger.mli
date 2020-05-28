@@ -30,7 +30,8 @@ module Scan_state : sig
 
   val hash : t -> Staged_ledger_hash.Aux_hash.t
 
-  val empty : unit -> t
+  val empty :
+    constraint_constants:Genesis_constants.Constraint_constants.t -> unit -> t
 
   val snark_job_list_json : t -> string
 
