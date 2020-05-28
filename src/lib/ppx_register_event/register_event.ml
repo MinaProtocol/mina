@@ -69,7 +69,13 @@ let type_ext_str ~options ~path (ty_ext : type_extension) =
     List.map label_decls ~f:(fun {pld_name= {txt; _}; _} -> txt)
   in
   let has_record_arg = not @@ List.is_empty label_names in
-  let (module Ast_builder) = Ast_builder.make ty_ext.ptyext_path.loc in
+  let deriver_attr =
+    (* succeeds, because we're calling this deriver *)
+    List.find_exn ty_ext.ptyext_attributes ~f:(fun ({txt; _}, _) ->
+        String.equal txt deriver )
+  in
+  let deriver_loc = match deriver_attr with {loc; _}, _ -> loc in
+  let (module Ast_builder) = Ast_builder.make deriver_loc in
   let open Ast_builder in
   let (msg : expression), msg_loc =
     match List.Assoc.find options "msg" ~equal:String.equal with
@@ -89,7 +95,7 @@ let type_ext_str ~options ~path (ty_ext : type_extension) =
   in
   check_interpolations ~loc:msg_loc msg label_names ;
   let event_name = String.lowercase ctor in
-  let identifying = String.concat (path @ (event_name :: label_names)) in
+  let identifying = String.concat (path @ [event_name]) ~sep:"." in
   let id_string = hash identifying in
   let core_type_of_string s =
     ptyp_constr {txt= Longident.parse s; loc= Location.none} []
