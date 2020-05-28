@@ -37,10 +37,17 @@ end
 module Make_real (Keys : Keys_lib.Keys.S) = struct
   let loc = Ppxlib.Location.none
 
+  let constraint_constants = Genesis_constants.Constraint_constants.compiled
+
+  let genesis_constants = Genesis_constants.compiled
+
+  let consensus_constants =
+    Consensus.Constants.create ~constraint_constants
+      ~protocol_constants:genesis_constants.protocol
+
   let protocol_state_with_hash =
     Genesis_protocol_state.t ~genesis_ledger:Test_genesis_ledger.t
-      ~constraint_constants:Genesis_constants.Constraint_constants.compiled
-      ~genesis_constants:Genesis_constants.compiled
+      ~constraint_constants ~consensus_constants
 
   let base_hash = Keys.Step.instance_hash protocol_state_with_hash.data
 
@@ -48,9 +55,10 @@ module Make_real (Keys : Keys_lib.Keys.S) = struct
     Genesis_proof.create_values
       ~keys:(module Keys : Keys_lib.Keys.S)
       ~proof_level:Full
-      ~constraint_constants:Genesis_constants.Constraint_constants.compiled
-      { genesis_constants= Genesis_constants.compiled
+      { constraint_constants
+      ; genesis_constants
       ; genesis_ledger= (module Test_genesis_ledger)
+      ; consensus_constants
       ; protocol_state_with_hash
       ; base_hash }
 
@@ -96,8 +104,11 @@ let main () =
              Lazy.force
                Coda_state.Genesis_protocol_state.For_tests.genesis_state
            in
-           { genesis_constants= Genesis_constants.for_unit_tests
+           { constraint_constants=
+               Genesis_constants.Constraint_constants.for_unit_tests
+           ; genesis_constants= Genesis_constants.for_unit_tests
            ; genesis_ledger= Genesis_ledger.for_unit_tests
+           ; consensus_constants= Lazy.force Consensus.Constants.for_unit_tests
            ; protocol_state_with_hash
            ; base_hash= unit_test_base_hash
            ; genesis_proof= unit_test_base_proof })
@@ -108,15 +119,23 @@ let main () =
 
       let compiled =
         lazy
-          (let protocol_state_with_hash =
-             Coda_state.Genesis_protocol_state.t
-               ~genesis_ledger:Test_genesis_ledger.t
-               ~constraint_constants:
-                 Genesis_constants.Constraint_constants.compiled
-               ~genesis_constants:Genesis_constants.compiled
+          (let constraint_constants =
+             Genesis_constants.Constraint_constants.compiled
            in
-           { genesis_constants= Genesis_constants.compiled
+           let genesis_constants = Genesis_constants.compiled in
+           let consensus_constants =
+             Consensus.Constants.create ~constraint_constants
+               ~protocol_constants:genesis_constants.protocol
+           in
+           let protocol_state_with_hash =
+             Coda_state.Genesis_protocol_state.t
+               ~genesis_ledger:Test_genesis_ledger.t ~constraint_constants
+               ~consensus_constants
+           in
+           { constraint_constants
+           ; genesis_constants
            ; genesis_ledger= (module Test_genesis_ledger)
+           ; consensus_constants
            ; protocol_state_with_hash
            ; base_hash= compiled_base_hash
            ; genesis_proof= compiled_base_proof })]

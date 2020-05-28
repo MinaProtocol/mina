@@ -2116,11 +2116,7 @@ module Data = struct
     let same_checkpoint_window ~constants ~prev ~next =
       make_checked (fun () -> same_checkpoint_window ~constants ~prev ~next)
 
-    let negative_one ~genesis_ledger ~constraint_constants
-        ~(protocol_constants : Genesis_constants.Protocol.t) =
-      let constants =
-        Constants.create ~constraint_constants ~protocol_constants
-      in
+    let negative_one ~genesis_ledger ~(constants : Constants.t) =
       let max_sub_window_density = constants.slots_per_sub_window in
       let max_window_density = constants.slots_per_window in
       { Poly.blockchain_length= Length.zero
@@ -2139,8 +2135,8 @@ module Data = struct
       ; has_ancestor_in_same_checkpoint_window= false }
 
     let create_genesis_from_transition ~negative_one_protocol_state_hash
-        ~consensus_transition ~genesis_ledger ~constraint_constants
-        ~protocol_constants : Value.t =
+        ~consensus_transition ~genesis_ledger ~constraint_constants ~constants
+        : Value.t =
       let producer_vrf_result =
         let _, sk = Vrf.Precomputed.genesis_winner in
         Vrf.eval ~constraint_constants ~private_key:sk
@@ -2153,22 +2149,17 @@ module Data = struct
         |> Coda_base.Frozen_ledger_hash.of_ledger_hash
       in
       Or_error.ok_exn
-        (update
-           ~constants:
-             (Constants.create ~constraint_constants ~protocol_constants)
-           ~producer_vrf_result
-           ~previous_consensus_state:
-             (negative_one ~genesis_ledger ~constraint_constants
-                ~protocol_constants)
+        (update ~constants ~producer_vrf_result
+           ~previous_consensus_state:(negative_one ~genesis_ledger ~constants)
            ~previous_protocol_state_hash:negative_one_protocol_state_hash
            ~consensus_transition ~supply_increase:Currency.Amount.zero
            ~snarked_ledger_hash)
 
     let create_genesis ~negative_one_protocol_state_hash ~genesis_ledger
-        ~constraint_constants ~protocol_constants : Value.t =
+        ~constraint_constants ~constants : Value.t =
       create_genesis_from_transition ~negative_one_protocol_state_hash
         ~consensus_transition:Consensus_transition.genesis ~genesis_ledger
-        ~constraint_constants ~protocol_constants
+        ~constraint_constants ~constants
 
     (* Check that both epoch and slot are zero.
     *)
@@ -3106,7 +3097,8 @@ module Hooks = struct
 
   let%test "should_bootstrap is sane" =
     (* Even when consensus constants are of prod sizes, candidate should still trigger a bootstrap *)
-    should_bootstrap_len ~constants:Constants.for_unit_tests
+    should_bootstrap_len
+      ~constants:(Lazy.force Constants.for_unit_tests)
       ~existing:Length.zero
       ~candidate:(Length.of_int 100_000_000)
 
@@ -3115,48 +3107,39 @@ module Hooks = struct
     |> Unix_timestamp.of_int64
 
   let%test "Receive a valid consensus_state with a bit of delay" =
-    let constraint_constants =
-      Genesis_constants.Constraint_constants.for_unit_tests
+    let constants = Lazy.force Constants.for_unit_tests in
+    let negative_one =
+      Consensus_state.negative_one ~genesis_ledger:Test_genesis_ledger.t
+        ~constants
     in
-    let protocol_constants = Genesis_constants.for_unit_tests.protocol in
     let curr_epoch, curr_slot =
-      Consensus_state.curr_epoch_and_slot
-        (Consensus_state.negative_one ~genesis_ledger:Test_genesis_ledger.t
-           ~constraint_constants ~protocol_constants)
+      Consensus_state.curr_epoch_and_slot negative_one
     in
-    let constants = Constants.for_unit_tests in
     let delay = UInt32.(div constants.delta (of_int 2)) in
     let new_slot = UInt32.Infix.(curr_slot + delay) in
     let time_received = Epoch.slot_start_time ~constants curr_epoch new_slot in
-    received_at_valid_time ~constants
-      (Consensus_state.negative_one ~genesis_ledger:Test_genesis_ledger.t
-         ~constraint_constants ~protocol_constants)
+    received_at_valid_time ~constants negative_one
       ~time_received:(to_unix_timestamp time_received)
     |> Result.is_ok
 
   let%test "Receive an invalid consensus_state" =
     let epoch = Epoch.of_int 5 in
-    let constants = Constants.for_unit_tests in
-    let constraint_constants =
-      Genesis_constants.Constraint_constants.for_unit_tests
+    let constants = Lazy.force Constants.for_unit_tests in
+    let negative_one =
+      Consensus_state.negative_one ~genesis_ledger:Test_genesis_ledger.t
+        ~constants
     in
-    let protocol_constants = Genesis_constants.for_unit_tests.protocol in
     let start_time = Epoch.start_time ~constants epoch in
     let ((curr_epoch, curr_slot) as curr) =
       Epoch_and_slot.of_time_exn ~constants start_time
     in
     let consensus_state =
-      { (Consensus_state.negative_one ~genesis_ledger:Test_genesis_ledger.t
-           ~constraint_constants ~protocol_constants)
-        with
+      { negative_one with
         curr_global_slot= Global_slot.of_epoch_and_slot ~constants curr }
     in
     let too_early =
       (* TODO: Does this make sense? *)
-      Epoch.start_time ~constants
-        (Consensus_state.curr_slot
-           (Consensus_state.negative_one ~genesis_ledger:Test_genesis_ledger.t
-              ~constraint_constants ~protocol_constants))
+      Epoch.start_time ~constants (Consensus_state.curr_slot negative_one)
     in
     let too_late =
       let delay = UInt32.(mul constants.delta (of_int 2)) in
@@ -3277,7 +3260,7 @@ module Hooks = struct
     module For_tests = struct
       let gen_consensus_state
           ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-          ~(gen_slot_advancement : int Quickcheck.Generator.t) :
+          ~constants ~(gen_slot_advancement : int Quickcheck.Generator.t) :
           (   previous_protocol_state:( Protocol_state.Value.t
                                       , Coda_base.State_hash.t )
                                       With_hash.t
@@ -3299,7 +3282,6 @@ module Hooks = struct
           let curr_global_slot =
             Global_slot.(prev.curr_global_slot + slot_advancement)
           in
-          let constants = Constants.for_unit_tests in
           let curr_epoch, curr_slot =
             Global_slot.to_epoch_and_slot curr_global_slot
           in
@@ -3358,6 +3340,8 @@ let%test_module "Proof of stake tests" =
     let constraint_constants =
       Genesis_constants.Constraint_constants.for_unit_tests
 
+    let constants = Lazy.force Constants.for_unit_tests
+
     let%test_unit "update, update_var agree starting from same genesis state" =
       (* build pieces needed to apply "update" *)
       let snarked_ledger_hash =
@@ -3369,9 +3353,8 @@ let%test_module "Proof of stake tests" =
         Consensus_state.create_genesis
           ~negative_one_protocol_state_hash:previous_protocol_state_hash
           ~genesis_ledger:Test_genesis_ledger.t ~constraint_constants
-          ~protocol_constants:Genesis_constants.for_unit_tests.protocol
+          ~constants
       in
-      let constants = Constants.for_unit_tests in
       let global_slot =
         Core_kernel.Time.now () |> Time.of_time
         |> Epoch_and_slot.of_time_exn ~constants
