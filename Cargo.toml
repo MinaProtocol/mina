@@ -16,7 +16,7 @@ crate-type = ["staticlib"]
 [dependencies]
 groupmap = { path = "../groupmap" }
 libc = { version = "0.2.0" }
-algebra = { path = "../algebra" }
+algebra = { path = "../algebra", features = [ "asm", "parallel", "bn_382" ] }
 ff-fft = { path = "../ff-fft" }
 rand = { version = "0.7" }
 num-bigint = { version = "0.2.3" }

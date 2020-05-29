@@ -1,30 +1,28 @@
 extern crate libc;
 use algebra::{
-    ToBytes, FromBytes,
+    ToBytes, FromBytes, One, Zero,
     biginteger::{BigInteger, BigInteger384},
+    bn_382::{
+        g::{Affine as GAffine, Projective as GProjective},
+        Bn_382, G1Affine, G1Projective, G2Affine,
+        g1::Bn_382G1Parameters,
+        g::Bn_382GParameters,
+        fp::{Fp, FpParameters as Fp_params},
+        fq::{Fq, FqParameters as Fq_params},
+    },
     curves::{
-        PairingCurve, PairingEngine,
-        bn_382::{
-            g::{Affine as GAffine, Projective as GProjective},
-            Bn_382, G1Affine, G1Projective, G2Affine,
-            g1::Bn_382G1Parameters,
-            g::Bn_382GParameters,
-        },
+        PairingEngine,
         AffineCurve, ProjectiveCurve,
     },
     fields::{
-        bn_382::{
-            fp::{Fp, FpParameters as Fp_params},
-            fq::{Fq, FqParameters as Fq_params},
-        },
-        Field, FpParameters, PrimeField, SquareRootField,
+        Field, FpParameters, PrimeField, SquareRootField, FftField,
     },
     UniformRand,
 };
 use commitment_pairing::urs::{URS};
 use evaluation_domains::EvaluationDomains;
 use circuits_pairing::index::{Index, VerifierIndex, MatrixValues, URSSpec};
-use ff_fft::{Evaluations, DensePolynomial, EvaluationDomain};
+use ff_fft::{Evaluations, DensePolynomial, EvaluationDomain, Radix2EvaluationDomain as Domain, GeneralEvaluationDomain};
 use num_bigint::BigUint;
 use oracle::{self, marlin_sponge::{ScalarChallenge, DefaultFqSponge, DefaultFrSponge}, poseidon, poseidon::Sponge};
 use protocol_pairing::{prover::{ ProverProof, ProofEvaluations, RandomOracles}};
@@ -41,7 +39,13 @@ use commitment_dlog::{commitment::{CommitmentCurve, PolyComm, product, b_poly_co
 use circuits_dlog::index::{Index as DlogIndex, VerifierIndex as DlogVerifierIndex, SRSSpec, SRSValue};
 use protocol_dlog::prover::{ProverProof as DlogProof, ProofEvaluations as DlogProofEvaluations};
 
-use algebra::curves::bn_382::g::Affine;
+use algebra::bn_382::g::Affine;
+
+fn evals_from_coeffs<F: FftField>(
+    v : Vec<F>,
+    d : Domain<F>) -> Evaluations<F, GeneralEvaluationDomain<F>> {
+    Evaluations::<F>::from_vec_and_domain(v, GeneralEvaluationDomain::Radix2(d))
+}
 
 fn ceil_pow2(x : usize) -> usize {
     let mut res = 1;
@@ -170,7 +174,7 @@ fn read_dense_polynomial<A: ToBytes + Field, R: Read>(mut r: R) -> IoResult<Dens
     Ok(DensePolynomial { coeffs })
 }
 
-fn write_domain<A: ToBytes + PrimeField, W: Write>(d : &EvaluationDomain<A>, mut w: W) -> IoResult<()> {
+fn write_domain<A: ToBytes + PrimeField, W: Write>(d : &Domain<A>, mut w: W) -> IoResult<()> {
     d.size.write(&mut w)?;
     d.log_size_of_group.write(&mut w)?;
     d.size_as_field_element.write(&mut w)?;
@@ -181,7 +185,7 @@ fn write_domain<A: ToBytes + PrimeField, W: Write>(d : &EvaluationDomain<A>, mut
     Ok(())
 }
 
-fn read_domain<A: ToBytes + PrimeField, R: Read>(mut r: R) -> IoResult<EvaluationDomain<A>> {
+fn read_domain<A: ToBytes + PrimeField, R: Read>(mut r: R) -> IoResult<Domain<A>> {
     let size = u64::read(&mut r)?;
     let log_size_of_group = u32::read(&mut r)?;
 
@@ -190,7 +194,7 @@ fn read_domain<A: ToBytes + PrimeField, R: Read>(mut r: R) -> IoResult<Evaluatio
     let group_gen = A::read(&mut r)?;
     let group_gen_inv = A::read(&mut r)?;
     let generator_inv = A::read(&mut r)?;
-    Ok(EvaluationDomain { size, log_size_of_group, size_as_field_element, size_inv, group_gen, group_gen_inv, generator_inv })
+    Ok(Domain { size, log_size_of_group, size_as_field_element, size_inv, group_gen, group_gen_inv, generator_inv })
 }
 
 fn write_evaluations<A: ToBytes + PrimeField, W: Write>(e : &Evaluations<A>, mut w: W) -> IoResult<()> {
@@ -200,9 +204,9 @@ fn write_evaluations<A: ToBytes + PrimeField, W: Write>(e : &Evaluations<A>, mut
 
 fn read_evaluations<A: ToBytes + PrimeField, R: Read>(mut r: R) -> IoResult<Evaluations<A>> {
     let evals = read_vec(&mut r)?;
-    let domain = EvaluationDomain::new(evals.len()).unwrap();
+    let domain = Domain::new(evals.len()).unwrap();
     assert_eq!(evals.len(), domain.size());
-    Ok( Evaluations::from_vec_and_domain(evals, domain) )
+    Ok( evals_from_coeffs(evals, domain) )
 }
 
 fn write_evaluation_domains<A: PrimeField, W: Write>(d : &EvaluationDomains<A>, mut w: W) -> IoResult<()> {
@@ -576,7 +580,7 @@ pub extern "C" fn camlsnark_bn382_fp_square(x: *const Fp) -> *mut Fp {
 pub extern "C" fn camlsnark_bn382_fp_add(x: *const Fp, y: *const Fp) -> *mut Fp {
     let x_ = unsafe { &(*x) };
     let y_ = unsafe { &(*y) };
-    let ret = *x_ + &y_;
+    let ret = *x_ + y_;
     return Box::into_raw(Box::new(ret));
 }
 
@@ -591,7 +595,7 @@ pub extern "C" fn camlsnark_bn382_fp_negate(x: *const Fp) -> *mut Fp {
 pub extern "C" fn camlsnark_bn382_fp_mul(x: *const Fp, y: *const Fp) -> *mut Fp {
     let x_ = unsafe { &(*x) };
     let y_ = unsafe { &(*y) };
-    let ret = *x_ * &y_;
+    let ret = *x_ * y_;
     return Box::into_raw(Box::new(ret));
 }
 
@@ -599,7 +603,7 @@ pub extern "C" fn camlsnark_bn382_fp_mul(x: *const Fp, y: *const Fp) -> *mut Fp 
 pub extern "C" fn camlsnark_bn382_fp_div(x: *const Fp, y: *const Fp) -> *mut Fp {
     let x_ = unsafe { &(*x) };
     let y_ = unsafe { &(*y) };
-    let ret = *x_ / &y_;
+    let ret = *x_ / y_;
     return Box::into_raw(Box::new(ret));
 }
 
@@ -607,7 +611,7 @@ pub extern "C" fn camlsnark_bn382_fp_div(x: *const Fp, y: *const Fp) -> *mut Fp 
 pub extern "C" fn camlsnark_bn382_fp_sub(x: *const Fp, y: *const Fp) -> *mut Fp {
     let x_ = unsafe { &(*x) };
     let y_ = unsafe { &(*y) };
-    let ret = *x_ - &y_;
+    let ret = *x_ - y_;
     return Box::into_raw(Box::new(ret));
 }
 
@@ -615,14 +619,14 @@ pub extern "C" fn camlsnark_bn382_fp_sub(x: *const Fp, y: *const Fp) -> *mut Fp 
 pub extern "C" fn camlsnark_bn382_fp_mut_add(x: *mut Fp, y: *const Fp) {
     let x_ = unsafe { &mut (*x) };
     let y_ = unsafe { &(*y) };
-    *x_ += &y_;
+    *x_ += y_;
 }
 
 #[no_mangle]
 pub extern "C" fn camlsnark_bn382_fp_mut_mul(x: *mut Fp, y: *const Fp) {
     let x_ = unsafe { &mut (*x) };
     let y_ = unsafe { &(*y) };
-    *x_ *= &y_;
+    *x_ *= y_;
 }
 
 #[no_mangle]
@@ -635,7 +639,7 @@ pub extern "C" fn camlsnark_bn382_fp_mut_square(x: *mut Fp) {
 pub extern "C" fn camlsnark_bn382_fp_mut_sub(x: *mut Fp, y: *const Fp) {
     let x_ = unsafe { &mut (*x) };
     let y_ = unsafe { &(*y) };
-    *x_ -= &y_;
+    *x_ -= y_;
 }
 
 #[no_mangle]
@@ -685,9 +689,9 @@ pub extern "C" fn camlsnark_bn382_fp_of_bigint(x: *const BigInteger384) -> *mut 
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_to_bigint_raw(x: *const Fp) -> *mut BigInteger384 {
+pub extern "C" fn camlsnark_bn382_fp_to_bigint_raw(x: *const Fp) -> *const BigInteger384 {
     let x_ = unsafe { &(*x) };
-    return Box::into_raw(Box::new(x_.into_repr_raw()));
+    return Box::into_raw(Box::new(x_.0));
 }
 
 #[no_mangle]
@@ -699,7 +703,7 @@ pub extern "C" fn camlsnark_bn382_fp_to_bigint_raw_noalloc(x: *const Fp) -> *con
 #[no_mangle]
 pub extern "C" fn camlsnark_bn382_fp_of_bigint_raw(x: *const BigInteger384) -> *mut Fp {
     let x_ = unsafe { &(*x) };
-    return Box::into_raw(Box::new(Fp::from_repr_raw(*x_)));
+    return Box::into_raw(Box::new(Fp::new(*x_)));
 }
 
 // Fp vector stubs
@@ -879,33 +883,32 @@ pub extern "C" fn camlsnark_bn382_batch_pairing_check(
     //   Experiment with scalar multiplying the affine point by b^i before adding into the
     //   accumulator.
     for ((p_i, (s_i, t_i)), u_i) in p.iter().zip(s.iter().zip(t)).zip(u) {
-        acc_beta_h *= &b;
+        acc_beta_h *= b;
         acc_beta_h.add_assign_mixed(p_i);
 
-        acc_h *= &b;
+        acc_h *= b;
         acc_h.add_assign_mixed(s_i);
         acc_h += &t_i.mul(a);
 
         for (j, u_ij) in u_i.iter().enumerate() {
-            acc_d[j] *= &b;
+            acc_d[j] *= b;
             acc_d[j].add_assign_mixed(u_ij);
         }
     }
-    acc_beta_h *= &(-a);
+    acc_beta_h *= -a;
     for acc_j in acc_d.iter_mut() {
         *acc_j = -(*acc_j);
     }
 
     let mut table = vec![
-        (acc_h.into_affine().prepare(), G2Affine::prime_subgroup_generator().prepare()),
-        (acc_beta_h.into_affine().prepare(), urs.hx.prepare())
+        (acc_h.into_affine().into(), G2Affine::prime_subgroup_generator().into()),
+        (acc_beta_h.into_affine().into(), urs.hx.into())
     ];
     for (acc_j, j) in acc_d.iter().zip(d) {
-        table.push((acc_j.into_affine().prepare(), urs.hn[&(urs.depth - j)].prepare()));
+        table.push((acc_j.into_affine().into(), urs.hn[&(urs.depth - j)].into()));
     }
 
-    let x: Vec<(&_, & _)> = table.iter().map(|x| (&x.0, &x.1)).collect();
-    Bn_382::final_exponentiation(&Bn_382::miller_loop(&x)).unwrap() == <Bn_382 as PairingEngine>::Fqk::one()
+    Bn_382::final_exponentiation(&Bn_382::miller_loop(&table)).unwrap() == <Bn_382 as PairingEngine>::Fqk::one()
 }
 
 // Fp proof
@@ -1132,7 +1135,7 @@ pub extern "C" fn camlsnark_bn382_fp_proof_commitment_with_degree_bound_0(
 #[no_mangle]
 pub extern "C" fn camlsnark_bn382_fp_proof_commitment_with_degree_bound_1(
     p: *const (G1Affine, G1Affine)) -> *const G1Affine {
-    let (_, x1) = unsafe { (*p)};
+    let (_, x1) = unsafe { *p };
     return Box::into_raw(Box::new(x1.clone()));
 }
 
@@ -1254,19 +1257,19 @@ pub extern "C" fn camlsnark_bn382_fp_proof_rc_evals_nocopy(
 
 #[no_mangle]
 pub extern "C" fn camlsnark_bn382_fp_proof_evals_0(evals: *const [Fp; 3]) -> *const Fp {
-    let x = (unsafe { (*evals) })[0].clone();
+    let x = (unsafe { *evals })[0].clone();
     return Box::into_raw(Box::new(x));
 }
 
 #[no_mangle]
 pub extern "C" fn camlsnark_bn382_fp_proof_evals_1(evals: *const [Fp; 3]) -> *const Fp {
-    let x = (unsafe { (*evals) })[1].clone();
+    let x = (unsafe { *evals })[1].clone();
     return Box::into_raw(Box::new(x));
 }
 
 #[no_mangle]
 pub extern "C" fn camlsnark_bn382_fp_proof_evals_2(evals: *const [Fp; 3]) -> *const Fp {
-    let x = (unsafe { (*evals) })[2].clone();
+    let x = (unsafe { *evals })[2].clone();
     return Box::into_raw(Box::new(x));
 }
 
@@ -1312,7 +1315,7 @@ pub extern "C" fn camlsnark_bn382_fp_oracles_create(
     let index = unsafe { &(*index) };
     let proof = unsafe { &(*proof) };
 
-    let x_hat = Evaluations::<Fp>::from_vec_and_domain(proof.public.clone(), index.domains.x).interpolate();
+    let x_hat = evals_from_coeffs(proof.public.clone(), index.domains.x).interpolate();
     let x_hat_comm = index.urs.commit(&x_hat).unwrap();
 
     let oracles = proof.oracles::<DefaultFqSponge<Bn_382G1Parameters>, DefaultFrSponge<Fp> >(index, x_hat_comm, &x_hat).unwrap();
@@ -1688,12 +1691,12 @@ pub extern "C" fn camlsnark_bn382_fp_urs_dummy_degree_bound_checks(
 
     let rs : Vec<Fp> = bounds.iter().enumerate().map(|(_, i)| ((i + 2) as u64).into()).collect();
 
-    let shifted = ss.zip(rs.iter()).map(|(s, r)| s.into_projective() * r)
+    let shifted : G1Affine =
+        ss.zip(rs.iter()).map(|(s, r)| s.mul(*r))
         .fold(G1Projective::zero(), |acc, x| acc + &x).into_affine();
 
     let mut res = vec![ shifted ];
-    res.extend(
-        cs.zip(rs).map(|(c, r)| (c.into_projective() * &r).into_affine()));
+    res.extend(cs.zip(rs.iter()).map(|(c, r)| c.mul(*r).into_affine()));
 
     Box::into_raw(Box::new(res))
 }
@@ -1717,10 +1720,10 @@ pub extern "C" fn camlsnark_bn382_fp_urs_dummy_opening_check(
     let v = p.evaluate(z);
     let pi = urs.open(vec![&p], Fp::one(), z).unwrap();
 
-    let res = ((f.into_projective() -
-     &(G1Projective::prime_subgroup_generator() * &v)
-     + & (pi.into_projective() * &z)).into_affine(),
-     pi);
+    let res =
+        ( (f.into_projective() - &(G1Affine::prime_subgroup_generator().mul(v)) + & pi.mul(z))
+          .into_affine()
+        , pi);
 
     Box::into_raw(Box::new(res))
 }
@@ -1836,9 +1839,9 @@ pub extern "C" fn camlsnark_bn382_fp_index_create<'a>(
 
     let m = if num_constraints > vars { num_constraints } else { vars };
 
-    let h_group_size = EvaluationDomain::<Fp>::compute_size_of_domain(m).unwrap();
+    let h_group_size = Domain::<Fp>::compute_size_of_domain(m).unwrap();
     let h_to_x_ratio = {
-        let x_group_size = EvaluationDomain::<Fp>::compute_size_of_domain(public_inputs).unwrap();
+        let x_group_size = Domain::<Fp>::compute_size_of_domain(public_inputs).unwrap();
         h_group_size / x_group_size
     };
 
@@ -2041,9 +2044,9 @@ pub extern "C" fn camlsnark_bn382_fq_index_create<'a>(
 
     let m = if num_constraints > vars { num_constraints } else { vars };
 
-    let h_group_size = EvaluationDomain::<Fq>::compute_size_of_domain(m).unwrap();
+    let h_group_size = Domain::<Fq>::compute_size_of_domain(m).unwrap();
     let h_to_x_ratio = {
-        let x_group_size = EvaluationDomain::<Fq>::compute_size_of_domain(public_inputs).unwrap();
+        let x_group_size = Domain::<Fq>::compute_size_of_domain(public_inputs).unwrap();
         h_group_size / x_group_size
     };
 
@@ -2439,7 +2442,7 @@ pub extern "C" fn camlsnark_bn382_g_add(
 ) -> *const GProjective {
     let x_ = unsafe { &(*x) };
     let y_ = unsafe { &(*y) };
-    let ret = *x_ + &y_;
+    let ret = *x_ + y_;
     return Box::into_raw(Box::new(ret));
 }
 
@@ -2459,7 +2462,7 @@ pub extern "C" fn camlsnark_bn382_g_scale(
 ) -> *const GProjective {
     let x_ = unsafe { &(*x) };
     let s_ = unsafe { &(*s) };
-    let ret = (*x_) * s_;
+    let ret = (*x_).mul(*s_);
     return Box::into_raw(Box::new(ret));
 }
 
@@ -2470,7 +2473,7 @@ pub extern "C" fn camlsnark_bn382_g_sub(
 ) -> *const GProjective {
     let x_ = unsafe { &(*x) };
     let y_ = unsafe { &(*y) };
-    let ret = *x_ - &y_;
+    let ret = *x_ - y_;
     return Box::into_raw(Box::new(ret));
 }
 
@@ -2595,7 +2598,7 @@ pub extern "C" fn camlsnark_bn382_g1_add(
 ) -> *const G1Projective {
     let x_ = unsafe { &(*x) };
     let y_ = unsafe { &(*y) };
-    let ret = *x_ + &y_;
+    let ret = *x_ + y_;
     return Box::into_raw(Box::new(ret));
 }
 
@@ -2615,7 +2618,7 @@ pub extern "C" fn camlsnark_bn382_g1_scale(
 ) -> *const G1Projective {
     let x_ = unsafe { &(*x) };
     let s_ = unsafe { &(*s) };
-    let ret = (*x_) * s_;
+    let ret = (*x_).mul(*s_);
     return Box::into_raw(Box::new(ret));
 }
 
@@ -2626,7 +2629,7 @@ pub extern "C" fn camlsnark_bn382_g1_sub(
 ) -> *const G1Projective {
     let x_ = unsafe { &(*x) };
     let y_ = unsafe { &(*y) };
-    let ret = *x_ - &y_;
+    let ret = *x_ - y_;
     return Box::into_raw(Box::new(ret));
 }
 
@@ -2810,7 +2813,7 @@ pub extern "C" fn camlsnark_bn382_fq_square(x: *const Fq) -> *mut Fq {
 pub extern "C" fn camlsnark_bn382_fq_add(x: *const Fq, y: *const Fq) -> *mut Fq {
     let x_ = unsafe { &(*x) };
     let y_ = unsafe { &(*y) };
-    let ret = *x_ + &y_;
+    let ret = *x_ + y_;
     return Box::into_raw(Box::new(ret));
 }
 
@@ -2825,7 +2828,7 @@ pub extern "C" fn camlsnark_bn382_fq_negate(x: *const Fq) -> *mut Fq {
 pub extern "C" fn camlsnark_bn382_fq_mul(x: *const Fq, y: *const Fq) -> *mut Fq {
     let x_ = unsafe { &(*x) };
     let y_ = unsafe { &(*y) };
-    let ret = *x_ * &y_;
+    let ret = *x_ * y_;
     return Box::into_raw(Box::new(ret));
 }
 
@@ -2833,7 +2836,7 @@ pub extern "C" fn camlsnark_bn382_fq_mul(x: *const Fq, y: *const Fq) -> *mut Fq 
 pub extern "C" fn camlsnark_bn382_fq_div(x: *const Fq, y: *const Fq) -> *mut Fq {
     let x_ = unsafe { &(*x) };
     let y_ = unsafe { &(*y) };
-    let ret = *x_ / &y_;
+    let ret = *x_ / y_;
     return Box::into_raw(Box::new(ret));
 }
 
@@ -2841,7 +2844,7 @@ pub extern "C" fn camlsnark_bn382_fq_div(x: *const Fq, y: *const Fq) -> *mut Fq 
 pub extern "C" fn camlsnark_bn382_fq_sub(x: *const Fq, y: *const Fq) -> *mut Fq {
     let x_ = unsafe { &(*x) };
     let y_ = unsafe { &(*y) };
-    let ret = *x_ - &y_;
+    let ret = *x_ - y_;
     return Box::into_raw(Box::new(ret));
 }
 
@@ -2849,14 +2852,14 @@ pub extern "C" fn camlsnark_bn382_fq_sub(x: *const Fq, y: *const Fq) -> *mut Fq 
 pub extern "C" fn camlsnark_bn382_fq_mut_add(x: *mut Fq, y: *const Fq) {
     let x_ = unsafe { &mut (*x) };
     let y_ = unsafe { &(*y) };
-    *x_ += &y_;
+    *x_ += y_;
 }
 
 #[no_mangle]
 pub extern "C" fn camlsnark_bn382_fq_mut_mul(x: *mut Fq, y: *const Fq) {
     let x_ = unsafe { &mut (*x) };
     let y_ = unsafe { &(*y) };
-    *x_ *= &y_;
+    *x_ *= y_;
 }
 
 #[no_mangle]
@@ -2869,7 +2872,7 @@ pub extern "C" fn camlsnark_bn382_fq_mut_square(x: *mut Fq) {
 pub extern "C" fn camlsnark_bn382_fq_mut_sub(x: *mut Fq, y: *const Fq) {
     let x_ = unsafe { &mut (*x) };
     let y_ = unsafe { &(*y) };
-    *x_ -= &y_;
+    *x_ -= y_;
 }
 
 #[no_mangle]
@@ -2921,7 +2924,7 @@ pub extern "C" fn camlsnark_bn382_fq_of_bigint(x: *const BigInteger384) -> *mut 
 #[no_mangle]
 pub extern "C" fn camlsnark_bn382_fq_to_bigint_raw(x: *const Fq) -> *mut BigInteger384 {
     let x_ = unsafe { &(*x) };
-    return Box::into_raw(Box::new(x_.into_repr_raw()));
+    return Box::into_raw(Box::new(x_.0));
 }
 
 #[no_mangle]
@@ -2933,7 +2936,7 @@ pub extern "C" fn camlsnark_bn382_fq_to_bigint_raw_noalloc(x: *const Fq) -> *con
 #[no_mangle]
 pub extern "C" fn camlsnark_bn382_fq_of_bigint_raw(x: *const BigInteger384) -> *mut Fq {
     let x_ = unsafe { &(*x) };
-    return Box::into_raw(Box::new(Fq::from_repr_raw(*x_)));
+    return Box::into_raw(Box::new(Fq::new(*x_)));
 }
 
 // Fq vector stubs
@@ -3206,7 +3209,7 @@ pub extern "C" fn camlsnark_bn382_fq_oracles_create(
     let proof = unsafe { &(*proof) };
 
     let x_hat = 
-        Evaluations::<Fq>::from_vec_and_domain(proof.public.clone(), index.domains.x).interpolate();
+        evals_from_coeffs(proof.public.clone(), index.domains.x).interpolate();
         // TODO: Should have no degree bound when we add the correct degree bound method
     let x_hat_comm = index.srs.get_ref().commit(&x_hat, None);
 
