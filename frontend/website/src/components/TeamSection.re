@@ -507,7 +507,7 @@ let make = () => {
       />
       <Member
         name="Ahmad Wilson"
-        title="Protocol Reliability Engineer"
+        title="Protocol Reliability Eng"
         description="Ahmad is a computer scientist and self-proclaimed “tech-head” interested in software infrastructure, \
       developer tools and user-interface engineering and a strong believer in the power of distributed networks \
       and AI/automation as major force multipliers and problem solvers. He holds a MSc. in Human-Computer \
