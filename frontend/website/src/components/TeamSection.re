@@ -53,7 +53,7 @@ module Member = {
           className=Css.(
             style([
               width(`rem(5.5)),
-              height(`percent(100.)),
+              height(`rem(5.5)),
               unsafe("WebkitFilter", "grayscale(1)"),
               unsafe("filter", "grayscale(1)"),
               marginLeft(`rem(0.875)),
