@@ -52,8 +52,10 @@ module Member = {
         <img
           className=Css.(
             style([
-              width(`rem(5.5)),
-              height(`rem(5.5)),
+              maxWidth(`rem(5.5)),
+              maxHeight(`rem(5.5)),
+              height(`auto),
+              width(`auto),
               unsafe("WebkitFilter", "grayscale(1)"),
               unsafe("filter", "grayscale(1)"),
               marginLeft(`rem(0.875)),
