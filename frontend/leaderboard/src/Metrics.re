@@ -203,6 +203,7 @@ let calculateMetrics = blocks => {
   let highestSnarkFeeCollected = getHighestSnarkFeeCollected(blocks);
   let transactionsReceivedByEcho =
     calculateTransactionsSentToAddress(blocks, echoBotPublicKey);
+  let coinbaseReceiverChallenge = calculateCoinbaseReceiverChallenge(blocks);
 
   calculateAllUsers([
     throwAwayValues(blocksCreated),
@@ -211,6 +212,7 @@ let calculateMetrics = blocks => {
     throwAwayValues(snarkFeesCollected),
     throwAwayValues(highestSnarkFeeCollected),
     throwAwayValues(transactionsReceivedByEcho),
+    throwAwayValues(coinbaseReceiverChallenge),
   ])
   |> StringMap.mapi((key, _) =>
        {
@@ -222,6 +224,7 @@ let calculateMetrics = blocks => {
            StringMap.find_opt(key, highestSnarkFeeCollected),
          transactionsReceivedByEcho:
            StringMap.find_opt(key, transactionsReceivedByEcho),
+         coinbaseReceiver: StringMap.find_opt(key, coinbaseReceiverChallenge),
        }
      );
 };

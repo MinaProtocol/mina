@@ -22,7 +22,7 @@ module NewBlock = {
   };
 
   type blockchainState = {date: string};
-  
+
   type data = {
     creatorAccount: account,
     snarkJobs: array(snarkJobs),
@@ -44,7 +44,8 @@ module Metrics = {
     | SnarkWorkCreated
     | SnarkFeesCollected
     | HighestSnarkFeeCollected
-    | TransactionsReceivedByEcho;
+    | TransactionsReceivedByEcho
+    | CoinbaseReceiver;
 
   type metricRecord = {
     blocksCreated: option(int),
@@ -53,5 +54,6 @@ module Metrics = {
     snarkFeesCollected: option(int64),
     highestSnarkFeeCollected: option(int64),
     transactionsReceivedByEcho: option(int),
+    coinbaseReceiver: option(bool),
   };
 };
