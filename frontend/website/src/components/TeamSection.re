@@ -512,7 +512,7 @@ let make = () => {
       developer tools and user-interface engineering and a strong believer in the power of distributed networks \
       and AI/automation as major force multipliers and problem solvers. He holds a MSc. in Human-Computer \
       Interaction & Artificial Intelligence from Brown University, a BS. in Computer Science from Morehouse \
-      College and has worked for a variety of organizations, ranging from a startup aimed at developing the world’s \
+      College and has worked for a variety of organizations, ranging from a startup aimed at developing the world's \
       first civic voter network to larger corporations such as Yelp and Microsoft, throughout over a decade of \
       experience as a software developer. In his free time he enjoys supporting his native New England based \
       sports teams (Go Pats!), keeping a variety of plants alive in his home garden, nerding out over the \
