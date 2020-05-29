@@ -89,12 +89,14 @@ let type_ext_str ~options ~path (ty_ext : type_extension) =
           failwith
             (sprintf "Expected structure item in payload for %s" deriver)
     in
-    List.find_map_exn ty_ext.ptyext_attributes ~f:(fun (_, payload) ->
-        match payload with
-        | PStr stris ->
-            Some (List.find_map_exn stris ~f:find_deriver)
-        | _ ->
-            failwith (sprintf "Expected structure payload for %s" deriver) )
+    List.find_map_exn ty_ext.ptyext_attributes ~f:(fun ({txt; _}, payload) ->
+        if String.equal txt "deriving" then
+          match payload with
+          | PStr stris ->
+              Some (List.find_map_exn stris ~f:find_deriver)
+          | _ ->
+              failwith (sprintf "Expected structure payload for %s" deriver)
+        else None )
   in
   let (module Ast_builder) = Ast_builder.make deriver_loc in
   let open Ast_builder in
