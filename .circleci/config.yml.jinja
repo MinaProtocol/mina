@@ -283,11 +283,6 @@ jobs:
                     DUNE_PROFILE: testnet_postake_medium_curves
                 command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'eval `opam config env` && dune build src/app/generate_keypair/generate_keypair.exe'
                 no_output_timeout: 20m
-            - run:
-                  name: Generate runtime ledger with 10k accounts
-                  command: |
-                    ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'eval `opam config env` && ./_build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -n 10000 -account-file genesis_ledgers/phase_three/genesis_ledger.json'
-                  no_output_timeout: 20m
             ### collection
             - run:
                 name: Collect Keys and Binaries
@@ -295,7 +290,6 @@ jobs:
                     mkdir -p package/keys
                     echo 'keys and genesis'
                     cp /tmp/s3_cache_dir/* package/keys/. ||:
-                    cp $TMPDIR/coda_cache_dir/coda_genesis_*.tar.gz package/keys/.
                     echo 'coda'
                     cp _build/default/src/app/cli/src/coda.exe package/coda
                     echo 'libp2p_helper'
@@ -412,6 +406,10 @@ jobs:
                   command: |
                     ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'eval `opam config env` && ./_build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -n 10000 -account-file genesis_ledgers/phase_three/genesis_ledger.json'
                   no_output_timeout: 20m
+            - run:
+                  name: Upload genesis ledger (old-style)
+                  command:
+                    ./scripts/skip_if_only_frontend_or_rfcs.sh ./scripts/upload-genesis.sh
             - run:
                   name: Build deb package with PV keys and PV key tar
                   command:  ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make deb'
@@ -604,7 +602,6 @@ workflows:
             - build-wallet
             - test-archive
             - build-archive
-            - build-macos
             - build-client-sdk
             {%- for profile in build_artifact_profiles %}
             - build-artifacts--{{profile}}
@@ -616,7 +613,7 @@ workflows:
             {%- for profile in small_curves_tests.keys() | sort %}
             - test--{{profile}}
             {%- endfor %}
-
+            - build-macos
     daily:
         triggers:
           - schedule:
