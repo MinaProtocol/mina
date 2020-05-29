@@ -523,7 +523,7 @@ let make = () => {
         name="Bijan Shahrokhi"
         title="Product Manager"
         description="Bijan has been a product leader in the fintech industry for over 10 years and in blockchain for \
-      over 5 years. Prior to joining O1labs, Bijan was Head of Product at Harbor, a Layer 2 compliance protocol on Ethereum. "
+      over 5 years. Prior to joining O(1) Labs, Bijan was Head of Product at Harbor, a Layer 2 compliance protocol on Ethereum. "
       />
     </Section>
     <Section name="Advisors">
