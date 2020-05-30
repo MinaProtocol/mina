@@ -56,13 +56,12 @@ val combine_split_commitments :
 
 val combine_split_evaluations' :
      ('a, 'n, 'm) t
-  -> shifted_pow:('a -> 'f -> 'f)
-  -> mul:('f -> 'f -> 'f)
-  -> add:('f -> 'f -> 'f)
-  -> one:'f
-  -> evaluation_point:'f
-  -> xi:'f
+  -> shifted_pow:('a -> 'f_ -> 'f_)
+  -> mul:('f -> 'f_ -> 'f)
+  -> mul_and_add:(acc:'f_ -> xi:'f_ -> 'f -> 'f_)
+  -> evaluation_point:'f_
+  -> xi:'f_
+  -> init:('f -> 'f_)
   -> ('f array, 'n) Vector.t
   -> ('f array, 'm) Vector.t
-  -> 'f
-
+  -> 'f_

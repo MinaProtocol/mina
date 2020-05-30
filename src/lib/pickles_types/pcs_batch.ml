@@ -5,8 +5,21 @@ type ('a, 'n, 'm) t =
 
 let map t ~f = {t with with_degree_bound= Vector.map t.with_degree_bound ~f}
 
-let pow ~one ~mul ~add x n =
+let num_bits n =
   let k = Int.ceil_log2 n in
+  if n = 1 lsl k then k + 1 else k
+
+let%test_unit "num_bits" =
+  let naive n =
+    let rec go k = if n < Int.pow 2 k then k else go (k + 1) in
+    go 0
+  in
+  Quickcheck.test (Int.gen_uniform_incl 0 Int.max_value) ~f:(fun n ->
+      [%test_eq: int] (num_bits n) (naive n) )
+
+let pow ~one ~mul ~add x n =
+  assert (n >= 0) ;
+  let k = num_bits n in
   let rec go acc i =
     if i < 0 then acc
     else
@@ -16,8 +29,6 @@ let pow ~one ~mul ~add x n =
       go acc (i - 1)
   in
   go one (k - 1)
-
-(* type ('n, 'm, 'f) tt = ( 'n, (  P  , 'm) Vector.t) t *)
 
 let create ~without_degree_bound ~with_degree_bound =
   {without_degree_bound; with_degree_bound}
@@ -68,47 +79,36 @@ open Dlog_marlin_types.Poly_comm
 
 let combine_split_commitments t ~scale ~add ~xi (type n)
     (without_degree_bound : (_, n) Vector.t) with_degree_bound =
-  match without_degree_bound with
+  let flat =
+    List.concat_map (Vector.to_list without_degree_bound) ~f:Array.to_list
+    @ List.concat_map (Vector.to_list with_degree_bound)
+        ~f:(fun {With_degree_bound.unshifted; shifted} ->
+          Array.to_list unshifted @ [shifted] )
+  in
+  match List.rev flat with
   | [] ->
-      failwith "combine_commitments: empty list"
-  | init :: without_degree_bound ->
-    match Array.to_list init with
-    | [] -> failwith "Empty initial array"
-    | init0 :: inits ->
-      let polys =
-        inits @
-         List.concat_map (Vector.to_list without_degree_bound)
-          ~f:Array.to_list
-        @ List.concat_map (Vector.to_list with_degree_bound)
-          ~f:(fun {With_degree_bound.unshifted; shifted} ->
-              Array.to_list unshifted @ [shifted] )
-      in
-      List.fold_left polys ~init:init0 ~f:(fun acc p -> add p (scale acc xi))
+      failwith "combine_split_commitments: empty"
+  | init :: comms ->
+      List.fold_left comms ~init ~f:(fun acc p -> add p (scale acc xi))
 
-let combine_split_evaluations' (type a n m f)
+let combine_split_evaluations' (type a n m f f')
     ({without_degree_bound; with_degree_bound} : (a, n, m) t)
-    ~shifted_pow ~(mul : f -> f -> f) ~add ~one
-    ~(evaluation_point: f)
-    ~(xi:f)
-    (evals0 : (f array, n ) Vector.t)
-    (evals1 : (f array, m) Vector.t)
-  : f
-  =
-  match evals0 with
-  | [] -> failwith "combine_split_evaluations: empty list"
-  | init:: evals0 ->
-    match Array.to_list init with
-    | [] -> failwith "Empty initial array"
-    | init :: inits ->
-    let evals =
-      inits@ List.concat_map (Vector.to_list evals0) ~f:Array.to_list
-      @ List.concat
-          (Vector.to_list
-             (Vector.map2 with_degree_bound evals1 ~f:(fun deg unshifted ->
-                  let u = unshifted.(Array.length unshifted - 1) in
-                  Array.to_list unshifted @
-                  [mul (shifted_pow deg evaluation_point) u]
-               )))
-    in
-    List.fold_left evals ~init ~f:(fun acc fx -> add fx (mul acc xi))
-
+    ~(shifted_pow : a -> f' -> f') ~(mul : f -> f' -> f)
+    ~(mul_and_add : acc:f' -> xi:f' -> f -> f') ~(evaluation_point : f')
+    ~(xi : f') ~init:(i : f -> f') (evals0 : (f array, n) Vector.t)
+    (evals1 : (f array, m) Vector.t) : f' =
+  let flat =
+    List.concat_map (Vector.to_list evals0) ~f:Array.to_list
+    @ List.concat
+        (Vector.to_list
+           (Vector.map2 with_degree_bound evals1 ~f:(fun deg unshifted ->
+                let u = unshifted.(Array.length unshifted - 1) in
+                Array.to_list unshifted
+                @ [mul u (shifted_pow deg evaluation_point)] )))
+  in
+  match List.rev flat with
+  | [] ->
+      failwith "combine_split_evaluations: empty"
+  | init :: es ->
+      List.fold_left es ~init:(i init) ~f:(fun acc fx ->
+          mul_and_add ~acc ~xi fx )
