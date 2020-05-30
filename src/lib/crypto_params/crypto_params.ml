@@ -20,7 +20,7 @@ module Tick = struct
   let group_map_params =
     Group_map.Params.create
       (module Snarky_bn382_backend.Fq)
-      Snarky_bn382_backend.G1.Params.{a;b}
+      Snarky_bn382_backend.G1.Params.{a; b}
 
   include Full.Internal_Basic
   module Number = Snarky.Number.Make (Full.Internal_Basic)
