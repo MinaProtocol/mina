@@ -108,6 +108,24 @@ module Make
               with type Impl.field = Snarky_bn382_backend.Fq.t
                and type G1.Constant.Scalar.t = Snarky_bn382_backend.Fp.t) =
 struct
+  module Opt_sponge =
+    Sponge.Make_bit_sponge (struct
+        type t = Inputs.Impl.Boolean.var
+      end)
+      (struct
+        open Inputs.Impl
+
+        type t = Field.t
+
+        let to_bits = Field.choose_preimage_var ~length:Field.size_in_bits
+      end)
+      (struct
+        open Inputs.Impl
+
+        type t = Boolean.var * Field.t
+      end)
+      (Opt_sponge.Make (Inputs.Impl))
+
   open Inputs
   open Impl
 
@@ -420,57 +438,61 @@ struct
     in
     (digest_before_evaluations, pairing_acc, deferred)
 
-module Split_evaluations = struct
+  let ones_vector : type n.
+      first_zero:Field.t -> n Nat.t -> (Boolean.var, n) Vector.t =
+   fun ~first_zero n ->
+    let rec go : type m.
+        Boolean.var -> int -> m Nat.t -> (Boolean.var, m) Vector.t =
+     fun value i m ->
+      match m with
+      | Z ->
+          []
+      | S m ->
+          let value =
+            Boolean.(value && not (Field.equal first_zero (Field.of_int i)))
+          in
+          value :: go value (i + 1) m
+    in
+    go Boolean.true_ 0 n
+
   module Pseudo = Pseudo.Make (Impl)
 
-  let mask (type n)
-      ~(lengths : (int, n) Vector.t)
-      (choice : (Boolean.var, n) Vector.t)
-    : Boolean.var array
-    =
-    let max = Option.value_exn (List.max_elt ~compare:Int.compare (Vector.to_list lengths)) in
-    let length = Pseudo.choose (choice, lengths) ~f:Field.of_int in
-    let m = ref Boolean.false_ in
-    let res = Array.init max ~f:(fun _ -> Boolean.false_) in
-    for i = 0 to max - 1 do
-      m := Boolean.(!m || Field.equal (Field.of_int i) length) ;
-      res.(i) <- !m
-    done ;
-    res
+  module Split_evaluations = struct
+    let mask (type n) ~(lengths : (int, n) Vector.t)
+        (choice : (Boolean.var, n) Vector.t) : Boolean.var array =
+      let max =
+        Option.value_exn
+          (List.max_elt ~compare:Int.compare (Vector.to_list lengths))
+      in
+      let length = Pseudo.choose (choice, lengths) ~f:Field.of_int in
+      let (T max) = Nat.of_int max in
+      Vector.to_array (ones_vector ~first_zero:length max)
 
-  let combine_split_evaluations' s =
-    Pcs_batch.combine_split_evaluations' s
-      ~mul:(fun (mask_out, x) (y : Field.t) -> 
-          (mask_out, Field.(y * x)))
-      ~mul_and_add:(fun ~acc ~xi (mask_out, fx) ->
-        Field.if_ mask_out
-          ~then_:acc
-          ~else_:Field.(fx + xi * acc) )
-      ~init:(fun (_, fx) -> fx)
+    let combine_split_evaluations' s =
+      Pcs_batch.combine_split_evaluations' s
+        ~mul:(fun (keep, x) (y : Field.t) -> (keep, Field.(y * x)))
+        ~mul_and_add:(fun ~acc ~xi (keep, fx) ->
+          Field.if_ keep ~then_:Field.(fx + (xi * acc)) ~else_:acc )
+        ~init:(fun (_, fx) -> fx)
+        ~shifted_pow:(Pseudo.Degree_bound.shifted_pow ~crs_max_degree)
+  end
+
+  let mask_evals (type n) ~(lengths : (int, n) Vector.t Evals.t)
+      (choice : (Boolean.var, n) Vector.t) (e : Field.t array Evals.t) :
+      (Boolean.var * Field.t) array Evals.t =
+    Evals.map2 lengths e ~f:(fun lengths e ->
+        Array.zip_exn (Split_evaluations.mask ~lengths choice) e )
+
+  let combined_evaluation (type b b_plus_19) b_plus_19 ~xi ~evaluation_point
+      ((without_degree_bound : (_, b_plus_19) Vector.t), with_degree_bound)
+      ~h_minus_1 ~k_minus_1 =
+    let open Field in
+    Pcs_batch.combine_split_evaluations' ~mul
+      ~mul_and_add:(fun ~acc ~xi fx -> fx + (xi * acc))
       ~shifted_pow:(Pseudo.Degree_bound.shifted_pow ~crs_max_degree)
-end
-
-let mask_evals (type n)
-  (lengths : (int, n) Vector.t Evals.t)
-  (choice : (Boolean.var, n) Vector.t)
-  (e : Field.t array Evals.t)
-  : (Boolean.var * Field.t) array Evals.t
-  =
-  Evals.map2 lengths e
-    ~f:(fun lengths e ->
-          Array.zip_exn
-            (Split_evaluations.mask ~lengths choice)
-            e )
-
-let combined_evaluation (type b b_plus_19) b_plus_19 ~xi
-    ~evaluation_point
-    ((without_degree_bound : (_, b_plus_19) Vector.t), with_degree_bound)
-    ~h_minus_1 ~k_minus_1
-  =
-  Split_evaluations.combine_split_evaluations'
-    (Common.dlog_pcs_batch b_plus_19 ~h_minus_1 ~k_minus_1)
-    ~evaluation_point ~xi
-    without_degree_bound with_degree_bound
+      ~init:Fn.id ~evaluation_point ~xi
+      (Common.dlog_pcs_batch b_plus_19 ~h_minus_1 ~k_minus_1)
+      without_degree_bound with_degree_bound
 
   let sum' xs f = List.reduce_exn (List.map xs ~f) ~f:Fq.( + )
 
@@ -486,49 +508,36 @@ let combined_evaluation (type b b_plus_19) b_plus_19 ~xi
 
   let b_poly = Fq.(b_poly ~add ~mul ~inv)
 
-  let ones_vector : type n.
-      first_zero:Field.t -> n Nat.t -> (Boolean.var, n) Vector.t =
-   fun ~first_zero n ->
-    let rec go : type m.
-        Boolean.var -> int -> m Nat.t -> (Boolean.var, m) Vector.t =
-     fun value i m ->
-      match m with
-      | Z ->
-          []
-      | S m ->
-          let value =
-            Boolean.(
-              value && Boolean.not (Field.equal first_zero (Field.of_int i)))
-          in
-          value :: go value (i + 1) m
-    in
-    go Boolean.true_ 0 n
-
   let pack_scalar_challenge (Pickles_types.Scalar_challenge.Scalar_challenge t)
       =
     Field.pack (Challenge.to_bits t)
 
-  let actual_evaluation 
-      (e : Field.t array) (pt : Field.t) : Field.t =
+  let actual_evaluation (e : Field.t array) (pt : Field.t) : Field.t =
     let pt_n =
-      let max_degree_log2 = failwith "TODO" in
+      let max_degree_log2 = Int.ceil_log2 crs_max_degree in
       let rec go acc i =
-        if i = 0
-        then acc
-        else go Field.(acc * acc) (i - 1)
+        if i = 0 then acc else go (Field.square acc) (i - 1)
       in
       go pt max_degree_log2
     in
     match List.rev (Array.to_list e) with
     | e :: es ->
-      List.fold ~init:e es ~f:(fun acc y -> Field.(y + pt_n * acc))
-    | [] -> failwith "empty list"
+        List.fold ~init:e es ~f:(fun acc y -> Field.(y + (pt_n * acc)))
+    | [] ->
+        failwith "empty list"
+
+  (*
+    let open Field in
+    Array.fold e ~init:(zero, one)
+      ~f:(fun (acc, s) (b, x) ->
+          (acc + s * ((b :> t) * x), s * pt_n) )
+    |> fst
+*)
 
   let finalize_other_proof (type b)
-      (module Branching : Nat.Add.Intf with type n = b)
-      ?actual_branching
-      ~domain_h ~domain_k ~input_domain ~h_minus_1 ~k_minus_1
-      ~sponge ~(old_bulletproof_challenges : (_, b) Vector.t)
+      (module Branching : Nat.Add.Intf with type n = b) ?actual_branching
+      ~domain_h ~domain_k ~input_domain ~h_minus_1 ~k_minus_1 ~sponge
+      ~(old_bulletproof_challenges : (_, b) Vector.t)
       ({xi; r; combined_inner_product; bulletproof_challenges; b; marlin} :
         _ Types.Pairing_based.Proof_state.Deferred_values.t)
       ((beta_1_evals, x_hat1), (beta_2_evals, x_hat2), (beta_3_evals, x_hat3))
@@ -536,13 +545,6 @@ let combined_evaluation (type b b_plus_19) b_plus_19 ~xi
     let T = Branching.eq in
     let open Vector in
     (* You use the NEW bulletproof challenges to check b. Not the old ones. *)
-    (* As a proof size optimization, we can probably rig each polynomial
-       to vanish on the previous challenges.
-    
-       Like instead of the deg n polynomial f(x), the degree (n + 1) polynomial with 
-       f_tilde(h) = f(h), for each h in h 
-       f_tilde(beta_1) = 0
-    *)
     let open Fq in
     let absorb_evals x_hat e =
       let xs, ys = Evals.to_vectors e in
@@ -578,24 +580,23 @@ let combined_evaluation (type b b_plus_19) b_plus_19 ~xi
         in
         let combine pt x_hat e =
           let pi = Branching.add Nat.N19.n in
-          let a, b = Evals.to_vectors (e : Fq.t array Evals.t)  in
+          let a, b = Evals.to_vectors (e : Fq.t array Evals.t) in
           let sg_evals =
             match actual_branching with
             | None ->
-              Vector.map sg_olds ~f:(fun f -> [|f pt|])
+                Vector.map sg_olds ~f:(fun f -> [|f pt|])
             | Some branching ->
                 let mask =
                   ones_vector ~first_zero:branching (Vector.length sg_olds)
                 in
-                Vector.map2 mask sg_olds ~f:(fun b f -> [|(b :> Field.t) * f pt|])
+                Vector.map2 mask sg_olds ~f:(fun b f ->
+                    [|Field.((b :> t) * f pt)|] )
           in
           let v = Vector.append sg_evals ([|x_hat|] :: a) (snd pi) in
-          combined_evaluation pi ~xi ~evaluation_point:pt 
-            (v, b)
-            ~h_minus_1 ~k_minus_1
+          combined_evaluation pi ~xi ~evaluation_point:pt (v, b) ~h_minus_1
+            ~k_minus_1
         in
-        combine 
-          marlin.beta_1 x_hat1 beta_1_evals
+        combine marlin.beta_1 x_hat1 beta_1_evals
         + r
           * ( combine marlin.beta_2 x_hat2 beta_2_evals
             + (r * combine marlin.beta_3 x_hat3 beta_3_evals) )
@@ -617,26 +618,20 @@ let combined_evaluation (type b b_plus_19) b_plus_19 ~xi
       let e = actual_evaluation in
       Marlin_checks.checked
         (module Impl)
-        ~input_domain ~domain_h ~domain_k ~x_hat_beta_1:x_hat1
-        marlin
+        ~input_domain ~domain_h ~domain_k ~x_hat_beta_1:x_hat1 marlin
         { w_hat= e beta_1_evals.w_hat marlin.beta_1
         ; g_1= e beta_1_evals.g_1 marlin.beta_1
         ; h_1= e beta_1_evals.h_1 marlin.beta_1
         ; z_hat_a= e beta_1_evals.z_hat_a marlin.beta_1
         ; z_hat_b= e beta_1_evals.z_hat_b marlin.beta_1
-        ; g_2=e beta_2_evals.g_2 marlin.beta_2
-        ; h_2=e beta_2_evals.h_2 marlin.beta_2
-        ; g_3=e beta_3_evals.g_3 marlin.beta_3
-        ; h_3=e beta_3_evals.h_3 marlin.beta_3
-        ; row=
-            Abc.map beta_3_evals.row ~f:(Fn.flip e marlin.beta_3)
-        ; col=
-            Abc.map beta_3_evals.col ~f:(Fn.flip e marlin.beta_3)
-        ; value =
-            Abc.map beta_3_evals.value ~f:(Fn.flip e marlin.beta_3)
-        ; rc=
-            Abc.map beta_3_evals.rc ~f:(Fn.flip e marlin.beta_3)
-        }
+        ; g_2= e beta_2_evals.g_2 marlin.beta_2
+        ; h_2= e beta_2_evals.h_2 marlin.beta_2
+        ; g_3= e beta_3_evals.g_3 marlin.beta_3
+        ; h_3= e beta_3_evals.h_3 marlin.beta_3
+        ; row= Abc.map beta_3_evals.row ~f:(Fn.flip e marlin.beta_3)
+        ; col= Abc.map beta_3_evals.col ~f:(Fn.flip e marlin.beta_3)
+        ; value= Abc.map beta_3_evals.value ~f:(Fn.flip e marlin.beta_3)
+        ; rc= Abc.map beta_3_evals.rc ~f:(Fn.flip e marlin.beta_3) }
     in
     print_bool "xi_and_r_correct" xi_and_r_correct ;
     print_bool "combined_inner_product_correct" combined_inner_product_correct ;

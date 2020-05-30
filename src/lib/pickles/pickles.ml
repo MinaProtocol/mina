@@ -29,32 +29,38 @@ module Ro = struct
   let scalar_chal () = Scalar_challenge.Scalar_challenge (chal ())
 end
 
+module Instant = struct
+  let now () = Time.now ()
+
+  let elapsed start = Time.diff (Time.now ()) start
+end
+
 module Timer = struct
   let l = ref ""
 
   let r = ref (Time.now ())
 
-  let start loc =
+  let start =
     Common.when_profiling
-      (fun () ->
+      (fun loc ->
         r := Time.now () ;
         l := loc )
-      ignore ()
+      ignore
 
-  let clock loc =
+  let clock =
     Common.when_profiling
-      (fun () ->
+      (fun loc ->
         let t = Time.now () in
         Core.printf "%s -> %s: %s\n%!" !l loc
           (Time.Span.to_string_hum (Time.diff t !r)) ;
         r := t ;
         l := loc )
-      ignore ()
+      ignore
 end
 
 (* Making this dynamic was a bit complicated. *)
 let permitted_domains =
-  [ Domain.Pow_2_roots_of_unity 13
+  [ Domain.Pow_2_roots_of_unity 14
   ; Pow_2_roots_of_unity 16
   ; Pow_2_roots_of_unity 17
   ; Pow_2_roots_of_unity 18
@@ -104,15 +110,15 @@ let compute_challenges chals =
 let compute_sg chals =
   let open Snarky_bn382.Fq_poly_comm in
   let comm =
-  Snarky_bn382.Fq_urs.b_poly_commitment
-    (Snarky_bn382_backend.Dlog_based.Keypair.load_urs ())
-    (Fq.Vector.of_array (Vector.to_array (compute_challenges chals)))
+    Snarky_bn382.Fq_urs.b_poly_commitment
+      (Snarky_bn382_backend.Dlog_based.Keypair.load_urs ())
+      (Fq.Vector.of_array (Vector.to_array (compute_challenges chals)))
   in
   Snarky_bn382.G.Affine.Vector.get (unshifted comm) 0
   |> Snarky_bn382_backend.G.Affine.of_backend
 
 (* We hardcode the number of rounds in the discrete log based proof. *)
-module Wrap_circuit_bulletproof_rounds = Nat.N20
+module Wrap_circuit_bulletproof_rounds = Snarky_bn382_backend.Dlog_based.Rounds
 module Nvector = Vector.With_length
 module Bp_vec = Nvector (Wrap_circuit_bulletproof_rounds)
 
@@ -123,7 +129,6 @@ let crs_max_degree =
 
 module Pmain = Pairing_main.Make (struct
   include Pairing_main_inputs
-  let crs_max_degree = crs_max_degree
   module Branching_pred = Nat.N0
 end)
 
@@ -136,6 +141,36 @@ module Dmain = Dlog_main.Make (struct
   module Branching_pred = Nat.N0
 end)
 
+(* TODO: Set to real values *)
+let wrap_domains =
+  { Domains.h= Pow_2_roots_of_unity 18
+  ; k= Pow_2_roots_of_unity 18
+  ; x= Pow_2_roots_of_unity 0 }
+
+let commitment_lengths' map ~h ~k : _ Dlog_marlin_types.Evals.t =
+  let index : _ Abc.t = {a= k; b= k; c= k} in
+  Dlog_marlin_types.Evals.map
+    ~f:(fun v ->
+      map v ~f:(fun x ->
+          Int.round_up x ~to_multiple_of:crs_max_degree / crs_max_degree ) )
+    { w_hat= h
+    ; z_hat_a= h
+    ; z_hat_b= h
+    ; h_1= map h ~f:(( * ) 2)
+    ; h_2= h
+    ; h_3= map k ~f:(fun k -> (3 * k) - 3)
+    ; row= index
+    ; col= index
+    ; value= index
+    ; rc= index
+    ; g_1= h
+    ; g_2= h
+    ; g_3= k }
+
+let commitment_lengths {Domains.h; k} : int Dlog_marlin_types.Evals.t =
+  let h, k = Domain.(size h, size k) in
+  commitment_lengths' (fun x ~f -> f x) ~h ~k
+
 module Dlog_proof = struct
   type t = dlog_opening * (g, fq) Pickles_types.Dlog_marlin_types.Messages.t
 
@@ -146,15 +181,15 @@ module Dlog_proof = struct
       Pickles_types.Dlog_marlin_types.Messages.t
 
   open Impls.Pairing_based
+
   let typ : (var, t) Typ.t =
-      (Typ.tuple2
-         (Types.Pairing_based.Openings.Bulletproof.typ ~length:(Nat.to_int Wrap_circuit_bulletproof_rounds.n) Fq.typ G.typ)
-         (Pickles_types.Dlog_marlin_types.Messages.typ 
-            ~commitment_lengths:(assert false)
-            Fq.typ
-            G.typ 
-         )
-      )
+    Typ.tuple2
+      (Types.Pairing_based.Openings.Bulletproof.typ
+         ~length:(Nat.to_int Wrap_circuit_bulletproof_rounds.n)
+         Fq.typ G.typ)
+      (Pickles_types.Dlog_marlin_types.Messages.typ
+         ~commitment_lengths:(commitment_lengths wrap_domains)
+         Fq.typ G.typ)
 end
 
 module Challenges_vector = struct
@@ -286,7 +321,8 @@ module Requests = struct
 
       type _ t +=
         | Evals :
-            ( (Field.Constant.t array Dlog_marlin_types.Evals.t * Field.Constant.t)
+            ( ( Field.Constant.t array Dlog_marlin_types.Evals.t
+              * Field.Constant.t )
               Tuple_lib.Triple.t
             , max_branching )
             Vector.t
@@ -339,7 +375,8 @@ module Requests = struct
 
         type _ t +=
           | Evals :
-              (fq array Dlog_marlin_types.Evals.t * fq) Tuple_lib.Triple.t vec t
+              (fq array Dlog_marlin_types.Evals.t * fq) Tuple_lib.Triple.t vec
+              t
           | Index : int t
           | Pairing_accs :
               (g1, g1 Int.Map.t) Pairing_marlin_types.Accumulator.t vec t
@@ -391,7 +428,7 @@ module Requests = struct
         | Me_only :
             ( g
             , statement
-            , (g , max_branching) Vector.t )
+            , (g, max_branching) Vector.t )
             Types.Pairing_based.Proof_state.Me_only.t
             t
     end
@@ -427,7 +464,7 @@ module Requests = struct
           | Me_only :
               ( g
               , statement
-              , (g , max_branching) Vector.t )
+              , (g, max_branching) Vector.t )
               Types.Pairing_based.Proof_state.Me_only.t
               t
       end in
@@ -507,6 +544,9 @@ end
 module B = Inductive_rule.B
 
 module Dummy = struct
+  (* TODO: Set to real values *)
+  let wrap_domains = wrap_domains
+
   let pairing_acc =
     lazy
       (Common.time "dummy pairing acc" (fun () ->
@@ -555,40 +595,15 @@ module Dummy = struct
 
   let evals =
     let e =
-      Dlog_marlin_types.Evals.of_vectors
-        ( Vector.init Nat.N18.n ~f:(fun _ -> Fq.one)
-        , Vector.init Nat.N3.n ~f:(fun _ -> Fq.one) )
+      Dlog_marlin_types.Evals.map (commitment_lengths wrap_domains)
+        ~f:(fun len -> Array.create ~len Fq.one)
     in
     let ex = (e, Fq.zero) in
     (ex, ex, ex)
 end
 
-let index_commitment_length k_size =
-  crs_max_degree / Domain.size k_size
-
-let commitment_lengths {Domains.h; k} : int Dlog_marlin_types.Evals.t =
-  let h, k = Domain.(size h, size k) in
-  let index : int Abc.t =
-    { a= k; b=k; c= k }
-  in
-  Dlog_marlin_types.Evals.map
-    ~f:(fun x ->
-        Int.round_up x ~to_multiple_of:crs_max_degree
-          / crs_max_degree )
-    { w_hat= h
-    ; z_hat_a= h
-    ; z_hat_b= h
-    ; h_1= h
-    ; h_2= h
-    ; h_3= (3*k - 3)
-    ; row= index
-    ; col= index
-    ; value= index
-    ; rc= index
-    ; g_1=h
-    ; g_2=h
-    ; g_3=k
-    }
+let index_commitment_length k =
+  Int.round_up ~to_multiple_of:crs_max_degree (Domain.size k) / crs_max_degree
 
 (* The SNARK function corresponding to the input inductive rule. *)
 let step_main
@@ -691,186 +706,198 @@ let step_main
   let main (stmt : _ Types.Pairing_based.Statement.t) =
     let open Requests.Step in
     let open Impls.Pairing_based in
-    let module Prev_statement = struct
-      open Impls.Pairing_based
+    with_label "testing-testing" (fun () ->
+        let module Prev_statement = struct
+          open Impls.Pairing_based
 
-      type 'a t =
-        ( Challenge.t
-        , Challenge.t Scalar_challenge.t
-        , Fp.t
-        , Boolean.var
-        , unit
-        , Digest.t
-        , Digest.t )
-        Types.Dlog_based.Proof_state.t
-        * 'a
-    end in
-    let T = Max_branching.eq in
-    let me_only =
-      exists
-        ~request:(fun () -> Req.Me_only)
-        (Types.Pairing_based.Proof_state.Me_only.typ
-           (Typ.array G.typ ~length:(
-               index_commitment_length
-                 basic.wrap_domains.k
-             ))
-           G.typ
-           basic.typ
-           Max_branching.n)
-    in
-    let datas =
-      let self_data :
-          ( a_var
-          , a_value
-          , max_branching
-          , self_branches )
-          Types_map.Data.For_step.t =
-        { branches= self_branches
-        ; max_branching= (module Max_branching)
-        ; typ= basic.typ
-        ; a_var_to_field_elements= basic.a_var_to_field_elements
-        ; a_value_to_field_elements= basic.a_value_to_field_elements
-        ; wrap_domains= basic.wrap_domains
-        ; step_domains= basic.step_domains
-        ; wrap_key= me_only.dlog_marlin_index }
-      in
-      let module M =
-        H4.Map (Tag) (Types_map.Data.For_step)
-          (struct
-            let f : type a b n m.
-                (a, b, n, m) Tag.t -> (a, b, n, m) Types_map.Data.For_step.t =
-             fun tag ->
-              match Type_equal.Id.same_witness self tag with
-              | Some T ->
-                  self_data
-              | None ->
-                  Types_map.Data.For_step.create (Types_map.lookup tag)
-          end)
-      in
-      M.f rule.prevs
-    in
-    let prevs =
-      exists (Prev_typ.f prev_typs) ~request:(fun () -> Req.Proof_with_datas)
-    in
-    let unfinalized_proofs =
-      let module H = H1.Of_vector (Unfinalized) in
-      H.f branching (Vector.trim stmt.proof_state.unfinalized_proofs lte)
-    in
-    let module Packed_digest = Field in
-    let prev_statements =
-      let module M =
-        H3.Map1_to_H1 (Per_proof_witness) (Id)
-          (struct
-            let f : type a b c. (a, b, c) Per_proof_witness.t -> a =
-             fun (x, _, _, _, _, _) -> x
-          end)
-      in
-      M.f prevs
-    in
-    let proofs_should_verify = rule.main prev_statements me_only.app_state in
-    let module Proof = struct
-      type t = Dlog_proof.var
-    end in
-    let open Pairing_main_inputs in
-    let open Pmain in
-    let pass_throughs =
-      let module V = H1.Of_vector (Digest) in
-      V.f branching
-        (Vector.map
-           (Vector.trim stmt.pass_through lte)
-           ~f:(Field.unpack ~length:Digest.length))
-    in
-    let _prevs_verified =
-      let rec go : type vars vals ns1 ns2.
-             (vars, ns1, ns2) H3.T(Per_proof_witness).t
-          -> (vars, vals, ns1, ns2) H4.T(Types_map.Data.For_step).t
-          -> vars H1.T(E01(Digest)).t
-          -> vars H1.T(E01(Unfinalized)).t
-          -> vars H1.T(E01(B)).t
-          -> B.t list =
-       fun proofs datas pass_throughs unfinalizeds should_verifys ->
-        match (proofs, datas, pass_throughs, unfinalizeds, should_verifys) with
-        | [], [], [], [], [] ->
-            []
-        | ( p :: proofs
-          , d :: datas
-          , pass_through :: pass_throughs
-          , (unfinalized, b) :: unfinalizeds
-          , should_verify :: should_verifys ) ->
-            Boolean.Assert.(b = should_verify) ;
-            let ( app_state
-                , which_index
-                , state
-                , prev_evals
-                , sg_old
-                , (opening, messages) ) =
-              p
-            in
-            let finalized =
-              let sponge_digest =
-                Fp.pack state.sponge_digest_before_evaluations
-              in
-              let sponge =
-                let open Pairing_main_inputs in
-                let sponge = Sponge.create sponge_params in
-                Sponge.absorb sponge (`Field sponge_digest) ;
-                sponge
-              in
-              let [domain_h; domain_k; input_domain] =
-                Vector.map
-                  Domains.[h; k; x]
-                  ~f:(fun f ->
-                    Pseudo.Domain.to_domain
-                      (which_index, Vector.map d.step_domains ~f) )
-              in
-              Pmain.finalize_other_proof ~input_domain ~domain_k ~domain_h
-                ~sponge state.deferred_values prev_evals
-            in
-            (* TODO Use a pseudo sg old which masks out the extraneous sgs
+          type 'a t =
+            ( Challenge.t
+            , Challenge.t Scalar_challenge.t
+            , Fp.t
+            , Boolean.var
+            , unit
+            , Digest.t
+            , Digest.t )
+            Types.Dlog_based.Proof_state.t
+            * 'a
+        end in
+        let T = Max_branching.eq in
+        let me_only =
+          with_label "me_only" (fun () ->
+              exists
+                ~request:(fun () -> Req.Me_only)
+                (Types.Pairing_based.Proof_state.Me_only.typ
+                   (Typ.array G.typ
+                      ~length:(index_commitment_length basic.wrap_domains.k))
+                   G.typ basic.typ Max_branching.n) )
+        in
+        let datas =
+          let self_data :
+              ( a_var
+              , a_value
+              , max_branching
+              , self_branches )
+              Types_map.Data.For_step.t =
+            { branches= self_branches
+            ; max_branching= (module Max_branching)
+            ; typ= basic.typ
+            ; a_var_to_field_elements= basic.a_var_to_field_elements
+            ; a_value_to_field_elements= basic.a_value_to_field_elements
+            ; wrap_domains= basic.wrap_domains
+            ; step_domains= basic.step_domains
+            ; wrap_key= me_only.dlog_marlin_index }
+          in
+          let module M =
+            H4.Map (Tag) (Types_map.Data.For_step)
+              (struct
+                let f : type a b n m.
+                       (a, b, n, m) Tag.t
+                    -> (a, b, n, m) Types_map.Data.For_step.t =
+                 fun tag ->
+                  match Type_equal.Id.same_witness self tag with
+                  | Some T ->
+                      self_data
+                  | None ->
+                      Types_map.Data.For_step.create (Types_map.lookup tag)
+              end)
+          in
+          M.f rule.prevs
+        in
+        let prevs =
+          exists (Prev_typ.f prev_typs) ~request:(fun () ->
+              Req.Proof_with_datas )
+        in
+        let unfinalized_proofs =
+          let module H = H1.Of_vector (Unfinalized) in
+          H.f branching (Vector.trim stmt.proof_state.unfinalized_proofs lte)
+        in
+        let module Packed_digest = Field in
+        let prev_statements =
+          let module M =
+            H3.Map1_to_H1 (Per_proof_witness) (Id)
+              (struct
+                let f : type a b c. (a, b, c) Per_proof_witness.t -> a =
+                 fun (x, _, _, _, _, _) -> x
+              end)
+          in
+          M.f prevs
+        in
+        let proofs_should_verify =
+          with_label "rule_main" (fun () ->
+              rule.main prev_statements me_only.app_state )
+        in
+        let module Proof = struct
+          type t = Dlog_proof.var
+        end in
+        let open Pairing_main_inputs in
+        let open Pmain in
+        let pass_throughs =
+          with_label "pass_throughs" (fun () ->
+              let module V = H1.Of_vector (Digest) in
+              V.f branching
+                (Vector.map
+                   (Vector.trim stmt.pass_through lte)
+                   ~f:(Field.unpack ~length:Digest.length)) )
+        in
+        let _prevs_verified =
+          with_label "prevs_verified" (fun () ->
+              let rec go : type vars vals ns1 ns2.
+                     (vars, ns1, ns2) H3.T(Per_proof_witness).t
+                  -> (vars, vals, ns1, ns2) H4.T(Types_map.Data.For_step).t
+                  -> vars H1.T(E01(Digest)).t
+                  -> vars H1.T(E01(Unfinalized)).t
+                  -> vars H1.T(E01(B)).t
+                  -> B.t list =
+               fun proofs datas pass_throughs unfinalizeds should_verifys ->
+                match
+                  (proofs, datas, pass_throughs, unfinalizeds, should_verifys)
+                with
+                | [], [], [], [], [] ->
+                    []
+                | ( p :: proofs
+                  , d :: datas
+                  , pass_through :: pass_throughs
+                  , (unfinalized, b) :: unfinalizeds
+                  , should_verify :: should_verifys ) ->
+                    Boolean.Assert.(b = should_verify) ;
+                    let ( app_state
+                        , which_index
+                        , state
+                        , prev_evals
+                        , sg_old
+                        , (opening, messages) ) =
+                      p
+                    in
+                    let finalized =
+                      let sponge_digest =
+                        Fp.pack state.sponge_digest_before_evaluations
+                      in
+                      let sponge =
+                        let open Pairing_main_inputs in
+                        let sponge = Sponge.create sponge_params in
+                        Sponge.absorb sponge (`Field sponge_digest) ;
+                        sponge
+                      in
+                      let [domain_h; domain_k; input_domain] =
+                        Vector.map
+                          Domains.[h; k; x]
+                          ~f:(fun f ->
+                            Pseudo.Domain.to_domain
+                              (which_index, Vector.map d.step_domains ~f) )
+                      in
+                      Pmain.finalize_other_proof ~input_domain ~domain_k
+                        ~domain_h ~sponge state.deferred_values prev_evals
+                    in
+                    (* TODO Use a pseudo sg old which masks out the extraneous sgs
                  for the index of this internal proof... *)
-            let statement =
-              let prev_me_only =
-                (* TODO: Don't rehash when it's not necessary *)
-                unstage
-                  (hash_me_only ~index:d.wrap_key d.a_var_to_field_elements)
-                  {app_state; dlog_marlin_index= d.wrap_key; sg= sg_old}
+                    let statement =
+                      let prev_me_only =
+                        (* TODO: Don't rehash when it's not necessary *)
+                        unstage
+                          (hash_me_only ~index:d.wrap_key
+                             d.a_var_to_field_elements)
+                          {app_state; dlog_marlin_index= d.wrap_key; sg= sg_old}
+                      in
+                      { Types.Dlog_based.Statement.pass_through= prev_me_only
+                      ; proof_state= {state with me_only= pass_through} }
+                    in
+                    let verified =
+                      Pmain.verify ~branching:d.max_branching
+                        ~wrap_domains:(d.wrap_domains.h, d.wrap_domains.k)
+                        ~is_base_case:should_verify ~sg_old ~opening ~messages
+                        ~wrap_verification_key:d.wrap_key statement unfinalized
+                    in
+                    if debug then
+                      as_prover
+                        As_prover.(
+                          fun () ->
+                            let finalized = read Boolean.typ finalized in
+                            let verified = read Boolean.typ verified in
+                            let should_verify =
+                              read Boolean.typ should_verify
+                            in
+                            printf "finalized: %b\n%!" finalized ;
+                            printf "verified: %b\n%!" verified ;
+                            printf "should_verify: %b\n\n%!" should_verify) ;
+                    Boolean.((verified && finalized) || not should_verify)
+                    :: go proofs datas pass_throughs unfinalizeds
+                         should_verifys
               in
-              { Types.Dlog_based.Statement.pass_through= prev_me_only
-              ; proof_state= {state with me_only= pass_through} }
-            in
-            let verified =
-              Pmain.verify ~branching:d.max_branching
-                ~wrap_domains:(d.wrap_domains.h, d.wrap_domains.k)
-                ~is_base_case:should_verify ~sg_old ~opening ~messages
-                ~wrap_verification_key:d.wrap_key statement unfinalized
-            in
-            if debug then
-              as_prover
-                As_prover.(
-                  fun () ->
-                    let finalized = read Boolean.typ finalized in
-                    let verified = read Boolean.typ verified in
-                    let should_verify = read Boolean.typ should_verify in
-                    printf "finalized: %b\n%!" finalized ;
-                    printf "verified: %b\n%!" verified ;
-                    printf "should_verify: %b\n\n%!" should_verify) ;
-            Boolean.((verified && finalized) || not should_verify)
-            :: go proofs datas pass_throughs unfinalizeds should_verifys
-      in
-      Boolean.Assert.all
-        (go prevs datas pass_throughs unfinalized_proofs proofs_should_verify)
-    in
-    let () =
-      let hash_me_only =
-        unstage
-          (Pmain.hash_me_only ~index:me_only.dlog_marlin_index
-             basic.a_var_to_field_elements)
-      in
-      Field.Assert.equal stmt.proof_state.me_only
-        (Field.pack (hash_me_only
-                       me_only))
-    in
-    ()
+              Boolean.Assert.all
+                (go prevs datas pass_throughs unfinalized_proofs
+                   proofs_should_verify) )
+        in
+        let () =
+          with_label "hash_me_only" (fun () ->
+              let hash_me_only =
+                unstage
+                  (Pmain.hash_me_only ~index:me_only.dlog_marlin_index
+                     basic.a_var_to_field_elements)
+              in
+              Field.Assert.equal stmt.proof_state.me_only
+                (Field.pack (hash_me_only me_only)) )
+        in
+        () )
   in
   stage main
 
@@ -903,7 +930,6 @@ let pad_local_max_branchings
   in
   let module V = H2_1.To_vector (Vec) in
   V.f length (M.f local_max_branchings)
-
 
 module Pseudo_dlog = Pseudo.Make (Impls.Dlog_based)
 module Pseudo_pairing = Pseudo.Make (Impls.Pairing_based)
@@ -963,32 +989,6 @@ module Split_evaluations = struct
       ~scale:G_with_id.scale
       ~add:G_with_id.add
   *)
-
-  let mask (type n)
-      ~(lengths : (int, n) Vector.t)
-      (choice : (Boolean.var, n) Vector.t)
-    : Boolean.var array
-    =
-    let max = Option.value_exn (List.max_elt ~compare:Int.compare (Vector.to_list lengths)) in
-    let length = Pseudo.choose (choice, lengths) ~f:Field.of_int in
-    let m = ref Boolean.false_ in
-    let res = Array.init max ~f:(fun _ -> Boolean.false_) in
-    for i = 0 to max - 1 do
-      m := Boolean.(!m || Field.equal (Field.of_int i) length) ;
-      res.(i) <- !m
-    done ;
-    res
-
-  let combine_split_evaluations' s =
-    Pcs_batch.combine_split_evaluations' s
-      ~mul:(fun (mask_out, x) (y : Field.t) -> 
-          (mask_out, Field.(y * x)))
-      ~mul_and_add:(fun ~acc ~xi (mask_out, fx) ->
-        Field.if_ mask_out
-          ~then_:acc
-          ~else_:Field.(fx + xi * acc) )
-      ~init:(fun (_, fx) -> fx)
-      ~shifted_pow:(Pseudo.Degree_bound.shifted_pow ~crs_max_degree)
 end
 
 (* The SNARK function for wrapping any proof coming from the given set of keys *)
@@ -1005,6 +1005,29 @@ let wrap_main
       (prev_varss, prev_valuess, _, _) H4.T(H4.T(E04(Domains))).t)
     (module Max_branching : Nat.Add.Intf with type n = max_branching) :
     (max_branching, max_local_max_branchings) Requests.Wrap.t * 'a =
+  let wrap_domains =
+    let r = ref None in
+    (* Assume all wraps have the same domain sizes *)
+    let module I =
+      H4.Iter
+        (H4.T
+           (E04
+              (Domains)))
+              (H4.Iter
+                 (E04
+                    (Domains))
+                    (struct
+                      let f (d : Domains.t) =
+                        match !r with
+                        | None ->
+                            r := Some d
+                        | Some d' ->
+                            assert (Domain.equal d.h d'.h) ;
+                            assert (Domain.equal d.k d'.k)
+                    end))
+    in
+    I.f prev_wrap_domains ; Option.value_exn !r
+  in
   let module Pseudo = Pseudo_dlog in
   let T = Max_branching.eq in
   let branches = Hlist.Length.to_nat pi_branches in
@@ -1101,7 +1124,7 @@ let wrap_main
         let module M =
           H4.Map
             (H4.T
-                (E04
+               (E04
                   (Domains)))
                   (E04 (Ds))
                   (struct
@@ -1109,7 +1132,7 @@ let wrap_main
 
                     let f : type a b c d.
                         (a, b, c, d) H4.T(E04(Domains)).t -> Ds.t =
-                      fun domains ->
+                     fun domains ->
                       let (T (len, pi)) = H.length domains in
                       let module V = H4.To_vector (Domains) in
                       Vector.extend_exn (V.f pi domains) Max_branching.n
@@ -1124,44 +1147,25 @@ let wrap_main
       in
       Vector.transpose ds
     in
+    let eval_lengths =
+      Vector.map domainses ~f:(fun v ->
+          commitment_lengths' Vector.map
+            ~h:(Vector.map v ~f:(fun {h; _} -> Domain.size h))
+            ~k:(Vector.map v ~f:(fun {k; _} -> Domain.size k)) )
+    in
     let new_bulletproof_challenges =
       let evals =
         let ty =
-          let tys =
-            Vector.map domainses ~f:(fun ds ->
-                let (h, k) =
-                  Vector.fold ds ~init:(0, 0) ~f:(fun (h, k) t ->
-                    (Int.max h (Domain.log2_size t.h),
-                     Int.max h (Domain.log2_size t.k)) )
-                in
-                let lengths = commitment_lengths
-                    { h=Pow_2_roots_of_unity h
-                    ; k=Pow_2_roots_of_unity k 
-                    ; x= Pow_2_roots_of_unity 0
-                    } 
-                in
-                let pad =
-                  Dlog_marlin_types.Evals.map2 lengths ~f:(fun n a ->
-                      let k = Array.length a in
-                      assert (k <= n);
-                      Array.(append a (init (n - k) ~f:(fun _ -> Fq.Constant.zero))))
-                in
-                Dlog_marlin_types.Evals.typ
-                  lengths
-                  Fq.typ 
-                |> Typ.transport ~there:pad ~back:Fn.id
-              )
-          in
           let ty =
             Typ.tuple2
               (Dlog_marlin_types.Evals.typ
-                 (commitment_lengths self_domains)
+                 (commitment_lengths wrap_domains)
                  Fq.typ)
               Fq.typ
           in
-          Typ.tuple3 ty ty ty
+          Vector.typ (Typ.tuple3 ty ty ty) Max_branching.n
         in
-        exists (Vector.typ ty Max_branching.n) ~request:(fun () -> Req.Evals)
+        exists ty ~request:(fun () -> Req.Evals)
       in
       let chals =
         let (wrap_domains : (_, Max_branching.n) Vector.t), hk_minus_1s =
@@ -1188,6 +1192,7 @@ let wrap_main
           ; old_bp_chals
           ; actual_branchings
           ; evals
+          ; eval_lengths
           ; wrap_domains
           ; hk_minus_1s ]
           ~f:(fun [ ( {deferred_values; sponge_digest_before_evaluations}
@@ -1195,6 +1200,7 @@ let wrap_main
                   ; old_bulletproof_challenges
                   ; actual_branching
                   ; evals
+                  ; eval_lengths
                   ; [domain_h; domain_k; input_domain]
                   ; (h_minus_1, k_minus_1) ]
              ->
@@ -1223,10 +1229,9 @@ let wrap_main
             let verified, chals =
               finalize_other_proof
                 (Nat.Add.create max_local_max_branching)
-                ~actual_branching ~h_minus_1 ~k_minus_1
-                ~shifted_pow:(Pseudo.Degree_bound.shifted_pow ~crs_max_degree)
-                ~input_domain ~domain_k ~domain_h ~sponge deferred_values
-                ~old_bulletproof_challenges evals
+                ~actual_branching ~h_minus_1 ~k_minus_1 ~input_domain ~domain_k
+                ~domain_h ~sponge deferred_values ~old_bulletproof_challenges
+                evals
             in
             Boolean.(Assert.any [not should_verify; verified]) ;
             chals )
@@ -1451,12 +1456,22 @@ module Proof_ = struct
   end
 end
 
-let fq_public_input_of_statement prev_statement =
+let vector_of_list (type a t)
+    (module V : Snarky.Vector.S with type elt = a and type t = t) (xs : a list)
+    : t =
+  let r = V.create () in
+  List.iter xs ~f:(V.emplace_back r) ;
+  r
+
+let fq_unpadded_public_input_of_statement prev_statement =
   let input =
     let (T (typ, _conv)) = Impls.Dlog_based.input () in
     Impls.Dlog_based.generate_public_input [typ] prev_statement
   in
-  Fq.one :: List.init (Fq.Vector.length input) ~f:(Fq.Vector.get input)
+  List.init (Fq.Vector.length input) ~f:(Fq.Vector.get input)
+
+let fq_public_input_of_statement s =
+  Fq.one :: fq_unpadded_public_input_of_statement s
 
 let fp_public_input_of_statement ~max_branching
     (prev_statement : _ Statement.Pairing_based.t) =
@@ -1474,7 +1489,6 @@ let crs_max_degree =
 
 let combined_evaluation (proof : Pairing_based.Proof.t) ~r ~xi ~beta_1 ~beta_2
     ~beta_3 ~x_hat_beta_1 =
-  let _ = (proof : _ Pairing_marlin_types.Proof.t).messages in
   let { Pairing_marlin_types.Evals.w_hat
       ; z_hat_a
       ; z_hat_b
@@ -1733,7 +1747,7 @@ let wrap (type max_branching max_local_max_branchings) max_branching
       , _
       , _
       , max_local_max_branchings H1.T(Proof_.Me_only.Dlog_based).t
-      , ( (Fq.t Dlog_marlin_types.Evals.t * Fq.t) Triple.t
+      , ( (Fq.t array Dlog_marlin_types.Evals.t * Fq.t) Triple.t
         , max_branching )
         Vector.t )
       Proof_.Pairing_based.t) =
@@ -1818,7 +1832,9 @@ let wrap (type max_branching max_local_max_branchings) max_branching
   let public_input =
     fp_public_input_of_statement ~max_branching prev_statement_with_hashes
   in
-  let o = O.create pairing_vk public_input proof in
+  let o =
+    O.create pairing_vk (vector_of_list (module Fp.Vector) public_input) proof
+  in
   let x_hat_beta_1 = O.x_hat_beta1 o in
   let next_statement : _ Statement.Dlog_based.t =
     let scalar_chal f =
@@ -1913,26 +1929,38 @@ let wrap (type max_branching max_local_max_branchings) max_branching
   in
   let next_proof =
     let (T (input, conv)) = Impls.Dlog_based.input () in
+    let module L = Snarky_log.Constraints (Impls.Dlog_based.Internal_Basic) in
+    let cwd = Sys.getcwd () in
+    Snarky_log.to_file
+      Core.(cwd ^/ "wrap.flame-graph")
+      (L.log
+         (Impls.Dlog_based.make_checked (fun () ->
+              let x =
+                Impls.Dlog_based.with_label "input" (fun () ->
+                    Impls.Dlog_based.exists input )
+              in
+              Impls.Pairing_based.with_label "main" (fun () ->
+                  wrap_main (conv x) ) ))) ;
     Common.time "wrap proof" (fun () ->
-      Impls.Dlog_based.prove pk
-        ~message:
-          ( Vector.map2 prev_statement.proof_state.me_only.sg
-              me_only_prepared.old_bulletproof_challenges ~f:(fun sg chals ->
-                { Snarky_bn382_backend.Dlog_based_proof.Challenge_polynomial
-                  .commitment= Array.get sg 0
-                ; challenges= Vector.to_array chals } )
-          |> Vector.to_list )
-        [input]
-        (fun x () ->
-          ( Impls.Dlog_based.handle
-              (fun () -> (wrap_main (conv x) : unit))
-              handler
-            : unit ) )
-        ()
-        { pass_through= prev_statement_with_hashes.proof_state.me_only
-        ; proof_state=
-            { next_statement.proof_state with
-              me_only= Common.hash_dlog_me_only me_only_prepared } } )
+        Impls.Dlog_based.prove pk
+          ~message:
+            ( Vector.map2 prev_statement.proof_state.me_only.sg
+                me_only_prepared.old_bulletproof_challenges ~f:(fun sg chals ->
+                  { Snarky_bn382_backend.Dlog_based_proof.Challenge_polynomial
+                    .commitment= sg
+                  ; challenges= Vector.to_array chals } )
+            |> Vector.to_list )
+          [input]
+          (fun x () ->
+            ( Impls.Dlog_based.handle
+                (fun () -> (wrap_main (conv x) : unit))
+                handler
+              : unit ) )
+          ()
+          { pass_through= prev_statement_with_hashes.proof_state.me_only
+          ; proof_state=
+              { next_statement.proof_state with
+                me_only= Common.hash_dlog_me_only me_only_prepared } } )
   in
   ( { proof= next_proof
     ; index= which_index
@@ -1950,7 +1978,10 @@ module Proof = struct
 
   let dummy (type w h) (w : w Nat.t) (h : h Nat.t) : (w, h) t =
     let open Ro in
-    let g = G.(to_affine_exn one) in
+    let g0 = G.(to_affine_exn one) in
+    let g len = Array.create ~len g0 in
+    let fq len = Array.init len ~f:(fun _ -> fq ()) in
+    let lengths = commitment_lengths Dummy.wrap_domains in
     { statement=
         { proof_state=
             { deferred_values=
@@ -1984,38 +2015,27 @@ module Proof = struct
         }
     ; proof=
         { messages=
-            { w_hat= g
-            ; z_hat_a= g
-            ; z_hat_b= g
-            ; gh_1= ((g, g), g)
-            ; sigma_gh_2= (fq (), ((g, g), g))
-            ; sigma_gh_3= (fq (), ((g, g), g)) }
+            { w_hat= g lengths.w_hat
+            ; z_hat_a= g lengths.z_hat_a
+            ; z_hat_b= g lengths.z_hat_a
+            ; gh_1= ({unshifted= g lengths.g_1; shifted= g0}, g lengths.h_1)
+            ; sigma_gh_2=
+                ( Ro.fq ()
+                , ({unshifted= g lengths.g_2; shifted= g0}, g lengths.h_2) )
+            ; sigma_gh_3=
+                ( Ro.fq ()
+                , ({unshifted= g lengths.g_3; shifted= g0}, g lengths.h_3) ) }
         ; openings=
             { proof=
                 { lr=
                     Array.init (Nat.to_int Wrap_circuit_bulletproof_rounds.n)
-                      ~f:(fun _ -> (g, g))
-                ; z_1= fq ()
-                ; z_2= fq ()
-                ; delta= g
-                ; sg= g }
+                      ~f:(fun _ -> (g0, g0))
+                ; z_1= Ro.fq ()
+                ; z_2= Ro.fq ()
+                ; delta= g0
+                ; sg= g0 }
             ; evals=
-                (let e : _ Dlog_marlin_types.Evals.t =
-                   let abc () = {Abc.a= fq (); b= fq (); c= fq ()} in
-                   { w_hat= fq ()
-                   ; z_hat_a= fq ()
-                   ; z_hat_b= fq ()
-                   ; g_1= fq ()
-                   ; h_1= fq ()
-                   ; g_2= fq ()
-                   ; h_2= fq ()
-                   ; g_3= fq ()
-                   ; h_3= fq ()
-                   ; row= abc ()
-                   ; col= abc ()
-                   ; value= abc ()
-                   ; rc= abc () }
-                 in
+                (let e = Dlog_marlin_types.Evals.map lengths ~f:fq in
                  (e, e, e)) } }
     ; prev_evals=
         (let abc () = {Abc.a= fp (); b= fp (); c= fp ()} in
@@ -2109,7 +2129,7 @@ struct
   let triple_zip (a1, a2, a3) (b1, b2, b3) = ((a1, b1), (a2, b2), (a3, b3))
 
   module E = struct
-    type t = Fq.t Dlog_marlin_types.Evals.t Triple.t
+    type t = Fq.t array Dlog_marlin_types.Evals.t Triple.t
   end
 
   (* The prover corresponding to the given inductive rule. *)
@@ -2224,8 +2244,7 @@ struct
               map2 statement.pass_through.sg
                 (* This should indeed have length max_branching... No! It should have type max_branching_a. That is, the max_branching specific to a proof of this type...*)
                 prev_challenges ~f:(fun commitment chals ->
-                  { Dlog_marlin_types.Challenge_polynomial
-                    .commitment
+                  { Dlog_based_proof.Challenge_polynomial.commitment
                   ; challenges= Vector.to_array chals } )
               |> to_list)
             public_input t.proof
@@ -2266,22 +2285,28 @@ struct
             Vector.map ~f:(Fn.compose b_poly Vector.to_array) prev_challenges
           in
           let open As_field in
-          let combine (x_hat: Snarky_bn382_backend.Fq.t array) pt e =
-            let a, b = Dlog_marlin_types.Evals.to_vectors e in
-            let v =
+          let combine (x_hat : Snarky_bn382_backend.Fq.t) pt e =
+            let a, b = Dlog_marlin_types.Evals.(to_vectors (e : _ array t)) in
+            let v : (Fq.t array, _) Vector.t =
               Vector.append
-                (Vector.map b_polys ~f:(fun f -> f pt))
-                (x_hat :: a)
+                (Vector.map b_polys ~f:(fun f -> [|f pt|]))
+                ([|x_hat|] :: a)
                 (snd (Local_max_branching.add Nat.N19.n))
             in
             let open Fq in
             let domains = data.wrap_domains in
-            Pcs_batch.combine_evaluations
+            Pcs_batch.combine_split_evaluations'
               (Common.dlog_pcs_batch
                  (Local_max_branching.add Nat.N19.n)
                  ~h_minus_1:Int.(Domain.size domains.h - 1)
                  ~k_minus_1:Int.(Domain.size domains.k - 1))
-              ~crs_max_degree ~xi ~mul ~add ~one ~evaluation_point:pt v b
+              ~xi ~init:Fn.id ~mul
+              ~mul_and_add:(fun ~acc ~xi fx -> fx + (xi * acc))
+              ~evaluation_point:pt
+              ~shifted_pow:(fun deg x ->
+                Pcs_batch.pow ~one ~mul ~add x
+                  Int.(crs_max_degree - (deg mod crs_max_degree)) )
+              v b
           in
           let open Fq in
           combine x_hat_1 beta_1 e1
@@ -2471,6 +2496,18 @@ struct
       let {Domains.h; k; x} =
         List.nth_exn (Vector.to_list step_domains) branch_data.index
       in
+      let module L = Snarky_log.Constraints (Impls.Pairing_based.Internal_Basic) in
+      let cwd = Sys.getcwd () in
+      Snarky_log.to_file
+        Core.(cwd ^/ sprintf "step_%d.flame-graph" branch_data.index)
+        (L.log
+           (Impls.Pairing_based.make_checked (fun () ->
+                let x =
+                  Impls.Pairing_based.with_label "input" (fun () ->
+                      Impls.Pairing_based.exists input )
+                in
+                Impls.Pairing_based.with_label "main" (fun () ->
+                    branch_data.main ~step_domains (conv x) ) ))) ;
       ksprintf Common.time "step-prover %d (%d, %d, %d)" branch_data.index
         (Domain.size h) (Domain.size k) (Domain.size x) (fun () ->
           Impls.Pairing_based.prove pk [input]
@@ -2542,7 +2579,8 @@ module Verification_key = struct
 
   module Repr = struct
     type t =
-      { commitments: G.Affine.t Abc.Stable.Latest.t Matrix_evals.Stable.Latest.t
+      { commitments:
+          G.Affine.t array Abc.Stable.Latest.t Matrix_evals.Stable.Latest.t
       ; step_domains: Domains.t array
       ; data: Data.t }
     [@@deriving bin_io]
@@ -2556,7 +2594,9 @@ module Verification_key = struct
 
   let of_repr urs {Repr.commitments= c; step_domains; data= d} =
     let u = Unsigned.Size_t.of_int in
-    let g = Snarky_bn382_backend.G.Affine.to_backend in
+    let g =
+      Snarky_bn382_backend.Fq_poly_comm.without_degree_bound_to_backend
+    in
     let t =
       Snarky_bn382.Fq_verifier_index.make (u d.public_inputs) (u d.variables)
         (u d.constraints) (u d.nonzero_entries) (u d.max_degree) urs
@@ -2582,8 +2622,9 @@ module Verification_key = struct
   include B
 
   let dummy =
+    let lengths = commitment_lengths Dummy.wrap_domains in
     let g = G.(to_affine_exn one) in
-    let e = {Abc.a= g; b= g; c= g} in
+    let e = Abc.map lengths.row ~f:(fun len -> Array.create ~len g) in
     { Repr.commitments= {row= e; col= e; value= e; rc= e}
     ; step_domains= [||]
     ; data=
@@ -2667,20 +2708,33 @@ let verify (type a n) (module Max_branching : Nat.Intf with type n = n)
   let module MLMB_vec = Nvector (Max_local_max_branching) in
   let module Fp = Impls.Pairing_based.Field.Constant in
   let fp : _ Marlin_checks.field = (module Fp) in
-  let finalized =
-    List.for_all ts
+  let check, result =
+    let r = ref [] in
+    let result () =
+      if List.for_all !r ~f:(fun (_lab, b) -> b) then Ok ()
+      else
+        Error
+          (String.concat ~sep:"\n"
+             (List.map !r ~f:(fun (lab, b) -> sprintf "%s: %b" lab b)))
+    in
+    ((fun x -> r := x :: !r), result)
+  in
+  let _finalized =
+    List.iter ts
       ~f:(fun ( app_state
               , { statement
                 ; index
                 ; prev_x_hat_beta_1= x_hat_beta_1
                 ; prev_evals= evals } )
          ->
+        Timer.start __LOC__ ;
         let statement =
           {statement with pass_through= {statement.pass_through with app_state}}
         in
         let open Pairing_marlin_types in
         let open Types.Dlog_based.Proof_state in
         let sc = SC.to_field_constant (module Fp) ~endo:Endo.Pairing.scalar in
+        Timer.clock __LOC__ ;
         let {Deferred_values.xi; r; marlin; r_xi_sum} =
           Deferred_values.map_challenges ~f:Challenge.Constant.to_fp ~scalar:sc
             statement.proof_state.deferred_values
@@ -2692,6 +2746,7 @@ let verify (type a n) (module Max_branching : Nat.Intf with type n = n)
             ~input_domain:(domain fp domains.x) ~domain_h:(domain fp domains.h)
             ~domain_k:(domain fp domains.k)
         in
+        Timer.clock __LOC__ ;
         let absorb, squeeze =
           let open Fp_sponge.Bits in
           let sponge =
@@ -2713,7 +2768,9 @@ let verify (type a n) (module Max_branching : Nat.Intf with type n = n)
         Vector.iter ~f:absorb (Evals.to_vector evals) ;
         let xi_actual = squeeze () in
         let r_actual = squeeze () in
+        Timer.clock __LOC__ ;
         let e1, e2, e3 = Evals.to_combined_vectors ~x_hat:x_hat_beta_1 evals in
+        Timer.clock __LOC__ ;
         let r_xi_sum_actual =
           let open Fp in
           let combine batch pt without_bound =
@@ -2727,46 +2784,64 @@ let verify (type a n) (module Max_branching : Nat.Intf with type n = n)
             ; combine Common.Pairing_pcs_batch.beta_2 b2 e2
             ; combine Common.Pairing_pcs_batch.beta_1 b1 e1 ]
         in
-        let check = List.for_all ~f:(fun (x, y) -> Fp.equal x y) in
-        check marlin_checks
-        && check [(xi, xi_actual); (r, r_actual); (r_xi_sum, r_xi_sum_actual)]
-    )
+        Timer.clock __LOC__ ;
+        List.iteri marlin_checks ~f:(fun i (x, y) ->
+            check (sprintf "marlin %d" i, Fp.equal x y) ) ;
+        Timer.clock __LOC__ ;
+        List.iter
+          ~f:(fun (s, x, y) -> check (s, Fp.equal x y))
+          [ ("xi", xi, xi_actual)
+          ; ("r", r, r_actual)
+          ; ("r_xi_sum", r_xi_sum, r_xi_sum_actual) ] )
   in
   let open Snarky_bn382_backend.Dlog_based_proof in
-  finalized
-  && Pairing_acc.batch_check
-       (List.map ts ~f:(fun (_, t) ->
-            t.statement.proof_state.me_only.pairing_marlin_acc ))
-  && batch_verify
-       (List.map ts ~f:(fun (app_state, t) ->
-            let prepared_statement : _ Statement.Dlog_based.t =
-              { pass_through=
-                  Common.hash_pairing_me_only
-                    ~app_state:A_value.to_field_elements
-                    (Reduced_me_only.Pairing_based.prepare
-                       ~dlog_marlin_index:key.commitments
-                       {t.statement.pass_through with app_state})
-              ; proof_state=
-                  { t.statement.proof_state with
-                    me_only=
-                      Common.hash_dlog_me_only
-                        (Reduced_me_only.Dlog_based.prepare
-                           t.statement.proof_state.me_only) } }
-            in
-            let input = fq_public_input_of_statement prepared_statement in
-            ( t.proof
-            , input
-            , Some
-                (Vector.to_list
-                   (Vector.map2
-                      ~f:(fun g cs ->
-                        { Challenge_polynomial.challenges=
-                            Vector.to_array (compute_challenges cs)
-                        ; commitment= g } )
-                      t.statement.pass_through.sg
-                      t.statement.proof_state.me_only
-                        .old_bulletproof_challenges)) ) ))
-       key.index
+  Common.time "pairing_check" (fun () ->
+      check
+        ( "pairing_check"
+        , Pairing_acc.batch_check
+            (List.map ts ~f:(fun (_, t) ->
+                 t.statement.proof_state.me_only.pairing_marlin_acc )) ) ) ;
+  Common.time "dlog_check" (fun () ->
+      check
+        ( "dlog_check"
+        , batch_verify
+            (List.map ts ~f:(fun (app_state, t) ->
+                 let prepared_statement : _ Statement.Dlog_based.t =
+                   { pass_through=
+                       Common.hash_pairing_me_only
+                         ~app_state:A_value.to_field_elements
+                         (Reduced_me_only.Pairing_based.prepare
+                            ~dlog_marlin_index:key.commitments
+                            {t.statement.pass_through with app_state})
+                   ; proof_state=
+                       { t.statement.proof_state with
+                         me_only=
+                           Common.hash_dlog_me_only
+                             (Reduced_me_only.Dlog_based.prepare
+                                t.statement.proof_state.me_only) } }
+                 in
+                 let input =
+                   fq_unpadded_public_input_of_statement prepared_statement
+                 in
+                 ( t.proof
+                 , input
+                 , Some
+                     (Vector.to_list
+                        (Vector.map2
+                           ~f:(fun g cs ->
+                             { Challenge_polynomial.challenges=
+                                 Vector.to_array (compute_challenges cs)
+                             ; commitment= g } )
+                           t.statement.pass_through.sg
+                           t.statement.proof_state.me_only
+                             .old_bulletproof_challenges)) ) ))
+            key.index ) ) ;
+  match result () with
+  | Ok () ->
+      true
+  | Error e ->
+      Core.printf "bad verify: %s\n%!" e ;
+      false
 
 module Dirty = struct
   type t = [`Cache_hit | `Generated_something | `Locally_generated]
@@ -2841,12 +2916,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
       lazy
         ( match%bind
             Common.time "step keypair read" (fun () ->
-                let start = Time.now () in
-                let%map t = Key_cache.read cache s_p (Lazy.force k_p) in
-                let stop = Time.now () in
-                Core.printf "keypair read %s\n%!"
-                  (Time.Span.to_string_hum (Time.diff stop start)) ;
-                t )
+                Key_cache.read cache s_p (Lazy.force k_p) )
           with
         | Ok (pk, dirty) ->
             Common.time "step keypair create" (fun () ->
@@ -3323,109 +3393,6 @@ let compile
 
     module Marlin = Types.Dlog_based.Proof_state.Deferred_values.Marlin
 
-    (* TODO
-<<<<<<< HEAD
-    let verify (ts : t list) =
-      let module Fp = Impls.Pairing_based.Field.Constant in
-      let fp : _ Marlin_checks.field = (module Fp) in
-      let finalized =
-        List.for_all ts
-          ~f:(fun { statement
-                  ; index
-                  ; prev_x_hat_beta_1= x_hat_beta_1
-                  ; prev_evals= evals }
-             ->
-            let open Pairing_marlin_types in
-            let open Types.Dlog_based.Proof_state in
-            let {Deferred_values.xi; r; marlin; r_xi_sum} =
-              Deferred_values.map_challenges
-                ~f:Challenge.Constant.to_fp
-                ~scalar:(SC.to_field_constant (module Fp) ~endo:Endo.Pairing.scalar)
-                statement.proof_state.deferred_values
-            in
-            let marlin_checks =
-              let domains = step_domains.(index) in
-              let open Marlin_checks in
-              checks fp marlin evals ~x_hat_beta_1
-                ~input_domain:(domain fp domains.x)
-                ~domain_h:(domain fp domains.h) ~domain_k:(domain fp domains.k)
-            in
-            let absorb, squeeze =
-              let open Fp_sponge.Bits in
-              let sponge =
-                let s = create Fp_sponge.params in
-                absorb s
-                  (Digest.Constant.to_fp
-                     statement.proof_state.sponge_digest_before_evaluations) ;
-                s
-              in
-              let squeeze () =
-                squeeze sponge ~length:Challenge.Constant.length |> Fp.project
-              in
-              (absorb sponge, squeeze)
-            in
-            absorb x_hat_beta_1 ;
-            Vector.iter ~f:absorb (Evals.to_vector evals) ;
-            let xi_actual = squeeze () in
-            let r_actual = squeeze () in
-            let e1, e2, e3 =
-              Evals.to_combined_vectors ~x_hat:x_hat_beta_1 evals
-            in
-            let r_xi_sum_actual =
-              let open Fp in
-              let combine batch pt without_bound =
-                Pcs_batch.combine_evaluations batch ~crs_max_degree ~mul ~add
-                  ~one ~evaluation_point:pt ~xi without_bound []
-              in
-              let {Marlin.beta_1= b1; beta_2= b2; beta_3= b3; _} = marlin in
-              List.fold ~init:zero
-                ~f:(fun acc x -> r * (x + acc))
-                [ combine Common.Pairing_pcs_batch.beta_3 b3 e3
-                ; combine Common.Pairing_pcs_batch.beta_2 b2 e2
-                ; combine Common.Pairing_pcs_batch.beta_1 b1 e1 ]
-            in
-            let check = List.for_all ~f:(fun (x, y) -> Fp.equal x y) in
-            check marlin_checks
-            && check
-                 [(xi, xi_actual); (r, r_actual); (r_xi_sum, r_xi_sum_actual)]
-        )
-      in
-      let open Snarky_bn382_backend.Dlog_based_proof in
-      finalized
-      && Pairing_acc.batch_check
-           (List.map ts ~f:(fun t ->
-                t.statement.proof_state.me_only.pairing_marlin_acc ))
-      && batch_verify
-           (List.map ts ~f:(fun t ->
-                let prepared_statement : _ Statement.Dlog_based.t =
-                  { pass_through=
-                      Common.hash_pairing_me_only
-                        ~app_state:A_value.to_field_elements
-                        (Reduced_me_only.Pairing_based.prepare
-                           ~dlog_marlin_index:data.wrap_key
-                           t.statement.pass_through)
-                  ; proof_state=
-                      { t.statement.proof_state with
-                        me_only=
-                          Common.hash_dlog_me_only
-                            (Reduced_me_only.Dlog_based.prepare
-                               t.statement.proof_state.me_only) } }
-                in
-                let input = fq_public_input_of_statement prepared_statement in
-                ( t.proof
-                , input
-                , Some
-                    (Vector.to_list
-                       (Vector.map2
-                          ~f:(fun g cs ->
-                            { Dlog_marlin_types.Challenge_polynomial.challenges=
-                                Vector.to_array (compute_challenges cs)
-                            ; commitment= g } )
-                          t.statement.pass_through.sg
-                          t.statement.proof_state.me_only
-                            .old_bulletproof_challenges)) ) ))
-           data.wrap_vk
-======= *)
     let id = wrap_disk_key
 
     let verification_key = wrap_vk
@@ -3444,7 +3411,6 @@ let compile
 module Provers = H3_2.T (Prover)
 module Proof0 = Proof
 
-(*
 let%test_module "test" =
   ( module struct
     let () = assert (Pairing_acc.batch_check [Lazy.force Dummy.pairing_acc])
@@ -3464,7 +3430,7 @@ let%test_module "test" =
         end
       end
 
-      let tag, p, Provers.[base; merge] =
+      let tag, _, p, Provers.[base; merge] =
         compile
           (module Statement)
           (module Statement.Constant)
@@ -3492,10 +3458,41 @@ let%test_module "test" =
       module Proof = (val p)
     end
 
+    let t_proof =
+      let base1 = Field.Constant.of_int 4 in
+      let base2 = Field.Constant.of_int 9 in
+      let base12 = Field.Constant.(base1 * base2) in
+      let t1 = Common.time "t1" (fun () -> Txn_snark.base [] base1) in
+      let module M = struct
+        type t = Field.Constant.t * Txn_snark.Proof.t [@@deriving bin_io]
+      end in
+      Out_channel.write_all
+        "/home/izzy/repos/coda/verifier-with-split-polys/proof"
+        ~data:(Binable.to_string (module M) (base1, t1)) ;
+      Common.time "verif" (fun () ->
+          assert (
+            Txn_snark.Proof.verify (List.init 2 ~f:(fun _ -> (base1, t1))) ) ) ;
+      Common.time "verif" (fun () ->
+          assert (
+            Txn_snark.Proof.verify (List.init 4 ~f:(fun _ -> (base1, t1))) ) ) ;
+      Common.time "verif" (fun () ->
+          assert (
+            Txn_snark.Proof.verify (List.init 8 ~f:(fun _ -> (base1, t1))) ) ) ;
+      let t2 = Common.time "t2" (fun () -> Txn_snark.base [] base2) in
+      assert (Txn_snark.Proof.verify [(base1, t1); (base2, t2)]) ;
+      (* Need two separate booleans.
+         Should carry around prev should verify and self should verify *)
+      let t12 =
+        Common.time "t12" (fun () ->
+            Txn_snark.merge [(base1, t1); (base2, t2)] base12 )
+      in
+      assert (Txn_snark.Proof.verify [(base1, t1); (base2, t2); (base12, t12)]) ;
+      (base12, t12)
+
     module Blockchain_snark = struct
       module Statement = Txn_snark.Statement
 
-      let tag, p, Provers.[step] =
+      let tag, _, p, Provers.[step] =
         Common.time "compile" (fun () ->
             compile
               (module Statement)
@@ -3523,20 +3520,29 @@ let%test_module "test" =
       module Proof = (val p)
     end
 
-    let b1 =
-      let base1 = Field.Constant.of_int 4 in
-      let base2 = Field.Constant.of_int 9 in
-      let base12 = Field.Constant.(base1 * base2) in
-      let t1 = Common.time "t1" (fun () -> Txn_snark.base [] base1) in
-      assert (Txn_snark.Proof.verify [(base1, t1)]) ;
-      let t2 = Common.time "t2" (fun () -> Txn_snark.base [] base2) in
-      assert (Txn_snark.Proof.verify [(base1, t1); (base2, t2)]) ;
-      (* Need two separate booleans.
-         Should carry around prev should verify and self should verify *)
-      let t12 =
-        Common.time "t12" (fun () ->
-            Txn_snark.merge [(base1, t1); (base2, t2)] base12 )
+    let xs =
+      let s_neg_one = Field.Constant.(negate one) in
+      let b_neg_one : (Nat.N2.n, Nat.N2.n) Proof0.t =
+        Proof0.dummy Nat.N2.n Nat.N2.n
       in
+      let b0 =
+        Common.time "b0" (fun () ->
+            Blockchain_snark.step
+              [(s_neg_one, b_neg_one); t_proof]
+              Field.Constant.zero )
+      in
+      let b1 =
+        Common.time "b1" (fun () ->
+            Blockchain_snark.step
+              [(Field.Constant.zero, b0); t_proof]
+              Field.Constant.one )
+      in
+      [(Field.Constant.zero, b0); (Field.Constant.one, b1)]
+
+    let%test_unit "verify" = assert (Blockchain_snark.Proof.verify xs)
+  end )
+
+(*
 <<<<<<< HEAD
       assert (Txn_snark.Proof.verify [t1; t2; t12]) ;
       let b_neg_one :
@@ -3622,26 +3628,4 @@ let%test_module "test" =
              ; rc= abc () })
         ; prev_x_hat_beta_1= fp ()
         ; index= 0 }
-=======
-      assert (Txn_snark.Proof.verify [(base1, t1); (base2, t2); (base12, t12)]) ;
-      let s_neg_one = Field.Constant.(negate one) in
-      let b_neg_one : (Nat.N2.n, Nat.N2.n) Proof0.t =
-        Proof0.dummy Nat.N2.n Nat.N2.n
->>>>>>> origin/integrate-pickles
-      in
-      let b0 =
-        Common.time "b0" (fun () ->
-            Blockchain_snark.step
-              [(s_neg_one, b_neg_one); (base12, t12)]
-              Field.Constant.zero )
-      in
-      let b1 =
-        Common.time "b1" (fun () ->
-            Blockchain_snark.step
-              [(Field.Constant.zero, b0); (base12, t12)]
-              Field.Constant.one )
-      in
-      assert (
-        Blockchain_snark.Proof.verify
-          [(Field.Constant.zero, b0); (Field.Constant.one, b1)] )
-  end ) *)
+*)

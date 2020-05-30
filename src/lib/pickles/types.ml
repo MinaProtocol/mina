@@ -217,12 +217,16 @@ module Dlog_based = struct
 
   module Pass_through = struct
     type ('g, 's, 'sg) t =
-      {app_state: 's; dlog_marlin_index: 'g Dlog_marlin_types.Poly_comm.Without_degree_bound.t Abc.t Matrix_evals.t; sg: 'sg}
+      { app_state: 's
+      ; dlog_marlin_index:
+          'g Dlog_marlin_types.Poly_comm.Without_degree_bound.t Abc.t
+          Matrix_evals.t
+      ; sg: 'sg }
 
     let to_field_elements {app_state; dlog_marlin_index; sg}
-        ~app_state:app_state_to_field_elements ~g =
+        ~app_state:app_state_to_field_elements ~comm ~g =
       Array.concat
-        [ index_to_field_elements ~g dlog_marlin_index
+        [ index_to_field_elements ~g:comm dlog_marlin_index
         ; Array.of_list (List.concat_map ~f:g (Vector.to_list sg))
         ; app_state_to_field_elements app_state ]
 
@@ -240,9 +244,9 @@ module Dlog_based = struct
     let of_hlist ([app_state; dlog_marlin_index; sg] : (unit, _) t) =
       {app_state; dlog_marlin_index; sg}
 
-    let typ g s branching =
+    let typ comm g s branching =
       Snarky.Typ.of_hlistable
-        [s; Matrix_evals.typ (Abc.typ g); Vector.typ g branching]
+        [s; Matrix_evals.typ (Abc.typ comm); Vector.typ g branching]
         ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
         ~value_of_hlist:of_hlist
   end

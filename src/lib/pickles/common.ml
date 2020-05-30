@@ -1,18 +1,29 @@
+module D = Digest
+open Core_kernel
+module Digest = D
 open Pickles_types
+module G = Snarky_bn382_backend.G
 
-let hash_pairing_me_only ~app_state t =
+let hash_pairing_me_only ~app_state
+    (t :
+      ( G.Affine.t
+      , 's
+      , (G.Affine.t, _) Vector.t )
+      Types.Pairing_based.Proof_state.Me_only.t) =
+  let g (x, y) = [x; y] in
   Fp_sponge.digest Fp_sponge.params
-    (Types.Pairing_based.Proof_state.Me_only.to_field_elements t
-       ~g:(fun (x : Snarky_bn382_backend.G.Affine.t Dlog_marlin_types.Poly_comm.Without_degree_bound.t) -> 
-       List.init (Array.length x * 2)
-        (fun i ->  let (xx, yy) = Array.get x (i/2) in if (i mod 2) = 0 then xx else yy) )
+    (Types.Pairing_based.Proof_state.Me_only.to_field_elements t ~g
+       ~comm:
+         (fun (x :
+                G.Affine.t Dlog_marlin_types.Poly_comm.Without_degree_bound.t) ->
+         List.concat_map (Array.to_list x) ~f:g )
        ~app_state)
   |> Digest.Constant.of_bits
 
 let hash_dlog_me_only t =
   Fq_sponge.digest Fq_sponge.params
     (Types.Dlog_based.Proof_state.Me_only.to_field_elements t
-       ~g1:(fun ((x, y) : Snarky_bn382_backend.G1.Affine.t) -> [x; y] ))
+       ~g1:(fun ((x, y) : Snarky_bn382_backend.G1.Affine.t) -> [x; y]))
   |> Digest.Constant.of_bits
 
 open Core_kernel

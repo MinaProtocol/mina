@@ -14,7 +14,8 @@ let unrelated_g (x, y) =
   let str = Fn.compose bits_to_bytes Fp.to_bits in
   group_map (fp_random_oracle (str x ^ str y))
 
-let dlog_crs_max_degree = 1 lsl 17
+(* TODO: This is incorrect *)
+let crs_max_degree = 1 lsl 22
 
 open Impl
 
@@ -52,6 +53,7 @@ module Sponge = struct
                 Bitstring_lib.Bitstring.Lsb_first.to_list
                   (Impl.Field.unpack_full t)
             end)
+            (Impl.Field)
             (S)
 
   let absorb t input =
@@ -71,19 +73,17 @@ module Input_domain = struct
     lazy
       (let domain_size = Domain.size domain in
        let u = Unsigned.Size_t.of_int in
-    assert (domain_size < dlog_crs_max_degree) ;
        time "lagrange" (fun () ->
            Array.init domain_size ~f:(fun i ->
                let v =
-                 (Snarky_bn382.Fq_urs.lagrange_commitment
-                    (Snarky_bn382_backend.Dlog_based.Keypair.load_urs ())
-                    (u domain_size) (u i)) 
-                |> Snarky_bn382.Fq_poly_comm.unshifted 
+                 Snarky_bn382.Fq_urs.lagrange_commitment
+                   (Snarky_bn382_backend.Dlog_based.Keypair.load_urs ())
+                   (u domain_size) (u i)
+                 |> Snarky_bn382.Fq_poly_comm.unshifted
                in
-               assert (G.Affine.Vector.length v = 1);
+               assert (G.Affine.Vector.length v = 1) ;
                G.Affine.Vector.get v 0
-               |> Snarky_bn382_backend.G.Affine.of_backend
-             )))
+               |> Snarky_bn382_backend.G.Affine.of_backend ) ))
 end
 
 module G = struct
@@ -136,7 +136,15 @@ module G = struct
 
       let random () = G.(to_affine_exn (random ()))
 
-      let ( + ) x y = G.(to_affine_exn (of_affine x + of_affine y))
+      let zero = Impl.Field.Constant.(zero, zero)
+
+      let ( + ) t1 t2 =
+        let is_zero (x, _) = Impl.Field.Constant.(equal zero x) in
+        if is_zero t1 then t2
+        else if is_zero t2 then t1
+        else
+          let r = G.(of_affine t1 + of_affine t2) in
+          try G.to_affine_exn r with _ -> zero
 
       let negate x = G.(to_affine_exn (negate (of_affine x)))
 
@@ -158,40 +166,12 @@ module G = struct
   module Scaling_precomputation = struct
     include T.Scaling_precomputation
 
-(*     let create t = create ~unrelated_base:(unrelated_g t) t *)
+    (*     let create t = create ~unrelated_base:(unrelated_g t) t *)
   end
 
   let ( + ) = T.add_exn
 
-  (* TODO: Make real *)
-  let scale t bs =
-    let res =
-      exists T.typ
-        ~compute:
-          As_prover.(
-            fun () ->
-              G.scale
-                (G.of_affine (read typ t))
-                (Snarky_bn382_backend.Fq.of_bits
-                   (List.map bs ~f:(read Boolean.typ)))
-              |> G.to_affine_exn)
-    in
-    let x, y = t in
-    let constraints_per_bit =
-      if Option.is_some (Field.to_constant x) then 2 else 6
-    in
-    let x = exists Field.typ ~compute:(fun () -> As_prover.read_var x)
-    and x2 =
-      exists Field.typ ~compute:(fun () ->
-          Field.Constant.square (As_prover.read_var x) )
-    in
-    ksprintf Impl.with_label "scale %s" __LOC__ (fun () ->
-        (* Dummy constraints *)
-        let num_bits = List.length bs in
-        for _ = 1 to constraints_per_bit * num_bits do
-          assert_r1cs x x x2
-        done ;
-        res )
+  let scale t bs = T.scale t (Bitstring_lib.Bitstring.Lsb_first.of_list bs)
 
   let to_field_elements (x, y) = [x; y]
 
@@ -209,7 +189,7 @@ module G = struct
                 (Fq.inv (Fq.of_bits (List.map ~f:(read Boolean.typ) bs)))
               |> G.to_affine_exn)
     in
-    ignore (scale res bs) ;
+    assert_equal t (scale res bs) ;
     res
 
   (* g -> 7 * g *)

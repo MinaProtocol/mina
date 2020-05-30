@@ -100,17 +100,14 @@ struct
         Sponge.absorb sponge (`Field low_bits) ;
         Sponge.absorb sponge (`Bits [high_bit])
     | Without_degree_bound ->
-      Array.iter t ~f:(fun t ->
-        absorb sponge PC t )
+        Array.iter t ~f:(fun t -> absorb sponge PC t)
     | With_degree_bound ->
-      Array.iter t.unshifted ~f:(fun t ->
-          absorb sponge PC t ) ;
-      absorb sponge PC t.shifted
+        Array.iter t.unshifted ~f:(fun t -> absorb sponge PC t) ;
+        absorb sponge PC t.shifted
     | ty1 :: ty2 ->
         let t1, t2 = t in
         let absorb t = absorb sponge t in
         absorb ty1 t1 ; absorb ty2 t2
-  ;;
 
   module Scalar_challenge = SC.Make (Impl) (G) (Challenge) (Endo.Dlog)
 
@@ -159,6 +156,29 @@ struct
 
   let h_precomp = Lazy.map ~f:G.Scaling_precomputation.create Generators.h
 
+  let group_map =
+    let f =
+      lazy
+        (let module M =
+           Group_map.Bw19.Make (Field.Constant) (Field)
+             (struct
+               let params =
+                 Group_map.Bw19.Params.create
+                   (module Field.Constant)
+                   {b= G.Params.b}
+             end)
+         in
+        let open M in
+        Snarky_group_map.Checked.wrap
+          (module Impl)
+          ~potential_xs
+          ~y_squared:(fun ~x ->
+            Field.(
+              (x * x * x) + (constant G.Params.a * x) + constant G.Params.b) )
+        |> unstage)
+    in
+    fun x -> Lazy.force f x
+
   let check_bulletproof ~pcs_batch ~domain_h ~domain_k ~sponge ~xi
       ~combined_inner_product
       ~
@@ -167,38 +187,43 @@ struct
       (advice : _ Openings.Bulletproof.Advice.t)
       ~polynomials:(without_degree_bound, with_degree_bound)
       ~openings_proof:({lr; delta; z_1; z_2; sg} :
-                         (G.t, Fq.t) Openings.Bulletproof.t) =
-    (* a_hat should be equal to
+                        (G.t, Fq.t) Openings.Bulletproof.t) =
+    with_label __LOC__ (fun () ->
+        (* a_hat should be equal to
        sum_i < t, r^i pows(beta_i) >
        = sum_i r^i < t, pows(beta_i) > *)
-    let u =
-      (* TODO sample u randomly *)
-      G.one
-    in
-    let open G in
-    let combined_polynomial (* Corresponds to xi in figure 7 of WTS *) =
-      Pcs_batch.combine_commitments pcs_batch ~scale:Scalar_challenge.endo
-        ~add:( + ) ~xi without_degree_bound with_degree_bound
-    in
-    let lr_prod, challenges = bullet_reduce sponge lr in
-    let p_prime =
-      combined_polynomial + scale u (Fq.to_bits combined_inner_product)
-    in
-    let q = p_prime + lr_prod in
-    absorb sponge PC delta ;
-    let c = squeeze_scalar sponge in
-    (* c Q + delta = z1 (G + b U) + z2 H *)
-    let lhs = Scalar_challenge.endo q c + delta in
-    let rhs =
-      let scale t x = scale t (Fq.to_bits x) in
-      let b_u = scale u advice.b in
-      let z_1_g_plus_b_u = scale (sg + b_u) z_1 in
-      let z2_h =
-        G.multiscale_known [|(Fq.to_bits z_2, Lazy.force h_precomp)|]
-      in
-      z_1_g_plus_b_u + z2_h
-    in
-    (`Success (equal_g lhs rhs), challenges)
+        let u =
+          let t = Sponge.squeeze_field sponge in
+          group_map t
+        in
+        let open G in
+        let combined_polynomial (* Corresponds to xi in figure 7 of WTS *) =
+          Pcs_batch.combine_split_commitments pcs_batch
+            ~scale:Scalar_challenge.endo ~add:( + ) ~xi without_degree_bound
+            with_degree_bound
+        in
+        let lr_prod, challenges = bullet_reduce sponge lr in
+        let p_prime =
+          combined_polynomial + scale u (Fq.to_bits combined_inner_product)
+        in
+        let q = p_prime + lr_prod in
+        absorb sponge PC delta ;
+        let c = squeeze_scalar sponge in
+        (* c Q + delta = z1 (G + b U) + z2 H *)
+        let lhs =
+          let cq = Scalar_challenge.endo q c in
+          cq + delta
+        in
+        let rhs =
+          let scale t x = scale t (Fq.to_bits x) in
+          let b_u = scale u advice.b in
+          let z_1_g_plus_b_u = scale (sg + b_u) z_1 in
+          let z2_h =
+            G.multiscale_known [|(Fq.to_bits z_2, Lazy.force h_precomp)|]
+          in
+          z_1_g_plus_b_u + z2_h
+        in
+        (`Success (equal_g lhs rhs), challenges) )
 
   let lagrange_precomputations =
     lazy
@@ -211,58 +236,60 @@ struct
       ~verification_key:(m : _ Abc.t Matrix_evals.t) ~xi ~sponge ~public_input
       ~(sg_old : (_, Branching.n) Vector.t) ~combined_inner_product ~advice
       ~(messages : _ Dlog_marlin_types.Messages.t) ~openings_proof =
-    let receive ty f =
-      let x = f messages in
-      absorb sponge ty x ; x
-    in
-    let sample () = Sponge.squeeze sponge ~length:Challenge.length in
-    let sample_scalar () = squeeze_scalar sponge in
-    let open Dlog_marlin_types.Messages in
-    let x_hat =
-      assert (
-        Int.ceil_pow2 (Array.length public_input)
-        = Domain.size Input_domain.domain ) ;
-      G.multiscale_known
-        (Array.mapi public_input ~f:(fun i x ->
-             (x, (Lazy.force lagrange_precomputations).(i)) ))
-    in
-    let without = Type.Without_degree_bound in
-    let with_ = Type.With_degree_bound in
-    absorb sponge PC x_hat ;
-    let w_hat = receive without w_hat in
-    let z_hat_a = receive without z_hat_a in
-    let z_hat_b = receive without z_hat_b in
-    let alpha = sample () in
-    let eta_a = sample () in
-    let eta_b = sample () in
-    let eta_c = sample () in
-    let g_1, h_1 = receive (with_ :: without) gh_1 in
-    let beta_1 = sample_scalar () in
-    (* At this point, we should use the previous "bulletproof_challenges" to
+    with_label __LOC__ (fun () ->
+        let receive ty f =
+          with_label __LOC__ (fun () ->
+              let x = f messages in
+              absorb sponge ty x ; x )
+        in
+        let sample () = Sponge.squeeze sponge ~length:Challenge.length in
+        let sample_scalar () = squeeze_scalar sponge in
+        let open Dlog_marlin_types.Messages in
+        let x_hat =
+          assert (
+            Int.ceil_pow2 (Array.length public_input)
+            = Domain.size Input_domain.domain ) ;
+          G.multiscale_known
+            (Array.mapi public_input ~f:(fun i x ->
+                 (x, (Lazy.force lagrange_precomputations).(i)) ))
+        in
+        let without = Type.Without_degree_bound in
+        let with_ = Type.With_degree_bound in
+        absorb sponge PC x_hat ;
+        let w_hat = receive without w_hat in
+        let z_hat_a = receive without z_hat_a in
+        let z_hat_b = receive without z_hat_b in
+        let alpha = sample () in
+        let eta_a = sample () in
+        let eta_b = sample () in
+        let eta_c = sample () in
+        let g_1, h_1 = receive (with_ :: without) gh_1 in
+        let beta_1 = sample_scalar () in
+        (* At this point, we should use the previous "bulletproof_challenges" to
        compute to compute f(beta_1) outside the snark
        where f is the polynomial corresponding to sg_old
     *)
-    let sigma_2, (g_2, h_2) =
-      receive (Scalar :: with_ :: without) sigma_gh_2
-    in
-    let beta_2 = sample_scalar () in
-    let sigma_3, (g_3, h_3) =
-      receive (Scalar :: with_ :: without) sigma_gh_3
-    in
-    let beta_3 = sample_scalar () in
-    let sponge_before_evaluations = Sponge.copy sponge in
-    let sponge_digest_before_evaluations =
-      Sponge.squeeze sponge ~length:Digest.length
-    in
-    (* xi, r are sampled here using the other sponge. *)
-    (* No need to expose the polynomial evaluations as deferred values as they're
+        let sigma_2, (g_2, h_2) =
+          receive (Scalar :: with_ :: without) sigma_gh_2
+        in
+        let beta_2 = sample_scalar () in
+        let sigma_3, (g_3, h_3) =
+          receive (Scalar :: with_ :: without) sigma_gh_3
+        in
+        let beta_3 = sample_scalar () in
+        let sponge_before_evaluations = Sponge.copy sponge in
+        let sponge_digest_before_evaluations =
+          Sponge.squeeze sponge ~length:Digest.length
+        in
+        (* xi, r are sampled here using the other sponge. *)
+        (* No need to expose the polynomial evaluations as deferred values as they're
        not needed here for the incremental verification. All we need is a_hat and
        "combined_inner_product".
 
        Then, in the other proof, we can witness the evaluations and check their correctness
        against "combined_inner_product" *)
-    let bulletproof_challenges =
-      (* This sponge needs to be initialized with (some derivative of)
+        let bulletproof_challenges =
+          (* This sponge needs to be initialized with (some derivative of)
          1. The polynomial commitments
          2. The combined inner product
          3. The challenge points.
@@ -270,51 +297,52 @@ struct
          It should be sufficient to fork the sponge after squeezing beta_3 and then to absorb
          the combined inner product. 
       *)
-      let without_degree_bound =
-        let T = Branching.eq in
-        Vector.append sg_old
-          [ [| x_hat |]
-          ; w_hat
-          ; z_hat_a
-          ; z_hat_b
-          ; h_1
-          ; h_2
-          ; h_3
-          ; m.row.a
-          ; m.row.b
-          ; m.row.c
-          ; m.col.a
-          ; m.col.b
-          ; m.col.c
-          ; m.value.a
-          ; m.value.b
-          ; m.value.c
-          ; m.rc.a
-          ; m.rc.b
-          ; m.rc.c ]
-          (snd (Branching.add Nat.N19.n))
-      in
-      check_bulletproof
-        ~pcs_batch:
-          (Common.dlog_pcs_batch
-             ~h_minus_1:(Domain.size domain_h - 1)
-             ~k_minus_1:(Domain.size domain_k - 1)
-             (Branching.add Nat.N19.n))
-        ~domain_h ~domain_k ~sponge:sponge_before_evaluations ~xi
-        ~combined_inner_product ~advice ~openings_proof
-        ~polynomials:(without_degree_bound, [g_1; g_2; g_3])
-    in
-    ( sponge_digest_before_evaluations
-    , bulletproof_challenges
-    , { Proof_state.Deferred_values.Marlin.sigma_2
-      ; sigma_3
-      ; alpha
-      ; eta_a
-      ; eta_b
-      ; eta_c
-      ; beta_1
-      ; beta_2
-      ; beta_3 } )
+          let without_degree_bound =
+            let T = Branching.eq in
+            Vector.append
+              (Vector.map sg_old ~f:(fun g -> [|g|]))
+              [ [|x_hat|]
+              ; w_hat
+              ; z_hat_a
+              ; z_hat_b
+              ; h_1
+              ; h_2
+              ; h_3
+              ; m.row.a
+              ; m.row.b
+              ; m.row.c
+              ; m.col.a
+              ; m.col.b
+              ; m.col.c
+              ; m.value.a
+              ; m.value.b
+              ; m.value.c
+              ; m.rc.a
+              ; m.rc.b
+              ; m.rc.c ]
+              (snd (Branching.add Nat.N19.n))
+          in
+          check_bulletproof
+            ~pcs_batch:
+              (Common.dlog_pcs_batch
+                 ~h_minus_1:(Domain.size domain_h - 1)
+                 ~k_minus_1:(Domain.size domain_k - 1)
+                 (Branching.add Nat.N19.n))
+            ~domain_h ~domain_k ~sponge:sponge_before_evaluations ~xi
+            ~combined_inner_product ~advice ~openings_proof
+            ~polynomials:(without_degree_bound, [g_1; g_2; g_3])
+        in
+        ( sponge_digest_before_evaluations
+        , bulletproof_challenges
+        , { Proof_state.Deferred_values.Marlin.sigma_2
+          ; sigma_3
+          ; alpha
+          ; eta_a
+          ; eta_b
+          ; eta_c
+          ; beta_1
+          ; beta_2
+          ; beta_3 } ) )
 
   let pack_scalar_challenge (Pickles_types.Scalar_challenge.Scalar_challenge t)
       =
@@ -384,11 +412,20 @@ struct
     let open Types.Pairing_based.Proof_state.Me_only in
     let after_index =
       let sponge = Sponge.create sponge_params in
-      Array.iter (Types.index_to_field_elements 
-       ~g:(fun (z : Inputs.G.t Dlog_marlin_types.Poly_comm.Without_degree_bound.t) -> 
-       List.init (Array.length z * 2)
-        (fun i ->  let xy = G.to_field_elements (Array.get z (i/2)) in if (i mod 2) = 0 then List.nth_exn xy 0 else List.nth_exn xy 1) ) index)
-       ~f:(fun x -> Sponge.absorb sponge (`Field x)) ;
+      Array.iter
+        (Types.index_to_field_elements
+           ~g:
+             (fun (z :
+                    Inputs.G.t
+                    Dlog_marlin_types.Poly_comm.Without_degree_bound.t) ->
+             List.init
+               (Array.length z * 2)
+               (fun i ->
+                 let xy = G.to_field_elements z.(i / 2) in
+                 if i mod 2 = 0 then List.nth_exn xy 0 else List.nth_exn xy 1
+                 ) )
+           index)
+        ~f:(fun x -> Sponge.absorb sponge (`Field x)) ;
       sponge
     in
     stage (fun t ->
@@ -403,29 +440,41 @@ struct
     Field.pack (Challenge.to_bits c)
 
   (* TODO *)
-  let assert_eq_marlin m1 m2 = ()
-
-  (*
+  let assert_eq_marlin
+      (m1 :
+        ( 'a
+        , Inputs.Impl.Field.t Pickles_types.Scalar_challenge.t
+        , Inputs.Impl.Field.t * Inputs.Impl.Boolean.var )
+        Types.Pairing_based.Proof_state.Deferred_values.Marlin.t)
+      (m2 :
+        ( Inputs.Impl.Boolean.var list
+        , Scalar_challenge.t
+        , Fq.t )
+        Types.Pairing_based.Proof_state.Deferred_values.Marlin.t) =
     let open Types.Dlog_based.Proof_state.Deferred_values.Marlin in
     let fq (x1, b1) (x2, b2) =
       Field.Assert.equal x1 x2 ;
       Boolean.Assert.(b1 = b2)
     in
     let chal c1 c2 = Field.Assert.equal c1 (Field.project c2) in
+    let scalar_chal (Scalar_challenge t1 : _ Pickles_types.Scalar_challenge.t)
+        (Scalar_challenge t2 : Scalar_challenge.t) =
+      Field.Assert.equal t1 (Field.project t2)
+    in
     chal m1.alpha m2.alpha ;
     chal m1.eta_a m2.eta_a ;
     chal m1.eta_b m2.eta_b ;
     chal m1.eta_c m2.eta_c ;
-    chal m1.beta_1 m2.beta_1 ;
+    scalar_chal m1.beta_1 m2.beta_1 ;
     fq m1.sigma_2 m2.sigma_2 ;
-    chal m1.beta_2 m2.beta_2 ;
+    scalar_chal m1.beta_2 m2.beta_2 ;
     fq m1.sigma_3 m2.sigma_3 ;
-    chal m1.beta_3 m2.beta_3 *)
+    scalar_chal m1.beta_3 m2.beta_3
 
   let verify ~branching ~is_base_case ~sg_old
-      ~(opening : _ Pickles_types.Dlog_marlin_types.Openings.Bulletproof.t) ~messages
-      ~wrap_domains:(domain_h, domain_k) ~wrap_verification_key statement
-      (unfinalized : _ Types.Pairing_based.Proof_state.Per_proof.t) =
+      ~(opening : _ Pickles_types.Dlog_marlin_types.Openings.Bulletproof.t)
+      ~messages ~wrap_domains:(domain_h, domain_k) ~wrap_verification_key
+      statement (unfinalized : _ Types.Pairing_based.Proof_state.Per_proof.t) =
     let public_input =
       let fp x =
         [|Bitstring_lib.Bitstring.Lsb_first.to_list (Fp.unpack_full x)|]
@@ -455,21 +504,22 @@ struct
         ~combined_inner_product ~advice:{b} ~messages ~openings_proof:opening
     in
     assert_eq_marlin unfinalized.deferred_values.marlin marlin_actual ;
-    Field.Assert.equal unfinalized.sponge_digest_before_evaluations
-      (Fp.pack sponge_digest_before_evaluations_actual) ;
-    Array.iteri
-      (Vector.to_array unfinalized.deferred_values.bulletproof_challenges)
-      ~f:(fun i c1 ->
-        let c2 = bulletproof_challenges_actual.(i) in
-        Boolean.Assert.( = ) c1.Bulletproof_challenge.is_square
-          (Boolean.if_ is_base_case ~then_:c1.is_square ~else_:c2.is_square) ;
-        let (Pickles_types.Scalar_challenge.Scalar_challenge c1) =
-          c1.prechallenge
-        in
-        let c2 =
-          Field.if_ is_base_case ~then_:c1
-            ~else_:(pack_scalar_challenge c2.prechallenge)
-        in
-        Field.Assert.equal c1 c2 ) ;
+    with_label __LOC__ (fun () ->
+        Field.Assert.equal unfinalized.sponge_digest_before_evaluations
+          (Fp.pack sponge_digest_before_evaluations_actual) ;
+        Array.iteri
+          (Vector.to_array unfinalized.deferred_values.bulletproof_challenges)
+          ~f:(fun i c1 ->
+            let c2 = bulletproof_challenges_actual.(i) in
+            Boolean.Assert.( = ) c1.Bulletproof_challenge.is_square
+              (Boolean.if_ is_base_case ~then_:c1.is_square ~else_:c2.is_square) ;
+            let (Pickles_types.Scalar_challenge.Scalar_challenge c1) =
+              c1.prechallenge
+            in
+            let c2 =
+              Field.if_ is_base_case ~then_:c1
+                ~else_:(pack_scalar_challenge c2.prechallenge)
+            in
+            Field.Assert.equal c1 c2 ) ) ;
     bulletproof_success
 end

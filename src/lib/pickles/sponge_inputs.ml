@@ -10,10 +10,7 @@ module Make (Impl : Snarky.Snark_intf.Run) = struct
   open Impl
   open Field
   module Field = Field
-
-  let rounds_full = 8
-
-  let rounds_partial = 30
+  include Make_sponge.Rounds
 
   let to_the_alpha x = x |> square |> square |> square |> square |> ( * ) x
 

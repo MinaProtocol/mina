@@ -20,10 +20,10 @@ module Input_domain = struct
     let u = Unsigned.Size_t.of_int in
     time "lagrange" (fun () ->
         Array.init domain_size ~f:(fun i ->
-            Snarky_bn382_backend.G1.Affine.of_backend
-              (Snarky_bn382.Fp_urs.lagrange_commitment
-                 (Snarky_bn382_backend.Pairing_based.Keypair.load_urs ())
-                 (u domain_size) (u i)) ) )
+            Snarky_bn382.Fp_urs.lagrange_commitment
+              (Snarky_bn382_backend.Pairing_based.Keypair.load_urs ())
+              (u domain_size) (u i)
+            |> Snarky_bn382_backend.G1.Affine.of_backend ) )
 
   let domain = Domain.Pow_2_roots_of_unity 6
 
@@ -32,8 +32,7 @@ end
 
 let group_map_fq =
   let params =
-    Group_map.Params.create (module Fq)
-      {a=Fq.zero;b=(Fq.of_int 14)}
+    Group_map.Params.create (module Fq) {a= Fq.zero; b= Fq.of_int 14}
   in
   fun x -> Group_map.to_group (module Fq) ~params x
 
@@ -44,11 +43,7 @@ module G1 = struct
     module Impl = Impl
 
     module Params = struct
-      open Impl.Field.Constant
-
-      let a = zero
-
-      let b = of_int 14
+      include G1.Params
 
       let one = G1.to_affine_exn G1.one
 
@@ -89,9 +84,17 @@ module G1 = struct
 
       let random () = G1.(to_affine_exn (random ()))
 
-      let ( + ) x y = G1.(to_affine_exn (of_affine x + of_affine y))
-
       let negate x = G1.(to_affine_exn (negate (of_affine x)))
+
+      let zero = Impl.Field.Constant.(zero, zero)
+
+      let ( + ) t1 t2 =
+        let is_zero (x, _) = Impl.Field.Constant.(equal zero x) in
+        if is_zero t1 then t2
+        else if is_zero t2 then t1
+        else
+          let r = G1.(of_affine t1 + of_affine t2) in
+          try G1.to_affine_exn r with _ -> zero
 
       let to_affine_exn = Fn.id
 
@@ -111,42 +114,13 @@ module G1 = struct
   module Scaling_precomputation = struct
     include T.Scaling_precomputation
 
-(*     let create t = create ~unrelated_base:(unrelated_g t) t *)
+    (*     let create t = create ~unrelated_base:(unrelated_g t) t *)
   end
 
   let ( + ) = add_exn
 
-  (* TODO: Make real *)
-  let scale t bs =
-    let res =
-      exists typ
-        ~compute:
-          As_prover.(
-            fun () ->
-              G1.scale
-                (G1.of_affine (read typ t))
-                (Snarky_bn382_backend.Fp.of_bits
-                   (List.map bs ~f:(read Boolean.typ)))
-              |> G1.to_affine_exn)
-    in
-    let x, y = t in
-    let constraints_per_bit =
-      if Option.is_some (Field.to_constant x) then 2 else 6
-    in
-    let x = exists Field.typ ~compute:(fun () -> As_prover.read_var x)
-    and x2 =
-      exists Field.typ ~compute:(fun () ->
-          Field.Constant.square (As_prover.read_var x) )
-    in
-    ksprintf Impl.with_label "scale %s" __LOC__ (fun () ->
-        (* Dummy constraints *)
-        let num_bits = List.length bs in
-        for _ = 1 to constraints_per_bit * num_bits do
-          assert_r1cs x x x2
-        done ;
-        res )
+  let scale t bs = T.scale t (Bitstring_lib.Bitstring.Lsb_first.of_list bs)
 
-  (*         T.scale t (Bitstring_lib.Bitstring.Lsb_first.of_list bs) *)
   let to_field_elements (x, y) = [x; y]
 
   let assert_equal (x1, y1) (x2, y2) =
@@ -158,12 +132,13 @@ module G1 = struct
         ~compute:
           As_prover.(
             fun () ->
-              G1.scale
-                (G1.of_affine (read typ t))
-                (Fp.inv (Fp.of_bits (List.map ~f:(read Boolean.typ) bs)))
-              |> G1.to_affine_exn)
+              G1.(
+                to_affine_exn
+                  (scale
+                     (of_affine (read typ t))
+                     (Fp.inv (Fp.of_bits (List.map ~f:(read Boolean.typ) bs))))))
     in
-    ignore (scale res bs) ;
+    assert_equal t (scale res bs) ;
     res
 
   (* g -> 7 * g *)
@@ -224,5 +199,6 @@ module Sponge = struct
                 Bitstring_lib.Bitstring.Lsb_first.to_list
                   (Impl.Field.unpack_full t)
             end)
+            (Impl.Field)
             (S)
 end

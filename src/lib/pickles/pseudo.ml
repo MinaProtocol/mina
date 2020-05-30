@@ -25,7 +25,9 @@ module Make (Impl : Snarky.Snark_intf.Run) = struct
 
     let shifted_pow ~crs_max_degree t x =
       let pow = Field.(Pcs_batch.pow ~one ~mul ~add) in
-      choose t ~f:(fun deg -> pow x (crs_max_degree - deg))
+      choose t ~f:(fun deg ->
+          let d = deg mod crs_max_degree in
+          pow x (crs_max_degree - d) )
   end
 
   module Domain = struct

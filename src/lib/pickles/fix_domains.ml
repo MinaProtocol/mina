@@ -10,7 +10,7 @@ let domains sys : Domains.t =
   ; x= Pow_2_roots_of_unity (Int.ceil_log2 (1 + sys.public_input_size)) }
 
 let rough_domains : Domains.t =
-  let d = Domain.Pow_2_roots_of_unity 17 in
+  let d = Domain.Pow_2_roots_of_unity 18 in
   {h= d; k= d; x= Pow_2_roots_of_unity 6}
 
 let domains (type field a)

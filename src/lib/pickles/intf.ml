@@ -139,6 +139,12 @@ module Group (Impl : Snarky.Snark_intf.Run) = struct
   module type S = sig
     type t
 
+    module Params : sig
+      val a : Field.Constant.t
+
+      val b : Field.Constant.t
+    end
+
     module Constant : sig
       type t
 
@@ -299,12 +305,16 @@ module Pairing_main_inputs = struct
 
     val sponge_params : Impl.Field.t Sponge_lib.Params.t
 
-    module Sponge :
-      Sponge_lib.Intf.Sponge
-      with module Field := Impl.Field
-       and module State := Sponge_lib.State
-       and type input :=
-                  [`Field of Impl.Field.t | `Bits of Impl.Boolean.var list]
-       and type digest := length:int -> Impl.Boolean.var list
+    module Sponge : sig
+      include
+        Sponge_lib.Intf.Sponge
+        with module Field := Impl.Field
+         and module State := Sponge_lib.State
+         and type input :=
+                    [`Field of Impl.Field.t | `Bits of Impl.Boolean.var list]
+         and type digest := length:int -> Impl.Boolean.var list
+
+      val squeeze_field : t -> Impl.Field.t
+    end
   end
 end
