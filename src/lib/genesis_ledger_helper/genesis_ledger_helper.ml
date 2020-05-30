@@ -130,20 +130,24 @@ module Genesis_proof = struct
     (* TODO(4829): Runtime proof-level. *)
     match proof_level with
     | Genesis_constants.Proof_level.Full ->
-      let module B = Blockchain_snark.Blockchain_snark_state.Make(Transaction_snark.Make()) in
+        let module B =
+          Blockchain_snark.Blockchain_snark_state.Make
+            (Transaction_snark.Make ()) in
         let protocol_state_with_hash =
           Coda_state.Genesis_protocol_state.t
             ~genesis_ledger:(Genesis_ledger.Packed.t ledger)
             ~constraint_constants ~genesis_constants
         in
         let computed_values =
-          Genesis_proof.create_values ~constraint_constants ~proof_level (module B)
+          Genesis_proof.create_values ~constraint_constants ~proof_level
+            (module B)
             { genesis_ledger= ledger
             ; protocol_state_with_hash
             ; genesis_constants }
         in
         computed_values.genesis_proof
-    | _ -> Coda_base.Proof.dummy
+    | _ ->
+        Coda_base.Proof.dummy
 
   let store ~filename proof =
     (* TODO: Use [Writer.write_bin_prot]. *)

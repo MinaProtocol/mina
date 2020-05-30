@@ -130,8 +130,8 @@ module Worker_state = struct
                    state_for_handler pending_coinbase =
                  let t, _proof = ledger_proof_opt chain next_state t in
                  let res =
-                   Blockchain_snark.Blockchain_snark_state.check
-                      ~proof_level ~constraint_constants
+                   Blockchain_snark.Blockchain_snark_state.check ~proof_level
+                     ~constraint_constants
                      {transition= block; prev_state= chain.state}
                      ~handler:
                        (Consensus.Data.Prover_state.handler state_for_handler

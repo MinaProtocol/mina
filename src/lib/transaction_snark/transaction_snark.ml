@@ -1389,7 +1389,11 @@ module Merge = struct
 
   let rule self : _ Pickles.Inductive_rule.t =
     let prev_should_verify =
-      match Genesis_constants.Proof_level.compiled with Full -> true | _ -> false
+      match Genesis_constants.Proof_level.compiled with
+      | Full ->
+          true
+      | _ ->
+          false
     in
     let b = Boolean.var_of_value prev_should_verify in
     { prevs= [self; self]

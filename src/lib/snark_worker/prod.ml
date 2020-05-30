@@ -32,13 +32,12 @@ module Inputs = struct
     let create ~proof_level () =
       let m =
         match proof_level with
-        | Genesis_constants.Proof_level.Full -> Some (module Transaction_snark.Make () : S)
-        | Check | None -> None
+        | Genesis_constants.Proof_level.Full ->
+            Some (module Transaction_snark.Make () : S)
+        | Check | None ->
+            None
       in
-      Deferred.return
-      { m
-      ; cache= Cache.create ()
-      ; proof_level }
+      Deferred.return {m; cache= Cache.create (); proof_level}
 
     let worker_wait_time = 5.
   end
@@ -51,8 +50,7 @@ module Inputs = struct
   [@@deriving sexp]
 
   (* TODO: Use public_key once SoK is implemented *)
-  let perform_single ({m; cache; proof_level} : Worker_state.t)
-      ~message =
+  let perform_single ({m; cache; proof_level} : Worker_state.t) ~message =
     let open Snark_work_lib in
     let sok_digest = Coda_base.Sok_message.digest message in
     fun (single : single_spec) ->
@@ -111,13 +109,11 @@ module Inputs = struct
           in
           let fee_excess =
             Currency.Amount.(
-              Signed.create
-                ~magnitude:(stmt.fee_excess.magnitude)
+              Signed.create ~magnitude:stmt.fee_excess.magnitude
                 ~sgn:stmt.fee_excess.sgn)
           in
           Or_error.return
-          @@ ( Transaction_snark.create
-                 ~source:stmt.source ~target:stmt.target
+          @@ ( Transaction_snark.create ~source:stmt.source ~target:stmt.target
                  ~supply_increase:stmt.supply_increase
                  ~pending_coinbase_stack_state:
                    stmt.pending_coinbase_stack_state ~fee_excess ~sok_digest

@@ -141,8 +141,9 @@ let str ~loc =
 [%%else]
 
 let str ~loc =
-  let e = [%expr Async.Deferred.return Pickles.Verification_key.dummy] in
-  str ~loc ~transaction_snark:e ~blockchain_snark:e
+  return
+    (let e = [%expr Async.Deferred.return Pickles.Verification_key.dummy] in
+     str ~loc ~transaction_snark:e ~blockchain_snark:e)
 
 [%%endif]
 

@@ -31,16 +31,16 @@ module Worker_state = struct
     | Full ->
         Deferred.return
           (let bc_vk = Precomputed_values.blockchain_verification ()
-          and tx_vk = Precomputed_values.transaction_verification () in
-          let module M = struct
-            let verify_blockchain_snark state proof =
-              Blockchain_snark.Blockchain_snark_state.verify state proof
-                ~key:bc_vk
+           and tx_vk = Precomputed_values.transaction_verification () in
+           let module M = struct
+             let verify_blockchain_snark state proof =
+               Blockchain_snark.Blockchain_snark_state.verify state proof
+                 ~key:bc_vk
 
-            let verify_transaction_snark ledger_proof ~message =
-              Transaction_snark.verify ledger_proof ~message ~key:tx_vk
-          end in
-          (module M : S))
+             let verify_transaction_snark ledger_proof ~message =
+               Transaction_snark.verify ledger_proof ~message ~key:tx_vk
+           end in
+           (module M : S))
     | Check | None ->
         Deferred.return
         @@ ( module struct
