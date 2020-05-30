@@ -62,6 +62,11 @@ module Var = Var
 module Oracles = struct
   open Snarky_bn382
 
+  let create vk input (pi : Proof.t) =
+    let t = Fp_oracles.create vk (Proof.to_backend input pi) in
+    Caml.Gc.finalise Fp_oracles.delete t ;
+    t
+
   let field f t =
     let x = f t in
     Caml.Gc.finalise Field.delete x ;

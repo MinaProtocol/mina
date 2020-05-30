@@ -19,7 +19,7 @@ end]
 
 include Stable.Latest
 
-let to_backend vk primary_input
+let to_backend primary_input
     ({ messages=
          { w_hat= w_comm
          ; z_hat_a= za_comm
@@ -44,18 +44,13 @@ let to_backend vk primary_input
              ; value= {a= val_0; b= val_1; c= val_2}
              ; rc= {a= rc_0; b= rc_1; c= rc_2} } } } :
       t) =
-  let primary_input =
-    let v = Fp.Vector.create () in
-    List.iter ~f:(Fp.Vector.emplace_back v) primary_input ;
-    v
-  in
   let g (a, b) =
     let open Snarky_bn382.G1.Affine in
     let t = create a b in
     Caml.Gc.finalise delete t ; t
   in
   let t =
-    Snarky_bn382.Fp_proof.make vk primary_input (g w_comm) (g za_comm) (g zb_comm)
+    Snarky_bn382.Fp_proof.make primary_input (g w_comm) (g za_comm) (g zb_comm)
       (g h1_comm) (g g1_comm_0) (g g1_comm_1) (g h2_comm) (g g2_comm_0)
       (g g2_comm_1) (g h3_comm) (g g3_comm_0) (g g3_comm_1) (g proof1)
       (g proof2) (g proof3) sigma2 sigma3 w za zb h1 g1 h2 g2 h3 g3 row_0 row_1
@@ -130,6 +125,13 @@ let create ?message:_ pk ~primary ~auxiliary =
   Snarky_bn382.Fp_proof.delete res ;
   t
 
-let verify ?message:_ proof vk primary =
-  let t = to_backend vk primary proof in
+let verify ?message:_ proof vk (primary : Fp.Vector.t) =
+  let t =
+    let v = Fq.Vector.create () in
+    Fq.Vector.emplace_back v Fq.one ;
+    for i = 0 to Fq.Vector.length primary - 1 do
+      Fq.Vector.emplace_back v (Fq.Vector.get primary i)
+    done ;
+    to_backend v proof
+  in
   Snarky_bn382.Fp_proof.verify vk t

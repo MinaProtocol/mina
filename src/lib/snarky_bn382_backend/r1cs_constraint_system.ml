@@ -282,5 +282,6 @@ struct
         let b, b_weight, _ = var_exn b in
         let c, c_weight, _ = var_exn c in
         choose_best [((), (a_weight, b_weight, c_weight))] (fun () -> (a, b, c))
-    | _ -> failwith "Unsupported constraint"
+    | _ ->
+        failwith "Unsupported constraint"
 end

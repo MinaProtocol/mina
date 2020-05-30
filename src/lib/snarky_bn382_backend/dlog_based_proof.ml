@@ -46,27 +46,21 @@ let fqv t f =
   Caml.Gc.finalise Fq.Vector.delete t ;
   Array.init (Fq.Vector.length t) (fun i -> Fq.Vector.get t i)
 
-let pc t f =
-  let t = f t in
+let pc (t : Snarky_bn382.Fq_poly_comm.t) =
   let open Snarky_bn382.Fq_poly_comm in
-  let gvec (type a) (t : a) (f : a -> Snarky_bn382.G.Affine.t) : G.Affine.t =
-    let t = f t in
-    Snarky_bn382.G.Affine.(G.Affine.of_backend t)
-  in
   let unshifted =
     let v = unshifted t in
     Array.init (Snarky_bn382.G.Affine.Vector.length v) (fun i ->
-        gvec v (fun v -> Snarky_bn382.G.Affine.Vector.get v i) )
+        G.Affine.of_backend (Snarky_bn382.G.Affine.Vector.get v i) )
   in
   let shifted = shifted t in
   let open Dlog_marlin_types.Poly_comm in
   match shifted with
   | Some g ->
-    `With_degree_bound
-      { With_degree_bound.unshifted
-      ; shifted= G.Affine.of_backend g
-      }
-  | None -> `Without_degree_bound unshifted
+      `With_degree_bound
+        {With_degree_bound.unshifted; shifted= G.Affine.of_backend g}
+  | None ->
+      `Without_degree_bound unshifted
 
 (* TODO: Lots of leakage here. *)
 let of_backend (t : Snarky_bn382.Fq_proof.t) : t =
@@ -120,17 +114,11 @@ let of_backend (t : Snarky_bn382.Fq_proof.t) : t =
            ; g_3= fqv g3 } )
   in
   let fq = fq t in
-  let pc = pc t in
+  let pc f = pc (f t) in
   let wo x =
-    match pc x with
-    | `Without_degree_bound gs -> gs
-    | _ -> assert false
+    match pc x with `Without_degree_bound gs -> gs | _ -> assert false
   in
-  let w x =
-    match pc x with
-    | `With_degree_bound t -> t
-    | _ -> assert false
-  in
+  let w x = match pc x with `With_degree_bound t -> t | _ -> assert false in
   { messages=
       { w_hat= wo w_comm
       ; z_hat_a= wo za_comm
@@ -172,7 +160,7 @@ let field_vector_of_list xs =
   List.iter ~f:(Fq.Vector.emplace_back v) xs ;
   v
 
-let to_backend' vk chal_polys primary_input
+let to_backend' (chal_polys : Challenge_polynomial.t list) primary_input
     ({ messages=
          { w_hat= w_comm
          ; z_hat_a= za_comm
@@ -188,28 +176,8 @@ let to_backend' vk chal_polys primary_input
     let t = create a b in
     Caml.Gc.finalise delete t ; t
   in
-  let pcw (commitment : G.Affine.t Dlog_marlin_types.Poly_comm.With_degree_bound.t) =
-    let unsh =
-      let v = Snarky_bn382.G.Affine.Vector.create () in
-      Array.iter commitment.unshifted ~f:(fun c ->
-          (* Very leaky *)
-          Snarky_bn382.G.Affine.Vector.emplace_back v (g c) ) ;
-      v
-    in
-    let t = Snarky_bn382.Fq_poly_comm.make unsh (Some (g commitment.shifted)) in
-    t
-  in
-  let pcwo (commitment : G.Affine.t Dlog_marlin_types.Poly_comm.Without_degree_bound.t) =
-    let unsh =
-      let v = Snarky_bn382.G.Affine.Vector.create () in
-      Array.iter commitment ~f:(fun c ->
-          (* Very leaky *)
-          Snarky_bn382.G.Affine.Vector.emplace_back v (g c) ) ;
-      v
-    in
-    let t = Snarky_bn382.Fq_poly_comm.make unsh None in
-    t
-  in
+  let pcw = Fq_poly_comm.with_degree_bound_to_backend in
+  let pcwo = Fq_poly_comm.without_degree_bound_to_backend in
   let lr =
     let v = Snarky_bn382.G.Affine.Pair.Vector.create () in
     Array.iter lr ~f:(fun (l, r) ->
@@ -219,39 +187,38 @@ let to_backend' vk chal_polys primary_input
     v
   in
   let challenges =
-    List.map chal_polys ~f:(fun {Dlog_marlin_types.Challenge_polynomial.challenges; commitment} ->
-        challenges )
+    List.map chal_polys
+      ~f:(fun {Challenge_polynomial.challenges; commitment= _} -> challenges)
     |> Array.concat |> Fq.Vector.of_array
   in
   let commitments =
     Array.of_list_map chal_polys
-      ~f:(fun {Dlog_marlin_types.Challenge_polynomial.commitment; _} ->
+      ~f:(fun {Challenge_polynomial.commitment; challenges= _} ->
         G.Affine.to_backend commitment )
     |> G.Affine.Vector.of_array
   in
-  Snarky_bn382.Fq_proof.make vk primary_input (pcwo w_comm) (pcwo za_comm)
+  Snarky_bn382.Fq_proof.make primary_input (pcwo w_comm) (pcwo za_comm)
     (pcwo zb_comm) (pcwo h1_comm) (pcw g1_comm) (pcwo h2_comm) (pcw g2_comm)
     (pcwo h3_comm) (pcw g3_comm) sigma2 sigma3 lr z_1 z_2 (g delta) (g sg)
     (* Leaky! *)
     (eval_to_backend evals0)
     (eval_to_backend evals1) (eval_to_backend evals2) challenges commitments
 
-let to_backend vk chal_polys primary_input t =
-  to_backend' vk chal_polys (field_vector_of_list primary_input) t
+let to_backend chal_polys primary_input t =
+  to_backend' chal_polys (field_vector_of_list primary_input) t
 
 let create ?message pk ~primary ~auxiliary =
-  let chal_polys = match message with
-    | Some s -> s
-    | None -> []
+  let chal_polys =
+    match (message : message option) with Some s -> s | None -> []
   in
   let challenges =
-    List.map chal_polys ~f:(fun {Dlog_marlin_types.Challenge_polynomial.challenges; _} ->
+    List.map chal_polys ~f:(fun {Challenge_polynomial.challenges; _} ->
         challenges )
     |> Array.concat |> Fq.Vector.of_array
   in
   let commitments =
     Array.of_list_map chal_polys
-      ~f:(fun {Dlog_marlin_types.Challenge_polynomial.commitment; _} ->
+      ~f:(fun {Challenge_polynomial.commitment; _} ->
         G.Affine.to_backend commitment )
     |> G.Affine.Vector.of_array
   in
@@ -268,11 +235,21 @@ let batch_verify' (conv : 'a -> Fq.Vector.t)
   let open Snarky_bn382.Fq_proof in
   let v = Vector.create () in
   List.iter ts ~f:(fun (t, xs, m) ->
-      let p = to_backend' vk (Option.value ~default:[] m) (conv xs) t in
+      let p = to_backend' (Option.value ~default:[] m) (conv xs) t in
       Vector.emplace_back v p ; delete p ) ;
   let res = batch_verify vk v in
   Vector.delete v ; res
 
-let batch_verify vk = batch_verify' field_vector_of_list
+let batch_verify =
+  batch_verify' (fun xs -> field_vector_of_list (Fq.one :: xs))
 
-let verify ?message t vk xs : bool = batch_verify' Fn.id [(t, xs, message)] vk
+let verify ?message t vk (xs : Fq.Vector.t) : bool =
+  batch_verify'
+    (fun xs ->
+      let v = Fq.Vector.create () in
+      Fq.Vector.emplace_back v Fq.one ;
+      for i = 0 to Fq.Vector.length xs - 1 do
+        Fq.Vector.emplace_back v (Fq.Vector.get xs i)
+      done ;
+      v )
+    [(t, xs, message)] vk
