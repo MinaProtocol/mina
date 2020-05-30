@@ -7,46 +7,14 @@ pub mod tweedle;
 
 
 use algebra::{
-    ToBytes, FromBytes, One, Zero,
     biginteger::{BigInteger, BigInteger384},
     bn_382::{
-        g::{Affine as GAffine, Projective as GProjective},
-        Bn_382, G1Affine, G1Projective, G2Affine,
-        g1::Bn_382G1Parameters,
-        g::Bn_382GParameters,
-        fp::{Fp, FpParameters as Fp_params},
-        fq::{Fq, FqParameters as Fq_params},
+        fp::{Fp, },
     },
-    curves::{
-        PairingEngine,
-        AffineCurve, ProjectiveCurve,
-    },
-    fields::{
-        Field, FpParameters, PrimeField, SquareRootField, FftField,
-    },
-    UniformRand,
 };
 
-
-
-use ff_fft::{Evaluations, DensePolynomial, EvaluationDomain, Radix2EvaluationDomain as Domain, GeneralEvaluationDomain};
 use num_bigint::BigUint;
 use oracle::{self, poseidon, poseidon::Sponge};
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 // Bigint stubs
 
