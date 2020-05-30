@@ -22,24 +22,24 @@ use algebra::{
 use commitment_pairing::urs::{URS};
 use evaluation_domains::EvaluationDomains;
 use circuits_pairing::index::{Index, VerifierIndex, MatrixValues, URSSpec};
-use ff_fft::{Evaluations, DensePolynomial, EvaluationDomain, Radix2EvaluationDomain as Domain, GeneralEvaluationDomain};
-use num_bigint::BigUint;
-use oracle::{self, marlin_sponge::{ScalarChallenge, DefaultFqSponge, DefaultFrSponge}, poseidon, poseidon::Sponge};
+use ff_fft::{Evaluations, DensePolynomial, EvaluationDomain, Radix2EvaluationDomain as Domain};
+
+use oracle::{self, marlin_sponge::{DefaultFqSponge, DefaultFrSponge}, poseidon, poseidon::Sponge};
 use protocol_pairing::{prover::{ ProverProof, ProofEvaluations, RandomOracles}};
 use rand::rngs::StdRng;
 use rand_core;
-use sprs::{CsMat, CsVecView, CSR};
+
 use std::os::raw::c_char;
 use std::ffi::CStr;
 use std::fs::File;
 use std::io::{Read, Result as IoResult, Write, BufReader, BufWriter};
-use groupmap::GroupMap;
 
-use commitment_dlog::{commitment::{CommitmentCurve, PolyComm, product, b_poly_coefficients, OpeningProof}, srs::{SRS}};
-use circuits_dlog::index::{Index as DlogIndex, VerifierIndex as DlogVerifierIndex, SRSSpec, SRSValue};
-use protocol_dlog::prover::{ProverProof as DlogProof, ProofEvaluations as DlogProofEvaluations};
 
-use algebra::bn_382::g::Affine;
+
+
+
+
+
 
 // Fp stubs
 
@@ -620,7 +620,7 @@ pub extern "C" fn camlsnark_bn382_fp_proof_g3_comm_nocopy(p: *mut ProverProof<Bn
 #[no_mangle]
 pub extern "C" fn camlsnark_bn382_fp_proof_commitment_with_degree_bound_0(
     p: *const (G1Affine, G1Affine)) -> *const G1Affine {
-    let (x0, _) = unsafe { (*p)};
+    let (x0, _) = unsafe { *p};
     return Box::into_raw(Box::new(x0.clone()));
 }
 
@@ -1617,7 +1617,7 @@ pub extern "C" fn camlsnark_bn382_fq_sponge_absorb(
 ) {
     let sponge = unsafe { &mut (*sponge) };
     let params = unsafe { &(*params) };
-    let x = unsafe { (*x) };
+    let x = unsafe { *x };
 
     sponge.absorb(params, &[x]);
 }
@@ -1638,14 +1638,14 @@ pub extern "C" fn camlsnark_bn382_fq_sponge_squeeze(
 #[no_mangle]
 pub extern "C" fn camlsnark_bn382_g1_affine_pair_0(
     p: *const (G1Affine, G1Affine)) -> *const G1Affine {
-    let (x0, _) = unsafe { (*p)};
+    let (x0, _) = unsafe { *p};
     return Box::into_raw(Box::new(x0.clone()));
 }
 
 #[no_mangle]
 pub extern "C" fn camlsnark_bn382_g1_affine_pair_1(
     p: *const (G1Affine, G1Affine)) -> *const G1Affine {
-    let (_, x1) = unsafe { (*p)};
+    let (_, x1) = unsafe { *p};
     return Box::into_raw(Box::new(x1.clone()));
 }
 

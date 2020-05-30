@@ -19,16 +19,16 @@ use algebra::{
     },
     UniformRand,
 };
-use commitment_pairing::urs::{URS};
+
 use evaluation_domains::EvaluationDomains;
-use circuits_pairing::index::{Index, VerifierIndex, MatrixValues, URSSpec};
-use ff_fft::{Evaluations, DensePolynomial, EvaluationDomain, Radix2EvaluationDomain as Domain, GeneralEvaluationDomain};
-use num_bigint::BigUint;
-use oracle::{self, marlin_sponge::{ScalarChallenge, DefaultFqSponge, DefaultFrSponge}, poseidon, poseidon::Sponge};
-use protocol_pairing::{prover::{ ProverProof, ProofEvaluations, RandomOracles}};
+
+use ff_fft::{Evaluations, DensePolynomial, EvaluationDomain, Radix2EvaluationDomain as Domain};
+
+use oracle::{self, marlin_sponge::{ScalarChallenge, DefaultFqSponge, DefaultFrSponge}, poseidon::Sponge};
+
 use rand::rngs::StdRng;
 use rand_core;
-use sprs::{CsMat, CsVecView, CSR};
+
 use std::os::raw::c_char;
 use std::ffi::CStr;
 use std::fs::File;
@@ -796,19 +796,19 @@ pub extern "C" fn camlsnark_bn382_fq_constraint_matrix_delete(x: *mut Vec<(Vec<u
 // Fq triple
 #[no_mangle]
 pub extern "C" fn camlsnark_bn382_fq_triple_0(evals: *const [Fq; 3]) -> *const Fq {
-    let x = (unsafe { (*evals) })[0].clone();
+    let x = (unsafe { *evals })[0].clone();
     return Box::into_raw(Box::new(x));
 }
 
 #[no_mangle]
 pub extern "C" fn camlsnark_bn382_fq_triple_1(evals: *const [Fq; 3]) -> *const Fq {
-    let x = (unsafe { (*evals) })[1].clone();
+    let x = (unsafe { *evals })[1].clone();
     return Box::into_raw(Box::new(x));
 }
 
 #[no_mangle]
 pub extern "C" fn camlsnark_bn382_fq_triple_2(evals: *const [Fq; 3]) -> *const Fq {
-    let x = (unsafe { (*evals) })[2].clone();
+    let x = (unsafe { *evals })[2].clone();
     return Box::into_raw(Box::new(x));
 }
 
@@ -958,14 +958,14 @@ pub extern "C" fn camlsnark_bn382_g_affine_delete(x: *mut GAffine) {
 #[no_mangle]
 pub extern "C" fn camlsnark_bn382_g_affine_pair_0(
     p: *const (GAffine, GAffine)) -> *const GAffine {
-    let (x0, _) = unsafe { (*p)};
+    let (x0, _) = unsafe { *p};
     return Box::into_raw(Box::new(x0.clone()));
 }
 
 #[no_mangle]
 pub extern "C" fn camlsnark_bn382_g_affine_pair_1(
     p: *const (GAffine, GAffine)) -> *const GAffine {
-    let (_, x1) = unsafe { (*p)};
+    let (_, x1) = unsafe { *p};
     return Box::into_raw(Box::new(x1.clone()));
 }
 
