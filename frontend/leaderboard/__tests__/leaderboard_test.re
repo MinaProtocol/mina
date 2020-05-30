@@ -20,16 +20,16 @@ describe("Metrics", () => {
   describe("blocksCreatedMetric", () => {
     let blockMetrics = Metrics.getBlocksCreatedByUser(blocks);
     test("correct number of users", () => {
-      expect(StringMap.cardinal(blockMetrics)) |> toBe(7)
+      expect(StringMap.cardinal(blockMetrics)) |> toBe(4)
     });
     test("correct number of blocks for publickey1", () => {
-      expect(StringMap.find("publickey1", blockMetrics)) |> toBe(3)
+      expect(StringMap.find("publickey1", blockMetrics)) |> toBe(4)
     });
     test("correct number of blocks for publickey2", () => {
-      expect(StringMap.find("publickey2", blockMetrics)) |> toBe(2)
+      expect(StringMap.find("publickey2", blockMetrics)) |> toBe(3)
     });
     test("correct number of blocks for publickey3", () => {
-      expect(StringMap.find("publickey3", blockMetrics)) |> toBe(1)
+      expect(StringMap.find("publickey3", blockMetrics)) |> toBe(2)
     });
   })
 });
@@ -49,31 +49,86 @@ describe("Challenges", () => {
 
   describe("Points functions", () => {
     let blockMetrics = blocks |> Metrics.calculateMetrics;
-    describe(
-      "addPointsToAtleastN adds correct number of points with atleast 1", () => {
-      let blockPoints =
-        Challenges.addPointsToUsersWithAtleastN(
-          (metricRecord: Types.Metrics.metricRecord) =>
-            metricRecord.blocksCreated,
-          1,
-          1000,
-          blockMetrics,
-        );
 
-      test("correct number of points given to publickey1", () => {
-        expect(StringMap.find("publickey1", blockPoints)) |> toBe(1000)
+    describe("addPointsToAtleastN", () => {
+      describe("adds correct number of points with atleast 1", () => {
+        let blockPoints =
+          Challenges.addPointsToUsersWithAtleastN(
+            (metricRecord: Types.Metrics.metricRecord) =>
+              metricRecord.blocksCreated,
+            1,
+            1000,
+            blockMetrics,
+          );
+
+        test("correct number of points given to publickey1", () => {
+          expect(StringMap.find("publickey1", blockPoints)) |> toBe(1000)
+        });
+        test("correct number of points given to publickey2", () => {
+          expect(StringMap.find("publickey2", blockPoints)) |> toBe(1000)
+        });
+        test("correct number of points given to publickey3", () => {
+          expect(StringMap.find("publickey3", blockPoints)) |> toBe(1000)
+        });
+        test("no points exist for publickey8", () => {
+          expect(() =>
+            StringMap.find("publickey8", blockPoints)
+          )
+          |> toThrowException(Not_found)
+        });
       });
-      test("correct number of points given to publickey2", () => {
-        expect(StringMap.find("publickey2", blockPoints)) |> toBe(1000)
+
+      describe("adds correct number of points with atleast 3", () => {
+        let blockPoints =
+          Challenges.addPointsToUsersWithAtleastN(
+            (metricRecord: Types.Metrics.metricRecord) =>
+              metricRecord.blocksCreated,
+            3,
+            1000,
+            blockMetrics,
+          );
+
+        test("correct number of points given to publickey1", () => {
+          expect(StringMap.find("publickey1", blockPoints)) |> toBe(1000)
+        });
+
+        test("no points exist for publickey2", () => {
+          expect(() =>
+            StringMap.find("publickey2", blockPoints)
+          )
+          |> toThrowException(Not_found)
+        });
       });
-      test("correct number of points given to publickey3", () => {
-        expect(StringMap.find("publickey3", blockPoints)) |> toBe(1000)
-      });
-      test("no points exist for publickey8", () => {
-        expect(() =>
-          StringMap.find("publickey8", blockPoints)
-        )
-        |> toThrowException(Not_found)
+      describe("applyTopNPoints", () => {
+        describe("adds correct number of points to top 3", () => {
+          let blockPoints =
+            Challenges.applyTopNPoints(
+              3,
+              1000,
+              blockMetrics,
+              (metricRecord: Types.Metrics.metricRecord) =>
+              metricRecord.blocksCreated
+            );
+
+          test("correct number of points given to publickey1", () => {
+            expect(StringMap.find("publickey1", blockPoints)) |> toBe(1000)
+          });
+
+          test("correct number of points given to publickey2", () => {
+            expect(StringMap.find("publickey2", blockPoints)) |> toBe(1000)
+          });
+
+          test("correct number of points given to publickey3", () => {
+            expect(StringMap.find("publickey3", blockPoints)) |> toBe(1000)
+          });
+
+          test("no points exist for publickey4", () => {
+            expect(() =>
+              StringMap.find("publickey4", blockPoints)
+            )
+            |> toThrowException(Not_found)
+          });
+        })
       });
     });
   });
