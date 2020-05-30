@@ -5,6 +5,8 @@ let B/Plugins/Partial = B.definitions/commandStep/properties/plugins/Type
 let Map = Prelude.Map
 
 let Cmd = ../Lib/Cmds.dhall
+let Decorate = ../Lib/Decorate.dhall
+
 let Docker = ./Docker/Type.dhall
 let Base = ./Base.dhall
 
