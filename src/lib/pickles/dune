@@ -11,15 +11,9 @@
     sgn_type
     sponge
     group_map
+    snarky_group_map
     snarky_curve
     snarky
     snarkette
     key_cache
     core_kernel ))
-
-(rule
- (targets precomputed_values.ml)
- (deps
-  (:< gen/gen.exe))
- (action
-  (run %{<} %{targets})))
