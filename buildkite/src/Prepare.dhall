@@ -15,6 +15,7 @@ let config : Pipeline.Config.Type = Pipeline.Config::{
     dirtyWhen = ""
   },
   steps = [
+  Command.build
     Command.Config::{
       commands = [
         "./buildkite/scripts/generate-jobs.sh > buildkite/src/gen/Jobs.dhall",

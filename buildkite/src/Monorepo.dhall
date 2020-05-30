@@ -35,6 +35,7 @@ in Pipeline.build Pipeline.Config::{
     dirtyWhen = ""
   },
   steps = [
+  Command.build
     Command.Config::{
       commands = prefixCommands # commands,
       label = "Monorepo triage",

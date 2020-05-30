@@ -21,6 +21,7 @@ Pipeline.build
   Pipeline.Config::{
     spec = ./Spec.dhall,
     steps = [
+    Command.build
       Command.Config::{
         commands = Command/Decorate.decorateAll commands,
         label = "Fast lint steps; CODEOWNERs, RFCs, Check Snarky Submodule, Preprocessor Deps",

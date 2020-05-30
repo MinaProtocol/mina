@@ -9,6 +9,7 @@ Pipeline.build
   Pipeline.Config::{
     spec = ./Spec.dhall,
     steps = [
+    Command.build
       Command.Config::{
         commands = [ "echo \"hello2\"" ],
         label = "Test Echo2", key = "hello2",

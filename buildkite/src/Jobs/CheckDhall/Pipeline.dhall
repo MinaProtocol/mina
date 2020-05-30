@@ -9,6 +9,7 @@ Pipeline.build
   Pipeline.Config::{
     spec = ./Spec.dhall,
     steps = [
+    Command.build
       Command.Config::{
         commands = [ "cd buildkite && make check" ],
         label = "Check all CI Dhall entrypoints",
