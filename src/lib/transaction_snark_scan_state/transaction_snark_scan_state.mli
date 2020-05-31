@@ -92,7 +92,8 @@ end
 
 val staged_undos : t -> Staged_undos.t
 
-val empty : unit -> t
+val empty :
+  constraint_constants:Genesis_constants.Constraint_constants.t -> unit -> t
 
 val fill_work_and_enqueue_transactions :
      t
