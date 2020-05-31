@@ -1,20 +1,14 @@
 module Bigint = struct
   module R = struct
-    include Bigint.R
+    include Fq.Bigint
 
-    let to_field x =
-      let r = Snarky_bn382.Fq.of_bigint x in
-      Gc.finalise Snarky_bn382.Fq.delete r ;
-      r
+    let to_field = Fq.of_bigint
 
-    let of_field x =
-      let r = Snarky_bn382.Fq.to_bigint x in
-      Gc.finalise Snarky_bn382.Bigint.delete r ;
-      r
+    let of_field = Fq.to_bigint
   end
 end
 
-let field_size : Bigint.R.t = Snarky_bn382.Fp.size ()
+let field_size : Bigint.R.t = Snarky_bn382.Fq.size ()
 
 module Field = Fq
 module R1CS_constraint_system =

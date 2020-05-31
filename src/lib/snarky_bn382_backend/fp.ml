@@ -1,1 +1,4 @@
-include Field.Make (Snarky_bn382.Fp)
+include Field.Make (struct
+    module Bigint = Bigint.T384
+    include Snarky_bn382.Fp
+  end)

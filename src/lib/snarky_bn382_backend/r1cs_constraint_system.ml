@@ -48,7 +48,7 @@ let digest (t : _ t) = Hash_state.digest t.hash
 module Make (Fp : sig
   include Field.S
 
-  val to_bigint_raw_noalloc : t -> Bigint.R.t
+  val to_bigint_raw_noalloc : t -> Bigint.t
 end)
 (Mat : Constraint_matrix_intf with type field_vector := Fp.Vector.t) =
 struct
@@ -56,14 +56,13 @@ struct
 
   module Hash_state = struct
     include Hash_state
-    module B = Snarky_bn382.Bigint
 
     let feed_constraint t (a, b, c) =
-      let n = Bigint.R.length_in_bytes in
+      let n = Fp.Bigint.length_in_bytes in
       let buf = Bytes.init (n + 8) ~f:(fun _ -> '\000') in
       let one x t =
         List.fold x ~init:t ~f:(fun acc (x, index) ->
-            let limbs = B.to_data (Fp.to_bigint_raw_noalloc x) in
+            let limbs = Fp.Bigint.to_ptr (Fp.to_bigint_raw_noalloc x) in
             for i = 0 to n - 1 do
               Bytes.set buf i Ctypes.(!@(limbs +@ i))
             done ;

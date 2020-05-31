@@ -1,20 +1,21 @@
 open Intf
-module B = Bigint
 open Core
 open Snarky_bn382
 
 module type Input_intf = sig
   include Type_with_delete
 
-  val to_bigint : t -> B.R.t
+  module Bigint : Bigint.Intf
 
-  val of_bigint : B.R.t -> t
+  val to_bigint : t -> Bigint.t
 
-  val to_bigint_raw : t -> B.R.t
+  val of_bigint : Bigint.t -> t
 
-  val to_bigint_raw_noalloc : t -> B.R.t
+  val to_bigint_raw : t -> Bigint.t
 
-  val of_bigint_raw : B.R.t -> t
+  val to_bigint_raw_noalloc : t -> Bigint.t
+
+  val of_bigint_raw : Bigint.t -> t
 
   val of_int : Unsigned.UInt64.t -> t
 
@@ -57,6 +58,7 @@ module type Input_intf = sig
 end
 
 module type S = sig
+  module Bigint : Bigint.Intf
   module Stable : sig
     module V1 : sig
       type t [@@deriving version, sexp, bin_io, compare, yojson]
@@ -67,11 +69,11 @@ module type S = sig
 
   type t = Stable.Latest.t [@@deriving sexp, compare, yojson, bin_io]
 
-  val to_bigint : t -> B.R.t
+  val to_bigint : t -> Bigint.t
 
-  val to_bigint_raw_noalloc : t -> B.R.t
+  val to_bigint_raw_noalloc : t -> Bigint.t
 
-  val of_bigint : B.R.t -> t
+  val of_bigint : Bigint.t -> t
 
   val of_int : int -> t
 
@@ -158,8 +160,13 @@ module type S = sig
   end
 end
 
-module Make (F : Input_intf) : S with type Stable.V1.t = F.t = struct
+module Make (F : Input_intf) : S
+  with type Stable.V1.t = F.t
+   and module Bigint = F.Bigint
+= struct
   open F
+
+  module Bigint = Bigint
 
   let gc2 op x1 x2 =
     let r = op x1 x2 in
@@ -171,7 +178,7 @@ module Make (F : Input_intf) : S with type Stable.V1.t = F.t = struct
 
   let to_bigint x =
     let r = to_bigint x in
-    Caml.Gc.finalise Snarky_bn382.Bigint.delete r ;
+    Caml.Gc.finalise Bigint.delete r ;
     r
 
   let of_bigint = gc1 of_bigint
@@ -186,7 +193,7 @@ module Make (F : Input_intf) : S with type Stable.V1.t = F.t = struct
 
       (* TODO: Don't allocate the bigint when writing and reading *)
       include Binable.Of_binable
-                (B.R)
+                (Bigint)
                 (struct
                   type nonrec t = t
 
@@ -196,7 +203,7 @@ module Make (F : Input_intf) : S with type Stable.V1.t = F.t = struct
                 end)
 
       include Sexpable.Of_sexpable
-                (B.R)
+                (Bigint)
                 (struct
                   type nonrec t = t
 
@@ -205,15 +212,15 @@ module Make (F : Input_intf) : S with type Stable.V1.t = F.t = struct
                   let of_sexpable = of_bigint
                 end)
 
-      let compare t1 t2 = B.R.compare (to_bigint t1) (to_bigint t2)
+      let compare t1 t2 = Bigint.compare (to_bigint t1) (to_bigint t2)
 
       let to_yojson t : Yojson.Safe.json =
-        `String (B.R.to_hex_string (to_bigint t))
+        `String (Bigint.to_hex_string (to_bigint t))
 
       let of_yojson j =
         match j with
         | `String h ->
-            Ok (of_bigint (B.R.of_hex_string h))
+            Ok (of_bigint (Bigint.of_hex_string h))
         | _ ->
             Error "expected hex string"
     end

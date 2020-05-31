@@ -1,16 +1,10 @@
 module Bigint = struct
   module R = struct
-    include Bigint.R
+    include Fp.Bigint
 
-    let to_field x =
-      let r = Snarky_bn382.Fp.of_bigint x in
-      Gc.finalise Snarky_bn382.Fp.delete r ;
-      r
+    let to_field = Fp.of_bigint
 
-    let of_field x =
-      let r = Snarky_bn382.Fp.to_bigint x in
-      Gc.finalise Snarky_bn382.Bigint.delete r ;
-      r
+    let of_field = Fp.to_bigint
   end
 end
 
