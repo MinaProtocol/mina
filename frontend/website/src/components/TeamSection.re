@@ -508,16 +508,12 @@ let make = () => {
       <Member
         name="Ahmad Wilson"
         title="Protocol Reliability Eng"
-        description="Ahmad is a computer scientist and self-proclaimed “tech-head” interested in software infrastructure, \
-      developer tools and user-interface engineering and a strong believer in the power of distributed networks \
-      and AI/automation as major force multipliers and problem solvers. He holds a MSc. in Human-Computer \
-      Interaction & Artificial Intelligence from Brown University, a BS. in Computer Science from Morehouse \
-      College and has worked for a variety of organizations, ranging from a startup aimed at developing the world's \
-      first civic voter network to larger corporations such as Yelp and Microsoft, throughout over a decade of \
-      experience as a software developer. In his free time he enjoys supporting his native New England based \
-      sports teams (Go Pats!), keeping a variety of plants alive in his home garden, nerding out over the \
-      latest tech and sci-fi movies and learning anything he can about cryptography/cryptocurrency, blockchains \
-      and the future of the decentralized web."
+        description="Ahmad is a computer scientist and self-proclaimed “tech-head” \
+        interested in software infrastructure, user-interfaces and AI/automation. \
+        He holds a MSc in HCI & AI from Brown University, and a BS in CS from Morehouse College. \
+        He has developed software for startups and larger corporations such as Yelp and Microsoft for over a decade. \
+        He's a fan of New England sports teams (Go Pats!), gardening, sci-fi and learning about \
+         cryptocurrency and the future of the decentralized web."
       />
       <Member
         name="Bijan Shahrokhi"
