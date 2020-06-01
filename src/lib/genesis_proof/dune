@@ -4,6 +4,7 @@
  (libraries
    coda_base
    coda_state
+   consensus
    keys_lib
    genesis_constants
    with_hash)

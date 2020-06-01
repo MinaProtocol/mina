@@ -154,6 +154,20 @@ module Ledger = struct
           ~metadata:[("path", `String filename)] ;
         None )
     in
+    let load_from_s3 filename =
+      let s3_path = s3_bucket_prefix ^/ filename in
+      let local_path = Cache_dir.s3_install_path ^/ filename in
+      match%bind Cache_dir.load_from_s3 [s3_path] [local_path] ~logger with
+      | Ok () ->
+          file_exists filename Cache_dir.s3_install_path
+      | Error e ->
+          Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
+            "Could not download genesis ledger from $uri: $error"
+            ~metadata:
+              [ ("uri", `String s3_path)
+              ; ("error", `String (Error.to_string_hum e)) ] ;
+          return None
+    in
     let%bind hash_filename =
       match config.hash with
       | Some hash -> (
@@ -164,21 +178,8 @@ module Ledger = struct
           match tar_path with
           | Some _ ->
               return tar_path
-          | None -> (
-              let s3_path = s3_bucket_prefix ^/ hash_filename in
-              let local_path = Cache_dir.s3_install_path ^/ hash_filename in
-              match%bind
-                Cache_dir.load_from_s3 [s3_path] [local_path] ~logger
-              with
-              | Ok () ->
-                  file_exists hash_filename Cache_dir.s3_install_path
-              | Error e ->
-                  Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
-                    "Could not download genesis ledger from $uri: $error"
-                    ~metadata:
-                      [ ("uri", `String s3_path)
-                      ; ("error", `String (Error.to_string_hum e)) ] ;
-                  return None ) )
+          | None ->
+              load_from_s3 hash_filename )
       | None ->
           return None
     in
@@ -190,12 +191,18 @@ module Ledger = struct
       | Hash hash ->
           assert (Some hash = config.hash) ;
           return None
-      | Accounts accounts ->
+      | Accounts accounts -> (
           let named_filename =
             named_filename ~constraint_constants
               ~num_accounts:config.num_accounts (accounts_name accounts)
           in
-          Deferred.List.find_map ~f:(file_exists named_filename) search_paths
+          match%bind
+            Deferred.List.find_map ~f:(file_exists named_filename) search_paths
+          with
+          | Some path ->
+              return (Some path)
+          | None ->
+              load_from_s3 named_filename )
       | Named name ->
           let named_filename =
             named_filename ~constraint_constants
@@ -373,7 +380,7 @@ module Ledger = struct
                   in
                   (* Add a symlink from the named path to the hash path. *)
                   let%map () = Unix.symlink ~target:tar_path ~link_name in
-                  Logger.error ~module_:__MODULE__ ~location:__LOC__ logger
+                  Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
                     "Linking ledger file $tar_path to $named_tar_path"
                     ~metadata:
                       [ ("tar_path", `String tar_path)
@@ -438,10 +445,14 @@ module Genesis_proof = struct
 
   let generate_inputs ~proof_level ~ledger ~constraint_constants
       ~(genesis_constants : Genesis_constants.t) =
+    let consensus_constants =
+      Consensus.Constants.create ~constraint_constants
+        ~protocol_constants:genesis_constants.protocol
+    in
     let protocol_state_with_hash =
       Coda_state.Genesis_protocol_state.t
         ~genesis_ledger:(Genesis_ledger.Packed.t ledger)
-        ~constraint_constants ~genesis_constants
+        ~constraint_constants ~consensus_constants
     in
     let%map base_hash =
       match proof_level with
@@ -450,22 +461,25 @@ module Genesis_proof = struct
       | _ ->
           return Snark_params.Tick.Field.zero
     in
-    { Genesis_proof.Inputs.genesis_ledger= ledger
+    { Genesis_proof.Inputs.constraint_constants
+    ; genesis_ledger= ledger
+    ; consensus_constants
     ; protocol_state_with_hash
     ; base_hash
     ; genesis_constants }
 
-  let generate ~proof_level ~constraint_constants inputs =
+  let generate ~proof_level inputs =
     (* TODO(4829): Runtime proof-level. *)
     match proof_level with
     | Genesis_constants.Proof_level.Full ->
         let%map ((module Keys) as keys) = Keys_lib.Keys.create () in
-        Genesis_proof.create_values ~constraint_constants ~proof_level ~keys
-          inputs
+        Genesis_proof.create_values ~proof_level ~keys inputs
     | _ ->
         return
-          { Genesis_proof.genesis_constants= inputs.genesis_constants
+          { Genesis_proof.constraint_constants= inputs.constraint_constants
+          ; genesis_constants= inputs.genesis_constants
           ; genesis_ledger= inputs.genesis_ledger
+          ; consensus_constants= inputs.consensus_constants
           ; protocol_state_with_hash= inputs.protocol_state_with_hash
           ; base_hash= inputs.base_hash
           ; genesis_proof= Dummy_values.Tock.Bowe_gabizon18.proof }
@@ -484,15 +498,18 @@ module Genesis_proof = struct
         >>| Sexp.of_string >>| Proof.Stable.V1.t_of_sexp )
 
   let load_or_generate ~genesis_dir ~logger ~may_generate ~proof_level
-      ~constraint_constants (inputs : Genesis_proof.Inputs.t) =
+      (inputs : Genesis_proof.Inputs.t) =
     let compiled = Precomputed_values.compiled in
     match%bind find_file ~logger ~base_hash:inputs.base_hash with
     | Some file -> (
         match%map load file with
         | Ok genesis_proof ->
             Ok
-              ( { Genesis_proof.genesis_constants= inputs.genesis_constants
+              ( { Genesis_proof.constraint_constants=
+                    inputs.constraint_constants
+                ; genesis_constants= inputs.genesis_constants
                 ; genesis_ledger= inputs.genesis_ledger
+                ; consensus_constants= inputs.consensus_constants
                 ; protocol_state_with_hash= inputs.protocol_state_with_hash
                 ; base_hash= inputs.base_hash
                 ; genesis_proof }
@@ -516,8 +533,10 @@ module Genesis_proof = struct
             ; ("compiled_hash", Ledger_hash.to_yojson compiled.base_hash) ] ;
         let filename = genesis_dir ^/ filename ~base_hash:inputs.base_hash in
         let values =
-          { Genesis_proof.genesis_constants= inputs.genesis_constants
+          { Genesis_proof.constraint_constants= inputs.constraint_constants
+          ; genesis_constants= inputs.genesis_constants
           ; genesis_ledger= inputs.genesis_ledger
+          ; consensus_constants= inputs.consensus_constants
           ; protocol_state_with_hash= inputs.protocol_state_with_hash
           ; base_hash= inputs.base_hash
           ; genesis_proof= compiled.genesis_proof }
@@ -542,7 +561,7 @@ module Genesis_proof = struct
           "No genesis proof file was found for $base_hash, generating a new \
            genesis proof"
           ~metadata:[("base_hash", Ledger_hash.to_yojson inputs.base_hash)] ;
-        let%bind values = generate ~proof_level ~constraint_constants inputs in
+        let%bind values = generate ~proof_level inputs in
         let filename = genesis_dir ^/ filename ~base_hash:inputs.base_hash in
         let%map () =
           match%map store ~filename values.genesis_proof with
@@ -626,7 +645,7 @@ let load_config_file filename =
           Or_error.error_string err )
 
 let init_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
-    ~may_generate ~constraint_constants ~proof_level ~genesis_constants
+    ~may_generate ~proof_level ~genesis_constants ~constraint_constants
     (config : Runtime_config.t) =
   let open Deferred.Or_error.Let_syntax in
   let%bind genesis_ledger, ledger_config, ledger_file =
@@ -652,7 +671,7 @@ let init_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
   let open Deferred.Or_error.Let_syntax in
   let%map values, proof_file =
     Genesis_proof.load_or_generate ~genesis_dir ~logger ~may_generate
-      ~proof_level ~constraint_constants proof_inputs
+      ~proof_level proof_inputs
   in
   Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
     "Loaded ledger from $ledger_file and genesis proof from $proof_file"

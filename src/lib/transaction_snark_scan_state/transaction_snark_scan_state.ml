@@ -158,7 +158,7 @@ Stable.Latest.(hash)]
 
 (**********Helpers*************)
 
-let create_expected_statement
+let create_expected_statement ~constraint_constants
     {Transaction_with_witness.transaction_with_info; witness; statement} =
   let open Or_error.Let_syntax in
   let source =
@@ -170,7 +170,8 @@ let create_expected_statement
   in
   let%bind after =
     Or_error.try_with (fun () ->
-        Sparse_ledger.apply_transaction_exn witness.ledger transaction )
+        Sparse_ledger.apply_transaction_exn ~constraint_constants
+          witness.ledger transaction )
   in
   let target =
     Frozen_ledger_hash.of_ledger_hash @@ Sparse_ledger.merkle_root after
@@ -254,7 +255,7 @@ struct
   module Fold = Parallel_scan.State.Make_foldable (M)
 
   (*TODO: fold over the pending_coinbase tree and validate the statements?*)
-  let scan_statement tree ~verifier :
+  let scan_statement ~constraint_constants tree ~verifier :
       (Transaction_snark.Statement.t, [`Error of Error.t | `Empty]) Result.t
       M.t =
     let write_error description =
@@ -325,7 +326,8 @@ struct
           with_error "Bad base statement" ~f:(fun () ->
               let open M.Or_error.Let_syntax in
               let%bind expected_statement =
-                M.return (create_expected_statement transaction)
+                M.return
+                  (create_expected_statement ~constraint_constants transaction)
               in
               if
                 Transaction_snark.Statement.equal transaction.statement
@@ -369,14 +371,14 @@ struct
     | Error e ->
         Error (`Error e)
 
-  let check_invariants t ~verifier ~error_prefix
+  let check_invariants t ~constraint_constants ~verifier ~error_prefix
       ~ledger_hash_end:current_ledger_hash
       ~ledger_hash_begin:snarked_ledger_hash =
     let clarify_error cond err =
       if not cond then Or_error.errorf "%s : %s" error_prefix err else Ok ()
     in
     let open M.Let_syntax in
-    match%map scan_statement ~verifier t with
+    match%map scan_statement ~constraint_constants ~verifier t with
     | Error (`Error e) ->
         Error e
     | Error `Empty ->
@@ -415,11 +417,11 @@ module Staged_undos = struct
 
   type t = undo list
 
-  let apply t ledger =
+  let apply ~constraint_constants t ledger =
     List.fold_left t ~init:(Ok ()) ~f:(fun acc t ->
         Or_error.bind
           (Or_error.map acc ~f:(fun _ -> t))
-          ~f:(fun u -> Ledger.undo ledger u) )
+          ~f:(fun u -> Ledger.undo ~constraint_constants ledger u) )
 end
 
 let statement_of_job : job -> Transaction_snark.Statement.t option = function
@@ -450,9 +452,10 @@ let create ~work_delay ~transaction_capacity_log_2 =
   let k = Int.pow 2 transaction_capacity_log_2 in
   Parallel_scan.empty ~delay:work_delay ~max_base_jobs:k
 
-let empty () =
-  create ~work_delay:Coda_compile_config.work_delay
-    ~transaction_capacity_log_2:Coda_compile_config.transaction_capacity_log_2
+let empty ~(constraint_constants : Genesis_constants.Constraint_constants.t) ()
+    =
+  create ~work_delay:constraint_constants.work_delay
+    ~transaction_capacity_log_2:constraint_constants.transaction_capacity_log_2
 
 let extract_txns txns_with_witnesses =
   (* TODO: This type checks, but are we actually pulling the inverse txn here? *)

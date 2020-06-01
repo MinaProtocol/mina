@@ -36,52 +36,42 @@ let applyTopNPoints = (n, points, metricsMap, getMetricValue) => {
 };
 
 // Examples of using the challenges
-let calculatePoints = metricsMap => {
-  // Get 500 pts if you send txn to the echo service
-  let echoTransactionPoints =
-    addPointsToUsersWithAtleastN(
-      (metricRecord: Types.Metrics.metricRecord) =>
-        metricRecord.transactionsReceivedByEcho,
-      1,
-      500,
-      metricsMap,
-    );
-
-  //Earn 3 fees by producing and selling zk-SNARKs on the snarketplace: 1000 pts*
-  let zkSnark3FeesPoints =
-    addPointsToUsersWithAtleastN(
-      (metricRecord: Types.Metrics.metricRecord) =>
-        metricRecord.snarkFeesCollected,
-      3L,
-      1000,
-      metricsMap,
-    );
-
-  //Anyone who earned 50 fees will be rewarded with an additional 1000 pts
-  let zkSnark50FeesPoints =
-    addPointsToUsersWithAtleastN(
-      (metricRecord: Types.Metrics.metricRecord) =>
-        metricRecord.snarkFeesCollected,
-      50L,
-      1000,
-      metricsMap,
-    );
-
-  // Producing at least 3 blocks will earn an additional 1000 pts
-  let blocksCreatedPoints =
-    addPointsToUsersWithAtleastN(
-      (metricRecord: Types.Metrics.metricRecord) =>
-        metricRecord.blocksCreated,
-      3,
-      1000,
-      metricsMap,
-    );
-
-  // Give Top 10 Block Producers 1500 pts
-  let topTenBlockProducerPoints =
-    applyTopNPoints(
-      10, 1500, metricsMap, (metricRecord: Types.Metrics.metricRecord) =>
-      metricRecord.blocksCreated
-    );
-  ();
+let calculatePoints = (challengeID, metricsMap) => {
+  switch (Js.String.match([%re "/\s*([a-zA-z\s*]+)\s*/"], challengeID)) {
+  | Some(res) =>
+    switch (res[1]) {
+    | "Blocks" =>
+      Some(
+        addPointsToUsersWithAtleastN(
+          (metricRecord: Types.Metrics.metricRecord) =>
+            metricRecord.blocksCreated,
+          3,
+          1000,
+          metricsMap,
+        ),
+      )
+    | "Snark Fees" =>
+      Some(
+        addPointsToUsersWithAtleastN(
+          (metricRecord: Types.Metrics.metricRecord) =>
+            metricRecord.snarkFeesCollected,
+          3L,
+          1000,
+          metricsMap,
+        ),
+      )
+    | "Echo Transaction" =>
+      Some(
+        addPointsToUsersWithAtleastN(
+          (metricRecord: Types.Metrics.metricRecord) =>
+            metricRecord.transactionsReceivedByEcho,
+          1,
+          500,
+          metricsMap,
+        ),
+      )
+    | _ => None
+    }
+  | None => None
+  };
 };

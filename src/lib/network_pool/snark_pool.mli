@@ -70,6 +70,7 @@ module type S = sig
   val load :
        config:Resource_pool.Config.t
     -> logger:Logger.t
+    -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> disk_location:string
     -> incoming_diffs:( Resource_pool.Diff.t Envelope.Incoming.t
                       * (bool -> unit) )

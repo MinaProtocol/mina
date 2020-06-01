@@ -78,6 +78,7 @@ module type S = sig
   val load :
        config:Resource_pool.Config.t
     -> logger:Logger.t
+    -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> disk_location:string
     -> incoming_diffs:( Resource_pool.Diff.t Envelope.Incoming.t
                       * (bool -> unit) )
@@ -375,8 +376,8 @@ module Make (Transition_frontier : Transition_frontier_intf) :
         Transaction_snark_work.Checked.create_unsafe
           {Transaction_snark_work.fee; proofs= proof; prover} )
 
-  let load ~config ~logger ~disk_location ~incoming_diffs ~local_diffs
-      ~frontier_broadcast_pipe =
+  let load ~config ~logger ~constraint_constants ~disk_location ~incoming_diffs
+      ~local_diffs ~frontier_broadcast_pipe =
     let tf_diff_reader, tf_diff_writer =
       Strict_pipe.(
         create ~name:"Snark pool Transition frontier diffs" Synchronous)
@@ -388,15 +389,15 @@ module Make (Transition_frontier : Transition_frontier_intf) :
     | Ok snark_table ->
         let pool = Resource_pool.of_serializable snark_table ~config ~logger in
         let network_pool =
-          of_resource_pool_and_diffs pool ~logger ~incoming_diffs ~local_diffs
-            ~tf_diffs:tf_diff_reader
+          of_resource_pool_and_diffs pool ~logger ~constraint_constants
+            ~incoming_diffs ~local_diffs ~tf_diffs:tf_diff_reader
         in
         Resource_pool.listen_to_frontier_broadcast_pipe frontier_broadcast_pipe
           pool ~tf_diff_writer ;
         network_pool
     | Error _e ->
-        create ~config ~logger ~incoming_diffs ~local_diffs
-          ~frontier_broadcast_pipe
+        create ~config ~logger ~constraint_constants ~incoming_diffs
+          ~local_diffs ~frontier_broadcast_pipe
 end
 
 (* TODO: defunctor or remove monkey patching (#3731) *)
@@ -437,6 +438,9 @@ let%test_module "random set test" =
 
     let proof_level = Genesis_constants.Proof_level.Check
 
+    let constraint_constants =
+      Genesis_constants.Constraint_constants.for_unit_tests
+
     let logger = Logger.null ()
 
     module Mock_snark_pool = Make (Mocks.Transition_frontier)
@@ -449,7 +453,8 @@ let%test_module "random set test" =
         Mock_snark_pool.Resource_pool.Diff.Add_solved_work
           (work, {Priced_proof.Stable.Latest.proof= proof work; fee})
       in
-      Mock_snark_pool.Resource_pool.Diff.unsafe_apply resource_pool
+      Mock_snark_pool.Resource_pool.Diff.unsafe_apply ~constraint_constants
+        resource_pool
         {Envelope.Incoming.data= diff; sender}
 
     let config verifier =
@@ -483,7 +488,7 @@ let%test_module "random set test" =
         in
         let config = config verifier in
         let resource_pool =
-          Mock_snark_pool.create ~config ~logger
+          Mock_snark_pool.create ~config ~logger ~constraint_constants
             ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
             ~incoming_diffs:incoming_diff_r ~local_diffs:local_diff_r
           |> Mock_snark_pool.resource_pool
@@ -634,8 +639,8 @@ let%test_module "random set test" =
           in
           let config = config verifier in
           let network_pool =
-            Mock_snark_pool.create ~config ~incoming_diffs:pool_reader
-              ~local_diffs:local_reader ~logger
+            Mock_snark_pool.create ~config ~constraint_constants
+              ~incoming_diffs:pool_reader ~local_diffs:local_reader ~logger
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
           in
           let priced_proof =
@@ -722,7 +727,7 @@ let%test_module "random set test" =
             in
             let config = config verifier in
             let network_pool =
-              Mock_snark_pool.create ~logger ~config
+              Mock_snark_pool.create ~logger ~config ~constraint_constants
                 ~incoming_diffs:pool_reader ~local_diffs:local_reader
                 ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
             in
@@ -777,7 +782,8 @@ let%test_module "random set test" =
           let config = config verifier in
           let network_pool =
             Mock_snark_pool.create ~logger:(Logger.null ()) ~config
-              ~incoming_diffs:pool_reader ~local_diffs:local_reader
+              ~constraint_constants ~incoming_diffs:pool_reader
+              ~local_diffs:local_reader
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
           in
           let resource_pool = Mock_snark_pool.resource_pool network_pool in

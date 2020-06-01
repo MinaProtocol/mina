@@ -190,4 +190,7 @@ val user_commands : t -> User_command.t list
 
 val completed_works : t -> Transaction_snark_work.t list
 
-val coinbase : t -> Currency.Amount.t
+val coinbase :
+     constraint_constants:Genesis_constants.Constraint_constants.t
+  -> t
+  -> Currency.Amount.t
