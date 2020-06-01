@@ -155,7 +155,7 @@ let calculateCoinbaseReceiverChallenge = blocks => {
       let coinbaseReceiver =
         block.transactions.coinbaseReceiverAccount.publicKey;
       let creatorAccount = block.creatorAccount.publicKey;
-      StringMap.add(
+      StringMap.update(
         block.creatorAccount.publicKey,
         _ => Some(coinbaseReceiver !== creatorAccount),
         map,
