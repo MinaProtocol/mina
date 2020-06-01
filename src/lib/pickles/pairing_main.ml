@@ -10,8 +10,8 @@ open Common
 
 module Make
     (Inputs : Intf.Pairing_main_inputs.S
-              with type Impl.field = Snarky_bn382_backend.Fp.t
-               and type G.Constant.Scalar.t = Snarky_bn382_backend.Fq.t) =
+              with type Impl.field = Zexe_backend.Fp.t
+               and type G.Constant.Scalar.t = Zexe_backend.Fq.t) =
 struct
   open Inputs
   open Impl

@@ -6,7 +6,7 @@ module Rounds = struct
   let rounds_partial = 30
 end
 
-module Make (Field : Snarky_bn382_backend.Field.S) = struct
+module Make (Field : Zexe_backend.Field.S) = struct
   module Inputs = struct
     include Rounds
     module Field = Field

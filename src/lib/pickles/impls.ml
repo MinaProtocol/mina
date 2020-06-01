@@ -2,7 +2,7 @@ open Pickles_types
 module D = Digest
 open Core_kernel
 module Digest = D
-open Snarky_bn382_backend
+open Zexe_backend
 
 module Pairing_based = struct
   module Impl = Snarky.Snark.Run.Make (Pairing_based) (Unit)

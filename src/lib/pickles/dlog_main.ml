@@ -105,8 +105,8 @@ let accumulate_opening_check ~add ~negate ~endo ~scale_generator ~r
 
 module Make
     (Inputs : Inputs
-              with type Impl.field = Snarky_bn382_backend.Fq.t
-               and type G1.Constant.Scalar.t = Snarky_bn382_backend.Fp.t) =
+              with type Impl.field = Zexe_backend.Fq.t
+               and type G1.Constant.Scalar.t = Zexe_backend.Fp.t) =
 struct
   module Opt_sponge =
     Sponge.Make_bit_sponge (struct

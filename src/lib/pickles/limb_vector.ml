@@ -58,14 +58,14 @@ module Constant = struct
       Vector.take_from_list bits N.n
 
     let of_fp x =
-      of_bits (List.take (Snarky_bn382_backend.Fp.to_bits x) length)
+      of_bits (List.take (Zexe_backend.Fp.to_bits x) length)
 
     let of_fq x =
-      of_bits (List.take (Snarky_bn382_backend.Fq.to_bits x) length)
+      of_bits (List.take (Zexe_backend.Fq.to_bits x) length)
 
-    let to_fp t = Snarky_bn382_backend.Fp.of_bits (to_bits t)
+    let to_fp t = Zexe_backend.Fp.of_bits (to_bits t)
 
-    let to_fq t = Snarky_bn382_backend.Fq.of_bits (to_bits t)
+    let to_fq t = Zexe_backend.Fq.of_bits (to_bits t)
 
     let dummy : t = Vector.init N.n ~f:(fun _ -> Int64.one)
   end

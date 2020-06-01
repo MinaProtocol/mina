@@ -12,7 +12,7 @@ module Inductive_rule = Inductive_rule
 module Tag = Tag
 
 module Ro = struct
-  open Snarky_bn382_backend
+  open Zexe_backend
 
   let ro lab length f =
     let r = ref 0 in
@@ -82,7 +82,7 @@ module Full_signature = struct
         (module Maxes.S with type length = 'max_width and type ns = 'maxes) }
 end
 
-open Snarky_bn382_backend
+open Zexe_backend
 
 type g = G.Affine.t [@@deriving sexp, bin_io, compare, yojson]
 
@@ -111,14 +111,14 @@ let compute_sg chals =
   let open Snarky_bn382.Fq_poly_comm in
   let comm =
     Snarky_bn382.Fq_urs.b_poly_commitment
-      (Snarky_bn382_backend.Dlog_based.Keypair.load_urs ())
+      (Zexe_backend.Dlog_based.Keypair.load_urs ())
       (Fq.Vector.of_array (Vector.to_array (compute_challenges chals)))
   in
   Snarky_bn382.G.Affine.Vector.get (unshifted comm) 0
-  |> Snarky_bn382_backend.G.Affine.of_backend
+  |> Zexe_backend.G.Affine.of_backend
 
 (* We hardcode the number of rounds in the discrete log based proof. *)
-module Wrap_circuit_bulletproof_rounds = Snarky_bn382_backend.Dlog_based.Rounds
+module Wrap_circuit_bulletproof_rounds = Zexe_backend.Dlog_based.Rounds
 module Nvector = Vector.With_length
 module Bp_vec = Nvector (Wrap_circuit_bulletproof_rounds)
 
@@ -204,7 +204,7 @@ module Unshifted_acc =
   Pairing_marlin_types.Accumulator.Degree_bound_checks.Unshifted_accumulators
 
 module Pairing_acc = struct
-  open Snarky_bn382_backend
+  open Zexe_backend
 
   type t = (g1, g1 Unshifted_acc.t) Pairing_marlin_types.Accumulator.t
 
@@ -247,7 +247,7 @@ module Pairing_acc = struct
     let res =
       Snarky_bn382.batch_pairing_check
         (* TODO: Don't load the whole thing! *)
-        (Snarky_bn382_backend.Pairing_based.Keypair.load_urs ())
+        (Zexe_backend.Pairing_based.Keypair.load_urs ())
         d s u t p
     in
     Snarky_bn382.Usize_vector.delete d ;
@@ -350,7 +350,7 @@ module Requests = struct
             t
         | Messages :
             ( G1.Constant.t
-            , Snarky_bn382_backend.Fp.t )
+            , Zexe_backend.Fp.t )
             Pairing_marlin_types.Messages.t
             t
         | Openings_proof : G1.Constant.t Tuple_lib.Triple.t t
@@ -368,7 +368,7 @@ module Requests = struct
 
         type nonrec max_local_max_branchings = ml
 
-        open Snarky_bn382_backend
+        open Zexe_backend
         open Snarky.Request
 
         type 'a vec = ('a, max_branching) Vector.t
@@ -487,7 +487,7 @@ module Unfinalized = struct
     * Boolean.var
 
   module Constant = struct
-    open Snarky_bn382_backend
+    open Zexe_backend
 
     type t =
       ( Challenge.Constant.t
@@ -555,14 +555,14 @@ module Dummy = struct
              (* TODO: Leaky *)
              let t =
                Snarky_bn382.Fp_urs.dummy_opening_check
-                 (Snarky_bn382_backend.Pairing_based.Keypair.load_urs ())
+                 (Zexe_backend.Pairing_based.Keypair.load_urs ())
              in
              { r_f_minus_r_v_plus_rz_pi=
                  Snarky_bn382.G1.Affine.Pair.f0 t
-                 |> Snarky_bn382_backend.G1.Affine.of_backend
+                 |> Zexe_backend.G1.Affine.of_backend
              ; r_pi=
                  Snarky_bn382.G1.Affine.Pair.f1 t
-                 |> Snarky_bn382_backend.G1.Affine.of_backend }
+                 |> Zexe_backend.G1.Affine.of_backend }
            in
            let degree_bound_checks :
                _ Pairing_marlin_types.Accumulator.Degree_bound_checks.t =
@@ -577,16 +577,16 @@ module Dummy = struct
                  v
                in
                Snarky_bn382.Fp_urs.dummy_degree_bound_checks
-                 (Snarky_bn382_backend.Pairing_based.Keypair.load_urs ())
+                 (Zexe_backend.Pairing_based.Keypair.load_urs ())
                  v
              in
              { shifted_accumulator=
                  Snarky_bn382.G1.Affine.Vector.get t 0
-                 |> Snarky_bn382_backend.G1.Affine.of_backend
+                 |> Zexe_backend.G1.Affine.of_backend
              ; unshifted_accumulators=
                  List.mapi shifts ~f:(fun i s ->
                      ( s
-                     , Snarky_bn382_backend.G1.Affine.of_backend
+                     , Zexe_backend.G1.Affine.of_backend
                          (Snarky_bn382.G1.Affine.Vector.get t (1 + i)) ) )
                  |> Int.Map.of_alist_exn }
            in
@@ -1362,7 +1362,7 @@ module Step_branch_data = struct
            t
 end
 
-open Snarky_bn382_backend
+open Zexe_backend
 
 module Proof_state = struct
   module Dlog_based = Types.Dlog_based.Proof_state
@@ -1557,10 +1557,10 @@ let combined_polynomials ~xi
     List.iter public_input ~f:(Fp.Vector.emplace_back v) ;
     let domain_size = Int.ceil_pow2 (List.length public_input) in
     Snarky_bn382.Fp_urs.commit_evaluations
-      (Snarky_bn382_backend.Pairing_based.Keypair.load_urs ())
+      (Zexe_backend.Pairing_based.Keypair.load_urs ())
       (Unsigned.Size_t.of_int domain_size)
       v
-    |> Snarky_bn382_backend.G1.Affine.of_backend
+    |> Zexe_backend.G1.Affine.of_backend
   in
   ( combine Common.Pairing_pcs_batch.beta_1
       [x_hat; w_hat; z_hat_a; z_hat_b; g1; h1]
@@ -1711,7 +1711,7 @@ module Wrap_domains (A : T0) (A_value : T0) = struct
     let dummy_step_keys =
       lazy
         (Vector.init num_choices ~f:(fun _ ->
-             let g = Snarky_bn382_backend.G1.(to_affine_exn one) in
+             let g = Zexe_backend.G1.(to_affine_exn one) in
              let t : _ Abc.t = {a= g; b= g; c= g} in
              {Matrix_evals.row= t; col= t; value= t; rc= t} ))
     in
@@ -1828,7 +1828,7 @@ let wrap (type max_branching max_local_max_branchings) max_branching
     | _ ->
         Snarky.Request.unhandled
   in
-  let module O = Snarky_bn382_backend.Pairing_based.Oracles in
+  let module O = Zexe_backend.Pairing_based.Oracles in
   let public_input =
     fp_public_input_of_statement ~max_branching prev_statement_with_hashes
   in
@@ -1876,7 +1876,7 @@ let wrap (type max_branching max_local_max_branchings) max_branching
           proof
       in
       let prev_pairing_acc =
-        let module G1 = Snarky_bn382_backend.G1 in
+        let module G1 = Zexe_backend.G1 in
         let open Pairing_marlin_types.Accumulator in
         let module M =
           H1.Map_reduce (Proof_.Me_only.Dlog_based) (Pairing_acc.Projective)
@@ -1946,7 +1946,7 @@ let wrap (type max_branching max_local_max_branchings) max_branching
           ~message:
             ( Vector.map2 prev_statement.proof_state.me_only.sg
                 me_only_prepared.old_bulletproof_challenges ~f:(fun sg chals ->
-                  { Snarky_bn382_backend.Dlog_based_proof.Challenge_polynomial
+                  { Zexe_backend.Dlog_based_proof.Challenge_polynomial
                     .commitment= sg
                   ; challenges= Vector.to_array chals } )
             |> Vector.to_list )
@@ -1999,7 +1999,7 @@ module Proof = struct
                     ; beta_2= scalar_chal ()
                     ; beta_3= scalar_chal () } }
             ; sponge_digest_before_evaluations=
-                Digest.Constant.of_fq Snarky_bn382_backend.Fq.zero
+                Digest.Constant.of_fq Zexe_backend.Fq.zero
             ; was_base_case= true
             ; me_only=
                 { pairing_marlin_acc= Lazy.force Dummy.pairing_acc
@@ -2181,9 +2181,9 @@ struct
       type t =
         ( Challenge.Constant.t
         , Challenge.Constant.t Scalar_challenge.t
-        , Snarky_bn382_backend.Fp.t
+        , Zexe_backend.Fp.t
         , bool
-        , Snarky_bn382_backend.Fq.t
+        , Zexe_backend.Fq.t
         , Digest.Constant.t
         , Digest.Constant.t
         , Digest.Constant.t )
@@ -2234,7 +2234,7 @@ struct
           , t.statement.pass_through.sg
           , (t.proof.openings.proof, t.proof.messages) )
         in
-        let module O = Snarky_bn382_backend.Dlog_based.Oracles in
+        let module O = Zexe_backend.Dlog_based.Oracles in
         let o =
           let public_input =
             fq_public_input_of_statement prev_statement_with_hashes
@@ -2285,7 +2285,7 @@ struct
             Vector.map ~f:(Fn.compose b_poly Vector.to_array) prev_challenges
           in
           let open As_field in
-          let combine (x_hat : Snarky_bn382_backend.Fq.t) pt e =
+          let combine (x_hat : Zexe_backend.Fq.t) pt e =
             let a, b = Dlog_marlin_types.Evals.(to_vectors (e : _ array t)) in
             let v : (Fq.t array, _) Vector.t =
               Vector.append
@@ -2595,7 +2595,7 @@ module Verification_key = struct
   let of_repr urs {Repr.commitments= c; step_domains; data= d} =
     let u = Unsigned.Size_t.of_int in
     let g =
-      Snarky_bn382_backend.Fq_poly_comm.without_degree_bound_to_backend
+      Zexe_backend.Fq_poly_comm.without_degree_bound_to_backend
     in
     let t =
       Snarky_bn382.Fq_verifier_index.make (u d.public_inputs) (u d.variables)
@@ -2616,7 +2616,7 @@ module Verification_key = struct
           {Repr.commitments; data; step_domains}
 
         let of_binable r =
-          of_repr (Snarky_bn382_backend.Dlog_based.Keypair.load_urs ()) r
+          of_repr (Zexe_backend.Dlog_based.Keypair.load_urs ()) r
       end)
 
   include B
@@ -2794,7 +2794,7 @@ let verify (type a n) (module Max_branching : Nat.Intf with type n = n)
           ; ("r", r, r_actual)
           ; ("r_xi_sum", r_xi_sum, r_xi_sum_actual) ] )
   in
-  let open Snarky_bn382_backend.Dlog_based_proof in
+  let open Zexe_backend.Dlog_based_proof in
   Common.time "pairing_check" (fun () ->
       check
         ( "pairing_check"
@@ -2922,7 +2922,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
             Common.time "step keypair create" (fun () ->
                 return
                   ( Keypair.create ~pk
-                      ~vk:(Snarky_bn382_backend.Pairing_based.Keypair.vk pk)
+                      ~vk:(Zexe_backend.Pairing_based.Keypair.vk pk)
                   , dirty ) )
         | Error _e ->
             Timer.clock __LOC__ ;
@@ -2963,7 +2963,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
          | Ok (pk, d) ->
              return
                ( Keypair.create ~pk
-                   ~vk:(Snarky_bn382_backend.Dlog_based.Keypair.vk pk)
+                   ~vk:(Zexe_backend.Dlog_based.Keypair.vk pk)
                , d )
          | Error _e ->
              let r = generate_keypair ~exposing:[typ] main in
@@ -2988,7 +2988,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
             let vk : Vk.t =
               { index= vk
               ; commitments=
-                  Snarky_bn382_backend.Dlog_based.Keypair.vk_commitments vk
+                  Zexe_backend.Dlog_based.Keypair.vk_commitments vk
               ; step_domains
               ; data=
                   (let open Snarky_bn382.Fq_index in
@@ -3160,7 +3160,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
       let module V = H4.To_vector (Lazy_keys) in
       lazy
         (Vector.map (V.f prev_varss_length step_keypairs) ~f:(fun (_, vk) ->
-             Snarky_bn382_backend.Pairing_based.Keypair.vk_commitments
+             Zexe_backend.Pairing_based.Keypair.vk_commitments
                (Lazy.force vk) ))
     in
     let wrap_requests, wrap_main =
@@ -3553,7 +3553,7 @@ let%test_module "test" =
         let open Ro in
         let g = G.(to_affine_exn one) in
         let evals =
-          let open Snarky_bn382_backend in
+          let open Zexe_backend in
           let e =
             Dlog_marlin_types.Evals.of_vectors
               ( Vector.init Nat.N18.n ~f:(fun _ -> [|Fq.one|])
@@ -3578,7 +3578,7 @@ let%test_module "test" =
                         ; beta_2= scalar_chal ()
                         ; beta_3= scalar_chal () } }
                 ; sponge_digest_before_evaluations=
-                    Digest.Constant.of_fq Snarky_bn382_backend.Fq.zero
+                    Digest.Constant.of_fq Zexe_backend.Fq.zero
                 ; was_base_case= true
                 ; me_only=
                     { pairing_marlin_acc= Dummy.pairing_acc

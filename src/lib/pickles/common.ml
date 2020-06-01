@@ -2,7 +2,7 @@ module D = Digest
 open Core_kernel
 module Digest = D
 open Pickles_types
-module G = Snarky_bn382_backend.G
+module G = Zexe_backend.G
 
 let hash_pairing_me_only ~app_state
     (t :
@@ -23,7 +23,7 @@ let hash_pairing_me_only ~app_state
 let hash_dlog_me_only t =
   Fq_sponge.digest Fq_sponge.params
     (Types.Dlog_based.Proof_state.Me_only.to_field_elements t
-       ~g1:(fun ((x, y) : Snarky_bn382_backend.G1.Affine.t) -> [x; y]))
+       ~g1:(fun ((x, y) : Zexe_backend.G1.Affine.t) -> [x; y]))
   |> Digest.Constant.of_bits
 
 open Core_kernel

@@ -6,13 +6,13 @@ module Step = struct
       type t =
         Type_equal.Id.Uid.t
         * int
-        * Snarky_bn382_backend.Pairing_based.R1CS_constraint_system.t
+        * Zexe_backend.Pairing_based.R1CS_constraint_system.t
 
       let to_string : t -> _ = function
         | _id, _n, h ->
             sprintf !"step-%s"
               (Md5.to_hex
-                 (Snarky_bn382_backend.Pairing_based.R1CS_constraint_system
+                 (Zexe_backend.Pairing_based.R1CS_constraint_system
                   .digest h))
     end
 
@@ -29,7 +29,7 @@ module Step = struct
     Key_cache.Disk_storable.simple Key.Proving.to_string
       (fun (_, _, t) ~path ->
         Snarky_bn382.Fp_index.read
-          (Snarky_bn382_backend.Pairing_based.Keypair.load_urs ())
+          (Zexe_backend.Pairing_based.Keypair.load_urs ())
           t.m.a t.m.b t.m.c
           (Unsigned.Size_t.of_int (1 + t.public_input_size))
           path )
@@ -54,13 +54,13 @@ module Wrap = struct
     module Proving = struct
       type t =
         Type_equal.Id.Uid.t
-        * Snarky_bn382_backend.Dlog_based.R1CS_constraint_system.t
+        * Zexe_backend.Dlog_based.R1CS_constraint_system.t
 
       let to_string : t -> _ = function
         | _id, h ->
             sprintf !"wrap-%s"
               (Md5.to_hex
-                 (Snarky_bn382_backend.Dlog_based.R1CS_constraint_system.digest
+                 (Zexe_backend.Dlog_based.R1CS_constraint_system.digest
                     h))
     end
   end
@@ -69,7 +69,7 @@ module Wrap = struct
     Key_cache.Disk_storable.simple Key.Proving.to_string
       (fun (_, t) ~path ->
         Snarky_bn382.Fq_index.read
-          (Snarky_bn382_backend.Dlog_based.Keypair.load_urs ())
+          (Zexe_backend.Dlog_based.Keypair.load_urs ())
           t.m.a t.m.b t.m.c
           (Unsigned.Size_t.of_int (1 + t.public_input_size))
           path )
@@ -79,7 +79,7 @@ module Wrap = struct
     Key_cache.Disk_storable.simple Key.Verification.to_string
       (fun _ ~path ->
         Snarky_bn382.Fq_verifier_index.read
-          (Snarky_bn382_backend.Dlog_based.Keypair.load_urs ())
+          (Zexe_backend.Dlog_based.Keypair.load_urs ())
           path )
       Snarky_bn382.Fq_verifier_index.write
 end

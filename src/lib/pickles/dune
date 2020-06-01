@@ -6,7 +6,7 @@
   (preprocess (pps ppx_coda ppx_jane ppx_deriving.std ppx_deriving_yojson ))
   (libraries
     digestif
-    snarky_bn382_backend
+    zexe_backend
     snarky_log
     sgn_type
     sponge

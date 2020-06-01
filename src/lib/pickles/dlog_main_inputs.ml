@@ -3,7 +3,7 @@ open Common
 
 module type S = Intf.Dlog_main_inputs.S
 
-open Snarky_bn382_backend
+open Zexe_backend
 module Impl = Impls.Dlog_based
 
 let fq_random_oracle ?length s = Fq.of_bits (bits_random_oracle ?length s)
@@ -21,9 +21,9 @@ module Input_domain = struct
     time "lagrange" (fun () ->
         Array.init domain_size ~f:(fun i ->
             Snarky_bn382.Fp_urs.lagrange_commitment
-              (Snarky_bn382_backend.Pairing_based.Keypair.load_urs ())
+              (Zexe_backend.Pairing_based.Keypair.load_urs ())
               (u domain_size) (u i)
-            |> Snarky_bn382_backend.G1.Affine.of_backend ) )
+            |> Zexe_backend.G1.Affine.of_backend ) )
 
   let domain = Domain.Pow_2_roots_of_unity 6
 
@@ -174,7 +174,7 @@ module Fp = struct
   type t = Fp.t
 
   let order =
-    Impl.Bigint.to_bignum_bigint Snarky_bn382_backend.Pairing_based.field_size
+    Impl.Bigint.to_bignum_bigint Zexe_backend.Pairing_based.field_size
 
   let size_in_bits = Fp.size_in_bits
 
