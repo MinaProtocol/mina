@@ -21,6 +21,7 @@ let applyTopNPoints = (n, points, metricsMap, getMetricValue) => {
     compare(getMetricValue(metricValue1), getMetricValue(metricValue2));
   };
   Array.sort(f, metricsArray);
+  Belt.Array.reverseInPlace(metricsArray);
   let topNArray =
     Array.sub(metricsArray, 0, min(n, Array.length(metricsArray)));
   let topNArrayWithPoints =
