@@ -20,9 +20,13 @@ let applyTopNPoints = (n, points, metricsMap, getMetricValue) => {
   let f = ((_, metricValue1), (_, metricValue2)) => {
     compare(getMetricValue(metricValue1), getMetricValue(metricValue2));
   };
+
   Array.sort(f, metricsArray);
+  Belt.Array.reverseInPlace(metricsArray);
+
   let topNArray =
     Array.sub(metricsArray, 0, min(n, Array.length(metricsArray)));
+
   let topNArrayWithPoints =
     Array.map(((user, _)) => {(user, points)}, topNArray);
 
