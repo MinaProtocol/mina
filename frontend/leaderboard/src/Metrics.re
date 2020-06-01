@@ -149,6 +149,23 @@ let filterBlocksByTimeWindow = (startTime, endTime, blocks) => {
   Array.of_list(filteredBlocksList);
 };
 
+let calculateCoinbaseReceiverChallenge = blocks => {
+  Array.fold_left(
+    (map, block: Types.NewBlock.data) => {
+      let coinbaseReceiver =
+        block.transactions.coinbaseReceiverAccount.publicKey;
+      let creatorAccount = block.creatorAccount.publicKey;
+      StringMap.add(
+        block.creatorAccount.publicKey,
+        _ => Some(coinbaseReceiver !== creatorAccount),
+        map,
+      );
+    },
+    StringMap.empty,
+    blocks,
+  );
+};
+
 let throwAwayValues = metric => {
   StringMap.map(_ => {()}, metric);
 };
@@ -186,6 +203,7 @@ let calculateMetrics = blocks => {
   let highestSnarkFeeCollected = getHighestSnarkFeeCollected(blocks);
   let transactionsReceivedByEcho =
     calculateTransactionsSentToAddress(blocks, echoBotPublicKey);
+  let coinbaseReceiverChallenge = calculateCoinbaseReceiverChallenge(blocks);
 
   calculateAllUsers([
     throwAwayValues(blocksCreated),
@@ -194,6 +212,7 @@ let calculateMetrics = blocks => {
     throwAwayValues(snarkFeesCollected),
     throwAwayValues(highestSnarkFeeCollected),
     throwAwayValues(transactionsReceivedByEcho),
+    throwAwayValues(coinbaseReceiverChallenge),
   ])
   |> StringMap.mapi((key, _) =>
        {
@@ -205,6 +224,7 @@ let calculateMetrics = blocks => {
            StringMap.find_opt(key, highestSnarkFeeCollected),
          transactionsReceivedByEcho:
            StringMap.find_opt(key, transactionsReceivedByEcho),
+         coinbaseReceiver: StringMap.find_opt(key, coinbaseReceiverChallenge),
        }
      );
 };
