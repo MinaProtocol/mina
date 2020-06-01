@@ -1,45 +1,19 @@
 use algebra::{
-    ToBytes, FromBytes, One, Zero,
-    biginteger::{BigInteger, BigInteger384},
-    bn_382::{
-        g::{Affine as GAffine, Projective as GProjective},
-        Bn_382, G1Affine, G1Projective, G2Affine,
-        g1::Bn_382G1Parameters,
-        g::Bn_382GParameters,
-        fp::{Fp, FpParameters as Fp_params},
-        fq::{Fq, FqParameters as Fq_params},
-    },
+    ToBytes, FromBytes,
     curves::{
-        PairingEngine,
-        AffineCurve, ProjectiveCurve,
+        AffineCurve,
     },
     fields::{
-        Field, FpParameters, PrimeField, SquareRootField, FftField,
+        Field, PrimeField, FftField,
     },
-    UniformRand,
 };
 
 use evaluation_domains::EvaluationDomains;
-use circuits_pairing::index::{Index, VerifierIndex, MatrixValues, URSSpec};
+use circuits_pairing::index::{MatrixValues,};
 use ff_fft::{Evaluations, DensePolynomial, EvaluationDomain, Radix2EvaluationDomain as Domain, GeneralEvaluationDomain};
-
-use oracle::{self, poseidon::Sponge};
-
-
-
 use sprs::{CsMat, CsVecView, CSR};
-
-
-
 use std::io::{Read, Result as IoResult, Write};
-
-
-use commitment_dlog::{commitment::{CommitmentCurve, PolyComm, product, b_poly_coefficients, OpeningProof}, srs::{SRS}};
-
-
-
-
-
+use commitment_dlog::{commitment::{PolyComm,}};
 
 pub fn evals_from_coeffs<F: FftField>(
     v : Vec<F>,
@@ -332,30 +306,30 @@ pub fn prepare_witness<F : PrimeField>(
 
 // usize vector stubs
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_usize_vector_create() -> *mut Vec<usize> {
+pub extern "C" fn zexe_usize_vector_create() -> *mut Vec<usize> {
     return Box::into_raw(Box::new(Vec::new()));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_usize_vector_length(v: *const Vec<usize>) -> i32 {
+pub extern "C" fn zexe_usize_vector_length(v: *const Vec<usize>) -> i32 {
     let v_ = unsafe { &(*v) };
     return v_.len() as i32;
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_usize_vector_emplace_back(v: *mut Vec<usize>, x: usize) {
+pub extern "C" fn zexe_usize_vector_emplace_back(v: *mut Vec<usize>, x: usize) {
     let v_ = unsafe { &mut (*v) };
     v_.push(x);
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_usize_vector_get(v: *mut Vec<usize>, i: u32) -> usize {
+pub extern "C" fn zexe_usize_vector_get(v: *mut Vec<usize>, i: u32) -> usize {
     let v = unsafe { &mut (*v) };
     v[i as usize]
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_usize_vector_delete(v: *mut Vec<usize>) {
+pub extern "C" fn zexe_usize_vector_delete(v: *mut Vec<usize>) {
     // Deallocation happens automatically when a box variable goes out of
     // scope.
     let _box = unsafe { Box::from_raw(v) };

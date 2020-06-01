@@ -12,6 +12,10 @@ module type Type = sig
   val typ : t typ
 end
 
+module type Prefix_type = sig
+  include Prefix include Type
+end
+
 module Pair (P : Prefix) (Elt : Type) (F : Ctypes.FOREIGN) = struct
   include (
     struct
@@ -36,8 +40,7 @@ end
 
 module Bigint (P : Prefix) (F : Ctypes.FOREIGN) = struct
   open F
-
-  let prefix = with_prefix (P.prefix "bigint")
+  open P
 
   include (
     struct
@@ -939,17 +942,23 @@ struct
 end
 
 module Full (F : Ctypes.FOREIGN) = struct
-  let prefix = with_prefix "camlsnark_bn382"
+  let zexe = with_prefix "zexe"
 
-  module Bigint =
+  module Bigint256 =
     Bigint (struct
-        let prefix = prefix
+        let prefix = with_prefix (zexe "bigint256")
+      end)
+      (F)
+
+  module Bigint384 =
+    Bigint (struct
+        let prefix = with_prefix (zexe "bigint384")
       end)
       (F)
 
   module Usize_vector =
     Vector (struct
-        let prefix = with_prefix (prefix "usize")
+        let prefix = with_prefix (zexe "usize")
       end)
       (struct
         type t = Unsigned.size_t
@@ -958,229 +967,420 @@ module Full (F : Ctypes.FOREIGN) = struct
       end)
       (F)
 
-  module Fp =
-    Field (struct
-        let prefix = with_prefix (prefix "fp")
-      end)
-      (Bigint)
-      (Usize_vector)
-      (F)
+  module Dlog_proof_system
+      (Field: sig
+         include Prefix_type
+         module Vector:Prefix_type
+         module Constraint_matrix:Type
+       end)
+      (Curve: sig
+         include Prefix_type
+         module Affine: sig
+            module Underlying : Type
+            include Type with type t = Underlying.t ptr
+            module Vector: Type
+           module Pair : sig
+             include Type
+             module Vector: Type
+           end
+          end
+       end)
+  = struct
+    let prefix = Field.prefix 
 
-  module Fq =
-    Field (struct
-        let prefix = with_prefix (prefix "fq")
-      end)
-      (Bigint)
-      (Usize_vector)
-      (F)
+    module Field_triple = Triple (Field) (Field) (F)
 
-  module G =
-    Curve (struct
-        let prefix = with_prefix (prefix "g")
-      end)
-      (Fp)
-      (Fq)
-      (F)
+    module Field_vector_triple = Triple (Field.Vector) (Field.Vector) (F)
 
-  module G1 =
-    Curve (struct
-        let prefix = with_prefix (prefix "g1")
-      end)
-      (Fq)
-      (Fp)
-      (F)
+    module Field_opening_proof =
+      Dlog_opening_proof (struct
+          let prefix = with_prefix (prefix "opening_proof")
+        end)
+        (Field)
+        (Curve.Affine)
+        (F)
 
-  module Fp_urs = struct
-    let prefix = with_prefix (prefix "fp_urs")
+    module Field_poly_comm =
+      Dlog_poly_comm (struct
+          let prefix = with_prefix (prefix "poly_comm")
+        end)
+        (Curve.Affine)
+        (F)
 
-    include URS (struct
-                let prefix = prefix
-              end)
-              (G1.Affine)
-              (Fp.Vector)
-              (F)
+    module Field_urs = struct
 
-    open F
+      let prefix = with_prefix (prefix "urs")
 
-    let dummy_opening_check =
-      foreign
-        (prefix "dummy_opening_check")
-        (typ @-> returning G1.Affine.Pair.typ)
+      include (
+        struct
+            type t = unit ptr
 
-    let dummy_degree_bound_checks =
-      foreign
-        (prefix "dummy_degree_bound_checks")
-        (typ @-> Usize_vector.typ @-> returning G1.Affine.Vector.typ)
+            let typ = ptr void
+          end :
+          Type )
+
+      open F
+
+      let create = foreign (prefix "create") (size_t @-> returning typ)
+
+      let read = foreign (prefix "read") (string @-> returning typ)
+
+      let write = foreign (prefix "write") (typ @-> string @-> returning void)
+
+      let lagrange_commitment =
+        foreign
+          (prefix "lagrange_commitment")
+          (typ @-> size_t @-> size_t @-> returning Field_poly_comm.typ)
+
+      let commit_evaluations =
+        foreign
+          (prefix "commit_evaluations")
+          (typ @-> size_t @-> Field.Vector.typ @-> returning Field_poly_comm.typ)
+
+      let h = foreign (prefix "h") (typ @-> returning Curve.Affine.typ)
+
+      let b_poly_commitment =
+        foreign
+          (prefix "b_poly_commitment")
+          (typ @-> Field.Vector.typ @-> returning Field_poly_comm.typ)
+    end
+
+    module Field_index =
+      Index (struct
+          let prefix = with_prefix (prefix "index")
+        end)
+        (Field.Constraint_matrix)
+        (Field_poly_comm)
+        (Field_urs)
+        (F)
+
+    module Field_verifier_index = struct
+      include VerifierIndex (struct
+          let prefix = with_prefix (prefix "verifier_index")
+        end)
+        (Field_index)
+        (Field_urs)
+        (Field_poly_comm)
+        (F)
+
+      open F
+
+      let read = foreign (prefix "read") (Field_urs.typ @-> string @-> returning typ)
+    end
+
+    module Field_proof =
+      Dlog_marlin_proof (struct
+          let prefix = with_prefix (prefix "proof")
+        end)
+        (Curve.Affine)
+        (Field)
+        (Field_index)
+        (Field_verifier_index)
+        (Field.Vector)
+        (Field_vector_triple)
+        (Field_opening_proof)
+        (Field_poly_comm)
+        (F)
+
+    module Field_oracles =
+      Dlog_oracles (struct
+          let prefix = with_prefix (prefix "oracles")
+        end)
+        (Field)
+        (Field_verifier_index)
+        (Field_proof)
+        (Field_vector_triple)
+        (F)
   end
 
-  module Fp_index =
-    Index (struct
-        let prefix = with_prefix (prefix "fp_index")
-      end)
-      (Fp.Constraint_matrix)
-      (G1.Affine)
-      (Fp_urs)
-      (F)
+  module Tweedle = struct
+    let prefix = with_prefix (zexe "tweedle")
 
-  module Fp_verifier_index = struct
-    include VerifierIndex (struct
-        let prefix = with_prefix (prefix "fp_verifier_index")
-      end)
-      (Fp_index)
-      (Fp_urs)
-      (G1.Affine)
-      (F)
+    module Fp =
+      Field (struct
+          let prefix = with_prefix (prefix "fp")
+        end)
+        (Bigint256)
+        (Usize_vector)
+        (F)
 
-    open F
+    module Fq =
+      Field (struct
+          let prefix = with_prefix (prefix "fq")
+        end)
+        (Bigint256)
+        (Usize_vector)
+        (F)
 
-    let read = foreign (prefix "read") (string @-> returning typ)
+    module Dum = struct
+      module Field = Fq
+
+      module Curve = Curve (struct
+          let prefix = with_prefix (prefix "dum")
+        end)
+        (Fp)
+        (Fq)
+        (F)
+
+      include Dlog_proof_system(Field)(Curve)
+    end
+
+    module Dee = struct
+      module Field = Fp
+      module Curve = Curve (struct
+          let prefix = with_prefix (prefix "dee")
+        end)
+        (Fq)
+        (Fp)
+        (F)
+      include Dlog_proof_system(Field)(Curve)
+    end
+
+    module Endo = struct
+      let endo typ which =
+        let open F in
+        F.foreign (prefix which) (void @-> returning typ)
+
+      module Dee = struct
+        let base = endo Fq.typ "fp_endo_base"
+        let scalar = endo Fp.typ "fp_endo_scalar"
+      end
+
+      module Dum = struct
+        let base = endo Fp.typ "fq_endo_base"
+        let scalar = endo Fq.typ "fq_endo_scalar"
+      end
+    end
   end
 
-  module Fp_proof =
-    Pairing_marlin_proof (struct
-        let prefix = with_prefix (prefix "fp_proof")
-      end)
-      (G1.Affine)
-      (Fp)
-      (Fp_index)
-      (Fp_verifier_index)
-      (Fp.Vector)
-      (F)
+  module Bn382 = struct
+    let prefix = with_prefix (zexe "bn382")
 
-  module Fp_oracles =
-    Pairing_oracles (struct
-        let prefix = with_prefix (prefix "fp_oracles")
-      end)
-      (Fp)
-      (Fp_verifier_index)
-      (Fp_proof)
-      (F)
+    module Fp =
+      Field (struct
+          let prefix = with_prefix (prefix "fp")
+        end)
+        (Bigint384)
+        (Usize_vector)
+        (F)
 
-  module Fq_triple = Triple (Fq) (Fq) (F)
+    module Fq =
+      Field (struct
+          let prefix = with_prefix (prefix "fq")
+        end)
+        (Bigint384)
+        (Usize_vector)
+        (F)
 
-  module Fq_vector_triple = Triple (Fq.Vector) (Fq.Vector) (F)
+    module G =
+      Curve (struct
+          let prefix = with_prefix (prefix "g")
+        end)
+        (Fp)
+        (Fq)
+        (F)
 
-  module Fq_opening_proof =
-    Dlog_opening_proof (struct
-        let prefix = with_prefix (prefix "fq_opening_proof")
-      end)
-      (Fq)
-      (G.Affine)
-      (F)
+    module G1 =
+      Curve (struct
+          let prefix = with_prefix (prefix "g1")
+        end)
+        (Fq)
+        (Fp)
+        (F)
 
-  module Fq_poly_comm =
-    Dlog_poly_comm (struct
-        let prefix = with_prefix (prefix "fq_poly_comm")
-      end)
-      (G.Affine)
-      (F)
+    module Fp_urs = struct
+      let prefix = with_prefix (prefix "fp_urs")
 
-  module Fq_urs = struct
+      include URS (struct
+                  let prefix = prefix
+                end)
+                (G1.Affine)
+                (Fp.Vector)
+                (F)
 
-    let prefix = with_prefix (prefix "fq_urs")
+      open F
 
-    include (
-      struct
-          type t = unit ptr
+      let dummy_opening_check =
+        foreign
+          (prefix "dummy_opening_check")
+          (typ @-> returning G1.Affine.Pair.typ)
 
-          let typ = ptr void
-        end :
-        Type )
+      let dummy_degree_bound_checks =
+        foreign
+          (prefix "dummy_degree_bound_checks")
+          (typ @-> Usize_vector.typ @-> returning G1.Affine.Vector.typ)
+    end
 
-    open F
+    module Fp_index =
+      Index (struct
+          let prefix = with_prefix (prefix "fp_index")
+        end)
+        (Fp.Constraint_matrix)
+        (G1.Affine)
+        (Fp_urs)
+        (F)
 
-    let create = foreign (prefix "create") (size_t @-> returning typ)
+    module Fp_verifier_index = struct
+      include VerifierIndex (struct
+          let prefix = with_prefix (prefix "fp_verifier_index")
+        end)
+        (Fp_index)
+        (Fp_urs)
+        (G1.Affine)
+        (F)
 
-    let read = foreign (prefix "read") (string @-> returning typ)
+      open F
 
-    let write = foreign (prefix "write") (typ @-> string @-> returning void)
+      let read = foreign (prefix "read") (string @-> returning typ)
+    end
 
-    let lagrange_commitment =
-      foreign
-        (prefix "lagrange_commitment")
-        (typ @-> size_t @-> size_t @-> returning Fq_poly_comm.typ)
+    module Fp_proof =
+      Pairing_marlin_proof (struct
+          let prefix = with_prefix (prefix "fp_proof")
+        end)
+        (G1.Affine)
+        (Fp)
+        (Fp_index)
+        (Fp_verifier_index)
+        (Fp.Vector)
+        (F)
 
-    let commit_evaluations =
-      foreign
-        (prefix "commit_evaluations")
-        (typ @-> size_t @-> Fq.Vector.typ @-> returning Fq_poly_comm.typ)
+    module Fp_oracles =
+      Pairing_oracles (struct
+          let prefix = with_prefix (prefix "fp_oracles")
+        end)
+        (Fp)
+        (Fp_verifier_index)
+        (Fp_proof)
+        (F)
 
-    let h = foreign (prefix "h") (typ @-> returning G.Affine.typ)
+    module Fq_triple = Triple (Fq) (Fq) (F)
 
-    let b_poly_commitment =
-      foreign
-        (prefix "b_poly_commitment")
-        (typ @-> Fq.Vector.typ @-> returning Fq_poly_comm.typ)
-  end
+    module Fq_vector_triple = Triple (Fq.Vector) (Fq.Vector) (F)
 
-  module Fq_index =
-    Index (struct
-        let prefix = with_prefix (prefix "fq_index")
-      end)
-      (Fq.Constraint_matrix)
-      (Fq_poly_comm)
-      (Fq_urs)
-      (F)
+    module Fq_opening_proof =
+      Dlog_opening_proof (struct
+          let prefix = with_prefix (prefix "fq_opening_proof")
+        end)
+        (Fq)
+        (G.Affine)
+        (F)
 
-  module Fq_verifier_index = struct
-    include VerifierIndex (struct
-        let prefix = with_prefix (prefix "fq_verifier_index")
-      end)
-      (Fq_index)
-      (Fq_urs)
-      (Fq_poly_comm)
-      (F)
+    module Fq_poly_comm =
+      Dlog_poly_comm (struct
+          let prefix = with_prefix (prefix "fq_poly_comm")
+        end)
+        (G.Affine)
+        (F)
 
-    open F
+    module Fq_urs = struct
 
-    let read = foreign (prefix "read") (Fq_urs.typ @-> string @-> returning typ)
-  end
+      let prefix = with_prefix (prefix "fq_urs")
 
-  module Fq_proof =
-    Dlog_marlin_proof (struct
-        let prefix = with_prefix (prefix "fq_proof")
-      end)
-      (G.Affine)
-      (Fq)
-      (Fq_index)
-      (Fq_verifier_index)
-      (Fq.Vector)
-      (Fq_vector_triple)
-      (Fq_opening_proof)
-      (Fq_poly_comm)
-      (F)
+      include (
+        struct
+            type t = unit ptr
 
-  module Fq_oracles =
-    Dlog_oracles (struct
-        let prefix = with_prefix (prefix "fq_oracles")
-      end)
-      (Fq)
-      (Fq_verifier_index)
-      (Fq_proof)
-      (Fq_vector_triple)
-      (F)
+            let typ = ptr void
+          end :
+          Type )
 
-  module Endo = struct
-    let endo typ which =
+      open F
+
+      let create = foreign (prefix "create") (size_t @-> returning typ)
+
+      let read = foreign (prefix "read") (string @-> returning typ)
+
+      let write = foreign (prefix "write") (typ @-> string @-> returning void)
+
+      let lagrange_commitment =
+        foreign
+          (prefix "lagrange_commitment")
+          (typ @-> size_t @-> size_t @-> returning Fq_poly_comm.typ)
+
+      let commit_evaluations =
+        foreign
+          (prefix "commit_evaluations")
+          (typ @-> size_t @-> Fq.Vector.typ @-> returning Fq_poly_comm.typ)
+
+      let h = foreign (prefix "h") (typ @-> returning G.Affine.typ)
+
+      let b_poly_commitment =
+        foreign
+          (prefix "b_poly_commitment")
+          (typ @-> Fq.Vector.typ @-> returning Fq_poly_comm.typ)
+    end
+
+    module Fq_index =
+      Index (struct
+          let prefix = with_prefix (prefix "fq_index")
+        end)
+        (Fq.Constraint_matrix)
+        (Fq_poly_comm)
+        (Fq_urs)
+        (F)
+
+    module Fq_verifier_index = struct
+      include VerifierIndex (struct
+          let prefix = with_prefix (prefix "fq_verifier_index")
+        end)
+        (Fq_index)
+        (Fq_urs)
+        (Fq_poly_comm)
+        (F)
+
+      open F
+
+      let read = foreign (prefix "read") (Fq_urs.typ @-> string @-> returning typ)
+    end
+
+    module Fq_proof =
+      Dlog_marlin_proof (struct
+          let prefix = with_prefix (prefix "fq_proof")
+        end)
+        (G.Affine)
+        (Fq)
+        (Fq_index)
+        (Fq_verifier_index)
+        (Fq.Vector)
+        (Fq_vector_triple)
+        (Fq_opening_proof)
+        (Fq_poly_comm)
+        (F)
+
+    module Fq_oracles =
+      Dlog_oracles (struct
+          let prefix = with_prefix (prefix "fq_oracles")
+        end)
+        (Fq)
+        (Fq_verifier_index)
+        (Fq_proof)
+        (Fq_vector_triple)
+        (F)
+
+    module Endo = struct
+      let endo typ which =
+        let open F in
+        F.foreign (prefix which) (void @-> returning typ)
+
+      module Pairing = struct
+        let base = endo Fq.typ "fp_endo_base"
+        let scalar = endo Fp.typ "fp_endo_scalar"
+      end
+
+      module Dlog = struct
+        let base = endo Fp.typ "fq_endo_base"
+        let scalar = endo Fq.typ "fq_endo_scalar"
+      end
+    end
+
+    let batch_pairing_check =
       let open F in
-      F.foreign (prefix which) (void @-> returning typ)
-
-    module Pairing = struct
-      let base = endo Fq.typ "fp_endo_base"
-      let scalar = endo Fp.typ "fp_endo_scalar"
-    end
-
-    module Dlog = struct
-      let base = endo Fp.typ "fq_endo_base"
-      let scalar = endo Fq.typ "fq_endo_scalar"
-    end
+      foreign
+        (prefix "batch_pairing_check")
+        ( Fp_urs.typ @-> Usize_vector.typ @-> G1.Affine.Vector.typ
+        @-> G1.Affine.Vector.typ @-> G1.Affine.Vector.typ
+        @-> G1.Affine.Vector.typ @-> returning bool )
   end
-
-  let batch_pairing_check =
-    let open F in
-    foreign
-      (prefix "batch_pairing_check")
-      ( Fp_urs.typ @-> Usize_vector.typ @-> G1.Affine.Vector.typ
-      @-> G1.Affine.Vector.typ @-> G1.Affine.Vector.typ
-      @-> G1.Affine.Vector.typ @-> returning bool )
+  include Bn382
 end

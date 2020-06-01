@@ -1,21 +1,19 @@
 use crate::common::*;
 use algebra::{
     ToBytes, FromBytes, One, Zero,
-    biginteger::{BigInteger, BigInteger384},
+    biginteger::{BigInteger384},
     bn_382::{
-        g::{Affine as GAffine, Projective as GProjective},
         Bn_382, G1Affine, G1Projective, G2Affine,
         g1::Bn_382G1Parameters,
-        g::Bn_382GParameters,
         fp::{Fp, FpParameters as Fp_params},
-        fq::{Fq, FqParameters as Fq_params},
+        fq::{Fq},
     },
     curves::{
         PairingEngine,
         AffineCurve, ProjectiveCurve,
     },
     fields::{
-        Field, FpParameters, PrimeField, SquareRootField, FftField,
+        Field, FpParameters, PrimeField, SquareRootField,
     },
     UniformRand,
 };
@@ -34,47 +32,40 @@ use std::ffi::CStr;
 use std::fs::File;
 use std::io::{Read, Result as IoResult, Write, BufReader, BufWriter};
 
-
-
-
-
-
-
-
 // Fp stubs
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_endo_base() -> *const Fq {
+pub extern "C" fn zexe_bn382_fp_endo_base() -> *const Fq {
     let (endo_q, _endo_r) = circuits_pairing::index::endos::<Bn_382>();
     return Box::into_raw(Box::new(endo_q));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_endo_scalar() -> *const Fp {
+pub extern "C" fn zexe_bn382_fp_endo_scalar() -> *const Fp {
     let (_endo_q, endo_r) = circuits_pairing::index::endos::<Bn_382>();
     return Box::into_raw(Box::new(endo_r));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_size_in_bits() -> i32 {
+pub extern "C" fn zexe_bn382_fp_size_in_bits() -> i32 {
     return Fp_params::MODULUS_BITS as i32;
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_size() -> *mut BigInteger384 {
+pub extern "C" fn zexe_bn382_fp_size() -> *mut BigInteger384 {
     let ret = Fp_params::MODULUS;
     return Box::into_raw(Box::new(ret));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_is_square(x: *const Fp) -> bool {
+pub extern "C" fn zexe_bn382_fp_is_square(x: *const Fp) -> bool {
     let x_ = unsafe { &(*x) };
     let s0 = x_.pow(Fp_params::MODULUS_MINUS_ONE_DIV_TWO);
     s0.is_zero() || s0.is_one()
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_sqrt(x: *const Fp) -> *mut Fp {
+pub extern "C" fn zexe_bn382_fp_sqrt(x: *const Fp) -> *mut Fp {
     let x_ = unsafe { &(*x) };
     let ret = match x_.sqrt() {
         Some(x) => x,
@@ -84,27 +75,27 @@ pub extern "C" fn camlsnark_bn382_fp_sqrt(x: *const Fp) -> *mut Fp {
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_random() -> *mut Fp {
+pub extern "C" fn zexe_bn382_fp_random() -> *mut Fp {
     let ret: Fp = UniformRand::rand(&mut rand::thread_rng());
     return Box::into_raw(Box::new(ret));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_of_int(i: u64) -> *mut Fp {
+pub extern "C" fn zexe_bn382_fp_of_int(i: u64) -> *mut Fp {
     let ret = Fp::from(i);
     return Box::into_raw(Box::new(ret));
 }
 
 // TODO: Leaky
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_to_string(x: *const Fp) -> *const u8 {
+pub extern "C" fn zexe_bn382_fp_to_string(x: *const Fp) -> *const u8 {
     let x = unsafe { *x };
     let s: String = format!("{}", x);
     s.as_ptr()
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_inv(x: *const Fp) -> *mut Fp {
+pub extern "C" fn zexe_bn382_fp_inv(x: *const Fp) -> *mut Fp {
     let x_ = unsafe { &(*x) };
     let ret = match x_.inverse() {
         Some(x) => x,
@@ -114,14 +105,14 @@ pub extern "C" fn camlsnark_bn382_fp_inv(x: *const Fp) -> *mut Fp {
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_square(x: *const Fp) -> *mut Fp {
+pub extern "C" fn zexe_bn382_fp_square(x: *const Fp) -> *mut Fp {
     let x_ = unsafe { &(*x) };
     let ret = x_.square();
     return Box::into_raw(Box::new(ret));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_add(x: *const Fp, y: *const Fp) -> *mut Fp {
+pub extern "C" fn zexe_bn382_fp_add(x: *const Fp, y: *const Fp) -> *mut Fp {
     let x_ = unsafe { &(*x) };
     let y_ = unsafe { &(*y) };
     let ret = *x_ + y_;
@@ -129,14 +120,14 @@ pub extern "C" fn camlsnark_bn382_fp_add(x: *const Fp, y: *const Fp) -> *mut Fp 
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_negate(x: *const Fp) -> *mut Fp {
+pub extern "C" fn zexe_bn382_fp_negate(x: *const Fp) -> *mut Fp {
     let x_ = unsafe { &(*x) };
     let ret = -*x_;
     return Box::into_raw(Box::new(ret));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_mul(x: *const Fp, y: *const Fp) -> *mut Fp {
+pub extern "C" fn zexe_bn382_fp_mul(x: *const Fp, y: *const Fp) -> *mut Fp {
     let x_ = unsafe { &(*x) };
     let y_ = unsafe { &(*y) };
     let ret = *x_ * y_;
@@ -144,7 +135,7 @@ pub extern "C" fn camlsnark_bn382_fp_mul(x: *const Fp, y: *const Fp) -> *mut Fp 
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_div(x: *const Fp, y: *const Fp) -> *mut Fp {
+pub extern "C" fn zexe_bn382_fp_div(x: *const Fp, y: *const Fp) -> *mut Fp {
     let x_ = unsafe { &(*x) };
     let y_ = unsafe { &(*y) };
     let ret = *x_ / y_;
@@ -152,7 +143,7 @@ pub extern "C" fn camlsnark_bn382_fp_div(x: *const Fp, y: *const Fp) -> *mut Fp 
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_sub(x: *const Fp, y: *const Fp) -> *mut Fp {
+pub extern "C" fn zexe_bn382_fp_sub(x: *const Fp, y: *const Fp) -> *mut Fp {
     let x_ = unsafe { &(*x) };
     let y_ = unsafe { &(*y) };
     let ret = *x_ - y_;
@@ -160,39 +151,39 @@ pub extern "C" fn camlsnark_bn382_fp_sub(x: *const Fp, y: *const Fp) -> *mut Fp 
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_mut_add(x: *mut Fp, y: *const Fp) {
+pub extern "C" fn zexe_bn382_fp_mut_add(x: *mut Fp, y: *const Fp) {
     let x_ = unsafe { &mut (*x) };
     let y_ = unsafe { &(*y) };
     *x_ += y_;
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_mut_mul(x: *mut Fp, y: *const Fp) {
+pub extern "C" fn zexe_bn382_fp_mut_mul(x: *mut Fp, y: *const Fp) {
     let x_ = unsafe { &mut (*x) };
     let y_ = unsafe { &(*y) };
     *x_ *= y_;
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_mut_square(x: *mut Fp) {
+pub extern "C" fn zexe_bn382_fp_mut_square(x: *mut Fp) {
     let x_ = unsafe { &mut (*x) };
     x_.square_in_place();
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_mut_sub(x: *mut Fp, y: *const Fp) {
+pub extern "C" fn zexe_bn382_fp_mut_sub(x: *mut Fp, y: *const Fp) {
     let x_ = unsafe { &mut (*x) };
     let y_ = unsafe { &(*y) };
     *x_ -= y_;
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_copy(x: *mut Fp, y: *const Fp) {
+pub extern "C" fn zexe_bn382_fp_copy(x: *mut Fp, y: *const Fp) {
     unsafe { (*x) = *y };
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_rng(i: i32) -> *mut Fp {
+pub extern "C" fn zexe_bn382_fp_rng(i: i32) -> *mut Fp {
     // We only care about entropy here, so we force a conversion i32 -> u32.
     let i: u64 = (i as u32).into();
     let mut rng: StdRng = rand::SeedableRng::seed_from_u64(i);
@@ -201,51 +192,51 @@ pub extern "C" fn camlsnark_bn382_fp_rng(i: i32) -> *mut Fp {
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_delete(x: *mut Fp) {
+pub extern "C" fn zexe_bn382_fp_delete(x: *mut Fp) {
     // Deallocation happens automatically when a box variable goes out of
     // scope.
     let _box = unsafe { Box::from_raw(x) };
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_print(x: *const Fp) {
+pub extern "C" fn zexe_bn382_fp_print(x: *const Fp) {
     let x_ = unsafe { &(*x) };
     println!("{}", *x_);
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_equal(x: *const Fp, y: *const Fp) -> bool {
+pub extern "C" fn zexe_bn382_fp_equal(x: *const Fp, y: *const Fp) -> bool {
     let x_ = unsafe { &(*x) };
     let y_ = unsafe { &(*y) };
     return *x_ == *y_;
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_to_bigint(x: *const Fp) -> *mut BigInteger384 {
+pub extern "C" fn zexe_bn382_fp_to_bigint(x: *const Fp) -> *mut BigInteger384 {
     let x_ = unsafe { &(*x) };
     return Box::into_raw(Box::new(x_.into_repr()));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_of_bigint(x: *const BigInteger384) -> *mut Fp {
+pub extern "C" fn zexe_bn382_fp_of_bigint(x: *const BigInteger384) -> *mut Fp {
     let x_ = unsafe { &(*x) };
     return Box::into_raw(Box::new(Fp::from_repr(*x_)));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_to_bigint_raw(x: *const Fp) -> *const BigInteger384 {
+pub extern "C" fn zexe_bn382_fp_to_bigint_raw(x: *const Fp) -> *const BigInteger384 {
     let x_ = unsafe { &(*x) };
     return Box::into_raw(Box::new(x_.0));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_to_bigint_raw_noalloc(x: *const Fp) -> *const BigInteger384 {
+pub extern "C" fn zexe_bn382_fp_to_bigint_raw_noalloc(x: *const Fp) -> *const BigInteger384 {
     let x_ = unsafe { &(*x) };
     &x_.0 as *const BigInteger384
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_of_bigint_raw(x: *const BigInteger384) -> *mut Fp {
+pub extern "C" fn zexe_bn382_fp_of_bigint_raw(x: *const BigInteger384) -> *mut Fp {
     let x_ = unsafe { &(*x) };
     return Box::into_raw(Box::new(Fp::new(*x_)));
 }
@@ -253,31 +244,31 @@ pub extern "C" fn camlsnark_bn382_fp_of_bigint_raw(x: *const BigInteger384) -> *
 // Fp vector stubs
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_vector_create() -> *mut Vec<Fp> {
+pub extern "C" fn zexe_bn382_fp_vector_create() -> *mut Vec<Fp> {
     return Box::into_raw(Box::new(Vec::new()));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_vector_length(v: *const Vec<Fp>) -> i32 {
+pub extern "C" fn zexe_bn382_fp_vector_length(v: *const Vec<Fp>) -> i32 {
     let v_ = unsafe { &(*v) };
     return v_.len() as i32;
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_vector_emplace_back(v: *mut Vec<Fp>, x: *const Fp) {
+pub extern "C" fn zexe_bn382_fp_vector_emplace_back(v: *mut Vec<Fp>, x: *const Fp) {
     let v_ = unsafe { &mut (*v) };
     let x_ = unsafe { &(*x) };
     v_.push(*x_);
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_vector_get(v: *mut Vec<Fp>, i: u32) -> *mut Fp {
+pub extern "C" fn zexe_bn382_fp_vector_get(v: *mut Vec<Fp>, i: u32) -> *mut Fp {
     let v_ = unsafe { &mut (*v) };
     return Box::into_raw(Box::new((*v_)[i as usize]));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_vector_delete(v: *mut Vec<Fp>) {
+pub extern "C" fn zexe_bn382_fp_vector_delete(v: *mut Vec<Fp>) {
     // Deallocation happens automatically when a box variable goes out of
     // scope.
     let _box = unsafe { Box::from_raw(v) };
@@ -286,12 +277,12 @@ pub extern "C" fn camlsnark_bn382_fp_vector_delete(v: *mut Vec<Fp>) {
 // Fp constraint-matrix stubs
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_constraint_matrix_create() -> *mut Vec<(Vec<usize>, Vec<Fp>)> {
+pub extern "C" fn zexe_bn382_fp_constraint_matrix_create() -> *mut Vec<(Vec<usize>, Vec<Fp>)> {
     return Box::into_raw(Box::new(vec![]));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_constraint_matrix_append_row(
+pub extern "C" fn zexe_bn382_fp_constraint_matrix_append_row(
     m: *mut Vec<(Vec<usize>, Vec<Fp>)>,
     indices: *mut Vec<usize>,
     coefficients: *mut Vec<Fp>,
@@ -303,14 +294,14 @@ pub extern "C" fn camlsnark_bn382_fp_constraint_matrix_append_row(
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_constraint_matrix_delete(x: *mut Vec<(Vec<usize>, Vec<Fp>)>) {
+pub extern "C" fn zexe_bn382_fp_constraint_matrix_delete(x: *mut Vec<(Vec<usize>, Vec<Fp>)>) {
     // Deallocation happens automatically when a box variable goes out of
     // scope.
     let _box = unsafe { Box::from_raw(x) };
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_batch_pairing_check(
+pub extern "C" fn zexe_bn382_batch_pairing_check(
 // Pardon the tortured encoding. It's this way because we have to add
 // additional OCaml bindings for each specialized vector type.
 //
@@ -405,7 +396,7 @@ pub extern "C" fn camlsnark_bn382_batch_pairing_check(
 
 // Fp proof
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_proof_create(
+pub extern "C" fn zexe_bn382_fp_proof_create(
     index: *const Index<Bn_382>,
     primary_input: *const Vec<Fp>,
     auxiliary_input: *const Vec<Fp>,
@@ -423,7 +414,7 @@ pub extern "C" fn camlsnark_bn382_fp_proof_create(
 
 // TODO: Batch verify across different indexes
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_proof_batch_verify(
+pub extern "C" fn zexe_bn382_fp_proof_batch_verify(
     index: *const VerifierIndex<Bn_382>,
     proofs: *const Vec<ProverProof<Bn_382>>,
 ) -> bool {
@@ -438,7 +429,7 @@ pub extern "C" fn camlsnark_bn382_fp_proof_batch_verify(
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_proof_verify(
+pub extern "C" fn zexe_bn382_fp_proof_verify(
     index: *const VerifierIndex<Bn_382>,
     proof: *const ProverProof<Bn_382>,
 ) -> bool {
@@ -459,7 +450,7 @@ pub extern "C" fn camlsnark_bn382_fp_proof_verify(
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_proof_make(
+pub extern "C" fn zexe_bn382_fp_proof_make(
     primary_input : *const Vec<Fp>,
 
     w_comm        : *const G1Affine,
@@ -559,164 +550,164 @@ pub extern "C" fn camlsnark_bn382_fp_proof_make(
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_proof_delete(x: *mut ProverProof<Bn_382>) {
+pub extern "C" fn zexe_bn382_fp_proof_delete(x: *mut ProverProof<Bn_382>) {
     let _box = unsafe { Box::from_raw(x) };
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_proof_w_comm(p: *mut ProverProof<Bn_382>) -> *const G1Affine {
+pub extern "C" fn zexe_bn382_fp_proof_w_comm(p: *mut ProverProof<Bn_382>) -> *const G1Affine {
     let x = (unsafe { (*p).w_comm }).clone();
     return Box::into_raw(Box::new(x));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_proof_za_comm(p: *mut ProverProof<Bn_382>) -> *const G1Affine {
+pub extern "C" fn zexe_bn382_fp_proof_za_comm(p: *mut ProverProof<Bn_382>) -> *const G1Affine {
     let x = (unsafe { (*p).za_comm }).clone();
     return Box::into_raw(Box::new(x));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_proof_zb_comm(p: *mut ProverProof<Bn_382>) -> *const G1Affine {
+pub extern "C" fn zexe_bn382_fp_proof_zb_comm(p: *mut ProverProof<Bn_382>) -> *const G1Affine {
     let x = (unsafe { (*p).zb_comm }).clone();
     return Box::into_raw(Box::new(x));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_proof_h1_comm(p: *mut ProverProof<Bn_382>) -> *const G1Affine {
+pub extern "C" fn zexe_bn382_fp_proof_h1_comm(p: *mut ProverProof<Bn_382>) -> *const G1Affine {
     let x = (unsafe { (*p).h1_comm }).clone();
     return Box::into_raw(Box::new(x));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_proof_g1_comm_nocopy(p: *mut ProverProof<Bn_382>) -> *const (G1Affine, G1Affine) {
+pub extern "C" fn zexe_bn382_fp_proof_g1_comm_nocopy(p: *mut ProverProof<Bn_382>) -> *const (G1Affine, G1Affine) {
     let x = unsafe {(*p).g1_comm};
     return Box::into_raw(Box::new(x));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_proof_h2_comm(p: *mut ProverProof<Bn_382>) -> *const G1Affine {
+pub extern "C" fn zexe_bn382_fp_proof_h2_comm(p: *mut ProverProof<Bn_382>) -> *const G1Affine {
     let x = (unsafe { (*p).h2_comm }).clone();
     return Box::into_raw(Box::new(x));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_proof_g2_comm_nocopy(p: *mut ProverProof<Bn_382>) -> *const (G1Affine, G1Affine) {
+pub extern "C" fn zexe_bn382_fp_proof_g2_comm_nocopy(p: *mut ProverProof<Bn_382>) -> *const (G1Affine, G1Affine) {
     let x = unsafe { (*p).g2_comm };
     return Box::into_raw(Box::new(x));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_proof_h3_comm(p: *mut ProverProof<Bn_382>) -> *const G1Affine {
+pub extern "C" fn zexe_bn382_fp_proof_h3_comm(p: *mut ProverProof<Bn_382>) -> *const G1Affine {
     let x = (unsafe { (*p).h3_comm }).clone();
     return Box::into_raw(Box::new(x));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_proof_g3_comm_nocopy(p: *mut ProverProof<Bn_382>) -> *const (G1Affine, G1Affine) {
+pub extern "C" fn zexe_bn382_fp_proof_g3_comm_nocopy(p: *mut ProverProof<Bn_382>) -> *const (G1Affine, G1Affine) {
     let x = unsafe { (*p).g3_comm };
     return Box::into_raw(Box::new(x));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_proof_commitment_with_degree_bound_0(
+pub extern "C" fn zexe_bn382_fp_proof_commitment_with_degree_bound_0(
     p: *const (G1Affine, G1Affine)) -> *const G1Affine {
     let (x0, _) = unsafe { *p};
     return Box::into_raw(Box::new(x0.clone()));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_proof_commitment_with_degree_bound_1(
+pub extern "C" fn zexe_bn382_fp_proof_commitment_with_degree_bound_1(
     p: *const (G1Affine, G1Affine)) -> *const G1Affine {
     let (_, x1) = unsafe { *p };
     return Box::into_raw(Box::new(x1.clone()));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_proof_proof1(p: *mut ProverProof<Bn_382>) -> *const G1Affine {
+pub extern "C" fn zexe_bn382_fp_proof_proof1(p: *mut ProverProof<Bn_382>) -> *const G1Affine {
     let x = (unsafe { (*p).proof1 }).clone();
     return Box::into_raw(Box::new(x));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_proof_proof2(p: *mut ProverProof<Bn_382>) -> *const G1Affine {
+pub extern "C" fn zexe_bn382_fp_proof_proof2(p: *mut ProverProof<Bn_382>) -> *const G1Affine {
     let x = (unsafe { (*p).proof2 }).clone();
     return Box::into_raw(Box::new(x));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_proof_proof3(p: *mut ProverProof<Bn_382>) -> *const G1Affine {
+pub extern "C" fn zexe_bn382_fp_proof_proof3(p: *mut ProverProof<Bn_382>) -> *const G1Affine {
     let x = (unsafe { (*p).proof3 }).clone();
     return Box::into_raw(Box::new(x));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_proof_sigma2(p: *mut ProverProof<Bn_382>) -> *const Fp {
+pub extern "C" fn zexe_bn382_fp_proof_sigma2(p: *mut ProverProof<Bn_382>) -> *const Fp {
     let x = (unsafe { (*p).sigma2 }).clone();
     return Box::into_raw(Box::new(x));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_proof_sigma3(p: *mut ProverProof<Bn_382>) -> *const Fp {
+pub extern "C" fn zexe_bn382_fp_proof_sigma3(p: *mut ProverProof<Bn_382>) -> *const Fp {
     let x = (unsafe { (*p).sigma3 }).clone();
     return Box::into_raw(Box::new(x));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_proof_w_eval(p: *mut ProverProof<Bn_382>) -> *const Fp {
+pub extern "C" fn zexe_bn382_fp_proof_w_eval(p: *mut ProverProof<Bn_382>) -> *const Fp {
     let x = (unsafe { (*p).evals.w }).clone();
     return Box::into_raw(Box::new(x));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_proof_za_eval(p: *mut ProverProof<Bn_382>) -> *const Fp {
+pub extern "C" fn zexe_bn382_fp_proof_za_eval(p: *mut ProverProof<Bn_382>) -> *const Fp {
     let x = (unsafe { (*p).evals.za }).clone();
     return Box::into_raw(Box::new(x));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_proof_zb_eval(p: *mut ProverProof<Bn_382>) -> *const Fp {
+pub extern "C" fn zexe_bn382_fp_proof_zb_eval(p: *mut ProverProof<Bn_382>) -> *const Fp {
     let x = (unsafe { (*p).evals.zb }).clone();
     return Box::into_raw(Box::new(x));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_proof_h1_eval(p: *mut ProverProof<Bn_382>) -> *const Fp {
+pub extern "C" fn zexe_bn382_fp_proof_h1_eval(p: *mut ProverProof<Bn_382>) -> *const Fp {
     let x = (unsafe { (*p).evals.h1 }).clone();
     return Box::into_raw(Box::new(x));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_proof_g1_eval(p: *mut ProverProof<Bn_382>) -> *const Fp {
+pub extern "C" fn zexe_bn382_fp_proof_g1_eval(p: *mut ProverProof<Bn_382>) -> *const Fp {
     let x = (unsafe { (*p).evals.g1 }).clone();
     return Box::into_raw(Box::new(x));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_proof_h2_eval(p: *mut ProverProof<Bn_382>) -> *const Fp {
+pub extern "C" fn zexe_bn382_fp_proof_h2_eval(p: *mut ProverProof<Bn_382>) -> *const Fp {
     let x = (unsafe { (*p).evals.h2 }).clone();
     return Box::into_raw(Box::new(x));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_proof_g2_eval(p: *mut ProverProof<Bn_382>) -> *const Fp {
+pub extern "C" fn zexe_bn382_fp_proof_g2_eval(p: *mut ProverProof<Bn_382>) -> *const Fp {
     let x = (unsafe { (*p).evals.g2 }).clone();
     return Box::into_raw(Box::new(x));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_proof_h3_eval(p: *mut ProverProof<Bn_382>) -> *const Fp {
+pub extern "C" fn zexe_bn382_fp_proof_h3_eval(p: *mut ProverProof<Bn_382>) -> *const Fp {
     let x = (unsafe { (*p).evals.h3 }).clone();
     return Box::into_raw(Box::new(x));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_proof_g3_eval(p: *mut ProverProof<Bn_382>) -> *const Fp {
+pub extern "C" fn zexe_bn382_fp_proof_g3_eval(p: *mut ProverProof<Bn_382>) -> *const Fp {
     let x = (unsafe { (*p).evals.g3 }).clone();
     return Box::into_raw(Box::new(x));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_proof_row_evals_nocopy(
+pub extern "C" fn zexe_bn382_fp_proof_row_evals_nocopy(
     p: *mut ProverProof<Bn_382>,
 ) -> *const [Fp; 3] {
     let x = unsafe { (*p).evals.row };
@@ -724,7 +715,7 @@ pub extern "C" fn camlsnark_bn382_fp_proof_row_evals_nocopy(
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_proof_col_evals_nocopy(
+pub extern "C" fn zexe_bn382_fp_proof_col_evals_nocopy(
     p: *mut ProverProof<Bn_382>,
 ) -> *const [Fp; 3] {
     let x = unsafe { (*p).evals.col };
@@ -732,7 +723,7 @@ pub extern "C" fn camlsnark_bn382_fp_proof_col_evals_nocopy(
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_proof_val_evals_nocopy(
+pub extern "C" fn zexe_bn382_fp_proof_val_evals_nocopy(
     p: *mut ProverProof<Bn_382>,
 ) -> *const [Fp; 3] {
     let x = unsafe { (*p).evals.val };
@@ -740,7 +731,7 @@ pub extern "C" fn camlsnark_bn382_fp_proof_val_evals_nocopy(
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_proof_rc_evals_nocopy(
+pub extern "C" fn zexe_bn382_fp_proof_rc_evals_nocopy(
     p: *mut ProverProof<Bn_382>,
 ) -> *const [Fp; 3] {
     let x = unsafe { (*p).evals.rc };
@@ -748,19 +739,19 @@ pub extern "C" fn camlsnark_bn382_fp_proof_rc_evals_nocopy(
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_proof_evals_0(evals: *const [Fp; 3]) -> *const Fp {
+pub extern "C" fn zexe_bn382_fp_proof_evals_0(evals: *const [Fp; 3]) -> *const Fp {
     let x = (unsafe { *evals })[0].clone();
     return Box::into_raw(Box::new(x));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_proof_evals_1(evals: *const [Fp; 3]) -> *const Fp {
+pub extern "C" fn zexe_bn382_fp_proof_evals_1(evals: *const [Fp; 3]) -> *const Fp {
     let x = (unsafe { *evals })[1].clone();
     return Box::into_raw(Box::new(x));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_proof_evals_2(evals: *const [Fp; 3]) -> *const Fp {
+pub extern "C" fn zexe_bn382_fp_proof_evals_2(evals: *const [Fp; 3]) -> *const Fp {
     let x = (unsafe { *evals })[2].clone();
     return Box::into_raw(Box::new(x));
 }
@@ -768,31 +759,31 @@ pub extern "C" fn camlsnark_bn382_fp_proof_evals_2(evals: *const [Fp; 3]) -> *co
 // Fp proof vector
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_proof_vector_create() -> *mut Vec<ProverProof<Bn_382>> {
+pub extern "C" fn zexe_bn382_fp_proof_vector_create() -> *mut Vec<ProverProof<Bn_382>> {
     return Box::into_raw(Box::new(Vec::new()));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_proof_vector_length(v: *const Vec<ProverProof<Bn_382>>) -> i32 {
+pub extern "C" fn zexe_bn382_fp_proof_vector_length(v: *const Vec<ProverProof<Bn_382>>) -> i32 {
     let v_ = unsafe { &(*v) };
     return v_.len() as i32;
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_proof_vector_emplace_back(v: *mut Vec<ProverProof<Bn_382>>, x: *const ProverProof<Bn_382>) {
+pub extern "C" fn zexe_bn382_fp_proof_vector_emplace_back(v: *mut Vec<ProverProof<Bn_382>>, x: *const ProverProof<Bn_382>) {
     let v_ = unsafe { &mut (*v) };
     let x_ = unsafe { &(*x) };
     v_.push(x_.clone());
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_proof_vector_get(v: *mut Vec<ProverProof<Bn_382>>, i: u32) -> *mut ProverProof<Bn_382> {
+pub extern "C" fn zexe_bn382_fp_proof_vector_get(v: *mut Vec<ProverProof<Bn_382>>, i: u32) -> *mut ProverProof<Bn_382> {
     let v_ = unsafe { &mut (*v) };
     return Box::into_raw(Box::new(v_[i as usize].clone()));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_proof_vector_delete(v: *mut Vec<ProverProof<Bn_382>>) {
+pub extern "C" fn zexe_bn382_fp_proof_vector_delete(v: *mut Vec<ProverProof<Bn_382>>) {
     // Deallocation happens automatically when a box variable goes out of
     // scope.
     let _box = unsafe { Box::from_raw(v) };
@@ -800,7 +791,7 @@ pub extern "C" fn camlsnark_bn382_fp_proof_vector_delete(v: *mut Vec<ProverProof
 
 // Fp oracles
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_oracles_create(
+pub extern "C" fn zexe_bn382_fp_oracles_create(
     index: *const VerifierIndex<Bn_382>,
     proof: *const ProverProof<Bn_382>,
 ) -> *const RandomOracles<Fp> {
@@ -815,105 +806,105 @@ pub extern "C" fn camlsnark_bn382_fp_oracles_create(
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_oracles_alpha(
+pub extern "C" fn zexe_bn382_fp_oracles_alpha(
     oracles: *const RandomOracles<Fp>,
 ) -> *const Fp {
     return Box::into_raw(Box::new( (unsafe {&(*oracles)}).alpha.clone() ));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_oracles_eta_a(
+pub extern "C" fn zexe_bn382_fp_oracles_eta_a(
     oracles: *const RandomOracles<Fp>,
 ) -> *const Fp {
     return Box::into_raw(Box::new( (unsafe {&(*oracles)}).eta_a.clone() ));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_oracles_eta_b(
+pub extern "C" fn zexe_bn382_fp_oracles_eta_b(
     oracles: *const RandomOracles<Fp>,
 ) -> *const Fp {
     return Box::into_raw(Box::new( (unsafe {&(*oracles)}).eta_b.clone() ));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_oracles_eta_c(
+pub extern "C" fn zexe_bn382_fp_oracles_eta_c(
     oracles: *const RandomOracles<Fp>,
 ) -> *const Fp {
     return Box::into_raw(Box::new( (unsafe {&(*oracles)}).eta_c.clone() ));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_oracles_beta1(
+pub extern "C" fn zexe_bn382_fp_oracles_beta1(
     oracles: *const RandomOracles<Fp>,
 ) -> *const Fp {
     return Box::into_raw(Box::new( (unsafe {&(*oracles)}).beta[0].0.clone() ));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_oracles_beta2(
+pub extern "C" fn zexe_bn382_fp_oracles_beta2(
     oracles: *const RandomOracles<Fp>,
 ) -> *const Fp {
     return Box::into_raw(Box::new( (unsafe {&(*oracles)}).beta[1].0.clone() ));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_oracles_beta3(
+pub extern "C" fn zexe_bn382_fp_oracles_beta3(
     oracles: *const RandomOracles<Fp>,
 ) -> *const Fp {
     return Box::into_raw(Box::new( (unsafe {&(*oracles)}).beta[2].0.clone() ));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_oracles_r_k(
+pub extern "C" fn zexe_bn382_fp_oracles_r_k(
     oracles: *const RandomOracles<Fp>,
 ) -> *const Fp {
     return Box::into_raw(Box::new( (unsafe {&(*oracles)}).r_k.0.clone() ));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_oracles_batch(
+pub extern "C" fn zexe_bn382_fp_oracles_batch(
     oracles: *const RandomOracles<Fp>,
 ) -> *const Fp {
     return Box::into_raw(Box::new( (unsafe {&(*oracles)}).batch.0.clone() ));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_oracles_r(
+pub extern "C" fn zexe_bn382_fp_oracles_r(
     oracles: *const RandomOracles<Fp>,
 ) -> *const Fp {
     return Box::into_raw(Box::new( (unsafe {&(*oracles)}).r.0.clone() ));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_oracles_x_hat_beta1(
+pub extern "C" fn zexe_bn382_fp_oracles_x_hat_beta1(
     oracles: *const RandomOracles<Fp>,
 ) -> *const Fp {
     return Box::into_raw(Box::new( (unsafe {&(*oracles)}).x_hat_beta1.clone() ));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_oracles_digest_before_evaluations(
+pub extern "C" fn zexe_bn382_fp_oracles_digest_before_evaluations(
     oracles: *const RandomOracles<Fp>,
 ) -> *const Fp {
     return Box::into_raw(Box::new( (unsafe {&(*oracles)}).digest_before_evaluations.clone() ));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_oracles_delete(
+pub extern "C" fn zexe_bn382_fp_oracles_delete(
     x: *mut RandomOracles<Fp>) {
     let _box = unsafe { Box::from_raw(x) };
 }
 
 // Fp verifier index stubs
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_verifier_index_create(
+pub extern "C" fn zexe_bn382_fp_verifier_index_create(
     index: *const Index<Bn_382>
 ) -> *const VerifierIndex<Bn_382> {
     Box::into_raw(Box::new(unsafe {&(*index)}.verifier_index()))
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_verifier_index_urs(
+pub extern "C" fn zexe_bn382_fp_verifier_index_urs(
     index: *const VerifierIndex<Bn_382>
 ) -> *const URS<Bn_382> {
     let index = unsafe { & *index };
@@ -922,7 +913,7 @@ pub extern "C" fn camlsnark_bn382_fp_verifier_index_urs(
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_verifier_index_make(
+pub extern "C" fn zexe_bn382_fp_verifier_index_make(
     public_inputs: usize,
     variables: usize,
     constraints: usize,
@@ -964,14 +955,14 @@ pub extern "C" fn camlsnark_bn382_fp_verifier_index_make(
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_verifier_index_delete(
+pub extern "C" fn zexe_bn382_fp_verifier_index_delete(
     x: *mut VerifierIndex<Bn_382>
 ) {
     let _box = unsafe { Box::from_raw(x) };
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_verifier_index_write<'a>(
+pub extern "C" fn zexe_bn382_fp_verifier_index_write<'a>(
     index : *const VerifierIndex<Bn_382>,
     path: *const c_char) {
     let index = unsafe { & *index };
@@ -993,7 +984,7 @@ pub extern "C" fn camlsnark_bn382_fp_verifier_index_write<'a>(
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_verifier_index_read<'a>(
+pub extern "C" fn zexe_bn382_fp_verifier_index_read<'a>(
     path: *const c_char) -> *const VerifierIndex<Bn_382> {
     let path = (unsafe { CStr::from_ptr(path) }).to_string_lossy().into_owned();
     let mut r = BufReader::new(File::open(path).unwrap());
@@ -1022,84 +1013,84 @@ pub extern "C" fn camlsnark_bn382_fp_verifier_index_read<'a>(
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_verifier_index_a_row_comm(
+pub extern "C" fn zexe_bn382_fp_verifier_index_a_row_comm(
     index: *const VerifierIndex<Bn_382>,
 ) -> *const G1Affine {
     Box::into_raw(Box::new((unsafe { (*index).matrix_commitments[0].row }).clone()))
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_verifier_index_a_col_comm(
+pub extern "C" fn zexe_bn382_fp_verifier_index_a_col_comm(
     index: *const VerifierIndex<Bn_382>,
 ) -> *const G1Affine {
     Box::into_raw(Box::new((unsafe { (*index).matrix_commitments[0].col }).clone()))
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_verifier_index_a_val_comm(
+pub extern "C" fn zexe_bn382_fp_verifier_index_a_val_comm(
     index: *const VerifierIndex<Bn_382>,
 ) -> *const G1Affine {
     Box::into_raw(Box::new((unsafe { (*index).matrix_commitments[0].val }).clone()))
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_verifier_index_a_rc_comm(
+pub extern "C" fn zexe_bn382_fp_verifier_index_a_rc_comm(
     index: *const VerifierIndex<Bn_382>,
 ) -> *const G1Affine {
     Box::into_raw(Box::new((unsafe { (*index).matrix_commitments[0].rc }).clone()))
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_verifier_index_b_row_comm(
+pub extern "C" fn zexe_bn382_fp_verifier_index_b_row_comm(
     index: *const VerifierIndex<Bn_382>,
 ) -> *const G1Affine {
     Box::into_raw(Box::new((unsafe { (*index).matrix_commitments[1].row }).clone()))
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_verifier_index_b_col_comm(
+pub extern "C" fn zexe_bn382_fp_verifier_index_b_col_comm(
     index: *const VerifierIndex<Bn_382>,
 ) -> *const G1Affine {
     Box::into_raw(Box::new((unsafe { (*index).matrix_commitments[1].col }).clone()))
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_verifier_index_b_val_comm(
+pub extern "C" fn zexe_bn382_fp_verifier_index_b_val_comm(
     index: *const VerifierIndex<Bn_382>,
 ) -> *const G1Affine {
     Box::into_raw(Box::new((unsafe { (*index).matrix_commitments[1].val }).clone()))
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_verifier_index_b_rc_comm(
+pub extern "C" fn zexe_bn382_fp_verifier_index_b_rc_comm(
     index: *const VerifierIndex<Bn_382>,
 ) -> *const G1Affine {
     Box::into_raw(Box::new((unsafe { (*index).matrix_commitments[1].rc }).clone()))
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_verifier_index_c_row_comm(
+pub extern "C" fn zexe_bn382_fp_verifier_index_c_row_comm(
     index: *const VerifierIndex<Bn_382>,
 ) -> *const G1Affine {
     Box::into_raw(Box::new((unsafe { (*index).matrix_commitments[2].row }).clone()))
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_verifier_index_c_col_comm(
+pub extern "C" fn zexe_bn382_fp_verifier_index_c_col_comm(
     index: *const VerifierIndex<Bn_382>,
 ) -> *const G1Affine {
     Box::into_raw(Box::new((unsafe { (*index).matrix_commitments[2].col }).clone()))
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_verifier_index_c_val_comm(
+pub extern "C" fn zexe_bn382_fp_verifier_index_c_val_comm(
     index: *const VerifierIndex<Bn_382>,
 ) -> *const G1Affine {
     Box::into_raw(Box::new((unsafe { (*index).matrix_commitments[2].val }).clone()))
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_verifier_index_c_rc_comm(
+pub extern "C" fn zexe_bn382_fp_verifier_index_c_rc_comm(
     index: *const VerifierIndex<Bn_382>,
 ) -> *const G1Affine {
     Box::into_raw(Box::new((unsafe { (*index).matrix_commitments[2].rc }).clone()))
@@ -1107,12 +1098,12 @@ pub extern "C" fn camlsnark_bn382_fp_verifier_index_c_rc_comm(
 
 // Fp URS stubs
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_urs_create(depth : usize) -> *const URS<Bn_382> {
+pub extern "C" fn zexe_bn382_fp_urs_create(depth : usize) -> *const URS<Bn_382> {
     Box::into_raw(Box::new(URS::create(depth, (0..depth).collect(), &mut rand_core::OsRng)))
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_urs_write(urs : *mut URS<Bn_382>, path: *mut c_char) {
+pub extern "C" fn zexe_bn382_fp_urs_write(urs : *mut URS<Bn_382>, path: *mut c_char) {
     let path = (unsafe { CStr::from_ptr(path) }).to_string_lossy().into_owned();
     let file = BufWriter::new(File::create(path).unwrap());
     let urs = unsafe { &*urs };
@@ -1120,7 +1111,7 @@ pub extern "C" fn camlsnark_bn382_fp_urs_write(urs : *mut URS<Bn_382>, path: *mu
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_urs_read(path: *mut c_char) -> *const URS<Bn_382> {
+pub extern "C" fn zexe_bn382_fp_urs_read(path: *mut c_char) -> *const URS<Bn_382> {
     let path = (unsafe { CStr::from_ptr(path) }).to_string_lossy().into_owned();
     let file = BufReader::new(File::open(path).unwrap());
     let res = URS::<Bn_382>::read(file).unwrap();
@@ -1128,7 +1119,7 @@ pub extern "C" fn camlsnark_bn382_fp_urs_read(path: *mut c_char) -> *const URS<B
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_urs_lagrange_commitment(
+pub extern "C" fn zexe_bn382_fp_urs_lagrange_commitment(
     urs : *const URS<Bn_382>,
     domain_size : usize,
     i: usize)
@@ -1144,7 +1135,7 @@ pub extern "C" fn camlsnark_bn382_fp_urs_lagrange_commitment(
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_urs_commit_evaluations(
+pub extern "C" fn zexe_bn382_fp_urs_commit_evaluations(
     urs : *const URS<Bn_382>,
     domain_size : usize,
     evals : *const Vec<Fp>)
@@ -1160,7 +1151,7 @@ pub extern "C" fn camlsnark_bn382_fp_urs_commit_evaluations(
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_urs_dummy_degree_bound_checks(
+pub extern "C" fn zexe_bn382_fp_urs_dummy_degree_bound_checks(
     urs : *const URS<Bn_382>,
     bounds : *const Vec<usize>,
     )
@@ -1194,7 +1185,7 @@ pub extern "C" fn camlsnark_bn382_fp_urs_dummy_degree_bound_checks(
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_urs_dummy_opening_check(
+pub extern "C" fn zexe_bn382_fp_urs_dummy_opening_check(
     urs : *const URS<Bn_382>)
 -> *const (G1Affine, G1Affine) {
     /*
@@ -1222,17 +1213,17 @@ pub extern "C" fn camlsnark_bn382_fp_urs_dummy_opening_check(
 
 // Fp index stubs
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_index_domain_h_size<'a>(i : *const Index<'a, Bn_382>) -> usize {
+pub extern "C" fn zexe_bn382_fp_index_domain_h_size<'a>(i : *const Index<'a, Bn_382>) -> usize {
     (unsafe { & *i }).domains.h.size()
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_index_domain_k_size<'a>(i : *const Index<'a, Bn_382>) -> usize {
+pub extern "C" fn zexe_bn382_fp_index_domain_k_size<'a>(i : *const Index<'a, Bn_382>) -> usize {
     (unsafe { & *i }).domains.k.size()
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_index_create<'a>(
+pub extern "C" fn zexe_bn382_fp_index_create<'a>(
     a: *mut Vec<(Vec<usize>, Vec<Fp>)>,
     b: *mut Vec<(Vec<usize>, Vec<Fp>)>,
     c: *mut Vec<(Vec<usize>, Vec<Fp>)>,
@@ -1272,12 +1263,12 @@ pub extern "C" fn camlsnark_bn382_fp_index_create<'a>(
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_index_delete(x: *mut Index<Bn_382>) {
+pub extern "C" fn zexe_bn382_fp_index_delete(x: *mut Index<Bn_382>) {
     let _box = unsafe { Box::from_raw(x) };
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_index_nonzero_entries(
+pub extern "C" fn zexe_bn382_fp_index_nonzero_entries(
     index: *const Index<Bn_382>,
 ) -> usize {
     let index = unsafe { &*index };
@@ -1285,7 +1276,7 @@ pub extern "C" fn camlsnark_bn382_fp_index_nonzero_entries(
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_index_max_degree(
+pub extern "C" fn zexe_bn382_fp_index_max_degree(
     index: *const Index<Bn_382>,
 ) -> usize {
     let index = unsafe { &*index };
@@ -1293,7 +1284,7 @@ pub extern "C" fn camlsnark_bn382_fp_index_max_degree(
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_index_num_variables(
+pub extern "C" fn zexe_bn382_fp_index_num_variables(
     index: *const Index<Bn_382>,
 ) -> usize {
     let index = unsafe { &*index };
@@ -1301,7 +1292,7 @@ pub extern "C" fn camlsnark_bn382_fp_index_num_variables(
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_index_public_inputs(
+pub extern "C" fn zexe_bn382_fp_index_public_inputs(
     index: *const Index<Bn_382>,
 ) -> usize {
     let index = unsafe { &*index };
@@ -1309,7 +1300,7 @@ pub extern "C" fn camlsnark_bn382_fp_index_public_inputs(
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_index_write<'a>(
+pub extern "C" fn zexe_bn382_fp_index_write<'a>(
     index : *const Index<'a, Bn_382>,
     path: *const c_char) {
 
@@ -1351,7 +1342,7 @@ pub extern "C" fn camlsnark_bn382_fp_index_write<'a>(
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_index_read<'a>(
+pub extern "C" fn zexe_bn382_fp_index_read<'a>(
     srs : *const URS<Bn_382>,
     a: *const Vec<(Vec<usize>, Vec<Fp>)>,
     b: *const Vec<(Vec<usize>, Vec<Fp>)>,
@@ -1427,24 +1418,24 @@ pub extern "C" fn camlsnark_bn382_fp_index_read<'a>(
 
 // G1 / Fq stubs
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_g1_random() -> *const G1Projective {
+pub extern "C" fn zexe_bn382_g1_random() -> *const G1Projective {
     let rng = &mut rand_core::OsRng;
     Box::into_raw(Box::new(G1Projective::rand(rng)))
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_g1_delete(x: *mut G1Projective) {
+pub extern "C" fn zexe_bn382_g1_delete(x: *mut G1Projective) {
     let _box = unsafe { Box::from_raw(x) };
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_g1_one() -> *const G1Projective {
+pub extern "C" fn zexe_bn382_g1_one() -> *const G1Projective {
     let ret = G1Projective::prime_subgroup_generator();
     Box::into_raw(Box::new(ret))
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_g1_add(
+pub extern "C" fn zexe_bn382_g1_add(
     x: *const G1Projective,
     y: *const G1Projective,
 ) -> *const G1Projective {
@@ -1455,7 +1446,7 @@ pub extern "C" fn camlsnark_bn382_g1_add(
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_g1_double(
+pub extern "C" fn zexe_bn382_g1_double(
     x: *const G1Projective,
 ) -> *const G1Projective {
     let x_ = unsafe { &(*x) };
@@ -1464,7 +1455,7 @@ pub extern "C" fn camlsnark_bn382_g1_double(
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_g1_scale(
+pub extern "C" fn zexe_bn382_g1_scale(
     x: *const G1Projective,
     s: *const Fp,
 ) -> *const G1Projective {
@@ -1475,7 +1466,7 @@ pub extern "C" fn camlsnark_bn382_g1_scale(
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_g1_sub(
+pub extern "C" fn zexe_bn382_g1_sub(
     x: *const G1Projective,
     y: *const G1Projective,
 ) -> *const G1Projective {
@@ -1486,28 +1477,28 @@ pub extern "C" fn camlsnark_bn382_g1_sub(
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_g1_negate(x: *const G1Projective) -> *const G1Projective {
+pub extern "C" fn zexe_bn382_g1_negate(x: *const G1Projective) -> *const G1Projective {
     let x_ = unsafe { &(*x) };
     let ret = -*x_;
     return Box::into_raw(Box::new(ret));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_g1_to_affine(p: *const G1Projective) -> *const G1Affine {
+pub extern "C" fn zexe_bn382_g1_to_affine(p: *const G1Projective) -> *const G1Affine {
     let p = unsafe { *p };
     let q = p.clone().into_affine();
     return Box::into_raw(Box::new(q));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_g1_of_affine(p: *const G1Affine) -> *const G1Projective {
+pub extern "C" fn zexe_bn382_g1_of_affine(p: *const G1Affine) -> *const G1Projective {
     let p = unsafe { *p };
     let q = p.clone().into_projective();
     return Box::into_raw(Box::new(q));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_g1_of_affine_coordinates(
+pub extern "C" fn zexe_bn382_g1_of_affine_coordinates(
     x: *const Fq,
     y: *const Fq,
 ) -> *const G1Projective {
@@ -1517,7 +1508,7 @@ pub extern "C" fn camlsnark_bn382_g1_of_affine_coordinates(
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_g1_affine_create(
+pub extern "C" fn zexe_bn382_g1_affine_create(
     x: *const Fq,
     y: *const Fq
     ) -> *const G1Affine {
@@ -1527,56 +1518,56 @@ pub extern "C" fn camlsnark_bn382_g1_affine_create(
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_g1_affine_x(p: *const G1Affine) -> *const Fq {
+pub extern "C" fn zexe_bn382_g1_affine_x(p: *const G1Affine) -> *const Fq {
     let p = unsafe { *p };
     return Box::into_raw(Box::new(p.x.clone()));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_g1_affine_y(p: *const G1Affine) -> *const Fq {
+pub extern "C" fn zexe_bn382_g1_affine_y(p: *const G1Affine) -> *const Fq {
     let p = unsafe { *p };
     return Box::into_raw(Box::new(p.y.clone()));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_g1_affine_is_zero(p: *const G1Affine) -> bool {
+pub extern "C" fn zexe_bn382_g1_affine_is_zero(p: *const G1Affine) -> bool {
     let p = unsafe { &*p };
     return p.is_zero();
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_g1_affine_delete(x: *mut G1Affine) {
+pub extern "C" fn zexe_bn382_g1_affine_delete(x: *mut G1Affine) {
     let _box = unsafe { Box::from_raw(x) };
 }
 
 // G1 vector stubs
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_g1_affine_vector_create() -> *mut Vec<G1Affine> {
+pub extern "C" fn zexe_bn382_g1_affine_vector_create() -> *mut Vec<G1Affine> {
     return Box::into_raw(Box::new(Vec::new()));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_g1_affine_vector_length(v: *const Vec<G1Affine>) -> i32 {
+pub extern "C" fn zexe_bn382_g1_affine_vector_length(v: *const Vec<G1Affine>) -> i32 {
     let v_ = unsafe { &(*v) };
     return v_.len() as i32;
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_g1_affine_vector_emplace_back(v: *mut Vec<G1Affine>, x: *const G1Affine) {
+pub extern "C" fn zexe_bn382_g1_affine_vector_emplace_back(v: *mut Vec<G1Affine>, x: *const G1Affine) {
     let v_ = unsafe { &mut (*v) };
     let x_ = unsafe { &(*x) };
     v_.push(*x_);
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_g1_affine_vector_get(v: *mut Vec<G1Affine>, i: u32) -> *mut G1Affine {
+pub extern "C" fn zexe_bn382_g1_affine_vector_get(v: *mut Vec<G1Affine>, i: u32) -> *mut G1Affine {
     let v_ = unsafe { &mut (*v) };
     return Box::into_raw(Box::new((*v_)[i as usize]));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_g1_affine_vector_delete(v: *mut Vec<G1Affine>) {
+pub extern "C" fn zexe_bn382_g1_affine_vector_delete(v: *mut Vec<G1Affine>) {
     // Deallocation happens automatically when a box variable goes out of
     // scope.
     let _box = unsafe { Box::from_raw(v) };
@@ -1585,32 +1576,32 @@ pub extern "C" fn camlsnark_bn382_g1_affine_vector_delete(v: *mut Vec<G1Affine>)
 // Fq sponge stubs
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fq_sponge_params_create(
+pub extern "C" fn zexe_bn382_fq_sponge_params_create(
 ) -> *mut poseidon::ArithmeticSpongeParams<Fq> {
     let ret = oracle::bn_382::fq::params();
     return Box::into_raw(Box::new(ret));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fq_sponge_params_delete(
+pub extern "C" fn zexe_bn382_fq_sponge_params_delete(
     x: *mut poseidon::ArithmeticSpongeParams<Fq>,
 ) {
     let _box = unsafe { Box::from_raw(x) };
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fq_sponge_create() -> *mut poseidon::ArithmeticSponge<Fq> {
+pub extern "C" fn zexe_bn382_fq_sponge_create() -> *mut poseidon::ArithmeticSponge<Fq> {
     let ret = oracle::poseidon::ArithmeticSponge::<Fq>::new();
     return Box::into_raw(Box::new(ret));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fq_sponge_delete(x: *mut poseidon::ArithmeticSponge<Fp>) {
+pub extern "C" fn zexe_bn382_fq_sponge_delete(x: *mut poseidon::ArithmeticSponge<Fp>) {
     let _box = unsafe { Box::from_raw(x) };
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fq_sponge_absorb(
+pub extern "C" fn zexe_bn382_fq_sponge_absorb(
     sponge: *mut poseidon::ArithmeticSponge<Fq>,
     params: *const poseidon::ArithmeticSpongeParams<Fq>,
     x: *const Fq,
@@ -1623,7 +1614,7 @@ pub extern "C" fn camlsnark_bn382_fq_sponge_absorb(
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fq_sponge_squeeze(
+pub extern "C" fn zexe_bn382_fq_sponge_squeeze(
     sponge: *mut poseidon::ArithmeticSponge<Fq>,
     params: *const poseidon::ArithmeticSpongeParams<Fq>,
 ) -> *mut Fq {
@@ -1636,52 +1627,52 @@ pub extern "C" fn camlsnark_bn382_fq_sponge_squeeze(
 
 // G1 affine pair#[no_mangle]
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_g1_affine_pair_0(
+pub extern "C" fn zexe_bn382_g1_affine_pair_0(
     p: *const (G1Affine, G1Affine)) -> *const G1Affine {
     let (x0, _) = unsafe { *p};
     return Box::into_raw(Box::new(x0.clone()));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_g1_affine_pair_1(
+pub extern "C" fn zexe_bn382_g1_affine_pair_1(
     p: *const (G1Affine, G1Affine)) -> *const G1Affine {
     let (_, x1) = unsafe { *p};
     return Box::into_raw(Box::new(x1.clone()));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_g1_affine_pair_make(x0 : *const G1Affine, x1 : *const G1Affine)
+pub extern "C" fn zexe_bn382_g1_affine_pair_make(x0 : *const G1Affine, x1 : *const G1Affine)
 -> *const (G1Affine, G1Affine) {
     let res = ((unsafe { *x0 }), (unsafe { *x1 }));
     return Box::into_raw(Box::new(res));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_g1_affine_pair_vector_create() -> *mut Vec<(G1Affine, G1Affine)> {
+pub extern "C" fn zexe_bn382_g1_affine_pair_vector_create() -> *mut Vec<(G1Affine, G1Affine)> {
     return Box::into_raw(Box::new(Vec::new()));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_g1_affine_pair_vector_length(v: *const Vec<(G1Affine, G1Affine)>) -> i32 {
+pub extern "C" fn zexe_bn382_g1_affine_pair_vector_length(v: *const Vec<(G1Affine, G1Affine)>) -> i32 {
     let v_ = unsafe { &(*v) };
     return v_.len() as i32;
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_g1_affine_pair_vector_emplace_back(v: *mut Vec<(G1Affine, G1Affine)>, x: *const (G1Affine, G1Affine)) {
+pub extern "C" fn zexe_bn382_g1_affine_pair_vector_emplace_back(v: *mut Vec<(G1Affine, G1Affine)>, x: *const (G1Affine, G1Affine)) {
     let v_ = unsafe { &mut (*v) };
     let x_ = unsafe { &(*x) };
     v_.push(*x_);
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_g1_affine_pair_vector_get(v: *mut Vec<(G1Affine, G1Affine)>, i: u32) -> *mut (G1Affine, G1Affine) {
+pub extern "C" fn zexe_bn382_g1_affine_pair_vector_get(v: *mut Vec<(G1Affine, G1Affine)>, i: u32) -> *mut (G1Affine, G1Affine) {
     let v_ = unsafe { &mut (*v) };
     return Box::into_raw(Box::new((*v_)[i as usize]));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_g1_affine_pair_vector_delete(v: *mut Vec<(G1Affine, G1Affine)>) {
+pub extern "C" fn zexe_bn382_g1_affine_pair_vector_delete(v: *mut Vec<(G1Affine, G1Affine)>) {
     // Deallocation happens automatically when a box variable goes out of
     // scope.
     let _box = unsafe { Box::from_raw(v) };
