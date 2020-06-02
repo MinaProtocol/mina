@@ -37,8 +37,7 @@ let applyTopNPoints = (n, points, metricsMap, getMetricValue) => {
   );
 };
 
-let applyPointsToRange =
-    (startRange, endRange, points, metricsMap, getMetricValue) => {
+let applyPointsToRange = (start, end_, points, metricsMap, getMetricValue) => {
   let metricsArray = Array.of_list(StringMap.bindings(metricsMap));
   let f = ((_, metricValue1), (_, metricValue2)) => {
     compare(getMetricValue(metricValue1), getMetricValue(metricValue2));
@@ -48,15 +47,10 @@ let applyPointsToRange =
   Belt.Array.reverseInPlace(metricsArray);
 
   let topNArrayWithPoints =
-    Array.mapi(
-      (i, (user, _)) =>
-        if (i > startRange && i < min(endRange, Array.length(metricsArray))) {
-          (user, points);
-        } else {
-          (user, 0);
-        },
-      metricsArray,
-    );
+    metricsArray
+    |> Js.Array.slice(~start, ~end_)
+    |> Array.map(((user, _)) => {(user, points)});
+
   Array.fold_left(
     (map, (userPublicKey, userPoints)) => {
       StringMap.add(userPublicKey, userPoints, map)
@@ -66,7 +60,7 @@ let applyPointsToRange =
   );
 };
 
-let applyNPlacePoints = (n, points, metricsMap, getMetricValue) => {
+let applyNPlacePoints = (place, points, metricsMap, getMetricValue) => {
   let metricsArray = Array.of_list(StringMap.bindings(metricsMap));
   let f = ((_, metricValue1), (_, metricValue2)) => {
     compare(getMetricValue(metricValue1), getMetricValue(metricValue2));
@@ -75,8 +69,8 @@ let applyNPlacePoints = (n, points, metricsMap, getMetricValue) => {
   Array.sort(f, metricsArray);
   Belt.Array.reverseInPlace(metricsArray);
 
-  if (n < Array.length(metricsArray)) {
-    let (username, _) = metricsArray[n];
+  if (place < Array.length(metricsArray)) {
+    let (username, _) = metricsArray[place];
     StringMap.empty |> StringMap.add(username, points);
   } else {
     StringMap.empty;
@@ -113,17 +107,17 @@ let bonusBlocksChallenge = metricsMap => {
   [
     // Top 100: 1000 pts
     applyPointsToRange(
-      24, 99, 1000, metricsMap, (metricRecord: Types.Metrics.metricRecord) =>
+      26, 101, 1000, metricsMap, (metricRecord: Types.Metrics.metricRecord) =>
       metricRecord.blocksCreated
     ),
     // Top 25: 1500 pts
     applyPointsToRange(
-      10, 24, 1500, metricsMap, (metricRecord: Types.Metrics.metricRecord) =>
+      11, 26, 1500, metricsMap, (metricRecord: Types.Metrics.metricRecord) =>
       metricRecord.blocksCreated
     ),
     // Top 10: 2000 pts
     applyPointsToRange(
-      3, 9, 2000, metricsMap, (metricRecord: Types.Metrics.metricRecord) =>
+      3, 11, 2000, metricsMap, (metricRecord: Types.Metrics.metricRecord) =>
       metricRecord.blocksCreated
     ),
     // 3rd place: 3000 pts
@@ -172,17 +166,17 @@ let bonusZkSnarkChallenge = metricsMap => {
   [
     // Top 100: 1000 pts
     applyPointsToRange(
-      24, 99, 1000, metricsMap, (metricRecord: Types.Metrics.metricRecord) =>
+      26, 101, 1000, metricsMap, (metricRecord: Types.Metrics.metricRecord) =>
       metricRecord.snarkWorkCreated
     ),
     // Top 25: 1500 pts
     applyPointsToRange(
-      9, 24, 1500, metricsMap, (metricRecord: Types.Metrics.metricRecord) =>
+      11, 26, 1500, metricsMap, (metricRecord: Types.Metrics.metricRecord) =>
       metricRecord.snarkWorkCreated
     ),
     // Top 10: 2000 pts
     applyPointsToRange(
-      3, 9, 2000, metricsMap, (metricRecord: Types.Metrics.metricRecord) =>
+      3, 11, 2000, metricsMap, (metricRecord: Types.Metrics.metricRecord) =>
       metricRecord.snarkWorkCreated
     ),
     // 3rd place: 3000 pts
@@ -227,7 +221,6 @@ let zkSnarksChallenge = metricsMap => {
   |> sumPointsMaps;
 };
 
-// Examples of using the challenges
 let calculatePoints = (challengeID, metricsMap) => {
   // Regex grabs last string after a "Challenge #"
   switch (
