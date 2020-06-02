@@ -151,20 +151,29 @@ let filterBlocksByTimeWindow = (startTime, endTime, blocks) => {
 };
 
 let calculateCoinbaseReceiverChallenge = blocks => {
-  Array.fold_left(
-    (map, block: Types.NewBlock.data) => {
-      let coinbaseReceiver =
-        block.transactions.coinbaseReceiverAccount.publicKey;
-      let creatorAccount = block.creatorAccount.publicKey;
-      StringMap.add(
-        block.creatorAccount.publicKey,
-        _ => Some(coinbaseReceiver !== creatorAccount),
-        map,
-      );
-    },
-    StringMap.empty,
-    blocks,
-  );
+  blocks
+  |> Array.fold_left(
+       (map, block: Types.NewBlock.data) => {
+         let creatorAccount = block.creatorAccount.publicKey;
+         switch (
+           Js.Types.classify(block.transactions.coinbaseReceiverAccount)
+         ) {
+         | JSNull
+         | JSUndefined => map
+         | _ =>
+           StringMap.update(
+             block.creatorAccount.publicKey,
+             _ =>
+               Some(
+                 block.transactions.coinbaseReceiverAccount.publicKey
+                 !== creatorAccount,
+               ),
+             map,
+           )
+         };
+       },
+       StringMap.empty,
+     );
 };
 
 let throwAwayValues = metric => {

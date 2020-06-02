@@ -193,11 +193,7 @@ let uploadPoints = metricsMap => {
       });
     Sheets.getRange(
       client,
-      {
-        spreadsheetId,
-        range: "PublicKeys1!A1:B",
-        valueRenderOption: "FORMULA",
-      },
+      {spreadsheetId, range: "PublicKeys!A1:B", valueRenderOption: "FORMULA"},
       result => {
       switch (result) {
       | Ok(pkUsernameData) =>

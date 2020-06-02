@@ -93,7 +93,7 @@ let sumPointsMaps = maps => {
      );
 };
 
-let calcEchoServiceTimedChallenge = metricsMap => {
+let calcEchoServiceChallenge = metricsMap => {
   addPointsToUsersWithAtleastN(
     (metricRecord: Types.Metrics.metricRecord) =>
       metricRecord.transactionsReceivedByEcho,
@@ -235,8 +235,8 @@ let calculatePoints = (challengeID, metricsMap) => {
       Some(blocksChallenge(metricsMap))
     | "Create and sell zk-SNARKs on Coda" =>
       Some(zkSnarksChallenge(metricsMap))
-    | "Connect to testnet and send coda to another testnet user " =>
-      Some(calcEchoServiceTimedChallenge(metricsMap))
+    | "Connect to testnet and send coda to another testnet user" =>
+      Some(calcEchoServiceChallenge(metricsMap))
     | _ => None
     }
   | None => None
