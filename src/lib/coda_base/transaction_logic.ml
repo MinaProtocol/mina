@@ -670,8 +670,9 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             if source_account.token_owner then return ()
             else Or_error.errorf "The source account does not own the token"
           in
+          let source_timing = source_account.timing in
           let%map source_account =
-            let%bind timing =
+            let%map timing =
               validate_timing ~txn_amount:amount
                 ~txn_global_slot:current_global_slot ~account:source_account
             in
@@ -680,6 +681,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           ( [ (fee_payer_location, fee_payer_account)
             ; (receiver_location, receiver_account)
             ; (source_location, source_account) ]
+          , `Source_timing source_timing
           , Undo.User_command_undo.Body.Mint )
     in
     match compute_updates () with
@@ -1014,7 +1016,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           (location, {account with balance})
         in
         let%map source_location, source_account =
-          let%bind location, account =
+          let%map location, account =
             if Account_id.equal source receiver then
               return (receiver_location, receiver_account)
             else
@@ -1024,7 +1026,9 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               let%map account = get' ledger "source" location in
               (location, account)
           in
-          (location, {account with balance})
+          ( location
+          , { account with
+              timing= Option.value ~default:account.timing source_timing } )
         in
         set ledger receiver_location receiver_account ;
         set ledger source_location source_account
