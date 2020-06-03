@@ -116,16 +116,34 @@ end
 
 module Ledger = struct
   let hash_filename hash =
-    "genesis_ledger_" ^ Blake2.to_hex (Blake2.digest_string hash) ^ ".tar.gz"
+    let str =
+      (* Consider the serialization of accounts as well as the hash. In
+         particular, adding fields that are
+         * hashed as a bit string
+         * default to an all-zero bit representation
+         may result in the same hash, but the accounts in the ledger will not
+         match the account record format.
+      *)
+      hash ^
+      (Bin_prot.Writer.to_string
+        Coda_base.Account.Stable.Latest.bin_writer_t
+        Coda_base.Account.empty)
+    in
+    "genesis_ledger_" ^ Blake2.to_hex (Blake2.digest_string str) ^ ".tar.gz"
 
   let named_filename
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ~num_accounts name =
     let str =
       String.concat
-        [ Int.to_string Coda_compile_config.curve_size
-        ; Int.to_string constraint_constants.ledger_depth
-        ; Int.to_string (Option.value ~default:0 num_accounts) ]
+        [ Int.to_string constraint_constants.ledger_depth
+        ; Int.to_string (Option.value ~default:0 num_accounts)
+        ; (* Distinguish ledgers when the hash function is different. *)
+          Snark_params.Tick.Field.to_string Coda_base.Account.empty_digest
+        ; (* Distinguish ledgers when the account record layout has changed. *)
+          Bin_prot.Writer.to_string
+            Coda_base.Account.Stable.Latest.bin_writer_t
+            Coda_base.Account.empty ]
     in
     "genesis_ledger_" ^ name ^ "_"
     ^ Blake2.(to_hex (digest_string str))
@@ -133,20 +151,8 @@ module Ledger = struct
 
   let accounts_name accounts =
     let hash =
-      let accounts_json =
-        Runtime_config.Accounts.to_yojson accounts |> Yojson.Safe.to_string
-      in
-      (* Distinguish ledgers where the hash function is different. *)
-      let empty_account_hash =
-        Snark_params.Tick.Field.to_string Coda_base.Account.empty_digest
-      in
-      (* Distinguish ledgers where the account record layout has changed. *)
-      let empty_account_serialize =
-        Bin_prot.Writer.to_string Coda_base.Account.Stable.Latest.bin_writer_t
-          Coda_base.Account.empty
-      in
-      Blake2.digest_string
-        (accounts_json ^ empty_account_hash ^ empty_account_serialize)
+      Runtime_config.Accounts.to_yojson accounts
+      |> Yojson.Safe.to_string |> Blake2.digest_string
     in
     "accounts_" ^ Blake2.to_hex hash
 
