@@ -156,20 +156,15 @@ let calculateCoinbaseReceiverChallenge = blocks => {
        (map, block: Types.NewBlock.data) => {
          let creatorAccount = block.creatorAccount.publicKey;
          switch (
-           Js.Types.classify(block.transactions.coinbaseReceiverAccount)
+           Js.Nullable.toOption(block.transactions.coinbaseReceiverAccount)
          ) {
-         | JSNull
-         | JSUndefined => map
-         | _ =>
+         | Some(account) =>
            StringMap.update(
              block.creatorAccount.publicKey,
-             _ =>
-               Some(
-                 block.transactions.coinbaseReceiverAccount.publicKey
-                 !== creatorAccount,
-               ),
+             _ => Some(account.publicKey !== creatorAccount),
              map,
            )
+         | None => map
          };
        },
        StringMap.empty,

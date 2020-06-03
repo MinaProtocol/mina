@@ -27,25 +27,19 @@ let applyTopNPoints = (threshholdPointsList, metricsMap, getMetricValue) => {
   let counter = ref(0);
   let topNArrayWithPoints =
     metricsArray
-    |> Array.map(((username, _)) =>
+    |> Array.mapi((i, (username, _)) =>
          if (counter^ >= Array.length(threshholdPointsList)) {
-           [|(username, 0)|];
+           (username, 0);
          } else {
            let (place, points) = threshholdPointsList[counter^];
-           if (place == counter^) {
+           if (place == i) {
              counter := counter^ + 1;
-             [|(username, points)|];
+             (username, points);
            } else {
-             let result =
-               Js.Array.slice(~start=counter^, ~end_=place, metricsArray)
-               |> Array.map(((username, _)) => {(username, points)});
-             counter := place;
-             result;
+             (username, points);
            };
          }
-       )
-    |> Array.to_list
-    |> Array.concat;
+       );
 
   Belt.Array.keep(topNArrayWithPoints, ((_, points)) => {points !== 0})
   |> Array.fold_left(
@@ -56,7 +50,7 @@ let applyTopNPoints = (threshholdPointsList, metricsMap, getMetricValue) => {
      );
 };
 
-// Combines two maps of users to points and returns one map of users to points
+// Combines a list of maps of users to points and returns one map of users to points
 let sumPointsMaps = maps => {
   maps
   |> List.fold_left(

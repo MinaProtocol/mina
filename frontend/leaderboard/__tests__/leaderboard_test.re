@@ -101,7 +101,7 @@ describe("Points functions", () => {
     describe("adds correct number of points to top 3", () => {
       let blockPoints =
         Challenges.applyTopNPoints(
-          [|(3, 1000)|],
+          [|(2, 1000)|],
           blockMetrics,
           (metricRecord: Types.Metrics.metricRecord) =>
           metricRecord.blocksCreated
@@ -109,15 +109,12 @@ describe("Points functions", () => {
       test("correct number of points given to publickey1", () => {
         expect(StringMap.find("publickey1", blockPoints)) |> toBe(1000)
       });
-
       test("correct number of points given to publickey2", () => {
         expect(StringMap.find("publickey2", blockPoints)) |> toBe(1000)
       });
-
       test("correct number of points given to publickey3", () => {
         expect(StringMap.find("publickey3", blockPoints)) |> toBe(1000)
       });
-
       test("publickey4 does not exist in points map", () => {
         expect(() =>
           StringMap.find("publickey4", blockPoints)
@@ -128,7 +125,7 @@ describe("Points functions", () => {
     describe("adds correct number of points to 1st place and 2-3 place", () => {
       let blockPoints =
         Challenges.applyTopNPoints(
-          [|(0, 2000), (3, 1000)|],
+          [|(0, 2000), (2, 1000)|],
           blockMetrics,
           (metricRecord: Types.Metrics.metricRecord) =>
           metricRecord.blocksCreated
