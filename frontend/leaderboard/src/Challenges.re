@@ -83,27 +83,19 @@ let calcEchoServiceChallenge = metricsMap => {
 };
 
 let bonusBlocksChallenge = metricsMap => {
-  [
-    applyTopNPoints(
-      [|
-        (0, 5500), // 1st place: 5500 pts
-        (1, 4000), // 2nd place: 4000 pts
-        (2, 3000), // 3rd place: 3000 pts
-        (11, 2000), // Top 10: 2000 pts.
-        (26, 1500), // Top 25: 1500 pts
-        (101, 1000) // Top 100: 1000 pts
-      |],
-      metricsMap,
-      (metricRecord: Types.Metrics.metricRecord) =>
-      metricRecord.blocksCreated
-    ),
-    //The user who sold the most expensive SNARK will receive a bonus of 500 pts
-    applyTopNPoints(
-      [|(0, 500)|], metricsMap, (metricRecord: Types.Metrics.metricRecord) =>
-      metricRecord.highestSnarkFeeCollected
-    ),
-  ]
-  |> sumPointsMaps;
+  applyTopNPoints(
+    [|
+      (0, 5500), // 1st place: 5500 pts
+      (1, 4000), // 2nd place: 4000 pts
+      (2, 3000), // 3rd place: 3000 pts
+      (11, 2000), // Top 10: 2000 pts.
+      (26, 1500), // Top 25: 1500 pts
+      (101, 1000) // Top 100: 1000 pts
+    |],
+    metricsMap,
+    (metricRecord: Types.Metrics.metricRecord) =>
+    metricRecord.blocksCreated
+  );
 };
 
 let blocksChallenge = metricsMap => {
@@ -130,19 +122,27 @@ let blocksChallenge = metricsMap => {
 };
 
 let bonusZkSnarkChallenge = metricsMap => {
-  applyTopNPoints(
-    [|
-      (0, 5500), // 1st place: 5500 pts
-      (1, 4000), // 2nd place: 4000 pts
-      (2, 3000), // 3rd place: 3000 pts
-      (11, 2000), // Top 10: 2000 pts.
-      (26, 1500), // Top 25: 1500 pts
-      (101, 1000) // Top 100: 1000 pts
-    |],
-    metricsMap,
-    (metricRecord: Types.Metrics.metricRecord) =>
-    metricRecord.snarkFeesCollected
-  );
+  [
+    applyTopNPoints(
+      [|
+        (0, 5500), // 1st place: 5500 pts
+        (1, 4000), // 2nd place: 4000 pts
+        (2, 3000), // 3rd place: 3000 pts
+        (11, 2000), // Top 10: 2000 pts.
+        (26, 1500), // Top 25: 1500 pts
+        (101, 1000) // Top 100: 1000 pts
+      |],
+      metricsMap,
+      (metricRecord: Types.Metrics.metricRecord) =>
+      metricRecord.snarkFeesCollected
+    ),
+    //The user who sold the most expensive SNARK will receive a bonus of 500 pts
+    applyTopNPoints(
+      [|(0, 500)|], metricsMap, (metricRecord: Types.Metrics.metricRecord) =>
+      metricRecord.highestSnarkFeeCollected
+    ),
+  ]
+  |> sumPointsMaps;
 };
 
 let zkSnarksChallenge = metricsMap => {
