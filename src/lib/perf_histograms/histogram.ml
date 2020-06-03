@@ -50,7 +50,7 @@ struct
       ; intervals: (Elem.t * Elem.t) list
       ; underflow: int
       ; overflow: int }
-    [@@deriving yojson, bin_io, fields]
+    [@@deriving yojson, bin_io_unversioned, fields]
   end
 
   let report {intervals; buckets; underflow; overflow; params= _} =
@@ -68,7 +68,7 @@ end
 
 module Exp_time_spans = Make (struct
   (** Note: All time spans are represented in JSON as floating point millis *)
-  type t = Time.Span.t [@@deriving bin_io]
+  type t = Time.Span.t [@@deriving bin_io_unversioned]
 
   let to_yojson t = `Float (Time.Span.to_ms t)
 

@@ -13,6 +13,8 @@ open Snark_params.Tick
 type t = Payment | Stake_delegation | Mint | Fee_transfer | Coinbase
 [@@deriving enum, eq, sexp]
 
+val to_string : t -> string
+
 val gen : t Quickcheck.Generator.t
 
 val to_bits : t -> bool list

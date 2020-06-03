@@ -37,9 +37,30 @@ end
 module Make_real (Keys : Keys_lib.Keys.S) = struct
   let loc = Ppxlib.Location.none
 
-  let protocol_state_with_hash = Genesis_protocol_state.compile_time_genesis ()
+  let constraint_constants = Genesis_constants.Constraint_constants.compiled
+
+  let genesis_constants = Genesis_constants.compiled
+
+  let consensus_constants =
+    Consensus.Constants.create ~constraint_constants
+      ~protocol_constants:genesis_constants.protocol
+
+  let protocol_state_with_hash =
+    Genesis_protocol_state.t ~genesis_ledger:Test_genesis_ledger.t
+      ~constraint_constants ~consensus_constants
 
   let base_hash = Keys.Step.instance_hash protocol_state_with_hash.data
+
+  let compiled_values =
+    Genesis_proof.create_values
+      ~keys:(module Keys : Keys_lib.Keys.S)
+      ~proof_level:Full
+      { constraint_constants
+      ; genesis_constants
+      ; genesis_ledger= (module Test_genesis_ledger)
+      ; consensus_constants
+      ; protocol_state_with_hash
+      ; base_hash }
 
   let base_hash_expr =
     [%expr
@@ -48,52 +69,12 @@ module Make_real (Keys : Keys_lib.Keys.S) = struct
           Ppx_util.expr_of_sexp ~loc
             (Snark_params.Tick.Field.sexp_of_t base_hash)]]
 
-  let wrap hash proof =
-    let open Snark_params in
-    let module Wrap = Keys.Wrap in
-    let input = Wrap_input.of_tick_field hash in
-    let proof =
-      Tock.prove
-        (Tock.Keypair.pk Wrap.keys)
-        Wrap.input {Wrap.Prover_state.proof} Wrap.main input
-    in
-    assert (Tock.verify proof (Tock.Keypair.vk Wrap.keys) Wrap.input input) ;
-    proof
-
   let base_proof_expr =
-    let open Snark_params in
-    let prover_state =
-      { Keys.Step.Prover_state.prev_proof= Tock.Proof.dummy
-      ; wrap_vk= Tock.Keypair.vk Keys.Wrap.keys
-      ; prev_state=
-          Protocol_state.negative_one ~genesis_ledger:Test_genesis_ledger.t
-            ~protocol_constants:Genesis_constants.compiled.protocol
-      ; genesis_state_hash= protocol_state_with_hash.hash
-      ; expected_next_state= None
-      ; update= Snark_transition.genesis ~genesis_ledger:Test_genesis_ledger.t
-      }
-    in
-    let main x =
-      Tick.handle
-        (Keys.Step.main ~logger:(Logger.create ()) x)
-        (Consensus.Data.Prover_state.precomputed_handler
-           ~genesis_ledger:Test_genesis_ledger.t)
-    in
-    let tick =
-      Tick.prove
-        (Tick.Keypair.pk Keys.Step.keys)
-        (Keys.Step.input ()) prover_state main base_hash
-    in
-    assert (
-      Tick.verify tick
-        (Tick.Keypair.vk Keys.Step.keys)
-        (Keys.Step.input ()) base_hash ) ;
-    let proof = wrap base_hash tick in
     [%expr
       Coda_base.Proof.Stable.V1.t_of_sexp
         [%e
           Ppx_util.expr_of_sexp ~loc
-            (Coda_base.Proof.Stable.V1.sexp_of_t proof)]]
+            (Coda_base.Proof.Stable.V1.sexp_of_t compiled_values.genesis_proof)]]
 end
 
 open Async
@@ -110,9 +91,54 @@ let main () =
   in
   let structure =
     [%str
-      let base_hash = [%e M.base_hash_expr]
+      module T = Genesis_proof.T
+      include T
 
-      let base_proof = [%e M.base_proof_expr]]
+      let unit_test_base_hash = Snark_params.Tick.Field.zero
+
+      let unit_test_base_proof = Dummy_values.Tock.Bowe_gabizon18.proof
+
+      let for_unit_tests =
+        lazy
+          (let protocol_state_with_hash =
+             Lazy.force
+               Coda_state.Genesis_protocol_state.For_tests.genesis_state
+           in
+           { constraint_constants=
+               Genesis_constants.Constraint_constants.for_unit_tests
+           ; genesis_constants= Genesis_constants.for_unit_tests
+           ; genesis_ledger= Genesis_ledger.for_unit_tests
+           ; consensus_constants= Lazy.force Consensus.Constants.for_unit_tests
+           ; protocol_state_with_hash
+           ; base_hash= unit_test_base_hash
+           ; genesis_proof= unit_test_base_proof })
+
+      let compiled_base_hash = [%e M.base_hash_expr]
+
+      let compiled_base_proof = [%e M.base_proof_expr]
+
+      let compiled =
+        lazy
+          (let constraint_constants =
+             Genesis_constants.Constraint_constants.compiled
+           in
+           let genesis_constants = Genesis_constants.compiled in
+           let consensus_constants =
+             Consensus.Constants.create ~constraint_constants
+               ~protocol_constants:genesis_constants.protocol
+           in
+           let protocol_state_with_hash =
+             Coda_state.Genesis_protocol_state.t
+               ~genesis_ledger:Test_genesis_ledger.t ~constraint_constants
+               ~consensus_constants
+           in
+           { constraint_constants
+           ; genesis_constants
+           ; genesis_ledger= (module Test_genesis_ledger)
+           ; consensus_constants
+           ; protocol_state_with_hash
+           ; base_hash= compiled_base_hash
+           ; genesis_proof= compiled_base_proof })]
   in
   Pprintast.top_phrase fmt (Ptop_def structure) ;
   exit 0

@@ -117,6 +117,9 @@ module Time : sig
 
   val to_string : t -> string
 
+  (** Strip time offset *)
+  val to_string_system_time : Controller.t -> t -> string
+
   val of_string_exn : string -> t
 
   val gen_incl : t -> t -> t Quickcheck.Generator.t

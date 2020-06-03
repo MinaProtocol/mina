@@ -210,7 +210,7 @@ module User_command = struct
              "INSERT INTO user_commands (type, fee_payer_id, source_id, \
               receiver_id, fee_token, token, nonce, amount, fee, memo, hash) \
               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id")
-          { typ= (if User_command.is_payment t then "payment" else "delegation")
+          { typ= User_command.tag_string t
           ; fee_payer_id
           ; source_id
           ; receiver_id
@@ -284,7 +284,9 @@ module Coinbase = struct
         return internal_command_id
     | None ->
         let%bind receiver_id =
-          Public_key.add_if_doesn't_exist (module Conn) (Coinbase.receiver t)
+          Public_key.add_if_doesn't_exist
+            (module Conn)
+            (Coinbase.receiver_pk t)
         in
         Conn.find
           (Caqti_request.find typ Caqti_type.int
@@ -386,7 +388,7 @@ module Block = struct
           ledger_hash, height, timestamp, coinbase_id FROM blocks WHERE id = ?")
       id
 
-  let add_if_doesn't_exist (module Conn : CONNECTION)
+  let add_if_doesn't_exist (module Conn : CONNECTION) ~constraint_constants
       ({data= t; hash} : (External_transition.t, State_hash.t) With_hash.t) =
     let open Deferred.Result.Let_syntax in
     match%bind find (module Conn) ~state_hash:hash with
@@ -427,7 +429,9 @@ module Block = struct
             ; timestamp= External_transition.timestamp t |> Block_time.to_int64
             ; coinbase_id= None }
         in
-        let transactions = External_transition.transactions t in
+        let transactions =
+          External_transition.transactions ~constraint_constants t
+        in
         let user_commands, fee_transfers, coinbases =
           Core.List.fold transactions ~init:([], [], [])
             ~f:(fun (acc_user_commands, acc_fee_transfers, acc_coinbases) ->
@@ -450,9 +454,9 @@ module Block = struct
                   ( acc_user_commands
                   , acc_fee_transfers
                   , coinbase :: acc_coinbases )
-              | Some fee_transfer ->
+              | Some {receiver_pk; fee} ->
                   ( acc_user_commands
-                  , fee_transfer :: acc_fee_transfers
+                  , (receiver_pk, fee) :: acc_fee_transfers
                   , coinbase :: acc_coinbases ) ) )
         in
         let%bind user_command_ids =
@@ -526,7 +530,7 @@ module Block = struct
                           (Coinbase.amount coinbase1)
                           (Coinbase.amount coinbase2)
                       |> Core.Option.value_exn )
-                    ~receiver:(Coinbase.receiver coinbase1)
+                    ~receiver:(Coinbase.receiver_pk coinbase1)
                     ~fee_transfer:None
                   |> Core.Result.map_error ~f:(fun _ ->
                          failwith "Coinbase_combination_failed" )
@@ -551,13 +555,13 @@ module Block = struct
         return block_id
 end
 
-let run (module Conn : CONNECTION) reader ~logger =
+let run (module Conn : CONNECTION) reader ~constraint_constants ~logger =
   Strict_pipe.Reader.iter reader ~f:(function
     | Diff.Transition_frontier (Breadcrumb_added {block; _}) -> (
         match%bind
           let open Deferred.Result.Let_syntax in
           let%bind () = Conn.start () in
-          Block.add_if_doesn't_exist (module Conn) block
+          Block.add_if_doesn't_exist ~constraint_constants (module Conn) block
         with
         | Error e ->
             Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
@@ -575,7 +579,7 @@ let run (module Conn : CONNECTION) reader ~logger =
             User_command.add_if_doesn't_exist (module Conn) user_command
             >>| ignore ) )
 
-let setup_server ~logger ~postgres_address ~server_port =
+let setup_server ~constraint_constants ~logger ~postgres_address ~server_port =
   let where_to_listen =
     Async.Tcp.Where_to_listen.bind_to All_addresses (On_port server_port)
   in
@@ -591,7 +595,7 @@ let setup_server ~logger ~postgres_address ~server_port =
         ~metadata:[("error", `String (Caqti_error.show e))] ;
       Deferred.unit
   | Ok conn ->
-      run conn reader ~logger |> don't_wait_for ;
+      run ~constraint_constants conn reader ~logger |> don't_wait_for ;
       Deferred.ignore
       @@ Tcp.Server.create
            ~on_handler_error:

@@ -35,7 +35,7 @@ module Pre_diff_two : sig
   type ('a, 'b) t =
     { completed_works: 'a list
     ; user_commands: 'b list
-    ; coinbase: Fee_transfer.Single.t At_most_two.t }
+    ; coinbase: Coinbase.Fee_transfer.t At_most_two.t }
   [@@deriving sexp, to_yojson]
 
   module Stable :
@@ -51,7 +51,7 @@ module Pre_diff_one : sig
   type ('a, 'b) t =
     { completed_works: 'a list
     ; user_commands: 'b list
-    ; coinbase: Fee_transfer.Single.t At_most_one.t }
+    ; coinbase: Coinbase.Fee_transfer.t At_most_one.t }
   [@@deriving sexp, to_yojson]
 
   module Stable :
@@ -190,4 +190,7 @@ val user_commands : t -> User_command.t list
 
 val completed_works : t -> Transaction_snark_work.t list
 
-val coinbase : t -> Currency.Amount.t
+val coinbase :
+     constraint_constants:Genesis_constants.Constraint_constants.t
+  -> t
+  -> Currency.Amount.t

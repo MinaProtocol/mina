@@ -41,10 +41,7 @@ module Pedersen = Pedersen_lib.Pedersen.Make (Tock0.Fq) (Tock0.G1)
 module Tock = struct
   include Tock0
 
-  let bg_params =
-    Group_map.Params.create
-      (module Fq)
-      ~a:G1.Coefficients.a ~b:G1.Coefficients.b
+  let bg_params = Group_map.Params.create (module Fq) G1.Coefficients.{a; b}
 
   module Bowe_gabizon = Tock0.Make_bowe_gabizon (Bowe_gabizon_hash.Make (struct
     module Field = Fq

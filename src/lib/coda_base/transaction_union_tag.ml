@@ -19,6 +19,16 @@ module Random_oracle = Random_oracle_nonconsensus
 type t = Payment | Stake_delegation | Mint | Fee_transfer | Coinbase
 [@@deriving enum, eq, sexp]
 
+let to_string = function
+  | Payment ->
+      "payment"
+  | Stake_delegation ->
+      "delegation"
+  | Fee_transfer ->
+      "fee-transfer"
+  | Coinbase ->
+      "coinbase"
+
 let gen =
   Quickcheck.Generator.map (Int.gen_incl min max) ~f:(fun i ->
       Option.value_exn (of_enum i) )

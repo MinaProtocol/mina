@@ -13,7 +13,11 @@ let restart_node worker ~config ~logger =
   Coda_process.spawn_exn config
 
 let main () =
-  let consensus_constants = Consensus.Constants.compiled in
+  let precomputed_values =
+    (* TODO: Load for this specific test. *)
+    Lazy.force Precomputed_values.compiled
+  in
+  let consensus_constants = precomputed_values.consensus_constants in
   let open Keypair in
   let logger = Logger.create () in
   let largest_account_keypair =
