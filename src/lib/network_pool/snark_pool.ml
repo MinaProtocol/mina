@@ -137,6 +137,20 @@ module Make (Transition_frontier : Transition_frontier_intf) :
        Whenever the verifier returns, if the queue is nonempty, flush it into the verifier.
     *)
 
+    let rec start_verifier t finished =
+      if Queue.is_empty t.queue then (
+        t.state <- Waiting ;
+        Ivar.fill finished (Ok true) )
+      else
+        let out_for_verification = Queue.to_list t.queue in
+        let next_finished = Ivar.create () in
+        t.state <- Verifying {next_finished; out_for_verification} ;
+        Queue.clear t.queue ;
+        let res = call_verifier t out_for_verification in
+        upon res (fun x ->
+            Ivar.fill finished x ;
+            start_verifier t next_finished )
+
     let verify t proofs =
       if List.is_empty proofs then Deferred.return (Ok true)
       else (
@@ -145,26 +159,8 @@ module Make (Transition_frontier : Transition_frontier_intf) :
         | Verifying {next_finished; _} ->
             Ivar.read next_finished
         | Waiting ->
-            let out_for_verification = Queue.to_list t.queue in
-            let next_finished = Ivar.create () in
-            t.state <- Verifying {next_finished; out_for_verification} ;
-            Queue.clear t.queue ;
-            let res = call_verifier t out_for_verification in
-            upon res (fun _ ->
-                let rec flush_after_verification finished =
-                  if Queue.is_empty t.queue then t.state <- Waiting
-                  else
-                    let out_for_verification = Queue.to_list t.queue in
-                    let next_finished = Ivar.create () in
-                    t.state <- Verifying {next_finished; out_for_verification} ;
-                    Queue.clear t.queue ;
-                    let res = call_verifier t out_for_verification in
-                    upon res (fun x ->
-                        Ivar.fill finished x ;
-                        flush_after_verification next_finished )
-                in
-                flush_after_verification next_finished ) ;
-            res )
+            let finished = Ivar.create () in
+            start_verifier t finished ; Ivar.read finished )
   end
 
   module Resource_pool = struct
