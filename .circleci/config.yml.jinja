@@ -158,13 +158,13 @@ jobs:
                   command: ./scripts/test.py render --check .circleci/config.yml.jinja .mergify.yml.jinja
             - run:
                   name: OCamlformat (make check-format)
-                  command: eval `opam config env` && LIBP2P_NIXLESS=1 make check-format
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'eval `opam config env` && LIBP2P_NIXLESS=1 make check-format'
             - run:
                   name: Snarky tracks master (make check-snarky-submodule)
-                  command: LIBP2P_NIXLESS=1 make check-snarky-submodule
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make check-snarky-submodule'
             - run:
                   name: Check ppx_optcomp preprocessor_deps
-                  command: ./scripts/lint_preprocessor_deps.sh
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c './scripts/lint_preprocessor_deps.sh'
             - run:
                   name: Check CODEOWNERS file format
                   command: ./scripts/lint_codeowners.sh
@@ -173,7 +173,7 @@ jobs:
                   command: ./scripts/lint_rfcs.sh
             - run:
                   name: Require ppx_version preprocessing for linting
-                  command: ./scripts/require-ppx-version.py
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c './scripts/require-ppx-version.py'
     lint-opt:
         docker:
             - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
