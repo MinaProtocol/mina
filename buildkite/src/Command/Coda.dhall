@@ -4,9 +4,10 @@ let B = ../External/Buildkite.dhall
 let B/Plugins/Partial = B.definitions/commandStep/properties/plugins/Type
 let Map = Prelude.Map
 
+let Decorate = ../Lib/Decorate.dhall
+
 let Docker = ./Docker/Type.dhall
 let Base = ./Base.dhall
-let Decorate = ./Decorate.dhall
 
 let Size = ./Size.dhall
 
