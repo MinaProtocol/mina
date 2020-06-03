@@ -124,10 +124,9 @@ module Ledger = struct
          may result in the same hash, but the accounts in the ledger will not
          match the account record format.
       *)
-      hash ^
-      (Bin_prot.Writer.to_string
-        Coda_base.Account.Stable.Latest.bin_writer_t
-        Coda_base.Account.empty)
+      hash
+      ^ Bin_prot.Writer.to_string Coda_base.Account.Stable.Latest.bin_writer_t
+          Coda_base.Account.empty
     in
     "genesis_ledger_" ^ Blake2.to_hex (Blake2.digest_string str) ^ ".tar.gz"
 
