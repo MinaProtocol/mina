@@ -37,7 +37,9 @@ module Undo = struct
         module V1 = struct
           type t =
             { user_command: User_command.Stable.V1.t
-            ; previous_receipt_chain_hash: Receipt.Chain_hash.Stable.V1.t }
+            ; previous_receipt_chain_hash: Receipt.Chain_hash.Stable.V1.t
+            ; fee_payer_timing: Account.Timing.Stable.V1.t
+            ; source_timing: Account.Timing.Stable.V1.t option }
           [@@deriving sexp]
 
           let to_latest = Fn.id
@@ -46,7 +48,9 @@ module Undo = struct
 
       type t = Stable.Latest.t =
         { user_command: User_command.t
-        ; previous_receipt_chain_hash: Receipt.Chain_hash.t }
+        ; previous_receipt_chain_hash: Receipt.Chain_hash.t
+        ; fee_payer_timing: Account.Timing.t
+        ; source_timing: Account.Timing.t option }
       [@@deriving sexp]
     end
 
@@ -170,7 +174,9 @@ module type S = sig
       module Common : sig
         type t = Undo.User_command_undo.Common.t =
           { user_command: User_command.t
-          ; previous_receipt_chain_hash: Receipt.Chain_hash.t }
+          ; previous_receipt_chain_hash: Receipt.Chain_hash.t
+          ; fee_payer_timing: Account.Timing.t
+          ; source_timing: Account.Timing.t option }
         [@@deriving sexp]
       end
 
@@ -461,12 +467,16 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       let fee = Amount.of_fee (User_command.fee user_command) in
       let%bind balance = sub_amount account.balance fee in
       let%bind () = validate_nonces nonce account.nonce in
-      let undo_common : Undo.User_command_undo.Common.t =
-        {user_command; previous_receipt_chain_hash= account.receipt_chain_hash}
-      in
+      let fee_payer_timing = account.timing in
       let%map timing =
         validate_timing ~txn_amount:fee ~txn_global_slot:current_global_slot
           ~account
+      in
+      let undo_common : Undo.User_command_undo.Common.t =
+        { user_command
+        ; previous_receipt_chain_hash= account.receipt_chain_hash
+        ; fee_payer_timing
+        ; source_timing= None }
       in
       ( location
       , { account with
@@ -510,7 +520,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           let%bind source_location, source_account =
             get_with_location ledger source
           in
-          let%map () =
+          let%bind () =
             match (source_location, receiver_location) with
             | `Existing _, `Existing _ ->
                 return ()
@@ -520,10 +530,21 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                 Or_error.errorf "The delegated-to account does not exist"
           in
           let previous_delegate = source_account.delegate in
+          let source_timing = source_account.timing in
+          (* Timing is always valid, but we need to record any switch from
+             timed to untimed here to stay in sync with the snark.
+          *)
+          let%map timing =
+            validate_timing ~txn_amount:Amount.zero
+              ~txn_global_slot:current_global_slot ~account:source_account
+          in
           let source_account =
-            {source_account with delegate= Account_id.public_key receiver}
+            { source_account with
+              delegate= Account_id.public_key receiver
+            ; timing }
           in
           ( [(source_location, source_account)]
+          , `Source_timing source_timing
           , Undo.User_command_undo.Body.Stake_delegation {previous_delegate} )
       | Payment {amount; token_id= token; _} ->
           let%bind receiver_location, receiver_account =
@@ -544,10 +565,10 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                   (amount, Amount.zero)
                 else
                   (* Charge the fee-payer for creating the account.
-                 Note: We don't have a better choice here: there is no other
-                 source of tokens in this transaction that is known to have
-                 accepted value.
-               *)
+                     Note: We don't have a better choice here: there is no
+                     other source of tokens in this transaction that is known
+                     to have accepted value.
+                  *)
                   let account_creation_fee =
                     Amount.of_fee constraint_constants.account_creation_fee
                   in
@@ -573,7 +594,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             in
             {receiver_account with balance}
           in
-          let%map source_location, source_account =
+          let%map source_location, source_timing, source_account =
             let ret =
               let%bind location, account =
                 if Account_id.equal source receiver then
@@ -591,12 +612,13 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                 | `New ->
                     Or_error.errorf "The source account does not exist"
               in
+              let source_timing = account.timing in
               let%bind timing =
                 validate_timing ~txn_amount:amount
                   ~txn_global_slot:current_global_slot ~account
               in
               let%map balance = sub_amount account.balance amount in
-              (location, {account with timing; balance})
+              (location, source_timing, {account with timing; balance})
             in
             if Account_id.equal fee_payer source then
               (* Don't process transactions with insufficient balance from the
@@ -615,13 +637,17 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           ( [ (fee_payer_location, fee_payer_account)
             ; (receiver_location, receiver_account)
             ; (source_location, source_account) ]
+          , `Source_timing source_timing
           , Undo.User_command_undo.Body.Payment {previous_empty_accounts} )
     in
     match compute_updates () with
-    | Ok (located_accounts, undo_body) ->
+    | Ok (located_accounts, `Source_timing source_timing, undo_body) ->
         (* Update the ledger. *)
         List.iter located_accounts ~f:(fun (location, account) ->
             set_with_location ledger location account ) ;
+        let undo_common =
+          {undo_common with source_timing= Some source_timing}
+        in
         return
           ({common= undo_common; body= undo_body} : Undo.User_command_undo.t)
     | Error _ ->
@@ -833,7 +859,9 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
   let undo_user_command ledger ~constraint_constants
       { Undo.User_command_undo.common=
           { user_command= {payload; signer= _; signature= _} as user_command
-          ; previous_receipt_chain_hash }
+          ; previous_receipt_chain_hash
+          ; fee_payer_timing
+          ; source_timing }
       ; body } =
     let open Or_error.Let_syntax in
     (* Fee-payer information *)
@@ -854,10 +882,19 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       { account with
         balance
       ; nonce
-      ; receipt_chain_hash= previous_receipt_chain_hash }
+      ; receipt_chain_hash= previous_receipt_chain_hash
+      ; timing= fee_payer_timing }
     in
     (* Update the fee-payer's account. *)
     set ledger fee_payer_location fee_payer_account ;
+    let source = User_command.source user_command in
+    let source_timing =
+      (* Prefer fee-payer original timing when applicable, since it is the
+         'true' original.
+      *)
+      if Account_id.equal fee_payer source then Some fee_payer_timing
+      else source_timing
+    in
     (* Reverse any other effects that the user command had. *)
     match (User_command.Payload.body payload, body) with
     | _, Failed ->
@@ -865,17 +902,17 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         return ()
     | Stake_delegation (Set_delegate _), Stake_delegation {previous_delegate}
       ->
-        let source = User_command.source user_command in
         let%bind source_location =
           location_of_account' ledger "source" source
         in
-        let%bind source_account = get' ledger "source" source_location in
+        let%map source_account = get' ledger "source" source_location in
         set ledger source_location
-          {source_account with delegate= previous_delegate} ;
-        return ()
+          { source_account with
+            delegate= previous_delegate
+          ; timing= Option.value ~default:source_account.timing source_timing
+          }
     | Payment {amount; token_id= token; _}, Payment {previous_empty_accounts}
       ->
-        let source = User_command.source user_command in
         let receiver = User_command.receiver user_command in
         let%bind fee_payer_account =
           let%map balance =
@@ -916,7 +953,10 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               (location, account)
           in
           let%map balance = add_amount account.balance amount in
-          (location, {account with balance})
+          ( location
+          , { account with
+              balance
+            ; timing= Option.value ~default:account.timing source_timing } )
         in
         set ledger fee_payer_location fee_payer_account ;
         set ledger receiver_location receiver_account ;
