@@ -15,9 +15,9 @@ module Stable = struct
   end
 end]
 
-type t = Stable.V1.t =
+type t = Stable.Latest.t =
   { token_owner_pk: Public_key.Compressed.t
   ; receiver_pk: Public_key.Compressed.t
   ; token: Token_id.t
-  ; amount: Currency.Amount.Stable.V1.t }
+  ; amount: Currency.Amount.t }
 [@@deriving compare, eq, sexp, hash, yojson]
