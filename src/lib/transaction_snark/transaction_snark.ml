@@ -1259,7 +1259,7 @@ module Base = struct
              in
              let%bind () =
                let%bind is_non_owner_minting =
-                 Boolean.(is_mint && account.token_owner)
+                 Boolean.(is_mint && not account.token_owner)
                in
                Field.Checked.Assert.equal
                  (user_command_failure.not_token_owner :> Field.Var.t)
