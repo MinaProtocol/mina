@@ -291,10 +291,7 @@ let apply_user_command_exn ~constraint_constants t
           assert (not Public_key.Compressed.(equal empty account.public_key)) ;
           assert account.token_owner ;
           { account with
-            balance=
-              Balance.sub_amount account.balance amount
-              |> Option.value_exn ?here:None ?error:None ?message:None
-          ; timing=
+            timing=
               Or_error.ok_exn
               @@ Transaction_logic.validate_timing ~txn_amount:amount
                    ~txn_global_slot:current_global_slot ~account }

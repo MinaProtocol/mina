@@ -649,8 +649,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               validate_timing ~txn_amount:amount
                 ~txn_global_slot:current_global_slot ~account:source_account
             in
-            let%map balance = sub_amount source_account.balance amount in
-            {source_account with timing; balance}
+            {source_account with timing}
           in
           ( [ (fee_payer_location, fee_payer_account)
             ; (receiver_location, receiver_account)
@@ -982,7 +981,6 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               let%map account = get' ledger "source" location in
               (location, account)
           in
-          let%map balance = add_amount account.balance amount in
           (location, {account with balance})
         in
         set ledger receiver_location receiver_account ;
