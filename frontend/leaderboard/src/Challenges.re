@@ -15,7 +15,7 @@ let addPointsToUsersWithAtleastN =
   );
 };
 
-let applyTopNPoints = (n, points, metricsMap, getMetricValue) => {
+let applyTopNPoints = (threshholdPointsList, metricsMap, getMetricValue) => {
   let metricsArray = Array.of_list(StringMap.bindings(metricsMap));
   let f = ((_, metricValue1), (_, metricValue2)) => {
     compare(getMetricValue(metricValue1), getMetricValue(metricValue2));
@@ -24,57 +24,36 @@ let applyTopNPoints = (n, points, metricsMap, getMetricValue) => {
   Array.sort(f, metricsArray);
   Belt.Array.reverseInPlace(metricsArray);
 
-  let topNArray =
-    Array.sub(metricsArray, 0, min(n, Array.length(metricsArray)));
-  let topNArrayWithPoints =
-    Array.map(((user, _)) => {(user, points)}, topNArray);
-  Array.fold_left(
-    (map, (userPublicKey, userPoints)) => {
-      StringMap.add(userPublicKey, userPoints, map)
-    },
-    StringMap.empty,
-    topNArrayWithPoints,
-  );
-};
-
-let applyPointsToRange = (start, end_, points, metricsMap, getMetricValue) => {
-  let metricsArray = Array.of_list(StringMap.bindings(metricsMap));
-  let f = ((_, metricValue1), (_, metricValue2)) => {
-    compare(getMetricValue(metricValue1), getMetricValue(metricValue2));
-  };
-
-  Array.sort(f, metricsArray);
-  Belt.Array.reverseInPlace(metricsArray);
-
+  let counter = ref(0);
   let topNArrayWithPoints =
     metricsArray
-    |> Js.Array.slice(~start, ~end_)
-    |> Array.map(((user, _)) => {(user, points)});
+    |> Array.map(((username, _)) =>
+         if (counter^ >= Array.length(threshholdPointsList)) {
+           [|(username, 0)|];
+         } else {
+           let (place, points) = threshholdPointsList[counter^];
+           if (place == counter^) {
+             counter := counter^ + 1;
+             [|(username, points)|];
+           } else {
+             let result =
+               Js.Array.slice(~start=counter^, ~end_=place, metricsArray)
+               |> Array.map(((username, _)) => {(username, points)});
+             counter := place;
+             result;
+           };
+         }
+       )
+    |> Array.to_list
+    |> Array.concat;
 
-  Array.fold_left(
-    (map, (userPublicKey, userPoints)) => {
-      StringMap.add(userPublicKey, userPoints, map)
-    },
-    StringMap.empty,
-    topNArrayWithPoints,
-  );
-};
-
-let applyNPlacePoints = (place, points, metricsMap, getMetricValue) => {
-  let metricsArray = Array.of_list(StringMap.bindings(metricsMap));
-  let f = ((_, metricValue1), (_, metricValue2)) => {
-    compare(getMetricValue(metricValue1), getMetricValue(metricValue2));
-  };
-
-  Array.sort(f, metricsArray);
-  Belt.Array.reverseInPlace(metricsArray);
-
-  if (place < Array.length(metricsArray)) {
-    let (username, _) = metricsArray[place];
-    StringMap.empty |> StringMap.add(username, points);
-  } else {
-    StringMap.empty;
-  };
+  Belt.Array.keep(topNArrayWithPoints, ((_, points)) => {points !== 0})
+  |> Array.fold_left(
+       (map, (userPublicKey, userPoints)) => {
+         StringMap.add(userPublicKey, userPoints, map)
+       },
+       StringMap.empty,
+     );
 };
 
 // Combines two maps of users to points and returns one map of users to points
@@ -105,35 +84,23 @@ let calcEchoServiceChallenge = metricsMap => {
 
 let bonusBlocksChallenge = metricsMap => {
   [
-    // Top 100: 1000 pts
-    applyPointsToRange(
-      26, 101, 1000, metricsMap, (metricRecord: Types.Metrics.metricRecord) =>
+    applyTopNPoints(
+      [|
+        (0, 5500), // 1st place: 5500 pts
+        (1, 4000), // 2nd place: 4000 pts
+        (2, 3000), // 3rd place: 3000 pts
+        (11, 2000), // Top 10: 2000 pts.
+        (26, 1500), // Top 25: 1500 pts
+        (101, 1000) // Top 100: 1000 pts
+      |],
+      metricsMap,
+      (metricRecord: Types.Metrics.metricRecord) =>
       metricRecord.blocksCreated
     ),
-    // Top 25: 1500 pts
-    applyPointsToRange(
-      11, 26, 1500, metricsMap, (metricRecord: Types.Metrics.metricRecord) =>
-      metricRecord.blocksCreated
-    ),
-    // Top 10: 2000 pts
-    applyPointsToRange(
-      3, 11, 2000, metricsMap, (metricRecord: Types.Metrics.metricRecord) =>
-      metricRecord.blocksCreated
-    ),
-    // 3rd place: 3000 pts
-    applyNPlacePoints(
-      2, 3000, metricsMap, (metricRecord: Types.Metrics.metricRecord) =>
-      metricRecord.blocksCreated
-    ),
-    // 2nd place: 4000 pts
-    applyNPlacePoints(
-      1, 4000, metricsMap, (metricRecord: Types.Metrics.metricRecord) =>
-      metricRecord.blocksCreated
-    ),
-    // 1st place: 5500 pts
-    applyNPlacePoints(
-      0, 5500, metricsMap, (metricRecord: Types.Metrics.metricRecord) =>
-      metricRecord.blocksCreated
+    //The user who sold the most expensive SNARK will receive a bonus of 500 pts
+    applyTopNPoints(
+      [|(0, 500)|], metricsMap, (metricRecord: Types.Metrics.metricRecord) =>
+      metricRecord.highestSnarkFeeCollected
     ),
   ]
   |> sumPointsMaps;
@@ -163,39 +130,19 @@ let blocksChallenge = metricsMap => {
 };
 
 let bonusZkSnarkChallenge = metricsMap => {
-  [
-    // Top 100: 1000 pts
-    applyPointsToRange(
-      26, 101, 1000, metricsMap, (metricRecord: Types.Metrics.metricRecord) =>
-      metricRecord.snarkWorkCreated
-    ),
-    // Top 25: 1500 pts
-    applyPointsToRange(
-      11, 26, 1500, metricsMap, (metricRecord: Types.Metrics.metricRecord) =>
-      metricRecord.snarkWorkCreated
-    ),
-    // Top 10: 2000 pts
-    applyPointsToRange(
-      3, 11, 2000, metricsMap, (metricRecord: Types.Metrics.metricRecord) =>
-      metricRecord.snarkWorkCreated
-    ),
-    // 3rd place: 3000 pts
-    applyNPlacePoints(
-      2, 3000, metricsMap, (metricRecord: Types.Metrics.metricRecord) =>
-      metricRecord.snarkWorkCreated
-    ),
-    // 2nd place: 4000 pts
-    applyNPlacePoints(
-      1, 4000, metricsMap, (metricRecord: Types.Metrics.metricRecord) =>
-      metricRecord.snarkWorkCreated
-    ),
-    // 1st place: 5500 pts
-    applyNPlacePoints(
-      0, 5500, metricsMap, (metricRecord: Types.Metrics.metricRecord) =>
-      metricRecord.snarkWorkCreated
-    ),
-  ]
-  |> sumPointsMaps;
+  applyTopNPoints(
+    [|
+      (0, 5500), // 1st place: 5500 pts
+      (1, 4000), // 2nd place: 4000 pts
+      (2, 3000), // 3rd place: 3000 pts
+      (11, 2000), // Top 10: 2000 pts.
+      (26, 1500), // Top 25: 1500 pts
+      (101, 1000) // Top 100: 1000 pts
+    |],
+    metricsMap,
+    (metricRecord: Types.Metrics.metricRecord) =>
+    metricRecord.snarkFeesCollected
+  );
 };
 
 let zkSnarksChallenge = metricsMap => {
@@ -203,16 +150,16 @@ let zkSnarksChallenge = metricsMap => {
     // Earn 3 fees by producing and selling zk-SNARKs on the snarketplace: 1000 pts
     addPointsToUsersWithAtleastN(
       (metricRecord: Types.Metrics.metricRecord) =>
-        metricRecord.snarkWorkCreated,
-      3,
+        metricRecord.snarkFeesCollected,
+      3L,
       1000,
       metricsMap,
     ),
     // Anyone who earned 50 fees will be rewarded with an additional 1000 pts.
     addPointsToUsersWithAtleastN(
       (metricRecord: Types.Metrics.metricRecord) =>
-        metricRecord.snarkWorkCreated,
-      50,
+        metricRecord.snarkFeesCollected,
+      50L,
       1000,
       metricsMap,
     ),
