@@ -4,19 +4,7 @@ module Make
     end) =
 struct
   open P
-
-  module B =
-    Group_map.Make
-      (M.Field.Constant)
-      (struct
-        include M.Field
-
-        let t_of_sexp x = constant (Constant.t_of_sexp x)
-
-        let negate x = zero - x
-      end)
-      (P)
-
+  module B = Group_map.Make (M.Field.Constant) (M.Field) (P)
   open M
 
   let non_residue : Field.Constant.t Lazy.t =
