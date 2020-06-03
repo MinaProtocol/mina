@@ -214,7 +214,7 @@ type t =
   ; ledger: Ledger.t option [@default None] }
 [@@deriving yojson]
 
-let fields = [|"ledger"; "genesis_constants"; "proof_constants"|]
+let fields = [|"ledger"; "genesis"; "proof"|]
 
 let of_yojson json = of_yojson @@ yojson_strip_fields ~fields json
 
