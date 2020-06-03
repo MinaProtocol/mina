@@ -57,6 +57,47 @@ type stream_state =
 
 type erased_magic = [`Be_very_careful_to_be_type_safe]
 
+module Go_log = struct
+  let ours_of_go lvl =
+    let open Logger.Level in
+    match lvl with
+    | 0 (* Critical gets mapped to error *) | 1 ->
+        Error
+    | 2 ->
+        Warn
+    | 3 (* Notice gets mapped to info (I can't find any use of notice?) *) | 4
+      ->
+        Info
+    | 5 ->
+        Debug
+    | _ ->
+        Spam
+
+  (* there should be no other levels. *)
+
+  type record =
+    { id: int64
+    ; time: string
+    ; module_: string [@key "module"]
+    ; level: int
+    ; message: string }
+  [@@deriving of_yojson]
+
+  let record_to_message r =
+    Logger.Message.
+      { timestamp= Time.of_string r.time
+      ; level= ours_of_go r.level
+      ; source=
+          Some
+            (Logger.Source.create
+               ~module_:(sprintf "Libp2p_helper.Go.%s" r.module_)
+               ~location:"(not tracked)")
+      ; message= r.message
+      ; metadata=
+          String.Map.singleton "go_message_id" (`String (Int64.to_string r.id))
+      }
+end
+
 module Helper = struct
   type t =
     { subprocess: Child_processes.t
@@ -231,7 +272,8 @@ module Helper = struct
         ; ifaces: string list
         ; external_maddr: string
         ; network_id: string
-        ; unsafe_no_trust_ip: bool }
+        ; unsafe_no_trust_ip: bool
+        ; flood: bool }
       [@@deriving yojson]
 
       type output = string [@@deriving yojson]
@@ -1062,7 +1104,7 @@ let list_peers net =
       []
 
 let configure net ~me ~external_maddr ~maddrs ~network_id ~on_new_peer
-    ~unsafe_no_trust_ip =
+    ~unsafe_no_trust_ip ~flood =
   match%map
     Helper.do_rpc net
       (module Helper.Rpcs.Configure)
@@ -1071,7 +1113,8 @@ let configure net ~me ~external_maddr ~maddrs ~network_id ~on_new_peer
       ; ifaces= List.map ~f:Multiaddr.to_string maddrs
       ; external_maddr= Multiaddr.to_string external_maddr
       ; network_id
-      ; unsafe_no_trust_ip }
+      ; unsafe_no_trust_ip
+      ; flood }
   with
   | Ok "configure success" ->
       Ivar.fill net.me_keypair me ;
@@ -1269,11 +1312,7 @@ let create ~logger ~conf_dir =
       ~git_root_relative_path:"src/app/libp2p_helper/result/bin/libp2p_helper"
       ~conf_dir ~args:[]
       ~stdout:(`Log Logger.Level.Spam, `Pipe, `Filter_empty)
-      ~stderr:
-        (`Log Logger.Level.Spam, `No_pipe, `Filter_empty)
-        (* TODO the stderr log messages are JSON but not in our format. The
-             helper should either emit our format or we should convert in
-             OCaml *)
+      ~stderr:(`Don't_log, `Pipe, `Filter_empty)
       ~termination:
         (`Handler
           (fun ~killed e ->
@@ -1327,6 +1366,17 @@ let create ~logger ~conf_dir =
         ; finished= false }
       in
       termination_hack_ref := Some t ;
+      Strict_pipe.Reader.iter (Child_processes.stderr_lines subprocess)
+        ~f:(fun line ->
+          ( match Go_log.record_of_yojson (Yojson.Safe.from_string line) with
+          | Ok record ->
+              Logger.raw logger Go_log.(record_to_message record)
+          | Error err ->
+              Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+                ~metadata:[("line", `String line); ("error", `String err)]
+                "failed to parse log line from helper stderr" ) ;
+          Deferred.unit )
+      |> don't_wait_for ;
       Strict_pipe.Reader.iter (Child_processes.stdout_lines subprocess)
         ~f:(fun line ->
           let open Yojson.Safe.Util in
@@ -1374,12 +1424,12 @@ let%test_module "coda network tests" =
       let%bind kp_b = Keypair.random a in
       let maddrs = ["/ip4/127.0.0.1/tcp/0"] in
       let%bind () =
-        configure a ~external_maddr:(List.hd_exn maddrs) ~me:kp_a ~maddrs
-          ~network_id ~on_new_peer:Fn.ignore ~unsafe_no_trust_ip:true
+        configure a ~flood:false ~external_maddr:(List.hd_exn maddrs) ~me:kp_a
+          ~maddrs ~network_id ~on_new_peer:Fn.ignore ~unsafe_no_trust_ip:true
         >>| Or_error.ok_exn
       and () =
-        configure b ~external_maddr:(List.hd_exn maddrs) ~me:kp_b ~maddrs
-          ~network_id ~on_new_peer:Fn.ignore ~unsafe_no_trust_ip:true
+        configure b ~flood:false ~external_maddr:(List.hd_exn maddrs) ~me:kp_b
+          ~maddrs ~network_id ~on_new_peer:Fn.ignore ~unsafe_no_trust_ip:true
         >>| Or_error.ok_exn
       in
       let%bind a_advert = begin_advertising a
@@ -1432,6 +1482,9 @@ let%test_module "coda network tests" =
         shutdown ()
       in
       Async.Thread_safe.block_on_async_exn (fun () -> test_def)
+
+    (* NOTE: these tests are not relevant in the current libp2p setup
+             due to how validation is implemented (see #4796)
 
     let unwrap_eof = function
       | `Eof ->
@@ -1516,4 +1569,5 @@ let%test_module "coda network tests" =
           end )
       in
       Async.Thread_safe.block_on_async_exn (fun () -> test_def)
+    *)
   end )

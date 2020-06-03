@@ -196,7 +196,7 @@ let rec compare : type n m.
         `Gt (function S pi -> gt pi) )
 
 let lte_exn n m =
-  match compare n m with `Lte pi -> pi | `Gt gt -> failwith "lte_exn"
+  match compare n m with `Lte pi -> pi | `Gt _gt -> failwith "lte_exn"
 
 let rec gt_implies_gte : type n m.
     n nat -> m nat -> (n, m) Lte.t Not.t -> (m, n) Lte.t =

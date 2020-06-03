@@ -28,6 +28,7 @@ module Config = struct
     ; logger: Logger.t
     ; unsafe_no_trust_ip: bool
     ; trust_system: Trust_system.t
+    ; flood: bool
     ; keypair: Coda_net2.Keypair.t option }
   [@@deriving make]
 end
@@ -92,7 +93,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
       let conf_dir = config.conf_dir ^/ "coda_net2" in
       let%bind () = Unix.mkdir ~p:() conf_dir in
       match%bind
-        Monitor.try_with (fun () ->
+        Monitor.try_with ~rest:`Raise (fun () ->
             trace "coda_net2" (fun () ->
                 Coda_net2.create ~logger:config.logger ~conf_dir ) )
       with
@@ -107,6 +108,13 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                 Keypair.random net2
           in
           let my_peer_id = Keypair.to_peer_id me |> Peer.Id.to_string in
+          Logger.append_to_global_metadata
+            [ ("peer_id", `String my_peer_id)
+            ; ( "host"
+              , `String
+                  (Unix.Inet_addr.to_string config.addrs_and_ports.external_ip)
+              )
+            ; ("port", `Int config.addrs_and_ports.libp2p_port) ] ;
           ( match config.addrs_and_ports.peer with
           | Some _ ->
               ()
@@ -120,10 +128,13 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
             ~location:__LOC__ ~module_:__MODULE__
             ~metadata:[("peer_id", `String my_peer_id)] ;
           let ctr = ref 0 in
+          let throttle =
+            Throttle.create ~max_concurrent_jobs:1 ~continue_on_error:true
+          in
           let initializing_libp2p_result : _ Deferred.Or_error.t =
             let open Deferred.Or_error.Let_syntax in
             let%bind () =
-              configure net2 ~me ~maddrs:[]
+              configure net2 ~me ~maddrs:[] ~flood:config.flood
                 ~external_maddr:
                   (Multiaddr.of_string
                      (sprintf "/ip4/%s/tcp/%d"
@@ -137,12 +148,17 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                   Ivar.fill_if_empty first_peer_ivar () ;
                   if !ctr < 4 then incr ctr
                   else Ivar.fill_if_empty high_connectivity_ivar () ;
-                  don't_wait_for
-                    (let open Deferred.Let_syntax in
-                    let%map peers = peers net2 in
-                    Coda_metrics.(
-                      Gauge.set Network.peers
-                        (List.length peers |> Int.to_float))) )
+                  if Throttle.num_jobs_waiting_to_start throttle = 0 then
+                    don't_wait_for
+                      (Throttle.enqueue throttle (fun () ->
+                           let open Deferred.Let_syntax in
+                           let%bind peers = peers net2 in
+                           Coda_metrics.(
+                             Gauge.set Network.peers
+                               (List.length peers |> Int.to_float)) ;
+                           after (Time.Span.of_sec 2.)
+                           (* don't spam the helper with peer fetches, only try update it every 2 seconds *)
+                       )) )
             in
             let implementation_list =
               List.bind rpc_handlers ~f:create_rpc_implementations
@@ -229,7 +245,6 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                    Instead of refactoring it to have validation up-front and decoupled,
                    we pass along a validation callback with the message. This ends up
                    ignoring the actual subscription message pipe, so drain it separately. *)
-                (* HACK: validation is currently bypassed, this function will never be called *)
                 ~should_forward_message:(fun envelope ->
                   (* Messages from ourselves are valid. Don't try and reingest them. *)
                   match Envelope.Incoming.sender envelope with
@@ -265,14 +280,10 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                       () ))
             in
             (* #4097 fix: drain the published message pipe, which we don't care about. *)
-            (* HACK: we're bypassing validation, use these messages *)
             don't_wait_for
               (Strict_pipe.Reader.iter
                  (Coda_net2.Pubsub.Subscription.message_pipe subscription)
-                 ~f:(fun envelope ->
-                   let valid_ivar = Ivar.create () in
-                   Strict_pipe.Writer.write message_writer
-                     (envelope, Ivar.fill valid_ivar) )) ;
+                 ~f:(fun _envelope -> Deferred.unit)) ;
             let%map _ =
               (* XXX: this ALWAYS needs to be AFTER handle_protocol/subscribe
                 or it is possible to miss connections! *)

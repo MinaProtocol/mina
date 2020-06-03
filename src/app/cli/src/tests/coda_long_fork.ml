@@ -4,7 +4,11 @@ open Async
 let name = "coda-long-fork"
 
 let main n waiting_time () =
-  let consensus_constants = Consensus.Constants.compiled in
+  let precomputed_values =
+    (* TODO: Load for this specific test. *)
+    Lazy.force Precomputed_values.compiled
+  in
+  let consensus_constants = precomputed_values.consensus_constants in
   let logger = Logger.create () in
   let keypairs =
     List.map

@@ -24,8 +24,7 @@ module Tock_backend = struct
     let bg_params =
       Group_map.Params.create
         (module Tick0.Field)
-        ~a:Tick_backend.Inner_curve.Coefficients.a
-        ~b:Tick_backend.Inner_curve.Coefficients.b
+        Tick_backend.Inner_curve.Coefficients.{a; b}
 
     include Snarky.Libsnark.Make_bowe_gabizon
               (Full)
@@ -52,15 +51,12 @@ module Tock_backend = struct
     module Field = Full.Field
     module Bigint = Full.Bigint
     module Var = Full.Var
-    module R1CS_constraint = Full.R1CS_constraint
 
     module R1CS_constraint_system = struct
       include Full.R1CS_constraint_system
 
       let finalize = swap_AB_if_beneficial
     end
-
-    module Linear_combination = Full.Linear_combination
 
     let field_size = Full.field_size
   end

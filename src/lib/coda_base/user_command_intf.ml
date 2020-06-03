@@ -116,8 +116,6 @@ module type S = sig
 
   val amount : t -> Currency.Amount.t option
 
-  val is_payment : t -> bool
-
   val memo : t -> User_command_memo.t
 
   val valid_until : t -> Global_slot.t
@@ -125,7 +123,11 @@ module type S = sig
   (* for filtering *)
   val minimum_fee : Currency.Fee.t
 
-  val is_trivial : t -> bool
+  val has_insufficient_fee : t -> bool
+
+  val tag : t -> Transaction_union_tag.t
+
+  val tag_string : t -> string
 
   include Gen_intf with type t := t
 
@@ -147,6 +149,9 @@ module type S = sig
 
     include Comparable.S with type t := t
   end
+
+  val sign_payload :
+    Signature_lib.Private_key.t -> User_command_payload.t -> Signature.t
 
   val sign :
     Signature_keypair.t -> User_command_payload.t -> With_valid_signature.t

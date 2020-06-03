@@ -56,6 +56,8 @@ module Styles = {
       marginTop(`rem(-0.25)),
       fontSize(`rem(1.25)),
       height(`rem(1.5)),
+      width(`percent(100.)),
+      textOverflow(`ellipsis),
       marginBottom(`rem(0.25)),
     ]);
 

@@ -10,11 +10,9 @@ consensus_mechanism]
 
 open Snark_params
 open Tick
-open Snark_bits
 
 [%%else]
 
-open Snark_bits_nonconsensus
 module Currency = Currency_nonconsensus.Currency
 module Coda_numbers = Coda_numbers_nonconsensus.Coda_numbers
 module Random_oracle = Random_oracle_nonconsensus.Random_oracle
@@ -38,20 +36,16 @@ module Index = struct
     end
   end]
 
-  let ledger_depth = Coda_compile_config.ledger_depth
-
   type t = Stable.Latest.t [@@deriving to_yojson, sexp]
 
   let to_int = Int.to_int
 
-  let gen = Int.gen_incl 0 ((1 lsl ledger_depth) - 1)
+  let gen ~ledger_depth = Int.gen_incl 0 ((1 lsl ledger_depth) - 1)
 
   module Table = Int.Table
 
   module Vector = struct
     include Int
-
-    let length = ledger_depth
 
     let empty = zero
 
@@ -60,17 +54,36 @@ module Index = struct
     let set v i b = if b then v lor (one lsl i) else v land lnot (one lsl i)
   end
 
-  include (
-    Bits.Vector.Make (Vector) : Bits_intf.Convertible_bits with type t := t)
+  let to_bits ~ledger_depth t = List.init ledger_depth ~f:(Vector.get t)
 
-  let fold_bits = fold
+  let of_bits =
+    List.foldi ~init:Vector.empty ~f:(fun i t b -> Vector.set t i b)
 
-  let fold t = Fold.group3 ~default:false (fold_bits t)
+  let fold_bits ~ledger_depth t =
+    { Fold.fold=
+        (fun ~init ~f ->
+          let rec go acc i =
+            if i = ledger_depth then acc
+            else go (f acc (Vector.get t i)) (i + 1)
+          in
+          go init 0 ) }
+
+  let fold ~ledger_depth t =
+    Fold.group3 ~default:false (fold_bits ~ledger_depth t)
 
   [%%ifdef
   consensus_mechanism]
 
-  include Bits.Snarkable.Small_bit_vector (Tick) (Vector)
+  module Unpacked = struct
+    type var = Tick.Boolean.var list
+
+    type value = Vector.t
+
+    let typ ~ledger_depth : (var, value) Tick.Typ.t =
+      Typ.transport
+        (Typ.list ~length:ledger_depth Boolean.typ)
+        ~there:(to_bits ~ledger_depth) ~back:of_bits
+  end
 
   [%%endif]
 end
@@ -179,7 +192,6 @@ module Poly = struct
 
   [%%endif]
 end
-[@@warning "-27"]
 
 module Key = struct
   [%%versioned

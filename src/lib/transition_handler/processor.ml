@@ -19,9 +19,9 @@ module Transition_frontier_validation =
   External_transition.Transition_frontier_validation (Transition_frontier)
 
 (* TODO: calculate a sensible value from postake consensus arguments *)
-let catchup_timeout_duration (genesis_constants : Genesis_constants.t) =
+let catchup_timeout_duration (precomputed_values : Precomputed_values.t) =
   Block_time.Span.of_ms
-    ( genesis_constants.protocol.delta
+    ( precomputed_values.genesis_constants.protocol.delta
       * Coda_compile_config.block_window_duration_ms
     |> Int64.of_int )
 
@@ -34,14 +34,12 @@ let cached_transform_deferred_result ~transform_cached ~transform_result cached
 (* add a breadcrumb and perform post processing *)
 let add_and_finalize ~logger ~frontier ~catchup_scheduler
     ~processed_transition_writer ~only_if_present ~time_controller ~source
-    cached_breadcrumb ~(genesis_constants : Genesis_constants.t) =
+    cached_breadcrumb ~(precomputed_values : Precomputed_values.t) =
   let breadcrumb =
     if Cached.is_pure cached_breadcrumb then Cached.peek cached_breadcrumb
     else Cached.invalidate_with_success cached_breadcrumb
   in
-  let consensus_constants =
-    Consensus.Constants.create ~protocol_constants:genesis_constants.protocol
-  in
+  let consensus_constants = precomputed_values.consensus_constants in
   let transition =
     Transition_frontier.Breadcrumb.validated_transition breadcrumb
   in
@@ -83,7 +81,7 @@ let add_and_finalize ~logger ~frontier ~catchup_scheduler
 
 let process_transition ~logger ~trust_system ~verifier ~frontier
     ~catchup_scheduler ~processed_transition_writer ~time_controller
-    ~transition:cached_initially_validated_transition ~genesis_constants =
+    ~transition:cached_initially_validated_transition ~precomputed_values =
   let enveloped_initially_validated_transition =
     Cached.peek cached_initially_validated_transition
   in
@@ -150,7 +148,7 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
                   (Transition_frontier.find frontier
                      (Non_empty_list.head delta_state_hashes))
                   ~init:(Block_time.Span.of_ms 0L)
-                  ~f:(fun _ _ -> catchup_timeout_duration genesis_constants)
+                  ~f:(fun _ _ -> catchup_timeout_duration precomputed_values)
               in
               Catchup_scheduler.watch catchup_scheduler ~timeout_duration
                 ~cached_transition:cached_initially_validated_transition ;
@@ -172,9 +170,11 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
     let%bind breadcrumb =
       cached_transform_deferred_result cached_initially_validated_transition
         ~transform_cached:(fun _ ->
-          Transition_frontier.Breadcrumb.build ~logger ~verifier ~trust_system
-            ~sender:(Some sender) ~parent:parent_breadcrumb
-            ~transition:mostly_validated_transition )
+          Transition_frontier.Breadcrumb.build ~logger
+            ~constraint_constants:precomputed_values.constraint_constants
+            ~verifier ~trust_system ~sender:(Some sender)
+            ~parent:parent_breadcrumb ~transition:mostly_validated_transition
+          )
         ~transform_result:(function
           | Error (`Invalid_staged_ledger_hash error)
           | Error (`Invalid_staged_ledger_diff error) ->
@@ -207,10 +207,10 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
     Deferred.map ~f:Result.return
       (add_and_finalize ~logger ~frontier ~catchup_scheduler
          ~processed_transition_writer ~only_if_present:false ~time_controller
-         ~source:`Gossip breadcrumb ~genesis_constants))
+         ~source:`Gossip breadcrumb ~precomputed_values))
 
-let run ~logger ~genesis_constants ~verifier ~trust_system ~time_controller
-    ~frontier
+let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
+    ~trust_system ~time_controller ~frontier
     ~(primary_transition_reader :
        ( External_transition.Initial_validated.t Envelope.Incoming.t
        , State_hash.t )
@@ -241,18 +241,19 @@ let run ~logger ~genesis_constants ~verifier ~trust_system ~time_controller
        , unit )
        Writer.t) ~processed_transition_writer =
   let catchup_scheduler =
-    Catchup_scheduler.create ~logger ~verifier ~trust_system ~frontier
-      ~time_controller ~catchup_job_writer ~catchup_breadcrumbs_writer
-      ~clean_up_signal:clean_up_catchup_scheduler
+    Catchup_scheduler.create ~logger
+      ~constraint_constants:precomputed_values.constraint_constants ~verifier
+      ~trust_system ~frontier ~time_controller ~catchup_job_writer
+      ~catchup_breadcrumbs_writer ~clean_up_signal:clean_up_catchup_scheduler
   in
   let add_and_finalize =
     add_and_finalize ~frontier ~catchup_scheduler ~processed_transition_writer
-      ~time_controller ~genesis_constants
+      ~time_controller ~precomputed_values
   in
   let process_transition =
     process_transition ~logger ~trust_system ~verifier ~frontier
       ~catchup_scheduler ~processed_transition_writer ~time_controller
-      ~genesis_constants
+      ~precomputed_values
   in
   ignore
     (Reader.Merge.iter
@@ -359,6 +360,10 @@ let%test_module "Transition_handler.Processor tests" =
 
     let logger = Logger.create ()
 
+    let proof_level = Genesis_constants.Proof_level.Check
+
+    let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
+
     let time_controller = Block_time.Controller.basic ~logger
 
     let trust_system = Trust_system.null ()
@@ -377,13 +382,14 @@ let%test_module "Transition_handler.Processor tests" =
       let branch_size = 10 in
       let max_length = frontier_size + branch_size in
       Quickcheck.test ~trials:4
-        (Transition_frontier.For_tests.gen_with_branch ~max_length
-           ~frontier_size ~branch_size ()) ~f:(fun (frontier, branch) ->
+        (Transition_frontier.For_tests.gen_with_branch ~proof_level
+           ~precomputed_values ~max_length ~frontier_size ~branch_size ())
+        ~f:(fun (frontier, branch) ->
           assert (
             Thread_safe.block_on_async_exn (fun () ->
                 let pids = Child_processes.Termination.create_pid_table () in
                 let%bind verifier =
-                  Verifier.create ~logger ~conf_dir:None ~pids
+                  Verifier.create ~logger ~proof_level ~conf_dir:None ~pids
                 in
                 let valid_transition_reader, valid_transition_writer =
                   Strict_pipe.create
@@ -410,8 +416,7 @@ let%test_module "Transition_handler.Processor tests" =
                   ~primary_transition_reader:valid_transition_reader
                   ~producer_transition_reader ~catchup_job_writer
                   ~catchup_breadcrumbs_reader ~catchup_breadcrumbs_writer
-                  ~processed_transition_writer
-                  ~genesis_constants:Genesis_constants.compiled ;
+                  ~processed_transition_writer ~precomputed_values ;
                 List.iter branch ~f:(fun breadcrumb ->
                     downcast_breadcrumb breadcrumb
                     |> Unprocessed_transition_cache.register_exn cache

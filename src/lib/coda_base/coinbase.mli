@@ -1,12 +1,13 @@
 open Core
 open Import
+module Fee_transfer = Coinbase_fee_transfer
 
 module Stable : sig
   module V1 : sig
     type t = private
       { receiver: Public_key.Compressed.Stable.V1.t
       ; amount: Currency.Amount.Stable.V1.t
-      ; fee_transfer: Fee_transfer.Single.Stable.V1.t option }
+      ; fee_transfer: Fee_transfer.Stable.V1.t option }
     [@@deriving sexp, bin_io, compare, eq, version, hash, yojson]
   end
 
@@ -15,23 +16,27 @@ end
 
 (* bin_io intentionally omitted in deriving list *)
 type t = Stable.Latest.t = private
-  { receiver: Public_key.Compressed.Stable.V1.t
-  ; amount: Currency.Amount.Stable.V1.t
-  ; fee_transfer: Fee_transfer.Single.Stable.V1.t option }
+  { receiver: Public_key.Compressed.t
+  ; amount: Currency.Amount.t
+  ; fee_transfer: Fee_transfer.t option }
 [@@deriving sexp, compare, eq, hash, yojson]
 
 include Codable.Base58_check_intf with type t := t
 
-val receiver : t -> Public_key.Compressed.t
+val receiver_pk : t -> Public_key.Compressed.t
+
+val receiver : t -> Account_id.t
 
 val amount : t -> Currency.Amount.t
 
-val fee_transfer : t -> Fee_transfer.Single.t option
+val fee_transfer : t -> Fee_transfer.t option
+
+val accounts_accessed : t -> Account_id.t list
 
 val create :
      amount:Currency.Amount.t
   -> receiver:Public_key.Compressed.t
-  -> fee_transfer:Fee_transfer.Single.Stable.V1.t option
+  -> fee_transfer:Fee_transfer.t option
   -> t Or_error.t
 
 val supply_increase : t -> Currency.Amount.t Or_error.t
@@ -39,12 +44,14 @@ val supply_increase : t -> Currency.Amount.t Or_error.t
 val fee_excess : t -> Currency.Fee.Signed.t Or_error.t
 
 module Gen : sig
-  val gen : t Quickcheck.Generator.t
+  val gen :
+       constraint_constants:Genesis_constants.Constraint_constants.t
+    -> t Quickcheck.Generator.t
 
   val with_random_receivers :
        keys:Signature_keypair.t array
     -> min_amount:int
     -> max_amount:int
-    -> fee_transfer:Fee_transfer.Single.t Quickcheck.Generator.t
+    -> fee_transfer:Fee_transfer.t Quickcheck.Generator.t
     -> t Quickcheck.Generator.t
 end

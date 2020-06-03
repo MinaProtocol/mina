@@ -42,12 +42,10 @@ let net_configs n =
       let%map () = Coda_net2.shutdown net in
       (addrs_and_ports_list, List.map ~f:(List.map ~f:fst) peers) )
 
-let offset =
-  lazy
-    (let consensus_constants = Consensus.Constants.compiled in
-     Core.Time.(
-       diff (now ())
-         (Block_time.to_time consensus_constants.genesis_state_timestamp)))
+let offset (consensus_constants : Consensus.Constants.t) =
+  Core.Time.(
+    diff (now ())
+      (Block_time.to_time consensus_constants.genesis_state_timestamp))
 
 let local_configs ?block_production_interval
     ?(block_production_keys = Fn.const None)
@@ -76,7 +74,10 @@ let local_configs ?block_production_interval
           ~work_selection_method ~trace_dir
           ~is_archive_rocksdb:(is_archive_rocksdb i)
           ~archive_process_location:(archive_process_location i)
-          ~offset:(Lazy.force offset) ~max_concurrent_connections () )
+          ~offset:
+            (offset
+               (Lazy.force Precomputed_values.compiled).consensus_constants)
+          ~max_concurrent_connections () )
   in
   configs
 

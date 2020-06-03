@@ -21,9 +21,8 @@ module Send_user_commands = struct
   [@@deriving bin_io_unversioned]
 
   type response =
-    ( Network_pool.Transaction_pool.Resource_pool.Diff.Stable.Latest.t
-    * Network_pool.Transaction_pool.Resource_pool.Diff.Rejected.Stable.Latest.t
-    )
+    ( Network_pool.Transaction_pool.Diff_versioned.Stable.Latest.t
+    * Network_pool.Transaction_pool.Diff_versioned.Rejected.Stable.Latest.t )
     Or_error.t
   [@@deriving bin_io_unversioned]
 
@@ -250,7 +249,7 @@ module Visualization = struct
 end
 
 module Add_trustlist = struct
-  type query = Unix.Inet_addr.t [@@deriving bin_io_unversioned]
+  type query = Unix.Cidr.t [@@deriving bin_io_unversioned]
 
   type response = unit Or_error.t [@@deriving bin_io_unversioned]
 
@@ -259,7 +258,7 @@ module Add_trustlist = struct
 end
 
 module Remove_trustlist = struct
-  type query = Unix.Inet_addr.t [@@deriving bin_io_unversioned]
+  type query = Unix.Cidr.t [@@deriving bin_io_unversioned]
 
   type response = unit Or_error.t [@@deriving bin_io_unversioned]
 
@@ -270,7 +269,7 @@ end
 module Get_trustlist = struct
   type query = unit [@@deriving bin_io_unversioned]
 
-  type response = Unix.Inet_addr.t list [@@deriving bin_io_unversioned]
+  type response = Unix.Cidr.t list [@@deriving bin_io_unversioned]
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Get_trustlist" ~version:0 ~bin_query ~bin_response

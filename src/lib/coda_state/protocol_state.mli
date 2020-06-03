@@ -84,7 +84,9 @@ type value = Value.t [@@deriving sexp, to_yojson]
 
 type var = (State_hash.var, Body.var) Poly.t
 
-include Snarkable.S with type value := Value.t and type var := var
+val typ :
+     constraint_constants:Genesis_constants.Constraint_constants.t
+  -> (var, value) Typ.t
 
 val create : previous_state_hash:'a -> body:'b -> ('a, 'b) Poly.t
 
@@ -122,7 +124,8 @@ val constants : (_, (_, _, _, 'a) Body.t) Poly.t -> 'a
 
 val negative_one :
      genesis_ledger:Coda_base.Ledger.t Lazy.t
-  -> protocol_constants:Genesis_constants.Protocol.t
+  -> constraint_constants:Genesis_constants.Constraint_constants.t
+  -> consensus_constants:Consensus.Constants.t
   -> Value.t
 
 val hash_checked : var -> (State_hash.var * State_body_hash.var, _) Checked.t

@@ -66,8 +66,8 @@ module Hashless_ledger = struct
 
   let create l = {base= l; overlay= Hashtbl.create (module Account_id)}
 
-  let with_ledger ~f =
-    Ledger.with_ledger ~f:(fun l ->
+  let with_ledger ~depth ~f =
+    Ledger.with_ledger ~depth ~f:(fun l ->
         let t = create l in
         f t )
 end
@@ -76,8 +76,8 @@ include Transaction_logic.Make (Hashless_ledger)
 
 let create = Hashless_ledger.create
 
-let apply_user_command l uc =
-  Result.map ~f:(Fn.const ()) (apply_user_command l uc)
+let apply_user_command ~constraint_constants l uc =
+  Result.ignore (apply_user_command ~constraint_constants l uc)
 
-let apply_transaction l txn =
-  Result.map ~f:(Fn.const ()) (apply_transaction l txn)
+let apply_transaction ~constraint_constants l txn =
+  Result.ignore (apply_transaction ~constraint_constants l txn)

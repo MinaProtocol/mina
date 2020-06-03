@@ -1,6 +1,5 @@
 open Core_kernel
 open Coda_base
-open Signature_lib
 
 type count_and_fee = int * Currency.Fee.t [@@deriving sexp, to_yojson]
 
@@ -39,16 +38,14 @@ module Summary = struct
   [@@deriving sexp, to_yojson, lens]
 
   let coinbase_fees
-      (coinbase :
-        (Public_key.Compressed.t * Currency.Fee.t)
-        Staged_ledger_diff.At_most_two.t) =
+      (coinbase : Coinbase.Fee_transfer.t Staged_ledger_diff.At_most_two.t) =
     match coinbase with
     | One (Some x) ->
-        Staged_ledger_diff.At_most_two.One (Some (snd x))
+        Staged_ledger_diff.At_most_two.One (Some x.fee)
     | Two (Some (x, None)) ->
-        Two (Some (snd x, None))
+        Two (Some (x.fee, None))
     | Two (Some (x, Some x')) ->
-        Two (Some (snd x, Some (snd x')))
+        Two (Some (x.fee, Some x'.fee))
     | Zero ->
         Zero
     | One None ->
@@ -59,9 +56,7 @@ module Summary = struct
   let init_resources
       ~(completed_work : Transaction_snark_work.Checked.t Sequence.t)
       ~(user_commands : User_command.With_valid_signature.t Sequence.t)
-      ~(coinbase :
-         (Public_key.Compressed.t * Currency.Fee.t)
-         Staged_ledger_diff.At_most_two.t) =
+      ~(coinbase : Coinbase.Fee_transfer.t Staged_ledger_diff.At_most_two.t) =
     let completed_work =
       ( Sequence.length completed_work
       , Sequence.sum
@@ -80,10 +75,8 @@ module Summary = struct
 
   let init ~(completed_work : Transaction_snark_work.Checked.t Sequence.t)
       ~(user_commands : User_command.With_valid_signature.t Sequence.t)
-      ~(coinbase :
-         (Public_key.Compressed.t * Currency.Fee.t)
-         Staged_ledger_diff.At_most_two.t) ~partition ~available_slots
-      ~required_work_count =
+      ~(coinbase : Coinbase.Fee_transfer.t Staged_ledger_diff.At_most_two.t)
+      ~partition ~available_slots ~required_work_count =
     let start_resources =
       init_resources ~completed_work ~user_commands ~coinbase
     in
@@ -106,9 +99,7 @@ module Summary = struct
 
   let end_log t ~(completed_work : Transaction_snark_work.Checked.t Sequence.t)
       ~(user_commands : User_command.With_valid_signature.t Sequence.t)
-      ~(coinbase :
-         (Public_key.Compressed.t * Currency.Fee.t)
-         Staged_ledger_diff.At_most_two.t) =
+      ~(coinbase : Coinbase.Fee_transfer.t Staged_ledger_diff.At_most_two.t) =
     end_resources.set
       (init_resources ~completed_work ~user_commands ~coinbase)
       t
@@ -152,9 +143,7 @@ module Detail = struct
 
   let init ~(completed_work : Transaction_snark_work.Checked.t Sequence.t)
       ~(user_commands : User_command.With_valid_signature.t Sequence.t)
-      ~(coinbase :
-         (Public_key.Compressed.t * Currency.Fee.t)
-         Staged_ledger_diff.At_most_two.t) =
+      ~(coinbase : Coinbase.Fee_transfer.t Staged_ledger_diff.At_most_two.t) =
     let init =
       Summary.init_resources ~completed_work ~user_commands ~coinbase
     in
@@ -214,10 +203,8 @@ type detail_list = Detail.t list [@@deriving sexp, to_yojson]
 
 let init ~(completed_work : Transaction_snark_work.Checked.t Sequence.t)
     ~(user_commands : User_command.With_valid_signature.t Sequence.t)
-    ~(coinbase :
-       (Public_key.Compressed.t * Currency.Fee.t)
-       Staged_ledger_diff.At_most_two.t) ~partition ~available_slots
-    ~required_work_count =
+    ~(coinbase : Coinbase.Fee_transfer.t Staged_ledger_diff.At_most_two.t)
+    ~partition ~available_slots ~required_work_count =
   let summary =
     Summary.init ~completed_work ~user_commands ~coinbase ~partition
       ~available_slots ~required_work_count
@@ -237,9 +224,7 @@ let discard_completed_work why completed_work t =
 
 let end_log ~(completed_work : Transaction_snark_work.Checked.t Sequence.t)
     ~(user_commands : User_command.With_valid_signature.t Sequence.t)
-    ~(coinbase :
-       (Public_key.Compressed.t * Currency.Fee.t)
-       Staged_ledger_diff.At_most_two.t) t =
+    ~(coinbase : Coinbase.Fee_transfer.t Staged_ledger_diff.At_most_two.t) t =
   let summary =
     Summary.end_log (fst t) ~completed_work ~user_commands ~coinbase
   in

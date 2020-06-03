@@ -1,0 +1,8 @@
+(library
+ (name protocol_version)
+ (public_name protocol_version)
+ (library_flags -linkall)
+ (libraries core_kernel)
+ (preprocess
+  (pps ppx_version ppx_bin_prot ppx_sexp_conv ppx_deriving.eq))
+ (synopsis "Protocol version representation"))
