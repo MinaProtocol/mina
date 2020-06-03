@@ -107,7 +107,9 @@ module Undo : sig
     module Common : sig
       type t = Undo.User_command_undo.Common.t =
         { user_command: User_command.t
-        ; previous_receipt_chain_hash: Receipt.Chain_hash.t }
+        ; previous_receipt_chain_hash: Receipt.Chain_hash.t
+        ; fee_payer_timing: Account.Timing.t
+        ; source_timing: Account.Timing.t option }
       [@@deriving sexp]
     end
 
