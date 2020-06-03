@@ -619,7 +619,10 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             ; (receiver_location, receiver_account)
             ; (source_location, source_account) ]
           , Undo.User_command_undo.Body.Payment {previous_empty_accounts} )
-      | Mint {amount; _} ->
+      | Mint {amount; token; _} ->
+          if Token_id.(equal default) token then
+            raise
+              (Reject (Error.of_string "The default token cannot be minted")) ;
           let%bind receiver_location, receiver_account =
             get_with_location ledger receiver
           in

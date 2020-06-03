@@ -811,8 +811,12 @@ module Base = struct
              (Token_id.Checked.Assert.equal fee_token
                 Token_id.(var_of_t default))
          in
-         [%with_label "Validate delegated token is default"]
-           Boolean.(Assert.any [token_default; not is_stake_delegation]))
+         let%bind () =
+           [%with_label "Validate delegated token is default"]
+             Boolean.(Assert.any [token_default; not is_stake_delegation])
+         in
+         [%with_label "Validate minted token is not default"]
+           Boolean.(Assert.any [not token_default; not is_mint]))
     in
     let current_global_slot =
       Global_slot.(Checked.constant zero)
