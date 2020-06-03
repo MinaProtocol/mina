@@ -136,14 +136,17 @@ module Ledger = struct
       let accounts_json =
         Runtime_config.Accounts.to_yojson accounts |> Yojson.Safe.to_string
       in
-      (* We use this to distinguish ledgers where the accounts record fields
-         differ. In this case, hashes stored with the ledger will differ, and
-         so the ledger files must be distinct.
-      *)
+      (* Distinguish ledgers where the hash function is different. *)
       let empty_account_hash =
         Snark_params.Tick.Field.to_string Coda_base.Account.empty_digest
       in
-      Blake2.digest_string (accounts_json ^ empty_account_hash)
+      (* Distinguish ledgers where the account record layout has changed. *)
+      let empty_account_serialize =
+        Bin_prot.Writer.to_string Coda_base.Account.Stable.Latest.bin_writer_t
+          Coda_base.Account.empty
+      in
+      Blake2.digest_string
+        (accounts_json ^ empty_account_hash ^ empty_account_serialize)
     in
     "accounts_" ^ Blake2.to_hex hash
 
