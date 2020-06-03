@@ -629,6 +629,8 @@ end
 
 [%%endif]
 
+let digest = crypto_hash
+
 let empty =
   { Poly.public_key= Public_key.Compressed.empty
   ; token_id= Token_id.default
@@ -639,7 +641,7 @@ let empty =
   ; voting_for= State_hash.dummy
   ; timing= Timing.Untimed }
 
-let digest = crypto_hash
+let empty_digest = digest empty
 
 let create account_id balance =
   let public_key = Account_id.public_key account_id in
