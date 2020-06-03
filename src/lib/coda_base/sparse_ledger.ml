@@ -206,6 +206,9 @@ let apply_user_command_exn ~constraint_constants t
         assert (
           not Public_key.Compressed.(equal empty source_account.public_key) ) ;
         let source_account =
+          (* Timing is always valid, but we need to record any switch from
+             timed to untimed here to stay in sync with the snark.
+          *)
           let timing =
             Or_error.ok_exn
             @@ Transaction_logic.validate_timing ~txn_amount:Amount.zero

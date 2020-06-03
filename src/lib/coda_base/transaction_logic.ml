@@ -531,6 +531,9 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           in
           let previous_delegate = source_account.delegate in
           let source_timing = source_account.timing in
+          (* Timing is always valid, but we need to record any switch from
+             timed to untimed here to stay in sync with the snark.
+          *)
           let%map timing =
             validate_timing ~txn_amount:Amount.zero
               ~txn_global_slot:current_global_slot ~account:source_account
