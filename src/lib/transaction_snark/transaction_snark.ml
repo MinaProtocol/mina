@@ -1612,7 +1612,7 @@ module Verification = struct
   module Keys = Verification_keys
 
   module type S = sig
-    val verify : t -> message:Sok_message.t -> bool
+    val verify : (t * Sok_message.t) list -> bool
 
     val verify_against_digest : t -> bool
 
@@ -1667,9 +1667,11 @@ module Verification = struct
       in
       Tock.verify proof keys.wrap wrap_input (Wrap_input.of_tick_field input)
 
-    let verify t ~message =
+    let verify_one t ~message =
       Sok_message.Digest.equal t.sok_digest (Sok_message.digest message)
       && verify_against_digest t
+
+    let verify = List.for_all ~f:(fun (t, m) -> verify_one t ~message:m)
 
     (* spec for [verify_merge s1 s2 _]:
       Returns a boolean which is true if there exists a tock proof proving
