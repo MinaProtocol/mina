@@ -206,7 +206,15 @@ let apply_user_command_exn ~constraint_constants t
         assert (
           not Public_key.Compressed.(equal empty source_account.public_key) ) ;
         let source_account =
-          {source_account with delegate= Account_id.public_key receiver}
+          (* Timing is always valid, but we need to record any switch from
+             timed to untimed here to stay in sync with the snark.
+          *)
+          let timing =
+            Or_error.ok_exn
+            @@ Transaction_logic.validate_timing ~txn_amount:Amount.zero
+                 ~txn_global_slot:current_global_slot ~account:source_account
+          in
+          {source_account with delegate= Account_id.public_key receiver; timing}
         in
         [(source_idx, source_account)]
     | Payment {amount; token_id= token; _} ->
