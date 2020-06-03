@@ -18,7 +18,7 @@ module NewBlock = {
   type transactions = {
     userCommands: array(userCommands),
     feeTransfer: array(feeTransfer),
-    coinbaseReceiverAccount: account,
+    coinbaseReceiverAccount: Js.Nullable.t(account),
   };
 
   type blockchainState = {date: string};
