@@ -251,6 +251,8 @@ module Body = struct
         Transaction_union_tag.Payment
     | Stake_delegation _ ->
         Transaction_union_tag.Stake_delegation
+    | Mint _ ->
+        Transaction_union_tag.Mint
 end
 
 module Poly = struct

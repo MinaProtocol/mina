@@ -24,6 +24,8 @@ let to_string = function
       "payment"
   | Stake_delegation ->
       "delegation"
+  | Mint ->
+      "mint"
   | Fee_transfer ->
       "fee-transfer"
   | Coinbase ->
