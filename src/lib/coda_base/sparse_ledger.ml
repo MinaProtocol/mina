@@ -289,6 +289,7 @@ let apply_user_command_exn ~constraint_constants t
           in
           (* Check that source account exists. *)
           assert (not Public_key.Compressed.(equal empty account.public_key)) ;
+          assert account.token_owner ;
           { account with
             balance=
               Balance.sub_amount account.balance amount

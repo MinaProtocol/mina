@@ -644,10 +644,6 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             if source_account.token_owner then return ()
             else Or_error.errorf "The source account does not own the token"
           in
-          let%bind () =
-            (*TODO(4673): Integrate with [token_owner] field. *)
-            Or_error.errorf "The source account does not own the token"
-          in
           let%map source_account =
             let%bind timing =
               validate_timing ~txn_amount:amount
