@@ -57,11 +57,7 @@ module Make_statement_scanner
         type t
 
         val verify :
-             verifier:t
-          -> proof:Ledger_proof.t
-          -> statement:Transaction_snark.Statement.t
-          -> message:Sok_message.t
-          -> sexp_bool M.t
+          verifier:t -> Ledger_proof_with_sok_message.t list -> sexp_bool M.t
     end) : sig
   val scan_statement :
        constraint_constants:Genesis_constants.Constraint_constants.t

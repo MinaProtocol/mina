@@ -90,7 +90,7 @@ let build ~logger ~verifier ~constraint_constants ~trust_system ~parent
                 let open Staged_ledger.Pre_diff_info.Error in
                 let action =
                   match staged_ledger_error with
-                  | Invalid_proof _ ->
+                  | Invalid_proofs _ ->
                       make_actions Sent_invalid_proof
                   | Pre_diff (Bad_signature _) ->
                       make_actions Sent_invalid_signature
