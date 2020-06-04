@@ -39,11 +39,11 @@ end
 module type S = sig
   type hash
 
-  type key
+  type account_id
 
   type account
 
-  type t = (hash, key, account) T.Stable.V1.t [@@deriving sexp, to_yojson]
+  type t = (hash, account_id, account) T.t [@@deriving sexp, to_yojson]
 
   val of_hash : depth:int -> hash -> t
 
@@ -53,10 +53,10 @@ module type S = sig
 
   val set_exn : t -> int -> account -> t
 
-  val find_index_exn : t -> key -> int
+  val find_index_exn : t -> account_id -> int
 
   val add_path :
-    t -> [`Left of hash | `Right of hash] list -> key -> account -> t
+    t -> [`Left of hash | `Right of hash] list -> account_id -> account -> t
 
   val iteri : t -> f:(int -> account -> unit) -> unit
 
@@ -71,7 +71,7 @@ module Make (Hash : sig
   type t [@@deriving eq, sexp, to_yojson, compare]
 
   val merge : height:int -> t -> t -> t
-end) (Key : sig
+end) (Account_id : sig
   type t [@@deriving eq, sexp, to_yojson]
 end) (Account : sig
   type t [@@deriving eq, sexp, to_yojson]
@@ -81,12 +81,12 @@ end) : sig
   include
     S
     with type hash := Hash.t
-     and type key := Key.t
+     and type account_id := Account_id.t
      and type account := Account.t
 
   val hash : (Hash.t, Account.t) Tree.t -> Hash.t
 end = struct
-  type t = (Hash.t, Key.t, Account.t) T.t [@@deriving sexp, to_yojson]
+  type t = (Hash.t, Account_id.t, Account.t) T.t [@@deriving sexp, to_yojson]
 
   let of_hash ~depth (hash : Hash.t) = of_hash ~depth hash
 
@@ -143,14 +143,14 @@ end = struct
     in
     union (depth0 - 1) tree0 (List.rev path0)
 
-  let add_path (t : t) path key account =
+  let add_path (t : t) path account_id account =
     let index =
       List.foldi path ~init:0 ~f:(fun i acc x ->
           match x with `Right _ -> acc + (1 lsl i) | `Left _ -> acc )
     in
     { t with
       tree= add_path t.depth t.tree path account
-    ; indexes= (key, index) :: t.indexes }
+    ; indexes= (account_id, index) :: t.indexes }
 
   let iteri (t : t) ~f =
     let rec go acc i tree ~f =
@@ -167,8 +167,8 @@ end = struct
 
   let ith_bit idx i = (idx lsr i) land 1 = 1
 
-  let find_index_exn (t : t) pk =
-    List.Assoc.find_exn t.indexes ~equal:Key.equal pk
+  let find_index_exn (t : t) aid =
+    List.Assoc.find_exn t.indexes ~equal:Account_id.equal aid
 
   let get_exn {T.tree; depth; _} idx =
     let rec go i tree =
@@ -190,7 +190,7 @@ end = struct
                 " node"
           in
           failwithf
-            "Spare_ledger.get: Bad index %i. Expected a%s, but got a%s at \
+            "Sparse_ledger.get: Bad index %i. Expected a%s, but got a%s at \
              depth %i."
             idx expected_kind kind (depth - i) ()
     in
@@ -219,7 +219,7 @@ end = struct
                 " node"
           in
           failwithf
-            "Spare_ledger.set: Bad index %i. Expected a%s, but got a%s at \
+            "Sparse_ledger.set: Bad index %i. Expected a%s, but got a%s at \
              depth %i."
             idx expected_kind kind (t.depth - i) ()
     in
@@ -283,11 +283,11 @@ let%test_module "sparse-ledger-test" =
         {name; favorite_number}
     end
 
-    module Key = struct
+    module Account_id = struct
       type t = string [@@deriving sexp, eq, to_yojson]
     end
 
-    include Make (Hash) (Key) (Account)
+    include Make (Hash) (Account_id) (Account)
 
     let gen =
       let open Quickcheck.Generator in

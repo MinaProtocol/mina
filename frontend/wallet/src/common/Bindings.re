@@ -63,15 +63,15 @@ module Stream = {
     type t;
 
     [@bs.module "fs"]
-    external create: (string, {. "encoding": string}) => t = "createWriteStream";
+    external create: (string, {. "encoding": string}) => t =
+      "createWriteStream";
 
     [@bs.send]
-    external onError: (t, [@bs.as "error"] _, string => unit) => t = "on";
+    external onError: (t, [@bs.as "error"] _, Js.Exn.t => unit) => t = "on";
     [@bs.send]
     external onFinish: (t, [@bs.as "finish"] _, unit => unit) => t = "on";
-    [@bs.send] external write: (t, Chunk.t) => unit = "";
+    [@bs.send] external write: (t, Chunk.t) => unit;
     [@bs.send] external endStream: t => unit = "end";
-      
   };
 
   module Readable = {
@@ -200,6 +200,18 @@ module Fs = {
 
   [@bs.val] [@bs.module "fs"]
   external watchFile: (string, unit => unit) => unit = "watchFile";
+
+  [@bs.val] [@bs.module "fs"]
+  external chmodSync: (string, int) => unit = "chmodSync";
+
+  [@bs.val] [@bs.module "fs"]
+  external symlinkSync: (string, string) => unit = "symLinkSync";
+
+  [@bs.val] [@bs.module "fs"]
+  external readdirSync: (string) => array(string) = "readdirSync";
+
+  [@bs.val] [@bs.module "fs"]
+  external renameSync: (string, string) => unit = "renameSync";
 };
 
 module Fetch = {
@@ -212,8 +224,10 @@ module LocalStorage = {
     (
       ~key: [@bs.string] [
               | [@bs.as "network"] `Network
+              | [@bs.as "daemonHost"] `DaemonHost
               | [@bs.as "addressbook"] `AddressBook
               | [@bs.as "onboarding"] `Onboarding
+              | [@bs.as "installed"] `Installed
             ],
       ~value: string
     ) =>
@@ -226,8 +240,10 @@ module LocalStorage = {
     [@bs.string]
     [
       | [@bs.as "network"] `Network
+      | [@bs.as "daemonHost"] `DaemonHost
       | [@bs.as "addressbook"] `AddressBook
       | [@bs.as "onboarding"] `Onboarding
+      | [@bs.as "installed"] `Installed
     ]
     ) =>
     Js.nullable(string) =

@@ -19,7 +19,7 @@ module Merkle_tree =
       let merge ~height h1 h2 =
         Tick.make_checked (fun () ->
             Random_oracle.Checked.hash
-              ~init:Hash_prefix.merkle_tree.(height)
+              ~init:(Hash_prefix.merkle_tree height)
               [|h1; h2|] )
 
       let assert_equal h1 h2 = Field.Checked.Assert.equal h1 h2
@@ -32,27 +32,39 @@ module Merkle_tree =
       let hash = Checked.digest
     end)
 
-let depth = Snark_params.ledger_depth
-
-include Data_hash.Make_full_size ()
-
-module T = struct
-  type t = Stable.Latest.t [@@deriving bin_io]
-
+include Data_hash.Make_full_size (struct
   let description = "Ledger hash"
 
   let version_byte = Base58_check.Version_bytes.ledger_hash
-end
+end)
 
-module Base58_check = Codable.Make_base58_check (T)
+(* Data hash versioned boilerplate below *)
 
-let to_string t = Base58_check.String_ops.to_string t
+[%%versioned
+module Stable = struct
+  module V1 = struct
+    module T = struct
+      type t = Field.t [@@deriving sexp, compare, hash, version {asserted}]
+    end
 
-let of_string s = Base58_check.String_ops.of_string s
+    include T
 
+    let to_latest = Core.Fn.id
+
+    [%%define_from_scope
+    to_yojson, of_yojson]
+
+    include Comparable.Make (T)
+    include Hashable.Make_binable (T)
+  end
+end]
+
+type _unused = unit constraint t = Stable.Latest.t
+
+(* End boilerplate *)
 let merge ~height (h1 : t) (h2 : t) =
   Random_oracle.hash
-    ~init:Hash_prefix.merkle_tree.(height)
+    ~init:(Hash_prefix.merkle_tree height)
     [|(h1 :> field); (h2 :> field)|]
   |> of_hash
 
@@ -73,7 +85,7 @@ type _ Request.t +=
   | Get_path : Account.Index.t -> path Request.t
   | Get_element : Account.Index.t -> (Account.t * path) Request.t
   | Set : Account.Index.t * Account.t -> unit Request.t
-  | Find_index : Public_key.Compressed.t -> Account.Index.t Request.t
+  | Find_index : Account_id.t -> Account.Index.t Request.t
 
 let reraise_merkle_requests (With {request; respond}) =
   match request with
@@ -86,26 +98,27 @@ let reraise_merkle_requests (With {request; respond}) =
   | _ ->
       unhandled
 
-let get t addr =
+let get ~depth t addr =
   handle
     (Merkle_tree.get_req ~depth (var_to_hash_packed t) addr)
     reraise_merkle_requests
 
 (*
-   [modify_account t pk ~filter ~f] implements the following spec:
+   [modify_account t aid ~filter ~f] implements the following spec:
 
-   - finds an account [account] in [t] for [pk] at path [addr] where [filter account] holds.
-     note that the account is not guaranteed to have public key [pk]; it might be a new account
-     created to satisfy this request.
-   - returns a root [t'] of a tree of depth [depth]
-   which is [t] but with the account [f account] at path [addr].
+   - finds an account [account] in [t] for [aid] at path [addr] where [filter
+     account] holds.
+     note that the account is not guaranteed to have identifier [aid]; it might
+     be a new account created to satisfy this request.
+   - returns a root [t'] of a tree of depth [depth] which is [t] but with the
+     account [f account] at path [addr].
 *)
-let%snarkydef modify_account t pk ~(filter : Account.var -> ('a, _) Checked.t)
-    ~f =
+let%snarkydef modify_account ~depth t aid
+    ~(filter : Account.var -> ('a, _) Checked.t) ~f =
   let%bind addr =
-    request_witness Account.Index.Unpacked.typ
-      As_prover.(
-        map (read Public_key.Compressed.typ pk) ~f:(fun s -> Find_index s))
+    request_witness
+      (Account.Index.Unpacked.typ ~ledger_depth:depth)
+      As_prover.(map (read Account_id.typ aid) ~f:(fun s -> Find_index s))
   in
   handle
     (Merkle_tree.modify_req ~depth (var_to_hash_packed t) addr
@@ -116,17 +129,18 @@ let%snarkydef modify_account t pk ~(filter : Account.var -> ('a, _) Checked.t)
   >>| var_of_hash_packed
 
 (*
-   [modify_account_send t pk ~f] implements the following spec:
+   [modify_account_send t aid ~f] implements the following spec:
 
-   - finds an account [account] in [t] at path [addr] whose public key is [pk] OR it is a fee transfer and is an empty account
-   - returns a root [t'] of a tree of depth [depth]
-   which is [t] but with the account [f account] at path [addr].
+   - finds an account [account] in [t] at path [addr] whose account id is [aid]
+     OR it is a fee transfer and is an empty account
+   - returns a root [t'] of a tree of depth [depth] which is [t] but with the
+     account [f account] at path [addr].
 *)
-let%snarkydef modify_account_send t pk ~is_writeable ~f =
-  modify_account t pk
+let%snarkydef modify_account_send ~depth t aid ~is_writeable ~f =
+  modify_account ~depth t aid
     ~filter:(fun account ->
       let%bind account_already_there =
-        Public_key.Compressed.Checked.equal account.public_key pk
+        Account_id.Checked.equal (Account.identifier_of_var account) aid
       in
       let%bind account_not_there =
         Public_key.Compressed.Checked.equal account.public_key
@@ -142,17 +156,18 @@ let%snarkydef modify_account_send t pk ~is_writeable ~f =
     ~f:(fun is_empty_and_writeable x -> f ~is_empty_and_writeable x)
 
 (*
-   [modify_account_recv t ~pk ~f] implements the following spec:
+   [modify_account_recv t aid ~f] implements the following spec:
 
-   - finds an account [account] in [t] at path [addr] whose public key is [pk] OR which is an empty account
-   - returns a root [t'] of a tree of depth [depth]
-   which is [t] but with the account [f account] at path [addr].
+   - finds an account [account] in [t] at path [addr] whose account id is [aid]
+     OR which is an empty account
+   - returns a root [t'] of a tree of depth [depth] which is [t] but with the
+     account [f account] at path [addr].
 *)
-let%snarkydef modify_account_recv t pk ~f =
-  modify_account t pk
+let%snarkydef modify_account_recv ~depth t aid ~f =
+  modify_account ~depth t aid
     ~filter:(fun account ->
       let%bind account_already_there =
-        Public_key.Compressed.Checked.equal account.public_key pk
+        Account_id.Checked.equal (Account.identifier_of_var account) aid
       in
       let%bind account_not_there =
         Public_key.Compressed.Checked.equal account.public_key

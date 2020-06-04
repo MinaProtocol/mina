@@ -12,7 +12,10 @@ module type Inputs_intf = sig
      and type location := Location.t
      and type hash := Hash.t
      and type key := Key.t
-     and type key_set := Key.Set.t
+     and type token_id := Token_id.t
+     and type token_id_set := Token_id.Set.t
+     and type account_id := Account_id.t
+     and type account_id_set := Account_id.Set.t
      and type parent := Base.t
 
   val mask_to_base : Mask.Attached.t -> Base.t

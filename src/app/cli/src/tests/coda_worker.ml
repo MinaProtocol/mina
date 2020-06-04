@@ -30,7 +30,7 @@ module Input = struct
     ; is_archive_rocksdb: bool
     ; is_seed: bool
     ; archive_process_location: Core.Host_and_port.t option }
-  [@@deriving bin_io]
+  [@@deriving bin_io_unversioned]
 end
 
 open Input
@@ -61,12 +61,12 @@ module T = struct
     ; start: ('worker, unit, unit) Rpc_parallel.Function.t
     ; get_balance:
         ( 'worker
-        , Public_key.Compressed.t
+        , Account_id.t
         , Currency.Balance.t option )
         Rpc_parallel.Function.t
     ; get_nonce:
         ( 'worker
-        , Public_key.Compressed.t
+        , Account_id.t
         , Coda_numbers.Account_nonce.t option )
         Rpc_parallel.Function.t
     ; root_length: ('worker, unit, int) Rpc_parallel.Function.t
@@ -91,7 +91,7 @@ module T = struct
         Rpc_parallel.Function.t
     ; get_all_transitions:
         ( 'worker
-        , Public_key.Compressed.t
+        , Account_id.t
         , ( Auxiliary_database.Filtered_external_transition.t
           , State_hash.t )
           With_hash.t
@@ -140,12 +140,9 @@ module T = struct
   type coda_functions =
     { coda_peers: unit -> Network_peer.Peer.t list Deferred.t
     ; coda_start: unit -> unit Deferred.t
-    ; coda_get_balance:
-           Public_key.Compressed.t
-        -> Currency.Balance.Stable.Latest.t option Deferred.t
+    ; coda_get_balance: Account_id.t -> Currency.Balance.t option Deferred.t
     ; coda_get_nonce:
-           Public_key.Compressed.t
-        -> Coda_numbers.Account_nonce.t option Deferred.t
+        Account_id.t -> Coda_numbers.Account_nonce.t option Deferred.t
     ; coda_root_length: unit -> int Deferred.t
     ; coda_send_payment:
            Send_payment_input.t
@@ -154,28 +151,23 @@ module T = struct
            User_command_input.t
         -> (User_command.t * Receipt.Chain_hash.t) Or_error.t Deferred.t
     ; coda_verified_transitions: unit -> state_hashes Pipe.Reader.t Deferred.t
-    ; coda_sync_status:
-        unit -> Sync_status.Stable.Latest.t Pipe.Reader.t Deferred.t
+    ; coda_sync_status: unit -> Sync_status.t Pipe.Reader.t Deferred.t
     ; coda_new_user_command:
-           Public_key.Compressed.Stable.Latest.t
-        -> User_command.Stable.Latest.t Pipe.Reader.t Deferred.t
+        Public_key.Compressed.t -> User_command.t Pipe.Reader.t Deferred.t
     ; coda_get_all_user_commands:
-           Public_key.Compressed.Stable.Latest.t
-        -> User_command.Stable.Latest.t list Deferred.t
+        Public_key.Compressed.t -> User_command.t list Deferred.t
     ; coda_replace_snark_worker_key:
-        Public_key.Compressed.Stable.Latest.t option -> unit Deferred.t
+        Public_key.Compressed.t option -> unit Deferred.t
     ; coda_stop_snark_worker: unit -> unit Deferred.t
     ; coda_validated_transitions_keyswaptest:
-           unit
-        -> External_transition.Validated.Stable.Latest.t Pipe.Reader.t
-           Deferred.t
+        unit -> External_transition.Validated.t Pipe.Reader.t Deferred.t
     ; coda_root_diff: unit -> Coda_lib.Root_diff.t Pipe.Reader.t Deferred.t
     ; coda_initialization_finish_signal: unit -> unit Pipe.Reader.t Deferred.t
     ; coda_prove_receipt:
            Receipt.Chain_hash.t * Receipt.Chain_hash.t
         -> (Receipt.Chain_hash.t * User_command.t list) Deferred.t
     ; coda_get_all_transitions:
-           Public_key.Compressed.t
+           Account_id.t
         -> ( Auxiliary_database.Filtered_external_transition.t
            , State_hash.t )
            With_hash.t
@@ -189,16 +181,16 @@ module T = struct
            Pipe.Reader.t
            Deferred.t
     ; coda_dump_tf: unit -> string Deferred.t
-    ; coda_best_path: unit -> State_hash.Stable.Latest.t list Deferred.t }
+    ; coda_best_path: unit -> State_hash.t list Deferred.t }
 
   module Worker_state = struct
-    type init_arg = Input.t [@@deriving bin_io]
+    type init_arg = Input.t [@@deriving bin_io_unversioned]
 
     type t = coda_functions
   end
 
   module Connection_state = struct
-    type init_arg = unit [@@deriving bin_io]
+    type init_arg = unit [@@deriving bin_io_unversioned]
 
     type t = unit
   end
@@ -271,7 +263,7 @@ module T = struct
 
     let get_all_transitions =
       C.create_rpc ~f:get_all_transitions_impl ~name:"get_all_transitions"
-        ~bin_input:Public_key.Compressed.Stable.Latest.bin_t
+        ~bin_input:Account_id.Stable.Latest.bin_t
         ~bin_output:
           [%bin_type_class:
             ( Auxiliary_database.Filtered_external_transition.Stable.Latest.t
@@ -290,13 +282,13 @@ module T = struct
 
     let get_balance =
       C.create_rpc ~f:get_balance_impl ~name:"get_balance"
-        ~bin_input:Public_key.Compressed.Stable.Latest.bin_t
+        ~bin_input:Account_id.Stable.Latest.bin_t
         ~bin_output:[%bin_type_class: Currency.Balance.Stable.Latest.t option]
         ()
 
     let get_nonce =
       C.create_rpc ~f:get_nonce_impl ~name:"get_nonce"
-        ~bin_input:Public_key.Compressed.Stable.Latest.bin_t
+        ~bin_input:Account_id.Stable.Latest.bin_t
         ~bin_output:
           [%bin_type_class: Coda_numbers.Account_nonce.Stable.Latest.t option]
         ()
@@ -439,6 +431,8 @@ module T = struct
             ; ("port", `Int addrs_and_ports.libp2p_port) ]
           ()
       in
+      let precomputed_values = Lazy.force Precomputed_values.compiled in
+      let (module Genesis_ledger) = precomputed_values.genesis_ledger in
       let pids = Child_processes.Termination.create_pid_table () in
       let%bind () =
         Option.value_map trace_dir
@@ -487,8 +481,8 @@ module T = struct
           in
           let block_production_keypair =
             Option.map block_production_key ~f:(fun i ->
-                List.nth_exn (Lazy.force Test_genesis_ledger.accounts) i
-                |> Test_genesis_ledger.keypair_of_account_record_exn )
+                List.nth_exn (Lazy.force Genesis_ledger.accounts) i
+                |> Genesis_ledger.keypair_of_account_record_exn )
           in
           let initial_block_production_keypairs =
             Keypair.Set.of_list (block_production_keypair |> Option.to_list)
@@ -502,7 +496,7 @@ module T = struct
           in
           let consensus_local_state =
             Consensus.Data.Local_state.create initial_block_production_keys
-              ~genesis_ledger:Test_genesis_ledger.t
+              ~genesis_ledger:Genesis_ledger.t
           in
           let gossip_net_params =
             Gossip_net.Libp2p.Config.
@@ -514,6 +508,7 @@ module T = struct
               ; chain_id
               ; logger
               ; unsafe_no_trust_ip= true
+              ; flood= false
               ; trust_system
               ; keypair= Some libp2p_keypair }
           in
@@ -524,7 +519,7 @@ module T = struct
             ; consensus_local_state
             ; is_seed= List.is_empty peers
             ; genesis_ledger_hash=
-                Ledger.merkle_root (Lazy.force Test_genesis_ledger.t)
+                Ledger.merkle_root (Lazy.force Genesis_ledger.t)
             ; log_gossip_heard=
                 { snark_pool_diff= true
                 ; transaction_pool_diff= true
@@ -538,16 +533,13 @@ module T = struct
           let with_monitor f input =
             Async.Scheduler.within' ~monitor (fun () -> f input)
           in
-          let genesis_state_hash =
-            Coda_state.Genesis_protocol_state.t
-              ~genesis_ledger:Test_genesis_ledger.t
-            |> With_hash.hash
-          in
           let coda_deferred () =
             Coda_lib.create
               (Coda_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
-                 ~is_seed ~coinbase_receiver:`Producer ~net_config
-                 ~gossip_net_params ~initial_fork_id:Fork_id.empty
+                 ~is_seed ~disable_telemetry:true ~coinbase_receiver:`Producer
+                 ~net_config ~gossip_net_params
+                 ~initial_protocol_version:Protocol_version.zero
+                 ~proposed_protocol_version_opt:None
                  ~work_selection_method:
                    (Cli_lib.Arg_type.work_selection_method_to_module
                       work_selection_method)
@@ -565,18 +557,17 @@ module T = struct
                  ~initial_block_production_keypairs ~monitor
                  ~consensus_local_state ~transaction_database
                  ~external_transition_database ~is_archive_rocksdb
-                 ~work_reassignment_wait:420000 ~genesis_state_hash ()
+                 ~work_reassignment_wait:420000 ~precomputed_values
                  ~archive_process_location:
                    (Option.map archive_process_location
                       ~f:(fun host_and_port ->
                         Cli_lib.Flag.Types.
-                          {name= "dummy"; value= host_and_port} )))
-              ~genesis_ledger:Test_genesis_ledger.t
-              ~base_proof:Precomputed_values.base_proof
+                          {name= "dummy"; value= host_and_port} ))
+                 ~proof_level:Genesis_constants.Proof_level.compiled ())
           in
           let coda_ref : Coda_lib.t option ref = ref None in
-          Coda_run.handle_shutdown ~monitor ~conf_dir ~top_logger:logger
-            coda_ref ;
+          Coda_run.handle_shutdown ~monitor ~time_controller ~conf_dir
+            ~top_logger:logger coda_ref ;
           let%map coda =
             with_monitor
               (fun () ->
@@ -600,14 +591,14 @@ module T = struct
               external_transition_database (Some pk)
             |> Deferred.return
           in
-          let coda_get_balance pk =
+          let coda_get_balance account_id =
             return
-              ( Coda_commands.get_balance coda pk
+              ( Coda_commands.get_balance coda account_id
               |> Participating_state.active_exn )
           in
-          let coda_get_nonce pk =
+          let coda_get_nonce account_id =
             return
-              ( Coda_commands.get_nonce coda pk
+              ( Coda_commands.get_nonce coda account_id
               |> Participating_state.active_exn )
           in
           let coda_root_length () =
@@ -618,9 +609,16 @@ module T = struct
               Public_key.of_private_key_exn sk |> Public_key.compress
             in
             let build_user_command_input amount sender_sk receiver_pk fee =
-              User_command_input.create ~sender:(pk_of_sk sender_sk) ~fee ~memo
+              let sender_pk = pk_of_sk sender_sk in
+              User_command_input.create ~fee ~fee_token:Token_id.default
+                ~fee_payer_pk:sender_pk ~signer:sender_pk ~memo
                 ~valid_until:Coda_numbers.Global_slot.max_value
-                ~body:(Payment {receiver= receiver_pk; amount})
+                ~body:
+                  (Payment
+                     { source_pk= sender_pk
+                     ; receiver_pk
+                     ; token_id= Token_id.default
+                     ; amount })
                 ~sign_choice:
                   (User_command_input.Sign_choice.Keypair
                      (Keypair.of_private_key_exn sender_sk))

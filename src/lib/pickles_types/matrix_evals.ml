@@ -9,6 +9,7 @@ module Stable = struct
 end]
 
 type 'a t = 'a Stable.Latest.t = {row: 'a; col: 'a; value: 'a; rc: 'a}
+[@@deriving sexp]
 
 let to_hlist {row; col; value; rc} = H_list.[row; col; value; rc]
 

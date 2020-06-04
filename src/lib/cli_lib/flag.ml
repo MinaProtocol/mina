@@ -289,7 +289,8 @@ let user_command_common : user_command_common Command.Param.t =
         (Printf.sprintf
            "FEE Amount you are willing to pay to process the transaction \
             (default: %s) (minimum: %s)"
-           (Currency.Fee.to_formatted_string Default.transaction_fee)
+           (Currency.Fee.to_formatted_string
+              Coda_compile_config.default_transaction_fee)
            (Currency.Fee.to_formatted_string Coda_base.User_command.minimum_fee))
       (optional txn_fee)
   and nonce =
@@ -304,7 +305,10 @@ let user_command_common : user_command_common Command.Param.t =
     flag "memo" ~doc:"STRING Memo accompanying the transaction"
       (optional string)
   in
-  {sender; fee= Option.value fee ~default:Default.transaction_fee; nonce; memo}
+  { sender
+  ; fee= Option.value fee ~default:Coda_compile_config.default_transaction_fee
+  ; nonce
+  ; memo }
 
 module User_command = struct
   open Arg_type
@@ -314,7 +318,7 @@ module User_command = struct
     flag "HD-index" ~doc:"HD-INDEX Index used by hardware wallet"
       (required hd_index)
 
-  let receiver =
+  let receiver_pk =
     let open Command.Param in
     flag "receiver" ~doc:"PUBLICKEY Public key to which you want to send money"
       (required public_key_compressed)
@@ -331,7 +335,8 @@ module User_command = struct
         (Printf.sprintf
            "FEE Amount you are willing to pay to process the transaction \
             (default: %s) (minimum: %s)"
-           (Currency.Fee.to_formatted_string Default.transaction_fee)
+           (Currency.Fee.to_formatted_string
+              Coda_compile_config.default_transaction_fee)
            (Currency.Fee.to_formatted_string Coda_base.User_command.minimum_fee))
       (optional txn_fee)
 

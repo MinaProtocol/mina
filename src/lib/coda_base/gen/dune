@@ -3,5 +3,5 @@
  (libraries async crs core coda_digestif snarky tuple_lib ppxlib
    crypto_params signature_lib yojson)
  (preprocess
-  (pps ppx_jane ppxlib.metaquot ppxlib.runner))
+  (pps ppx_version ppx_jane ppxlib.metaquot))
  (modes native))

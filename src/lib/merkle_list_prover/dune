@@ -1,5 +1,5 @@
 (library
 (name merkle_list_prover)
   (public_name merkle_list_prover)
-  (preprocess (pps ppx_coda ppx_jane))
+  (preprocess (pps ppx_version ppx_jane))
   (libraries core_kernel))

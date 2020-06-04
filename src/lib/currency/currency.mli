@@ -27,6 +27,8 @@ module Fee : sig
 
   include Codable.S with type t := t
 
+  val scale : t -> int -> t option
+
   (* TODO: Get rid of signed fee, use signed amount *)
   [%%ifdef consensus_mechanism]
 
@@ -136,6 +138,12 @@ module Balance : sig
     val add_amount : var -> Amount.var -> (var, _) Checked.t
 
     val sub_amount : var -> Amount.var -> (var, _) Checked.t
+
+    val sub_amount_flagged :
+      var -> Amount.var -> (var * [`Underflow of Boolean.var], _) Checked.t
+
+    val add_amount_flagged :
+      var -> Amount.var -> (var * [`Overflow of Boolean.var], _) Checked.t
 
     val ( + ) : var -> Amount.var -> (var, _) Checked.t
 

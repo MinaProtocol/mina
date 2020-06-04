@@ -9,14 +9,20 @@ module type S = sig
 
   type key
 
-  type key_set
+  type token_id
+
+  type token_id_set
+
+  type account_id
+
+  type account_id_set
 
   type index = int
 
   (* no deriving, purposely; signatures that include this one may add deriving *)
   type t
 
-  module Addr : Merkle_address.S
+  module Addr : module type of Merkle_address
 
   module Path : Merkle_path.S with type hash := hash
 
@@ -36,16 +42,17 @@ module type S = sig
   (** list of accounts, in increasing order of their storage locations *)
   val to_list : t -> account list
 
-  val foldi_with_ignored_keys :
+  (** the set of [account_id]s are ledger elements to skip during the fold,
+      because they're in a mask
+  *)
+  val foldi_with_ignored_accounts :
        t
-    -> key_set
+    -> account_id_set
     -> init:'accum
     -> f:(Addr.t -> 'accum -> account -> 'accum)
     -> 'accum
 
   val iteri : t -> f:(index -> account -> unit) -> unit
-
-  (** the set of keys are ledger elements to skip during the fold, because they're in a mask *)
 
   val foldi :
     t -> init:'accum -> f:(Addr.t -> 'accum -> account -> 'accum) -> 'accum
@@ -57,22 +64,33 @@ module type S = sig
     -> finish:('accum -> 'stop)
     -> 'stop
 
-  (** set of public keys associated with accounts *)
-  val keys : t -> key_set
+  (** set of account ids associated with accounts *)
+  val accounts : t -> account_id_set
 
-  val location_of_key : t -> key -> Location.t option
+  (** Get the public key that owns a token. *)
+  val token_owner : t -> token_id -> key option
+
+  (** Get the set of all accounts which own a token. *)
+  val token_owners : t -> account_id_set
+
+  (** Get all of the tokens for which a public key has accounts. *)
+  val tokens : t -> key -> token_id_set
+
+  val location_of_account : t -> account_id -> Location.t option
 
   val get_or_create_account :
-    t -> key -> account -> ([`Added | `Existed] * Location.t) Or_error.t
+    t -> account_id -> account -> ([`Added | `Existed] * Location.t) Or_error.t
 
   val get_or_create_account_exn :
-    t -> key -> account -> [`Added | `Existed] * Location.t
+    t -> account_id -> account -> [`Added | `Existed] * Location.t
 
   val close : t -> unit
 
   val last_filled : t -> Location.t option
 
   val get_uuid : t -> Uuid.t
+
+  val get_directory : t -> string option
 
   val get : t -> Location.t -> account option
 
@@ -84,7 +102,7 @@ module type S = sig
 
   val set_at_index_exn : t -> int -> account -> unit
 
-  val index_of_key_exn : t -> key -> int
+  val index_of_account_exn : t -> account_id -> int
 
   val merkle_root : t -> root_hash
 
@@ -92,5 +110,5 @@ module type S = sig
 
   val merkle_path_at_index_exn : t -> int -> Path.t
 
-  val remove_accounts_exn : t -> key list -> unit
+  val remove_accounts_exn : t -> account_id list -> unit
 end

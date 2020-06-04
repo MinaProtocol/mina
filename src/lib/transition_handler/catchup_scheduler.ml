@@ -56,7 +56,8 @@ type t =
         list )
       Capped_supervisor.t }
 
-let create ~logger ~verifier ~trust_system ~frontier ~time_controller
+let create ~logger ~constraint_constants ~verifier ~trust_system ~frontier
+    ~time_controller
     ~(catchup_job_writer :
        ( State_hash.t
          * ( External_transition.Initial_validated.t Envelope.Incoming.t
@@ -92,8 +93,8 @@ let create ~logger ~verifier ~trust_system ~frontier ~time_controller
                   (Logger.extend logger
                      [ ( "catchup_scheduler"
                        , `String "Called from catchup scheduler" ) ])
-                ~verifier ~trust_system ~frontier ~initial_hash
-                transition_branches
+                ~constraint_constants ~verifier ~trust_system ~frontier
+                ~initial_hash transition_branches
             with
             | Ok trees_of_breadcrumbs ->
                 Writer.write catchup_breadcrumbs_writer
@@ -277,6 +278,10 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
 
     let logger = Logger.null ()
 
+    let proof_level = Genesis_constants.Proof_level.Check
+
+    let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
+
     let trust_system = Trust_system.null ()
 
     let pids = Child_processes.Termination.create_pid_table ()
@@ -302,11 +307,12 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
       let test_delta = Block_time.Span.of_ms 100L in
       let verifier =
         Async.Thread_safe.block_on_async_exn (fun () ->
-            Verifier.create ~logger ~conf_dir:None ~pids )
+            Verifier.create ~logger ~proof_level ~conf_dir:None ~pids )
       in
       Quickcheck.test ~trials:3
-        (Transition_frontier.For_tests.gen_with_branch ~verifier ~max_length
-           ~frontier_size:1 ~branch_size:2 ()) ~f:(fun (frontier, branch) ->
+        (Transition_frontier.For_tests.gen_with_branch ~proof_level
+           ~precomputed_values ~verifier ~max_length ~frontier_size:1
+           ~branch_size:2 ()) ~f:(fun (frontier, branch) ->
           let catchup_job_reader, catchup_job_writer =
             Strict_pipe.create ~name:(__MODULE__ ^ __LOC__)
               (Buffered (`Capacity 10, `Overflow Crash))
@@ -317,7 +323,9 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           in
           let disjoint_breadcrumb = List.last_exn branch in
           let scheduler =
-            create ~frontier ~verifier ~catchup_job_writer
+            create
+              ~constraint_constants:precomputed_values.constraint_constants
+              ~frontier ~verifier ~catchup_job_writer
               ~catchup_breadcrumbs_writer ~clean_up_signal:(Ivar.create ())
           in
           watch scheduler ~timeout_duration
@@ -355,11 +363,12 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
       let test_delta = Block_time.Span.of_ms 100L in
       let verifier =
         Async.Thread_safe.block_on_async_exn (fun () ->
-            Verifier.create ~logger ~conf_dir:None ~pids )
+            Verifier.create ~logger ~proof_level ~conf_dir:None ~pids )
       in
       Quickcheck.test ~trials:3
-        (Transition_frontier.For_tests.gen_with_branch ~verifier ~max_length
-           ~frontier_size:1 ~branch_size:2 ()) ~f:(fun (frontier, branch) ->
+        (Transition_frontier.For_tests.gen_with_branch ~proof_level
+           ~precomputed_values ~verifier ~max_length ~frontier_size:1
+           ~branch_size:2 ()) ~f:(fun (frontier, branch) ->
           let cache = Unprocessed_transition_cache.create ~logger in
           let register_breadcrumb breadcrumb =
             Unprocessed_transition_cache.register_exn cache
@@ -378,7 +387,9 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
             List.map ~f:register_breadcrumb branch
           in
           let scheduler =
-            create ~frontier ~verifier ~catchup_job_writer
+            create
+              ~constraint_constants:precomputed_values.constraint_constants
+              ~frontier ~verifier ~catchup_job_writer
               ~catchup_breadcrumbs_writer ~clean_up_signal:(Ivar.create ())
           in
           watch scheduler ~timeout_duration
@@ -439,11 +450,12 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
       let timeout_duration = Block_time.Span.of_ms 400L in
       let verifier =
         Async.Thread_safe.block_on_async_exn (fun () ->
-            Verifier.create ~logger ~conf_dir:None ~pids )
+            Verifier.create ~logger ~proof_level ~conf_dir:None ~pids )
       in
       Quickcheck.test ~trials:3
-        (Transition_frontier.For_tests.gen_with_branch ~verifier ~max_length
-           ~frontier_size:1 ~branch_size:5 ()) ~f:(fun (frontier, branch) ->
+        (Transition_frontier.For_tests.gen_with_branch ~proof_level
+           ~precomputed_values ~verifier ~max_length ~frontier_size:1
+           ~branch_size:5 ()) ~f:(fun (frontier, branch) ->
           let catchup_job_reader, catchup_job_writer =
             Strict_pipe.create ~name:(__MODULE__ ^ __LOC__)
               (Buffered (`Capacity 10, `Overflow Crash))
@@ -453,7 +465,9 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
               (Buffered (`Capacity 10, `Overflow Crash))
           in
           let scheduler =
-            create ~frontier ~verifier ~catchup_job_writer
+            create
+              ~constraint_constants:precomputed_values.constraint_constants
+              ~frontier ~verifier ~catchup_job_writer
               ~catchup_breadcrumbs_writer ~clean_up_signal:(Ivar.create ())
           in
           let[@warning "-8"] (oldest_breadcrumb :: dependent_breadcrumbs) =

@@ -7,7 +7,7 @@ open Coda_transition
 open Signature_lib
 open O1trace
 open Otp_lib
-module Time = Coda_base.Block_time
+module Time = Block_time
 
 module Singleton_supervisor : sig
   type ('data, 'a) t
@@ -101,9 +101,10 @@ end = struct
     t.timeout <- Some timeout
 end
 
-let generate_next_state ~previous_protocol_state ~time_controller
-    ~staged_ledger ~transactions ~get_completed_work ~logger ~coinbase_receiver
-    ~(keypair : Keypair.t) ~block_data ~scheduled_time ~log_block_creation =
+let generate_next_state ~constraint_constants ~previous_protocol_state
+    ~time_controller ~staged_ledger ~transactions ~get_completed_work ~logger
+    ~coinbase_receiver ~(keypair : Keypair.t) ~block_data ~scheduled_time
+    ~log_block_creation =
   let open Interruptible.Let_syntax in
   let self = Public_key.compress keypair.public_key in
   let previous_protocol_state_body_hash =
@@ -114,13 +115,13 @@ let generate_next_state ~previous_protocol_state ~time_controller
       (let open Deferred.Let_syntax in
       let diff =
         measure "create_diff" (fun () ->
-            Staged_ledger.create_diff staged_ledger ~self ~coinbase_receiver
-              ~logger ~transactions_by_fee:transactions ~get_completed_work
-              ~log_block_creation )
+            Staged_ledger.create_diff ~constraint_constants staged_ledger ~self
+              ~coinbase_receiver ~logger ~transactions_by_fee:transactions
+              ~get_completed_work ~log_block_creation )
       in
       match%map
-        Staged_ledger.apply_diff_unchecked staged_ledger diff
-          ~state_body_hash:previous_protocol_state_body_hash
+        Staged_ledger.apply_diff_unchecked ~constraint_constants staged_ledger
+          diff ~state_body_hash:previous_protocol_state_body_hash
       with
       | Ok
           ( `Hash_after_applying next_staged_ledger_hash
@@ -207,7 +208,7 @@ let generate_next_state ~previous_protocol_state ~time_controller
                       .user_commands diff
                       :> User_command.t list )
                   ~snarked_ledger_hash:previous_ledger_hash ~supply_increase
-                  ~logger ) )
+                  ~logger ~constraint_constants ) )
       in
       lift_sync (fun () ->
           measure "making Snark and Internal transitions" (fun () ->
@@ -251,8 +252,11 @@ let generate_next_state ~previous_protocol_state ~time_controller
 let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
     ~transaction_resource_pool ~time_controller ~keypairs ~coinbase_receiver
     ~consensus_local_state ~frontier_reader ~transition_writer
-    ~set_next_producer_timing ~log_block_creation =
+    ~set_next_producer_timing ~log_block_creation
+    ~(precomputed_values : Precomputed_values.t) =
   trace "block_producer" (fun () ->
+      let constraint_constants = precomputed_values.constraint_constants in
+      let consensus_constants = precomputed_values.consensus_constants in
       let log_bootstrap_mode () =
         Logger.info logger ~module_:__MODULE__ ~location:__LOC__
           "Pausing block production while bootstrapping"
@@ -273,7 +277,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
             let crumb = Transition_frontier.best_tip frontier in
             Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
               ~metadata:[("breadcrumb", Breadcrumb.to_yojson crumb)]
-              !"Producing new block with parent $breadcrumb%!" ;
+              "Producing new block with parent $breadcrumb%!" ;
             let previous_protocol_state, previous_protocol_state_proof =
               let transition : External_transition.Validated.t =
                 Breadcrumb.validated_transition crumb
@@ -291,8 +295,9 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
               Interruptible.lift (Deferred.return ()) (Ivar.read ivar)
             in
             let%bind next_state_opt =
-              generate_next_state ~scheduled_time ~coinbase_receiver
-                ~block_data ~previous_protocol_state ~time_controller
+              generate_next_state ~constraint_constants ~scheduled_time
+                ~coinbase_receiver ~block_data ~previous_protocol_state
+                ~time_controller
                 ~staged_ledger:(Breadcrumb.staged_ledger crumb)
                 ~transactions ~get_completed_work ~logger ~keypair
                 ~log_block_creation
@@ -381,7 +386,10 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                       in
                       let delta_transition_chain_proof =
                         Transition_chain_prover.prove
-                          ~length:(Consensus.Constants.delta - 1)
+                          ~length:
+                            ( Coda_numbers.Length.to_int
+                                consensus_constants.delta
+                            - 1 )
                           ~frontier previous_state_hash
                         |> Option.value_exn
                       in
@@ -403,8 +411,9 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                                   ~delta_transition_chain_proof () }
                           |> External_transition.skip_time_received_validation
                                `This_transition_was_not_received_via_gossip
-                          |> External_transition.skip_fork_ids_validation
-                               `This_transition_has_valid_fork_ids
+                          |> External_transition
+                             .skip_protocol_versions_validation
+                               `This_transition_has_valid_protocol_versions
                           |> External_transition
                              .validate_genesis_protocol_state
                                ~genesis_state_hash:
@@ -462,8 +471,9 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                             return ()
                         | Ok transition -> (
                             let%bind breadcrumb_result =
-                              Breadcrumb.build ~logger ~verifier ~trust_system
-                                ~parent:crumb ~transition ~sender:None
+                              Breadcrumb.build ~logger ~constraint_constants
+                                ~verifier ~trust_system ~parent:crumb
+                                ~transition ~sender:None
                             in
                             let exn name =
                               raise
@@ -488,25 +498,25 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                                 Logger.error logger ~module_:__MODULE__
                                   ~location:__LOC__
                                   ~metadata:
-                                    [ ( "diff"
+                                    [ ("error", `String (Error.to_string_hum e))
+                                    ; ( "diff"
                                       , Staged_ledger_diff.to_yojson
                                           staged_ledger_diff ) ]
-                                  !"Error building breadcrumb from produced \
-                                    transition. Invalid staged ledger diff -- \
-                                    %s"
-                                  (Error.to_string_hum e) ;
+                                  !"Unable to build breadcrumb from produced \
+                                    transition due to invlaid staged ledger \
+                                    diff: $error" ;
                                 return ()
                             | Ok breadcrumb -> (
+                                Logger.trace logger ~module_:__MODULE__
+                                  ~location:__LOC__
+                                  ~metadata:
+                                    [("breadcrumb", Breadcrumb.to_yojson crumb)]
+                                  "Successfully produced a new block: \
+                                   $breadcrumb" ;
                                 let metadata =
                                   [ ( "state_hash"
                                     , State_hash.to_yojson transition_hash ) ]
                                 in
-                                Logger.info logger ~module_:__MODULE__
-                                  ~location:__LOC__
-                                  !"Submitting newly produced block \
-                                    $state_hash to the transition frontier \
-                                    controller"
-                                  ~metadata ;
                                 Coda_metrics.(
                                   Counter.inc_one
                                     Block_producer.blocks_produced) ;
@@ -516,7 +526,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                                 in
                                 Logger.debug logger ~module_:__MODULE__
                                   ~location:__LOC__ ~metadata
-                                  "Waiting for transition $state_hash to be \
+                                  "Waiting for block $state_hash to be \
                                    inserted into frontier" ;
                                 Deferred.choose
                                   [ Deferred.choice
@@ -539,19 +549,16 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                                       "Generated transition $state_hash was \
                                        accepted into transition frontier"
                                 | `Timed_out ->
-                                    let str =
+                                    (* FIXME #3167: this should be fatal, and more importantly, shouldn't happen. *)
+                                    Logger.fatal logger ~module_:__MODULE__
+                                      ~location:__LOC__ ~metadata
                                       "Timed out waiting for generated \
                                        transition $state_hash to enter \
                                        transition frontier. Continuing to \
                                        produce new blocks anyway. This may \
                                        mean your CPU is overloaded. Consider \
                                        disabling `-run-snark-worker` if it's \
-                                       configured."
-                                    in
-                                    (* FIXME #3167: this should be fatal, and more importantly, shouldn't happen. *)
-                                    Logger.error logger ~module_:__MODULE__
-                                      ~location:__LOC__ ~metadata "%s" str ) )
-                        ) )) )
+                                       configured." ) ) ) )) )
       in
       let production_supervisor = Singleton_supervisor.create ~task:produce in
       let scheduler = Singleton_scheduler.create time_controller in
@@ -564,7 +571,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                   (* Perform block production key swap since we have new
                      keypairs *)
                   Consensus.Data.Local_state.block_production_keys_swap
-                    consensus_local_state
+                    ~constants:consensus_constants consensus_local_state
                     ( Keypair.And_compressed_pk.Set.to_list keypairs
                     |> List.map ~f:snd |> Public_key.Compressed.Set.of_list )
                     (Time.now time_controller) ;
@@ -588,15 +595,17 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                   |> Breadcrumb.consensus_state
                 in
                 assert (
-                  Consensus.Hooks.required_local_state_sync ~consensus_state
+                  Consensus.Hooks.required_local_state_sync
+                    ~constants:consensus_constants ~consensus_state
                     ~local_state:consensus_local_state
                   = None ) ;
                 let now = Time.now time_controller in
                 let next_producer_timing =
                   measure "asking consensus what to do" (fun () ->
-                      Consensus.Hooks.next_producer_timing (time_to_ms now)
-                        consensus_state ~local_state:consensus_local_state
-                        ~keypairs ~logger )
+                      Consensus.Hooks.next_producer_timing
+                        ~constraint_constants ~constants:consensus_constants
+                        (time_to_ms now) consensus_state
+                        ~local_state:consensus_local_state ~keypairs ~logger )
                 in
                 set_next_producer_timing next_producer_timing ;
                 match next_producer_timing with
@@ -636,14 +645,14 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
               ~f:check_next_block_timing ) ;
         check_next_block_timing ()
       in
+      let genesis_state_timestamp =
+        consensus_constants.genesis_state_timestamp
+      in
       (* if the producer starts before genesis, sleep until genesis *)
       let now = Time.now time_controller in
-      if Time.( >= ) now Consensus.Constants.genesis_state_timestamp then
-        start ()
+      if Time.( >= ) now genesis_state_timestamp then start ()
       else
-        let time_till_genesis =
-          Time.diff Consensus.Constants.genesis_state_timestamp now
-        in
+        let time_till_genesis = Time.diff genesis_state_timestamp now in
         Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
           ~metadata:
             [ ( "time_till_genesis"

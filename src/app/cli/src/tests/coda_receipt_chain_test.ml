@@ -13,6 +13,11 @@ let restart_node worker ~config ~logger =
   Coda_process.spawn_exn config
 
 let main () =
+  let precomputed_values =
+    (* TODO: Load for this specific test. *)
+    Lazy.force Precomputed_values.compiled
+  in
+  let consensus_constants = precomputed_values.consensus_constants in
   let open Keypair in
   let logger = Logger.create () in
   let largest_account_keypair =
@@ -24,11 +29,14 @@ let main () =
     |> Test_genesis_ledger.keypair_of_account_record_exn
   in
   let block_production_interval =
-    Consensus.Constants.block_window_duration_ms
+    consensus_constants.block_window_duration_ms |> Block_time.Span.to_ms
+    |> Int64.to_int_exn
   in
   let acceptable_delay =
     Time.Span.of_ms
-      (block_production_interval * Consensus.Constants.delta |> Float.of_int)
+      ( block_production_interval
+        * Unsigned.UInt32.to_int consensus_constants.delta
+      |> Float.of_int )
   in
   let n = 2 in
   let receiver_pk = Public_key.compress another_account_keypair.public_key in

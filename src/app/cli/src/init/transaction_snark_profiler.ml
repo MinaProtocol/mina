@@ -13,20 +13,30 @@ end
 
 let create_ledger_and_transactions num_transitions =
   let num_accounts = 4 in
-  let ledger = Ledger.create () in
+  let constraint_constants = Genesis_constants.Constraint_constants.compiled in
+  let ledger = Ledger.create ~depth:constraint_constants.ledger_depth () in
   let keys =
     Array.init num_accounts ~f:(fun _ -> Signature_lib.Keypair.create ())
   in
   Array.iter keys ~f:(fun k ->
       let public_key = Public_key.compress k.public_key in
-      Ledger.create_new_account_exn ledger public_key
-        (Account.create public_key (Currency.Balance.of_int 10_000)) ) ;
-  let txn from_kp (to_kp : Signature_lib.Keypair.t) amount fee nonce =
+      let account_id = Account_id.create public_key Token_id.default in
+      Ledger.create_new_account_exn ledger account_id
+        (Account.create account_id (Currency.Balance.of_int 10_000)) ) ;
+  let txn (from_kp : Signature_lib.Keypair.t) (to_kp : Signature_lib.Keypair.t)
+      amount fee nonce =
+    let to_pk = Public_key.compress to_kp.public_key in
+    let from_pk = Public_key.compress from_kp.public_key in
     let payload : User_command.Payload.t =
-      User_command.Payload.create ~fee ~nonce ~memo:User_command_memo.dummy
+      User_command.Payload.create ~fee ~fee_token:Token_id.default
+        ~fee_payer_pk:from_pk ~nonce ~memo:User_command_memo.dummy
         ~valid_until:Coda_numbers.Global_slot.max_value
         ~body:
-          (Payment {receiver= Public_key.compress to_kp.public_key; amount})
+          (Payment
+             { source_pk= from_pk
+             ; receiver_pk= to_pk
+             ; token_id= Token_id.default
+             ; amount })
     in
     User_command.sign from_kp payload
   in
@@ -64,7 +74,7 @@ let create_ledger_and_transactions num_transitions =
         `One (Public_key.compress keys.(0).public_key, total_fee)
       in
       let coinbase =
-        Coinbase.create ~amount:Coda_compile_config.coinbase
+        Coinbase.create ~amount:constraint_constants.coinbase_amount
           ~receiver:(Public_key.compress keys.(0).public_key)
           ~fee_transfer:None
         |> Or_error.ok_exn
@@ -121,12 +131,14 @@ let pending_coinbase_stack_target (t : Transaction.t) stack =
    unbounded parallelism. *)
 let profile (module T : Transaction_snark.S) sparse_ledger0
     (transitions : Transaction.t list) preeval =
+  let constraint_constants = Genesis_constants.Constraint_constants.compiled in
   let (base_proof_time, _, _), base_proofs =
     List.fold_map transitions
       ~init:(Time.Span.zero, sparse_ledger0, Pending_coinbase.Stack.empty)
       ~f:(fun (max_span, sparse_ledger, coinbase_stack_source) t ->
         let sparse_ledger' =
-          Sparse_ledger.apply_transaction_exn sparse_ledger t
+          Sparse_ledger.apply_transaction_exn ~constraint_constants
+            sparse_ledger t
         in
         let coinbase_stack_target, state_body_hash =
           pending_coinbase_stack_target t coinbase_stack_source
@@ -134,7 +146,8 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
         let state_body_hash_opt = Some state_body_hash in
         let span, proof =
           time (fun () ->
-              T.of_transaction ?preeval ~sok_digest:Sok_message.Digest.default
+              T.of_transaction ?preeval ~constraint_constants
+                ~sok_digest:Sok_message.Digest.default
                 ~source:(Sparse_ledger.merkle_root sparse_ledger)
                 ~target:(Sparse_ledger.merkle_root sparse_ledger')
                 ~pending_coinbase_stack_state:
@@ -168,6 +181,7 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
 
 let check_base_snarks sparse_ledger0 (transitions : Transaction.t list) preeval
     =
+  let constraint_constants = Genesis_constants.Constraint_constants.compiled in
   let _ =
     let sok_message =
       Sok_message.create ~fee:Currency.Fee.zero
@@ -176,14 +190,16 @@ let check_base_snarks sparse_ledger0 (transitions : Transaction.t list) preeval
     in
     List.fold transitions ~init:sparse_ledger0 ~f:(fun sparse_ledger t ->
         let sparse_ledger' =
-          Sparse_ledger.apply_transaction_exn sparse_ledger t
+          Sparse_ledger.apply_transaction_exn ~constraint_constants
+            sparse_ledger t
         in
         let coinbase_stack_target, state_body_hash =
           pending_coinbase_stack_target t Pending_coinbase.Stack.empty
         in
         let state_body_hash_opt = Some state_body_hash in
         let () =
-          Transaction_snark.check_transaction ?preeval ~sok_message
+          Transaction_snark.check_transaction ?preeval ~constraint_constants
+            ~sok_message
             ~source:(Sparse_ledger.merkle_root sparse_ledger)
             ~target:(Sparse_ledger.merkle_root sparse_ledger')
             ~pending_coinbase_stack_state:
@@ -199,6 +215,7 @@ let check_base_snarks sparse_ledger0 (transitions : Transaction.t list) preeval
 
 let generate_base_snarks_witness sparse_ledger0
     (transitions : Transaction.t list) preeval =
+  let constraint_constants = Genesis_constants.Constraint_constants.compiled in
   let _ =
     let sok_message =
       Sok_message.create ~fee:Currency.Fee.zero
@@ -207,14 +224,16 @@ let generate_base_snarks_witness sparse_ledger0
     in
     List.fold transitions ~init:sparse_ledger0 ~f:(fun sparse_ledger t ->
         let sparse_ledger' =
-          Sparse_ledger.apply_transaction_exn sparse_ledger t
+          Sparse_ledger.apply_transaction_exn ~constraint_constants
+            sparse_ledger t
         in
         let coinbase_stack_target, state_body_hash =
           pending_coinbase_stack_target t Pending_coinbase.Stack.empty
         in
         let state_body_hash_opt = Some state_body_hash in
         let () =
-          Transaction_snark.generate_transaction_witness ?preeval ~sok_message
+          Transaction_snark.generate_transaction_witness ?preeval
+            ~constraint_constants ~sok_message
             ~source:(Sparse_ledger.merkle_root sparse_ledger)
             ~target:(Sparse_ledger.merkle_root sparse_ledger')
             { Transaction_snark.Pending_coinbase_stack_state.source=
@@ -230,17 +249,19 @@ let generate_base_snarks_witness sparse_ledger0
 
 let run profiler num_transactions repeats preeval =
   let ledger, transitions = create_ledger_and_transactions num_transactions in
+  let aid_of_pk pk = Account_id.create pk Token_id.default in
   let sparse_ledger =
     Coda_base.Sparse_ledger.of_ledger_subset_exn ledger
       (List.concat_map transitions ~f:(fun t ->
            match t with
            | Fee_transfer t ->
-               One_or_two.map t ~f:(fun (pk, _) -> pk) |> One_or_two.to_list
+               One_or_two.map t ~f:(fun (pk, _) -> aid_of_pk pk)
+               |> One_or_two.to_list
            | User_command t ->
                let t = (t :> User_command.t) in
                User_command.accounts_accessed t
-           | Coinbase {receiver; fee_transfer; _} ->
-               receiver :: Option.to_list (Option.map fee_transfer ~f:fst) ))
+           | Coinbase cb ->
+               Coinbase.accounts_accessed cb ))
   in
   for i = 1 to repeats do
     let message = profiler sparse_ledger transitions preeval in

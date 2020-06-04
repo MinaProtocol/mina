@@ -2791,6 +2791,18 @@
               },
               "isDeprecated": false,
               "deprecationReason": null
+            },
+            {
+              "name": "coinbaseReceiverAccount",
+              "description": "Account to which the coinbase for this block was granted",
+              "args": [],
+              "type": {
+                "kind": "OBJECT",
+                "name": "Account",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
             }
           ],
           "inputFields": null,
@@ -3365,6 +3377,22 @@
             {
               "name": "date",
               "description": "date (stringified Unix time - number of milliseconds since January 1, 1970)",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "utcDate",
+              "description": "utcDate (stringified Unix time - number of milliseconds since January 1, 1970). Time offsets are adjusted to reflect true wall-clock time instead of genesis time.",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -4238,6 +4266,22 @@
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "Int",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "genesisStateTimestamp",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
                   "ofType": null
                 }
               },

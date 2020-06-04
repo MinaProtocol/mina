@@ -60,11 +60,11 @@ let is_valid_user_command _t (txn : User_command.t) account_opt =
   in
   Option.is_some remainder
 
-let get_account t (addr : Public_key.Compressed.t) =
+let get_account t (addr : Account_id.t) =
   let open Participating_state.Let_syntax in
   let%map ledger = Coda_lib.best_ledger t in
   let open Option.Let_syntax in
-  let%bind loc = Ledger.location_of_key ledger addr in
+  let%bind loc = Ledger.location_of_account ledger addr in
   Ledger.get ledger loc
 
 let get_accounts t =
@@ -88,12 +88,12 @@ let get_keys_with_details t =
       , account.Account.Poly.balance |> Currency.Balance.to_int
       , account.Account.Poly.nonce |> Account.Nonce.to_int ) )
 
-let get_nonce t (addr : Public_key.Compressed.t) =
+let get_nonce t (addr : Account_id.t) =
   let open Participating_state.Option.Let_syntax in
   let%map account = get_account t addr in
   account.Account.Poly.nonce
 
-let get_balance t (addr : Public_key.Compressed.t) =
+let get_balance t (addr : Account_id.t) =
   let open Participating_state.Option.Let_syntax in
   let%map account = get_account t addr in
   account.Account.Poly.balance
@@ -129,7 +129,8 @@ let replace_block_production_keys keys pks =
 let setup_and_submit_user_command t (user_command_input : User_command_input.t)
     =
   let open Participating_state.Let_syntax in
-  let%map account_opt = get_account t user_command_input.sender in
+  let fee_payer = User_command_input.fee_payer user_command_input in
+  let%map account_opt = get_account t fee_payer in
   let open Deferred.Let_syntax in
   let%map result = Coda_lib.add_transactions t [user_command_input] in
   txn_count := !txn_count + 1 ;
@@ -172,8 +173,8 @@ module Receipt_chain_hash = struct
   Receipt.Chain_hash.(cons, empty)]
 end
 
-let verify_payment t (addr : Public_key.Compressed.Stable.Latest.t)
-    (verifying_txn : User_command.t) (init_receipt, proof) =
+let verify_payment t (addr : Account_id.t) (verifying_txn : User_command.t)
+    (init_receipt, proof) =
   let open Participating_state.Let_syntax in
   let%map account = get_account t addr in
   let account = Option.value_exn account in
@@ -212,12 +213,17 @@ type active_state_fields =
 
 let get_status ~flag t =
   let open Coda_lib.Config in
+  let config = Coda_lib.config t in
+  let precomputed_values = config.precomputed_values in
+  let protocol_constants = precomputed_values.genesis_constants.protocol in
+  let constraint_constants = precomputed_values.constraint_constants in
+  let consensus_constants = precomputed_values.consensus_constants in
   let uptime_secs =
     Time_ns.diff (Time_ns.now ()) start_time
     |> Time_ns.Span.to_sec |> Int.of_float
   in
   let commit_id = Coda_version.commit_id in
-  let conf_dir = (Coda_lib.config t).conf_dir in
+  let conf_dir = config.conf_dir in
   let%map peers = Coda_lib.peers t in
   let peers =
     List.map peers ~f:(fun peer ->
@@ -233,11 +239,14 @@ let get_status ~flag t =
   let snark_work_fee = Currency.Fee.to_int @@ Coda_lib.snark_work_fee t in
   let block_production_keys = Coda_lib.block_production_pubkeys t in
   let consensus_mechanism = Consensus.name in
-  let time_controller = (Coda_lib.config t).time_controller in
+  let time_controller = config.time_controller in
   let consensus_time_now =
-    Consensus.Data.Consensus_time.of_time_exn @@ Block_time.now time_controller
+    Consensus.Data.Consensus_time.of_time_exn ~constants:consensus_constants
+      (Block_time.now time_controller)
   in
-  let consensus_configuration = Consensus.Configuration.t in
+  let consensus_configuration =
+    Consensus.Configuration.t ~constraint_constants ~protocol_constants
+  in
   let r = Perf_histograms.report in
   let histograms =
     match flag with
@@ -351,8 +360,7 @@ let get_status ~flag t =
           `Check_again (time |> Span.of_ms |> of_span_since_epoch) )
   in
   let addrs_and_ports =
-    Node_addrs_and_ports.to_display
-      (Coda_lib.config t).gossip_net_params.addrs_and_ports
+    Node_addrs_and_ports.to_display config.gossip_net_params.addrs_and_ports
   in
   { Daemon_rpcs.Types.Status.num_accounts
   ; sync_status
@@ -392,6 +400,7 @@ end
 
 module For_tests = struct
   let get_all_user_commands coda public_key =
+    let account_id = Account_id.create public_key Token_id.default in
     let external_transition_database =
       Coda_lib.external_transition_database coda
     in
@@ -402,7 +411,7 @@ module For_tests = struct
              Auxiliary_database.Filtered_external_transition.user_commands
              With_hash.data)
       @@ Auxiliary_database.External_transition_database.get_all_values
-           external_transition_database (Some public_key)
+           external_transition_database (Some account_id)
     in
     let participants_user_commands =
       User_command.filter_by_participant user_commands public_key

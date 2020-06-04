@@ -67,8 +67,8 @@ let verify_transition ~logger ~trust_system ~verifier ~frontier
       External_transition.Validation.wrap transition
       |> External_transition.skip_time_received_validation
            `This_transition_was_not_received_via_gossip
-      |> External_transition.skip_fork_ids_validation
-           `This_transition_has_valid_fork_ids
+      |> External_transition.skip_protocol_versions_validation
+           `This_transition_has_valid_protocol_versions
       |> Fn.compose Deferred.return
            (External_transition.validate_genesis_protocol_state
               ~genesis_state_hash)
@@ -250,9 +250,9 @@ let download_transitions ~logger ~trust_system ~network ~num_peers
                      ~sender:(Envelope.Sender.Remote (peer.host, peer.peer_id))
                ) ) )
 
-let verify_transitions_and_build_breadcrumbs ~logger ~trust_system ~verifier
-    ~frontier ~unprocessed_transition_cache ~transitions ~target_hash ~subtrees
-    =
+let verify_transitions_and_build_breadcrumbs ~logger ~constraint_constants
+    ~trust_system ~verifier ~frontier ~unprocessed_transition_cache
+    ~transitions ~target_hash ~subtrees =
   let open Deferred.Or_error.Let_syntax in
   let%bind transitions_with_initial_validation, initial_hash =
     fold_until (List.rev transitions) ~init:[]
@@ -293,7 +293,8 @@ let verify_transitions_and_build_breadcrumbs ~logger ~trust_system ~verifier
   let open Deferred.Let_syntax in
   match%bind
     Transition_handler.Breadcrumb_builder.build_subtrees_of_breadcrumbs ~logger
-      ~verifier ~trust_system ~frontier ~initial_hash trees_of_transitions
+      ~constraint_constants ~verifier ~trust_system ~frontier ~initial_hash
+      trees_of_transitions
   with
   | Ok result ->
       Deferred.Or_error.return result
@@ -309,7 +310,8 @@ let garbage_collect_subtrees ~logger ~subtrees =
   Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
     "garbage collected failed cached transitions"
 
-let run ~logger ~trust_system ~verifier ~network ~frontier ~catchup_job_reader
+let run ~logger ~constraint_constants ~trust_system ~verifier ~network
+    ~frontier ~catchup_job_reader
     ~(catchup_breadcrumbs_writer :
        ( (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t Rose_tree.t
          list
@@ -350,9 +352,10 @@ let run ~logger ~trust_system ~verifier ~network ~frontier ~catchup_job_reader
                     ~num_peers ~preferred_peer ~maximum_download_size
                     ~hashes_of_missing_transitions
               in
-              verify_transitions_and_build_breadcrumbs ~logger ~trust_system
-                ~verifier ~frontier ~unprocessed_transition_cache ~transitions
-                ~target_hash ~subtrees
+              verify_transitions_and_build_breadcrumbs ~logger
+                ~constraint_constants ~trust_system ~verifier ~frontier
+                ~unprocessed_transition_cache ~transitions ~target_hash
+                ~subtrees
             with
             | Ok trees_of_breadcrumbs ->
                 Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
@@ -408,6 +411,12 @@ let%test_module "Ledger_catchup tests" =
 
     let logger = Logger.null ()
 
+    let proof_level = Genesis_constants.Proof_level.Check
+
+    let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
+
+    let constraint_constants = precomputed_values.constraint_constants
+
     let trust_system = Trust_system.null ()
 
     let time_controller = Block_time.Controller.basic ~logger
@@ -457,9 +466,11 @@ let%test_module "Ledger_catchup tests" =
         Transition_handler.Unprocessed_transition_cache.create ~logger
       in
       let pids = Child_processes.Termination.create_pid_table () in
-      let%map verifier = Verifier.create ~logger ~conf_dir:None ~pids in
-      run ~logger ~verifier ~trust_system ~network ~frontier
-        ~catchup_breadcrumbs_writer ~catchup_job_reader
+      let%map verifier =
+        Verifier.create ~logger ~proof_level ~conf_dir:None ~pids
+      in
+      run ~logger ~constraint_constants ~verifier ~trust_system ~network
+        ~frontier ~catchup_breadcrumbs_writer ~catchup_job_reader
         ~unprocessed_transition_cache ;
       { cache= unprocessed_transition_cache
       ; job_writer= catchup_job_writer
@@ -527,7 +538,7 @@ let%test_module "Ledger_catchup tests" =
           let%bind peer_branch_size =
             Int.gen_incl (max_frontier_length / 2) (max_frontier_length - 1)
           in
-          gen ~max_frontier_length
+          gen ~proof_level ~precomputed_values ~max_frontier_length
             [ fresh_peer
             ; peer_with_branch ~frontier_branch_size:peer_branch_size ])
         ~f:(fun network ->
@@ -546,7 +557,7 @@ let%test_module "Ledger_catchup tests" =
                    in the frontier" =
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
-          gen ~max_frontier_length
+          gen ~proof_level ~precomputed_values ~max_frontier_length
             [fresh_peer; peer_with_branch ~frontier_branch_size:1])
         ~f:(fun network ->
           let open Fake_network in
@@ -560,7 +571,7 @@ let%test_module "Ledger_catchup tests" =
     let%test_unit "catchup fails if one of the parent transitions fail" =
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
-          gen ~max_frontier_length
+          gen ~proof_level ~precomputed_values ~max_frontier_length
             [ fresh_peer
             ; peer_with_branch ~frontier_branch_size:(max_frontier_length * 2)
             ])
@@ -580,7 +591,8 @@ let%test_module "Ledger_catchup tests" =
             let failing_root_data =
               List.nth_exn (Root_history.to_list history) 1
             in
-            downcast_transition failing_root_data.transition
+            downcast_transition
+              (Frontier_base.Root_data.Historical.transition failing_root_data)
           in
           Thread_safe.block_on_async_exn (fun () ->
               let%bind `Test {cache; _}, `Cached_transition cached_transition =

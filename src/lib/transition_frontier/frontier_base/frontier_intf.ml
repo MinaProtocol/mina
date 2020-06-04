@@ -28,6 +28,9 @@ module type S = sig
 
   val find : t -> State_hash.t -> Breadcrumb.t option
 
+  val find_protocol_state :
+    t -> State_hash.t -> Coda_state.Protocol_state.value option
+
   val successor_hashes : t -> State_hash.t -> State_hash.t list
 
   val successor_hashes_rec : t -> State_hash.t -> State_hash.t list
@@ -45,4 +48,8 @@ module type S = sig
   val visualize_to_string : t -> string
 
   val visualize : filename:string -> t -> unit
+
+  val precomputed_values : t -> Precomputed_values.t
+
+  val genesis_constants : t -> Genesis_constants.t
 end
