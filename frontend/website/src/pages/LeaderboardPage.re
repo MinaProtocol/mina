@@ -51,6 +51,8 @@ module Styles = {
       flexDirection(`column),
       justifyContent(`center),
     ]);
+
+  let heroLinks = style([padding2(~v=`rem(0.), ~h=`rem(6.0))]);
 };
 
 module StatisticsRow = {
@@ -161,17 +163,20 @@ let make = () => {
                 bgColorHover=Theme.Colors.clover
               />
             </div>
-            <div className=Styles.flexColumn>
-              <Next.Link href="">
-                <a className=Theme.Link.basic>
-                  {React.string("Leaderboard FAQ")}
-                </a>
-              </Next.Link>
-              <Next.Link href="">
-                <a className=Theme.Link.basic>
-                  {React.string("Discord #Leaderboard Channel")}
-                </a>
-              </Next.Link>
+            <Spacer height=4.8 />
+            <div className=Styles.heroLinks>
+              <div className=Styles.flexColumn>
+                <Next.Link href="">
+                  <a className=Theme.Link.basic>
+                    {React.string("Leaderboard FAQ")}
+                  </a>
+                </Next.Link>
+                <Next.Link href="">
+                  <a className=Theme.Link.basic>
+                    {React.string("Discord #Leaderboard Channel")}
+                  </a>
+                </Next.Link>
+              </div>
             </div>
           </div>
         </div>
