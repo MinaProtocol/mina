@@ -139,6 +139,7 @@ module Make (Transition_frontier : Transition_frontier_intf) :
 
     let rec start_verifier t finished =
       if Queue.is_empty t.queue then (
+        (* we looped in the else after verifier finished but no pending work. *)
         t.state <- Waiting ;
         Ivar.fill finished (Ok true) )
       else
