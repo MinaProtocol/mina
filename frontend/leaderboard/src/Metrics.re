@@ -11,6 +11,7 @@ let printMap = map => {
   );
 };
 
+// Iterate through list of blocks and apply f on all fields in a block
 let calculateProperty = (f, blocks) => {
   blocks
   |> Array.fold_left((map, block) => {f(map, block)}, StringMap.empty);
@@ -150,20 +151,24 @@ let filterBlocksByTimeWindow = (startTime, endTime, blocks) => {
 };
 
 let calculateCoinbaseReceiverChallenge = blocks => {
-  Array.fold_left(
-    (map, block: Types.NewBlock.data) => {
-      let coinbaseReceiver =
-        block.transactions.coinbaseReceiverAccount.publicKey;
-      let creatorAccount = block.creatorAccount.publicKey;
-      StringMap.add(
-        block.creatorAccount.publicKey,
-        _ => Some(coinbaseReceiver !== creatorAccount),
-        map,
-      );
-    },
-    StringMap.empty,
-    blocks,
-  );
+  blocks
+  |> Array.fold_left(
+       (map, block: Types.NewBlock.data) => {
+         let creatorAccount = block.creatorAccount.publicKey;
+         switch (
+           Js.Nullable.toOption(block.transactions.coinbaseReceiverAccount)
+         ) {
+         | Some(account) =>
+           StringMap.update(
+             block.creatorAccount.publicKey,
+             _ => Some(account.publicKey !== creatorAccount),
+             map,
+           )
+         | None => map
+         };
+       },
+       StringMap.empty,
+     );
 };
 
 let throwAwayValues = metric => {
@@ -175,22 +180,6 @@ let calculateAllUsers = metrics => {
     StringMap.merge((_, _, _) => {Some()}),
     StringMap.empty,
     metrics,
-  );
-};
-
-// Combines two maps of users to points and returns one map of users to points
-let sumPointsMaps = maps => {
-  List.fold_left(
-    StringMap.merge((_, value, secondValue) => {
-      switch (value, secondValue) {
-      | (Some(value), Some(secondValue)) => Some(value + secondValue)
-      | (Some(value), None)
-      | (None, Some(value)) => Some(value)
-      | (None, None) => None
-      }
-    }),
-    StringMap.empty,
-    maps,
   );
 };
 
