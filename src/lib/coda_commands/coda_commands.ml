@@ -230,7 +230,7 @@ let get_status ~flag t =
   (*
   let%map peers = Coda_lib.peers t in
   *)
-  let peers = [] in
+  let%map peers = return [] in
   let peers =
     List.map peers ~f:(fun peer ->
         Network_peer.Peer.to_discovery_host_and_port peer
