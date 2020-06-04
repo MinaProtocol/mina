@@ -100,7 +100,9 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
     let%bind mostly_validated_transition =
       let open Deferred.Let_syntax in
       match
-        Transition_frontier_validation.validate_frontier_dependencies ~logger
+        Transition_frontier_validation.validate_frontier_dependencies
+          ~consensus_constants:
+            precomputed_values.Precomputed_values.consensus_constants ~logger
           ~frontier initially_validated_transition
       with
       | Ok t ->

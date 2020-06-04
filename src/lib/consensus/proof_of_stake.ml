@@ -2800,13 +2800,13 @@ module Hooks = struct
       (Consensus_state.curr_epoch_and_slot consensus_state)
       ~time_received
 
-  let is_short_range =
+  let is_short_range ~constants =
     let open Consensus_state in
     let is_pred x1 x2 = Epoch.equal (Epoch.succ x1) x2 in
     let pred_case c1 c2 =
       let e1, e2 = (curr_epoch c1, curr_epoch c2) in
       let c1_next_is_finalized =
-        not (Slot.in_seed_update_range (Slot.succ (curr_slot c1)))
+        not (Slot.in_seed_update_range ~constants (Slot.succ (curr_slot c1)))
       in
       is_pred e1 e2 && c1_next_is_finalized
       && Coda_base.State_hash.equal c1.next_epoch_data.lock_checkpoint
@@ -2818,7 +2818,7 @@ module Hooks = struct
           c2.staking_epoch_data.lock_checkpoint
       else pred_case c1 c2 || pred_case c2 c1
 
-  let select ~existing ~candidate ~logger =
+  let select ~constants ~existing ~candidate ~logger =
     let string_of_choice = function `Take -> "Take" | `Keep -> "Keep" in
     let log_result choice msg =
       Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
@@ -2857,7 +2857,7 @@ module Hooks = struct
       c < 0 || (c = 0 && candidate_vrf_is_bigger)
     in
     let precondition_msg, choice_msg, should_take =
-      if is_short_range existing candidate then
+      if is_short_range existing candidate ~constants then
         ( "most recent finalized checkpoints are equal"
         , "candidate length is longer than existing length "
         , existing.blockchain_length << candidate.blockchain_length )
@@ -3048,7 +3048,7 @@ module Hooks = struct
 
   let should_bootstrap ~(constants : Constants.t) ~existing ~candidate ~logger
       =
-    match select ~existing ~candidate ~logger with
+    match select ~constants ~existing ~candidate ~logger with
     | `Keep ->
         false
     | `Take ->

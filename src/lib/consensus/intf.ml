@@ -535,7 +535,8 @@ module type S = sig
      * kept, or `\`Take` if the second tip should be taken instead.
     *)
     val select :
-         existing:Consensus_state.Value.t
+         constants:Constants.t
+      -> existing:Consensus_state.Value.t
       -> candidate:Consensus_state.Value.t
       -> logger:Logger.t
       -> [`Keep | `Take]

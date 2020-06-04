@@ -462,6 +462,7 @@ let calculate_diffs t breadcrumb =
       let diffs =
         if
           Consensus.Hooks.select
+            ~constants:t.precomputed_values.consensus_constants
             ~existing:(Breadcrumb.consensus_state current_best_tip)
             ~candidate:(Breadcrumb.consensus_state breadcrumb)
             ~logger:
