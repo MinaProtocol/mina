@@ -7,7 +7,8 @@ open Cache_lib
 open Coda_transition
 open Network_peer
 
-let validate_transition ~logger ~frontier ~unprocessed_transition_cache
+let validate_transition ~consensus_constants ~logger ~frontier
+    ~unprocessed_transition_cache
     (enveloped_transition :
       External_transition.Initial_validated.t Envelope.Incoming.t) =
   let open Protocol_state in
@@ -34,7 +35,7 @@ let validate_transition ~logger ~frontier ~unprocessed_transition_cache
   let%map () =
     Result.ok_if_true
       ( `Take
-      = Consensus.Hooks.select
+      = Consensus.Hooks.select ~constants:consensus_constants
           ~logger:
             (Logger.extend logger
                [("selection_context", `String "Transition_handler.Validator")])
@@ -46,7 +47,8 @@ let validate_transition ~logger ~frontier ~unprocessed_transition_cache
   Unprocessed_transition_cache.register_exn unprocessed_transition_cache
     enveloped_transition
 
-let run ~logger ~trust_system ~time_controller ~frontier ~transition_reader
+let run ~logger ~consensus_constants ~trust_system ~time_controller ~frontier
+    ~transition_reader
     ~(valid_transition_writer :
        ( ( External_transition.Initial_validated.t Envelope.Incoming.t
          , State_hash.t )
@@ -62,8 +64,8 @@ let run ~logger ~trust_system ~time_controller ~frontier ~transition_reader
          in
          let sender = Envelope.Incoming.sender transition_env in
          match
-           validate_transition ~logger ~frontier ~unprocessed_transition_cache
-             transition_env
+           validate_transition ~consensus_constants ~logger ~frontier
+             ~unprocessed_transition_cache transition_env
          with
          | Ok cached_transition ->
              let%map () =
