@@ -15,14 +15,15 @@ let config : Pipeline.Config.Type = Pipeline.Config::{
     dirtyWhen = ""
   },
   steps = [
+  Command.build
     Command.Config::{
       commands = [
-        "./.buildkite/scripts/generate-jobs.sh > .buildkite/src/gen/Jobs.dhall",
+        "./buildkite/scripts/generate-jobs.sh > buildkite/src/gen/Jobs.dhall",
         triggerCommand "src/Monorepo.dhall"
       ],
       label = "Prepare monorepo triage",
       key = "monorepo",
-      target = Size.Small,
+      target = Size.Large,
       docker = Docker::{ image = (./Constants/ContainerImages.dhall).toolchainBase }
     }
   ]
