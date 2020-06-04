@@ -20,6 +20,7 @@ val setup :
      ?logger:Logger.t
   -> ?trust_system:Trust_system.t
   -> ?time_controller:Block_time.Controller.t
+  -> consensus_constants:Consensus.Constants.t
   -> (peer_state, 'n num_peers) Vect.t
   -> 'n num_peers t
 

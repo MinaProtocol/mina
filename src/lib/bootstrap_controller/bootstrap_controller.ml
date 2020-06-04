@@ -9,6 +9,7 @@ open Network_peer
 type t =
   { logger: Logger.t
   ; trust_system: Trust_system.t
+  ; consensus_constants: Consensus.Constants.t
   ; verifier: Verifier.t
   ; mutable best_seen_transition: External_transition.Initial_validated.t
   ; mutable current_root: External_transition.Initial_validated.t
@@ -16,7 +17,7 @@ type t =
 
 let worth_getting_root t candidate =
   `Take
-  = Consensus.Hooks.select
+  = Consensus.Hooks.select ~constants:t.consensus_constants
       ~logger:
         (Logger.extend t.logger
            [ ( "selection_context"
@@ -100,7 +101,8 @@ let on_transition t ~sender:(host, peer_id) ~root_sync_ledger
     | Ok peer_root_with_proof -> (
         match%bind
           Sync_handler.Root.verify ~logger:t.logger ~verifier:t.verifier
-            ~genesis_constants candidate_state peer_root_with_proof.data
+            ~consensus_constants:t.consensus_constants ~genesis_constants
+            candidate_state peer_root_with_proof.data
         with
         | Ok (`Root root, `Best_tip best_tip) ->
             if done_syncing_root root_sync_ledger then return `Ignored
@@ -139,6 +141,19 @@ let sync_ledger t ~root_sync_ledger ~transition_graph ~sync_ledger_reader
              transition )
       else Deferred.unit )
 
+let external_transition_compare consensus_constants =
+  Comparable.lift
+    (fun existing candidate ->
+      (* To prevent the logger to spam a lot of messsages, the logger input is set to null *)
+      if Consensus.Data.Consensus_state.Value.equal existing candidate then 0
+      else if
+        `Keep
+        = Consensus.Hooks.select ~constants:consensus_constants ~existing
+            ~candidate ~logger:(Logger.null ())
+      then -1
+      else 1 )
+    ~f:External_transition.consensus_state
+
 (* We conditionally ask other peers for their best tip. This is for testing
    eager bootstrapping and the regular functionalities of bootstrapping in
    isolation *)
@@ -164,6 +179,8 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
     in
     let t =
       { network
+      ; consensus_constants=
+          Precomputed_values.consensus_constants precomputed_values
       ; logger
       ; trust_system
       ; verifier
@@ -382,7 +399,8 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
                     Envelope.Incoming.data incoming_transition
                   in
                   `Take
-                  = Consensus.Hooks.select ~existing:root_consensus_state
+                  = Consensus.Hooks.select ~constants:t.consensus_constants
+                      ~existing:root_consensus_state
                       ~candidate:
                         (External_transition.consensus_state transition)
                       ~logger )
@@ -399,7 +417,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
                          Envelope.Incoming.data incoming_transition
                        in
                        transition )
-                     External_transition.compare)
+                     (external_transition_compare t.consensus_constants))
             in
             (new_frontier, sorted_filtered_collected_transitins) )
   in
@@ -457,6 +475,8 @@ let%test_module "Bootstrap_controller tests" =
         |> External_transition.Validation.reset_staged_ledger_diff_validation
       in
       { logger
+      ; consensus_constants=
+          Precomputed_values.consensus_constants precomputed_values
       ; trust_system
       ; verifier
       ; best_seen_transition= transition
@@ -529,9 +549,20 @@ let%test_module "Bootstrap_controller tests" =
                    let transition, _ = Envelope.Incoming.data env in
                    transition.data )
           in
-          [%test_result: External_transition.Set.t]
-            (External_transition.Set.of_list saved_transitions)
-            ~expect:(External_transition.Set.of_list expected_transitions) )
+          let module E = struct
+            module T = struct
+              type t = External_transition.t [@@deriving sexp]
+
+              let compare =
+                external_transition_compare
+                  (Precomputed_values.consensus_constants precomputed_values)
+            end
+
+            include Comparable.Make (T)
+          end in
+          [%test_result: E.Set.t]
+            (E.Set.of_list saved_transitions)
+            ~expect:(E.Set.of_list expected_transitions) )
 
     let run_bootstrap ~timeout_duration ~my_net ~transition_reader =
       let open Fake_network in
