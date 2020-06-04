@@ -66,14 +66,28 @@ let sumPointsMaps = maps => {
      );
 };
 
-let calcEchoServiceChallenge = metricsMap => {
-  addPointsToUsersWithAtleastN(
-    (metricRecord: Types.Metrics.metricRecord) =>
-      metricRecord.transactionsReceivedByEcho,
-    1,
-    500,
-    metricsMap,
-  );
+let echoServiceChallenge = metricsMap => {
+  metricsMap
+  |> addPointsToUsersWithAtleastN(
+       (metricRecord: Types.Metrics.metricRecord) =>
+         metricRecord.transactionsReceivedByEcho,
+       1,
+       500,
+     );
+};
+
+let coinbaseReceiverChallenge = (points, metricsMap) => {
+  metricsMap
+  |> StringMap.fold(
+       (key, metric: Types.Metrics.metricRecord, map) => {
+         switch (metric.coinbaseReceiver) {
+         | Some(metricValue) =>
+           metricValue == true ? StringMap.add(key, points, map) : map
+         | None => map
+         }
+       },
+       StringMap.empty,
+     );
 };
 
 let bonusBlocksChallenge = metricsMap => {
@@ -177,7 +191,7 @@ let calculatePoints = (challengeID, metricsMap) => {
     | "Create and sell zk-SNARKs on Coda" =>
       Some(zkSnarksChallenge(metricsMap))
     | "Connect to testnet and send coda to another testnet user" =>
-      Some(calcEchoServiceChallenge(metricsMap))
+      Some(echoServiceChallenge(metricsMap))
     | _ => None
     }
   | None => None
