@@ -112,7 +112,7 @@ module Make (Transition_frontier : Transition_frontier_intf) :
     val verify :
          t
       -> (Ledger_proof.t * Coda_base.Sok_message.t) list
-      -> bool Or_error.t Deferred.t
+      -> bool Deferred.Or_error.t
   end = struct
     type state =
       | Waiting
