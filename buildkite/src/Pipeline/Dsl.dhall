@@ -15,16 +15,21 @@ let Config = {
   Type = {
     spec: JobSpec.Type,
     -- TODO: Union type with block steps
-    steps: List Command.Config.Type
+    steps: List Command.Type
   },
   default = {=}
 }
 
 let build : Config.Type -> Pipeline/Type = \(c : Config.Type) ->
   let name = c.spec.name
-  let buildCommand = \(c : Command.Config.Type) ->
-    Command.build c // { key = Some "$${name}-${c.key}" }
+  let buildCommand = \(c : Command.Type) ->
+    c // { key =
+      let key =
+        Prelude.Optional.fold Text c.key Text (\(k : Text) -> k) ""
+      in
+      Some "_${name}-${key}"
+    }
   in
-  { steps = List/map Command.Config.Type Command.Type buildCommand c.steps }
+  { steps = List/map Command.Type Command.Type buildCommand c.steps }
 
 in {Config = Config, build = build, Type = Pipeline/Type}

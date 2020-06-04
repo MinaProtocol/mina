@@ -9,12 +9,12 @@ Pipeline.build
   Pipeline.Config::{
     spec = ./Spec.dhall,
     steps = [
+    Command.build
       Command.Config::{
-        commands = [ "cd .buildkite && make check" ],
-        label = "Check all CI Dhall entrypoints",
-        key = "check",
+        commands = [ "echo \"hello2\"" ],
+        label = "Test Echo2", key = "hello2",
         target = Size.Small,
         docker = Docker::{ image = (../../Constants/ContainerImages.dhall).toolchainBase }
-      }
+        }
     ]
   }
