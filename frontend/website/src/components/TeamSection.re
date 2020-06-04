@@ -521,6 +521,17 @@ let make = () => {
         description="Bijan has been a product leader in the fintech industry for over 10 years and in blockchain for \
       over 5 years. Prior to joining O(1) Labs, Bijan was Head of Product at Harbor, a Layer 2 compliance protocol on Ethereum. "
       />
+      <Member
+        name="Aneesha Raines"
+        title="Engineering Manager"
+        description="
+        Aneesha's career in software engineering has spanned a wide range of \
+        technology companies from biotech startup to big enterprise.  \
+        She has an MSE in computer engineering from the University of Michigan \
+        and most recently came from an identity company as an Engineering Manager. \
+        Her primary background is in QA, so believes in delivering high quality, scalable and maintainable software.  \
+        She loves team building and working with individuals to achieve their goals."
+      />
     </Section>
     <Section name="Advisors">
       <Member
