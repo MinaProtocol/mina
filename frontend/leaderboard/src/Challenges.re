@@ -82,7 +82,7 @@ let coinbaseReceiverChallenge = (points, metricsMap) => {
        (key, metric: Types.Metrics.metricRecord, map) => {
          switch (metric.coinbaseReceiver) {
          | Some(metricValue) =>
-           metricValue == true ? StringMap.add(key, points, map) : map
+           metricValue ? StringMap.add(key, points, map) : map
          | None => map
          }
        },
