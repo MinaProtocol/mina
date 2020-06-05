@@ -90,6 +90,8 @@ module type S = sig
 
   val get_uuid : t -> Uuid.t
 
+  val get_directory : t -> string option
+
   val get : t -> Location.t -> account option
 
   val set : t -> Location.t -> account -> unit

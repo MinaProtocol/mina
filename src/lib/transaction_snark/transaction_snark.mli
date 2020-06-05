@@ -153,7 +153,7 @@ end
 
 module Verification : sig
   module type S = sig
-    val verify : t -> message:Sok_message.t -> bool
+    val verify : (t * Sok_message.t) list -> bool
 
     val verify_against_digest : t -> bool
 
@@ -175,6 +175,7 @@ end
 
 val check_transaction :
      ?preeval:bool
+  -> constraint_constants:Genesis_constants.Constraint_constants.t
   -> sok_message:Sok_message.t
   -> source:Frozen_ledger_hash.t
   -> target:Frozen_ledger_hash.t
@@ -184,7 +185,8 @@ val check_transaction :
   -> unit
 
 val check_user_command :
-     sok_message:Sok_message.t
+     constraint_constants:Genesis_constants.Constraint_constants.t
+  -> sok_message:Sok_message.t
   -> source:Frozen_ledger_hash.t
   -> target:Frozen_ledger_hash.t
   -> Pending_coinbase.Stack.t
@@ -194,6 +196,7 @@ val check_user_command :
 
 val generate_transaction_witness :
      ?preeval:bool
+  -> constraint_constants:Genesis_constants.Constraint_constants.t
   -> sok_message:Sok_message.t
   -> source:Frozen_ledger_hash.t
   -> target:Frozen_ledger_hash.t
@@ -207,6 +210,7 @@ module type S = sig
 
   val of_transaction :
        ?preeval:bool
+    -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> sok_digest:Sok_message.Digest.t
     -> source:Frozen_ledger_hash.t
     -> target:Frozen_ledger_hash.t
@@ -216,7 +220,8 @@ module type S = sig
     -> t
 
   val of_user_command :
-       sok_digest:Sok_message.Digest.t
+       constraint_constants:Genesis_constants.Constraint_constants.t
+    -> sok_digest:Sok_message.Digest.t
     -> source:Frozen_ledger_hash.t
     -> target:Frozen_ledger_hash.t
     -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
@@ -225,7 +230,8 @@ module type S = sig
     -> t
 
   val of_fee_transfer :
-       sok_digest:Sok_message.Digest.t
+       constraint_constants:Genesis_constants.Constraint_constants.t
+    -> sok_digest:Sok_message.Digest.t
     -> source:Frozen_ledger_hash.t
     -> target:Frozen_ledger_hash.t
     -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t

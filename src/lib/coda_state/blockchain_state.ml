@@ -87,9 +87,12 @@ let to_input ({staged_ledger_hash; snarked_ledger_hash; timestamp} : Value.t) =
 
 let set_timestamp t timestamp = {t with Poly.timestamp}
 
-let negative_one ~genesis_ledger_hash =
+let negative_one
+    ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+    ~genesis_ledger_hash =
   Poly.
-    { staged_ledger_hash= Staged_ledger_hash.genesis ~genesis_ledger_hash
+    { staged_ledger_hash=
+        Staged_ledger_hash.genesis ~constraint_constants ~genesis_ledger_hash
     ; snarked_ledger_hash=
         Frozen_ledger_hash.of_ledger_hash genesis_ledger_hash
     ; timestamp= Block_time.of_time Time.epoch }

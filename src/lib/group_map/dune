@@ -1,8 +1,0 @@
-(library
-  (name group_map)
-  (public_name group_map)
-  (preprocess (pps ppx_coda ppx_jane ppx_deriving.eq))
-  (inline_tests)
-  (libraries
-    snarkette ; This is actually just needed in tests
-    core_kernel ))

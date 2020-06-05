@@ -81,11 +81,11 @@ let fee_excess t =
       Currency.Fee.Signed.zero )
 
 module Gen = struct
-  let gen =
+  let gen ~(constraint_constants : Genesis_constants.Constraint_constants.t) =
     let open Quickcheck.Let_syntax in
     let%bind receiver = Public_key.Compressed.gen in
     let%bind amount =
-      Currency.Amount.(gen_incl zero Coda_compile_config.coinbase)
+      Currency.Amount.(gen_incl zero constraint_constants.coinbase_amount)
     in
     let max_fee = Currency.Amount.to_fee amount in
     let%map fee_transfer =

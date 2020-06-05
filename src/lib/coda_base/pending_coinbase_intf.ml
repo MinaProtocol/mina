@@ -210,18 +210,20 @@ module type S = sig
     val var_of_t : t -> var
   end
 
-  val create : unit -> t Or_error.t
+  val create : depth:int -> unit -> t Or_error.t
 
   (** Delete the oldest stack*)
-  val remove_coinbase_stack : t -> (Stack.t * t) Or_error.t
+  val remove_coinbase_stack : depth:int -> t -> (Stack.t * t) Or_error.t
 
   (** Root of the merkle tree that has stacks as leaves*)
   val merkle_root : t -> Hash.t
 
-  val handler : t -> is_new_stack:bool -> (request -> response) Staged.t
+  val handler :
+    depth:int -> t -> is_new_stack:bool -> (request -> response) Staged.t
 
   (** Update the current working stack or if [is_new_stack] add as the new working stack*)
-  val update_coinbase_stack : t -> Stack.t -> is_new_stack:bool -> t Or_error.t
+  val update_coinbase_stack :
+    depth:int -> t -> Stack.t -> is_new_stack:bool -> t Or_error.t
 
   (** Stack that is currently being updated. if [is_new_stack] then a new stack is returned*)
   val latest_stack : t -> is_new_stack:bool -> Stack.t Or_error.t
@@ -242,7 +244,7 @@ module type S = sig
 
       type var
 
-      val typ : (var, value) Typ.t
+      val typ : depth:int -> (var, value) Typ.t
     end
 
     type _ Request.t +=
@@ -256,7 +258,7 @@ module type S = sig
       | Find_index_of_oldest_stack : Address.value Request.t
       | Get_previous_stack : Coinbase_stack_state.t Request.t
 
-    val get : var -> Address.var -> (Stack.var, _) Tick.Checked.t
+    val get : depth:int -> var -> Address.var -> (Stack.var, _) Tick.Checked.t
 
     (**
        [update_stack t ~is_new_stack updated_stack] implements the following spec:
@@ -264,7 +266,11 @@ module type S = sig
        - finds a coinbase stack in [t] at path [addr] and pushes the coinbase_data on to the stack
        - returns a root [t'] of the tree
     *)
-    val add_coinbase : var -> Update.var -> (var, 's) Tick.Checked.t
+    val add_coinbase :
+         constraint_constants:Genesis_constants.Constraint_constants.t
+      -> var
+      -> Update.var
+      -> (var, 's) Tick.Checked.t
 
     (**
        [pop_coinbases t pk updated_stack] implements the following spec:
@@ -274,6 +280,9 @@ module type S = sig
        - returns a root [t'] of the tree
     *)
     val pop_coinbases :
-      var -> proof_emitted:Boolean.var -> (var * Stack.var, 's) Tick.Checked.t
+         constraint_constants:Genesis_constants.Constraint_constants.t
+      -> var
+      -> proof_emitted:Boolean.var
+      -> (var * Stack.var, 's) Tick.Checked.t
   end
 end

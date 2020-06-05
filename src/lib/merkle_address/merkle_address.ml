@@ -270,7 +270,7 @@ let%test "Bitstring bin_io serialization does not change" =
   let known_good_hash =
     "\x0D\xF3\x25\xCE\xD4\x05\xBD\x6C\xB9\xC6\x88\x9E\x16\xD1\x4A\x1B\xEF\xB8\xBC\x3F\xB7\x16\x58\xCB\xC6\x16\xAC\x4B\xD6\x3B\x70\x5B"
   in
-  Module_version.Serialization.check_serialization
+  Ppx_version.Serialization.check_serialization
     (module Stable.V1)
     bitstring known_good_hash
 

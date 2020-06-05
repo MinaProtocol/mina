@@ -87,11 +87,11 @@ let daemon logger =
             producing blocks). If not provided, coinbase rewards will be sent \
             to the producer of a block."
          (optional public_key_compressed)
-     and genesis_ledger_dir_flag =
+     and genesis_dir =
        flag "genesis-ledger-dir"
          ~doc:
            "DIR Directory that contains the genesis ledger and the genesis \
-            blockchain proof (default: <config-dir>/genesis-ledger)"
+            blockchain proof (default: <config-dir>)"
          (optional string)
      and run_snark_worker_flag =
        flag "run-snark-worker"
@@ -222,16 +222,18 @@ let daemon logger =
      and proposed_protocol_version =
        flag "proposed-protocol-version" (optional string)
          ~doc:"NN.NN.NN Proposed protocol version to signal other nodes"
-     and genesis_runtime_constants =
-       flag "genesis-constants"
+     and config_file =
+       flag "config-file"
          ~doc:
-           (sprintf
-              "PATH path to the runtime-configurable constants. (default: \
-               compiled constants) For example: %s"
-              ( Genesis_constants.(
-                  Daemon_config.(of_genesis_constants compiled |> to_yojson))
-              |> Yojson.Safe.to_string ))
+           "PATH path to the configuration file (overrides CODA_CONFIG_FILE, \
+            default: <config_dir>/daemon.json)"
          (optional string)
+     and may_generate =
+       flag "generate-genesis-proof"
+         ~doc:
+           "true|false Generate a new genesis proof for the current \
+            configuration if none is found (default: false)"
+         (optional bool)
      and disable_telemetry =
        flag "disable-telemetry" no_arg
          ~doc:"Disable reporting telemetry to other nodes"
@@ -390,61 +392,89 @@ let daemon logger =
                 level %s"
                (str proof_level) (str compiled) ()
        in
+       let may_generate = Option.value ~default:false may_generate in
        let coda_initialization_deferred () =
-         let%bind genesis_ledger, base_proof, genesis_constants =
-           Genesis_ledger_helper.retrieve_genesis_state genesis_ledger_dir_flag
-             ~logger ~conf_dir ~daemon_conf:genesis_runtime_constants
+         let config_file, must_find_config_file =
+           match config_file with
+           | Some config_file ->
+               (config_file, true)
+           | None -> (
+             match Sys.getenv "CODA_CONFIG_FILE" with
+             | Some config_file ->
+                 (config_file, false)
+             | None ->
+                 (conf_dir ^/ "daemon.json", false) )
          in
-         let%bind precomputed_values =
-           let protocol_state_with_hash =
-             Coda_state.Genesis_protocol_state.t
-               ~constraint_constants:
-                 Genesis_constants.Constraint_constants.compiled
-               ~genesis_constants
-               ~genesis_ledger:(Genesis_ledger.Packed.t genesis_ledger)
-           in
-           let%map base_hash =
-             Keys_lib.Keys.step_instance_hash protocol_state_with_hash.data
-           in
-           { Precomputed_values.genesis_constants
-           ; genesis_ledger
-           ; protocol_state_with_hash
-           ; base_hash
-           ; genesis_proof= base_proof }
-         in
-         Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-           "Initializing with genesis constants $genesis_constants"
-           ~metadata:
-             [ ( "genesis_constants"
-               , Genesis_constants.to_yojson genesis_constants ) ] ;
-         let%bind config =
-           let configpath = conf_dir ^/ "daemon.json" in
-           match%map
-             Monitor.try_with_or_error ~extract_exn:true (fun () ->
-                 let%bind r = Reader.open_file configpath in
-                 Pipe.to_list (Reader.lines r)
-                 >>| fun ss -> String.concat ~sep:"\n" ss )
-           with
-           | Error e ->
-               Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-                 "No daemon.json found at $configpath: $error"
+         let%bind config_json =
+           match%map Genesis_ledger_helper.load_config_json config_file with
+           | Ok config ->
+               Some config
+           | Error err when must_find_config_file ->
+               Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+                 "Failed reading configuration from $config_file: $error"
                  ~metadata:
-                   [ ("error", `String (Error.to_string_mach e))
-                   ; ("configpath", `String configpath) ] ;
+                   [ ("config_file", `String config_file)
+                   ; ("error", `String (Error.to_string_hum err)) ] ;
+               Error.raise err
+           | Error err ->
+               Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+                 "Failed reading configuration from $config_file: $error"
+                 ~metadata:
+                   [ ("config_file", `String config_file)
+                   ; ("error", `String (Error.to_string_hum err)) ] ;
                None
-           | Ok contents -> (
-             try
-               let json = YJ.from_string ~fname:"daemon.json" contents in
-               Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-                 "Using daemon.json config found at $configpath"
-                 ~metadata:[("configpath", `String configpath)] ;
-               Some json
-             with Yojson.Json_error e ->
-               Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-                 "Error parsing daemon.json at $configpath: $error"
+         in
+         let%bind config_json =
+           match config_json with
+           | Some config_json ->
+               let%map config_json =
+                 Genesis_ledger_helper.upgrade_old_config ~logger config_file
+                   config_json
+               in
+               Some config_json
+           | None ->
+               return None
+         in
+         let config =
+           match config_json with
+           | Some config_json -> (
+             match Runtime_config.of_yojson config_json with
+             | Ok config ->
+                 config
+             | Error err ->
+                 Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+                   "Could not parse configuration from $config_file: $error"
+                   ~metadata:
+                     [ ("config_file", `String config_file)
+                     ; ("error", `String err) ] ;
+                 failwithf "Could not parse configuration: %s" err () )
+           | _ ->
+               Runtime_config.default
+         in
+         let constraint_constants =
+           Genesis_constants.Constraint_constants.compiled
+         in
+         let genesis_dir = Option.value ~default:conf_dir genesis_dir in
+         let%bind precomputed_values =
+           match%map
+             Genesis_ledger_helper.init_from_config_file ~genesis_dir ~logger
+               ~may_generate ~constraint_constants ~proof_level
+               ~genesis_constants:Genesis_constants.compiled config
+           with
+           | Ok (precomputed_values, _) ->
+               precomputed_values
+           | Error err ->
+               Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+                 "Failed initializing with configuration $config: $error"
                  ~metadata:
-                   [("error", `String e); ("configpath", `String configpath)] ;
-               None )
+                   [ ("config", Runtime_config.to_yojson config)
+                   ; ("error", `String (Error.to_string_hum err)) ] ;
+               Error.raise err
+         in
+         let daemon_config =
+           Option.bind config_json ~f:(fun config_json ->
+               YJ.Util.(to_option Fn.id (YJ.Util.member "daemon" config_json))
+           )
          in
          let maybe_from_config (type a) (f : YJ.json -> a option)
              (keyname : string) (actual_value : a option) : a option =
@@ -454,8 +484,10 @@ let daemon logger =
            | Some v ->
                Some v
            | None ->
-               let%bind config = config in
-               let%bind json_val = to_option Fn.id (member keyname config) in
+               let%bind daemon_config = daemon_config in
+               let%bind json_val =
+                 to_option Fn.id (member keyname daemon_config)
+               in
                Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
                  "Key $key being used from config file"
                  ~metadata:[("key", `String keyname)] ;
@@ -669,16 +701,11 @@ let daemon logger =
          let trust_system = Trust_system.create trust_dir in
          trace_database_initialization "trust_system" __LOC__ trust_dir ;
          let genesis_state_hash =
-           Coda_state.Genesis_protocol_state.t
-             ~constraint_constants:
-               Genesis_constants.Constraint_constants.compiled
-             ~genesis_constants
-             ~genesis_ledger:(Genesis_ledger.Packed.t genesis_ledger)
-           |> With_hash.hash
+           Precomputed_values.genesis_state_hash precomputed_values
          in
          let genesis_ledger_hash =
-           genesis_ledger |> Genesis_ledger.Packed.t |> Lazy.force
-           |> Ledger.merkle_root
+           Precomputed_values.genesis_ledger precomputed_values
+           |> Lazy.force |> Ledger.merkle_root
          in
          let initial_block_production_keypairs =
            block_production_keypair |> Option.to_list |> Keypair.Set.of_list
@@ -686,7 +713,8 @@ let daemon logger =
          let epoch_ledger_location = conf_dir ^/ "epoch_ledger" in
          let consensus_local_state =
            Consensus.Data.Local_state.create
-             ~genesis_ledger:(Genesis_ledger.Packed.t genesis_ledger)
+             ~genesis_ledger:
+               (Precomputed_values.genesis_ledger precomputed_values)
              ~epoch_ledger_location
              ( Option.map block_production_keypair ~f:(fun keypair ->
                    let open Keypair in
@@ -715,7 +743,9 @@ let daemon logger =
              { timeout= Time.Span.of_sec 3.
              ; logger
              ; conf_dir
-             ; chain_id= chain_id ~genesis_state_hash ~genesis_constants
+             ; chain_id=
+                 chain_id ~genesis_state_hash
+                   ~genesis_constants:precomputed_values.genesis_constants
              ; unsafe_no_trust_ip= false
              ; initial_peers
              ; addrs_and_ports
@@ -851,10 +881,7 @@ let daemon logger =
                 ~consensus_local_state ~transaction_database
                 ~external_transition_database ~is_archive_rocksdb
                 ~work_reassignment_wait ~archive_process_location
-                ~log_block_creation
-                ~constraint_constants:
-                  Genesis_constants.Constraint_constants.compiled
-                ~precomputed_values ~proof_level ())
+                ~log_block_creation ~precomputed_values ~proof_level ())
          in
          {Coda_initialization.coda; client_trustlist; rest_server_port}
        in

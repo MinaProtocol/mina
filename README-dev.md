@@ -26,8 +26,8 @@ The short version:
      - This might fail with `git@github.com: Permission denied (publickey).`. If that happens it means
     you need to [set up SSH keys on your machine](https://help.github.com/en/articles/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent).
  4. Install Docker, GNU make, and bash
- 5. `make USEDOCKER=TRUE dev`
- 6. `make USEDOCKER=TRUE deb`
+ 5. `make LIBP2P_NIXLESS=1 USEDOCKER=TRUE dev`
+ 6. `make LIBP2P_NIXLESS=1 USEDOCKER=TRUE deb`
 
 Now you'll have a `src/_build/codaclient.deb` ready to install on Ubuntu or Debian!
 
@@ -41,6 +41,7 @@ of the repo.
 ### Developer Setup (MacOS)
 
 * Invoke `make macos-setup`
+* Make sure [`nix` is installed](https://nixos.org/download.html) (if you are running the latest macOS, [this workaround](https://medium.com/@robinbb/install-nix-on-macos-catalina-ca8c03a225fc) or a similar one will be necessary).
 * Wait a long time...
 * Invoke `make build`
 * Jump to [customizing your editor for autocomplete](#dev-env)
@@ -59,7 +60,7 @@ of the repo.
 
 * Pull down developer container image  (~2GB download, go stretch your legs)
 
-`docker pull codaprotocol/coda:toolchain-eb73e64d524c906384e9dbb23e9d0b8ae2be9e9e`
+`docker pull codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea`
 
 * Create local builder image
 

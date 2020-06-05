@@ -9,7 +9,7 @@ module Hash = struct
 
   let hash_account = Fn.compose Ledger_hash.of_digest Account.digest
 
-  let empty_account = hash_account Account.empty
+  let empty_account = Ledger_hash.of_digest Account.empty_digest
 end
 
 module Root_hash = struct
