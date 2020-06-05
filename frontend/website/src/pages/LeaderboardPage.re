@@ -15,7 +15,10 @@ module Styles = {
       flexDirection(`column),
       justifyContent(`spaceBetween),
       alignItems(`center),
-      media(Theme.MediaQuery.tablet, [flexDirection(`row)]),
+      media(
+        Theme.MediaQuery.tablet,
+        [flexDirection(`row), padding2(~v=`rem(3.5), ~h=`zero)],
+      ),
     ]);
 
   let header =
@@ -41,7 +44,13 @@ module Styles = {
       ]),
     ]);
 
-  let buttonRow = style([display(`flex), flexDirection(`row)]);
+  let buttonRow =
+    style([
+      display(`flex),
+      flexDirection(`row),
+      position(`relative),
+      top(`rem(1.0)),
+    ]);
 
   let heroLeft = style([maxWidth(`rem(38.))]);
   let heroRight = style([display(`flex), flexDirection(`column)]);
@@ -53,6 +62,8 @@ module Styles = {
     ]);
 
   let heroLinks = style([padding2(~v=`rem(0.), ~h=`rem(6.0))]);
+  let icon =
+    style([marginRight(`px(8)), position(`relative), top(`px(3))]);
 };
 
 module StatisticsRow = {
@@ -168,14 +179,35 @@ let make = () => {
               <div className=Styles.flexColumn>
                 <Next.Link href="">
                   <a className=Theme.Link.basic>
+                    <Svg
+                      link="/static/img/Icon.Link.svg"
+                      dims=(1.0, 1.0)
+                      className=Styles.icon
+                      alt="an arrow pointing to the right with a square around it"
+                    />
                     {React.string("Leaderboard FAQ")}
                   </a>
                 </Next.Link>
                 <Next.Link href="">
                   <a className=Theme.Link.basic>
+                    <Svg
+                      link="/static/img/Icon.Link.svg"
+                      dims=(0.9425, 0.8725)
+                      className=Styles.icon
+                      alt="an arrow pointing to the right with a square around it"
+                    />
                     {React.string("Discord #Leaderboard Channel")}
                   </a>
                 </Next.Link>
+                <span className=Theme.Link.basic>
+                  <Svg
+                    link="/static/img/Icon.Info.svg"
+                    className=Styles.icon
+                    dims=(1.0, 1.0)
+                    alt="a undercase letter i inside a blue circle"
+                  />
+                  {React.string("Last manually updated May 1 2020")}
+                </span>
               </div>
             </div>
           </div>
