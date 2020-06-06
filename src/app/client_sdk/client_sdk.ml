@@ -1,5 +1,5 @@
 (* sign_js.ml *)
-
+(*
 [%%import
 "/src/config.mlh"]
 
@@ -10,6 +10,7 @@ consensus_mechanism]
 "Client_sdk cannot be built if \"consensus_mechanism\" is defined"]
 
 [%%endif]
+*)
 
 open Js_of_ocaml
 open Snark_params_nonconsensus
@@ -39,6 +40,21 @@ let _ =
 
            val publicKey = pk_str_js
          end
+
+       method writeKeys (keypair_js : keypair_js) (key_path_js : string_js) =
+         let private_key =
+           keypair_js##.privateKey |> Js.to_string
+           |> Private_key.of_base58_check_exn
+         in
+         let public_key =
+           keypair_js##.publicKey |> Js.to_string
+           |> Public_key.Compressed.of_base58_check_exn
+           |> Public_key.decompress_exn
+         in
+         let keypair = Keypair.{public_key; private_key} in
+         let key_path = Js.to_string key_path_js in
+         Secrets.Keypair.Terminal_stdin.write_exn keypair
+           ~privkey_path:key_path
 
        (** sign arbitrary string with private key *)
        method signString (sk_base58_check_js : string_js) (str_js : string_js)

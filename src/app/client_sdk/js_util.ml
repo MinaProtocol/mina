@@ -47,6 +47,11 @@ type payment_js =
   ; paymentPayload: payment_payload_js Js.prop >
   Js.t
 
+type keypair_js =
+  < privateKey: string_js Js.readonly_prop
+  ; publicKey: string_js Js.readonly_prop >
+  Js.t
+
 let payment_body_of_js payment_payload =
   let source_pk =
     payment_payload##.source |> Js.to_string
