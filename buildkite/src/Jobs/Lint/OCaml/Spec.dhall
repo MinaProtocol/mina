@@ -1,8 +1,12 @@
+let S = ../../../Lib/SelectFiles.dhall
 let JobSpec = ../../../Pipeline/JobSpec.dhall
 
 in
 JobSpec::{
-  dirtyWhen = "^buildkite/src/Jobs/Lint/OCaml|^src/",
+  dirtyWhen = [
+    S.contains "^buildkite/src/Jobs/Lint/OCaml",
+    S.contains "^src/"
+  ],
   path = "Lint",
   name = "OCaml"
 }
