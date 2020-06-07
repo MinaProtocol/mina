@@ -563,8 +563,6 @@ module T = struct
                       ~f:(fun host_and_port ->
                         Cli_lib.Flag.Types.
                           {name= "dummy"; value= host_and_port} ))
-                 ~constraint_constants:
-                   Genesis_constants.Constraint_constants.compiled
                  ~proof_level:Genesis_constants.Proof_level.compiled ())
           in
           let coda_ref : Coda_lib.t option ref = ref None in

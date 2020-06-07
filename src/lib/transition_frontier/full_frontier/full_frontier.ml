@@ -65,8 +65,7 @@ type t =
       Protocol_states_for_root_scan_state.t
   ; consensus_local_state: Consensus.Data.Local_state.t
   ; max_length: int
-  ; genesis_constants: Genesis_constants.t
-  ; constraint_constants: Genesis_constants.Constraint_constants.t }
+  ; precomputed_values: Precomputed_values.t }
 
 let consensus_local_state {consensus_local_state; _} = consensus_local_state
 
@@ -106,7 +105,7 @@ let close t =
        (Breadcrumb.mask (root t)))
 
 let create ~logger ~root_data ~root_ledger ~base_hash ~consensus_local_state
-    ~max_length ~constraint_constants ~genesis_constants =
+    ~max_length ~precomputed_values =
   let open Root_data in
   let root_hash =
     External_transition.Validated.state_hash root_data.transition
@@ -145,8 +144,7 @@ let create ~logger ~root_data ~root_ledger ~base_hash ~consensus_local_state
     ; table
     ; consensus_local_state
     ; max_length
-    ; genesis_constants
-    ; constraint_constants
+    ; precomputed_values
     ; protocol_states_for_root_scan_state }
   in
   t
@@ -194,7 +192,9 @@ let best_tip_path t = path_map t (best_tip t) ~f:Fn.id
 
 let hash_path t breadcrumb = path_map t breadcrumb ~f:Breadcrumb.state_hash
 
-let genesis_constants t = t.genesis_constants
+let precomputed_values t = t.precomputed_values
+
+let genesis_constants t = t.precomputed_values.genesis_constants
 
 let iter t ~f = Hashtbl.iter t.table ~f:(fun n -> f n.breadcrumb)
 
@@ -412,7 +412,11 @@ let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
            (Staged_ledger.proof_txns
               (Breadcrumb.staged_ledger new_root_node.breadcrumb)))
         ~f:(fun txn ->
-          ignore (Or_error.ok_exn (Ledger.apply_transaction mt txn)) ) ;
+          ignore
+            (Or_error.ok_exn
+               (Ledger.apply_transaction
+                  ~constraint_constants:
+                    t.precomputed_values.constraint_constants mt txn)) ) ;
       (* STEP 6 *)
       Ledger.commit mt ;
       (* STEP 7 *)
@@ -458,6 +462,7 @@ let calculate_diffs t breadcrumb =
       let diffs =
         if
           Consensus.Hooks.select
+            ~constants:t.precomputed_values.consensus_constants
             ~existing:(Breadcrumb.consensus_state current_best_tip)
             ~candidate:(Breadcrumb.consensus_state breadcrumb)
             ~logger:
@@ -571,10 +576,7 @@ let apply_diffs t diffs ~ignore_consensus_local_state =
   Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
     "Applying %d diffs to full frontier (%s --> ?)" (List.length diffs)
     (Frontier_hash.to_string t.hash) ;
-  let consensus_constants =
-    Consensus.Constants.create ~constraint_constants:t.constraint_constants
-      ~protocol_constants:t.genesis_constants.protocol
-  in
+  let consensus_constants = t.precomputed_values.consensus_constants in
   let local_state_was_synced_at_start =
     Consensus.Hooks.required_local_state_sync ~constants:consensus_constants
       ~consensus_state:(Breadcrumb.consensus_state (best_tip t))

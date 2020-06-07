@@ -56,8 +56,8 @@ module Catchup_jobs = struct
   let decr () = update (( - ) 1)
 end
 
-let verify_transition ~logger ~trust_system ~verifier ~frontier
-    ~unprocessed_transition_cache enveloped_transition =
+let verify_transition ~logger ~consensus_constants ~trust_system ~verifier
+    ~frontier ~unprocessed_transition_cache enveloped_transition =
   let sender = Envelope.Incoming.sender enveloped_transition in
   let genesis_state_hash = Transition_frontier.genesis_state_hash frontier in
   let cached_initially_validated_transition_result =
@@ -82,7 +82,8 @@ let verify_transition ~logger ~trust_system ~verifier ~frontier
     in
     Deferred.return
     @@ Transition_handler.Validator.validate_transition ~logger ~frontier
-         ~unprocessed_transition_cache enveloped_initially_validated_transition
+         ~consensus_constants ~unprocessed_transition_cache
+         enveloped_initially_validated_transition
   in
   let open Deferred.Let_syntax in
   match%bind cached_initially_validated_transition_result with
@@ -250,17 +251,17 @@ let download_transitions ~logger ~trust_system ~network ~num_peers
                      ~sender:(Envelope.Sender.Remote (peer.host, peer.peer_id))
                ) ) )
 
-let verify_transitions_and_build_breadcrumbs ~logger ~trust_system ~verifier
-    ~frontier ~unprocessed_transition_cache ~transitions ~target_hash ~subtrees
-    =
+let verify_transitions_and_build_breadcrumbs ~logger ~consensus_constants
+    ~constraint_constants ~trust_system ~verifier ~frontier
+    ~unprocessed_transition_cache ~transitions ~target_hash ~subtrees =
   let open Deferred.Or_error.Let_syntax in
   let%bind transitions_with_initial_validation, initial_hash =
     fold_until (List.rev transitions) ~init:[]
       ~f:(fun acc transition ->
         let open Deferred.Let_syntax in
         match%bind
-          verify_transition ~logger ~trust_system ~verifier ~frontier
-            ~unprocessed_transition_cache transition
+          verify_transition ~logger ~consensus_constants ~trust_system
+            ~verifier ~frontier ~unprocessed_transition_cache transition
         with
         | Error e ->
             List.map acc ~f:Cached.invalidate_with_failure |> ignore ;
@@ -293,7 +294,8 @@ let verify_transitions_and_build_breadcrumbs ~logger ~trust_system ~verifier
   let open Deferred.Let_syntax in
   match%bind
     Transition_handler.Breadcrumb_builder.build_subtrees_of_breadcrumbs ~logger
-      ~verifier ~trust_system ~frontier ~initial_hash trees_of_transitions
+      ~constraint_constants ~verifier ~trust_system ~frontier ~initial_hash
+      trees_of_transitions
   with
   | Ok result ->
       Deferred.Or_error.return result
@@ -309,7 +311,8 @@ let garbage_collect_subtrees ~logger ~subtrees =
   Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
     "garbage collected failed cached transitions"
 
-let run ~logger ~trust_system ~verifier ~network ~frontier ~catchup_job_reader
+let run ~logger ~consensus_constants ~constraint_constants ~trust_system
+    ~verifier ~network ~frontier ~catchup_job_reader
     ~(catchup_breadcrumbs_writer :
        ( (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t Rose_tree.t
          list
@@ -350,7 +353,8 @@ let run ~logger ~trust_system ~verifier ~network ~frontier ~catchup_job_reader
                     ~num_peers ~preferred_peer ~maximum_download_size
                     ~hashes_of_missing_transitions
               in
-              verify_transitions_and_build_breadcrumbs ~logger ~trust_system
+              verify_transitions_and_build_breadcrumbs ~logger
+                ~consensus_constants ~constraint_constants ~trust_system
                 ~verifier ~frontier ~unprocessed_transition_cache ~transitions
                 ~target_hash ~subtrees
             with
@@ -410,10 +414,11 @@ let%test_module "Ledger_catchup tests" =
 
     let proof_level = Genesis_constants.Proof_level.Check
 
-    let constraint_constants =
-      Genesis_constants.Constraint_constants.for_unit_tests
-
     let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
+
+    let constraint_constants = precomputed_values.constraint_constants
+
+    let consensus_constants = precomputed_values.consensus_constants
 
     let trust_system = Trust_system.null ()
 
@@ -467,9 +472,9 @@ let%test_module "Ledger_catchup tests" =
       let%map verifier =
         Verifier.create ~logger ~proof_level ~conf_dir:None ~pids
       in
-      run ~logger ~verifier ~trust_system ~network ~frontier
-        ~catchup_breadcrumbs_writer ~catchup_job_reader
-        ~unprocessed_transition_cache ;
+      run ~logger ~consensus_constants ~constraint_constants ~verifier
+        ~trust_system ~network ~frontier ~catchup_breadcrumbs_writer
+        ~catchup_job_reader ~unprocessed_transition_cache ;
       { cache= unprocessed_transition_cache
       ; job_writer= catchup_job_writer
       ; breadcrumbs_reader= catchup_breadcrumbs_reader }
@@ -536,8 +541,7 @@ let%test_module "Ledger_catchup tests" =
           let%bind peer_branch_size =
             Int.gen_incl (max_frontier_length / 2) (max_frontier_length - 1)
           in
-          gen ~proof_level ~constraint_constants ~precomputed_values
-            ~max_frontier_length
+          gen ~proof_level ~precomputed_values ~max_frontier_length
             [ fresh_peer
             ; peer_with_branch ~frontier_branch_size:peer_branch_size ])
         ~f:(fun network ->
@@ -556,8 +560,7 @@ let%test_module "Ledger_catchup tests" =
                    in the frontier" =
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
-          gen ~proof_level ~constraint_constants ~precomputed_values
-            ~max_frontier_length
+          gen ~proof_level ~precomputed_values ~max_frontier_length
             [fresh_peer; peer_with_branch ~frontier_branch_size:1])
         ~f:(fun network ->
           let open Fake_network in
@@ -571,8 +574,7 @@ let%test_module "Ledger_catchup tests" =
     let%test_unit "catchup fails if one of the parent transitions fail" =
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
-          gen ~proof_level ~constraint_constants ~precomputed_values
-            ~max_frontier_length
+          gen ~proof_level ~precomputed_values ~max_frontier_length
             [ fresh_peer
             ; peer_with_branch ~frontier_branch_size:(max_frontier_length * 2)
             ])
