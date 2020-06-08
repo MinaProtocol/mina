@@ -41,9 +41,12 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
         unprocessed_transition_cache t
       |> Strict_pipe.Writer.write primary_transition_writer ) ;
   trace_recurring "validator" (fun () ->
-      Transition_handler.Validator.run ~logger ~trust_system ~time_controller
-        ~frontier ~transition_reader:network_transition_reader
-        ~valid_transition_writer ~unprocessed_transition_cache ) ;
+      Transition_handler.Validator.run
+        ~consensus_constants:
+          (Precomputed_values.consensus_constants precomputed_values)
+        ~logger ~trust_system ~time_controller ~frontier
+        ~transition_reader:network_transition_reader ~valid_transition_writer
+        ~unprocessed_transition_cache ) ;
   Strict_pipe.Reader.iter_without_pushback valid_transition_reader
     ~f:(Strict_pipe.Writer.write primary_transition_writer)
   |> don't_wait_for ;
@@ -57,6 +60,7 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
         ~processed_transition_writer ) ;
   trace_recurring "catchup" (fun () ->
       Ledger_catchup.run ~logger
+        ~consensus_constants:precomputed_values.consensus_constants
         ~constraint_constants:precomputed_values.constraint_constants
         ~trust_system ~verifier ~network ~frontier ~catchup_job_reader
         ~catchup_breadcrumbs_writer ~unprocessed_transition_cache ) ;

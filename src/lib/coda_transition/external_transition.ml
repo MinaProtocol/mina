@@ -104,29 +104,9 @@ module Stable = struct
         (user_commands external_transition)
         ~f:(Fn.compose User_command_payload.is_payment User_command.payload)
 
-    module T = struct
-      type nonrec t = t
-
-      let t_of_sexp = t_of_sexp
-
-      let sexp_of_t = sexp_of_t
-
-      let compare =
-        Comparable.lift
-          (fun existing candidate ->
-            (* To prevent the logger to spam a lot of messsages, the logger input is set to null *)
-            if Consensus.Data.Consensus_state.Value.equal existing candidate
-            then 0
-            else if
-              `Keep
-              = Consensus.Hooks.select ~existing ~candidate
-                  ~logger:(Logger.null ())
-            then -1
-            else 1 )
-          ~f:consensus_state
-    end
-
-    include Comparable.Make (T)
+    let equal =
+      Comparable.lift Consensus.Data.Consensus_state.Value.equal
+        ~f:consensus_state
   end
 end]
 
@@ -171,7 +151,7 @@ Stable.Latest.
   , payments
   , to_yojson )]
 
-include Comparable.Make (Stable.Latest)
+let equal = Stable.Latest.equal
 
 let create ~protocol_state ~protocol_state_proof ~staged_ledger_diff
     ~delta_transition_chain_proof ~validation_callback
@@ -973,7 +953,8 @@ module Transition_frontier_validation (Transition_frontier : sig
   val find : t -> State_hash.t -> Breadcrumb.t option
 end) =
 struct
-  let validate_frontier_dependencies (t, validation) ~logger ~frontier =
+  let validate_frontier_dependencies (t, validation) ~consensus_constants
+      ~logger ~frontier =
     let open Result.Let_syntax in
     let hash = With_hash.hash t in
     let protocol_state = protocol_state (With_hash.data t) in
@@ -993,7 +974,7 @@ struct
       let ( = ) = Pervasives.( = ) in
       Result.ok_if_true
         ( `Take
-        = Consensus.Hooks.select
+        = Consensus.Hooks.select ~constants:consensus_constants
             ~logger:
               (Logger.extend logger
                  [ ( "selection_context"
