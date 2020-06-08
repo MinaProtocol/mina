@@ -9,14 +9,6 @@ brew update-reset
 NEEDED_PACKAGES=" bash boost cmake gmp gpatch jemalloc libffi libomp libsodium opam openssl@1.1 pkg-config zlib libpq postgresql"
 echo "Needed:  ${NEEDED_PACKAGES}"
 
-CURRENT_PACKAGES=$(brew list | xargs)
-echo "Current: ${CURRENT_PACKAGES}"
-
-# Prune already installed packages from the todo list
-for p in $CURRENT_PACKAGES; do
-  NEEDED_PACKAGES=${NEEDED_PACKAGES// $p / }
-done;
-
 echo "Todo:    ${NEEDED_PACKAGES}"
 
 # Remove old python (uses force to always return true)
