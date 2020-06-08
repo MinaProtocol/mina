@@ -102,21 +102,21 @@ module StatisticsRow = {
       ]);
   };
   [@react.component]
-  let make = () => {
+  let make = (~participants="456", ~blocks="123", ~genesisMembers="121") => {
     <div className=Styles.flexRow>
       <div className=Styles.flexColumn>
         <h2 className=Styles.statistic> {React.string("Participants")} </h2>
-        <p className=Styles.value> {React.string("456")} </p>
+        <p className=Styles.value> {React.string(participants)} </p>
       </div>
       <div className=Styles.flexColumn>
         <h2 className=Styles.statistic> {React.string("Blocks")} </h2>
-        <p className=Styles.value> {React.string("123")} </p>
+        <p className=Styles.value> {React.string(blocks)} </p>
       </div>
       <div className=Styles.flexColumn>
         <h2 className=Styles.statistic>
           {React.string("Genesis Members")}
         </h2>
-        <p className=Styles.value> {React.string("121")} </p>
+        <p className=Styles.value> {React.string(genesisMembers)} </p>
       </div>
     </div>;
   };
