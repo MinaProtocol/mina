@@ -117,7 +117,7 @@ let%snarkydef eliminate_fee_excess_checked (fee_token_l, fee_excess_l)
       Field.Checked.if_ may_move ~then_:fee_excess_m
         ~else_:Field.(Var.constant zero)
     in
-    ( (fee_token, Field.Var.add fee_excess_l fee_excess_to_move)
+    ( (fee_token, Field.Var.add fee_excess fee_excess_to_move)
     , Field.Var.sub fee_excess_m fee_excess_to_move )
   in
   (* NOTE: Below, we may update the tokens on both sides, even though we only
