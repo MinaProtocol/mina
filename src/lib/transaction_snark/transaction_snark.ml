@@ -1846,7 +1846,7 @@ module Merge = struct
      returns a bool which is true iff
      there is a snark proving making tock_vk
      accept on one of [ H(s1, s2, excess); H(s1, s2, excess, tock_vk) ] *)
-  let verify_transition tock_vk tock_vk_precomp wrap_vk_hash_state
+  let%snarkydef verify_transition tock_vk tock_vk_precomp wrap_vk_hash_state
       get_transition_data s1 s2 ~pending_coinbase_stack1
       ~pending_coinbase_stack2 supply_increase ~fee_token_l ~fee_excess_l
       ~fee_token_r ~fee_excess_r =
@@ -1944,40 +1944,43 @@ module Merge = struct
       Verifier.Verification_key.Precomputation.create tock_vk
     in
     let%bind () =
-      let%bind (fee_token_l, fee_excess_l), (fee_token_r, fee_excess_r) =
-        reduce_fee_excesses_checked
-          (fee_token12_l, fee_excess12_l)
-          (fee_token12_r, fee_excess12_r)
-          (fee_token23_l, fee_excess23_l)
-          (fee_token23_r, fee_excess23_r)
-      in
-      let%bind supply_increase =
-        Amount.Checked.add supply_increase12 supply_increase23
-      in
-      let%bind input =
-        let%bind sok_digest =
-          exists' Sok_message.Digest.typ ~f:Prover_state.sok_digest
-        in
-        construct_input_checked ~prefix:wrap_vk_hash_state ~sok_digest
-          ~state1:s1 ~state2:s3 ~pending_coinbase_stack1:pending_coinbase1
-          ~pending_coinbase_stack2:pending_coinbase3 ~supply_increase
-          ~fee_token_l ~fee_excess_l ~fee_token_r ~fee_excess_r
-      in
-      Field.Checked.Assert.equal top_hash input
+      [%with_label "Check top hash"]
+        (let%bind (fee_token_l, fee_excess_l), (fee_token_r, fee_excess_r) =
+           reduce_fee_excesses_checked
+             (fee_token12_l, fee_excess12_l)
+             (fee_token12_r, fee_excess12_r)
+             (fee_token23_l, fee_excess23_l)
+             (fee_token23_r, fee_excess23_r)
+         in
+         let%bind supply_increase =
+           Amount.Checked.add supply_increase12 supply_increase23
+         in
+         let%bind input =
+           let%bind sok_digest =
+             exists' Sok_message.Digest.typ ~f:Prover_state.sok_digest
+           in
+           construct_input_checked ~prefix:wrap_vk_hash_state ~sok_digest
+             ~state1:s1 ~state2:s3 ~pending_coinbase_stack1:pending_coinbase1
+             ~pending_coinbase_stack2:pending_coinbase3 ~supply_increase
+             ~fee_token_l ~fee_excess_l ~fee_token_r ~fee_excess_r
+         in
+         Field.Checked.Assert.equal top_hash input)
     and verify_12 =
-      verify_transition tock_vk tock_vk_precomp wrap_vk_hash_state
-        Prover_state.transition12 s1 s2
-        ~pending_coinbase_stack1:pending_coinbase1
-        ~pending_coinbase_stack2:pending_coinbase2 supply_increase12
-        ~fee_token_l:fee_token12_l ~fee_excess_l:fee_excess12_l
-        ~fee_token_r:fee_token12_r ~fee_excess_r:fee_excess12_r
+      [%with_label "Verify left transition"]
+        (verify_transition tock_vk tock_vk_precomp wrap_vk_hash_state
+           Prover_state.transition12 s1 s2
+           ~pending_coinbase_stack1:pending_coinbase1
+           ~pending_coinbase_stack2:pending_coinbase2 supply_increase12
+           ~fee_token_l:fee_token12_l ~fee_excess_l:fee_excess12_l
+           ~fee_token_r:fee_token12_r ~fee_excess_r:fee_excess12_r)
     and verify_23 =
-      verify_transition tock_vk tock_vk_precomp wrap_vk_hash_state
-        Prover_state.transition23 s2 s3
-        ~pending_coinbase_stack1:pending_coinbase2
-        ~pending_coinbase_stack2:pending_coinbase3 supply_increase23
-        ~fee_token_l:fee_token23_l ~fee_excess_l:fee_excess23_l
-        ~fee_token_r:fee_token23_r ~fee_excess_r:fee_excess23_r
+      [%with_label "Verify right transition"]
+        (verify_transition tock_vk tock_vk_precomp wrap_vk_hash_state
+           Prover_state.transition23 s2 s3
+           ~pending_coinbase_stack1:pending_coinbase2
+           ~pending_coinbase_stack2:pending_coinbase3 supply_increase23
+           ~fee_token_l:fee_token23_l ~fee_excess_l:fee_excess23_l
+           ~fee_token_r:fee_token23_r ~fee_excess_r:fee_excess23_r)
     in
     Boolean.Assert.all [verify_12; verify_23]
 
