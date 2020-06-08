@@ -697,12 +697,7 @@ let next_producer_timing t = t.next_producer_timing
 
 let staking_ledger t =
   let open Option.Let_syntax in
-  let consensus_constants =
-    Consensus.Constants.create
-      ~constraint_constants:t.config.constraint_constants
-      ~protocol_constants:
-        (Precomputed_values.protocol_constants t.config.precomputed_values)
-  in
+  let consensus_constants = t.config.precomputed_values.consensus_constants in
   let%map transition_frontier =
     Broadcast_pipe.Reader.peek t.components.transition_frontier
   in
@@ -757,18 +752,12 @@ let start t =
     ~frontier_reader:t.components.transition_frontier
     ~transition_writer:t.pipes.producer_transition_writer
     ~log_block_creation:t.config.log_block_creation
-    ~constraint_constants:t.config.constraint_constants
-    ~genesis_constants:
-      (Precomputed_values.genesis_constants t.config.precomputed_values) ;
+    ~precomputed_values:t.config.precomputed_values ;
   Snark_worker.start t
 
 let create (config : Config.t) =
-  let consensus_constants =
-    Consensus.Constants.create
-      ~constraint_constants:config.constraint_constants
-      ~protocol_constants:
-        (Precomputed_values.protocol_constants config.precomputed_values)
-  in
+  let constraint_constants = config.precomputed_values.constraint_constants in
+  let consensus_constants = config.precomputed_values.consensus_constants in
   let monitor = Option.value ~default:(Monitor.create ()) config.monitor in
   Async.Scheduler.within' ~monitor (fun () ->
       trace "coda" (fun () ->
@@ -784,8 +773,7 @@ let create (config : Config.t) =
               (fun () ->
                 trace "prover" (fun () ->
                     Prover.create ~logger:config.logger
-                      ~proof_level:config.proof_level
-                      ~constraint_constants:config.constraint_constants
+                      ~proof_level:config.proof_level ~constraint_constants
                       ~pids:config.pids ~conf_dir:config.conf_dir ) )
             >>| Result.ok_exn
           in
@@ -984,7 +972,9 @@ let create (config : Config.t) =
                                    ledger_hash)) ) )
               ~get_ancestry:
                 (handle_request "get_ancestry"
-                   ~f:(Sync_handler.Root.prove ~logger:config.logger))
+                   ~f:
+                     (Sync_handler.Root.prove ~consensus_constants
+                        ~logger:config.logger))
               ~get_best_tip:
                 (handle_request "get_best_tip" ~f:(fun ~frontier () ->
                      Best_tip_prover.prove ~logger:config.logger frontier ))
@@ -1016,7 +1006,7 @@ let create (config : Config.t) =
           in
           let transaction_pool =
             Network_pool.Transaction_pool.create ~config:txn_pool_config
-              ~logger:config.logger
+              ~constraint_constants ~logger:config.logger
               ~incoming_diffs:(Coda_networking.transaction_pool_diffs net)
               ~local_diffs:local_txns_reader
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
@@ -1109,7 +1099,6 @@ let create (config : Config.t) =
                                   .forget_validation_with_hash et ) ;
                          breadcrumb ))
                   ~most_recent_valid_block
-                  ~constraint_constants:config.constraint_constants
                   ~precomputed_values:config.precomputed_values )
           in
           let ( valid_transitions_for_network
@@ -1216,7 +1205,7 @@ let create (config : Config.t) =
           in
           let%bind snark_pool =
             Network_pool.Snark_pool.load ~config:snark_pool_config
-              ~logger:config.logger
+              ~constraint_constants ~logger:config.logger
               ~disk_location:config.snark_pool_disk_location
               ~incoming_diffs:(Coda_networking.snark_pool_diffs net)
               ~local_diffs:local_snark_work_reader
@@ -1255,7 +1244,8 @@ let create (config : Config.t) =
                 archive_process_port ) ;
           let subscriptions =
             Coda_subscriptions.create ~logger:config.logger
-              ~time_controller:config.time_controller ~new_blocks ~wallets
+              ~constraint_constants ~time_controller:config.time_controller
+              ~new_blocks ~wallets
               ~external_transition_database:config.external_transition_database
               ~transition_frontier:frontier_broadcast_pipe_r
               ~is_storing_all:config.is_archive_rocksdb

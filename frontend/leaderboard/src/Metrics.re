@@ -11,6 +11,7 @@ let printMap = map => {
   );
 };
 
+// Iterate through list of blocks and apply f on all fields in a block
 let calculateProperty = (f, blocks) => {
   blocks
   |> Array.fold_left((map, block) => {f(map, block)}, StringMap.empty);
@@ -135,6 +136,41 @@ let calculateTransactionsSentToAddress = (blocks, address) => {
   );
 };
 
+let filterBlocksByTimeWindow = (startTime, endTime, blocks) => {
+  let blocksList = Array.to_list(blocks);
+
+  let filteredBlocksList =
+    List.filter(
+      (block: Types.NewBlock.data) => {
+        endTime < block.protocolState.date
+        && block.protocolState.date > startTime
+      },
+      blocksList,
+    );
+  Array.of_list(filteredBlocksList);
+};
+
+let calculateCoinbaseReceiverChallenge = blocks => {
+  blocks
+  |> Array.fold_left(
+       (map, block: Types.NewBlock.data) => {
+         let creatorAccount = block.creatorAccount.publicKey;
+         switch (
+           Js.Nullable.toOption(block.transactions.coinbaseReceiverAccount)
+         ) {
+         | Some(account) =>
+           StringMap.update(
+             block.creatorAccount.publicKey,
+             _ => Some(account.publicKey !== creatorAccount),
+             map,
+           )
+         | None => map
+         };
+       },
+       StringMap.empty,
+     );
+};
+
 let throwAwayValues = metric => {
   StringMap.map(_ => {()}, metric);
 };
@@ -156,6 +192,7 @@ let calculateMetrics = blocks => {
   let highestSnarkFeeCollected = getHighestSnarkFeeCollected(blocks);
   let transactionsReceivedByEcho =
     calculateTransactionsSentToAddress(blocks, echoBotPublicKey);
+  let coinbaseReceiverChallenge = calculateCoinbaseReceiverChallenge(blocks);
 
   calculateAllUsers([
     throwAwayValues(blocksCreated),
@@ -164,6 +201,7 @@ let calculateMetrics = blocks => {
     throwAwayValues(snarkFeesCollected),
     throwAwayValues(highestSnarkFeeCollected),
     throwAwayValues(transactionsReceivedByEcho),
+    throwAwayValues(coinbaseReceiverChallenge),
   ])
   |> StringMap.mapi((key, _) =>
        {
@@ -175,6 +213,7 @@ let calculateMetrics = blocks => {
            StringMap.find_opt(key, highestSnarkFeeCollected),
          transactionsReceivedByEcho:
            StringMap.find_opt(key, transactionsReceivedByEcho),
+         coinbaseReceiver: StringMap.find_opt(key, coinbaseReceiverChallenge),
        }
      );
 };

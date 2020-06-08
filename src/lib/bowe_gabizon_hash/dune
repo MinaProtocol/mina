@@ -1,7 +1,7 @@
 (library
   (name bowe_gabizon_hash)
   (public_name bowe_gabizon_hash)
-  (preprocess (pps ppx_coda ppx_jane ppx_deriving.eq))
+  (preprocess (pps ppx_version ppx_jane ppx_deriving.eq))
   (inline_tests)
   (libraries
     core_kernel ))

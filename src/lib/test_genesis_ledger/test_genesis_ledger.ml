@@ -8,7 +8,7 @@ defined genesis_ledger]
 "genesis_ledger", genesis_ledger]
 
 include Genesis_ledger.Make (struct
-  include (val Genesis_ledger.fetch_ledger genesis_ledger)
+  include (val Genesis_ledger.fetch_ledger_exn genesis_ledger)
 
   let directory = `Ephemeral
 

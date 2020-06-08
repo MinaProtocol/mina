@@ -103,8 +103,8 @@ module Worker_state = struct
                    Tick.handle
                      (Keys.Step.main ~logger ~proof_level ~constraint_constants
                         x)
-                     (Consensus.Data.Prover_state.handler state_for_handler
-                        ~pending_coinbase)
+                     (Consensus.Data.Prover_state.handler ~constraint_constants
+                        state_for_handler ~pending_coinbase)
                  in
                  let res =
                    Or_error.try_with (fun () ->
@@ -155,8 +155,8 @@ module Worker_state = struct
                    Tick.handle
                      (Keys.Step.main ~logger ~proof_level ~constraint_constants
                         x)
-                     (Consensus.Data.Prover_state.handler state_for_handler
-                        ~pending_coinbase)
+                     (Consensus.Data.Prover_state.handler ~constraint_constants
+                        state_for_handler ~pending_coinbase)
                  in
                  let res =
                    Or_error.map

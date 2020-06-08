@@ -280,7 +280,7 @@ module Verification_keys = struct
         let known_good_hash =
           "\x1B\x95\x7B\x94\xF0\xC0\xD0\x74\x47\xFA\x69\x26\x31\xBC\x19\xA5\x2E\x09\xE8\x20\x43\xEB\x4C\xFA\xEB\x11\x6B\x9A\x2A\x9B\xA2\xBA"
         in
-        Module_version.Serialization.check_serialization
+        Ppx_version.Serialization.check_serialization
           (module V1)
           keys known_good_hash
     end
@@ -405,7 +405,9 @@ module Base = struct
         would need to pay the account creation fee if the user command were to
         succeed (irrespective or whether it actually will or not).
     *)
-    let compute_unchecked ~txn_global_slot ~(fee_payer_account : Account.t)
+    let compute_unchecked
+        ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+        ~txn_global_slot ~(fee_payer_account : Account.t)
         ~(receiver_account : Account.t) ~(source_account : Account.t)
         ({payload; signature= _; signer= _} : Transaction_union.t) =
       match payload.body.tag with
@@ -488,7 +490,7 @@ module Base = struct
               let fee_token_is_token = Token_id.equal fee_token token in
               let amount_insufficient_to_create, creation_fee =
                 let creation_amount =
-                  Amount.of_fee Coda_compile_config.account_creation_fee
+                  Amount.of_fee constraint_constants.account_creation_fee
                 in
                 if receiver_needs_creating then
                   if fee_token_is_token then
@@ -555,7 +557,7 @@ module Base = struct
                 ; source_insufficient_balance
                 ; source_bad_timing } ) )
 
-    let%snarkydef compute_as_prover ~txn_global_slot
+    let%snarkydef compute_as_prover ~constraint_constants ~txn_global_slot
         (txn : Transaction_union.var) =
       let%bind data =
         exists (Typ.Internal.ref ())
@@ -644,8 +646,8 @@ module Base = struct
               in
               let%map txn_global_slot = read Global_slot.typ txn_global_slot in
               let `Should_pay_to_create should_pay_to_create, t =
-                compute_unchecked ~txn_global_slot ~fee_payer_account
-                  ~source_account ~receiver_account txn
+                compute_unchecked ~constraint_constants ~txn_global_slot
+                  ~fee_payer_account ~source_account ~receiver_account txn
               in
               (should_pay_to_create, t))
       in
@@ -880,7 +882,7 @@ module Base = struct
        consistency.
     *)
     let%bind `Should_pay_to_create should_pay_to_create, user_command_failure =
-      User_command_failure.compute_as_prover
+      User_command_failure.compute_as_prover ~constraint_constants
         ~txn_global_slot:current_global_slot txn
     in
     let%bind () =
@@ -908,7 +910,7 @@ module Base = struct
     in
     let account_creation_amount =
       Amount.Checked.of_fee
-        Fee.(var_of_t Coda_compile_config.account_creation_fee)
+        Fee.(var_of_t constraint_constants.account_creation_fee)
     in
     let%bind root_after_fee_payer_update =
       [%with_label "Update fee payer"]
@@ -1011,7 +1013,7 @@ module Base = struct
                           (should_pay_for_receiver :> t))
                   in
                   let account_creation_fee =
-                    Coda_compile_config.account_creation_fee |> Fee.to_bits
+                    constraint_constants.account_creation_fee |> Fee.to_bits
                     |> Bignum_bigint.of_bits_lsb
                     |> Snarky_integer.Integer.constant ~m
                   in
@@ -1066,6 +1068,7 @@ module Base = struct
              { Account.Poly.balance
              ; public_key
              ; token_id
+             ; token_owner= account.token_owner
              ; nonce= next_nonce
              ; receipt_chain_hash
              ; delegate
@@ -1178,6 +1181,7 @@ module Base = struct
              { Account.Poly.balance
              ; public_key
              ; token_id
+             ; token_owner= account.token_owner
              ; nonce= account.nonce
              ; receipt_chain_hash= account.receipt_chain_hash
              ; delegate
@@ -1274,6 +1278,7 @@ module Base = struct
              { Account.Poly.balance
              ; public_key= account.public_key
              ; token_id= account.token_id
+             ; token_owner= account.token_owner
              ; nonce= account.nonce
              ; receipt_chain_hash= account.receipt_chain_hash
              ; delegate
@@ -1692,7 +1697,7 @@ module Verification = struct
   module Keys = Verification_keys
 
   module type S = sig
-    val verify : t -> message:Sok_message.t -> bool
+    val verify : (t * Sok_message.t) list -> bool
 
     val verify_against_digest : t -> bool
 
@@ -1747,9 +1752,11 @@ module Verification = struct
       in
       Tock.verify proof keys.wrap wrap_input (Wrap_input.of_tick_field input)
 
-    let verify t ~message =
+    let verify_one t ~message =
       Sok_message.Digest.equal t.sok_digest (Sok_message.digest message)
       && verify_against_digest t
+
+    let verify = List.for_all ~f:(fun (t, m) -> verify_one t ~message:m)
 
     (* spec for [verify_merge s1 s2 _]:
       Returns a boolean which is true if there exists a tock proof proving
@@ -2343,6 +2350,15 @@ end
 
 let%test_module "transaction_snark" =
   ( module struct
+    let constraint_constants =
+      Genesis_constants.Constraint_constants.for_unit_tests
+
+    let genesis_constants = Genesis_constants.for_unit_tests
+
+    let consensus_constants =
+      Consensus.Constants.create ~constraint_constants
+        ~protocol_constants:genesis_constants.protocol
+
     (* For tests let's just monkey patch ledger and sparse ledger to freeze their
      * ledger_hashes. The nominal type is just so we don't mix this up in our
      * real code. *)
@@ -2353,7 +2369,8 @@ let%test_module "transaction_snark" =
 
       let merkle_root_after_user_command_exn t ~txn_global_slot txn =
         Frozen_ledger_hash.of_ledger_hash
-        @@ merkle_root_after_user_command_exn t ~txn_global_slot txn
+        @@ merkle_root_after_user_command_exn ~constraint_constants
+             ~txn_global_slot t txn
     end
 
     module Sparse_ledger = struct
@@ -2363,9 +2380,6 @@ let%test_module "transaction_snark" =
     end
 
     type wallet = {private_key: Private_key.t; account: Account.t}
-
-    let constraint_constants =
-      Genesis_constants.Constraint_constants.for_unit_tests
 
     let ledger_depth = constraint_constants.ledger_depth
 
@@ -2424,7 +2438,7 @@ let%test_module "transaction_snark" =
     let state_body =
       let open Lazy.Let_syntax in
       let%map compile_time_genesis =
-        Coda_state.Genesis_protocol_state.compile_time_genesis
+        Coda_state.Genesis_protocol_state.For_tests.genesis_state
       in
       compile_time_genesis.data |> Coda_state.Protocol_state.body
 
@@ -2498,7 +2512,7 @@ let%test_module "transaction_snark" =
           ~fee_transfer:
             (Some
                (Coinbase.Fee_transfer.create ~receiver_pk:other
-                  ~fee:Coda_compile_config.account_creation_fee))
+                  ~fee:constraint_constants.account_creation_fee))
         |> Or_error.ok_exn
       in
       let transaction = Transaction.Coinbase cb in
@@ -2532,7 +2546,8 @@ let%test_module "transaction_snark" =
             ~target:
               Sparse_ledger.(
                 merkle_root
-                  (apply_transaction_exn sparse_ledger txn_in_block.transaction))
+                  (apply_transaction_exn ~constraint_constants sparse_ledger
+                     txn_in_block.transaction))
             ~pending_coinbase_stack_state:
               { source= source_stack
               ; target= pending_coinbase_stack_target
@@ -2602,7 +2617,7 @@ let%test_module "transaction_snark" =
                 {transaction= t1; block_data= Lazy.force state_body}
                 (unstage @@ Sparse_ledger.handler sparse_ledger) ) )
 
-    let account_fee = Fee.to_int Coda_compile_config.account_creation_fee
+    let account_fee = Fee.to_int constraint_constants.account_creation_fee
 
     let test_transaction ~constraint_constants ?txn_global_slot ledger txn =
       let source = Ledger.merkle_root ledger in
@@ -2672,7 +2687,9 @@ let%test_module "transaction_snark" =
         Sparse_ledger.of_ledger_subset_exn ledger mentioned_keys
       in
       let _undo =
-        Or_error.ok_exn @@ Ledger.apply_transaction ledger ~txn_global_slot txn
+        Or_error.ok_exn
+        @@ Ledger.apply_transaction ledger ~constraint_constants
+             ~txn_global_slot txn
       in
       let target = Ledger.merkle_root ledger in
       let sok_message = Sok_message.create ~fee:Fee.zero ~prover:signer in
@@ -2775,7 +2792,7 @@ let%test_module "transaction_snark" =
           let other = wallets.(1) in
           let dummy_account = wallets.(2) in
           let reward = 10_000_000_000 in
-          let fee = Fee.to_int Coda_compile_config.account_creation_fee in
+          let fee = Fee.to_int constraint_constants.account_creation_fee in
           let coinbase_count = 3 in
           let ft_count = 2 in
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
@@ -2784,7 +2801,7 @@ let%test_module "transaction_snark" =
                   List.map (List.init ft_count ~f:Fn.id) ~f:(fun _ ->
                       Coinbase.Fee_transfer.create
                         ~receiver_pk:other.account.public_key
-                        ~fee:Coda_compile_config.account_creation_fee )
+                        ~fee:constraint_constants.account_creation_fee )
                 in
                 List.fold ~init:(fts, []) (List.init coinbase_count ~f:Fn.id)
                   ~f:(fun (fts, cbs) _ ->
@@ -2880,7 +2897,8 @@ let%test_module "transaction_snark" =
                   (unstage @@ Sparse_ledger.handler sparse_ledger)
               in
               let sparse_ledger =
-                Sparse_ledger.apply_user_command_exn sparse_ledger
+                Sparse_ledger.apply_user_command_exn ~constraint_constants
+                  sparse_ledger
                   (t1 :> User_command.t)
               in
               let current_global_slot =
@@ -2913,7 +2931,7 @@ let%test_module "transaction_snark" =
                   ; init_stack }
                 , state_body2 )
               in
-              Ledger.apply_user_command ledger
+              Ledger.apply_user_command ~constraint_constants ledger
                 ~txn_global_slot:current_global_slot t1
               |> Or_error.ok_exn |> ignore ;
               [%test_eq: Frozen_ledger_hash.t]
@@ -2925,7 +2943,8 @@ let%test_module "transaction_snark" =
                   (unstage @@ Sparse_ledger.handler sparse_ledger)
               in
               let sparse_ledger =
-                Sparse_ledger.apply_user_command_exn sparse_ledger
+                Sparse_ledger.apply_user_command_exn ~constraint_constants
+                  sparse_ledger
                   (t2 :> User_command.t)
               in
               let pending_coinbase_stack_state_merge =
@@ -2938,7 +2957,7 @@ let%test_module "transaction_snark" =
                 Coda_state.Protocol_state.Body.consensus_state state_body2
                 |> Consensus.Data.Consensus_state.curr_slot
               in
-              Ledger.apply_user_command ledger
+              Ledger.apply_user_command ledger ~constraint_constants
                 ~txn_global_slot:current_global_slot t2
               |> Or_error.ok_exn |> ignore ;
               [%test_eq: Frozen_ledger_hash.t]
@@ -2992,10 +3011,8 @@ let%test_module "transaction_snark" =
       let state_hash_and_body1 =
         let state_body0 =
           Coda_state.Protocol_state.negative_one
-            ~genesis_ledger:Test_genesis_ledger.t
-            ~protocol_constants:Genesis_constants.compiled.protocol
-            ~constraint_constants:
-              Genesis_constants.Constraint_constants.compiled
+            ~genesis_ledger:Test_genesis_ledger.t ~constraint_constants
+            ~consensus_constants
           |> Coda_state.Protocol_state.body
         in
         let state_body_hash0 =
@@ -3017,10 +3034,8 @@ let%test_module "transaction_snark" =
       let state_hash_and_body1 =
         let state_body0 =
           Coda_state.Protocol_state.negative_one
-            ~genesis_ledger:Test_genesis_ledger.t
-            ~protocol_constants:Genesis_constants.compiled.protocol
-            ~constraint_constants:
-              Genesis_constants.Constraint_constants.compiled
+            ~genesis_ledger:Test_genesis_ledger.t ~constraint_constants
+            ~consensus_constants
           |> Coda_state.Protocol_state.body
         in
         let state_body_hash0 =
@@ -3113,7 +3128,7 @@ let%test_module "transaction_snark" =
               let sub_fee fee = sub_amount (Amount.of_fee fee) in
               let expected_fee_payer_balance =
                 accounts.(0).balance |> sub_fee fee
-                |> sub_fee Coda_compile_config.account_creation_fee
+                |> sub_fee constraint_constants.account_creation_fee
               in
               assert (
                 Balance.equal fee_payer_account.balance

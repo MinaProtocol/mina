@@ -1,13 +1,12 @@
 module StringMap = Map.Make(String);
 
 let addPointsToUsersWithAtleastN =
-    (getMetricValue, threshold, pointsToReward, metricsMap) => {
+    (getMetricValue, threshold, points, metricsMap) => {
   StringMap.fold(
     (key, metric, map) => {
       switch (getMetricValue(metric)) {
       | Some(metricValue) =>
-        metricValue >= threshold
-          ? StringMap.add(key, pointsToReward, map) : map
+        metricValue >= threshold ? StringMap.add(key, points, map) : map
       | None => map
       }
     },
@@ -16,147 +15,171 @@ let addPointsToUsersWithAtleastN =
   );
 };
 
-let max = (a, b) => {
-  a > b ? a : b;
-};
-
-let getHighestSnarkFeeCollected = blocks => {
-  Array.fold_left(
-    (map, block: Types.NewBlock.data) => {
-      Array.fold_left(
-        (map, snarkJob: Types.NewBlock.snarkJobs) => {
-          StringMap.update(
-            snarkJob.prover,
-            feeCount =>
-              switch (feeCount) {
-              | Some(feeCount) => Some(max(feeCount, snarkJob.fee))
-              | None => Some(snarkJob.fee)
-              },
-            map,
-          )
-        },
-        map,
-        block.snarkJobs,
-      )
-    },
-    StringMap.empty,
-    blocks,
-  );
-};
-
-let calculateTransactionsSentToAddress = (blocks, address) => {
-  Array.fold_left(
-    (map, block: Types.NewBlock.data) => {
-      block.transactions.userCommands
-      |> Array.fold_left(
-           (map, userCommand: Types.NewBlock.userCommands) => {
-             userCommand.toAccount.publicKey === address
-               ? incrementMapValue(userCommand.fromAccount.publicKey, map)
-               : map
-           },
-           map,
-         )
-    },
-    StringMap.empty,
-    blocks,
-  );
-};
-
-// Calculate users and metrics
-let calculateAllUsers = metrics => {
-  List.fold_left(
-    StringMap.merge((_, _, _) => {Some()}),
-    StringMap.empty,
-    metrics,
-  );
-};
-
-let echoBotPublicKey = "4vsRCVNep7JaFhtySu6vZCjnArvoAhkRscTy5TQsGTsKM4tJcYVc3uNUMRxQZAwVzSvkHDGWBmvhFpmCeiPASGnByXqvKzmHt4aR5uAWAQf3kqhwDJ2ZY3Hw4Dzo6awnJkxY338GEp12LE4x";
-
-let metricsMap = blocks => {
-  let blocksCreated = blocks |> getBlocksCreatedByUser;
-  let transactionSent = blocks |> getTransactionSentByUser;
-  let snarkWorkCreated = blocks |> getSnarkWorkCreatedByUser;
-  let users = calculateAllUsers([blocksCreated, transactionSent]);
-  let snarkFeesCollected = blocks |> getSnarkFeesCollected;
-  let highestSnarkFeeCollected = blocks |> getHighestSnarkFeeCollected;
-  let transactionsReceivedByEcho =
-    calculateTransactionsSentToAddress(blocks, echoBotPublicKey);
-  StringMap.mapi(
-    (key, _) =>
-      {
-        Types.Metrics.blocksCreated: StringMap.find_opt(key, blocksCreated),
-        transactionSent: StringMap.find_opt(key, transactionSent),
-        snarkWorkCreated: StringMap.find_opt(key, snarkWorkCreated),
-        snarkFeesCollected: StringMap.find_opt(key, snarkFeesCollected),
-        highestSnarkFeeCollected:
-          StringMap.find_opt(key, highestSnarkFeeCollected),
-        transactionsReceivedByEcho:
-          StringMap.find_opt(key, transactionsReceivedByEcho),
-      },
-    users,
-  );
-};
-
-// Awards x points for top N
-let applyTopNPoints = (n, pointsToGive, metricsMap, getMetricValue) => {
+let applyTopNPoints = (threshholdPointsList, metricsMap, getMetricValue) => {
   let metricsArray = Array.of_list(StringMap.bindings(metricsMap));
   let f = ((_, metricValue1), (_, metricValue2)) => {
     compare(getMetricValue(metricValue1), getMetricValue(metricValue2));
   };
+
   Array.sort(f, metricsArray);
-  let topNArray =
-    Array.sub(metricsArray, 0, min(n, Array.length(metricsArray)));
+  Belt.Array.reverseInPlace(metricsArray);
+
+  let counter = ref(0);
   let topNArrayWithPoints =
-    Array.map(((user, _)) => {(user, pointsToGive)}, topNArray);
+    metricsArray
+    |> Array.mapi((i, (username, _)) =>
+         if (counter^ >= Array.length(threshholdPointsList)) {
+           (username, 0);
+         } else {
+           let (place, points) = threshholdPointsList[counter^];
+           if (place == i) {
+             counter := counter^ + 1;
+             (username, points);
+           } else {
+             (username, points);
+           };
+         }
+       );
 
-  Array.fold_left(
-    (map, (userPublicKey, userPoints)) => {
-      StringMap.add(userPublicKey, userPoints, map)
-    },
-    StringMap.empty,
-    topNArrayWithPoints,
+  Belt.Array.keep(topNArrayWithPoints, ((_, points)) => {points !== 0})
+  |> Array.fold_left(
+       (map, (userPublicKey, userPoints)) => {
+         StringMap.add(userPublicKey, userPoints, map)
+       },
+       StringMap.empty,
+     );
+};
+
+// Combines a list of maps of users to points and returns one map of users to points
+let sumPointsMaps = maps => {
+  maps
+  |> List.fold_left(
+       StringMap.merge((_, value, secondValue) => {
+         switch (value, secondValue) {
+         | (Some(value), Some(secondValue)) => Some(value + secondValue)
+         | (Some(value), None)
+         | (None, Some(value)) => Some(value)
+         | (None, None) => None
+         }
+       }),
+       StringMap.empty,
+     );
+};
+
+let calcEchoServiceChallenge = metricsMap => {
+  addPointsToUsersWithAtleastN(
+    (metricRecord: Types.Metrics.metricRecord) =>
+      metricRecord.transactionsReceivedByEcho,
+    1,
+    500,
+    metricsMap,
   );
-  
-let calculatePoints = metricsMap => {
-  // Get 500 pts if you send txn to the echo service
-  let echoTransactionPoints =
+};
+
+let bonusBlocksChallenge = metricsMap => {
+  applyTopNPoints(
+    [|
+      (0, 5500), // 1st place: 5500 pts
+      (1, 4000), // 2nd place: 4000 pts
+      (2, 3000), // 3rd place: 3000 pts
+      (11, 2000), // Top 10: 2000 pts.
+      (26, 1500), // Top 25: 1500 pts
+      (101, 1000) // Top 100: 1000 pts
+    |],
+    metricsMap,
+    (metricRecord: Types.Metrics.metricRecord) =>
+    metricRecord.blocksCreated
+  );
+};
+
+let blocksChallenge = metricsMap => {
+  [
+    // Produce 1 block and get them accepted in the main chain for 1000 pts
     addPointsToUsersWithAtleastN(
       (metricRecord: Types.Metrics.metricRecord) =>
-        metricRecord.transactionsReceivedByEcho,
+        metricRecord.blocksCreated,
       1,
-      500,
-      metricsMap,
-    );
-
-  //Earn 3 fees by producing and selling zk-SNARKs on the snarketplace: 1000 pts*
-  let zkSnark3FeesPoints =
-    addPointsToUsersWithAtleastN(
-      (metricRecord: Types.Metrics.metricRecord) =>
-        metricRecord.snarkFeesCollected,
-      3L,
       1000,
       metricsMap,
-    );
-
-  //Anyone who earned 50 fees will be rewarded with an additional 1000 pts
-  let zkSnark50FeesPoints =
-    addPointsToUsersWithAtleastN(
-      (metricRecord: Types.Metrics.metricRecord) =>
-        metricRecord.snarkFeesCollected,
-      50L,
-      1000,
-      metricsMap,
-    );
-
-  // Producing at least 3 blocks will earn an additional 1000 pts
-  let blocksCreatedPoints =
+    ),
+    // Anyone who produces at least 3 blocks will earn an additional 1000 pts.
     addPointsToUsersWithAtleastN(
       (metricRecord: Types.Metrics.metricRecord) =>
         metricRecord.blocksCreated,
       3,
       1000,
       metricsMap,
-    );
-  ();
+    ),
+    bonusBlocksChallenge(metricsMap),
+  ]
+  |> sumPointsMaps;
+};
+
+let bonusZkSnarkChallenge = metricsMap => {
+  [
+    applyTopNPoints(
+      [|
+        (0, 5500), // 1st place: 5500 pts
+        (1, 4000), // 2nd place: 4000 pts
+        (2, 3000), // 3rd place: 3000 pts
+        (11, 2000), // Top 10: 2000 pts.
+        (26, 1500), // Top 25: 1500 pts
+        (101, 1000) // Top 100: 1000 pts
+      |],
+      metricsMap,
+      (metricRecord: Types.Metrics.metricRecord) =>
+      metricRecord.snarkFeesCollected
+    ),
+    //The user who sold the most expensive SNARK will receive a bonus of 500 pts
+    applyTopNPoints(
+      [|(0, 500)|], metricsMap, (metricRecord: Types.Metrics.metricRecord) =>
+      metricRecord.highestSnarkFeeCollected
+    ),
+  ]
+  |> sumPointsMaps;
+};
+
+let zkSnarksChallenge = metricsMap => {
+  [
+    // Earn 3 fees by producing and selling zk-SNARKs on the snarketplace: 1000 pts
+    addPointsToUsersWithAtleastN(
+      (metricRecord: Types.Metrics.metricRecord) =>
+        metricRecord.snarkFeesCollected,
+      3L,
+      1000,
+      metricsMap,
+    ),
+    // Anyone who earned 50 fees will be rewarded with an additional 1000 pts.
+    addPointsToUsersWithAtleastN(
+      (metricRecord: Types.Metrics.metricRecord) =>
+        metricRecord.snarkFeesCollected,
+      50L,
+      1000,
+      metricsMap,
+    ),
+    bonusZkSnarkChallenge(metricsMap),
+  ]
+  |> sumPointsMaps;
+};
+
+let calculatePoints = (challengeID, metricsMap) => {
+  // Regex grabs last string after a "Challenge #"
+  switch (
+    Js.String.match(
+      [%re "/\s*([a-zA-z\s-*]+)\s*(?!.*\s*([a-zA-z\s-*]+)\s*)/"],
+      challengeID,
+    )
+  ) {
+  | Some(res) =>
+    switch (res[1]) {
+    | "Stake your Coda and produce blocks" =>
+      Some(blocksChallenge(metricsMap))
+    | "Create and sell zk-SNARKs on Coda" =>
+      Some(zkSnarksChallenge(metricsMap))
+    | "Connect to testnet and send coda to another testnet user" =>
+      Some(calcEchoServiceChallenge(metricsMap))
+    | _ => None
+    }
+  | None => None
+  };
 };

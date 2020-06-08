@@ -5,6 +5,6 @@
  (library_flags -linkall)
  (libraries async async_extra coda_digestif core lens non_empty_list pipe_lib sgn state_or_error)
  (preprocess
-   ; lens.ppx_deriving omitted because of interaction with `versioned_module` in ppx_coda *)
-   (pps ppx_jane ppx_coda ppx_deriving.eq bisect_ppx -- -conditional))
+   ; lens.ppx_deriving omitted because of interaction with `versioned_module` in ppx_version *)
+   (pps ppx_jane ppx_coda ppx_version ppx_deriving.eq bisect_ppx -- -conditional))
  (synopsis "Parallel scan over an infinite stream (incremental map-reduce)"))

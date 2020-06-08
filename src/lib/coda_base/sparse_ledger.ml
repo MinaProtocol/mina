@@ -132,14 +132,16 @@ let get_or_initialize_exn account_id t idx =
       ; token_id= Account_id.token_id account_id } )
   else (`Existed, account)
 
-let sub_account_creation_fee action (amount : Currency.Amount.t) =
+let sub_account_creation_fee
+    ~(constraint_constants : Genesis_constants.Constraint_constants.t) action
+    (amount : Currency.Amount.t) =
   if action = `Added then
     Option.value_exn
       Currency.Amount.(
-        sub amount (of_fee Coda_compile_config.account_creation_fee))
+        sub amount (of_fee constraint_constants.account_creation_fee))
   else amount
 
-let apply_user_command_exn t
+let apply_user_command_exn ~constraint_constants t
     ({signer; payload; signature= _} as user_command : User_command.t) =
   let open Currency in
   let signer_pk = Public_key.compress signer in
@@ -204,7 +206,15 @@ let apply_user_command_exn t
         assert (
           not Public_key.Compressed.(equal empty source_account.public_key) ) ;
         let source_account =
-          {source_account with delegate= Account_id.public_key receiver}
+          (* Timing is always valid, but we need to record any switch from
+             timed to untimed here to stay in sync with the snark.
+          *)
+          let timing =
+            Or_error.ok_exn
+            @@ Transaction_logic.validate_timing ~txn_amount:Amount.zero
+                 ~txn_global_slot:current_global_slot ~account:source_account
+          in
+          {source_account with delegate= Account_id.public_key receiver; timing}
         in
         [(source_idx, source_account)]
     | Payment {amount; token_id= token; _} ->
@@ -214,10 +224,11 @@ let apply_user_command_exn t
         in
         let receiver_amount, creation_fee =
           if Token_id.equal fee_token token then
-            (sub_account_creation_fee action amount, Amount.zero)
+            ( sub_account_creation_fee ~constraint_constants action amount
+            , Amount.zero )
           else if action = `Added then
             let account_creation_fee =
-              Amount.of_fee Coda_compile_config.account_creation_fee
+              Amount.of_fee constraint_constants.account_creation_fee
             in
             (amount, account_creation_fee)
           else (amount, Amount.zero)
@@ -283,7 +294,7 @@ let apply_user_command_exn t
       (* Not able to apply the user command successfully, charge fee only. *)
       t
 
-let apply_fee_transfer_exn =
+let apply_fee_transfer_exn ~constraint_constants =
   let apply_single t ((pk, fee) : Fee_transfer.Single.t) =
     let account_id = Account_id.create pk Token_id.default in
     let index = find_index_exn t account_id in
@@ -291,21 +302,25 @@ let apply_fee_transfer_exn =
     let open Currency in
     let amount = Amount.of_fee fee in
     let balance =
-      let amount' = sub_account_creation_fee action amount in
+      let amount' =
+        sub_account_creation_fee ~constraint_constants action amount
+      in
       Option.value_exn (Balance.add_amount account.balance amount')
     in
     set_exn t index {account with balance}
   in
   fun t transfer -> One_or_two.fold transfer ~f:apply_single ~init:t
 
-let apply_coinbase_exn t
+let apply_coinbase_exn ~constraint_constants t
     ({receiver; fee_transfer; amount= coinbase_amount} : Coinbase.t) =
   let open Currency in
   let add_to_balance t pk amount =
     let idx = find_index_exn t pk in
     let action, a = get_or_initialize_exn pk t idx in
     let balance =
-      let amount' = sub_account_creation_fee action amount in
+      let amount' =
+        sub_account_creation_fee ~constraint_constants action amount
+      in
       Option.value_exn (Balance.add_amount a.balance amount')
     in
     set_exn t idx {a with balance}
@@ -326,14 +341,15 @@ let apply_coinbase_exn t
   let receiver_id = Account_id.create receiver Token_id.default in
   add_to_balance t receiver_id receiver_reward
 
-let apply_transaction_exn t (transition : Transaction.t) =
+let apply_transaction_exn ~constraint_constants t (transition : Transaction.t)
+    =
   match transition with
   | Fee_transfer tr ->
-      apply_fee_transfer_exn t tr
+      apply_fee_transfer_exn ~constraint_constants t tr
   | User_command cmd ->
-      apply_user_command_exn t (cmd :> User_command.t)
+      apply_user_command_exn ~constraint_constants t (cmd :> User_command.t)
   | Coinbase c ->
-      apply_coinbase_exn t c
+      apply_coinbase_exn ~constraint_constants t c
 
 let merkle_root t = Ledger_hash.of_hash (merkle_root t :> Pedersen.Digest.t)
 

@@ -663,7 +663,9 @@ type t =
 [@@deriving fields]
 
 let offline_time =
-  Block_time.Span.of_ms @@ Int64.of_int Coda_compile_config.inactivity_ms
+  (* This is a bit of a hack, see #3232. *)
+  let inactivity_ms = Coda_compile_config.block_window_duration_ms * 8 in
+  Block_time.Span.of_ms @@ Int64.of_int inactivity_ms
 
 let setup_timer time_controller sync_state_broadcaster =
   Block_time.Timeout.create time_controller offline_time ~f:(fun _ ->

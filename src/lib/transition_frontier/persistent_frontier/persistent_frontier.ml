@@ -8,8 +8,9 @@ module Database = Database
 
 exception Invalid_genesis_state_hash of External_transition.Validated.t
 
-let construct_staged_ledger_at_root ~root_ledger ~root_transition ~root
-    ~protocol_states ~logger =
+let construct_staged_ledger_at_root
+    ~(precomputed_values : Precomputed_values.t) ~root_ledger ~root_transition
+    ~root ~protocol_states ~logger =
   let open Deferred.Or_error.Let_syntax in
   let open Root_data.Minimal in
   let snarked_ledger_hash =
@@ -53,7 +54,9 @@ let construct_staged_ledger_at_root ~root_ledger ~root_transition ~root
            let open Or_error.Let_syntax in
            let%bind () = acc in
            let%map _ =
-             Ledger.apply_transaction mask
+             Ledger.apply_transaction
+               ~constraint_constants:precomputed_values.constraint_constants
+               mask
                ~txn_global_slot:
                  ( Protocol_state.consensus_state protocol_state
                  |> Consensus.Data.Consensus_state.curr_global_slot )
@@ -62,7 +65,9 @@ let construct_staged_ledger_at_root ~root_ledger ~root_transition ~root
            () ))
   in
   Staged_ledger.of_scan_state_and_ledger_unchecked ~snarked_ledger_hash
-    ~ledger:mask ~scan_state ~pending_coinbase_collection:pending_coinbase
+    ~ledger:mask ~scan_state
+    ~constraint_constants:precomputed_values.constraint_constants
+    ~pending_coinbase_collection:pending_coinbase
 
 module rec Instance_type : sig
   type t =
@@ -179,7 +184,7 @@ module Instance = struct
       Error `Bootstrap_required )
 
   let load_full_frontier t ~root_ledger ~consensus_local_state ~max_length
-      ~ignore_consensus_local_state ~constraint_constants ~genesis_constants =
+      ~ignore_consensus_local_state ~precomputed_values =
     let open Deferred.Result.Let_syntax in
     let downgrade_transition transition genesis_state_hash :
         ( External_transition.Almost_validated.t
@@ -233,8 +238,8 @@ module Instance = struct
     let%bind root_staged_ledger =
       let open Deferred.Let_syntax in
       match%map
-        construct_staged_ledger_at_root ~root_ledger ~root_transition ~root
-          ~protocol_states ~logger:t.factory.logger
+        construct_staged_ledger_at_root ~precomputed_values ~root_ledger
+          ~root_transition ~root ~protocol_states ~logger:t.factory.logger
       with
       | Error err ->
           Error (`Failure (Error.to_string_hum err))
@@ -252,8 +257,7 @@ module Instance = struct
               List.map protocol_states ~f:(fun s -> (Protocol_state.hash s, s))
           }
         ~root_ledger:(Ledger.Any_ledger.cast (module Ledger.Db) root_ledger)
-        ~consensus_local_state ~max_length ~constraint_constants
-        ~genesis_constants
+        ~consensus_local_state ~max_length ~precomputed_values
     in
     let%bind extensions =
       Deferred.map
@@ -283,8 +287,9 @@ module Instance = struct
                    |> Deferred.return
              in
              let%bind breadcrumb =
-               Breadcrumb.build ~logger:t.factory.logger
-                 ~verifier:t.factory.verifier
+               Breadcrumb.build
+                 ~constraint_constants:precomputed_values.constraint_constants
+                 ~logger:t.factory.logger ~verifier:t.factory.verifier
                  ~trust_system:(Trust_system.null ()) ~parent ~transition
                  ~sender:None
              in
