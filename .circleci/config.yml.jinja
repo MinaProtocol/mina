@@ -210,6 +210,15 @@ jobs:
                   name: Update branch protection rule from test configuration
                   command: ./scripts/test.py required-status >required_status && cat required_status && ./scripts/update_branch_rule.py required_status
 
+    run-leaderboard:
+      docker:
+          - image: node
+      steps:
+          - checkout
+          - run:
+              name: Update the Leaderboard
+              command: yarn & yarn build & yarn start
+
     build-macos:
         macos:
             xcode: "10.2.1"
@@ -614,6 +623,17 @@ workflows:
             {%- for profile in small_curves_tests.keys() | sort %}
             - test--{{profile}}
             {%- endfor %}
+
+    leaderboard:
+        triggers:
+          - schedule:
+              cron: "0 1 * * *"
+              filters:
+                branches:
+                  only:
+                    - develop
+          jobs:
+            - run-leaderboard
 
     daily:
         triggers:
