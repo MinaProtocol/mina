@@ -9,6 +9,9 @@ brew update-reset
 NEEDED_PACKAGES=" bash boost cmake gmp gpatch jemalloc libffi libomp libsodium opam openssl@1.1 pkg-config zlib libpq postgresql"
 echo "Needed:  ${NEEDED_PACKAGES}"
 
+# force upgrade libffi so we can set it to 7
+brew upgrade libffi
+
 echo "Todo:    ${NEEDED_PACKAGES}"
 
 # Remove old python (uses force to always return true)
