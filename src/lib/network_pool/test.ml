@@ -11,6 +11,9 @@ let%test_module "network pool test" =
 
     let proof_level = Genesis_constants.Proof_level.Check
 
+    let constraint_constants =
+      Genesis_constants.Constraint_constants.for_unit_tests
+
     module Mock_snark_pool = Snark_pool.Make (Mocks.Transition_frontier)
 
     let config verifier =
@@ -45,8 +48,8 @@ let%test_module "network pool test" =
           in
           let config = config verifier in
           let network_pool =
-            Mock_snark_pool.create ~config ~logger ~incoming_diffs:pool_reader
-              ~local_diffs:local_reader
+            Mock_snark_pool.create ~config ~logger ~constraint_constants
+              ~incoming_diffs:pool_reader ~local_diffs:local_reader
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
           in
           let command =
@@ -114,8 +117,8 @@ let%test_module "network pool test" =
         in
         let config = config verifier in
         let network_pool =
-          Mock_snark_pool.create ~config ~logger ~incoming_diffs:pool_reader
-            ~local_diffs:local_reader
+          Mock_snark_pool.create ~config ~logger ~constraint_constants
+            ~incoming_diffs:pool_reader ~local_diffs:local_reader
             ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
         in
         don't_wait_for

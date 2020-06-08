@@ -172,7 +172,7 @@ module T0 = struct
       let known_good_hash =
         "\x6D\xB1\xAB\x5F\x4C\xA2\x8F\xBA\xF5\x31\x2D\xE9\xEB\x07\xD1\x78\x1F\x20\xD5\x22\xA6\x9F\x5E\x0B\x77\xE0\x00\x07\x78\x85\x90\x8B"
       in
-      Module_version.Serialization.check_serialization
+      Ppx_version.Serialization.check_serialization
         (module Stable.V1)
         field known_good_hash
 
@@ -183,7 +183,7 @@ module T0 = struct
       let known_good_hash =
         "\x68\xDA\x30\x2C\xD0\xE5\x71\x3C\xAB\x42\x02\x8B\x31\xC1\x2E\x93\xE3\xC0\x99\x6B\xF6\xAA\xE2\x11\xF4\x2F\x88\x97\x3C\xC2\xA2\xF0"
       in
-      Module_version.Serialization.check_serialization
+      Ppx_version.Serialization.check_serialization
         (module Stable.V1)
         field known_good_hash
 

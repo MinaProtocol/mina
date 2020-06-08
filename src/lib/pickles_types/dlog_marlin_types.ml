@@ -1,4 +1,3 @@
-open Tuple_lib
 open Core_kernel
 
 module Evals = struct
@@ -19,11 +18,25 @@ module Evals = struct
         ; g_1: 'a
         ; g_2: 'a
         ; g_3: 'a }
-      [@@deriving fields, bin_io, version, sexp, compare, yojson]
+      [@@deriving fields, sexp, compare, yojson]
     end
   end]
 
-  include Stable.Latest
+  type 'a t = 'a Stable.Latest.t =
+    { w_hat: 'a
+    ; z_hat_a: 'a
+    ; z_hat_b: 'a
+    ; h_1: 'a
+    ; h_2: 'a
+    ; h_3: 'a
+    ; row: 'a Abc.t
+    ; col: 'a Abc.t
+    ; value: 'a Abc.t
+    ; rc: 'a Abc.t
+    ; g_1: 'a
+    ; g_2: 'a
+    ; g_3: 'a }
+  [@@deriving fields, sexp, compare, yojson]
 
   let map (type a b)
       ({ w_hat
@@ -157,11 +170,14 @@ module Openings = struct
       module V1 = struct
         type ('g, 'fq) t =
           {lr: ('g * 'g) array; z_1: 'fq; z_2: 'fq; delta: 'g; sg: 'g}
-        [@@deriving bin_io, version, sexp, compare, yojson]
+        [@@deriving sexp, compare, yojson]
       end
     end]
 
-    include Stable.Latest
+    type ('fq, 'g) t = ('fq, 'g) Stable.Latest.t =
+      {lr: ('g * 'g) array; z_1: 'fq; z_2: 'fq; delta: 'g; sg: 'g}
+    [@@deriving sexp, compare, yojson]
+
     open Snarky.H_list
 
     let to_hlist {lr; z_1; z_2; delta; sg} = [lr; z_1; z_2; delta; sg]
@@ -177,8 +193,6 @@ module Openings = struct
         ~value_of_hlist:of_hlist
   end
 
-  open Evals
-
   [%%versioned
   module Stable = struct
     module V1 = struct
@@ -192,7 +206,10 @@ module Openings = struct
     end
   end]
 
-  include Stable.Latest
+  type ('fq, 'g) t =
+    { proof: ('fq, 'g) Bulletproof.t
+    ; evals: 'fq Evals.t * 'fq Evals.t * 'fq Evals.t }
+  [@@deriving sexp, compare, yojson]
 
   let to_hlist {proof; evals} = Snarky.H_list.[proof; evals]
 

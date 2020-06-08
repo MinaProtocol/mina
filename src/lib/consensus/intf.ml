@@ -265,7 +265,9 @@ module type State_hooks = sig
 
   module For_tests : sig
     val gen_consensus_state :
-         gen_slot_advancement:int Quickcheck.Generator.t
+         constraint_constants:Genesis_constants.Constraint_constants.t
+      -> constants:Constants.t
+      -> gen_slot_advancement:int Quickcheck.Generator.t
       -> (   previous_protocol_state:( protocol_state
                                      , Coda_base.State_hash.t )
                                      With_hash.t
@@ -367,12 +369,17 @@ module type S = sig
       type t = Stable.Latest.t [@@deriving to_yojson, sexp]
 
       val precomputed_handler :
-        genesis_ledger:Coda_base.Ledger.t Lazy.t -> Snark_params.Tick.Handler.t
+           constraint_constants:Genesis_constants.Constraint_constants.t
+        -> genesis_ledger:Coda_base.Ledger.t Lazy.t
+        -> Snark_params.Tick.Handler.t
 
       val handler :
            t
+        -> constraint_constants:Genesis_constants.Constraint_constants.t
         -> pending_coinbase:Coda_base.Pending_coinbase_witness.t
         -> Snark_params.Tick.Handler.t
+
+      val ledger_depth : t -> int
     end
 
     module Consensus_transition : sig
@@ -444,24 +451,21 @@ module type S = sig
         -> (var, Value.t) Snark_params.Tick.Typ.t
 
       val negative_one :
-           genesis_ledger:Ledger.t Lazy.t
-        -> constraint_constants:Genesis_constants.Constraint_constants.t
-        -> protocol_constants:Genesis_constants.Protocol.t
-        -> Value.t
+        genesis_ledger:Ledger.t Lazy.t -> constants:Constants.t -> Value.t
 
       val create_genesis_from_transition :
            negative_one_protocol_state_hash:Coda_base.State_hash.t
         -> consensus_transition:Consensus_transition.Value.t
         -> genesis_ledger:Ledger.t Lazy.t
         -> constraint_constants:Genesis_constants.Constraint_constants.t
-        -> protocol_constants:Genesis_constants.Protocol.t
+        -> constants:Constants.t
         -> Value.t
 
       val create_genesis :
            negative_one_protocol_state_hash:Coda_base.State_hash.t
         -> genesis_ledger:Ledger.t Lazy.t
         -> constraint_constants:Genesis_constants.Constraint_constants.t
-        -> protocol_constants:Genesis_constants.Protocol.t
+        -> constants:Constants.t
         -> Value.t
 
       open Snark_params.Tick
@@ -549,7 +553,8 @@ module type S = sig
      * future.
      *)
     val next_producer_timing :
-         constants:Constants.t
+         constraint_constants:Genesis_constants.Constraint_constants.t
+      -> constants:Constants.t
       -> Unix_timestamp.t
       -> Consensus_state.Value.t
       -> local_state:Local_state.t

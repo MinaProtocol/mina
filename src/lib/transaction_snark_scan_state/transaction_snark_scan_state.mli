@@ -64,12 +64,14 @@ module Make_statement_scanner
           -> sexp_bool M.t
     end) : sig
   val scan_statement :
-       t
+       constraint_constants:Genesis_constants.Constraint_constants.t
+    -> t
     -> verifier:Verifier.t
     -> (Transaction_snark.Statement.t, [`Empty | `Error of Error.t]) result M.t
 
   val check_invariants :
        t
+    -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> verifier:Verifier.t
     -> error_prefix:string
     -> ledger_hash_end:Frozen_ledger_hash.t
@@ -81,12 +83,17 @@ end
 module Staged_undos : sig
   type t
 
-  val apply : t -> Ledger.t -> unit Or_error.t
+  val apply :
+       constraint_constants:Genesis_constants.Constraint_constants.t
+    -> t
+    -> Ledger.t
+    -> unit Or_error.t
 end
 
 val staged_undos : t -> Staged_undos.t
 
-val empty : unit -> t
+val empty :
+  constraint_constants:Genesis_constants.Constraint_constants.t -> unit -> t
 
 val fill_work_and_enqueue_transactions :
      t

@@ -19,33 +19,50 @@ module Random_oracle = Random_oracle_nonconsensus
 type t = Payment | Stake_delegation | Fee_transfer | Coinbase
 [@@deriving enum, eq, sexp]
 
+let to_string = function
+  | Payment ->
+      "payment"
+  | Stake_delegation ->
+      "delegation"
+  | Fee_transfer ->
+      "fee-transfer"
+  | Coinbase ->
+      "coinbase"
+
 let gen =
   Quickcheck.Generator.map (Int.gen_incl min max) ~f:(fun i ->
       Option.value_exn (of_enum i) )
 
 module Bits = struct
-  type t = bool * bool [@@deriving eq]
+  type t = bool * bool * bool [@@deriving eq]
 
-  let payment = (false, false)
+  let of_int i : t =
+    let test_mask mask = i land mask = mask in
+    (test_mask 0b100, test_mask 0b10, test_mask 0b1)
 
-  let stake_delegation = (true, false)
+  let of_t x = of_int (to_enum x)
 
-  let fee_transfer = (false, true)
+  let payment = of_t Payment
 
-  let coinbase = (true, true)
+  let stake_delegation = of_t Stake_delegation
 
-  let to_bits (b1, b2) = [b1; b2]
+  let fee_transfer = of_t Fee_transfer
+
+  let coinbase = of_t Coinbase
+
+  let to_bits (b1, b2, b3) = [b1; b2; b3]
 
   let to_input t = Random_oracle.Input.bitstring (to_bits t)
 
   [%%ifdef
   consensus_mechanism]
 
-  type var = Boolean.var * Boolean.var
+  type var = Boolean.var * Boolean.var * Boolean.var
 
-  let typ = Typ.tuple2 Boolean.typ Boolean.typ
+  let typ = Typ.tuple3 Boolean.typ Boolean.typ Boolean.typ
 
-  let constant (b1, b2) = Boolean.(var_of_value b1, var_of_value b2)
+  let constant (b1, b2, b3) =
+    Boolean.(var_of_value b1, var_of_value b2, var_of_value b3)
 
   [%%endif]
 end
@@ -165,20 +182,21 @@ module Unpacked = struct
        exactly the bits in that tag's bit representation will be true in the
        resulting bits.
     *)
-    let b1, b2 =
+    let b1, b2, b3 =
       List.fold
-        ~init:Field.(Var.(constant zero, constant zero))
+        ~init:Field.(Var.(constant zero, constant zero, constant zero))
         [ (Bits.payment, is_payment)
         ; (Bits.stake_delegation, is_stake_delegation)
         ; (Bits.fee_transfer, is_fee_transfer)
         ; (Bits.coinbase, is_coinbase) ]
-        ~f:(fun (acc1, acc2) ((bit1, bit2), bool_var) ->
+        ~f:(fun (acc1, acc2, acc3) ((bit1, bit2, bit3), bool_var) ->
           let add_if_true bit acc =
             if bit then Field.Var.add acc (bool_var :> Field.Var.t) else acc
           in
-          (add_if_true bit1 acc1, add_if_true bit2 acc2) )
+          (add_if_true bit1 acc1, add_if_true bit2 acc2, add_if_true bit3 acc3)
+          )
     in
-    (Boolean.Unsafe.of_cvar b1, Boolean.Unsafe.of_cvar b2)
+    Boolean.Unsafe.(of_cvar b1, of_cvar b2, of_cvar b3)
 
   let typ : (var, t) Typ.t =
     let base_typ = Poly.typ Boolean.typ in

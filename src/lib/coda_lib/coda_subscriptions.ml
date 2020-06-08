@@ -37,8 +37,9 @@ let add_new_subscription (t : t) ~pk =
     ~default:Pipe.create
   |> ignore
 
-let create ~logger ~wallets ~time_controller ~external_transition_database
-    ~new_blocks ~transition_frontier ~is_storing_all =
+let create ~logger ~constraint_constants ~wallets ~time_controller
+    ~external_transition_database ~new_blocks ~transition_frontier
+    ~is_storing_all =
   let subscribed_block_users =
     Optional_public_key.Table.of_alist_multi
     @@ List.map (Secrets.Wallets.pks wallets) ~f:(fun wallet ->
@@ -101,7 +102,8 @@ let create ~logger ~wallets ~time_controller ~external_transition_database
             |> Coda_transition.External_transition.Validated.state_hash
           in
           match
-            Filtered_external_transition.validate_transactions new_block
+            Filtered_external_transition.validate_transactions
+              ~constraint_constants new_block
           with
           | Ok verified_transactions ->
               let unfiltered_external_transition =

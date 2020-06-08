@@ -30,7 +30,8 @@ module Scan_state : sig
 
   val hash : t -> Staged_ledger_hash.Aux_hash.t
 
-  val empty : unit -> t
+  val empty :
+    constraint_constants:Genesis_constants.Constraint_constants.t -> unit -> t
 
   val snark_job_list_json : t -> string
 
@@ -73,10 +74,14 @@ val scan_state : t -> Scan_state.t
 
 val pending_coinbase_collection : t -> Pending_coinbase.t
 
-val create_exn : ledger:Ledger.t -> t
+val create_exn :
+     constraint_constants:Genesis_constants.Constraint_constants.t
+  -> ledger:Ledger.t
+  -> t
 
 val of_scan_state_and_ledger :
      logger:Logger.t
+  -> constraint_constants:Genesis_constants.Constraint_constants.t
   -> verifier:Verifier.t
   -> snarked_ledger_hash:Frozen_ledger_hash.t
   -> ledger:Ledger.t
@@ -85,7 +90,8 @@ val of_scan_state_and_ledger :
   -> t Or_error.t Deferred.t
 
 val of_scan_state_and_ledger_unchecked :
-     snarked_ledger_hash:Frozen_ledger_hash.t
+     constraint_constants:Genesis_constants.Constraint_constants.t
+  -> snarked_ledger_hash:Frozen_ledger_hash.t
   -> ledger:Ledger.t
   -> scan_state:Scan_state.t
   -> pending_coinbase_collection:Pending_coinbase.t
@@ -100,7 +106,8 @@ val copy : t -> t
 val hash : t -> Staged_ledger_hash.t
 
 val apply :
-     t
+     constraint_constants:Genesis_constants.Constraint_constants.t
+  -> t
   -> Staged_ledger_diff.t
   -> logger:Logger.t
   -> verifier:Verifier.t
@@ -114,7 +121,8 @@ val apply :
      Deferred.Result.t
 
 val apply_diff_unchecked :
-     t
+     constraint_constants:Genesis_constants.Constraint_constants.t
+  -> t
   -> Staged_ledger_diff.With_valid_signatures_and_proofs.t
   -> state_body_hash:State_body_hash.t
   -> ( [`Hash_after_applying of Staged_ledger_hash.t]
@@ -130,7 +138,8 @@ val current_ledger_proof : t -> Ledger_proof.t option
 (* This should memoize the snark verifications *)
 
 val create_diff :
-     ?log_block_creation:bool
+     constraint_constants:Genesis_constants.Constraint_constants.t
+  -> ?log_block_creation:bool
   -> t
   -> self:Public_key.Compressed.t
   -> coinbase_receiver:[`Producer | `Other of Public_key.Compressed.t]
@@ -141,10 +150,13 @@ val create_diff :
   -> Staged_ledger_diff.With_valid_signatures_and_proofs.t
 
 val statement_exn :
-  t -> [`Non_empty of Transaction_snark.Statement.t | `Empty] Deferred.t
+     constraint_constants:Genesis_constants.Constraint_constants.t
+  -> t
+  -> [`Non_empty of Transaction_snark.Statement.t | `Empty] Deferred.t
 
 val of_scan_state_pending_coinbases_and_snarked_ledger :
      logger:Logger.t
+  -> constraint_constants:Genesis_constants.Constraint_constants.t
   -> verifier:Verifier.t
   -> scan_state:Scan_state.t
   -> snarked_ledger:Ledger.t

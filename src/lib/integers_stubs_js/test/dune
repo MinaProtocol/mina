@@ -3,4 +3,4 @@
  (modes js)
  (js_of_ocaml (flags +nat.js --source-map --pretty))
  (libraries integers integers_stubs_js)
- (preprocess (pps ppx_coda)))
+ (preprocess (pps ppx_version)))

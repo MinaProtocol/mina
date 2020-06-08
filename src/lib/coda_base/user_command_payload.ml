@@ -177,7 +177,6 @@ module Common = struct
 
   [%%endif]
 end
-[@@warning "-27"]
 
 module Body = struct
   [%%versioned
@@ -238,6 +237,12 @@ module Body = struct
   let source t = Account_id.create (source_pk t) (token t)
 
   let receiver t = Account_id.create (receiver_pk t) (token t)
+
+  let tag = function
+    | Payment _ ->
+        Transaction_union_tag.Payment
+    | Stake_delegation _ ->
+        Transaction_union_tag.Stake_delegation
 end
 
 module Poly = struct
@@ -301,6 +306,8 @@ let receiver_pk (t : t) = Body.receiver_pk t.body
 let receiver (t : t) = Body.receiver t.body
 
 let token (t : t) = Body.token t.body
+
+let tag (t : t) = Body.tag t.body
 
 let amount (t : t) =
   match t.body with

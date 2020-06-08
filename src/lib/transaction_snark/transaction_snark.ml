@@ -404,7 +404,9 @@ module Base = struct
         would need to pay the account creation fee if the user command were to
         succeed (irrespective or whether it actually will or not).
     *)
-    let compute_unchecked ~txn_global_slot ~(fee_payer_account : Account.t)
+    let compute_unchecked
+        ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+        ~txn_global_slot ~(fee_payer_account : Account.t)
         ~(receiver_account : Account.t) ~(source_account : Account.t)
         ({payload; signature= _; signer= _} : Transaction_union.t) =
       match payload.body.tag with
@@ -487,7 +489,7 @@ module Base = struct
               let fee_token_is_token = Token_id.equal fee_token token in
               let amount_insufficient_to_create, creation_fee =
                 let creation_amount =
-                  Amount.of_fee Coda_compile_config.account_creation_fee
+                  Amount.of_fee constraint_constants.account_creation_fee
                 in
                 if receiver_needs_creating then
                   if fee_token_is_token then
@@ -554,7 +556,7 @@ module Base = struct
                 ; source_insufficient_balance
                 ; source_bad_timing } ) )
 
-    let%snarkydef compute_as_prover ~txn_global_slot
+    let%snarkydef compute_as_prover ~constraint_constants ~txn_global_slot
         (txn : Transaction_union.var) =
       let%bind data =
         exists (Typ.Internal.ref ())
@@ -643,8 +645,8 @@ module Base = struct
               in
               let%map txn_global_slot = read Global_slot.typ txn_global_slot in
               let `Should_pay_to_create should_pay_to_create, t =
-                compute_unchecked ~txn_global_slot ~fee_payer_account
-                  ~source_account ~receiver_account txn
+                compute_unchecked ~constraint_constants ~txn_global_slot
+                  ~fee_payer_account ~source_account ~receiver_account txn
               in
               (should_pay_to_create, t))
       in
@@ -752,7 +754,9 @@ module Base = struct
     let%bind then_ = then_ and else_ = else_ in
     if_ b ~then_ ~else_
 
-  let%snarkydef apply_tagged_transaction (type shifted)
+  let%snarkydef apply_tagged_transaction
+      ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+      (type shifted)
       (shifted : (module Inner_curve.Checked.Shifted.S with type t = shifted))
       root pending_coinbase_stack_before pending_coinbase_after
       state_body_hash_opt
@@ -856,7 +860,7 @@ module Base = struct
        consistency.
     *)
     let%bind `Should_pay_to_create should_pay_to_create, user_command_failure =
-      User_command_failure.compute_as_prover
+      User_command_failure.compute_as_prover ~constraint_constants
         ~txn_global_slot:current_global_slot txn
     in
     let%bind () =
@@ -884,11 +888,12 @@ module Base = struct
     in
     let account_creation_amount =
       Amount.Checked.of_fee
-        Fee.(var_of_t Coda_compile_config.account_creation_fee)
+        Fee.(var_of_t constraint_constants.account_creation_fee)
     in
     let%bind root_after_fee_payer_update =
       [%with_label "Update fee payer"]
-        (Frozen_ledger_hash.modify_account_send root
+        (Frozen_ledger_hash.modify_account_send
+           ~depth:constraint_constants.ledger_depth root
            ~is_writeable:(Boolean.not is_user_command) fee_payer
            ~f:(fun ~is_empty_and_writeable account ->
              (* this account is:
@@ -986,7 +991,7 @@ module Base = struct
                           (should_pay_for_receiver :> t))
                   in
                   let account_creation_fee =
-                    Coda_compile_config.account_creation_fee |> Fee.to_bits
+                    constraint_constants.account_creation_fee |> Fee.to_bits
                     |> Bignum_bigint.of_bits_lsb
                     |> Snarky_integer.Integer.constant ~m
                   in
@@ -1041,6 +1046,7 @@ module Base = struct
              { Account.Poly.balance
              ; public_key
              ; token_id
+             ; token_owner= account.token_owner
              ; nonce= next_nonce
              ; receipt_chain_hash
              ; delegate
@@ -1069,7 +1075,8 @@ module Base = struct
     in
     let%bind root_after_receiver_update =
       [%with_label "Update receiver"]
-        (Frozen_ledger_hash.modify_account_recv root_after_fee_payer_update
+        (Frozen_ledger_hash.modify_account_recv
+           ~depth:constraint_constants.ledger_depth root_after_fee_payer_update
            receiver ~f:(fun ~is_empty_and_writeable account ->
              (* this account is:
                - the receiver for payments
@@ -1152,6 +1159,7 @@ module Base = struct
              { Account.Poly.balance
              ; public_key
              ; token_id
+             ; token_owner= account.token_owner
              ; nonce= account.nonce
              ; receipt_chain_hash= account.receipt_chain_hash
              ; delegate
@@ -1162,10 +1170,11 @@ module Base = struct
     let%bind root_after_source_update =
       [%with_label "Update source"]
         (Frozen_ledger_hash.modify_account_send
-         (* [modify_account_send] does this failure check for us. *)
-           ~is_writeable:user_command_failure.source_not_present
-           root_after_receiver_update source
-           ~f:(fun ~is_empty_and_writeable:_ account ->
+           ~depth:constraint_constants.ledger_depth
+           ~is_writeable:
+             (* [modify_account_send] does this failure check for us. *)
+             user_command_failure.source_not_present root_after_receiver_update
+           source ~f:(fun ~is_empty_and_writeable:_ account ->
              (* this account is:
                - the source for payments
                - the delegator for stake delegation
@@ -1247,6 +1256,7 @@ module Base = struct
              { Account.Poly.balance
              ; public_key= account.public_key
              ; token_id= account.token_id
+             ; token_owner= account.token_owner
              ; nonce= account.nonce
              ; receipt_chain_hash= account.receipt_chain_hash
              ; delegate
@@ -1307,7 +1317,7 @@ module Base = struct
    such that
    H(l1, l2, pending_coinbase_stack_state.source, pending_coinbase_stack_state.target, fee_excess, supply_increase) = top_hash,
    applying [t] to ledger with merkle hash [l1] results in ledger with merkle hash [l2]. *)
-  let%snarkydef main (statement : Statement.With_sok.Checked.t) =
+  let%snarkydef main ~constraint_constants (statement : Statement.With_sok.Checked.t) =
     let%bind (module Shifted) = Tick.Inner_curve.Checked.Shifted.create () in
     let%bind t =
       with_label __LOC__
@@ -1319,7 +1329,7 @@ module Base = struct
     in
     let pc = statement.pending_coinbase_stack_state in
     let%bind root_after, fee_excess, supply_increase =
-      apply_tagged_transaction
+      apply_tagged_transaction ~constraint_constants
         (module Shifted)
         statement.source pc.source pc.target state_body_hash_opt t
     in
@@ -1451,7 +1461,8 @@ module type S = sig
   val cache_handle : Pickles.Cache_handle.t
 
   val of_transaction :
-       sok_digest:Sok_message.Digest.t
+       constraint_constants:Genesis_constants.Constraint_constants.t
+    -> sok_digest:Sok_message.Digest.t
     -> source:Frozen_ledger_hash.t
     -> target:Frozen_ledger_hash.t
     -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
@@ -1460,7 +1471,8 @@ module type S = sig
     -> t
 
   val of_user_command :
-       sok_digest:Sok_message.Digest.t
+       constraint_constants:Genesis_constants.Constraint_constants.t
+    -> sok_digest:Sok_message.Digest.t
     -> source:Frozen_ledger_hash.t
     -> target:Frozen_ledger_hash.t
     -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
@@ -1469,7 +1481,8 @@ module type S = sig
     -> t
 
   val of_fee_transfer :
-       sok_digest:Sok_message.Digest.t
+       constraint_constants:Genesis_constants.Constraint_constants.t
+    -> sok_digest:Sok_message.Digest.t
     -> source:Frozen_ledger_hash.t
     -> target:Frozen_ledger_hash.t
     -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
@@ -1480,8 +1493,9 @@ module type S = sig
   val merge : t -> t -> sok_digest:Sok_message.Digest.t -> t Or_error.t
 end
 
-let check_transaction_union ?(preeval = false) sok_message source target pc
-    transaction state_body_hash_opt handler =
+let check_transaction_union ?(preeval = false) ~constraint_constants
+    sok_message source target pc transaction
+    state_body_hash_opt handler =
   let sok_digest = Sok_message.digest sok_message in
   let handler =
     Base.transaction_union_handler handler transaction state_body_hash_opt
@@ -1503,13 +1517,13 @@ let check_transaction_union ?(preeval = false) sok_message source target pc
                     ; fee_excess= Transaction_union.excess transaction
                     ; sok_digest
                     ; pending_coinbase_stack_state= pc })
-             >>= Base.main))
+             >>= Base.main ~constraint_constants))
           handler)
        ())
   |> ignore
 
-let check_transaction ?preeval ~sok_message ~source ~target
-    ~pending_coinbase_stack_state
+let check_transaction ?preeval ~constraint_constants ~sok_message ~source
+    ~target ~pending_coinbase_stack_state
     (transaction_in_block : Transaction.t Transaction_protocol_state.t) handler
     =
   let transaction =
@@ -1518,22 +1532,22 @@ let check_transaction ?preeval ~sok_message ~source ~target
   let state_body_hash_opt =
     Transaction_protocol_state.block_data transaction_in_block
   in
-  check_transaction_union ?preeval sok_message source target
-    pending_coinbase_stack_state
+  check_transaction_union ?preeval ~constraint_constants sok_message source
+    target pending_coinbase_stack_state
     (Transaction_union.of_transaction transaction)
     state_body_hash_opt handler
 
-let check_user_command ~sok_message ~source ~target pending_coinbase_stack
-    t_in_block handler =
+let check_user_command ~constraint_constants ~sok_message ~source ~target
+    pending_coinbase_stack t_in_block handler =
   let user_command = Transaction_protocol_state.transaction t_in_block in
-  check_transaction ~sok_message ~source ~target
+  check_transaction ~constraint_constants ~sok_message ~source ~target
     ~pending_coinbase_stack_state:
       {source= pending_coinbase_stack; target= pending_coinbase_stack}
     {t_in_block with transaction= User_command user_command}
     handler
 
-let generate_transaction_union_witness ?(preeval = false) sok_message source
-    target transaction_in_block pc handler =
+let generate_transaction_union_witness ?(preeval = false) ~constraint_constants
+    sok_message source target transaction_in_block pc handler =
   let transaction =
     Transaction_protocol_state.transaction transaction_in_block
   in
@@ -1554,17 +1568,18 @@ let generate_transaction_union_witness ?(preeval = false) sok_message source
     ; pending_coinbase_stack_state= pc }
   in
   if preeval then failwith "preeval currently disabled" ;
-  let main x = handle (Base.main x) handler in
+  let main x = handle (Base.main ~constraint_constants x) handler in
   generate_auxiliary_input [Statement.With_sok.typ] () main input
 
-let generate_transaction_witness ?preeval ~sok_message ~source ~target
-    pending_coinbase_stack_state
+let generate_transaction_witness ?preeval ~constraint_constants ~sok_message
+    ~source ~target pending_coinbase_stack_state
     (transaction_in_block : Transaction.t Transaction_protocol_state.t) handler
     =
   let transaction =
     Transaction_protocol_state.transaction transaction_in_block
   in
-  generate_transaction_union_witness ?preeval sok_message source target
+  generate_transaction_union_witness ?preeval ~constraint_constants sok_message
+    source target
     { transaction_in_block with
       transaction= Transaction_union.of_transaction transaction }
     pending_coinbase_stack_state handler
@@ -1594,7 +1609,7 @@ module Make () = struct
       t.statement.sok_digest
     && verify_against_digest t
 
-  let of_transaction_union sok_digest source target
+  let of_transaction_union ~constraint_constants sok_digest source target
       ~pending_coinbase_stack_state transaction state_body_hash_opt handler =
     let s =
       { Statement.source
@@ -1612,30 +1627,33 @@ module Make () = struct
                state_body_hash_opt)
           s }
 
-  let of_transaction ~sok_digest ~source ~target ~pending_coinbase_stack_state
-      transaction_in_block handler =
+  let of_transaction ~constraint_constants ~sok_digest ~source ~target
+      ~pending_coinbase_stack_state transaction_in_block handler =
     let transaction =
       Transaction_protocol_state.transaction transaction_in_block
     in
     let state_body_hash_opt =
       Transaction_protocol_state.block_data transaction_in_block
     in
-    of_transaction_union sok_digest source target ~pending_coinbase_stack_state
+    of_transaction_union ~constraint_constants sok_digest source
+      target ~pending_coinbase_stack_state
       (Transaction_union.of_transaction transaction)
       state_body_hash_opt handler
 
-  let of_user_command ~sok_digest ~source ~target ~pending_coinbase_stack_state
-      user_command_in_block handler =
-    of_transaction ~sok_digest ~source ~target ~pending_coinbase_stack_state
+  let of_user_command ~constraint_constants ~sok_digest ~source ~target
+      ~pending_coinbase_stack_state user_command_in_block handler =
+    of_transaction ~constraint_constants ~sok_digest ~source ~target
+      ~pending_coinbase_stack_state
       { user_command_in_block with
         transaction=
           User_command
             (Transaction_protocol_state.transaction user_command_in_block) }
       handler
 
-  let of_fee_transfer ~sok_digest ~source ~target ~pending_coinbase_stack_state
-      transfer_in_block handler =
-    of_transaction ~sok_digest ~source ~target ~pending_coinbase_stack_state
+  let of_fee_transfer ~constraint_constants ~sok_digest ~source ~target
+      ~pending_coinbase_stack_state transfer_in_block handler =
+    of_transaction ~constraint_constants ~sok_digest ~source ~target
+      ~pending_coinbase_stack_state
       { transfer_in_block with
         transaction=
           Fee_transfer
@@ -1674,6 +1692,9 @@ end
 
 let%test_module "transaction_snark" =
   ( module struct
+    let constraint_constants =
+      Genesis_constants.Constraint_constants.for_unit_tests
+
     (* For tests let's just monkey patch ledger and sparse ledger to freeze their
      * ledger_hashes. The nominal type is just so we don't mix this up in our
      * real code. *)
@@ -1684,7 +1705,7 @@ let%test_module "transaction_snark" =
 
       let merkle_root_after_user_command_exn t txn =
         Frozen_ledger_hash.of_ledger_hash
-        @@ merkle_root_after_user_command_exn t txn
+        @@ merkle_root_after_user_command_exn ~constraint_constants t txn
     end
 
     module Sparse_ledger = struct
@@ -1695,8 +1716,7 @@ let%test_module "transaction_snark" =
 
     type wallet = {private_key: Private_key.t; account: Account.t}
 
-    let ledger_depth =
-      Genesis_constants.Constraint_constants.for_unit_tests.ledger_depth
+    let ledger_depth = constraint_constants.ledger_depth
 
     let random_wallets ?(n = min (Int.pow 2 ledger_depth) (1 lsl 10)) () =
       let random_wallet () : wallet =
@@ -1784,7 +1804,7 @@ let%test_module "transaction_snark" =
         { Transaction_protocol_state.Poly.transaction= user_command
         ; block_data= state_body_hash_opt }
       in
-      ( of_user_command ~sok_digest ~source ~target
+      ( of_user_command ~constraint_constants ~sok_digest ~source ~target
           ~pending_coinbase_stack_state user_command_in_block handler
       , pending_coinbase_stack_target )
 
@@ -1820,7 +1840,7 @@ let%test_module "transaction_snark" =
           ~fee_transfer:
             (Some
                (Coinbase.Fee_transfer.create ~receiver_pk:other
-                  ~fee:Coda_compile_config.account_creation_fee))
+                  ~fee:constraint_constants.account_creation_fee))
         |> Or_error.ok_exn
       in
       let txn_in_block =
@@ -1840,6 +1860,7 @@ let%test_module "transaction_snark" =
           in
           check_transaction txn_in_block
             (unstage (Sparse_ledger.handler sparse_ledger))
+            ~constraint_constants
             ~sok_message:
               (Coda_base.Sok_message.create ~fee:Currency.Fee.zero
                  ~prover:Public_key.Compressed.empty)
@@ -1847,7 +1868,8 @@ let%test_module "transaction_snark" =
             ~target:
               Sparse_ledger.(
                 merkle_root
-                  (apply_transaction_exn sparse_ledger txn_in_block.transaction))
+                  (apply_transaction_exn ~constraint_constants sparse_ledger
+                     txn_in_block.transaction))
             ~pending_coinbase_stack_state:
               { source= pending_coinbase_init
               ; target= pending_coinbase_stack_target } )
@@ -1904,17 +1926,17 @@ let%test_module "transaction_snark" =
                   ~prover:wallets.(1).account.public_key
               in
               let pending_coinbase_stack = Pending_coinbase.Stack.empty in
-              check_user_command ~sok_message
+              check_user_command ~constraint_constants ~sok_message
                 ~source:(Ledger.merkle_root ledger)
                 ~target pending_coinbase_stack
                 {transaction= t1; block_data= state_body_hash_opt}
                 (unstage @@ Sparse_ledger.handler sparse_ledger) ) )
 
-    let account_fee = Fee.to_int Coda_compile_config.account_creation_fee
+    let account_fee = Fee.to_int constraint_constants.account_creation_fee
 
     let state_body_hash_opt : Transaction_protocol_state.Block_data.t = None
 
-    let test_transaction ledger txn =
+    let test_transaction ~constraint_constants ledger txn =
       let source = Ledger.merkle_root ledger in
       let pending_coinbase_stack = Pending_coinbase.Stack.empty in
       let mentioned_keys, pending_coinbase_stack_target =
@@ -1938,10 +1960,13 @@ let%test_module "transaction_snark" =
       let sparse_ledger =
         Sparse_ledger.of_ledger_subset_exn ledger mentioned_keys
       in
-      let _undo = Ledger.apply_transaction ledger txn in
+      let _undo =
+        Or_error.ok_exn
+        @@ Ledger.apply_transaction ~constraint_constants ledger txn
+      in
       let target = Ledger.merkle_root ledger in
       let sok_message = Sok_message.create ~fee:Fee.zero ~prover:signer in
-      check_transaction ~sok_message ~source ~target
+      check_transaction ~constraint_constants ~sok_message ~source ~target
         ~pending_coinbase_stack_state:
           { Pending_coinbase_stack_state.source= pending_coinbase_stack
           ; target= pending_coinbase_stack_target }
@@ -1984,7 +2009,8 @@ let%test_module "transaction_snark" =
                 sender.account ;
               let () =
                 List.iter ucs ~f:(fun uc ->
-                    test_transaction ledger (Transaction.User_command uc) )
+                    test_transaction ~constraint_constants ledger
+                      (Transaction.User_command uc) )
               in
               List.iter receivers ~f:(fun receiver ->
                   check_balance
@@ -2023,7 +2049,7 @@ let%test_module "transaction_snark" =
               let () =
                 List.iter fts ~f:(fun ft ->
                     let txn = Transaction.Fee_transfer ft in
-                    test_transaction ledger txn )
+                    test_transaction ~constraint_constants ledger txn )
               in
               List.iter receivers ~f:(fun receiver ->
                   check_balance
@@ -2038,7 +2064,7 @@ let%test_module "transaction_snark" =
           let other = wallets.(1) in
           let dummy_account = wallets.(2) in
           let reward = 10_000_000_000 in
-          let fee = Fee.to_int Coda_compile_config.account_creation_fee in
+          let fee = Fee.to_int constraint_constants.account_creation_fee in
           let coinbase_count = 3 in
           let ft_count = 2 in
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
@@ -2047,7 +2073,7 @@ let%test_module "transaction_snark" =
                   List.map (List.init ft_count ~f:Fn.id) ~f:(fun _ ->
                       Coinbase.Fee_transfer.create
                         ~receiver_pk:other.account.public_key
-                        ~fee:Coda_compile_config.account_creation_fee )
+                        ~fee:constraint_constants.account_creation_fee )
                 in
                 List.fold ~init:(fts, []) (List.init coinbase_count ~f:Fn.id)
                   ~f:(fun (fts, cbs) _ ->
@@ -2066,7 +2092,7 @@ let%test_module "transaction_snark" =
               let () =
                 List.iter cbs ~f:(fun cb ->
                     let txn = Transaction.Coinbase cb in
-                    test_transaction ledger txn )
+                    test_transaction ~constraint_constants ledger txn )
               in
               let fees = fee * ft_count in
               check_balance
@@ -2130,10 +2156,12 @@ let%test_module "transaction_snark" =
               in
               assert (Proof.verify [(proof12.statement, proof12.proof)]) ;
               let sparse_ledger =
-                Sparse_ledger.apply_user_command_exn sparse_ledger
+                Sparse_ledger.apply_user_command_exn ~constraint_constants
+                  sparse_ledger
                   (User_command.forget_check t1)
               in
-              Ledger.apply_user_command ledger t1 |> Or_error.ok_exn |> ignore ;
+              Ledger.apply_user_command ~constraint_constants ledger t1
+              |> Or_error.ok_exn |> ignore ;
               [%test_eq: Frozen_ledger_hash.t]
                 (Ledger.merkle_root ledger)
                 (Sparse_ledger.merkle_root sparse_ledger) ;
@@ -2143,10 +2171,12 @@ let%test_module "transaction_snark" =
                   (unstage @@ Sparse_ledger.handler sparse_ledger)
               in
               let sparse_ledger =
-                Sparse_ledger.apply_user_command_exn sparse_ledger
+                Sparse_ledger.apply_user_command_exn ~constraint_constants
+                  sparse_ledger
                   (t2 :> User_command.t)
               in
-              Ledger.apply_user_command ledger t2 |> Or_error.ok_exn |> ignore ;
+              Ledger.apply_user_command ~constraint_constants ledger t2
+              |> Or_error.ok_exn |> ignore ;
               [%test_eq: Frozen_ledger_hash.t]
                 (Ledger.merkle_root ledger)
                 (Sparse_ledger.merkle_root sparse_ledger) ;
@@ -2155,8 +2185,8 @@ let%test_module "transaction_snark" =
               in
               Proof.verify [(proof13.statement, proof13.proof)] ) )
 
-    let test_user_command_with_accounts ~ledger ~accounts ~signer ~fee
-        ~fee_payer_pk ~fee_token ?memo ~valid_until ~nonce body =
+    let test_user_command_with_accounts ~constraint_constants ~ledger ~accounts
+        ~signer ~fee ~fee_payer_pk ~fee_token ?memo ~valid_until ~nonce body =
       let memo =
         match memo with
         | Some memo ->
@@ -2175,7 +2205,7 @@ let%test_module "transaction_snark" =
           ~valid_until ~memo ~body
       in
       let user_command = User_command.sign signer payload in
-      test_transaction ledger (User_command user_command)
+      test_transaction ~constraint_constants ledger (User_command user_command)
 
     let random_int_incl l u = Quickcheck.random_value (Int.gen_incl l u)
 
@@ -2210,8 +2240,9 @@ let%test_module "transaction_snark" =
               let valid_until = Global_slot.max_value in
               let nonce = accounts.(0).nonce in
               let () =
-                test_user_command_with_accounts ~ledger ~accounts ~signer ~fee
-                  ~fee_payer_pk ~fee_token ~valid_until ~nonce
+                test_user_command_with_accounts ~constraint_constants ~ledger
+                  ~accounts ~signer ~fee ~fee_payer_pk ~fee_token ~valid_until
+                  ~nonce
                   (Payment {source_pk; receiver_pk; token_id; amount})
               in
               let get_account aid =
@@ -2233,7 +2264,7 @@ let%test_module "transaction_snark" =
               let sub_fee fee = sub_amount (Amount.of_fee fee) in
               let expected_fee_payer_balance =
                 accounts.(0).balance |> sub_fee fee
-                |> sub_fee Coda_compile_config.account_creation_fee
+                |> sub_fee constraint_constants.account_creation_fee
               in
               assert (
                 Balance.equal fee_payer_account.balance
@@ -2282,8 +2313,9 @@ let%test_module "transaction_snark" =
               let valid_until = Global_slot.max_value in
               let nonce = accounts.(0).nonce in
               let () =
-                test_user_command_with_accounts ~ledger ~accounts ~signer ~fee
-                  ~fee_payer_pk ~fee_token ~valid_until ~nonce
+                test_user_command_with_accounts ~constraint_constants ~ledger
+                  ~accounts ~signer ~fee ~fee_payer_pk ~fee_token ~valid_until
+                  ~nonce
                   (Payment {source_pk; receiver_pk; token_id; amount})
               in
               let get_account aid =
@@ -2353,8 +2385,9 @@ let%test_module "transaction_snark" =
               let valid_until = Global_slot.max_value in
               let nonce = accounts.(0).nonce in
               let () =
-                test_user_command_with_accounts ~ledger ~accounts ~signer ~fee
-                  ~fee_payer_pk ~fee_token ~valid_until ~nonce
+                test_user_command_with_accounts ~constraint_constants ~ledger
+                  ~accounts ~signer ~fee ~fee_payer_pk ~fee_token ~valid_until
+                  ~nonce
                   (Payment {source_pk; receiver_pk; token_id; amount})
               in
               let get_account aid =
@@ -2412,8 +2445,9 @@ let%test_module "transaction_snark" =
               let valid_until = Global_slot.max_value in
               let nonce = accounts.(0).nonce in
               let () =
-                test_user_command_with_accounts ~ledger ~accounts ~signer ~fee
-                  ~fee_payer_pk ~fee_token ~valid_until ~nonce
+                test_user_command_with_accounts ~constraint_constants ~ledger
+                  ~accounts ~signer ~fee ~fee_payer_pk ~fee_token ~valid_until
+                  ~nonce
                   (Payment {source_pk; receiver_pk; token_id; amount})
               in
               let get_account aid =
@@ -2467,8 +2501,9 @@ let%test_module "transaction_snark" =
               let valid_until = Global_slot.max_value in
               let nonce = accounts.(0).nonce in
               let () =
-                test_user_command_with_accounts ~ledger ~accounts ~signer ~fee
-                  ~fee_payer_pk ~fee_token ~valid_until ~nonce
+                test_user_command_with_accounts ~constraint_constants ~ledger
+                  ~accounts ~signer ~fee ~fee_payer_pk ~fee_token ~valid_until
+                  ~nonce
                   (Payment {source_pk; receiver_pk; token_id; amount})
               in
               let get_account aid =
@@ -2523,8 +2558,9 @@ let%test_module "transaction_snark" =
               let valid_until = Global_slot.max_value in
               let nonce = accounts.(0).nonce in
               let () =
-                test_user_command_with_accounts ~ledger ~accounts ~signer ~fee
-                  ~fee_payer_pk ~fee_token ~valid_until ~nonce
+                test_user_command_with_accounts ~constraint_constants ~ledger
+                  ~accounts ~signer ~fee ~fee_payer_pk ~fee_token ~valid_until
+                  ~nonce
                   (Payment {source_pk; receiver_pk; token_id; amount})
               in
               let get_account aid =
@@ -2579,8 +2615,9 @@ let%test_module "transaction_snark" =
               let valid_until = Global_slot.max_value in
               let nonce = accounts.(0).nonce in
               let () =
-                test_user_command_with_accounts ~ledger ~accounts ~signer ~fee
-                  ~fee_payer_pk ~fee_token ~valid_until ~nonce
+                test_user_command_with_accounts ~constraint_constants ~ledger
+                  ~accounts ~signer ~fee ~fee_payer_pk ~fee_token ~valid_until
+                  ~nonce
                   (Stake_delegation
                      (Set_delegate
                         {delegator= source_pk; new_delegate= receiver_pk}))
@@ -2633,8 +2670,9 @@ let%test_module "transaction_snark" =
               let valid_until = Global_slot.max_value in
               let nonce = accounts.(0).nonce in
               let () =
-                test_user_command_with_accounts ~ledger ~accounts ~signer ~fee
-                  ~fee_payer_pk ~fee_token ~valid_until ~nonce
+                test_user_command_with_accounts ~constraint_constants ~ledger
+                  ~accounts ~signer ~fee ~fee_payer_pk ~fee_token ~valid_until
+                  ~nonce
                   (Stake_delegation
                      (Set_delegate
                         {delegator= source_pk; new_delegate= receiver_pk}))
@@ -2690,8 +2728,9 @@ let%test_module "transaction_snark" =
               let valid_until = Global_slot.max_value in
               let nonce = accounts.(0).nonce in
               let () =
-                test_user_command_with_accounts ~ledger ~accounts ~signer ~fee
-                  ~fee_payer_pk ~fee_token ~valid_until ~nonce
+                test_user_command_with_accounts ~constraint_constants ~ledger
+                  ~accounts ~signer ~fee ~fee_payer_pk ~fee_token ~valid_until
+                  ~nonce
                   (Stake_delegation
                      (Set_delegate
                         {delegator= source_pk; new_delegate= receiver_pk}))
@@ -2922,5 +2961,9 @@ let constraint_system_digests () =
               main [x1; x2] x )) )
   ; ( "transaction-base"
     , digest
-        Base.(Tick.constraint_system ~exposing:[Statement.With_sok.typ] main)
+  Base.(Tick.constraint_system ~exposing:[Statement.With_sok.typ] 
+          (main
+               ~constraint_constants:
+                 Genesis_constants.Constraint_constants.compiled)
+       )
     ) ]

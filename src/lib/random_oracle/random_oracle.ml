@@ -39,7 +39,7 @@ module Inputs = struct
   let to_the_alpha x =
     let open Field in
     let res = square x in
-    let open Snarky_bn382_backend.Fp in
+    let open Zexe_backend.Fp in
     Mutable.square res ;
     (* x^4 *)
     Mutable.square res ;

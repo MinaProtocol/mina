@@ -16,5 +16,5 @@
    snarky )
  (preprocessor_deps ../../../config.mlh)
  (preprocess
-  (pps ppx_coda ppx_optcomp ppx_let ppxlib.metaquot))
+  (pps ppx_version ppx_optcomp ppx_let ppxlib.metaquot))
  (modes native))

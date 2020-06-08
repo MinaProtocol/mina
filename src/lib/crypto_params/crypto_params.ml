@@ -4,13 +4,13 @@ module Tock = struct
 
   let group_map_params =
     Group_map.Params.create
-      (module Snarky_bn382_backend.Fp)
-      Snarky_bn382_backend.G.Params.{a; b}
+      (module Zexe_backend.Fp)
+      Zexe_backend.G.Params.{a; b}
 
   include Full.Internal_Basic
   module Number = Snarky.Number.Make (Full.Internal_Basic)
   module Enumerable = Snarky.Enumerable.Make (Full.Internal_Basic)
-  module Inner_curve = Snarky_bn382_backend.G1
+  module Inner_curve = Zexe_backend.G1
 end
 
 module Tick = struct
@@ -19,11 +19,11 @@ module Tick = struct
 
   let group_map_params =
     Group_map.Params.create
-      (module Snarky_bn382_backend.Fq)
-      Snarky_bn382_backend.G1.Params.{a; b}
+      (module Zexe_backend.Fq)
+      Zexe_backend.G1.Params.{a; b}
 
   include Full.Internal_Basic
   module Number = Snarky.Number.Make (Full.Internal_Basic)
   module Enumerable = Snarky.Enumerable.Make (Full.Internal_Basic)
-  module Inner_curve = Snarky_bn382_backend.G
+  module Inner_curve = Zexe_backend.G
 end

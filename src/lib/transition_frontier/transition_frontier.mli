@@ -30,7 +30,6 @@ val load :
   -> consensus_local_state:Consensus.Data.Local_state.t
   -> persistent_root:Persistent_root.t
   -> persistent_frontier:Persistent_frontier.t
-  -> constraint_constants:Genesis_constants.Constraint_constants.t
   -> precomputed_values:Precomputed_values.t
   -> unit
   -> ( t
@@ -66,7 +65,6 @@ module For_tests : sig
     -> consensus_local_state:Consensus.Data.Local_state.t
     -> persistent_root:Persistent_root.t
     -> persistent_frontier:Persistent_frontier.t
-    -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> precomputed_values:Precomputed_values.t
     -> unit
     -> ( t
@@ -97,7 +95,6 @@ module For_tests : sig
     -> ?verifier:Verifier.t
     -> ?trust_system:Trust_system.t
     -> ?consensus_local_state:Consensus.Data.Local_state.t
-    -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> precomputed_values:Precomputed_values.t
     -> ?root_ledger_and_accounts:Ledger.t
                                  * (Private_key.t option * Account.t) list
@@ -117,7 +114,6 @@ module For_tests : sig
     -> ?verifier:Verifier.t
     -> ?trust_system:Trust_system.t
     -> ?consensus_local_state:Consensus.Data.Local_state.t
-    -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> precomputed_values:Precomputed_values.t
     -> ?root_ledger_and_accounts:Ledger.t
                                  * (Private_key.t option * Account.t) list

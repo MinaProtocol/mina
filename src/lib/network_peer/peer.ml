@@ -121,6 +121,9 @@ module Display = struct
   end]
 
   type t = Stable.Latest.t = {host: string; libp2p_port: int; peer_id: string}
+  [@@deriving yojson, sexp]
+
+  module Fields = Stable.Latest.Fields
 end
 
 let to_display {host; libp2p_port; peer_id} =

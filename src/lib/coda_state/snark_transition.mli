@@ -84,7 +84,10 @@ val create_value :
   -> unit
   -> Value.t
 
-val genesis : genesis_ledger:Ledger.t Lazy.t -> Value.t
+val genesis :
+     constraint_constants:Genesis_constants.Constraint_constants.t
+  -> genesis_ledger:Ledger.t Lazy.t
+  -> Value.t
 
 val consensus_transition :
   (_, 'consensus_transition, _, _, _) Poly.t -> 'consensus_transition

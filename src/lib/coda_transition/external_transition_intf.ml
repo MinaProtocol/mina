@@ -32,7 +32,10 @@ module type External_transition_common_intf = sig
 
   val block_producer : t -> Public_key.Compressed.t
 
-  val transactions : t -> Transaction.t list
+  val transactions :
+       constraint_constants:Genesis_constants.Constraint_constants.t
+    -> t
+    -> Transaction.t list
 
   val user_commands : t -> User_command.t list
 
@@ -223,6 +226,17 @@ module type S = sig
          , 'protocol_versions )
          with_transition
       -> external_transition
+
+    val forget_validation_with_hash :
+         ( 'time_received
+         , 'genesis_state
+         , 'proof
+         , 'delta_transition_chain
+         , 'frontier_dependencies
+         , 'staged_ledger_diff
+         , 'protocol_versions )
+         with_transition
+      -> (external_transition, State_hash.t) With_hash.t
   end
 
   module Initial_validated : sig
@@ -310,7 +324,7 @@ module type S = sig
        Validation.with_transition
 
   val validate_time_received :
-       constraint_constants:Genesis_constants.Constraint_constants.t
+       precomputed_values:Precomputed_values.t
     -> ( [`Time_received] * unit Truth.false_t
        , 'genesis_state
        , 'proof
@@ -602,6 +616,7 @@ module type S = sig
          , 'protocol_versions )
          Validation.with_transition
       -> logger:Logger.t
+      -> constraint_constants:Genesis_constants.Constraint_constants.t
       -> verifier:Verifier.t
       -> parent_staged_ledger:Staged_ledger.t
       -> parent_protocol_state:Protocol_state.value

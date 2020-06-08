@@ -187,7 +187,7 @@ module Db = struct
       let to_hash = Fn.id
     end
 
-    module Location = Merkle_ledger.Location.Make (Depth)
+    module Location = Merkle_ledger.Location.T
 
     module Location_binable = struct
       module Arg = struct
@@ -210,7 +210,6 @@ module Db = struct
 
     module Base_ledger_inputs = struct
       include Base_ledger_inputs
-      module Depth = Depth
       module Location = Location
       module Location_binable = Location_binable
       module Kvdb = In_memory_kvdb
@@ -226,7 +225,7 @@ module Db = struct
       type addr = Addr.t
 
       let load_ledger num_accounts (balance : int) =
-        let ledger = create ~depth:Base_ledger_inputs.Depth.depth () in
+        let ledger = create ~depth:Depth.depth () in
         let account_ids = Account_id.gen_accounts num_accounts in
         let currency_balance = Currency.Balance.of_int balance in
         List.iter account_ids ~f:(fun aid ->

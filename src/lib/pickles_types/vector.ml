@@ -35,7 +35,7 @@ let rec map2 : type a b c n.
   | x :: xs, y :: ys ->
       f x y :: map2 xs ys ~f
 
-let rec hhead_off : type xs y n.
+let rec hhead_off : type xs n.
        (xs, n s) Hlist0.H1_1(T).t
     -> xs Hlist0.HlistId.t * (xs, n) Hlist0.H1_1(T).t =
  fun xss ->
@@ -50,7 +50,7 @@ let rec mapn : type xs y n.
     (xs, n) Hlist0.H1_1(T).t -> f:(xs Hlist0.HlistId.t -> y) -> (y, n) t =
  fun xss ~f ->
   match xss with
-  | [] :: xss ->
+  | [] :: _xss ->
       []
   | (_ :: _) :: _ ->
       let hds, tls = hhead_off xss in
@@ -368,7 +368,7 @@ let rec extend_exn : type n m a. (a, n) t -> m Nat.t -> a -> (a, m) t =
       []
   | [], S n ->
       default :: extend_exn [] n default
-  | x :: xs, Z ->
+  | _x :: _xs, Z ->
       failwith "extend_exn: list too long"
   | x :: xs, S m ->
       let extended = extend_exn xs m default in

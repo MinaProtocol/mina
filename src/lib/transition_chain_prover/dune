@@ -1,5 +1,5 @@
 (library
   (name transition_chain_prover)
   (public_name transition_chain_prover)
-  (preprocess (pps ppx_coda ppx_jane))
+  (preprocess (pps ppx_version ppx_jane))
   (libraries core_kernel coda_intf coda_base transition_frontier merkle_list_prover))
