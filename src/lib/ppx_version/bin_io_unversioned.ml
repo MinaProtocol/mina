@@ -92,21 +92,13 @@ let ctxt_base =
   in
   Expansion_context.Base.top_level ~omp_config ~file_path:""
 
-let rewrite_to_bin_io ~options ~path type_decls =
+let rewrite_to_bin_io ~loc ~path (_rec_flag, type_decls) =
   let type_decl1 = List.hd_exn type_decls in
-  let type_decl2 = List.last_exn type_decls in
-  let loc =
-    { loc_start= type_decl1.ptype_loc.loc_start
-    ; loc_end= type_decl2.ptype_loc.loc_end
-    ; loc_ghost= false }
-  in
   if not (Int.equal (List.length type_decls) 1) then
     Ppx_deriving.raise_errorf ~loc
       "deriving bin_io_unversioned can only be used on a single type" ;
-  if not @@ List.is_empty options then
-    Ppx_deriving.raise_errorf ~loc
-      "bin_io_unversioned does not take any options" ;
-  let inner2_modules = List.take (List.rev path) 2 in
+  let module_path = List.drop String.(split path ~on:'.') 2 in
+  let inner2_modules = List.take (List.rev module_path) 2 in
   validate_type_decl inner2_modules type_decl1 ;
   let ctxt =
     let derived_item_loc = loc in
@@ -115,5 +107,9 @@ let rewrite_to_bin_io ~options ~path type_decls =
   List.concat_map bin_io_gens ~f:(fun gen ->
       gen ~ctxt (Nonrecursive, type_decls) [] )
 
-let () =
-  Ppx_deriving.(register (create deriver ~type_decl_str:rewrite_to_bin_io ()))
+let str_type_decl :
+    (structure, rec_flag * type_declaration list) Ppxlib.Deriving.Generator.t =
+  let open Ppxlib.Deriving in
+  Generator.make_noarg rewrite_to_bin_io
+
+let () = Ppxlib.Deriving.add deriver ~str_type_decl |> Ppxlib.Deriving.ignore
