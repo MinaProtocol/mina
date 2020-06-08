@@ -495,6 +495,19 @@ let statement
 
 let create = Fields.create
 
+let top_hash_logging_enabled = ref false
+
+let with_top_hash_logging f =
+  let old = !top_hash_logging_enabled in
+  top_hash_logging_enabled := true ;
+  try
+    let ret = f () in
+    top_hash_logging_enabled := old ;
+    ret
+  with err ->
+    top_hash_logging_enabled := old ;
+    raise err
+
 let construct_input ~proof_type ~sok_digest ~state1 ~state2 ~supply_increase
     ~fee_token_l ~fee_excess_l ~fee_token_r ~fee_excess_r
     ~(pending_coinbase_stack_state : Pending_coinbase_stack_state.t) =
@@ -513,6 +526,11 @@ let construct_input ~proof_type ~sok_digest ~state1 ~state2 ~supply_increase
       ; Token_id.to_input fee_token_r
       ; Amount.Signed.to_input fee_excess_r ]
   in
+  if !top_hash_logging_enabled then
+    Format.eprintf
+      !"Generating unchecked top hash from:@.%{sexp: (Tick.Field.t, bool) \
+        Random_oracle.Input.t}@."
+      input ;
   let init =
     match proof_type with
     | `Base ->
@@ -531,19 +549,44 @@ let construct_input_checked ~sok_digest ~state1 ~state2 ~supply_increase
     ~fee_token_l ~fee_excess_l ~fee_token_r ~fee_excess_r
     ~pending_coinbase_stack1 ~pending_coinbase_stack2 =
   let open Random_oracle.Input in
-  List.reduce_exn ~f:append
-    [ Sok_message.Digest.Checked.to_input sok_digest
-    ; Frozen_ledger_hash.var_to_input state1
-    ; Frozen_ledger_hash.var_to_input state2
-    ; Pending_coinbase.Stack.var_to_input pending_coinbase_stack1
-    ; Pending_coinbase.Stack.var_to_input pending_coinbase_stack2
-    ; bitstring
-        (Bitstring_lib.Bitstring.Lsb_first.to_list
-           (Amount.var_to_bits supply_increase))
-    ; Token_id.Checked.to_input fee_token_l
-    ; Amount.Signed.Checked.to_input fee_excess_l
-    ; Token_id.Checked.to_input fee_token_r
-    ; Amount.Signed.Checked.to_input fee_excess_r ]
+  let input =
+    List.reduce_exn ~f:append
+      [ Sok_message.Digest.Checked.to_input sok_digest
+      ; Frozen_ledger_hash.var_to_input state1
+      ; Frozen_ledger_hash.var_to_input state2
+      ; Pending_coinbase.Stack.var_to_input pending_coinbase_stack1
+      ; Pending_coinbase.Stack.var_to_input pending_coinbase_stack2
+      ; bitstring
+          (Bitstring_lib.Bitstring.Lsb_first.to_list
+             (Amount.var_to_bits supply_increase))
+      ; Token_id.Checked.to_input fee_token_l
+      ; Amount.Signed.Checked.to_input fee_excess_l
+      ; Token_id.Checked.to_input fee_token_r
+      ; Amount.Signed.Checked.to_input fee_excess_r ]
+  in
+  let open Tick in
+  let%map () =
+    as_prover
+      As_prover.(
+        if !top_hash_logging_enabled then
+          let%bind field_elements =
+            read
+              (Typ.list ~length:0 Field.typ)
+              (Array.to_list input.field_elements)
+          in
+          let%map bitstrings =
+            read
+              (Typ.list ~length:0 (Typ.list ~length:0 Boolean.typ))
+              (Array.to_list input.bitstrings)
+          in
+          Format.eprintf
+            !"Generating checked top hash from:@.%{sexp: (Field.t, bool) \
+              Random_oracle.Input.t}@."
+            { Random_oracle.Input.field_elements= Array.of_list field_elements
+            ; bitstrings= Array.of_list bitstrings }
+        else return ())
+  in
+  input
 
 module Verification_keys = struct
   [%%versioned_asserted
@@ -1661,7 +1704,7 @@ module Base = struct
            [%with_label "Fetch the sok_digest"]
              (exists' Sok_message.Digest.typ ~f:Prover_state.sok_digest)
          in
-         let input =
+         let%bind input =
            construct_input_checked ~sok_digest ~state1:root_before
              ~state2:root_after ~supply_increase
              ~pending_coinbase_stack1:pending_coinbase_before
@@ -1785,7 +1828,7 @@ module Merge = struct
   let construct_input_checked ~prefix ~sok_digest ~state1 ~state2
       ~supply_increase ~fee_token_l ~fee_excess_l ~fee_token_r ~fee_excess_r
       ~pending_coinbase_stack1 ~pending_coinbase_stack2 =
-    let input =
+    let%bind input =
       construct_input_checked ~sok_digest ~state1 ~state2 ~supply_increase
         ~fee_token_l ~fee_excess_l ~fee_token_r ~fee_excess_r
         ~pending_coinbase_stack1 ~pending_coinbase_stack2

@@ -11,6 +11,9 @@ val reduce_fee_excesses :
      * (Token_id.t * Currency.Amount.Signed.t) )
      Or_error.t
 
+(** For debugging. Logs to stderr the inputs to the top hash. *)
+val with_top_hash_logging : (unit -> 'a) -> 'a
+
 module Proof_type : sig
   module Stable : sig
     module V1 : sig
