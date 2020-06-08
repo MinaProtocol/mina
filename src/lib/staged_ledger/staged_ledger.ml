@@ -343,7 +343,10 @@ module T = struct
   let apply_transaction_and_get_statement ~constraint_constants ledger
       current_stack s state_body_hash_opt =
     let open Result.Let_syntax in
-    let%bind fee_excess = Transaction.fee_excess s |> to_staged_ledger_or_error
+    let%bind fee_token_l, fee_excess_l =
+      Transaction.fee_excess_l s |> to_staged_ledger_or_error
+    and fee_token_r, fee_excess_r =
+      Transaction.fee_excess_r s |> to_staged_ledger_or_error
     and supply_increase =
       Transaction.supply_increase s |> to_staged_ledger_or_error
     in
@@ -360,7 +363,10 @@ module T = struct
     ( undo
     , { Transaction_snark.Statement.source
       ; target= Ledger.merkle_root ledger |> Frozen_ledger_hash.of_ledger_hash
-      ; fee_excess
+      ; fee_token_l
+      ; fee_excess_l
+      ; fee_token_r
+      ; fee_excess_r
       ; supply_increase
       ; pending_coinbase_stack_state=
           {source= current_stack; target= pending_coinbase_after}
@@ -1820,11 +1826,16 @@ let%test_module "test" =
     let assert_fee_excess :
         (Ledger_proof.t * Transaction.t list) option -> unit =
      fun proof_opt ->
-      let fee_excess =
+      let fee_excess_l =
         Option.value_map ~default:Fee.Signed.zero proof_opt ~f:(fun proof ->
-            (Ledger_proof.statement (fst proof)).fee_excess )
+            (Ledger_proof.statement (fst proof)).fee_excess_l )
       in
-      assert (Fee.Signed.(equal fee_excess zero))
+      let fee_excess_r =
+        Option.value_map ~default:Fee.Signed.zero proof_opt ~f:(fun proof ->
+            (Ledger_proof.statement (fst proof)).fee_excess_r )
+      in
+      assert (Fee.Signed.(equal fee_excess_l zero)) ;
+      assert (Fee.Signed.(equal fee_excess_r zero))
 
     let transaction_capacity =
       Int.pow 2 constraint_constants.transaction_capacity_log_2

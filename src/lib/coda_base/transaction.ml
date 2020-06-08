@@ -39,6 +39,24 @@ let fee_excess = function
   | Coinbase t ->
       Coinbase.fee_excess t
 
+let fee_token = function
+  | User_command t ->
+      User_command_payload.fee_token (User_command.forget_check t).payload
+  | Fee_transfer t ->
+      Fee_transfer.fee_token t
+  | Coinbase _t ->
+      Token_id.default
+
+(* NB: This should match the implementation in [Transaction_union]. *)
+let fee_excess_l (t : t) =
+  Or_error.map (fee_excess t) ~f:(fun fee_excess ->
+      if Currency.Fee.Signed.(equal zero) fee_excess then
+        (Token_id.default, fee_excess)
+      else (fee_token t, fee_excess) )
+
+(* NB: This should match the implementation in [Transaction_union]. *)
+let fee_excess_r (_ : t) = Ok (Token_id.default, Currency.Fee.Signed.zero)
+
 let supply_increase = function
   | User_command _ | Fee_transfer _ ->
       Ok Currency.Amount.zero

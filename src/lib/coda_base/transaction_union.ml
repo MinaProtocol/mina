@@ -91,7 +91,14 @@ let of_transaction : Transaction.t -> t = function
       | `Two (t1, t2) ->
           two t1 t2 )
 
-let excess (t : t) = Transaction_union_payload.excess t.payload
+(* NB: This should match the implementation in [Transaction]. *)
+let fee_excess_l (t : t) =
+  let fee_excess = Transaction_union_payload.excess t.payload in
+  if Amount.Signed.(equal zero) fee_excess then (Token_id.default, fee_excess)
+  else (t.payload.common.fee_token, fee_excess)
+
+(* NB: This should match the implementation in [Transaction]. *)
+let fee_excess_r (_ : t) = (Token_id.default, Amount.Signed.zero)
 
 let supply_increase (t : t) =
   Transaction_union_payload.supply_increase t.payload

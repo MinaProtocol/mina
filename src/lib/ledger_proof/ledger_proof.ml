@@ -39,12 +39,17 @@ module Prod : Ledger_proof_intf.S with type t = Transaction_snark.t = struct
       ~statement:{ Transaction_snark.Statement.source
                  ; target
                  ; supply_increase
-                 ; fee_excess
+                 ; fee_token_l
+                 ; fee_excess_l
+                 ; fee_token_r
+                 ; fee_excess_r
                  ; pending_coinbase_stack_state
                  ; proof_type } ~sok_digest ~proof =
     Transaction_snark.create ~source ~target ~pending_coinbase_stack_state
-      ~supply_increase
-      ~fee_excess:(to_signed_amount fee_excess)
+      ~supply_increase ~fee_token_l
+      ~fee_excess_l:(to_signed_amount fee_excess_l)
+      ~fee_token_r
+      ~fee_excess_r:(to_signed_amount fee_excess_r)
       ~sok_digest ~proof ~proof_type
 end
 

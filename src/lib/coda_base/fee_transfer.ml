@@ -31,6 +31,8 @@ module Single = struct
 
   let fee (_, fee) = fee
 
+  let fee_token _ = Token_id.default
+
   module Gen = struct
     let with_random_receivers ~keys ~max_fee : t Quickcheck.Generator.t =
       let open Quickcheck.Generator.Let_syntax in
@@ -68,6 +70,8 @@ let fee_excess = function
     | Some res ->
         Ok (Currency.Fee.Signed.negate @@ Currency.Fee.Signed.of_unsigned res)
     )
+
+let fee_token _ = Token_id.default
 
 let receivers t = One_or_two.map t ~f:(fun (pk, _) -> pk)
 

@@ -21,6 +21,8 @@ module Single : sig
 
   val fee : t -> Currency.Fee.t
 
+  val fee_token : t -> Token_id.t
+
   module Gen : sig
     val with_random_receivers :
       keys:Signature_keypair.t array -> max_fee:int -> t Quickcheck.Generator.t
@@ -42,6 +44,8 @@ type t = Single.Stable.Latest.t One_or_two.Stable.Latest.t
 include Comparable.S with type t := t
 
 val fee_excess : t -> Currency.Fee.Signed.t Or_error.t
+
+val fee_token : t -> Token_id.t
 
 val receivers : t -> Public_key.Compressed.t One_or_two.t
 
