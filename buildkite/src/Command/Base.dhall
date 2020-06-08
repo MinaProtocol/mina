@@ -14,6 +14,7 @@ let Docker = ./Docker/Type.dhall
 let Size = ./Size.dhall
 
 -- We assume we're only using the Docker plugin for now
+-- TODO: enable variable plugin loading
 let B/Command = B.definitions/commandStep/Type Text Text Docker.Type Docker.Type
 let B/Plugins = B/Plugins/Partial Docker.Type Docker.Type
 
