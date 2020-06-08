@@ -306,15 +306,14 @@ jobs:
             - restore_cache:
                 name: Restore cache - homebrew
                 keys:
-                    - homebrew-v9-{{ checksum "brew_ci_cache.sig" }}
-                    - homebrew-v8-{{ checksum "brew_ci_cache.sig" }}
+                    - homebrew-v10-{{ checksum "brew_ci_cache.sig" }}
             - run:
                 name: Install macos dependencies - homebrew - macos-setup-brew.sh
                 command: |
                     ./scripts/skip_if_only_frontend_or_rfcs.sh ./scripts/macos-setup-brew.sh
             - save_cache:
                 name: Save cache - homebrew
-                key: homebrew-v9-{{ checksum "brew_ci_cache.sig" }}
+                key: homebrew-v10-{{ checksum "brew_ci_cache.sig" }}
                 paths:
                     - "/usr/local/Homebrew"
                     - "/Users/distiller/Library/Caches/Homebrew"
