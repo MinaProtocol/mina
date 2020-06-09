@@ -8,10 +8,11 @@ module Styles = {
       margin(`auto),
     ]);
 
+  let header = merge([Theme.H1.basic, style([marginTop(`rem(4.))])]);
+
   let heroRow =
     style([
       display(`flex),
-      marginTop(`rem(6.15)),
       flexDirection(`column),
       justifyContent(`spaceBetween),
       alignItems(`center),
@@ -20,19 +21,6 @@ module Styles = {
         [flexDirection(`row), padding2(~v=`rem(3.5), ~h=`zero)],
       ),
     ]);
-
-  let header =
-    style([
-      display(`flex),
-      flexDirection(`column),
-      width(`percent(100.)),
-      color(Theme.Colors.slate),
-      textAlign(`center),
-      margin2(~v=rem(3.5), ~h=`zero),
-    ]);
-
-  let heroText =
-    merge([header, style([maxWidth(`px(500)), textAlign(`left)])]);
 
   let heroH3 =
     merge([
@@ -47,9 +35,10 @@ module Styles = {
   let buttonRow =
     style([
       display(`flex),
-      flexDirection(`row),
+      flexDirection(`column),
       position(`relative),
       top(`rem(1.0)),
+      media(Theme.MediaQuery.notMobile, [flexDirection(`row)]),
     ]);
 
   let heroLeft = style([maxWidth(`rem(38.))]);
@@ -61,7 +50,13 @@ module Styles = {
       justifyContent(`center),
     ]);
 
-  let heroLinks = style([padding2(~v=`rem(0.), ~h=`rem(6.0))]);
+  let heroLinks =
+    style([
+      media(
+        Theme.MediaQuery.notMobile,
+        [padding2(~v=`rem(0.), ~h=`rem(6.0))],
+      ),
+    ]);
   let icon =
     style([marginRight(`px(8)), position(`relative), top(`px(3))]);
 };
@@ -158,11 +153,11 @@ let make = (~lastManualUpdatedDate) => {
   <Page title="Testnet Leaderboard">
     <Wrapped>
       <div className=Styles.page>
+        <h1 className=Styles.header>
+          {React.string("Testnet Leaderboard")}
+        </h1>
         <div className=Styles.heroRow>
           <div className=Styles.heroLeft>
-            <h1 className=Theme.H1.basic>
-              {React.string("Testnet Leaderboard")}
-            </h1>
             <Spacer height=4.3 />
             <StatisticsRow />
             <HeroText />
@@ -175,7 +170,7 @@ let make = (~lastManualUpdatedDate) => {
                 bgColor=Theme.Colors.jungle
                 bgColorHover=Theme.Colors.clover
               />
-              <Spacer width=2.0 />
+              <Spacer width=2.0 height=1.0 />
               <Button
                 link=""
                 label="Genesis Program"
@@ -215,8 +210,7 @@ let make = (~lastManualUpdatedDate) => {
                     dims=(1.0, 1.0)
                     alt="a undercase letter i inside a blue circle"
                   />
-                  {React.string("Last manually updated ")
-                   ++ React.string(date)}
+                  {React.string("Last manually updated " ++ date)}
                 </span>
               </div>
             </div>
