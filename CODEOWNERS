@@ -26,7 +26,6 @@
 /src/lib/ @CodaProtocol/protocol-eng-reviewers
 
 /src/lib/blake2/ @CodaProtocol/crypto-eng-reviewers
-/src/lib/chunked_triples/ @CodaProtocol/crypto-eng-reviewers
 /src/lib/cli_lib/ @CodaProtocol/product-eng-reviewers
 /src/lib/coda_commands @CodaProtocol/product-eng-reviewers
 /src/lib/coda_graphql @CodaProtocol/product-eng-reviewers
