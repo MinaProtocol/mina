@@ -17,7 +17,7 @@ let snark_pool_list t =
   |> Network_pool.Snark_pool.Resource_pool.snark_pool_json
   |> Yojson.Safe.to_string
 
-(* create reader, writer for fork IDs, but really for any one-line item in conf_dir *)
+(* create reader, writer for protocol versions, but really for any one-line item in conf_dir *)
 let make_conf_dir_item_io ~conf_dir ~filename =
   let item_file = conf_dir ^/ filename in
   let read_item () =

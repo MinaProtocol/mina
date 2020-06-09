@@ -185,12 +185,12 @@ let calculatePoints = (challengeID, metricsMap) => {
     )
   ) {
   | Some(res) =>
-    switch (res[1]) {
-    | "Stake your Coda and produce blocks" =>
+    switch (String.lowercase_ascii(res[1])) {
+    | "stake your coda and produce blocks" =>
       Some(blocksChallenge(metricsMap))
-    | "Create and sell zk-SNARKs on Coda" =>
+    | "create and sell zk-snarks on coda" =>
       Some(zkSnarksChallenge(metricsMap))
-    | "Connect to testnet and send coda to another testnet user" =>
+    | "connect to testnet and send coda" =>
       Some(echoServiceChallenge(metricsMap))
     | _ => None
     }
