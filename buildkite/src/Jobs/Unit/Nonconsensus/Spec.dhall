@@ -7,7 +7,7 @@ in
 
 JobSpec::{
   dirtyWhen = [
-    S::{ dir = Some [D.Lit "src/consensus", D.Any], exts = Some ["ml"] },
+    S::{ dir = Some [D.Lit "src/nonconsensus", D.Any], exts = Some ["ml"] },
     S.contains "Makefile",
     S.exactly "scripts/link-coredumps" "sh"
   ],
