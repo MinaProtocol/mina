@@ -8,12 +8,10 @@
     digestif
     zexe_backend
     snarky_log
-    sgn_type
     sponge
     group_map
     snarky_group_map
     snarky_curve
     snarky
-    snarkette
     key_cache
     core_kernel ))
