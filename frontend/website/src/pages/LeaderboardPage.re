@@ -338,13 +338,10 @@ let make = (~lastManualUpdatedDate) => {
                 </span>
               </div>
             </div>
-            <div>
-              <FilterButtons
-                currentOption={state.currentOption}
-                onFilterPress
-              />
-            </div>
           </div>
+        </div>
+        <div>
+          <FilterButtons currentOption={state.currentOption} onFilterPress />
         </div>
       </div>
     </Wrapped>
