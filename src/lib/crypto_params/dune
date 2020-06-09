@@ -18,7 +18,7 @@
  (synopsis "Cryptographic parameters"))
 
 (rule
- (targets pedersen_params.ml)
+ (targets group_map_params.ml)
  (deps
   (:< gen/gen.exe))
  (action

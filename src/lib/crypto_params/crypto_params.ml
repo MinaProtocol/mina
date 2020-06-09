@@ -1,6 +1,5 @@
 open Core
 include Curve_choice
-module Pedersen_params = Pedersen_params
 
 module Tock_backend = struct
   module Full = Cycle.Mnt6
@@ -9,10 +8,7 @@ module Tock_backend = struct
     let bg_salt =
       lazy (Random_oracle.salt (Hash_prefixes.bowe_gabizon_hash :> string))
 
-    let bg_params =
-      Group_map.Params.create
-        (module Tick0.Field)
-        Tick_backend.Inner_curve.Coefficients.{a; b}
+    let bg_params () = Lazy.force Group_map_params.params
 
     include Snarky.Libsnark.Make_bowe_gabizon
               (Full)
@@ -30,8 +26,8 @@ module Tock_backend = struct
                 module G1 = Full.G1
                 module G2 = Full.G2
 
-                let group_map =
-                  Group_map.to_group (module Field) ~params:bg_params
+                let group_map x =
+                  Group_map.to_group (module Field) ~params:(bg_params ()) x
 
                 let hash xs = Random_oracle.hash ~init:(Lazy.force bg_salt) xs
               end))

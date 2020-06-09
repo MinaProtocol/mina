@@ -551,10 +551,11 @@ module Tick = struct
         let hash xs =
           Random_oracle.Checked.hash ~init:(Lazy.force Tock_backend.bg_salt) xs
 
-        let group_map =
+        let group_map x =
           Snarky_group_map.Checked.to_group
             (module Run)
-            ~params:Tock_backend.bg_params
+            ~params:(Tock_backend.bg_params ())
+            x
       end)
 
       let hash ?message ~a ~b ~c ~delta_prime =
@@ -637,13 +638,17 @@ let target_bit_length = Tick.Field.size_in_bits - 8
 module type Snark_intf = Snark_intf.S
 
 module Group_map = struct
-  let to_group =
-    Group_map.to_group (module Tick.Field) ~params:Tock_backend.bg_params
+  let to_group x =
+    Group_map.to_group
+      (module Tick.Field)
+      ~params:(Tock_backend.bg_params ())
+      x
 
   module Checked = struct
-    let to_group =
+    let to_group x =
       Snarky_group_map.Checked.to_group
         (module Tick.Run)
-        ~params:Tock_backend.bg_params
+        ~params:(Tock_backend.bg_params ())
+        x
   end
 end
