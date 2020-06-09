@@ -1,12 +1,12 @@
-let Prelude = ../../../External/Prelude.dhall
+let Prelude = ../../External/Prelude.dhall
 
-let Decorate = ../../../Lib/Decorate.dhall
+let Decorate = ../../Lib/Decorate.dhall
 
-let Pipeline = ../../../Pipeline/Dsl.dhall
-let Command = ../../../Command/Base.dhall
-let Docker = ../../../Command/Docker/Type.dhall
-let Size = ../../../Command/Size.dhall
-let JobSpec = ../../../Pipeline/JobSpec.dhall
+let Pipeline = ../../Pipeline/Dsl.dhall
+let Command = ../../Command/Base.dhall
+let Docker = ../../Command/Docker/Type.dhall
+let Size = ../../Command/Size.dhall
+let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let opamCommands =
   [
@@ -19,7 +19,7 @@ let opamCommands =
 
 let commands =
   opamCommands # [
-    "make check-snarky-submodule",
+    "make check-snarky-submodule"
   ]
 
 in
@@ -34,7 +34,7 @@ Pipeline.build
         label = "Build client-sdk",
         key = "build-client-sdk",
         target = Size.Small,
-        docker = Docker::{ image = (../../../Constants/ContainerImages.dhall).codaToolchain }
+        docker = Docker::{ image = (../../Constants/ContainerImages.dhall).codaToolchain }
       }
     ]
   }
