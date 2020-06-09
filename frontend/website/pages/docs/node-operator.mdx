@@ -5,14 +5,6 @@ export default Page({title: "Become a Node Operator"});
 
 Now that we've set up our Coda node and sent our first transaction, let's turn our attention to the other ways we can interact with the Coda network - namely, participating in consensus, and helping compress data by generating zk-SNARKs. By operating a node that helps secure the network, you can receive coda for your efforts.
 
-<Alert kind="welcome">
-
-For the 3.2a testnet, we are not running a live network. Instead, we encourage you to play with the [Sandbox Node](/docs/developers/sandbox-node).
-
-Inside the sandbox node, block production and compressing zk-SNARKs with a Snark Worker are enabled by default.
-
-</Alert>
-
 ## Participating in Consensus
 
 The Coda network is secured by [Proof-of-Stake consensus](/docs/glossary/#proof-of-stake). With this model of consensus, you don't need to have complex equipment like in Bitcoin mining. By simply having coda in our wallet, we can choose to either stake it ourselves, or delegate it to another node. Let's first see how to stake coda ourselves:
@@ -69,11 +61,10 @@ The `Block producers running` field in the response above returns the number of 
 
 </Alert>
 
-<Alert>
-
 If you'd like to send your coinbase to an account other than the one that is staking, you can use the `-coinbase-receiver` flag when you start your daemon. You can even point the coinbase at a cold wallet!
 
-</Alert>
+
+
 
 ### Delegating coda
 
