@@ -39,12 +39,12 @@ module Compressed = struct
         let pk =
           Quickcheck.random_value ~seed:(`Deterministic "public key") V1.gen
         in
-        let known_good_hash =
+        let known_good_digest =
           "\x20\x1E\xC9\xEC\x67\x5E\x76\x79\x18\xBB\x28\x2C\x51\x5B\x36\x37\x5B\x5F\x39\x18\x21\x3A\x33\x4C\x69\x4B\x8C\xC6\x09\x24\xAD\xE7"
         in
         Ppx_version.Serialization.check_serialization
           (module V1)
-          pk known_good_hash
+          pk known_good_digest
 
       [%%elif
       curve_size = 753]
@@ -53,12 +53,12 @@ module Compressed = struct
         let pk =
           Quickcheck.random_value ~seed:(`Deterministic "public key") V1.gen
         in
-        let known_good_hash =
+        let known_good_digest =
           "\xBE\x4C\x9B\xAC\xD4\xEA\x2A\x78\xCF\xC6\x70\x70\x8E\xB0\x31\xCA\x6B\x09\xB2\xD5\x28\xB3\x19\xCA\x18\xC8\x4E\x4A\xA2\xCC\xCB\xDF"
         in
         Ppx_version.Serialization.check_serialization
           (module V1)
-          pk known_good_hash
+          pk known_good_digest
 
       [%%else]
 
