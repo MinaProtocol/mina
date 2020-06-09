@@ -311,7 +311,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
               ->
                 Debug_assert.debug_assert (fun () ->
                     [%test_result: [`Take | `Keep]]
-                      (Consensus.Hooks.select
+                      (Consensus.Hooks.select ~constants:consensus_constants
                          ~existing:
                            (Protocol_state.consensus_state
                               previous_protocol_state)
@@ -328,6 +328,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                     in
                     [%test_result: [`Take | `Keep]]
                       (Consensus.Hooks.select ~existing:root_consensus_state
+                         ~constants:consensus_constants
                          ~candidate:
                            (Protocol_state.consensus_state protocol_state)
                          ~logger)
@@ -444,6 +445,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                         match
                           Transition_frontier_validation
                           .validate_frontier_dependencies ~logger ~frontier t
+                            ~consensus_constants
                         with
                         | Error `Already_in_frontier ->
                             Logger.error logger ~module_:__MODULE__

@@ -942,7 +942,9 @@ let create (config : Config.t) =
                                    ledger_hash)) ) )
               ~get_ancestry:
                 (handle_request "get_ancestry"
-                   ~f:(Sync_handler.Root.prove ~logger:config.logger))
+                   ~f:
+                     (Sync_handler.Root.prove ~consensus_constants
+                        ~logger:config.logger))
               ~get_best_tip:
                 (handle_request "get_best_tip" ~f:(fun ~frontier () ->
                      Best_tip_prover.prove ~logger:config.logger frontier ))

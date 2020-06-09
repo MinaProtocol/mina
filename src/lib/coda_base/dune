@@ -22,7 +22,6 @@
     hash_prefix_states
     hash_prefixes
     linked_tree
-    lite_base
     merkle_ledger
     merkle_mask
     one_or_two

@@ -124,13 +124,13 @@ module Make (Inputs : Inputs_intf) :
              validated_transition )
 
   module Root = struct
-    let prove ~logger ~frontier seen_consensus_state =
+    let prove ~logger ~consensus_constants ~frontier seen_consensus_state =
       let open Option.Let_syntax in
       let%bind best_tip_with_witness =
         Best_tip_prover.prove ~logger frontier
       in
       let is_tip_better =
-        Consensus.Hooks.select
+        Consensus.Hooks.select ~constants:consensus_constants
           ~logger:
             (Logger.extend logger [("selection_context", `String "Root.prove")])
           ~existing:
@@ -141,14 +141,15 @@ module Make (Inputs : Inputs_intf) :
       let%map () = Option.some_if is_tip_better () in
       best_tip_with_witness
 
-    let verify ~logger ~verifier ~genesis_constants observed_state peer_root =
+    let verify ~logger ~verifier ~consensus_constants ~genesis_constants
+        observed_state peer_root =
       let open Deferred.Result.Let_syntax in
       let%bind ( (`Root _, `Best_tip (best_tip_transition, _)) as
                verified_witness ) =
         Best_tip_prover.verify ~verifier ~genesis_constants peer_root
       in
       let is_before_best_tip candidate =
-        Consensus.Hooks.select
+        Consensus.Hooks.select ~constants:consensus_constants
           ~logger:
             (Logger.extend logger [("selection_context", `String "Root.verify")])
           ~existing:
