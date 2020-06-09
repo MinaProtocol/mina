@@ -46,7 +46,7 @@ let () =
   ( try
       ignore (M1.Stable.V2.bin_read_t buf ~pos_ref:(ref 0)) ;
       assert false
-    with Assert_failure _ -> () ) ;
+    with Failure _ -> () ) ;
   (* Test that [deserialize_binary_opt] finds and uses the right
      deserialisation.
   *)
