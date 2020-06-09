@@ -3,7 +3,7 @@
  (public_name ppx_version)
  (kind ppx_deriver)
  (modules (:standard \ print_versioned_types print_binable_functors))
- (libraries coda_digestif compiler-libs.common ppxlib ppx_bin_prot core_kernel)
+ (libraries compiler-libs.common ppxlib ppx_bin_prot core_kernel)
  (preprocess (pps ppxlib.metaquot)))
 
 (executable
