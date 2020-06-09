@@ -102,20 +102,8 @@ let updatePointsColumns =
        if (StringMap.mem(username, usernamePointsMap)) {
          // Found a username, get the points to update
          let pointsBinding = StringMap.find(username, usernamePointsMap);
-         let pointsValue =
-           switch (row[pointIndex]) {
-           | Some(points) => int_of_string_opt(points)
-           | None => None
-           };
-
-         switch (pointsValue, pointsBinding) {
-         | (Some(sheetsValue), pointsBinding) =>
-           // Add points from sheets and challenge
-           row[pointIndex] = Some(string_of_int(sheetsValue + pointsBinding))
-         | (None, pointsBinding) =>
-           // If user as an empty cell, add points from challenge
-           row[pointIndex] = Some(string_of_int(pointsBinding))
-         };
+         // Add points from challenge
+         row[pointIndex] = Some(string_of_int(pointsBinding));
        } else {
          // If username has no points for the challenge, wipe cell
          row[pointIndex] =
