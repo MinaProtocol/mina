@@ -54,10 +54,11 @@ module Pre_diff_info : Pre_diff_info.S
 module Staged_ledger_error : sig
   type t =
     | Non_zero_fee_excess of Scan_state.Space_partition.t * Transaction.t list
-    | Invalid_proof of
-        Ledger_proof.t
+    | Invalid_proofs of
+        ( Ledger_proof.t
         * Transaction_snark.Statement.t
-        * Public_key.Compressed.t
+        * Coda_base.Sok_message.t )
+        list
     | Pre_diff of Pre_diff_info.Error.t
     | Insufficient_work of string
     | Unexpected of Error.t
