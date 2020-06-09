@@ -177,10 +177,6 @@ module Keypair = struct
       ; m= {a; b; c}
       ; weight } =
     let vars = 1 + public_input_size + auxiliary_input_size in
-    Core.printf "dlog weight %d\n%!"
-      (R1cs_constraint_system.Weight.norm weight) ;
-    Core.printf "dlog vars %d %d\n%!" public_input_size auxiliary_input_size ;
-    Core.printf "dlog constraints %d %d\n%!" public_input_size constraints ;
     Fq_index.create a b c
       (Unsigned.Size_t.of_int vars)
       (Unsigned.Size_t.of_int (public_input_size + 1))
