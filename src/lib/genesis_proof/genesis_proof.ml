@@ -8,7 +8,9 @@ module Inputs = struct
     ; genesis_ledger: Genesis_ledger.Packed.t
     ; consensus_constants: Consensus.Constants.t
     ; protocol_state_with_hash:
-        (Protocol_state.value, State_hash.t) With_hash.t }
+        (Protocol_state.value, State_hash.t) With_hash.t 
+    ; blockchain_proof_system_id: Pickles.Verification_key.Id.t
+    }
 end
 
 module T = struct
@@ -97,7 +99,7 @@ let base_proof ~proof_level:(_ : Genesis_constants.Proof_level.t)
     [(prev_state, dummy); (dummy_txn_stmt, dummy)]
     t.protocol_state_with_hash.data
 
-let create_values ~proof_level ~constraint_constants b (t : Inputs.t) =
+let create_values ~proof_level b (t : Inputs.t) =
   { constraint_constants= t.constraint_constants
   ; genesis_constants= t.genesis_constants
   ; genesis_ledger= t.genesis_ledger

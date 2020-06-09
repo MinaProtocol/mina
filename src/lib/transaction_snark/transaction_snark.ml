@@ -75,7 +75,7 @@ module Statement = struct
               'pc Pending_coinbase_stack_state.Poly.Stable.V1.t
           ; fee_excess: 'signed_amt
           ; sok_digest: 'sok }
-        [@@deriving bin_io, compare, equal, hash, sexp, yojson]
+        [@@deriving version, bin_io, compare, equal, hash, sexp, yojson]
       end
     end]
   end
@@ -123,7 +123,7 @@ module Statement = struct
             Currency.Signed_poly.Stable.V1.t
           , Sok_message.Digest.Stable.V1.t )
           Poly.Stable.V1.t
-        [@@deriving bin_io, compare, equal, hash, sexp, yojson]
+        [@@deriving version, bin_io, compare, equal, hash, sexp, yojson]
 
         let to_latest = Fn.id
       end
@@ -276,7 +276,8 @@ module Proof = struct
     end
   end]
 
-  include Stable.Latest
+  type t = Stable.Latest.t
+  [@@deriving yojson, compare, sexp]
 end
 
 [%%versioned
@@ -1340,11 +1341,11 @@ module Base = struct
       ; Currency.Amount.Signed.Checked.assert_equal fee_excess
           statement.fee_excess ]
 
-  let rule : _ Pickles.Inductive_rule.t =
+  let rule ~constraint_constants : _ Pickles.Inductive_rule.t =
     { prevs= []
     ; main=
         (fun [] x ->
-          Run.run_checked (main x) ;
+          Run.run_checked (main ~constraint_constants x) ;
           [] )
     ; main_value= (fun [] _ -> []) }
 
@@ -1430,7 +1431,7 @@ let time lab f =
   printf "%s: %s\n%!" lab (Time.Span.to_string_hum (Time.diff stop start)) ;
   x
 
-let system () =
+let system ~constraint_constants =
   time "Transaction_snark.system" (fun () ->
       Pickles.compile ~cache:Cache_dir.cache
         (module Statement.With_sok.Checked)
@@ -1439,7 +1440,7 @@ let system () =
         ~branches:(module Nat.N2)
         ~max_branching:(module Nat.N2)
         ~name:"transaction-snark"
-        ~choices:(fun ~self -> [Base.rule; Merge.rule self]) )
+        ~choices:(fun ~self -> [Base.rule ~constraint_constants; Merge.rule self]) )
 
 module Verification = struct
   module type S = sig
@@ -1461,8 +1462,7 @@ module type S = sig
   val cache_handle : Pickles.Cache_handle.t
 
   val of_transaction :
-       constraint_constants:Genesis_constants.Constraint_constants.t
-    -> sok_digest:Sok_message.Digest.t
+       sok_digest:Sok_message.Digest.t
     -> source:Frozen_ledger_hash.t
     -> target:Frozen_ledger_hash.t
     -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
@@ -1471,8 +1471,7 @@ module type S = sig
     -> t
 
   val of_user_command :
-       constraint_constants:Genesis_constants.Constraint_constants.t
-    -> sok_digest:Sok_message.Digest.t
+       sok_digest:Sok_message.Digest.t
     -> source:Frozen_ledger_hash.t
     -> target:Frozen_ledger_hash.t
     -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
@@ -1481,8 +1480,7 @@ module type S = sig
     -> t
 
   val of_fee_transfer :
-       constraint_constants:Genesis_constants.Constraint_constants.t
-    -> sok_digest:Sok_message.Digest.t
+       sok_digest:Sok_message.Digest.t
     -> source:Frozen_ledger_hash.t
     -> target:Frozen_ledger_hash.t
     -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
@@ -1592,7 +1590,8 @@ let verify ({statement; proof} : t) ~key ~message =
        key [(statement, proof)]
 
 module Make () = struct
-  let tag, cache_handle, p, Pickles.Provers.[base; merge] = system ()
+  let tag, cache_handle, p, Pickles.Provers.[base; merge] =
+    system ~constraint_constants:Genesis_constants.Constraint_constants.compiled
 
   module Proof = (val p)
 
@@ -1609,7 +1608,7 @@ module Make () = struct
       t.statement.sok_digest
     && verify_against_digest t
 
-  let of_transaction_union ~constraint_constants sok_digest source target
+  let of_transaction_union sok_digest source target
       ~pending_coinbase_stack_state transaction state_body_hash_opt handler =
     let s =
       { Statement.source
@@ -1627,7 +1626,7 @@ module Make () = struct
                state_body_hash_opt)
           s }
 
-  let of_transaction ~constraint_constants ~sok_digest ~source ~target
+  let of_transaction ~sok_digest ~source ~target
       ~pending_coinbase_stack_state transaction_in_block handler =
     let transaction =
       Transaction_protocol_state.transaction transaction_in_block
@@ -1635,14 +1634,14 @@ module Make () = struct
     let state_body_hash_opt =
       Transaction_protocol_state.block_data transaction_in_block
     in
-    of_transaction_union ~constraint_constants sok_digest source
+    of_transaction_union sok_digest source
       target ~pending_coinbase_stack_state
       (Transaction_union.of_transaction transaction)
       state_body_hash_opt handler
 
-  let of_user_command ~constraint_constants ~sok_digest ~source ~target
+  let of_user_command ~sok_digest ~source ~target
       ~pending_coinbase_stack_state user_command_in_block handler =
-    of_transaction ~constraint_constants ~sok_digest ~source ~target
+    of_transaction ~sok_digest ~source ~target
       ~pending_coinbase_stack_state
       { user_command_in_block with
         transaction=
@@ -1650,9 +1649,9 @@ module Make () = struct
             (Transaction_protocol_state.transaction user_command_in_block) }
       handler
 
-  let of_fee_transfer ~constraint_constants ~sok_digest ~source ~target
+  let of_fee_transfer ~sok_digest ~source ~target
       ~pending_coinbase_stack_state transfer_in_block handler =
-    of_transaction ~constraint_constants ~sok_digest ~source ~target
+    of_transaction ~sok_digest ~source ~target
       ~pending_coinbase_stack_state
       { transfer_in_block with
         transaction=
@@ -1804,7 +1803,7 @@ let%test_module "transaction_snark" =
         { Transaction_protocol_state.Poly.transaction= user_command
         ; block_data= state_body_hash_opt }
       in
-      ( of_user_command ~constraint_constants ~sok_digest ~source ~target
+      ( of_user_command ~sok_digest ~source ~target
           ~pending_coinbase_stack_state user_command_in_block handler
       , pending_coinbase_stack_target )
 

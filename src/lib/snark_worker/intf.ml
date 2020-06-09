@@ -14,7 +14,6 @@ module type Inputs_intf = sig
 
     val create :
          proof_level:Genesis_constants.Proof_level.t
-      -> constraint_constants:Genesis_constants.Constraint_constants.t
       -> unit
       -> t Deferred.t
 

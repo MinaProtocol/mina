@@ -93,29 +93,12 @@ module Worker_state = struct
 
                let extend_blockchain (chain : Blockchain.t)
                    (next_state : Protocol_state.Value.t)
-                   (block : Snark_transition.value) state_for_handler
+                   (block : Snark_transition.value) (t : Ledger_proof.t option)
+                   state_for_handler
                    pending_coinbase =
-                 let next_state_top_hash =
-                   Keys.Step.instance_hash next_state
-                 in
-                 let prover_state =
-                   { Keys.Step.Prover_state.prev_proof= chain.proof
-                   ; wrap_vk= Tock.Keypair.vk Keys.Wrap.keys
-                   ; prev_state= chain.state
-                   ; genesis_state_hash=
-                       Coda_state.Protocol_state.genesis_state_hash chain.state
-                   ; expected_next_state= Some next_state
-                   ; update= block }
-                 in
-                 let main x =
-                   Tick.handle
-                     (Keys.Step.main ~logger ~proof_level ~constraint_constants
-                        x)
-                     (Consensus.Data.Prover_state.handler ~constraint_constants
-                        state_for_handler ~pending_coinbase)
-                 in
                  let res =
                    Or_error.try_with (fun () ->
+                       let t = ledger_proof_opt chain next_state t in
                        let proof =
                          B.step
                            ~handler:

@@ -119,7 +119,7 @@ module Dlog_based = struct
     module Me_only = struct
       type ('g1, 'unshifted, 'bulletproof_challenges) t =
         { pairing_marlin_acc:
-            ('g1, 'unshifted) Pairing_marlin_types.Accumulator.t
+            ('g1, 'unshifted) Pairing_marlin_types.Accumulator.Stable.Latest.t
         ; old_bulletproof_challenges: 'bulletproof_challenges }
       [@@deriving bin_io, sexp, compare, yojson]
 

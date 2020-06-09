@@ -1391,7 +1391,7 @@ module Reduced_me_only = struct
   module Dlog_based = struct
     module Challenges_vector = struct
       type t =
-        (Challenge.Constant.t Scalar_challenge.t, bool) Bulletproof_challenge.t
+        (Challenge.Constant.t Scalar_challenge.Stable.Latest.t, bool) Bulletproof_challenge.t
         Bp_vec.t
       [@@deriving bin_io, sexp, compare, yojson]
 
@@ -1440,7 +1440,7 @@ module Proof_ = struct
     type ('s, 'dlog_me_only, 'sgs) t =
       { statement:
           ( Challenge.Constant.t
-          , Challenge.Constant.t Scalar_challenge.t
+          , Challenge.Constant.t Scalar_challenge.Stable.Latest.t
           , fp
           , bool
           , fq
@@ -1449,7 +1449,7 @@ module Proof_ = struct
           , ('s, 'sgs) Me_only.Pairing_based.t )
           Statement.Dlog_based.t
       ; index: int
-      ; prev_evals: fp Pairing_marlin_types.Evals.t
+      ; prev_evals: fp Pairing_marlin_types.Evals.Stable.Latest.t
       ; prev_x_hat_beta_1: fp
       ; proof: Dlog_based.Proof.t }
     [@@deriving bin_io, compare, sexp, yojson]
@@ -2062,7 +2062,7 @@ module Proof = struct
     type t =
       ( unit
       , ( g1
-        , g1 Unshifted_acc.t
+        , g1 Unshifted_acc.Stable.Latest.t
         , Reduced_me_only.Dlog_based.Challenges_vector.t MLMB_vec.t )
         Me_only.Dlog_based.t
       , g Max_branching_vec.t )
@@ -2304,7 +2304,7 @@ struct
               ~mul_and_add:(fun ~acc ~xi fx -> fx + (xi * acc))
               ~evaluation_point:pt
               ~shifted_pow:(fun deg x ->
-                Pcs_batch.pow ~one ~mul ~add x
+                Pcs_batch.pow ~one ~mul x
                   Int.(crs_max_degree - (deg mod crs_max_degree)) )
               v b
           in
@@ -2565,7 +2565,16 @@ module type Statement_var_intf = Statement_intf with type field := Fpv.t
 module type Statement_value_intf = Statement_intf with type field := Fp.t
 
 module Verification_key = struct
-  module Id = Cache.Wrap.Key.Verification
+  module Id = struct
+    include Cache.Wrap.Key.Verification
+
+    let dummy_id =
+      Type_equal.Id.(uid (create ~name:"dummy" sexp_of_opaque))
+
+    let dummy : unit -> t =
+      let t = lazy (dummy_id, Md5.digest_string "") in
+      fun () -> Lazy.force t
+  end
 
   module Data = struct
     type t =
@@ -3541,91 +3550,3 @@ let%test_module "test" =
 
     let%test_unit "verify" = assert (Blockchain_snark.Proof.verify xs)
   end )
-
-(*
-<<<<<<< HEAD
-      assert (Txn_snark.Proof.verify [t1; t2; t12]) ;
-      let b_neg_one :
-          ( Blockchain_snark.Statement.Constant.t
-          , Pickles_types.Nat.N2.n
-          , Pickles_types.Nat.N1.n )
-          Prev_proof.t =
-        let open Ro in
-        let g = G.(to_affine_exn one) in
-        let evals =
-          let open Zexe_backend in
-          let e =
-            Dlog_marlin_types.Evals.of_vectors
-              ( Vector.init Nat.N18.n ~f:(fun _ -> [|Fq.one|])
-              , Vector.init Nat.N3.n ~f:(fun _ -> [|Fq.one|]) )
-          in
-          (e, e, e)
-        in
-        { statement=
-            { proof_state=
-                { deferred_values=
-                    { xi= scalar_chal ()
-                    ; r= scalar_chal ()
-                    ; r_xi_sum= fp ()
-                    ; marlin=
-                        { sigma_2= fp ()
-                        ; sigma_3= fp ()
-                        ; alpha= chal ()
-                        ; eta_a= chal ()
-                        ; eta_b= chal ()
-                        ; eta_c= chal ()
-                        ; beta_1= scalar_chal ()
-                        ; beta_2= scalar_chal ()
-                        ; beta_3= scalar_chal () } }
-                ; sponge_digest_before_evaluations=
-                    Digest.Constant.of_fq Zexe_backend.Fq.zero
-                ; was_base_case= true
-                ; me_only=
-                    { pairing_marlin_acc= Dummy.pairing_acc
-                    ; old_bulletproof_challenges=
-                        Vector.init Nat.N2.n ~f:(fun _ ->
-                            Unfinalized.Constant.dummy_bulletproof_challenges
-                        ) } }
-            ; pass_through=
-                { app_state= Field.Constant.(negate one)
-                ; sg=
-                    Vector.init Nat.N2.n ~f:(fun _ ->
-                        Lazy.force Unfinalized.Constant.corresponding_dummy_sg
-                    ) } }
-        ; proof=
-            { messages=
-                { w_hat= [|g|]
-                ; z_hat_a= [|g|]
-                ; z_hat_b= [|g|]
-                ; gh_1= ({unshifted=[|g|]; shifted=g}, [|g|])
-                ; sigma_gh_2= (fq (), ({unshifted=[|g|]; shifted=g}, [|g|]))
-                ; sigma_gh_3= (fq (), ({unshifted=[|g|]; shifted=g}, [|g|])) }
-            ; openings=
-                { proof=
-                    { lr=
-                        Array.init
-                          (Nat.to_int Wrap_circuit_bulletproof_rounds.n)
-                          ~f:(fun _ -> (g, g))
-                    ; z_1= fq ()
-                    ; z_2= fq ()
-                    ; delta= g
-                    ; sg= g }
-                ; evals= evals } }
-        ; prev_evals=
-            (let abc () = {Abc.a= fp (); b= fp (); c= fp ()} in
-             { w_hat= fp ()
-             ; z_hat_a= fp ()
-             ; z_hat_b= fp ()
-             ; g_1= fp ()
-             ; h_1= fp ()
-             ; g_2= fp ()
-             ; h_2= fp ()
-             ; g_3= fp ()
-             ; h_3= fp ()
-             ; row= abc ()
-             ; col= abc ()
-             ; value= abc ()
-             ; rc= abc () })
-        ; prev_x_hat_beta_1= fp ()
-        ; index= 0 }
-*)

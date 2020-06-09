@@ -24,7 +24,7 @@ module Make (Impl : Snarky.Snark_intf.Run) = struct
     type nonrec 'n t = (int, 'n) t
 
     let shifted_pow ~crs_max_degree t x =
-      let pow = Field.(Pcs_batch.pow ~one ~mul ~add) in
+      let pow = Field.(Pcs_batch.pow ~one ~mul) in
       choose t ~f:(fun deg ->
           let d = deg mod crs_max_degree in
           pow x (crs_max_degree - d) )

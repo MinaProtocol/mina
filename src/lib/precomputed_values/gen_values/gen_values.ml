@@ -21,6 +21,8 @@ let use_dummy_values = true
 [%%endif]
 
 module type S = sig
+  val blockchain_proof_system_id : Parsetree.expression
+
   val base_proof_expr : Parsetree.expression
 
   val transaction_verification : Parsetree.expression
@@ -46,6 +48,9 @@ module Dummy = struct
   let loc = Ppxlib.Location.none
 
   let base_proof_expr = [%expr Coda_base.Proof.dummy]
+
+  let blockchain_proof_system_id =
+    [%expr fun () -> Pickles.Verification_key.Id.dummy ()]
 
   let transaction_verification =
     [%expr fun () -> Pickles.Verification_key.dummy]
@@ -91,8 +96,22 @@ module Make_real () = struct
       ; genesis_constants
       ; genesis_ledger= (module Test_genesis_ledger)
       ; consensus_constants
-      ; protocol_state_with_hash
-      ; base_hash }
+      ; protocol_state_with_hash 
+      ; blockchain_proof_system_id= Lazy.force B.Proof.id
+      }
+
+  let blockchain_proof_system_id =
+    [%expr
+      let t =
+        lazy
+          (Core.Sexp.of_string_conv_exn
+             [%e estring
+                 (Core.Sexp.to_string
+                    (Pickles.Verification_key.Id.sexp_of_t
+                       (Lazy.force B.Proof.id))) ]
+             Pickles.Verification_key.Id.t_of_sexp )
+      in
+      fun () -> Lazy.force t]
 
   let transaction_verification =
     [%expr
@@ -147,6 +166,8 @@ let main () =
       module T = Genesis_proof.T
       include T
 
+      let blockchain_proof_system_id = [%e M.blockchain_proof_system_id]
+
       let compiled_base_proof = [%e M.base_proof_expr]
 
       let unit_test_base_proof = Coda_base.Proof.dummy
@@ -168,7 +189,6 @@ let main () =
       let key_hashes = [%e M.key_hashes]
 
       let blockchain_verification = [%e M.blockchain_verification]
-
 
       let transaction_verification = [%e M.transaction_verification]
 
@@ -192,7 +212,6 @@ let main () =
            ; genesis_ledger= (module Test_genesis_ledger)
            ; consensus_constants
            ; protocol_state_with_hash
-           ; base_hash= compiled_base_hash
            ; genesis_proof= compiled_base_proof })]
   in
   Pprintast.top_phrase fmt (Ptop_def structure) ;

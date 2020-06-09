@@ -3,7 +3,7 @@ type ('a, 'n, 'm) t
 val map : ('a, 'n, 'm) t -> f:('a -> 'b) -> ('b, 'n, 'm) t
 
 val pow :
-  one:'f -> mul:('f -> 'f -> 'f) -> add:('f -> 'f -> 'f) -> 'f -> int -> 'f
+  one:'f -> mul:('f -> 'f -> 'f) -> 'f -> int -> 'f
 
 val create :
      without_degree_bound:'n Nat.t

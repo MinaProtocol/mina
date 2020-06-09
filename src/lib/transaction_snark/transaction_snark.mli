@@ -217,8 +217,7 @@ module type S = sig
   val cache_handle : Pickles.Cache_handle.t
 
   val of_transaction :
-       constraint_constants:Genesis_constants.Constraint_constants.t
-    -> sok_digest:Sok_message.Digest.t
+       sok_digest:Sok_message.Digest.t
     -> source:Frozen_ledger_hash.t
     -> target:Frozen_ledger_hash.t
     -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
@@ -227,8 +226,7 @@ module type S = sig
     -> t
 
   val of_user_command :
-       constraint_constants:Genesis_constants.Constraint_constants.t
-    -> sok_digest:Sok_message.Digest.t
+       sok_digest:Sok_message.Digest.t
     -> source:Frozen_ledger_hash.t
     -> target:Frozen_ledger_hash.t
     -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
@@ -237,8 +235,7 @@ module type S = sig
     -> t
 
   val of_fee_transfer :
-       constraint_constants:Genesis_constants.Constraint_constants.t
-    -> sok_digest:Sok_message.Digest.t
+       sok_digest:Sok_message.Digest.t
     -> source:Frozen_ledger_hash.t
     -> target:Frozen_ledger_hash.t
     -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
