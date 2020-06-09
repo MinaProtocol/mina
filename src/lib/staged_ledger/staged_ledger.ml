@@ -1824,11 +1824,7 @@ let%test_module "test" =
       List.fold coinbase_fts ~init:Currency.Fee.zero ~f:(fun total ft ->
           Currency.Fee.add total ft.fee |> Option.value_exn )
 
-    (* These tests do a lot of updating Merkle ledgers so making Pedersen
-       hashing faster is a big win.
-    *)
     let () =
-      Snark_params.set_chunked_hashing true ;
       Async.Scheduler.set_record_backtraces true ;
       Backtrace.elide := false
 

@@ -1,18 +1,6 @@
 open Core
 include Curve_choice
 module Pedersen_params = Pedersen_params
-module Pedersen_chunk_table = Pedersen_chunk_table
-
-module Tick_pedersen = Chunked_pedersen_lib.Pedersen.Make (struct
-  open Tick0
-  module Field = Field
-  module Bigint = Bigint
-  module Curve = Tick_backend.Inner_curve
-
-  let params = Pedersen_params.params
-
-  let chunk_table = Pedersen_chunk_table.chunk_table
-end)
 
 module Tock_backend = struct
   module Full = Cycle.Mnt6

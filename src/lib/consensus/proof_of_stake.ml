@@ -157,7 +157,7 @@ module Data = struct
 
     type _unused = unit constraint t = Stable.Latest.t
 
-    let initial : t = of_hash Tick.Pedersen.zero_hash
+    let initial : t = of_hash Outside_hash_image.t
 
     let update (seed : t) vrf_result =
       let open Random_oracle in
