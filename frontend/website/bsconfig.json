@@ -10,7 +10,8 @@
     "reason-react",
     "bs-css",
     "bsc-stdlib-polyfill",
-    "bs-fetch"
+    "bs-fetch",
+    "bs-moment"
   ],
   "reason": {
     "react-jsx": 3

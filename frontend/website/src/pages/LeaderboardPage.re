@@ -144,8 +144,17 @@ module HeroText = {
   };
 };
 
+module Moment = {
+  type t;
+};
+
+[@bs.module] external momentWithDate: Js.Date.t => Moment.t = "moment";
+[@bs.send] external format: (Moment.t, string) => string = "format";
+
 [@react.component]
-let make = () => {
+let make = (~lastManualUpdatedDate) => {
+  let dateAsMoment = momentWithDate(lastManualUpdatedDate);
+  let date = format(dateAsMoment, "MMMM Do YYYY");
   <Page title="Testnet Leaderboard">
     <Wrapped>
       <div className=Styles.page>
@@ -206,7 +215,8 @@ let make = () => {
                     dims=(1.0, 1.0)
                     alt="a undercase letter i inside a blue circle"
                   />
-                  {React.string("Last manually updated May 1 2020")}
+                  {React.string("Last manually updated ")
+                   ++ React.string(date)}
                 </span>
               </div>
             </div>
