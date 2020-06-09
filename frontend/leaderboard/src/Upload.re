@@ -79,7 +79,7 @@ let createPublickeyUsernameMap = sheetsData => {
 
 let createUsernamePointsMap = (pointsMap, pkUsernameMap) => {
   StringMap.fold(
-    (pk, username, map) => {
+    (username, pk, map) => {
       StringMap.mem(pk, pointsMap)
         ? StringMap.add(username, StringMap.find(pk, pointsMap), map) : map
     },
