@@ -165,6 +165,7 @@ module H1 = {
         ],
       ),
     ]);
+  let basic = merge([hero, style([fontWeight(`semiBold)])]);
 };
 
 module H2 = {
