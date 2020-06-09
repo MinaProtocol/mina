@@ -24,23 +24,6 @@ let result_field_no_inputs ~resolve =
   Schema.io_field ~resolve:(fun resolve_info src ->
       Deferred.return @@ resolve resolve_info src )
 
-let verification_key =
-  lazy
-    (let open Async in
-    let%map vk = Snark_keys.blockchain_verification () in
-    let open Crypto_params.Tock_backend.Verification_key in
-    let open Lite_compat_algebra in
-    let key =
-      { Lite_base.Crypto_params.Tock.Bowe_gabizon.Verification_key.alpha_beta=
-          alpha_beta vk.wrap |> target_field
-      ; delta= delta vk.wrap |> g2
-      ; query= query vk.wrap |> g1_vector }
-    in
-    sprintf
-      !"%{sexp:\n\
-       \    Lite_base.Crypto_params.Tock.Bowe_gabizon.Verification_key.t}\n"
-      key)
-
 module Doc = struct
   let date ?(extra = "") s =
     sprintf
@@ -1899,14 +1882,6 @@ module Queries = struct
       ~doc:"The version of the node (git commit hash)"
       ~resolve:(fun _ _ -> Some Coda_version.commit_id)
 
-  let blockchain_verification_key =
-    io_field "blockchainVerificationKey" ~typ:(non_null string)
-      ~args:Arg.[]
-      ~doc:"Experimental: Verification key for blockchain snark"
-      ~resolve:(fun _ _ ->
-        let%map key = Lazy.force verification_key in
-        Ok key )
-
   let tracked_accounts_resolver {ctx= coda; _} () =
     let wallets = Coda_lib.wallets coda in
     let block_production_pubkeys = Coda_lib.block_production_pubkeys coda in
@@ -2095,7 +2070,6 @@ module Queries = struct
     ; trust_status
     ; trust_status_all
     ; snark_pool
-    ; blockchain_verification_key
     ; pending_snark_work ]
 end
 

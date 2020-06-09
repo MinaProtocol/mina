@@ -1,5 +1,7 @@
 let Prelude = ./External/Prelude.dhall
 
+let SelectFiles = ./Lib/SelectFiles.dhall
+
 let Command = ./Command/Base.dhall
 let Docker = ./Command/Docker/Type.dhall
 let JobSpec = ./Pipeline/JobSpec.dhall
@@ -11,11 +13,12 @@ let jobs : List JobSpec.Type = ./gen/Jobs.dhall
 
 -- Run a job if we touched a dirty path
 let makeCommand = \(job : JobSpec.Type) ->
+  let dirtyWhen = SelectFiles.compile job.dirtyWhen
   let trigger = triggerCommand "src/Jobs/${job.path}/${job.name}/Pipeline.dhall"
   in ''
-    if cat _computed_diff.txt | egrep -q '${job.dirtyWhen}'; then
+    if cat _computed_diff.txt | egrep -q '${dirtyWhen}'; then
         echo "Triggering ${job.name} for reason:"
-        cat _computed_diff.txt | egrep '${job.dirtyWhen}'
+        cat _computed_diff.txt | egrep '${dirtyWhen}'
         ${trigger}
     fi
   ''
@@ -32,7 +35,7 @@ in Pipeline.build Pipeline.Config::{
   spec = JobSpec::{
     name = "monorepo-triage",
     -- TODO: Clean up this code so we don't need an unused dirtyWhen here
-    dirtyWhen = ""
+    dirtyWhen = [ SelectFiles.everything ]
   },
   steps = [
   Command.build
