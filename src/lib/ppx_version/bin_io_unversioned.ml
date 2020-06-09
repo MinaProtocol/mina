@@ -80,7 +80,7 @@ let validate_type_decl inner2_modules type_decl =
         with _ -> false
       in
       if inside_stable_versioned then
-        Ppx_deriving.raise_errorf ~loc:type_decl.ptype_loc
+        Location.raise_errorf ~loc:type_decl.ptype_loc
           "Cannot use \"deriving bin_io_unversioned\" for a type defined in a \
            stable-versioned module"
   | _ ->
@@ -95,7 +95,7 @@ let ctxt_base =
 let rewrite_to_bin_io ~loc ~path (_rec_flag, type_decls) =
   let type_decl1 = List.hd_exn type_decls in
   if not (Int.equal (List.length type_decls) 1) then
-    Ppx_deriving.raise_errorf ~loc
+    Location.raise_errorf ~loc
       "deriving bin_io_unversioned can only be used on a single type" ;
   let module_path = List.drop String.(split path ~on:'.') 2 in
   let inner2_modules = List.take (List.rev module_path) 2 in
