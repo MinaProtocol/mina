@@ -139,6 +139,112 @@ module HeroText = {
   };
 };
 
+module FilterButtons = {
+  module ButtonStyles = {
+    open Css;
+    let header =
+      style([
+        Theme.Typeface.ibmplexsans,
+        fontStyle(`normal),
+        fontWeight(`semiBold),
+        fontSize(`rem(1.25)),
+        lineHeight(`rem(1.5)),
+        color(Theme.Colors.saville),
+      ]);
+
+    let flexColumn =
+      merge([
+        Styles.flexColumn,
+        style([media("(max-width: 960px)", [display(`none)])]),
+      ]);
+
+    let buttonRow =
+      merge([
+        Styles.buttonRow,
+        style([
+          selector(
+            "*:not(:last-child)",
+            [borderRight(`px(1), `solid, Theme.Colors.grey)],
+          ),
+        ]),
+      ]);
+
+    let textStyles =
+      merge([
+        style([
+          Theme.Typeface.ibmplexsans,
+          fontStyle(`normal),
+          fontSize(`rem(0.75)),
+          fontWeight(`num(500)),
+          lineHeight(`rem(1.625)),
+          letterSpacing(`rem(0.0875)),
+          textAlign(`center),
+          textTransform(`uppercase),
+          textShadow(~y=`px(1), `rgba((0, 0, 0, 0.25))),
+        ]),
+      ]);
+
+    let button =
+      merge([
+        textStyles,
+        style([
+          width(`rem(14.)),
+          height(`rem(3.)),
+          borderRadius(`px(2)),
+          padding2(~v=`px(12), ~h=`px(24)),
+          alignSelf(`center),
+          backgroundColor(Theme.Colors.gandalf),
+          color(`rgb((71, 90, 104))),
+          cursor(`pointer),
+          boxShadow(~blur=`px(8), ~inset=true, `rgba((0, 0, 0, 0.1))),
+        ]),
+      ]);
+
+    let selectedButton =
+      merge([
+        button,
+        style([
+          backgroundColor(Theme.Colors.hyperlink),
+          color(Theme.Colors.white),
+        ]),
+      ]);
+  };
+
+  [@react.component]
+  let make = (~currentOption, ~onFilterPress) => {
+    <div className=ButtonStyles.flexColumn>
+      <h3 className=ButtonStyles.header> {React.string("View")} </h3>
+      <Spacer height=0.5 />
+      <div className=ButtonStyles.buttonRow>
+        <div
+          className={
+            currentOption == "btn1"
+              ? ButtonStyles.selectedButton : ButtonStyles.button
+          }
+          onClick={_ => onFilterPress("btn1")}>
+          {React.string("All Participants")}
+        </div>
+        <div
+          className={
+            currentOption == "btn2"
+              ? ButtonStyles.selectedButton : ButtonStyles.button
+          }
+          onClick={_ => onFilterPress("btn2")}>
+          {React.string("Genesis Members")}
+        </div>
+        <div
+          className={
+            currentOption == "btn3"
+              ? ButtonStyles.selectedButton : ButtonStyles.button
+          }
+          onClick={_ => onFilterPress("btn3")}>
+          {React.string("Non-Genesis Members")}
+        </div>
+      </div>
+    </div>;
+  };
+};
+
 module Moment = {
   type t;
 };
@@ -146,8 +252,26 @@ module Moment = {
 [@bs.module] external momentWithDate: Js.Date.t => Moment.t = "moment";
 [@bs.send] external format: (Moment.t, string) => string = "format";
 
+type state = {currentOption: string};
+let initialState = {currentOption: "btn1"};
+
+type action =
+  | Filtered(string);
+
+let reducer = (_, action) => {
+  switch (action) {
+  | Filtered(option) => {currentOption: option}
+  };
+};
+
 [@react.component]
 let make = (~lastManualUpdatedDate) => {
+  let (state, dispatch) = React.useReducer(reducer, initialState);
+
+  let onFilterPress = s => {
+    dispatch(Filtered(s));
+  };
+
   let dateAsMoment = momentWithDate(lastManualUpdatedDate);
   let date = format(dateAsMoment, "MMMM Do YYYY");
   <Page title="Testnet Leaderboard">
@@ -213,6 +337,12 @@ let make = (~lastManualUpdatedDate) => {
                   {React.string("Last manually updated " ++ date)}
                 </span>
               </div>
+            </div>
+            <div>
+              <FilterButtons
+                currentOption={state.currentOption}
+                onFilterPress
+              />
             </div>
           </div>
         </div>
