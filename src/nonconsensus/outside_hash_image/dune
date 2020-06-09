@@ -4,10 +4,3 @@
   (libraries snark_params_nonconsensus)
   (preprocess
     (pps ppx_version ppx_optcomp ppxlib.metaquot)))
-
-(rule
-  (targets outside_pedersen_image.ml)
-  (deps
-    (:< gen_values/gen_values.exe))
-  (action
-    (run %{<} %{targets})))
