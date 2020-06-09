@@ -1,4 +1,4 @@
-let S = ../../Lib/SelectFiles.dhall
+let S = ../../../Lib/SelectFiles.dhall
 let D = S.PathPattern
 
 let JobSpec = ../../../Pipeline/JobSpec.dhall
