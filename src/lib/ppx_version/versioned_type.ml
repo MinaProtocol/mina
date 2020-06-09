@@ -22,12 +22,11 @@
   where option is one of "rpc", "asserted", or "binable".
 
   Without options (the common case), the type must be named "t", and its definition
-  occurs in the module hierarchy "Stable.Vn.T", where n is a positive integer.
+  occurs in the module hierarchy "Stable.Vn" or "Stable.Vn.T", where n is a positive integer.
 
   The "asserted" option asserts that the type is versioned, to allow compilation
   to proceed. The types referred to in the type are not checked for versioning
-  with this option. The type must be contained in the module hierarchy "Stable.Vn.T".
-  Eventually, all uses of this option should be removed.
+  with this option.
 
   The "binable" option is a synonym for "asserted". It assumes that the type
   will be serialized using a "Binable.Of_..." or "Make_binable" functors, which relies
@@ -155,9 +154,6 @@ module Deriving = struct
   let validate_plain_type_decl inner3_modules type_decl =
     match inner3_modules with
     | ["T"; module_version; "Stable"] | module_version :: "Stable" :: _ ->
-        (* TODO: The pattern here with "T" can be removed when the registration
-         functors are replaced with the versioned module ppx.
-      *)
         validate_module_version module_version type_decl.ptype_loc
     | _ ->
         Location.raise_errorf ~loc:type_decl.ptype_loc
@@ -194,9 +190,6 @@ module Deriving = struct
   let module_name_from_plain_path inner3_modules =
     match inner3_modules with
     | ["T"; module_version; "Stable"] | module_version :: "Stable" :: _ ->
-        (* NOTE: The pattern here with "T" can be removed when the registration
-         functors are replaced with the versioned module ppx.
-      *)
         module_version
     | _ ->
         failwith "module_name_from_plain_path: unexpected module path"
