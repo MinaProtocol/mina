@@ -8,9 +8,8 @@ module Inputs = struct
     ; genesis_ledger: Genesis_ledger.Packed.t
     ; consensus_constants: Consensus.Constants.t
     ; protocol_state_with_hash:
-        (Protocol_state.value, State_hash.t) With_hash.t 
-    ; blockchain_proof_system_id: Pickles.Verification_key.Id.t
-    }
+        (Protocol_state.value, State_hash.t) With_hash.t
+    ; blockchain_proof_system_id: Pickles.Verification_key.Id.t }
 end
 
 module T = struct
@@ -70,8 +69,8 @@ let base_proof ~proof_level:(_ : Genesis_constants.Proof_level.t)
   let constraint_constants = t.constraint_constants in
   let consensus_constants = t.consensus_constants in
   let prev_state =
-      Protocol_state.negative_one ~genesis_ledger ~constraint_constants
-        ~consensus_constants
+    Protocol_state.negative_one ~genesis_ledger ~constraint_constants
+      ~consensus_constants
   in
   let curr = t.protocol_state_with_hash.data in
   let dummy_txn_stmt : Transaction_snark.Statement.With_sok.t =
@@ -91,10 +90,11 @@ let base_proof ~proof_level:(_ : Genesis_constants.Proof_level.t)
   let dummy = Coda_base.Proof.dummy in
   B.step
     ~handler:
-      (Consensus.Data.Prover_state.precomputed_handler
-         ~constraint_constants
+      (Consensus.Data.Prover_state.precomputed_handler ~constraint_constants
          ~genesis_ledger:Test_genesis_ledger.t)
-    { transition= Snark_transition.genesis ~constraint_constants ~genesis_ledger:Test_genesis_ledger.t
+    { transition=
+        Snark_transition.genesis ~constraint_constants
+          ~genesis_ledger:Test_genesis_ledger.t
     ; prev_state }
     [(prev_state, dummy); (dummy_txn_stmt, dummy)]
     t.protocol_state_with_hash.data

@@ -12,8 +12,7 @@ module Step = struct
         | _id, _n, h ->
             sprintf !"step-%s"
               (Md5.to_hex
-                 (Zexe_backend.Pairing_based.R1CS_constraint_system
-                  .digest h))
+                 (Zexe_backend.Pairing_based.R1CS_constraint_system.digest h))
     end
 
     module Verification = struct
@@ -53,15 +52,13 @@ module Wrap = struct
 
     module Proving = struct
       type t =
-        Type_equal.Id.Uid.t
-        * Zexe_backend.Dlog_based.R1CS_constraint_system.t
+        Type_equal.Id.Uid.t * Zexe_backend.Dlog_based.R1CS_constraint_system.t
 
       let to_string : t -> _ = function
         | _id, h ->
             sprintf !"wrap-%s"
               (Md5.to_hex
-                 (Zexe_backend.Dlog_based.R1CS_constraint_system.digest
-                    h))
+                 (Zexe_backend.Dlog_based.R1CS_constraint_system.digest h))
     end
   end
 

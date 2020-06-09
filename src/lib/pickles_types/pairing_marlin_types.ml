@@ -249,6 +249,7 @@ module Accumulator = struct
         module V1 = struct
           type 'a t = 'a Shift.Map.t
           [@@deriving sexp, version {asserted}, compare]
+
           let to_yojson f t = Alist.to_yojson f (Map.to_alist t)
 
           let of_yojson f t =

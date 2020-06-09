@@ -96,20 +96,20 @@ module Make_real () = struct
       ; genesis_constants
       ; genesis_ledger= (module Test_genesis_ledger)
       ; consensus_constants
-      ; protocol_state_with_hash 
-      ; blockchain_proof_system_id= Lazy.force B.Proof.id
-      }
+      ; protocol_state_with_hash
+      ; blockchain_proof_system_id= Lazy.force B.Proof.id }
 
   let blockchain_proof_system_id =
     [%expr
       let t =
         lazy
           (Core.Sexp.of_string_conv_exn
-             [%e estring
+             [%e
+               estring
                  (Core.Sexp.to_string
                     (Pickles.Verification_key.Id.sexp_of_t
-                       (Lazy.force B.Proof.id))) ]
-             Pickles.Verification_key.Id.t_of_sexp )
+                       (Lazy.force B.Proof.id)))]
+             Pickles.Verification_key.Id.t_of_sexp)
       in
       fun () -> Lazy.force t]
 

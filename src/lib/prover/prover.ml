@@ -94,16 +94,16 @@ module Worker_state = struct
                let extend_blockchain (chain : Blockchain.t)
                    (next_state : Protocol_state.Value.t)
                    (block : Snark_transition.value) (t : Ledger_proof.t option)
-                   state_for_handler
-                   pending_coinbase =
+                   state_for_handler pending_coinbase =
                  let res =
                    Or_error.try_with (fun () ->
                        let t = ledger_proof_opt chain next_state t in
                        let proof =
                          B.step
                            ~handler:
-                             (Consensus.Data.Prover_state.handler ~constraint_constants
-                                state_for_handler ~pending_coinbase)
+                             (Consensus.Data.Prover_state.handler
+                                ~constraint_constants state_for_handler
+                                ~pending_coinbase)
                            {transition= block; prev_state= chain.state}
                            [(chain.state, chain.proof); t]
                            next_state
@@ -134,8 +134,7 @@ module Worker_state = struct
                      {transition= block; prev_state= chain.state}
                      ~handler:
                        (Consensus.Data.Prover_state.handler state_for_handler
-                          ~constraint_constants
-                          ~pending_coinbase)
+                          ~constraint_constants ~pending_coinbase)
                      t
                      (Protocol_state.hash next_state)
                    |> Or_error.map ~f:(fun () ->

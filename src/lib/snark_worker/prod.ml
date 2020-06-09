@@ -37,10 +37,7 @@ module Inputs = struct
         | Check | None ->
             None
       in
-      Deferred.return
-      { m
-      ; cache= Cache.create ()
-      ; proof_level }
+      Deferred.return {m; cache= Cache.create (); proof_level}
 
     let worker_wait_time = 5.
   end
@@ -52,9 +49,7 @@ module Inputs = struct
     Snark_work_lib.Work.Single.Spec.t
   [@@deriving sexp]
 
-  let perform_single
-      ({m; cache; proof_level} :
-        Worker_state.t) ~message =
+  let perform_single ({m; cache; proof_level} : Worker_state.t) ~message =
     let open Snark_work_lib in
     let sok_digest = Coda_base.Sok_message.digest message in
     fun (single : single_spec) ->

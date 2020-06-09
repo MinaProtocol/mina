@@ -92,7 +92,7 @@ let combine_split_commitments _t ~scale ~add ~xi (type n)
       List.fold_left comms ~init ~f:(fun acc p -> add p (scale acc xi))
 
 let combine_split_evaluations' (type a n m f f')
-    ({without_degree_bound=_; with_degree_bound} : (a, n, m) t)
+    ({without_degree_bound= _; with_degree_bound} : (a, n, m) t)
     ~(shifted_pow : a -> f' -> f') ~(mul : f -> f' -> f)
     ~(mul_and_add : acc:f' -> xi:f' -> f -> f') ~(evaluation_point : f')
     ~(xi : f') ~init:(i : f -> f') (evals0 : (f array, n) Vector.t)

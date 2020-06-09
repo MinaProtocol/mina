@@ -17,8 +17,7 @@ let domains (type field a)
     (module Impl : Snarky.Snark_intf.Run
       with type field = field
        and type R1CS_constraint_system.t = a
-                                           Zexe_backend
-                                           .R1cs_constraint_system
+                                           Zexe_backend.R1cs_constraint_system
                                            .t) (Spec.ETyp.T (typ, conv)) main =
   let main x () : unit = main (conv x) in
   domains (Impl.constraint_system ~exposing:[typ] main)

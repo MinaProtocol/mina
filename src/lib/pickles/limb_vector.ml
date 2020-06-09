@@ -57,11 +57,9 @@ module Constant = struct
       in
       Vector.take_from_list bits N.n
 
-    let of_fp x =
-      of_bits (List.take (Zexe_backend.Fp.to_bits x) length)
+    let of_fp x = of_bits (List.take (Zexe_backend.Fp.to_bits x) length)
 
-    let of_fq x =
-      of_bits (List.take (Zexe_backend.Fq.to_bits x) length)
+    let of_fq x = of_bits (List.take (Zexe_backend.Fq.to_bits x) length)
 
     let to_fp t = Zexe_backend.Fp.of_bits (to_bits t)
 

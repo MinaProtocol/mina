@@ -349,9 +349,7 @@ module Requests = struct
             Types.Pairing_based.Proof_state.t
             t
         | Messages :
-            ( G1.Constant.t
-            , Zexe_backend.Fp.t )
-            Pairing_marlin_types.Messages.t
+            (G1.Constant.t, Zexe_backend.Fp.t) Pairing_marlin_types.Messages.t
             t
         | Openings_proof : G1.Constant.t Tuple_lib.Triple.t t
     end
@@ -1391,7 +1389,9 @@ module Reduced_me_only = struct
   module Dlog_based = struct
     module Challenges_vector = struct
       type t =
-        (Challenge.Constant.t Scalar_challenge.Stable.Latest.t, bool) Bulletproof_challenge.t
+        ( Challenge.Constant.t Scalar_challenge.Stable.Latest.t
+        , bool )
+        Bulletproof_challenge.t
         Bp_vec.t
       [@@deriving bin_io, sexp, compare, yojson]
 
@@ -2568,8 +2568,7 @@ module Verification_key = struct
   module Id = struct
     include Cache.Wrap.Key.Verification
 
-    let dummy_id =
-      Type_equal.Id.(uid (create ~name:"dummy" sexp_of_opaque))
+    let dummy_id = Type_equal.Id.(uid (create ~name:"dummy" sexp_of_opaque))
 
     let dummy : unit -> t =
       let t = lazy (dummy_id, Md5.digest_string "") in
@@ -2603,9 +2602,7 @@ module Verification_key = struct
 
   let of_repr urs {Repr.commitments= c; step_domains; data= d} =
     let u = Unsigned.Size_t.of_int in
-    let g =
-      Zexe_backend.Fq_poly_comm.without_degree_bound_to_backend
-    in
+    let g = Zexe_backend.Fq_poly_comm.without_degree_bound_to_backend in
     let t =
       Snarky_bn382.Fq_verifier_index.make (u d.public_inputs) (u d.variables)
         (u d.constraints) (u d.nonzero_entries) (u d.max_degree) urs
@@ -2971,8 +2968,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
          match%bind Key_cache.read cache s_p k with
          | Ok (pk, d) ->
              return
-               ( Keypair.create ~pk
-                   ~vk:(Zexe_backend.Dlog_based.Keypair.vk pk)
+               ( Keypair.create ~pk ~vk:(Zexe_backend.Dlog_based.Keypair.vk pk)
                , d )
          | Error _e ->
              let r = generate_keypair ~exposing:[typ] main in
@@ -2996,8 +2992,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
             let pk = Keypair.pk kp in
             let vk : Vk.t =
               { index= vk
-              ; commitments=
-                  Zexe_backend.Dlog_based.Keypair.vk_commitments vk
+              ; commitments= Zexe_backend.Dlog_based.Keypair.vk_commitments vk
               ; step_domains
               ; data=
                   (let open Snarky_bn382.Fq_index in
@@ -3169,8 +3164,8 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
       let module V = H4.To_vector (Lazy_keys) in
       lazy
         (Vector.map (V.f prev_varss_length step_keypairs) ~f:(fun (_, vk) ->
-             Zexe_backend.Pairing_based.Keypair.vk_commitments
-               (Lazy.force vk) ))
+             Zexe_backend.Pairing_based.Keypair.vk_commitments (Lazy.force vk)
+         ))
     in
     let wrap_requests, wrap_main =
       let prev_wrap_domains =

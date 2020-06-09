@@ -3,11 +3,13 @@ open Snarky_bn382
 
 module type Intf = sig
   type t [@@deriving bin_io, sexp, compare]
+
   include Intf.Type_with_delete with type t := t
 
   val length_in_bytes : int
 
   val to_hex_string : t -> string
+
   val of_hex_string : string -> t
 
   val test_bit : t -> int -> bool
@@ -16,7 +18,7 @@ module type Intf = sig
 
   val of_ptr : char Ctypes.ptr -> t
 
-  val of_data: Bigstring.t -> bitcount:int -> t
+  val of_data : Bigstring.t -> bitcount:int -> t
 
   val of_decimal_string : string -> t
 
@@ -27,7 +29,9 @@ module T384 : Intf with type t = Snarky_bn382.Bigint384.t = struct
   open Bigint384
 
   let delete = delete
+
   let to_ptr = to_data
+
   let of_ptr = of_data
 
   let length_in_bytes = 48

@@ -82,8 +82,7 @@ module Input_domain = struct
                  |> Snarky_bn382.Fq_poly_comm.unshifted
                in
                assert (G.Affine.Vector.length v = 1) ;
-               G.Affine.Vector.get v 0
-               |> Zexe_backend.G.Affine.of_backend ) ))
+               G.Affine.Vector.get v 0 |> Zexe_backend.G.Affine.of_backend ) ))
 end
 
 module G = struct
@@ -221,7 +220,6 @@ end
 module Generators = struct
   let h =
     lazy
-      ( Snarky_bn382.Fq_urs.h
-          (Zexe_backend.Dlog_based.Keypair.load_urs ())
+      ( Snarky_bn382.Fq_urs.h (Zexe_backend.Dlog_based.Keypair.load_urs ())
       |> Zexe_backend.G.Affine.of_backend )
 end

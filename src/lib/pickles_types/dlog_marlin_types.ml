@@ -176,7 +176,7 @@ module Openings = struct
 
     type ('g, 'fq) t = ('g, 'fq) Stable.Latest.t =
       {lr: ('g * 'g) array; z_1: 'fq; z_2: 'fq; delta: 'g; sg: 'g}
-    [@@deriving  sexp, compare, yojson]
+    [@@deriving sexp, compare, yojson]
 
     open Snarky.H_list
 
@@ -206,13 +206,10 @@ module Openings = struct
     end
   end]
 
-    type ('g, 'fq, 'fqv) t = ('g, 'fq, 'fqv) Stable.Latest.t = 
-      { proof: ('g, 'fq) Bulletproof.t
-      ; evals:
-          'fqv Evals.t
-          * 'fqv Evals.t
-          * 'fqv Evals.t }
-    [@@deriving sexp, compare, yojson]
+  type ('g, 'fq, 'fqv) t = ('g, 'fq, 'fqv) Stable.Latest.t =
+    { proof: ('g, 'fq) Bulletproof.t
+    ; evals: 'fqv Evals.t * 'fqv Evals.t * 'fqv Evals.t }
+  [@@deriving sexp, compare, yojson]
 
   let to_hlist {proof; evals} = Snarky.H_list.[proof; evals]
 
@@ -263,8 +260,7 @@ module Poly_comm = struct
       end
     end]
 
-    type 'g t = 'g Stable.Latest.t
-    [@@deriving sexp, compare, yojson]
+    type 'g t = 'g Stable.Latest.t [@@deriving sexp, compare, yojson]
 
     let typ g ~length = Snarky.Typ.array ~length g
   end
@@ -280,10 +276,17 @@ module Messages = struct
         { w_hat: 'g Without_degree_bound.Stable.V1.t
         ; z_hat_a: 'g Without_degree_bound.Stable.V1.t
         ; z_hat_b: 'g Without_degree_bound.Stable.V1.t
-        ; gh_1: 'g With_degree_bound.Stable.V1.t * 'g Without_degree_bound.Stable.V1.t
-        ; sigma_gh_2: 'fq * ('g With_degree_bound.Stable.V1.t * 'g Without_degree_bound.Stable.V1.t)
-        ; sigma_gh_3: 'fq * ('g With_degree_bound.Stable.V1.t * 'g Without_degree_bound.Stable.V1.t)
-        }
+        ; gh_1:
+            'g With_degree_bound.Stable.V1.t
+            * 'g Without_degree_bound.Stable.V1.t
+        ; sigma_gh_2:
+            'fq
+            * ( 'g With_degree_bound.Stable.V1.t
+              * 'g Without_degree_bound.Stable.V1.t )
+        ; sigma_gh_3:
+            'fq
+            * ( 'g With_degree_bound.Stable.V1.t
+              * 'g Without_degree_bound.Stable.V1.t ) }
       [@@deriving bin_io, version, sexp, compare, yojson, fields]
     end
   end]
@@ -294,8 +297,7 @@ module Messages = struct
     ; z_hat_b: 'g Without_degree_bound.t
     ; gh_1: 'g With_degree_bound.t * 'g Without_degree_bound.t
     ; sigma_gh_2: 'fq * ('g With_degree_bound.t * 'g Without_degree_bound.t)
-    ; sigma_gh_3: 'fq * ('g With_degree_bound.t * 'g Without_degree_bound.t)
-    }
+    ; sigma_gh_3: 'fq * ('g With_degree_bound.t * 'g Without_degree_bound.t) }
   [@@deriving sexp, compare, yojson, fields]
 
   let to_hlist {w_hat; z_hat_a; z_hat_b; gh_1; sigma_gh_2; sigma_gh_3} =
@@ -329,14 +331,15 @@ module Proof = struct
   module Stable = struct
     module V1 = struct
       type ('g, 'fq, 'fqv) t =
-        {messages: ('g, 'fq) Messages.Stable.V1.t; openings: ('g, 'fq, 'fqv) Openings.Stable.V1.t}
+        { messages: ('g, 'fq) Messages.Stable.V1.t
+        ; openings: ('g, 'fq, 'fqv) Openings.Stable.V1.t }
       [@@deriving bin_io, version, sexp, compare, yojson]
     end
   end]
 
-    type ('g, 'fq, 'fqv) t = ('g, 'fq, 'fqv) Stable.Latest.t = 
-      {messages: ('g, 'fq) Messages.t; openings: ('g, 'fq, 'fqv) Openings.t}
-    [@@deriving sexp, compare, yojson]
+  type ('g, 'fq, 'fqv) t = ('g, 'fq, 'fqv) Stable.Latest.t =
+    {messages: ('g, 'fq) Messages.t; openings: ('g, 'fq, 'fqv) Openings.t}
+  [@@deriving sexp, compare, yojson]
 
   let to_hlist {messages; openings} = Snarky.H_list.[messages; openings]
 

@@ -276,8 +276,7 @@ module Proof = struct
     end
   end]
 
-  type t = Stable.Latest.t
-  [@@deriving yojson, compare, sexp]
+  type t = Stable.Latest.t [@@deriving yojson, compare, sexp]
 end
 
 [%%versioned
@@ -1318,7 +1317,8 @@ module Base = struct
    such that
    H(l1, l2, pending_coinbase_stack_state.source, pending_coinbase_stack_state.target, fee_excess, supply_increase) = top_hash,
    applying [t] to ledger with merkle hash [l1] results in ledger with merkle hash [l2]. *)
-  let%snarkydef main ~constraint_constants (statement : Statement.With_sok.Checked.t) =
+  let%snarkydef main ~constraint_constants
+      (statement : Statement.With_sok.Checked.t) =
     let%bind (module Shifted) = Tick.Inner_curve.Checked.Shifted.create () in
     let%bind t =
       with_label __LOC__
@@ -1440,7 +1440,8 @@ let system ~constraint_constants =
         ~branches:(module Nat.N2)
         ~max_branching:(module Nat.N2)
         ~name:"transaction-snark"
-        ~choices:(fun ~self -> [Base.rule ~constraint_constants; Merge.rule self]) )
+        ~choices:(fun ~self ->
+          [Base.rule ~constraint_constants; Merge.rule self] ) )
 
 module Verification = struct
   module type S = sig
@@ -1492,8 +1493,7 @@ module type S = sig
 end
 
 let check_transaction_union ?(preeval = false) ~constraint_constants
-    sok_message source target pc transaction
-    state_body_hash_opt handler =
+    sok_message source target pc transaction state_body_hash_opt handler =
   let sok_digest = Sok_message.digest sok_message in
   let handler =
     Base.transaction_union_handler handler transaction state_body_hash_opt
@@ -1591,7 +1591,8 @@ let verify ({statement; proof} : t) ~key ~message =
 
 module Make () = struct
   let tag, cache_handle, p, Pickles.Provers.[base; merge] =
-    system ~constraint_constants:Genesis_constants.Constraint_constants.compiled
+    system
+      ~constraint_constants:Genesis_constants.Constraint_constants.compiled
 
   module Proof = (val p)
 
@@ -1604,10 +1605,10 @@ module Make () = struct
 
   let verify ts =
     List.for_all ts ~f:(fun (p, m) ->
-      Sok_message.Digest.equal
-        (Sok_message.digest m)
-        p.statement.sok_digest )
-      && Proof.verify (List.map ts ~f:(fun ({ statement; proof }, _) -> (statement, proof)))
+        Sok_message.Digest.equal (Sok_message.digest m) p.statement.sok_digest
+    )
+    && Proof.verify
+         (List.map ts ~f:(fun ({statement; proof}, _) -> (statement, proof)))
 
   let of_transaction_union sok_digest source target
       ~pending_coinbase_stack_state transaction state_body_hash_opt handler =
@@ -1627,33 +1628,30 @@ module Make () = struct
                state_body_hash_opt)
           s }
 
-  let of_transaction ~sok_digest ~source ~target
-      ~pending_coinbase_stack_state transaction_in_block handler =
+  let of_transaction ~sok_digest ~source ~target ~pending_coinbase_stack_state
+      transaction_in_block handler =
     let transaction =
       Transaction_protocol_state.transaction transaction_in_block
     in
     let state_body_hash_opt =
       Transaction_protocol_state.block_data transaction_in_block
     in
-    of_transaction_union sok_digest source
-      target ~pending_coinbase_stack_state
+    of_transaction_union sok_digest source target ~pending_coinbase_stack_state
       (Transaction_union.of_transaction transaction)
       state_body_hash_opt handler
 
-  let of_user_command ~sok_digest ~source ~target
-      ~pending_coinbase_stack_state user_command_in_block handler =
-    of_transaction ~sok_digest ~source ~target
-      ~pending_coinbase_stack_state
+  let of_user_command ~sok_digest ~source ~target ~pending_coinbase_stack_state
+      user_command_in_block handler =
+    of_transaction ~sok_digest ~source ~target ~pending_coinbase_stack_state
       { user_command_in_block with
         transaction=
           User_command
             (Transaction_protocol_state.transaction user_command_in_block) }
       handler
 
-  let of_fee_transfer ~sok_digest ~source ~target
-      ~pending_coinbase_stack_state transfer_in_block handler =
-    of_transaction ~sok_digest ~source ~target
-      ~pending_coinbase_stack_state
+  let of_fee_transfer ~sok_digest ~source ~target ~pending_coinbase_stack_state
+      transfer_in_block handler =
+    of_transaction ~sok_digest ~source ~target ~pending_coinbase_stack_state
       { transfer_in_block with
         transaction=
           Fee_transfer
@@ -2961,9 +2959,8 @@ let constraint_system_digests () =
               main [x1; x2] x )) )
   ; ( "transaction-base"
     , digest
-  Base.(Tick.constraint_system ~exposing:[Statement.With_sok.typ] 
-          (main
+        Base.(
+          Tick.constraint_system ~exposing:[Statement.With_sok.typ]
+            (main
                ~constraint_constants:
-                 Genesis_constants.Constraint_constants.compiled)
-       )
-    ) ]
+                 Genesis_constants.Constraint_constants.compiled)) ) ]
