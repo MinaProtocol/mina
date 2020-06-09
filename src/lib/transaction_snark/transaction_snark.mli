@@ -2,15 +2,6 @@ open Core
 open Coda_base
 open Snark_params
 
-val reduce_fee_excesses :
-     Token_id.t * Currency.Amount.Signed.t
-  -> Token_id.t * Currency.Amount.Signed.t
-  -> Token_id.t * Currency.Amount.Signed.t
-  -> Token_id.t * Currency.Amount.Signed.t
-  -> ( (Token_id.t * Currency.Amount.Signed.t)
-     * (Token_id.t * Currency.Amount.Signed.t) )
-     Or_error.t
-
 (** For debugging. Logs to stderr the inputs to the top hash. *)
 val with_top_hash_logging : (unit -> 'a) -> 'a
 
@@ -52,16 +43,7 @@ module Statement : sig
         ; target: Coda_base.Frozen_ledger_hash.Stable.V1.t
         ; supply_increase: Currency.Amount.Stable.V1.t
         ; pending_coinbase_stack_state: Pending_coinbase_stack_state.t
-        ; fee_token_l: Coda_base.Token_id.Stable.V1.t
-        ; fee_excess_l:
-            ( Currency.Fee.Stable.V1.t
-            , Sgn.Stable.V1.t )
-            Currency.Signed_poly.Stable.V1.t
-        ; fee_token_r: Coda_base.Token_id.Stable.V1.t
-        ; fee_excess_r:
-            ( Currency.Fee.Stable.V1.t
-            , Sgn.Stable.V1.t )
-            Currency.Signed_poly.Stable.V1.t
+        ; fee_excess: Fee_excess.Stable.V1.t
         ; proof_type: Proof_type.Stable.V1.t }
       [@@deriving compare, equal, hash, sexp, yojson]
     end
@@ -72,10 +54,7 @@ module Statement : sig
     ; target: Coda_base.Frozen_ledger_hash.t
     ; supply_increase: Currency.Amount.t
     ; pending_coinbase_stack_state: Pending_coinbase_stack_state.t
-    ; fee_token_l: Coda_base.Token_id.t
-    ; fee_excess_l: Currency.Fee.Signed.t
-    ; fee_token_r: Coda_base.Token_id.t
-    ; fee_excess_r: Currency.Fee.Signed.t
+    ; fee_excess: Fee_excess.t
     ; proof_type: Proof_type.t }
   [@@deriving compare, equal, hash, sexp, yojson]
 
@@ -103,10 +82,7 @@ val create :
   -> proof_type:Proof_type.t
   -> supply_increase:Currency.Amount.t
   -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
-  -> fee_token_l:Token_id.t
-  -> fee_excess_l:Currency.Amount.Signed.t
-  -> fee_token_r:Token_id.t
-  -> fee_excess_r:Currency.Amount.Signed.t
+  -> fee_excess:Fee_excess.t
   -> sok_digest:Sok_message.Digest.t
   -> proof:Tock.Proof.t
   -> t

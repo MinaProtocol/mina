@@ -359,9 +359,12 @@ module Types = struct
               "Total transaction fee that is not accounted for in the \
                transition from source ledger to target ledger"
             ~args:Arg.[]
-            ~resolve:(fun _ {Transaction_snark.Statement.fee_excess_l; _} ->
+            ~resolve:
+              (fun _
+                   { Transaction_snark.Statement.fee_excess= {fee_excess_l; _}
+                   ; _ } ->
+              (* TODO: Expose full fee excess data. *)
               fee_excess_l )
-          (* TODO: Expose [fee_excess_r]. *)
         ; field "supplyIncrease" ~typ:(non_null uint64)
             ~doc:"Increase in total coinbase reward "
             ~args:Arg.[]

@@ -43,7 +43,7 @@ type t = Single.Stable.Latest.t One_or_two.Stable.Latest.t
 
 include Comparable.S with type t := t
 
-val fee_excess : t -> Currency.Fee.Signed.t Or_error.t
+val fee_excess : t -> Fee_excess.t Or_error.t
 
 val fee_token : t -> Token_id.t
 

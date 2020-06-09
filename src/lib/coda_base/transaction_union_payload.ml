@@ -205,6 +205,18 @@ let excess (payload : t) : Amount.Signed.t =
   | Coinbase ->
       Amount.Signed.zero
 
+let fee_excess (payload : t) =
+  match payload.body.tag with
+  | Payment | Stake_delegation ->
+      Fee_excess.of_single
+        (payload.common.fee_token, Fee.Signed.of_unsigned payload.common.fee)
+  | Fee_transfer ->
+      Fee_excess.of_single
+        ( payload.common.fee_token
+        , Fee.Signed.of_unsigned payload.common.fee |> Fee.Signed.negate )
+  | Coinbase ->
+      Fee_excess.of_single (Token_id.default, Fee.Signed.zero)
+
 let supply_increase (payload : payload) =
   let tag = payload.body.tag in
   match tag with

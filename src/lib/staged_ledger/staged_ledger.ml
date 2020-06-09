@@ -343,10 +343,7 @@ module T = struct
   let apply_transaction_and_get_statement ~constraint_constants ledger
       current_stack s state_body_hash_opt =
     let open Result.Let_syntax in
-    let%bind fee_token_l, fee_excess_l =
-      Transaction.fee_excess_l s |> to_staged_ledger_or_error
-    and fee_token_r, fee_excess_r =
-      Transaction.fee_excess_r s |> to_staged_ledger_or_error
+    let%bind fee_excess = Transaction.fee_excess s |> to_staged_ledger_or_error
     and supply_increase =
       Transaction.supply_increase s |> to_staged_ledger_or_error
     in
@@ -363,10 +360,7 @@ module T = struct
     ( undo
     , { Transaction_snark.Statement.source
       ; target= Ledger.merkle_root ledger |> Frozen_ledger_hash.of_ledger_hash
-      ; fee_token_l
-      ; fee_excess_l
-      ; fee_token_r
-      ; fee_excess_r
+      ; fee_excess
       ; supply_increase
       ; pending_coinbase_stack_state=
           {source= current_stack; target= pending_coinbase_after}
@@ -451,7 +445,6 @@ module T = struct
      the slots are split into two partitions, total fee excess of the transactions
      to be enqueued on each of the partitions should be zero respectively *)
   let check_zero_fee_excess scan_state data =
-    let zero = Fee.Signed.zero in
     let partitions = Scan_state.partition_if_overflowing scan_state in
     let txns_from_data data =
       List.fold_right ~init:(Ok []) data
@@ -464,26 +457,24 @@ module T = struct
           t :: acc )
     in
     let total_fee_excess txns =
-      List.fold txns ~init:(Ok (Some zero)) ~f:(fun fe (txn : Transaction.t) ->
-          let open Or_error.Let_syntax in
-          let%bind fe' = fe in
-          let%map fee_excess = Transaction.fee_excess txn in
-          Option.bind fe' ~f:(fun f -> Fee.Signed.add f fee_excess) )
+      List.fold_until txns ~init:Fee_excess.empty ~finish:Or_error.return
+        ~f:(fun acc (txn : Transaction.t) ->
+          match
+            let open Or_error.Let_syntax in
+            let%bind fee_excess = Transaction.fee_excess txn in
+            Fee_excess.combine acc fee_excess
+          with
+          | Ok fee_excess ->
+              Continue fee_excess
+          | Error _ as err ->
+              Stop err )
       |> to_staged_ledger_or_error
     in
     let open Result.Let_syntax in
     let check data slots =
       let%bind txns = txns_from_data data |> to_staged_ledger_or_error in
-      let%bind fe = total_fee_excess txns in
-      let%bind fe_no_overflow =
-        Option.value_map
-          ~default:
-            (to_staged_ledger_or_error
-               (Or_error.error_string "fee excess overflow"))
-          ~f:(fun fe -> Ok fe)
-          fe
-      in
-      if Fee.Signed.equal fe_no_overflow zero then Ok ()
+      let%bind fee_excess = total_fee_excess txns in
+      if Fee_excess.is_zero fee_excess then Ok ()
       else Error (Non_zero_fee_excess (slots, txns))
     in
     let%bind () = check (List.take data (fst partitions.first)) partitions in
@@ -1826,16 +1817,11 @@ let%test_module "test" =
     let assert_fee_excess :
         (Ledger_proof.t * Transaction.t list) option -> unit =
      fun proof_opt ->
-      let fee_excess_l =
-        Option.value_map ~default:Fee.Signed.zero proof_opt ~f:(fun proof ->
-            (Ledger_proof.statement (fst proof)).fee_excess_l )
+      let fee_excess =
+        Option.value_map ~default:Fee_excess.zero proof_opt
+          ~f:(fun (proof, _txns) -> (Ledger_proof.statement proof).fee_excess)
       in
-      let fee_excess_r =
-        Option.value_map ~default:Fee.Signed.zero proof_opt ~f:(fun proof ->
-            (Ledger_proof.statement (fst proof)).fee_excess_r )
-      in
-      assert (Fee.Signed.(equal fee_excess_l zero)) ;
-      assert (Fee.Signed.(equal fee_excess_r zero))
+      assert (Fee_excess.is_zero fee_excess)
 
     let transaction_capacity =
       Int.pow 2 constraint_constants.transaction_capacity_log_2

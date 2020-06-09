@@ -62,13 +62,17 @@ include Comparable.Make (Stable.Latest)
 
 let fee_excess = function
   | `One (_, fee) ->
-      Ok (Currency.Fee.Signed.negate @@ Currency.Fee.Signed.of_unsigned fee)
+      Ok
+        (Fee_excess.of_single
+           (Token_id.default, Currency.Fee.Signed.(negate (of_unsigned fee))))
   | `Two ((_, fee1), (_, fee2)) -> (
     match Currency.Fee.add fee1 fee2 with
     | None ->
         Or_error.error_string "Fee_transfer.fee_excess: overflow"
     | Some res ->
-        Ok (Currency.Fee.Signed.negate @@ Currency.Fee.Signed.of_unsigned res)
+        Ok
+          (Fee_excess.of_single
+             (Token_id.default, Currency.Fee.Signed.(negate (of_unsigned res))))
     )
 
 let fee_token _ = Token_id.default

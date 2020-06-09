@@ -88,14 +88,16 @@ module Job_view = struct
         [ ("Work_id", `Int (Transaction_snark.Statement.hash s))
         ; ("Source", hash_yojson s.source)
         ; ("Target", hash_yojson s.target)
-        ; ( "Fee Excess 1"
+        ; ( "Fee Excess"
           , `List
-              [ Token_id.to_yojson s.fee_token_l
-              ; Fee.Signed.to_yojson s.fee_excess_l ] )
-        ; ( "Fee Excess 2"
-          , `List
-              [ Token_id.to_yojson s.fee_token_r
-              ; Fee.Signed.to_yojson s.fee_excess_r ] )
+              [ `Assoc
+                  [ ("token", Token_id.to_yojson s.fee_excess.fee_token_l)
+                  ; ("amount", Fee.Signed.to_yojson s.fee_excess.fee_excess_l)
+                  ]
+              ; `Assoc
+                  [ ("token", Token_id.to_yojson s.fee_excess.fee_token_r)
+                  ; ("amount", Fee.Signed.to_yojson s.fee_excess.fee_excess_r)
+                  ] ] )
         ; ("Supply Increase", Amount.to_yojson s.supply_increase) ]
     in
     let job_to_yojson =
@@ -200,15 +202,11 @@ let create_expected_statement ~constraint_constants
     | _ ->
         pending_coinbase_with_state
   in
-  let%bind fee_token_l, fee_excess_l = Transaction.fee_excess_l transaction in
-  let%bind fee_token_r, fee_excess_r = Transaction.fee_excess_r transaction in
+  let%bind fee_excess = Transaction.fee_excess transaction in
   let%map supply_increase = Transaction.supply_increase transaction in
   { Transaction_snark.Statement.source
   ; target
-  ; fee_token_l
-  ; fee_excess_l
-  ; fee_token_r
-  ; fee_excess_r
+  ; fee_excess
   ; supply_increase
   ; pending_coinbase_stack_state=
       { Transaction_snark.Pending_coinbase_stack_state.source=
@@ -227,12 +225,7 @@ let completed_work_to_scanable_work (job : job) (fee, current_proof, prover) :
   | Merge ((p, _), (p', _)) ->
       let s = Ledger_proof.statement p and s' = Ledger_proof.statement p' in
       let open Or_error.Let_syntax in
-      let%map (fee_token_l, fee_excess_l), (fee_token_r, fee_excess_r) =
-        Transaction_snark.reduce_fee_excesses
-          (s.fee_token_l, Signed_poly.map ~f:Amount.of_fee s.fee_excess_l)
-          (s.fee_token_r, Signed_poly.map ~f:Amount.of_fee s.fee_excess_r)
-          (s'.fee_token_l, Signed_poly.map ~f:Amount.of_fee s'.fee_excess_l)
-          (s'.fee_token_r, Signed_poly.map ~f:Amount.of_fee s'.fee_excess_r)
+      let%map fee_excess = Fee_excess.combine s.fee_excess s'.fee_excess
       and supply_increase =
         Amount.add s.supply_increase s'.supply_increase
         |> option "Error adding supply_increases"
@@ -244,10 +237,7 @@ let completed_work_to_scanable_work (job : job) (fee, current_proof, prover) :
         ; pending_coinbase_stack_state=
             { source= s.pending_coinbase_stack_state.source
             ; target= s'.pending_coinbase_stack_state.target }
-        ; fee_token_l
-        ; fee_excess_l= Signed_poly.map ~f:Amount.to_fee fee_excess_l
-        ; fee_token_r
-        ; fee_excess_r= Signed_poly.map ~f:Amount.to_fee fee_excess_r
+        ; fee_excess
         ; proof_type= `Merge }
       in
       ( Ledger_proof.create ~statement ~sok_digest ~proof
@@ -406,10 +396,7 @@ struct
               (Frozen_ledger_hash.equal hash current_ledger_hash)
               "did not connect with snarked ledger hash" )
     | Ok
-        { fee_token_l
-        ; fee_excess_l
-        ; fee_token_r
-        ; fee_excess_r
+        { fee_excess= {fee_token_l; fee_excess_l; fee_token_r; fee_excess_r}
         ; source
         ; target
         ; supply_increase= _
@@ -440,7 +427,7 @@ struct
         and () =
           clarify_error
             (Token_id.equal Token_id.default fee_token_r)
-            "nonzero fee token"
+            "nondefault fee token"
         in
         ()
 end
@@ -467,18 +454,8 @@ let statement_of_job : job -> Transaction_snark.Statement.t option = function
       let%bind () =
         Option.some_if (Frozen_ledger_hash.equal stmt1.target stmt2.source) ()
       in
-      let%map (fee_token_l, fee_excess_l), (fee_token_r, fee_excess_r) =
-        match
-          Transaction_snark.reduce_fee_excesses
-            ( stmt1.fee_token_l
-            , Signed_poly.map ~f:Amount.of_fee stmt1.fee_excess_l )
-            ( stmt1.fee_token_r
-            , Signed_poly.map ~f:Amount.of_fee stmt1.fee_excess_r )
-            ( stmt2.fee_token_l
-            , Signed_poly.map ~f:Amount.of_fee stmt2.fee_excess_l )
-            ( stmt2.fee_token_r
-            , Signed_poly.map ~f:Amount.of_fee stmt2.fee_excess_r )
-        with
+      let%map fee_excess =
+        match Fee_excess.combine stmt1.fee_excess stmt2.fee_excess with
         | Ok ret ->
             Some ret
         | Error _ ->
@@ -492,10 +469,7 @@ let statement_of_job : job -> Transaction_snark.Statement.t option = function
       ; pending_coinbase_stack_state=
           { source= stmt1.pending_coinbase_stack_state.source
           ; target= stmt2.pending_coinbase_stack_state.target }
-      ; fee_token_l
-      ; fee_excess_l= Signed_poly.map ~f:Amount.to_fee fee_excess_l
-      ; fee_token_r
-      ; fee_excess_r= Signed_poly.map ~f:Amount.to_fee fee_excess_r
+      ; fee_excess
       ; proof_type= `Merge }
 
 let create ~work_delay ~transaction_capacity_log_2 =
