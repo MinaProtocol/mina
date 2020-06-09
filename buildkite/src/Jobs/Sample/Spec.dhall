@@ -1,7 +1,9 @@
+let SelectFiles = ../../Lib/SelectFiles.dhall
+
 let JobSpec = ../../Pipeline/JobSpec.dhall
 
 in
 JobSpec::{
-  dirtyWhen = "transition",
+  dirtyWhen = [ SelectFiles.contains "transition" ],
   name = "Sample"
 }
