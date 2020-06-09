@@ -1446,11 +1446,11 @@ module Verification = struct
   module type S = sig
     val tag : tag
 
+    val verify : (t * Sok_message.t) list -> bool
+
     val id : Pickles.Verification_key.Id.t Lazy.t
 
     val verification_key : Pickles.Verification_key.t Lazy.t
-
-    val verify : t -> message:Sok_message.t -> bool
 
     val verify_against_digest : t -> bool
   end
@@ -1602,11 +1602,12 @@ module Make () = struct
   let verify_against_digest {statement; proof} =
     Proof.verify [(statement, proof)]
 
-  let verify t ~message =
-    Sok_message.Digest.equal
-      (Sok_message.digest message)
-      t.statement.sok_digest
-    && verify_against_digest t
+  let verify ts =
+    List.for_all ts ~f:(fun (p, m) ->
+      Sok_message.Digest.equal
+        (Sok_message.digest m)
+        p.statement.sok_digest )
+      && Proof.verify (List.map ts ~f:(fun ({ statement; proof }, _) -> (statement, proof)))
 
   let of_transaction_union sok_digest source target
       ~pending_coinbase_stack_state transaction state_body_hash_opt handler =

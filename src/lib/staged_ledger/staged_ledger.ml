@@ -19,10 +19,11 @@ module T = struct
     type t =
       | Non_zero_fee_excess of
           Scan_state.Space_partition.t * Transaction.t list
-      | Invalid_proof of
-          Ledger_proof.t
+      | Invalid_proofs of
+          ( Ledger_proof.t
           * Transaction_snark.Statement.t
-          * Public_key.Compressed.t
+          * Coda_base.Sok_message.t )
+          list
       | Pre_diff of Pre_diff_info.Error.t
       | Insufficient_work of string
       | Unexpected of Error.t
@@ -39,13 +40,16 @@ module T = struct
           Format.asprintf
             !"Pre_diff_info.Error error: %{sexp:Pre_diff_info.Error.t}"
             pre_diff_error
-      | Invalid_proof (_p, s, prover) ->
+      | Invalid_proofs ts ->
           Format.asprintf
-            !"Verification failed for proof with statement: %{sexp: \
-              Transaction_snark.Statement.t} work_id: %i Prover:%s}\n"
-            s
-            (Transaction_snark.Statement.hash s)
-            (Yojson.Safe.to_string @@ Public_key.Compressed.to_yojson prover)
+            !"Verification failed for proofs with (statement, work_id, \
+              prover): %{sexp: (Transaction_snark.Statement.t * int * string) \
+              list}\n"
+            (List.map ts ~f:(fun (_p, s, m) ->
+                 ( s
+                 , Transaction_snark.Statement.hash s
+                 , Yojson.Safe.to_string
+                   @@ Public_key.Compressed.to_yojson m.prover ) ))
       | Insufficient_work str ->
           str
       | Unexpected e ->
@@ -62,60 +66,93 @@ module T = struct
 
   type job = Scan_state.Available_job.t [@@deriving sexp]
 
-  let verify_proof ~logger ~verifier ~proof ~statement ~message =
+  let verify_proofs ~logger ~verifier proofs =
+    let statements () =
+      `List
+        (List.map proofs ~f:(fun (_, s, _) ->
+             Transaction_snark.Statement.to_yojson s ))
+    in
     let log_error err_str ~metadata =
       Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
         ~metadata:
-          ( [ ("statement", Transaction_snark.Statement.to_yojson statement)
+          ( [ ("statements", statements ())
             ; ("error", `String err_str)
-            ; ("sok_message", Sok_message.to_yojson message) ]
+            ; ( "sok_messages"
+              , `List
+                  (List.map proofs ~f:(fun (_, _, m) -> Sok_message.to_yojson m))
+              ) ]
           @ metadata )
         "Invalid transaction snark for statement $statement: $error" ;
       Deferred.return false
     in
-    let statement_eq a b = Int.(Transaction_snark.Statement.compare a b = 0) in
-    if not (statement_eq (Ledger_proof.statement proof) statement) then
+    if
+      List.exists proofs ~f:(fun (proof, statement, _msg) ->
+          not
+            (Transaction_snark.Statement.equal
+               (Ledger_proof.statement proof)
+               statement) )
+    then
       log_error "Statement and proof do not match"
         ~metadata:
-          [ ( "statement_from_proof"
-            , Transaction_snark.Statement.to_yojson
-                (Ledger_proof.statement proof) ) ]
+          [ ( "statements_from_proof"
+            , `List
+                (List.map proofs ~f:(fun (p, _, _) ->
+                     Transaction_snark.Statement.to_yojson
+                       (Ledger_proof.statement p) )) ) ]
     else
       let start = Time.now () in
-      match%bind Verifier.verify_transaction_snark verifier proof ~message with
+      match%bind
+        Verifier.verify_transaction_snarks verifier
+          (List.map proofs ~f:(fun (proof, _, msg) -> (proof, msg)))
+      with
       | Ok b ->
           let time_ms = Time.abs_diff (Time.now ()) start |> Time.Span.to_ms in
           Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
             ~metadata:
-              [ ("work_id", `Int (Transaction_snark.Statement.hash statement))
+              [ ( "work_id"
+                , `List
+                    (List.map proofs ~f:(fun (_, s, _) ->
+                         `Int (Transaction_snark.Statement.hash s) )) )
               ; ("time", `Float time_ms) ]
             "Verification in apply_diff for work $work_id took $time ms" ;
           Deferred.return b
       | Error e ->
           Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
             ~metadata:
-              [ ("statement", Transaction_snark.Statement.to_yojson statement)
+              [ ( "statement"
+                , `List
+                    (List.map proofs ~f:(fun (_, s, _) ->
+                         Transaction_snark.Statement.to_yojson s )) )
               ; ("error", `String (Error.to_string_hum e)) ]
             "Verifier error when checking transaction snark for statement \
              $statement: $error" ;
           exit 21
 
-  let verify ~logger ~verifier ~message job proof prover =
+  let map_opt xs ~f =
+    with_return (fun {return} ->
+        Some
+          (List.map xs ~f:(fun x ->
+               match f x with Some y -> y | None -> return None )) )
+
+  let verify ~logger ~verifier job_msg_proofs =
     let open Deferred.Let_syntax in
-    match Scan_state.statement_of_job job with
+    match
+      map_opt job_msg_proofs ~f:(fun (job, msg, proof) ->
+          Option.map (Scan_state.statement_of_job job) ~f:(fun s ->
+              (proof, s, msg) ) )
+    with
     | None ->
         Deferred.return
-          ( Or_error.errorf !"Error creating statement from job %{sexp:job}" job
+          ( Or_error.errorf
+              !"Error creating statement from job %{sexp:job list}"
+              (List.map job_msg_proofs ~f:(fun (j, _, _) -> j))
           |> to_staged_ledger_or_error )
-    | Some statement -> (
-        match%map
-          verify_proof ~logger ~verifier ~proof ~statement ~message
-        with
+    | Some proof_statement_msgs -> (
+        match%map verify_proofs ~logger ~verifier proof_statement_msgs with
         | true ->
             Ok ()
         | _ ->
-            Error
-              (Staged_ledger_error.Invalid_proof (proof, statement, prover)) )
+            Error (Staged_ledger_error.Invalid_proofs proof_statement_msgs) )
 
   module Statement_scanner = struct
     include Scan_state.Make_statement_scanner
@@ -123,15 +160,16 @@ module T = struct
               (struct
                 type t = unit
 
-                let verify ~verifier:() ~proof:_ ~statement:_ ~message:_ =
-                  Deferred.return true
+                let verify ~verifier:() _proofs = Deferred.return true
               end)
   end
 
   module Statement_scanner_proof_verifier = struct
     type t = {logger: Logger.t; verifier: Verifier.t}
 
-    let verify ~verifier:{logger; verifier} = verify_proof ~logger ~verifier
+    let verify ~verifier:{logger; verifier} ts =
+      verify_proofs ~logger ~verifier
+        (List.map ts ~f:(fun (p, m) -> (p, Ledger_proof.statement p, m)))
   end
 
   module Statement_scanner_with_proofs =
@@ -429,19 +467,16 @@ module T = struct
     let job_pairs =
       Scan_state.k_work_pairs_for_new_diff scan_state ~k:work_count
     in
-    let check job_proofs prover message =
-      One_or_two.Deferred_result.map job_proofs ~f:(fun (job, proof) ->
-          verify ~logger ~verifier ~message job proof prover )
-    in
-    let open Deferred.Let_syntax in
-    let%map result =
-      Deferred.List.find_map (List.zip_exn job_pairs completed_works)
+    let jmps =
+      List.concat_map (List.zip_exn job_pairs completed_works)
         ~f:(fun (jobs, work) ->
           let message = Sok_message.create ~fee:work.fee ~prover:work.prover in
-          Deferred.map ~f:Result.error
-          @@ check (One_or_two.zip_exn jobs work.proofs) work.prover message )
+          One_or_two.(
+            to_list
+              (map (zip_exn jobs work.proofs) ~f:(fun (job, proof) ->
+                   (job, message, proof) ))) )
     in
-    Option.value_map result ~default:(Ok ()) ~f:(fun e -> Error e)
+    verify jmps ~logger ~verifier
 
   (**The total fee excess caused by any diff should be zero. In the case where
      the slots are split into two partitions, total fee excess of the transactions
