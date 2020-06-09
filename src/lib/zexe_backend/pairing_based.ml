@@ -1,16 +1,10 @@
 module Bigint = struct
   module R = struct
-    include Bigint.R
+    include Fp.Bigint
 
-    let to_field x =
-      let r = Snarky_bn382.Fp.of_bigint x in
-      Gc.finalise Snarky_bn382.Fp.delete r ;
-      r
+    let to_field = Fp.of_bigint
 
-    let of_field x =
-      let r = Snarky_bn382.Fp.to_bigint x in
-      Gc.finalise Snarky_bn382.Bigint.delete r ;
-      r
+    let of_field = Fp.to_bigint
   end
 end
 
@@ -19,10 +13,31 @@ open Core_kernel
 let field_size : Bigint.R.t = Snarky_bn382.Fp.size ()
 
 module Field = Fp
-module Proving_key = Proving_key
-module R1CS_constraint_system =
-  R1cs_constraint_system.Make (Fp) (Snarky_bn382.Fp.Constraint_matrix)
-module Var = Var
+
+module Proving_key = struct
+  open Core
+  open Snarky_bn382
+
+  type t = Fp_index.t
+
+  include Binable.Of_binable
+            (Unit)
+            (struct
+              type t = Fp_index.t
+
+              let to_binable _ = ()
+
+              let of_binable () = failwith "TODO"
+            end)
+
+  let is_initialized _ = `Yes
+
+  let set_constraint_system _ _ = ()
+
+  let to_string _ = failwith "TODO"
+
+  let of_string _ = failwith "TODO"
+end
 
 module Verification_key = struct
   open Snarky_bn382
@@ -33,6 +48,10 @@ module Verification_key = struct
 
   let of_string _ = failwith "TODO"
 end
+
+module R1CS_constraint_system =
+  R1cs_constraint_system.Make (Fp) (Snarky_bn382.Fp.Constraint_matrix)
+module Var = Var
 
 module Oracles = struct
   open Snarky_bn382
