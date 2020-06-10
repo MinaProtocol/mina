@@ -1,4 +1,0 @@
-# Freshen the remote so that our diff is accurate
-git fetch origin
-./.buildkite/scripts/generate-diff.sh > $computed_diff.txt
-

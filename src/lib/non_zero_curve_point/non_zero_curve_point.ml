@@ -91,12 +91,10 @@ module Compressed = struct
           Quickcheck.random_value
             ~seed:(`Deterministic "nonzero_curve_point_compressed-seed") V1.gen
         in
-        let known_good_hash =
-          "\xC3\x5E\x26\x42\xA5\x04\x4A\x9D\x00\x17\xD8\x3E\xED\x84\x08\xDB\xD1\xA0\xCE\x13\x13\x10\x28\x80\x74\xD4\xF1\x25\x6C\x87\x44\x04"
-        in
+        let known_good_digest = "437f5bc6710b6a8fda8f9e8cf697fc2c" in
         Ppx_version.Serialization.check_serialization
           (module V1)
-          point known_good_hash
+          point known_good_digest
 
       [%%elif
       curve_size = 753]
@@ -106,12 +104,10 @@ module Compressed = struct
           Quickcheck.random_value
             ~seed:(`Deterministic "nonzero_curve_point_compressed-seed") V1.gen
         in
-        let known_good_hash =
-          "\x4C\x68\x08\xF4\xC0\xB7\xF1\x41\xFE\xDF\x43\x55\xDA\xB6\x13\xD4\x69\x46\x04\x51\x58\xF7\x92\x51\x02\x5B\x2B\x20\x3F\x6F\x2C\x11"
-        in
+        let known_good_digest = "067f8be67e5cc31f5c5ac4be91d5f6db" in
         Ppx_version.Serialization.check_serialization
           (module V1)
-          point known_good_hash
+          point known_good_digest
 
       [%%else]
 

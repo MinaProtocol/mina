@@ -5,8 +5,7 @@ open O1trace
 
 let run ~logger ~trust_system ~verifier ~network ~time_controller
     ~collected_transitions ~frontier ~network_transition_reader
-    ~producer_transition_reader ~clear_reader ~constraint_constants
-    ~precomputed_values =
+    ~producer_transition_reader ~clear_reader ~precomputed_values =
   let valid_transition_pipe_capacity = 30 in
   let valid_transition_reader, valid_transition_writer =
     Strict_pipe.create ~name:"valid transitions"
@@ -42,16 +41,19 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
         unprocessed_transition_cache t
       |> Strict_pipe.Writer.write primary_transition_writer ) ;
   trace_recurring "validator" (fun () ->
-      Transition_handler.Validator.run ~logger ~trust_system ~time_controller
-        ~frontier ~transition_reader:network_transition_reader
-        ~valid_transition_writer ~unprocessed_transition_cache ) ;
+      Transition_handler.Validator.run
+        ~consensus_constants:
+          (Precomputed_values.consensus_constants precomputed_values)
+        ~logger ~trust_system ~time_controller ~frontier
+        ~transition_reader:network_transition_reader ~valid_transition_writer
+        ~unprocessed_transition_cache ) ;
   Strict_pipe.Reader.iter_without_pushback valid_transition_reader
     ~f:(Strict_pipe.Writer.write primary_transition_writer)
   |> don't_wait_for ;
   let clean_up_catchup_scheduler = Ivar.create () in
   trace_recurring "processor" (fun () ->
-      Transition_handler.Processor.run ~logger ~constraint_constants
-        ~precomputed_values ~time_controller ~trust_system ~verifier ~frontier
+      Transition_handler.Processor.run ~logger ~precomputed_values
+        ~time_controller ~trust_system ~verifier ~frontier
         ~primary_transition_reader ~producer_transition_reader
         ~clean_up_catchup_scheduler ~catchup_job_writer
         ~catchup_breadcrumbs_reader ~catchup_breadcrumbs_writer

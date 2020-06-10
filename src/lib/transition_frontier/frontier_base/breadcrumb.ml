@@ -90,7 +90,7 @@ let build ~logger ~precomputed_values ~verifier ~trust_system ~parent
                 let open Staged_ledger.Pre_diff_info.Error in
                 let action =
                   match staged_ledger_error with
-                  | Invalid_proof _ ->
+                  | Invalid_proofs _ ->
                       make_actions Sent_invalid_proof
                   | Pre_diff (Bad_signature _) ->
                       make_actions Sent_invalid_signature
@@ -239,6 +239,9 @@ module For_tests = struct
     let gen_slot_advancement = Int.gen_incl 1 10 in
     let%map make_next_consensus_state =
       Consensus_state_hooks.For_tests.gen_consensus_state ~gen_slot_advancement
+        ~constraint_constants:
+          precomputed_values.Precomputed_values.constraint_constants
+        ~constants:precomputed_values.consensus_constants
     in
     fun parent_breadcrumb ->
       let open Deferred.Let_syntax in
@@ -267,6 +270,7 @@ module For_tests = struct
       in
       let staged_ledger_diff =
         Staged_ledger.create_diff parent_staged_ledger ~logger
+          ~constraint_constants:precomputed_values.constraint_constants
           ~coinbase_receiver:`Producer ~self:largest_account_public_key
           ~transactions_by_fee:transactions ~get_completed_work
       in
@@ -277,6 +281,7 @@ module For_tests = struct
         match%bind
           Staged_ledger.apply_diff_unchecked parent_staged_ledger
             staged_ledger_diff
+            ~constraint_constants:precomputed_values.constraint_constants
             ~state_body_hash:
               ( validated_transition parent_breadcrumb
               |> External_transition.Validated.protocol_state

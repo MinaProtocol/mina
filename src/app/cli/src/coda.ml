@@ -878,8 +878,7 @@ let daemon logger =
                 ~consensus_local_state ~transaction_database
                 ~external_transition_database ~is_archive_rocksdb
                 ~work_reassignment_wait ~archive_process_location
-                ~log_block_creation ~constraint_constants ~precomputed_values
-                ~proof_level ())
+                ~log_block_creation ~precomputed_values ~proof_level ())
          in
          {Coda_initialization.coda; client_trustlist; rest_server_port}
        in
@@ -895,8 +894,6 @@ let daemon logger =
        in
        coda_ref := Some coda ;
        let%bind () = maybe_sleep 3. in
-       let web_service = Web_pipe.get_service () in
-       Web_pipe.run_service coda web_service ~conf_dir ~logger ;
        Coda_run.setup_local_server ?client_trustlist ~rest_server_port
          ~insecure_rest_server coda ;
        let%bind () = Coda_lib.start coda in

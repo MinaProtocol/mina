@@ -17,7 +17,6 @@
   immutable_array
   key_value_database
   merkle_address
-  module_version
   non_empty_list
   signature_lib
   visualization)

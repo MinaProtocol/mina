@@ -22,12 +22,11 @@
   where option is one of "rpc", "asserted", or "binable".
 
   Without options (the common case), the type must be named "t", and its definition
-  occurs in the module hierarchy "Stable.Vn.T", where n is a positive integer.
+  occurs in the module hierarchy "Stable.Vn" or "Stable.Vn.T", where n is a positive integer.
 
   The "asserted" option asserts that the type is versioned, to allow compilation
   to proceed. The types referred to in the type are not checked for versioning
-  with this option. The type must be contained in the module hierarchy "Stable.Vn.T".
-  Eventually, all uses of this option should be removed.
+  with this option.
 
   The "binable" option is a synonym for "asserted". It assumes that the type
   will be serialized using a "Binable.Of_..." or "Make_binable" functors, which relies
@@ -62,6 +61,9 @@ let printing_ref = ref false
 let set_printing () = printing_ref := true
 
 let unset_printing () = printing_ref := false
+
+(* path is filename.ml.M1.M2.... *)
+let module_path_list path = List.drop (String.split path ~on:'.') 2
 
 (* print versioned types *)
 module Printing = struct
@@ -114,9 +116,10 @@ module Printing = struct
     {pstr_desc= Pstr_type (Ast.Recursive, type_decls); pstr_loc= Location.none}
 
   (* prints module_path:type_definition *)
-  let print_type ~options:_ ~path type_decls =
-    let path_len = List.length path in
-    List.iteri path ~f:(fun i s ->
+  let print_type ~loc:_ ~path (_rec_flag, type_decls) _rpc _asserted _binable =
+    let module_path = module_path_list path in
+    let path_len = List.length module_path in
+    List.iteri module_path ~f:(fun i s ->
         printf "%s" s ;
         if i < path_len - 1 then printf "." ) ;
     printf ":%!" ;
@@ -132,7 +135,7 @@ module Printing = struct
   (* we're worried about changes to the serialization of types, which can occur via changes to implementations,
      so nothing to do for signatures
   *)
-  let gen_empty_sig ~options:_ ~path:_ _type_decls = []
+  let gen_empty_sig ~loc:_ ~path:_ (_rec_flag, _type_decls) = []
 end
 
 (* real derivers *)
@@ -151,14 +154,11 @@ module Deriving = struct
   let validate_plain_type_decl inner3_modules type_decl =
     match inner3_modules with
     | ["T"; module_version; "Stable"] | module_version :: "Stable" :: _ ->
-        (* NOTE: The pattern here with "T" can be removed when the registration
-         functors are replaced with the versioned module ppx.
-      *)
         validate_module_version module_version type_decl.ptype_loc
     | _ ->
         Location.raise_errorf ~loc:type_decl.ptype_loc
-          "Versioned type must be contained in module path Stable.Vn.T, for \
-           some number n"
+          "Versioned type must be contained in module path Stable.Vn or \
+           Stable.Vn.T, for some number n"
 
   (* check that a versioned type occurs in valid module hierarchy and is named "t"
      (for RPC types, the name can be "query", "response", or "msg")
@@ -185,12 +185,11 @@ module Deriving = struct
             "Versioned type must be named \"%s\", got: \"%s\"" valid_name name ;
         validate_plain_type_decl inner3_modules type_decl
 
+  (* module structure in this case validated by linter *)
+
   let module_name_from_plain_path inner3_modules =
     match inner3_modules with
     | ["T"; module_version; "Stable"] | module_version :: "Stable" :: _ ->
-        (* NOTE: The pattern here with "T" can be removed when the registration
-         functors are replaced with the versioned module ppx.
-      *)
         module_version
     | _ ->
         failwith "module_name_from_plain_path: unexpected module path"
@@ -270,8 +269,7 @@ module Deriving = struct
         let module_path = Longident.flatten_exn prefix in
         is_jane_street_stable_module module_path
     | Lapply _ ->
-        Ppx_deriving.raise_errorf ~loc
-          "Type name contains unexpected application"
+        Location.raise_errorf ~loc "Type name contains unexpected application"
 
   (* disallow Stable.Latest types in versioned types *)
 
@@ -315,11 +313,11 @@ module Deriving = struct
             | [_] ->
                 generate_version_lets_for_core_types type_name core_types
             | _ ->
-                Ppx_deriving.raise_errorf ~loc:core_type.ptyp_loc
+                Location.raise_errorf ~loc:core_type.ptyp_loc
                   "Type constructor \"%s\" expects one type argument, got %d"
                   id (List.length core_types)
           else
-            Ppx_deriving.raise_errorf ~loc:core_type.ptyp_loc
+            Location.raise_errorf ~loc:core_type.ptyp_loc
               "\"%s\" is neither an OCaml type constructor nor a versioned type"
               id
       | Ldot (prefix, "t") ->
@@ -328,7 +326,7 @@ module Deriving = struct
              disallow Stable.Latest.t
           *)
           if is_stable_latest prefix then
-            Ppx_deriving.raise_errorf ~loc:core_type.ptyp_loc
+            Location.raise_errorf ~loc:core_type.ptyp_loc
               "Cannot use type of the form Stable.Latest.t within a versioned \
                type" ;
           let core_type_decls =
@@ -362,7 +360,7 @@ module Deriving = struct
             in
             [%str let _ = [%e versioned_ident]] @ core_type_decls
       | _ ->
-          Ppx_deriving.raise_errorf ~loc:core_type.ptyp_loc
+          Location.raise_errorf ~loc:core_type.ptyp_loc
             "Unrecognized type constructor for versioned type" )
     | Ptyp_tuple core_types ->
         (* type t = t1 * t2 * t3 *)
@@ -377,7 +375,7 @@ module Deriving = struct
         (* underscore *)
         []
     | _ ->
-        Ppx_deriving.raise_errorf ~loc:core_type.ptyp_loc
+        Location.raise_errorf ~loc:core_type.ptyp_loc
           "Can't determine versioning for contained type"
 
   and generate_version_lets_for_core_types type_name core_types =
@@ -440,7 +438,7 @@ module Deriving = struct
         | Some manifest ->
             generate_core_type_version_decls type_name manifest
         | None ->
-            Ppx_deriving.raise_errorf ~loc:type_decl.ptype_loc
+            Location.raise_errorf ~loc:type_decl.ptype_loc
               "Versioned type, not a label or variant, must have manifest \
                (right-hand side)" )
       | Ptype_variant ctor_decls ->
@@ -449,7 +447,7 @@ module Deriving = struct
       | Ptype_record label_decls ->
           generate_version_lets_for_label_decls type_name label_decls
       | Ptype_open ->
-          Ppx_deriving.raise_errorf ~loc:type_decl.ptype_loc
+          Location.raise_errorf ~loc:type_decl.ptype_loc
             "Versioned type may not be open"
     in
     constraint_type_version_decls @ main_type_version_decls
@@ -480,101 +478,86 @@ module Deriving = struct
         ; loc_end= type_decl2.ptype_loc.loc_end
         ; loc_ghost= true }
       in
-      Ppx_deriving.raise_errorf ~loc
+      Location.raise_errorf ~loc
         "Versioned type must be just one type \"t\", not a sequence of types"
     ) ;
     type_decl1
 
-  let check_for_option s options =
-    let is_s_opt opt =
-      match opt with
-      | str1, {pexp_desc= Pexp_ident {txt= Lident str2; _}; _} ->
-          String.equal s str1 && String.equal s str2
-      | _ ->
-          false
-    in
-    List.find options ~f:is_s_opt |> Option.is_some
-
-  let validate_options valid options =
-    let get_option_name (str, _) = str in
-    let is_valid opt =
-      get_option_name opt |> List.mem valid ~equal:String.equal
-    in
-    if not (List.for_all options ~f:is_valid) then
-      let exprs = List.map options ~f:snd in
-      let {pexp_loc= loc1; _} = List.hd_exn exprs in
-      let {pexp_loc= loc2; _} = List.hd_exn (List.rev exprs) in
-      let loc =
-        {loc_start= loc1.loc_start; loc_end= loc2.loc_end; loc_ghost= true}
-      in
-      Ppx_deriving.raise_errorf ~loc "Valid options to \"version\" are: %s"
-        (String.concat ~sep:"," valid)
-
-  let generate_let_bindings_for_type_decl_str ~options ~path type_decls =
-    ignore (validate_options ["rpc"; "asserted"; "binable"] options) ;
+  let generate_let_bindings_for_type_decl_str ~loc ~path
+      (_rec_flag, type_decls) rpc asserted binable =
+    (* binable is synonym for asserted,
+       in the sense that we don't require the type to be versioned
+    *)
+    let asserted = asserted || binable in
     let type_decl = get_type_decl_representative type_decls in
-    let asserted =
-      check_for_option "asserted" options || check_for_option "binable" options
-    in
-    let rpc = check_for_option "rpc" options in
     if asserted && rpc then
-      Ppx_deriving.raise_errorf ~loc:type_decl.ptype_loc
+      Location.raise_errorf ~loc:type_decl.ptype_loc
         "Options \"asserted\" and \"rpc\" cannot be combined" ;
     let generation_kind = if rpc then Rpc else Plain in
-    let inner3_modules = List.take (List.rev path) 3 in
-    validate_type_decl inner3_modules generation_kind type_decl ;
-    let versioned_decls =
-      generate_versioned_decls ~asserted generation_kind type_decl
-    in
-    let type_name = type_decl.ptype_name.txt in
-    (* generate version number for Rpc response, but not for query, so we
-       don't get an unused value
+    let module_path = module_path_list path in
+    let inner3_modules = List.take (List.rev module_path) 3 in
+    (* TODO: when Module_version.Registration goes away, remove
+       the empty list special case
     *)
-    if generation_kind = Rpc && String.equal type_name "query" then
-      versioned_decls
-    else
-      generate_version_number_decl inner3_modules type_decl.ptype_loc
-        generation_kind
-      @ versioned_decls
+    if List.is_empty inner3_modules then
+      (* module path doesn't seem to be tracked inside test module *)
+      []
+    else (
+      validate_type_decl inner3_modules generation_kind type_decl ;
+      let versioned_decls =
+        generate_versioned_decls ~asserted generation_kind type_decl
+      in
+      let type_name = type_decl.ptype_name.txt in
+      (* generate version number for Rpc response, but not for query, so we
+         don't get an unused value
+      *)
+      if generation_kind = Rpc && String.equal type_name "query" then
+        versioned_decls
+      else
+        generate_version_number_decl inner3_modules loc generation_kind
+        @ versioned_decls )
 
-  let generate_val_decls_for_type_decl type_decl ~numbered =
+  let generate_val_decls_for_type_decl ~loc type_decl =
     match type_decl.ptype_kind with
     (* the structure of the type doesn't affect what we generate for signatures *)
     | Ptype_abstract | Ptype_variant _ | Ptype_record _ ->
-        let loc = type_decl.ptype_loc in
-        let versioned = [%sigi: val __versioned__ : unit] in
-        if numbered then [[%sigi: val version : int]; versioned]
-        else [versioned]
+        [[%sigi: val __versioned__ : unit]]
     | Ptype_open ->
         (* but the type can't be open, else it might vary over time *)
-        Ppx_deriving.raise_errorf ~loc:type_decl.ptype_loc
+        Location.raise_errorf ~loc
           "Versioned type in a signature must not be open"
 
-  let generate_val_decls_for_type_decl_sig ~options ~path:_ type_decls =
+  let generate_val_decls_for_type_decl_sig ~loc ~path:_ (_rec_flag, type_decls)
+      =
     (* in a signature, the module path may vary *)
-    ignore (validate_options ["numbered"] options) ;
     let type_decl = get_type_decl_representative type_decls in
-    let numbered = check_for_option "numbered" options in
-    generate_val_decls_for_type_decl type_decl ~numbered
+    generate_val_decls_for_type_decl ~loc type_decl
 end
 
 (* at preprocessing time, choose between printing, deriving derivers *)
 let choose_deriver ~printing ~deriving =
   if !printing_ref then printing else deriving
 
-let type_decl_str ~options ~path ty_decls =
+let str_type_decl :
+    (structure, rec_flag * type_declaration list) Ppxlib.Deriving.Generator.t =
+  let args =
+    let open Ppxlib.Deriving.Args in
+    empty +> flag "rpc" +> flag "asserted" +> flag "binable"
+  in
   let deriver =
     choose_deriver ~printing:Printing.print_type
       ~deriving:Deriving.generate_let_bindings_for_type_decl_str
   in
-  deriver ~options ~path ty_decls
+  Ppxlib.Deriving.Generator.make args deriver
 
-let type_decl_sig ~options ~path ty_decls =
+let sig_type_decl :
+    (signature, rec_flag * type_declaration list) Ppxlib.Deriving.Generator.t =
   let deriver =
     choose_deriver ~printing:Printing.gen_empty_sig
       ~deriving:Deriving.generate_val_decls_for_type_decl_sig
   in
-  deriver ~options ~path ty_decls
+  Ppxlib.Deriving.Generator.make_noarg deriver
 
 let () =
-  Ppx_deriving.(register (create deriver ~type_decl_str ~type_decl_sig ()))
+  Ppxlib.Deriving.add deriver ~str_type_decl ~sig_type_decl
+  |> Ppxlib.Deriving.ignore

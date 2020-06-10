@@ -8,6 +8,7 @@ let main () =
   let postgres_address =
     Uri.of_string "postgres://admin:codarules@localhost:5432/archiver"
   in
+  let constraint_constants = Genesis_constants.Constraint_constants.compiled in
   let%bind conn =
     match%map Caqti_async.connect postgres_address with
     | Ok conn ->
@@ -16,7 +17,8 @@ let main () =
         failwith @@ Caqti_error.show e
   in
   let logger = Logger.create () in
-  Archive_lib.Processor.setup_server ~logger ~postgres_address
+  Archive_lib.Processor.setup_server ~logger ~constraint_constants
+    ~postgres_address
     ~server_port:(Host_and_port.port archive_address)
   |> don't_wait_for ;
   let public_key = Test_genesis_ledger.largest_account_pk_exn () in
