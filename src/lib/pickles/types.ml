@@ -139,26 +139,6 @@ module Dlog_based = struct
                  |> Sequence.map ~f:snd |> Sequence.to_array ))
               ~f:(fun g -> Array.of_list (g1_to_field_elements g)) ]
 
-      (*
-
-      let to_field_elements
-          { pairing_marlin_acc=
-              { opening_check= {r_f_minus_r_v_plus_rz_pi; r_pi}
-              ; degree_bound_checks=
-                  {shifted_accumulator; unshifted_accumulators} }
-          ; pairing_marlin_index
-          ; old_bulletproof_challenges } ~g1:g1_to_field_elements =
-        Array.concat
-          [ index_to_field_elements ~g:g1_to_field_elements pairing_marlin_index
-          ; Vector.to_array old_bulletproof_challenges
-            |> Array.concat_map ~f:Vector.to_array
-          ; Array.concat_map
-              (Array.append
-                 [|r_f_minus_r_v_plus_rz_pi; r_pi; shifted_accumulator|]
-                 (Vector.to_array unshifted_accumulators))
-              ~f:(fun g -> Array.of_list (g1_to_field_elements g)) ]
-*)
-
       open Snarky.H_list
 
       let to_hlist {pairing_marlin_acc; old_bulletproof_challenges} =
@@ -395,12 +375,6 @@ module Pairing_based = struct
     module Pass_through = Dlog_based.Proof_state.Me_only
     module Me_only = Dlog_based.Pass_through
 
-    (* TODO: Delete
-    let _t =
-      let open Spec in
-      Struct [B Field; B Bool; Struct [Vector (B Digest, Nat.N10.n); B Field]]
-
-*)
     module Per_proof = struct
       type ( 'challenge
            , 'scalar_challenge
@@ -518,33 +492,6 @@ module Pairing_based = struct
       { proof_state: ('unfinalized_proofs, 'me_only) Proof_state.t
       ; pass_through: 'pass_through }
     [@@deriving bin_io, sexp, compare, yojson]
-
-    (* Basic types:
-       - Boolean
-       - Digest
-       - Challenge
-       - Field
-
-       Compound
-       - array
-       - vector
-    *)
-
-    (*  Need:
-        - a "type" for the data
-          (essentially a big product type of all the basic inputs in order)
-        - a function from the source type to that type
-        - a typ value for that type
-        - a funciton for laying it out into a bunch of bitstring/field elts
-
-        want to simultaneously compute given (x : input)
-
-        type data_var data_value
-
-        val typ : (data_var, data_value)
-
-        val pack : input -> data_var
-    *)
 
     let to_data {proof_state= {unfinalized_proofs; me_only}; pass_through} =
       let open Hlist.HlistId in

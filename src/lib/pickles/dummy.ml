@@ -2,7 +2,6 @@ open Core
 open Pickles_types
 open Zexe_backend
 
-(* TODO: Set to real values *)
 let wrap_domains = Common.wrap_domains
 
 let pairing_acc = Pairing_acc.dummy

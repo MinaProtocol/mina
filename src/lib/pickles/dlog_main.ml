@@ -108,24 +108,6 @@ module Make
               with type Impl.field = Zexe_backend.Fq.t
                and type G1.Constant.Scalar.t = Zexe_backend.Fp.t) =
 struct
-  module Opt_sponge =
-    Sponge.Make_bit_sponge (struct
-        type t = Inputs.Impl.Boolean.var
-      end)
-      (struct
-        open Inputs.Impl
-
-        type t = Field.t
-
-        let to_bits = Field.choose_preimage_var ~length:Field.size_in_bits
-      end)
-      (struct
-        open Inputs.Impl
-
-        type t = Boolean.var * Field.t
-      end)
-      (Opt_sponge.Make (Inputs.Impl))
-
   open Inputs
   open Impl
 
