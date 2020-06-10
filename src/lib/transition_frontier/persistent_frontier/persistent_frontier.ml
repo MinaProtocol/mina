@@ -78,13 +78,13 @@ module Instance = struct
     | Some sync ->
         f sync
 
-  let start_sync t =
+  let start_sync ~constraint_constants t =
     let open Result.Let_syntax in
     let%bind () = assert_no_sync t in
     let%map base_hash = Database.get_frontier_hash t.db in
     t.sync
     <- Some
-         (Sync.create ~logger:t.factory.logger
+         (Sync.create ~constraint_constants ~logger:t.factory.logger
             ~time_controller:t.factory.time_controller ~base_hash ~db:t.db)
 
   let stop_sync t =
@@ -258,9 +258,8 @@ module Instance = struct
                    |> Deferred.return
              in
              let%bind breadcrumb =
-               Breadcrumb.build
-                 ~constraint_constants:precomputed_values.constraint_constants
-                 ~logger:t.factory.logger ~verifier:t.factory.verifier
+               Breadcrumb.build ~logger:t.factory.logger ~precomputed_values
+                 ~verifier:t.factory.verifier
                  ~trust_system:(Trust_system.null ()) ~parent ~transition
                  ~sender:None
              in
