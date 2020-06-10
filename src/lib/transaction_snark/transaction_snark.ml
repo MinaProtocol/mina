@@ -2097,11 +2097,11 @@ struct
       transition12 transition23 =
     let fee_excess =
       Or_error.ok_exn
-      @@ Fee_excess.combine transition12.fee_excess transition23.fee_excess
+      @@ Fee_excess.combine transition12.Transition_data.fee_excess
+           transition23.Transition_data.fee_excess
     in
     let supply_increase =
-      Amount.add transition12.Transition_data.supply_increase
-        transition23.Transition_data.supply_increase
+      Amount.add transition12.supply_increase transition23.supply_increase
       |> Option.value_exn
     in
     let top_hash =
