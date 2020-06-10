@@ -3,7 +3,7 @@ let Prelude = ../../External/Prelude.dhall
 let Decorate = ../../Lib/Decorate.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
-let Command = ../../Command/Base.dhall
+let Command = ../../Command/Coda.dhall
 let Docker = ../../Command/Docker/Type.dhall
 let Size = ../../Command/Size.dhall
 let JobSpec = ../../Pipeline/JobSpec.dhall
@@ -33,8 +33,6 @@ Pipeline.build
         commands = Decorate.decorateAll commands,
         label = "Build client-sdk",
         key = "build-client-sdk",
-        target = Size.Small,
-        docker = Docker::{ image = (../../Constants/ContainerImages.dhall).codaToolchain }
       }
     ]
   }
