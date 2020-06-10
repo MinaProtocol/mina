@@ -5,7 +5,6 @@ open Unsigned
 open Currency
 open Fold_lib
 open Signature_lib
-open Module_version
 open Snark_params
 open Bitstring_lib
 open Num_util

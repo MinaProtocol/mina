@@ -277,12 +277,10 @@ module Verification_keys = struct
         let wrap = Tock.Verification_key.of_string "wrap key" in
         let merge = Tick.Verification_key.of_string "merge key" in
         let keys = V1.{base; wrap; merge} in
-        let known_good_hash =
-          "\x1B\x95\x7B\x94\xF0\xC0\xD0\x74\x47\xFA\x69\x26\x31\xBC\x19\xA5\x2E\x09\xE8\x20\x43\xEB\x4C\xFA\xEB\x11\x6B\x9A\x2A\x9B\xA2\xBA"
-        in
+        let known_good_digest = "1cade6287d659338ae1f2c3971ee8d06" in
         Ppx_version.Serialization.check_serialization
           (module V1)
-          keys known_good_hash
+          keys known_good_digest
     end
   end]
 

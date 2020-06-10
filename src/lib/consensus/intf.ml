@@ -478,8 +478,6 @@ module type S = sig
 
       val to_input : Value.t -> (Field.t, bool) Random_oracle.Input.t
 
-      val to_lite : (Value.t -> Lite_base.Consensus_state.t) option
-
       val display : Value.t -> display
 
       val consensus_time : Value.t -> Consensus_time.t
