@@ -42,34 +42,24 @@ module Message = struct
     Tick.Typ.of_hlistable data_spec ~var_to_hlist:to_hlist
       ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
-  let fold {state_hash} =
-    Fold_lib.Fold.group3 ~default:false (Coda_base.State_hash.fold state_hash)
-
   let gen =
     let open Quickcheck.Let_syntax in
     let%map state_hash = Coda_base.State_hash.gen in
     {state_hash}
 
   let hash_to_group ~constraint_constants:_ msg =
-    let msg_hash_state =
-      Snark_params.Tick.Pedersen.hash_fold
-        (Snark_params.Tick.Pedersen.State.create ())
-        (fold msg)
-    in
-    msg_hash_state.acc
+    Group_map.to_group
+      (Random_oracle.hash ~init:Coda_base.Hash_prefix.vrf_message
+         [|msg.state_hash|])
+    |> Tick.Inner_curve.of_affine
 
   module Checked = struct
-    let var_to_triples {state_hash} =
-      let open Snark_params.Tick in
-      let%map bits = Coda_base.State_hash.var_to_bits state_hash in
-      Bitstring_lib.Bitstring.pad_to_triple_list ~default:Boolean.false_ bits
-
     let hash_to_group msg =
-      let open Snark_params.Tick in
-      let%bind msg_triples = var_to_triples msg in
-      Pedersen.Checked.hash_triples
-        ~init:(Snark_params.Tick.Pedersen.State.create ())
-        msg_triples
+      Tick.make_checked (fun () ->
+          Group_map.Checked.to_group
+            (Random_oracle.Checked.hash ~init:Coda_base.Hash_prefix.vrf_message
+               (Random_oracle.Checked.pack_input
+                  (Coda_base.State_hash.var_to_input msg.state_hash))) )
   end
 end
 

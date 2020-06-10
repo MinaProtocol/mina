@@ -59,12 +59,10 @@ module Stable = struct
         Quickcheck.random_value ~seed:(`Deterministic "private key seed v1")
           V1.gen
       in
-      let known_good_hash =
-        "\xB5\xFE\x88\xB3\x7E\xDD\x30\x25\xA2\xB5\x00\x69\xCA\x0E\xE3\xC4\xAC\x17\x57\x40\xAD\x85\x40\xBB\x55\xDE\x3C\xB6\x30\xAD\x52\x5B"
-      in
+      let known_good_digest = "4bbc6cd7832cfc67f0fe3abcd7f765df" in
       Ppx_version.Serialization.check_serialization
         (module V1)
-        pk known_good_hash
+        pk known_good_digest
 
     [%%elif
     curve_size = 753]
@@ -74,12 +72,10 @@ module Stable = struct
         Quickcheck.random_value ~seed:(`Deterministic "private key seed v1")
           V1.gen
       in
-      let known_good_hash =
-        "\x61\xB5\xC7\xDD\x3F\x67\x72\xD4\x8F\x58\x59\xD9\xE2\x2B\x2C\x94\xDD\x09\x83\x50\x1E\x8E\x2E\x9E\xBD\x48\x94\x9D\xC9\x8B\x51\x0A"
-      in
+      let known_good_digest = "65c75a7d10b6ce193f0c0e296611a935" in
       Ppx_version.Serialization.check_serialization
         (module V1)
-        pk known_good_hash
+        pk known_good_digest
 
     [%%else]
 

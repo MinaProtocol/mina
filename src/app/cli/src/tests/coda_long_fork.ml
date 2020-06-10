@@ -10,16 +10,12 @@ let main n waiting_time () =
   in
   let consensus_constants = precomputed_values.consensus_constants in
   let logger = Logger.create () in
-  let keypairs =
+  let public_keys =
     List.map
       (Lazy.force Test_genesis_ledger.accounts)
-      ~f:Test_genesis_ledger.keypair_of_account_record_exn
+      ~f:Test_genesis_ledger.pk_of_account_record
   in
-  let snark_work_public_keys i =
-    Some
-      ( (List.nth_exn keypairs i).public_key
-      |> Signature_lib.Public_key.compress )
-  in
+  let snark_work_public_keys i = Some (List.nth_exn public_keys i) in
   let%bind testnet =
     Coda_worker_testnet.test ~name logger n Option.some snark_work_public_keys
       Cli_lib.Arg_type.Work_selection_method.Sequence

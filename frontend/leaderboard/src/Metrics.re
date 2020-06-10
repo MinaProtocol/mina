@@ -121,14 +121,18 @@ let getHighestSnarkFeeCollected = blocks => {
   blocks |> calculateProperty(calculateHighestSnarkFeeCollected);
 };
 
-let getTransactionsSentToAddress = (blocks, address) => {
+let getTransactionsSentToAddress = (blocks, addresses) => {
   blocks
   |> Array.fold_left(
        (map, block: Types.NewBlock.data) => {
          block.transactions.userCommands
          |> Array.fold_left(
               (map, userCommand: Types.NewBlock.userCommands) => {
-                userCommand.toAccount.publicKey === address
+                addresses
+                |> List.filter(address => {
+                     userCommand.toAccount.publicKey === address
+                   })
+                |> List.length > 0
                   ? incrementMapValue(userCommand.fromAccount.publicKey, map)
                   : map
               },
@@ -172,7 +176,10 @@ let calculateAllUsers = metrics => {
   );
 };
 
-let echoBotPublicKey = "4vsRCVNep7JaFhtySu6vZCjnArvoAhkRscTy5TQsGTsKM4tJcYVc3uNUMRxQZAwVzSvkHDGWBmvhFpmCeiPASGnByXqvKzmHt4aR5uAWAQf3kqhwDJ2ZY3Hw4Dzo6awnJkxY338GEp12LE4x";
+let echoBotPublicKeys = [
+  "4vsRCVNep7JaFhtySu6vZCjnArvoAhkRscTy5TQsGTsKM4tJcYVc3uNUMRxQZAwVzSvkHDGWBmvhFpmCeiPASGnByXqvKzmHt4aR5uAWAQf3kqhwDJ2ZY3Hw4Dzo6awnJkxY338GEp12LE4x",
+  "4vsRCViQQRxXfkgEspR9vPWLypuSEGkZtHxjYF7srq5M1mZN4LSoX7wWCFZGitJLmdoozDXmrCugvBBKsePd6hfBAp9P3eTCHs5HwdC763A1FbjzskfrCvWMq9KXXsmFxWhYpG9nnhWzqSC1",
+];
 let calculateMetrics = blocks => {
   let blocksCreated = getBlocksCreatedByUser(blocks);
   let transactionSent = getTransactionSentByUser(blocks);
@@ -180,7 +187,7 @@ let calculateMetrics = blocks => {
   let snarkFeesCollected = getSnarkFeesCollected(blocks);
   let highestSnarkFeeCollected = getHighestSnarkFeeCollected(blocks);
   let transactionsReceivedByEcho =
-    getTransactionsSentToAddress(blocks, echoBotPublicKey);
+    getTransactionsSentToAddress(blocks, echoBotPublicKeys);
   let coinbaseReceiverChallenge = getCoinbaseReceiverChallenge(blocks);
 
   calculateAllUsers([
