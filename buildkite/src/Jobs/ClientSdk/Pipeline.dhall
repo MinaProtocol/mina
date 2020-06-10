@@ -19,6 +19,7 @@ let opamCommands =
 
 let commands =
   opamCommands # [
+    "mkdir -p /tmp/artifacts",
     "bash -c 'set -o pipefail; eval `opam config env` && make client_sdk 2>&1 | tee /tmp/artifacts/buildclientsdk.log'"
   ]
 
