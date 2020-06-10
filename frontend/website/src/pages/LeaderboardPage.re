@@ -1,12 +1,6 @@
 module Styles = {
   open Css;
-  let page =
-    style([
-      maxWidth(`rem(81.5)),
-      paddingLeft(`rem(1.25)),
-      paddingRight(`rem(1.25)),
-      margin(`auto),
-    ]);
+  let page = style([maxWidth(`rem(89.0)), margin(`auto)]);
 
   let header = merge([Theme.H1.basic, style([marginTop(`rem(4.))])]);
 
@@ -14,7 +8,7 @@ module Styles = {
     style([
       display(`flex),
       flexDirection(`column),
-      justifyContent(`spaceBetween),
+      justifyContent(`flexStart),
       alignItems(`center),
       media(
         Theme.MediaQuery.tablet,
@@ -36,13 +30,29 @@ module Styles = {
     style([
       display(`flex),
       flexDirection(`column),
-      position(`relative),
-      top(`rem(1.0)),
-      media(Theme.MediaQuery.notMobile, [flexDirection(`row)]),
+      marginTop(`rem(3.)),
+      media(
+        Theme.MediaQuery.notMobile,
+        [flexDirection(`row), justifyContent(`flexStart)],
+      ),
+      media(Theme.MediaQuery.tablet, [marginTop(`zero)]),
     ]);
 
-  let heroLeft = style([maxWidth(`rem(38.))]);
-  let heroRight = style([display(`flex), flexDirection(`column)]);
+  let heroLeft =
+    style([
+      maxWidth(`rem(38.)),
+      marginTop(`rem(2.5)),
+      media(Theme.MediaQuery.tablet, [marginTop(`zero)]),
+    ]);
+  let heroRight =
+    style([
+      display(`flex),
+      flexDirection(`column),
+      media(
+        Theme.MediaQuery.tablet,
+        [minHeight(`rem(21.)), marginLeft(`rem(6.))],
+      ),
+    ]);
   let flexColumn =
     style([
       display(`flex),
@@ -83,11 +93,17 @@ module StatisticsRow = {
           textAlign(`center),
         ]),
       ]);
-    let flexRow =
+    let container =
       style([
         display(`flex),
         flexDirection(`row),
-        justifyContent(`spaceBetween),
+        justifyContent(`spaceAround),
+        maxWidth(`rem(20.)),
+        flexWrap(`wrap),
+        media(
+          Theme.MediaQuery.notMobile,
+          [padding2(~v=`zero, ~h=`rem(2.5)), maxWidth(`rem(35.))],
+        ),
       ]);
     let flexColumn =
       style([
@@ -98,7 +114,7 @@ module StatisticsRow = {
   };
   [@react.component]
   let make = (~participants="456", ~blocks="123", ~genesisMembers="121") => {
-    <div className=Styles.flexRow>
+    <div className=Styles.container>
       <div className=Styles.flexColumn>
         <h2 className=Styles.statistic> {React.string("Participants")} </h2>
         <p className=Styles.value> {React.string(participants)} </p>
@@ -127,14 +143,14 @@ module HeroText = {
            that contribute to the development of the protocol.",
          )}
       </p>
-      <p className=Theme.Body.basic>
+      <span className=Theme.Body.basic>
         {React.string(
            "*Testnet Points (abbreviated 'pts') are designed solely to track contributions \
            to the Testnet and Testnet Points have no cash or other monetary value. \
            Testnet Points are not transferable and are not redeemable or exchangeable \
            for any cryptocurrency or digital assets. We may at any time amend or eliminate Testnet Points.",
          )}
-      </p>
+      </span>
     </div>;
   };
 };
@@ -157,11 +173,7 @@ let make = (~lastManualUpdatedDate) => {
           {React.string("Testnet Leaderboard")}
         </h1>
         <div className=Styles.heroRow>
-          <div className=Styles.heroLeft>
-            <Spacer height=4.3 />
-            <StatisticsRow />
-            <HeroText />
-          </div>
+          <div className=Styles.heroLeft> <StatisticsRow /> <HeroText /> </div>
           <div className=Styles.heroRight>
             <div className=Styles.buttonRow>
               <Button
@@ -178,7 +190,7 @@ let make = (~lastManualUpdatedDate) => {
                 bgColorHover=Theme.Colors.clover
               />
             </div>
-            <Spacer height=4.8 />
+            <Spacer height=3.0/>
             <div className=Styles.heroLinks>
               <div className=Styles.flexColumn>
                 <Next.Link href="">
