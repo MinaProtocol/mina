@@ -22,7 +22,7 @@ module Transition_frontier_validation =
 let catchup_timeout_duration (precomputed_values : Precomputed_values.t) =
   Block_time.Span.of_ms
     ( precomputed_values.genesis_constants.protocol.delta
-      * Coda_compile_config.block_window_duration_ms
+      * precomputed_values.constraint_constants.block_window_duration_ms
     |> Int64.of_int )
 
 let cached_transform_deferred_result ~transform_cached ~transform_result cached

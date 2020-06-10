@@ -31,8 +31,8 @@ end
 let setup (type n) ?(logger = Logger.null ())
     ?(trust_system = Trust_system.null ())
     ?(time_controller = Block_time.Controller.basic ~logger)
-    ~consensus_constants (states : (peer_state, n num_peers) Vect.t) :
-    n num_peers t =
+    ~(precomputed_values : Precomputed_values.t)
+    (states : (peer_state, n num_peers) Vect.t) : n num_peers t =
   let _, peers =
     Vect.fold_map states
       ~init:(Constants.init_ip, Constants.init_discovery_port)
@@ -60,6 +60,7 @@ let setup (type n) ?(logger = Logger.null ())
     ; is_seed= Vect.is_empty peers
     ; genesis_ledger_hash=
         Ledger.merkle_root (Lazy.force Test_genesis_ledger.t)
+    ; constraint_constants= precomputed_values.constraint_constants
     ; creatable_gossip_net=
         Gossip_net.Any.Creatable
           ( (module Gossip_net.Fake)
@@ -121,7 +122,9 @@ let setup (type n) ?(logger = Logger.null ())
                                  ledger_hash)) )
                 ~get_ancestry:(fun query_env ->
                   Deferred.return
-                    (Sync_handler.Root.prove ~consensus_constants ~logger
+                    (Sync_handler.Root.prove
+                       ~consensus_constants:
+                         precomputed_values.consensus_constants ~logger
                        ~frontier
                        (Envelope.Incoming.data query_env)) )
                 ~get_best_tip:(fun _ -> failwith "Get_best_tip unimplemented")
@@ -189,8 +192,5 @@ module Generator = struct
       Vect.Quickcheck_generator.map configs ~f:(fun config ->
           config ~proof_level ~precomputed_values ~max_frontier_length )
     in
-    setup
-      ~consensus_constants:
-        (Precomputed_values.consensus_constants precomputed_values)
-      states
+    setup ~precomputed_values states
 end
