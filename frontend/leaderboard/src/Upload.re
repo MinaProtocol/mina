@@ -155,7 +155,6 @@ let findChallenges = (metricsMap, userMap, sheetsData, usernameIndex) => {
              columnIndex,
              usernameIndex,
            );
-           ();
          | None => ()
          };
        | None => ()
