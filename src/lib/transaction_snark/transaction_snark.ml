@@ -2434,14 +2434,15 @@ let%test_module "transaction_snark" =
     end)
 
     let state_body =
-      let open Lazy.Let_syntax in
-      let%map compile_time_genesis =
-        Coda_state.Genesis_protocol_state.For_tests.genesis_state
+      let compile_time_genesis =
+        (*not using Precomputed_values.for_unit_test because of dependency cycle*)
+        Coda_state.Genesis_protocol_state.t
+          ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
+          ~constraint_constants ~consensus_constants
       in
       compile_time_genesis.data |> Coda_state.Protocol_state.body
 
-    let state_body_hash =
-      Lazy.map ~f:Coda_state.Protocol_state.Body.hash state_body
+    let state_body_hash = Coda_state.Protocol_state.Body.hash state_body
 
     let pending_coinbase_stack_target (t : Transaction.t) state_body_hash stack
         =
@@ -2553,11 +2554,11 @@ let%test_module "transaction_snark" =
 
     let%test_unit "coinbase with new state body hash" =
       Test_util.with_randomness 123456789 (fun () ->
-          coinbase_test (Lazy.force state_body) ~carryforward:false )
+          coinbase_test state_body ~carryforward:false )
 
     let%test_unit "coinbase with carry-forward state body hash" =
       Test_util.with_randomness 123456789 (fun () ->
-          coinbase_test (Lazy.force state_body) ~carryforward:true )
+          coinbase_test state_body ~carryforward:true )
 
     let%test_unit "new_account" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -2580,8 +2581,7 @@ let%test_module "transaction_snark" =
                         ~len:User_command_memo.max_digestible_string_length))
               in
               let current_global_slot =
-                Lazy.force state_body
-                |> Coda_state.Protocol_state.Body.consensus_state
+                Coda_state.Protocol_state.Body.consensus_state state_body
                 |> Consensus.Data.Consensus_state.curr_slot
               in
               let target =
@@ -2600,8 +2600,7 @@ let%test_module "transaction_snark" =
               in
               let pending_coinbase_stack = Pending_coinbase.Stack.empty in
               let pending_coinbase_stack_target =
-                pending_coinbase_stack_target (User_command t1)
-                  (Lazy.force state_body_hash)
+                pending_coinbase_stack_target (User_command t1) state_body_hash
                   pending_coinbase_stack
               in
               let pending_coinbase_stack_state =
@@ -2612,7 +2611,7 @@ let%test_module "transaction_snark" =
               check_user_command ~constraint_constants ~sok_message
                 ~source:(Ledger.merkle_root ledger)
                 ~target pending_coinbase_stack_state
-                {transaction= t1; block_data= Lazy.force state_body}
+                {transaction= t1; block_data= state_body}
                 (unstage @@ Sparse_ledger.handler sparse_ledger) ) )
 
     let account_fee = Fee.to_int constraint_constants.account_creation_fee
@@ -2623,15 +2622,13 @@ let%test_module "transaction_snark" =
       let state_body, state_body_hash, txn_global_slot =
         match txn_global_slot with
         | None ->
-            let state_body = Lazy.force state_body in
             let txn_global_slot =
               state_body |> Coda_state.Protocol_state.Body.consensus_state
               |> Consensus.Data.Consensus_state.curr_slot
             in
-            (state_body, Lazy.force state_body_hash, txn_global_slot)
+            (state_body, state_body_hash, txn_global_slot)
         | Some txn_global_slot ->
             let state_body =
-              let state_body = Lazy.force state_body in
               let state =
                 (* NB: The [previous_state_hash] is a dummy, do not use. *)
                 Coda_state.Protocol_state.create
@@ -2985,9 +2982,7 @@ let%test_module "transaction_snark" =
 
     let%test "base_and_merge: transactions in one block (t1,t2 in b1), \
               carryforward the state from a previous transaction t0 in b1" =
-      let state_hash_and_body1 =
-        (Lazy.force state_body_hash, Lazy.force state_body)
-      in
+      let state_hash_and_body1 = (state_body_hash, state_body) in
       test_base_and_merge ~state_hash_and_body1
         ~state_hash_and_body2:state_hash_and_body1 ~carryforward1:true
         ~carryforward2:true
@@ -2996,9 +2991,7 @@ let%test_module "transaction_snark" =
 
     let%test "base_and_merge: transactions in one block (t1,t2 in b1), don't \
               carryforward the state from a previous transaction t0 in b1" =
-      let state_hash_and_body1 =
-        (Lazy.force state_body_hash, Lazy.force state_body)
-      in
+      let state_hash_and_body1 = (state_body_hash, state_body) in
       test_base_and_merge ~state_hash_and_body1
         ~state_hash_and_body2:state_hash_and_body1 ~carryforward1:false
         ~carryforward2:true
@@ -3018,9 +3011,7 @@ let%test_module "transaction_snark" =
         in
         (state_body_hash0, state_body0)
       in
-      let state_hash_and_body2 =
-        (Lazy.force state_body_hash, Lazy.force state_body)
-      in
+      let state_hash_and_body2 = (state_body_hash, state_body) in
       test_base_and_merge ~state_hash_and_body1 ~state_hash_and_body2
         ~carryforward1:true ~carryforward2:false
 
@@ -3041,9 +3032,7 @@ let%test_module "transaction_snark" =
         in
         (state_body_hash0, state_body0)
       in
-      let state_hash_and_body2 =
-        (Lazy.force state_body_hash, Lazy.force state_body)
-      in
+      let state_hash_and_body2 = (state_body_hash, state_body) in
       test_base_and_merge ~state_hash_and_body1 ~state_hash_and_body2
         ~carryforward1:false ~carryforward2:false
 

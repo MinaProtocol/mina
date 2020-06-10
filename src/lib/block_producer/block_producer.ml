@@ -486,7 +486,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                             return ()
                         | Ok transition -> (
                             let%bind breadcrumb_result =
-                              Breadcrumb.build ~logger ~constraint_constants
+                              Breadcrumb.build ~logger ~precomputed_values
                                 ~verifier ~trust_system ~parent:crumb
                                 ~transition ~sender:None
                             in

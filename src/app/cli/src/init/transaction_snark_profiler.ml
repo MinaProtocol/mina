@@ -112,11 +112,12 @@ let rec pair_up = function
   | _ ->
       failwith "Expected even length list"
 
+let precomputed_values = Precomputed_values.compiled
+
 let state_body =
   Coda_state.(
-    Lazy.map Genesis_protocol_state.For_tests.genesis_state
-      ~f:(fun compile_time_genesis ->
-        compile_time_genesis.data |> Protocol_state.body ))
+    Lazy.map precomputed_values ~f:(fun values ->
+        values.protocol_state_with_hash.data |> Protocol_state.body ))
 
 let state_body_hash =
   Lazy.map ~f:Coda_state.Protocol_state.Body.hash state_body
