@@ -12,12 +12,12 @@ KEY=$2
 PATH=$3
 
 if [[ "$MODE" == "save" ]]; then
-  tar cvf "$KEY.tar" "$PATH"
+  zip -r "$KEY.zip" "$PATH"
   buildkite-agent artifact upload "$KEY.tar" "gs://buildkite/coda/shared"
 elif [[ "$MODE" == "restore" ]]; then
   # restoring may fail if cache miss
-  gsutil -o GSUtil:parallel_composite_upload_threshold=100M -q cp "$KEY.tar" "." || true
-  tar xvf "$KEY.tar" "$PATH" || true
+  buildkite-agent artifact download "$KEY.zip" . || true
+  unzip "$KEY.zip" "$PATH" || true
 fi
 
 
