@@ -8,8 +8,7 @@ open Core_kernel
 [%%ifndef
 consensus_mechanism]
 
-module Outside_pedersen_image =
-  Outside_pedersen_image_nonconsensus.Outside_pedersen_image
+module Outside_hash_image = Outside_hash_image_nonconsensus.Outside_hash_image
 module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 open Snark_params_nonconsensus
 
@@ -25,21 +24,19 @@ include Data_hash.Make_full_size (struct
   let description = "State hash"
 end)
 
-let dummy = of_hash Outside_pedersen_image.t
+let dummy = of_hash Outside_hash_image.t
 
 [%%ifdef
 consensus_mechanism]
 
-let zero = Snark_params.Tick.Pedersen.zero_hash
+let zero = dummy
 
 [%%else]
 
 (* in the nonconsensus world, we don't have the Pedersen machinery available,
    so just inline the value for zero
 *)
-let zero =
-  Snark_params_nonconsensus.Field.of_string
-    "332637027557984585263317650500984572911029666110240270052776816409842001629441009391914692"
+let zero = Snark_params_nonconsensus.Field.of_string "0"
 
 [%%endif]
 

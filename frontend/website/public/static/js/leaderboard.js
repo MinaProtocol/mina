@@ -37,7 +37,7 @@ function renderChallenge(challenge) {
 function startLeaderboard() {
   return gapi.client.request({
     path:
-      "https://sheets.googleapis.com/v4/spreadsheets/1CLX9DF7oFDWb1UiimQXgh_J6jO4fVLJEcEnPVAOfq24/values/C3:N"
+      "https://sheets.googleapis.com/v4/spreadsheets/1Nq_Y76ALzSVJRhSFZZm4pfuGbPkZs2vTtCnVQ1ehujE/values/C3:N"
   }).then(
     function (response) {
       const {
@@ -73,7 +73,7 @@ function startLeaderboard() {
 function startChallenges() {
   return gapi.client.request({
     path:
-      "https://sheets.googleapis.com/v4/spreadsheets/1CLX9DF7oFDWb1UiimQXgh_J6jO4fVLJEcEnPVAOfq24/values/Challenges!A:AZ"
+      "https://sheets.googleapis.com/v4/spreadsheets/1Nq_Y76ALzSVJRhSFZZm4pfuGbPkZs2vTtCnVQ1ehujE/values/Challenges!A:AZ"
   }).then(
     function (response) {
       const {
