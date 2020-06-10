@@ -439,6 +439,10 @@ module type S = sig
 
         type t = Stable.Latest.t
         [@@deriving hash, eq, compare, sexp, to_yojson]
+
+        module For_tests : sig
+          val with_curr_global_slot : t -> Global_slot.t -> t
+        end
       end
 
       type display [@@deriving yojson]
@@ -480,10 +484,14 @@ module type S = sig
 
       val blockchain_length : Value.t -> Length.t
 
+      val curr_global_slot_var : var -> Global_slot.Checked.t
+
       val graphql_type :
         unit -> ('ctx, Value.t option) Graphql_async.Schema.typ
 
       val curr_slot : Value.t -> Slot.t
+
+      val curr_global_slot : Value.t -> Coda_numbers.Global_slot.t
 
       val is_genesis_state : Value.t -> bool
 

@@ -13,16 +13,16 @@ module Make (Inputs : Intf.Inputs_intf) :
     module Single = struct
       module Spec = struct
         type t =
-          ( Transaction.t Transaction_protocol_state.t
+          ( Transaction.t
           , Transaction_witness.t
           , Ledger_proof.t )
           Work.Single.Spec.t
-        [@@deriving sexp]
+        [@@deriving sexp, to_yojson]
       end
     end
 
     module Spec = struct
-      type t = Single.Spec.t Work.Spec.t [@@deriving sexp]
+      type t = Single.Spec.t Work.Spec.t [@@deriving sexp, to_yojson]
     end
 
     module Result = struct

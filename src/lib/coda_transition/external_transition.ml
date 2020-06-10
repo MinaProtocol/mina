@@ -1045,8 +1045,16 @@ module Staged_ledger_validation = struct
       Staged_ledger.apply
         ~constraint_constants:precomputed_values.constraint_constants ~logger
         ~verifier parent_staged_ledger staged_ledger_diff
-        ~state_body_hash:
-          Protocol_state.(Body.hash @@ body parent_protocol_state)
+        ~current_global_slot:
+          ( Coda_state.Protocol_state.(
+              Body.consensus_state @@ body parent_protocol_state)
+          |> Consensus.Data.Consensus_state.curr_slot )
+        ~state_and_body_hash:
+          (let body_hash =
+             Protocol_state.(Body.hash @@ body parent_protocol_state)
+           in
+           ( Protocol_state.hash_with_body parent_protocol_state ~body_hash
+           , body_hash ))
       |> Deferred.Result.map_error ~f:(fun e ->
              `Staged_ledger_application_failed e )
     in

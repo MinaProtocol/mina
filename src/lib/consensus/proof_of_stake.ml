@@ -1836,6 +1836,15 @@ module Data = struct
       type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash]
 
       let to_yojson = Stable.Latest.to_yojson
+
+      module For_tests = struct
+        let with_curr_global_slot (state : t) slot_number =
+          let curr_global_slot : Global_slot.t =
+            Global_slot.For_tests.of_global_slot state.curr_global_slot
+              slot_number
+          in
+          {state with curr_global_slot}
+      end
     end
 
     open Snark_params.Tick
@@ -2318,6 +2327,12 @@ module Data = struct
     let curr_epoch = curr_ Global_slot.epoch
 
     let curr_slot = curr_ Global_slot.slot
+
+    let curr_global_slot_var (t : var) =
+      Global_slot.slot_number t.curr_global_slot
+
+    let curr_global_slot (t : Value.t) =
+      Global_slot.slot_number t.curr_global_slot
 
     let consensus_time (t : Value.t) = t.curr_global_slot
 
