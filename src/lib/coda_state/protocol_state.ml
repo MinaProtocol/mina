@@ -285,14 +285,13 @@ let hash s =
 
 let negative_one ~genesis_ledger ~constraint_constants ~consensus_constants =
   { Poly.Stable.Latest.previous_state_hash=
-      State_hash.of_hash Snark_params.Tick.Pedersen.zero_hash
+      State_hash.of_hash Outside_hash_image.t
   ; body=
       { Body.Poly.blockchain_state=
           Blockchain_state.negative_one ~constraint_constants
             ~genesis_ledger_hash:
               (Coda_base.Ledger.merkle_root (Lazy.force genesis_ledger))
-      ; genesis_state_hash=
-          State_hash.of_hash Snark_params.Tick.Pedersen.zero_hash
+      ; genesis_state_hash= State_hash.of_hash Outside_hash_image.t
       ; consensus_state=
           Consensus.Data.Consensus_state.negative_one ~genesis_ledger
             ~constants:consensus_constants

@@ -26,7 +26,7 @@
     merkle_mask
     one_or_two
     o1trace
-    outside_pedersen_image
+    outside_hash_image
     ppx_version
     quickcheck_lib
     random_oracle

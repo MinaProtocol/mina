@@ -82,7 +82,7 @@ module type S = sig
 
     val empty_hash : t
 
-    val of_digest : Pedersen.Digest.t -> t
+    val of_digest : Random_oracle.Digest.t -> t
   end
 
   module Hash_versioned : sig
