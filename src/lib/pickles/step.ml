@@ -5,6 +5,7 @@ open Pickles_types
 open Hlist
 open Zexe_backend
 open Tuple_lib
+open Import
 open Types
 open Common
 

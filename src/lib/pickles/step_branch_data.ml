@@ -2,6 +2,7 @@ open Core
 open Pickles_types
 open Hlist
 open Common
+open Import
 
 (* The data obtained from "compiling" an inductive rule into a circuit. *)
 type ( 'a_var

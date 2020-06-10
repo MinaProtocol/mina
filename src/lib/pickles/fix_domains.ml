@@ -1,4 +1,5 @@
 open Core_kernel
+open Import
 
 let domains sys : Domains.t =
   let open Zexe_backend.R1cs_constraint_system in

@@ -1,5 +1,4 @@
 (* q > p *)
-module D = Digest
 open Core_kernel
 open Import
 open Util
@@ -7,6 +6,7 @@ open Types.Pairing_based
 module SC = Scalar_challenge
 open Pickles_types
 open Common
+open Import
 
 module Make
     (Inputs : Intf.Pairing_main_inputs.S
@@ -18,7 +18,7 @@ struct
   module PC = G
   module Fp = Impl.Field
   module Challenge = Challenge.Make (Impl)
-  module Digest = D.Make (Impl)
+  module Digest = Digest.Make (Impl)
 
   (* q > p *)
   module Fq = struct

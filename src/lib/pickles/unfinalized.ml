@@ -1,6 +1,7 @@
 open Impls.Pairing_based
 open Pickles_types
 open Common
+open Import
 
 (* Unfinalized dlog-based proof *)
 type t =

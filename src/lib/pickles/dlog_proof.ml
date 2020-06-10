@@ -1,5 +1,6 @@
 open Pickles_types
 open Zexe_backend
+open Import
 
 type dlog_opening =
   (G.Affine.t, Fq.t) Types.Pairing_based.Openings.Bulletproof.t

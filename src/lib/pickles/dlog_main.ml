@@ -1,5 +1,3 @@
-module D = Digest
-
 module type Inputs = Intf.Dlog_main_inputs.S
 
 open Core_kernel
@@ -10,6 +8,7 @@ open Pickles_types
 open Dlog_marlin_types
 module Accumulator = Pairing_marlin_types.Accumulator
 open Tuple_lib
+open Import
 
 let sg_polynomial ~add ~mul chals chal_invs pt =
   let ( + ) = add and ( * ) = mul in
@@ -183,7 +182,7 @@ struct
   module PC = G1
   module Fq = Field
   module Challenge = Challenge.Make (Impl)
-  module Digest = D.Make (Impl)
+  module Digest = Digest.Make (Impl)
   module Scalar_challenge = SC.Make (Impl) (G1) (Challenge) (Endo.Pairing)
 
   let product m f = List.reduce_exn (List.init m ~f) ~f:Field.( * )

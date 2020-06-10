@@ -2,6 +2,7 @@ open Core
 open Pickles_types
 open Hlist
 open Common
+open Import
 open Types
 
 module Dmain = Dlog_main.Make (struct

@@ -3,6 +3,7 @@ open Pickles_types
 open Zexe_backend
 open Tuple_lib
 open Common
+open Import
 
 type t =
   (G1.Affine.t, G1.Affine.t Unshifted_acc.t) Pairing_marlin_types.Accumulator.t

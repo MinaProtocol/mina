@@ -1,4 +1,4 @@
-module D = Digest
+module D = Limb_vector.Digest
 open Core_kernel
 open Pickles_types
 open Hlist
@@ -150,7 +150,7 @@ let rec etyp : type f var value env.
 
 module Common (Impl : Snarky.Snark_intf.Run) = struct
   module Digest = D.Make (Impl)
-  module Challenge = Challenge.Make (Impl)
+  module Challenge = Limb_vector.Challenge.Make (Impl)
   open Impl
 
   module Env = struct
@@ -244,7 +244,7 @@ let packed_typ_basic (type field other_field other_field_var)
     (field : (other_field_var, other_field, field) ETyp.t) =
   let open Impl in
   let module Digest = D.Make (Impl) in
-  let module Challenge = Challenge.Make (Impl) in
+  let module Challenge = Limb_vector.Challenge.Make (Impl) in
   let module Env = struct
     type ('other_field, 'other_field_var, 'a) t =
       < field1: 'other_field

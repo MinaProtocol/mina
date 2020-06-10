@@ -1,9 +1,8 @@
-module D = Digest
 open Core
-module Digest = D
 open Pickles_types
 open Common
 open Hlist
+open Import
 
 let index_commitment_length k =
   Int.round_up ~to_multiple_of:crs_max_degree (Domain.size k) / crs_max_degree

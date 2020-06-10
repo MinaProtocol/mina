@@ -1,6 +1,8 @@
 open Core_kernel
 open Pickles_types
 
+module Domain = Marlin_checks.Domain
+
 module Make (Impl : Snarky.Snark_intf.Run) = struct
   open Impl
 

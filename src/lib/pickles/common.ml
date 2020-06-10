@@ -1,11 +1,10 @@
-module D = Digest
 open Core_kernel
-module Digest = D
 open Pickles_types
 module G = Zexe_backend.G
 module Rounds = Zexe_backend.Dlog_based.Rounds
 module Unshifted_acc =
   Pairing_marlin_types.Accumulator.Degree_bound_checks.Unshifted_accumulators
+open Import
 
 let crs_max_degree = 1 lsl Nat.to_int Rounds.n
 

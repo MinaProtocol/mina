@@ -6,6 +6,8 @@ module type S = Intf.Dlog_main_inputs.S
 open Zexe_backend
 module Impl = Impls.Dlog_based
 
+open Import
+
 let fq_random_oracle ?length s = Fq.of_bits (bits_random_oracle ?length s)
 
 let unrelated_g =

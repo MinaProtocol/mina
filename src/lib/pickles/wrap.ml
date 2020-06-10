@@ -1,14 +1,13 @@
 module SC = Scalar_challenge
 module P = Proof
-module D = Digest
 open Pickles_types
 open Hlist
 open Tuple_lib
 open Zexe_backend
-open Types
 open Common
 open Core
-module Digest = D
+open Import
+open Types
 
 (* This contains the "wrap" prover *)
 
@@ -301,7 +300,7 @@ let wrap (type max_branching max_local_max_branchings) max_branching
               ~f:(fun (_, should_verify) -> not should_verify)
               (Vector.to_list prev_statement.proof_state.unfinalized_proofs)
         ; sponge_digest_before_evaluations=
-            D.Constant.of_fp sponge_digest_before_evaluations
+            Digest.Constant.of_fp sponge_digest_before_evaluations
         ; me_only }
     ; pass_through= prev_statement.proof_state.me_only }
   in

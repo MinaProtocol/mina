@@ -2,6 +2,9 @@ open Pickles_types
 module Scalar_challenge = Pickles_types.Scalar_challenge
 open Core_kernel
 
+module Bulletproof_challenge = Bulletproof_challenge
+module Spec = Spec
+
 let index_to_field_elements ({row; col; value} : 'a Abc.t Matrix_evals.t)
     ~g:g_to_field_elements =
   Array.concat_map [|row; col; value|] ~f:(fun {a; b; c} ->

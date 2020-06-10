@@ -1,9 +1,8 @@
-module D = Digest
 module SC = Scalar_challenge
 open Core
 open Pickles_types
-module Digest = D
 open Common
+open Import
 
 let verify (type a n) (module Max_branching : Nat.Intf with type n = n)
     (module A_value : Intf.Statement_value with type t = a)

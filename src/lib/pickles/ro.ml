@@ -1,8 +1,7 @@
-module D = Digest
 open Core
 open Zexe_backend
-module Digest = D
 open Pickles_types
+open Import
 
 let ro lab length f =
   let r = ref 0 in

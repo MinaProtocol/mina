@@ -1,6 +1,8 @@
 open Core_kernel
 open Pickles_types
 
+module Domain = Domain
+
 type 'field domain = < size: 'field ; vanishing_polynomial: 'field -> 'field >
 
 let debug = false
@@ -41,9 +43,11 @@ let domain (type t) ((module F) : t field) (domain : Domain.t) : t domain =
     method vanishing_polynomial x = vanishing_polynomial (module F) domain x
   end
 
+let all_but m = List.filter Abc.Label.all ~f:(( <> ) m)
+
 let checks (type t) (module F : Field_intf with type t = t) ~input_domain
     ~domain_h ~domain_k ~x_hat_beta_1
-    { Types.Dlog_based.Proof_state.Deferred_values.Marlin.sigma_2
+    { Composition_types.Dlog_based.Proof_state.Deferred_values.Marlin.sigma_2
     ; sigma_3
     ; alpha
     ; eta_a
@@ -65,8 +69,8 @@ let checks (type t) (module F : Field_intf with type t = t) ~input_domain
     ; col= {a= col_a; b= col_b; c= col_c}
     ; value= {a= value_a; b= value_b; c= value_c}
     ; rc= {a= rc_a; b= rc_b; c= rc_c} } =
-  let open Util in
   let open F in
+  let abc = Abc.abc in
   (* Marlin checks follow *)
   let row = abc row_a row_b row_c
   and col = abc col_a col_b col_c
@@ -94,16 +98,16 @@ let checks (type t) (module F : Field_intf with type t = t) ~input_domain
     in
     let a =
       v_h_beta_1 * v_h_beta_2
-      * sum ms (fun m -> eta m * value m * prod (all_but m) term)
+      * sum Abc.Label.all (fun m -> eta m * value m * prod (all_but m) term)
     in
-    let b = prod ms term in
+    let b = prod Abc.Label.all term in
     (a, b)
   in
   [ ( h_3 * domain_k#vanishing_polynomial beta_3
     , a_beta_3 - (b_beta_3 * ((beta_3 * g_3) + sigma_3)) )
   ; ( r_alpha beta_2 * sigma_3 * domain_k#size
     , (h_2 * v_h_beta_2) + sigma_2 + (g_2 * beta_2) )
-  ; ( r_alpha beta_1 * sum ms (fun m -> eta m * z_ m)
+  ; ( r_alpha beta_1 * sum Abc.Label.all (fun m -> eta m * z_ m)
     , (h_1 * v_h_beta_1) + (beta_1 * g_1) + (sigma_2 * domain_h#size * z_hat)
     ) ]
 

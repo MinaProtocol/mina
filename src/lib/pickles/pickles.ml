@@ -7,11 +7,10 @@ module type Statement_var_intf = Intf.Statement_var
 module type Statement_value_intf = Intf.Statement_value
 
 open Tuple_lib
-module D = Digest
 module SC = Scalar_challenge
 open Core_kernel
+open Import
 open Types
-module Digest = D
 open Pickles_types
 open Hlist
 open Pickles_types

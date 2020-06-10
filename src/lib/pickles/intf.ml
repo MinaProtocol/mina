@@ -1,5 +1,7 @@
 open Core_kernel
 open Pickles_types
+open Import
+
 module Sponge_lib = Sponge
 
 module Snarkable = struct

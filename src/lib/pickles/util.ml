@@ -1,17 +1,7 @@
 open Core_kernel
 open Import
 
-module M = struct
-  type t = A | B | C [@@deriving eq]
-end
-
-type m = M.t = A | B | C
-
-let ms = [A; B; C]
-
-let abc a b c = function A -> a | B -> b | C -> c
-
-let all_but m = List.filter ms ~f:(( <> ) m)
+type m = Pickles_types.Abc.Label.t = A | B | C
 
 let rec absorb : type a g1 f scalar.
        absorb_field:(f -> unit)

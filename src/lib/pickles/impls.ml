@@ -1,7 +1,6 @@
 open Pickles_types
-module D = Digest
 open Core_kernel
-module Digest = D
+open Import
 open Zexe_backend
 
 module Pairing_based = struct
@@ -32,7 +31,7 @@ module Pairing_based = struct
     let to_bits (x, b) = Field.unpack x ~length:(Field.size_in_bits - 1) @ [b]
   end
 
-  module Digest = D.Make (Impl)
+  module Digest = Digest.Make (Impl)
   module Challenge = Challenge.Make (Impl)
 
   let input ~branching ~bulletproof_log2 =
@@ -49,7 +48,7 @@ module Dlog_based = struct
   module Impl = Snarky.Snark.Run.Make (Dlog_based) (Unit)
   include Impl
   module Challenge = Challenge.Make (Impl)
-  module Digest = D.Make (Impl)
+  module Digest = Digest.Make (Impl)
   module Fq = Fq
 
   let input () =

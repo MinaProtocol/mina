@@ -2,6 +2,7 @@ open Core_kernel
 open Common
 open Zexe_backend
 module Impl = Impls.Pairing_based
+open Import
 
 let sponge_params_constant =
   Sponge.Params.(map bn382_p ~f:Impl.Field.Constant.of_string)
