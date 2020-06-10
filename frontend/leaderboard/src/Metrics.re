@@ -1,3 +1,25 @@
+/*
+  Metrics.re has the responsibilities of taking a collection of blocks as input
+  and transforming that block data into a Map of public keys to metricRecord types.
+  The metricRecord type is defined in Types/Metrics.
+
+  The data visualized for a Map is as follows, where x is some int value:
+
+ "public_key1": {
+    blocksCreated: x,
+    transactionSent: x,
+    snarkWorkCreated: x,
+    snarkFeesCollected: x,
+    highestSnarkFeeCollected: x,
+    transactionsReceivedByEcho: x,
+    coinbaseReceiver: x,
+ }
+
+  All the metrics to be computed are specified in calculateMetrics(). Each
+  metric to be computed is contained within it's own Map structure and is then
+  combined together with all other metric Maps.
+ */
+
 module StringMap = Map.Make(String);
 
 // Helper functions for gathering metrics
@@ -164,16 +186,13 @@ let getCoinbaseReceiverChallenge = blocks => {
      );
 };
 
-let throwAwayValues = metric => {
-  StringMap.map(_ => {()}, metric);
+let throwAwayValues = metrics => {
+  metrics |> StringMap.map(_ => {()});
 };
 
 let calculateAllUsers = metrics => {
-  List.fold_left(
-    StringMap.merge((_, _, _) => {Some()}),
-    StringMap.empty,
-    metrics,
-  );
+  metrics
+  |> List.fold_left(StringMap.merge((_, _, _) => {Some()}), StringMap.empty);
 };
 
 let echoBotPublicKeys = [
