@@ -59,7 +59,8 @@ let setup (type n) ?(logger = Logger.null ())
     ; consensus_local_state
     ; is_seed= Vect.is_empty peers
     ; genesis_ledger_hash=
-        Ledger.merkle_root (Lazy.force Test_genesis_ledger.t)
+        Ledger.merkle_root
+          (Lazy.force (Precomputed_values.genesis_ledger precomputed_values))
     ; constraint_constants= precomputed_values.constraint_constants
     ; creatable_gossip_net=
         Gossip_net.Any.Creatable
