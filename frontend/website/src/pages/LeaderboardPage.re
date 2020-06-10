@@ -2,7 +2,16 @@ module Styles = {
   open Css;
   let page = style([maxWidth(`rem(89.0)), margin(`auto)]);
 
-  let header = merge([Theme.H1.basic, style([marginTop(`rem(4.))])]);
+  let header =
+    merge([
+      Theme.H1.basic,
+      style([
+        marginTop(`zero),
+        fontSize(`rem(3.)),
+        lineHeight(`rem(4.)),
+        media(Theme.MediaQuery.notMobile, [marginTop(`rem(4.))]),
+      ]),
+    ]);
 
   let heroRow =
     style([
@@ -10,9 +19,14 @@ module Styles = {
       flexDirection(`column),
       justifyContent(`flexStart),
       alignItems(`center),
+      paddingTop(`rem(2.8)),
       media(
         Theme.MediaQuery.tablet,
-        [flexDirection(`row), padding2(~v=`rem(3.5), ~h=`zero)],
+        [
+          flexDirection(`row),
+          padding2(~v=`rem(3.5), ~h=`zero),
+          paddingTop(`zero),
+        ],
       ),
     ]);
 
@@ -20,12 +34,24 @@ module Styles = {
     merge([
       Theme.H3.basic,
       style([
+        display(none),
+        media(Theme.MediaQuery.notMobile, [display(`block)]),
         textAlign(`left),
         fontWeight(`semiBold),
         color(Theme.Colors.marine),
       ]),
     ]);
 
+  let asterisk =
+    merge([
+      Theme.Body.basic,
+      style([
+        display(none),
+        media(Theme.MediaQuery.notMobile, [display(`inline)]),
+      ]),
+    ]);
+  let disclaimer =
+    merge([Theme.Body.basic_small, style([marginTop(`rem(4.6))])]);
   let buttonRow =
     style([
       display(`flex),
@@ -41,16 +67,17 @@ module Styles = {
   let heroLeft =
     style([
       maxWidth(`rem(38.)),
-      marginTop(`rem(2.5)),
       media(Theme.MediaQuery.tablet, [marginTop(`zero)]),
     ]);
   let heroRight =
     style([
       display(`flex),
       flexDirection(`column),
+      paddingLeft(`rem(1.)),
+      alignItems(`flexStart),
       media(
         Theme.MediaQuery.tablet,
-        [minHeight(`rem(21.)), marginLeft(`rem(6.))],
+        [minHeight(`rem(21.)), marginLeft(`rem(6.)), paddingLeft(`zero)],
       ),
     ]);
   let flexColumn =
@@ -67,8 +94,11 @@ module Styles = {
         [padding2(~v=`rem(0.), ~h=`rem(6.0))],
       ),
     ]);
+
+  let link = merge([Theme.Link.basic, style([lineHeight(`px(28))])]);
+  let coloredLink = merge([link, style([color(Theme.Colors.teal)])]);
   let icon =
-    style([marginRight(`px(8)), position(`relative), top(`px(3))]);
+    style([marginRight(`px(8)), position(`relative), top(`px(1))]);
 };
 
 module StatisticsRow = {
@@ -87,18 +117,13 @@ module StatisticsRow = {
     let value =
       merge([
         statistic,
-        style([
-          fontSize(`rem(2.25)),
-          marginTop(`px(10)),
-          textAlign(`center),
-        ]),
+        style([fontSize(`rem(2.25)), textAlign(`center)]),
       ]);
     let container =
       style([
         display(`flex),
         flexDirection(`row),
         justifyContent(`spaceAround),
-        maxWidth(`rem(20.)),
         flexWrap(`wrap),
         media(
           Theme.MediaQuery.notMobile,
@@ -111,23 +136,25 @@ module StatisticsRow = {
         flexDirection(`column),
         justifyContent(`center),
       ]);
+    let lastStatistic =
+      merge([flexColumn, style([marginTop(`rem(2.25))])]);
   };
   [@react.component]
   let make = (~participants="456", ~blocks="123", ~genesisMembers="121") => {
     <div className=Styles.container>
       <div className=Styles.flexColumn>
         <h2 className=Styles.statistic> {React.string("Participants")} </h2>
-        <p className=Styles.value> {React.string(participants)} </p>
+        <span className=Styles.value> {React.string(participants)} </span>
       </div>
       <div className=Styles.flexColumn>
         <h2 className=Styles.statistic> {React.string("Blocks")} </h2>
-        <p className=Styles.value> {React.string(blocks)} </p>
+        <span className=Styles.value> {React.string(blocks)} </span>
       </div>
-      <div className=Styles.flexColumn>
-        <h2 className=Styles.statistic>
+      <div className=Styles.lastStatistic>
+        <span className=Styles.statistic>
           {React.string("Genesis Members")}
-        </h2>
-        <p className=Styles.value> {React.string(genesisMembers)} </p>
+        </span>
+        <span className=Styles.value> {React.string(genesisMembers)} </span>
       </div>
     </div>;
   };
@@ -143,14 +170,15 @@ module HeroText = {
            that contribute to the development of the protocol.",
          )}
       </p>
-      <span className=Theme.Body.basic>
+      <span className=Styles.asterisk> {React.string("*")} </span>
+      <div className=Styles.disclaimer>
         {React.string(
-           "*Testnet Points (abbreviated 'pts') are designed solely to track contributions \
+           "Testnet Points (abbreviated 'pts') are designed solely to track contributions \
            to the Testnet and Testnet Points have no cash or other monetary value. \
            Testnet Points are not transferable and are not redeemable or exchangeable \
            for any cryptocurrency or digital assets. We may at any time amend or eliminate Testnet Points.",
          )}
-      </span>
+      </div>
     </div>;
   };
 };
@@ -190,11 +218,11 @@ let make = (~lastManualUpdatedDate) => {
                 bgColorHover=Theme.Colors.clover
               />
             </div>
-            <Spacer height=3.0/>
+            <Spacer height=3.0 />
             <div className=Styles.heroLinks>
               <div className=Styles.flexColumn>
                 <Next.Link href="">
-                  <a className=Theme.Link.basic>
+                  <a className=Styles.link>
                     <Svg
                       link="/static/img/Icon.Link.svg"
                       dims=(1.0, 1.0)
@@ -205,7 +233,7 @@ let make = (~lastManualUpdatedDate) => {
                   </a>
                 </Next.Link>
                 <Next.Link href="">
-                  <a className=Theme.Link.basic>
+                  <a className=Styles.link>
                     <Svg
                       link="/static/img/Icon.Link.svg"
                       dims=(0.9425, 0.8725)
@@ -215,14 +243,14 @@ let make = (~lastManualUpdatedDate) => {
                     {React.string("Discord #Leaderboard Channel")}
                   </a>
                 </Next.Link>
-                <span className=Theme.Link.basic>
+                <span className=Styles.coloredLink>
                   <Svg
                     link="/static/img/Icon.Info.svg"
                     className=Styles.icon
                     dims=(1.0, 1.0)
                     alt="a undercase letter i inside a blue circle"
                   />
-                  {React.string("Last manually updated " ++ date)}
+                  {React.string("Last manual update " ++ date)}
                 </span>
               </div>
             </div>
