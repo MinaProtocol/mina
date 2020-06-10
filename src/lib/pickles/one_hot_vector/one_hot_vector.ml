@@ -6,7 +6,7 @@ module Constant = struct
 end
 
 module T (Impl : Snarky.Snark_intf.Run) = struct
-  (* TODO: Optimization. Have this have length 1 - n since the last one is
+  (* TODO: Optimization. Have this have length n - 1 since the last one is
    determined by the remaining ones. *)
   type 'n t = (Impl.Boolean.var, 'n) Vector.t
 end
