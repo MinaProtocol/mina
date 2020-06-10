@@ -152,3 +152,7 @@ module Checked = struct
         ( Epoch.Checked.Unsafe.of_integer epoch
         , Slot.Checked.Unsafe.of_integer slot ) )
 end
+
+module For_tests = struct
+  let of_global_slot (t : t) slot_number : t = {t with slot_number}
+end

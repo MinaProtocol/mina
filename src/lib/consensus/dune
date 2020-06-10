@@ -20,7 +20,6 @@
     unix_timestamp
     global_signer_private_key
     non_zero_curve_point
-    module_version
     yojson
     staged_ledger_hash
     coda_metrics

@@ -19,7 +19,7 @@ module type S = sig
     end
   end]
 
-  type path = Pedersen.Digest.t list
+  type path = Random_oracle.Digest.t list
 
   type _ Request.t +=
     | Get_path : Account.Index.t -> path Request.t
@@ -42,7 +42,7 @@ module type S = sig
 
   val empty_hash : t
 
-  val of_digest : Pedersen.Digest.t -> t
+  val of_digest : Random_oracle.Digest.t -> t
 
   val modify_account_send :
        depth:int

@@ -24,7 +24,8 @@ module T = struct
       { history
       ; capacity
       ; current_root
-      ; protocol_states_for_root_scan_state= State_hash.Map.empty }
+      ; protocol_states_for_root_scan_state=
+          Full_frontier.protocol_states_for_root_scan_state frontier }
     in
     (t, t)
 
