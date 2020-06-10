@@ -1,0 +1,6 @@
+(library
+ (name ppx_register_event)
+ (public_name ppx_register_event)
+ (kind ppx_deriver)
+ (libraries coda_digestif compiler-libs.common ppxlib ppx_deriving.api core_kernel str ppx_deriving_yojson)
+ (preprocess (pps ppx_version ppxlib.metaquot)))

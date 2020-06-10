@@ -474,8 +474,6 @@ module type S = sig
 
       val to_input : Value.t -> (Field.t, bool) Random_oracle.Input.t
 
-      val to_lite : (Value.t -> Lite_base.Consensus_state.t) option
-
       val display : Value.t -> display
 
       val consensus_time : Value.t -> Consensus_time.t
@@ -535,7 +533,8 @@ module type S = sig
      * kept, or `\`Take` if the second tip should be taken instead.
     *)
     val select :
-         existing:Consensus_state.Value.t
+         constants:Constants.t
+      -> existing:Consensus_state.Value.t
       -> candidate:Consensus_state.Value.t
       -> logger:Logger.t
       -> [`Keep | `Take]

@@ -81,12 +81,10 @@ include Make ()
  *)
 let%test "serialization test V1" =
   let blake2s = T0.digest_string "serialization test V1" in
-  let known_good_hash =
-    "\xFF\x16\xAB\xDC\xE7\x1D\x0F\x7A\xE7\x0E\xF6\xBE\xB5\x76\x3B\x86\xDC\xCE\xDD\xC8\xD1\x9C\x80\x22\xD5\x25\xD5\x34\x7E\xA6\xB0\x1C"
-  in
+  let known_good_digest = "162e120bf889f4e2bccf8017ed93d845" in
   Ppx_version.Serialization.check_serialization
     (module Stable.V1)
-    blake2s known_good_hash
+    blake2s known_good_digest
 
 let%test_unit "bits_to_string" =
   [%test_eq: string]

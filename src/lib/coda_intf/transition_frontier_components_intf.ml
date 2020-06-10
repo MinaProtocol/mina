@@ -189,6 +189,7 @@ module type Consensus_best_tip_prover_intf = sig
 
   val prove :
        logger:Logger.t
+    -> consensus_constants:Consensus.Constants.t
     -> frontier:transition_frontier
     -> Consensus.Data.Consensus_state.Value.t
     -> ( External_transition.t
@@ -199,6 +200,7 @@ module type Consensus_best_tip_prover_intf = sig
   val verify :
        logger:Logger.t
     -> verifier:Verifier.t
+    -> consensus_constants:Consensus.Constants.t
     -> genesis_constants:Genesis_constants.t
     -> Consensus.Data.Consensus_state.Value.t
     -> ( External_transition.t

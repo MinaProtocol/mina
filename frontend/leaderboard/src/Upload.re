@@ -79,7 +79,7 @@ let createPublickeyUsernameMap = sheetsData => {
 
 let createUsernamePointsMap = (pointsMap, pkUsernameMap) => {
   StringMap.fold(
-    (pk, username, map) => {
+    (username, pk, map) => {
       StringMap.mem(pk, pointsMap)
         ? StringMap.add(username, StringMap.find(pk, pointsMap), map) : map
     },
@@ -102,20 +102,8 @@ let updatePointsColumns =
        if (StringMap.mem(username, usernamePointsMap)) {
          // Found a username, get the points to update
          let pointsBinding = StringMap.find(username, usernamePointsMap);
-         let pointsValue =
-           switch (row[pointIndex]) {
-           | Some(points) => int_of_string_opt(points)
-           | None => None
-           };
-
-         switch (pointsValue, pointsBinding) {
-         | (Some(sheetsValue), pointsBinding) =>
-           // Add points from sheets and challenge
-           row[pointIndex] = Some(string_of_int(sheetsValue + pointsBinding))
-         | (None, pointsBinding) =>
-           // If user as an empty cell, add points from challenge
-           row[pointIndex] = Some(string_of_int(pointsBinding))
-         };
+         // Add points from challenge
+         row[pointIndex] = Some(string_of_int(pointsBinding));
        } else {
          // If username has no points for the challenge, wipe cell
          row[pointIndex] =
@@ -155,58 +143,60 @@ let updatePoints = (metricsMap, pkUsernameMap, sheetsData) => {
   };
 };
 
+let updateSheets = (client, spreadsheetId, range, pkUsernameMap, metricsMap) => {
+  Sheets.getRange(
+    client, {spreadsheetId, range, valueRenderOption: "FORMULA"}, result => {
+    switch (result) {
+    | Ok(leaderboardData) =>
+      let decodedResult =
+        leaderboardData |> decodeGoogleSheets |> normalizeGoogleSheets;
+      updatePoints(metricsMap, pkUsernameMap, decodedResult);
+      let resource: Bindings.GoogleSheets.sheetsUploadData = {
+        values: encodeGoogleSheets(decodedResult),
+      };
+      Sheets.updateRange(
+        client,
+        {spreadsheetId, range, valueInputOption: "USER_ENTERED", resource},
+        result => {
+        switch (result) {
+        | Ok(_) => Js.log({j|Data uploaded to $range|j})
+        | Error(error) => Js.log(error)
+        }
+      });
+    | Error(error) => Js.log(error)
+    }
+  });
+};
+
 [@bs.val]
 external spreadsheetId: Js.Undefined.t(string) = "process.env.SPREADSHEET_ID";
 let uploadPoints = metricsMap => {
   switch (Js.undefinedToOption(spreadsheetId)) {
   | Some(spreadsheetId) =>
-    let auth = {
-      Bindings.GoogleSheets.scopes: [|
-        "https://www.googleapis.com/auth/spreadsheets",
-      |],
-    };
-    let client = Bindings.GoogleSheets.googleAuth(auth);
+    let client =
+      Bindings.GoogleSheets.googleAuth({
+        Bindings.GoogleSheets.scopes: [|
+          "https://www.googleapis.com/auth/spreadsheets",
+        |],
+      });
     Sheets.getRange(
       client,
-      {spreadsheetId, range: "PublicKeys!A1:B", valueRenderOption: "FORMULA"},
+      {spreadsheetId, range: "Users!A2:B", valueRenderOption: "FORMULA"},
       result => {
       switch (result) {
       | Ok(pkUsernameData) =>
         let pkUsernameMap =
           pkUsernameData |> decodeGoogleSheets |> createPublickeyUsernameMap;
-        Sheets.getRange(
+        updateSheets(
           client,
-          {spreadsheetId, range: "Data!A1:K", valueRenderOption: "FORMULA"},
-          result => {
-          switch (result) {
-          | Ok(leaderboardData) =>
-            let decodedResult =
-              leaderboardData |> decodeGoogleSheets |> normalizeGoogleSheets;
-            updatePoints(metricsMap, pkUsernameMap, decodedResult);
-            let resource: Bindings.GoogleSheets.sheetsUploadData = {
-              values: encodeGoogleSheets(decodedResult),
-            };
-            Sheets.updateRange(
-              client,
-              {
-                spreadsheetId,
-                range: "Data!M1",
-                valueInputOption: "USER_ENTERED",
-                resource,
-              },
-              result => {
-              switch (result) {
-              | Ok(_) => Js.log("Data uploaded")
-              | Error(error) => Js.log(error)
-              }
-            });
-          | Error(error) => Js.log(error)
-          }
-        });
+          spreadsheetId,
+          "3.2b!A3:M",
+          pkUsernameMap,
+          metricsMap,
+        );
       | Error(error) => Js.log(error)
       }
     });
-  | None => Js.log("Invalid spread sheet id")
+  | None => Js.log("Invalid spreadsheet ID")
   };
-  ();
 };

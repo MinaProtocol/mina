@@ -265,12 +265,10 @@ module Protocol = struct
               Time.of_string "2019-10-08 17:51:23.050849Z" }
         in
         (*from the print statement in Serialization.check_serialization*)
-        let known_good_hash =
-          "\x18\x3E\xF4\x11\xAC\x44\x83\xBF\x0E\x0F\x76\x5B\xF7\xE6\xFA\xE7\xEB\x24\xF6\xF7\xAA\xC8\x37\x71\xF7\xB9\x54\x66\xF6\x38\xB3\xF1"
-        in
+        let known_good_digest = "2b1a964e0fea8c31fdf76e7f5bebcdd6" in
         Ppx_version.Serialization.check_serialization
           (module V1)
-          t known_good_hash
+          t known_good_digest
     end
   end]
 

@@ -1,5 +1,5 @@
 /CODEOWNERS @nholland94 @bkase @imeckler
-/.buildkite @CodaProtocol/infra-eng-reviewers
+/buildkite @CodaProtocol/infra-eng-reviewers
 /frontend/ @CodaProtocol/product-eng-reviewers
 /dockerfiles/ @CodaProtocol/infra-eng-reviewers
 /scripts/ @CodaProtocol/infra-eng-reviewers @CodaProtocol/protocol-eng-reviewers
@@ -34,11 +34,9 @@
 /src/lib/crs/ @CodaProtocol/crypto-eng-reviewers
 /src/lib/crypto_params/ @CodaProtocol/crypto-eng-reviewers
 /src/lib/dummy_values/ @CodaProtocol/crypto-eng-reviewers
-/src/lib/group_map/ @CodaProtocol/crypto-eng-reviewers
 /src/lib/hash_prefixes/ @CodaProtocol/crypto-eng-reviewers
 /src/lib/integers_stubs_js @CodaProtocol/crypto-eng-reviewers
 /src/lib/keys_lib/ @CodaProtocol/crypto-eng-reviewers
-/src/lib/lite_params/ @CodaProtocol/crypto-eng-reviewers
 /src/lib/non_zero_curve_point/ @CodaProtocol/crypto-eng-reviewers
 /src/lib/outside_pedersen_image/ @CodaProtocol/crypto-eng-reviewers
 /src/lib/pokolog/ @CodaProtocol/crypto-eng-reviewers

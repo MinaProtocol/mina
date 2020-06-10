@@ -398,6 +398,7 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~time_controller
                  in
                  if
                    Consensus.Hooks.select
+                     ~constants:precomputed_values.consensus_constants
                      ~existing:
                        (External_transition.Initial_validated.consensus_state
                           current_transition)
