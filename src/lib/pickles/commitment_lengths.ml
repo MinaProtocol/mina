@@ -2,6 +2,9 @@ open Core
 open Pickles_types
 open Import
 
+(* Compute the number of group elements required to represent each commitment.
+   This is simply ceil(degree of commitment / max degree natively supported by the PCS) *)
+
 let generic map ~h ~k : _ Dlog_marlin_types.Evals.t =
   let index : _ Abc.t = {a= k; b= k; c= k} in
   Dlog_marlin_types.Evals.map
