@@ -17,11 +17,12 @@ let rec absorb : type a g1 f scalar.
   | Scalar ->
       absorb_field (pack_scalar t)
   | Without_degree_bound ->
-    Array.iter ~f:(Fn.compose (List.iter ~f:absorb_field) g1_to_field_elements)
-      t
+      Array.iter
+        ~f:(Fn.compose (List.iter ~f:absorb_field) g1_to_field_elements)
+        t
   | With_degree_bound ->
-    Array.iter t.unshifted ~f:(fun t -> 
-        absorb ~absorb_field ~g1_to_field_elements ~pack_scalar PC t) ;
+      Array.iter t.unshifted ~f:(fun t ->
+          absorb ~absorb_field ~g1_to_field_elements ~pack_scalar PC t ) ;
       absorb ~absorb_field ~g1_to_field_elements ~pack_scalar PC t.shifted
   | ty1 :: ty2 ->
       let absorb t =
