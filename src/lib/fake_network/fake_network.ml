@@ -31,8 +31,8 @@ end
 let setup (type n) ?(logger = Logger.null ())
     ?(trust_system = Trust_system.null ())
     ?(time_controller = Block_time.Controller.basic ~logger)
-    ~precomputed_values (states : (peer_state, n num_peers) Vect.t) :
-    n num_peers t =
+    ~(precomputed_values : Precomputed_values.t)
+    (states : (peer_state, n num_peers) Vect.t) : n num_peers t =
   let _, peers =
     Vect.fold_map states
       ~init:(Constants.init_ip, Constants.init_discovery_port)
@@ -61,6 +61,7 @@ let setup (type n) ?(logger = Logger.null ())
     ; genesis_ledger_hash=
         Ledger.merkle_root
           (Lazy.force (Precomputed_values.genesis_ledger precomputed_values))
+    ; constraint_constants= precomputed_values.constraint_constants
     ; creatable_gossip_net=
         Gossip_net.Any.Creatable
           ( (module Gossip_net.Fake)
