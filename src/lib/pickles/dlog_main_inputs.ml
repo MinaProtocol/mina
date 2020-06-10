@@ -8,11 +8,10 @@ module Impl = Impls.Dlog_based
 
 let fq_random_oracle ?length s = Fq.of_bits (bits_random_oracle ?length s)
 
-let group_map = unstage (group_map (module Fq) ~a:Fq.zero ~b:(Fq.of_int 14))
-
-let unrelated_g (x, y) =
-  let str = Fn.compose bits_to_bytes Fq.to_bits in
-  group_map (fq_random_oracle (str x ^ str y))
+let unrelated_g =
+  let group_map = unstage (group_map (module Fq) ~a:G1.Params.a ~b:G1.Params.b)
+  and str = Fn.compose bits_to_bytes Fq.to_bits in
+  fun (x, y) -> group_map (fq_random_oracle (str x ^ str y))
 
 module Input_domain = struct
   let lagrange_commitments domain =
@@ -30,12 +29,6 @@ module Input_domain = struct
   let self = Domain.Pow_2_roots_of_unity 5
 end
 
-let group_map_fq =
-  let params =
-    Group_map.Params.create (module Fq) {a= Fq.zero; b= Fq.of_int 14}
-  in
-  fun x -> Group_map.to_group (module Fq) ~params x
-
 open Impl
 
 module G1 = struct
@@ -47,7 +40,7 @@ module G1 = struct
 
       let one = G1.to_affine_exn G1.one
 
-      let group_size_in_bits = 382
+      let group_size_in_bits = Field.size_in_bits
     end
 
     module F = struct
@@ -111,11 +104,7 @@ module G1 = struct
       module type of T
       with module Scaling_precomputation := T.Scaling_precomputation )
 
-  module Scaling_precomputation = struct
-    include T.Scaling_precomputation
-
-    (*     let create t = create ~unrelated_base:(unrelated_g t) t *)
-  end
+  module Scaling_precomputation = T.Scaling_precomputation
 
   let ( + ) = add_exn
 
