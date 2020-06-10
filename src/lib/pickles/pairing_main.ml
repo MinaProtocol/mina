@@ -15,7 +15,6 @@ module Make
 struct
   open Inputs
   open Impl
-  module Branching = Nat.S (Branching_pred)
   module PC = G
   module Fp = Impl.Field
   module Challenge = Challenge.Make (Impl)
@@ -34,16 +33,14 @@ struct
       Typ.transport
         (Typ.tuple2 Fp.typ Boolean.typ)
         ~there:(fun x ->
-          let low, high = Common.split_last (Fq.to_bits x) in
+          let low, high = Util.split_last (Fq.to_bits x) in
           (Fp.Constant.project low, high) )
         ~back:(fun (low, high) ->
-          let low, _ = Common.split_last (Fp.Constant.unpack low) in
+          let low, _ = Util.split_last (Fp.Constant.unpack low) in
           Fq.of_bits (low @ [high]) )
 
     let to_bits (x, b) = Field.unpack x ~length:(Field.size_in_bits - 1) @ [b]
   end
-
-  type 'a vec = ('a, Branching.n) Vector.t
 
   let debug = false
 
@@ -523,3 +520,5 @@ struct
             Field.Assert.equal c1 c2 ) ) ;
     bulletproof_success
 end
+
+include Make (Pairing_main_inputs)

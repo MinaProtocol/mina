@@ -23,10 +23,10 @@ module Pairing_based = struct
       Typ.transport
         (Typ.tuple2 Fp.typ Boolean.typ)
         ~there:(fun x ->
-          let low, high = Common.split_last (Fq.to_bits x) in
+          let low, high = Util.split_last (Fq.to_bits x) in
           (Fp.Constant.project low, high) )
         ~back:(fun (low, high) ->
-          let low, _ = Common.split_last (Fp.Constant.unpack low) in
+          let low, _ = Util.split_last (Fp.Constant.unpack low) in
           Fq.of_bits (low @ [high]) )
 
     let to_bits (x, b) = Field.unpack x ~length:(Field.size_in_bits - 1) @ [b]

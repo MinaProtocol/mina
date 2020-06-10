@@ -569,3 +569,15 @@ module Pairing_based = struct
         [Vector (per_proof, branching); B Digest; Vector (B Digest, branching)]
   end
 end
+
+module Nvector = Vector.With_length
+module Bp_vec = Nvector (Zexe_backend.Dlog_based.Rounds)
+
+module Challenges_vector = struct
+  type 'n t =
+    (Zexe_backend.Dlog_based.Field.t Snarky.Cvar.t Bp_vec.t, 'n) Vector.t
+
+  module Constant = struct
+    type 'n t = (Zexe_backend.Dlog_based.Field.t Bp_vec.t, 'n) Vector.t
+  end
+end

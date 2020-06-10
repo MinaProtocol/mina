@@ -32,3 +32,14 @@ let rec absorb : type a g1 f scalar.
       in
       let t1, t2 = t in
       absorb ty1 t1 ; absorb ty2 t2
+
+let split_last xs =
+  let rec go acc = function
+    | [x] ->
+        (List.rev acc, x)
+    | x :: xs ->
+        go (x :: acc) xs
+    | [] ->
+        failwith "Empty list"
+  in
+  go [] xs
