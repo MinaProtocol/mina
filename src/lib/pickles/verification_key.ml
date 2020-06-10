@@ -64,20 +64,17 @@ let of_repr urs {Repr.commitments= c; step_domains; data= d} =
   in
   {commitments= c; step_domains; data= d; index= t}
 
-module B =
-  Binable.Of_binable
-    (Repr.Stable.Latest)
-    (struct
-      type nonrec t = t
+include Binable.Of_binable
+          (Repr.Stable.Latest)
+          (struct
+            type nonrec t = t
 
-      let to_binable {commitments; step_domains; data; index= _} =
-        {Repr.commitments; data; step_domains}
+            let to_binable {commitments; step_domains; data; index= _} =
+              {Repr.commitments; data; step_domains}
 
-      let of_binable r =
-        of_repr (Zexe_backend.Dlog_based.Keypair.load_urs ()) r
-    end)
-
-include B
+            let of_binable r =
+              of_repr (Zexe_backend.Dlog_based.Keypair.load_urs ()) r
+          end)
 
 let dummy =
   let lengths = Commitment_lengths.of_domains Common.wrap_domains in
