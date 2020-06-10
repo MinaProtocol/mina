@@ -164,10 +164,11 @@ module Common = struct
     let to_input
         ({fee; fee_token; fee_payer_pk; nonce; valid_until; memo} : var) =
       let%map nonce = Account_nonce.Checked.to_input nonce
-      and valid_until = Global_slot.Checked.to_input valid_until in
+      and valid_until = Global_slot.Checked.to_input valid_until
+      and fee_token = Token_id.Checked.to_input fee_token in
       Array.reduce_exn ~f:Random_oracle.Input.append
         [| Currency.Fee.var_to_input fee
-         ; Token_id.Checked.to_input fee_token
+         ; fee_token
          ; Public_key.Compressed.Checked.to_input fee_payer_pk
          ; nonce
          ; valid_until
