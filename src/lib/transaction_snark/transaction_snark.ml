@@ -1508,7 +1508,7 @@ module Merge = struct
      verify_transition tock_vk _ s1 s2 pending_coinbase_stack12.source, pending_coinbase_stack12.target is true
      verify_transition tock_vk _ s2 s3 pending_coinbase_stack23.source, pending_coinbase_stack23.target is true
   *)
-  let%snarkydef main (top_hash : Pedersen.Checked.Digest.var) =
+  let%snarkydef main (top_hash : Random_oracle.Checked.Digest.t) =
     let%bind tock_vk =
       exists' (Verifier.Verification_key.typ ~input_size:wrap_input_size)
         ~f:(fun {Prover_state.tock_vk; _} -> Verifier.vk_of_backend_vk tock_vk
