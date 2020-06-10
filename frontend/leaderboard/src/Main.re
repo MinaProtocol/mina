@@ -1,3 +1,15 @@
+/*
+  Main.re is the entry point of the leaderboard project.
+
+  Main.re has the responsibilities for reading in a directory of blocks and
+  packing it up to be handed to Metrics.re. Blocks are defined in a json format.
+  The parsed fields for blocks are defined in Types/NewBlock.
+
+  Additionally, Main.re expects to have the credentials available in the form of
+  an environment variable. If no blocks are found, the execution fails and reports
+  an error.
+ */
+
 let blockDirectory =
   ([%bs.node __dirname] |> Belt.Option.getExn |> Filename.dirname)
   ++ "/src/blocks/";

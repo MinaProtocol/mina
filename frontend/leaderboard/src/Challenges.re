@@ -1,3 +1,21 @@
+/*
+  Challenges.re has the responsibilities of taking a Map of public keys to
+  metricRecords and compute a new Map that contains a public key to
+  points where points is a number value (either Int64 or int).
+
+  Points are rewarded based on completing challenges that are previously defined
+  by O(1) community managers. The challenges that are supported are defined in
+  calculatePoints()
+
+  The data visualized for a Map is as follows, where x is some number value:
+
+  "public_key1": x
+
+   All the challenges to be computed are specified in calculatePoints().
+   calculatePoints() is invoked in Upload.re where the points are computed
+   and then uploaded to the Leaderboard Google Sheets.
+ */
+
 module StringMap = Map.Make(String);
 
 let addPointsToUsersWithAtleastN =
