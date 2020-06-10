@@ -44,11 +44,6 @@ let to_backend primary_input
              ; value= {a= val_0; b= val_1; c= val_2}
              ; rc= {a= rc_0; b= rc_1; c= rc_2} } } } :
       t) =
-  let primary_input =
-    let v = Fp.Vector.create () in
-    List.iter ~f:(Fp.Vector.emplace_back v) primary_input ;
-    v
-  in
   let g (a, b) =
     let open Snarky_bn382.G1.Affine in
     let t = create a b in
@@ -130,4 +125,13 @@ let create ?message:_ pk ~primary ~auxiliary =
   Snarky_bn382.Fp_proof.delete res ;
   t
 
-let verify ?message:_ _ _ _ = true
+let verify ?message:_ proof vk (primary : Fp.Vector.t) =
+  let t =
+    let v = Fq.Vector.create () in
+    Fq.Vector.emplace_back v Fq.one ;
+    for i = 0 to Fq.Vector.length primary - 1 do
+      Fq.Vector.emplace_back v (Fq.Vector.get primary i)
+    done ;
+    to_backend v proof
+  in
+  Snarky_bn382.Fp_proof.verify vk t

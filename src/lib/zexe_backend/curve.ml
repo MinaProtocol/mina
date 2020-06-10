@@ -17,6 +17,8 @@ module type Input_intf = sig
 
     val y : t -> BaseField.t
 
+    val is_zero : t -> bool
+
     val create : BaseField.t -> BaseField.t -> t
 
     val delete : t -> unit
@@ -129,8 +131,12 @@ struct
 
   let to_affine_exn t =
     let r = C.to_affine_exn t in
-    let r' = Affine.of_backend r in
-    C.Affine.delete r ; r'
+    if C.Affine.is_zero r then (
+      C.Affine.delete r ;
+      failwith "to_affine_exn: Got identity" )
+    else
+      let r' = Affine.of_backend r in
+      C.Affine.delete r ; r'
 
   let of_affine (x, y) = op2 C.of_affine_coordinates x y
 
