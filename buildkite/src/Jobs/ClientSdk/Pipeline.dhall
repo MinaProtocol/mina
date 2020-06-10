@@ -3,7 +3,7 @@ let Prelude = ../../External/Prelude.dhall
 let Decorate = ../../Lib/Decorate.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
-let Command = ../../Command/Coda.dhall
+let Command/Coda = ../../Command/Coda.dhall
 let Docker = ../../Command/Docker/Type.dhall
 let Size = ../../Command/Size.dhall
 let JobSpec = ../../Pipeline/JobSpec.dhall
@@ -28,11 +28,11 @@ Pipeline.build
   Pipeline.Config::{
     spec = ./Spec.dhall,
     steps = [
-    Command.build
-      Command.Config::{
+    Command/Coda.build
+      Command/Coda.Config::{
         commands = Decorate.decorateAll commands,
         label = "Build client-sdk",
-        key = "build-client-sdk",
+        key = "build-client-sdk"
       }
     ]
   }
