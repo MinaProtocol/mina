@@ -5,14 +5,11 @@
   (flags -warn-error -27)
   (preprocess (pps ppx_version ppx_coda ppx_jane ppx_deriving.std ppx_deriving_yojson ))
   (libraries
-    composition_types
-    limb_vector
-    one_hot_vector
-    marlin_checks
-    pseudo
-
     digestif
     zexe_backend
+    pickles.composition_types
+    pickles.limb_vector
+    pickles.marlin_checks
     snarky_log
     sponge
     group_map
