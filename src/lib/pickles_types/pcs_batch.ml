@@ -5,9 +5,7 @@ type ('a, 'n, 'm) t =
 
 let map t ~f = {t with with_degree_bound= Vector.map t.with_degree_bound ~f}
 
-let num_bits n =
-  let k = Int.ceil_log2 n in
-  if n = 1 lsl k then k + 1 else k
+let num_bits n = Int.floor_log2 n + 1
 
 let%test_unit "num_bits" =
   let naive n =
