@@ -67,6 +67,9 @@ struct
 
   let typ : (t, Constant.t) Typ.t = SC.typ Challenge.typ
 
+  (* TODO-someday: Combine this and the identical definition in the
+     snarky_curve library.
+  *)
   (* b ? t : -t *)
   let conditional_negation (b : Boolean.var) (x, y) =
     let y' =
@@ -80,6 +83,9 @@ struct
     assert_r1cs y Field.((of_int 2 * (b :> Field.t)) - of_int 1) y' ;
     (x, y')
 
+  (* TODO-someday: Combine this and the identical definition in the
+     snarky_curve library.
+  *)
   let p_plus_q_plus_p (x1, y1) (x2, y2) =
     let open Field in
     let ( ! ) = As_prover.read typ in
