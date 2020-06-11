@@ -13,7 +13,7 @@ PATH=$3
 
 if [[ "$MODE" == "save" ]]; then
   zip -r "$KEY.zip" "$PATH"
-  buildkite-agent artifact upload "$KEY.tar" "gs://buildkite/coda/shared"
+  buildkite-agent artifact upload "$KEY.zip" "gs://buildkite/coda/shared"
 elif [[ "$MODE" == "restore" ]]; then
   # restoring may fail if cache miss
   buildkite-agent artifact download "$KEY.zip" . || true
