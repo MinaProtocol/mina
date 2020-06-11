@@ -37,8 +37,7 @@ module Make (Field : Zexe_backend.Field.S) = struct
   end
 
   module Field = Sponge.Make_sponge (Sponge.Poseidon (Inputs))
-  module Bits =
-    Sponge.Make_bit_sponge (Bool) (Inputs.Field) (Inputs.Field) (Field)
+  module Bits = Sponge.Make_bit_sponge (Bool) (Inputs.Field) (Field)
 
   let digest params elts =
     let sponge = Bits.create params in
