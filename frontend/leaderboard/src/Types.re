@@ -3,7 +3,7 @@ module NewBlock = {
 
   type snarkJobs = {
     prover: string,
-    fee: int64,
+    fee: string,
   };
 
   type userCommands = {
@@ -12,7 +12,7 @@ module NewBlock = {
   };
 
   type feeTransfer = {
-    fee: int64,
+    fee: string,
     recipient: string,
   };
   type transactions = {
@@ -51,8 +51,8 @@ module Metrics = {
     blocksCreated: option(int),
     transactionSent: option(int),
     snarkWorkCreated: option(int),
-    snarkFeesCollected: option(int64),
-    highestSnarkFeeCollected: option(int64),
+    snarkFeesCollected: option(string),
+    highestSnarkFeeCollected: option(string),
     transactionsReceivedByEcho: option(int),
     coinbaseReceiver: option(bool),
   };
