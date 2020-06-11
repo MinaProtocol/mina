@@ -28,6 +28,9 @@ let blocks =
        block.data.newBlock;
      });
 
+let blockHeight =
+  blockDirectory |> Node.Fs.readdirSync |> Array.length |> string_of_int;
+
 let setSheetsCredentials = () => {
   switch (Js.undefinedToOption(credentials)) {
   | Some(validCredentials) =>
@@ -46,7 +49,9 @@ let setSheetsCredentials = () => {
 
 let main = () => {
   switch (setSheetsCredentials()) {
-  | Ok () => blocks |> Metrics.calculateMetrics |> Upload.uploadPoints
+  | Ok () =>
+    blocks |> Metrics.calculateMetrics |> Upload.uploadPoints;
+    Upload.uploadBlockHeight(Some(blockHeight));
   | Error(error) => failwith(error)
   };
 };
