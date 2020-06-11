@@ -13,10 +13,10 @@ DEST=$3
 
 if [[ "$MODE" == "save" ]]; then
   zip -r "$KEY.zip" "$DEST"
-  buildkite-agent artifact upload "$KEY.zip" "gs://buildkite/coda/shared"
+  ~/.buildkite-agent/bin/buildkite-agent artifact upload "$KEY.zip" "gs://buildkite/coda/shared"
 elif [[ "$MODE" == "restore" ]]; then
   # restoring may fail if cache miss
-  buildkite-agent artifact download "$KEY.zip" . || true
+  ~/.buildkite-agent/bin/buildkite-agent artifact download "$KEY.zip" . || true
   unzip "$KEY.zip" "$DEST" || true
 fi
 
