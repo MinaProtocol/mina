@@ -1,6 +1,11 @@
 module Styles = {
   open Css;
-  let page = style([maxWidth(`rem(89.0)), margin(`auto)]);
+  let page =
+    style([
+      maxWidth(`rem(58.0)),
+      margin(`auto),
+      media(Theme.MediaQuery.tablet, [maxWidth(`rem(89.))]),
+    ]);
 
   let header =
     merge([
@@ -17,28 +22,30 @@ module Styles = {
     style([
       display(`flex),
       flexDirection(`column),
-      justifyContent(`flexStart),
-      alignItems(`center),
       paddingTop(`rem(2.8)),
+      media(Theme.MediaQuery.notMobile, [alignItems(`center)]),
       media(
         Theme.MediaQuery.tablet,
-        [
-          flexDirection(`row),
-          padding2(~v=`rem(3.5), ~h=`zero),
-          paddingTop(`zero),
-        ],
+        [flexDirection(`row), paddingTop(`zero), marginTop(`rem(3.5))],
       ),
     ]);
 
   let heroH3 =
     merge([
-      Theme.H3.basic,
+      Theme.Body.big_semibold,
       style([
         display(none),
-        media(Theme.MediaQuery.notMobile, [display(`block)]),
         textAlign(`left),
         fontWeight(`semiBold),
-        color(Theme.Colors.marine),
+        color(Theme.Colors.leaderboardMidnight),
+        media(
+          Theme.MediaQuery.notMobile,
+          [
+            display(`block),
+            marginTop(`rem(3.5)),
+            marginBottom(`rem(2.5)),
+          ],
+        ),
       ]),
     ]);
 
@@ -51,7 +58,16 @@ module Styles = {
       ]),
     ]);
   let disclaimer =
-    merge([Theme.Body.basic_small, style([marginTop(`rem(4.6))])]);
+    merge([
+      Theme.Body.basic_small,
+      style([
+        marginTop(`rem(3.6)),
+        media(
+          Theme.MediaQuery.notMobile,
+          [display(`inline), marginTop(`rem(4.6))],
+        ),
+      ]),
+    ]);
   let buttonRow =
     style([
       display(`flex),
@@ -75,9 +91,15 @@ module Styles = {
       flexDirection(`column),
       paddingLeft(`rem(1.)),
       alignItems(`flexStart),
+      unsafe("width", "fit-content"),
       media(
         Theme.MediaQuery.tablet,
-        [minHeight(`rem(21.)), marginLeft(`rem(6.)), paddingLeft(`zero)],
+        [
+          minHeight(`rem(21.)),
+          marginLeft(`rem(6.)),
+          paddingLeft(`zero),
+          alignItems(`center),
+        ],
       ),
     ]);
   let flexColumn =
@@ -125,10 +147,7 @@ module StatisticsRow = {
         flexDirection(`row),
         justifyContent(`spaceAround),
         flexWrap(`wrap),
-        media(
-          Theme.MediaQuery.notMobile,
-          [padding2(~v=`zero, ~h=`rem(2.5)), maxWidth(`rem(35.))],
-        ),
+        media(Theme.MediaQuery.notMobile, [maxWidth(`rem(35.))]),
       ]);
     let flexColumn =
       style([
@@ -137,7 +156,13 @@ module StatisticsRow = {
         justifyContent(`center),
       ]);
     let lastStatistic =
-      merge([flexColumn, style([marginTop(`rem(2.25))])]);
+      merge([
+        flexColumn,
+        style([
+          marginTop(`rem(2.1)),
+          media(Theme.MediaQuery.notMobile, [marginTop(`zero)]),
+        ]),
+      ]);
   };
   [@react.component]
   let make = (~participants="456", ~blocks="123", ~genesisMembers="121") => {
@@ -218,7 +243,7 @@ let make = (~lastManualUpdatedDate) => {
                 bgColorHover=Theme.Colors.clover
               />
             </div>
-            <Spacer height=3.0 />
+            <Spacer height=4.8 />
             <div className=Styles.heroLinks>
               <div className=Styles.flexColumn>
                 <Next.Link href="">
