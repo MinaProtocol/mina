@@ -9,15 +9,15 @@ fi
 
 MODE=$1
 KEY=$2
-PATH=$3
+DEST=$3
 
 if [[ "$MODE" == "save" ]]; then
-  zip -r "$KEY.zip" "$PATH"
+  zip -r "$KEY.zip" "$DEST"
   buildkite-agent artifact upload "$KEY.zip" "gs://buildkite/coda/shared"
 elif [[ "$MODE" == "restore" ]]; then
   # restoring may fail if cache miss
   buildkite-agent artifact download "$KEY.zip" . || true
-  unzip "$KEY.zip" "$PATH" || true
+  unzip "$KEY.zip" "$DEST" || true
 fi
 
 
