@@ -563,8 +563,9 @@ jobs:
                     LIBP2P_NIXLESS: 1
                     GO: /usr/lib/go/bin/go
             - save_cache:
-              - key: dune-build-cache-test--{{profile}}-{{'{{'}} .Branch {{'}}'}}-{{'{{'}} .Revision {{'}}'}}
-              - paths:
+                name: Save cache - _build directory
+                key: dune-build-cache-test--{{profile}}-{{'{{'}} .Branch {{'}}'}}-{{'{{'}} .Revision {{'}}'}}
+                paths:
                   - _build
             - run:
                 name: Build libp2p_helper
@@ -597,8 +598,9 @@ jobs:
                     LIBP2P_NIXLESS: 1
                     GO: /usr/lib/go/bin/go
             - save_cache:
-              - key: dune-build-cache-test--{{profile}}-{{'{{'}} .Branch {{'}}'}}-{{'{{'}} .Revision {{'}}'}}
-              - paths:
+                name: Save cache - _build directory
+                key: dune-build-cache-test--{{profile}}-{{'{{'}} .Branch {{'}}'}}-{{'{{'}} .Revision {{'}}'}}
+                paths:
                   - _build
             - run:
                 name: Build libp2p_helper
