@@ -7,6 +7,9 @@
   (libraries
     digestif
     zexe_backend
+    pickles.composition_types
+    pickles.limb_vector
+    pickles.marlin_checks
     snarky_log
     sponge
     group_map
