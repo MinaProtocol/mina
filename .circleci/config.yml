@@ -709,6 +709,20 @@ jobs:
                 name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
                 command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
 
+            - restore_cache:
+                keys:
+                  - dune-build-cache-test--fake_hash-{{ .Branch }}-{{ .Revision }}
+            - run:
+                name: Build ocaml
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && make build'
+                environment:
+                    DUNE_PROFILE: fake_hash
+                    LIBP2P_NIXLESS: 1
+                    GO: /usr/lib/go/bin/go
+            - save_cache:
+              - key: dune-build-cache-test--fake_hash-{{ .Branch }}-{{ .Revision }}
+              - paths:
+                  - _build
             - run:
                 name: Build libp2p_helper
                 command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
@@ -741,6 +755,20 @@ jobs:
                 name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
                 command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
 
+            - restore_cache:
+                keys:
+                  - dune-build-cache-test--test_postake-{{ .Branch }}-{{ .Revision }}
+            - run:
+                name: Build ocaml
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && make build'
+                environment:
+                    DUNE_PROFILE: test_postake
+                    LIBP2P_NIXLESS: 1
+                    GO: /usr/lib/go/bin/go
+            - save_cache:
+              - key: dune-build-cache-test--test_postake-{{ .Branch }}-{{ .Revision }}
+              - paths:
+                  - _build
             - run:
                 name: Build libp2p_helper
                 command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
@@ -776,6 +804,20 @@ jobs:
                 name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
                 command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
 
+            - restore_cache:
+                keys:
+                  - dune-build-cache-test--test_postake_bootstrap-{{ .Branch }}-{{ .Revision }}
+            - run:
+                name: Build ocaml
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && make build'
+                environment:
+                    DUNE_PROFILE: test_postake_bootstrap
+                    LIBP2P_NIXLESS: 1
+                    GO: /usr/lib/go/bin/go
+            - save_cache:
+              - key: dune-build-cache-test--test_postake_bootstrap-{{ .Branch }}-{{ .Revision }}
+              - paths:
+                  - _build
             - run:
                 name: Build libp2p_helper
                 command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
@@ -808,6 +850,20 @@ jobs:
                 name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
                 command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
 
+            - restore_cache:
+                keys:
+                  - dune-build-cache-test--test_postake_catchup-{{ .Branch }}-{{ .Revision }}
+            - run:
+                name: Build ocaml
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && make build'
+                environment:
+                    DUNE_PROFILE: test_postake_catchup
+                    LIBP2P_NIXLESS: 1
+                    GO: /usr/lib/go/bin/go
+            - save_cache:
+              - key: dune-build-cache-test--test_postake_catchup-{{ .Branch }}-{{ .Revision }}
+              - paths:
+                  - _build
             - run:
                 name: Build libp2p_helper
                 command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
@@ -840,6 +896,20 @@ jobs:
                 name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
                 command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
 
+            - restore_cache:
+                keys:
+                  - dune-build-cache-test--test_postake_delegation-{{ .Branch }}-{{ .Revision }}
+            - run:
+                name: Build ocaml
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && make build'
+                environment:
+                    DUNE_PROFILE: test_postake_delegation
+                    LIBP2P_NIXLESS: 1
+                    GO: /usr/lib/go/bin/go
+            - save_cache:
+              - key: dune-build-cache-test--test_postake_delegation-{{ .Branch }}-{{ .Revision }}
+              - paths:
+                  - _build
             - run:
                 name: Build libp2p_helper
                 command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
@@ -872,6 +942,20 @@ jobs:
                 name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
                 command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
 
+            - restore_cache:
+                keys:
+                  - dune-build-cache-test--test_postake_five_even_txns-{{ .Branch }}-{{ .Revision }}
+            - run:
+                name: Build ocaml
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && make build'
+                environment:
+                    DUNE_PROFILE: test_postake_five_even_txns
+                    LIBP2P_NIXLESS: 1
+                    GO: /usr/lib/go/bin/go
+            - save_cache:
+              - key: dune-build-cache-test--test_postake_five_even_txns-{{ .Branch }}-{{ .Revision }}
+              - paths:
+                  - _build
             - run:
                 name: Build libp2p_helper
                 command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
@@ -904,6 +988,20 @@ jobs:
                 name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
                 command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
 
+            - restore_cache:
+                keys:
+                  - dune-build-cache-test--test_postake_snarkless-{{ .Branch }}-{{ .Revision }}
+            - run:
+                name: Build ocaml
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && make build'
+                environment:
+                    DUNE_PROFILE: test_postake_snarkless
+                    LIBP2P_NIXLESS: 1
+                    GO: /usr/lib/go/bin/go
+            - save_cache:
+              - key: dune-build-cache-test--test_postake_snarkless-{{ .Branch }}-{{ .Revision }}
+              - paths:
+                  - _build
             - run:
                 name: Build libp2p_helper
                 command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
@@ -939,6 +1037,20 @@ jobs:
                 name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
                 command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
 
+            - restore_cache:
+                keys:
+                  - dune-build-cache-test--test_postake_split-{{ .Branch }}-{{ .Revision }}
+            - run:
+                name: Build ocaml
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && make build'
+                environment:
+                    DUNE_PROFILE: test_postake_split
+                    LIBP2P_NIXLESS: 1
+                    GO: /usr/lib/go/bin/go
+            - save_cache:
+              - key: dune-build-cache-test--test_postake_split-{{ .Branch }}-{{ .Revision }}
+              - paths:
+                  - _build
             - run:
                 name: Build libp2p_helper
                 command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
@@ -971,6 +1083,20 @@ jobs:
                 name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
                 command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
 
+            - restore_cache:
+                keys:
+                  - dune-build-cache-test--test_postake_split_snarkless-{{ .Branch }}-{{ .Revision }}
+            - run:
+                name: Build ocaml
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && make build'
+                environment:
+                    DUNE_PROFILE: test_postake_split_snarkless
+                    LIBP2P_NIXLESS: 1
+                    GO: /usr/lib/go/bin/go
+            - save_cache:
+              - key: dune-build-cache-test--test_postake_split_snarkless-{{ .Branch }}-{{ .Revision }}
+              - paths:
+                  - _build
             - run:
                 name: Build libp2p_helper
                 command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
@@ -1021,6 +1147,20 @@ jobs:
                 name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
                 command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
 
+            - restore_cache:
+                keys:
+                  - dune-build-cache-test--test_postake_three_producers-{{ .Branch }}-{{ .Revision }}
+            - run:
+                name: Build ocaml
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && make build'
+                environment:
+                    DUNE_PROFILE: test_postake_three_producers
+                    LIBP2P_NIXLESS: 1
+                    GO: /usr/lib/go/bin/go
+            - save_cache:
+              - key: dune-build-cache-test--test_postake_three_producers-{{ .Branch }}-{{ .Revision }}
+              - paths:
+                  - _build
             - run:
                 name: Build libp2p_helper
                 command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
@@ -1053,6 +1193,20 @@ jobs:
                 name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
                 command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
 
+            - restore_cache:
+                keys:
+                  - dune-build-cache-test--test_postake_txns-{{ .Branch }}-{{ .Revision }}
+            - run:
+                name: Build ocaml
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && make build'
+                environment:
+                    DUNE_PROFILE: test_postake_txns
+                    LIBP2P_NIXLESS: 1
+                    GO: /usr/lib/go/bin/go
+            - save_cache:
+              - key: dune-build-cache-test--test_postake_txns-{{ .Branch }}-{{ .Revision }}
+              - paths:
+                  - _build
             - run:
                 name: Build libp2p_helper
                 command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
@@ -1088,6 +1242,20 @@ jobs:
                 name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
                 command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
 
+            - restore_cache:
+                keys:
+                  - dune-build-cache-test--test_postake_full_epoch-{{ .Branch }}-{{ .Revision }}
+            - run:
+                name: Build ocaml
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && make build'
+                environment:
+                    DUNE_PROFILE: test_postake_full_epoch
+                    LIBP2P_NIXLESS: 1
+                    GO: /usr/lib/go/bin/go
+            - save_cache:
+              - key: dune-build-cache-test--test_postake_full_epoch-{{ .Branch }}-{{ .Revision }}
+              - paths:
+                  - _build
             - run:
                 name: Build libp2p_helper
                 command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
@@ -1120,6 +1288,20 @@ jobs:
                 name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
                 command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
 
+            - restore_cache:
+                keys:
+                  - dune-build-cache-test--test_postake_medium_curves-{{ .Branch }}-{{ .Revision }}
+            - run:
+                name: Build ocaml
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && make build'
+                environment:
+                    DUNE_PROFILE: test_postake_medium_curves
+                    LIBP2P_NIXLESS: 1
+                    GO: /usr/lib/go/bin/go
+            - save_cache:
+              - key: dune-build-cache-test--test_postake_medium_curves-{{ .Branch }}-{{ .Revision }}
+              - paths:
+                  - _build
             - run:
                 name: Build libp2p_helper
                 command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
@@ -1157,6 +1339,20 @@ jobs:
                 name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
                 command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
 
+            - restore_cache:
+                keys:
+                  - dune-build-cache-test--test_postake_snarkless_medium_curves-{{ .Branch }}-{{ .Revision }}
+            - run:
+                name: Build ocaml
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && make build'
+                environment:
+                    DUNE_PROFILE: test_postake_snarkless_medium_curves
+                    LIBP2P_NIXLESS: 1
+                    GO: /usr/lib/go/bin/go
+            - save_cache:
+              - key: dune-build-cache-test--test_postake_snarkless_medium_curves-{{ .Branch }}-{{ .Revision }}
+              - paths:
+                  - _build
             - run:
                 name: Build libp2p_helper
                 command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
@@ -1192,6 +1388,20 @@ jobs:
                 name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
                 command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
 
+            - restore_cache:
+                keys:
+                  - dune-build-cache-test--test_postake_split_medium_curves-{{ .Branch }}-{{ .Revision }}
+            - run:
+                name: Build ocaml
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && make build'
+                environment:
+                    DUNE_PROFILE: test_postake_split_medium_curves
+                    LIBP2P_NIXLESS: 1
+                    GO: /usr/lib/go/bin/go
+            - save_cache:
+              - key: dune-build-cache-test--test_postake_split_medium_curves-{{ .Branch }}-{{ .Revision }}
+              - paths:
+                  - _build
             - run:
                 name: Build libp2p_helper
                 command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper

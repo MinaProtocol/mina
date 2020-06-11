@@ -552,6 +552,20 @@ jobs:
         steps:
             - checkout
             {{ opam_init_linux }}
+            - restore_cache:
+                keys:
+                  - dune-build-cache-test--{{profile}}-{{'{{'}} .Branch {{'}}'}}-{{'{{'}} .Revision {{'}}'}}
+            - run:
+                name: Build ocaml
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && make build'
+                environment:
+                    DUNE_PROFILE: {{profile}}
+                    LIBP2P_NIXLESS: 1
+                    GO: /usr/lib/go/bin/go
+            - save_cache:
+              - key: dune-build-cache-test--{{profile}}-{{'{{'}} .Branch {{'}}'}}-{{'{{'}} .Revision {{'}}'}}
+              - paths:
+                  - _build
             - run:
                 name: Build libp2p_helper
                 command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
@@ -572,6 +586,20 @@ jobs:
         steps:
             - checkout
             {{ opam_init_linux }}
+            - restore_cache:
+                keys:
+                  - dune-build-cache-test--{{profile}}-{{'{{'}} .Branch {{'}}'}}-{{'{{'}} .Revision {{'}}'}}
+            - run:
+                name: Build ocaml
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && make build'
+                environment:
+                    DUNE_PROFILE: {{profile}}
+                    LIBP2P_NIXLESS: 1
+                    GO: /usr/lib/go/bin/go
+            - save_cache:
+              - key: dune-build-cache-test--{{profile}}-{{'{{'}} .Branch {{'}}'}}-{{'{{'}} .Revision {{'}}'}}
+              - paths:
+                  - _build
             - run:
                 name: Build libp2p_helper
                 command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
