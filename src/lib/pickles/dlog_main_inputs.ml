@@ -5,7 +5,6 @@ module type S = Intf.Dlog_main_inputs.S
 
 open Zexe_backend
 module Impl = Impls.Dlog_based
-
 open Import
 
 let fq_random_oracle ?length s = Fq.of_bits (bits_random_oracle ?length s)
@@ -148,7 +147,7 @@ module G1 = struct
             fun () ->
               G1.(to_affine_exn (scale (of_affine (read typ t)) one_seventh)))
     in
-    ignore (scale_by_quadratic_nonresidue res) ;
+    assert_equal t (scale_by_quadratic_nonresidue res) ;
     res
 
   let if_ = T.if_
