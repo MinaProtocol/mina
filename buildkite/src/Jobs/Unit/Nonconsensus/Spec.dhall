@@ -12,5 +12,5 @@ JobSpec::{
     S.exactly "scripts/link-coredumps" "sh"
   ],
   path = "Unit",
-  name = "Coda Unit-Tests: nonconsensus_medium_curves"
+  name = "UnitTestNonconsensus"
 }

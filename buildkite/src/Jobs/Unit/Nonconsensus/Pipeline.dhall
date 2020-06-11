@@ -8,10 +8,7 @@ let Docker = ../../../Command/Docker/Type.dhall
 let Size = ../../../Command/Size.dhall
 let JobSpec = ../../../Pipeline/JobSpec.dhall
 
-let commands =
-  [
-    "bash -c 'source ~/.profile && (dune runtest src/nonconsensus --profile=nonconsensus_medium_curves -j8 || (./scripts/link-coredumps.sh && false))'"
-  ]
+let commonEnvVars = (../../../Constants/ContainerEnvVars.dhall).defaults # ["LIBP2P_NIXLESS=1", "GO=/usr/lib/go/bin/go"]
 
 in
 
@@ -21,18 +18,17 @@ Pipeline.build
     steps = [
     Command.build
       Command.Config::{
-        commands = Decorate.decorateAll commands,
-        label = "Unit Tests: nonconsensus_medium_curves",
-        key = "unit",
-        target = Size.Small,
+        commands = Decorate.decorate "bash -c 'source ~/.profile && (dune runtest src/nonconsensus --profile=nonconsensus_medium_curves -j8 || (./scripts/link-coredumps.sh && false))'",
+        label = "Run nonconsensus unit-tests",
+        key = "unit-nonconsensus",
+        target = Size.Large,
         docker = Docker::{
           image = (../../../Constants/ContainerImages.dhall).toolchainBase,
-          environment = (../../../Constants/ContainerEnvVars.dhall).defaults # [
-            "LIBP2P_NIXLESS=1",
-            "GO=/usr/lib/go/bin/go",
+          environment = commonEnvVars # [
             "DUNE_PROFILE=nonconsensus_medium_curves"
           ]
-        }
+        },
+        depends_on = ["build-client-sdk"]
       }
     ]
   }
