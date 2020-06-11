@@ -2,6 +2,10 @@ open Core_kernel
 open Import
 module SC = Pickles_types.Scalar_challenge
 
+(* Implementation of the algorithm described on page 29 of the Halo paper
+   https://eprint.iacr.org/2019/1021.pdf
+*)
+
 let to_field_checked (type f)
     (module Impl : Snarky.Snark_intf.Run with type field = f) ~endo
     (SC.Scalar_challenge bits) =
@@ -61,6 +65,9 @@ struct
 
   let typ : (t, Constant.t) Typ.t = SC.typ Challenge.typ
 
+  (* TODO-someday: Combine this and the identical definition in the
+     snarky_curve library.
+  *)
   (* b ? t : -t *)
   let conditional_negation (b : Boolean.var) (x, y) =
     let y' =
@@ -74,6 +81,9 @@ struct
     assert_r1cs y Field.((of_int 2 * (b :> Field.t)) - of_int 1) y' ;
     (x, y')
 
+  (* TODO-someday: Combine this and the identical definition in the
+     snarky_curve library.
+  *)
   let p_plus_q_plus_p (x1, y1) (x2, y2) =
     let open Field in
     let ( ! ) = As_prover.read typ in
@@ -127,17 +137,9 @@ struct
                   else read_var x)
         in
         (* TODO: Play around with this constraint and see how it affects
-  performance.
-  E.g., try
-  sx = (1 + (endo - 1) * bits.(2*i + 1)) * x
-*)
-
-        (*
-        Field.(
-        (* (endo - 1) * bits.(2*i + 1) * x = sx - x *)
-          assert_r1cs
-            (scale (b_2i1 :> t) Constant.(Endo.base - one)) x
-            (sx - x)) ; *)
+           performance.
+           E.g., try sx = (1 + (endo - 1) * bits.(2*i + 1)) * x
+        *)
         Field.(
           (* (endo - 1) * bits.(2*i + 1) * x = sx - x *)
           assert_r1cs
