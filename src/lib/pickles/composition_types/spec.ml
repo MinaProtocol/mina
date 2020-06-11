@@ -265,10 +265,7 @@ let packed_typ_basic (type field other_field other_field_var)
   end in
   let etyp : type a b.
          (a, b, ((other_field, other_field_var, 'e) Env.t as 'e)) Basic.t
-      -> (b, a, field) ETyp.t =
-    (* TODO: Have to think this through in terms of how to force each of these things
-       to be laid out as a single field element, which is the ultimate goal *)
-    function
+      -> (b, a, field) ETyp.t = function
     | Field ->
         field
     | Bool ->

@@ -18,4 +18,3 @@ let time lab f =
       printf "%s: %s\n%!" lab (Time.Span.to_string_hum (Time.diff stop start)) ;
       x )
     f ()
-
