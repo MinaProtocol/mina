@@ -2,6 +2,9 @@ open Core_kernel
 open Import
 module SC = Pickles_types.Scalar_challenge
 
+(* Implementation of the algorithm described on page 29 of the Halo paper
+   https://eprint.iacr.org/2019/1021.pdf
+*)
 let to_field_checked (type f)
     (module Impl : Snarky.Snark_intf.Run with type field = f) ~endo
     (SC.Scalar_challenge bits) =
@@ -22,6 +25,9 @@ let to_field_checked (type f)
   done ;
   F.(scale !a endo + !b)
 
+(* Implementation of the algorithm described on page 29 of the Halo paper
+   https://eprint.iacr.org/2019/1021.pdf
+*)
 let to_field_constant (type f) ~endo
     (module F : Marlin_checks.Field_intf with type t = f)
     (SC.Scalar_challenge c) =
