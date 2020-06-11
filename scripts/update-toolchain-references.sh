@@ -16,5 +16,5 @@ filenames="
 
 for filename in $filenames ; do
     echo "Updating $filename with new toolchain reference: $1"
-    sed -i "s/toolchain-[0-9a-f]\+[^\`]\?/toolchain-$1/g" $filename
+    sed -i "" "s/toolchain-[0-9a-f]\+[^\`]\?/toolchain-$1/g" $filename
 done

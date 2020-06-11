@@ -99,6 +99,10 @@ RUN sudo apt-get install --yes wget
 RUN cd /usr/lib && sudo wget https://dl.google.com/go/go1.13.10.linux-amd64.tar.gz && sudo tar -xvf go1.13.10.linux-amd64.tar.gz && sudo rm go1.13.10.linux-amd64.tar.gz
 RUN echo 'export PATH="$PATH:/usr/lib/go/bin"' >> /home/opam/.bashrc
 
+# Buildkite support
+RUN bash -c "`curl -sL https://raw.githubusercontent.com/buildkite/agent/master/install.sh`"
+RUN export PATH="$PATH:$HOME/.buildkite-agent/bin" >> /home/opam/.bashrc
+
 # The Ocaml images are set to London time for reason. UTC makes reading the logs
 # easier.
 RUN sudo ln -sf /usr/share/zoneinfo/UTC /etc/localtime
