@@ -162,6 +162,9 @@ module FilterButtons = {
       merge([
         Styles.buttonRow,
         style([
+          width(`rem(42.0)), // size of 3 buttons
+          borderRadius(`px(4)),
+          overflow(`hidden),
           selector(
             "*:not(:last-child)",
             [borderRight(`px(1), `solid, Theme.Colors.grey)],
@@ -180,7 +183,7 @@ module FilterButtons = {
           letterSpacing(`rem(0.0875)),
           textAlign(`center),
           textTransform(`uppercase),
-          textShadow(~y=`px(1), `rgba((0, 0, 0, 0.25))),
+          textShadow(~y=`px(1), Theme.Colors.blackAlpha(0.25)),
         ]),
       ]);
 
@@ -190,13 +193,11 @@ module FilterButtons = {
         style([
           width(`rem(14.)),
           height(`rem(3.)),
-          borderRadius(`px(2)),
           padding2(~v=`px(12), ~h=`px(24)),
           alignSelf(`center),
           backgroundColor(Theme.Colors.gandalf),
           color(`rgb((71, 90, 104))),
           cursor(`pointer),
-          boxShadow(~blur=`px(8), ~inset=true, `rgba((0, 0, 0, 0.1))),
         ]),
       ]);
 
@@ -204,6 +205,12 @@ module FilterButtons = {
       merge([
         button,
         style([
+          boxShadow(
+            ~blur=`px(8),
+            ~inset=true,
+            Theme.Colors.blackAlpha(0.1),
+          ),
+          textShadow(~y=`px(1), Theme.Colors.blackAlpha(0.25)),
           backgroundColor(Theme.Colors.hyperlink),
           color(Theme.Colors.white),
         ]),

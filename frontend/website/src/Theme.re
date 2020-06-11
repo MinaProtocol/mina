@@ -16,6 +16,8 @@ module Colors = {
     `hsla((`deg(201.), `percent(71.), `percent(52.), `num(a)));
   let hyperlink = hyperlinkAlpha(1.0);
 
+  let blackAlpha = a => `rgba((0, 0, 0, a));
+
   let hyperlinkHover = `hex("0AA9FF");
   let hyperlinkLight = `hsl((`deg(201.), `percent(71.), `percent(70.)));
 
