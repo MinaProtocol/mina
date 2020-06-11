@@ -221,18 +221,21 @@ module type S = sig
 
   val apply_user_command :
        constraint_constants:Genesis_constants.Constraint_constants.t
+    -> txn_global_slot:Global_slot.t
     -> ledger
     -> User_command.With_valid_signature.t
     -> Undo.User_command_undo.t Or_error.t
 
   val apply_transaction :
        constraint_constants:Genesis_constants.Constraint_constants.t
+    -> txn_global_slot:Global_slot.t
     -> ledger
     -> Transaction.t
     -> Undo.t Or_error.t
 
   val merkle_root_after_user_command_exn :
        constraint_constants:Genesis_constants.Constraint_constants.t
+    -> txn_global_slot:Global_slot.t
     -> ledger
     -> User_command.With_valid_signature.t
     -> Ledger_hash.t
@@ -422,12 +425,12 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
   (* someday: It would probably be better if we didn't modify the receipt chain hash
   in the case that the sender is equal to the receiver, but it complicates the SNARK, so
   we don't for now. *)
-  let apply_user_command_unchecked ~constraint_constants ledger
-      ({payload; signer; signature= _} as user_command : User_command.t) =
+  let apply_user_command_unchecked ~constraint_constants ~txn_global_slot
+      ledger ({payload; signer; signature= _} as user_command : User_command.t)
+      =
     let open Or_error.Let_syntax in
     let signer_pk = Public_key.compress signer in
-    (* TODO: Put actual value here. See issue #4036. *)
-    let current_global_slot = Global_slot.zero in
+    let current_global_slot = txn_global_slot in
     let%bind () =
       validate_time
         ~valid_until:(User_command.valid_until user_command)
@@ -659,9 +662,9 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         *)
         Error err
 
-  let apply_user_command ~constraint_constants ledger
+  let apply_user_command ~constraint_constants ~txn_global_slot ledger
       (user_command : User_command.With_valid_signature.t) =
-    apply_user_command_unchecked ~constraint_constants ledger
+    apply_user_command_unchecked ~constraint_constants ~txn_global_slot ledger
       (User_command.forget_check user_command)
 
   let process_fee_transfer t (transfer : Fee_transfer.t) ~modify_balance =
@@ -986,15 +989,16 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         [%test_eq: Ledger_hash.t] undo.previous_hash (merkle_root ledger) ) ;
     res
 
-  let apply_transaction ~constraint_constants ledger (t : Transaction.t) =
+  let apply_transaction ~constraint_constants ~txn_global_slot ledger
+      (t : Transaction.t) =
     O1trace.measure "apply_transaction" (fun () ->
         let previous_hash = merkle_root ledger in
         Or_error.map
           ( match t with
           | User_command txn ->
               Or_error.map
-                (apply_user_command ~constraint_constants ledger txn)
-                ~f:(fun undo -> Undo.Varying.User_command undo)
+                (apply_user_command ~constraint_constants ~txn_global_slot
+                   ledger txn) ~f:(fun undo -> Undo.Varying.User_command undo)
           | Fee_transfer t ->
               Or_error.map (apply_fee_transfer ~constraint_constants ledger t)
                 ~f:(fun undo -> Undo.Varying.Fee_transfer undo)
@@ -1003,9 +1007,12 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                 ~f:(fun undo -> Undo.Varying.Coinbase undo) )
           ~f:(fun varying -> {Undo.previous_hash; varying}) )
 
-  let merkle_root_after_user_command_exn ~constraint_constants ledger payment =
+  let merkle_root_after_user_command_exn ~constraint_constants ~txn_global_slot
+      ledger payment =
     let undo =
-      Or_error.ok_exn (apply_user_command ~constraint_constants ledger payment)
+      Or_error.ok_exn
+        (apply_user_command ~constraint_constants ~txn_global_slot ledger
+           payment)
     in
     let root = merkle_root ledger in
     Or_error.ok_exn (undo_user_command ~constraint_constants ledger undo) ;

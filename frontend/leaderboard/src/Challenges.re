@@ -1,3 +1,21 @@
+/*
+  Challenges.re has the responsibilities of taking a Map of public keys to
+  metricRecords and compute a new Map that contains a public key to
+  points where points is a number value (either Int64 or int).
+
+  Points are rewarded based on completing challenges that are previously defined
+  by O(1) community managers. The challenges that are supported are defined in
+  calculatePoints()
+
+  The data visualized for a Map is as follows, where x is some number value:
+
+  "public_key1": x
+
+   All the challenges to be computed are specified in calculatePoints().
+   calculatePoints() is invoked in Upload.re where the points are computed
+   and then uploaded to the Leaderboard Google Sheets.
+ */
+
 module StringMap = Map.Make(String);
 
 let addPointsToUsersWithAtleastN =
@@ -15,10 +33,11 @@ let addPointsToUsersWithAtleastN =
   );
 };
 
-let applyTopNPoints = (threshholdPointsList, metricsMap, getMetricValue) => {
+let applyTopNPoints =
+    (threshholdPointsList, metricsMap, getMetricValue, compareFunc) => {
   let metricsArray = Array.of_list(StringMap.bindings(metricsMap));
   let f = ((_, metricValue1), (_, metricValue2)) => {
-    compare(getMetricValue(metricValue1), getMetricValue(metricValue2));
+    compareFunc(getMetricValue(metricValue1), getMetricValue(metricValue2));
   };
 
   Array.sort(f, metricsArray);
@@ -66,14 +85,28 @@ let sumPointsMaps = maps => {
      );
 };
 
-let calcEchoServiceChallenge = metricsMap => {
-  addPointsToUsersWithAtleastN(
-    (metricRecord: Types.Metrics.metricRecord) =>
-      metricRecord.transactionsReceivedByEcho,
-    1,
-    500,
-    metricsMap,
-  );
+let echoServiceChallenge = metricsMap => {
+  metricsMap
+  |> addPointsToUsersWithAtleastN(
+       (metricRecord: Types.Metrics.metricRecord) =>
+         metricRecord.transactionsReceivedByEcho,
+       1,
+       500,
+     );
+};
+
+let coinbaseReceiverChallenge = (points, metricsMap) => {
+  metricsMap
+  |> StringMap.fold(
+       (key, metric: Types.Metrics.metricRecord, map) => {
+         switch (metric.coinbaseReceiver) {
+         | Some(metricValue) =>
+           metricValue ? StringMap.add(key, points, map) : map
+         | None => map
+         }
+       },
+       StringMap.empty,
+     );
 };
 
 let bonusBlocksChallenge = metricsMap => {
@@ -87,8 +120,8 @@ let bonusBlocksChallenge = metricsMap => {
       (101, 1000) // Top 100: 1000 pts
     |],
     metricsMap,
-    (metricRecord: Types.Metrics.metricRecord) =>
-    metricRecord.blocksCreated
+    (metricRecord: Types.Metrics.metricRecord) => metricRecord.blocksCreated,
+    compare,
   );
 };
 
@@ -128,12 +161,22 @@ let bonusZkSnarkChallenge = metricsMap => {
       |],
       metricsMap,
       (metricRecord: Types.Metrics.metricRecord) =>
-      metricRecord.snarkFeesCollected
+        switch (metricRecord.snarkFeesCollected) {
+        | Some(snarkFeesCollected) => Int64.of_string(snarkFeesCollected)
+        | None => Int64.zero
+        },
+      Int64.compare,
     ),
     //The user who sold the most expensive SNARK will receive a bonus of 500 pts
     applyTopNPoints(
-      [|(0, 500)|], metricsMap, (metricRecord: Types.Metrics.metricRecord) =>
-      metricRecord.highestSnarkFeeCollected
+      [|(0, 500)|],
+      metricsMap,
+      (metricRecord: Types.Metrics.metricRecord) =>
+        switch (metricRecord.snarkFeesCollected) {
+        | Some(snarkFeesCollected) => Int64.of_string(snarkFeesCollected)
+        | None => Int64.zero
+        },
+      Int64.compare,
     ),
   ]
   |> sumPointsMaps;
@@ -144,7 +187,11 @@ let zkSnarksChallenge = metricsMap => {
     // Earn 3 fees by producing and selling zk-SNARKs on the snarketplace: 1000 pts
     addPointsToUsersWithAtleastN(
       (metricRecord: Types.Metrics.metricRecord) =>
-        metricRecord.snarkFeesCollected,
+        switch (metricRecord.snarkFeesCollected) {
+        | Some(snarkFeesCollected) =>
+          Some(Int64.of_string(snarkFeesCollected))
+        | None => Some(Int64.zero)
+        },
       3L,
       1000,
       metricsMap,
@@ -152,7 +199,11 @@ let zkSnarksChallenge = metricsMap => {
     // Anyone who earned 50 fees will be rewarded with an additional 1000 pts.
     addPointsToUsersWithAtleastN(
       (metricRecord: Types.Metrics.metricRecord) =>
-        metricRecord.snarkFeesCollected,
+        switch (metricRecord.snarkFeesCollected) {
+        | Some(snarkFeesCollected) =>
+          Some(Int64.of_string(snarkFeesCollected))
+        | None => Some(Int64.zero)
+        },
       50L,
       1000,
       metricsMap,
@@ -171,13 +222,13 @@ let calculatePoints = (challengeID, metricsMap) => {
     )
   ) {
   | Some(res) =>
-    switch (res[1]) {
-    | "Stake your Coda and produce blocks" =>
+    switch (String.lowercase_ascii(res[1])) {
+    | "stake your coda and produce blocks" =>
       Some(blocksChallenge(metricsMap))
-    | "Create and sell zk-SNARKs on Coda" =>
+    | "create and sell zk-snarks on coda" =>
       Some(zkSnarksChallenge(metricsMap))
-    | "Connect to testnet and send coda to another testnet user" =>
-      Some(calcEchoServiceChallenge(metricsMap))
+    | "connect to testnet and send coda" =>
+      Some(echoServiceChallenge(metricsMap))
     | _ => None
     }
   | None => None

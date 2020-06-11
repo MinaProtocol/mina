@@ -696,7 +696,6 @@ let daemon logger =
              ~location typ
          in
          let trust_dir = conf_dir ^/ "trust" in
-         let () = Snark_params.set_chunked_hashing true in
          let%bind () = Async.Unix.mkdir ~p:() trust_dir in
          let trust_system = Trust_system.create trust_dir in
          trace_database_initialization "trust_system" __LOC__ trust_dir ;
@@ -757,6 +756,7 @@ let daemon logger =
            ; time_controller
            ; consensus_local_state
            ; genesis_ledger_hash
+           ; constraint_constants
            ; log_gossip_heard
            ; is_seed
            ; creatable_gossip_net=
@@ -894,8 +894,6 @@ let daemon logger =
        in
        coda_ref := Some coda ;
        let%bind () = maybe_sleep 3. in
-       let web_service = Web_pipe.get_service () in
-       Web_pipe.run_service coda web_service ~conf_dir ~logger ;
        Coda_run.setup_local_server ?client_trustlist ~rest_server_port
          ~insecure_rest_server coda ;
        let%bind () = Coda_lib.start coda in
