@@ -17,6 +17,6 @@
     `propagate-environment` = True,
     `mount-buildkite-agent` = False,
     `mount-workdir` = False,
-    environment = [ "BUILDKITE_AGENT_ACCESS_TOKEN" ]
+    environment = [ "BUILDKITE_AGENT_ACCESS_TOKEN", "BUILDKITE_GS_APPLICATION_CREDENTIALS_JSON" ]
   }
 }
