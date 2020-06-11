@@ -139,17 +139,9 @@ struct
                   else read_var x)
         in
         (* TODO: Play around with this constraint and see how it affects
-  performance.
-  E.g., try
-  sx = (1 + (endo - 1) * bits.(2*i + 1)) * x
-*)
-
-        (*
-        Field.(
-        (* (endo - 1) * bits.(2*i + 1) * x = sx - x *)
-          assert_r1cs
-            (scale (b_2i1 :> t) Constant.(Endo.base - one)) x
-            (sx - x)) ; *)
+           performance.
+           E.g., try sx = (1 + (endo - 1) * bits.(2*i + 1)) * x
+        *)
         Field.(
           (* (endo - 1) * bits.(2*i + 1) * x = sx - x *)
           assert_r1cs
