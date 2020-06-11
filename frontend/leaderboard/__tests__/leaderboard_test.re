@@ -104,7 +104,8 @@ describe("Points functions", () => {
           [|(2, 1000)|],
           blockMetrics,
           (metricRecord: Types.Metrics.metricRecord) =>
-          metricRecord.blocksCreated
+            metricRecord.blocksCreated,
+          compare,
         );
       test("correct number of points given to publickey1", () => {
         expect(StringMap.find("publickey1", blockPoints)) |> toBe(1000)
@@ -128,7 +129,8 @@ describe("Points functions", () => {
           [|(0, 2000), (2, 1000)|],
           blockMetrics,
           (metricRecord: Types.Metrics.metricRecord) =>
-          metricRecord.blocksCreated
+            metricRecord.blocksCreated,
+          compare,
         );
       test("correct number of points given to publickey1", () => {
         expect(StringMap.find("publickey1", blockPoints)) |> toBe(2000)
@@ -153,7 +155,8 @@ describe("Points functions", () => {
           [|(0, 3000), (1, 2000), (5, 1000)|],
           blockMetrics,
           (metricRecord: Types.Metrics.metricRecord) =>
-          metricRecord.blocksCreated
+            metricRecord.blocksCreated,
+          compare,
         );
       test("correct number of points given to publickey1", () => {
         expect(StringMap.find("publickey1", blockPoints)) |> toBe(3000)

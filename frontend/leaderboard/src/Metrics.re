@@ -107,7 +107,13 @@ let calculateSnarkFeeCount = (map, block: Types.NewBlock.data) => {
            snarkJob.prover,
            feeCount =>
              switch (feeCount) {
-             | Some(feeCount) => Some(Int64.add(feeCount, snarkJob.fee))
+             | Some(feeCount) =>
+               let result =
+                 Int64.add(
+                   Int64.of_string(snarkJob.fee),
+                   Int64.of_string(feeCount),
+                 );
+               Some(Int64.to_string(result));
              | None => Some(snarkJob.fee)
              },
            map,
@@ -129,7 +135,15 @@ let calculateHighestSnarkFeeCollected = (map, block: Types.NewBlock.data) => {
            snarkJob.prover,
            feeCount =>
              switch (feeCount) {
-             | Some(feeCount) => Some(max(feeCount, snarkJob.fee))
+             | Some(feeCount) =>
+               Some(
+                 Int64.to_string(
+                   max(
+                     Int64.of_string(snarkJob.fee),
+                     Int64.of_string(feeCount),
+                   ),
+                 ),
+               )
              | None => Some(snarkJob.fee)
              },
            map,
