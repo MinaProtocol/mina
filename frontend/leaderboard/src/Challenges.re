@@ -33,10 +33,11 @@ let addPointsToUsersWithAtleastN =
   );
 };
 
-let applyTopNPoints = (threshholdPointsList, metricsMap, getMetricValue) => {
+let applyTopNPoints =
+    (threshholdPointsList, metricsMap, getMetricValue, compareFunc) => {
   let metricsArray = Array.of_list(StringMap.bindings(metricsMap));
   let f = ((_, metricValue1), (_, metricValue2)) => {
-    compare(getMetricValue(metricValue1), getMetricValue(metricValue2));
+    compareFunc(getMetricValue(metricValue1), getMetricValue(metricValue2));
   };
 
   Array.sort(f, metricsArray);
@@ -119,8 +120,8 @@ let bonusBlocksChallenge = metricsMap => {
       (101, 1000) // Top 100: 1000 pts
     |],
     metricsMap,
-    (metricRecord: Types.Metrics.metricRecord) =>
-    metricRecord.blocksCreated
+    (metricRecord: Types.Metrics.metricRecord) => metricRecord.blocksCreated,
+    compare,
   );
 };
 
@@ -160,12 +161,22 @@ let bonusZkSnarkChallenge = metricsMap => {
       |],
       metricsMap,
       (metricRecord: Types.Metrics.metricRecord) =>
-      metricRecord.snarkFeesCollected
+        switch (metricRecord.snarkFeesCollected) {
+        | Some(snarkFeesCollected) => Int64.of_string(snarkFeesCollected)
+        | None => Int64.zero
+        },
+      Int64.compare,
     ),
     //The user who sold the most expensive SNARK will receive a bonus of 500 pts
     applyTopNPoints(
-      [|(0, 500)|], metricsMap, (metricRecord: Types.Metrics.metricRecord) =>
-      metricRecord.highestSnarkFeeCollected
+      [|(0, 500)|],
+      metricsMap,
+      (metricRecord: Types.Metrics.metricRecord) =>
+        switch (metricRecord.snarkFeesCollected) {
+        | Some(snarkFeesCollected) => Int64.of_string(snarkFeesCollected)
+        | None => Int64.zero
+        },
+      Int64.compare,
     ),
   ]
   |> sumPointsMaps;
@@ -176,7 +187,11 @@ let zkSnarksChallenge = metricsMap => {
     // Earn 3 fees by producing and selling zk-SNARKs on the snarketplace: 1000 pts
     addPointsToUsersWithAtleastN(
       (metricRecord: Types.Metrics.metricRecord) =>
-        metricRecord.snarkFeesCollected,
+        switch (metricRecord.snarkFeesCollected) {
+        | Some(snarkFeesCollected) =>
+          Some(Int64.of_string(snarkFeesCollected))
+        | None => Some(Int64.zero)
+        },
       3L,
       1000,
       metricsMap,
@@ -184,7 +199,11 @@ let zkSnarksChallenge = metricsMap => {
     // Anyone who earned 50 fees will be rewarded with an additional 1000 pts.
     addPointsToUsersWithAtleastN(
       (metricRecord: Types.Metrics.metricRecord) =>
-        metricRecord.snarkFeesCollected,
+        switch (metricRecord.snarkFeesCollected) {
+        | Some(snarkFeesCollected) =>
+          Some(Int64.of_string(snarkFeesCollected))
+        | None => Some(Int64.zero)
+        },
       50L,
       1000,
       metricsMap,
