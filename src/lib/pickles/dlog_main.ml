@@ -502,14 +502,6 @@ struct
     | [] ->
         failwith "empty list"
 
-  (*
-    let open Field in
-    Array.fold e ~init:(zero, one)
-      ~f:(fun (acc, s) (b, x) ->
-          (acc + s * ((b :> t) * x), s * pt_n) )
-    |> fst
-*)
-
   let finalize_other_proof (type b)
       (module Branching : Nat.Add.Intf with type n = b) ?actual_branching
       ~domain_h ~domain_k ~input_domain ~h_minus_1 ~k_minus_1 ~sponge
