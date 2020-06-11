@@ -6,8 +6,8 @@ type 'n t = (Int64.t, 'n) Vector.t [@@deriving sexp_of]
 let to_bits t =
   Vector.to_list t
   |> List.concat_map ~f:(fun n ->
-          let test_bit i = Int64.(shift_right n i land one = one) in
-          List.init 64 ~f:test_bit )
+         let test_bit i = Int64.(shift_right n i land one = one) in
+         List.init 64 ~f:test_bit )
 
 module Make (N : Vector.Nat_intf) = struct
   module A = Vector.With_length (N)
@@ -28,9 +28,7 @@ module Make (N : Vector.Nat_intf) = struct
 
     let of_hex h =
       let f s = Hex.of_string ("0x" ^ s) in
-      let hi, lo =
-        String.(f (sub h ~pos:0 ~len:8), f (sub h ~pos:8 ~len:8))
-      in
+      let hi, lo = String.(f (sub h ~pos:0 ~len:8), f (sub h ~pos:8 ~len:8)) in
       (hi lsl 32) lor lo
 
     let%test_unit "int64 hex" =
@@ -66,4 +64,3 @@ module Make (N : Vector.Nat_intf) = struct
 
   let dummy : t = Vector.init N.n ~f:(fun _ -> Int64.one)
 end
-
