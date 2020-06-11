@@ -347,7 +347,7 @@ let make = (~challenges as _, ~testnetName as _) => {
             </h1>
             // href="https://testnet-points-frontend-dot-o1labs-192920.appspot.com/"
             <a
-              href="http://bit.ly/TestnetBetaLeaderboard"
+              href="https://bit.ly/TestnetLeaderboard"
               target="_blank"
               className=Styles.headerLink>
               {React.string({j|View Full Leaderboard\u00A0→|j})}
