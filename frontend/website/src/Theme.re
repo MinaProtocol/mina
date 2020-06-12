@@ -330,6 +330,35 @@ module H5 = {
   let basic = merge([init, style([lineHeight(`rem(1.5))])]);
 
   let tight = merge([init, style([lineHeight(`rem(1.25))])]);
+
+  let semiBold =
+    merge([
+      style([
+        Typeface.ibmplexsans,
+        fontStyle(`normal),
+        fontWeight(`semiBold),
+        fontSize(`rem(1.25)),
+        lineHeight(`rem(1.5)),
+        color(Colors.saville),
+      ]),
+    ]);
+};
+
+module H6 = {
+  open Css;
+  let init =
+    style([Typeface.ibmplexsans, fontStyle(`normal), textAlign(`center)]);
+
+  let extraSmall =
+    merge([
+      init,
+      style([
+        fontSize(`rem(0.75)),
+        letterSpacing(`rem(0.0875)),
+        fontWeight(`num(500)),
+        lineHeight(`rem(1.0)),
+      ]),
+    ]);
 };
 
 module Body = {

@@ -139,30 +139,23 @@ module HeroText = {
   };
 };
 
-module FilterButtons = {
+module ToggleButtons = {
   module ButtonStyles = {
     open Css;
-    let header =
-      style([
-        Theme.Typeface.ibmplexsans,
-        fontStyle(`normal),
-        fontWeight(`semiBold),
-        fontSize(`rem(1.25)),
-        lineHeight(`rem(1.5)),
-        color(Theme.Colors.saville),
-      ]);
-
     let flexColumn =
       merge([
         Styles.flexColumn,
-        style([media("(max-width: 960px)", [display(`none)])]),
+        style([
+          height(`rem(4.5)),
+          media("(max-width: 960px)", [display(`none)]),
+        ]),
       ]);
 
     let buttonRow =
       merge([
         Styles.buttonRow,
         style([
-          width(`rem(42.0)), // size of 3 buttons
+          width(`rem(40.5)),
           borderRadius(`px(4)),
           overflow(`hidden),
           selector(
@@ -173,30 +166,28 @@ module FilterButtons = {
       ]);
 
     let textStyles =
-      merge([
-        style([
-          Theme.Typeface.ibmplexsans,
-          fontStyle(`normal),
-          fontSize(`rem(0.75)),
-          fontWeight(`num(500)),
-          lineHeight(`rem(1.625)),
-          letterSpacing(`rem(0.0875)),
-          textAlign(`center),
-          textTransform(`uppercase),
-          textShadow(~y=`px(1), Theme.Colors.blackAlpha(0.25)),
-        ]),
+      merge([Theme.H6.extraSmall, style([textTransform(`uppercase)])]);
+
+    let hover =
+      hover([
+        backgroundColor(Theme.Colors.hyperlinkHover),
+        color(Theme.Colors.white),
+        textShadow(~y=`px(1), Theme.Colors.blackAlpha(0.25)),
       ]);
 
     let button =
       merge([
         textStyles,
         style([
-          width(`rem(14.)),
-          height(`rem(3.)),
-          padding2(~v=`px(12), ~h=`px(24)),
-          alignSelf(`center),
+          hover,
+          display(`flex),
+          justifyContent(`center),
+          alignItems(`center),
+          width(`rem(13.5)),
+          height(`rem(2.5)),
+          textAlign(`center),
           backgroundColor(Theme.Colors.gandalf),
-          color(`rgb((71, 90, 104))),
+          color(Theme.Colors.denimTwo),
           cursor(`pointer),
         ]),
       ]);
@@ -218,9 +209,9 @@ module FilterButtons = {
   };
 
   [@react.component]
-  let make = (~currentOption, ~onFilterPress) => {
+  let make = (~currentOption, ~onTogglePress) => {
     <div className=ButtonStyles.flexColumn>
-      <h3 className=ButtonStyles.header> {React.string("View")} </h3>
+      <h3 className=Theme.H5.semiBold> {React.string("View")} </h3>
       <Spacer height=0.5 />
       <div className=ButtonStyles.buttonRow>
         <div
@@ -228,7 +219,7 @@ module FilterButtons = {
             currentOption == "btn1"
               ? ButtonStyles.selectedButton : ButtonStyles.button
           }
-          onClick={_ => onFilterPress("btn1")}>
+          onClick={_ => onTogglePress("btn1")}>
           {React.string("All Participants")}
         </div>
         <div
@@ -236,7 +227,7 @@ module FilterButtons = {
             currentOption == "btn2"
               ? ButtonStyles.selectedButton : ButtonStyles.button
           }
-          onClick={_ => onFilterPress("btn2")}>
+          onClick={_ => onTogglePress("btn2")}>
           {React.string("Genesis Members")}
         </div>
         <div
@@ -244,7 +235,7 @@ module FilterButtons = {
             currentOption == "btn3"
               ? ButtonStyles.selectedButton : ButtonStyles.button
           }
-          onClick={_ => onFilterPress("btn3")}>
+          onClick={_ => onTogglePress("btn3")}>
           {React.string("Non-Genesis Members")}
         </div>
       </div>
@@ -263,11 +254,11 @@ type state = {currentOption: string};
 let initialState = {currentOption: "btn1"};
 
 type action =
-  | Filtered(string);
+  | Toggled(string);
 
 let reducer = (_, action) => {
   switch (action) {
-  | Filtered(option) => {currentOption: option}
+  | Toggled(option) => {currentOption: option}
   };
 };
 
@@ -275,8 +266,8 @@ let reducer = (_, action) => {
 let make = (~lastManualUpdatedDate) => {
   let (state, dispatch) = React.useReducer(reducer, initialState);
 
-  let onFilterPress = s => {
-    dispatch(Filtered(s));
+  let onTogglePress = s => {
+    dispatch(Toggled(s));
   };
 
   let dateAsMoment = momentWithDate(lastManualUpdatedDate);
@@ -348,7 +339,7 @@ let make = (~lastManualUpdatedDate) => {
           </div>
         </div>
         <div>
-          <FilterButtons currentOption={state.currentOption} onFilterPress />
+          <ToggleButtons currentOption={state.currentOption} onTogglePress />
         </div>
       </div>
     </Wrapped>
