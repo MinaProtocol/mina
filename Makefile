@@ -170,8 +170,8 @@ macos-setup:
 
 # push steps require auth on docker hub
 docker-toolchain:
-	@if true ; then \
-		docker build --file dockerfiles/Dockerfile-toolchain --tag codaprotocol/coda:toolchain-$(GITLONGHASH) . && \
+	@if git diff-index --quiet HEAD ; then \
+		docker build --no-cache --file dockerfiles/Dockerfile-toolchain --tag codaprotocol/coda:toolchain-$(GITLONGHASH) . && \
 		docker tag  codaprotocol/coda:toolchain-$(GITLONGHASH) codaprotocol/coda:toolchain-latest && \
 		docker push codaprotocol/coda:toolchain-$(GITLONGHASH) && \
 		docker push codaprotocol/coda:toolchain-latest ;\
