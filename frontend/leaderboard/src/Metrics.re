@@ -1,3 +1,25 @@
+/*
+  Metrics.re has the responsibilities of taking a collection of blocks as input
+  and transforming that block data into a Map of public keys to metricRecord types.
+  The metricRecord type is defined in Types/Metrics.
+
+  The data visualized for a Map is as follows, where x is some int value:
+
+ "public_key1": {
+    blocksCreated: x,
+    transactionSent: x,
+    snarkWorkCreated: x,
+    snarkFeesCollected: x,
+    highestSnarkFeeCollected: x,
+    transactionsReceivedByEcho: x,
+    coinbaseReceiver: x,
+ }
+
+  All the metrics to be computed are specified in calculateMetrics(). Each
+  metric to be computed is contained within it's own Map structure and is then
+  combined together with all other metric Maps.
+ */
+
 module StringMap = Map.Make(String);
 
 // Helper functions for gathering metrics
@@ -85,7 +107,13 @@ let calculateSnarkFeeCount = (map, block: Types.NewBlock.data) => {
            snarkJob.prover,
            feeCount =>
              switch (feeCount) {
-             | Some(feeCount) => Some(Int64.add(feeCount, snarkJob.fee))
+             | Some(feeCount) =>
+               let result =
+                 Int64.add(
+                   Int64.of_string(snarkJob.fee),
+                   Int64.of_string(feeCount),
+                 );
+               Some(Int64.to_string(result));
              | None => Some(snarkJob.fee)
              },
            map,
@@ -107,7 +135,15 @@ let calculateHighestSnarkFeeCollected = (map, block: Types.NewBlock.data) => {
            snarkJob.prover,
            feeCount =>
              switch (feeCount) {
-             | Some(feeCount) => Some(max(feeCount, snarkJob.fee))
+             | Some(feeCount) =>
+               Some(
+                 Int64.to_string(
+                   max(
+                     Int64.of_string(snarkJob.fee),
+                     Int64.of_string(feeCount),
+                   ),
+                 ),
+               )
              | None => Some(snarkJob.fee)
              },
            map,
@@ -121,14 +157,18 @@ let getHighestSnarkFeeCollected = blocks => {
   blocks |> calculateProperty(calculateHighestSnarkFeeCollected);
 };
 
-let getTransactionsSentToAddress = (blocks, address) => {
+let getTransactionsSentToAddress = (blocks, addresses) => {
   blocks
   |> Array.fold_left(
        (map, block: Types.NewBlock.data) => {
          block.transactions.userCommands
          |> Array.fold_left(
               (map, userCommand: Types.NewBlock.userCommands) => {
-                userCommand.toAccount.publicKey === address
+                addresses
+                |> List.filter(address => {
+                     userCommand.toAccount.publicKey === address
+                   })
+                |> List.length > 0
                   ? incrementMapValue(userCommand.fromAccount.publicKey, map)
                   : map
               },
@@ -160,19 +200,19 @@ let getCoinbaseReceiverChallenge = blocks => {
      );
 };
 
-let throwAwayValues = metric => {
-  StringMap.map(_ => {()}, metric);
+let throwAwayValues = metrics => {
+  metrics |> StringMap.map(_ => {()});
 };
 
 let calculateAllUsers = metrics => {
-  List.fold_left(
-    StringMap.merge((_, _, _) => {Some()}),
-    StringMap.empty,
-    metrics,
-  );
+  metrics
+  |> List.fold_left(StringMap.merge((_, _, _) => {Some()}), StringMap.empty);
 };
 
-let echoBotPublicKey = "4vsRCVNep7JaFhtySu6vZCjnArvoAhkRscTy5TQsGTsKM4tJcYVc3uNUMRxQZAwVzSvkHDGWBmvhFpmCeiPASGnByXqvKzmHt4aR5uAWAQf3kqhwDJ2ZY3Hw4Dzo6awnJkxY338GEp12LE4x";
+let echoBotPublicKeys = [
+  "4vsRCVNep7JaFhtySu6vZCjnArvoAhkRscTy5TQsGTsKM4tJcYVc3uNUMRxQZAwVzSvkHDGWBmvhFpmCeiPASGnByXqvKzmHt4aR5uAWAQf3kqhwDJ2ZY3Hw4Dzo6awnJkxY338GEp12LE4x",
+  "4vsRCViQQRxXfkgEspR9vPWLypuSEGkZtHxjYF7srq5M1mZN4LSoX7wWCFZGitJLmdoozDXmrCugvBBKsePd6hfBAp9P3eTCHs5HwdC763A1FbjzskfrCvWMq9KXXsmFxWhYpG9nnhWzqSC1",
+];
 let calculateMetrics = blocks => {
   let blocksCreated = getBlocksCreatedByUser(blocks);
   let transactionSent = getTransactionSentByUser(blocks);
@@ -180,7 +220,7 @@ let calculateMetrics = blocks => {
   let snarkFeesCollected = getSnarkFeesCollected(blocks);
   let highestSnarkFeeCollected = getHighestSnarkFeeCollected(blocks);
   let transactionsReceivedByEcho =
-    getTransactionsSentToAddress(blocks, echoBotPublicKey);
+    getTransactionsSentToAddress(blocks, echoBotPublicKeys);
   let coinbaseReceiverChallenge = getCoinbaseReceiverChallenge(blocks);
 
   calculateAllUsers([

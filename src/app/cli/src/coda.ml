@@ -696,7 +696,6 @@ let daemon logger =
              ~location typ
          in
          let trust_dir = conf_dir ^/ "trust" in
-         let () = Snark_params.set_chunked_hashing true in
          let%bind () = Async.Unix.mkdir ~p:() trust_dir in
          let trust_system = Trust_system.create trust_dir in
          trace_database_initialization "trust_system" __LOC__ trust_dir ;
@@ -757,6 +756,7 @@ let daemon logger =
            ; time_controller
            ; consensus_local_state
            ; genesis_ledger_hash
+           ; constraint_constants
            ; log_gossip_heard
            ; is_seed
            ; creatable_gossip_net=
