@@ -172,8 +172,8 @@ let bonusZkSnarkChallenge = metricsMap => {
       [|(0, 500)|],
       metricsMap,
       (metricRecord: Types.Metrics.metricRecord) =>
-        switch (metricRecord.snarkFeesCollected) {
-        | Some(snarkFeesCollected) => Int64.of_string(snarkFeesCollected)
+        switch (metricRecord.highestSnarkFeeCollected) {
+        | Some(highestSnarkFee) => Int64.of_string(highestSnarkFee)
         | None => Int64.zero
         },
       Int64.compare,
