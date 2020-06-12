@@ -34,7 +34,7 @@ let opamCommands : List Cmd.Type =
     r "cat src/opam.export >> opam_ci_cache.sig",
     r "date +%Y-%m >> opam_ci_cache.sig",
     let file =
-      "opam-v1-`sha256sum opam_ci_cache.sig | cut -d\" \" -f1`.tar"
+      "opam-v1-`sha256sum opam_ci_cache.sig | cut -d\" \" -f1`.tar.gz"
     in
     Cmd.cacheThrough
       Cmd.Docker::{
@@ -42,8 +42,8 @@ let opamCommands : List Cmd.Type =
       }
       file
       Cmd.CompoundCmd::{
-        preprocess = r "tar cvf ${file} /home/opam/.opam",
-        postprocess = r "tar xvf ${file} -C /home/opam",
+        preprocess = r "tar cvfz ${file} /home/opam/.opam",
+        postprocess = r "tar xvfz ${file} -C /home/opam",
         inner = r "make setup-opam"
       }
   ]
