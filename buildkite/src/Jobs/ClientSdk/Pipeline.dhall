@@ -24,16 +24,6 @@ let opamCommands : List Cmd.Type =
       r "tar -zxf google-cloud-sdk-296.0.1-linux-x86_64.tar.gz",
       Cmd.quietly "echo \"\\\$BUILDKITE_GS_APPLICATION_CREDENTIALS_JSON\" > /tmp/gcp_creds.json",
       r "export GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcp_creds.json && ./google-cloud-sdk/bin/gcloud auth activate-service-account bk-large@o1labs-192920.iam.gserviceaccount.com --key-file /tmp/gcp_creds.json",
-    Cmd.cacheThrough
-      Cmd.Docker::{
-        image = (../../Constants/ContainerImages.dhall).codaToolchain
-      }
-      "test.tar"
-      Cmd.CompoundCmd::{
-        preprocess = r "tar cvf test.tar /tmp/test.txt",
-        postprocess = r "tar xvf test.tar -C /tmp",
-        inner = r "echo hello > /tmp/test.txt"
-      },
     r "cat scripts/setup-opam.sh > opam_ci_cache.sig",
     r "cat src/opam.export >> opam_ci_cache.sig",
     r "date +%Y-%m >> opam_ci_cache.sig",
