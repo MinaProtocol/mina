@@ -47,7 +47,7 @@ module ToggleButtons = {
     let renderToggleButtons = () => {
       toggleLabels
       |> Array.map(label => {
-           <ToggleButton currentOption onTogglePress label />
+           <ToggleButton currentOption onTogglePress label key=label />
          })
       |> React.array;
     };
