@@ -25,7 +25,7 @@ let Config = {
 let build : Config.Type -> Base.Type = \(c : Config.Type) ->
   Base.build
     Base.Config::{
-      commands = [ Cmd.quietly fixPermissionsCommand ] # c.commands,
+      commands = [ Cmd.run fixPermissionsCommand ] # c.commands,
       label = c.label,
       key = c.key,
       target = Size.Large,
