@@ -20,6 +20,10 @@ module Test_inputs = struct
     type t = Fee.t
 
     let fee = Fn.id
+
+    module Statement = struct
+      type t = Transaction_snark.Statement.t One_or_two.t
+    end
   end
 
   module Snark_pool = struct
@@ -51,15 +55,16 @@ module Test_inputs = struct
 
   module Staged_ledger = struct
     type t =
-      ( int Transaction_protocol_state.t
-      , int
-      , Transaction_snark_work.t )
-      Snark_work_lib.Work.Single.Spec.t
+      (int, int, Transaction_snark_work.t) Snark_work_lib.Work.Single.Spec.t
       List.t
 
     let work = Fn.id
 
-    let all_work_pairs_exn = One_or_two.group_list
+    let all_work_pairs t ~get_state:_ = Ok (One_or_two.group_list t)
+
+    let all_work_statements_exn t =
+      List.map (One_or_two.group_list t)
+        ~f:(One_or_two.map ~f:Snark_work_lib.Work.Single.Spec.statement)
   end
 end
 

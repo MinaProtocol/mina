@@ -241,24 +241,44 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
                Error.of_string "received faulty scan state from peer" )
         |> Deferred.return
       in
+      let%bind protocol_states =
+        Staged_ledger.Scan_state.check_required_protocol_states scan_state
+          ~protocol_states
+        |> Deferred.return
+      in
+      let protocol_states_map = State_hash.Map.of_alist_exn protocol_states in
+      let get_state hash =
+        match Map.find protocol_states_map hash with
+        | None ->
+            let new_state_hash = (fst new_root).hash in
+            Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+              ~metadata:
+                [ ("new_root", State_hash.to_yojson new_state_hash)
+                ; ("state_hash", State_hash.to_yojson hash) ]
+              "Protocol state (for scan state transactions) for $state_hash \
+               not found when boostrapping to the new root $new_root" ;
+            Or_error.errorf
+              !"Protocol state (for scan state transactions) for \
+                %{sexp:State_hash.t} not found when boostrapping to the new \
+                root %{sexp:State_hash.t}"
+              hash new_state_hash
+        | Some protocol_state ->
+            Ok protocol_state
+      in
       (* Construct the staged ledger before constructing the transition
        * frontier in order to verify the scan state we received.
        * TODO: reorganize the code to avoid doing this twice (#3480)  *)
-      let%bind _ =
+      let%map _ =
         let open Deferred.Let_syntax in
         let temp_mask = Ledger.of_database temp_snarked_ledger in
         let%map result =
           Staged_ledger.of_scan_state_pending_coinbases_and_snarked_ledger
             ~logger ~verifier ~constraint_constants ~scan_state
             ~snarked_ledger:temp_mask ~expected_merkle_root ~pending_coinbases
+            ~get_state
         in
         ignore (Ledger.Maskable.unregister_mask_exn temp_mask) ;
         result
-      in
-      let%map protocol_states =
-        Staged_ledger.Scan_state.check_required_protocol_states scan_state
-          ~protocol_states
-        |> Deferred.return
       in
       (scan_state, pending_coinbases, new_root, protocol_states)
     in
@@ -445,6 +465,8 @@ let%test_module "Bootstrap_controller tests" =
 
     let constraint_constants = precomputed_values.constraint_constants
 
+    module Genesis_ledger = (val precomputed_values.genesis_ledger)
+
     let pids = Child_processes.Termination.create_pid_table ()
 
     let downcast_transition ~sender transition =
@@ -497,8 +519,7 @@ let%test_module "Bootstrap_controller tests" =
         let%map make_branch =
           Transition_frontier.Breadcrumb.For_tests.gen_seq ~proof_level
             ~precomputed_values
-            ~accounts_with_secret_keys:
-              (Lazy.force Test_genesis_ledger.accounts)
+            ~accounts_with_secret_keys:(Lazy.force Genesis_ledger.accounts)
             branch_size
         in
         let [me; _] = fake_network.peer_networks in
@@ -678,6 +699,18 @@ let%test_module "Bootstrap_controller tests" =
                 |> Ledger.of_database
               in
               let scan_state = Staged_ledger.scan_state staged_ledger in
+              let get_state hash =
+                match
+                  Transition_frontier.find_protocol_state frontier hash
+                with
+                | Some protocol_state ->
+                    Ok protocol_state
+                | None ->
+                    Or_error.errorf
+                      !"Protocol state (for scan state transactions) for \
+                        %{sexp:State_hash.t} not found"
+                      hash
+              in
               let pending_coinbases =
                 Staged_ledger.pending_coinbase_collection staged_ledger
               in
@@ -688,7 +721,7 @@ let%test_module "Bootstrap_controller tests" =
                 Staged_ledger
                 .of_scan_state_pending_coinbases_and_snarked_ledger ~scan_state
                   ~logger ~verifier ~constraint_constants ~snarked_ledger
-                  ~expected_merkle_root ~pending_coinbases
+                  ~expected_merkle_root ~pending_coinbases ~get_state
                 |> Deferred.Or_error.ok_exn
               in
               assert (

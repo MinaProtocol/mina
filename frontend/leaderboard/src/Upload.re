@@ -1,3 +1,20 @@
+/*
+  Upload.re has the responsibilities of managing all logic with the Leaderboard
+  Google Sheets .
+
+  The entry point to upload points is uploadPoints(). uploadPoints() expects
+  that there is an environment variable for the spreadsheet id, otherwise it will
+  report an error.
+
+  The fetched Google Sheets data is in a form of an array of rows. Each entry
+  in the array is another array that represents cell values for a particular user.
+
+  The first fetch that is done is to compute a mapping of usernames and public keys
+  which is contained in the "users" tab and is then used to match on the
+  challenge points map that was computed. Once points are rewarded, updatePointsColumns()
+  is executed and the data is then uploaded to the spreadsheet.
+ */
+
 module StringMap = Map.Make(String);
 
 let getCellType = v =>
@@ -77,13 +94,13 @@ let createPublickeyUsernameMap = sheetsData => {
      );
 };
 
-let createUsernamePointsMap = (pointsMap, pkUsernameMap) => {
+let createUsernamePointsMap = (pointsMap, userMap) => {
   StringMap.fold(
-    (pk, username, map) => {
+    (username, pk, map) => {
       StringMap.mem(pk, pointsMap)
         ? StringMap.add(username, StringMap.find(pk, pointsMap), map) : map
     },
-    pkUsernameMap,
+    userMap,
     StringMap.empty,
   );
 };
@@ -102,20 +119,8 @@ let updatePointsColumns =
        if (StringMap.mem(username, usernamePointsMap)) {
          // Found a username, get the points to update
          let pointsBinding = StringMap.find(username, usernamePointsMap);
-         let pointsValue =
-           switch (row[pointIndex]) {
-           | Some(points) => int_of_string_opt(points)
-           | None => None
-           };
-
-         switch (pointsValue, pointsBinding) {
-         | (Some(sheetsValue), pointsBinding) =>
-           // Add points from sheets and challenge
-           row[pointIndex] = Some(string_of_int(sheetsValue + pointsBinding))
-         | (None, pointsBinding) =>
-           // If user as an empty cell, add points from challenge
-           row[pointIndex] = Some(string_of_int(pointsBinding))
-         };
+         // Add points from challenge
+         row[pointIndex] = Some(string_of_int(pointsBinding));
        } else {
          // If username has no points for the challenge, wipe cell
          row[pointIndex] =
@@ -124,16 +129,26 @@ let updatePointsColumns =
      });
 };
 
-let findChallenges = (metricsMap, pkUsernameMap, sheetsData, usernameIndex) => {
+let filterMetricsMap = (metricsMap, userMap) => {
+  let userPublickeys =
+    StringMap.bindings(userMap) |> List.map(((_, publickey)) => publickey);
+  metricsMap
+  |> StringMap.filter((publickey, _) => {
+       List.mem(publickey, userPublickeys)
+     });
+};
+
+let findChallenges = (metricsMap, userMap, sheetsData, usernameIndex) => {
   // Loop through the first row which contains all challenge headers and calculate valid challenges
   sheetsData[0]
   |> Array.iteri((columnIndex, columnHeader) => {
        switch (columnHeader) {
        | Some(challengeHeader) =>
-         switch (Challenges.calculatePoints(challengeHeader, metricsMap)) {
+         let filteredMetrics = filterMetricsMap(metricsMap, userMap);
+         switch (Challenges.calculatePoints(challengeHeader, filteredMetrics)) {
          | Some(pointsMap) =>
            let usernamePointsMap =
-             createUsernamePointsMap(pointsMap, pkUsernameMap);
+             createUsernamePointsMap(pointsMap, userMap);
            updatePointsColumns(
              usernamePointsMap,
              sheetsData,
@@ -141,28 +156,28 @@ let findChallenges = (metricsMap, pkUsernameMap, sheetsData, usernameIndex) => {
              usernameIndex,
            );
          | None => ()
-         }
+         };
        | None => ()
        }
      });
 };
 
-let updatePoints = (metricsMap, pkUsernameMap, sheetsData) => {
+let updatePoints = (metricsMap, userMap, sheetsData) => {
   switch (getColumnIndex(sheetsData[0], "Name")) {
   | Some(usernameIndex) =>
-    findChallenges(metricsMap, pkUsernameMap, sheetsData, usernameIndex)
+    findChallenges(metricsMap, userMap, sheetsData, usernameIndex)
   | None => ()
   };
 };
 
-let updateSheets = (client, spreadsheetId, range, pkUsernameMap, metricsMap) => {
+let updateSheets = (client, spreadsheetId, range, userMap, metricsMap) => {
   Sheets.getRange(
     client, {spreadsheetId, range, valueRenderOption: "FORMULA"}, result => {
     switch (result) {
     | Ok(leaderboardData) =>
       let decodedResult =
         leaderboardData |> decodeGoogleSheets |> normalizeGoogleSheets;
-      updatePoints(metricsMap, pkUsernameMap, decodedResult);
+      updatePoints(metricsMap, userMap, decodedResult);
       let resource: Bindings.GoogleSheets.sheetsUploadData = {
         values: encodeGoogleSheets(decodedResult),
       };
@@ -196,16 +211,10 @@ let uploadPoints = metricsMap => {
       {spreadsheetId, range: "Users!A2:B", valueRenderOption: "FORMULA"},
       result => {
       switch (result) {
-      | Ok(pkUsernameData) =>
-        let pkUsernameMap =
-          pkUsernameData |> decodeGoogleSheets |> createPublickeyUsernameMap;
-        updateSheets(
-          client,
-          spreadsheetId,
-          "3.2b!A3:M",
-          pkUsernameMap,
-          metricsMap,
-        );
+      | Ok(userData) =>
+        let userMap =
+          userData |> decodeGoogleSheets |> createPublickeyUsernameMap;
+        updateSheets(client, spreadsheetId, "3.2b!A3:M", userMap, metricsMap);
       | Error(error) => Js.log(error)
       }
     });

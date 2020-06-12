@@ -74,7 +74,7 @@ module Make (Digest : sig
   module Tick :
     Tick.Snarkable.Bits.Lossy
     with type Packed.var = Tick.Field.Var.t
-     and type Packed.value = Tick.Pedersen.Digest.t
+     and type Packed.value = Random_oracle.Digest.t
 end)
 (System : S) =
 struct
