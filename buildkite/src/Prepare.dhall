@@ -1,6 +1,8 @@
 -- Autogenerates any pre-reqs for monorepo triage execution
 -- Keep these rules lean! They have to run unconditionally.
 
+let SelectFiles = ./Lib/SelectFiles.dhall
+
 let Command = ./Command/Base.dhall
 let Docker = ./Command/Docker/Type.dhall
 let JobSpec = ./Pipeline/JobSpec.dhall
@@ -12,7 +14,7 @@ let config : Pipeline.Config.Type = Pipeline.Config::{
   spec = JobSpec::{
     name = "prepare",
     -- TODO: Clean up this code so we don't need an unused dirtyWhen here
-    dirtyWhen = ""
+    dirtyWhen = [ SelectFiles.everything ]
   },
   steps = [
   Command.build

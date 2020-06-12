@@ -26,7 +26,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
         type query = unit
 
         type response =
-          ( ( Transaction.t Transaction_protocol_state.t
+          ( ( Transaction.t
             , Transaction_witness.t
             , Ledger_proof.t )
             Work.Single.Spec.t
@@ -49,7 +49,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
 
       module T = struct
         type query =
-          ( ( Transaction.t Transaction_protocol_state.t
+          ( ( Transaction.t
             , Transaction_witness.t
             , Ledger_proof.t )
             Work.Single.Spec.t
