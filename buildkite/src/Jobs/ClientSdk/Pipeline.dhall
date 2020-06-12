@@ -22,7 +22,7 @@ let opamCommands : List Cmd.Type =
   [
       r "wget https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-296.0.1-linux-x86_64.tar.gz && tar -zxf google-cloud-sdk-296.0.1-linux-x86_64.tar.gz",
       r "tar -zxf google-cloud-sdk-296.0.1-linux-x86_64.tar.gz",
-      Cmd.quiety "echo \"\\\$BUILDKITE_GS_APPLICATION_CREDENTIALS_JSON\" > /tmp/gcp_creds.json",
+      Cmd.quietly "echo \"\\\$BUILDKITE_GS_APPLICATION_CREDENTIALS_JSON\" > /tmp/gcp_creds.json",
       r "export GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcp_creds.json && ./google-cloud-sdk/bin/gcloud auth activate-service-account bk-small@o1labs-192920.iam.gserviceaccount.com --key-file /tmp/gcp_creds.json",
     Cmd.cacheThrough
       Cmd.Docker::{
