@@ -1,14 +1,15 @@
 # Infrastructure Specification for Integration tests
 
 ## Goal
-To specify the interfaces between different components and the iteractions involved in executing an integration test. More concretly, proposing a spec for a Test Executive (pretty close to the one defined [here](https://github.com/CodaProtocol/coda/pull/4715). The role of a test executive is to bring together various components involved in executing an integration test and coordinating the interactions among them.
-These components are 
-    1. Testnet infrastructure: Given a network configuration, deploys a testnet for a specific infrastruture.
+
+To specify the interfaces between different components and the interactions involved in executing an integration test. More concretely, proposing a spec for a Test Executive (pretty close to the one defined [here](https://github.com/CodaProtocol/coda/pull/4715). The role of a test executive is to bring together various components involved in executing an integration test and coordinating the interactions among them.
+These components are:
+    1. Testnet infrastructure: Given a network configuration, deploys a testnet for a specific infrastructure.
     2. Test: Defining the integration test itself
     3. Logging: Consuming logs from the deployed testnet for validation
     4. Automated validation: Defines and executes network-wide validations (Out of scope)
 
-The goal is to have a system where each of these components can be independently implemented and the test executive will be responsible for intializing them and facilitating the interactions.
+The goal is to have a system where each of these components can be independently implemented and the test executive will be responsible for initializing them and facilitating the interactions.
 
 ## Design
 
@@ -26,12 +27,13 @@ The proposal for the test executive is part of the whole integration test framew
 
 #### Test executive
 
-The test executive requires the following inputs to succesfully execute an integration test
+The test executive requires the following inputs to successfully execute an integration test
 
-1. Genesis constants and ledger: 
-`Runtime_config.t` currently has all the configurable constants and ledger 
+1. Genesis constants and ledger:
+`Runtime_config.t` currently has all the configurable constants and ledger
 
 A ledger can be specified in any of the following way: (already implemented)
+
 ```ocaml
 
 module Accounts = struct
@@ -48,11 +50,11 @@ module Ledger = struct
     | Accounts of Accounts.t  (** A ledger generated from the given accounts *)
     | Hash of string  (** The ledger with the given root hash *)
 end
-
 ```
-Therefore, one could either use compiled ledgers or generate a new json list using the Testnet SDK from coda_automation.  [TODO: can be used to generate the json list with an option to include private keys. Since these are interation tests and transaction would be sent by different components]
 
-2. Network config: the configuration for the network the integration test will run on
+Therefore, one could either use compiled ledgers or generate a new json list using the Testnet SDK from coda_automation.
+
+2.Network config: the configuration for the network the integration test will run on.
 
 ```ocaml
 
@@ -78,16 +80,14 @@ type snark_coordinator = { count : int; with_unique_keys: int; workers_per_coord
 type t = {
       block_producers: block_producers
     ; snark_coordinators: snark_coordinators
-    ; archive_nodes: archive_nodes
-    ; env: `Local | `Cloud }
+    ; archive_nodes: archive_nodes }
 
 ```
 
-3. Integration test: This is the program that defines the integration test written in a custom DSL (#4766)
+3.Integration test: This is the program that defines the integration test written in a custom DSL (#4766)
 The inputs to the test executive (network config and runtime config) can be passed to this program
 
-
-A test executive will interact with two main components as shown in the image :
+A test executive will interact with the two main components as shown in the image :
 
 1. Network manager
 2. Log engine
@@ -96,11 +96,26 @@ A test executive will interact with two main components as shown in the image :
 
 ##### Network Manager
 
-A network manager is basically a wrapper around the network infrastructure using which a testnet is deployed. The network manager implemented in ocaml would take as input network configuration and use it to generate required configuration for the deployment and deploy a testnet. The network manager is responsible for creating the seed nodes that other nodes can connect to. A separate network manager would be created for each environment where we want to run the testnet. The choice of the a network manager is made by the test executive. The interface between a network manager and the test executive is a module that the network manager would generate. This module `Testnet` exposes all the nodes and the commands that can be issued to the nodes.
+A network manager is basically a wrapper around the network infrastructure using which a testnet is deployed. The network manager implemented in ocaml would take as input a network configuration and use it to generate required configuration for the deployment and deploy a testnet. The network manager is responsible for creating the seed nodes that other nodes can connect to. A separate network manager would be created for each environment where we want to run the testnet. The choice of a network manager is made by the test executive based on a user input (whether to run locally or on the cloud). The interface between a network manager and the test executive exposes all the nodes and the commands that can be issued to the nodes.
+
+In the current testnet infrastructure, a network manager would generate the necessary terraform configuration files and deploy using terraform.
+To run it locally, using minikube perhaps, we would create another network manager that deploys a testnet locally.
+
+The network manager itself can be specified as:
 
 ```ocaml
 
-module Node : sig
+module Node : Node_intf
+(* Deploy the network*)
+val deploy : Network_config.t -> Daemon_config.t -> Testnet.t Deferred.t
+
+(*Tear down the network*)
+val destroy : Testnet.t -> unit Deferred.t
+```
+
+```ocaml
+
+module type Node_intf : sig
     type t
 
     val node_id_json : t -> json
@@ -112,51 +127,43 @@ module Node : sig
     ...
 end
 
-
-module Testnet = struct
+module type Testnet = sig
 
     type t =
-        { 
-        testnet_id : json
-        ; block_producers : Node list
-        ; snark_coordinators: Node list
-        ; archive_nodes: Node list}
+        {
+          block_producers : Node.t list
+        ; snark_coordinators: Node.t list
+        ; archive_nodes: Node.t list
+        ; ... }
 end
 ```
 
-A node will encapsulate all the information needed to connect to it and issue commands (if we want to use cli commands then we'll have to send the ip of the test executive to client-whitelist). In the current testnet infrastucture, a network manager would generate the terraform configuration files and deploy using terraform. There's no ocaml wrapper for terraform so we would have to write one.
-To run it locally, using minikube perhaps, we would create another network manager that deploys a testnet locally.
-
-The network manager itself can be specified as:
-
-```ocaml
-val deploy : Network_config.t -> Daemon_config.t -> Testnet.t Deferred.t
-
-val destroy : Testnet.t -> unit Deferred.t
-```
+A node will encapsulate all the information needed to connect to it and make requests such as sending payments, retrieving a node's status, and so on. These requests implemented by the network manager could be either using graphql commands or cli commands. The interface should also implement functions to start and stop a node that can be triggered at any time by the test program. This is particularly needed for testing functionalities like bootstrap and catchup. The network infrastructure should facilitate stopping and restarting coda daemon containers (with or w/o persisting the config directory). Currently a pod or a container within a pod is restarted automatically every time the daemon terminates. This behavior should be changed to support restarting a node on request. The following are some of the options to enable restart on request:
+    1. Have another process as the root of the container that initiates or terminates coda daemon based on a request from the network manager. This requires implementing and maintaining another application.
+    2. Using kubernetes init containers to start/stop coda daemon containers. The communication between the network manager and the init containers will have to be facilitated by incorporating some sort of message queues in the deployment architecture. This would not require a custom application that needs to be maintained but adds more complexity to the deployment architecture.
+    3. Deleting and redeploying helm releases for stop and start requests from the network manager provided we can persist coda-config.
 
 ##### Log engine
 
-Similar to the network manager, a log engine is also a wrapper around the logging infrastructure we'd use. The log engine will provide query functions to extract events from structured logs. Log engine queries can be used for node specific or network wide querying by choosing specific filters.
-Again, for each logging infrastructure there will be a log engine that has custom implementation for the specific logging application used.
+Similar to the network manager, a log engine is also a wrapper around the logging infrastructure we'd use. The log engine will provide functions that would filter the logs from all the nodes in the network. Log engine queries correspond to the required primitives for the test DSL, for example, the `wait_for` primitive defined [here](https://github.com/CodaProtocol/coda/blob/rfc/integration-tests/docs/test_dsl_spec.md) would return when block production logs with the given filters are seen.
 
-TODO: Example stack driver queries
+Currently we use Stackdriver as our logging infrastructure for testnets and qa-nets. Using stackdriver, one can set up a pub/sub system to subscribe to a topic ([for more information](https://cloud.google.com/pubsub/docs/quickstart-py-mac)). Log filters can be added to a subscription and so only log messages that match the filter will be published to the topic. Each query defined in the log engine would correspond to a specific topic.
 
-The interface will basically need to have all the queries the test DSL would expose
+Here's a rough structure of the test executive and how it links different components
 
-Here's a rough structure of the test executive and how the it links different components
+Assumption: (as a CI step)
+    1. generate and upload the docker image
+    2. generate genesis proof, genesis ledger with the input runtime configuration using `runtime_genesis_ledger.exe` and upload it to s3
 
-Assumption: (as a CI step?)
-1. generate and upload the docker image
-
-2. generate genesis proof, genesis ledger with the input runtime configuration using `runtime_genesis_ledger.exe` and uplod it to s3 (TODO: or pass the configuration file and let the nodes generate one themselves? if we are having them download then might as well download the ledger and the proof)
- 
 ```ocaml
 
-    module Test_executive 
-        (Test: sig
-            val execute : module Log_engine -> Testnet.t -> Runtime_config.t -> bool Deferred.t
+    module type Make_test_intf = functor (Node: Node_intf) :
+        (sig
+            val execute : (module Log_engine : Log_engine_intf) -> Testnet.t -> Runtime_config.t -> bool Deferred.t
             end)
+
+    module Test_executive
+        (Make_test : Make_test_intf)
         ( Config : sig
             val runtime_config : Runtime_config.t
             val network_config: Network_config.t
@@ -166,14 +173,21 @@ Assumption: (as a CI step?)
         let execute () =
             let deploy_config = {daemon_image}
             in
-            let%bind testnet: Testnet.t = Cloud_network_manager.deploy network_config daemon_config
+            (*deploy the network*)
+            let%bind testnet : Testnet.t = Cloud_network_manager.deploy network_config daemon_config
             in
+            (*create the log engine based on the testnet configuration*)
             let module Log_engine = Make_log_engine (struct
                 let testnet = testnet
                 end)
             in
+            (*Test module for the specific Node implementation*)
+            let module Test = Make_test (Cloud_network_manager.Node)
+            in
+            (*Execute the test*)
             let%bind result = Test.execute Log_engine testnet runtime_config
             in
+            (*Teardown the network*)
             let%map () = Cloud_network_manager.destroy testnet
             in
             if not result then failwith "Test failed" else ()
@@ -183,6 +197,8 @@ Assumption: (as a CI step?)
 
 ## Outstanding Questions/Concerns
 
-1. We'd still need build profiles because of the constraint constants.
-2. Would we be running all the tests with snarks?
-3. Snark coordinators currently don't sync with each other which makes it a waste of resource to allow multiple coordinators
+1. We'd still need build profiles because of the constraint constants. This means there would be a docker image uploaded for each build profile.
+2. Would we be running all the tests with snarks? Currently we run integration tests with different proof levels (full | check | none). Some of the tests like the delegation test or bootstrap test that run without snarks would take really long time to complete with proof-level=full.  
+3. Snark coordinators currently don't sync with each other which makes it a waste of resources to allow multiple coordinators.
+4. gcloud authentication from CI
+5. Logging infrastructure when running the tests in local environments. This also affects the automated validation when we integrate it with the testing framework.
