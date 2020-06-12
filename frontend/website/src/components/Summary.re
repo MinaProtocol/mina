@@ -37,7 +37,7 @@ module Styles = {
           [
             display(`block),
             marginTop(`rem(3.5)),
-            marginBottom(`rem(2.5)),
+            marginBottom(`rem(1.5)),
           ],
         ),
       ]),
@@ -77,14 +77,14 @@ module Styles = {
   let heroLeft =
     style([
       maxWidth(`rem(38.)),
-      media(Theme.MediaQuery.tablet, [marginTop(`zero)]),
+      media(Theme.MediaQuery.tablet, [marginTop(`rem(-3.5))]),
     ]);
   let heroRight =
     style([
       display(`flex),
       flexDirection(`column),
       paddingLeft(`rem(1.)),
-      alignItems(`flexStart),
+      alignItems(`center),
       unsafe("width", "fit-content"),
       media(
         Theme.MediaQuery.tablet,
@@ -128,20 +128,27 @@ module StatisticsRow = {
         color(Theme.Colors.saville),
         letterSpacing(`px(2)),
         fontWeight(`semiBold),
+        alignSelf(`center),
       ]);
 
     let value =
       merge([
         statistic,
-        style([fontSize(`rem(2.25)), textAlign(`center)]),
+        style([
+          display(`flex),
+          fontSize(`rem(2.25)),
+          justifyContent(`center),
+        ]),
       ]);
     let container =
       style([
         display(`flex),
-        flexDirection(`row),
-        justifyContent(`spaceAround),
         flexWrap(`wrap),
-        media(Theme.MediaQuery.notMobile, [maxWidth(`rem(35.))]),
+        justifyContent(`spaceAround),
+        media(
+          Theme.MediaQuery.tablet,
+          [gridTemplateColumns([`rem(12.), `rem(12.), `rem(12.)])],
+        ),
       ]);
     let flexColumn =
       style([
@@ -152,10 +159,7 @@ module StatisticsRow = {
     let lastStatistic =
       merge([
         flexColumn,
-        style([
-          marginTop(`rem(2.1)),
-          media(Theme.MediaQuery.notMobile, [marginTop(`zero)]),
-        ]),
+        style([media(Theme.MediaQuery.notMobile, [marginTop(`zero)])]),
       ]);
   };
   [@react.component]
