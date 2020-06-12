@@ -149,6 +149,22 @@ let%test_module "Full_frontier tests" =
                             breadcrumbs" ;
                      i + 1 ) ) )
 
+    let%test_unit "length is incremental" =
+      Quickcheck.test (gen_breadcrumb_seq 20) ~trials:5 ~f:(fun make_seq ->
+          Async.Thread_safe.block_on_async_exn (fun () ->
+              let frontier = create_frontier () in
+              let root = Full_frontier.root frontier in
+              let%map seq = make_seq root in
+              List.iter seq
+                ~f:(fun breadcrumb -> add_breadcrumb frontier breadcrumb)
+                Hashtbl.fold frontier.table
+                ~f:(fun ~key:hash ~data:node ->
+                  List.iter (Full_frontier.successors node hash)
+                    ~f:(fun successor ->
+                      [%test_eq: State_hash.t]
+                        (Breadcrumb.parent_hash successor)
+                        hash ) ) ) )
+
     let%test_unit "Protocol states are available for every transaction in the \
                    frontier" =
       Quickcheck.test
