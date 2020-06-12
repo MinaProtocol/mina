@@ -97,8 +97,8 @@ let module = \(environment : List Text) ->
     \(op : Text) ->
     \(cacheData : CacheData.Type) ->
     run "./buildkite/scripts/cache.sh ${op} ${cacheData.key} \"${cacheData.dir}\""
-  let load : CacheData.Type -> Cmd = cacheInteract "load"
-  let store : CacheData.Type -> Cmd = cacheInteract "store"
+  let load : CacheData.Type -> Cmd = cacheInteract "restore"
+  let store : CacheData.Type -> Cmd = cacheInteract "save"
 
   let cacheThrough : CacheData.Type -> Cmd -> Cmd =
     \(cacheData : CacheData.Type) ->
