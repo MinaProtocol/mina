@@ -76,7 +76,7 @@ module Styles = {
 
   let heroLeft =
     style([
-      maxWidth(`rem(38.)),
+      // maxWidth(`rem(38.)),
       media(Theme.MediaQuery.tablet, [marginTop(`rem(-3.5))]),
     ]);
   let heroRight =
@@ -147,7 +147,10 @@ module StatisticsRow = {
         justifyContent(`spaceAround),
         media(
           Theme.MediaQuery.tablet,
-          [gridTemplateColumns([`rem(12.), `rem(12.), `rem(12.)])],
+          [
+            gridTemplateColumns([`rem(12.), `rem(12.), `rem(12.)]),
+            // marginTop(`rem(3.5)),
+          ],
         ),
       ]);
     let flexColumn =
@@ -159,7 +162,10 @@ module StatisticsRow = {
     let lastStatistic =
       merge([
         flexColumn,
-        style([media(Theme.MediaQuery.notMobile, [marginTop(`zero)])]),
+        style([
+          marginTop(`rem(1.)),
+          media("(min-width: 26.8rem)", [marginTop(`zero)]),
+        ]),
       ]);
   };
   [@react.component]
@@ -226,15 +232,15 @@ let make = (~lastManualUpdatedDate) => {
           <Button
             link=""
             label="Current Challenges"
-            bgColor=Theme.Colors.jungle
-            bgColorHover=Theme.Colors.clover
+            bgColor=Theme.Colors.clover
+            bgColorHover=Theme.Colors.jungle
           />
           <Spacer width=2.0 height=1.0 />
           <Button
             link=""
             label="Genesis Program"
-            bgColor=Theme.Colors.jungle
-            bgColorHover=Theme.Colors.clover
+            bgColor=Theme.Colors.clover
+            bgColorHover=Theme.Colors.jungle
           />
         </div>
         <Spacer height=4.8 />
