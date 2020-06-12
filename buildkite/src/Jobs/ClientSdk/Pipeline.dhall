@@ -31,7 +31,7 @@ let opamCommands : List Cmd.Type =
     r "date +%Y-%m >> opam_ci_cache.sig",
     Cmd.cacheThrough
       Cmd.CacheData::{
-        key = "$(sha256sum opam_ci_cache.sig)",
+        key = "$$(sha256sum opam_ci_cache.sig)",
         dir = "/home/opam/.opam"
       }
       (runD (r "make setup-opam"))
