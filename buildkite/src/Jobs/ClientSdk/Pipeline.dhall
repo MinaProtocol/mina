@@ -21,20 +21,31 @@ let r = Cmd.run in
 let opamCommands : List Cmd.Type =
   [
     Cmd.cacheThrough
-      Cmd.CacheData::{
-        key = "test",
-        dir = "test.txt"
+      Cmd.Docker::{
+        image = (../../Constants/ContainerImages.dhall).codaToolchain
       }
-      (runD (r "echo foo > test.txt")),
+      "test.tar"
+      Cmd.CompoundCmd::{
+        preprocess = r "tar cvf test.tar /tmp/test.txt",
+        postprocess = r "tar xvf test.tar -C /tmp",
+        inner = r "echo hello > /tmp/test.txt"
+      },
     r "cat scripts/setup-opam.sh > opam_ci_cache.sig",
     r "cat src/opam.export >> opam_ci_cache.sig",
     r "date +%Y-%m >> opam_ci_cache.sig",
+    let file =
+      "opam-v1-`sha256sum opam_ci_cache.sig | cut -d' ' -f1`.tar"
+    in
     Cmd.cacheThrough
-      Cmd.CacheData::{
-        key = "opam-v1-`sha256sum opam_ci_cache.sig | cut -d' ' -f1`",
-        dir = "/home/opam/.opam"
+      Cmd.Docker::{
+        image = (../../Constants/ContainerImages.dhall).codaToolchain
       }
-      (runD (r "make setup-opam"))
+      file
+      Cmd.CompoundCmd::{
+        preprocess = r "tar cvf ${file} /home/opam/.opam",
+        postprocess = r "tar xvf ${file} -C /home/opam",
+        inner = r "make setup-opam"
+      }
   ]
 
 let commands =

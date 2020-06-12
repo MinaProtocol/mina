@@ -20,20 +20,14 @@ let module = \(environment : List Text) ->
     }
   }
 
-  let CacheData = {
-    Type = {
-      key : Text,
-      dir : Text
-    },
-    default = {=}
-  }
-
   let Cmd = { line: Text, readable: Optional Text }
   let run : Text -> Cmd =
     \(script: Text) -> { line = script, readable = Some script }
 
   let quietly : Text -> Cmd =
     \(script: Text) -> { line = script, readable = None Text }
+  let true : Cmd = quietly "true"
+  let false : Cmd = quietly "false"
 
   let binop : Text -> List Cmd -> Cmd =
     \(op : Text) ->
@@ -75,6 +69,9 @@ let module = \(environment : List Text) ->
   let exampleTwoQuiet = assert :
     (Some "( a && d )") === (and [ run "a", quietly "b", quietly "c", run "d" ]).readable
 
+  let outerDir : Text =
+    "/var/buildkite/builds/\$BUILDKITE_AGENT_NAME/\$BUILDKITE_ORGANIZATION_SLUG/\$BUILDKITE_PIPELINE_SLUG"
+
   let inDocker : Docker.Type -> Cmd -> Cmd =
     \(docker : Docker.Type) ->
     \(inner : Cmd) ->
@@ -84,7 +81,7 @@ let module = \(environment : List Text) ->
         (\(var : Text) -> " --env ${var}")
         (docker.extraEnv # environment)
     in
-    { line = "docker run -it --rm --init --volume /var/buildkite/builds/\$BUILDKITE_AGENT_NAME/\$BUILDKITE_ORGANIZATION_SLUG/\$BUILDKITE_PIPELINE_SLUG:/workdir --workdir /workdir${envVars} ${docker.image} bash -c '${inner.line}'"
+    { line = "docker run -it --rm --init --volume ${outerDir}:/workdir --workdir /workdir${envVars} ${docker.image} bash -c '${inner.line}'"
     , readable = Optional/map Text Text (\(readable : Text) -> "Docker@${docker.image} ( ${readable} )") inner.readable
     }
 
@@ -93,22 +90,36 @@ let module = \(environment : List Text) ->
     \(script : Text) ->
     inDocker docker (run script)
 
-  let cacheInteract : Text -> CacheData.Type -> Cmd =
-    \(op : Text) ->
-    \(cacheData : CacheData.Type) ->
-    run "./buildkite/scripts/cache.sh ${op} ${cacheData.key} \"${cacheData.dir}\""
-  let load : CacheData.Type -> Cmd = cacheInteract "restore"
-  let store : CacheData.Type -> Cmd = cacheInteract "save"
+  -- Handles the ugly workdir prefix for you
+  let load : Text -> Cmd =
+    \(path : Text) ->
+    run "buildkite-agent artifact download ${path} ${outerDir}"
+  let store : Text -> Cmd =
+    \(path : Text) ->
+    run "buildkite-agent artifact upload ${outerDir}/${path} gs://buildkite_k8s/coda/shared"
 
-  let cacheThrough : CacheData.Type -> Cmd -> Cmd =
-    \(cacheData : CacheData.Type) ->
-    \(oldCmd : Cmd) ->
+  let CompoundCmd = {
+    Type = {
+      preprocess : Cmd,
+      postprocess : Cmd,
+      inner : Cmd
+    },
+    default = {=}
+  }
+
+  -- Loads through cache, innards with docker, buildkite-agent interactions outside
+  let cacheThrough : Docker.Type -> Text -> CompoundCmd.Type -> Cmd =
+    \(docker : Docker.Type) ->
+    \(cachePath : Text) ->
+    \(cmd : CompoundCmd.Type) ->
     and [
       seq [
-        load cacheData,
-        oldCmd
+        or [ load cachePath, true ],
+        inDocker
+          docker
+          (or [ cmd.preprocess, cmd.inner, cmd.postprocess ])
       ],
-      store cacheData
+      store cachePath
     ]
 
   let format : Cmd -> Text =
@@ -118,11 +129,13 @@ let module = \(environment : List Text) ->
 
   { Type = Cmd
   , Docker = Docker
-  , CacheData = CacheData
+  , CompoundCmd = CompoundCmd
   , quietly = quietly
   , run = run
   , seq = seq
   , and = and
+  , true = true
+  , false = false
   , or = or
   , runInDocker = runInDocker
   , inDocker = inDocker
@@ -134,16 +147,6 @@ let module = \(environment : List Text) ->
 
 let tests =
   let M = module ["TEST"] in
-
-  let cacheExample = assert :
-''
-  ( ( ./buildkite/scripts/cache.sh restore cacheKey "/tmp/data" ; echo hello > /tmp/data/foo.txt ) && ./buildkite/scripts/cache.sh save cacheKey "/tmp/data" )''
-===
-  M.format (
-    M.cacheThrough
-      M.CacheData::{ key = "cacheKey", dir = "/tmp/data" }
-      (M.run "echo hello > /tmp/data/foo.txt")
-  )
 
   let dockerExample = assert :
   { line =
@@ -172,6 +175,24 @@ let tests =
       ],
       M.run "echo \"and then\""
     ]
+  )
+
+  let cacheExample = assert :
+''
+  ( ( ( buildkite-agent artifact download data.tar /var/buildkite/builds/$BUILDKITE_AGENT_NAME/$BUILDKITE_ORGANIZATION_SLUG/$BUILDKITE_PIPELINE_SLUG || true ) ; docker run -it --rm --init --volume /var/buildkite/builds/$BUILDKITE_AGENT_NAME/$BUILDKITE_ORGANIZATION_SLUG/$BUILDKITE_PIPELINE_SLUG:/workdir --workdir /workdir --env ENV1 --env ENV2 --env TEST foo/bar:tag bash -c '( tar cvf data.tar /tmp/data || echo hello > /tmp/data/foo.txt || tar xvf data.tar -C /tmp/data )' ) && buildkite-agent artifact upload /var/buildkite/builds/$BUILDKITE_AGENT_NAME/$BUILDKITE_ORGANIZATION_SLUG/$BUILDKITE_PIPELINE_SLUG/data.tar gs://buildkite_k8s/coda/shared )''
+===
+  M.format (
+    M.cacheThrough
+      M.Docker::{
+        image = "foo/bar:tag",
+        extraEnv = [ "ENV1", "ENV2" ]
+      }
+      "data.tar"
+      M.CompoundCmd::{
+        preprocess = M.run "tar cvf data.tar /tmp/data",
+        postprocess = M.run "tar xvf data.tar -C /tmp/data",
+        inner = M.run "echo hello > /tmp/data/foo.txt"
+      }
   )
   in
   ""

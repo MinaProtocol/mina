@@ -158,7 +158,9 @@ macos-setup-download:
 	./scripts/macos-setup-brew.sh
 
 setup-opam:
-	./scripts/setup-opam.sh
+	mkdir -p /home/opam/.opam
+	echo "test" > /home/opam/.opam/test.txt
+	# ./scripts/setup-opam.sh
 
 macos-setup:
 	./scripts/macos-setup-brew.sh
