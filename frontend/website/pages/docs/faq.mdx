@@ -81,6 +81,25 @@ No, Coda does not natively implement privacy features at the moment. However, pr
 
 [See here](/docs/node-operator#running-coda-as-a-service) for information about using launchd or systemd with coda.
 
+## Block Producers
+
+#### How can I verify that I am indeed producing blocks?
+
+(Via the CLI): 
+Execute `coda client status`
+
+As output, you should see a block of text, there will be a line similar to this if your Block Producer is running: 
+`Block producers running:        1 (4vsRCVGqpKonGx515x3fL...)`
+
+If your Block Producer has won a slot, you will see something like this: 
+`Next block will be produced in:  in 17.52m`
+
+(Via the Logs): 
+The following text is outputted each time the daemon produces a block: 
+
+`Producing new block with parent $breadcrumb`
+
+
 ## SNARKs and Snark Workers
 
 #### If I run a Snark Worker, how do I get paid for my SNARKs that I generate?
