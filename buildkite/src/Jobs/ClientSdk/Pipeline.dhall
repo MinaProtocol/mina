@@ -1,31 +1,53 @@
 let Prelude = ../../External/Prelude.dhall
 
-let Decorate = ../../Lib/Decorate.dhall
+let Cmd = ../../Lib/Cmds.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
-let Command/Coda = ../../Command/Coda.dhall
+let Command = ../../Command/Base.dhall
 let Docker = ../../Command/Docker/Type.dhall
 let Size = ../../Command/Size.dhall
 let JobSpec = ../../Pipeline/JobSpec.dhall
 
-let opamCommands =
+let runD : Cmd.Type -> Cmd.Type =
+  \(script: Cmd.Type) ->
+    Cmd.inDocker
+      Cmd.Docker::{
+        image = (../../Constants/ContainerImages.dhall).codaToolchain
+      }
+      script
+
+let r = Cmd.run in
+
+let opamCommands : List Cmd.Type =
   [
-    "buildkite/scripts/cache.sh restore test test.txt",
-    "echo foo > test.txt",
-    "buildkite/scripts/cache.sh save test test.txt",
-    "cat scripts/setup-opam.sh > opam_ci_cache.sig",
-    "cat src/opam.export >> opam_ci_cache.sig",
-    "date +%Y-%m >> opam_ci_cache.sig",
-    "buildkite/scripts/cache.sh restore $(sha256sum opam_ci_cache.sig) /home/opam/.opam",
-    "make setup-opam",
-    "buildkite/scripts/cache.sh save $(sha256sum opam_ci_cache.sig) /home/opam/.opam"
+    Cmd.cacheThrough
+      Cmd.CacheData::{
+        key = "test",
+        dir = "test.txt"
+      }
+      (runD (r "echo foo > test.txt")),
+    r "cat scripts/setup-opam.sh > opam_ci_cache.sig",
+    r "cat src/opam.export >> opam_ci_cache.sig",
+    r "date +%Y-%m >> opam_ci_cache.sig",
+    Cmd.cacheThrough
+      Cmd.CacheData::{
+        key = "$(sha256sum opam_ci_cache.sig)",
+        dir = "/home/opam/.opam"
+      }
+      (runD (r "make setup-opam"))
   ]
 
 let commands =
-  opamCommands # [
-    "mkdir -p /tmp/artifacts",
-    "bash -c 'set -o pipefail; eval `opam config env` && make client_sdk 2>&1 | tee /tmp/artifacts/buildclientsdk.log'"
-  ]
+  opamCommands # [ runD (Cmd.and [
+    r "mkdir -p /tmp/artifacts",
+    Cmd.seq [
+      r "set -o pipefail",
+      Cmd.and [
+        r "eval `opam config env`",
+        r "make client_sdk 2>&1 | tee /tmp/artifacts/buildclientsdk.log"
+      ]
+    ]
+  ]) ]
 
 in
 
@@ -33,11 +55,13 @@ Pipeline.build
   Pipeline.Config::{
     spec = ./Spec.dhall,
     steps = [
-    Command/Coda.build
-      Command/Coda.Config::{
-        commands = Decorate.decorateAll commands,
+    Command.build
+      Command.Config::{
+        commands = commands,
         label = "Build client-sdk",
-        key = "build-client-sdk"
+        key = "build-client-sdk",
+        target = Size.Large,
+        docker = None Docker.Type
       }
     ]
   }
