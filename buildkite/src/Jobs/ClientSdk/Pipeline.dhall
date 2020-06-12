@@ -42,8 +42,8 @@ let opamCommands : List Cmd.Type =
       }
       file
       Cmd.CompoundCmd::{
-        preprocess = r "tar cvfz ${file} /home/opam/.opam",
-        postprocess = r "tar xvfz ${file} -C /home/opam",
+        preprocess = r "tar cfz ${file} /home/opam/.opam",
+        postprocess = r "tar xfz ${file} -C /home/opam",
         inner = r "make setup-opam"
       }
   ]
