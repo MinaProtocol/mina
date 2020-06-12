@@ -28,7 +28,7 @@ let blocks =
        block.data.newBlock;
      });
 
-let blockHeight =
+let totalBlocks =
   blockDirectory |> Node.Fs.readdirSync |> Array.length |> string_of_int;
 
 let setSheetsCredentials = () => {
@@ -51,7 +51,7 @@ let main = () => {
   switch (setSheetsCredentials()) {
   | Ok () =>
     blocks |> Metrics.calculateMetrics |> Upload.uploadPoints;
-    Upload.uploadBlockHeight(Some(blockHeight));
+    Upload.uploadTotalBlocks(Some(totalBlocks));
   | Error(error) => failwith(error)
   };
 };

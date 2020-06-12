@@ -223,7 +223,7 @@ let uploadPoints = metricsMap => {
   };
 };
 
-let uploadBlockHeight = blockHeight => {
+let uploadTotalBlocks = totalBlocks => {
   switch (Js.undefinedToOption(spreadsheetId)) {
   | Some(spreadsheetId) =>
     let client =
@@ -239,7 +239,7 @@ let uploadBlockHeight = blockHeight => {
       switch (result) {
       | Ok(sheetsData) =>
         let newSheetsData = sheetsData |> decodeGoogleSheets;
-        newSheetsData[0][1] = blockHeight;
+        newSheetsData[0][1] = totalBlocks;
         let resource: Bindings.GoogleSheets.sheetsUploadData = {
           values: encodeGoogleSheets(newSheetsData),
         };
@@ -253,7 +253,7 @@ let uploadBlockHeight = blockHeight => {
           },
           result => {
           switch (result) {
-          | Ok(_) => Js.log({j|Uploaded block height|j})
+          | Ok(_) => Js.log({j|Uploaded total blocks|j})
           | Error(error) => Js.log(error)
           }
         });
