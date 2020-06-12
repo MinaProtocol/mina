@@ -137,7 +137,7 @@ let tests =
 
   let cacheExample = assert :
 ''
-  ( ( ./buildkite/scripts/cache.sh load cacheKey "/tmp/data" ; echo hello > /tmp/data/foo.txt ) && ./buildkite/scripts/cache.sh store cacheKey "/tmp/data" )''
+  ( ( ./buildkite/scripts/cache.sh restore cacheKey "/tmp/data" ; echo hello > /tmp/data/foo.txt ) && ./buildkite/scripts/cache.sh save cacheKey "/tmp/data" )''
 ===
   M.format (
     M.cacheThrough
