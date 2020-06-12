@@ -2,5 +2,5 @@
 
 {
   toolchainBase = "codaprotocol/ci-toolchain-base:v3",
-  codaToolchain = "codaprotocol/coda:toolchain-2a5195188d81c562cdab4196eb50e1a2e1b6eeca"
+  codaToolchain = "codaprotocol/coda:toolchain-eb73e64d524c906384e9dbb23e9d0b8ae2be9e9e"
 }
