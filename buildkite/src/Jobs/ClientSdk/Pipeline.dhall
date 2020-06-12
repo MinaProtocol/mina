@@ -34,7 +34,7 @@ let opamCommands : List Cmd.Type =
     r "cat src/opam.export >> opam_ci_cache.sig",
     r "date +%Y-%m >> opam_ci_cache.sig",
     let file =
-      "opam-v1-`sha256sum opam_ci_cache.sig | cut -d' ' -f1`.tar"
+      "opam-v1-`sha256sum opam_ci_cache.sig | cut -d\" \" -f1`.tar"
     in
     Cmd.cacheThrough
       Cmd.Docker::{

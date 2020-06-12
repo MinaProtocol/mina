@@ -69,8 +69,6 @@ let module = \(environment : List Text) ->
   let exampleTwoQuiet = assert :
     (Some "( a && d )") === (and [ run "a", quietly "b", quietly "c", run "d" ]).readable
 
-  let outerDir : Text =
-    "/var/buildkite/builds/\$BUILDKITE_AGENT_NAME/\$BUILDKITE_ORGANIZATION_SLUG/\$BUILDKITE_PIPELINE_SLUG"
 
   let inDocker : Docker.Type -> Cmd -> Cmd =
     \(docker : Docker.Type) ->
@@ -80,6 +78,8 @@ let module = \(environment : List Text) ->
         Text
         (\(var : Text) -> " --env ${var}")
         (docker.extraEnv # environment)
+    let outerDir : Text =
+      "/var/buildkite/builds/\$BUILDKITE_AGENT_NAME/\$BUILDKITE_ORGANIZATION_SLUG/\$BUILDKITE_PIPELINE_SLUG"
     in
     { line = "docker run -it --rm --init --volume ${outerDir}:/workdir --workdir /workdir${envVars} ${docker.image} bash -c '${inner.line}'"
     , readable = Optional/map Text Text (\(readable : Text) -> "Docker@${docker.image} ( ${readable} )") inner.readable
@@ -93,10 +93,10 @@ let module = \(environment : List Text) ->
   -- Handles the ugly workdir prefix for you
   let load : Text -> Cmd =
     \(path : Text) ->
-    run "buildkite-agent artifact download ${path} ${outerDir}"
+    run "buildkite-agent artifact download ${path} ."
   let store : Text -> Cmd =
     \(path : Text) ->
-    run "buildkite-agent artifact upload ${outerDir}/${path} gs://buildkite_k8s/coda/shared"
+    run "buildkite-agent artifact upload ${path} gs://buildkite_k8s/coda/shared"
 
   let CompoundCmd = {
     Type = {
@@ -179,7 +179,7 @@ let tests =
 
   let cacheExample = assert :
 ''
-  ( ( ( buildkite-agent artifact download data.tar /var/buildkite/builds/$BUILDKITE_AGENT_NAME/$BUILDKITE_ORGANIZATION_SLUG/$BUILDKITE_PIPELINE_SLUG || true ) ; docker run -it --rm --init --volume /var/buildkite/builds/$BUILDKITE_AGENT_NAME/$BUILDKITE_ORGANIZATION_SLUG/$BUILDKITE_PIPELINE_SLUG:/workdir --workdir /workdir --env ENV1 --env ENV2 --env TEST foo/bar:tag bash -c '( tar cvf data.tar /tmp/data || echo hello > /tmp/data/foo.txt || tar xvf data.tar -C /tmp/data )' ) && buildkite-agent artifact upload /var/buildkite/builds/$BUILDKITE_AGENT_NAME/$BUILDKITE_ORGANIZATION_SLUG/$BUILDKITE_PIPELINE_SLUG/data.tar gs://buildkite_k8s/coda/shared )''
+  ( ( ( buildkite-agent artifact download data.tar . || true ) ; docker run -it --rm --init --volume /var/buildkite/builds/$BUILDKITE_AGENT_NAME/$BUILDKITE_ORGANIZATION_SLUG/$BUILDKITE_PIPELINE_SLUG:/workdir --workdir /workdir --env ENV1 --env ENV2 --env TEST foo/bar:tag bash -c '( tar cvf data.tar /tmp/data || echo hello > /tmp/data/foo.txt || tar xvf data.tar -C /tmp/data )' ) && buildkite-agent artifact upload data.tar gs://buildkite_k8s/coda/shared )''
 ===
   M.format (
     M.cacheThrough
