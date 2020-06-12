@@ -12,12 +12,12 @@ KEY=$2
 DEST=$3
 
 if [[ "$MODE" == "save" ]]; then
-  zip -r "$KEY.zip" "$DEST"
-  buildkite-agent artifact upload "$KEY.zip" "gs://buildkite_k8s/coda/shared"
+  tar cvf "$KEY.tar" "$DEST"
+  buildkite-agent artifact upload "$KEY.tar" "gs://buildkite_k8s/coda/shared"
 elif [[ "$MODE" == "restore" ]]; then
   # restoring may fail if cache miss
-  buildkite-agent artifact download "$KEY.zip" . || true
-  unzip "$KEY.zip" "$DEST" || true
+  buildkite-agent artifact download "$KEY.tar" . || true
+  tar xvf "$KEY.tar" "$DEST" || true
 fi
 
 
