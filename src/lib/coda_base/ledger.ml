@@ -240,7 +240,12 @@ module Ledger_inner = struct
 
   let create_new_account_exn t pk account =
     let action, _ = get_or_create_account_exn t pk account in
-    assert (action = `Added)
+    if action = `Existed then
+      failwith
+        (sprintf
+           !"Could create a new account with pk \
+             %{sexp:Public_key.Compressed.t}: Account already exists"
+           (Account_id.public_key pk))
 
   (* shadows definition in MaskedLedger, extra assurance hash is of right type  *)
   let merkle_root t =
