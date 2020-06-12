@@ -92,7 +92,7 @@ let module = \(environment : List Text) ->
 
   let load : Text -> Cmd =
     \(path : Text) ->
-    run "./google-cloud-sdk/bin/gsutil cp \"gs://buildkite_k8s/coda/shared/${path}\" ."
+    run "( ./google-cloud-sdk/bin/gsutil cp \"gs://buildkite_k8s/coda/shared/${path}\" . && chmod +r ${path} )"
   let store : Text -> Cmd =
     \(path : Text) ->
     run "./google-cloud-sdk/bin/gsutil cp ${path} \"gs://buildkite_k8s/coda/shared/${path}\""
@@ -178,7 +178,7 @@ let tests =
 
   let cacheExample = assert :
 ''
-  ( ( ( ./google-cloud-sdk/bin/gsutil cp "gs://buildkite_k8s/coda/shared/data.tar" . || true ) ; docker run -it --rm --init --volume /var/buildkite/builds/$BUILDKITE_AGENT_NAME/$BUILDKITE_ORGANIZATION_SLUG/$BUILDKITE_PIPELINE_SLUG:/workdir --workdir /workdir --env ENV1 --env ENV2 --env TEST foo/bar:tag bash -c '( tar cvf data.tar /tmp/data || echo hello > /tmp/data/foo.txt || tar xvf data.tar -C /tmp/data )' ) && ./google-cloud-sdk/bin/gsutil cp data.tar "gs://buildkite_k8s/coda/shared/data.tar" )''
+  ( ( ( ( ./google-cloud-sdk/bin/gsutil cp "gs://buildkite_k8s/coda/shared/data.tar" . && chmod +r data.tar ) || true ) ; docker run -it --rm --init --volume /var/buildkite/builds/$BUILDKITE_AGENT_NAME/$BUILDKITE_ORGANIZATION_SLUG/$BUILDKITE_PIPELINE_SLUG:/workdir --workdir /workdir --env ENV1 --env ENV2 --env TEST foo/bar:tag bash -c '( tar cvf data.tar /tmp/data || echo hello > /tmp/data/foo.txt || tar xvf data.tar -C /tmp/data )' ) && ./google-cloud-sdk/bin/gsutil cp data.tar "gs://buildkite_k8s/coda/shared/data.tar" )''
 ===
   M.format (
     M.cacheThrough
