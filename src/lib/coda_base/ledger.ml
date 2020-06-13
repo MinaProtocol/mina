@@ -243,7 +243,7 @@ module Ledger_inner = struct
     if action = `Existed then
       failwith
         (sprintf
-           !"Could create a new account with pk \
+           !"Could not create a new account with pk \
              %{sexp:Public_key.Compressed.t}: Account already exists"
            (Account_id.public_key pk))
 
