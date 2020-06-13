@@ -85,7 +85,7 @@ No, Coda does not natively implement privacy features at the moment. However, pr
 
 #### Can I run multiple Block Producers with the same Private Key? 
 
-No. It is important to only run one Block Producer process against a particular private key. In the event the Coda Daemon receives two different blocks from the same Block Producer, both blocks would be discarded. 
+No. It is important to only run one Block Producer process against a particular private key. In the event the Coda daemon receives two different blocks from the same Block Producer, both blocks would be discarded. 
 
 #### How can I verify that I am indeed producing blocks?
 
@@ -171,5 +171,4 @@ Nope -- when a new block is generated, Coda computes the proof recursively over 
 #### How do you control or limit the number of cores Snark Workers use?
 
 You can use the `-snark-worker-parallelism` flag when starting up `coda daemon`.
-
 
