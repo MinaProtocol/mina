@@ -159,6 +159,49 @@ let batch_check (ts : t list) =
   List.iter ~f:delete [s; u; t; p] ;
   res
 
+module Checked = struct
+  open Dlog_main_inputs
+  open Impl
+
+  let accumulate_degree_bound_checks ~step_domains:(step_h, step_k) =
+    let mask_gs bs gs =
+      let open Field in
+      List.map2_exn bs gs ~f:(fun (b : Boolean.var) (x, y) ->
+          let b = (b :> t) in
+          (b * x, b * y) )
+      |> List.reduce_exn ~f:(fun (x1, y1) (x2, y2) -> (x1 + x2, y1 + y2))
+    in
+    accumulate_degree_bound_checks' ~add:G1.( + )
+      ~update_unshifted:(fun m (uh, uk) ->
+        let m = Map.to_sequence ~order:`Increasing_key m |> Sequence.to_list in
+        let keys = List.map m ~f:fst in
+        let add domain delta elts =
+          let flags =
+            let domain_size = domain#size in
+            List.map keys ~f:(fun shift ->
+                Field.(equal (domain_size - one) (of_int shift)) )
+          in
+          let elt_plus_delta = G1.( + ) (mask_gs flags elts) delta in
+          List.map2_exn flags elts ~f:(fun b g ->
+              G1.if_ b ~then_:elt_plus_delta ~else_:g )
+        in
+        add step_h uh (List.map m ~f:snd)
+        |> add step_k uk |> List.zip_exn keys |> Int.Map.of_alist_exn )
+
+  let combine_pairing_accs : type n. (_, n) Vector.t -> _ = function
+    | [] ->
+        failwith "combine_pairing_accs: empty list"
+    | [acc] ->
+        acc
+    | a :: accs ->
+        let open Pairing_marlin_types.Accumulator in
+        let (module Shifted) = G1.shifted () in
+        Vector.fold accs
+          ~init:(map a ~f:(fun x -> Shifted.(add zero x)))
+          ~f:(fun acc t -> map2 acc t ~f:Shifted.add)
+        |> map ~f:Shifted.unshift_nonzero
+end
+
 let dummy : t Lazy.t =
   lazy
     (Common.time "dummy pairing acc" (fun () ->
