@@ -8,9 +8,9 @@ let Docker = ../../Command/Docker/Type.dhall
 let Size = ../../Command/Size.dhall
 let JobSpec = ../../Pipeline/JobSpec.dhall
 
-let runD : Cmd.Type -> Cmd.Type =
-  \(script: Cmd.Type) ->
-    Cmd.inDocker
+let runD : Text -> Cmd.Type =
+  \(script: Text) ->
+    Cmd.runInDocker
       Cmd.Docker::{
         image = (../../Constants/ContainerImages.dhall).codaToolchain
       }
@@ -39,16 +39,9 @@ let opamCommands : List Cmd.Type =
   ]
 
 let commands =
-  opamCommands # [ runD (Cmd.and [
-    r "mkdir -p /tmp/artifacts",
-    Cmd.seq [
-      r "set -o pipefail",
-      Cmd.and [
-        r "eval `opam config env`",
-        r "make client_sdk 2>&1 | tee /tmp/artifacts/buildclientsdk.log"
-      ]
-    ]
-  ]) ]
+  opamCommands # [ runD
+    "mkdir -p /tmp/artifacts && ( set -o pipefail ; eval `opam config env` && make client_sdk 2>&1 | tee /tmp/artifacts/buildclientsdk.log"
+  ]
 
 in
 

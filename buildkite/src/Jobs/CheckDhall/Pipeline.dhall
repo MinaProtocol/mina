@@ -14,10 +14,7 @@ Pipeline.build
     Command.build
       Command.Config::{
         commands = [
-          Cmd.and [
-            Cmd.run "cd buildkite",
-            Cmd.run "make check"
-          ]
+          Cmd.run "cd buildkite && make check"
         ],
         label = "Check all CI Dhall entrypoints",
         key = "check",

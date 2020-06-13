@@ -29,47 +29,6 @@ let module = \(environment : List Text) ->
   let true : Cmd = quietly "true"
   let false : Cmd = quietly "false"
 
-  let binop : Text -> List Cmd -> Cmd =
-    \(op : Text) ->
-    \(cmds : List Cmd) ->
-    let encodedLine : Text =
-      Text/concatSep
-        " ${op} "
-        (List/map Cmd Text (\(cmd : Cmd) -> cmd.line) cmds)
-    let encodedReadable : Optional Text =
-      -- skip over the quiet commands
-      let xs =
-        List/concatMap Cmd Text
-          (\(cmd : Cmd) ->
-            Optional/toList
-              Text
-              cmd.readable)
-          cmds
-      in
-
-      if P.List.null Text xs then
-        None Text
-      else
-        Some (
-          Text/concatSep
-            " ${op} "
-            xs
-        )
-    in
-    { line = "( ${encodedLine} )"
-    , readable = Optional/map Text Text (\(txt : Text) -> "( ${txt} )") encodedReadable
-    }
-
-  let seq = binop ";"
-  let and = binop "&&"
-  let or = binop "||"
-
-  let exampleVeryQuiet = assert :
-    (None Text) === (and [ quietly "a", quietly "b" ]).readable
-  let exampleTwoQuiet = assert :
-    (Some "( a && d )") === (and [ run "a", quietly "b", quietly "c", run "d" ]).readable
-
-
   let inDocker : Docker.Type -> Cmd -> Cmd =
     \(docker : Docker.Type) ->
     \(inner : Cmd) ->
@@ -125,11 +84,8 @@ let module = \(environment : List Text) ->
   , CompoundCmd = CompoundCmd
   , quietly = quietly
   , run = run
-  , seq = seq
-  , and = and
   , true = true
   , false = false
-  , or = or
   , runInDocker = runInDocker
   , inDocker = inDocker
   , cacheThrough = cacheThrough
@@ -141,9 +97,9 @@ let tests =
 
   let dockerExample = assert :
   { line =
-"docker run -it --rm --init --volume /var/buildkite/builds/$BUILDKITE_AGENT_NAME/$BUILDKITE_ORGANIZATION_SLUG/$BUILDKITE_PIPELINE_SLUG:/workdir --workdir /workdir --env ENV1 --env ENV2 --env TEST foo/bar:tag bash -c '( echo hello && echo hello2 )'"
+"docker run -it --rm --init --volume /var/buildkite/builds/$BUILDKITE_AGENT_NAME/$BUILDKITE_ORGANIZATION_SLUG/$BUILDKITE_PIPELINE_SLUG:/workdir --workdir /workdir --env ENV1 --env ENV2 --env TEST foo/bar:tag bash -c 'echo hello'"
   , readable =
-    Some "Docker@foo/bar:tag ( ( echo hello ) )"
+    Some "Docker@foo/bar:tag ( echo hello )"
   }
   ===
     M.inDocker
@@ -151,22 +107,7 @@ let tests =
         image = "foo/bar:tag",
         extraEnv = [ "ENV1", "ENV2" ]
       }
-      (M.and [ M.run "echo hello", M.quietly "echo hello2" ])
-
-  let combinators = assert :
-''
-  ( ( echo "hello" || echo "goodbye" || echo "oh well" ) && echo "and then" )''
-===
-  M.format (
-    M.and [
-      M.or [
-        M.run "echo \"hello\"",
-        M.run "echo \"goodbye\"",
-        M.run "echo \"oh well\""
-      ],
-      M.run "echo \"and then\""
-    ]
-  )
+      ( M.run "echo hello" )
 
   let cacheExample = assert :
 ''
