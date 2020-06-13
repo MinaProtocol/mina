@@ -90,13 +90,6 @@ let module = \(environment : List Text) ->
     \(script : Text) ->
     inDocker docker (run script)
 
-  let load : Text -> Cmd =
-    \(path : Text) ->
-    run "( ./google-cloud-sdk/bin/gsutil cp \"gs://buildkite_k8s/coda/shared/${path}\" . && chmod +r ${path} )"
-  let store : Text -> Cmd =
-    \(path : Text) ->
-    run "./google-cloud-sdk/bin/gsutil cp ${path} \"gs://buildkite_k8s/coda/shared/${path}\""
-
   let CompoundCmd = {
     Type = {
       preprocess : Cmd,
@@ -106,24 +99,25 @@ let module = \(environment : List Text) ->
     default = {=}
   }
 
+  let format : Cmd -> Text =
+    \(cmd : Cmd) -> cmd.line
+
   -- Loads through cache, innards with docker, buildkite-agent interactions outside
   let cacheThrough : Docker.Type -> Text -> CompoundCmd.Type -> Cmd =
     \(docker : Docker.Type) ->
     \(cachePath : Text) ->
     \(cmd : CompoundCmd.Type) ->
-    and [
-      seq [
-        or [ load cachePath, true ],
-        inDocker
-          docker
-          (and [ cmd.postprocess, cmd.inner, cmd.preprocess ])
-      ],
-      store cachePath
-    ]
-
-  let format : Cmd -> Text =
-    \(cmd : Cmd) -> cmd.line
-
+      let script =
+        ( format cmd.postprocess ) ++ " && " ++
+        ( format cmd.inner ) ++ " && " ++
+        ( format cmd.preprocess )
+      in
+      let cmd =
+        runInDocker docker script
+      in
+      { line = "./buildkite/scripts/cache-through.sh ${cachePath} \"${format ( runInDocker docker script )}\""
+      , readable = Optional/map Text Text (\(readable : Text) -> "Cache@${cachePath} ( ${readable} ) ") cmd.readable
+      }
   in
 
   { Type = Cmd
@@ -139,8 +133,6 @@ let module = \(environment : List Text) ->
   , runInDocker = runInDocker
   , inDocker = inDocker
   , cacheThrough = cacheThrough
-  , load = load
-  , store = store
   , format = format
   }
 
@@ -178,7 +170,7 @@ let tests =
 
   let cacheExample = assert :
 ''
-  ( ( ( ( ./google-cloud-sdk/bin/gsutil cp "gs://buildkite_k8s/coda/shared/data.tar" . && chmod +r data.tar ) || true ) ; docker run -it --rm --init --volume /var/buildkite/builds/$BUILDKITE_AGENT_NAME/$BUILDKITE_ORGANIZATION_SLUG/$BUILDKITE_PIPELINE_SLUG:/workdir --workdir /workdir --env ENV1 --env ENV2 --env TEST foo/bar:tag bash -c '( tar xvf data.tar -C /tmp/data && echo hello > /tmp/data/foo.txt && tar cvf data.tar /tmp/data )' ) && ./google-cloud-sdk/bin/gsutil cp data.tar "gs://buildkite_k8s/coda/shared/data.tar" )''
+  ./buildkite/scripts/cache-through.sh data.tar "docker run -it --rm --init --volume /var/buildkite/builds/$BUILDKITE_AGENT_NAME/$BUILDKITE_ORGANIZATION_SLUG/$BUILDKITE_PIPELINE_SLUG:/workdir --workdir /workdir --env ENV1 --env ENV2 --env TEST foo/bar:tag bash -c 'tar xvf data.tar -C /tmp/data && echo hello > /tmp/data/foo.txt && tar cvf data.tar /tmp/data'"''
 ===
   M.format (
     M.cacheThrough
