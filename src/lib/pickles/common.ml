@@ -81,3 +81,13 @@ let compute_challenge ~is_square x =
 let compute_challenges chals =
   Vector.map chals ~f:(fun {Bulletproof_challenge.prechallenge; is_square} ->
       compute_challenge ~is_square prechallenge )
+
+let compute_sg chals =
+  let open Zexe_backend in
+  let open Snarky_bn382.Fq_poly_comm in
+  let comm =
+    Snarky_bn382.Fq_urs.b_poly_commitment
+      (Dlog_based.Keypair.load_urs ())
+      (Fq.Vector.of_array (Vector.to_array (compute_challenges chals)))
+  in
+  Snarky_bn382.G.Affine.Vector.get (unshifted comm) 0 |> G.Affine.of_backend

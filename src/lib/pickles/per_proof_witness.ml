@@ -1,6 +1,5 @@
 open Pickles_types
 open Import
-
 module Impl = Impls.Pairing_based
 module One_hot_vector = One_hot_vector.Make (Impl)
 
