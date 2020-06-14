@@ -9,7 +9,8 @@ fi
 
 # download gsutil if it doesn't exist
 # TODO: Bake this into the agents
-if [[ -z ./google-cloud-sdk/bin/gsutil ]]; then
+if [[ ! -f ./google-cloud-sdk/bin/gsutil ]]; then
+  echo "Downloading gsutil because it doesn't exist"
   wget https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-296.0.1-linux-x86_64.tar.gz && tar -zxf google-cloud-sdk-296.0.1-linux-x86_64.tar.gz
 
   tar -zxf google-cloud-sdk-296.0.1-linux-x86_64.tar.gz
@@ -29,6 +30,7 @@ $UPLOAD_BIN cp \"gs://buildkite_k8s/coda/shared/${FILE}\" . ; echo $? > download
 set -e
 
 if ! ( exit $(cat download_status.txt) ); then
+  echo "*** Cache miss -- executing step ***"
   bash -c "$CMD"
   $UPLOAD_BIN cp ${FILE} \"gs://buildkite_k8s/coda/shared/${FILE}\"
 else
