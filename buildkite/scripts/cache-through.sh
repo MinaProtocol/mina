@@ -1,6 +1,7 @@
 #!/bin/bash
 
 set -eou pipefail
+set +x
 
 if [[ $# -ne 2 ]]; then
   echo "Usage: $0 <path-to-file> <postprocess-run-preprocess-in-docker-cmd>"
