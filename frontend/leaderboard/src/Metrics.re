@@ -52,7 +52,7 @@ let max = (a, b) => {
 };
 
 let convertNanoToBase = a => {
-  Int64.div(Int64.add(a, 5000000L), 1000000000L);
+  a->Int64.add(5000000L)->Int64.div(1000000000L);
 };
 
 let filterBlocksByTimeWindow = (startTime, endTime, blocks) => {
