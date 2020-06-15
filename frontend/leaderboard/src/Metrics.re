@@ -109,9 +109,12 @@ let calculateSnarkFeeCount = (map, block: Types.NewBlock.data) => {
              switch (feeCount) {
              | Some(feeCount) =>
                let result =
-                 Int64.add(
-                   Int64.of_string(snarkJob.fee),
-                   Int64.of_string(feeCount),
+                 Int64.div(
+                   Int64.add(
+                     Int64.of_string(snarkJob.fee),
+                     Int64.of_string(feeCount),
+                   ),
+                   1000000000L,
                  );
                Some(Int64.to_string(result));
              | None => Some(snarkJob.fee)
@@ -138,9 +141,12 @@ let calculateHighestSnarkFeeCollected = (map, block: Types.NewBlock.data) => {
              | Some(feeCount) =>
                Some(
                  Int64.to_string(
-                   max(
-                     Int64.of_string(snarkJob.fee),
-                     Int64.of_string(feeCount),
+                   Int64.div(
+                     max(
+                       Int64.of_string(snarkJob.fee),
+                       Int64.of_string(feeCount),
+                     ),
+                     1000000000L,
                    ),
                  ),
                )
