@@ -391,18 +391,6 @@ struct
       let {Domains.h; k; x} =
         List.nth_exn (Vector.to_list step_domains) branch_data.index
       in
-      let module L = Snarky_log.Constraints (Impls.Pairing_based.Internal_Basic) in
-      let cwd = Sys.getcwd () in
-      Snarky_log.to_file
-        Core.(cwd ^/ sprintf "step_%d.flame-graph" branch_data.index)
-        (L.log
-           (Impls.Pairing_based.make_checked (fun () ->
-                let x =
-                  Impls.Pairing_based.with_label "input" (fun () ->
-                      Impls.Pairing_based.exists input )
-                in
-                Impls.Pairing_based.with_label "main" (fun () ->
-                    branch_data.main ~step_domains (conv x) ) ))) ;
       ksprintf Common.time "step-prover %d (%d, %d, %d)" branch_data.index
         (Domain.size h) (Domain.size k) (Domain.size x) (fun () ->
           Impls.Pairing_based.prove pk [input]
