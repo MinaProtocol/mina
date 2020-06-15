@@ -4,6 +4,22 @@ open Zexe_backend
 open Tuple_lib
 open Common
 open Import
+module Accumulator = Pairing_marlin_types.Accumulator
+
+let accumulate_degree_bound_checks' ~update_unshifted ~add ~scale ~r_h ~r_k
+    { Accumulator.Degree_bound_checks.shifted_accumulator
+    ; unshifted_accumulators } (g1, g1_s) (g2, g2_s) (g3, g3_s) =
+  let ( + ) = add in
+  let ( * ) = Fn.flip scale in
+  let shifted_accumulator =
+    shifted_accumulator + (r_h * (g1 + (r_h * g2))) + (r_k * g3)
+  in
+  let h_update = r_h * (g1_s + (r_h * g2_s)) in
+  let k_update = r_k * g3_s in
+  let unshifted_accumulators =
+    update_unshifted unshifted_accumulators (h_update, k_update)
+  in
+  {Accumulator.Degree_bound_checks.shifted_accumulator; unshifted_accumulators}
 
 type t =
   (G1.Affine.t, G1.Affine.t Unshifted_acc.t) Pairing_marlin_types.Accumulator.t
@@ -11,6 +27,54 @@ type t =
 module Projective = struct
   type t = (G1.t, G1.t Unshifted_acc.t) Pairing_marlin_types.Accumulator.t
 end
+
+let accumulate_degree_bound_checks ~domain_h ~domain_k ~add =
+  accumulate_degree_bound_checks' ~add
+    ~update_unshifted:(fun unsh (h_update, k_update) ->
+      Map.update unsh
+        (Domain.size domain_h - 1)
+        ~f:(fun x -> add h_update (Option.value_exn x))
+      |> Fn.flip Map.update
+           (Domain.size domain_k - 1)
+           ~f:(fun x -> add k_update (Option.value_exn x)) )
+
+(*
+   check that pi proves that U opens to v at z.
+
+   pi =? commitmennt to (U - v * g ) / (beta*g - z)
+
+   e(pi, beta*g - z*g) = e(U - v, g)
+
+   e(pi, beta*g) - e(z*pi, g) - e(U - v, g) = 0
+   e(pi, beta*g) - e(z*pi - (U - v * g), g) = 0
+
+   sum_i r^i e(pi_i, beta_i*g) - e(z*pi - (U - v_i * g), g) = 0
+*)
+
+let accumulate_opening_check ~add ~negate ~endo ~scale_generator ~r
+    ~(* r should be exposed. *) r_xi_sum (* s should be exposed *)
+    {Accumulator.Opening_check.r_f_minus_r_v_plus_rz_pi; r_pi}
+    (f_1, beta_1, pi_1) (f_2, beta_2, pi_2) (f_3, beta_3, pi_3) =
+  let ( + ) = add in
+  let ( * ) s p = endo p s in
+  let r_f_minus_r_v_plus_rz_pi =
+    let rz_pi_term =
+      let zpi_1 = beta_1 * pi_1 in
+      let zpi_2 = beta_2 * pi_2 in
+      let zpi_3 = beta_3 * pi_3 in
+      r * (zpi_1 + (r * (zpi_2 + (r * zpi_3))))
+      (* Could be more efficient at the cost of more public inputs. *)
+      (* sum_{i=1}^3 r^i beta_i pi_i *)
+    in
+    let f_term = r * (f_1 + (r * (f_2 + (r * f_3)))) in
+    let v_term = scale_generator r_xi_sum in
+    r_f_minus_r_v_plus_rz_pi + f_term + negate v_term + rz_pi_term
+  in
+  let pi_term =
+    (* sum_{i=1}^3 r^i pi_i *)
+    r * (pi_1 + (r * (pi_2 + (r * pi_3))))
+  in
+  {Accumulator.Opening_check.r_f_minus_r_v_plus_rz_pi; r_pi= r_pi + pi_term}
 
 let accumulate (prev_acc : t) (proof : Pairing_based.Proof.t) ~domain_h
     ~domain_k ~r ~r_k ~r_xi_sum ~beta_1 ~beta_2 ~beta_3 (f_1, f_2, f_3) : t =
@@ -23,13 +87,12 @@ let accumulate (prev_acc : t) (proof : Pairing_based.Proof.t) ~domain_h
   let g3 = conv (fst (snd proof.messages.sigma_gh_3)) in
   Pairing_marlin_types.Accumulator.map ~f:to_affine_exn
     { degree_bound_checks=
-        Dlog_main.accumulate_degree_bound_checks' ~domain_h ~domain_k
+        accumulate_degree_bound_checks ~domain_h ~domain_k
           prev_acc.degree_bound_checks ~add ~scale ~r_h:r ~r_k g1 g2 g3
     ; opening_check=
-        Dlog_main.accumulate_opening_check ~add ~negate
-          ~scale_generator:(scale one) ~endo:scale ~r ~r_xi_sum
-          prev_acc.opening_check (f_1, beta_1, proof1) (f_2, beta_2, proof2)
-          (f_3, beta_3, proof3) }
+        accumulate_opening_check ~add ~negate ~scale_generator:(scale one)
+          ~endo:scale ~r ~r_xi_sum prev_acc.opening_check (f_1, beta_1, proof1)
+          (f_2, beta_2, proof2) (f_3, beta_3, proof3) }
 
 (* Making this dynamic was a bit complicated. *)
 let permitted_domains =

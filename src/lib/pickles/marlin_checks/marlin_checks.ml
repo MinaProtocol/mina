@@ -1,6 +1,5 @@
 open Core_kernel
 open Pickles_types
-
 module Domain = Domain
 
 type 'field domain = < size: 'field ; vanishing_polynomial: 'field -> 'field >

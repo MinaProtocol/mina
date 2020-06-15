@@ -1,7 +1,6 @@
 open Core_kernel
 open Pickles_types
 open Import
-
 module Sponge_lib = Sponge
 
 module Snarkable = struct
@@ -328,6 +327,6 @@ module type Statement = sig
 end
 
 module type Statement_var =
-  Statement with type field := Impls.Pairing_based.Field.t
+  Statement with type field := Zexe_backend.Fp.t Snarky.Cvar.t
 
 module type Statement_value = Statement with type field := Zexe_backend.Fp.t

@@ -23,4 +23,3 @@ module T (Impl : Snarky.Snark_intf.Run) (N : Vector.Nat_intf) = struct
          ~back:(fun x ->
            Constant.of_bits (List.take (Field.Constant.unpack x) length) )
 end
-

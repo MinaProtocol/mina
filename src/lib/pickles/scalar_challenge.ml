@@ -1,6 +1,5 @@
 open Core_kernel
 open Import
-
 module SC = Pickles_types.Scalar_challenge
 
 let to_field_checked (type f)
