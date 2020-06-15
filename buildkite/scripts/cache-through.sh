@@ -10,7 +10,7 @@ fi
 
 # download gsutil if it doesn't exist
 # TODO: Bake this into the agents
-if [[ ! -f ./google-cloud-sdk/bin/gsutil ]]; then
+if [[ ! -f /usr/local/google-cloud-sdk/bin/gsutil ]]; then
   echo "Downloading gsutil because it doesn't exist"
   wget https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-296.0.1-linux-x86_64.tar.gz
 
