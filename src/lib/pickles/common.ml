@@ -126,4 +126,3 @@ let fq_unpadded_public_input_of_statement prev_statement =
 let fq_public_input_of_statement s =
   let open Zexe_backend in
   Fq.one :: fq_unpadded_public_input_of_statement s
-
