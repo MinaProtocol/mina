@@ -27,13 +27,13 @@ FILE="$1"
 CMD="$2"
 
 set +e
-$UPLOAD_BIN cp \"gs://buildkite_k8s/coda/shared/${FILE}\" . ; echo $? > download_status.txt
+$UPLOAD_BIN cp gs://buildkite_k8s/coda/shared/${FILE} . ; echo $? > download_status.txt
 set -e
 
 if ! ( exit $(cat download_status.txt) ); then
   echo "*** Cache miss -- executing step ***"
   bash -c "$CMD"
-  $UPLOAD_BIN cp ${FILE} \"gs://buildkite_k8s/coda/shared/${FILE}\"
+  $UPLOAD_BIN cp ${FILE} gs://buildkite_k8s/coda/shared/${FILE}
 else
   echo "*** Cache Hit -- skipping step ***"
 fi
