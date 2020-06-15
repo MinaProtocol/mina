@@ -28,14 +28,13 @@ FILE="$1"
 CMD="$2"
 
 set +e
-$UPLOAD_BIN cp ${PREFIX}/${FILE} . ; echo $? > download_status.txt
-set -e
-
-if ! ( exit $(cat download_status.txt) ); then
+if ! $UPLOAD_BIN cp ${PREFIX}/${FILE} .; then
+  set -e
   echo "*** Cache miss -- executing step ***"
   bash -c "$CMD"
   $UPLOAD_BIN cp ${FILE} ${PREFIX}/${FILE}
 else
+  set -e
   echo "*** Cache Hit -- skipping step ***"
 fi
 

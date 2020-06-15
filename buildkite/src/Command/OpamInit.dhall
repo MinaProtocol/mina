@@ -6,11 +6,10 @@ let r = Cmd.run
 
 let commands : List Cmd.Type =
   [
-    r "cat scripts/setup-opam.sh > opam_ci_cache.sig",
-    r "cat src/opam.export >> opam_ci_cache.sig",
-    r "date +%Y-%m >> opam_ci_cache.sig",
+    r ("cat scripts/setup-opam.sh src/opam.export <(date +%Y-%m)" ++
+          "> opam_ci_cache.sig"),
     let file =
-      "opam-v2-`sha256sum opam_ci_cache.sig | cut -d\" \" -f1`.tar.gz"
+      "\"opam-v2-\\\$(sha256sum opam_ci_cache.sig | cut -d\" \" -f1).tar.gz\""
     in
     Cmd.cacheThrough
       Cmd.Docker::{
