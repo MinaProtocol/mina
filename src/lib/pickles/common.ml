@@ -122,3 +122,8 @@ let fq_unpadded_public_input_of_statement prev_statement =
     Impls.Dlog_based.generate_public_input [typ] prev_statement
   in
   List.init (Fq.Vector.length input) ~f:(Fq.Vector.get input)
+
+let fq_public_input_of_statement s =
+  let open Zexe_backend in
+  Fq.one :: fq_unpadded_public_input_of_statement s
+
