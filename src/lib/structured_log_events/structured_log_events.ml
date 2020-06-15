@@ -9,8 +9,8 @@ type id = string [@@deriving eq, yojson, sexp]
 let id_of_string s = s
 
 type repr =
-  { log: t -> (string * id * (string * Yojson.Safe.json) list) option
-  ; parse: id -> (string * Yojson.Safe.json) list -> t option }
+  { log: t -> (string * id * (string * Yojson.Safe.t) list) option
+  ; parse: id -> (string * Yojson.Safe.t) list -> t option }
 
 module Registry = struct
   let reprs = ref []
