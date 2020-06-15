@@ -23,7 +23,6 @@ fi
 
 UPLOAD_BIN=/usr/local/google-cloud-sdk/bin/gsutil
 PREFIX=gs://buildkite_k8s/coda/shared
-# UPLOAD_BIN=echo
 FILE="$1"
 CMD="$2"
 
