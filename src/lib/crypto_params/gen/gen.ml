@@ -6,11 +6,6 @@ open Asttypes
 open Parsetree
 open Longident
 open Core
-
-let seed = "CodaPedersenParams"
-
-let random_bool = Crs.create ~seed
-
 module Impl = Pickles.Impls.Pairing_based.Internal_Basic
 module Group = Snarky_bn382_backend.G
 
@@ -31,13 +26,14 @@ let group_map_params_structure ~loc =
   let open E in
   [%str
     let params =
-      let module T = struct
-        type t = Snarky_bn382_backend.Fp.Stable.Latest.t Group_map.Params.t
-        [@@deriving bin_io_unversioned]
-      end in
-      Binable.of_string
-        (module T)
-        [%e estring (Binable.to_string (module T) group_map_params)]]
+      lazy
+        (let module T = struct
+           type t = Snarky_bn382_backend.Fp.Stable.Latest.t Group_map.Params.t
+           [@@deriving bin_io_unversioned]
+         end in
+        Core.Binable.of_string
+          (module T)
+          [%e estring (Core.Binable.to_string (module T) group_map_params)])]
 
 let generate_ml_file filename structure =
   let fmt = Format.formatter_of_out_channel (Out_channel.create filename) in

@@ -211,21 +211,6 @@ module Tick = struct
     end
 
     let typ = Checked.typ
-
-    let%test_unit "checked-unchecked scale" =
-      Test.test_equal ~sexp_of_t
-        ~equal:(fun a b ->
-          let a = to_affine_exn a in
-          let b = to_affine_exn b in
-          [%eq: Field.t * Field.t] a b )
-        (Typ.tuple2 typ Scalar.typ)
-        typ
-        (fun (g, s) ->
-          let%bind (module S) = Checked.Shifted.create () in
-          let%bind t = Checked.scale (module S) g s ~init:S.zero in
-          S.unshift_nonzero t )
-        (fun (g, s) -> scale g s)
-        (random (), Scalar.random ())
   end
 
   module Util = Snark_util.Make (Tick0)
@@ -254,9 +239,10 @@ module Group_map = struct
     Group_map.to_group (module Tick.Field) ~params:Tock.group_map_params
 
   module Checked = struct
-    let to_group =
+    let to_group x =
       Snarky_group_map.Checked.to_group
         (module Tick.Run)
-        ~params:Tock.group_map_params
+        ~params:(Tock_backend.bg_params ())
+        x
   end
 end

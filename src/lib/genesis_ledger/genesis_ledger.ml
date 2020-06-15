@@ -47,6 +47,42 @@ module Balances (Balances : Intf.Named_balances_intf) = struct
   end)
 end
 
+module Utils = struct
+  let keypair_of_account_record_exn (private_key, account) =
+    let open Account in
+    let sk_error_msg =
+      "cannot access genesis ledger account private key "
+      ^ "(HINT: did you forget to compile with `--profile=test`?)"
+    in
+    let pk_error_msg = "failed to decompress a genesis ledger public key" in
+    let private_key = Option.value_exn private_key ~message:sk_error_msg in
+    let public_key =
+      Option.value_exn
+        (Public_key.decompress account.Poly.Stable.Latest.public_key)
+        ~message:pk_error_msg
+    in
+    {Keypair.public_key; private_key}
+
+  let id_of_account_record (_private_key, account) = Account.identifier account
+
+  let pk_of_account_record (_private_key, account) = Account.public_key account
+
+  let find_account_record_exn ~f accounts =
+    List.find_exn accounts ~f:(fun (_, account) -> f account)
+
+  let find_new_account_record_exn_ accounts old_account_pks =
+    find_account_record_exn accounts ~f:(fun new_account ->
+        not
+          (List.mem ~equal:Public_key.Compressed.equal old_account_pks
+             (Account.public_key new_account)) )
+
+  let find_new_account_record_exn accounts old_account_pks =
+    find_new_account_record_exn_ accounts
+      (List.map ~f:Public_key.compress old_account_pks)
+end
+
+include Utils
+
 module Make (Inputs : Intf.Ledger_input_intf) : Intf.S = struct
   include Inputs
 
@@ -69,31 +105,16 @@ module Make (Inputs : Intf.Ledger_input_intf) : Intf.S = struct
             account ) ;
     ledger
 
+  include Utils
+
   let find_account_record_exn ~f =
-    List.find_exn (Lazy.force accounts) ~f:(fun (_, account) -> f account)
+    find_account_record_exn ~f (Lazy.force accounts)
+
+  let find_new_account_record_exn_ old_account_pks =
+    find_new_account_record_exn_ (Lazy.force accounts) old_account_pks
 
   let find_new_account_record_exn old_account_pks =
-    find_account_record_exn ~f:(fun new_account ->
-        not
-          (List.exists old_account_pks ~f:(fun old_account_pk ->
-               Public_key.equal
-                 (Public_key.decompress_exn (Account.public_key new_account))
-                 old_account_pk )) )
-
-  let keypair_of_account_record_exn (private_key, account) =
-    let open Account in
-    let sk_error_msg =
-      "cannot access genesis ledger account private key "
-      ^ "(HINT: did you forget to compile with `--profile=test`?)"
-    in
-    let pk_error_msg = "failed to decompress a genesis ledger public key" in
-    let private_key = Option.value_exn private_key ~message:sk_error_msg in
-    let public_key =
-      Option.value_exn
-        (Public_key.decompress account.Poly.Stable.Latest.public_key)
-        ~message:pk_error_msg
-    in
-    {Keypair.public_key; private_key}
+    find_new_account_record_exn (Lazy.force accounts) old_account_pks
 
   let largest_account_exn =
     let error_msg =
@@ -104,6 +125,12 @@ module Make (Inputs : Intf.Ledger_input_intf) : Intf.S = struct
         List.max_elt (Lazy.force accounts) ~compare:(fun (_, a) (_, b) ->
             Balance.compare a.balance b.balance )
         |> Option.value_exn ?here:None ?error:None ~message:error_msg )
+
+  let largest_account_id_exn =
+    Memo.unit (fun () -> largest_account_exn () |> id_of_account_record)
+
+  let largest_account_pk_exn =
+    Memo.unit (fun () -> largest_account_exn () |> pk_of_account_record)
 
   let largest_account_keypair_exn =
     Memo.unit (fun () -> keypair_of_account_record_exn (largest_account_exn ()))
@@ -120,16 +147,20 @@ module Packed = struct
 
   let find_account_record_exn ((module L) : t) = L.find_account_record_exn
 
+  let find_new_account_record_exn_ ((module L) : t) =
+    L.find_new_account_record_exn_
+
   let find_new_account_record_exn ((module L) : t) =
     L.find_new_account_record_exn
 
-  let largest_account_exn ((module L) : t) = L.largest_account_exn
+  let largest_account_exn ((module L) : t) = L.largest_account_exn ()
+
+  let largest_account_id_exn ((module L) : t) = L.largest_account_id_exn ()
+
+  let largest_account_pk_exn ((module L) : t) = L.largest_account_pk_exn ()
 
   let largest_account_keypair_exn ((module L) : t) =
-    L.largest_account_keypair_exn
-
-  let keypair_of_account_record_exn ((module L) : t) =
-    L.keypair_of_account_record_exn
+    L.largest_account_keypair_exn ()
 end
 
 module Of_ledger (T : sig
@@ -143,19 +174,16 @@ end) : Intf.S = struct
     Lazy.map t
       ~f:(Ledger.foldi ~init:[] ~f:(fun _loc accs acc -> (None, acc) :: accs))
 
+  include Utils
+
   let find_account_record_exn ~f =
-    List.find_exn (Lazy.force accounts) ~f:(fun (_, account) -> f account)
+    find_account_record_exn ~f (Lazy.force accounts)
+
+  let find_new_account_record_exn_ old_account_pks =
+    find_new_account_record_exn_ (Lazy.force accounts) old_account_pks
 
   let find_new_account_record_exn old_account_pks =
-    find_account_record_exn ~f:(fun new_account ->
-        not
-          (List.exists old_account_pks ~f:(fun old_account_pk ->
-               Public_key.equal
-                 (Public_key.decompress_exn (Account.public_key new_account))
-                 old_account_pk )) )
-
-  let keypair_of_account_record_exn _ =
-    failwith "cannot access genesis ledger account private key"
+    find_new_account_record_exn (Lazy.force accounts) old_account_pks
 
   let largest_account_exn =
     let error_msg =
@@ -166,6 +194,12 @@ end) : Intf.S = struct
         List.max_elt (Lazy.force accounts) ~compare:(fun (_, a) (_, b) ->
             Balance.compare a.Account.Poly.balance b.Account.Poly.balance )
         |> Option.value_exn ?here:None ?error:None ~message:error_msg )
+
+  let largest_account_id_exn =
+    Memo.unit (fun () -> largest_account_exn () |> id_of_account_record)
+
+  let largest_account_pk_exn =
+    Memo.unit (fun () -> largest_account_exn () |> pk_of_account_record)
 
   let largest_account_keypair_exn () =
     failwith "cannot access genesis ledger account private key"

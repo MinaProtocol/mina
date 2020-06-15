@@ -756,6 +756,7 @@ let daemon logger =
            ; time_controller
            ; consensus_local_state
            ; genesis_ledger_hash
+           ; constraint_constants
            ; log_gossip_heard
            ; is_seed
            ; creatable_gossip_net=

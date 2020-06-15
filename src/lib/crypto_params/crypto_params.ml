@@ -2,10 +2,7 @@ module Tock = struct
   module Full = Pickles.Impls.Dlog_based
   module Run = Pickles.Impls.Dlog_based
 
-  let group_map_params =
-    Group_map.Params.create
-      (module Zexe_backend.Fp)
-      Zexe_backend.G.Params.{a; b}
+  let group_map_params () = Lazy.force Group_map_params.params
 
   include Full.Internal_Basic
   module Number = Snarky.Number.Make (Full.Internal_Basic)

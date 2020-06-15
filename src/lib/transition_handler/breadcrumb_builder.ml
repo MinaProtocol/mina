@@ -5,7 +5,7 @@ open Cache_lib
 open Coda_transition
 open Network_peer
 
-let build_subtrees_of_breadcrumbs ~logger ~constraint_constants ~verifier
+let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
     ~trust_system ~frontier ~initial_hash subtrees_of_enveloped_transitions =
   (* If the breadcrumb we are targetting is removed from the transition
    * frontier while we're catching up, it means this path is not on the
@@ -95,7 +95,7 @@ let build_subtrees_of_breadcrumbs ~logger ~constraint_constants ~verifier
                 match%bind
                   O1trace.trace_recurring "Breadcrumb.build" (fun () ->
                       Transition_frontier.Breadcrumb.build ~logger
-                        ~constraint_constants ~verifier ~trust_system ~parent
+                        ~precomputed_values ~verifier ~trust_system ~parent
                         ~transition:mostly_validated_transition
                         ~sender:(Some sender) )
                 with

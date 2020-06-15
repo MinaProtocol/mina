@@ -147,7 +147,7 @@ module G1 = struct
             fun () ->
               G1.(to_affine_exn (scale (of_affine (read typ t)) one_seventh)))
     in
-    ignore (scale_by_quadratic_nonresidue res) ;
+    assert_equal t (scale_by_quadratic_nonresidue res) ;
     res
 
   let if_ = T.if_

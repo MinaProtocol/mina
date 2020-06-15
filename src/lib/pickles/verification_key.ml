@@ -3,22 +3,48 @@ open Pickles_types
 open Zexe_backend
 
 module Data = struct
-  type t =
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t =
+        { public_inputs: int
+        ; variables: int
+        ; constraints: int
+        ; nonzero_entries: int
+        ; max_degree: int }
+      [@@deriving version, bin_io]
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  type t = Stable.Latest.t =
     { public_inputs: int
     ; variables: int
     ; constraints: int
     ; nonzero_entries: int
     ; max_degree: int }
-  [@@deriving bin_io]
 end
 
 module Repr = struct
-  type t =
-    { commitments:
-        G.Affine.t array Abc.Stable.Latest.t Matrix_evals.Stable.Latest.t
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t =
+        { commitments:
+            G.Affine.Stable.V1.t array Abc.Stable.V1.t Matrix_evals.Stable.V1.t
+        ; step_domains: Domains.Stable.V1.t array
+        ; data: Data.Stable.V1.t }
+      [@@deriving version, bin_io]
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  type t = Stable.Latest.t =
+    { commitments: G.Affine.t array Abc.t Matrix_evals.t
     ; step_domains: Domains.t array
     ; data: Data.t }
-  [@@deriving bin_io]
 end
 
 type t =
@@ -38,20 +64,17 @@ let of_repr urs {Repr.commitments= c; step_domains; data= d} =
   in
   {commitments= c; step_domains; data= d; index= t}
 
-module B =
-  Binable.Of_binable
-    (Repr)
-    (struct
-      type nonrec t = t
+include Binable.Of_binable
+          (Repr.Stable.Latest)
+          (struct
+            type nonrec t = t
 
-      let to_binable {commitments; step_domains; data; index= _} =
-        {Repr.commitments; data; step_domains}
+            let to_binable {commitments; step_domains; data; index= _} =
+              {Repr.commitments; data; step_domains}
 
-      let of_binable r =
-        of_repr (Zexe_backend.Dlog_based.Keypair.load_urs ()) r
-    end)
-
-include B
+            let of_binable r =
+              of_repr (Zexe_backend.Dlog_based.Keypair.load_urs ()) r
+          end)
 
 let dummy =
   let lengths = Commitment_lengths.of_domains Common.wrap_domains in

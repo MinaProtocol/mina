@@ -44,6 +44,13 @@ let domain (type t) ((module F) : t field) (domain : Domain.t) : t domain =
 
 let all_but m = List.filter Abc.Label.all ~f:(( <> ) m)
 
+(* These correspond to the blue equations on [page 32 here](https://eprint.iacr.org/2019/1047.pdf),
+   with a few modifications:
+
+   - our [sigma_2] is the paper's [sigma_2 / domain_h#size]
+   - our [sigma_3] is the paper's [sigma_3 / domain_k#size]
+   - our Marlin variant does not have [h_0] and so the last equation on that page can be omitted.
+*)
 let checks (type t) (module F : Field_intf with type t = t) ~input_domain
     ~domain_h ~domain_k ~x_hat_beta_1
     { Composition_types.Dlog_based.Proof_state.Deferred_values.Marlin.sigma_2

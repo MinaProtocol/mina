@@ -31,6 +31,8 @@ module T = struct
   let ledger_depth {genesis_ledger; _} =
     Genesis_ledger.Packed.depth genesis_ledger
 
+  include Genesis_ledger.Utils
+
   let genesis_ledger {genesis_ledger; _} =
     Genesis_ledger.Packed.t genesis_ledger
 
@@ -45,9 +47,6 @@ module T = struct
 
   let largest_account_keypair_exn {genesis_ledger; _} =
     Genesis_ledger.Packed.largest_account_keypair_exn genesis_ledger
-
-  let keypair_of_account_record_exn {genesis_ledger; _} =
-    Genesis_ledger.Packed.keypair_of_account_record_exn genesis_ledger
 
   let consensus_constants {consensus_constants; _} = consensus_constants
 
