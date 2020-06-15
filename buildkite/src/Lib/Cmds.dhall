@@ -67,7 +67,7 @@ let module = \(environment : List Text) ->
     \(cachePath : Text) ->
     \(cmd : CompoundCmd.Type) ->
       let script =
-        ( format cmd.postprocess ) ++ " && " ++
+        "( ${format cmd.postprocess} || true ) && " ++
         ( format cmd.inner ) ++ " && " ++
         ( format cmd.preprocess )
       in
@@ -111,7 +111,7 @@ let tests =
 
   let cacheExample = assert :
 ''
-  ./buildkite/scripts/cache-through.sh data.tar "docker run -it --rm --init --volume /var/buildkite/builds/$BUILDKITE_AGENT_NAME/$BUILDKITE_ORGANIZATION_SLUG/$BUILDKITE_PIPELINE_SLUG:/workdir --workdir /workdir --env ENV1 --env ENV2 --env TEST foo/bar:tag bash -c 'tar xvf data.tar -C /tmp/data && echo hello > /tmp/data/foo.txt && tar cvf data.tar /tmp/data'"''
+  ./buildkite/scripts/cache-through.sh data.tar "docker run -it --rm --init --volume /var/buildkite/builds/$BUILDKITE_AGENT_NAME/$BUILDKITE_ORGANIZATION_SLUG/$BUILDKITE_PIPELINE_SLUG:/workdir --workdir /workdir --env ENV1 --env ENV2 --env TEST foo/bar:tag bash -c '( tar xvf data.tar -C /tmp/data || true ) && echo hello > /tmp/data/foo.txt && tar cvf data.tar /tmp/data'"''
 ===
   M.format (
     M.cacheThrough
