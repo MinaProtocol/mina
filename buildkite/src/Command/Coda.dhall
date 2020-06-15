@@ -4,8 +4,7 @@ let B = ../External/Buildkite.dhall
 let B/Plugins/Partial = B.definitions/commandStep/properties/plugins/Type
 let Map = Prelude.Map
 
-let Decorate = ../Lib/Decorate.dhall
-
+let Cmd = ../Lib/Cmds.dhall
 let Docker = ./Docker/Type.dhall
 let Base = ./Base.dhall
 
@@ -15,7 +14,7 @@ let fixPermissionsCommand = "sudo chown -R opam ."
 
 let Config = {
   Type = {
-    commands : List Text,
+    commands : List Cmd.Type,
     label : Text,
     key : Text
   },
@@ -26,11 +25,11 @@ let Config = {
 let build : Config.Type -> Base.Type = \(c : Config.Type) ->
   Base.build
     Base.Config::{
-      commands = [ fixPermissionsCommand ] # Decorate.decorateAll c.commands,
+      commands = [ Cmd.run fixPermissionsCommand ] # c.commands,
       label = c.label,
       key = c.key,
       target = Size.Large,
-      docker = Docker::{ image = (../Constants/ContainerImages.dhall).codaToolchain }
+      docker = Some Docker::{ image = (../Constants/ContainerImages.dhall).codaToolchain }
     }
 
 in {Config = Config, build = build, Type = Base.Type}

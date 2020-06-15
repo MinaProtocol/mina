@@ -1,6 +1,6 @@
 let Prelude = ../../../External/Prelude.dhall
 
-let Decorate = ../../../Lib/Decorate.dhall
+let Cmd = ../../../Lib/Cmds.dhall
 
 let Pipeline = ../../../Pipeline/Dsl.dhall
 let Command = ../../../Command/Base.dhall
@@ -10,10 +10,10 @@ let JobSpec = ../../../Pipeline/JobSpec.dhall
 
 let commands =
   [
-    "./scripts/lint_codeowners.sh",
-    "./scripts/lint_rfcs.sh",
-    "make check-snarky-submodule",
-    "./scripts/lint_preprocessor_deps.sh"
+    Cmd.run "./scripts/lint_codeowners.sh",
+    Cmd.run "./scripts/lint_rfcs.sh",
+    Cmd.run "make check-snarky-submodule",
+    Cmd.run "./scripts/lint_preprocessor_deps.sh"
   ]
 
 in
@@ -24,11 +24,11 @@ Pipeline.build
     steps = [
     Command.build
       Command.Config::{
-        commands = Decorate.decorateAll commands,
+        commands = commands,
         label = "Fast lint steps; CODEOWNERs, RFCs, Check Snarky Submodule, Preprocessor Deps",
         key = "lint",
         target = Size.Small,
-        docker = Docker::{ image = (../../../Constants/ContainerImages.dhall).toolchainBase }
+        docker = Some Docker::{ image = (../../../Constants/ContainerImages.dhall).toolchainBase }
       }
     ]
   }
