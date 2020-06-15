@@ -18,7 +18,7 @@ if [[ ! -f ./google-cloud-sdk/bin/gsutil ]]; then
 
   echo "$BUILDKITE_GS_APPLICATION_CREDENTIALS_JSON" > /tmp/gcp_creds.json
 
-  export GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcp_creds.json && ./google-cloud-sdk/bin/gcloud auth activate-service-account bk-large@o1labs-192920.iam.gserviceaccount.com --key-file /tmp/gcp_creds.json
+  export GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcp_creds.json && /usr/local/google-cloud-sdk/bin/gcloud auth activate-service-account bk-large@o1labs-192920.iam.gserviceaccount.com --key-file /tmp/gcp_creds.json
 fi
 
 UPLOAD_BIN=/usr/local/google-cloud-sdk/bin/gsutil
