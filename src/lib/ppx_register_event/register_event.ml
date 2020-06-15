@@ -4,7 +4,7 @@ open Ppxlib
 let deriver = "register_event"
 
 (* module in Structured_events library *)
-let module_name = "Structured_events"
+let module_name = "Structured_log_events"
 
 let hash name =
   let open Digestif.SHA256 in
