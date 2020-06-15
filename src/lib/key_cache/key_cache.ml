@@ -43,9 +43,7 @@ let s3 to_string read ~bucket_prefix ~install_path =
     let file_path = install_path ^/ label in
     let open Deferred.Or_error.Let_syntax in
     let%bind result =
-      Process.run ~prog:"curl"
-        ~args:["--fail"; "-o"; file_path; uri_string]
-        ()
+      Process.run ~prog:"curl" ~args:["--fail"; "-o"; file_path; uri_string] ()
     in
     Logger.debug ~module_:__MODULE__ ~location:__LOC__ (Logger.create ())
       "Curl finished"
