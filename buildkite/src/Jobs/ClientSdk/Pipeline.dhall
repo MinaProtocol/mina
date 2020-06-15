@@ -40,7 +40,7 @@ let opamCommands : List Cmd.Type =
 
 let commands =
   opamCommands # [ runD
-    "mkdir -p /tmp/artifacts && ( set -o pipefail ; eval \\\$(opam config env) && make client_sdk 2>&1 | tee /tmp/artifacts/buildclientsdk.log"
+    "mkdir -p /tmp/artifacts && ( set -o pipefail ; eval \\\\\$(opam config env) && make client_sdk 2>&1 | tee /tmp/artifacts/buildclientsdk.log"
   ]
 
 in
