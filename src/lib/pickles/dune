@@ -10,6 +10,8 @@
     pickles.composition_types
     pickles.limb_vector
     pickles.marlin_checks
+    pickles.one_hot_vector
+    pickles.pseudo
     snarky_log
     sponge
     group_map
