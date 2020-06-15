@@ -552,4 +552,37 @@ let gen =
         ; fee_token_r= Token_id.default
         ; fee_excess_r= Fee.Signed.zero } )
 
+let%test_unit "Checked and unchecked behaviour is consistent" =
+  Quickcheck.test (Quickcheck.Generator.tuple2 gen gen) ~f:(fun (fe1, fe2) ->
+      let fe = combine fe1 fe2 in
+      let fe_checked =
+        Or_error.try_with (fun () ->
+            Test_util.checked_to_unchecked
+              Typ.(typ * typ)
+              typ
+              (fun (fe1, fe2) -> combine_checked fe1 fe2)
+              (fe1, fe2) )
+      in
+      match (fe, fe_checked) with
+      | Ok fe, Ok fe_checked ->
+          [%test_eq: t] fe fe_checked
+      | Error _, Error _ ->
+          ()
+      | _ ->
+          [%test_eq: t Or_error.t] fe fe_checked )
+
+let%test_unit "Combine succeeds when the middle excess is zero" =
+  Quickcheck.test (Quickcheck.Generator.tuple3 gen Token_id.gen Fee.Signed.gen)
+    ~f:(fun (fe1, tid, excess) ->
+      let fe2 =
+        if Fee.Signed.(equal zero) fe1.fee_excess_r then of_single (tid, excess)
+        else
+          Or_error.ok_exn
+          @@ of_one_or_two
+               (`Two
+                 ( (fe1.fee_token_r, Fee.Signed.negate fe1.fee_excess_r)
+                 , (tid, excess) ))
+      in
+      assert (Or_error.is_ok (combine fe1 fe2)) )
+
 [%%endif]
