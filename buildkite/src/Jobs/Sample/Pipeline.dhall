@@ -1,3 +1,5 @@
+let Cmd = ../../Lib/Cmds.dhall
+
 let Pipeline = ../../Pipeline/Dsl.dhall
 let Command = ../../Command/Base.dhall
 let Docker = ../../Command/Docker/Type.dhall
@@ -11,10 +13,10 @@ Pipeline.build
     steps = [
     Command.build
       Command.Config::{
-        commands = [ "echo \"hello\"" ],
+        commands = [ Cmd.run "echo \"hello\"" ],
         label = "Test Echo", key = "hello",
         target = Size.Small,
-        docker = Docker::{ image = (../../Constants/ContainerImages.dhall).toolchainBase }
+        docker = Some Docker::{ image = (../../Constants/ContainerImages.dhall).toolchainBase }
       }
     ]
   }
