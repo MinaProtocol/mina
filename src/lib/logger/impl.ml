@@ -35,7 +35,7 @@ module Metadata = struct
   [%%versioned_binable
   module Stable = struct
     module V1 = struct
-      type t = Yojson.Safe.json String.Map.t
+      type t = Yojson.Safe.t String.Map.t
 
       let to_latest = Fn.id
 
@@ -357,7 +357,7 @@ type 'a log_function =
      t
   -> module_:string
   -> location:string
-  -> ?metadata:(string, Yojson.Safe.json) List.Assoc.t
+  -> ?metadata:(string, Yojson.Safe.t) List.Assoc.t
   -> ('a, unit, string, unit) format4
   -> 'a
 
