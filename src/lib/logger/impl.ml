@@ -114,18 +114,16 @@ module Message = struct
     | None ->
         without_source_to_yojson {timestamp; level; message; metadata}
 
-  let metadata_interpolation_regex = Re2.create_exn {|\$(\[a-zA-Z_]+)|}
-
-  let metadata_references str =
-    match Re2.find_all ~sub:(`Index 1) metadata_interpolation_regex str with
-    | Ok ls ->
-        ls
-    | Error _ ->
-        []
-
   let check_invariants (t : t) =
-    let refs = metadata_references t.message in
-    List.for_all refs ~f:(Metadata.mem t.metadata)
+    match Logproc_lib.Interpolator.parse t.message with
+    | Error _ ->
+        false
+    | Ok items ->
+        List.for_all items ~f:(function
+          | `Interpolate item ->
+              Metadata.mem t.metadata item
+          | `Raw _ ->
+              true )
 end
 
 module Processor = struct
