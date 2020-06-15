@@ -33,4 +33,3 @@ module Label = struct
 end
 
 let abc a b c = function Label.A -> a | B -> b | C -> c
-
