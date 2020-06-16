@@ -947,8 +947,10 @@ module Base = struct
            Public_key.Compressed.Checked.equal payload.common.fee_payer_pk
              payload.body.source_pk
          in
-         Boolean.Assert.( = ) user_command_failure.predicate_failed
-           (Boolean.not bypass_predicate))
+         assert_r1cs
+           (Boolean.not bypass_predicate :> Field.Var.t)
+           (is_user_command :> Field.Var.t)
+           (user_command_failure.predicate_failed :> Field.Var.t))
     in
     let account_creation_amount =
       Amount.Checked.of_fee
