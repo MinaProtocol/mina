@@ -7,11 +7,8 @@ defmodule Coda.Validations.BlockProductionRate do
   use Architecture.Validation
 
   # TODO
-  @impl true
   defp slot_time, do: 3 * 60 * 1000
-  @impl true
   defp grace_window(_state), do: 20 * 60 * 1000
-  @impl true
   defp acceptable_margin, do: 0.05
 
   defp win_rate(_), do: raise("TODO")

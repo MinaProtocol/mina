@@ -3,8 +3,8 @@ defmodule Architecture.LogFilter do
 
   @type selection :: [String.t()]
 
+  # TODO: remove global_restriction support in favor of local restrictions on messages?
   @type t ::
-          # TODO: remove global_restriction support in favor of local restrictions on messages?
           {:global_restriction, String.t()}
           | {:equals | :contains, selection, String.t()}
           | {:adjunction | :disjunction, [t]}

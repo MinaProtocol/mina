@@ -87,12 +87,12 @@ defmodule Class do
 
   @doc """
     Same as `inheritance_chain/2`, but explosive!
-    If `c1` is not a subclass of `c2`, a `Class.NotASubclass` exception is raised."
+    If `c1` is not a subclass of `c2`, a `Class.NotASubclassError` exception is raised."
   """
   @spec inheritance_chain!(c1 :: t, c2 :: t) :: [t]
   def inheritance_chain!(c1, c2) do
     case inheritance_chain(c1, c2) do
-      nil -> raise NotASubclass, class: c1, expected_subclass_of: c2
+      nil -> raise NotASubclassError, class: c1, expected_subclass_of: c2
       chain -> chain
     end
   end

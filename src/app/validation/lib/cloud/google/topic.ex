@@ -17,8 +17,11 @@ defmodule Cloud.Google.Topic do
 
       {:error, error} ->
         Logger.warn(
-          "got error looking up object from api; assuming that means it's not there for now -- #{inspect(error)}"
+          "got error looking up object from api; assuming that means it's not there for now -- #{
+            inspect(error)
+          }"
         )
+
         nil
     end
   end

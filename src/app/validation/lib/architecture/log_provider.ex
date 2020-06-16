@@ -40,7 +40,7 @@ defmodule Architecture.LogProvider do
 
     defclass(
       conn: Cloud.Google.pubsub_conn(),
-      subscription: Subscription.t,
+      subscription: Subscription.t(),
       log_provider: module
     )
   end
@@ -55,8 +55,9 @@ defmodule Architecture.LogProvider do
     alias Architecture.LogProvider
 
     @spec child_spec(LogProvider.Spec.t()) :: Supervisor.child_spec()
-    def child_spec(spec) do
+    def child_spec(%LogProvider.Spec{} = spec) do
       %{
+        id: __MODULE__,
         type: :worker,
         start: {__MODULE__, :start_link, [spec]},
         restart: :permanent,

@@ -143,6 +143,7 @@ defmodule Architecture.Statistic do
 
         broker_id = "Statistic.Broker:#{stat_spec.statistic}:#{resource.name}"
         timer_cosup_id = "Timer.CoSupervisor:#{broker_id}"
+
         Supervisor.child_spec(
           {Timer.CoSupervisor, supervisor_params},
           id: timer_cosup_id

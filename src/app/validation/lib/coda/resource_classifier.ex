@@ -1,4 +1,3 @@
-
 defmodule Coda.ResourceClassifier do
   @moduledoc """
   Resource classification for coda networks.

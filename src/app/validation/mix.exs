@@ -43,7 +43,13 @@ defmodule CodaValidation.MixProject do
   defp aliases do
     [
       test: "test --no-start",
-      run: "run --no-halt"
+      run: "run --no-halt",
+      check: [
+        "compile --warnings-as-errors",
+        "format --check-formatted",
+        "dialyzer",
+        "credo"
+      ]
     ]
   end
 end

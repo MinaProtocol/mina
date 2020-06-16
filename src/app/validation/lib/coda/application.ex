@@ -5,8 +5,8 @@ defmodule Coda.Application do
 
   alias Architecture.LogFilter
   alias Architecture.ResourceDatabase
+  alias Cloud.Google.LogPipeline
   alias Coda.Resources
-  alias Google.Cloud.LogPipeline
 
   use Application
 
