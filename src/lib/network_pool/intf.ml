@@ -196,8 +196,16 @@ module type Snark_pool_diff_intf = sig
         * Ledger_proof.t One_or_two.t Priced_proof.t
   [@@deriving compare, sexp]
 
+  type compact =
+    { work: Transaction_snark_work.Statement.t
+    ; fee: Currency.Fee.t
+    ; prover: Signature_lib.Public_key.Compressed.t }
+  [@@deriving yojson]
+
   include
     Resource_pool_diff_intf with type t := t and type pool := resource_pool
+
+  val to_compact : t -> compact
 
   val compact_json : t -> Yojson.Safe.t
 
@@ -212,7 +220,7 @@ end
 module type Transaction_pool_diff_intf = sig
   type resource_pool
 
-  type t = User_command.t list [@@deriving sexp]
+  type t = User_command.t list [@@deriving sexp, of_yojson]
 
   module Diff_error : sig
     type t =
