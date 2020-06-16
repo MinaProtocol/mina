@@ -376,3 +376,36 @@ let spam = log ~level:Spam ~module_:"" ~location:"" ?event_id:None
 
 (* deprecated, use Trust_system.record instead *)
 let faulty_peer = faulty_peer_without_punishment
+
+module Structured = struct
+  type log_function =
+       t
+    -> module_:string
+    -> location:string
+    -> ?metadata:(string, Yojson.Safe.t) List.Assoc.t
+    -> Structured_log_events.t
+    -> unit
+
+  let log t ~level ~module_ ~location ?(metadata = []) event =
+    let message, event_id, str_metadata = Structured_log_events.log event in
+    let event_id = Some event_id in
+    let metadata = str_metadata @ metadata in
+    raw t
+    @@ make_message t ~level ~module_ ~location ~metadata ~message ~event_id
+
+  let trace = log ~level:Trace
+
+  let debug = log ~level:Debug
+
+  let info = log ~level:Info
+
+  let warn = log ~level:Warn
+
+  let error = log ~level:Error
+
+  let fatal = log ~level:Fatal
+
+  let faulty_peer_without_punishment = log ~level:Faulty_peer
+end
+
+module Str = Structured
