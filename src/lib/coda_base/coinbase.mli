@@ -41,7 +41,7 @@ val create :
 
 val supply_increase : t -> Currency.Amount.t Or_error.t
 
-val fee_excess : t -> Currency.Fee.Signed.t Or_error.t
+val fee_excess : t -> Fee_excess.t Or_error.t
 
 module Gen : sig
   val gen :
