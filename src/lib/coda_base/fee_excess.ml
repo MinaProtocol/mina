@@ -575,6 +575,12 @@ let%test_unit "Checked and unchecked behaviour is consistent" =
 let%test_unit "Combine succeeds when the middle excess is zero" =
   Quickcheck.test (Quickcheck.Generator.tuple3 gen Token_id.gen Fee.Signed.gen)
     ~f:(fun (fe1, tid, excess) ->
+      let tid =
+        (* The tokens before and after should be distinct. Especially in this
+           scenario, we may get an overflow error otherwise.
+        *)
+        if Token_id.equal fe1.fee_token_l tid then Token_id.next tid else tid
+      in
       let fe2 =
         if Fee.Signed.(equal zero) fe1.fee_excess_r then of_single (tid, excess)
         else
@@ -584,6 +590,6 @@ let%test_unit "Combine succeeds when the middle excess is zero" =
                  ( (fe1.fee_token_r, Fee.Signed.negate fe1.fee_excess_r)
                  , (tid, excess) ))
       in
-      assert (Or_error.is_ok (combine fe1 fe2)) )
+      ignore @@ Or_error.ok_exn (combine fe1 fe2) )
 
 [%%endif]
