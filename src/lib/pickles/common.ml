@@ -1,5 +1,6 @@
 open Core_kernel
 open Pickles_types
+module G = Zexe_backend.G
 module Rounds = Zexe_backend.Dlog_based.Rounds
 module Unshifted_acc =
   Pairing_marlin_types.Accumulator.Degree_bound_checks.Unshifted_accumulators
@@ -11,6 +12,28 @@ let wrap_domains =
   { Domains.h= Pow_2_roots_of_unity 18
   ; k= Pow_2_roots_of_unity 18
   ; x= Pow_2_roots_of_unity 0 }
+
+let hash_pairing_me_only ~app_state
+    (t :
+      ( G.Affine.t
+      , 's
+      , (G.Affine.t, _) Vector.t )
+      Types.Pairing_based.Proof_state.Me_only.t) =
+  let g (x, y) = [x; y] in
+  Fp_sponge.digest Fp_sponge.params
+    (Types.Pairing_based.Proof_state.Me_only.to_field_elements t ~g
+       ~comm:
+         (fun (x :
+                G.Affine.t Dlog_marlin_types.Poly_comm.Without_degree_bound.t) ->
+         List.concat_map (Array.to_list x) ~f:g )
+       ~app_state)
+  |> Digest.Constant.of_bits
+
+let hash_dlog_me_only t =
+  Fq_sponge.digest Fq_sponge.params
+    (Types.Dlog_based.Proof_state.Me_only.to_field_elements t
+       ~g1:(fun ((x, y) : Zexe_backend.G1.Affine.t) -> [x; y]))
+  |> Digest.Constant.of_bits
 
 let dlog_pcs_batch (type n_branching total)
     ((without_degree_bound, pi) :
@@ -91,3 +114,11 @@ let compute_sg chals =
       (Fq.Vector.of_array (Vector.to_array (compute_challenges chals)))
   in
   Snarky_bn382.G.Affine.Vector.get (unshifted comm) 0 |> G.Affine.of_backend
+
+let fq_unpadded_public_input_of_statement prev_statement =
+  let open Zexe_backend in
+  let input =
+    let (T (typ, _conv)) = Impls.Dlog_based.input () in
+    Impls.Dlog_based.generate_public_input [typ] prev_statement
+  in
+  List.init (Fq.Vector.length input) ~f:(Fq.Vector.get input)
