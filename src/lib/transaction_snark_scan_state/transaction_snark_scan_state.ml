@@ -1,5 +1,6 @@
 open Core_kernel
 open Coda_base
+open Currency
 
 let option lab =
   Option.value_map ~default:(Or_error.error_string lab) ~f:(fun x -> Ok x)
@@ -80,14 +81,23 @@ module Job_view = struct
   type t = Transaction_snark.Statement.t Parallel_scan.Job_view.t
   [@@deriving sexp]
 
-  let to_yojson ({value; position} : t) : Yojson.Safe.json =
+  let to_yojson ({value; position} : t) : Yojson.Safe.t =
     let hash_yojson h = Frozen_ledger_hash.to_yojson h in
     let statement_to_yojson (s : Transaction_snark.Statement.t) =
       `Assoc
         [ ("Work_id", `Int (Transaction_snark.Statement.hash s))
         ; ("Source", hash_yojson s.source)
         ; ("Target", hash_yojson s.target)
-        ; ("Fee Excess", Currency.Fee.Signed.to_yojson s.fee_excess)
+        ; ( "Fee Excess"
+          , `List
+              [ `Assoc
+                  [ ("token", Token_id.to_yojson s.fee_excess.fee_token_l)
+                  ; ("amount", Fee.Signed.to_yojson s.fee_excess.fee_excess_l)
+                  ]
+              ; `Assoc
+                  [ ("token", Token_id.to_yojson s.fee_excess.fee_token_r)
+                  ; ("amount", Fee.Signed.to_yojson s.fee_excess.fee_excess_r)
+                  ] ] )
         ; ("Supply Increase", Currency.Amount.to_yojson s.supply_increase)
         ; ( "Pending coinbase stack"
           , Transaction_snark.Pending_coinbase_stack_state.to_yojson
@@ -222,11 +232,9 @@ let completed_work_to_scanable_work (job : job) (fee, current_proof, prover) :
   | Merge ((p, _), (p', _)) ->
       let s = Ledger_proof.statement p and s' = Ledger_proof.statement p' in
       let open Or_error.Let_syntax in
-      let%map fee_excess =
-        Currency.Fee.Signed.add s.fee_excess s'.fee_excess
-        |> option "Error adding fees"
+      let%map fee_excess = Fee_excess.combine s.fee_excess s'.fee_excess
       and supply_increase =
-        Currency.Amount.add s.supply_increase s'.supply_increase
+        Amount.add s.supply_increase s'.supply_increase
         |> option "Error adding supply_increases"
       and _valid_pending_coinbase_stack =
         if
@@ -379,7 +387,7 @@ struct
               (Frozen_ledger_hash.equal hash current_ledger_hash)
               "did not connect with snarked ledger hash" )
     | Ok
-        { fee_excess
+        { fee_excess= {fee_token_l; fee_excess_l; fee_token_r; fee_excess_r}
         ; source
         ; target
         ; supply_increase= _
@@ -397,8 +405,20 @@ struct
             "incorrect statement target hash"
         and () =
           clarify_error
-            (Currency.Fee.Signed.equal Currency.Fee.Signed.zero fee_excess)
+            (Fee.Signed.equal Fee.Signed.zero fee_excess_l)
             "nonzero fee excess"
+        and () =
+          clarify_error
+            (Fee.Signed.equal Fee.Signed.zero fee_excess_r)
+            "nonzero fee excess"
+        and () =
+          clarify_error
+            (Token_id.equal Token_id.default fee_token_l)
+            "nondefault fee token"
+        and () =
+          clarify_error
+            (Token_id.equal Token_id.default fee_token_r)
+            "nondefault fee token"
         in
         ()
 end
@@ -426,7 +446,11 @@ let statement_of_job : job -> Transaction_snark.Statement.t option = function
         Option.some_if (Frozen_ledger_hash.equal stmt1.target stmt2.source) ()
       in
       let%map fee_excess =
-        Currency.Fee.Signed.add stmt1.fee_excess stmt2.fee_excess
+        match Fee_excess.combine stmt1.fee_excess stmt2.fee_excess with
+        | Ok ret ->
+            Some ret
+        | Error _ ->
+            None
       and supply_increase =
         Currency.Amount.add stmt1.supply_increase stmt2.supply_increase
       in
