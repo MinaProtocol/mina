@@ -53,7 +53,8 @@ module Message : sig
     ; level: Level.t
     ; source: Source.t option
     ; message: string
-    ; metadata: Metadata.t }
+    ; metadata: Metadata.t
+    ; event_id: Structured_log_events.id option }
   [@@deriving yojson]
 end
 
@@ -107,6 +108,7 @@ type 'a log_function =
   -> module_:string
   -> location:string
   -> ?metadata:(string, Yojson.Safe.t) List.Assoc.t
+  -> ?event_id:Structured_log_events.id
   -> ('a, unit, string, unit) format4
   -> 'a
 
@@ -145,3 +147,32 @@ val faulty_peer_without_punishment : _ log_function
 val fatal : _ log_function
 
 val append_to_global_metadata : (string * Yojson.Safe.t) list -> unit
+
+module Structured : sig
+  (** Logging of structured events. *)
+
+  type log_function =
+       t
+    -> module_:string
+    -> location:string
+    -> ?metadata:(string, Yojson.Safe.t) List.Assoc.t
+    -> Structured_log_events.t
+    -> unit
+
+  val trace : log_function
+
+  val debug : log_function
+
+  val info : log_function
+
+  val warn : log_function
+
+  val error : log_function
+
+  val fatal : log_function
+
+  val faulty_peer_without_punishment : log_function
+end
+
+(** Short alias for Structured. *)
+module Str = Structured
