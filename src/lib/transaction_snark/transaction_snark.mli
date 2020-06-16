@@ -2,18 +2,6 @@ open Core
 open Coda_base
 open Snark_params
 
-module Proof_type : sig
-  module Stable : sig
-    module V1 : sig
-      type t = [`Base | `Merge] [@@deriving bin_io, sexp, yojson]
-    end
-
-    module Latest = V1
-  end
-
-  type t = Stable.Latest.t [@@deriving sexp, yojson]
-end
-
 module Pending_coinbase_stack_state : sig
   module Init_stack : sig
     [%%versioned:
@@ -28,23 +16,30 @@ module Pending_coinbase_stack_state : sig
     [@@deriving sexp, hash, compare, yojson]
   end
 
+  module Poly : sig
+    module Stable : sig
+      module V1 : sig
+        type 's t = {source: 's; target: 's}
+        [@@deriving bin_io, compare, eq, fields, hash, sexp, version, yojson]
+      end
+
+      module Latest = V1
+    end
+  end
+
   module Stable : sig
     module V1 : sig
-      type t =
-        { source: Pending_coinbase.Stack_versioned.Stable.V1.t
-        ; target: Pending_coinbase.Stack_versioned.Stable.V1.t
-        ; init_stack: Init_stack.Stable.V1.t }
-      [@@deriving bin_io, compare, eq, fields, hash, sexp, version, yojson]
+      type t = Pending_coinbase.Stack_versioned.Stable.V1.t Poly.Stable.V1.t
+      [@@deriving bin_io, compare, eq, hash, sexp, version, yojson]
     end
 
     module Latest = V1
   end
 
-  type t = Stable.Latest.t =
-    { source: Pending_coinbase.Stack.t
-    ; target: Pending_coinbase.Stack.t
-    ; init_stack: Init_stack.t }
-  [@@deriving sexp, hash, compare, eq, yojson]
+  type 's t_ = 's Poly.Stable.Latest.t = {source: 's; target: 's}
+  [@@deriving sexp, hash, compare, eq, fields, yojson]
+
+  type t = Stable.Latest.t [@@deriving sexp, hash, compare, eq, yojson]
 end
 
 module Statement : sig
@@ -168,8 +163,7 @@ type tag =
   , Nat.N2.n )
   Pickles.Tag.t
 
-val verify :
-  t -> key:Pickles.Verification_key.t -> message:Sok_message.t -> bool
+val verify : (t * Sok_message.t) list -> key:Pickles.Verification_key.t -> bool
 
 module Verification : sig
   module type S = sig
@@ -192,6 +186,7 @@ val check_transaction :
   -> source:Frozen_ledger_hash.t
   -> target:Frozen_ledger_hash.t
   -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
+  -> init_stack:Pending_coinbase.Stack.t
   -> Transaction.t Transaction_protocol_state.t
   -> Tick.Handler.t
   -> unit
@@ -202,6 +197,7 @@ val check_user_command :
   -> source:Frozen_ledger_hash.t
   -> target:Frozen_ledger_hash.t
   -> Pending_coinbase_stack_state.t
+  -> init_stack:Pending_coinbase.Stack.t
   -> User_command.With_valid_signature.t Transaction_protocol_state.t
   -> Tick.Handler.t
   -> unit
@@ -212,6 +208,7 @@ val generate_transaction_witness :
   -> sok_message:Sok_message.t
   -> source:Frozen_ledger_hash.t
   -> target:Frozen_ledger_hash.t
+  -> init_stack:Pending_coinbase.Stack.t
   -> Pending_coinbase_stack_state.t
   -> Transaction.t Transaction_protocol_state.t
   -> Tick.Handler.t
@@ -227,6 +224,7 @@ module type S = sig
     -> source:Frozen_ledger_hash.t
     -> target:Frozen_ledger_hash.t
     -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
+    -> init_stack:Pending_coinbase.Stack.t
     -> Transaction.t Transaction_protocol_state.t
     -> Tick.Handler.t
     -> t
@@ -236,6 +234,7 @@ module type S = sig
     -> source:Frozen_ledger_hash.t
     -> target:Frozen_ledger_hash.t
     -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
+    -> init_stack:Pending_coinbase.Stack.t
     -> User_command.With_valid_signature.t Transaction_protocol_state.t
     -> Tick.Handler.t
     -> t
@@ -245,6 +244,7 @@ module type S = sig
     -> source:Frozen_ledger_hash.t
     -> target:Frozen_ledger_hash.t
     -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
+    -> init_stack:Pending_coinbase.Stack.t
     -> Fee_transfer.t Transaction_protocol_state.t
     -> Tick.Handler.t
     -> t
