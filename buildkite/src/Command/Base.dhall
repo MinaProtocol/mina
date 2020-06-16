@@ -2,12 +2,15 @@
 
 let Prelude = ../External/Prelude.dhall
 let List/map = Prelude.List.map
+let Optional/map = Prelude.Optional.map
 let B = ../External/Buildkite.dhall
 let B/Plugins/Partial = B.definitions/commandStep/properties/plugins/Type
 let Map = Prelude.Map
 
-let Docker = ./Docker/Type.dhall
+let Cmd = ../Lib/Cmds.dhall
+let Decorate = ../Lib/Decorate.dhall
 
+let Docker = ./Docker/Type.dhall
 let Size = ./Size.dhall
 
 -- We assume we're only using the Docker plugin for now
@@ -36,15 +39,16 @@ let B/DependsOn =
 -- more powerful.
 let Config =
   { Type =
-      { commands : List Text
+      { commands : List Cmd.Type
       , depends_on : List Text
       , label : Text
       , key : Text
       , target : Size
-      , docker : Docker.Type
+      , docker : Optional Docker.Type
       }
-  , default = {
-      depends_on = [] : List Text
+  , default =
+    { depends_on = [] : List Text
+    , docker = None Docker.Type
     }
   }
 
@@ -59,7 +63,8 @@ let build : Config.Type -> B/Command.Type = \(c : Config.Type) ->
     agents =
       let agents = targetToAgent c.target in
       if Prelude.List.null (Map.Entry Text Text) agents then None (Map.Type Text Text) else Some agents,
-    commands = B.definitions/commandStep/properties/commands/Type.ListString c.commands,
+    commands =
+      B.definitions/commandStep/properties/commands/Type.ListString (Decorate.decorateAll c.commands),
     depends_on = if Prelude.List.null Text c.depends_on then
         None B/DependsOn.Type
       else
@@ -67,7 +72,7 @@ let build : Config.Type -> B/Command.Type = \(c : Config.Type) ->
     key = Some c.key,
     label = Some c.label,
     plugins =
-      Some (B/Plugins.Plugins/Type (toMap { `docker#v3.5.0` = c.docker }))
+      Optional/map Docker.Type B/Plugins (\(docker: Docker.Type) -> B/Plugins.Plugins/Type (toMap { `docker#v3.5.0` = docker })) c.docker
   }
 
 in {Config = Config, build = build, Type = B/Command.Type}

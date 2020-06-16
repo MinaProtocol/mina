@@ -19,8 +19,8 @@ type id [@@deriving eq, yojson, sexp]
 
 (** logger, parser for a particular `t` constructor *)
 type repr =
-  { log: t -> (string * id * (string * Yojson.Safe.json) list) option
-  ; parse: id -> (string * Yojson.Safe.json) list -> t option }
+  { log: t -> (string * id * (string * Yojson.Safe.t) list) option
+  ; parse: id -> (string * Yojson.Safe.t) list -> t option }
 
 (** used by generated code; shouldn't have to call this explicitly *)
 val id_of_string : string -> id
@@ -37,10 +37,10 @@ val register_constructor : repr -> unit
     - id
     - field-name,yojson pairs
 *)
-val log : t -> string * id * (string * Yojson.Safe.json) list
+val log : t -> string * id * (string * Yojson.Safe.t) list
 
 (** calls parser in some `repr` instance
    second argument is field-name,yojson pairs
 *)
 
-val parse_exn : id -> (string * Yojson.Safe.json) list -> t
+val parse_exn : id -> (string * Yojson.Safe.t) list -> t
