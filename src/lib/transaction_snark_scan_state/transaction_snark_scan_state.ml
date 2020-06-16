@@ -81,7 +81,7 @@ module Job_view = struct
   type t = Transaction_snark.Statement.t Parallel_scan.Job_view.t
   [@@deriving sexp]
 
-  let to_yojson ({value; position} : t) : Yojson.Safe.json =
+  let to_yojson ({value; position} : t) : Yojson.Safe.t =
     let hash_yojson h = Frozen_ledger_hash.to_yojson h in
     let statement_to_yojson (s : Transaction_snark.Statement.t) =
       `Assoc
