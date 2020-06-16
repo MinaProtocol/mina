@@ -79,4 +79,12 @@ module Checked = struct
   end
 end
 
+let%test_unit "var_of_t preserves the underlying value" =
+  let open Snark_params.Tick in
+  Quickcheck.test gen ~f:(fun tid ->
+      [%test_eq: t] tid
+        (Test_util.checked_to_unchecked Typ.unit typ
+           (fun () -> Snark_params.Tick.Checked.return (var_of_t tid))
+           ()) )
+
 [%%endif]

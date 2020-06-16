@@ -41,6 +41,14 @@ module Extend
     let hash_fold_t s t = Int64.hash_fold_t s (Unsigned.to_int64 t)
 
     let hash t = Int64.hash (Unsigned.to_int64 t)
+
+    let to_bigint t =
+      let i64 = Unsigned.to_int64 t in
+      if Int64.(i64 >= 0L) then Bignum_bigint.of_int64 i64
+      else
+        Bignum_bigint.(
+          of_int64 i64 - of_int64 Int64.min_value + of_int64 Int64.max_value
+          + one)
   end
 
   include T
