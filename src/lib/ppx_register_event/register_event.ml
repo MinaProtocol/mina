@@ -3,7 +3,7 @@ open Ppxlib
 
 let deriver = "register_event"
 
-(* module in Structured_events library *)
+(* module in Structured_log_events library *)
 let module_name = "Structured_log_events"
 
 let hash name =
