@@ -653,8 +653,8 @@ end = struct
             (Option.value_exn t.desired_root)
             (MT.merkle_root t.tree)
         then (
-          Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
-            "Snarked database sync'd. All done" ;
+          Logger.Structured.trace t.logger ~module_:__MODULE__
+            ~location:__LOC__ Snarked_ledger_synced ;
           all_done t ) ;
         Deferred.unit
     in

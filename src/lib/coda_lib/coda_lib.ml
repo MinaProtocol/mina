@@ -383,28 +383,28 @@ let create_sync_status_observer ~logger ~demo_mode
           match online_status with
           | `Offline ->
               if `Empty = first_connection then (
-                Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-                  "Coda daemon is now connecting" ;
+                Logger.Structured.info logger ~module_:__MODULE__
+                  ~location:__LOC__ Connecting ;
                 `Connecting )
               else if `Empty = first_message then (
-                Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-                  "Coda daemon is now listening" ;
+                Logger.Structured.info logger ~module_:__MODULE__
+                  ~location:__LOC__ Listening ;
                 `Listening )
               else `Offline
           | `Online -> (
             match active_status with
             | None ->
-                Logger.info (Logger.create ()) ~module_:__MODULE__
-                  ~location:__LOC__ "Coda daemon is now bootstrapping" ;
+                Logger.Structured.info (Logger.create ()) ~module_:__MODULE__
+                  ~location:__LOC__ Bootstrapping ;
                 `Bootstrap
             | Some (_, catchup_jobs) ->
                 if catchup_jobs > 0 then (
-                  Logger.info (Logger.create ()) ~module_:__MODULE__
-                    ~location:__LOC__ "Coda daemon is now doing ledger catchup" ;
+                  Logger.Structured.info (Logger.create ()) ~module_:__MODULE__
+                    ~location:__LOC__ Ledger_catchup ;
                   `Catchup )
                 else (
-                  Logger.info (Logger.create ()) ~module_:__MODULE__
-                    ~location:__LOC__ "Coda daemon is now synced" ;
+                  Logger.Structured.info (Logger.create ()) ~module_:__MODULE__
+                    ~location:__LOC__ Synced ;
                   `Synced ) ) )
   in
   let observer = observe incremental_status in

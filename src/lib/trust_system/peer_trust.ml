@@ -71,9 +71,7 @@ module Make0 (Inputs : Input_intf) = struct
                               time)
                      | _ ->
                          Error "Trust_system.Peer_trust: Could not parse time"])
-        ; action: string
-        ; action_metadata:
-            (Yojson.Safe.t[@to_yojson Fn.id] [@of_yojson Result.return]) }
+        ; action: string }
     [@@deriving register_event {msg= ban_message}]
 
   type t =
@@ -169,16 +167,9 @@ module Make0 (Inputs : Input_intf) = struct
     let%map () =
       match (simple_old.banned, simple_new.banned) with
       | Unbanned, Banned_until expiration ->
-          Logger.faulty_peer_without_punishment logger ~module_:__MODULE__
-            ~location:__LOC__
-            ~metadata:
-              ( [ ("peer_id", Peer_id.to_yojson peer)
-                ; ( "expiration"
-                  , `String (Time.to_string_abs expiration ~zone:Time.Zone.utc)
-                  )
-                ; ("action", `String action_fmt) ]
-              @ action_metadata )
-            "%s" ban_message ;
+          Logger.Str.faulty_peer_without_punishment logger ~module_:__MODULE__
+            ~location:__LOC__ ~metadata:action_metadata
+            (Peer_banned {peer_id= peer; expiration; action= action_fmt}) ;
           if Option.is_some db then (
             Coda_metrics.Gauge.inc_one Coda_metrics.Trust_system.banned_peers ;
             if tmp_bans_are_disabled then Deferred.unit

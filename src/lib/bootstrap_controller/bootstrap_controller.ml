@@ -402,8 +402,8 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
               | Error `Persistent_frontier_malformed ->
                   fail "persistent frontier was malformed"
             in
-            Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-              "Bootstrap state: complete." ;
+            Logger.Structured.info logger ~module_:__MODULE__ ~location:__LOC__
+              Bootstrap_complete ;
             let collected_transitions =
               Transition_cache.data transition_graph
             in
