@@ -7,17 +7,14 @@ open Parsetree
 open Longident
 open Core
 module Impl = Pickles.Impls.Pairing_based.Internal_Basic
-module Group = Snarky_bn382_backend.G
+module Group = Zexe_backend.G
 
 let group_map_params =
-  Group_map.Params.create
-    (module Snarky_bn382_backend.Fp)
-    Snarky_bn382_backend.G.Params.{a; b}
+  Group_map.Params.create (module Zexe_backend.Fp) Zexe_backend.G.Params.{a; b}
 
 let group_map_params_structure ~loc =
   let module T = struct
-    type t =
-      Snarky_bn382_backend.Fp.Stable.Latest.t Group_map.Params.Stable.Latest.t
+    type t = Zexe_backend.Fp.Stable.Latest.t Group_map.Params.t
     [@@deriving bin_io_unversioned]
   end in
   let module E = Ppxlib.Ast_builder.Make (struct
@@ -28,7 +25,7 @@ let group_map_params_structure ~loc =
     let params =
       lazy
         (let module T = struct
-           type t = Snarky_bn382_backend.Fp.Stable.Latest.t Group_map.Params.t
+           type t = Zexe_backend.Fp.Stable.Latest.t Group_map.Params.t
            [@@deriving bin_io_unversioned]
          end in
         Core.Binable.of_string
