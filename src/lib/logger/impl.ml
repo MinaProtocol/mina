@@ -86,33 +86,27 @@ module Message = struct
   type t =
     { timestamp: Time.t
     ; level: Level.t
-    ; source: Source.t option
+    ; source: Source.t option [@default None]
     ; message: string
     ; metadata: Metadata.t }
   [@@deriving yojson]
 
-  type without_source =
-    {timestamp: Time.t; level: Level.t; message: string; metadata: Metadata.t}
-  [@@deriving yojson]
+  let escape_chars = ['"'; '\\']
 
-  let escape_string str =
-    String.to_list str
-    |> List.bind ~f:(function '"' -> ['\\'; '"'] | c -> [c])
-    |> String.of_char_list
+  let to_yojson =
+    let escape =
+      Staged.unstage
+      @@ String.Escaping.escape ~escapeworthy:escape_chars ~escape_char:'\\'
+    in
+    fun t -> to_yojson {t with message= escape t.message}
 
-  let of_yojson json =
-    match without_source_of_yojson json with
-    | Ok {timestamp; level; message; metadata} ->
-        Ok {timestamp; level; message; metadata; source= None}
-    | Error _ ->
-        of_yojson json
-
-  let to_yojson ({timestamp; level; source; message; metadata} as m) =
-    match source with
-    | Some _ ->
-        to_yojson {m with message= escape_string m.message}
-    | None ->
-        without_source_to_yojson {timestamp; level; message; metadata}
+  let of_yojson =
+    let unescape =
+      Staged.unstage @@ String.Escaping.unescape ~escape_char:'\\'
+    in
+    fun json ->
+      Result.map (of_yojson json) ~f:(fun t ->
+          {t with message= unescape t.message} )
 
   let check_invariants (t : t) =
     match Logproc_lib.Interpolator.parse t.message with
