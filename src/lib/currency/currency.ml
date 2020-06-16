@@ -48,6 +48,8 @@ end) : sig
   include S with type t = Unsigned.t
 
   [%%endif]
+
+  val scale : t -> int -> t option
 end = struct
   let max_int = Unsigned.max_int
 
@@ -172,6 +174,11 @@ end = struct
     let z = Unsigned.add x y in
     if z < x then None else Some z
 
+  let scale u64 i =
+    let i = Unsigned.of_int i in
+    let max_val = Unsigned.(div max_int i) in
+    if max_val >= u64 then Some (Unsigned.mul u64 i) else None
+
   let ( + ) = add
 
   let ( - ) = sub
@@ -200,7 +207,8 @@ end = struct
 
     let gen =
       Quickcheck.Generator.map2 gen Sgn.gen ~f:(fun magnitude sgn ->
-          create ~magnitude ~sgn )
+          if Unsigned.(equal zero magnitude) then zero
+          else create ~magnitude ~sgn )
 
     let sgn_to_bool = function Sgn.Pos -> true | Neg -> false
 
@@ -225,7 +233,9 @@ end = struct
                 ~magnitude:Unsigned.Infix.(x.magnitude - y.magnitude)
             else zero )
 
-    let negate t = {t with sgn= Sgn.negate t.sgn}
+    let negate t =
+      if Unsigned.(equal zero t.magnitude) then zero
+      else {t with sgn= Sgn.negate t.sgn}
 
     let of_unsigned magnitude = create ~magnitude ~sgn:Sgn.Pos
 
@@ -516,9 +526,8 @@ module Fee = struct
       type t = Unsigned_extended.UInt64.Stable.V1.t
       [@@deriving sexp, compare, hash, eq]
 
-      let to_yojson = to_yojson
-
-      let of_yojson = of_yojson
+      [%%define_from_scope
+      to_yojson, of_yojson]
 
       let to_latest = Fn.id
     end
@@ -557,9 +566,8 @@ module Amount = struct
       type t = Unsigned_extended.UInt64.Stable.V1.t
       [@@deriving sexp, compare, hash, eq, yojson]
 
-      let to_yojson = to_yojson
-
-      let of_yojson = of_yojson
+      [%%define_from_scope
+      to_yojson, of_yojson]
 
       let to_latest = Fn.id
     end

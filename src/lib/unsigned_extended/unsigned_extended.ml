@@ -163,19 +163,15 @@ end
 (* check that serializations don't change *)
 let%test_module "Unsigned serializations" =
   ( module struct
-    open Module_version.Serialization
+    open Ppx_version.Serialization
 
     let%test "UInt32 V1 serialization" =
       let uint32 = UInt32.of_int 9775 in
-      let known_good_hash =
-        "\xE1\x66\x83\x04\x30\x8D\x3E\xE0\x50\xBF\x3E\xFF\x2C\xA5\x64\x8C\xF8\x5A\x58\x38\xED\xFA\xE4\xE2\x52\xE0\x84\xF6\xBA\x6A\xEC\x90"
-      in
-      check_serialization (module UInt32.Stable.V1) uint32 known_good_hash
+      let known_good_digest = "b66e8ba9d68f2d08bafaa3abd3abccba" in
+      check_serialization (module UInt32.Stable.V1) uint32 known_good_digest
 
     let%test "UInt64 V1 serialization" =
       let uint64 = UInt64.of_int64 191797697848L in
-      let known_good_hash =
-        "\x26\xA8\x3E\xB9\xCA\x2A\xDE\x52\xD3\xB7\x95\x36\x61\xAD\xCB\xA8\x1C\x71\x50\xE9\xAC\x07\xE8\xD9\x50\x5B\x8F\x36\x8D\x6E\xAE\x27"
-      in
-      check_serialization (module UInt64.Stable.V1) uint64 known_good_hash
+      let known_good_digest = "9a34874c0a6a0c797b19d1f756f39103" in
+      check_serialization (module UInt64.Stable.V1) uint64 known_good_digest
   end )

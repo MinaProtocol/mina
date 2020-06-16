@@ -243,6 +243,7 @@ module type State_hooks = sig
     -> snarked_ledger_hash:Coda_base.Frozen_ledger_hash.t
     -> supply_increase:Currency.Amount.t
     -> logger:Logger.t
+    -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> protocol_state * consensus_transition
 
   (**
@@ -250,7 +251,8 @@ module type State_hooks = sig
    * a given consensus state and snark transition.
   *)
   val next_state_checked :
-       prev_state:protocol_state_var
+       constraint_constants:Genesis_constants.Constraint_constants.t
+    -> prev_state:protocol_state_var
     -> prev_state_hash:Coda_base.State_hash.var
     -> snark_transition_var
     -> Currency.Amount.var
@@ -262,7 +264,9 @@ module type State_hooks = sig
 
   module For_tests : sig
     val gen_consensus_state :
-         gen_slot_advancement:int Quickcheck.Generator.t
+         constraint_constants:Genesis_constants.Constraint_constants.t
+      -> constants:Constants.t
+      -> gen_slot_advancement:int Quickcheck.Generator.t
       -> (   previous_protocol_state:( protocol_state
                                      , Coda_base.State_hash.t )
                                      With_hash.t
@@ -314,7 +318,10 @@ module type S = sig
       ; acceptable_network_delay: int }
     [@@deriving yojson, fields]
 
-    val t : protocol_constants:Genesis_constants.Protocol.t -> t
+    val t :
+         constraint_constants:Genesis_constants.Constraint_constants.t
+      -> protocol_constants:Genesis_constants.Protocol.t
+      -> t
   end
 
   module Data : sig
@@ -361,12 +368,17 @@ module type S = sig
       type t = Stable.Latest.t [@@deriving to_yojson, sexp]
 
       val precomputed_handler :
-        genesis_ledger:Coda_base.Ledger.t Lazy.t -> Snark_params.Tick.Handler.t
+           constraint_constants:Genesis_constants.Constraint_constants.t
+        -> genesis_ledger:Coda_base.Ledger.t Lazy.t
+        -> Snark_params.Tick.Handler.t
 
       val handler :
            t
+        -> constraint_constants:Genesis_constants.Constraint_constants.t
         -> pending_coinbase:Coda_base.Pending_coinbase_witness.t
         -> Snark_params.Tick.Handler.t
+
+      val ledger_depth : t -> int
     end
 
     module Consensus_transition : sig
@@ -427,28 +439,36 @@ module type S = sig
 
         type t = Stable.Latest.t
         [@@deriving hash, eq, compare, sexp, to_yojson]
+
+        module For_tests : sig
+          val with_curr_global_slot : t -> Global_slot.t -> t
+        end
       end
 
       type display [@@deriving yojson]
 
-      include Snark_params.Tick.Snarkable.S with type value := Value.t
+      type var
+
+      val typ :
+           constraint_constants:Genesis_constants.Constraint_constants.t
+        -> (var, Value.t) Snark_params.Tick.Typ.t
 
       val negative_one :
-           genesis_ledger:Ledger.t Lazy.t
-        -> protocol_constants:Genesis_constants.Protocol.t
-        -> Value.t
+        genesis_ledger:Ledger.t Lazy.t -> constants:Constants.t -> Value.t
 
       val create_genesis_from_transition :
            negative_one_protocol_state_hash:Coda_base.State_hash.t
         -> consensus_transition:Consensus_transition.Value.t
         -> genesis_ledger:Ledger.t Lazy.t
-        -> protocol_constants:Genesis_constants.Protocol.t
+        -> constraint_constants:Genesis_constants.Constraint_constants.t
+        -> constants:Constants.t
         -> Value.t
 
       val create_genesis :
            negative_one_protocol_state_hash:Coda_base.State_hash.t
         -> genesis_ledger:Ledger.t Lazy.t
-        -> protocol_constants:Genesis_constants.Protocol.t
+        -> constraint_constants:Genesis_constants.Constraint_constants.t
+        -> constants:Constants.t
         -> Value.t
 
       open Snark_params.Tick
@@ -458,18 +478,20 @@ module type S = sig
 
       val to_input : Value.t -> (Field.t, bool) Random_oracle.Input.t
 
-      val to_lite : (Value.t -> Lite_base.Consensus_state.t) option
-
       val display : Value.t -> display
 
       val consensus_time : Value.t -> Consensus_time.t
 
       val blockchain_length : Value.t -> Length.t
 
+      val curr_global_slot_var : var -> Global_slot.Checked.t
+
       val graphql_type :
         unit -> ('ctx, Value.t option) Graphql_async.Schema.typ
 
       val curr_slot : Value.t -> Slot.t
+
+      val curr_global_slot : Value.t -> Coda_numbers.Global_slot.t
 
       val is_genesis_state : Value.t -> bool
 
@@ -519,7 +541,8 @@ module type S = sig
      * kept, or `\`Take` if the second tip should be taken instead.
     *)
     val select :
-         existing:Consensus_state.Value.t
+         constants:Constants.t
+      -> existing:Consensus_state.Value.t
       -> candidate:Consensus_state.Value.t
       -> logger:Logger.t
       -> [`Keep | `Take]
@@ -538,7 +561,8 @@ module type S = sig
      * future.
      *)
     val next_producer_timing :
-         constants:Constants.t
+         constraint_constants:Genesis_constants.Constraint_constants.t
+      -> constants:Constants.t
       -> Unix_timestamp.t
       -> Consensus_state.Value.t
       -> local_state:Local_state.t

@@ -29,6 +29,8 @@ module Body : sig
     end
   end]
 
+  val tag : t -> Transaction_union_tag.t
+
   val receiver : t -> Account_id.t
 
   val token : t -> Token_id.t
@@ -164,6 +166,8 @@ val fee_payer_pk : t -> Public_key.Compressed.t
 
 val fee_payer : t -> Account_id.t
 
+val fee_excess : t -> Fee_excess.t
+
 val nonce : t -> Coda_numbers.Account_nonce.t
 
 val valid_until : t -> Coda_numbers.Global_slot.t
@@ -187,5 +191,7 @@ val amount : t -> Currency.Amount.t option
 val is_payment : t -> bool
 
 val accounts_accessed : t -> Account_id.t list
+
+val tag : t -> Transaction_union_tag.t
 
 val gen : t Quickcheck.Generator.t

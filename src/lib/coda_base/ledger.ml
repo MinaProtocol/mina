@@ -1,17 +1,29 @@
 open Core
-open Snark_params
 open Signature_lib
 open Merkle_ledger
 
 module Ledger_inner = struct
-  module Depth = struct
-    let depth = Coda_compile_config.ledger_depth
+  module Location_at_depth : Merkle_ledger.Location_intf.S =
+    Merkle_ledger.Location.T
+
+  module Location_binable = struct
+    module Arg = struct
+      type t = Location_at_depth.t =
+        | Generic of Location.Bigstring.Stable.Latest.t
+        | Account of Location_at_depth.Addr.Stable.Latest.t
+        | Hash of Location_at_depth.Addr.Stable.Latest.t
+      [@@deriving bin_io_unversioned, hash, sexp, compare]
+    end
+
+    type t = Arg.t =
+      | Generic of Location.Bigstring.t
+      | Account of Location_at_depth.Addr.t
+      | Hash of Location_at_depth.Addr.t
+    [@@deriving hash, sexp, compare]
+
+    include Hashable.Make_binable (Arg) [@@deriving
+                                          sexp, compare, hash, yojson]
   end
-
-  module Location0 : Merkle_ledger.Location_intf.S =
-    Merkle_ledger.Location.Make (Depth)
-
-  module Location_at_depth = Location0
 
   module Kvdb : Intf.Key_value_database with type config := string =
     Rocksdb.Database
@@ -21,23 +33,23 @@ module Ledger_inner = struct
   end
 
   module Hash = struct
+    module Arg = struct
+      type t = Ledger_hash.Stable.Latest.t
+      [@@deriving sexp, compare, hash, bin_io_unversioned]
+    end
+
     [%%versioned
     module Stable = struct
       module V1 = struct
         type t = Ledger_hash.Stable.V1.t
         [@@deriving sexp, compare, hash, eq, yojson]
 
+        type _unused = unit constraint t = Arg.t
+
         let to_latest = Fn.id
 
-        (* TODO: move T outside V1 when %%versioned ppx allows it *)
-        module T = struct
-          type typ = t [@@deriving sexp, compare, hash, bin_io]
-
-          type t = typ [@@deriving sexp, compare, hash, bin_io]
-        end
-
-        include Hashable.Make_binable (T) [@@deriving
-                                            sexp, compare, hash, eq, yojson]
+        include Hashable.Make_binable (Arg) [@@deriving
+                                              sexp, compare, hash, eq, yojson]
 
         let to_string = Ledger_hash.to_string
 
@@ -45,7 +57,7 @@ module Ledger_inner = struct
 
         let hash_account = Fn.compose Ledger_hash.of_digest Account.digest
 
-        let empty_account = hash_account Account.empty
+        let empty_account = Ledger_hash.of_digest Account.empty_digest
       end
     end]
 
@@ -82,9 +94,9 @@ module Ledger_inner = struct
     module Balance = Currency.Balance
     module Account = Account.Stable.Latest
     module Hash = Hash.Stable.Latest
-    module Depth = Depth
     module Kvdb = Kvdb
     module Location = Location_at_depth
+    module Location_binable = Location_binable
     module Storage_locations = Storage_locations
   end
 
@@ -164,33 +176,34 @@ module Ledger_inner = struct
 
   let of_database db =
     let casted = Any_ledger.cast (module Db) db in
-    let mask = Mask.create () in
+    let mask = Mask.create ~depth:(Db.depth db) () in
     Maskable.register_mask casted mask
 
   (* Mask.Attached.create () fails, can't create an attached mask directly
   shadow create in order to create an attached mask
   *)
-  let create ?directory_name () = of_database (Db.create ?directory_name ())
+  let create ?directory_name ~depth () =
+    of_database (Db.create ?directory_name ~depth ())
 
-  let create_ephemeral_with_base () =
-    let maskable = Null.create () in
+  let create_ephemeral_with_base ~depth () =
+    let maskable = Null.create ~depth () in
     let casted = Any_ledger.cast (module Null) maskable in
-    let mask = Mask.create () in
+    let mask = Mask.create ~depth () in
     (casted, Maskable.register_mask casted mask)
 
-  let create_ephemeral () =
-    let _base, mask = create_ephemeral_with_base () in
+  let create_ephemeral ~depth () =
+    let _base, mask = create_ephemeral_with_base ~depth () in
     mask
 
-  let with_ledger ~f =
-    let ledger = create () in
+  let with_ledger ~depth ~f =
+    let ledger = create ~depth () in
     try
       let result = f ledger in
       close ledger ; result
     with exn -> close ledger ; raise exn
 
-  let with_ephemeral_ledger ~f =
-    let _base_ledger, masked_ledger = create_ephemeral_with_base () in
+  let with_ephemeral_ledger ~depth ~f =
+    let _base_ledger, masked_ledger = create_ephemeral_with_base ~depth () in
     try
       let result = f masked_ledger in
       let (_ : Mask.t) =
@@ -227,11 +240,16 @@ module Ledger_inner = struct
 
   let create_new_account_exn t pk account =
     let action, _ = get_or_create_account_exn t pk account in
-    assert (action = `Added)
+    if action = `Existed then
+      failwith
+        (sprintf
+           !"Could not create a new account with pk \
+             %{sexp:Public_key.Compressed.t}: Account already exists"
+           (Account_id.public_key pk))
 
   (* shadows definition in MaskedLedger, extra assurance hash is of right type  *)
   let merkle_root t =
-    Ledger_hash.of_hash (merkle_root t :> Tick.Pedersen.Digest.t)
+    Ledger_hash.of_hash (merkle_root t :> Random_oracle.Digest.t)
 
   let get_or_create ledger account_id =
     let action, loc =
@@ -263,10 +281,10 @@ module Ledger_inner = struct
         match request with
         | Ledger_hash.Get_element idx ->
             let elt = get_at_index_exn t idx in
-            let path = (path_exn idx :> Pedersen.Digest.t list) in
+            let path = (path_exn idx :> Random_oracle.Digest.t list) in
             respond (Provide (elt, path))
         | Ledger_hash.Get_path idx ->
-            let path = (path_exn idx :> Pedersen.Digest.t list) in
+            let path = (path_exn idx :> Random_oracle.Digest.t list) in
             respond (Provide path)
         | Ledger_hash.Set (idx, account) ->
             set_at_index_exn t idx account ;

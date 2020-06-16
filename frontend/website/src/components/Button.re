@@ -9,6 +9,7 @@ module Styles = {
         backgroundColor(bgColor),
         borderRadius(`px(6)),
         textDecoration(`none),
+        fontSize(`rem(1.)),
         color(white),
         padding2(~v=`px(12), ~h=`px(24)),
         textAlign(`center),
@@ -30,7 +31,9 @@ let make =
       ~bgColor=Theme.Colors.hyperlink,
       ~bgColorHover=Theme.Colors.hyperlinkAlpha(1.),
     ) => {
-  <a className={Styles.button(bgColor, bgColorHover)} href=link>
-    {React.string(label)}
-  </a>;
+  <Next.Link href=link>
+    <a className={Styles.button(bgColor, bgColorHover)}>
+      {React.string(label)}
+    </a>
+  </Next.Link>;
 };

@@ -15,7 +15,11 @@ module Rpcs : sig
     type query = State_hash.t
 
     type response =
-      (Staged_ledger.Scan_state.t * Ledger_hash.t * Pending_coinbase.t) option
+      ( Staged_ledger.Scan_state.t
+      * Ledger_hash.t
+      * Pending_coinbase.t
+      * Coda_state.Protocol_state.value list )
+      option
   end
 
   module Answer_sync_ledger_query : sig
@@ -136,6 +140,7 @@ module Config : sig
     ; time_controller: Block_time.Controller.t
     ; consensus_local_state: Consensus.Data.Local_state.t
     ; genesis_ledger_hash: Ledger_hash.t
+    ; constraint_constants: Genesis_constants.Constraint_constants.t
     ; creatable_gossip_net: Gossip_net.Any.creatable
     ; is_seed: bool
     ; log_gossip_heard: log_gossip_heard }
@@ -197,7 +202,10 @@ val get_staged_ledger_aux_and_pending_coinbases_at_hash :
      t
   -> Peer.Id.t
   -> State_hash.t
-  -> (Staged_ledger.Scan_state.t * Ledger_hash.t * Pending_coinbase.t)
+  -> ( Staged_ledger.Scan_state.t
+     * Ledger_hash.t
+     * Pending_coinbase.t
+     * Coda_state.Protocol_state.value list )
      Deferred.Or_error.t
 
 val ban_notify : t -> Network_peer.Peer.t -> Time.t -> unit Deferred.Or_error.t
@@ -213,7 +221,8 @@ val transaction_pool_diffs :
      * (bool -> unit) )
      Strict_pipe.Reader.t
 
-val broadcast_state : t -> External_transition.t -> unit
+val broadcast_state :
+  t -> (External_transition.t, State_hash.t) With_hash.t -> unit
 
 val broadcast_snark_pool_diff : t -> Snark_pool.Resource_pool.Diff.t -> unit
 

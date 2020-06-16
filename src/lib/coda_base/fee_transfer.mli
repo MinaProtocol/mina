@@ -36,6 +36,8 @@ module Single : sig
 
   val fee : t -> Currency.Fee.t
 
+  val fee_token : t -> Token_id.t
+
   module Gen : sig
     val with_random_receivers :
          keys:Signature_keypair.t array
@@ -76,7 +78,9 @@ val to_singles : t -> Single.t One_or_two.t
 
 val of_singles : Single.t One_or_two.t -> t Or_error.t
 
-val fee_excess : t -> Currency.Fee.Signed.t Or_error.t
+val fee_excess : t -> Fee_excess.t Or_error.t
+
+val fee_token : t -> Token_id.t
 
 val receiver_pks : t -> Public_key.Compressed.t list
 

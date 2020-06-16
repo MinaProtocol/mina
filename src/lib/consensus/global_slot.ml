@@ -53,9 +53,9 @@ let to_input (t : value) =
   Random_oracle.Input.bitstrings
     [|T.to_bits t.slot_number; Length.to_bits t.slots_per_epoch|]
 
-let gen =
+let gen ~(constants : Constants.t) =
   let open Quickcheck.Let_syntax in
-  let slots_per_epoch = Constants.compiled.slots_per_epoch in
+  let slots_per_epoch = constants.slots_per_epoch in
   let%map slot_number = T.gen in
   {Poly.slot_number; slots_per_epoch}
 
@@ -151,4 +151,8 @@ module Checked = struct
         in
         ( Epoch.Checked.Unsafe.of_integer epoch
         , Slot.Checked.Unsafe.of_integer slot ) )
+end
+
+module For_tests = struct
+  let of_global_slot (t : t) slot_number : t = {t with slot_number}
 end

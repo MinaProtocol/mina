@@ -93,7 +93,7 @@ let of_transaction : Transaction.t -> t = function
       | `Two (t1, t2) ->
           two t1 t2 )
 
-let excess (t : t) = Transaction_union_payload.excess t.payload
+let fee_excess (t : t) = Transaction_union_payload.fee_excess t.payload
 
 let supply_increase (t : t) =
   Transaction_union_payload.supply_increase t.payload

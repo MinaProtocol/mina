@@ -24,16 +24,7 @@ module Make_basic (M : sig
   val length_in_bits : int
 end) =
 struct
-  type t = Field.t [@@deriving sexp, compare]
-
-  let to_yojson t = `String (Field.to_string t)
-
-  let of_yojson = function
-    | `String s -> (
-      try Ok (Field.of_string s)
-      with exn -> Error Error.(to_string_hum (of_exn exn)) )
-    | _ ->
-        Error "of_yojson: expected string"
+  type t = Field.t [@@deriving sexp, compare, hash]
 
   let to_decimal_string (t : Field.t) = Field.to_string t
 
@@ -63,7 +54,7 @@ struct
       ~f:(fun x -> Bigint.(to_field (of_bignum_bigint x)))
 
   type var =
-    { digest: Pedersen.Checked.Digest.var
+    { digest: Random_oracle.Checked.Digest.t
     ; mutable bits: Boolean.var Bitstring.Lsb_first.t option }
 
   let var_of_t t =
@@ -77,17 +68,12 @@ struct
 
   open Let_syntax
 
-  let var_of_hash_unpacked unpacked =
-    { digest= Pedersen.Checked.Digest.Unpacked.project unpacked
-    ; bits= Some (Bitstring.Lsb_first.of_list (unpacked :> Boolean.var list))
-    }
-
   let var_to_hash_packed {digest; _} = digest
 
   (* TODO: Audit this usage of choose_preimage *)
   let unpack =
     if Int.( = ) length_in_bits Field.size_in_bits then fun x ->
-      Pedersen.Checked.Digest.choose_preimage x
+      Field.Checked.choose_preimage_var x ~length:length_in_bits
       >>| fun x -> (x :> Boolean.var list)
     else Field.Checked.unpack ~length:length_in_bits
 
@@ -105,7 +91,12 @@ struct
   (* TODO : use Random oracle.Digest to satisfy Bits_intf.S, move out of
      consensus_mechanism guard
   *)
-  include Pedersen.Digest.Bits
+  module Bs =
+    Snark_bits.Bits.Make_field
+      (Snark_params.Tick.Field)
+      (Snark_params.Tick.Bigint)
+
+  include (Bs : module type of Bs with type t := t)
 
   let assert_equal x y = Field.Checked.Assert.equal x.digest y.digest
 
@@ -146,38 +137,92 @@ struct
   [%%endif]
 end
 
-module Make_full_size () = struct
+module T0 = struct
+  [%%versioned_binable
+  module Stable = struct
+    module V1 = struct
+      type t = Field.t [@@deriving sexp, compare, hash]
+
+      let to_latest = Fn.id
+
+      module Arg = struct
+        type nonrec t = t
+
+        [%%define_locally Field.(to_string, of_string)]
+      end
+
+      include Binable.Of_stringable (Arg)
+    end
+  end]
+
+  module Tests = struct
+    (* these test the stability of the serialization derived from the
+       string representation of Field.t, not the direct serialization of
+       Field.t
+    *)
+
+    let field =
+      Quickcheck.random_value ~seed:(`Deterministic "Data_hash.T0 tests")
+        Field.gen
+
+    [%%if
+    curve_size = 298]
+
+    let%test "Binable from stringable V1" =
+      let known_good_digest = "66e2f2648cf3d2c39465ddbe4f05202a" in
+      Ppx_version.Serialization.check_serialization
+        (module Stable.V1)
+        field known_good_digest
+
+    [%%elif
+    curve_size = 753]
+
+    let%test "Binable from stringable V1" =
+      let known_good_digest = "0e586911e7deaf7e5b49c801bf248c92" in
+      Ppx_version.Serialization.check_serialization
+        (module Stable.V1)
+        field known_good_digest
+
+    [%%else]
+
+    let%test "Binable from stringable V1" =
+      failwith "No test for this curve size"
+
+    [%%endif]
+  end
+end
+
+module Make_full_size (B58_data : Data_hash_intf.Data_hash_descriptor) = struct
   module Basic = Make_basic (struct
     let length_in_bits = Field.size_in_bits
   end)
 
   include Basic
 
-  (* inside functor of no arguments, versioned types are allowed *)
+  module Base58_check = Codable.Make_base58_check (struct
+    include T0.Stable.Latest
 
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      module T = struct
-        type t = Field.t [@@deriving sexp, compare, hash, version {asserted}]
-      end
+    (* the serialization here is only used for the hash impl which is only
+       used for hashtbl, it's ok to disagree with the "real" serialization *)
+    include Hashable.Make_binable (T0.Stable.Latest)
+    include B58_data
+  end)
 
-      include T
+  [%%define_locally
+  Base58_check.(to_base58_check, of_base58_check, of_base58_check_exn)]
 
-      let to_latest = Fn.id
+  [%%define_locally
+  Base58_check.String_ops.(to_string, of_string)]
 
-      [%%define_locally
-      Basic.(to_yojson, of_yojson)]
+  [%%define_locally
+  Base58_check.(to_yojson, of_yojson)]
 
-      include Comparable.Make (T)
-      include Hashable.Make_binable (T)
-    end
-  end]
+  module T = struct
+    type t = Field.t [@@deriving sexp, compare, hash]
+  end
 
-  type _unused = unit constraint t = Stable.Latest.t
-
-  include Comparable.Make (Stable.Latest)
-  include Hashable.Make (Stable.Latest)
+  include Comparable.Make (T)
+  include Hashable.Make (T)
 
   let of_hash = Fn.id
 

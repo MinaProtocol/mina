@@ -3,7 +3,7 @@ open Async
 open Coda_base
 
 module Make (Inputs : Intf.Inputs_intf) :
-  Intf.S with type ledger_proof := Inputs.Ledger_proof.t = struct
+  Intf.S0 with type ledger_proof := Inputs.Ledger_proof.t = struct
   open Inputs
   module Rpcs = Rpcs.Make (Inputs)
 
@@ -13,16 +13,16 @@ module Make (Inputs : Intf.Inputs_intf) :
     module Single = struct
       module Spec = struct
         type t =
-          ( Transaction.t Transaction_protocol_state.t
+          ( Transaction.t
           , Transaction_witness.t
           , Ledger_proof.t )
           Work.Single.Spec.t
-        [@@deriving sexp]
+        [@@deriving sexp, to_yojson]
       end
     end
 
     module Spec = struct
-      type t = Single.Spec.t Work.Spec.t [@@deriving sexp]
+      type t = Single.Spec.t Work.Spec.t [@@deriving sexp, to_yojson]
     end
 
     module Result = struct
@@ -93,8 +93,14 @@ module Make (Inputs : Intf.Inputs_intf) :
               "Base SNARK generated in $time"
               ~metadata:[("time", `String (Time.Span.to_string_hum total))] )
 
-  let main ~logger daemon_address shutdown_on_disconnect =
-    let%bind state = Worker_state.create () in
+  let main
+      (module Rpcs_versioned : Intf.Rpcs_versioned_S
+        with type Work.ledger_proof = Inputs.Ledger_proof.t) ~logger
+      ~proof_level ~constraint_constants daemon_address shutdown_on_disconnect
+      =
+    let%bind state =
+      Worker_state.create ~proof_level ~constraint_constants ()
+    in
     let wait ?(sec = 0.5) () = after (Time.Span.of_sec sec) in
     (* retry interval with jitter *)
     let retry_pause sec = Random.float_range (sec -. 2.0) (sec +. 2.0) in
@@ -119,7 +125,7 @@ module Make (Inputs : Intf.Inputs_intf) :
     in
     let rec go () =
       match%bind
-        dispatch Rpcs.Get_work.Latest.rpc shutdown_on_disconnect ()
+        dispatch Rpcs_versioned.Get_work.Latest.rpc shutdown_on_disconnect ()
           daemon_address
       with
       | Error e ->
@@ -151,8 +157,8 @@ module Make (Inputs : Intf.Inputs_intf) :
                     , `String (Host_and_port.to_string daemon_address) ) ] ;
               let rec submit_work () =
                 match%bind
-                  dispatch Rpcs.Submit_work.Latest.rpc shutdown_on_disconnect
-                    result daemon_address
+                  dispatch Rpcs_versioned.Submit_work.Latest.rpc
+                    shutdown_on_disconnect result daemon_address
                 with
                 | Error e ->
                     log_and_retry "submitting work" e (retry_pause 10.)
@@ -164,13 +170,19 @@ module Make (Inputs : Intf.Inputs_intf) :
     in
     go ()
 
-  let command =
+  let command_from_rpcs
+      (module Rpcs_versioned : Intf.Rpcs_versioned_S
+        with type Work.ledger_proof = Inputs.Ledger_proof.t) =
     Command.async ~summary:"Snark worker"
       (let open Command.Let_syntax in
       let%map_open daemon_port =
         flag "daemon-address"
           (required (Arg_type.create Host_and_port.of_string))
           ~doc:"HOST-AND-PORT address daemon is listening on"
+      and proof_level =
+        flag "proof-level"
+          (required (Arg_type.create Genesis_constants.Proof_level.of_string))
+          ~doc:"full|check|none"
       and shutdown_on_disconnect =
         flag "shutdown-on-disconnect" (optional bool)
           ~doc:
@@ -185,12 +197,18 @@ module Make (Inputs : Intf.Inputs_intf) :
               !"Received signal to terminate. Aborting snark worker process"
               ~module_:__MODULE__ ~location:__LOC__ ;
             Core.exit 0 ) ;
-        main ~logger daemon_port
+        main
+          (module Rpcs_versioned)
+          ~logger ~proof_level
+          ~constraint_constants:Genesis_constants.Constraint_constants.compiled
+          daemon_port
           (Option.value ~default:true shutdown_on_disconnect))
 
-  let arguments ~daemon_address ~shutdown_on_disconnect =
+  let arguments ~proof_level ~daemon_address ~shutdown_on_disconnect =
     [ "-daemon-address"
     ; Host_and_port.to_string daemon_address
+    ; "-proof-level"
+    ; Genesis_constants.Proof_level.to_string proof_level
     ; "-shutdown-on-disconnect"
     ; Bool.to_string shutdown_on_disconnect ]
 end

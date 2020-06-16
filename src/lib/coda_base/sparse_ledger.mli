@@ -25,11 +25,19 @@ val path_exn :
 
 val find_index_exn : t -> Account_id.t -> int
 
-val of_root : Ledger_hash.t -> t
+val of_root : depth:int -> Ledger_hash.t -> t
 
-val apply_user_command_exn : t -> User_command.t -> t
+val apply_user_command_exn :
+     constraint_constants:Genesis_constants.Constraint_constants.t
+  -> t
+  -> User_command.t
+  -> t
 
-val apply_transaction_exn : t -> Transaction.t -> t
+val apply_transaction_exn :
+     constraint_constants:Genesis_constants.Constraint_constants.t
+  -> t
+  -> Transaction.t
+  -> t
 
 val of_any_ledger : Ledger.Any_ledger.M.t -> t
 

@@ -2,62 +2,52 @@ open Core_kernel
 open Coda_base
 open Coda_transition
 open Signature_lib
-open Module_version
 open Digestif.SHA256
 
+[%%versioned_binable
 module Stable = struct
   module V1 = struct
-    module T = struct
-      type t = Digestif.SHA256.t [@@deriving version {asserted}]
+    type t = Digestif.SHA256.t
 
-      module Base58_check = Base58_check.Make (struct
-        let description = "Frontier hash"
+    let to_latest = Fn.id
 
-        let version_byte = Base58_check.Version_bytes.frontier_hash
-      end)
+    module Base58_check = Base58_check.Make (struct
+      let description = "Frontier hash"
 
-      let to_yojson hash =
-        [%derive.to_yojson: string] (Base58_check.encode (to_raw_string hash))
+      let version_byte = Base58_check.Version_bytes.frontier_hash
+    end)
 
-      let of_yojson json =
-        let open Result.Let_syntax in
-        let%bind raw_str = [%derive.of_yojson: string] json in
-        let%bind str =
-          Base58_check.decode raw_str
-          |> Result.map_error ~f:Error.to_string_hum
-        in
-        match of_raw_string_opt str with
-        | Some hash ->
-            Ok hash
-        | None ->
-            Error "invalid raw hash"
+    let to_yojson hash =
+      [%derive.to_yojson: string] (Base58_check.encode (to_raw_string hash))
 
-      include Binable.Of_stringable (struct
-        type nonrec t = t
+    let of_yojson json =
+      let open Result.Let_syntax in
+      let%bind raw_str = [%derive.of_yojson: string] json in
+      let%bind str =
+        Base58_check.decode raw_str |> Result.map_error ~f:Error.to_string_hum
+      in
+      match of_raw_string_opt str with
+      | Some hash ->
+          Ok hash
+      | None ->
+          Error "invalid raw hash"
 
-        let of_string = of_hex
+    include Binable.Of_stringable (struct
+      type nonrec t = t
 
-        let to_string = to_hex
-      end)
-    end
+      let of_string = of_hex
 
-    include T
-    include Registration.Make_latest_version (T)
+      let to_string = to_hex
+    end)
   end
+end]
 
-  module Latest = V1
+type t = Stable.Latest.t
 
-  module Module_decl = struct
-    let name = "transition_frontier_hash"
+[%%define_locally
+Stable.Latest.(to_yojson, of_yojson)]
 
-    type latest = Latest.t
-  end
-
-  module Registrar = Registration.Make (Module_decl)
-  module Registered_V1 = Registrar.Register (V1)
-end
-
-include Stable.Latest
+module Base58_check = Stable.Latest.Base58_check
 
 type transition = {source: t; target: t}
 
@@ -98,11 +88,19 @@ let merge_scan_state acc scan_state =
   let hash = Staged_ledger.Scan_state.hash scan_state in
   merge_string acc (Staged_ledger_hash.Aux_hash.to_bytes hash)
 
-let merge_root_data acc {Root_data.Minimal.hash; scan_state; pending_coinbase}
-    =
-  merge_pending_coinbase
-    (merge_scan_state (merge_state_hash acc hash) scan_state)
-    pending_coinbase
+let merge_protocol_states acc protocol_states =
+  List.fold protocol_states ~init:acc ~f:(fun acc (h, _) ->
+      merge_state_hash acc h )
+
+let merge_root_data acc (root_data : Root_data.Limited.t) =
+  let open Root_data.Limited in
+  merge_protocol_states
+    (merge_pending_coinbase
+       (merge_scan_state
+          (merge_state_hash acc (hash root_data))
+          (scan_state root_data))
+       (pending_coinbase root_data))
+    (protocol_states root_data)
 
 let merge_diff : type mutant. t -> (Diff.lite, mutant) Diff.t -> t =
  fun acc diff ->

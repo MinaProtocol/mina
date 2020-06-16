@@ -347,7 +347,7 @@ let make = (~challenges as _, ~testnetName as _) => {
             </h1>
             // href="https://testnet-points-frontend-dot-o1labs-192920.appspot.com/"
             <a
-              href="http://bit.ly/TestnetBetaLeaderboard"
+              href="https://bit.ly/TestnetLeaderboard"
               target="_blank"
               className=Styles.headerLink>
               {React.string({j|View Full Leaderboard\u00A0→|j})}
@@ -419,8 +419,7 @@ let make = (~challenges as _, ~testnetName as _) => {
               </ul>
               <p className=Styles.markdownStyles>
                 {React.string("Check out all challenges ")}
-                <a
-                  href="https://forums.codaprotocol.com/t/testnet-beta-release-3-1-challenges/271">
+                <a href="https://bit.ly/Challenges3-2a">
                   {React.string(" here ")}
                 </a>
                 {React.string("and join ")}

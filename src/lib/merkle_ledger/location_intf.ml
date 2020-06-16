@@ -3,20 +3,18 @@
 open Core
 
 module type S = sig
-  module Addr : Merkle_address.S
+  module Addr : module type of Merkle_address
 
   module Prefix : sig
     val generic : Unsigned.UInt8.t
 
     val account : Unsigned.UInt8.t
 
-    val hash : int -> Unsigned.UInt8.t
+    val hash : ledger_depth:int -> int -> Unsigned.UInt8.t
   end
 
   type t = Generic of Bigstring.t | Account of Addr.t | Hash of Addr.t
-  [@@deriving eq, sexp, bin_io, hash, compare]
-
-  include Hashable.S_binable with type t := t
+  [@@deriving eq, sexp, hash, compare]
 
   val is_generic : t -> bool
 
@@ -24,7 +22,7 @@ module type S = sig
 
   val is_hash : t -> bool
 
-  val height : t -> int
+  val height : ledger_depth:int -> t -> int
 
   val root_hash : t
 
@@ -32,13 +30,13 @@ module type S = sig
 
   val build_generic : Bigstring.t -> t
 
-  val parse : Bigstring.t -> (t, unit) Result.t
+  val parse : ledger_depth:int -> Bigstring.t -> (t, unit) Result.t
 
   val prefix_bigstring : Unsigned.UInt8.t -> Bigstring.t -> Bigstring.t
 
   val to_path_exn : t -> Addr.t
 
-  val serialize : t -> Bigstring.t
+  val serialize : ledger_depth:int -> t -> Bigstring.t
 
   val parent : t -> t
 

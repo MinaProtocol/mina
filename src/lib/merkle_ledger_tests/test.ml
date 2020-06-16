@@ -8,14 +8,33 @@ let%test_module "Database integration test" =
       let depth = 4
     end
 
-    module Location = Merkle_ledger.Location.Make (Depth)
+    module Location = Merkle_ledger.Location.T
+
+    module Location_binable = struct
+      module Arg = struct
+        type t = Location.t =
+          | Generic of Merkle_ledger.Location.Bigstring.Stable.Latest.t
+          | Account of Location.Addr.Stable.Latest.t
+          | Hash of Location.Addr.Stable.Latest.t
+        [@@deriving bin_io_unversioned, hash, sexp, compare]
+      end
+
+      type t = Arg.t =
+        | Generic of Merkle_ledger.Location.Bigstring.t
+        | Account of Location.Addr.t
+        | Hash of Location.Addr.t
+      [@@deriving hash, sexp, compare]
+
+      include Hashable.Make_binable (Arg) [@@deriving
+                                            sexp, compare, hash, yojson]
+    end
 
     module Inputs = struct
       include Test_stubs.Base_inputs
       module Location = Location
+      module Location_binable = Location_binable
       module Kvdb = In_memory_kvdb
       module Storage_locations = Storage_locations
-      module Depth = Depth
     end
 
     module DB = Database.Make (Inputs)
@@ -33,7 +52,7 @@ let%test_module "Database integration test" =
           let accounts =
             List.map2_exn account_ids balances ~f:Account.create
           in
-          DB.with_ledger ~f:(fun db ->
+          DB.with_ledger ~depth:Depth.depth ~f:(fun db ->
               let enumerate_dir_combinations max_depth =
                 Sequence.range 0 (max_depth - 1)
                 |> Sequence.fold ~init:[[]] ~f:(fun acc _ ->

@@ -31,6 +31,7 @@ end
 let setup (type n) ?(logger = Logger.null ())
     ?(trust_system = Trust_system.null ())
     ?(time_controller = Block_time.Controller.basic ~logger)
+    ~(precomputed_values : Precomputed_values.t)
     (states : (peer_state, n num_peers) Vect.t) : n num_peers t =
   let _, peers =
     Vect.fold_map states
@@ -58,7 +59,9 @@ let setup (type n) ?(logger = Logger.null ())
     ; consensus_local_state
     ; is_seed= Vect.is_empty peers
     ; genesis_ledger_hash=
-        Ledger.merkle_root (Lazy.force Test_genesis_ledger.t)
+        Ledger.merkle_root
+          (Lazy.force (Precomputed_values.genesis_ledger precomputed_values))
+    ; constraint_constants= precomputed_values.constraint_constants
     ; creatable_gossip_net=
         Gossip_net.Any.Creatable
           ( (module Gossip_net.Fake)
@@ -80,8 +83,10 @@ let setup (type n) ?(logger = Logger.null ())
                   let input = Envelope.Incoming.data query_env in
                   Deferred.return
                     (let open Option.Let_syntax in
-                    let%map scan_state, expected_merkle_root, pending_coinbases
-                        =
+                    let%map ( scan_state
+                            , expected_merkle_root
+                            , pending_coinbases
+                            , protocol_states ) =
                       Sync_handler
                       .get_staged_ledger_aux_and_pending_coinbases_at_hash
                         ~frontier input
@@ -97,12 +102,31 @@ let setup (type n) ?(logger = Logger.null ())
                           , Staged_ledger_hash.to_yojson staged_ledger_hash )
                         ]
                       "sending scan state and pending coinbase" ;
-                    (scan_state, expected_merkle_root, pending_coinbases)) )
-                ~answer_sync_ledger_query:(fun _ ->
-                  failwith "Answer_sync_ledger_query unimplemented" )
+                    ( scan_state
+                    , expected_merkle_root
+                    , pending_coinbases
+                    , protocol_states )) )
+                ~answer_sync_ledger_query:(fun query_env ->
+                  let ledger_hash, _ = Envelope.Incoming.data query_env in
+                  Sync_handler.answer_query ~frontier ledger_hash
+                    (Envelope.Incoming.map ~f:Tuple2.get2 query_env)
+                    ~logger:(Logger.create ())
+                    ~trust_system:(Trust_system.null ())
+                  |> Deferred.map
+                     (* begin error string prefix so we can pattern-match *)
+                       ~f:
+                         (Result.of_option
+                            ~error:
+                              (Error.createf
+                                 !"%s for ledger_hash: %{sexp:Ledger_hash.t}"
+                                 Coda_networking.refused_answer_query_string
+                                 ledger_hash)) )
                 ~get_ancestry:(fun query_env ->
                   Deferred.return
-                    (Sync_handler.Root.prove ~logger ~frontier
+                    (Sync_handler.Root.prove
+                       ~consensus_constants:
+                         precomputed_values.consensus_constants ~logger
+                       ~frontier
                        (Envelope.Incoming.data query_env)) )
                 ~get_best_tip:(fun _ -> failwith "Get_best_tip unimplemented")
                 ~get_telemetry_data:(fun _ ->
@@ -124,27 +148,38 @@ module Generator = struct
   open Quickcheck
   open Generator.Let_syntax
 
-  type peer_config = max_frontier_length:int -> peer_state Generator.t
+  type peer_config =
+       proof_level:Genesis_constants.Proof_level.t
+    -> precomputed_values:Precomputed_values.t
+    -> max_frontier_length:int
+    -> peer_state Generator.t
 
-  let fresh_peer ~max_frontier_length =
+  let fresh_peer ~proof_level ~precomputed_values ~max_frontier_length =
+    let genesis_ledger =
+      Precomputed_values.genesis_ledger precomputed_values
+    in
     let consensus_local_state =
       Consensus.Data.Local_state.create Public_key.Compressed.Set.empty
-        ~genesis_ledger:Test_genesis_ledger.t
+        ~genesis_ledger
     in
     let%map frontier =
-      Transition_frontier.For_tests.gen ~consensus_local_state
-        ~max_length:max_frontier_length ~size:0 ()
+      Transition_frontier.For_tests.gen ~proof_level ~precomputed_values
+        ~consensus_local_state ~max_length:max_frontier_length ~size:0 ()
     in
     {frontier; consensus_local_state}
 
-  let peer_with_branch ~frontier_branch_size ~max_frontier_length =
+  let peer_with_branch ~frontier_branch_size ~proof_level ~precomputed_values
+      ~max_frontier_length =
+    let genesis_ledger =
+      Precomputed_values.genesis_ledger precomputed_values
+    in
     let consensus_local_state =
       Consensus.Data.Local_state.create Public_key.Compressed.Set.empty
-        ~genesis_ledger:Test_genesis_ledger.t
+        ~genesis_ledger
     in
     let%map frontier, branch =
-      Transition_frontier.For_tests.gen_with_branch
-        ~max_length:max_frontier_length ~frontier_size:0
+      Transition_frontier.For_tests.gen_with_branch ~proof_level
+        ~precomputed_values ~max_length:max_frontier_length ~frontier_size:0
         ~branch_size:frontier_branch_size ~consensus_local_state ()
     in
     Async.Thread_safe.block_on_async_exn (fun () ->
@@ -152,41 +187,11 @@ module Generator = struct
           ~f:(Transition_frontier.add_breadcrumb_exn frontier) ) ;
     {frontier; consensus_local_state}
 
-  let gen ~max_frontier_length configs =
+  let gen ~proof_level ~precomputed_values ~max_frontier_length configs =
     let open Quickcheck.Generator.Let_syntax in
     let%map states =
       Vect.Quickcheck_generator.map configs ~f:(fun config ->
-          config ~max_frontier_length )
+          config ~proof_level ~precomputed_values ~max_frontier_length )
     in
-    setup states
+    setup ~precomputed_values states
 end
-
-(*
-let send_transition ~logger ~transition_writer ~peer:{peer; frontier}
-    state_hash =
-  let transition =
-    let validated_transition =
-      Transition_frontier.find_exn frontier state_hash
-      |> Transition_frontier.Breadcrumb.validated_transition
-    in
-    validated_transition
-    |> External_transition.Validation
-       .reset_frontier_dependencies_validation
-    |> External_transition.Validation.reset_staged_ledger_diff_validation
-  in
-  Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-    ~metadata:
-      [ ("peer", Network_peer.Peer.to_yojson peer)
-      ; ("state_hash", State_hash.to_yojson state_hash) ]
-    "Peer $peer sending $state_hash" ;
-  let enveloped_transition =
-    Envelope.Incoming.wrap ~data:transition
-      ~sender:(Envelope.Sender.Remote peer.host)
-  in
-  Pipe_lib.Strict_pipe.Writer.write transition_writer
-    (`Transition enveloped_transition, `Time_received Constants.time)
-
-let make_transition_pipe () =
-  Pipe_lib.Strict_pipe.create ~name:(__MODULE__ ^ __LOC__)
-    (Buffered (`Capacity 30, `Overflow Drop_head))
-*)

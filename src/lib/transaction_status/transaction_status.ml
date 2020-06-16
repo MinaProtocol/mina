@@ -71,24 +71,28 @@ let%test_module "transaction_status" =
 
     let logger = Logger.null ()
 
+    let proof_level = Genesis_constants.Proof_level.Check
+
+    let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
+
+    module Genesis_ledger = (val precomputed_values.genesis_ledger)
+
     let trust_system = Trust_system.null ()
 
-    let pool_max_size = Genesis_constants.compiled.txpool_max_size
+    let pool_max_size = precomputed_values.genesis_constants.txpool_max_size
 
     let key_gen =
       let open Quickcheck.Generator in
       let open Quickcheck.Generator.Let_syntax in
-      let keypairs =
-        List.map (Lazy.force Test_genesis_ledger.accounts) ~f:fst
-      in
+      let keypairs = List.map (Lazy.force Genesis_ledger.accounts) ~f:fst in
       let%map random_key_opt = of_list keypairs in
-      ( Test_genesis_ledger.largest_account_keypair_exn ()
+      ( Genesis_ledger.largest_account_keypair_exn ()
       , Signature_lib.Keypair.of_private_key_exn
           (Option.value_exn random_key_opt) )
 
     let gen_frontier =
-      Transition_frontier.For_tests.gen ~logger ~trust_system ~max_length
-        ~size:frontier_size ()
+      Transition_frontier.For_tests.gen ~logger ~proof_level
+        ~precomputed_values ~trust_system ~max_length ~size:frontier_size ()
 
     let gen_user_command =
       User_command.Gen.payment ~sign_type:`Real ~max_amount:100 ~max_fee:10
@@ -106,8 +110,10 @@ let%test_module "transaction_status" =
         Transaction_pool.Resource_pool.make_config ~trust_system ~pool_max_size
       in
       let transaction_pool =
-        Transaction_pool.create ~config ~incoming_diffs:pool_reader ~logger
-          ~local_diffs:local_reader ~frontier_broadcast_pipe
+        Transaction_pool.create ~config
+          ~constraint_constants:precomputed_values.constraint_constants
+          ~incoming_diffs:pool_reader ~logger ~local_diffs:local_reader
+          ~frontier_broadcast_pipe
       in
       don't_wait_for
       @@ Linear_pipe.iter (Transaction_pool.broadcasts transaction_pool)

@@ -10,7 +10,8 @@ module Transactions = struct
       type t =
         { user_commands: User_command.Stable.V1.t list
         ; fee_transfers: Fee_transfer.Single.Stable.V1.t list
-        ; coinbase: Currency.Amount.Stable.V1.t }
+        ; coinbase: Currency.Amount.Stable.V1.t
+        ; coinbase_receiver: Public_key.Compressed.Stable.V1.t option }
 
       let to_latest = Fn.id
     end
@@ -19,7 +20,8 @@ module Transactions = struct
   type t = Stable.Latest.t =
     { user_commands: User_command.t list
     ; fee_transfers: Fee_transfer.Single.t list
-    ; coinbase: Currency.Amount.t }
+    ; coinbase: Currency.Amount.t
+    ; coinbase_receiver: Public_key.Compressed.t option }
 end
 
 module Protocol_state = struct
@@ -117,7 +119,8 @@ let of_transition external_transition tracked_participants
       ~init:
         { Transactions.user_commands= []
         ; fee_transfers= []
-        ; coinbase= Currency.Amount.zero } ~f:(fun acc_transactions -> function
+        ; coinbase= Currency.Amount.zero
+        ; coinbase_receiver= None } ~f:(fun acc_transactions -> function
       | User_command checked_user_command -> (
           let user_command = User_command.forget_check checked_user_command in
           let should_include_transaction user_command participants =
@@ -152,9 +155,19 @@ let of_transition external_transition tracked_participants
           in
           { acc_transactions with
             fee_transfers= fee_transfers @ acc_transactions.fee_transfers }
-      | Coinbase {Coinbase.amount; _} ->
+      | Coinbase {Coinbase.amount; fee_transfer; receiver} ->
+          let fee_transfer =
+            Option.map ~f:Coinbase_fee_transfer.to_fee_transfer fee_transfer
+          in
+          let fee_transfers =
+            List.append
+              (Option.to_list fee_transfer)
+              acc_transactions.fee_transfers
+          in
           { acc_transactions with
-            coinbase=
+            fee_transfers
+          ; coinbase_receiver= Some receiver
+          ; coinbase=
               Currency.Amount.(
                 Option.value_exn (add amount acc_transactions.coinbase)) } )
   in

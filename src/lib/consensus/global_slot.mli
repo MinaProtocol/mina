@@ -4,16 +4,6 @@ open Core_kernel
 open Coda_base
 open Unsigned
 
-(*include
-  Coda_numbers.Nat.Intf.S_unchecked
-  with type t = Coda_numbers.Global_slot.Stable.Latest.t
-
-[%%versioned:
-module Stable : sig
-  module V1 : sig
-    type nonrec t = t [@@deriving sexp, eq, compare, hash, yojson]
-  end
-end]*)
 module Poly : sig
   [%%versioned:
   module Stable : sig
@@ -45,7 +35,7 @@ val to_input : t -> (_, bool) Random_oracle.Input.t
 
 val of_slot_number : constants:Constants.t -> Coda_numbers.Global_slot.t -> t
 
-val gen : t Quickcheck.Generator.t
+val gen : constants:Constants.t -> t Quickcheck.Generator.t
 
 val ( + ) : t -> int -> t
 
@@ -111,3 +101,7 @@ val typ : (Checked.t, t) Typ.t
 val slot_number : ('a, _) Poly.t -> 'a
 
 val slots_per_epoch : (_, 'b) Poly.t -> 'b
+
+module For_tests : sig
+  val of_global_slot : t -> Coda_numbers.Global_slot.t -> t
+end

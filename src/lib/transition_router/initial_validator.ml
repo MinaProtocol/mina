@@ -13,8 +13,8 @@ type validation_error =
   | `Invalid_proof
   | `Invalid_delta_transition_chain_proof
   | `Verifier_error of Error.t
-  | `Mismatched_fork_id
-  | `Invalid_fork_id ]
+  | `Mismatched_protocol_version
+  | `Invalid_protocol_version ]
 
 let handle_validation_error ~logger ~trust_system ~sender ~state_hash ~delta
     (error : validation_error) =
@@ -54,10 +54,10 @@ let handle_validation_error ~logger ~trust_system ~sender ~state_hash ~delta
         (Some
            ( "off by $slot_diff slots"
            , [("slot_diff", `String (Int64.to_string slot_diff))] ))
-  | `Invalid_fork_id ->
-      punish Sent_invalid_fork_id None
-  | `Mismatched_fork_id ->
-      punish Sent_mismatched_fork_id None
+  | `Invalid_protocol_version ->
+      punish Sent_invalid_protocol_version None
+  | `Mismatched_protocol_version ->
+      punish Sent_mismatched_protocol_version None
 
 module Duplicate_block_detector = struct
   (* maintain a map from block producer key, epoch, slot to state hashes *)
@@ -89,10 +89,8 @@ module Duplicate_block_detector = struct
     ; block_producer }
 
   (* every gc_interval blocks seen, discard blocks more than gc_width ago *)
-  let table_gc ~(genesis_constants : Genesis_constants.t) t block =
-    let consensus_constants =
-      Consensus.Constants.create ~protocol_constants:genesis_constants.protocol
-    in
+  let table_gc ~(precomputed_values : Precomputed_values.t) t block =
+    let consensus_constants = precomputed_values.consensus_constants in
     let ( `Acceptable_network_delay _
         , `Gc_width _
         , `Gc_width_epoch _
@@ -108,7 +106,7 @@ module Duplicate_block_detector = struct
 
   let create () = {table= Map.empty (module Blocks); latest_epoch= 0}
 
-  let check ~genesis_constants t logger external_transition_with_hash =
+  let check ~precomputed_values t logger external_transition_with_hash =
     let external_transition = external_transition_with_hash.With_hash.data in
     let protocol_state_hash = external_transition_with_hash.hash in
     let open Consensus.Data.Consensus_state in
@@ -121,7 +119,7 @@ module Duplicate_block_detector = struct
     in
     let block = Blocks.{consensus_time; block_producer} in
     (* try table GC *)
-    table_gc ~genesis_constants t block ;
+    table_gc ~precomputed_values t block ;
     match Map.find t.table block with
     | None ->
         t.table <- Map.add_exn t.table ~key:block ~data:protocol_state_hash
@@ -142,8 +140,14 @@ module Duplicate_block_detector = struct
 end
 
 let run ~logger ~trust_system ~verifier ~transition_reader
-    ~valid_transition_writer ~initialization_finish_signal ~genesis_state_hash
-    ~genesis_constants =
+    ~valid_transition_writer ~initialization_finish_signal ~precomputed_values
+    =
+  let genesis_state_hash =
+    Precomputed_values.genesis_state_hash precomputed_values
+  in
+  let genesis_constants =
+    Precomputed_values.genesis_constants precomputed_values
+  in
   let open Deferred.Let_syntax in
   let duplicate_checker = Duplicate_block_detector.create () in
   don't_wait_for
@@ -161,7 +165,7 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                     (Fn.compose Protocol_state.hash
                        External_transition.protocol_state)
            in
-           Duplicate_block_detector.check ~genesis_constants duplicate_checker
+           Duplicate_block_detector.check ~precomputed_values duplicate_checker
              logger transition_with_hash ;
            let sender = Envelope.Incoming.sender transition_env in
            let defer f = Fn.compose Deferred.return f in
@@ -169,11 +173,12 @@ let run ~logger ~trust_system ~verifier ~transition_reader
              let open Deferred.Result.Monad_infix in
              External_transition.(
                Validation.wrap transition_with_hash
-               |> defer (validate_time_received ~time_received)
+               |> defer
+                    (validate_time_received ~precomputed_values ~time_received)
                >>= defer (validate_genesis_protocol_state ~genesis_state_hash)
                >>= validate_proof ~verifier
                >>= defer validate_delta_transition_chain
-               >>= defer validate_fork_ids)
+               >>= defer validate_protocol_versions)
            with
            | Ok verified_transition ->
                External_transition.poke_validation_callback

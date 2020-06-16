@@ -101,26 +101,40 @@ end = struct
     t.timeout <- Some timeout
 end
 
-let generate_next_state ~previous_protocol_state ~time_controller
-    ~staged_ledger ~transactions ~get_completed_work ~logger ~coinbase_receiver
-    ~(keypair : Keypair.t) ~block_data ~scheduled_time ~log_block_creation =
+let generate_next_state ~constraint_constants ~previous_protocol_state
+    ~time_controller ~staged_ledger ~transactions ~get_completed_work ~logger
+    ~coinbase_receiver ~(keypair : Keypair.t) ~block_data ~scheduled_time
+    ~log_block_creation =
   let open Interruptible.Let_syntax in
   let self = Public_key.compress keypair.public_key in
   let previous_protocol_state_body_hash =
     Protocol_state.body previous_protocol_state |> Protocol_state.Body.hash
+  in
+  let previous_protocol_state_hash =
+    Protocol_state.hash_with_body ~body_hash:previous_protocol_state_body_hash
+      previous_protocol_state
+  in
+  let previous_global_slot =
+    Protocol_state.body previous_protocol_state
+    |> Coda_state.Protocol_state.Body.consensus_state
+    |> Consensus.Data.Consensus_state.curr_slot
   in
   let%bind res =
     Interruptible.uninterruptible
       (let open Deferred.Let_syntax in
       let diff =
         measure "create_diff" (fun () ->
-            Staged_ledger.create_diff staged_ledger ~self ~coinbase_receiver
-              ~logger ~transactions_by_fee:transactions ~get_completed_work
+            Staged_ledger.create_diff ~constraint_constants staged_ledger ~self
+              ~coinbase_receiver ~logger
+              ~current_global_slot:previous_global_slot
+              ~transactions_by_fee:transactions ~get_completed_work
               ~log_block_creation )
       in
       match%map
-        Staged_ledger.apply_diff_unchecked staged_ledger diff
-          ~state_body_hash:previous_protocol_state_body_hash
+        Staged_ledger.apply_diff_unchecked staged_ledger ~constraint_constants
+          diff ~logger ~current_global_slot:previous_global_slot
+          ~state_and_body_hash:
+            (previous_protocol_state_hash, previous_protocol_state_body_hash)
       with
       | Ok
           ( `Hash_after_applying next_staged_ledger_hash
@@ -207,7 +221,7 @@ let generate_next_state ~previous_protocol_state ~time_controller
                       .user_commands diff
                       :> User_command.t list )
                   ~snarked_ledger_hash:previous_ledger_hash ~supply_increase
-                  ~logger ) )
+                  ~logger ~constraint_constants ) )
       in
       lift_sync (fun () ->
           measure "making Snark and Internal transitions" (fun () ->
@@ -252,12 +266,10 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
     ~transaction_resource_pool ~time_controller ~keypairs ~coinbase_receiver
     ~consensus_local_state ~frontier_reader ~transition_writer
     ~set_next_producer_timing ~log_block_creation
-    ~(genesis_constants : Genesis_constants.t) =
+    ~(precomputed_values : Precomputed_values.t) =
   trace "block_producer" (fun () ->
-      let consensus_constants =
-        Consensus.Constants.create
-          ~protocol_constants:genesis_constants.protocol
-      in
+      let constraint_constants = precomputed_values.constraint_constants in
+      let consensus_constants = precomputed_values.consensus_constants in
       let log_bootstrap_mode () =
         Logger.info logger ~module_:__MODULE__ ~location:__LOC__
           "Pausing block production while bootstrapping"
@@ -296,8 +308,9 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
               Interruptible.lift (Deferred.return ()) (Ivar.read ivar)
             in
             let%bind next_state_opt =
-              generate_next_state ~scheduled_time ~coinbase_receiver
-                ~block_data ~previous_protocol_state ~time_controller
+              generate_next_state ~constraint_constants ~scheduled_time
+                ~coinbase_receiver ~block_data ~previous_protocol_state
+                ~time_controller
                 ~staged_ledger:(Breadcrumb.staged_ledger crumb)
                 ~transactions ~get_completed_work ~logger ~keypair
                 ~log_block_creation
@@ -311,7 +324,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
               ->
                 Debug_assert.debug_assert (fun () ->
                     [%test_result: [`Take | `Keep]]
-                      (Consensus.Hooks.select
+                      (Consensus.Hooks.select ~constants:consensus_constants
                          ~existing:
                            (Protocol_state.consensus_state
                               previous_protocol_state)
@@ -328,6 +341,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                     in
                     [%test_result: [`Take | `Keep]]
                       (Consensus.Hooks.select ~existing:root_consensus_state
+                         ~constants:consensus_constants
                          ~candidate:
                            (Protocol_state.consensus_state protocol_state)
                          ~logger)
@@ -411,8 +425,9 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                                   ~delta_transition_chain_proof () }
                           |> External_transition.skip_time_received_validation
                                `This_transition_was_not_received_via_gossip
-                          |> External_transition.skip_fork_ids_validation
-                               `This_transition_has_valid_fork_ids
+                          |> External_transition
+                             .skip_protocol_versions_validation
+                               `This_transition_has_valid_protocol_versions
                           |> External_transition
                              .validate_genesis_protocol_state
                                ~genesis_state_hash:
@@ -443,6 +458,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                         match
                           Transition_frontier_validation
                           .validate_frontier_dependencies ~logger ~frontier t
+                            ~consensus_constants
                         with
                         | Error `Already_in_frontier ->
                             Logger.error logger ~module_:__MODULE__
@@ -470,8 +486,9 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                             return ()
                         | Ok transition -> (
                             let%bind breadcrumb_result =
-                              Breadcrumb.build ~logger ~verifier ~trust_system
-                                ~parent:crumb ~transition ~sender:None
+                              Breadcrumb.build ~logger ~precomputed_values
+                                ~verifier ~trust_system ~parent:crumb
+                                ~transition ~sender:None
                             in
                             let exn name =
                               raise
@@ -601,9 +618,9 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                 let next_producer_timing =
                   measure "asking consensus what to do" (fun () ->
                       Consensus.Hooks.next_producer_timing
-                        ~constants:consensus_constants (time_to_ms now)
-                        consensus_state ~local_state:consensus_local_state
-                        ~keypairs ~logger )
+                        ~constraint_constants ~constants:consensus_constants
+                        (time_to_ms now) consensus_state
+                        ~local_state:consensus_local_state ~keypairs ~logger )
                 in
                 set_next_producer_timing next_producer_timing ;
                 match next_producer_timing with

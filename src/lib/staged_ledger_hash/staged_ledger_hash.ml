@@ -111,7 +111,7 @@ module Non_snark = struct
 
   let dummy : t Lazy.t =
     lazy
-      { ledger_hash= Ledger.merkle_root (Lazy.force Test_genesis_ledger.t)
+      { ledger_hash= Coda_base.Ledger_hash.empty_hash
       ; aux_hash= Aux_hash.dummy
       ; pending_coinbase_aux= Pending_coinbase_aux.dummy }
 
@@ -196,7 +196,7 @@ module Stable = struct
       *)
     type t =
       ( Non_snark.Stable.V1.t
-      , Pending_coinbase.Hash.Stable.V1.t )
+      , Pending_coinbase.Hash_versioned.Stable.V1.t )
       Poly.Stable.V1.t
     [@@deriving sexp, eq, compare, hash, yojson]
 
@@ -230,8 +230,13 @@ let of_aux_ledger_and_coinbase_hash aux_hash ledger_hash pending_coinbase : t =
         (Pending_coinbase.hash_extra pending_coinbase)
   ; pending_coinbase_hash= Pending_coinbase.merkle_root pending_coinbase }
 
-let genesis ~genesis_ledger_hash : t =
-  let pending_coinbase = Pending_coinbase.create () |> Or_error.ok_exn in
+let genesis ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+    ~genesis_ledger_hash : t =
+  let pending_coinbase =
+    Pending_coinbase.create ~depth:constraint_constants.pending_coinbase_depth
+      ()
+    |> Or_error.ok_exn
+  in
   { non_snark= Non_snark.genesis ~genesis_ledger_hash
   ; pending_coinbase_hash= Pending_coinbase.merkle_root pending_coinbase }
 

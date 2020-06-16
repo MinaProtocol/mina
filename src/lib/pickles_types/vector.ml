@@ -35,7 +35,7 @@ let rec map2 : type a b c n.
   | x :: xs, y :: ys ->
       f x y :: map2 xs ys ~f
 
-let rec hhead_off : type xs y n.
+let rec hhead_off : type xs n.
        (xs, n s) Hlist0.H1_1(T).t
     -> xs Hlist0.HlistId.t * (xs, n) Hlist0.H1_1(T).t =
  fun xss ->
@@ -50,7 +50,7 @@ let rec mapn : type xs y n.
     (xs, n) Hlist0.H1_1(T).t -> f:(xs Hlist0.HlistId.t -> y) -> (y, n) t =
  fun xss ~f ->
   match xss with
-  | [] :: xss ->
+  | [] :: _xss ->
       []
   | (_ :: _) :: _ ->
       let hds, tls = hhead_off xss in
@@ -127,10 +127,8 @@ let rec of_list_and_length_exn : type a n. a list -> n nat -> (a, n) t =
 let of_list_and_length xs n =
   Core_kernel.Option.try_with (fun () -> of_list_and_length_exn xs n)
 
-let reverse (t : ('a, 'n) t) : ('a, 'n) t =
+let reverse t =
   let (T xs) = of_list (List.rev (to_list t)) in
-  (* Would need to build GADT witnesses with for the length argument to be
-     correct, so we just magic. *)
   Obj.magic xs
 
 let rec take_from_list : type a n. a list -> n nat -> (a, n) t =
@@ -192,6 +190,29 @@ struct
   let sexp_of_t f t = List.sexp_of_t f (to_list t)
 
   let t_of_sexp f s = of_list_and_length_exn (List.t_of_sexp f s) N.n
+end
+
+module L = struct
+  type 'a t = 'a list [@@deriving yojson]
+end
+
+module type Yojson_intf1 = sig
+  type 'a t
+
+  val to_yojson : ('a -> Yojson.Safe.json) -> 'a t -> Yojson.Safe.json
+
+  val of_yojson :
+       (Yojson.Safe.json -> 'a Ppx_deriving_yojson_runtime.error_or)
+    -> Yojson.Safe.json
+    -> 'a t Ppx_deriving_yojson_runtime.error_or
+end
+
+module Yojson (N : Nat_intf) : Yojson_intf1 with type 'a t := ('a, N.n) t =
+struct
+  let to_yojson f t = L.to_yojson f (to_list t)
+
+  let of_yojson f s =
+    Result.map (L.of_yojson f s) ~f:(Fn.flip of_list_and_length_exn N.n)
 end
 
 module Binable (N : Nat_intf) : Binable.S1 with type 'a t := ('a, N.n) t =
@@ -287,22 +308,35 @@ struct
     Common.raise_variant_wrong_type "vector" !pos_ref
 end
 
-let rec typ : type f var value n.
-       (var, value, f) Snarky.Typ.t
-    -> n nat
+module With_length (N : Nat.Intf) = struct
+  type nonrec 'a t = ('a, N.n) t
+
+  let compare c t1 t2 = Core.List.compare c (to_list t1) (to_list t2)
+
+  include Yojson (N)
+  include Binable (N)
+  include Sexpable (N)
+
+  let map (t : 'a t) = map t
+end
+
+let rec typ' : type f var value n.
+       ((var, value, f) Snarky.Typ.t, n) t
     -> ((var, n) t, (value, n) t, f) Snarky.Typ.t =
   let open Snarky.Typ in
-  fun elt n ->
-    match n with
-    | S n ->
-        let tl = typ elt n in
+  fun elts ->
+    match elts with
+    | elt :: elts ->
+        let tl = typ' elts in
         let there = function x :: xs -> (x, xs) in
         let back (x, xs) = x :: xs in
         transport (elt * tl) ~there ~back |> transport_var ~there ~back
-    | Z ->
+    | [] ->
         let there [] = () in
         let back () = [] in
         transport (unit ()) ~there ~back |> transport_var ~there ~back
+
+let typ elt n = typ' (init n ~f:(fun _ -> elt))
 
 let rec append : type n m n_m a.
     (a, n) t -> (a, m) t -> (n, m, n_m) Nat.Adds.t -> (a, n_m) t =
@@ -334,7 +368,7 @@ let rec extend_exn : type n m a. (a, n) t -> m Nat.t -> a -> (a, m) t =
       []
   | [], S n ->
       default :: extend_exn [] n default
-  | x :: xs, Z ->
+  | _x :: _xs, Z ->
       failwith "extend_exn: list too long"
   | x :: xs, S m ->
       let extended = extend_exn xs m default in

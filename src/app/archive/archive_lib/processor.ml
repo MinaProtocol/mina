@@ -210,7 +210,7 @@ module User_command = struct
              "INSERT INTO user_commands (type, fee_payer_id, source_id, \
               receiver_id, fee_token, token, nonce, amount, fee, memo, hash) \
               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id")
-          { typ= (if User_command.is_payment t then "payment" else "delegation")
+          { typ= User_command.tag_string t
           ; fee_payer_id
           ; source_id
           ; receiver_id
@@ -397,7 +397,7 @@ module Block = struct
           ledger_hash, height, timestamp, coinbase_id FROM blocks WHERE id = ?")
       id
 
-  let add_if_doesn't_exist (module Conn : CONNECTION)
+  let add_if_doesn't_exist (module Conn : CONNECTION) ~constraint_constants
       ({data= t; hash} : (External_transition.t, State_hash.t) With_hash.t) =
     let open Deferred.Result.Let_syntax in
     match%bind find (module Conn) ~state_hash:hash with
@@ -438,7 +438,9 @@ module Block = struct
             ; timestamp= External_transition.timestamp t |> Block_time.to_int64
             ; coinbase_id= None }
         in
-        let transactions = External_transition.transactions t in
+        let transactions =
+          External_transition.transactions ~constraint_constants t
+        in
         let user_commands, fee_transfers, coinbases =
           Core.List.fold transactions ~init:([], [], [])
             ~f:(fun (acc_user_commands, acc_fee_transfers, acc_coinbases) ->
@@ -567,13 +569,13 @@ module Block = struct
         return block_id
 end
 
-let run (module Conn : CONNECTION) reader ~logger =
+let run (module Conn : CONNECTION) reader ~constraint_constants ~logger =
   Strict_pipe.Reader.iter reader ~f:(function
     | Diff.Transition_frontier (Breadcrumb_added {block; _}) -> (
         match%bind
           let open Deferred.Result.Let_syntax in
           let%bind () = Conn.start () in
-          Block.add_if_doesn't_exist (module Conn) block
+          Block.add_if_doesn't_exist ~constraint_constants (module Conn) block
         with
         | Error e ->
             Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
@@ -591,7 +593,7 @@ let run (module Conn : CONNECTION) reader ~logger =
             User_command.add_if_doesn't_exist (module Conn) user_command
             >>| ignore ) )
 
-let setup_server ~logger ~postgres_address ~server_port =
+let setup_server ~constraint_constants ~logger ~postgres_address ~server_port =
   let where_to_listen =
     Async.Tcp.Where_to_listen.bind_to All_addresses (On_port server_port)
   in
@@ -607,7 +609,7 @@ let setup_server ~logger ~postgres_address ~server_port =
         ~metadata:[("error", `String (Caqti_error.show e))] ;
       Deferred.unit
   | Ok conn ->
-      run conn reader ~logger |> don't_wait_for ;
+      run ~constraint_constants conn reader ~logger |> don't_wait_for ;
       Deferred.ignore
       @@ Tcp.Server.create
            ~on_handler_error:

@@ -1201,8 +1201,8 @@ let generate_libp2p_keypair =
 let trustlist_ip_flag =
   Command.Param.(
     flag "ip-address"
-      ~doc:"IP An IPv4 or IPv6 address for the client trustlist"
-      (required Cli_lib.Arg_type.ip_address))
+      ~doc:"CIDR An IPv4 CIDR mask for the client trustlist (eg, 10.0.0.0/8)"
+      (required Cli_lib.Arg_type.cidr_mask))
 
 let trustlist_add =
   let open Deferred.Let_syntax in
@@ -1210,7 +1210,7 @@ let trustlist_add =
   Command.async ~summary:"Add an IP to the trustlist"
     (Cli_lib.Background_daemon.rpc_init trustlist_ip_flag
        ~f:(fun port trustlist_ip ->
-         let trustlist_ip_string = Unix.Inet_addr.to_string trustlist_ip in
+         let trustlist_ip_string = Unix.Cidr.to_string trustlist_ip in
          match%map Client.dispatch Add_trustlist.rpc trustlist_ip port with
          | Ok (Ok ()) ->
              printf "Added %s to client trustlist" trustlist_ip_string
@@ -1224,10 +1224,10 @@ let trustlist_add =
 let trustlist_remove =
   let open Deferred.Let_syntax in
   let open Daemon_rpcs in
-  Command.async ~summary:"Add an IP to the trustlist"
+  Command.async ~summary:"Remove a CIDR mask from the trustlist"
     (Cli_lib.Background_daemon.rpc_init trustlist_ip_flag
        ~f:(fun port trustlist_ip ->
-         let trustlist_ip_string = Unix.Inet_addr.to_string trustlist_ip in
+         let trustlist_ip_string = Unix.Cidr.to_string trustlist_ip in
          match%map Client.dispatch Remove_trustlist.rpc trustlist_ip port with
          | Ok (Ok ()) ->
              printf "Removed %s to client trustlist" trustlist_ip_string
@@ -1242,15 +1242,14 @@ let trustlist_list =
   let open Deferred.Let_syntax in
   let open Daemon_rpcs in
   let open Command.Param in
-  Command.async ~summary:"Add an IP to the trustlist"
+  Command.async ~summary:"List the CIDR masks in the trustlist"
     (Cli_lib.Background_daemon.rpc_init (return ()) ~f:(fun port () ->
          match%map Client.dispatch Get_trustlist.rpc () port with
          | Ok ips ->
              printf
                "The following IPs are permitted to connect to the daemon \
                 control port:\n" ;
-             List.iter ips ~f:(fun ip ->
-                 printf "%s\n" (Unix.Inet_addr.to_string ip) )
+             List.iter ips ~f:(fun ip -> printf "%s\n" (Unix.Cidr.to_string ip))
          | Error e ->
              eprintf "Unknown error doing daemon RPC: %s"
                (Error.to_string_hum e) ))
@@ -1271,7 +1270,7 @@ let telemetry =
     flag "show-errors" no_arg ~doc:"Include error responses in output"
   in
   let flags = Args.zip3 daemon_peers_flag peer_ids_flag show_errors_flag in
-  Command.async ~summary:"Get the trust status associated with an IP address"
+  Command.async ~summary:"Get telemetry data for a set of peers"
     (Cli_lib.Background_daemon.rpc_init flags
        ~f:(fun port (daemon_peers, peer_ids, show_errors) ->
          if

@@ -1,7 +1,6 @@
 open Core
 open Async
 open Coda_base
-open Signature_lib
 
 let name = "coda-receipt-chain-test"
 
@@ -13,16 +12,19 @@ let restart_node worker ~config ~logger =
   Coda_process.spawn_exn config
 
 let main () =
-  let consensus_constants = Consensus.Constants.compiled in
-  let open Keypair in
-  let logger = Logger.create () in
-  let largest_account_keypair =
-    Test_genesis_ledger.largest_account_keypair_exn ()
+  let precomputed_values =
+    (* TODO: Load for this specific test. *)
+    Lazy.force Precomputed_values.compiled
   in
-  let another_account_keypair =
-    Test_genesis_ledger.find_new_account_record_exn
-      [largest_account_keypair.public_key]
-    |> Test_genesis_ledger.keypair_of_account_record_exn
+  let consensus_constants = precomputed_values.consensus_constants in
+  let logger = Logger.create () in
+  let sender_sk, largest_account =
+    Test_genesis_ledger.largest_account_exn ()
+  in
+  let receiver_pk =
+    Test_genesis_ledger.find_new_account_record_exn_
+      [Account.public_key largest_account]
+    |> Test_genesis_ledger.pk_of_account_record
   in
   let block_production_interval =
     consensus_constants.block_window_duration_ms |> Block_time.Span.to_ms
@@ -35,8 +37,7 @@ let main () =
       |> Float.of_int )
   in
   let n = 2 in
-  let receiver_pk = Public_key.compress another_account_keypair.public_key in
-  let sender_sk = largest_account_keypair.private_key in
+  let sender_sk = Option.value_exn sender_sk in
   let send_amount = Currency.Amount.of_int 10 in
   let fee = User_command.minimum_fee in
   let%bind program_dir = Unix.getcwd () in

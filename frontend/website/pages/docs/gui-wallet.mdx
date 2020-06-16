@@ -1,7 +1,7 @@
 import Page from '@reason/pages/Docs';
-export default Page({title: "GUI Wallet"});
+export default Page({title: "Coda Wallet"});
 
-# GUI Wallet Beta
+# Coda Wallet
 
 <Alert>
 
@@ -11,37 +11,40 @@ We're working hard on the next release of the beta wallet. Stay tuned for update
 
 ![Screenshot of the Coda Wallet GUI.](/static/img/coda-wallet.png)
 
-The GUI Wallet is the easiest way to connect to the Coda network and run a node. You can use the wallet to send transactions, check your funds, stake coda, and create zk-SNARKs to compress transactions.
+The GUI Wallet is the easiest way to connect to the Coda network and run a node. You can use the wallet to send transactions and check your funds.
+
+Our Coda Wallet provides a graphical user interface (GUI) for simplifying the operation of Coda. The current version of the GUI Wallet will enable you to play with some of the core features of the protocol, including sending transactions between multiple accounts and checking funds.
 
 ## Installation
 
-You'll need to make sure TCP ports 8302 and 8303 are open on your router. You can check out our [Getting Started](/docs/getting-started/) guide for more details.
+The Wallet needs to connect to a daemon in order to work, but you will be guided through the process of setting up a node when you first launch the wallet. If you already are running a node, you can use that one.
 
-If you have your ports open, the GUI wallet will be able to start Coda for you in the background.
-
-Alternatively, if you already have a node running, the wallet will notice and connect to that running Coda node.
+Alternatively, if you are already running a node, for example, via the sandbox node, the wallet will detect and connect to it automatically.
 
 ### MacOS
 
-Stay Tuned!
+[Download the latest build here](https://github.com/CodaProtocol/coda/releases/download/wallet-v0.1.2-beta/CodaWallet-0.1.2.dmg)
 
-<!-- [Download the latest build here](https://github.com/CodaProtocol/coda/releases/download/0.1.1-wallet-compat-0.0.11-beta/Coda.Wallet.0.1.1.dmg)
+Open the DMG file and drag the wallet into your Applications folder.
 
-Open the DMG file and drag the wallet into your Applications folder  -->
+The first time you run the wallet you will see this screeen:
+
+![Screenshot of security warning screen.](/static/img/coda-wallet-security-warn.png)
+
+You will need to go to Settings, open Security & Privacy, and then click "Allow" as seen in the screenshot below. Afterwards, the Coda Wallet will open.
+
+![Screenshot of security preferences](/static/img/coda-wallet-security-preferences.png)
 
 ### Linux
 
-Stay Tuned!
+Coming soon!
 
-<!-- [Download the latest build here](https://github.com/CodaProtocol/coda/releases/download/0.1.1-wallet-compat-0.0.11-beta/Coda.Wallet.0.1.1.AppImage)
+### Windows
 
-1. Download the AppImage file
-2. `chmod +x` the file
-3. Run the appimage in a terminal
-
-[AppImage](https://appimage.org/) supports Ubuntu/Debian, Fedora, and many others.
--->
+Windows isn't supported at this time.
 
 ## Setup
 
-When you open the Wallet for the first time you'll be guided through a few steps to create an account and begin using Coda. If you get stuck on anything head over to the Discord and ask for help in the #product channel.
+When you open the Wallet for the first time you'll be guided through a few steps to setup your node, create an account and begin using Coda.
+
+If you get stuck on anything head over to [Discord](https://bit.ly/CodaDiscord) and ask for help in the #product channel.

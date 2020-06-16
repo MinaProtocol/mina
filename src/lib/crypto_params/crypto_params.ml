@@ -1,18 +1,5 @@
 open Core
 include Curve_choice
-module Pedersen_params = Pedersen_params
-module Pedersen_chunk_table = Pedersen_chunk_table
-
-module Tick_pedersen = Chunked_pedersen_lib.Pedersen.Make (struct
-  open Tick0
-  module Field = Field
-  module Bigint = Bigint
-  module Curve = Tick_backend.Inner_curve
-
-  let params = Pedersen_params.params
-
-  let chunk_table = Pedersen_chunk_table.chunk_table
-end)
 
 module Tock_backend = struct
   module Full = Cycle.Mnt6
@@ -21,11 +8,7 @@ module Tock_backend = struct
     let bg_salt =
       lazy (Random_oracle.salt (Hash_prefixes.bowe_gabizon_hash :> string))
 
-    let bg_params =
-      Group_map.Params.create
-        (module Tick0.Field)
-        ~a:Tick_backend.Inner_curve.Coefficients.a
-        ~b:Tick_backend.Inner_curve.Coefficients.b
+    let bg_params () = Lazy.force Group_map_params.params
 
     include Snarky.Libsnark.Make_bowe_gabizon
               (Full)
@@ -43,8 +26,8 @@ module Tock_backend = struct
                 module G1 = Full.G1
                 module G2 = Full.G2
 
-                let group_map =
-                  Group_map.to_group (module Field) ~params:bg_params
+                let group_map x =
+                  Group_map.to_group (module Field) ~params:(bg_params ()) x
 
                 let hash xs = Random_oracle.hash ~init:(Lazy.force bg_salt) xs
               end))
@@ -52,15 +35,12 @@ module Tock_backend = struct
     module Field = Full.Field
     module Bigint = Full.Bigint
     module Var = Full.Var
-    module R1CS_constraint = Full.R1CS_constraint
 
     module R1CS_constraint_system = struct
       include Full.R1CS_constraint_system
 
       let finalize = swap_AB_if_beneficial
     end
-
-    module Linear_combination = Full.Linear_combination
 
     let field_size = Full.field_size
   end

@@ -1,18 +1,14 @@
 open Core
 open Async
-open Signature_lib
 
 let name = "coda-bootstrap-test"
 
 let main () =
   let logger = Logger.create () in
-  let largest_account_keypair =
-    Test_genesis_ledger.largest_account_keypair_exn ()
-  in
   let n = 2 in
   let block_production_keys i = Some i in
   let snark_work_public_keys i =
-    if i = 0 then Some (Public_key.compress largest_account_keypair.public_key)
+    if i = 0 then Some (Test_genesis_ledger.largest_account_pk_exn ())
     else None
   in
   let%bind testnet =
@@ -37,8 +33,7 @@ let main () =
     Coda_worker_testnet.Restarts.trigger_bootstrap testnet ~logger
       ~node:bootstrapping_node
   in
-  let%bind () = after (Time.Span.of_sec 180.) in
-  (* TODO: one of the previous_statuses should be `Bootstrap. The broadcast pip 
+  (* TODO: one of the previous_statuses should be `Bootstrap. The broadcast pip
     coda.transition_frontier never gets set to None *)
   assert (Hash_set.mem previous_status `Synced) ;
   Coda_worker_testnet.Api.teardown testnet ~logger
