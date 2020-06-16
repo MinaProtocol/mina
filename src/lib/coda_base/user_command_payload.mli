@@ -166,6 +166,8 @@ val fee_payer_pk : t -> Public_key.Compressed.t
 
 val fee_payer : t -> Account_id.t
 
+val fee_excess : t -> Fee_excess.t
+
 val nonce : t -> Coda_numbers.Account_nonce.t
 
 val valid_until : t -> Coda_numbers.Global_slot.t

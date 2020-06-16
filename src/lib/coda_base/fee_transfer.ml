@@ -31,6 +31,8 @@ module Single = struct
 
   let fee (_, fee) = fee
 
+  let fee_token _ = Token_id.default
+
   module Gen = struct
     let with_random_receivers ~keys ~max_fee : t Quickcheck.Generator.t =
       let open Quickcheck.Generator.Let_syntax in
@@ -60,14 +62,20 @@ include Comparable.Make (Stable.Latest)
 
 let fee_excess = function
   | `One (_, fee) ->
-      Ok (Currency.Fee.Signed.negate @@ Currency.Fee.Signed.of_unsigned fee)
+      Ok
+        (Fee_excess.of_single
+           (Token_id.default, Currency.Fee.Signed.(negate (of_unsigned fee))))
   | `Two ((_, fee1), (_, fee2)) -> (
     match Currency.Fee.add fee1 fee2 with
     | None ->
         Or_error.error_string "Fee_transfer.fee_excess: overflow"
     | Some res ->
-        Ok (Currency.Fee.Signed.negate @@ Currency.Fee.Signed.of_unsigned res)
+        Ok
+          (Fee_excess.of_single
+             (Token_id.default, Currency.Fee.Signed.(negate (of_unsigned res))))
     )
+
+let fee_token _ = Token_id.default
 
 let receivers t = One_or_two.map t ~f:(fun (pk, _) -> pk)
 
