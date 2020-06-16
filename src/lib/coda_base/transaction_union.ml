@@ -78,7 +78,7 @@ let of_transaction : Transaction.t -> t = function
                 ; valid_until= Coda_numbers.Global_slot.max_value
                 ; memo= User_command_memo.empty }
             ; body=
-                { source_pk= pk2
+                { source_pk= pk1
                 ; receiver_pk= pk1
                 ; token_id
                 ; amount= Amount.of_fee fee1

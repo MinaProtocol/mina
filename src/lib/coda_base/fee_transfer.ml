@@ -43,7 +43,7 @@ module Single = struct
 
   let fee {fee; _} = fee
 
-  let fee_token _ = Token_id.default
+  let fee_token {fee_token; _} = fee_token
 
   module Gen = struct
     let with_random_receivers ~keys ~max_fee ~token : t Quickcheck.Generator.t
@@ -124,6 +124,8 @@ let receiver_pks t =
   One_or_two.to_list (One_or_two.map ~f:Single.receiver_pk t)
 
 let receivers t = One_or_two.to_list (One_or_two.map ~f:Single.receiver t)
+
+let fee_tokens = One_or_two.map ~f:Single.fee_token
 
 let map = One_or_two.map
 

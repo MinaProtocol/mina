@@ -670,6 +670,14 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
   let process_fee_transfer t (transfer : Fee_transfer.t) ~modify_balance =
     let open Or_error.Let_syntax in
     (* TODO(#4555): Allow token_id to vary from default. *)
+    let%bind () =
+      if
+        List.for_all
+          ~f:Token_id.(equal default)
+          (One_or_two.to_list Fee_transfer.fee_tokens transfer)
+      then return ()
+      else Or_error.errorf "Cannot pay fees in non-default tokens."
+    in
     match Fee_transfer.to_singles transfer with
     | `One ft ->
         let account_id = Fee_transfer.Single.receiver ft in

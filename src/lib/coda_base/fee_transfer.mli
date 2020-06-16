@@ -80,7 +80,9 @@ val of_singles : Single.t One_or_two.t -> t Or_error.t
 
 val fee_excess : t -> Fee_excess.t Or_error.t
 
-val fee_token : t -> Token_id.t
+val fee_token : single -> Token_id.t
+
+val fee_tokens : t -> Token_id.t One_or_two.t
 
 val receiver_pks : t -> Public_key.Compressed.t list
 
