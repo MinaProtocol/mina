@@ -95,7 +95,7 @@ module Go_log = struct
       ; message= r.message
       ; metadata=
           String.Map.singleton "go_message_id" (`String (Int64.to_string r.id))
-      }
+      ; event_id= None }
 end
 
 module Helper = struct

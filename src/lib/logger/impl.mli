@@ -53,7 +53,8 @@ module Message : sig
     ; level: Level.t
     ; source: Source.t option
     ; message: string
-    ; metadata: Metadata.t }
+    ; metadata: Metadata.t
+    ; event_id: Structured_log_events.id option }
   [@@deriving yojson]
 end
 
@@ -107,6 +108,7 @@ type 'a log_function =
   -> module_:string
   -> location:string
   -> ?metadata:(string, Yojson.Safe.t) List.Assoc.t
+  -> ?event_id:Structured_log_events.id
   -> ('a, unit, string, unit) format4
   -> 'a
 

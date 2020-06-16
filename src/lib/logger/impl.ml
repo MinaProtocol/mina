@@ -88,7 +88,8 @@ module Message = struct
     ; level: Level.t
     ; source: Source.t option [@default None]
     ; message: string
-    ; metadata: Metadata.t }
+    ; metadata: Metadata.t
+    ; event_id: Structured_log_events.id option [@default None] }
   [@@deriving yojson]
 
   let escape_chars = ['"'; '\\']
@@ -325,13 +326,15 @@ let extend t metadata = {t with metadata= Metadata.extend t.metadata metadata}
 
 let change_id {null; metadata; id= _} ~id = {null; metadata; id}
 
-let make_message (t : t) ~level ~module_ ~location ~metadata ~message =
+let make_message (t : t) ~level ~module_ ~location ~metadata ~message ~event_id
+    =
   { Message.timestamp= Time.now ()
   ; level
   ; source= Some (Source.create ~module_ ~location)
   ; message
   ; metadata=
-      Metadata.extend (Metadata.extend t.metadata metadata) !global_metadata }
+      Metadata.extend (Metadata.extend t.metadata metadata) !global_metadata
+  ; event_id }
 
 let raw ({id; _} as t) msg =
   if t.null then ()
@@ -339,9 +342,10 @@ let raw ({id; _} as t) msg =
     Consumer_registry.broadcast_log_message ~id msg
   else failwithf "invalid log call \"%s\"" (String.escaped msg.message) ()
 
-let log t ~level ~module_ ~location ?(metadata = []) fmt =
+let log t ~level ~module_ ~location ?(metadata = []) ?event_id fmt =
   let f message =
-    raw t @@ make_message t ~level ~module_ ~location ~metadata ~message
+    raw t
+    @@ make_message t ~level ~module_ ~location ~metadata ~message ~event_id
   in
   ksprintf f fmt
 
@@ -350,6 +354,7 @@ type 'a log_function =
   -> module_:string
   -> location:string
   -> ?metadata:(string, Yojson.Safe.t) List.Assoc.t
+  -> ?event_id:Structured_log_events.id
   -> ('a, unit, string, unit) format4
   -> 'a
 
@@ -367,7 +372,7 @@ let fatal = log ~level:Fatal
 
 let faulty_peer_without_punishment = log ~level:Faulty_peer
 
-let spam = log ~level:Spam ~module_:"" ~location:""
+let spam = log ~level:Spam ~module_:"" ~location:"" ?event_id:None
 
 (* deprecated, use Trust_system.record instead *)
 let faulty_peer = faulty_peer_without_punishment
