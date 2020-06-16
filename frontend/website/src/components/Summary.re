@@ -19,7 +19,7 @@ module Styles = {
       paddingTop(`rem(2.8)),
       media(Theme.MediaQuery.notMobile, [alignItems(`center)]),
       media(
-        Theme.MediaQuery.tablet,
+        Theme.MediaQuery.desktop,
         [flexDirection(`row), paddingTop(`zero), marginTop(`rem(3.5))],
       ),
     ]);
@@ -75,10 +75,7 @@ module Styles = {
     ]);
 
   let heroLeft =
-    style([
-      // maxWidth(`rem(38.)),
-      media(Theme.MediaQuery.tablet, [marginTop(`rem(-3.5))]),
-    ]);
+    style([media(Theme.MediaQuery.tablet, [marginBottom(`rem(3.))])]);
   let heroRight =
     style([
       display(`flex),
@@ -88,13 +85,9 @@ module Styles = {
       unsafe("width", "fit-content"),
       media(
         Theme.MediaQuery.tablet,
-        [
-          minHeight(`rem(21.)),
-          marginLeft(`rem(6.)),
-          paddingLeft(`zero),
-          alignItems(`center),
-        ],
+        [minHeight(`rem(21.)), paddingLeft(`zero), alignItems(`center)],
       ),
+      media(Theme.MediaQuery.tablet, [marginTop(`zero)]),
     ]);
   let flexColumn =
     style([
@@ -147,10 +140,7 @@ module StatisticsRow = {
         justifyContent(`spaceAround),
         media(
           Theme.MediaQuery.tablet,
-          [
-            gridTemplateColumns([`rem(12.), `rem(12.), `rem(12.)]),
-            // marginTop(`rem(3.5)),
-          ],
+          [gridTemplateColumns([`rem(12.), `rem(12.), `rem(12.)])],
         ),
       ]);
     let flexColumn =
