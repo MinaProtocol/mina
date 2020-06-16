@@ -31,6 +31,10 @@ type Structured_log_events.t += Ledger_catchup
 type Structured_log_events.t += Synced
   [@@deriving register_event {msg= "Coda daemon is now synced"}]
 
+type Structured_log_events.t +=
+  | Rebroadcast_transition of {state_hash: State_hash.t}
+  [@@deriving register_event {msg= "Rebroadcasting $state_hash"}]
+
 exception Snark_worker_error of int
 
 exception Snark_worker_signal_interrupt of Signal.t
@@ -1155,14 +1159,13 @@ let create (config : Config.t) =
                       consensus_state
                   with
                   | Ok () ->
-                      Logger.trace config.logger ~module_:__MODULE__
+                      Logger.Str.trace config.logger ~module_:__MODULE__
                         ~location:__LOC__
                         ~metadata:
-                          [ ("state_hash", State_hash.to_yojson hash)
-                          ; ( "external_transition"
+                          [ ( "external_transition"
                             , External_transition.Validated.to_yojson
                                 transition ) ]
-                        "Rebroadcasting $state_hash" ;
+                        (Rebroadcast_transition {state_hash= hash}) ;
                       External_transition.Validated.broadcast transition
                   | Error reason -> (
                       let timing_error_json =
