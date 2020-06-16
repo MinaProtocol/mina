@@ -22,7 +22,7 @@ Pipeline.build
             Cmd.Docker::{
               image = (../../Constants/ContainerImages.dhall).toolchainBase
             }
-            "make libp2p_helper"
+            "( cat Makefile | grep libp2p_helper ) && make libp2p_helper"
         ],
         label = "Libp2p helper",
         key = "build-client-sdk",
