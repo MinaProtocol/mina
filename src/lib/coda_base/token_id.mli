@@ -1,6 +1,7 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
+open Import
 
 [%%ifdef consensus_mechanism]
 
@@ -9,7 +10,6 @@ open Tick
 
 [%%else]
 
-module Random_oracle = Random_oracle_nonconsensus
 open Snark_params_nonconsensus
 
 [%%endif]

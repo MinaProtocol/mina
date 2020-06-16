@@ -2,6 +2,7 @@
 "/src/config.mlh"]
 
 open Core_kernel
+open Import
 
 module T = Coda_numbers.Nat.Make64 ()
 
