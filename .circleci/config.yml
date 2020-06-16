@@ -571,7 +571,7 @@ jobs:
                         if [[ "$CODA_WAS_PUBLISHED" = true  ]]; then
 
                               echo "$DOCKER_PASSWORD" | docker login --username $DOCKER_USERNAME --password-stdin
-                              ./scripts/skip_if_only_frontend_or_rfcs.sh scripts/release-docker.sh \
+                              scripts/release-docker.sh \
                               -s coda-daemon \
                               -v $CODA_GIT_TAG-$CODA_GIT_BRANCH-$CODA_GIT_HASH \
                               --extra-args "--build-arg coda_version=$CODA_DEB_VERSION --build-arg deb_repo=$CODA_DEB_REPO"
@@ -602,7 +602,7 @@ jobs:
                         if [[ "$CODA_WAS_PUBLISHED" = true  ]]; then
 
                               echo "$DOCKER_PASSWORD" | docker login --username $DOCKER_USERNAME --password-stdin
-                              ./scripts/skip_if_only_frontend_or_rfcs.sh scripts/release-docker.sh \
+                              scripts/release-docker.sh \
                               -s coda-demo \
                               -v $CODA_GIT_TAG-$CODA_GIT_BRANCH-$CODA_GIT_HASH \
                               --extra-args "--build-arg coda_version=$CODA_DEB_VERSION --build-arg deb_repo=$CODA_DEB_REPO"
