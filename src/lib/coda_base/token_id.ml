@@ -2,7 +2,13 @@
 "/src/config.mlh"]
 
 open Core_kernel
+
+[%%ifndef
+consensus_mechanism]
+
 open Import
+
+[%%endif]
 
 module T = Coda_numbers.Nat.Make64 ()
 
