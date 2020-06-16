@@ -6,6 +6,71 @@ module Styles = {
       margin(`auto),
       media(Theme.MediaQuery.tablet, [maxWidth(`rem(89.))]),
     ]);
+  let filters =
+    style([
+      display(`flex),
+      flexDirection(`column),
+      media(Theme.MediaQuery.notMobile, [flexDirection(`row)]),
+      justifyContent(`spaceBetween),
+      width(`percent(100.)),
+    ]);
+  let searchBar = style([display(`flex), flexDirection(`column)]);
+  let textField =
+    style([
+      display(`inlineFlex),
+      alignItems(`center),
+      height(px(40)),
+      borderRadius(px(4)),
+      width(`percent(100.)),
+      fontSize(rem(1.)),
+      color(Theme.Colors.teal),
+      textTransform(`uppercase),
+      padding(px(12)),
+      marginTop(`rem(0.5)),
+      border(px(1), `solid, Theme.Colors.hyperlinkAlpha(0.3)),
+      active([
+        outline(px(0), `solid, `transparent),
+        padding(px(11)),
+        borderWidth(px(2)),
+        borderColor(Theme.Colors.hyperlinkAlpha(1.)),
+      ]),
+      focus([
+        outline(px(0), `solid, `transparent),
+        padding(px(11)),
+        borderWidth(px(2)),
+        borderColor(Theme.Colors.hyperlinkAlpha(1.)),
+      ]),
+      hover([borderColor(Theme.Colors.hyperlinkAlpha(1.))]),
+      selector(
+        "::placeholder",
+        [
+          fontSize(`px(12)),
+          fontWeight(normal),
+          color(Theme.Colors.slateAlpha(0.7)),
+        ],
+      ),
+      media(Theme.MediaQuery.notMobile, [width(`rem(39.))]),
+    ]);
+};
+
+module SearchBar = {
+  [@react.component]
+  let make = () => {
+    let (input, setInput) = React.useState(() => "");
+    <div className=Styles.searchBar>
+      <span className=Theme.H5.semiBold> {React.string("Find")} </span>
+      <input
+        type_="text"
+        value=input
+        placeholder="Search:"
+        onChange={e => {
+          let value = ReactEvent.Form.target(e)##value;
+          setInput(_ => value);
+        }}
+        className=Styles.textField
+      />
+    </div>;
+  };
 };
 
 module ToggleButtons = {
@@ -83,7 +148,10 @@ let make = (~lastManualUpdatedDate) => {
   <Page title="Testnet Leaderboard">
     <Wrapped>
       <div className=Styles.page> <Summary lastManualUpdatedDate /> </div>
-      <ToggleButtons currentOption={state.currentOption} onTogglePress />
+      <div className=Styles.filters>
+        <SearchBar />
+        <ToggleButtons currentOption={state.currentOption} onTogglePress />
+      </div>
     </Wrapped>
   </Page>;
 };
