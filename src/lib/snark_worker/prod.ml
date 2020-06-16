@@ -86,7 +86,7 @@ module Inputs = struct
                 (input, t, (w : Transaction_witness.t)) ->
                 process (fun () ->
                     Or_error.try_with (fun () ->
-                        M.of_transaction ~sok_digest
+                        M.of_transaction ~sok_digest ~init_stack:w.init_stack
                           ~source:input.Transaction_snark.Statement.source
                           ~target:input.target
                           { Transaction_protocol_state.Poly.transaction= t

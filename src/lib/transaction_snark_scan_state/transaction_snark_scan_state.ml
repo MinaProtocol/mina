@@ -36,6 +36,9 @@ module Transaction_with_witness = struct
         { transaction_with_info: Transaction_logic.Undo.Stable.V1.t
         ; state_hash: State_hash.Stable.V1.t * State_body_hash.Stable.V1.t
         ; statement: Transaction_snark.Statement.Stable.V1.t
+        ; init_stack:
+            Transaction_snark.Pending_coinbase_stack_state.Init_stack.Stable.V1
+            .t
         ; ledger_witness: Coda_base.Sparse_ledger.Stable.V1.t sexp_opaque }
       [@@deriving sexp]
 
@@ -48,6 +51,7 @@ module Transaction_with_witness = struct
     { transaction_with_info: Ledger.Undo.t
     ; state_hash: State_hash.t * State_body_hash.t
     ; statement: Transaction_snark.Statement.t
+    ; init_stack: Transaction_snark.Pending_coinbase_stack_state.Init_stack.t
     ; ledger_witness: Coda_base.Sparse_ledger.t sexp_opaque }
   [@@deriving sexp]
 end
@@ -165,6 +169,7 @@ let create_expected_statement ~constraint_constants
     { Transaction_with_witness.transaction_with_info
     ; state_hash
     ; ledger_witness
+    ; init_stack
     ; statement } =
   let open Or_error.Let_syntax in
   let source =
@@ -181,7 +186,7 @@ let create_expected_statement ~constraint_constants
     Frozen_ledger_hash.of_ledger_hash @@ Sparse_ledger.merkle_root after
   in
   let%bind pending_coinbase_before =
-    match statement.pending_coinbase_stack_state.init_stack with
+    match init_stack with
     | Base source ->
         Ok source
     | Merge ->
@@ -242,8 +247,7 @@ let completed_work_to_scanable_work (job : job) (fee, current_proof, prover) :
         ; supply_increase
         ; pending_coinbase_stack_state=
             { source= s.pending_coinbase_stack_state.source
-            ; target= s'.pending_coinbase_stack_state.target
-            ; init_stack= Merge }
+            ; target= s'.pending_coinbase_stack_state.target }
         ; fee_excess
         ; sok_digest= () }
       in
@@ -437,8 +441,7 @@ let statement_of_job : job -> Transaction_snark.Statement.t option = function
       ; supply_increase
       ; pending_coinbase_stack_state=
           { source= stmt1.pending_coinbase_stack_state.source
-          ; target= stmt2.pending_coinbase_stack_state.target
-          ; init_stack= Merge }
+          ; target= stmt2.pending_coinbase_stack_state.target }
       ; fee_excess
       ; sok_digest= () }
 
@@ -519,8 +522,7 @@ let partition_if_overflowing t =
 let extract_from_job (job : job) =
   match job with
   | Parallel_scan.Available_job.Base d ->
-      First
-        (d.transaction_with_info, d.statement, d.state_hash, d.ledger_witness)
+      First (d, d.statement, d.state_hash, d.ledger_witness)
   | Merge ((p1, _), (p2, _)) ->
       Second (p1, p2)
 
@@ -584,17 +586,27 @@ let all_work_pairs t
   let open Or_error.Let_syntax in
   let single_spec (job : job) =
     match extract_from_job job with
-    | First (transaction_with_info, statement, state_hash, ledger_witness) ->
-        let%bind transaction = Ledger.Undo.transaction transaction_with_info in
-        let%map protocol_state_body =
+    | First (d, statement, state_hash, ledger_witness) ->
+        let%bind transaction =
+          Ledger.Undo.transaction d.transaction_with_info
+        in
+        let%bind protocol_state_body =
           let%map state = get_state (fst state_hash) in
           Coda_state.Protocol_state.body state
+        in
+        let%map init_stack =
+          match d.init_stack with
+          | Base x ->
+              Ok x
+          | Merge ->
+              Or_error.error_string "init_stack was Merge"
         in
         Snark_work_lib.Work.Single.Spec.Transition
           ( statement
           , transaction
-          , {Transaction_witness.ledger= ledger_witness; protocol_state_body}
-          )
+          , { Transaction_witness.ledger= ledger_witness
+            ; protocol_state_body
+            ; init_stack } )
     | Second (p1, p2) ->
         let%map merged =
           Transaction_snark.Statement.merge

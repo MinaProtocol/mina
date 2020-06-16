@@ -38,7 +38,10 @@ module Worker_state = struct
                  ~key:bc_vk
 
              let verify_transaction_snarks ts =
-               match Or_error.try_with (fun () -> T.verify ts) with
+               match
+                 Or_error.try_with (fun () ->
+                     Transaction_snark.verify ~key:tx_vk ts )
+               with
                | Ok result ->
                    result
                | Error e ->
