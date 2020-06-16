@@ -1015,7 +1015,7 @@ let create (config : Config.t)
                  |> Blockchain_state.timestamp |> Block_time.to_time )) ;
             if config.log_gossip_heard.new_state then
               Logger.debug config.logger ~module_:__MODULE__ ~location:__LOC__
-                "Received a block $block from $sender"
+                "Received a block $external_transition from $sender"
                 ~metadata:
                   [ ("external_transition", External_transition.to_yojson state)
                   ; ( "state_hash"
