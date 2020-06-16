@@ -125,6 +125,8 @@ let receiver_pks t =
 
 let receivers t = One_or_two.to_list (One_or_two.map ~f:Single.receiver t)
 
+let fee_token = Single.fee_token
+
 let fee_tokens = One_or_two.map ~f:Single.fee_token
 
 let map = One_or_two.map
