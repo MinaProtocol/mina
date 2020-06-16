@@ -47,7 +47,7 @@ module Tick0 = struct
 end
 
 let%test_unit "group-map test" =
-  let params = Crypto_params.Tock.group_map_params in
+  let params = Crypto_params.Tock.group_map_params () in
   let module M = Crypto_params.Tick.Run in
   Quickcheck.test ~trials:3 Tick0.Field.gen ~f:(fun t ->
       let (), checked_output =
@@ -235,14 +235,13 @@ let target_bit_length = Tick.Field.size_in_bits - 8
 module type Snark_intf = Snark_intf.S
 
 module Group_map = struct
-  let to_group =
-    Group_map.to_group (module Tick.Field) ~params:Tock.group_map_params
+  let to_group x =
+    Group_map.to_group (module Tick.Field) ~params:(Tock.group_map_params ()) x
 
   module Checked = struct
     let to_group x =
       Snarky_group_map.Checked.to_group
         (module Tick.Run)
-        ~params:(Tock_backend.bg_params ())
-        x
+        ~params:(Tock.group_map_params ()) x
   end
 end
