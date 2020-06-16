@@ -317,6 +317,9 @@ let amount (t : t) =
   | Stake_delegation _ ->
       None
 
+let fee_excess (t : t) =
+  Fee_excess.of_single (fee_token t, Currency.Fee.Signed.of_unsigned (fee t))
+
 let is_payment (t : t) =
   match t.body with Payment _ -> true | Stake_delegation _ -> false
 
