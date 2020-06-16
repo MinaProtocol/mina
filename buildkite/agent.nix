@@ -47,6 +47,9 @@
 # Stick deps in here
 let
   deps = with pkgs; [
+    # cachix
+    cachix
+
     # buildkite
     buildkite-agent
 

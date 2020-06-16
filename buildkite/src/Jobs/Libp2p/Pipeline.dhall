@@ -20,7 +20,7 @@ Pipeline.build
         commands = [
           Cmd.runInDocker
             Cmd.Docker::{
-              image = (../../Constants/ContainerImages.dhall).cachix1909
+              image = (../../Constants/ContainerImages.dhall).toolchainBase
             }
             "make libp2p_helper"
         ],
