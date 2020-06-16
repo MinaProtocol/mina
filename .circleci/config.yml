@@ -546,7 +546,7 @@ jobs:
                 key: docker-deploy-env-v1-testnet_postake_medium_curves-{{ .Revision }}
                 paths:
                     - "/tmp/DOCKER_DEPLOY_ENV"
-                    - "home/opam/scripts"
+                    - "scripts"
             - store_artifacts:
                   path: /tmp/artifacts
     build-artifacts-docker--testnet_postake_medium_curves--coda-daemon:
