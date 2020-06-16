@@ -178,11 +178,12 @@ let to_input {fee_token_l; fee_excess_l; fee_token_r; fee_excess_r} =
 consensus_mechanism]
 
 let to_input_checked {fee_token_l; fee_excess_l; fee_token_r; fee_excess_r} =
-  let open Random_oracle.Input in
-  List.reduce_exn ~f:append
-    [ Token_id.Checked.to_input fee_token_l
+  let%map fee_token_l = Token_id.Checked.to_input fee_token_l
+  and fee_token_r = Token_id.Checked.to_input fee_token_r in
+  List.reduce_exn ~f:Random_oracle.Input.append
+    [ fee_token_l
     ; Fee.Signed.Checked.to_input fee_excess_l
-    ; Token_id.Checked.to_input fee_token_r
+    ; fee_token_r
     ; Fee.Signed.Checked.to_input fee_excess_r ]
 
 [%%endif]
