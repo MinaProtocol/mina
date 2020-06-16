@@ -2,6 +2,36 @@ open Core
 open Async
 open Coda_base
 
+type Structured_log_events.t +=
+  | Merge_snark_generated of
+      { time:
+          (Time.Span.t[@to_yojson
+                        fun total -> `String (Time.Span.to_string_hum total)]
+                      [@of_yojson
+                        function
+                        | `String time ->
+                            Ok (Time.Span.of_string time)
+                        | _ ->
+                            Error
+                              "Snark_worker.Functor: Could not parse timespan"])
+      }
+  [@@deriving register_event {msg= "Merge SNARK generated in $time"}]
+
+type Structured_log_events.t +=
+  | Base_snark_generated of
+      { time:
+          (Time.Span.t[@to_yojson
+                        fun total -> `String (Time.Span.to_string_hum total)]
+                      [@of_yojson
+                        function
+                        | `String time ->
+                            Ok (Time.Span.of_string time)
+                        | _ ->
+                            Error
+                              "Snark_worker.Functor: Could not parse timespan"])
+      }
+  [@@deriving register_event {msg= "Base SNARK generated in $time"}]
+
 module Make (Inputs : Intf.Inputs_intf) :
   Intf.S0 with type ledger_proof := Inputs.Ledger_proof.t = struct
   open Inputs

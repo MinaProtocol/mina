@@ -6,6 +6,9 @@ open Pipe_lib.Strict_pipe
 open Coda_transition
 open Network_peer
 
+type Structured_log_events.t += Bootstrap_complete
+  [@@deriving register_event {msg= "Bootstrap state: complete."}]
+
 type t =
   { logger: Logger.t
   ; trust_system: Trust_system.t

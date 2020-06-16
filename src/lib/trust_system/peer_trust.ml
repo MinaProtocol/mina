@@ -24,7 +24,7 @@ let max_rate secs =
 
 module type Input_intf = sig
   module Peer_id : sig
-    type t [@@deriving sexp, to_yojson]
+    type t [@@deriving sexp, yojson]
   end
 
   module Now : sig
@@ -46,6 +46,35 @@ end
 
 module Make0 (Inputs : Input_intf) = struct
   open Inputs
+
+  let ban_message =
+    if tmp_bans_are_disabled then
+      "Would ban peer $peer_id until $expiration due to $action, refusing due \
+       to trust system being disabled"
+    else "Banning peer $peer_id until $expiration due to $action"
+
+  (* TODO: Split per action. *)
+  type Structured_log_events.t +=
+    | Peer_banned of
+        { peer_id: Peer_id.t
+        ; expiration:
+            (Time.t[@to_yojson
+                     fun expiration ->
+                       `String
+                         (Time.to_string_abs expiration ~zone:Time.Zone.utc)]
+                   [@of_yojson
+                     function
+                     | `String time ->
+                         Ok
+                           (Time.of_string_gen
+                              ~if_no_timezone:(`Use_this_one Time.Zone.utc)
+                              time)
+                     | _ ->
+                         Error "Trust_system.Peer_trust: Could not parse time"])
+        ; action: string
+        ; action_metadata:
+            (Yojson.Safe.t[@to_yojson Fn.id] [@of_yojson Result.return]) }
+    [@@deriving register_event {msg= ban_message}]
 
   type t =
     { db: Db.t option
@@ -140,12 +169,6 @@ module Make0 (Inputs : Input_intf) = struct
     let%map () =
       match (simple_old.banned, simple_new.banned) with
       | Unbanned, Banned_until expiration ->
-          let message =
-            if tmp_bans_are_disabled then
-              "Would ban peer $peer_id until $expiration due to $action, \
-               refusing due to trust system being disabled"
-            else "Banning peer $peer_id until $expiration due to $action"
-          in
           Logger.faulty_peer_without_punishment logger ~module_:__MODULE__
             ~location:__LOC__
             ~metadata:
@@ -155,7 +178,7 @@ module Make0 (Inputs : Input_intf) = struct
                   )
                 ; ("action", `String action_fmt) ]
               @ action_metadata )
-            "%s" message ;
+            "%s" ban_message ;
           if Option.is_some db then (
             Coda_metrics.Gauge.inc_one Coda_metrics.Trust_system.banned_peers ;
             if tmp_bans_are_disabled then Deferred.unit
@@ -398,6 +421,12 @@ module Make (Action : Action_intf) = Make0 (struct
     include Unix.Inet_addr.Blocking_sexp
 
     let to_yojson x = `String (Unix.Inet_addr.to_string x)
+
+    let of_yojson = function
+      | `String addr ->
+          Result.return (Unix.Inet_addr.of_string addr)
+      | _ ->
+          Error "Trust_system.Peer_id.of_yojson"
   end
 
   module Now = struct

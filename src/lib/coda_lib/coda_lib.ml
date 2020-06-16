@@ -16,6 +16,21 @@ module Config = Config
 module Subscriptions = Coda_subscriptions
 module Snark_worker_lib = Snark_worker
 
+type Structured_log_events.t += Connecting
+  [@@deriving register_event {msg= "Coda daemon is now connecting"}]
+
+type Structured_log_events.t += Listening
+  [@@deriving register_event {msg= "Coda daemon is now listening"}]
+
+type Structured_log_events.t += Bootstrapping
+  [@@deriving register_event {msg= "Coda daemon is now bootstrapping"}]
+
+type Structured_log_events.t += Ledger_catchup
+  [@@deriving register_event {msg= "Coda daemon is now doing ledger catchup"}]
+
+type Structured_log_events.t += Synced
+  [@@deriving register_event {msg= "Coda daemon is now synced"}]
+
 exception Snark_worker_error of int
 
 exception Snark_worker_signal_interrupt of Signal.t
