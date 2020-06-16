@@ -13,7 +13,7 @@ module type Action_intf = sig
 
   val to_trust_response : t -> Trust_response.t
 
-  val to_log : t -> string * (string, Yojson.Safe.json) List.Assoc.t
+  val to_log : t -> string * (string, Yojson.Safe.t) List.Assoc.t
 end
 
 let max_rate secs =
