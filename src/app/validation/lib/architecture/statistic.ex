@@ -1,0 +1,143 @@
+defmodule Architecture.Statistic do
+  @moduledoc "`#{__MODULE__}` defines the implementation and process architecture sorrounding statistics."
+
+  alias Architecture.LogProvider
+  alias Architecture.Resource
+  alias Architecture.ResourceDatabase
+  alias Architecture.Timer
+
+  @callback log_providers :: [module]
+  @callback resources(ResourceDatabase.t()) :: ResourceDatabase.t()
+  @callback init(Resource.t()) :: struct
+  @callback update(Resource.t(), state) :: state when state: struct
+  @callback handle_log(Resource.t(), state, LogProvider.t(), LogProvider.log()) :: state
+            when state: struct
+
+  defmacro __using__(_params) do
+    quote do
+      @behaviour unquote(__MODULE__)
+    end
+  end
+
+  defmodule Junction do
+    use Architecture.Junction
+
+    def subscribe(statistic, resource), do: subscribe({statistic, resource})
+    def broadcast(statistic, resource, msg), do: broadcast({statistic, resource}, msg)
+  end
+
+  defmodule Spec do
+    use Class
+
+    defclass(
+      statistic: module,
+      resource_db: ResourceDatabase.t()
+    )
+  end
+
+  defmodule Broker do
+    alias Architecture.Statistic
+    require Logger
+
+    defmodule Params do
+      defstruct [:mod, :resource]
+    end
+
+    use GenServer
+
+    def start_link(params) do
+      Logger.info("starting #{__MODULE__} for #{params.resource.name}")
+
+      GenServer.start_link(
+        __MODULE__,
+        params,
+        name: String.to_atom(params.resource.name)
+      )
+    end
+
+    def update(server), do: GenServer.call(server, :update)
+
+    @impl true
+    def init(params) do
+      Logger.metadata(context: __MODULE__)
+      Logger.info("subscribing to log providers", process_module: __MODULE__)
+      Enum.each(params.mod.log_providers(), &LogProvider.Junction.subscribe(&1, params.resource))
+      state = params.mod.init(params.resource)
+      {:ok, {params, state}}
+    end
+
+    @impl true
+    def handle_cast({:subscription, provider, message}, {params, state}) do
+      state = params.mod.handle_log(params.resource, state, provider, message)
+      Statistic.Junction.broadcast(__MODULE__, params.resource, state)
+      {:noreply, {params, state}}
+    end
+
+    @impl true
+    def handle_call(:tick, _from, {params, state}) do
+      state = params.mod.update(params.resource, state)
+      Statistic.Junction.broadcast(__MODULE__, state)
+      {:reply, :ok, {params, state}}
+    end
+  end
+
+  defmodule MainSupervisor do
+    alias Architecture.Statistic
+
+    use Supervisor
+
+    # TODO: make configurable per statistic
+    @default_update_interval 20000
+
+    def start_link(statistics_spec) do
+      Supervisor.start_link(__MODULE__, statistics_spec, name: __MODULE__)
+    end
+
+    def init(stat_specs) do
+      # Logger.metadata(context: __MODULE__)
+
+      all_broker_child_specs = Enum.flat_map(stat_specs, &broker_child_specs/1)
+      children = [Statistic.Junction.child_spec() | all_broker_child_specs]
+
+      IO.puts("INIT Statistic.Supervisor")
+      IO.inspect(children)
+
+      Supervisor.init(children, strategy: :one_for_one)
+    end
+
+    @spec broker_child_specs(Statistic.Spec.t()) :: [Supervisor.child_spec()]
+    def broker_child_specs(stat_spec = %Statistic.Spec{}) do
+      if not Util.has_behaviour?(stat_spec.statistic, Architecture.Statistic) do
+        raise "#{inspect(stat_spec.statistic)} must be a Statistic"
+      end
+
+      stat_spec.statistic.resources(stat_spec.resource_db)
+      |> ResourceDatabase.all_resources()
+      |> Enum.map(fn resource ->
+        # We construct the following supervision tree for each statistic we compute:
+        #
+        #                      Timer.CoSupervisor
+        #                    /                    \
+        #             Statistic.Broker           Timer
+        #    (executing stat_spec.statistic)
+
+        # TEMP HACK: existence of resource.id is an unreasonable assumption
+        id = "#{Module.concat(stat_spec.statistic, resource.__struct__)}:#{resource.name}"
+
+        server_params = %Statistic.Broker.Params{
+          mod: stat_spec.statistic,
+          resource: resource
+        }
+
+        supervisor_params = %Timer.CoSupervisor.Params{
+          sidecar_mod: Statistic.Broker,
+          sidecar_arg: server_params,
+          update_interval: @default_update_interval
+        }
+
+        # IO.puts "#{id} -- #{inspect(supervisor_params)}"
+        Supervisor.child_spec({Timer.CoSupervisor, supervisor_params}, id: id)
+      end)
+    end
+  end
+end

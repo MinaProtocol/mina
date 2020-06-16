@@ -1,0 +1,2 @@
+defmodule Architecture do
+end

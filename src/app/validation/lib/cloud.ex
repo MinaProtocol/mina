@@ -1,0 +1,2 @@
+defmodule Cloud do
+end
