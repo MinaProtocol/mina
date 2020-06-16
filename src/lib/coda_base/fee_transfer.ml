@@ -105,20 +105,11 @@ let create_single ~receiver_pk ~fee ~fee_token =
 
 include Comparable.Make (Stable.Latest)
 
-let fee_excess = function
-  | `One (_, fee) ->
-      Ok
-        (Fee_excess.of_single
-           (Token_id.default, Currency.Fee.Signed.(negate (of_unsigned fee))))
-  | `Two ((_, fee1), (_, fee2)) -> (
-    match Currency.Fee.add fee1 fee2 with
-    | None ->
-        Or_error.error_string "Fee_transfer.fee_excess: overflow"
-    | Some res ->
-        Ok
-          (Fee_excess.of_single
-             (Token_id.default, Currency.Fee.Signed.(negate (of_unsigned res))))
-    )
+let fee_excess ft =
+  ft
+  |> One_or_two.map ~f:(fun {fee_token; fee; _} ->
+         (fee_token, Currency.Fee.Signed.(negate (of_unsigned fee))) )
+  |> Fee_excess.of_one_or_two
 
 let receiver_pks t =
   One_or_two.to_list (One_or_two.map ~f:Single.receiver_pk t)
