@@ -27,10 +27,8 @@ defmodule Architecture.Validation do
   defmodule Broker do
     use GenServer
 
-    def child_spec(mod, resource) do
+    def child_spec([mod, resource]) do
       %{
-        # TEMP HACK: existence of resource.id is an unreasonable assumption
-        id: "#{mod}:#{resource.__struct__}:#{resource.name}",
         type: :worker,
         start: {__MODULE__, :start_link, [mod, resource]},
         restart: :permanent,
@@ -41,7 +39,8 @@ defmodule Architecture.Validation do
     def start_link(mod, resource) do
       GenServer.start_link(
         __MODULE__,
-        {mod, resource}
+        {mod, resource},
+        name: String.to_atom("#{__MODULE__}:#{mod}:#{resource.name}")
       )
     end
 
@@ -49,11 +48,9 @@ defmodule Architecture.Validation do
     def init({mod, resource}) do
       Logger.metadata(context: __MODULE__)
       Logger.info("initializing")
-      # IO.puts("here...#{Enum.member?(Process.registered(), Architecture.Statistic.Junction)}")
 
       # TODO: pluralize
-      # validations = 
-      # Enum.map(...)
+      # validations = Enum.map(...)
       {:ok, {mod, resource}, {:continue, nil}}
     end
 
@@ -90,14 +87,21 @@ defmodule Architecture.Validation do
 
     @impl true
     def init(validation_specs) do
-      # children = Validation.Spec.child_specs(validations_spec)
       children =
         Enum.flat_map(validation_specs, fn spec ->
           ResourceDatabase.all_resources(spec.resource_db)
-          |> Enum.map(&Validation.Broker.child_spec(spec.validation, &1))
+          |> Enum.map(&broker_child_spec(spec.validation, &1))
         end)
 
       Supervisor.init(children, strategy: :one_for_one)
+    end
+
+    defp broker_child_spec(validation, resource) do
+      # TEMP HACK: existence of resource.id is an unreasonable assumption
+      Supervisor.child_spec(
+        {Validation.Broker, [validation, resource]},
+        id: "Validation.Broker:#{validation}:#{resource.name}"
+      )
     end
   end
 end

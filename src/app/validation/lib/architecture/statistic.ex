@@ -51,7 +51,7 @@ defmodule Architecture.Statistic do
       GenServer.start_link(
         __MODULE__,
         params,
-        name: String.to_atom(params.resource.name)
+        name: String.to_atom("#{__MODULE__}:#{params.mod}:#{params.resource.name}")
       )
     end
 
@@ -122,7 +122,6 @@ defmodule Architecture.Statistic do
         #    (executing stat_spec.statistic)
 
         # TEMP HACK: existence of resource.id is an unreasonable assumption
-        id = "#{Module.concat(stat_spec.statistic, resource.__struct__)}:#{resource.name}"
 
         server_params = %Statistic.Broker.Params{
           mod: stat_spec.statistic,
@@ -135,8 +134,12 @@ defmodule Architecture.Statistic do
           update_interval: @default_update_interval
         }
 
-        # IO.puts "#{id} -- #{inspect(supervisor_params)}"
-        Supervisor.child_spec({Timer.CoSupervisor, supervisor_params}, id: id)
+        broker_id = "Statistic.Broker:#{stat_spec.statistic}:#{resource.name}"
+        timer_cosup_id = "Timer.CoSupervisor:#{broker_id}"
+        Supervisor.child_spec(
+          {Timer.CoSupervisor, supervisor_params},
+          id: timer_cosup_id
+        )
       end)
     end
   end

@@ -26,7 +26,7 @@ iex(.)> CodaValidation.start([], [])
 - Fix auth token TTL expiration (refresh on interval?)
 - Design spot providers and unify with log providers
 - Implement aggregate statistics (as opposed to scalar statistics)
-- Implement statistics subscribig to statistics (switch to defining list of data sources; check for cycles)
+- Implement statistics subscribing to statistics (switch to defining list of data sources; check for cycles)
 - Implement planning (given resources and validation requests, plan all process requests)
   - May involve dynamic request graph?
 - Implement discord alerting backend

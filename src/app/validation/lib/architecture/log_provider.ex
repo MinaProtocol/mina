@@ -47,8 +47,10 @@ defmodule Architecture.LogProvider do
     @spec child_spec(LogProvider.Spec.t()) :: Supervisor.child_spec()
     def child_spec(spec) do
       %{
-        id: spec.log_provider,
-        start: {__MODULE__, :start_link, [spec]}
+        type: :worker,
+        start: {__MODULE__, :start_link, [spec]},
+        restart: :permanent,
+        modules: [__MODULE__, spec.log_provider]
       }
     end
 
@@ -60,6 +62,7 @@ defmodule Architecture.LogProvider do
     @spec init(LogProvider.Spec.t()) :: no_return
     def init(spec) do
       Logger.metadata(context: __MODULE__)
+      Process.register(self(), String.to_atom("#{__MODULE__}:#{spec.log_provider}"))
       run(spec)
     end
 
@@ -99,10 +102,17 @@ defmodule Architecture.LogProvider do
     def init(log_provider_specs) do
       children = [
         LogProvider.Junction.child_spec()
-        | Enum.map(log_provider_specs, &LogProvider.Broker.child_spec/1)
+        | Enum.map(log_provider_specs, &broker_child_spec/1)
       ]
 
       Supervisor.init(children, strategy: :one_for_one)
+    end
+
+    defp broker_child_spec(spec) do
+      Supervisor.child_spec(
+        {LogProvider.Broker, spec},
+        id: "LogProvider.Broker:#{spec.log_provider}"
+      )
     end
   end
 end
