@@ -14,36 +14,24 @@ let hash name =
 
 let check_interpolations ~loc msg label_names =
   match msg.pexp_desc with
-  | Pexp_constant (Pconst_string (s, _)) ->
-      (* check that every interpolation point $foo in msg has a matching label;
+  | Pexp_constant (Pconst_string (s, _)) -> (
+    (* check that every interpolation point $foo in msg has a matching label;
        OK to have extra labels not mentioned in message
     *)
-      let len = String.length s in
-      let interpolates =
-        let re = Str.regexp "\\$[a-z]\\([a-z]\\|[0-9]\\)*" in
-        let rec loop start acc =
-          if start >= len then acc
-          else
-            try
-              let offs = Str.search_forward re s start in
-              let s = Str.matched_string s in
-              let s_len = String.length s in
-              loop (offs + s_len) (String.sub s ~pos:1 ~len:(s_len - 1) :: acc)
-            with _ ->
-              (* wild-card match; actual match is deprecated Not_found *)
-              acc
-        in
-        loop 0 []
-      in
-      List.iter interpolates ~f:(fun interp ->
-          if not (List.mem label_names interp ~equal:String.equal) then
-            Location.raise_errorf ~loc
-              (Scanf.format_from_string
-                 (sprintf
-                    "The msg contains interpolation point \"$%s\" which is \
-                     not a field in the record"
-                    interp)
-                 "") )
+    match Logproc_lib.Interpolator.parse s with
+    | Error err ->
+        Location.raise_errorf ~loc
+          "Encountered an error while parsing the msg: %s" err
+    | Ok items ->
+        List.iter items ~f:(function
+          | `Interpolate interp
+            when not (List.mem ~equal:String.equal label_names interp) ->
+              Location.raise_errorf ~loc
+                "The msg contains interpolation point \"$%s\" which is not a \
+                 field in the record"
+                interp
+          | _ ->
+              () ) )
   | _ ->
       ()
 
