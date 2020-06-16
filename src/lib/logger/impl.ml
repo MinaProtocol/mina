@@ -343,7 +343,7 @@ let raw ({id; _} as t) msg =
   if t.null then ()
   else if Message.check_invariants msg then
     Consumer_registry.broadcast_log_message ~id msg
-  else failwith "invalid log call"
+  else failwithf "invalid log call \"%s\"" (String.escaped msg) ()
 
 let log t ~level ~module_ ~location ?(metadata = []) fmt =
   let f message =
