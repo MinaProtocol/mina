@@ -759,7 +759,7 @@ let pooled_user_commands =
          let%map response =
            Graphql_client.query_exn graphql graphql_endpoint
          in
-         let json_response : Yojson.Safe.json =
+         let json_response : Yojson.Safe.t =
            `List
              ( List.map ~f:Graphql_client.User_command.to_yojson
              @@ Array.to_list response#pooledUserCommands )
