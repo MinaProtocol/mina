@@ -36,5 +36,4 @@ let log t =
   | None ->
       failwith "log: did not find matching logger"
 
-[%%define_locally
-Registry.(register_constructor)]
+let register_constructor = Registry.register_constructor
