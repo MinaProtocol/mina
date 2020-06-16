@@ -628,7 +628,7 @@ workflows:
             {%- for profile in build_artifact_profiles %}
             {%- if profile in medium_curve_profiles %}
             {%- for docker_image in ['coda-daemon', 'coda-demo'] %}
-            - build-artifacts-docker--{{profile}}-{{docker_image}}:
+            - build-artifacts-docker--{{profile}}--{{docker_image}}:
                 - requires:
                     - build-artifacts--{{profile}}
             {%- endfor %}
