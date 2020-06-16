@@ -199,11 +199,11 @@ end
 module type Yojson_intf1 = sig
   type 'a t
 
-  val to_yojson : ('a -> Yojson.Safe.json) -> 'a t -> Yojson.Safe.json
+  val to_yojson : ('a -> Yojson.Safe.t) -> 'a t -> Yojson.Safe.t
 
   val of_yojson :
-       (Yojson.Safe.json -> 'a Ppx_deriving_yojson_runtime.error_or)
-    -> Yojson.Safe.json
+       (Yojson.Safe.t -> 'a Ppx_deriving_yojson_runtime.error_or)
+    -> Yojson.Safe.t
     -> 'a t Ppx_deriving_yojson_runtime.error_or
 end
 
