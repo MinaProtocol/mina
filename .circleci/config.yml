@@ -547,6 +547,7 @@ jobs:
                 paths:
                     - "/tmp/DOCKER_DEPLOY_ENV"
                     - "scripts"
+                    - "dockerfiles"
             - store_artifacts:
                   path: /tmp/artifacts
     build-artifacts-docker--testnet_postake_medium_curves--coda-daemon:
