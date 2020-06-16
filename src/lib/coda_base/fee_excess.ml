@@ -584,11 +584,17 @@ let%test_unit "Combine succeeds when the middle excess is zero" =
       let fe2 =
         if Fee.Signed.(equal zero) fe1.fee_excess_r then of_single (tid, excess)
         else
-          Or_error.ok_exn
-          @@ of_one_or_two
-               (`Two
-                 ( (fe1.fee_token_r, Fee.Signed.negate fe1.fee_excess_r)
-                 , (tid, excess) ))
+          match
+            of_one_or_two
+              (`Two
+                ( (fe1.fee_token_r, Fee.Signed.negate fe1.fee_excess_r)
+                , (tid, excess) ))
+          with
+          | Ok fe2 ->
+              fe2
+          | Error _ ->
+              (* The token is the same, and rebalancing causes an overflow. *)
+              of_single (fe1.fee_token_r, Fee.Signed.negate fe1.fee_excess_r)
       in
       ignore @@ Or_error.ok_exn (combine fe1 fe2) )
 
