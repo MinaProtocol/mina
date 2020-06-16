@@ -1262,11 +1262,11 @@ workflows:
             - build-client-sdk
             - build-artifacts--testnet_postake_medium_curves
             - build-artifacts-docker--testnet_postake_medium_curves--coda-daemon:
-                - requires:
-                    - build-artifacts--testnet_postake_medium_curves
+                requires:
+                  - build-artifacts--testnet_postake_medium_curves
             - build-artifacts-docker--testnet_postake_medium_curves--coda-demo:
-                - requires:
-                    - build-artifacts--testnet_postake_medium_curves
+                requires:
+                  - build-artifacts--testnet_postake_medium_curves
             - test-unit--dev
             - test-unit--nonconsensus_medium_curves
             - test--fake_hash
