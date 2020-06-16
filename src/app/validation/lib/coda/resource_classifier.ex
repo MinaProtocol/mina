@@ -1,6 +1,12 @@
-# it is a temporary flaw in the design that this is necessary, but I believe that this can be folded into the resource abstraction (with some thought)
 
 defmodule Coda.ResourceClassifier do
+  @moduledoc """
+  Resource classification for coda networks.
+
+  It is a temporary flaw in the design that this is necessary, but I believe that this can be folded
+  into the resource abstraction (with some thought).
+  """
+
   alias Coda.Resources
 
   def classify_resource(message) do

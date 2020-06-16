@@ -2,8 +2,10 @@
 # currently, it depends on Coda directly for configuration, and log providers depend on this directly
 
 defmodule Cloud.Google do
-  alias GoogleApi.PubSub.V1, as: PubSub
+  @moduledoc "Google Cloud interface."
+
   alias GoogleApi.Logging.V2, as: Logging
+  alias GoogleApi.PubSub.V1, as: PubSub
 
   @type pubsub_conn :: PubSub.Connection.t()
   @type logging_conn :: Logging.Connection.t()
@@ -17,6 +19,8 @@ defmodule Cloud.Google do
   end
 
   defmodule Connections do
+    @moduledoc "Collection of connections for communicating with the Google Cloud API"
+
     use Class
 
     defclass(

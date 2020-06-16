@@ -1,10 +1,12 @@
 # OOP! (sin methods, constructors, mutation, abstractions -- ok, maybe drop the P and just call it OO)
 # TODO: make this less fragile (needs to check that modules is applies functions to are actually classes first)
 defmodule Class do
+  @moduledoc "A lightweight, immutable, record subtyping relationship and definition system."
+
   import Util
   import Util.ForMacros
 
-  defmodule NotASubclass do
+  defmodule NotASubclassError do
     defexception [:class, :expected_subclass_of]
 
     def message(%__MODULE__{class: class, expected_subclass_of: expected_subclass_of}) do
@@ -18,6 +20,8 @@ defmodule Class do
   # Root object (which all classes are a subclass of)
 
   defmodule Object do
+    @moduledoc "The root record type which all class instances are a subtype of."
+
     defstruct []
     @type t :: %__MODULE__{}
     def parent_class, do: nil
@@ -57,7 +61,7 @@ defmodule Class do
         instance
 
       not instance_of?(instance, class) ->
-        raise NotASubclass, class: class_of(instance), expected_subclass_of: class
+        raise NotASubclassError, class: class_of(instance), expected_subclass_of: class
 
       true ->
         struct!(class, Map.take(instance, Keyword.keys(class.__class_fields)))
@@ -96,6 +100,8 @@ defmodule Class do
   # Class heiarchy
 
   defmodule Hiearchy do
+    @moduledoc "Tree structure for representing class hiearchies."
+
     @type t :: {Class.t(), [t]}
 
     def compute(root_class, leaf_classes) do

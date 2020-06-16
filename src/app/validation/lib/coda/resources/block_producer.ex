@@ -1,4 +1,6 @@
 defmodule Coda.Resources.BlockProducer do
+  @moduledoc "BlockProducer resource definition."
+
   use Architecture.Resource
 
   defresource(Coda.Resources.CodaNode,

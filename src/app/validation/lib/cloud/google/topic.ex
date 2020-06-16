@@ -1,6 +1,9 @@
 defmodule Cloud.Google.Topic do
+  @moduledoc "Wrapper for interacting with GoogleCloud pub sub topics."
+
   alias GoogleApi.PubSub.V1, as: PubSub
 
+  require Logger
   import Util
   import PubSub.Api.Projects
 
@@ -13,11 +16,9 @@ defmodule Cloud.Google.Topic do
         topic
 
       {:error, error} ->
-        IO.puts(
-          "got error looking up object from api; assuming that means it's not there for now"
+        Logger.warn(
+          "got error looking up object from api; assuming that means it's not there for now -- #{inspect(error)}"
         )
-
-        IO.inspect(error)
         nil
     end
   end

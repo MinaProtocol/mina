@@ -1,4 +1,6 @@
 defmodule Coda.Statistics.BlockProductionRate do
+  @moduledoc "A scalar stastics that monitors the block production rate of a block producer"
+
   alias Architecture.ResourceDatabase
   alias Architecture.Statistic
 
@@ -11,6 +13,8 @@ defmodule Coda.Statistics.BlockProductionRate do
     do: ResourceDatabase.select(resource_db, Coda.Resources.BlockProducer)
 
   defmodule State do
+    @moduledoc "State for Coda.Statistics.BlockProductionRate"
+
     use Class
 
     defclass(

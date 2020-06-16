@@ -1,7 +1,10 @@
 defmodule Architecture.LogFilter do
+  @moduledoc "A generalized language for representing log filters."
+
   @type selection :: [String.t()]
 
   @type t ::
+          # TODO: remove global_restriction support in favor of local restrictions on messages?
           {:global_restriction, String.t()}
           | {:equals | :contains, selection, String.t()}
           | {:adjunction | :disjunction, [t]}
@@ -85,6 +88,8 @@ defmodule Architecture.LogFilter do
 end
 
 defmodule Architecture.LogFilter.Language do
+  @moduledoc "A DSL for constructing log filters."
+
   defmodule SyntaxError do
     defexception [:syntax, :error]
 
@@ -159,12 +164,10 @@ defmodule Architecture.LogFilter.Language do
   end
 
   defp parse_filter(syntax) do
-    try do
-      quote do: unquote(Architecture.LogFilter).global_restriction(unquote(parse_string(syntax)))
-    rescue
-      SyntaxError ->
-        raise SyntaxError, syntax: syntax, error: "invalid filter syntax"
-    end
+    quote do: unquote(Architecture.LogFilter).global_restriction(unquote(parse_string(syntax)))
+  rescue
+    SyntaxError ->
+      reraise SyntaxError, [syntax: syntax, error: "invalid filter syntax"], __STACKTRACE__
   end
 
   defmacro filter(do: {:__block__, _, body}) do

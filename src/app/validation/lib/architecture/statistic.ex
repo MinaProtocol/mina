@@ -1,5 +1,5 @@
 defmodule Architecture.Statistic do
-  @moduledoc "`#{__MODULE__}` defines the implementation and process architecture sorrounding statistics."
+  @moduledoc "Behaviour for statistics."
 
   alias Architecture.LogProvider
   alias Architecture.Resource
@@ -20,6 +20,8 @@ defmodule Architecture.Statistic do
   end
 
   defmodule Junction do
+    @moduledoc "Junction for statistic states."
+
     use Architecture.Junction
 
     def subscribe(statistic, resource), do: subscribe({statistic, resource})
@@ -27,6 +29,8 @@ defmodule Architecture.Statistic do
   end
 
   defmodule Spec do
+    @moduledoc "Specification of a statistic to execute."
+
     use Class
 
     defclass(
@@ -36,10 +40,14 @@ defmodule Architecture.Statistic do
   end
 
   defmodule Broker do
+    @moduledoc "Interpreter and message broker for executing statistics."
+
     alias Architecture.Statistic
     require Logger
 
     defmodule Params do
+      @moduledoc "Statistic broker parameters."
+
       defstruct [:mod, :resource]
     end
 
@@ -82,12 +90,14 @@ defmodule Architecture.Statistic do
   end
 
   defmodule MainSupervisor do
+    @moduledoc "Main supervisor for spawning and monitoring statistics."
+
     alias Architecture.Statistic
 
     use Supervisor
 
     # TODO: make configurable per statistic
-    @default_update_interval 20000
+    @default_update_interval 20_000
 
     def start_link(statistics_spec) do
       Supervisor.start_link(__MODULE__, statistics_spec, name: __MODULE__)
@@ -99,14 +109,11 @@ defmodule Architecture.Statistic do
       all_broker_child_specs = Enum.flat_map(stat_specs, &broker_child_specs/1)
       children = [Statistic.Junction.child_spec() | all_broker_child_specs]
 
-      IO.puts("INIT Statistic.Supervisor")
-      IO.inspect(children)
-
       Supervisor.init(children, strategy: :one_for_one)
     end
 
     @spec broker_child_specs(Statistic.Spec.t()) :: [Supervisor.child_spec()]
-    def broker_child_specs(stat_spec = %Statistic.Spec{}) do
+    def broker_child_specs(%Statistic.Spec{} = stat_spec) do
       if not Util.has_behaviour?(stat_spec.statistic, Architecture.Statistic) do
         raise "#{inspect(stat_spec.statistic)} must be a Statistic"
       end

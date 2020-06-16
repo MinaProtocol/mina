@@ -1,4 +1,6 @@
 defmodule Coda.Resources.CodaNode do
+  @moduledoc "CodaNode resource definition."
+
   use Architecture.Resource
 
   defresource(name: String.t())

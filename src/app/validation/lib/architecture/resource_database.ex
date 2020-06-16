@@ -1,4 +1,9 @@
 defmodule Architecture.ResourceDatabase do
+  @moduledoc """
+  An indexed, queryable set of resources. Supports computing filters for all resources in the
+  database.
+  """
+
   alias Architecture.Resource
 
   use Class
@@ -76,7 +81,7 @@ defmodule Architecture.ResourceDatabase do
     # need to crawl a tree of class relationships in order to build the proper filter expression
     # for each resource, nest with least descriptive class on the outer, and most descriptive class inner
     # eg:
-    #   
+    #
     #   (
     #     CodaNode.global_filter
     #     AND (

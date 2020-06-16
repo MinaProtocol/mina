@@ -1,5 +1,8 @@
 defmodule Architecture.LogProvider do
+  @moduledoc "Behaviour for log providers."
+
   alias Architecture.ResourceDatabase
+  alias Cloud.Google.Subscription
 
   @type t :: module
   # TODO
@@ -22,6 +25,8 @@ defmodule Architecture.LogProvider do
   end
 
   defmodule Junction do
+    @moduledoc "Junction for logs."
+
     use Architecture.Junction
 
     def subscribe(log_provider, resource), do: subscribe({log_provider, resource})
@@ -29,18 +34,23 @@ defmodule Architecture.LogProvider do
   end
 
   defmodule Spec do
+    @moduledoc "Specification of a log provider to execute."
+
     use Class
 
     defclass(
       conn: Cloud.Google.pubsub_conn(),
-      subscription: Cloud.Google.Subscription.t(),
+      subscription: Subscription.t,
       log_provider: module
     )
   end
 
   defmodule Broker do
-    # each provider has 1 sink pub/sub pipeline associated with it
-    # provider ingests gcloud subscriptions and forwards to junction if the associated resource exists in the resource database
+    @moduledoc "Interpreter and message broker for executing log providers."
+
+    # Each provider has 1 sink pub/sub pipeline associated with it. Provider ingests gcloud
+    # subscriptions and forwards to junction if the associated resource exists in the resource
+    # database.
     require Logger
     alias Architecture.LogProvider
 
@@ -68,7 +78,7 @@ defmodule Architecture.LogProvider do
 
     @spec run(LogProvider.Spec.t()) :: nil
     def run(spec) do
-      Cloud.Google.Subscription.pull_and_process(spec.conn, spec.subscription, &handle_message/1)
+      Subscription.pull_and_process(spec.conn, spec.subscription, &handle_message/1)
       run(spec)
     end
 
@@ -82,7 +92,7 @@ defmodule Architecture.LogProvider do
         rescue
           e ->
             Logger.error("failed to classify resource")
-            raise e
+            reraise e, __STACKTRACE__
         end
 
       LogProvider.Junction.broadcast(__MODULE__, resource, message)
@@ -90,6 +100,8 @@ defmodule Architecture.LogProvider do
   end
 
   defmodule MainSupervisor do
+    @moduledoc "Main supervisor for spawning and monitoring log providers."
+
     alias Architecture.LogProvider
 
     use Supervisor

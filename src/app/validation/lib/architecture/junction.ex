@@ -1,4 +1,9 @@
 defmodule Architecture.Junction do
+  @moduledoc """
+  Mixin for defining junctions. Junctions are a pattern around `Registry`s which provide a
+  highly-parallel pub/sub system.
+  """
+
   defmacro __using__(_params) do
     quote do
       def child_spec do

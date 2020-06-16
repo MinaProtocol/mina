@@ -1,7 +1,9 @@
 defmodule Architecture.Timer do
+  @moduledoc "A generic timer process which can send :tick messages to a GenServer on an interval."
+
   require Logger
 
-  defmodule TargetUnavailable do
+  defmodule TargetUnavailableError do
     defexception []
 
     def message(_), do: "timer target is unavailable"
@@ -34,7 +36,7 @@ defmodule Architecture.Timer do
       # if the target can't be found, crash and let our supervisor choose how to restart us to try again
       nil ->
         Logger.error("target is unavailable")
-        raise TargetUnavailable
+        raise TargetUnavailableError
 
       target_pid ->
         Logger.info("target found")
@@ -50,11 +52,17 @@ defmodule Architecture.Timer do
     tick_loop(target_pid, update_interval)
   end
 
-  # Timer.CoSupervisor is a simple supervisor which can monitor another process alongside a timer. This is useful for wrapping the target process of a timer.
   defmodule CoSupervisor do
+    @moduledoc """
+    A simple supervisor which can monitor another process alongside a timer.
+    This is useful for wrapping the target process of a timer.
+    """
+
     use Supervisor
 
     defmodule Params do
+      @moduledoc "Supervisor parameters."
+
       use Class
 
       defclass(
@@ -72,22 +80,20 @@ defmodule Architecture.Timer do
 
     @spec find_sidecar(pid, module) :: pid | nil
     def find_sidecar(supervisor_pid, sidecar_mod) do
-      try do
-        sidecar_child_data =
-          Supervisor.which_children(supervisor_pid)
-          |> Enum.find(fn {_id, child_pid, _type, modules} ->
-            Enum.member?(modules, sidecar_mod) and child_pid != :restarting
-          end)
+      sidecar_child_data =
+        Supervisor.which_children(supervisor_pid)
+        |> Enum.find(fn {_id, child_pid, _type, modules} ->
+          Enum.member?(modules, sidecar_mod) and child_pid != :restarting
+        end)
 
-        case sidecar_child_data do
-          nil -> nil
-          {_id, sidecar_pid, _type, _modules} -> sidecar_pid
-        end
-      rescue
-        e ->
-          Logger.error("exception while getting target: #{inspect(e)}")
-          nil
+      case sidecar_child_data do
+        nil -> nil
+        {_id, sidecar_pid, _type, _modules} -> sidecar_pid
       end
+    rescue
+      e ->
+        Logger.error("exception while getting target: #{inspect(e)}")
+        nil
     end
 
     def start_link(params) do
@@ -95,8 +101,9 @@ defmodule Architecture.Timer do
     end
 
     @impl true
-    def init(params = %Params{}) do
-      # in order to make the timer restart with the sidecar, but only restart the timer when it fails, we choose the rest_for_one strategy and put the sidecar in front of the timer
+    def init(%Params{} = params) do
+      # in order to make the timer restart with the sidecar, but only restart the timer when it
+      # fails, we choose the rest_for_one strategy and put the sidecar in front of the timer
       strategy = :rest_for_one
 
       supervisor_pid = self()

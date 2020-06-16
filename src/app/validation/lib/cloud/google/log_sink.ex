@@ -1,4 +1,6 @@
 defmodule Cloud.Google.LogSink do
+  @moduledoc "Wrapper for interacting with GoogleCloud logging sinks."
+
   import Util
   alias GoogleApi.Logging.V2, as: Logging
   import Logging.Api.Sinks

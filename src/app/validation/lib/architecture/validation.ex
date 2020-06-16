@@ -1,10 +1,13 @@
 defmodule Architecture.Validation do
-  require Logger
+  @moduledoc "Behaviour for validations."
+
   alias Architecture.AlertServer
   alias Architecture.Resource
   alias Architecture.ResourceDatabase
   alias Architecture.Statistic
   alias Architecture.Validation
+
+  require Logger
 
   @callback statistic :: module
   @callback validate(Resource.t(), module, any) :: :valid | {:invalid, String.t()}
@@ -16,6 +19,8 @@ defmodule Architecture.Validation do
   end
 
   defmodule Spec do
+    @moduledoc "Specification of a validation to execute."
+
     use Class
 
     defclass(
@@ -25,6 +30,8 @@ defmodule Architecture.Validation do
   end
 
   defmodule Broker do
+    @moduledoc "Interpreter and message broker for executing validations."
+
     use GenServer
 
     def child_spec([mod, resource]) do
@@ -79,6 +86,8 @@ defmodule Architecture.Validation do
   end
 
   defmodule MainSupervisor do
+    @moduledoc "Main supervisor for spawning and monitoring validations."
+
     use Supervisor
 
     def start_link(validation_specs) do

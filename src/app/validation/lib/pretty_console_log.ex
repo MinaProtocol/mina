@@ -1,4 +1,9 @@
 defmodule PrettyConsoleLog do
+  @moduledoc """
+  Provides an alternative message format for elixir's `Logger`. Processes in the system may register
+  a `:context` metadata value which will be logged along with logs from that process.
+  """
+
   defp format_pid(pid) do
     # pids are opaque, and can't be inspected; this hack attempts to parse the inspect format to shorten it some
     # TODO: remove sigil for improved portability
@@ -27,14 +32,12 @@ defmodule PrettyConsoleLog do
   end
 
   def format(level, message, timestamp, metadata) do
-    try do
-      format!(level, message, timestamp, metadata)
-    rescue
-      e ->
-        "!!! failed to format log message: #{Exception.format(:error, e)} (#{inspect(timestamp)} [#{
-          level
-        }] #{message} #{inspect(metadata)})\n"
-    end
+    format!(level, message, timestamp, metadata)
+  rescue
+    e ->
+      "!!! failed to format log message: #{Exception.format(:error, e)} (#{inspect(timestamp)} [#{
+        level
+      }] #{message} #{inspect(metadata)})\n"
   end
 
   # def format_log_message(level, message, timestamp, metadata) do

@@ -1,4 +1,9 @@
 defmodule Coda.Validations.BlockProductionRate do
+  @moduledoc """
+  Validates that a block producer's block production rate matches is within an acceptable_margin of
+  the expected rate.
+  """
+
   use Architecture.Validation
 
   # TODO

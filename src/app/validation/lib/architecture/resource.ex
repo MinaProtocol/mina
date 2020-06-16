@@ -1,4 +1,6 @@
 defmodule Architecture.Resource do
+  @moduledoc "Behaviour and mixin for resources."
+
   import Util.ForMacros
 
   use Class

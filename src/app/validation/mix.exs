@@ -10,7 +10,10 @@ defmodule CodaValidation.MixProject do
       start_permanent: true,
       deps: deps(),
       aliases: aliases(),
-      dialyzer: [plt_add_deps: :app_tree],
+      dialyzer: [
+        plt_add_deps: :app_tree,
+        plt_file: {:no_warn, "priv/plts/dialyzer.plt"}
+      ],
       docs: [
         main: "CodaValidation",
         extras: ["README.md"]
@@ -30,7 +33,9 @@ defmodule CodaValidation.MixProject do
       {:google_api_logging, "~> 0.28.0"},
       {:google_api_pub_sub, "~> 0.23.0"},
       {:goth, "~> 1.2.0"},
-      {:dialyxir, "~> 1.0", only: [:dev], runtime: false},
+      {:credo, "~> 1.4", only: [:dev, :test], runtime: false},
+      {:dialyxir, "~> 1.0", only: [:dev, :test], runtime: false},
+      {:doctor, "~> 0.14.0", only: [:dev], runtime: false},
       {:ex_doc, "~> 0.22", only: [:dev], runtime: false}
     ]
   end

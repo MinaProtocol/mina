@@ -1,18 +1,25 @@
 defmodule Coda.Application do
+  @moduledoc """
+  The root application. Responsible for initializing the process tree.
+  """
+
+  alias Architecture.LogFilter
   alias Architecture.ResourceDatabase
+  alias Coda.Resources
+  alias Google.Cloud.LogPipeline
 
   use Application
 
   def resource_db_entries do
     [
-      Coda.Resources.BlockProducer.build("whale", 1),
-      Coda.Resources.BlockProducer.build("whale", 2),
-      Coda.Resources.BlockProducer.build("whale", 3),
-      Coda.Resources.BlockProducer.build("whale", 4),
-      Coda.Resources.BlockProducer.build("whale", 5)
-      # Coda.Resources.BlockProducer.build("fish", 1),
-      # Coda.Resources.BlockProducer.build("fish", 2),
-      # Coda.Resources.BlockProducer.build("fish", 3)
+      Resources.BlockProducer.build("whale", 1),
+      Resources.BlockProducer.build("whale", 2),
+      Resources.BlockProducer.build("whale", 3),
+      Resources.BlockProducer.build("whale", 4),
+      Resources.BlockProducer.build("whale", 5)
+      # Resources.BlockProducer.build("fish", 1),
+      # Resources.BlockProducer.build("fish", 2),
+      # Resources.BlockProducer.build("fish", 3)
     ]
   end
 
@@ -55,15 +62,15 @@ defmodule Coda.Application do
     filter = Architecture.LogProvider.log_filter(Coda.Providers.BlockProduced, resource_db)
 
     IO.puts("LOG FILTER:")
-    IO.puts(Architecture.LogFilter.render(filter))
+    IO.puts(LogFilter.render(filter))
     IO.puts("===========")
 
     log_pipeline =
-      Cloud.Google.LogPipeline.create(
+      LogPipeline.create(
         api_conns.pubsub,
         api_conns.logging,
         "blocks-produced",
-        Architecture.LogFilter.render(filter)
+        LogFilter.render(filter)
       )
 
     validations_spec = [

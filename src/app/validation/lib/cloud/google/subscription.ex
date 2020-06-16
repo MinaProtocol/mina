@@ -1,4 +1,6 @@
 defmodule Cloud.Google.Subscription do
+  @moduledoc "Wrapper for interacting with GoogleCloud pub sub subscriptions."
+
   alias GoogleApi.PubSub.V1, as: PubSub
   alias PubSub.Model.AcknowledgeRequest
   alias PubSub.Model.ExpirationPolicy

@@ -1,4 +1,10 @@
 defmodule Cloud.Google.LogPipeline do
+  @moduledoc """
+  A log pipelines consists of 3 cloud resources representing a data pipeline of logs to consume from
+  Google StackDriver. A log pipeline contains a pub sub topic, a subscription to that topic, and a
+  log sink which is feeding messages into the pub sub topic.
+  """
+
   alias Cloud.Google.LogSink
   alias Cloud.Google.Subscription
   alias Cloud.Google.Topic
