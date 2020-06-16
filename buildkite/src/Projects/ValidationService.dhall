@@ -12,11 +12,13 @@ let initCommands =
   let archivePath = "\"mix-cache-\\\$(sha256sum ${sigPath} | cut -d\" \" -f1).tar.gz\""
   in [
     Cmd.run "elixir --version | tail -n1 > ${sigPath}",
-    Cmd.run "(cd ${validationPath}; mix archive.build -o archive.ez)",
+    Cmd.run "(cd ${validationPath}; mix local.hex --force)",
+    Cmd.run "(cd ${validationPath}; mix local.rebar --force)",
+    Cmd.run "echo \\\$(pwd)",
     Cmd.cacheThrough docker archivePath Cmd.CompoundCmd::{
-      preprocess = Cmd.run "tar czf ${archivePath} -C ${validationPath} archive.ez priv/plts",
+      preprocess = Cmd.run "tar czf ${archivePath} -C ${validationPath} archive.ez priv/plts _build",
       postprocess = Cmd.run "tar xzf ${archivePath} -C ${validationPath}",
-      inner = Cmd.run "(cd ${validationPath}; mix archive.install archive.ez; mix deps.get)"
+      inner = Cmd.run "(cd ${validationPath}; ([ ! -f archive.ex ] || mix archive.install archive.ez) && mix deps.get && mix archive.build -o archive.ez && mix dialyzer.build)"
     }
   ]
 
