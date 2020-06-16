@@ -120,17 +120,12 @@ module Inputs = struct
             | Merge (stmt, _, _) ->
                 (stmt, `Merge)
           in
-          let fee_excess =
-            Currency.Amount.(
-              Signed.create
-                ~magnitude:(of_fee stmt.fee_excess.magnitude)
-                ~sgn:stmt.fee_excess.sgn)
-          in
           Or_error.return
           @@ ( Transaction_snark.create ~source:stmt.source ~target:stmt.target
                  ~proof_type ~supply_increase:stmt.supply_increase
                  ~pending_coinbase_stack_state:
-                   stmt.pending_coinbase_stack_state ~fee_excess ~sok_digest
+                   stmt.pending_coinbase_stack_state
+                 ~fee_excess:stmt.fee_excess ~sok_digest
                  ~proof:Precomputed_values.unit_test_base_proof
              , Time.Span.zero )
 end
