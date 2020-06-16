@@ -447,6 +447,7 @@ jobs:
                 key: docker-deploy-env-v1-{{profile}}-{{'{{'}} .Revision {{'}}'}}
                 paths:
                     - "/tmp/DOCKER_DEPLOY_ENV"
+                    - "home/opam/scripts/run-demo.sh"
             - store_artifacts:
                   path: /tmp/artifacts
             {%- endif %}
