@@ -442,6 +442,27 @@ jobs:
                   name: Copy artifacts to cloud
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh scripts/artifacts.sh
             {%- if profile in medium_curve_profiles %}
+            - save_cache:
+                name: Save cache - docker deploy env
+                key: docker-deploy-env-v1-{{profile}}-{{'{{'}} .Revision {{'}}'}}
+                paths:
+                    - "/tmp/DOCKER_DEPLOY_ENV"
+            - store_artifacts:
+                  path: /tmp/artifacts
+            {%- endif %}
+    {%- endfor %}
+
+    {%- for profile in build_artifact_profiles %}
+    {%- if profile in medium_curve_profiles %}
+    {%- for docker_image in ['coda-daemon', 'coda-demo'] %}
+    build-artifacts-docker--{{profile}}--{{docker_image}}:
+        resource_class: xlarge
+        docker:
+            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+        steps:
+            - restore_cache:
+                name: Restore cache - docker deploy env
+                key: docker-deploy-env-v1-{{profile}}-{{'{{'}} .Revision {{'}}'}}
             - setup_remote_docker
             - run:
                   name: Build and Upload Docker
@@ -457,20 +478,17 @@ jobs:
 
                               echo "$DOCKER_PASSWORD" | docker login --username $DOCKER_USERNAME --password-stdin
                               ./scripts/skip_if_only_frontend_or_rfcs.sh scripts/release-docker.sh \
-                              -s coda-daemon \
+                              -s {{docker_image}} \
                               -v $CODA_GIT_TAG-$CODA_GIT_BRANCH-$CODA_GIT_HASH \
                               --extra-args "--build-arg coda_version=$CODA_DEB_VERSION --build-arg deb_repo=$CODA_DEB_REPO"
 
                               echo "$DOCKER_PASSWORD" | docker login --username $DOCKER_USERNAME --password-stdin
-                              ./scripts/skip_if_only_frontend_or_rfcs.sh scripts/release-docker.sh \
-                              -s coda-demo \
-                              -v $CODA_GIT_TAG-$CODA_GIT_BRANCH-$CODA_GIT_HASH \
-                              --extra-args "--build-arg coda_version=$CODA_DEB_VERSION --build-arg deb_repo=$CODA_DEB_REPO"
                         fi
                     fi
             - store_artifacts:
                   path: /tmp/artifacts
-            {%- endif %}
+    {%- endfor %}
+    {%- endif %}
     {%- endfor %}
 
     {%- for profile in unit_test_profiles %}
@@ -606,6 +624,15 @@ workflows:
             - build-client-sdk
             {%- for profile in build_artifact_profiles %}
             - build-artifacts--{{profile}}
+            {%- endfor %}
+            {%- for profile in build_artifact_profiles %}
+            {%- if profile in medium_curve_profiles %}
+            {%- for docker_image in ['coda-daemon', 'coda-demo'] %}
+            - build-artifacts-docker--{{profile}}-{{docker_image}}:
+                - requires:
+                    - build-artifacts--{{profile}}
+            {%- endfor %}
+            {%- endif %}
             {%- endfor %}
             {%- for profile in unit_test_profiles %}
             - test-unit--{{profile}}
