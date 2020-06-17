@@ -16,6 +16,25 @@ module Config = Config
 module Subscriptions = Coda_subscriptions
 module Snark_worker_lib = Snark_worker
 
+type Structured_log_events.t += Connecting
+  [@@deriving register_event {msg= "Coda daemon is now connecting"}]
+
+type Structured_log_events.t += Listening
+  [@@deriving register_event {msg= "Coda daemon is now listening"}]
+
+type Structured_log_events.t += Bootstrapping
+  [@@deriving register_event {msg= "Coda daemon is now bootstrapping"}]
+
+type Structured_log_events.t += Ledger_catchup
+  [@@deriving register_event {msg= "Coda daemon is now doing ledger catchup"}]
+
+type Structured_log_events.t += Synced
+  [@@deriving register_event {msg= "Coda daemon is now synced"}]
+
+type Structured_log_events.t +=
+  | Rebroadcast_transition of {state_hash: State_hash.t}
+  [@@deriving register_event {msg= "Rebroadcasting $state_hash"}]
+
 exception Snark_worker_error of int
 
 exception Snark_worker_signal_interrupt of Signal.t
@@ -368,28 +387,28 @@ let create_sync_status_observer ~logger ~demo_mode
           match online_status with
           | `Offline ->
               if `Empty = first_connection then (
-                Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-                  "Coda daemon is now connecting" ;
+                Logger.Structured.info logger ~module_:__MODULE__
+                  ~location:__LOC__ Connecting ;
                 `Connecting )
               else if `Empty = first_message then (
-                Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-                  "Coda daemon is now listening" ;
+                Logger.Structured.info logger ~module_:__MODULE__
+                  ~location:__LOC__ Listening ;
                 `Listening )
               else `Offline
           | `Online -> (
             match active_status with
             | None ->
-                Logger.info (Logger.create ()) ~module_:__MODULE__
-                  ~location:__LOC__ "Coda daemon is now bootstrapping" ;
+                Logger.Structured.info (Logger.create ()) ~module_:__MODULE__
+                  ~location:__LOC__ Bootstrapping ;
                 `Bootstrap
             | Some (_, catchup_jobs) ->
                 if catchup_jobs > 0 then (
-                  Logger.info (Logger.create ()) ~module_:__MODULE__
-                    ~location:__LOC__ "Coda daemon is now doing ledger catchup" ;
+                  Logger.Structured.info (Logger.create ()) ~module_:__MODULE__
+                    ~location:__LOC__ Ledger_catchup ;
                   `Catchup )
                 else (
-                  Logger.info (Logger.create ()) ~module_:__MODULE__
-                    ~location:__LOC__ "Coda daemon is now synced" ;
+                  Logger.Structured.info (Logger.create ()) ~module_:__MODULE__
+                    ~location:__LOC__ Synced ;
                   `Synced ) ) )
   in
   let observer = observe incremental_status in
@@ -1140,14 +1159,13 @@ let create (config : Config.t) =
                       consensus_state
                   with
                   | Ok () ->
-                      Logger.trace config.logger ~module_:__MODULE__
+                      Logger.Str.trace config.logger ~module_:__MODULE__
                         ~location:__LOC__
                         ~metadata:
-                          [ ("state_hash", State_hash.to_yojson hash)
-                          ; ( "external_transition"
+                          [ ( "external_transition"
                             , External_transition.Validated.to_yojson
                                 transition ) ]
-                        "Rebroadcasting $state_hash" ;
+                        (Rebroadcast_transition {state_hash= hash}) ;
                       External_transition.Validated.broadcast transition
                   | Error reason -> (
                       let timing_error_json =

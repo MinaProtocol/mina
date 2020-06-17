@@ -617,24 +617,28 @@ module Checked = struct
       f (fun x ->
           bitstring (Bitstring_lib.Bitstring.Lsb_first.to_list (conv x)) )
     in
-    List.reduce_exn ~f:append
-      (Poly.Fields.fold ~init:[]
-         ~public_key:(f Public_key.Compressed.Checked.to_input)
-         ~token_id:(f Token_id.Checked.to_input)
-         ~token_owner:(f (fun x -> bitstring [x]))
-         ~balance:(bits Balance.var_to_bits)
-         ~nonce:(bits !Nonce.Checked.to_bits)
-         ~receipt_chain_hash:(f Receipt.Chain_hash.var_to_input)
-         ~delegate:(f Public_key.Compressed.Checked.to_input)
-         ~voting_for:(f State_hash.var_to_input)
-         ~timing:(bits Timing.var_to_bits))
+    make_checked (fun () ->
+        List.reduce_exn ~f:append
+          (Poly.Fields.fold ~init:[]
+             ~public_key:(f Public_key.Compressed.Checked.to_input)
+             ~token_id:
+               (* We use [run_checked] here to avoid routing the [Checked.t]
+                  monad throughout this calculation.
+               *)
+               (f (fun x -> Run.run_checked (Token_id.Checked.to_input x)))
+             ~token_owner:(f (fun x -> bitstring [x]))
+             ~balance:(bits Balance.var_to_bits)
+             ~nonce:(bits !Nonce.Checked.to_bits)
+             ~receipt_chain_hash:(f Receipt.Chain_hash.var_to_input)
+             ~delegate:(f Public_key.Compressed.Checked.to_input)
+             ~voting_for:(f State_hash.var_to_input)
+             ~timing:(bits Timing.var_to_bits)) )
 
   let digest t =
     make_checked (fun () ->
         Random_oracle.Checked.(
-          hash ~init:crypto_hash_prefix (pack_input (to_input t))) )
-
-  let to_input t = make_checked (fun () -> to_input t)
+          hash ~init:crypto_hash_prefix
+            (pack_input (Run.run_checked (to_input t)))) )
 end
 
 [%%endif]

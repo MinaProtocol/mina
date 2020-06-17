@@ -60,9 +60,11 @@ module Checked : sig
 
   val to_input :
        var
-    -> ( Snark_params.Tick.Field.Var.t
-       , Snark_params.Tick.Boolean.var )
-       Random_oracle.Input.t
+    -> ( ( Snark_params.Tick.Field.Var.t
+         , Snark_params.Tick.Boolean.var )
+         Random_oracle.Input.t
+       , _ )
+       Checked.t
 
   val equal : var -> var -> (Boolean.var, _) Checked.t
 

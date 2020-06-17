@@ -5,5 +5,5 @@
  (libraries core async network_peer key_value_database logger pipe_lib rocksdb coda_metrics ppx_version)
  (inline_tests)
  (preprocess (pps ppx_base ppx_coda ppx_version ppx_let ppx_assert ppx_deriving.std ppx_deriving_yojson
-                  ppx_sexp_conv ppx_bin_prot ppx_custom_printf ppx_inline_test ppx_optcomp ppx_snarky ppx_deriving_yojson ppx_fields_conv bisect_ppx -conditional))
+                  ppx_sexp_conv ppx_bin_prot ppx_custom_printf ppx_inline_test ppx_optcomp ppx_snarky ppx_deriving_yojson ppx_fields_conv ppx_register_event bisect_ppx -conditional))
  (synopsis "Track how much we trust peers"))

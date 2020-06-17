@@ -11,3 +11,5 @@ end]
 type ('magnitude, 'sgn) t = ('magnitude, 'sgn) Stable.Latest.t =
   {magnitude: 'magnitude; sgn: 'sgn}
 [@@deriving sexp, hash, compare, eq, yojson]
+
+let map ~f {magnitude; sgn} = {magnitude= f magnitude; sgn}

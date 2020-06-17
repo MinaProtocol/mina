@@ -77,8 +77,7 @@ let supply_increase {receiver= _; amount; fee_transfer} =
            ~default:(Or_error.error_string "Coinbase underflow")
 
 let fee_excess t =
-  Or_error.map (supply_increase t) ~f:(fun _increase ->
-      Currency.Fee.Signed.zero )
+  Or_error.map (supply_increase t) ~f:(fun _increase -> Fee_excess.empty)
 
 module Gen = struct
   let gen ~(constraint_constants : Genesis_constants.Constraint_constants.t) =
