@@ -59,6 +59,7 @@ end
 
 module type S = sig
   module Bigint : Bigint.Intf
+
   module Stable : sig
     module V1 : sig
       type t [@@deriving version, sexp, bin_io, compare, yojson]
@@ -160,12 +161,9 @@ module type S = sig
   end
 end
 
-module Make (F : Input_intf) : S
-  with type Stable.V1.t = F.t
-   and module Bigint = F.Bigint
-= struct
+module Make (F : Input_intf) :
+  S with type Stable.V1.t = F.t and module Bigint = F.Bigint = struct
   open F
-
   module Bigint = Bigint
 
   let gc2 op x1 x2 =

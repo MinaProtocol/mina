@@ -3,11 +3,13 @@ open Snarky_bn382
 
 module type Intf = sig
   type t [@@deriving bin_io, sexp, compare]
+
   include Intf.Type_with_delete with type t := t
 
   val length_in_bytes : int
 
   val to_hex_string : t -> string
+
   val of_hex_string : string -> t
 
   val test_bit : t -> int -> bool
@@ -16,21 +18,44 @@ module type Intf = sig
 
   val of_ptr : char Ctypes.ptr -> t
 
-  val of_data: Bigstring.t -> bitcount:int -> t
+  val of_data : Bigstring.t -> bitcount:int -> t
 
   val of_decimal_string : string -> t
 
   val of_numeral : string -> base:int -> t
 end
 
-module T384 : Intf with type t = Snarky_bn382.Bigint384.t = struct
-  open Bigint384
+module type Bindings = sig
+  type t
+
+  val delete : t -> unit
+
+  val to_data : t -> char Ctypes.ptr
+
+  val of_data : char Ctypes.ptr -> t
+
+  val compare : t -> t -> Unsigned.UInt8.t
+
+  val test_bit : t -> int -> bool
+
+  val of_decimal_string : string -> t
+
+  val of_numeral : string -> int -> int -> t
+end
+
+module Make
+    (B : Bindings) (M : sig
+        val length_in_bytes : int
+    end) : Intf with type t = B.t = struct
+  open B
 
   let delete = delete
+
   let to_ptr = to_data
+
   let of_ptr = of_data
 
-  let length_in_bytes = 48
+  let length_in_bytes = M.length_in_bytes
 
   type nonrec t = t
 
@@ -88,3 +113,10 @@ module T384 : Intf with type t = Snarky_bn382.Bigint384.t = struct
   let compare x y =
     match Unsigned.UInt8.to_int (compare x y) with 255 -> -1 | x -> x
 end
+
+(*
+module T384 : Intf with type t = Snarky_bn382.Bigint384.t = 
+  Make(Bigint384)(struct
+    let length_in_bytes = 48
+  end)
+*)

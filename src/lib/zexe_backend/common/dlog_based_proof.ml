@@ -1,6 +1,28 @@
 open Core_kernel
 open Pickles_types
 
+module type Stable_v1 = sig
+  module Stable : sig
+    module V1 : sig
+      type t [@@deriving version, bin_io, sexp, compare, yojson]
+    end
+
+    module Latest = V1
+  end
+
+  type t = Stable.V1.t [@@deriving sexp, compare, yojson]
+end
+
+module type Inputs_intf = sig
+  open Intf
+
+  module Base_field : sig
+    include Stable_v1
+
+    module Vector : Vector with type elt := t
+  end
+end
+
 module Challenge_polynomial = struct
   [%%versioned
   module Stable = struct
