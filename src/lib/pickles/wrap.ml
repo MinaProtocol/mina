@@ -309,18 +309,6 @@ let wrap (type max_branching max_local_max_branchings) max_branching
   in
   let next_proof =
     let (T (input, conv)) = Impls.Dlog_based.input () in
-    let module L = Snarky_log.Constraints (Impls.Dlog_based.Internal_Basic) in
-    let cwd = Sys.getcwd () in
-    Snarky_log.to_file
-      Core.(cwd ^/ "wrap.flame-graph")
-      (L.log
-         (Impls.Dlog_based.make_checked (fun () ->
-              let x =
-                Impls.Dlog_based.with_label "input" (fun () ->
-                    Impls.Dlog_based.exists input )
-              in
-              Impls.Pairing_based.with_label "main" (fun () ->
-                  wrap_main (conv x) ) ))) ;
     Common.time "wrap proof" (fun () ->
         Impls.Dlog_based.prove pk
           ~message:

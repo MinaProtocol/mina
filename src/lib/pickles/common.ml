@@ -35,8 +35,6 @@ let hash_dlog_me_only t =
        ~g1:(fun ((x, y) : Zexe_backend.G1.Affine.t) -> [x; y]))
   |> Digest.Constant.of_bits
 
-open Core_kernel
-
 let dlog_pcs_batch (type n_branching total)
     ((without_degree_bound, pi) :
       total Nat.t * (n_branching, Nat.N19.n, total) Nat.Adds.t) ~h_minus_1

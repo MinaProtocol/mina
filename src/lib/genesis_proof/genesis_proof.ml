@@ -81,7 +81,7 @@ let base_proof ~proof_level:(_ : Genesis_constants.Proof_level.t)
         Blockchain_state.snarked_ledger_hash
           (Protocol_state.blockchain_state curr)
     ; supply_increase= Currency.Amount.zero
-    ; fee_excess= Currency.Amount.Signed.zero
+    ; fee_excess= Fee_excess.zero
     ; pending_coinbase_stack_state=
         { source= Coda_base.Pending_coinbase.Stack.empty
         ; target= Coda_base.Pending_coinbase.Stack.empty } }

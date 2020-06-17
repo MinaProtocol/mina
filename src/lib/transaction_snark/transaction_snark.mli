@@ -77,9 +77,7 @@ module Statement : sig
         ( Frozen_ledger_hash.Stable.V1.t
         , Currency.Amount.Stable.V1.t
         , Pending_coinbase.Stack_versioned.Stable.V1.t
-        , ( Currency.Amount.Stable.V1.t
-          , Sgn.Stable.V1.t )
-          Currency.Signed_poly.Stable.V1.t
+        , Fee_excess.Stable.V1.t
         , unit )
         Poly.Stable.V1.t
       [@@deriving bin_io, compare, equal, hash, sexp, yojson]
@@ -96,9 +94,7 @@ module Statement : sig
           ( Frozen_ledger_hash.Stable.V1.t
           , Currency.Amount.Stable.V1.t
           , Pending_coinbase.Stack_versioned.Stable.V1.t
-          , ( Currency.Amount.Stable.V1.t
-            , Sgn.Stable.V1.t )
-            Currency.Signed_poly.Stable.V1.t
+          , Fee_excess.Stable.V1.t
           , Sok_message.Digest.Stable.V1.t )
           Poly.Stable.V1.t
         [@@deriving bin_io, compare, equal, hash, sexp, yojson]
@@ -112,7 +108,7 @@ module Statement : sig
         ( Frozen_ledger_hash.var
         , Currency.Amount.var
         , Pending_coinbase.Stack.var
-        , Currency.Amount.Signed.var
+        , Fee_excess.var
         , Sok_message.Digest.Checked.t )
         t_
     end
@@ -143,7 +139,7 @@ val create :
   -> target:Frozen_ledger_hash.t
   -> supply_increase:Currency.Amount.t
   -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
-  -> fee_excess:Currency.Amount.Signed.t
+  -> fee_excess:Fee_excess.t
   -> sok_digest:Sok_message.Digest.t
   -> proof:Coda_base.Proof.t
   -> t

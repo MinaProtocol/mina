@@ -5,6 +5,10 @@ open Pickles_types
 open Types
 open Common
 
+(* The pairing-based "reduced" me-only contains the data of the standard me-only
+   but without the wrap verification key. The purpose of this type is for sending
+   pairing me-onlys on the wire. There is no need to send the wrap-key since everyone
+   knows it. *)
 module Pairing_based = struct
   type ('s, 'sgs) t = {app_state: 's; sg: 'sgs}
   [@@deriving sexp, bin_io, yojson, sexp, compare]

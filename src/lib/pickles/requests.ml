@@ -105,6 +105,8 @@ module Wrap = struct
 end
 
 module Step = struct
+  open Zexe_backend
+
   module type S = sig
     type statement
 

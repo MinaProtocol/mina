@@ -342,12 +342,20 @@ module Types = struct
               "Total transaction fee that is not accounted for in the \
                transition from source ledger to target ledger"
             ~args:Arg.[]
-            ~resolve:(fun _ {Transaction_snark.Statement.fee_excess; _} ->
-              fee_excess )
+            ~resolve:
+              (fun _
+                   ({ Transaction_snark.Statement.fee_excess=
+                        {Fee_excess.fee_excess_l; _}
+                    ; _ } :
+                     Transaction_snark.Statement.t) ->
+              (* TODO: Expose full fee excess data. *)
+              { fee_excess_l with
+                magnitude= Currency.Amount.of_fee fee_excess_l.magnitude } )
         ; field "supplyIncrease" ~typ:(non_null uint64)
             ~doc:"Increase in total coinbase reward "
             ~args:Arg.[]
-            ~resolve:(fun _ {Transaction_snark.Statement.supply_increase; _} ->
+            ~resolve:
+              (fun _ ({supply_increase; _} : Transaction_snark.Statement.t) ->
               Currency.Amount.to_uint64 supply_increase )
         ; field "workId" ~doc:"Unique identifier for a snark work"
             ~typ:(non_null int)

@@ -159,10 +159,11 @@ let%snarkydef step ~(logger : Logger.t)
         |> Blockchain_state.snarked_ledger_hash
       in
       let open Checked in
+      let%bind () =
+        Fee_excess.(assert_equal_checked (var_of_t zero) txn_snark.fee_excess)
+      in
       all
-        [ Currency.Amount.Signed.(
-            Checked.(equal (constant zero) txn_snark.fee_excess))
-        ; Frozen_ledger_hash.equal_var txn_snark.source (lh previous_state)
+        [ Frozen_ledger_hash.equal_var txn_snark.source (lh previous_state)
         ; Frozen_ledger_hash.equal_var txn_snark.target (lh new_state)
         ; Pending_coinbase.Stack.equal_var
             txn_snark.pending_coinbase_stack_state.source
@@ -196,7 +197,9 @@ let%snarkydef step ~(logger : Logger.t)
       as_prover
         As_prover.(
           Let_syntax.(
-            let%map nothing_changed = read Boolean.typ nothing_changed
+            let%map txn_snark_input_correct =
+              read Boolean.typ txn_snark_input_correct
+            and nothing_changed = read Boolean.typ nothing_changed
             and no_coinbases_popped = read Boolean.typ no_coinbases_popped
             and updated_consensus_state =
               read Boolean.typ updated_consensus_state
@@ -204,16 +207,17 @@ let%snarkydef step ~(logger : Logger.t)
               read Boolean.typ correct_coinbase_status
             and result = read Boolean.typ result in
             Logger.trace logger
-              "blockchain snark update success (check pending coinbase = \
-               $check): $result = \
-               (correct_transaction_snark=$correct_transaction_snark ∨ \
-               nothing_changed \
+              "blockchain snark update success: $result = \
+               (transaction_snark_input_correct=$transaction_snark_input_correct \
+               ∨ nothing_changed \
                (no_coinbases_popped=$no_coinbases_popped)=$nothing_changed) \
                ∧ updated_consensus_state=$updated_consensus_state ∧ \
                correct_coinbase_status=$correct_coinbase_status"
               ~module_:__MODULE__ ~location:__LOC__
               ~metadata:
-                [ ("nothing_changed", `Bool nothing_changed)
+                [ ( "transaction_snark_input_correct"
+                  , `Bool txn_snark_input_correct )
+                ; ("nothing_changed", `Bool nothing_changed)
                 ; ("updated_consensus_state", `Bool updated_consensus_state)
                 ; ("correct_coinbase_status", `Bool correct_coinbase_status)
                 ; ("result", `Bool result)

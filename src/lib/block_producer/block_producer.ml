@@ -9,6 +9,9 @@ open O1trace
 open Otp_lib
 module Time = Block_time
 
+type Structured_log_events.t += Block_produced
+  [@@deriving register_event {msg= "Successfully produced a new block"}]
+
 module Singleton_supervisor : sig
   type ('data, 'a) t
 
@@ -513,12 +516,11 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                                     diff: $error" ;
                                 return ()
                             | Ok breadcrumb -> (
-                                Logger.trace logger ~module_:__MODULE__
+                                Logger.Str.trace logger ~module_:__MODULE__
                                   ~location:__LOC__
                                   ~metadata:
                                     [("breadcrumb", Breadcrumb.to_yojson crumb)]
-                                  "Successfully produced a new block: \
-                                   $breadcrumb" ;
+                                  Block_produced ;
                                 let metadata =
                                   [ ( "state_hash"
                                     , State_hash.to_yojson transition_hash ) ]

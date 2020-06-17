@@ -3,7 +3,10 @@ open Pickles_types
 open Common
 open Import
 
-(* Unfinalized dlog-based proof *)
+(* Unfinalized dlog-based proof, along with a flag which is true iff it
+   is expected to verify. This allows for situations like the blockchain
+   SNARK where we let the previous proof fail in the base case.
+*)
 type t =
   ( Field.t
   , Field.t Scalar_challenge.t
