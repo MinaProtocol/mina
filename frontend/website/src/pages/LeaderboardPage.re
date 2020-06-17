@@ -31,7 +31,6 @@ module Styles = {
       width(`percent(100.)),
       fontSize(rem(1.)),
       color(Theme.Colors.teal),
-      textTransform(`uppercase),
       padding(px(12)),
       marginTop(`rem(0.5)),
       border(px(1), `solid, Theme.Colors.hyperlinkAlpha(0.3)),
@@ -63,17 +62,16 @@ module Styles = {
 
 module SearchBar = {
   [@react.component]
-  let make = () => {
-    let (input, setInput) = React.useState(() => "");
+  let make = (~setUsername, ~username) => {
     <div className=Styles.searchBar>
       <span className=Theme.H5.semiBold> {React.string("Find")} </span>
       <input
         type_="text"
-        value=input
-        placeholder="Search:"
+        value=username
+        placeholder="SEARCH:"
         onChange={e => {
           let value = ReactEvent.Form.target(e)##value;
-          setInput(_ => value);
+          setUsername(_ => value);
         }}
         className=Styles.textField
       />
@@ -148,7 +146,7 @@ let reducer = (_, action) => {
 [@react.component]
 let make = (~lastManualUpdatedDate) => {
   let (state, dispatch) = React.useReducer(reducer, initialState);
-
+  let (username, setUsername) = React.useState(() => "");
   let onTogglePress = s => {
     dispatch(Toggled(s));
   };
@@ -157,7 +155,7 @@ let make = (~lastManualUpdatedDate) => {
     <Wrapped>
       <div className=Styles.page> <Summary lastManualUpdatedDate /> </div>
       <div className=Styles.filters>
-        <SearchBar />
+        <SearchBar setUsername username />
         <ToggleButtons currentOption={state.currentOption} onTogglePress />
       </div>
     </Wrapped>
