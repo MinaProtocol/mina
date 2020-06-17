@@ -188,7 +188,7 @@ module Statement = struct
           ; Pending_coinbase.Stack.var_to_input p.source
           ; Pending_coinbase.Stack.var_to_input p.target
           ; Amount.var_to_input supply_increase
-          ; Fee_excess.to_input_checked fee_excess ]
+          ; Tick.Run.run_checked (Fee_excess.to_input_checked fee_excess) ]
         |> Random_oracle.Checked.pack_input
     end
 

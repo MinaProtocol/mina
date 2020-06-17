@@ -1,3 +1,7 @@
+let () = Zexe_backend.Dlog_based.Keypair.set_urs_info Cache_dir.cache
+
+let () = Zexe_backend.Pairing_based.Keypair.set_urs_info Cache_dir.cache
+
 module Tock = struct
   module Full = Pickles.Impls.Dlog_based
   module Run = Pickles.Impls.Dlog_based
