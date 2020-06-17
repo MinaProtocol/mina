@@ -2,8 +2,6 @@ open Core
 open Async
 open Signature_lib
 open Coda_base
-open Coda_transition
-open Coda_state
 open O1trace
 module Graphql_cohttp_async =
   Graphql_internal.Make (Graphql_async.Schema) (Cohttp_async.Io)
@@ -18,54 +16,6 @@ let snark_pool_list t =
   Coda_lib.snark_pool t |> Network_pool.Snark_pool.resource_pool
   |> Network_pool.Snark_pool.Resource_pool.snark_pool_json
   |> Yojson.Safe.to_string
-
-let get_lite_chain :
-    (Coda_lib.t -> Public_key.Compressed.t list -> Lite_base.Lite_chain.t)
-    option =
-  Option.map Consensus.Data.Consensus_state.to_lite
-    ~f:(fun consensus_state_to_lite t pks ->
-      let ledger = Coda_lib.best_ledger t |> Participating_state.active_exn in
-      let transition =
-        Transition_frontier.Breadcrumb.validated_transition
-          (Coda_lib.best_tip t |> Participating_state.active_exn)
-      in
-      let state = External_transition.Validated.protocol_state transition in
-      let proof =
-        External_transition.Validated.protocol_state_proof transition
-      in
-      let ledger =
-        List.fold pks
-          ~f:(fun acc key ->
-            let aid = Account_id.create key Token_id.default in
-            let loc =
-              Option.value_exn (Ledger.location_of_account ledger aid)
-            in
-            Lite_lib.Sparse_ledger.add_path acc
-              (Lite_compat.merkle_path (Ledger.merkle_path ledger loc))
-              (Lite_compat.public_key key)
-              (Lite_compat.account (Option.value_exn (Ledger.get ledger loc)))
-            )
-          ~init:
-            (Lite_lib.Sparse_ledger.of_hash ~depth:(Ledger.depth ledger)
-               (Lite_compat.digest
-                  ( Ledger.merkle_root ledger
-                    :> Snark_params.Tick.Pedersen.Digest.t )))
-      in
-      let protocol_state : Lite_base.Protocol_state.t =
-        { previous_state_hash=
-            Lite_compat.digest
-              ( Protocol_state.previous_state_hash state
-                :> Snark_params.Tick.Pedersen.Digest.t )
-        ; body=
-            { blockchain_state=
-                Lite_compat.blockchain_state
-                  (Protocol_state.blockchain_state state)
-            ; consensus_state=
-                consensus_state_to_lite (Protocol_state.consensus_state state)
-            } }
-      in
-      let proof = Lite_compat.proof proof in
-      {Lite_base.Lite_chain.proof; ledger; protocol_state} )
 
 (* create reader, writer for protocol versions, but really for any one-line item in conf_dir *)
 let make_conf_dir_item_io ~conf_dir ~filename =
@@ -454,10 +404,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
             let%bind snark_worker_key = Coda_lib.snark_worker_key coda in
             let%map r = Coda_lib.request_work coda in
             Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-              ~metadata:
-                [ ( "work_spec"
-                  , `String (sprintf !"%{sexp:Snark_worker.Work.Spec.t}" r) )
-                ]
+              ~metadata:[("work_spec", Snark_worker.Work.Spec.to_yojson r)]
               "responding to a Get_work request with some new work" ;
             Coda_metrics.(Counter.inc_one Snark_work.snark_work_assigned_rpc) ;
             (r, snark_worker_key)) )
@@ -468,10 +415,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
           Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
             "received completed work from a snark worker"
             ~metadata:
-              [ ( "work_spec"
-                , `String
-                    (sprintf !"%{sexp:Snark_worker.Work.Spec.t}" work.spec) )
-              ] ;
+              [("work_spec", Snark_worker.Work.Spec.to_yojson work.spec)] ;
           One_or_two.iter work.metrics ~f:(fun (total, tag) ->
               match tag with
               | `Merge ->

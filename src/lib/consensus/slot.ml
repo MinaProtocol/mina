@@ -9,8 +9,9 @@ include (T : module type of T with module Checked := T.Checked)
 
 let in_seed_update_range ~(constants : Constants.t) (slot : t) =
   let open UInt32.Infix in
+  (* TODO: This must be 1/3 of the epoch length *)
   let ck = constants.c * constants.k in
-  ck <= slot && slot < ck * UInt32.of_int 2
+  slot < ck * UInt32.of_int 2
 
 module Checked = struct
   include T.Checked
@@ -27,11 +28,8 @@ module Checked = struct
     in
     let two = Integer.constant ~m (Bignum_bigint.of_int 2) in
     let%bind ck_times_2 = integer_mul ck two in
-    let slot_gte_ck = Integer.gte ~m (T.Checked.to_integer slot) ck in
-    let slot_lt_ck_times_2 =
-      Integer.lt ~m (T.Checked.to_integer slot) ck_times_2
-    in
-    Boolean.(slot_gte_ck && slot_lt_ck_times_2)
+    make_checked (fun () ->
+        Integer.lt ~m (T.Checked.to_integer slot) ck_times_2 )
 end
 
 let gen (constants : Constants.t) =

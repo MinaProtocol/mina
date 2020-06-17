@@ -3,7 +3,7 @@ module NewBlock = {
 
   type snarkJobs = {
     prover: string,
-    fee: int64,
+    fee: string,
   };
 
   type userCommands = {
@@ -12,15 +12,17 @@ module NewBlock = {
   };
 
   type feeTransfer = {
-    fee: int64,
+    fee: string,
     recipient: string,
   };
   type transactions = {
     userCommands: array(userCommands),
     feeTransfer: array(feeTransfer),
+    coinbaseReceiverAccount: Js.Nullable.t(account),
   };
 
   type blockchainState = {date: string};
+
   type data = {
     creatorAccount: account,
     snarkJobs: array(snarkJobs),
@@ -42,24 +44,16 @@ module Metrics = {
     | SnarkWorkCreated
     | SnarkFeesCollected
     | HighestSnarkFeeCollected
-    | TransactionsReceivedByEcho;
+    | TransactionsReceivedByEcho
+    | CoinbaseReceiver;
 
   type metricRecord = {
     blocksCreated: option(int),
     transactionSent: option(int),
     snarkWorkCreated: option(int),
-    snarkFeesCollected: option(int64),
-    highestSnarkFeeCollected: option(int64),
+    snarkFeesCollected: option(string),
+    highestSnarkFeeCollected: option(string),
     transactionsReceivedByEcho: option(int),
+    coinbaseReceiver: option(bool),
   };
-};
-
-module FileCredentials = {
-  type t = {
-    clientId: string,
-    clientSecret: string,
-    redirectURI: string,
-    spreadsheetId: string,
-  };
-  external unsafeJSONToFileCredentials: Js.Json.t => t = "%identity";
 };

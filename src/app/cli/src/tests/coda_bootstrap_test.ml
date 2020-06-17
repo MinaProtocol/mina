@@ -1,18 +1,14 @@
 open Core
 open Async
-open Signature_lib
 
 let name = "coda-bootstrap-test"
 
 let main () =
   let logger = Logger.create () in
-  let largest_account_keypair =
-    Test_genesis_ledger.largest_account_keypair_exn ()
-  in
   let n = 2 in
   let block_production_keys i = Some i in
   let snark_work_public_keys i =
-    if i = 0 then Some (Public_key.compress largest_account_keypair.public_key)
+    if i = 0 then Some (Test_genesis_ledger.largest_account_pk_exn ())
     else None
   in
   let%bind testnet =

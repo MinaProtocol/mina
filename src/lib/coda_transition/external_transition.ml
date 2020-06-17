@@ -104,29 +104,9 @@ module Stable = struct
         (user_commands external_transition)
         ~f:(Fn.compose User_command_payload.is_payment User_command.payload)
 
-    module T = struct
-      type nonrec t = t
-
-      let t_of_sexp = t_of_sexp
-
-      let sexp_of_t = sexp_of_t
-
-      let compare =
-        Comparable.lift
-          (fun existing candidate ->
-            (* To prevent the logger to spam a lot of messsages, the logger input is set to null *)
-            if Consensus.Data.Consensus_state.Value.equal existing candidate
-            then 0
-            else if
-              `Keep
-              = Consensus.Hooks.select ~existing ~candidate
-                  ~logger:(Logger.null ())
-            then -1
-            else 1 )
-          ~f:consensus_state
-    end
-
-    include Comparable.Make (T)
+    let equal =
+      Comparable.lift Consensus.Data.Consensus_state.Value.equal
+        ~f:consensus_state
   end
 end]
 
@@ -171,7 +151,7 @@ Stable.Latest.
   , payments
   , to_yojson )]
 
-include Comparable.Make (Stable.Latest)
+let equal = Stable.Latest.equal
 
 let create ~protocol_state ~protocol_state_proof ~staged_ledger_diff
     ~delta_transition_chain_proof ~validation_callback
@@ -973,7 +953,8 @@ module Transition_frontier_validation (Transition_frontier : sig
   val find : t -> State_hash.t -> Breadcrumb.t option
 end) =
 struct
-  let validate_frontier_dependencies (t, validation) ~logger ~frontier =
+  let validate_frontier_dependencies (t, validation) ~consensus_constants
+      ~logger ~frontier =
     let open Result.Let_syntax in
     let hash = With_hash.hash t in
     let protocol_state = protocol_state (With_hash.data t) in
@@ -993,7 +974,7 @@ struct
       let ( = ) = Pervasives.( = ) in
       Result.ok_if_true
         ( `Take
-        = Consensus.Hooks.select
+        = Consensus.Hooks.select ~constants:consensus_constants
             ~logger:
               (Logger.extend logger
                  [ ( "selection_context"
@@ -1027,7 +1008,7 @@ module Staged_ledger_validation = struct
          , 'protocol_versions )
          Validation.with_transition
       -> logger:Logger.t
-      -> constraint_constants:Genesis_constants.Constraint_constants.t
+      -> precomputed_values:Precomputed_values.t
       -> verifier:Verifier.t
       -> parent_staged_ledger:Staged_ledger.t
       -> parent_protocol_state:Protocol_state.value
@@ -1049,7 +1030,7 @@ module Staged_ledger_validation = struct
            | `Staged_ledger_application_failed of
              Staged_ledger.Staged_ledger_error.t ] )
          Deferred.Result.t =
-   fun (t, validation) ~logger ~constraint_constants ~verifier
+   fun (t, validation) ~logger ~precomputed_values ~verifier
        ~parent_staged_ledger ~parent_protocol_state ->
     let open Deferred.Result.Let_syntax in
     let transition = With_hash.data t in
@@ -1061,10 +1042,19 @@ module Staged_ledger_validation = struct
              , `Ledger_proof proof_opt
              , `Staged_ledger transitioned_staged_ledger
              , `Pending_coinbase_data _ ) =
-      Staged_ledger.apply ~constraint_constants ~logger ~verifier
-        parent_staged_ledger staged_ledger_diff
-        ~state_body_hash:
-          Protocol_state.(Body.hash @@ body parent_protocol_state)
+      Staged_ledger.apply
+        ~constraint_constants:precomputed_values.constraint_constants ~logger
+        ~verifier parent_staged_ledger staged_ledger_diff
+        ~current_global_slot:
+          ( Coda_state.Protocol_state.(
+              Body.consensus_state @@ body parent_protocol_state)
+          |> Consensus.Data.Consensus_state.curr_slot )
+        ~state_and_body_hash:
+          (let body_hash =
+             Protocol_state.(Body.hash @@ body parent_protocol_state)
+           in
+           ( Protocol_state.hash_with_body parent_protocol_state ~body_hash
+           , body_hash ))
       |> Deferred.Result.map_error ~f:(fun e ->
              `Staged_ledger_application_failed e )
     in
@@ -1075,8 +1065,9 @@ module Staged_ledger_validation = struct
             (Staged_ledger.current_ledger_proof transitioned_staged_ledger)
             ~f:target_hash_of_ledger_proof
             ~default:
-              (Frozen_ledger_hash.of_ledger_hash
-                 (Ledger.merkle_root (Lazy.force Test_genesis_ledger.t)))
+              ( Precomputed_values.genesis_ledger precomputed_values
+              |> Lazy.force |> Ledger.merkle_root
+              |> Frozen_ledger_hash.of_ledger_hash )
       | Some (proof, _) ->
           target_hash_of_ledger_proof proof
     in

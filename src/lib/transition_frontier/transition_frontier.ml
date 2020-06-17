@@ -32,14 +32,14 @@ type t =
 let genesis_root_data ~precomputed_values =
   let open Root_data.Limited in
   let transition = External_transition.genesis ~precomputed_values in
-  let scan_state = Staged_ledger.Scan_state.empty () in
+  let constraint_constants = precomputed_values.constraint_constants in
+  let scan_state = Staged_ledger.Scan_state.empty ~constraint_constants () in
   (*if scan state is empty the protocol states required is also empty*)
   let protocol_states = [] in
   let pending_coinbase =
     Or_error.ok_exn
       (Pending_coinbase.create
-         ~depth:precomputed_values.constraint_constants.pending_coinbase_depth
-         ())
+         ~depth:constraint_constants.pending_coinbase_depth ())
   in
   create ~transition ~scan_state ~pending_coinbase ~protocol_states
 
@@ -104,7 +104,9 @@ let load_from_persistence_and_start ~logger ~verifier ~consensus_local_state
   in
   let%map () =
     Deferred.return
-      ( Persistent_frontier.Instance.start_sync persistent_frontier_instance
+      ( Persistent_frontier.Instance.start_sync
+          ~constraint_constants:precomputed_values.constraint_constants
+          persistent_frontier_instance
       |> Result.map_error ~f:(function
            | `Sync_cannot_be_running ->
                `Failure "sync job is already running on persistent frontier"
@@ -423,7 +425,8 @@ module For_tests = struct
 
   (* a helper quickcheck generator which always returns the genesis breadcrumb *)
   let gen_genesis_breadcrumb ?(logger = Logger.null ()) ~proof_level ?verifier
-      ~precomputed_values () =
+      ~(precomputed_values : Precomputed_values.t) () =
+    let constraint_constants = precomputed_values.constraint_constants in
     let verifier =
       match verifier with
       | Some x ->
@@ -440,21 +443,27 @@ module For_tests = struct
         let genesis_ledger =
           Lazy.force (Precomputed_values.genesis_ledger precomputed_values)
         in
+        (*scan state is empty so no protocol state should be required*)
+        let get_state hash =
+          Or_error.errorf
+            !"Protocol state (for scan state transactions) for \
+              %{sexp:State_hash.t} not found"
+            hash
+        in
         let genesis_staged_ledger =
           Or_error.ok_exn
             (Async.Thread_safe.block_on_async_exn (fun () ->
                  Staged_ledger
                  .of_scan_state_pending_coinbases_and_snarked_ledger ~logger
-                   ~verifier
-                   ~constraint_constants:
-                     precomputed_values.constraint_constants
-                   ~scan_state:(Staged_ledger.Scan_state.empty ())
+                   ~verifier ~constraint_constants
+                   ~scan_state:
+                     (Staged_ledger.Scan_state.empty ~constraint_constants ())
+                   ~get_state
                    ~pending_coinbases:
                      ( Or_error.ok_exn
                      @@ Pending_coinbase.create
-                          ~depth:
-                            precomputed_values.constraint_constants
-                              .pending_coinbase_depth () )
+                          ~depth:constraint_constants.pending_coinbase_depth ()
+                     )
                    ~snarked_ledger:genesis_ledger
                    ~expected_merkle_root:(Ledger.merkle_root genesis_ledger) ))
         in

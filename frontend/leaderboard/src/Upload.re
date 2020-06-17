@@ -1,3 +1,20 @@
+/*
+  Upload.re has the responsibilities of managing all logic with the Leaderboard
+  Google Sheets .
+
+  The entry point to upload points is uploadPoints(). uploadPoints() expects
+  that there is an environment variable for the spreadsheet id, otherwise it will
+  report an error.
+
+  The fetched Google Sheets data is in a form of an array of rows. Each entry
+  in the array is another array that represents cell values for a particular user.
+
+  The first fetch that is done is to compute a mapping of usernames and public keys
+  which is contained in the "users" tab and is then used to match on the
+  challenge points map that was computed. Once points are rewarded, updatePointsColumns()
+  is executed and the data is then uploaded to the spreadsheet.
+ */
+
 module StringMap = Map.Make(String);
 
 let getCellType = v =>
@@ -38,6 +55,17 @@ let encodeGoogleSheets = sheetsData => {
      });
 };
 
+let getColumnIndex = (data, columnToFind) => {
+  Belt.Array.getIndexBy(data, headerName =>
+    switch (headerName) {
+    | Some(headerName) =>
+      String.lowercase_ascii(headerName)
+      == String.lowercase_ascii(columnToFind)
+    | None => false
+    }
+  );
+};
+
 let normalizeGoogleSheets = sheetsData => {
   let headerLength = Array.length(sheetsData[0]);
 
@@ -45,7 +73,7 @@ let normalizeGoogleSheets = sheetsData => {
   |> Array.map(row => {
        let rowLength = Array.length(row);
        if (rowLength < headerLength) {
-         Array.append(ArrayLabels.make(headerLength - rowLength, None), row);
+         Array.append(row, ArrayLabels.make(headerLength - rowLength, None));
        } else {
          row;
        };
@@ -66,13 +94,13 @@ let createPublickeyUsernameMap = sheetsData => {
      );
 };
 
-let createUsernamePointsMap = (pointsMap, pkUsernameMap) => {
+let createUsernamePointsMap = (pointsMap, userMap) => {
   StringMap.fold(
-    (pk, username, map) => {
+    (username, pk, map) => {
       StringMap.mem(pk, pointsMap)
         ? StringMap.add(username, StringMap.find(pk, pointsMap), map) : map
     },
-    pkUsernameMap,
+    userMap,
     StringMap.empty,
   );
 };
@@ -91,20 +119,8 @@ let updatePointsColumns =
        if (StringMap.mem(username, usernamePointsMap)) {
          // Found a username, get the points to update
          let pointsBinding = StringMap.find(username, usernamePointsMap);
-         let pointsValue =
-           switch (row[pointIndex]) {
-           | Some(points) => int_of_string_opt(points)
-           | None => None
-           };
-
-         switch (pointsValue, pointsBinding) {
-         | (Some(sheetsValue), pointsBinding) =>
-           // Add points from sheets and challenge
-           row[pointIndex] = Some(string_of_int(sheetsValue + pointsBinding))
-         | (None, pointsBinding) =>
-           // If user as an empty cell, add points from challenge
-           row[pointIndex] = Some(string_of_int(pointsBinding))
-         };
+         // Add points from challenge
+         row[pointIndex] = Some(string_of_int(pointsBinding));
        } else {
          // If username has no points for the challenge, wipe cell
          row[pointIndex] =
@@ -113,104 +129,137 @@ let updatePointsColumns =
      });
 };
 
-let getColumnIndex = (data, columnToFind) => {
-  Belt.Array.getIndexBy(data, headerName =>
-    switch (headerName) {
-    | Some(headerName) =>
-      String.lowercase_ascii(headerName)
-      == String.lowercase_ascii(columnToFind)
-    | None => false
-    }
-  );
+let filterMetricsMap = (metricsMap, userMap) => {
+  let userPublickeys =
+    StringMap.bindings(userMap) |> List.map(((_, publickey)) => publickey);
+  metricsMap
+  |> StringMap.filter((publickey, _) => {
+       List.mem(publickey, userPublickeys)
+     });
 };
 
-let findChallenges = (metricsMap, pkUsernameMap, sheetsData, usernameIndex) => {
+let findChallenges = (metricsMap, userMap, sheetsData, usernameIndex) => {
   // Loop through the first row which contains all challenge headers and calculate valid challenges
   sheetsData[0]
   |> Array.iteri((columnIndex, columnHeader) => {
        switch (columnHeader) {
        | Some(challengeHeader) =>
-         switch (Challenges.calculatePoints(challengeHeader, metricsMap)) {
+         let filteredMetrics = filterMetricsMap(metricsMap, userMap);
+         switch (Challenges.calculatePoints(challengeHeader, filteredMetrics)) {
          | Some(pointsMap) =>
            let usernamePointsMap =
-             createUsernamePointsMap(pointsMap, pkUsernameMap);
+             createUsernamePointsMap(pointsMap, userMap);
            updatePointsColumns(
              usernamePointsMap,
              sheetsData,
              columnIndex,
              usernameIndex,
            );
+           ();
          | None => ()
-         }
+         };
        | None => ()
        }
      });
 };
 
-let updatePoints = (metricsMap, pkUsernameMap, sheetsData) => {
+let updatePoints = (metricsMap, userMap, sheetsData) => {
   switch (getColumnIndex(sheetsData[0], "Name")) {
   | Some(usernameIndex) =>
-    findChallenges(metricsMap, pkUsernameMap, sheetsData, usernameIndex)
+    findChallenges(metricsMap, userMap, sheetsData, usernameIndex)
   | None => ()
   };
 };
 
-let uploadPoints = (fileCredentials, metricsMap) => {
-  let {
-    Types.FileCredentials.clientId,
-    clientSecret,
-    redirectURI,
-    spreadsheetId,
-  } = fileCredentials;
-
-  Sheets.createClient({clientId, clientSecret, redirectURI}, client => {
-    switch (client) {
-    | Ok(client) =>
-      Sheets.getRange(
+let updateSheets = (client, spreadsheetId, range, userMap, metricsMap) => {
+  Sheets.getRange(
+    client, {spreadsheetId, range, valueRenderOption: "FORMULA"}, result => {
+    switch (result) {
+    | Ok(leaderboardData) =>
+      let decodedResult =
+        leaderboardData |> decodeGoogleSheets |> normalizeGoogleSheets;
+      updatePoints(metricsMap, userMap, decodedResult);
+      let resource: Bindings.GoogleSheets.sheetsUploadData = {
+        values: encodeGoogleSheets(decodedResult),
+      };
+      Sheets.updateRange(
         client,
-        {
-          spreadsheetId,
-          range: "PublicKeys!A1:B",
-          valueRenderOption: "FORMULA",
-        },
+        {spreadsheetId, range, valueInputOption: "USER_ENTERED", resource},
         result => {
         switch (result) {
-        | Ok(pkUsernameData) =>
-          let pkUsernameMap =
-            pkUsernameData |> decodeGoogleSheets |> createPublickeyUsernameMap;
-          Sheets.getRange(
-            client,
-            {spreadsheetId, range: "Data!A1:K", valueRenderOption: "FORMULA"},
-            result => {
-            switch (result) {
-            | Ok(leaderboardData) =>
-              let decodedResult =
-                decodeGoogleSheets(leaderboardData) |> normalizeGoogleSheets;
-              updatePoints(metricsMap, pkUsernameMap, decodedResult);
-              let resource: Bindings.GoogleSheets.sheetsUploadData = {
-                values: encodeGoogleSheets(decodedResult),
-              };
-              Sheets.updateRange(
-                client,
-                {
-                  spreadsheetId,
-                  range: "Data!M1",
-                  valueInputOption: "USER_ENTERED",
-                  resource,
-                },
-                result => {
-                switch (result) {
-                | Ok(_) => Js.log("Data uploaded")
-                | Error(error) => Js.log(error)
-                }
-              });
-            | Error(error) => Js.log(error)
-            }
-          });
+        | Ok(_) => Js.log({j|Data uploaded to $range|j})
         | Error(error) => Js.log(error)
         }
-      })
+      });
     | Error(error) => Js.log(error)
     }
   });
+};
+
+[@bs.val]
+external spreadsheetId: Js.Undefined.t(string) = "process.env.SPREADSHEET_ID";
+let uploadPoints = metricsMap => {
+  switch (Js.undefinedToOption(spreadsheetId)) {
+  | Some(spreadsheetId) =>
+    let client =
+      Bindings.GoogleSheets.googleAuth({
+        Bindings.GoogleSheets.scopes: [|
+          "https://www.googleapis.com/auth/spreadsheets",
+        |],
+      });
+    Sheets.getRange(
+      client,
+      {spreadsheetId, range: "Users!A2:B", valueRenderOption: "FORMULA"},
+      result => {
+      switch (result) {
+      | Ok(userData) =>
+        let userMap =
+          userData |> decodeGoogleSheets |> createPublickeyUsernameMap;
+        updateSheets(client, spreadsheetId, "3.2b!A3:M", userMap, metricsMap);
+      | Error(error) => Js.log(error)
+      }
+    });
+  | None => Js.log("Invalid spreadsheet ID")
+  };
+};
+
+let uploadTotalBlocks = totalBlocks => {
+  switch (Js.undefinedToOption(spreadsheetId)) {
+  | Some(spreadsheetId) =>
+    let client =
+      Bindings.GoogleSheets.googleAuth({
+        Bindings.GoogleSheets.scopes: [|
+          "https://www.googleapis.com/auth/spreadsheets",
+        |],
+      });
+    Sheets.getRange(
+      client,
+      {spreadsheetId, range: "Data!A1:B", valueRenderOption: "FORMULA"},
+      result => {
+      switch (result) {
+      | Ok(sheetsData) =>
+        let newSheetsData = sheetsData |> decodeGoogleSheets;
+        newSheetsData[0][1] = totalBlocks;
+        let resource: Bindings.GoogleSheets.sheetsUploadData = {
+          values: encodeGoogleSheets(newSheetsData),
+        };
+        Sheets.updateRange(
+          client,
+          {
+            spreadsheetId,
+            range: "Data!A1:B",
+            valueInputOption: "USER_ENTERED",
+            resource,
+          },
+          result => {
+          switch (result) {
+          | Ok(_) => Js.log({j|Uploaded total blocks|j})
+          | Error(error) => Js.log(error)
+          }
+        });
+      | Error(error) => Js.log(error)
+      }
+    });
+  | None => Js.log("Invalid spreadsheet ID")
+  };
 };

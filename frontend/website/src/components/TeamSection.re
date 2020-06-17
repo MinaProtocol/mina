@@ -52,8 +52,10 @@ module Member = {
         <img
           className=Css.(
             style([
-              width(`rem(5.5)),
-              height(`rem(5.5)),
+              maxWidth(`rem(5.5)),
+              maxHeight(`rem(5.5)),
+              height(`auto),
+              width(`auto),
               unsafe("WebkitFilter", "grayscale(1)"),
               unsafe("filter", "grayscale(1)"),
               marginLeft(`rem(0.875)),
@@ -401,19 +403,6 @@ let make = () => {
        he studied cryptography."
       />
       <Member
-        name="Rebekah Mercer"
-        title="Protocol Researcher"
-        description={
-          "Most recently, Rebekah was a PhD student at Aarhus University, where \
-       she was advised by Claudio Orlandi and Ivan "
-          ++ {js|Damgård.|js}
-          ++ " Her research \
-       revolves around cryptography and privacy, particularly privacy in \
-       cryptocurrencies. Rebekah holds an MSc in Information Security from \
-       UCL and a BSc in Mathematics from the University of Manchester."
-        }
-      />
-      <Member
         name="Jiawei Tang"
         title="Protocol Engineer"
         description="Jiawei loves writing interpreters and type checkers. He received his \
@@ -457,16 +446,6 @@ let make = () => {
         of Texas at Austin."
       />
       <Member
-        name="Pranay Mohan"
-        title="Developer Relations"
-        description="Pranay is a frontiersman at heart, and joined the cryptocurrency \
-              space to play a role in the rethinking of financial systems. He is excited about \
-              changing the story of money to create a more equitable world. \
-              Pranay's interest lies in digesting complex technical concepts and delivering them to \
-              users as intuitive experiences. Prior to joining O(1) Labs, he built products at \
-              Snapchat and co-founded Software Engineering Daily."
-      />
-      <Member
         name="Conner Swann"
         title="Protocol Reliability Eng"
         description="Conner is an infrastructure enthusiast with extensive \
@@ -506,6 +485,52 @@ let make = () => {
         empathy for the user and iterative processes. She recently graduated \
         from Smith College with a BA in Computer Science and is excited about \
         developing products that contribute to the evolution of decentralized technology. "
+      />
+      <Member
+        name="Sherry Lin"
+        title="Community Manager"
+        description="Sherry is a marketing and communications professional who enjoys \
+       telling stories that resonate. Her previous experiences have been in the hardware \
+       (semiconductor) space, but she is really interested in how blockchain can solve problems \
+       by disrupting the status quo. She is excited to work on developing blockchain technology \
+       that will open up more opportunities to more people. Sherry holds a BA in Communications/International \
+       Studies from Northwestern University."
+      />
+      <Member
+        name="Kate El-Bizri"
+        title="Visual Designer"
+        description="In addition to a BFA in Visual Design, Kate has a Bachelor's degree in psychology. \
+      Her philosophy is that understanding what motivates and drives our behaviors creates effective design systems.\
+       Through both agency and in-house, she's worked with many companies from small startups to large-scale \
+       Fortune 100 companies to communicate their stories to the world. She believes everyone is creative at heart, \
+       and that creative inspiration can come from anywhere through engaging with the world around us."
+      />
+      <Member
+        name="Ahmad Wilson"
+        title="Protocol Reliability Eng"
+        description="Ahmad is a computer scientist and self-proclaimed “tech-head” \
+        interested in software infrastructure, user-interfaces and AI/automation. \
+        He holds a MSc in HCI & AI from Brown University, and a BS in CS from Morehouse College. \
+        He has developed software for startups and larger corporations such as Yelp and Microsoft for over a decade. \
+        He's a fan of New England sports teams (Go Pats!), gardening, sci-fi and learning about \
+         cryptocurrency and the future of the decentralized web."
+      />
+      <Member
+        name="Bijan Shahrokhi"
+        title="Product Manager"
+        description="Bijan has been a product leader in the fintech industry for over 10 years and in blockchain for \
+      over 5 years. Prior to joining O(1) Labs, Bijan was Head of Product at Harbor, a Layer 2 compliance protocol on Ethereum. "
+      />
+      <Member
+        name="Aneesha Raines"
+        title="Engineering Manager"
+        description="
+        Aneesha's career in software engineering has spanned a wide range of \
+        technology companies from biotech startup to big enterprise.  \
+        She has an MSE in computer engineering from the University of Michigan \
+        and most recently came from an identity company as an Engineering Manager. \
+        Her primary background is in QA, so believes in delivering high quality, scalable and maintainable software.  \
+        She loves team building and working with individuals to achieve their goals."
       />
     </Section>
     <Section name="Advisors">

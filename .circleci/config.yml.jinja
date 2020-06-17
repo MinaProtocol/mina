@@ -158,13 +158,13 @@ jobs:
                   command: ./scripts/test.py render --check .circleci/config.yml.jinja .mergify.yml.jinja
             - run:
                   name: OCamlformat (make check-format)
-                  command: eval `opam config env` && LIBP2P_NIXLESS=1 make check-format
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'eval `opam config env` && LIBP2P_NIXLESS=1 make check-format'
             - run:
                   name: Snarky tracks master (make check-snarky-submodule)
-                  command: LIBP2P_NIXLESS=1 make check-snarky-submodule
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make check-snarky-submodule'
             - run:
                   name: Check ppx_optcomp preprocessor_deps
-                  command: ./scripts/lint_preprocessor_deps.sh
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c './scripts/lint_preprocessor_deps.sh'
             - run:
                   name: Check CODEOWNERS file format
                   command: ./scripts/lint_codeowners.sh
@@ -173,7 +173,7 @@ jobs:
                   command: ./scripts/lint_rfcs.sh
             - run:
                   name: Require ppx_version preprocessing for linting
-                  command: ./scripts/require-ppx-version.py
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c './scripts/require-ppx-version.py'
     lint-opt:
         docker:
             - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
@@ -419,7 +419,7 @@ jobs:
                 no_output_timeout: 20m
             - run:
                 name: Upload genesis data
-                command: ./scripts/upload-genesis.sh
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c './scripts/upload-genesis.sh'
             - run:
                   name: Build deb package with PV keys and PV key tar
                   command:  ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make deb'
@@ -442,6 +442,29 @@ jobs:
                   name: Copy artifacts to cloud
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh scripts/artifacts.sh
             {%- if profile in medium_curve_profiles %}
+            - save_cache:
+                name: Save cache - docker deploy env
+                key: docker-deploy-env-v1-{{profile}}-{{'{{'}} .Revision {{'}}'}}
+                paths:
+                    - "/tmp/DOCKER_DEPLOY_ENV"
+                    - "scripts"
+                    - "dockerfiles"
+            - store_artifacts:
+                  path: /tmp/artifacts
+            {%- endif %}
+    {%- endfor %}
+
+    {%- for profile in build_artifact_profiles %}
+    {%- if profile in medium_curve_profiles %}
+    {%- for docker_image in ['coda-daemon', 'coda-demo'] %}
+    build-artifacts-docker--{{profile}}--{{docker_image}}:
+        resource_class: xlarge
+        docker:
+            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+        steps:
+            - restore_cache:
+                name: Restore cache - docker deploy env
+                key: docker-deploy-env-v1-{{profile}}-{{'{{'}} .Revision {{'}}'}}
             - setup_remote_docker
             - run:
                   name: Build and Upload Docker
@@ -456,21 +479,17 @@ jobs:
                         if [[ "$CODA_WAS_PUBLISHED" = true  ]]; then
 
                               echo "$DOCKER_PASSWORD" | docker login --username $DOCKER_USERNAME --password-stdin
-                              ./scripts/skip_if_only_frontend_or_rfcs.sh scripts/release-docker.sh \
-                              -s coda-daemon \
+                              scripts/release-docker.sh \
+                              -s {{docker_image}} \
                               -v $CODA_GIT_TAG-$CODA_GIT_BRANCH-$CODA_GIT_HASH \
                               --extra-args "--build-arg coda_version=$CODA_DEB_VERSION --build-arg deb_repo=$CODA_DEB_REPO"
 
-                              echo "$DOCKER_PASSWORD" | docker login --username $DOCKER_USERNAME --password-stdin
-                              ./scripts/skip_if_only_frontend_or_rfcs.sh scripts/release-docker.sh \
-                              -s coda-demo \
-                              -v $CODA_GIT_TAG-$CODA_GIT_BRANCH-$CODA_GIT_HASH \
-                              --extra-args "--build-arg coda_version=$CODA_DEB_VERSION --build-arg deb_repo=$CODA_DEB_REPO"
                         fi
                     fi
             - store_artifacts:
                   path: /tmp/artifacts
-            {%- endif %}
+    {%- endfor %}
+    {%- endif %}
     {%- endfor %}
 
     {%- for profile in unit_test_profiles %}
@@ -606,6 +625,15 @@ workflows:
             - build-client-sdk
             {%- for profile in build_artifact_profiles %}
             - build-artifacts--{{profile}}
+            {%- endfor %}
+            {%- for profile in build_artifact_profiles %}
+            {%- if profile in medium_curve_profiles %}
+            {%- for docker_image in ['coda-daemon', 'coda-demo'] %}
+            - build-artifacts-docker--{{profile}}--{{docker_image}}:
+                requires:
+                  - build-artifacts--{{profile}}
+            {%- endfor %}
+            {%- endif %}
             {%- endfor %}
             {%- for profile in unit_test_profiles %}
             - test-unit--{{profile}}

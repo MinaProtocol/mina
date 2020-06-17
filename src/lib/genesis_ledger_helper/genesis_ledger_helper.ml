@@ -116,16 +116,33 @@ end
 
 module Ledger = struct
   let hash_filename hash =
-    "genesis_ledger_" ^ Blake2.to_hex (Blake2.digest_string hash) ^ ".tar.gz"
+    let str =
+      (* Consider the serialization of accounts as well as the hash. In
+         particular, adding fields that are
+         * hashed as a bit string
+         * default to an all-zero bit representation
+         may result in the same hash, but the accounts in the ledger will not
+         match the account record format.
+      *)
+      hash
+      ^ Bin_prot.Writer.to_string Coda_base.Account.Stable.Latest.bin_writer_t
+          Coda_base.Account.empty
+    in
+    "genesis_ledger_" ^ Blake2.to_hex (Blake2.digest_string str) ^ ".tar.gz"
 
   let named_filename
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ~num_accounts name =
     let str =
       String.concat
-        [ Int.to_string Coda_compile_config.curve_size
-        ; Int.to_string constraint_constants.ledger_depth
-        ; Int.to_string (Option.value ~default:0 num_accounts) ]
+        [ Int.to_string constraint_constants.ledger_depth
+        ; Int.to_string (Option.value ~default:0 num_accounts)
+        ; (* Distinguish ledgers when the hash function is different. *)
+          Snark_params.Tick.Field.to_string Coda_base.Account.empty_digest
+        ; (* Distinguish ledgers when the account record layout has changed. *)
+          Bin_prot.Writer.to_string
+            Coda_base.Account.Stable.Latest.bin_writer_t
+            Coda_base.Account.empty ]
     in
     "genesis_ledger_" ^ name ^ "_"
     ^ Blake2.(to_hex (digest_string str))
@@ -154,6 +171,20 @@ module Ledger = struct
           ~metadata:[("path", `String filename)] ;
         None )
     in
+    let load_from_s3 filename =
+      let s3_path = s3_bucket_prefix ^/ filename in
+      let local_path = Cache_dir.s3_install_path ^/ filename in
+      match%bind Cache_dir.load_from_s3 [s3_path] [local_path] ~logger with
+      | Ok () ->
+          file_exists filename Cache_dir.s3_install_path
+      | Error e ->
+          Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
+            "Could not download genesis ledger from $uri: $error"
+            ~metadata:
+              [ ("uri", `String s3_path)
+              ; ("error", `String (Error.to_string_hum e)) ] ;
+          return None
+    in
     let%bind hash_filename =
       match config.hash with
       | Some hash -> (
@@ -164,21 +195,8 @@ module Ledger = struct
           match tar_path with
           | Some _ ->
               return tar_path
-          | None -> (
-              let s3_path = s3_bucket_prefix ^/ hash_filename in
-              let local_path = Cache_dir.s3_install_path ^/ hash_filename in
-              match%bind
-                Cache_dir.load_from_s3 [s3_path] [local_path] ~logger
-              with
-              | Ok () ->
-                  file_exists hash_filename Cache_dir.s3_install_path
-              | Error e ->
-                  Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
-                    "Could not download genesis ledger from $uri: $error"
-                    ~metadata:
-                      [ ("uri", `String s3_path)
-                      ; ("error", `String (Error.to_string_hum e)) ] ;
-                  return None ) )
+          | None ->
+              load_from_s3 hash_filename )
       | None ->
           return None
     in
@@ -190,12 +208,18 @@ module Ledger = struct
       | Hash hash ->
           assert (Some hash = config.hash) ;
           return None
-      | Accounts accounts ->
+      | Accounts accounts -> (
           let named_filename =
             named_filename ~constraint_constants
               ~num_accounts:config.num_accounts (accounts_name accounts)
           in
-          Deferred.List.find_map ~f:(file_exists named_filename) search_paths
+          match%bind
+            Deferred.List.find_map ~f:(file_exists named_filename) search_paths
+          with
+          | Some path ->
+              return (Some path)
+          | None ->
+              load_from_s3 named_filename )
       | Named name ->
           let named_filename =
             named_filename ~constraint_constants
@@ -373,7 +397,7 @@ module Ledger = struct
                   in
                   (* Add a symlink from the named path to the hash path. *)
                   let%map () = Unix.symlink ~target:tar_path ~link_name in
-                  Logger.error ~module_:__MODULE__ ~location:__LOC__ logger
+                  Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
                     "Linking ledger file $tar_path to $named_tar_path"
                     ~metadata:
                       [ ("tar_path", `String tar_path)

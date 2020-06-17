@@ -82,7 +82,7 @@ module type S = sig
 
     val empty_hash : t
 
-    val of_digest : Pedersen.Digest.t -> t
+    val of_digest : Random_oracle.Digest.t -> t
   end
 
   module Hash_versioned : sig
@@ -153,13 +153,18 @@ module type S = sig
 
       val if_ : Boolean.var -> then_:t -> else_:t -> (t, _) Tick.Checked.t
 
+      val check_merge :
+           transition1:t * t
+        -> transition2:t * t
+        -> (Boolean.var, _) Tick.Checked.t
+
       val empty : t
 
       val create_with : t -> t
     end
   end
 
-  module Coinbase_stack_state : sig
+  module State_stack : sig
     type t
   end
 
@@ -256,7 +261,7 @@ module type S = sig
           Update.Action.t
           -> (Address.value * Address.value) Request.t
       | Find_index_of_oldest_stack : Address.value Request.t
-      | Get_previous_stack : Coinbase_stack_state.t Request.t
+      | Get_previous_stack : State_stack.t Request.t
 
     val get : depth:int -> var -> Address.var -> (Stack.var, _) Tick.Checked.t
 
