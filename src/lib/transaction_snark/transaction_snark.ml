@@ -948,8 +948,10 @@ module Base = struct
            Public_key.Compressed.Checked.equal payload.common.fee_payer_pk
              payload.body.source_pk
          in
-         Boolean.Assert.( = ) user_command_failure.predicate_failed
-           (Boolean.not bypass_predicate))
+         assert_r1cs
+           (Boolean.not bypass_predicate :> Field.Var.t)
+           (is_user_command :> Field.Var.t)
+           (user_command_failure.predicate_failed :> Field.Var.t))
     in
     let account_creation_amount =
       Amount.Checked.of_fee
@@ -2711,10 +2713,7 @@ let%test_module "transaction_snark" =
             ( User_command.accounts_accessed (uc :> User_command.t)
             , pending_coinbase_stack )
         | Fee_transfer ft ->
-            ( One_or_two.map ft ~f:(fun (key, _) ->
-                  Account_id.create key Token_id.default )
-              |> One_or_two.to_list
-            , pending_coinbase_stack )
+            (Fee_transfer.receivers ft, pending_coinbase_stack)
         | Coinbase cb ->
             ( Coinbase.accounts_accessed cb
             , Pending_coinbase.Stack.push_coinbase cb pending_coinbase_stack )
@@ -2807,10 +2806,12 @@ let%test_module "transaction_snark" =
                 in
                 List.fold receivers ~init:[] ~f:(fun txns receiver ->
                     let ft : Fee_transfer.t =
-                      One_or_two.map receiver ~f:(fun receiver ->
-                          ( ( receiver.account.public_key
-                            , Currency.Fee.of_int fee )
-                            : Fee_transfer.Single.t ) )
+                      Or_error.ok_exn @@ Fee_transfer.of_singles
+                      @@ One_or_two.map receiver ~f:(fun receiver ->
+                             Fee_transfer.Single.create
+                               ~receiver_pk:receiver.account.public_key
+                               ~fee:(Currency.Fee.of_int fee)
+                               ~fee_token:receiver.account.token_id )
                     in
                     txns @ [ft] )
               in
