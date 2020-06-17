@@ -266,7 +266,9 @@ let merge_top_hash wrap_vk_bits =
 
 let construct_input_checked ~sok_digest ~state1 ~state2 ~supply_increase
     ~fee_excess ~pending_coinbase_stack1 ~pending_coinbase_stack2 =
+  let open Tick in
   let open Random_oracle.Input in
+  let%bind fee_excess = Fee_excess.to_input_checked fee_excess in
   let input =
     List.reduce_exn ~f:append
       [ Sok_message.Digest.Checked.to_input sok_digest
@@ -277,9 +279,8 @@ let construct_input_checked ~sok_digest ~state1 ~state2 ~supply_increase
       ; bitstring
           (Bitstring_lib.Bitstring.Lsb_first.to_list
              (Amount.var_to_bits supply_increase))
-      ; Fee_excess.to_input_checked fee_excess ]
+      ; fee_excess ]
   in
-  let open Tick in
   let%map () =
     as_prover
       As_prover.(
