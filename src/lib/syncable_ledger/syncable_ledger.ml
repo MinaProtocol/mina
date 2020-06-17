@@ -3,6 +3,9 @@ open Async_kernel
 open Pipe_lib
 open Network_peer
 
+type Structured_log_events.t += Snarked_ledger_synced
+  [@@deriving register_event {msg= "Snarked database sync'd. All done"}]
+
 (** Run f recursively n times, starting with value r.
     e.g. funpow 3 f r = f (f (f r)) *)
 let rec funpow n f r = if n > 0 then funpow (n - 1) f (f r) else r
@@ -650,8 +653,8 @@ end = struct
             (Option.value_exn t.desired_root)
             (MT.merkle_root t.tree)
         then (
-          Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
-            "Snarked database sync'd. All done" ;
+          Logger.Structured.trace t.logger ~module_:__MODULE__
+            ~location:__LOC__ Snarked_ledger_synced ;
           all_done t ) ;
         Deferred.unit
     in
