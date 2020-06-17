@@ -420,6 +420,15 @@ module Body = {
       fontSize(`rem(0.8125)),
       color(Colors.saville),
     ]);
+
+let medium =
+    style([
+      Typeface.ibmplexsans,
+      fontStyle(`normal),
+      fontSize(`px(16)),
+      lineHeight(`px(24)),
+      color(Colors.teal)
+    ]);
 };
 
 // Match Tachyons setting pretty much everything to border-box

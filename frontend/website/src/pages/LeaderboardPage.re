@@ -43,11 +43,11 @@ module ToggleButtons = {
   |];
 
   [@react.component]
-  let make = (~currentOption, ~onTogglePress) => {
+  let make = (~currentToggle, ~onTogglePress) => {
     let renderToggleButtons = () => {
       toggleLabels
       |> Array.map(label => {
-           <ToggleButton currentOption onTogglePress label key=label />
+           <ToggleButton currentToggle onTogglePress label key=label />
          })
       |> React.array;
     };
@@ -60,15 +60,76 @@ module ToggleButtons = {
   };
 };
 
-type state = {currentOption: string};
-let initialState = {currentOption: ToggleButtons.toggleLabels[0]};
+module FilterDropdown = {
+  module FilterDropdownStyles = {
+    open Css;
+
+    let flexColumn =
+      style([
+        display(`flex),
+        flexDirection(`column),
+        justifyContent(`center),
+        height(`rem(4.5)),
+        media(Theme.MediaQuery.tablet, [display(`none)]),
+      ]);
+
+    let dropdownStyle = {
+      merge([
+        Theme.Body.medium,
+        style([
+          backgroundColor(Theme.Colors.white),
+          borderRadius(`px(4)),
+          boxSizing(`borderBox),
+          border(`px(1), `solid, `rgba((71, 137, 196, 0.3))),
+          width(`percent(100.)),
+          height(`rem(2.5)),
+          textIndent(`rem(0.5)),
+        ]),
+      ]);
+    };
+  };
+
+  let options = [|"This Release", "Previous Phase", "All Time"|];
+
+  [@react.component]
+  let make = (~onFilterPress) => {
+    let renderDropdown = () => {
+      <select
+        onClick={e => onFilterPress(ReactEvent.Mouse.target(e)##value)}
+        className=FilterDropdownStyles.dropdownStyle>
+        {options
+         |> Array.map(option => {
+              <option value=option> {React.string(option)} </option>
+            })
+         |> React.array}
+      </select>;
+    };
+
+    <div className=FilterDropdownStyles.flexColumn>
+      <h3 className=Theme.H5.semiBold> {React.string("View")} </h3>
+      <Spacer height=0.5 />
+      {renderDropdown()}
+    </div>;
+  };
+};
+
+type state = {
+  currentToggle: string,
+  currentFilter: string,
+};
+let initialState = {
+  currentToggle: ToggleButtons.toggleLabels[0],
+  currentFilter: FilterDropdown.options[0],
+};
 
 type action =
-  | Toggled(string);
+  | Toggled(string)
+  | Filtered(string);
 
-let reducer = (_, action) => {
+let reducer = (state, action) => {
   switch (action) {
-  | Toggled(option) => {currentOption: option}
+  | Toggled(toggle) => {...state, currentToggle: toggle}
+  | Filtered(filter) => {...state, currentFilter: filter}
   };
 };
 
@@ -80,10 +141,15 @@ let make = (~lastManualUpdatedDate) => {
     dispatch(Toggled(s));
   };
 
+  let onFilterPress = s => {
+    dispatch(Filtered(s));
+  };
+
   <Page title="Testnet Leaderboard">
     <Wrapped>
       <div className=Styles.page> <Summary lastManualUpdatedDate /> </div>
-      <ToggleButtons currentOption={state.currentOption} onTogglePress />
+      <ToggleButtons currentToggle={state.currentToggle} onTogglePress />
+      <FilterDropdown onFilterPress />
     </Wrapped>
   </Page>;
 };
