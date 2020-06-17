@@ -759,7 +759,7 @@ let pooled_user_commands =
          let%map response =
            Graphql_client.query_exn graphql graphql_endpoint
          in
-         let json_response : Yojson.Safe.json =
+         let json_response : Yojson.Safe.t =
            `List
              ( List.map ~f:Graphql_client.User_command.to_yojson
              @@ Array.to_list response#pooledUserCommands )
@@ -1270,7 +1270,7 @@ let telemetry =
     flag "show-errors" no_arg ~doc:"Include error responses in output"
   in
   let flags = Args.zip3 daemon_peers_flag peer_ids_flag show_errors_flag in
-  Command.async ~summary:"Get the trust status associated with an IP address"
+  Command.async ~summary:"Get telemetry data for a set of peers"
     (Cli_lib.Background_daemon.rpc_init flags
        ~f:(fun port (daemon_peers, peer_ids, show_errors) ->
          if

@@ -136,24 +136,14 @@ module Types = struct
             ~args:Arg.[]
             ~resolve:(fun {ctx= coda; _} global_slot ->
               let constants =
-                Consensus.Constants.create
-                  ~constraint_constants:
-                    (Coda_lib.config coda).constraint_constants
-                  ~protocol_constants:
-                    (Coda_lib.config coda).precomputed_values.genesis_constants
-                      .protocol
+                (Coda_lib.config coda).precomputed_values.consensus_constants
               in
               Block_time.to_string @@ C.start_time ~constants global_slot )
         ; field "endTime" ~typ:(non_null string)
             ~args:Arg.[]
             ~resolve:(fun {ctx= coda; _} global_slot ->
               let constants =
-                Consensus.Constants.create
-                  ~constraint_constants:
-                    (Coda_lib.config coda).constraint_constants
-                  ~protocol_constants:
-                    (Coda_lib.config coda).precomputed_values.genesis_constants
-                      .protocol
+                (Coda_lib.config coda).precomputed_values.consensus_constants
               in
               Block_time.to_string @@ C.end_time ~constants global_slot ) ] )
 
@@ -172,12 +162,7 @@ module Types = struct
             ~args:Arg.[]
             ~resolve:(fun {ctx= coda; _} ->
               let consensus_constants =
-                Consensus.Constants.create
-                  ~constraint_constants:
-                    (Coda_lib.config coda).constraint_constants
-                  ~protocol_constants:
-                    (Coda_lib.config coda).precomputed_values.genesis_constants
-                      .protocol
+                (Coda_lib.config coda).precomputed_values.consensus_constants
               in
               function
               | `Check_again _time ->
@@ -253,19 +238,18 @@ module Types = struct
                ~acceptable_network_delay:nn_int
                ~genesis_state_timestamp:nn_time )
 
-    let peer : (_, Network_peer.Peer.Display.Stable.V1.t option) typ =
+    let peer : (_, Network_peer.Peer.Display.t option) typ =
       obj "Peer" ~fields:(fun _ ->
           let open Reflection.Shorthand in
           List.rev
-          @@ Network_peer.Peer.Display.Stable.V1.Fields.fold ~init:[]
-               ~host:nn_string ~libp2p_port:nn_int ~peer_id:nn_string )
+          @@ Network_peer.Peer.Display.Fields.fold ~init:[] ~host:nn_string
+               ~libp2p_port:nn_int ~peer_id:nn_string )
 
-    let addrs_and_ports :
-        (_, Node_addrs_and_ports.Display.Stable.V1.t option) typ =
+    let addrs_and_ports : (_, Node_addrs_and_ports.Display.t option) typ =
       obj "AddrsAndPorts" ~fields:(fun _ ->
           let open Reflection.Shorthand in
           List.rev
-          @@ Node_addrs_and_ports.Display.Stable.V1.Fields.fold ~init:[]
+          @@ Node_addrs_and_ports.Display.Fields.fold ~init:[]
                ~external_ip:nn_string ~bind_ip:nn_string ~client_port:nn_int
                ~libp2p_port:nn_int ~peer:(id ~typ:peer) )
 
@@ -358,12 +342,20 @@ module Types = struct
               "Total transaction fee that is not accounted for in the \
                transition from source ledger to target ledger"
             ~args:Arg.[]
-            ~resolve:(fun _ {Transaction_snark.Statement.fee_excess; _} ->
-              fee_excess )
+            ~resolve:
+              (fun _
+                   ({ Transaction_snark.Statement.fee_excess=
+                        {Fee_excess.fee_excess_l; _}
+                    ; _ } :
+                     Transaction_snark.Statement.t) ->
+              (* TODO: Expose full fee excess data. *)
+              { fee_excess_l with
+                magnitude= Currency.Amount.of_fee fee_excess_l.magnitude } )
         ; field "supplyIncrease" ~typ:(non_null uint64)
             ~doc:"Increase in total coinbase reward "
             ~args:Arg.[]
-            ~resolve:(fun _ {Transaction_snark.Statement.supply_increase; _} ->
+            ~resolve:
+              (fun _ ({supply_increase; _} : Transaction_snark.Statement.t) ->
               Currency.Amount.to_uint64 supply_increase )
         ; field "workId" ~doc:"Unique identifier for a snark work"
             ~typ:(non_null int)
@@ -473,6 +465,7 @@ module Types = struct
       let to_full_account
           { Account.Poly.public_key
           ; token_id
+          ; token_owner
           ; nonce
           ; balance
           ; receipt_chain_hash
@@ -481,6 +474,7 @@ module Types = struct
           ; timing } =
         let open Option.Let_syntax in
         let%bind public_key = public_key in
+        let%bind token_owner = token_owner in
         let%bind nonce = nonce in
         let%bind receipt_chain_hash = receipt_chain_hash in
         let%bind delegate = delegate in
@@ -488,6 +482,7 @@ module Types = struct
         let%map timing = timing in
         { Account.Poly.public_key
         ; token_id
+        ; token_owner
         ; nonce
         ; balance
         ; receipt_chain_hash
@@ -498,6 +493,7 @@ module Types = struct
       let of_full_account
           { Account.Poly.public_key
           ; token_id
+          ; token_owner
           ; nonce
           ; balance
           ; receipt_chain_hash
@@ -506,6 +502,7 @@ module Types = struct
           ; timing } blockchain_length =
         { Account.Poly.public_key= Some public_key
         ; token_id
+        ; token_owner= Some token_owner
         ; nonce= Some nonce
         ; balance=
             { AnnotatedBalance.total= balance
@@ -535,6 +532,7 @@ module Types = struct
         | Some
             ( { Account.Poly.public_key
               ; token_id
+              ; token_owner
               ; nonce
               ; balance
               ; receipt_chain_hash
@@ -544,6 +542,7 @@ module Types = struct
             , blockchain_length ) ->
             { Account.Poly.public_key= Some public_key
             ; token_id
+            ; token_owner= Some token_owner
             ; nonce= Some nonce
             ; delegate= Some delegate
             ; balance=
@@ -557,6 +556,7 @@ module Types = struct
             Account.
               { Poly.public_key= Some (Account_id.public_key account_id)
               ; token_id= Account_id.token_id account_id
+              ; token_owner= None
               ; nonce= None
               ; delegate= None
               ; balance=
@@ -580,6 +580,7 @@ module Types = struct
       { account:
           ( Public_key.Compressed.t option
           , Token_id.t
+          , bool option
           , AnnotatedBalance.t
           , Account.Nonce.t option
           , Receipt.Chain_hash.t option
@@ -863,7 +864,13 @@ module Types = struct
             ~doc:"Amount of coda granted to the producer of this block"
             ~args:Arg.[]
             ~resolve:(fun _ {coinbase; _} -> Currency.Amount.to_uint64 coinbase)
-        ] )
+        ; field "coinbaseReceiverAccount" ~typ:AccountObj.account
+            ~doc:"Account to which the coinbase for this block was granted"
+            ~args:Arg.[]
+            ~resolve:(fun {ctx= coda; _} {coinbase_receiver; _} ->
+              Option.map
+                ~f:(AccountObj.get_best_ledger_account coda)
+                coinbase_receiver ) ] )
 
   let protocol_state_proof : (Coda_lib.t, Proof.t option) typ =
     (* TODO *)
@@ -1765,6 +1772,7 @@ module Mutations = struct
   let commands =
     [ add_wallet
     ; create_account
+    ; create_hd_account
     ; unlock_account
     ; unlock_wallet
     ; lock_account
@@ -1971,7 +1979,9 @@ module Queries = struct
             in
             let transactions =
               Coda_transition.External_transition.Validated.transactions
-                transition
+                ~constraint_constants:
+                  (Coda_lib.config coda).precomputed_values
+                    .constraint_constants transition
             in
             With_hash.Stable.Latest.
               { data=

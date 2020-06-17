@@ -1,4 +1,3 @@
-open Tuple_lib
 open Core_kernel
 
 module Evals = struct
@@ -19,7 +18,7 @@ module Evals = struct
         ; g_1: 'a
         ; g_2: 'a
         ; g_3: 'a }
-      [@@deriving fields, bin_io, version, sexp, compare, yojson]
+      [@@deriving fields, sexp, compare, yojson]
     end
   end]
 
@@ -193,8 +192,6 @@ module Openings = struct
         ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
         ~value_of_hlist:of_hlist
   end
-
-  open Evals
 
   [%%versioned
   module Stable = struct

@@ -104,6 +104,8 @@ module type S = sig
 
   val fee_payer : t -> Account_id.t
 
+  val fee_excess : t -> Fee_excess.t
+
   val token : t -> Token_id.t
 
   val source_pk : t -> Public_key.Compressed.t
@@ -116,8 +118,6 @@ module type S = sig
 
   val amount : t -> Currency.Amount.t option
 
-  val is_payment : t -> bool
-
   val memo : t -> User_command_memo.t
 
   val valid_until : t -> Global_slot.t
@@ -126,6 +126,10 @@ module type S = sig
   val minimum_fee : Currency.Fee.t
 
   val has_insufficient_fee : t -> bool
+
+  val tag : t -> Transaction_union_tag.t
+
+  val tag_string : t -> string
 
   include Gen_intf with type t := t
 

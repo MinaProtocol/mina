@@ -16,4 +16,4 @@ if __name__ == "__main__":
         print("The .ml files must have the same name, with different paths")
         sys.exit(1)
 
-    run_comparison('Binable functors',sys.argv[1],sys.argv[2])
+    run_comparison('_build/default/src/external/ppx_version/src/print_binable_functors.exe','Binable functors',sys.argv[1],sys.argv[2])

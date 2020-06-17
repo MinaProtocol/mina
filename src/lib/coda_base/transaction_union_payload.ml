@@ -115,11 +115,12 @@ module Body = struct
       ; amount= Currency.Amount.var_of_t amount }
 
     let to_input {tag; source_pk; receiver_pk; token_id; amount} =
+      let%map token_id = Token_id.Checked.to_input token_id in
       Array.reduce_exn ~f:Random_oracle.Input.append
         [| Tag.Unpacked.to_input tag
          ; Public_key.Compressed.Checked.to_input source_pk
          ; Public_key.Compressed.Checked.to_input receiver_pk
-         ; Token_id.Checked.to_input token_id
+         ; token_id
          ; Currency.Amount.var_to_input amount |]
   end
 
@@ -175,8 +176,9 @@ let payload_typ = typ
 
 module Checked = struct
   let to_input ({common; body} : var) =
-    let%map common = User_command_payload.Common.Checked.to_input common in
-    Random_oracle.Input.append common (Body.Checked.to_input body)
+    let%map common = User_command_payload.Common.Checked.to_input common
+    and body = Body.Checked.to_input body in
+    Random_oracle.Input.append common body
 
   let constant ({common; body} : t) : var =
     { common= User_command_payload.Common.Checked.constant common
@@ -204,6 +206,19 @@ let excess (payload : t) : Amount.Signed.t =
       |> Amount.Signed.of_unsigned |> Amount.Signed.negate
   | Coinbase ->
       Amount.Signed.zero
+
+let fee_excess ({body= {tag; amount; _}; common= {fee_token; fee; _}} : t) =
+  match tag with
+  | Payment | Stake_delegation ->
+      Fee_excess.of_single (fee_token, Fee.Signed.of_unsigned fee)
+  | Fee_transfer ->
+      let excess =
+        Option.value_exn (Amount.add_fee amount fee)
+        |> Amount.to_fee |> Fee.Signed.of_unsigned |> Fee.Signed.negate
+      in
+      Fee_excess.of_single (fee_token, excess)
+  | Coinbase ->
+      Fee_excess.of_single (Token_id.default, Fee.Signed.zero)
 
 let supply_increase (payload : payload) =
   let tag = payload.body.tag in

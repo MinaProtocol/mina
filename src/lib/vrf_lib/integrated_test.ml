@@ -42,34 +42,24 @@ module Message = struct
     Tick.Typ.of_hlistable data_spec ~var_to_hlist:to_hlist
       ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
-  let fold {state_hash} =
-    Fold_lib.Fold.group3 ~default:false (Coda_base.State_hash.fold state_hash)
-
   let gen =
     let open Quickcheck.Let_syntax in
     let%map state_hash = Coda_base.State_hash.gen in
     {state_hash}
 
-  let hash_to_group msg =
-    let msg_hash_state =
-      Snark_params.Tick.Pedersen.hash_fold
-        (Snark_params.Tick.Pedersen.State.create ())
-        (fold msg)
-    in
-    msg_hash_state.acc
+  let hash_to_group ~constraint_constants:_ msg =
+    Group_map.to_group
+      (Random_oracle.hash ~init:Coda_base.Hash_prefix.vrf_message
+         [|msg.state_hash|])
+    |> Tick.Inner_curve.of_affine
 
   module Checked = struct
-    let var_to_triples {state_hash} =
-      let open Snark_params.Tick in
-      let%map bits = Coda_base.State_hash.var_to_bits state_hash in
-      Bitstring_lib.Bitstring.pad_to_triple_list ~default:Boolean.false_ bits
-
     let hash_to_group msg =
-      let open Snark_params.Tick in
-      let%bind msg_triples = var_to_triples msg in
-      Pedersen.Checked.hash_triples
-        ~init:(Snark_params.Tick.Pedersen.State.create ())
-        msg_triples
+      Tick.make_checked (fun () ->
+          Group_map.Checked.to_group
+            (Random_oracle.Checked.hash ~init:Coda_base.Hash_prefix.vrf_message
+               (Random_oracle.Checked.pack_input
+                  (Coda_base.State_hash.var_to_input msg.state_hash))) )
   end
 end
 
@@ -80,7 +70,7 @@ module Output_hash = struct
 
   let typ : (var, value) Snark_params.Tick.Typ.t = Snark_params.Tick.Field.typ
 
-  let hash ({Message.state_hash} : Message.value) g =
+  let hash ~constraint_constants:_ ({Message.state_hash} : Message.value) g =
     let x, y = Snark_params.Tick.Inner_curve.to_affine_exn g in
     Random_oracle.hash [|(state_hash :> Snark_params.Tick.Field.t); x; y|]
 
@@ -97,6 +87,9 @@ module Vrf =
   Vrf_lib.Integrated.Make (Tick) (Scalar) (Group) (Message) (Output_hash)
 
 let%test_unit "eval unchecked vs. checked equality" =
+  let constraint_constants =
+    Genesis_constants.Constraint_constants.for_unit_tests
+  in
   let gen =
     let open Quickcheck.Let_syntax in
     let%map pk = Private_key.gen and msg = Message.gen in
@@ -112,10 +105,14 @@ let%test_unit "eval unchecked vs. checked equality" =
            let open Tick.Checked in
            let%bind (module Shifted) = Group.Checked.Shifted.create () in
            Vrf.Checked.eval (module Shifted) ~private_key msg )
-         (fun (private_key, msg) -> Vrf.eval ~private_key msg))
+         (fun (private_key, msg) ->
+           Vrf.eval ~constraint_constants ~private_key msg ))
 
 let%bench_module "vrf bench module" =
   ( module struct
+    let constraint_constants =
+      Genesis_constants.Constraint_constants.for_unit_tests
+
     let gen =
       let open Quickcheck.Let_syntax in
       let%map pk = Private_key.gen and msg = Message.gen in
@@ -123,7 +120,7 @@ let%bench_module "vrf bench module" =
 
     let%bench_fun "vrf eval unchecked" =
       let private_key, msg = Quickcheck.random_value gen in
-      fun () -> Vrf.eval ~private_key msg
+      fun () -> Vrf.eval ~constraint_constants ~private_key msg
 
     let%bench_fun "vrf eval checked" =
       let private_key, msg = Quickcheck.random_value gen in

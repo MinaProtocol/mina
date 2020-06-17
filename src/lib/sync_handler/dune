@@ -2,5 +2,5 @@
  (name sync_handler)
  (public_name sync_handler)
  (inline_tests)
- (preprocess (pps ppx_coda ppx_jane))
+ (preprocess (pps ppx_version ppx_jane))
  (libraries async_kernel core_kernel coda_intf coda_base transition_frontier syncable_ledger merkle_address consensus best_tip_prover))

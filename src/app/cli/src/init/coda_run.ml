@@ -17,7 +17,7 @@ let snark_pool_list t =
   |> Network_pool.Snark_pool.Resource_pool.snark_pool_json
   |> Yojson.Safe.to_string
 
-(* create reader, writer for fork IDs, but really for any one-line item in conf_dir *)
+(* create reader, writer for protocol versions, but really for any one-line item in conf_dir *)
 let make_conf_dir_item_io ~conf_dir ~filename =
   let item_file = conf_dir ^/ filename in
   let read_item () =
@@ -404,10 +404,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
             let%bind snark_worker_key = Coda_lib.snark_worker_key coda in
             let%map r = Coda_lib.request_work coda in
             Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-              ~metadata:
-                [ ( "work_spec"
-                  , `String (sprintf !"%{sexp:Snark_worker.Work.Spec.t}" r) )
-                ]
+              ~metadata:[("work_spec", Snark_worker.Work.Spec.to_yojson r)]
               "responding to a Get_work request with some new work" ;
             Coda_metrics.(Counter.inc_one Snark_work.snark_work_assigned_rpc) ;
             (r, snark_worker_key)) )
@@ -418,10 +415,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
           Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
             "received completed work from a snark worker"
             ~metadata:
-              [ ( "work_spec"
-                , `String
-                    (sprintf !"%{sexp:Snark_worker.Work.Spec.t}" work.spec) )
-              ] ;
+              [("work_spec", Snark_worker.Work.Spec.to_yojson work.spec)] ;
           One_or_two.iter work.metrics ~f:(fun (total, tag) ->
               match tag with
               | `Merge ->

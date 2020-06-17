@@ -2,6 +2,36 @@ open Core
 open Async
 open Coda_base
 
+type Structured_log_events.t +=
+  | Merge_snark_generated of
+      { time:
+          (Time.Span.t[@to_yojson
+                        fun total -> `String (Time.Span.to_string_hum total)]
+                      [@of_yojson
+                        function
+                        | `String time ->
+                            Ok (Time.Span.of_string time)
+                        | _ ->
+                            Error
+                              "Snark_worker.Functor: Could not parse timespan"])
+      }
+  [@@deriving register_event {msg= "Merge SNARK generated in $time"}]
+
+type Structured_log_events.t +=
+  | Base_snark_generated of
+      { time:
+          (Time.Span.t[@to_yojson
+                        fun total -> `String (Time.Span.to_string_hum total)]
+                      [@of_yojson
+                        function
+                        | `String time ->
+                            Ok (Time.Span.of_string time)
+                        | _ ->
+                            Error
+                              "Snark_worker.Functor: Could not parse timespan"])
+      }
+  [@@deriving register_event {msg= "Base SNARK generated in $time"}]
+
 module Make (Inputs : Intf.Inputs_intf) :
   Intf.S0 with type ledger_proof := Inputs.Ledger_proof.t = struct
   open Inputs
@@ -13,16 +43,16 @@ module Make (Inputs : Intf.Inputs_intf) :
     module Single = struct
       module Spec = struct
         type t =
-          ( Transaction.t Transaction_protocol_state.t
+          ( Transaction.t
           , Transaction_witness.t
           , Ledger_proof.t )
           Work.Single.Spec.t
-        [@@deriving sexp]
+        [@@deriving sexp, to_yojson]
       end
     end
 
     module Spec = struct
-      type t = Single.Spec.t Work.Spec.t [@@deriving sexp]
+      type t = Single.Spec.t Work.Spec.t [@@deriving sexp, to_yojson]
     end
 
     module Result = struct
@@ -76,22 +106,20 @@ module Make (Inputs : Intf.Inputs_intf) :
         res
 
   let emit_proof_metrics metrics logger =
-    One_or_two.iter metrics ~f:(fun (total, tag) ->
+    One_or_two.iter metrics ~f:(fun (time, tag) ->
         match tag with
         | `Merge ->
             Coda_metrics.(
               Cryptography.Snark_work_histogram.observe
-                Cryptography.snark_work_merge_time_sec (Time.Span.to_sec total)) ;
-            Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-              "Merge SNARK generated in $time"
-              ~metadata:[("time", `String (Time.Span.to_string_hum total))]
+                Cryptography.snark_work_merge_time_sec (Time.Span.to_sec time)) ;
+            Logger.Structured.info logger ~module_:__MODULE__ ~location:__LOC__
+              (Merge_snark_generated {time})
         | `Transition ->
             Coda_metrics.(
               Cryptography.Snark_work_histogram.observe
-                Cryptography.snark_work_base_time_sec (Time.Span.to_sec total)) ;
-            Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-              "Base SNARK generated in $time"
-              ~metadata:[("time", `String (Time.Span.to_string_hum total))] )
+                Cryptography.snark_work_base_time_sec (Time.Span.to_sec time)) ;
+            Logger.Structured.info logger ~module_:__MODULE__ ~location:__LOC__
+              (Base_snark_generated {time}) )
 
   let main
       (module Rpcs_versioned : Intf.Rpcs_versioned_S

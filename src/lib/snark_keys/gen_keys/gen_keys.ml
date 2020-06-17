@@ -38,7 +38,8 @@ let from_disk_expr ~loc id =
     in
     t]
 
-let str ~loc ~transaction_snark ~blockchain_snark =
+let str ~loc ~blockchain_verification_key_id ~transaction_snark
+    ~blockchain_snark =
   let module E = Ppxlib.Ast_builder.Make (struct
     let loc = loc
   end) in
@@ -46,6 +47,8 @@ let str ~loc ~transaction_snark ~blockchain_snark =
   let hashes = hashes ~loc in
   [%str
     open! Core_kernel
+
+    let blockchain_verification_key_id = [%e blockchain_verification_key_id]
 
     let transaction_verification () = [%e transaction_snark]
 
@@ -134,16 +137,36 @@ let str ~loc =
           ~f:Cache_handle.generate_or_load
         |> List.reduce_exn ~f:Dirty.( + ))
   in
+  let module E = Ppxlib.Ast_builder.Make (struct
+    let loc = loc
+  end) in
+  let open E in
   str ~loc
+    ~blockchain_verification_key_id:
+      [%expr
+        let t =
+          lazy
+            (Sexp.of_string_conv_exn
+               [%e
+                 estring
+                   ( Pickles.Verification_key.Id.sexp_of_t
+                       (Lazy.force B.Proof.id)
+                   |> Sexp.to_string )]
+               Pickles.Verification_key.Id.t_of_sexp)
+        in
+        fun () -> Lazy.force t]
     ~transaction_snark:(from_disk_expr ~loc (Lazy.force T.id))
     ~blockchain_snark:(from_disk_expr ~loc (Lazy.force B.Proof.id))
 
 [%%else]
 
 let str ~loc =
+  let e = [%expr Async.Deferred.return Pickles.Verification_key.dummy] in
   return
-    (let e = [%expr Async.Deferred.return Pickles.Verification_key.dummy] in
-     str ~loc ~transaction_snark:e ~blockchain_snark:e)
+    (str ~loc
+       ~blockchain_verification_key_id:
+         [%expr Pickles.Verification_key.Id.dummy] ~transaction_snark:e
+       ~blockchain_snark:e)
 
 [%%endif]
 

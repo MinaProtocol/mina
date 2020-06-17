@@ -5,6 +5,7 @@
  (library_flags -linkall)
  (inline_tests)
  (libraries
+  cache_dir
   hash_prefixes
   group_map
   snarky
@@ -14,6 +15,12 @@
   random_oracle
   tuple_lib)
  (preprocess
-  (pps ppx_coda ppx_jane bisect_ppx -- -conditional))
+  (pps ppx_version ppx_jane bisect_ppx -- -conditional))
  (synopsis "Cryptographic parameters"))
 
+(rule
+ (targets group_map_params.ml)
+ (deps
+  (:< gen/gen.exe))
+ (action
+  (run %{<} %{targets})))

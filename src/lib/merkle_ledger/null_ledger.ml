@@ -87,6 +87,8 @@ end = struct
 
   let get_uuid t = t.uuid
 
+  let get_directory _ = None
+
   let last_filled _t = None
 
   let close _t = ()

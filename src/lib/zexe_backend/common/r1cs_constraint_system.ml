@@ -234,7 +234,7 @@ struct
     in
     let open Snarky.Constraint in
     match constr with
-    | Boolean x ->
+    | Snarky.Constraint.Boolean x ->
         let x, x_weight, x_has_constant_term = var_exn x in
         let x_minus_1_weight =
           x_weight + if x_has_constant_term then 0 else 1
@@ -249,11 +249,11 @@ struct
                 (x, x, x)
             | `x_xMinus1_0 ->
                 (x, decr_constant_term x, []) )
-    | Equal (x, y) ->
+    | Snarky.Constraint.Equal (x, y) ->
         (* x * 1 = y
-         y * 1 = x
-        (x - y) * 1 = 0
-      *)
+           y * 1 = x
+           (x - y) * 1 = 0
+        *)
         let x_terms, x_weight, _ = var_exn x in
         let y_terms, y_weight, _ = var_exn y in
         let x_minus_y_weight =
@@ -272,15 +272,17 @@ struct
               (y_terms, one, x_terms)
           | `x_minus_y_1_zero ->
               (sub_terms x_terms y_terms, one, []) )
-    | Square (x, z) ->
+    | Snarky.Constraint.Square (x, z) ->
         let x, x_weight, _ = var_exn x in
         let z, z_weight, _ = var_exn z in
         choose_best [((), (x_weight, x_weight, z_weight))] (fun () -> (x, x, z))
-    | R1CS (a, b, c) ->
+    | Snarky.Constraint.R1CS (a, b, c) ->
         let a, a_weight, _ = var_exn a in
         let b, b_weight, _ = var_exn b in
         let c, c_weight, _ = var_exn c in
         choose_best [((), (a_weight, b_weight, c_weight))] (fun () -> (a, b, c))
-    | _ ->
-        failwith "Unsupported constraint"
+    | constr ->
+        failwithf "Unhandled constraint %s"
+          Obj.(extension_name (extension_constructor constr))
+          ()
 end

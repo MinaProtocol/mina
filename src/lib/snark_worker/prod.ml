@@ -43,13 +43,12 @@ module Inputs = struct
   end
 
   type single_spec =
-    ( Transaction.t Transaction_protocol_state.t
+    ( Transaction.t
     , Transaction_witness.t
     , Transaction_snark.t )
     Snark_work_lib.Work.Single.Spec.t
   [@@deriving sexp]
 
-  (* TODO: Use public_key once SoK is implemented *)
   let perform_single ({m; cache; proof_level} : Worker_state.t) ~message =
     let open Snark_work_lib in
     let sok_digest = Coda_base.Sok_message.digest message in
@@ -87,9 +86,11 @@ module Inputs = struct
                 (input, t, (w : Transaction_witness.t)) ->
                 process (fun () ->
                     Or_error.try_with (fun () ->
-                        M.of_transaction ~sok_digest
+                        M.of_transaction ~sok_digest ~init_stack:w.init_stack
                           ~source:input.Transaction_snark.Statement.source
-                          ~target:input.target t
+                          ~target:input.target
+                          { Transaction_protocol_state.Poly.transaction= t
+                          ; block_data= w.protocol_state_body }
                           ~pending_coinbase_stack_state:
                             input
                               .Transaction_snark.Statement
@@ -107,16 +108,12 @@ module Inputs = struct
             | Merge (stmt, _, _) ->
                 stmt
           in
-          let fee_excess =
-            Currency.Amount.(
-              Signed.create ~magnitude:stmt.fee_excess.magnitude
-                ~sgn:stmt.fee_excess.sgn)
-          in
           Or_error.return
           @@ ( Transaction_snark.create ~source:stmt.source ~target:stmt.target
                  ~supply_increase:stmt.supply_increase
                  ~pending_coinbase_stack_state:
-                   stmt.pending_coinbase_stack_state ~fee_excess ~sok_digest
+                   stmt.pending_coinbase_stack_state
+                 ~fee_excess:stmt.fee_excess ~sok_digest
                  ~proof:Precomputed_values.unit_test_base_proof
              , Time.Span.zero )
 end

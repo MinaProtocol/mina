@@ -10,11 +10,9 @@ consensus_mechanism]
 
 open Snark_params
 open Tick
-open Snark_bits
 
 [%%else]
 
-open Snark_bits_nonconsensus
 module Currency = Currency_nonconsensus.Currency
 module Coda_numbers = Coda_numbers_nonconsensus.Coda_numbers
 module Random_oracle = Random_oracle_nonconsensus.Random_oracle
@@ -38,20 +36,16 @@ module Index = struct
     end
   end]
 
-  let ledger_depth = Coda_compile_config.ledger_depth
-
   type t = Stable.Latest.t [@@deriving to_yojson, sexp]
 
   let to_int = Int.to_int
 
-  let gen = Int.gen_incl 0 ((1 lsl ledger_depth) - 1)
+  let gen ~ledger_depth = Int.gen_incl 0 ((1 lsl ledger_depth) - 1)
 
   module Table = Int.Table
 
   module Vector = struct
     include Int
-
-    let length = ledger_depth
 
     let empty = zero
 
@@ -60,17 +54,36 @@ module Index = struct
     let set v i b = if b then v lor (one lsl i) else v land lnot (one lsl i)
   end
 
-  include (
-    Bits.Vector.Make (Vector) : Bits_intf.Convertible_bits with type t := t)
+  let to_bits ~ledger_depth t = List.init ledger_depth ~f:(Vector.get t)
 
-  let fold_bits = fold
+  let of_bits =
+    List.foldi ~init:Vector.empty ~f:(fun i t b -> Vector.set t i b)
 
-  let fold t = Fold.group3 ~default:false (fold_bits t)
+  let fold_bits ~ledger_depth t =
+    { Fold.fold=
+        (fun ~init ~f ->
+          let rec go acc i =
+            if i = ledger_depth then acc
+            else go (f acc (Vector.get t i)) (i + 1)
+          in
+          go init 0 ) }
+
+  let fold ~ledger_depth t =
+    Fold.group3 ~default:false (fold_bits ~ledger_depth t)
 
   [%%ifdef
   consensus_mechanism]
 
-  include Bits.Snarkable.Small_bit_vector (Tick) (Vector)
+  module Unpacked = struct
+    type var = Tick.Boolean.var list
+
+    type value = Vector.t
+
+    let typ ~ledger_depth : (var, value) Tick.Typ.t =
+      Typ.transport
+        (Typ.list ~length:ledger_depth Boolean.typ)
+        ~there:(to_bits ~ledger_depth) ~back:of_bits
+  end
 
   [%%endif]
 end
@@ -83,6 +96,7 @@ module Poly = struct
     module V1 = struct
       type ( 'pk
            , 'tid
+           , 'bool
            , 'amount
            , 'nonce
            , 'receipt_chain_hash
@@ -91,6 +105,7 @@ module Poly = struct
            t =
         { public_key: 'pk
         ; token_id: 'tid
+        ; token_owner: 'bool
         ; balance: 'amount
         ; nonce: 'nonce
         ; receipt_chain_hash: 'receipt_chain_hash
@@ -103,6 +118,7 @@ module Poly = struct
 
   type ( 'pk
        , 'tid
+       , 'bool
        , 'amount
        , 'nonce
        , 'receipt_chain_hash
@@ -111,6 +127,7 @@ module Poly = struct
        t =
         ( 'pk
         , 'tid
+        , 'bool
         , 'amount
         , 'nonce
         , 'receipt_chain_hash
@@ -119,6 +136,7 @@ module Poly = struct
         Stable.Latest.t =
     { public_key: 'pk
     ; token_id: 'tid
+    ; token_owner: 'bool
     ; balance: 'amount
     ; nonce: 'nonce
     ; receipt_chain_hash: 'receipt_chain_hash
@@ -126,8 +144,54 @@ module Poly = struct
     ; voting_for: 'state_hash
     ; timing: 'timing }
   [@@deriving sexp, eq, compare, hash, yojson, fields]
+
+  [%%ifdef
+  consensus_mechanism]
+
+  let of_hlist
+      ([ public_key
+       ; token_id
+       ; token_owner
+       ; balance
+       ; nonce
+       ; receipt_chain_hash
+       ; delegate
+       ; voting_for
+       ; timing ] :
+        (unit, _) H_list.t) =
+    { public_key
+    ; token_id
+    ; token_owner
+    ; balance
+    ; nonce
+    ; receipt_chain_hash
+    ; delegate
+    ; voting_for
+    ; timing }
+
+  let to_hlist
+      { public_key
+      ; token_id
+      ; token_owner
+      ; balance
+      ; nonce
+      ; receipt_chain_hash
+      ; delegate
+      ; voting_for
+      ; timing } =
+    H_list.
+      [ public_key
+      ; token_id
+      ; token_owner
+      ; balance
+      ; nonce
+      ; receipt_chain_hash
+      ; delegate
+      ; voting_for
+      ; timing ]
+
+  [%%endif]
 end
-[@@warning "-27"]
 
 module Key = struct
   [%%versioned
@@ -415,6 +479,7 @@ module Stable = struct
     type t =
       ( Public_key.Compressed.Stable.V1.t
       , Token_id.Stable.V1.t
+      , bool
       , Balance.Stable.V1.t
       , Nonce.Stable.V1.t
       , Receipt.Chain_hash.Stable.V1.t
@@ -440,6 +505,7 @@ let identifier ({public_key; token_id; _} : t) =
 type value =
   ( Public_key.Compressed.t
   , Token_id.t
+  , bool
   , Balance.t
   , Nonce.t
   , Receipt.Chain_hash.t
@@ -460,6 +526,7 @@ let initialize account_id : t =
   in
   { public_key
   ; token_id
+  ; token_owner= false
   ; balance= Balance.zero
   ; nonce= Nonce.zero
   ; receipt_chain_hash= Receipt.Chain_hash.empty
@@ -474,6 +541,7 @@ let to_input (t : t) =
   Poly.Fields.fold ~init:[]
     ~public_key:(f Public_key.Compressed.to_input)
     ~token_id:(f Token_id.to_input) ~balance:(bits Balance.to_bits)
+    ~token_owner:(f (fun x -> bitstring [x]))
     ~nonce:(bits Nonce.Bits.to_bits)
     ~receipt_chain_hash:(f Receipt.Chain_hash.to_input)
     ~delegate:(f Public_key.Compressed.to_input)
@@ -492,6 +560,7 @@ consensus_mechanism]
 type var =
   ( Public_key.Compressed.var
   , Token_id.var
+  , Boolean.var
   , Balance.var
   , Nonce.Checked.t
   , Receipt.Chain_hash.var
@@ -504,73 +573,24 @@ let identifier_of_var ({public_key; token_id; _} : var) =
 
 let typ : (var, value) Typ.t =
   let spec =
-    let open Data_spec in
-    [ Public_key.Compressed.typ
-    ; Token_id.typ
-    ; Balance.typ
-    ; Nonce.typ
-    ; Receipt.Chain_hash.typ
-    ; Public_key.Compressed.typ
-    ; State_hash.typ
-    ; Timing.typ ]
+    Data_spec.
+      [ Public_key.Compressed.typ
+      ; Token_id.typ
+      ; Boolean.typ
+      ; Balance.typ
+      ; Nonce.typ
+      ; Receipt.Chain_hash.typ
+      ; Public_key.Compressed.typ
+      ; State_hash.typ
+      ; Timing.typ ]
   in
-  let of_hlist
-        : 'a 'b 'c 'd 'e 'f 'g.    ( unit
-                                   ,    'a (* public key *)
-                                     -> 'b
-                                     -> 'c
-                                     -> 'd
-                                     -> 'e
-                                     -> 'a (* public key again *)
-                                     -> 'f
-                                     -> 'g
-                                     -> unit )
-                                   H_list.t
-          -> ('a, 'b, 'c, 'd, 'e, 'f, 'g) Poly.t =
-    let open H_list in
-    fun [ public_key
-        ; token_id
-        ; balance
-        ; nonce
-        ; receipt_chain_hash
-        ; delegate
-        ; voting_for
-        ; timing ] ->
-      { public_key
-      ; token_id
-      ; balance
-      ; nonce
-      ; receipt_chain_hash
-      ; delegate
-      ; voting_for
-      ; timing }
-  in
-  let to_hlist
-      Poly.
-        { public_key
-        ; token_id
-        ; balance
-        ; nonce
-        ; receipt_chain_hash
-        ; delegate
-        ; voting_for
-        ; timing } =
-    H_list.
-      [ public_key
-      ; token_id
-      ; balance
-      ; nonce
-      ; receipt_chain_hash
-      ; delegate
-      ; voting_for
-      ; timing ]
-  in
-  Typ.of_hlistable spec ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
-    ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+  Typ.of_hlistable spec ~var_to_hlist:Poly.to_hlist ~var_of_hlist:Poly.of_hlist
+    ~value_to_hlist:Poly.to_hlist ~value_of_hlist:Poly.of_hlist
 
 let var_of_t
     ({ public_key
      ; token_id
+     ; token_owner
      ; balance
      ; nonce
      ; receipt_chain_hash
@@ -580,6 +600,7 @@ let var_of_t
       value) =
   { Poly.public_key= Public_key.Compressed.var_of_t public_key
   ; token_id= Token_id.var_of_t token_id
+  ; token_owner= Boolean.var_of_value token_owner
   ; balance= Balance.var_of_t balance
   ; nonce= Nonce.Checked.constant nonce
   ; receipt_chain_hash= Receipt.Chain_hash.var_of_t receipt_chain_hash
@@ -596,30 +617,38 @@ module Checked = struct
       f (fun x ->
           bitstring (Bitstring_lib.Bitstring.Lsb_first.to_list (conv x)) )
     in
-    List.reduce_exn ~f:append
-      (Poly.Fields.fold ~init:[]
-         ~public_key:(f Public_key.Compressed.Checked.to_input)
-         ~token_id:(f Token_id.Checked.to_input)
-         ~balance:(bits Balance.var_to_bits)
-         ~nonce:(bits !Nonce.Checked.to_bits)
-         ~receipt_chain_hash:(f Receipt.Chain_hash.var_to_input)
-         ~delegate:(f Public_key.Compressed.Checked.to_input)
-         ~voting_for:(f State_hash.var_to_input)
-         ~timing:(bits Timing.var_to_bits))
+    make_checked (fun () ->
+        List.reduce_exn ~f:append
+          (Poly.Fields.fold ~init:[]
+             ~public_key:(f Public_key.Compressed.Checked.to_input)
+             ~token_id:
+               (* We use [run_checked] here to avoid routing the [Checked.t]
+                  monad throughout this calculation.
+               *)
+               (f (fun x -> Run.run_checked (Token_id.Checked.to_input x)))
+             ~token_owner:(f (fun x -> bitstring [x]))
+             ~balance:(bits Balance.var_to_bits)
+             ~nonce:(bits !Nonce.Checked.to_bits)
+             ~receipt_chain_hash:(f Receipt.Chain_hash.var_to_input)
+             ~delegate:(f Public_key.Compressed.Checked.to_input)
+             ~voting_for:(f State_hash.var_to_input)
+             ~timing:(bits Timing.var_to_bits)) )
 
   let digest t =
     make_checked (fun () ->
         Random_oracle.Checked.(
-          hash ~init:crypto_hash_prefix (pack_input (to_input t))) )
-
-  let to_input t = make_checked (fun () -> to_input t)
+          hash ~init:crypto_hash_prefix
+            (pack_input (Run.run_checked (to_input t)))) )
 end
 
 [%%endif]
 
+let digest = crypto_hash
+
 let empty =
   { Poly.public_key= Public_key.Compressed.empty
   ; token_id= Token_id.default
+  ; token_owner= false
   ; balance= Balance.zero
   ; nonce= Nonce.zero
   ; receipt_chain_hash= Receipt.Chain_hash.empty
@@ -627,7 +656,7 @@ let empty =
   ; voting_for= State_hash.dummy
   ; timing= Timing.Untimed }
 
-let digest = crypto_hash
+let empty_digest = digest empty
 
 let create account_id balance =
   let public_key = Account_id.public_key account_id in
@@ -639,6 +668,7 @@ let create account_id balance =
   in
   { Poly.public_key
   ; token_id
+  ; token_owner= false
   ; balance
   ; nonce= Nonce.zero
   ; receipt_chain_hash= Receipt.Chain_hash.empty
@@ -666,6 +696,7 @@ let create_timed account_id balance ~initial_minimum_balance ~cliff_time
     Or_error.return
       { Poly.public_key
       ; token_id
+      ; token_owner= false
       ; balance
       ; nonce= Nonce.zero
       ; receipt_chain_hash= Receipt.Chain_hash.empty

@@ -1,5 +1,6 @@
 open Core_kernel
 open Pickles_types
+open Import
 module Sponge_lib = Sponge
 
 module Snarkable = struct
@@ -259,8 +260,6 @@ module Pairing_main_inputs = struct
   module type S = sig
     val crs_max_degree : int
 
-    module Branching_pred : Nat.Add.Intf_transparent
-
     module Impl : Snarky.Snark_intf.Run with type prover_state = unit
 
     module G : sig
@@ -318,3 +317,16 @@ module Pairing_main_inputs = struct
     end
   end
 end
+
+module type Statement = sig
+  type field
+
+  type t
+
+  val to_field_elements : t -> field array
+end
+
+module type Statement_var =
+  Statement with type field := Zexe_backend.Fp.t Snarky.Cvar.t
+
+module type Statement_value = Statement with type field := Zexe_backend.Fp.t

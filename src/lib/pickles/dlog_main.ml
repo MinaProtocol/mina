@@ -1,5 +1,3 @@
-module D = Digest
-
 module type Inputs = Intf.Dlog_main_inputs.S
 
 open Core_kernel
@@ -10,122 +8,37 @@ open Pickles_types
 open Dlog_marlin_types
 module Accumulator = Pairing_marlin_types.Accumulator
 open Tuple_lib
+open Import
 
-let sg_polynomial ~add ~mul chals chal_invs pt =
-  let ( + ) = add and ( * ) = mul in
-  let k = Array.length chals in
-  let pow_two_pows =
-    let res = Array.init k ~f:(fun _ -> pt) in
-    for i = 1 to k - 1 do
-      let y = res.(i - 1) in
-      res.(i) <- y * y
-    done ;
-    res
-  in
-  let prod f =
-    let r = ref (f 0) in
-    for i = 1 to k - 1 do
-      r := f i * !r
-    done ;
-    !r
-  in
-  prod (fun i -> chal_invs.(i) + (chals.(i) * pow_two_pows.(k - 1 - i)))
-
+(* given [chals], compute
+   \prod_i (1 / chals.(i) + chals.(i) * x^{2^i}) *)
 let b_poly ~add ~mul ~inv chals =
+  let ( + ) = add and ( * ) = mul in
   let chal_invs = Array.map chals ~f:inv in
-  fun x -> sg_polynomial ~add ~mul chals chal_invs x
-
-let accumulate_degree_bound_checks ~update_unshifted ~add ~scale ~r_h ~r_k
-    { Accumulator.Degree_bound_checks.shifted_accumulator
-    ; unshifted_accumulators } (g1, g1_s) (g2, g2_s) (g3, g3_s) =
-  let ( + ) = add in
-  let ( * ) = Fn.flip scale in
-  let shifted_accumulator =
-    shifted_accumulator + (r_h * (g1 + (r_h * g2))) + (r_k * g3)
-  in
-  let h_update = r_h * (g1_s + (r_h * g2_s)) in
-  let k_update = r_k * g3_s in
-  let unshifted_accumulators =
-    update_unshifted unshifted_accumulators (h_update, k_update)
-    (*
-    Map.update unshifted_accumulators (Domain.size domain_h)
-      ~f:(fun x -> h_update + Option.value_exn x)
-    |> Fn.flip Map.update (Domain.size domain_k)
-        ~f:(fun x -> k_update + Option.value_exn x) *)
-  in
-  {Accumulator.Degree_bound_checks.shifted_accumulator; unshifted_accumulators}
-
-let accumulate_degree_bound_checks' ~domain_h ~domain_k ~add =
-  accumulate_degree_bound_checks ~add
-    ~update_unshifted:(fun unsh (h_update, k_update) ->
-      Map.update unsh
-        (Domain.size domain_h - 1)
-        ~f:(fun x -> add h_update (Option.value_exn x))
-      |> Fn.flip Map.update
-           (Domain.size domain_k - 1)
-           ~f:(fun x -> add k_update (Option.value_exn x)) )
-
-(*
-   check that pi proves that U opens to v at z.
-
-   pi =? commitmennt to (U - v * g ) / (beta*g - z)
-
-   e(pi, beta*g - z*g) = e(U - v, g)
-
-   e(pi, beta*g) - e(z*pi, g) - e(U - v, g) = 0
-   e(pi, beta*g) - e(z*pi - (U - v * g), g) = 0
-
-   sum_i r^i e(pi_i, beta_i*g) - e(z*pi - (U - v_i * g), g) = 0
-*)
-
-let accumulate_opening_check ~add ~negate ~endo ~scale_generator ~r
-    ~(* r should be exposed. *) r_xi_sum (* s should be exposed *)
-    {Accumulator.Opening_check.r_f_minus_r_v_plus_rz_pi; r_pi}
-    (f_1, beta_1, pi_1) (f_2, beta_2, pi_2) (f_3, beta_3, pi_3) =
-  let ( + ) = add in
-  let ( * ) s p = endo p s in
-  let r_f_minus_r_v_plus_rz_pi =
-    let rz_pi_term =
-      let zpi_1 = beta_1 * pi_1 in
-      let zpi_2 = beta_2 * pi_2 in
-      let zpi_3 = beta_3 * pi_3 in
-      r * (zpi_1 + (r * (zpi_2 + (r * zpi_3))))
-      (* Could be more efficient at the cost of more public inputs. *)
-      (* sum_{i=1}^3 r^i beta_i pi_i *)
-    in
-    let f_term = r * (f_1 + (r * (f_2 + (r * f_3)))) in
-    let v_term = scale_generator r_xi_sum in
-    r_f_minus_r_v_plus_rz_pi + f_term + negate v_term + rz_pi_term
-  in
-  let pi_term =
-    (* sum_{i=1}^3 r^i pi_i *)
-    r * (pi_1 + (r * (pi_2 + (r * pi_3))))
-  in
-  {Accumulator.Opening_check.r_f_minus_r_v_plus_rz_pi; r_pi= r_pi + pi_term}
+  stage (fun pt ->
+      let k = Array.length chals in
+      let pow_two_pows =
+        let res = Array.init k ~f:(fun _ -> pt) in
+        for i = 1 to k - 1 do
+          let y = res.(i - 1) in
+          res.(i) <- y * y
+        done ;
+        res
+      in
+      let prod f =
+        let r = ref (f 0) in
+        for i = 1 to k - 1 do
+          r := f i * !r
+        done ;
+        !r
+      in
+      prod (fun i -> chal_invs.(i) + (chals.(i) * pow_two_pows.(k - 1 - i))) )
 
 module Make
     (Inputs : Inputs
               with type Impl.field = Zexe_backend.Fq.t
                and type G1.Constant.Scalar.t = Zexe_backend.Fp.t) =
 struct
-  module Opt_sponge =
-    Sponge.Make_bit_sponge (struct
-        type t = Inputs.Impl.Boolean.var
-      end)
-      (struct
-        open Inputs.Impl
-
-        type t = Field.t
-
-        let to_bits = Field.choose_preimage_var ~length:Field.size_in_bits
-      end)
-      (struct
-        open Inputs.Impl
-
-        type t = Boolean.var * Field.t
-      end)
-      (Opt_sponge.Make (Inputs.Impl))
-
   open Inputs
   open Impl
 
@@ -198,26 +111,12 @@ struct
       as_prover (fun () ->
           printf "%s: %b\n%!" lab (As_prover.read Boolean.typ x) )
 
-  module PC = G1
   module Fq = Field
   module Challenge = Challenge.Make (Impl)
-  module Digest = D.Make (Impl)
+  module Digest = Digest.Make (Impl)
   module Scalar_challenge = SC.Make (Impl) (G1) (Challenge) (Endo.Pairing)
 
   let product m f = List.reduce_exn (List.init m ~f) ~f:Field.( * )
-
-  let b (u : Fq.t array) (x : Fq.t) : Fq.t =
-    let bulletproof_challenges = Array.length u in
-    let x_to_pow2s =
-      let res = Array.create ~len:bulletproof_challenges x in
-      for i = 1 to bulletproof_challenges - 1 do
-        res.(i) <- Field.square res.(i - 1)
-      done ;
-      res
-    in
-    let open Field in
-    product bulletproof_challenges (fun i ->
-        u.(i) + (inv u.(i) * x_to_pow2s.(i)) )
 
   let absorb sponge ty t =
     absorb ~absorb_field:(Sponge.absorb sponge)
@@ -231,14 +130,12 @@ struct
     List.fold_left (Vector.to_list ps) ~init:p0 ~f:(fun acc p ->
         G1.(p + scale acc xi) )
 
-  let accumulate_degree_bound_checks =
-    accumulate_degree_bound_checks ~add:G1.( + ) ~scale:Scalar_challenge.endo
-
   let accumulate_opening_check =
     let open G1 in
     let g = G1.Scaling_precomputation.create Generators.g in
-    accumulate_opening_check ~add:( + ) ~negate ~endo:Scalar_challenge.endo
-      ~scale_generator:(fun bits -> G1.multiscale_known [|(bits, g)|])
+    Pairing_acc.accumulate_opening_check ~add:( + ) ~negate
+      ~endo:Scalar_challenge.endo ~scale_generator:(fun bits ->
+        G1.multiscale_known [|(bits, g)|] )
 
   module One_hot_vector = One_hot_vector.Make (Impl)
 
@@ -252,9 +149,9 @@ struct
         let y = exists Field.typ ~compute:As_prover.(fun () -> read_var x) in
         Field.Assert.equal x y ; y
 
-  let rec choose_key : type n.
-      n Nat.s One_hot_vector.t -> (G1.t index, n Nat.s) Vector.t -> G1.t index
-      =
+  (* Mask out the given vector of indices with the given one-hot vector *)
+  let choose_key : type n.
+      n One_hot_vector.t -> (G1.t index, n) Vector.t -> G1.t index =
     let open Tuple_lib in
     let map ~f = Matrix_evals.map ~f:(Abc.map ~f:(Double.map ~f)) in
     let map2 ~f =
@@ -262,19 +159,10 @@ struct
         ~f:(Abc.map2 ~f:(fun (x1, y1) (x2, y2) -> (f x1 x2, f y1 y2)))
     in
     fun bs keys ->
-      Vector.reduce
+      Vector.reduce_exn
         (Vector.map2 bs keys ~f:(fun b -> map ~f:Field.(( * ) (b :> t))))
         ~f:(map2 ~f:Field.( + ))
       |> map ~f:seal
-
-  let choose_key (type n) (i : n One_hot_vector.t) (vec : (_, n) Vector.t) =
-    match vec with
-    | [] ->
-        failwith "choose_key: empty list"
-    | _ :: _ ->
-        choose_key i vec
-
-  let input_domain = Set_once.create ()
 
   let print_pairing_acc domain_sizes lab t =
     let open Pickles_types.Pairing_marlin_types in
@@ -311,14 +199,7 @@ struct
           [%test_eq: int] (Domain.size d) (Int.ceil_pow2 input_size) ) ;
       fun i -> Lazy.force (Lazy.force t).(i)
 
-  let mask_gs bs gs =
-    let open Field in
-    List.map2_exn bs gs ~f:(fun (b : Boolean.var) (x, y) ->
-        let b = (b :> t) in
-        (b * x, b * y) )
-    |> List.reduce_exn ~f:(fun (x1, y1) (x2, y2) -> (x1 + x2, y1 + y2))
-
-  let incrementally_verify_pairings ~step_domains:(step_h, step_k)
+  let incrementally_verify_pairings ~step_domains
       ~verification_key:(m : _ Abc.t Matrix_evals.t) ~sponge ~public_input
       ~pairing_acc:{Accumulator.opening_check; degree_bound_checks}
       ~(messages : _ Pairing_marlin_types.Messages.t)
@@ -330,8 +211,6 @@ struct
     let sample () = Sponge.squeeze sponge ~length:Challenge.length in
     let sample_scalar () = squeeze_scalar sponge in
     let open Pairing_marlin_types.Messages in
-    Set_once.set_if_none input_domain Stdlib.Lexing.dummy_pos
-      (Domain.Pow_2_roots_of_unity (Int.ceil_log2 (Array.length public_input))) ;
     let x_hat =
       let input_size = Array.length public_input in
       G1.multiscale_known
@@ -368,11 +247,11 @@ struct
       Sponge.squeeze sponge ~length:Digest.length
     in
     let open Vector in
-    let combine_commitments t =
-      Pcs_batch.combine_commitments ~scale:Scalar_challenge.endo ~add:G1.( + )
-        ~xi t
-    in
     let pairing_acc =
+      let combine_commitments t =
+        Pcs_batch.combine_commitments ~scale:Scalar_challenge.endo
+          ~add:G1.( + ) ~xi t
+      in
       let (g1, g1_s), (g2, g2_s), (g3, g3_s) = (g_1, g_2, g_3) in
       let f_1 =
         combine_commitments Common.Pairing_pcs_batch.beta_1
@@ -402,25 +281,9 @@ struct
       in
       List.iteri [f_1; f_2; f_3] ~f:(ksprintf print_g1 "f_%d") ;
       { Accumulator.degree_bound_checks=
-          accumulate_degree_bound_checks
-            ~update_unshifted:(fun m (uh, uk) ->
-              let m =
-                Map.to_sequence ~order:`Increasing_key m |> Sequence.to_list
-              in
-              let keys = List.map m ~f:fst in
-              let add domain delta elts =
-                let flags =
-                  let domain_size = domain#size in
-                  List.map keys ~f:(fun shift ->
-                      Field.(equal (domain_size - one) (of_int shift)) )
-                in
-                let elt_plus_delta = G1.( + ) (mask_gs flags elts) delta in
-                List.map2_exn flags elts ~f:(fun b g ->
-                    G1.if_ b ~then_:elt_plus_delta ~else_:g )
-              in
-              add step_h uh (List.map m ~f:snd)
-              |> add step_k uk |> List.zip_exn keys |> Int.Map.of_alist_exn )
-            degree_bound_checks ~r_h:r ~r_k g_1 g_2 g_3
+          Pairing_acc.Checked.accumulate_degree_bound_checks
+            ~scale:Scalar_challenge.endo ~step_domains degree_bound_checks
+            ~r_h:r ~r_k g_1 g_2 g_3
       ; opening_check=
           accumulate_opening_check opening_check ~r ~r_xi_sum
             (f_1, beta_1, pi_1) (f_2, beta_2, pi_2) (f_3, beta_3, pi_3) }
@@ -494,10 +357,6 @@ struct
       (Common.dlog_pcs_batch b_plus_19 ~h_minus_1 ~k_minus_1)
       without_degree_bound with_degree_bound
 
-  let sum' xs f = List.reduce_exn (List.map xs ~f) ~f:Fq.( + )
-
-  let prod xs f = List.reduce_exn (List.map xs ~f) ~f:Fq.( * )
-
   let compute_challenges ~scalar chals =
     (* TODO: Put this in the functor argument. *)
     let nonresidue = Fq.of_int 7 in
@@ -526,14 +385,15 @@ struct
     | [] ->
         failwith "empty list"
 
-  (*
-    let open Field in
-    Array.fold e ~init:(zero, one)
-      ~f:(fun (acc, s) (b, x) ->
-          (acc + s * ((b :> t) * x), s * pt_n) )
-    |> fst
-*)
-
+  (* This finalizes the "deferred values" coming from a previous proof over the same field.
+   It 
+   1. Checks that [xi] and [r] where sampled correctly. I.e., by absorbing all the
+   evaluation openings and then squeezing.
+   2. Checks that the "combined inner product" value used in the elliptic curve part of
+   the opening proof was computed correctly, in terms of the evaluation openings and the
+   evaluation points.
+   3. Check that the "b" value was computed correctly.
+   4. Perform the arithmetic checks from marlin. *)
   let finalize_other_proof (type b)
       (module Branching : Nat.Add.Intf with type n = b) ?actual_branching
       ~domain_h ~domain_k ~input_domain ~h_minus_1 ~k_minus_1 ~sponge
@@ -576,7 +436,7 @@ struct
       let actual_combined_inner_product =
         let sg_olds =
           Vector.map old_bulletproof_challenges ~f:(fun chals ->
-              b_poly (Vector.to_array chals) )
+              unstage (b_poly (Vector.to_array chals)) )
         in
         let combine pt x_hat e =
           let pi = Branching.add Nat.N19.n in
@@ -607,7 +467,7 @@ struct
       compute_challenges ~scalar bulletproof_challenges
     in
     let b_correct =
-      let b_poly = b_poly (Vector.to_array bulletproof_challenges) in
+      let b_poly = unstage (b_poly (Vector.to_array bulletproof_challenges)) in
       let b_actual =
         b_poly marlin.beta_1
         + (r * (b_poly marlin.beta_2 + (r * b_poly marlin.beta_3)))
@@ -666,8 +526,7 @@ struct
   (* TODO: No need to hash the entire bulletproof challenges. Could
    just hash the segment of the public input LDE corresponding to them
    that we compute when verifying the previous proof. That is a commitment
-   to them.
-*)
+   to them. *)
 
   let hash_me_only t =
     let sponge = Sponge.create sponge_params in
@@ -676,42 +535,53 @@ struct
          ~g1:G1.to_field_elements t) ;
     Sponge.squeeze sponge ~length:Digest.length
 
-  let combine_pairing_accs : type n. (_, n) Vector.t -> _ = function
-    | [] ->
-        failwith "combine_pairing_accs: empty list"
-    | [acc] ->
-        acc
-    | a :: accs ->
-        let open Pairing_marlin_types.Accumulator in
-        let (module Shifted) = G1.shifted () in
-        Vector.fold accs
-          ~init:(map a ~f:(fun x -> Shifted.(add zero x)))
-          ~f:(fun acc t -> map2 acc t ~f:Shifted.add)
-        |> map ~f:Shifted.unshift_nonzero
+  module Marlin = Types.Dlog_based.Proof_state.Deferred_values.Marlin
 
-  (* TODO
+  (* Just for exhaustiveness over fields *)
+  let iter2 ~fp ~chal ~scalar_chal
+      { Marlin.sigma_2= sigma_2_0
+      ; sigma_3= sigma_3_0
+      ; alpha= alpha_0
+      ; eta_a= eta_a_0
+      ; eta_b= eta_b_0
+      ; eta_c= eta_c_0
+      ; beta_1= beta_1_0
+      ; beta_2= beta_2_0
+      ; beta_3= beta_3_0 }
+      { Marlin.sigma_2= sigma_2_1
+      ; sigma_3= sigma_3_1
+      ; alpha= alpha_1
+      ; eta_a= eta_a_1
+      ; eta_b= eta_b_1
+      ; eta_c= eta_c_1
+      ; beta_1= beta_1_1
+      ; beta_2= beta_2_1
+      ; beta_3= beta_3_1 } =
+    fp sigma_2_0 sigma_2_1 ;
+    fp sigma_3_0 sigma_3_1 ;
+    chal alpha_0 alpha_1 ;
+    chal eta_a_0 eta_a_1 ;
+    chal eta_b_0 eta_b_1 ;
+    chal eta_c_0 eta_c_1 ;
+    scalar_chal beta_1_0 beta_1_1 ;
+    scalar_chal beta_2_0 beta_2_1 ;
+    scalar_chal beta_3_0 beta_3_1
 
   let assert_eq_marlin
       (m1 :
-        ( Field.t
+        ( _
+        , Field.t Pickles_types.Scalar_challenge.t
         , Field.t )
         Types.Dlog_based.Proof_state.Deferred_values.Marlin.t)
       (m2 :
         ( Boolean.var list
+        , Scalar_challenge.t
         , Field.t )
         Types.Dlog_based.Proof_state.Deferred_values.Marlin.t) =
-    let open Types.Dlog_based.Proof_state.Deferred_values.Marlin in
-    let fp x1 x2 = Field.(Assert.equal x1 x2) in
-    let chal c1 c2 = Field.Assert.equal c1 (Field.project c2) in
-    chal m1.alpha m2.alpha ;
-    chal m1.eta_a m2.eta_a ;
-    chal m1.eta_b m2.eta_b ;
-    chal m1.eta_c m2.eta_c ;
-    chal m1.beta_1 m2.beta_1 ;
-    fp m1.sigma_2 m2.sigma_2 ;
-    chal m1.beta_2 m2.beta_2 ;
-    fp m1.sigma_3 m2.sigma_3 ;
-    chal m1.beta_3 m2.beta_3
-*)
-  let assert_eq_marlin _ _ = ()
+    iter2 m1 m2 ~fp:Field.Assert.equal
+      ~chal:(fun c1 c2 -> Field.Assert.equal c1 (Field.project c2))
+      ~scalar_chal:
+        (fun (Scalar_challenge t1 : _ Pickles_types.Scalar_challenge.t)
+             (Scalar_challenge t2 : Scalar_challenge.t) ->
+        Field.Assert.equal t1 (Field.project t2) )
 end

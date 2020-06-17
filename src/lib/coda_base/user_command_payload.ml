@@ -164,10 +164,11 @@ module Common = struct
     let to_input
         ({fee; fee_token; fee_payer_pk; nonce; valid_until; memo} : var) =
       let%map nonce = Account_nonce.Checked.to_input nonce
-      and valid_until = Global_slot.Checked.to_input valid_until in
+      and valid_until = Global_slot.Checked.to_input valid_until
+      and fee_token = Token_id.Checked.to_input fee_token in
       Array.reduce_exn ~f:Random_oracle.Input.append
         [| Currency.Fee.var_to_input fee
-         ; Token_id.Checked.to_input fee_token
+         ; fee_token
          ; Public_key.Compressed.Checked.to_input fee_payer_pk
          ; nonce
          ; valid_until
@@ -177,7 +178,6 @@ module Common = struct
 
   [%%endif]
 end
-[@@warning "-27"]
 
 module Body = struct
   [%%versioned
@@ -238,6 +238,12 @@ module Body = struct
   let source t = Account_id.create (source_pk t) (token t)
 
   let receiver t = Account_id.create (receiver_pk t) (token t)
+
+  let tag = function
+    | Payment _ ->
+        Transaction_union_tag.Payment
+    | Stake_delegation _ ->
+        Transaction_union_tag.Stake_delegation
 end
 
 module Poly = struct
@@ -302,12 +308,17 @@ let receiver (t : t) = Body.receiver t.body
 
 let token (t : t) = Body.token t.body
 
+let tag (t : t) = Body.tag t.body
+
 let amount (t : t) =
   match t.body with
   | Payment payload ->
       Some payload.Payment_payload.Poly.amount
   | Stake_delegation _ ->
       None
+
+let fee_excess (t : t) =
+  Fee_excess.of_single (fee_token t, Currency.Fee.Signed.of_unsigned (fee t))
 
 let is_payment (t : t) =
   match t.body with Payment _ -> true | Stake_delegation _ -> false

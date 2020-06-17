@@ -3,12 +3,8 @@ open Signature_lib
 open Merkle_ledger
 
 module Ledger_inner = struct
-  module Depth = struct
-    let depth = Coda_compile_config.ledger_depth
-  end
-
   module Location_at_depth : Merkle_ledger.Location_intf.S =
-    Merkle_ledger.Location.Make (Depth)
+    Merkle_ledger.Location.T
 
   module Location_binable = struct
     module Arg = struct
@@ -61,7 +57,7 @@ module Ledger_inner = struct
 
         let hash_account = Fn.compose Ledger_hash.of_digest Account.digest
 
-        let empty_account = hash_account Account.empty
+        let empty_account = Ledger_hash.of_digest Account.empty_digest
       end
     end]
 
@@ -98,7 +94,6 @@ module Ledger_inner = struct
     module Balance = Currency.Balance
     module Account = Account.Stable.Latest
     module Hash = Hash.Stable.Latest
-    module Depth = Depth
     module Kvdb = Kvdb
     module Location = Location_at_depth
     module Location_binable = Location_binable
@@ -245,7 +240,12 @@ module Ledger_inner = struct
 
   let create_new_account_exn t pk account =
     let action, _ = get_or_create_account_exn t pk account in
-    assert (action = `Added)
+    if action = `Existed then
+      failwith
+        (sprintf
+           !"Could not create a new account with pk \
+             %{sexp:Public_key.Compressed.t}: Account already exists"
+           (Account_id.public_key pk))
 
   (* shadows definition in MaskedLedger, extra assurance hash is of right type  *)
   let merkle_root t =

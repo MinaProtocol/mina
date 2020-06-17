@@ -3,17 +3,20 @@
   (name pickles)
   (public_name pickles)
   (flags -warn-error -27)
-  (preprocess (pps ppx_coda ppx_jane ppx_deriving.std ppx_deriving_yojson ))
+  (preprocess (pps ppx_version ppx_coda ppx_jane ppx_deriving.std ppx_deriving_yojson ))
   (libraries
     digestif
     zexe_backend
+    pickles.composition_types
+    pickles.limb_vector
+    pickles.marlin_checks
+    pickles.one_hot_vector
+    pickles.pseudo
     snarky_log
-    sgn_type
     sponge
     group_map
     snarky_group_map
     snarky_curve
     snarky
-    snarkette
     key_cache
     core_kernel ))

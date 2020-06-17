@@ -140,6 +140,7 @@ module Config : sig
     ; time_controller: Block_time.Controller.t
     ; consensus_local_state: Consensus.Data.Local_state.t
     ; genesis_ledger_hash: Ledger_hash.t
+    ; constraint_constants: Genesis_constants.Constraint_constants.t
     ; creatable_gossip_net: Gossip_net.Any.creatable
     ; is_seed: bool
     ; log_gossip_heard: log_gossip_heard }
@@ -220,7 +221,8 @@ val transaction_pool_diffs :
      * (bool -> unit) )
      Strict_pipe.Reader.t
 
-val broadcast_state : t -> External_transition.t -> unit
+val broadcast_state :
+  t -> (External_transition.t, State_hash.t) With_hash.t -> unit
 
 val broadcast_snark_pool_diff : t -> Snark_pool.Resource_pool.Diff.t -> unit
 

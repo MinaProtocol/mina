@@ -3,10 +3,11 @@
   (name zexe_backend)
   (public_name zexe_backend)
   (flags -warn-error -27)
-  (preprocess (pps ppx_coda ppx_jane ppx_deriving_yojson ppx_deriving.std))
+  (preprocess (pps ppx_version ppx_jane ppx_deriving_yojson ppx_deriving.std))
   (libraries
     zexe_backend.common
     zexe_backend.bn382
+    coda_digestif
     hex
     pickles_types
     snarky_bn382
@@ -16,4 +17,3 @@
     sponge
     snarkette
     core ))
-

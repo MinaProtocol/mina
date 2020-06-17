@@ -7,7 +7,7 @@ module T = struct
 
   type view = int * int Work.Table.t
 
-  let get_work = Staged_ledger.Scan_state.all_work_statements
+  let get_work = Staged_ledger.Scan_state.all_work_statements_exn
 
   (** Returns true if this update changed which elements are in the table
       (but not if the same elements exist with a different reference count) *)

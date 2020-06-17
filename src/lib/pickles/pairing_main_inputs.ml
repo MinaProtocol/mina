@@ -2,19 +2,18 @@ open Core_kernel
 open Common
 open Zexe_backend
 module Impl = Impls.Pairing_based
+open Import
 
 let sponge_params_constant =
   Sponge.Params.(map bn382_p ~f:Impl.Field.Constant.of_string)
 
 let fp_random_oracle ?length s = Fp.of_bits (bits_random_oracle ?length s)
 
-let group_map = unstage (group_map (module Fp) ~a:Fp.zero ~b:(Fp.of_int 7))
+let unrelated_g =
+  let group_map = unstage (group_map (module Fp) ~a:G.Params.a ~b:G.Params.b)
+  and str = Fn.compose bits_to_bytes Fp.to_bits in
+  fun (x, y) -> group_map (fp_random_oracle (str x ^ str y))
 
-let unrelated_g (x, y) =
-  let str = Fn.compose bits_to_bytes Fp.to_bits in
-  group_map (fp_random_oracle (str x ^ str y))
-
-(* TODO: This is incorrect *)
 let crs_max_degree = 1 lsl 22
 
 open Impl
@@ -91,14 +90,11 @@ module G = struct
 
     module Params = struct
       open Impl.Field.Constant
-
-      let a = zero
-
-      let b = of_int 7
+      include G.Params
 
       let one = G.to_affine_exn G.one
 
-      let group_size_in_bits = 382
+      let group_size_in_bits = Field.size_in_bits
     end
 
     module F = struct
@@ -162,11 +158,7 @@ module G = struct
       module type of T
       with module Scaling_precomputation := T.Scaling_precomputation )
 
-  module Scaling_precomputation = struct
-    include T.Scaling_precomputation
-
-    (*     let create t = create ~unrelated_base:(unrelated_g t) t *)
-  end
+  module Scaling_precomputation = T.Scaling_precomputation
 
   let ( + ) = T.add_exn
 

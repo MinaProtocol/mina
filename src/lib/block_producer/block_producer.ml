@@ -9,6 +9,9 @@ open O1trace
 open Otp_lib
 module Time = Block_time
 
+type Structured_log_events.t += Block_produced
+  [@@deriving register_event {msg= "Successfully produced a new block"}]
+
 module Singleton_supervisor : sig
   type ('data, 'a) t
 
@@ -110,18 +113,31 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
   let previous_protocol_state_body_hash =
     Protocol_state.body previous_protocol_state |> Protocol_state.Body.hash
   in
+  let previous_protocol_state_hash =
+    Protocol_state.hash_with_body ~body_hash:previous_protocol_state_body_hash
+      previous_protocol_state
+  in
+  let previous_global_slot =
+    Protocol_state.body previous_protocol_state
+    |> Coda_state.Protocol_state.Body.consensus_state
+    |> Consensus.Data.Consensus_state.curr_slot
+  in
   let%bind res =
     Interruptible.uninterruptible
       (let open Deferred.Let_syntax in
       let diff =
         measure "create_diff" (fun () ->
-            Staged_ledger.create_diff staged_ledger ~self ~coinbase_receiver
-              ~logger ~transactions_by_fee:transactions ~get_completed_work
+            Staged_ledger.create_diff ~constraint_constants staged_ledger ~self
+              ~coinbase_receiver ~logger
+              ~current_global_slot:previous_global_slot
+              ~transactions_by_fee:transactions ~get_completed_work
               ~log_block_creation )
       in
       match%map
-        Staged_ledger.apply_diff_unchecked staged_ledger diff
-          ~state_body_hash:previous_protocol_state_body_hash
+        Staged_ledger.apply_diff_unchecked staged_ledger ~constraint_constants
+          diff ~logger ~current_global_slot:previous_global_slot
+          ~state_and_body_hash:
+            (previous_protocol_state_hash, previous_protocol_state_body_hash)
       with
       | Ok
           ( `Hash_after_applying next_staged_ledger_hash
@@ -243,13 +259,11 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
 let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
     ~transaction_resource_pool ~time_controller ~keypairs ~coinbase_receiver
     ~consensus_local_state ~frontier_reader ~transition_writer
-    ~set_next_producer_timing ~log_block_creation ~constraint_constants
-    ~(genesis_constants : Genesis_constants.t) =
+    ~set_next_producer_timing ~log_block_creation
+    ~(precomputed_values : Precomputed_values.t) =
   trace "block_producer" (fun () ->
-      let consensus_constants =
-        Consensus.Constants.create ~constraint_constants
-          ~protocol_constants:genesis_constants.protocol
-      in
+      let constraint_constants = precomputed_values.constraint_constants in
+      let consensus_constants = precomputed_values.consensus_constants in
       let log_bootstrap_mode () =
         Logger.info logger ~module_:__MODULE__ ~location:__LOC__
           "Pausing block production while bootstrapping"
@@ -304,7 +318,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
               ->
                 Debug_assert.debug_assert (fun () ->
                     [%test_result: [`Take | `Keep]]
-                      (Consensus.Hooks.select
+                      (Consensus.Hooks.select ~constants:consensus_constants
                          ~existing:
                            (Protocol_state.consensus_state
                               previous_protocol_state)
@@ -321,6 +335,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                     in
                     [%test_result: [`Take | `Keep]]
                       (Consensus.Hooks.select ~existing:root_consensus_state
+                         ~constants:consensus_constants
                          ~candidate:
                            (Protocol_state.consensus_state protocol_state)
                          ~logger)
@@ -437,6 +452,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                         match
                           Transition_frontier_validation
                           .validate_frontier_dependencies ~logger ~frontier t
+                            ~consensus_constants
                         with
                         | Error `Already_in_frontier ->
                             Logger.error logger ~module_:__MODULE__
@@ -464,8 +480,9 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                             return ()
                         | Ok transition -> (
                             let%bind breadcrumb_result =
-                              Breadcrumb.build ~logger ~verifier ~trust_system
-                                ~parent:crumb ~transition ~sender:None
+                              Breadcrumb.build ~logger ~precomputed_values
+                                ~verifier ~trust_system ~parent:crumb
+                                ~transition ~sender:None
                             in
                             let exn name =
                               raise
@@ -499,12 +516,11 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                                     diff: $error" ;
                                 return ()
                             | Ok breadcrumb -> (
-                                Logger.trace logger ~module_:__MODULE__
+                                Logger.Str.trace logger ~module_:__MODULE__
                                   ~location:__LOC__
                                   ~metadata:
                                     [("breadcrumb", Breadcrumb.to_yojson crumb)]
-                                  "Successfully produced a new block: \
-                                   $breadcrumb" ;
+                                  Block_produced ;
                                 let metadata =
                                   [ ( "state_hash"
                                     , State_hash.to_yojson transition_hash ) ]
@@ -595,9 +611,9 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                 let next_producer_timing =
                   measure "asking consensus what to do" (fun () ->
                       Consensus.Hooks.next_producer_timing
-                        ~constants:consensus_constants (time_to_ms now)
-                        consensus_state ~local_state:consensus_local_state
-                        ~keypairs ~logger )
+                        ~constraint_constants ~constants:consensus_constants
+                        (time_to_ms now) consensus_state
+                        ~local_state:consensus_local_state ~keypairs ~logger )
                 in
                 set_next_producer_timing next_producer_timing ;
                 match next_producer_timing with

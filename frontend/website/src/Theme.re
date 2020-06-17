@@ -16,6 +16,8 @@ module Colors = {
     `hsla((`deg(201.), `percent(71.), `percent(52.), `num(a)));
   let hyperlink = hyperlinkAlpha(1.0);
 
+  let blackAlpha = a => `rgba((0, 0, 0, a));
+
   let hyperlinkHover = `hex("0AA9FF");
   let hyperlinkLight = `hsl((`deg(201.), `percent(71.), `percent(70.)));
 
@@ -59,6 +61,7 @@ module Colors = {
 
   let blueBlue = `rgb((42, 81, 224));
   let midnight = `rgb((31, 45, 61));
+  let leaderboardMidnight = `hex("344B65");
 
   let india = `rgb((242, 183, 5));
   let indiaAlpha = a => `rgba((242, 183, 5, a));
@@ -165,6 +168,7 @@ module H1 = {
         ],
       ),
     ]);
+  let basic = merge([hero, style([fontWeight(`semiBold)])]);
 };
 
 module H2 = {
@@ -327,6 +331,35 @@ module H5 = {
   let basic = merge([init, style([lineHeight(`rem(1.5))])]);
 
   let tight = merge([init, style([lineHeight(`rem(1.25))])]);
+
+  let semiBold =
+    merge([
+      style([
+        Typeface.ibmplexsans,
+        fontStyle(`normal),
+        fontWeight(`semiBold),
+        fontSize(`rem(1.25)),
+        lineHeight(`rem(1.5)),
+        color(Colors.saville),
+      ]),
+    ]);
+};
+
+module H6 = {
+  open Css;
+  let init =
+    style([Typeface.ibmplexsans, fontStyle(`normal), textAlign(`center)]);
+
+  let extraSmall =
+    merge([
+      init,
+      style([
+        fontSize(`rem(0.75)),
+        letterSpacing(`rem(0.0875)),
+        fontWeight(`num(500)),
+        lineHeight(`rem(1.0)),
+      ]),
+    ]);
 };
 
 module Body = {

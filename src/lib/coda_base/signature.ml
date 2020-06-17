@@ -2,7 +2,6 @@
 "/src/config.mlh"]
 
 open Core_kernel
-open Module_version
 
 [%%ifdef
 consensus_mechanism]
@@ -41,30 +40,17 @@ module Stable = struct
 
   module Tests = struct
     [%%if
-    curve_size = 298]
+    curve_size = 382]
 
-    let%test "signature serialization v1 (curve_size=298)" =
+    let%test "signature serialization v1 (curve_size=382)" =
       let signature =
         Quickcheck.random_value
           ~seed:(`Deterministic "signature serialization") V1.gen
       in
-      let known_good_hash =
-        "\xAB\x7E\xE6\x52\xB9\xF4\x6C\xEE\x7B\xAB\x77\x3E\x25\x49\x84\xF5\xD0\x6E\x27\xB7\x2B\xCB\x76\x6B\xE5\xAC\x74\xAB\x8A\xC6\x27\x42"
-      in
-      Serialization.check_serialization (module V1) signature known_good_hash
-
-    [%%elif
-    curve_size = 753]
-
-    let%test "signature serialization v1 (curve_size=753)" =
-      let signature =
-        Quickcheck.random_value
-          ~seed:(`Deterministic "signature serialization") V1.gen
-      in
-      let known_good_hash =
-        "\xFE\x32\x2E\x97\x30\xE8\x41\xA5\x8E\xC3\xCD\x85\xB1\x12\x8D\x41\x82\x99\xB5\x43\x00\x42\xDF\x10\xD6\xF0\xEC\x33\x38\x77\x2B\x50"
-      in
-      Serialization.check_serialization (module V1) signature known_good_hash
+      let known_good_digest = "7fd92b5cbf6da5b55772ddd325a67ad3" in
+      Ppx_version.Serialization.check_serialization
+        (module V1)
+        signature known_good_digest
 
     [%%else]
 

@@ -152,18 +152,12 @@ module Keypair = struct
     in
     (set_urs_info, load)
 
-  let () =
-    set_urs_info
-      [On_disk {directory= "/home/izzy/pickles-new/"; should_write= true}]
-
   let create
       { R1cs_constraint_system.public_input_size
       ; auxiliary_input_size
       ; m= {a; b; c}
       ; weight } =
     let vars = 1 + public_input_size + auxiliary_input_size in
-    Core.printf "pairing weight %d\n%!"
-      (R1cs_constraint_system.Weight.norm weight) ;
     Fp_index.create a b c
       (Unsigned.Size_t.of_int vars)
       (Unsigned.Size_t.of_int (public_input_size + 1))

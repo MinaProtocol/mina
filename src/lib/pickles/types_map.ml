@@ -4,6 +4,9 @@ open Zexe_backend
 
 (* TODO: max_branching is a terrible name. It should be max_width. *)
 
+(* We maintain a global hash table which stores for each inductive proof system some
+   data.
+*)
 module Data = struct
   type f = Impls.Dlog_based.field
 
@@ -14,10 +17,12 @@ module Data = struct
     ; wrap_domains: Domains.t
     ; step_domains: (Domains.t, 'branches) Vector.t }
 
+  (* This is the data associated to an inductive proof system with statement type
+   ['a_var], which has ['branches] many "variants" each of which depends on at most
+   ['max_branching] many previous statements. *)
   type ('a_var, 'a_value, 'max_branching, 'branches) t =
     { branches: 'branches Nat.t
     ; max_branching: (module Nat.Add.Intf with type n = 'max_branching)
-          (*         ; verification_keys :  G1.Affine.t Abc.t Matrix_evals.t list *)
     ; typ: ('a_var, 'a_value) Impls.Pairing_based.Typ.t
     ; a_value_to_field_elements: 'a_value -> Fp.t array
     ; a_var_to_field_elements: 'a_var -> Impls.Pairing_based.Field.t array
@@ -47,7 +52,7 @@ module Data = struct
 
     let create
         ({ branches
-         ; max_branching (*         ; verification_keys          *)
+         ; max_branching
          ; typ
          ; a_value_to_field_elements
          ; a_var_to_field_elements
@@ -70,11 +75,7 @@ end
 
 module Packed = struct
   type t =
-    | T :
-        (*('var * 'value * 'n1 * 'n2) Type_equal.Id.t  *)
-        ('var, 'value, 'n1, 'n2) Tag.t
-        * ('var, 'value, 'n1, 'n2) Data.t
-        -> t
+    | T : ('var, 'value, 'n1, 'n2) Tag.t * ('var, 'value, 'n1, 'n2) Data.t -> t
 end
 
 type t = Packed.t Type_equal.Id.Uid.Table.t

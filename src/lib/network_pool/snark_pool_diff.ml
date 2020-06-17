@@ -29,12 +29,17 @@ module Make
 
   type rejected = Rejected.t [@@deriving sexp, yojson]
 
-  let compact_json = function
+  type compact =
+    { work: Work.t
+    ; fee: Currency.Fee.t
+    ; prover: Signature_lib.Public_key.Compressed.t }
+  [@@deriving yojson]
+
+  let to_compact = function
     | Add_solved_work (work, {proof= _; fee= {fee; prover}}) ->
-        `Assoc
-          [ ("work_ids", Work.compact_json work)
-          ; ("fee", Currency.Fee.to_yojson fee)
-          ; ("prover", Signature_lib.Public_key.Compressed.to_yojson prover) ]
+        {work; fee; prover}
+
+  let compact_json t = compact_to_yojson (to_compact t)
 
   let summary = function
     | Add_solved_work (work, {proof= _; fee}) ->
@@ -56,7 +61,8 @@ module Make
           ~f:Snark_work_lib.Work.Single.Spec.statement
       , {proof= res.proofs; fee= {fee= res.spec.fee; prover= res.prover}} )
 
-  let unsafe_apply (pool : Pool.t) (t : t Envelope.Incoming.t) =
+  let unsafe_apply ~constraint_constants:_ (pool : Pool.t)
+      (t : t Envelope.Incoming.t) =
     let {Envelope.Incoming.data= diff; sender} = t in
     let is_local = match sender with Local -> true | _ -> false in
     let to_or_error = function

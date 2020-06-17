@@ -7,4 +7,4 @@
    blockchain_snark
    genesis_constants
    with_hash)
- (preprocess (pps ppx_coda)))
+ (preprocess (pps ppx_version)))

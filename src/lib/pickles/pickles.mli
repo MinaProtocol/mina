@@ -26,7 +26,9 @@ module Verification_key : sig
   val dummy : t
 
   module Id : sig
-    type t [@@deriving sexp]
+    type t [@@deriving sexp, eq]
+
+    val dummy : unit -> t
   end
 
   val load :
