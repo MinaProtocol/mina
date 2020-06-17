@@ -709,6 +709,14 @@ module Proof0 = Proof
 
 let%test_module "test" =
   ( module struct
+    let () =
+      Zexe_backend.Dlog_based.Keypair.set_urs_info
+        [On_disk {directory= "/tmp/"; should_write= true}]
+
+    let () =
+      Zexe_backend.Pairing_based.Keypair.set_urs_info
+        [On_disk {directory= "/tmp/"; should_write= true}]
+
     let () = assert (Pairing_acc.batch_check [Lazy.force Dummy.pairing_acc])
 
     open Impls.Pairing_based
@@ -762,9 +770,6 @@ let%test_module "test" =
       let module M = struct
         type t = Field.Constant.t * Txn_snark.Proof.t [@@deriving bin_io]
       end in
-      Out_channel.write_all
-        "/home/izzy/repos/coda/verifier-with-split-polys/proof"
-        ~data:(Binable.to_string (module M) (base1, t1)) ;
       Common.time "verif" (fun () ->
           assert (
             Txn_snark.Proof.verify (List.init 2 ~f:(fun _ -> (base1, t1))) ) ) ;
