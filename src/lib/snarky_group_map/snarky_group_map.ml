@@ -27,6 +27,8 @@ let to_group (type t)
 module Checked = struct
   open Snarky
 
+  let wrap = Checked_map.wrap
+
   let to_group (type f) (module M : Snark_intf.Run with type field = f) ~params
       t =
     let module G =
