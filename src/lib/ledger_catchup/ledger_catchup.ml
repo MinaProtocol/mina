@@ -54,19 +54,19 @@ let verify_transition ~logger ~consensus_constants ~trust_system ~verifier
     ~frontier ~unprocessed_transition_cache enveloped_transition =
   let sender = Envelope.Incoming.sender enveloped_transition in
   let genesis_state_hash = Transition_frontier.genesis_state_hash frontier in
+  let transition_with_hash = Envelope.Incoming.data enveloped_transition in
   let cached_initially_validated_transition_result =
     let open Deferred.Result.Let_syntax in
-    let transition = Envelope.Incoming.data enveloped_transition in
     let%bind initially_validated_transition =
-      External_transition.Validation.wrap transition
+      External_transition.Validation.wrap transition_with_hash
       |> External_transition.skip_time_received_validation
            `This_transition_was_not_received_via_gossip
-      |> External_transition.skip_protocol_versions_validation
-           `This_transition_has_valid_protocol_versions
       |> Fn.compose Deferred.return
            (External_transition.validate_genesis_protocol_state
               ~genesis_state_hash)
       >>= External_transition.validate_proof ~verifier
+      >>= Fn.compose Deferred.return
+            External_transition.validate_protocol_versions
       >>= Fn.compose Deferred.return
             External_transition.validate_delta_transition_chain
     in
@@ -129,6 +129,42 @@ let verify_transition ~logger ~consensus_constants ~trust_system ~verifier
           , Some ("invalid delta transition chain witness", []) )
       in
       Error (Error.of_string "invalid delta transition chain witness")
+  | Error `Invalid_protocol_version ->
+      let transition = With_hash.data transition_with_hash in
+      let%map () =
+        Trust_system.record_envelope_sender trust_system logger sender
+          ( Trust_system.Actions.Sent_invalid_protocol_version
+          , Some
+              ( "Invalid current or proposed protocol version in catchup block"
+              , [ ( "current_protocol_version"
+                  , `String
+                      ( External_transition.current_protocol_version transition
+                      |> Protocol_version.to_string ) )
+                ; ( "proposed_protocol_version"
+                  , `String
+                      ( External_transition.proposed_protocol_version_opt
+                          transition
+                      |> Option.value_map ~default:"<None>"
+                           ~f:Protocol_version.to_string ) ) ] ) )
+      in
+      Error (Error.of_string "invalid protocol version")
+  | Error `Mismatched_protocol_version ->
+      let transition = With_hash.data transition_with_hash in
+      let%map () =
+        Trust_system.record_envelope_sender trust_system logger sender
+          ( Trust_system.Actions.Sent_mismatched_protocol_version
+          , Some
+              ( "Current protocol version in catchup block does not match \
+                 daemon protocol version"
+              , [ ( "block_current_protocol_version"
+                  , `String
+                      ( External_transition.current_protocol_version transition
+                      |> Protocol_version.to_string ) )
+                ; ( "daemon_current_protocol_version"
+                  , `String Protocol_version.(get_current () |> to_string) ) ]
+              ) )
+      in
+      Error (Error.of_string "mismatched protocol version")
   | Error `Disconnected ->
       Deferred.Or_error.fail @@ Error.of_string "disconnected chain"
 
@@ -247,6 +283,65 @@ let download_transitions ~logger ~trust_system ~network ~num_peers
                ) ) )
 *)
 
+(*
+let verify_transitions_and_build_breadcrumbs' ~logger
+    ~(precomputed_values : Precomputed_values.t) ~trust_system ~verifier
+    ~frontier ~unprocessed_transition_cache ~transitions ~target_hash ~subtrees
+    =
+  let open Deferred.Or_error.Let_syntax in
+  let%bind transitions_with_initial_validation, initial_hash =
+    fold_until (List.rev transitions) ~init:[]
+      ~f:(fun acc transition ->
+        let open Deferred.Let_syntax in
+        match%bind
+          verify_transition ~logger
+            ~consensus_constants:precomputed_values.consensus_constants
+            ~trust_system ~verifier ~frontier ~unprocessed_transition_cache
+            transition
+        with
+        | Error e ->
+            List.map acc ~f:Cached.invalidate_with_failure |> ignore ;
+            Deferred.Or_error.fail e
+        | Ok (`In_frontier initial_hash) ->
+            Deferred.Or_error.return
+            @@ Continue_or_stop.Stop (acc, initial_hash)
+        | Ok (`Building_path transition_with_initial_validation) ->
+            Deferred.Or_error.return
+            @@ Continue_or_stop.Continue
+                 (transition_with_initial_validation :: acc) )
+      ~finish:(fun acc ->
+        if List.length transitions <= 0 then
+          Deferred.Or_error.return ([], target_hash)
+        else
+          let oldest_missing_transition =
+            List.hd_exn transitions |> Envelope.Incoming.data |> With_hash.data
+          in
+          let initial_state_hash =
+            External_transition.parent_hash oldest_missing_transition
+          in
+          Deferred.Or_error.return (acc, initial_state_hash) )
+  in
+  let trees_of_transitions =
+    Option.fold
+      (Non_empty_list.of_list_opt transitions_with_initial_validation)
+      ~init:subtrees ~f:(fun _ transitions ->
+        [Rose_tree.of_non_empty_list ~subtrees transitions] )
+  in
+  let open Deferred.Let_syntax in
+  match%bind
+    Transition_handler.Breadcrumb_builder.build_subtrees_of_breadcrumbs ~logger
+      ~precomputed_values ~verifier ~trust_system ~frontier ~initial_hash
+      trees_of_transitions
+  with
+  | Ok result ->
+      Deferred.Or_error.return result
+  | Error e ->
+      List.map transitions_with_initial_validation
+        ~f:Cached.invalidate_with_failure
+      |> ignore ;
+      Deferred.Or_error.fail e
+*)
+
 let verify_transitions_and_build_breadcrumbs ~logger
     ~(precomputed_values : Precomputed_values.t) ~trust_system ~verifier
     ~frontier ~unprocessed_transition_cache ~transitions ~target_hash ~subtrees
@@ -308,6 +403,7 @@ let download_transitions_in_chunks ~logger ~trust_system ~network ~num_peers
     ~preferred_peer ~maximum_download_size ~hashes_of_missing_transitions =
   let%bind random_peers = Coda_networking.random_peers network num_peers in
   Deferred.Or_error.List.map
+    (* May change to normal List.map to have a list of Deferred.t *)
     (partition maximum_download_size hashes_of_missing_transitions)
     ~how:`Parallel ~f:(fun hashes ->
       Deferred.Or_error.find_map_ok (preferred_peer :: random_peers)
@@ -343,37 +439,48 @@ let download_transitions_in_chunks ~logger ~trust_system ~network ~num_peers
                      ~sender:(Envelope.Sender.Remote (peer.host, peer.peer_id))
                ) ) )
 
-exception Breadcrumb_Error of Error.t
-
-let verify_transitions_and_build_breadcrumbs_in_chunks ~logger
-    ~precomputed_values ~trust_system ~verifier ~frontier
-    ~unprocessed_transition_cache ~transitions_chunks ~target_hash ~subtrees =
-  try
-    Deferred.Or_error.return
-    @@ List.mapi transitions_chunks ~f:(fun index transitions_chunk ->
-           let current_subtrees =
-             if index <> List.length transitions_chunk - 1 then []
-             else subtrees
-           in
-           match%bind
-             verify_transitions_and_build_breadcrumbs ~logger
-               ~precomputed_values ~trust_system ~verifier ~frontier
-               ~unprocessed_transition_cache ~transitions:transitions_chunk
-               ~target_hash ~subtrees:current_subtrees
-           with
-           | Ok trees_of_breadcrumbs ->
-               Deferred.return trees_of_breadcrumbs
-           | Error e ->
-               raise (Breadcrumb_Error e) )
-  with Breadcrumb_Error e -> Deferred.Or_error.fail e
-
 let garbage_collect_subtrees ~logger ~subtrees =
   List.iter subtrees ~f:(fun subtree ->
       Rose_tree.map subtree ~f:Cached.invalidate_with_failure |> ignore ) ;
   Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
     "garbage collected failed cached transitions"
 
-(*
+let verify_transitions_and_build_breadcrumbs_in_chunks ~logger
+    ~precomputed_values ~trust_system ~verifier ~frontier
+    ~unprocessed_transition_cache ~transitions_chunks ~target_hash ~subtrees =
+  (* let _ = Core.printf "Start verifying and building:\n%!" in *)
+  let previous_trees_of_breadcrumbs = ref [] in
+  let modified_transitions_chunks =
+    if List.length transitions_chunks = 0 then [[]] else transitions_chunks
+  in
+  Deferred.Or_error.List.foldi modified_transitions_chunks ~init:[]
+    ~f:(fun index acc transitions_chunk ->
+      (* let _ = Core.printf "Working on index %d:\n%!" index in *)
+      let current_subtrees =
+        if index <> List.length modified_transitions_chunks - 1 then []
+        else subtrees
+      in
+      match%bind
+        verify_transitions_and_build_breadcrumbs ~logger ~precomputed_values
+          ~trust_system ~verifier ~frontier ~unprocessed_transition_cache
+          ~transitions:transitions_chunk ~target_hash
+          ~subtrees:current_subtrees
+      with
+      | Ok trees_of_breadcrumbs ->
+          (* Core.printf "Success on one\n%!"; *)
+          previous_trees_of_breadcrumbs :=
+            trees_of_breadcrumbs :: !previous_trees_of_breadcrumbs ;
+          Deferred.Or_error.return (trees_of_breadcrumbs :: acc)
+      | Error e ->
+          (* Core.printf "Meeting error in building breadcrumbs\n%!"; *)
+          List.map !previous_trees_of_breadcrumbs
+            ~f:(fun trees_of_breadcrumbs ->
+              garbage_collect_subtrees ~logger ~subtrees:trees_of_breadcrumbs
+          )
+          |> ignore ;
+          Deferred.Or_error.fail e )
+
+(* 
 let run' ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
     ~catchup_job_reader
     ~(catchup_breadcrumbs_writer :
@@ -463,8 +570,7 @@ let run' ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
                 Coda_metrics.(
                   Gauge.set Transition_frontier_controller.catchup_time_ms
                     Core.Time.(Span.to_ms @@ diff (now ()) start_time)) ;
-                Catchup_jobs.decr ()) ))
-*)
+                Catchup_jobs.decr ()) )) *)
 
 let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
     ~catchup_job_reader
@@ -514,53 +620,54 @@ let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
                 ~subtrees
             with
             | Ok breadcrumbs_chunks ->
-                List.fold breadcrumbs_chunks ~init:()
-                  ~f:(fun () breadcrumbs_chunk ->
-                    ignore
-                    @@ let%bind trees_of_breadcrumbs = breadcrumbs_chunk in
-                       Logger.trace logger ~module_:__MODULE__
-                         ~location:__LOC__
-                         ~metadata:
-                           [ ( "hashes of transitions"
-                             , `List
-                                 (List.map trees_of_breadcrumbs ~f:(fun tree ->
-                                      Rose_tree.to_yojson
-                                        (fun breadcrumb ->
-                                          Cached.peek breadcrumb
-                                          |> Transition_frontier.Breadcrumb
-                                             .state_hash
-                                          |> State_hash.to_yojson )
-                                        tree )) ) ]
-                         "about to write to the catchup breadcrumbs pipe" ;
-                       if
-                         Strict_pipe.Writer.is_closed
-                           catchup_breadcrumbs_writer
-                       then (
-                         Logger.trace logger ~module_:__MODULE__
-                           ~location:__LOC__
-                           "catchup breadcrumbs pipe was closed; attempt to \
-                            write to closed pipe" ;
-                         garbage_collect_subtrees ~logger
-                           ~subtrees:trees_of_breadcrumbs ;
-                         Deferred.return
-                           Coda_metrics.(
-                             Gauge.set
-                               Transition_frontier_controller.catchup_time_ms
-                               Core.Time.(
-                                 Span.to_ms @@ diff (now ()) start_time)) )
-                       else
-                         let ivar = Ivar.create () in
-                         Strict_pipe.Writer.write catchup_breadcrumbs_writer
-                           (trees_of_breadcrumbs, `Ledger_catchup ivar) ;
-                         let%bind () = Ivar.read ivar in
-                         Deferred.return
-                           Coda_metrics.(
-                             Gauge.set
-                               Transition_frontier_controller.catchup_time_ms
-                               Core.Time.(
-                                 Span.to_ms @@ diff (now ()) start_time)) ) ;
+                (* let _ =
+                  Core.printf "verify and build done, length %d\n%!"
+                    (List.length breadcrumbs_chunks)
+                in *)
+                let%bind () =
+                  Deferred.List.iter ~how:`Sequential
+                    (List.rev breadcrumbs_chunks)
+                    ~f:(fun trees_of_breadcrumbs ->
+                      (* Core.printf "breadcrumbs length: %d \n%!" (List.length trees_of_breadcrumbs); *)
+                      Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+                        ~metadata:
+                          [ ( "hashes of transitions"
+                            , `List
+                                (List.map trees_of_breadcrumbs ~f:(fun tree ->
+                                     Rose_tree.to_yojson
+                                       (fun breadcrumb ->
+                                         Cached.peek breadcrumb
+                                         |> Transition_frontier.Breadcrumb
+                                            .state_hash |> State_hash.to_yojson
+                                         )
+                                       tree )) ) ]
+                        "about to write to the catchup breadcrumbs pipe" ;
+                      if
+                        Strict_pipe.Writer.is_closed catchup_breadcrumbs_writer
+                      then (
+                        (* Core.printf "Writer is closed \n%!" ; *)
+                        Logger.trace logger ~module_:__MODULE__
+                          ~location:__LOC__
+                          "catchup breadcrumbs pipe was closed; attempt to \
+                           write to closed pipe" ;
+                        Deferred.return
+                        @@ garbage_collect_subtrees ~logger
+                             ~subtrees:trees_of_breadcrumbs )
+                      else
+                        (* let _ = Core.printf "Writer is open \n%!" in *)
+                        let ivar = Ivar.create () in
+                        Strict_pipe.Writer.write catchup_breadcrumbs_writer
+                          (trees_of_breadcrumbs, `Ledger_catchup ivar) ;
+                        let%map () = Ivar.read ivar in
+                        () )
+                in
+                Coda_metrics.(
+                  Gauge.set Transition_frontier_controller.catchup_time_ms
+                    Core.Time.(Span.to_ms @@ diff (now ()) start_time)) ;
+                (* Core.printf "Finish\n%!"; *)
                 Catchup_jobs.decr ()
             | Error e ->
+                (* let _ = Core.printf "Error in run \n%!" in *)
                 Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
                   ~metadata:[("error", `String (Error.to_string_hum e))]
                   "Catchup process failed -- unable to receive valid data \
@@ -707,7 +814,7 @@ let%test_module "Ledger_catchup tests" =
           let%bind peer_branch_size =
             Int.gen_incl (max_frontier_length / 2) (max_frontier_length - 1)
           in
-          gen ~proof_level ~precomputed_values ~max_frontier_length
+          gen ~precomputed_values ~max_frontier_length
             [ fresh_peer
             ; peer_with_branch ~frontier_branch_size:peer_branch_size ])
         ~f:(fun network ->
@@ -726,7 +833,7 @@ let%test_module "Ledger_catchup tests" =
                    in the frontier" =
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
-          gen ~proof_level ~precomputed_values ~max_frontier_length
+          gen ~precomputed_values ~max_frontier_length
             [fresh_peer; peer_with_branch ~frontier_branch_size:1])
         ~f:(fun network ->
           let open Fake_network in
@@ -740,7 +847,7 @@ let%test_module "Ledger_catchup tests" =
     let%test_unit "catchup fails if one of the parent transitions fail" =
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
-          gen ~proof_level ~precomputed_values ~max_frontier_length
+          gen ~precomputed_values ~max_frontier_length
             [ fresh_peer
             ; peer_with_branch ~frontier_branch_size:(max_frontier_length * 2)
             ])
