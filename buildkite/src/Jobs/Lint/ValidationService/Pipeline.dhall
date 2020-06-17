@@ -10,6 +10,9 @@ let commands =
   let archivePath = "\"mix-cache-\\\$(sha256sum ${sigPath} | cut -d\" \" -f1).tar.gz\""
   in [
     Cmd.run "elixir --version | tail -n1 > ${sigPath}",
+    Cmd.run "cat ${sigPath}",
+    Cmd.run "echo \\\$(pwd)",
+    Cmd.run "cat ./buildkite/scripts/cache-through.sh || echo 'does not exist'",
     Cmd.cacheThrough ValidationService.docker archivePath Cmd.CompoundCmd::{
       preprocess = Cmd.run "tar czf ${archivePath} -C ${ValidationService.rootPath} priv/plts",
       postprocess = Cmd.run "tar xzf ${archivePath} -C ${ValidationService.rootPath}",
