@@ -9,7 +9,7 @@ in Pipeline.build Pipeline.Config::{
   steps = [
     Command.build Command.Config::{
       commands = ValidationService.initCommands # [
-        ValidationService.runMix "mix test"
+        ValidationService.runMix "test"
       ],
       label = "Validation service tests; executes the ExUnit test suite",
       key = "test",

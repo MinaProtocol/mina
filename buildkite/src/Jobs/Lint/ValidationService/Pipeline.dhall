@@ -9,9 +9,9 @@ in Pipeline.build Pipeline.Config::{
   steps = [
     Command.build Command.Config::{
       commands = ValidationService.initCommands # [
-        ValidationService.runMix "mix clean",
-        ValidationService.runMix "mix check"
-        {- run_in validation "mix doctor" -}
+        ValidationService.runMix "clean",
+        ValidationService.runMix "check"
+        {- ValidationService.runMix "doctor" -}
       ],
       label = "Validation service lint steps; employs various forms static analysis on the elixir codebase",
       key = "lint",
