@@ -41,7 +41,7 @@ open Zexe_backend
    An inductive set A is defined by a sequence of inductive rules.
    An inductive rule is intuitively described by something of the form
 
-   a1 ∈ A1, ..., an ∈ An 
+   a1 ∈ A1, ..., an ∈ An
      f [ a0, ... a1 ] a
    ----------------------
            a ∈ A
@@ -52,7 +52,7 @@ open Zexe_backend
    We pursue the "step" then "wrap" approach for proof composition.
 
    The main source of complexity is that we must "wrap" proofs whose verifiers are
-   slightly different. 
+   slightly different.
 
    The main sources of complexity are twofold:
    1. Each SNARK verifier includes group operations and scalar field operations.
@@ -88,7 +88,7 @@ open Zexe_backend
       I didn't implement it exactly this way (although in retrospect probably I should have) but
       that's the basic idea.
 
-      **The complexity this causes:** 
+      **The complexity this causes:**
       When you prove a rule that includes k recursive verifications, you expose k unfinalized
       proofs. So, the shape of a statement depends on how many "predecessor statements" it has
       or in other words, how many verifications were performed within it.

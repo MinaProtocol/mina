@@ -9,15 +9,15 @@ open Tick
 
 [%%else]
 
-module Random_oracle = Random_oracle_nonconsensus
 open Snark_params_nonconsensus
+open Import
 
 [%%endif]
 
 [%%versioned:
 module Stable : sig
   module V1 : sig
-    type t [@@deriving version, sexp, eq, hash, compare, yojson]
+    type t [@@deriving sexp, eq, hash, compare, yojson]
   end
 end]
 
@@ -66,9 +66,10 @@ val typ : (var, t) Typ.t
 val var_of_t : t -> var
 
 module Checked : sig
-  val to_input : var -> (Field.Var.t, Boolean.var) Random_oracle.Input.t
+  val to_input :
+    var -> ((Field.Var.t, Boolean.var) Random_oracle.Input.t, _) Tick.Checked.t
 
-  val next : var -> var
+  val next : var -> (var, _) Checked.t
 
   val equal : var -> var -> (Boolean.var, _) Checked.t
 
