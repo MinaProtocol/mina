@@ -107,9 +107,7 @@ let write spec {Disk_storable.to_string; read= r; write= w} k v =
           match s with
           | Spec.On_disk {directory; should_write} ->
               if should_write then (
-                Core.printf "write on disk %s %b\n%!" directory should_write ;
                 let%bind () = Unix.mkdir ~p:() directory in
-                Core.printf "made dir %s\n%!" directory ;
                 (on_disk to_string r w directory).write k v )
               else Deferred.Or_error.return ()
           | S3 {bucket_prefix= _; install_path= _} ->
