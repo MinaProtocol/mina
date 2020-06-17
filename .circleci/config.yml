@@ -278,6 +278,21 @@ jobs:
                   name: Update branch protection rule from test configuration
                   command: ./scripts/test.py required-status >required_status && cat required_status && ./scripts/update_branch_rule.py required_status
 
+    run-leaderboard:
+        docker:
+            - image: node
+        steps:
+            - checkout
+            - run:
+                name: Update the Leaderboard
+                command: cd frontend/leaderboard && yarn && yarn build
+            - run:
+                name: Download blocks
+                command: cd frontend/leaderboard/lib/js/src/ && mkdir blocks && gsutil -m rsync gs://points-data-hack-april20/v1/32b-joyous-occasion blocks
+            - run:
+                name: Run the Leaderboard
+                run: node frontend/leaderboard/lib/js/src/Main.bs.js
+
     build-macos:
         macos:
             xcode: "10.2.1"
@@ -1232,6 +1247,17 @@ workflows:
             - test--test_postake_split_snarkless
             - test--test_postake_three_producers
             - test--test_postake_txns
+
+    leaderboard:
+        triggers:
+          - schedule:
+              cron: "0 1 * * *"
+              filters:
+                branches:
+                  only:
+                    - develop
+          jobs:
+            - run-leaderboard
 
     daily:
         triggers:
