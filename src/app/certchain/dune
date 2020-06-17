@@ -1,0 +1,5 @@
+(executable
+(libraries core snarky signature_lib)
+(public_name certchain)
+(package certchain)
+ (name certchain))
