@@ -102,10 +102,11 @@ let to_input {Poly.source_pk; receiver_pk; token_id; amount} =
      ; Amount.to_input amount |]
 
 let var_to_input {Poly.source_pk; receiver_pk; token_id; amount} =
+  let%map token_id = Token_id.Checked.to_input token_id in
   Array.reduce_exn ~f:Random_oracle.Input.append
     [| Public_key.Compressed.Checked.to_input source_pk
      ; Public_key.Compressed.Checked.to_input receiver_pk
-     ; Token_id.Checked.to_input token_id
+     ; token_id
      ; Amount.var_to_input amount |]
 
 let var_of_t ({source_pk; receiver_pk; token_id; amount} : t) : var =

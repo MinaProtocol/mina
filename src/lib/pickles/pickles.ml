@@ -41,7 +41,7 @@ open Zexe_backend
    An inductive set A is defined by a sequence of inductive rules.
    An inductive rule is intuitively described by something of the form
 
-   a1 ∈ A1, ..., an ∈ An 
+   a1 ∈ A1, ..., an ∈ An
      f [ a0, ... a1 ] a
    ----------------------
            a ∈ A
@@ -52,7 +52,7 @@ open Zexe_backend
    We pursue the "step" then "wrap" approach for proof composition.
 
    The main source of complexity is that we must "wrap" proofs whose verifiers are
-   slightly different. 
+   slightly different.
 
    The main sources of complexity are twofold:
    1. Each SNARK verifier includes group operations and scalar field operations.
@@ -88,7 +88,7 @@ open Zexe_backend
       I didn't implement it exactly this way (although in retrospect probably I should have) but
       that's the basic idea.
 
-      **The complexity this causes:** 
+      **The complexity this causes:**
       When you prove a rule that includes k recursive verifications, you expose k unfinalized
       proofs. So, the shape of a statement depends on how many "predecessor statements" it has
       or in other words, how many verifications were performed within it.
@@ -709,6 +709,14 @@ module Proof0 = Proof
 
 let%test_module "test" =
   ( module struct
+    let () =
+      Zexe_backend.Dlog_based.Keypair.set_urs_info
+        [On_disk {directory= "/tmp/"; should_write= true}]
+
+    let () =
+      Zexe_backend.Pairing_based.Keypair.set_urs_info
+        [On_disk {directory= "/tmp/"; should_write= true}]
+
     let () = assert (Pairing_acc.batch_check [Lazy.force Dummy.pairing_acc])
 
     open Impls.Pairing_based
@@ -762,9 +770,6 @@ let%test_module "test" =
       let module M = struct
         type t = Field.Constant.t * Txn_snark.Proof.t [@@deriving bin_io]
       end in
-      Out_channel.write_all
-        "/home/izzy/repos/coda/verifier-with-split-polys/proof"
-        ~data:(Binable.to_string (module M) (base1, t1)) ;
       Common.time "verif" (fun () ->
           assert (
             Txn_snark.Proof.verify (List.init 2 ~f:(fun _ -> (base1, t1))) ) ) ;
