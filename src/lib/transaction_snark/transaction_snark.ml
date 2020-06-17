@@ -926,11 +926,27 @@ module Base = struct
       Amount.Checked.of_fee
         Fee.(var_of_t constraint_constants.account_creation_fee)
     in
+    let%bind is_zero_fee =
+      fee |> Fee.var_to_number |> Number.to_var
+      |> Field.(Checked.equal (Var.constant zero))
+    in
+    let%bind can_create_fee_payer_account =
+      (* Fee transfers and coinbases may create an account. We check the normal
+         invariants to ensure that the account creation fee is paid.
+      *)
+      let%bind fee_may_be_charged =
+        (* If the fee is zero, we do not create the account at all, so we allow
+           this through. Otherwise, the fee must be the default.
+        *)
+        Boolean.(token_default || is_zero_fee)
+      in
+      Boolean.((not is_user_command) && fee_may_be_charged)
+    in
     let%bind root_after_fee_payer_update =
       [%with_label "Update fee payer"]
         (Frozen_ledger_hash.modify_account_send
            ~depth:constraint_constants.ledger_depth root
-           ~is_writeable:(Boolean.not is_user_command) fee_payer
+           ~is_writeable:can_create_fee_payer_account fee_payer
            ~f:(fun ~is_empty_and_writeable account ->
              (* this account is:
                - the fee-payer for payments
@@ -959,10 +975,6 @@ module Base = struct
                (* If this is a coinbase with zero fee, do not create the
                   account, since the fee amount won't be enough to pay for it.
                *)
-               let%bind is_zero_fee =
-                 fee |> Fee.var_to_number |> Number.to_var
-                 |> Field.(Checked.equal (Var.constant zero))
-               in
                Boolean.(is_empty_and_writeable && not is_zero_fee)
              in
              let%bind amount =
@@ -973,6 +985,7 @@ module Base = struct
                       ~magnitude:(Amount.Checked.of_fee fee)
                       ~sgn
                   in
+                  (* Account creation fee for fee transfers/coinbases. *)
                   let%bind account_creation_fee =
                     let%map magnitude =
                       Amount.Checked.if_ is_empty_and_writeable
@@ -1079,11 +1092,28 @@ module Base = struct
              let%bind () =
                [%with_label
                  "Check whether creation fails due to a non-default token"]
-                 (let%bind token_cannot_create =
-                    Boolean.all
-                      [ is_empty_and_writeable
-                      ; Boolean.not token_default
-                      ; is_user_command ]
+                 (let%bind token_should_not_create =
+                    Boolean.(
+                      is_empty_and_writeable && Boolean.not token_default)
+                  in
+                  let%bind token_cannot_create =
+                    Boolean.(token_should_not_create && is_user_command)
+                  in
+                  let%bind () =
+                    [%with_label
+                      "Check that account creation is paid in the default \
+                       token for non-user-commands"]
+                      ((* This expands to
+                          [token_should_not_create =
+                            token_should_not_create && is_user_command]
+                          which is
+                          - [token_should_not_create = token_should_not_create]
+                            (ie. always satisfied) for user commands
+                          - [token_should_not_create = false] for coinbases/fee
+                            transfers.
+                       *)
+                       Boolean.Assert.( = ) token_should_not_create
+                         token_cannot_create)
                   in
                   Boolean.Assert.( = ) token_cannot_create
                     user_command_failure.token_cannot_create)
