@@ -639,35 +639,43 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
   let process_fee_transfer t (transfer : Fee_transfer.t) ~modify_balance =
     let open Or_error.Let_syntax in
     (* TODO(#4555): Allow token_id to vary from default. *)
-    match transfer with
-    | `One (pk, fee) ->
-        let account_id = Account_id.create pk Token_id.default in
+    let%bind () =
+      if
+        List.for_all
+          ~f:Token_id.(equal default)
+          (One_or_two.to_list (Fee_transfer.fee_tokens transfer))
+      then return ()
+      else Or_error.errorf "Cannot pay fees in non-default tokens."
+    in
+    match Fee_transfer.to_singles transfer with
+    | `One ft ->
+        let account_id = Fee_transfer.Single.receiver ft in
         (* TODO(#4496): Do not use get_or_create here; we should not create a
            new account before we know that the transaction will go through and
            thus the creation fee has been paid.
         *)
         let action, a, loc = get_or_create t account_id in
         let emptys = previous_empty_accounts action account_id in
-        let%map balance = modify_balance action account_id a.balance fee in
+        let%map balance = modify_balance action account_id a.balance ft.fee in
         set t loc {a with balance} ;
         emptys
-    | `Two ((pk1, fee1), (pk2, fee2)) ->
-        let account_id1 = Account_id.create pk1 Token_id.default in
+    | `Two (ft1, ft2) ->
+        let account_id1 = Fee_transfer.Single.receiver ft1 in
         (* TODO(#4496): Do not use get_or_create here; we should not create a
            new account before we know that the transaction will go through and
            thus the creation fee has been paid.
         *)
         let action1, a1, l1 = get_or_create t account_id1 in
         let emptys1 = previous_empty_accounts action1 account_id1 in
-        if Public_key.Compressed.equal pk1 pk2 then (
-          let%bind fee = error_opt "overflow" (Fee.add fee1 fee2) in
+        let account_id2 = Fee_transfer.Single.receiver ft2 in
+        if Account_id.equal account_id1 account_id2 then (
+          let%bind fee = error_opt "overflow" (Fee.add ft1.fee ft2.fee) in
           let%map balance =
             modify_balance action1 account_id1 a1.balance fee
           in
           set t l1 {a1 with balance} ;
           emptys1 )
         else
-          let account_id2 = Account_id.create pk2 Token_id.default in
           (* TODO(#4496): Do not use get_or_create here; we should not create a
              new account before we know that the transaction will go through
              and thus the creation fee has been paid.
@@ -675,10 +683,10 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           let action2, a2, l2 = get_or_create t account_id2 in
           let emptys2 = previous_empty_accounts action2 account_id2 in
           let%bind balance1 =
-            modify_balance action1 account_id1 a1.balance fee1
+            modify_balance action1 account_id1 a1.balance ft1.fee
           in
           let%map balance2 =
-            modify_balance action2 account_id2 a2.balance fee2
+            modify_balance action2 account_id2 a2.balance ft2.fee
           in
           set t l1 {a1 with balance= balance1} ;
           set t l2 {a2 with balance= balance2} ;
