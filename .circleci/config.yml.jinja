@@ -602,6 +602,7 @@ workflows:
             - build-wallet
             - test-archive
             - build-archive
+            - build-macos
             - build-client-sdk
             {%- for profile in build_artifact_profiles %}
             - build-artifacts--{{profile}}
@@ -613,9 +614,6 @@ workflows:
             {%- for profile in small_curves_tests.keys() | sort %}
             - test--{{profile}}
             {%- endfor %}
-            - build-macos:
-                requires:
-                    - build-artifacts--testnet_postake_medium_curves
 
     daily:
         triggers:
