@@ -122,3 +122,19 @@ let fq_unpadded_public_input_of_statement prev_statement =
     Impls.Dlog_based.generate_public_input [typ] prev_statement
   in
   List.init (Fq.Vector.length input) ~f:(Fq.Vector.get input)
+
+let fq_public_input_of_statement s =
+  let open Zexe_backend in
+  Fq.one :: fq_unpadded_public_input_of_statement s
+
+let fp_public_input_of_statement ~max_branching
+    (prev_statement : _ Types.Pairing_based.Statement.t) =
+  let open Zexe_backend in
+  let input =
+    let (T (input, conv)) =
+      Impls.Pairing_based.input ~branching:max_branching
+        ~bulletproof_log2:Rounds.n
+    in
+    Impls.Pairing_based.generate_public_input [input] prev_statement
+  in
+  Fp.one :: List.init (Fp.Vector.length input) ~f:(Fp.Vector.get input)
