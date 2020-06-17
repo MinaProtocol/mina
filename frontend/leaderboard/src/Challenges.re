@@ -162,7 +162,7 @@ let bonusZkSnarkChallenge = metricsMap => {
       metricsMap,
       (metricRecord: Types.Metrics.metricRecord) =>
         switch (metricRecord.snarkFeesCollected) {
-        | Some(snarkFeesCollected) => Int64.of_string(snarkFeesCollected)
+        | Some(snarkFeesCollected) => snarkFeesCollected
         | None => Int64.zero
         },
       Int64.compare,
@@ -173,7 +173,7 @@ let bonusZkSnarkChallenge = metricsMap => {
       metricsMap,
       (metricRecord: Types.Metrics.metricRecord) =>
         switch (metricRecord.highestSnarkFeeCollected) {
-        | Some(highestSnarkFee) => Int64.of_string(highestSnarkFee)
+        | Some(highestSnarkFee) => highestSnarkFee
         | None => Int64.zero
         },
       Int64.compare,
@@ -188,8 +188,7 @@ let zkSnarksChallenge = metricsMap => {
     addPointsToUsersWithAtleastN(
       (metricRecord: Types.Metrics.metricRecord) =>
         switch (metricRecord.snarkFeesCollected) {
-        | Some(snarkFeesCollected) =>
-          Some(Int64.of_string(snarkFeesCollected))
+        | Some(snarkFeesCollected) => Some(snarkFeesCollected)
         | None => Some(Int64.zero)
         },
       3L,
@@ -200,8 +199,7 @@ let zkSnarksChallenge = metricsMap => {
     addPointsToUsersWithAtleastN(
       (metricRecord: Types.Metrics.metricRecord) =>
         switch (metricRecord.snarkFeesCollected) {
-        | Some(snarkFeesCollected) =>
-          Some(Int64.of_string(snarkFeesCollected))
+        | Some(snarkFeesCollected) => Some(snarkFeesCollected)
         | None => Some(Int64.zero)
         },
       50L,
