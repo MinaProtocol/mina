@@ -380,13 +380,6 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         Amount.(sub amount (of_fee fee))
     else Ok amount
 
-  let add_account_creation_fee_bal
-      ~(constraint_constants : Genesis_constants.Constraint_constants.t) action
-      balance =
-    let fee = constraint_constants.account_creation_fee in
-    if action = `Added then add_amount balance (Amount.of_fee fee)
-    else Ok balance
-
   let check b =
     ksprintf (fun s -> if b then Ok () else Or_error.error_string s)
 
@@ -554,42 +547,19 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             get_with_location ledger receiver
           in
           (* Charge the account creation fee. *)
-          let%bind receiver_amount, creation_fee =
+          let%bind receiver_amount =
             match receiver_location with
             | `Existing _ ->
-                return (amount, Amount.zero)
+                return amount
             | `New ->
-                if Token_id.equal fee_token token then
+                if Token_id.(equal default) token then
                   (* Subtract the creation fee from the transaction amount. *)
-                  let%map amount =
-                    sub_account_creation_fee ~constraint_constants `Added
-                      amount
-                  in
-                  (amount, Amount.zero)
+                  sub_account_creation_fee ~constraint_constants `Added amount
                 else
-                  (* Charge the fee-payer for creating the account.
-                     Note: We don't have a better choice here: there is no
-                     other source of tokens in this transaction that is known
-                     to have accepted value.
-                  *)
-                  let account_creation_fee =
-                    Amount.of_fee constraint_constants.account_creation_fee
-                  in
-                  return (amount, account_creation_fee)
-          in
-          (* NOTE: From here on, either [fee_payer_account] is unchanged, or
-             [fee_payer] is distinct from both [source] and [receiver], due to
-             the [Token_id.equal] check above.
-          *)
-          let%bind fee_payer_account =
-            let%bind balance =
-              sub_amount fee_payer_account.balance creation_fee
-            in
-            let%map timing =
-              validate_timing ~txn_amount:creation_fee
-                ~txn_global_slot:current_global_slot ~account:fee_payer_account
-            in
-            {fee_payer_account with balance; timing}
+                  Or_error.errorf
+                    !"The receiving account does not exist, and the \
+                      transferred token %{sexp: Token_id.t} is not the default"
+                    token
           in
           let%bind receiver_account =
             let%map balance =
@@ -637,8 +607,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             | `New ->
                 [receiver]
           in
-          ( [ (fee_payer_location, fee_payer_account)
-            ; (receiver_location, receiver_account)
+          ( [ (receiver_location, receiver_account)
             ; (source_location, source_account) ]
           , `Source_timing source_timing
           , Undo.User_command_undo.Body.Payment {previous_empty_accounts} )
@@ -867,7 +836,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     set t receiver_location {receiver_account with balance= receiver_balance} ;
     remove_accounts_exn t previous_empty_accounts
 
-  let undo_user_command ledger ~constraint_constants
+  let undo_user_command ledger
       { Undo.User_command_undo.common=
           { user_command= {payload; signer= _; signature= _} as user_command
           ; previous_receipt_chain_hash
@@ -876,7 +845,6 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       ; body } =
     let open Or_error.Let_syntax in
     (* Fee-payer information *)
-    let fee_token = User_command.fee_token user_command in
     let fee_payer = User_command.fee_payer user_command in
     let nonce = User_command.nonce user_command in
     let%bind fee_payer_location =
@@ -922,21 +890,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             delegate= previous_delegate
           ; timing= Option.value ~default:source_account.timing source_timing
           }
-    | Payment {amount; token_id= token; _}, Payment {previous_empty_accounts}
-      ->
+    | Payment {amount; _}, Payment {previous_empty_accounts} ->
         let receiver = User_command.receiver user_command in
-        let%bind fee_payer_account =
-          let%map balance =
-            if
-              Token_id.equal fee_token token
-              || List.is_empty previous_empty_accounts
-            then return fee_payer_account.balance
-            else
-              add_account_creation_fee_bal ~constraint_constants `Added
-                fee_payer_account.balance
-          in
-          {fee_payer_account with balance}
-        in
         let%bind receiver_location, receiver_account =
           let%bind location =
             location_of_account' ledger "receiver" receiver
@@ -969,7 +924,6 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               balance
             ; timing= Option.value ~default:account.timing source_timing } )
         in
-        set ledger fee_payer_location fee_payer_account ;
         set ledger receiver_location receiver_account ;
         set ledger source_location source_account ;
         remove_accounts_exn ledger previous_empty_accounts
@@ -988,7 +942,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       | Fee_transfer u ->
           undo_fee_transfer ~constraint_constants ledger u
       | User_command u ->
-          undo_user_command ~constraint_constants ledger u
+          undo_user_command ledger u
       | Coinbase c ->
           undo_coinbase ~constraint_constants ledger c ;
           Ok ()
@@ -1023,7 +977,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
            payment)
     in
     let root = merkle_root ledger in
-    Or_error.ok_exn (undo_user_command ~constraint_constants ledger undo) ;
+    Or_error.ok_exn (undo_user_command ledger undo) ;
     root
 
   module For_tests = struct

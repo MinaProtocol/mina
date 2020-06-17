@@ -223,27 +223,12 @@ let apply_user_command_exn ~constraint_constants t
         let action, receiver_account =
           get_or_initialize_exn receiver t receiver_idx
         in
-        let receiver_amount, creation_fee =
-          if Token_id.equal fee_token token then
-            ( sub_account_creation_fee ~constraint_constants action amount
-            , Amount.zero )
+        let receiver_amount =
+          if Token_id.(equal default) token then
+            sub_account_creation_fee ~constraint_constants action amount
           else if action = `Added then
-            let account_creation_fee =
-              Amount.of_fee constraint_constants.account_creation_fee
-            in
-            (amount, account_creation_fee)
-          else (amount, Amount.zero)
-        in
-        let fee_payer_account =
-          { fee_payer_account with
-            balance=
-              Balance.sub_amount fee_payer_account.balance creation_fee
-              |> Option.value_exn ?here:None ?error:None ?message:None
-          ; timing=
-              Or_error.ok_exn
-              @@ Transaction_logic.validate_timing ~txn_amount:creation_fee
-                   ~txn_global_slot:current_global_slot
-                   ~account:fee_payer_account }
+            failwith "Receiver account does not exist, and we cannot create it"
+          else amount
         in
         let receiver_account =
           { receiver_account with
@@ -276,9 +261,7 @@ let apply_user_command_exn ~constraint_constants t
             *)
             raise (Reject exn)
         in
-        [ (fee_payer_idx, fee_payer_account)
-        ; (receiver_idx, receiver_account)
-        ; (source_idx, source_account) ]
+        [(receiver_idx, receiver_account); (source_idx, source_account)]
   in
   try
     let indexed_accounts = compute_updates () in
