@@ -296,12 +296,12 @@ let apply_user_command_exn ~constraint_constants t
       t
 
 let apply_fee_transfer_exn ~constraint_constants =
-  let apply_single t ((pk, fee) : Fee_transfer.Single.t) =
-    let account_id = Account_id.create pk Token_id.default in
+  let apply_single t (ft : Fee_transfer.Single.t) =
+    let account_id = Fee_transfer.Single.receiver ft in
     let index = find_index_exn t account_id in
     let action, account = get_or_initialize_exn account_id t index in
     let open Currency in
-    let amount = Amount.of_fee fee in
+    let amount = Amount.of_fee ft.fee in
     let balance =
       let amount' =
         sub_account_creation_fee ~constraint_constants action amount
@@ -310,7 +310,7 @@ let apply_fee_transfer_exn ~constraint_constants =
     in
     set_exn t index {account with balance}
   in
-  fun t transfer -> One_or_two.fold transfer ~f:apply_single ~init:t
+  fun t transfer -> Fee_transfer.fold transfer ~f:apply_single ~init:t
 
 let apply_coinbase_exn ~constraint_constants t
     ({receiver; fee_transfer; amount= coinbase_amount} : Coinbase.t) =

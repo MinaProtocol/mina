@@ -229,8 +229,13 @@ let create_fee_transfers completed_works delta public_key coinbase_fts =
               else Public_key.Compressed.Map.remove accum receiver_pk )
       (* TODO: This creates a weird incentive to have a small public_key *)
       |> Map.to_alist ~key_order:`Increasing
-      |> One_or_two.group_list )
-  |> to_staged_ledger_or_error
+      |> List.map ~f:(fun (receiver_pk, fee) ->
+             Fee_transfer.Single.create ~receiver_pk ~fee
+               ~fee_token:Token_id.default )
+      |> One_or_two.group_list
+      |> List.map ~f:Fee_transfer.of_singles
+      |> Or_error.all )
+  |> Or_error.join |> to_staged_ledger_or_error
 
 let get_individual_info ~constraint_constants coinbase_parts ~receiver
     user_commands completed_works =

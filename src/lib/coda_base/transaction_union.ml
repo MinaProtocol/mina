@@ -67,27 +67,29 @@ let of_transaction : Transaction.t -> t = function
       ; signer= Public_key.decompress_exn other_pk
       ; signature= Signature.dummy }
   | Fee_transfer tr -> (
-      let two (pk1, fee1) (pk2, fee2) : t =
+      let two {Fee_transfer.receiver_pk= pk1; fee= fee1; fee_token}
+          {Fee_transfer.receiver_pk= pk2; fee= fee2; fee_token= token_id} : t =
         { payload=
             { common=
                 { fee= fee2
-                ; fee_token= Token_id.default
+                ; fee_token
                 ; fee_payer_pk= pk2
                 ; nonce= Account.Nonce.zero
                 ; valid_until= Coda_numbers.Global_slot.max_value
                 ; memo= User_command_memo.empty }
             ; body=
-                { source_pk= pk2
+                { source_pk= pk1
                 ; receiver_pk= pk1
-                ; token_id= Token_id.default
+                ; token_id
                 ; amount= Amount.of_fee fee1
                 ; tag= Tag.Fee_transfer } }
         ; signer= Public_key.decompress_exn pk2
         ; signature= Signature.dummy }
       in
-      match tr with
-      | `One (pk, fee) ->
-          two (pk, fee) (pk, Fee.zero)
+      match Fee_transfer.to_singles tr with
+      | `One ({receiver_pk; fee= _; fee_token} as t) ->
+          two t
+            (Fee_transfer.Single.create ~receiver_pk ~fee:Fee.zero ~fee_token)
       | `Two (t1, t2) ->
           two t1 t2 )
 
