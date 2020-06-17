@@ -45,7 +45,7 @@ M.
   , iteri )]
 
 let of_root ~depth (h : Ledger_hash.t) =
-  of_hash ~depth (Ledger_hash.of_digest (h :> Pedersen.Digest.t))
+  of_hash ~depth (Ledger_hash.of_digest (h :> Random_oracle.Digest.t))
 
 let of_ledger_root ledger =
   of_root ~depth:(Ledger.depth ledger) (Ledger.merkle_root ledger)
@@ -88,7 +88,8 @@ let of_ledger_subset_exn (oledger : Ledger.t) keys =
   Debug_assert.debug_assert (fun () ->
       [%test_eq: Ledger_hash.t]
         (Ledger.merkle_root ledger)
-        ((merkle_root sparse :> Pedersen.Digest.t) |> Ledger_hash.of_hash) ) ;
+        ((merkle_root sparse :> Random_oracle.Digest.t) |> Ledger_hash.of_hash)
+  ) ;
   sparse
 
 let of_ledger_index_subset_exn (ledger : Ledger.Any_ledger.witness) indexes =
@@ -119,7 +120,7 @@ let%test_unit "of_ledger_subset_exn with keys that don't exist works" =
       let sl = of_ledger_subset_exn ledger [aid1; aid2] in
       [%test_eq: Ledger_hash.t]
         (Ledger.merkle_root ledger)
-        ((merkle_root sl :> Pedersen.Digest.t) |> Ledger_hash.of_hash) )
+        ((merkle_root sl :> Random_oracle.Digest.t) |> Ledger_hash.of_hash) )
 
 let get_or_initialize_exn account_id t idx =
   let account = get_exn t idx in
@@ -351,7 +352,8 @@ let apply_transaction_exn ~constraint_constants t (transition : Transaction.t)
   | Coinbase c ->
       apply_coinbase_exn ~constraint_constants t c
 
-let merkle_root t = Ledger_hash.of_hash (merkle_root t :> Pedersen.Digest.t)
+let merkle_root t =
+  Ledger_hash.of_hash (merkle_root t :> Random_oracle.Digest.t)
 
 let handler t =
   let ledger = ref t in
@@ -362,10 +364,10 @@ let handler t =
       match request with
       | Ledger_hash.Get_element idx ->
           let elt = get_exn !ledger idx in
-          let path = (path_exn idx :> Pedersen.Digest.t list) in
+          let path = (path_exn idx :> Random_oracle.Digest.t list) in
           respond (Provide (elt, path))
       | Ledger_hash.Get_path idx ->
-          let path = (path_exn idx :> Pedersen.Digest.t list) in
+          let path = (path_exn idx :> Random_oracle.Digest.t list) in
           respond (Provide path)
       | Ledger_hash.Set (idx, account) ->
           ledger := set_exn !ledger idx account ;

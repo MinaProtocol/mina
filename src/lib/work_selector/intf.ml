@@ -1,3 +1,4 @@
+open Core
 open Currency
 
 module type Inputs_intf = sig
@@ -25,6 +26,10 @@ module type Inputs_intf = sig
     type t
 
     val fee : t -> Fee.t
+
+    module Statement : sig
+      type t = Transaction_snark.Statement.t One_or_two.t
+    end
   end
 
   module Snark_pool : sig
@@ -43,14 +48,19 @@ module type Inputs_intf = sig
   module Staged_ledger : sig
     type t
 
-    val all_work_pairs_exn :
+    val all_work_pairs :
          t
-      -> ( Transaction.t Transaction_protocol_state.t
+      -> get_state:(   Coda_base.State_hash.t
+                    -> Coda_state.Protocol_state.value Or_error.t)
+      -> ( Transaction.t
          , Transaction_witness.t
          , Ledger_proof.t )
          Snark_work_lib.Work.Single.Spec.t
          One_or_two.t
          list
+         Or_error.t
+
+    val all_work_statements_exn : t -> Transaction_snark_work.Statement.t list
   end
 end
 
@@ -72,7 +82,7 @@ module type Lib_intf = sig
 
     val remove :
          t
-      -> ( Transaction.t Transaction_protocol_state.t
+      -> ( Transaction.t
          , Transaction_witness.t
          , Ledger_proof.t )
          Snark_work_lib.Work.Single.Spec.t
@@ -81,7 +91,7 @@ module type Lib_intf = sig
 
     val set :
          t
-      -> ( Transaction.t Transaction_protocol_state.t
+      -> ( Transaction.t
          , Transaction_witness.t
          , Ledger_proof.t )
          Snark_work_lib.Work.Single.Spec.t
@@ -92,13 +102,13 @@ module type Lib_intf = sig
   val get_expensive_work :
        snark_pool:Snark_pool.t
     -> fee:Fee.t
-    -> ( Transaction.t Transaction_protocol_state.t
+    -> ( Transaction.t
        , Transaction_witness.t
        , Ledger_proof.t )
        Snark_work_lib.Work.Single.Spec.t
        One_or_two.t
        list
-    -> ( Transaction.t Transaction_protocol_state.t
+    -> ( Transaction.t
        , Transaction_witness.t
        , Ledger_proof.t )
        Snark_work_lib.Work.Single.Spec.t
@@ -107,14 +117,17 @@ module type Lib_intf = sig
 
   (**Jobs that have not been assigned yet*)
   val all_unseen_works :
-       Staged_ledger.t
+       get_protocol_state:(   Coda_base.State_hash.t
+                           -> Coda_state.Protocol_state.value Or_error.t)
+    -> Staged_ledger.t
     -> State.t
-    -> ( Transaction.t Transaction_protocol_state.t
+    -> ( Transaction.t
        , Transaction_witness.t
        , Ledger_proof.t )
        Snark_work_lib.Work.Single.Spec.t
        One_or_two.t
        list
+       Or_error.t
 
   (**jobs that are not in the snark pool yet*)
   val pending_work_statements :
@@ -127,11 +140,7 @@ module type Lib_intf = sig
     val does_not_have_better_fee :
          snark_pool:Snark_pool.t
       -> fee:Fee.t
-      -> ( Transaction.t Transaction_protocol_state.t
-         , Transaction_witness.t
-         , Ledger_proof.t )
-         Snark_work_lib.Work.Single.Spec.t
-         One_or_two.t
+      -> Transaction_snark_work.Statement.t
       -> bool
   end
 end
@@ -151,9 +160,11 @@ module type Selection_method_intf = sig
        snark_pool:snark_pool
     -> fee:Currency.Fee.t
     -> logger:Logger.t
+    -> get_protocol_state:(   Coda_base.State_hash.t
+                           -> Coda_state.Protocol_state.value Or_error.t)
     -> staged_ledger
     -> State.t
-    -> work One_or_two.t option * State.t
+    -> (work One_or_two.t option * State.t) Or_error.t
 
   val pending_work_statements :
        snark_pool:snark_pool
@@ -168,7 +179,7 @@ module type Make_selection_method_intf = functor
   -> Selection_method_intf
      with type staged_ledger := Inputs.Staged_ledger.t
       and type work :=
-                 ( Inputs.Transaction.t Inputs.Transaction_protocol_state.t
+                 ( Inputs.Transaction.t
                  , Inputs.Transaction_witness.t
                  , Inputs.Ledger_proof.t )
                  Snark_work_lib.Work.Single.Spec.t

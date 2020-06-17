@@ -1,5 +1,7 @@
 let Prelude = ../../../External/Prelude.dhall
 
+let Cmd = ../../../Lib/Cmds.dhall
+
 let Pipeline = ../../../Pipeline/Dsl.dhall
 let Command/Coda = ../../../Command/Coda.dhall
 let Docker = ../../../Command/Docker/Type.dhall
@@ -7,8 +9,8 @@ let Size = ../../../Command/Size.dhall
 
 let commands =
   [
-    "eval $$(opam config env) && make check-format",
-    "./scripts/require-ppx-version.py"
+    Cmd.run "eval $$(opam config env) && make check-format",
+    Cmd.run "./scripts/require-ppx-version.py"
   ]
 in
 

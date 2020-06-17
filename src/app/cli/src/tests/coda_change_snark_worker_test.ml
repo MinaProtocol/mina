@@ -1,5 +1,4 @@
 open Core
-open Coda_base
 open Coda_transition
 open Signature_lib
 open Async
@@ -13,10 +12,7 @@ let main () =
   let block_production_keys i =
     if i = snark_worker_and_block_producer_id then Some i else None
   in
-  let largest_public_key =
-    let _, account = Test_genesis_ledger.largest_account_exn () in
-    Account.public_key account
-  in
+  let largest_public_key = Test_genesis_ledger.largest_account_pk_exn () in
   let snark_work_public_keys i =
     if i = snark_worker_and_block_producer_id then Some largest_public_key
     else None
@@ -67,12 +63,8 @@ let main () =
     wait_for_snark_worker_proof new_block_pipe1 largest_public_key
   in
   let new_snark_worker =
-    List.find_map_exn (Lazy.force Test_genesis_ledger.accounts)
-      ~f:(fun (_, account) ->
-        let public_key = Account.public_key account in
-        Option.some_if
-          (not @@ Public_key.Compressed.equal largest_public_key public_key)
-          public_key )
+    Test_genesis_ledger.find_new_account_record_exn_ [largest_public_key]
+    |> Test_genesis_ledger.pk_of_account_record
   in
   Logger.trace logger "Setting new snark worker key"
     ~metadata:

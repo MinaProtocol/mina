@@ -1,6 +1,5 @@
 open Core
 open Async
-open Signature_lib
 
 let name = "coda-archive-processor-test"
 
@@ -22,17 +21,10 @@ let main () =
     ~postgres_address
     ~server_port:(Host_and_port.port archive_address)
   |> don't_wait_for ;
-  let largest_account_keypair =
-    Test_genesis_ledger.largest_account_keypair_exn ()
-  in
-  let largest_account_public_key =
-    Public_key.compress largest_account_keypair.public_key
-  in
+  let public_key = Test_genesis_ledger.largest_account_pk_exn () in
   let n = 2 in
   let block_production_keys i = if i = 0 then Some i else None in
-  let snark_work_public_keys i =
-    if i = 0 then Some largest_account_public_key else None
-  in
+  let snark_work_public_keys i = if i = 0 then Some public_key else None in
   let is_archive_rocksdb i = i = 1 in
   let archive_process_location i =
     if i = 1 then Some archive_address else None
@@ -44,9 +36,7 @@ let main () =
       ~archive_process_location
   in
   let%bind new_block_pipe =
-    let%map pipe =
-      Coda_worker_testnet.Api.new_block testnet 1 largest_account_public_key
-    in
+    let%map pipe = Coda_worker_testnet.Api.new_block testnet 1 public_key in
     (Option.value_exn pipe).pipe
   in
   let num_blocks_to_wait = 5 in
