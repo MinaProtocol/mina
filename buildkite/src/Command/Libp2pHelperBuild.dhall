@@ -18,8 +18,8 @@ let commands : List Cmd.Type =
       }
       cache_dir
       Cmd.CompoundCmd::{
-        preprocess = r "[ ! -d \"${libp2p_dir}\" ] && echo Libp2p helper \"directory ${libp2p_dir} DOES NOT exist.\" && exit 1",
-        postprocess = r "[ ! -d \"${cache_dir}\" ] && echo helper build \"directory ${cache_dir} DOES NOT exist.\" && exit 1",
+        preprocess = r "echo \"Checking Libp2p helper directory ${libp2p_dir}...\"",
+        postprocess = r "echo \"Checking helper build directory ${cache_dir}...\"",
         inner = r "make libp2p_helper"
       }
   ]
