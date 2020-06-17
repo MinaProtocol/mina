@@ -52,14 +52,13 @@ module Chain_hash = struct
 
   let cons payload (t : t) =
     let open Random_oracle in
-    hash ~init:Hash_prefix.receipt_chain
-      (pack_input
-         Input.(
-           append
-             ( Transaction_union_payload.(
-                 to_input (of_user_command_payload payload))
-               : (Field.t, bool) Input.t )
-             (field (t :> Field.t))))
+    Input.(
+      append
+        ( Transaction_union_payload.(to_input (of_user_command_payload payload))
+          : (Field.t, bool) Input.t )
+        (field (t :> Field.t)))
+    |> pack_input
+    |> hash ~init:Hash_prefix.receipt_chain
     |> of_hash
 
   [%%if
