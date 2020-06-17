@@ -33,7 +33,7 @@ module Pagination =
       let compare a b = -compare a b
     end)
 
-let fee_transfer_participants (pk, _) = [Account_id.create pk Token_id.default]
+let fee_transfer_participants ft = [Fee_transfer.Single.receiver ft]
 
 type t = {pagination: Pagination.t; database: Database.t; logger: Logger.t}
 
