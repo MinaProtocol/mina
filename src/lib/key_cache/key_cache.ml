@@ -106,9 +106,9 @@ let write spec {Disk_storable.to_string; read= r; write= w} k v =
         let res =
           match s with
           | Spec.On_disk {directory; should_write} ->
-              if should_write then (
+              if should_write then
                 let%bind () = Unix.mkdir ~p:() directory in
-                (on_disk to_string r w directory).write k v )
+                (on_disk to_string r w directory).write k v
               else Deferred.Or_error.return ()
           | S3 {bucket_prefix= _; install_path= _} ->
               Deferred.Or_error.return ()
