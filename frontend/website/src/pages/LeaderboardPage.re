@@ -63,7 +63,6 @@ module ToggleButtons = {
 module FilterDropdown = {
   module FilterDropdownStyles = {
     open Css;
-
     let flexColumn =
       style([
         display(`flex),
@@ -80,7 +79,7 @@ module FilterDropdown = {
           backgroundColor(Theme.Colors.white),
           borderRadius(`px(4)),
           boxSizing(`borderBox),
-          border(`px(1), `solid, `rgba((71, 137, 196, 0.3))),
+          border(`px(1), `solid, Theme.Colors.tealAlpha(0.3)),
           width(`percent(100.)),
           height(`rem(2.5)),
           textIndent(`rem(0.5)),
@@ -89,17 +88,16 @@ module FilterDropdown = {
     };
   };
 
-  let options = [|"This Release", "Previous Phase", "All Time"|];
-
+  let filterLabels = [|"This Release", "Previous Phase", "All Time"|];
   [@react.component]
   let make = (~onFilterPress) => {
     let renderDropdown = () => {
       <select
         onClick={e => onFilterPress(ReactEvent.Mouse.target(e)##value)}
         className=FilterDropdownStyles.dropdownStyle>
-        {options
-         |> Array.map(option => {
-              <option value=option> {React.string(option)} </option>
+        {filterLabels
+         |> Array.map(label => {
+              <option key=label value=label> {React.string(label)} </option>
             })
          |> React.array}
       </select>;
@@ -119,7 +117,7 @@ type state = {
 };
 let initialState = {
   currentToggle: ToggleButtons.toggleLabels[0],
-  currentFilter: FilterDropdown.options[0],
+  currentFilter: FilterDropdown.filterLabels[0],
 };
 
 type action =
