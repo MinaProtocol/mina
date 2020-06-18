@@ -1,5 +1,6 @@
 open Core_kernel
 open Pickles_types
+open Basic
 
 [%%versioned
 module Stable = struct

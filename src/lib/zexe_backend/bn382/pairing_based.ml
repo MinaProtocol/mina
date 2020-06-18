@@ -1,3 +1,5 @@
+open Basic
+
 module Bigint = struct
   module R = struct
     include Fp.Bigint
@@ -50,14 +52,14 @@ module Verification_key = struct
 end
 
 module R1CS_constraint_system =
-  R1cs_constraint_system.Make (Fp) (Snarky_bn382.Fp.Constraint_matrix)
-module Var = Var
+  Common.R1cs_constraint_system.Make (Fp) (Snarky_bn382.Fp.Constraint_matrix)
+module Var = Common.Var
 
 module Oracles = struct
   open Snarky_bn382
 
-  let create vk input (pi : Proof.t) =
-    let t = Fp_oracles.create vk (Proof.to_backend input pi) in
+  let create vk input (pi : Pairing_based_proof.t) =
+    let t = Fp_oracles.create vk (Pairing_based_proof.to_backend input pi) in
     Caml.Gc.finalise Fp_oracles.delete t ;
     t
 
@@ -153,7 +155,7 @@ module Keypair = struct
     (set_urs_info, load)
 
   let create
-      { R1cs_constraint_system.public_input_size
+      { Common.R1cs_constraint_system.public_input_size
       ; auxiliary_input_size
       ; m= {a; b; c}
       ; weight } =
@@ -178,4 +180,4 @@ module Keypair = struct
     |> Matrix_evals.map ~f:(Abc.map ~f:G1.Affine.of_backend)
 end
 
-module Proof = Proof
+module Proof = Pairing_based_proof

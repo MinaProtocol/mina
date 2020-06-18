@@ -7,6 +7,8 @@ module type Input_intf = sig
 
   module Bigint : Bigint.Intf
 
+  val size : unit -> Bigint.t
+
   val to_bigint : t -> Bigint.t
 
   val of_bigint : Bigint.t -> t
@@ -53,8 +55,11 @@ module type Input_intf = sig
 
   val copy : t -> t -> unit
 
-  module Vector :
-    Snarky.Vector.S with type elt := t and type t = unit Ctypes.ptr
+  module Vector : sig
+    include Snarky.Vector.S with type elt := t and type t = unit Ctypes.ptr
+
+    module Triple : Intf.Triple with type elt := t
+  end
 end
 
 module type S = sig
@@ -71,6 +76,8 @@ module type S = sig
   type t = Stable.Latest.t [@@deriving sexp, compare, yojson, bin_io]
 
   val to_bigint : t -> Bigint.t
+
+  val size : Bigint.t
 
   val to_bigint_raw_noalloc : t -> Bigint.t
 
@@ -158,13 +165,24 @@ module type S = sig
     val length : t -> int
 
     val of_array : elt array -> t
+
+    module Triple : Intf.Triple with type elt := t
   end
 end
 
 module Make (F : Input_intf) :
-  S with type Stable.V1.t = F.t and module Bigint = F.Bigint = struct
+  S
+  with type Stable.V1.t = F.t
+   and module Bigint = F.Bigint
+   and type Vector.t = F.Vector.t
+   and type Vector.Triple.t = F.Vector.Triple.t = struct
   open F
   module Bigint = Bigint
+
+  let size =
+    let t = size () in
+    Caml.Gc.finalise Bigint.delete t ;
+    t
 
   let gc2 op x1 x2 =
     let r = op x1 x2 in

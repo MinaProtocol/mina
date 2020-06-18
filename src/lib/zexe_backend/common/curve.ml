@@ -23,7 +23,9 @@ module type Input_intf = sig
 
     val delete : t -> unit
 
-    module Vector : Snarky.Vector.S with type elt := t
+    module Vector : Snarky.Vector.S with type elt = t
+
+    module Pair : Intf.Pair with type elt := t
   end
 
   type t
@@ -72,17 +74,20 @@ module type Field_intf = sig
 end
 
 module Make
-    (BaseField : Field_intf)
-    (ScalarField : Field_intf) (Params : sig
-        val a : BaseField.t
+    (BaseField : Field_intf) (ScalarField : sig
+        type t
+    end) (Params : sig
+      val a : BaseField.t
 
-        val b : BaseField.t
+      val b : BaseField.t
     end)
     (C : Input_intf
          with module BaseField := BaseField
           and module ScalarField := ScalarField) =
 struct
   module Affine = struct
+    module Backend = C.Affine
+
     module Stable = struct
       module V1 = struct
         type t = BaseField.Stable.Latest.t * BaseField.Stable.Latest.t
@@ -105,18 +110,6 @@ struct
       let y = C.Affine.y t in
       Caml.Gc.finalise BaseField.delete y ;
       (x, y)
-
-    module Vector = struct
-      type elt = t
-
-      include C.Affine.Vector
-
-      (* TODO: Leaky *)
-      let of_array a =
-        let t = create () in
-        Array.iter a ~f:(emplace_back t) ;
-        t
-    end
   end
 
   let op1 f x =

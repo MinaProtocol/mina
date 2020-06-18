@@ -1,3 +1,7 @@
+module type T0 = sig
+  type t
+end
+
 module type Type_with_delete = sig
   type t
 
@@ -16,4 +20,30 @@ module type Vector = sig
   val length : t -> int
 
   val get : t -> int -> elt
+end
+
+module type Triple = sig
+  type elt
+
+  type t
+
+  val f0 : t -> elt
+
+  val f1 : t -> elt
+
+  val f2 : t -> elt
+end
+
+module type Pair = sig
+  type elt
+
+  type t
+
+  module Vector : Vector with type elt = t
+
+  val make : elt -> elt -> t
+
+  val f0 : t -> elt
+
+  val f1 : t -> elt
 end
