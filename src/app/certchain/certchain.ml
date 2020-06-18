@@ -5,7 +5,7 @@ open Core_kernel
 module Backend = Snarky.Backends.Bn128.Default
 module Impl = Snarky.Snark.Run.Make(Backend) (Unit)
 module Signature_lib = Signature_lib
-module Field = Backend.Field
+
 
 
 open Signature_lib
@@ -29,13 +29,15 @@ let queryGen domain  =
   (kp.public_key, kp.private_key, signature)
 
 module Cert = struct
-  type t = Field.t
   let certify (sk_authority : Schnorr.Private_key.t) domain (pk_domain : Schnorr.Public_key.t) signature =
     let (b : bool) = Signature_lib.Schnorr.verify signature pk_domain domain in
     if b = false then None
     else 
-    let hvalue = Random_oracle.hash [|(domain :> t); (pk_domain :> t)|]
-    let signature_auth = Schnorr.sign sk_authority (domain, pk_domain)
+    let hvalue = Random_oracle.hash [|(domain :> field); (pk_domain :> field)|] in
+    let signature_auth = Schnorr.sign sk_authority hvalue in
+    Some signature_auth 
+end
+
 
 
 
