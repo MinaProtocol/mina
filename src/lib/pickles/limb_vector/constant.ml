@@ -54,13 +54,13 @@ module Make (N : Vector.Nat_intf) = struct
     in
     Vector.take_from_list bits N.n
 
-  let of_fp x = of_bits (List.take (Zexe_backend.Fp.to_bits x) length)
+  let of_fp x = of_bits (List.take (Backend.Tick.Field.to_bits x) length)
 
-  let of_fq x = of_bits (List.take (Zexe_backend.Fq.to_bits x) length)
+  let of_fq x = of_bits (List.take (Backend.Tock.Field.to_bits x) length)
 
-  let to_fp t = Zexe_backend.Fp.of_bits (to_bits t)
+  let to_fp t = Backend.Tick.Field.of_bits (to_bits t)
 
-  let to_fq t = Zexe_backend.Fq.of_bits (to_bits t)
+  let to_fq t = Backend.Tock.Field.of_bits (to_bits t)
 
   let dummy : t = Vector.init N.n ~f:(fun _ -> Int64.one)
 end

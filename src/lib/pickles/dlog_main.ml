@@ -1,5 +1,6 @@
 module type Inputs = Intf.Dlog_main_inputs.S
 
+open Backend
 open Core_kernel
 open Import
 open Util
@@ -36,8 +37,8 @@ let b_poly ~add ~mul ~inv chals =
 
 module Make
     (Inputs : Inputs
-              with type Impl.field = Zexe_backend.Fq.t
-               and type G1.Constant.Scalar.t = Zexe_backend.Fp.t) =
+              with type Impl.field = Tock.Field.t
+               and type G1.Constant.Scalar.t = Tick.Field.t) =
 struct
   open Inputs
   open Impl

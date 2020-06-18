@@ -7,10 +7,12 @@ open Zexe_backend
 module Impl = Impls.Dlog_based
 open Import
 
+module Fq = Backend.Tock.Field
+
 let fq_random_oracle ?length s = Fq.of_bits (bits_random_oracle ?length s)
 
 let unrelated_g =
-  let group_map = unstage (group_map (module Fq) ~a:G1.Params.a ~b:G1.Params.b)
+  let group_map = unstage (group_map (module Fq) ~a:Bn382.G1.Params.a ~b:Bn382.G1.Params.b)
   and str = Fn.compose bits_to_bytes Fq.to_bits in
   fun (x, y) -> group_map (fq_random_oracle (str x ^ str y))
 
@@ -21,9 +23,9 @@ module Input_domain = struct
     time "lagrange" (fun () ->
         Array.init domain_size ~f:(fun i ->
             Snarky_bn382.Fp_urs.lagrange_commitment
-              (Zexe_backend.Pairing_based.Keypair.load_urs ())
+              (Zexe_backend.Bn382.Pairing_based.Keypair.load_urs ())
               (u domain_size) (u i)
-            |> Zexe_backend.G1.Affine.of_backend ) )
+            |> Bn382.G1.Affine.of_backend ) )
 
   let domain = Domain.Pow_2_roots_of_unity 6
 
@@ -37,9 +39,9 @@ module G1 = struct
     module Impl = Impl
 
     module Params = struct
-      include G1.Params
+      include Bn382.G1.Params
 
-      let one = G1.to_affine_exn G1.one
+      let one = Bn382.G1.to_affine_exn Bn382.G1.one
 
       let group_size_in_bits = Field.size_in_bits
     end
@@ -71,14 +73,14 @@ module G1 = struct
     end
 
     module Constant = struct
-      include G1.Affine
+      include Bn382.G1.Affine
       module Scalar = Impls.Pairing_based.Field.Constant
 
-      let scale (t : t) x : t = G1.(to_affine_exn (scale (of_affine t) x))
+      let scale (t : t) x : t = Bn382.G1.(to_affine_exn (scale (of_affine t) x))
 
-      let random () = G1.(to_affine_exn (random ()))
+      let random () = Bn382.G1.(to_affine_exn (random ()))
 
-      let negate x = G1.(to_affine_exn (negate (of_affine x)))
+      let negate x = Bn382.G1.(to_affine_exn (negate (of_affine x)))
 
       let zero = Impl.Field.Constant.(zero, zero)
 
@@ -87,8 +89,8 @@ module G1 = struct
         if is_zero t1 then t2
         else if is_zero t2 then t1
         else
-          let r = G1.(of_affine t1 + of_affine t2) in
-          try G1.to_affine_exn r with _ -> zero
+          let r = Bn382.G1.(of_affine t1 + of_affine t2) in
+          try Bn382.G1.to_affine_exn r with _ -> zero
 
       let to_affine_exn = Fn.id
 
@@ -122,7 +124,7 @@ module G1 = struct
         ~compute:
           As_prover.(
             fun () ->
-              G1.(
+              Bn382.G1.(
                 to_affine_exn
                   (scale
                      (of_affine (read typ t))
@@ -145,7 +147,7 @@ module G1 = struct
         ~compute:
           As_prover.(
             fun () ->
-              G1.(to_affine_exn (scale (of_affine (read typ t)) one_seventh)))
+              Bn382.G1.(to_affine_exn (scale (of_affine (read typ t)) one_seventh)))
     in
     assert_equal t (scale_by_quadratic_nonresidue res) ;
     res
@@ -164,7 +166,7 @@ module Fp = struct
   type t = Fp.t
 
   let order =
-    Impl.Bigint.to_bignum_bigint Zexe_backend.Pairing_based.field_size
+    Impl.Bigint.to_bignum_bigint Backend.Tick.field_size
 
   let size_in_bits = Fp.size_in_bits
 

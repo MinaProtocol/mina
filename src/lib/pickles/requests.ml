@@ -5,6 +5,7 @@ open Pickles_types
 open Hlist
 open Snarky.Request
 open Common
+open Backend
 
 module Wrap = struct
   module type S = sig
@@ -46,7 +47,7 @@ module Wrap = struct
           Types.Pairing_based.Proof_state.t
           t
       | Messages :
-          (G1.Constant.t, Zexe_backend.Fp.t) Pairing_marlin_types.Messages.t t
+          (G1.Constant.t, Tick.Field.t) Pairing_marlin_types.Messages.t t
       | Openings_proof : G1.Constant.t Tuple_lib.Triple.t t
   end
 
@@ -62,20 +63,19 @@ module Wrap = struct
 
       type nonrec max_local_max_branchings = ml
 
-      open Zexe_backend
       open Snarky.Request
 
       type 'a vec = ('a, max_branching) Vector.t
 
       type _ t +=
         | Evals :
-            (Fq.t array Dlog_marlin_types.Evals.t * Fq.t) Tuple_lib.Triple.t
+            (Tock.Field.t array Dlog_marlin_types.Evals.t * Tock.Field.t) Tuple_lib.Triple.t
             vec
             t
         | Index : int t
         | Pairing_accs :
-            ( G1.Affine.t
-            , G1.Affine.t Int.Map.t )
+            ( Tock.Inner_curve.Affine.t
+            , Tock.Inner_curve.Affine.t Int.Map.t )
             Pairing_marlin_types.Accumulator.t
             vec
             t
@@ -84,7 +84,7 @@ module Wrap = struct
         | Proof_state :
             ( ( ( Challenge.Constant.t
                 , Challenge.Constant.t Scalar_challenge.t
-                , Fq.t
+                , Tock.Field.t
                 , ( ( Challenge.Constant.t Scalar_challenge.t
                     , bool )
                     Bulletproof_challenge.t
@@ -98,8 +98,8 @@ module Wrap = struct
             , Digest.Constant.t )
             Types.Pairing_based.Proof_state.t
             t
-        | Messages : (G1.Affine.t, Fp.t) Pairing_marlin_types.Messages.t t
-        | Openings_proof : G1.Affine.t Tuple_lib.Triple.t t
+        | Messages : (Tock.Inner_curve.Affine.t, Tick.Field.t) Pairing_marlin_types.Messages.t t
+        | Openings_proof : Tock.Inner_curve.Affine.t Tuple_lib.Triple.t t
     end in
     (module R)
 end

@@ -4,7 +4,7 @@
   (flags -warn-error -27)
   (preprocess (pps ppx_version ppx_coda ppx_jane ppx_deriving.std ppx_deriving_yojson ))
   (libraries
-    zexe_backend
+    backend
     pickles_types
     snarky
     core_kernel ))

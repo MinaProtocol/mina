@@ -1,3 +1,4 @@
+open Backend
 open Impls.Pairing_based
 open Pickles_types
 open Common
@@ -24,7 +25,7 @@ module Constant = struct
   type t =
     ( Challenge.Constant.t
     , Challenge.Constant.t Scalar_challenge.t
-    , Fq.t
+    , Tock.Field.t
     , ( (Challenge.Constant.t Scalar_challenge.t, bool) Bulletproof_challenge.t
       , Rounds.n )
       Vector.t
@@ -35,13 +36,13 @@ module Constant = struct
     Vector.init Rounds.n ~f:(fun _ ->
         let prechallenge = Ro.scalar_chal () in
         { Bulletproof_challenge.is_square=
-            Fq.is_square (Endo.Dlog.to_field prechallenge)
+            Tock.Field.is_square (Endo.Dlog.to_field prechallenge)
         ; prechallenge } )
 
   let dummy_bulletproof_challenges_computed =
     Vector.map dummy_bulletproof_challenges
       ~f:(fun {is_square; prechallenge} ->
-        (compute_challenge ~is_square prechallenge : Fq.t) )
+        (compute_challenge ~is_square prechallenge : Tock.Field.t) )
 
   let dummy : t =
     let one_chal = Challenge.Constant.dummy in

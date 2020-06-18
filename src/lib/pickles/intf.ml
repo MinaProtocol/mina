@@ -327,6 +327,6 @@ module type Statement = sig
 end
 
 module type Statement_var =
-  Statement with type field := Zexe_backend.Fp.t Snarky.Cvar.t
+  Statement with type field := Backend.Tick.Field.t Snarky.Cvar.t
 
-module type Statement_value = Statement with type field := Zexe_backend.Fp.t
+module type Statement_value = Statement with type field := Backend.Tick.Field.t

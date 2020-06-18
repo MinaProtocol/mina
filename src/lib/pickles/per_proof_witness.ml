@@ -1,3 +1,4 @@
+open Backend
 open Pickles_types
 open Import
 module Impl = Impls.Pairing_based
@@ -26,14 +27,14 @@ module Constant = struct
     * One_hot_vector.Constant.t
     * ( Challenge.Constant.t
       , Challenge.Constant.t Scalar_challenge.t
-      , Fp.t
+      , Tick.Field.t
       , bool
-      , Fq.t
+      , Tock.Field.t
       , unit
       , Digest.Constant.t )
       Types.Dlog_based.Proof_state.t
-    * (Fp.t Pairing_marlin_types.Evals.t * Fp.t)
-    * (G.Affine.t, 'local_max_branching) Vector.t
+    * (Tick.Field.t Pairing_marlin_types.Evals.t * Tick.Field.t)
+    * (Tick.Inner_curve.Affine.t, 'local_max_branching) Vector.t
     * Dlog_proof.t
 end
 

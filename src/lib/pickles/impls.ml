@@ -1,10 +1,10 @@
 open Pickles_types
 open Core_kernel
 open Import
-open Zexe_backend
+open Backend
 
 module Pairing_based = struct
-  module Impl = Snarky.Snark.Run.Make (Pairing_based) (Unit)
+  module Impl = Snarky.Snark.Run.Make (Tick) (Unit)
   include Impl
   module Fp = Field
 
@@ -12,7 +12,7 @@ module Pairing_based = struct
     let size_in_bits = Fp.size_in_bits
 
     module Constant = struct
-      type t = Fq.t
+      type t = Tock.Field.t
     end
 
     type t = (* Low bits, high bit *)
@@ -22,11 +22,11 @@ module Pairing_based = struct
       Typ.transport
         (Typ.tuple2 Fp.typ Boolean.typ)
         ~there:(fun x ->
-          let low, high = Util.split_last (Fq.to_bits x) in
+          let low, high = Util.split_last (Tock.Field.to_bits x) in
           (Fp.Constant.project low, high) )
         ~back:(fun (low, high) ->
           let low, _ = Util.split_last (Fp.Constant.unpack low) in
-          Fq.of_bits (low @ [high]) )
+          Tock.Field.of_bits (low @ [high]) )
 
     let to_bits (x, b) = Field.unpack x ~length:(Field.size_in_bits - 1) @ [b]
   end
@@ -45,11 +45,12 @@ module Pairing_based = struct
 end
 
 module Dlog_based = struct
-  module Impl = Snarky.Snark.Run.Make (Dlog_based) (Unit)
+  module Impl = Snarky.Snark.Run.Make (Tock) (Unit)
   include Impl
   module Challenge = Challenge.Make (Impl)
   module Digest = Digest.Make (Impl)
-  module Fq = Fq
+  module Fp = Tick.Field
+  module Fq = Tock.Field
 
   let input () =
     let fp_as_fq (x : Fp.t) = Fq.of_bigint (Fp.to_bigint x) in

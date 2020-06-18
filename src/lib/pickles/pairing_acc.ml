@@ -1,6 +1,6 @@
 open Core
 open Pickles_types
-open Zexe_backend
+open Zexe_backend.Bn382
 open Tuple_lib
 open Common
 open Import
@@ -129,7 +129,7 @@ let batch_check (ts : t list) =
         emplace_back d (Unsigned.Size_t.of_int x) ) ;
     d
   in
-  let open G1.Affine.Vector in
+  let open Bn382.G1.Affine.Backend.Vector in
   let s = create () in
   let u = create () in
   let t = create () in
@@ -210,14 +210,14 @@ let dummy : t Lazy.t =
            (* TODO: Leaky *)
            let t =
              Snarky_bn382.Fp_urs.dummy_opening_check
-               (Zexe_backend.Pairing_based.Keypair.load_urs ())
+               (Backend.Tick.Keypair.load_urs ())
            in
            { r_f_minus_r_v_plus_rz_pi=
                Snarky_bn382.G1.Affine.Pair.f0 t
-               |> Zexe_backend.G1.Affine.of_backend
+               |> Zexe_backend.Bn382.G1.Affine.of_backend
            ; r_pi=
                Snarky_bn382.G1.Affine.Pair.f1 t
-               |> Zexe_backend.G1.Affine.of_backend }
+               |> Zexe_backend.Bn382.G1.Affine.of_backend }
          in
          let degree_bound_checks :
              _ Pairing_marlin_types.Accumulator.Degree_bound_checks.t =
@@ -232,16 +232,16 @@ let dummy : t Lazy.t =
                v
              in
              Snarky_bn382.Fp_urs.dummy_degree_bound_checks
-               (Zexe_backend.Pairing_based.Keypair.load_urs ())
+               (Backend.Tick.Keypair.load_urs ())
                v
            in
            { shifted_accumulator=
                Snarky_bn382.G1.Affine.Vector.get t 0
-               |> Zexe_backend.G1.Affine.of_backend
+               |> Zexe_backend.Bn382.G1.Affine.of_backend
            ; unshifted_accumulators=
                List.mapi shifts ~f:(fun i s ->
                    ( s
-                   , Zexe_backend.G1.Affine.of_backend
+                   , Zexe_backend.Bn382.G1.Affine.of_backend
                        (Snarky_bn382.G1.Affine.Vector.get t (1 + i)) ) )
                |> Int.Map.of_alist_exn }
          in

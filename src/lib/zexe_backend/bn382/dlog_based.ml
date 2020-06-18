@@ -19,7 +19,7 @@ module R1CS_constraint_system =
 module Var = Var
 
 module Verification_key = struct
-  type t
+  type t = Snarky_bn382.Fq_verifier_index.t
 
   let to_string _ = failwith "TODO"
 
@@ -37,13 +37,11 @@ module Proof = Dlog_based_proof.Make (struct
   module Curve = G
 end)
 
-open Core_kernel
-
 module Proving_key = struct
   type t = Snarky_bn382.Fq_index.t
 
-  include Binable.Of_binable
-            (Unit)
+  include Core_kernel.Binable.Of_binable
+            (Core_kernel.Unit)
             (struct
               type nonrec t = t
 
@@ -71,4 +69,11 @@ module Keypair = Dlog_based_keypair.Make (struct
   module Poly_comm = Fq_poly_comm
   module Verifier_index = Snarky_bn382.Fq_verifier_index
   module Constraint_matrix = Snarky_bn382.Fq.Constraint_matrix
+end)
+
+module Oracles = Dlog_based_oracles.Make(struct
+  module Verifier_index = Snarky_bn382.Fq_verifier_index
+  module Field = Field
+  module Proof = Proof
+  module Backend = Snarky_bn382.Fq_oracles
 end)

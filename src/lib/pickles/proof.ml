@@ -3,7 +3,7 @@ open Pickles_types
 open Import
 open Types
 open Common
-open Zexe_backend
+open Backend
 
 module Base = struct
   module Me_only = Reduced_me_only
@@ -17,7 +17,7 @@ module Base = struct
           Types.Pairing_based.Statement.t
       ; index: int
       ; prev_evals: 'prev_evals
-      ; proof: Pairing_based.Proof.t }
+      ; proof: Tick.Proof.t }
   end
 
   module Dlog_based = struct
@@ -25,17 +25,17 @@ module Base = struct
       { statement:
           ( Challenge.Constant.t
           , Challenge.Constant.t Scalar_challenge.Stable.Latest.t
-          , Fp.t
+          , Tick.Field.t
           , bool
-          , Fq.t
+          , Tock.Field.t
           , 'dlog_me_only
           , Digest.Constant.t
           , ('s, 'sgs) Me_only.Pairing_based.t )
           Types.Dlog_based.Statement.t
       ; index: int
-      ; prev_evals: Fp.t Pairing_marlin_types.Evals.Stable.Latest.t
-      ; prev_x_hat_beta_1: Fp.t
-      ; proof: Dlog_based.Proof.t }
+      ; prev_evals: Tick.Field.t Pairing_marlin_types.Evals.Stable.Latest.t
+      ; prev_x_hat_beta_1: Tick.Field.t
+      ; proof: Tock.Proof.t }
     [@@deriving bin_io, compare, sexp, yojson]
   end
 end
@@ -69,7 +69,7 @@ let dummy (type w h) (w : w Nat.t) (h : h Nat.t) : (w, h) t =
                   ; beta_2= scalar_chal ()
                   ; beta_3= scalar_chal () } }
           ; sponge_digest_before_evaluations=
-              Digest.Constant.of_fq Zexe_backend.Fq.zero
+              Digest.Constant.of_fq Tock.Field.zero
           ; was_base_case= true
           ; me_only=
               { pairing_marlin_acc= Lazy.force Dummy.pairing_acc
@@ -127,8 +127,8 @@ module Make (W : Nat.Intf) (MLMB : Nat.Intf) = struct
 
   type t =
     ( unit
-    , ( G1.Affine.t
-      , G1.Affine.t Unshifted_acc.Stable.Latest.t
+    , ( Tock.Inner_curve.Affine.t
+      , Tock.Inner_curve.Affine.t Unshifted_acc.Stable.Latest.t
       , Reduced_me_only.Dlog_based.Challenges_vector.t MLMB_vec.t )
       Types.Dlog_based.Proof_state.Me_only.t
     , G.Affine.t Max_branching_vec.t )

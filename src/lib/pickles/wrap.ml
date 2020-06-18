@@ -8,6 +8,7 @@ open Common
 open Core
 open Import
 open Types
+open Backend
 
 (* This contains the "wrap" prover *)
 
@@ -18,7 +19,7 @@ let vector_of_list (type a t)
   List.iter xs ~f:(V.emplace_back r) ;
   r
 
-let combined_evaluation (proof : Zexe_backend.Pairing_based.Proof.t) ~r ~xi
+let combined_evaluation (proof : Tick.Proof.t) ~r ~xi
     ~beta_1 ~beta_2 ~beta_3 ~x_hat_beta_1 =
   let { Pairing_marlin_types.Evals.w_hat
       ; z_hat_a
@@ -35,8 +36,8 @@ let combined_evaluation (proof : Zexe_backend.Pairing_based.Proof.t) ~r ~xi
       ; rc= {a= rc_0; b= rc_1; c= rc_2} } =
     proof.Pairing_marlin_types.Proof.openings.evals
   in
-  let combine t (pt : Fp.t) =
-    let open Fp in
+  let combine t (pt : Tick.Field.t) =
+    let open Tick.Field in
     Pcs_batch.combine_evaluations ~crs_max_degree ~mul ~add ~one
       ~evaluation_point:pt ~xi t
   in
@@ -64,16 +65,16 @@ let combined_evaluation (proof : Zexe_backend.Pairing_based.Proof.t) ~r ~xi
       ; rc_2 ]
       []
   in
-  Fp.(r * (f_1 + (r * (f_2 + (r * f_3)))))
+  Tick.Field.(r * (f_1 + (r * (f_2 + (r * f_3)))))
 
 let combined_polynomials ~xi
     ~pairing_marlin_index:(index : _ Abc.t Matrix_evals.t) public_input
-    (proof : Zexe_backend.Pairing_based.Proof.t) =
+    (proof : Tick.Proof.t) =
   let combine t v =
-    let open G1 in
+    let open Tock.Inner_curve in
     let open Pickles_types in
     Pcs_batch.combine_commitments t ~scale ~add ~xi
-      (Vector.map v ~f:G1.of_affine)
+      (Vector.map v ~f:of_affine)
   in
   let { Pairing_marlin_types.Messages.w_hat
       ; z_hat_a
@@ -84,14 +85,14 @@ let combined_polynomials ~xi
     proof.messages
   in
   let x_hat =
-    let v = Fp.Vector.create () in
-    List.iter public_input ~f:(Fp.Vector.emplace_back v) ;
+    let v = Tick.Field.Vector.create () in
+    List.iter public_input ~f:(Tick.Field.Vector.emplace_back v) ;
     let domain_size = Int.ceil_pow2 (List.length public_input) in
     Snarky_bn382.Fp_urs.commit_evaluations
-      (Zexe_backend.Pairing_based.Keypair.load_urs ())
+      (Tick.Keypair.load_urs ())
       (Unsigned.Size_t.of_int domain_size)
       v
-    |> Zexe_backend.G1.Affine.of_backend
+    |> Tock.Inner_curve.Affine.of_backend
   in
   ( combine Common.Pairing_pcs_batch.beta_1
       [x_hat; w_hat; z_hat_a; z_hat_b; g1; h1]
@@ -127,7 +128,7 @@ let wrap (type max_branching max_local_max_branchings) max_branching
       , _
       , _
       , max_local_max_branchings H1.T(P.Base.Me_only.Dlog_based).t
-      , ( (Fq.t array Dlog_marlin_types.Evals.t * Fq.t) Triple.t
+      , ( (Tock.Field.t array Dlog_marlin_types.Evals.t * Tock.Field.t) Triple.t
         , max_branching )
         Vector.t )
       P.Base.Pairing_based.t) =
@@ -208,12 +209,12 @@ let wrap (type max_branching max_local_max_branchings) max_branching
     | _ ->
         Snarky.Request.unhandled
   in
-  let module O = Zexe_backend.Pairing_based.Oracles in
+  let module O = Tick.Oracles in
   let public_input =
     fp_public_input_of_statement ~max_branching prev_statement_with_hashes
   in
   let o =
-    O.create pairing_vk (vector_of_list (module Fp.Vector) public_input) proof
+    O.create pairing_vk (vector_of_list (module Tick.Field.Vector) public_input) proof
   in
   let x_hat_beta_1 = O.x_hat_beta1 o in
   let next_statement : _ Types.Dlog_based.Statement.t =
@@ -232,7 +233,7 @@ let wrap (type max_branching max_local_max_branchings) max_branching
     let eta_b = O.eta_b o in
     let eta_c = O.eta_c o in
     let module As_field = struct
-      let to_field = SC.to_field_constant (module Fp) ~endo:Endo.Pairing.scalar
+      let to_field = SC.to_field_constant (module Tick.Field) ~endo:Endo.Pairing.scalar
 
       let r = to_field r
 
@@ -256,7 +257,7 @@ let wrap (type max_branching max_local_max_branchings) max_branching
           proof
       in
       let prev_pairing_acc =
-        let module G1 = Zexe_backend.G1 in
+        let module G1 = Tock.Inner_curve in
         let open Pairing_marlin_types.Accumulator in
         let module M =
           H1.Map_reduce (P.Base.Me_only.Dlog_based) (Pairing_acc.Projective)
@@ -314,7 +315,7 @@ let wrap (type max_branching max_local_max_branchings) max_branching
           ~message:
             ( Vector.map2 prev_statement.proof_state.me_only.sg
                 me_only_prepared.old_bulletproof_challenges ~f:(fun sg chals ->
-                  { Zexe_backend.Dlog_based_proof.Challenge_polynomial
+                  { Tock.Proof.Challenge_polynomial
                     .commitment= sg
                   ; challenges= Vector.to_array chals } )
             |> Vector.to_list )

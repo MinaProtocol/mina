@@ -37,7 +37,7 @@ module Make (A : T0) (A_value : T0) = struct
     let dummy_step_keys =
       lazy
         (Vector.init num_choices ~f:(fun _ ->
-             let g = Zexe_backend.G1.(to_affine_exn one) in
+             let g = Backend.Tock.Inner_curve.(to_affine_exn one) in
              let t : _ Abc.t = {a= g; b= g; c= g} in
              {Matrix_evals.row= t; col= t; value= t; rc= t} ))
     in

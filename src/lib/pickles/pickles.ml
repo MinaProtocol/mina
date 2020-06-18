@@ -15,6 +15,7 @@ open Pickles_types
 open Hlist
 open Pickles_types
 open Common
+open Backend
 module Sponge_inputs = Sponge_inputs
 module Impls = Impls
 module Inductive_rule = Inductive_rule
@@ -23,8 +24,6 @@ module Dirty = Dirty
 module Cache_handle = Cache_handle
 
 let verify = Verify.verify
-
-open Zexe_backend
 
 (* This file (as you can see from the mli) defines a compiler which turns an inductive
    definition of a set into an inductive SNARK system for proving using those rules.
@@ -456,7 +455,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
       let module V = H4.To_vector (Lazy_keys) in
       lazy
         (Vector.map (V.f prev_varss_length step_keypairs) ~f:(fun (_, vk) ->
-             Zexe_backend.Pairing_based.Keypair.vk_commitments (Lazy.force vk)
+             Tick.Keypair.vk_commitments (Lazy.force vk)
          ))
     in
     let wrap_requests, wrap_main =
@@ -679,8 +678,8 @@ let compile
 
     type t =
       ( unit
-      , ( G1.Affine.t
-        , G1.Affine.t Int.Map.t
+      , ( Tock.Inner_curve.Affine.t
+        , Tock.Inner_curve.Affine.t Int.Map.t
         , Reduced_me_only.Dlog_based.Challenges_vector.t MLMB_vec.t )
         Me_only.Dlog_based.t
       , G.Affine.t Max_branching_vec.t )
@@ -710,11 +709,11 @@ module Proof0 = Proof
 let%test_module "test" =
   ( module struct
     let () =
-      Zexe_backend.Dlog_based.Keypair.set_urs_info
+      Tock.Keypair.set_urs_info
         [On_disk {directory= "/tmp/"; should_write= true}]
 
     let () =
-      Zexe_backend.Pairing_based.Keypair.set_urs_info
+      Tick.Keypair.set_urs_info
         [On_disk {directory= "/tmp/"; should_write= true}]
 
     let () = assert (Pairing_acc.batch_check [Lazy.force Dummy.pairing_acc])

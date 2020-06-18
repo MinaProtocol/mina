@@ -6,13 +6,13 @@ module Step = struct
       type t =
         Type_equal.Id.Uid.t
         * int
-        * Zexe_backend.Pairing_based.R1CS_constraint_system.t
+        * Backend.Tick.R1CS_constraint_system.t
 
       let to_string : t -> _ = function
         | _id, _n, h ->
             sprintf !"step-%s"
               (Md5.to_hex
-                 (Zexe_backend.Pairing_based.R1CS_constraint_system.digest h))
+                 (Backend.Tick.R1CS_constraint_system.digest h))
     end
 
     module Verification = struct
@@ -28,7 +28,7 @@ module Step = struct
     Key_cache.Disk_storable.simple Key.Proving.to_string
       (fun (_, _, t) ~path ->
         Snarky_bn382.Fp_index.read
-          (Zexe_backend.Pairing_based.Keypair.load_urs ())
+          (Backend.Tick.Keypair.load_urs ())
           t.m.a t.m.b t.m.c
           (Unsigned.Size_t.of_int (1 + t.public_input_size))
           path )
@@ -54,7 +54,7 @@ module Step = struct
             Common.time "step keypair create" (fun () ->
                 return
                   ( Keypair.create ~pk
-                      ~vk:(Zexe_backend.Pairing_based.Keypair.vk pk)
+                      ~vk:(Backend.Tick.Keypair.vk pk)
                   , dirty ) )
         | Error _e ->
             Timer.clock __LOC__ ;
@@ -96,13 +96,13 @@ module Wrap = struct
 
     module Proving = struct
       type t =
-        Type_equal.Id.Uid.t * Zexe_backend.Dlog_based.R1CS_constraint_system.t
+        Type_equal.Id.Uid.t * Backend.Tock.R1CS_constraint_system.t
 
       let to_string : t -> _ = function
         | _id, h ->
             sprintf !"wrap-%s"
               (Md5.to_hex
-                 (Zexe_backend.Dlog_based.R1CS_constraint_system.digest h))
+                 (Backend.Tock.R1CS_constraint_system.digest h))
     end
   end
 
@@ -110,7 +110,7 @@ module Wrap = struct
     Key_cache.Disk_storable.simple Key.Proving.to_string
       (fun (_, t) ~path ->
         Snarky_bn382.Fq_index.read
-          (Zexe_backend.Dlog_based.Keypair.load_urs ())
+          (Backend.Tock.Keypair.load_urs ())
           t.m.a t.m.b t.m.c
           (Unsigned.Size_t.of_int (1 + t.public_input_size))
           path )
@@ -120,7 +120,7 @@ module Wrap = struct
     Key_cache.Disk_storable.simple Key.Verification.to_string
       (fun _ ~path ->
         Snarky_bn382.Fq_verifier_index.read
-          (Zexe_backend.Dlog_based.Keypair.load_urs ())
+          (Backend.Tock.Keypair.load_urs ())
           path )
       Snarky_bn382.Fq_verifier_index.write
 
@@ -135,7 +135,7 @@ module Wrap = struct
          match%bind Key_cache.read cache s_p k with
          | Ok (pk, d) ->
              return
-               ( Keypair.create ~pk ~vk:(Zexe_backend.Dlog_based.Keypair.vk pk)
+               ( Keypair.create ~pk ~vk:(Backend.Tock.Keypair.vk pk)
                , d )
          | Error _e ->
              let r = generate_keypair ~exposing:[typ] main in
@@ -158,7 +158,7 @@ module Wrap = struct
             let pk = Keypair.pk kp in
             let vk : Vk.t =
               { index= vk
-              ; commitments= Zexe_backend.Dlog_based.Keypair.vk_commitments vk
+              ; commitments= Backend.Tock.Keypair.vk_commitments vk
               ; step_domains
               ; data=
                   (let open Snarky_bn382.Fq_index in

@@ -10,8 +10,8 @@ open Import
 
 module Make
     (Inputs : Intf.Pairing_main_inputs.S
-              with type Impl.field = Zexe_backend.Fp.t
-               and type G.Constant.Scalar.t = Zexe_backend.Fq.t) =
+              with type Impl.field = Backend.Tick.Field.t
+               and type G.Constant.Scalar.t = Backend.Tock.Field.t) =
 struct
   open Inputs
   open Impl

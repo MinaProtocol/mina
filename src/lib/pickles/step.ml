@@ -3,7 +3,7 @@ open Core
 module P = Proof
 open Pickles_types
 open Hlist
-open Zexe_backend
+open Backend
 open Tuple_lib
 open Import
 open Types
@@ -15,14 +15,14 @@ module Make
     (A : T0) (A_value : sig
         type t
 
-        val to_field_elements : t -> Fp.t array
+        val to_field_elements : t -> Tick.Field.t array
     end)
     (Max_branching : Nat.Add.Intf_transparent) =
 struct
   let triple_zip (a1, a2, a3) (b1, b2, b3) = ((a1, b1), (a2, b2), (a3, b3))
 
   module E = struct
-    type t = Fq.t array Dlog_marlin_types.Evals.t Triple.t
+    type t = Tock.Field.t array Dlog_marlin_types.Evals.t Triple.t
   end
 
   (* The prover corresponding to the given inductive rule. *)
@@ -68,21 +68,21 @@ struct
       branch_data.rule.main_value prevs next_state
     in
     let module X_hat = struct
-      type t = Fq.t Triple.t
+      type t = Tock.Field.t Triple.t
     end in
     let module Statement_with_hashes = struct
       type t =
         ( Challenge.Constant.t
         , Challenge.Constant.t Scalar_challenge.t
-        , Zexe_backend.Fp.t
+        , Tick.Field.t
         , bool
-        , Zexe_backend.Fq.t
+        , Tock.Field.t
         , Digest.Constant.t
         , Digest.Constant.t
         , Digest.Constant.t )
         Dlog_based.Statement.t
     end in
-    let b_poly = Fq.(Dlog_main.b_poly ~add ~mul ~inv) in
+    let b_poly = Tock.Field.(Dlog_main.b_poly ~add ~mul ~inv) in
     let unfinalized_proofs, statements_with_hashes, x_hats, witnesses =
       let f : type var value max n m.
              max Nat.t
@@ -127,7 +127,7 @@ struct
           , t.statement.pass_through.sg
           , (t.proof.openings.proof, t.proof.messages) )
         in
-        let module O = Zexe_backend.Dlog_based.Oracles in
+        let module O = Tock.Oracles in
         let o =
           let public_input =
             fq_public_input_of_statement prev_statement_with_hashes
@@ -137,7 +137,7 @@ struct
               map2 statement.pass_through.sg
                 (* This should indeed have length max_branching... No! It should have type max_branching_a. That is, the max_branching specific to a proof of this type...*)
                 prev_challenges ~f:(fun commitment chals ->
-                  { Dlog_based_proof.Challenge_polynomial.commitment
+                  { Tock.Proof.Challenge_polynomial.commitment
                   ; challenges= Vector.to_array chals } )
               |> to_list)
             public_input t.proof
@@ -157,7 +157,7 @@ struct
         let r = scalar_chal O.evals in
         let sponge_digest_before_evaluations = O.digest_before_evaluations o in
         let to_field =
-          SC.to_field_constant (module Fq) ~endo:Endo.Dlog.scalar
+          SC.to_field_constant (module Tock.Field) ~endo:Endo.Dlog.scalar
         in
         let module As_field = struct
           let r = to_field r
@@ -180,15 +180,15 @@ struct
               prev_challenges
           in
           let open As_field in
-          let combine (x_hat : Zexe_backend.Fq.t) pt e =
+          let combine (x_hat : Tock.Field.t) pt e =
             let a, b = Dlog_marlin_types.Evals.(to_vectors (e : _ array t)) in
-            let v : (Fq.t array, _) Vector.t =
+            let v : (Tock.Field.t array, _) Vector.t =
               Vector.append
                 (Vector.map b_polys ~f:(fun f -> [|f pt|]))
                 ([|x_hat|] :: a)
                 (snd (Local_max_branching.add Nat.N19.n))
             in
-            let open Fq in
+            let open Tock.Field in
             let domains = data.wrap_domains in
             Pcs_batch.combine_split_evaluations'
               (Common.dlog_pcs_batch
@@ -203,7 +203,7 @@ struct
                   Int.(crs_max_degree - (deg mod crs_max_degree)) )
               v b
           in
-          let open Fq in
+          let open Tock.Field in
           combine x_hat_1 beta_1 e1
           + (r * (combine x_hat_2 beta_2 e2 + (r * combine x_hat_3 beta_3 e3)))
         in
@@ -211,7 +211,7 @@ struct
           let prechals =
             Array.map (O.opening_prechallenges o) ~f:(fun x ->
                 let x = Scalar_challenge.map ~f:Challenge.Constant.of_fq x in
-                (x, Fq.is_square (to_field x)) )
+                (x, Tock.Field.is_square (to_field x)) )
           in
           let chals =
             Array.map prechals ~f:(fun (x, is_square) ->
@@ -220,7 +220,7 @@ struct
           let b_poly = unstage (b_poly chals) in
           let open As_field in
           let b =
-            let open Fq in
+            let open Tock.Field in
             b_poly beta_1 + (r * (b_poly beta_2 + (r * b_poly beta_3)))
           in
           let prechals =
@@ -360,7 +360,7 @@ struct
       | _ -> (
         match handler with Some f -> f r | None -> Snarky.Request.unhandled )
     in
-    let (next_proof : Zexe_backend.Pairing_based.Proof.t) =
+    let (next_proof : Tick.Proof.t) =
       let (T (input, conv)) =
         Impls.Pairing_based.input ~branching:Max_branching.n
           ~bulletproof_log2:Rounds.n

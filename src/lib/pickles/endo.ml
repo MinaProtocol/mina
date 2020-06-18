@@ -8,21 +8,21 @@ open Import
 module Dlog = struct
   open Dlog
 
-  let base : Fp.t = base ()
+  let base : Backend.Tick.Field.t = base ()
 
-  let scalar : Fq.t = scalar ()
+  let scalar : Backend.Tock.Field.t = scalar ()
 
-  let to_field (t : Challenge.Constant.t Scalar_challenge.t) : Fq.t =
-    SC.to_field_constant (module Fq) ~endo:scalar t
+  let to_field (t : Challenge.Constant.t Scalar_challenge.t) : Backend.Tock.Field.t =
+    SC.to_field_constant (module Backend.Tock.Field) ~endo:scalar t
 end
 
 module Pairing = struct
   open Pairing
 
-  let base : Fq.t = base ()
+  let base : Backend.Tock.Field.t = base ()
 
-  let scalar : Fp.t = scalar ()
+  let scalar : Backend.Tick.Field.t = scalar ()
 
-  let to_field (t : Challenge.Constant.t Scalar_challenge.t) : Fp.t =
-    SC.to_field_constant (module Fp) ~endo:scalar t
+  let to_field (t : Challenge.Constant.t Scalar_challenge.t) : Backend.Tick.Field.t =
+    SC.to_field_constant (module Backend.Tick.Field) ~endo:scalar t
 end

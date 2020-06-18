@@ -2,7 +2,7 @@ open Core_kernel
 open Import
 
 let domains sys : Domains.t =
-  let open Zexe_backend.R1cs_constraint_system in
+  let open Zexe_backend.R1CS_constraint_system in
   let open Domain in
   let weight = Weight.norm sys.weight in
   let witness_size = 1 + sys.public_input_size + sys.auxiliary_input_size in
@@ -18,7 +18,7 @@ let domains (type field a)
     (module Impl : Snarky.Snark_intf.Run
       with type field = field
        and type R1CS_constraint_system.t = a
-                                           Zexe_backend.R1cs_constraint_system
+                                           Zexe_backend.R1CS_constraint_system
                                            .t) (Spec.ETyp.T (typ, conv)) main =
   let main x () : unit = main (conv x) in
   domains (Impl.constraint_system ~exposing:[typ] main)

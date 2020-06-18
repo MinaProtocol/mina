@@ -1,5 +1,5 @@
 open Pickles_types
-open Zexe_backend
+open Zexe_backend.Bn382
 open Import
 
 type dlog_opening =

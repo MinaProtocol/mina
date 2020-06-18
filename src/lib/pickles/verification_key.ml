@@ -1,6 +1,6 @@
 open Core
 open Pickles_types
-open Zexe_backend
+open Zexe_backend.Bn382
 
 module Data = struct
   [%%versioned
@@ -55,7 +55,7 @@ type t =
 
 let of_repr urs {Repr.commitments= c; step_domains; data= d} =
   let u = Unsigned.Size_t.of_int in
-  let g = Zexe_backend.Fq_poly_comm.without_degree_bound_to_backend in
+  let g = Zexe_backend.Bn382.Fq_poly_comm.without_degree_bound_to_backend in
   let t =
     Snarky_bn382.Fq_verifier_index.make (u d.public_inputs) (u d.variables)
       (u d.constraints) (u d.nonzero_entries) (u d.max_degree) urs (g c.row.a)
@@ -73,7 +73,7 @@ include Binable.Of_binable
               {Repr.commitments; data; step_domains}
 
             let of_binable r =
-              of_repr (Zexe_backend.Dlog_based.Keypair.load_urs ()) r
+              of_repr (Zexe_backend.Bn382.Dlog_based.Keypair.load_urs ()) r
           end)
 
 let dummy =

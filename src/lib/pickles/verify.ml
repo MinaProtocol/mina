@@ -99,7 +99,7 @@ let verify (type a n) (module Max_branching : Nat.Intf with type n = n)
           ; ("r", r, r_actual)
           ; ("r_xi_sum", r_xi_sum, r_xi_sum_actual) ] )
   in
-  let open Zexe_backend.Dlog_based_proof in
+  let open Backend.Tock.Proof in
   Common.time "pairing_check" (fun () ->
       check
         ( "pairing_check"

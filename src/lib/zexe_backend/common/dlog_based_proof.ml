@@ -222,6 +222,7 @@ end
 
 module Make (Inputs : Inputs_intf) = struct
   open Inputs
+  module Backend = Backend
   module Fq = Scalar_field
   module G = Curve
 

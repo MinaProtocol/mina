@@ -1,6 +1,6 @@
 open Core_kernel
 open Common
-open Zexe_backend
+open Zexe_backend.Bn382
 module Impl = Impls.Pairing_based
 open Import
 
@@ -21,7 +21,7 @@ open Impl
 module Fq = struct
   type t = Impls.Dlog_based.Field.Constant.t [@@deriving sexp]
 
-  open Zexe_backend.Fq
+  open Zexe_backend.Bn382.Fq
 
   let of_bits = of_bits
 
@@ -76,12 +76,12 @@ module Input_domain = struct
            Array.init domain_size ~f:(fun i ->
                let v =
                  Snarky_bn382.Fq_urs.lagrange_commitment
-                   (Zexe_backend.Dlog_based.Keypair.load_urs ())
+                   (Zexe_backend.Bn382.Dlog_based.Keypair.load_urs ())
                    (u domain_size) (u i)
                  |> Snarky_bn382.Fq_poly_comm.unshifted
                in
-               assert (G.Affine.Vector.length v = 1) ;
-               G.Affine.Vector.get v 0 |> Zexe_backend.G.Affine.of_backend ) ))
+               assert (G.Affine.Backend.Vector.length v = 1) ;
+               G.Affine.Backend.Vector.get v 0 |> G.Affine.of_backend ) ))
 end
 
 module G = struct
@@ -212,6 +212,6 @@ end
 module Generators = struct
   let h =
     lazy
-      ( Snarky_bn382.Fq_urs.h (Zexe_backend.Dlog_based.Keypair.load_urs ())
-      |> Zexe_backend.G.Affine.of_backend )
+      ( Snarky_bn382.Fq_urs.h (Zexe_backend.Bn382.Dlog_based.Keypair.load_urs ())
+      |> Zexe_backend.Bn382.G.Affine.of_backend )
 end

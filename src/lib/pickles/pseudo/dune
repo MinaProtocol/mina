@@ -6,7 +6,6 @@
   (libraries
     marlin_checks
 
-    zexe_backend
     pickles_types
     snarky
     core_kernel ))
