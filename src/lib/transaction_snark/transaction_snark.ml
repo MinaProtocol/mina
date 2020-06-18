@@ -884,8 +884,8 @@ module Base = struct
           Boolean.(Assert.is_true (not creating_new_token))
       in
       let%bind token =
-        Token_id.Checked.if_ creating_new_token ~then_:token
-          ~else_:next_available_token
+        Token_id.Checked.if_ creating_new_token ~then_:next_available_token
+          ~else_:token
       in
       let%map next_available_token =
         Token_id.Checked.next_if next_available_token creating_new_token
