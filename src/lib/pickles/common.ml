@@ -99,7 +99,8 @@ let compute_challenge ~is_square x =
   let nonresidue = Backend.Tock.Field.of_int 7 in
   let x = Endo.Dlog.to_field x in
   assert (is_square = Backend.Tock.Field.is_square x) ;
-  Backend.Tock.Field.sqrt (if is_square then x else Backend.Tock.Field.(nonresidue * x))
+  Backend.Tock.Field.sqrt
+    (if is_square then x else Backend.Tock.Field.(nonresidue * x))
 
 let compute_challenges chals =
   Vector.map chals ~f:(fun {Bulletproof_challenge.prechallenge; is_square} ->
@@ -111,7 +112,8 @@ let compute_sg chals =
   let comm =
     Snarky_bn382.Fq_urs.b_poly_commitment
       (Backend.Tock.Keypair.load_urs ())
-      (Backend.Tock.Field.Vector.of_array (Vector.to_array (compute_challenges chals)))
+      (Backend.Tock.Field.Vector.of_array
+         (Vector.to_array (compute_challenges chals)))
   in
   Snarky_bn382.G.Affine.Vector.get (unshifted comm) 0 |> G.Affine.of_backend
 
@@ -121,7 +123,9 @@ let fq_unpadded_public_input_of_statement prev_statement =
     let (T (typ, _conv)) = Impls.Dlog_based.input () in
     Impls.Dlog_based.generate_public_input [typ] prev_statement
   in
-  List.init (Backend.Tock.Field.Vector.length input) ~f:(Backend.Tock.Field.Vector.get input)
+  List.init
+    (Backend.Tock.Field.Vector.length input)
+    ~f:(Backend.Tock.Field.Vector.get input)
 
 let fq_public_input_of_statement s =
   let open Zexe_backend in
@@ -137,4 +141,7 @@ let fp_public_input_of_statement ~max_branching
     in
     Impls.Pairing_based.generate_public_input [input] prev_statement
   in
-  Backend.Tick.Field.one :: List.init (Backend.Tick.Field.Vector.length input) ~f:(Backend.Tick.Field.Vector.get input)
+  Backend.Tick.Field.one
+  :: List.init
+       (Backend.Tick.Field.Vector.length input)
+       ~f:(Backend.Tick.Field.Vector.get input)

@@ -455,8 +455,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
       let module V = H4.To_vector (Lazy_keys) in
       lazy
         (Vector.map (V.f prev_varss_length step_keypairs) ~f:(fun (_, vk) ->
-             Tick.Keypair.vk_commitments (Lazy.force vk)
-         ))
+             Tick.Keypair.vk_commitments (Lazy.force vk) ))
     in
     let wrap_requests, wrap_main =
       let prev_wrap_domains =

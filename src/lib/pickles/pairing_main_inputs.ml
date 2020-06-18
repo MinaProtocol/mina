@@ -212,6 +212,7 @@ end
 module Generators = struct
   let h =
     lazy
-      ( Snarky_bn382.Fq_urs.h (Zexe_backend.Bn382.Dlog_based.Keypair.load_urs ())
+      ( Snarky_bn382.Fq_urs.h
+          (Zexe_backend.Bn382.Dlog_based.Keypair.load_urs ())
       |> Zexe_backend.Bn382.G.Affine.of_backend )
 end

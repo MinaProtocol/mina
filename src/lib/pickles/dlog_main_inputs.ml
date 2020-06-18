@@ -6,13 +6,13 @@ module type S = Intf.Dlog_main_inputs.S
 open Zexe_backend
 module Impl = Impls.Dlog_based
 open Import
-
 module Fq = Backend.Tock.Field
 
 let fq_random_oracle ?length s = Fq.of_bits (bits_random_oracle ?length s)
 
 let unrelated_g =
-  let group_map = unstage (group_map (module Fq) ~a:Bn382.G1.Params.a ~b:Bn382.G1.Params.b)
+  let group_map =
+    unstage (group_map (module Fq) ~a:Bn382.G1.Params.a ~b:Bn382.G1.Params.b)
   and str = Fn.compose bits_to_bytes Fq.to_bits in
   fun (x, y) -> group_map (fq_random_oracle (str x ^ str y))
 
@@ -76,7 +76,8 @@ module G1 = struct
       include Bn382.G1.Affine
       module Scalar = Impls.Pairing_based.Field.Constant
 
-      let scale (t : t) x : t = Bn382.G1.(to_affine_exn (scale (of_affine t) x))
+      let scale (t : t) x : t =
+        Bn382.G1.(to_affine_exn (scale (of_affine t) x))
 
       let random () = Bn382.G1.(to_affine_exn (random ()))
 
@@ -147,7 +148,8 @@ module G1 = struct
         ~compute:
           As_prover.(
             fun () ->
-              Bn382.G1.(to_affine_exn (scale (of_affine (read typ t)) one_seventh)))
+              Bn382.G1.(
+                to_affine_exn (scale (of_affine (read typ t)) one_seventh)))
     in
     assert_equal t (scale_by_quadratic_nonresidue res) ;
     res
@@ -165,8 +167,7 @@ let sponge_params_constant =
 module Fp = struct
   type t = Fp.t
 
-  let order =
-    Impl.Bigint.to_bignum_bigint Backend.Tick.field_size
+  let order = Impl.Bigint.to_bignum_bigint Backend.Tick.field_size
 
   let size_in_bits = Fp.size_in_bits
 

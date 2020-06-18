@@ -19,8 +19,8 @@ let vector_of_list (type a t)
   List.iter xs ~f:(V.emplace_back r) ;
   r
 
-let combined_evaluation (proof : Tick.Proof.t) ~r ~xi
-    ~beta_1 ~beta_2 ~beta_3 ~x_hat_beta_1 =
+let combined_evaluation (proof : Tick.Proof.t) ~r ~xi ~beta_1 ~beta_2 ~beta_3
+    ~x_hat_beta_1 =
   let { Pairing_marlin_types.Evals.w_hat
       ; z_hat_a
       ; z_hat_b
@@ -73,8 +73,7 @@ let combined_polynomials ~xi
   let combine t v =
     let open Tock.Inner_curve in
     let open Pickles_types in
-    Pcs_batch.combine_commitments t ~scale ~add ~xi
-      (Vector.map v ~f:of_affine)
+    Pcs_batch.combine_commitments t ~scale ~add ~xi (Vector.map v ~f:of_affine)
   in
   let { Pairing_marlin_types.Messages.w_hat
       ; z_hat_a
@@ -88,8 +87,7 @@ let combined_polynomials ~xi
     let v = Tick.Field.Vector.create () in
     List.iter public_input ~f:(Tick.Field.Vector.emplace_back v) ;
     let domain_size = Int.ceil_pow2 (List.length public_input) in
-    Snarky_bn382.Fp_urs.commit_evaluations
-      (Tick.Keypair.load_urs ())
+    Snarky_bn382.Fp_urs.commit_evaluations (Tick.Keypair.load_urs ())
       (Unsigned.Size_t.of_int domain_size)
       v
     |> Tock.Inner_curve.Affine.of_backend
@@ -214,7 +212,9 @@ let wrap (type max_branching max_local_max_branchings) max_branching
     fp_public_input_of_statement ~max_branching prev_statement_with_hashes
   in
   let o =
-    O.create pairing_vk (vector_of_list (module Tick.Field.Vector) public_input) proof
+    O.create pairing_vk
+      (vector_of_list (module Tick.Field.Vector) public_input)
+      proof
   in
   let x_hat_beta_1 = O.x_hat_beta1 o in
   let next_statement : _ Types.Dlog_based.Statement.t =
@@ -233,7 +233,8 @@ let wrap (type max_branching max_local_max_branchings) max_branching
     let eta_b = O.eta_b o in
     let eta_c = O.eta_c o in
     let module As_field = struct
-      let to_field = SC.to_field_constant (module Tick.Field) ~endo:Endo.Pairing.scalar
+      let to_field =
+        SC.to_field_constant (module Tick.Field) ~endo:Endo.Pairing.scalar
 
       let r = to_field r
 
@@ -315,8 +316,7 @@ let wrap (type max_branching max_local_max_branchings) max_branching
           ~message:
             ( Vector.map2 prev_statement.proof_state.me_only.sg
                 me_only_prepared.old_bulletproof_challenges ~f:(fun sg chals ->
-                  { Tock.Proof.Challenge_polynomial
-                    .commitment= sg
+                  { Tock.Proof.Challenge_polynomial.commitment= sg
                   ; challenges= Vector.to_array chals } )
             |> Vector.to_list )
           [input]

@@ -12,7 +12,8 @@ module Dlog = struct
 
   let scalar : Backend.Tock.Field.t = scalar ()
 
-  let to_field (t : Challenge.Constant.t Scalar_challenge.t) : Backend.Tock.Field.t =
+  let to_field (t : Challenge.Constant.t Scalar_challenge.t) :
+      Backend.Tock.Field.t =
     SC.to_field_constant (module Backend.Tock.Field) ~endo:scalar t
 end
 
@@ -23,6 +24,7 @@ module Pairing = struct
 
   let scalar : Backend.Tick.Field.t = scalar ()
 
-  let to_field (t : Challenge.Constant.t Scalar_challenge.t) : Backend.Tick.Field.t =
+  let to_field (t : Challenge.Constant.t Scalar_challenge.t) :
+      Backend.Tick.Field.t =
     SC.to_field_constant (module Backend.Tick.Field) ~endo:scalar t
 end

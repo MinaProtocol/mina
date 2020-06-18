@@ -4,15 +4,12 @@ module Step = struct
   module Key = struct
     module Proving = struct
       type t =
-        Type_equal.Id.Uid.t
-        * int
-        * Backend.Tick.R1CS_constraint_system.t
+        Type_equal.Id.Uid.t * int * Backend.Tick.R1CS_constraint_system.t
 
       let to_string : t -> _ = function
         | _id, _n, h ->
             sprintf !"step-%s"
-              (Md5.to_hex
-                 (Backend.Tick.R1CS_constraint_system.digest h))
+              (Md5.to_hex (Backend.Tick.R1CS_constraint_system.digest h))
     end
 
     module Verification = struct
@@ -53,9 +50,8 @@ module Step = struct
         | Ok (pk, dirty) ->
             Common.time "step keypair create" (fun () ->
                 return
-                  ( Keypair.create ~pk
-                      ~vk:(Backend.Tick.Keypair.vk pk)
-                  , dirty ) )
+                  (Keypair.create ~pk ~vk:(Backend.Tick.Keypair.vk pk), dirty)
+            )
         | Error _e ->
             Timer.clock __LOC__ ;
             let r = generate_keypair ~exposing:[typ] main in
@@ -95,14 +91,12 @@ module Wrap = struct
     end
 
     module Proving = struct
-      type t =
-        Type_equal.Id.Uid.t * Backend.Tock.R1CS_constraint_system.t
+      type t = Type_equal.Id.Uid.t * Backend.Tock.R1CS_constraint_system.t
 
       let to_string : t -> _ = function
         | _id, h ->
             sprintf !"wrap-%s"
-              (Md5.to_hex
-                 (Backend.Tock.R1CS_constraint_system.digest h))
+              (Md5.to_hex (Backend.Tock.R1CS_constraint_system.digest h))
     end
   end
 
@@ -134,9 +128,7 @@ module Wrap = struct
         (let k = Lazy.force k_p in
          match%bind Key_cache.read cache s_p k with
          | Ok (pk, d) ->
-             return
-               ( Keypair.create ~pk ~vk:(Backend.Tock.Keypair.vk pk)
-               , d )
+             return (Keypair.create ~pk ~vk:(Backend.Tock.Keypair.vk pk), d)
          | Error _e ->
              let r = generate_keypair ~exposing:[typ] main in
              let%map _ = Key_cache.write cache s_p k (Keypair.pk r) in

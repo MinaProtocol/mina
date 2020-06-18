@@ -27,7 +27,9 @@ module Data = struct
     ; a_value_to_field_elements: 'a_value -> Tick.Field.t array
     ; a_var_to_field_elements: 'a_var -> Impls.Pairing_based.Field.t array
     ; wrap_key:
-        Tick.Inner_curve.Affine.t Dlog_marlin_types.Poly_comm.Without_degree_bound.t Abc.t
+        Tick.Inner_curve.Affine.t
+        Dlog_marlin_types.Poly_comm.Without_degree_bound.t
+        Abc.t
         Matrix_evals.t
     ; wrap_vk: Impls.Dlog_based.Verification_key.t
     ; wrap_domains: Domains.t
@@ -92,7 +94,8 @@ let max_branching : type n1.
     (_, _, n1, _) Tag.t -> (module Nat.Add.Intf with type n = n1) =
  fun tag -> (lookup tag).max_branching
 
-let value_to_field_elements : type a. (_, a, _, _) Tag.t -> a -> Tick.Field.t array =
+let value_to_field_elements : type a.
+    (_, a, _, _) Tag.t -> a -> Tick.Field.t array =
  fun tag -> (lookup tag).a_value_to_field_elements
 
 let lookup_map (type a b c d) (t : (a, b, c, d) Tag.t) ~self ~default

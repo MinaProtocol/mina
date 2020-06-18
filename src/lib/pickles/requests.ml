@@ -69,7 +69,8 @@ module Wrap = struct
 
       type _ t +=
         | Evals :
-            (Tock.Field.t array Dlog_marlin_types.Evals.t * Tock.Field.t) Tuple_lib.Triple.t
+            (Tock.Field.t array Dlog_marlin_types.Evals.t * Tock.Field.t)
+            Tuple_lib.Triple.t
             vec
             t
         | Index : int t
@@ -98,7 +99,11 @@ module Wrap = struct
             , Digest.Constant.t )
             Types.Pairing_based.Proof_state.t
             t
-        | Messages : (Tock.Inner_curve.Affine.t, Tick.Field.t) Pairing_marlin_types.Messages.t t
+        | Messages :
+            ( Tock.Inner_curve.Affine.t
+            , Tick.Field.t )
+            Pairing_marlin_types.Messages.t
+            t
         | Openings_proof : Tock.Inner_curve.Affine.t Tuple_lib.Triple.t t
     end in
     (module R)
