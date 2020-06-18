@@ -9,7 +9,7 @@ let commands =
   let sigPath = "mix_cache.sig"
   let archivePath = "\"mix-cache-\\\$(sha256sum ${sigPath} | cut -d\" \" -f1).tar.gz\""
   in [
-    Cmd.run "elixir --version | tail -n1 > ${sigPath}",
+    Cmd.run "${Cmd.format (Cmd.runInDocker ValidationService.docker "elixir --version | tail -n1")} > ${sigPath}",
     Cmd.run "cat ${sigPath}",
     Cmd.run "echo \\\$(pwd)",
     Cmd.run "cat ./buildkite/scripts/cache-through.sh || echo 'does not exist'",
@@ -29,7 +29,7 @@ in Pipeline.build Pipeline.Config::{
       label = "Validation service lint steps; employs various forms static analysis on the elixir codebase",
       key = "lint",
       target = Size.Large,
-      docker = Some Docker::{ image = ValidationService.containerImage }
+      docker = None Docker.Type
     }
   ]
 }
