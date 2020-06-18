@@ -1,3 +1,6 @@
+let Prelude = ../../../External/Prelude.dhall
+let List/map = Prelude.List.map
+
 let Pipeline = ../../../Pipeline/Dsl.dhall
 let Cmd = ../../../Lib/Cmds.dhall
 let Command = ../../../Command/Base.dhall
@@ -25,7 +28,12 @@ in Pipeline.build Pipeline.Config::{
   spec = ./Spec.dhall,
   steps = [
     Command.build Command.Config::{
-      commands = ValidationService.initCommands # commands,
+      commands =
+        (List/map
+          Cmd.Type
+          Cmd.Type
+          (Cmd.inDocker ValidationService.docker)
+          ValidationService.initCommands) # commands,
       label = "Validation service lint steps; employs various forms static analysis on the elixir codebase",
       key = "lint",
       target = Size.Large,
