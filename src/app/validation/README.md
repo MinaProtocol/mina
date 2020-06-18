@@ -3,6 +3,7 @@
 Compile application only: `mix compile`
 Compile and perform static analysis (check for type-errors): `mix dialyzer`
 Compile and execute test suite: `mix test`
+Compile, execute test suite, and generate test coverage html: `MIX_ENV=test mix coveralls.html`
 Compile and run application locally: `mix run`
 Compile and run inside interactive elixir session: `iex -S mix`
 Compile and start interactive elixir session inside application scope, without actually starting the application: `iex -S mix run --no-start`

@@ -58,10 +58,15 @@ defmodule Architecture.LogFilter do
   # TODO: apply stack driver specific optimizations (e.g. `a = "a" OR a = "b"` can be optimized to `a = ("a" OR "b")`)
 
   @spec render_string(String.t()) :: String.t()
-  defp render_string(str) when is_binary(str), do: "\"#{str}\""
+  defp render_string(str) when is_binary(str) do
+    escaped_str = String.replace(str, "\"", "\\\"")
+    "\"#{escaped_str}\""
+  end
 
+  # TODO: custom selection part escape logic (will reduce the size of rendered filters)
+  # for now, we just wrap all selection parts in strings to avoid special escape logic
   @spec render_selection(selection) :: String.t()
-  defp render_selection(sel), do: Enum.join(sel, ".")
+  defp render_selection(sel), do: sel |> Enum.map(&render_string/1) |> Enum.join(".")
 
   @spec render_comparison(selection, String.t()) :: String.t()
   defp render_comparison(sel, str), do: "#{render_selection(sel)}=#{render_string(str)}"

@@ -17,7 +17,8 @@ defmodule CodaValidation.MixProject do
       docs: [
         main: "CodaValidation",
         extras: ["README.md"]
-      ]
+      ],
+      test_coverage: [tool: ExCoveralls]
     ]
   end
 
@@ -36,7 +37,8 @@ defmodule CodaValidation.MixProject do
       {:credo, "~> 1.4", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.0", only: [:dev, :test], runtime: false},
       {:doctor, "~> 0.14.0", only: [:dev], runtime: false},
-      {:ex_doc, "~> 0.22", only: [:dev], runtime: false}
+      {:ex_doc, "~> 0.22", only: [:dev], runtime: false},
+      {:excoveralls, "~> 0.10", only: [:test]}
     ]
   end
 

@@ -180,7 +180,9 @@ defmodule Class do
   end
 
   defmacro defclass(super_class, fields) when is_list(fields) do
-    if not Class.is_class?(super_class) do
+    Code.ensure_compiled(resolve_module(__CALLER__, super_class))
+
+    if not Class.is_class?(resolve_module(__CALLER__, super_class)) do
       raise "cannot extend #{super_class} because it is not a class"
     end
 
