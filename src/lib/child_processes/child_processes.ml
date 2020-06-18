@@ -205,7 +205,8 @@ let reader_to_strict_pipe_with_logging :
                  ; metadata=
                      String.Map.set ~key:"child_name" ~data:(`String name)
                        (String.Map.set ~key:"line" ~data:(`String line)
-                          (Logger.metadata logger)) }
+                          (Logger.metadata logger))
+                 ; event_id= None }
              in
              match
                Option.try_with (fun () -> Yojson.Safe.from_string line)
