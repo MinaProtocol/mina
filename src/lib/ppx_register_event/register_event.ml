@@ -3,8 +3,8 @@ open Ppxlib
 
 let deriver = "register_event"
 
-(* module in Structured_events library *)
-let module_name = "Structured_events"
+(* module in Structured_log_events library *)
+let module_name = "Structured_log_events"
 
 let hash name =
   let open Digestif.SHA256 in
@@ -14,40 +14,28 @@ let hash name =
 
 let check_interpolations ~loc msg label_names =
   match msg.pexp_desc with
-  | Pexp_constant (Pconst_string (s, _)) ->
-      (* check that every interpolation point $foo in msg has a matching label;
+  | Pexp_constant (Pconst_string (s, _)) -> (
+    (* check that every interpolation point $foo in msg has a matching label;
        OK to have extra labels not mentioned in message
     *)
-      let len = String.length s in
-      let interpolates =
-        let re = Str.regexp "\\$[a-z]\\([a-z]\\|[0-9]\\)*" in
-        let rec loop start acc =
-          if start >= len then acc
-          else
-            try
-              let offs = Str.search_forward re s start in
-              let s = Str.matched_string s in
-              let s_len = String.length s in
-              loop (offs + s_len) (String.sub s ~pos:1 ~len:(s_len - 1) :: acc)
-            with _ ->
-              (* wild-card match; actual match is deprecated Not_found *)
-              acc
-        in
-        loop 0 []
-      in
-      List.iter interpolates ~f:(fun interp ->
-          if not (List.mem label_names interp ~equal:String.equal) then
-            Location.raise_errorf ~loc
-              (Scanf.format_from_string
-                 (sprintf
-                    "The msg contains interpolation point \"$%s\" which is \
-                     not a field in the record"
-                    interp)
-                 "") )
+    match Logproc_lib.Interpolator.parse s with
+    | Error err ->
+        Location.raise_errorf ~loc
+          "Encountered an error while parsing the msg: %s" err
+    | Ok items ->
+        List.iter items ~f:(function
+          | `Interpolate interp
+            when not (List.mem ~equal:String.equal label_names interp) ->
+              Location.raise_errorf ~loc
+                "The msg contains interpolation point \"$%s\" which is not a \
+                 field in the record"
+                interp
+          | _ ->
+              () ) )
   | _ ->
       ()
 
-let type_ext_str ~options ~path (ty_ext : type_extension) =
+let generate_loggers_and_parsers ~loc:_ ~path ty_ext msg_opt =
   let add_module_qualifier s = String.concat ~sep:"." [module_name; s] in
   let ctor, ctor_args, label_decls =
     match ty_ext.ptyext_constructors with
@@ -101,7 +89,7 @@ let type_ext_str ~options ~path (ty_ext : type_extension) =
   let (module Ast_builder) = Ast_builder.make deriver_loc in
   let open Ast_builder in
   let (msg : expression), msg_loc =
-    match List.Assoc.find options "msg" ~equal:String.equal with
+    match msg_opt with
     | Some expr ->
         (expr, expr.pexp_loc)
     | None ->
@@ -118,7 +106,7 @@ let type_ext_str ~options ~path (ty_ext : type_extension) =
   in
   check_interpolations ~loc:msg_loc msg label_names ;
   let event_name = String.lowercase ctor in
-  let identifying = String.concat (path @ [event_name]) ~sep:"." in
+  let identifying = path ^ "." ^ event_name in
   let id_string = hash identifying in
   let core_type_of_string s =
     ptyp_constr {txt= Longident.parse s; loc= Location.none} []
@@ -158,6 +146,7 @@ let type_ext_str ~options ~path (ty_ext : type_extension) =
   in
   let equal_id = evar (add_module_qualifier "equal_id") in
   let repr_type = core_type_of_string (add_module_qualifier "repr") in
+  let split_path = String.split path ~on:'.' in
   let wrap_in_result_binds expr =
     List.fold_right label_decls
       ~init:[%expr Result.return [%e expr]]
@@ -166,7 +155,7 @@ let type_ext_str ~options ~path (ty_ext : type_extension) =
           Result.bind
             ([%e
                Ppx_deriving_yojson.desu_expr_of_typ
-                 ~path:(path @ [ctor; decl.pld_name.txt])
+                 ~path:(split_path @ [ctor; decl.pld_name.txt])
                  decl.pld_type]
                [%e evar decl.pld_name.txt])
             ~f:(fun [%p pvar decl.pld_name.txt] -> [%e acc])] )
@@ -226,4 +215,11 @@ let type_ext_str ~options ~path (ty_ext : type_extension) =
   in
   [event_id; repr; registration]
 
-let () = Ppx_deriving.(register (create deriver ~type_ext_str ()))
+let str_type_ext =
+  let args =
+    let open Ppxlib.Deriving.Args in
+    empty +> arg "msg" __
+  in
+  Ppxlib.Deriving.Generator.make args generate_loggers_and_parsers
+
+let () = Ppxlib.Deriving.add deriver ~str_type_ext |> Ppxlib.Deriving.ignore

@@ -36,6 +36,7 @@ CREATE TABLE internal_commands
 , type        internal_command_type NOT NULL
 , receiver_id int                   NOT NULL REFERENCES public_keys(id)
 , fee         bigint                NOT NULL
+, token       text                  NOT NULL
 , hash        text                  NOT NULL UNIQUE
 );
 

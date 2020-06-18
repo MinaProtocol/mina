@@ -251,17 +251,20 @@ let download_transitions ~logger ~trust_system ~network ~num_peers
                      ~sender:(Envelope.Sender.Remote (peer.host, peer.peer_id))
                ) ) )
 
-let verify_transitions_and_build_breadcrumbs ~logger ~consensus_constants
-    ~constraint_constants ~trust_system ~verifier ~frontier
-    ~unprocessed_transition_cache ~transitions ~target_hash ~subtrees =
+let verify_transitions_and_build_breadcrumbs ~logger
+    ~(precomputed_values : Precomputed_values.t) ~trust_system ~verifier
+    ~frontier ~unprocessed_transition_cache ~transitions ~target_hash ~subtrees
+    =
   let open Deferred.Or_error.Let_syntax in
   let%bind transitions_with_initial_validation, initial_hash =
     fold_until (List.rev transitions) ~init:[]
       ~f:(fun acc transition ->
         let open Deferred.Let_syntax in
         match%bind
-          verify_transition ~logger ~consensus_constants ~trust_system
-            ~verifier ~frontier ~unprocessed_transition_cache transition
+          verify_transition ~logger
+            ~consensus_constants:precomputed_values.consensus_constants
+            ~trust_system ~verifier ~frontier ~unprocessed_transition_cache
+            transition
         with
         | Error e ->
             List.map acc ~f:Cached.invalidate_with_failure |> ignore ;
@@ -294,7 +297,7 @@ let verify_transitions_and_build_breadcrumbs ~logger ~consensus_constants
   let open Deferred.Let_syntax in
   match%bind
     Transition_handler.Breadcrumb_builder.build_subtrees_of_breadcrumbs ~logger
-      ~constraint_constants ~verifier ~trust_system ~frontier ~initial_hash
+      ~precomputed_values ~verifier ~trust_system ~frontier ~initial_hash
       trees_of_transitions
   with
   | Ok result ->
@@ -311,8 +314,8 @@ let garbage_collect_subtrees ~logger ~subtrees =
   Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
     "garbage collected failed cached transitions"
 
-let run ~logger ~consensus_constants ~constraint_constants ~trust_system
-    ~verifier ~network ~frontier ~catchup_job_reader
+let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
+    ~catchup_job_reader
     ~(catchup_breadcrumbs_writer :
        ( (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t Rose_tree.t
          list
@@ -354,9 +357,9 @@ let run ~logger ~consensus_constants ~constraint_constants ~trust_system
                     ~hashes_of_missing_transitions
               in
               verify_transitions_and_build_breadcrumbs ~logger
-                ~consensus_constants ~constraint_constants ~trust_system
-                ~verifier ~frontier ~unprocessed_transition_cache ~transitions
-                ~target_hash ~subtrees
+                ~precomputed_values ~trust_system ~verifier ~frontier
+                ~unprocessed_transition_cache ~transitions ~target_hash
+                ~subtrees
             with
             | Ok trees_of_breadcrumbs ->
                 Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
@@ -416,10 +419,6 @@ let%test_module "Ledger_catchup tests" =
 
     let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
 
-    let constraint_constants = precomputed_values.constraint_constants
-
-    let consensus_constants = precomputed_values.consensus_constants
-
     let trust_system = Trust_system.null ()
 
     let time_controller = Block_time.Controller.basic ~logger
@@ -472,9 +471,9 @@ let%test_module "Ledger_catchup tests" =
       let%map verifier =
         Verifier.create ~logger ~proof_level ~conf_dir:None ~pids
       in
-      run ~logger ~consensus_constants ~constraint_constants ~verifier
-        ~trust_system ~network ~frontier ~catchup_breadcrumbs_writer
-        ~catchup_job_reader ~unprocessed_transition_cache ;
+      run ~logger ~precomputed_values ~verifier ~trust_system ~network
+        ~frontier ~catchup_breadcrumbs_writer ~catchup_job_reader
+        ~unprocessed_transition_cache ;
       { cache= unprocessed_transition_cache
       ; job_writer= catchup_job_writer
       ; breadcrumbs_reader= catchup_breadcrumbs_reader }

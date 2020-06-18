@@ -8,7 +8,6 @@
    blake2
    core_kernel
    hash_prefix_states_nonconsensus
-   module_version
    non_zero_curve_point_nonconsensus
    random_oracle_nonconsensus
    snark_params_nonconsensus
