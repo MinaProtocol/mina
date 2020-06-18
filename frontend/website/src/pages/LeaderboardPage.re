@@ -19,7 +19,11 @@ module Styles = {
       display(`flex),
       flexDirection(`column),
       marginTop(`rem(3.)),
-      media(Theme.MediaQuery.notMobile, [marginTop(`zero)]),
+      media(
+        Theme.MediaQuery.notMobile,
+        [marginTop(`zero), marginRight(`rem(1.))],
+      ),
+      width(`percent(100.)),
     ]);
   let textField =
     style([
@@ -62,7 +66,7 @@ module Styles = {
           marginRight(`rem(1.)),
         ],
       ),
-      media(Theme.MediaQuery.desktop, [width(`rem(39.))]),
+      media(Theme.MediaQuery.veryVeryLarge, [width(`percent(100.))]),
     ]);
 };
 
