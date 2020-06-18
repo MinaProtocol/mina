@@ -11,12 +11,11 @@ let Libp2pHelper = ../../Command/Libp2pHelperBuild.dhall
 let Docker = ../../Command/Docker/Type.dhall
 let Size = ../../Command/Size.dhall
 
-let setupCommands = OpamInit.commands # Libp2pHelper.commands
-
 let buildTestCmd : Text -> Text -> Command.Type = \(profile : Text) -> \(path : Text) ->
   Command.build
     Command.Config::{
-      commands = setupCommands # [
+      commands =  OpamInit.commands # [
+        Cmd.run "buildkite-agent artifact download libp2p_helper src/app/result/bin",
         Cmd.runInDocker
           Cmd.Docker::{
             image = (../../Constants/ContainerImages.dhall).codaToolchain,
@@ -36,9 +35,9 @@ Pipeline.build
   Pipeline.Config::{
     spec = ./Spec.dhall,
     steps = [
+      Libp2pHelper.step,
       buildTestCmd "dev" "src/lib",
       buildTestCmd "dev_medium_curves" "src/lib",
       buildTestCmd "nonconsensus_medium_curves" "src/nonconsensus"
     ]
   }
-
