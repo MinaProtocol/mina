@@ -124,11 +124,38 @@ Issues
 
 - as in Alternative (2), except that the chain strength issue is resolved
 
+Resolution
+==========
+
+After discussion in the PR associated with this RFC (#5019), there was
+agreement of the acceptability of Alternative 2. There remains some concern
+about the weakening of chain strength, but attacks based on that
+weakening don't seem to open a plausible attack to an adversary.
+
+In addition to the above description of Alternative 2, the discussion
+proposed and accepted another feature, unsafety bits contained in the
+protocol state, to indicate which parts of the protocol state may have
+changed.
+
+If no unsafe bits are set, the fork is safe, in the sense that the protocol
+state may be proved with blockchain SNARKs in effect at the pause point.
+
+If an unsafe bit is set, some component of the protocol state has changed,
+so the protocol state cannot be proved. For example, the protocol state
+contains a blockchain state, which includes a hash of a SNARKed ledger and
+a hash of a staged ledger. If the structure of accounts changes, that will
+affect both ledger hashes. Therefore, the protocol state might have
+unsafe bits specifically for ledger hashes.
+
+Unsafety bits indicate unsafety relative to the previous block on the chain.
+Blocks produced after a block with some unsafety bits set will not have any
+unsafety bits set, at least, not until the next hard fork.
+
 ## Drawbacks
 [drawbacks]: #drawbacks
 
-There's no compelling reason not to do this. We need to be prepared to perform a hard fork if the main net
-fails.
+There's no compelling reason not to do this. We need to be prepared to
+perform a hard fork if the main net fails.
 
 ## Rationale and alternatives
 [rationale-and-alternatives]: #rationale-and-alternatives
@@ -139,20 +166,22 @@ design.
 ## Prior art
 [prior-art]: #prior-art
 
-Echo Nolan created a branch, `rfc/hard-forks`, that was not merged into the code base.
-There is a section in the RFC there, "Technical considerations", that mentions issues
-related to the blockchain.
+Echo Nolan created a branch, `rfc/hard-forks`, that was not merged
+into the code base.  There is a section in the RFC there, "Technical
+considerations", that mentions issues related to the blockchain.
 
-The core technical idea for the blockchain in that RFC was to add `era ids` in blocks
-corresponding to slot ranges. An era id denotes some set of features, and
-the type system verifies feature flags for code using such features. The blockchain SNARK
-verifies the era id in blocks.
+The core technical idea for the blockchain in that RFC was to add `era
+ids` in blocks corresponding to slot ranges. An era id denotes some
+set of features, and the type system verifies feature flags for code
+using such features. The blockchain SNARK verifies the era id in
+blocks.
 
-The alternatives presented here don't mention feature flags, but do raise the possibility
-of pre- and post-fork code.
+The alternatives presented here don't mention feature flags, but do
+raise the possibility of pre- and post-fork code.
 
 ## Unresolved questions
 [unresolved-questions]: #unresolved-questions
 
-See the issues for the alternatives presented in this RFC. Undoubtedly, new issues will
-become apparent through implementation and testing of any of the alternatives.
+See the issues for the alternatives presented in this
+RFC. Undoubtedly, new issues will become apparent through
+implementation and testing of any of the alternatives.
