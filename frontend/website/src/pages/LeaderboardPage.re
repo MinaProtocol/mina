@@ -13,7 +13,6 @@ module Styles = {
       media(Theme.MediaQuery.notMobile, [flexDirection(`row)]),
       justifyContent(`spaceBetween),
       width(`percent(100.)),
-      media(Theme.MediaQuery.tablet, [marginTop(`rem(5.))]),
     ]);
   let searchBar =
     style([
@@ -55,7 +54,14 @@ module Styles = {
           color(Theme.Colors.slateAlpha(0.7)),
         ],
       ),
-      media(Theme.MediaQuery.tablet, [width(`rem(28.))]),
+      media(
+        Theme.MediaQuery.tablet,
+        [
+          width(`percent(100.)),
+          maxWidth(`rem(27.)),
+          marginRight(`rem(1.)),
+        ],
+      ),
       media(Theme.MediaQuery.desktop, [width(`rem(39.))]),
     ]);
 };
