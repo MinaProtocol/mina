@@ -58,7 +58,7 @@ module Stable = struct
         Quickcheck.random_value ~seed:(`Deterministic "private key seed v1")
           V1.gen
       in
-      let known_good_digest ="a990d65c59ec61ceb157ab486c241231" in
+      let known_good_digest = "a990d65c59ec61ceb157ab486c241231" in
       Ppx_version.Serialization.check_serialization
         (module V1)
         pk known_good_digest
