@@ -256,9 +256,12 @@ module Snark_worker = struct
         t.processes.snark_worker
         <- `On ({public_key= new_key; process; kill_ivar}, fee) ;
         start t
-    | `On ({public_key= _; process; kill_ivar}, fee), Some new_key ->
+    | `On ({public_key= old; process; kill_ivar}, fee), Some new_key ->
         Logger.debug logger
           !"Changing snark worker key from $old to $new"
+          ~metadata:
+            [ ("old", Public_key.Compressed.to_yojson old)
+            ; ("new", Public_key.Compressed.to_yojson new_key) ]
           ~module_:__MODULE__ ~location:__LOC__ ;
         t.processes.snark_worker
         <- `On ({public_key= new_key; process; kill_ivar}, fee) ;
