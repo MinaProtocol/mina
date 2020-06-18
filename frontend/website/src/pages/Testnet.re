@@ -419,7 +419,7 @@ let make = (~challenges as _, ~testnetName as _) => {
               </ul>
               <p className=Styles.markdownStyles>
                 {React.string("Check out all challenges ")}
-                <a href="https://bit.ly/Challenges3-2a">
+                <a href="https://bit.ly/3dNmPle">
                   {React.string(" here ")}
                 </a>
                 {React.string("and join ")}

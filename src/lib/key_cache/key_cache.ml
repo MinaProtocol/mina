@@ -43,7 +43,7 @@ let s3 to_string read ~bucket_prefix ~install_path =
     let file_path = install_path ^/ label in
     let open Deferred.Or_error.Let_syntax in
     let%bind result =
-      Process.run ~prog:"curl" ~args:["-o"; file_path; uri_string] ()
+      Process.run ~prog:"curl" ~args:["--fail"; "-o"; file_path; uri_string] ()
     in
     Logger.debug ~module_:__MODULE__ ~location:__LOC__ (Logger.create ())
       "Curl finished"
@@ -96,7 +96,7 @@ let read spec {Disk_storable.to_string; read= r; write= w} k =
             Some (i, x) )
   with
   | Some (i, x) ->
-      Ok (x, if i = 0 then `Cache_hit else `Generated_something)
+      Ok (x, if i = 0 then `Cache_hit else `Locally_generated)
   | None ->
       Error (Error.of_list !errs)
 
@@ -112,8 +112,8 @@ let write spec {Disk_storable.to_string; read= r; write= w} k v =
                 Core.printf "made dir %s\n%!" directory ;
                 (on_disk to_string r w directory).write k v )
               else Deferred.Or_error.return ()
-          | S3 {bucket_prefix; install_path} ->
-              (s3 to_string r ~bucket_prefix ~install_path).write k v
+          | S3 {bucket_prefix= _; install_path= _} ->
+              Deferred.Or_error.return ()
         in
         match%map res with Error e -> Some e | Ok () -> None )
   in
