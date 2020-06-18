@@ -65,6 +65,8 @@ module Checked = struct
 
   let next = T.Checked.succ
 
+  let next_if = T.Checked.succ_if
+
   let to_input = T.Checked.to_input
 
   let equal = T.Checked.equal
