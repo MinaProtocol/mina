@@ -62,7 +62,7 @@ module Styles = {
 
 module SearchBar = {
   [@react.component]
-  let make = (~setUsername, ~username) => {
+  let make = (~onUsernameEntered, ~username) => {
     <div className=Styles.searchBar>
       <span className=Theme.H5.semiBold> {React.string("Find")} </span>
       <input
@@ -71,7 +71,7 @@ module SearchBar = {
         placeholder="SEARCH:"
         onChange={e => {
           let value = ReactEvent.Form.target(e)##value;
-          setUsername(_ => value);
+          onUsernameEntered(value);
         }}
         className=Styles.textField
       />
@@ -131,31 +131,47 @@ module ToggleButtons = {
   };
 };
 
-type state = {currentOption: string};
-let initialState = {currentOption: ToggleButtons.toggleLabels[0]};
+type state = {
+  currentOption: string,
+  username: string,
+};
+let initialState = {
+  currentOption: ToggleButtons.toggleLabels[0],
+  username: "",
+};
 
 type action =
-  | Toggled(string);
+  | Toggled(string)
+  | UsernameEntered(string);
 
-let reducer = (_, action) => {
+let reducer = (previousState, action) => {
   switch (action) {
-  | Toggled(option) => {currentOption: option}
+  | Toggled(option) => {
+      currentOption: option,
+      username: previousState.username,
+    }
+  | UsernameEntered(input) => {
+      currentOption: previousState.currentOption,
+      username: input,
+    }
   };
 };
 
 [@react.component]
 let make = (~lastManualUpdatedDate) => {
   let (state, dispatch) = React.useReducer(reducer, initialState);
-  let (username, setUsername) = React.useState(() => "");
   let onTogglePress = s => {
     dispatch(Toggled(s));
+  };
+  let onUsernameEntered = username => {
+    dispatch(UsernameEntered(username));
   };
 
   <Page title="Testnet Leaderboard">
     <Wrapped>
       <div className=Styles.page> <Summary lastManualUpdatedDate /> </div>
       <div className=Styles.filters>
-        <SearchBar setUsername username />
+        <SearchBar onUsernameEntered username={state.username} />
         <ToggleButtons currentOption={state.currentOption} onTogglePress />
       </div>
     </Wrapped>
