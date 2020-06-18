@@ -182,6 +182,7 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
           ~blockchain_state:(Snark_transition.blockchain_state transition)
           ~consensus_state
           ~constants:(Protocol_state.constants previous_state)
+          ~global_state:(Protocol_state.global_state previous_state)
       in
       let%map state_hash, _ = Protocol_state.hash_checked new_state in
       (state_hash, new_state, `Success success)

@@ -75,6 +75,51 @@ module type Blockchain_state = sig
   val timestamp : (_, _, 'time) Poly.t -> 'time
 end
 
+module type Global_state = sig
+  module Poly : sig
+    [%%versioned:
+    module Stable : sig
+      module V1 : sig
+        type 'token_id t = {next_available_token: 'token_id}
+        [@@deriving sexp, eq, compare, hash, yojson]
+      end
+    end]
+
+    type 'token_id t = {next_available_token: 'token_id}
+    [@@deriving sexp, eq, compare, fields, yojson]
+  end
+
+  type 'token_id poly = 'token_id Poly.t = {next_available_token: 'token_id}
+  [@@deriving sexp, eq, compare, fields, hash, yojson]
+
+  module Value : sig
+    [%%versioned:
+    module Stable : sig
+      module V1 : sig
+        type t = Token_id.Stable.V1.t Poly.Stable.V1.t
+        [@@deriving sexp, eq, compare, hash, yojson]
+      end
+    end]
+
+    type t = Stable.Latest.t
+  end
+
+  type t = Value.t
+
+  val create_value : next_available_token:Token_id.t -> Value.t
+
+  open Snark_params.Tick
+
+  type var = Token_id.var Poly.t
+
+  val typ : (var, t) Typ.t
+
+  val to_input : Value.t -> (Field.t, bool) Random_oracle.Input.t
+
+  val var_to_input :
+    var -> ((Field.Var.t, Boolean.var) Random_oracle.Input.t, _) Checked.t
+end
+
 module type Protocol_state = sig
   type blockchain_state
 
@@ -83,6 +128,10 @@ module type Protocol_state = sig
   type consensus_state
 
   type consensus_state_var
+
+  type global_state
+
+  type global_state_var
 
   module Poly : sig
     [%%versioned:
@@ -101,16 +150,27 @@ module type Protocol_state = sig
       [%%versioned:
       module Stable : sig
         module V1 : sig
-          type ('state_hash, 'blockchain_state, 'consensus_state, 'constants) t
+          type ( 'state_hash
+               , 'blockchain_state
+               , 'consensus_state
+               , 'constants
+               , 'global_state )
+               t
           [@@deriving sexp]
         end
       end]
 
-      type ('state_hash, 'blockchain_state, 'consensus_state, 'constants) t =
+      type ( 'state_hash
+           , 'blockchain_state
+           , 'consensus_state
+           , 'constants
+           , 'global_state )
+           t =
         ( 'state_hash
         , 'blockchain_state
         , 'consensus_state
-        , 'constants )
+        , 'constants
+        , 'global_state )
         Stable.Latest.t
       [@@deriving sexp]
     end
@@ -123,7 +183,8 @@ module type Protocol_state = sig
             ( State_hash.t
             , blockchain_state
             , consensus_state
-            , Protocol_constants_checked.Value.Stable.V1.t )
+            , Protocol_constants_checked.Value.Stable.V1.t
+            , global_state )
             Poly.Stable.V1.t
           [@@deriving sexp, to_yojson]
         end
@@ -134,7 +195,8 @@ module type Protocol_state = sig
       ( State_hash.var
       , blockchain_state_var
       , consensus_state_var
-      , Protocol_constants_checked.var )
+      , Protocol_constants_checked.var
+      , global_state_var )
       Poly.Stable.Latest.t
   end
 
@@ -158,6 +220,7 @@ module type Protocol_state = sig
     -> blockchain_state:blockchain_state
     -> consensus_state:consensus_state
     -> constants:Protocol_constants_checked.Value.t
+    -> global_state:global_state
     -> Value.t
 
   val previous_state_hash : ('state_hash, _) Poly.t -> 'state_hash
@@ -165,15 +228,20 @@ module type Protocol_state = sig
   val body : (_, 'body) Poly.t -> 'body
 
   val blockchain_state :
-    (_, (_, 'blockchain_state, _, _) Body.Poly.t) Poly.t -> 'blockchain_state
+       (_, (_, 'blockchain_state, _, _, _) Body.Poly.t) Poly.t
+    -> 'blockchain_state
 
   val genesis_state_hash :
     ?state_hash:State_hash.t option -> Value.t -> State_hash.t
 
   val consensus_state :
-    (_, (_, _, 'consensus_state, _) Body.Poly.t) Poly.t -> 'consensus_state
+    (_, (_, _, 'consensus_state, _, _) Body.Poly.t) Poly.t -> 'consensus_state
 
-  val constants : (_, (_, _, _, 'constants) Body.Poly.t) Poly.t -> 'constants
+  val constants :
+    (_, (_, _, _, 'constants, _) Body.Poly.t) Poly.t -> 'constants
+
+  val global_state :
+    (_, (_, _, _, _, 'global_state) Body.Poly.t) Poly.t -> 'global_state
 
   val hash : Value.t -> State_hash.t
 end
@@ -622,13 +690,16 @@ module type S = sig
 
     module Make_state_hooks
         (Blockchain_state : Blockchain_state)
+        (Global_state : Global_state)
         (Protocol_state : Protocol_state
                           with type blockchain_state :=
                                       Blockchain_state.Value.t
                            and type blockchain_state_var :=
                                       Blockchain_state.var
                            and type consensus_state := Consensus_state.Value.t
-                           and type consensus_state_var := Consensus_state.var)
+                           and type consensus_state_var := Consensus_state.var
+                           and type global_state := Global_state.Value.t
+                           and type global_state_var := Global_state.var)
         (Snark_transition : Snark_transition
                             with type blockchain_state_var :=
                                         Blockchain_state.var

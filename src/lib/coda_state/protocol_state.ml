@@ -38,25 +38,38 @@ module Body = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type ('state_hash, 'blockchain_state, 'consensus_state, 'constants) t =
+        type ( 'state_hash
+             , 'blockchain_state
+             , 'consensus_state
+             , 'constants
+             , 'global_state )
+             t =
           { genesis_state_hash: 'state_hash
           ; blockchain_state: 'blockchain_state
           ; consensus_state: 'consensus_state
-          ; constants: 'constants }
+          ; constants: 'constants
+          ; global_state: 'global_state }
         [@@deriving bin_io, sexp, eq, compare, to_yojson, hash, version]
       end
     end]
 
-    type ('state_hash, 'blockchain_state, 'consensus_state, 'constants) t =
+    type ( 'state_hash
+         , 'blockchain_state
+         , 'consensus_state
+         , 'constants
+         , 'global_state )
+         t =
           ( 'state_hash
           , 'blockchain_state
           , 'consensus_state
-          , 'constants )
+          , 'constants
+          , 'global_state )
           Stable.Latest.t =
       { genesis_state_hash: 'state_hash
       ; blockchain_state: 'blockchain_state
       ; consensus_state: 'consensus_state
-      ; constants: 'constants }
+      ; constants: 'constants
+      ; global_state: 'global_state }
     [@@deriving sexp]
   end
 
@@ -68,7 +81,8 @@ module Body = struct
           ( State_hash.Stable.V1.t
           , Blockchain_state.Value.Stable.V1.t
           , Consensus.Data.Consensus_state.Value.Stable.V1.t
-          , Protocol_constants_checked.Value.Stable.V1.t )
+          , Protocol_constants_checked.Value.Stable.V1.t
+          , Global_state.Value.Stable.V1.t )
           Poly.Stable.V1.t
         [@@deriving eq, ord, bin_io, hash, sexp, to_yojson, version]
 
@@ -79,8 +93,18 @@ module Body = struct
     type t = Stable.Latest.t [@@deriving sexp, to_yojson]
   end
 
-  type ('state_hash, 'blockchain_state, 'consensus_state, 'constants) t =
-    ('state_hash, 'blockchain_state, 'consensus_state, 'constants) Poly.t
+  type ( 'state_hash
+       , 'blockchain_state
+       , 'consensus_state
+       , 'constants
+       , 'global_state )
+       t =
+    ( 'state_hash
+    , 'blockchain_state
+    , 'consensus_state
+    , 'constants
+    , 'global_state )
+    Poly.t
 
   type value = Value.t [@@deriving sexp, to_yojson]
 
@@ -91,26 +115,43 @@ module Body = struct
     ( State_hash.var
     , Blockchain_state.var
     , Consensus.Data.Consensus_state.var
-    , Protocol_constants_checked.var )
+    , Protocol_constants_checked.var
+    , Global_state.var )
     Poly.t
 
   let to_hlist
-      {Poly.genesis_state_hash; blockchain_state; consensus_state; constants} =
-    H_list.[genesis_state_hash; blockchain_state; consensus_state; constants]
+      { Poly.genesis_state_hash
+      ; blockchain_state
+      ; consensus_state
+      ; constants
+      ; global_state } =
+    H_list.
+      [ genesis_state_hash
+      ; blockchain_state
+      ; consensus_state
+      ; constants
+      ; global_state ]
 
-  let of_hlist :
-         (unit, 'sh -> 'bs -> 'cs -> 'cc -> unit) H_list.t
-      -> ('sh, 'bs, 'cs, 'cc) Poly.t =
+  let of_hlist : (unit, _) H_list.t -> _ Poly.t =
    fun H_list.
-         [genesis_state_hash; blockchain_state; consensus_state; constants] ->
-    {genesis_state_hash; blockchain_state; consensus_state; constants}
+         [ genesis_state_hash
+         ; blockchain_state
+         ; consensus_state
+         ; constants
+         ; global_state ] ->
+    { genesis_state_hash
+    ; blockchain_state
+    ; consensus_state
+    ; constants
+    ; global_state }
 
   let data_spec ~constraint_constants =
     Data_spec.
       [ State_hash.typ
       ; Blockchain_state.typ
       ; Consensus.Data.Consensus_state.typ ~constraint_constants
-      ; Protocol_constants_checked.typ ]
+      ; Protocol_constants_checked.typ
+      ; Global_state.typ ]
 
   let typ ~constraint_constants =
     Typ.of_hlistable
@@ -122,25 +163,32 @@ module Body = struct
       { Poly.genesis_state_hash: State_hash.t
       ; blockchain_state
       ; consensus_state
-      ; constants } =
+      ; constants
+      ; global_state } =
     Random_oracle.Input.(
       append
         (Blockchain_state.to_input blockchain_state)
         (Consensus.Data.Consensus_state.to_input consensus_state)
       |> append (field (genesis_state_hash :> Field.t))
-      |> append (Protocol_constants_checked.to_input constants))
+      |> append (Protocol_constants_checked.to_input constants)
+      |> append (Global_state.to_input global_state))
 
   let var_to_input
-      {Poly.genesis_state_hash; blockchain_state; consensus_state; constants} =
+      { Poly.genesis_state_hash
+      ; blockchain_state
+      ; consensus_state
+      ; constants
+      ; global_state } =
     let blockchain_state = Blockchain_state.var_to_input blockchain_state in
     let%bind constants = Protocol_constants_checked.var_to_input constants in
-    let%map consensus_state =
+    let%bind consensus_state =
       Consensus.Data.Consensus_state.var_to_input consensus_state
     in
+    let%map global_state = Global_state.var_to_input global_state in
     Random_oracle.Input.(
       append blockchain_state consensus_state
       |> append (field (State_hash.var_to_hash_packed genesis_state_hash))
-      |> append constants)
+      |> append constants |> append global_state)
 
   let hash_checked (t : var) =
     let%bind input = var_to_input t in
@@ -150,6 +198,8 @@ module Body = struct
           |> State_body_hash.var_of_hash_packed) )
 
   let consensus_state {Poly.consensus_state; _} = consensus_state
+
+  let global_state {Poly.global_state; _} = global_state
 
   [%%endif]
 
@@ -192,13 +242,14 @@ let create ~previous_state_hash ~body =
   {Poly.Stable.Latest.previous_state_hash; body}
 
 let create' ~previous_state_hash ~genesis_state_hash ~blockchain_state
-    ~consensus_state ~constants =
+    ~consensus_state ~constants ~global_state =
   { Poly.Stable.Latest.previous_state_hash
   ; body=
       { Body.Poly.genesis_state_hash
       ; blockchain_state
       ; consensus_state
-      ; constants } }
+      ; constants
+      ; global_state } }
 
 let create_value = create'
 
@@ -217,6 +268,8 @@ let consensus_state {Poly.Stable.Latest.body= {Body.Poly.consensus_state; _}; _}
 
 let constants {Poly.Stable.Latest.body= {Body.Poly.constants; _}; _} =
   constants
+
+let global_state {Poly.Stable.Latest.body; _} = Body.global_state body
 
 [%%ifdef
 consensus_mechanism]
@@ -296,4 +349,7 @@ let negative_one ~genesis_ledger ~constraint_constants ~consensus_constants =
           Consensus.Data.Consensus_state.negative_one ~genesis_ledger
             ~constants:consensus_constants
       ; constants=
-          Consensus.Constants.to_protocol_constants consensus_constants } }
+          Consensus.Constants.to_protocol_constants consensus_constants
+      ; global_state=
+          Global_state.create_value
+            ~next_available_token:Token_id.(next default) } }

@@ -341,6 +341,9 @@ module For_tests = struct
         Protocol_state.create_value ~genesis_state_hash ~previous_state_hash
           ~blockchain_state:next_blockchain_state ~consensus_state
           ~constants:(Protocol_state.constants previous_protocol_state)
+          ~global_state:
+            (Global_state.create_value
+               ~next_available_token:Token_id.(next default))
       in
       Protocol_version.(set_current zero) ;
       let next_external_transition =

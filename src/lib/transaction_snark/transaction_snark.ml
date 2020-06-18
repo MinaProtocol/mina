@@ -2728,7 +2728,8 @@ let%test_module "transaction_snark" =
 
     let account_fee = Fee.to_int constraint_constants.account_creation_fee
 
-    let test_transaction ~constraint_constants ?txn_global_slot ledger txn =
+    let test_transaction ~constraint_constants ?txn_global_slot
+        ?(next_available_token = Token_id.(next default)) ledger txn =
       let source = Ledger.merkle_root ledger in
       let pending_coinbase_stack = Pending_coinbase.Stack.empty in
       let state_body, state_body_hash, txn_global_slot =
@@ -2752,15 +2753,17 @@ let%test_module "transaction_snark" =
                   (Coda_state.Protocol_state.consensus_state state)
                   txn_global_slot
               in
-              Coda_state.Protocol_state.(
-                create_value
-                  ~previous_state_hash:(previous_state_hash state)
-                  ~genesis_state_hash:(genesis_state_hash state)
-                  ~blockchain_state:(blockchain_state state)
-                  ~consensus_state:consensus_state_at_slot
-                  ~constants:
-                    (Protocol_constants_checked.value_of_t
-                       Genesis_constants.compiled.protocol))
+              (Coda_state.Protocol_state.(
+                 create_value
+                   ~previous_state_hash:(previous_state_hash state)
+                   ~genesis_state_hash:(genesis_state_hash state)
+                   ~blockchain_state:(blockchain_state state)
+                   ~consensus_state:consensus_state_at_slot
+                   ~constants:
+                     (Protocol_constants_checked.value_of_t
+                        Genesis_constants.compiled.protocol))
+                 ~global_state:
+                   (Coda_state.Global_state.create_value ~next_available_token))
                 .body
             in
             let state_body_hash =

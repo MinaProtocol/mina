@@ -3137,11 +3137,14 @@ module Hooks = struct
 
   module Make_state_hooks
       (Blockchain_state : Intf.Blockchain_state)
+      (Global_state : Intf.Global_state)
       (Protocol_state : Intf.Protocol_state
                         with type blockchain_state := Blockchain_state.Value.t
                          and type blockchain_state_var := Blockchain_state.var
                          and type consensus_state := Consensus_state.Value.t
-                         and type consensus_state_var := Consensus_state.var)
+                         and type consensus_state_var := Consensus_state.var
+                         and type global_state := Global_state.Value.t
+                         and type global_state_var := Global_state.var)
       (Snark_transition : Intf.Snark_transition
                           with type blockchain_state_var :=
                                       Blockchain_state.var
@@ -3214,6 +3217,7 @@ module Hooks = struct
           ~previous_state_hash:(Protocol_state.hash previous_protocol_state)
           ~blockchain_state ~consensus_state
           ~constants:(Protocol_state.constants previous_protocol_state)
+          ~global_state:(Protocol_state.global_state previous_protocol_state)
       in
       (protocol_state, consensus_transition)
 
