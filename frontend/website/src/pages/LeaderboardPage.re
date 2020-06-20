@@ -14,7 +14,6 @@ module Styles = {
       justifyContent(`spaceBetween),
       width(`percent(100.)),
       marginTop(`rem(2.)),
-      media(Theme.MediaQuery.tablet, [marginTop(`rem(5.))]),
     ]);
   let searchBar =
     style([
@@ -23,7 +22,7 @@ module Styles = {
       marginTop(`rem(3.)),
       media(
         Theme.MediaQuery.notMobile,
-        [width(`percent(45.)), marginTop(`zero)],
+        [width(`percent(48.)), marginTop(`zero)],
       ),
     ]);
   let textField =
@@ -89,11 +88,16 @@ module ToggleButtons = {
 
     let flexColumn =
       style([
-        display(`flex),
-        flexDirection(`column),
-        justifyContent(`center),
-        height(`rem(4.5)),
-        media("(max-width: 960px)", [display(`none)]),
+        display(`none),
+        media(
+          Theme.MediaQuery.tablet,
+          [
+            display(`flex),
+            flexDirection(`column),
+            justifyContent(`center),
+            height(`rem(4.5)),
+          ],
+        ),
       ]);
 
     let buttonRow =
@@ -144,25 +148,82 @@ module FilterDropdown = {
         flexDirection(`column),
         justifyContent(`center),
         height(`rem(4.5)),
-        media(Theme.MediaQuery.tablet, [display(`none)]),
         width(`percent(100.)),
         marginTop(`rem(2.0)),
+        media(Theme.MediaQuery.tablet, [display(`none)]),
         media(
           Theme.MediaQuery.notMobile,
-          [width(`percent(45.)), marginTop(`zero)],
+          [width(`percent(48.)), marginTop(`zero)],
         ),
       ]);
 
-    let dropdownStyle = {
+    let dropdownTitle =
+      style([
+        display(`inlineFlex),
+        alignItems(`center),
+        marginTop(`px(4)),
+        marginLeft(`rem(0.5)),
+      ]);
+
+    let dropdownContainer = {
       merge([
         Theme.Body.medium,
         style([
-          backgroundColor(Theme.Colors.white),
+          position(`relative),
+          width(`percent(100.)),
+          letterSpacing(`rem(-0.0125)),
+          fontWeight(`num(500)),
+          border(`px(1), `solid, Theme.Colors.hyperlinkAlpha(0.3)),
           borderRadius(`px(4)),
-          boxSizing(`borderBox),
-          border(`px(1), `solid, Theme.Colors.tealAlpha(0.3)),
-          height(`rem(2.5)),
-          textIndent(`rem(0.5)),
+          padding(`px(5)),
+          cursor(`pointer),
+          after([
+            // Render triangle icon at the end of the dropdown
+            unsafe("content", ""),
+            position(`absolute),
+            width(`zero),
+            height(`zero),
+            borderLeft(`px(7), `solid, transparent),
+            borderRight(`px(7), `solid, transparent),
+            borderTop(`px(7), `solid, Theme.Colors.teal),
+            borderRadius(`px(4)),
+            right(`px(15)),
+            top(`percent(40.)),
+          ]),
+        ]),
+      ]);
+    };
+
+    let collapsedDropdown = {
+      style([
+        position(`absolute),
+        left(`zero),
+        right(`zero),
+        fontWeight(`num(500)),
+        backgroundColor(Theme.Colors.white),
+        pointerEvents(`none),
+        border(`px(1), `solid, Theme.Colors.hyperlinkAlpha(0.3)),
+        opacity(0.),
+      ]);
+    };
+
+    let expandedDropdown = {
+      merge([
+        collapsedDropdown,
+        style([
+          borderRadius(`px(4)),
+          pointerEvents(`auto),
+          opacity(1.),
+          selector(
+            "li",
+            [
+              display(`block),
+              textDecoration(`none),
+              padding(`px(10)),
+              zIndex(1),
+              hover([background(Theme.Colors.gandalf)]),
+            ],
+          ),
         ]),
       ]);
     };
@@ -170,17 +231,36 @@ module FilterDropdown = {
 
   let filterLabels = [|"This Release", "Previous Phase", "All Time"|];
   [@react.component]
-  let make = (~onFilterPress) => {
+  let make = (~currentFilter, ~onFilterPress) => {
+    let (menuOpen, toggleMenu) = React.useState(() => false);
+
+    let onDropdownItemPress = label => {
+      onFilterPress(label);
+      toggleMenu(_ => !menuOpen);
+    };
+
     let renderDropdown = () => {
-      <select
-        onClick={e => onFilterPress(ReactEvent.Mouse.target(e)##value)}
-        className=FilterDropdownStyles.dropdownStyle>
-        {filterLabels
-         |> Array.map(label => {
-              <option key=label value=label> {React.string(label)} </option>
-            })
-         |> React.array}
-      </select>;
+      <div
+        className=FilterDropdownStyles.dropdownContainer
+        onClick={_ => {toggleMenu(_ => !menuOpen)}}>
+        <span className=FilterDropdownStyles.dropdownTitle>
+          {React.string(currentFilter)}
+        </span>
+        <ul
+          className={
+            menuOpen
+              ? FilterDropdownStyles.expandedDropdown
+              : FilterDropdownStyles.collapsedDropdown
+          }>
+          {filterLabels
+           |> Array.map(label => {
+                <li key=label onClick={_ => {onDropdownItemPress(label)}}>
+                  {React.string(label)}
+                </li>
+              })
+           |> React.array}
+        </ul>
+      </div>;
     };
 
     <div className=FilterDropdownStyles.flexColumn>
@@ -222,12 +302,12 @@ let make = (~lastManualUpdatedDate) => {
     dispatch(Toggled(s));
   };
 
-  let onUsernameEntered = username => {
-    dispatch(UsernameEntered(username));
-  };
-
   let onFilterPress = s => {
     dispatch(Filtered(s));
+  };
+
+  let onUsernameEntered = username => {
+    dispatch(UsernameEntered(username));
   };
 
   <Page title="Testnet Leaderboard">
@@ -236,7 +316,7 @@ let make = (~lastManualUpdatedDate) => {
       <div className=Styles.filters>
         <SearchBar onUsernameEntered username={state.username} />
         <ToggleButtons currentToggle={state.currentToggle} onTogglePress />
-        <FilterDropdown onFilterPress />
+        <FilterDropdown currentFilter={state.currentFilter} onFilterPress />
       </div>
     </Wrapped>
   </Page>;
