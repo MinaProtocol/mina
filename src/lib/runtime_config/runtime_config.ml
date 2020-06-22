@@ -165,12 +165,88 @@ module Proof_keys = struct
              'level' to contain a string"
   end
 
-  type t = {level: Level.t option [@default None]} [@@deriving yojson]
+  module Transaction_capacity = struct
+    type t = Log_2 of int | Txns_per_second_x10 of int
+
+    let to_yojson = function
+      | Log_2 i ->
+          `Assoc [("2_to_the", `Int i)]
+      | Txns_per_second_x10 i ->
+          `Assoc [("txns_per_second_x10", `Int i)]
+
+    let of_yojson json =
+      match
+        yojson_strip_fields ~fields:[|"2_to_the"; "txns_per_second_x10"|] json
+      with
+      | `Assoc [("2_to_the", i)] -> (
+        match i with
+        | `Int i ->
+            Ok (Log_2 i)
+        | _ ->
+            Error
+              "Runtime_config.Proof_keys.Transaction_capacity.of_yojson: \
+               Expected the field '2_to_the' to contain an integer" )
+      | `Assoc [("txns_per_second_x10", i)] -> (
+        match i with
+        | `Int i ->
+            Ok (Txns_per_second_x10 i)
+        | _ ->
+            Error
+              "Runtime_config.Proof_keys.Transaction_capacity.of_yojson: \
+               Expected the field 'txns_per_second_x10' to contain an integer"
+        )
+      | `Assoc _ ->
+          Error
+            "Runtime_config.Proof_keys.Transaction_capacity.of_yojson: \
+             Expected exactly one of the fields '2_to_the' or \
+             'txns_per_second_x10'"
+      | _ ->
+          Error
+            "Runtime_config.Proof_keys.Level.of_yojson: Expected the field \
+             'transaction_capacity' to contain a JSON object"
+  end
+
+  type t =
+    { level: Level.t option [@default None]
+    ; c: int option [@default None]
+    ; ledger_depth: int option [@default None]
+    ; work_delay: int option [@default None]
+    ; block_window_duration_ms: int option [@default None]
+    ; transaction_capacity: Transaction_capacity.t option [@default None]
+    ; coinbase_amount: Currency.Amount.t option [@default None]
+    ; account_creation_fee: Currency.Fee.t option [@default None] }
+  [@@deriving yojson]
 
   let of_yojson json =
-    of_yojson @@ yojson_strip_fields ~fields:[|"level"|] json
+    of_yojson
+    @@ yojson_strip_fields
+         ~fields:
+           [| "level"
+            ; "c"
+            ; "ledger_depth"
+            ; "work_delay"
+            ; "block_window_duration_ms"
+            ; "transaction_capacity"
+            ; "coinbase_amount"
+            ; "account_creation_fee" |]
+         json
 
-  let combine t1 t2 = {level= opt_fallthrough ~default:t1.level t2.level}
+  let combine t1 t2 =
+    { level= opt_fallthrough ~default:t1.level t2.level
+    ; c= opt_fallthrough ~default:t1.c t2.c
+    ; ledger_depth= opt_fallthrough ~default:t1.ledger_depth t2.ledger_depth
+    ; work_delay= opt_fallthrough ~default:t1.work_delay t2.work_delay
+    ; block_window_duration_ms=
+        opt_fallthrough ~default:t1.block_window_duration_ms
+          t2.block_window_duration_ms
+    ; transaction_capacity=
+        opt_fallthrough ~default:t1.transaction_capacity
+          t2.transaction_capacity
+    ; coinbase_amount=
+        opt_fallthrough ~default:t1.coinbase_amount t2.coinbase_amount
+    ; account_creation_fee=
+        opt_fallthrough ~default:t1.account_creation_fee
+          t2.account_creation_fee }
 end
 
 module Genesis = struct
@@ -210,18 +286,26 @@ end
   { "daemon":
       { "txpool_max_size": 1 }
   , "genesis": { "k": 1, "delta": 1 }
-  , "proof": { "level": "check" }
+  , "proof":
+      { "level": "check"
+      , "c": 8
+      , "ledger_depth": 14
+      , "work_delay": 2
+      , "block_window_duration_ms": 180000
+      , "transaction_capacity": {"txns_per_second_x10": 2}
+      , "coinbase_amount": "200"
+      , "account_creation_fee": "0.001" }
   , "ledger":
       { "name": "release"
       , "accounts":
-          [ { pk: "public_key"
-            , sk: "secret_key"
-            , balance: "0.000600000"
-            , delegate: "public_key" }
-          , { pk: "public_key"
-            , sk: "secret_key"
-            , balance: "0.000000000"
-            , delegate: "public_key" } ]
+          [ { "pk": "public_key"
+            , "sk": "secret_key"
+            , "balance": "0.000600000"
+            , "delegate": "public_key" }
+          , { "pk": "public_key"
+            , "sk": "secret_key"
+            , "balance": "0.000000000"
+            , "delegate": "public_key" } ]
       , "hash": "root_hash"
       , "num_accounts": 10
       , "genesis_state_timestamp": "2000-00-00 12:00:00+0100" } }
