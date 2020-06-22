@@ -22,7 +22,7 @@ module Styles = {
       marginTop(`rem(3.)),
       media(
         Theme.MediaQuery.notMobile,
-        [width(`percent(48.)), marginTop(`zero)],
+        [marginTop(`zero), marginRight(`rem(1.)), width(`percent(48.))],
       ),
     ]);
   let textField =
@@ -62,7 +62,7 @@ module Styles = {
         Theme.MediaQuery.tablet,
         [
           width(`percent(100.)),
-          maxWidth(`rem(27.)),
+          maxWidth(`rem(38.5)),
           marginRight(`rem(1.)),
         ],
       ),
