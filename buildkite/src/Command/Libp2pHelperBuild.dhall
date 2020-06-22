@@ -8,6 +8,7 @@ let Cmd = ../Lib/Cmds.dhall
 
 let commands : List Cmd.Type =
   [
+    Cmd.run "sudo chown -R opam .",
     Cmd.runInDocker
       Cmd.Docker::{
         image = (../Constants/ContainerImages.dhall).codaToolchain,
