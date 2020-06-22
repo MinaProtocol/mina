@@ -376,6 +376,11 @@ module Base = struct
   open Tick
   open Let_syntax
 
+  type _ Snarky.Request.t +=
+    | Transaction : Transaction_union.t Snarky.Request.t
+    | State_body : Coda_state.Protocol_state.Body.Value.t Snarky.Request.t
+    | Init_stack : Pending_coinbase.Stack.t Snarky.Request.t
+
   module User_command_failure = struct
     (** The various ways that a user command may fail. These should be computed
         before applying the snark, to ensure that only the base fee is charged
@@ -1321,9 +1326,7 @@ module Base = struct
 
   module Prover_state = struct
     type t =
-      { transaction: Transaction_union.t
-      ; state_body: Coda_state.Protocol_state.Body.Value.t
-      ; state1: Frozen_ledger_hash.t
+      { state1: Frozen_ledger_hash.t
       ; state2: Frozen_ledger_hash.t
       ; pending_coinbase_stack_state: Pending_coinbase_stack_state.t
       ; sok_digest: Sok_message.Digest.t }
@@ -1349,7 +1352,7 @@ module Base = struct
     in
     let%bind t =
       with_label __LOC__
-        (exists' Transaction_union.typ ~f:Prover_state.transaction)
+        (exists Transaction_union.typ ~request:(As_prover.return Transaction))
     in
     let%bind pending_coinbase_before =
       exists' Pending_coinbase.Stack.typ ~f:(fun s ->
@@ -1360,18 +1363,12 @@ module Base = struct
           (Prover_state.pending_coinbase_stack_state s).target )
     in
     let%bind pending_coinbase_init =
-      exists' Pending_coinbase.Stack.typ ~f:(fun s ->
-          match (Prover_state.pending_coinbase_stack_state s).init_stack with
-          | Base stack ->
-              stack
-          | Merge ->
-              raise
-                (Invalid_argument "Pending_coinbase_stack_state.Init_stack") )
+      exists Pending_coinbase.Stack.typ ~request:(As_prover.return Init_stack)
     in
     let%bind state_body =
-      exists'
+      exists
         (Coda_state.Protocol_state.Body.typ ~constraint_constants)
-        ~f:Prover_state.state_body
+        ~request:(As_prover.return State_body)
     in
     let%bind root_after, fee_excess, supply_increase =
       apply_tagged_transaction ~constraint_constants
@@ -1418,6 +1415,20 @@ module Base = struct
     in
     ()
 
+  let transaction_union_handler handler (transaction : Transaction_union.t)
+      (state_body : Coda_state.Protocol_state.Body.Value.t)
+      (init_stack : Pending_coinbase.Stack.t) : Snarky.Request.request -> _ =
+   fun (With {request; respond} as r) ->
+    match request with
+    | Transaction ->
+        respond (Provide transaction)
+    | State_body ->
+        respond (Provide state_body)
+    | Init_stack ->
+        respond (Provide init_stack)
+    | _ ->
+        handler r
+
   let create_keys () =
     generate_keypair
       (main
@@ -1427,16 +1438,19 @@ module Base = struct
   let transaction_union_proof ?(preeval = false) ~constraint_constants
       ~proving_key sok_digest state1 state2 pending_coinbase_stack_state
       (transaction : Transaction_union.t) state_body handler =
+    if preeval then failwith "preeval currently disabled" ;
     let prover_state : Prover_state.t =
-      { transaction
-      ; state_body
-      ; state1
-      ; state2
-      ; sok_digest
-      ; pending_coinbase_stack_state }
+      {state1; state2; sok_digest; pending_coinbase_stack_state}
     in
-    let main =
-      if preeval then failwith "preeval currently disabled" else main
+    let init_stack =
+      match pending_coinbase_stack_state.init_stack with
+      | Base init_stack ->
+          init_stack
+      | Merge ->
+          assert false
+    in
+    let handler =
+      transaction_union_handler handler transaction state_body init_stack
     in
     let main top_hash = handle (main ~constraint_constants top_hash) handler in
     let top_hash =
@@ -1925,14 +1939,20 @@ end
 let check_transaction_union ?(preeval = false) ~constraint_constants
     sok_message source target pending_coinbase_stack_state transaction
     state_body handler =
+  if preeval then failwith "preeval currently disabled" ;
   let sok_digest = Sok_message.digest sok_message in
   let prover_state : Base.Prover_state.t =
-    { transaction
-    ; state_body
-    ; state1= source
-    ; state2= target
-    ; sok_digest
-    ; pending_coinbase_stack_state }
+    {state1= source; state2= target; sok_digest; pending_coinbase_stack_state}
+  in
+  let init_stack =
+    match pending_coinbase_stack_state.init_stack with
+    | Base init_stack ->
+        init_stack
+    | Merge ->
+        assert false
+  in
+  let handler =
+    Base.transaction_union_handler handler transaction state_body init_stack
   in
   let top_hash =
     base_top_hash ~sok_digest ~state1:source ~state2:target
@@ -1941,15 +1961,11 @@ let check_transaction_union ?(preeval = false) ~constraint_constants
       ~supply_increase:(Transaction_union.supply_increase transaction)
   in
   let open Tick in
-  let main =
-    if preeval then failwith "preeval currently disabled" else Base.main
+  let main top_hash =
+    handle (Base.main ~constraint_constants top_hash) handler
   in
   let main =
-    handle
-      (Checked.map
-         (main ~constraint_constants (Field.Var.constant top_hash))
-         ~f:As_prover.return)
-      handler
+    Checked.map (main (Field.Var.constant top_hash)) ~f:As_prover.return
   in
   Or_error.ok_exn (run_and_check main prover_state) |> ignore
 
@@ -1979,6 +1995,7 @@ let check_user_command ~constraint_constants ~sok_message ~source ~target
 let generate_transaction_union_witness ?(preeval = false) ~constraint_constants
     sok_message source target transaction_in_block pending_coinbase_stack_state
     handler =
+  if preeval then failwith "preeval currently disabled" ;
   let transaction =
     Transaction_protocol_state.transaction transaction_in_block
   in
@@ -1987,24 +2004,28 @@ let generate_transaction_union_witness ?(preeval = false) ~constraint_constants
   in
   let sok_digest = Sok_message.digest sok_message in
   let prover_state : Base.Prover_state.t =
-    { transaction
-    ; state_body
-    ; state1= source
-    ; state2= target
-    ; sok_digest
-    ; pending_coinbase_stack_state }
+    {state1= source; state2= target; sok_digest; pending_coinbase_stack_state}
+  in
+  let init_stack =
+    match pending_coinbase_stack_state.init_stack with
+    | Base init_stack ->
+        init_stack
+    | Merge ->
+        assert false
+  in
+  let handler =
+    Base.transaction_union_handler handler transaction state_body init_stack
   in
   let top_hash =
     base_top_hash ~sok_digest ~state1:source ~state2:target
+      ~pending_coinbase_stack_state
       ~fee_excess:(Transaction_union.fee_excess transaction)
       ~supply_increase:(Transaction_union.supply_increase transaction)
-      ~pending_coinbase_stack_state
   in
   let open Tick in
-  let main =
-    if preeval then failwith "preeval currently disabled" else Base.main
+  let main top_hash =
+    handle (Base.main ~constraint_constants top_hash) handler
   in
-  let main x = handle (main ~constraint_constants x) handler in
   generate_auxiliary_input (tick_input ()) prover_state main top_hash
 
 let generate_transaction_witness ?preeval ~constraint_constants ~sok_message
