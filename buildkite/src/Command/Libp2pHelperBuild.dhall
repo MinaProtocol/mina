@@ -19,16 +19,16 @@ let commands : List Cmd.Type =
 
 in
 
-let cmdDef =
+let cmdConfig =
   Command.build
     Command.Config::{
       commands  = commands,
       label = "Libp2p helper commands",
       key = "libp2p-helper",
-      target = Size.Small,
+      target = Size.Large,
       docker = None Docker.Type
     }
 
 in
 
-{ step = cmdDef }
+{ step = cmdConfig }
