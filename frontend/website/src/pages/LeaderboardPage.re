@@ -211,6 +211,7 @@ module FilterDropdown = {
       merge([
         collapsedDropdown,
         style([
+          top(`rem(2.3)),
           borderRadius(`px(4)),
           pointerEvents(`auto),
           opacity(1.),
@@ -298,12 +299,12 @@ let reducer = (prevState, action) => {
 [@react.component]
 let make = (~lastManualUpdatedDate) => {
   let (state, dispatch) = React.useReducer(reducer, initialState);
-  let onTogglePress = s => {
-    dispatch(Toggled(s));
+  let onTogglePress = toggle => {
+    dispatch(Toggled(toggle));
   };
 
-  let onFilterPress = s => {
-    dispatch(Filtered(s));
+  let onFilterPress = filter => {
+    dispatch(Filtered(filter));
   };
 
   let onUsernameEntered = username => {
