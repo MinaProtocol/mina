@@ -16,7 +16,6 @@ end
 type t =
   { conf_dir: string
   ; logger: Logger.t
-  ; proof_level: Genesis_constants.Proof_level.t
   ; pids: Child_processes.Termination.t
   ; trust_system: Trust_system.t
   ; monitor: Monitor.t option

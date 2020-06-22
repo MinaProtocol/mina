@@ -479,21 +479,22 @@ module Genesis_proof = struct
           return Snark_params.Tick.Field.zero
     in
     { Genesis_proof.Inputs.constraint_constants
+    ; proof_level
     ; genesis_ledger= ledger
     ; consensus_constants
     ; protocol_state_with_hash
     ; base_hash
     ; genesis_constants }
 
-  let generate ~proof_level inputs =
-    (* TODO(4829): Runtime proof-level. *)
-    match proof_level with
+  let generate inputs =
+    match inputs.Genesis_proof.Inputs.proof_level with
     | Genesis_constants.Proof_level.Full ->
         let%map ((module Keys) as keys) = Keys_lib.Keys.create () in
-        Genesis_proof.create_values ~proof_level ~keys inputs
+        Genesis_proof.create_values ~keys inputs
     | _ ->
         return
           { Genesis_proof.constraint_constants= inputs.constraint_constants
+          ; proof_level= inputs.proof_level
           ; genesis_constants= inputs.genesis_constants
           ; genesis_ledger= inputs.genesis_ledger
           ; consensus_constants= inputs.consensus_constants
@@ -514,7 +515,7 @@ module Genesis_proof = struct
         Reader.file_contents filename
         >>| Sexp.of_string >>| Proof.Stable.V1.t_of_sexp )
 
-  let load_or_generate ~genesis_dir ~logger ~may_generate ~proof_level
+  let load_or_generate ~genesis_dir ~logger ~may_generate
       (inputs : Genesis_proof.Inputs.t) =
     let compiled = Precomputed_values.compiled in
     match%bind find_file ~logger ~base_hash:inputs.base_hash with
@@ -524,6 +525,7 @@ module Genesis_proof = struct
             Ok
               ( { Genesis_proof.constraint_constants=
                     inputs.constraint_constants
+                ; proof_level= inputs.proof_level
                 ; genesis_constants= inputs.genesis_constants
                 ; genesis_ledger= inputs.genesis_ledger
                 ; consensus_constants= inputs.consensus_constants
@@ -551,6 +553,7 @@ module Genesis_proof = struct
         let filename = genesis_dir ^/ filename ~base_hash:inputs.base_hash in
         let values =
           { Genesis_proof.constraint_constants= inputs.constraint_constants
+          ; proof_level= inputs.proof_level
           ; genesis_constants= inputs.genesis_constants
           ; genesis_ledger= inputs.genesis_ledger
           ; consensus_constants= inputs.consensus_constants
@@ -578,7 +581,7 @@ module Genesis_proof = struct
           "No genesis proof file was found for $base_hash, generating a new \
            genesis proof"
           ~metadata:[("base_hash", Ledger_hash.to_yojson inputs.base_hash)] ;
-        let%bind values = generate ~proof_level inputs in
+        let%bind values = generate inputs in
         let filename = genesis_dir ^/ filename ~base_hash:inputs.base_hash in
         let%map () =
           match%map store ~filename values.genesis_proof with
@@ -688,7 +691,7 @@ let init_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
   let open Deferred.Or_error.Let_syntax in
   let%map values, proof_file =
     Genesis_proof.load_or_generate ~genesis_dir ~logger ~may_generate
-      ~proof_level proof_inputs
+      proof_inputs
   in
   Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
     "Loaded ledger from $ledger_file and genesis proof from $proof_file"
