@@ -683,6 +683,41 @@ let init_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
     Deferred.return
     @@ make_genesis_constants ~logger ~default:genesis_constants config
   in
+  let proof_level =
+    List.find_map_exn ~f:Fn.id
+      [ proof_level
+      ; Option.Let_syntax.(
+          let%bind proof = config.proof in
+          match%map proof.level with
+          | Full ->
+              Genesis_constants.Proof_level.Full
+          | Check ->
+              Check
+          | None ->
+              None)
+      ; Some Genesis_constants.Proof_level.compiled ]
+  in
+  let%bind () =
+    match (proof_level, Genesis_constants.Proof_level.compiled) with
+    | Full, Full ->
+        (* TODO: Check that constraint constants are consistent, once they are
+           exposed in the config file.
+        *)
+        return ()
+    | (Check | None), _ ->
+        return ()
+    | Full, ((Check | None) as compiled) ->
+        let str = Genesis_constants.Proof_level.to_string in
+        Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+          "Proof level $proof_level is not compatible with compile-time proof \
+           level $compiled_proof_level"
+          ~metadata:
+            [ ("proof_level", `String (str proof_level))
+            ; ("compiled_proof_level", `String (str compiled)) ] ;
+        Deferred.Or_error.errorf
+          "Proof level %s is not compatible with compile-time proof level %s"
+          (str proof_level) (str compiled)
+  in
   let open Deferred.Let_syntax in
   let%bind proof_inputs =
     Genesis_proof.generate_inputs ~proof_level ~ledger:genesis_ledger
