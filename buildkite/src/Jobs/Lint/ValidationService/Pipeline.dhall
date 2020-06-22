@@ -12,15 +12,12 @@ let commands =
   let sigPath = "mix_cache.sig"
   let archivePath = "\"mix-cache-\\\$(sha256sum ${sigPath} | cut -d\" \" -f1).tar.gz\""
   in [
-    Cmd.runInDocker ValidationService.docker "pwd && ls && elixir --version | tail -n1 > ${sigPath}",
-    Cmd.run "echo \\\$(pwd)",
-    Cmd.run "ls",
+    Cmd.runInDocker ValidationService.docker "elixir --version | tail -n1 > ${sigPath}",
     Cmd.run "cat ${sigPath}",
-    Cmd.run "echo \\\$(pwd)",
     Cmd.cacheThrough ValidationService.docker archivePath Cmd.CompoundCmd::{
       preprocess = Cmd.run "tar xzf ${archivePath} -C ${ValidationService.rootPath}",
       postprocess = Cmd.run "tar czf ${archivePath} -C ${ValidationService.rootPath} priv/plts",
-      inner = Cmd.run "echo \\\$(pwd); ${Cmd.format (ValidationService.runCmd "mix check")}"
+      inner = ValidationService.runCmd "mix check --force"
     }
   ]
 
