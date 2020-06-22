@@ -21,6 +21,7 @@ module Transaction_with_witness : sig
     { transaction_with_info: Ledger.Undo.t
     ; state_hash: State_hash.t * State_body_hash.t
     ; statement: Transaction_snark.Statement.t
+    ; init_stack: Transaction_snark.Pending_coinbase_stack_state.Init_stack.t
     ; ledger_witness: Sparse_ledger.t }
   [@@deriving sexp]
 end
