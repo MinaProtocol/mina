@@ -43,16 +43,12 @@ SNARKed ledger at the root as the staged ledger, and an empty scan state.
 Discarding the staged ledger means that we're discarding the finalized
 transactions reflected in that ledger. Also, the staged ledger hash
 at the pause point is no longer valid, and needs to be recomputed
-from the SNARKed ledger used as the staged ledger. The total currency in the
-consensus data part of the protocol state becomes invalid, and would
-need to be recomputed by summing the account balances in that SNARKed
-ledger.
+from the SNARKed ledger used as the staged ledger.
 
-Alternatively, we could retain the scan state, and staged ledger,
-while retaining the total currency amount, by generating new proofs
-to replace the existing proofs. The fee transfers in the scan state
-would be retained in that way, so that SNARK workers who generated
-the original proofs will still get paid.
+Alternatively, we could retain the scan state and staged ledger, by
+generating new proofs to replace the existing proofs. The fee
+transfers in the scan state would be retained in that way, so that
+SNARK workers who generated the original proofs will still get paid.
 
 For the safe case, we can make use of the information in the scan
 state at the pause point. Some nodes in the scan may have proofs,
