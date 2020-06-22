@@ -1326,9 +1326,7 @@ module Base = struct
 
   module Prover_state = struct
     type t =
-      { transaction: Transaction_union.t
-      ; state_body: Coda_state.Protocol_state.Body.Value.t
-      ; state1: Frozen_ledger_hash.t
+      { state1: Frozen_ledger_hash.t
       ; state2: Frozen_ledger_hash.t
       ; pending_coinbase_stack_state: Pending_coinbase_stack_state.t
       ; sok_digest: Sok_message.Digest.t }
@@ -1442,12 +1440,7 @@ module Base = struct
       (transaction : Transaction_union.t) state_body handler =
     if preeval then failwith "preeval currently disabled" ;
     let prover_state : Prover_state.t =
-      { transaction
-      ; state_body
-      ; state1
-      ; state2
-      ; sok_digest
-      ; pending_coinbase_stack_state }
+      {state1; state2; sok_digest; pending_coinbase_stack_state}
     in
     let init_stack =
       match pending_coinbase_stack_state.init_stack with
@@ -1949,12 +1942,7 @@ let check_transaction_union ?(preeval = false) ~constraint_constants
   if preeval then failwith "preeval currently disabled" ;
   let sok_digest = Sok_message.digest sok_message in
   let prover_state : Base.Prover_state.t =
-    { transaction
-    ; state_body
-    ; state1= source
-    ; state2= target
-    ; sok_digest
-    ; pending_coinbase_stack_state }
+    {state1= source; state2= target; sok_digest; pending_coinbase_stack_state}
   in
   let init_stack =
     match pending_coinbase_stack_state.init_stack with
@@ -2016,12 +2004,7 @@ let generate_transaction_union_witness ?(preeval = false) ~constraint_constants
   in
   let sok_digest = Sok_message.digest sok_message in
   let prover_state : Base.Prover_state.t =
-    { transaction
-    ; state_body
-    ; state1= source
-    ; state2= target
-    ; sok_digest
-    ; pending_coinbase_stack_state }
+    {state1= source; state2= target; sok_digest; pending_coinbase_stack_state}
   in
   let init_stack =
     match pending_coinbase_stack_state.init_stack with
