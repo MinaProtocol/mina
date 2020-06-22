@@ -345,7 +345,7 @@ let%test_module "predicates" =
       test_predicate Unpacked.is_stake_delegation (( = ) Stake_delegation)
 
     let%test_unit "is_create_account" =
-      test_predicate Unpacked.is_stake_delegation (( = ) Create_account)
+      test_predicate Unpacked.is_create_account (( = ) Create_account)
 
     let%test_unit "is_fee_transfer" =
       test_predicate Unpacked.is_fee_transfer (( = ) Fee_transfer)
