@@ -12,7 +12,7 @@ let commands =
   let sigPath = "mix_cache.sig"
   let archivePath = "\"mix-cache-\\\$(sha256sum ${sigPath} | cut -d\" \" -f1).tar.gz\""
   in [
-    Cmd.runInDocker ValidationService.docker "elixir --version | tail -n1 > ${sigPath}",
+    Cmd.runInDocker ValidationService.docker "pwd && ls && elixir --version | tail -n1 > ${sigPath}",
     Cmd.run "echo \\\$(pwd)",
     Cmd.run "ls",
     Cmd.run "cat ${sigPath}",
