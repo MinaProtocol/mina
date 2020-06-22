@@ -26,10 +26,33 @@ fork, and the "unsafe" case, where that condition does not hold.
 
 For the unsafe case, the proofs in the scan state are not of
 consequence to the post-fork chain. Those proofs are for transactions
-not yet reflected in SNARKed ledger. Therefore, we can discard the
-scan state at the pause point.  The regrettable consequence is that
-the proofs are lost, and the fees paid to create them are for
-nought. Block producers should be made aware of this risk.
+not yet reflected in SNARKed ledger. There are two ways in which
+we might handle the scan state when the chain is resumed.
+
+One way is to simply discard the scan state at the pause point.  The
+regrettable consequence is that the proofs are lost, and the fees paid
+to create them are for nought. Block producers should be made aware of
+this risk.
+
+Discarding proofs in the scan state means also discarding the
+fee transfers associated with them. Since these fee transfers have
+already been applied to the staged ledger, we will have to discard the
+staged ledger at the root, and when the chain resumes, using the
+SNARKed ledger at the root as the staged ledger, and an empty scan state.
+
+Discarding the staged ledger means that we're discarding the finalized
+transactions reflected in that ledger. Also, the staged ledger hash
+at the pause point is no longer valid, and needs to be recomputed
+from the SNARKed ledger used as the staged ledger. The total currency in the
+consensus data part of the protocol state becomes invalid, and would
+need to be recomputed by summing the account balances in that SNARKed
+ledger.
+
+Alternatively, we could retain the scan state, and staged ledger,
+while retaining the total currency amount, by generating new proofs
+to replace the existing proofs. The fee transfers in the scan state
+would be retained in that way, so that SNARK workers who generated
+the original proofs will still get paid.
 
 For the safe case, we can make use of the information in the scan
 state at the pause point. Some nodes in the scan may have proofs,
