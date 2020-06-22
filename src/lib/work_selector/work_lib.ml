@@ -58,10 +58,9 @@ module Make (Inputs : Intf.Inputs_intf) = struct
   end
 
   let does_not_have_better_fee ~snark_pool ~fee
-      (statements : ('a, 'b, 'c) Work_spec.t One_or_two.t) : bool =
+      (statements : Inputs.Transaction_snark_work.Statement.t) : bool =
     Option.value_map ~default:true
-      (Inputs.Snark_pool.get_completed_work snark_pool
-         (One_or_two.map ~f:Work_spec.statement statements))
+      (Inputs.Snark_pool.get_completed_work snark_pool statements)
       ~f:(fun priced_proof ->
         let competing_fee = Inputs.Transaction_snark_work.fee priced_proof in
         Fee.compare fee competing_fee < 0 )
@@ -73,17 +72,21 @@ module Make (Inputs : Intf.Inputs_intf) = struct
   let get_expensive_work ~snark_pool ~fee
       (jobs : ('a, 'b, 'c) Work_spec.t One_or_two.t list) :
       ('a, 'b, 'c) Work_spec.t One_or_two.t list =
-    List.filter jobs ~f:(does_not_have_better_fee ~snark_pool ~fee)
+    List.filter jobs ~f:(fun job ->
+        does_not_have_better_fee ~snark_pool ~fee
+          (One_or_two.map job ~f:Work_spec.statement) )
 
-  let all_pending_work ~snark_pool jobs =
-    List.filter jobs ~f:(fun st ->
-        Option.is_none
-          (Inputs.Snark_pool.get_completed_work snark_pool
-             (One_or_two.map ~f:Work_spec.statement st)) )
+  let all_pending_work ~snark_pool statements =
+    List.filter statements ~f:(fun st ->
+        Option.is_none (Inputs.Snark_pool.get_completed_work snark_pool st) )
 
-  let all_unseen_works (staged_ledger : Inputs.Staged_ledger.t)
-      (state : State.t) =
-    let all_jobs = Inputs.Staged_ledger.all_work_pairs_exn staged_ledger in
+  let all_unseen_works ~get_protocol_state
+      (staged_ledger : Inputs.Staged_ledger.t) (state : State.t) =
+    let open Or_error.Let_syntax in
+    let%map all_jobs =
+      Inputs.Staged_ledger.all_work_pairs staged_ledger
+        ~get_state:get_protocol_state
+    in
     let unseen_jobs =
       List.filter all_jobs ~f:(fun js ->
           not
@@ -94,13 +97,15 @@ module Make (Inputs : Intf.Inputs_intf) = struct
 
   (*Seen/Unseen jobs that are not in the snark pool yet*)
   let pending_work_statements ~snark_pool ~fee_opt ~staged_ledger =
-    let all_jobs = Inputs.Staged_ledger.all_work_pairs_exn staged_ledger in
-    let filtered_jobs =
-      match fee_opt with
-      | None ->
-          all_pending_work ~snark_pool all_jobs
-      | Some fee ->
-          get_expensive_work ~snark_pool ~fee all_jobs
+    let all_todo_statements =
+      Inputs.Staged_ledger.all_work_statements_exn staged_ledger
     in
-    List.map filtered_jobs ~f:(One_or_two.map ~f:Work_spec.statement)
+    let expensive_work statements ~fee =
+      List.filter statements ~f:(does_not_have_better_fee ~snark_pool ~fee)
+    in
+    match fee_opt with
+    | None ->
+        all_pending_work ~snark_pool all_todo_statements
+    | Some fee ->
+        expensive_work all_todo_statements ~fee
 end

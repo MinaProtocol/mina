@@ -24,23 +24,6 @@ let result_field_no_inputs ~resolve =
   Schema.io_field ~resolve:(fun resolve_info src ->
       Deferred.return @@ resolve resolve_info src )
 
-let verification_key =
-  lazy
-    (let open Async in
-    let%map vk = Snark_keys.blockchain_verification () in
-    let open Crypto_params.Tock_backend.Verification_key in
-    let open Lite_compat_algebra in
-    let key =
-      { Lite_base.Crypto_params.Tock.Bowe_gabizon.Verification_key.alpha_beta=
-          alpha_beta vk.wrap |> target_field
-      ; delta= delta vk.wrap |> g2
-      ; query= query vk.wrap |> g1_vector }
-    in
-    sprintf
-      !"%{sexp:\n\
-       \    Lite_base.Crypto_params.Tock.Bowe_gabizon.Verification_key.t}\n"
-      key)
-
 module Doc = struct
   let date ?(extra = "") s =
     sprintf
@@ -301,11 +284,12 @@ module Types = struct
             ~args:Arg.[]
             ~doc:"Public key of fee transfer recipient"
             ~typ:(non_null public_key)
-            ~resolve:(fun _ (pk, _) -> pk)
+            ~resolve:(fun _ {Fee_transfer.receiver_pk= pk; _} -> pk)
         ; field "fee" ~typ:(non_null uint64)
             ~args:Arg.[]
             ~doc:"Amount that the recipient is paid in this fee transfer"
-            ~resolve:(fun _ (_, fee) -> Currency.Fee.to_uint64 fee) ] )
+            ~resolve:(fun _ {Fee_transfer.fee; _} -> Currency.Fee.to_uint64 fee)
+        ] )
 
   let completed_work =
     obj "CompletedWork" ~doc:"Completed snark works" ~fields:(fun _ ->
@@ -359,8 +343,12 @@ module Types = struct
               "Total transaction fee that is not accounted for in the \
                transition from source ledger to target ledger"
             ~args:Arg.[]
-            ~resolve:(fun _ {Transaction_snark.Statement.fee_excess; _} ->
-              fee_excess )
+            ~resolve:
+              (fun _
+                   { Transaction_snark.Statement.fee_excess= {fee_excess_l; _}
+                   ; _ } ->
+              (* TODO: Expose full fee excess data. *)
+              fee_excess_l )
         ; field "supplyIncrease" ~typ:(non_null uint64)
             ~doc:"Increase in total coinbase reward "
             ~args:Arg.[]
@@ -474,6 +462,7 @@ module Types = struct
       let to_full_account
           { Account.Poly.public_key
           ; token_id
+          ; token_owner
           ; nonce
           ; balance
           ; receipt_chain_hash
@@ -482,6 +471,7 @@ module Types = struct
           ; timing } =
         let open Option.Let_syntax in
         let%bind public_key = public_key in
+        let%bind token_owner = token_owner in
         let%bind nonce = nonce in
         let%bind receipt_chain_hash = receipt_chain_hash in
         let%bind delegate = delegate in
@@ -489,6 +479,7 @@ module Types = struct
         let%map timing = timing in
         { Account.Poly.public_key
         ; token_id
+        ; token_owner
         ; nonce
         ; balance
         ; receipt_chain_hash
@@ -499,6 +490,7 @@ module Types = struct
       let of_full_account
           { Account.Poly.public_key
           ; token_id
+          ; token_owner
           ; nonce
           ; balance
           ; receipt_chain_hash
@@ -507,6 +499,7 @@ module Types = struct
           ; timing } blockchain_length =
         { Account.Poly.public_key= Some public_key
         ; token_id
+        ; token_owner= Some token_owner
         ; nonce= Some nonce
         ; balance=
             { AnnotatedBalance.total= balance
@@ -536,6 +529,7 @@ module Types = struct
         | Some
             ( { Account.Poly.public_key
               ; token_id
+              ; token_owner
               ; nonce
               ; balance
               ; receipt_chain_hash
@@ -545,6 +539,7 @@ module Types = struct
             , blockchain_length ) ->
             { Account.Poly.public_key= Some public_key
             ; token_id
+            ; token_owner= Some token_owner
             ; nonce= Some nonce
             ; delegate= Some delegate
             ; balance=
@@ -558,6 +553,7 @@ module Types = struct
             Account.
               { Poly.public_key= Some (Account_id.public_key account_id)
               ; token_id= Account_id.token_id account_id
+              ; token_owner= None
               ; nonce= None
               ; delegate= None
               ; balance=
@@ -581,6 +577,7 @@ module Types = struct
       { account:
           ( Public_key.Compressed.t option
           , Token_id.t
+          , bool option
           , AnnotatedBalance.t
           , Account.Nonce.t option
           , Receipt.Chain_hash.t option
@@ -1890,14 +1887,6 @@ module Queries = struct
       ~doc:"The version of the node (git commit hash)"
       ~resolve:(fun _ _ -> Some Coda_version.commit_id)
 
-  let blockchain_verification_key =
-    io_field "blockchainVerificationKey" ~typ:(non_null string)
-      ~args:Arg.[]
-      ~doc:"Experimental: Verification key for blockchain snark"
-      ~resolve:(fun _ _ ->
-        let%map key = Lazy.force verification_key in
-        Ok key )
-
   let tracked_accounts_resolver {ctx= coda; _} () =
     let wallets = Coda_lib.wallets coda in
     let block_production_pubkeys = Coda_lib.block_production_pubkeys coda in
@@ -2086,7 +2075,6 @@ module Queries = struct
     ; trust_status
     ; trust_status_all
     ; snark_pool
-    ; blockchain_verification_key
     ; pending_snark_work ]
 end
 

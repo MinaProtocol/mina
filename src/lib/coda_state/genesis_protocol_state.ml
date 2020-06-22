@@ -26,16 +26,3 @@ let t ~genesis_ledger ~constraint_constants ~consensus_constants =
       ~consensus_state:genesis_consensus_state ~constants:protocol_constants
   in
   With_hash.of_data ~hash_data:Protocol_state.hash state
-
-module For_tests = struct
-  (*Use test_ledger generated at compile time*)
-
-  let genesis_state =
-    lazy
-      (t ~genesis_ledger:Test_genesis_ledger.t
-         ~constraint_constants:
-           Genesis_constants.Constraint_constants.for_unit_tests
-         ~consensus_constants:(Lazy.force Consensus.Constants.for_unit_tests))
-
-  let genesis_state_hash = Lazy.map ~f:With_hash.hash genesis_state
-end

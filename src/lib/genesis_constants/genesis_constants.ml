@@ -48,6 +48,7 @@ module Constraint_constants = struct
         { c: int
         ; ledger_depth: int
         ; work_delay: int
+        ; block_window_duration_ms: int
         ; transaction_capacity_log_2: int
         ; pending_coinbase_depth: int
         ; coinbase_amount: Currency.Amount.Stable.V1.t
@@ -61,6 +62,7 @@ module Constraint_constants = struct
     { c: int
     ; ledger_depth: int
     ; work_delay: int
+    ; block_window_duration_ms: int
     ; transaction_capacity_log_2: int
     ; pending_coinbase_depth: int
     ; coinbase_amount: Currency.Amount.t
@@ -108,6 +110,9 @@ module Constraint_constants = struct
         [%%inject
         "work_delay", scan_state_work_delay]
 
+        [%%inject
+        "block_window_duration_ms", block_window_duration]
+
         [%%if
         scan_state_with_tps_goal]
 
@@ -120,8 +125,7 @@ module Constraint_constants = struct
            by 10 again because we have tps * 10
         *)
         let max_user_commands_per_block =
-          tps_goal_x10 * Coda_compile_config.block_window_duration_ms
-          / (1000 * 10)
+          tps_goal_x10 * block_window_duration_ms / (1000 * 10)
 
         (** Log of the capacity of transactions per transition.
             - 1 will only work if we don't have prover fees.
@@ -150,6 +154,7 @@ module Constraint_constants = struct
           { c
           ; ledger_depth
           ; work_delay
+          ; block_window_duration_ms
           ; transaction_capacity_log_2
           ; pending_coinbase_depth
           ; coinbase_amount=
@@ -260,12 +265,10 @@ module Protocol = struct
               Time.of_string "2019-10-08 17:51:23.050849Z" }
         in
         (*from the print statement in Serialization.check_serialization*)
-        let known_good_hash =
-          "\x18\x3E\xF4\x11\xAC\x44\x83\xBF\x0E\x0F\x76\x5B\xF7\xE6\xFA\xE7\xEB\x24\xF6\xF7\xAA\xC8\x37\x71\xF7\xB9\x54\x66\xF6\x38\xB3\xF1"
-        in
+        let known_good_digest = "2b1a964e0fea8c31fdf76e7f5bebcdd6" in
         Ppx_version.Serialization.check_serialization
           (module V1)
-          t known_good_hash
+          t known_good_digest
     end
   end]
 
@@ -283,7 +286,8 @@ module T = struct
           [t.protocol.k; t.protocol.delta; t.txpool_max_size]
           ~f:Int.to_string
       |> String.concat ~sep:"" )
-      ^ Core.Time.to_string t.protocol.genesis_state_timestamp
+      ^ Core.Time.to_string_abs ~zone:Time.Zone.utc
+          t.protocol.genesis_state_timestamp
     in
     Blake2.digest_string str |> Blake2.to_hex
 end

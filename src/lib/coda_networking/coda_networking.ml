@@ -11,6 +11,38 @@ let refused_answer_query_string = "Refused to answer_query"
 
 type exn += No_initial_peers
 
+type Structured_log_events.t +=
+  | Block_received of {state_hash: State_hash.t; sender: Envelope.Sender.t}
+  [@@deriving register_event {msg= "Received a block from $sender"}]
+
+type Structured_log_events.t +=
+  | Snark_work_received of
+      { work: Snark_pool.Resource_pool.Diff.compact
+      ; sender: Envelope.Sender.t }
+  [@@deriving
+    register_event {msg= "Received Snark-pool diff $work from $sender"}]
+
+type Structured_log_events.t +=
+  | Transactions_received of
+      { txns: Transaction_pool.Resource_pool.Diff.t
+      ; sender: Envelope.Sender.t }
+  [@@deriving
+    register_event {msg= "Received transaction-pool diff $txns from $sender"}]
+
+type Structured_log_events.t += Gossip_new_state of {state_hash: State_hash.t}
+  [@@deriving register_event {msg= "Broadcasting new state over gossip net"}]
+
+type Structured_log_events.t +=
+  | Gossip_transaction_pool_diff of
+      { txns: Transaction_pool.Resource_pool.Diff.t }
+  [@@deriving
+    register_event {msg= "Broadcasting snark pool diff over gossip net"}]
+
+type Structured_log_events.t +=
+  | Gossip_snark_pool_diff of {work: Snark_pool.Resource_pool.Diff.compact}
+  [@@deriving
+    register_event {msg= "Broadcasting transaction pool diff over gossip net"}]
+
 (* INSTRUCTIONS FOR ADDING A NEW RPC:
  *   - define a new module under the Rpcs module
  *   - add an entry to the Rpcs.rpc GADT definition for the new module (type ('query, 'response) rpc, below)
@@ -636,6 +668,7 @@ module Config = struct
     ; time_controller: Block_time.Controller.t
     ; consensus_local_state: Consensus.Data.Local_state.t
     ; genesis_ledger_hash: Ledger_hash.t
+    ; constraint_constants: Genesis_constants.Constraint_constants.t
     ; creatable_gossip_net: Gossip_net.Any.creatable
     ; is_seed: bool
     ; log_gossip_heard: log_gossip_heard }
@@ -662,17 +695,20 @@ type t =
   ; first_received_message_signal: unit Ivar.t }
 [@@deriving fields]
 
-let offline_time =
+let offline_time
+    {Genesis_constants.Constraint_constants.block_window_duration_ms; _} =
   (* This is a bit of a hack, see #3232. *)
-  let inactivity_ms = Coda_compile_config.block_window_duration_ms * 8 in
+  let inactivity_ms = block_window_duration_ms * 8 in
   Block_time.Span.of_ms @@ Int64.of_int inactivity_ms
 
-let setup_timer time_controller sync_state_broadcaster =
-  Block_time.Timeout.create time_controller offline_time ~f:(fun _ ->
+let setup_timer ~constraint_constants time_controller sync_state_broadcaster =
+  Block_time.Timeout.create time_controller (offline_time constraint_constants)
+    ~f:(fun _ ->
       Broadcast_pipe.Writer.write sync_state_broadcaster `Offline
       |> don't_wait_for )
 
-let online_broadcaster time_controller received_messages =
+let online_broadcaster ~constraint_constants time_controller received_messages
+    =
   let online_reader, online_writer = Broadcast_pipe.create `Offline in
   let init =
     Block_time.Timeout.create time_controller
@@ -682,7 +718,7 @@ let online_broadcaster time_controller received_messages =
   Strict_pipe.Reader.fold received_messages ~init ~f:(fun old_timeout _ ->
       let%map () = Broadcast_pipe.Writer.write online_writer `Online in
       Block_time.Timeout.cancel time_controller old_timeout () ;
-      setup_timer time_controller online_writer )
+      setup_timer ~constraint_constants time_controller online_writer )
   |> Deferred.ignore |> don't_wait_for ;
   online_reader
 
@@ -992,7 +1028,8 @@ let create (config : Config.t)
       (Gossip_net.Any.received_message_reader gossip_net)
   in
   let online_status =
-    online_broadcaster config.time_controller online_notifier
+    online_broadcaster ~constraint_constants:config.constraint_constants
+      config.time_controller online_notifier
   in
   let first_received_message_signal = Ivar.create () in
   let states, snark_pool_diffs, transaction_pool_diffs =
@@ -1009,41 +1046,33 @@ let create (config : Config.t)
                  |> Protocol_state.blockchain_state
                  |> Blockchain_state.timestamp |> Block_time.to_time )) ;
             if config.log_gossip_heard.new_state then
-              Logger.debug config.logger ~module_:__MODULE__ ~location:__LOC__
-                "Received a block $block from $sender"
+              Logger.Str.debug config.logger ~module_:__MODULE__
+                ~location:__LOC__
                 ~metadata:
-                  [ ("external_transition", External_transition.to_yojson state)
-                  ; ( "state_hash"
-                    , External_transition.state_hash state
-                      |> State_hash.to_yojson )
-                  ; ( "sender"
-                    , Envelope.(Sender.to_yojson (Incoming.sender envelope)) )
-                  ] ;
+                  [("external_transition", External_transition.to_yojson state)]
+                (Block_received
+                   { state_hash= External_transition.state_hash state
+                   ; sender= Envelope.Incoming.sender envelope }) ;
             `Fst
               ( Envelope.Incoming.map envelope ~f:(fun _ -> state)
               , Block_time.now config.time_controller
               , valid_cb )
         | Snark_pool_diff diff ->
             if config.log_gossip_heard.snark_pool_diff then
-              Logger.debug config.logger ~module_:__MODULE__ ~location:__LOC__
-                "Received Snark-pool diff $work from $sender"
-                ~metadata:
-                  [ ("work", Snark_pool.Resource_pool.Diff.compact_json diff)
-                  ; ( "sender"
-                    , Envelope.(Sender.to_yojson (Incoming.sender envelope)) )
-                  ] ;
+              Logger.Str.debug config.logger ~module_:__MODULE__
+                ~location:__LOC__
+                (Snark_work_received
+                   { work= Snark_pool.Resource_pool.Diff.to_compact diff
+                   ; sender= Envelope.Incoming.sender envelope }) ;
             Coda_metrics.(
               Counter.inc_one Snark_work.completed_snark_work_received_gossip) ;
             `Snd (Envelope.Incoming.map envelope ~f:(fun _ -> diff), valid_cb)
         | Transaction_pool_diff diff ->
             if config.log_gossip_heard.transaction_pool_diff then
-              Logger.debug config.logger ~module_:__MODULE__ ~location:__LOC__
-                "Received transaction-pool diff $txns from $sender"
-                ~metadata:
-                  [ ("txns", Transaction_pool.Resource_pool.Diff.to_yojson diff)
-                  ; ( "sender"
-                    , Envelope.(Sender.to_yojson (Incoming.sender envelope)) )
-                  ] ;
+              Logger.Str.debug config.logger ~module_:__MODULE__
+                ~location:__LOC__
+                (Transactions_received
+                   {txns= diff; sender= Envelope.Incoming.sender envelope}) ;
             let diff' =
               List.filter diff ~f:(fun cmd ->
                   if User_command.has_insufficient_fee cmd then (
@@ -1105,25 +1134,26 @@ let fill_first_received_message_signal {first_received_message_signal; _} =
   Ivar.fill_if_empty first_received_message_signal ()
 
 (* TODO: Have better pushback behavior *)
-let broadcast ?(extra_metadata = []) t msg =
-  Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
-    ~metadata:
-      (("message", Gossip_net.Message.msg_to_yojson msg) :: extra_metadata)
-    !"Broadcasting %s over gossip net"
-    (Gossip_net.Message.summary msg) ;
+let broadcast t ~log_msg msg =
+  Logger.Str.trace t.logger ~module_:__MODULE__ ~location:__LOC__
+    ~metadata:[("message", Gossip_net.Message.msg_to_yojson msg)]
+    log_msg ;
   Gossip_net.Any.broadcast t.gossip_net msg
 
 let broadcast_state t state =
   broadcast t
     (Gossip_net.Message.New_state (With_hash.data state))
-    ~extra_metadata:
-      [("state_hash", With_hash.hash state |> State_hash.to_yojson)]
+    ~log_msg:(Gossip_new_state {state_hash= With_hash.hash state})
 
 let broadcast_transaction_pool_diff t diff =
   broadcast t (Gossip_net.Message.Transaction_pool_diff diff)
+    ~log_msg:(Gossip_transaction_pool_diff {txns= diff})
 
 let broadcast_snark_pool_diff t diff =
   broadcast t (Gossip_net.Message.Snark_pool_diff diff)
+    ~log_msg:
+      (Gossip_snark_pool_diff
+         {work= Snark_pool.Resource_pool.Diff.to_compact diff})
 
 (* TODO: This is kinda inefficient *)
 let find_map xs ~f =

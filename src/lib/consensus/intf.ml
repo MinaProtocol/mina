@@ -439,6 +439,10 @@ module type S = sig
 
         type t = Stable.Latest.t
         [@@deriving hash, eq, compare, sexp, to_yojson]
+
+        module For_tests : sig
+          val with_curr_global_slot : t -> Global_slot.t -> t
+        end
       end
 
       type display [@@deriving yojson]
@@ -474,18 +478,20 @@ module type S = sig
 
       val to_input : Value.t -> (Field.t, bool) Random_oracle.Input.t
 
-      val to_lite : (Value.t -> Lite_base.Consensus_state.t) option
-
       val display : Value.t -> display
 
       val consensus_time : Value.t -> Consensus_time.t
 
       val blockchain_length : Value.t -> Length.t
 
+      val curr_global_slot_var : var -> Global_slot.Checked.t
+
       val graphql_type :
         unit -> ('ctx, Value.t option) Graphql_async.Schema.typ
 
       val curr_slot : Value.t -> Slot.t
+
+      val curr_global_slot : Value.t -> Coda_numbers.Global_slot.t
 
       val is_genesis_state : Value.t -> bool
 
@@ -535,7 +541,8 @@ module type S = sig
      * kept, or `\`Take` if the second tip should be taken instead.
     *)
     val select :
-         existing:Consensus_state.Value.t
+         constants:Constants.t
+      -> existing:Consensus_state.Value.t
       -> candidate:Consensus_state.Value.t
       -> logger:Logger.t
       -> [`Keep | `Take]

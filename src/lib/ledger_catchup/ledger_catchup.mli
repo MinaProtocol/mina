@@ -11,7 +11,7 @@ end
 
 val run :
      logger:Logger.t
-  -> constraint_constants:Genesis_constants.Constraint_constants.t
+  -> precomputed_values:Precomputed_values.t
   -> trust_system:Trust_system.t
   -> verifier:Verifier.t
   -> network:Coda_networking.t

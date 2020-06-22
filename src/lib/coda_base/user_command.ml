@@ -90,6 +90,8 @@ let fee_payer_pk ({payload; _} : t) = Payload.fee_payer_pk payload
 
 let fee_payer ({payload; _} : t) = Payload.fee_payer payload
 
+let fee_excess ({payload; _} : t) = Payload.fee_excess payload
+
 let token ({payload; _} : t) = Payload.token payload
 
 let source_pk ({payload; _} : t) = Payload.source_pk payload

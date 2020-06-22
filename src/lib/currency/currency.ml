@@ -207,7 +207,8 @@ end = struct
 
     let gen =
       Quickcheck.Generator.map2 gen Sgn.gen ~f:(fun magnitude sgn ->
-          create ~magnitude ~sgn )
+          if Unsigned.(equal zero magnitude) then zero
+          else create ~magnitude ~sgn )
 
     let sgn_to_bool = function Sgn.Pos -> true | Neg -> false
 
@@ -232,7 +233,9 @@ end = struct
                 ~magnitude:Unsigned.Infix.(x.magnitude - y.magnitude)
             else zero )
 
-    let negate t = {t with sgn= Sgn.negate t.sgn}
+    let negate t =
+      if Unsigned.(equal zero t.magnitude) then zero
+      else {t with sgn= Sgn.negate t.sgn}
 
     let of_unsigned magnitude = create ~magnitude ~sgn:Sgn.Pos
 

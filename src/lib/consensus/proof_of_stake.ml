@@ -5,7 +5,6 @@ open Unsigned
 open Currency
 open Fold_lib
 open Signature_lib
-open Module_version
 open Snark_params
 open Bitstring_lib
 open Num_util
@@ -157,7 +156,7 @@ module Data = struct
 
     type _unused = unit constraint t = Stable.Latest.t
 
-    let initial : t = of_hash Tick.Pedersen.zero_hash
+    let initial : t = of_hash Outside_hash_image.t
 
     let update (seed : t) vrf_result =
       let open Random_oracle in
@@ -1233,13 +1232,13 @@ module Data = struct
 
     let update_pair
         ((staking_data, next_data) : Staking.Value.t * Next.Value.t)
-        epoch_count ~prev_epoch ~next_epoch ~prev_slot
+        epoch_count ~prev_epoch ~next_epoch ~next_slot
         ~prev_protocol_state_hash ~producer_vrf_result ~snarked_ledger_hash
         ~total_currency ~(constants : Constants.t) =
       let staking_data', next_data', epoch_count' =
         if next_epoch > prev_epoch then
           ( next_to_staking next_data
-          , { Poly.seed= Epoch_seed.initial
+          , { Poly.seed= next_data.seed
             ; ledger=
                 {Epoch_ledger.Poly.hash= snarked_ledger_hash; total_currency}
             ; start_checkpoint=
@@ -1256,7 +1255,7 @@ module Data = struct
           , epoch_count ) )
       in
       let curr_seed, curr_lock_checkpoint =
-        if Slot.in_seed_update_range prev_slot ~constants then
+        if Slot.in_seed_update_range next_slot ~constants then
           ( Epoch_seed.update next_data'.seed producer_vrf_result
           , prev_protocol_state_hash )
         else (next_data'.seed, next_data'.lock_checkpoint)
@@ -1837,6 +1836,15 @@ module Data = struct
       type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash]
 
       let to_yojson = Stable.Latest.to_yojson
+
+      module For_tests = struct
+        let with_curr_global_slot (state : t) slot_number =
+          let curr_global_slot : Global_slot.t =
+            Global_slot.For_tests.of_global_slot state.curr_global_slot
+              slot_number
+          in
+          {state with curr_global_slot}
+      end
     end
 
     open Snark_params.Tick
@@ -2064,7 +2072,7 @@ module Data = struct
           ( previous_consensus_state.staking_epoch_data
           , previous_consensus_state.next_epoch_data )
           previous_consensus_state.epoch_count ~prev_epoch ~next_epoch
-          ~prev_slot ~prev_protocol_state_hash:previous_protocol_state_hash
+          ~next_slot ~prev_protocol_state_hash:previous_protocol_state_hash
           ~producer_vrf_result ~snarked_ledger_hash ~total_currency
       in
       let min_window_density, sub_window_densities =
@@ -2196,7 +2204,7 @@ module Data = struct
         let%bind is_genesis = is_genesis next_global_slot in
         Boolean.Assert.any [global_slot_increased; is_genesis]
       in
-      let%bind next_epoch, _next_slot =
+      let%bind next_epoch, next_slot =
         Global_slot.Checked.to_epoch_and_slot next_global_slot
       and prev_epoch, prev_slot =
         Global_slot.Checked.to_epoch_and_slot prev_global_slot
@@ -2223,15 +2231,11 @@ module Data = struct
           ~next:next_global_slot
       in
       let%bind in_seed_update_range =
-        Slot.Checked.in_seed_update_range prev_slot ~constants
+        Slot.Checked.in_seed_update_range next_slot ~constants
       in
       let%bind next_epoch_data =
         let%map seed =
-          let%bind base =
-            Epoch_seed.if_ epoch_increased
-              ~then_:Epoch_seed.(var_of_t initial)
-              ~else_:previous_state.next_epoch_data.seed
-          in
+          let base = previous_state.next_epoch_data.seed in
           let%bind updated = Epoch_seed.update_var base vrf_result in
           Epoch_seed.if_ in_seed_update_range ~then_:updated ~else_:base
         and epoch_length =
@@ -2323,6 +2327,12 @@ module Data = struct
     let curr_epoch = curr_ Global_slot.epoch
 
     let curr_slot = curr_ Global_slot.slot
+
+    let curr_global_slot_var (t : var) =
+      Global_slot.slot_number t.curr_global_slot
+
+    let curr_global_slot (t : Value.t) =
+      Global_slot.slot_number t.curr_global_slot
 
     let consensus_time (t : Value.t) = t.curr_global_slot
 
@@ -2804,7 +2814,25 @@ module Hooks = struct
       (Consensus_state.curr_epoch_and_slot consensus_state)
       ~time_received
 
-  let select ~existing ~candidate ~logger =
+  let is_short_range ~constants =
+    let open Consensus_state in
+    let is_pred x1 x2 = Epoch.equal (Epoch.succ x1) x2 in
+    let pred_case c1 c2 =
+      let e1, e2 = (curr_epoch c1, curr_epoch c2) in
+      let c1_next_is_finalized =
+        not (Slot.in_seed_update_range ~constants (Slot.succ (curr_slot c1)))
+      in
+      is_pred e1 e2 && c1_next_is_finalized
+      && Coda_base.State_hash.equal c1.next_epoch_data.lock_checkpoint
+           c2.staking_epoch_data.lock_checkpoint
+    in
+    fun c1 c2 ->
+      if Epoch.equal (curr_epoch c1) (curr_epoch c2) then
+        Coda_base.State_hash.equal c1.staking_epoch_data.lock_checkpoint
+          c2.staking_epoch_data.lock_checkpoint
+      else pred_case c1 c2 || pred_case c2 c1
+
+  let select ~constants ~existing ~candidate ~logger =
     let string_of_choice = function `Take -> "Take" | `Keep -> "Keep" in
     let log_result choice msg =
       Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
@@ -2839,89 +2867,36 @@ module Hooks = struct
     in
     let ( << ) a b =
       let c = Length.compare a b in
+      (* TODO: I'm not sure we should throw away our current chain if they compare equal *)
       c < 0 || (c = 0 && candidate_vrf_is_bigger)
     in
-    let ( = ) = Coda_base.State_hash.equal in
-    let branches =
-      [ ( ( lazy
-              ( existing.staking_epoch_data.lock_checkpoint
-              = candidate.staking_epoch_data.lock_checkpoint )
-          , "last epoch lock checkpoints are equal" )
-        , ( lazy (existing.blockchain_length << candidate.blockchain_length)
-          , "candidate is longer than existing" ) )
-      ; ( ( lazy
-              ( existing.staking_epoch_data.start_checkpoint
-              = candidate.staking_epoch_data.start_checkpoint )
-          , "last epoch start checkpoints are equal" )
-        , ( lazy
-              ( existing.staking_epoch_data.epoch_length
-              << candidate.staking_epoch_data.epoch_length )
-          , "candidate last epoch is longer than existing last epoch" ) )
-        (* these two could be condensed into one entry *)
-      ; ( ( lazy
-              ( existing.next_epoch_data.lock_checkpoint
-              = candidate.staking_epoch_data.lock_checkpoint )
-          , "candidate last epoch lock checkpoint is equal to existing \
-             current epoch lock checkpoint" )
-        , ( lazy (existing.blockchain_length << candidate.blockchain_length)
-          , "candidate is longer than existing" ) )
-      ; ( ( lazy
-              ( candidate.next_epoch_data.lock_checkpoint
-              = existing.staking_epoch_data.lock_checkpoint )
-          , "candidate current epoch lock checkpoint is equal to existing \
-             last epoch lock checkpoint" )
-        , ( lazy (existing.blockchain_length << candidate.blockchain_length)
-          , "candidate is longer than existing" ) )
-      ; ( ( lazy
-              ( existing.next_epoch_data.start_checkpoint
-              = candidate.staking_epoch_data.start_checkpoint )
-          , "candidate last epoch start checkpoint is equal to existing \
-             current epoch start checkpoint" )
-        , ( lazy
-              ( existing.next_epoch_data.epoch_length
-              << candidate.staking_epoch_data.epoch_length )
-          , "candidate last epoch is longer than existing current epoch" ) )
-      ; ( ( lazy
-              ( existing.staking_epoch_data.start_checkpoint
-              = candidate.next_epoch_data.start_checkpoint )
-          , "candidate current epoch start checkpoint is equal to existing \
-             last epoch start checkpoint" )
-        , ( lazy
-              ( existing.staking_epoch_data.epoch_length
-              << candidate.next_epoch_data.epoch_length )
-          , "candidate current epoch is longer than existing last epoch" ) ) ]
-    in
     let precondition_msg, choice_msg, should_take =
-      List.find_map branches
-        ~f:(fun ((precondition, precondition_msg), (choice, choice_msg)) ->
-          Option.some_if (Lazy.force precondition)
-            (precondition_msg, choice_msg, choice) )
-      |> Option.value
-           ~default:
-             ( "default case"
-             , "candidate virtual min-length is longer than existing virtual \
-                min-length"
-             , lazy
-                 (let newest_epoch =
-                    Epoch.max
-                      (Consensus_state.curr_epoch existing)
-                      (Consensus_state.curr_epoch candidate)
-                  in
-                  let virtual_min_length (s : Consensus_state.Value.t) =
-                    let curr_epoch = Consensus_state.curr_epoch s in
-                    if Epoch.(succ curr_epoch < newest_epoch) then Length.zero
-                      (* There is a gap of an entire epoch *)
-                    else if Epoch.(succ curr_epoch = newest_epoch) then
-                      Length.(
-                        min s.min_window_density s.next_epoch_data.epoch_length)
-                      (* Imagine the latest epoch was padded out with zeros to reach the newest_epoch *)
-                    else s.min_window_density
-                  in
-                  Length.(
-                    virtual_min_length existing < virtual_min_length candidate))
-             )
+      if is_short_range existing candidate ~constants then
+        ( "most recent finalized checkpoints are equal"
+        , "candidate length is longer than existing length "
+        , existing.blockchain_length << candidate.blockchain_length )
+      else
+        ( "most recent finalized checkpoints are not equal"
+        , "candidate virtual min-length is longer than existing virtual \
+           min-length"
+        , let newest_epoch =
+            Epoch.max
+              (Consensus_state.curr_epoch existing)
+              (Consensus_state.curr_epoch candidate)
+          in
+          let virtual_min_length (s : Consensus_state.Value.t) =
+            let curr_epoch = Consensus_state.curr_epoch s in
+            if Epoch.(succ curr_epoch < newest_epoch) then Length.zero
+              (* There is a gap of an entire epoch *)
+            else if Epoch.(succ curr_epoch = newest_epoch) then
+              Length.(min s.min_window_density s.next_epoch_data.epoch_length)
+              (* Imagine the latest epoch was padded out with zeros to reach the newest_epoch *)
+            else s.min_window_density
+          in
+          Length.(virtual_min_length existing < virtual_min_length candidate)
+        )
     in
-    let choice = if Lazy.force should_take then `Take else `Keep in
+    let choice = if should_take then `Take else `Keep in
     log_choice ~precondition_msg ~choice_msg choice ;
     choice
 
@@ -3087,7 +3062,7 @@ module Hooks = struct
 
   let should_bootstrap ~(constants : Constants.t) ~existing ~candidate ~logger
       =
-    match select ~existing ~candidate ~logger with
+    match select ~constants ~existing ~candidate ~logger with
     | `Keep ->
         false
     | `Take ->
@@ -3108,9 +3083,9 @@ module Hooks = struct
 
   let%test "Receive a valid consensus_state with a bit of delay" =
     let constants = Lazy.force Constants.for_unit_tests in
+    let genesis_ledger = Genesis_ledger.(Packed.t for_unit_tests) in
     let negative_one =
-      Consensus_state.negative_one ~genesis_ledger:Test_genesis_ledger.t
-        ~constants
+      Consensus_state.negative_one ~genesis_ledger ~constants
     in
     let curr_epoch, curr_slot =
       Consensus_state.curr_epoch_and_slot negative_one
@@ -3125,9 +3100,9 @@ module Hooks = struct
   let%test "Receive an invalid consensus_state" =
     let epoch = Epoch.of_int 5 in
     let constants = Lazy.force Constants.for_unit_tests in
+    let genesis_ledger = Genesis_ledger.(Packed.t for_unit_tests) in
     let negative_one =
-      Consensus_state.negative_one ~genesis_ledger:Test_genesis_ledger.t
-        ~constants
+      Consensus_state.negative_one ~genesis_ledger ~constants
     in
     let start_time = Epoch.start_time ~constants epoch in
     let ((curr_epoch, curr_slot) as curr) =
@@ -3296,7 +3271,8 @@ module Hooks = struct
           let staking_epoch_data, next_epoch_data, epoch_count =
             Epoch_data.update_pair ~constants
               (prev.staking_epoch_data, prev.next_epoch_data)
-              prev.epoch_count ~prev_epoch ~next_epoch:curr_epoch ~prev_slot
+              prev.epoch_count ~prev_epoch ~next_epoch:curr_epoch
+              ~next_slot:curr_slot
               ~prev_protocol_state_hash:
                 (With_hash.hash previous_protocol_state)
               ~producer_vrf_result ~snarked_ledger_hash ~total_currency
@@ -3342,18 +3318,19 @@ let%test_module "Proof of stake tests" =
 
     let constants = Lazy.force Constants.for_unit_tests
 
+    module Genesis_ledger = (val Genesis_ledger.for_unit_tests)
+
     let%test_unit "update, update_var agree starting from same genesis state" =
       (* build pieces needed to apply "update" *)
       let snarked_ledger_hash =
         Frozen_ledger_hash.of_ledger_hash
-          (Ledger.merkle_root (Lazy.force Test_genesis_ledger.t))
+          (Ledger.merkle_root (Lazy.force Genesis_ledger.t))
       in
       let previous_protocol_state_hash = State_hash.(of_hash zero) in
       let previous_consensus_state =
         Consensus_state.create_genesis
           ~negative_one_protocol_state_hash:previous_protocol_state_hash
-          ~genesis_ledger:Test_genesis_ledger.t ~constraint_constants
-          ~constants
+          ~genesis_ledger:Genesis_ledger.t ~constraint_constants ~constants
       in
       let global_slot =
         Core_kernel.Time.now () |> Time.of_time
@@ -3367,14 +3344,14 @@ let%test_module "Proof of stake tests" =
       (* setup ledger, needed to compute producer_vrf_result here and handler below *)
       let open Coda_base in
       (* choose largest account as most likely to produce a block *)
-      let ledger_data = Lazy.force Test_genesis_ledger.t in
+      let ledger_data = Lazy.force Genesis_ledger.t in
       let ledger = Ledger.Any_ledger.cast (module Ledger) ledger_data in
       let pending_coinbases =
         Pending_coinbase.create
           ~depth:constraint_constants.pending_coinbase_depth ()
         |> Or_error.ok_exn
       in
-      let maybe_sk, account = Test_genesis_ledger.largest_account_exn () in
+      let maybe_sk, account = Genesis_ledger.largest_account_exn () in
       let private_key = Option.value_exn maybe_sk in
       let public_key_compressed = Account.public_key account in
       let account_id =

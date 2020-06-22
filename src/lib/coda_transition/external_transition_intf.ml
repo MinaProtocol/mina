@@ -55,9 +55,7 @@ module type External_transition_common_intf = sig
 end
 
 module type External_transition_base_intf = sig
-  type t [@@deriving sexp, compare, to_yojson]
-
-  include Comparable.S with type t := t
+  type t [@@deriving sexp, to_yojson, eq]
 
   [%%versioned:
   module Stable : sig
@@ -510,6 +508,7 @@ module type S = sig
          , 'staged_ledger_diff
          , 'protocol_versions )
          Validation.with_transition
+      -> consensus_constants:Consensus.Constants.t
       -> logger:Logger.t
       -> frontier:Transition_frontier.t
       -> ( ( 'time_received
@@ -616,7 +615,7 @@ module type S = sig
          , 'protocol_versions )
          Validation.with_transition
       -> logger:Logger.t
-      -> constraint_constants:Genesis_constants.Constraint_constants.t
+      -> precomputed_values:Precomputed_values.t
       -> verifier:Verifier.t
       -> parent_staged_ledger:Staged_ledger.t
       -> parent_protocol_state:Protocol_state.value

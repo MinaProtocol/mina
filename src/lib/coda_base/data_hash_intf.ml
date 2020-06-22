@@ -35,9 +35,7 @@ module type Basic = sig
 
   type var
 
-  val var_of_hash_unpacked : Pedersen.Checked.Digest.Unpacked.var -> var
-
-  val var_to_hash_packed : var -> Pedersen.Checked.Digest.var
+  val var_to_hash_packed : var -> Random_oracle.Checked.Digest.t
 
   val var_to_input : var -> (Field.Var.t, Boolean.var) Random_oracle.Input.t
 
@@ -82,7 +80,7 @@ module type Full_size = sig
 
   val if_ : Boolean.var -> then_:var -> else_:var -> (var, _) Checked.t
 
-  val var_of_hash_packed : Pedersen.Checked.Digest.var -> var
+  val var_of_hash_packed : Random_oracle.Checked.Digest.t -> var
 
   [%%endif]
 

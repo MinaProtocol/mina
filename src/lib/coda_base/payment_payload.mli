@@ -62,6 +62,7 @@ val typ : (var, t) Typ.t
 
 val to_input : t -> (Field.t, bool) Random_oracle.Input.t
 
-val var_to_input : var -> (Field.Var.t, Boolean.var) Random_oracle.Input.t
+val var_to_input :
+  var -> ((Field.Var.t, Boolean.var) Random_oracle.Input.t, _) Checked.t
 
 val var_of_t : t -> var
