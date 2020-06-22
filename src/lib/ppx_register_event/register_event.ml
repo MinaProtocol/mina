@@ -32,7 +32,7 @@ let check_interpolations ~loc msg label_names =
   | _ ->
       ()
 
-let type_ext_str ~options ~path (ty_ext : type_extension) =
+let generate_loggers_and_parsers ~loc:_ ~path ty_ext msg_opt =
   let ctor, label_decls =
     match ty_ext.ptyext_constructors with
     (* record argument *)
@@ -82,7 +82,7 @@ let type_ext_str ~options ~path (ty_ext : type_extension) =
   let (module Ast_builder) = Ast_builder.make deriver_loc in
   let open Ast_builder in
   let (msg : expression), msg_loc =
-    match List.Assoc.find options "msg" ~equal:String.equal with
+    match msg_opt with
     | Some expr ->
         (expr, expr.pexp_loc)
     | None ->
@@ -99,7 +99,8 @@ let type_ext_str ~options ~path (ty_ext : type_extension) =
   in
   check_interpolations ~loc:msg_loc msg label_names ;
   let event_name = String.lowercase ctor in
-  let event_path = String.concat (path @ [ctor]) ~sep:"." in
+  let event_path = path ^ "." ^ event_name in
+  let split_path = String.split path ~on:'.' in
   let to_yojson = Ppx_deriving_yojson.ser_expr_of_typ in
   let of_yojson = Ppx_deriving_yojson.desu_expr_of_typ in
   let elist ~f l = elist (List.map ~f l) in
@@ -167,7 +168,9 @@ let type_ext_str ~options ~path (ty_ext : type_extension) =
                           [%expr
                             Core_kernel.Result.bind
                               ([%e
-                                 of_yojson ~path:(path @ [ctor; name]) pld_type]
+                                 of_yojson
+                                   ~path:(split_path @ [ctor; name])
+                                   pld_type]
                                  [%e evar name])
                               ~f:(fun [%p pvar name] -> [%e acc])] )
                         ~init:
@@ -184,4 +187,11 @@ let type_ext_str ~options ~path (ty_ext : type_extension) =
         Structured_log_events.register_constructor
           [%e evar (event_name ^ "_structured_events_repr")]] ]
 
-let () = Ppx_deriving.(register (create deriver ~type_ext_str ()))
+let str_type_ext =
+  let args =
+    let open Ppxlib.Deriving.Args in
+    empty +> arg "msg" __
+  in
+  Ppxlib.Deriving.Generator.make args generate_loggers_and_parsers
+
+let () = Ppxlib.Deriving.add deriver ~str_type_ext |> Ppxlib.Deriving.ignore

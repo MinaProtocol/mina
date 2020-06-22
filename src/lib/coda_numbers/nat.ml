@@ -64,8 +64,7 @@ struct
             (Bitstring_lib.Bitstring.Lsb_first.to_list bits) )
 
     let constant n =
-      Integer.constant ~length:N.length_in_bits ~m
-        (Bignum_bigint.of_int (N.to_int n))
+      Integer.constant ~length:N.length_in_bits ~m (N.to_bigint n)
 
     (* warning: this typ does not work correctly with the generic if_ *)
     let typ : (field Integer.t, t) Typ.t =
