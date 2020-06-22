@@ -51,9 +51,12 @@ let module = \(environment : List Text) ->
 
   let CompoundCmd = {
     Type = {
-      preprocess : Cmd,
-      postprocess : Cmd,
-      inner : Cmd
+      -- unpackage data downloaded from gcloud
+      before : Cmd,
+      -- run your command to produce data
+      inner : Cmd,
+      -- package data before an upload to gcloud
+      after : Cmd
     },
     default = {=}
   }
@@ -67,9 +70,9 @@ let module = \(environment : List Text) ->
     \(cachePath : Text) ->
     \(cmd : CompoundCmd.Type) ->
       let script =
-        "( ${format cmd.postprocess} || true ) && " ++
+        "( ${format cmd.before} || true ) && " ++
         ( format cmd.inner ) ++ " && " ++
-        ( format cmd.preprocess )
+        ( format cmd.after )
       in
       let cmd =
         runInDocker docker script
@@ -121,9 +124,9 @@ let tests =
       }
       "data.tar"
       M.CompoundCmd::{
-        preprocess = M.run "tar cvf data.tar /tmp/data",
-        postprocess = M.run "tar xvf data.tar -C /tmp/data",
-        inner = M.run "echo hello > /tmp/data/foo.txt"
+        before = M.run "tar xvf data.tar -C /tmp/data",
+        inner = M.run "echo hello > /tmp/data/foo.txt",
+        after = M.run "tar cvf data.tar /tmp/data"
       }
   )
   in
