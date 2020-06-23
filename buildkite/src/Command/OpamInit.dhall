@@ -13,7 +13,7 @@ let file =
 let unpackageScript : Text =
   "mv /home/opam/.opam /home/opam/.opam.bak && " ++
   "tar xfz ${file} --strip-components=2 && " ++
-  "ln -s \\\$(pwd)/.opam /home/opam/.opam"
+  "ln -s /workdir/.opam /home/opam/.opam"
 
 let commands : List Cmd.Type =
   [
