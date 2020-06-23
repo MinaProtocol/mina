@@ -1,15 +1,17 @@
-let Prelude = ../../External/Prelude.dhall
+let Prelude = ../External/Prelude.dhall
 
-let Cmd = ../../Lib/Cmds.dhall
+let Cmd = ../Lib/Cmds.dhall
+let S = ../Lib/SelectFiles.dhall
+let D = S.PathPattern
 
-let Pipeline = ../../Pipeline/Dsl.dhall
-let JobSpec = ../../Pipeline/JobSpec.dhall
+let Pipeline = ../Pipeline/Dsl.dhall
+let JobSpec = ../Pipeline/JobSpec.dhall
 
-let Command = ../../Command/Base.dhall
-let OpamInit = ../../Command/OpamInit.dhall
-let Libp2pHelper = ../../Command/Libp2pHelperBuild.dhall
-let Docker = ../../Command/Docker/Type.dhall
-let Size = ../../Command/Size.dhall
+let Command = ../Command/Base.dhall
+let OpamInit = ../Command/OpamInit.dhall
+let Libp2pHelper = ../Command/Libp2pHelperBuild.dhall
+let Docker = ../Command/Docker/Type.dhall
+let Size = ../Command/Size.dhall
 
 let buildTestCmd : Text -> Text -> Command.Type = \(profile : Text) -> \(path : Text) ->
   Command.build
@@ -18,7 +20,7 @@ let buildTestCmd : Text -> Text -> Command.Type = \(profile : Text) -> \(path : 
         Cmd.run "buildkite-agent artifact download libp2p_helper src/app/result/bin",
         Cmd.runInDocker
           Cmd.Docker::{
-            image = (../../Constants/ContainerImages.dhall).codaToolchain,
+            image = (../Constants/ContainerImages.dhall).codaToolchain,
             extraEnv = [ "DUNE_PROFILE=${profile}", "LIBP2P_NIXLESS=1", "GO=/usr/lib/go/bin/go" ]
           }
           ("source ~/.profile && make build && (dune runtest ${path} --profile=${profile} -j8 || (./scripts/link-coredumps.sh && false))")
@@ -34,7 +36,21 @@ in
 
 Pipeline.build
   Pipeline.Config::{
-    spec = ./Spec.dhall,
+    spec = 
+      let unitDirtyWhen = [
+        S.strictlyStart (S.contains "src/lib"),
+        S.strictlyStart (S.contains "src/nonconsensus"),
+        S.strictly (S.contains "Makefile"),
+        S.strictlyStart (S.contains "buildkite/src/Jobs/Unit"),
+        S.exactly "scripts/link-coredumps" "sh"
+      ]
+
+      in
+
+      JobSpec::{
+        dirtyWhen = unitDirtyWhen,
+        name = "Unit"
+      },
     steps = [
       Libp2pHelper.step,
       buildTestCmd "dev" "src/lib",
