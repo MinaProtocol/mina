@@ -18,12 +18,12 @@ Pipeline.build
     steps = [
     Command.build
       Command.Config::{
-        commands = [ Coda.fixPermissionsCommand ] # (OpamInit.commands (
-            Cmd.run ("mkdir -p /tmp/artifacts && (" ++
-              "set -o pipefail ; " ++
-              "./buildkite/scripts/opam-env.sh && " ++
-              "make client_sdk 2>&1 | tee /tmp/artifacts/buildclientsdk.log" ++
-            ")"))),
+        commands = OpamInit.andThenRunInDocker (
+            "mkdir -p /tmp/artifacts && (" ++
+                "set -o pipefail ; " ++
+                "./buildkite/scripts/opam-env.sh && " ++
+                "make client_sdk 2>&1 | tee /tmp/artifacts/buildclientsdk.log" ++
+              ")"),
         label = "Build client-sdk",
         key = "build-client-sdk",
         target = Size.Large,

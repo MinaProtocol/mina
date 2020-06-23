@@ -55,8 +55,6 @@ let module = \(environment : List Text) ->
 
   let CompoundCmd = {
     Type = {
-      -- unpackage data downloaded from gcloud (only on cache hit)
-      unpackage : Optional Cmd,
       -- run your command to create data (only on miss)
       create : Cmd,
       -- package data before an upload to gcloud (only on miss)
@@ -69,48 +67,23 @@ let module = \(environment : List Text) ->
     \(cmd : Cmd) -> cmd.line
 
   -- Loads through cache, innards with docker, buildkite-agent interactions outside, continues in docker after hit or miss with continuation
-  let cacheThrough : Docker.Type -> Text -> CompoundCmd.Type -> Cmd -> Cmd =
+  let cacheThrough : Docker.Type -> Text -> CompoundCmd.Type -> Cmd =
     \(docker : Docker.Type) ->
     \(cachePath : Text) ->
     \(cmd : CompoundCmd.Type) ->
-    \(continuation : Cmd) ->
-      let hitScript =
+      let missScript =
         ( format cmd.create ) ++ " && " ++
-        ( format cmd.package ) ++ " && " ++
-        ( format continuation )
+        ( format cmd.package )
       let missCmd =
-        runInDocker docker hitScript
-      let hitCmd =
-        runInDocker docker (
-          ( format (Optional/default Cmd true cmd.unpackage) ) ++ " && " ++
-          ( format continuation )
-        )
+        runInDocker docker missScript
       in
-      { line = "./buildkite/scripts/cache-through.sh ${cachePath} \"${format hitCmd}\" \"${format missCmd}\""
+      { line = "./buildkite/scripts/cache-through.sh ${cachePath} \"${format missCmd}\""
       , readable =
-        let makeSnippet = \(label : Text) -> \(cmd : Cmd) ->
-          Optional/toList Text (
-            Optional/map
-              Text
-              Text
-              (\(readable : Text) -> "${label} = ${readable}")
-              cmd.readable)
-        let details =
-          List/concat
+          Optional/map
             Text
-            [
-              makeSnippet "onHit" hitCmd,
-              makeSnippet "onMiss" missCmd
-            ]
-        let summary =
-          Text/concatSep
-            " ; "
-            details
-        in
-        if List/null Text details then
-          None Text
-        else
-          Some "Cache@${cachePath} ( ${summary} )"
+            Text
+            (\(readable : Text) -> "Cache@${cachePath} ( onMiss = ${readable} )")
+            missCmd.readable
       }
   in
 
@@ -146,7 +119,7 @@ let tests =
 
   let cacheExample = assert :
 ''
-  ./buildkite/scripts/cache-through.sh data.tar "docker run -it --rm --init --volume /var/buildkite/builds/$BUILDKITE_AGENT_NAME/$BUILDKITE_ORGANIZATION_SLUG/$BUILDKITE_PIPELINE_SLUG:/workdir --workdir /workdir --env ENV1 --env ENV2 --env TEST foo/bar:tag bash -c 'tar xvf data.tar -C /tmp/data && echo continue'" "docker run -it --rm --init --volume /var/buildkite/builds/$BUILDKITE_AGENT_NAME/$BUILDKITE_ORGANIZATION_SLUG/$BUILDKITE_PIPELINE_SLUG:/workdir --workdir /workdir --env ENV1 --env ENV2 --env TEST foo/bar:tag bash -c 'echo hello > /tmp/data/foo.txt && tar cvf data.tar /tmp/data && echo continue'"''
+  ./buildkite/scripts/cache-through.sh data.tar "docker run -it --rm --init --volume /var/buildkite/builds/$BUILDKITE_AGENT_NAME/$BUILDKITE_ORGANIZATION_SLUG/$BUILDKITE_PIPELINE_SLUG:/workdir --workdir /workdir --env ENV1 --env ENV2 --env TEST foo/bar:tag bash -c 'echo hello > /tmp/data/foo.txt && tar cvf data.tar /tmp/data'"''
 ===
   M.format (
     M.cacheThrough
@@ -156,11 +129,9 @@ let tests =
       }
       "data.tar"
       M.CompoundCmd::{
-        unpackage = Some (M.run "tar xvf data.tar -C /tmp/data"),
         create = M.run "echo hello > /tmp/data/foo.txt",
         package = M.run "tar cvf data.tar /tmp/data"
       }
-      (M.run "echo continue")
   )
   in
   ""

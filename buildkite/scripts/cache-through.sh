@@ -3,8 +3,8 @@
 set -eou pipefail
 set +x
 
-if [[ $# -ne 3 ]]; then
-  echo "Usage: $0 <path-to-file> <hit-in-docker-cmd> <miss-in-docker-cmd>"
+if [[ $# -ne 2 ]]; then
+  echo "Usage: $0 <path-to-file> <miss-in-docker-cmd>"
   exit 1
 fi
 
@@ -24,8 +24,7 @@ fi
 UPLOAD_BIN=/usr/local/google-cloud-sdk/bin/gsutil
 PREFIX=gs://buildkite_k8s/coda/shared
 FILE="$1"
-HIT_CMD="$2"
-MISS_CMD="$3"
+MISS_CMD="$2"
 
 set +e
 if ! $UPLOAD_BIN cp ${PREFIX}/${FILE} .; then
@@ -36,6 +35,5 @@ if ! $UPLOAD_BIN cp ${PREFIX}/${FILE} .; then
 else
   set -e
   echo "*** Cache Hit -- skipping step ***"
-  bash -c "$HIT_CMD"
 fi
 
