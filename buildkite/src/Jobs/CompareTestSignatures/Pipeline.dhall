@@ -15,7 +15,7 @@ Pipeline.build
     steps = [
       Command/Coda.build 
         Command/Coda.Config::{
-           commands = commands,
+           commands = OpamInit.commands # commands,
            label = "Compare test signatures",
            key = "check"
         }
