@@ -11,12 +11,10 @@ let file =
 
 -- Mv is faster than rm -rf
 let unpackageScript : Text =
-  "echo \"start mv\" && date +%s && " ++
-  "mv /home/opam/.opam /home/opam/.opam.bak && " ++
   "echo \"end mv, start tar xfz\" && date +%s && " ++
   "tar xfz ${file} --strip-components=2 && " ++
   "echo \"end tar, start ln\" && date +%s && " ++
-  "ln -s /workdir/.opam /home/opam/.opam && ls -la /home/opam/.opam/ && ls -la /home/opam"
+  "ln -Ffs /workdir/.opam /home/opam/.opam && ls -la /home/opam/.opam/ && ls -la /home/opam"
 
 let commands : List Cmd.Type =
   [
