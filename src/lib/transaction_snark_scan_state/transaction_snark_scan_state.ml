@@ -544,7 +544,12 @@ let partition_if_overflowing t =
 let extract_from_job (job : job) =
   match job with
   | Parallel_scan.Available_job.Base d ->
-      First (d, d.statement, d.state_hash, d.ledger_witness)
+      First
+        ( d.transaction_with_info
+        , d.statement
+        , d.state_hash
+        , d.ledger_witness
+        , d.init_stack )
   | Merge ((p1, _), (p2, _)) ->
       Second (p1, p2)
 
@@ -608,16 +613,19 @@ let all_work_pairs t
   let open Or_error.Let_syntax in
   let single_spec (job : job) =
     match extract_from_job job with
-    | First (d, statement, state_hash, ledger_witness) ->
-        let%bind transaction =
-          Ledger.Undo.transaction d.transaction_with_info
-        in
+    | First
+        ( transaction_with_info
+        , statement
+        , state_hash
+        , ledger_witness
+        , init_stack ) ->
+        let%bind transaction = Ledger.Undo.transaction transaction_with_info in
         let%bind protocol_state_body =
           let%map state = get_state (fst state_hash) in
           Coda_state.Protocol_state.body state
         in
         let%map init_stack =
-          match d.init_stack with
+          match init_stack with
           | Base x ->
               Ok x
           | Merge ->

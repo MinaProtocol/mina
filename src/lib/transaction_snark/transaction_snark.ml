@@ -1489,8 +1489,8 @@ module type S = sig
        sok_digest:Sok_message.Digest.t
     -> source:Frozen_ledger_hash.t
     -> target:Frozen_ledger_hash.t
-    -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
     -> init_stack:Pending_coinbase.Stack.t
+    -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
     -> Transaction.t Transaction_protocol_state.t
     -> Tick.Handler.t
     -> t
@@ -1499,8 +1499,8 @@ module type S = sig
        sok_digest:Sok_message.Digest.t
     -> source:Frozen_ledger_hash.t
     -> target:Frozen_ledger_hash.t
-    -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
     -> init_stack:Pending_coinbase.Stack.t
+    -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
     -> User_command.With_valid_signature.t Transaction_protocol_state.t
     -> Tick.Handler.t
     -> t
@@ -1509,8 +1509,8 @@ module type S = sig
        sok_digest:Sok_message.Digest.t
     -> source:Frozen_ledger_hash.t
     -> target:Frozen_ledger_hash.t
-    -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
     -> init_stack:Pending_coinbase.Stack.t
+    -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
     -> Fee_transfer.t Transaction_protocol_state.t
     -> Tick.Handler.t
     -> t
@@ -1519,12 +1519,13 @@ module type S = sig
 end
 
 let check_transaction_union ?(preeval = false) ~constraint_constants
-    sok_message source target pc transaction state_body init_stack handler =
+    sok_message source target init_stack pending_coinbase_stack_state
+    transaction state_body handler =
+  if preeval then failwith "preeval currently disabled" ;
   let sok_digest = Sok_message.digest sok_message in
   let handler =
     Base.transaction_union_handler handler transaction state_body init_stack
   in
-  if preeval then failwith "preeval currently disabled" ;
   let open Tick in
   Or_error.ok_exn
     (run_and_check
@@ -1540,14 +1541,14 @@ let check_transaction_union ?(preeval = false) ~constraint_constants
                         Transaction_union.supply_increase transaction
                     ; fee_excess= Transaction_union.fee_excess transaction
                     ; sok_digest
-                    ; pending_coinbase_stack_state= pc })
+                    ; pending_coinbase_stack_state })
              >>= Base.main ~constraint_constants))
           handler)
        ())
   |> ignore
 
 let check_transaction ?preeval ~constraint_constants ~sok_message ~source
-    ~target ~pending_coinbase_stack_state ~init_stack
+    ~target ~init_stack ~pending_coinbase_stack_state
     (transaction_in_block : Transaction.t Transaction_protocol_state.t) handler
     =
   let transaction =
@@ -1557,20 +1558,22 @@ let check_transaction ?preeval ~constraint_constants ~sok_message ~source
     Transaction_protocol_state.block_data transaction_in_block
   in
   check_transaction_union ?preeval ~constraint_constants sok_message source
-    target pending_coinbase_stack_state
+    target init_stack pending_coinbase_stack_state
     (Transaction_union.of_transaction transaction)
-    state_body init_stack handler
+    state_body handler
 
 let check_user_command ~constraint_constants ~sok_message ~source ~target
-    pending_coinbase_stack_state ~init_stack t_in_block handler =
+    ~init_stack pending_coinbase_stack_state t_in_block handler =
   let user_command = Transaction_protocol_state.transaction t_in_block in
   check_transaction ~constraint_constants ~sok_message ~source ~target
-    ~pending_coinbase_stack_state ~init_stack
+    ~init_stack ~pending_coinbase_stack_state
     {t_in_block with transaction= User_command user_command}
     handler
 
 let generate_transaction_union_witness ?(preeval = false) ~constraint_constants
-    sok_message source target transaction_in_block pc init_stack handler =
+    sok_message source target transaction_in_block init_stack
+    pending_coinbase_stack_state handler =
+  if preeval then failwith "preeval currently disabled" ;
   let transaction =
     Transaction_protocol_state.transaction transaction_in_block
   in
@@ -1588,9 +1591,8 @@ let generate_transaction_union_witness ?(preeval = false) ~constraint_constants
     ; supply_increase= Transaction_union.supply_increase transaction
     ; fee_excess= Transaction_union.fee_excess transaction
     ; sok_digest
-    ; pending_coinbase_stack_state= pc }
+    ; pending_coinbase_stack_state }
   in
-  if preeval then failwith "preeval currently disabled" ;
   let main x = handle (Base.main ~constraint_constants x) handler in
   generate_auxiliary_input [Statement.With_sok.typ] () main input
 
@@ -1605,7 +1607,7 @@ let generate_transaction_witness ?preeval ~constraint_constants ~sok_message
     source target
     { transaction_in_block with
       transaction= Transaction_union.of_transaction transaction }
-    pending_coinbase_stack_state init_stack handler
+    init_stack pending_coinbase_stack_state handler
 
 let verify (ts : (t * _) list) ~key =
   List.for_all ts ~f:(fun ({statement; _}, message) ->
@@ -1658,33 +1660,33 @@ module Make () = struct
                init_stack)
           s }
 
-  let of_transaction ~sok_digest ~source ~target ~pending_coinbase_stack_state
-      ~init_stack transaction_in_block handler =
+  let of_transaction ~sok_digest ~source ~target ~init_stack
+      ~pending_coinbase_stack_state transaction_in_block handler =
     let transaction =
       Transaction_protocol_state.transaction transaction_in_block
     in
     let state_body =
       Transaction_protocol_state.block_data transaction_in_block
     in
-    of_transaction_union sok_digest source target ~pending_coinbase_stack_state
-      ~init_stack
+    of_transaction_union sok_digest source target ~init_stack
+      ~pending_coinbase_stack_state
       (Transaction_union.of_transaction transaction)
       state_body handler
 
-  let of_user_command ~sok_digest ~source ~target ~pending_coinbase_stack_state
-      ~init_stack user_command_in_block handler =
-    of_transaction ~sok_digest ~source ~target ~pending_coinbase_stack_state
-      ~init_stack
+  let of_user_command ~sok_digest ~source ~target ~init_stack
+      ~pending_coinbase_stack_state user_command_in_block handler =
+    of_transaction ~sok_digest ~source ~target ~init_stack
+      ~pending_coinbase_stack_state
       { user_command_in_block with
         transaction=
           User_command
             (Transaction_protocol_state.transaction user_command_in_block) }
       handler
 
-  let of_fee_transfer ~sok_digest ~source ~target ~pending_coinbase_stack_state
-      ~init_stack transfer_in_block handler =
-    of_transaction ~sok_digest ~source ~target ~pending_coinbase_stack_state
-      ~init_stack
+  let of_fee_transfer ~sok_digest ~source ~target ~init_stack
+      ~pending_coinbase_stack_state transfer_in_block handler =
+    of_transaction ~sok_digest ~source ~target ~init_stack
+      ~pending_coinbase_stack_state
       { transfer_in_block with
         transaction=
           Fee_transfer
@@ -1827,8 +1829,8 @@ let%test_module "transaction_snark" =
       let acc = Ledger.get ledger loc |> Option.value_exn in
       [%test_eq: Balance.t] acc.balance (Balance.of_int balance)
 
-    let of_user_command' sok_digest ledger user_command
-        pending_coinbase_stack_state state_body init_stack handler =
+    let of_user_command' sok_digest ledger user_command init_stack
+        pending_coinbase_stack_state state_body handler =
       let source = Ledger.merkle_root ledger in
       let current_global_slot =
         Coda_state.Protocol_state.Body.consensus_state state_body
@@ -1974,9 +1976,9 @@ let%test_module "transaction_snark" =
                 ; target= pending_coinbase_stack_target }
               in
               check_user_command ~constraint_constants ~sok_message
-                ~init_stack:pending_coinbase_stack
                 ~source:(Ledger.merkle_root ledger)
-                ~target pending_coinbase_stack_state
+                ~target ~init_stack:pending_coinbase_stack
+                pending_coinbase_stack_state
                 {transaction= t1; block_data= state_body}
                 (unstage @@ Sparse_ledger.handler sparse_ledger) ) )
 
@@ -2241,25 +2243,31 @@ let%test_module "transaction_snark" =
                        User_command.accounts_accessed (t :> User_command.t) )
                      [t1; t2])
               in
+              let init_stack1 = Pending_coinbase.Stack.empty in
               let pending_coinbase_stack_state1 =
-                (*No coinbase to add to the stack*)
+                (* No coinbase to add to the stack. *)
                 let stack_with_state =
-                  Pending_coinbase.Stack.(
-                    push_state state_body_hash1 Pending_coinbase.Stack.empty)
+                  Pending_coinbase.Stack.push_state state_body_hash1
+                    init_stack1
                 in
-                (*Since protocol state body is added once per block, the source would already have the state if carryforward=true from the previous transaction in the sequence of transactions in a block. We add state to init_stack and then check if it is equal to the target*)
+                (* Since protocol state body is added once per block, the
+                   source would already have the state if [carryforward=true]
+                   from the previous transaction in the sequence of
+                   transactions in a block. We add state to [init_stack] and
+                   then check that it is equal to the target.
+                *)
                 let source_stack, target_stack =
                   if carryforward1 then (stack_with_state, stack_with_state)
-                  else (Pending_coinbase.Stack.empty, stack_with_state)
+                  else (init_stack1, stack_with_state)
                 in
                 { Pc_with_init_stack.pc=
                     {source= source_stack; target= target_stack}
-                ; init_stack= Pending_coinbase.Stack.empty }
+                ; init_stack= init_stack1 }
               in
               let proof12 =
                 of_user_command' sok_digest ledger t1
-                  pending_coinbase_stack_state1.pc state_body1
                   pending_coinbase_stack_state1.init_stack
+                  pending_coinbase_stack_state1.pc state_body1
                   (unstage @@ Sparse_ledger.handler sparse_ledger)
               in
               assert (Proof.verify [(proof12.statement, proof12.proof)]) ;
@@ -2278,16 +2286,20 @@ let%test_module "transaction_snark" =
                   Pending_coinbase.Stack.(
                     push_state state_body_hash2 previous_stack)
                 in
-                (*No coinbase to add*)
+                (* No coinbase to add. *)
                 let source_stack, target_stack, init_stack, state_body2 =
                   if carryforward2 then
-                    (*Source and target already have the protocol state, init_stack will be such that init_stack + state_body_hash1 = target = source *)
-                    ( previous_stack
-                    , previous_stack
-                    , pending_coinbase_stack_state1.init_stack
-                    , state_body1 )
+                    (* Source and target already have the protocol state,
+                       init_stack will be such that
+                       [init_stack + state_body_hash1 = target = source].
+                    *)
+                    (previous_stack, previous_stack, init_stack1, state_body1)
                   else
-                    (*Add the new state such that previous_stack + state_body_hash2 = init_stack + state_body_hash2 = target*)
+                    (* Add the new state such that
+                       [previous_stack + state_body_hash2
+                        = init_stack + state_body_hash2
+                        = target].
+                    *)
                     ( previous_stack
                     , stack_with_state2
                     , previous_stack
@@ -2306,8 +2318,8 @@ let%test_module "transaction_snark" =
                 (Sparse_ledger.merkle_root sparse_ledger) ;
               let proof23 =
                 of_user_command' sok_digest ledger t2
-                  pending_coinbase_stack_state2.pc state_body2
                   pending_coinbase_stack_state2.init_stack
+                  pending_coinbase_stack_state2.pc state_body2
                   (unstage @@ Sparse_ledger.handler sparse_ledger)
               in
               let sparse_ledger =
