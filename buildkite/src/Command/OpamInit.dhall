@@ -14,7 +14,7 @@ let unpackageScript : Text =
   "echo \"end mv, start tar xfz\" && date +%s && " ++
   "tar xfz ${file} --strip-components=2 && " ++
   "echo \"end tar, start ln\" && date +%s && " ++
-  "ln -Ffs /workdir/.opam /home/opam/.opam && ls -la /home/opam/.opam/ && ls -la /home/opam"
+  "ln -Ffs /workdir/.opam /home/opam && ls -la /home/opam/.opam/ && ls -la /home/opam"
 
 let commands : List Cmd.Type =
   [
