@@ -20,9 +20,6 @@ tail_process = None
 coda_process = None
 daemon_args = sys.argv[1:] if len(sys.argv) > 1 else []
 
-def escape_arg(arg):
-  return '"%s"' % arg
-
 # just nooping on this signal suffices, since merely trapping it will cause
 # `signal.pause()` to resume
 def handle_child_termination(signum, frame):
@@ -75,7 +72,6 @@ def active_loop():
     elif inactive_daemon_request:
       stop_daemon()
       inactive_daemon_request = False
-      child_terminated = False
       break
 
   inactive_loop()
