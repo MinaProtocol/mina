@@ -27,13 +27,16 @@ FILE="$1"
 MISS_CMD="$2"
 
 set +e
-if ! $UPLOAD_BIN cp ${PREFIX}/${FILE} .; then
-  set -e
-  echo "*** Cache miss -- executing step ***"
-  bash -c "$MISS_CMD"
-  $UPLOAD_BIN cp ${FILE} ${PREFIX}/${FILE}
-else
+if [[ -f "${FILE}" ]] || $UPLOAD_BIN cp "${PREFIX}/${FILE}" .; then
   set -e
   echo "*** Cache Hit -- skipping step ***"
+else
+  set -e
+  echo "*** Cache miss -- executing step ***"
+  date +%s
+  bash -c "$MISS_CMD"
+  date +%s
+  $UPLOAD_BIN cp "${FILE}" "${PREFIX}/${FILE}"
+  date +%s
 fi
 
