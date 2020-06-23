@@ -1022,7 +1022,6 @@ let coda_commands logger =
         ; (module Coda_transitive_peers_test)
         ; (module Coda_shared_prefix_test)
         ; (module Coda_shared_prefix_multiproducer_test)
-        ; (module Coda_five_nodes_test)
         ; (module Coda_restart_node_test)
         ; (module Coda_receipt_chain_test)
         ; (module Coda_restarts_and_txns_holy_grail)
