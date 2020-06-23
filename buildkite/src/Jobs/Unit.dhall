@@ -23,7 +23,8 @@ let buildTestCmd : Text -> Text -> Command.Type = \(profile : Text) -> \(path : 
             image = (../Constants/ContainerImages.dhall).codaToolchain,
             extraEnv = [ "DUNE_PROFILE=${profile}", "LIBP2P_NIXLESS=1", "GO=/usr/lib/go/bin/go" ]
           }
-          ("source ~/.profile && make build && (dune runtest ${path} --profile=${profile} -j8 || (./scripts/link-coredumps.sh && false))")
+          ("source ~/.profile && make build && (dune runtest ${path} --profile=${profile} -j8" ++
+            " || (./scripts/link-coredumps.sh && false))")
       ],
       label = "Run ${profile} unit-tests",
       key = "unit-test-${profile}",
