@@ -461,7 +461,7 @@ module Genesis_proof = struct
                 ; ("error", `String (Error.to_string_hum e)) ] ;
             return None )
 
-  let generate_inputs ~ledger ~constraint_constants
+  let generate_inputs ~proof_level ~ledger ~constraint_constants
       ~(genesis_constants : Genesis_constants.t) =
     let consensus_constants =
       Consensus.Constants.create ~constraint_constants
@@ -473,23 +473,24 @@ module Genesis_proof = struct
         ~constraint_constants ~consensus_constants
     in
     { Genesis_proof.Inputs.constraint_constants
+    ; proof_level
     ; blockchain_proof_system_id= Snark_keys.blockchain_verification_key_id ()
     ; genesis_ledger= ledger
     ; consensus_constants
     ; protocol_state_with_hash
     ; genesis_constants }
 
-  let generate ~proof_level (inputs : Genesis_proof.Inputs.t) =
-    (* TODO(4829): Runtime proof-level. *)
-    match proof_level with
+  let generate (inputs : Genesis_proof.Inputs.t) =
+    match inputs.proof_level with
     | Genesis_constants.Proof_level.Full ->
         let module B =
           Blockchain_snark.Blockchain_snark_state.Make
             (Transaction_snark.Make ()) in
         let computed_values =
-          Genesis_proof.create_values ~proof_level
+          Genesis_proof.create_values
             (module B)
             { genesis_ledger= inputs.genesis_ledger
+            ; proof_level= inputs.proof_level
             ; blockchain_proof_system_id= Lazy.force B.Proof.id
             ; protocol_state_with_hash= inputs.protocol_state_with_hash
             ; genesis_constants= inputs.genesis_constants
@@ -499,6 +500,7 @@ module Genesis_proof = struct
         computed_values
     | _ ->
         { Genesis_proof.constraint_constants= inputs.constraint_constants
+        ; proof_level= inputs.proof_level
         ; genesis_constants= inputs.genesis_constants
         ; genesis_ledger= inputs.genesis_ledger
         ; consensus_constants= inputs.consensus_constants
@@ -521,7 +523,7 @@ module Genesis_proof = struct
   let id_to_json x =
     `String (Sexp.to_string (Pickles.Verification_key.Id.sexp_of_t x))
 
-  let load_or_generate ~genesis_dir ~logger ~may_generate ~proof_level
+  let load_or_generate ~genesis_dir ~logger ~may_generate
       (inputs : Genesis_proof.Inputs.t) =
     let compiled = Precomputed_values.compiled in
     match%bind find_file ~logger ~id:inputs.blockchain_proof_system_id with
@@ -531,6 +533,7 @@ module Genesis_proof = struct
             Ok
               ( { Genesis_proof.constraint_constants=
                     inputs.constraint_constants
+                ; proof_level= inputs.proof_level
                 ; genesis_constants= inputs.genesis_constants
                 ; genesis_ledger= inputs.genesis_ledger
                 ; consensus_constants= inputs.consensus_constants
@@ -561,6 +564,7 @@ module Genesis_proof = struct
         in
         let values =
           { Genesis_proof.constraint_constants= inputs.constraint_constants
+          ; proof_level= inputs.proof_level
           ; genesis_constants= inputs.genesis_constants
           ; genesis_ledger= inputs.genesis_ledger
           ; consensus_constants= inputs.consensus_constants
@@ -587,7 +591,7 @@ module Genesis_proof = struct
           "No genesis proof file was found for $id, generating a new genesis \
            proof"
           ~metadata:[("id", id_to_json inputs.blockchain_proof_system_id)] ;
-        let values = generate ~proof_level inputs in
+        let values = generate inputs in
         let filename =
           genesis_dir ^/ filename ~id:inputs.blockchain_proof_system_id
         in
@@ -693,13 +697,13 @@ let init_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
     @@ make_genesis_constants ~logger ~default:genesis_constants config
   in
   let proof_inputs =
-    Genesis_proof.generate_inputs ~ledger:genesis_ledger ~constraint_constants
-      ~genesis_constants
+    Genesis_proof.generate_inputs ~proof_level ~ledger:genesis_ledger
+      ~constraint_constants ~genesis_constants
   in
   let open Deferred.Or_error.Let_syntax in
   let%map values, proof_file =
     Genesis_proof.load_or_generate ~genesis_dir ~logger ~may_generate
-      ~proof_level proof_inputs
+      proof_inputs
   in
   Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
     "Loaded ledger from $ledger_file and genesis proof from $proof_file"
