@@ -135,17 +135,42 @@ module Ledger = struct
 end
 
 module Proof_keys = struct
-  type t = unit
+  module Level = struct
+    type t = Full | Check | None
 
-  let to_yojson () = `Assoc []
+    let to_yojson = function
+      | Full ->
+          `String "full"
+      | Check ->
+          `String "check"
+      | None ->
+          `String "none"
 
-  let of_yojson = function
-    | `Assoc _ ->
-        Ok ()
-    | _ ->
-        Error "Runtime_config.Proof_keys.of_yojson: Expected a JSON object"
+    let of_yojson = function
+      | `String str -> (
+        match String.lowercase str with
+        | "full" ->
+            Ok Full
+        | "check" ->
+            Ok Check
+        | "none" ->
+            Ok None
+        | _ ->
+            Error
+              "Runtime_config.Proof_keys.Level.of_yojson: Expected the field \
+               'level' to contain one of 'full', 'check', or 'none'" )
+      | _ ->
+          Error
+            "Runtime_config.Proof_keys.Level.of_yojson: Expected the field \
+             'level' to contain a string"
+  end
 
-  let combine () () = ()
+  type t = {level: Level.t option [@default None]} [@@deriving yojson]
+
+  let of_yojson json =
+    of_yojson @@ yojson_strip_fields ~fields:[|"level"|] json
+
+  let combine t1 t2 = {level= opt_fallthrough ~default:t1.level t2.level}
 end
 
 module Genesis = struct
@@ -185,7 +210,7 @@ end
   { "daemon":
       { "txpool_max_size": 1 }
   , "genesis": { "k": 1, "delta": 1 }
-  , "proof": { }
+  , "proof": { "level": "check" }
   , "ledger":
       { "name": "release"
       , "accounts":
