@@ -67,7 +67,6 @@ module Styles = {
         ],
       ),
       media(Theme.MediaQuery.veryVeryLarge, [width(`percent(100.))]),
-
     ]);
 };
 
