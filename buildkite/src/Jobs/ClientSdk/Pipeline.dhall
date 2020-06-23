@@ -23,7 +23,7 @@ Pipeline.build
             Cmd.Docker::{
               image = (../../Constants/ContainerImages.dhall).codaToolchain
             }
-            ("opam install dune ppx_custom_printf && " ++
+            ("opam install dune ppx_custom_printf js_of_ocaml-compiler js_of_ocaml-ppx && " ++
               "mkdir -p /tmp/artifacts && (" ++
               "set -o pipefail ; " ++
               "./buildkite/scripts/opam-env.sh && " ++
