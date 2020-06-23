@@ -71,7 +71,7 @@ module Footer = {
               {React.string("o1labs.org")}
             </Link>
             <Link
-              link="https://github.com/CodaProtocol/coda-grants" name="o1www">
+              link="https://github.com/CodaProtocol/coda-grants" name="grants">
               {React.string("Project Grants")}
             </Link>
             <Link link="https://twitter.com/codaprotocol" name="twitter">
