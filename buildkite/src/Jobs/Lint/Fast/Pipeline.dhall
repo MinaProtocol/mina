@@ -31,15 +31,15 @@ Pipeline.build
       Command.Config::{
         commands = commands,
         label = "Fast lint steps; CODEOWNERs, RFCs, Check Snarky Submodule, Preprocessor Deps",
-        key = "lint",
+        key = "lint-required",
         target = Size.Small,
         docker = Some Docker::{ image = (../../../Constants/ContainerImages.dhall).toolchainBase }
       },
     Command.build
       Command.Config::{
         commands = compat_diff_commands,
-        label = "Optional lint steps; versions and binable compatability changes",
-        key = "lint",
+        label = "Optional fast lint steps; versions and binable compatability changes",
+        key = "lint-optional",
         target = Size.Small,
         soft_fail = Some (Command.SoftFail.Boolean True),
         docker = Some Docker::{ image = (../../../Constants/ContainerImages.dhall).toolchainBase }
