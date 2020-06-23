@@ -340,14 +340,10 @@ module Base = struct
   open Tick
   open Let_syntax
 
-  include struct
-    open Snarky.Request
-
-    type _ t +=
-      | Transaction : Transaction_union.t t
-      | State_body : Coda_state.Protocol_state.Body.Value.t t
-      | Init_stack : Pending_coinbase.Stack.t t
-  end
+  type _ Snarky.Request.t +=
+    | Transaction : Transaction_union.t Snarky.Request.t
+    | State_body : Coda_state.Protocol_state.Body.Value.t Snarky.Request.t
+    | Init_stack : Pending_coinbase.Stack.t Snarky.Request.t
 
   module User_command_failure = struct
     (** The various ways that a user command may fail. These should be computed
@@ -1365,14 +1361,13 @@ module Base = struct
       (state_body : Coda_state.Protocol_state.Body.Value.t)
       (init_stack : Pending_coinbase.Stack.t) : Snarky.Request.request -> _ =
    fun (With {request; respond} as r) ->
-    let k r = respond (Provide r) in
     match request with
     | Transaction ->
-        k transaction
+        respond (Provide transaction)
     | State_body ->
-        k state_body
+        respond (Provide state_body)
     | Init_stack ->
-        k init_stack
+        respond (Provide init_stack)
     | _ ->
         handler r
 end
