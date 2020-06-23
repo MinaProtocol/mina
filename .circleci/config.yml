@@ -1297,17 +1297,6 @@ workflows:
             - test--test_postake_three_producers
             - test--test_postake_txns
 
-    leaderboard:
-        triggers:
-          - schedule:
-              cron: "0 1 * * *"
-              filters:
-                branches:
-                  only:
-                    - develop
-        jobs:
-          - run-leaderboard
-
     daily:
         triggers:
           - schedule:
