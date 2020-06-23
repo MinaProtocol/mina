@@ -19,8 +19,7 @@ Pipeline.build
     Command.build
       Command.Config::{
         commands = [ Coda.fixPermissionsCommand ] # (OpamInit.commands (
-            Cmd.run ("ls -la /home/opam/ && ls -la /home/opam/.opam && opam install dune && dune external-lib-deps --missing --profile nonconsensus_medium_curves && " ++
-              "mkdir -p /tmp/artifacts && (" ++
+            Cmd.run ("mkdir -p /tmp/artifacts && (" ++
               "set -o pipefail ; " ++
               "./buildkite/scripts/opam-env.sh && " ++
               "make client_sdk 2>&1 | tee /tmp/artifacts/buildclientsdk.log" ++
