@@ -5,6 +5,7 @@ let List/map = Prelude.List.map
 let Optional/map = Prelude.Optional.map
 let B = ../External/Buildkite.dhall
 let B/Plugins/Partial = B.definitions/commandStep/properties/plugins/Type
+let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 let Map = Prelude.Map
 
 let Cmd = ../Lib/Cmds.dhall
@@ -45,10 +46,12 @@ let Config =
       , key : Text
       , target : Size
       , docker : Optional Docker.Type
+      , soft_fail : Optional B/SoftFail
       }
   , default =
     { depends_on = [] : List Text
     , docker = None Docker.Type
+    , soft_fail = None B/SoftFail
     }
   }
 
@@ -69,11 +72,12 @@ let build : Config.Type -> B/Command.Type = \(c : Config.Type) ->
         None B/DependsOn.Type
       else
         Some (B/DependsOn.depends c.depends_on),
+    soft_fail = c.soft_fail,
     key = Some c.key,
     label = Some c.label,
     plugins =
       Optional/map Docker.Type B/Plugins (\(docker: Docker.Type) -> B/Plugins.Plugins/Type (toMap { `docker#v3.5.0` = docker })) c.docker
   }
 
-in {Config = Config, build = build, Type = B/Command.Type}
+in {Config = Config, build = build, Type = B/Command.Type, SoftFail = B/SoftFail}
 
