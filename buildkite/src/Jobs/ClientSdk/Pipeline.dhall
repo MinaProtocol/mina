@@ -4,6 +4,7 @@ let Cmd = ../../Lib/Cmds.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
 let Command = ../../Command/Base.dhall
+let Coda = ../../Command/Coda.dhall
 let OpamInit = ../../Command/OpamInit.dhall
 let Docker = ../../Command/Docker/Type.dhall
 let Size = ../../Command/Size.dhall
@@ -17,7 +18,7 @@ Pipeline.build
     steps = [
     Command.build
       Command.Config::{
-        commands = OpamInit.commands # [
+        commands = [ Coda.fixPermissionsCommand ] # OpamInit.commands # [
           Cmd.runInDocker
             Cmd.Docker::{
               image = (../../Constants/ContainerImages.dhall).codaToolchain
