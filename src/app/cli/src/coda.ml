@@ -371,27 +371,6 @@ let daemon logger =
        let time_controller =
          Block_time.Controller.create @@ Block_time.Controller.basic ~logger
        in
-       let proof_level =
-         match (proof_level, Genesis_constants.Proof_level.compiled) with
-         | Some (Full as proof_level), _
-         | Some (Check as proof_level), Check
-         | Some (None as proof_level), None ->
-             proof_level
-         | None, compiled ->
-             compiled
-         | Some proof_level, compiled ->
-             let str = Genesis_constants.Proof_level.to_string in
-             Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
-               "Proof level $proof_level is not compatible with compile-time \
-                proof level $compiled_proof_level"
-               ~metadata:
-                 [ ("proof_level", `String (str proof_level))
-                 ; ("compiled_proof_level", `String (str compiled)) ] ;
-             failwithf
-               "Proof level %s is not compatible with compile-time proof \
-                level %s"
-               (str proof_level) (str compiled) ()
-       in
        let may_generate = Option.value ~default:false may_generate in
        let coda_initialization_deferred () =
          let config_file, must_find_config_file =
@@ -878,7 +857,7 @@ let daemon logger =
                 ~consensus_local_state ~transaction_database
                 ~external_transition_database ~is_archive_rocksdb
                 ~work_reassignment_wait ~archive_process_location
-                ~log_block_creation ~precomputed_values ~proof_level ())
+                ~log_block_creation ~precomputed_values ())
          in
          {Coda_initialization.coda; client_trustlist; rest_server_port}
        in

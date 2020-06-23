@@ -31,6 +31,8 @@ module Proof_level = struct
   "compiled", proof_level]
 
   let compiled = of_string compiled
+
+  let for_unit_tests = Check
 end
 
 (** Constants that affect the constraint systems for proofs (and thus also key
