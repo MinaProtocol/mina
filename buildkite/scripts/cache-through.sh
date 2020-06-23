@@ -3,7 +3,7 @@
 set -eou pipefail
 set +x
 
-if [[ $# -ne 2 ]]; then
+if [[ $# -ne 3 ]]; then
   echo "Usage: $0 <path-to-file> <hit-in-docker-cmd> <miss-in-docker-cmd>"
   exit 1
 fi
