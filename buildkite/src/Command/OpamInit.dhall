@@ -17,9 +17,9 @@ let commands : List Cmd.Type =
       }
       file
       Cmd.CompoundCmd::{
-        before = r "tar xfz ${file} -C /home/opam",
-        inner = r "make setup-opam",
-        after = r "tar cfz ${file} /home/opam/.opam"
+        unpackage = Some (r "tar xfz ${file} -C /home/opam"),
+        create = r "make setup-opam",
+        package = r "tar cfz ${file} /home/opam/.opam"
       }
   ]
 
