@@ -51,10 +51,6 @@ let max = (a, b) => {
   a > b ? a : b;
 };
 
-let convertNanoToBase = a => {
-  a->Int64.add(5000000L)->Int64.div(1000000000L);
-};
-
 let filterBlocksByTimeWindow = (startTime, endTime, blocks) => {
   Array.to_list(blocks)
   |> List.filter((block: Types.NewBlock.data) => {
@@ -113,7 +109,7 @@ let calculateSnarkFeeSum = (map, block: Types.NewBlock.data) => {
              let snarkFee = Int64.of_string(snarkJob.fee);
              switch (feeSum) {
              | Some(feeSum) =>
-               let result = convertNanoToBase(Int64.add(snarkFee, feeSum));
+               let result = Int64.add(snarkFee, feeSum);
                Some(result);
              | None => Some(snarkFee)
              };
@@ -138,8 +134,7 @@ let calculateHighestSnarkFeeCollected = (map, block: Types.NewBlock.data) => {
            feeCount => {
              let snarkFee = Int64.of_string(snarkJob.fee);
              switch (feeCount) {
-             | Some(feeCount) =>
-               Some(convertNanoToBase(max(snarkFee, feeCount)))
+             | Some(feeCount) => Some(max(snarkFee, feeCount))
              | None => Some(snarkFee)
              };
            },

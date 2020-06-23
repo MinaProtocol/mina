@@ -191,7 +191,7 @@ let zkSnarksChallenge = metricsMap => {
         | Some(snarkFeesCollected) => Some(snarkFeesCollected)
         | None => Some(Int64.zero)
         },
-      3L,
+      3000000000L,
       1000,
       metricsMap,
     ),
@@ -202,7 +202,7 @@ let zkSnarksChallenge = metricsMap => {
         | Some(snarkFeesCollected) => Some(snarkFeesCollected)
         | None => Some(Int64.zero)
         },
-      50L,
+      50000000000L,
       1000,
       metricsMap,
     ),

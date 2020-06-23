@@ -50,8 +50,10 @@ let setSheetsCredentials = () => {
 let main = () => {
   switch (setSheetsCredentials()) {
   | Ok () =>
-    blocks |> Metrics.calculateMetrics |> Upload.uploadPoints;
-    Upload.uploadTotalBlocks(Some(totalBlocks));
+    // Testnet challenges are now frozen for 3.2b.
+    // blocks |> Metrics.calculateMetrics |> Upload.uploadPoints;
+
+    Upload.uploadTotalBlocks(Some(totalBlocks))
   | Error(error) => failwith(error)
   };
 };
