@@ -794,9 +794,8 @@ let init_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
   let config =
     {config with ledger= Option.map config.ledger ~f:(fun _ -> ledger_config)}
   in
-  let%bind genesis_constants =
-    Deferred.return
-    @@ make_genesis_constants ~logger ~default:genesis_constants config
+  let genesis_constants =
+    make_genesis_constants ~logger ~default:genesis_constants config
   in
   let open Deferred.Let_syntax in
   let%bind proof_inputs =
