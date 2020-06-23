@@ -18,18 +18,13 @@ Pipeline.build
     steps = [
     Command.build
       Command.Config::{
-        commands = [ Coda.fixPermissionsCommand ] # OpamInit.commands # [
-          Cmd.runInDocker
-            Cmd.Docker::{
-              image = (../../Constants/ContainerImages.dhall).codaToolchain
-            }
-            ("ls -l /home/opam/.opam && opam install dune && dune external-lib-deps --missing --profile nonconsensus_medium_curves && " ++
+        commands = [ Coda.fixPermissionsCommand ] # (OpamInit.commands (
+            Cmd.run ("ls -la /home/opam/ && ls -la /home/opam/.opam && opam install dune && dune external-lib-deps --missing --profile nonconsensus_medium_curves && " ++
               "mkdir -p /tmp/artifacts && (" ++
               "set -o pipefail ; " ++
               "./buildkite/scripts/opam-env.sh && " ++
               "make client_sdk 2>&1 | tee /tmp/artifacts/buildclientsdk.log" ++
-            ")")
-        ],
+            ")"))),
         label = "Build client-sdk",
         key = "build-client-sdk",
         target = Size.Large,
