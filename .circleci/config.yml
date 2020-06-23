@@ -357,7 +357,7 @@ jobs:
             - run:
                 name: Install nix and cachix
                 command: |
-                    curl https://nixos.org/nix/install | sh
+                    curl -L https://nixos.org/nix/install | sh
                     . ~/.nix-profile/etc/profile.d/nix.sh
                     nix-env -iA cachix -f https://cachix.org/api/v1/install
             ### dune

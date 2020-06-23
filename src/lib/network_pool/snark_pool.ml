@@ -499,7 +499,7 @@ let%test_module "random set test" =
 
     let trust_system = Mocks.trust_system
 
-    let proof_level = Genesis_constants.Proof_level.Check
+    let proof_level = Genesis_constants.Proof_level.for_unit_tests
 
     let constraint_constants =
       Genesis_constants.Constraint_constants.for_unit_tests
