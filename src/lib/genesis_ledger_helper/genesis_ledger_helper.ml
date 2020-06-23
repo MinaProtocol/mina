@@ -718,7 +718,7 @@ let load_config_file filename =
           Or_error.error_string err )
 
 let init_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
-    ~may_generate ~proof_level ~genesis_constants (config : Runtime_config.t) =
+    ~may_generate ~proof_level (config : Runtime_config.t) =
   let open Deferred.Or_error.Let_syntax in
   let proof_level =
     List.find_map_exn ~f:Fn.id
@@ -796,7 +796,8 @@ let init_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
   in
   let%bind genesis_constants =
     Deferred.return
-    @@ make_genesis_constants ~logger ~default:genesis_constants config
+    @@ make_genesis_constants ~logger ~default:Genesis_constants.compiled
+         config
   in
   let open Deferred.Let_syntax in
   let%bind proof_inputs =
@@ -875,3 +876,58 @@ let upgrade_old_config ~logger filename json =
   | _ ->
       (* This error will get handled properly elsewhere, do nothing here. *)
       return json
+
+let extract_runtime_config (precomputed_values : Precomputed_values.t) :
+    Runtime_config.t =
+  let genesis_constants = precomputed_values.genesis_constants in
+  let constraint_constants = precomputed_values.constraint_constants in
+  { daemon= Some {txpool_max_size= Some genesis_constants.txpool_max_size}
+  ; genesis=
+      Some
+        { k= Some genesis_constants.protocol.k
+        ; delta= Some genesis_constants.protocol.delta
+        ; genesis_state_timestamp=
+            Some
+              (Time.to_string_abs ~zone:Time.Zone.utc
+                 genesis_constants.protocol.genesis_state_timestamp) }
+  ; proof=
+      Some
+        { level=
+            Some
+              ( match precomputed_values.proof_level with
+              | Full ->
+                  Full
+              | Check ->
+                  Check
+              | None ->
+                  None )
+        ; c= Some constraint_constants.c
+        ; ledger_depth= Some constraint_constants.ledger_depth
+        ; work_delay= Some constraint_constants.work_delay
+        ; block_window_duration_ms=
+            Some constraint_constants.block_window_duration_ms
+        ; transaction_capacity=
+            Some (Log_2 constraint_constants.transaction_capacity_log_2)
+        ; coinbase_amount= Some constraint_constants.coinbase_amount
+        ; account_creation_fee= Some constraint_constants.account_creation_fee
+        }
+  ; ledger=
+      Some
+        { base=
+            Accounts
+              (List.map
+                 (Lazy.force (Precomputed_values.accounts precomputed_values))
+                 ~f:(fun (sk, {public_key; balance; delegate; _}) ->
+                   { Runtime_config.Accounts.pk=
+                       Some (Public_key.Compressed.to_base58_check public_key)
+                   ; sk= Option.map ~f:Private_key.to_base58_check sk
+                   ; balance
+                   ; delegate=
+                       Some (Public_key.Compressed.to_base58_check delegate) }
+                   ))
+        ; num_accounts= genesis_constants.num_accounts
+        ; hash=
+            Some
+              ( precomputed_values |> Precomputed_values.genesis_ledger
+              |> Lazy.force |> Coda_base.Ledger.merkle_root
+              |> State_hash.to_string ) } }

@@ -52,7 +52,7 @@ let local_configs ?block_production_interval
     ?(is_archive_rocksdb = Fn.const false)
     ?(archive_process_location = Fn.const None) n ~acceptable_delay ~chain_id
     ~program_dir ~snark_worker_public_keys ~work_selection_method ~trace_dir
-    ~max_concurrent_connections =
+    ~max_concurrent_connections ~runtime_config =
   let%map net_configs = net_configs n in
   let addrs_and_ports_list, peers = net_configs in
   let peers = [] :: List.drop peers 1 in
@@ -77,7 +77,7 @@ let local_configs ?block_production_interval
           ~offset:
             (offset
                (Lazy.force Precomputed_values.compiled).consensus_constants)
-          ~max_concurrent_connections () )
+          ~max_concurrent_connections ~runtime_config () )
   in
   configs
 

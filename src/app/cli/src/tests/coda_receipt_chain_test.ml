@@ -6,18 +6,28 @@ let name = "coda-receipt-chain-test"
 
 let lift = Deferred.map ~f:Option.some
 
+let runtime_config =
+  lazy
+    ( (* TODO: Decide on a profile for this test.
+         (It has never been used on CI.)
+      *)
+      "{}" |> Yojson.Safe.from_string |> Runtime_config.of_yojson
+    |> Result.ok_or_failwith )
+
 (* TODO: This should completely kill the coda daemon for a worker *)
 let restart_node worker ~config ~logger =
   let%bind () = Coda_process.disconnect worker ~logger in
   Coda_process.spawn_exn config
 
 let main () =
-  let precomputed_values =
-    (* TODO: Load for this specific test. *)
-    Lazy.force Precomputed_values.compiled
+  let logger = Logger.create () in
+  let%bind precomputed_values, runtime_config =
+    Genesis_ledger_helper.init_from_config_file ~logger ~may_generate:false
+      ~proof_level:None
+      (Lazy.force runtime_config)
+    >>| Or_error.ok_exn
   in
   let consensus_constants = precomputed_values.consensus_constants in
-  let logger = Logger.create () in
   let sender_sk, largest_account =
     Test_genesis_ledger.largest_account_exn ()
   in
@@ -50,7 +60,7 @@ let main () =
       ~acceptable_delay ~chain_id:name ~snark_worker_public_keys:None
       ~block_production_keys:(Fn.const None) ~work_selection_method
       ~trace_dir:(Unix.getenv "CODA_TRACING")
-      ~max_concurrent_connections:None
+      ~max_concurrent_connections:None ~runtime_config
   in
   let%bind workers = Coda_processes.spawn_local_processes_exn configs in
   let worker = List.hd_exn workers in

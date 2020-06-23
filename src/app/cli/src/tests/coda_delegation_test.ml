@@ -7,10 +7,40 @@ let name = "coda-delegation-test"
 
 include Heartbeat.Make ()
 
+let runtime_config =
+  lazy
+    ( (* test_postake_delegation *)
+      {json|
+  { "daemon":
+      { "txpool_max_size": 3000 }
+  , "genesis":
+      { "k": 6
+      , "delta": 3
+      , "genesis_state_timestamp": "2019-01-30 12:00:00-08:00" }
+  , "proof":
+      { "level": "check"
+      , "c": 1
+      , "ledger_depth": 6
+      , "work_delay": 1
+      , "block_window_duration_ms": 10000
+      , "transaction_capacity": {"2_to_the": 2}
+      , "coinbase_amount": "20"
+      , "account_creation_fee": "1" }
+  , "ledger": { "name": "test_split_two_stakers" } }
+      |json}
+    |> Yojson.Safe.from_string |> Runtime_config.of_yojson
+    |> Result.ok_or_failwith )
+
 let main () =
   let logger = Logger.create () in
+  let%bind precomputed_values, runtime_config =
+    Genesis_ledger_helper.init_from_config_file ~logger ~may_generate:false
+      ~proof_level:None
+      (Lazy.force runtime_config)
+    >>| Or_error.ok_exn
+  in
   let num_block_producers = 3 in
-  let accounts = Lazy.force Test_genesis_ledger.accounts in
+  let accounts = Lazy.force (Precomputed_values.accounts precomputed_values) in
   let snark_work_public_keys ndx =
     List.nth_exn accounts ndx
     |> fun (_, acct) -> Some (Account.public_key acct)
@@ -18,7 +48,7 @@ let main () =
   let%bind testnet =
     Coda_worker_testnet.test ~name logger num_block_producers Option.some
       snark_work_public_keys Cli_lib.Arg_type.Work_selection_method.Sequence
-      ~max_concurrent_connections:None
+      ~max_concurrent_connections:None ~runtime_config
   in
   Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "Started test net" ;
   (* keep CI alive *)
@@ -46,7 +76,7 @@ let main () =
   let ((_, delegator_account) as delegator) = List.nth_exn accounts 2 in
   let delegator_pubkey = Account.public_key delegator_account in
   let delegator_keypair =
-    Test_genesis_ledger.keypair_of_account_record_exn delegator
+    Precomputed_values.keypair_of_account_record_exn delegator
   in
   (* zeroth account is delegatee *)
   let _, delegatee_account = List.nth_exn accounts 0 in

@@ -3,22 +3,36 @@ open Async
 
 let name = "coda-shared-prefix-multiproducer-test"
 
+let runtime_config =
+  lazy
+    ( (* TODO: Decide on a profile for this test.
+         (This uses multiple profiles on CI)
+      *)
+      "{}" |> Yojson.Safe.from_string |> Runtime_config.of_yojson
+    |> Result.ok_or_failwith )
+
 let main n enable_payments () =
   let logger = Logger.create () in
+  let%bind precomputed_values, runtime_config =
+    Genesis_ledger_helper.init_from_config_file ~logger ~may_generate:false
+      ~proof_level:None
+      (Lazy.force runtime_config)
+    >>| Or_error.ok_exn
+  in
   let keypairs =
     List.map
-      (Lazy.force Test_genesis_ledger.accounts)
-      ~f:Test_genesis_ledger.keypair_of_account_record_exn
+      (Lazy.force (Precomputed_values.accounts precomputed_values))
+      ~f:Precomputed_values.keypair_of_account_record_exn
   in
   let public_keys =
-    List.map ~f:Test_genesis_ledger.pk_of_account_record
-      (Lazy.force Test_genesis_ledger.accounts)
+    List.map ~f:Precomputed_values.pk_of_account_record
+      (Lazy.force (Precomputed_values.accounts precomputed_values))
   in
   let snark_work_public_keys i = Some (List.nth_exn public_keys i) in
   let%bind testnet =
     Coda_worker_testnet.test ~name logger n Option.some snark_work_public_keys
       Cli_lib.Arg_type.Work_selection_method.Sequence
-      ~max_concurrent_connections:None
+      ~max_concurrent_connections:None ~runtime_config
   in
   let%bind () =
     if enable_payments then

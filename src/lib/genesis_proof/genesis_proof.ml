@@ -47,11 +47,17 @@ module T = struct
   let find_new_account_record_exn {genesis_ledger; _} =
     Genesis_ledger.Packed.find_new_account_record_exn genesis_ledger
 
+  let find_new_account_record_exn_ {genesis_ledger; _} =
+    Genesis_ledger.Packed.find_new_account_record_exn_ genesis_ledger
+
   let largest_account_exn {genesis_ledger; _} =
     Genesis_ledger.Packed.largest_account_exn genesis_ledger
 
   let largest_account_keypair_exn {genesis_ledger; _} =
     Genesis_ledger.Packed.largest_account_keypair_exn genesis_ledger
+
+  let largest_account_pk_exn {genesis_ledger; _} =
+    Genesis_ledger.Packed.largest_account_pk_exn genesis_ledger
 
   let consensus_constants {consensus_constants; _} = consensus_constants
 

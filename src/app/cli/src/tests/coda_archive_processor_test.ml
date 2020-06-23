@@ -3,12 +3,43 @@ open Async
 
 let name = "coda-archive-processor-test"
 
+let runtime_config =
+  lazy
+    ( (* test_archive_processor *)
+      {json|
+  { "daemon":
+      { "txpool_max_size": 3000 }
+  , "genesis":
+      { "k": 6
+      , "delta": 3
+      , "genesis_state_timestamp": "2019-01-30 12:00:00-08:00" }
+  , "proof":
+      { "level": "none"
+      , "c": 8
+      , "ledger_depth": 6
+      , "work_delay": 2
+      , "block_window_duration_ms": 600
+      , "transaction_capacity": {"2_to_the": 3}
+      , "coinbase_amount": "20"
+      , "account_creation_fee": "1" }
+  , "ledger": { "name": "test" } }
+      |json}
+    |> Yojson.Safe.from_string |> Runtime_config.of_yojson
+    |> Result.ok_or_failwith )
+
 let main () =
   let archive_address = Host_and_port.of_string "localhost:3086" in
   let postgres_address =
     Uri.of_string "postgres://admin:codarules@localhost:5432/archiver"
   in
-  let constraint_constants = Genesis_constants.Constraint_constants.compiled in
+  let logger = Logger.create () in
+  let%bind precomputed_values, runtime_config =
+    Genesis_ledger_helper.init_from_config_file ~logger ~may_generate:false
+      ~proof_level:None
+      (Lazy.force runtime_config)
+    >>| Or_error.ok_exn
+  in
+  let constraint_constants = precomputed_values.constraint_constants in
   let%bind conn =
     match%map Caqti_async.connect postgres_address with
     | Ok conn ->
@@ -21,7 +52,9 @@ let main () =
     ~postgres_address
     ~server_port:(Host_and_port.port archive_address)
   |> don't_wait_for ;
-  let public_key = Test_genesis_ledger.largest_account_pk_exn () in
+  let public_key =
+    Precomputed_values.largest_account_pk_exn precomputed_values
+  in
   let n = 2 in
   let block_production_keys i = if i = 0 then Some i else None in
   let snark_work_public_keys i = if i = 0 then Some public_key else None in
@@ -33,7 +66,7 @@ let main () =
     Coda_worker_testnet.test ~name logger n block_production_keys
       snark_work_public_keys Cli_lib.Arg_type.Work_selection_method.Sequence
       ~max_concurrent_connections:None ~is_archive_rocksdb
-      ~archive_process_location
+      ~archive_process_location ~runtime_config
   in
   let%bind new_block_pipe =
     let%map pipe = Coda_worker_testnet.Api.new_block testnet 1 public_key in

@@ -5,14 +5,46 @@ open Async
 
 let name = "coda-change-snark-worker-test"
 
+let runtime_config =
+  lazy
+    ( (* test_postake_split_snarkless *)
+      {json|
+  { "daemon":
+      { "txpool_max_size": 3000 }
+  , "genesis":
+      { "k": 24
+      , "delta": 3
+      , "genesis_state_timestamp": "2019-01-30 12:00:00-08:00" }
+  , "proof":
+      { "level": "check"
+      , "c": 8
+      , "ledger_depth": 30
+      , "work_delay": 1
+      , "block_window_duration_ms": 10000
+      , "transaction_capacity": {"2_to_the": 2}
+      , "coinbase_amount": "20"
+      , "account_creation_fee": "1" }
+  , "ledger": { "name": "test_split_two_stakers" } }
+      |json}
+    |> Yojson.Safe.from_string |> Runtime_config.of_yojson
+    |> Result.ok_or_failwith )
+
 let main () =
   let snark_worker_and_block_producer_id = 0 in
   let logger = Logger.create () in
+  let%bind precomputed_values, runtime_config =
+    Genesis_ledger_helper.init_from_config_file ~logger ~may_generate:false
+      ~proof_level:None
+      (Lazy.force runtime_config)
+    >>| Or_error.ok_exn
+  in
   let n = 2 in
   let block_production_keys i =
     if i = snark_worker_and_block_producer_id then Some i else None
   in
-  let largest_public_key = Test_genesis_ledger.largest_account_pk_exn () in
+  let largest_public_key =
+    Precomputed_values.largest_account_pk_exn precomputed_values
+  in
   let snark_work_public_keys i =
     if i = snark_worker_and_block_producer_id then Some largest_public_key
     else None
@@ -20,7 +52,7 @@ let main () =
   let%bind testnet =
     Coda_worker_testnet.test ~name logger n block_production_keys
       snark_work_public_keys Cli_lib.Arg_type.Work_selection_method.Sequence
-      ~max_concurrent_connections:None
+      ~max_concurrent_connections:None ~runtime_config
   in
   let%bind new_block_pipe1, new_block_pipe2 =
     let%map pipe =
@@ -63,8 +95,9 @@ let main () =
     wait_for_snark_worker_proof new_block_pipe1 largest_public_key
   in
   let new_snark_worker =
-    Test_genesis_ledger.find_new_account_record_exn_ [largest_public_key]
-    |> Test_genesis_ledger.pk_of_account_record
+    Precomputed_values.find_new_account_record_exn_ precomputed_values
+      [largest_public_key]
+    |> Precomputed_values.pk_of_account_record
   in
   Logger.trace logger "Setting new snark worker key"
     ~metadata:

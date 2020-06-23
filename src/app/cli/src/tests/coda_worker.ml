@@ -29,7 +29,8 @@ module Input = struct
     ; max_concurrent_connections: int option
     ; is_archive_rocksdb: bool
     ; is_seed: bool
-    ; archive_process_location: Core.Host_and_port.t option }
+    ; archive_process_location: Core.Host_and_port.t option
+    ; runtime_config: Runtime_config.t }
   [@@deriving bin_io_unversioned]
 end
 
@@ -423,6 +424,7 @@ module T = struct
         ; is_archive_rocksdb
         ; is_seed
         ; archive_process_location
+        ; runtime_config
         ; _ } =
       let logger =
         Logger.create
@@ -431,10 +433,12 @@ module T = struct
             ; ("port", `Int addrs_and_ports.libp2p_port) ]
           ()
       in
-      let precomputed_values = Lazy.force Precomputed_values.compiled in
-      let constraint_constants =
-        Genesis_constants.Constraint_constants.compiled
+      let%bind precomputed_values, _runtime_config =
+        Genesis_ledger_helper.init_from_config_file ~logger ~may_generate:false
+          ~proof_level:None runtime_config
+        >>| Or_error.ok_exn
       in
+      let constraint_constants = precomputed_values.constraint_constants in
       let (module Genesis_ledger) = precomputed_values.genesis_ledger in
       let pids = Child_processes.Termination.create_pid_table () in
       let%bind () =
