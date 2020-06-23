@@ -23,7 +23,7 @@ Pipeline.build
             Cmd.Docker::{
               image = (../../Constants/ContainerImages.dhall).codaToolchain
             }
-            ("dune external-lib-deps --missing --profile nonconsensus_medium_curves && " ++
+            ("ls -l /home/opam/.opam && opam install dune && dune external-lib-deps --missing --profile nonconsensus_medium_curves && " ++
               "mkdir -p /tmp/artifacts && (" ++
               "set -o pipefail ; " ++
               "./buildkite/scripts/opam-env.sh && " ++
