@@ -27,7 +27,7 @@
 {% set checkout_no_lfs %}
             - run:
                 name: Disable LFS checkout
-                command|
+                command: |
                     git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
                     git config --global lfs.fetchexclude "*"
             - checkout
