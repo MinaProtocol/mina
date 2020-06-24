@@ -99,7 +99,6 @@ required_excludes = [
 extra_required_status_checks = [
     "ci/circleci: lint",
     "ci/circleci: tracetool",
-    "ci/circleci: build-wallet",
     "ci/circleci: compare-test-signatures",
     "ci/circleci: build-client-sdk",
     "ci/circleci: test-unit--nonconsensus_medium_curves",
@@ -108,6 +107,7 @@ extra_required_status_checks = [
 # these are full status check names. they will not be required to succeed.
 not_required_status_checks = [
     "ci/circleci: build-macos",
+    "ci/circleci: build-wallet",
 ]
 
 
