@@ -592,7 +592,9 @@ jobs:
                 command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Build OCaml
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && make build'
+                  command: |
+                      ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && make build'
+                      ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'echo built > should_run_tests'
                   environment:
                     DUNE_PROFILE: {{profile}}
                     LIBP2P_NIXLESS: 1
@@ -605,6 +607,7 @@ jobs:
                     - "_build/default/src/app/cli/src/coda.exe"
                     - "_build/default/src/app/logproc/logproc.exe"
                     - "scripts"
+                    - "should_run_tests"
 
     {%- for test in compile_config_agnostic_tests %}
     test--{{profile}}--{{test.replace(' ','_')}}:
@@ -618,7 +621,7 @@ jobs:
                     -  {{profile}}-build-binaries-v1-{{'{{'}} .Revision {{'}}'}}
             - run:
                   name: Running test -- {{profile}}:{{test}}
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "{{profile}}:{{test}}"'
+                  command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "{{profile}}:{{test}}"; fi
     {%- endfor %}
     {%- endfor %}
 

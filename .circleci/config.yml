@@ -773,7 +773,9 @@ jobs:
                 command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Build OCaml
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && make build'
+                  command: |
+                      ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && make build'
+                      ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'echo built > should_run_tests'
                   environment:
                     DUNE_PROFILE: dev
                     LIBP2P_NIXLESS: 1
@@ -786,6 +788,7 @@ jobs:
                     - "_build/default/src/app/cli/src/coda.exe"
                     - "_build/default/src/app/logproc/logproc.exe"
                     - "scripts"
+                    - "should_run_tests"
     test--dev--coda-archive-node-test:
         resource_class: large
         docker:
@@ -797,7 +800,7 @@ jobs:
                     -  dev-build-binaries-v1-{{ .Revision }}
             - run:
                   name: Running test -- dev:coda-archive-node-test
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-archive-node-test"'
+                  command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-archive-node-test"; fi
     test--dev--coda-batch-payment-test:
         resource_class: large
         docker:
@@ -809,7 +812,7 @@ jobs:
                     -  dev-build-binaries-v1-{{ .Revision }}
             - run:
                   name: Running test -- dev:coda-batch-payment-test
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-batch-payment-test"'
+                  command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-batch-payment-test"; fi
     test--dev--coda-block-production-test:
         resource_class: large
         docker:
@@ -821,7 +824,7 @@ jobs:
                     -  dev-build-binaries-v1-{{ .Revision }}
             - run:
                   name: Running test -- dev:coda-block-production-test
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-block-production-test"'
+                  command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-block-production-test"; fi
     test--dev--coda-bootstrap-test:
         resource_class: large
         docker:
@@ -833,7 +836,7 @@ jobs:
                     -  dev-build-binaries-v1-{{ .Revision }}
             - run:
                   name: Running test -- dev:coda-bootstrap-test
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-bootstrap-test"'
+                  command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-bootstrap-test"; fi
     test--dev--coda-change-snark-worker-test:
         resource_class: large
         docker:
@@ -845,7 +848,7 @@ jobs:
                     -  dev-build-binaries-v1-{{ .Revision }}
             - run:
                   name: Running test -- dev:coda-change-snark-worker-test
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-change-snark-worker-test"'
+                  command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-change-snark-worker-test"; fi
     test--dev--coda-delegation-test:
         resource_class: large
         docker:
@@ -857,7 +860,7 @@ jobs:
                     -  dev-build-binaries-v1-{{ .Revision }}
             - run:
                   name: Running test -- dev:coda-delegation-test
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-delegation-test"'
+                  command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-delegation-test"; fi
     test--dev--coda-peers-test:
         resource_class: large
         docker:
@@ -869,7 +872,7 @@ jobs:
                     -  dev-build-binaries-v1-{{ .Revision }}
             - run:
                   name: Running test -- dev:coda-peers-test
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-peers-test"'
+                  command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-peers-test"; fi
     test--dev--coda-restart-node-test:
         resource_class: large
         docker:
@@ -881,7 +884,7 @@ jobs:
                     -  dev-build-binaries-v1-{{ .Revision }}
             - run:
                   name: Running test -- dev:coda-restart-node-test
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-restart-node-test"'
+                  command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-restart-node-test"; fi
     test--dev--coda-shared-prefix-test_-who-produces_0:
         resource_class: large
         docker:
@@ -893,7 +896,7 @@ jobs:
                     -  dev-build-binaries-v1-{{ .Revision }}
             - run:
                   name: Running test -- dev:coda-shared-prefix-test -who-produces 0
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-shared-prefix-test -who-produces 0"'
+                  command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-shared-prefix-test -who-produces 0"; fi
     test--dev--coda-shared-prefix-test_-who-produces_1:
         resource_class: large
         docker:
@@ -905,7 +908,7 @@ jobs:
                     -  dev-build-binaries-v1-{{ .Revision }}
             - run:
                   name: Running test -- dev:coda-shared-prefix-test -who-produces 1
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-shared-prefix-test -who-produces 1"'
+                  command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-shared-prefix-test -who-produces 1"; fi
     test--dev--coda-shared-state-test:
         resource_class: large
         docker:
@@ -917,7 +920,7 @@ jobs:
                     -  dev-build-binaries-v1-{{ .Revision }}
             - run:
                   name: Running test -- dev:coda-shared-state-test
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-shared-state-test"'
+                  command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-shared-state-test"; fi
     test--dev--coda-transitive-peers-test:
         resource_class: large
         docker:
@@ -929,7 +932,7 @@ jobs:
                     -  dev-build-binaries-v1-{{ .Revision }}
             - run:
                   name: Running test -- dev:coda-transitive-peers-test
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-transitive-peers-test"'
+                  command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-transitive-peers-test"; fi
     test--dev--coda-txns-and-restart-non-producers:
         resource_class: large
         docker:
@@ -941,7 +944,7 @@ jobs:
                     -  dev-build-binaries-v1-{{ .Revision }}
             - run:
                   name: Running test -- dev:coda-txns-and-restart-non-producers
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-txns-and-restart-non-producers"'
+                  command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-txns-and-restart-non-producers"; fi
     test--fake_hash:
         resource_class: large
         docker:
