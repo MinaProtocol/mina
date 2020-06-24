@@ -41,10 +41,10 @@ module ButtonStyles = {
 };
 
 [@react.component]
-let make = (~currentOption, ~onTogglePress, ~label) => {
+let make = (~currentToggle, ~onTogglePress, ~label) => {
   <div
     className={
-      currentOption == label
+      currentToggle == label
         ? ButtonStyles.selectedButton : ButtonStyles.button
     }
     onClick={_ => onTogglePress(label)}>
