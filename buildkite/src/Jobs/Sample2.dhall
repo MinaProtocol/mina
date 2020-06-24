@@ -22,7 +22,10 @@ in
 Pipeline.build
   Pipeline.Config::{
     spec = JobSpec::{
-      dirtyWhen = [ S.contains "src/lib" ],
+      dirtyWhen = [
+        S.contains "src/lib",
+        S.contains "buildkite"
+      ],
       name = name
     },
     steps = [
