@@ -19,12 +19,9 @@ Pipeline.build
     Command.build
       Command.Config::{
         commands = OpamInit.andThenRunInDocker (
-            "date +%s && mkdir -p /tmp/artifacts && (" ++
-                "set -o pipefail ; " ++
+            "date +%s && mkdir -p /tmp/artifacts && " ++
                 "./buildkite/scripts/opam-env.sh && " ++
-                "make client_sdk 2>&1 | tee /tmp/artifacts/buildclientsdk.log && " ++
-                "date +%s" ++
-              ")"),
+                "date +%s"),
         label = "Build client-sdk",
         key = "build-client-sdk",
         target = Size.Large,
