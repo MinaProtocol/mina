@@ -778,8 +778,8 @@ jobs:
                     DUNE_PROFILE: dev
                     LIBP2P_NIXLESS: 1
                     GO: /usr/lib/go/bin/go
-            - save_cache
-                name: Dev build binaries
+            - save_cache:
+                name: Store config-agnostic test binaries
                 key: dev-build-binaries-v1-{{ .Revision }}
                 paths:
                     - "src/app/libp2p_helper/result"
