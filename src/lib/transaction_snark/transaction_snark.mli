@@ -56,14 +56,16 @@ module Statement : sig
              , 'amount
              , 'pending_coinbase
              , 'fee_excess
-             , 'proof_type )
+             , 'proof_type
+             , 'sok_digest )
              t =
           { source: 'ledger_hash
           ; target: 'ledger_hash
           ; supply_increase: 'amount
           ; pending_coinbase_stack_state: 'pending_coinbase
           ; fee_excess: 'fee_excess
-          ; proof_type: 'proof_type }
+          ; proof_type: 'proof_type
+          ; sok_digest: 'sok_digest }
         [@@deriving compare, equal, hash, sexp, yojson]
 
         val to_latest :
@@ -72,34 +74,45 @@ module Statement : sig
           -> ('pending_coinbase -> 'pending_coinbase')
           -> ('fee_excess -> 'fee_excess')
           -> ('proof_type -> 'proof_type')
+          -> ('sok_digest -> 'sok_digest')
           -> ( 'ledger_hash
              , 'amount
              , 'pending_coinbase
              , 'fee_excess
-             , 'proof_type )
+             , 'proof_type
+             , 'sok_digest )
              t
           -> ( 'ledger_hash'
              , 'amount'
              , 'pending_coinbase'
              , 'fee_excess'
-             , 'proof_type' )
+             , 'proof_type'
+             , 'sok_digest' )
              t
       end
     end]
 
-    type ('ledger_hash, 'amount, 'pending_coinbase, 'fee_excess, 'proof_type) t =
+    type ( 'ledger_hash
+         , 'amount
+         , 'pending_coinbase
+         , 'fee_excess
+         , 'proof_type
+         , 'sok_digest )
+         t =
           ( 'ledger_hash
           , 'amount
           , 'pending_coinbase
           , 'fee_excess
-          , 'proof_type )
+          , 'proof_type
+          , 'sok_digest )
           Stable.Latest.t =
       { source: 'ledger_hash
       ; target: 'ledger_hash
       ; supply_increase: 'amount
       ; pending_coinbase_stack_state: 'pending_coinbase
       ; fee_excess: 'fee_excess
-      ; proof_type: 'proof_type }
+      ; proof_type: 'proof_type
+      ; sok_digest: 'sok_digest }
     [@@deriving compare, equal, hash, sexp, yojson]
   end
 
@@ -107,20 +120,23 @@ module Statement : sig
        , 'amount
        , 'pending_coinbase
        , 'fee_excess
-       , 'proof_type )
+       , 'proof_type
+       , 'sok_digest )
        poly =
         ( 'ledger_hash
         , 'amount
         , 'pending_coinbase
         , 'fee_excess
-        , 'proof_type )
+        , 'proof_type
+        , 'sok_digest )
         Poly.t =
     { source: 'ledger_hash
     ; target: 'ledger_hash
     ; supply_increase: 'amount
     ; pending_coinbase_stack_state: 'pending_coinbase
     ; fee_excess: 'fee_excess
-    ; proof_type: 'proof_type }
+    ; proof_type: 'proof_type
+    ; sok_digest: 'sok_digest }
   [@@deriving compare, equal, hash, sexp, yojson]
 
   [%%versioned:
@@ -131,7 +147,8 @@ module Statement : sig
         , Currency.Amount.Stable.V1.t
         , Pending_coinbase_stack_state.Stable.V1.t
         , Fee_excess.Stable.V1.t
-        , Proof_type.Stable.V1.t )
+        , Proof_type.Stable.V1.t
+        , unit )
         Poly.Stable.V1.t
       [@@deriving compare, equal, hash, sexp, yojson]
     end
@@ -142,7 +159,8 @@ module Statement : sig
     , Currency.Amount.t
     , Pending_coinbase_stack_state.t
     , Fee_excess.t
-    , Proof_type.t )
+    , Proof_type.t
+    , unit )
     Poly.t
   [@@deriving sexp, hash, compare, yojson]
 

@@ -224,7 +224,8 @@ let create_expected_statement ~constraint_constants
   ; pending_coinbase_stack_state=
       { statement.pending_coinbase_stack_state with
         target= pending_coinbase_after }
-  ; proof_type= `Base }
+  ; proof_type= `Base
+  ; sok_digest= () }
 
 let completed_work_to_scanable_work (job : job) (fee, current_proof, prover) :
     'a Or_error.t =
@@ -256,7 +257,8 @@ let completed_work_to_scanable_work (job : job) (fee, current_proof, prover) :
             { source= s.pending_coinbase_stack_state.source
             ; target= s'.pending_coinbase_stack_state.target }
         ; fee_excess
-        ; proof_type= `Merge }
+        ; proof_type= `Merge
+        ; sok_digest= () }
       in
       ( Ledger_proof.create ~statement ~sok_digest ~proof
       , Sok_message.create ~fee ~prover )
@@ -396,7 +398,8 @@ struct
         ; target
         ; supply_increase= _
         ; pending_coinbase_stack_state= _ (*TODO: check pending coinbases?*)
-        ; proof_type= _ } ->
+        ; proof_type= _
+        ; sok_digest= () } ->
         let open Or_error.Let_syntax in
         let%map () =
           Option.value_map ~default:(Ok ()) snarked_ledger_hash ~f:(fun hash ->
@@ -465,7 +468,8 @@ let statement_of_job : job -> Transaction_snark.Statement.t option = function
             { source= stmt1.pending_coinbase_stack_state.source
             ; target= stmt2.pending_coinbase_stack_state.target }
         ; fee_excess
-        ; proof_type= `Merge }
+        ; proof_type= `Merge
+        ; sok_digest= () }
         : Transaction_snark.Statement.t )
 
 let create ~work_delay ~transaction_capacity_log_2 =

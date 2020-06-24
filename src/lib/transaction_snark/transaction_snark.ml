@@ -74,47 +74,59 @@ module Statement = struct
              , 'amount
              , 'pending_coinbase
              , 'fee_excess
-             , 'proof_type )
+             , 'proof_type
+             , 'sok_digest )
              t =
           { source: 'ledger_hash
           ; target: 'ledger_hash
           ; supply_increase: 'amount
           ; pending_coinbase_stack_state: 'pending_coinbase
           ; fee_excess: 'fee_excess
-          ; proof_type: 'proof_type }
+          ; proof_type: 'proof_type
+          ; sok_digest: 'sok_digest }
         [@@deriving compare, equal, hash, sexp, yojson]
 
         let to_latest ledger_hash amount pending_coinbase fee_excess'
-            proof_type'
+            proof_type' sok_digest'
             { source
             ; target
             ; supply_increase
             ; pending_coinbase_stack_state
             ; fee_excess
-            ; proof_type } =
+            ; proof_type
+            ; sok_digest } =
           { source= ledger_hash source
           ; target= ledger_hash target
           ; supply_increase= amount supply_increase
           ; pending_coinbase_stack_state=
               pending_coinbase pending_coinbase_stack_state
           ; fee_excess= fee_excess' fee_excess
-          ; proof_type= proof_type' proof_type }
+          ; proof_type= proof_type' proof_type
+          ; sok_digest= sok_digest' sok_digest }
       end
     end]
 
-    type ('ledger_hash, 'amount, 'pending_coinbase, 'fee_excess, 'proof_type) t =
+    type ( 'ledger_hash
+         , 'amount
+         , 'pending_coinbase
+         , 'fee_excess
+         , 'proof_type
+         , 'sok_digest )
+         t =
           ( 'ledger_hash
           , 'amount
           , 'pending_coinbase
           , 'fee_excess
-          , 'proof_type )
+          , 'proof_type
+          , 'sok_digest )
           Stable.Latest.t =
       { source: 'ledger_hash
       ; target: 'ledger_hash
       ; supply_increase: 'amount
       ; pending_coinbase_stack_state: 'pending_coinbase
       ; fee_excess: 'fee_excess
-      ; proof_type: 'proof_type }
+      ; proof_type: 'proof_type
+      ; sok_digest: 'sok_digest }
     [@@deriving compare, equal, hash, sexp, yojson]
   end
 
@@ -122,20 +134,23 @@ module Statement = struct
        , 'amount
        , 'pending_coinbase
        , 'fee_excess
-       , 'proof_type )
+       , 'proof_type
+       , 'sok_digest )
        poly =
         ( 'ledger_hash
         , 'amount
         , 'pending_coinbase
         , 'fee_excess
-        , 'proof_type )
+        , 'proof_type
+        , 'sok_digest )
         Poly.t =
     { source: 'ledger_hash
     ; target: 'ledger_hash
     ; supply_increase: 'amount
     ; pending_coinbase_stack_state: 'pending_coinbase
     ; fee_excess: 'fee_excess
-    ; proof_type: 'proof_type }
+    ; proof_type: 'proof_type
+    ; sok_digest: 'sok_digest }
   [@@deriving compare, equal, hash, sexp, yojson]
 
   [%%versioned
@@ -146,7 +161,8 @@ module Statement = struct
         , Currency.Amount.Stable.V1.t
         , Pending_coinbase_stack_state.Stable.V1.t
         , Fee_excess.Stable.V1.t
-        , Proof_type.Stable.V1.t )
+        , Proof_type.Stable.V1.t
+        , unit )
         Poly.Stable.V1.t
       [@@deriving compare, equal, hash, sexp, yojson]
 
@@ -159,7 +175,8 @@ module Statement = struct
     , Currency.Amount.t
     , Pending_coinbase_stack_state.t
     , Fee_excess.t
-    , Proof_type.t )
+    , Proof_type.t
+    , unit )
     Poly.t
   [@@deriving sexp, hash, compare, yojson]
 
@@ -180,7 +197,8 @@ module Statement = struct
       ; supply_increase
       ; pending_coinbase_stack_state=
           { source= s1.pending_coinbase_stack_state.source
-          ; target= s2.pending_coinbase_stack_state.target } }
+          ; target= s2.pending_coinbase_stack_state.target }
+      ; sok_digest= () }
       : t )
 
   include Hashable.Make_binable (Stable.Latest)
@@ -203,7 +221,8 @@ module Statement = struct
       ; proof_type
       ; supply_increase
       ; pending_coinbase_stack_state=
-          {source= pending_coinbase_before; target= pending_coinbase_after} }
+          {source= pending_coinbase_before; target= pending_coinbase_after}
+      ; sok_digest= () }
       : t )
 end
 
@@ -266,7 +285,8 @@ let statement
   ; proof_type
   ; supply_increase
   ; pending_coinbase_stack_state
-  ; fee_excess }
+  ; fee_excess
+  ; sok_digest= () }
 
 let create = Fields.create
 
