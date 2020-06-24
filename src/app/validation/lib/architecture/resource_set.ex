@@ -32,49 +32,49 @@ defmodule Architecture.ResourceSet do
   # insertion is private to enforce correct usage
   # (please see NB at defclass if considering exposing publicly)
   @spec insert(t, Class.instance()) :: t
-  defp insert(db, resource) do
-    id = db.max_resource_id + 1
+  defp insert(set, resource) do
+    id = set.max_resource_id + 1
     resource_class = Class.class_of(resource)
     all_classes = [resource_class | Class.all_super_classes(resource_class)]
     # there's no reason to index the root object or root resource
     # TODO: Class.super_classes_up_to()
     indexable_classes = Enum.filter(all_classes, &(&1 != Class.Object and &1 != Resource))
-    resources = Map.put(db.resources, id, resource)
+    resources = Map.put(set.resources, id, resource)
 
     class_index =
       Enum.reduce(
         indexable_classes,
-        db.class_index,
+        set.class_index,
         &Map.update(&2, &1, [], fn ids -> [id | ids] end)
       )
 
-    %{db | max_resource_id: id, resources: resources, class_index: class_index}
+    %{set | max_resource_id: id, resources: resources, class_index: class_index}
   end
 
   @spec all_resources(t) :: [Resource.t()]
-  def all_resources(db), do: Map.values(db.resources)
+  def all_resources(set), do: Map.values(set.resources)
 
   @spec all_resource_classes(t) :: [Class.t()]
-  def all_resource_classes(db), do: Map.keys(db.class_index)
+  def all_resource_classes(set), do: Map.keys(set.class_index)
 
   @spec select(t, Class.t()) :: t
-  def select(db, class), do: slice(db, Map.get(db.class_index, class, []))
+  def select(set, class), do: slice(set, Map.get(set.class_index, class, []))
 
   @spec slice(t, [resource_id]) :: t
-  defp slice(db, ids) do
-    {resources, _} = Map.split(db.resources, ids)
+  defp slice(set, ids) do
+    {resources, _} = Map.split(set.resources, ids)
 
     class_index =
-      Enum.map(db.class_index, fn {class, index} ->
+      Enum.map(set.class_index, fn {class, index} ->
         {class, Enum.filter(index, &Enum.member?(ids, &1))}
       end)
       |> Map.new()
 
-    %__MODULE__{db | resources: resources, class_index: class_index}
+    %__MODULE__{set | resources: resources, class_index: class_index}
   end
 
   @spec filter(t) :: Architecture.LogFilter.t()
-  def filter(db) do
+  def filter(set) do
     import Architecture.LogFilter
 
     # need to crawl a tree of class relationships in order to build the proper filter expression
@@ -94,22 +94,24 @@ defmodule Architecture.ResourceSet do
     # the adjunctions are nested in a tree following the subclass relationships up to Architecture.Resource
 
     resource_filters_by_class =
-      all_resources(db)
+      all_resources(set)
       |> Enum.reduce(%{}, fn resource, map ->
         resource_class = Class.class_of(resource)
 
-        local_filters =
+        local_filter =
           Class.inheritance_chain!(resource_class, Resource)
+          |> Enum.reverse()
           |> Enum.map(fn class -> class.local_filter(Class.downcast!(resource, class)) end)
+          |> adjoin()
 
-        if length(local_filters) > 0 do
-          Map.update(map, resource_class, [], &[adjoin(local_filters) | &1])
+        if local_filter != nil do
+          Map.update(map, resource_class, [local_filter], &(&1 ++ [local_filter]))
         else
           map
         end
       end)
 
-    Class.Hiearchy.compute(Resource, all_resource_classes(db))
+    Class.Hiearchy.compute(Resource, all_resource_classes(set))
     |> Class.Hiearchy.reduce_depth_first_exclusive(
       nil,
       fn class, child_filters ->
@@ -117,7 +119,7 @@ defmodule Architecture.ResourceSet do
 
         adjoin(
           class.global_filter(),
-          disjoin(child_filters, disjoin(resource_filters))
+          disjoin(disjoin(resource_filters), child_filters)
         )
       end,
       &disjoin/1

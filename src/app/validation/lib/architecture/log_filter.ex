@@ -35,6 +35,7 @@ defmodule Architecture.LogFilter do
 
   @spec adjoin([t] | nil) :: t
   def adjoin(nil), do: nil
+  def adjoin([]), do: nil
   def adjoin(ls) when is_list(ls), do: Enum.reduce(ls, &adjoin(&2, &1))
 
   @spec disjoin(t, t) :: t
@@ -48,6 +49,7 @@ defmodule Architecture.LogFilter do
 
   @spec disjoin([t] | nil) :: t
   def disjoin(nil), do: nil
+  def disjoin([]), do: nil
   def disjoin(ls) when is_list(ls), do: Enum.reduce(ls, &disjoin(&2, &1))
 
   @spec nest(String.t()) :: String.t()
