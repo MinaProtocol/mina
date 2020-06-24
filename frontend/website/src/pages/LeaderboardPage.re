@@ -90,7 +90,7 @@ module SearchBar = {
 };
 
 module ToggleButtons = {
-  module ToggleStyles = {
+  module Styles = {
     open Css;
 
     let flexColumn =
@@ -138,16 +138,16 @@ module ToggleButtons = {
       |> React.array;
     };
 
-    <div className=ToggleStyles.flexColumn>
+    <div className=Styles.flexColumn>
       <h3 className=Theme.H5.semiBold> {React.string("View")} </h3>
       <Spacer height=0.5 />
-      <div className=ToggleStyles.buttonRow> {renderToggleButtons()} </div>
+      <div className=Styles.buttonRow> {renderToggleButtons()} </div>
     </div>;
   };
 };
 
 module FilterDropdown = {
-  module FilterDropdownStyles = {
+  module Styles = {
     open Css;
     let flexColumn =
       style([
@@ -163,118 +163,19 @@ module FilterDropdown = {
           [width(`percent(48.)), marginTop(`zero)],
         ),
       ]);
-
-    let dropdownTitle =
-      style([
-        display(`inlineFlex),
-        alignItems(`center),
-        marginTop(`px(4)),
-        marginLeft(`rem(0.5)),
-      ]);
-
-    let dropdownContainer = {
-      merge([
-        Theme.Body.medium,
-        style([
-          position(`relative),
-          width(`percent(100.)),
-          letterSpacing(`rem(-0.0125)),
-          fontWeight(`num(500)),
-          border(`px(1), `solid, Theme.Colors.hyperlinkAlpha(0.3)),
-          borderRadius(`px(4)),
-          padding(`px(5)),
-          cursor(`pointer),
-          after([
-            // Render triangle icon at the end of the dropdown
-            unsafe("content", ""),
-            position(`absolute),
-            width(`zero),
-            height(`zero),
-            borderLeft(`px(7), `solid, transparent),
-            borderRight(`px(7), `solid, transparent),
-            borderTop(`px(7), `solid, Theme.Colors.teal),
-            borderRadius(`px(4)),
-            right(`px(15)),
-            top(`percent(40.)),
-          ]),
-        ]),
-      ]);
-    };
-
-    let collapsedDropdown = {
-      style([
-        position(`absolute),
-        left(`zero),
-        right(`zero),
-        fontWeight(`num(500)),
-        backgroundColor(Theme.Colors.white),
-        pointerEvents(`none),
-        border(`px(1), `solid, Theme.Colors.hyperlinkAlpha(0.3)),
-        opacity(0.),
-      ]);
-    };
-
-    let expandedDropdown = {
-      merge([
-        collapsedDropdown,
-        style([
-          top(`rem(2.3)),
-          borderRadius(`px(4)),
-          pointerEvents(`auto),
-          opacity(1.),
-          selector(
-            "li",
-            [
-              display(`block),
-              textDecoration(`none),
-              padding(`px(10)),
-              zIndex(1),
-              hover([background(Theme.Colors.gandalf)]),
-            ],
-          ),
-        ]),
-      ]);
-    };
   };
 
   let filterLabels = [|"This Release", "Previous Phase", "All Time"|];
   [@react.component]
   let make = (~currentFilter, ~onFilterPress) => {
-    let (menuOpen, toggleMenu) = React.useState(() => false);
-
-    let onDropdownItemPress = label => {
-      onFilterPress(label);
-      toggleMenu(_ => !menuOpen);
-    };
-
-    let renderDropdown = () => {
-      <div
-        className=FilterDropdownStyles.dropdownContainer
-        onClick={_ => {toggleMenu(_ => !menuOpen)}}>
-        <span className=FilterDropdownStyles.dropdownTitle>
-          {React.string(currentFilter)}
-        </span>
-        <ul
-          className={
-            menuOpen
-              ? FilterDropdownStyles.expandedDropdown
-              : FilterDropdownStyles.collapsedDropdown
-          }>
-          {filterLabels
-           |> Array.map(label => {
-                <li key=label onClick={_ => {onDropdownItemPress(label)}}>
-                  {React.string(label)}
-                </li>
-              })
-           |> React.array}
-        </ul>
-      </div>;
-    };
-
-    <div className=FilterDropdownStyles.flexColumn>
+    <div className=Styles.flexColumn>
       <h3 className=Theme.H5.semiBold> {React.string("View")} </h3>
       <Spacer height=0.5 />
-      {renderDropdown()}
+      <Dropdown
+        items=filterLabels
+        currentItem=currentFilter
+        onItemPress=onFilterPress
+      />
     </div>;
   };
 };
