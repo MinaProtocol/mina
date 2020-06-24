@@ -801,6 +801,10 @@ jobs:
             - run:
                   name: Running test -- dev:coda-archive-node-test
                   command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-archive-node-test"; fi
+                  environment:
+                    LIBP2P_NIXLESS: 1
+                    CODA_LIBP2P_HELPER_PATH: /home/opam/src/app/libp2p_helper/result/bin/libp2p_helper
+                    GO: /usr/lib/go/bin/go
     test--dev--coda-batch-payment-test:
         resource_class: large
         docker:
@@ -813,6 +817,10 @@ jobs:
             - run:
                   name: Running test -- dev:coda-batch-payment-test
                   command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-batch-payment-test"; fi
+                  environment:
+                    LIBP2P_NIXLESS: 1
+                    CODA_LIBP2P_HELPER_PATH: /home/opam/src/app/libp2p_helper/result/bin/libp2p_helper
+                    GO: /usr/lib/go/bin/go
     test--dev--coda-block-production-test:
         resource_class: large
         docker:
@@ -825,6 +833,10 @@ jobs:
             - run:
                   name: Running test -- dev:coda-block-production-test
                   command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-block-production-test"; fi
+                  environment:
+                    LIBP2P_NIXLESS: 1
+                    CODA_LIBP2P_HELPER_PATH: /home/opam/src/app/libp2p_helper/result/bin/libp2p_helper
+                    GO: /usr/lib/go/bin/go
     test--dev--coda-bootstrap-test:
         resource_class: large
         docker:
@@ -837,6 +849,10 @@ jobs:
             - run:
                   name: Running test -- dev:coda-bootstrap-test
                   command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-bootstrap-test"; fi
+                  environment:
+                    LIBP2P_NIXLESS: 1
+                    CODA_LIBP2P_HELPER_PATH: /home/opam/src/app/libp2p_helper/result/bin/libp2p_helper
+                    GO: /usr/lib/go/bin/go
     test--dev--coda-change-snark-worker-test:
         resource_class: large
         docker:
@@ -849,6 +865,10 @@ jobs:
             - run:
                   name: Running test -- dev:coda-change-snark-worker-test
                   command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-change-snark-worker-test"; fi
+                  environment:
+                    LIBP2P_NIXLESS: 1
+                    CODA_LIBP2P_HELPER_PATH: /home/opam/src/app/libp2p_helper/result/bin/libp2p_helper
+                    GO: /usr/lib/go/bin/go
     test--dev--coda-delegation-test:
         resource_class: large
         docker:
@@ -861,6 +881,10 @@ jobs:
             - run:
                   name: Running test -- dev:coda-delegation-test
                   command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-delegation-test"; fi
+                  environment:
+                    LIBP2P_NIXLESS: 1
+                    CODA_LIBP2P_HELPER_PATH: /home/opam/src/app/libp2p_helper/result/bin/libp2p_helper
+                    GO: /usr/lib/go/bin/go
     test--dev--coda-peers-test:
         resource_class: large
         docker:
@@ -873,6 +897,10 @@ jobs:
             - run:
                   name: Running test -- dev:coda-peers-test
                   command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-peers-test"; fi
+                  environment:
+                    LIBP2P_NIXLESS: 1
+                    CODA_LIBP2P_HELPER_PATH: /home/opam/src/app/libp2p_helper/result/bin/libp2p_helper
+                    GO: /usr/lib/go/bin/go
     test--dev--coda-restart-node-test:
         resource_class: large
         docker:
@@ -885,6 +913,10 @@ jobs:
             - run:
                   name: Running test -- dev:coda-restart-node-test
                   command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-restart-node-test"; fi
+                  environment:
+                    LIBP2P_NIXLESS: 1
+                    CODA_LIBP2P_HELPER_PATH: /home/opam/src/app/libp2p_helper/result/bin/libp2p_helper
+                    GO: /usr/lib/go/bin/go
     test--dev--coda-shared-prefix-test_-who-produces_0:
         resource_class: large
         docker:
@@ -897,6 +929,10 @@ jobs:
             - run:
                   name: Running test -- dev:coda-shared-prefix-test -who-produces 0
                   command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-shared-prefix-test -who-produces 0"; fi
+                  environment:
+                    LIBP2P_NIXLESS: 1
+                    CODA_LIBP2P_HELPER_PATH: /home/opam/src/app/libp2p_helper/result/bin/libp2p_helper
+                    GO: /usr/lib/go/bin/go
     test--dev--coda-shared-prefix-test_-who-produces_1:
         resource_class: large
         docker:
@@ -909,6 +945,10 @@ jobs:
             - run:
                   name: Running test -- dev:coda-shared-prefix-test -who-produces 1
                   command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-shared-prefix-test -who-produces 1"; fi
+                  environment:
+                    LIBP2P_NIXLESS: 1
+                    CODA_LIBP2P_HELPER_PATH: /home/opam/src/app/libp2p_helper/result/bin/libp2p_helper
+                    GO: /usr/lib/go/bin/go
     test--dev--coda-shared-state-test:
         resource_class: large
         docker:
@@ -921,6 +961,10 @@ jobs:
             - run:
                   name: Running test -- dev:coda-shared-state-test
                   command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-shared-state-test"; fi
+                  environment:
+                    LIBP2P_NIXLESS: 1
+                    CODA_LIBP2P_HELPER_PATH: /home/opam/src/app/libp2p_helper/result/bin/libp2p_helper
+                    GO: /usr/lib/go/bin/go
     test--dev--coda-transitive-peers-test:
         resource_class: large
         docker:
@@ -933,6 +977,10 @@ jobs:
             - run:
                   name: Running test -- dev:coda-transitive-peers-test
                   command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-transitive-peers-test"; fi
+                  environment:
+                    LIBP2P_NIXLESS: 1
+                    CODA_LIBP2P_HELPER_PATH: /home/opam/src/app/libp2p_helper/result/bin/libp2p_helper
+                    GO: /usr/lib/go/bin/go
     test--dev--coda-txns-and-restart-non-producers:
         resource_class: large
         docker:
@@ -945,6 +993,10 @@ jobs:
             - run:
                   name: Running test -- dev:coda-txns-and-restart-non-producers
                   command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-txns-and-restart-non-producers"; fi
+                  environment:
+                    LIBP2P_NIXLESS: 1
+                    CODA_LIBP2P_HELPER_PATH: /home/opam/src/app/libp2p_helper/result/bin/libp2p_helper
+                    GO: /usr/lib/go/bin/go
     test--fake_hash:
         resource_class: large
         docker:
