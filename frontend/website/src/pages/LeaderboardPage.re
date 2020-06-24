@@ -13,14 +13,17 @@ module Styles = {
       media(Theme.MediaQuery.notMobile, [flexDirection(`row)]),
       justifyContent(`spaceBetween),
       width(`percent(100.)),
-      media(Theme.MediaQuery.tablet, [marginTop(`rem(5.))]),
     ]);
   let searchBar =
     style([
       display(`flex),
       flexDirection(`column),
       marginTop(`rem(3.)),
-      media(Theme.MediaQuery.notMobile, [marginTop(`zero)]),
+      media(
+        Theme.MediaQuery.notMobile,
+        [marginTop(`zero), marginRight(`rem(1.))],
+      ),
+      width(`percent(100.)),
     ]);
   let textField =
     style([
@@ -55,8 +58,15 @@ module Styles = {
           color(Theme.Colors.slateAlpha(0.7)),
         ],
       ),
-      media(Theme.MediaQuery.tablet, [width(`rem(28.))]),
-      media(Theme.MediaQuery.desktop, [width(`rem(39.))]),
+      media(
+        Theme.MediaQuery.tablet,
+        [
+          width(`percent(100.)),
+          maxWidth(`rem(27.)),
+          marginRight(`rem(1.)),
+        ],
+      ),
+      media(Theme.MediaQuery.veryVeryLarge, [width(`percent(100.))]),
     ]);
 };
 
