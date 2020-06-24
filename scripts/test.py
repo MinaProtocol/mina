@@ -68,6 +68,14 @@ compile_config_agnostic_tests = [
 
 compile_config_agnostic_profiles = ['dev']
 
+required_config_agnostic_tests = {
+    'dev':
+      [ 'coda-bootstrap-test'
+      , 'coda-delegation-test'
+      , 'coda-shared-state-test'
+      , 'coda-batch-payment-test' ]
+}
+
 # dictionary mapping configs to lists of tests
 small_curves_tests = {
     'fake_hash': ['full-test'],
@@ -489,7 +497,10 @@ def get_required_status():
                                          "test-unit--%s" % profile
                                          for profile in unit_test_profiles),
                                     ("build-artifacts--%s" % profile
-                                     for profile in build_artifact_profiles))),
+                                     for profile in build_artifact_profiles),
+                                    ("test--%s--%s" % (profile, name)
+                                     for profile in required_config_agnostic_tests
+                                     for name in required_config_agnostic_tests[profile]))),
                   extra_required_status_checks)))
 
 
