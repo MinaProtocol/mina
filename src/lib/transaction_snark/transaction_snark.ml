@@ -13,6 +13,19 @@ let wrap_input = Tock.Data_spec.[Wrap_input.typ]
 
 let exists' typ ~f = Tick.(exists typ ~compute:As_prover.(map get_state ~f))
 
+let top_hash_logging_enabled = ref false
+
+let with_top_hash_logging f =
+  let old = !top_hash_logging_enabled in
+  top_hash_logging_enabled := true ;
+  try
+    let ret = f () in
+    top_hash_logging_enabled := old ;
+    ret
+  with err ->
+    top_hash_logging_enabled := old ;
+    raise err
+
 module Proof_type = struct
   [%%versioned
   module Stable = struct
@@ -314,13 +327,21 @@ module Statement = struct
         ; fee_excess
         ; proof_type= _
         ; sok_digest } =
-      Array.reduce_exn ~f:Random_oracle.Input.append
-        [| Sok_message.Digest.to_input sok_digest
-         ; Frozen_ledger_hash.to_input source
-         ; Frozen_ledger_hash.to_input target
-         ; Pending_coinbase_stack_state.to_input pending_coinbase_stack_state
-         ; Amount.to_input supply_increase
-         ; Fee_excess.to_input fee_excess |]
+      let input =
+        Array.reduce_exn ~f:Random_oracle.Input.append
+          [| Sok_message.Digest.to_input sok_digest
+           ; Frozen_ledger_hash.to_input source
+           ; Frozen_ledger_hash.to_input target
+           ; Pending_coinbase_stack_state.to_input pending_coinbase_stack_state
+           ; Amount.to_input supply_increase
+           ; Fee_excess.to_input fee_excess |]
+      in
+      if !top_hash_logging_enabled then
+        Format.eprintf
+          !"Generating unchecked top hash from:@.%{sexp: (Tick.Field.t, bool) \
+            Random_oracle.Input.t}@."
+          input ;
+      input
 
     let var_to_input
         { source
@@ -330,16 +351,42 @@ module Statement = struct
         ; fee_excess
         ; proof_type= _
         ; sok_digest } =
-      let open Tick.Checked.Let_syntax in
-      let%map fee_excess = Fee_excess.to_input_checked fee_excess in
-      Array.reduce_exn ~f:Random_oracle.Input.append
-        [| Sok_message.Digest.Checked.to_input sok_digest
-         ; Frozen_ledger_hash.var_to_input source
-         ; Frozen_ledger_hash.var_to_input target
-         ; Pending_coinbase_stack_state.var_to_input
-             pending_coinbase_stack_state
-         ; Amount.var_to_input supply_increase
-         ; fee_excess |]
+      let open Tick in
+      let open Checked.Let_syntax in
+      let%bind fee_excess = Fee_excess.to_input_checked fee_excess in
+      let input =
+        Array.reduce_exn ~f:Random_oracle.Input.append
+          [| Sok_message.Digest.Checked.to_input sok_digest
+           ; Frozen_ledger_hash.var_to_input source
+           ; Frozen_ledger_hash.var_to_input target
+           ; Pending_coinbase_stack_state.var_to_input
+               pending_coinbase_stack_state
+           ; Amount.var_to_input supply_increase
+           ; fee_excess |]
+      in
+      let%map () =
+        as_prover
+          As_prover.(
+            if !top_hash_logging_enabled then
+              let%bind field_elements =
+                read
+                  (Typ.list ~length:0 Field.typ)
+                  (Array.to_list input.field_elements)
+              in
+              let%map bitstrings =
+                read
+                  (Typ.list ~length:0 (Typ.list ~length:0 Boolean.typ))
+                  (Array.to_list input.bitstrings)
+              in
+              Format.eprintf
+                !"Generating checked top hash from:@.%{sexp: (Field.t, bool) \
+                  Random_oracle.Input.t}@."
+                { Random_oracle.Input.field_elements=
+                    Array.of_list field_elements
+                ; bitstrings= Array.of_list bitstrings }
+            else return ())
+      in
+      input
   end
 
   let option lab =
@@ -451,19 +498,6 @@ let statement
   ; sok_digest= () }
 
 let create = Fields.create
-
-let top_hash_logging_enabled = ref false
-
-let with_top_hash_logging f =
-  let old = !top_hash_logging_enabled in
-  top_hash_logging_enabled := true ;
-  try
-    let ret = f () in
-    top_hash_logging_enabled := old ;
-    ret
-  with err ->
-    top_hash_logging_enabled := old ;
-    raise err
 
 let construct_input ~proof_type ~sok_digest ~state1 ~state2 ~supply_increase
     ~fee_excess
