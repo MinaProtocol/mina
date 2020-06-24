@@ -301,14 +301,16 @@ module Ledger = struct
           match config.base with
           | Hash _ ->
               return None
-          | Accounts accounts when proof_level = Full ->
-              return
-                (Some
-                   ( lazy
-                     (add_genesis_winner_account (Accounts.to_full accounts))
-                     ))
-          | Accounts accounts ->
-              return (Some (lazy (Accounts.to_full accounts)))
+          | Accounts accounts -> (
+            match proof_level with
+            | Genesis_constants.Proof_level.Full ->
+                return
+                  (Some
+                     ( lazy
+                       (add_genesis_winner_account (Accounts.to_full accounts))
+                       ))
+            | Check | None ->
+                return (Some (lazy (Accounts.to_full accounts))) )
           | Named name -> (
             match Genesis_ledger.fetch_ledger name with
             | Some (module M) ->
