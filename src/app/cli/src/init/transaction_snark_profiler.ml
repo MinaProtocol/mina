@@ -159,10 +159,9 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
                 ~sok_digest:Sok_message.Digest.default
                 ~source:(Sparse_ledger.merkle_root sparse_ledger)
                 ~target:(Sparse_ledger.merkle_root sparse_ledger')
+                ~init_stack:coinbase_stack_source
                 ~pending_coinbase_stack_state:
-                  { source= coinbase_stack_source
-                  ; target= coinbase_stack_target
-                  ; init_stack= Base coinbase_stack_source }
+                  {source= coinbase_stack_source; target= coinbase_stack_target}
                 { Transaction_protocol_state.Poly.transaction= t
                 ; block_data= Lazy.force state_body }
                 (unstage (Sparse_ledger.handler sparse_ledger)) )
@@ -212,10 +211,10 @@ let check_base_snarks sparse_ledger0 (transitions : Transaction.t list) preeval
             ~sok_message
             ~source:(Sparse_ledger.merkle_root sparse_ledger)
             ~target:(Sparse_ledger.merkle_root sparse_ledger')
+            ~init_stack:Pending_coinbase.Stack.empty
             ~pending_coinbase_stack_state:
               { source= Pending_coinbase.Stack.empty
-              ; target= coinbase_stack_target
-              ; init_stack= Base Pending_coinbase.Stack.empty }
+              ; target= coinbase_stack_target }
             { Transaction_protocol_state.Poly.block_data= Lazy.force state_body
             ; transaction= t }
             (unstage (Sparse_ledger.handler sparse_ledger))
@@ -246,10 +245,10 @@ let generate_base_snarks_witness sparse_ledger0
             ~constraint_constants ~sok_message
             ~source:(Sparse_ledger.merkle_root sparse_ledger)
             ~target:(Sparse_ledger.merkle_root sparse_ledger')
+            ~init_stack:Pending_coinbase.Stack.empty
             { Transaction_snark.Pending_coinbase_stack_state.source=
                 Pending_coinbase.Stack.empty
-            ; target= coinbase_stack_target
-            ; init_stack= Base Pending_coinbase.Stack.empty }
+            ; target= coinbase_stack_target }
             { Transaction_protocol_state.Poly.transaction= t
             ; block_data= Lazy.force state_body }
             (unstage (Sparse_ledger.handler sparse_ledger))
