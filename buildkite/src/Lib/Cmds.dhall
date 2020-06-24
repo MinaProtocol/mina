@@ -50,7 +50,7 @@ let module = \(environment : List Text) ->
 
   let runInDocker : Docker.Type -> Text -> Cmd =
     \(docker : Docker.Type) ->
-    /bin/shscript : Text) ->
+    \(script : Text) ->
     inDocker docker (run script)
 
   let CacheSetupCmd = {
