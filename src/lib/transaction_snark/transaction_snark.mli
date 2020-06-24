@@ -31,20 +31,39 @@ module Pending_coinbase_stack_state : sig
     [@@deriving sexp, hash, compare, yojson]
   end
 
-  module Stable : sig
-    module V1 : sig
-      type t =
-        { source: Pending_coinbase.Stack_versioned.Stable.V1.t
-        ; target: Pending_coinbase.Stack_versioned.Stable.V1.t }
-      [@@deriving bin_io, compare, eq, fields, hash, sexp, version, yojson]
-    end
+  module Poly : sig
+    [%%versioned:
+    module Stable : sig
+      module V1 : sig
+        type 'pending_coinbase t =
+          {source: 'pending_coinbase; target: 'pending_coinbase}
+        [@@deriving compare, eq, fields, hash, sexp, yojson]
 
-    module Latest = V1
+        val to_latest :
+             ('pending_coinbase -> 'pending_coinbase')
+          -> 'pending_coinbase t
+          -> 'pending_coinbase' t
+      end
+    end]
+
+    type 'pending_coinbase t = 'pending_coinbase Stable.Latest.t =
+      {source: 'pending_coinbase; target: 'pending_coinbase}
+    [@@deriving compare, eq, fields, hash, sexp, yojson]
   end
 
-  type t = Stable.Latest.t =
-    {source: Pending_coinbase.Stack.t; target: Pending_coinbase.Stack.t}
-  [@@deriving sexp, hash, compare, eq, yojson]
+  type 'pending_coinbase poly = 'pending_coinbase Poly.t =
+    {source: 'pending_coinbase; target: 'pending_coinbase}
+  [@@deriving sexp, hash, compare, eq, fields, yojson]
+
+  [%%versioned:
+  module Stable : sig
+    module V1 : sig
+      type t = Pending_coinbase.Stack_versioned.Stable.V1.t Poly.Stable.V1.t
+      [@@deriving compare, eq, hash, sexp, yojson]
+    end
+  end]
+
+  type t = Stable.Latest.t [@@deriving sexp, hash, compare, eq, yojson]
 end
 
 module Statement : sig

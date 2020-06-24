@@ -44,22 +44,40 @@ module Pending_coinbase_stack_state = struct
     [@@deriving sexp, hash, compare, yojson]
   end
 
+  module Poly = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type 'pending_coinbase t =
+          {source: 'pending_coinbase; target: 'pending_coinbase}
+        [@@deriving sexp, hash, compare, eq, fields, yojson]
+
+        let to_latest pending_coinbase {source; target} =
+          {source= pending_coinbase source; target= pending_coinbase target}
+      end
+    end]
+
+    type 'pending_coinbase t = 'pending_coinbase Stable.Latest.t =
+      {source: 'pending_coinbase; target: 'pending_coinbase}
+    [@@deriving sexp, hash, compare, eq, fields, yojson]
+  end
+
+  type 'pending_coinbase poly = 'pending_coinbase Poly.t =
+    {source: 'pending_coinbase; target: 'pending_coinbase}
+  [@@deriving sexp, hash, compare, eq, fields, yojson]
+
   (* State of the coinbase stack for the current transaction snark *)
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t =
-        { source: Pending_coinbase.Stack_versioned.Stable.V1.t
-        ; target: Pending_coinbase.Stack_versioned.Stable.V1.t }
-      [@@deriving sexp, hash, compare, eq, fields, yojson]
+      type t = Pending_coinbase.Stack_versioned.Stable.V1.t Poly.Stable.V1.t
+      [@@deriving sexp, hash, compare, eq, yojson]
 
       let to_latest = Fn.id
     end
   end]
 
-  type t = Stable.Latest.t =
-    {source: Pending_coinbase.Stack.t; target: Pending_coinbase.Stack.t}
-  [@@deriving sexp, hash, compare, yojson]
+  type t = Stable.Latest.t [@@deriving sexp, hash, compare, yojson]
 
   include Hashable.Make_binable (Stable.Latest)
   include Comparable.Make (Stable.Latest)
@@ -2203,9 +2221,8 @@ struct
       merge_top_hash wrap_vk_state ~sok_digest ~state1:ledger_hash1
         ~state2:ledger_hash3
         ~pending_coinbase_stack_state:
-          Pending_coinbase_stack_state.Stable.Latest.
-            { source= transition12.pending_coinbase_stack_state.source
-            ; target= transition23.pending_coinbase_stack_state.target }
+          { source= transition12.pending_coinbase_stack_state.source
+          ; target= transition23.pending_coinbase_stack_state.target }
         ~fee_excess ~supply_increase
     in
     let prover_state =
@@ -3088,7 +3105,7 @@ let%test_module "transaction_snark" =
                   (t2 :> User_command.t)
               in
               let pending_coinbase_stack_state_merge =
-                Pending_coinbase_stack_state.Stable.Latest.
+                Pending_coinbase_stack_state.
                   { source= pending_coinbase_stack_state1.source
                   ; target= pending_coinbase_stack_state2.target }
               in
