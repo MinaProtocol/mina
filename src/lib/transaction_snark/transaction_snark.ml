@@ -128,6 +128,53 @@ module Statement = struct
       ; proof_type: 'proof_type
       ; sok_digest: 'sok_digest }
     [@@deriving compare, equal, hash, sexp, yojson]
+
+    let to_hlist
+        { source
+        ; target
+        ; supply_increase
+        ; pending_coinbase_stack_state
+        ; fee_excess
+        ; proof_type
+        ; sok_digest } =
+      H_list.
+        [ source
+        ; target
+        ; supply_increase
+        ; pending_coinbase_stack_state
+        ; fee_excess
+        ; proof_type
+        ; sok_digest ]
+
+    let of_hlist
+        ([ source
+         ; target
+         ; supply_increase
+         ; pending_coinbase_stack_state
+         ; fee_excess
+         ; proof_type
+         ; sok_digest ] :
+          (unit, _) H_list.t) =
+      { source
+      ; target
+      ; supply_increase
+      ; pending_coinbase_stack_state
+      ; fee_excess
+      ; proof_type
+      ; sok_digest }
+
+    let typ ledger_hash amount pending_coinbase fee_excess proof_type
+        sok_digest =
+      Tick.Typ.of_hlistable
+        [ ledger_hash
+        ; ledger_hash
+        ; amount
+        ; pending_coinbase
+        ; fee_excess
+        ; proof_type
+        ; sok_digest ]
+        ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
+        ~value_of_hlist:of_hlist
   end
 
   type ( 'ledger_hash
