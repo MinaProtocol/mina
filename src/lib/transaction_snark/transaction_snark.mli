@@ -69,7 +69,9 @@ module Pending_coinbase_stack_state : sig
 
   type t = Stable.Latest.t [@@deriving sexp, hash, compare, eq, yojson]
 
-  val typ : (Pending_coinbase.Stack.var Poly.t, t) Tick.Typ.t
+  type var = Pending_coinbase.Stack.var Poly.t
+
+  val typ : (var, t) Tick.Typ.t
 end
 
 module Statement : sig
@@ -214,6 +216,18 @@ module Statement : sig
       , Sok_message.Digest.t )
       Poly.t
     [@@deriving sexp, hash, compare, yojson]
+
+    type var =
+      ( Frozen_ledger_hash.var
+      , Currency.Amount.var
+      , Pending_coinbase_stack_state.var
+      , Fee_excess.var
+      , (* TODO: This is a hack, remove proof_type from the statement. *)
+      Proof_type.t Tick.As_prover.Ref.t
+      , Sok_message.Digest.Checked.t )
+      Poly.Stable.V1.t
+
+    val typ : (var, t) Tick.Typ.t
   end
 
   val gen : t Quickcheck.Generator.t

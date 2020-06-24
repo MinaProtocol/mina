@@ -89,6 +89,8 @@ module Pending_coinbase_stack_state = struct
 
   type t = Stable.Latest.t [@@deriving sexp, hash, compare, yojson]
 
+  type var = Pending_coinbase.Stack.var Poly.t
+
   let typ = Poly.typ Pending_coinbase.Stack.typ
 
   include Hashable.Make_binable (Stable.Latest)
@@ -276,6 +278,23 @@ module Statement = struct
     end]
 
     type t = Stable.Latest.t [@@deriving sexp, hash, compare, yojson]
+
+    type var =
+      ( Frozen_ledger_hash.var
+      , Currency.Amount.var
+      , Pending_coinbase_stack_state.var
+      , Fee_excess.var
+      , (* TODO: This is a hack, remove proof_type from the statement. *)
+      Proof_type.t Tick.As_prover.Ref.t
+      , Sok_message.Digest.Checked.t )
+      Poly.t
+
+    let typ : (var, t) Tick.Typ.t =
+      Poly.typ Frozen_ledger_hash.typ Currency.Amount.typ
+        Pending_coinbase_stack_state.typ Fee_excess.typ
+        ((* TODO: This is a hack, remove proof_type from the statement. *)
+         Tick.Typ.Internal.ref ())
+        Sok_message.Digest.typ
   end
 
   let option lab =
