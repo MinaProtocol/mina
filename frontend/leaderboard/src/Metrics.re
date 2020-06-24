@@ -108,9 +108,7 @@ let calculateSnarkFeeSum = (map, block: Types.NewBlock.data) => {
            feeSum => {
              let snarkFee = Int64.of_string(snarkJob.fee);
              switch (feeSum) {
-             | Some(feeSum) =>
-               let result = Int64.add(snarkFee, feeSum);
-               Some(result);
+             | Some(feeSum) => Some(Int64.add(snarkFee, feeSum))
              | None => Some(snarkFee)
              };
            },
