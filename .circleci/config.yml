@@ -18,7 +18,9 @@ jobs:
             
             - run:
                 name: Disable LFS checkout
-                command: git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                command|
+                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                    git config --global lfs.fetchexclude "*"
             - checkout
 
             - run:
@@ -78,7 +80,9 @@ jobs:
             
             - run:
                 name: Disable LFS checkout
-                command: git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                command|
+                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                    git config --global lfs.fetchexclude "*"
             - checkout
 
             
@@ -134,7 +138,9 @@ jobs:
             
             - run:
                 name: Disable LFS checkout
-                command: git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                command|
+                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                    git config --global lfs.fetchexclude "*"
             - checkout
 
             
@@ -188,7 +194,9 @@ jobs:
             
             - run:
                 name: Disable LFS checkout
-                command: git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                command|
+                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                    git config --global lfs.fetchexclude "*"
             - checkout
 
             
@@ -237,7 +245,9 @@ jobs:
             
             - run:
                 name: Disable LFS checkout
-                command: git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                command|
+                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                    git config --global lfs.fetchexclude "*"
             - checkout
 
             - run:
@@ -274,7 +284,9 @@ jobs:
             
             - run:
                 name: Disable LFS checkout
-                command: git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                command|
+                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                    git config --global lfs.fetchexclude "*"
             - checkout
 
             
@@ -308,7 +320,9 @@ jobs:
             
             - run:
                 name: Disable LFS checkout
-                command: git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                command|
+                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                    git config --global lfs.fetchexclude "*"
             - checkout
 
             - run:
@@ -322,7 +336,9 @@ jobs:
             
             - run:
                 name: Disable LFS checkout
-                command: git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                command|
+                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                    git config --global lfs.fetchexclude "*"
             - checkout
 
             - run:
@@ -353,7 +369,9 @@ jobs:
             
             - run:
                 name: Disable LFS checkout
-                command: git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                command|
+                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                    git config --global lfs.fetchexclude "*"
             - checkout
 
             - run:
@@ -489,7 +507,9 @@ jobs:
             
             - run:
                 name: Disable LFS checkout
-                command: git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                command|
+                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                    git config --global lfs.fetchexclude "*"
             - checkout
 
             - run:
@@ -528,7 +548,9 @@ jobs:
             
             - run:
                 name: Disable LFS checkout
-                command: git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                command|
+                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                    git config --global lfs.fetchexclude "*"
             - checkout
 
             - run:
@@ -692,7 +714,9 @@ jobs:
             
             - run:
                 name: Disable LFS checkout
-                command: git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                command|
+                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                    git config --global lfs.fetchexclude "*"
             - checkout
 
             - run: ulimit -c unlimited
@@ -737,7 +761,9 @@ jobs:
             
             - run:
                 name: Disable LFS checkout
-                command: git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                command|
+                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                    git config --global lfs.fetchexclude "*"
             - checkout
 
             - run: ulimit -c unlimited
@@ -780,7 +806,9 @@ jobs:
             
             - run:
                 name: Disable LFS checkout
-                command: git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                command|
+                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                    git config --global lfs.fetchexclude "*"
             - checkout
 
             - run: ulimit -c unlimited
@@ -823,7 +851,9 @@ jobs:
             
             - run:
                 name: Disable LFS checkout
-                command: git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                command|
+                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                    git config --global lfs.fetchexclude "*"
             - checkout
 
             
@@ -860,7 +890,9 @@ jobs:
             
             - run:
                 name: Disable LFS checkout
-                command: git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                command|
+                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                    git config --global lfs.fetchexclude "*"
             - checkout
 
             
@@ -900,7 +932,9 @@ jobs:
             
             - run:
                 name: Disable LFS checkout
-                command: git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                command|
+                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                    git config --global lfs.fetchexclude "*"
             - checkout
 
             
@@ -937,7 +971,9 @@ jobs:
             
             - run:
                 name: Disable LFS checkout
-                command: git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                command|
+                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                    git config --global lfs.fetchexclude "*"
             - checkout
 
             
@@ -974,7 +1010,9 @@ jobs:
             
             - run:
                 name: Disable LFS checkout
-                command: git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                command|
+                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                    git config --global lfs.fetchexclude "*"
             - checkout
 
             
@@ -1011,7 +1049,9 @@ jobs:
             
             - run:
                 name: Disable LFS checkout
-                command: git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                command|
+                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                    git config --global lfs.fetchexclude "*"
             - checkout
 
             
@@ -1048,7 +1088,9 @@ jobs:
             
             - run:
                 name: Disable LFS checkout
-                command: git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                command|
+                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                    git config --global lfs.fetchexclude "*"
             - checkout
 
             
@@ -1088,7 +1130,9 @@ jobs:
             
             - run:
                 name: Disable LFS checkout
-                command: git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                command|
+                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                    git config --global lfs.fetchexclude "*"
             - checkout
 
             
@@ -1125,7 +1169,9 @@ jobs:
             
             - run:
                 name: Disable LFS checkout
-                command: git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                command|
+                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                    git config --global lfs.fetchexclude "*"
             - checkout
 
             
@@ -1180,7 +1226,9 @@ jobs:
             
             - run:
                 name: Disable LFS checkout
-                command: git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                command|
+                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                    git config --global lfs.fetchexclude "*"
             - checkout
 
             
@@ -1217,7 +1265,9 @@ jobs:
             
             - run:
                 name: Disable LFS checkout
-                command: git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                command|
+                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                    git config --global lfs.fetchexclude "*"
             - checkout
 
             
@@ -1257,7 +1307,9 @@ jobs:
             
             - run:
                 name: Disable LFS checkout
-                command: git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                command|
+                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                    git config --global lfs.fetchexclude "*"
             - checkout
 
             
@@ -1294,7 +1346,9 @@ jobs:
             
             - run:
                 name: Disable LFS checkout
-                command: git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                command|
+                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                    git config --global lfs.fetchexclude "*"
             - checkout
 
             
@@ -1336,7 +1390,9 @@ jobs:
             
             - run:
                 name: Disable LFS checkout
-                command: git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                command|
+                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                    git config --global lfs.fetchexclude "*"
             - checkout
 
             
@@ -1376,7 +1432,9 @@ jobs:
             
             - run:
                 name: Disable LFS checkout
-                command: git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                command|
+                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                    git config --global lfs.fetchexclude "*"
             - checkout
 
             
