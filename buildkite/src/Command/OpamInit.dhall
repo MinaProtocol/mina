@@ -1,8 +1,7 @@
 let Prelude = ../External/Prelude.dhall
-
 let Cmd = ../Lib/Cmds.dhall
-
 let Coda = ../Command/Coda.dhall
+let S = ../Lib/SelectFiles.dhall
 
 let r = Cmd.run
 
@@ -38,5 +37,13 @@ let andThenRunInDocker : Text -> List Cmd.Type =
 
 in
 
-{ andThenRunInDocker = andThenRunInDocker }
+{ andThenRunInDocker = andThenRunInDocker
+, dirtyWhen =
+    [ S.exactly "src/opam" "export"
+    , S.exactly "scripts/setup-opam" "sh"
+    , S.strictly (S.contains "Makefile")
+    , S.exactly "buildkite/src/Command/OpamInit" "dhall"
+    , S.exactly "buildkite/scripts/cache-through" "sh"
+    ]
+}
 

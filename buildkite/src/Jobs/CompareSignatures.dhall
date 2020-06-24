@@ -12,16 +12,8 @@ in
 Pipeline.build
    Pipeline.Config::
      { spec =
-         let opamDirtyWhen =
-           [ S.exactly "src/opam" "export"
-           , S.exactly "scripts/setup-opam" "sh"
-           , S.strictly (S.contains "Makefile")
-           , S.exactly "buildkite/src/Command/OpamInit" "dhall"
-           , S.exactly "buildkite/scripts/cache-through" "sh"
-           ]
-         in
          JobSpec::
-           { dirtyWhen = opamDirtyWhen #
+           { dirtyWhen = OpamInit.dirtyWhen #
                [ S.strictlyStart (S.contains "buildkite/src/Jobs/CompareSignatures")
                , S.strictlyStart (S.contains "src")
                ]
