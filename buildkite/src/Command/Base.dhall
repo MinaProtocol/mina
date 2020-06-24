@@ -109,7 +109,7 @@ let build : Config.Type -> B/Command.Type = \(c : Config.Type) ->
               toMap { `docker#v3.5.0` = Plugins.Docker docker })
             c.docker)
       let summonPart =
-        [ toMap { `angaza/summon#0.1.0` = Plugins.Summon c.summon } ]
+        [ toMap { `angaza/summon#v0.1.0` = Plugins.Summon c.summon } ]
       -- Add more plugins here as needed, empty list omits that part from the
       -- plugins map
       let allPlugins =
