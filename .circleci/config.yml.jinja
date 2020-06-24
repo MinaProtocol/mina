@@ -658,17 +658,6 @@ workflows:
             - test--{{profile}}
             {%- endfor %}
 
-    leaderboard:
-        triggers:
-          - schedule:
-              cron: "0 1 * * *"
-              filters:
-                branches:
-                  only:
-                    - develop
-        jobs:
-          - run-leaderboard
-
     daily:
         triggers:
           - schedule:
