@@ -49,6 +49,10 @@ module Pending_coinbase_stack_state : sig
     type 'pending_coinbase t = 'pending_coinbase Stable.Latest.t =
       {source: 'pending_coinbase; target: 'pending_coinbase}
     [@@deriving compare, eq, fields, hash, sexp, yojson]
+
+    val typ :
+         ('pending_coinbase_var, 'pending_coinbase) Tick.Typ.t
+      -> ('pending_coinbase_var t, 'pending_coinbase t) Tick.Typ.t
   end
 
   type 'pending_coinbase poly = 'pending_coinbase Poly.t =
@@ -64,6 +68,8 @@ module Pending_coinbase_stack_state : sig
   end]
 
   type t = Stable.Latest.t [@@deriving sexp, hash, compare, eq, yojson]
+
+  val typ : (Pending_coinbase.Stack.var Poly.t, t) Tick.Typ.t
 end
 
 module Statement : sig

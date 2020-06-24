@@ -60,6 +60,16 @@ module Pending_coinbase_stack_state = struct
     type 'pending_coinbase t = 'pending_coinbase Stable.Latest.t =
       {source: 'pending_coinbase; target: 'pending_coinbase}
     [@@deriving sexp, hash, compare, eq, fields, yojson]
+
+    let to_hlist {source; target} = H_list.[source; target]
+
+    let of_hlist ([source; target] : (unit, _) H_list.t) = {source; target}
+
+    let typ pending_coinbase =
+      Tick.Typ.of_hlistable
+        [pending_coinbase; pending_coinbase]
+        ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
+        ~value_of_hlist:of_hlist
   end
 
   type 'pending_coinbase poly = 'pending_coinbase Poly.t =
@@ -78,6 +88,8 @@ module Pending_coinbase_stack_state = struct
   end]
 
   type t = Stable.Latest.t [@@deriving sexp, hash, compare, yojson]
+
+  let typ = Poly.typ Pending_coinbase.Stack.typ
 
   include Hashable.Make_binable (Stable.Latest)
   include Comparable.Make (Stable.Latest)
