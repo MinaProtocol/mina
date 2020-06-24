@@ -223,7 +223,7 @@ jobs:
                 command: cd frontend/leaderboard/lib/js/src/ && mkdir blocks && gsutil -m rsync gs://points-data-hack-april20/v1/32b-joyous-occasion blocks
             - run:
                 name: Run the Leaderboard
-                run: node frontend/leaderboard/lib/js/src/Main.bs.js
+                command: node frontend/leaderboard/lib/js/src/Main.bs.js
 
     build-macos:
         macos:
