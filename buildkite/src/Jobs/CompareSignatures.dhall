@@ -25,7 +25,7 @@ Pipeline.build
                [ S.strictlyStart (S.contains "buildkite/src/Jobs/CompareSignatures")
                , S.strictlyStart (S.contains "src")
                ]
-           , name = "ClientSdk"
+           , name = "CompareSignatures"
            }
      , steps =
          [ Command.build
