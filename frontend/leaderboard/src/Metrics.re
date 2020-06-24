@@ -51,10 +51,6 @@ let max = (a, b) => {
   a > b ? a : b;
 };
 
-let convertNanoToBase = a => {
-  a->Int64.add(5000000L)->Int64.div(1000000000L);
-};
-
 let filterBlocksByTimeWindow = (startTime, endTime, blocks) => {
   Array.to_list(blocks)
   |> List.filter((block: Types.NewBlock.data) => {
@@ -103,25 +99,19 @@ let getSnarkWorkCreatedByUser = blocks => {
   blocks |> calculateProperty(calculateSnarkWorkCount);
 };
 
-let calculateSnarkFeeCount = (map, block: Types.NewBlock.data) => {
+let calculateSnarkFeeSum = (map, block: Types.NewBlock.data) => {
   block.snarkJobs
   |> Array.fold_left(
        (map, snarkJob: Types.NewBlock.snarkJobs) => {
          StringMap.update(
            snarkJob.prover,
-           feeCount =>
-             switch (feeCount) {
-             | Some(feeCount) =>
-               let result =
-                 convertNanoToBase(
-                   Int64.add(
-                     Int64.of_string(snarkJob.fee),
-                     Int64.of_string(feeCount),
-                   ),
-                 );
-               Some(Int64.to_string(result));
-             | None => Some(snarkJob.fee)
-             },
+           feeSum => {
+             let snarkFee = Int64.of_string(snarkJob.fee);
+             switch (feeSum) {
+             | Some(feeSum) => Some(Int64.add(snarkFee, feeSum))
+             | None => Some(snarkFee)
+             };
+           },
            map,
          )
        },
@@ -130,7 +120,7 @@ let calculateSnarkFeeCount = (map, block: Types.NewBlock.data) => {
 };
 
 let getSnarkFeesCollected = blocks => {
-  blocks |> calculateProperty(calculateSnarkFeeCount);
+  blocks |> calculateProperty(calculateSnarkFeeSum);
 };
 
 let calculateHighestSnarkFeeCollected = (map, block: Types.NewBlock.data) => {
@@ -139,21 +129,13 @@ let calculateHighestSnarkFeeCollected = (map, block: Types.NewBlock.data) => {
        (map, snarkJob: Types.NewBlock.snarkJobs) => {
          StringMap.update(
            snarkJob.prover,
-           feeCount =>
+           feeCount => {
+             let snarkFee = Int64.of_string(snarkJob.fee);
              switch (feeCount) {
-             | Some(feeCount) =>
-               Some(
-                 Int64.to_string(
-                   convertNanoToBase(
-                     max(
-                       Int64.of_string(snarkJob.fee),
-                       Int64.of_string(feeCount),
-                     ),
-                   ),
-                 ),
-               )
-             | None => Some(snarkJob.fee)
-             },
+             | Some(feeCount) => Some(max(snarkFee, feeCount))
+             | None => Some(snarkFee)
+             };
+           },
            map,
          )
        },

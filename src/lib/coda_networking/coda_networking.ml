@@ -470,7 +470,10 @@ module Rpcs = struct
         module V1 = struct
           type t =
             { node_ip_addr: Core.Unix.Inet_addr.Stable.V1.t
+                  [@to_yojson
+                    fun ip_addr -> `String (Unix.Inet_addr.to_string ip_addr)]
             ; node_peer_id: Network_peer.Peer.Id.Stable.V1.t
+                  [@to_yojson fun peer_id -> `String peer_id]
             ; peers: Network_peer.Peer.Stable.V1.t list
             ; block_producers:
                 Signature_lib.Public_key.Compressed.Stable.V1.t list
@@ -479,33 +482,9 @@ module Rpcs = struct
                 ( Core.Unix.Inet_addr.Stable.V1.t
                 * Trust_system.Peer_status.Stable.V1.t )
                 list
+                  [@to_yojson yojson_of_ban_statuses]
             ; k_block_hashes: State_hash.Stable.V1.t list }
-
-          (* N.B.: the [@@to_yojson ...] per-field spec didn't seem to work, so we write
-             the full function in gory detail
-           *)
-          let to_yojson t =
-            `Assoc
-              [ ( "node_ip_addr"
-                , `String (Unix.Inet_addr.to_string t.node_ip_addr) )
-              ; ("node_peer_id", `String t.node_peer_id)
-              ; ( "peers"
-                , `List
-                    (List.map t.peers ~f:Network_peer.Peer.Stable.V1.to_yojson)
-                )
-              ; ( "block_producers"
-                , `List
-                    (List.map t.block_producers
-                       ~f:
-                         Signature_lib.Public_key.Compressed.Stable.V1
-                         .to_yojson) )
-              ; ( "protocol_state_hash"
-                , State_hash.Stable.V1.to_yojson t.protocol_state_hash )
-              ; ("ban_statuses", yojson_of_ban_statuses t.ban_statuses)
-              ; ( "k_block_hashes"
-                , `List
-                    (List.map t.k_block_hashes
-                       ~f:State_hash.Stable.V1.to_yojson) ) ]
+          [@@deriving to_yojson]
 
           let to_latest = Fn.id
         end
