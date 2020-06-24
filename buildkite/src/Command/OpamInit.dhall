@@ -20,7 +20,7 @@ let commands : List Cmd.Type =
         image = (../Constants/ContainerImages.dhall).codaToolchain
       }
       file
-      Cmd.CompoundCmd::{
+      Cmd.CacheSetupCmd::{
         create = r "make setup-opam",
         package = r "tar cfz ${file} /home/opam/.opam"
       }

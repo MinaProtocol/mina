@@ -53,7 +53,7 @@ let module = \(environment : List Text) ->
     \(script : Text) ->
     inDocker docker (run script)
 
-  let CompoundCmd = {
+  let CacheSetupCmd = {
     Type = {
       -- run your command to create data (only on miss)
       create : Cmd,
@@ -67,10 +67,10 @@ let module = \(environment : List Text) ->
     \(cmd : Cmd) -> cmd.line
 
   -- Loads through cache, innards with docker, buildkite-agent interactions outside, continues in docker after hit or miss with continuation
-  let cacheThrough : Docker.Type -> Text -> CompoundCmd.Type -> Cmd =
+  let cacheThrough : Docker.Type -> Text -> CacheSetupCmd.Type -> Cmd =
     \(docker : Docker.Type) ->
     \(cachePath : Text) ->
-    \(cmd : CompoundCmd.Type) ->
+    \(cmd : CacheSetupCmd.Type) ->
       let missScript =
         ( format cmd.create ) ++ " && " ++
         ( format cmd.package )
@@ -89,7 +89,7 @@ let module = \(environment : List Text) ->
 
   { Type = Cmd
   , Docker = Docker
-  , CompoundCmd = CompoundCmd
+  , CacheSetupCmd = CacheSetupCmd
   , quietly = quietly
   , run = run
   , true = true
@@ -128,7 +128,7 @@ let tests =
         extraEnv = [ "ENV1", "ENV2" ]
       }
       "data.tar"
-      M.CompoundCmd::{
+      M.CacheSetupCmd::{
         create = M.run "echo hello > /tmp/data/foo.txt",
         package = M.run "tar cvf data.tar /tmp/data"
       }
