@@ -578,6 +578,50 @@ jobs:
                 path: core_dumps
     {%- endfor %}
 
+    {%- for profile in compile_config_agnostic_profiles %}
+    build-binaries--{{profile}}:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+        steps:
+            - checkout
+            - run: ulimit -c unlimited
+            {{ opam_init_linux }}
+            - run:
+                name: Build libp2p_helper
+                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
+            - run:
+                  name: Build OCaml
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && make build'
+                  environment:
+                    DUNE_PROFILE: {{profile}}
+                    LIBP2P_NIXLESS: 1
+                    GO: /usr/lib/go/bin/go
+            - save_cache
+                name: Dev build binaries
+                key: {{profile}}-build-binaries-v1-{{'{{'}} .Revision {{'}}'}}
+                paths:
+                    - "src/app/libp2p_helper/result"
+                    - "_build/default/src/app/cli/src/coda.exe"
+                    - "_build/default/src/app/logproc/logproc.exe"
+                    - "scripts"
+
+    {%- for test in compile_config_agnostic_tests %}
+    test--{{profile}}--{{test.replace(' ','_')}}:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+        steps:
+            - restore_cache:
+                name: Restore cache - opam
+                keys:
+                    -  {{profile}}-build-binaries-v1-{{'{{'}} .Revision {{'}}'}}
+            - run:
+                  name: Running test -- {{profile}}:{{test}}
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "{{profile}}:{{test}}"'
+    {%- endfor %}
+    {%- endfor %}
+
     {%- for profile in small_curves_tests.keys() | sort %}
     test--{{profile}}:
         resource_class: large
@@ -656,6 +700,13 @@ workflows:
             - test-unit--nonconsensus_medium_curves
             {%- for profile in small_curves_tests.keys() | sort %}
             - test--{{profile}}
+            {%- endfor %}
+            {%- for profile in compile_config_agnostic_profiles %}
+            {%- for test in compile_config_agnostic_tests %}
+            - test--{{profile}}--{{test.replace(' ','_')}}:
+                requires:
+                  - build-binaries--{{profile}}
+            {%- endfor %}
             {%- endfor %}
 
     leaderboard:
