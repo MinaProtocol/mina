@@ -93,6 +93,16 @@ module Pending_coinbase_stack_state = struct
 
   let typ = Poly.typ Pending_coinbase.Stack.typ
 
+  let to_input ({source; target} : t) =
+    Random_oracle.Input.append
+      (Pending_coinbase.Stack.to_input source)
+      (Pending_coinbase.Stack.to_input target)
+
+  let var_to_input ({source; target} : var) =
+    Random_oracle.Input.append
+      (Pending_coinbase.Stack.var_to_input source)
+      (Pending_coinbase.Stack.var_to_input target)
+
   include Hashable.Make_binable (Stable.Latest)
   include Comparable.Make (Stable.Latest)
 end
@@ -295,6 +305,41 @@ module Statement = struct
         ((* TODO: This is a hack, remove proof_type from the statement. *)
          Tick.Typ.Internal.ref ())
         Sok_message.Digest.typ
+
+    let to_input
+        { source
+        ; target
+        ; supply_increase
+        ; pending_coinbase_stack_state
+        ; fee_excess
+        ; proof_type= _
+        ; sok_digest } =
+      Array.reduce_exn ~f:Random_oracle.Input.append
+        [| Sok_message.Digest.to_input sok_digest
+         ; Frozen_ledger_hash.to_input source
+         ; Frozen_ledger_hash.to_input target
+         ; Pending_coinbase_stack_state.to_input pending_coinbase_stack_state
+         ; Amount.to_input supply_increase
+         ; Fee_excess.to_input fee_excess |]
+
+    let var_to_input
+        { source
+        ; target
+        ; supply_increase
+        ; pending_coinbase_stack_state
+        ; fee_excess
+        ; proof_type= _
+        ; sok_digest } =
+      let open Tick.Checked.Let_syntax in
+      let%map fee_excess = Fee_excess.to_input_checked fee_excess in
+      Array.reduce_exn ~f:Random_oracle.Input.append
+        [| Sok_message.Digest.Checked.to_input sok_digest
+         ; Frozen_ledger_hash.var_to_input source
+         ; Frozen_ledger_hash.var_to_input target
+         ; Pending_coinbase_stack_state.var_to_input
+             pending_coinbase_stack_state
+         ; Amount.var_to_input supply_increase
+         ; fee_excess |]
   end
 
   let option lab =

@@ -71,7 +71,13 @@ module Pending_coinbase_stack_state : sig
 
   type var = Pending_coinbase.Stack.var Poly.t
 
-  val typ : (var, t) Tick.Typ.t
+  open Tick
+
+  val typ : (var, t) Typ.t
+
+  val to_input : t -> (Field.t, bool) Random_oracle.Input.t
+
+  val var_to_input : var -> (Field.Var.t, Boolean.var) Random_oracle.Input.t
 end
 
 module Statement : sig
@@ -227,7 +233,14 @@ module Statement : sig
       , Sok_message.Digest.Checked.t )
       Poly.Stable.V1.t
 
-    val typ : (var, t) Tick.Typ.t
+    open Tick
+
+    val typ : (var, t) Typ.t
+
+    val to_input : t -> (Field.t, bool) Random_oracle.Input.t
+
+    val var_to_input :
+      var -> ((Field.Var.t, Boolean.var) Random_oracle.Input.t, _) Checked.t
   end
 
   val gen : t Quickcheck.Generator.t
