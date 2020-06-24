@@ -210,6 +210,21 @@ jobs:
                   name: Update branch protection rule from test configuration
                   command: ./scripts/test.py required-status >required_status && cat required_status && ./scripts/update_branch_rule.py required_status
 
+    run-leaderboard:
+        docker:
+            - image: node:14.4.0
+        steps:
+            - checkout
+            - run:
+                name: Update the Leaderboard
+                command: cd frontend/leaderboard && yarn && yarn build
+            - run:
+                name: Download blocks
+                command: cd frontend/leaderboard/lib/js/src/ && mkdir blocks && gsutil -m rsync gs://points-data-hack-april20/v1/32b-joyous-occasion blocks
+            - run:
+                name: Run the Leaderboard
+                command: node frontend/leaderboard/lib/js/src/Main.bs.js
+
     build-macos:
         macos:
             xcode: "10.2.1"
@@ -274,7 +289,7 @@ jobs:
             - run:
                 name: Install nix and cachix
                 command: |
-                    curl https://nixos.org/nix/install | sh
+                    curl -L https://nixos.org/nix/install | sh
                     . ~/.nix-profile/etc/profile.d/nix.sh
                     nix-env -iA cachix -f https://cachix.org/api/v1/install
             ### dune
@@ -442,6 +457,29 @@ jobs:
                   name: Copy artifacts to cloud
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh scripts/artifacts.sh
             {%- if profile in medium_curve_profiles %}
+            - save_cache:
+                name: Save cache - docker deploy env
+                key: docker-deploy-env-v1-{{profile}}-{{'{{'}} .Revision {{'}}'}}
+                paths:
+                    - "/tmp/DOCKER_DEPLOY_ENV"
+                    - "scripts"
+                    - "dockerfiles"
+            - store_artifacts:
+                  path: /tmp/artifacts
+            {%- endif %}
+    {%- endfor %}
+
+    {%- for profile in build_artifact_profiles %}
+    {%- if profile in medium_curve_profiles %}
+    {%- for docker_image in ['coda-daemon', 'coda-demo'] %}
+    build-artifacts-docker--{{profile}}--{{docker_image}}:
+        resource_class: xlarge
+        docker:
+            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+        steps:
+            - restore_cache:
+                name: Restore cache - docker deploy env
+                key: docker-deploy-env-v1-{{profile}}-{{'{{'}} .Revision {{'}}'}}
             - setup_remote_docker
             - run:
                   name: Build and Upload Docker
@@ -456,21 +494,17 @@ jobs:
                         if [[ "$CODA_WAS_PUBLISHED" = true  ]]; then
 
                               echo "$DOCKER_PASSWORD" | docker login --username $DOCKER_USERNAME --password-stdin
-                              ./scripts/skip_if_only_frontend_or_rfcs.sh scripts/release-docker.sh \
-                              -s coda-daemon \
+                              scripts/release-docker.sh \
+                              -s {{docker_image}} \
                               -v $CODA_GIT_TAG-$CODA_GIT_BRANCH-$CODA_GIT_HASH \
                               --extra-args "--build-arg coda_version=$CODA_DEB_VERSION --build-arg deb_repo=$CODA_DEB_REPO"
 
-                              echo "$DOCKER_PASSWORD" | docker login --username $DOCKER_USERNAME --password-stdin
-                              ./scripts/skip_if_only_frontend_or_rfcs.sh scripts/release-docker.sh \
-                              -s coda-demo \
-                              -v $CODA_GIT_TAG-$CODA_GIT_BRANCH-$CODA_GIT_HASH \
-                              --extra-args "--build-arg coda_version=$CODA_DEB_VERSION --build-arg deb_repo=$CODA_DEB_REPO"
                         fi
                     fi
             - store_artifacts:
                   path: /tmp/artifacts
-            {%- endif %}
+    {%- endfor %}
+    {%- endif %}
     {%- endfor %}
 
     {%- for profile in unit_test_profiles %}
@@ -607,6 +641,15 @@ workflows:
             {%- for profile in build_artifact_profiles %}
             - build-artifacts--{{profile}}
             {%- endfor %}
+            {%- for profile in build_artifact_profiles %}
+            {%- if profile in medium_curve_profiles %}
+            {%- for docker_image in ['coda-daemon', 'coda-demo'] %}
+            - build-artifacts-docker--{{profile}}--{{docker_image}}:
+                requires:
+                  - build-artifacts--{{profile}}
+            {%- endfor %}
+            {%- endif %}
+            {%- endfor %}
             {%- for profile in unit_test_profiles %}
             - test-unit--{{profile}}
             {%- endfor %}
@@ -614,6 +657,17 @@ workflows:
             {%- for profile in small_curves_tests.keys() | sort %}
             - test--{{profile}}
             {%- endfor %}
+
+    leaderboard:
+        triggers:
+          - schedule:
+              cron: "0 1 * * *"
+              filters:
+                branches:
+                  only:
+                    - develop
+        jobs:
+          - run-leaderboard
 
     daily:
         triggers:

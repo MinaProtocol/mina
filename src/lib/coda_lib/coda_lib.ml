@@ -200,7 +200,8 @@ module Snark_worker = struct
           !"Starting snark worker process"
           ~module_:__MODULE__ ~location:__LOC__ ;
         let%map snark_worker_process =
-          run_process ~logger:t.config.logger ~proof_level:t.config.proof_level
+          run_process ~logger:t.config.logger
+            ~proof_level:t.config.precomputed_values.proof_level
             t.config.gossip_net_params.addrs_and_ports.client_port kill_ivar
             t.config.snark_worker_config.num_threads
         in
@@ -256,9 +257,12 @@ module Snark_worker = struct
         t.processes.snark_worker
         <- `On ({public_key= new_key; process; kill_ivar}, fee) ;
         start t
-    | `On ({public_key= _; process; kill_ivar}, fee), Some new_key ->
+    | `On ({public_key= old; process; kill_ivar}, fee), Some new_key ->
         Logger.debug logger
           !"Changing snark worker key from $old to $new"
+          ~metadata:
+            [ ("old", Public_key.Compressed.to_yojson old)
+            ; ("new", Public_key.Compressed.to_yojson new_key) ]
           ~module_:__MODULE__ ~location:__LOC__ ;
         t.processes.snark_worker
         <- `On ({public_key= new_key; process; kill_ivar}, fee) ;
@@ -792,8 +796,9 @@ let create (config : Config.t) =
               (fun () ->
                 trace "prover" (fun () ->
                     Prover.create ~logger:config.logger
-                      ~proof_level:config.proof_level ~constraint_constants
-                      ~pids:config.pids ~conf_dir:config.conf_dir ) )
+                      ~proof_level:config.precomputed_values.proof_level
+                      ~constraint_constants ~pids:config.pids
+                      ~conf_dir:config.conf_dir ) )
             >>| Result.ok_exn
           in
           let%bind verifier =
@@ -809,8 +814,8 @@ let create (config : Config.t) =
               (fun () ->
                 trace "verifier" (fun () ->
                     Verifier.create ~logger:config.logger
-                      ~proof_level:config.proof_level ~pids:config.pids
-                      ~conf_dir:(Some config.conf_dir) ) )
+                      ~proof_level:config.precomputed_values.proof_level
+                      ~pids:config.pids ~conf_dir:(Some config.conf_dir) ) )
             >>| Result.ok_exn
           in
           let snark_worker =

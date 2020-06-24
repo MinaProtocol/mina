@@ -278,6 +278,21 @@ jobs:
                   name: Update branch protection rule from test configuration
                   command: ./scripts/test.py required-status >required_status && cat required_status && ./scripts/update_branch_rule.py required_status
 
+    run-leaderboard:
+        docker:
+            - image: node:14.4.0
+        steps:
+            - checkout
+            - run:
+                name: Update the Leaderboard
+                command: cd frontend/leaderboard && yarn && yarn build
+            - run:
+                name: Download blocks
+                command: cd frontend/leaderboard/lib/js/src/ && mkdir blocks && gsutil -m rsync gs://points-data-hack-april20/v1/32b-joyous-occasion blocks
+            - run:
+                name: Run the Leaderboard
+                command: node frontend/leaderboard/lib/js/src/Main.bs.js
+
     build-macos:
         macos:
             xcode: "10.2.1"
@@ -342,7 +357,7 @@ jobs:
             - run:
                 name: Install nix and cachix
                 command: |
-                    curl https://nixos.org/nix/install | sh
+                    curl -L https://nixos.org/nix/install | sh
                     . ~/.nix-profile/etc/profile.d/nix.sh
                     nix-env -iA cachix -f https://cachix.org/api/v1/install
             ### dune
@@ -541,6 +556,23 @@ jobs:
             - run:
                   name: Copy artifacts to cloud
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh scripts/artifacts.sh
+            - save_cache:
+                name: Save cache - docker deploy env
+                key: docker-deploy-env-v1-testnet_postake_medium_curves-{{ .Revision }}
+                paths:
+                    - "/tmp/DOCKER_DEPLOY_ENV"
+                    - "scripts"
+                    - "dockerfiles"
+            - store_artifacts:
+                  path: /tmp/artifacts
+    build-artifacts-docker--testnet_postake_medium_curves--coda-daemon:
+        resource_class: xlarge
+        docker:
+            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+        steps:
+            - restore_cache:
+                name: Restore cache - docker deploy env
+                key: docker-deploy-env-v1-testnet_postake_medium_curves-{{ .Revision }}
             - setup_remote_docker
             - run:
                   name: Build and Upload Docker
@@ -555,16 +587,42 @@ jobs:
                         if [[ "$CODA_WAS_PUBLISHED" = true  ]]; then
 
                               echo "$DOCKER_PASSWORD" | docker login --username $DOCKER_USERNAME --password-stdin
-                              ./scripts/skip_if_only_frontend_or_rfcs.sh scripts/release-docker.sh \
+                              scripts/release-docker.sh \
                               -s coda-daemon \
                               -v $CODA_GIT_TAG-$CODA_GIT_BRANCH-$CODA_GIT_HASH \
                               --extra-args "--build-arg coda_version=$CODA_DEB_VERSION --build-arg deb_repo=$CODA_DEB_REPO"
 
+                        fi
+                    fi
+            - store_artifacts:
+                  path: /tmp/artifacts
+    build-artifacts-docker--testnet_postake_medium_curves--coda-demo:
+        resource_class: xlarge
+        docker:
+            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+        steps:
+            - restore_cache:
+                name: Restore cache - docker deploy env
+                key: docker-deploy-env-v1-testnet_postake_medium_curves-{{ .Revision }}
+            - setup_remote_docker
+            - run:
+                  name: Build and Upload Docker
+                  command: |
+                    # Check if we should deploy this build
+                    FILE=/tmp/DOCKER_DEPLOY_ENV
+                    if test -f "$FILE"; then
+                        source $FILE
+                        echo "Publishing Docker"
+                        echo "Should Publish Docker: $CODA_WAS_PUBLISHED"
+                        set -x
+                        if [[ "$CODA_WAS_PUBLISHED" = true  ]]; then
+
                               echo "$DOCKER_PASSWORD" | docker login --username $DOCKER_USERNAME --password-stdin
-                              ./scripts/skip_if_only_frontend_or_rfcs.sh scripts/release-docker.sh \
+                              scripts/release-docker.sh \
                               -s coda-demo \
                               -v $CODA_GIT_TAG-$CODA_GIT_BRANCH-$CODA_GIT_HASH \
                               --extra-args "--build-arg coda_version=$CODA_DEB_VERSION --build-arg deb_repo=$CODA_DEB_REPO"
+
                         fi
                     fi
             - store_artifacts:
@@ -1219,6 +1277,12 @@ workflows:
             - build-macos
             - build-client-sdk
             - build-artifacts--testnet_postake_medium_curves
+            - build-artifacts-docker--testnet_postake_medium_curves--coda-daemon:
+                requires:
+                  - build-artifacts--testnet_postake_medium_curves
+            - build-artifacts-docker--testnet_postake_medium_curves--coda-demo:
+                requires:
+                  - build-artifacts--testnet_postake_medium_curves
             - test-unit--dev
             - test-unit--nonconsensus_medium_curves
             - test--fake_hash
@@ -1232,6 +1296,17 @@ workflows:
             - test--test_postake_split_snarkless
             - test--test_postake_three_producers
             - test--test_postake_txns
+
+    leaderboard:
+        triggers:
+          - schedule:
+              cron: "0 1 * * *"
+              filters:
+                branches:
+                  only:
+                    - develop
+        jobs:
+          - run-leaderboard
 
     daily:
         triggers:
