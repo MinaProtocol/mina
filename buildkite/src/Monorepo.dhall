@@ -1,4 +1,5 @@
 let Prelude = ./External/Prelude.dhall
+let List/map = Prelude.List.map
 
 let SelectFiles = ./Lib/SelectFiles.dhall
 let Cmd = ./Lib/Cmds.dhall
@@ -10,7 +11,12 @@ let Pipeline = ./Pipeline/Dsl.dhall
 let Size = ./Command/Size.dhall
 let triggerCommand = ./Pipeline/TriggerCommand.dhall
 
-let jobs : List JobSpec.Type = ./gen/Jobs.dhall
+let jobs : List JobSpec.Type =
+  List/map
+    Pipeline.CompoundType
+    JobSpec.Type
+    (\(composite: Pipeline.CompoundType) -> composite.spec)
+    ./gen/Jobs.dhall
 
 -- Run a job if we touched a dirty path
 let makeCommand : JobSpec.Type -> Cmd.Type = \(job : JobSpec.Type) ->
@@ -32,7 +38,7 @@ let prefixCommands = [
 
 let commands = Prelude.List.map JobSpec.Type Cmd.Type makeCommand jobs
 
-in Pipeline.build Pipeline.Config::{
+in (Pipeline.build Pipeline.Config::{
   spec = JobSpec::{
     name = "monorepo-triage",
     -- TODO: Clean up this code so we don't need an unused dirtyWhen here
@@ -48,5 +54,5 @@ in Pipeline.build Pipeline.Config::{
       docker = Some Docker::{ image = (./Constants/ContainerImages.dhall).toolchainBase }
     }
   ]
-}
+}).pipeline
 
