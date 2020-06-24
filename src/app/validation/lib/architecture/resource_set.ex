@@ -1,7 +1,6 @@
-defmodule Architecture.ResourceDatabase do
+defmodule Architecture.ResourceSet do
   @moduledoc """
-  An indexed, queryable set of resources. Supports computing filters for all resources in the
-  database.
+  An indexed, queryable set of resources. Supports computing filters for all resources in the set.
   """
 
   alias Architecture.Resource
@@ -11,7 +10,7 @@ defmodule Architecture.ResourceDatabase do
   @type resource_id :: integer
 
   # NB:
-  #   with this design, uniqueness is only guaranteed within a single database, not across databases
+  #   with this design, uniqueness is only guaranteed within a single set, not across sets
   #   (should be fine for now, needs to use a max_resource_id agent if use-case changes)
   defclass(
     max_resource_id: integer,

@@ -8,8 +8,6 @@ if [[ $# -ne 2 ]]; then
   exit 1
 fi
 
-echo "looking for gsutil"
-
 # download gsutil if it doesn't exist
 # TODO: Bake this into the agents
 if [[ ! -f /usr/local/google-cloud-sdk/bin/gsutil ]]; then
@@ -27,8 +25,6 @@ UPLOAD_BIN=/usr/local/google-cloud-sdk/bin/gsutil
 PREFIX=gs://buildkite_k8s/coda/shared
 FILE="$1"
 CMD="$2"
-
-echo "checking for file"
 
 set +e
 if ! $UPLOAD_BIN cp ${PREFIX}/${FILE} .; then

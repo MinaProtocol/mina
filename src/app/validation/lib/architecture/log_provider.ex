@@ -1,7 +1,7 @@
 defmodule Architecture.LogProvider do
   @moduledoc "Behaviour for log providers."
 
-  alias Architecture.ResourceDatabase
+  alias Architecture.ResourceSet
   alias Cloud.Google.Subscription
 
   @type t :: module
@@ -20,7 +20,7 @@ defmodule Architecture.LogProvider do
   end
 
   def log_filter(log_provider, resource_db) do
-    resource_filter = ResourceDatabase.filter(resource_db)
+    resource_filter = ResourceSet.filter(resource_db)
     Architecture.LogFilter.adjoin(resource_filter, log_provider.log_filter())
   end
 
@@ -50,7 +50,7 @@ defmodule Architecture.LogProvider do
 
     # Each provider has 1 sink pub/sub pipeline associated with it. Provider ingests gcloud
     # subscriptions and forwards to junction if the associated resource exists in the resource
-    # database.
+    # set.
     require Logger
     alias Architecture.LogProvider
 

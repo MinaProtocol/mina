@@ -3,7 +3,7 @@ defmodule Architecture.Validation do
 
   alias Architecture.AlertServer
   alias Architecture.Resource
-  alias Architecture.ResourceDatabase
+  alias Architecture.ResourceSet
   alias Architecture.Statistic
   alias Architecture.Validation
 
@@ -25,7 +25,7 @@ defmodule Architecture.Validation do
 
     defclass(
       validation: module,
-      resource_db: ResourceDatabase.t()
+      resource_db: ResourceSet.t()
     )
   end
 
@@ -98,7 +98,7 @@ defmodule Architecture.Validation do
     def init(validation_specs) do
       children =
         Enum.flat_map(validation_specs, fn spec ->
-          ResourceDatabase.all_resources(spec.resource_db)
+          ResourceSet.all_resources(spec.resource_db)
           |> Enum.map(&broker_child_spec(spec.validation, &1))
         end)
 

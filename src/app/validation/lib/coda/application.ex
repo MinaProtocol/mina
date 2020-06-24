@@ -4,7 +4,7 @@ defmodule Coda.Application do
   """
 
   alias Architecture.LogFilter
-  alias Architecture.ResourceDatabase
+  alias Architecture.ResourceSet
   alias Cloud.Google.LogPipeline
   alias Coda.Resources
 
@@ -30,7 +30,7 @@ defmodule Coda.Application do
     api_conns = Cloud.Google.connect()
 
     # TODO: derive all of this from validations + resource query
-    resource_db = ResourceDatabase.build(resource_db_entries())
+    resource_db = ResourceSet.build(resource_db_entries())
 
     # validation_requests = [Validations.GlobalBlockAcceptanceRate]
     # requirements ==>

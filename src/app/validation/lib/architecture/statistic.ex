@@ -3,11 +3,11 @@ defmodule Architecture.Statistic do
 
   alias Architecture.LogProvider
   alias Architecture.Resource
-  alias Architecture.ResourceDatabase
+  alias Architecture.ResourceSet
   alias Architecture.Timer
 
   @callback log_providers :: [module]
-  @callback resources(ResourceDatabase.t()) :: ResourceDatabase.t()
+  @callback resources(ResourceSet.t()) :: ResourceSet.t()
   @callback init(Resource.t()) :: struct
   @callback update(Resource.t(), state) :: state when state: struct
   @callback handle_log(Resource.t(), state, LogProvider.t(), LogProvider.log()) :: state
@@ -35,7 +35,7 @@ defmodule Architecture.Statistic do
 
     defclass(
       statistic: module,
-      resource_db: ResourceDatabase.t()
+      resource_db: ResourceSet.t()
     )
   end
 
@@ -119,7 +119,7 @@ defmodule Architecture.Statistic do
       end
 
       stat_spec.statistic.resources(stat_spec.resource_db)
-      |> ResourceDatabase.all_resources()
+      |> ResourceSet.all_resources()
       |> Enum.map(fn resource ->
         # We construct the following supervision tree for each statistic we compute:
         #
