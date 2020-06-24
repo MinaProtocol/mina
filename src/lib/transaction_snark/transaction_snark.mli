@@ -164,6 +164,33 @@ module Statement : sig
     Poly.t
   [@@deriving sexp, hash, compare, yojson]
 
+  module With_sok : sig
+    [%%versioned:
+    module Stable : sig
+      module V1 : sig
+        type t =
+          ( Frozen_ledger_hash.Stable.V1.t
+          , Currency.Amount.Stable.V1.t
+          , Pending_coinbase_stack_state.Stable.V1.t
+          , Fee_excess.Stable.V1.t
+          , Proof_type.Stable.V1.t
+          , Sok_message.Digest.Stable.V1.t )
+          Poly.Stable.V1.t
+        [@@deriving compare, equal, hash, sexp, yojson]
+      end
+    end]
+
+    type t =
+      ( Frozen_ledger_hash.t
+      , Currency.Amount.t
+      , Pending_coinbase_stack_state.t
+      , Fee_excess.t
+      , Proof_type.t
+      , Sok_message.Digest.t )
+      Poly.t
+    [@@deriving sexp, hash, compare, yojson]
+  end
+
   val gen : t Quickcheck.Generator.t
 
   val merge : t -> t -> t Or_error.t
