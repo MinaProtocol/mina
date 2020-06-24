@@ -1,10 +1,10 @@
 open Core_kernel
 
-let yojson_strip_fields ~fields = function
+let yojson_strip_fields ~keep_fields = function
   | `Assoc l ->
       `Assoc
         (List.filter l ~f:(fun (fld, _) ->
-             Array.mem ~equal:String.equal fields fld ))
+             Array.mem ~equal:String.equal keep_fields fld ))
   | json ->
       json
 
@@ -21,7 +21,9 @@ module Accounts = struct
 
   let single_of_yojson json =
     single_of_yojson
-    @@ yojson_strip_fields ~fields:[|"pk"; "sk"; "balance"; "delegate"|] json
+    @@ yojson_strip_fields
+         ~keep_fields:[|"pk"; "sk"; "balance"; "delegate"|]
+         json
 
   type t = single list [@@deriving yojson, bin_io_unversioned]
 end
@@ -179,7 +181,9 @@ module Proof_keys = struct
 
     let of_yojson json =
       match
-        yojson_strip_fields ~fields:[|"2_to_the"; "txns_per_second_x10"|] json
+        yojson_strip_fields
+          ~keep_fields:[|"2_to_the"; "txns_per_second_x10"|]
+          json
       with
       | `Assoc [("2_to_the", i)] -> (
         match i with
@@ -224,7 +228,7 @@ module Proof_keys = struct
   let of_yojson json =
     of_yojson
     @@ yojson_strip_fields
-         ~fields:
+         ~keep_fields:
            [| "level"
             ; "c"
             ; "ledger_depth"
@@ -263,7 +267,7 @@ module Genesis = struct
   let of_yojson json =
     of_yojson
     @@ yojson_strip_fields
-         ~fields:[|"k"; "delta"; "genesis_state_timestamp"|]
+         ~keep_fields:[|"k"; "delta"; "genesis_state_timestamp"|]
          json
 
   let combine t1 t2 =
@@ -279,7 +283,7 @@ module Daemon = struct
   [@@deriving yojson, bin_io_unversioned]
 
   let of_yojson json =
-    of_yojson @@ yojson_strip_fields ~fields:[|"txpool_max_size"|] json
+    of_yojson @@ yojson_strip_fields ~keep_fields:[|"txpool_max_size"|] json
 
   let combine t1 t2 =
     { txpool_max_size=
@@ -328,9 +332,9 @@ type t =
   ; ledger: Ledger.t option [@default None] }
 [@@deriving yojson, bin_io_unversioned]
 
-let fields = [|"ledger"; "genesis"; "proof"|]
+let keep_fields = [|"ledger"; "genesis"; "proof"|]
 
-let of_yojson json = of_yojson @@ yojson_strip_fields ~fields json
+let of_yojson json = of_yojson @@ yojson_strip_fields ~keep_fields json
 
 let default = {daemon= None; genesis= None; proof= None; ledger= None}
 
