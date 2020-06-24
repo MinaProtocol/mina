@@ -33,10 +33,7 @@ if [[ -f "${FILE}" ]] || $UPLOAD_BIN cp "${PREFIX}/${FILE}" .; then
 else
   set -e
   echo "*** Cache miss -- executing step ***"
-  date +%s
   bash -c "$MISS_CMD"
-  date +%s
   $UPLOAD_BIN cp "${FILE}" "${PREFIX}/${FILE}"
-  date +%s
 fi
 

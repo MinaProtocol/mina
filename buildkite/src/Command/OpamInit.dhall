@@ -9,9 +9,7 @@ let r = Cmd.run
 let file =
   "\"opam-v3-\\\$(sha256sum opam_ci_cache.sig | cut -d\" \" -f1).tar.gz\""
 
--- Mv is faster than rm -rf
 let unpackageScript : Text = "tar xfz ${file} --strip-components=2 -C /home/opam"
-
 
 let commands : List Cmd.Type =
   [
