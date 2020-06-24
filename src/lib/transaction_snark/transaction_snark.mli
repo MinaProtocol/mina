@@ -239,8 +239,14 @@ module Statement : sig
 
     val to_input : t -> (Field.t, bool) Random_oracle.Input.t
 
-    val var_to_input :
-      var -> ((Field.Var.t, Boolean.var) Random_oracle.Input.t, _) Checked.t
+    val to_field_elements : t -> Field.t array
+
+    module Checked : sig
+      val to_input :
+        var -> ((Field.Var.t, Boolean.var) Random_oracle.Input.t, _) Checked.t
+
+      val to_field_elements : var -> (Field.Var.t array, _) Checked.t
+    end
   end
 
   val gen : t Quickcheck.Generator.t
