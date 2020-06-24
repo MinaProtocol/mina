@@ -31,7 +31,7 @@ let andThenRunInDocker : Text -> List Cmd.Type =
     [ Coda.fixPermissionsCommand ] # commands # [
       Cmd.runInDocker
         (Cmd.Docker::{ image = (../Constants/ContainerImages.dhall).codaToolchain })
-        (unpackageScript ++ innerScript)
+        (unpackageScript ++ " && " ++ innerScript)
     ]
 
 in
