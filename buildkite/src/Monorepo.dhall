@@ -38,7 +38,7 @@ let prefixCommands = [
 
 let commands = Prelude.List.map JobSpec.Type Cmd.Type makeCommand jobs
 
-in (Pipeline.build Pipeline.Config::{
+in Pipeline.build Pipeline.Config::{
   spec = JobSpec::{
     name = "monorepo-triage",
     -- TODO: Clean up this code so we don't need an unused dirtyWhen here
@@ -54,5 +54,5 @@ in (Pipeline.build Pipeline.Config::{
       docker = Some Docker::{ image = (./Constants/ContainerImages.dhall).toolchainBase }
     }
   ]
-}).pipeline
+}
 
