@@ -449,11 +449,13 @@ def run(args):
 
     for profile in all_tests.keys():
         print('- %s:' % profile)
-        build_log_name = '%s.log' % profile
-        build_log = os.path.join(out_dir.build_logs, build_log_name)
-        executive.reserve_file(build_log)
-        executive.register_artifact_collector(SingleArtifactCollector(out_dir.build_logs, 'build', build_log_name))
-        if not args.no_build:
+        if args.no_build:
+            print('Skipping build')
+        else:
+            build_log_name = '%s.log' % profile
+            build_log = os.path.join(out_dir.build_logs, build_log_name)
+            executive.reserve_file(build_log)
+            executive.register_artifact_collector(SingleArtifactCollector(out_dir.build_logs, 'build', build_log_name))
             project.build(build_log, profile)
 
         for test in all_tests[profile]:
