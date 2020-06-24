@@ -607,6 +607,59 @@ module Genesis_proof = struct
            genesis proof"
 end
 
+let make_constraint_constants
+    ~(default : Genesis_constants.Constraint_constants.t)
+    (config : Runtime_config.Proof_keys.t) :
+    Genesis_constants.Constraint_constants.t =
+  let work_delay =
+    Option.value ~default:default.work_delay config.work_delay
+  in
+  let block_window_duration_ms =
+    Option.value ~default:default.block_window_duration_ms
+      config.block_window_duration_ms
+  in
+  let transaction_capacity_log_2 =
+    match config.transaction_capacity with
+    | Some (Log_2 i) ->
+        i
+    | Some (Txns_per_second_x10 tps_goal_x10) ->
+        let max_coinbases = 2 in
+        let max_user_commands_per_block =
+          (* block_window_duration is in milliseconds, so divide by 1000 divide
+             by 10 again because we have tps * 10
+          *)
+          tps_goal_x10 * block_window_duration_ms / (1000 * 10)
+        in
+        (* Log of the capacity of transactions per transition.
+            - 1 will only work if we don't have prover fees.
+            - 2 will work with prover fees, but not if we want a transaction
+              included in every block.
+            - At least 3 ensures a transaction per block and the staged-ledger
+              unit tests pass.
+        *)
+        1
+        + Core_kernel.Int.ceil_log2
+            (max_user_commands_per_block + max_coinbases)
+    | None ->
+        default.transaction_capacity_log_2
+  in
+  let pending_coinbase_depth =
+    Core_kernel.Int.ceil_log2
+      (((transaction_capacity_log_2 + 1) * (work_delay + 1)) + 1)
+  in
+  { c= Option.value ~default:default.c config.c
+  ; ledger_depth=
+      Option.value ~default:default.ledger_depth config.ledger_depth
+  ; work_delay
+  ; block_window_duration_ms
+  ; transaction_capacity_log_2
+  ; pending_coinbase_depth
+  ; coinbase_amount=
+      Option.value ~default:default.coinbase_amount config.coinbase_amount
+  ; account_creation_fee=
+      Option.value ~default:default.account_creation_fee
+        config.account_creation_fee }
+
 let make_genesis_constants ~logger ~(default : Genesis_constants.t)
     (config : Runtime_config.t) =
   let open Or_error.Let_syntax in
@@ -665,24 +718,8 @@ let load_config_file filename =
           Or_error.error_string err )
 
 let init_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
-    ~may_generate ~proof_level ~genesis_constants ~constraint_constants
-    (config : Runtime_config.t) =
+    ~may_generate ~proof_level ~genesis_constants (config : Runtime_config.t) =
   let open Deferred.Or_error.Let_syntax in
-  let%bind genesis_ledger, ledger_config, ledger_file =
-    Ledger.load ~genesis_dir ~logger ~constraint_constants
-      (Option.value config.ledger
-         ~default:
-           { base= Named Coda_compile_config.genesis_ledger
-           ; num_accounts= None
-           ; hash= None })
-  in
-  let config =
-    {config with ledger= Option.map config.ledger ~f:(fun _ -> ledger_config)}
-  in
-  let%bind genesis_constants =
-    Deferred.return
-    @@ make_genesis_constants ~logger ~default:genesis_constants config
-  in
   let proof_level =
     List.find_map_exn ~f:Fn.id
       [ proof_level
@@ -697,13 +734,41 @@ let init_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
               None)
       ; Some Genesis_constants.Proof_level.compiled ]
   in
+  let constraint_constants, generated_constraint_constants =
+    match config.proof with
+    | None ->
+        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+          "Using the compiled constraint constants" ;
+        (Genesis_constants.Constraint_constants.compiled, false)
+    | Some config ->
+        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+          "Using the constraint constants from the configuration file" ;
+        ( make_constraint_constants
+            ~default:Genesis_constants.Constraint_constants.compiled config
+        , true )
+  in
   let%bind () =
     match (proof_level, Genesis_constants.Proof_level.compiled) with
     | Full, Full ->
-        (* TODO: Check that constraint constants are consistent, once they are
-           exposed in the config file.
-        *)
-        return ()
+        if generated_constraint_constants then
+          if
+            Genesis_constants.Constraint_constants.(equal compiled)
+              constraint_constants
+          then (
+            Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+              "This binary only supports the compiled proof constants for \
+               proof_level= Full. The 'proof' field in the configuration file \
+               should be removed." ;
+            return () )
+          else (
+            Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+              "This binary only supports the compiled proof constants for \
+               proof_level= Full. The 'proof' field in the configuration file \
+               does not match." ;
+            Deferred.Or_error.errorf
+              "The compiled proof constants do not match the constants in the \
+               configuration file" )
+        else return ()
     | (Check | None), _ ->
         return ()
     | Full, ((Check | None) as compiled) ->
@@ -717,6 +782,21 @@ let init_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
         Deferred.Or_error.errorf
           "Proof level %s is not compatible with compile-time proof level %s"
           (str proof_level) (str compiled)
+  in
+  let%bind genesis_ledger, ledger_config, ledger_file =
+    Ledger.load ~genesis_dir ~logger ~constraint_constants
+      (Option.value config.ledger
+         ~default:
+           { base= Named Coda_compile_config.genesis_ledger
+           ; num_accounts= None
+           ; hash= None })
+  in
+  let config =
+    {config with ledger= Option.map config.ledger ~f:(fun _ -> ledger_config)}
+  in
+  let%bind genesis_constants =
+    Deferred.return
+    @@ make_genesis_constants ~logger ~default:genesis_constants config
   in
   let open Deferred.Let_syntax in
   let%bind proof_inputs =

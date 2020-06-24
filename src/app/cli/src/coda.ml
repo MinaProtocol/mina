@@ -430,14 +430,11 @@ let daemon logger =
            | _ ->
                Runtime_config.default
          in
-         let constraint_constants =
-           Genesis_constants.Constraint_constants.compiled
-         in
          let genesis_dir = Option.value ~default:conf_dir genesis_dir in
          let%bind precomputed_values =
            match%map
              Genesis_ledger_helper.init_from_config_file ~genesis_dir ~logger
-               ~may_generate ~constraint_constants ~proof_level
+               ~may_generate ~proof_level
                ~genesis_constants:Genesis_constants.compiled config
            with
            | Ok (precomputed_values, _) ->
@@ -735,7 +732,7 @@ let daemon logger =
            ; time_controller
            ; consensus_local_state
            ; genesis_ledger_hash
-           ; constraint_constants
+           ; constraint_constants= precomputed_values.constraint_constants
            ; log_gossip_heard
            ; is_seed
            ; creatable_gossip_net=
