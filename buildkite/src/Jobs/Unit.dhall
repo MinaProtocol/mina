@@ -16,16 +16,12 @@ let Size = ../Command/Size.dhall
 let buildTestCmd : Text -> Text -> Command.Type = \(profile : Text) -> \(path : Text) ->
   Command.build
     Command.Config::{
-      commands =  OpamInit.commands # [
-        Cmd.run "buildkite-agent artifact download libp2p_helper src/app/result/bin",
-        Cmd.runInDocker
-          Cmd.Docker::{
-            image = (../Constants/ContainerImages.dhall).codaToolchain,
-            extraEnv = [ "DUNE_PROFILE=${profile}", "LIBP2P_NIXLESS=1", "GO=/usr/lib/go/bin/go" ]
-          }
-          ("source ~/.profile && make build && (dune runtest ${path} --profile=${profile} -j8" ++
-            " || (./scripts/link-coredumps.sh && false))")
-      ],
+      commands =  [
+        Cmd.run "buildkite-agent arfifact download libp2p_helper"] # 
+        OpamInit.andThenRunInDocker (
+          "source ~/.profile && make build && (dune runtest ${path} --profile=${profile} -j8" ++
+          " || (./scripts/link-coredumps.sh && false))"
+        ),
       label = "Run ${profile} unit-tests",
       key = "unit-test-${profile}",
       target = Size.Large,
