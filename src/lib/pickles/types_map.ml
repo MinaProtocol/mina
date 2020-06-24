@@ -4,7 +4,8 @@ open Zexe_backend
 
 (* TODO: max_branching is a terrible name. It should be max_width. *)
 
-(* We maintain a global hash table which stores some data for each inductive proof system.
+(* We maintain a global hash table which stores for each inductive proof system some
+   data.
 *)
 module Data = struct
   type f = Impls.Dlog_based.field

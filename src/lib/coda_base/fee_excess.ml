@@ -178,11 +178,12 @@ let to_input {fee_token_l; fee_excess_l; fee_token_r; fee_excess_r} =
 consensus_mechanism]
 
 let to_input_checked {fee_token_l; fee_excess_l; fee_token_r; fee_excess_r} =
-  let open Random_oracle.Input in
-  List.reduce_exn ~f:append
-    [ Token_id.Checked.to_input fee_token_l
+  let%map fee_token_l = Token_id.Checked.to_input fee_token_l
+  and fee_token_r = Token_id.Checked.to_input fee_token_r in
+  List.reduce_exn ~f:Random_oracle.Input.append
+    [ fee_token_l
     ; Fee.Signed.Checked.to_input fee_excess_l
-    ; Token_id.Checked.to_input fee_token_r
+    ; fee_token_r
     ; Fee.Signed.Checked.to_input fee_excess_r ]
 
 [%%endif]
@@ -574,15 +575,27 @@ let%test_unit "Checked and unchecked behaviour is consistent" =
 let%test_unit "Combine succeeds when the middle excess is zero" =
   Quickcheck.test (Quickcheck.Generator.tuple3 gen Token_id.gen Fee.Signed.gen)
     ~f:(fun (fe1, tid, excess) ->
+      let tid =
+        (* The tokens before and after should be distinct. Especially in this
+           scenario, we may get an overflow error otherwise.
+        *)
+        if Token_id.equal fe1.fee_token_l tid then Token_id.next tid else tid
+      in
       let fe2 =
         if Fee.Signed.(equal zero) fe1.fee_excess_r then of_single (tid, excess)
         else
-          Or_error.ok_exn
-          @@ of_one_or_two
-               (`Two
-                 ( (fe1.fee_token_r, Fee.Signed.negate fe1.fee_excess_r)
-                 , (tid, excess) ))
+          match
+            of_one_or_two
+              (`Two
+                ( (fe1.fee_token_r, Fee.Signed.negate fe1.fee_excess_r)
+                , (tid, excess) ))
+          with
+          | Ok fe2 ->
+              fe2
+          | Error _ ->
+              (* The token is the same, and rebalancing causes an overflow. *)
+              of_single (fe1.fee_token_r, Fee.Signed.negate fe1.fee_excess_r)
       in
-      assert (Or_error.is_ok (combine fe1 fe2)) )
+      ignore @@ Or_error.ok_exn (combine fe1 fe2) )
 
 [%%endif]
