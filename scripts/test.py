@@ -454,7 +454,7 @@ def run(args):
     for profile in all_tests.keys():
         print('- %s:' % profile)
         if args.no_build:
-            executive.no_build(profile)
+            project.no_build(profile)
         else:
             build_log_name = '%s.log' % profile
             build_log = os.path.join(out_dir.build_logs, build_log_name)
