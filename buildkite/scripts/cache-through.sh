@@ -4,7 +4,7 @@ set -eou pipefail
 set +x
 
 if [[ $# -ne 2 ]]; then
-  echo "Usage: $0 <path-to-file> <postprocess-run-preprocess-in-docker-cmd>"
+  echo "Usage: $0 <path-to-file> <miss-in-docker-cmd>"
   exit 1
 fi
 
@@ -24,16 +24,16 @@ fi
 UPLOAD_BIN=/usr/local/google-cloud-sdk/bin/gsutil
 PREFIX=gs://buildkite_k8s/coda/shared
 FILE="$1"
-CMD="$2"
+MISS_CMD="$2"
 
 set +e
-if ! $UPLOAD_BIN cp ${PREFIX}/${FILE} .; then
-  set -e
-  echo "*** Cache miss -- executing step ***"
-  bash -c "$CMD"
-  $UPLOAD_BIN cp ${FILE} ${PREFIX}/${FILE}
-else
+if [[ -f "${FILE}" ]] || $UPLOAD_BIN cp "${PREFIX}/${FILE}" .; then
   set -e
   echo "*** Cache Hit -- skipping step ***"
+else
+  set -e
+  echo "*** Cache miss -- executing step ***"
+  bash -c "$MISS_CMD"
+  $UPLOAD_BIN cp "${FILE}" "${PREFIX}/${FILE}"
 fi
 
