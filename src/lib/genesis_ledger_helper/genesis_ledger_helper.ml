@@ -280,7 +280,7 @@ module Ledger = struct
     let%map () = Tar.create ~root:dirname ~file:tar_path ~directory:"." () in
     tar_path
 
-  let load ~genesis_dir ~logger ~constraint_constants
+  let load ~proof_level ~genesis_dir ~logger ~constraint_constants
       (config : Runtime_config.Ledger.t) =
     Monitor.try_with_join_or_error (fun () ->
         let open Deferred.Or_error.Let_syntax in
@@ -301,12 +301,14 @@ module Ledger = struct
           match config.base with
           | Hash _ ->
               return None
-          | Accounts accounts ->
+          | Accounts accounts when proof_level = Full ->
               return
                 (Some
                    ( lazy
                      (add_genesis_winner_account (Accounts.to_full accounts))
                      ))
+          | Accounts accounts ->
+              return (Some (lazy (Accounts.to_full accounts)))
           | Named name -> (
             match Genesis_ledger.fetch_ledger name with
             | Some (module M) ->
@@ -784,7 +786,7 @@ let init_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
           (str proof_level) (str compiled)
   in
   let%bind genesis_ledger, ledger_config, ledger_file =
-    Ledger.load ~genesis_dir ~logger ~constraint_constants
+    Ledger.load ~proof_level ~genesis_dir ~logger ~constraint_constants
       (Option.value config.ledger
          ~default:
            { base= Named Coda_compile_config.genesis_ledger
