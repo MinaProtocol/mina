@@ -702,6 +702,7 @@ workflows:
             - test--{{profile}}
             {%- endfor %}
             {%- for profile in compile_config_agnostic_profiles %}
+            - build-binaries--{{profile}}
             {%- for test in compile_config_agnostic_tests %}
             - test--{{profile}}--{{test.replace(' ','_')}}:
                 requires:

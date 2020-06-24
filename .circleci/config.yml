@@ -1276,6 +1276,7 @@ workflows:
             - test--test_postake_five_even_txns
             - test--test_postake_snarkless
             - test--test_postake_split
+            - build-binaries--dev
             - test--dev--coda-archive-node-test:
                 requires:
                   - build-binaries--dev
