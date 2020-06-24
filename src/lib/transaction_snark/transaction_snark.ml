@@ -515,46 +515,6 @@ let merge_top_hash wrap_vk_bits t =
   Random_oracle.hash ~init:wrap_vk_bits
     (Statement.With_sok.to_field_elements t)
 
-let construct_input_checked ~sok_digest ~state1 ~state2 ~supply_increase
-    ~fee_excess ~pending_coinbase_stack1 ~pending_coinbase_stack2 =
-  let open Tick in
-  let open Random_oracle.Input in
-  let%bind fee_excess = Fee_excess.to_input_checked fee_excess in
-  let input =
-    List.reduce_exn ~f:append
-      [ Sok_message.Digest.Checked.to_input sok_digest
-      ; Frozen_ledger_hash.var_to_input state1
-      ; Frozen_ledger_hash.var_to_input state2
-      ; Pending_coinbase.Stack.var_to_input pending_coinbase_stack1
-      ; Pending_coinbase.Stack.var_to_input pending_coinbase_stack2
-      ; bitstring
-          (Bitstring_lib.Bitstring.Lsb_first.to_list
-             (Amount.var_to_bits supply_increase))
-      ; fee_excess ]
-  in
-  let%map () =
-    as_prover
-      As_prover.(
-        if !top_hash_logging_enabled then
-          let%bind field_elements =
-            read
-              (Typ.list ~length:0 Field.typ)
-              (Array.to_list input.field_elements)
-          in
-          let%map bitstrings =
-            read
-              (Typ.list ~length:0 (Typ.list ~length:0 Boolean.typ))
-              (Array.to_list input.bitstrings)
-          in
-          Format.eprintf
-            !"Generating checked top hash from:@.%{sexp: (Field.t, bool) \
-              Random_oracle.Input.t}@."
-            { Random_oracle.Input.field_elements= Array.of_list field_elements
-            ; bitstrings= Array.of_list bitstrings }
-        else return ())
-  in
-  input
-
 module Verification_keys = struct
   [%%versioned_asserted
   module Stable = struct
@@ -1653,15 +1613,24 @@ module Base = struct
              (exists' Sok_message.Digest.typ ~f:Prover_state.sok_digest)
          in
          let%bind input =
-           construct_input_checked ~sok_digest ~state1:root_before
-             ~state2:root_after ~supply_increase
-             ~pending_coinbase_stack1:pending_coinbase_before
-             ~pending_coinbase_stack2:pending_coinbase_after ~fee_excess
+           let%bind proof_type =
+             As_prover.Ref.create As_prover.(return `Base)
+           in
+           Statement.With_sok.Checked.to_field_elements
+             { source= root_before
+             ; target= root_after
+             ; fee_excess
+             ; supply_increase
+             ; pending_coinbase_stack_state=
+                 { source= pending_coinbase_before
+                 ; target= pending_coinbase_after }
+             ; proof_type
+             ; sok_digest }
          in
          [%with_label "Compare the hashes"]
            ( make_checked (fun () ->
                  Random_oracle.Checked.(
-                   hash ~init:Hash_prefix.base_snark (pack_input input)) )
+                   hash ~init:Hash_prefix.base_snark input) )
            >>= Field.Checked.Assert.equal top_hash ))
     in
     ()
@@ -1775,17 +1744,6 @@ module Merge = struct
 
   module Verifier = Tick.Verifier
 
-  let construct_input_checked ~prefix ~sok_digest ~state1 ~state2
-      ~supply_increase ~fee_excess ~pending_coinbase_stack1
-      ~pending_coinbase_stack2 =
-    let%bind input =
-      construct_input_checked ~sok_digest ~state1 ~state2 ~supply_increase
-        ~fee_excess ~pending_coinbase_stack1 ~pending_coinbase_stack2
-    in
-    make_checked (fun () ->
-        Random_oracle.Checked.(
-          digest (update ~state:prefix (pack_input input))) )
-
   let hash_state_if b ~then_ ~else_ =
     make_checked (fun () ->
         Random_oracle.State.map2 then_ else_ ~f:(fun then_ else_ ->
@@ -1814,9 +1772,20 @@ module Merge = struct
         ~else_:wrap_vk_hash_state
     in
     let%bind input =
-      construct_input_checked ~prefix:top_hash_init ~sok_digest ~state1:s1
-        ~state2:s2 ~pending_coinbase_stack1 ~pending_coinbase_stack2
-        ~supply_increase ~fee_excess
+      let%bind proof_type = As_prover.Ref.create As_prover.(return `Merge) in
+      let%bind input =
+        Statement.With_sok.Checked.to_field_elements
+          { source= s1
+          ; target= s2
+          ; fee_excess
+          ; supply_increase
+          ; pending_coinbase_stack_state=
+              {source= pending_coinbase_stack1; target= pending_coinbase_stack2}
+          ; proof_type
+          ; sok_digest }
+      in
+      make_checked (fun () ->
+          Random_oracle.Checked.(digest (update ~state:top_hash_init input)) )
       >>= Wrap_input.Checked.tick_field_to_scalars
     in
     let%bind proof =
@@ -1903,10 +1872,23 @@ module Merge = struct
            let%bind sok_digest =
              exists' Sok_message.Digest.typ ~f:Prover_state.sok_digest
            in
-           construct_input_checked ~prefix:wrap_vk_hash_state ~sok_digest
-             ~state1:s1 ~state2:s3 ~pending_coinbase_stack1:pending_coinbase1
-             ~pending_coinbase_stack2:pending_coinbase4 ~supply_increase
-             ~fee_excess
+           let%bind proof_type =
+             As_prover.Ref.create As_prover.(return `Merge)
+           in
+           let%bind input =
+             Statement.With_sok.Checked.to_field_elements
+               { source= s1
+               ; target= s3
+               ; fee_excess
+               ; supply_increase
+               ; pending_coinbase_stack_state=
+                   {source= pending_coinbase1; target= pending_coinbase4}
+               ; proof_type
+               ; sok_digest }
+           in
+           make_checked (fun () ->
+               Random_oracle.Checked.(
+                 digest (update ~state:wrap_vk_hash_state input)) )
          in
          Field.Checked.Assert.equal top_hash input)
     and verify_12 =
@@ -2046,11 +2028,27 @@ module Verification = struct
         get_proof =
       let open Tick in
       let%bind top_hash =
-        Merge.construct_input_checked
-          ~prefix:(Random_oracle.State.map wrap_vk_state ~f:Run.Field.constant)
-          ~state1:s1 ~state2:s2 ~pending_coinbase_stack1
-          ~pending_coinbase_stack2 ~sok_digest ~supply_increase
-          ~fee_excess:Fee_excess.(var_of_t empty)
+        let%bind proof_type = As_prover.Ref.create As_prover.(return `Merge) in
+        let%bind input =
+          Statement.With_sok.Checked.to_field_elements
+            { source= s1
+            ; target= s2
+            ; fee_excess= Fee_excess.(var_of_t empty)
+            ; supply_increase
+            ; pending_coinbase_stack_state=
+                { source= pending_coinbase_stack1
+                ; target= pending_coinbase_stack2 }
+            ; proof_type
+            ; sok_digest }
+        in
+        make_checked (fun () ->
+            Random_oracle.Checked.(
+              digest
+                (update
+                   ~state:
+                     (Random_oracle.State.map wrap_vk_state
+                        ~f:Run.Field.constant)
+                   input)) )
       in
       let%bind input = Wrap_input.Checked.tick_field_to_scalars top_hash in
       let%map result =
