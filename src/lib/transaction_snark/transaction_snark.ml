@@ -291,7 +291,7 @@ module Statement = struct
           , Currency.Amount.Stable.V1.t
           , Pending_coinbase_stack_state.Stable.V1.t
           , Fee_excess.Stable.V1.t
-          , Proof_type.Stable.V1.t
+          , unit
           , Sok_message.Digest.Stable.V1.t )
           Poly.Stable.V1.t
         [@@deriving compare, equal, hash, sexp, yojson]
@@ -307,16 +307,13 @@ module Statement = struct
       , Currency.Amount.var
       , Pending_coinbase_stack_state.var
       , Fee_excess.var
-      , (* TODO: This is a hack, remove proof_type from the statement. *)
-      Proof_type.t Tick.As_prover.Ref.t
+      , unit
       , Sok_message.Digest.Checked.t )
       Poly.t
 
     let typ : (var, t) Tick.Typ.t =
       Poly.typ Frozen_ledger_hash.typ Currency.Amount.typ
-        Pending_coinbase_stack_state.typ Fee_excess.typ
-        ((* TODO: This is a hack, remove proof_type from the statement. *)
-         Tick.Typ.Internal.ref ())
+        Pending_coinbase_stack_state.typ Fee_excess.typ Tick.Typ.unit
         Sok_message.Digest.typ
 
     let to_input
@@ -1613,9 +1610,6 @@ module Base = struct
              (exists' Sok_message.Digest.typ ~f:Prover_state.sok_digest)
          in
          let%bind input =
-           let%bind proof_type =
-             As_prover.Ref.create As_prover.(return `Base)
-           in
            Statement.With_sok.Checked.to_field_elements
              { source= root_before
              ; target= root_after
@@ -1624,7 +1618,7 @@ module Base = struct
              ; pending_coinbase_stack_state=
                  { source= pending_coinbase_before
                  ; target= pending_coinbase_after }
-             ; proof_type
+             ; proof_type= ()
              ; sok_digest }
          in
          [%with_label "Compare the hashes"]
@@ -1673,7 +1667,7 @@ module Base = struct
       ; supply_increase= Transaction_union.supply_increase transaction
       ; pending_coinbase_stack_state
       ; fee_excess= Transaction_union.fee_excess transaction
-      ; proof_type= `Base
+      ; proof_type= ()
       ; sok_digest }
     in
     let top_hash = base_top_hash statement in
@@ -1772,7 +1766,6 @@ module Merge = struct
         ~else_:wrap_vk_hash_state
     in
     let%bind input =
-      let%bind proof_type = As_prover.Ref.create As_prover.(return `Merge) in
       let%bind input =
         Statement.With_sok.Checked.to_field_elements
           { source= s1
@@ -1781,7 +1774,7 @@ module Merge = struct
           ; supply_increase
           ; pending_coinbase_stack_state=
               {source= pending_coinbase_stack1; target= pending_coinbase_stack2}
-          ; proof_type
+          ; proof_type= ()
           ; sok_digest }
       in
       make_checked (fun () ->
@@ -1872,9 +1865,6 @@ module Merge = struct
            let%bind sok_digest =
              exists' Sok_message.Digest.typ ~f:Prover_state.sok_digest
            in
-           let%bind proof_type =
-             As_prover.Ref.create As_prover.(return `Merge)
-           in
            let%bind input =
              Statement.With_sok.Checked.to_field_elements
                { source= s1
@@ -1883,7 +1873,7 @@ module Merge = struct
                ; supply_increase
                ; pending_coinbase_stack_state=
                    {source= pending_coinbase1; target= pending_coinbase4}
-               ; proof_type
+               ; proof_type= ()
                ; sok_digest }
            in
            make_checked (fun () ->
@@ -1984,7 +1974,7 @@ module Verification = struct
       let (stmt : Statement.With_sok.t) =
         { source
         ; target
-        ; proof_type
+        ; proof_type= ()
         ; fee_excess
         ; sok_digest
         ; supply_increase
@@ -2028,7 +2018,6 @@ module Verification = struct
         get_proof =
       let open Tick in
       let%bind top_hash =
-        let%bind proof_type = As_prover.Ref.create As_prover.(return `Merge) in
         let%bind input =
           Statement.With_sok.Checked.to_field_elements
             { source= s1
@@ -2038,7 +2027,7 @@ module Verification = struct
             ; pending_coinbase_stack_state=
                 { source= pending_coinbase_stack1
                 ; target= pending_coinbase_stack2 }
-            ; proof_type
+            ; proof_type= ()
             ; sok_digest }
         in
         make_checked (fun () ->
@@ -2209,7 +2198,7 @@ let check_transaction_union ?(preeval = false) ~constraint_constants
     ; supply_increase= Transaction_union.supply_increase transaction
     ; pending_coinbase_stack_state
     ; fee_excess= Transaction_union.fee_excess transaction
-    ; proof_type= `Base
+    ; proof_type= ()
     ; sok_digest }
   in
   let top_hash = base_top_hash statement in
@@ -2268,7 +2257,7 @@ let generate_transaction_union_witness ?(preeval = false) ~constraint_constants
     ; supply_increase= Transaction_union.supply_increase transaction
     ; pending_coinbase_stack_state
     ; fee_excess= Transaction_union.fee_excess transaction
-    ; proof_type= `Base
+    ; proof_type= ()
     ; sok_digest }
   in
   let top_hash = base_top_hash statement in
@@ -2333,7 +2322,7 @@ struct
           { source= transition12.pending_coinbase_stack_state.source
           ; target= transition23.pending_coinbase_stack_state.target }
       ; fee_excess
-      ; proof_type= `Merge
+      ; proof_type= ()
       ; sok_digest }
     in
     let top_hash = merge_top_hash wrap_vk_state statement in
@@ -3252,7 +3241,7 @@ let%test_module "transaction_snark" =
                     pending_coinbase_stack_state_merge
                 ; fee_excess=
                     Fee_excess.of_single (Token_id.default, total_fees)
-                ; proof_type= `Merge
+                ; proof_type= ()
                 ; sok_digest }
               in
               Tock.verify proof13.proof keys.verification.wrap wrap_input

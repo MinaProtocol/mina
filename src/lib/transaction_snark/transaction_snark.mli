@@ -206,7 +206,7 @@ module Statement : sig
           , Currency.Amount.Stable.V1.t
           , Pending_coinbase_stack_state.Stable.V1.t
           , Fee_excess.Stable.V1.t
-          , Proof_type.Stable.V1.t
+          , unit
           , Sok_message.Digest.Stable.V1.t )
           Poly.Stable.V1.t
         [@@deriving compare, equal, hash, sexp, yojson]
@@ -218,7 +218,7 @@ module Statement : sig
       , Currency.Amount.t
       , Pending_coinbase_stack_state.t
       , Fee_excess.t
-      , Proof_type.t
+      , unit
       , Sok_message.Digest.t )
       Poly.t
     [@@deriving sexp, hash, compare, yojson]
@@ -228,8 +228,7 @@ module Statement : sig
       , Currency.Amount.var
       , Pending_coinbase_stack_state.var
       , Fee_excess.var
-      , (* TODO: This is a hack, remove proof_type from the statement. *)
-      Proof_type.t Tick.As_prover.Ref.t
+      , unit
       , Sok_message.Digest.Checked.t )
       Poly.Stable.V1.t
 
