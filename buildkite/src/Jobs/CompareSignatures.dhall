@@ -1,0 +1,41 @@
+let Prelude =  ../External/Prelude.dhall
+let S = ../Lib/SelectFiles.dhall
+let Cmd =  ../Lib/Cmds.dhall
+let Pipeline = ../Pipeline/Dsl.dhall
+let Command = ../Command/Base.dhall
+let OpamInit = ../Command/OpamInit.dhall
+let Docker = ../Command/Docker/Type.dhall
+let Size = ../Command/Size.dhall
+let JobSpec = ../Pipeline/JobSpec.dhall
+in
+
+Pipeline.build
+   Pipeline.Config::
+     { spec =
+         let opamDirtyWhen =
+           [ S.exactly "src/opam" "export"
+           , S.exactly "scripts/setup-opam" "sh"
+           , S.strictly (S.contains "Makefile")
+           , S.exactly "buildkite/src/Command/OpamInit" "dhall"
+           , S.exactly "buildkite/scripts/cache-through" "sh"
+           ]
+         in
+         JobSpec::
+           { dirtyWhen = opamDirtyWhen #
+               [ S.strictlyStart (S.contains "buildkite/src/Jobs/CompareSignatures")
+               , S.strictlyStart (S.contains "src")
+               ]
+           , name = "ClientSdk"
+           }
+     , steps =
+         [ Command.build
+             Command.Config::
+               { commands = OpamInit.andThenRunInDocker "./scripts/compare_test_signatures.sh"
+               , label = "Compare test signatures"
+               , key = "compare-test-signatures"
+               , target = Size.Large
+               , docker = None Docker.Type
+               }
+         ]
+     }
+
