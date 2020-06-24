@@ -77,8 +77,8 @@ module Styles = {
 let make = (~items, ~currentItem, ~onItemPress) => {
   let (menuOpen, toggleMenu) = React.useState(() => false);
 
-  let onDropdownItemPress = label => {
-    onItemPress(label);
+  let onDropdownItemPress = item => {
+    onItemPress(item);
     toggleMenu(_ => !menuOpen);
   };
 
@@ -89,9 +89,9 @@ let make = (~items, ~currentItem, ~onItemPress) => {
     <ul
       className={menuOpen ? Styles.expandedDropdown : Styles.collapsedDropdown}>
       {items
-       |> Array.map(label => {
-            <li key=label onClick={_ => {onDropdownItemPress(label)}}>
-              {React.string(label)}
+       |> Array.map(item => {
+            <li key=item onClick={_ => {onDropdownItemPress(item)}}>
+              {React.string(item)}
             </li>
           })
        |> React.array}
