@@ -369,6 +369,10 @@ class CodaProject:
         self.executive.run_cmd(cmd, directory=self.root, log=build_log)
         self.current_profile = profile
 
+    def no_build(self, profile='dev'):
+        print('Skipping build')
+        self.current_profile = profile
+
     def run_test(self, test, test_log):
         if self.current_profile == None:
             self.executive.fail('run_test initiated without building')
@@ -450,7 +454,7 @@ def run(args):
     for profile in all_tests.keys():
         print('- %s:' % profile)
         if args.no_build:
-            print('Skipping build')
+            executive.no_build(profile)
         else:
             build_log_name = '%s.log' % profile
             build_log = os.path.join(out_dir.build_logs, build_log_name)
