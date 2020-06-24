@@ -66,50 +66,122 @@ module Pending_coinbase_stack_state = struct
 end
 
 module Statement = struct
+  module Poly = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type ( 'ledger_hash
+             , 'amount
+             , 'pending_coinbase
+             , 'fee_excess
+             , 'proof_type )
+             t =
+          { source: 'ledger_hash
+          ; target: 'ledger_hash
+          ; supply_increase: 'amount
+          ; pending_coinbase_stack_state: 'pending_coinbase
+          ; fee_excess: 'fee_excess
+          ; proof_type: 'proof_type }
+        [@@deriving compare, equal, hash, sexp, yojson]
+
+        let to_latest ledger_hash amount pending_coinbase fee_excess'
+            proof_type'
+            { source
+            ; target
+            ; supply_increase
+            ; pending_coinbase_stack_state
+            ; fee_excess
+            ; proof_type } =
+          { source= ledger_hash source
+          ; target= ledger_hash target
+          ; supply_increase= amount supply_increase
+          ; pending_coinbase_stack_state=
+              pending_coinbase pending_coinbase_stack_state
+          ; fee_excess= fee_excess' fee_excess
+          ; proof_type= proof_type' proof_type }
+      end
+    end]
+
+    type ('ledger_hash, 'amount, 'pending_coinbase, 'fee_excess, 'proof_type) t =
+          ( 'ledger_hash
+          , 'amount
+          , 'pending_coinbase
+          , 'fee_excess
+          , 'proof_type )
+          Stable.Latest.t =
+      { source: 'ledger_hash
+      ; target: 'ledger_hash
+      ; supply_increase: 'amount
+      ; pending_coinbase_stack_state: 'pending_coinbase
+      ; fee_excess: 'fee_excess
+      ; proof_type: 'proof_type }
+    [@@deriving compare, equal, hash, sexp, yojson]
+  end
+
+  type ( 'ledger_hash
+       , 'amount
+       , 'pending_coinbase
+       , 'fee_excess
+       , 'proof_type )
+       poly =
+        ( 'ledger_hash
+        , 'amount
+        , 'pending_coinbase
+        , 'fee_excess
+        , 'proof_type )
+        Poly.t =
+    { source: 'ledger_hash
+    ; target: 'ledger_hash
+    ; supply_increase: 'amount
+    ; pending_coinbase_stack_state: 'pending_coinbase
+    ; fee_excess: 'fee_excess
+    ; proof_type: 'proof_type }
+  [@@deriving compare, equal, hash, sexp, yojson]
+
   [%%versioned
   module Stable = struct
     module V1 = struct
       type t =
-        { source: Frozen_ledger_hash.Stable.V1.t
-        ; target: Frozen_ledger_hash.Stable.V1.t
-        ; supply_increase: Currency.Amount.Stable.V1.t
-        ; pending_coinbase_stack_state:
-            Pending_coinbase_stack_state.Stable.V1.t
-        ; fee_excess: Fee_excess.Stable.V1.t
-        ; proof_type: Proof_type.Stable.V1.t }
+        ( Frozen_ledger_hash.Stable.V1.t
+        , Currency.Amount.Stable.V1.t
+        , Pending_coinbase_stack_state.Stable.V1.t
+        , Fee_excess.Stable.V1.t
+        , Proof_type.Stable.V1.t )
+        Poly.Stable.V1.t
       [@@deriving compare, equal, hash, sexp, yojson]
 
       let to_latest = Fn.id
     end
   end]
 
-  type t = Stable.Latest.t =
-    { source: Frozen_ledger_hash.t
-    ; target: Frozen_ledger_hash.t
-    ; supply_increase: Currency.Amount.t
-    ; pending_coinbase_stack_state: Pending_coinbase_stack_state.t
-    ; fee_excess: Fee_excess.t
-    ; proof_type: Proof_type.t }
+  type t =
+    ( Frozen_ledger_hash.t
+    , Currency.Amount.t
+    , Pending_coinbase_stack_state.t
+    , Fee_excess.t
+    , Proof_type.t )
+    Poly.t
   [@@deriving sexp, hash, compare, yojson]
 
   let option lab =
     Option.value_map ~default:(Or_error.error_string lab) ~f:(fun x -> Ok x)
 
-  let merge s1 s2 =
+  let merge (s1 : t) (s2 : t) =
     let open Or_error.Let_syntax in
     let%map fee_excess = Fee_excess.combine s1.fee_excess s2.fee_excess
     and supply_increase =
       Currency.Amount.add s1.supply_increase s2.supply_increase
       |> option "Error adding supply_increase"
     in
-    { source= s1.source
-    ; target= s2.target
-    ; fee_excess
-    ; proof_type= `Merge
-    ; supply_increase
-    ; pending_coinbase_stack_state=
-        { source= s1.pending_coinbase_stack_state.source
-        ; target= s2.pending_coinbase_stack_state.target } }
+    ( { source= s1.source
+      ; target= s2.target
+      ; fee_excess
+      ; proof_type= `Merge
+      ; supply_increase
+      ; pending_coinbase_stack_state=
+          { source= s1.pending_coinbase_stack_state.source
+          ; target= s2.pending_coinbase_stack_state.target } }
+      : t )
 
   include Hashable.Make_binable (Stable.Latest)
   include Comparable.Make (Stable.Latest)
@@ -125,13 +197,14 @@ module Statement = struct
     and proof_type =
       Bool.quickcheck_generator >>| fun b -> if b then `Merge else `Base
     in
-    { source
-    ; target
-    ; fee_excess
-    ; proof_type
-    ; supply_increase
-    ; pending_coinbase_stack_state=
-        {source= pending_coinbase_before; target= pending_coinbase_after} }
+    ( { source
+      ; target
+      ; fee_excess
+      ; proof_type
+      ; supply_increase
+      ; pending_coinbase_stack_state=
+          {source= pending_coinbase_before; target= pending_coinbase_after} }
+      : t )
 end
 
 [%%versioned
@@ -187,8 +260,8 @@ let statement
      ; pending_coinbase_stack_state
      ; sok_digest= _
      ; proof= _ } :
-      t) =
-  { Statement.Stable.V1.source
+      t) : Statement.t =
+  { source
   ; target
   ; proof_type
   ; supply_increase
