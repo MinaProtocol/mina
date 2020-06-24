@@ -10,12 +10,7 @@ let file =
   "\"opam-v3-\\\$(sha256sum opam_ci_cache.sig | cut -d\" \" -f1).tar.gz\""
 
 -- Mv is faster than rm -rf
-let unpackageScript : Text =
-  "echo \"start tar xfz\" && date +%s && " ++
-  "tar xfz ${file} --strip-components=2 -C /home/opam && " ++
-  "echo \"end tar\" && date +%s && " ++
-  "opam config env && " ++
-  "ls -la /home/opam && ls -la /home/opam/.opam"
+let unpackageScript : Text = "tar xfz ${file} --strip-components=2 -C /home/opam"
 
 
 let commands : List Cmd.Type =
@@ -38,7 +33,7 @@ let andThenRunInDocker : Text -> List Cmd.Type =
     [ Coda.fixPermissionsCommand ] # commands # [
       Cmd.runInDocker
         (Cmd.Docker::{ image = (../Constants/ContainerImages.dhall).codaToolchain })
-        (unpackageScript ++ " && date +%s && " ++ innerScript)
+        (unpackageScript ++ innerScript)
     ]
 
 in

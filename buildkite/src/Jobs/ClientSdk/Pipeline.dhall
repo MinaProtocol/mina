@@ -18,10 +18,8 @@ Pipeline.build
     steps = [
     Command.build
       Command.Config::{
-        commands = OpamInit.andThenRunInDocker (
-            "date +%s && mkdir -p /tmp/artifacts && " ++
-                "./buildkite/scripts/opam-env.sh && " ++
-                "date +%s"),
+        commands = OpamInit.andThenRunInDocker
+            "mkdir -p /tmp/artifacts && ./buildkite/scripts/build-client-sdk.sh",
         label = "Build client-sdk",
         key = "build-client-sdk",
         target = Size.Large,
