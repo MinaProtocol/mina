@@ -107,7 +107,6 @@ extra_required_status_checks = [
 # these are full status check names. they will not be required to succeed.
 not_required_status_checks = [
     "ci/circleci: build-macos",
-    "ci/circleci: build-wallet",
 ]
 
 
