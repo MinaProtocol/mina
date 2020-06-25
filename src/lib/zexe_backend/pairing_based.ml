@@ -152,10 +152,6 @@ module Keypair = struct
     in
     (set_urs_info, load)
 
-  let () =
-    set_urs_info
-      [On_disk {directory= "/home/izzy/pickles-new/"; should_write= true}]
-
   let create
       { R1cs_constraint_system.public_input_size
       ; auxiliary_input_size

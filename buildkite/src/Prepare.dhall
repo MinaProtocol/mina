@@ -2,6 +2,7 @@
 -- Keep these rules lean! They have to run unconditionally.
 
 let SelectFiles = ./Lib/SelectFiles.dhall
+let Cmd = ./Lib/Cmds.dhall
 
 let Command = ./Command/Base.dhall
 let Docker = ./Command/Docker/Type.dhall
@@ -20,14 +21,14 @@ let config : Pipeline.Config.Type = Pipeline.Config::{
   Command.build
     Command.Config::{
       commands = [
-        "./buildkite/scripts/generate-jobs.sh > buildkite/src/gen/Jobs.dhall",
+        Cmd.run "./buildkite/scripts/generate-jobs.sh > buildkite/src/gen/Jobs.dhall",
         triggerCommand "src/Monorepo.dhall"
       ],
       label = "Prepare monorepo triage",
       key = "monorepo",
       target = Size.Large,
-      docker = Docker::{ image = (./Constants/ContainerImages.dhall).toolchainBase }
+      docker = Some Docker::{ image = (./Constants/ContainerImages.dhall).toolchainBase }
     }
   ]
 }
-in Pipeline.build config
+in (Pipeline.build config).pipeline

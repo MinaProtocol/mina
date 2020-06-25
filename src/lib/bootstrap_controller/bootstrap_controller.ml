@@ -6,6 +6,9 @@ open Pipe_lib.Strict_pipe
 open Coda_transition
 open Network_peer
 
+type Structured_log_events.t += Bootstrap_complete
+  [@@deriving register_event {msg= "Bootstrap state: complete."}]
+
 type t =
   { logger: Logger.t
   ; trust_system: Trust_system.t
@@ -399,8 +402,8 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
               | Error `Persistent_frontier_malformed ->
                   fail "persistent frontier was malformed"
             in
-            Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-              "Bootstrap state: complete." ;
+            Logger.Structured.info logger ~module_:__MODULE__ ~location:__LOC__
+              Bootstrap_complete ;
             let collected_transitions =
               Transition_cache.data transition_graph
             in
@@ -457,11 +460,11 @@ let%test_module "Bootstrap_controller tests" =
 
     let logger = Logger.create ()
 
-    let proof_level = Genesis_constants.Proof_level.Check
-
     let trust_system = Trust_system.null ()
 
     let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
+
+    let proof_level = precomputed_values.proof_level
 
     let constraint_constants = precomputed_values.constraint_constants
 
@@ -513,12 +516,11 @@ let%test_module "Bootstrap_controller tests" =
         (* we only need one node for this test, but we need more than one peer so that coda_networking does not throw an error *)
         let%bind fake_network =
           Fake_network.Generator.(
-            gen ~proof_level ~precomputed_values ~max_frontier_length
+            gen ~precomputed_values ~max_frontier_length
               [fresh_peer; fresh_peer])
         in
         let%map make_branch =
-          Transition_frontier.Breadcrumb.For_tests.gen_seq ~proof_level
-            ~precomputed_values
+          Transition_frontier.Breadcrumb.For_tests.gen_seq ~precomputed_values
             ~accounts_with_secret_keys:(Lazy.force Genesis_ledger.accounts)
             branch_size
         in
@@ -642,7 +644,7 @@ let%test_module "Bootstrap_controller tests" =
     let%test_unit "sync with one node after receiving a transition" =
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
-          gen ~proof_level ~precomputed_values ~max_frontier_length
+          gen ~precomputed_values ~max_frontier_length
             [ fresh_peer
             ; peer_with_branch
                 ~frontier_branch_size:((max_frontier_length * 2) + 2) ])
@@ -681,7 +683,7 @@ let%test_module "Bootstrap_controller tests" =
     let%test_unit "reconstruct staged_ledgers using \
                    of_scan_state_and_snarked_ledger" =
       Quickcheck.test ~trials:1
-        (Transition_frontier.For_tests.gen ~proof_level ~precomputed_values
+        (Transition_frontier.For_tests.gen ~precomputed_values
            ~max_length:max_frontier_length ~size:max_frontier_length ())
         ~f:(fun frontier ->
           Thread_safe.block_on_async_exn

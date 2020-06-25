@@ -387,9 +387,15 @@ module T = struct
   let push_state current_stack state_body_hash =
     Pending_coinbase.Stack.push_state state_body_hash current_stack
 
+  module Stack_state_with_init_stack = struct
+    type t =
+      { pc: Transaction_snark.Pending_coinbase_stack_state.t
+      ; init_stack: Pending_coinbase.Stack.t }
+  end
+
   let apply_transaction_and_get_statement ~constraint_constants ledger
-      (pending_coinbase_stack_state :
-        Transaction_snark.Pending_coinbase_stack_state.t) s txn_global_slot =
+      (pending_coinbase_stack_state : Stack_state_with_init_stack.t) s
+      txn_global_slot =
     let open Result.Let_syntax in
     let%bind fee_excess = Transaction.fee_excess s |> to_staged_ledger_or_error
     and supply_increase =
@@ -399,15 +405,10 @@ module T = struct
       Ledger.merkle_root ledger |> Frozen_ledger_hash.of_ledger_hash
     in
     let pending_coinbase_target =
-      push_coinbase pending_coinbase_stack_state.target s
+      push_coinbase pending_coinbase_stack_state.pc.target s
     in
     let new_init_stack =
-      match pending_coinbase_stack_state.init_stack with
-      | Transaction_snark.Pending_coinbase_stack_state.Init_stack.Base stack ->
-          Transaction_snark.Pending_coinbase_stack_state.Init_stack.Base
-            (push_coinbase stack s)
-      | Merge ->
-          Merge
+      push_coinbase pending_coinbase_stack_state.init_stack s
     in
     let%map undo =
       Ledger.apply_transaction ~constraint_constants ~txn_global_slot ledger s
@@ -419,11 +420,10 @@ module T = struct
       ; fee_excess
       ; supply_increase
       ; pending_coinbase_stack_state=
-          {pending_coinbase_stack_state with target= pending_coinbase_target}
+          {pending_coinbase_stack_state.pc with target= pending_coinbase_target}
       ; proof_type= `Base }
-    , { Transaction_snark.Pending_coinbase_stack_state.source=
-          pending_coinbase_target
-      ; target= pending_coinbase_target
+    , { Stack_state_with_init_stack.pc=
+          {source= pending_coinbase_target; target= pending_coinbase_target}
       ; init_stack= new_init_stack } )
 
   let apply_transaction_and_get_witness ~constraint_constants ledger
@@ -431,7 +431,7 @@ module T = struct
     let open Deferred.Let_syntax in
     let public_keys = function
       | Transaction.Fee_transfer t ->
-          Fee_transfer.receiver_ids t |> One_or_two.to_list
+          Fee_transfer.receivers t
       | User_command t ->
           let t = (t :> User_command.t) in
           User_command.accounts_accessed t
@@ -458,6 +458,7 @@ module T = struct
     ( { Scan_state.Transaction_with_witness.transaction_with_info= undo
       ; state_hash= state_and_body_hash
       ; ledger_witness
+      ; init_stack= Base pending_coinbase_stack_state.init_stack
       ; statement }
     , updated_pending_coinbase_stack_state )
 
@@ -484,12 +485,11 @@ module T = struct
     in
     let%map res, updated_pending_coinbase_stack_state =
       go
-        { Transaction_snark.Pending_coinbase_stack_state.source= current_stack
-        ; target= current_stack_with_state
-        ; init_stack= Base current_stack }
+        { pc= {source= current_stack; target= current_stack_with_state}
+        ; init_stack= current_stack }
         [] ts
     in
-    (res, updated_pending_coinbase_stack_state.target)
+    (res, updated_pending_coinbase_stack_state.pc.target)
 
   let check_completed_works ~logger ~verifier scan_state
       (completed_works : Transaction_snark_work.t list) =
@@ -512,7 +512,6 @@ module T = struct
      the slots are split into two partitions, total fee excess of the transactions
      to be enqueued on each of the partitions should be zero respectively *)
   let check_zero_fee_excess scan_state data =
-    let zero = Fee.Signed.zero in
     let partitions = Scan_state.partition_if_overflowing scan_state in
     let txns_from_data data =
       List.fold_right ~init:(Ok []) data
@@ -523,26 +522,24 @@ module T = struct
           t :: acc )
     in
     let total_fee_excess txns =
-      List.fold txns ~init:(Ok (Some zero)) ~f:(fun fe (txn : Transaction.t) ->
-          let open Or_error.Let_syntax in
-          let%bind fe' = fe in
-          let%map fee_excess = Transaction.fee_excess txn in
-          Option.bind fe' ~f:(fun f -> Fee.Signed.add f fee_excess) )
+      List.fold_until txns ~init:Fee_excess.empty ~finish:Or_error.return
+        ~f:(fun acc (txn : Transaction.t) ->
+          match
+            let open Or_error.Let_syntax in
+            let%bind fee_excess = Transaction.fee_excess txn in
+            Fee_excess.combine acc fee_excess
+          with
+          | Ok fee_excess ->
+              Continue fee_excess
+          | Error _ as err ->
+              Stop err )
       |> to_staged_ledger_or_error
     in
     let open Result.Let_syntax in
     let check data slots =
       let%bind txns = txns_from_data data |> to_staged_ledger_or_error in
-      let%bind fe = total_fee_excess txns in
-      let%bind fe_no_overflow =
-        Option.value_map
-          ~default:
-            (to_staged_ledger_or_error
-               (Or_error.error_string "fee excess overflow"))
-          ~f:(fun fe -> Ok fe)
-          fe
-      in
-      if Fee.Signed.equal fe_no_overflow zero then Ok ()
+      let%bind fee_excess = total_fee_excess txns in
+      if Fee_excess.is_zero fee_excess then Ok ()
       else Error (Non_zero_fee_excess (slots, txns))
     in
     let%bind () = check (List.take data (fst partitions.first)) partitions in
@@ -1657,7 +1654,7 @@ let%test_module "test" =
       Quickcheck.random_value ~seed:(`Deterministic "receiver_pk")
         Public_key.Compressed.gen
 
-    let proof_level = Genesis_constants.Proof_level.Check
+    let proof_level = Genesis_constants.Proof_level.for_unit_tests
 
     let constraint_constants =
       Genesis_constants.Constraint_constants.for_unit_tests
@@ -1896,10 +1893,10 @@ let%test_module "test" =
         (Ledger_proof.t * (Transaction.t * _) list) option -> unit =
      fun proof_opt ->
       let fee_excess =
-        Option.value_map ~default:Fee.Signed.zero proof_opt ~f:(fun proof ->
-            (Ledger_proof.statement (fst proof)).fee_excess )
+        Option.value_map ~default:Fee_excess.zero proof_opt
+          ~f:(fun (proof, _txns) -> (Ledger_proof.statement proof).fee_excess)
       in
-      assert (Fee.Signed.(equal fee_excess zero))
+      assert (Fee_excess.is_zero fee_excess)
 
     let transaction_capacity =
       Int.pow 2 constraint_constants.transaction_capacity_log_2

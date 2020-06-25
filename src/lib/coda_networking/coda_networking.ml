@@ -11,6 +11,38 @@ let refused_answer_query_string = "Refused to answer_query"
 
 type exn += No_initial_peers
 
+type Structured_log_events.t +=
+  | Block_received of {state_hash: State_hash.t; sender: Envelope.Sender.t}
+  [@@deriving register_event {msg= "Received a block from $sender"}]
+
+type Structured_log_events.t +=
+  | Snark_work_received of
+      { work: Snark_pool.Resource_pool.Diff.compact
+      ; sender: Envelope.Sender.t }
+  [@@deriving
+    register_event {msg= "Received Snark-pool diff $work from $sender"}]
+
+type Structured_log_events.t +=
+  | Transactions_received of
+      { txns: Transaction_pool.Resource_pool.Diff.t
+      ; sender: Envelope.Sender.t }
+  [@@deriving
+    register_event {msg= "Received transaction-pool diff $txns from $sender"}]
+
+type Structured_log_events.t += Gossip_new_state of {state_hash: State_hash.t}
+  [@@deriving register_event {msg= "Broadcasting new state over gossip net"}]
+
+type Structured_log_events.t +=
+  | Gossip_transaction_pool_diff of
+      { txns: Transaction_pool.Resource_pool.Diff.t }
+  [@@deriving
+    register_event {msg= "Broadcasting snark pool diff over gossip net"}]
+
+type Structured_log_events.t +=
+  | Gossip_snark_pool_diff of {work: Snark_pool.Resource_pool.Diff.compact}
+  [@@deriving
+    register_event {msg= "Broadcasting transaction pool diff over gossip net"}]
+
 (* INSTRUCTIONS FOR ADDING A NEW RPC:
  *   - define a new module under the Rpcs module
  *   - add an entry to the Rpcs.rpc GADT definition for the new module (type ('query, 'response) rpc, below)
@@ -438,7 +470,10 @@ module Rpcs = struct
         module V1 = struct
           type t =
             { node_ip_addr: Core.Unix.Inet_addr.Stable.V1.t
+                  [@to_yojson
+                    fun ip_addr -> `String (Unix.Inet_addr.to_string ip_addr)]
             ; node_peer_id: Network_peer.Peer.Id.Stable.V1.t
+                  [@to_yojson fun peer_id -> `String peer_id]
             ; peers: Network_peer.Peer.Stable.V1.t list
             ; block_producers:
                 Signature_lib.Public_key.Compressed.Stable.V1.t list
@@ -447,33 +482,9 @@ module Rpcs = struct
                 ( Core.Unix.Inet_addr.Stable.V1.t
                 * Trust_system.Peer_status.Stable.V1.t )
                 list
+                  [@to_yojson yojson_of_ban_statuses]
             ; k_block_hashes: State_hash.Stable.V1.t list }
-
-          (* N.B.: the [@@to_yojson ...] per-field spec didn't seem to work, so we write
-             the full function in gory detail
-           *)
-          let to_yojson t =
-            `Assoc
-              [ ( "node_ip_addr"
-                , `String (Unix.Inet_addr.to_string t.node_ip_addr) )
-              ; ("node_peer_id", `String t.node_peer_id)
-              ; ( "peers"
-                , `List
-                    (List.map t.peers ~f:Network_peer.Peer.Stable.V1.to_yojson)
-                )
-              ; ( "block_producers"
-                , `List
-                    (List.map t.block_producers
-                       ~f:
-                         Signature_lib.Public_key.Compressed.Stable.V1
-                         .to_yojson) )
-              ; ( "protocol_state_hash"
-                , State_hash.Stable.V1.to_yojson t.protocol_state_hash )
-              ; ("ban_statuses", yojson_of_ban_statuses t.ban_statuses)
-              ; ( "k_block_hashes"
-                , `List
-                    (List.map t.k_block_hashes
-                       ~f:State_hash.Stable.V1.to_yojson) ) ]
+          [@@deriving to_yojson]
 
           let to_latest = Fn.id
         end
@@ -1014,41 +1025,33 @@ let create (config : Config.t)
                  |> Protocol_state.blockchain_state
                  |> Blockchain_state.timestamp |> Block_time.to_time )) ;
             if config.log_gossip_heard.new_state then
-              Logger.debug config.logger ~module_:__MODULE__ ~location:__LOC__
-                "Received a block $block from $sender"
+              Logger.Str.debug config.logger ~module_:__MODULE__
+                ~location:__LOC__
                 ~metadata:
-                  [ ("external_transition", External_transition.to_yojson state)
-                  ; ( "state_hash"
-                    , External_transition.state_hash state
-                      |> State_hash.to_yojson )
-                  ; ( "sender"
-                    , Envelope.(Sender.to_yojson (Incoming.sender envelope)) )
-                  ] ;
+                  [("external_transition", External_transition.to_yojson state)]
+                (Block_received
+                   { state_hash= External_transition.state_hash state
+                   ; sender= Envelope.Incoming.sender envelope }) ;
             `Fst
               ( Envelope.Incoming.map envelope ~f:(fun _ -> state)
               , Block_time.now config.time_controller
               , valid_cb )
         | Snark_pool_diff diff ->
             if config.log_gossip_heard.snark_pool_diff then
-              Logger.debug config.logger ~module_:__MODULE__ ~location:__LOC__
-                "Received Snark-pool diff $work from $sender"
-                ~metadata:
-                  [ ("work", Snark_pool.Resource_pool.Diff.compact_json diff)
-                  ; ( "sender"
-                    , Envelope.(Sender.to_yojson (Incoming.sender envelope)) )
-                  ] ;
+              Logger.Str.debug config.logger ~module_:__MODULE__
+                ~location:__LOC__
+                (Snark_work_received
+                   { work= Snark_pool.Resource_pool.Diff.to_compact diff
+                   ; sender= Envelope.Incoming.sender envelope }) ;
             Coda_metrics.(
               Counter.inc_one Snark_work.completed_snark_work_received_gossip) ;
             `Snd (Envelope.Incoming.map envelope ~f:(fun _ -> diff), valid_cb)
         | Transaction_pool_diff diff ->
             if config.log_gossip_heard.transaction_pool_diff then
-              Logger.debug config.logger ~module_:__MODULE__ ~location:__LOC__
-                "Received transaction-pool diff $txns from $sender"
-                ~metadata:
-                  [ ("txns", Transaction_pool.Resource_pool.Diff.to_yojson diff)
-                  ; ( "sender"
-                    , Envelope.(Sender.to_yojson (Incoming.sender envelope)) )
-                  ] ;
+              Logger.Str.debug config.logger ~module_:__MODULE__
+                ~location:__LOC__
+                (Transactions_received
+                   {txns= diff; sender= Envelope.Incoming.sender envelope}) ;
             let diff' =
               List.filter diff ~f:(fun cmd ->
                   if User_command.has_insufficient_fee cmd then (
@@ -1110,25 +1113,26 @@ let fill_first_received_message_signal {first_received_message_signal; _} =
   Ivar.fill_if_empty first_received_message_signal ()
 
 (* TODO: Have better pushback behavior *)
-let broadcast ?(extra_metadata = []) t msg =
-  Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
-    ~metadata:
-      (("message", Gossip_net.Message.msg_to_yojson msg) :: extra_metadata)
-    !"Broadcasting %s over gossip net"
-    (Gossip_net.Message.summary msg) ;
+let broadcast t ~log_msg msg =
+  Logger.Str.trace t.logger ~module_:__MODULE__ ~location:__LOC__
+    ~metadata:[("message", Gossip_net.Message.msg_to_yojson msg)]
+    log_msg ;
   Gossip_net.Any.broadcast t.gossip_net msg
 
 let broadcast_state t state =
   broadcast t
     (Gossip_net.Message.New_state (With_hash.data state))
-    ~extra_metadata:
-      [("state_hash", With_hash.hash state |> State_hash.to_yojson)]
+    ~log_msg:(Gossip_new_state {state_hash= With_hash.hash state})
 
 let broadcast_transaction_pool_diff t diff =
   broadcast t (Gossip_net.Message.Transaction_pool_diff diff)
+    ~log_msg:(Gossip_transaction_pool_diff {txns= diff})
 
 let broadcast_snark_pool_diff t diff =
   broadcast t (Gossip_net.Message.Snark_pool_diff diff)
+    ~log_msg:
+      (Gossip_snark_pool_diff
+         {work= Snark_pool.Resource_pool.Diff.to_compact diff})
 
 (* TODO: This is kinda inefficient *)
 let find_map xs ~f =

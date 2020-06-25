@@ -212,7 +212,7 @@ module Make (F : Input_intf) :
 
       let compare t1 t2 = Bigint.compare (to_bigint t1) (to_bigint t2)
 
-      let to_yojson t : Yojson.Safe.json =
+      let to_yojson t : Yojson.Safe.t =
         `String (Bigint.to_hex_string (to_bigint t))
 
       let of_yojson j =

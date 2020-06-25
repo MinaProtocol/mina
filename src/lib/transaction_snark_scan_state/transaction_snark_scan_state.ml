@@ -1,5 +1,6 @@
 open Core_kernel
 open Coda_base
+open Currency
 
 let option lab =
   Option.value_map ~default:(Or_error.error_string lab) ~f:(fun x -> Ok x)
@@ -36,6 +37,9 @@ module Transaction_with_witness = struct
         { transaction_with_info: Transaction_logic.Undo.Stable.V1.t
         ; state_hash: State_hash.Stable.V1.t * State_body_hash.Stable.V1.t
         ; statement: Transaction_snark.Statement.Stable.V1.t
+        ; init_stack:
+            Transaction_snark.Pending_coinbase_stack_state.Init_stack.Stable.V1
+            .t
         ; ledger_witness: Coda_base.Sparse_ledger.Stable.V1.t sexp_opaque }
       [@@deriving sexp]
 
@@ -48,6 +52,7 @@ module Transaction_with_witness = struct
     { transaction_with_info: Ledger.Undo.t
     ; state_hash: State_hash.t * State_body_hash.t
     ; statement: Transaction_snark.Statement.t
+    ; init_stack: Transaction_snark.Pending_coinbase_stack_state.Init_stack.t
     ; ledger_witness: Coda_base.Sparse_ledger.t sexp_opaque }
   [@@deriving sexp]
 end
@@ -80,14 +85,23 @@ module Job_view = struct
   type t = Transaction_snark.Statement.t Parallel_scan.Job_view.t
   [@@deriving sexp]
 
-  let to_yojson ({value; position} : t) : Yojson.Safe.json =
+  let to_yojson ({value; position} : t) : Yojson.Safe.t =
     let hash_yojson h = Frozen_ledger_hash.to_yojson h in
     let statement_to_yojson (s : Transaction_snark.Statement.t) =
       `Assoc
         [ ("Work_id", `Int (Transaction_snark.Statement.hash s))
         ; ("Source", hash_yojson s.source)
         ; ("Target", hash_yojson s.target)
-        ; ("Fee Excess", Currency.Fee.Signed.to_yojson s.fee_excess)
+        ; ( "Fee Excess"
+          , `List
+              [ `Assoc
+                  [ ("token", Token_id.to_yojson s.fee_excess.fee_token_l)
+                  ; ("amount", Fee.Signed.to_yojson s.fee_excess.fee_excess_l)
+                  ]
+              ; `Assoc
+                  [ ("token", Token_id.to_yojson s.fee_excess.fee_token_r)
+                  ; ("amount", Fee.Signed.to_yojson s.fee_excess.fee_excess_r)
+                  ] ] )
         ; ("Supply Increase", Currency.Amount.to_yojson s.supply_increase)
         ; ( "Pending coinbase stack"
           , Transaction_snark.Pending_coinbase_stack_state.to_yojson
@@ -165,6 +179,7 @@ let create_expected_statement ~constraint_constants
     { Transaction_with_witness.transaction_with_info
     ; state_hash
     ; ledger_witness
+    ; init_stack
     ; statement } =
   let open Or_error.Let_syntax in
   let source =
@@ -181,7 +196,7 @@ let create_expected_statement ~constraint_constants
     Frozen_ledger_hash.of_ledger_hash @@ Sparse_ledger.merkle_root after
   in
   let%bind pending_coinbase_before =
-    match statement.pending_coinbase_stack_state.init_stack with
+    match init_stack with
     | Base source ->
         Ok source
     | Merge ->
@@ -222,11 +237,9 @@ let completed_work_to_scanable_work (job : job) (fee, current_proof, prover) :
   | Merge ((p, _), (p', _)) ->
       let s = Ledger_proof.statement p and s' = Ledger_proof.statement p' in
       let open Or_error.Let_syntax in
-      let%map fee_excess =
-        Currency.Fee.Signed.add s.fee_excess s'.fee_excess
-        |> option "Error adding fees"
+      let%map fee_excess = Fee_excess.combine s.fee_excess s'.fee_excess
       and supply_increase =
-        Currency.Amount.add s.supply_increase s'.supply_increase
+        Amount.add s.supply_increase s'.supply_increase
         |> option "Error adding supply_increases"
       and _valid_pending_coinbase_stack =
         if
@@ -241,8 +254,7 @@ let completed_work_to_scanable_work (job : job) (fee, current_proof, prover) :
         ; supply_increase
         ; pending_coinbase_stack_state=
             { source= s.pending_coinbase_stack_state.source
-            ; target= s'.pending_coinbase_stack_state.target
-            ; init_stack= Merge }
+            ; target= s'.pending_coinbase_stack_state.target }
         ; fee_excess
         ; proof_type= `Merge }
       in
@@ -379,7 +391,7 @@ struct
               (Frozen_ledger_hash.equal hash current_ledger_hash)
               "did not connect with snarked ledger hash" )
     | Ok
-        { fee_excess
+        { fee_excess= {fee_token_l; fee_excess_l; fee_token_r; fee_excess_r}
         ; source
         ; target
         ; supply_increase= _
@@ -397,8 +409,20 @@ struct
             "incorrect statement target hash"
         and () =
           clarify_error
-            (Currency.Fee.Signed.equal Currency.Fee.Signed.zero fee_excess)
+            (Fee.Signed.equal Fee.Signed.zero fee_excess_l)
             "nonzero fee excess"
+        and () =
+          clarify_error
+            (Fee.Signed.equal Fee.Signed.zero fee_excess_r)
+            "nonzero fee excess"
+        and () =
+          clarify_error
+            (Token_id.equal Token_id.default fee_token_l)
+            "nondefault fee token"
+        and () =
+          clarify_error
+            (Token_id.equal Token_id.default fee_token_r)
+            "nondefault fee token"
         in
         ()
 end
@@ -426,7 +450,11 @@ let statement_of_job : job -> Transaction_snark.Statement.t option = function
         Option.some_if (Frozen_ledger_hash.equal stmt1.target stmt2.source) ()
       in
       let%map fee_excess =
-        Currency.Fee.Signed.add stmt1.fee_excess stmt2.fee_excess
+        match Fee_excess.combine stmt1.fee_excess stmt2.fee_excess with
+        | Ok ret ->
+            Some ret
+        | Error _ ->
+            None
       and supply_increase =
         Currency.Amount.add stmt1.supply_increase stmt2.supply_increase
       in
@@ -435,8 +463,7 @@ let statement_of_job : job -> Transaction_snark.Statement.t option = function
       ; supply_increase
       ; pending_coinbase_stack_state=
           { source= stmt1.pending_coinbase_stack_state.source
-          ; target= stmt2.pending_coinbase_stack_state.target
-          ; init_stack= Merge }
+          ; target= stmt2.pending_coinbase_stack_state.target }
       ; fee_excess
       ; proof_type= `Merge }
 
@@ -518,7 +545,11 @@ let extract_from_job (job : job) =
   match job with
   | Parallel_scan.Available_job.Base d ->
       First
-        (d.transaction_with_info, d.statement, d.state_hash, d.ledger_witness)
+        ( d.transaction_with_info
+        , d.statement
+        , d.state_hash
+        , d.ledger_witness
+        , d.init_stack )
   | Merge ((p1, _), (p2, _)) ->
       Second (p1, p2)
 
@@ -582,17 +613,30 @@ let all_work_pairs t
   let open Or_error.Let_syntax in
   let single_spec (job : job) =
     match extract_from_job job with
-    | First (transaction_with_info, statement, state_hash, ledger_witness) ->
+    | First
+        ( transaction_with_info
+        , statement
+        , state_hash
+        , ledger_witness
+        , init_stack ) ->
         let%bind transaction = Ledger.Undo.transaction transaction_with_info in
-        let%map protocol_state_body =
+        let%bind protocol_state_body =
           let%map state = get_state (fst state_hash) in
           Coda_state.Protocol_state.body state
+        in
+        let%map init_stack =
+          match init_stack with
+          | Base x ->
+              Ok x
+          | Merge ->
+              Or_error.error_string "init_stack was Merge"
         in
         Snark_work_lib.Work.Single.Spec.Transition
           ( statement
           , transaction
-          , {Transaction_witness.ledger= ledger_witness; protocol_state_body}
-          )
+          , { Transaction_witness.ledger= ledger_witness
+            ; protocol_state_body
+            ; init_stack } )
     | Second (p1, p2) ->
         let%map merged =
           Transaction_snark.Statement.merge

@@ -155,6 +155,7 @@ let findChallenges = (metricsMap, userMap, sheetsData, usernameIndex) => {
              columnIndex,
              usernameIndex,
            );
+           ();
          | None => ()
          };
        | None => ()
@@ -215,6 +216,47 @@ let uploadPoints = metricsMap => {
         let userMap =
           userData |> decodeGoogleSheets |> createPublickeyUsernameMap;
         updateSheets(client, spreadsheetId, "3.2b!A3:M", userMap, metricsMap);
+      | Error(error) => Js.log(error)
+      }
+    });
+  | None => Js.log("Invalid spreadsheet ID")
+  };
+};
+
+let uploadTotalBlocks = totalBlocks => {
+  switch (Js.undefinedToOption(spreadsheetId)) {
+  | Some(spreadsheetId) =>
+    let client =
+      Bindings.GoogleSheets.googleAuth({
+        Bindings.GoogleSheets.scopes: [|
+          "https://www.googleapis.com/auth/spreadsheets",
+        |],
+      });
+    Sheets.getRange(
+      client,
+      {spreadsheetId, range: "Data!A1:B", valueRenderOption: "FORMULA"},
+      result => {
+      switch (result) {
+      | Ok(sheetsData) =>
+        let newSheetsData = sheetsData |> decodeGoogleSheets;
+        newSheetsData[0][1] = totalBlocks;
+        let resource: Bindings.GoogleSheets.sheetsUploadData = {
+          values: encodeGoogleSheets(newSheetsData),
+        };
+        Sheets.updateRange(
+          client,
+          {
+            spreadsheetId,
+            range: "Data!A1:B",
+            valueInputOption: "USER_ENTERED",
+            resource,
+          },
+          result => {
+          switch (result) {
+          | Ok(_) => Js.log({j|Uploaded total blocks|j})
+          | Error(error) => Js.log(error)
+          }
+        });
       | Error(error) => Js.log(error)
       }
     });

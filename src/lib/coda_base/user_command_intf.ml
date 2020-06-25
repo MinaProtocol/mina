@@ -104,6 +104,8 @@ module type S = sig
 
   val fee_payer : t -> Account_id.t
 
+  val fee_excess : t -> Fee_excess.t
+
   val token : t -> Token_id.t
 
   val source_pk : t -> Public_key.Compressed.t

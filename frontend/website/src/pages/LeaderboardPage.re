@@ -2,220 +2,230 @@ module Styles = {
   open Css;
   let page =
     style([
-      maxWidth(`rem(81.5)),
-      paddingLeft(`rem(1.25)),
-      paddingRight(`rem(1.25)),
+      maxWidth(`rem(58.0)),
       margin(`auto),
+      media(Theme.MediaQuery.tablet, [maxWidth(`rem(89.))]),
     ]);
-
-  let header = merge([Theme.H1.basic, style([marginTop(`rem(4.))])]);
-
-  let heroRow =
+  let filters =
     style([
       display(`flex),
       flexDirection(`column),
-      justifyContent(`spaceBetween),
-      alignItems(`center),
-      media(
-        Theme.MediaQuery.tablet,
-        [flexDirection(`row), padding2(~v=`rem(3.5), ~h=`zero)],
-      ),
-    ]);
-
-  let heroH3 =
-    merge([
-      Theme.H3.basic,
-      style([
-        textAlign(`left),
-        fontWeight(`semiBold),
-        color(Theme.Colors.marine),
-      ]),
-    ]);
-
-  let buttonRow =
-    style([
-      display(`flex),
-      flexDirection(`column),
-      position(`relative),
-      top(`rem(1.0)),
       media(Theme.MediaQuery.notMobile, [flexDirection(`row)]),
+      justifyContent(`spaceBetween),
+      width(`percent(100.)),
+      marginTop(`rem(2.)),
     ]);
-
-  let heroLeft = style([maxWidth(`rem(38.))]);
-  let heroRight = style([display(`flex), flexDirection(`column)]);
-  let flexColumn =
+  let searchBar =
     style([
       display(`flex),
       flexDirection(`column),
-      justifyContent(`center),
-    ]);
-
-  let heroLinks =
-    style([
+      marginTop(`rem(3.)),
       media(
         Theme.MediaQuery.notMobile,
-        [padding2(~v=`rem(0.), ~h=`rem(6.0))],
+        [marginTop(`zero), marginRight(`rem(1.)), width(`percent(48.))],
       ),
     ]);
-  let icon =
-    style([marginRight(`px(8)), position(`relative), top(`px(3))]);
+  let textField =
+    style([
+      display(`inlineFlex),
+      alignItems(`center),
+      height(px(40)),
+      borderRadius(px(4)),
+      width(`percent(100.)),
+      fontSize(rem(1.)),
+      color(Theme.Colors.teal),
+      padding(px(12)),
+      marginTop(`rem(0.5)),
+      border(px(1), `solid, Theme.Colors.hyperlinkAlpha(0.3)),
+      active([
+        outline(px(0), `solid, `transparent),
+        padding(px(11)),
+        borderWidth(px(2)),
+        borderColor(Theme.Colors.hyperlinkAlpha(1.)),
+      ]),
+      focus([
+        outline(px(0), `solid, `transparent),
+        padding(px(11)),
+        borderWidth(px(2)),
+        borderColor(Theme.Colors.hyperlinkAlpha(1.)),
+      ]),
+      hover([borderColor(Theme.Colors.hyperlinkAlpha(1.))]),
+      selector(
+        "::placeholder",
+        [
+          fontSize(`px(12)),
+          fontWeight(normal),
+          color(Theme.Colors.slateAlpha(0.7)),
+        ],
+      ),
+      media(
+        Theme.MediaQuery.tablet,
+        [
+          width(`percent(100.)),
+          maxWidth(`rem(38.5)),
+          marginRight(`rem(1.)),
+        ],
+      ),
+      media(Theme.MediaQuery.veryVeryLarge, [width(`percent(100.))]),
+    ]);
 };
 
-module StatisticsRow = {
+module SearchBar = {
+  [@react.component]
+  let make = (~onUsernameEntered, ~username) => {
+    <div className=Styles.searchBar>
+      <span className=Theme.H5.semiBold> {React.string("Find")} </span>
+      <input
+        type_="text"
+        value=username
+        placeholder="SEARCH:"
+        onChange={e => {
+          let value = ReactEvent.Form.target(e)##value;
+          onUsernameEntered(value);
+        }}
+        className=Styles.textField
+      />
+    </div>;
+  };
+};
+
+module ToggleButtons = {
   module Styles = {
     open Css;
-    let statistic =
+
+    let flexColumn =
       style([
-        Theme.Typeface.ibmplexsans,
-        textTransform(`uppercase),
-        fontSize(`rem(1.0)),
-        color(Theme.Colors.saville),
-        letterSpacing(`px(2)),
-        fontWeight(`semiBold),
+        display(`none),
+        media(
+          Theme.MediaQuery.tablet,
+          [
+            display(`flex),
+            flexDirection(`column),
+            justifyContent(`center),
+            height(`rem(4.5)),
+          ],
+        ),
       ]);
 
-    let value =
+    let buttonRow =
       merge([
-        statistic,
         style([
-          fontSize(`rem(2.25)),
-          marginTop(`px(10)),
-          textAlign(`center),
+          display(`flex),
+          width(`rem(40.5)),
+          borderRadius(`px(4)),
+          overflow(`hidden),
+          selector(
+            "*:not(:last-child)",
+            [borderRight(`px(1), `solid, Theme.Colors.grey)],
+          ),
         ]),
       ]);
-    let flexRow =
-      style([
-        display(`flex),
-        flexDirection(`row),
-        justifyContent(`spaceBetween),
-      ]);
+  };
+
+  let toggleLabels = [|
+    "All Participants",
+    "Genesis Members",
+    "Non-Genesis Members",
+  |];
+
+  [@react.component]
+  let make = (~currentToggle, ~onTogglePress) => {
+    let renderToggleButtons = () => {
+      toggleLabels
+      |> Array.map(label => {
+           <ToggleButton currentToggle onTogglePress label key=label />
+         })
+      |> React.array;
+    };
+
+    <div className=Styles.flexColumn>
+      <h3 className=Theme.H5.semiBold> {React.string("View")} </h3>
+      <Spacer height=0.5 />
+      <div className=Styles.buttonRow> {renderToggleButtons()} </div>
+    </div>;
+  };
+};
+
+module FilterDropdown = {
+  module Styles = {
+    open Css;
     let flexColumn =
       style([
         display(`flex),
         flexDirection(`column),
         justifyContent(`center),
+        height(`rem(4.5)),
+        width(`percent(100.)),
+        marginTop(`rem(2.0)),
+        media(Theme.MediaQuery.tablet, [display(`none)]),
+        media(
+          Theme.MediaQuery.notMobile,
+          [width(`percent(48.)), marginTop(`zero)],
+        ),
       ]);
   };
+
+  let filterLabels = [|"This Release", "Previous Phase", "All Time"|];
   [@react.component]
-  let make = (~participants="456", ~blocks="123", ~genesisMembers="121") => {
-    <div className=Styles.flexRow>
-      <div className=Styles.flexColumn>
-        <h2 className=Styles.statistic> {React.string("Participants")} </h2>
-        <p className=Styles.value> {React.string(participants)} </p>
-      </div>
-      <div className=Styles.flexColumn>
-        <h2 className=Styles.statistic> {React.string("Blocks")} </h2>
-        <p className=Styles.value> {React.string(blocks)} </p>
-      </div>
-      <div className=Styles.flexColumn>
-        <h2 className=Styles.statistic>
-          {React.string("Genesis Members")}
-        </h2>
-        <p className=Styles.value> {React.string(genesisMembers)} </p>
-      </div>
+  let make = (~currentFilter, ~onFilterPress) => {
+    <div className=Styles.flexColumn>
+      <h3 className=Theme.H5.semiBold> {React.string("View")} </h3>
+      <Spacer height=0.5 />
+      <Dropdown
+        items=filterLabels
+        currentItem=currentFilter
+        onItemPress=onFilterPress
+      />
     </div>;
   };
 };
 
-module HeroText = {
-  [@react.component]
-  let make = () => {
-    <div>
-      <p className=Styles.heroH3>
-        {React.string(
-           "Coda rewards community members with testnet points* for completing challenges \
-           that contribute to the development of the protocol.",
-         )}
-      </p>
-      <p className=Theme.Body.basic>
-        {React.string(
-           "*Testnet Points (abbreviated 'pts') are designed solely to track contributions \
-           to the Testnet and Testnet Points have no cash or other monetary value. \
-           Testnet Points are not transferable and are not redeemable or exchangeable \
-           for any cryptocurrency or digital assets. We may at any time amend or eliminate Testnet Points.",
-         )}
-      </p>
-    </div>;
+type state = {
+  currentToggle: string,
+  currentFilter: string,
+  username: string,
+};
+let initialState = {
+  currentToggle: ToggleButtons.toggleLabels[0],
+  currentFilter: FilterDropdown.filterLabels[0],
+  username: "",
+};
+
+type action =
+  | Toggled(string)
+  | Filtered(string)
+  | UsernameEntered(string);
+
+let reducer = (prevState, action) => {
+  switch (action) {
+  | Toggled(toggle) => {...prevState, currentToggle: toggle}
+  | Filtered(filter) => {...prevState, currentFilter: filter}
+  | UsernameEntered(input) => {...prevState, username: input}
   };
 };
-
-module Moment = {
-  type t;
-};
-
-[@bs.module] external momentWithDate: Js.Date.t => Moment.t = "moment";
-[@bs.send] external format: (Moment.t, string) => string = "format";
 
 [@react.component]
 let make = (~lastManualUpdatedDate) => {
-  let dateAsMoment = momentWithDate(lastManualUpdatedDate);
-  let date = format(dateAsMoment, "MMMM Do YYYY");
+  let (state, dispatch) = React.useReducer(reducer, initialState);
+  let onTogglePress = toggle => {
+    dispatch(Toggled(toggle));
+  };
+
+  let onFilterPress = filter => {
+    dispatch(Filtered(filter));
+  };
+
+  let onUsernameEntered = username => {
+    dispatch(UsernameEntered(username));
+  };
+
   <Page title="Testnet Leaderboard">
     <Wrapped>
-      <div className=Styles.page>
-        <h1 className=Styles.header>
-          {React.string("Testnet Leaderboard")}
-        </h1>
-        <div className=Styles.heroRow>
-          <div className=Styles.heroLeft>
-            <Spacer height=4.3 />
-            <StatisticsRow />
-            <HeroText />
-          </div>
-          <div className=Styles.heroRight>
-            <div className=Styles.buttonRow>
-              <Button
-                link=""
-                label="Current Challenges"
-                bgColor=Theme.Colors.jungle
-                bgColorHover=Theme.Colors.clover
-              />
-              <Spacer width=2.0 height=1.0 />
-              <Button
-                link=""
-                label="Genesis Program"
-                bgColor=Theme.Colors.jungle
-                bgColorHover=Theme.Colors.clover
-              />
-            </div>
-            <Spacer height=4.8 />
-            <div className=Styles.heroLinks>
-              <div className=Styles.flexColumn>
-                <Next.Link href="">
-                  <a className=Theme.Link.basic>
-                    <Svg
-                      link="/static/img/Icon.Link.svg"
-                      dims=(1.0, 1.0)
-                      className=Styles.icon
-                      alt="an arrow pointing to the right with a square around it"
-                    />
-                    {React.string("Leaderboard FAQ")}
-                  </a>
-                </Next.Link>
-                <Next.Link href="">
-                  <a className=Theme.Link.basic>
-                    <Svg
-                      link="/static/img/Icon.Link.svg"
-                      dims=(0.9425, 0.8725)
-                      className=Styles.icon
-                      alt="an arrow pointing to the right with a square around it"
-                    />
-                    {React.string("Discord #Leaderboard Channel")}
-                  </a>
-                </Next.Link>
-                <span className=Theme.Link.basic>
-                  <Svg
-                    link="/static/img/Icon.Info.svg"
-                    className=Styles.icon
-                    dims=(1.0, 1.0)
-                    alt="a undercase letter i inside a blue circle"
-                  />
-                  {React.string("Last manually updated " ++ date)}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
+      <div className=Styles.page> <Summary lastManualUpdatedDate /> </div>
+      <div className=Styles.filters>
+        <SearchBar onUsernameEntered username={state.username} />
+        <ToggleButtons currentToggle={state.currentToggle} onTogglePress />
+        <FilterDropdown currentFilter={state.currentFilter} onFilterPress />
       </div>
     </Wrapped>
   </Page>;

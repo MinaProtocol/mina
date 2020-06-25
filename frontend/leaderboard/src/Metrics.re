@@ -99,23 +99,19 @@ let getSnarkWorkCreatedByUser = blocks => {
   blocks |> calculateProperty(calculateSnarkWorkCount);
 };
 
-let calculateSnarkFeeCount = (map, block: Types.NewBlock.data) => {
+let calculateSnarkFeeSum = (map, block: Types.NewBlock.data) => {
   block.snarkJobs
   |> Array.fold_left(
        (map, snarkJob: Types.NewBlock.snarkJobs) => {
          StringMap.update(
            snarkJob.prover,
-           feeCount =>
-             switch (feeCount) {
-             | Some(feeCount) =>
-               let result =
-                 Int64.add(
-                   Int64.of_string(snarkJob.fee),
-                   Int64.of_string(feeCount),
-                 );
-               Some(Int64.to_string(result));
-             | None => Some(snarkJob.fee)
-             },
+           feeSum => {
+             let snarkFee = Int64.of_string(snarkJob.fee);
+             switch (feeSum) {
+             | Some(feeSum) => Some(Int64.add(snarkFee, feeSum))
+             | None => Some(snarkFee)
+             };
+           },
            map,
          )
        },
@@ -124,7 +120,7 @@ let calculateSnarkFeeCount = (map, block: Types.NewBlock.data) => {
 };
 
 let getSnarkFeesCollected = blocks => {
-  blocks |> calculateProperty(calculateSnarkFeeCount);
+  blocks |> calculateProperty(calculateSnarkFeeSum);
 };
 
 let calculateHighestSnarkFeeCollected = (map, block: Types.NewBlock.data) => {
@@ -133,19 +129,13 @@ let calculateHighestSnarkFeeCollected = (map, block: Types.NewBlock.data) => {
        (map, snarkJob: Types.NewBlock.snarkJobs) => {
          StringMap.update(
            snarkJob.prover,
-           feeCount =>
+           feeCount => {
+             let snarkFee = Int64.of_string(snarkJob.fee);
              switch (feeCount) {
-             | Some(feeCount) =>
-               Some(
-                 Int64.to_string(
-                   max(
-                     Int64.of_string(snarkJob.fee),
-                     Int64.of_string(feeCount),
-                   ),
-                 ),
-               )
-             | None => Some(snarkJob.fee)
-             },
+             | Some(feeCount) => Some(max(snarkFee, feeCount))
+             | None => Some(snarkFee)
+             };
+           },
            map,
          )
        },
