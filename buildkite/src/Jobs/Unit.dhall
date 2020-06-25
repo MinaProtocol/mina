@@ -16,7 +16,7 @@ let Size = ../Command/Size.dhall
 let buildTestCmd : Text -> Text -> Command.Type = \(profile : Text) -> \(path : Text) ->
   Command.build
     Command.Config::{
-      commands =  [
+      commands =
         -- Cmd.run "mkdir -p src/app/libp2p_helper/result/bin && buildkite-agent artifact download libp2p_helper src/app/libp2p_helper/result/bin/"] # 
         OpamInit.andThenRunInDocker (
           "source ~/.profile && make build && (dune runtest ${path} --profile=${profile} -j8" ++
