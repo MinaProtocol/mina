@@ -12,18 +12,16 @@ let Size = ../../Command/Size.dhall
 
 let commands =
   [
-    Cmd.run "eval $$(opam config env) && make check-format",
+    Cmd.run "./buildkite/scripts/lint-check-format.sh",
     Cmd.run "./scripts/require-ppx-version.py"
   ]
 in
 
 Pipeline.build
   Pipeline.Config::{
-    spec = 
-      let 
-          dirtyDhallDir = S.strictlyStart (S.contains "buildkite/src/Jobs/Lint/OCaml")
-      let 
-          dirtyDhallDirCompiles = assert : S.compile [dirtyDhallDir] === "^buildkite/src/Jobs/Lint/OCaml"
+    spec =
+      let dirtyDhallDir = S.strictlyStart (S.contains "buildkite/src/Jobs/Lint/OCaml")
+      let dirtyDhallDirCompiles = assert : S.compile [dirtyDhallDir] === "^buildkite/src/Jobs/Lint/OCaml"
       in
       JobSpec::{
         dirtyWhen = [
