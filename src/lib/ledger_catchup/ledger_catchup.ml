@@ -403,10 +403,7 @@ let download_transitions_in_chunks ~logger ~trust_system ~network ~num_peers
     ~preferred_peer ~maximum_download_size ~hashes_of_missing_transitions =
   let%bind random_peers = Coda_networking.random_peers network num_peers in
   Deferred.Or_error.List.map
-<<<<<<< HEAD
     (* May change to normal List.map to have a list of Deferred.t *)
-=======
->>>>>>> small changes, type error remains
     (partition maximum_download_size hashes_of_missing_transitions)
     ~how:`Parallel ~f:(fun hashes ->
       Deferred.Or_error.find_map_ok (preferred_peer :: random_peers)
@@ -442,33 +439,6 @@ let download_transitions_in_chunks ~logger ~trust_system ~network ~num_peers
                      ~sender:(Envelope.Sender.Remote (peer.host, peer.peer_id))
                ) ) )
 
-<<<<<<< HEAD
-=======
-exception Breadcrumb_Error of Error.t
-
-let verify_transitions_and_build_breadcrumbs_in_chunks ~logger ~trust_system
-    ~verifier ~frontier ~unprocessed_transition_cache ~transitions_chunks
-    ~target_hash ~subtrees =
-  try
-    Deferred.Or_error.return
-    @@ List.mapi transitions_chunks ~f:(fun index transitions_chunk ->
-           let current_subtrees =
-             if index <> List.length transitions_chunk - 1 then []
-             else subtrees
-           in
-           match%bind
-             verify_transitions_and_build_breadcrumbs ~logger ~trust_system
-               ~verifier ~frontier ~unprocessed_transition_cache
-               ~transitions:transitions_chunk ~target_hash
-               ~subtrees:current_subtrees
-           with
-           | Ok trees_of_breadcrumbs ->
-               Deferred.return trees_of_breadcrumbs
-           | Error e ->
-               raise (Breadcrumb_Error e) )
-  with Breadcrumb_Error e -> Deferred.Or_error.fail e
-
->>>>>>> small changes, type error remains
 let garbage_collect_subtrees ~logger ~subtrees =
   List.iter subtrees ~f:(fun subtree ->
       Rose_tree.map subtree ~f:Cached.invalidate_with_failure |> ignore ) ;
@@ -698,104 +668,6 @@ let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
                 Catchup_jobs.decr ()
             | Error e ->
                 (* let _ = Core.printf "Error in run \n%!" in *)
-                Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
-                  ~metadata:[("error", `String (Error.to_string_hum e))]
-                  "Catchup process failed -- unable to receive valid data \
-                   from peers or transition frontier progressed faster than \
-                   catchup data received. See error for details: $error" ;
-                garbage_collect_subtrees ~logger ~subtrees ;
-                Coda_metrics.(
-                  Gauge.set Transition_frontier_controller.catchup_time_ms
-                    Core.Time.(Span.to_ms @@ diff (now ()) start_time)) ;
-                Catchup_jobs.decr ()) ))
-
-exception Impossible
-
-let run' ~logger ~trust_system ~verifier ~network ~frontier ~catchup_job_reader
-    ~(catchup_breadcrumbs_writer :
-       ( (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t Rose_tree.t
-         list
-         * [`Ledger_catchup of unit Ivar.t | `Catchup_scheduler]
-       , Strict_pipe.crash Strict_pipe.buffered
-       , unit )
-       Strict_pipe.Writer.t) ~unprocessed_transition_cache : unit =
-  let num_peers = 8 in
-  let maximum_download_size = 100 in
-  don't_wait_for
-    (Strict_pipe.Reader.iter_without_pushback catchup_job_reader
-       ~f:(fun (target_hash, subtrees) ->
-         don't_wait_for
-           (let start_time = Core.Time.now () in
-            let%bind () = Catchup_jobs.incr () in
-            match%bind
-              let open Deferred.Or_error.Let_syntax in
-              let%bind preferred_peer, hashes_of_missing_transitions =
-                download_state_hashes ~logger ~trust_system ~network ~frontier
-                  ~num_peers ~target_hash
-              in
-              let num_of_missing_transitions =
-                List.length hashes_of_missing_transitions
-              in
-              Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-                ~metadata:
-                  [ ( "hashes_of_missing_transitions"
-                    , `List
-                        (List.map hashes_of_missing_transitions
-                           ~f:State_hash.to_yojson) ) ]
-                !"Number of missing transitions is %d"
-                num_of_missing_transitions ;
-              let%bind transitions_chunks =
-                if num_of_missing_transitions <= 0 then
-                  Deferred.Or_error.return []
-                else
-                  download_transitions_in_chunks ~logger ~trust_system ~network
-                    ~num_peers ~preferred_peer ~maximum_download_size
-                    ~hashes_of_missing_transitions
-              in
-              verify_transitions_and_build_breadcrumbs_in_chunks ~logger
-                ~trust_system ~verifier ~frontier ~unprocessed_transition_cache
-                ~transitions_chunks ~target_hash ~subtrees
-            with
-            | Ok breadcrumbs_chunks ->
-                List.fold breadcrumbs_chunks ~init:()
-                  ~f:(fun () breadcrumbs_chunk ->
-                    let%bind trees_of_breadcrumbs = breadcrumbs_chunk in
-                    Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-                      ~metadata:
-                        [ ( "hashes of transitions"
-                          , `List
-                              (List.map trees_of_breadcrumbs ~f:(fun tree ->
-                                   Rose_tree.to_yojson
-                                     (fun breadcrumb ->
-                                       Cached.peek breadcrumb
-                                       |> Transition_frontier.Breadcrumb
-                                          .state_hash |> State_hash.to_yojson
-                                       )
-                                     tree )) ) ]
-                      "about to write to the catchup breadcrumbs pipe" ;
-                    if Strict_pipe.Writer.is_closed catchup_breadcrumbs_writer
-                    then (
-                      Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-                        "catchup breadcrumbs pipe was closed; attempt to \
-                         write to closed pipe" ;
-                      garbage_collect_subtrees ~logger
-                        ~subtrees:trees_of_breadcrumbs ;
-                      Coda_metrics.(
-                        Gauge.set
-                          Transition_frontier_controller.catchup_time_ms
-                          Core.Time.(Span.to_ms @@ diff (now ()) start_time)) )
-                    else
-                      let ivar = Ivar.create () in
-                      Strict_pipe.Writer.write catchup_breadcrumbs_writer
-                        (trees_of_breadcrumbs, `Ledger_catchup ivar) ;
-                      let%bind () = Ivar.read ivar in
-                      Coda_metrics.(
-                        Gauge.set
-                          Transition_frontier_controller.catchup_time_ms
-                          Core.Time.(Span.to_ms @@ diff (now ()) start_time))
-                ) ;
-                Catchup_jobs.decr ()
-            | Error e ->
                 Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
                   ~metadata:[("error", `String (Error.to_string_hum e))]
                   "Catchup process failed -- unable to receive valid data \
