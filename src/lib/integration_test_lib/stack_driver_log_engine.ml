@@ -1,29 +1,15 @@
 open Async
 open Core
 
+(** This implements Log_engine_intf for stack driver logs for integration tests
+    Assumptions:
+      1. gcloud is installed and authorized to perform logging and pubsub related changes
+      2. gcloud API key is set in the environment variable GCLOUD_API_KEY*)
+
+(*Project Id is required for creating topic, sinks, and subscriptions*)
 let project_id = "o1labs-192920"
 
-(*Env variable, for the keyfile as well and then gcloud auth activate-service-account account --key-file *)
-
 let prog = "gcloud"
-
-(*install gcloud in the contianer this service will be running and set up the authorization *)
-
-(*module Authentication = struct
-  let auth () = 
-    (*gcloud iam service-accounts keys create ./SERVICE_ACC_KEYS --iam-account=log-engine-integration-tests@o1labs-192920.iam.gserviceaccount.com
-    gcloud auth activate-service-account log-engine-integration-tests@o1labs-192920.iam.gserviceaccount.com --key-file=./SERVICE_ACC_KEYS
-   *)
-    let service_key_dir = Unix.mkdtemp "/tmp/service_keys"
-    in
-    let%bind _ = Process.run_exn ~prog ~args:["config"; "set"; "account"; service_account] ()
-    in
-    (*download service account key*)
-    let%bind _ = Process.run_exn ~prog ~args:["iam"; "service-accounts"; "keys"; "create"; service_key_dir^/"service_key"; "--iam-account"; service_account] () in
-    (*authenticate*)
-    Process.run_exn ~prog ~args:["auth"; "activate-service-account"; service_account; "--key-file"; service_key_dir^/"service_key"] ()
-
-  end*)
 
 let load_config_json json_str =
   Or_error.try_with (fun () -> Yojson.Safe.from_string json_str)
@@ -31,10 +17,16 @@ let load_config_json json_str =
 module Subscription = struct
   type t = {name: string; topic: string; sink: string}
 
+  (*Using the api endpoint to create a sink instead of the gcloud command
+  because the cli doesn't allow setting the writerIdentity account for the sink
+  and instead generates an account that doesn't have permissions to publish
+  logs to the topic. The account needs to be given permissions explicitly andthen there's this from the documentation:
+    There is a delay between creating the sink and using the sink's new service
+     account to authorize writing to the export destination. During the first 24
+     hours after sink creation, you might see permission-related error messages
+     from the sink on your project's Activity page; you can ignore them.
+  *)
   let create_sink ~name ~topic ~filter ~key =
-    (* curl -i --request POST https://logging.googleapis.com/v2/projects/o1labs-192920/sinks?key=d296f21253733bd391f9816bb141967def3356be   --header 'Authorization: Bearer ya29.c.KpQB0AdI0EiZVmuvQpb6l6JCaye_tKONbmXgYdWoalUcxcYYOezYec-34BRX5a0yIBoC4wgEUhEn8wwttcZGE7i7hKgIxaIh4GoeKRV_XWRhwQGIFVXUsN3dytiWISGniG5ZiWNwws8IOgXz4fIogaX_ncL3630XtycALh1jTFLIynp_hgwHCSx3eDIcEjqSCm4Dr5UUPA'   --header 'Accept: application/json'   --header 'Content-Type: application/json'   --data '{"name":"sink-using-curl-dfndjf","destination":"pubsub.googleapis.com/projects/o1labs-192920/topics/blocks_produced_4030e2ab-73e6-3d5e-37ca-d60f373fdf70_topic","filter":"resource.type= k8s_container resource.labels.project_id= o1labs-192920 resource.labels.location= us-east1 resource.labels.cluster_name= coda-infra-east resource.labels.namespace_name= joyous-occasion resource.labels.pod_name: \"block-producer\" resource.labels.container_name= coda \"successfully produced a\""}' --compressed
-
-*)
     let open Deferred.Or_error.Let_syntax in
     let url =
       "https://logging.googleapis.com/v2/projects/o1labs-192920/sinks?key="
@@ -62,21 +54,6 @@ module Subscription = struct
         ; ("filter", `String filter) ]
       |> Yojson.Safe.to_string
     in
-    Core.printf "Curl command: \\\" %s"
-      (String.concat ~sep:" "
-         [ "curl"
-         ; "--request"
-         ; "POST"
-         ; url
-         ; header
-         ; authorization
-         ; header
-         ; req_type
-         ; header
-         ; content_type
-         ; "--data"
-         ; data
-         ; "--compressed" ]) ;
     let%bind response =
       Process.run ~prog:"curl"
         ~args:
@@ -125,11 +102,6 @@ module Subscription = struct
     let create_topic name =
       Process.run ~prog ~args:["pubsub"; "topics"; "create"; name] ()
     in
-    (*let create_sink name topic filter =
-      let destination = String.concat ~sep:"/" ["pubsub.googleapis.com";"projects"; project_id; "topics"; topic]
-      in
-      Process.run_exn ~prog ~args:["logging"; "sinks"; "create"; name; destination; "--log-filter"; filter; "--project"; project_id] ()
-    in*)
     let create_subscription name topic =
       Process.run ~prog
         ~args:
@@ -174,12 +146,11 @@ module Subscription = struct
     Or_error.combine_errors lst
 
   let pull t =
-    (* gcloud pubsub subscriptions pull projects/o1labs-192920/subscriptions/block_production_test --auto-ack --format="table(DATA)" --limit=5*)
     let subscription_id =
       String.concat ~sep:"/" ["projects"; project_id; "subscriptions"; t.name]
     in
     (*By default limits to one log line per pull request*)
-    Process.run_exn ~prog
+    Process.run ~prog
       ~args:
         [ "pubsub"
         ; "subscriptions"
@@ -190,9 +161,81 @@ module Subscription = struct
       ()
 end
 
-module Block_produced_filter = struct
-  (*Assumption: The json is a tree of `Assoc objects as seen in the example log line. Duplicates keys will have the latest seen value*)
-  let rec json_flat_map ~key (json : Yojson.Safe.t)
+module Block_produced_query = struct
+  module Result = struct
+    module T = struct
+      type t =
+        { block_height: int
+        ; epoch: int
+        ; global_slot: int
+        ; snarked_ledger_generated: bool }
+    end
+
+    include T
+
+    let empty =
+      { block_height= 0
+      ; epoch= 0
+      ; global_slot= 0
+      ; snarked_ledger_generated= false }
+
+    (*Aggregated values for determining timeout conditions. Note: Slots passed and epochs passed are only determined if we produce a block. Add a log for these events to calculate these independently?*)
+    module Aggregated = struct
+      type t =
+        { last_seen_result: T.t
+        ; blocks_generated: int
+        ; slots_passed: int
+        ; epochs_passed: int
+        ; snarked_ledgers_generated: int }
+
+      let empty =
+        { last_seen_result= empty
+        ; blocks_generated= 0
+        ; slots_passed= 0
+        ; epochs_passed= 0
+        ; snarked_ledgers_generated= 0 }
+
+      let init (result : T.t) =
+        { last_seen_result= result
+        ; blocks_generated= 1
+        ; slots_passed= 1
+        ; epochs_passed= 0
+        ; snarked_ledgers_generated=
+            (if result.snarked_ledger_generated then 1 else 0) }
+    end
+
+    (*Todo: Reorg will mess up the value of snarked_ledgers_generated*)
+    let aggregate (aggregated : Aggregated.t) (result : t) : Aggregated.t =
+      if result.block_height > aggregated.last_seen_result.block_height then
+        { Aggregated.last_seen_result= result
+        ; blocks_generated= aggregated.blocks_generated + 1
+        ; slots_passed=
+            aggregated.slots_passed
+            + (result.global_slot - aggregated.last_seen_result.global_slot)
+        ; epochs_passed=
+            aggregated.epochs_passed
+            + (result.epoch - aggregated.last_seen_result.epoch)
+        ; snarked_ledgers_generated=
+            ( if result.snarked_ledger_generated then
+              aggregated.snarked_ledgers_generated + 1
+            else aggregated.snarked_ledgers_generated ) }
+      else aggregated
+  end
+
+  let filter testnet_log_filter =
+    (*TODO: Structured logging: Block Produced*)
+    String.concat ~sep:" "
+      [ testnet_log_filter
+      ; "resource.labels.project_id="
+      ; project_id
+      ; "resource.labels.pod_name:"
+      ; "\"block-producer\""
+      ; "resource.labels.container_name="
+      ; "coda"
+      ; "\"successfully produced a\"" ]
+
+  (*Map of json associations flattened. Duplicates keys will have the latest seen value*)
+  let rec json_field_map ~key (json : Yojson.Safe.t)
       (map : Yojson.Safe.t String.Map.t) =
     match json with
     | `String _ | `Int _ | `Null | `Bool _ | `Float _ | `Intlit _ ->
@@ -204,143 +247,46 @@ module Block_produced_filter = struct
             | Error e ->
                 Stop (Error e)
             | Ok acc ->
-                Continue (json_flat_map ~key json acc) )
+                Continue (json_field_map ~key json acc) )
           ~finish:Fn.id
     | `List lst ->
-        (*TODO: expand this if needed*)
+        (*TODO: expand this if needed, for example: "sub_window_densities":["0","20","20","20","20","20","20","20"]*)
         Ok (Map.update map key ~f:(fun _ -> `List lst))
     | _ ->
         Error
           (Error.of_string
              (sprintf "Invalid json object %s" (Yojson.Safe.to_string json)))
 
-  type t = {block_height: int; epoch: int; global_slot: int}
-
-  (*
-{"insertId":"8blazmpgqb2usa3ik",
- "jsonPayload":
-    {"level":"Trace","message":"Successfully produced a new block: $breadcrumb", "metadata":
-        {"breadcrumb":
-            {"just_emitted_a_proof":false,
-             "staged_ledger":"<opaque>",
-             "validated_transition":
-                {"data":
-                    {"current_protocol_version":"0.1.0",
-                     "delta_transition_chain_proof":"<opaque>",
-                     "proposed_protocol_version":"<None>",
-                     "protocol_state":
-                        {"body":
-                            {"blockchain_state":    
-                                {"snarked_ledger_hash":"4mKBT3x3GiDcYTsjkQttqmdZNyY39Xm7ioVCS6JAgMqVvoDXmroyt9sgDWDavNV5p4yoi4K8WzWR4FDxXUSHHb3n2VWHs75fQKnBU72krVMPvQ2Fmw36wiJAiBSsBJqgb8ogWn64JhvbVwhk66U9YiSusfeMVMoWWhgFFp5UqKQmsu1jEspCfGpQaN1JT6T68pKcioNRs9JWY2HZ7DkN18AeiyC6i6V6eX37YUy6ctGTHFj9yT7KFMTJRjBdDVc3RbAzjpsQgy3q4hjPKm5yuM6F86pLYtFNT8ts7X2h95SUSJchck9YhtsgikYVH6pKs5",
-                                "staged_ledger_hash":
-                                    {"non_snark":   
-                                        {"aux_hash":"UHisJuuSRjBAJvdtNEnXajfBKPxUvxU6ShjpMMpZSRyRwJXqH9",
-                                        "ledger_hash":"4mKBT3x6KrR4FBtziNTLF49pbjhzFAYjARZoJzL2R1hgG8xBcPg6pBLb7ryrexXersh1mUkbayhvL4nZ9y5FgNgxPNweGuzav3DahkQChXexsyG56Q5755UhpFbzb57R4m7hsLZHyEJpUmBUN5XM8hrVYYtaCoNei127oavjCVKpdgSsPHyFc4rrRuLQXtYzjrXGBhFZEtJniP2mMSHkTVBiaszJYZ8GGw8v1xrGnWW8FipEDDoJj9VAgKwcTvAauKun4PsGqLMJPFjsXNLd4pzADferNvr5q2LdZdMwxAxWitJbtfKmhDkqej5VuTW82v",
-                                        "pending_coinbase_aux":"WewbKnjz78S5g6GMgtv5AkaR54HuGAfAX7YHkoMxzZji8dDm82"},"pending_coinbase_hash":"A2UdxEstp1EeKLQwd7DERaAQN9RyJsy2Z8Q3WBh7omHYzDZmh4AkfHz2W9uAMnDBKJkNNJ4uYqRnT5prhxdCkcAVxj1ZSqwThhpAygwwNFBGYbkLbxh3eLx9rg9GNFqH8GP1LiMojbmtXbRtzCjEo2gUBVXqJSNwcmsg77sRYmUgHfv1dytMrckXZRZxq7indUttMBsjCZjG9no1syU7ccmh8CCgwzUFsPkmfjAEPxeUvRqM18KLm3UYYJKmxub2EFV44h32yGmybVedM7AfuxKrYit6fZqqTQnGWSQdQvNeaxbsgDQRaw8vKy2WaPcR9Y"},
-                                "timestamp":"1593038880000"},
-                            "consensus_state":
-                                {"blockchain_length":"1870",
-                                 "curr_global_slot":
-                                    {"slot_number":"7746","slots_per_epoch":"480"},
-                                 "epoch_count":"16",
-                                 "has_ancestor_in_same_checkpoint_window":true,
-                                 "last_vrf_output":"<opaque>",
-                                 "min_window_density":"160",
-                                 "next_epoch_data":
-                                    {"epoch_length":"12",
-                                     "ledger":
-                                        {"hash":"4mKBT3x3GiDcYTsjkQttqmdZNyY39Xm7ioVCS6JAgMqVvoDXmroyt9sgDWDavNV5p4yoi4K8WzWR4FDxXUSHHb3n2VWHs75fQKnBU72krVMPvQ2Fmw36wiJAiBSsBJqgb8ogWn64JhvbVwhk66U9YiSusfeMVMoWWhgFFp5UqKQmsu1jEspCfGpQaN1JT6T68pKcioNRs9JWY2HZ7DkN18AeiyC6i6V6eX37YUy6ctGTHFj9yT7KFMTJRjBdDVc3RbAzjpsQgy3q4hjPKm5yuM6F86pLYtFNT8ts7X2h95SUSJchck9YhtsgikYVH6pKs5",
-                                        "total_currency":"22694300002389927"},
-                                        "lock_checkpoint":"3j7Fqw9d9wLyNdjTPBSVH3yPDPWMtqUC22L1JSeqnpYMBfHTK7UmtDbYbnCL9mYDccjspNy8vJEnmXMA72qgswFdMocqYWprdWRYCUmhZx2jBKQcjXMjyUm8yFFBU8HfbSHSWfWmFVEXLw15rTR5ELjFy5xQMpgaWWMELu4ArxRc4DBbDebX2ezU4AhXULwsRhgbXw3n8gf6Tfi8GFTMQ8aTfuwmGeLmDAzXY4UvaEFuzcZ4ZFrFHrLZhKXYTbYyKebTBbcYqZScQcBNp1CC76tMP6NJkAaANYMGnRC1atoBwxBx6iCAb8osx12mCYgi9",
-                                        "seed":"3DUfsm6DRo8H9B9evJWxP72s18BAmWbFPMjr1EphFQFF7Fjjas1H8Y3UHGLTCocUKga4Yzh9izSHTvPn7UXN8x87c6soskzRtxjzatt2nPVK7jJ3xB2jMQFKfkmXLh4baiuQkDogz8nzirjbrUDnPsGi85efffcdEdCfV9AazPpZSbJKdvxMY4KZYXmdmtASzyQxeDhfpfCgfuUwfKCdPWi2biXxTrX9GkKLVcJFVCgY1ZggSFGiMn6kB3zxtKqUEJ1KvXnfdsyLsRrQwDKGGfqGSaS2b5baosyBnML27GJUGUDhP7vNipc5EVu1BZUEL",
-                                        "start_checkpoint":"D2rcXVQYai5JsZ4jvdbKYrN91pgcdB5M8dgRqrq5ZQqZs4QBZEfFouryedSLCMyXLHJkz4mLyZm7Q17yj6258a3fGMD6BuC7VviLGcDJA8BjXvpc9jyQ1JssbbLCF3kroYFduktekUhi2FkxCDZA4gsuXP56msQYwYwsCoKRoUr3HWHs2hdsYytLV2vTg695RbtTGeGVWKk4ihRM78JVypL2iWN2L6ghWpydfBVieqY7Kf6MVWvG7EHpf1Wpg3P1L67wkakWX8BAq9FXJVRd3uTkQM4RffsUuvhtTDDXXhaoAXjGeP669RGgwuUivKUkz4"},
-                                        "staking_epoch_data":   
-                                            {"epoch_length":"30",
-                                             "ledger":   
-                                                {"hash":"4mKBT3x3GiDcYTsjkQttqmdZNyY39Xm7ioVCS6JAgMqVvoDXmroyt9sgDWDavNV5p4yoi4K8WzWR4FDxXUSHHb3n2VWHs75fQKnBU72krVMPvQ2Fmw36wiJAiBSsBJqgb8ogWn64JhvbVwhk66U9YiSusfeMVMoWWhgFFp5UqKQmsu1jEspCfGpQaN1JT6T68pKcioNRs9JWY2HZ7DkN18AeiyC6i6V6eX37YUy6ctGTHFj9yT7KFMTJRjBdDVc3RbAzjpsQgy3q4hjPKm5yuM6F86pLYtFNT8ts7X2h95SUSJchck9YhtsgikYVH6pKs5",
-                                                "total_currency":"22694300002389927"},
-                                             "lock_checkpoint":"D2rcXVQa7xzkV8oPav5NMR2mmSbGDzzi4Cdz9UbjqvYA5Wb515gWEWWEvZbFQqS5tvig9BrfhaVwCiCd3tX3d1Jv3AmH1ijFtcu3DEp5gc6n2Kktx35sX9ZyKV4nhzuxh5DouzUeaULFV8yZ6AbQSF9FZExZ6HFUMPCA81QtzLwT1ZCsUYSyS4p5oJ6HYusYPawjBfCUf8QAx3AozWKBs98nTmBQUQCSgdZkjGkMB6pxcQqG11gnNPCCFDWYTsn2LYKz69Z1vGNL3g8kcTY4yBpxAejewwR5a4vu9qvKo8MokVDGGxhBmAEWptmF9jxpMW",
-                                             "seed":"3DUfsm6E7rP2B1dzUTDBa7oqdLPm48NPTZxzupoFjCAX8nfpBSbGfpWr7uHhcgpwHDnVjzfstD1Srzi3coatywp1vFwXMkPQ6ZkkD3WVMWxrRiXfyUt3q33RXnN6sPCw1RoBFDyp9R5vemXcvZ7jCHqCqx2kuZTJFVzgZjBPhFTNpWJnnX2o4yMSKVYhduRi7M3zVZ5LPyYo3WhngEvdFFnQwpUUaFN2PrsKru7Kp6UEz4qRpDV3LBoLuid8p88Qyk3EiRcHsq9D6zspSAA7MvFhjB7j85FUPcrBHNUBeshujzPcoMWJD5aiQY2UyYP1c",
-                                             "start_checkpoint":"D2rcXVQa6wLcxA31rbiCfMuA7kPpem4bb3jopQyE8EAKKCQVA7Pt6oP8VznuhebhUq2ebh2WdP75wynUHje5yjpzdmmdWa5FaTUdHtWz7SkLmAHt87CxCjGNHo6EjWQzv71fSq9ebgkfoBWW9yJPndoD7UggNR2KYZDNhGPwTggoNdcgiLnmZ5kYF9PEn8eaCx7Barv9K3rWjWDUJocySfeJfdLUeAPsNxYcRzFGaPE86MXB1aqExNb2rJUxyTJbx2zfzuQb746ENfAmfkSdSpSY8Ke1FFs8Ebx7A7tTSbB9Wy13yfuuhL1HRnf2UHhu1L"},
-                                        "sub_window_densities":["0","20","20","20","20","20","20","20"],
-                                        "total_currency":"22694300.002389927"},
-                            "constants":
-                                {"delta":"3",
-                                 "genesis_state_timestamp":"1591644600000",
-                                 "k":"20"},
-                                 "genesis_state_hash":"D2rcXVQa8eS14d6EWdpMVoys5aeqjiwJppFQRrdoZLpbsDUoq1a9AVYb1VQtqxPhxT87sQWHWwL7c1z7qWmC72GdedUy7RaqanKpJzCk5B4fMnxDTKFDVc53gZF3Z95pMauhWi12vAvuCK5bstGcAh3ZUJveK6RVmnN6aM2tHjTgcp1uvMfzXTjwBuxX6gGpsFKWZw5gDguQpDqhbMiYJw44Mc2ggKthUnfP2NsxJTkNzfJGknYaarK7wRZNEjHeNtrVfyxZDKyTGg6ZisfPemCYPTyXsvs9MmfmAtNhBAAUFuA1NuxnpfAjbdJ3RacHPW"},"previous_state_hash":"D2rcXVQd7LYsuiTTVhhxhw6naMDWGduxFPa7i1TTcsxzX6fFeQeYUbbnE5WJQQdPWJQTB2HwTFWj6MdMi7LiiNQMbnehsx1197WHin8ZYRrgppJVLCEPUQ9gMw4GGphMLYoH4trpd7GLt4dye3Yr2RQVkiq1LAgADfBTbGSF5yKnos4Dv4ZyNwVQbU4KebsjUQkuPyt18jJgFN7X2mCXUHJuYFTmc2pMoCLsyrqsZaaks9kog6YmUDops2Ag91f4CezppMUpPbuckwcsHc6WTk82Eo1qGfn88CdhnK8PdWrkw6eP2w9PjYKon4wg4SjbJu"},
-                        "protocol_state_proof":"<opaque>",
-                        "staged_ledger_diff":"<opaque>"},
-                    "hash":"D2rcXVQYbPbBERbK3Ak5FtDVz77pe95Wei3814txvVgzejFn9JegrDFkv8h3JEKytabDQuJys9533w8RjUaBhGeETL4nSBt4SpJSdS4zDicj4bLVcUW3Gr5ef7mttXpuYiuBB4nTq3pphiU3DDJnuSEustZBpExRd6Bs67SovSd1C4nSwms9HuMB64VXCF7d3ZKHhHDJh4iBNFwUVabT8CnBZVxYsVMiXkvpSLFuvDF1ark1NvvN64box6s4pzdsnskyMyz8Y4s78jzH9MP5oUmBEHRmRwg88mVLGJNYotvo4g2PmRpz2WFXFXXUyqzwfo"}},"host":"35.196.202.161",
-                    "peer_id":"12D3KooWF44GaTczmyEhWbv3p4onjfp3DDC2fJGckhaECza1bbr6",
-                    "pid":10,
-                    "port":10005},
-            "source":
-                {"location":"File \"src/lib/block_producer/block_producer.ml\", line 512, characters 44-51",
-                "module":"Block_producer"},
-            "timestamp":"2020-06-24 23:28:47.264783Z"},
-    "labels":
-        {"k8s-pod/app":"whale-block-producer-5",
-         "k8s-pod/class":"whale",
-         "k8s-pod/pod-template-hash":"9f8895cb9",
-         "k8s-pod/role":"block-producer",
-         "k8s-pod/testnet":"joyous-occasion",
-         "k8s-pod/version":"0.0.12-beta-feature-bump-genesis-timestamp-3e9b174"}
-    ,"logName":"projects/o1labs-192920/logs/stdout",
-    "receiveTimestamp":"2020-06-24T23:28:48.891183134Z",
-    "resource":
-        {"labels":
-            {"cluster_name":"coda-infra-east",
-             "container_name":"coda",
-             "location":"us-east1",
-             "namespace_name":"joyous-occasion","pod_name":"whale-block-producer-5-9f8895cb9-59p8h","project_id":"o1labs-192920"},
-         "type":"k8s_container"},
-    "severity":"INFO",
-    "timestamp":"2020-06-24T23:28:47.957899176Z"}
-    *)
-
-  let filter testnet_log_filter =
-    (*replace most of this with log_filter*)
-    String.concat ~sep:" "
-      [ testnet_log_filter
-      ; "resource.labels.project_id="
-      ; project_id
-      ; "resource.labels.pod_name:"
-      ; "\"block-producer\""
-      ; "resource.labels.container_name="
-      ; "coda"
-      ; "\"successfully produced a\"" ]
-
-  (*TODO: Block Produced*)
-
   let parse_log log =
     let open Or_error.Let_syntax in
     let%bind json = load_config_json log in
-    let%bind json_map = json_flat_map ~key:"" json String.Map.empty in
+    let%bind json_map = json_field_map ~key:"" json String.Map.empty in
     let extract_int json =
       Or_error.try_with (fun _ ->
           Yojson.Safe.Util.to_string json |> Int.of_string )
     in
-    let%bind block_height =
-      Map.find_or_error json_map "blockchain_length" >>= fun h -> extract_int h
+    let extract_bool json =
+      Or_error.try_with (fun _ -> Yojson.Safe.Util.to_bool json)
     in
-    let%bind global_slot =
-      Map.find_or_error json_map "slot_number" >>= fun h -> extract_int h
+    let find_int json_field =
+      Map.find_or_error json_map json_field >>= fun h -> extract_int h
     in
-    let%map epoch =
-      Map.find_or_error json_map "epoch_count" >>= fun h -> extract_int h
+    let%bind block_height = find_int "blockchain_length" in
+    let%bind global_slot = find_int "slot_number" in
+    let%bind snarked_ledger_generated =
+      Map.find_or_error json_map "just_emitted_a_proof"
+      >>= fun h -> extract_bool h
     in
-    Some {block_height; global_slot; epoch}
+    let%map epoch = find_int "epoch_count" in
+    Some {Result.block_height; global_slot; epoch; snarked_ledger_generated}
 
   let parse result =
     let open Or_error.Let_syntax in
     let%bind log_line =
       match String.split_lines result with
       | [] | ["DATA"] ->
-          Core.printf !"No log line yet :(\n%!" ;
           Ok None
       | ["DATA"; x] | [x] ->
-          Core.printf !"Got log line!\n%s%!" x ;
           Ok (Some x)
       | _ ->
           Error
@@ -361,7 +307,8 @@ module Make (Testnet : Test_intf.Testnet_intf) :
   Test_intf.Log_engine_intf with type testnet := Testnet.t = struct
   type subscriptions = {blocks_produced: Subscription.t}
 
-  type t = {testnet_log_filter: string; subscriptions: subscriptions}
+  type t =
+    {testnet_log_filter: string; subscriptions: subscriptions; logger: Logger.t}
 
   let subscription_list testnet_log_filter : subscriptions Deferred.Or_error.t
       =
@@ -369,17 +316,17 @@ module Make (Testnet : Test_intf.Testnet_intf) :
     let open Deferred.Or_error.Let_syntax in
     let%map blocks_produced =
       Subscription.create ~name:"blocks_produced"
-        ~filter:(Block_produced_filter.filter testnet_log_filter)
+        ~filter:(Block_produced_query.filter testnet_log_filter)
     in
     {blocks_produced}
 
   let delete_subscriptions subscriptions =
     Subscription.delete subscriptions.blocks_produced
 
-  let create (testnet : Testnet.t) =
+  let create ~logger (testnet : Testnet.t) =
     match%map subscription_list "joyous-occasion" with
     | Ok subscriptions ->
-        {testnet_log_filter= testnet.testnet_log_filter; subscriptions}
+        {testnet_log_filter= testnet.testnet_log_filter; subscriptions; logger}
     | Error e ->
         failwith (Error.to_string_hum e)
 
@@ -388,80 +335,103 @@ module Make (Testnet : Test_intf.Testnet_intf) :
     | Ok _ ->
         None
     | Error e' ->
-        (*TODO: Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__ "Error deleting subscriptions: $error" ~metadata:[("error", `String (Error.to_string_hum e'))];*)
+        Logger.fatal t.logger ~module_:__MODULE__ ~location:__LOC__
+          "Error deleting subscriptions: $error"
+          ~metadata:[("error", `String (Error.to_string_hum e'))] ;
         Some (Error.to_string_hum e')
 
   let delete t =
     match%map cleanup t with None -> () | Some err_str -> failwith err_str
 
+  (*TODO: Node status. Should that be a part of a node query instead? or we need a new log that has status info and some node identifier*)
   let wait_for' :
          blocks:int
       -> epoch_reached:int
-      -> timeout:[`Slots of int | `Epochs of int | `Milliseconds of int64]
+      -> timeout:[ `Slots of int
+                 | `Epochs of int
+                 | `Snarked_ledgers_generated of int
+                 | `Milliseconds of int64 ]
       -> t
-      -> unit Deferred.t =
+      -> unit Deferred.Or_error.t =
    fun ~blocks ~epoch_reached ~timeout t ->
     if blocks = 0 && epoch_reached = 0 && timeout = `Milliseconds 0L then
-      Deferred.unit
+      Deferred.Or_error.return ()
     else
-      let timeout_ms =
-        let now = Time.now () in
+      let now = Time.now () in
+      let timeout_safety =
+        (*Don't wait for more than an hour in any case*)
+        Time.add now (Time.Span.of_ms (Int64.to_float 3600000L))
+      in
+      let query_timeout_ms =
         match timeout with
         | `Milliseconds x ->
-            Time.add now (Time.Span.of_ms (Int64.to_float x))
+            Some (Time.add now (Time.Span.of_ms (Int64.to_float x)))
         | _ ->
-            (*Don't wait for more than an hour in any case*)
-            Time.add now (Time.Span.of_ms (Int64.to_float 3600000L))
+            None
       in
-      let timed_out (res : Block_produced_filter.t option) =
-        match (timeout, res) with
-        | `Slots x, Some res' ->
-            res'.global_slot >= x
-        | `Epochs x, Some res' ->
-            res'.epoch >= x
-        | _, _ ->
-            Time.( > ) (Time.now ()) timeout_ms
+      let timed_out (res : Block_produced_query.Result.Aggregated.t) =
+        match timeout with
+        | `Slots x ->
+            res.slots_passed >= x
+        | `Epochs x ->
+            res.epochs_passed >= x
+        | `Snarked_ledgers_generated x ->
+            res.snarked_ledgers_generated >= x
+        | `Milliseconds _ ->
+            Time.( > ) (Time.now ()) (Option.value_exn query_timeout_ms)
+      in
+      let conditions_passed (res : Block_produced_query.Result.t) =
+        res.block_height >= blocks && res.epoch >= epoch_reached
       in
       (*TODO: this should be block window duration once the constraint constants are added to runtime config*)
       let block_window_duration =
         Genesis_constants.Constraint_constants.compiled
           .block_window_duration_ms
       in
-      let rec go res =
-        (*TODO: Error if timedout before the conditions are met?*)
-        if timed_out res then Deferred.unit
+      let open Deferred.Or_error.Let_syntax in
+      let rec go aggregated_res : unit Deferred.Or_error.t =
+        if Time.( > ) (Time.now ()) timeout_safety then
+          Deferred.Or_error.error_string "wait_for took too long to complete"
+        else if timed_out aggregated_res then Deferred.Or_error.ok_unit
         else
           let%bind pull_result =
             Subscription.pull t.subscriptions.blocks_produced
           in
-          match Block_produced_filter.parse pull_result |> Or_error.ok_exn with
-          | None ->
-              Async.after
-                (Time.Span.of_ms (Int.to_float block_window_duration))
-              >>= fun _ -> go None
-          | Some res ->
-              if res.block_height >= blocks && res.epoch >= epoch_reached then (
-                Core.printf !"Condition met]\n%!" ;
-                Deferred.unit )
-              else go (Some res)
+          match Block_produced_query.parse pull_result with
+          | Error e ->
+              Deferred.return (Error e)
+          | Ok None ->
+              Deferred.bind
+                (Async.after
+                   (Time.Span.of_ms (Int.to_float block_window_duration)))
+                ~f:(fun () -> go aggregated_res)
+          | Ok (Some res) ->
+              if conditions_passed res then Deferred.Or_error.ok_unit
+              else
+                go (Block_produced_query.Result.aggregate aggregated_res res)
       in
-      go None
+      go Block_produced_query.Result.Aggregated.empty
 
   let wait_for :
          ?blocks:int
       -> ?epoch_reached:int
-      -> ?timeout:[`Slots of int | `Epochs of int | `Milliseconds of int64]
+      -> ?timeout:[ `Slots of int
+                  | `Epochs of int
+                  | `Snarked_ledgers_generated of int
+                  | `Milliseconds of int64 ]
       -> t
       -> unit Deferred.t =
    fun ?(blocks = 0) ?(epoch_reached = 0) ?(timeout = `Milliseconds 300000L) t ->
     match%bind
-      Deferred.Or_error.try_with (fun _ ->
+      Deferred.Or_error.try_with_join (fun _ ->
           wait_for' ~blocks ~epoch_reached ~timeout t )
     with
     | Ok _ ->
         Deferred.unit
     | Error e -> (
-        (*TODO: Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__ "wait_for failed with error: $error" ~metadata:[("error", `String (Error.to_string_hum e))];*)
+        Logger.fatal t.logger ~module_:__MODULE__ ~location:__LOC__
+          "wait_for failed with error: $error"
+          ~metadata:[("error", `String (Error.to_string_hum e))] ;
         match%map cleanup t with
         | None ->
             failwith (Error.to_string_hum e)
@@ -470,7 +440,8 @@ module Make (Testnet : Test_intf.Testnet_intf) :
               (String.concat ~sep:" and " [Error.to_string_hum e; err_str]) )
 end
 
-let%test_module "Log tests" =
+(*TODO: unit tests without conencting to gcloud. The following test connects to joyous-occasion*)
+(*let%test_module "Log tests" =
   ( module struct
     module Node : Test_intf.Node_intf = struct
       type t = unit
@@ -495,6 +466,8 @@ let%test_module "Log tests" =
 
     include Make (Testnet)
 
+    let logger = Logger.create ()
+
     let testnet : Testnet.t =
       let k8 = "k8s_container" in
       let location = "us-east1" in
@@ -515,17 +488,17 @@ let%test_module "Log tests" =
             ; testnet_name ] }
 
     let wait_for_block_height () =
-      let%bind log_engine = create testnet in
+      let%bind log_engine = create ~logger testnet in
       let%bind _ = wait_for ~blocks:2500 log_engine in
       delete log_engine
 
     let wait_for_slot_timeout () =
-      let%bind log_engine = create testnet in
-      let%bind _ = wait_for ~timeout:(`Slots 7500) log_engine in
+      let%bind log_engine = create ~logger testnet in
+      let%bind _ = wait_for ~timeout:(`Slots 2) log_engine in
       delete log_engine
 
     let wait_for_epoch () =
-      let%bind log_engine = create testnet in
+      let%bind log_engine = create ~logger testnet in
       let%bind _ = wait_for ~epoch_reached:16 log_engine in
       delete log_engine
 
@@ -537,4 +510,4 @@ let%test_module "Log tests" =
 
     let%test_unit "joyous-occasion - wait_for_epoch" =
       Async.Thread_safe.block_on_async_exn wait_for_epoch
-  end )
+  end ) *)

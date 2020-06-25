@@ -48,14 +48,22 @@ module type Log_engine_intf = sig
 
   type testnet
 
-  val create : testnet -> t Deferred.t
+  val create : logger:Logger.t -> testnet -> t Deferred.t
 
   val delete : t -> unit Deferred.t
 
+  (** waits until a block is produced with at least one of the following conditions being true
+    1. Blockchain length = blocks
+    2. epoch of the block = epoch_reached
+    3. Has seen some number of slots/epochs crossed/snarked ledgers generated or x milliseconds has passed
+  Note: Varying number of snarked ledgers generated because of reorgs is not captured here *)
   val wait_for :
        ?blocks:int
     -> ?epoch_reached:int
-    -> ?timeout:[`Slots of int | `Epochs of int | `Milliseconds of int64]
+    -> ?timeout:[ `Slots of int
+                | `Epochs of int
+                | `Snarked_ledgers_generated of int
+                | `Milliseconds of int64 ]
     -> t
     -> unit Deferred.t
 end
