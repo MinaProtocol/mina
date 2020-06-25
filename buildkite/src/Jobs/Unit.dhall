@@ -17,7 +17,7 @@ let buildTestCmd : Text -> Text -> Command.Type = \(profile : Text) -> \(path : 
   Command.build
     Command.Config::{
       commands =  [
-        Cmd.run "buildkite-agent arfifact download libp2p_helper src/app/result/bin"] # 
+        Cmd.run "buildkite-agent artifact download libp2p_helper src/app/result/bin/"] # 
         OpamInit.andThenRunInDocker (
           "source ~/.profile && make build && (dune runtest ${path} --profile=${profile} -j8" ++
           " || (./scripts/link-coredumps.sh && false))"
