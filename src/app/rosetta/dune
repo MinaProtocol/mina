@@ -8,20 +8,19 @@
     caqti
     caqti-async
     caqti-driver-postgresql
-   ; cli_lib
     cohttp
     cohttp-async
-    core
+    core_kernel
+    models
     ppx_deriving_yojson.runtime
     yojson
-    models
     )
   (preprocess (pps
-    ppx_version
     graphql_ppx
     ppx_coda
-    ppx_jane
-    ppx_deriving_yojson
     ppx_deriving.show
+    ppx_deriving_yojson
+    ppx_jane
+    ppx_version
     ))
   )

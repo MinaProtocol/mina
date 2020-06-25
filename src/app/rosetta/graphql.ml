@@ -1,4 +1,4 @@
-open Core
+open Core_kernel
 open Async
 
 let graphql_error_to_string e =

@@ -1,4 +1,4 @@
-open Core
+open Core_kernel
 open Async
 open Models
 
@@ -29,30 +29,38 @@ module Get_version = [%graphql {|
   }
 |}]
 
-let map_parse res = Deferred.return (Result.map_error ~f:Errors.create res)
+(* TODO: Is there a better way to get the genesis block info *)
+let genesis_block_query =
+  Caqti_request.find Caqti_type.unit Caqti_type.string
+    "SELECT state_hash FROM blocks WHERE height = 0"
 
-let router ~graphql_uri route body =
+let router ~graphql_uri (module Db : Caqti_async.CONNECTION) route body =
   let open Async.Deferred.Result.Let_syntax in
   match route with
   | ["list"] ->
-      let%map _meta = map_parse @@ Metadata_request.of_yojson body in
+      let%map _meta = Mappers.parse @@ Metadata_request.of_yojson body in
       Network_list_response.to_yojson
         { Network_list_response.network_identifiers=
             [ { Network_identifier.blockchain= "coda"
               ; network= "testnet"
               ; sub_network_identifier= None } ] }
   | ["status"] ->
-      let%bind _network = map_parse @@ Network_request.of_yojson body in
+      (* TODO: Check that the network corresponds to the node we're connected to *)
+      let%bind _network = Mappers.parse @@ Network_request.of_yojson body in
       let%bind res = Graphql.query (Get_status.make ()) graphql_uri in
-      let%map latest_block =
+      let%bind latest_block =
         Deferred.return
           ( match res#bestChain with
           | Some [||] ->
               Error (Errors.create "No blocks in chain")
           | Some chain ->
+              (* TODO: Verify this is sorted correctly *)
               Ok chain.(0)
           | None ->
               Error (Errors.create "Could not get chain information") )
+      in
+      let%map genesis_block_state_hash =
+        Mappers.sql @@ Db.find genesis_block_query ()
       in
       Network_status_response.to_yojson
         { Network_status_response.current_block_identifier=
@@ -61,17 +69,19 @@ let router ~graphql_uri route body =
               latest_block#stateHash
         ; current_block_timestamp=
             ((latest_block#protocolState)#blockchainState)#utcDate
-        ; genesis_block_identifier= Block_identifier.create Int64.one "???"
+        ; genesis_block_identifier=
+            Block_identifier.create Int64.zero genesis_block_state_hash
         ; peers=
             (res#daemonStatus)#peers |> Array.to_list
             |> List.map ~f:Peer.create }
   | ["options"] ->
-      let%bind _network = map_parse @@ Network_request.of_yojson body in
+      let%bind _network = Mappers.parse @@ Network_request.of_yojson body in
       let%map res = Graphql.query (Get_version.make ()) graphql_uri in
       Network_options_response.to_yojson
         { Network_options_response.version=
             Version.create "1.3.1"
               (Option.value ~default:"unknown" res#version)
+            (* TODO: Fill in allow field *)
         ; allow= {Allow.operation_statuses= []; operation_types= []; errors= []}
         }
   | _ ->
