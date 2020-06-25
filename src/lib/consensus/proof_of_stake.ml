@@ -894,6 +894,23 @@ module Data = struct
                       request))
     end
 
+    let%bench_fun "vrf eval unchecked" =
+      let constraint_constants =
+        Genesis_constants.Constraint_constants.for_unit_tests
+      in
+      let gen =
+        let open Quickcheck.Let_syntax in
+        let%map pk = Private_key.gen
+        and msg = Message.gen ~constraint_constants in
+        (pk, msg)
+      in
+      let private_key, msg = Quickcheck.random_value gen in
+      fun () ->
+        T.eval ~constraint_constants ~private_key msg
+        |> Output.truncate
+        |> Threshold.is_satisfied ~my_stake:Balance.zero
+             ~total_stake:Currency.Amount.one
+
     let check ~constraint_constants ~global_slot ~seed ~private_key ~public_key
         ~public_key_compressed ~total_stake ~logger ~epoch_snapshot =
       let open Message in
