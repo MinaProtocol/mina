@@ -62,12 +62,12 @@ let Config =
       , key : Text
       , target : Size
       , docker : Optional Docker.Type
-      , summon : Summon.Type
+      , summon : Optional Summon.Type
       }
   , default =
     { depends_on = [] : List TaggedKey.Type
     , docker = None Docker.Type
-    , summon = Summon::{=}
+    , summon = None Summon.Type
     }
   }
 
@@ -109,7 +109,15 @@ let build : Config.Type -> B/Command.Type = \(c : Config.Type) ->
               toMap { `docker#v3.5.0` = Plugins.Docker docker })
             c.docker)
       let summonPart =
-        [ toMap { `angaza/summon#v0.1.0` = Plugins.Summon c.summon } ]
+        Optional/toList
+          (Map.Type Text Plugins)
+          (Optional/map
+            Summon.Type
+            (Map.Type Text Plugins)
+            (\(summon: Summon.Type) ->
+              toMap { `angaza/summon#v0.1.0` = Plugins.Summon summon })
+            c.summon)
+
       -- Add more plugins here as needed, empty list omits that part from the
       -- plugins map
       let allPlugins =
