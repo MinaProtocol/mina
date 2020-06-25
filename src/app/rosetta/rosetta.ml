@@ -1,19 +1,31 @@
 open Core
 open Async
-open Cli_lib
 
-let command =
-  let open Command.Let_syntax in
-  let%map_open log_json = Flag.Log.json and log_level = Flag.Log.level in
-  fun () ->
-    let logger = Logger.create () in
-    Stdout_log.setup log_json log_level ;
-    Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-      "Failed to connect to postgresql database" ;
-    Deferred.unit
+let router uri body =
+  match List.tl_exn (String.split ~on:'/' (Uri.path uri)) with
+  | "network" :: tl ->
+      Network.router tl body
+  | _ ->
+      Respond.error_404
 
-let () =
-  Command.run
-    (Command.async
-       ~summary:"Run an archive process that can store all of the data of Coda"
-       command)
+let _ =
+  let callback ~body _ req =
+    let uri = Cohttp_async.Request.uri req in
+    let%bind body = Cohttp_async.Body.to_string body in
+    printf "Uri: %s\n" (Uri.path uri) ;
+    match Yojson.Safe.from_string body with
+    | body ->
+        router uri body
+    | exception Yojson.Json_error "Blank input data" ->
+        router uri `Null
+    | exception Yojson.Json_error err ->
+        Respond.user_error ("Error JSON body (" ^ err ^ ")")
+  in
+  let%map _ =
+    Cohttp_async.Server.create ~on_handler_error:`Raise
+      (Async.Tcp.Where_to_listen.bind_to Localhost (On_port 8000))
+      callback
+  in
+  print_endline "started server"
+
+let () = never_returns (Scheduler.go ())

@@ -3,6 +3,24 @@
   (name rosetta)
   (public_name rosetta)
   (modes native)
-  (libraries core async ppx_version caqti caqti-async caqti-driver-postgresql cli_lib)
-  (preprocess (pps ppx_coda ppx_version ppx_jane))
+  (libraries
+    async
+    caqti
+    caqti-async
+    caqti-driver-postgresql
+   ; cli_lib
+    cohttp
+    cohttp-async
+    core
+    ppx_deriving_yojson.runtime
+    yojson
+    models
+    )
+  (preprocess (pps
+    ppx_version
+    ppx_coda
+    ppx_jane
+    ppx_deriving_yojson
+    ppx_deriving.show
+    ))
   )
