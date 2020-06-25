@@ -1,9 +1,6 @@
 open Core
 open Async
 
-let make_error ?(code = 400) ?(retriable = true) message =
-  Error (`Error {Models.Error.code= Int32.of_int_exn code; message; retriable})
-
 let router ~graphql_uri route body =
   match route with
   | "network" :: tl ->
@@ -14,7 +11,7 @@ let router ~graphql_uri route body =
 let callback ~graphql_uri ~body _ req =
   let uri = Cohttp_async.Request.uri req in
   let%bind body = Cohttp_async.Body.to_string body in
-  printf "Uri: %s\n" (Uri.path uri) ;
+  printf "Route: %s\n" (Uri.path uri) ;
   let route = List.tl_exn (String.split ~on:'/' (Uri.path uri)) in
   let%bind result =
     match Yojson.Safe.from_string body with
@@ -23,7 +20,8 @@ let callback ~graphql_uri ~body _ req =
     | exception Yojson.Json_error "Blank input data" ->
         router route `Null ~graphql_uri
     | exception Yojson.Json_error err ->
-        make_error ("Error JSON body (" ^ err ^ ")") |> Deferred.return
+        Error (Errors.create ("Error parsing JSON body (" ^ err ^ ")"))
+        |> Deferred.return
   in
   match result with
   | Ok json ->
@@ -42,7 +40,7 @@ let start port =
   let%map _ =
     Cohttp_async.Server.create ~on_handler_error:`Raise
       (Async.Tcp.Where_to_listen.bind_to Localhost (On_port port))
-      (callback ~graphql_uri:"http://localhost:3085/graphql")
+      (callback ~graphql_uri:(Uri.of_string "http://localhost:3085/graphql"))
   in
   printf "Started server on port %d\n" port
 

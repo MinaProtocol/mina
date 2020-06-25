@@ -18,6 +18,7 @@
     )
   (preprocess (pps
     ppx_version
+    graphql_ppx
     ppx_coda
     ppx_jane
     ppx_deriving_yojson
