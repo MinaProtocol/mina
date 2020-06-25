@@ -247,7 +247,7 @@ let download_transitions ~logger ~trust_system ~network ~num_peers
                ) ) )
 *)
 
-let verify_transitions_and_build_breadcrumbs ~logger
+let verify_transitions_and_build_breadcrumbs' ~logger
     ~(precomputed_values : Precomputed_values.t) ~trust_system ~verifier
     ~frontier ~unprocessed_transition_cache ~transitions ~target_hash ~subtrees
     =
@@ -304,6 +304,63 @@ let verify_transitions_and_build_breadcrumbs ~logger
       |> ignore ;
       Deferred.Or_error.fail e
 
+let verify_transitions_and_build_breadcrumbs ~logger
+    ~(precomputed_values : Precomputed_values.t) ~trust_system ~verifier
+    ~frontier ~unprocessed_transition_cache ~transitions ~target_hash ~subtrees
+    =
+  let open Deferred.Or_error.Let_syntax in
+  let%bind transitions_with_initial_validation, initial_hash =
+    fold_until (List.rev transitions) ~init:[]
+      ~f:(fun acc transition ->
+        let open Deferred.Let_syntax in
+        match%bind
+          verify_transition ~logger
+            ~consensus_constants:precomputed_values.consensus_constants
+            ~trust_system ~verifier ~frontier ~unprocessed_transition_cache
+            transition
+        with
+        | Error e ->
+            List.map acc ~f:Cached.invalidate_with_failure |> ignore ;
+            Deferred.Or_error.fail e
+        | Ok (`In_frontier initial_hash) ->
+            Deferred.Or_error.return
+            @@ Continue_or_stop.Stop (acc, initial_hash)
+        | Ok (`Building_path transition_with_initial_validation) ->
+            Deferred.Or_error.return
+            @@ Continue_or_stop.Continue
+                 (transition_with_initial_validation :: acc) )
+      ~finish:(fun acc ->
+        if List.length transitions <= 0 then
+          Deferred.Or_error.return ([], target_hash)
+        else
+          let oldest_missing_transition =
+            List.hd_exn transitions |> Envelope.Incoming.data |> With_hash.data
+          in
+          let initial_state_hash =
+            External_transition.parent_hash oldest_missing_transition
+          in
+          Deferred.Or_error.return (acc, initial_state_hash) )
+  in
+  let trees_of_transitions =
+    Option.fold
+      (Non_empty_list.of_list_opt transitions_with_initial_validation)
+      ~init:subtrees ~f:(fun _ transitions ->
+        [Rose_tree.of_non_empty_list ~subtrees transitions] )
+  in
+  let open Deferred.Let_syntax in
+  match%bind
+    Transition_handler.Breadcrumb_builder.build_subtrees_of_breadcrumbs ~logger
+      ~precomputed_values ~verifier ~trust_system ~frontier ~initial_hash
+      trees_of_transitions
+  with
+  | Ok result ->
+      Deferred.Or_error.return (transitions_with_initial_validation, result)
+  | Error e ->
+      List.map transitions_with_initial_validation
+        ~f:Cached.invalidate_with_failure
+      |> ignore ;
+      Deferred.Or_error.fail e
+
 let download_transitions_in_chunks ~logger ~trust_system ~network ~num_peers
     ~preferred_peer ~maximum_download_size ~hashes_of_missing_transitions =
   let%bind random_peers = Coda_networking.random_peers network num_peers in
@@ -349,6 +406,7 @@ let verify_transitions_and_build_breadcrumbs_in_chunks ~logger
     ~precomputed_values ~trust_system ~verifier ~frontier
     ~unprocessed_transition_cache ~transitions_chunks ~target_hash ~subtrees =
   try
+    let previous_transitions_with_initial_validation = ref [] in
     Deferred.Or_error.return
     @@ List.mapi transitions_chunks ~f:(fun index transitions_chunk ->
            let current_subtrees =
@@ -361,9 +419,17 @@ let verify_transitions_and_build_breadcrumbs_in_chunks ~logger
                ~unprocessed_transition_cache ~transitions:transitions_chunk
                ~target_hash ~subtrees:current_subtrees
            with
-           | Ok trees_of_breadcrumbs ->
+           | Ok (transitions_with_initial_validation, trees_of_breadcrumbs) ->
+               previous_transitions_with_initial_validation :=
+                 transitions_with_initial_validation
+                 :: !previous_transitions_with_initial_validation ;
                Deferred.return trees_of_breadcrumbs
            | Error e ->
+               List.map !previous_transitions_with_initial_validation
+                 ~f:(fun transitions_with_initial_validation ->
+                   List.map transitions_with_initial_validation
+                     ~f:Cached.invalidate_with_failure )
+               |> ignore ;
                raise (Breadcrumb_Error e) )
   with Breadcrumb_Error e -> Deferred.Or_error.fail e
 
