@@ -12,7 +12,7 @@ let Size = ./Size.dhall
 
 let dockerImage = (../Constants/ContainerImages.dhall).codaToolchain
 
-let fixPermissionsCommand = Cmd.runInDocker Cmd.Docker::{ image = dockerImage } "sudo chown -R opam ."
+let fixPermissionsScript = "sudo chown -R opam ."
 
 let Config = {
   Type = {
@@ -27,12 +27,17 @@ let Config = {
 let build : Config.Type -> Base.Type = \(c : Config.Type) ->
   Base.build
     Base.Config::{
-      commands = [ fixPermissionsCommand ] # c.commands,
+      commands = [ Cmd.run fixPermissionsScript ] # c.commands,
       label = c.label,
       key = c.key,
       target = Size.Large,
       docker = Some Docker::{ image = dockerImage }
     }
 
-in {fixPermissionsCommand = fixPermissionsCommand, Config = Config, build = build, Type = Base.Type}
+in {
+    fixPermissionsCommand = Cmd.runInDocker Cmd.Docker::{ image = dockerImage } fixPermissionsScript,
+    Config = Config,
+    build = build,
+    Type = Base.Type
+}
 
