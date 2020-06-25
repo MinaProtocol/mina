@@ -13,7 +13,7 @@
   default = {
     `secrets-file` = "./secrets.yml",
     provider = "summon-aws-secrets",
-    environment = "dev",
-    substitutions = [ "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY" ]
+    environment = "",
+    substitutions = [] : List Text
   }
 }
