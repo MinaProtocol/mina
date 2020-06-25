@@ -14,8 +14,6 @@ let%test_module "Full_frontier tests" =
 
     let logger = Logger.null ()
 
-    let proof_level = Genesis_constants.Proof_level.Check
-
     let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
 
     let constraint_constants = precomputed_values.constraint_constants
@@ -31,12 +29,12 @@ let%test_module "Full_frontier tests" =
     let max_length = 5
 
     let gen_breadcrumb =
-      Breadcrumb.For_tests.gen ~logger ~proof_level ~precomputed_values
-        ?verifier:None ?trust_system:None ~accounts_with_secret_keys
+      Breadcrumb.For_tests.gen ~logger ~precomputed_values ?verifier:None
+        ?trust_system:None ~accounts_with_secret_keys
 
     let gen_breadcrumb_seq =
-      Breadcrumb.For_tests.gen_seq ~logger ~proof_level ~precomputed_values
-        ?verifier:None ?trust_system:None ~accounts_with_secret_keys
+      Breadcrumb.For_tests.gen_seq ~logger ~precomputed_values ?verifier:None
+        ?trust_system:None ~accounts_with_secret_keys
 
     module Transfer = Ledger_transfer.Make (Ledger) (Ledger)
 

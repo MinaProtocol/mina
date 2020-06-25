@@ -103,6 +103,7 @@ module Inputs = struct
                           ~target:input.target
                           { Transaction_protocol_state.Poly.transaction= t
                           ; block_data= w.protocol_state_body }
+                          ~init_stack:w.init_stack
                           ~pending_coinbase_stack_state:
                             input
                               .Transaction_snark.Statement
