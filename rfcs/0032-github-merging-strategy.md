@@ -93,8 +93,8 @@ git commit -C develop
 ```
 
 Locally, developers can also use `git log -m --first-parent` to view only the
-merge commits. `git log -m --first-parent --patch` shows the changes hidden
-below the merge commit, as expected.
+merge commits. `git log -m --first-parent --patch` shows the changes from
+commits beneath the merge commit, as expected.
 
 #### `git blame` identifies the commit within PRs instead of the merge commit
 
