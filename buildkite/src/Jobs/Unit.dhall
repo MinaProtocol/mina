@@ -25,8 +25,7 @@ let buildTestCmd : Text -> Text -> Command.Type = \(profile : Text) -> \(path : 
       label = "Run ${profile} unit-tests",
       key = "unit-test-${profile}",
       target = Size.Large,
-      docker = None Docker.Type,
-      depends_on = ["_Unit-libp2p-helper"]
+      docker = None Docker.Type
     }
 
 in
