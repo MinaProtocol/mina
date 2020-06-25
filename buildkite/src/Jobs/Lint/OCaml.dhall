@@ -6,18 +6,12 @@ let JobSpec = ../../Pipeline/JobSpec.dhall
 let Cmd = ../../Lib/Cmds.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
-let Command/Coda = ../../Command/Coda.dhall
+let OpamInit = ../../Command/OpamInit.dhall
+let Command = ../../Command/Base.dhall
 let Docker = ../../Command/Docker/Type.dhall
 let Size = ../../Command/Size.dhall
 
-let commands =
-  [
-    Cmd.run "./buildkite/scripts/lint-check-format.sh",
-    Cmd.run "./scripts/require-ppx-version.py"
-  ]
-in
-
-Pipeline.build
+in Pipeline.build
   Pipeline.Config::{
     spec =
       let dirtyDhallDir = S.strictlyStart (S.contains "buildkite/src/Jobs/Lint/OCaml")
@@ -32,11 +26,15 @@ Pipeline.build
         name = "OCaml"
       },
     steps = [
-      Command/Coda.build
-        Command/Coda.Config::{
-          commands = commands,
+      Command.build
+        Command.Config::{
+          commands = OpamInit.andThenRunInDocker (
+            "./buildkite/scripts/lint-check-format.sh && " ++
+            "./scripts/require-ppx-version.py"),
           label = "OCaml Lints; Check-format, Require-ppx-version",
-          key = "check"
+          key = "check",
+          target = Size.Large,
+          docker = None Docker.Type
         }
     ]
   }
