@@ -19,7 +19,7 @@ dune build "--profile=$profile" -j8 || (error 'BUILD FAILED' && exit 1)
 trace 'RUNNING TESTS'
 dune runtest "--profile=$profile" -j8 &
 test_pid=$!
-trap "kill \"$test_pid\"" EXIT
+trap "kill \"$test_pid\" >/dev/null 2>&1" EXIT
 
 i=0
 while ps | grep " $test_pid "; do
