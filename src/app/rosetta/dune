@@ -11,6 +11,7 @@
     cohttp
     cohttp-async
     core_kernel
+    logger
     models
     ppx_deriving_yojson.runtime
     yojson

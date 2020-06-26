@@ -34,11 +34,12 @@ let genesis_block_query =
   Caqti_request.find Caqti_type.unit Caqti_type.string
     "SELECT state_hash FROM blocks WHERE height = 0"
 
-let router ~graphql_uri (module Db : Caqti_async.CONNECTION) route body =
+let router ~graphql_uri ~logger:_ ~db route body =
+  let (module Db : Caqti_async.CONNECTION) = db in
   let open Async.Deferred.Result.Let_syntax in
   match route with
   | ["list"] ->
-      let%map _meta = Mappers.parse @@ Metadata_request.of_yojson body in
+      let%map _meta = Errors.map_parse @@ Metadata_request.of_yojson body in
       Network_list_response.to_yojson
         { Network_list_response.network_identifiers=
             [ { Network_identifier.blockchain= "coda"
@@ -46,7 +47,7 @@ let router ~graphql_uri (module Db : Caqti_async.CONNECTION) route body =
               ; sub_network_identifier= None } ] }
   | ["status"] ->
       (* TODO: Check that the network corresponds to the node we're connected to *)
-      let%bind _network = Mappers.parse @@ Network_request.of_yojson body in
+      let%bind _network = Errors.map_parse @@ Network_request.of_yojson body in
       let%bind res = Graphql.query (Get_status.make ()) graphql_uri in
       let%bind latest_block =
         Deferred.return
@@ -60,7 +61,7 @@ let router ~graphql_uri (module Db : Caqti_async.CONNECTION) route body =
               Error (Errors.create "Could not get chain information") )
       in
       let%map genesis_block_state_hash =
-        Mappers.sql @@ Db.find genesis_block_query ()
+        Errors.map_sql @@ Db.find genesis_block_query ()
       in
       Network_status_response.to_yojson
         { Network_status_response.current_block_identifier=
@@ -75,7 +76,7 @@ let router ~graphql_uri (module Db : Caqti_async.CONNECTION) route body =
             (res#daemonStatus)#peers |> Array.to_list
             |> List.map ~f:Peer.create }
   | ["options"] ->
-      let%bind _network = Mappers.parse @@ Network_request.of_yojson body in
+      let%bind _network = Errors.map_parse @@ Network_request.of_yojson body in
       let%map res = Graphql.query (Get_version.make ()) graphql_uri in
       Network_options_response.to_yojson
         { Network_options_response.version=
