@@ -2,6 +2,9 @@ open Core
 open Coda_base
 open Snark_params
 
+(** For debugging. Logs to stderr the inputs to the top hash. *)
+val with_top_hash_logging : (unit -> 'a) -> 'a
+
 module Pending_coinbase_stack_state : sig
   module Init_stack : sig
     [%%versioned:
@@ -17,29 +20,52 @@ module Pending_coinbase_stack_state : sig
   end
 
   module Poly : sig
+    [%%versioned:
     module Stable : sig
       module V1 : sig
-        type 's t = {source: 's; target: 's}
-        [@@deriving bin_io, compare, eq, fields, hash, sexp, version, yojson]
-      end
+        type 'pending_coinbase t =
+          {source: 'pending_coinbase; target: 'pending_coinbase}
+        [@@deriving compare, eq, fields, hash, sexp, yojson]
 
-      module Latest = V1
-    end
+        val to_latest :
+             ('pending_coinbase -> 'pending_coinbase')
+          -> 'pending_coinbase t
+          -> 'pending_coinbase' t
+      end
+    end]
+
+    type 'pending_coinbase t = 'pending_coinbase Stable.Latest.t =
+      {source: 'pending_coinbase; target: 'pending_coinbase}
+    [@@deriving compare, eq, fields, hash, sexp, yojson]
+
+    val typ :
+         ('pending_coinbase_var, 'pending_coinbase) Tick.Typ.t
+      -> ('pending_coinbase_var t, 'pending_coinbase t) Tick.Typ.t
   end
 
+  type 'pending_coinbase poly = 'pending_coinbase Poly.t =
+    {source: 'pending_coinbase; target: 'pending_coinbase}
+  [@@deriving sexp, hash, compare, eq, fields, yojson]
+
+  [%%versioned:
   module Stable : sig
     module V1 : sig
       type t = Pending_coinbase.Stack_versioned.Stable.V1.t Poly.Stable.V1.t
-      [@@deriving bin_io, compare, eq, hash, sexp, version, yojson]
+      [@@deriving compare, eq, hash, sexp, yojson]
     end
-
-    module Latest = V1
-  end
-
-  type 's t_ = 's Poly.Stable.Latest.t = {source: 's; target: 's}
-  [@@deriving sexp, hash, compare, eq, fields, yojson]
+  end]
 
   type t = Stable.Latest.t [@@deriving sexp, hash, compare, eq, yojson]
+
+  type var = Pending_coinbase.Stack.var Poly.t
+
+  open Tick
+
+  val typ : (var, t) Typ.t
+
+  val to_input : t -> (Field.t, bool) Random_oracle.Input.t
+
+  val var_to_input : var -> (Field.Var.t, Boolean.var) Random_oracle.Input.t
 end
 
 module Statement : sig
@@ -47,28 +73,76 @@ module Statement : sig
     [%%versioned:
     module Stable : sig
       module V1 : sig
-        type ('lh, 'amt, 'pc, 'signed_amt, 'sok) t =
-          { source: 'lh
-          ; target: 'lh
-          ; supply_increase: 'amt
-          ; pending_coinbase_stack_state:
-              'pc Pending_coinbase_stack_state.Poly.Stable.V1.t
-          ; fee_excess: 'signed_amt
-          ; sok_digest: 'sok }
+        type ( 'ledger_hash
+             , 'amount
+             , 'pending_coinbase
+             , 'fee_excess
+             , 'sok_digest )
+             t =
+          { source: 'ledger_hash
+          ; target: 'ledger_hash
+          ; supply_increase: 'amount
+          ; pending_coinbase_stack_state: 'pending_coinbase
+          ; fee_excess: 'fee_excess
+          ; sok_digest: 'sok_digest }
         [@@deriving compare, equal, hash, sexp, yojson]
+
+        val to_latest :
+             ('ledger_hash -> 'ledger_hash')
+          -> ('amount -> 'amount')
+          -> ('pending_coinbase -> 'pending_coinbase')
+          -> ('fee_excess -> 'fee_excess')
+          -> ('sok_digest -> 'sok_digest')
+          -> ( 'ledger_hash
+             , 'amount
+             , 'pending_coinbase
+             , 'fee_excess
+             , 'sok_digest )
+             t
+          -> ( 'ledger_hash'
+             , 'amount'
+             , 'pending_coinbase'
+             , 'fee_excess'
+             , 'sok_digest' )
+             t
       end
     end]
+
+    type ('ledger_hash, 'amount, 'pending_coinbase, 'fee_excess, 'sok_digest) t =
+          ( 'ledger_hash
+          , 'amount
+          , 'pending_coinbase
+          , 'fee_excess
+          , 'sok_digest )
+          Stable.Latest.t =
+      { source: 'ledger_hash
+      ; target: 'ledger_hash
+      ; supply_increase: 'amount
+      ; pending_coinbase_stack_state: 'pending_coinbase
+      ; fee_excess: 'fee_excess
+      ; sok_digest: 'sok_digest }
+    [@@deriving compare, equal, hash, sexp, yojson]
   end
 
-  type ('lh, 'amt, 'pc, 'signed_amt, 'sok) t_ =
-        ('lh, 'amt, 'pc, 'signed_amt, 'sok) Poly.Stable.Latest.t =
-    { source: 'lh
-    ; target: 'lh
-    ; supply_increase: 'amt
-    ; pending_coinbase_stack_state:
-        'pc Pending_coinbase_stack_state.Poly.Stable.V1.t
-    ; fee_excess: 'signed_amt
-    ; sok_digest: 'sok }
+  type ( 'ledger_hash
+       , 'amount
+       , 'pending_coinbase
+       , 'fee_excess
+       , 'sok_digest )
+       poly =
+        ( 'ledger_hash
+        , 'amount
+        , 'pending_coinbase
+        , 'fee_excess
+        , 'sok_digest )
+        Poly.t =
+    { source: 'ledger_hash
+    ; target: 'ledger_hash
+    ; supply_increase: 'amount
+    ; pending_coinbase_stack_state: 'pending_coinbase
+    ; fee_excess: 'fee_excess
+    ; sok_digest: 'sok_digest }
+  [@@deriving compare, equal, hash, sexp, yojson]
 
   [%%versioned:
   module Stable : sig
@@ -76,15 +150,22 @@ module Statement : sig
       type t =
         ( Frozen_ledger_hash.Stable.V1.t
         , Currency.Amount.Stable.V1.t
-        , Pending_coinbase.Stack_versioned.Stable.V1.t
+        , Pending_coinbase_stack_state.Stable.V1.t
         , Fee_excess.Stable.V1.t
         , unit )
         Poly.Stable.V1.t
-      [@@deriving bin_io, compare, equal, hash, sexp, yojson]
+      [@@deriving compare, equal, hash, sexp, yojson]
     end
   end]
 
-  type t = Stable.Latest.t [@@deriving compare, equal, hash, sexp, yojson]
+  type t =
+    ( Frozen_ledger_hash.t
+    , Currency.Amount.t
+    , Pending_coinbase_stack_state.t
+    , Fee_excess.t
+    , unit )
+    Poly.t
+  [@@deriving sexp, hash, compare, yojson]
 
   module With_sok : sig
     [%%versioned:
@@ -93,27 +174,48 @@ module Statement : sig
         type t =
           ( Frozen_ledger_hash.Stable.V1.t
           , Currency.Amount.Stable.V1.t
-          , Pending_coinbase.Stack_versioned.Stable.V1.t
+          , Pending_coinbase_stack_state.Stable.V1.t
           , Fee_excess.Stable.V1.t
           , Sok_message.Digest.Stable.V1.t )
           Poly.Stable.V1.t
-        [@@deriving bin_io, compare, equal, hash, sexp, yojson]
+        [@@deriving compare, equal, hash, sexp, yojson]
       end
     end]
 
-    type t = Stable.Latest.t [@@deriving compare, equal, hash, sexp, yojson]
+    type t =
+      ( Frozen_ledger_hash.t
+      , Currency.Amount.t
+      , Pending_coinbase_stack_state.t
+      , Fee_excess.t
+      , Sok_message.Digest.t )
+      Poly.t
+    [@@deriving sexp, hash, compare, yojson]
+
+    type var =
+      ( Frozen_ledger_hash.var
+      , Currency.Amount.var
+      , Pending_coinbase_stack_state.var
+      , Fee_excess.var
+      , Sok_message.Digest.Checked.t )
+      Poly.Stable.V1.t
+
+    open Tick
+
+    val typ : (var, t) Typ.t
+
+    val to_input : t -> (Field.t, bool) Random_oracle.Input.t
+
+    val to_field_elements : t -> Field.t array
 
     module Checked : sig
-      type t =
-        ( Frozen_ledger_hash.var
-        , Currency.Amount.var
-        , Pending_coinbase.Stack.var
-        , Fee_excess.var
-        , Sok_message.Digest.Checked.t )
-        t_
-    end
+      type t = var
 
-    val typ : (Checked.t, t) Tick.Typ.t
+      val to_input :
+        var -> ((Field.Var.t, Boolean.var) Random_oracle.Input.t, _) Checked.t
+
+      (* This is actually a checked function. *)
+      val to_field_elements : var -> Field.Var.t array
+    end
   end
 
   val gen : t Quickcheck.Generator.t

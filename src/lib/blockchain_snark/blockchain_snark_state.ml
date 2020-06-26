@@ -276,7 +276,7 @@ let rule ~proof_level ~constraint_constants transaction_snark self :
         in
         [b1; b2] )
   ; main_value=
-      (fun [prev; txn] curr ->
+      (fun [prev; (txn : Transaction_snark.Statement.With_sok.t)] curr ->
         Core.printf
           !"new state out of snark %{sexp:Protocol_state.Value.t}\n%!"
           curr ;

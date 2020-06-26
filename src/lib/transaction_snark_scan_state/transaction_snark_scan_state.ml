@@ -248,8 +248,8 @@ let completed_work_to_scanable_work (job : job) (fee, current_proof, prover) :
         then Ok ()
         else Or_error.error_string "Invalid pending coinbase stack state"
       in
-      let statement =
-        { Transaction_snark.Statement.source= s.source
+      let statement : Transaction_snark.Statement.t =
+        { source= s.source
         ; target= s'.target
         ; supply_increase
         ; pending_coinbase_stack_state=
@@ -458,14 +458,15 @@ let statement_of_job : job -> Transaction_snark.Statement.t option = function
       and supply_increase =
         Currency.Amount.add stmt1.supply_increase stmt2.supply_increase
       in
-      { Transaction_snark.Statement.source= stmt1.source
-      ; target= stmt2.target
-      ; supply_increase
-      ; pending_coinbase_stack_state=
-          { source= stmt1.pending_coinbase_stack_state.source
-          ; target= stmt2.pending_coinbase_stack_state.target }
-      ; fee_excess
-      ; sok_digest= () }
+      ( { source= stmt1.source
+        ; target= stmt2.target
+        ; supply_increase
+        ; pending_coinbase_stack_state=
+            { source= stmt1.pending_coinbase_stack_state.source
+            ; target= stmt2.pending_coinbase_stack_state.target }
+        ; fee_excess
+        ; sok_digest= () }
+        : Transaction_snark.Statement.t )
 
 let create ~work_delay ~transaction_capacity_log_2 =
   let k = Int.pow 2 transaction_capacity_log_2 in
