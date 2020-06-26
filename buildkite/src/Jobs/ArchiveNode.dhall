@@ -9,6 +9,11 @@ let Docker = ../Command/Docker/Type.dhall
 let Size = ../Command/Size.dhall
 in
 
+let user = "admin"
+let password = "codarules"
+let db = "archiver"
+in
+
 Pipeline.build
   Pipeline.Config::
     { spec =
@@ -23,14 +28,19 @@ Pipeline.build
     , steps =
       [ Command.build
           Command.Config::
-            { commands = OpamInit.andThenRunInDocker (Prelude.Text.concatSep "\n"
-                [ "sudo apt-get install -y postgresql"
-                , "sudo service postgresql start"
-                , "su -u postgres psql --command \"CREATE USER pguser WITH SUPERUSER PASSWORD 'pguser';\""
-                , "su -u postgres createdb -O pguser archiver"
-                , "PGPASSWORD=pguser psql -h localhost -p 5432 -U pguser -d archiver -a -f src/app/archive/create_schema.sql"
-                , "./scripts/test.py run 'test_archive_processor:coda-archive-processor-test'"
-                ])
+            { commands = OpamInit.andThenRunInDocker
+                [ "POSTGRES_PASSWORD=${password}"
+                , "POSTGRES_USER=${user}"
+                , "POSTGRES_DB=${db}"
+                ]
+                (Prelude.Text.concatSep "\n"
+                  [ "sudo apt-get install -y postgresql"
+                  , "sudo service postgresql start"
+                  , "su -u postgres psql --command \"CREATE USER ${user} WITH SUPERUSER PASSWORD '${password}';\""
+                  , "su -u postgres createdb -O ${user} ${db}"
+                  , "PGPASSWORD=${password} psql -h localhost -p 5432 -U ${user} -d ${db} -a -f src/app/archive/create_schema.sql"
+                  , "./scripts/test.py run 'test_archive_processor:coda-archive-processor-test'"
+                  ])
             , label = "Archive-node unit tests"
             , key = "build-client-sdk"
             , target = Size.Large

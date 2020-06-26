@@ -27,11 +27,13 @@ let commands : List Cmd.Type =
       }
   ]
 
-let andThenRunInDocker : Text -> List Cmd.Type =
+let andThenRunInDocker : List Text -> Text -> List Cmd.Type =
+  \(envVars : List Text) ->
   \(innerScript : Text) ->
     [ Coda.fixPermissionsCommand ] # commands # [
       Cmd.runInDocker
-        (Cmd.Docker::{ image = (../Constants/ContainerImages.dhall).codaToolchain })
+        (Cmd.Docker::{ image = (../Constants/ContainerImages.dhall).codaToolchain
+                     , extraEnv = envVars })
         (unpackageScript ++ " && " ++ exposeOpamEnv ++ " && " ++ innerScript)
     ]
 
