@@ -35,7 +35,8 @@ module Prod : Ledger_proof_intf.S with type t = Transaction_snark.t = struct
                  ; supply_increase
                  ; fee_excess
                  ; pending_coinbase_stack_state
-                 ; proof_type } ~sok_digest ~proof =
+                 ; proof_type
+                 ; sok_digest= () } ~sok_digest ~proof =
     Transaction_snark.create ~source ~target ~pending_coinbase_stack_state
       ~supply_increase ~fee_excess ~sok_digest ~proof ~proof_type
 end
