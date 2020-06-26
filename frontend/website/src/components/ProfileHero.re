@@ -105,7 +105,10 @@ module Styles = {
         left(`rem(2.0)),
         width(`rem(18.)),
         media(Theme.MediaQuery.notMobile, [marginTop(`zero)]),
-        media(Theme.MediaQuery.veryVeryLarge, [position(`unset)]),
+        media(
+          Theme.MediaQuery.veryVeryLarge,
+          [position(`unset), marginTop(`rem(2.))],
+        ),
       ]),
     ]);
 };
