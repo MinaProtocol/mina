@@ -2,6 +2,7 @@ let Cmd = ../Lib/Cmds.dhall
 
 let S = ../Lib/SelectFiles.dhall
 
+let JobSpec = ../Pipeline/JobSpec.dhall
 let Pipeline = ../Pipeline/Dsl.dhall
 let Command = ../Command/Base.dhall
 let Docker = ../Command/Docker/Type.dhall

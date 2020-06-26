@@ -51,8 +51,8 @@ module Metrics = {
     blocksCreated: option(int),
     transactionSent: option(int),
     snarkWorkCreated: option(int),
-    snarkFeesCollected: option(string),
-    highestSnarkFeeCollected: option(string),
+    snarkFeesCollected: option(int64),
+    highestSnarkFeeCollected: option(int64),
     transactionsReceivedByEcho: option(int),
     coinbaseReceiver: option(bool),
   };

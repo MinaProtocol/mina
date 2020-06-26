@@ -31,4 +31,4 @@ let config : Pipeline.Config.Type = Pipeline.Config::{
     }
   ]
 }
-in Pipeline.build config
+in (Pipeline.build config).pipeline
