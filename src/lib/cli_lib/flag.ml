@@ -106,18 +106,11 @@ module Port = struct
 
   let default_client = 8301
 
-  let default_external = 8302
-
   let default_rest = 0xc0d
 
   let default_archive = default_rest + 1
 
-  (* This is always computed as default_external+1 *)
-  let _default_discovery = 8303
-
-  let default_libp2p = 28675
-
-  let default_hasura_port = 9000
+  let default_libp2p = 8302
 
   let of_raw raw =
     let open Or_error.Let_syntax in
@@ -135,8 +128,8 @@ module Port = struct
 
   module Daemon = struct
     let external_ =
-      create ~name:"external-port" ~default:default_external
-        "Base server port for daemon TCP (discovery UDP on port+1)"
+      create ~name:"external-port" ~default:default_libp2p
+        "Port to use for all libp2p communications (gossip and RPC)"
 
     let client =
       create ~name:"client-port" ~default:default_client
@@ -145,10 +138,6 @@ module Port = struct
     let rest_server =
       create ~name:"rest-port" ~default:default_rest
         "local REST-server for daemon interaction"
-
-    let discovery =
-      create ~name:"discovery-port" ~default:default_libp2p
-        "Daemon to archive process communication"
   end
 
   module Archive = struct
@@ -207,7 +196,7 @@ module Host_and_port = struct
 
   module Daemon = struct
     let archive =
-      create ~name:"archive-port" ~arg_type
+      create ~name:"archive-address" ~arg_type
         (make_doc_builder "Daemon to archive process communication"
            Port.default_archive)
         Optional
@@ -252,22 +241,18 @@ module Uri = struct
   end
 
   module Archive = struct
-    let hasura =
+    let postgres =
       let doc_builder =
         Doc_builder.create ~display:to_string
           ~examples:
-            [ Port.to_uri ~path:"graphql" Port.default_client
-            ; Uri.of_string
-                ( example_host ^ ":"
-                ^ Int.to_string Port.default_client
-                ^/ "v1/graphql" ) ]
-          "URI/LOCALHOST-PORT" "Srchive process to communicate with Hasura"
+            [Uri.of_string "postgres://admin:codarules@postgres:5432/archiver"]
+          "URI" "URI for postgresql database"
       in
-      create ~name:"hasura-port"
-        ~arg_type:(arg_type ~path:"v1/graphql")
+      create ~name:"postgres-uri"
+        ~arg_type:(Command.Arg_type.map Command.Param.string ~f:Uri.of_string)
         doc_builder
         (Resolve_with_default
-           (Port.to_uri ~path:"graphql" Port.default_hasura_port))
+           (Uri.of_string "postgres://admin:codarules@postgres:5432/archiver"))
   end
 end
 
@@ -303,9 +288,10 @@ let user_command_common : user_command_common Command.Param.t =
       ~doc:
         (Printf.sprintf
            "FEE Amount you are willing to pay to process the transaction \
-            (default: %d) (minimum: %d)"
-           (Currency.Fee.to_int Default.transaction_fee)
-           (Currency.Fee.to_int Coda_base.User_command.minimum_fee))
+            (default: %s) (minimum: %s)"
+           (Currency.Fee.to_formatted_string
+              Coda_compile_config.default_transaction_fee)
+           (Currency.Fee.to_formatted_string Coda_base.User_command.minimum_fee))
       (optional txn_fee)
   and nonce =
     flag "nonce"
@@ -319,4 +305,67 @@ let user_command_common : user_command_common Command.Param.t =
     flag "memo" ~doc:"STRING Memo accompanying the transaction"
       (optional string)
   in
-  {sender; fee= Option.value fee ~default:Default.transaction_fee; nonce; memo}
+  { sender
+  ; fee= Option.value fee ~default:Coda_compile_config.default_transaction_fee
+  ; nonce
+  ; memo }
+
+module User_command = struct
+  open Arg_type
+
+  let hd_index =
+    let open Command.Param in
+    flag "HD-index" ~doc:"HD-INDEX Index used by hardware wallet"
+      (required hd_index)
+
+  let receiver_pk =
+    let open Command.Param in
+    flag "receiver" ~doc:"PUBLICKEY Public key to which you want to send money"
+      (required public_key_compressed)
+
+  let amount =
+    let open Command.Param in
+    flag "amount" ~doc:"VALUE Payment amount you want to send"
+      (required txn_amount)
+
+  let fee =
+    let open Command.Param in
+    flag "fee"
+      ~doc:
+        (Printf.sprintf
+           "FEE Amount you are willing to pay to process the transaction \
+            (default: %s) (minimum: %s)"
+           (Currency.Fee.to_formatted_string
+              Coda_compile_config.default_transaction_fee)
+           (Currency.Fee.to_formatted_string Coda_base.User_command.minimum_fee))
+      (optional txn_fee)
+
+  let valid_until =
+    let open Command.Param in
+    flag "valid-until"
+      ~doc:
+        "GLOBAL-SLOT The last global-slot at which this transaction will be \
+         considered valid. This makes it possible to have transactions which \
+         expire if they are not applied before this time. If omitted, the \
+         transaction will never expire."
+      (optional global_slot)
+
+  let nonce =
+    let open Command.Param in
+    flag "nonce"
+      ~doc:
+        "NONCE Nonce that you would like to set for your transaction \
+         (default: nonce of your account on the best ledger or the successor \
+         of highest value nonce of your sent transactions from the \
+         transaction pool )"
+      (optional txn_nonce)
+
+  let memo =
+    let open Command.Param in
+    flag "memo"
+      ~doc:
+        (sprintf
+           "STRING Memo accompanying the transaction (up to %d characters)"
+           Coda_base.User_command_memo.max_input_length)
+      (optional string)
+end

@@ -15,8 +15,7 @@ let to_group (type t)
         let params = params
       end)
   in
-  let a = Params.a params in
-  let b = Params.b params in
+  let {Group_map.Spec.a; b} = Params.spec params in
   let try_decode x =
     let f x = F.((x * x * x) + (a * x) + b) in
     let y = f x in
@@ -27,6 +26,8 @@ let to_group (type t)
 
 module Checked = struct
   open Snarky
+
+  let wrap = Checked_map.wrap
 
   let to_group (type f) (module M : Snark_intf.Run with type field = f) ~params
       t =

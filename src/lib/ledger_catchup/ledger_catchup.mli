@@ -3,6 +3,7 @@ open Pipe_lib
 open Cache_lib
 open Coda_base
 open Coda_transition
+open Network_peer
 
 module Catchup_jobs : sig
   val reader : int Broadcast_pipe.Reader.t
@@ -10,6 +11,7 @@ end
 
 val run :
      logger:Logger.t
+  -> precomputed_values:Precomputed_values.t
   -> trust_system:Trust_system.t
   -> verifier:Verifier.t
   -> network:Coda_networking.t

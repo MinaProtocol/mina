@@ -1,3 +1,8 @@
+(* bits.ml *)
+
+[%%import
+"/src/config.mlh"]
+
 open Core_kernel
 open Fold_lib
 open Bitstring_lib
@@ -79,6 +84,8 @@ module Vector = struct
 
     let of_bits bools =
       List.foldi bools ~init:V.empty ~f:(fun i t bool -> V.set t i bool)
+
+    let size_in_bits = V.length
   end
 end
 
@@ -87,6 +94,9 @@ module UInt64 : Bits_intf.Convertible_bits with type t := Unsigned.UInt64.t =
 
 module UInt32 : Bits_intf.Convertible_bits with type t := Unsigned.UInt32.t =
   Vector.Make (Vector.UInt32)
+
+[%%ifdef
+consensus_mechanism]
 
 module type Big_int_intf = sig
   include Snarky.Bigint_intf.S
@@ -125,6 +135,8 @@ module Make_field0
       if i < 0 then acc else go (Bigint.test_bit n i :: acc) (i - 1)
     in
     go [] (bit_length - 1)
+
+  let size_in_bits = bit_length
 end
 
 module Make_field
@@ -148,7 +160,7 @@ end
 
 module Snarkable = struct
   module Small_bit_vector
-      (Impl : Snarky_intf.S) (V : sig
+      (Impl : Snarky.Snark_intf.S) (V : sig
           type t
 
           val empty : t
@@ -176,6 +188,8 @@ module Snarkable = struct
 
     let () = assert (bit_length < Field.size_in_bits)
 
+    let size_in_bits = bit_length
+
     let init ~f =
       let rec go acc i =
         if i = V.length then acc else go (V.set acc i (f i)) (i + 1)
@@ -188,9 +202,10 @@ module Snarkable = struct
       type value = V.t
 
       let typ : (var, value) Typ.t =
+        let open Typ in
         let read v =
-          let open Typ.Read.Let_syntax in
-          let%map x = Typ.Read.read v in
+          let open Read.Let_syntax in
+          let%map x = Read.read v in
           let n = Bigint.of_field x in
           init ~f:(fun i -> Bigint.test_bit n i)
         in
@@ -203,11 +218,13 @@ module Snarkable = struct
               in
               go (Field.add two_to_the_i two_to_the_i) (i + 1) acc
           in
-          Typ.Store.store (go Field.one 0 Field.zero)
+          Store.store (go Field.one 0 Field.zero)
         in
-        let alloc = Typ.Alloc.alloc in
+        let alloc = Alloc.alloc in
         let check _ = Checked.return () in
-        Typ.{read; store; alloc; check}
+        {read; store; alloc; check}
+
+      let size_in_bits = size_in_bits
     end
 
     let v_to_list n v =
@@ -240,9 +257,11 @@ module Snarkable = struct
 
       let var_of_value v =
         List.init V.length ~f:(fun i -> Boolean.var_of_value (V.get v i))
+
+      let size_in_bits = size_in_bits
     end
 
-    let unpack_var x = Field.Checked.unpack x ~length:bit_length
+    let unpack_var x = Impl.Field.Checked.unpack x ~length:bit_length
 
     let var_of_field = unpack_var
 
@@ -251,18 +270,19 @@ module Snarkable = struct
     let unpack_value (x : Packed.value) : Unpacked.value = x
 
     let compare_var x y =
-      Field.Checked.compare ~bit_length:V.length (pack_var x) (pack_var y)
+      Impl.Field.Checked.compare ~bit_length:V.length (pack_var x) (pack_var y)
 
     let%snarkydef increment_if_var bs (b : Boolean.var) =
+      let open Impl in
       let v = Field.Var.pack bs in
       let v' = Field.Var.add v (b :> Field.Var.t) in
       Field.Checked.unpack v' ~length:V.length
 
-    let%snarkydef increment_var (bs : Unpacked.var) =
+    let%snarkydef increment_var bs =
+      let open Impl in
       let v = Field.Var.pack bs in
       let v' = Field.Var.add v (Field.Var.constant Field.one) in
-      ( Field.Checked.unpack v' ~length:V.length
-        : (Unpacked.var, _, Field.t) Snarky.Checked.t )
+      Field.Checked.unpack v' ~length:V.length
 
     let%snarkydef equal_var (n : Unpacked.var) (n' : Unpacked.var) =
       Field.Checked.equal (pack_var n) (pack_var n')
@@ -295,6 +315,8 @@ module Snarkable = struct
     open Impl
     include M
 
+    let size_in_bits = bit_length
+
     module Packed = struct
       type var = Field.Var.t
 
@@ -303,6 +325,8 @@ module Snarkable = struct
       let typ = Typ.field
 
       let assert_equal = Field.Checked.Assert.equal
+
+      let size_in_bits = size_in_bits
     end
 
     module Unpacked = struct
@@ -326,6 +350,8 @@ module Snarkable = struct
       let var_of_value v =
         unpack_field Field.unpack ~bit_length v
         |> List.map ~f:Boolean.var_of_value
+
+      let size_in_bits = size_in_bits
     end
 
     let project_value = Fn.id
@@ -396,3 +422,5 @@ struct
 
   let typ : (var, value) Typ.t = Typ.list ~length:M.bit_length Boolean.typ
 end
+
+[%%endif]

@@ -178,6 +178,50 @@ describe("Bindings", () =>
   })
 );
 
+describe("CurrencyFormatter", () => {
+  describe("toFormattedString", () => {
+    test("1 nanocoda", () => {
+      expect(CurrencyFormatter.toFormattedString(Int64.of_int(1)))
+      |> toBe("0.000000001")
+    });
+    test("90 coda", () => {
+      expect(
+        CurrencyFormatter.toFormattedString(Int64.of_string("90000000000")),
+      )
+      |> toBe("90")
+    });
+    test("no trailing zeroes", () => {
+      expect(CurrencyFormatter.toFormattedString(Int64.of_int(100)))
+      |> toBe("0.0000001")
+    });
+    test("fails on negative", () => {
+      expect(() =>
+        CurrencyFormatter.toFormattedString(Int64.of_int(-1))
+      )
+      |> toThrow
+    });
+  });
+  describe("ofFormattedString", () => {
+    test("1 nanocoda", () => {
+      expect(CurrencyFormatter.ofFormattedString("0.000000001"))
+      |> toEqual(Int64.of_string("1"))
+    });
+    test("90 coda", () => {
+      expect(CurrencyFormatter.ofFormattedString("90"))
+      |> toEqual(Int64.of_string("90000000000"))
+    });
+    test("no trailing zeroes", () => {
+      expect(CurrencyFormatter.ofFormattedString("0.0000001"))
+      |> toEqual(Int64.of_string("100"))
+    });
+    test("fails on negative", () => {
+      expect(() =>
+        CurrencyFormatter.ofFormattedString("-1")
+      ) |> toThrow
+    });
+  });
+});
+
 describe("Time", () => {
   let testNow =
     Js.Date.makeWithYMDHMS(

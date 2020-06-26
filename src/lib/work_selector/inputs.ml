@@ -8,33 +8,36 @@ module Test_inputs = struct
   module Transaction = Int
   module Ledger_proof_statement = Fee
 
+  module Transaction_protocol_state = struct
+    type 'a t = 'a
+  end
+
   module Ledger_proof = struct
-    module T = struct
-      type t = Fee.t [@@deriving hash, compare, sexp]
-
-      let of_binable = Fee.of_int
-
-      let to_binable = Fee.to_int
-    end
-
-    include Binable.Of_binable (Int) (T)
-    include T
+    type t = Fee.t [@@deriving hash, compare, sexp]
   end
 
   module Transaction_snark_work = struct
     type t = Fee.t
 
     let fee = Fn.id
+
+    module Statement = struct
+      type t = Transaction_snark.Statement.t One_or_two.t
+    end
   end
 
   module Snark_pool = struct
-    module T = struct
-      type t =
-        Transaction_snark.Statement.Stable.Latest.t One_or_two.Stable.Latest.t
-      [@@deriving bin_io, hash, compare, sexp]
-    end
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = Transaction_snark.Statement.Stable.V1.t One_or_two.Stable.V1.t
+        [@@deriving hash, compare, sexp]
 
-    module Work = Hashable.Make_binable (T)
+        let to_latest = Fn.id
+      end
+    end]
+
+    module Work = Hashable.Make_binable (Stable.Latest)
 
     type t = Currency.Fee.t Work.Table.t
 
@@ -57,7 +60,11 @@ module Test_inputs = struct
 
     let work = Fn.id
 
-    let all_work_pairs_exn = One_or_two.group_list
+    let all_work_pairs t ~get_state:_ = Ok (One_or_two.group_list t)
+
+    let all_work_statements_exn t =
+      List.map (One_or_two.group_list t)
+        ~f:(One_or_two.map ~f:Snark_work_lib.Work.Single.Spec.statement)
   end
 end
 
@@ -71,4 +78,5 @@ module Implementation_inputs = struct
   module Transaction_snark_work = Transaction_snark_work
   module Snark_pool = Network_pool.Snark_pool
   module Staged_ledger = Staged_ledger
+  module Transaction_protocol_state = Transaction_protocol_state
 end

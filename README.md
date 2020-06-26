@@ -1,5 +1,5 @@
 <a href="https://codaprotocol.com">
-	<img width="200" src="./frontend/website/static/img/coda-logo@3x.png" alt="Coda Logo" />
+	<img width="200" src="./frontend/website/public/static/img/coda-logo@3x.png" alt="Coda Logo" />
 </a>
 <hr/>
 
@@ -35,7 +35,7 @@ The [Developer docs](https://codaprotocol.com/docs/developers/) contain all the 
 
 #### Quick Links:
 * [Developer readme](README-dev.md)
-* [Compiling from source and and running a node](docs/demo.md)
+* [Compiling from source and running a node](docs/demo.md)
 * [Directory structure](frontend/website/docs/developers/directory-structure.md)
 * [Lifecycle of a payment](frontend/website/docs/architecture/lifecycle-payment.md)
 

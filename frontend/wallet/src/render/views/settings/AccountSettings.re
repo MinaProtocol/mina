@@ -146,10 +146,11 @@ module DeleteButton = {
            title="Delete Account" onRequestClose={_ => updateModal(_ => None)}>
            <div className=Styles.modalContainer>
              <div className=Styles.deleteAlert>
-               <Alert kind=`Warning message=warningMessage />
+               <Alert kind=`Warning defaultMessage=warningMessage />
              </div>
              {switch (error) {
-              | Some(errorText) => <Alert kind=`Danger message=errorText />
+              | Some(errorText) =>
+                <Alert kind=`Danger defaultMessage=errorText />
               | None => React.null
               }}
              <div className=Styles.deleteModalLabel>
@@ -201,7 +202,10 @@ module DeleteButton = {
                                  let message =
                                    err
                                    |> Array.get(~index=0)
-                                   |> Option.map(~f=e => e##message)
+                                   |> Option.map(
+                                        ~f=(e: ReasonApolloTypes.graphqlError) =>
+                                        e.message
+                                      )
                                    |> Option.withDefault(
                                         ~default="Server error",
                                       );
@@ -284,7 +288,8 @@ module BlockRewards = {
         {response =>
            switch (response.result) {
            | Loading => <Loader />
-           | Error(err) => <span> {React.string(err##message)} </span>
+           | Error((err: ReasonApolloTypes.apolloError)) =>
+             <span> {React.string(err.message)} </span>
            | Data(data) =>
              let account = Option.getExn(data##account);
              let isDelegationInProgress =
@@ -295,11 +300,17 @@ module BlockRewards = {
              switch (account.delegateAccount, data##syncStatus) {
              | (None, `SYNCED) =>
                <Well>
-                 <Alert kind=`Warning message="Your node is synced, but the account has not entered the ledger yet because there are no funds in this account. Have you requested from the faucet yet?" />
+                 <Alert
+                   kind=`Warning
+                   defaultMessage="Your node is synced, but the account has not entered the ledger yet because there are no funds in this account. Have you requested from the faucet yet?"
+                 />
                </Well>
-             | (None, _) => 
-                <Well>
-                 <Alert kind=`Warning message="Wait until fully synced..." />
+             | (None, _) =>
+               <Well>
+                 <Alert
+                   kind=`Warning
+                   defaultMessage="Wait until fully synced..."
+                 />
                </Well>
              | (Some(delegate), _) =>
                let isDelegation =
@@ -337,7 +348,18 @@ module BlockRewards = {
                                     onMouseLeave={_ =>
                                       setStakingHovered(_ => false)
                                     }
-                                    onClick={_ => Task.liftPromise(mutate) |> Task.perform(~f=_ => {Bindings.setTimeout(100) |> ignore response.refetch(Some(accountInfoVariables))} |> ignore) }
+                                    onClick={_ =>
+                                      Task.liftPromise(mutate)
+                                      |> Task.perform(~f=_ =>
+                                           {
+                                             Bindings.setTimeout(100) |> ignore;
+                                             response.refetch(
+                                               Some(accountInfoVariables),
+                                             );
+                                           }
+                                           |> ignore
+                                         )
+                                    }
                                   />
                               )
                             </DisableStakingMutation>
@@ -417,7 +439,8 @@ module BlockRewards = {
   };
 };
 
-[@bs.scope "window"] [@bs.val] external showItemInFolder: string => unit = "";
+[@bs.scope "window"] [@bs.val]
+external showItemInFolder: string => unit = "showItemInFolder";
 
 module KeypathQueryString = [%graphql
   {|
@@ -538,8 +561,6 @@ let make = (~publicKey) => {
         </KeypathQuery>
       </div>
     </div>
-    <Spacer height=1.5 />
-    <BlockRewards publicKey />
     <Spacer height=4.0 />
     <DeleteButton publicKey />
   </div>;

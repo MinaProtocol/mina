@@ -26,7 +26,7 @@ let make = (~onClose) => {
     <div className=Modal.Styles.default>
       <Alert
         kind=`Info
-        message="You can rename or delete your account at anytime."
+        defaultMessage="You can rename or delete your account at anytime."
       />
       <Spacer height=1. />
       <TextField
@@ -46,9 +46,10 @@ let make = (~onClose) => {
         <Button label="Cancel" style=Button.Gray onClick={_ => onClose()} />
         <Spacer width=1. />
         <AddAccountMutation>
-          {(mutation, _) =>
+          {(mutation, {result}) =>
              <Button
                label="Create"
+               disabled={result === Loading}
                style=Button.Green
                onClick={_ => {
                  let variables = AddAccount.make(~password, ())##variables;
@@ -71,6 +72,7 @@ let make = (~onClose) => {
                          updateAddressBook(
                            AddressBook.set(~key, ~name=accountName),
                          );
+
                          onClose();
                        },
                  );

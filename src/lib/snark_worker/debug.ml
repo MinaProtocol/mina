@@ -7,9 +7,14 @@ module Inputs = struct
   module Worker_state = struct
     include Unit
 
-    let create () = Deferred.unit
+    let create ~proof_level ~constraint_constants:_ () =
+      match proof_level with
+      | Genesis_constants.Proof_level.Full ->
+          failwith "Unable to handle proof-level=Full"
+      | Check | None ->
+          Deferred.unit
 
-    let worker_wait_time = 0.1
+    let worker_wait_time = 0.5
   end
 
   let perform_single () ~message s =
@@ -18,5 +23,3 @@ module Inputs = struct
         , Coda_base.Sok_message.digest message )
       , Time.Span.zero )
 end
-
-module Worker = Functor.Make (Inputs)

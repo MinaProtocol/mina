@@ -1,8 +1,23 @@
+[%%import
+"/src/config.mlh"]
+
 open Core_kernel
-open Snark_bits
 open Fold_lib
 open Tuple_lib
 open Unsigned
+
+[%%ifdef
+consensus_mechanism]
+
+open Snark_bits
+
+[%%else]
+
+open Snark_bits_nonconsensus
+module Unsigned_extended = Unsigned_extended_nonconsensus.Unsigned_extended
+module Random_oracle = Random_oracle_nonconsensus.Random_oracle
+
+[%%endif]
 
 module type S_unchecked = sig
   type t [@@deriving sexp, compare, hash, yojson]
@@ -42,8 +57,13 @@ module type S_unchecked = sig
 
   val of_bits : bool list -> t
 
+  val to_input : t -> (_, bool) Random_oracle.Input.t
+
   val fold : t -> bool Triple.t Fold.t
 end
+
+[%%ifdef
+consensus_mechanism]
 
 module type S_checked = sig
   type unchecked
@@ -71,6 +91,8 @@ module type S_checked = sig
 
   val to_bits : t -> (Boolean.var Bitstring.Lsb_first.t, _) Checked.t
 
+  val to_input : t -> ((_, Boolean.var) Random_oracle.Input.t, _) Checked.t
+
   val to_integer : t -> field Snarky_integer.Integer.t
 
   val succ_if : t -> Boolean.var -> (t, _) Checked.t
@@ -97,11 +119,15 @@ module type S_checked = sig
   end
 end
 
-module type S = sig
-  open Bitstring_lib
-  open Snark_params.Tick
+[%%endif]
 
+module type S = sig
   include S_unchecked
+
+  [%%ifdef consensus_mechanism]
+
+  open Snark_params.Tick
+  open Bitstring_lib
 
   module Checked : S_checked with type unchecked := t
 
@@ -109,6 +135,8 @@ module type S = sig
   val typ : (Checked.t, t) Snark_params.Tick.Typ.t
 
   val var_to_bits : Checked.t -> Boolean.var Bitstring.Lsb_first.t
+
+  [%%endif]
 end
 
 module type UInt32 = sig

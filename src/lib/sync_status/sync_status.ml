@@ -7,7 +7,7 @@ open Core_kernel
     the node receives a constant flow of messages, its state should be SYNCED.
     However, when the node is bootstrapping, its state is BOOTSTRAPPING. If it
     hasn’t received messages for some time
-    (Consensus.Constants.inactivity_secs), then it is OFFLINE. *)
+    (Coda_compile_config.inactivity_secs), then it is OFFLINE. *)
 let to_string = function
   | `Connecting ->
       "Connecting"
@@ -41,31 +41,35 @@ let of_string string =
 
 let to_yojson status = `String (to_string status)
 
-[%%versioned
-module Stable = struct
-  module V1 = struct
-    type t =
-      [`Connecting | `Listening | `Offline | `Bootstrap | `Synced | `Catchup]
-    [@@deriving sexp, hash, compare, equal, enumerate]
+module T = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t =
+        [`Connecting | `Listening | `Offline | `Bootstrap | `Synced | `Catchup]
+      [@@deriving sexp, hash, compare, equal, enumerate]
 
-    let to_latest = Fn.id
+      let to_latest = Fn.id
 
-    let to_yojson = to_yojson
+      let to_yojson = to_yojson
 
-    module T = struct
-      type typ = t [@@deriving sexp, hash, compare, equal, enumerate]
+      module T = struct
+        type typ = t [@@deriving sexp, hash, compare, equal, enumerate]
 
-      type t = typ [@@deriving sexp, hash, compare, equal, enumerate]
+        type t = typ [@@deriving sexp, hash, compare, equal, enumerate]
+      end
+
+      include Hashable.Make (T)
     end
+  end]
 
-    include Hashable.Make (T)
-  end
-end]
+  type t =
+    [`Connecting | `Listening | `Offline | `Bootstrap | `Synced | `Catchup]
+  [@@deriving sexp, hash, equal, compare, enumerate]
+end
 
-type t = [`Connecting | `Listening | `Offline | `Bootstrap | `Synced | `Catchup]
-[@@deriving sexp, hash, equal, enumerate]
-
-include Hashable.Make (Stable.Latest.T)
+include T
+include Hashable.Make (T)
 
 let%test "of_string (to_string x) == x" =
   List.for_all

@@ -43,7 +43,7 @@ end
 (** A monoid for tracking the "dirty bit" of whether or not we've generated
  * something or only received cache hits *)
 module Track_generated : sig
-  type t = [`Generated_something | `Cache_hit]
+  type t = [`Generated_something | `Locally_generated | `Cache_hit]
 
   val empty : t
 

@@ -1,0 +1,11 @@
+(library
+ (name genesis_proof)
+ (public_name coda_genesis_proof)
+ (libraries
+   coda_base
+   coda_state
+   consensus
+   keys_lib
+   genesis_constants
+   with_hash)
+ (preprocess (pps ppx_version)))

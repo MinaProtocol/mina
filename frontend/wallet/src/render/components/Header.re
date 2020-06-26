@@ -1,3 +1,5 @@
+open ReactIntl;
+
 module Styles = {
   open Css;
   open Theme;
@@ -53,6 +55,7 @@ module Styles = {
           borderRadius(`px(6)),
           color(Theme.Colors.slate),
         ]),
+        textTransform(`capitalize),
       ]),
     ]);
 
@@ -110,16 +113,40 @@ module SyncStatus = {
     /*     None; */
     /*   }); */
     switch ((result: SyncStatusQuery.response)) {
-    | Loading => <Alert kind=`Warning message="Connecting" />
-    | Error(_) => <Alert kind=`Danger message="Error" />
+    | Loading =>
+      <Alert
+        kind=`Warning
+        messageID="connecting"
+        defaultMessage="Connecting"
+      />
+    | Error(_) =>
+      <Alert kind=`Danger messageID="error" defaultMessage="Error" />
     | Data(response) =>
       switch (response##syncStatus) {
-      | `OFFLINE => <Alert kind=`Danger message="Offline" />
-      | `SYNCED => <Alert kind=`Success message="Synced" />
-      | `BOOTSTRAP => <Alert kind=`Warning message="Syncing" />
-      | `CONNECTING => <Alert kind=`Warning message="Connecting" />
-      | `CATCHUP => <Alert kind=`Warning message="Catching up" />
-      | `LISTENING => <Alert kind=`Warning message="Listening" />
+      | `OFFLINE =>
+        <Alert kind=`Danger messageID="offline" defaultMessage="Offline" />
+      | `SYNCED =>
+        <Alert kind=`Success messageID="synced" defaultMessage="Synced" />
+      | `BOOTSTRAP =>
+        <Alert kind=`Warning messageID="syncing" defaultMessage="Syncing" />
+      | `CONNECTING =>
+        <Alert
+          kind=`Warning
+          messageID="connecting"
+          defaultMessage="Connecting"
+        />
+      | `CATCHUP =>
+        <Alert
+          kind=`Warning
+          messageID="catching up"
+          defaultMessage="Catching up"
+        />
+      | `LISTENING =>
+        <Alert
+          kind=`Warning
+          messageID="listening"
+          defaultMessage="Listening"
+        />
       }
     };
   };
@@ -196,7 +223,6 @@ let make = () => {
     <div className=Styles.logo onClick={_ => ReasonReact.Router.push("/")}>
       <img src=codaSvg alt="Coda logo" />
     </div>
-    <DefaultToast />
     <div className=Styles.rightButtons>
       <SyncStatusQuery fetchPolicy="no-cache" partialRefetch=true>
         {response =>
@@ -218,12 +244,8 @@ let make = () => {
            ? <Icon kind=Icon.Cross /> : <Icon kind=Icon.Settings />}
         <Spacer width=0.25 />
         {onSettingsPage
-           ? {
-             React.string("Close");
-           }
-           : {
-             React.string("Settings");
-           }}
+           ? <FormattedMessage id="close" defaultMessage="Close" />
+           : <FormattedMessage id="settings" defaultMessage="Settings" />}
       </a>
     </div>
   </header>;

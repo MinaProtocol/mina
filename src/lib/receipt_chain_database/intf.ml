@@ -80,8 +80,8 @@ module type Tree_node = sig
   end
 
   type t = Stable.Latest.t =
-    { key: Receipt.Chain_hash.Stable.V1.t
-    ; value: User_command.Stable.V1.t
-    ; parent: Receipt.Chain_hash.Stable.V1.t }
+    { key: Receipt.Chain_hash.t
+    ; value: User_command.t
+    ; parent: Receipt.Chain_hash.t }
   [@@deriving sexp]
 end

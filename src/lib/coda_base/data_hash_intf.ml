@@ -2,25 +2,40 @@
 "/src/config.mlh"]
 
 open Core_kernel
+
+[%%ifdef
+consensus_mechanism]
+
 open Snark_params.Tick
 open Snark_bits
 
-module type Basic = sig
-  type t = Pedersen.Digest.t [@@deriving sexp, yojson]
+[%%else]
 
-  val gen : t Quickcheck.Generator.t
+open Snark_params_nonconsensus
+module Random_oracle = Random_oracle_nonconsensus.Random_oracle
+
+[%%endif]
+
+module type Data_hash_descriptor = sig
+  val version_byte : char
+
+  val description : string
+end
+
+module type Basic = sig
+  type t = Field.t [@@deriving sexp, yojson]
 
   val to_decimal_string : t -> string
 
   val to_bytes : t -> string
 
-  [%%if defined consensus_mechanism]
+  [%%ifdef consensus_mechanism]
+
+  val gen : t Quickcheck.Generator.t
 
   type var
 
-  val var_of_hash_unpacked : Pedersen.Checked.Digest.Unpacked.var -> var
-
-  val var_to_hash_packed : var -> Pedersen.Checked.Digest.var
+  val var_to_hash_packed : var -> Random_oracle.Checked.Digest.t
 
   val var_to_input : var -> (Field.Var.t, Boolean.var) Random_oracle.Input.t
 
@@ -34,9 +49,22 @@ module type Basic = sig
 
   val var_of_t : t -> var
 
+  (* TODO : define bit ops using Random_oracle instead of Pedersen.Digest,
+     move this outside of consensus_mechanism guard
+  *)
+  include Bits_intf.S with type t := t
+
   [%%endif]
 
-  include Bits_intf.S with type t := t
+  val to_string : t -> string
+
+  val of_string : string -> t
+
+  val to_base58_check : t -> string
+
+  val of_base58_check : string -> t Base.Or_error.t
+
+  val of_base58_check_exn : string -> t
 
   val to_input : t -> (Field.t, bool) Random_oracle.Input.t
 end
@@ -44,41 +72,17 @@ end
 module type Full_size = sig
   include Basic
 
-  [%%versioned:
-  module Stable : sig
-    module V1 : sig
-      type t = Pedersen.Digest.Stable.V1.t
-      [@@deriving sexp, compare, hash, yojson]
-
-      include Comparable.S with type t := t
-
-      include Hashable_binable with type t := t
-    end
-  end]
-
   include Comparable.S with type t := t
 
   include Hashable with type t := t
 
-  [%%if defined consensus_mechanism]
+  [%%ifdef consensus_mechanism]
 
   val if_ : Boolean.var -> then_:var -> else_:var -> (var, _) Checked.t
 
-  val var_of_hash_packed : Pedersen.Checked.Digest.var -> var
+  val var_of_hash_packed : Random_oracle.Checked.Digest.t -> var
 
   [%%endif]
 
-  val of_hash : Pedersen.Digest.t -> t
-end
-
-module type Small = sig
-  include Basic
-
-  [%%if defined consensus_mechanism]
-
-  val var_of_hash_packed : Pedersen.Checked.Digest.var -> (var, _) Checked.t
-
-  [%%endif]
-
-  val of_hash : Pedersen.Digest.t -> t Or_error.t
+  val of_hash : Field.t -> t
 end

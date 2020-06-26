@@ -6,6 +6,9 @@
 [%%import "/src/config/debug_level/all.mlh"]
 [%%import "/src/config/proof_level/check.mlh"]
 [%%import "/src/config/txpool_size.mlh"]
+[%%import "/src/config/account_creation_fee/standard.mlh"]
+[%%import "/src/config/amount_defaults/standard.mlh"]
+[%%import "/src/config/protocol_version/current.mlh"]
 
 [%%define time_offsets false]
 [%%define fake_hash false]
@@ -22,3 +25,4 @@
 [%%define print_versioned_types false]
 
 [%%define daemon_expiry "never"]
+[%%define test_full_epoch false]

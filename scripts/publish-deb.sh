@@ -8,6 +8,7 @@ DEBS3='deb-s3 upload '\
 '--s3-region=us-west-2 '\
 '--bucket packages.o1test.net '\
 '--preserve-versions '\
+'--lock '\
 '--cache-control=max-age=120 '\
 '--component main'
 
@@ -55,7 +56,7 @@ esac
 
 # only publish wanted jobs
 case "$CIRCLE_JOB" in
-    build-artifacts--testnet_postake_medium_curves | build-artifacts--net_10k | FORCED)
+    build-artifacts--testnet_postake_medium_curves | FORCED)
         echo "Publishing debs: ${DEBS}"
         set -x
         ${DEBS3} --codename "${CODENAME}" "${DEBS}"
