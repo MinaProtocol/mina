@@ -178,7 +178,7 @@ module Statement : sig
           , Fee_excess.Stable.V1.t
           , Sok_message.Digest.Stable.V1.t )
           Poly.Stable.V1.t
-        [@@deriving compare, equal, hash, sexp, yojson]
+        [@@deriving compare, equal, hash, sexp, to_yojson]
       end
     end]
 
@@ -189,7 +189,7 @@ module Statement : sig
       , Fee_excess.t
       , Sok_message.Digest.t )
       Poly.t
-    [@@deriving sexp, hash, compare, yojson]
+    [@@deriving sexp, hash, compare, to_yojson]
 
     type var =
       ( Frozen_ledger_hash.var

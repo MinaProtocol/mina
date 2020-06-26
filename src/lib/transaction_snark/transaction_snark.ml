@@ -258,15 +258,16 @@ module Statement = struct
           , Currency.Amount.Stable.V1.t
           , Pending_coinbase_stack_state.Stable.V1.t
           , Fee_excess.Stable.V1.t
-          , Sok_message.Digest.Stable.V1.t )
+          , (Sok_message.Digest.Stable.V1.t[@to_yojson
+                                             fun _ -> `String "<opaque>"]) )
           Poly.Stable.V1.t
-        [@@deriving compare, equal, hash, sexp, yojson]
+        [@@deriving compare, equal, hash, sexp, to_yojson]
 
         let to_latest = Fn.id
       end
     end]
 
-    type t = Stable.Latest.t [@@deriving sexp, hash, compare, yojson]
+    type t = Stable.Latest.t [@@deriving sexp, hash, compare, to_yojson]
 
     type var =
       ( Frozen_ledger_hash.var
@@ -421,26 +422,14 @@ module Stable = struct
   module V1 = struct
     type t =
       {statement: Statement.With_sok.Stable.V1.t; proof: Proof.Stable.V1.t}
-    [@@deriving compare, fields, sexp, version]
-
-    let to_yojson {statement= s; proof} =
-      `Assoc
-        [ ("source", Frozen_ledger_hash.to_yojson s.source)
-        ; ("target", Frozen_ledger_hash.to_yojson s.target)
-        ; ("supply_increase", Amount.to_yojson s.supply_increase)
-        ; ( "pending_coinbase_stack_state"
-          , Pending_coinbase_stack_state.to_yojson
-              s.pending_coinbase_stack_state )
-        ; ("fee_excess", Fee_excess.to_yojson s.fee_excess)
-        ; ("sok_digest", `String "<opaque>")
-        ; ("proof", Proof.to_yojson proof) ]
+    [@@deriving compare, fields, sexp, version, to_yojson]
 
     let to_latest = Fn.id
   end
 end]
 
 type t = Stable.Latest.t = {statement: Statement.With_sok.t; proof: Proof.t}
-[@@deriving sexp]
+[@@deriving sexp, to_yojson]
 
 let proof t = t.proof
 
