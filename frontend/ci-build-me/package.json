@@ -13,14 +13,21 @@
     "type": "git",
     "url": "git+https://github.com/eddies/github-webhook-cloud-function.git"
   },
-  "keywords": ["github", "buildkite", "google cloud functions", "node"],
+  "keywords": [
+    "github",
+    "buildkite",
+    "google cloud functions",
+    "node"
+  ],
   "author": "Edwin Shin",
   "license": "ISC",
   "bugs": {
     "url": "https://github.com/eddies/github-webhook-cloud-function/issues"
   },
   "homepage": "https://github.com/eddies/github-webhook-cloud-function#readme",
-  "dependencies": {},
+  "dependencies": {
+    "axios": "^0.19.2"
+  },
   "devDependencies": {
     "@google-cloud/functions-framework": "^1.6.0",
     "eslint": "^6.8.0",
@@ -31,11 +38,16 @@
     "smee-client": "^1.1.0"
   },
   "jest": {
-    "collectCoverageFrom": ["src/**/*.js"],
+    "collectCoverageFrom": [
+      "src/**/*.js"
+    ],
     "coverageDirectory": "build/coverage",
     "testEnvironment": "node"
   },
   "nodemonConfig": {
-    "ignore": ["test/*", "docs/*"]
+    "ignore": [
+      "test/*",
+      "docs/*"
+    ]
   }
 }

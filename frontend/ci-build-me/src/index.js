@@ -2,6 +2,7 @@ const github = require("./util/github");
 const HTTPError = require("./util/httpError");
 
 const { httpsRequest } = require("./util/httpsRequest");
+const axios = require("axios");
 
 const apiKey = process.env.BUILDKITE_API_ACCESS_TOKEN;
 
@@ -32,17 +33,54 @@ const runBuild = async (github) => {
   return request;
 };
 
+const getRequest = async (url) => {
+  const request = await axios.get(url);
+  if (request.status < 200 || request.status >= 300) {
+    throw new HTTPError(request.status);
+  }
+  return request;
+};
+
 const handler = async (event, req) => {
   const buildkiteTrigger = {};
+  let request;
   if (event == "pull_request") {
     if (
+      // if PR has ci-build-me label
       req.body.pull_request.labels.filter(
         (label) => label.name == "ci-build-me"
       ).length > 0 &&
-      (req.body.action == "synchronize" || req.body.action == "labeled")
+      // and we are pushing new commits or actively adding this label
+      (req.body.action == "synchronize" || req.body.action == "labeled") &&
+      // and this is PR _not_ from a fork
+      req.body.pull_request.head.user.login ==
+        req.body.pull_request.base.user.login
     ) {
       request = await runBuild(req.body);
       return request;
+    }
+  } else if (event == "issue_comment") {
+    if (
+      // we are creating the comment
+      req.body.action == "created" &&
+      // and this is actually a pull request
+      req.body.issue.pull_request &&
+      req.body.issue.pull_request.url &&
+      // and the comment contents is exactly the slug we are looking for
+      req.body.comment.body == "!ci-build-me"
+    ) {
+      const orgData = await getRequest(req.body.sender.organizations_url);
+      // and the comment author is part of the core team
+      if (
+        orgData.data.filter((org) => org.login == "CodaProtocol").length > 0
+      ) {
+        const prData = await getRequest(req.body.issue.pull_request.url);
+        const request = await runBuild({
+          sender: req.body.sender,
+          pull_request: prData.data,
+        });
+        return request;
+      }
     }
   }
   return null;
