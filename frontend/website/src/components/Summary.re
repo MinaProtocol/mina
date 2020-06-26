@@ -93,7 +93,7 @@ module Styles = {
       unsafe("width", "fit-content"),
       media(
         Theme.MediaQuery.tablet,
-        [paddingLeft(`zero), marginBottom(`rem(3.)), alignItems(`center)],
+        [paddingLeft(`zero), marginBottom(`rem(8.)), alignItems(`center)],
       ),
     ]);
   let flexColumn =
