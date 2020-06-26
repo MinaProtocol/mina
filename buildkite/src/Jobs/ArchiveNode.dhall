@@ -25,7 +25,10 @@ Pipeline.build
           Command.Config::
             { commands = OpamInit.andThenRunInDocker (Prelude.Text.concatSep "\n"
                 [ "sudo apt-get install -y postgresql"
-                , "PGPASSWORD=codarules psql -h localhost -p 5432 -U admin -d archiver -a -f src/app/archive/create_schema.sql"
+                , "sudo service postgresql start"
+                , "su -u postgres psql --command \"CREATE USER pguser WITH SUPERUSER PASSWORD 'pguser';\""
+                , "su -u postgres createdb -O pguser archiver"
+                , "PGPASSWORD=pguser psql -h localhost -p 5432 -U pguser -d archiver -a -f src/app/archive/create_schema.sql"
                 , "./scripts/test.py run 'test_archive_processor:coda-archive-processor-test'"
                 ])
             , label = "Archive-node unit tests"
