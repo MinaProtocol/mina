@@ -56,47 +56,81 @@ module Styles = {
   let middleRow =
     style([
       display(`flex),
-      flexDirection(`row),
+      flexDirection(`column),
+      media(
+        Theme.MediaQuery.notMobile,
+        [justifyContent(`spaceBetween), marginTop(`rem(5.))],
+      ),
       media(
         Theme.MediaQuery.veryVeryLarge,
-        [selector(":last-child", [marginLeft(`rem(10.))])],
+        [flexDirection(`row), marginTop(`rem(4.8)), width(`rem(75.))],
       ),
     ]);
-  let linksColumn = merge([flexColumn, style([marginLeft(`rem(10.))])]);
+  let buttonAndLinks =
+    merge([
+      flexColumn,
+      style([
+        marginTop(`rem(3.)),
+        justifyContent(`spaceBetween),
+        media(
+          Theme.MediaQuery.notMobile,
+          [
+            marginLeft(`auto),
+            marginRight(`auto),
+            marginTop(`rem(5.25)),
+            flexDirection(`row),
+            width(`rem(35.)),
+          ],
+        ),
+        media(
+          Theme.MediaQuery.veryVeryLarge,
+          [
+            flexDirection(`column),
+            marginLeft(`zero),
+            marginRight(`zero),
+            marginTop(`zero),
+          ],
+        ),
+      ]),
+    ]);
+  let linksColumn = merge([flexColumn, style([])]);
 };
 
 module Links = {
   [@react.component]
   let make = () => {
-    <div className=Styles.linksColumn>
+    <div className=Styles.buttonAndLinks>
       <Button
         link=""
         label="Current Challenges"
         bgColor=Theme.Colors.clover
         bgColorHover=Theme.Colors.jungle
       />
-      <Next.Link href="">
-        <a className=Styles.link>
-          <Svg
-            link="/static/img/Icon.Link.svg"
-            dims=(1.0, 1.0)
-            className=Styles.icon
-            alt="an arrow pointing to the right with a square around it"
-          />
-          {React.string("Leaderboard FAQ")}
-        </a>
-      </Next.Link>
-      <Next.Link href="">
-        <a className=Styles.link>
-          <Svg
-            link="/static/img/Icon.Link.svg"
-            dims=(0.9425, 0.8725)
-            className=Styles.icon
-            alt="an arrow pointing to the right with a square around it"
-          />
-          {React.string("Discord #Leaderboard Channel")}
-        </a>
-      </Next.Link>
+      <Spacer height=1. />
+      <div className=Styles.linksColumn>
+        <Next.Link href="">
+          <a className=Styles.link>
+            <Svg
+              link="/static/img/Icon.Link.svg"
+              dims=(1.0, 1.0)
+              className=Styles.icon
+              alt="an arrow pointing to the right with a square around it"
+            />
+            {React.string("Leaderboard FAQ")}
+          </a>
+        </Next.Link>
+        <Next.Link href="">
+          <a className=Styles.link>
+            <Svg
+              link="/static/img/Icon.Link.svg"
+              dims=(0.9425, 0.8725)
+              className=Styles.icon
+              alt="an arrow pointing to the right with a square around it"
+            />
+            {React.string("Discord #Leaderboard Channel")}
+          </a>
+        </Next.Link>
+      </div>
     </div>;
   };
 };
@@ -104,32 +138,101 @@ module Links = {
 module Points = {
   module Styles = {
     open Css;
-    let flexColumn = style([display(`flex), flexDirection(`column)]);
-    let flexRow = style([display(`flex), flexDirection(`row)]);
-    let linkRow = merge([flexRow, style([marginBottom(`rem(4.75))])]);
+    let pointsColumn = style([display(`flex), flexDirection(`column)]);
+    let flexColumn = pointsColumn;
+    let rankAndPoints =
+      style([
+        display(`flex),
+        flexDirection(`row),
+        marginTop(`rem(1.3)),
+        justifyContent(`spaceBetween),
+        width(`rem(12.5)),
+      ]);
+
+    let pointsRow =
+      style([
+        display(`flex),
+        flexDirection(`row),
+        justifyContent(`center),
+        selector(
+          "> :last-child",
+          [
+            display(`none),
+            media(Theme.MediaQuery.notMobile, [display(`inlineBlock)]),
+          ],
+        ),
+        selector(
+          "> :first-child",
+          [
+            display(`none),
+            media(Theme.MediaQuery.notMobile, [display(`inlineBlock)]),
+          ],
+        ),
+        media(
+          Theme.MediaQuery.notMobile,
+          [width(`rem(51.)), justifyContent(`spaceBetween)],
+        ),
+        media(
+          Theme.MediaQuery.veryVeryLarge,
+          [width(`rem(46.5)), justifyContent(`spaceBetween)],
+        ),
+      ]);
+    let linkRow =
+      merge([
+        pointsRow,
+        style([
+          marginBottom(`rem(4.75)),
+          marginTop(`rem(1.3)),
+          media(Theme.MediaQuery.notMobile, [marginTop(`rem(5.))]),
+          media(Theme.MediaQuery.veryVeryLarge, [marginTop(`zero)]),
+        ]),
+      ]);
     let pointType =
       merge([
         Theme.H4.header,
-        style([position(`relative), top(`px(5)), left(`px(10))]),
+        style([
+          display(`block),
+          position(`relative),
+          top(`px(5)),
+          textAlign(`center),
+        ]),
       ]);
     let rank =
-      merge([Theme.H6.extraSmall, style([textTransform(`uppercase)])]);
+      merge([
+        Theme.H6.extraSmall,
+        style([
+          textTransform(`uppercase),
+          color(Theme.Colors.saville),
+          fontSize(`rem(1.)),
+          lineHeight(`rem(1.5)),
+        ]),
+      ]);
     let points = merge([flexColumn, style([marginLeft(`rem(2.))])]);
+    let value =
+      merge([
+        Theme.H3.basic,
+        style([
+          fontSize(`rem(2.25)),
+          fontWeight(`semiBold),
+          color(Theme.Colors.saville),
+          marginTop(`px(10)),
+        ]),
+      ]);
   };
 
   module PointsColumn = {
     [@react.component]
     let make = (~pointType, ~rank, ~points) => {
-      <div className=Styles.flexColumn>
-        <p className=Styles.pointType> {React.string(pointType)} </p>
-        <div className=Styles.linkRow>
-          <span className=Styles.flexColumn>
+      <div className=Styles.pointsColumn>
+        <span className=Styles.pointType> {React.string(pointType)} </span>
+        <div className=Styles.rankAndPoints>
+          <span className=Styles.pointsColumn>
             <span className=Styles.rank> {React.string("Rank")} </span>
-            <span> {React.string(rank)} </span>
+            <span className=Styles.value> {React.string(rank)} </span>
           </span>
           <div className=Styles.points>
-            <span> {React.string("Points *")} </span>
-            <span> {React.string(points)} </span>
+            <span className=Styles.rank> {React.string("Points *")} </span>
+            <span className=Styles.value> {React.string(points)} </span>
           </div>
         </div>
       </div>;
@@ -143,7 +246,7 @@ module Points = {
         ~pointsforPhase="11000",
         ~pointsAllTime="100000",
       ) => {
-    <div className=Styles.flexRow>
+    <div className=Styles.pointsRow>
       <PointsColumn pointType="This Release" rank="1" points="5000" />
       <PointsColumn pointType="This Phase" rank="19" points="10000" />
       <PointsColumn pointType="All Time" rank="101" points="10500" />
