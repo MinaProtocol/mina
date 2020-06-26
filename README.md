@@ -3,6 +3,8 @@
 </a>
 <hr/>
 
+Test
+
 Coda is the first cryptocurrency with a lightweight, constant-sized blockchain. This is the main source code repository for the Coda project. It contains code for the OCaml protocol implementation, [website](https://codaprotocol.com), and wallet. Enjoy!
 
 ## Notes
@@ -13,15 +15,18 @@ Coda is the first cryptocurrency with a lightweight, constant-sized blockchain. 
 ## What is Coda?
 
 ### Coda Walkthrough
+
 - [Overview of Coda](https://codaprotocol.com/docs/)
 - [Getting Started](https://codaprotocol.com/docs/getting-started/)
 - [My First Transaction](https://codaprotocol.com/docs/my-first-transaction/)
 - [Become a Node Operator](https://codaprotocol.com/docs/node-operator/)
 
 ### Technical Papers
+
 - [Coda Whitepaper](https://cdn.codaprotocol.com/v2/static/coda-whitepaper-05-10-2018-0.pdf)
 
 ### Blog
+
 - [Coda Protocol Blog](https://codaprotocol.com/blog.html)
 
 ## Contributing
@@ -32,13 +37,12 @@ Read the [Contributing Guide](https://codaprotocol.com/docs/contributing/) for i
 
 The [Developer docs](https://codaprotocol.com/docs/developers/) contain all the information needed to begin contributing code to Coda, and using Coda APIs to build applications.
 
-
 #### Quick Links:
-* [Developer readme](README-dev.md)
-* [Compiling from source and and running a node](docs/demo.md)
-* [Directory structure](frontend/website/docs/developers/directory-structure.md)
-* [Lifecycle of a payment](frontend/website/docs/architecture/lifecycle-payment.md)
 
+- [Developer readme](README-dev.md)
+- [Compiling from source and and running a node](docs/demo.md)
+- [Directory structure](frontend/website/docs/developers/directory-structure.md)
+- [Lifecycle of a payment](frontend/website/docs/architecture/lifecycle-payment.md)
 
 ## Community
 
