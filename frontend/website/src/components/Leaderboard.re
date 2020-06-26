@@ -126,6 +126,13 @@ module Styles = {
   let activePointsCell =
     merge([cell, style([justifySelf(`flexEnd), fontWeight(`semiBold)])]);
   let inactivePointsCell = merge([pointsCell, style([opacity(0.5)])]);
+
+  let loading =
+    style([
+      padding(`rem(5.)),
+      color(Theme.Colors.leaderboardMidnight),
+      textAlign(`center),
+    ]);
 };
 
 module LeaderboardRow = {
@@ -151,12 +158,37 @@ module LeaderboardRow = {
   };
 };
 
+type filter =
+  | All
+  | Genesis
+  | NonGenesis;
+
+type sort =
+  | Release
+  | Phase
+  | AllTime;
+
+type state = {
+  loading: bool,
+  members: array(member),
+};
+let initialState = {loading: true, members: [||]};
+
+type actions =
+  | UpdateMembers(array(member));
+
+let reducer = (_, action) => {
+  switch (action) {
+  | UpdateMembers(members) => {loading: false, members}
+  };
+};
+
 [@react.component]
 let make = () => {
-  let (entries, setEntries) = React.useState(() => [||]);
+  let (state, dispatch) = React.useReducer(reducer, initialState);
 
   React.useEffect0(() => {
-    fetchLeaderboard() |> Promise.iter(e => setEntries(_ => e));
+    fetchLeaderboard() |> Promise.iter(e => dispatch(UpdateMembers(e)));
     None;
   });
 
@@ -177,9 +209,12 @@ let make = () => {
              rank={member.rank}
              member
            />,
-         entries,
+         state.members,
        )
        |> React.array}
+      {state.loading
+         ? <div className=Styles.loading> {React.string("Loading...")} </div>
+         : React.null}
     </div>
   </div>;
 };
