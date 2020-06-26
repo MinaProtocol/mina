@@ -743,7 +743,7 @@ jobs:
                 command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Run unit tests
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/run_unit_tests_ci.sh dev || (./scripts/link-coredumps.sh && false)'
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && make build && ./scripts/run_unit_tests_ci.sh dev || (./scripts/link-coredumps.sh && false)'
                   environment:
                     DUNE_PROFILE: dev
                     LIBP2P_NIXLESS: 1
@@ -790,7 +790,7 @@ jobs:
                 command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Run unit tests
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && (dune runtest src/nonconsensus --profile=nonconsensus_medium_curves -j8 || (./scripts/link-coredumps.sh && false))'
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/run_unit_tests_ci.sh nonconsensus_medium_curves || (./scripts/link-coredumps.sh && false)'
                   no_output_timeout: 30m
                   environment:
                     DUNE_PROFILE: nonconsensus_medium_curves
