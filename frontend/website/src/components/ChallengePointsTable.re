@@ -164,16 +164,6 @@ module Styles = {
   };
 };
 
-let challengeInfo = [|
-  (None, "Coda Sandbox", Some(1000)),
-  (Some("**"), "Share Your Thoughts", None),
-  (Some("**"), "Tell a Friend", Some(1000)),
-  (None, "Megaphone", Some(1000)),
-  (Some("**"), "Community Builder", None),
-  (None, "Let's Meetup", Some(1000)),
-  (None, "Bonus", Some(1000)),
-|];
-
 module Row = {
   [@react.component]
   let make = (~star, ~rank, ~name, ~points) => {
@@ -199,7 +189,7 @@ module Row = {
 };
 
 [@react.component]
-let make = () => {
+let make = (~challengeInfo) => {
   let renderChallengePointsTable = () => {
     challengeInfo
     |> Array.mapi((index, challenge) => {

@@ -219,14 +219,24 @@ let make = (~lastManualUpdatedDate) => {
     dispatch(UsernameEntered(username));
   };
 
+  let challengeInfo = [|
+    (None, "Coda Sandbox", Some(1000)),
+    (Some("**"), "Share Your Thoughts", None),
+    (Some("**"), "Tell a Friend", Some(1000)),
+    (None, "Megaphone", Some(1000)),
+    (Some("**"), "Community Builder", None),
+    (None, "Let's Meetup", Some(1000)),
+    (None, "Bonus", Some(1000)),
+  |];
+
   <Page title="Testnet Leaderboard">
     <Wrapped>
       <div className=Styles.page> <Summary lastManualUpdatedDate /> </div>
       <div className=Styles.filters>
-        <SearchBar onUsernameEntered username={state.username} />
-        <ToggleButtons currentToggle={state.currentToggle} onTogglePress />
-        <FilterDropdown currentFilter={state.currentFilter} onFilterPress />
-      </div>
+        //<SearchBar onUsernameEntered username={state.username} />
+        //<ToggleButtons currentToggle={state.currentToggle} onTogglePress />
+        //<FilterDropdown currentFilter={state.currentFilter} onFilterPress />
+         <ChallengePointsTable challengeInfo /> </div>
     </Wrapped>
   </Page>;
 };
