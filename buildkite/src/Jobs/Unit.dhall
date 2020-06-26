@@ -9,7 +9,6 @@ let JobSpec = ../Pipeline/JobSpec.dhall
 
 let Command = ../Command/Base.dhall
 let OpamInit = ../Command/OpamInit.dhall
-let Libp2pHelper = ../Command/Libp2pHelperBuild.dhall
 let Docker = ../Command/Docker/Type.dhall
 let Size = ../Command/Size.dhall
 
@@ -17,14 +16,13 @@ let buildTestCmd : Text -> Text -> Command.Type = \(profile : Text) -> \(path : 
   Command.build
     Command.Config::{
       commands =
-        -- Cmd.run "mkdir -p src/app/libp2p_helper/result/bin && buildkite-agent artifact download libp2p_helper src/app/libp2p_helper/result/bin/"] # 
         OpamInit.andThenRunInDocker (
           "source ~/.profile && make build && (dune runtest ${path} --profile=${profile} -j8" ++
           " || (./scripts/link-coredumps.sh && false))"
         ),
       label = "Run ${profile} unit-tests",
       key = "unit-test-${profile}",
-      target = Size.Large,
+      target = Size.XXlarge,
       docker = None Docker.Type
     }
 
@@ -48,7 +46,6 @@ Pipeline.build
         name = "Unit"
       },
     steps = [
-      -- Libp2pHelper.step,
       buildTestCmd "dev" "src/lib",
       buildTestCmd "dev_medium_curves" "src/lib",
       buildTestCmd "nonconsensus_medium_curves" "src/nonconsensus"
