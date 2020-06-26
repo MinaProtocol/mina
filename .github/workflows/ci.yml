@@ -11,5 +11,5 @@ jobs:
         env:
           BUILDKITE_API_ACCESS_TOKEN: ${{ secrets.BUILDKITE_API_ACCESS_TOKEN }}
           PIPELINE: "o-1-labs-2/coda"
-          COMMIT: ${{ github.sha  }}
+          COMMIT: ${{ github.sha }}
           MESSAGE: ":github: ${{github.event.head_commit.message}}"
