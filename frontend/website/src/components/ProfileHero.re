@@ -11,7 +11,10 @@ module Styles = {
         fontSize(`rem(1.5)),
         lineHeight(`rem(2.)),
         marginBottom(`rem(0.)),
-        media(Theme.MediaQuery.notMobile, [fontSize(`rem(3.))]),
+        media(
+          Theme.MediaQuery.notMobile,
+          [fontSize(`rem(3.)), lineHeight(`rem(3.))],
+        ),
       ]),
     ]);
   let links =
