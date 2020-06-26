@@ -161,6 +161,9 @@ proofs.
 ## Unresolved questions
 [unresolved-questions]: #unresolved-questions
 
+Is it practical to download breadcrumbs, seeing how there's been
+concern about the size of scan states?
+
 If we do offline proving:
 
  - How long will it take to produce the needed proofs to finish off the
