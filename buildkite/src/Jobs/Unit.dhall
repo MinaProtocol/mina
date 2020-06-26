@@ -47,7 +47,6 @@ Pipeline.build
       },
     steps = [
       buildTestCmd "dev" "src/lib",
-      buildTestCmd "dev_medium_curves" "src/lib",
       buildTestCmd "nonconsensus_medium_curves" "src/nonconsensus"
     ]
   }
