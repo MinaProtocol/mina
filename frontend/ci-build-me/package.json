@@ -1,0 +1,41 @@
+{
+  "name": "github-webhook-cloud-function",
+  "version": "1.0.0",
+  "description": "Update Trello from GitHub Webhooks using Google Cloud Functions",
+  "main": "src/index.js",
+  "scripts": {
+    "coverage": "jest --coverage",
+    "lint": "eslint src/** test/**",
+    "start": "nodemon -x functions-framework --target=githubWebhookHandler",
+    "test": "jest"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/eddies/github-webhook-cloud-function.git"
+  },
+  "keywords": ["github", "buildkite", "google cloud functions", "node"],
+  "author": "Edwin Shin",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/eddies/github-webhook-cloud-function/issues"
+  },
+  "homepage": "https://github.com/eddies/github-webhook-cloud-function#readme",
+  "dependencies": {},
+  "devDependencies": {
+    "@google-cloud/functions-framework": "^1.6.0",
+    "eslint": "^6.8.0",
+    "eslint-config-airbnb-base": "^14.1.0",
+    "eslint-plugin-import": "^2.20.1",
+    "jest": "^25.1.0",
+    "nodemon": "^2.0.2",
+    "smee-client": "^1.1.0"
+  },
+  "jest": {
+    "collectCoverageFrom": ["src/**/*.js"],
+    "coverageDirectory": "build/coverage",
+    "testEnvironment": "node"
+  },
+  "nodemonConfig": {
+    "ignore": ["test/*", "docs/*"]
+  }
+}
