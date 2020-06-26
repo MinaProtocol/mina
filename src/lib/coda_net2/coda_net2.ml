@@ -57,11 +57,52 @@ type stream_state =
 
 type erased_magic = [`Be_very_careful_to_be_type_safe]
 
+module Go_log = struct
+  let ours_of_go lvl =
+    let open Logger.Level in
+    match lvl with
+    | 0 (* Critical gets mapped to error *) | 1 ->
+        Error
+    | 2 ->
+        Warn
+    | 3 (* Notice gets mapped to info (I can't find any use of notice?) *) | 4
+      ->
+        Info
+    | 5 ->
+        Debug
+    | _ ->
+        Spam
+
+  (* there should be no other levels. *)
+
+  type record =
+    { id: int64
+    ; time: string
+    ; module_: string [@key "module"]
+    ; level: int
+    ; message: string }
+  [@@deriving of_yojson]
+
+  let record_to_message r =
+    Logger.Message.
+      { timestamp= Time.of_string r.time
+      ; level= ours_of_go r.level
+      ; source=
+          Some
+            (Logger.Source.create
+               ~module_:(sprintf "Libp2p_helper.Go.%s" r.module_)
+               ~location:"(not tracked)")
+      ; message= r.message
+      ; metadata=
+          String.Map.singleton "go_message_id" (`String (Int64.to_string r.id))
+      ; event_id= None }
+end
+
 module Helper = struct
   type t =
     { subprocess: Child_processes.t
     ; conf_dir: string
-    ; outstanding_requests: (int, Yojson.Safe.json Or_error.t Ivar.t) Hashtbl.t
+    ; outstanding_requests: (int, Yojson.Safe.t Or_error.t Ivar.t) Hashtbl.t
           (**
       seqno is used to assign unique IDs to our outbound requests and index the
       tables below.
@@ -1271,11 +1312,7 @@ let create ~logger ~conf_dir =
       ~git_root_relative_path:"src/app/libp2p_helper/result/bin/libp2p_helper"
       ~conf_dir ~args:[]
       ~stdout:(`Log Logger.Level.Spam, `Pipe, `Filter_empty)
-      ~stderr:
-        (`Log Logger.Level.Spam, `No_pipe, `Filter_empty)
-        (* TODO the stderr log messages are JSON but not in our format. The
-             helper should either emit our format or we should convert in
-             OCaml *)
+      ~stderr:(`Don't_log, `Pipe, `Filter_empty)
       ~termination:
         (`Handler
           (fun ~killed e ->
@@ -1329,6 +1366,17 @@ let create ~logger ~conf_dir =
         ; finished= false }
       in
       termination_hack_ref := Some t ;
+      Strict_pipe.Reader.iter (Child_processes.stderr_lines subprocess)
+        ~f:(fun line ->
+          ( match Go_log.record_of_yojson (Yojson.Safe.from_string line) with
+          | Ok record ->
+              Logger.raw logger Go_log.(record_to_message record)
+          | Error err ->
+              Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+                ~metadata:[("line", `String line); ("error", `String err)]
+                "failed to parse log line from helper stderr" ) ;
+          Deferred.unit )
+      |> don't_wait_for ;
       Strict_pipe.Reader.iter (Child_processes.stdout_lines subprocess)
         ~f:(fun line ->
           let open Yojson.Safe.Util in

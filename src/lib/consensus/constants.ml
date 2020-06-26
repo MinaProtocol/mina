@@ -192,7 +192,7 @@ let create' (type a b c)
   let open M in
   let c = constant constraint_constants.c in
   let block_window_duration_ms =
-    constant Coda_compile_config.block_window_duration_ms
+    constant constraint_constants.block_window_duration_ms
   in
   let k = of_length protocol_constants.k in
   let delta = of_length protocol_constants.delta in
@@ -258,9 +258,14 @@ let create ~(constraint_constants : Genesis_constants.Constraint_constants.t)
   ; checkpoint_window_slots_per_year }
 
 let for_unit_tests =
-  create
-    ~constraint_constants:Genesis_constants.Constraint_constants.for_unit_tests
-    ~protocol_constants:Genesis_constants.for_unit_tests.protocol
+  lazy
+    (create
+       ~constraint_constants:
+         Genesis_constants.Constraint_constants.for_unit_tests
+       ~protocol_constants:Genesis_constants.for_unit_tests.protocol)
+
+let to_protocol_constants ({k; delta; genesis_state_timestamp; _} : _ Poly.t) =
+  {Coda_base.Protocol_constants_checked.Poly.k; delta; genesis_state_timestamp}
 
 let to_hlist
     ({ k

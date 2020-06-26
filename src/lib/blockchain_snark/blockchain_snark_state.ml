@@ -82,7 +82,8 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
         let%bind new_pending_coinbase_hash, deleted_stack, no_coinbases_popped
             =
           let%bind root_after_delete, deleted_stack =
-            Pending_coinbase.Checked.pop_coinbases prev_pending_coinbase_root
+            Pending_coinbase.Checked.pop_coinbases ~constraint_constants
+              prev_pending_coinbase_root
               ~proof_emitted:(Boolean.not ledger_hash_didn't_change)
           in
           (*If snarked ledger hash did not change (no new ledger proof) then pop_coinbases should be a no-op*)
@@ -93,7 +94,8 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
           (*new stack or update one*)
           let%map new_root =
             with_label __LOC__
-              (Pending_coinbase.Checked.add_coinbase root_after_delete
+              (Pending_coinbase.Checked.add_coinbase ~constraint_constants
+                 root_after_delete
                  ( Snark_transition.pending_coinbase_action transition
                  , ( Snark_transition.coinbase_receiver transition
                    , Snark_transition.coinbase_amount transition )
@@ -152,8 +154,7 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
                   read Boolean.typ correct_coinbase_status
                 and result = read Boolean.typ result in
                 Logger.trace logger
-                  "blockchain snark update success (check pending coinbase = \
-                   $check): $result = \
+                  "blockchain snark update success: $result = \
                    (correct_transaction_snark=$correct_transaction_snark ∨ \
                    nothing_changed \
                    (no_coinbases_popped=$no_coinbases_popped)=$nothing_changed) \

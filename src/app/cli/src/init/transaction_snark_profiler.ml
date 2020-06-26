@@ -13,10 +13,8 @@ end
 
 let create_ledger_and_transactions num_transitions =
   let num_accounts = 4 in
-  let ledger =
-    Ledger.create
-      ~depth:Genesis_constants.Constraint_constants.compiled.ledger_depth ()
-  in
+  let constraint_constants = Genesis_constants.Constraint_constants.compiled in
+  let ledger = Ledger.create ~depth:constraint_constants.ledger_depth () in
   let keys =
     Array.init num_accounts ~f:(fun _ -> Signature_lib.Keypair.create ())
   in
@@ -73,10 +71,12 @@ let create_ledger_and_transactions num_transitions =
                 (add acc
                    (User_command.Payload.fee (t :> User_command.t).payload)) )
         in
-        `One (Public_key.compress keys.(0).public_key, total_fee)
+        Fee_transfer.create_single
+          ~receiver_pk:(Public_key.compress keys.(0).public_key)
+          ~fee:total_fee ~fee_token:Token_id.default
       in
       let coinbase =
-        Coinbase.create ~amount:Coda_compile_config.coinbase
+        Coinbase.create ~amount:constraint_constants.coinbase_amount
           ~receiver:(Public_key.compress keys.(0).public_key)
           ~fee_transfer:None
         |> Or_error.ok_exn
@@ -114,11 +114,19 @@ let rec pair_up = function
   | _ ->
       failwith "Expected even length list"
 
-let state_body_hash = Quickcheck.random_value State_body_hash.gen
+let precomputed_values = Precomputed_values.compiled
+
+let state_body =
+  Coda_state.(
+    Lazy.map precomputed_values ~f:(fun values ->
+        values.protocol_state_with_hash.data |> Protocol_state.body ))
+
+let state_body_hash =
+  Lazy.map ~f:Coda_state.Protocol_state.Body.hash state_body
 
 let pending_coinbase_stack_target (t : Transaction.t) stack =
   let stack_with_state =
-    Pending_coinbase.Stack.(push_state state_body_hash stack)
+    Pending_coinbase.Stack.(push_state (Lazy.force state_body_hash) stack)
   in
   let target =
     match t with
@@ -127,35 +135,35 @@ let pending_coinbase_stack_target (t : Transaction.t) stack =
     | _ ->
         stack_with_state
   in
-  (target, state_body_hash)
+  target
 
 (* This gives the "wall-clock time" to snarkify the given list of transactions, assuming
    unbounded parallelism. *)
 let profile (module T : Transaction_snark.S) sparse_ledger0
     (transitions : Transaction.t list) preeval =
+  let constraint_constants = Genesis_constants.Constraint_constants.compiled in
   let (base_proof_time, _, _), base_proofs =
     List.fold_map transitions
       ~init:(Time.Span.zero, sparse_ledger0, Pending_coinbase.Stack.empty)
       ~f:(fun (max_span, sparse_ledger, coinbase_stack_source) t ->
         let sparse_ledger' =
-          Sparse_ledger.apply_transaction_exn sparse_ledger t
+          Sparse_ledger.apply_transaction_exn ~constraint_constants
+            sparse_ledger t
         in
-        let coinbase_stack_target, state_body_hash =
+        let coinbase_stack_target =
           pending_coinbase_stack_target t coinbase_stack_source
         in
-        let state_body_hash_opt = Some state_body_hash in
         let span, proof =
           time (fun () ->
-              T.of_transaction ?preeval
-                ~constraint_constants:
-                  Genesis_constants.Constraint_constants.compiled
+              T.of_transaction ?preeval ~constraint_constants
                 ~sok_digest:Sok_message.Digest.default
                 ~source:(Sparse_ledger.merkle_root sparse_ledger)
                 ~target:(Sparse_ledger.merkle_root sparse_ledger')
+                ~init_stack:coinbase_stack_source
                 ~pending_coinbase_stack_state:
                   {source= coinbase_stack_source; target= coinbase_stack_target}
                 { Transaction_protocol_state.Poly.transaction= t
-                ; block_data= state_body_hash_opt }
+                ; block_data= Lazy.force state_body }
                 (unstage (Sparse_ledger.handler sparse_ledger)) )
         in
         ( (Time.Span.max span max_span, sparse_ledger', coinbase_stack_target)
@@ -183,6 +191,7 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
 
 let check_base_snarks sparse_ledger0 (transitions : Transaction.t list) preeval
     =
+  let constraint_constants = Genesis_constants.Constraint_constants.compiled in
   let _ =
     let sok_message =
       Sok_message.create ~fee:Currency.Fee.zero
@@ -191,22 +200,22 @@ let check_base_snarks sparse_ledger0 (transitions : Transaction.t list) preeval
     in
     List.fold transitions ~init:sparse_ledger0 ~f:(fun sparse_ledger t ->
         let sparse_ledger' =
-          Sparse_ledger.apply_transaction_exn sparse_ledger t
+          Sparse_ledger.apply_transaction_exn ~constraint_constants
+            sparse_ledger t
         in
-        let coinbase_stack_target, state_body_hash =
+        let coinbase_stack_target =
           pending_coinbase_stack_target t Pending_coinbase.Stack.empty
         in
-        let state_body_hash_opt = Some state_body_hash in
         let () =
-          Transaction_snark.check_transaction ?preeval
-            ~constraint_constants:
-              Genesis_constants.Constraint_constants.compiled ~sok_message
+          Transaction_snark.check_transaction ?preeval ~constraint_constants
+            ~sok_message
             ~source:(Sparse_ledger.merkle_root sparse_ledger)
             ~target:(Sparse_ledger.merkle_root sparse_ledger')
+            ~init_stack:Pending_coinbase.Stack.empty
             ~pending_coinbase_stack_state:
               { source= Pending_coinbase.Stack.empty
               ; target= coinbase_stack_target }
-            { Transaction_protocol_state.Poly.block_data= state_body_hash_opt
+            { Transaction_protocol_state.Poly.block_data= Lazy.force state_body
             ; transaction= t }
             (unstage (Sparse_ledger.handler sparse_ledger))
         in
@@ -216,6 +225,7 @@ let check_base_snarks sparse_ledger0 (transitions : Transaction.t list) preeval
 
 let generate_base_snarks_witness sparse_ledger0
     (transitions : Transaction.t list) preeval =
+  let constraint_constants = Genesis_constants.Constraint_constants.compiled in
   let _ =
     let sok_message =
       Sok_message.create ~fee:Currency.Fee.zero
@@ -224,23 +234,23 @@ let generate_base_snarks_witness sparse_ledger0
     in
     List.fold transitions ~init:sparse_ledger0 ~f:(fun sparse_ledger t ->
         let sparse_ledger' =
-          Sparse_ledger.apply_transaction_exn sparse_ledger t
+          Sparse_ledger.apply_transaction_exn ~constraint_constants
+            sparse_ledger t
         in
-        let coinbase_stack_target, state_body_hash =
+        let coinbase_stack_target =
           pending_coinbase_stack_target t Pending_coinbase.Stack.empty
         in
-        let state_body_hash_opt = Some state_body_hash in
         let () =
           Transaction_snark.generate_transaction_witness ?preeval
-            ~constraint_constants:
-              Genesis_constants.Constraint_constants.compiled ~sok_message
+            ~constraint_constants ~sok_message
             ~source:(Sparse_ledger.merkle_root sparse_ledger)
             ~target:(Sparse_ledger.merkle_root sparse_ledger')
+            ~init_stack:Pending_coinbase.Stack.empty
             { Transaction_snark.Pending_coinbase_stack_state.source=
                 Pending_coinbase.Stack.empty
             ; target= coinbase_stack_target }
             { Transaction_protocol_state.Poly.transaction= t
-            ; block_data= state_body_hash_opt }
+            ; block_data= Lazy.force state_body }
             (unstage (Sparse_ledger.handler sparse_ledger))
         in
         sparse_ledger' )
@@ -249,14 +259,12 @@ let generate_base_snarks_witness sparse_ledger0
 
 let run profiler num_transactions repeats preeval =
   let ledger, transitions = create_ledger_and_transactions num_transactions in
-  let aid_of_pk pk = Account_id.create pk Token_id.default in
   let sparse_ledger =
     Coda_base.Sparse_ledger.of_ledger_subset_exn ledger
       (List.concat_map transitions ~f:(fun t ->
            match t with
            | Fee_transfer t ->
-               One_or_two.map t ~f:(fun (pk, _) -> aid_of_pk pk)
-               |> One_or_two.to_list
+               Fee_transfer.receivers t
            | User_command t ->
                let t = (t :> User_command.t) in
                User_command.accounts_accessed t

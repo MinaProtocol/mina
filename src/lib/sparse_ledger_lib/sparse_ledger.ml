@@ -43,8 +43,7 @@ module type S = sig
 
   type account
 
-  type t = (hash, account_id, account) T.Stable.V1.t
-  [@@deriving sexp, to_yojson]
+  type t = (hash, account_id, account) T.t [@@deriving sexp, to_yojson]
 
   val of_hash : depth:int -> hash -> t
 
@@ -191,7 +190,7 @@ end = struct
                 " node"
           in
           failwithf
-            "Spare_ledger.get: Bad index %i. Expected a%s, but got a%s at \
+            "Sparse_ledger.get: Bad index %i. Expected a%s, but got a%s at \
              depth %i."
             idx expected_kind kind (depth - i) ()
     in
@@ -220,7 +219,7 @@ end = struct
                 " node"
           in
           failwithf
-            "Spare_ledger.set: Bad index %i. Expected a%s, but got a%s at \
+            "Sparse_ledger.set: Bad index %i. Expected a%s, but got a%s at \
              depth %i."
             idx expected_kind kind (t.depth - i) ()
     in

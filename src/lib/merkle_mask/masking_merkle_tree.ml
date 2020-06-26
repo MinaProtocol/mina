@@ -105,6 +105,10 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     let get_uuid t = assert_is_attached t ; t.uuid
 
+    let get_directory t =
+      assert_is_attached t ;
+      Option.bind ~f:Base.get_directory t.parent
+
     let depth t = assert_is_attached t ; t.depth
 
     (* don't rely on a particular implementation *)
@@ -536,8 +540,44 @@ module Make (Inputs : Inputs_intf.S) = struct
              Int.compare addr1 addr2 )
       |> List.map ~f:(fun (_, account) -> account)
 
-    (* TODO *)
-    let iteri _t ~f:_ = failwith "iteri not implemented on masks"
+    let iteri t ~f =
+      let account_ids = accounts t |> Account_id.Set.to_list in
+      let idx_account_pairs_unsorted =
+        List.map account_ids ~f:(fun acct_id ->
+            let idx =
+              try index_of_account_exn t acct_id
+              with exn ->
+                failwith
+                  (sprintf
+                     !"iter: index_of_account_exn failed, mask uuid: %{sexp: \
+                       Uuid.t} account id: %{sexp: Account_id.t}, exception: \
+                       %s"
+                     (get_uuid t) acct_id (Exn.to_string exn))
+            in
+            match location_of_account t acct_id with
+            | None ->
+                failwith
+                  (sprintf
+                     !"iter: location_of_account returned None, mask uuid: \
+                       %{sexp: Uuid.t} account id: %{sexp: Account_id.t}"
+                     (get_uuid t) acct_id)
+            | Some loc -> (
+              match get t loc with
+              | None ->
+                  failwith
+                    (sprintf
+                       !"iter: get returned None, mask uuid: %{sexp: Uuid.t} \
+                         account id: %{sexp: Account_id.t}"
+                       (get_uuid t) acct_id)
+              | Some acct ->
+                  (idx, acct) ) )
+      in
+      (* in case iteration order matters *)
+      let idx_account_pairs =
+        List.sort idx_account_pairs_unsorted
+          ~compare:(fun (idx1, _) (idx2, _) -> Int.compare idx1 idx2)
+      in
+      List.iter idx_account_pairs ~f:(fun (idx, acct) -> f idx acct)
 
     let foldi_with_ignored_accounts t ignored_accounts ~init ~f =
       assert_is_attached t ;

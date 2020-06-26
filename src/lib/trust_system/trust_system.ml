@@ -54,7 +54,7 @@ module Actions = struct
 
   (** The action they took, paired with a message and associated JSON metadata
       for logging. *)
-  type t = action * (string * (string, Yojson.Safe.json) List.Assoc.t) option
+  type t = action * (string * (string, Yojson.Safe.t) List.Assoc.t) option
 
   let to_trust_response (action, _) =
     let open Peer_trust.Trust_response in
@@ -139,7 +139,7 @@ module Actions = struct
     | Sent_old_gossip ->
         Trust_decrease old_gossip_increment
 
-  let to_log : t -> string * (string, Yojson.Safe.json) List.Assoc.t =
+  let to_log : t -> string * (string, Yojson.Safe.t) List.Assoc.t =
    fun (action, extra_opt) ->
     match extra_opt with
     | None ->

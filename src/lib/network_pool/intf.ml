@@ -53,7 +53,8 @@ module type Resource_pool_diff_intf = sig
   conincides with applying locally generated diffs or diffs from the network
   or diffs from transition frontier extensions.*)
   val unsafe_apply :
-       pool
+       constraint_constants:Genesis_constants.Constraint_constants.t
+    -> pool
     -> t Envelope.Incoming.t
     -> ( t * rejected
        , [`Locally_generated of t * rejected | `Other of Error.t] )
@@ -107,6 +108,7 @@ module type Network_pool_base_intf = sig
 
   val create :
        config:config
+    -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> incoming_diffs:(resource_pool_diff Envelope.Incoming.t * (bool -> unit))
                       Strict_pipe.Reader.t
     -> local_diffs:( resource_pool_diff
@@ -121,6 +123,7 @@ module type Network_pool_base_intf = sig
   val of_resource_pool_and_diffs :
        resource_pool
     -> logger:Logger.t
+    -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> incoming_diffs:(resource_pool_diff Envelope.Incoming.t * (bool -> unit))
                       Strict_pipe.Reader.t
     -> local_diffs:( resource_pool_diff
@@ -175,7 +178,7 @@ module type Snark_resource_pool_intf = sig
     -> Transaction_snark_work.Statement.t
     -> Ledger_proof.t One_or_two.t Priced_proof.t option
 
-  val snark_pool_json : t -> Yojson.Safe.json
+  val snark_pool_json : t -> Yojson.Safe.t
 
   val all_completed_work : t -> Transaction_snark_work.Info.t list
 
@@ -193,10 +196,18 @@ module type Snark_pool_diff_intf = sig
         * Ledger_proof.t One_or_two.t Priced_proof.t
   [@@deriving compare, sexp]
 
+  type compact =
+    { work: Transaction_snark_work.Statement.t
+    ; fee: Currency.Fee.t
+    ; prover: Signature_lib.Public_key.Compressed.t }
+  [@@deriving yojson]
+
   include
     Resource_pool_diff_intf with type t := t and type pool := resource_pool
 
-  val compact_json : t -> Yojson.Safe.json
+  val to_compact : t -> compact
+
+  val compact_json : t -> Yojson.Safe.t
 
   val of_result :
        ( ('a, 'b, 'c) Snark_work_lib.Work.Single.Spec.t
@@ -209,7 +220,7 @@ end
 module type Transaction_pool_diff_intf = sig
   type resource_pool
 
-  type t = User_command.t list [@@deriving sexp]
+  type t = User_command.t list [@@deriving sexp, of_yojson]
 
   module Diff_error : sig
     type t =

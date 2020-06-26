@@ -9,14 +9,13 @@ module Hash = struct
 
   let hash_account = Fn.compose Ledger_hash.of_digest Account.digest
 
-  let empty_account = hash_account Account.empty
+  let empty_account = Ledger_hash.of_digest Account.empty_digest
 end
 
 module Root_hash = struct
   include Ledger_hash
 
-  let to_hash (h : t) =
-    Ledger_hash.of_digest (h :> Snark_params.Tick.Pedersen.Digest.t)
+  let to_hash (h : t) = Ledger_hash.of_digest (h :> Random_oracle.Digest.t)
 end
 
 module Mask = Syncable_ledger.Make (struct

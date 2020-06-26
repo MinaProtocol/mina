@@ -60,9 +60,15 @@ module Body : sig
 
   type ('a, 'b, 'c, 'd) t = ('a, 'b, 'c, 'd) Poly.t
 
+  val typ :
+       constraint_constants:Genesis_constants.Constraint_constants.t
+    -> (var, Value.t) Typ.t
+
   val hash : Value.t -> State_body_hash.t
 
   val hash_checked : var -> (State_body_hash.var, _) Checked.t
+
+  val consensus_state : (_, _, 'a, _) Poly.t -> 'a
 end
 
 module Value : sig
@@ -125,9 +131,14 @@ val constants : (_, (_, _, _, 'a) Body.t) Poly.t -> 'a
 val negative_one :
      genesis_ledger:Coda_base.Ledger.t Lazy.t
   -> constraint_constants:Genesis_constants.Constraint_constants.t
-  -> protocol_constants:Genesis_constants.Protocol.t
+  -> consensus_constants:Consensus.Constants.t
   -> Value.t
 
 val hash_checked : var -> (State_hash.var * State_body_hash.var, _) Checked.t
 
 val hash : Value.t -> State_hash.t
+
+(** Same as [hash], but accept the [body_hash] directly to avoid re-computing
+    it.
+*)
+val hash_with_body : Value.t -> body_hash:State_body_hash.t -> State_hash.t

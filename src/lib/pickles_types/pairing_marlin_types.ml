@@ -249,21 +249,21 @@ module Accumulator = struct
         module V1 = struct
           type 'a t = 'a Shift.Map.t
           [@@deriving sexp, version {asserted}, compare]
+
+          let to_yojson f t = Alist.to_yojson f (Map.to_alist t)
+
+          let of_yojson f t =
+            let open Result.Let_syntax in
+            let%bind t = Alist.of_yojson f t in
+            match Shift.Map.of_alist t with
+            | `Ok t ->
+                return t
+            | `Duplicate_key k ->
+                Error (sprintf "Duplicate key %d" k)
         end
       end]
 
-      type 'a t = 'a Stable.Latest.t [@@deriving sexp, compare]
-
-      let to_yojson f t = Alist.to_yojson f (Map.to_alist t)
-
-      let of_yojson f t =
-        let open Result.Let_syntax in
-        let%bind t = Alist.of_yojson f t in
-        match Shift.Map.of_alist t with
-        | `Ok t ->
-            return t
-        | `Duplicate_key k ->
-            Error (sprintf "Duplicate key %d" k)
+      type 'a t = 'a Stable.Latest.t [@@deriving sexp, compare, yojson]
     end
 
     [%%versioned
@@ -537,7 +537,7 @@ module Proof = struct
     end
   end]
 
-  type ('pc, 'fp, 'openings) t =
+  type ('pc, 'fp, 'openings) t = ('pc, 'fp, 'openings) Stable.Latest.t =
     {messages: ('pc, 'fp) Messages.t; openings: 'openings}
   [@@deriving fields, sexp, compare, yojson]
 

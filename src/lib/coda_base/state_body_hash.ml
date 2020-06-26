@@ -21,7 +21,7 @@ include Data_hash.Make_full_size (struct
   let version_byte = Base58_check.Version_bytes.state_body_hash
 end)
 
-let dummy = of_hash Outside_pedersen_image.t
+let dummy = of_hash Outside_hash_image.t
 
 (* Data hash versioned boilerplate below *)
 

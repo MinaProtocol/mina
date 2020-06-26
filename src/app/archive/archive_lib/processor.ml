@@ -210,7 +210,7 @@ module User_command = struct
              "INSERT INTO user_commands (type, fee_payer_id, source_id, \
               receiver_id, fee_token, token, nonce, amount, fee, memo, hash) \
               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id")
-          { typ= (if User_command.is_payment t then "payment" else "delegation")
+          { typ= User_command.tag_string t
           ; fee_payer_id
           ; source_id
           ; receiver_id
@@ -235,12 +235,16 @@ module Internal_command = struct
 end
 
 module Fee_transfer = struct
-  type t = {receiver_id: int; fee: int; hash: string}
+  type t = {receiver_id: int; fee: int; token: string; hash: string}
 
   let typ =
-    let encode t = Ok ("fee_transfer", t.receiver_id, t.fee, t.hash) in
-    let decode (_, receiver_id, fee, hash) = Ok {receiver_id; fee; hash} in
-    let rep = Caqti_type.(tup4 string int int string) in
+    let encode t =
+      Ok (("fee_transfer", t.receiver_id, t.fee, t.token), t.hash)
+    in
+    let decode ((_, receiver_id, fee, token), hash) =
+      Ok {receiver_id; fee; token; hash}
+    in
+    let rep = Caqti_type.(tup2 (tup4 string int int string) string) in
     Caqti_type.custom ~encode ~decode rep
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
@@ -254,14 +258,15 @@ module Fee_transfer = struct
         let%bind receiver_id =
           Public_key.add_if_doesn't_exist
             (module Conn)
-            (Fee_transfer.Single.receiver t)
+            (Fee_transfer.Single.receiver_pk t)
         in
         Conn.find
           (Caqti_request.find typ Caqti_type.int
-             "INSERT INTO internal_commands (type, receiver_id, fee, hash) \
-              VALUES (?, ?, ?, ?) RETURNING id")
+             "INSERT INTO internal_commands (type, receiver_id, fee, token, \
+              hash) VALUES (?, ?, ?, ?, ?) RETURNING id")
           { receiver_id
           ; fee= Fee_transfer.Single.fee t |> Currency.Fee.to_int
+          ; token= Token_id.to_string t.fee_token
           ; hash= transaction_hash |> Transaction_hash.to_base58_check }
 end
 
@@ -269,11 +274,15 @@ module Coinbase = struct
   type t = {receiver_id: int; amount: int; hash: string}
 
   let typ =
-    let encode t = Ok ("coinbase", t.receiver_id, t.amount, t.hash) in
-    let decode (_, receiver_id, amount, hash) =
+    let encode t =
+      Ok
+        ( ("coinbase", t.receiver_id, t.amount, Token_id.(to_string default))
+        , t.hash )
+    in
+    let decode ((_, receiver_id, amount, _), hash) =
       Ok {receiver_id; amount; hash}
     in
-    let rep = Caqti_type.(tup4 string int int string) in
+    let rep = Caqti_type.(tup2 (tup4 string int int string) string) in
     Caqti_type.custom ~encode ~decode rep
 
   let add_if_doesn't_exist (module Conn : CONNECTION) (t : Coinbase.t) =
@@ -290,8 +299,8 @@ module Coinbase = struct
         in
         Conn.find
           (Caqti_request.find typ Caqti_type.int
-             "INSERT INTO internal_commands (type, receiver_id, fee, hash) \
-              VALUES (?, ?, ?, ?) RETURNING id")
+             "INSERT INTO internal_commands (type, receiver_id, fee, token, \
+              hash) VALUES (?, ?, ?, ?, ?) RETURNING id")
           { receiver_id
           ; amount= Coinbase.amount t |> Currency.Amount.to_int
           ; hash= transaction_hash |> Transaction_hash.to_base58_check }
@@ -388,7 +397,7 @@ module Block = struct
           ledger_hash, height, timestamp, coinbase_id FROM blocks WHERE id = ?")
       id
 
-  let add_if_doesn't_exist (module Conn : CONNECTION)
+  let add_if_doesn't_exist (module Conn : CONNECTION) ~constraint_constants
       ({data= t; hash} : (External_transition.t, State_hash.t) With_hash.t) =
     let open Deferred.Result.Let_syntax in
     match%bind find (module Conn) ~state_hash:hash with
@@ -429,7 +438,9 @@ module Block = struct
             ; timestamp= External_transition.timestamp t |> Block_time.to_int64
             ; coinbase_id= None }
         in
-        let transactions = External_transition.transactions t in
+        let transactions =
+          External_transition.transactions ~constraint_constants t
+        in
         let user_commands, fee_transfers, coinbases =
           Core.List.fold transactions ~init:([], [], [])
             ~f:(fun (acc_user_commands, acc_fee_transfers, acc_coinbases) ->
@@ -442,7 +453,9 @@ module Block = struct
                 , acc_fee_transfers
                 , acc_coinbases )
             | Fee_transfer fee_transfer_bundled ->
-                let fee_transfers = One_or_two.to_list fee_transfer_bundled in
+                let fee_transfers =
+                  Coda_base.Fee_transfer.to_list fee_transfer_bundled
+                in
                 ( acc_user_commands
                 , fee_transfers @ acc_fee_transfers
                 , acc_coinbases )
@@ -454,7 +467,9 @@ module Block = struct
                   , coinbase :: acc_coinbases )
               | Some {receiver_pk; fee} ->
                   ( acc_user_commands
-                  , (receiver_pk, fee) :: acc_fee_transfers
+                  , Coda_base.Fee_transfer.Single.create ~receiver_pk ~fee
+                      ~fee_token:Token_id.default
+                    :: acc_fee_transfers
                   , coinbase :: acc_coinbases ) ) )
         in
         let%bind user_command_ids =
@@ -476,9 +491,7 @@ module Block = struct
         (* For technique reasons, there might be multiple fee transfers for
            one receiver. As suggested by deepthi, I combine all the fee transfer
            that goes to one public key here *)
-        let fee_transfer_table =
-          Core.Hashtbl.create (module Signature_lib.Public_key.Compressed)
-        in
+        let fee_transfer_table = Core.Hashtbl.create (module Account_id) in
         let () =
           let open Coda_base in
           Core.List.iter fee_transfers ~f:(fun fee_transfer ->
@@ -487,11 +500,14 @@ module Block = struct
                 | None ->
                     fee_transfer
                 | Some acc ->
-                    ( receiver
-                    , Currency.Fee.add
-                        (Fee_transfer.Single.fee acc)
-                        (Fee_transfer.Single.fee fee_transfer)
-                      |> Core.Option.value_exn ) ) )
+                    Fee_transfer.Single.create
+                      ~receiver_pk:fee_transfer.receiver_pk
+                      ~fee_token:fee_transfer.fee_token
+                      ~fee:
+                        ( Currency.Fee.add
+                            (Fee_transfer.Single.fee acc)
+                            (Fee_transfer.Single.fee fee_transfer)
+                        |> Core.Option.value_exn ) ) )
         in
         let combined_fee_transfers = Core.Hashtbl.data fee_transfer_table in
         let%bind fee_transfer_ids =
@@ -553,13 +569,13 @@ module Block = struct
         return block_id
 end
 
-let run (module Conn : CONNECTION) reader ~logger =
+let run (module Conn : CONNECTION) reader ~constraint_constants ~logger =
   Strict_pipe.Reader.iter reader ~f:(function
     | Diff.Transition_frontier (Breadcrumb_added {block; _}) -> (
         match%bind
           let open Deferred.Result.Let_syntax in
           let%bind () = Conn.start () in
-          Block.add_if_doesn't_exist (module Conn) block
+          Block.add_if_doesn't_exist ~constraint_constants (module Conn) block
         with
         | Error e ->
             Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
@@ -577,7 +593,7 @@ let run (module Conn : CONNECTION) reader ~logger =
             User_command.add_if_doesn't_exist (module Conn) user_command
             >>| ignore ) )
 
-let setup_server ~logger ~postgres_address ~server_port =
+let setup_server ~constraint_constants ~logger ~postgres_address ~server_port =
   let where_to_listen =
     Async.Tcp.Where_to_listen.bind_to All_addresses (On_port server_port)
   in
@@ -593,7 +609,7 @@ let setup_server ~logger ~postgres_address ~server_port =
         ~metadata:[("error", `String (Caqti_error.show e))] ;
       Deferred.unit
   | Ok conn ->
-      run conn reader ~logger |> don't_wait_for ;
+      run ~constraint_constants conn reader ~logger |> don't_wait_for ;
       Deferred.ignore
       @@ Tcp.Server.create
            ~on_handler_error:

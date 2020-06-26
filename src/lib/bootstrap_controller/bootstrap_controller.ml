@@ -6,9 +6,13 @@ open Pipe_lib.Strict_pipe
 open Coda_transition
 open Network_peer
 
+type Structured_log_events.t += Bootstrap_complete
+  [@@deriving register_event {msg= "Bootstrap state: complete."}]
+
 type t =
   { logger: Logger.t
   ; trust_system: Trust_system.t
+  ; consensus_constants: Consensus.Constants.t
   ; verifier: Verifier.t
   ; mutable best_seen_transition: External_transition.Initial_validated.t
   ; mutable current_root: External_transition.Initial_validated.t
@@ -16,7 +20,7 @@ type t =
 
 let worth_getting_root t candidate =
   `Take
-  = Consensus.Hooks.select
+  = Consensus.Hooks.select ~constants:t.consensus_constants
       ~logger:
         (Logger.extend t.logger
            [ ( "selection_context"
@@ -100,7 +104,8 @@ let on_transition t ~sender:(host, peer_id) ~root_sync_ledger
     | Ok peer_root_with_proof -> (
         match%bind
           Sync_handler.Root.verify ~logger:t.logger ~verifier:t.verifier
-            ~genesis_constants candidate_state peer_root_with_proof.data
+            ~consensus_constants:t.consensus_constants ~genesis_constants
+            candidate_state peer_root_with_proof.data
         with
         | Ok (`Root root, `Best_tip best_tip) ->
             if done_syncing_root root_sync_ledger then return `Ignored
@@ -139,15 +144,29 @@ let sync_ledger t ~root_sync_ledger ~transition_graph ~sync_ledger_reader
              transition )
       else Deferred.unit )
 
+let external_transition_compare consensus_constants =
+  Comparable.lift
+    (fun existing candidate ->
+      (* To prevent the logger to spam a lot of messsages, the logger input is set to null *)
+      if Consensus.Data.Consensus_state.Value.equal existing candidate then 0
+      else if
+        `Keep
+        = Consensus.Hooks.select ~constants:consensus_constants ~existing
+            ~candidate ~logger:(Logger.null ())
+      then -1
+      else 1 )
+    ~f:External_transition.consensus_state
+
 (* We conditionally ask other peers for their best tip. This is for testing
    eager bootstrapping and the regular functionalities of bootstrapping in
    isolation *)
 let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
     ~transition_reader ~persistent_root ~persistent_frontier
-    ~initial_root_transition ~constraint_constants ~precomputed_values =
+    ~initial_root_transition ~precomputed_values =
   let genesis_constants =
     Precomputed_values.genesis_constants precomputed_values
   in
+  let constraint_constants = precomputed_values.constraint_constants in
   let rec loop () =
     let sync_ledger_reader, sync_ledger_writer =
       create ~name:"sync ledger pipe"
@@ -163,6 +182,8 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
     in
     let t =
       { network
+      ; consensus_constants=
+          Precomputed_values.consensus_constants precomputed_values
       ; logger
       ; trust_system
       ; verifier
@@ -223,24 +244,44 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
                Error.of_string "received faulty scan state from peer" )
         |> Deferred.return
       in
+      let%bind protocol_states =
+        Staged_ledger.Scan_state.check_required_protocol_states scan_state
+          ~protocol_states
+        |> Deferred.return
+      in
+      let protocol_states_map = State_hash.Map.of_alist_exn protocol_states in
+      let get_state hash =
+        match Map.find protocol_states_map hash with
+        | None ->
+            let new_state_hash = (fst new_root).hash in
+            Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+              ~metadata:
+                [ ("new_root", State_hash.to_yojson new_state_hash)
+                ; ("state_hash", State_hash.to_yojson hash) ]
+              "Protocol state (for scan state transactions) for $state_hash \
+               not found when boostrapping to the new root $new_root" ;
+            Or_error.errorf
+              !"Protocol state (for scan state transactions) for \
+                %{sexp:State_hash.t} not found when boostrapping to the new \
+                root %{sexp:State_hash.t}"
+              hash new_state_hash
+        | Some protocol_state ->
+            Ok protocol_state
+      in
       (* Construct the staged ledger before constructing the transition
        * frontier in order to verify the scan state we received.
        * TODO: reorganize the code to avoid doing this twice (#3480)  *)
-      let%bind _ =
+      let%map _ =
         let open Deferred.Let_syntax in
         let temp_mask = Ledger.of_database temp_snarked_ledger in
         let%map result =
           Staged_ledger.of_scan_state_pending_coinbases_and_snarked_ledger
-            ~logger ~verifier ~scan_state ~snarked_ledger:temp_mask
-            ~expected_merkle_root ~pending_coinbases
+            ~logger ~verifier ~constraint_constants ~scan_state
+            ~snarked_ledger:temp_mask ~expected_merkle_root ~pending_coinbases
+            ~get_state
         in
         ignore (Ledger.Maskable.unregister_mask_exn temp_mask) ;
         result
-      in
-      let%map protocol_states =
-        Staged_ledger.Scan_state.check_required_protocol_states scan_state
-          ~protocol_states
-        |> Deferred.return
       in
       (scan_state, pending_coinbases, new_root, protocol_states)
     in
@@ -285,10 +326,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
         match%bind
           match
             Consensus.Hooks.required_local_state_sync
-              ~constants:
-                (Consensus.Constants.create ~constraint_constants
-                   ~protocol_constants:
-                     (Precomputed_values.protocol_constants precomputed_values))
+              ~constants:precomputed_values.consensus_constants
               ~consensus_state ~local_state:consensus_local_state
           with
           | None ->
@@ -352,8 +390,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
               in
               Transition_frontier.load ~retry_with_fresh_db:false ~logger
                 ~verifier ~consensus_local_state ~persistent_root
-                ~persistent_frontier ~constraint_constants ~precomputed_values
-                ()
+                ~persistent_frontier ~precomputed_values ()
               >>| function
               | Ok frontier ->
                   frontier
@@ -365,8 +402,8 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
               | Error `Persistent_frontier_malformed ->
                   fail "persistent frontier was malformed"
             in
-            Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-              "Bootstrap state: complete." ;
+            Logger.Structured.info logger ~module_:__MODULE__ ~location:__LOC__
+              Bootstrap_complete ;
             let collected_transitions =
               Transition_cache.data transition_graph
             in
@@ -385,7 +422,8 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
                     Envelope.Incoming.data incoming_transition
                   in
                   `Take
-                  = Consensus.Hooks.select ~existing:root_consensus_state
+                  = Consensus.Hooks.select ~constants:t.consensus_constants
+                      ~existing:root_consensus_state
                       ~candidate:
                         (External_transition.consensus_state transition)
                       ~logger )
@@ -402,7 +440,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
                          Envelope.Incoming.data incoming_transition
                        in
                        transition )
-                     External_transition.compare)
+                     (external_transition_compare t.consensus_constants))
             in
             (new_frontier, sorted_filtered_collected_transitins) )
   in
@@ -422,14 +460,15 @@ let%test_module "Bootstrap_controller tests" =
 
     let logger = Logger.create ()
 
-    let proof_level = Genesis_constants.Proof_level.Check
-
     let trust_system = Trust_system.null ()
 
-    let constraint_constants =
-      Genesis_constants.Constraint_constants.for_unit_tests
-
     let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
+
+    let proof_level = precomputed_values.proof_level
+
+    let constraint_constants = precomputed_values.constraint_constants
+
+    module Genesis_ledger = (val precomputed_values.genesis_ledger)
 
     let pids = Child_processes.Termination.create_pid_table ()
 
@@ -461,6 +500,8 @@ let%test_module "Bootstrap_controller tests" =
         |> External_transition.Validation.reset_staged_ledger_diff_validation
       in
       { logger
+      ; consensus_constants=
+          Precomputed_values.consensus_constants precomputed_values
       ; trust_system
       ; verifier
       ; best_seen_transition= transition
@@ -475,13 +516,12 @@ let%test_module "Bootstrap_controller tests" =
         (* we only need one node for this test, but we need more than one peer so that coda_networking does not throw an error *)
         let%bind fake_network =
           Fake_network.Generator.(
-            gen ~proof_level ~constraint_constants ~precomputed_values
-              ~max_frontier_length [fresh_peer; fresh_peer])
+            gen ~precomputed_values ~max_frontier_length
+              [fresh_peer; fresh_peer])
         in
         let%map make_branch =
-          Transition_frontier.Breadcrumb.For_tests.gen_seq ~proof_level
-            ~accounts_with_secret_keys:
-              (Lazy.force Test_genesis_ledger.accounts)
+          Transition_frontier.Breadcrumb.For_tests.gen_seq ~precomputed_values
+            ~accounts_with_secret_keys:(Lazy.force Genesis_ledger.accounts)
             branch_size
         in
         let [me; _] = fake_network.peer_networks in
@@ -532,9 +572,20 @@ let%test_module "Bootstrap_controller tests" =
                    let transition, _ = Envelope.Incoming.data env in
                    transition.data )
           in
-          [%test_result: External_transition.Set.t]
-            (External_transition.Set.of_list saved_transitions)
-            ~expect:(External_transition.Set.of_list expected_transitions) )
+          let module E = struct
+            module T = struct
+              type t = External_transition.t [@@deriving sexp]
+
+              let compare =
+                external_transition_compare
+                  (Precomputed_values.consensus_constants precomputed_values)
+            end
+
+            include Comparable.Make (T)
+          end in
+          [%test_result: E.Set.t]
+            (E.Set.of_list saved_transitions)
+            ~expect:(E.Set.of_list expected_transitions) )
 
     let run_bootstrap ~timeout_duration ~my_net ~transition_reader =
       let open Fake_network in
@@ -560,7 +611,7 @@ let%test_module "Bootstrap_controller tests" =
         (run ~logger ~trust_system ~verifier ~network:my_net.network
            ~consensus_local_state:my_net.state.consensus_local_state
            ~transition_reader ~persistent_root ~persistent_frontier
-           ~initial_root_transition ~constraint_constants ~precomputed_values)
+           ~initial_root_transition ~precomputed_values)
 
     let assert_transitions_increasingly_sorted ~root
         (incoming_transitions :
@@ -593,8 +644,7 @@ let%test_module "Bootstrap_controller tests" =
     let%test_unit "sync with one node after receiving a transition" =
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
-          gen ~proof_level ~constraint_constants ~precomputed_values
-            ~max_frontier_length
+          gen ~precomputed_values ~max_frontier_length
             [ fresh_peer
             ; peer_with_branch
                 ~frontier_branch_size:((max_frontier_length * 2) + 2) ])
@@ -633,9 +683,9 @@ let%test_module "Bootstrap_controller tests" =
     let%test_unit "reconstruct staged_ledgers using \
                    of_scan_state_and_snarked_ledger" =
       Quickcheck.test ~trials:1
-        (Transition_frontier.For_tests.gen ~proof_level ~constraint_constants
-           ~precomputed_values ~max_length:max_frontier_length
-           ~size:max_frontier_length ()) ~f:(fun frontier ->
+        (Transition_frontier.For_tests.gen ~precomputed_values
+           ~max_length:max_frontier_length ~size:max_frontier_length ())
+        ~f:(fun frontier ->
           Thread_safe.block_on_async_exn
           @@ fun () ->
           Deferred.List.iter (Transition_frontier.all_breadcrumbs frontier)
@@ -651,6 +701,18 @@ let%test_module "Bootstrap_controller tests" =
                 |> Ledger.of_database
               in
               let scan_state = Staged_ledger.scan_state staged_ledger in
+              let get_state hash =
+                match
+                  Transition_frontier.find_protocol_state frontier hash
+                with
+                | Some protocol_state ->
+                    Ok protocol_state
+                | None ->
+                    Or_error.errorf
+                      !"Protocol state (for scan state transactions) for \
+                        %{sexp:State_hash.t} not found"
+                      hash
+              in
               let pending_coinbases =
                 Staged_ledger.pending_coinbase_collection staged_ledger
               in
@@ -660,8 +722,8 @@ let%test_module "Bootstrap_controller tests" =
               let%map actual_staged_ledger =
                 Staged_ledger
                 .of_scan_state_pending_coinbases_and_snarked_ledger ~scan_state
-                  ~logger ~verifier ~snarked_ledger ~expected_merkle_root
-                  ~pending_coinbases
+                  ~logger ~verifier ~constraint_constants ~snarked_ledger
+                  ~expected_merkle_root ~pending_coinbases ~get_state
                 |> Deferred.Or_error.ok_exn
               in
               assert (
