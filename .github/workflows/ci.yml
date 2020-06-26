@@ -3,6 +3,7 @@ on:
     types: [labeled, synchronize]
 jobs:
   ci:
+    runs-on: ubuntu-latest
     steps:
       - name: Run Coda Pipeline
         uses: buildkite/trigger-pipeline-action@v1.2.0
