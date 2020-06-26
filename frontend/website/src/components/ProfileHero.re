@@ -86,14 +86,25 @@ module Styles = {
           Theme.MediaQuery.veryVeryLarge,
           [
             flexDirection(`column),
-            marginLeft(`zero),
-            marginRight(`zero),
             marginTop(`zero),
+            marginRight(`zero),
+            width(`rem(18.75)),
           ],
         ),
       ]),
     ]);
-  let linksColumn = merge([flexColumn, style([])]);
+  let linksColumn =
+    merge([
+      flexColumn,
+      style([
+        position(`relative),
+        marginTop(`rem(2.)),
+        left(`rem(2.0)),
+        width(`rem(18.)),
+        media(Theme.MediaQuery.notMobile, [marginTop(`zero)]),
+        media(Theme.MediaQuery.veryVeryLarge, [position(`unset)]),
+      ]),
+    ]);
 };
 
 module Links = {
@@ -106,7 +117,6 @@ module Links = {
         bgColor=Theme.Colors.clover
         bgColorHover=Theme.Colors.jungle
       />
-      <Spacer height=1. />
       <div className=Styles.linksColumn>
         <Next.Link href="">
           <a className=Styles.link>
@@ -154,6 +164,7 @@ module Points = {
         display(`flex),
         flexDirection(`row),
         justifyContent(`center),
+        marginTop(`rem(6.)),
         selector(
           "> :last-child",
           [
@@ -170,7 +181,11 @@ module Points = {
         ),
         media(
           Theme.MediaQuery.notMobile,
-          [width(`rem(51.)), justifyContent(`spaceBetween)],
+          [
+            width(`rem(51.)),
+            justifyContent(`spaceBetween),
+            marginTop(`zero),
+          ],
         ),
         media(
           Theme.MediaQuery.veryVeryLarge,
