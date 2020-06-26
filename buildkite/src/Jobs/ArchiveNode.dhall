@@ -28,17 +28,19 @@ Pipeline.build
     , steps =
       [ Command.build
           Command.Config::
-            { commands = OpamInit.andThenRunInDocker
+            { commands = OpamInit.
+            InDocker
                 [ "POSTGRES_PASSWORD=${password}"
                 , "POSTGRES_USER=${user}"
                 , "POSTGRES_DB=${db}"
                 ]
                 (Prelude.Text.concatSep "\n"
-                  [ "sudo apt-get install -y postgresql"
-                  , "sudo service postgresql start"
-                  , "su -u postgres psql --command \"CREATE USER ${user} WITH SUPERUSER PASSWORD '${password}';\""
-                  , "su -u postgres createdb -O ${user} ${db}"
-                  , "PGPASSWORD=${password} psql -h localhost -p 5432 -U ${user} -d ${db} -a -f src/app/archive/create_schema.sql"
+                  [ "sudo apt-get install -y postgresql &&"
+                  , "sudo service postgresql start &&"
+                  , "su -u postgres psql --command \"CREATE USER ${user} WITH SUPERUSER PASSWORD '${password}';\" &&"
+                  , "su -u postgres createdb -O ${user} ${db} &&"
+                  , "PGPASSWORD=${password} psql -h localhost -p 5432 -U ${user} -d ${db} -a -f src/app/archive/create_schema.sql &&"
+                  , "make archive &&"
                   , "./scripts/test.py run 'test_archive_processor:coda-archive-processor-test'"
                   ])
             , label = "Archive-node unit tests"
