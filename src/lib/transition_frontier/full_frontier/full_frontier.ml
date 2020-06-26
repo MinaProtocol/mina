@@ -96,6 +96,9 @@ let find_protocol_state (t : t) hash =
 
 let root t = find_exn t t.root
 
+let protocol_states_for_root_scan_state t =
+  t.protocol_states_for_root_scan_state
+
 let best_tip t = find_exn t t.best_tip
 
 let close t =
@@ -409,14 +412,21 @@ let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
       (* STEP 5 *)
       Non_empty_list.iter
         (Option.value_exn
-           (Staged_ledger.proof_txns
+           (Staged_ledger.proof_txns_with_state_hashes
               (Breadcrumb.staged_ledger new_root_node.breadcrumb)))
-        ~f:(fun txn ->
+        ~f:(fun (txn, state_hash) ->
+          (*Validate transactions against the protocol state associated with the transaction*)
+          let txn_global_slot =
+            find_protocol_state t state_hash
+            |> Option.value_exn |> Protocol_state.consensus_state
+            |> Consensus.Data.Consensus_state.curr_global_slot
+          in
           ignore
             (Or_error.ok_exn
                (Ledger.apply_transaction
                   ~constraint_constants:
-                    t.precomputed_values.constraint_constants mt txn)) ) ;
+                    t.precomputed_values.constraint_constants ~txn_global_slot
+                  mt txn)) ) ;
       (* STEP 6 *)
       Ledger.commit mt ;
       (* STEP 7 *)
@@ -429,7 +439,11 @@ let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
       (Breadcrumb.validated_transition new_root_node.breadcrumb)
       new_staged_ledger
   in
-  (*Update the protocol states required for scan state at the new root*)
+  (*Update the protocol states required for scan state at the new root.
+  Note: this should be after applying the transactions to the snarked ledger (Step 5)
+  because the protocol states corresponding to those transactions won't be part
+  of the new_root_protocol_states since those transactions would have been
+  deleted from the scan state after emitting the proof*)
   let new_protocol_states_map =
     State_hash.Map.of_alist_exn new_root_protocol_states
   in

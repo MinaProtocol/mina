@@ -10,7 +10,10 @@ let%test_module "Archive node unit tests" =
 
     let proof_level = Genesis_constants.Proof_level.None
 
-    let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
+    let precomputed_values =
+      {(Lazy.force Precomputed_values.for_unit_tests) with proof_level}
+
+    module Genesis_ledger = (val Genesis_ledger.for_unit_tests)
 
     let conn_lazy =
       lazy
@@ -33,6 +36,7 @@ let%test_module "Archive node unit tests" =
 
     let fee_transfer_gen =
       Fee_transfer.Single.Gen.with_random_receivers ~keys ~max_fee:10
+        ~token:(Quickcheck.Generator.return Token_id.default)
 
     let coinbase_gen =
       Coinbase.Gen.with_random_receivers ~keys ~min_amount:20 ~max_amount:100
@@ -117,13 +121,13 @@ let%test_module "Archive node unit tests" =
       Quickcheck.test ~trials:20
         ( Quickcheck.Generator.with_size ~size:10
         @@ Quickcheck_lib.gen_imperative_list
-             (Transition_frontier.For_tests.gen_genesis_breadcrumb ~proof_level
+             (Transition_frontier.For_tests.gen_genesis_breadcrumb
                 ~precomputed_values ())
              (Transition_frontier.Breadcrumb.For_tests.gen_non_deferred
-                ?logger:None ~proof_level ~precomputed_values ?verifier:None
+                ?logger:None ~precomputed_values ?verifier:None
                 ?trust_system:None
-                ~accounts_with_secret_keys:
-                  (Lazy.force Test_genesis_ledger.accounts)) )
+                ~accounts_with_secret_keys:(Lazy.force Genesis_ledger.accounts))
+        )
         ~f:(fun breadcrumbs ->
           Thread_safe.block_on_async_exn
           @@ fun () ->

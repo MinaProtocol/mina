@@ -649,6 +649,15 @@ module H4 = struct
       match xs with [] -> init | x :: xs -> f ~init:(C.f init x) xs
   end
 
+  module Iter
+      (F : T4) (C : sig
+          val f : _ F.t -> unit
+      end) =
+  struct
+    let rec f : type a b c d. (a, b, c, d) T(F).t -> unit =
+     fun xs -> match xs with [] -> () | x :: xs -> C.f x ; f xs
+  end
+
   module Map
       (F : T4)
       (G : T4) (C : sig

@@ -22,7 +22,7 @@ module Transition_frontier_validation =
 let catchup_timeout_duration (precomputed_values : Precomputed_values.t) =
   Block_time.Span.of_ms
     ( precomputed_values.genesis_constants.protocol.delta
-      * Coda_compile_config.block_window_duration_ms
+      * precomputed_values.constraint_constants.block_window_duration_ms
     |> Int64.of_int )
 
 let cached_transform_deferred_result ~transform_cached ~transform_result cached
@@ -172,8 +172,7 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
     let%bind breadcrumb =
       cached_transform_deferred_result cached_initially_validated_transition
         ~transform_cached:(fun _ ->
-          Transition_frontier.Breadcrumb.build ~logger
-            ~constraint_constants:precomputed_values.constraint_constants
+          Transition_frontier.Breadcrumb.build ~logger ~precomputed_values
             ~verifier ~trust_system ~sender:(Some sender)
             ~parent:parent_breadcrumb ~transition:mostly_validated_transition
           )
@@ -243,8 +242,7 @@ let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
        , unit )
        Writer.t) ~processed_transition_writer =
   let catchup_scheduler =
-    Catchup_scheduler.create ~logger
-      ~constraint_constants:precomputed_values.constraint_constants ~verifier
+    Catchup_scheduler.create ~logger ~precomputed_values ~verifier
       ~trust_system ~frontier ~time_controller ~catchup_job_writer
       ~catchup_breadcrumbs_writer ~clean_up_signal:clean_up_catchup_scheduler
   in
@@ -362,9 +360,9 @@ let%test_module "Transition_handler.Processor tests" =
 
     let logger = Logger.create ()
 
-    let proof_level = Genesis_constants.Proof_level.Check
-
     let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
+
+    let proof_level = precomputed_values.proof_level
 
     let time_controller = Block_time.Controller.basic ~logger
 
@@ -384,8 +382,8 @@ let%test_module "Transition_handler.Processor tests" =
       let branch_size = 10 in
       let max_length = frontier_size + branch_size in
       Quickcheck.test ~trials:4
-        (Transition_frontier.For_tests.gen_with_branch ~proof_level
-           ~precomputed_values ~max_length ~frontier_size ~branch_size ())
+        (Transition_frontier.For_tests.gen_with_branch ~precomputed_values
+           ~max_length ~frontier_size ~branch_size ())
         ~f:(fun (frontier, branch) ->
           assert (
             Thread_safe.block_on_async_exn (fun () ->

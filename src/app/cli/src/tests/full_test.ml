@@ -85,6 +85,7 @@ let print_heartbeat logger =
 let run_test () : unit Deferred.t =
   let logger = Logger.create () in
   let precomputed_values = Lazy.force Precomputed_values.compiled in
+  let constraint_constants = Genesis_constants.Constraint_constants.compiled in
   let (module Genesis_ledger) = precomputed_values.genesis_ledger in
   let pids = Child_processes.Termination.create_pid_table () in
   let consensus_constants = precomputed_values.consensus_constants in
@@ -170,6 +171,7 @@ let run_test () : unit Deferred.t =
           ; is_seed= true
           ; genesis_ledger_hash=
               Ledger.merkle_root (Lazy.force Genesis_ledger.t)
+          ; constraint_constants
           ; log_gossip_heard=
               { snark_pool_diff= false
               ; transaction_pool_diff= false
@@ -212,8 +214,7 @@ let run_test () : unit Deferred.t =
              ~time_controller ~receipt_chain_database ~snark_work_fee
              ~consensus_local_state ~transaction_database
              ~external_transition_database ~work_reassignment_wait:420000
-             ~precomputed_values
-             ~proof_level:Genesis_constants.Proof_level.compiled ())
+             ~precomputed_values ())
       in
       don't_wait_for
         (Strict_pipe.Reader.iter_without_pushback

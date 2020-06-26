@@ -10,7 +10,7 @@ external parseEntry: Js.Json.t => entry = "%identity";
 
 let fetchLeaderboard = () => {
   ReFetch.fetch(
-    "https://sheets.googleapis.com/v4/spreadsheets/1CLX9DF7oFDWb1UiimQXgh_J6jO4fVLJEcEnPVAOfq24/values/D4:Z?key="
+    "https://sheets.googleapis.com/v4/spreadsheets/1Nq_Y76ALzSVJRhSFZZm4pfuGbPkZs2vTtCnVQ1ehujE/values/D4:Z?key="
     ++ Next.Config.google_api_key,
     ~method_=Get,
     ~headers={
