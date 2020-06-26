@@ -421,7 +421,8 @@ module T = struct
       ; supply_increase
       ; pending_coinbase_stack_state=
           {pending_coinbase_stack_state.pc with target= pending_coinbase_target}
-      ; proof_type= `Base }
+      ; proof_type= `Base
+      ; sok_digest= () }
     , { Stack_state_with_init_stack.pc=
           {source= pending_coinbase_target; target= pending_coinbase_target}
       ; init_stack= new_init_stack } )
