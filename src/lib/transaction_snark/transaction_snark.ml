@@ -602,9 +602,10 @@ module Base = struct
       ; token_cannot_create: 'bool (* Payment only, token<>default *)
       ; source_insufficient_balance: 'bool (* Payment only *)
       ; source_bad_timing: 'bool (* Payment only *)
-      ; receiver_exists: 'bool (* Create_account only *) }
+      ; receiver_exists: 'bool (* Create_account only *)
+      ; not_token_owner: 'bool (* Create_account only *) }
 
-    let num_fields = 8
+    let num_fields = 9
 
     let to_list
         { predicate_failed
@@ -614,7 +615,8 @@ module Base = struct
         ; token_cannot_create
         ; source_insufficient_balance
         ; source_bad_timing
-        ; receiver_exists } =
+        ; receiver_exists
+        ; not_token_owner } =
       [ predicate_failed
       ; source_not_present
       ; receiver_not_present
@@ -622,7 +624,8 @@ module Base = struct
       ; token_cannot_create
       ; source_insufficient_balance
       ; source_bad_timing
-      ; receiver_exists ]
+      ; receiver_exists
+      ; not_token_owner ]
 
     let of_list = function
       | [ predicate_failed
@@ -632,7 +635,8 @@ module Base = struct
         ; token_cannot_create
         ; source_insufficient_balance
         ; source_bad_timing
-        ; receiver_exists ] ->
+        ; receiver_exists
+        ; not_token_owner ] ->
           { predicate_failed
           ; source_not_present
           ; receiver_not_present
@@ -640,7 +644,8 @@ module Base = struct
           ; token_cannot_create
           ; source_insufficient_balance
           ; source_bad_timing
-          ; receiver_exists }
+          ; receiver_exists
+          ; not_token_owner }
       | _ ->
           failwith
             "Transaction_snark.Base.User_command_failure.to_list: bad length"
@@ -660,7 +665,7 @@ module Base = struct
     *)
     let compute_unchecked
         ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-        ~txn_global_slot ~(fee_payer_account : Account.t)
+        ~txn_global_slot ~creating_new_token ~(fee_payer_account : Account.t)
         ~(receiver_account : Account.t) ~(source_account : Account.t)
         ({payload; signature= _; signer= _} : Transaction_union.t) =
       match payload.body.tag with
@@ -726,7 +731,8 @@ module Base = struct
               ; token_cannot_create= false
               ; source_insufficient_balance= false
               ; source_bad_timing= false
-              ; receiver_exists= false }
+              ; receiver_exists= false
+              ; not_token_owner= false }
           | Payment ->
               let receiver_account =
                 if Account_id.equal receiver fee_payer then fee_payer_account
@@ -793,17 +799,34 @@ module Base = struct
               ; token_cannot_create
               ; source_insufficient_balance
               ; source_bad_timing
-              ; receiver_exists= false }
+              ; receiver_exists= false
+              ; not_token_owner= false }
           | Create_account ->
               let receiver_account =
                 if Account_id.equal receiver fee_payer then fee_payer_account
                 else receiver_account
+              in
+              let receiver_account =
+                { receiver_account with
+                  token_owner=
+                    ( if creating_new_token then true
+                    else receiver_account.token_owner ) }
               in
               let receiver_exists =
                 let id = Account.identifier receiver_account in
                 if Account_id.equal Account_id.empty id then false
                 else if Account_id.equal receiver id then true
                 else fail "bad receiver account ID"
+              in
+              let source_account =
+                if Account_id.equal source fee_payer then fee_payer_account
+                else if Account_id.equal source receiver then receiver_account
+                else source_account
+              in
+              let not_token_owner =
+                not
+                  ( source_account.token_owner
+                  || Token_id.(equal default) (Account_id.token_id receiver) )
               in
               { predicate_failed
               ; source_not_present= false
@@ -812,10 +835,11 @@ module Base = struct
               ; token_cannot_create= false
               ; source_insufficient_balance= false
               ; source_bad_timing= false
-              ; receiver_exists } )
+              ; receiver_exists
+              ; not_token_owner } )
 
     let%snarkydef compute_as_prover ~constraint_constants ~txn_global_slot
-        (txn : Transaction_union.var) =
+        ~creating_new_token (txn : Transaction_union.var) =
       let%bind data =
         exists (Typ.Internal.ref ())
           ~compute:
@@ -899,9 +923,13 @@ module Base = struct
             let%bind receiver_account, _path =
               read (Typ.Internal.ref ()) receiver_account
             in
+            let%bind creating_new_token =
+              read Boolean.typ creating_new_token
+            in
             let%map txn_global_slot = read Global_slot.typ txn_global_slot in
             compute_unchecked ~constraint_constants ~txn_global_slot
-              ~fee_payer_account ~source_account ~receiver_account txn)
+              ~creating_new_token ~fee_payer_account ~source_account
+              ~receiver_account txn)
   end
 
   let%snarkydef check_signature shifted ~payload ~is_user_command ~signer
@@ -1198,7 +1226,7 @@ module Base = struct
     *)
     let%bind user_command_failure =
       User_command_failure.compute_as_prover ~constraint_constants
-        ~txn_global_slot:current_global_slot txn
+        ~txn_global_slot:current_global_slot ~creating_new_token txn
     in
     let%bind user_command_fails =
       User_command_failure.any user_command_failure
@@ -1582,11 +1610,17 @@ module Base = struct
                     user_command_failure.source_insufficient_balance)
              in
              let%bind () =
-               [%with_label
-                 "Owns the token (if not default) when creating an account"]
-                 Boolean.(
-                   Assert.any
-                     [account.token_owner; token_default; not is_create_account])
+               [%with_label "Check not_token_owner failure matches predicted"]
+                 (let%bind token_owner_ok =
+                    Boolean.(
+                      any
+                        [ account.token_owner
+                        ; token_default
+                        ; not is_create_account ])
+                  in
+                  Boolean.(
+                    Assert.( = ) (not token_owner_ok)
+                      user_command_failure.not_token_owner))
              in
              let%map delegate =
                Public_key.Compressed.Checked.if_ is_stake_delegation
