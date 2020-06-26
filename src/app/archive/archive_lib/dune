@@ -1,9 +1,8 @@
 (library
   (name archive_lib)
   (public_name archive_lib)
-  (libraries core async coda_base coda_transition graphql_lib graphql_query one_or_two transition_frontier)
+  (libraries core async coda_base coda_transition one_or_two transition_frontier caqti-async caqti caqti-driver-postgresql)
   (inline_tests)
-  (modes      native)
-  (preprocessor_deps ../archive_graphql_schema.json)
-  (preprocess (pps ppx_coda ppx_jane graphql_ppx -- -schema src/app/archive/archive_graphql_schema.json)))
+  (modes native)
+  (preprocess (pps ppx_version ppx_jane)))
   

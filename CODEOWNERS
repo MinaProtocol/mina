@@ -1,122 +1,55 @@
-/CODEOWNERS @imeckler @bkase
-/frontend/ @schmavery @bkase @figitaki @o1pranay
-/dockerfiles/ @nholland94 @yourbuddyconner @bkase @psteckler
-/rfcs/ @imeckler @es92 @bkase
-/scripts/ @nholland94 @yourbuddyconner @emberian @bkase @psteckler
-/Makefile @nholland94 @bkase @yourbuddyconner
-/src/config/dev.mlh @nholland94 @emberian @bkase
-/src/config/testnet_postake_medium_curves.mlh @nholland94 @bkase @emberian
-/CODE_OF_CONDUCT.md @imeckler @emberian @o1pranay
-/CONTRIBUTING.md @imeckler @emberian @o1pranay
+/CODEOWNERS @nholland94 @bkase @imeckler
+/buildkite @CodaProtocol/infra-eng-reviewers
+/frontend/ @CodaProtocol/product-eng-reviewers
+/dockerfiles/ @CodaProtocol/infra-eng-reviewers
+/scripts/ @CodaProtocol/infra-eng-reviewers @CodaProtocol/protocol-eng-reviewers
+/Makefile @CodaProtocol/infra-eng-reviewers
+/src/config/dev.mlh @CodaProtocol/infra-eng-reviewers @CodaProtocol/protocol-eng-reviewers
+/src/config/testnet_postake_medium_curves.mlh @CodaProtocol/infra-eng-reviewers @CodaProtocol/protocol-eng-reviewers
+/CODE_OF_CONDUCT.md @imeckler @emberian
+/CONTRIBUTING.md @CodaProtocol/product-eng-reviewers
 /LICENSE @imeckler
-/README.md @emberian @imeckler @o1pranay
-/README-dev.md @emberian @imeckler @o1pranay
+/README.md @CodaProtocol/product-eng-reviewers
+/README-dev.md @CodaProtocol/protocol-eng-reviewers
 
 /src/external/ @emberian @bkase @psteckler @imeckler
 
-/src/app/archive @bkase @schmavery @ghost-not-in-the-shell @nholland94
-/src/app/cli/src/tests @emberian @bkase @ghost-not-in-the-shell @deepthiskumar
-/src/app/cli/src/coda.ml @nholland94 @bkase @emberian @imeckler
-/src/app/cli/src/init @nholland94 @bkase @emberian @imeckler
-/src/app/libp2p_helper @emberian @bkase @nholland94
-/src/app/reformat/ @bkase
-/src/app/trace-tool/ @emberian @mrmr1993
-/src/app/runtime_genesis_ledger/ @emberian @psteckler @deepthiskumar
+/src/app/archive @CodaProtocol/product-eng-reviewers
+/src/app/cli/src/tests @CodaProtocol/protocol-eng-reviewers
+/src/app/cli/src/coda.ml @CodaProtocol/protocol-eng-reviewers
+/src/app/cli/src/init @CodaProtocol/protocol-eng-reviewers
+/src/app/libp2p_helper @CodaProtocol/protocol-eng-reviewers
+/src/app/reformat/ @CodaProtocol/infra-eng-reviewers
+/src/app/trace-tool/ @CodaProtocol/protocol-eng-reviewers
+/src/app/runtime_genesis_ledger/ @CodaProtocol/protocol-eng-reviewers
 
-/src/lib/best_tip_prover/ @nholland94 @ghost-not-in-the-shell
-/src/lib/blake2/ @rbkhmrcr @vanishreerao @imeckler
-/src/lib/blockchain_snark/ @nholland94 @bkase @imeckler @mrmr1993
-/src/lib/bootstrap_controller/ @nholland94 @ghost-not-in-the-shell
-/src/lib/cache_lib/ @nholland94 @ghost-not-in-the-shell
-/src/lib/chunked_triples/ @psteckler @rbkhmrcr @vanishreerao @imeckler @mrmr1993
-/src/lib/cli_lib/ @bkase @schmavery @figitaki
-/src/lib/coda_base/ @emberian @nholland94 @bkase @imeckler
-/src/lib/coda_commands @bkase @schmavery @figitaki
-/src/lib/coda_graphql @bkase @schmavery @o1pranay
-/src/lib/coda_networking/ @emberian @nholland94
-/src/lib/coda_numbers/ @bkase @nholland94 @imeckler @mrmr1993
-/src/lib/coda_state/ @nholland94 @ghost-not-in-the-shell @deepthiskumar
-/src/lib/coda_transition/ @nholland94 @ghost-not-in-the-shell @deepthiskumar
-/src/lib/consensus/ @nholland94 @imeckler
-/src/lib/crs/ @rbkhmrcr @vanishreerao @imeckler
-/src/lib/crypto_params/ @rbkhmrcr @vanishreerao @imeckler
-/src/lib/currency/ @bkase @nholland94 @imeckler @rbkhmrcr @vanishreerao
-/src/lib/daemon_rpcs/ @bkase @schmavery @figitaki
-/src/lib/debug_assert/ @nholland94 @bkase @emberian
-/src/lib/dummy_values/ @bkase @imeckler @mrmr1993
-/src/lib/test_genesis_ledger/ @nholland94 @bkase @emberian @psteckler @yourbuddyconner
-/src/lib/gossip_net/ @emberian @bkase @nholland94
-/src/lib/group_map/ @rbkhmrcr @vanishreerao @imeckler
-/src/lib/hash_prefixes/ @rbkhmrcr @vanishreerao @imeckler
-/src/lib/interruptible/ @bkase @nholland94
-/src/lib/key_value_database/ @bkase @nholland94 @psteckler
-/src/lib/keys_lib/ @emberian @mrmr1993 @imeckler
-/src/lib/ledger_catchup/ @nholland94 @ghost-not-in-the-shell
-/src/lib/ledger_proof/ @nholland94 @imeckler
-/src/lib/linked_tree/ @emberian @imeckler @bkase
-/src/lib/lite_base/ @bkase @emberian @imeckler
-/src/lib/lite_lib/ @bkase @emberian @imeckler
-/src/lib/lite_params/ @rbkhmrcr @vanishreerao @imeckler
-/src/lib/logger/ @nholland94 @schmavery
-/src/lib/logproc_lib/ @nholland94 @schmavery
-/src/lib/merkle_address/ @emberian @bkase @nholland94
-/src/lib/merkle_ledger/ @emberian @nholland94 @psteckler
-/src/lib/merkle_list_prover/ @emberian @psteckler @nholland94 @ghost-not-in-the-shell
-/src/lib/merkle_list_verifier/ @emberian @psteckler @nholland94 @ghost-not-in-the-shell
-/src/lib/merkle_mask/ @nholland94 @psteckler
-/src/lib/module_version/ @psteckler @mrmr1993
-/src/lib/network_pool/ @nholland94 @deepthiskumar
-/src/lib/non_zero_curve_point/ @rbkhmrcr @vanishreerao @imeckler
-/src/lib/o1trace/ @emberian @mrmr1993
-/src/lib/otp_lib/ @nholland94 @bkase
-/src/lib/outside_pedersen_image/ @rbkhmrcr @vanishreerao @imeckler @psteckler
-/src/lib/parallel_scan/ @deepthiskumar @bkase @emberian @imeckler
-/src/lib/pedersen_lib/ @emberian @imeckler @psteckler @mrmr1993
-/src/lib/pipe_lib/ @nholland94 @ghost-not-in-the-shell
-/src/lib/pokolog/ @bkase @vanishreerao @rbkhmrcr @imeckler @mrmr1993
-/src/lib/ppx_coda/ @psteckler @mrmr1993
-/src/lib/ppx_util/ @mrmr1993 @psteckler
-/src/lib/precomputed_values/ @emberian @bkase @mrmr1993 @imeckler
-/src/lib/block_producer/ @nholland94 @emberian @bkase @ghost-not-in-the-shell
-/src/lib/prover/ @nholland94 @bkase @imeckler @mrmr1993
-/src/lib/quickcheck_lib/ @nholland94 @ghost-not-in-the-shell
-/src/lib/random_oracle/ @emberian @imeckler @mrmr1993
-/src/lib/receipt_chain_database/ @bkase @nholland94
-/src/lib/rocksdb/ @psteckler @nholland94
-/src/lib/transition_chain_prover/ @ghost-not-in-the-shell @nholland94
-/src/lib/transition_chain_verifier/ @ghost-not-in-the-shell @nholland94
-/src/lib/rose_tree/ @bkase @nholland94
-/src/lib/secrets/ @emberian @imeckler
-/src/lib/sgn/ @deepthiskumar @bkase @imeckler @mrmr1993
-/src/lib/sgn_type/ @deepthiskumar @bkase @imeckler @mrmr1993
-/src/lib/sha256_lib/ @rbkhmrcr @vanishreerao @imeckler @mrmr1993
-/src/lib/signature_lib/ @rbkhmrcr @vanishreerao @mrmr1993 @imeckler
-/src/lib/snark_bits/ @bkase @mrmr1993 @imeckler
-/src/lib/snark_worker/ @emberian @nholland94 @imeckler
-/src/lib/snark_keys/ @mrmr1993 @imeckler
-/src/lib/snarky/ @mrmr1993 @imeckler
-/src/lib/snarky_blake2/ @rbkhmrcr @vanishreerao @imeckler @mrmr1993
-/src/lib/snarky_curves/ @rbkhmrcr @vanishreerao @imeckler @mrmr1993
-/src/lib/snarky_field_extensions/ @bkase @rbkhmrcr @vanishreerao @imeckler @mrmr1993
-/src/lib/snarky_group_map/ @rbkhmrcr @vanishreerao @imeckler
-/src/lib/snarky_log/ @rbkhmrcr @vanishreerao @mrmr1993 @imeckler
-/src/lib/snarky_pairing/ @rbkhmrcr @vanishreerao @mrmr1993 @imeckler
-/src/lib/snarky_taylor/ @bkase @emberian @mrmr1993 @mrmr1993 @imeckler
-/src/lib/snarky_verifier/ @bkase @mrmr1993 @imeckler
-/src/lib/sparse_ledger_lib/ @bkase @imeckler @emberian
-/src/lib/staged_ledger/ @deepthiskumar @emberian
-/src/lib/staged_ledger_diff/ @deepthiskumar @emberian
-/src/lib/sync_handler/ @emberian @nholland94
-/src/lib/syncable_ledger/ @emberian @nholland94
-/src/lib/auxiliary_database/ @bkase @schmavery @nholland94
-/src/lib/transaction_snark/ @deepthiskumar @bkase @imeckler @mrmr1993
-/src/lib/transaction_snark_scan_state/ @deepthiskumar @imeckler @emberian
-/src/lib/transaction_snark_work/ @deepthiskumar @emberian @imeckler
-/src/lib/transition_frontier/ @nholland94 @emberian
-/src/lib/transition_frontier_controller/ @nholland94 @ghost-not-in-the-shell
-/src/lib/transition_handler/ @nholland94 @ghost-not-in-the-shell
-/src/lib/transition_router/ @nholland94 @ghost-not-in-the-shell
-/src/lib/trust_system/ @nholland94 @psteckler
-/src/lib/unsigned_extended/ @bkase @mrmr1993 @imeckler
-/src/lib/vrf_lib/ @nholland94 @mrmr1993 @bkase @imeckler
-/src/lib/work_selector/ @deepthiskumar @nholland94
+/src/lib/ @CodaProtocol/protocol-eng-reviewers
+
+/src/lib/blake2/ @CodaProtocol/crypto-eng-reviewers
+/src/lib/cli_lib/ @CodaProtocol/product-eng-reviewers
+/src/lib/coda_commands @CodaProtocol/product-eng-reviewers
+/src/lib/coda_graphql @CodaProtocol/product-eng-reviewers
+/src/lib/coda_numbers/ @CodaProtocol/crypto-eng-reviewers
+/src/lib/crs/ @CodaProtocol/crypto-eng-reviewers
+/src/lib/crypto_params/ @CodaProtocol/crypto-eng-reviewers
+/src/lib/dummy_values/ @CodaProtocol/crypto-eng-reviewers
+/src/lib/hash_prefixes/ @CodaProtocol/crypto-eng-reviewers
+/src/lib/integers_stubs_js @CodaProtocol/crypto-eng-reviewers
+/src/lib/keys_lib/ @CodaProtocol/crypto-eng-reviewers
+/src/lib/non_zero_curve_point/ @CodaProtocol/crypto-eng-reviewers
+/src/lib/outside_hash_image/ @CodaProtocol/crypto-eng-reviewers
+/src/lib/pokolog/ @CodaProtocol/crypto-eng-reviewers
+/src/lib/precomputed_values/ @CodaProtocol/crypto-eng-reviewers
+/src/lib/sha256_lib/ @CodaProtocol/crypto-eng-reviewers
+/src/lib/signature_lib/ @CodaProtocol/crypto-eng-reviewers
+/src/lib/snark_keys/ @CodaProtocol/crypto-eng-reviewers
+/src/lib/snarky/ @CodaProtocol/crypto-eng-reviewers
+/src/lib/snarky_blake2/ @CodaProtocol/crypto-eng-reviewers
+/src/lib/snarky_curves/ @CodaProtocol/crypto-eng-reviewers
+/src/lib/snarky_field_extensions/ @CodaProtocol/crypto-eng-reviewers
+/src/lib/snarky_group_map/ @CodaProtocol/crypto-eng-reviewers
+/src/lib/snarky_log/ @CodaProtocol/crypto-eng-reviewers
+/src/lib/snarky_pairing/ @CodaProtocol/crypto-eng-reviewers
+/src/lib/unsigned_extended/ @CodaProtocol/crypto-eng-reviewers
+
+/src/nonconsensus @CodaProtocol/protocol-eng-reviewers

@@ -8,14 +8,33 @@ let%test_module "Database integration test" =
       let depth = 4
     end
 
-    module Location = Merkle_ledger.Location.Make (Depth)
+    module Location = Merkle_ledger.Location.T
+
+    module Location_binable = struct
+      module Arg = struct
+        type t = Location.t =
+          | Generic of Merkle_ledger.Location.Bigstring.Stable.Latest.t
+          | Account of Location.Addr.Stable.Latest.t
+          | Hash of Location.Addr.Stable.Latest.t
+        [@@deriving bin_io_unversioned, hash, sexp, compare]
+      end
+
+      type t = Arg.t =
+        | Generic of Merkle_ledger.Location.Bigstring.t
+        | Account of Location.Addr.t
+        | Hash of Location.Addr.t
+      [@@deriving hash, sexp, compare]
+
+      include Hashable.Make_binable (Arg) [@@deriving
+                                            sexp, compare, hash, yojson]
+    end
 
     module Inputs = struct
       include Test_stubs.Base_inputs
       module Location = Location
+      module Location_binable = Location_binable
       module Kvdb = In_memory_kvdb
       module Storage_locations = Storage_locations
-      module Depth = Depth
     end
 
     module DB = Database.Make (Inputs)
@@ -29,11 +48,11 @@ let%test_module "Database integration test" =
       in
       Quickcheck.test ~trials:5 ~sexp_of:[%sexp_of: Balance.t list]
         gen_non_zero_balances ~f:(fun balances ->
-          let public_keys = Key.gen_keys num_accounts in
+          let account_ids = Account_id.gen_accounts num_accounts in
           let accounts =
-            List.map2_exn public_keys balances ~f:Account.create
+            List.map2_exn account_ids balances ~f:Account.create
           in
-          DB.with_ledger ~f:(fun db ->
+          DB.with_ledger ~depth:Depth.depth ~f:(fun db ->
               let enumerate_dir_combinations max_depth =
                 Sequence.range 0 (max_depth - 1)
                 |> Sequence.fold ~init:[[]] ~f:(fun acc _ ->
@@ -42,8 +61,8 @@ let%test_module "Database integration test" =
                        @ List.map acc ~f:(List.cons Direction.Right) )
               in
               List.iter accounts ~f:(fun account ->
-                  let public_key = Account.public_key account in
-                  ignore @@ DB.get_or_create_account_exn db public_key account
+                  let account_id = Account.identifier account in
+                  ignore @@ DB.get_or_create_account_exn db account_id account
               ) ;
               let binary_tree = Binary_tree.set_accounts accounts in
               Sequence.iter

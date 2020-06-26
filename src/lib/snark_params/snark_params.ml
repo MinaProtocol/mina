@@ -1,6 +1,3 @@
-[%%import
-"/src/config.mlh"]
-
 open Core_kernel
 open Bitstring_lib
 open Snark_bits
@@ -8,7 +5,6 @@ module Tick_backend = Crypto_params.Tick_backend
 module Tock_backend = Crypto_params.Tock_backend
 module Snarkette_tick = Crypto_params.Snarkette_tick
 module Snarkette_tock = Crypto_params.Snarkette_tock
-module Scan_state_constants = Scan_state_constants
 
 module Make_snarkable (Impl : Snarky.Snark_intf.S) = struct
   open Impl
@@ -58,8 +54,7 @@ let%test_unit "group-map test" =
   let params =
     Group_map.Params.create
       (module Tick0.Field)
-      ~a:Tick_backend.Inner_curve.Coefficients.a
-      ~b:Tick_backend.Inner_curve.Coefficients.b
+      Tick_backend.Inner_curve.Coefficients.{a; b}
   in
   let module M = Snarky.Snark.Run.Make (Tick_backend) (Unit) in
   Quickcheck.test ~trials:3 Tick0.Field.gen ~f:(fun t ->
@@ -390,150 +385,6 @@ module Tick = struct
     let typ = Checked.typ
   end
 
-  module Pedersen = struct
-    include Crypto_params.Pedersen_params
-    include Crypto_params.Pedersen_chunk_table
-    include Crypto_params.Tick_pedersen
-
-    let zero_hash =
-      digest_fold (State.create ())
-        (Fold_lib.Fold.of_list [(false, false, false)])
-
-    module Checked = struct
-      include Snarky.Pedersen.Make (Tick0) (Inner_curve)
-                (struct
-                  let params = Crypto_params.Pedersen_params.affine
-                end)
-
-      let hash_triples ts ~(init : State.t) =
-        hash ts ~init:(init.triples_consumed, `Value init.acc)
-
-      let digest_triples ts ~init =
-        Checked.map (hash_triples ts ~init) ~f:digest
-    end
-
-    (* easier to put these hashing tests here, where Pedersen.Make has been applied, than
-      inside the Pedersen functor
-    *)
-    module For_tests = struct
-      open Fold_lib
-
-      let equal_curves c1 c2 =
-        if phys_equal c1 Inner_curve.zero || phys_equal c2 Inner_curve.zero
-        then phys_equal c1 c2
-        else
-          let c1_x, c1_y = Inner_curve.to_affine_exn c1 in
-          let c2_x, c2_y = Inner_curve.to_affine_exn c2 in
-          Field.equal c1_x c2_x && Field.equal c1_y c2_y
-
-      let equal_states s1 s2 =
-        equal_curves s1.State.acc s2.State.acc
-        && Int.equal s1.triples_consumed s2.triples_consumed
-
-      (* params, chunk_tables should never be modified *)
-
-      let gen_fold n =
-        let gen_triple =
-          Quickcheck.Generator.map (Int.gen_incl 0 7) ~f:(function
-            | 0 ->
-                (false, false, false)
-            | 1 ->
-                (false, false, true)
-            | 2 ->
-                (false, true, false)
-            | 3 ->
-                (false, true, true)
-            | 4 ->
-                (true, false, false)
-            | 5 ->
-                (true, false, true)
-            | 6 ->
-                (true, true, false)
-            | 7 ->
-                (true, true, true)
-            | _ ->
-                failwith "gen_triple: got unexpected integer" )
-        in
-        let gen_triples n =
-          Quickcheck.random_value
-            (Quickcheck.Generator.list_with_length n gen_triple)
-        in
-        Fold.of_list (gen_triples n)
-
-      let initial_state = State.create ()
-
-      let run_updates fold =
-        (* make sure chunk table deserialized before running test;
-           actual deserialization happens just once
-         *)
-        ignore (Lazy.force chunk_table) ;
-        let result = State.update_fold_chunked initial_state fold in
-        let unchunked_result =
-          State.update_fold_unchunked initial_state fold
-        in
-        (result, unchunked_result)
-
-      let run_hash_test n =
-        let fold = gen_fold n in
-        let result, unchunked_result = run_updates fold in
-        assert (equal_states result unchunked_result)
-
-      let hash_unchunked n =
-        let fold = gen_fold n in
-        State.update_fold_unchunked initial_state fold
-
-      let hash_chunked n =
-        let fold = gen_fold n in
-        State.update_fold_chunked initial_state fold
-    end
-
-    (* compare unchunked, chunked hashes *)
-
-    let%test_unit "hash one triple" = For_tests.run_hash_test 1
-
-    let%test_unit "hash small number of chunks" =
-      For_tests.run_hash_test (Chunked_triples.Chunk.size * 25)
-
-    let%test_unit "hash small number of chunks plus 1" =
-      For_tests.run_hash_test ((Chunked_triples.Chunk.size * 25) + 1)
-
-    let%test_unit "hash large number of chunks" =
-      For_tests.run_hash_test (Chunked_triples.Chunk.size * 250)
-
-    let%test_unit "hash large number of chunks plus 2" =
-      For_tests.run_hash_test ((Chunked_triples.Chunk.size * 250) + 2)
-
-    (* benchmark unchunked, chunked hashes *)
-
-    let%bench "hash one triple unchunked" = For_tests.hash_unchunked 1
-
-    let%bench_fun "hash one triple chunked" =
-      (* make sure chunk table deserialized *)
-      ignore (Lazy.force chunk_table) ;
-      fun () -> For_tests.hash_chunked 1
-
-    let%bench "hash small number of triples unchunked" =
-      For_tests.hash_unchunked 25
-
-    let%bench_fun "hash small number of triples chunked" =
-      ignore (Lazy.force chunk_table) ;
-      fun () -> For_tests.hash_chunked 25
-
-    let%bench "hash large number of triples unchunked" =
-      For_tests.hash_unchunked 250
-
-    let%bench_fun "hash large number of triples chunked" =
-      ignore (Lazy.force chunk_table) ;
-      fun () -> For_tests.hash_chunked 250
-
-    let%bench "hash huge number of triples unchunked" =
-      For_tests.hash_unchunked 1000
-
-    let%bench_fun "hash huge number of triples chunked" =
-      ignore (Lazy.force chunk_table) ;
-      fun () -> For_tests.hash_chunked 1000
-  end
-
   module Util = Snark_util.Make (Tick0)
 
   module Pairing = struct
@@ -700,10 +551,11 @@ module Tick = struct
         let hash xs =
           Random_oracle.Checked.hash ~init:(Lazy.force Tock_backend.bg_salt) xs
 
-        let group_map =
+        let group_map x =
           Snarky_group_map.Checked.to_group
             (module Run)
-            ~params:Tock_backend.bg_params
+            ~params:(Tock_backend.bg_params ())
+            x
       end)
 
       let hash ?message ~a ~b ~c ~delta_prime =
@@ -771,24 +623,6 @@ let embed (x : Tick.Field.t) : Tock.Field.t =
   in
   go Tock.Field.one Tock.Field.zero 0
 
-(** enable/disable use of chunk table in Pedersen hashing *)
-let set_chunked_hashing b = Tick.Pedersen.State.set_chunked_fold b
-
-[%%inject
-"ledger_depth", ledger_depth]
-
-let scan_state_transaction_capacity_log_2 =
-  Scan_state_constants.transaction_capacity_log_2
-
-let scan_state_work_delay = Scan_state_constants.work_delay
-
-(*Log of maximum number of trees in the parallel scan state*)
-let pending_coinbase_depth =
-  Int.ceil_log2
-    ( (scan_state_transaction_capacity_log_2 + 1)
-      * (scan_state_work_delay + 1)
-    + 1 )
-
 (* Let n = Tick.Field.size_in_bits.
    Let k = n - 3.
    The reason k = n - 3 is as follows. Inside [meets_target], we compare
@@ -804,13 +638,17 @@ let target_bit_length = Tick.Field.size_in_bits - 8
 module type Snark_intf = Snark_intf.S
 
 module Group_map = struct
-  let to_group =
-    Group_map.to_group (module Tick.Field) ~params:Tock_backend.bg_params
+  let to_group x =
+    Group_map.to_group
+      (module Tick.Field)
+      ~params:(Tock_backend.bg_params ())
+      x
 
   module Checked = struct
-    let to_group =
+    let to_group x =
       Snarky_group_map.Checked.to_group
         (module Tick.Run)
-        ~params:Tock_backend.bg_params
+        ~params:(Tock_backend.bg_params ())
+        x
   end
 end

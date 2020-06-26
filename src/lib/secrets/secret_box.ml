@@ -25,27 +25,23 @@ module BytesWr = struct
         Error "Bytes.of_yojson needs a string"
 end
 
-module Stable = struct
-  module V1 = struct
-    type t =
-      { box_primitive: string
-      ; pw_primitive: string
-      ; nonce: Bytes.t
-      ; pwsalt: Bytes.t
-      ; pwdiff: Int64.t * int
-      ; ciphertext: Bytes.t }
-    [@@deriving sexp]
-  end
-
-  module Latest = V1
+module T = struct
+  type t =
+    { box_primitive: string
+    ; pw_primitive: string
+    ; nonce: Bytes.t
+    ; pwsalt: Bytes.t
+    ; pwdiff: Int64.t * int
+    ; ciphertext: Bytes.t }
+  [@@deriving sexp]
 end
 
 module Json : sig
   type t [@@deriving yojson]
 
-  val of_stable : Stable.V1.t -> t
+  val of_stable : T.t -> t
 
-  val to_stable : t -> Stable.V1.t
+  val to_stable : t -> T.t
 end = struct
   type t =
     { box_primitive: string
@@ -57,16 +53,15 @@ end = struct
   [@@deriving yojson]
 
   let of_stable
-      {Stable.V1.box_primitive; pw_primitive; nonce; pwsalt; pwdiff; ciphertext}
-      =
+      {T.box_primitive; pw_primitive; nonce; pwsalt; pwdiff; ciphertext} =
     {box_primitive; pw_primitive; nonce; pwsalt; pwdiff; ciphertext}
 
   let to_stable {box_primitive; pw_primitive; nonce; pwsalt; pwdiff; ciphertext}
       =
-    {Stable.V1.box_primitive; pw_primitive; nonce; pwsalt; pwdiff; ciphertext}
+    {T.box_primitive; pw_primitive; nonce; pwsalt; pwdiff; ciphertext}
 end
 
-type t = Stable.Latest.t =
+type t = T.t =
   { box_primitive: string
   ; pw_primitive: string
   ; nonce: Bytes.t
@@ -75,9 +70,9 @@ type t = Stable.Latest.t =
   ; ciphertext: Bytes.t }
 [@@deriving sexp]
 
-let to_yojson t : Yojson.Safe.json = Json.to_yojson (Json.of_stable t)
+let to_yojson t : Yojson.Safe.t = Json.to_yojson (Json.of_stable t)
 
-let of_yojson (t : Yojson.Safe.json) =
+let of_yojson (t : Yojson.Safe.t) =
   Result.map ~f:Json.to_stable (Json.of_yojson t)
 
 (** warning: this will zero [password] *)

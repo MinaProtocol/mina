@@ -276,6 +276,10 @@ let make = (~challenges as _, ~testnetName as _) => {
                  "By participating in the testnet, you'll be helping advance the first cryptocurrency that utilizes recursive zk-SNARKs and production-scale Ouroboros proof of stake consensus.",
                )}
             </p>
+            <p className=Theme.Body.basic>
+              {React.string("Testnet Status: ")}
+              <StatusBadge service=`Network />
+            </p>
           </div>
           <Terminal.Wrapper lineDelay=2000>
             <Terminal.Line prompt=">" value="coda daemon -peer ..." />
@@ -326,12 +330,12 @@ let make = (~challenges as _, ~testnetName as _) => {
               href="https://forums.codaprotocol.com/"
             />
             <ActionButton
-              icon={React.string({js| 📬 |js})}
-              heading={React.string({js| Newsletter |js})}
+              icon={React.string({js| 🌟 |js})}
+              heading={React.string({js| Token Grant |js})}
               text={React.string(
-                "Sign up for the Testnet newsletter to get weekly updates",
+                "Apply to be one of the early members to receive a Genesis token grant",
               )}
-              href="https://docs.google.com/forms/d/e/1FAIpQLScQRGW0-xGattPmr5oT-yRb9aCkPE6yIKXSfw1LRmNx1oh6AA/viewform"
+              href="/genesis"
             />
           </div>
         </div>
@@ -343,7 +347,7 @@ let make = (~challenges as _, ~testnetName as _) => {
             </h1>
             // href="https://testnet-points-frontend-dot-o1labs-192920.appspot.com/"
             <a
-              href="http://bit.ly/TestnetBetaLeaderboard"
+              href="https://bit.ly/TestnetLeaderboard"
               target="_blank"
               className=Styles.headerLink>
               {React.string({j|View Full Leaderboard\u00A0→|j})}
@@ -415,8 +419,7 @@ let make = (~challenges as _, ~testnetName as _) => {
               </ul>
               <p className=Styles.markdownStyles>
                 {React.string("Check out all challenges ")}
-                <a
-                  href="https://forums.codaprotocol.com/t/testnet-beta-release-3-1-challenges/271">
+                <a href="https://bit.ly/3dNmPle">
                   {React.string(" here ")}
                 </a>
                 {React.string("and join ")}

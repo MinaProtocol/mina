@@ -30,12 +30,11 @@ let transfer ~logger ~archive_location
               ()
           | Error e ->
               Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
-                !"Could not send breadcrumb to archive: %s"
-                (Error.to_string_hum e)
                 ~metadata:
-                  [ ( "Breadcrumb"
+                  [ ("error", `String (Error.to_string_hum e))
+                  ; ( "breadcrumb"
                     , Transition_frontier.Breadcrumb.to_yojson breadcrumb ) ]
-      ) )
+                "Could not send breadcrumb to archive: $error" ) )
 
 let run ~logger
     ~(frontier_broadcast_pipe :

@@ -1,8 +1,13 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
-open Snark_params.Tick
 open Intf
+
+[%%ifdef consensus_mechanism]
+
+open Snark_params.Tick
+
+[%%endif]
 
 type uint64 = Unsigned.uint64
 
@@ -22,8 +27,10 @@ module Fee : sig
 
   include Codable.S with type t := t
 
+  val scale : t -> int -> t option
+
   (* TODO: Get rid of signed fee, use signed amount *)
-  [%%if defined consensus_mechanism]
+  [%%ifdef consensus_mechanism]
 
   module Signed :
     Signed_intf with type magnitude := t and type magnitude_var := var
@@ -34,6 +41,8 @@ module Fee : sig
 
   [%%endif]
 
+  [%%ifdef consensus_mechanism]
+
   module Checked : sig
     include
       Checked_arithmetic_intf
@@ -43,6 +52,8 @@ module Fee : sig
 
     val add_signed : var -> Signed.var -> (var, _) Checked.t
   end
+
+  [%%endif]
 end
 
 module Amount : sig
@@ -59,7 +70,7 @@ module Amount : sig
 
   include Codable.S with type t := t
 
-  [%%if defined consensus_mechanism]
+  [%%ifdef consensus_mechanism]
 
   module Signed :
     Signed_intf with type magnitude := t and type magnitude_var := var
@@ -78,7 +89,7 @@ module Amount : sig
 
   val add_fee : t -> Fee.t -> t option
 
-  [%%if defined consensus_mechanism]
+  [%%ifdef consensus_mechanism]
 
   module Checked : sig
     include
@@ -119,7 +130,7 @@ module Balance : sig
 
   val ( - ) : t -> Amount.t -> t option
 
-  [%%if defined consensus_mechanism]
+  [%%ifdef consensus_mechanism]
 
   module Checked : sig
     val add_signed_amount : var -> Amount.Signed.var -> (var, _) Checked.t
@@ -127,6 +138,12 @@ module Balance : sig
     val add_amount : var -> Amount.var -> (var, _) Checked.t
 
     val sub_amount : var -> Amount.var -> (var, _) Checked.t
+
+    val sub_amount_flagged :
+      var -> Amount.var -> (var * [`Underflow of Boolean.var], _) Checked.t
+
+    val add_amount_flagged :
+      var -> Amount.var -> (var * [`Overflow of Boolean.var], _) Checked.t
 
     val ( + ) : var -> Amount.var -> (var, _) Checked.t
 

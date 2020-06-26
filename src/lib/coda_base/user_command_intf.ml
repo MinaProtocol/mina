@@ -1,6 +1,22 @@
+(* user_command_intf.ml *)
+
+[%%import
+"/src/config.mlh"]
+
 open Import
-open Core
+open Core_kernel
+
+[%%ifdef
+consensus_mechanism]
+
 open Coda_numbers
+
+[%%else]
+
+open Coda_numbers_nonconsensus.Coda_numbers
+module Currency = Currency_nonconsensus.Currency
+
+[%%endif]
 
 module type Gen_intf = sig
   type t
@@ -17,6 +33,8 @@ module type Gen_intf = sig
                  Quickcheck.Generator.t
       -> ?nonce:Account_nonce.t
       -> max_amount:int
+      -> ?fee_token:Token_id.t
+      -> ?payment_token:Token_id.t
       -> max_fee:int
       -> unit
       -> t Quickcheck.Generator.t
@@ -31,6 +49,8 @@ module type Gen_intf = sig
       -> keys:Signature_keypair.t array
       -> ?nonce:Account_nonce.t
       -> max_amount:int
+      -> ?fee_token:Token_id.t
+      -> ?payment_token:Token_id.t
       -> max_fee:int
       -> unit
       -> t Quickcheck.Generator.t
@@ -39,6 +59,7 @@ module type Gen_intf = sig
          key_gen:(Signature_keypair.t * Signature_keypair.t)
                  Quickcheck.Generator.t
       -> ?nonce:Account_nonce.t
+      -> ?fee_token:Token_id.t
       -> max_fee:int
       -> unit
       -> t Quickcheck.Generator.t
@@ -46,6 +67,7 @@ module type Gen_intf = sig
     val stake_delegation_with_random_participants :
          keys:Signature_keypair.t array
       -> ?nonce:Account_nonce.t
+      -> ?fee_token:Token_id.t
       -> max_fee:int
       -> unit
       -> t Quickcheck.Generator.t
@@ -56,10 +78,7 @@ module type Gen_intf = sig
     val sequence :
          ?length:int
       -> ?sign_type:[`Fake | `Real]
-      -> ( Signature_lib.Keypair.t
-         * Currency.Amount.t
-         * Coda_numbers.Account_nonce.t )
-         array
+      -> (Signature_lib.Keypair.t * Currency.Amount.t * Account_nonce.t) array
       -> t list Quickcheck.Generator.t
   end
 end
@@ -69,28 +88,48 @@ module type S = sig
 
   include Comparable.S with type t := t
 
+  include Hashable.S with type t := t
+
   val payload : t -> User_command_payload.t
 
   val fee : t -> Currency.Fee.t
 
   val nonce : t -> Account_nonce.t
 
-  val sender : t -> Public_key.Compressed.t
+  val signer : t -> Public_key.t
 
-  val receiver : t -> Public_key.Compressed.t
+  val fee_token : t -> Token_id.t
+
+  val fee_payer_pk : t -> Public_key.Compressed.t
+
+  val fee_payer : t -> Account_id.t
+
+  val fee_excess : t -> Fee_excess.t
+
+  val token : t -> Token_id.t
+
+  val source_pk : t -> Public_key.Compressed.t
+
+  val source : t -> Account_id.t
+
+  val receiver_pk : t -> Public_key.Compressed.t
+
+  val receiver : t -> Account_id.t
 
   val amount : t -> Currency.Amount.t option
 
-  val is_payment : t -> bool
-
   val memo : t -> User_command_memo.t
 
-  val valid_until : t -> Coda_numbers.Global_slot.t
+  val valid_until : t -> Global_slot.t
 
   (* for filtering *)
   val minimum_fee : Currency.Fee.t
 
-  val is_trivial : t -> bool
+  val has_insufficient_fee : t -> bool
+
+  val tag : t -> Transaction_union_tag.t
+
+  val tag_string : t -> string
 
   include Gen_intf with type t := t
 
@@ -113,8 +152,13 @@ module type S = sig
     include Comparable.S with type t := t
   end
 
+  val sign_payload :
+    Signature_lib.Private_key.t -> User_command_payload.t -> Signature.t
+
   val sign :
     Signature_keypair.t -> User_command_payload.t -> With_valid_signature.t
+
+  val check_signature : t -> bool
 
   val create_with_signature_checked :
        Signature.t
@@ -132,7 +176,7 @@ module type S = sig
   (** Forget the signature check. *)
   val forget_check : With_valid_signature.t -> t
 
-  val accounts_accessed : t -> Public_key.Compressed.t list
+  val accounts_accessed : t -> Account_id.t list
 
   val filter_by_participant : t list -> Public_key.Compressed.t -> t list
 

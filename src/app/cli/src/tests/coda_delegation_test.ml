@@ -24,15 +24,19 @@ let main () =
   (* keep CI alive *)
   Deferred.don't_wait_for (print_heartbeat logger) ;
   (* dump account info to log *)
-  List.iteri accounts ~f:(fun ndx ((_, acct) as record) ->
-      let keypair = Test_genesis_ledger.keypair_of_account_record_exn record in
+  List.iteri accounts ~f:(fun ndx (sk, acct) ->
+      let sk =
+        match sk with
+        | Some sk ->
+            `String (Private_key.to_base58_check sk)
+        | None ->
+            `Null
+      in
       Logger.info logger ~module_:__MODULE__ ~location:__LOC__
         "Account: $account_number"
         ~metadata:
           [ ("account_number", `Int ndx)
-          ; ( "private_key"
-            , `String (Import.Private_key.to_base58_check keypair.private_key)
-            )
+          ; ("private_key", sk)
           ; ( "public_key"
             , `String
                 ( Public_key.Compressed.to_base58_check
@@ -63,19 +67,19 @@ let main () =
   Deferred.don't_wait_for
     (Pipe_lib.Linear_pipe.iter delegator_transition_reader
        ~f:(fun {With_hash.data= transition; _} ->
-         assert (
-           Public_key.Compressed.equal transition.creator delegator_pubkey ) ;
-         Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-           "Observed block produced by delegator $delegator"
-           ~metadata:
-             [ ( "delegator"
-               , `String
-                   (Public_key.Compressed.to_base58_check delegator_pubkey) )
-             ] ;
-         assert (not !delegatee_has_produced) ;
-         incr delegator_production_count ;
-         if Int.equal !delegator_production_count delegator_production_goal
-         then Ivar.fill delegator_ivar () ;
+         if Public_key.Compressed.equal transition.creator delegator_pubkey
+         then (
+           Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+             "Observed block produced by delegator $delegator"
+             ~metadata:
+               [ ( "delegator"
+                 , `String
+                     (Public_key.Compressed.to_base58_check delegator_pubkey)
+                 ) ] ;
+           assert (not !delegatee_has_produced) ;
+           incr delegator_production_count ;
+           if Int.equal !delegator_production_count delegator_production_goal
+           then Ivar.fill delegator_ivar () ) ;
          return () )) ;
   Logger.info logger ~module_:__MODULE__ ~location:__LOC__
     "Started delegator transition reader" ;
@@ -90,19 +94,19 @@ let main () =
   Deferred.don't_wait_for
     (Pipe_lib.Linear_pipe.iter delegatee_transition_reader
        ~f:(fun {With_hash.data= transition; _} ->
-         assert (
-           Public_key.Compressed.equal transition.creator delegatee_pubkey ) ;
-         Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-           "Observed block produced by delegatee $delegatee"
-           ~metadata:
-             [ ( "delegatee"
-               , `String
-                   (Public_key.Compressed.to_base58_check delegatee_pubkey) )
-             ] ;
-         delegatee_has_produced := true ;
-         incr delegatee_production_count ;
-         if Int.equal !delegatee_production_count delegatee_production_goal
-         then Ivar.fill delegatee_ivar () ;
+         if Public_key.Compressed.equal transition.creator delegatee_pubkey
+         then (
+           Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+             "Observed block produced by delegatee $delegatee"
+             ~metadata:
+               [ ( "delegatee"
+                 , `String
+                     (Public_key.Compressed.to_base58_check delegatee_pubkey)
+                 ) ] ;
+           delegatee_has_produced := true ;
+           incr delegatee_production_count ;
+           if Int.equal !delegatee_production_count delegatee_production_goal
+           then Ivar.fill delegatee_ivar () ) ;
          return () )) ;
   Logger.info logger ~module_:__MODULE__ ~location:__LOC__
     "Started delegatee transition reader" ;

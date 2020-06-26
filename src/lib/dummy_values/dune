@@ -5,7 +5,7 @@
  (libraries crypto_params snarky)
  (ppx_runtime_libraries base)
  (preprocess
-  (pps ppx_coda ppx_jane ppxlib.metaquot ppxlib.runner)))
+  (pps ppx_version ppx_jane ppxlib.metaquot)))
 
 (rule
  (targets dummy_values.ml)

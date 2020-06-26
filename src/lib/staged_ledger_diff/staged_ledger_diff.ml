@@ -58,7 +58,7 @@ module Ft = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = Fee_transfer.Single.Stable.V1.t [@@deriving sexp, to_yojson]
+      type t = Coinbase.Fee_transfer.Stable.V1.t [@@deriving sexp, to_yojson]
 
       let to_latest = Fn.id
     end
@@ -313,7 +313,8 @@ let completed_works (t : t) =
   (fst t.diff).completed_works
   @ Option.value_map (snd t.diff) ~default:[] ~f:(fun d -> d.completed_works)
 
-let coinbase (t : t) =
+let coinbase ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+    (t : t) =
   let first_pre_diff, second_pre_diff_opt = t.diff in
   match
     ( first_pre_diff.coinbase
@@ -323,4 +324,4 @@ let coinbase (t : t) =
   | At_most_two.Zero, At_most_one.Zero ->
       Currency.Amount.zero
   | _ ->
-      Coda_compile_config.coinbase
+      constraint_constants.coinbase_amount

@@ -11,8 +11,19 @@
 
 open Coda_base
 open Frontier_base
+open Coda_state
 
 include Frontier_intf.S
+
+module Protocol_states_for_root_scan_state : sig
+  type t = Protocol_state.value State_hash.Map.t
+
+  val protocol_states_for_next_root_scan_state :
+       t
+    -> new_scan_state:Staged_ledger.Scan_state.t
+    -> old_root_state:(Protocol_state.value, State_hash.t) With_hash.t
+    -> (State_hash.t * Protocol_state.value) list
+end
 
 val create :
      logger:Logger.t
@@ -21,6 +32,7 @@ val create :
   -> base_hash:Frontier_hash.t
   -> consensus_local_state:Consensus.Data.Local_state.t
   -> max_length:int
+  -> precomputed_values:Precomputed_values.t
   -> t
 
 val close : t -> unit
@@ -33,6 +45,9 @@ val hash : t -> Frontier_hash.t
 
 val calculate_diffs : t -> Breadcrumb.t -> Diff.Full.E.t list
 
+val protocol_states_for_root_scan_state :
+  t -> Protocol_states_for_root_scan_state.t
+
 val apply_diffs :
      t
   -> Diff.Full.E.t list
@@ -42,4 +57,7 @@ val apply_diffs :
 
 module For_tests : sig
   val equal : t -> t -> bool
+
+  val find_protocol_state_exn :
+    t -> State_hash.t -> Coda_state.Protocol_state.value
 end

@@ -11,14 +11,20 @@ module Db :
    and type hash := Ledger_hash.t
    and type account := Account.t
    and type key := Public_key.Compressed.t
-   and type key_set := Public_key.Compressed.Set.t
+   and type token_id := Token_id.t
+   and type token_id_set := Token_id.Set.t
+   and type account_id := Account_id.t
+   and type account_id_set := Account_id.Set.t
 
 module Any_ledger :
   Merkle_ledger.Any_ledger.S
   with module Location = Location
   with type account := Account.t
    and type key := Public_key.Compressed.t
-   and type key_set := Public_key.Compressed.Set.t
+   and type token_id := Token_id.t
+   and type token_id_set := Token_id.Set.t
+   and type account_id := Account_id.t
+   and type account_id_set := Account_id.Set.t
    and type hash := Ledger_hash.t
 
 module Mask :
@@ -27,7 +33,10 @@ module Mask :
    and module Attached.Addr = Location.Addr
   with type account := Account.t
    and type key := Public_key.Compressed.t
-   and type key_set := Public_key.Compressed.Set.t
+   and type token_id := Token_id.t
+   and type token_id_set := Token_id.Set.t
+   and type account_id := Account_id.t
+   and type account_id_set := Account_id.Set.t
    and type hash := Ledger_hash.t
    and type location := Location.t
    and type parent := Any_ledger.M.t
@@ -38,7 +47,10 @@ module Maskable :
   with module Addr = Location.Addr
   with type account := Account.t
    and type key := Public_key.Compressed.t
-   and type key_set := Public_key.Compressed.Set.t
+   and type token_id := Token_id.t
+   and type token_id_set := Token_id.Set.t
+   and type account_id := Account_id.t
+   and type account_id_set := Account_id.Set.t
    and type hash := Ledger_hash.t
    and type root_hash := Ledger_hash.t
    and type unattached_mask := Mask.t
@@ -53,7 +65,10 @@ include
    and type hash := Ledger_hash.t
    and type account := Account.t
    and type key := Public_key.Compressed.t
-   and type key_set := Public_key.Compressed.Set.t
+   and type token_id := Token_id.t
+   and type token_id_set := Token_id.Set.t
+   and type account_id := Account_id.t
+   and type account_id_set := Account_id.Set.t
    and type t = Mask.Attached.t
    and type attached_mask = Mask.Attached.t
    and type unattached_mask = Mask.t
@@ -68,13 +83,13 @@ val unregister_mask_exn : Mask.Attached.t -> Mask.t
  * work off of this type *)
 type maskable_ledger = t
 
-val with_ledger : f:(t -> 'a) -> 'a
+val with_ledger : depth:int -> f:(t -> 'a) -> 'a
 
-val with_ephemeral_ledger : f:(t -> 'a) -> 'a
+val with_ephemeral_ledger : depth:int -> f:(t -> 'a) -> 'a
 
-val create : ?directory_name:string -> unit -> t
+val create : ?directory_name:string -> depth:int -> unit -> t
 
-val create_ephemeral : unit -> t
+val create_ephemeral : depth:int -> unit -> t
 
 val of_database : Db.t -> t
 
@@ -92,14 +107,17 @@ module Undo : sig
     module Common : sig
       type t = Undo.User_command_undo.Common.t =
         { user_command: User_command.t
-        ; previous_receipt_chain_hash: Receipt.Chain_hash.t }
+        ; previous_receipt_chain_hash: Receipt.Chain_hash.t
+        ; fee_payer_timing: Account.Timing.t
+        ; source_timing: Account.Timing.t option }
       [@@deriving sexp]
     end
 
     module Body : sig
       type t = Undo.User_command_undo.Body.t =
-        | Payment of {previous_empty_accounts: Public_key.Compressed.t list}
+        | Payment of {previous_empty_accounts: Account_id.t list}
         | Stake_delegation of {previous_delegate: Public_key.Compressed.t}
+        | Failed
       [@@deriving sexp]
     end
 
@@ -109,15 +127,13 @@ module Undo : sig
 
   module Fee_transfer_undo : sig
     type t = Undo.Fee_transfer_undo.t =
-      { fee_transfer: Fee_transfer.t
-      ; previous_empty_accounts: Public_key.Compressed.t list }
+      {fee_transfer: Fee_transfer.t; previous_empty_accounts: Account_id.t list}
     [@@deriving sexp]
   end
 
   module Coinbase_undo : sig
     type t = Undo.Coinbase_undo.t =
-      { coinbase: Coinbase.t
-      ; previous_empty_accounts: Public_key.Compressed.t list }
+      {coinbase: Coinbase.t; previous_empty_accounts: Account_id.t list}
     [@@deriving sexp]
   end
 
@@ -135,21 +151,36 @@ module Undo : sig
   val transaction : t -> Transaction.t Or_error.t
 end
 
-val create_new_account_exn : t -> Public_key.Compressed.t -> Account.t -> unit
+val create_new_account_exn : t -> Account_id.t -> Account.t -> unit
 
 val apply_user_command :
-     t
+     constraint_constants:Genesis_constants.Constraint_constants.t
+  -> txn_global_slot:Coda_numbers.Global_slot.t
+  -> t
   -> User_command.With_valid_signature.t
   -> Undo.User_command_undo.t Or_error.t
 
-val apply_transaction : t -> Transaction.t -> Undo.t Or_error.t
+val apply_transaction :
+     constraint_constants:Genesis_constants.Constraint_constants.t
+  -> txn_global_slot:Coda_numbers.Global_slot.t
+  -> t
+  -> Transaction.t
+  -> Undo.t Or_error.t
 
-val undo : t -> Undo.t -> unit Or_error.t
+val undo :
+     constraint_constants:Genesis_constants.Constraint_constants.t
+  -> t
+  -> Undo.t
+  -> unit Or_error.t
 
 val merkle_root_after_user_command_exn :
-  t -> User_command.With_valid_signature.t -> Ledger_hash.t
+     constraint_constants:Genesis_constants.Constraint_constants.t
+  -> txn_global_slot:Coda_numbers.Global_slot.t
+  -> t
+  -> User_command.With_valid_signature.t
+  -> Ledger_hash.t
 
-val create_empty : t -> Public_key.Compressed.t -> Path.t * Account.t
+val create_empty : t -> Account_id.t -> Path.t * Account.t
 
 val num_accounts : t -> int
 

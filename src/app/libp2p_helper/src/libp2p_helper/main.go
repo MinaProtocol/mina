@@ -42,17 +42,22 @@ type subscription struct {
 	Cancel context.CancelFunc
 }
 
+type validationStatus struct {
+	Completion chan bool
+	TimedOutAt *time.Time
+}
+
 type app struct {
 	P2p             *codanet.Helper
 	Ctx             context.Context
 	Subs            map[int]subscription
-	Validators      map[int]chan bool
+	Validators      map[int]*validationStatus
 	ValidatorMutex  *sync.Mutex
 	Streams         map[int]net.Stream
-	OutLock         sync.Mutex
+	StreamsMutex    sync.Mutex
 	Out             *bufio.Writer
+	OutChan         chan interface{}
 	UnsafeNoTrustIP bool
-	Extra           *os.File
 }
 
 var seqs = make(chan int)
@@ -83,6 +88,8 @@ const (
 	unbanIP
 )
 
+const validationTimeout = 5 * time.Minute
+
 type codaPeerInfo struct {
 	Libp2pPort int    `json:"libp2p_port"`
 	Host       string `json:"host"`
@@ -96,26 +103,7 @@ type envelope struct {
 }
 
 func (app *app) writeMsg(msg interface{}) {
-	app.OutLock.Lock()
-	defer app.OutLock.Unlock()
-	bytes, err := json.Marshal(msg)
-	app.Extra.Write(bytes)
-	if err == nil {
-		n, err := app.Out.Write(bytes)
-		if err != nil {
-			panic(err)
-		}
-		if n != len(bytes) {
-			// TODO: handle this correctly.
-			panic("short write :(")
-		}
-		app.Out.WriteByte(0x0a)
-		if err := app.Out.Flush(); err != nil {
-			panic(err)
-		}
-	} else {
-		panic(err)
-	}
+	app.OutChan <- msg
 }
 
 type action interface {
@@ -209,6 +197,7 @@ type configureMsg struct {
 	ListenOn        []string `json:"ifaces"`
 	External        string   `json:"external_maddr"`
 	UnsafeNoTrustIP bool     `json:"unsafe_no_trust_ip"`
+	Flood           bool     `json:"flood_gossip"`
 }
 
 type discoveredPeerUpcall struct {
@@ -244,6 +233,19 @@ func (m *configureMsg) run(app *app) (interface{}, error) {
 	if err != nil {
 		return nil, badHelper(err)
 	}
+
+	var ps *pubsub.PubSub
+	if m.Flood {
+		ps, err = pubsub.NewFloodSub(app.Ctx, helper.Host, pubsub.WithStrictSignatureVerification(true), pubsub.WithMessageSigning(true))
+	} else {
+		ps, err = pubsub.NewRandomSub(app.Ctx, helper.Host, pubsub.WithStrictSignatureVerification(true), pubsub.WithMessageSigning(true))
+	}
+
+	if err != nil {
+		return nil, badHelper(err)
+	}
+
+	helper.Pubsub = ps
 	app.P2p = helper
 
 	return "configure success", nil
@@ -340,7 +342,8 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 		seqno := <-seqs
 		ch := make(chan bool, 1)
 		app.ValidatorMutex.Lock()
-		app.Validators[seqno] = ch
+		app.Validators[seqno] = new(validationStatus)
+		(*app.Validators[seqno]).Completion = ch
 		app.ValidatorMutex.Unlock()
 
 		app.P2p.Logger.Info("validating a new pubsub message ...")
@@ -371,8 +374,16 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 			// validationComplete will remove app.Validators[seqno] once the
 			// coda process gets around to it.
 			app.P2p.Logger.Error("validation timed out :(")
+
+			app.ValidatorMutex.Lock()
+
+			(*app.Validators[seqno]).TimedOutAt = new(time.Time)
+			*((*app.Validators[seqno]).TimedOutAt) = time.Now()
+
+			app.ValidatorMutex.Unlock()
+
 			if app.UnsafeNoTrustIP {
-				app.P2p.Logger.Info("validated!")
+				app.P2p.Logger.Info("validated anyway!")
 				return true
 			}
 			app.P2p.Logger.Info("unvalidated :(")
@@ -385,7 +396,7 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 			}
 			return res
 		}
-	}, pubsub.WithValidatorTimeout(5*time.Minute))
+	}, pubsub.WithValidatorTimeout(validationTimeout))
 
 	if err != nil {
 		return nil, badp2p(err)
@@ -406,17 +417,20 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 		for {
 			msg, err := sub.Next(ctx)
 			if err == nil {
-				sender, err := findPeerInfo(app, msg.ReceivedFrom)
+				// sender, err := findPeerInfo(app, msg.ReceivedFrom)
 				if err != nil && !app.UnsafeNoTrustIP {
 					app.P2p.Logger.Errorf("failed to connect to peer %s that just sent us an already-validated pubsub message, dropping it", peer.IDB58Encode(msg.ReceivedFrom))
 				} else {
-					data := codaEncode(msg.Data)
-					app.writeMsg(publishUpcall{
-						Upcall:       "publish",
-						Subscription: s.Subscription,
-						Data:         data,
-						Sender:       sender,
-					})
+					/* Don't bother informing the helper about this message; it ignores it
+										   and we don't want to block here or else we might lose messages
+					            data := codaEncode(msg.Data)
+					            app.writeMsg(publishUpcall{
+					              Upcall:       "publish",
+					              Subscription: s.Subscription,
+					              Data:         data,
+					              Sender:       sender,
+					            })
+					*/
 				}
 			} else {
 				if ctx.Err() != context.Canceled {
@@ -466,8 +480,11 @@ func (r *validationCompleteMsg) run(app *app) (interface{}, error) {
 	}
 	app.ValidatorMutex.Lock()
 	defer app.ValidatorMutex.Unlock()
-	if ch, ok := app.Validators[r.Seqno]; ok {
-		ch <- r.Valid
+	if st, ok := app.Validators[r.Seqno]; ok {
+		st.Completion <- r.Valid
+		if st.TimedOutAt != nil {
+			app.P2p.Logger.Errorf("validation for item %d took %d seconds", r.Seqno, time.Now().Add(validationTimeout).Sub(*st.TimedOutAt))
+		}
 		delete(app.Validators, r.Seqno)
 		return "validationComplete success", nil
 	}
@@ -592,6 +609,8 @@ func (o *openStreamMsg) run(app *app) (interface{}, error) {
 		return nil, badp2p(err)
 	}
 
+	app.StreamsMutex.Lock()
+	defer app.StreamsMutex.Unlock()
 	app.Streams[streamIdx] = stream
 	go func() {
 		// FIXME HACK: allow time for the openStreamResult to get printed before we start inserting stream events
@@ -609,6 +628,8 @@ func (cs *closeStreamMsg) run(app *app) (interface{}, error) {
 	if app.P2p == nil {
 		return nil, needsConfigure()
 	}
+	app.StreamsMutex.Lock()
+	defer app.StreamsMutex.Unlock()
 	if stream, ok := app.Streams[cs.StreamIdx]; ok {
 		err := stream.Close()
 		if err != nil {
@@ -627,6 +648,8 @@ func (cs *resetStreamMsg) run(app *app) (interface{}, error) {
 	if app.P2p == nil {
 		return nil, needsConfigure()
 	}
+	app.StreamsMutex.Lock()
+	defer app.StreamsMutex.Unlock()
 	if stream, ok := app.Streams[cs.StreamIdx]; ok {
 		err := stream.Reset()
 		delete(app.Streams, cs.StreamIdx)
@@ -652,6 +675,8 @@ func (cs *sendStreamMsgMsg) run(app *app) (interface{}, error) {
 		return nil, badRPC(err)
 	}
 
+	app.StreamsMutex.Lock()
+	defer app.StreamsMutex.Unlock()
 	if stream, ok := app.Streams[cs.StreamIdx]; ok {
 		n, err := stream.Write(data)
 		if err != nil {
@@ -684,6 +709,8 @@ func (as *addStreamHandlerMsg) run(app *app) (interface{}, error) {
 			return
 		}
 		streamIdx := <-seqs
+		app.StreamsMutex.Lock()
+		defer app.StreamsMutex.Unlock()
 		app.Streams[streamIdx] = stream
 		app.writeMsg(incomingStreamUpcall{
 			Upcall:    "incomingStream",
@@ -816,7 +843,7 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 	// report dht peers
 	go func() {
 		// wait a bit for our advertisement to go out and get some responses
-		time.Sleep(5 * time.Second)
+		time.Sleep(1 * time.Second)
 
 		for {
 			// default is to yield only 100 peers at a time. for now, always be
@@ -829,7 +856,7 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 			for info := range dhtpeers {
 				foundPeer(info, "dht")
 			}
-			time.Sleep(5 * time.Minute)
+			time.Sleep(30 * time.Second)
 		}
 	}()
 
@@ -971,13 +998,8 @@ type successResult struct {
 }
 
 func main() {
-    logwriter.Configure(logwriter.Output(os.Stderr), logwriter.LdJSONFormatter)
-    os.Mkdir("/tmp/artifacts", os.ModePerm)
-	logfile, err := os.Create("/tmp/artifacts/helper.log")
-	if err != nil {
-		panic(err)
-	}
-	log.SetOutput(logfile)
+	logwriter.Configure(logwriter.Output(os.Stderr), logwriter.LdJSONFormatter)
+	log.SetOutput(os.Stderr)
 	logging.SetAllLoggers(logging2.INFO)
 	helperLog := logging.Logger("helper top-level JSON handling")
 
@@ -990,8 +1012,9 @@ func main() {
 	}()
 
 	lines := bufio.NewScanner(os.Stdin)
-	// 11MiB buffer size, larger than the 10.66MB minimum for 8MiB to be b64'd
-	bufsize := (1024 * 1024) * 11
+	// 22MiB buffer size, larger than the 21.33MB minimum for 16MiB to be b64'd
+	// 4 * (2^24/3) / 2^20 = 21.33
+	bufsize := (1024 * 1024) * 22
 	lines.Buffer(make([]byte, bufsize), bufsize)
 	out := bufio.NewWriter(os.Stdout)
 
@@ -1000,15 +1023,45 @@ func main() {
 		Ctx:            context.Background(),
 		Subs:           make(map[int]subscription),
 		ValidatorMutex: &sync.Mutex{},
-		Validators:     make(map[int]chan bool),
+		Validators:     make(map[int]*validationStatus),
 		Streams:        make(map[int]net.Stream),
-		Extra:          logfile,
-		// OutLock doesn't need to be initialized
-		Out: out,
+		OutChan:        make(chan interface{}, 4096),
+		Out:            out,
 	}
 
+	go func() {
+		for {
+			msg := <-app.OutChan
+			bytes, err := json.Marshal(msg)
+			if err == nil {
+				n, err := app.Out.Write(bytes)
+				if err != nil {
+					panic(err)
+				}
+				if n != len(bytes) {
+					// TODO: handle this correctly.
+					panic("short write :(")
+				}
+				app.Out.WriteByte(0x0a)
+				if err := app.Out.Flush(); err != nil {
+					panic(err)
+				}
+			} else {
+				panic(err)
+			}
+		}
+	}()
+
+	var line string
+
+	defer func() {
+		if r := recover(); r != nil {
+			helperLog.Error("While handling RPC:", line, "\nThe following panic occurred: ", r, "\nstack:\n", debug.Stack())
+		}
+	}()
+
 	for lines.Scan() {
-		line := lines.Text()
+		line = lines.Text()
 		var raw json.RawMessage
 		env := envelope{
 			Body: &raw,
@@ -1022,11 +1075,6 @@ func main() {
 			log.Print("when unmarshaling the method invocation...")
 			log.Panic(err)
 		}
-		defer func() {
-			if r := recover(); r != nil {
-				helperLog.Error("While handling RPC:", line, "\nThe following panic occurred: ", r, "\nstack:\n", debug.Stack())
-			}
-		}()
 		start := time.Now()
 		res, err := msg.run(app)
 		if err == nil {

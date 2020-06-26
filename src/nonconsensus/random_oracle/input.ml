@@ -1,0 +1,1 @@
+../../lib/random_oracle/input.ml

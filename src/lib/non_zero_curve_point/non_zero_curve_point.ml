@@ -2,16 +2,23 @@
 "/src/config.mlh"]
 
 open Core_kernel
-open Module_version
 
-[%%if
-defined consensus_mechanism]
+[%%ifdef
+consensus_mechanism]
 
 open Snark_params.Tick
 
-[%%endif]
-
 let parity y = Bigint.(test_bit (of_field y) 0)
+
+[%%else]
+
+open Snark_params_nonconsensus
+
+let parity y = Field.parity y
+
+module Random_oracle = Random_oracle_nonconsensus.Random_oracle
+
+[%%endif]
 
 let gen_uncompressed =
   Quickcheck.Generator.filter_map Field.gen_uniform ~f:(fun x ->
@@ -27,7 +34,7 @@ module Compressed = struct
     [%%versioned_asserted
     module Stable = struct
       module V1 = struct
-        type t = (Snark_params.Tick.Field.t, bool) Poly.Stable.V1.t
+        type t = (Field.t, bool) Poly.Stable.V1.t
 
         let to_latest = Fn.id
 
@@ -48,12 +55,11 @@ module Compressed = struct
   [%%versioned_asserted
   module Stable = struct
     module V1 = struct
-      type t = (Snark_params.Tick.Field.t, bool) Poly.Stable.V1.t
-      [@@deriving eq, compare, hash]
+      type t = (Field.t, bool) Poly.Stable.V1.t [@@deriving eq, compare, hash]
 
       (* dummy type for inserting constraint
          adding constraint to t produces "unused rec" error
-                                *)
+      *)
       type unused = unit constraint t = Arg.Stable.V1.t
 
       let to_latest = Fn.id
@@ -73,6 +79,10 @@ module Compressed = struct
     end
 
     module Tests = struct
+      (* these tests check not only whether the serialization of the version-asserted type has changed,
+         but also whether the serializations for the consensus and nonconsensus code are identical
+       *)
+
       [%%if
       curve_size = 298]
 
@@ -81,10 +91,10 @@ module Compressed = struct
           Quickcheck.random_value
             ~seed:(`Deterministic "nonzero_curve_point_compressed-seed") V1.gen
         in
-        let known_good_hash =
-          "\xC3\x5E\x26\x42\xA5\x04\x4A\x9D\x00\x17\xD8\x3E\xED\x84\x08\xDB\xD1\xA0\xCE\x13\x13\x10\x28\x80\x74\xD4\xF1\x25\x6C\x87\x44\x04"
-        in
-        Serialization.check_serialization (module V1) point known_good_hash
+        let known_good_digest = "437f5bc6710b6a8fda8f9e8cf697fc2c" in
+        Ppx_version.Serialization.check_serialization
+          (module V1)
+          point known_good_digest
 
       [%%elif
       curve_size = 753]
@@ -94,10 +104,10 @@ module Compressed = struct
           Quickcheck.random_value
             ~seed:(`Deterministic "nonzero_curve_point_compressed-seed") V1.gen
         in
-        let known_good_hash =
-          "\x4C\x68\x08\xF4\xC0\xB7\xF1\x41\xFE\xDF\x43\x55\xDA\xB6\x13\xD4\x69\x46\x04\x51\x58\xF7\x92\x51\x02\x5B\x2B\x20\x3F\x6F\x2C\x11"
-        in
-        Serialization.check_serialization (module V1) point known_good_hash
+        let known_good_digest = "067f8be67e5cc31f5c5ac4be91d5f6db" in
+        Ppx_version.Serialization.check_serialization
+          (module V1)
+          point known_good_digest
 
       [%%else]
 
@@ -128,8 +138,8 @@ module Compressed = struct
   let to_input {Poly.x; is_odd} =
     {Random_oracle.Input.field_elements= [|x|]; bitstrings= [|[is_odd]|]}
 
-  [%%if
-  defined consensus_mechanism]
+  [%%ifdef
+  consensus_mechanism]
 
   (* snarky-dependent *)
 
@@ -188,11 +198,10 @@ module Uncompressed = struct
 
   let compress = Compressed.compress
 
-  [%%versioned_asserted
+  [%%versioned_binable
   module Stable = struct
     module V1 = struct
-      type t = Snark_params.Tick.Field.t * Snark_params.Tick.Field.t
-      [@@deriving eq, compare, hash]
+      type t = Field.t * Field.t [@@deriving eq, compare, hash]
 
       let to_latest = Fn.id
 
@@ -238,40 +247,6 @@ module Uncompressed = struct
       let t_of_sexp sexp =
         Option.value_exn (decompress @@ Compressed.t_of_sexp sexp)
     end
-
-    module Tests = struct
-      [%%if
-      curve_size = 298]
-
-      let%test "nonzero_curve_point v1" =
-        let point =
-          Quickcheck.random_value
-            ~seed:(`Deterministic "nonzero_curve_point-seed") V1.gen
-        in
-        let known_good_hash =
-          "\x9F\x36\xA5\x8E\xF2\x0F\x58\xFA\x79\xA4\x47\x18\x79\x43\xE0\x38\xC2\x6B\x6B\x7E\xD3\xF5\xE2\x45\x4E\x20\x19\x64\x62\xCF\x63\x75"
-        in
-        Serialization.check_serialization (module V1) point known_good_hash
-
-      [%%elif
-      curve_size = 753]
-
-      let%test "nonzero_curve_point v1" =
-        let point =
-          Quickcheck.random_value
-            ~seed:(`Deterministic "nonzero_curve_point-seed") V1.gen
-        in
-        let known_good_hash =
-          "\xE2\x8A\xF9\x55\x41\x07\x54\x1F\xF4\x90\x09\x94\xE8\xA5\x7C\x0E\xD3\xED\x8C\xC1\xC9\x1F\x05\x3E\x2C\x39\x28\x9F\x9C\xF1\x10\xCC"
-        in
-        Serialization.check_serialization (module V1) point known_good_hash
-
-      [%%else]
-
-      let%test "nonzero_curve_point_v1" = failwith "Unknown curve size"
-
-      [%%endif]
-    end
   end]
 
   type t =
@@ -298,8 +273,8 @@ module Uncompressed = struct
     Quickcheck.test gen ~f:(fun pk ->
         assert (equal (decompress_exn (compress pk)) pk) )
 
-  [%%if
-  defined consensus_mechanism]
+  [%%ifdef
+  consensus_mechanism]
 
   (* snarky-dependent *)
 

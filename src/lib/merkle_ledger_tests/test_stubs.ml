@@ -1,19 +1,20 @@
 open Core
-open Unsigned
 module Balance = Currency.Balance
 
 module Account = struct
   (* want bin_io, not available with Account.t *)
-  type t = Coda_base.Account.Stable.V1.t
-  [@@deriving bin_io, sexp, eq, compare, hash, yojson]
+  type t = Coda_base.Account.Stable.Latest.t
+  [@@deriving bin_io_unversioned, sexp, eq, compare, hash, yojson]
 
-  type key = Coda_base.Account.Key.Stable.V1.t
-  [@@deriving bin_io, sexp, eq, compare, hash]
+  type key = Coda_base.Account.Key.Stable.Latest.t
+  [@@deriving bin_io_unversioned, sexp, eq, compare, hash]
 
   (* use Account items needed *)
   let empty = Coda_base.Account.empty
 
   let public_key = Coda_base.Account.public_key
+
+  let identifier = Coda_base.Account.identifier
 
   let key_gen = Coda_base.Account.key_gen
 
@@ -26,74 +27,11 @@ module Account = struct
   let update_balance t bal = {t with Coda_base.Account.Poly.balance= bal}
 end
 
-(* below are alternative modules that use strings as public keys and UInt64 as balances for
-   in accounts
-
-   using these modules instead of Account and Balance above speeds up the
-   ledger tests
-
-   we don't use the alternatives for testing currently, because Account
-   and Balance above are the modules used for actual ledgers
- *)
-
-module Balance_not_used = struct
-  include UInt64
-  include Binable.Of_stringable (UInt64)
-
-  let sexp_of_t t = [%sexp_of: string] (to_string t)
-
-  let t_of_sexp sexp =
-    let string_balance = [%of_sexp: string] sexp in
-    of_string string_balance
-
-  let equal x y = UInt64.compare x y = 0
-
-  let gen =
-    Quickcheck.Generator.map ~f:UInt64.of_int64 Int64.quickcheck_generator
-end
-
-module Account_not_used = struct
-  type key = string [@@deriving sexp, show, bin_io, eq, compare, hash]
-
-  type t =
-    { public_key: key
-    ; balance: Balance.Stable.V1.t
-          [@printer
-            fun fmt balance ->
-              Format.pp_print_string fmt (Balance.to_string balance)] }
-  [@@deriving bin_io, eq, show, fields]
-
-  let sexp_of_t {public_key; balance} =
-    [%sexp_of: string * string] (public_key, Balance.to_string balance)
-
-  let t_of_sexp sexp =
-    let public_key, string_balance = [%of_sexp: string * string] sexp in
-    let balance = Balance.of_string string_balance in
-    {public_key; balance}
-
-  (* vanilla String.quickcheck_generator yields the empty string about half the time *)
-  let key_gen = String.gen_with_length 10 Char.quickcheck_generator
-
-  let set_balance {public_key; _} balance = {public_key; balance}
-
-  let create public_key balance = {public_key; balance}
-
-  let empty = {public_key= ""; balance= Balance.zero}
-
-  let gen =
-    let open Quickcheck.Let_syntax in
-    let%bind public_key = String.quickcheck_generator in
-    let%map int_balance = Int.quickcheck_generator in
-    let nat_balance = abs int_balance in
-    let balance = Balance.of_int nat_balance in
-    {public_key; balance}
-end
-
 module Receipt = Coda_base.Receipt
 
 module Hash = struct
   module T = struct
-    type t = Md5.t [@@deriving sexp, hash, compare, bin_io, eq]
+    type t = Md5.t [@@deriving sexp, hash, compare, bin_io_unversioned, eq]
 
     let to_string = Md5.to_hex
 
@@ -181,13 +119,15 @@ module Storage_locations : Intf.Storage_locations = struct
 end
 
 module Key = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = Account.key [@@deriving sexp, bin_io, eq, compare, hash]
-    end
+      type t = Coda_base.Account.Key.Stable.V1.t
+      [@@deriving sexp, eq, compare, hash]
 
-    module Latest = V1
-  end
+      let to_latest = Fn.id
+    end
+  end]
 
   type t = Stable.Latest.t [@@deriving sexp, compare, hash]
 
@@ -195,7 +135,7 @@ module Key = struct
 
   let gen = Account.key_gen
 
-  let empty = Account.empty.public_key
+  let empty : t = Account.empty.public_key
 
   let gen_keys num_keys =
     Quickcheck.random_value
@@ -205,8 +145,45 @@ module Key = struct
   include Comparable.Make (Stable.Latest)
 end
 
+module Token_id = Coda_base.Token_id
+
+module Account_id = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t = Coda_base.Account_id.Stable.V1.t
+      [@@deriving sexp, eq, compare, hash]
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  type t = Coda_base.Account_id.t [@@deriving sexp, compare, hash]
+
+  include Hashable.Make_binable (Stable.Latest)
+  include Comparable.Make (Stable.Latest)
+
+  let create = Coda_base.Account_id.create
+
+  let token_id = Coda_base.Account_id.token_id
+
+  let public_key = Coda_base.Account_id.public_key
+
+  (* TODO: Non-default tokens *)
+  let gen =
+    let open Quickcheck.Generator.Let_syntax in
+    let%map pk = Key.gen in
+    create pk Token_id.default
+
+  let gen_accounts num_accounts =
+    Quickcheck.random_value
+      (Quickcheck.Generator.list_with_length num_accounts gen)
+end
+
 module Base_inputs = struct
   module Key = Key
+  module Account_id = Account_id
+  module Token_id = Token_id
   module Balance = Balance
   module Account = Account
   module Hash = Hash

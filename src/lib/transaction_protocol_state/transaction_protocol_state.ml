@@ -1,14 +1,11 @@
 open Core
-open Coda_base
-open Snark_params
-open Snarky
-open Tick
 
 module Block_data = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = State_body_hash.Stable.V1.t option [@@deriving sexp]
+      type t = Coda_state.Protocol_state.Body.Value.Stable.V1.t
+      [@@deriving sexp]
 
       let to_latest = Fn.id
     end
@@ -16,38 +13,9 @@ module Block_data = struct
 
   type t = Stable.Latest.t [@@deriving sexp]
 
-  type var = State_body_hash.var * Boolean.var
+  type var = Coda_state.Protocol_state.Body.var
 
-  let typ =
-    let spec =
-      let open Data_spec in
-      [State_body_hash.typ; Boolean.typ]
-    in
-    let var_to_hlist (sbh, push_state) = H_list.[sbh; push_state] in
-    let var_of_hlist :
-        (unit, State_body_hash.var -> Boolean.var -> unit) H_list.t -> var =
-      let open H_list in
-      fun [sbh; push_state] -> (sbh, push_state)
-    in
-    let value_to_hlist = function
-      | Some sbh ->
-          H_list.[sbh; true]
-      | None ->
-          H_list.[State_body_hash.dummy; false]
-    in
-    let value_of_hlist :
-        (unit, State_body_hash.t -> bool -> unit) H_list.t -> t =
-      let open H_list in
-      fun [sbh; push_state] -> if push_state then Some sbh else None
-    in
-    Typ.of_hlistable spec ~var_to_hlist ~var_of_hlist ~value_to_hlist
-      ~value_of_hlist
-
-  module Checked = struct
-    let push_state var = snd var
-
-    let state_body_hash var = fst var
-  end
+  let typ = Coda_state.Protocol_state.Body.typ
 end
 
 module Poly = struct
@@ -56,6 +24,14 @@ module Poly = struct
     module V1 = struct
       type 'a t = {transaction: 'a; block_data: Block_data.Stable.V1.t}
       [@@deriving sexp]
+
+      let to_latest a_latest {transaction; block_data} =
+        {transaction= a_latest transaction; block_data}
+
+      let of_latest a_latest {transaction; block_data} =
+        let open Result.Let_syntax in
+        let%map transaction = a_latest transaction in
+        {transaction; block_data}
     end
   end]
 
@@ -67,6 +43,10 @@ end
 module Stable = struct
   module V1 = struct
     type 'a t = 'a Poly.Stable.V1.t [@@deriving sexp]
+
+    let to_latest = Poly.Stable.V1.to_latest
+
+    let of_latest = Poly.Stable.V1.of_latest
   end
 end]
 

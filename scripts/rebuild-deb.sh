@@ -39,7 +39,7 @@ Version: ${VERSION}
 Section: base
 Priority: optional
 Architecture: amd64
-Depends: libffi6, libgmp10, libgomp1, libjemalloc1, libprocps6, libssl1.1, miniupnpc
+Depends: libffi6, libgmp10, libgomp1, libjemalloc1, libprocps6, libssl1.1, miniupnpc, postgresql
 Conflicts: coda-discovery
 License: Apache-2.0
 Homepage: https://codaprotocol.com/
@@ -61,7 +61,8 @@ ls -l ../src/app/libp2p_helper/result/bin
 p2p_path="${BUILDDIR}/usr/local/bin/coda-libp2p_helper"
 cp ../src/app/libp2p_helper/result/bin/libp2p_helper $p2p_path
 chmod +w $p2p_path
-patchelf --set-interpreter /lib64/ld-linux-x86-64.so.2 "${BUILDDIR}/usr/local/bin/coda-libp2p_helper"
+# Only for nix builds
+# patchelf --set-interpreter /lib64/ld-linux-x86-64.so.2 "${BUILDDIR}/usr/local/bin/coda-libp2p_helper"
 chmod -w $p2p_path
 cp ./default/src/app/logproc/logproc.exe "${BUILDDIR}/usr/local/bin/coda-logproc"
 cp ./default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe "${BUILDDIR}/usr/local/bin/coda-create-genesis"
@@ -107,8 +108,8 @@ do
 done
 
 # Genesis Ledger Copy
-for f in /tmp/coda_cache_dir/coda_genesis*; do
-    cp /tmp/coda_cache_dir/coda_genesis* "${BUILDDIR}/var/lib/coda/."
+for f in /tmp/coda_cache_dir/genesis*; do
+    cp /tmp/coda_cache_dir/genesis* "${BUILDDIR}/var/lib/coda/."
 done
 
 # Bash autocompletion

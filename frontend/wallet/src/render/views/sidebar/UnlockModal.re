@@ -61,13 +61,15 @@ let make = (~account, ~onClose, ~onSuccess) => {
            | Data(_) =>
              onSuccess();
              React.null;
-           | Error(err) =>
+           | Error((err: ReasonApolloTypes.apolloError)) =>
              let message =
-               err##graphQLErrors
+               err.graphQLErrors
                |> Js.Nullable.toOption
-               |> Option.withDefault(~default=Array.empty)
+               |> Option.withDefault(~default=[||])
                |> Array.get(~index=0)
-               |> Option.map(~f=e => e##message)
+               |> Option.map(~f=(e: ReasonApolloTypes.graphqlError) =>
+                    e.message
+                  )
                |> Option.withDefault(~default="Server error");
              setError(_ => Some(message));
              React.null;
@@ -79,7 +81,15 @@ let make = (~account, ~onClose, ~onSuccess) => {
             />
             {React.string(" ")}
             <AccountName pubkey=account />
-            {React.string(".")}
+            {React.string(". ")}
+            {if (PublicKey.toString(account) == "4vsRCVMNTrCx4NpN6kKTkFKLcFN4vXUP5RB9PqSZe1qsyDs4AW5XeNgAf16WUPRBCakaPiXcxjp6JUpGNQ6fdU977x5LntvxrSg11xrmK6ZDaGSMEGj12dkeEpyKcEpkzcKwYWZ2Yf2vpwQP") {
+                <FormattedMessage
+                   id="unlock-modal.please-enter-password-hack"
+                   defaultMessage="Leave password blank for this account."
+                />
+            } else {
+               React.null
+            }}
           </p>
           <Spacer height=1. />
           <TextField
@@ -92,7 +102,7 @@ let make = (~account, ~onClose, ~onSuccess) => {
           <Spacer height=1.5 />
           <div className=Css.(style([display(`flex)]))>
             <Button
-              label="cancel"
+              label="Cancel"
               style=Button.Gray
               onClick={evt => {
                 ReactEvent.Synthetic.stopPropagation(evt);
@@ -100,7 +110,12 @@ let make = (~account, ~onClose, ~onSuccess) => {
               }}
             />
             <Spacer width=1. />
-            <Button label="unlock" style=Button.Green type_="submit" />
+            <Button
+              disabled={result === Loading}
+              label="Unlock"
+              style=Button.Green
+              type_="submit"
+            />
           </div>
         </form>
       }

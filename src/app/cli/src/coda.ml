@@ -30,14 +30,21 @@ let maybe_sleep _ = Deferred.unit
 
 [%%endif]
 
-let chain_id ~genesis_state_hash =
+let chain_id ~genesis_state_hash ~genesis_constants =
   let genesis_state_hash = State_hash.to_base58_check genesis_state_hash in
+  let genesis_constants_hash = Genesis_constants.hash genesis_constants in
   let all_snark_keys = String.concat ~sep:"" Snark_keys.key_hashes in
-  let b2 = Blake2.digest_string (genesis_state_hash ^ all_snark_keys) in
+  let b2 =
+    Blake2.digest_string
+      (genesis_state_hash ^ all_snark_keys ^ genesis_constants_hash)
+  in
   Blake2.to_hex b2
 
 [%%inject
 "daemon_expiry", daemon_expiry]
+
+[%%inject
+"compile_time_current_protocol_version", current_protocol_version]
 
 let daemon logger =
   let open Command.Let_syntax in
@@ -51,6 +58,23 @@ let daemon logger =
             provide both `block-producer-key` and `block-producer-pubkey`. \
             (default: don't produce blocks)"
          (optional string)
+     and block_production_pubkey =
+       flag "block-producer-pubkey"
+         ~doc:
+           "PUBLICKEY Public key for the associated private key that is being \
+            tracked by this daemon. You cannot provide both \
+            `block-producer-key` and `block-producer-pubkey`. (default: don't \
+            produce blocks)"
+         (optional public_key_compressed)
+     and block_production_password =
+       flag "block-producer-password"
+         ~doc:
+           "PASSWORD Password associated with the block-producer key. Setting \
+            this is equivalent to setting the CODA_PRIVKEY_PASS environment \
+            variable. Be careful when setting it in the commandline as it \
+            will likely get tracked in your history. Mainly to be used from \
+            the daemon.json config file"
+         (optional string)
      and demo_mode =
        flag "demo-mode" no_arg
          ~doc:
@@ -63,16 +87,22 @@ let daemon logger =
             producing blocks). If not provided, coinbase rewards will be sent \
             to the producer of a block."
          (optional public_key_compressed)
-     and genesis_ledger_dir_flag =
+     and genesis_dir =
        flag "genesis-ledger-dir"
          ~doc:
-           "Dir Directory that contains the genesis ledger and the genesis \
-            blockchain proof (default: <config-dir>/genesis-ledger)"
+           "DIR Directory that contains the genesis ledger and the genesis \
+            blockchain proof (default: <config-dir>)"
          (optional string)
      and run_snark_worker_flag =
        flag "run-snark-worker"
          ~doc:"PUBLICKEY Run the SNARK worker with this public key"
          (optional public_key_compressed)
+     and snark_worker_parallelism_flag =
+       flag "snark-worker-parallelism"
+         ~doc:
+           "NUM Run the SNARK worker using this many threads. Equivalent to \
+            setting OMP_NUM_THREADS, but doesn't affect block production."
+         (optional int)
      and work_selection_method_flag =
        flag "work-selection"
          ~doc:
@@ -118,7 +148,7 @@ let daemon logger =
            (sprintf
               "FEE Amount a worker wants to get compensated for generating a \
                snark proof (default: %d)"
-              (Currency.Fee.to_int Cli_lib.Default.snark_worker_fee))
+              (Currency.Fee.to_int Coda_compile_config.default_snark_worker_fee))
          (optional txn_fee)
      and work_reassignment_wait =
        flag "work-reassignment-wait" (optional int)
@@ -159,18 +189,58 @@ let daemon logger =
            "true|false Log transaction-pool diff received from peers \
             (default: false)"
          (optional bool)
+     and log_block_creation =
+       flag "log-block-creation"
+         ~doc:
+           "true|false Log the steps involved in including transactions and \
+            snark work in a block (default: true)"
+         (optional bool)
      and libp2p_keypair =
        flag "discovery-keypair" (optional string)
          ~doc:
            "KEYFILE Keypair (generated from `coda advanced \
             generate-libp2p-keypair`) to use with libp2p discovery (default: \
             generate per-run temporary keypair)"
+     and is_seed = flag "seed" ~doc:"Start the node as a seed node" no_arg
+     and enable_flooding =
+       flag "enable-flooding"
+         ~doc:
+           "Enable pubsub flooding, gossiping every message to every peer \
+            (uses lots of bandwidth! default: false)"
+         no_arg
      and libp2p_peers_raw =
        flag "peer"
          ~doc:
            "/ip4/IPADDR/tcp/PORT/ipfs/PEERID initial \"bootstrap\" peers for \
             discovery"
          (listed string)
+     and curr_protocol_version =
+       flag "current-protocol-version" (optional string)
+         ~doc:
+           "NN.NN.NN Current protocol version, only blocks with the same \
+            version accepted"
+     and proposed_protocol_version =
+       flag "proposed-protocol-version" (optional string)
+         ~doc:"NN.NN.NN Proposed protocol version to signal other nodes"
+     and config_file =
+       flag "config-file"
+         ~doc:
+           "PATH path to the configuration file (overrides CODA_CONFIG_FILE, \
+            default: <config_dir>/daemon.json)"
+         (optional string)
+     and may_generate =
+       flag "generate-genesis-proof"
+         ~doc:
+           "true|false Generate a new genesis proof for the current \
+            configuration if none is found (default: false)"
+         (optional bool)
+     and disable_telemetry =
+       flag "disable-telemetry" no_arg
+         ~doc:"Disable reporting telemetry to other nodes"
+     and proof_level =
+       flag "proof-level"
+         (optional (Arg_type.create Genesis_constants.Proof_level.of_string))
+         ~doc:"full|check|none"
      in
      fun () ->
        let open Deferred.Let_syntax in
@@ -212,7 +282,7 @@ let daemon logger =
            "Daemon will expire at $exp"
            ~metadata:[("exp", `String daemon_expiry)] ;
          let tm =
-           (* same approach as in Consensus.Constants.genesis_state_timestamp *)
+           (* same approach as in Genesis_constants.genesis_state_timestamp *)
            let default_timezone = Core.Time.Zone.of_utc_offset ~hours:(-8) in
            Core.Time.of_string_gen
              ~if_no_timezone:(`Use_this_one default_timezone) daemon_expiry
@@ -291,100 +361,98 @@ let daemon logger =
                ~metadata:[("config_directory", `String conf_dir)] ;
              make_version ~wipe_dir:false
        in
-       don't_wait_for
-         (let bytes_per_word = Sys.word_size / 8 in
-          (* Curve points are allocated in C++ and deallocated with finalizers.
-             The points on the C++ heap are much bigger than the OCaml heap
-             objects that point to them, which makes the GC underestimate how
-             much memory has been allocated since the last collection and not
-             run major GCs often enough, which means the finalizers don't run
-             and we use way too much memory. As a band-aid solution, we run a
-             major GC cycle every ten minutes.
-          *)
-          let gc_method =
-            Option.value ~default:"full" @@ Unix.getenv "CODA_GC_HACK_MODE"
-          in
-          (* Doing Gc.major is known to work, but takes quite a bit of time.
-             Running a single slice might be sufficient, but I haven't tested it
-             and the documentation isn't super clear. *)
-          let gc_fun =
-            match gc_method with
-            | "full" ->
-                Gc.major
-            | "slice" ->
-                fun () -> ignore (Gc.major_slice 0)
-            | other ->
-                failwithf
-                  "CODA_GC_HACK_MODE was %s, it should be full or slice. \
-                   Default is full."
-                  other
-          in
-          let interval =
-            Time.Span.of_sec
-            @@ Option.(
-                 value ~default:600.
-                   ( map ~f:Float.of_string
-                   @@ Unix.getenv "CODA_GC_HACK_INTERVAL" ))
-          in
-          let log_stats suffix =
-            let stat = Gc.stat () in
-            Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-              "OCaml memory statistics, %s" suffix
-              ~metadata:
-                [ ("heap_size", `Int (stat.heap_words * bytes_per_word))
-                ; ("heap_chunks", `Int stat.heap_chunks)
-                ; ("max_heap_size", `Int (stat.top_heap_words * bytes_per_word))
-                ; ("live_size", `Int (stat.live_words * bytes_per_word))
-                ; ("live_blocks", `Int stat.live_blocks) ] ;
-            let {Jemalloc.active; resident; allocated; mapped} =
-              Jemalloc.get_memory_stats ()
-            in
-            Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-              "Jemalloc memory statistics (in bytes)"
-              ~metadata:
-                [ ("active", `Int active)
-                ; ("resident", `Int resident)
-                ; ("allocated", `Int allocated)
-                ; ("mapped", `Int mapped) ]
-          in
-          let rec loop () =
-            log_stats "before major gc" ;
-            gc_fun () ;
-            log_stats "after major gc" ;
-            let%bind () = after interval in
-            loop ()
-          in
-          loop ()) ;
+       Memory_stats.log_memory_stats logger ~process:"daemon" ;
        Parallel.init_master () ;
        let monitor = Async.Monitor.create ~name:"coda" () in
        let module Coda_initialization = struct
          type ('a, 'b, 'c) t =
            {coda: 'a; client_trustlist: 'b; rest_server_port: 'c}
        end in
+       let time_controller =
+         Block_time.Controller.create @@ Block_time.Controller.basic ~logger
+       in
+       let may_generate = Option.value ~default:false may_generate in
        let coda_initialization_deferred () =
-         let%bind genesis_ledger, base_proof =
-           Genesis_ledger_helper.retrieve_genesis_state genesis_ledger_dir_flag
-             ~logger ~conf_dir
+         let config_file, must_find_config_file =
+           match config_file with
+           | Some config_file ->
+               (config_file, true)
+           | None -> (
+             match Sys.getenv "CODA_CONFIG_FILE" with
+             | Some config_file ->
+                 (config_file, false)
+             | None ->
+                 (conf_dir ^/ "daemon.json", false) )
          in
-         let%bind config =
-           match%map
-             Monitor.try_with_or_error ~extract_exn:true (fun () ->
-                 let%bind r = Reader.open_file (conf_dir ^/ "daemon.json") in
-                 let%map contents =
-                   Pipe.to_list (Reader.lines r)
-                   >>| fun ss -> String.concat ~sep:"\n" ss
-                 in
-                 YJ.from_string ~fname:"daemon.json" contents )
-           with
-           | Ok c ->
-               Some c
-           | Error e ->
-               Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-                 "Error reading daemon.json: $error"
-                 ~metadata:[("error", `String (Error.to_string_mach e))] ;
+         let%bind config_json =
+           match%map Genesis_ledger_helper.load_config_json config_file with
+           | Ok config ->
+               Some config
+           | Error err when must_find_config_file ->
+               Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+                 "Failed reading configuration from $config_file: $error"
+                 ~metadata:
+                   [ ("config_file", `String config_file)
+                   ; ("error", `String (Error.to_string_hum err)) ] ;
+               Error.raise err
+           | Error err ->
+               Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+                 "Failed reading configuration from $config_file: $error"
+                 ~metadata:
+                   [ ("config_file", `String config_file)
+                   ; ("error", `String (Error.to_string_hum err)) ] ;
                None
          in
-         let maybe_from_config (type a) (f : YJ.json -> a option)
+         let%bind config_json =
+           match config_json with
+           | Some config_json ->
+               let%map config_json =
+                 Genesis_ledger_helper.upgrade_old_config ~logger config_file
+                   config_json
+               in
+               Some config_json
+           | None ->
+               return None
+         in
+         let config =
+           match config_json with
+           | Some config_json -> (
+             match Runtime_config.of_yojson config_json with
+             | Ok config ->
+                 config
+             | Error err ->
+                 Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+                   "Could not parse configuration from $config_file: $error"
+                   ~metadata:
+                     [ ("config_file", `String config_file)
+                     ; ("error", `String err) ] ;
+                 failwithf "Could not parse configuration: %s" err () )
+           | _ ->
+               Runtime_config.default
+         in
+         let genesis_dir = Option.value ~default:conf_dir genesis_dir in
+         let%bind precomputed_values =
+           match%map
+             Genesis_ledger_helper.init_from_config_file ~genesis_dir ~logger
+               ~may_generate ~proof_level
+               ~genesis_constants:Genesis_constants.compiled config
+           with
+           | Ok (precomputed_values, _) ->
+               precomputed_values
+           | Error err ->
+               Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+                 "Failed initializing with configuration $config: $error"
+                 ~metadata:
+                   [ ("config", Runtime_config.to_yojson config)
+                   ; ("error", `String (Error.to_string_hum err)) ] ;
+               Error.raise err
+         in
+         let daemon_config =
+           Option.bind config_json ~f:(fun config_json ->
+               YJ.Util.(to_option Fn.id (YJ.Util.member "daemon" config_json))
+           )
+         in
+         let maybe_from_config (type a) (f : YJ.t -> a option)
              (keyname : string) (actual_value : a option) : a option =
            let open Option.Let_syntax in
            let open YJ.Util in
@@ -392,8 +460,13 @@ let daemon logger =
            | Some v ->
                Some v
            | None ->
-               let%bind config = config in
-               let%bind json_val = to_option Fn.id (member keyname config) in
+               let%bind daemon_config = daemon_config in
+               let%bind json_val =
+                 to_option Fn.id (member keyname daemon_config)
+               in
+               Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+                 "Key $key being used from config file"
+                 ~metadata:[("key", `String keyname)] ;
                f json_val
          in
          let or_from_config map keyname actual_value ~default =
@@ -417,7 +490,8 @@ let daemon logger =
              YJ.Util.to_int_option json |> Option.map ~f:Currency.Fee.of_int
            in
            or_from_config json_to_currency_fee_option "snark-worker-fee"
-             ~default:Cli_lib.Default.snark_worker_fee snark_work_fee
+             ~default:Coda_compile_config.default_snark_worker_fee
+             snark_work_fee
          in
          (* FIXME #4095: pass this through to Gossip_net.Libp2p *)
          let _max_concurrent_connections =
@@ -453,11 +527,41 @@ let daemon logger =
            or_from_config YJ.Util.to_bool_option "log-txn-pool-gossip"
              ~default:false log_transaction_pool_diff
          in
+         let log_block_creation =
+           or_from_config YJ.Util.to_bool_option "log-block-creation"
+             ~default:true log_block_creation
+         in
          let log_gossip_heard =
            { Coda_networking.Config.snark_pool_diff=
                log_received_snark_pool_diff
            ; transaction_pool_diff= log_transaction_pool_diff
            ; new_state= log_received_blocks }
+         in
+         let json_to_publickey_compressed_option json =
+           YJ.Util.to_string_option json
+           |> Option.bind ~f:(fun pk_str ->
+                  match Public_key.Compressed.of_base58_check pk_str with
+                  | Ok key ->
+                      Some key
+                  | Error e ->
+                      Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+                        "Error decoding public key ($key): $error"
+                        ~metadata:
+                          [ ("key", `String pk_str)
+                          ; ("error", `String (Error.to_string_hum e)) ] ;
+                      None )
+         in
+         let run_snark_worker_flag =
+           maybe_from_config json_to_publickey_compressed_option
+             "run-snark-worker" run_snark_worker_flag
+         in
+         let snark_worker_parallelism_flag =
+           maybe_from_config YJ.Util.to_int_option "snark-worker-parallelism"
+             snark_worker_parallelism_flag
+         in
+         let coinbase_receiver_flag =
+           maybe_from_config json_to_publickey_compressed_option
+             "coinbase-receiver" coinbase_receiver_flag
          in
          let%bind external_ip =
            match external_ip_opt with
@@ -473,19 +577,66 @@ let daemon logger =
          let addrs_and_ports : Node_addrs_and_ports.t =
            {external_ip; bind_ip; peer= None; client_port; libp2p_port}
          in
+         let block_production_key =
+           maybe_from_config YJ.Util.to_string_option "block-producer-key"
+             block_production_key
+         in
+         let block_production_pubkey =
+           maybe_from_config json_to_publickey_compressed_option
+             "block-producer-pubkey" block_production_pubkey
+         in
+         let block_production_password =
+           maybe_from_config YJ.Util.to_string_option "block-producer-password"
+             block_production_password
+         in
+         Option.iter
+           ~f:(fun password ->
+             match Sys.getenv Secrets.Keypair.env with
+             | Some env_pass when env_pass <> password ->
+                 Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+                   "$envkey environment variable doesn't match value provided \
+                    on command-line or daemon.json. Using value from $envkey"
+                   ~metadata:[("envkey", `String Secrets.Keypair.env)]
+             | _ ->
+                 Unix.putenv ~key:Secrets.Keypair.env ~data:password )
+           block_production_password ;
          let%bind block_production_keypair =
-           match block_production_key with
-           | Some sk_file ->
+           match (block_production_key, block_production_pubkey) with
+           | Some _, Some _ ->
+               eprintf
+                 "Error: You cannot provide both `block-producer-key` and \
+                  `block_production_pubkey`\n" ;
+               exit 11
+           | None, None ->
+               Deferred.return None
+           | Some sk_file, _ ->
                let%map kp = Secrets.Keypair.Terminal_stdin.read_exn sk_file in
                Some kp
-           | None ->
-               return None
+           | _, Some tracked_pubkey ->
+               let%bind wallets =
+                 Secrets.Wallets.load ~logger
+                   ~disk_location:(conf_dir ^/ "wallets")
+               in
+               let sk_file = Secrets.Wallets.get_path wallets tracked_pubkey in
+               let%map kp = Secrets.Keypair.Terminal_stdin.read_exn sk_file in
+               Some kp
          in
          let%bind client_trustlist =
            Reader.load_sexp
              (conf_dir ^/ "client_trustlist")
-             [%of_sexp: Unix.Inet_addr.Blocking_sexp.t list]
+             [%of_sexp: Unix.Cidr.t list]
            >>| Or_error.ok
+         in
+         let client_trustlist =
+           match Unix.getenv "CODA_CLIENT_TRUSTLIST" with
+           | Some envstr ->
+               let cidrs =
+                 String.split ~on:',' envstr |> List.map ~f:Unix.Cidr.of_string
+               in
+               Some
+                 (List.append cidrs (Option.value ~default:[] client_trustlist))
+           | None ->
+               client_trustlist
          in
          Stream.iter
            (Async.Scheduler.long_cycles
@@ -521,25 +672,23 @@ let daemon logger =
              ~location typ
          in
          let trust_dir = conf_dir ^/ "trust" in
-         let () = Snark_params.set_chunked_hashing true in
          let%bind () = Async.Unix.mkdir ~p:() trust_dir in
          let trust_system = Trust_system.create trust_dir in
          trace_database_initialization "trust_system" __LOC__ trust_dir ;
          let genesis_state_hash =
-           Coda_state.Genesis_protocol_state.t ~genesis_ledger
-           |> With_hash.hash
+           Precomputed_values.genesis_state_hash precomputed_values
          in
          let genesis_ledger_hash =
-           Lazy.force genesis_ledger |> Ledger.merkle_root
-         in
-         let time_controller =
-           Block_time.Controller.create @@ Block_time.Controller.basic ~logger
+           Precomputed_values.genesis_ledger precomputed_values
+           |> Lazy.force |> Ledger.merkle_root
          in
          let initial_block_production_keypairs =
            block_production_keypair |> Option.to_list |> Keypair.Set.of_list
          in
          let consensus_local_state =
-           Consensus.Data.Local_state.create ~genesis_ledger
+           Consensus.Data.Local_state.create
+             ~genesis_ledger:
+               (Precomputed_values.genesis_ledger precomputed_values)
              ( Option.map block_production_keypair ~f:(fun keypair ->
                    let open Keypair in
                    Public_key.compress keypair.public_key )
@@ -557,17 +706,24 @@ let daemon logger =
                     "peers" None ~default:[] ]
          in
          if enable_tracing then Coda_tracing.start conf_dir |> don't_wait_for ;
-         let is_seed = List.is_empty initial_peers in
+         if is_seed then
+           Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+             "Starting node as a seed node"
+         else if List.is_empty initial_peers then
+           failwith "no seed or initial peer flags passed" ;
          let gossip_net_params =
            Gossip_net.Libp2p.Config.
              { timeout= Time.Span.of_sec 3.
              ; logger
              ; conf_dir
-             ; chain_id= chain_id ~genesis_state_hash
+             ; chain_id=
+                 chain_id ~genesis_state_hash
+                   ~genesis_constants:precomputed_values.genesis_constants
              ; unsafe_no_trust_ip= false
              ; initial_peers
              ; addrs_and_ports
              ; trust_system
+             ; flood= enable_flooding
              ; keypair= libp2p_keypair }
          in
          let net_config =
@@ -576,6 +732,7 @@ let daemon logger =
            ; time_controller
            ; consensus_local_state
            ; genesis_ledger_hash
+           ; constraint_constants= precomputed_values.constraint_constants
            ; log_gossip_heard
            ; is_seed
            ; creatable_gossip_net=
@@ -608,6 +765,8 @@ let daemon logger =
            Auxiliary_database.External_transition_database.create ~logger
              external_transition_database_dir
          in
+         trace_database_initialization "external_transition_database" __LOC__
+           external_transition_database_dir ;
          (* log terminated child processes *)
          (* FIXME adapt to new system, move into child_processes lib *)
          let pids = Child_processes.Termination.create_pid_table () in
@@ -662,17 +821,30 @@ let daemon logger =
            Option.value_map coinbase_receiver_flag ~default:`Producer
              ~f:(fun pk -> `Other pk)
          in
+         let current_protocol_version =
+           Coda_run.get_current_protocol_version
+             ~compile_time_current_protocol_version ~conf_dir ~logger
+             curr_protocol_version
+         in
+         let proposed_protocol_version_opt =
+           Coda_run.get_proposed_protocol_version_opt ~conf_dir ~logger
+             proposed_protocol_version
+         in
          let%map coda =
            Coda_lib.create
              (Coda_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
-                ~demo_mode ~coinbase_receiver ~net_config ~gossip_net_params
+                ~is_seed ~disable_telemetry ~demo_mode ~coinbase_receiver
+                ~net_config ~gossip_net_params
+                ~initial_protocol_version:current_protocol_version
+                ~proposed_protocol_version_opt
                 ~work_selection_method:
                   (Cli_lib.Arg_type.work_selection_method_to_module
                      work_selection_method)
                 ~snark_worker_config:
                   { Coda_lib.Config.Snark_worker_config.initial_snark_worker_key=
                       run_snark_worker_flag
-                  ; shutdown_on_disconnect= true }
+                  ; shutdown_on_disconnect= true
+                  ; num_threads= snark_worker_parallelism_flag }
                 ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
                 ~wallets_disk_location:(conf_dir ^/ "wallets")
                 ~persistent_root_location:(conf_dir ^/ "root")
@@ -682,14 +854,14 @@ let daemon logger =
                 ~consensus_local_state ~transaction_database
                 ~external_transition_database ~is_archive_rocksdb
                 ~work_reassignment_wait ~archive_process_location
-                ~genesis_state_hash ())
-             ~genesis_ledger ~base_proof
+                ~log_block_creation ~precomputed_values ())
          in
          {Coda_initialization.coda; client_trustlist; rest_server_port}
        in
        (* Breaks a dependency cycle with monitor initilization and coda *)
        let coda_ref : Coda_lib.t option ref = ref None in
-       Coda_run.handle_shutdown ~monitor ~conf_dir ~top_logger:logger coda_ref ;
+       Coda_run.handle_shutdown ~monitor ~time_controller ~conf_dir
+         ~top_logger:logger coda_ref ;
        Async.Scheduler.within' ~monitor
        @@ fun () ->
        let%bind {Coda_initialization.coda; client_trustlist; rest_server_port}
@@ -698,8 +870,6 @@ let daemon logger =
        in
        coda_ref := Some coda ;
        let%bind () = maybe_sleep 3. in
-       let web_service = Web_pipe.get_service () in
-       Web_pipe.run_service coda web_service ~conf_dir ~logger ;
        Coda_run.setup_local_server ?client_trustlist ~rest_server_port
          ~insecure_rest_server coda ;
        let%bind () = Coda_lib.start coda in
@@ -813,16 +983,52 @@ let internal_commands =
                  Logger.info logger "Prover state being logged to %s" conf_dir
                    ~module_:__MODULE__ ~location:__LOC__ ;
                  let%bind prover =
-                   Prover.create ~logger ~pids:(Pid.Table.create ()) ~conf_dir
+                   Prover.create ~logger
+                     ~proof_level:Genesis_constants.Proof_level.compiled
+                     ~constraint_constants:
+                       Genesis_constants.Constraint_constants.compiled
+                     ~pids:(Pid.Table.create ()) ~conf_dir
                  in
                  Prover.prove_from_input_sexp prover sexp >>| ignore
              | `Eof ->
-                 failwith "early EOF while reading sexp" )) ) ]
+                 failwith "early EOF while reading sexp" )) )
+  ; ( "dump-structured-events"
+    , Command.async ~summary:"Dump the registered structured events"
+        (let open Command.Let_syntax in
+        let%map outfile =
+          Core_kernel.Command.Param.flag "-out-file"
+            (Core_kernel.Command.Flag.optional Core_kernel.Command.Param.string)
+            ~doc:"FILENAME File to output to. Defaults to stdout"
+        and pretty =
+          Core_kernel.Command.Param.flag "-pretty"
+            Core_kernel.Command.Param.no_arg
+            ~doc:"  Set to output 'pretty' JSON"
+        in
+        fun () ->
+          let out_channel =
+            match outfile with
+            | Some outfile ->
+                Core_kernel.Out_channel.create outfile
+            | None ->
+                Core_kernel.Out_channel.stdout
+          in
+          let json =
+            Structured_log_events.dump_registered_events ()
+            |> [%derive.to_yojson:
+                 (string * Structured_log_events.id * string list) list]
+          in
+          if pretty then Yojson.Safe.pretty_to_channel out_channel json
+          else Yojson.Safe.to_channel out_channel json ;
+          ( match outfile with
+          | Some _ ->
+              Core_kernel.Out_channel.close out_channel
+          | None ->
+              () ) ;
+          Deferred.return ()) ) ]
 
 let coda_commands logger =
   [ ("accounts", Client.accounts)
   ; ("daemon", daemon logger)
-  ; ("client-old", Client.command)
   ; ("client", Client.client)
   ; ("advanced", Client.advanced)
   ; ("internal", Command.group ~summary:"Internal commands" internal_commands)
@@ -863,7 +1069,8 @@ let coda_commands logger =
         ; (module Full_test)
         ; (module Transaction_snark_profiler)
         ; (module Snark_flame_graphs)
-        ; (module Coda_archive_node_test) ]
+        ; (module Coda_archive_node_test)
+        ; (module Coda_archive_processor_test) ]
         : (module Integration_test) list )
   in
   coda_commands logger

@@ -26,26 +26,29 @@ module Make () = struct
     include Sexpable.Of_stringable (T0)
   end
 
+  [%%versioned_binable
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t = T1.t
-        [@@deriving version {asserted; unnumbered}, hash, sexp, compare]
+      type t = T1.t [@@deriving hash, sexp, compare]
+
+      let to_latest = Fn.id
+
+      module Arg = struct
+        type nonrec t = t
+
+        [%%define_locally T1.(to_string, of_string)]
       end
 
-      include T
-      include Binable.Of_stringable (T1)
+      include Binable.Of_stringable (Arg)
     end
-
-    module Latest = V1
-  end
+  end]
 
   type t = T1.t [@@deriving hash, sexp, compare]
 
   [%%define_locally
   T1.(to_raw_string, digest_string, to_hex)]
 
-  (* do not use Binable.Of_stringable *)
+  (* do not create bin_io serialization *)
   include Hashable.Make (T1)
   include Comparable.Make (T1)
 
@@ -72,6 +75,16 @@ module Make () = struct
 end
 
 include Make ()
+
+(* values come from external library digestif, and serialization relies on raw string functions in that library,
+   so check serialization is stable
+ *)
+let%test "serialization test V1" =
+  let blake2s = T0.digest_string "serialization test V1" in
+  let known_good_digest = "162e120bf889f4e2bccf8017ed93d845" in
+  Ppx_version.Serialization.check_serialization
+    (module Stable.V1)
+    blake2s known_good_digest
 
 let%test_unit "bits_to_string" =
   [%test_eq: string]

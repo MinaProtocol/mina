@@ -6,5 +6,5 @@
  (libraries core async coda_base snark_keys blockchain_snark
    transaction_snark)
  (preprocess
-  (pps ppx_coda ppx_jane bisect_ppx -- -conditional))
+  (pps ppx_version ppx_jane bisect_ppx -- -conditional))
  (synopsis "SNARK keys"))

@@ -26,14 +26,23 @@ RUN echo "deb [trusted=yes] http://packages.o1test.net $deb_repo main" > /etc/ap
   && apt-get update \
   && apt-get install --force-yes coda-testnet-postake-medium-curves=$coda_version -y
 
-RUN echo '#!/bin/bash\n\
+WORKDIR /root
+
+RUN echo '#!/bin/bash -x\n\
 mkdir -p .coda-config\n\
 touch .coda-config/coda-prover.log\n\
 touch .coda-config/coda-verifier.log\n\
 coda "$@" 2>&1 >coda.log &\n\
-tail -q -f coda.log -f .coda-config/coda-prover.log -f .coda-config/coda-verifier.log'\
+coda_pid=$!\n\
+tail -q -f coda.log -f .coda-config/coda-prover.log -f .coda-config/coda-verifier.log &\n\
+tail_pid=$!\n\
+wait "$coda_pid"\n\
+echo "Coda process exited with status code $?"\n\
+sleep 10\n\
+kill "$tail_pid"\n\
+exit 0'\
 > init_coda.sh
 
 RUN chmod +x init_coda.sh
 
-ENTRYPOINT ["/usr/bin/dumb-init", "/init_coda.sh"]
+ENTRYPOINT ["/usr/bin/dumb-init", "/root/init_coda.sh"]

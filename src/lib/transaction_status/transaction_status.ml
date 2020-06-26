@@ -2,31 +2,16 @@ open Core_kernel
 open Coda_base
 open Pipe_lib
 open Network_pool
-open Module_version
 
 module State = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t = Pending | Included | Unknown
-        [@@deriving equal, sexp, compare, bin_io, version]
-      end
+      type t = Pending | Included | Unknown [@@deriving equal, sexp, compare]
 
-      include T
-      include Registration.Make_latest_version (T)
+      let to_latest = Fn.id
     end
-
-    module Latest = V1
-
-    module Module_decl = struct
-      let name = "transaction_status_state"
-
-      type latest = Latest.t
-    end
-
-    module Registrar = Registration.Make (Module_decl)
-    module Registered_V1 = Registrar.Register (V1)
-  end
+  end]
 
   type t = Stable.Latest.t = Pending | Included | Unknown
   [@@deriving equal, sexp, compare]
@@ -86,22 +71,26 @@ let%test_module "transaction_status" =
 
     let logger = Logger.null ()
 
+    let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
+
+    module Genesis_ledger = (val precomputed_values.genesis_ledger)
+
     let trust_system = Trust_system.null ()
+
+    let pool_max_size = precomputed_values.genesis_constants.txpool_max_size
 
     let key_gen =
       let open Quickcheck.Generator in
       let open Quickcheck.Generator.Let_syntax in
-      let keypairs =
-        List.map (Lazy.force Test_genesis_ledger.accounts) ~f:fst
-      in
+      let keypairs = List.map (Lazy.force Genesis_ledger.accounts) ~f:fst in
       let%map random_key_opt = of_list keypairs in
-      ( Test_genesis_ledger.largest_account_keypair_exn ()
+      ( Genesis_ledger.largest_account_keypair_exn ()
       , Signature_lib.Keypair.of_private_key_exn
           (Option.value_exn random_key_opt) )
 
     let gen_frontier =
-      Transition_frontier.For_tests.gen ~logger ~trust_system ~max_length
-        ~size:frontier_size ()
+      Transition_frontier.For_tests.gen ~logger ~precomputed_values
+        ~trust_system ~max_length ~size:frontier_size ()
 
     let gen_user_command =
       User_command.Gen.payment ~sign_type:`Real ~max_amount:100 ~max_fee:10
@@ -115,10 +104,14 @@ let%test_module "transaction_status" =
       let local_reader, local_writer =
         Strict_pipe.(create ~name:"transaction_status local diff" Synchronous)
       in
-      let config = Transaction_pool.Resource_pool.make_config ~trust_system in
+      let config =
+        Transaction_pool.Resource_pool.make_config ~trust_system ~pool_max_size
+      in
       let transaction_pool =
-        Transaction_pool.create ~config ~incoming_diffs:pool_reader ~logger
-          ~local_diffs:local_reader ~frontier_broadcast_pipe
+        Transaction_pool.create ~config
+          ~constraint_constants:precomputed_values.constraint_constants
+          ~incoming_diffs:pool_reader ~logger ~local_diffs:local_reader
+          ~frontier_broadcast_pipe
       in
       don't_wait_for
       @@ Linear_pipe.iter (Transaction_pool.broadcasts transaction_pool)
@@ -145,7 +138,8 @@ let%test_module "transaction_status" =
                 create_pool ~frontier_broadcast_pipe
               in
               let%bind () =
-                Strict_pipe.Writer.write local_diffs_writer [user_command]
+                Strict_pipe.Writer.write local_diffs_writer
+                  ([user_command], Fn.const ())
               in
               let%map () = Async.Scheduler.yield_until_no_jobs_remain () in
               Logger.info logger "Checking status" ~module_:__MODULE__
@@ -169,7 +163,8 @@ let%test_module "transaction_status" =
                 create_pool ~frontier_broadcast_pipe
               in
               let%bind () =
-                Strict_pipe.Writer.write local_diffs_writer [user_command]
+                Strict_pipe.Writer.write local_diffs_writer
+                  ([user_command], Fn.const ())
               in
               let%map () = Async.Scheduler.yield_until_no_jobs_remain () in
               let status =
@@ -206,7 +201,8 @@ let%test_module "transaction_status" =
                 Non_empty_list.uncons user_commands
               in
               let%bind () =
-                Strict_pipe.Writer.write local_diffs_writer pool_user_commands
+                Strict_pipe.Writer.write local_diffs_writer
+                  (pool_user_commands, Fn.const ())
               in
               let%map () = Async.Scheduler.yield_until_no_jobs_remain () in
               Logger.info logger "Computing status" ~module_:__MODULE__

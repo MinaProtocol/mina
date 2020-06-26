@@ -1,5 +1,4 @@
 open Core
-open Coda_base
 open Gadt_lib
 
 (* There must be at least 2 peers to create a network *)
@@ -21,20 +20,25 @@ val setup :
      ?logger:Logger.t
   -> ?trust_system:Trust_system.t
   -> ?time_controller:Block_time.Controller.t
+  -> precomputed_values:Precomputed_values.t
   -> (peer_state, 'n num_peers) Vect.t
   -> 'n num_peers t
 
 module Generator : sig
   open Quickcheck
 
-  type peer_config = max_frontier_length:int -> peer_state Generator.t
+  type peer_config =
+       precomputed_values:Precomputed_values.t
+    -> max_frontier_length:int
+    -> peer_state Generator.t
 
   val fresh_peer : peer_config
 
   val peer_with_branch : frontier_branch_size:int -> peer_config
 
   val gen :
-       max_frontier_length:int
+       precomputed_values:Precomputed_values.t
+    -> max_frontier_length:int
     -> (peer_config, 'n num_peers) Vect.t
     -> 'n num_peers t Generator.t
 end

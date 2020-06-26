@@ -4,16 +4,14 @@ type member = {
   id: int,
 };
 
-type entry = {
-  member,
-  score: int,
-};
+type entry = array(string);
 
 external parseEntry: Js.Json.t => entry = "%identity";
 
 let fetchLeaderboard = () => {
   ReFetch.fetch(
-    "https://points.o1test.net/api/v1/leaderboard/?ordering=-score",
+    "https://sheets.googleapis.com/v4/spreadsheets/1Nq_Y76ALzSVJRhSFZZm4pfuGbPkZs2vTtCnVQ1ehujE/values/D4:Z?key="
+    ++ Next.Config.google_api_key,
     ~method_=Get,
     ~headers={
       "Accept": "application/json",
@@ -23,12 +21,18 @@ let fetchLeaderboard = () => {
   |> Promise.bind(Bs_fetch.Response.json)
   |> Promise.map(r => {
        let results =
-         Option.bind(Js.Json.decodeObject(r), o =>
-           Js.Dict.get(o, "results")
-         );
+         Option.bind(Js.Json.decodeObject(r), o => Js.Dict.get(o, "values"));
 
        switch (Option.bind(results, Js.Json.decodeArray)) {
-       | Some(resultsArr) => Array.map(parseEntry, resultsArr)
+       | Some(resultsArr) =>
+         let arr = Array.map(parseEntry, resultsArr);
+         arr
+         |> Array.sort((e1, e2) => {
+              let len = Array.length;
+              int_of_string(e2[len(e2) - 1])
+              - int_of_string(e1[len(e1) - 1]);
+            });
+         arr;
        | None => [||]
        };
      })
@@ -98,15 +102,11 @@ module LeaderboardRow = {
         <span className=Styles.rank>
           {React.string(string_of_int(rank))}
         </span>
-        <span className=Styles.username>
-          {React.string(entry.member.nickname)}
-        </span>
+        <span className=Styles.username> {React.string(entry[0])} </span>
         <span className=Styles.current>
-          {React.string(string_of_int(entry.score))}
+          {React.string(entry[Array.length(entry) - 1])}
         </span>
-        <span className=Styles.total>
-          {React.string(string_of_int(entry.score))}
-        </span>
+        <span className=Styles.total> {React.string(entry[1])} </span>
       </div>
     </>;
   };
@@ -114,7 +114,8 @@ module LeaderboardRow = {
 
 [@react.component]
 let make = () => {
-  let (entries, setEntries) = React.useState(() => [||]);
+  let (entries, setEntries) =
+    React.useState(() => [|[|"Loading...", ""|]|]);
 
   React.useEffect0(() => {
     fetchLeaderboard() |> Promise.iter(e => setEntries(_ => e));
@@ -133,7 +134,7 @@ let make = () => {
       {Array.mapi(
          (i, entry) =>
            <LeaderboardRow
-             key={string_of_int(entry.member.id)}
+             key={entry[0] ++ string_of_int(i)}
              rank={i + 1}
              entry
            />,

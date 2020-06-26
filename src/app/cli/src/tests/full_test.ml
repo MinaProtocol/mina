@@ -9,6 +9,7 @@ open Signature_lib
 open Pipe_lib
 open O1trace
 open Init
+open Coda_numbers
 
 let pk_of_sk sk = Public_key.of_private_key_exn sk |> Public_key.compress
 
@@ -50,17 +51,18 @@ let medium_curves = false
 [%%if
 time_offsets = true]
 
-let setup_time_offsets () =
+let setup_time_offsets consensus_constants =
   Unix.putenv ~key:"CODA_TIME_OFFSET"
     ~data:
-      ( Time.Span.to_int63_seconds_round_down_exn (force Coda_processes.offset)
+      ( Time.Span.to_int63_seconds_round_down_exn
+          (Coda_processes.offset consensus_constants)
       |> Int63.to_int
       |> Option.value_exn ?here:None ?message:None ?error:None
       |> Int.to_string )
 
 [%%else]
 
-let setup_time_offsets () = ()
+let setup_time_offsets _ = ()
 
 [%%endif]
 
@@ -82,13 +84,17 @@ let print_heartbeat logger =
 
 let run_test () : unit Deferred.t =
   let logger = Logger.create () in
+  let precomputed_values = Lazy.force Precomputed_values.compiled in
+  let constraint_constants = Genesis_constants.Constraint_constants.compiled in
+  let (module Genesis_ledger) = precomputed_values.genesis_ledger in
   let pids = Child_processes.Termination.create_pid_table () in
-  setup_time_offsets () ;
+  let consensus_constants = precomputed_values.consensus_constants in
+  setup_time_offsets consensus_constants ;
   print_heartbeat logger |> don't_wait_for ;
   Parallel.init_master () ;
   File_system.with_temp_dir (Filename.temp_dir_name ^/ "full_test_config")
     ~f:(fun temp_conf_dir ->
-      let keypair = Test_genesis_ledger.largest_account_keypair_exn () in
+      let keypair = Genesis_ledger.largest_account_keypair_exn () in
       let%bind () =
         match Unix.getenv "CODA_TRACING" with
         | Some trace_dir ->
@@ -132,7 +138,7 @@ let run_test () : unit Deferred.t =
       in
       let time_controller = Block_time.Controller.(create @@ basic ~logger) in
       let consensus_local_state =
-        Consensus.Data.Local_state.create ~genesis_ledger:Test_genesis_ledger.t
+        Consensus.Data.Local_state.create ~genesis_ledger:Genesis_ledger.t
           (Public_key.Compressed.Set.singleton
              (Public_key.compress keypair.public_key))
       in
@@ -144,6 +150,7 @@ let run_test () : unit Deferred.t =
           ; logger
           ; initial_peers= []
           ; unsafe_no_trust_ip= true
+          ; flood= false
           ; conf_dir= temp_conf_dir
           ; chain_id= "bogus chain id for testing"
           ; addrs_and_ports=
@@ -163,7 +170,8 @@ let run_test () : unit Deferred.t =
           ; consensus_local_state
           ; is_seed= true
           ; genesis_ledger_hash=
-              Ledger.merkle_root (Lazy.force Test_genesis_ledger.t)
+              Ledger.merkle_root (Lazy.force Genesis_ledger.t)
+          ; constraint_constants
           ; log_gossip_heard=
               { snark_pool_diff= false
               ; transaction_pool_diff= false
@@ -176,7 +184,7 @@ let run_test () : unit Deferred.t =
       Core.Backtrace.elide := false ;
       Async.Scheduler.set_record_backtraces true ;
       let largest_account_keypair =
-        Test_genesis_ledger.largest_account_keypair_exn ()
+        Genesis_ledger.largest_account_keypair_exn ()
       in
       let fee = Currency.Fee.of_int in
       let snark_work_fee, transaction_fee =
@@ -186,7 +194,9 @@ let run_test () : unit Deferred.t =
         Coda_lib.create
           (Coda_lib.Config.make ~logger ~pids ~trust_system ~net_config
              ~coinbase_receiver:`Producer ~conf_dir:temp_conf_dir
-             ~gossip_net_params
+             ~gossip_net_params ~is_seed:true ~disable_telemetry:true
+             ~initial_protocol_version:Protocol_version.zero
+             ~proposed_protocol_version_opt:None
              ~work_selection_method:
                (module Work_selector.Selection_methods.Sequence)
              ~initial_block_production_keypairs:(Keypair.Set.singleton keypair)
@@ -195,7 +205,8 @@ let run_test () : unit Deferred.t =
                  { initial_snark_worker_key=
                      Some
                        (Public_key.compress largest_account_keypair.public_key)
-                 ; shutdown_on_disconnect= true }
+                 ; shutdown_on_disconnect= true
+                 ; num_threads= None }
              ~snark_pool_disk_location:(temp_conf_dir ^/ "snark_pool")
              ~wallets_disk_location:(temp_conf_dir ^/ "wallets")
              ~persistent_root_location:(temp_conf_dir ^/ "root")
@@ -203,12 +214,7 @@ let run_test () : unit Deferred.t =
              ~time_controller ~receipt_chain_database ~snark_work_fee
              ~consensus_local_state ~transaction_database
              ~external_transition_database ~work_reassignment_wait:420000
-             ~genesis_state_hash:
-               (Coda_state.Genesis_protocol_state.For_tests.genesis_state_hash
-                  ())
-             ())
-          ~genesis_ledger:Test_genesis_ledger.t
-          ~base_proof:Precomputed_values.base_proof
+             ~precomputed_values ())
       in
       don't_wait_for
         (Strict_pipe.Reader.iter_without_pushback
@@ -224,10 +230,10 @@ let run_test () : unit Deferred.t =
         in
         Deferred.any [after (Time.Span.of_min timeout_min); go ()]
       in
-      let balance_change_or_timeout ~initial_receiver_balance receiver_pk =
+      let balance_change_or_timeout ~initial_receiver_balance receiver_id =
         let cond t =
           match
-            Coda_commands.get_balance t receiver_pk
+            Coda_commands.get_balance t receiver_id
             |> Participating_state.active_exn
           with
           | Some b when not (Currency.Balance.equal b initial_receiver_balance)
@@ -238,20 +244,21 @@ let run_test () : unit Deferred.t =
         in
         wait_until_cond ~f:cond ~timeout_min:3.
       in
-      let assert_balance pk amount =
+      let assert_balance account_id amount =
         match
-          Coda_commands.get_balance coda pk |> Participating_state.active_exn
+          Coda_commands.get_balance coda account_id
+          |> Participating_state.active_exn
         with
         | Some balance ->
             if not (Currency.Balance.equal balance amount) then
               failwithf
-                !"Balance in account (%{sexp: Public_key.Compressed.t}) \
-                  %{sexp: Currency.Balance.t} is not asserted balance %{sexp: \
+                !"Balance in account (%{sexp: Account_id.t}) %{sexp: \
+                  Currency.Balance.t} is not asserted balance %{sexp: \
                   Currency.Balance.t}"
-                pk balance amount ()
+                account_id balance amount ()
         | None ->
             failwith
-              (sprintf !"Invalid Account: %{sexp: Public_key.Compressed.t}" pk)
+              (sprintf !"Invalid Account: %{sexp: Account_id.t}" account_id)
       in
       Coda_run.setup_local_server coda ;
       let%bind () = Coda_lib.start coda in
@@ -264,67 +271,72 @@ let run_test () : unit Deferred.t =
       *)
       let send_amount = Currency.Amount.of_int 10 in
       (* Send money to someone *)
-      let build_payment amount sender_sk receiver_pk fee =
+      let build_payment ?nonce amount sender_sk receiver_pk fee =
         trace_recurring "build_payment" (fun () ->
-            let nonce =
-              Option.value_exn
-                ( Coda_commands.get_nonce coda (pk_of_sk sender_sk)
-                |> Participating_state.active_exn )
-            in
+            let signer = pk_of_sk sender_sk in
             let memo =
               User_command_memo.create_from_string_exn
                 "A memo created in full-test"
             in
-            let payload : User_command.Payload.t =
-              User_command.Payload.create ~fee ~nonce ~memo
-                ~valid_until:Coda_numbers.Global_slot.max_value
-                ~body:(Payment {receiver= receiver_pk; amount})
-            in
-            (* verify memo is in the payload *)
-            assert (User_command_memo.equal memo payload.common.memo) ;
-            User_command.sign (Keypair.of_private_key_exn sender_sk) payload )
+            User_command_input.create ?nonce ~signer ~fee ~fee_payer_pk:signer
+              ~fee_token:Token_id.default ~memo
+              ~valid_until:Coda_numbers.Global_slot.max_value
+              ~body:
+                (Payment
+                   { source_pk= signer
+                   ; receiver_pk
+                   ; token_id= Token_id.default
+                   ; amount })
+              ~sign_choice:
+                (User_command_input.Sign_choice.Keypair
+                   (Keypair.of_private_key_exn sender_sk))
+              () )
       in
       let assert_ok x = assert (Or_error.is_ok x) in
+      let send_payment (payment : User_command_input.t) =
+        Coda_commands.setup_and_submit_user_command coda payment
+        |> Participating_state.to_deferred_or_error
+        |> Deferred.map ~f:Or_error.join
+      in
       let test_sending_payment sender_sk receiver_pk =
+        let sender_id =
+          Account_id.create (pk_of_sk sender_sk) Token_id.default
+        in
+        let receiver_id = Account_id.create receiver_pk Token_id.default in
         let payment =
           build_payment send_amount sender_sk receiver_pk transaction_fee
         in
         let prev_sender_balance =
           Option.value_exn
-            ( Coda_commands.get_balance coda (pk_of_sk sender_sk)
+            ( Coda_commands.get_balance coda sender_id
             |> Participating_state.active_exn )
         in
         let prev_receiver_balance =
-          Coda_commands.get_balance coda receiver_pk
+          Coda_commands.get_balance coda receiver_id
           |> Participating_state.active_exn
           |> Option.value ~default:Currency.Balance.zero
         in
-        let p1_res =
-          Coda_commands.send_user_command coda (payment :> User_command.t)
-          |> Participating_state.active_error
-        in
-        assert_ok (Or_error.join p1_res) ;
+        let%bind p1_res = send_payment payment in
+        assert_ok p1_res ;
+        let user_cmd, _receipt = p1_res |> Or_error.ok_exn in
         (* Send a similar payment twice on purpose; this second one will be rejected
            because the nonce is wrong *)
         let payment' =
-          build_payment send_amount sender_sk receiver_pk transaction_fee
+          build_payment
+            ~nonce:(User_command.nonce user_cmd)
+            send_amount sender_sk receiver_pk transaction_fee
         in
-        let p2_res =
-          Coda_commands.send_user_command coda (payment' :> User_command.t)
-          |> Participating_state.active_error
-        in
-        assert_ok @@ Or_error.join p2_res ;
-        (* The payment fails, but the rpc command doesn't indicate that because that
-           failure comes from the network. *)
+        let%bind p2_res = send_payment payment' in
+        assert (Or_error.is_error p2_res) ;
         (* Let the system settle, mine some blocks *)
         let%map () =
           balance_change_or_timeout
-            ~initial_receiver_balance:prev_receiver_balance receiver_pk
+            ~initial_receiver_balance:prev_receiver_balance receiver_id
         in
-        assert_balance receiver_pk
+        assert_balance receiver_id
           (Option.value_exn
              (Currency.Balance.( + ) prev_receiver_balance send_amount)) ;
-        assert_balance (pk_of_sk sender_sk)
+        assert_balance sender_id
           (Option.value_exn
              (Currency.Balance.( - ) prev_sender_balance
                 (Option.value_exn
@@ -344,12 +356,8 @@ let run_test () : unit Deferred.t =
               Option.value_exn
                 (Currency.Balance.add_amount (Option.value_exn v) amount) )
         in
-        let p_res =
-          Coda_commands.send_user_command coda (payment :> User_command.t)
-          |> Participating_state.active_error
-        in
-        p_res |> Or_error.join |> assert_ok ;
-        new_balance_sheet'
+        let%map p_res = send_payment payment in
+        assert_ok p_res ; new_balance_sheet'
       in
       let pks accounts =
         List.map accounts ~f:(fun ((keypair : Signature_lib.Keypair.t), _) ->
@@ -357,7 +365,7 @@ let run_test () : unit Deferred.t =
       in
       let send_payments accounts ~txn_count balance_sheet f_amount =
         let pks = pks accounts in
-        List.foldi (List.take accounts txn_count) ~init:balance_sheet
+        Deferred.List.foldi (List.take accounts txn_count) ~init:balance_sheet
           ~f:(fun i acc ((keypair : Signature_lib.Keypair.t), _) ->
             let sender_pk = Public_key.compress keypair.public_key in
             let receiver =
@@ -384,7 +392,7 @@ let run_test () : unit Deferred.t =
                  ( Public_key.compress keypair.public_key
                  , account.Account.Poly.balance ) ))
         in
-        let updated_balance_sheet =
+        let%bind updated_balance_sheet =
           send_payments accounts ~txn_count balance_sheet (fun i ->
               Currency.Amount.of_int ((i + 1) * 10) )
         in
@@ -392,7 +400,8 @@ let run_test () : unit Deferred.t =
         let%map () = wait_for_proof_or_timeout timeout_min () in
         assert (Option.is_some @@ Coda_lib.staged_ledger_ledger_proof coda) ;
         Map.fold updated_balance_sheet ~init:() ~f:(fun ~key ~data () ->
-            assert_balance key data ) ;
+            let account_id = Account_id.create key Token_id.default in
+            assert_balance account_id data ) ;
         blockchain_length coda
       in
       let test_duplicate_payments (sender_keypair : Signature_lib.Keypair.t)
@@ -408,20 +417,20 @@ let run_test () : unit Deferred.t =
         sending multiple payments*)
       let receiver_keypair =
         let receiver =
-          Test_genesis_ledger.find_new_account_record_exn
+          Genesis_ledger.find_new_account_record_exn
             [largest_account_keypair.public_key]
         in
-        Test_genesis_ledger.keypair_of_account_record_exn receiver
+        Genesis_ledger.keypair_of_account_record_exn receiver
       in
       let sender_keypair =
         let sender =
-          Test_genesis_ledger.find_new_account_record_exn
+          Genesis_ledger.find_new_account_record_exn
             [largest_account_keypair.public_key; receiver_keypair.public_key]
         in
-        Test_genesis_ledger.keypair_of_account_record_exn sender
+        Genesis_ledger.keypair_of_account_record_exn sender
       in
       let other_accounts =
-        List.filter (Lazy.force Test_genesis_ledger.accounts)
+        List.filter (Lazy.force Genesis_ledger.accounts)
           ~f:(fun (_, account) ->
             let reserved_public_keys =
               [ largest_account_keypair.public_key
@@ -434,7 +443,7 @@ let run_test () : unit Deferred.t =
                      (Public_key.decompress_exn @@ Account.public_key account)
                )) )
         |> List.map ~f:(fun (sk, account) ->
-               ( Test_genesis_ledger.keypair_of_account_record_exn (sk, account)
+               ( Genesis_ledger.keypair_of_account_record_exn (sk, account)
                , account ) )
       in
       let timeout_mins =
@@ -443,14 +452,11 @@ let run_test () : unit Deferred.t =
         else 7.
       in
       let wait_till_length =
-        if medium_curves then Coda_numbers.Length.of_int 1
+        if medium_curves then Length.of_int 1
         else if test_full_epoch then
           (*Note: wait to produce (2*slots_per_epoch) blocks. This could take a while depending on what k and c are*)
-          Coda_numbers.Length.of_int
-            (Unsigned.UInt32.to_int
-               Consensus.Constants.(
-                 Unsigned.UInt32.(mul slots_per_epoch (of_int 2))))
-        else Coda_numbers.Length.of_int 5
+          Length.(to_int consensus_constants.slots_per_epoch * 2 |> of_int)
+        else Length.of_int 5
       in
       let%map () =
         if with_snark then
@@ -463,26 +469,27 @@ let run_test () : unit Deferred.t =
             wait_until_cond
               ~f:(fun t ->
                 blockchain_length t
-                > Coda_numbers.Length.add blockchain_length' wait_till_length
-                )
+                > Length.add blockchain_length' wait_till_length )
               ~timeout_min:
-                ( Consensus.Constants.(
-                    (delta + c)
-                    * ( block_window_duration_ms
-                      * (Coda_numbers.Length.to_int wait_till_length + 1) ))
+                ( ( Length.to_int consensus_constants.delta
+                  + Length.to_int consensus_constants.c )
+                  * ( ( Block_time.Span.to_ms
+                          consensus_constants.block_window_duration_ms
+                      |> Int64.to_int_exn )
+                    * (Length.to_int wait_till_length + 1) )
                   / 1000 / 60
                 |> Float.of_int )
           in
           assert (
             blockchain_length coda
-            > Coda_numbers.Length.add blockchain_length' wait_till_length )
+            > Length.add blockchain_length' wait_till_length )
         else if with_check then
-          let%map _ =
+          let%bind _ =
             test_multiple_payments other_accounts
               ~txn_count:(List.length other_accounts / 2)
               timeout_mins
           in
-          ()
+          test_duplicate_payments sender_keypair receiver_keypair
         else
           let%bind _ =
             test_multiple_payments other_accounts

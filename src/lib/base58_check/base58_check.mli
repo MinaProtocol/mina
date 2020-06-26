@@ -10,6 +10,8 @@ exception Invalid_base58_check_length of string
 
 exception Invalid_base58_character of string
 
+val coda_alphabet : B58.alphabet
+
 module Make (M : sig
   val description : string
 

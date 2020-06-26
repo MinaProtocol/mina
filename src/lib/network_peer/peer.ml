@@ -1,7 +1,6 @@
 (* peer.ml -- peer with libp2p port and peer id *)
 
 open Core
-open Module_version
 
 (** A libp2p PeerID is more or less a hash of a public key. *)
 module Id = struct
@@ -23,72 +22,57 @@ module Id = struct
   let unsafe_of_string (s : string) : t = s
 end
 
+[%%versioned
 module Stable = struct
   module V1 = struct
-    module T = struct
-      type t =
-        { host: Core.Unix.Inet_addr.Stable.V1.t (* IPv4 or IPv6 address *)
-        ; libp2p_port: int (* TCP *)
-        ; peer_id: Id.Stable.V1.t }
-      [@@deriving bin_io, compare, sexp, version]
+    type t =
+      { host: Core.Unix.Inet_addr.Stable.V1.t (* IPv4 or IPv6 address *)
+      ; libp2p_port: int (* TCP *)
+      ; peer_id: Id.Stable.V1.t }
+    [@@deriving compare, sexp]
 
-      let equal t t' = compare t t' = 0
+    let to_latest = Fn.id
 
-      (* these hash functions come from the implementation of Inet_addr,
+    let equal t t' = compare t t' = 0
+
+    (* these hash functions come from the implementation of Inet_addr,
          though they're not exposed *)
-      let hash_fold_t hash t = hash_fold_int hash (Hashtbl.hash t)
+    let hash_fold_t hash t = hash_fold_int hash (Hashtbl.hash t)
 
-      let hash : t -> int = Ppx_hash_lib.Std.Hash.of_fold hash_fold_t
+    let hash : t -> int = Ppx_hash_lib.Std.Hash.of_fold hash_fold_t
 
-      let to_yojson {host; peer_id; libp2p_port} =
-        `Assoc
-          [ ("host", `String (Unix.Inet_addr.to_string host))
-          ; ("peer_id", `String peer_id)
-          ; ("libp2p_port", `Int libp2p_port) ]
+    let to_yojson {host; peer_id; libp2p_port} =
+      `Assoc
+        [ ("host", `String (Unix.Inet_addr.to_string host))
+        ; ("peer_id", `String peer_id)
+        ; ("libp2p_port", `Int libp2p_port) ]
 
-      let of_yojson =
-        let lift_string = function `String s -> Some s | _ -> None in
-        let lift_int = function `Int n -> Some n | _ -> None in
-        function
-        | `Assoc ls ->
-            let open Option.Let_syntax in
-            Result.of_option ~error:"missing keys"
-              (let%bind host_str =
-                 List.Assoc.find ls "host" ~equal:String.equal >>= lift_string
-               in
-               let%bind peer_id =
-                 List.Assoc.find ls "peer_id" ~equal:String.equal
-                 >>= lift_string
-               in
-               let%map libp2p_port =
-                 List.Assoc.find ls "libp2p_port" ~equal:String.equal
-                 >>= lift_int
-               in
-               let host = Unix.Inet_addr.of_string host_str in
-               {host; peer_id; libp2p_port})
-        | _ ->
-            Error "expected object"
-    end
-
-    include T
-    include Registration.Make_latest_version (T)
+    let of_yojson =
+      let lift_string = function `String s -> Some s | _ -> None in
+      let lift_int = function `Int n -> Some n | _ -> None in
+      function
+      | `Assoc ls ->
+          let open Option.Let_syntax in
+          Result.of_option ~error:"missing keys"
+            (let%bind host_str =
+               List.Assoc.find ls "host" ~equal:String.equal >>= lift_string
+             in
+             let%bind peer_id =
+               List.Assoc.find ls "peer_id" ~equal:String.equal >>= lift_string
+             in
+             let%map libp2p_port =
+               List.Assoc.find ls "libp2p_port" ~equal:String.equal
+               >>= lift_int
+             in
+             let host = Unix.Inet_addr.of_string host_str in
+             {host; peer_id; libp2p_port})
+      | _ ->
+          Error "expected object"
   end
+end]
 
-  module Latest = V1
-
-  module Module_decl = struct
-    let name = "peer"
-
-    type latest = Latest.t
-  end
-
-  module Registrar = Registration.Make (Module_decl)
-  module Registered_V1 = Registrar.Register (V1)
-end
-
-(* bin_io omitted *)
 type t = Stable.Latest.t =
-  {host: Core.Unix.Inet_addr.Stable.V1.t; libp2p_port: int; peer_id: string}
+  {host: Unix.Inet_addr.Blocking_sexp.t; libp2p_port: int; peer_id: string}
 [@@deriving compare, sexp]
 
 [%%define_locally
@@ -137,6 +121,9 @@ module Display = struct
   end]
 
   type t = Stable.Latest.t = {host: string; libp2p_port: int; peer_id: string}
+  [@@deriving yojson, sexp]
+
+  module Fields = Stable.Latest.Fields
 end
 
 let to_display {host; libp2p_port; peer_id} =

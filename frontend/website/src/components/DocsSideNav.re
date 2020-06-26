@@ -67,13 +67,12 @@ module Style = {
   let flip = style([transform(rotate(`deg(180.)))]);
 };
 
-
 module CurrentSlugProvider = {
-  let (context, make, makeProps) = ReactUtils.createContext("");
+  let (context, make, makeProps) = ReactExt.createContext("");
 };
 
 module FolderSlugProvider = {
-  let (context, make, makeProps) = ReactUtils.createContext(None);
+  let (context, make, makeProps) = ReactExt.createContext(None);
 };
 
 let slugConcat = (n1, n2) => {
@@ -103,20 +102,14 @@ module Page = {
 };
 
 module Folder = {
-  // props obviously isn't always a Js.Dict.t(string) but it works here
-  [@bs.val] [@bs.module "react"] [@bs.scope "Children"]
-  external forEachChildren:
-    (React.element, (. {. "props": Js.Dict.t(string)}) => 'a) => unit =
-    "forEach";
-
   [@react.component]
   let make = (~title, ~slug, ~children) => {
     let currentSlug = React.useContext(CurrentSlugProvider.context);
     let hasCurrentSlug = ref(false);
 
     // Check if the children's props contain the current slug
-    forEachChildren(children, (. child) => {
-      switch (Js.Dict.get(child##props, "slug")) {
+    ReactExt.Children.forEach(children, (. child) => {
+      switch (ReactExt.props(child)##slug) {
       | Some(childSlug) when slugConcat(slug, childSlug) == currentSlug =>
         hasCurrentSlug := true
       | _ => ()
@@ -173,6 +166,7 @@ let make = (~currentSlug) => {
           <Page title="Repository Structure" slug="directory-structure" />
           <Page title="Code Reviews" slug="code-reviews" />
           <Page title="Style Guide" slug="style-guide" />
+          <Page title="Sandbox Node" slug="sandbox-node" />
           <Page title="GraphQL API" slug="graphql-api" />
         </Folder>
         <Folder title="Coda Protocol Architecture" slug="architecture">
@@ -180,6 +174,7 @@ let make = (~currentSlug) => {
           <Page title="Lifecycle of a Payment" slug="lifecycle-payment" />
           <Page title="Consensus" slug="consensus" />
           <Page title="Proof of Stake" slug="proof-of-stake" />
+          <Page title="Snark Workers" slug="snark-workers" />
         </Folder>
         <Folder title="SNARKs" slug="snarks">
           <Page title="SNARKs Overview" slug="" />

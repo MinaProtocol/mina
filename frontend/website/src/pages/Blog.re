@@ -53,7 +53,7 @@ let make = (~posts) => {
       <ul className=Style.postList>
         {React.array(
            Array.map(
-             (post: ContentType.Post.t) => {
+             (post: ContentType.BlogPost.t) => {
                <li key={post.slug} className=Style.postListItem>
                  <Next.Link
                    href="/blog/[slug]"
@@ -61,8 +61,7 @@ let make = (~posts) => {
                    passHref=true>
                    <a className=Style.title> {React.string(post.title)} </a>
                  </Next.Link>
-                 {ReactUtils.fromOpt(
-                    Js.Undefined.toOption(post.subtitle), ~f=s =>
+                 {ReactExt.fromOpt(Js.Undefined.toOption(post.subtitle), ~f=s =>
                     <div className=Style.subtitle> {React.string(s)} </div>
                   )}
                  <Spacer height=1. />
@@ -99,13 +98,16 @@ Next.injectGetInitialProps(make, _ => {
     Lazy.force(Contentful.client),
     {
       "include": 0,
-      "content_type": ContentType.Post.id,
+      "content_type": ContentType.BlogPost.id,
       "order": "-fields.date",
     },
   )
-  |> Promise.map((entries: ContentType.Post.entries) => {
+  |> Promise.map((entries: ContentType.BlogPost.entries) => {
        let posts =
-         Array.map((e: ContentType.Post.entry) => e.fields, entries.items);
+         Array.map(
+           (e: ContentType.BlogPost.entry) => e.fields,
+           entries.items,
+         );
        {"posts": posts};
      })
 });

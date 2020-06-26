@@ -22,17 +22,17 @@ module T = struct
   let get_path_diff t frontier (bc1 : Breadcrumb.t) (bc2 : Breadcrumb.t) :
       Breadcrumb.t list * Breadcrumb.t list =
     let ancestor = Full_frontier.common_ancestor frontier bc1 bc2 in
-    (* Find the breadcrumbs connecting bc1 and bc2, excluding bc1. Precondition:
-       bc1 is an ancestor of bc2. *)
-    let path_from_to bc1 bc2 =
+    (* Find the breadcrumbs connecting t1 and t2, excluding t1. Precondition:
+       t1 is an ancestor of t2. *)
+    let path_from_to t1 t2 =
       let rec go cursor acc =
-        if Breadcrumb.equal cursor bc1 then acc
+        if Breadcrumb.equal cursor t1 then acc
         else
           go
             (Full_frontier.find_exn frontier @@ Breadcrumb.parent_hash cursor)
             (cursor :: acc)
       in
-      go bc2 []
+      go t2 []
     in
     Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
       !"Common ancestor: %{sexp: State_hash.t}"
@@ -58,7 +58,7 @@ module T = struct
                 Full_frontier.find_exn frontier new_best_tip
               in
               let old_best_tip =
-                (*This should be present in the frontier because root did not transition*)
+                (*FIXME #4404*)
                 Full_frontier.find_exn frontier old_best_tip_hash
               in
               let added_to_best_tip_path, removed_from_best_tip_path =
@@ -79,8 +79,7 @@ module T = struct
                         (List.map ~f:Breadcrumb.to_yojson
                            removed_from_best_tip_path) ) ] ;
               let new_user_commands =
-                Breadcrumb.user_commands new_best_tip_breadcrumb
-                @ List.bind added_to_best_tip_path ~f:Breadcrumb.user_commands
+                List.bind added_to_best_tip_path ~f:Breadcrumb.user_commands
                 @ new_user_commands
               in
               let removed_user_commands =

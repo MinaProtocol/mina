@@ -96,6 +96,16 @@ module Style = {
       selector("ul", [paddingLeft(`rem(1.))]),
       selector("ul > li", [paddingLeft(`rem(0.5))]),
       selector("ul > li > ul", [marginLeft(`rem(1.))]),
+      selector(
+        "img + em",
+        [
+          fontSize(`px(13)),
+          color(`hex("757575")),
+          width(`percent(100.)),
+          display(`inlineBlock),
+          textAlign(`center),
+        ],
+      ),
       mediaMedium([
         selector(".not-large, .not-mobile", [display(`block)]),
         selector(".mobile-only, .large-only", [display(`none)]),
@@ -111,7 +121,7 @@ module Style = {
 };
 
 [@react.component]
-let make = (~post: option(ContentType.Post.t)) => {
+let make = (~post: option(ContentType.BlogPost.t)) => {
   switch (post) {
   | None =>
     <Page title="Coda Protocol Blog">
@@ -122,7 +132,7 @@ let make = (~post: option(ContentType.Post.t)) => {
     </Page>
   | Some(
       (
-        {title, subtitle, author, date, text: content, snippet, slug}: ContentType.Post.t
+        {title, subtitle, author, date, text: content, snippet, slug}: ContentType.BlogPost.t
       ),
     ) =>
     // Manually set the canonical route to remove .html
@@ -130,7 +140,7 @@ let make = (~post: option(ContentType.Post.t)) => {
       <Next.Head> Markdown.katexStylesheet </Next.Head>
       <div className=Style.wrapper>
         <div className=Style.title id="title"> {React.string(title)} </div>
-        {ReactUtils.fromOpt(Js.Undefined.toOption(subtitle), ~f=s =>
+        {ReactExt.fromOpt(Js.Undefined.toOption(subtitle), ~f=s =>
            <div className=Style.subtitle id="subtitle">
              {React.string(s)}
            </div>
@@ -149,7 +159,7 @@ let make = (~post: option(ContentType.Post.t)) => {
   };
 };
 
-let cache: Js.Dict.t(option(ContentType.Post.t)) = Js.Dict.empty();
+let cache: Js.Dict.t(option(ContentType.BlogPost.t)) = Js.Dict.empty();
 
 Next.injectGetInitialProps(make, ({Next.query}) => {
   switch (Js.Dict.get(query, "slug")) {
@@ -162,11 +172,11 @@ Next.injectGetInitialProps(make, ({Next.query}) => {
         Lazy.force(Contentful.client),
         {
           "include": 0,
-          "content_type": ContentType.Post.id,
+          "content_type": ContentType.BlogPost.id,
           "fields.slug": slug,
         },
       )
-      |> Promise.map((entries: ContentType.Post.entries) => {
+      |> Promise.map((entries: ContentType.BlogPost.entries) => {
            let post =
              switch (entries.items) {
              | [|item|] => Some(item.fields)

@@ -5,8 +5,8 @@ open Cache_lib
 open Coda_transition
 open Network_peer
 
-let build_subtrees_of_breadcrumbs ~logger ~verifier ~trust_system ~frontier
-    ~initial_hash subtrees_of_enveloped_transitions =
+let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
+    ~trust_system ~frontier ~initial_hash subtrees_of_enveloped_transitions =
   (* If the breadcrumb we are targetting is removed from the transition
    * frontier while we're catching up, it means this path is not on the
    * critical path that has been chosen in the frontier. As such, we should
@@ -21,7 +21,8 @@ let build_subtrees_of_breadcrumbs ~logger ~verifier ~trust_system ~frontier
         in
         Logger.error logger ~module_:__MODULE__ ~location:__LOC__
           ~metadata:
-            [ ( "hashes of transitions"
+            [ ("state_hash", Coda_base.State_hash.to_yojson initial_hash)
+            ; ( "transition_hashes"
               , `List
                   (List.map subtrees_of_enveloped_transitions
                      ~f:(fun subtree ->
@@ -30,11 +31,10 @@ let build_subtrees_of_breadcrumbs ~logger ~verifier ~trust_system ~frontier
                            Cached.peek enveloped_transitions
                            |> Envelope.Incoming.data
                            |> External_transition.Initial_validated.state_hash
-                           |> fun hash ->
-                           `String (Coda_base.State_hash.to_base58_check hash)
-                           )
+                           |> Coda_base.State_hash.to_yojson )
                          subtree )) ) ]
-          !"%s" msg ;
+          "Transition frontier already garbage-collected the parent of \
+           $state_hash" ;
         Or_error.error_string msg
     | Some breadcrumb ->
         Or_error.return breadcrumb
@@ -94,8 +94,8 @@ let build_subtrees_of_breadcrumbs ~logger ~verifier ~trust_system ~frontier
                 let open Deferred.Let_syntax in
                 match%bind
                   O1trace.trace_recurring "Breadcrumb.build" (fun () ->
-                      Transition_frontier.Breadcrumb.build ~logger ~verifier
-                        ~trust_system ~parent
+                      Transition_frontier.Breadcrumb.build ~logger
+                        ~precomputed_values ~verifier ~trust_system ~parent
                         ~transition:mostly_validated_transition
                         ~sender:(Some sender) )
                 with
