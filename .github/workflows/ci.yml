@@ -6,7 +6,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Run Coda Pipeline
-        uses: pauldthomson/trigger-pipeline-action
+        uses: pauldthomson/trigger-pipeline-action@master
         if: contains(github.event.pull_request.labels.*.name, 'ci-build-me')
         env:
           BUILDKITE_API_ACCESS_TOKEN: ${{ secrets.BUILDKITE_API_ACCESS_TOKEN }}
