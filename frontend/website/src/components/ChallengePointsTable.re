@@ -189,7 +189,7 @@ module Row = {
 };
 
 [@react.component]
-let make = (~challengeInfo) => {
+let make = (~releaseInfo, ~challengeInfo) => {
   let renderChallengePointsTable = () => {
     challengeInfo
     |> Array.mapi((index, challenge) => {
@@ -200,7 +200,7 @@ let make = (~challengeInfo) => {
   };
 
   <div className=Styles.container>
-    <div className=Styles.releaseTitle> {React.string("Release 3.2a")} </div>
+    <div className=Styles.releaseTitle> {React.string(releaseInfo)} </div>
     <div className=Styles.tableContainer>
       <div className=Styles.topRow>
         <span className=Styles.challengeLabel>

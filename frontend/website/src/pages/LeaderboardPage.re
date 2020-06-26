@@ -219,6 +219,7 @@ let make = (~lastManualUpdatedDate) => {
     dispatch(UsernameEntered(username));
   };
 
+  let releaseInfo = "Release 3.2a";
   let challengeInfo = [|
     (None, "Coda Sandbox", Some(1000)),
     (Some("**"), "Share Your Thoughts", None),
@@ -236,7 +237,7 @@ let make = (~lastManualUpdatedDate) => {
         //<SearchBar onUsernameEntered username={state.username} />
         //<ToggleButtons currentToggle={state.currentToggle} onTogglePress />
         //<FilterDropdown currentFilter={state.currentFilter} onFilterPress />
-         <ChallengePointsTable challengeInfo /> </div>
+         <ChallengePointsTable releaseInfo challengeInfo /> </div>
     </Wrapped>
   </Page>;
 };
