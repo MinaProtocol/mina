@@ -808,7 +808,9 @@ module Base = struct
               in
               let receiver_account =
                 { receiver_account with
-                  token_owner=
+                  public_key= Account_id.public_key receiver
+                ; token_id= Account_id.token_id receiver
+                ; token_owner=
                     ( if creating_new_token then true
                     else receiver_account.token_owner ) }
               in
@@ -823,13 +825,19 @@ module Base = struct
                 else if Account_id.equal source receiver then receiver_account
                 else source_account
               in
+              let source_not_present =
+                let id = Account.identifier source_account in
+                if Account_id.equal Account_id.empty id then true
+                else if Account_id.equal receiver id then false
+                else fail "bad source account ID"
+              in
               let not_token_owner =
                 not
                   ( source_account.token_owner
                   || Token_id.(equal default) (Account_id.token_id receiver) )
               in
               { predicate_failed
-              ; source_not_present= false
+              ; source_not_present
               ; receiver_not_present= false
               ; amount_insufficient_to_create= false
               ; token_cannot_create= false
@@ -1538,7 +1546,7 @@ module Base = struct
            ~is_writeable:
              (* [modify_account_send] does this failure check for us. *)
              user_command_failure.source_not_present root_after_receiver_update
-           source ~f:(fun ~is_empty_and_writeable:_ account ->
+           source ~f:(fun ~is_empty_and_writeable account ->
              (* this account is:
                - the source for payments
                - the delegator for stake delegation
@@ -1546,6 +1554,11 @@ module Base = struct
                - the fee-receiver for a coinbase
                - the second receiver for a fee transfer
              *)
+             let%bind () =
+               [%with_label "Check source presence failure matches predicted"]
+                 (Boolean.Assert.( = ) is_empty_and_writeable
+                    user_command_failure.source_not_present)
+             in
              let%bind () =
                [%with_label
                  "Check source failure cases do not apply when fee-payer is \
