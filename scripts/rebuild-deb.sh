@@ -39,7 +39,8 @@ Version: ${VERSION}
 Section: base
 Priority: optional
 Architecture: amd64
-Depends: coda-discovery, libffi6, libgmp10, libgomp1, libjemalloc1, libprocps6, libssl1.1, miniupnpc
+Depends: libffi6, libgmp10, libgomp1, libjemalloc1, libprocps6, libssl1.1, miniupnpc, postgresql
+Conflicts: coda-discovery
 License: Apache-2.0
 Homepage: https://codaprotocol.com/
 Maintainer: o(1)Labs <build@o1labs.org>
@@ -56,7 +57,15 @@ echo "------------------------------------------------------------"
 # Binaries
 mkdir -p "${BUILDDIR}/usr/local/bin"
 cp ./default/src/app/cli/src/coda.exe "${BUILDDIR}/usr/local/bin/coda"
+ls -l ../src/app/libp2p_helper/result/bin
+p2p_path="${BUILDDIR}/usr/local/bin/coda-libp2p_helper"
+cp ../src/app/libp2p_helper/result/bin/libp2p_helper $p2p_path
+chmod +w $p2p_path
+# Only for nix builds
+# patchelf --set-interpreter /lib64/ld-linux-x86-64.so.2 "${BUILDDIR}/usr/local/bin/coda-libp2p_helper"
+chmod -w $p2p_path
 cp ./default/src/app/logproc/logproc.exe "${BUILDDIR}/usr/local/bin/coda-logproc"
+cp ./default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe "${BUILDDIR}/usr/local/bin/coda-create-genesis"
 
 # Build Config
 mkdir -p "${BUILDDIR}/etc/coda/build_config"
@@ -98,6 +107,11 @@ do
     done
 done
 
+# Genesis Ledger Copy
+for f in /tmp/coda_cache_dir/genesis*; do
+    cp /tmp/coda_cache_dir/genesis* "${BUILDDIR}/var/lib/coda/."
+done
+
 # Bash autocompletion
 # NOTE: We do not list bash-completion as a required package,
 #       but it needs to be present for this to be effective
@@ -113,7 +127,7 @@ find "${BUILDDIR}"
 
 # Build the package
 echo "------------------------------------------------------------"
-dpkg-deb --build "${BUILDDIR}" ${PROJECT}_${VERSION}.deb
+fakeroot dpkg-deb --build "${BUILDDIR}" ${PROJECT}_${VERSION}.deb
 ls -lh coda*.deb
 
 # Tar up keys for an artifact
@@ -139,7 +153,7 @@ Version: ${VERSION}
 Section: base
 Priority: optional
 Architecture: amd64
-Depends: coda-discovery, libffi6, libgmp10, libgomp1, libjemalloc1, libprocps6, libssl1.1, miniupnpc
+Depends: libffi6, libgmp10, libgomp1, libjemalloc1, libprocps6, libssl1.1, miniupnpc
 License: Apache-2.0
 Homepage: https://codaprotocol.com/
 Maintainer: o(1)Labs <build@o1labs.org>
@@ -152,5 +166,5 @@ EOF
 rm -f "${BUILDDIR}"/var/lib/coda/*_proving
 
 # build another deb
-dpkg-deb --build "${BUILDDIR}" ${PROJECT}-noprovingkeys_${VERSION}.deb
+fakeroot dpkg-deb --build "${BUILDDIR}" ${PROJECT}-noprovingkeys_${VERSION}.deb
 ls -lh coda*.deb

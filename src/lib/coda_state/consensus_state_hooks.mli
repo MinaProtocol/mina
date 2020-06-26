@@ -10,4 +10,4 @@ include
    and type consensus_state := Consensus_state.Value.t
    and type consensus_state_var := Consensus_state.var
    and type consensus_transition := Consensus_transition.Value.t
-   and type proposal_data := Proposal_data.t
+   and type block_data := Block_data.t

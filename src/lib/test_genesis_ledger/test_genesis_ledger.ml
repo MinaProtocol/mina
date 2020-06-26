@@ -1,65 +1,19 @@
 [%%import
 "/src/config.mlh"]
 
-[%%inject
-"ledger_depth", ledger_depth]
-
-[%%inject
-"fake_accounts_target", fake_accounts_target]
-
-let _ =
-  if Base.Int.(fake_accounts_target > pow 2 ledger_depth) then
-    failwith "Genesis_ledger: fake_accounts_target >= 2**ledger_depth"
-
 [%%if
 defined genesis_ledger]
 
-[%%if
-genesis_ledger = "release"]
+[%%inject
+"genesis_ledger", genesis_ledger]
 
-include Release_ledger
+include Genesis_ledger.Make (struct
+  include (val Genesis_ledger.fetch_ledger_exn genesis_ledger)
 
-[%%elif
-genesis_ledger = "test"]
+  let directory = `Ephemeral
 
-include Test_ledger
-
-[%%elif
-genesis_ledger = "test_split_two_stakers"]
-
-include Test_split_two_stakes_ledger
-
-[%%elif
-genesis_ledger = "test_five_even_stakes"]
-
-include Test_five_even_stakes
-
-[%%elif
-genesis_ledger = "test_three_even_stakes"]
-
-include Test_three_even_stakes_ledger
-
-[%%elif
-genesis_ledger = "test_delegation"]
-
-include Test_delegation_ledger
-
-[%%elif
-genesis_ledger = "testnet_postake"]
-
-include Testnet_postake_ledger
-
-[%%elif
-genesis_ledger = "testnet_postake_many_proposers"]
-
-include Testnet_postake_ledger_many_proposers
-
-[%%else]
-
-[%%error
-"\"genesis_ledger\" is set to invalid value in config.mlh"]
-
-[%%endif]
+  let depth = Genesis_constants.Constraint_constants.compiled.ledger_depth
+end)
 
 [%%else]
 

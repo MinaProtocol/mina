@@ -1,0 +1,8 @@
+(library
+  (inline_tests)
+  (name pickles_types)
+  (public_name pickles_types)
+  (preprocess (pps ppx_version -lint-version-syntax-warnings ppx_deriving_yojson ppx_jane ppx_deriving.std))
+  (libraries
+    snarky
+    core_kernel))

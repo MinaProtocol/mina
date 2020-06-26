@@ -56,6 +56,8 @@ module Styles = {
       marginTop(`rem(-0.25)),
       fontSize(`rem(1.25)),
       height(`rem(1.5)),
+      width(`percent(100.)),
+      textOverflow(`ellipsis),
       marginBottom(`rem(0.25)),
     ]);
 
@@ -133,7 +135,9 @@ let make = (~account: Account.t) => {
       <span className=Css.(style([paddingBottom(px(2))]))>
         {React.string({js|■ |js})}
       </span>
-      {ReasonReact.string(Int64.to_string(account.balance##total))}
+      {ReasonReact.string(
+         CurrencyFormatter.toFormattedString(account.balance##total),
+       )}
     </div>
     <LockAccountMutation>
       {(lockAccount, _) => {

@@ -1,6 +1,18 @@
-open Core
+[%%import "/src/config.mlh"]
+
+open Core_kernel
+
+[%%ifdef consensus_mechanism]
+
 open Snark_params
 open Tick
+
+[%%else]
+
+open Snark_params_nonconsensus
+module Random_oracle = Random_oracle_nonconsensus.Random_oracle
+
+[%%endif]
 
 type t = Field.t * Field.t [@@deriving sexp, hash]
 
@@ -17,6 +29,8 @@ end
 
 include Comparable.S_binable with type t := t
 
+[%%ifdef consensus_mechanism]
+
 type var = Field.Var.t * Field.Var.t
 
 val typ : (var, t) Typ.t
@@ -24,6 +38,8 @@ val typ : (var, t) Typ.t
 val var_of_t : t -> var
 
 val assert_equal : var -> var -> (unit, 'a) Checked.t
+
+[%%endif]
 
 val of_private_key_exn : Private_key.t -> t
 
@@ -60,12 +76,6 @@ module Compressed : sig
 
   val empty : t
 
-  type var = (Field.Var.t, Boolean.var) Poly.t
-
-  val typ : (var, t) Typ.t
-
-  val var_of_t : t -> var
-
   include Comparable.S with type t := t
 
   include Hashable.S_binable with type t := t
@@ -80,6 +90,14 @@ module Compressed : sig
 
   val of_base58_check : string -> t Or_error.t
 
+  [%%ifdef consensus_mechanism]
+
+  type var = (Field.Var.t, Boolean.var) Poly.t
+
+  val typ : (var, t) Typ.t
+
+  val var_of_t : t -> var
+
   module Checked : sig
     val equal : var -> var -> (Boolean.var, _) Checked.t
 
@@ -91,6 +109,8 @@ module Compressed : sig
       val equal : var -> var -> (unit, _) Checked.t
     end
   end
+
+  [%%endif]
 end
 
 val gen : t Quickcheck.Generator.t
@@ -105,6 +125,10 @@ val decompress : Compressed.t -> t option
 
 val decompress_exn : Compressed.t -> t
 
+[%%ifdef consensus_mechanism]
+
 val compress_var : var -> (Compressed.var, _) Checked.t
 
 val decompress_var : Compressed.var -> (var, _) Checked.t
+
+[%%endif]

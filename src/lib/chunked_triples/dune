@@ -1,6 +1,0 @@
-(library
-  (name chunked_triples)
-  (public_name chunked_triples)
-  (libraries core tuple_lib)
-  (preprocess (pps ppx_coda ppx_jane bisect_ppx -conditional))
-  (inline_tests))

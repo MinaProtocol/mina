@@ -1,0 +1,50 @@
+FROM ubuntu:18.04
+ARG deb_repo=develop
+
+# Dependencies
+RUN apt-get -y update && \
+  DEBIAN_FRONTEND=noninteractive apt-get -y upgrade && \
+  DEBIAN_FRONTEND=noninteractive apt-get -y install \
+    strace \
+    dumb-init \
+    libssl1.1 \
+    libprocps6 \
+    libgmp10 \
+    libgomp1 \
+    libffi6 \
+    apt-transport-https \
+    ca-certificates \
+    dnsutils \
+    tzdata \
+    postgresql \
+    postgresql-contrib && \
+  rm -rf /var/lib/apt/lists/*
+
+# coda and archive packages
+RUN echo "deb [trusted=yes] http://packages.o1test.net $deb_repo main" > /etc/apt/sources.list.d/coda.list \
+  && apt-get update \
+  && apt-get install --force-yes coda-testnet-postake-medium-curves=0.0.12-beta+403845-develop-0116d7c-PV947be79c -y \
+  && apt-get install --force-yes coda-archive -y
+
+RUN mkdir -p /data/coda-config \
+    && mkdir -p /data/postgresql \
+    && chown postgres /data/postgresql \
+    && su postgres -c '/usr/lib/postgresql/10/bin/initdb -D /data/postgresql' \
+    && echo "data_directory = '/data/postgresql'" >> /etc/postgresql/10/main/postgresql.conf \
+    && echo "listen_addresses='*'" >> /etc/postgresql/10/main/postgresql.conf \
+    && echo "host all  all    0.0.0.0/0  md5" >> /etc/postgresql/10/main/pg_hba.conf
+
+USER postgres
+
+COPY src/app/archive/create_schema.sql .
+
+RUN /etc/init.d/postgresql start \
+    && psql --command "CREATE USER pguser WITH SUPERUSER PASSWORD 'pguser';" \
+    && createdb -O pguser archiver \
+    && psql postgresql://pguser:pguser@localhost:5432/archiver -f ./create_schema.sql
+
+USER root
+
+COPY src/app/rosetta/start.sh .
+
+ENTRYPOINT ["bash", "./start.sh"]

@@ -1,3 +1,5 @@
+open ReactIntl;
+
 module Styles = {
   open Css;
 
@@ -9,7 +11,7 @@ module Styles = {
       right(`zero),
       display(`flex),
       height(Theme.Spacing.footerHeight),
-      justifyContent(`spaceBetween),
+      justifyContent(`flexEnd),
       alignItems(`center),
       padding2(~v=`zero, ~h=`rem(1.25)),
       borderTop(`px(1), `solid, Theme.Colors.borderColor),
@@ -51,10 +53,14 @@ module StakingSwitch = {
                   ? Theme.Colors.serpentine : Theme.Colors.slateAlpha(0.7),
               ),
               marginLeft(`rem(1.)),
+              firstLetter([textTransform(`capitalize)]),
             ]),
           ])
         )>
-        {ReasonReact.string("Compress the blockchain")}
+        <FormattedMessage
+          id="footer.compress-blockchain"
+          defaultMessage="Compress the blockchain"
+        />
       </span>
     </div>;
   };
@@ -83,7 +89,6 @@ module AccountQuery = ReasonApollo.CreateQuery(Accounts);
 let make = () => {
   let (modalState, setModalState) = React.useState(() => false);
   <div className=Styles.footer>
-    <StakingSwitch />
     <div className=Styles.footerButtons>
       <AccountQuery partialRefetch=true>
         {response =>

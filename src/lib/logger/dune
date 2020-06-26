@@ -3,8 +3,8 @@
  (public_name logger)
  (library_flags -linkall)
  (inline_tests)
- (libraries core async yojson ppx_deriving_yojson.runtime re2 logproc_lib)
+ (libraries core async yojson ppx_deriving_yojson.runtime re2 logproc_lib structured_log_events)
  (preprocess
-  (pps ppx_coda ppx_jane ppx_deriving.std ppx_deriving_yojson bisect_ppx --
+  (pps ppx_version ppx_coda ppx_jane ppx_deriving.std ppx_deriving_yojson bisect_ppx --
     -conditional))
  (synopsis "Logging library"))

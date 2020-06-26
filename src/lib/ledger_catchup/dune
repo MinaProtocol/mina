@@ -2,7 +2,7 @@
   (name ledger_catchup)
   (public_name ledger_catchup)
   (inline_tests)
-  (preprocess (pps ppx_coda ppx_jane))
+  (preprocess (pps ppx_version ppx_jane))
   (libraries
     async_kernel
     non_empty_list 
@@ -16,7 +16,6 @@
     merkle_address 
     coda_base 
     coda_metrics
-    kademlia
     transition_chain_verifier
     coda_networking
     fake_network))

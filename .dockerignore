@@ -1,7 +1,10 @@
 *
 !src/opam.export
 !coda.deb
+!coda-discovery.deb
+!scripts/run-demo.sh
 !src/external/**/*
-!src/app/kademlia-haskell
 !src/app/libp2p_helper
 !src/app/trace-tool
+!src/app/archive/create_schema.sql
+!src/app/rosetta/start.sh

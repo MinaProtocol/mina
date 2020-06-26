@@ -1,4 +1,12 @@
+open ReactIntl;
 open Tc;
+
+module Styles = {
+  open Css;
+
+  let subtitle =
+    merge([Theme.Text.Body.regular, style([textTransform(`capitalize)])]);
+};
 
 module UnlockAccount = [%graphql
   {| mutation unlock($password: String!, $publicKey: PublicKey!) {
@@ -13,6 +21,17 @@ module UnlockMutation = ReasonApollo.CreateMutation(UnlockAccount);
 type modalState = {error: option(string)};
 [@react.component]
 let make = (~account, ~onClose, ~onSuccess) => {
+  let intl = useIntl();
+
+  let modalTitle =
+    Intl.formatMessage(
+      intl,
+      {
+        "id": "unlock-modal.unlock-account",
+        "defaultMessage": "Unlock Account",
+      },
+    );
+
   let (error, setError) = React.useState(() => None);
   let (password, setPassword) = React.useState(() => "");
   let variables =
@@ -21,7 +40,7 @@ let make = (~account, ~onClose, ~onSuccess) => {
       ~publicKey=Apollo.Encoders.publicKey(account),
       (),
     )##variables;
-  <Modal title="Unlock Account" onRequestClose=onClose>
+  <Modal title=modalTitle onRequestClose=onClose>
     <UnlockMutation>
       ...{(mutation, {result}) =>
         <form
@@ -42,21 +61,35 @@ let make = (~account, ~onClose, ~onSuccess) => {
            | Data(_) =>
              onSuccess();
              React.null;
-           | Error(err) =>
+           | Error((err: ReasonApolloTypes.apolloError)) =>
              let message =
-               err##graphQLErrors
+               err.graphQLErrors
                |> Js.Nullable.toOption
-               |> Option.withDefault(~default=Array.empty)
+               |> Option.withDefault(~default=[||])
                |> Array.get(~index=0)
-               |> Option.map(~f=e => e##message)
+               |> Option.map(~f=(e: ReasonApolloTypes.graphqlError) =>
+                    e.message
+                  )
                |> Option.withDefault(~default="Server error");
              setError(_ => Some(message));
              React.null;
            }}
-          <p className=Theme.Text.Body.regular>
-            {React.string("Please enter password for ")}
+          <p className=Styles.subtitle>
+            <FormattedMessage
+              id="unlock-modal.please-enter-password"
+              defaultMessage="Please enter password for"
+            />
+            {React.string(" ")}
             <AccountName pubkey=account />
-            {React.string(".")}
+            {React.string(". ")}
+            {if (PublicKey.toString(account) == "4vsRCVMNTrCx4NpN6kKTkFKLcFN4vXUP5RB9PqSZe1qsyDs4AW5XeNgAf16WUPRBCakaPiXcxjp6JUpGNQ6fdU977x5LntvxrSg11xrmK6ZDaGSMEGj12dkeEpyKcEpkzcKwYWZ2Yf2vpwQP") {
+                <FormattedMessage
+                   id="unlock-modal.please-enter-password-hack"
+                   defaultMessage="Leave password blank for this account."
+                />
+            } else {
+               React.null
+            }}
           </p>
           <Spacer height=1. />
           <TextField
@@ -77,7 +110,12 @@ let make = (~account, ~onClose, ~onSuccess) => {
               }}
             />
             <Spacer width=1. />
-            <Button label="Unlock" style=Button.Green type_="submit" />
+            <Button
+              disabled={result === Loading}
+              label="Unlock"
+              style=Button.Green
+              type_="submit"
+            />
           </div>
         </form>
       }

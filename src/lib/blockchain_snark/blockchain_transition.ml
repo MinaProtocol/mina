@@ -4,8 +4,7 @@ open Snark_params
 open Snark_bits
 open Coda_state
 open Fold_lib
-open Bitstring_lib
-module Digest = Tick.Pedersen.Digest
+module Digest = Random_oracle.Digest
 module Storage = Storage.List.Make (Storage.Disk)
 
 module Keys = struct
@@ -166,27 +165,31 @@ module Make (T : Transaction_snark.Verification.S) = struct
 
   include Transition_system.Make (struct
               module Tick = struct
+                let size_in_bits = Tick.Field.size_in_bits
+
                 module Packed = struct
-                  type value = Tick.Pedersen.Digest.t
+                  type value = Random_oracle.Digest.t
 
-                  type var = Tick.Pedersen.Checked.Digest.var
+                  type var = Random_oracle.Checked.Digest.t
 
-                  let typ = Tick.Pedersen.Checked.Digest.typ
+                  let typ = Tick.Field.typ
+
+                  let size_in_bits = size_in_bits
                 end
 
                 module Unpacked = struct
-                  type value = Tick.Pedersen.Checked.Digest.Unpacked.t
+                  type value = bool list
 
-                  type var = Tick.Pedersen.Checked.Digest.Unpacked.var
+                  type var = Tick.Boolean.var list
 
                   let typ : (var, value) Tick.Typ.t =
-                    Tick.Pedersen.Checked.Digest.Unpacked.typ
+                    Tick.Typ.list ~length:size_in_bits Tick.Boolean.typ
 
                   let var_to_bits (x : var) =
                     Bitstring_lib.Bitstring.Lsb_first.of_list
                       (x :> Tick.Boolean.var list)
 
-                  let var_of_bits = Fn.id
+                  let var_of_bits = Bitstring_lib.Bitstring.Lsb_first.to_list
 
                   let var_to_triples xs =
                     let open Fold in
@@ -194,20 +197,19 @@ module Make (T : Transaction_snark.Verification.S) = struct
                       (group3 ~default:Tick.Boolean.false_
                          (of_list (var_to_bits xs :> Tick.Boolean.var list)))
 
-                  let var_of_value =
-                    Tick.Pedersen.Checked.Digest.Unpacked.constant
+                  let var_of_value = List.map ~f:Tick.Boolean.var_of_value
+
+                  let size_in_bits = size_in_bits
                 end
 
-                let project_value =
-                  Fn.compose Tick.Field.project Bitstring.Lsb_first.to_list
+                let project_value = Tick.Field.project
 
-                let project_var = Tick.Pedersen.Checked.Digest.Unpacked.project
+                let project_var = Tick.Field.Var.project
 
-                let unpack_value =
-                  Fn.compose Bitstring.Lsb_first.of_list Tick.Field.unpack
+                let unpack_value = Tick.Field.unpack
 
                 let choose_preimage_var =
-                  Tick.Pedersen.Checked.Digest.choose_preimage
+                  Tick.Field.Checked.choose_preimage_var ~length:size_in_bits
               end
 
               module Tock = Bits.Snarkable.Field (Tock)
@@ -240,7 +242,10 @@ module Make (T : Transaction_snark.Verification.S) = struct
         ~create_env:Tick.Keypair.generate
         ~input:
           (Tick.constraint_system ~exposing:(Step_base.input ())
-             (Step_base.main (Logger.null ())))
+             (Step_base.main ~logger:(Logger.null ())
+                ~proof_level:Genesis_constants.Proof_level.compiled
+                ~constraint_constants:
+                  Genesis_constants.Constraint_constants.compiled))
 
     let cached () =
       let open Cached.Deferred_with_track_generated.Let_syntax in
@@ -319,7 +324,10 @@ let constraint_system_digests () =
   [ ( "blockchain-step"
     , digest
         M.Step_base.(
-          Tick.constraint_system ~exposing:(input ()) (main (Logger.null ())))
-    )
+          Tick.constraint_system ~exposing:(input ())
+            (main ~logger:(Logger.null ())
+               ~proof_level:Genesis_constants.Proof_level.compiled
+               ~constraint_constants:
+                 Genesis_constants.Constraint_constants.compiled)) )
   ; ("blockchain-wrap", digest' W.(Tock.constraint_system ~exposing:input main))
   ]

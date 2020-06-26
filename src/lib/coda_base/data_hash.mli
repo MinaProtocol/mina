@@ -1,12 +1,6 @@
-(* data_hash.mli -- data hash that uses Snarky *)
+(* data_hash.mli *)
 
-module type Full_size =
-  Data_hash_functor.Make_sigs(Snark_params.Tick).Full_size
+module type Full_size = Data_hash_intf.Full_size
 
-module type Small = Data_hash_functor.Make_sigs(Snark_params.Tick).Small
-
-module Make_small (M : sig
-  val length_in_bits : int
-end) : Small
-
-module Make_full_size () : Full_size
+module Make_full_size (B58_data : Data_hash_intf.Data_hash_descriptor) :
+  Full_size

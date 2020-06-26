@@ -1,297 +1,216 @@
-(* intf.ml -- enough of an interface to allow the functor to work *)
+[%%import
+"/src/config.mlh"]
 
 open Core_kernel
 
-module type Tick_S = sig
-  type field
+[%%ifdef
+consensus_mechanism]
 
-  module rec Checked : sig
-    type ('a, 's) t = ('a, 's, field) Snarky.Checked.t
+open Snark_bits
+open Snark_params.Tick
 
-    val map : ('a, 'e) t -> f:('a -> 'b) -> ('b, 'e) t
+[%%else]
 
-    val return : 'a -> ('a, 's) t
+open Snark_bits_nonconsensus
+module Random_oracle = Random_oracle_nonconsensus.Random_oracle
+module Sgn = Sgn_nonconsensus.Sgn
 
-    module List : sig
-      type 'a t = 'a list
+[%%endif]
 
-      val all : ('a, 's) Checked.t t -> ('a t, 's) Checked.t
-    end
+type uint64 = Unsigned.uint64
+
+module type Basic = sig
+  type t [@@deriving sexp, compare, hash, yojson]
+
+  type magnitude = t [@@deriving sexp, compare]
+
+  val max_int : t
+
+  val length_in_bits : int
+
+  include Comparable.S with type t := t
+
+  val gen_incl : t -> t -> t Quickcheck.Generator.t
+
+  val gen : t Quickcheck.Generator.t
+
+  include Bits_intf.Convertible_bits with type t := t
+
+  val to_input : t -> (_, bool) Random_oracle.Input.t
+
+  val zero : t
+
+  val one : t
+
+  val of_string : string -> t
+
+  val to_string : t -> string
+
+  val of_formatted_string : string -> t
+
+  val to_formatted_string : t -> string
+
+  val of_int : int -> t
+
+  val to_int : t -> int
+
+  val to_uint64 : t -> uint64
+
+  val of_uint64 : uint64 -> t
+
+  [%%ifdef consensus_mechanism]
+
+  type var
+
+  val typ : (var, t) Typ.t
+
+  val var_of_t : t -> var
+
+  val var_to_number : var -> Number.t
+
+  val var_to_bits : var -> Boolean.var Bitstring_lib.Bitstring.Lsb_first.t
+
+  val var_to_input : var -> (_, Boolean.var) Random_oracle.Input.t
+
+  val equal_var : var -> var -> (Boolean.var, _) Checked.t
+
+  [%%endif]
+end
+
+module type Arithmetic_intf = sig
+  type t
+
+  val add : t -> t -> t option
+
+  val sub : t -> t -> t option
+
+  val ( + ) : t -> t -> t option
+
+  val ( - ) : t -> t -> t option
+end
+
+module type Signed_intf = sig
+  type magnitude
+
+  [%%ifdef consensus_mechanism]
+
+  type magnitude_var
+
+  [%%endif]
+
+  type t = (magnitude, Sgn.t) Signed_poly.t
+  [@@deriving sexp, hash, compare, eq, yojson]
+
+  val gen : t Quickcheck.Generator.t
+
+  val create :
+    magnitude:'magnitude -> sgn:'sgn -> ('magnitude, 'sgn) Signed_poly.t
+
+  val sgn : t -> Sgn.t
+
+  val magnitude : t -> magnitude
+
+  val zero : t
+
+  val to_input : t -> (_, bool) Random_oracle.Input.t
+
+  val add : t -> t -> t option
+
+  val ( + ) : t -> t -> t option
+
+  val negate : t -> t
+
+  val of_unsigned : magnitude -> t
+
+  [%%ifdef consensus_mechanism]
+
+  type var = (magnitude_var, Sgn.var) Signed_poly.t
+
+  val typ : (var, t) Typ.t
+
+  module Checked : sig
+    val constant : t -> var
+
+    val of_unsigned : magnitude_var -> var
+
+    val negate : var -> var
+
+    val if_ : Boolean.var -> then_:var -> else_:var -> (var, _) Checked.t
+
+    val to_input : var -> (_, Boolean.var) Random_oracle.Input.t
+
+    val add : var -> var -> (var, _) Checked.t
+
+    val ( + ) : var -> var -> (var, _) Checked.t
+
+    val to_field_var : var -> (Field.Var.t, _) Checked.t
+
+    val scale : Field.Var.t -> var -> (var, _) Checked.t
+
+    val cswap :
+         Boolean.var
+      -> (magnitude_var, Sgn.t) Signed_poly.t
+         * (magnitude_var, Sgn.t) Signed_poly.t
+      -> (var * var, _) Checked.t
   end
 
-  module Data_spec : sig
-    type ('r_var, 'r_value, 'k_var, 'k_value) t =
-      ('r_var, 'r_value, 'k_var, 'k_value, field) Snarky.Typ.Data_spec.t
-  end
+  [%%endif]
+end
 
-  module rec Field : sig
-    type t = field [@@deriving eq, compare, hash]
+[%%ifdef
+consensus_mechanism]
 
-    val sexp_of_t : t -> Sexp.t
+module type Checked_arithmetic_intf = sig
+  type t
 
-    val t_of_sexp : Sexp.t -> t
+  type var
 
-    val zero : t
+  type signed_var
 
-    val one : t
+  val if_ : Boolean.var -> then_:var -> else_:var -> (var, _) Checked.t
 
-    val negate : t -> t
+  val if_value : Boolean.var -> then_:t -> else_:t -> var
 
-    val add : t -> t -> t
+  val add : var -> var -> (var, _) Checked.t
 
-    val inv : t -> t
+  val sub : var -> var -> (var, _) Checked.t
 
-    val of_int : int -> t
+  val sub_flagged :
+    var -> var -> (var * [`Underflow of Boolean.var], _) Checked.t
 
-    val size_in_bits : int
+  val add_flagged :
+    var -> var -> (var * [`Overflow of Boolean.var], _) Checked.t
 
-    val gen_uniform : t Quickcheck.Generator.t
+  val ( + ) : var -> var -> (var, _) Checked.t
 
-    module Var : sig
-      type t = field Snarky.Cvar.t
+  val ( - ) : var -> var -> (var, _) Checked.t
 
-      val project : Boolean.var list -> t
+  val add_signed : var -> signed_var -> (var, _) Checked.t
 
-      val constant : field -> t
+  val scale : Field.Var.t -> var -> (var, _) Checked.t
+end
 
-      val add : t -> t -> t
+[%%endif]
 
-      val sub : t -> t -> t
+module type S = sig
+  include Basic
 
-      val scale : t -> field -> t
+  include Arithmetic_intf with type t := t
 
-      val pack : Boolean.var list -> t
-    end
+  [%%ifdef consensus_mechanism]
 
-    val typ : (Var.t, t) Typ.t
+  module Signed :
+    Signed_intf with type magnitude := t and type magnitude_var := var
 
-    module Checked : sig
-      type comparison_result
+  module Checked :
+    Checked_arithmetic_intf
+    with type var := var
+     and type signed_var := Signed.var
+     and type t := t
 
-      val ( + ) : Var.t -> Var.t -> Var.t
+  [%%else]
 
-      val ( - ) : Var.t -> Var.t -> Var.t
+  module Signed : Signed_intf with type magnitude := t
 
-      val ( * ) : Field.t -> Var.t -> Var.t
-
-      val compare :
-        bit_length:int -> Var.t -> Var.t -> (comparison_result, 'a) Checked.t
-
-      val equal : Var.t -> Var.t -> (Boolean.var, _) Checked.t
-
-      val if_ :
-        Boolean.var -> then_:Var.t -> else_:Var.t -> (Var.t, _) Checked.t
-
-      val unpack : Var.t -> length:int -> (Boolean.var list, _) Checked.t
-
-      val unpack_flagged :
-           Var.t
-        -> length:int
-        -> (Boolean.var list * [`Success of Boolean.var], _) Checked.t
-
-      val unpack_full :
-        Var.t -> (Boolean.var Bitstring_lib.Bitstring.Lsb_first.t, _) Checked.t
-
-      val mul : Var.t -> Var.t -> (Var.t, _) Checked.t
-
-      module Assert : sig
-        val equal : Var.t -> Var.t -> (unit, _) Checked.t
-      end
-    end
-  end
-
-  and Typ : sig
-    type ('var, 'value, 'field, 'checked) typ =
-          ('var, 'value, 'field, 'checked) Snarky.Types.Typ.typ =
-      { store: 'value -> ('var, 'field) Snarky.Typ_monads.Store.t
-      ; read: 'var -> ('value, 'field) Snarky.Typ_monads.Read.t
-      ; alloc: ('var, 'field) Snarky.Typ_monads.Alloc.t
-      ; check: 'var -> 'checked }
-
-    type ('var, 'value) t = ('var, 'value, Field.t, (unit, unit) Checked.t) typ
-
-    val field : (Field.Var.t, field) t
-
-    val ( * ) :
-         ('var1, 'value1) t
-      -> ('var2, 'value2) t
-      -> ('var1 * 'var2, 'value1 * 'value2) t
-
-    val of_hlistable :
-         (unit, unit, 'k_var, 'k_value) Data_spec.t
-      -> var_to_hlist:('var -> (unit, 'k_var) Snarky.H_list.t)
-      -> var_of_hlist:((unit, 'k_var) Snarky.H_list.t -> 'var)
-      -> value_to_hlist:('value -> (unit, 'k_value) Snarky.H_list.t)
-      -> value_of_hlist:((unit, 'k_value) Snarky.H_list.t -> 'value)
-      -> ('var, 'value) t
-
-    val transport :
-         ('var, 'value1) t
-      -> there:('value2 -> 'value1)
-      -> back:('value1 -> 'value2)
-      -> ('var, 'value2) t
-
-    val list : length:int -> ('var, 'value) t -> ('var list, 'value list) t
-
-    val tuple2 :
-         ('var1, 'value1) t
-      -> ('var2, 'value2) t
-      -> ('var1 * 'var2, 'value1 * 'value2) t
-
-    module Store : sig
-      type 'a t = ('a, Field.t) Snarky.Typ_monads.Store.t
-
-      val store : Field.t -> Field.Var.t t
-    end
-
-    module Alloc : sig
-      type 'a t = ('a, Field.t) Snarky.Typ_monads.Alloc.t
-
-      val alloc : Field.Var.t t
-    end
-
-    module Read : sig
-      type 'a t = ('a, Field.t) Snarky.Typ_monads.Read.t
-
-      val ( >>| ) : 'a t -> ('a -> 'b) -> 'b t
-
-      module Let_syntax : sig
-        val map : 'a t -> f:('a -> 'b) -> 'b t
-
-        module Let_syntax : sig
-          val return : 'a -> 'a t
-
-          val bind : 'a t -> f:('a -> 'b t) -> 'b t
-
-          val map : 'a t -> f:('a -> 'b) -> 'b t
-
-          val both : 'a t -> 'b t -> ('a * 'b) t
-        end
-      end
-
-      val read : Field.Var.t -> Field.t t
-    end
-  end
-
-  and Boolean : sig
-    type var = Field.Var.t Snarky.Boolean.t
-
-    type value = bool
-
-    val true_ : var
-
-    val false_ : var
-
-    val not : var -> var
-
-    val if_ : var -> then_:var -> else_:var -> (var, 'a) Checked.t
-
-    val var_of_value : value -> var
-
-    val typ : (var, value) Typ.t
-
-    val equal : var -> var -> (var, 'a) Checked.t
-
-    val ( && ) : var -> var -> (var, 'a) Checked.t
-
-    module Unsafe : sig
-      val of_cvar : Field.Var.t -> var
-    end
-
-    module Assert : sig
-      val ( = ) : var -> var -> (unit, _) Checked.t
-    end
-  end
-
-  module Number : sig
-    type t
-
-    val of_bits : Boolean.var list -> t
-  end
-
-  module Bigint : sig
-    type t
-
-    val of_field : field -> t
-
-    val test_bit : t -> int -> bool
-  end
-
-  module Inner_curve : sig
-    type t
-
-    module Affine : sig
-      type t = field * field
-    end
-
-    val find_y : field -> field option
-
-    val of_affine : Affine.t -> t
-
-    val to_affine_exn : t -> Affine.t
-
-    val to_affine : t -> Affine.t option
-
-    module Checked : sig
-      type t = Field.Var.t * Field.Var.t
-
-      module Assert : sig
-        val on_curve : t -> (unit, _) Checked.t
-      end
-    end
-  end
-
-  module Let_syntax : sig
-    val ( >>= ) :
-      ('a, 'e) Checked.t -> ('a -> ('b, 'e) Checked.t) -> ('b, 'e) Checked.t
-
-    val ( >>| ) : ('a, 'e) Checked.t -> ('a -> 'b) -> ('b, 'e) Checked.t
-
-    val return : 'a -> ('a, 'e) Checked.t
-
-    val bind :
-      ('a, 'e) Checked.t -> f:('a -> ('b, 'e) Checked.t) -> ('b, 'e) Checked.t
-
-    val map : ('a, 'e) Checked.t -> f:('a -> 'b) -> ('b, 'e) Checked.t
-
-    val both :
-      ('a, 'e) Checked.t -> ('b, 'e) Checked.t -> ('a * 'b, 'e) Checked.t
-  end
-
-  module As_prover : sig
-    type ('value, 's) t
-
-    val read : ('var, 'value) Typ.t -> 'var -> ('value, 'prover_state) t
-
-    val map : ('a, 'e) t -> f:('a -> 'b) -> ('b, 'e) t
-
-    module Let_syntax : sig
-      val ( >>= ) : ('a, 'e) t -> ('a -> ('b, 'e) t) -> ('b, 'e) t
-
-      val ( >>| ) : ('a, 'e) t -> ('a -> 'b) -> ('b, 'e) t
-
-      val return : 'a -> ('a, 'e) t
-
-      val bind : ('a, 'e) t -> f:('a -> ('b, 'e) t) -> ('b, 'e) t
-
-      val map : ('a, 'e) t -> f:('a -> 'b) -> ('b, 'e) t
-
-      val both : ('a, 'e) t -> ('b, 'e) t -> ('a * 'b, 'e) t
-    end
-  end
-
-  val assert_r1cs :
-       ?label:string
-    -> Field.Var.t
-    -> Field.Var.t
-    -> Field.Var.t
-    -> (unit, 'a) Checked.t
-
-  val exists :
-       ?request:('value Snarky.Request.t, 's) As_prover.t
-    -> ?compute:('value, 's) As_prover.t
-    -> ('var, 'value) Typ.t
-    -> ('var, 's) Checked.t
-
-  val check : ('a, 's) Checked.t -> 's -> unit Or_error.t
+  [%%endif]
 end

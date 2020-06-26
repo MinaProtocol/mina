@@ -1,7 +1,6 @@
 open Core
 open Async
 open Coda_base
-open Signature_lib
 
 let name = "coda-receipt-chain-test"
 
@@ -13,24 +12,32 @@ let restart_node worker ~config ~logger =
   Coda_process.spawn_exn config
 
 let main () =
-  let open Keypair in
+  let precomputed_values =
+    (* TODO: Load for this specific test. *)
+    Lazy.force Precomputed_values.compiled
+  in
+  let consensus_constants = precomputed_values.consensus_constants in
   let logger = Logger.create () in
-  let largest_account_keypair =
-    Test_genesis_ledger.largest_account_keypair_exn ()
+  let sender_sk, largest_account =
+    Test_genesis_ledger.largest_account_exn ()
   in
-  let another_account_keypair =
-    Test_genesis_ledger.find_new_account_record_exn
-      [largest_account_keypair.public_key]
-    |> Test_genesis_ledger.keypair_of_account_record_exn
+  let receiver_pk =
+    Test_genesis_ledger.find_new_account_record_exn_
+      [Account.public_key largest_account]
+    |> Test_genesis_ledger.pk_of_account_record
   in
-  let proposal_interval = Consensus.Constants.block_window_duration_ms in
+  let block_production_interval =
+    consensus_constants.block_window_duration_ms |> Block_time.Span.to_ms
+    |> Int64.to_int_exn
+  in
   let acceptable_delay =
     Time.Span.of_ms
-      (proposal_interval * Consensus.Constants.delta |> Float.of_int)
+      ( block_production_interval
+        * Unsigned.UInt32.to_int consensus_constants.delta
+      |> Float.of_int )
   in
   let n = 2 in
-  let receiver_pk = Public_key.compress another_account_keypair.public_key in
-  let sender_sk = largest_account_keypair.private_key in
+  let sender_sk = Option.value_exn sender_sk in
   let send_amount = Currency.Amount.of_int 10 in
   let fee = User_command.minimum_fee in
   let%bind program_dir = Unix.getcwd () in
@@ -38,10 +45,10 @@ let main () =
     Cli_lib.Arg_type.Work_selection_method.Sequence
   in
   Parallel.init_master () ;
-  let configs =
-    Coda_processes.local_configs n ~program_dir ~proposal_interval
-      ~acceptable_delay ~snark_worker_public_keys:None
-      ~proposers:(Fn.const None) ~work_selection_method
+  let%bind configs =
+    Coda_processes.local_configs n ~program_dir ~block_production_interval
+      ~acceptable_delay ~chain_id:name ~snark_worker_public_keys:None
+      ~block_production_keys:(Fn.const None) ~work_selection_method
       ~trace_dir:(Unix.getenv "CODA_TRACING")
       ~max_concurrent_connections:None
   in
@@ -52,7 +59,7 @@ let main () =
     Coda_process.send_user_command_exn worker sender_sk receiver_pk send_amount
       fee User_command_memo.dummy
   in
-  let receipt_chain_hash = Or_error.ok_exn receipt_chain_hash in
+  let _user_cmd, receipt_chain_hash = Or_error.ok_exn receipt_chain_hash in
   let%bind restarted_worker = restart_node ~config worker ~logger in
   let%bind (initial_receipt, _) : Receipt.Chain_hash.t * User_command.t list =
     Coda_process.prove_receipt_exn restarted_worker receipt_chain_hash

@@ -1,12 +1,29 @@
+[%%import "/src/config.mlh"]
+
+[%%ifdef consensus_mechanism]
+
 open Snark_params
 open Tick
+
+[%%else]
+
+open Snark_params_nonconsensus
+module Random_oracle = Random_oracle_nonconsensus.Random_oracle
+
+[%%endif]
+
 open Random_oracle
 
 val signature : Field.t State.t
 
-val merkle_tree : Field.t State.t array
+(** [merkle_tree depth] gives the hash prefix for the given node depth.
 
-val coinbase_merkle_tree : Field.t State.t array
+    This function performs caching: all prefixes up to the given depth will be
+    computed, and subsequent calls will retrieve them with negligible cost.
+*)
+val merkle_tree : int -> Field.t State.t
+
+val coinbase_merkle_tree : int -> Field.t State.t
 
 val vrf_message : Field.t State.t
 

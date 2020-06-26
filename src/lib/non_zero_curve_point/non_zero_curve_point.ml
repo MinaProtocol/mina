@@ -2,13 +2,29 @@
 "/src/config.mlh"]
 
 open Core_kernel
-open Module_version
-module T = Functor.Make (Snark_params.Tick)
 
-(* the Make functor does not supply any bin_prot functions, so 
-   we define them here. The base58 and yojson definitions 
-   depend on those functions, so they're also in this file
- *)
+[%%ifdef
+consensus_mechanism]
+
+open Snark_params.Tick
+
+let parity y = Bigint.(test_bit (of_field y) 0)
+
+[%%else]
+
+open Snark_params_nonconsensus
+
+let parity y = Field.parity y
+
+module Random_oracle = Random_oracle_nonconsensus.Random_oracle
+
+[%%endif]
+
+let gen_uncompressed =
+  Quickcheck.Generator.filter_map Field.gen_uniform ~f:(fun x ->
+      let open Option.Let_syntax in
+      let%map y = Inner_curve.find_y x in
+      (x, y) )
 
 module Compressed = struct
   open Compressed_poly
@@ -18,7 +34,7 @@ module Compressed = struct
     [%%versioned_asserted
     module Stable = struct
       module V1 = struct
-        type t = (Snark_params.Tick.Field.t, bool) Poly.Stable.V1.t
+        type t = (Field.t, bool) Poly.Stable.V1.t
 
         let to_latest = Fn.id
 
@@ -34,17 +50,16 @@ module Compressed = struct
     end]
   end
 
-  let compress (x, y) = {Poly.x; is_odd= T.parity y}
+  let compress (x, y) = {Poly.x; is_odd= parity y}
 
   [%%versioned_asserted
   module Stable = struct
     module V1 = struct
-      type t = (Snark_params.Tick.Field.t, bool) Poly.Stable.V1.t
-      [@@deriving eq, compare, hash]
+      type t = (Field.t, bool) Poly.Stable.V1.t [@@deriving eq, compare, hash]
 
       (* dummy type for inserting constraint
          adding constraint to t produces "unused rec" error
-       *)
+      *)
       type unused = unit constraint t = Arg.Stable.V1.t
 
       let to_latest = Fn.id
@@ -59,11 +74,15 @@ module Compressed = struct
 
       let gen =
         let open Quickcheck.Generator.Let_syntax in
-        let%map uncompressed = T.gen_uncompressed in
+        let%map uncompressed = gen_uncompressed in
         compress uncompressed
     end
 
     module Tests = struct
+      (* these tests check not only whether the serialization of the version-asserted type has changed,
+         but also whether the serializations for the consensus and nonconsensus code are identical
+       *)
+
       [%%if
       curve_size = 298]
 
@@ -72,10 +91,10 @@ module Compressed = struct
           Quickcheck.random_value
             ~seed:(`Deterministic "nonzero_curve_point_compressed-seed") V1.gen
         in
-        let known_good_hash =
-          "\xC3\x5E\x26\x42\xA5\x04\x4A\x9D\x00\x17\xD8\x3E\xED\x84\x08\xDB\xD1\xA0\xCE\x13\x13\x10\x28\x80\x74\xD4\xF1\x25\x6C\x87\x44\x04"
-        in
-        Serialization.check_serialization (module V1) point known_good_hash
+        let known_good_digest = "437f5bc6710b6a8fda8f9e8cf697fc2c" in
+        Ppx_version.Serialization.check_serialization
+          (module V1)
+          point known_good_digest
 
       [%%elif
       curve_size = 753]
@@ -85,10 +104,10 @@ module Compressed = struct
           Quickcheck.random_value
             ~seed:(`Deterministic "nonzero_curve_point_compressed-seed") V1.gen
         in
-        let known_good_hash =
-          "\x4C\x68\x08\xF4\xC0\xB7\xF1\x41\xFE\xDF\x43\x55\xDA\xB6\x13\xD4\x69\x46\x04\x51\x58\xF7\x92\x51\x02\x5B\x2B\x20\x3F\x6F\x2C\x11"
-        in
-        Serialization.check_serialization (module V1) point known_good_hash
+        let known_good_digest = "067f8be67e5cc31f5c5ac4be91d5f6db" in
+        Ppx_version.Serialization.check_serialization
+          (module V1)
+          point known_good_digest
 
       [%%else]
 
@@ -100,7 +119,6 @@ module Compressed = struct
   end]
 
   module Poly = Poly
-  include T.Compressed
   include Comparable.Make_binable (Stable.Latest)
   include Hashable.Make_binable (Stable.Latest)
   include Stable.Latest.Base58
@@ -109,16 +127,81 @@ module Compressed = struct
 
   [%%define_locally
   Stable.Latest.(sexp_of_t, t_of_sexp, gen)]
+
+  let compress (x, y) = {Poly.x; is_odd= parity y}
+
+  (* sexp operations written manually, don't derive them *)
+  type t = (Field.t, bool) Poly.t [@@deriving eq, compare, hash]
+
+  let empty = Poly.{x= Field.zero; is_odd= false}
+
+  let to_input {Poly.x; is_odd} =
+    {Random_oracle.Input.field_elements= [|x|]; bitstrings= [|[is_odd]|]}
+
+  [%%ifdef
+  consensus_mechanism]
+
+  (* snarky-dependent *)
+
+  type var = (Field.Var.t, Boolean.var) Poly.t
+
+  let to_hlist Poly.Stable.Latest.{x; is_odd} = Snarky.H_list.[x; is_odd]
+
+  let of_hlist : (unit, 'a -> 'b -> unit) Snarky.H_list.t -> ('a, 'b) Poly.t =
+    Snarky.H_list.(fun [x; is_odd] -> {x; is_odd})
+
+  let typ : (var, t) Typ.t =
+    Typ.of_hlistable [Field.typ; Boolean.typ] ~var_to_hlist:to_hlist
+      ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+
+  let var_of_t ({x; is_odd} : t) : var =
+    {x= Field.Var.constant x; is_odd= Boolean.var_of_value is_odd}
+
+  let assert_equal (t1 : var) (t2 : var) =
+    let%map () = Field.Checked.Assert.equal t1.x t2.x
+    and () = Boolean.Assert.(t1.is_odd = t2.is_odd) in
+    ()
+
+  module Checked = struct
+    let equal t1 t2 =
+      let%bind x_eq = Field.Checked.equal t1.Poly.x t2.Poly.x in
+      let%bind odd_eq = Boolean.equal t1.is_odd t2.is_odd in
+      Boolean.(x_eq && odd_eq)
+
+    let to_input = to_input
+
+    let if_ cond ~then_:t1 ~else_:t2 =
+      let%map x = Field.Checked.if_ cond ~then_:t1.Poly.x ~else_:t2.Poly.x
+      and is_odd = Boolean.if_ cond ~then_:t1.is_odd ~else_:t2.is_odd in
+      Poly.{x; is_odd}
+
+    module Assert = struct
+      let equal t1 t2 =
+        let%map () = Field.Checked.Assert.equal t1.Poly.x t2.Poly.x
+        and () = Boolean.Assert.(t1.is_odd = t2.is_odd) in
+        ()
+    end
+  end
+
+  (* end snarky-dependent *)
+  [%%endif]
 end
 
 module Uncompressed = struct
-  include T.Uncompressed
+  let decompress ({x; is_odd} : Compressed.t) =
+    Option.map (Inner_curve.find_y x) ~f:(fun y ->
+        let y_parity = parity y in
+        let y = if Bool.(is_odd = y_parity) then y else Field.negate y in
+        (x, y) )
 
-  [%%versioned_asserted
+  let decompress_exn t = Option.value_exn (decompress t)
+
+  let compress = Compressed.compress
+
+  [%%versioned_binable
   module Stable = struct
     module V1 = struct
-      type t = Snark_params.Tick.Field.t * Snark_params.Tick.Field.t
-      [@@deriving eq, compare, hash]
+      type t = Field.t * Field.t [@@deriving eq, compare, hash]
 
       let to_latest = Fn.id
 
@@ -132,7 +215,7 @@ module Uncompressed = struct
                   let to_binable = compress
                 end)
 
-      let gen : t Quickcheck.Generator.t = T.gen_uncompressed
+      let gen : t Quickcheck.Generator.t = gen_uncompressed
 
       let of_bigstring bs =
         let open Or_error.Let_syntax in
@@ -164,41 +247,12 @@ module Uncompressed = struct
       let t_of_sexp sexp =
         Option.value_exn (decompress @@ Compressed.t_of_sexp sexp)
     end
-
-    module Tests = struct
-      [%%if
-      curve_size = 298]
-
-      let%test "nonzero_curve_point v1" =
-        let point =
-          Quickcheck.random_value
-            ~seed:(`Deterministic "nonzero_curve_point-seed") V1.gen
-        in
-        let known_good_hash =
-          "\x9F\x36\xA5\x8E\xF2\x0F\x58\xFA\x79\xA4\x47\x18\x79\x43\xE0\x38\xC2\x6B\x6B\x7E\xD3\xF5\xE2\x45\x4E\x20\x19\x64\x62\xCF\x63\x75"
-        in
-        Serialization.check_serialization (module V1) point known_good_hash
-
-      [%%elif
-      curve_size = 753]
-
-      let%test "nonzero_curve_point v1" =
-        let point =
-          Quickcheck.random_value
-            ~seed:(`Deterministic "nonzero_curve_point-seed") V1.gen
-        in
-        let known_good_hash =
-          "\xE2\x8A\xF9\x55\x41\x07\x54\x1F\xF4\x90\x09\x94\xE8\xA5\x7C\x0E\xD3\xED\x8C\xC1\xC9\x1F\x05\x3E\x2C\x39\x28\x9F\x9C\xF1\x10\xCC"
-        in
-        Serialization.check_serialization (module V1) point known_good_hash
-
-      [%%else]
-
-      let%test "nonzero_curve_point_v1" = failwith "Unknown curve size"
-
-      [%%endif]
-    end
   end]
+
+  type t =
+    Field.t * Field.t
+    (* sexp operations written manually, don't derive them *)
+  [@@deriving compare, hash]
 
   (* so we can make sets of public keys *)
   include Comparable.Make_binable (Stable.Latest)
@@ -207,9 +261,60 @@ module Uncompressed = struct
   Stable.Latest.
     (of_bigstring, to_bigstring, sexp_of_t, t_of_sexp, to_yojson, of_yojson)]
 
+  let gen : t Quickcheck.Generator.t = gen_uncompressed
+
+  let ( = ) = equal
+
+  let of_inner_curve_exn = Inner_curve.to_affine_exn
+
+  let to_inner_curve = Inner_curve.of_affine
+
   let%test_unit "point-compression: decompress . compress = id" =
     Quickcheck.test gen ~f:(fun pk ->
         assert (equal (decompress_exn (compress pk)) pk) )
+
+  [%%ifdef
+  consensus_mechanism]
+
+  (* snarky-dependent *)
+
+  type var = Field.Var.t * Field.Var.t
+
+  let assert_equal var1 var2 =
+    let open Field.Checked.Assert in
+    let v1_f1, v1_f2 = var1 in
+    let v2_f1, v2_f2 = var2 in
+    let%bind () = equal v1_f1 v2_f1 in
+    let%map () = equal v1_f2 v2_f2 in
+    ()
+
+  let var_of_t (x, y) = (Field.Var.constant x, Field.Var.constant y)
+
+  let typ : (var, t) Typ.t = Typ.(field * field)
+
+  let parity_var y =
+    let%map bs = Field.Checked.unpack_full y in
+    List.hd_exn (Bitstring_lib.Bitstring.Lsb_first.to_list bs)
+
+  let decompress_var ({x; is_odd} as c : Compressed.var) =
+    let open Let_syntax in
+    let%bind y =
+      exists Typ.field
+        ~compute:
+          As_prover.(
+            map (read Compressed.typ c) ~f:(fun c -> snd (decompress_exn c)))
+    in
+    let%map () = Inner_curve.Checked.Assert.on_curve (x, y)
+    and () = parity_var y >>= Boolean.Assert.(( = ) is_odd) in
+    (x, y)
+
+  let%snarkydef compress_var ((x, y) : var) : (Compressed.var, _) Checked.t =
+    let open Compressed_poly in
+    let%map is_odd = parity_var y in
+    {Poly.x; is_odd}
+
+  (* end snarky-dependent *)
+  [%%endif]
 end
 
 include Uncompressed

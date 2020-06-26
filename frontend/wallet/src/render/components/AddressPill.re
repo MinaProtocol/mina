@@ -74,20 +74,26 @@ let make = (~pubkey) => {
   let isActive = activeAccount === Some(pubkey);
 
   let (hovered, setHovered) = React.useState(() => false);
-  let (editing, setEditing) = React.useState(() => false);
+  let (editing, setEditing) = React.useState(() => None);
 
   let pillMode =
     switch (hovered, editing, isActive) {
-    | (false, false, true) => Pill.Blue
-    | (false, false, false) => Pill.Grey
+    | (false, None, true) => Pill.Blue
+    | (false, None, false) => Pill.Grey
     | (true, _, _)
-    | (_, true, _) => Pill.DarkBlue
+    | (_, Some(_), _) => Pill.DarkBlue
     };
 
   let handleEnter = e => {
     switch (ReactEvent.Keyboard.which(e)) {
     | 13 =>
-      setEditing(_ => false);
+      updateAddressBook(
+        AddressBook.set(
+          ~key=pubkey,
+          ~name=ReactEvent.Keyboard.target(e)##value,
+        ),
+      );
+      setEditing(_ => None);
       setHovered(_ => false);
     | _ => ()
     };
@@ -95,7 +101,7 @@ let make = (~pubkey) => {
 
   let handleNameChange = e =>
     updateAddressBook(
-      AddressBook.set(~key=pubkey, ~name=ReactEvent.Form.target(e)##value),
+      AddressBook.set(~key=pubkey, ~name=ReactEvent.Focus.target(e)##value),
     );
 
   let handleClipboard = _ =>
@@ -113,31 +119,39 @@ let make = (~pubkey) => {
       </span>
     </Pill>
     {switch (hovered, editing) {
-     | (true, false) =>
+     | (true, None) =>
        <div className=Styles.hoverContainer>
          <span className=Styles.copyButton onClick=handleClipboard>
            {React.string("Copy")}
          </span>
          <span
-           onClick={_ => setEditing(_ => true)} className=Styles.editButton>
+           onClick={_ =>
+             setEditing(_ =>
+               Some(
+                 AddressBook.lookup(addressBook, pubkey)
+                 |> Option.withDefault(~default=""),
+               )
+             )
+           }
+           className=Styles.editButton>
            {React.string("Edit")}
          </span>
        </div>
-     | (_, true) =>
-       <div className=Styles.editing>
+     | (_, Some(tmpValue)) =>
+       <form className=Styles.editing>
          <input
            className=Styles.nameInput
            autoFocus=true
            onKeyPress=handleEnter
-           onBlur={_ => setEditing(_ => false)}
-           onChange=handleNameChange
-           value={
-             AddressBook.lookup(addressBook, pubkey)
-             |> Option.withDefault(~default="")
-           }
+           onBlur=handleNameChange
+           onChange={e => {
+             let value = ReactEvent.Form.target(e)##value;
+             setEditing(_ => Some(value));
+           }}
+           value=tmpValue
          />
-       </div>
-     | (false, false) => React.string("")
+       </form>
+     | (false, None) => React.string("")
      }}
   </div>;
 };

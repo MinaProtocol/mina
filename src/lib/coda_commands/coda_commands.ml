@@ -60,33 +60,11 @@ let is_valid_user_command _t (txn : User_command.t) account_opt =
   in
   Option.is_some remainder
 
-let schedule_user_command t (txn : User_command.t) account_opt :
-    unit Or_error.t Deferred.t =
-  (* FIXME #3457: return a status from Transaction_pool.add and use it instead
-     of is_valid_user_command
-  *)
-  if not (is_valid_user_command t txn account_opt) then
-    Deferred.return
-    @@ Or_error.error_string "Invalid user command: account balance is too low"
-  else
-    let txn_pool = Coda_lib.transaction_pool t in
-    let%map () = Network_pool.Transaction_pool.add txn_pool [txn] in
-    let logger =
-      Logger.extend
-        (Coda_lib.top_level_logger t)
-        [("coda_command", `String "scheduling a user command")]
-    in
-    Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-      ~metadata:[("user_command", User_command.to_yojson txn)]
-      "Added transaction $user_command to transaction pool successfully" ;
-    txn_count := !txn_count + 1 ;
-    Or_error.return ()
-
-let get_account t (addr : Public_key.Compressed.t) =
+let get_account t (addr : Account_id.t) =
   let open Participating_state.Let_syntax in
   let%map ledger = Coda_lib.best_ledger t in
   let open Option.Let_syntax in
-  let%bind loc = Ledger.location_of_key ledger addr in
+  let%bind loc = Ledger.location_of_account ledger addr in
   Ledger.get ledger loc
 
 let get_accounts t =
@@ -110,46 +88,12 @@ let get_keys_with_details t =
       , account.Account.Poly.balance |> Currency.Balance.to_int
       , account.Account.Poly.nonce |> Account.Nonce.to_int ) )
 
-let get_inferred_nonce_from_transaction_pool_and_ledger t
-    (addr : Public_key.Compressed.t) =
-  let transaction_pool = Coda_lib.transaction_pool t in
-  let resource_pool =
-    Network_pool.Transaction_pool.resource_pool transaction_pool
-  in
-  let pooled_transactions =
-    Network_pool.Transaction_pool.Resource_pool.all_from_user resource_pool
-      addr
-  in
-  let txn_pool_nonce =
-    let nonces =
-      List.map pooled_transactions
-        ~f:(Fn.compose User_command.nonce User_command.forget_check)
-    in
-    (* The last nonce gives us the maximum nonce in the transaction pool *)
-    List.last nonces
-  in
-  match txn_pool_nonce with
-  | Some nonce ->
-      Participating_state.Option.return (Account.Nonce.succ nonce)
-  | None ->
-      let open Participating_state.Option.Let_syntax in
-      let%map account = get_account t addr in
-      account.Account.Poly.nonce
-
-let get_nonce t (addr : Public_key.Compressed.t) =
+let get_nonce t (addr : Account_id.t) =
   let open Participating_state.Option.Let_syntax in
   let%map account = get_account t addr in
   account.Account.Poly.nonce
 
-let send_user_command t (txn : User_command.t) =
-  let public_key = Public_key.compress txn.sender in
-  let open Participating_state.Let_syntax in
-  let%map account_opt = get_account t public_key in
-  let open Deferred.Or_error.Let_syntax in
-  let%map () = schedule_user_command t txn account_opt in
-  record_payment t txn (Option.value_exn account_opt)
-
-let get_balance t (addr : Public_key.Compressed.t) =
+let get_balance t (addr : Account_id.t) =
   let open Participating_state.Option.Let_syntax in
   let%map account = get_account t addr in
   account.Account.Poly.balance
@@ -169,7 +113,7 @@ let reset_trust_status t (ip_address : Unix.Inet_addr.Blocking_sexp.t) =
   let trust_system = config.trust_system in
   Trust_system.reset trust_system ip_address
 
-let replace_proposers keys pks =
+let replace_block_production_keys keys pks =
   let kps =
     List.filter_map pks ~f:(fun pk ->
         let open Option.Let_syntax in
@@ -178,18 +122,48 @@ let replace_proposers keys pks =
         in
         (kps, pk) )
   in
-  Coda_lib.replace_propose_keypairs keys
+  Coda_lib.replace_block_production_keypairs keys
     (Keypair.And_compressed_pk.Set.of_list kps) ;
   kps |> List.map ~f:snd
 
-let setup_user_command ~fee ~nonce ~valid_until ~memo ~sender_kp
-    user_command_body =
-  let payload =
-    User_command.Payload.create ~fee ~nonce ~valid_until ~memo
-      ~body:user_command_body
-  in
-  let signed_user_command = User_command.sign sender_kp payload in
-  User_command.forget_check signed_user_command
+let setup_and_submit_user_command t (user_command_input : User_command_input.t)
+    =
+  let open Participating_state.Let_syntax in
+  let fee_payer = User_command_input.fee_payer user_command_input in
+  let%map account_opt = get_account t fee_payer in
+  let open Deferred.Let_syntax in
+  let%map result = Coda_lib.add_transactions t [user_command_input] in
+  txn_count := !txn_count + 1 ;
+  match result with
+  | Ok ([], [failed_txn]) ->
+      Error
+        (Error.of_string
+           (sprintf !"%s"
+              ( Network_pool.Transaction_pool.Resource_pool.Diff.Diff_error
+                .to_yojson (snd failed_txn)
+              |> Yojson.Safe.to_string )))
+  | Ok ([txn], []) ->
+      Logger.info
+        (Coda_lib.top_level_logger t)
+        ~module_:__MODULE__ ~location:__LOC__
+        ~metadata:[("user_command", User_command.to_yojson txn)]
+        "Scheduled payment $user_command" ;
+      Ok (txn, record_payment t txn (Option.value_exn account_opt))
+  | Ok _ ->
+      Error (Error.of_string "Invalid result from scheduling a payment")
+  | Error e ->
+      Error e
+
+let setup_and_submit_user_commands t user_command_list =
+  let open Participating_state.Let_syntax in
+  let%map _is_active = Coda_lib.active_or_bootstrapping t in
+  Logger.warn
+    (Coda_lib.top_level_logger t)
+    ~module_:__MODULE__ ~location:__LOC__
+    "batch-send-payments does not yet report errors"
+    ~metadata:
+      [("coda_command", `String "scheduling a batch of user transactions")] ;
+  Coda_lib.add_transactions t user_command_list
 
 module Receipt_chain_hash = struct
   (* Receipt.Chain_hash does not have bin_io *)
@@ -199,8 +173,8 @@ module Receipt_chain_hash = struct
   Receipt.Chain_hash.(cons, empty)]
 end
 
-let verify_payment t (addr : Public_key.Compressed.Stable.Latest.t)
-    (verifying_txn : User_command.t) (init_receipt, proof) =
+let verify_payment t (addr : Account_id.t) (verifying_txn : User_command.t)
+    (init_receipt, proof) =
   let open Participating_state.Let_syntax in
   let%map account = get_account t addr in
   let account = Option.value_exn account in
@@ -217,21 +191,6 @@ let verify_payment t (addr : Public_key.Compressed.Stable.Latest.t)
     Or_error.errorf
       !"Merkle list proof does not contain payment %{sexp:User_command.t}"
       verifying_txn
-
-(* TODO: Properly record receipt_chain_hash for multiple transactions. See #1143 *)
-let schedule_user_commands t (txns : User_command.t list) :
-    unit Deferred.t Participating_state.t =
-  Participating_state.return
-  @@
-  let txn_pool = Coda_lib.transaction_pool t in
-  let logger =
-    Logger.extend
-      (Coda_lib.top_level_logger t)
-      [("coda_command", `String "scheduling a batch of user transactions")]
-  in
-  Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
-    "batch-send-payments does not yet report errors" ;
-  Network_pool.Transaction_pool.add txn_pool txns
 
 let prove_receipt t ~proving_receipt ~resulting_receipt =
   let receipt_chain_database = Coda_lib.receipt_chain_database t in
@@ -254,14 +213,20 @@ type active_state_fields =
 
 let get_status ~flag t =
   let open Coda_lib.Config in
+  let config = Coda_lib.config t in
+  let precomputed_values = config.precomputed_values in
+  let protocol_constants = precomputed_values.genesis_constants.protocol in
+  let constraint_constants = precomputed_values.constraint_constants in
+  let consensus_constants = precomputed_values.consensus_constants in
   let uptime_secs =
     Time_ns.diff (Time_ns.now ()) start_time
     |> Time_ns.Span.to_sec |> Int.of_float
   in
   let commit_id = Coda_version.commit_id in
-  let conf_dir = (Coda_lib.config t).conf_dir in
+  let conf_dir = config.conf_dir in
+  let%map peers = Coda_lib.peers t in
   let peers =
-    List.map (Coda_lib.peers t) ~f:(fun peer ->
+    List.map peers ~f:(fun peer ->
         Network_peer.Peer.to_discovery_host_and_port peer
         |> Host_and_port.to_string )
   in
@@ -272,13 +237,16 @@ let get_status ~flag t =
       ~f:Public_key.Compressed.to_base58_check
   in
   let snark_work_fee = Currency.Fee.to_int @@ Coda_lib.snark_work_fee t in
-  let propose_pubkeys = Coda_lib.propose_public_keys t in
+  let block_production_keys = Coda_lib.block_production_pubkeys t in
   let consensus_mechanism = Consensus.name in
-  let time_controller = (Coda_lib.config t).time_controller in
+  let time_controller = config.time_controller in
   let consensus_time_now =
-    Consensus.Data.Consensus_time.of_time_exn @@ Block_time.now time_controller
+    Consensus.Data.Consensus_time.of_time_exn ~constants:consensus_constants
+      (Block_time.now time_controller)
   in
-  let consensus_configuration = Consensus.Configuration.t in
+  let consensus_configuration =
+    Consensus.Configuration.t ~constraint_constants ~protocol_constants
+  in
   let r = Perf_histograms.report in
   let histograms =
     match flag with
@@ -381,25 +349,18 @@ let get_status ~flag t =
           ; state_hash= None
           ; consensus_time_best_tip= None } )
   in
-  let next_proposal =
+  let next_block_production =
     let open Block_time in
-    Option.map (Coda_lib.next_proposal t) ~f:(function
-      | `Propose_now _ ->
-          `Propose_now
-      | `Propose (time, _, _) ->
-          `Propose (time |> Span.of_ms |> of_span_since_epoch)
+    Option.map (Coda_lib.next_producer_timing t) ~f:(function
+      | `Produce_now _ ->
+          `Produce_now
+      | `Produce (time, _, _) ->
+          `Produce (time |> Span.of_ms |> of_span_since_epoch)
       | `Check_again time ->
           `Check_again (time |> Span.of_ms |> of_span_since_epoch) )
   in
-  let libp2p_peer_id =
-    Option.value ~default:"<not connected to libp2p>"
-      Option.(
-        Coda_lib.net t |> Coda_networking.net2 >>= Coda_net2.me
-        >>| Coda_net2.Keypair.to_peerid >>| Coda_net2.PeerID.to_string)
-  in
   let addrs_and_ports =
-    Kademlia.Node_addrs_and_ports.to_display
-      (Coda_lib.config t).gossip_net_params.addrs_and_ports
+    Node_addrs_and_ports.to_display config.gossip_net_params.addrs_and_ports
   in
   { Daemon_rpcs.Types.Status.num_accounts
   ; sync_status
@@ -415,15 +376,14 @@ let get_status ~flag t =
   ; user_commands_sent
   ; snark_worker
   ; snark_work_fee
-  ; propose_pubkeys=
-      Public_key.Compressed.Set.to_list propose_pubkeys
+  ; block_production_keys=
+      Public_key.Compressed.Set.to_list block_production_keys
       |> List.map ~f:Public_key.Compressed.to_base58_check
   ; histograms
-  ; next_proposal
+  ; next_block_production
   ; consensus_time_now
   ; consensus_mechanism
   ; consensus_configuration
-  ; libp2p_peer_id
   ; addrs_and_ports }
 
 let clear_hist_status ~flag t = Perf_histograms.wipe () ; get_status ~flag t
@@ -440,6 +400,7 @@ end
 
 module For_tests = struct
   let get_all_user_commands coda public_key =
+    let account_id = Account_id.create public_key Token_id.default in
     let external_transition_database =
       Coda_lib.external_transition_database coda
     in
@@ -450,7 +411,7 @@ module For_tests = struct
              Auxiliary_database.Filtered_external_transition.user_commands
              With_hash.data)
       @@ Auxiliary_database.External_transition_database.get_all_values
-           external_transition_database (Some public_key)
+           external_transition_database (Some account_id)
     in
     let participants_user_commands =
       User_command.filter_by_participant user_commands public_key

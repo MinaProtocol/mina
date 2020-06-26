@@ -1,8 +1,0 @@
-(executable
-  (name gen_values)
-  (libraries async core snark_params
-             ppxlib ppx_util)
-  (preprocess
-    (pps ppx_jane ppxlib.metaquot))
-  (flags -w -40 -g)
-  (modes native))

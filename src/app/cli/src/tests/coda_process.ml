@@ -18,15 +18,36 @@ let spawn_exn (config : Coda_worker.Input.t) =
   File_system.dup_stderr process ;
   return (conn, process, config)
 
-let local_config ?proposal_interval:_ ~peers ~addrs_and_ports ~acceptable_delay
-    ~program_dir ~proposer ~snark_worker_key ~work_selection_method ~offset
-    ~trace_dir ~max_concurrent_connections ~is_archive_rocksdb () =
+let local_config ?block_production_interval:_ ~is_seed ~peers ~addrs_and_ports
+    ~chain_id ~libp2p_keypair
+    ~net_configs:(addrs_and_ports_list, all_peers_list) ~acceptable_delay
+    ~program_dir ~block_production_key ~snark_worker_key ~work_selection_method
+    ~offset ~trace_dir ~max_concurrent_connections ~is_archive_rocksdb
+    ~archive_process_location () =
   let conf_dir =
-    Filename.temp_dir_name
-    ^/ String.init 16 ~f:(fun _ -> (Int.to_string (Random.int 10)).[0])
+    match Sys.getenv "CODA_INTEGRATION_TEST_DIR" with
+    | Some dir ->
+        dir
+        ^/ Network_peer.Peer.Id.to_string
+             (Coda_net2.Keypair.to_peer_id libp2p_keypair)
+    | None ->
+        Filename.temp_dir_name
+        ^/ String.init 16 ~f:(fun _ -> (Int.to_string (Random.int 10)).[0])
   in
+  if Core.Sys.file_exists conf_dir <> `No then
+    failwithf
+      "cannot configure coda process because directory already exists: %s"
+      conf_dir () ;
   let config =
     { Coda_worker.Input.addrs_and_ports
+    ; libp2p_keypair
+    ; net_configs=
+        ( List.map
+            ~f:(fun (na, kp) -> (Node_addrs_and_ports.to_display na, kp))
+            addrs_and_ports_list
+        , List.map
+            ~f:(List.map ~f:Node_addrs_and_ports.to_display)
+            all_peers_list )
     ; env=
         ( "CODA_TIME_OFFSET"
         , Time.Span.to_int63_seconds_round_down_exn offset
@@ -39,15 +60,18 @@ let local_config ?proposal_interval:_ ~peers ~addrs_and_ports ~acceptable_delay
                   (Fn.compose
                      (function [a; b] -> Some (a, b) | _ -> None)
                      (String.split ~on:'=')) )
-    ; proposer
+    ; block_production_key
     ; snark_worker_key
     ; work_selection_method
-    ; peers
     ; conf_dir
+    ; chain_id
+    ; peers
     ; trace_dir
     ; program_dir
     ; acceptable_delay
     ; is_archive_rocksdb
+    ; is_seed
+    ; archive_process_location
     ; max_concurrent_connections }
   in
   config

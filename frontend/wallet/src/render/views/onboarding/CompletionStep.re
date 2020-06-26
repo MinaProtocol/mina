@@ -46,8 +46,6 @@ module Styles = {
   };
 };
 
-[@bs.scope "window"] [@bs.val] external openExternal: string => unit = "";
-
 module Accounts = [%graphql
   {|
     query getAccounts {
@@ -135,57 +133,34 @@ module CopyKeyButton = {
 };
 
 [@react.component]
-let make = (~closeOnboarding, ~prevStep) => {
-  <div className=Theme.Onboarding.main>
-    <div className=Styles.hero>
-      <div className=Styles.heroLeft>
-        <h1 className=Styles.header> {React.string("Setup Complete!")} </h1>
-        <Spacer height=0.25 />
-        <FadeIn duration=500 delay=150>
-          <p className=Styles.heroBody>
-            {React.string(
-               "You’ve completed your intial account set up. You may now request funds and make transactions. Please use our Discord faucet channel to request funds. You may skip this step for now.",
-             )}
-          </p>
-        </FadeIn>
-        <Spacer height=0.5 />
-        <FadeIn duration=500 delay=250>
-          <Link
-            kind=Link.Blue
-            onClick={_ => openExternal("https://discordapp.com/invite/Vexf4ED")}>
-            {React.string({js| Open Discord → |js})}
-          </Link>
-        </FadeIn>
-        <Spacer height=2. />
-        <div className=Styles.buttonRow>
+let make = (~prevStep, ~closeOnboarding) => {
+  <OnboardingTemplate
+    heading="Your Tokens Have Been Requested"
+    description={
+      <p>
+        {React.string(
+           "You should receive testnet tokens within an hour from the faucet. Reach out to the #support channel on our Discord community if you need help troubleshooting.",
+         )}
+      </p>
+    }
+    miscLeft=
+      <>
+        <Spacer height=2.0 />
+        <div className=OnboardingTemplate.Styles.buttonRow>
           <Button
-            style=Button.Gray
+            style=Button.HyperlinkBlue2
+            width=9.
             label="Go Back"
             onClick={_ => prevStep()}
           />
-          <Spacer width=0.5 />
+          <Spacer width=1.5 />
           <Button
-            label="Continue"
-            style=Button.HyperlinkBlue
+            label="Take me to My Account"
+            style=Button.HyperlinkBlue3
+            width=15.
             onClick={_ => closeOnboarding()}
           />
         </div>
-      </div>
-      <div className=Styles.line />
-      <div />
-      <AccountQuery>
-        {response =>
-           switch (response.result) {
-           | Loading => <Loader />
-           | Error(err) => React.string(err##message)
-           | Data(data) =>
-             let publicKey =
-               PublicKey.toString(data##trackedAccounts[0]##publicKey);
-             let handleClipboard = () =>
-               ignore(Bindings.Navigator.Clipboard.writeText(publicKey));
-             <CopyKeyButton publicKey onClick=handleClipboard />;
-           }}
-      </AccountQuery>
-    </div>
-  </div>;
+      </>
+  />;
 };
