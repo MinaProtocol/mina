@@ -37,7 +37,7 @@ Pipeline.build
                 (Prelude.Text.concatSep " && "
                   [ "sudo apt-get install -y postgresql"
                   , "sudo service postgresql start"
-                  , "sudo -u postgres psql --command \"CREATE USER ${user} WITH SUPERUSER PASSWORD '${password}';\""
+                  , "sudo -u postgres psql -c \"CREATE USER ${user} WITH SUPERUSER PASSWORD '${password}';\""
 --                  , "sudo -u postgres createdb -O ${user} ${db}"
 --                  , "PGPASSWORD=${password} psql -h localhost -p 5432 -U ${user} -d ${db} -a -f src/app/archive/create_schema.sql"
 --                  , "./scripts/test.py run 'test_archive_processor:coda-archive-processor-test'"
