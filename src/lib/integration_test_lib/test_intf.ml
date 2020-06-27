@@ -48,9 +48,9 @@ module type Log_engine_intf = sig
 
   type testnet
 
-  val create : logger:Logger.t -> testnet -> t Deferred.t
+  val create : logger:Logger.t -> testnet -> t Deferred.Or_error.t
 
-  val delete : t -> unit Deferred.t
+  val delete : t -> unit Deferred.Or_error.t
 
   (** waits until a block is produced with at least one of the following conditions being true
     1. Blockchain length = blocks
@@ -65,7 +65,7 @@ module type Log_engine_intf = sig
                 | `Snarked_ledgers_generated of int
                 | `Milliseconds of int64 ]
     -> t
-    -> unit Deferred.t
+    -> unit Deferred.Or_error.t
 end
 
 module type Make_log_engine_intf = functor (Testnet : Testnet_intf) -> Log_engine_intf

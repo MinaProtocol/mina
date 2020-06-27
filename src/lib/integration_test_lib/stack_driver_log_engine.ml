@@ -20,13 +20,14 @@ module Subscription = struct
   (*Using the api endpoint to create a sink instead of the gcloud command
   because the cli doesn't allow setting the writerIdentity account for the sink
   and instead generates an account that doesn't have permissions to publish
-  logs to the topic. The account needs to be given permissions explicitly andthen there's this from the documentation:
+  logs to the topic. The account needs to be given permissions explicitly and
+  then there's this from the documentation:
     There is a delay between creating the sink and using the sink's new service
      account to authorize writing to the export destination. During the first 24
      hours after sink creation, you might see permission-related error messages
      from the sink on your project's Activity page; you can ignore them.
   *)
-  let create_sink ~name ~topic ~filter ~key =
+  let create_sink ~topic ~filter ~key ~logger name =
     let open Deferred.Or_error.Let_syntax in
     let url =
       "https://logging.googleapis.com/v2/projects/o1labs-192920/sinks?key="
@@ -71,33 +72,32 @@ module Subscription = struct
           ; "--compressed" ]
         ()
     in
-    Core.printf "Response %s" response ;
-    let%map response_json = Deferred.return @@ load_config_json response in
+    let%bind response_json = Deferred.return @@ load_config_json response in
+    Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+      "Create sink response: $response"
+      ~metadata:[("response", response_json)] ;
     match
       Yojson.Safe.Util.(to_option Fn.id (member "error" response_json))
     with
     | Some _ ->
-        failwith response
+        Deferred.Or_error.errorf !"Error when creating sink: %s" response
     | None ->
-        ()
+        Deferred.Or_error.ok_unit
 
-  let create ~name ~filter =
+  let create ~name ~filter ~logger =
     let open Deferred.Or_error.Let_syntax in
     let uuid = Uuid_unix.create () in
     let name = name ^ "_" ^ Uuid.to_string uuid in
     let gcloud_key_file_env = "GCLOUD_API_KEY" in
     let%bind key =
-      ( match Sys.getenv gcloud_key_file_env with
+      match Sys.getenv gcloud_key_file_env with
       | Some key ->
-          Ok key
+          return key
       | None ->
-          Error
-            (Error.of_string
-               (sprintf
-                  "Set environment variable %s with the service account key \
-                   to use Stackdriver logging"
-                  gcloud_key_file_env)) )
-      |> Deferred.return
+          Deferred.Or_error.errorf
+            "Set environment variable %s with the service account key to use \
+             Stackdriver logging"
+            gcloud_key_file_env
     in
     let create_topic name =
       Process.run ~prog ~args:["pubsub"; "topics"; "create"; name] ()
@@ -118,12 +118,11 @@ module Subscription = struct
     let topic = name ^ "_topic" in
     let sink = name ^ "_sink" in
     let%bind _ = create_topic topic in
-    let%bind _ = create_sink ~name:sink ~topic ~filter ~key in
+    let%bind _ = create_sink ~topic ~filter ~key ~logger sink in
     let%map _ = create_subscription name topic in
     {name; topic; sink}
 
   let delete t =
-    let open Deferred.Let_syntax in
     let delete_subscription () =
       Process.run ~prog
         ~args:
@@ -140,10 +139,8 @@ module Subscription = struct
         ~args:["pubsub"; "topics"; "delete"; t.topic; "--project"; project_id]
         ()
     in
-    let%map lst =
-      Deferred.all [delete_subscription (); delete_sink (); delete_topic ()]
-    in
-    Or_error.combine_errors lst
+    Deferred.Or_error.combine_errors
+      [delete_subscription (); delete_sink (); delete_topic ()]
 
   let pull t =
     let subscription_id =
@@ -234,29 +231,34 @@ module Block_produced_query = struct
       ; "coda"
       ; "\"successfully produced a\"" ]
 
-  (*Map of json associations flattened. Duplicates keys will have the latest seen value*)
+  (*Map of json associations flattened*)
   let rec json_field_map ~key (json : Yojson.Safe.t)
       (map : Yojson.Safe.t String.Map.t) =
     match json with
     | `String _ | `Int _ | `Null | `Bool _ | `Float _ | `Intlit _ ->
-        Ok (Map.update map key ~f:(fun _ -> json))
+        Ok (Map.set map ~key ~data:json)
     | `Assoc assoc_list ->
         List.fold_until assoc_list ~init:(Ok map)
-          ~f:(fun acc (key, json) ->
+          ~f:(fun acc (key_nested, json) ->
             match acc with
             | Error e ->
                 Stop (Error e)
             | Ok acc ->
+                let key =
+                  String.concat
+                    [key; (if key = "" then "" else "."); key_nested]
+                in
                 Continue (json_field_map ~key json acc) )
           ~finish:Fn.id
     | `List lst ->
         (*TODO: expand this if needed, for example: "sub_window_densities":["0","20","20","20","20","20","20","20"]*)
-        Ok (Map.update map key ~f:(fun _ -> `List lst))
+        Ok (Map.set map ~key ~data:(`List lst))
     | _ ->
         Error
           (Error.of_string
              (sprintf "Invalid json object %s" (Yojson.Safe.to_string json)))
 
+  (*TODO: Once we transition to structured events, this should call Structured_log_event.parse_exn and match on the structured events that it returns.*)
   let parse_log log =
     let open Or_error.Let_syntax in
     let%bind json = load_config_json log in
@@ -271,13 +273,23 @@ module Block_produced_query = struct
     let find_int json_field =
       Map.find_or_error json_map json_field >>= fun h -> extract_int h
     in
-    let%bind block_height = find_int "blockchain_length" in
-    let%bind global_slot = find_int "slot_number" in
+    let%bind block_height =
+      find_int
+        "jsonPayload.metadata.breadcrumb.validated_transition.data.protocol_state.body.consensus_state.blockchain_length"
+    in
+    let%bind global_slot =
+      find_int
+        "jsonPayload.metadata.breadcrumb.validated_transition.data.protocol_state.body.consensus_state.curr_global_slot.slot_number"
+    in
     let%bind snarked_ledger_generated =
-      Map.find_or_error json_map "just_emitted_a_proof"
+      Map.find_or_error json_map
+        "jsonPayload.metadata.breadcrumb.just_emitted_a_proof"
       >>= fun h -> extract_bool h
     in
-    let%map epoch = find_int "epoch_count" in
+    let%map epoch =
+      find_int
+        "jsonPayload.metadata.breadcrumb.validated_transition.data.protocol_state.body.consensus_state.epoch_count"
+    in
     Some {Result.block_height; global_slot; epoch; snarked_ledger_generated}
 
   let parse result =
@@ -310,12 +322,12 @@ module Make (Testnet : Test_intf.Testnet_intf) :
   type t =
     {testnet_log_filter: string; subscriptions: subscriptions; logger: Logger.t}
 
-  let subscription_list testnet_log_filter : subscriptions Deferred.Or_error.t
-      =
+  let subscription_list ~logger testnet_log_filter :
+      subscriptions Deferred.Or_error.t =
     (*create one subscription per query*)
     let open Deferred.Or_error.Let_syntax in
     let%map blocks_produced =
-      Subscription.create ~name:"blocks_produced"
+      Subscription.create ~logger ~name:"blocks_produced"
         ~filter:(Block_produced_query.filter testnet_log_filter)
     in
     {blocks_produced}
@@ -324,24 +336,24 @@ module Make (Testnet : Test_intf.Testnet_intf) :
     Subscription.delete subscriptions.blocks_produced
 
   let create ~logger (testnet : Testnet.t) =
-    match%map subscription_list "joyous-occasion" with
+    match%map subscription_list ~logger testnet.testnet_log_filter with
     | Ok subscriptions ->
-        {testnet_log_filter= testnet.testnet_log_filter; subscriptions; logger}
+        Ok
+          { testnet_log_filter= testnet.testnet_log_filter
+          ; subscriptions
+          ; logger }
     | Error e ->
-        failwith (Error.to_string_hum e)
+        Error e
 
-  let cleanup t =
+  let delete t : unit Deferred.Or_error.t =
     match%map delete_subscriptions t.subscriptions with
     | Ok _ ->
-        None
+        Ok ()
     | Error e' ->
         Logger.fatal t.logger ~module_:__MODULE__ ~location:__LOC__
           "Error deleting subscriptions: $error"
           ~metadata:[("error", `String (Error.to_string_hum e'))] ;
-        Some (Error.to_string_hum e')
-
-  let delete t =
-    match%map cleanup t with None -> () | Some err_str -> failwith err_str
+        Error e'
 
   (*TODO: Node status. Should that be a part of a node query instead? or we need a new log that has status info and some node identifier*)
   let wait_for' :
@@ -359,8 +371,8 @@ module Make (Testnet : Test_intf.Testnet_intf) :
     else
       let now = Time.now () in
       let timeout_safety =
-        (*Don't wait for more than an hour in any case*)
-        Time.add now (Time.Span.of_ms (Int64.to_float 3600000L))
+        (*Don't wait for more than an hour in any case. TODO: make this an argument or compute using the query timeout*)
+        Time.add now (Time.Span.of_ms (Int64.to_float 300000L))
       in
       let query_timeout_ms =
         match timeout with
@@ -420,24 +432,20 @@ module Make (Testnet : Test_intf.Testnet_intf) :
                   | `Snarked_ledgers_generated of int
                   | `Milliseconds of int64 ]
       -> t
-      -> unit Deferred.t =
+      -> unit Deferred.Or_error.t =
    fun ?(blocks = 0) ?(epoch_reached = 0) ?(timeout = `Milliseconds 300000L) t ->
-    match%bind
-      Deferred.Or_error.try_with_join (fun _ ->
-          wait_for' ~blocks ~epoch_reached ~timeout t )
-    with
+    match%bind wait_for' ~blocks ~epoch_reached ~timeout t with
     | Ok _ ->
-        Deferred.unit
+        Deferred.Or_error.ok_unit
     | Error e -> (
         Logger.fatal t.logger ~module_:__MODULE__ ~location:__LOC__
           "wait_for failed with error: $error"
           ~metadata:[("error", `String (Error.to_string_hum e))] ;
-        match%map cleanup t with
-        | None ->
-            failwith (Error.to_string_hum e)
-        | Some err_str ->
-            failwith
-              (String.concat ~sep:" and " [Error.to_string_hum e; err_str]) )
+        match%map delete t with
+        | Ok _ ->
+            Error e
+        | Error e' ->
+            Or_error.combine_errors_unit [Error e; Error e'] )
 end
 
 (*TODO: unit tests without conencting to gcloud. The following test connects to joyous-occasion*)
@@ -488,26 +496,33 @@ end
             ; testnet_name ] }
 
     let wait_for_block_height () =
+      let open Deferred.Or_error.Let_syntax in
       let%bind log_engine = create ~logger testnet in
       let%bind _ = wait_for ~blocks:2500 log_engine in
       delete log_engine
 
     let wait_for_slot_timeout () =
+      let open Deferred.Or_error.Let_syntax in
       let%bind log_engine = create ~logger testnet in
       let%bind _ = wait_for ~timeout:(`Slots 2) log_engine in
       delete log_engine
 
     let wait_for_epoch () =
+      let open Deferred.Or_error.Let_syntax in
       let%bind log_engine = create ~logger testnet in
       let%bind _ = wait_for ~epoch_reached:16 log_engine in
       delete log_engine
 
+    let test_exn f () =
+      let%map res = f () in
+      Or_error.ok_exn res
+
     let%test_unit "joyous-occasion - wait_for_block_height" =
-      Async.Thread_safe.block_on_async_exn wait_for_block_height
+      Async.Thread_safe.block_on_async_exn (test_exn wait_for_block_height)
 
     let%test_unit "joyous-occasion - wait_for_slot_timeout" =
-      Async.Thread_safe.block_on_async_exn wait_for_slot_timeout
+      Async.Thread_safe.block_on_async_exn (test_exn wait_for_slot_timeout)
 
     let%test_unit "joyous-occasion - wait_for_epoch" =
-      Async.Thread_safe.block_on_async_exn wait_for_epoch
-  end ) *)
+      Async.Thread_safe.block_on_async_exn (test_exn wait_for_epoch)
+  end )*)
