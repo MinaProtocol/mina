@@ -437,15 +437,12 @@ module Make (Testnet : Test_intf.Testnet_intf) :
     match%bind wait_for' ~blocks ~epoch_reached ~timeout t with
     | Ok _ ->
         Deferred.Or_error.ok_unit
-    | Error e -> (
+    | Error e ->
         Logger.fatal t.logger ~module_:__MODULE__ ~location:__LOC__
           "wait_for failed with error: $error"
           ~metadata:[("error", `String (Error.to_string_hum e))] ;
-        match%map delete t with
-        | Ok _ ->
-            Error e
-        | Error e' ->
-            Or_error.combine_errors_unit [Error e; Error e'] )
+        let%map res = delete t in
+        Or_error.combine_errors_unit [Error e; res]
 end
 
 (*TODO: unit tests without conencting to gcloud. The following test connects to joyous-occasion*)
