@@ -120,10 +120,8 @@ let build : Config.Type -> B/Command.Type = \(c : Config.Type) ->
 
       -- Add more plugins here as needed, empty list omits that part from the
       -- plugins map
-      let allPlugins =
-        List/concat (Map.Entry Text Plugins) (dockerPart # summonPart)
-      in
-      Some (B/Plugins.Plugins/Type allPlugins)
+      let allPlugins = List/concat (Map.Entry Text Plugins) (dockerPart # summonPart) in
+      if Prelude.List.null (Map.Entry Text Plugins) allPlugins then None B/Plugins else Some (B/Plugins.Plugins/Type allPlugins)
   }
 
 in {Config = Config, build = build, Type = B/Command.Type, TaggedKey = TaggedKey}
