@@ -6,11 +6,14 @@ let Map = Prelude.Map
 
 let Cmd = ../Lib/Cmds.dhall
 let Docker = ./Docker/Type.dhall
+let Summon = ./Summon/Type.dhall
 let Base = ./Base.dhall
 
 let Size = ./Size.dhall
 
-let fixPermissionsCommand = "sudo chown -R opam ."
+let dockerImage = (../Constants/ContainerImages.dhall).codaToolchain
+
+let fixPermissionsScript = "sudo chown -R opam ."
 
 let Config = {
   Type = {
@@ -25,12 +28,17 @@ let Config = {
 let build : Config.Type -> Base.Type = \(c : Config.Type) ->
   Base.build
     Base.Config::{
-      commands = [ Cmd.run fixPermissionsCommand ] # c.commands,
+      commands = [ Cmd.run fixPermissionsScript ] # c.commands,
       label = c.label,
       key = c.key,
       target = Size.Large,
-      docker = Some Docker::{ image = (../Constants/ContainerImages.dhall).codaToolchain }
+      docker = Some Docker::{ image = dockerImage }
     }
 
-in {Config = Config, build = build, Type = Base.Type}
+in {
+    fixPermissionsCommand = Cmd.runInDocker Cmd.Docker::{ image = dockerImage } fixPermissionsScript,
+    Config = Config,
+    build = build,
+    Type = Base.Type
+}
 

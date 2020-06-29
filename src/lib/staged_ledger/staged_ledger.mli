@@ -6,19 +6,16 @@ open Signature_lib
 type t [@@deriving sexp]
 
 module Scan_state : sig
-  type t [@@deriving sexp]
+  [%%versioned:
+  module Stable : sig
+    module V1 : sig
+      type t [@@deriving sexp]
 
-  module Stable :
-    sig
-      module V1 : sig
-        type t [@@deriving sexp, bin_io, version]
-
-        val hash : t -> Staged_ledger_hash.Aux_hash.t
-      end
-
-      module Latest = V1
+      val hash : t -> Staged_ledger_hash.Aux_hash.t
     end
-    with type V1.t = t
+  end]
+
+  type t = Stable.Latest.t [@@deriving sexp]
 
   module Job_view : sig
     type t [@@deriving sexp, to_yojson]

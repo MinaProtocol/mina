@@ -15,14 +15,8 @@ in
 Pipeline.build
   Pipeline.Config::{
     spec = 
-      let opamDirtyWhen = [
-          S.exactly "src/opam" "export",
-          S.exactly "scripts/setup-opam" "sh",
-          S.strictly (S.contains "Makefile")
-        ]
-      in
       JobSpec::{
-        dirtyWhen = opamDirtyWhen # [
+        dirtyWhen = OpamInit.dirtyWhen # [
           S.strictlyStart (S.contains "buildkite/src/Jobs/ClientSdk"),
           S.strictlyStart (S.contains "src")
         ],
@@ -31,17 +25,7 @@ Pipeline.build
     steps = [
     Command.build
       Command.Config::{
-        commands = OpamInit.commands # [
-          Cmd.runInDocker
-            Cmd.Docker::{
-              image = (../../Constants/ContainerImages.dhall).codaToolchain
-            }
-            ("mkdir -p /tmp/artifacts && (" ++
-              "set -o pipefail ; " ++
-              "./buildkite/scripts/opam-env.sh && " ++
-              "make client_sdk 2>&1 | tee /tmp/artifacts/buildclientsdk.log" ++
-            ")")
-        ],
+        commands = OpamInit.andThenRunInDocker "./buildkite/scripts/build-client-sdk.sh",
         label = "Build client-sdk",
         key = "build-client-sdk",
         target = Size.Large,
