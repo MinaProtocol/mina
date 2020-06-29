@@ -17,10 +17,22 @@ open Sparse_ledger_lib
 
 module Domain = struct
   type t = string [@@deriving sexp, eq, to_yojson]
-  
+
+  let to_bits : t -> bool list =
+    fun d ->
+      failwith "TODO"
 end
 
-module Certificate_authority = struct
+module Certificate_authority : sig
+  type t
+
+  val register
+    : t
+    -> domain: Domain.t
+    -> public_key:Signature_lib.Schnorr.Public_key.t
+    -> self_signature:Signature.t
+    -> Signature.t Or_error.t
+end = struct
   type t = Private_key.t
 
   let nybble_bits = function
@@ -73,13 +85,30 @@ module Certificate_authority = struct
     Stdlib.(Array.of_seq (Seq.map char_bits (String.to_seq s))) }
 
 
-  let register (skca : t) (domain : Domain.t) (pkd : Signature_lib.Schnorr.Public_key.t) (signature_self : Signature_lib.Schnorr.Signature.t)  =
-    let (b : bool) = Signature_lib.Schnorr.verify signature_self pkd (string_to_input domain) in
-    let msg = Random_oracle.hash ~init:[]
-    Random_oracle.Input.{field_elements= [||]; bitstrings= [|Stdlib.(Array.of_seq (Seq.map char_bits (String.to_seq domain))); Public_key.to_bigstring pkd|]} in
+  module My_cool_record = struct
+    type t =
+      { a : int; b : string }
+  end
+
+  let record = { My_cool_record. a=1; b= "hello" }
+
+  let register (skca : t) (domain : Domain.t) (pkd : Public_key.t) (signature_self : Signature_lib.Schnorr.Signature.t)  =
+    let (b : bool) =
+      Schnorr.verify signature_self 
+        (Inner_curve.of_affine pkd)
+        (string_to_input domain)
+    in
+    let msg =
+      let (x, y) = pkd in
+      { Random_oracle.Input.
+        field_elements= [| x; y |]
+      ; bitstrings=
+          [| Domain.to_bits domain
+          |]
+      }
+    in
     if b then Ok (Signature_lib.Schnorr.sign skca msg)
     else Or_error.error_string "invalid query"
-
 end
 
 module DomainAccount = struct
@@ -92,6 +121,7 @@ module DomainAccount = struct
 
   let key {domain; _} = domain
 
+  (* TODO: Should use poseidon (i.e., Random_oracle) *)
   let data_hash t = Md5.digest_string (Binable.to_string (module T) t)
 
   let gen =
@@ -104,7 +134,9 @@ end
 
 
 
+  (* TODO: Should use poseidon (i.e., Random_oracle) *)
 module Hash = struct
+  (* TODO: Use Random_oracle.Digest *)
     type t = Core_kernel.Md5.t [@@deriving sexp, compare]
 
     let equal h1 h2 = Int.equal (compare h1 h2) 0
@@ -122,8 +154,43 @@ module Hash = struct
   end
 
 
-module Merkle_tree_maintainer = Sparse_ledger_lib.Sparse_ledger.Make (Hash) (Domain) (DomainAccount)
+module Merkle_tree_maintainer : sig
+  type t 
 
+  val get_path: Domain.t -> [`Left of Hash.t | `Right of Hash.t] list
+end = struct
+  include Sparse_ledger_lib.Sparse_ledger.Make (Hash) (Domain) (DomainAccount)
+end
 
+module Proof = struct
+  type t = Tick.Proof.t
+end
 
+module Statement = struct
+  type t =
+    { merkle_root_old: Hash.t
+    ; merkle_root_new: Hash.t
+    }
+end
 
+module Witness = struct
+  type t =
+    { path        : [`Left of Hash.t | `Right of Hash.t] list
+    ; account_old : DomainAccount.t
+    ; account_new : DomainAccount.t
+    }
+end
+
+module Prover : sig
+  type t
+
+  val prove : Witness.t -> Proof.t * Statement.t
+end = struct
+
+  (* *)
+  let prove (w : Witness.t) =
+    (* Use the function
+
+       Tick.prove
+    *)
+end
