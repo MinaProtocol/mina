@@ -22,7 +22,7 @@ let buildTestCmd : Text -> Text -> Command.Type = \(profile : Text) -> \(path : 
         ),
       label = "Run ${profile} unit-tests",
       key = "unit-test-${profile}",
-      target = Size.XXlarge,
+      target = Size.Large,
       docker = None Docker.Type
     }
 

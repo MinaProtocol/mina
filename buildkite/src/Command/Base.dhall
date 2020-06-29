@@ -62,8 +62,7 @@ let Config =
   }
 
 let targetToAgent = \(target : Size) ->
-  merge { XXlarge = toMap { size = "xxlarge" },
-          Large = toMap { size = "large" },
+  merge { Large = toMap { size = "large" },
           Small = toMap { size = "small" }
         }
         target

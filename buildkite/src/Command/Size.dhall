@@ -1,1 +1,1 @@
-<XXlarge|Large|Small>
+<Large|Small>
