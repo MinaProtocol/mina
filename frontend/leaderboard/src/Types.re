@@ -3,7 +3,7 @@ module NewBlock = {
 
   type snarkJobs = {
     prover: string,
-    fee: int64,
+    fee: string,
   };
 
   type userCommands = {
@@ -12,7 +12,7 @@ module NewBlock = {
   };
 
   type feeTransfer = {
-    fee: int64,
+    fee: string,
     recipient: string,
   };
   type transactions = {

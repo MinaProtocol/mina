@@ -22,6 +22,8 @@ module type S = sig
   val ( <= ) : t -> t -> bool
 
   val ( >= ) : t -> t -> bool
+
+  val to_bigint : t -> Bigint.t
 end
 
 module type F = functor

@@ -1,17 +1,7 @@
 (* similar to account.ml *)
 
 
-open Core_kernel
-open Coda_base
 
-
-open Snark_params
-open Tick
-
-
-
-open Currency
-open Coda_numbers
 
 
 module Index = struct

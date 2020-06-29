@@ -1,6 +1,7 @@
 open Core
 open Core_kernel
 open Async
+open Coda_base
 open Import
 open Snark_params
 open Snarky
@@ -17,8 +18,9 @@ open Signature_lib
 
 open! U.Impl
 open! U
+open Random_oracle 
 
-include Non_zero_curve_point (* AAA should this come here to add .Compressed for Domain, should Domain be of different type*)
+include Non_zero_curve_point 
 module Domain = struct
   
   type t = Signature_lib.Schnorr.Message.t
@@ -29,30 +31,30 @@ module Domain = struct
     type t = Field.Constant.t
   end
 
-  let queryGen (domain : t)  =
-    let kp = Signature_lib.Keypair.create () in
-    let signature = Signature_lib.Schnorr.sign kp.private_key domain in
-    (kp.public_key, kp.private_key, signature)
+  
 
 end
+
+
 
 
 module Certificate_authority = struct
   type t = Private_key.t
 
+
   let register (skca : t) (domain : Domain.t) (pkd : Signature_lib.Schnorr.Public_key.t) (signature_self : Signature_lib.Schnorr.Signature.t)  =
     let (b : bool) = Signature_lib.Schnorr.verify signature_self pkd domain in
-    if b then Ok (Signature_lib.Schnorr.sign skca (domain, pkd))
+    let msg = Random_oracle.hash ~init:[] 
+    {Random_oracle.Input.field_elements= [||]; Random_oracle.Input.bitstrings= [|Random_oracle.Input.to_bits domain; Public_key.to_bigstring pkd|]} in
+    if b then Ok (Signature_lib.Schnorr.sign skca msg)
     else Or_error.error_string "invalid query"
 
-  (* let register t (domain : Domain.t) (pkd : Public_key.t) (signature_self : Signature_lib.Schnorr.Signature.t)  =
-    let domain =  Command.Param.(anon ("domain" %: Domain.t)) in 
-    let pkd = Command.Param.(anon ("pkd" %: Public_key.t)) in
-    let signature_self  = Command.Param.(anon ("signature_self" %: Signature_lib.Schnorr.Signature.t))  in
-*)   
 end
-  (* AAA review the sig, needs to be able to run queryGen, how to include that, how to explicitly include ability to call register *))
- type domain_owner = {
+
+
+module Domain_owner = struct
+
+ type t = {
    domain : Domain.t;
    pkd : Signature_lib.Schnorr.Public_key.t;
    skd : Signature_lib.Schnorr.Private_key.t;
@@ -60,6 +62,13 @@ end
    certificate : Signature_lib.Schnorr.Public_key.t * Signature_lib.Schnorr.Signature.t;
 } 
 
+let queryGen (domain : Domain.t)  =
+  let kp = Signature_lib.Keypair.create () in
+  let self_signature = Signature_lib.Schnorr.sign kp.private_key domain in
+  (kp.public_key, kp.private_key, self_signature)
+
+
+end
 
 
 
@@ -71,5 +80,24 @@ end
 
 
 module Merkle_tree_maintainer = struct
+
+  module Hash = struct
+    type t = Core_kernel.Md5.t [@@deriving sexp, compare]
+
+    let equal h1 h2 = Int.equal (compare h1 h2) 0
+
+    let to_yojson md5 = `String (Core_kernel.Md5.to_hex md5)
+
+    let merge ~height x y =
+      let open Md5 in
+      digest_string
+        (sprintf "sparse-ledger_%03d" height ^ to_binary x ^ to_binary y)
+
+    let gen =
+      Quickcheck.Generator.map String.quickcheck_generator
+        ~f:Md5.digest_string
+  end
+
+
 
 end

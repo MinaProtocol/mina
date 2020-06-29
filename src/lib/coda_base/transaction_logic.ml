@@ -221,18 +221,21 @@ module type S = sig
 
   val apply_user_command :
        constraint_constants:Genesis_constants.Constraint_constants.t
+    -> txn_global_slot:Global_slot.t
     -> ledger
     -> User_command.With_valid_signature.t
     -> Undo.User_command_undo.t Or_error.t
 
   val apply_transaction :
        constraint_constants:Genesis_constants.Constraint_constants.t
+    -> txn_global_slot:Global_slot.t
     -> ledger
     -> Transaction.t
     -> Undo.t Or_error.t
 
   val merkle_root_after_user_command_exn :
        constraint_constants:Genesis_constants.Constraint_constants.t
+    -> txn_global_slot:Global_slot.t
     -> ledger
     -> User_command.With_valid_signature.t
     -> Ledger_hash.t
@@ -377,13 +380,6 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         Amount.(sub amount (of_fee fee))
     else Ok amount
 
-  let add_account_creation_fee_bal
-      ~(constraint_constants : Genesis_constants.Constraint_constants.t) action
-      balance =
-    let fee = constraint_constants.account_creation_fee in
-    if action = `Added then add_amount balance (Amount.of_fee fee)
-    else Ok balance
-
   let check b =
     ksprintf (fun s -> if b then Ok () else Or_error.error_string s)
 
@@ -422,12 +418,12 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
   (* someday: It would probably be better if we didn't modify the receipt chain hash
   in the case that the sender is equal to the receiver, but it complicates the SNARK, so
   we don't for now. *)
-  let apply_user_command_unchecked ~constraint_constants ledger
-      ({payload; signer; signature= _} as user_command : User_command.t) =
+  let apply_user_command_unchecked ~constraint_constants ~txn_global_slot
+      ledger ({payload; signer; signature= _} as user_command : User_command.t)
+      =
     let open Or_error.Let_syntax in
     let signer_pk = Public_key.compress signer in
-    (* TODO: Put actual value here. See issue #4036. *)
-    let current_global_slot = Global_slot.zero in
+    let current_global_slot = txn_global_slot in
     let%bind () =
       validate_time
         ~valid_until:(User_command.valid_until user_command)
@@ -551,42 +547,19 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             get_with_location ledger receiver
           in
           (* Charge the account creation fee. *)
-          let%bind receiver_amount, creation_fee =
+          let%bind receiver_amount =
             match receiver_location with
             | `Existing _ ->
-                return (amount, Amount.zero)
+                return amount
             | `New ->
-                if Token_id.equal fee_token token then
+                if Token_id.(equal default) token then
                   (* Subtract the creation fee from the transaction amount. *)
-                  let%map amount =
-                    sub_account_creation_fee ~constraint_constants `Added
-                      amount
-                  in
-                  (amount, Amount.zero)
+                  sub_account_creation_fee ~constraint_constants `Added amount
                 else
-                  (* Charge the fee-payer for creating the account.
-                     Note: We don't have a better choice here: there is no
-                     other source of tokens in this transaction that is known
-                     to have accepted value.
-                  *)
-                  let account_creation_fee =
-                    Amount.of_fee constraint_constants.account_creation_fee
-                  in
-                  return (amount, account_creation_fee)
-          in
-          (* NOTE: From here on, either [fee_payer_account] is unchanged, or
-             [fee_payer] is distinct from both [source] and [receiver], due to
-             the [Token_id.equal] check above.
-          *)
-          let%bind fee_payer_account =
-            let%bind balance =
-              sub_amount fee_payer_account.balance creation_fee
-            in
-            let%map timing =
-              validate_timing ~txn_amount:creation_fee
-                ~txn_global_slot:current_global_slot ~account:fee_payer_account
-            in
-            {fee_payer_account with balance; timing}
+                  Or_error.errorf
+                    !"The receiving account does not exist, and the \
+                      transferred token %{sexp: Token_id.t} is not the default"
+                    token
           in
           let%bind receiver_account =
             let%map balance =
@@ -634,8 +607,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             | `New ->
                 [receiver]
           in
-          ( [ (fee_payer_location, fee_payer_account)
-            ; (receiver_location, receiver_account)
+          ( [ (receiver_location, receiver_account)
             ; (source_location, source_account) ]
           , `Source_timing source_timing
           , Undo.User_command_undo.Body.Payment {previous_empty_accounts} )
@@ -659,43 +631,51 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         *)
         Error err
 
-  let apply_user_command ~constraint_constants ledger
+  let apply_user_command ~constraint_constants ~txn_global_slot ledger
       (user_command : User_command.With_valid_signature.t) =
-    apply_user_command_unchecked ~constraint_constants ledger
+    apply_user_command_unchecked ~constraint_constants ~txn_global_slot ledger
       (User_command.forget_check user_command)
 
   let process_fee_transfer t (transfer : Fee_transfer.t) ~modify_balance =
     let open Or_error.Let_syntax in
     (* TODO(#4555): Allow token_id to vary from default. *)
-    match transfer with
-    | `One (pk, fee) ->
-        let account_id = Account_id.create pk Token_id.default in
+    let%bind () =
+      if
+        List.for_all
+          ~f:Token_id.(equal default)
+          (One_or_two.to_list (Fee_transfer.fee_tokens transfer))
+      then return ()
+      else Or_error.errorf "Cannot pay fees in non-default tokens."
+    in
+    match Fee_transfer.to_singles transfer with
+    | `One ft ->
+        let account_id = Fee_transfer.Single.receiver ft in
         (* TODO(#4496): Do not use get_or_create here; we should not create a
            new account before we know that the transaction will go through and
            thus the creation fee has been paid.
         *)
         let action, a, loc = get_or_create t account_id in
         let emptys = previous_empty_accounts action account_id in
-        let%map balance = modify_balance action account_id a.balance fee in
+        let%map balance = modify_balance action account_id a.balance ft.fee in
         set t loc {a with balance} ;
         emptys
-    | `Two ((pk1, fee1), (pk2, fee2)) ->
-        let account_id1 = Account_id.create pk1 Token_id.default in
+    | `Two (ft1, ft2) ->
+        let account_id1 = Fee_transfer.Single.receiver ft1 in
         (* TODO(#4496): Do not use get_or_create here; we should not create a
            new account before we know that the transaction will go through and
            thus the creation fee has been paid.
         *)
         let action1, a1, l1 = get_or_create t account_id1 in
         let emptys1 = previous_empty_accounts action1 account_id1 in
-        if Public_key.Compressed.equal pk1 pk2 then (
-          let%bind fee = error_opt "overflow" (Fee.add fee1 fee2) in
+        let account_id2 = Fee_transfer.Single.receiver ft2 in
+        if Account_id.equal account_id1 account_id2 then (
+          let%bind fee = error_opt "overflow" (Fee.add ft1.fee ft2.fee) in
           let%map balance =
             modify_balance action1 account_id1 a1.balance fee
           in
           set t l1 {a1 with balance} ;
           emptys1 )
         else
-          let account_id2 = Account_id.create pk2 Token_id.default in
           (* TODO(#4496): Do not use get_or_create here; we should not create a
              new account before we know that the transaction will go through
              and thus the creation fee has been paid.
@@ -703,10 +683,10 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           let action2, a2, l2 = get_or_create t account_id2 in
           let emptys2 = previous_empty_accounts action2 account_id2 in
           let%bind balance1 =
-            modify_balance action1 account_id1 a1.balance fee1
+            modify_balance action1 account_id1 a1.balance ft1.fee
           in
           let%map balance2 =
-            modify_balance action2 account_id2 a2.balance fee2
+            modify_balance action2 account_id2 a2.balance ft2.fee
           in
           set t l1 {a1 with balance= balance1} ;
           set t l2 {a2 with balance= balance2} ;
@@ -856,7 +836,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     set t receiver_location {receiver_account with balance= receiver_balance} ;
     remove_accounts_exn t previous_empty_accounts
 
-  let undo_user_command ledger ~constraint_constants
+  let undo_user_command ledger
       { Undo.User_command_undo.common=
           { user_command= {payload; signer= _; signature= _} as user_command
           ; previous_receipt_chain_hash
@@ -865,7 +845,6 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       ; body } =
     let open Or_error.Let_syntax in
     (* Fee-payer information *)
-    let fee_token = User_command.fee_token user_command in
     let fee_payer = User_command.fee_payer user_command in
     let nonce = User_command.nonce user_command in
     let%bind fee_payer_location =
@@ -911,21 +890,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             delegate= previous_delegate
           ; timing= Option.value ~default:source_account.timing source_timing
           }
-    | Payment {amount; token_id= token; _}, Payment {previous_empty_accounts}
-      ->
+    | Payment {amount; _}, Payment {previous_empty_accounts} ->
         let receiver = User_command.receiver user_command in
-        let%bind fee_payer_account =
-          let%map balance =
-            if
-              Token_id.equal fee_token token
-              || List.is_empty previous_empty_accounts
-            then return fee_payer_account.balance
-            else
-              add_account_creation_fee_bal ~constraint_constants `Added
-                fee_payer_account.balance
-          in
-          {fee_payer_account with balance}
-        in
         let%bind receiver_location, receiver_account =
           let%bind location =
             location_of_account' ledger "receiver" receiver
@@ -958,7 +924,6 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               balance
             ; timing= Option.value ~default:account.timing source_timing } )
         in
-        set ledger fee_payer_location fee_payer_account ;
         set ledger receiver_location receiver_account ;
         set ledger source_location source_account ;
         remove_accounts_exn ledger previous_empty_accounts
@@ -977,7 +942,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       | Fee_transfer u ->
           undo_fee_transfer ~constraint_constants ledger u
       | User_command u ->
-          undo_user_command ~constraint_constants ledger u
+          undo_user_command ledger u
       | Coinbase c ->
           undo_coinbase ~constraint_constants ledger c ;
           Ok ()
@@ -986,15 +951,16 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         [%test_eq: Ledger_hash.t] undo.previous_hash (merkle_root ledger) ) ;
     res
 
-  let apply_transaction ~constraint_constants ledger (t : Transaction.t) =
+  let apply_transaction ~constraint_constants ~txn_global_slot ledger
+      (t : Transaction.t) =
     O1trace.measure "apply_transaction" (fun () ->
         let previous_hash = merkle_root ledger in
         Or_error.map
           ( match t with
           | User_command txn ->
               Or_error.map
-                (apply_user_command ~constraint_constants ledger txn)
-                ~f:(fun undo -> Undo.Varying.User_command undo)
+                (apply_user_command ~constraint_constants ~txn_global_slot
+                   ledger txn) ~f:(fun undo -> Undo.Varying.User_command undo)
           | Fee_transfer t ->
               Or_error.map (apply_fee_transfer ~constraint_constants ledger t)
                 ~f:(fun undo -> Undo.Varying.Fee_transfer undo)
@@ -1003,12 +969,15 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                 ~f:(fun undo -> Undo.Varying.Coinbase undo) )
           ~f:(fun varying -> {Undo.previous_hash; varying}) )
 
-  let merkle_root_after_user_command_exn ~constraint_constants ledger payment =
+  let merkle_root_after_user_command_exn ~constraint_constants ~txn_global_slot
+      ledger payment =
     let undo =
-      Or_error.ok_exn (apply_user_command ~constraint_constants ledger payment)
+      Or_error.ok_exn
+        (apply_user_command ~constraint_constants ~txn_global_slot ledger
+           payment)
     in
     let root = merkle_root ledger in
-    Or_error.ok_exn (undo_user_command ~constraint_constants ledger undo) ;
+    Or_error.ok_exn (undo_user_command ledger undo) ;
     root
 
   module For_tests = struct

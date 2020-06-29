@@ -615,7 +615,7 @@ module type S = sig
          , 'protocol_versions )
          Validation.with_transition
       -> logger:Logger.t
-      -> constraint_constants:Genesis_constants.Constraint_constants.t
+      -> precomputed_values:Precomputed_values.t
       -> verifier:Verifier.t
       -> parent_staged_ledger:Staged_ledger.t
       -> parent_protocol_state:Protocol_state.value

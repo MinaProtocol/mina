@@ -71,9 +71,9 @@ let%test_module "transaction_status" =
 
     let logger = Logger.null ()
 
-    let proof_level = Genesis_constants.Proof_level.Check
-
     let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
+
+    module Genesis_ledger = (val precomputed_values.genesis_ledger)
 
     let trust_system = Trust_system.null ()
 
@@ -82,17 +82,15 @@ let%test_module "transaction_status" =
     let key_gen =
       let open Quickcheck.Generator in
       let open Quickcheck.Generator.Let_syntax in
-      let keypairs =
-        List.map (Lazy.force Test_genesis_ledger.accounts) ~f:fst
-      in
+      let keypairs = List.map (Lazy.force Genesis_ledger.accounts) ~f:fst in
       let%map random_key_opt = of_list keypairs in
-      ( Test_genesis_ledger.largest_account_keypair_exn ()
+      ( Genesis_ledger.largest_account_keypair_exn ()
       , Signature_lib.Keypair.of_private_key_exn
           (Option.value_exn random_key_opt) )
 
     let gen_frontier =
-      Transition_frontier.For_tests.gen ~logger ~proof_level
-        ~precomputed_values ~trust_system ~max_length ~size:frontier_size ()
+      Transition_frontier.For_tests.gen ~logger ~precomputed_values
+        ~trust_system ~max_length ~size:frontier_size ()
 
     let gen_user_command =
       User_command.Gen.payment ~sign_type:`Real ~max_amount:100 ~max_fee:10

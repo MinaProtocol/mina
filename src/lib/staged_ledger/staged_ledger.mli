@@ -6,19 +6,16 @@ open Signature_lib
 type t [@@deriving sexp]
 
 module Scan_state : sig
-  type t [@@deriving sexp]
+  [%%versioned:
+  module Stable : sig
+    module V1 : sig
+      type t [@@deriving sexp]
 
-  module Stable :
-    sig
-      module V1 : sig
-        type t [@@deriving sexp, bin_io, version]
-
-        val hash : t -> Staged_ledger_hash.Aux_hash.t
-      end
-
-      module Latest = V1
+      val hash : t -> Staged_ledger_hash.Aux_hash.t
     end
-    with type V1.t = t
+  end]
+
+  type t = Stable.Latest.t [@@deriving sexp]
 
   module Job_view : sig
     type t [@@deriving sexp, to_yojson]
@@ -37,7 +34,12 @@ module Scan_state : sig
 
   val staged_transactions : t -> Transaction.t list Or_error.t
 
-  val all_work_statements : t -> Transaction_snark_work.Statement.t list
+  val staged_transactions_with_protocol_states :
+       t
+    -> get_state:(State_hash.t -> Coda_state.Protocol_state.value Or_error.t)
+    -> (Transaction.t * Coda_state.Protocol_state.value) list Or_error.t
+
+  val all_work_statements_exn : t -> Transaction_snark_work.Statement.t list
 
   (** Hashes of the protocol states required for proving pending transactions*)
   val required_state_hashes : t -> State_hash.Set.t
@@ -100,7 +102,8 @@ val of_scan_state_and_ledger_unchecked :
 
 val replace_ledger_exn : t -> Ledger.t -> t
 
-val proof_txns : t -> Transaction.t Non_empty_list.t option
+val proof_txns_with_state_hashes :
+  t -> (Transaction.t * State_hash.t) Non_empty_list.t option
 
 val copy : t -> t
 
@@ -112,9 +115,11 @@ val apply :
   -> Staged_ledger_diff.t
   -> logger:Logger.t
   -> verifier:Verifier.t
-  -> state_body_hash:State_body_hash.t
+  -> current_global_slot:Coda_numbers.Global_slot.t
+  -> state_and_body_hash:State_hash.t * State_body_hash.t
   -> ( [`Hash_after_applying of Staged_ledger_hash.t]
-       * [`Ledger_proof of (Ledger_proof.t * Transaction.t list) option]
+       * [ `Ledger_proof of
+           (Ledger_proof.t * (Transaction.t * State_hash.t) list) option ]
        * [`Staged_ledger of t]
        * [ `Pending_coinbase_data of
            bool * Currency.Amount.t * Pending_coinbase.Update.Action.t ]
@@ -125,9 +130,12 @@ val apply_diff_unchecked :
      constraint_constants:Genesis_constants.Constraint_constants.t
   -> t
   -> Staged_ledger_diff.With_valid_signatures_and_proofs.t
-  -> state_body_hash:State_body_hash.t
+  -> logger:Logger.t
+  -> current_global_slot:Coda_numbers.Global_slot.t
+  -> state_and_body_hash:State_hash.t * State_body_hash.t
   -> ( [`Hash_after_applying of Staged_ledger_hash.t]
-       * [`Ledger_proof of (Ledger_proof.t * Transaction.t list) option]
+       * [ `Ledger_proof of
+           (Ledger_proof.t * (Transaction.t * State_hash.t) list) option ]
        * [`Staged_ledger of t]
        * [ `Pending_coinbase_data of
            bool * Currency.Amount.t * Pending_coinbase.Update.Action.t ]
@@ -145,6 +153,7 @@ val create_diff :
   -> self:Public_key.Compressed.t
   -> coinbase_receiver:[`Producer | `Other of Public_key.Compressed.t]
   -> logger:Logger.t
+  -> current_global_slot:Coda_numbers.Global_slot.t
   -> transactions_by_fee:User_command.With_valid_signature.t Sequence.t
   -> get_completed_work:(   Transaction_snark_work.Statement.t
                          -> Transaction_snark_work.Checked.t option)
@@ -163,13 +172,18 @@ val of_scan_state_pending_coinbases_and_snarked_ledger :
   -> snarked_ledger:Ledger.t
   -> expected_merkle_root:Ledger_hash.t
   -> pending_coinbases:Pending_coinbase.t
+  -> get_state:(State_hash.t -> Coda_state.Protocol_state.value Or_error.t)
   -> t Or_error.t Deferred.t
 
-val all_work_pairs_exn :
+val all_work_pairs :
      t
-  -> ( Transaction.t Transaction_protocol_state.t
+  -> get_state:(State_hash.t -> Coda_state.Protocol_state.value Or_error.t)
+  -> ( Transaction.t
      , Transaction_witness.t
      , Ledger_proof.t )
      Snark_work_lib.Work.Single.Spec.t
      One_or_two.t
      list
+     Or_error.t
+
+val all_work_statements_exn : t -> Transaction_snark_work.Statement.t list

@@ -155,12 +155,14 @@ val create_new_account_exn : t -> Account_id.t -> Account.t -> unit
 
 val apply_user_command :
      constraint_constants:Genesis_constants.Constraint_constants.t
+  -> txn_global_slot:Coda_numbers.Global_slot.t
   -> t
   -> User_command.With_valid_signature.t
   -> Undo.User_command_undo.t Or_error.t
 
 val apply_transaction :
      constraint_constants:Genesis_constants.Constraint_constants.t
+  -> txn_global_slot:Coda_numbers.Global_slot.t
   -> t
   -> Transaction.t
   -> Undo.t Or_error.t
@@ -173,6 +175,7 @@ val undo :
 
 val merkle_root_after_user_command_exn :
      constraint_constants:Genesis_constants.Constraint_constants.t
+  -> txn_global_slot:Coda_numbers.Global_slot.t
   -> t
   -> User_command.With_valid_signature.t
   -> Ledger_hash.t

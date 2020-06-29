@@ -1,5 +1,5 @@
 (executable
-(libraries core snarky signature_lib snarky_universe async  snark_params coda_numbers coda_base snark_params_nonconsensus)
+(libraries core snarky signature_lib snarky_universe async domaccount snark_params coda_numbers coda_base snark_params_nonconsensus sparse_ledger_lib)
 (public_name certchain)
 (package certchain)
  (name certchain))

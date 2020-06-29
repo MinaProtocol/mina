@@ -201,7 +201,7 @@ module Make (Transition_frontier : Transition_frontier_intf) :
         ; logger
         ; removed_counter= removed_breadcrumb_wait }
 
-      let snark_pool_json t : Yojson.Safe.json =
+      let snark_pool_json t : Yojson.Safe.t =
         `List
           (Statement_table.fold ~init:[] t.snark_tables.all
              ~f:(fun ~key ~data:{proof= _; fee= {fee; prover}} acc ->
@@ -499,7 +499,7 @@ let%test_module "random set test" =
 
     let trust_system = Mocks.trust_system
 
-    let proof_level = Genesis_constants.Proof_level.Check
+    let proof_level = Genesis_constants.Proof_level.for_unit_tests
 
     let constraint_constants =
       Genesis_constants.Constraint_constants.for_unit_tests
