@@ -1,7 +1,7 @@
 {
   "name": "github-webhook-cloud-function",
   "version": "1.0.0",
-  "description": "Update Trello from GitHub Webhooks using Google Cloud Functions",
+  "description": "Ci-build-me bot helps run CI on PRs using Google Cloud Functions",
   "main": "src/index.js",
   "scripts": {
     "coverage": "jest --coverage",
@@ -13,18 +13,13 @@
     "type": "git",
     "url": "git+https://github.com/eddies/github-webhook-cloud-function.git"
   },
-  "keywords": [
-    "github",
-    "buildkite",
-    "google cloud functions",
-    "node"
-  ],
-  "author": "Edwin Shin",
+  "keywords": ["github", "buildkite", "google cloud functions", "node"],
+  "author": "O(1) Labs (forked from Edwin Shin)",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/eddies/github-webhook-cloud-function/issues"
+    "url": "https://github.com/codaprotocol/coda/issues"
   },
-  "homepage": "https://github.com/eddies/github-webhook-cloud-function#readme",
+  "homepage": "https://github.com/codaprotocol/coda",
   "dependencies": {
     "axios": "^0.19.2"
   },
@@ -38,16 +33,11 @@
     "smee-client": "^1.1.0"
   },
   "jest": {
-    "collectCoverageFrom": [
-      "src/**/*.js"
-    ],
+    "collectCoverageFrom": ["src/**/*.js"],
     "coverageDirectory": "build/coverage",
     "testEnvironment": "node"
   },
   "nodemonConfig": {
-    "ignore": [
-      "test/*",
-      "docs/*"
-    ]
+    "ignore": ["test/*", "docs/*"]
   }
 }
