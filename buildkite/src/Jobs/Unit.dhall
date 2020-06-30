@@ -16,11 +16,7 @@ let Size = ../Command/Size.dhall
 let buildTestCmd : Text -> Text -> Command.Type = \(profile : Text) -> \(path : Text) ->
   Command.build
     Command.Config::{
-      commands =
-        OpamInit.andThenRunInDocker (
-          "source ~/.profile && make build && (dune runtest ${path} --profile=${profile} -j8" ++
-          " || (./scripts/link-coredumps.sh && false))"
-        ),
+      commands = OpamInit.andThenRunInDocker "scripts/unit-test.sh ${profile} ${path}",
       label = "Run ${profile} unit-tests",
       key = "unit-test-${profile}",
       target = Size.Experimental,
