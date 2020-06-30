@@ -283,7 +283,6 @@ module Ledger = struct
   let load ~genesis_dir ~logger ~constraint_constants
       (config : Runtime_config.Ledger.t) =
     Monitor.try_with_join_or_error (fun () ->
-        let open Deferred.Or_error.Let_syntax in
         let add_genesis_winner_account accounts =
           let pk, _ = Coda_state.Consensus_state_hooks.genesis_winner in
           match accounts with
@@ -297,29 +296,25 @@ module Ledger = struct
                   (Currency.Balance.of_int 1000) )
               :: accounts
         in
-        let%bind accounts =
+        let accounts =
           match config.base with
           | Hash _ ->
-              return None
+              None
           | Accounts accounts ->
-              return
-                (Some
-                   ( lazy
-                     (add_genesis_winner_account (Accounts.to_full accounts))
-                     ))
+              Some
+                (lazy (add_genesis_winner_account (Accounts.to_full accounts)))
           | Named name -> (
             match Genesis_ledger.fetch_ledger name with
             | Some (module M) ->
                 Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
                   "Found genesis ledger with name $ledger_name"
                   ~metadata:[("ledger_name", `String name)] ;
-                return
-                  (Some (Lazy.map ~f:add_genesis_winner_account M.accounts))
+                Some (Lazy.map ~f:add_genesis_winner_account M.accounts)
             | None ->
-                Logger.error ~module_:__MODULE__ ~location:__LOC__ logger
-                  "Could not find a genesis ledger named $ledger_name"
+                Logger.warn ~module_:__MODULE__ ~location:__LOC__ logger
+                  "Could not find a built-in genesis ledger named $ledger_name"
                   ~metadata:[("ledger_name", `String name)] ;
-                Deferred.Or_error.errorf "Genesis ledger '%s' not found" name )
+                None )
         in
         let accounts =
           Option.map
@@ -353,17 +348,29 @@ module Ledger = struct
           match accounts with
           | None -> (
             match config.base with
+            | Accounts _ ->
+                assert false
             | Hash hash ->
                 Logger.error ~module_:__MODULE__ ~location:__LOC__ logger
                   "Could not find or generate a ledger for $root_hash"
                   ~metadata:[("root_hash", `String hash)] ;
                 Deferred.Or_error.errorf
                   "Could not find a ledger tar file for hash '%s'" hash
-            | _ ->
+            | Named ledger_name ->
+                let ledger_filename =
+                  named_filename ~constraint_constants
+                    ~num_accounts:config.num_accounts ledger_name
+                in
                 Logger.error ~module_:__MODULE__ ~location:__LOC__ logger
-                  "Bad config $config"
-                  ~metadata:[("config", Runtime_config.Ledger.to_yojson config)] ;
-                assert false )
+                  "Bad config $config: genesis ledger named $ledger_name is \
+                   not built in, and no ledger file was found at \
+                   $ledger_filename"
+                  ~metadata:
+                    [ ("config", Runtime_config.Ledger.to_yojson config)
+                    ; ("ledger_name", `String ledger_name)
+                    ; ("ledger_filename", `String ledger_filename) ] ;
+                Deferred.Or_error.errorf "Genesis ledger '%s' not found"
+                  ledger_name )
           | Some accounts -> (
               let (packed : Genesis_ledger.Packed.t) =
                 ( module Genesis_ledger.Make (struct
