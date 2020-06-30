@@ -76,6 +76,9 @@ module type S = sig
   (** Get all of the tokens for which a public key has accounts. *)
   val tokens : t -> key -> token_id_set
 
+  (** The next token that is not present in the ledger. This token will be used
+      as the new token when a [Create_new_token] transaction is processed.
+  *)
   val next_available_token : t -> token_id
 
   val set_next_available_token : t -> token_id -> unit
