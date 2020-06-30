@@ -243,11 +243,12 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     let next_available_token t =
       assert_is_attached t ;
+      let base_token = Base.next_available_token (get_parent t) in
       match t.next_available_token with
       | Some tid ->
-          tid
+          Token_id.max tid base_token
       | None ->
-          Base.next_available_token (get_parent t)
+          base_token
 
     let set_next_available_token t tid =
       assert_is_attached t ;
