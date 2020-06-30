@@ -395,6 +395,11 @@ module Ledger = struct
                     ^/ named_filename ~constraint_constants
                          ~num_accounts:config.num_accounts name
                   in
+                  (* Delete the file if it already exists. *)
+                  let%bind () =
+                    Deferred.Or_error.try_with (fun () -> Sys.remove link_name)
+                    |> Deferred.ignore
+                  in
                   (* Add a symlink from the named path to the hash path. *)
                   let%map () = Unix.symlink ~target:tar_path ~link_name in
                   Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
