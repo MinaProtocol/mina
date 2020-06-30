@@ -155,9 +155,9 @@ module Ledger = struct
     in
     "accounts_" ^ Blake2.to_hex hash
 
-  let find_tar ~logger ~constraint_constants (config : Runtime_config.Ledger.t)
-      =
-    let search_paths = Cache_dir.possible_paths "" in
+  let find_tar ~logger ~genesis_dir ~constraint_constants
+      (config : Runtime_config.Ledger.t) =
+    let search_paths = Cache_dir.possible_paths "" @ [genesis_dir] in
     let file_exists filename path =
       let filename = path ^/ filename in
       if%map file_exists ~follow_symlinks:true filename then (
@@ -331,7 +331,9 @@ module Ledger = struct
             accounts
         in
         let open Deferred.Let_syntax in
-        let%bind tar_path = find_tar ~logger ~constraint_constants config in
+        let%bind tar_path =
+          find_tar ~logger ~genesis_dir ~constraint_constants config
+        in
         match tar_path with
         | Some tar_path -> (
             match%map
