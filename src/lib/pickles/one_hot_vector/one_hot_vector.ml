@@ -17,6 +17,11 @@ struct
   open Impl
   include T (Impl)
 
+  let of_index i ~length =
+    let v = Vector.init length ~f:(fun j -> Field.equal (Field.of_int j) i) in
+    Boolean.Assert.any (Vector.to_list v) ;
+    v
+
   let typ (n : 'n Nat.t) : ('n t, Constant.t) Typ.t =
     let typ = Vector.typ Boolean.typ n in
     let typ =
