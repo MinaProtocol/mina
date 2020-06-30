@@ -269,7 +269,7 @@ web:
 ## Benchmarks
 
 benchmarks:
-	dune build app/benchmarks/main.exe
+	dune build src/app/benchmarks/main.exe
 
 
 ########################################
