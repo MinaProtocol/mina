@@ -16,7 +16,7 @@ let buildTestCmd : Text -> Text -> Command.Type = \(profile : Text) -> \(path : 
   Command.build
     Command.Config::{
       commands =
-        OpamInit.andThenRunInDocker (
+        OpamInit.andThenRunInDocker ([] : List Text) (
           "source ~/.profile && make build && (dune runtest ${path} --profile=${profile} -j8" ++
           " || (./scripts/link-coredumps.sh && false))"
         ),
