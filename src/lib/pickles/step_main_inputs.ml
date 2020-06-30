@@ -1,39 +1,32 @@
 open Core_kernel
 open Common
-open Zexe_backend.Bn382
-module Impl = Impls.Pairing_based
+open Backend
+module Impl = Impls.Step
 open Import
 
 let sponge_params_constant =
-  Sponge.Params.(map bn382_p ~f:Impl.Field.Constant.of_string)
+  Sponge.Params.(map tweedle_q ~f:Impl.Field.Constant.of_string)
 
-let fp_random_oracle ?length s = Fp.of_bits (bits_random_oracle ?length s)
+let tick_field_random_oracle ?length s =
+  Tick.Field.of_bits (bits_random_oracle ?length s)
 
 let unrelated_g =
-  let group_map = unstage (group_map (module Fp) ~a:G.Params.a ~b:G.Params.b)
-  and str = Fn.compose bits_to_bytes Fp.to_bits in
-  fun (x, y) -> group_map (fp_random_oracle (str x ^ str y))
-
-let crs_max_degree = 1 lsl 22
+  let group_map =
+    unstage
+      (group_map
+         (module Tick.Field)
+         ~a:Tick.Inner_curve.Params.a ~b:Tick.Inner_curve.Params.b)
+  and str = Fn.compose bits_to_bytes Tick.Field.to_bits in
+  fun (x, y) -> group_map (tick_field_random_oracle (str x ^ str y))
 
 open Impl
 
-module Fq = struct
-  type t = Impls.Dlog_based.Field.Constant.t [@@deriving sexp]
+module Other_field = struct
+  type t = Impls.Wrap.Field.Constant.t [@@deriving sexp]
 
-  open Zexe_backend.Bn382.Fq
+  include (Tock.Field : module type of Tock.Field with type t := t)
 
-  let of_bits = of_bits
-
-  let to_bits = to_bits
-
-  let is_square = is_square
-
-  let inv = inv
-
-  let print = print
-
-  let of_int = of_int
+  let size = Impls.Wrap.Bigint.to_bignum_bigint size
 end
 
 let sponge_params =
@@ -42,7 +35,7 @@ let sponge_params =
 module Sponge = struct
   module S = Sponge.Make_sponge (Sponge.Poseidon (Sponge_inputs.Make (Impl)))
 
-  include Sponge.Make_bit_sponge (struct
+  include Sponge.Bit_sponge.Make (struct
               type t = Impl.Boolean.var
             end)
             (struct
@@ -64,9 +57,7 @@ module Sponge = struct
 end
 
 module Input_domain = struct
-  let self = Domain.Pow_2_roots_of_unity 6
-
-  let domain = Domain.Pow_2_roots_of_unity 5
+  let domain = Domain.Pow_2_roots_of_unity 6
 
   let lagrange_commitments =
     lazy
@@ -75,24 +66,25 @@ module Input_domain = struct
        time "lagrange" (fun () ->
            Array.init domain_size ~f:(fun i ->
                let v =
-                 Snarky_bn382.Fq_urs.lagrange_commitment
-                   (Zexe_backend.Bn382.Dlog_based.Keypair.load_urs ())
+                 Snarky_bn382.Tweedle.Dee.Field_urs.lagrange_commitment
+                   (Zexe_backend.Tweedle.Dee_based.Keypair.load_urs ())
                    (u domain_size) (u i)
-                 |> Snarky_bn382.Fq_poly_comm.unshifted
+                 |> Snarky_bn382.Tweedle.Dee.Field_poly_comm.unshifted
                in
-               assert (G.Affine.Backend.Vector.length v = 1) ;
-               G.Affine.Backend.Vector.get v 0 |> G.Affine.of_backend ) ))
+               assert (Tick.Inner_curve.Affine.Backend.Vector.length v = 1) ;
+               Tick.Inner_curve.Affine.Backend.Vector.get v 0
+               |> Tick.Inner_curve.Affine.of_backend ) ))
 end
 
-module G = struct
+module Inner_curve = struct
   module Inputs = struct
     module Impl = Impl
 
     module Params = struct
       open Impl.Field.Constant
-      include G.Params
+      include Tweedle.Dee.Params
 
-      let one = G.to_affine_exn G.one
+      let one = Tweedle.Dee.to_affine_exn Tweedle.Dee.one
 
       let group_size_in_bits = Field.size_in_bits
     end
@@ -124,12 +116,13 @@ module G = struct
     end
 
     module Constant = struct
-      include G.Affine
-      module Scalar = Impls.Dlog_based.Field.Constant
+      include Tweedle.Dee.Affine
+      module Scalar = Impls.Wrap.Field.Constant
 
-      let scale (t : t) x : t = G.(to_affine_exn (scale (of_affine t) x))
+      let scale (t : t) x : t =
+        Tweedle.Dee.(to_affine_exn (scale (of_affine t) x))
 
-      let random () = G.(to_affine_exn (random ()))
+      let random () = Tweedle.Dee.(to_affine_exn (random ()))
 
       let zero = Impl.Field.Constant.(zero, zero)
 
@@ -138,10 +131,10 @@ module G = struct
         if is_zero t1 then t2
         else if is_zero t2 then t1
         else
-          let r = G.(of_affine t1 + of_affine t2) in
-          try G.to_affine_exn r with _ -> zero
+          let r = Tweedle.Dee.(of_affine t1 + of_affine t2) in
+          try Tweedle.Dee.to_affine_exn r with _ -> zero
 
-      let negate x = G.(to_affine_exn (negate (of_affine x)))
+      let negate x = Tweedle.Dee.(to_affine_exn (negate (of_affine x)))
 
       let to_affine_exn = Fn.id
 
@@ -175,21 +168,22 @@ module G = struct
         ~compute:
           As_prover.(
             fun () ->
-              G.scale
-                (G.of_affine (read typ t))
-                (Fq.inv (Fq.of_bits (List.map ~f:(read Boolean.typ) bs)))
-              |> G.to_affine_exn)
+              Tweedle.Dee.scale
+                (Tweedle.Dee.of_affine (read typ t))
+                (Tock.Field.inv
+                   (Tock.Field.of_bits (List.map ~f:(read Boolean.typ) bs)))
+              |> Tweedle.Dee.to_affine_exn)
     in
     assert_equal t (scale res bs) ;
     res
 
-  (* g -> 7 * g *)
+  (* g -> 5 * g *)
   let scale_by_quadratic_nonresidue t =
     let t2 = T.double t in
     let t4 = T.double t2 in
-    t + t2 + t4
+    t + t4
 
-  let one_seventh = Fq.(inv (of_int 7))
+  let quadratic_nonresidue_inv = Tock.Field.(inv (of_int 5))
 
   let scale_by_quadratic_nonresidue_inv t =
     let res =
@@ -197,7 +191,10 @@ module G = struct
         ~compute:
           As_prover.(
             fun () ->
-              G.to_affine_exn (G.scale (G.of_affine (read typ t)) one_seventh))
+              Tweedle.Dee.to_affine_exn
+                (Tweedle.Dee.scale
+                   (Tweedle.Dee.of_affine (read typ t))
+                   quadratic_nonresidue_inv))
     in
     ignore (scale_by_quadratic_nonresidue res) ;
     res
@@ -212,7 +209,7 @@ end
 module Generators = struct
   let h =
     lazy
-      ( Snarky_bn382.Fq_urs.h
-          (Zexe_backend.Bn382.Dlog_based.Keypair.load_urs ())
-      |> Zexe_backend.Bn382.G.Affine.of_backend )
+      ( Snarky_bn382.Tweedle.Dee.Field_urs.h
+          (Zexe_backend.Tweedle.Dee_based.Keypair.load_urs ())
+      |> Zexe_backend.Tweedle.Dee.Affine.of_backend )
 end

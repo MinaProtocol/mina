@@ -16,7 +16,7 @@ type ( 'a_var
      t =
   | T :
       { branching: 'branching Nat.t * ('prev_vars, 'branching) Hlist.Length.t
-      ; index: int
+      ; index: Types.Index.t
       ; lte: ('branching, 'max_branching) Nat.Lte.t
       ; domains: Domains.t
       ; rule:
@@ -30,8 +30,8 @@ type ( 'a_var
       ; main:
              step_domains:(Domains.t, 'branches) Vector.t
           -> ( (Unfinalized.t, 'max_branching) Vector.t
-             , Impls.Pairing_based.Field.t
-             , (Impls.Pairing_based.Field.t, 'max_branching) Vector.t )
+             , Impls.Step.Field.t
+             , (Impls.Step.Field.t, 'max_branching) Vector.t )
              Types.Pairing_based.Statement.t
           -> unit
       ; requests:
@@ -56,7 +56,8 @@ let create
     (type branches max_branching local_signature local_branches a_var a_value
     prev_vars prev_values) ~index
     ~(self : (a_var, a_value, max_branching, branches) Tag.t) ~wrap_domains
-    ~(max_branching : max_branching Nat.t) ~(branches : branches Nat.t) ~typ
+    ~(max_branching : max_branching Nat.t)
+    ~(branchings : (int, branches) Vector.t) ~(branches : branches Nat.t) ~typ
     a_var_to_field_elements a_value_to_field_elements
     (rule : _ Inductive_rule.t) =
   let module HT = H4.T (Tag) in
@@ -91,6 +92,7 @@ let create
       rule
       ~basic:
         { typ
+        ; branchings
         ; a_var_to_field_elements
         ; a_value_to_field_elements
         ; wrap_domains
@@ -107,10 +109,9 @@ let create
           (Vector.init branches ~f:(fun _ -> Fix_domains.rough_domains))
     in
     let etyp =
-      Impls.Pairing_based.input ~branching:max_branching
-        ~bulletproof_log2:Rounds.n
+      Impls.Step.input ~branching:max_branching ~bulletproof_log2:Rounds.n
     in
-    Fix_domains.domains (module Impls.Pairing_based) etyp main
+    Fix_domains.domains (module Impls.Step) etyp main
   in
   T
     { branching= (self_width, branching)

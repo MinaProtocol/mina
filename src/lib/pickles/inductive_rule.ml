@@ -2,7 +2,7 @@ open Core_kernel
 open Pickles_types.Hlist
 
 module B = struct
-  type t = Impls.Pairing_based.Boolean.var
+  type t = Impls.Step.Boolean.var
 end
 
 (* This type models an "inductive rule". It includes

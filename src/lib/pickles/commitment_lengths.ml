@@ -29,3 +29,8 @@ let generic map ~h ~k : _ Dlog_marlin_types.Evals.t =
 let of_domains {Domains.h; k} : int Dlog_marlin_types.Evals.t =
   let h, k = Domain.(size h, size k) in
   generic (fun x ~f -> f x) ~h ~k
+
+let of_domains_vector domainses =
+  let open Vector in
+  let f field = map domainses ~f:(Fn.compose Domain.size field) in
+  Vector.(generic map ~h:(f Domains.h) ~k:(f Domains.k))

@@ -1,25 +1,41 @@
 open Pickles_types
-open Zexe_backend.Bn382
 open Import
+open Backend
 
 type dlog_opening =
-  (G.Affine.t, Fq.t) Types.Pairing_based.Openings.Bulletproof.t
+  ( Tock.Curve.Affine.t
+  , Tock.Field.t )
+  Types.Pairing_based.Openings.Bulletproof.t
 
-type t = dlog_opening * (G.Affine.t, Fq.t) Dlog_marlin_types.Messages.t
+type t =
+  dlog_opening
+  * (Tock.Curve.Affine.t, Tock.Field.t) Dlog_marlin_types.Messages.t
 
-open Pairing_main_inputs
+open Step_main_inputs
 
 type var =
-  (G.t, Impls.Pairing_based.Fq.t) Types.Pairing_based.Openings.Bulletproof.t
-  * (G.t, Impls.Pairing_based.Fq.t) Dlog_marlin_types.Messages.t
+  ( Inner_curve.t
+  , Impls.Step.Other_field.t )
+  Types.Pairing_based.Openings.Bulletproof.t
+  * (Inner_curve.t, Impls.Step.Other_field.t) Dlog_marlin_types.Messages.t
 
-open Impls.Pairing_based
+open Impls.Step
 
 let typ : (var, t) Typ.t =
   Typ.tuple2
     (Types.Pairing_based.Openings.Bulletproof.typ
-       ~length:(Nat.to_int Dlog_based.Rounds.n)
-       Fq.typ G.typ)
-    (Pickles_types.Dlog_marlin_types.Messages.typ
-       ~commitment_lengths:(Commitment_lengths.of_domains Common.wrap_domains)
-       Fq.typ G.typ)
+       ~length:(Nat.to_int Backend.Rounds.n)
+       Other_field.typ Inner_curve.typ)
+    (Dlog_marlin_types.Messages.typ ~dummy:Inner_curve.Params.one
+       ~commitment_lengths:
+         (Dlog_marlin_types.Evals.map
+            ~f:(fun x -> Vector.[x])
+            (let t = Commitment_lengths.of_domains Common.wrap_domains in
+             let open Core in
+             printf
+               !"expected commitment lengths: %{sexp:int \
+                 Dlog_marlin_types.Evals.t}\n\
+                 %!"
+               t ;
+             t))
+       Other_field.typ Inner_curve.typ)

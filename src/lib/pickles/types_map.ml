@@ -8,11 +8,13 @@ open Backend
    data.
 *)
 module Data = struct
-  type f = Impls.Dlog_based.field
+  type f = Impls.Wrap.field
 
   type ('a_var, 'a_value, 'max_branching, 'branches) basic =
-    { typ: ('a_var, 'a_value) Impls.Pairing_based.Typ.t
-    ; a_var_to_field_elements: 'a_var -> Impls.Pairing_based.Field.t array
+    { typ: ('a_var, 'a_value) Impls.Step.Typ.t
+    ; branchings: (int, 'branches) Vector.t
+          (* For each branch in this rule, how many predecessor proofs does it have? *)
+    ; a_var_to_field_elements: 'a_var -> Impls.Step.Field.t array
     ; a_value_to_field_elements: 'a_value -> Tick.Field.t array
     ; wrap_domains: Domains.t
     ; step_domains: (Domains.t, 'branches) Vector.t }
@@ -23,30 +25,35 @@ module Data = struct
   type ('a_var, 'a_value, 'max_branching, 'branches) t =
     { branches: 'branches Nat.t
     ; max_branching: (module Nat.Add.Intf with type n = 'max_branching)
-    ; typ: ('a_var, 'a_value) Impls.Pairing_based.Typ.t
+    ; branchings: (int, 'branches) Vector.t
+          (* For each branch in this rule, how many predecessor proofs does it have? *)
+    ; typ: ('a_var, 'a_value) Impls.Step.Typ.t
     ; a_value_to_field_elements: 'a_value -> Tick.Field.t array
-    ; a_var_to_field_elements: 'a_var -> Impls.Pairing_based.Field.t array
+    ; a_var_to_field_elements: 'a_var -> Impls.Step.Field.t array
     ; wrap_key:
         Tick.Inner_curve.Affine.t
         Dlog_marlin_types.Poly_comm.Without_degree_bound.t
         Abc.t
         Matrix_evals.t
-    ; wrap_vk: Impls.Dlog_based.Verification_key.t
+    ; wrap_vk: Impls.Wrap.Verification_key.t
     ; wrap_domains: Domains.t
     ; step_domains: (Domains.t, 'branches) Vector.t }
 
   type ('a, 'b, 'c, 'd) data = ('a, 'b, 'c, 'd) t
 
   module For_step = struct
+    type inner_curve_var =
+      Tick.Field.t Snarky.Cvar.t * Tick.Field.t Snarky.Cvar.t
+
     type ('a_var, 'a_value, 'max_branching, 'branches) t =
       { branches: 'branches Nat.t
       ; max_branching: (module Nat.Add.Intf with type n = 'max_branching)
-      ; typ: ('a_var, 'a_value) Impls.Pairing_based.Typ.t
+      ; branchings: (int, 'branches) Vector.t
+      ; typ: ('a_var, 'a_value) Impls.Step.Typ.t
       ; a_value_to_field_elements: 'a_value -> Tick.Field.t array
-      ; a_var_to_field_elements: 'a_var -> Impls.Pairing_based.Field.t array
+      ; a_var_to_field_elements: 'a_var -> Impls.Step.Field.t array
       ; wrap_key:
-          Pairing_main_inputs.G.t
-          Dlog_marlin_types.Poly_comm.Without_degree_bound.t
+          inner_curve_var Dlog_marlin_types.Poly_comm.Without_degree_bound.t
           Abc.t
           Matrix_evals.t
       ; wrap_domains: Domains.t
@@ -55,6 +62,7 @@ module Data = struct
     let create
         ({ branches
          ; max_branching
+         ; branchings
          ; typ
          ; a_value_to_field_elements
          ; a_var_to_field_elements
@@ -64,12 +72,19 @@ module Data = struct
           _ data) =
       { branches
       ; max_branching
+      ; branchings
       ; typ
       ; a_value_to_field_elements
       ; a_var_to_field_elements
       ; wrap_key=
           Matrix_evals.map wrap_key
-            ~f:(Abc.map ~f:(Array.map ~f:Pairing_main_inputs.G.constant))
+            ~f:
+              (Abc.map
+                 ~f:
+                   (Array.map
+                      ~f:
+                        Step_main_inputs.Inner_curve.constant
+                        (*                 Pairing_main_inputs.G.constant *)))
       ; wrap_domains
       ; step_domains }
   end
