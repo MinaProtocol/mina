@@ -1,4 +1,4 @@
-module D = Limb_vector.Digest
+module D = Digest
 open Core_kernel
 open Pickles_types
 open Hlist
@@ -27,6 +27,7 @@ type (_, _, _) Basic.t +=
         ; bulletproof_challenge2: 'bp_chal2
         ; .. > )
       t
+  | Index : ('index1, 'index2, < index1: 'index1 ; index2: 'index2 ; .. >) t
 
 module rec T : sig
   type (_, _, _) t =
@@ -167,6 +168,8 @@ module Common (Impl : Snarky.Snark_intf.Run) = struct
           (Challenge.Constant.t Sc.t, bool) Bulletproof_challenge.t
       ; bulletproof_challenge2:
           (Challenge.t Sc.t, Boolean.var) Bulletproof_challenge.t
+      ; index1: Index.t
+      ; index2: (Boolean.var, Nat.N8.n) Vector.t
       ; .. >
       as
       'a
@@ -190,9 +193,11 @@ let pack_basic (type field other_field other_field_var)
     | Bool ->
         [|[x]|]
     | Digest ->
-        [|x|]
+        [|Digest.to_bits x|]
     | Challenge ->
         [|Challenge.to_bits x|]
+    | Index ->
+        [|Vector.to_list x|]
     | Bulletproof_challenge ->
         let (Scalar_challenge pre) = x.prechallenge in
         [|[x.is_square]; Challenge.to_bits pre|]
@@ -218,20 +223,14 @@ let typ_basic (type field other_field other_field_var)
         field
     | Bool ->
         Boolean.typ
+    | Index ->
+        Index.typ Boolean.typ
     | Digest ->
         Digest.typ
     | Challenge ->
         Challenge.typ
     | Bulletproof_challenge ->
-        let there {Bulletproof_challenge.prechallenge; is_square} =
-          (prechallenge, is_square)
-        in
-        let back (prechallenge, is_square) =
-          {Bulletproof_challenge.prechallenge; is_square}
-        in
-        Typ.transport ~there ~back
-          (Typ.tuple2 (Sc.typ Challenge.typ) Boolean.typ)
-        |> Typ.transport_var ~there ~back
+        Bulletproof_challenge.typ Challenge.typ Boolean.typ
     | _ ->
         failwith "unknown basic spec"
   in
@@ -259,6 +258,8 @@ let packed_typ_basic (type field other_field other_field_var)
           (Challenge.Constant.t Sc.t, bool) Bulletproof_challenge.t
       ; bulletproof_challenge2:
           (Field.t Sc.t, Boolean.var) Bulletproof_challenge.t
+      ; index1: Index.t
+      ; index2: Field.t
       ; .. >
       as
       'a
@@ -271,9 +272,11 @@ let packed_typ_basic (type field other_field other_field_var)
     | Bool ->
         T (Boolean.typ, Fn.id)
     | Digest ->
-        T (Digest.packed_typ, Fn.id)
+        T (Digest.typ, Fn.id)
     | Challenge ->
         T (Challenge.packed_typ, Fn.id)
+    | Index ->
+        T (Index.packed_typ (module Impl), Fn.id)
     | Bulletproof_challenge ->
         let typ =
           let there
