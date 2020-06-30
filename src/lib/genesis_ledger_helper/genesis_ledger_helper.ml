@@ -380,12 +380,14 @@ module Ledger = struct
                 }
               in
               let name =
-                match config.base with
-                | Named name ->
+                match (config.base, config.name) with
+                | Named name, _ ->
                     Some name
-                | Accounts accounts ->
+                | _, Some name ->
+                    Some name
+                | Accounts accounts, None ->
                     Some (accounts_name accounts)
-                | Hash _ ->
+                | Hash _, None ->
                     None
               in
               match (tar_path, name) with
@@ -794,7 +796,8 @@ let init_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
          ~default:
            { base= Named Coda_compile_config.genesis_ledger
            ; num_accounts= None
-           ; hash= None })
+           ; hash= None
+           ; name= None })
   in
   let config =
     {config with ledger= Option.map config.ledger ~f:(fun _ -> ledger_config)}

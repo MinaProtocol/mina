@@ -34,11 +34,15 @@ module Ledger = struct
     | Accounts of Accounts.t  (** A ledger generated from the given accounts *)
     | Hash of string  (** The ledger with the given root hash *)
 
-  type t = {base: base; num_accounts: int option; hash: string option}
+  type t =
+    { base: base
+    ; num_accounts: int option
+    ; hash: string option
+    ; name: string option }
 
   let base_to_yojson_field = function
     | Named name ->
-        ("named", `String name)
+        ("name", `String name)
     | Accounts accounts ->
         ("accounts", Accounts.to_yojson accounts)
     | Hash hash ->
@@ -55,15 +59,17 @@ module Ledger = struct
                    (Accounts.of_yojson value))
             else None )
       ; List.find_map ~f:(fun (fld, value) ->
-            if String.equal fld "name" then
+            if String.equal fld "name" || String.equal fld "named" then
               match value with
               | `String name ->
                   Some (Ok (Named name))
               | _ ->
                   Some
                     (Error
-                       "Runtime_config.Ledger.of_yojson: Expected the field \
-                        'name' to contain a string")
+                       (sprintf
+                          "Runtime_config.Ledger.of_yojson: Expected the \
+                           field '%s' to contain a string"
+                          fld))
             else None )
       ; List.find_map ~f:(fun (fld, value) ->
             if String.equal fld "hash" then
@@ -82,7 +88,7 @@ module Ledger = struct
                "Runtime_config.Ledger.of_yojson: Expected a field 'accounts', \
                 'name' or 'hash'") ) ]
 
-  let to_yojson {base; num_accounts; hash} =
+  let to_yojson {base; num_accounts; hash; name} =
     let fields =
       List.filter_opt
         [ Option.map num_accounts ~f:(fun i -> ("num_accounts", `Int i))
@@ -91,7 +97,13 @@ module Ledger = struct
               | Hash _ ->
                   None
               | _ ->
-                  Some ("hash", `String hash) ) ]
+                  Some ("hash", `String hash) )
+        ; Option.bind name ~f:(fun name ->
+              match base with
+              | Named _ ->
+                  None
+              | _ ->
+                  Some ("name", `String name) ) ]
     in
     `Assoc (base_to_yojson_field base :: fields)
 
@@ -113,6 +125,22 @@ module Ledger = struct
                              field 'num_accounts' to contain an integer")
                  else None )
         in
+        let%bind name =
+          Option.value ~default:(return None)
+          @@ List.find_map l ~f:(fun (fld, value) ->
+                 if String.equal fld "name" || String.equal fld "named" then
+                   match value with
+                   | `String name ->
+                       Some (Ok (Some name))
+                   | _ ->
+                       Some
+                         (Error
+                            (sprintf
+                               "Runtime_config.Ledger.of_yojson: Expected the \
+                                field '%s' to contain a string"
+                               fld))
+                 else None )
+        in
         let%map hash =
           match base with
           | Hash hash ->
@@ -131,7 +159,7 @@ module Ledger = struct
                                  the field 'hash' to contain a string")
                      else None )
         in
-        {base; num_accounts; hash}
+        {base; num_accounts; hash; name}
     | _ ->
         Error "Runtime_config.Ledger.of_yojson: Expected a JSON object"
 end
