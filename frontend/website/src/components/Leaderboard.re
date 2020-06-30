@@ -16,37 +16,21 @@ let safeParseInt = str =>
   };
 
 let fetchLeaderboard = () => {
-  ReFetch.fetch(
-    "https://sheets.googleapis.com/v4/spreadsheets/1Nq_Y76ALzSVJRhSFZZm4pfuGbPkZs2vTtCnVQ1ehujE/values/B4:H?key="
-    ++ Next.Config.google_api_key,
-    ~method_=Get,
-    ~headers={
-      "Accept": "application/json",
-      "Content-Type": "application/json",
-    },
+  Sheets.fetchRange(
+    ~sheet="1Nq_Y76ALzSVJRhSFZZm4pfuGbPkZs2vTtCnVQ1ehujE",
+    ~range="B4:H",
   )
-  |> Promise.bind(Bs_fetch.Response.json)
-  |> Promise.map(r => {
-       let results =
-         Option.bind(Js.Json.decodeObject(r), o => Js.Dict.get(o, "values"));
-
-       switch (Option.bind(results, Js.Json.decodeArray)) {
-       | Some(resultsArr) =>
-         let res =
-           Array.map(parseEntry, resultsArr)
-           |> Array.map(entry => {
-                {
-                  rank: safeParseInt(entry[0]),
-                  name: entry[2],
-                  phase: safeParseInt(entry[3]),
-                  release: safeParseInt(entry[6]),
-                  allTime: safeParseInt(entry[3]),
-                }
-              });
-         Js.log(res);
-         res;
-       | None => [||]
-       };
+  |> Promise.map(res => {
+       Array.map(parseEntry, res)
+       |> Array.map(entry => {
+            {
+              rank: safeParseInt(entry[0]),
+              name: entry[2],
+              phase: safeParseInt(entry[3]),
+              release: safeParseInt(entry[6]),
+              allTime: safeParseInt(entry[3]),
+            }
+          })
      })
   |> Js.Promise.catch(_ => Promise.return([||]));
 };
@@ -209,7 +193,8 @@ let make = () => {
              rank={member.rank}
              member
            />,
-         state.members,
+         Array.length(state.members) > 0
+           ? Array.sub(state.members, 0, 10) : state.members,
        )
        |> React.array}
       {state.loading
