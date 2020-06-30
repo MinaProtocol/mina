@@ -19,7 +19,7 @@ module Styles = {
       paddingTop(`rem(2.8)),
       media(Theme.MediaQuery.notMobile, [alignItems(`center)]),
       media(
-        Theme.MediaQuery.desktop,
+        Theme.MediaQuery.veryVeryLarge,
         [flexDirection(`row), paddingTop(`zero), marginTop(`rem(3.5))],
       ),
     ]);
@@ -78,8 +78,8 @@ module Styles = {
     style([
       media(Theme.MediaQuery.tablet, [marginBottom(`rem(3.))]),
       media(
-        Theme.MediaQuery.desktop,
-        [maxWidth(`rem(39.)), marginRight(`rem(3.))],
+        Theme.MediaQuery.veryVeryLarge,
+        [maxWidth(`rem(38.)), marginRight(`rem(7.))],
       ),
     ]);
   let heroRight =
@@ -93,7 +93,7 @@ module Styles = {
       unsafe("width", "fit-content"),
       media(
         Theme.MediaQuery.tablet,
-        [minHeight(`rem(21.)), paddingLeft(`zero), alignItems(`center)],
+        [paddingLeft(`zero), marginBottom(`rem(8.)), alignItems(`center)],
       ),
     ]);
   let flexColumn =
