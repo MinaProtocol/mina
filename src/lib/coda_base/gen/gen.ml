@@ -15,7 +15,7 @@ let keypairs =
     in
     List.map sks ~f:Keypair.of_private_key_exn
   in
-(*
+  (*
   let () =
     Core.printf "key0 ex: %s\n%!"
       (Private_key.to_base58_check (Private_key.create ())) ;
