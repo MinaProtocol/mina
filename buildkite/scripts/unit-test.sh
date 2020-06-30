@@ -1,5 +1,5 @@
 #!/bin/bash
-set -euo pipefail
+set -o pipefail
 
 if [[ $# -ne 2 ]]; then
     echo "Usage: $0 <dune-profile> <path-to-source-tests>"
@@ -10,5 +10,7 @@ profile=$1
 path=$2
 
 source ~/.profile
-make build 2>&1 | tee /tmp/artifacts/make-build.log
-dune runtest "${path}" --profile="${profile}" -j8 || (./scripts/link-coredumps.sh && false) 2>&1 | tee /tmp/artifacts/unit-test.log
+echo "--- Make build"
+make build 2>&1 | tee /tmp/make-build.log
+echo "--- Run unit tests"
+dune runtest "${path}" --profile="${profile}" -j8 || (./scripts/link-coredumps.sh && false) 2>&1 | tee /tmp/unit-test.log
