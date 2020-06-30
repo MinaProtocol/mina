@@ -37,6 +37,7 @@ Pipeline.build
                 (Prelude.Text.concatSep " && "
                   [ "buildkite/scripts/setup-database-for-archive-node.sh ${user} ${password} ${db}"
                   , "PGPASSWORD=${password} psql -h localhost -p 5432 -U ${user} -d ${db} -a -f src/app/archive/create_schema.sql"
+                  , "LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper"
                   , "./scripts/test.py run 'test_archive_processor:coda-archive-processor-test'"
                   ])
             , label = "Archive-node unit tests"
