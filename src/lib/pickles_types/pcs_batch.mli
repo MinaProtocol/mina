@@ -45,22 +45,23 @@ val combine_evaluations' :
 open Dlog_marlin_types.Poly_comm
 
 val combine_split_commitments :
-     (int, 'n, 'm) t
-  -> scale:('g -> 'f -> 'g)
-  -> add:('g -> 'g -> 'g)
+     (_, 'n, 'm) t
+  -> scale_and_add:(acc:'g_acc -> xi:'f -> 'g -> 'g_acc)
+  -> init:('g -> 'g_acc)
   -> xi:'f
   -> ('g Without_degree_bound.t, 'n) Vector.t
   -> ('g With_degree_bound.t, 'm) Vector.t
-  -> 'g
+  -> 'g_acc
 
-val combine_split_evaluations' :
+val combine_split_evaluations :
      ('a, 'n, 'm) t
   -> shifted_pow:('a -> 'f_ -> 'f_)
   -> mul:('f -> 'f_ -> 'f)
   -> mul_and_add:(acc:'f_ -> xi:'f_ -> 'f -> 'f_)
   -> evaluation_point:'f_
-  -> xi:'f_
   -> init:('f -> 'f_)
+  -> last:('f array -> 'f)
+  -> xi:'f_
   -> ('f array, 'n) Vector.t
   -> ('f array, 'm) Vector.t
   -> 'f_
