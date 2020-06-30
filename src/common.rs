@@ -1,5 +1,5 @@
 use algebra::{
-    ToBytes, FromBytes,
+    ToBytes, FromBytes, Zero, One, UniformRand, VariableBaseMSM, 
     curves::{
         AffineCurve,
     },
@@ -13,7 +13,60 @@ use circuits_pairing::index::{MatrixValues,};
 use ff_fft::{Evaluations, DensePolynomial, EvaluationDomain, Radix2EvaluationDomain as Domain, GeneralEvaluationDomain};
 use sprs::{CsMat, CsVecView, CSR};
 use std::io::{Read, Result as IoResult, Write};
-use commitment_dlog::{commitment::{PolyComm,}};
+use commitment_dlog::{srs::SRS, commitment::{PolyComm,CommitmentCurve, b_poly_coefficients}};
+use rayon::prelude::*;
+
+pub fn batch_dlog_accumulator_check<G: CommitmentCurve>(
+    urs : &SRS<G>,
+    comms: &Vec<G>,
+    chals : &Vec<G::ScalarField>) -> bool {
+
+    let k = comms.len();
+    let rounds = chals.len() / k;
+    assert_eq!(chals.len() % rounds, 0);
+
+    let rs = {
+        let r = G::ScalarField::rand(&mut rand_core::OsRng);
+        let mut rs = vec![G::ScalarField::one(); k];
+        for i in 1..k {
+            rs[i] = r * &rs[i - 1];
+        }
+        rs
+    };
+
+    let mut points = urs.g.clone();
+    let n = points.len();
+    points.extend(comms);
+
+    let mut scalars = vec![G::ScalarField::zero(); n];
+    scalars.extend(&rs[..]);
+
+    let chal_invs = {
+        let mut cs = chals.clone();
+        algebra::fields::batch_inversion(&mut cs);
+        cs
+    };
+
+    let termss : Vec<_> = chals.par_iter().zip(chal_invs).chunks(rounds).zip(rs).map(|(chunk, r)| {
+        let s0 = chunk.iter().fold(G::ScalarField::one(), |x, (_, c_inv)| x * c_inv);
+        let c_squareds : Vec<_> = chunk.iter().map(|(c, _)| c.square()).collect();
+        let mut s = b_poly_coefficients(
+            s0,
+            &c_squareds);
+        s.iter_mut().for_each(|c| *c *= &r);
+        s
+    }).collect();
+
+    for terms in termss {
+        assert_eq!(terms.len(), n);
+        for i in 0..n {
+            scalars[i] -= &terms[i];
+        }
+    }
+
+    let scalars: Vec<_> = scalars.iter().map(|x| x.into_repr()).collect();
+    VariableBaseMSM::multi_scalar_mul(&points, &scalars) == G::Projective::zero()
+}
 
 pub fn evals_from_coeffs<F: FftField>(
     v : Vec<F>,

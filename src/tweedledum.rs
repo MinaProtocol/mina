@@ -5,8 +5,8 @@ use algebra::{
     tweedle::{
         dum::{Affine as GAffine, Projective as GProjective},
         dum::TweedledumParameters,
-        fp::{Fp, FpParameters as Fp_params},
-        fq::{Fq},
+        fp::{Fp, },
+        fq::{Fq, FqParameters as Fq_params},
     },
     curves::{
         AffineCurve, ProjectiveCurve,
@@ -105,6 +105,17 @@ pub extern "C" fn zexe_tweedle_fq_urs_b_poly_commitment(
     let g = urs.commit(&p, None);
 
     Box::into_raw(Box::new(g))
+}
+
+#[no_mangle]
+pub extern "C" fn zexe_tweedle_fq_urs_batch_accumulator_check(
+    urs : *const SRS<GAffine>,
+    comms: *const Vec<GAffine>,
+    chals : *const Vec<Fq>) -> bool {
+    let urs = unsafe { &*urs };
+    let comms = unsafe { &*comms };
+    let chals = unsafe { &*chals };
+    batch_dlog_accumulator_check(urs, comms, chals)
 }
 
 #[no_mangle]
@@ -536,19 +547,19 @@ pub extern "C" fn zexe_tweedle_fq_endo_scalar() -> *const Fq {
 
 #[no_mangle]
 pub extern "C" fn zexe_tweedle_fq_size_in_bits() -> i32 {
-    return Fp_params::MODULUS_BITS as i32;
+    return Fq_params::MODULUS_BITS as i32;
 }
 
 #[no_mangle]
 pub extern "C" fn zexe_tweedle_fq_size() -> *mut BigInteger {
-    let ret = Fp_params::MODULUS;
+    let ret = Fq_params::MODULUS;
     return Box::into_raw(Box::new(ret));
 }
 
 #[no_mangle]
 pub extern "C" fn zexe_tweedle_fq_is_square(x: *const Fq) -> bool {
     let x_ = unsafe { &(*x) };
-    let s0 = x_.pow(Fp_params::MODULUS_MINUS_ONE_DIV_TWO);
+    let s0 = x_.pow(Fq_params::MODULUS_MINUS_ONE_DIV_TWO);
     s0.is_zero() || s0.is_one()
 }
 

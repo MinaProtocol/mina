@@ -22,6 +22,7 @@ rand = { version = "0.7" }
 num-bigint = { version = "0.2.3" }
 sprs = { version = "0.7.1" }
 rand_core = { version = "0.5" }
+rayon = { version = "1" }
 
 oracle = { path = "../../marlin/oracle" }
 evaluation_domains = { path = "../../marlin/evaluation_domains" }

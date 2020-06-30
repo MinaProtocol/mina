@@ -300,6 +300,43 @@ pub extern "C" fn zexe_bn382_fp_constraint_matrix_delete(x: *mut Vec<(Vec<usize>
     let _box = unsafe { Box::from_raw(x) };
 }
 
+// Fp triple
+#[no_mangle]
+pub extern "C" fn zexe_bn382_fp_triple_0(evals: *const [Fp; 3]) -> *const Fp {
+    let x = (unsafe { *evals })[0].clone();
+    return Box::into_raw(Box::new(x));
+}
+
+#[no_mangle]
+pub extern "C" fn zexe_bn382_fp_triple_1(evals: *const [Fp; 3]) -> *const Fp {
+    let x = (unsafe { *evals })[1].clone();
+    return Box::into_raw(Box::new(x));
+}
+
+#[no_mangle]
+pub extern "C" fn zexe_bn382_fp_triple_2(evals: *const [Fp; 3]) -> *const Fp {
+    let x = (unsafe { *evals })[2].clone();
+    return Box::into_raw(Box::new(x));
+}
+
+#[no_mangle]
+pub extern "C" fn zexe_bn382_fp_vector_triple_0(evals: *const [Vec<Fp>; 3]) -> *const Vec<Fp> {
+    let x = (unsafe { &(*evals) })[0].clone();
+    return Box::into_raw(Box::new(x));
+}
+
+#[no_mangle]
+pub extern "C" fn zexe_bn382_fp_vector_triple_1(evals: *const [Vec<Fp>; 3]) -> *const Vec<Fp> {
+    let x = (unsafe { &(*evals) })[1].clone();
+    return Box::into_raw(Box::new(x));
+}
+
+#[no_mangle]
+pub extern "C" fn zexe_bn382_fp_vector_triple_2(evals: *const [Vec<Fp>; 3]) -> *const Vec<Fp> {
+    let x = (unsafe { &(*evals) })[2].clone();
+    return Box::into_raw(Box::new(x));
+}
+
 #[no_mangle]
 pub extern "C" fn zexe_bn382_batch_pairing_check(
 // Pardon the tortured encoding. It's this way because we have to add

@@ -110,6 +110,17 @@ pub extern "C" fn zexe_bn382_fq_urs_b_poly_commitment(
 }
 
 #[no_mangle]
+pub extern "C" fn zexe_bn382_fq_urs_batch_accumulator_check(
+    urs : *const SRS<GAffine>,
+    comms: *const Vec<GAffine>,
+    chals : *const Vec<Fq>) -> bool {
+    let urs = unsafe { &*urs };
+    let comms = unsafe { &*comms };
+    let chals = unsafe { &*chals };
+    batch_dlog_accumulator_check(urs, comms, chals)
+}
+
+#[no_mangle]
 pub extern "C" fn zexe_bn382_fq_urs_h(
     urs : *const SRS<GAffine>, )
 -> *const GAffine {
