@@ -1,4 +1,4 @@
-open Common
+open Zexe_backend_common
 open Basic
 module T = Snarky_bn382.Tweedle
 module Field = Fq
@@ -62,9 +62,11 @@ module Proving_key = struct
   let of_string _ = failwith "TODO"
 end
 
-module Rounds = Pickles_types.Nat.N17
+module Rounds = Rounds
 
 module Keypair = Dlog_based_keypair.Make (struct
+  let name = "tweedledum"
+
   module Rounds = Rounds
   module Urs = B.Field_urs
   module Index = B.Field_index

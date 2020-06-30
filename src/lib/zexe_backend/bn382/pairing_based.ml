@@ -52,8 +52,10 @@ module Verification_key = struct
 end
 
 module R1CS_constraint_system =
-  Common.R1cs_constraint_system.Make (Fp) (Snarky_bn382.Fp.Constraint_matrix)
-module Var = Common.Var
+  Zexe_backend_common.R1cs_constraint_system.Make
+    (Fp)
+    (Snarky_bn382.Fp.Constraint_matrix)
+module Var = Zexe_backend_common.Var
 
 module Oracles = struct
   open Snarky_bn382
@@ -155,7 +157,7 @@ module Keypair = struct
     (set_urs_info, load)
 
   let create
-      { Common.R1cs_constraint_system.public_input_size
+      { Zexe_backend_common.R1cs_constraint_system.public_input_size
       ; auxiliary_input_size
       ; m= {a; b; c}
       ; weight } =

@@ -1,4 +1,4 @@
-open Common
+open Zexe_backend_common
 open Basic
 module Field = Fq
 
@@ -62,6 +62,8 @@ end
 module Rounds = Pickles_types.Nat.N17
 
 module Keypair = Dlog_based_keypair.Make (struct
+  let name = "bn382-g"
+
   module Rounds = Rounds
   module Urs = Snarky_bn382.Fq_urs
   module Index = Snarky_bn382.Fq_index

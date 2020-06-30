@@ -1,6 +1,8 @@
 module type Inputs_intf = sig
   open Intf
 
+  val name : string
+
   module Rounds : Pickles_types.Nat.Intf
 
   module Constraint_matrix : T0
@@ -100,7 +102,7 @@ module Make (Inputs : Inputs_intf) = struct
           in
           let store =
             Key_cache.Disk_storable.simple
-              (fun () -> "fq-urs")
+              (fun () -> name)
               (fun () ~path -> Urs.read path)
               Urs.write
           in

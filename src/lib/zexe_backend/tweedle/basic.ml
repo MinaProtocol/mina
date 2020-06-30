@@ -1,9 +1,9 @@
 open Core_kernel
 open Snarky_bn382
-open Common
+open Zexe_backend_common
 
 module Bigint256 =
-  Common.Bigint.Make
+  Zexe_backend_common.Bigint.Make
     (Bigint256)
     (struct
       let length_in_bytes = 32
@@ -43,13 +43,13 @@ module Dum = struct
   include Curve.Make (Fp) (Fq) (Params) (Snarky_bn382.Tweedle.Dum.Curve)
 end
 
-module Fq_poly_comm = Common.Poly_comm.Make (struct
+module Fq_poly_comm = Zexe_backend_common.Poly_comm.Make (struct
   module Curve = Dum
   module Base_field = Fp
   module Backend = Snarky_bn382.Tweedle.Dum.Field_poly_comm
 end)
 
-module Fp_poly_comm = Common.Poly_comm.Make (struct
+module Fp_poly_comm = Zexe_backend_common.Poly_comm.Make (struct
   module Curve = Dee
   module Base_field = Fq
   module Backend = Snarky_bn382.Tweedle.Dee.Field_poly_comm

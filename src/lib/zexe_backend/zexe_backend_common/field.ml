@@ -9,6 +9,8 @@ module type Input_intf = sig
 
   val size : unit -> Bigint.t
 
+  val size_in_bits : unit -> int
+
   val to_bigint : t -> Bigint.t
 
   val of_bigint : Bigint.t -> t
@@ -56,24 +58,16 @@ module type Input_intf = sig
   val copy : t -> t -> unit
 
   module Vector : sig
-    include Snarky.Vector.S with type elt := t and type t = unit Ctypes.ptr
+    include Snarky.Vector.S with type elt := t
 
     module Triple : Intf.Triple with type elt := t
   end
 end
 
 module type S = sig
+  type t [@@deriving sexp, compare, yojson, bin_io]
+
   module Bigint : Bigint.Intf
-
-  module Stable : sig
-    module V1 : sig
-      type t [@@deriving version, sexp, bin_io, compare, yojson]
-    end
-
-    module Latest = V1
-  end
-
-  type t = Stable.Latest.t [@@deriving sexp, compare, yojson, bin_io]
 
   val to_bigint : t -> Bigint.t
 
@@ -150,7 +144,7 @@ module type S = sig
   module Vector : sig
     type elt = t
 
-    type t = unit Ctypes.ptr
+    type t
 
     val typ : t Ctypes.typ
 
@@ -170,8 +164,20 @@ module type S = sig
   end
 end
 
+module type S_with_version = sig
+  module Stable : sig
+    module V1 : sig
+      type t [@@deriving version, sexp, bin_io, compare, yojson]
+    end
+
+    module Latest = V1
+  end
+
+  include S with type t = Stable.Latest.t
+end
+
 module Make (F : Input_intf) :
-  S
+  S_with_version
   with type Stable.V1.t = F.t
    and module Bigint = F.Bigint
    and type Vector.t = F.Vector.t
@@ -270,7 +276,7 @@ module Make (F : Input_intf) :
 
   let equal = equal
 
-  let size_in_bits = 382
+  let size_in_bits = size_in_bits ()
 
   let to_bits t =
     (* Avoids allocation *)

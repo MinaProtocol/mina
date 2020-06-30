@@ -5,7 +5,7 @@
   (flags -warn-error -27)
   (preprocess (pps ppx_version ppx_jane ppx_deriving_yojson ppx_deriving.std))
   (libraries
-    common
+    zexe_backend_common
     hex
     pickles_types
     snarky_bn382
