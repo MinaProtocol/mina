@@ -361,7 +361,8 @@ module Make (Inputs : Inputs_intf.S) = struct
       let account_data = Location_binable.Table.to_alist t.account_tbl in
       Base.set_batch (get_parent t) account_data ;
       Option.iter t.next_available_token ~f:(fun tid ->
-          Base.set_next_available_token (get_parent t) tid ;
+          if Token_id.(tid > Base.next_available_token (get_parent t)) then
+            Base.set_next_available_token (get_parent t) tid ;
           t.next_available_token <- None ) ;
       Location_binable.Table.clear t.account_tbl ;
       Addr.Table.clear t.hash_tbl ;
