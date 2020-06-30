@@ -285,7 +285,7 @@ module Make (Inputs : Inputs_intf) :
 
     let next_available_kv ~ledger_depth tid =
       let token_buf =
-        Bigstring.create (Token_id.Stable.Latest.bin_size_t tid)
+        Bin_prot.Common.create_buf (Token_id.Stable.Latest.bin_size_t tid)
       in
       ignore (Token_id.Stable.Latest.bin_write_t token_buf ~pos:0 tid) ;
       (Location.serialize ~ledger_depth (next_available_key ()), token_buf)
@@ -305,7 +305,9 @@ module Make (Inputs : Inputs_intf) :
              (Format.sprintf !"$tid!%{sexp: Token_id.t}" token_id))
 
       let serialize_kv ~ledger_depth (tid, pk) =
-        let pk_buf = Bigstring.create (Key.Stable.Latest.bin_size_t pk) in
+        let pk_buf =
+          Bin_prot.Common.create_buf (Key.Stable.Latest.bin_size_t pk)
+        in
         ignore (Key.Stable.Latest.bin_write_t pk_buf ~pos:0 pk) ;
         (Location.serialize ~ledger_depth (build_location tid), pk_buf)
 
@@ -345,7 +347,9 @@ module Make (Inputs : Inputs_intf) :
         (Bigstring.of_string (Format.sprintf !"$tids!%{sexp: Key.t}" pk))
 
     let serialize_kv ~ledger_depth (pk, tids) =
-      let tokens_buf = Bigstring.create (Token_id.Set.bin_size_t tids) in
+      let tokens_buf =
+        Bin_prot.Common.create_buf (Token_id.Set.bin_size_t tids)
+      in
       ignore (Token_id.Set.bin_write_t tokens_buf ~pos:0 tids) ;
       (Location.serialize ~ledger_depth (build_location pk), tokens_buf)
 
