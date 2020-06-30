@@ -90,6 +90,8 @@ module type Account = sig
 
   val balance : t -> balance
 
+  val token_owner : t -> bool
+
   val empty : t
 end
 

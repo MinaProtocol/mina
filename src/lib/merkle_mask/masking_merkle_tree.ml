@@ -241,11 +241,27 @@ module Make (Inputs : Inputs_intf.S) = struct
       | None ->
           Base.merkle_root (get_parent t)
 
+    let next_available_token t =
+      assert_is_attached t ;
+      match t.next_available_token with
+      | Some tid ->
+          tid
+      | None ->
+          Base.next_available_token (get_parent t)
+
+    let set_next_available_token t tid =
+      assert_is_attached t ;
+      t.next_available_token <- Some tid
+
     let remove_account_and_update_hashes t location =
       assert_is_attached t ;
       (* remove account and key from tables *)
       let account = Option.value_exn (self_find_account t location) in
       Location_binable.Table.remove t.account_tbl location ;
+      (* Update token info. *)
+      let account_token = Account.token account in
+      if Account.token_owner account then
+        Token_id.Table.remove t.token_owners account_token ;
       (* TODO : use stack database to save unused location, which can be used
          when allocating a location *)
       Account_id.Table.remove t.location_tbl (Account.identifier account) ;
@@ -273,6 +289,14 @@ module Make (Inputs : Inputs_intf.S) = struct
     let set t location account =
       assert_is_attached t ;
       self_set_account t location account ;
+      (* Update token info. *)
+      let account_token = Account.token account in
+      if Token_id.(next_available_token t <= account_token) then
+        set_next_available_token t (Token_id.next account_token) ;
+      if Account.token_owner account then
+        Token_id.Table.set t.token_owners ~key:account_token
+          ~data:(Account_id.public_key (Account.identifier account)) ;
+      (* Update merkle path. *)
       let account_address = Location.to_path_exn location in
       let account_hash = Hash.hash_account account in
       let merkle_path = merkle_path t location in
@@ -414,8 +438,18 @@ module Make (Inputs : Inputs_intf.S) = struct
             Account_id.Table.set t.location_tbl ~key ~data )
 
       let set_raw_account_batch t locations_and_accounts =
+        let next_available_token = next_available_token t in
+        let new_next_available_token = ref next_available_token in
         List.iter locations_and_accounts ~f:(fun (location, account) ->
-            self_set_account t location account )
+            let token = Account.token account in
+            new_next_available_token :=
+              Token_id.max token (Token_id.next !new_next_available_token) ;
+            if Account.token_owner account then
+              Token_id.Table.set t.token_owners ~key:token
+                ~data:(Account_id.public_key (Account.identifier account)) ;
+            self_set_account t location account ) ;
+        if Token_id.(next_available_token < !new_next_available_token) then
+          set_next_available_token t !new_next_available_token
     end)
 
     let set_batch_accounts t addresses_and_accounts =
@@ -466,18 +500,6 @@ module Make (Inputs : Inputs_intf.S) = struct
         |> Token_id.Set.of_list
       in
       Set.union mask_tokens (Base.tokens (get_parent t) pk)
-
-    let next_available_token t =
-      assert_is_attached t ;
-      match t.next_available_token with
-      | Some tid ->
-          tid
-      | None ->
-          Base.next_available_token (get_parent t)
-
-    let set_next_available_token t tid =
-      assert_is_attached t ;
-      t.next_available_token <- Some tid
 
     let num_accounts t =
       assert_is_attached t ;
@@ -557,9 +579,6 @@ module Make (Inputs : Inputs_intf.S) = struct
     let set_at_index_exn t index account =
       assert_is_attached t ;
       let addr = Addr.of_int_exn ~ledger_depth:t.depth index in
-      let account_token = Account.token account in
-      if Token_id.(next_available_token t <= account_token) then
-        set_next_available_token t (Token_id.next account_token) ;
       set t (Location.Account addr) account
 
     let to_list t =
