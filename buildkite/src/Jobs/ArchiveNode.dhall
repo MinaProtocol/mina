@@ -35,10 +35,7 @@ Pipeline.build
                 , "POSTGRES_DB=${db}"
                 ]
                 (Prelude.Text.concatSep " && "
-                  [ "sudo apt-get install -y postgresql"
-                  , "sudo service postgresql start"
-                  , "sudo -u postgres psql -c \"CREATE USER ${user} WITH SUPERUSER PASSWORD \'${password}\';\""
---                  , "sudo -u postgres createdb -O ${user} ${db}"
+                  [ "buildkite/scripts/setup-database-for-archive-node.sh ${user} ${password} ${db}"
 --                  , "PGPASSWORD=${password} psql -h localhost -p 5432 -U ${user} -d ${db} -a -f src/app/archive/create_schema.sql"
 --                  , "./scripts/test.py run 'test_archive_processor:coda-archive-processor-test'"
                   ])
