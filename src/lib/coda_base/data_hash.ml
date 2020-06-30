@@ -138,21 +138,16 @@ struct
 end
 
 module T0 = struct
-  [%%versioned_binable
+  [%%versioned_asserted
   module Stable = struct
     module V1 = struct
-      type t = Field.t [@@deriving sexp, compare, hash]
+      type t = Field.t
+      [@@deriving sexp, compare, hash, version {asserted}, bin_io]
 
       let to_latest = Fn.id
-
-      module Arg = struct
-        type nonrec t = t
-
-        [%%define_locally Field.(to_string, of_string)]
-      end
-
-      include Binable.Of_stringable (Arg)
     end
+
+    module Tests = struct end
   end]
 
   module Tests = struct
@@ -169,7 +164,7 @@ module T0 = struct
     curve_size = 382]
 
     let%test "Binable from stringable V1" =
-      let known_good_digest = "65e290c124a89ba3fb1b0c66f7b65669" in
+      let known_good_digest = "02af2dbde8102784d876d53c323b9f02" in
       Ppx_version.Serialization.check_serialization
         (module Stable.V1)
         field known_good_digest

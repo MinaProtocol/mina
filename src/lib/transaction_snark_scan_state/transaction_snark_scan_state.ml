@@ -248,8 +248,8 @@ let completed_work_to_scanable_work (job : job) (fee, current_proof, prover) :
         then Ok ()
         else Or_error.error_string "Invalid pending coinbase stack state"
       in
-      let statement =
-        { Transaction_snark.Statement.source= s.source
+      let statement : Transaction_snark.Statement.t =
+        { source= s.source
         ; target= s'.target
         ; supply_increase
         ; pending_coinbase_stack_state=
@@ -458,14 +458,15 @@ let statement_of_job : job -> Transaction_snark.Statement.t option = function
       and supply_increase =
         Currency.Amount.add stmt1.supply_increase stmt2.supply_increase
       in
-      { Transaction_snark.Statement.source= stmt1.source
-      ; target= stmt2.target
-      ; supply_increase
-      ; pending_coinbase_stack_state=
-          { source= stmt1.pending_coinbase_stack_state.source
-          ; target= stmt2.pending_coinbase_stack_state.target }
-      ; fee_excess
-      ; sok_digest= () }
+      ( { source= stmt1.source
+        ; target= stmt2.target
+        ; supply_increase
+        ; pending_coinbase_stack_state=
+            { source= stmt1.pending_coinbase_stack_state.source
+            ; target= stmt2.pending_coinbase_stack_state.target }
+        ; fee_excess
+        ; sok_digest= () }
+        : Transaction_snark.Statement.t )
 
 let create ~work_delay ~transaction_capacity_log_2 =
   let k = Int.pow 2 transaction_capacity_log_2 in
@@ -544,7 +545,12 @@ let partition_if_overflowing t =
 let extract_from_job (job : job) =
   match job with
   | Parallel_scan.Available_job.Base d ->
-      First (d, d.statement, d.state_hash, d.ledger_witness)
+      First
+        ( d.transaction_with_info
+        , d.statement
+        , d.state_hash
+        , d.ledger_witness
+        , d.init_stack )
   | Merge ((p1, _), (p2, _)) ->
       Second (p1, p2)
 
@@ -608,16 +614,19 @@ let all_work_pairs t
   let open Or_error.Let_syntax in
   let single_spec (job : job) =
     match extract_from_job job with
-    | First (d, statement, state_hash, ledger_witness) ->
-        let%bind transaction =
-          Ledger.Undo.transaction d.transaction_with_info
-        in
+    | First
+        ( transaction_with_info
+        , statement
+        , state_hash
+        , ledger_witness
+        , init_stack ) ->
+        let%bind transaction = Ledger.Undo.transaction transaction_with_info in
         let%bind protocol_state_body =
           let%map state = get_state (fst state_hash) in
           Coda_state.Protocol_state.body state
         in
         let%map init_stack =
-          match d.init_stack with
+          match init_stack with
           | Base x ->
               Ok x
           | Merge ->

@@ -4,6 +4,7 @@ open Coda_state
 module Inputs = struct
   type t =
     { constraint_constants: Genesis_constants.Constraint_constants.t
+    ; proof_level: Genesis_constants.Proof_level.t
     ; genesis_constants: Genesis_constants.t
     ; genesis_ledger: Genesis_ledger.Packed.t
     ; consensus_constants: Consensus.Constants.t
@@ -16,6 +17,7 @@ module T = struct
   type t =
     { constraint_constants: Genesis_constants.Constraint_constants.t
     ; genesis_constants: Genesis_constants.t
+    ; proof_level: Genesis_constants.Proof_level.t
     ; genesis_ledger: Genesis_ledger.Packed.t
     ; consensus_constants: Consensus.Constants.t
     ; protocol_state_with_hash:
@@ -25,6 +27,8 @@ module T = struct
   let constraint_constants {constraint_constants; _} = constraint_constants
 
   let genesis_constants {genesis_constants; _} = genesis_constants
+
+  let proof_level {proof_level; _} = proof_level
 
   let protocol_constants t = (genesis_constants t).protocol
 
@@ -62,8 +66,8 @@ end
 
 include T
 
-let base_proof ~proof_level:(_ : Genesis_constants.Proof_level.t)
-    (module B : Blockchain_snark.Blockchain_snark_state.S) (t : Inputs.t) =
+let base_proof (module B : Blockchain_snark.Blockchain_snark_state.S)
+    (t : Inputs.t) =
   let genesis_ledger = Genesis_ledger.Packed.t t.genesis_ledger in
   let constraint_constants = t.constraint_constants in
   let consensus_constants = t.consensus_constants in
@@ -98,10 +102,11 @@ let base_proof ~proof_level:(_ : Genesis_constants.Proof_level.t)
     [(prev_state, dummy); (dummy_txn_stmt, dummy)]
     t.protocol_state_with_hash.data
 
-let create_values ~proof_level b (t : Inputs.t) =
+let create_values b (t : Inputs.t) =
   { constraint_constants= t.constraint_constants
+  ; proof_level= t.proof_level
   ; genesis_constants= t.genesis_constants
   ; genesis_ledger= t.genesis_ledger
   ; consensus_constants= t.consensus_constants
   ; protocol_state_with_hash= t.protocol_state_with_hash
-  ; genesis_proof= base_proof ~proof_level b t }
+  ; genesis_proof= base_proof b t }

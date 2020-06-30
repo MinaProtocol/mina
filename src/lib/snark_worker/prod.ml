@@ -86,11 +86,12 @@ module Inputs = struct
                 (input, t, (w : Transaction_witness.t)) ->
                 process (fun () ->
                     Or_error.try_with (fun () ->
-                        M.of_transaction ~sok_digest ~init_stack:w.init_stack
+                        M.of_transaction ~sok_digest
                           ~source:input.Transaction_snark.Statement.source
                           ~target:input.target
                           { Transaction_protocol_state.Poly.transaction= t
                           ; block_data= w.protocol_state_body }
+                          ~init_stack:w.init_stack
                           ~pending_coinbase_stack_state:
                             input
                               .Transaction_snark.Statement

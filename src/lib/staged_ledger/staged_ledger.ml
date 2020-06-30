@@ -1654,7 +1654,7 @@ let%test_module "test" =
       Quickcheck.random_value ~seed:(`Deterministic "receiver_pk")
         Public_key.Compressed.gen
 
-    let proof_level = Genesis_constants.Proof_level.Check
+    let proof_level = Genesis_constants.Proof_level.for_unit_tests
 
     let constraint_constants =
       Genesis_constants.Constraint_constants.for_unit_tests

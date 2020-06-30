@@ -91,8 +91,8 @@ module Make_real () = struct
   let compiled_values =
     Genesis_proof.create_values
       (module B)
-      ~proof_level:Full
       { constraint_constants
+      ; proof_level= Full
       ; genesis_constants
       ; genesis_ledger= (module Test_genesis_ledger)
       ; consensus_constants
@@ -184,6 +184,7 @@ let main () =
            in
            { constraint_constants=
                Genesis_constants.Constraint_constants.for_unit_tests
+           ; proof_level= Genesis_constants.Proof_level.for_unit_tests
            ; genesis_constants= Genesis_constants.for_unit_tests
            ; genesis_ledger= Genesis_ledger.for_unit_tests
            ; consensus_constants= Lazy.force Consensus.Constants.for_unit_tests
@@ -212,6 +213,7 @@ let main () =
                ~consensus_constants
            in
            { constraint_constants
+           ; proof_level= Genesis_constants.Proof_level.compiled
            ; genesis_constants
            ; genesis_ledger= (module Test_genesis_ledger)
            ; consensus_constants

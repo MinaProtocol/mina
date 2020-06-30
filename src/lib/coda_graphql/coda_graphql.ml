@@ -345,9 +345,7 @@ module Types = struct
             ~args:Arg.[]
             ~resolve:
               (fun _
-                   ({ Transaction_snark.Statement.fee_excess=
-                        {Fee_excess.fee_excess_l; _}
-                    ; _ } :
+                   ({fee_excess= {fee_excess_l; _}; _} :
                      Transaction_snark.Statement.t) ->
               (* TODO: Expose full fee excess data. *)
               { fee_excess_l with
