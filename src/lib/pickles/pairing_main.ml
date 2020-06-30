@@ -239,18 +239,9 @@ struct
         let open Dlog_marlin_types.Messages in
         let x_hat =
           let input_size = Array.length public_input in
-          Core.printf "step rec input size = %d\n%!" input_size ;
           assert (Int.ceil_pow2 input_size = Domain.size Input_domain.domain) ;
           Inner_curve.multiscale_known
             (Array.mapi public_input ~f:(fun i x ->
-                 as_prover
-                   As_prover.(
-                     fun () ->
-                       Core.printf
-                         !"public_input[%d] = %{sexp:Backend.Tock.Field.t}\n%!"
-                         i
-                         (Backend.Tock.Field.of_bits
-                            (List.map ~f:(read Boolean.typ) x))) ;
                  (x, (Lazy.force lagrange_precomputations).(i)) ))
         in
         let without = Type.Without_degree_bound in
@@ -388,18 +379,6 @@ struct
       Pcs_batch.combine_split_evaluations ~last
         ~mul:(fun (keep, x) (y : Field.t) -> (keep, Field.(y * x)))
         ~mul_and_add:(fun ~acc ~xi (keep, fx) ->
-          as_prover
-            As_prover.(
-              fun () ->
-                Core.printf
-                  !{|Vmul_and_add
-  acc: %{sexp:Field.Constant.t}\n
-  xi: %{sexp:Field.Constant.t}\n
-  keep: %b\n
-  fx: %{sexp:Field.Constant.t}\n%!
-)|}
-                  (read_var acc) (read_var xi) (read Boolean.typ keep)
-                  (read_var fx)) ;
           Field.if_ keep ~then_:Field.(fx + (xi * acc)) ~else_:acc )
         ~init:(fun (_, fx) -> fx)
         (Common.dlog_pcs_batch b_plus_19 ~h_minus_1 ~k_minus_1)
@@ -522,37 +501,12 @@ struct
       let xs, ys = Evals.to_vectors e in
       List.iter
         Vector.([|(Boolean.true_, x_hat)|] :: (to_list xs @ to_list ys))
-        ~f:
-          (Array.iter ~f:(fun x ->
-               as_prover
-                 As_prover.(
-                   fun () ->
-                     let b, x = x in
-                     Core.printf
-                       !"%b %{sexp:Field.Constant.t}\n%!"
-                       (read Boolean.typ b) (read_var x)) ;
-               Opt_sponge.absorb sponge x ))
+        ~f:(Array.iter ~f:(Opt_sponge.absorb sponge))
     in
-    let print () =
-      as_prover
-        As_prover.(
-          fun () ->
-            Core.printf
-              !"Vstate: %{sexp:Field.Constant.t array}\n%!"
-              (Array.map ~f:read_var (Opt_sponge.state sponge)))
-    in
-    print () ;
-    Core.printf "Vabsorption 1 begins\n%!" ;
     (* A lot of hashing. *)
     absorb_evals x_hat1 beta_1_evals ;
-    print () ;
-    Core.printf "Vabsorption 2 begins\n%!" ;
     absorb_evals x_hat2 beta_2_evals ;
-    print () ;
-    Core.printf "Vabsorption 3 begins\n%!" ;
     absorb_evals x_hat3 beta_3_evals ;
-    print () ;
-    Core.printf "Vsqueezing xi\n%!" ;
     let xi_actual = Opt_sponge.squeeze sponge ~length:Challenge.length in
     let r_actual = Opt_sponge.squeeze sponge ~length:Challenge.length in
     let xi_correct = equal (pack xi_actual) (pack_scalar_challenge xi) in
@@ -562,15 +516,7 @@ struct
         ~f:Field.pack ~scalar marlin
     in
     let xi = scalar xi in
-    as_prover
-      As_prover.(
-        fun () ->
-          Core.printf !"Vxi actual: %{sexp:Field.Constant.t}\n%!" (read_var xi)) ;
     let r = scalar (Scalar_challenge r_actual) in
-    as_prover
-      As_prover.(
-        fun () ->
-          Core.printf !"Vr_actual: %{sexp:Field.Constant.t}\n%!" (read_var r)) ;
     let combined_inner_product_correct =
       (* sum_i r^i sum_j xi^j f_j(beta_i) *)
       let actual_combined_inner_product =
@@ -589,17 +535,9 @@ struct
               sg_olds
               ~f:(fun keep f -> [|(keep, f pt)|])
           in
-          as_prover
-            As_prover.(
-              fun () ->
-                Core.printf
-                  !"Vactual width = %{sexp:Field.Constant.t}\n%!"
-                  (read_var actual_width) ;
-                Core.printf !"Vmax_branching = %d\n%!" (Nat.to_int Branching.n)) ;
           let v =
             Vector.append sg_evals ([|(Boolean.true_, x_hat)|] :: a) (snd pi)
           in
-          Core.printf "Vcombined inner product\n%!" ;
           Split_evaluations.combine_split_evaluations' pi ~xi
             ~evaluation_point:pt ~step_domains ~which_branch v b
         in
@@ -677,26 +615,6 @@ struct
           ~f:(fun x -> Sponge.absorb sponge (`Field x))
           (to_field_elements_without_index t ~app_state:state_to_field_elements
              ~g:Inner_curve.to_field_elements) ;
-        as_prover
-          As_prover.(
-            fun () ->
-              let open Backend in
-              Core.printf
-                !"Vhash_pairing_me_only:\n\
-                 \          %{sexp: (Inner_curve.Constant.t, unit, \
-                  Inner_curve.Constant.t list, Tick.Field.t Types.Bp_vec.t \
-                  list) Types.Pairing_based.Proof_state.Me_only.t}"
-                { t with
-                  app_state= ()
-                ; sg=
-                    Pickles_types.Vector.to_list t.sg
-                    |> List.map ~f:(read Inner_curve.typ)
-                ; old_bulletproof_challenges=
-                    Pickles_types.Vector.to_list t.old_bulletproof_challenges
-                    |> List.map ~f:(Pickles_types.Vector.map ~f:read_var)
-                ; dlog_marlin_index=
-                    Matrix_evals.map t.dlog_marlin_index
-                      ~f:(Abc.map ~f:(Array.map ~f:(read Inner_curve.typ))) }) ;
         Sponge.squeeze_field sponge )
 
   let hash_me_only_opt (type s) ~index
@@ -731,33 +649,6 @@ struct
                   Vector.map v ~f:(fun x -> `Opt (b, x)) )
           ; sg= Vector.map2 mask t.sg ~f:(fun b g -> (b, g)) }
         in
-        as_prover
-          As_prover.(
-            fun () ->
-              let open Backend in
-              Core.printf
-                !"Vhash_pairing_me_only: %{sexp: (Inner_curve.Constant.t, \
-                  unit, (bool * Inner_curve.Constant.t) list, (bool * \
-                  Tick.Field.t) Types.Bp_vec.t list) \
-                  Types.Pairing_based.Proof_state.Me_only.t}"
-                { t with
-                  app_state= ()
-                ; sg=
-                    List.map (Pickles_types.Vector.to_list t.sg)
-                      ~f:(fun (b, g) ->
-                        (read Boolean.typ b, read Inner_curve.typ g) )
-                ; dlog_marlin_index=
-                    Matrix_evals.map t.dlog_marlin_index
-                      ~f:(Abc.map ~f:(Array.map ~f:(read Inner_curve.typ)))
-                ; old_bulletproof_challenges=
-                    List.map
-                      (Pickles_types.Vector.to_list
-                         t.old_bulletproof_challenges) ~f:(fun v ->
-                        Pickles_types.Vector.map v ~f:(function
-                          | `Opt (b, x) ->
-                              (read Boolean.typ b, read_var x)
-                          | `Not_opt x ->
-                              (true, read_var x) ) ) }) ;
         let not_opt x = `Not_opt x in
         let hash_inputs =
           to_field_elements_without_index t
@@ -846,15 +737,6 @@ struct
            fp Types.Dlog_based.Statement.spec
            (Types.Dlog_based.Statement.to_data statement))
     in
-    as_prover
-      As_prover.(
-        fun () ->
-          Array.iteri public_input ~f:(fun i x ->
-              Core.printf
-                !"public_input[%d] = %{sexp:Backend.Tock.Field.t}\n%!"
-                i
-                (Backend.Tock.Field.of_bits (List.map x ~f:(read Boolean.typ)))
-          )) ;
     let sponge = Sponge.create sponge_params in
     let { Types.Pairing_based.Proof_state.Deferred_values.xi
         ; combined_inner_product

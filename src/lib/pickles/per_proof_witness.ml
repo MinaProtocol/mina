@@ -69,10 +69,6 @@ let typ (type n avar aval m) (statement : (avar, aval) Impls.Step.Typ.t)
        Commitment_lengths.of_domains_vector step_domains
        |> Dlog_marlin_types.Evals.map ~f:(Vector.reduce_exn ~f:Core.Int.max)
      in
-     Core.printf
-       !"%s step domains %{sexp: Domains.t list}\n%!"
-       __LOC__
-       (Vector.to_list step_domains) ;
      let t =
        Typ.tuple2
          (Dlog_marlin_types.Evals.typ ~default:Field.Constant.zero lengths

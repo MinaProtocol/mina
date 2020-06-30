@@ -360,7 +360,6 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
         ~choices:(f choices)
         ~max_branching:(module Max_branching)
     in
-    Core.printf !"wrap_domains %{sexp:Domains.t}\n%!" wrap_domains ;
     Timer.clock __LOC__ ;
     let module Branch_data = struct
       type ('vars, 'vals, 'n, 'm) t =
@@ -492,12 +491,8 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
                        (struct
                          let f (type a b c d) (t : (a, b, c, d) Tag.t) :
                              Domains.t =
-                           let t =
-                             Types_map.lookup_map t ~self ~default:wrap_domains
-                               ~f:(fun d -> d.wrap_domains)
-                           in
-                           Core.printf !"Dhi %{sexp: Domains.t}\n%!" t ;
-                           t
+                           Types_map.lookup_map t ~self ~default:wrap_domains
+                             ~f:(fun d -> d.wrap_domains)
                        end)
                    in
                    M.f rule.Inductive_rule.prevs

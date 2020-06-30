@@ -117,18 +117,6 @@ struct
         Dlog_based.Statement.t
     end in
     let b_poly = Tock.Field.(Dlog_main.b_poly ~add ~mul ~inv) in
-    let print_dlog_me_only lab t =
-      Core.printf
-        !"%s %{sexp:(Tock.Inner_curve.Affine.t, Tock.Field.t Bp_vec.t list) \
-          Types.Dlog_based.Proof_state.Me_only.t}\n\
-          %!"
-        lab
-        { t with
-          old_bulletproof_challenges=
-            Vector.to_list
-              t.Types.Dlog_based.Proof_state.Me_only.old_bulletproof_challenges
-        }
-    in
     let sgs, unfinalized_proofs, statements_with_hashes, x_hats, witnesses =
       let f : type var value max local_max_branching m.
              max Nat.t
@@ -161,16 +149,12 @@ struct
           ; proof_state=
               { statement.proof_state with
                 me_only=
-                  (let t =
-                     { Types.Dlog_based.Proof_state.Me_only
-                       .old_bulletproof_challenges=
-                         (* TODO: Get rid of this padding *)
-                         Vector.extend_exn prev_challenges Max_branching.n
-                           Dummy.Ipa.Wrap.challenges_computed
-                     ; sg= statement.proof_state.me_only.sg }
-                   in
-                   print_dlog_me_only "step prev_statement_with_hashes" t ;
-                   Common.hash_dlog_me_only Max_branching.n t) } }
+                  Common.hash_dlog_me_only Max_branching.n
+                    { old_bulletproof_challenges=
+                        (* TODO: Get rid of this padding *)
+                        Vector.extend_exn prev_challenges Max_branching.n
+                          Dummy.Ipa.Wrap.challenges_computed
+                    ; sg= statement.proof_state.me_only.sg } } }
         in
         let module O = Tock.Oracles in
         let o =
@@ -372,37 +356,11 @@ struct
             (struct
               let f : type a b c.
                   (a, b, c) P.With_data.t -> b P.Base.Me_only.Dlog_based.t =
-               fun (T t) ->
-                Core.printf
-                  !"step pass_through %{sexp:(Tock.Inner_curve.Affine.t, \
-                    Tock.Field.t Bp_vec.t list) \
-                    Types.Dlog_based.Proof_state.Me_only.t}\n\
-                    %!"
-                  { t.statement.proof_state.me_only with
-                    old_bulletproof_challenges=
-                      List.map ~f:Ipa.Wrap.compute_challenges
-                        (Vector.to_list
-                           t.statement.proof_state.me_only
-                             .old_bulletproof_challenges) } ;
-                t.statement.proof_state.me_only
+               fun (T t) -> t.statement.proof_state.me_only
             end)
         in
         M.f prev_with_proofs
       in
-      (*
-      let sgs =
-        let module M =
-          H3.Map
-            (P.With_data)
-            (E03 (Tock.Curve.Affine))
-            (struct
-              let f (T t : _ P.With_data.t) = t.proof.openings.proof.sg
-            end)
-        in
-        let module V = H3.To_vector (Tock.Curve.Affine) in
-        V.f prev_values_length (M.f prev_with_proofs)
-      in
-*)
       let old_bulletproof_challenges =
         let module VV = struct
           type t =
@@ -425,19 +383,7 @@ struct
       in
       let me_only : _ Reduced_me_only.Pairing_based.t =
         (* Have the sg be available in the opening proof and verify it. *)
-        { app_state= next_state
-        ; sg=
-            sgs
-            (*
-              (Vector.mapn [unfinalized_proofs; sgs]
-                 ~f:(fun [(u, must_verify); sg] ->
-                   (* If it's the base case we should recompute this based on
-                the new_bulletproof_challenges
-              *)
-                   if not must_verify then
-                     Ipa.Wrap.compute_sg u.deferred_values.bulletproof_challenges
-                   else sg )) *)
-        ; old_bulletproof_challenges }
+        {app_state= next_state; sg= sgs; old_bulletproof_challenges}
       in
       { proof_state= {unfinalized_proofs= unfinalized_proofs_extended; me_only}
       ; pass_through }
@@ -463,10 +409,6 @@ struct
       let (T (input, conv)) =
         Impls.Step.input ~branching:Max_branching.n ~bulletproof_log2:Rounds.n
       in
-      (*
-      Core.printf !"Dummy.Ipa.Step.sg = %{sexp: Tick.Curve.Affine.t}\n%!"
-        (Lazy.force Dummy.Ipa.Step.sg ) ;
-*)
       let rec pad : type n k maxes pvals lws lhs.
              (Digest.Constant.t, k) Vector.t
           -> maxes H1.T(Nat).t
@@ -487,11 +429,6 @@ struct
                   Vector.init Max_branching.n ~f:(fun _ ->
                       Dummy.Ipa.Wrap.challenges_computed ) }
             in
-            print_dlog_me_only "step padding"
-              { sg= Lazy.force Dummy.Ipa.Step.sg
-              ; old_bulletproof_challenges=
-                  Vector.init Max_branching.n ~f:(fun _ ->
-                      Dummy.Ipa.Wrap.challenges_computed ) } ;
             Common.hash_dlog_me_only Max_branching.n t :: pad [] ms n
       in
       let {Domains.h; k; x} =
@@ -512,19 +449,12 @@ struct
         let module V = H3.To_vector (Tick.Curve.Affine) in
         V.f prev_values_length (M.f prev_with_proofs)
       in
-      Core.printf
-        !"step pass_through_unpadded %{sexp:Digest.Constant.t list}\n%!"
-        ( Vector.map statements_with_hashes ~f:(fun s -> s.proof_state.me_only)
-        |> Vector.to_list ) ;
       let pass_through =
         (* TODO: Use the same pad_pass_through function as in wrap *)
         pad
           (Vector.map statements_with_hashes ~f:(fun s -> s.proof_state.me_only))
           Maxes.maxes Maxes.length
       in
-      Core.printf
-        !"step pass_through %{sexp:Digest.Constant.t list}\n%!"
-        (pass_through |> Vector.to_list) ;
       ksprintf Common.time "step-prover %d (%d, %d, %d)"
         (Index.to_int branch_data.index)
         (Domain.size h) (Domain.size k) (Domain.size x) (fun () ->
@@ -552,18 +482,10 @@ struct
                       next_me_only_prepared }
             ; pass_through=
                 (* TODO: Use the same pad_pass_through function as in wrap *)
-                (let t =
-                   pad
-                     (Vector.map statements_with_hashes ~f:(fun s ->
-                          s.proof_state.me_only ))
-                     Maxes.maxes Maxes.length
-                 in
-                 Core.printf
-                   !"step padded pass_through digests \
-                     %{sexp:Digest.Constant.t list}\n\
-                     %!"
-                   (Vector.to_list t) ;
-                 t) } )
+                pad
+                  (Vector.map statements_with_hashes ~f:(fun s ->
+                       s.proof_state.me_only ))
+                  Maxes.maxes Maxes.length } )
     in
     let prev_evals =
       let module M =

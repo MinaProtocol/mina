@@ -316,32 +316,9 @@ let wrap_main
                  every rule is exactly 2 simplified the implementation. In the future we
                  will have to fix this. *)
             let T = Nat.eq_exn max_local_max_branching Max_branching.n in
-            let open Backend in
-            as_prover
-              As_prover.(
-                fun () ->
-                  Core.printf
-                    !"wrap_main prev me_only \
-                      %{sexp:(Tock.Inner_curve.Affine.t, Tock.Field.t \
-                      Bp_vec.t list) Types.Dlog_based.Proof_state.Me_only.t}\n\
-                      %!"
-                    { sg= read Inner_curve.typ sacc
-                    ; old_bulletproof_challenges=
-                        Pickles_types.Vector.map
-                          ~f:(Pickles_types.Vector.map ~f:read_var)
-                          chals
-                        |> Pickles_types.Vector.to_list }) ;
             hash_me_only Max_branching.n
               {sg= sacc; old_bulletproof_challenges= chals} )
       in
-      as_prover
-        As_prover.(
-          fun () ->
-            Core.printf
-              !"wrap_main digested prev_me_onlys %{sexp:Digest.Constant.t list}\n\
-                %!"
-              Pickles_types.Vector.(
-                to_list (map ~f:(read Digest.typ) prev_me_onlys))) ;
       { Types.Pairing_based.Statement.pass_through= prev_me_onlys
       ; proof_state= prev_proof_state }
     in

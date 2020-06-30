@@ -67,7 +67,7 @@ let verify (type a n) (module Max_branching : Nat.Intf with type n = n)
             ~domain_k:(domain tick_field step_domains.k)
         in
         Timer.clock __LOC__ ;
-        let absorb, squeeze, print_state =
+        let absorb, squeeze =
           let open Tick_field_sponge.Bits in
           let sponge =
             let s = create Tick_field_sponge.params in
@@ -77,55 +77,23 @@ let verify (type a n) (module Max_branching : Nat.Intf with type n = n)
             s
           in
           let squeeze () =
-            Core.printf "verify_squeeze\n%!" ;
             let underlying =
               Challenge.Constant.of_bits
                 (squeeze sponge ~length:Challenge.Constant.length)
             in
-            let value = sc (Scalar_challenge underlying) in
-            Core.printf
-              !"verify evals itself %{sexp:Challenge.Constant.t} \
-                %{sexp:Tick_field.t}\n\
-                %!"
-              underlying value ;
-            value
+            sc (Scalar_challenge underlying)
           in
-          ( (fun x ->
-              absorb sponge x ;
-              Core.printf
-                !"Ostate-absorb: %{sexp: Impls.Step.Field.Constant.t array}\n\
-                  %!"
-                (state sponge) )
-          , squeeze
-          , fun () ->
-              Core.printf
-                !"Ostate: %{sexp: Impls.Step.Field.Constant.t array}\n%!"
-                (state sponge) )
+          (absorb sponge, squeeze)
         in
         let absorb_evals (x_hat, e) =
-          Core.printf "Oabsorption\n%!" ;
           let xs, ys = Dlog_marlin_types.Evals.to_vectors e in
           List.iter
             Vector.([|x_hat|] :: (to_list xs @ to_list ys))
-            ~f:
-              (Array.iter ~f:(fun a ->
-                   Core.printf !"%{sexp:Impls.Step.Field.Constant.t}\n%!" a ;
-                   absorb a ))
+            ~f:(Array.iter ~f:absorb)
         in
-        Triple.(
-          print_state () ;
-          iter ~f:absorb_evals (map2 prev_x_hat evals ~f:Tuple2.create)) ;
-        print_state () ;
-        Core.printf "verify chalpolys\n%!" ;
+        Triple.(iter ~f:absorb_evals (map2 prev_x_hat evals ~f:Tuple2.create)) ;
         let xi_actual = squeeze () in
-        Core.printf "verify chalevals\n%!" ;
         let r_actual = squeeze () in
-        Core.printf
-          !"Oxi_actual = %{sexp: Impls.Step.Field.Constant.t}\n%!"
-          xi_actual ;
-        Core.printf
-          !"Or_actual = %{sexp: Impls.Step.Field.Constant.t}\n%!"
-          r_actual ;
         Timer.clock __LOC__ ;
         (* TODO: The deferred values "bulletproof_challenges" should get routed
            into a "batch dlog Tick acc verifier" *)
@@ -133,9 +101,6 @@ let verify (type a n) (module Max_branching : Nat.Intf with type n = n)
           Vector.length statement.pass_through.old_bulletproof_challenges
         in
         Timer.clock __LOC__ ;
-        Core.printf "old bp chals length %d\n%!"
-          (Nat.to_int
-             (Vector.length statement.pass_through.old_bulletproof_challenges)) ;
         let combined_inner_product_actual =
           Wrap.combined_inner_product
             ~actual_branching:(Nat.Add.create actual_branching)

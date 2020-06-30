@@ -36,12 +36,7 @@ let combined_inner_product (type actual_branching)
     let a, b = Dlog_marlin_types.Evals.(to_vectors (e : _ array t)) in
     let v : (Tick.Field.t array, _) Vector.t =
       Vector.append
-        (Vector.map b_polys ~f:(fun f ->
-             [| (let e = f pt in
-                 Core.printf
-                   !"wrap e %{sexp:Impls.Step.Field.Constant.t}\n%!"
-                   e ;
-                 e) |] ))
+        (Vector.map b_polys ~f:(fun f -> [|f pt|]))
         ([|x_hat|] :: a) (snd pi)
     in
     let open Tick.Field in
@@ -50,16 +45,7 @@ let combined_inner_product (type actual_branching)
          ~h_minus_1:Int.(Domain.size step_branch_domains.h - 1)
          ~k_minus_1:Int.(Domain.size step_branch_domains.k - 1))
       ~xi ~init:Fn.id ~mul
-      ~mul_and_add:(fun ~acc ~xi fx ->
-        (let open Impls.Step in
-        Core.printf
-          !{|Omul_and_add
-  acc: %{sexp:Field.Constant.t}
-  xi: %{sexp:Field.Constant.t}
-  fx: %{sexp:Field.Constant.t}
-  %!|}
-          acc xi fx) ;
-        fx + (xi * acc) )
+      ~mul_and_add:(fun ~acc ~xi fx -> fx + (xi * acc))
       ~last:Array.last ~evaluation_point:pt
       ~shifted_pow:(fun deg x ->
         Pcs_batch.pow ~one ~mul x
@@ -150,11 +136,7 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
             end)
         in
         let module V = H1.To_vector (Pairing_acc) in
-        let v = V.f Max_local_max_branchings.length (M.f prev_me_only) in
-        Core.printf
-          !"Step_accs = %{sexp: Tick.Curve.Affine.t list}\n%!"
-          (Vector.to_list v) ;
-        k v
+        k (V.f Max_local_max_branchings.length (M.f prev_me_only))
     | Old_bulletproof_challenges ->
         let module M =
           H1.Map
@@ -162,11 +144,6 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
             (Challenges_vector.Constant)
             (struct
               let f (t : _ P.Base.Me_only.Dlog_based.Prepared.t) =
-                Core.printf
-                  !"wrap old_bulletproof_challenges = %{sexp: Tock.Field.t \
-                    Bp_vec.t list}\n\
-                    %!"
-                  (Vector.to_list t.old_bulletproof_challenges) ;
                 t.old_bulletproof_challenges
             end)
         in
@@ -189,7 +166,6 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
       prev_statement.proof_state.me_only.old_bulletproof_challenges
   in
   let actual_branching = Vector.length prev_challenges in
-  Core.printf "wrap actual branching = %d\n%!" (Nat.to_int actual_branching) ;
   let lte =
     Nat.lte_exn actual_branching
       (Length.to_nat Max_local_max_branchings.length)
@@ -247,11 +223,6 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
     end in
     let combined_inner_product =
       let open As_field in
-      Core.printf
-        !"wrap x_hat: %{sexp: Impls.Step.Field.Constant.t * \
-          Impls.Step.Field.Constant.t * Impls.Step.Field.Constant.t}\n\
-          %!"
-        x_hat ;
       combined_inner_product (* Note: We do not pad here. *)
         ~actual_branching:(Nat.Add.create actual_branching)
         proof.openings.evals ~x_hat ~r ~xi ~beta_1 ~beta_2 ~beta_3

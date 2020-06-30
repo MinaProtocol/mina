@@ -154,7 +154,7 @@ struct
         Boolean.(any [all [b; b']; all [p; b || b']])
       in
       cond_permute permute ;
-      add_in state p' Field.(y * (add_in_y_after_perm :> t)) ;
+      add_in state p' Field.(y * (add_in_y_after_perm :> t))
     done ;
     let empty_imput =
       Boolean.not (Boolean.Array.any (Array.map input ~f:fst))

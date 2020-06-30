@@ -160,9 +160,8 @@ let step_main
                  fun tag ->
                   match Type_equal.Id.same_witness self tag with
                   | Some T ->
-                      Core.printf "self\n%!" ; self_data
+                      self_data
                   | None ->
-                      Core.printf "other\n%!" ;
                       Types_map.Data.For_step.create (Types_map.lookup tag)
               end)
           in

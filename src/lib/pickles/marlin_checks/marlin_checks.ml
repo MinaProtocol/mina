@@ -165,11 +165,11 @@ let checked (type t) (module Impl : Snarky.Snark_intf.Run with type field = t)
               let x = read_var x in
               let y = read_var y in
               if not (Field.Constant.equal x y) then (
-                Core.printf "bad marlin %d\n%!" i ;
+                printf "bad marlin %d\n%!" i ;
                 Field.Constant.print x ;
-                Core.printf "%!" ;
+                printf "%!" ;
                 Field.Constant.print y ;
-                Core.printf "%!" )) ;
+                printf "%!" )) ;
       Field.equal x y )
     eqns
   |> Boolean.all
