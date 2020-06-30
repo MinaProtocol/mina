@@ -275,7 +275,7 @@ module Make (Inputs : Inputs_intf) :
   module Tokens = struct
     let next_available_key =
       Memo.unit (fun () ->
-          Location.build_generic (Bigstring.of_string "last_account_location")
+          Location.build_generic (Bigstring.of_string "next_available_token")
       )
 
     let next_available mdb =
