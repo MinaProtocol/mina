@@ -32,6 +32,7 @@ module Make (Inputs : Inputs_intf.S) = struct
     { uuid: Uuid.Stable.V1.t
     ; account_tbl: Account.t Location_binable.Table.t
     ; token_owners: Key.Stable.Latest.t Token_id.Table.t
+    ; mutable next_available_token: Token_id.t option
     ; mutable parent: Parent.t
     ; hash_tbl: Hash.t Addr.Table.t
     ; location_tbl: Location.t Account_id.Table.t
@@ -46,6 +47,7 @@ module Make (Inputs : Inputs_intf.S) = struct
     ; parent= None
     ; account_tbl= Location_binable.Table.create ()
     ; token_owners= Token_id.Table.create ()
+    ; next_available_token= None
     ; hash_tbl= Addr.Table.create ()
     ; location_tbl= Account_id.Table.create ()
     ; current_location= None
@@ -333,6 +335,9 @@ module Make (Inputs : Inputs_intf.S) = struct
       let old_root_hash = merkle_root t in
       let account_data = Location_binable.Table.to_alist t.account_tbl in
       Base.set_batch (get_parent t) account_data ;
+      Option.iter t.next_available_token ~f:(fun tid ->
+          Base.set_next_available_token (get_parent t) tid ;
+          t.next_available_token <- None ) ;
       Location_binable.Table.clear t.account_tbl ;
       Addr.Table.clear t.hash_tbl ;
       Debug_assert.debug_assert (fun () ->
@@ -354,6 +359,7 @@ module Make (Inputs : Inputs_intf.S) = struct
       ; parent= Some (get_parent t)
       ; account_tbl= Location_binable.Table.copy t.account_tbl
       ; token_owners= Token_id.Table.copy t.token_owners
+      ; next_available_token= t.next_available_token
       ; location_tbl= Account_id.Table.copy t.location_tbl
       ; hash_tbl= Addr.Table.copy t.hash_tbl
       ; current_location= t.current_location
@@ -432,20 +438,46 @@ module Make (Inputs : Inputs_intf.S) = struct
       let parent_keys = Base.accounts (get_parent t) in
       Account_id.Set.union parent_keys mask_keys
 
-    let token_owner t tid = Token_id.Table.find t.token_owners tid
+    let token_owner t tid =
+      assert_is_attached t ;
+      match Token_id.Table.find t.token_owners tid with
+      | Some pk ->
+          Some pk
+      | None ->
+          Base.token_owner (get_parent t) tid
 
     let token_owners t =
-      Token_id.Table.to_alist t.token_owners
-      |> List.map ~f:(fun (tid, pk) -> Account_id.create pk tid)
-      |> Account_id.Set.of_list
+      assert_is_attached t ;
+      let mask_owners =
+        Token_id.Table.to_alist t.token_owners
+        |> List.map ~f:(fun (tid, pk) -> Account_id.create pk tid)
+        |> Account_id.Set.of_list
+      in
+      Set.union mask_owners (Base.token_owners (get_parent t))
 
     let tokens t pk =
-      Account_id.Table.keys t.location_tbl
-      |> List.filter_map ~f:(fun aid ->
-             if Key.equal pk (Account_id.public_key aid) then
-               Some (Account_id.token_id aid)
-             else None )
-      |> Token_id.Set.of_list
+      assert_is_attached t ;
+      let mask_tokens =
+        Account_id.Table.keys t.location_tbl
+        |> List.filter_map ~f:(fun aid ->
+               if Key.equal pk (Account_id.public_key aid) then
+                 Some (Account_id.token_id aid)
+               else None )
+        |> Token_id.Set.of_list
+      in
+      Set.union mask_tokens (Base.tokens (get_parent t) pk)
+
+    let next_available_token t =
+      assert_is_attached t ;
+      match t.next_available_token with
+      | Some tid ->
+          tid
+      | None ->
+          Base.next_available_token (get_parent t)
+
+    let set_next_available_token t tid =
+      assert_is_attached t ;
+      t.next_available_token <- Some tid
 
     let num_accounts t =
       assert_is_attached t ;
@@ -507,6 +539,7 @@ module Make (Inputs : Inputs_intf.S) = struct
     let close t =
       assert_is_attached t ;
       Location_binable.Table.clear t.account_tbl ;
+      t.next_available_token <- None ;
       Addr.Table.clear t.hash_tbl ;
       Account_id.Table.clear t.location_tbl
 
@@ -524,6 +557,9 @@ module Make (Inputs : Inputs_intf.S) = struct
     let set_at_index_exn t index account =
       assert_is_attached t ;
       let addr = Addr.of_int_exn ~ledger_depth:t.depth index in
+      let account_token = Account.token account in
+      if Token_id.(next_available_token t <= account_token) then
+        set_next_available_token t (Token_id.next account_token) ;
       set t (Location.Account addr) account
 
     let to_list t =

@@ -350,6 +350,31 @@ module Make (Inputs : Inputs_intf) :
       ordered list.
   *)
   module Tokens = struct
+    let next_available_key =
+      Memo.unit (fun () ->
+          Location.build_generic (Bigstring.of_string "last_account_location")
+      )
+
+    let next_available mdb =
+      Option.value
+        ~default:Token_id.(next default)
+        (get_bin mdb (next_available_key ()) Token_id.Stable.Latest.bin_read_t)
+
+    let next_available_kv ~ledger_depth tid =
+      let tokens_buf =
+        Bigstring.create (Token_id.Stable.Latest.bin_size_t tid)
+      in
+      ignore (Token_id.Stable.Latest.bin_write_t tokens_buf ~pos:0 tid) ;
+      (Location.serialize ~ledger_depth (next_available_key ()), tokens_buf)
+
+    let set_next_available mdb tid =
+      set_bin mdb (next_available_key ()) Token_id.Stable.Latest.bin_size_t
+        Token_id.Stable.Latest.bin_write_t tid
+
+    let update_next_available_token mdb tid =
+      if Token_id.(next_available mdb <= tid) then
+        set_next_available mdb Token_id.(next tid)
+
     let build_location pk =
       Location.build_generic
         (Bigstring.of_string (Format.sprintf !"$tids!%{sexp: Key.t}" pk))
@@ -438,6 +463,10 @@ module Make (Inputs : Inputs_intf) :
 
   let tokens = Tokens.get
 
+  let next_available_token = Tokens.next_available
+
+  let set_next_available_token = Tokens.set_next_available
+
   include Util.Make (struct
     module Key = Key
     module Token_id = Token_id
@@ -471,22 +500,35 @@ module Make (Inputs : Inputs_intf) :
       let last_location_key_value =
         (Account_location.last_location_key (), last_location)
       in
+      let next_available_token = Tokens.next_available mdb in
       let key_to_location_list = Non_empty_list.to_list key_to_location_list in
-      let account_tokens =
-        List.fold ~init:Key.Map.empty key_to_location_list
-          ~f:(fun map (aid, _) ->
-            Map.update map (Account_id.public_key aid) ~f:(function
-              | Some set ->
-                  Set.add set (Account_id.token_id aid)
-              | None ->
-                  Token_id.Set.singleton (Account_id.token_id aid) ) )
+      let account_tokens, new_next_available_token =
+        List.fold ~init:(Key.Map.empty, next_available_token)
+          key_to_location_list ~f:(fun (map, next_available_token) (aid, _) ->
+            ( Map.update map (Account_id.public_key aid) ~f:(function
+                | Some set ->
+                    Set.add set (Account_id.token_id aid)
+                | None ->
+                    Token_id.Set.singleton (Account_id.token_id aid) )
+            , (* If the token is present in an account, it is no longer
+                 available.
+              *)
+              Token_id.max next_available_token
+                (Token_id.next (Account_id.token_id aid)) ) )
+      in
+      let next_available_token_change =
+        if new_next_available_token > next_available_token then
+          [ Tokens.next_available_kv ~ledger_depth:mdb.depth
+              new_next_available_token ]
+        else []
       in
       let batched_changes =
-        Account_location.serialize_last_account_kv ~ledger_depth:mdb.depth
-          last_location_key_value
-        :: ( Tokens.add_batch_create mdb account_tokens
-           @ Account_location.set_batch_create ~ledger_depth:mdb.depth
-               key_to_location_list )
+        next_available_token_change
+        @ Account_location.serialize_last_account_kv ~ledger_depth:mdb.depth
+            last_location_key_value
+          :: ( Tokens.add_batch_create mdb account_tokens
+             @ Account_location.set_batch_create ~ledger_depth:mdb.depth
+                 key_to_location_list )
       in
       Kvdb.set_batch mdb.kvdb ~remove_keys:[] ~key_data_pairs:batched_changes
 
@@ -537,6 +579,8 @@ module Make (Inputs : Inputs_intf) :
       | Ok location ->
           set mdb location account ;
           Tokens.add_account mdb account_id ;
+          Tokens.update_next_available_token mdb
+            (Account_id.token_id account_id) ;
           Ok (`Added, location)
       | Error err ->
           Error (Error.create "get_or_create_account" err Db_error.sexp_of_t) )
