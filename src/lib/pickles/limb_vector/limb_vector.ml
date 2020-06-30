@@ -1,2 +1,2 @@
-module Digest = Digest
+module Constant = Constant
 module Challenge = Challenge
