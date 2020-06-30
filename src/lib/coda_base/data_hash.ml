@@ -103,36 +103,11 @@ struct
   let equal_var x y = Field.Checked.equal x.digest y.digest
 
   let typ : (var, t) Typ.t =
-    let store (t : t) =
-      let open Typ.Store.Let_syntax in
-      let n = Bigint.of_field t in
-      let rec go i acc =
-        if Int.(i < 0) then return (Bitstring.Lsb_first.of_list acc)
-        else
-          let%bind b = Boolean.typ.store (Bigint.test_bit n i) in
-          go Int.(i - 1) (b :: acc)
-      in
-      let%map bits = go (Field.size_in_bits - 1) [] in
-      {bits= Some bits; digest= Field.Var.project (bits :> Boolean.var list)}
-    in
-    let read (t : var) = Field.typ.read t.digest in
-    let alloc =
-      let open Typ.Alloc.Let_syntax in
-      let rec go i acc =
-        if Int.(i < 0) then return (Bitstring.Lsb_first.of_list acc)
-        else
-          let%bind b = Boolean.typ.alloc in
-          go Int.(i - 1) (b :: acc)
-      in
-      let%map bits = go (Field.size_in_bits - 1) [] in
-      {bits= Some bits; digest= Field.Var.project (bits :> Boolean.var list)}
-    in
-    let check {bits; _} =
-      Checked.List.iter
-        (Option.value_exn bits :> Boolean.var list)
-        ~f:Boolean.typ.check
-    in
-    {store; read; alloc; check}
+    Typ.transport_var Typ.field
+      ~there:(fun {digest; bits} ->
+        assert (Option.is_none bits) ;
+        digest )
+      ~back:(fun digest -> {digest; bits= None})
 
   [%%endif]
 end

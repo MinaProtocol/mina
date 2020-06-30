@@ -16,6 +16,7 @@ open Hlist
 open Pickles_types
 open Common
 open Backend
+module Backend = Backend
 module Sponge_inputs = Sponge_inputs
 module Impls = Impls
 module Inductive_rule = Inductive_rule

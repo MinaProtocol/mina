@@ -6,7 +6,7 @@ open Core_kernel
 [%%ifdef
 consensus_mechanism]
 
-open Pickles.Impls.Pairing_based.Internal_Basic
+open Pickles.Impls.Step.Internal_Basic
 
 [%%else]
 
@@ -24,7 +24,7 @@ end
 module Input = Input
 
 let params : Field.t Sponge.Params.t =
-  Sponge.Params.(map bn382_p ~f:Field.of_string)
+  Sponge.Params.(map tweedle_q ~f:Field.of_string)
 
 module Inputs = struct
   module Field = Field
@@ -39,7 +39,7 @@ module Inputs = struct
   let to_the_alpha x =
     let open Field in
     let res = square x in
-    let open Zexe_backend.Fp in
+    let open Pickles.Backend.Tick.Field in
     Mutable.square res ;
     (* x^4 *)
     Mutable.square res ;
@@ -122,10 +122,10 @@ let hash ?init = hash ?init params
 consensus_mechanism]
 
 module Checked = struct
-  module Inputs = Pickles.Sponge_inputs.Make (Pickles.Impls.Pairing_based)
+  module Inputs = Pickles.Sponge_inputs.Make (Pickles.Impls.Step)
 
   module Digest = struct
-    open Pickles.Impls.Pairing_based.Field
+    open Pickles.Impls.Step.Field
 
     type nonrec t = t
 
@@ -178,7 +178,7 @@ let%test_unit "iterativeness" =
 consensus_mechanism]
 
 let%test_unit "sponge checked-unchecked" =
-  let open Pickles.Impls.Pairing_based in
+  let open Pickles.Impls.Step in
   let module T = Internal_Basic in
   let x = T.Field.random () in
   let y = T.Field.random () in

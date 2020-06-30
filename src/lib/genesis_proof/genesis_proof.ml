@@ -90,7 +90,9 @@ let base_proof (module B : Blockchain_snark.Blockchain_snark_state.S)
         { source= Coda_base.Pending_coinbase.Stack.empty
         ; target= Coda_base.Pending_coinbase.Stack.empty } }
   in
-  let dummy = Coda_base.Proof.dummy in
+  let open Pickles_types in
+  let blockchain_dummy = Pickles.Proof.dummy Nat.N2.n Nat.N2.n Nat.N2.n in
+  let txn_dummy = Pickles.Proof.dummy Nat.N2.n Nat.N2.n Nat.N0.n in
   B.step
     ~handler:
       (Consensus.Data.Prover_state.precomputed_handler ~constraint_constants
@@ -99,7 +101,7 @@ let base_proof (module B : Blockchain_snark.Blockchain_snark_state.S)
         Snark_transition.genesis ~constraint_constants
           ~genesis_ledger:Test_genesis_ledger.t
     ; prev_state }
-    [(prev_state, dummy); (dummy_txn_stmt, dummy)]
+    [(prev_state, blockchain_dummy); (dummy_txn_stmt, txn_dummy)]
     t.protocol_state_with_hash.data
 
 let create_values b (t : Inputs.t) =

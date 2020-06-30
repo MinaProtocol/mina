@@ -602,22 +602,24 @@ module Data = struct
           let description = "Vrf Truncated Output"
         end)
 
-        let length_in_bytes = 32
-
-        let length_in_bits = 8 * length_in_bytes
-
         open Tick
+
+        let length_in_bits = Int.min 256 (Field.size_in_bits - 2)
 
         type var = Boolean.var array
 
         let typ : (var, t) Typ.t =
           Typ.array ~length:length_in_bits Boolean.typ
-          |> Typ.transport ~there:Blake2.string_to_bits
+          |> Typ.transport
+               ~there:(fun s ->
+                 Array.sub (Blake2.string_to_bits s) ~pos:0 ~len:length_in_bits
+                 )
                ~back:Blake2.bits_to_string
 
-        let dummy = String.init length_in_bytes ~f:(fun _ -> '\000')
+        let dummy = String.init 32 ~f:(fun _ -> '\000')
 
-        let to_bits t = Fold.(to_list (string_bits t))
+        let to_bits t =
+          Fold.(to_list (string_bits t)) |> Fn.flip List.take length_in_bits
       end
 
       open Tick

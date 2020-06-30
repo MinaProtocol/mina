@@ -69,12 +69,10 @@ let%snarkydef step ~(logger : Logger.t)
       [ previous_state_hash
       ; (txn_snark : Transaction_snark.Statement.With_sok.Checked.t) ]
     new_state_hash : (_, _) Tick.Checked.t =
-  Core.printf "step %s\n%!" __LOC__ ;
   let%bind transition =
     with_label __LOC__
       (exists Snark_transition.typ ~request:(As_prover.return Transition))
   in
-  Core.printf "step %s\n%!" __LOC__ ;
   let%bind previous_state, previous_state_body_hash =
     let%bind t =
       with_label __LOC__
@@ -82,7 +80,6 @@ let%snarkydef step ~(logger : Logger.t)
            (Protocol_state.typ ~constraint_constants)
            ~request:(As_prover.return Prev_state))
     in
-    Core.printf "step %s\n%!" __LOC__ ;
     let%bind h, body = Protocol_state.hash_checked t in
     let%map () =
       with_label __LOC__ (State_hash.assert_equal h previous_state_hash)

@@ -8,7 +8,7 @@ open Async
 let proof_string =
   let open Pickles_types in
   let module Proof = Pickles.Proof.Make (Nat.N2) (Nat.N2) in
-  let dummy = Pickles.Proof.dummy Nat.N2.n Nat.N2.n in
+  let dummy = Pickles.Proof.dummy Nat.N2.n Nat.N2.n Nat.N2.n in
   Binable.to_string (module Proof) dummy
 
 let proof ~loc =

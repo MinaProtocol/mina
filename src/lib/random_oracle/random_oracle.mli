@@ -2,7 +2,7 @@
 
 [%%ifdef consensus_mechanism]
 
-open Pickles.Impls.Pairing_based.Internal_Basic
+open Pickles.Impls.Step.Internal_Basic
 
 [%%else]
 
