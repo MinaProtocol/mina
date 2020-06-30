@@ -234,10 +234,12 @@ let make = (~lastManualUpdatedDate) => {
     <Wrapped>
       <div className=Styles.page> <Summary lastManualUpdatedDate /> </div>
       <div className=Styles.filters>
-        //<SearchBar onUsernameEntered username={state.username} />
-        //<ToggleButtons currentToggle={state.currentToggle} onTogglePress />
-        //<FilterDropdown currentFilter={state.currentFilter} onFilterPress />
-         <ChallengePointsTable releaseInfo challengeInfo /> </div>
+        <SearchBar onUsernameEntered username={state.username} />
+        <ToggleButtons currentToggle={state.currentToggle} onTogglePress />
+        <FilterDropdown currentFilter={state.currentFilter} onFilterPress />
+      </div>
+      <Spacer height=1.5 />
+      <Leaderboard />
     </Wrapped>
   </Page>;
 };
