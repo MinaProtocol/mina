@@ -353,15 +353,13 @@ let handle_committed_txn :
        t
     -> User_command.With_valid_signature.t
     -> fee_payer_balance:Currency.Amount.t
-    -> source_balance:Currency.Amount.t
     -> ( t * User_command.With_valid_signature.t Sequence.t
        , [ `Queued_txns_by_sender of
            string * User_command.With_valid_signature.t Sequence.t ] )
        Result.t =
- fun t committed ~fee_payer_balance ~source_balance ->
+ fun t committed ~fee_payer_balance ->
   let committed' = User_command.forget_check committed in
   let fee_payer = User_command.fee_payer committed' in
-  let source = User_command.source committed' in
   let nonce_to_remove = User_command.nonce committed' in
   match Map.find t.all_by_sender fee_payer with
   | None ->
@@ -420,47 +418,13 @@ let handle_committed_txn :
         let t3 =
           set_all_by_sender fee_payer new_queued_cmds currency_reserved'' t2
         in
-        let t4, source_dropped_cmds =
-          if Account_id.equal source fee_payer then (t3, Sequence.empty)
-          else
-            match Map.find t.all_by_sender source with
-            | None ->
-                (t3, Sequence.empty)
-            | Some (source_cmds, currency_reserved) ->
-                (* The command may have decreased the balance of the source
-                   account, drop any commands that no longer have sufficient
-                   balance to execute.
-                *)
-                let new_queued_cmds, currency_reserved, dropped_cmds =
-                  drop_until_sufficient_balance
-                    (source_cmds, currency_reserved)
-                    source_balance
-                in
-                let t3' =
-                  if F_sequence.is_empty new_queued_cmds then t3
-                  else
-                    let first_cmd = F_sequence.head_exn source_cmds in
-                    t3
-                    |> Fn.flip remove_applicable_exn first_cmd
-                    |> Fn.flip remove_all_by_fee_exn first_cmd
-                in
-                let t3'' =
-                  Sequence.fold dropped_cmds ~init:t3' ~f:remove_all_by_fee_exn
-                in
-                ( set_all_by_sender source new_queued_cmds currency_reserved
-                    t3''
-                , dropped_cmds )
-        in
         Ok
-          ( t4
+          ( t3
           , Sequence.append
-              (Sequence.append
-                 ( if
-                   User_command.With_valid_signature.equal committed first_cmd
-                 then Sequence.empty
-                 else Sequence.singleton first_cmd )
-                 dropped_cmds)
-              source_dropped_cmds )
+              ( if User_command.With_valid_signature.equal committed first_cmd
+              then Sequence.empty
+              else Sequence.singleton first_cmd )
+              dropped_cmds )
 
 let remove_lowest_fee : t -> User_command.With_valid_signature.t Sequence.t * t
     =

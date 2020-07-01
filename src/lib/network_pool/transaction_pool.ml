@@ -199,7 +199,6 @@ struct
                    in the pool are always valid against the best tip, so
                    no need to check balances here *)
                 ~fee_payer_balance:Currency.Amount.max_int
-                ~source_balance:Currency.Amount.max_int
             with
             | Ok (t, _) ->
                 Some (cmd, t)
@@ -341,8 +340,6 @@ struct
             let fee_payer_balance =
               Currency.Balance.to_amount (balance fee_payer)
             in
-            let source = User_command.source cmd in
-            let source_balance = Currency.Balance.to_amount (balance source) in
             let cmd' =
               User_command.check cmd
               |> Option.value_exn ~message:"user command was invalid"
@@ -361,7 +358,6 @@ struct
             let p', dropped =
               match
                 Indexed_pool.handle_committed_txn p cmd' ~fee_payer_balance
-                  ~source_balance
               with
               | Ok res ->
                   res
