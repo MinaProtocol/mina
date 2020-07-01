@@ -1,0 +1,27 @@
+################################################################
+##  PLATFORMS (for cross-platform builds)
+
+platform(
+    name = "x86_64-unknown-linux-gnu",
+    constraint_values = [
+        "@platforms//os:linux",
+        "@platforms//cpu:x86_64",
+    ],
+)
+
+platform(
+    name = "armv8-rpi3-linux-gnueabihf",
+    constraint_values = [
+        "@platforms//os:linux",
+        "@platforms//cpu:arm",
+    ],
+)
+
+platform(
+    name = "x86_64-linux-musl",
+    constraint_values = [
+        "@platforms//os:linux",
+        "@platforms//cpu:x86_64",
+        "//tc:clib_musl",
+    ],
+)
