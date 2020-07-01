@@ -54,8 +54,6 @@ module Diff_versioned = struct
           | Invalid_signature
           | Duplicate
           | Sender_account_does_not_exist
-          | Insufficient_amount_for_account_creation
-          | Delegate_not_found
           | Invalid_nonce
           | Insufficient_funds
           | Insufficient_fee
@@ -71,8 +69,6 @@ module Diff_versioned = struct
       | Invalid_signature
       | Duplicate
       | Sender_account_does_not_exist
-      | Insufficient_amount_for_account_creation
-      | Delegate_not_found
       | Invalid_nonce
       | Insufficient_funds
       | Insufficient_fee
@@ -199,7 +195,6 @@ struct
                    in the pool are always valid against the best tip, so
                    no need to check balances here *)
                 ~fee_payer_balance:Currency.Amount.max_int
-                ~source_balance:Currency.Amount.max_int
             with
             | Ok (t, _) ->
                 Some (cmd, t)
@@ -341,8 +336,6 @@ struct
             let fee_payer_balance =
               Currency.Balance.to_amount (balance fee_payer)
             in
-            let source = User_command.source cmd in
-            let source_balance = Currency.Balance.to_amount (balance source) in
             let cmd' =
               User_command.check cmd
               |> Option.value_exn ~message:"user command was invalid"
@@ -361,7 +354,6 @@ struct
             let p', dropped =
               match
                 Indexed_pool.handle_committed_txn p cmd' ~fee_payer_balance
-                  ~source_balance
               with
               | Ok res ->
                   res
@@ -462,9 +454,10 @@ struct
                   log_invalid () ) ;
       Deferred.unit
 
-    let create ~frontier_broadcast_pipe ~config ~logger ~tf_diff_writer =
+    let create ~constraint_constants ~frontier_broadcast_pipe ~config ~logger
+        ~tf_diff_writer =
       let t =
-        { pool= Indexed_pool.empty
+        { pool= Indexed_pool.empty ~constraint_constants
         ; locally_generated_uncommitted=
             Hashtbl.create (module User_command.With_valid_signature)
         ; locally_generated_committed=
@@ -586,8 +579,6 @@ struct
           | Invalid_signature
           | Duplicate
           | Sender_account_does_not_exist
-          | Insufficient_amount_for_account_creation
-          | Delegate_not_found
           | Invalid_nonce
           | Insufficient_funds
           | Insufficient_fee
@@ -608,9 +599,7 @@ struct
 
       let is_empty t = List.is_empty t
 
-      let apply
-          ~(constraint_constants : Genesis_constants.Constraint_constants.t) t
-          env =
+      let apply t env =
         let txs = Envelope.Incoming.data env in
         let sender = Envelope.Incoming.sender env in
         let is_sender_local = Envelope.Sender.(equal sender Local) in
@@ -679,43 +668,11 @@ struct
                               :: rejected )
                       | Some sender_account ->
                           if has_sufficient_fee pool tx ~pool_max_size then (
-                            let validate_receiver =
-                              match
-                                account ledger (User_command.receiver tx)
-                              with
-                              | None -> (
-                                (*receiver account is new*)
-                                match User_command.amount tx with
-                                | None ->
-                                    (* When tx is for stake delegation. The new Delegate should be in the ledger*)
-                                    Error `Delegate_not_found
-                                | Some receiver_amount ->
-                                    (*amount should be at least account_creation_fee for transactions that create new accounts*)
-                                    let receiver_amount_to_fee =
-                                      Currency.Amount.to_fee receiver_amount
-                                    in
-                                    if
-                                      Currency.Fee.(
-                                        receiver_amount_to_fee
-                                        >= constraint_constants
-                                             .account_creation_fee)
-                                    then Ok ()
-                                    else
-                                      Error
-                                        `Insufficient_amount_for_account_creation
-                                )
-                              | Some _ ->
-                                  Ok ()
-                            in
                             let add_res =
-                              Result.bind
-                                ( Indexed_pool.add_from_gossip_exn pool tx'
-                                    sender_account.nonce
-                                @@ Currency.Balance.to_amount
-                                     sender_account.balance )
-                                ~f:(fun res ->
-                                  Result.map validate_receiver ~f:(fun _ -> res)
-                                  )
+                              Indexed_pool.add_from_gossip_exn pool tx'
+                                sender_account.nonce
+                              @@ Currency.Balance.to_amount
+                                   sender_account.balance
                             in
                             let of_indexed_pool_error = function
                               | `Invalid_nonce (`Between (low, hi), nonce) ->
@@ -744,10 +701,6 @@ struct
                                     ; ("fee", fee_json fee) ] )
                               | `Overflow ->
                                   (Overflow, [])
-                              | `Delegate_not_found ->
-                                  (Delegate_not_found, [])
-                              | `Insufficient_amount_for_account_creation ->
-                                  (Insufficient_amount_for_account_creation, [])
                             in
                             let yojson_fail_reason =
                               Fn.compose
@@ -760,13 +713,7 @@ struct
                                   | `Insufficient_replace_fee _ ->
                                       "insufficient replace fee"
                                   | `Overflow ->
-                                      "overflow"
-                                  | `Delegate_not_found ->
-                                      "delegate not found"
-                                  | `Insufficient_amount_for_account_creation
-                                    ->
-                                      "insufficient amount for reciever \
-                                       account creation" )
+                                      "overflow" )
                             in
                             match add_res with
                             | Ok (pool', dropped) ->
@@ -911,12 +858,8 @@ struct
             in
             go txs t.pool ([], [])
 
-      let unsafe_apply ~constraint_constants t env =
-        match%map apply ~constraint_constants t env with
-        | Ok e ->
-            Ok e
-        | Error e ->
-            Error (`Other e)
+      let unsafe_apply t env =
+        match%map apply t env with Ok e -> Ok e | Error e -> Error (`Other e)
     end
 
     let get_rebroadcastable (t : t) ~is_expired =
@@ -1158,7 +1101,7 @@ let%test_module _ =
           in
           assert_pool_txs [] ;
           let%bind apply_res =
-            Test.Resource_pool.Diff.unsafe_apply ~constraint_constants pool
+            Test.Resource_pool.Diff.unsafe_apply pool
               (Envelope.Incoming.local independent_cmds)
           in
           [%test_eq: pool_apply]
@@ -1214,7 +1157,7 @@ let%test_module _ =
           in
           assert_pool_txs [] ;
           let%bind apply_res =
-            Test.Resource_pool.Diff.unsafe_apply ~constraint_constants pool
+            Test.Resource_pool.Diff.unsafe_apply pool
               ( Envelope.Incoming.local
               @@ (List.hd_exn independent_cmds :: List.drop independent_cmds 2)
               )
@@ -1250,7 +1193,7 @@ let%test_module _ =
               ; reorg_best_tip= false }
           in
           let%bind apply_res =
-            Test.Resource_pool.Diff.unsafe_apply ~constraint_constants pool
+            Test.Resource_pool.Diff.unsafe_apply pool
             @@ Envelope.Incoming.local independent_cmds
           in
           [%test_eq: pool_apply]
@@ -1302,7 +1245,7 @@ let%test_module _ =
                  ~max_fee:10_000_000_000 ())
           in
           let%bind apply_res =
-            Test.Resource_pool.Diff.unsafe_apply ~constraint_constants pool
+            Test.Resource_pool.Diff.unsafe_apply pool
             @@ Envelope.Incoming.local [cmd1]
           in
           [%test_eq: pool_apply] (accepted_user_commands apply_res) (Ok [cmd1]) ;
@@ -1356,7 +1299,7 @@ let%test_module _ =
             Broadcast_pipe.Writer.write frontier_pipe_w (Some frontier1)
           in
           let%bind _ =
-            Test.Resource_pool.Diff.unsafe_apply ~constraint_constants pool
+            Test.Resource_pool.Diff.unsafe_apply pool
               (Envelope.Incoming.local independent_cmds)
           in
           assert_pool_txs @@ independent_cmds ;
@@ -1411,7 +1354,7 @@ let%test_module _ =
       let txs3 = List.map ~f:(set_sender 3) txs0 in
       let txs_all = txs0 @ txs1 @ txs2 @ txs3 in
       let%bind apply_res =
-        Test.Resource_pool.Diff.unsafe_apply ~constraint_constants pool
+        Test.Resource_pool.Diff.unsafe_apply pool
           (Envelope.Incoming.local txs_all)
       in
       [%test_eq: pool_apply] (Ok txs_all) (accepted_user_commands apply_res) ;
@@ -1427,7 +1370,7 @@ let%test_module _ =
           mk_payment 3 10_000_000_000 1 4 927_000_000_000 ]
       in
       let%bind apply_res_2 =
-        Test.Resource_pool.Diff.unsafe_apply ~constraint_constants pool
+        Test.Resource_pool.Diff.unsafe_apply pool
           (Envelope.Incoming.local replace_txs)
       in
       [%test_eq: pool_apply]
@@ -1449,7 +1392,7 @@ let%test_module _ =
       in
       let committed_tx = mk_payment 0 5_000_000_000 0 2 25_000_000_000 in
       let%bind apply_res =
-        Test.Resource_pool.Diff.unsafe_apply ~constraint_constants pool
+        Test.Resource_pool.Diff.unsafe_apply pool
         @@ Envelope.Incoming.local txs
       in
       [%test_eq: pool_apply] (Ok txs) (accepted_user_commands apply_res) ;
@@ -1508,13 +1451,13 @@ let%test_module _ =
               in
               let cmds1, cmds2 = List.split_n cmds pool_max_size in
               let%bind apply_res1 =
-                Test.Resource_pool.Diff.unsafe_apply ~constraint_constants pool
+                Test.Resource_pool.Diff.unsafe_apply pool
                   (Envelope.Incoming.local cmds1)
               in
               assert (Result.is_ok apply_res1) ;
               [%test_eq: int] pool_max_size (Indexed_pool.size pool.pool) ;
               let%map _apply_res2 =
-                Test.Resource_pool.Diff.unsafe_apply ~constraint_constants pool
+                Test.Resource_pool.Diff.unsafe_apply pool
                   (Envelope.Incoming.local cmds2)
               in
               (* N.B. Adding a transaction when the pool is full may drop > 1
@@ -1551,7 +1494,7 @@ let%test_module _ =
           let remote_cmds = List.drop independent_cmds 5 in
           (* Locally generated transactions are rebroadcastable *)
           let%bind apply_res_1 =
-            Test.Resource_pool.Diff.unsafe_apply ~constraint_constants pool
+            Test.Resource_pool.Diff.unsafe_apply pool
               (Envelope.Incoming.local local_cmds)
           in
           [%test_eq: pool_apply]
@@ -1562,7 +1505,7 @@ let%test_module _ =
           (* Adding non-locally-generated transactions doesn't affect
              rebroadcastable pool *)
           let%bind apply_res_2 =
-            Test.Resource_pool.Diff.unsafe_apply ~constraint_constants pool
+            Test.Resource_pool.Diff.unsafe_apply pool
               (Envelope.Incoming.wrap ~data:remote_cmds ~sender:mock_sender)
           in
           [%test_eq: pool_apply]
