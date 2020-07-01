@@ -59,7 +59,9 @@ module Body = struct
         | Payment ->
             (Amount.zero, max_amount_without_overflow)
         | Stake_delegation ->
-            (Amount.zero, max_amount_without_overflow)
+            (Amount.zero, Amount.zero)
+        | Create_account ->
+            (Amount.zero, Amount.zero)
         | Fee_transfer ->
             (Amount.zero, max_amount_without_overflow)
         | Coinbase ->
@@ -201,6 +203,8 @@ let excess (payload : t) : Amount.Signed.t =
       Amount.Signed.of_unsigned (Amount.of_fee fee)
   | Stake_delegation ->
       Amount.Signed.of_unsigned (Amount.of_fee fee)
+  | Create_account ->
+      Amount.Signed.of_unsigned (Amount.of_fee fee)
   | Fee_transfer ->
       Option.value_exn (Amount.add_fee amount fee)
       |> Amount.Signed.of_unsigned |> Amount.Signed.negate
@@ -209,7 +213,7 @@ let excess (payload : t) : Amount.Signed.t =
 
 let fee_excess ({body= {tag; amount; _}; common= {fee_token; fee; _}} : t) =
   match tag with
-  | Payment | Stake_delegation ->
+  | Payment | Stake_delegation | Create_account ->
       Fee_excess.of_single (fee_token, Fee.Signed.of_unsigned fee)
   | Fee_transfer ->
       let excess =
@@ -225,5 +229,5 @@ let supply_increase (payload : payload) =
   match tag with
   | Coinbase ->
       payload.body.amount
-  | Payment | Stake_delegation | Fee_transfer ->
+  | Payment | Stake_delegation | Create_account | Fee_transfer ->
       Amount.zero

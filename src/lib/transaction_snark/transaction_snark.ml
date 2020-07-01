@@ -601,9 +601,11 @@ module Base = struct
       ; amount_insufficient_to_create: 'bool (* Payment only *)
       ; token_cannot_create: 'bool (* Payment only, token<>default *)
       ; source_insufficient_balance: 'bool (* Payment only *)
-      ; source_bad_timing: 'bool (* Payment only *) }
+      ; source_bad_timing: 'bool (* Payment only *)
+      ; receiver_exists: 'bool (* Create_account only *)
+      ; not_token_owner: 'bool (* Create_account only *) }
 
-    let num_fields = 7
+    let num_fields = 9
 
     let to_list
         { predicate_failed
@@ -612,14 +614,18 @@ module Base = struct
         ; amount_insufficient_to_create
         ; token_cannot_create
         ; source_insufficient_balance
-        ; source_bad_timing } =
+        ; source_bad_timing
+        ; receiver_exists
+        ; not_token_owner } =
       [ predicate_failed
       ; source_not_present
       ; receiver_not_present
       ; amount_insufficient_to_create
       ; token_cannot_create
       ; source_insufficient_balance
-      ; source_bad_timing ]
+      ; source_bad_timing
+      ; receiver_exists
+      ; not_token_owner ]
 
     let of_list = function
       | [ predicate_failed
@@ -628,14 +634,18 @@ module Base = struct
         ; amount_insufficient_to_create
         ; token_cannot_create
         ; source_insufficient_balance
-        ; source_bad_timing ] ->
+        ; source_bad_timing
+        ; receiver_exists
+        ; not_token_owner ] ->
           { predicate_failed
           ; source_not_present
           ; receiver_not_present
           ; amount_insufficient_to_create
           ; token_cannot_create
           ; source_insufficient_balance
-          ; source_bad_timing }
+          ; source_bad_timing
+          ; receiver_exists
+          ; not_token_owner }
       | _ ->
           failwith
             "Transaction_snark.Base.User_command_failure.to_list: bad length"
@@ -655,7 +665,7 @@ module Base = struct
     *)
     let compute_unchecked
         ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-        ~txn_global_slot ~(fee_payer_account : Account.t)
+        ~txn_global_slot ~creating_new_token ~(fee_payer_account : Account.t)
         ~(receiver_account : Account.t) ~(source_account : Account.t)
         ({payload; signature= _; signer= _} : Transaction_union.t) =
       match payload.body.tag with
@@ -720,7 +730,9 @@ module Base = struct
               ; amount_insufficient_to_create= false
               ; token_cannot_create= false
               ; source_insufficient_balance= false
-              ; source_bad_timing= false }
+              ; source_bad_timing= false
+              ; receiver_exists= false
+              ; not_token_owner= false }
           | Payment ->
               let receiver_account =
                 if Account_id.equal receiver fee_payer then fee_payer_account
@@ -786,10 +798,56 @@ module Base = struct
               ; amount_insufficient_to_create
               ; token_cannot_create
               ; source_insufficient_balance
-              ; source_bad_timing } )
+              ; source_bad_timing
+              ; receiver_exists= false
+              ; not_token_owner= false }
+          | Create_account ->
+              let receiver_account =
+                if Account_id.equal receiver fee_payer then fee_payer_account
+                else receiver_account
+              in
+              let receiver_account =
+                { receiver_account with
+                  public_key= Account_id.public_key receiver
+                ; token_id= Account_id.token_id receiver
+                ; token_owner=
+                    ( if creating_new_token then true
+                    else receiver_account.token_owner ) }
+              in
+              let receiver_exists =
+                let id = Account.identifier receiver_account in
+                if Account_id.equal Account_id.empty id then false
+                else if Account_id.equal receiver id then true
+                else fail "bad receiver account ID"
+              in
+              let source_account =
+                if Account_id.equal source fee_payer then fee_payer_account
+                else if Account_id.equal source receiver then receiver_account
+                else source_account
+              in
+              let source_not_present =
+                let id = Account.identifier source_account in
+                if Account_id.equal Account_id.empty id then true
+                else if Account_id.equal receiver id then false
+                else fail "bad source account ID"
+              in
+              let not_token_owner =
+                not
+                  ( source_account.token_owner
+                  || Token_id.(equal default) (Account_id.token_id receiver) )
+              in
+              { predicate_failed= false
+              ; source_not_present
+              ; receiver_not_present= false
+              ; amount_insufficient_to_create= false
+              ; token_cannot_create= false
+              ; source_insufficient_balance= false
+              ; source_bad_timing= false
+              ; receiver_exists
+              ; not_token_owner } )
 
     let%snarkydef compute_as_prover ~constraint_constants ~txn_global_slot
-        (txn : Transaction_union.var) =
+        ~creating_new_token (txn : Transaction_union.var) =
       let%bind data =
         exists (Typ.Internal.ref ())
           ~compute:
@@ -873,9 +931,13 @@ module Base = struct
             let%bind receiver_account, _path =
               read (Typ.Internal.ref ()) receiver_account
             in
+            let%bind creating_new_token =
+              read Boolean.typ creating_new_token
+            in
             let%map txn_global_slot = read Global_slot.typ txn_global_slot in
             compute_unchecked ~constraint_constants ~txn_global_slot
-              ~fee_payer_account ~source_account ~receiver_account txn)
+              ~creating_new_token ~fee_payer_account ~source_account
+              ~receiver_account txn)
   end
 
   let%snarkydef check_signature shifted ~payload ~is_user_command ~signer
@@ -999,38 +1061,95 @@ module Base = struct
          Public_key.Compressed.Checked.Assert.equal signer_pk
            payload.common.fee_payer_pk)
     in
-    let fee = payload.common.fee in
-    let token = payload.body.token_id in
-    let receiver = Account_id.Checked.create payload.body.receiver_pk token in
-    let source = Account_id.Checked.create payload.body.source_pk token in
-    (* Information for the fee-payer. *)
-    let nonce = payload.common.nonce in
-    let fee_token = payload.common.fee_token in
-    let fee_payer =
-      Account_id.Checked.create payload.common.fee_payer_pk fee_token
-    in
     (* Compute transaction kind. *)
     let is_payment = Transaction_union.Tag.Unpacked.is_payment tag in
-    let is_fee_transfer = Transaction_union.Tag.Unpacked.is_fee_transfer tag in
     let is_stake_delegation =
       Transaction_union.Tag.Unpacked.is_stake_delegation tag
     in
+    let is_create_account =
+      Transaction_union.Tag.Unpacked.is_create_account tag
+    in
+    let is_fee_transfer = Transaction_union.Tag.Unpacked.is_fee_transfer tag in
     let is_coinbase = Transaction_union.Tag.Unpacked.is_coinbase tag in
+    let fee_token = payload.common.fee_token in
+    let%bind fee_token_invalid =
+      Token_id.(Checked.equal fee_token (var_of_t invalid))
+    in
+    let%bind fee_token_default =
+      Token_id.(Checked.equal fee_token (var_of_t default))
+    in
+    let token = payload.body.token_id in
+    let%bind token_invalid =
+      Token_id.(Checked.equal token (var_of_t invalid))
+    in
     let%bind token_default =
       Token_id.(Checked.equal token (var_of_t default))
     in
     let%bind () =
       [%with_label "Validate tokens"]
-        (let%bind () =
-           (* TODO: Remove this check and update the transaction snark once we
-              have an exchange rate mechanism. See issue #4447.
-           *)
-           [%with_label "Validate fee token"]
-             (Token_id.Checked.Assert.equal fee_token
-                Token_id.(var_of_t default))
-         in
-         [%with_label "Validate delegated token is default"]
-           Boolean.(Assert.any [token_default; not is_stake_delegation]))
+        (Checked.all_unit
+           [ [%with_label "Fee token is valid"]
+               Boolean.(Assert.is_true (not fee_token_invalid))
+           ; [%with_label
+               "Fee token is default or command allows non-default fee"]
+               (Boolean.Assert.any
+                  [ fee_token_default
+                  ; is_payment
+                  ; is_stake_delegation
+                  ; is_fee_transfer ])
+           ; (* TODO: Remove this check and update the transaction snark once we
+               have an exchange rate mechanism. See issue #4447.
+            *)
+             [%with_label "Fees in tokens disabled"]
+               (Boolean.Assert.is_true fee_token_default)
+           ; [%with_label "Token is valid or command allows invalid token"]
+               Boolean.(Assert.any [not token_invalid; is_create_account])
+           ; [%with_label
+               "Token is default or command allows non-default token"]
+               (Boolean.Assert.any
+                  [ token_default
+                  ; is_payment
+                  ; is_create_account
+                    (* TODO: Enable this when fees in tokens are enabled. *)
+                    (*; is_fee_transfer*) ])
+           ; [%with_label
+               "Token is non-default or command allows default token"]
+               Boolean.(
+                 Assert.any
+                   [ not token_default
+                   ; is_payment
+                   ; is_stake_delegation
+                   ; is_fee_transfer
+                   ; is_coinbase ]) ])
+    in
+    let%bind creating_new_token =
+      Boolean.(is_create_account && token_invalid)
+    in
+    let%bind next_available_token, token =
+      (* TODO: Use next_available_token from the protocol state.  *)
+      let next_available_token = Token_id.(var_of_t (next default)) in
+      let%bind () =
+        [%with_label "New token creation is disabled"]
+          Boolean.(Assert.is_true (not creating_new_token))
+      in
+      let%bind token =
+        Token_id.Checked.if_ creating_new_token ~then_:next_available_token
+          ~else_:token
+      in
+      let%map next_available_token =
+        Token_id.Checked.next_if next_available_token creating_new_token
+      in
+      (next_available_token, token)
+    in
+    (* TODO: Route this out back to the protocol state. *)
+    ignore next_available_token ;
+    let fee = payload.common.fee in
+    let receiver = Account_id.Checked.create payload.body.receiver_pk token in
+    let source = Account_id.Checked.create payload.body.source_pk token in
+    (* Information for the fee-payer. *)
+    let nonce = payload.common.nonce in
+    let fee_payer =
+      Account_id.Checked.create payload.common.fee_payer_pk fee_token
     in
     let current_global_slot =
       Coda_state.Protocol_state.Body.consensus_state state_body
@@ -1116,7 +1235,7 @@ module Base = struct
     *)
     let%bind user_command_failure =
       User_command_failure.compute_as_prover ~constraint_constants
-        ~txn_global_slot:current_global_slot txn
+        ~txn_global_slot:current_global_slot ~creating_new_token txn
     in
     let%bind user_command_fails =
       User_command_failure.any user_command_failure
@@ -1129,8 +1248,11 @@ module Base = struct
       [%with_label "Check success failure against predicted"]
         (* TODO: Predicates. *)
         (let%bind bypass_predicate =
-           Public_key.Compressed.Checked.equal payload.common.fee_payer_pk
-             payload.body.source_pk
+           let%bind is_own_account =
+             Public_key.Compressed.Checked.equal payload.common.fee_payer_pk
+               payload.body.source_pk
+           in
+           Boolean.(is_create_account || is_own_account)
          in
          assert_r1cs
            (Boolean.not bypass_predicate :> Field.Var.t)
@@ -1166,6 +1288,7 @@ module Base = struct
              (* this account is:
                - the fee-payer for payments
                - the fee-payer for stake delegation
+               - the fee-payer for account creation
                - the fee-receiver for a coinbase
                - the second receiver for a fee transfer
              *)
@@ -1192,6 +1315,16 @@ module Base = struct
                *)
                Boolean.(is_empty_and_writeable && not is_zero_fee)
              in
+             let%bind should_pay_to_create =
+               (* Coinbases and fee transfers may create, or we may be creating
+                  a new token account. These are mutually exclusive, so we can
+                  encode this as a boolean.
+               *)
+               let%bind creating_new_token =
+                 Boolean.(creating_new_token && not user_command_fails)
+               in
+               Boolean.(is_empty_and_writeable || creating_new_token)
+             in
              let%bind amount =
                [%with_label "Compute fee payer amount"]
                  (let fee_payer_amount =
@@ -1203,7 +1336,7 @@ module Base = struct
                   (* Account creation fee for fee transfers/coinbases. *)
                   let%bind account_creation_fee =
                     let%map magnitude =
-                      Amount.Checked.if_ is_empty_and_writeable
+                      Amount.Checked.if_ should_pay_to_create
                         ~then_:account_creation_amount
                         ~else_:Amount.(var_of_t zero)
                     in
@@ -1262,12 +1395,16 @@ module Base = struct
     let%bind receiver_increase =
       (* - payments:         payload.body.amount
          - stake delegation: 0
+         - account creation: 0
          - coinbase:         payload.body.amount - payload.common.fee
          - fee transfer:     payload.body.amount
       *)
       [%with_label "Compute receiver increase"]
         (let%bind base_amount =
-           Amount.Checked.if_ is_stake_delegation
+           let%bind zero_transfer =
+             Boolean.any [is_stake_delegation; is_create_account]
+           in
+           Amount.Checked.if_ zero_transfer
              ~then_:(Amount.var_of_t Amount.zero)
              ~else_:payload.body.amount
          in
@@ -1287,6 +1424,7 @@ module Base = struct
              (* this account is:
                - the receiver for payments
                - the delegated-to account for stake delegation
+               - the created account for an account creation
                - the receiver for a coinbase
                - the first receiver for a fee transfer
              *)
@@ -1298,18 +1436,28 @@ module Base = struct
                  (Boolean.Assert.( = ) is_empty_delegatee
                     user_command_failure.receiver_not_present)
              in
+             let%bind () =
+               [%with_label "Receiver creation failure matches predicted"]
+                 (let%bind is_nonempty_creating =
+                    Boolean.((not is_empty_and_writeable) && is_create_account)
+                  in
+                  Boolean.Assert.( = ) is_nonempty_creating
+                    user_command_failure.receiver_exists)
+             in
              let is_empty_and_writeable =
                (* is_empty_and_writable && not is_stake_delegation *)
                Boolean.Unsafe.of_cvar
                @@ Field.Var.(
                     sub (is_empty_and_writeable :> t) (is_empty_delegatee :> t))
              in
+             let%bind should_pay_to_create =
+               Boolean.(is_empty_and_writeable && not is_create_account)
+             in
              let%bind () =
                [%with_label
                  "Check whether creation fails due to a non-default token"]
                  (let%bind token_should_not_create =
-                    Boolean.(
-                      is_empty_and_writeable && Boolean.not token_default)
+                    Boolean.(should_pay_to_create && Boolean.not token_default)
                   in
                   let%bind token_cannot_create =
                     Boolean.(token_should_not_create && is_user_command)
@@ -1339,7 +1487,7 @@ module Base = struct
                *)
                let%bind receiver_amount =
                  let%bind account_creation_amount =
-                   Amount.Checked.if_ is_empty_and_writeable
+                   Amount.Checked.if_ should_pay_to_create
                      ~then_:account_creation_amount
                      ~else_:Amount.(var_of_t zero)
                  in
@@ -1371,6 +1519,7 @@ module Base = struct
                (* Only default tokens may participate in delegation. *)
                Boolean.(is_empty_and_writeable && token_default)
              in
+             let token_owner = creating_new_token in
              let%map delegate =
                Public_key.Compressed.Checked.if_ may_delegate
                  ~then_:(Account_id.Checked.public_key receiver)
@@ -1386,7 +1535,7 @@ module Base = struct
              { Account.Poly.balance
              ; public_key
              ; token_id
-             ; token_owner= account.token_owner
+             ; token_owner
              ; nonce= account.nonce
              ; receipt_chain_hash= account.receipt_chain_hash
              ; delegate
@@ -1401,13 +1550,19 @@ module Base = struct
            ~is_writeable:
              (* [modify_account_send] does this failure check for us. *)
              user_command_failure.source_not_present root_after_receiver_update
-           source ~f:(fun ~is_empty_and_writeable:_ account ->
+           source ~f:(fun ~is_empty_and_writeable account ->
              (* this account is:
                - the source for payments
                - the delegator for stake delegation
+               - the token owner for account creation
                - the fee-receiver for a coinbase
                - the second receiver for a fee transfer
              *)
+             let%bind () =
+               [%with_label "Check source presence failure matches predicted"]
+                 (Boolean.Assert.( = ) is_empty_and_writeable
+                    user_command_failure.source_not_present)
+             in
              let%bind () =
                [%with_label
                  "Check source failure cases do not apply when fee-payer is \
@@ -1471,6 +1626,19 @@ module Base = struct
                  (Boolean.Assert.( = ) underflow
                     user_command_failure.source_insufficient_balance)
              in
+             let%bind () =
+               [%with_label "Check not_token_owner failure matches predicted"]
+                 (let%bind token_owner_ok =
+                    Boolean.(
+                      any
+                        [ account.token_owner
+                        ; token_default
+                        ; not is_create_account ])
+                  in
+                  Boolean.(
+                    Assert.( = ) (not token_owner_ok)
+                      user_command_failure.not_token_owner))
+             in
              let%map delegate =
                Public_key.Compressed.Checked.if_ is_stake_delegation
                  ~then_:(Account_id.Checked.public_key receiver)
@@ -1493,6 +1661,7 @@ module Base = struct
     let%bind fee_excess =
       (* - payments:         payload.common.fee
          - stake delegation: payload.common.fee
+         - account creation: payload.common.fee
          - coinbase:         0 (fee already paid above)
          - fee transfer:     - payload.body.amount - payload.common.fee
       *)
