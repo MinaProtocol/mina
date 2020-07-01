@@ -54,8 +54,6 @@ module Diff_versioned = struct
           | Invalid_signature
           | Duplicate
           | Sender_account_does_not_exist
-          | Insufficient_amount_for_account_creation
-          | Delegate_not_found
           | Invalid_nonce
           | Insufficient_funds
           | Insufficient_fee
@@ -71,8 +69,6 @@ module Diff_versioned = struct
       | Invalid_signature
       | Duplicate
       | Sender_account_does_not_exist
-      | Insufficient_amount_for_account_creation
-      | Delegate_not_found
       | Invalid_nonce
       | Insufficient_funds
       | Insufficient_fee
@@ -582,8 +578,6 @@ struct
           | Invalid_signature
           | Duplicate
           | Sender_account_does_not_exist
-          | Insufficient_amount_for_account_creation
-          | Delegate_not_found
           | Invalid_nonce
           | Insufficient_funds
           | Insufficient_fee
@@ -675,43 +669,11 @@ struct
                               :: rejected )
                       | Some sender_account ->
                           if has_sufficient_fee pool tx ~pool_max_size then (
-                            let validate_receiver =
-                              match
-                                account ledger (User_command.receiver tx)
-                              with
-                              | None -> (
-                                (*receiver account is new*)
-                                match User_command.amount tx with
-                                | None ->
-                                    (* When tx is for stake delegation. The new Delegate should be in the ledger*)
-                                    Error `Delegate_not_found
-                                | Some receiver_amount ->
-                                    (*amount should be at least account_creation_fee for transactions that create new accounts*)
-                                    let receiver_amount_to_fee =
-                                      Currency.Amount.to_fee receiver_amount
-                                    in
-                                    if
-                                      Currency.Fee.(
-                                        receiver_amount_to_fee
-                                        >= constraint_constants
-                                             .account_creation_fee)
-                                    then Ok ()
-                                    else
-                                      Error
-                                        `Insufficient_amount_for_account_creation
-                                )
-                              | Some _ ->
-                                  Ok ()
-                            in
                             let add_res =
-                              Result.bind
-                                ( Indexed_pool.add_from_gossip_exn pool tx'
-                                    sender_account.nonce
-                                @@ Currency.Balance.to_amount
-                                     sender_account.balance )
-                                ~f:(fun res ->
-                                  Result.map validate_receiver ~f:(fun _ -> res)
-                                  )
+                              Indexed_pool.add_from_gossip_exn pool tx'
+                                sender_account.nonce
+                              @@ Currency.Balance.to_amount
+                                   sender_account.balance
                             in
                             let of_indexed_pool_error = function
                               | `Invalid_nonce (`Between (low, hi), nonce) ->
@@ -740,10 +702,6 @@ struct
                                     ; ("fee", fee_json fee) ] )
                               | `Overflow ->
                                   (Overflow, [])
-                              | `Delegate_not_found ->
-                                  (Delegate_not_found, [])
-                              | `Insufficient_amount_for_account_creation ->
-                                  (Insufficient_amount_for_account_creation, [])
                             in
                             let yojson_fail_reason =
                               Fn.compose
@@ -756,13 +714,7 @@ struct
                                   | `Insufficient_replace_fee _ ->
                                       "insufficient replace fee"
                                   | `Overflow ->
-                                      "overflow"
-                                  | `Delegate_not_found ->
-                                      "delegate not found"
-                                  | `Insufficient_amount_for_account_creation
-                                    ->
-                                      "insufficient amount for reciever \
-                                       account creation" )
+                                      "overflow" )
                             in
                             match add_res with
                             | Ok (pool', dropped) ->

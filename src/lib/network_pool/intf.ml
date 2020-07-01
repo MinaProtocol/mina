@@ -228,8 +228,6 @@ module type Transaction_pool_diff_intf = sig
       | Invalid_signature
       | Duplicate
       | Sender_account_does_not_exist
-      | Insufficient_amount_for_account_creation
-      | Delegate_not_found
       | Invalid_nonce
       | Insufficient_funds
       | Insufficient_fee
