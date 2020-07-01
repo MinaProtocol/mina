@@ -16,7 +16,7 @@ type t [@@deriving sexp_of]
 (* TODO sexp is debug only, remove *)
 
 (** Empty pool *)
-val empty : t
+val empty : constraint_constants:Genesis_constants.Constraint_constants.t -> t
 
 (** How many transactions are currently in the pool *)
 val size : t -> int
@@ -43,7 +43,6 @@ val handle_committed_txn :
      t
   -> User_command.With_valid_signature.t
   -> fee_payer_balance:Currency.Amount.t
-  -> source_balance:Currency.Amount.t
   -> ( t * User_command.With_valid_signature.t Sequence.t
      , [ `Queued_txns_by_sender of
          string * User_command.With_valid_signature.t Sequence.t ] )
