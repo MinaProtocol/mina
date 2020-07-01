@@ -40,9 +40,9 @@ module Stable = struct
 
   module Tests = struct
     [%%if
-    curve_size = 382]
+    curve_size = 255]
 
-    let%test "signature serialization v1 (curve_size=382)" =
+    let%test "signature serialization v1 (curve_size=255)" =
       let signature =
         Quickcheck.random_value
           ~seed:(`Deterministic "signature serialization") V1.gen

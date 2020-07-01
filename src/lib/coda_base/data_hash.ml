@@ -136,7 +136,7 @@ module T0 = struct
         Field.gen
 
     [%%if
-    curve_size = 382]
+    curve_size = 255]
 
     let%test "Binable from stringable V1" =
       let known_good_digest = "02af2dbde8102784d876d53c323b9f02" in
