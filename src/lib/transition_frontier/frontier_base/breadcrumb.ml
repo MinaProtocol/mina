@@ -322,18 +322,18 @@ module For_tests = struct
             Ledger_proof.statement proof |> Ledger_proof.statement_target )
           ~default:previous_ledger_hash
       in
-      let next_available_token =
+      let snarked_next_available_token =
         match ledger_proof_opt with
         | Some (proof, _) ->
             (Ledger_proof.statement proof).next_available_token_after
         | None ->
             previous_protocol_state |> Protocol_state.blockchain_state
-            |> Blockchain_state.next_available_token
+            |> Blockchain_state.snarked_next_available_token
       in
       let next_blockchain_state =
         Blockchain_state.create_value
           ~timestamp:(Block_time.now @@ Block_time.Controller.basic ~logger)
-          ~snarked_ledger_hash:next_ledger_hash ~next_available_token
+          ~snarked_ledger_hash:next_ledger_hash ~snarked_next_available_token
           ~staged_ledger_hash:next_staged_ledger_hash
       in
       let previous_state_hash = Protocol_state.hash previous_protocol_state in

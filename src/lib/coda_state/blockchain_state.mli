@@ -9,7 +9,7 @@ module Poly : sig
       type ('staged_ledger_hash, 'snarked_ledger_hash, 'token_id, 'time) t =
         { staged_ledger_hash: 'staged_ledger_hash
         ; snarked_ledger_hash: 'snarked_ledger_hash
-        ; next_available_token: 'token_id
+        ; snarked_next_available_token: 'token_id
         ; timestamp: 'time }
       [@@deriving sexp, eq, compare, yojson]
     end
@@ -23,7 +23,7 @@ module Poly : sig
         Stable.Latest.t =
     { staged_ledger_hash: 'staged_ledger_hash
     ; snarked_ledger_hash: 'snarked_ledger_hash
-    ; next_available_token: 'token_id
+    ; snarked_next_available_token: 'token_id
     ; timestamp: 'time }
   [@@deriving sexp, eq, compare, fields, yojson]
 end
@@ -61,27 +61,27 @@ val staged_ledger_hash :
 val snarked_ledger_hash :
   (_, 'snarked_ledger_hash, _, _) Poly.t -> 'snarked_ledger_hash
 
-val next_available_token : (_, _, 'token_id, _) Poly.t -> 'token_id
+val snarked_next_available_token : (_, _, 'token_id, _) Poly.t -> 'token_id
 
 val timestamp : (_, _, _, 'time) Poly.t -> 'time
 
 val create_value :
      staged_ledger_hash:Staged_ledger_hash.t
   -> snarked_ledger_hash:Frozen_ledger_hash.t
-  -> next_available_token:Token_id.t
+  -> snarked_next_available_token:Token_id.t
   -> timestamp:Block_time.t
   -> Value.t
 
 val negative_one :
      constraint_constants:Genesis_constants.Constraint_constants.t
   -> genesis_ledger_hash:Ledger_hash.t
-  -> next_available_token:Token_id.t
+  -> snarked_next_available_token:Token_id.t
   -> Value.t
 
 val genesis :
      constraint_constants:Genesis_constants.Constraint_constants.t
   -> genesis_ledger_hash:Ledger_hash.t
-  -> next_available_token:Token_id.t
+  -> snarked_next_available_token:Token_id.t
   -> Value.t
 
 val set_timestamp :

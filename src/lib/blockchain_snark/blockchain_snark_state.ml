@@ -130,9 +130,9 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
                |> Blockchain_state.snarked_ledger_hash )
                pending_coinbase_source_stack deleted_stack supply_increase
                ( previous_state |> Protocol_state.blockchain_state
-               |> Blockchain_state.next_available_token )
+               |> Blockchain_state.snarked_next_available_token )
                ( transition |> Snark_transition.blockchain_state
-               |> Blockchain_state.next_available_token )
+               |> Blockchain_state.snarked_next_available_token )
                (As_prover.return
                   (Option.value ~default:Tock.Proof.dummy
                      (Snark_transition.ledger_proof transition))))

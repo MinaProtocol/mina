@@ -72,7 +72,7 @@ module type Blockchain_state = sig
   val create_value :
        staged_ledger_hash:Staged_ledger_hash.t
     -> snarked_ledger_hash:Frozen_ledger_hash.t
-    -> next_available_token:Token_id.t
+    -> snarked_next_available_token:Token_id.t
     -> timestamp:Block_time.t
     -> Value.t
 
@@ -82,7 +82,7 @@ module type Blockchain_state = sig
   val snarked_ledger_hash :
     (_, 'frozen_ledger_hash, _, _) Poly.t -> 'frozen_ledger_hash
 
-  val next_available_token : (_, _, 'token_id, _) Poly.t -> 'token_id
+  val snarked_next_available_token : (_, _, 'token_id, _) Poly.t -> 'token_id
 
   val timestamp : (_, _, _, 'time) Poly.t -> 'time
 end

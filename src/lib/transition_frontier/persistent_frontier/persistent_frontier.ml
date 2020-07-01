@@ -19,7 +19,7 @@ let construct_staged_ledger_at_root
   in
   let snarked_next_available_token =
     External_transition.Validated.blockchain_state root_transition
-    |> Blockchain_state.next_available_token
+    |> Blockchain_state.snarked_next_available_token
   in
   let scan_state = scan_state root in
   let pending_coinbase = pending_coinbase root in
