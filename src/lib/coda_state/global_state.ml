@@ -35,10 +35,10 @@ module Value = struct
     end
   end]
 
-  type t = Stable.Latest.t
+  type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash, yojson]
 end
 
-type t = Value.t
+type t = Value.t [@@deriving sexp, eq, compare, hash, yojson]
 
 type var = Token_id.var Poly.t
 
