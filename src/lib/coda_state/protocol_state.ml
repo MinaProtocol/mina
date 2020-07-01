@@ -49,7 +49,7 @@ module Body = struct
           ; consensus_state: 'consensus_state
           ; constants: 'constants
           ; global_state: 'global_state }
-        [@@deriving bin_io, sexp, eq, compare, to_yojson, hash, version]
+        [@@deriving sexp, eq, compare, to_yojson, hash]
       end
     end]
 
@@ -84,7 +84,7 @@ module Body = struct
           , Protocol_constants_checked.Value.Stable.V1.t
           , Global_state.Value.Stable.V1.t )
           Poly.Stable.V1.t
-        [@@deriving eq, ord, bin_io, hash, sexp, to_yojson, version]
+        [@@deriving eq, ord, hash, sexp, to_yojson]
 
         let to_latest = Fn.id
       end
