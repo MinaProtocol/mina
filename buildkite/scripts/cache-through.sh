@@ -10,7 +10,9 @@ fi
 
 # download gsutil if it doesn't exist
 # TODO: Bake this into the agents
-if [[ ! -f /usr/local/google-cloud-sdk/bin/gsutil ]]; then
+UPLOAD_BIN=/usr/local/google-cloud-sdk/bin/gsutil
+
+if [[ ! -f $UPLOAD_BIN ]]; then
   echo "Downloading gsutil because it doesn't exist"
   wget https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-296.0.1-linux-x86_64.tar.gz
 
@@ -21,7 +23,6 @@ if [[ ! -f /usr/local/google-cloud-sdk/bin/gsutil ]]; then
   export GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcp_creds.json && /usr/local/google-cloud-sdk/bin/gcloud auth activate-service-account bk-large@o1labs-192920.iam.gserviceaccount.com --key-file /tmp/gcp_creds.json
 fi
 
-UPLOAD_BIN=/usr/local/google-cloud-sdk/bin/gsutil
 PREFIX=gs://buildkite_k8s/coda/shared
 FILE="$1"
 MISS_CMD="$2"
