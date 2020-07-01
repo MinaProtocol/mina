@@ -836,7 +836,7 @@ module Base = struct
                   ( source_account.token_owner
                   || Token_id.(equal default) (Account_id.token_id receiver) )
               in
-              { predicate_failed
+              { predicate_failed= false
               ; source_not_present
               ; receiver_not_present= false
               ; amount_insufficient_to_create= false
@@ -1247,8 +1247,11 @@ module Base = struct
       [%with_label "Check success failure against predicted"]
         (* TODO: Predicates. *)
         (let%bind bypass_predicate =
-           Public_key.Compressed.Checked.equal payload.common.fee_payer_pk
-             payload.body.source_pk
+           let%bind is_own_account =
+             Public_key.Compressed.Checked.equal payload.common.fee_payer_pk
+               payload.body.source_pk
+           in
+           Boolean.(is_create_account || is_own_account)
          in
          assert_r1cs
            (Boolean.not bypass_predicate :> Field.Var.t)
