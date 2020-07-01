@@ -51,14 +51,14 @@ module Stable = struct
      *)
 
     [%%if
-    curve_size = 382]
+    curve_size = 255]
 
     let%test "private key serialization v1" =
       let pk =
         Quickcheck.random_value ~seed:(`Deterministic "private key seed v1")
           V1.gen
       in
-      let known_good_digest = "a990d65c59ec61ceb157ab486c241231" in
+      let known_good_digest = "bdfcf483d2d5c27af03047376eb87255" in
       Ppx_version.Serialization.check_serialization
         (module V1)
         pk known_good_digest

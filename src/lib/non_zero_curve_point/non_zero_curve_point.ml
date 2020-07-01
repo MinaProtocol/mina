@@ -84,14 +84,14 @@ module Compressed = struct
        *)
 
       [%%if
-      curve_size = 382]
+      curve_size = 255]
 
       let%test "nonzero_curve_point_compressed v1" =
         let point =
           Quickcheck.random_value
             ~seed:(`Deterministic "nonzero_curve_point_compressed-seed") V1.gen
         in
-        let known_good_digest = "96893614296cb3768fd7e389efe9e0eb" in
+        let known_good_digest = "038f3153aa36387b23b54af004de82c8" in
         Ppx_version.Serialization.check_serialization
           (module V1)
           point known_good_digest
