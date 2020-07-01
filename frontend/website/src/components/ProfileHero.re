@@ -261,22 +261,29 @@ module Points = {
   };
 
   [@react.component]
-  let make =
-      (
-        ~pointsForRelease="1000",
-        ~pointsforPhase="11000",
-        ~pointsAllTime="100000",
-      ) => {
+  let make = (~pointsForRelease, ~pointsForPhase, ~pointsAllTime) => {
     <div className=Styles.pointsRow>
-      <PointsColumn pointType="This Release" rank="1" points="5000" />
-      <PointsColumn pointType="This Phase" rank="19" points="10000" />
-      <PointsColumn pointType="All Time" rank="101" points="10500" />
+      <PointsColumn
+        pointType="This Release"
+        rank="1"
+        points={string_of_int(pointsForRelease)}
+      />
+      <PointsColumn
+        pointType="This Phase"
+        rank="19"
+        points={string_of_int(pointsForPhase)}
+      />
+      <PointsColumn
+        pointType="All Time"
+        rank="101"
+        points={string_of_int(pointsAllTime)}
+      />
     </div>;
   };
 };
 
 [@react.component]
-let make = (~name="Matt Harrott / Figment Network#8705") => {
+let make = (~name, ~release, ~phase, ~allTime) => {
   <div className=Styles.linkRow>
     <Next.Link href="/testnet">
       <a className=Theme.Link.basic> {React.string("Testnet")} </a>
@@ -290,6 +297,13 @@ let make = (~name="Matt Harrott / Figment Network#8705") => {
       {React.string("Participant Details")}
     </span>
     <p className=Styles.header> {React.string(name)} </p>
-    <div className=Styles.middleRow> <Points /> <Links /> </div>
+    <div className=Styles.middleRow>
+      <Points
+        pointsForRelease=release
+        pointsForPhase=phase
+        pointsAllTime=allTime
+      />
+      <Links />
+    </div>
   </div>;
 };

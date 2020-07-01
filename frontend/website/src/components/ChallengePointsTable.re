@@ -188,19 +188,47 @@ module Row = {
   };
 };
 
+type challengeInfo = {
+  challengeName: string,
+  challengePoints: option(int),
+};
+type releaseInfo = {
+  name: string,
+  challenges: array(challengeInfo),
+};
+
 [@react.component]
-let make = (~releaseInfo, ~challengeInfo) => {
+let make = (~releaseTitle, ~challengeInfo) => {
+  let calculateTotalPoints = () => {
+    challengeInfo
+    |> Array.fold_left(
+         (totalPoints, challenge) => {
+           switch (challenge.challengePoints) {
+           | Some(points) => totalPoints + points
+           | None => totalPoints
+           }
+         },
+         0,
+       )
+    |> string_of_int;
+  };
   let renderChallengePointsTable = () => {
     challengeInfo
     |> Array.mapi((index, challenge) => {
-         let (star, name, points) = challenge;
-         <Row star rank={index + 1} name points />;
+         let {challengeName, challengePoints} = challenge;
+         <Row
+           key={string_of_int(index)}
+           star={Some("")} /* TODO: not sure what these are. Follow up with Chris on this. */
+           rank={index + 1}
+           name=challengeName
+           points=challengePoints
+         />;
        })
     |> React.array;
   };
 
   <div className=Styles.container>
-    <div className=Styles.releaseTitle> {React.string(releaseInfo)} </div>
+    <div className=Styles.releaseTitle> {React.string(releaseTitle)} </div>
     <div className=Styles.tableContainer>
       <div className=Styles.topRow>
         <span className=Styles.challengeLabel>
@@ -216,7 +244,7 @@ let make = (~releaseInfo, ~challengeInfo) => {
           {React.string("Total Points *")}
         </span>
         <span className=Styles.totalPointsLabel>
-          {React.string("5000")}
+          {React.string(calculateTotalPoints())}
         </span>
       </div>
       <div>
