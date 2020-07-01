@@ -63,8 +63,7 @@ module Make
     let data = to_data t in
     String.concat
       (List.init length_in_bytes ~f:(fun i ->
-           let i = length_in_bytes - 1 - i in
-           sprintf "%02X" (Char.to_int Ctypes.(!@(data +@ i))) ))
+           sprintf "%02x" (Char.to_int Ctypes.(!@(data +@ i))) ))
     |> sprintf "0x%s"
 
   let sexp_of_t t = to_hex_string t |> Sexp.of_string

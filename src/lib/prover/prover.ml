@@ -341,9 +341,10 @@ let extend_blockchain {connection; logger; _} chain next_state block
                 (Sexp.to_string (Extend_blockchain_input.sexp_of_t input)) )
           ; ( "input-bin-io"
             , `String
-                (Binable.to_string
+                (Base64.encode_exn 
+                   (Binable.to_string
                    (module Extend_blockchain_input.Stable.Latest)
-                   input) )
+                   input) ) )
           ; ("error", `String (Error.to_string_hum e)) ]
         "Prover failed: $error" ;
       Error e

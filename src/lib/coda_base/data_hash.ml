@@ -104,9 +104,7 @@ struct
 
   let typ : (var, t) Typ.t =
     Typ.transport_var Typ.field
-      ~there:(fun {digest; bits} ->
-        assert (Option.is_none bits) ;
-        digest )
+      ~there:(fun {digest; bits= _} -> digest)
       ~back:(fun digest -> {digest; bits= None})
 
   [%%endif]
