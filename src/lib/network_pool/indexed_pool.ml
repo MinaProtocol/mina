@@ -37,7 +37,8 @@ type t =
             Ordered by nonce inside the accounts. *)
   ; all_by_fee: User_command.With_valid_signature.Set.t Currency.Fee.Map.t
         (** All transactions in the pool indexed by fee. *)
-  ; size: int }
+  ; size: int
+  ; constraint_constants: Genesis_constants.Constraint_constants.t }
 [@@deriving sexp_of]
 
 (* Compute the total currency required from the sender to execute a command.
@@ -73,7 +74,11 @@ module For_tests = struct
   (* Check the invariants of the pool structure as listed in the comment above.
   *)
   let assert_invariants : t -> unit =
-   fun {applicable_by_fee; all_by_sender; all_by_fee; size} ->
+   fun { applicable_by_fee
+       ; all_by_sender
+       ; all_by_fee
+       ; size
+       ; constraint_constants= _ } ->
     let assert_all_by_fee tx =
       if
         Set.mem
@@ -167,11 +172,12 @@ module For_tests = struct
       size
 end
 
-let empty : t =
+let empty ~constraint_constants : t =
   { applicable_by_fee= Currency.Fee.Map.empty
   ; all_by_sender= Account_id.Map.empty
   ; all_by_fee= Currency.Fee.Map.empty
-  ; size= 0 }
+  ; size= 0
+  ; constraint_constants }
 
 let size : t -> int = fun t -> t.size
 
@@ -472,7 +478,7 @@ let rec add_from_gossip_exn :
            [`Replace_fee of Currency.Fee.t] * Currency.Fee.t
          | `Overflow ] )
        Result.t =
- fun t cmd current_nonce balance ->
+ fun ({constraint_constants; _} as t) cmd current_nonce balance ->
   let unchecked = User_command.forget_check cmd in
   let fee = User_command.fee unchecked in
   let fee_payer = User_command.fee_payer unchecked in
@@ -509,7 +515,8 @@ let rec add_from_gossip_exn :
               Map_set.insert
                 (module User_command.With_valid_signature)
                 t.all_by_fee fee cmd
-          ; size= t.size + 1 }
+          ; size= t.size + 1
+          ; constraint_constants }
         , Sequence.empty )
   | Some (queued_cmds, reserved_currency) -> (
       (* commands queued for this sender *)
@@ -612,7 +619,7 @@ let rec add_from_gossip_exn :
             failwith "recursive add_exn failed" )
 
 let add_from_backtrack : t -> User_command.With_valid_signature.t -> t =
- fun t cmd ->
+ fun ({constraint_constants; _} as t) cmd ->
   let unchecked = User_command.forget_check cmd in
   let fee_payer = User_command.fee_payer unchecked in
   let fee = User_command.fee unchecked in
@@ -633,7 +640,8 @@ let add_from_backtrack : t -> User_command.With_valid_signature.t -> t =
           Map_set.insert
             (module User_command.With_valid_signature)
             t.applicable_by_fee fee cmd
-      ; size= t.size + 1 }
+      ; size= t.size + 1
+      ; constraint_constants }
   | Some (queue, currency_reserved) ->
       let first_queued = F_sequence.head_exn queue in
       if
@@ -663,7 +671,8 @@ let add_from_backtrack : t -> User_command.With_valid_signature.t -> t =
               ( F_sequence.cons cmd queue
               , Option.value_exn Currency.Amount.(currency_reserved + consumed)
               )
-      ; size= t.size + 1 }
+      ; size= t.size + 1
+      ; constraint_constants }
 
 let%test_module _ =
   ( module struct
@@ -674,6 +683,12 @@ let%test_module _ =
     let gen_cmd =
       User_command.With_valid_signature.Gen.payment_with_random_participants
         ~keys:test_keys ~max_amount:1000 ~max_fee:10
+
+    let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
+
+    let constraint_constants = precomputed_values.constraint_constants
+
+    let empty = empty ~constraint_constants
 
     let%test_unit "empty invariants" = assert_invariants empty
 

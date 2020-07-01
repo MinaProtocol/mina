@@ -16,7 +16,7 @@ type t [@@deriving sexp_of]
 (* TODO sexp is debug only, remove *)
 
 (** Empty pool *)
-val empty : t
+val empty : constraint_constants:Genesis_constants.Constraint_constants.t -> t
 
 (** How many transactions are currently in the pool *)
 val size : t -> int
