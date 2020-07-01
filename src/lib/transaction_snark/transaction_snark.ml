@@ -454,8 +454,14 @@ module Statement = struct
       else
         Or_error.errorf
           !"Next available token is inconsistent between transitions (%{sexp: \
-            Token_id.t} vs %{sexp: Token_id.t})"
+            Token_id.t} vs %{sexp: Token_id.t})\n\
+            Transitions are:\n\
+            %s\n\
+            vs\n\
+            %s\n"
           s1.next_available_token_after s2.next_available_token_before
+          (Yojson.Safe.pretty_to_string (to_yojson s1))
+          (Yojson.Safe.pretty_to_string (to_yojson s2))
     in
     ( { source= s1.source
       ; target= s2.target
