@@ -39,7 +39,7 @@ module Stable = struct
 
     [%%else]
 
-    let gen = Inner_curve.Scalar.(gen_uniform_incl one (size - one))
+    let gen = Inner_curve.Scalar.(gen_uniform_incl one (zero - one))
 
     [%%endif]
   end

@@ -412,7 +412,7 @@ open Hash_prefix_states_nonconsensus
 module Message = struct
   open Tick
 
-  type t = (Field.t, bool) Random_oracle.Input.t
+  type t = (Field.t, bool) Random_oracle.Input.t [@@deriving sexp]
 
   let challenge_length = 128
 
@@ -426,6 +426,7 @@ module Message = struct
     Random_oracle.Input.to_bits ~unpack:Field.unpack input
     |> Array.of_list |> Blake2.bits_to_string |> Blake2.digest_string
     |> Blake2.to_raw_string |> Blake2.string_to_bits |> Array.to_list
+    |> Fn.flip List.take (Int.min 256 (Field.size_in_bits - 1))
     |> Tock.Field.project
 
   let hash t ~public_key ~r =

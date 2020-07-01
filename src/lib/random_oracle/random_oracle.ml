@@ -11,7 +11,6 @@ open Pickles.Impls.Step.Internal_Basic
 [%%else]
 
 open Snark_params_nonconsensus
-module Sponge_params = Sponge_params_nonconsensus.Sponge_params
 
 [%%endif]
 
@@ -58,7 +57,7 @@ module Inputs = struct
     (* x^2 *)
     let res = res * res in
     (* x^4 *)
-    let res = res * req in
+    let res = res * res in
     (* x^8 *)
     let res = res * res in
     (* x^16 *)

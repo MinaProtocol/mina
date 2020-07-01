@@ -30,12 +30,5 @@ let typ : (var, t) Typ.t =
        ~commitment_lengths:
          (Dlog_marlin_types.Evals.map
             ~f:(fun x -> Vector.[x])
-            (let t = Commitment_lengths.of_domains Common.wrap_domains in
-             let open Core in
-             printf
-               !"expected commitment lengths: %{sexp:int \
-                 Dlog_marlin_types.Evals.t}\n\
-                 %!"
-               t ;
-             t))
+            (Commitment_lengths.of_domains Common.wrap_domains))
        Other_field.typ Inner_curve.typ)

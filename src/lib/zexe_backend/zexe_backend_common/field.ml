@@ -213,15 +213,14 @@ module Make (F : Input_intf) :
     module V1 = struct
       type t = F.t [@@deriving version {asserted}]
 
-      (* TODO: Don't allocate the bigint when writing and reading *)
       include Binable.Of_binable
                 (Bigint)
                 (struct
                   type nonrec t = t
 
-                  let to_binable = to_bigint_raw_noalloc
+                  let to_binable = to_bigint
 
-                  let of_binable = of_bigint_raw
+                  let of_binable = of_bigint
                 end)
 
       include Sexpable.Of_sexpable

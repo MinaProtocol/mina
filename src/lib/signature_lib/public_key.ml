@@ -16,8 +16,6 @@ let of_private_key_exn p = of_inner_curve_exn Inner_curve.(scale one p)
 include Non_zero_curve_point_nonconsensus.Non_zero_curve_point
 module Inner_curve = Snark_params_nonconsensus.Inner_curve
 
-let of_private_key_exn p =
-  of_inner_curve_exn
-    Inner_curve.(scale one (p : Private_key.t :> Snarkette.Nat.t))
+let of_private_key_exn p = of_inner_curve_exn Inner_curve.(scale one p)
 
 [%%endif]
