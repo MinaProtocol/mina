@@ -1141,6 +1141,7 @@ module Base = struct
       in
       (next_available_token, token)
     in
+    (* TODO: Route this out back to the protocol state. *)
     ignore next_available_token ;
     let fee = payload.common.fee in
     let receiver = Account_id.Checked.create payload.body.receiver_pk token in
