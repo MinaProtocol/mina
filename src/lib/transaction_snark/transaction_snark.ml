@@ -481,19 +481,18 @@ module Statement = struct
     and supply_increase = Currency.Amount.gen
     and pending_coinbase_before = Pending_coinbase.Stack.gen
     and pending_coinbase_after = Pending_coinbase.Stack.gen
-    (*
     and next_available_token_before, next_available_token_after =
       let%map token1 = Token_id.gen_non_default
       and token2 = Token_id.gen_non_default in
-      (Token_id.min token1 token2, Token_id.max token1 token2)*)
+      (Token_id.min token1 token2, Token_id.max token1 token2)
     and proof_type =
       Bool.quickcheck_generator >>| fun b -> if b then `Merge else `Base
     in
     ( { source
       ; target
       ; fee_excess
-      ; next_available_token_before= Token_id.(next default)
-      ; next_available_token_after= Token_id.(next default)
+      ; next_available_token_before
+      ; next_available_token_after
       ; proof_type
       ; supply_increase
       ; pending_coinbase_stack_state=
