@@ -101,29 +101,27 @@ module Make (Inputs : Inputs_intf) = struct
                 t
           in
           let store =
-            Key_cache.Disk_storable.simple
+            Key_cache.Sync.Disk_storable.simple
               (fun () -> name)
               (fun () ~path -> Urs.read path)
               Urs.write
           in
           let u =
-            Async.Thread_safe.block_on_async_exn (fun () ->
-                let open Async in
-                match%bind Key_cache.read specs store () with
-                | Ok (u, _) ->
-                    return u
-                | Error _e ->
-                    let urs = Urs.create (Unsigned.Size_t.of_int degree) in
-                    let%map _ =
-                      Key_cache.write
-                        (List.filter specs ~f:(function
-                          | On_disk _ ->
-                              true
-                          | S3 _ ->
-                              false ))
-                        store () urs
-                    in
-                    urs )
+            match Key_cache.Sync.read specs store () with
+            | Ok (u, _) ->
+                u
+            | Error _e ->
+                let urs = Urs.create (Unsigned.Size_t.of_int degree) in
+                let _ =
+                  Key_cache.Sync.write
+                    (List.filter specs ~f:(function
+                      | On_disk _ ->
+                          true
+                      | S3 _ ->
+                          false ))
+                    store () urs
+                in
+                urs
           in
           urs := Some u ;
           u

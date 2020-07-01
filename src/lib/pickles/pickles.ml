@@ -202,10 +202,13 @@ module Verification_key = struct
       fun () -> Lazy.force t
   end
 
+  (* TODO: Make async *)
   let load ~cache id =
-    Key_cache.read cache
-      (Key_cache.Disk_storable.of_binable Id.to_string (module Verification_key))
+    Key_cache.Sync.read cache
+      (Key_cache.Sync.Disk_storable.of_binable Id.to_string
+         (module Verification_key))
       id
+    |> Async.return
 end
 
 module type Proof_intf = sig
