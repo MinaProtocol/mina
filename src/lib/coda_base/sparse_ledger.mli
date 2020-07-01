@@ -1,6 +1,7 @@
 open Core
 open Snark_params.Tick
 
+[%%versioned:
 module Stable : sig
   module V1 : sig
     type t =
@@ -9,11 +10,9 @@ module Stable : sig
       , Account.Stable.V1.t
       , Token_id.Stable.V1.t )
       Sparse_ledger_lib.Sparse_ledger.T.Stable.V1.t
-    [@@deriving bin_io, sexp, to_yojson, version]
+    [@@deriving sexp, to_yojson]
   end
-
-  module Latest = V1
-end
+end]
 
 type t = Stable.Latest.t [@@deriving to_yojson, sexp]
 
