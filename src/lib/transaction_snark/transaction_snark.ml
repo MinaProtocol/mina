@@ -453,7 +453,9 @@ module Statement = struct
       then return ()
       else
         Or_error.errorf
-          "Next available token is inconsistent between transitions"
+          !"Next available token is inconsistent between transitions (%{sexp: \
+            Token_id.t} vs %{sexp: Token_id.t})"
+          s1.next_available_token_after s2.next_available_token_before
     in
     ( { source= s1.source
       ; target= s2.target
