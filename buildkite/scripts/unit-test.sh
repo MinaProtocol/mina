@@ -12,10 +12,13 @@ path=$2
 echo "--- CPU frequency info"
 lscpu | grep -i hz
 
+echo "--- CPU general info"
+cat /proc/cpuinfo
+
 source ~/.profile
 
 echo "--- Make build"
-make build 2>&1 | tee /tmp/make-build.log
+make build
 
 echo "--- Run unit tests"
-(dune runtest "${path}" --profile="${profile}" -j8 || (./scripts/link-coredumps.sh && false)) 2>&1 | tee /tmp/unit-test.log
+dune runtest "${path}" --profile="${profile}" -j8 || (./scripts/link-coredumps.sh && false)
