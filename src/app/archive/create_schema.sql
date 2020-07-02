@@ -12,7 +12,7 @@ CREATE TABLE snarked_ledger_hashes
 
 CREATE INDEX idx_snarked_ledger_hashes_value ON snarked_ledger_hashes(value);
 
-CREATE TYPE user_command_type AS ENUM ('payment', 'delegation');
+CREATE TYPE user_command_type AS ENUM ('payment', 'delegation', 'create_account');
 
 CREATE TABLE user_commands
 ( id           serial            PRIMARY KEY

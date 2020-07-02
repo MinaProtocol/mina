@@ -71,6 +71,8 @@ module Checked : sig
 
   val next : var -> (var, _) Checked.t
 
+  val next_if : var -> Boolean.var -> (var, _) Checked.t
+
   val equal : var -> var -> (Boolean.var, _) Checked.t
 
   val if_ : Boolean.var -> then_:var -> else_:var -> (var, _) Checked.t
