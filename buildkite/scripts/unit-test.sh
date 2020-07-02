@@ -18,7 +18,7 @@ cat /proc/cpuinfo
 source ~/.profile
 
 echo "--- Make build"
-make build
+time make build
 
 echo "--- Run unit tests"
-dune runtest "${path}" --profile="${profile}" -j8 || (./scripts/link-coredumps.sh && false)
+time dune runtest "${path}" --profile="${profile}" -j8 || (./scripts/link-coredumps.sh && false)
