@@ -1182,16 +1182,31 @@ module Base = struct
                    ; is_fee_transfer
                    ; is_coinbase ]) ])
     in
+    let current_global_slot =
+      Coda_state.Protocol_state.Body.consensus_state state_body
+      |> Consensus.Data.Consensus_state.curr_global_slot_var
+    in
     let%bind creating_new_token =
       Boolean.(is_create_account && token_invalid)
+    in
+    (* Query user command predicted failure/success. *)
+    let%bind user_command_failure =
+      User_command_failure.compute_as_prover ~constraint_constants
+        ~txn_global_slot:current_global_slot ~creating_new_token txn
+    in
+    let%bind user_command_fails =
+      User_command_failure.any user_command_failure
     in
     let%bind next_available_token_after, token =
       let%bind token =
         Token_id.Checked.if_ creating_new_token ~then_:next_available_token
           ~else_:token
       in
+      let%bind will_create_new_token =
+        Boolean.(creating_new_token && not user_command_fails)
+      in
       let%map next_available_token =
-        Token_id.Checked.next_if next_available_token creating_new_token
+        Token_id.Checked.next_if next_available_token will_create_new_token
       in
       (next_available_token, token)
     in
@@ -1202,10 +1217,6 @@ module Base = struct
     let nonce = payload.common.nonce in
     let fee_payer =
       Account_id.Checked.create payload.common.fee_payer_pk fee_token
-    in
-    let current_global_slot =
-      Coda_state.Protocol_state.Body.consensus_state state_body
-      |> Consensus.Data.Consensus_state.curr_global_slot_var
     in
     let%bind () =
       [%with_label "Check slot validity"]
@@ -1285,13 +1296,6 @@ module Base = struct
        the failures should be checked against potential failures to ensure
        consistency.
     *)
-    let%bind user_command_failure =
-      User_command_failure.compute_as_prover ~constraint_constants
-        ~txn_global_slot:current_global_slot ~creating_new_token txn
-    in
-    let%bind user_command_fails =
-      User_command_failure.any user_command_failure
-    in
     let%bind () =
       [%with_label "A failing user command is a user command"]
         Boolean.(Assert.any [is_user_command; not user_command_fails])
