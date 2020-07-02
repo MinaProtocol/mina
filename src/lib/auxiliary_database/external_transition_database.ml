@@ -51,12 +51,14 @@ let add_user_blocks (pagination : Pagination.t)
   let fee_transfer_participants =
     List.concat_map transactions.fee_transfers ~f:fee_transfer_participants
   in
-  let next_available_token = ref next_available_token in
   let user_command_participants =
-    List.concat_map transactions.user_commands ~f:(fun txn ->
-        let token = !next_available_token in
-        next_available_token := User_command.next_available_token txn token ;
-        User_command.accounts_accessed ~next_available_token:token txn )
+    List.rev @@ fst
+    @@ List.fold ~init:([], next_available_token) transactions.user_commands
+         ~f:(fun (participants, next_available_token) txn ->
+           ( List.rev_append
+               (User_command.accounts_accessed ~next_available_token txn)
+               participants
+           , User_command.next_available_token txn next_available_token ) )
   in
   let creator_aid = Account_id.create creator Token_id.default in
   Pagination.add pagination

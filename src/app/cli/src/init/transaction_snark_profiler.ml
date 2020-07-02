@@ -276,25 +276,21 @@ let generate_base_snarks_witness sparse_ledger0
   "Base constraint system satisfied"
 
 let run profiler num_transactions repeats preeval =
-  let ledger, transitions = create_ledger_and_transactions num_transactions in
-  let next_available_token = ref (Ledger.next_available_token ledger) in
+  let ledger, transactions = create_ledger_and_transactions num_transactions in
   let sparse_ledger =
     Coda_base.Sparse_ledger.of_ledger_subset_exn ledger
-      (List.concat_map transitions ~f:(fun t ->
-           match t with
-           | Fee_transfer t ->
-               Fee_transfer.receivers t
-           | User_command t ->
-               let token = !next_available_token in
-               let t = User_command.forget_check t in
-               next_available_token :=
-                 User_command.next_available_token t token ;
-               User_command.accounts_accessed ~next_available_token:token t
-           | Coinbase cb ->
-               Coinbase.accounts_accessed cb ))
+      ( fst
+      @@ List.fold
+           ~init:([], Ledger.next_available_token ledger)
+           transactions
+           ~f:(fun (participants, next_available_token) t ->
+             ( List.rev_append
+                 (Transaction.accounts_accessed ~next_available_token t)
+                 participants
+             , Transaction.next_available_token t next_available_token ) ) )
   in
   for i = 1 to repeats do
-    let message = profiler sparse_ledger transitions preeval in
+    let message = profiler sparse_ledger transactions preeval in
     Core.printf !"[%i] %s\n%!" i message
   done ;
   exit 0
