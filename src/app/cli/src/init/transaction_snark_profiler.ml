@@ -146,6 +146,9 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
     List.fold_map transitions
       ~init:(Time.Span.zero, sparse_ledger0, Pending_coinbase.Stack.empty)
       ~f:(fun (max_span, sparse_ledger, coinbase_stack_source) t ->
+        let next_available_token =
+          Sparse_ledger.next_available_token sparse_ledger
+        in
         let sparse_ledger' =
           Sparse_ledger.apply_transaction_exn ~constraint_constants
             sparse_ledger t
@@ -159,7 +162,7 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
                 ~sok_digest:Sok_message.Digest.default
                 ~source:(Sparse_ledger.merkle_root sparse_ledger)
                 ~target:(Sparse_ledger.merkle_root sparse_ledger')
-                ~init_stack:coinbase_stack_source
+                ~init_stack:coinbase_stack_source ~next_available_token
                 ~pending_coinbase_stack_state:
                   {source= coinbase_stack_source; target= coinbase_stack_target}
                 { Transaction_protocol_state.Poly.transaction= t
@@ -199,6 +202,9 @@ let check_base_snarks sparse_ledger0 (transitions : Transaction.t list) preeval
           Public_key.(compress (of_private_key_exn (Private_key.create ())))
     in
     List.fold transitions ~init:sparse_ledger0 ~f:(fun sparse_ledger t ->
+        let next_available_token =
+          Sparse_ledger.next_available_token sparse_ledger
+        in
         let sparse_ledger' =
           Sparse_ledger.apply_transaction_exn ~constraint_constants
             sparse_ledger t
@@ -211,7 +217,7 @@ let check_base_snarks sparse_ledger0 (transitions : Transaction.t list) preeval
             ~sok_message
             ~source:(Sparse_ledger.merkle_root sparse_ledger)
             ~target:(Sparse_ledger.merkle_root sparse_ledger')
-            ~init_stack:Pending_coinbase.Stack.empty
+            ~init_stack:Pending_coinbase.Stack.empty ~next_available_token
             ~pending_coinbase_stack_state:
               { source= Pending_coinbase.Stack.empty
               ; target= coinbase_stack_target }
@@ -233,6 +239,9 @@ let generate_base_snarks_witness sparse_ledger0
           Public_key.(compress (of_private_key_exn (Private_key.create ())))
     in
     List.fold transitions ~init:sparse_ledger0 ~f:(fun sparse_ledger t ->
+        let next_available_token =
+          Sparse_ledger.next_available_token sparse_ledger
+        in
         let sparse_ledger' =
           Sparse_ledger.apply_transaction_exn ~constraint_constants
             sparse_ledger t
@@ -245,10 +254,11 @@ let generate_base_snarks_witness sparse_ledger0
             ~constraint_constants ~sok_message
             ~source:(Sparse_ledger.merkle_root sparse_ledger)
             ~target:(Sparse_ledger.merkle_root sparse_ledger')
-            ~init_stack:Pending_coinbase.Stack.empty
-            { Transaction_snark.Pending_coinbase_stack_state.source=
-                Pending_coinbase.Stack.empty
-            ; target= coinbase_stack_target }
+            ~init_stack:Pending_coinbase.Stack.empty ~next_available_token
+            ~pending_coinbase_stack_state:
+              { Transaction_snark.Pending_coinbase_stack_state.source=
+                  Pending_coinbase.Stack.empty
+              ; target= coinbase_stack_target }
             { Transaction_protocol_state.Poly.transaction= t
             ; block_data= Lazy.force state_body }
             (unstage (Sparse_ledger.handler sparse_ledger))

@@ -129,6 +129,7 @@ module Statement = struct
              , 'amount
              , 'pending_coinbase
              , 'fee_excess
+             , 'token_id
              , 'proof_type
              , 'sok_digest )
              t =
@@ -137,17 +138,21 @@ module Statement = struct
           ; supply_increase: 'amount
           ; pending_coinbase_stack_state: 'pending_coinbase
           ; fee_excess: 'fee_excess
+          ; next_available_token_before: 'token_id
+          ; next_available_token_after: 'token_id
           ; proof_type: 'proof_type
           ; sok_digest: 'sok_digest }
         [@@deriving compare, equal, hash, sexp, yojson]
 
-        let to_latest ledger_hash amount pending_coinbase fee_excess'
+        let to_latest ledger_hash amount pending_coinbase fee_excess' token_id
             proof_type' sok_digest'
             { source
             ; target
             ; supply_increase
             ; pending_coinbase_stack_state
             ; fee_excess
+            ; next_available_token_before
+            ; next_available_token_after
             ; proof_type
             ; sok_digest } =
           { source= ledger_hash source
@@ -156,6 +161,8 @@ module Statement = struct
           ; pending_coinbase_stack_state=
               pending_coinbase pending_coinbase_stack_state
           ; fee_excess= fee_excess' fee_excess
+          ; next_available_token_before= token_id next_available_token_before
+          ; next_available_token_after= token_id next_available_token_after
           ; proof_type= proof_type' proof_type
           ; sok_digest= sok_digest' sok_digest }
       end
@@ -165,6 +172,7 @@ module Statement = struct
          , 'amount
          , 'pending_coinbase
          , 'fee_excess
+         , 'token_id
          , 'proof_type
          , 'sok_digest )
          t =
@@ -172,6 +180,7 @@ module Statement = struct
           , 'amount
           , 'pending_coinbase
           , 'fee_excess
+          , 'token_id
           , 'proof_type
           , 'sok_digest )
           Stable.Latest.t =
@@ -180,6 +189,8 @@ module Statement = struct
       ; supply_increase: 'amount
       ; pending_coinbase_stack_state: 'pending_coinbase
       ; fee_excess: 'fee_excess
+      ; next_available_token_before: 'token_id
+      ; next_available_token_after: 'token_id
       ; proof_type: 'proof_type
       ; sok_digest: 'sok_digest }
     [@@deriving compare, equal, hash, sexp, yojson]
@@ -190,6 +201,8 @@ module Statement = struct
         ; supply_increase
         ; pending_coinbase_stack_state
         ; fee_excess
+        ; next_available_token_before
+        ; next_available_token_after
         ; proof_type
         ; sok_digest } =
       H_list.
@@ -198,6 +211,8 @@ module Statement = struct
         ; supply_increase
         ; pending_coinbase_stack_state
         ; fee_excess
+        ; next_available_token_before
+        ; next_available_token_after
         ; proof_type
         ; sok_digest ]
 
@@ -207,6 +222,8 @@ module Statement = struct
          ; supply_increase
          ; pending_coinbase_stack_state
          ; fee_excess
+         ; next_available_token_before
+         ; next_available_token_after
          ; proof_type
          ; sok_digest ] :
           (unit, _) H_list.t) =
@@ -215,10 +232,12 @@ module Statement = struct
       ; supply_increase
       ; pending_coinbase_stack_state
       ; fee_excess
+      ; next_available_token_before
+      ; next_available_token_after
       ; proof_type
       ; sok_digest }
 
-    let typ ledger_hash amount pending_coinbase fee_excess proof_type
+    let typ ledger_hash amount pending_coinbase fee_excess token_id proof_type
         sok_digest =
       Tick.Typ.of_hlistable
         [ ledger_hash
@@ -226,6 +245,8 @@ module Statement = struct
         ; amount
         ; pending_coinbase
         ; fee_excess
+        ; token_id
+        ; token_id
         ; proof_type
         ; sok_digest ]
         ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
@@ -236,6 +257,7 @@ module Statement = struct
        , 'amount
        , 'pending_coinbase
        , 'fee_excess
+       , 'token_id
        , 'proof_type
        , 'sok_digest )
        poly =
@@ -243,6 +265,7 @@ module Statement = struct
         , 'amount
         , 'pending_coinbase
         , 'fee_excess
+        , 'token_id
         , 'proof_type
         , 'sok_digest )
         Poly.t =
@@ -251,6 +274,8 @@ module Statement = struct
     ; supply_increase: 'amount
     ; pending_coinbase_stack_state: 'pending_coinbase
     ; fee_excess: 'fee_excess
+    ; next_available_token_before: 'token_id
+    ; next_available_token_after: 'token_id
     ; proof_type: 'proof_type
     ; sok_digest: 'sok_digest }
   [@@deriving compare, equal, hash, sexp, yojson]
@@ -263,6 +288,7 @@ module Statement = struct
         , Currency.Amount.Stable.V1.t
         , Pending_coinbase_stack_state.Stable.V1.t
         , Fee_excess.Stable.V1.t
+        , Token_id.Stable.V1.t
         , Proof_type.Stable.V1.t
         , unit )
         Poly.Stable.V1.t
@@ -277,6 +303,7 @@ module Statement = struct
     , Currency.Amount.t
     , Pending_coinbase_stack_state.t
     , Fee_excess.t
+    , Token_id.t
     , Proof_type.t
     , unit )
     Poly.t
@@ -291,6 +318,7 @@ module Statement = struct
           , Currency.Amount.Stable.V1.t
           , Pending_coinbase_stack_state.Stable.V1.t
           , Fee_excess.Stable.V1.t
+          , Token_id.Stable.V1.t
           , unit
           , Sok_message.Digest.Stable.V1.t )
           Poly.Stable.V1.t
@@ -307,14 +335,15 @@ module Statement = struct
       , Currency.Amount.var
       , Pending_coinbase_stack_state.var
       , Fee_excess.var
+      , Token_id.var
       , unit
       , Sok_message.Digest.Checked.t )
       Poly.t
 
     let typ : (var, t) Tick.Typ.t =
       Poly.typ Frozen_ledger_hash.typ Currency.Amount.typ
-        Pending_coinbase_stack_state.typ Fee_excess.typ Tick.Typ.unit
-        Sok_message.Digest.typ
+        Pending_coinbase_stack_state.typ Fee_excess.typ Token_id.typ
+        Tick.Typ.unit Sok_message.Digest.typ
 
     let to_input
         { source
@@ -322,6 +351,8 @@ module Statement = struct
         ; supply_increase
         ; pending_coinbase_stack_state
         ; fee_excess
+        ; next_available_token_before
+        ; next_available_token_after
         ; proof_type= _
         ; sok_digest } =
       let input =
@@ -331,7 +362,9 @@ module Statement = struct
            ; Frozen_ledger_hash.to_input target
            ; Pending_coinbase_stack_state.to_input pending_coinbase_stack_state
            ; Amount.to_input supply_increase
-           ; Fee_excess.to_input fee_excess |]
+           ; Fee_excess.to_input fee_excess
+           ; Token_id.to_input next_available_token_before
+           ; Token_id.to_input next_available_token_after |]
       in
       if !top_hash_logging_enabled then
         Format.eprintf
@@ -349,11 +382,19 @@ module Statement = struct
           ; supply_increase
           ; pending_coinbase_stack_state
           ; fee_excess
+          ; next_available_token_before
+          ; next_available_token_after
           ; proof_type= _
           ; sok_digest } =
         let open Tick in
         let open Checked.Let_syntax in
         let%bind fee_excess = Fee_excess.to_input_checked fee_excess in
+        let%bind next_available_token_before =
+          Token_id.Checked.to_input next_available_token_before
+        in
+        let%bind next_available_token_after =
+          Token_id.Checked.to_input next_available_token_after
+        in
         let input =
           Array.reduce_exn ~f:Random_oracle.Input.append
             [| Sok_message.Digest.Checked.to_input sok_digest
@@ -362,7 +403,9 @@ module Statement = struct
              ; Pending_coinbase_stack_state.var_to_input
                  pending_coinbase_stack_state
              ; Amount.var_to_input supply_increase
-             ; fee_excess |]
+             ; fee_excess
+             ; next_available_token_before
+             ; next_available_token_after |]
         in
         let%map () =
           as_prover
@@ -403,10 +446,22 @@ module Statement = struct
     and supply_increase =
       Currency.Amount.add s1.supply_increase s2.supply_increase
       |> option "Error adding supply_increase"
+    and () =
+      if
+        Token_id.equal s1.next_available_token_after
+          s2.next_available_token_before
+      then return ()
+      else
+        Or_error.errorf
+          !"Next available token is inconsistent between transitions (%{sexp: \
+            Token_id.t} vs %{sexp: Token_id.t})"
+          s1.next_available_token_after s2.next_available_token_before
     in
     ( { source= s1.source
       ; target= s2.target
       ; fee_excess
+      ; next_available_token_before= s1.next_available_token_before
+      ; next_available_token_after= s2.next_available_token_after
       ; proof_type= `Merge
       ; supply_increase
       ; pending_coinbase_stack_state=
@@ -426,12 +481,18 @@ module Statement = struct
     and supply_increase = Currency.Amount.gen
     and pending_coinbase_before = Pending_coinbase.Stack.gen
     and pending_coinbase_after = Pending_coinbase.Stack.gen
+    and next_available_token_before, next_available_token_after =
+      let%map token1 = Token_id.gen_non_default
+      and token2 = Token_id.gen_non_default in
+      (Token_id.min token1 token2, Token_id.max token1 token2)
     and proof_type =
       Bool.quickcheck_generator >>| fun b -> if b then `Merge else `Base
     in
     ( { source
       ; target
       ; fee_excess
+      ; next_available_token_before
+      ; next_available_token_after
       ; proof_type
       ; supply_increase
       ; pending_coinbase_stack_state=
@@ -450,22 +511,13 @@ module Stable = struct
       ; supply_increase: Amount.Stable.V1.t
       ; pending_coinbase_stack_state: Pending_coinbase_stack_state.Stable.V1.t
       ; fee_excess: Fee_excess.Stable.V1.t
-      ; sok_digest: Sok_message.Digest.Stable.V1.t
+      ; next_available_token_before: Token_id.Stable.V1.t
+      ; next_available_token_after: Token_id.Stable.V1.t
+      ; sok_digest:
+          (Sok_message.Digest.Stable.V1.t[@to_yojson
+                                           fun _ -> `String "<opaque>"])
       ; proof: Proof.Stable.V1.t }
-    [@@deriving compare, fields, sexp, version]
-
-    let to_yojson t =
-      `Assoc
-        [ ("source", Frozen_ledger_hash.to_yojson t.source)
-        ; ("target", Frozen_ledger_hash.to_yojson t.target)
-        ; ("proof_type", Proof_type.to_yojson t.proof_type)
-        ; ("supply_increase", Amount.to_yojson t.supply_increase)
-        ; ( "pending_coinbase_stack_state"
-          , Pending_coinbase_stack_state.to_yojson
-              t.pending_coinbase_stack_state )
-        ; ("fee_excess", Fee_excess.to_yojson t.fee_excess)
-        ; ("sok_digest", `String "<opaque>")
-        ; ("proof", Proof.to_yojson t.proof) ]
+    [@@deriving compare, fields, sexp, version, to_yojson]
 
     let to_latest = Fn.id
   end
@@ -478,6 +530,8 @@ type t = Stable.Latest.t =
   ; supply_increase: Amount.t
   ; pending_coinbase_stack_state: Pending_coinbase_stack_state.t
   ; fee_excess: Fee_excess.t
+  ; next_available_token_before: Token_id.t
+  ; next_available_token_after: Token_id.t
   ; sok_digest: Sok_message.Digest.t
   ; proof: Proof.t }
 [@@deriving fields, sexp]
@@ -489,6 +543,8 @@ let statement
      ; target
      ; proof_type
      ; fee_excess
+     ; next_available_token_before
+     ; next_available_token_after
      ; supply_increase
      ; pending_coinbase_stack_state
      ; sok_digest= _
@@ -500,6 +556,8 @@ let statement
   ; supply_increase
   ; pending_coinbase_stack_state
   ; fee_excess
+  ; next_available_token_before
+  ; next_available_token_after
   ; sok_digest= () }
 
 let create = Fields.create
@@ -588,6 +646,7 @@ module Base = struct
     | Transaction : Transaction_union.t Snarky.Request.t
     | State_body : Coda_state.Protocol_state.Body.Value.t Snarky.Request.t
     | Init_stack : Pending_coinbase.Stack.t Snarky.Request.t
+    | Next_available_token : Token_id.t Snarky.Request.t
 
   module User_command_failure = struct
     (** The various ways that a user command may fail. These should be computed
@@ -601,9 +660,11 @@ module Base = struct
       ; amount_insufficient_to_create: 'bool (* Payment only *)
       ; token_cannot_create: 'bool (* Payment only, token<>default *)
       ; source_insufficient_balance: 'bool (* Payment only *)
-      ; source_bad_timing: 'bool (* Payment only *) }
+      ; source_bad_timing: 'bool (* Payment only *)
+      ; receiver_exists: 'bool (* Create_account only *)
+      ; not_token_owner: 'bool (* Create_account only *) }
 
-    let num_fields = 7
+    let num_fields = 9
 
     let to_list
         { predicate_failed
@@ -612,14 +673,18 @@ module Base = struct
         ; amount_insufficient_to_create
         ; token_cannot_create
         ; source_insufficient_balance
-        ; source_bad_timing } =
+        ; source_bad_timing
+        ; receiver_exists
+        ; not_token_owner } =
       [ predicate_failed
       ; source_not_present
       ; receiver_not_present
       ; amount_insufficient_to_create
       ; token_cannot_create
       ; source_insufficient_balance
-      ; source_bad_timing ]
+      ; source_bad_timing
+      ; receiver_exists
+      ; not_token_owner ]
 
     let of_list = function
       | [ predicate_failed
@@ -628,14 +693,18 @@ module Base = struct
         ; amount_insufficient_to_create
         ; token_cannot_create
         ; source_insufficient_balance
-        ; source_bad_timing ] ->
+        ; source_bad_timing
+        ; receiver_exists
+        ; not_token_owner ] ->
           { predicate_failed
           ; source_not_present
           ; receiver_not_present
           ; amount_insufficient_to_create
           ; token_cannot_create
           ; source_insufficient_balance
-          ; source_bad_timing }
+          ; source_bad_timing
+          ; receiver_exists
+          ; not_token_owner }
       | _ ->
           failwith
             "Transaction_snark.Base.User_command_failure.to_list: bad length"
@@ -655,7 +724,7 @@ module Base = struct
     *)
     let compute_unchecked
         ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-        ~txn_global_slot ~(fee_payer_account : Account.t)
+        ~txn_global_slot ~creating_new_token ~(fee_payer_account : Account.t)
         ~(receiver_account : Account.t) ~(source_account : Account.t)
         ({payload; signature= _; signer= _} : Transaction_union.t) =
       match payload.body.tag with
@@ -720,7 +789,9 @@ module Base = struct
               ; amount_insufficient_to_create= false
               ; token_cannot_create= false
               ; source_insufficient_balance= false
-              ; source_bad_timing= false }
+              ; source_bad_timing= false
+              ; receiver_exists= false
+              ; not_token_owner= false }
           | Payment ->
               let receiver_account =
                 if Account_id.equal receiver fee_payer then fee_payer_account
@@ -786,10 +857,56 @@ module Base = struct
               ; amount_insufficient_to_create
               ; token_cannot_create
               ; source_insufficient_balance
-              ; source_bad_timing } )
+              ; source_bad_timing
+              ; receiver_exists= false
+              ; not_token_owner= false }
+          | Create_account ->
+              let receiver_account =
+                if Account_id.equal receiver fee_payer then fee_payer_account
+                else receiver_account
+              in
+              let receiver_account =
+                { receiver_account with
+                  public_key= Account_id.public_key receiver
+                ; token_id= Account_id.token_id receiver
+                ; token_owner=
+                    ( if creating_new_token then true
+                    else receiver_account.token_owner ) }
+              in
+              let receiver_exists =
+                let id = Account.identifier receiver_account in
+                if Account_id.equal Account_id.empty id then false
+                else if Account_id.equal receiver id then true
+                else fail "bad receiver account ID"
+              in
+              let source_account =
+                if Account_id.equal source fee_payer then fee_payer_account
+                else if Account_id.equal source receiver then receiver_account
+                else source_account
+              in
+              let source_not_present =
+                let id = Account.identifier source_account in
+                if Account_id.equal Account_id.empty id then true
+                else if Account_id.equal receiver id then false
+                else fail "bad source account ID"
+              in
+              let not_token_owner =
+                not
+                  ( source_account.token_owner
+                  || Token_id.(equal default) (Account_id.token_id receiver) )
+              in
+              { predicate_failed= false
+              ; source_not_present
+              ; receiver_not_present= false
+              ; amount_insufficient_to_create= false
+              ; token_cannot_create= false
+              ; source_insufficient_balance= false
+              ; source_bad_timing= false
+              ; receiver_exists
+              ; not_token_owner } )
 
     let%snarkydef compute_as_prover ~constraint_constants ~txn_global_slot
-        (txn : Transaction_union.var) =
+        ~creating_new_token (txn : Transaction_union.var) =
       let%bind data =
         exists (Typ.Internal.ref ())
           ~compute:
@@ -873,9 +990,13 @@ module Base = struct
             let%bind receiver_account, _path =
               read (Typ.Internal.ref ()) receiver_account
             in
+            let%bind creating_new_token =
+              read Boolean.typ creating_new_token
+            in
             let%map txn_global_slot = read Global_slot.typ txn_global_slot in
             compute_unchecked ~constraint_constants ~txn_global_slot
-              ~fee_payer_account ~source_account ~receiver_account txn)
+              ~creating_new_token ~fee_payer_account ~source_account
+              ~receiver_account txn)
   end
 
   let%snarkydef check_signature shifted ~payload ~is_user_command ~signer
@@ -984,7 +1105,7 @@ module Base = struct
       (type shifted)
       (shifted : (module Inner_curve.Checked.Shifted.S with type t = shifted))
       root pending_coinbase_stack_init pending_coinbase_stack_before
-      pending_coinbase_after state_body
+      pending_coinbase_after next_available_token state_body
       ({signer; signature; payload} as txn : Transaction_union.var) =
     let tag = payload.body.tag in
     let is_user_command = Transaction_union.Tag.Unpacked.is_user_command tag in
@@ -999,38 +1120,91 @@ module Base = struct
          Public_key.Compressed.Checked.Assert.equal signer_pk
            payload.common.fee_payer_pk)
     in
-    let fee = payload.common.fee in
-    let token = payload.body.token_id in
-    let receiver = Account_id.Checked.create payload.body.receiver_pk token in
-    let source = Account_id.Checked.create payload.body.source_pk token in
-    (* Information for the fee-payer. *)
-    let nonce = payload.common.nonce in
-    let fee_token = payload.common.fee_token in
-    let fee_payer =
-      Account_id.Checked.create payload.common.fee_payer_pk fee_token
-    in
     (* Compute transaction kind. *)
     let is_payment = Transaction_union.Tag.Unpacked.is_payment tag in
-    let is_fee_transfer = Transaction_union.Tag.Unpacked.is_fee_transfer tag in
     let is_stake_delegation =
       Transaction_union.Tag.Unpacked.is_stake_delegation tag
     in
+    let is_create_account =
+      Transaction_union.Tag.Unpacked.is_create_account tag
+    in
+    let is_fee_transfer = Transaction_union.Tag.Unpacked.is_fee_transfer tag in
     let is_coinbase = Transaction_union.Tag.Unpacked.is_coinbase tag in
+    let fee_token = payload.common.fee_token in
+    let%bind fee_token_invalid =
+      Token_id.(Checked.equal fee_token (var_of_t invalid))
+    in
+    let%bind fee_token_default =
+      Token_id.(Checked.equal fee_token (var_of_t default))
+    in
+    let token = payload.body.token_id in
+    let%bind token_invalid =
+      Token_id.(Checked.equal token (var_of_t invalid))
+    in
     let%bind token_default =
       Token_id.(Checked.equal token (var_of_t default))
     in
     let%bind () =
       [%with_label "Validate tokens"]
-        (let%bind () =
-           (* TODO: Remove this check and update the transaction snark once we
-              have an exchange rate mechanism. See issue #4447.
-           *)
-           [%with_label "Validate fee token"]
-             (Token_id.Checked.Assert.equal fee_token
-                Token_id.(var_of_t default))
-         in
-         [%with_label "Validate delegated token is default"]
-           Boolean.(Assert.any [token_default; not is_stake_delegation]))
+        (Checked.all_unit
+           [ [%with_label "Fee token is valid"]
+               Boolean.(Assert.is_true (not fee_token_invalid))
+           ; [%with_label
+               "Fee token is default or command allows non-default fee"]
+               (Boolean.Assert.any
+                  [ fee_token_default
+                  ; is_payment
+                  ; is_stake_delegation
+                  ; is_fee_transfer ])
+           ; (* TODO: Remove this check and update the transaction snark once we
+               have an exchange rate mechanism. See issue #4447.
+            *)
+             [%with_label "Fees in tokens disabled"]
+               (Boolean.Assert.is_true fee_token_default)
+           ; [%with_label "Token is valid or command allows invalid token"]
+               Boolean.(Assert.any [not token_invalid; is_create_account])
+           ; [%with_label
+               "Token is default or command allows non-default token"]
+               (Boolean.Assert.any
+                  [ token_default
+                  ; is_payment
+                  ; is_create_account
+                    (* TODO: Enable this when fees in tokens are enabled. *)
+                    (*; is_fee_transfer*) ])
+           ; [%with_label
+               "Token is non-default or command allows default token"]
+               Boolean.(
+                 Assert.any
+                   [ not token_default
+                   ; is_payment
+                   ; is_stake_delegation
+                   ; is_fee_transfer
+                   ; is_coinbase ]) ])
+    in
+    let%bind creating_new_token =
+      Boolean.(is_create_account && token_invalid)
+    in
+    let%bind next_available_token_after, token =
+      let%bind () =
+        [%with_label "New token creation is disabled"]
+          Boolean.(Assert.is_true (not creating_new_token))
+      in
+      let%bind token =
+        Token_id.Checked.if_ creating_new_token ~then_:next_available_token
+          ~else_:token
+      in
+      let%map next_available_token =
+        Token_id.Checked.next_if next_available_token creating_new_token
+      in
+      (next_available_token, token)
+    in
+    let fee = payload.common.fee in
+    let receiver = Account_id.Checked.create payload.body.receiver_pk token in
+    let source = Account_id.Checked.create payload.body.source_pk token in
+    (* Information for the fee-payer. *)
+    let nonce = payload.common.nonce in
+    let fee_payer =
+      Account_id.Checked.create payload.common.fee_payer_pk fee_token
     in
     let current_global_slot =
       Coda_state.Protocol_state.Body.consensus_state state_body
@@ -1116,7 +1290,7 @@ module Base = struct
     *)
     let%bind user_command_failure =
       User_command_failure.compute_as_prover ~constraint_constants
-        ~txn_global_slot:current_global_slot txn
+        ~txn_global_slot:current_global_slot ~creating_new_token txn
     in
     let%bind user_command_fails =
       User_command_failure.any user_command_failure
@@ -1129,8 +1303,11 @@ module Base = struct
       [%with_label "Check success failure against predicted"]
         (* TODO: Predicates. *)
         (let%bind bypass_predicate =
-           Public_key.Compressed.Checked.equal payload.common.fee_payer_pk
-             payload.body.source_pk
+           let%bind is_own_account =
+             Public_key.Compressed.Checked.equal payload.common.fee_payer_pk
+               payload.body.source_pk
+           in
+           Boolean.(is_create_account || is_own_account)
          in
          assert_r1cs
            (Boolean.not bypass_predicate :> Field.Var.t)
@@ -1166,6 +1343,7 @@ module Base = struct
              (* this account is:
                - the fee-payer for payments
                - the fee-payer for stake delegation
+               - the fee-payer for account creation
                - the fee-receiver for a coinbase
                - the second receiver for a fee transfer
              *)
@@ -1192,6 +1370,16 @@ module Base = struct
                *)
                Boolean.(is_empty_and_writeable && not is_zero_fee)
              in
+             let%bind should_pay_to_create =
+               (* Coinbases and fee transfers may create, or we may be creating
+                  a new token account. These are mutually exclusive, so we can
+                  encode this as a boolean.
+               *)
+               let%bind creating_new_token =
+                 Boolean.(creating_new_token && not user_command_fails)
+               in
+               Boolean.(is_empty_and_writeable || creating_new_token)
+             in
              let%bind amount =
                [%with_label "Compute fee payer amount"]
                  (let fee_payer_amount =
@@ -1203,7 +1391,7 @@ module Base = struct
                   (* Account creation fee for fee transfers/coinbases. *)
                   let%bind account_creation_fee =
                     let%map magnitude =
-                      Amount.Checked.if_ is_empty_and_writeable
+                      Amount.Checked.if_ should_pay_to_create
                         ~then_:account_creation_amount
                         ~else_:Amount.(var_of_t zero)
                     in
@@ -1262,12 +1450,16 @@ module Base = struct
     let%bind receiver_increase =
       (* - payments:         payload.body.amount
          - stake delegation: 0
+         - account creation: 0
          - coinbase:         payload.body.amount - payload.common.fee
          - fee transfer:     payload.body.amount
       *)
       [%with_label "Compute receiver increase"]
         (let%bind base_amount =
-           Amount.Checked.if_ is_stake_delegation
+           let%bind zero_transfer =
+             Boolean.any [is_stake_delegation; is_create_account]
+           in
+           Amount.Checked.if_ zero_transfer
              ~then_:(Amount.var_of_t Amount.zero)
              ~else_:payload.body.amount
          in
@@ -1287,6 +1479,7 @@ module Base = struct
              (* this account is:
                - the receiver for payments
                - the delegated-to account for stake delegation
+               - the created account for an account creation
                - the receiver for a coinbase
                - the first receiver for a fee transfer
              *)
@@ -1298,18 +1491,28 @@ module Base = struct
                  (Boolean.Assert.( = ) is_empty_delegatee
                     user_command_failure.receiver_not_present)
              in
+             let%bind () =
+               [%with_label "Receiver creation failure matches predicted"]
+                 (let%bind is_nonempty_creating =
+                    Boolean.((not is_empty_and_writeable) && is_create_account)
+                  in
+                  Boolean.Assert.( = ) is_nonempty_creating
+                    user_command_failure.receiver_exists)
+             in
              let is_empty_and_writeable =
                (* is_empty_and_writable && not is_stake_delegation *)
                Boolean.Unsafe.of_cvar
                @@ Field.Var.(
                     sub (is_empty_and_writeable :> t) (is_empty_delegatee :> t))
              in
+             let%bind should_pay_to_create =
+               Boolean.(is_empty_and_writeable && not is_create_account)
+             in
              let%bind () =
                [%with_label
                  "Check whether creation fails due to a non-default token"]
                  (let%bind token_should_not_create =
-                    Boolean.(
-                      is_empty_and_writeable && Boolean.not token_default)
+                    Boolean.(should_pay_to_create && Boolean.not token_default)
                   in
                   let%bind token_cannot_create =
                     Boolean.(token_should_not_create && is_user_command)
@@ -1339,7 +1542,7 @@ module Base = struct
                *)
                let%bind receiver_amount =
                  let%bind account_creation_amount =
-                   Amount.Checked.if_ is_empty_and_writeable
+                   Amount.Checked.if_ should_pay_to_create
                      ~then_:account_creation_amount
                      ~else_:Amount.(var_of_t zero)
                  in
@@ -1371,6 +1574,7 @@ module Base = struct
                (* Only default tokens may participate in delegation. *)
                Boolean.(is_empty_and_writeable && token_default)
              in
+             let token_owner = creating_new_token in
              let%map delegate =
                Public_key.Compressed.Checked.if_ may_delegate
                  ~then_:(Account_id.Checked.public_key receiver)
@@ -1386,7 +1590,7 @@ module Base = struct
              { Account.Poly.balance
              ; public_key
              ; token_id
-             ; token_owner= account.token_owner
+             ; token_owner
              ; nonce= account.nonce
              ; receipt_chain_hash= account.receipt_chain_hash
              ; delegate
@@ -1401,13 +1605,19 @@ module Base = struct
            ~is_writeable:
              (* [modify_account_send] does this failure check for us. *)
              user_command_failure.source_not_present root_after_receiver_update
-           source ~f:(fun ~is_empty_and_writeable:_ account ->
+           source ~f:(fun ~is_empty_and_writeable account ->
              (* this account is:
                - the source for payments
                - the delegator for stake delegation
+               - the token owner for account creation
                - the fee-receiver for a coinbase
                - the second receiver for a fee transfer
              *)
+             let%bind () =
+               [%with_label "Check source presence failure matches predicted"]
+                 (Boolean.Assert.( = ) is_empty_and_writeable
+                    user_command_failure.source_not_present)
+             in
              let%bind () =
                [%with_label
                  "Check source failure cases do not apply when fee-payer is \
@@ -1471,6 +1681,19 @@ module Base = struct
                  (Boolean.Assert.( = ) underflow
                     user_command_failure.source_insufficient_balance)
              in
+             let%bind () =
+               [%with_label "Check not_token_owner failure matches predicted"]
+                 (let%bind token_owner_ok =
+                    Boolean.(
+                      any
+                        [ account.token_owner
+                        ; token_default
+                        ; not is_create_account ])
+                  in
+                  Boolean.(
+                    Assert.( = ) (not token_owner_ok)
+                      user_command_failure.not_token_owner))
+             in
              let%map delegate =
                Public_key.Compressed.Checked.if_ is_stake_delegation
                  ~then_:(Account_id.Checked.public_key receiver)
@@ -1493,6 +1716,7 @@ module Base = struct
     let%bind fee_excess =
       (* - payments:         payload.common.fee
          - stake delegation: payload.common.fee
+         - account creation: payload.common.fee
          - coinbase:         0 (fee already paid above)
          - fee transfer:     - payload.body.amount - payload.common.fee
       *)
@@ -1523,7 +1747,7 @@ module Base = struct
       Frozen_ledger_hash.if_ user_command_fails
         ~then_:root_after_fee_payer_update ~else_:root_after_source_update
     in
-    (final_root, fee_excess, supply_increase)
+    (final_root, fee_excess, supply_increase, next_available_token_after)
 
   (* Someday:
    write the following soundness tests:
@@ -1573,16 +1797,22 @@ module Base = struct
     let%bind pending_coinbase_init =
       exists Pending_coinbase.Stack.typ ~request:(As_prover.return Init_stack)
     in
+    let%bind next_available_token_before =
+      exists Token_id.typ ~request:(As_prover.return Next_available_token)
+    in
     let%bind state_body =
       exists
         (Coda_state.Protocol_state.Body.typ ~constraint_constants)
         ~request:(As_prover.return State_body)
     in
-    let%bind root_after, fee_excess, supply_increase =
+    let%bind ( root_after
+             , fee_excess
+             , supply_increase
+             , next_available_token_after ) =
       apply_tagged_transaction ~constraint_constants
         (module Shifted)
         root_before pending_coinbase_init pending_coinbase_before
-        pending_coinbase_after state_body t
+        pending_coinbase_after next_available_token_before state_body t
     in
     let%bind fee_excess =
       (* Use the default token for the fee excess if it is zero.
@@ -1614,6 +1844,8 @@ module Base = struct
              { source= root_before
              ; target= root_after
              ; fee_excess
+             ; next_available_token_before
+             ; next_available_token_after
              ; supply_increase
              ; pending_coinbase_stack_state=
                  { source= pending_coinbase_before
@@ -1631,7 +1863,8 @@ module Base = struct
 
   let transaction_union_handler handler (transaction : Transaction_union.t)
       (state_body : Coda_state.Protocol_state.Body.Value.t)
-      (init_stack : Pending_coinbase.Stack.t) : Snarky.Request.request -> _ =
+      (init_stack : Pending_coinbase.Stack.t)
+      (next_available_token : Token_id.t) : Snarky.Request.request -> _ =
    fun (With {request; respond} as r) ->
     match request with
     | Transaction ->
@@ -1640,6 +1873,8 @@ module Base = struct
         respond (Provide state_body)
     | Init_stack ->
         respond (Provide init_stack)
+    | Next_available_token ->
+        respond (Provide next_available_token)
     | _ ->
         handler r
 
@@ -1651,14 +1886,18 @@ module Base = struct
 
   let transaction_union_proof ?(preeval = false) ~constraint_constants
       ~proving_key sok_digest state1 state2 init_stack
-      pending_coinbase_stack_state (transaction : Transaction_union.t)
-      state_body handler =
+      pending_coinbase_stack_state next_available_token
+      (transaction : Transaction_union.t) state_body handler =
     if preeval then failwith "preeval currently disabled" ;
     let prover_state : Prover_state.t =
       {state1; state2; sok_digest; pending_coinbase_stack_state}
     in
     let handler =
       transaction_union_handler handler transaction state_body init_stack
+        next_available_token
+    in
+    let next_available_token_after =
+      Transaction_union.next_available_token transaction next_available_token
     in
     let main top_hash = handle (main ~constraint_constants top_hash) handler in
     let statement : Statement.With_sok.t =
@@ -1667,6 +1906,8 @@ module Base = struct
       ; supply_increase= Transaction_union.supply_increase transaction
       ; pending_coinbase_stack_state
       ; fee_excess= Transaction_union.fee_excess transaction
+      ; next_available_token_before= next_available_token
+      ; next_available_token_after
       ; proof_type= ()
       ; sok_digest }
     in
@@ -1725,6 +1966,9 @@ module Merge = struct
       ; transition12: Transition_data.t
       ; ledger_hash3: Frozen_ledger_hash.t
       ; transition23: Transition_data.t
+      ; next_available_token1: Token_id.t
+      ; next_available_token2: Token_id.t
+      ; next_available_token3: Token_id.t
       ; pending_coinbase_stack1: Pending_coinbase.Stack.t
       ; pending_coinbase_stack2: Pending_coinbase.Stack.t
       ; pending_coinbase_stack3: Pending_coinbase.Stack.t
@@ -1749,7 +1993,8 @@ module Merge = struct
      accept on one of [ H(s1, s2, excess); H(s1, s2, excess, tock_vk) ] *)
   let%snarkydef verify_transition tock_vk tock_vk_precomp wrap_vk_hash_state
       get_transition_data s1 s2 ~pending_coinbase_stack1
-      ~pending_coinbase_stack2 supply_increase ~fee_excess =
+      ~pending_coinbase_stack2 supply_increase ~fee_excess
+      ~next_available_token_before ~next_available_token_after =
     let%bind is_base =
       let get_type s = get_transition_data s |> Transition_data.proof |> fst in
       with_label __LOC__
@@ -1771,6 +2016,8 @@ module Merge = struct
           { source= s1
           ; target= s2
           ; fee_excess
+          ; next_available_token_before
+          ; next_available_token_after
           ; supply_increase
           ; pending_coinbase_stack_state=
               {source= pending_coinbase_stack1; target= pending_coinbase_stack2}
@@ -1820,6 +2067,12 @@ module Merge = struct
       exists' Amount.typ
         ~f:
           (Fn.compose Transition_data.supply_increase Prover_state.transition23)
+    and next_available_token1 =
+      exists' Token_id.typ ~f:Prover_state.next_available_token1
+    and next_available_token2 =
+      exists' Token_id.typ ~f:Prover_state.next_available_token2
+    and next_available_token3 =
+      exists' Token_id.typ ~f:Prover_state.next_available_token3
     and pending_coinbase1 =
       exists' Pending_coinbase.Stack.typ
         ~f:Prover_state.pending_coinbase_stack1
@@ -1870,6 +2123,8 @@ module Merge = struct
                { source= s1
                ; target= s3
                ; fee_excess
+               ; next_available_token_before= next_available_token1
+               ; next_available_token_after= next_available_token3
                ; supply_increase
                ; pending_coinbase_stack_state=
                    {source= pending_coinbase1; target= pending_coinbase4}
@@ -1887,14 +2142,18 @@ module Merge = struct
            Prover_state.transition12 s1 s2
            ~pending_coinbase_stack1:pending_coinbase1
            ~pending_coinbase_stack2:pending_coinbase2 supply_increase12
-           ~fee_excess:fee_excess12)
+           ~fee_excess:fee_excess12
+           ~next_available_token_before:next_available_token1
+           ~next_available_token_after:next_available_token2)
     and verify_23 =
       [%with_label "Verify right transition"]
         (verify_transition tock_vk tock_vk_precomp wrap_vk_hash_state
            Prover_state.transition23 s2 s3
            ~pending_coinbase_stack1:pending_coinbase3
            ~pending_coinbase_stack2:pending_coinbase4 supply_increase23
-           ~fee_excess:fee_excess23)
+           ~fee_excess:fee_excess23
+           ~next_available_token_before:next_available_token2
+           ~next_available_token_after:next_available_token3)
     in
     Boolean.Assert.all [verify_12; verify_23]
 
@@ -1939,6 +2198,8 @@ module Verification = struct
       -> Pending_coinbase.Stack.var
       -> Pending_coinbase.Stack.var
       -> Currency.Amount.var
+      -> Token_id.var
+      -> Token_id.var
       -> (Tock.Proof.t, 's) Tick.As_prover.t
       -> (Tick.Boolean.var, 's) Tick.Checked.t
   end
@@ -1968,6 +2229,8 @@ module Verification = struct
         ; proof
         ; proof_type
         ; fee_excess
+        ; next_available_token_before
+        ; next_available_token_after
         ; sok_digest
         ; supply_increase
         ; pending_coinbase_stack_state } =
@@ -1976,6 +2239,8 @@ module Verification = struct
         ; target
         ; proof_type= ()
         ; fee_excess
+        ; next_available_token_before
+        ; next_available_token_after
         ; sok_digest
         ; supply_increase
         ; pending_coinbase_stack_state }
@@ -2015,7 +2280,7 @@ module Verification = struct
     let verify_complete_merge sok_digest s1 s2
         (pending_coinbase_stack1 : Pending_coinbase.Stack.var)
         (pending_coinbase_stack2 : Pending_coinbase.Stack.var) supply_increase
-        get_proof =
+        next_available_token_before next_available_token_after get_proof =
       let open Tick in
       let%bind top_hash =
         let%bind input =
@@ -2023,6 +2288,8 @@ module Verification = struct
             { source= s1
             ; target= s2
             ; fee_excess= Fee_excess.(var_of_t empty)
+            ; next_available_token_before
+            ; next_available_token_after
             ; supply_increase
             ; pending_coinbase_stack_state=
                 { source= pending_coinbase_stack1
@@ -2152,6 +2419,7 @@ module type S = sig
     -> target:Frozen_ledger_hash.t
     -> init_stack:Pending_coinbase.Stack.t
     -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
+    -> next_available_token:Token_id.t
     -> Transaction.t Transaction_protocol_state.t
     -> Tick.Handler.t
     -> t
@@ -2163,6 +2431,7 @@ module type S = sig
     -> target:Frozen_ledger_hash.t
     -> init_stack:Pending_coinbase.Stack.t
     -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
+    -> next_available_token:Token_id.t
     -> User_command.With_valid_signature.t Transaction_protocol_state.t
     -> Tick.Handler.t
     -> t
@@ -2174,6 +2443,7 @@ module type S = sig
     -> target:Frozen_ledger_hash.t
     -> init_stack:Pending_coinbase.Stack.t
     -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
+    -> next_available_token:Token_id.t
     -> Fee_transfer.t Transaction_protocol_state.t
     -> Tick.Handler.t
     -> t
@@ -2183,7 +2453,7 @@ end
 
 let check_transaction_union ?(preeval = false) ~constraint_constants
     sok_message source target init_stack pending_coinbase_stack_state
-    transaction state_body handler =
+    next_available_token transaction state_body handler =
   if preeval then failwith "preeval currently disabled" ;
   let sok_digest = Sok_message.digest sok_message in
   let prover_state : Base.Prover_state.t =
@@ -2191,6 +2461,10 @@ let check_transaction_union ?(preeval = false) ~constraint_constants
   in
   let handler =
     Base.transaction_union_handler handler transaction state_body init_stack
+      next_available_token
+  in
+  let next_available_token_after =
+    Transaction_union.next_available_token transaction next_available_token
   in
   let statement : Statement.With_sok.t =
     { source
@@ -2198,6 +2472,8 @@ let check_transaction_union ?(preeval = false) ~constraint_constants
     ; supply_increase= Transaction_union.supply_increase transaction
     ; pending_coinbase_stack_state
     ; fee_excess= Transaction_union.fee_excess transaction
+    ; next_available_token_before= next_available_token
+    ; next_available_token_after
     ; proof_type= ()
     ; sok_digest }
   in
@@ -2212,7 +2488,7 @@ let check_transaction_union ?(preeval = false) ~constraint_constants
   Or_error.ok_exn (run_and_check main prover_state) |> ignore
 
 let check_transaction ?preeval ~constraint_constants ~sok_message ~source
-    ~target ~init_stack ~pending_coinbase_stack_state
+    ~target ~init_stack ~pending_coinbase_stack_state ~next_available_token
     (transaction_in_block : Transaction.t Transaction_protocol_state.t) handler
     =
   let transaction =
@@ -2222,21 +2498,22 @@ let check_transaction ?preeval ~constraint_constants ~sok_message ~source
     Transaction_protocol_state.block_data transaction_in_block
   in
   check_transaction_union ?preeval ~constraint_constants sok_message source
-    target init_stack pending_coinbase_stack_state
+    target init_stack pending_coinbase_stack_state next_available_token
     (Transaction_union.of_transaction transaction)
     state_body handler
 
 let check_user_command ~constraint_constants ~sok_message ~source ~target
-    ~init_stack pending_coinbase_stack_state t_in_block handler =
+    ~init_stack ~pending_coinbase_stack_state ~next_available_token t_in_block
+    handler =
   let user_command = Transaction_protocol_state.transaction t_in_block in
   check_transaction ~constraint_constants ~sok_message ~source ~target
-    ~init_stack ~pending_coinbase_stack_state
+    ~init_stack ~pending_coinbase_stack_state ~next_available_token
     {t_in_block with transaction= User_command user_command}
     handler
 
 let generate_transaction_union_witness ?(preeval = false) ~constraint_constants
     sok_message source target transaction_in_block init_stack
-    pending_coinbase_stack_state handler =
+    next_available_token pending_coinbase_stack_state handler =
   if preeval then failwith "preeval currently disabled" ;
   let transaction =
     Transaction_protocol_state.transaction transaction_in_block
@@ -2250,6 +2527,10 @@ let generate_transaction_union_witness ?(preeval = false) ~constraint_constants
   in
   let handler =
     Base.transaction_union_handler handler transaction state_body init_stack
+      next_available_token
+  in
+  let next_available_token_after =
+    Transaction_union.next_available_token transaction next_available_token
   in
   let statement : Statement.With_sok.t =
     { source
@@ -2257,6 +2538,8 @@ let generate_transaction_union_witness ?(preeval = false) ~constraint_constants
     ; supply_increase= Transaction_union.supply_increase transaction
     ; pending_coinbase_stack_state
     ; fee_excess= Transaction_union.fee_excess transaction
+    ; next_available_token_before= next_available_token
+    ; next_available_token_after
     ; proof_type= ()
     ; sok_digest }
   in
@@ -2268,7 +2551,8 @@ let generate_transaction_union_witness ?(preeval = false) ~constraint_constants
   generate_auxiliary_input (tick_input ()) prover_state main top_hash
 
 let generate_transaction_witness ?preeval ~constraint_constants ~sok_message
-    ~source ~target ~init_stack pending_coinbase_stack_state
+    ~source ~target ~init_stack ~pending_coinbase_stack_state
+    ~next_available_token
     (transaction_in_block : Transaction.t Transaction_protocol_state.t) handler
     =
   let transaction =
@@ -2278,7 +2562,7 @@ let generate_transaction_witness ?preeval ~constraint_constants ~sok_message
     source target
     { transaction_in_block with
       transaction= Transaction_union.of_transaction transaction }
-    init_stack pending_coinbase_stack_state handler
+    init_stack next_available_token pending_coinbase_stack_state handler
 
 let verification_keys_of_keys {Keys0.verification; _} = verification
 
@@ -2304,6 +2588,7 @@ struct
       (Wrap_input.of_tick_field input)
 
   let merge_proof sok_digest ledger_hash1 ledger_hash2 ledger_hash3
+      next_available_token1 next_available_token2 next_available_token3
       transition12 transition23 =
     let fee_excess =
       Or_error.ok_exn
@@ -2322,6 +2607,8 @@ struct
           { source= transition12.pending_coinbase_stack_state.source
           ; target= transition23.pending_coinbase_stack_state.target }
       ; fee_excess
+      ; next_available_token_before= next_available_token1
+      ; next_available_token_after= next_available_token2
       ; proof_type= ()
       ; sok_digest }
     in
@@ -2331,6 +2618,9 @@ struct
       ; ledger_hash1
       ; ledger_hash2
       ; ledger_hash3
+      ; next_available_token1
+      ; next_available_token2
+      ; next_available_token3
       ; pending_coinbase_stack1=
           transition12.pending_coinbase_stack_state.source
       ; pending_coinbase_stack2=
@@ -2348,24 +2638,29 @@ struct
         top_hash )
 
   let of_transaction_union ?preeval ~constraint_constants sok_digest source
-      target ~init_stack ~pending_coinbase_stack_state transaction state_body
-      handler =
+      target ~init_stack ~pending_coinbase_stack_state ~next_available_token
+      transaction state_body handler =
     let top_hash, proof =
       Base.transaction_union_proof ?preeval ~constraint_constants sok_digest
         ~proving_key:keys.proving.base source target init_stack
-        pending_coinbase_stack_state transaction state_body handler
+        pending_coinbase_stack_state next_available_token transaction
+        state_body handler
     in
     { source
     ; sok_digest
     ; target
     ; proof_type= `Base
     ; fee_excess= Transaction_union.fee_excess transaction
+    ; next_available_token_before= next_available_token
+    ; next_available_token_after=
+        Transaction_union.next_available_token transaction next_available_token
     ; pending_coinbase_stack_state
     ; supply_increase= Transaction_union.supply_increase transaction
     ; proof= wrap `Base proof top_hash }
 
   let of_transaction ?preeval ~constraint_constants ~sok_digest ~source ~target
-      ~init_stack ~pending_coinbase_stack_state transaction_in_block handler =
+      ~init_stack ~pending_coinbase_stack_state ~next_available_token
+      transaction_in_block handler =
     let transaction =
       Transaction_protocol_state.transaction transaction_in_block
     in
@@ -2373,14 +2668,15 @@ struct
       Transaction_protocol_state.block_data transaction_in_block
     in
     of_transaction_union ?preeval ~constraint_constants sok_digest source
-      target ~init_stack ~pending_coinbase_stack_state
+      target ~init_stack ~pending_coinbase_stack_state ~next_available_token
       (Transaction_union.of_transaction transaction)
       state_body handler
 
   let of_user_command ~constraint_constants ~sok_digest ~source ~target
-      ~init_stack ~pending_coinbase_stack_state user_command_in_block handler =
+      ~init_stack ~pending_coinbase_stack_state ~next_available_token
+      user_command_in_block handler =
     of_transaction ~constraint_constants ~sok_digest ~source ~target
-      ~init_stack ~pending_coinbase_stack_state
+      ~init_stack ~pending_coinbase_stack_state ~next_available_token
       { user_command_in_block with
         transaction=
           User_command
@@ -2388,9 +2684,10 @@ struct
       handler
 
   let of_fee_transfer ~constraint_constants ~sok_digest ~source ~target
-      ~init_stack ~pending_coinbase_stack_state transfer_in_block handler =
+      ~init_stack ~pending_coinbase_stack_state ~next_available_token
+      transfer_in_block handler =
     of_transaction ~constraint_constants ~sok_digest ~source ~target
-      ~init_stack ~pending_coinbase_stack_state
+      ~init_stack ~pending_coinbase_stack_state ~next_available_token
       { transfer_in_block with
         transaction=
           Fee_transfer
@@ -2403,8 +2700,20 @@ struct
         !"Transaction_snark.merge: t1.target <> t2.source \
           (%{sexp:Frozen_ledger_hash.t} vs %{sexp:Frozen_ledger_hash.t})"
         t1.target t2.source () ;
+    if
+      not
+        (Token_id.( = ) t1.next_available_token_after
+           t2.next_available_token_before)
+    then
+      failwithf
+        !"Transaction_snark.merge: t1.next_available_token_befre <> \
+          t2.next_available_token_after (%{sexp:Token_id.t} vs \
+          %{sexp:Token_id.t})"
+        t1.next_available_token_after t2.next_available_token_before () ;
     let input, proof =
       merge_proof sok_digest t1.source t1.target t2.target
+        t1.next_available_token_before t1.next_available_token_after
+        t2.next_available_token_after
         { Transition_data.proof= (t1.proof_type, t1.proof)
         ; fee_excess= t1.fee_excess
         ; supply_increase= t1.supply_increase
@@ -2429,6 +2738,8 @@ struct
     ; target= t2.target
     ; sok_digest
     ; fee_excess
+    ; next_available_token_before= t1.next_available_token_before
+    ; next_available_token_after= t2.next_available_token_after
     ; supply_increase
     ; pending_coinbase_stack_state=
         { source= t1.pending_coinbase_stack_state.source
@@ -2727,12 +3038,14 @@ let%test_module "transaction_snark" =
         Ledger.merkle_root_after_user_command_exn ledger
           ~txn_global_slot:current_global_slot user_command
       in
+      let next_available_token = Ledger.next_available_token ledger in
       let user_command_in_block =
         { Transaction_protocol_state.Poly.transaction= user_command
         ; block_data= state_body }
       in
       of_user_command ~constraint_constants ~sok_digest ~source ~target
-        ~init_stack ~pending_coinbase_stack_state user_command_in_block handler
+        ~init_stack ~pending_coinbase_stack_state ~next_available_token
+        user_command_in_block handler
 
     (*
                 ~proposer:
@@ -2803,6 +3116,7 @@ let%test_module "transaction_snark" =
                 merkle_root
                   (apply_transaction_exn ~constraint_constants sparse_ledger
                      txn_in_block.transaction))
+            ~next_available_token:(Ledger.next_available_token ledger)
             ~init_stack:pending_coinbase_init
             ~pending_coinbase_stack_state:
               {source= source_stack; target= pending_coinbase_stack_target} )
@@ -2865,7 +3179,8 @@ let%test_module "transaction_snark" =
               check_user_command ~constraint_constants ~sok_message
                 ~source:(Ledger.merkle_root ledger)
                 ~target ~init_stack:pending_coinbase_stack
-                pending_coinbase_stack_state
+                ~pending_coinbase_stack_state
+                ~next_available_token:(Ledger.next_available_token ledger)
                 {transaction= t1; block_data= state_body}
                 (unstage @@ Sparse_ledger.handler sparse_ledger) ) )
 
@@ -2945,6 +3260,7 @@ let%test_module "transaction_snark" =
         ~pending_coinbase_stack_state:
           { Pending_coinbase_stack_state.source= pending_coinbase_stack
           ; target= pending_coinbase_stack_target }
+        ~next_available_token:(Ledger.next_available_token ledger)
         {transaction= txn; block_data= state_body}
         (unstage @@ Sparse_ledger.handler sparse_ledger)
 
@@ -3118,6 +3434,7 @@ let%test_module "transaction_snark" =
                 |> Sok_message.digest
               in
               let state1 = Ledger.merkle_root ledger in
+              let next_available_token1 = Ledger.next_available_token ledger in
               let sparse_ledger =
                 Sparse_ledger.of_ledger_subset_exn ledger
                   (List.concat_map
@@ -3230,6 +3547,7 @@ let%test_module "transaction_snark" =
                 Signed.create ~magnitude ~sgn:Sgn.Pos
               in
               let state3 = Sparse_ledger.merkle_root sparse_ledger in
+              let next_available_token3 = Ledger.next_available_token ledger in
               let proof13 =
                 merge ~sok_digest proof12 proof23 |> Or_error.ok_exn
               in
@@ -3241,6 +3559,8 @@ let%test_module "transaction_snark" =
                     pending_coinbase_stack_state_merge
                 ; fee_excess=
                     Fee_excess.of_single (Token_id.default, total_fees)
+                ; next_available_token_before= next_available_token1
+                ; next_available_token_after= next_available_token3
                 ; proof_type= ()
                 ; sok_digest }
               in
