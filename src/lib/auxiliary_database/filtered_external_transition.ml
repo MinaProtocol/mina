@@ -67,7 +67,7 @@ type t = Stable.Latest.t =
 let participants ~next_available_token
     {transactions= {user_commands; fee_transfers; _}; creator; _} =
   let open Account_id.Set in
-  let _, user_command_set =
+  let _next_available_token, user_command_set =
     List.fold user_commands ~init:(next_available_token, empty)
       ~f:(fun (next_available_token, set) user_command ->
         ( User_command.next_available_token user_command next_available_token
