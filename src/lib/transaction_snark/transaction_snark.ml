@@ -1383,10 +1383,10 @@ module Base = struct
                   a new token account. These are mutually exclusive, so we can
                   encode this as a boolean.
                *)
-               let%bind creating_new_token =
-                 Boolean.(creating_new_token && not user_command_fails)
+               let%bind is_create_account =
+                 Boolean.(is_create_account && not user_command_fails)
                in
-               Boolean.(is_empty_and_writeable || creating_new_token)
+               Boolean.(is_empty_and_writeable || is_create_account)
              in
              let%bind amount =
                [%with_label "Compute fee payer amount"]
