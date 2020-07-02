@@ -1,16 +1,5 @@
-[%%import
-"/src/config.mlh"]
-
 open Core_kernel
-
-[%%ifndef
-consensus_mechanism]
-
-[%%else]
-
 open Import
-
-[%%endif]
 
 [%%versioned
 module Stable = struct
