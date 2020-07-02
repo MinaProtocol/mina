@@ -123,8 +123,7 @@ let state_body =
 
 let curr_global_slot =
   Lazy.map state_body ~f:(fun state_body ->
-      state_body |> Lazy.force
-      |> Coda_state.Protocol_state.Body.consensus_state
+      state_body |> Coda_state.Protocol_state.Body.consensus_state
       |> Consensus.Data.Consensus_state.curr_global_slot )
 
 let state_body_hash =
