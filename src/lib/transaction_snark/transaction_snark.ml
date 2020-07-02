@@ -1178,6 +1178,7 @@ module Base = struct
                    [ not token_default
                    ; is_payment
                    ; is_stake_delegation
+                   ; is_create_account
                    ; is_fee_transfer
                    ; is_coinbase ]) ])
     in
