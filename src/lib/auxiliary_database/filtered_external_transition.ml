@@ -123,7 +123,7 @@ let of_transition external_transition tracked_participants
   let next_available_token =
     protocol_state.blockchain_state.snarked_next_available_token
   in
-  let transactions, _ =
+  let transactions, _next_available_token =
     List.fold calculated_transactions
       ~init:
         ( { Transactions.user_commands= []
