@@ -1615,7 +1615,6 @@ module Base = struct
                (* Only default tokens may participate in delegation. *)
                Boolean.(is_empty_and_writeable && token_default)
              in
-             let token_owner = creating_new_token in
              let%map delegate =
                Public_key.Compressed.Checked.if_ may_delegate
                  ~then_:(Account_id.Checked.public_key receiver)
@@ -1627,6 +1626,9 @@ module Base = struct
              and token_id =
                Token_id.Checked.if_ is_empty_and_writeable ~then_:token
                  ~else_:account.token_id
+             and token_owner =
+               Boolean.if_ is_empty_and_writeable ~then_:creating_new_token
+                 ~else_:account.token_owner
              in
              { Account.Poly.balance
              ; public_key
