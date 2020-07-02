@@ -1034,7 +1034,11 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         set ledger receiver_location receiver_account ;
         set ledger source_location source_account ;
         remove_accounts_exn ledger previous_empty_accounts
-    | Create_new_token _, Create_new_token _ ->
+    | Create_new_token _, Create_new_token _
+    | Create_token_account _, Create_token_account ->
+        (* We group these commands together because their undo behaviour is
+           identical: remove the created account, and un-charge the fee payer
+           for creating the account. *)
         let fee_payer_account =
           let balance =
             Option.value_exn
@@ -1059,33 +1063,10 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             timing= Option.value ~default:source_account.timing source_timing
           } ;
         remove_accounts_exn ledger [receiver] ;
-        (* Restore to the previous [next_available_token]. *)
+        (* Restore to the previous [next_available_token]. This is a no-op if
+           the [next_available_token] did not change.
+        *)
         set_next_available_token ledger next_available_token
-    | Create_token_account _, Create_token_account ->
-        let fee_payer_account =
-          let balance =
-            Option.value_exn
-              (Balance.add_amount fee_payer_account.balance
-                 (Amount.of_fee constraint_constants.account_creation_fee))
-          in
-          {fee_payer_account with balance}
-        in
-        let%bind source_location =
-          location_of_account' ledger "source" source
-        in
-        let%map source_account =
-          if Account_id.equal fee_payer source then return fee_payer_account
-          else get' ledger "source" source_location
-        in
-        let receiver =
-          User_command.receiver ~next_available_token user_command
-        in
-        set ledger fee_payer_location fee_payer_account ;
-        set ledger source_location
-          { source_account with
-            timing= Option.value ~default:source_account.timing source_timing
-          } ;
-        remove_accounts_exn ledger [receiver]
     | _, _ ->
         failwith "Undo/command mismatch"
 
