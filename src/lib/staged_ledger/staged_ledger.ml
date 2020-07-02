@@ -210,18 +210,23 @@ module T = struct
     in
     target
 
-  let verify_scan_state_after_apply ledger (scan_state : Scan_state.t) =
+  let verify_scan_state_after_apply ~constraint_constants
+      ~next_available_token_before ~next_available_token_after ledger
+      (scan_state : Scan_state.t) =
     let error_prefix =
       "Error verifying the parallel scan state after applying the diff."
     in
     match Scan_state.latest_ledger_proof scan_state with
     | None ->
-        Statement_scanner.check_invariants scan_state ~verifier:()
-          ~error_prefix ~ledger_hash_end:ledger ~ledger_hash_begin:None
+        Statement_scanner.check_invariants ~constraint_constants scan_state
+          ~verifier:() ~error_prefix ~ledger_hash_end:ledger
+          ~ledger_hash_begin:None ~next_available_token_before
+          ~next_available_token_after
     | Some proof ->
-        Statement_scanner.check_invariants scan_state ~verifier:()
-          ~error_prefix ~ledger_hash_end:ledger
+        Statement_scanner.check_invariants ~constraint_constants scan_state
+          ~verifier:() ~error_prefix ~ledger_hash_end:ledger
           ~ledger_hash_begin:(Some (get_target proof))
+          ~next_available_token_before ~next_available_token_after
 
   let statement_exn ~constraint_constants t =
     let open Deferred.Let_syntax in
@@ -242,8 +247,8 @@ module T = struct
 
   let of_scan_state_and_ledger ~logger
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-      ~verifier ~snarked_ledger_hash ~ledger ~scan_state
-      ~pending_coinbase_collection =
+      ~verifier ~snarked_ledger_hash ~snarked_next_available_token ~ledger
+      ~scan_state ~pending_coinbase_collection =
     let open Deferred.Or_error.Let_syntax in
     let t =
       of_scan_state_and_ledger_unchecked ~ledger ~scan_state
@@ -257,12 +262,15 @@ module T = struct
         ~ledger_hash_end:
           (Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root ledger))
         ~ledger_hash_begin:(Some snarked_ledger_hash)
+        ~next_available_token_before:snarked_next_available_token
+        ~next_available_token_after:(Ledger.next_available_token ledger)
     in
     return t
 
   let of_scan_state_and_ledger_unchecked
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-      ~snarked_ledger_hash ~ledger ~scan_state ~pending_coinbase_collection =
+      ~snarked_ledger_hash ~snarked_next_available_token ~ledger ~scan_state
+      ~pending_coinbase_collection =
     let open Deferred.Or_error.Let_syntax in
     let t =
       {ledger; scan_state; constraint_constants; pending_coinbase_collection}
@@ -273,6 +281,8 @@ module T = struct
         ~ledger_hash_end:
           (Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root ledger))
         ~ledger_hash_begin:(Some snarked_ledger_hash)
+        ~next_available_token_before:snarked_next_available_token
+        ~next_available_token_after:(Ledger.next_available_token ledger)
     in
     return t
 
@@ -283,6 +293,9 @@ module T = struct
     let snarked_ledger_hash = Ledger.merkle_root snarked_ledger in
     let snarked_frozen_ledger_hash =
       Frozen_ledger_hash.of_ledger_hash snarked_ledger_hash
+    in
+    let snarked_next_available_token =
+      Ledger.next_available_token snarked_ledger
     in
     let%bind txs_with_protocol_state =
       Scan_state.staged_transactions_with_protocol_states scan_state ~get_state
@@ -312,8 +325,9 @@ module T = struct
                 expected_merkle_root staged_ledger_hash)
     in
     of_scan_state_and_ledger ~logger ~constraint_constants ~verifier
-      ~snarked_ledger_hash:snarked_frozen_ledger_hash ~ledger:snarked_ledger
-      ~scan_state ~pending_coinbase_collection:pending_coinbases
+      ~snarked_ledger_hash:snarked_frozen_ledger_hash
+      ~snarked_next_available_token ~ledger:snarked_ledger ~scan_state
+      ~pending_coinbase_collection:pending_coinbases
 
   let copy
       {scan_state; ledger; constraint_constants; pending_coinbase_collection} =
@@ -404,6 +418,7 @@ module T = struct
     let source =
       Ledger.merkle_root ledger |> Frozen_ledger_hash.of_ledger_hash
     in
+    let next_available_token_before = Ledger.next_available_token ledger in
     let pending_coinbase_target =
       push_coinbase pending_coinbase_stack_state.pc.target s
     in
@@ -414,10 +429,13 @@ module T = struct
       Ledger.apply_transaction ~constraint_constants ~txn_global_slot ledger s
       |> to_staged_ledger_or_error
     in
+    let next_available_token_after = Ledger.next_available_token ledger in
     ( undo
     , { Transaction_snark.Statement.source
       ; target= Ledger.merkle_root ledger |> Frozen_ledger_hash.of_ledger_hash
       ; fee_excess
+      ; next_available_token_before
+      ; next_available_token_after
       ; supply_increase
       ; pending_coinbase_stack_state=
           {pending_coinbase_stack_state.pc with target= pending_coinbase_target}
@@ -714,6 +732,7 @@ module T = struct
       ( Int.min (Scan_state.free_space t.scan_state) max_throughput
       , List.length jobs )
     in
+    let next_available_token_before = Ledger.next_available_token t.ledger in
     let new_mask = Ledger.Mask.create ~depth:(Ledger.depth t.ledger) () in
     let new_ledger = Ledger.register_mask t.ledger new_mask in
     let transactions, works, user_commands_count, coinbases = pre_diff_info in
@@ -779,6 +798,8 @@ module T = struct
     let%map () =
       Deferred.(
         verify_scan_state_after_apply ~constraint_constants
+          ~next_available_token_before
+          ~next_available_token_after:(Ledger.next_available_token new_ledger)
           (Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root new_ledger))
           scan_state'
         >>| to_staged_ledger_or_error)
