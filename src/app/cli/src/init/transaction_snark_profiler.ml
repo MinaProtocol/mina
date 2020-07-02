@@ -152,12 +152,15 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
     List.fold_map transitions
       ~init:(Time.Span.zero, sparse_ledger0, Pending_coinbase.Stack.empty)
       ~f:(fun (max_span, sparse_ledger, coinbase_stack_source) t ->
-        let next_available_token =
+        let next_available_token_before =
           Sparse_ledger.next_available_token sparse_ledger
         in
         let sparse_ledger' =
           Sparse_ledger.apply_transaction_exn ~constraint_constants
             ~txn_global_slot sparse_ledger t
+        in
+        let next_available_token_after =
+          Sparse_ledger.next_available_token sparse_ledger'
         in
         let coinbase_stack_target =
           pending_coinbase_stack_target t coinbase_stack_source
@@ -168,7 +171,8 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
                 ~sok_digest:Sok_message.Digest.default
                 ~source:(Sparse_ledger.merkle_root sparse_ledger)
                 ~target:(Sparse_ledger.merkle_root sparse_ledger')
-                ~init_stack:coinbase_stack_source ~next_available_token
+                ~init_stack:coinbase_stack_source ~next_available_token_before
+                ~next_available_token_after
                 ~pending_coinbase_stack_state:
                   {source= coinbase_stack_source; target= coinbase_stack_target}
                 { Transaction_protocol_state.Poly.transaction= t
@@ -209,12 +213,15 @@ let check_base_snarks sparse_ledger0 (transitions : Transaction.t list) preeval
     in
     let txn_global_slot = Lazy.force curr_global_slot in
     List.fold transitions ~init:sparse_ledger0 ~f:(fun sparse_ledger t ->
-        let next_available_token =
+        let next_available_token_before =
           Sparse_ledger.next_available_token sparse_ledger
         in
         let sparse_ledger' =
           Sparse_ledger.apply_transaction_exn ~constraint_constants
             ~txn_global_slot sparse_ledger t
+        in
+        let next_available_token_after =
+          Sparse_ledger.next_available_token sparse_ledger'
         in
         let coinbase_stack_target =
           pending_coinbase_stack_target t Pending_coinbase.Stack.empty
@@ -224,7 +231,8 @@ let check_base_snarks sparse_ledger0 (transitions : Transaction.t list) preeval
             ~sok_message
             ~source:(Sparse_ledger.merkle_root sparse_ledger)
             ~target:(Sparse_ledger.merkle_root sparse_ledger')
-            ~init_stack:Pending_coinbase.Stack.empty ~next_available_token
+            ~init_stack:Pending_coinbase.Stack.empty
+            ~next_available_token_before ~next_available_token_after
             ~pending_coinbase_stack_state:
               { source= Pending_coinbase.Stack.empty
               ; target= coinbase_stack_target }
@@ -247,12 +255,15 @@ let generate_base_snarks_witness sparse_ledger0
     in
     let txn_global_slot = Lazy.force curr_global_slot in
     List.fold transitions ~init:sparse_ledger0 ~f:(fun sparse_ledger t ->
-        let next_available_token =
+        let next_available_token_before =
           Sparse_ledger.next_available_token sparse_ledger
         in
         let sparse_ledger' =
           Sparse_ledger.apply_transaction_exn ~constraint_constants
             ~txn_global_slot sparse_ledger t
+        in
+        let next_available_token_after =
+          Sparse_ledger.next_available_token sparse_ledger'
         in
         let coinbase_stack_target =
           pending_coinbase_stack_target t Pending_coinbase.Stack.empty
@@ -262,7 +273,8 @@ let generate_base_snarks_witness sparse_ledger0
             ~constraint_constants ~sok_message
             ~source:(Sparse_ledger.merkle_root sparse_ledger)
             ~target:(Sparse_ledger.merkle_root sparse_ledger')
-            ~init_stack:Pending_coinbase.Stack.empty ~next_available_token
+            ~init_stack:Pending_coinbase.Stack.empty
+            ~next_available_token_before ~next_available_token_after
             ~pending_coinbase_stack_state:
               { Transaction_snark.Pending_coinbase_stack_state.source=
                   Pending_coinbase.Stack.empty

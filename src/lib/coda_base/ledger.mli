@@ -180,7 +180,7 @@ val merkle_root_after_user_command_exn :
   -> txn_global_slot:Coda_numbers.Global_slot.t
   -> t
   -> User_command.With_valid_signature.t
-  -> Ledger_hash.t
+  -> Ledger_hash.t * [`Next_available_token of Token_id.t]
 
 val create_empty : t -> Account_id.t -> Path.t * Account.t
 

@@ -1894,18 +1894,16 @@ module Base = struct
 
   let transaction_union_proof ?(preeval = false) ~constraint_constants
       ~proving_key sok_digest state1 state2 init_stack
-      pending_coinbase_stack_state next_available_token
-      (transaction : Transaction_union.t) state_body handler =
+      pending_coinbase_stack_state next_available_token_before
+      next_available_token_after (transaction : Transaction_union.t) state_body
+      handler =
     if preeval then failwith "preeval currently disabled" ;
     let prover_state : Prover_state.t =
       {state1; state2; sok_digest; pending_coinbase_stack_state}
     in
     let handler =
       transaction_union_handler handler transaction state_body init_stack
-        next_available_token
-    in
-    let next_available_token_after =
-      Transaction_union.next_available_token transaction next_available_token
+        next_available_token_before
     in
     let main top_hash = handle (main ~constraint_constants top_hash) handler in
     let statement : Statement.With_sok.t =
@@ -1914,7 +1912,7 @@ module Base = struct
       ; supply_increase= Transaction_union.supply_increase transaction
       ; pending_coinbase_stack_state
       ; fee_excess= Transaction_union.fee_excess transaction
-      ; next_available_token_before= next_available_token
+      ; next_available_token_before
       ; next_available_token_after
       ; proof_type= ()
       ; sok_digest }
@@ -2427,7 +2425,8 @@ module type S = sig
     -> target:Frozen_ledger_hash.t
     -> init_stack:Pending_coinbase.Stack.t
     -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
-    -> next_available_token:Token_id.t
+    -> next_available_token_before:Token_id.t
+    -> next_available_token_after:Token_id.t
     -> Transaction.t Transaction_protocol_state.t
     -> Tick.Handler.t
     -> t
@@ -2439,7 +2438,8 @@ module type S = sig
     -> target:Frozen_ledger_hash.t
     -> init_stack:Pending_coinbase.Stack.t
     -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
-    -> next_available_token:Token_id.t
+    -> next_available_token_before:Token_id.t
+    -> next_available_token_after:Token_id.t
     -> User_command.With_valid_signature.t Transaction_protocol_state.t
     -> Tick.Handler.t
     -> t
@@ -2451,7 +2451,8 @@ module type S = sig
     -> target:Frozen_ledger_hash.t
     -> init_stack:Pending_coinbase.Stack.t
     -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
-    -> next_available_token:Token_id.t
+    -> next_available_token_before:Token_id.t
+    -> next_available_token_after:Token_id.t
     -> Fee_transfer.t Transaction_protocol_state.t
     -> Tick.Handler.t
     -> t
@@ -2461,7 +2462,8 @@ end
 
 let check_transaction_union ?(preeval = false) ~constraint_constants
     sok_message source target init_stack pending_coinbase_stack_state
-    next_available_token transaction state_body handler =
+    next_available_token_before next_available_token_after transaction
+    state_body handler =
   if preeval then failwith "preeval currently disabled" ;
   let sok_digest = Sok_message.digest sok_message in
   let prover_state : Base.Prover_state.t =
@@ -2469,10 +2471,7 @@ let check_transaction_union ?(preeval = false) ~constraint_constants
   in
   let handler =
     Base.transaction_union_handler handler transaction state_body init_stack
-      next_available_token
-  in
-  let next_available_token_after =
-    Transaction_union.next_available_token transaction next_available_token
+      next_available_token_before
   in
   let statement : Statement.With_sok.t =
     { source
@@ -2480,7 +2479,7 @@ let check_transaction_union ?(preeval = false) ~constraint_constants
     ; supply_increase= Transaction_union.supply_increase transaction
     ; pending_coinbase_stack_state
     ; fee_excess= Transaction_union.fee_excess transaction
-    ; next_available_token_before= next_available_token
+    ; next_available_token_before
     ; next_available_token_after
     ; proof_type= ()
     ; sok_digest }
@@ -2496,7 +2495,8 @@ let check_transaction_union ?(preeval = false) ~constraint_constants
   Or_error.ok_exn (run_and_check main prover_state) |> ignore
 
 let check_transaction ?preeval ~constraint_constants ~sok_message ~source
-    ~target ~init_stack ~pending_coinbase_stack_state ~next_available_token
+    ~target ~init_stack ~pending_coinbase_stack_state
+    ~next_available_token_before ~next_available_token_after
     (transaction_in_block : Transaction.t Transaction_protocol_state.t) handler
     =
   let transaction =
@@ -2506,22 +2506,25 @@ let check_transaction ?preeval ~constraint_constants ~sok_message ~source
     Transaction_protocol_state.block_data transaction_in_block
   in
   check_transaction_union ?preeval ~constraint_constants sok_message source
-    target init_stack pending_coinbase_stack_state next_available_token
+    target init_stack pending_coinbase_stack_state next_available_token_before
+    next_available_token_after
     (Transaction_union.of_transaction transaction)
     state_body handler
 
 let check_user_command ~constraint_constants ~sok_message ~source ~target
-    ~init_stack ~pending_coinbase_stack_state ~next_available_token t_in_block
-    handler =
+    ~init_stack ~pending_coinbase_stack_state ~next_available_token_before
+    ~next_available_token_after t_in_block handler =
   let user_command = Transaction_protocol_state.transaction t_in_block in
   check_transaction ~constraint_constants ~sok_message ~source ~target
-    ~init_stack ~pending_coinbase_stack_state ~next_available_token
+    ~init_stack ~pending_coinbase_stack_state ~next_available_token_before
+    ~next_available_token_after
     {t_in_block with transaction= User_command user_command}
     handler
 
 let generate_transaction_union_witness ?(preeval = false) ~constraint_constants
     sok_message source target transaction_in_block init_stack
-    next_available_token pending_coinbase_stack_state handler =
+    next_available_token_before next_available_token_after
+    pending_coinbase_stack_state handler =
   if preeval then failwith "preeval currently disabled" ;
   let transaction =
     Transaction_protocol_state.transaction transaction_in_block
@@ -2535,10 +2538,7 @@ let generate_transaction_union_witness ?(preeval = false) ~constraint_constants
   in
   let handler =
     Base.transaction_union_handler handler transaction state_body init_stack
-      next_available_token
-  in
-  let next_available_token_after =
-    Transaction_union.next_available_token transaction next_available_token
+      next_available_token_before
   in
   let statement : Statement.With_sok.t =
     { source
@@ -2546,7 +2546,7 @@ let generate_transaction_union_witness ?(preeval = false) ~constraint_constants
     ; supply_increase= Transaction_union.supply_increase transaction
     ; pending_coinbase_stack_state
     ; fee_excess= Transaction_union.fee_excess transaction
-    ; next_available_token_before= next_available_token
+    ; next_available_token_before
     ; next_available_token_after
     ; proof_type= ()
     ; sok_digest }
@@ -2560,7 +2560,7 @@ let generate_transaction_union_witness ?(preeval = false) ~constraint_constants
 
 let generate_transaction_witness ?preeval ~constraint_constants ~sok_message
     ~source ~target ~init_stack ~pending_coinbase_stack_state
-    ~next_available_token
+    ~next_available_token_before ~next_available_token_after
     (transaction_in_block : Transaction.t Transaction_protocol_state.t) handler
     =
   let transaction =
@@ -2570,7 +2570,8 @@ let generate_transaction_witness ?preeval ~constraint_constants ~sok_message
     source target
     { transaction_in_block with
       transaction= Transaction_union.of_transaction transaction }
-    init_stack next_available_token pending_coinbase_stack_state handler
+    init_stack next_available_token_before next_available_token_after
+    pending_coinbase_stack_state handler
 
 let verification_keys_of_keys {Keys0.verification; _} = verification
 
@@ -2646,29 +2647,29 @@ struct
         top_hash )
 
   let of_transaction_union ?preeval ~constraint_constants sok_digest source
-      target ~init_stack ~pending_coinbase_stack_state ~next_available_token
-      transaction state_body handler =
+      target ~init_stack ~pending_coinbase_stack_state
+      ~next_available_token_before ~next_available_token_after transaction
+      state_body handler =
     let top_hash, proof =
       Base.transaction_union_proof ?preeval ~constraint_constants sok_digest
         ~proving_key:keys.proving.base source target init_stack
-        pending_coinbase_stack_state next_available_token transaction
-        state_body handler
+        pending_coinbase_stack_state next_available_token_before
+        next_available_token_after transaction state_body handler
     in
     { source
     ; sok_digest
     ; target
     ; proof_type= `Base
     ; fee_excess= Transaction_union.fee_excess transaction
-    ; next_available_token_before= next_available_token
-    ; next_available_token_after=
-        Transaction_union.next_available_token transaction next_available_token
+    ; next_available_token_before
+    ; next_available_token_after
     ; pending_coinbase_stack_state
     ; supply_increase= Transaction_union.supply_increase transaction
     ; proof= wrap `Base proof top_hash }
 
   let of_transaction ?preeval ~constraint_constants ~sok_digest ~source ~target
-      ~init_stack ~pending_coinbase_stack_state ~next_available_token
-      transaction_in_block handler =
+      ~init_stack ~pending_coinbase_stack_state ~next_available_token_before
+      ~next_available_token_after transaction_in_block handler =
     let transaction =
       Transaction_protocol_state.transaction transaction_in_block
     in
@@ -2676,15 +2677,17 @@ struct
       Transaction_protocol_state.block_data transaction_in_block
     in
     of_transaction_union ?preeval ~constraint_constants sok_digest source
-      target ~init_stack ~pending_coinbase_stack_state ~next_available_token
+      target ~init_stack ~pending_coinbase_stack_state
+      ~next_available_token_before ~next_available_token_after
       (Transaction_union.of_transaction transaction)
       state_body handler
 
   let of_user_command ~constraint_constants ~sok_digest ~source ~target
-      ~init_stack ~pending_coinbase_stack_state ~next_available_token
-      user_command_in_block handler =
+      ~init_stack ~pending_coinbase_stack_state ~next_available_token_before
+      ~next_available_token_after user_command_in_block handler =
     of_transaction ~constraint_constants ~sok_digest ~source ~target
-      ~init_stack ~pending_coinbase_stack_state ~next_available_token
+      ~init_stack ~pending_coinbase_stack_state ~next_available_token_before
+      ~next_available_token_after
       { user_command_in_block with
         transaction=
           User_command
@@ -2692,10 +2695,11 @@ struct
       handler
 
   let of_fee_transfer ~constraint_constants ~sok_digest ~source ~target
-      ~init_stack ~pending_coinbase_stack_state ~next_available_token
-      transfer_in_block handler =
+      ~init_stack ~pending_coinbase_stack_state ~next_available_token_before
+      ~next_available_token_after transfer_in_block handler =
     of_transaction ~constraint_constants ~sok_digest ~source ~target
-      ~init_stack ~pending_coinbase_stack_state ~next_available_token
+      ~init_stack ~pending_coinbase_stack_state ~next_available_token_before
+      ~next_available_token_after
       { transfer_in_block with
         transaction=
           Fee_transfer
@@ -2941,9 +2945,11 @@ let%test_module "transaction_snark" =
       let merkle_root t = Frozen_ledger_hash.of_ledger_hash @@ merkle_root t
 
       let merkle_root_after_user_command_exn t ~txn_global_slot txn =
-        Frozen_ledger_hash.of_ledger_hash
-        @@ merkle_root_after_user_command_exn ~constraint_constants
-             ~txn_global_slot t txn
+        let hash, `Next_available_token tid =
+          merkle_root_after_user_command_exn ~constraint_constants
+            ~txn_global_slot t txn
+        in
+        (Frozen_ledger_hash.of_ledger_hash hash, `Next_available_token tid)
     end
 
     module Sparse_ledger = struct
@@ -3042,18 +3048,18 @@ let%test_module "transaction_snark" =
         Coda_state.Protocol_state.Body.consensus_state state_body
         |> Consensus.Data.Consensus_state.curr_slot
       in
-      let target =
+      let next_available_token_before = Ledger.next_available_token ledger in
+      let target, `Next_available_token next_available_token_after =
         Ledger.merkle_root_after_user_command_exn ledger
           ~txn_global_slot:current_global_slot user_command
       in
-      let next_available_token = Ledger.next_available_token ledger in
       let user_command_in_block =
         { Transaction_protocol_state.Poly.transaction= user_command
         ; block_data= state_body }
       in
       of_user_command ~constraint_constants ~sok_digest ~source ~target
-        ~init_stack ~pending_coinbase_stack_state ~next_available_token
-        user_command_in_block handler
+        ~init_stack ~pending_coinbase_stack_state ~next_available_token_before
+        ~next_available_token_after user_command_in_block handler
 
     (*
                 ~proposer:
@@ -3112,6 +3118,15 @@ let%test_module "transaction_snark" =
             Sparse_ledger.of_ledger_subset_exn ledger
               [producer_id; receiver_id; other_id]
           in
+          let sparse_ledger_after =
+            Sparse_ledger.apply_transaction_exn ~constraint_constants
+              sparse_ledger
+              ~txn_global_slot:
+                ( txn_in_block.block_data
+                |> Coda_state.Protocol_state.Body.consensus_state
+                |> Consensus.Data.Consensus_state.curr_global_slot )
+              txn_in_block.transaction
+          in
           check_transaction txn_in_block
             (unstage (Sparse_ledger.handler sparse_ledger))
             ~constraint_constants
@@ -3119,16 +3134,10 @@ let%test_module "transaction_snark" =
               (Coda_base.Sok_message.create ~fee:Currency.Fee.zero
                  ~prover:Public_key.Compressed.empty)
             ~source:(Sparse_ledger.merkle_root sparse_ledger)
-            ~target:
-              Sparse_ledger.(
-                merkle_root
-                  (apply_transaction_exn ~constraint_constants sparse_ledger
-                     ~txn_global_slot:
-                       ( txn_in_block.block_data
-                       |> Coda_state.Protocol_state.Body.consensus_state
-                       |> Consensus.Data.Consensus_state.curr_global_slot )
-                     txn_in_block.transaction))
-            ~next_available_token:(Ledger.next_available_token ledger)
+            ~target:(Sparse_ledger.merkle_root sparse_ledger_after)
+            ~next_available_token_before:(Ledger.next_available_token ledger)
+            ~next_available_token_after:
+              (Sparse_ledger.next_available_token sparse_ledger_after)
             ~init_stack:pending_coinbase_init
             ~pending_coinbase_stack_state:
               {source= source_stack; target= pending_coinbase_stack_target} )
@@ -3165,13 +3174,16 @@ let%test_module "transaction_snark" =
                 Coda_state.Protocol_state.Body.consensus_state state_body
                 |> Consensus.Data.Consensus_state.curr_slot
               in
-              let next_available_token = Ledger.next_available_token ledger in
-              let target =
+              let next_available_token_before =
+                Ledger.next_available_token ledger
+              in
+              let target, `Next_available_token next_available_token_after =
                 Ledger.merkle_root_after_user_command_exn ledger
                   ~txn_global_slot:current_global_slot t1
               in
               let mentioned_keys =
-                User_command.accounts_accessed ~next_available_token
+                User_command.accounts_accessed
+                  ~next_available_token:next_available_token_before
                   (User_command.forget_check t1)
               in
               let sparse_ledger =
@@ -3193,7 +3205,8 @@ let%test_module "transaction_snark" =
               check_user_command ~constraint_constants ~sok_message
                 ~source:(Ledger.merkle_root ledger)
                 ~target ~init_stack:pending_coinbase_stack
-                ~pending_coinbase_stack_state ~next_available_token
+                ~pending_coinbase_stack_state ~next_available_token_before
+                ~next_available_token_after
                 {transaction= t1; block_data= state_body}
                 (unstage @@ Sparse_ledger.handler sparse_ledger) ) )
 
@@ -3275,7 +3288,8 @@ let%test_module "transaction_snark" =
         ~pending_coinbase_stack_state:
           { Pending_coinbase_stack_state.source= pending_coinbase_stack
           ; target= pending_coinbase_stack_target }
-        ~next_available_token
+        ~next_available_token_before:next_available_token
+        ~next_available_token_after:(Ledger.next_available_token ledger)
         {transaction= txn; block_data= state_body}
         (unstage @@ Sparse_ledger.handler sparse_ledger)
 

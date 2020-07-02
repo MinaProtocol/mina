@@ -248,7 +248,7 @@ module type S = sig
     -> txn_global_slot:Global_slot.t
     -> ledger
     -> User_command.With_valid_signature.t
-    -> Ledger_hash.t
+    -> Ledger_hash.t * [`Next_available_token of Token_id.t]
 
   val undo :
        constraint_constants:Genesis_constants.Constraint_constants.t
@@ -1117,8 +1117,9 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
            payment)
     in
     let root = merkle_root ledger in
+    let next_available_token = next_available_token ledger in
     Or_error.ok_exn (undo_user_command ~constraint_constants ledger undo) ;
-    root
+    (root, `Next_available_token next_available_token)
 
   module For_tests = struct
     let validate_timing = validate_timing
