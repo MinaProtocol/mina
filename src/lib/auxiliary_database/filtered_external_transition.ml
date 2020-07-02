@@ -151,7 +151,8 @@ let of_transition external_transition tracked_participants
                 ( acc_transactions
                 , User_command.next_available_token user_command
                     next_available_token )
-            | _ ->
+            | `All | `Some _ ->
+                (* Should include this command. *)
                 ( { acc_transactions with
                     user_commands=
                       user_command :: acc_transactions.user_commands }
