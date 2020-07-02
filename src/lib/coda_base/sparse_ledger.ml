@@ -8,7 +8,8 @@ module Stable = struct
     type t =
       ( Ledger_hash.Stable.V1.t
       , Account_id.Stable.V1.t
-      , Account.Stable.V1.t )
+      , Account.Stable.V1.t
+      , Token_id.Stable.V1.t )
       Sparse_ledger_lib.Sparse_ledger.T.Stable.V1.t
     [@@deriving to_yojson, sexp]
 
@@ -30,7 +31,8 @@ module Account = struct
   let data_hash = Fn.compose Ledger_hash.of_digest Account.digest
 end
 
-module M = Sparse_ledger_lib.Sparse_ledger.Make (Hash) (Account_id) (Account)
+module M =
+  Sparse_ledger_lib.Sparse_ledger.Make (Hash) (Token_id) (Account_id) (Account)
 
 [%%define_locally
 M.
@@ -42,19 +44,25 @@ M.
   , find_index_exn
   , add_path
   , merkle_root
-  , iteri )]
+  , iteri
+  , next_available_token )]
 
-let of_root ~depth (h : Ledger_hash.t) =
-  of_hash ~depth (Ledger_hash.of_digest (h :> Random_oracle.Digest.t))
+let of_root ~depth ~next_available_token (h : Ledger_hash.t) =
+  of_hash ~depth ~next_available_token
+    (Ledger_hash.of_digest (h :> Random_oracle.Digest.t))
 
 let of_ledger_root ledger =
-  of_root ~depth:(Ledger.depth ledger) (Ledger.merkle_root ledger)
+  of_root ~depth:(Ledger.depth ledger)
+    ~next_available_token:(Ledger.next_available_token ledger)
+    (Ledger.merkle_root ledger)
 
 let of_any_ledger (ledger : Ledger.Any_ledger.witness) =
   Ledger.Any_ledger.M.foldi ledger
     ~init:
       (of_root
          ~depth:(Ledger.Any_ledger.M.depth ledger)
+         ~next_available_token:
+           (Ledger.Any_ledger.M.next_available_token ledger)
          (Ledger.Any_ledger.M.merkle_root ledger))
     ~f:(fun _addr sparse_ledger account ->
       let loc =
@@ -97,6 +105,8 @@ let of_ledger_index_subset_exn (ledger : Ledger.Any_ledger.witness) indexes =
     ~init:
       (of_root
          ~depth:(Ledger.Any_ledger.M.depth ledger)
+         ~next_available_token:
+           (Ledger.Any_ledger.M.next_available_token ledger)
          (Ledger.Any_ledger.M.merkle_root ledger))
     ~f:(fun acc i ->
       let account = Ledger.Any_ledger.M.get_at_index_exn ledger i in

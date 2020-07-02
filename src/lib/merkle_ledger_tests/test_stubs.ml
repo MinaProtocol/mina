@@ -25,6 +25,10 @@ module Account = struct
   let balance Coda_base.Account.Poly.{balance; _} = balance
 
   let update_balance t bal = {t with Coda_base.Account.Poly.balance= bal}
+
+  let token Coda_base.Account.Poly.{token_id; _} = token_id
+
+  let token_owner Coda_base.Account.Poly.{token_owner; _} = token_owner
 end
 
 module Receipt = Coda_base.Receipt
