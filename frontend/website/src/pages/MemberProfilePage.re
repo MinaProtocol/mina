@@ -75,12 +75,12 @@ let fetchRelease = (name, release) => {
               let (challengeTitle, challengePoints) = user;
               switch (challengePoints) {
               | "" => {
-                  ChallengePointsTable.challengeName: challengeTitle,
-                  challengePoints: None,
+                  ChallengePointsTable.name: challengeTitle,
+                  points: None,
                 }
               | points => {
-                  ChallengePointsTable.challengeName: challengeTitle,
-                  challengePoints: Some(int_of_string(points)),
+                  ChallengePointsTable.name: challengeTitle,
+                  points: Some(int_of_string(points)),
                 }
               };
             });
@@ -104,13 +104,13 @@ let fetchReleases = name => {
 
 type state = {
   loading: bool,
-  releases: array(ChallengePointsTable.releaseInfo),
+  releases: array(ChallengePointsTable.release),
 };
 
 let initialState = {loading: true, releases: [||]};
 
 type actions =
-  | UpdateReleaseInfo(array(ChallengePointsTable.releaseInfo));
+  | UpdateReleaseInfo(array(ChallengePointsTable.release));
 
 let reducer = (prevState, action) => {
   switch (action) {
@@ -128,7 +128,7 @@ let make = () => {
   /* using a random member from the leaderboards to test table fetching/rendering */
   let testMember = {
     Leaderboard.rank: 1,
-    name: "kunkomu#6084",
+    name: "Matt Harrop / Figment Network#7027",
     phase: 10000,
     release: 5000,
     allTime: 10500,
@@ -156,11 +156,11 @@ let make = () => {
       <div className=Styles.page>
         <div> <ProfileHero name release phase allTime /> </div>
         {state.releases
-         |> Array.map((release: ChallengePointsTable.releaseInfo) => {
-              <div>
+         |> Array.map((release: ChallengePointsTable.release) => {
+              <div key={release.name}>
                 <ChallengePointsTable
                   releaseTitle={release.name}
-                  challengeInfo={release.challenges}
+                  challenges={release.challenges}
                 />
               </div>
             })

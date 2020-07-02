@@ -64,6 +64,7 @@ module Styles = {
 
   let leaderboardRow =
     style([
+      cursor(`pointer),
       padding2(~v=`rem(1.), ~h=`rem(1.)),
       display(`grid),
       gridColumnGap(rem(1.5)),
@@ -123,21 +124,23 @@ module LeaderboardRow = {
   [@react.component]
   let make = (~rank, ~member) => {
     <>
-      <div className=Styles.leaderboardRow>
-        <span className=Styles.rank>
-          {React.string(string_of_int(rank))}
-        </span>
-        <span className=Styles.username> {React.string(member.name)} </span>
-        <span className=Styles.activePointsCell>
-          {React.string(string_of_int(member.release))}
-        </span>
-        <span className=Styles.inactivePointsCell>
-          {React.string(string_of_int(member.phase))}
-        </span>
-        <span className=Styles.inactivePointsCell>
-          {React.string(string_of_int(member.allTime))}
-        </span>
-      </div>
+      <Next.Link href="">
+        <div className=Styles.leaderboardRow>
+          <span className=Styles.rank>
+            {React.string(string_of_int(rank))}
+          </span>
+          <span className=Styles.username> {React.string(member.name)} </span>
+          <span className=Styles.activePointsCell>
+            {React.string(string_of_int(member.release))}
+          </span>
+          <span className=Styles.inactivePointsCell>
+            {React.string(string_of_int(member.phase))}
+          </span>
+          <span className=Styles.inactivePointsCell>
+            {React.string(string_of_int(member.allTime))}
+          </span>
+        </div>
+      </Next.Link>
     </>;
   };
 };

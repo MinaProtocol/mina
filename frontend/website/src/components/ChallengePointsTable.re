@@ -188,22 +188,22 @@ module Row = {
   };
 };
 
-type challengeInfo = {
-  challengeName: string,
-  challengePoints: option(int),
-};
-type releaseInfo = {
+type challenge = {
   name: string,
-  challenges: array(challengeInfo),
+  points: option(int),
+};
+type release = {
+  name: string,
+  challenges: array(challenge),
 };
 
 [@react.component]
-let make = (~releaseTitle, ~challengeInfo) => {
+let make = (~releaseTitle, ~challenges) => {
   let calculateTotalPoints = () => {
-    challengeInfo
+    challenges
     |> Array.fold_left(
          (totalPoints, challenge) => {
-           switch (challenge.challengePoints) {
+           switch (challenge.points) {
            | Some(points) => totalPoints + points
            | None => totalPoints
            }
@@ -213,15 +213,15 @@ let make = (~releaseTitle, ~challengeInfo) => {
     |> string_of_int;
   };
   let renderChallengePointsTable = () => {
-    challengeInfo
+    challenges
     |> Array.mapi((index, challenge) => {
-         let {challengeName, challengePoints} = challenge;
+         let {name, points} = challenge;
          <Row
            key={string_of_int(index)}
            star={Some("")} /* TODO: not sure what these are. Follow up with Chris on this. */
            rank={index + 1}
-           name=challengeName
-           points=challengePoints
+           name
+           points
          />;
        })
     |> React.array;
