@@ -197,12 +197,33 @@ let apply_user_command_exn ~constraint_constants ~txn_global_slot t
        This must re-check the conditions in Transaction_logic, to ensure that
        the failure cases are consistent.
     *)
-    let () =
-      (* TODO: Predicates. *)
-      assert (
+    let predicate_passed =
+      if
         Public_key.Compressed.equal
           (User_command.fee_payer_pk user_command)
-          (User_command.source_pk user_command) )
+          (User_command.source_pk user_command)
+      then true
+      else
+        match payload.body with
+        | Create_new_token _ ->
+            (* Any account is allowed to create a new token associated with a
+               public key.
+            *)
+            true
+        | Create_token_account _ ->
+            (* Predicate failure is deferred here. It will be checked later. *)
+            let predicate_result =
+              (* TODO(#4554): Hook predicate evaluation in here once
+                 implemented.
+              *)
+              false
+            in
+            predicate_result
+        | Payment _ | Stake_delegation _ ->
+            (* TODO(#4554): Hook predicate evaluation in here once implemented. *)
+            failwith
+              "The fee-payer is not authorised to issue commands for the \
+               source account"
     in
     match User_command.Payload.body payload with
     | Stake_delegation _ ->
@@ -339,6 +360,17 @@ let apply_user_command_exn ~constraint_constants ~txn_global_slot t
             if not source_account.token_owner then
               failwith "Token owner account does not own the token" ;
             source_account
+        in
+        let () =
+          let should_check_predicate =
+            (* TODO: Token owner permissions. *)
+            false
+          in
+          if (not should_check_predicate) || predicate_passed then ()
+          else
+            failwith
+              "The fee-payer is not authorised to create token accounts for \
+               this token"
         in
         let source_account =
           let timing =

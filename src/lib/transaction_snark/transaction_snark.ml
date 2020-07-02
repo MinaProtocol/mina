@@ -753,11 +753,36 @@ module Base = struct
                 @@ Balance.sub_amount fee_payer_account.balance
                      (Amount.of_fee payload.common.fee) }
           in
-          let predicate_failed =
-            (* TODO: Predicates. *)
-            not
-              (Public_key.Compressed.equal payload.common.fee_payer_pk
-                 payload.body.source_pk)
+          let predicate_failed, predicate_result =
+            if
+              Public_key.Compressed.equal payload.common.fee_payer_pk
+                payload.body.source_pk
+            then (false, true)
+            else
+              match payload.body.tag with
+              | Create_account when creating_new_token ->
+                  (* Any account is allowed to create a new token associated
+                     with a public key.
+                  *)
+                  (false, true)
+              | Create_account ->
+                  (* Predicate failure is deferred here. It will be checked
+                     later.
+                  *)
+                  let predicate_result =
+                    (* TODO(#4554): Hook predicate evaluation in here once
+                       implemented.
+                    *)
+                    false
+                  in
+                  (false, predicate_result)
+              | Payment | Stake_delegation ->
+                  (* TODO(#4554): Hook predicate evaluation in here once
+                     implemented.
+                  *)
+                  (true, false)
+              | Fee_transfer | Coinbase ->
+                  assert false
           in
           match payload.body.tag with
           | Fee_transfer | Coinbase ->
@@ -883,6 +908,14 @@ module Base = struct
                 if Account_id.equal source fee_payer then fee_payer_account
                 else if Account_id.equal source receiver then receiver_account
                 else source_account
+              in
+              let _token_auth_failed =
+                let should_check_predicate =
+                  (* TODO: Token owner permissions. *)
+                  false
+                in
+                if (not should_check_predicate) || predicate_result then false
+                else true
               in
               let source_not_present =
                 let id = Account.identifier source_account in
