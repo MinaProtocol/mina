@@ -39,15 +39,24 @@ type t = {pagination: Pagination.t; database: Database.t; logger: Logger.t}
 
 let add_user_blocks (pagination : Pagination.t)
     ( ( { With_hash.hash= state_hash
-        ; data= {Filtered_external_transition.transactions; creator; _} } as
-      external_transition )
+        ; data=
+            { Filtered_external_transition.transactions
+            ; creator
+            ; protocol_state=
+                { blockchain_state=
+                    {snarked_next_available_token= next_available_token; _}
+                ; _ }
+            ; _ } } as external_transition )
     , time ) =
   let fee_transfer_participants =
     List.concat_map transactions.fee_transfers ~f:fee_transfer_participants
   in
+  let next_available_token = ref next_available_token in
   let user_command_participants =
-    List.concat_map transactions.user_commands
-      ~f:User_command.accounts_accessed
+    List.concat_map transactions.user_commands ~f:(fun txn ->
+        let token = !next_available_token in
+        next_available_token := User_command.next_available_token txn token ;
+        User_command.accounts_accessed ~next_available_token:token txn )
   in
   let creator_aid = Account_id.create creator Token_id.default in
   Pagination.add pagination

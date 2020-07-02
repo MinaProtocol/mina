@@ -25,6 +25,10 @@ module type Ledger_intf = sig
   val merkle_root : t -> Ledger_hash.t
 
   val with_ledger : depth:int -> f:(t -> 'a) -> 'a
+
+  val next_available_token : t -> Token_id.t
+
+  val set_next_available_token : t -> Token_id.t -> unit
 end
 
 module Undo = struct
@@ -62,6 +66,8 @@ module Undo = struct
             | Payment of {previous_empty_accounts: Account_id.Stable.V1.t list}
             | Stake_delegation of
                 { previous_delegate: Public_key.Compressed.Stable.V1.t }
+            | Create_new_token of {created_token: Token_id.Stable.V1.t}
+            | Create_token_account
             | Failed
           [@@deriving sexp]
 
@@ -72,6 +78,8 @@ module Undo = struct
       type t = Stable.Latest.t =
         | Payment of {previous_empty_accounts: Account_id.t list}
         | Stake_delegation of {previous_delegate: Public_key.Compressed.t}
+        | Create_new_token of {created_token: Token_id.t}
+        | Create_token_account
         | Failed
       [@@deriving sexp]
     end
@@ -184,6 +192,8 @@ module type S = sig
         type t = Undo.User_command_undo.Body.t =
           | Payment of {previous_empty_accounts: Account_id.t list}
           | Stake_delegation of {previous_delegate: Public_key.Compressed.t}
+          | Create_new_token of {created_token: Token_id.t}
+          | Create_token_account
           | Failed
         [@@deriving sexp]
       end
@@ -488,8 +498,9 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
        command.
     *)
     set_with_location ledger fee_payer_location fee_payer_account ;
-    let source = User_command.source user_command in
-    let receiver = User_command.receiver user_command in
+    let next_available_token = next_available_token ledger in
+    let source = User_command.source ~next_available_token user_command in
+    let receiver = User_command.receiver ~next_available_token user_command in
     let exception Reject of Error.t in
     let compute_updates () =
       (* Compute the necessary changes to apply the command, failing if any of
@@ -611,6 +622,103 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             ; (source_location, source_account) ]
           , `Source_timing source_timing
           , Undo.User_command_undo.Body.Payment {previous_empty_accounts} )
+      | Create_new_token _ ->
+          (* NOTE: source and receiver are definitionally equal here. *)
+          let fee_payer_account =
+            try
+              let balance =
+                Option.value_exn
+                  (Balance.sub_amount fee_payer_account.balance
+                     (Amount.of_fee constraint_constants.account_creation_fee))
+              in
+              let fee_payer_account = {fee_payer_account with balance} in
+              let timing =
+                Or_error.ok_exn
+                  (validate_timing ~txn_amount:Amount.zero
+                     ~txn_global_slot:current_global_slot
+                     ~account:fee_payer_account)
+              in
+              {fee_payer_account with timing}
+            with exn -> raise (Reject (Error.of_exn exn))
+          in
+          let%map receiver_location, receiver_account =
+            get_with_location ledger receiver
+          in
+          if not (receiver_location = `New) then
+            failwith
+              "Token owner account for newly created token already exists?!?!" ;
+          let receiver_account = {receiver_account with token_owner= true} in
+          ( [ (fee_payer_location, fee_payer_account)
+            ; (receiver_location, receiver_account) ]
+          , `Source_timing receiver_account.timing
+          , Undo.User_command_undo.Body.Create_new_token
+              {created_token= next_available_token} )
+      | Create_token_account _ ->
+          let fee_payer_account =
+            try
+              let balance =
+                Option.value_exn
+                  (Balance.sub_amount fee_payer_account.balance
+                     (Amount.of_fee constraint_constants.account_creation_fee))
+              in
+              let fee_payer_account = {fee_payer_account with balance} in
+              let timing =
+                Or_error.ok_exn
+                  (validate_timing ~txn_amount:Amount.zero
+                     ~txn_global_slot:current_global_slot
+                     ~account:fee_payer_account)
+              in
+              {fee_payer_account with timing}
+            with exn -> raise (Reject (Error.of_exn exn))
+          in
+          let%bind receiver_location, receiver_account =
+            get_with_location ledger receiver
+          in
+          let%bind () =
+            match receiver_location with
+            | `New ->
+                return ()
+            | `Existing _ ->
+                Or_error.errorf
+                  "Attempted to create an account that already exists"
+          in
+          let%bind source_location, source_account =
+            get_with_location ledger source
+          in
+          let%bind source_account =
+            if Token_id.(equal default) (Account_id.token_id receiver) then
+              return receiver_account
+            else
+              match source_location with
+              | `New ->
+                  Or_error.errorf "Token owner account does not exist"
+              | `Existing _ ->
+                  if source_account.token_owner then return source_account
+                  else
+                    Or_error.errorf
+                      "Token owner account does not own the token"
+          in
+          let source_timing = source_account.timing in
+          let%map source_account =
+            let%map timing =
+              validate_timing ~txn_amount:Amount.zero
+                ~txn_global_slot:current_global_slot ~account:source_account
+            in
+            {source_account with timing}
+          in
+          let located_accounts =
+            if Account_id.equal source receiver then
+              (* For token_id= default, we allow this *)
+              [ (fee_payer_location, fee_payer_account)
+              ; (source_location, source_account) ]
+            else
+              [ (receiver_location, receiver_account)
+              ; (fee_payer_location, fee_payer_account)
+              ; (source_location, source_account) ]
+          in
+          ( located_accounts
+          , `Source_timing source_timing
+          , Undo.User_command_undo.Body.Create_token_account )
     in
     match compute_updates () with
     | Ok (located_accounts, `Source_timing source_timing, undo_body) ->
@@ -836,7 +944,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     set t receiver_location {receiver_account with balance= receiver_balance} ;
     remove_accounts_exn t previous_empty_accounts
 
-  let undo_user_command ledger
+  let undo_user_command
+      ~(constraint_constants : Genesis_constants.Constraint_constants.t) ledger
       { Undo.User_command_undo.common=
           { user_command= {payload; signer= _; signature= _} as user_command
           ; previous_receipt_chain_hash
@@ -866,7 +975,14 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     in
     (* Update the fee-payer's account. *)
     set ledger fee_payer_location fee_payer_account ;
-    let source = User_command.source user_command in
+    let next_available_token =
+      match body with
+      | Create_new_token {created_token} ->
+          created_token
+      | _ ->
+          next_available_token ledger
+    in
+    let source = User_command.source ~next_available_token user_command in
     let source_timing =
       (* Prefer fee-payer original timing when applicable, since it is the
          'true' original.
@@ -891,7 +1007,9 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           ; timing= Option.value ~default:source_account.timing source_timing
           }
     | Payment {amount; _}, Payment {previous_empty_accounts} ->
-        let receiver = User_command.receiver user_command in
+        let receiver =
+          User_command.receiver ~next_available_token user_command
+        in
         let%bind receiver_location, receiver_account =
           let%bind location =
             location_of_account' ledger "receiver" receiver
@@ -927,6 +1045,58 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         set ledger receiver_location receiver_account ;
         set ledger source_location source_account ;
         remove_accounts_exn ledger previous_empty_accounts
+    | Create_new_token _, Create_new_token _ ->
+        let fee_payer_account =
+          let balance =
+            Option.value_exn
+              (Balance.add_amount fee_payer_account.balance
+                 (Amount.of_fee constraint_constants.account_creation_fee))
+          in
+          {fee_payer_account with balance}
+        in
+        let%bind source_location =
+          location_of_account' ledger "source" source
+        in
+        let%map source_account =
+          if Account_id.equal fee_payer source then return fee_payer_account
+          else get' ledger "source" source_location
+        in
+        let receiver =
+          User_command.receiver ~next_available_token user_command
+        in
+        set ledger fee_payer_location fee_payer_account ;
+        set ledger source_location
+          { source_account with
+            timing= Option.value ~default:source_account.timing source_timing
+          } ;
+        remove_accounts_exn ledger [receiver] ;
+        (* Restore to the previous [next_available_token]. *)
+        set_next_available_token ledger next_available_token
+    | Create_token_account _, Create_token_account ->
+        let fee_payer_account =
+          let balance =
+            Option.value_exn
+              (Balance.add_amount fee_payer_account.balance
+                 (Amount.of_fee constraint_constants.account_creation_fee))
+          in
+          {fee_payer_account with balance}
+        in
+        let%bind source_location =
+          location_of_account' ledger "source" source
+        in
+        let%map source_account =
+          if Account_id.equal fee_payer source then return fee_payer_account
+          else get' ledger "source" source_location
+        in
+        let receiver =
+          User_command.receiver ~next_available_token user_command
+        in
+        set ledger fee_payer_location fee_payer_account ;
+        set ledger source_location
+          { source_account with
+            timing= Option.value ~default:source_account.timing source_timing
+          } ;
+        remove_accounts_exn ledger [receiver]
     | _, _ ->
         failwith "Undo/command mismatch"
 
@@ -942,7 +1112,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       | Fee_transfer u ->
           undo_fee_transfer ~constraint_constants ledger u
       | User_command u ->
-          undo_user_command ledger u
+          undo_user_command ~constraint_constants ledger u
       | Coinbase c ->
           undo_coinbase ~constraint_constants ledger c ;
           Ok ()
@@ -977,7 +1147,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
            payment)
     in
     let root = merkle_root ledger in
-    Or_error.ok_exn (undo_user_command ledger undo) ;
+    Or_error.ok_exn (undo_user_command ~constraint_constants ledger undo) ;
     root
 
   module For_tests = struct

@@ -3115,6 +3115,10 @@ let%test_module "transaction_snark" =
               Sparse_ledger.(
                 merkle_root
                   (apply_transaction_exn ~constraint_constants sparse_ledger
+                     ~txn_global_slot:
+                       ( txn_in_block.block_data
+                       |> Coda_state.Protocol_state.Body.consensus_state
+                       |> Consensus.Data.Consensus_state.curr_global_slot )
                      txn_in_block.transaction))
             ~next_available_token:(Ledger.next_available_token ledger)
             ~init_stack:pending_coinbase_init
@@ -3153,12 +3157,14 @@ let%test_module "transaction_snark" =
                 Coda_state.Protocol_state.Body.consensus_state state_body
                 |> Consensus.Data.Consensus_state.curr_slot
               in
+              let next_available_token = Ledger.next_available_token ledger in
               let target =
                 Ledger.merkle_root_after_user_command_exn ledger
                   ~txn_global_slot:current_global_slot t1
               in
               let mentioned_keys =
-                User_command.accounts_accessed (t1 :> User_command.t)
+                User_command.accounts_accessed ~next_available_token
+                  (User_command.forget_check t1)
               in
               let sparse_ledger =
                 Sparse_ledger.of_ledger_subset_exn ledger mentioned_keys
@@ -3179,8 +3185,7 @@ let%test_module "transaction_snark" =
               check_user_command ~constraint_constants ~sok_message
                 ~source:(Ledger.merkle_root ledger)
                 ~target ~init_stack:pending_coinbase_stack
-                ~pending_coinbase_stack_state
-                ~next_available_token:(Ledger.next_available_token ledger)
+                ~pending_coinbase_stack_state ~next_available_token
                 {transaction= t1; block_data= state_body}
                 (unstage @@ Sparse_ledger.handler sparse_ledger) ) )
 
@@ -3189,6 +3194,7 @@ let%test_module "transaction_snark" =
     let test_transaction ~constraint_constants ?txn_global_slot ledger txn =
       let source = Ledger.merkle_root ledger in
       let pending_coinbase_stack = Pending_coinbase.Stack.empty in
+      let next_available_token = Ledger.next_available_token ledger in
       let state_body, state_body_hash, txn_global_slot =
         match txn_global_slot with
         | None ->
@@ -3233,7 +3239,8 @@ let%test_module "transaction_snark" =
         in
         match txn with
         | Transaction.User_command uc ->
-            ( User_command.accounts_accessed (uc :> User_command.t)
+            ( User_command.accounts_accessed ~next_available_token
+                (uc :> User_command.t)
             , pending_coinbase_stack )
         | Fee_transfer ft ->
             (Fee_transfer.receivers ft, pending_coinbase_stack)
@@ -3260,7 +3267,7 @@ let%test_module "transaction_snark" =
         ~pending_coinbase_stack_state:
           { Pending_coinbase_stack_state.source= pending_coinbase_stack
           ; target= pending_coinbase_stack_target }
-        ~next_available_token:(Ledger.next_available_token ledger)
+        ~next_available_token
         {transaction= txn; block_data= state_body}
         (unstage @@ Sparse_ledger.handler sparse_ledger)
 
@@ -3439,7 +3446,13 @@ let%test_module "transaction_snark" =
                 Sparse_ledger.of_ledger_subset_exn ledger
                   (List.concat_map
                      ~f:(fun t ->
-                       User_command.accounts_accessed (t :> User_command.t) )
+                       (* NB: Shouldn't assume the same next_available_token
+                          for each command normally, but we know statically
+                          that these are payments in this test.
+                       *)
+                       User_command.accounts_accessed
+                         ~next_available_token:next_available_token1
+                         (User_command.forget_check t) )
                      [t1; t2])
               in
               let init_stack1 = Pending_coinbase.Stack.empty in
@@ -3467,14 +3480,14 @@ let%test_module "transaction_snark" =
                   pending_coinbase_stack_state1 state_body1
                   (unstage @@ Sparse_ledger.handler sparse_ledger)
               in
-              let sparse_ledger =
-                Sparse_ledger.apply_user_command_exn ~constraint_constants
-                  sparse_ledger
-                  (t1 :> User_command.t)
-              in
               let current_global_slot =
                 Coda_state.Protocol_state.Body.consensus_state state_body1
                 |> Consensus.Data.Consensus_state.curr_slot
+              in
+              let sparse_ledger =
+                Sparse_ledger.apply_user_command_exn ~constraint_constants
+                  ~txn_global_slot:current_global_slot sparse_ledger
+                  (t1 :> User_command.t)
               in
               let pending_coinbase_stack_state2, state_body2, init_stack2 =
                 let previous_stack = pending_coinbase_stack_state1.target in
@@ -3517,19 +3530,19 @@ let%test_module "transaction_snark" =
                   pending_coinbase_stack_state2 state_body2
                   (unstage @@ Sparse_ledger.handler sparse_ledger)
               in
+              let current_global_slot =
+                Coda_state.Protocol_state.Body.consensus_state state_body2
+                |> Consensus.Data.Consensus_state.curr_slot
+              in
               let sparse_ledger =
                 Sparse_ledger.apply_user_command_exn ~constraint_constants
-                  sparse_ledger
+                  ~txn_global_slot:current_global_slot sparse_ledger
                   (t2 :> User_command.t)
               in
               let pending_coinbase_stack_state_merge =
                 Pending_coinbase_stack_state.
                   { source= pending_coinbase_stack_state1.source
                   ; target= pending_coinbase_stack_state2.target }
-              in
-              let current_global_slot =
-                Coda_state.Protocol_state.Body.consensus_state state_body2
-                |> Consensus.Data.Consensus_state.curr_slot
               in
               Ledger.apply_user_command ledger ~constraint_constants
                 ~txn_global_slot:current_global_slot t2

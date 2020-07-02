@@ -142,6 +142,10 @@ let pending_coinbase_stack_target (t : Transaction.t) stack =
 let profile (module T : Transaction_snark.S) sparse_ledger0
     (transitions : Transaction.t list) preeval =
   let constraint_constants = Genesis_constants.Constraint_constants.compiled in
+  let txn_global_slot =
+    state_body |> Lazy.force |> Coda_state.Protocol_state.Body.consensus_state
+    |> Consensus.Data.Consensus_state.curr_global_slot
+  in
   let (base_proof_time, _, _), base_proofs =
     List.fold_map transitions
       ~init:(Time.Span.zero, sparse_ledger0, Pending_coinbase.Stack.empty)
@@ -151,7 +155,7 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
         in
         let sparse_ledger' =
           Sparse_ledger.apply_transaction_exn ~constraint_constants
-            sparse_ledger t
+            ~txn_global_slot sparse_ledger t
         in
         let coinbase_stack_target =
           pending_coinbase_stack_target t coinbase_stack_source
@@ -201,13 +205,18 @@ let check_base_snarks sparse_ledger0 (transitions : Transaction.t list) preeval
         ~prover:
           Public_key.(compress (of_private_key_exn (Private_key.create ())))
     in
+    let txn_global_slot =
+      state_body |> Lazy.force
+      |> Coda_state.Protocol_state.Body.consensus_state
+      |> Consensus.Data.Consensus_state.curr_global_slot
+    in
     List.fold transitions ~init:sparse_ledger0 ~f:(fun sparse_ledger t ->
         let next_available_token =
           Sparse_ledger.next_available_token sparse_ledger
         in
         let sparse_ledger' =
           Sparse_ledger.apply_transaction_exn ~constraint_constants
-            sparse_ledger t
+            ~txn_global_slot sparse_ledger t
         in
         let coinbase_stack_target =
           pending_coinbase_stack_target t Pending_coinbase.Stack.empty
@@ -238,13 +247,18 @@ let generate_base_snarks_witness sparse_ledger0
         ~prover:
           Public_key.(compress (of_private_key_exn (Private_key.create ())))
     in
+    let txn_global_slot =
+      state_body |> Lazy.force
+      |> Coda_state.Protocol_state.Body.consensus_state
+      |> Consensus.Data.Consensus_state.curr_global_slot
+    in
     List.fold transitions ~init:sparse_ledger0 ~f:(fun sparse_ledger t ->
         let next_available_token =
           Sparse_ledger.next_available_token sparse_ledger
         in
         let sparse_ledger' =
           Sparse_ledger.apply_transaction_exn ~constraint_constants
-            sparse_ledger t
+            ~txn_global_slot sparse_ledger t
         in
         let coinbase_stack_target =
           pending_coinbase_stack_target t Pending_coinbase.Stack.empty
@@ -269,6 +283,7 @@ let generate_base_snarks_witness sparse_ledger0
 
 let run profiler num_transactions repeats preeval =
   let ledger, transitions = create_ledger_and_transactions num_transactions in
+  let next_available_token = ref (Ledger.next_available_token ledger) in
   let sparse_ledger =
     Coda_base.Sparse_ledger.of_ledger_subset_exn ledger
       (List.concat_map transitions ~f:(fun t ->
@@ -276,8 +291,11 @@ let run profiler num_transactions repeats preeval =
            | Fee_transfer t ->
                Fee_transfer.receivers t
            | User_command t ->
-               let t = (t :> User_command.t) in
-               User_command.accounts_accessed t
+               let token = !next_available_token in
+               let t = User_command.forget_check t in
+               next_available_token :=
+                 User_command.next_available_token t token ;
+               User_command.accounts_accessed ~next_available_token:token t
            | Coinbase cb ->
                Coinbase.accounts_accessed cb ))
   in

@@ -1341,6 +1341,9 @@ let%test_module _ =
               ; body=
                   Stake_delegation
                     (Set_delegate {payload with delegator= sender_pk}) }
+          | { common
+            ; body= (Create_new_token _ | Create_token_account _) as body } ->
+              {common= {common with fee_payer_pk= sender_pk}; body}
         in
         User_command.forget_check @@ User_command.sign sender_kp payload
       in
