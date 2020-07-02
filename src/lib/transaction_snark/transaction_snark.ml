@@ -865,6 +865,12 @@ module Base = struct
                 if Account_id.equal receiver fee_payer then fee_payer_account
                 else receiver_account
               in
+              let receiver_exists =
+                let id = Account.identifier receiver_account in
+                if Account_id.equal Account_id.empty id then false
+                else if Account_id.equal receiver id then true
+                else fail "bad receiver account ID"
+              in
               let receiver_account =
                 { receiver_account with
                   public_key= Account_id.public_key receiver
@@ -872,12 +878,6 @@ module Base = struct
                 ; token_owner=
                     ( if creating_new_token then true
                     else receiver_account.token_owner ) }
-              in
-              let receiver_exists =
-                let id = Account.identifier receiver_account in
-                if Account_id.equal Account_id.empty id then false
-                else if Account_id.equal receiver id then true
-                else fail "bad receiver account ID"
               in
               let source_account =
                 if Account_id.equal source fee_payer then fee_payer_account
