@@ -115,6 +115,6 @@ module Inputs = struct
                  ~pending_coinbase_stack_state:
                    stmt.pending_coinbase_stack_state
                  ~fee_excess:stmt.fee_excess ~sok_digest
-                 ~proof:Precomputed_values.unit_test_base_proof
+                 ~proof:Proof.transaction_dummy
              , Time.Span.zero )
 end

@@ -505,7 +505,7 @@ module Genesis_proof = struct
         ; genesis_ledger= inputs.genesis_ledger
         ; consensus_constants= inputs.consensus_constants
         ; protocol_state_with_hash= inputs.protocol_state_with_hash
-        ; genesis_proof= Coda_base.Proof.dummy }
+        ; genesis_proof= Coda_base.Proof.blockchain_dummy }
 
   let store ~filename proof =
     (* TODO: Use [Writer.write_bin_prot]. *)

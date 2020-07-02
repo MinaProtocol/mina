@@ -122,7 +122,7 @@ let rec of_list_and_length_exn : type a n. a list -> n nat -> (a, n) t =
   | x :: xs, S n ->
       x :: of_list_and_length_exn xs n
   | _ ->
-      failwith "Length mismatch"
+      failwith "Vector: Length mismatch"
 
 let of_list_and_length xs n =
   Core_kernel.Option.try_with (fun () -> of_list_and_length_exn xs n)

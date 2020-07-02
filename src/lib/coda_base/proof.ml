@@ -4,7 +4,9 @@
 open Core_kernel
 open Pickles_types
 
-let dummy = Dummy_values.proof
+let blockchain_dummy = Dummy_values.blockchain_proof
+
+let transaction_dummy = Dummy_values.transaction_proof
 
 module T = Pickles.Proof.Make (Nat.N2) (Nat.N2)
 

@@ -62,7 +62,7 @@ struct
 
   let statement ((t, _) : t) : Transaction_snark.Statement.t = t
 
-  let underlying_proof (_ : t) = Proof.dummy
+  let underlying_proof (_ : t) = Proof.transaction_dummy
 
   let statement_target (t : Transaction_snark.Statement.t) = t.target
 
@@ -92,5 +92,6 @@ type with_witness = With_witness : 't * 't type_witness -> with_witness
 
 module For_tests = struct
   let mk_dummy_proof statement =
-    create ~statement ~sok_digest:Sok_message.Digest.default ~proof:Proof.dummy
+    create ~statement ~sok_digest:Sok_message.Digest.default
+      ~proof:Proof.transaction_dummy
 end

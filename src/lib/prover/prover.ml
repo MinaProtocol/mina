@@ -79,7 +79,7 @@ module Worker_state = struct
           ; pending_coinbase_stack_state=
               { source= Pending_coinbase.Stack.empty
               ; target= Pending_coinbase.Stack.empty } }
-        , Proof.dummy )
+        , Proof.transaction_dummy )
 
   let create {logger; proof_level; constraint_constants; _} : t Deferred.t =
     Deferred.return
@@ -156,7 +156,9 @@ module Worker_state = struct
 
                let extend_blockchain _chain next_state _block _ledger_proof
                    _state_for_handler _pending_coinbase =
-                 Ok {Blockchain.proof= Coda_base.Proof.dummy; state= next_state}
+                 Ok
+                   { Blockchain.proof= Coda_base.Proof.blockchain_dummy
+                   ; state= next_state }
 
                let verify _ _ = true
              end
@@ -341,10 +343,10 @@ let extend_blockchain {connection; logger; _} chain next_state block
                 (Sexp.to_string (Extend_blockchain_input.sexp_of_t input)) )
           ; ( "input-bin-io"
             , `String
-                (Base64.encode_exn 
+                (Base64.encode_exn
                    (Binable.to_string
-                   (module Extend_blockchain_input.Stable.Latest)
-                   input) ) )
+                      (module Extend_blockchain_input.Stable.Latest)
+                      input)) )
           ; ("error", `String (Error.to_string_hum e)) ]
         "Prover failed: $error" ;
       Error e

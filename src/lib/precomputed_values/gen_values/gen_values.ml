@@ -47,7 +47,7 @@ let hashes =
 module Dummy = struct
   let loc = Ppxlib.Location.none
 
-  let base_proof_expr = [%expr Coda_base.Proof.dummy]
+  let base_proof_expr = [%expr Coda_base.Proof.blockchain_dummy]
 
   let blockchain_proof_system_id =
     [%expr fun () -> Pickles.Verification_key.Id.dummy ()]
@@ -170,8 +170,6 @@ let main () =
 
       let compiled_base_proof = [%e M.base_proof_expr]
 
-      let unit_test_base_proof = Coda_base.Proof.dummy
-
       let for_unit_tests =
         lazy
           (let protocol_state_with_hash =
@@ -189,7 +187,7 @@ let main () =
            ; genesis_ledger= Genesis_ledger.for_unit_tests
            ; consensus_constants= Lazy.force Consensus.Constants.for_unit_tests
            ; protocol_state_with_hash
-           ; genesis_proof= unit_test_base_proof })
+           ; genesis_proof= Coda_base.Proof.blockchain_dummy })
 
       let key_hashes = [%e M.key_hashes]
 

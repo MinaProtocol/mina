@@ -2,7 +2,9 @@ open Pickles_types
 
 type t = (Nat.N2.n, Nat.N2.n) Pickles.Proof.t [@@deriving sexp, yojson]
 
-val dummy : t
+val blockchain_dummy : t
+
+val transaction_dummy : t
 
 [%%versioned:
 module Stable : sig
