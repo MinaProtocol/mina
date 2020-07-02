@@ -675,8 +675,9 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             get_with_location ledger source
           in
           let%bind source_account =
-            if Token_id.(equal default) (Account_id.token_id receiver) then
-              return receiver_account
+            if Account_id.equal source receiver then return receiver_account
+            else if Account_id.equal source fee_payer then
+              return fee_payer_account
             else
               match source_location with
               | `New ->
