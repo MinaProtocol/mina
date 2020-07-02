@@ -887,7 +887,7 @@ module Base = struct
               let source_not_present =
                 let id = Account.identifier source_account in
                 if Account_id.equal Account_id.empty id then true
-                else if Account_id.equal receiver id then false
+                else if Account_id.equal source id then false
                 else fail "bad source account ID"
               in
               let not_token_owner =
