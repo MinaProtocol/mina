@@ -445,7 +445,7 @@ module Make (Inputs : Inputs_intf.S) = struct
         List.iter locations_and_accounts ~f:(fun (location, account) ->
             let token = Account.token account in
             new_next_available_token :=
-              Token_id.max token (Token_id.next !new_next_available_token) ;
+              Token_id.max !new_next_available_token (Token_id.next token) ;
             if Account.token_owner account then
               Token_id.Table.set t.token_owners ~key:token
                 ~data:(Account_id.public_key (Account.identifier account)) ;
