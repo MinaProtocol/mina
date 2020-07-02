@@ -1185,10 +1185,6 @@ module Base = struct
       Boolean.(is_create_account && token_invalid)
     in
     let%bind next_available_token_after, token =
-      let%bind () =
-        [%with_label "New token creation is disabled"]
-          Boolean.(Assert.is_true (not creating_new_token))
-      in
       let%bind token =
         Token_id.Checked.if_ creating_new_token ~then_:next_available_token
           ~else_:token
