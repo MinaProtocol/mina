@@ -428,9 +428,10 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
   (* someday: It would probably be better if we didn't modify the receipt chain hash
   in the case that the sender is equal to the receiver, but it complicates the SNARK, so
   we don't for now. *)
-  let apply_user_command_unchecked ~constraint_constants ~txn_global_slot
-      ledger ({payload; signer; signature= _} as user_command : User_command.t)
-      =
+  let apply_user_command_unchecked
+      ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+      ~txn_global_slot ledger
+      ({payload; signer; signature= _} as user_command : User_command.t) =
     let open Or_error.Let_syntax in
     let signer_pk = Public_key.compress signer in
     let current_global_slot = txn_global_slot in
@@ -502,6 +503,20 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     let source = User_command.source ~next_available_token user_command in
     let receiver = User_command.receiver ~next_available_token user_command in
     let exception Reject of Error.t in
+    let charge_account_creation_fee_exn (account : Account.t) =
+      let balance =
+        Option.value_exn
+          (Balance.sub_amount account.balance
+             (Amount.of_fee constraint_constants.account_creation_fee))
+      in
+      let account = {account with balance} in
+      let timing =
+        Or_error.ok_exn
+          (validate_timing ~txn_amount:Amount.zero
+             ~txn_global_slot:current_global_slot ~account)
+      in
+      {account with timing}
+    in
     let compute_updates () =
       (* Compute the necessary changes to apply the command, failing if any of
          the conditions are not met.
@@ -625,20 +640,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       | Create_new_token _ ->
           (* NOTE: source and receiver are definitionally equal here. *)
           let fee_payer_account =
-            try
-              let balance =
-                Option.value_exn
-                  (Balance.sub_amount fee_payer_account.balance
-                     (Amount.of_fee constraint_constants.account_creation_fee))
-              in
-              let fee_payer_account = {fee_payer_account with balance} in
-              let timing =
-                Or_error.ok_exn
-                  (validate_timing ~txn_amount:Amount.zero
-                     ~txn_global_slot:current_global_slot
-                     ~account:fee_payer_account)
-              in
-              {fee_payer_account with timing}
+            try charge_account_creation_fee_exn fee_payer_account
             with exn -> raise (Reject (Error.of_exn exn))
           in
           let%map receiver_location, receiver_account =
@@ -655,20 +657,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               {created_token= next_available_token} )
       | Create_token_account _ ->
           let fee_payer_account =
-            try
-              let balance =
-                Option.value_exn
-                  (Balance.sub_amount fee_payer_account.balance
-                     (Amount.of_fee constraint_constants.account_creation_fee))
-              in
-              let fee_payer_account = {fee_payer_account with balance} in
-              let timing =
-                Or_error.ok_exn
-                  (validate_timing ~txn_amount:Amount.zero
-                     ~txn_global_slot:current_global_slot
-                     ~account:fee_payer_account)
-              in
-              {fee_payer_account with timing}
+            try charge_account_creation_fee_exn fee_payer_account
             with exn -> raise (Reject (Error.of_exn exn))
           in
           let%bind receiver_location, receiver_account =
