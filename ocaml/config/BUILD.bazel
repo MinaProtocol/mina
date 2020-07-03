@@ -1,4 +1,4 @@
-load("@obazl//ocaml:build.bzl",
+load("@obazl_rules_ocaml//ocaml:build.bzl",
      "ocaml_binary",
      "ocaml_library",
      "ppx_binary",
