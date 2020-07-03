@@ -4406,6 +4406,7 @@ let%test_module "transaction_snark" =
               let sub_fee fee bal =
                 Option.value_exn (Balance.sub_amount bal (Amount.of_fee fee))
               in
+              (* No account creation fee: the command fails. *)
               let expected_fee_payer_balance =
                 accounts.(0).balance |> sub_fee fee
               in
@@ -4447,6 +4448,7 @@ let%test_module "transaction_snark" =
               let sub_fee fee bal =
                 Option.value_exn (Balance.sub_amount bal (Amount.of_fee fee))
               in
+              (* No account creation fee: the command fails. *)
               let expected_fee_payer_balance =
                 accounts.(0).balance |> sub_fee fee
               in
@@ -4487,6 +4489,7 @@ let%test_module "transaction_snark" =
               let sub_fee fee bal =
                 Option.value_exn (Balance.sub_amount bal (Amount.of_fee fee))
               in
+              (* No account creation fee: the command fails. *)
               let expected_fee_payer_balance =
                 accounts.(0).balance |> sub_fee fee
               in
