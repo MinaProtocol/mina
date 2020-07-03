@@ -1,4 +1,5 @@
 .bazel
+bazel-*
 user.bazelrc
 _build*
 *.pdf
