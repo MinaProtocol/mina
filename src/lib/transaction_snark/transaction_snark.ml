@@ -4454,8 +4454,8 @@ let%test_module "transaction_snark" =
               assert (Balance.(equal zero) token_owner_account.balance) ;
               assert (Balance.(equal zero) receiver_account.balance) ) )
 
-    let%test_unit "create new token account fails if token owner doesn't own \
-                   the token" =
+    let%test_unit "create new token account fails if claimed token owner \
+                   doesn't own the token" =
       Test_util.with_randomness 123456789 (fun () ->
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               let wallets = random_wallets ~n:3 () in
