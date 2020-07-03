@@ -753,11 +753,36 @@ module Base = struct
                 @@ Balance.sub_amount fee_payer_account.balance
                      (Amount.of_fee payload.common.fee) }
           in
-          let predicate_failed =
-            (* TODO: Predicates. *)
-            not
-              (Public_key.Compressed.equal payload.common.fee_payer_pk
-                 payload.body.source_pk)
+          let predicate_failed, predicate_result =
+            if
+              Public_key.Compressed.equal payload.common.fee_payer_pk
+                payload.body.source_pk
+            then (false, true)
+            else
+              match payload.body.tag with
+              | Create_account when creating_new_token ->
+                  (* Any account is allowed to create a new token associated
+                     with a public key.
+                  *)
+                  (false, true)
+              | Create_account ->
+                  (* Predicate failure is deferred here. It will be checked
+                     later.
+                  *)
+                  let predicate_result =
+                    (* TODO(#4554): Hook predicate evaluation in here once
+                       implemented.
+                    *)
+                    false
+                  in
+                  (false, predicate_result)
+              | Payment | Stake_delegation ->
+                  (* TODO(#4554): Hook predicate evaluation in here once
+                     implemented.
+                  *)
+                  (true, false)
+              | Fee_transfer | Coinbase ->
+                  assert false
           in
           match payload.body.tag with
           | Fee_transfer | Coinbase ->
@@ -865,6 +890,12 @@ module Base = struct
                 if Account_id.equal receiver fee_payer then fee_payer_account
                 else receiver_account
               in
+              let receiver_exists =
+                let id = Account.identifier receiver_account in
+                if Account_id.equal Account_id.empty id then false
+                else if Account_id.equal receiver id then true
+                else fail "bad receiver account ID"
+              in
               let receiver_account =
                 { receiver_account with
                   public_key= Account_id.public_key receiver
@@ -873,21 +904,23 @@ module Base = struct
                     ( if creating_new_token then true
                     else receiver_account.token_owner ) }
               in
-              let receiver_exists =
-                let id = Account.identifier receiver_account in
-                if Account_id.equal Account_id.empty id then false
-                else if Account_id.equal receiver id then true
-                else fail "bad receiver account ID"
-              in
               let source_account =
                 if Account_id.equal source fee_payer then fee_payer_account
                 else if Account_id.equal source receiver then receiver_account
                 else source_account
               in
+              let _token_auth_failed =
+                let should_check_predicate =
+                  (* TODO: Token owner permissions. *)
+                  false
+                in
+                if (not should_check_predicate) || predicate_result then false
+                else true
+              in
               let source_not_present =
                 let id = Account.identifier source_account in
                 if Account_id.equal Account_id.empty id then true
-                else if Account_id.equal receiver id then false
+                else if Account_id.equal source id then false
                 else fail "bad source account ID"
               in
               let not_token_owner =
@@ -906,14 +939,20 @@ module Base = struct
               ; not_token_owner } )
 
     let%snarkydef compute_as_prover ~constraint_constants ~txn_global_slot
-        ~creating_new_token (txn : Transaction_union.var) =
+        ~creating_new_token ~next_available_token (txn : Transaction_union.var)
+        =
       let%bind data =
         exists (Typ.Internal.ref ())
           ~compute:
             As_prover.(
-              let%map txn = read Transaction_union.typ txn in
+              let%bind txn = read Transaction_union.typ txn in
               let fee_token = txn.payload.common.fee_token in
               let token = txn.payload.body.token_id in
+              let%map token =
+                if Token_id.(equal invalid) token then
+                  read Token_id.typ next_available_token
+                else return token
+              in
               let fee_payer =
                 Account_id.create txn.payload.common.fee_payer_pk fee_token
               in
@@ -1178,23 +1217,36 @@ module Base = struct
                    [ not token_default
                    ; is_payment
                    ; is_stake_delegation
+                   ; is_create_account
                    ; is_fee_transfer
                    ; is_coinbase ]) ])
+    in
+    let current_global_slot =
+      Coda_state.Protocol_state.Body.consensus_state state_body
+      |> Consensus.Data.Consensus_state.curr_global_slot_var
     in
     let%bind creating_new_token =
       Boolean.(is_create_account && token_invalid)
     in
+    (* Query user command predicted failure/success. *)
+    let%bind user_command_failure =
+      User_command_failure.compute_as_prover ~constraint_constants
+        ~txn_global_slot:current_global_slot ~creating_new_token
+        ~next_available_token txn
+    in
+    let%bind user_command_fails =
+      User_command_failure.any user_command_failure
+    in
     let%bind next_available_token_after, token =
-      let%bind () =
-        [%with_label "New token creation is disabled"]
-          Boolean.(Assert.is_true (not creating_new_token))
-      in
       let%bind token =
         Token_id.Checked.if_ creating_new_token ~then_:next_available_token
           ~else_:token
       in
+      let%bind will_create_new_token =
+        Boolean.(creating_new_token && not user_command_fails)
+      in
       let%map next_available_token =
-        Token_id.Checked.next_if next_available_token creating_new_token
+        Token_id.Checked.next_if next_available_token will_create_new_token
       in
       (next_available_token, token)
     in
@@ -1205,10 +1257,6 @@ module Base = struct
     let nonce = payload.common.nonce in
     let fee_payer =
       Account_id.Checked.create payload.common.fee_payer_pk fee_token
-    in
-    let current_global_slot =
-      Coda_state.Protocol_state.Body.consensus_state state_body
-      |> Consensus.Data.Consensus_state.curr_global_slot_var
     in
     let%bind () =
       [%with_label "Check slot validity"]
@@ -1288,13 +1336,6 @@ module Base = struct
        the failures should be checked against potential failures to ensure
        consistency.
     *)
-    let%bind user_command_failure =
-      User_command_failure.compute_as_prover ~constraint_constants
-        ~txn_global_slot:current_global_slot ~creating_new_token txn
-    in
-    let%bind user_command_fails =
-      User_command_failure.any user_command_failure
-    in
     let%bind () =
       [%with_label "A failing user command is a user command"]
         Boolean.(Assert.any [is_user_command; not user_command_fails])
@@ -1375,10 +1416,10 @@ module Base = struct
                   a new token account. These are mutually exclusive, so we can
                   encode this as a boolean.
                *)
-               let%bind creating_new_token =
-                 Boolean.(creating_new_token && not user_command_fails)
+               let%bind is_create_account =
+                 Boolean.(is_create_account && not user_command_fails)
                in
-               Boolean.(is_empty_and_writeable || creating_new_token)
+               Boolean.(is_empty_and_writeable || is_create_account)
              in
              let%bind amount =
                [%with_label "Compute fee payer amount"]
@@ -1574,7 +1615,6 @@ module Base = struct
                (* Only default tokens may participate in delegation. *)
                Boolean.(is_empty_and_writeable && token_default)
              in
-             let token_owner = creating_new_token in
              let%map delegate =
                Public_key.Compressed.Checked.if_ may_delegate
                  ~then_:(Account_id.Checked.public_key receiver)
@@ -1586,6 +1626,9 @@ module Base = struct
              and token_id =
                Token_id.Checked.if_ is_empty_and_writeable ~then_:token
                  ~else_:account.token_id
+             and token_owner =
+               Boolean.if_ is_empty_and_writeable ~then_:creating_new_token
+                 ~else_:account.token_owner
              in
              { Account.Poly.balance
              ; public_key
@@ -1886,18 +1929,16 @@ module Base = struct
 
   let transaction_union_proof ?(preeval = false) ~constraint_constants
       ~proving_key sok_digest state1 state2 init_stack
-      pending_coinbase_stack_state next_available_token
-      (transaction : Transaction_union.t) state_body handler =
+      pending_coinbase_stack_state next_available_token_before
+      next_available_token_after (transaction : Transaction_union.t) state_body
+      handler =
     if preeval then failwith "preeval currently disabled" ;
     let prover_state : Prover_state.t =
       {state1; state2; sok_digest; pending_coinbase_stack_state}
     in
     let handler =
       transaction_union_handler handler transaction state_body init_stack
-        next_available_token
-    in
-    let next_available_token_after =
-      Transaction_union.next_available_token transaction next_available_token
+        next_available_token_before
     in
     let main top_hash = handle (main ~constraint_constants top_hash) handler in
     let statement : Statement.With_sok.t =
@@ -1906,7 +1947,7 @@ module Base = struct
       ; supply_increase= Transaction_union.supply_increase transaction
       ; pending_coinbase_stack_state
       ; fee_excess= Transaction_union.fee_excess transaction
-      ; next_available_token_before= next_available_token
+      ; next_available_token_before
       ; next_available_token_after
       ; proof_type= ()
       ; sok_digest }
@@ -2419,7 +2460,8 @@ module type S = sig
     -> target:Frozen_ledger_hash.t
     -> init_stack:Pending_coinbase.Stack.t
     -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
-    -> next_available_token:Token_id.t
+    -> next_available_token_before:Token_id.t
+    -> next_available_token_after:Token_id.t
     -> Transaction.t Transaction_protocol_state.t
     -> Tick.Handler.t
     -> t
@@ -2431,7 +2473,8 @@ module type S = sig
     -> target:Frozen_ledger_hash.t
     -> init_stack:Pending_coinbase.Stack.t
     -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
-    -> next_available_token:Token_id.t
+    -> next_available_token_before:Token_id.t
+    -> next_available_token_after:Token_id.t
     -> User_command.With_valid_signature.t Transaction_protocol_state.t
     -> Tick.Handler.t
     -> t
@@ -2443,7 +2486,8 @@ module type S = sig
     -> target:Frozen_ledger_hash.t
     -> init_stack:Pending_coinbase.Stack.t
     -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
-    -> next_available_token:Token_id.t
+    -> next_available_token_before:Token_id.t
+    -> next_available_token_after:Token_id.t
     -> Fee_transfer.t Transaction_protocol_state.t
     -> Tick.Handler.t
     -> t
@@ -2453,7 +2497,8 @@ end
 
 let check_transaction_union ?(preeval = false) ~constraint_constants
     sok_message source target init_stack pending_coinbase_stack_state
-    next_available_token transaction state_body handler =
+    next_available_token_before next_available_token_after transaction
+    state_body handler =
   if preeval then failwith "preeval currently disabled" ;
   let sok_digest = Sok_message.digest sok_message in
   let prover_state : Base.Prover_state.t =
@@ -2461,10 +2506,7 @@ let check_transaction_union ?(preeval = false) ~constraint_constants
   in
   let handler =
     Base.transaction_union_handler handler transaction state_body init_stack
-      next_available_token
-  in
-  let next_available_token_after =
-    Transaction_union.next_available_token transaction next_available_token
+      next_available_token_before
   in
   let statement : Statement.With_sok.t =
     { source
@@ -2472,7 +2514,7 @@ let check_transaction_union ?(preeval = false) ~constraint_constants
     ; supply_increase= Transaction_union.supply_increase transaction
     ; pending_coinbase_stack_state
     ; fee_excess= Transaction_union.fee_excess transaction
-    ; next_available_token_before= next_available_token
+    ; next_available_token_before
     ; next_available_token_after
     ; proof_type= ()
     ; sok_digest }
@@ -2488,7 +2530,8 @@ let check_transaction_union ?(preeval = false) ~constraint_constants
   Or_error.ok_exn (run_and_check main prover_state) |> ignore
 
 let check_transaction ?preeval ~constraint_constants ~sok_message ~source
-    ~target ~init_stack ~pending_coinbase_stack_state ~next_available_token
+    ~target ~init_stack ~pending_coinbase_stack_state
+    ~next_available_token_before ~next_available_token_after
     (transaction_in_block : Transaction.t Transaction_protocol_state.t) handler
     =
   let transaction =
@@ -2498,22 +2541,25 @@ let check_transaction ?preeval ~constraint_constants ~sok_message ~source
     Transaction_protocol_state.block_data transaction_in_block
   in
   check_transaction_union ?preeval ~constraint_constants sok_message source
-    target init_stack pending_coinbase_stack_state next_available_token
+    target init_stack pending_coinbase_stack_state next_available_token_before
+    next_available_token_after
     (Transaction_union.of_transaction transaction)
     state_body handler
 
 let check_user_command ~constraint_constants ~sok_message ~source ~target
-    ~init_stack ~pending_coinbase_stack_state ~next_available_token t_in_block
-    handler =
+    ~init_stack ~pending_coinbase_stack_state ~next_available_token_before
+    ~next_available_token_after t_in_block handler =
   let user_command = Transaction_protocol_state.transaction t_in_block in
   check_transaction ~constraint_constants ~sok_message ~source ~target
-    ~init_stack ~pending_coinbase_stack_state ~next_available_token
+    ~init_stack ~pending_coinbase_stack_state ~next_available_token_before
+    ~next_available_token_after
     {t_in_block with transaction= User_command user_command}
     handler
 
 let generate_transaction_union_witness ?(preeval = false) ~constraint_constants
     sok_message source target transaction_in_block init_stack
-    next_available_token pending_coinbase_stack_state handler =
+    next_available_token_before next_available_token_after
+    pending_coinbase_stack_state handler =
   if preeval then failwith "preeval currently disabled" ;
   let transaction =
     Transaction_protocol_state.transaction transaction_in_block
@@ -2527,10 +2573,7 @@ let generate_transaction_union_witness ?(preeval = false) ~constraint_constants
   in
   let handler =
     Base.transaction_union_handler handler transaction state_body init_stack
-      next_available_token
-  in
-  let next_available_token_after =
-    Transaction_union.next_available_token transaction next_available_token
+      next_available_token_before
   in
   let statement : Statement.With_sok.t =
     { source
@@ -2538,7 +2581,7 @@ let generate_transaction_union_witness ?(preeval = false) ~constraint_constants
     ; supply_increase= Transaction_union.supply_increase transaction
     ; pending_coinbase_stack_state
     ; fee_excess= Transaction_union.fee_excess transaction
-    ; next_available_token_before= next_available_token
+    ; next_available_token_before
     ; next_available_token_after
     ; proof_type= ()
     ; sok_digest }
@@ -2552,7 +2595,7 @@ let generate_transaction_union_witness ?(preeval = false) ~constraint_constants
 
 let generate_transaction_witness ?preeval ~constraint_constants ~sok_message
     ~source ~target ~init_stack ~pending_coinbase_stack_state
-    ~next_available_token
+    ~next_available_token_before ~next_available_token_after
     (transaction_in_block : Transaction.t Transaction_protocol_state.t) handler
     =
   let transaction =
@@ -2562,7 +2605,8 @@ let generate_transaction_witness ?preeval ~constraint_constants ~sok_message
     source target
     { transaction_in_block with
       transaction= Transaction_union.of_transaction transaction }
-    init_stack next_available_token pending_coinbase_stack_state handler
+    init_stack next_available_token_before next_available_token_after
+    pending_coinbase_stack_state handler
 
 let verification_keys_of_keys {Keys0.verification; _} = verification
 
@@ -2638,29 +2682,29 @@ struct
         top_hash )
 
   let of_transaction_union ?preeval ~constraint_constants sok_digest source
-      target ~init_stack ~pending_coinbase_stack_state ~next_available_token
-      transaction state_body handler =
+      target ~init_stack ~pending_coinbase_stack_state
+      ~next_available_token_before ~next_available_token_after transaction
+      state_body handler =
     let top_hash, proof =
       Base.transaction_union_proof ?preeval ~constraint_constants sok_digest
         ~proving_key:keys.proving.base source target init_stack
-        pending_coinbase_stack_state next_available_token transaction
-        state_body handler
+        pending_coinbase_stack_state next_available_token_before
+        next_available_token_after transaction state_body handler
     in
     { source
     ; sok_digest
     ; target
     ; proof_type= `Base
     ; fee_excess= Transaction_union.fee_excess transaction
-    ; next_available_token_before= next_available_token
-    ; next_available_token_after=
-        Transaction_union.next_available_token transaction next_available_token
+    ; next_available_token_before
+    ; next_available_token_after
     ; pending_coinbase_stack_state
     ; supply_increase= Transaction_union.supply_increase transaction
     ; proof= wrap `Base proof top_hash }
 
   let of_transaction ?preeval ~constraint_constants ~sok_digest ~source ~target
-      ~init_stack ~pending_coinbase_stack_state ~next_available_token
-      transaction_in_block handler =
+      ~init_stack ~pending_coinbase_stack_state ~next_available_token_before
+      ~next_available_token_after transaction_in_block handler =
     let transaction =
       Transaction_protocol_state.transaction transaction_in_block
     in
@@ -2668,15 +2712,17 @@ struct
       Transaction_protocol_state.block_data transaction_in_block
     in
     of_transaction_union ?preeval ~constraint_constants sok_digest source
-      target ~init_stack ~pending_coinbase_stack_state ~next_available_token
+      target ~init_stack ~pending_coinbase_stack_state
+      ~next_available_token_before ~next_available_token_after
       (Transaction_union.of_transaction transaction)
       state_body handler
 
   let of_user_command ~constraint_constants ~sok_digest ~source ~target
-      ~init_stack ~pending_coinbase_stack_state ~next_available_token
-      user_command_in_block handler =
+      ~init_stack ~pending_coinbase_stack_state ~next_available_token_before
+      ~next_available_token_after user_command_in_block handler =
     of_transaction ~constraint_constants ~sok_digest ~source ~target
-      ~init_stack ~pending_coinbase_stack_state ~next_available_token
+      ~init_stack ~pending_coinbase_stack_state ~next_available_token_before
+      ~next_available_token_after
       { user_command_in_block with
         transaction=
           User_command
@@ -2684,10 +2730,11 @@ struct
       handler
 
   let of_fee_transfer ~constraint_constants ~sok_digest ~source ~target
-      ~init_stack ~pending_coinbase_stack_state ~next_available_token
-      transfer_in_block handler =
+      ~init_stack ~pending_coinbase_stack_state ~next_available_token_before
+      ~next_available_token_after transfer_in_block handler =
     of_transaction ~constraint_constants ~sok_digest ~source ~target
-      ~init_stack ~pending_coinbase_stack_state ~next_available_token
+      ~init_stack ~pending_coinbase_stack_state ~next_available_token_before
+      ~next_available_token_after
       { transfer_in_block with
         transaction=
           Fee_transfer
@@ -2933,9 +2980,11 @@ let%test_module "transaction_snark" =
       let merkle_root t = Frozen_ledger_hash.of_ledger_hash @@ merkle_root t
 
       let merkle_root_after_user_command_exn t ~txn_global_slot txn =
-        Frozen_ledger_hash.of_ledger_hash
-        @@ merkle_root_after_user_command_exn ~constraint_constants
-             ~txn_global_slot t txn
+        let hash, `Next_available_token tid =
+          merkle_root_after_user_command_exn ~constraint_constants
+            ~txn_global_slot t txn
+        in
+        (Frozen_ledger_hash.of_ledger_hash hash, `Next_available_token tid)
     end
 
     module Sparse_ledger = struct
@@ -3034,18 +3083,18 @@ let%test_module "transaction_snark" =
         Coda_state.Protocol_state.Body.consensus_state state_body
         |> Consensus.Data.Consensus_state.curr_slot
       in
-      let target =
+      let next_available_token_before = Ledger.next_available_token ledger in
+      let target, `Next_available_token next_available_token_after =
         Ledger.merkle_root_after_user_command_exn ledger
           ~txn_global_slot:current_global_slot user_command
       in
-      let next_available_token = Ledger.next_available_token ledger in
       let user_command_in_block =
         { Transaction_protocol_state.Poly.transaction= user_command
         ; block_data= state_body }
       in
       of_user_command ~constraint_constants ~sok_digest ~source ~target
-        ~init_stack ~pending_coinbase_stack_state ~next_available_token
-        user_command_in_block handler
+        ~init_stack ~pending_coinbase_stack_state ~next_available_token_before
+        ~next_available_token_after user_command_in_block handler
 
     (*
                 ~proposer:
@@ -3104,6 +3153,15 @@ let%test_module "transaction_snark" =
             Sparse_ledger.of_ledger_subset_exn ledger
               [producer_id; receiver_id; other_id]
           in
+          let sparse_ledger_after =
+            Sparse_ledger.apply_transaction_exn ~constraint_constants
+              sparse_ledger
+              ~txn_global_slot:
+                ( txn_in_block.block_data
+                |> Coda_state.Protocol_state.Body.consensus_state
+                |> Consensus.Data.Consensus_state.curr_global_slot )
+              txn_in_block.transaction
+          in
           check_transaction txn_in_block
             (unstage (Sparse_ledger.handler sparse_ledger))
             ~constraint_constants
@@ -3111,12 +3169,10 @@ let%test_module "transaction_snark" =
               (Coda_base.Sok_message.create ~fee:Currency.Fee.zero
                  ~prover:Public_key.Compressed.empty)
             ~source:(Sparse_ledger.merkle_root sparse_ledger)
-            ~target:
-              Sparse_ledger.(
-                merkle_root
-                  (apply_transaction_exn ~constraint_constants sparse_ledger
-                     txn_in_block.transaction))
-            ~next_available_token:(Ledger.next_available_token ledger)
+            ~target:(Sparse_ledger.merkle_root sparse_ledger_after)
+            ~next_available_token_before:(Ledger.next_available_token ledger)
+            ~next_available_token_after:
+              (Sparse_ledger.next_available_token sparse_ledger_after)
             ~init_stack:pending_coinbase_init
             ~pending_coinbase_stack_state:
               {source= source_stack; target= pending_coinbase_stack_target} )
@@ -3153,12 +3209,17 @@ let%test_module "transaction_snark" =
                 Coda_state.Protocol_state.Body.consensus_state state_body
                 |> Consensus.Data.Consensus_state.curr_slot
               in
-              let target =
+              let next_available_token_before =
+                Ledger.next_available_token ledger
+              in
+              let target, `Next_available_token next_available_token_after =
                 Ledger.merkle_root_after_user_command_exn ledger
                   ~txn_global_slot:current_global_slot t1
               in
               let mentioned_keys =
-                User_command.accounts_accessed (t1 :> User_command.t)
+                User_command.accounts_accessed
+                  ~next_available_token:next_available_token_before
+                  (User_command.forget_check t1)
               in
               let sparse_ledger =
                 Sparse_ledger.of_ledger_subset_exn ledger mentioned_keys
@@ -3179,8 +3240,8 @@ let%test_module "transaction_snark" =
               check_user_command ~constraint_constants ~sok_message
                 ~source:(Ledger.merkle_root ledger)
                 ~target ~init_stack:pending_coinbase_stack
-                ~pending_coinbase_stack_state
-                ~next_available_token:(Ledger.next_available_token ledger)
+                ~pending_coinbase_stack_state ~next_available_token_before
+                ~next_available_token_after
                 {transaction= t1; block_data= state_body}
                 (unstage @@ Sparse_ledger.handler sparse_ledger) ) )
 
@@ -3189,6 +3250,7 @@ let%test_module "transaction_snark" =
     let test_transaction ~constraint_constants ?txn_global_slot ledger txn =
       let source = Ledger.merkle_root ledger in
       let pending_coinbase_stack = Pending_coinbase.Stack.empty in
+      let next_available_token = Ledger.next_available_token ledger in
       let state_body, state_body_hash, txn_global_slot =
         match txn_global_slot with
         | None ->
@@ -3233,7 +3295,8 @@ let%test_module "transaction_snark" =
         in
         match txn with
         | Transaction.User_command uc ->
-            ( User_command.accounts_accessed (uc :> User_command.t)
+            ( User_command.accounts_accessed ~next_available_token
+                (uc :> User_command.t)
             , pending_coinbase_stack )
         | Fee_transfer ft ->
             (Fee_transfer.receivers ft, pending_coinbase_stack)
@@ -3260,7 +3323,8 @@ let%test_module "transaction_snark" =
         ~pending_coinbase_stack_state:
           { Pending_coinbase_stack_state.source= pending_coinbase_stack
           ; target= pending_coinbase_stack_target }
-        ~next_available_token:(Ledger.next_available_token ledger)
+        ~next_available_token_before:next_available_token
+        ~next_available_token_after:(Ledger.next_available_token ledger)
         {transaction= txn; block_data= state_body}
         (unstage @@ Sparse_ledger.handler sparse_ledger)
 
@@ -3439,7 +3503,13 @@ let%test_module "transaction_snark" =
                 Sparse_ledger.of_ledger_subset_exn ledger
                   (List.concat_map
                      ~f:(fun t ->
-                       User_command.accounts_accessed (t :> User_command.t) )
+                       (* NB: Shouldn't assume the same next_available_token
+                          for each command normally, but we know statically
+                          that these are payments in this test.
+                       *)
+                       User_command.accounts_accessed
+                         ~next_available_token:next_available_token1
+                         (User_command.forget_check t) )
                      [t1; t2])
               in
               let init_stack1 = Pending_coinbase.Stack.empty in
@@ -3467,14 +3537,14 @@ let%test_module "transaction_snark" =
                   pending_coinbase_stack_state1 state_body1
                   (unstage @@ Sparse_ledger.handler sparse_ledger)
               in
-              let sparse_ledger =
-                Sparse_ledger.apply_user_command_exn ~constraint_constants
-                  sparse_ledger
-                  (t1 :> User_command.t)
-              in
               let current_global_slot =
                 Coda_state.Protocol_state.Body.consensus_state state_body1
                 |> Consensus.Data.Consensus_state.curr_slot
+              in
+              let sparse_ledger =
+                Sparse_ledger.apply_user_command_exn ~constraint_constants
+                  ~txn_global_slot:current_global_slot sparse_ledger
+                  (t1 :> User_command.t)
               in
               let pending_coinbase_stack_state2, state_body2, init_stack2 =
                 let previous_stack = pending_coinbase_stack_state1.target in
@@ -3517,19 +3587,19 @@ let%test_module "transaction_snark" =
                   pending_coinbase_stack_state2 state_body2
                   (unstage @@ Sparse_ledger.handler sparse_ledger)
               in
+              let current_global_slot =
+                Coda_state.Protocol_state.Body.consensus_state state_body2
+                |> Consensus.Data.Consensus_state.curr_slot
+              in
               let sparse_ledger =
                 Sparse_ledger.apply_user_command_exn ~constraint_constants
-                  sparse_ledger
+                  ~txn_global_slot:current_global_slot sparse_ledger
                   (t2 :> User_command.t)
               in
               let pending_coinbase_stack_state_merge =
                 Pending_coinbase_stack_state.
                   { source= pending_coinbase_stack_state1.source
                   ; target= pending_coinbase_stack_state2.target }
-              in
-              let current_global_slot =
-                Coda_state.Protocol_state.Body.consensus_state state_body2
-                |> Consensus.Data.Consensus_state.curr_slot
               in
               Ledger.apply_user_command ledger ~constraint_constants
                 ~txn_global_slot:current_global_slot t2
@@ -3624,8 +3694,12 @@ let%test_module "transaction_snark" =
       test_base_and_merge ~state_hash_and_body1 ~state_hash_and_body2
         ~carryforward1:false ~carryforward2:false
 
+    let create_account pk token balance =
+      Account.create (Account_id.create pk token) (Balance.of_int balance)
+
     let test_user_command_with_accounts ~constraint_constants ~ledger ~accounts
-        ~signer ~fee ~fee_payer_pk ~fee_token ?memo ~valid_until ~nonce body =
+        ~signer ~fee ~fee_payer_pk ~fee_token ?memo
+        ?(valid_until = Global_slot.max_value) ?nonce body =
       let memo =
         match memo with
         | Some memo ->
@@ -3639,65 +3713,82 @@ let%test_module "transaction_snark" =
           Ledger.create_new_account_exn ledger
             (Account.identifier account)
             account ) ;
+      let get_account aid =
+        Option.bind
+          (Ledger.location_of_account ledger aid)
+          ~f:(Ledger.get ledger)
+      in
+      let nonce =
+        match nonce with
+        | Some nonce ->
+            nonce
+        | None -> (
+          match get_account (Account_id.create fee_payer_pk fee_token) with
+          | Some {nonce; _} ->
+              nonce
+          | None ->
+              failwith
+                "Could not infer a valid nonce for this test. Provide one \
+                 explicitly" )
+      in
       let payload =
         User_command.Payload.create ~fee ~fee_payer_pk ~fee_token ~nonce
           ~valid_until ~memo ~body
       in
+      let signer = Keypair.of_private_key_exn signer in
       let user_command = User_command.sign signer payload in
-      test_transaction ~constraint_constants ledger (User_command user_command)
+      let next_available_token = Ledger.next_available_token ledger in
+      test_transaction ~constraint_constants ledger (User_command user_command) ;
+      let fee_payer = User_command.Payload.fee_payer payload in
+      let source = User_command.Payload.source ~next_available_token payload in
+      let receiver =
+        User_command.Payload.receiver ~next_available_token payload
+      in
+      let fee_payer_account = get_account fee_payer in
+      let source_account = get_account source in
+      let receiver_account = get_account receiver in
+      ( `Fee_payer_account fee_payer_account
+      , `Source_account source_account
+      , `Receiver_account receiver_account )
 
     let random_int_incl l u = Quickcheck.random_value (Int.gen_incl l u)
+
+    let sub_amount amt bal = Option.value_exn (Balance.sub_amount bal amt)
+
+    let add_amount amt bal = Option.value_exn (Balance.add_amount bal amt)
+
+    let sub_fee fee = sub_amount (Amount.of_fee fee)
 
     let%test_unit "transfer non-default tokens to a new account: fails but \
                    charges fee" =
       Test_util.with_randomness 123456789 (fun () ->
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               let wallets = random_wallets ~n:2 () in
-              let signer =
-                Keypair.of_private_key_exn wallets.(0).private_key
-              in
-              let fee_payer_pk = Public_key.compress signer.public_key in
+              let signer = wallets.(0).private_key in
+              let fee_payer_pk = wallets.(0).account.public_key in
               let source_pk = fee_payer_pk in
               let receiver_pk = wallets.(1).account.public_key in
               let fee_token = Token_id.default in
               let token_id =
                 Quickcheck.random_value Token_id.gen_non_default
               in
-              let fee_payer = Account_id.create fee_payer_pk fee_token in
-              let source = Account_id.create source_pk token_id in
-              let receiver = Account_id.create receiver_pk token_id in
-              let create_account aid balance =
-                Account.create aid (Balance.of_int balance)
-              in
               let accounts =
-                [| create_account fee_payer 20_000_000_000
-                 ; create_account source 30_000_000_000 |]
+                [| create_account fee_payer_pk fee_token 20_000_000_000
+                 ; create_account source_pk token_id 30_000_000_000 |]
               in
               let fee = Fee.of_int (random_int_incl 2 15 * 1_000_000_000) in
               let amount =
                 Amount.of_int (random_int_incl 0 30 * 1_000_000_000)
               in
-              let valid_until = Global_slot.max_value in
-              let nonce = accounts.(0).nonce in
-              let () =
+              let ( `Fee_payer_account fee_payer_account
+                  , `Source_account source_account
+                  , `Receiver_account receiver_account ) =
                 test_user_command_with_accounts ~constraint_constants ~ledger
-                  ~accounts ~signer ~fee ~fee_payer_pk ~fee_token ~valid_until
-                  ~nonce
+                  ~accounts ~signer ~fee ~fee_payer_pk ~fee_token
                   (Payment {source_pk; receiver_pk; token_id; amount})
               in
-              let get_account aid =
-                Option.bind
-                  (Ledger.location_of_account ledger aid)
-                  ~f:(Ledger.get ledger)
-              in
-              let fee_payer_account =
-                Option.value_exn (get_account fee_payer)
-              in
-              let source_account = Option.value_exn (get_account source) in
-              let receiver_account = get_account receiver in
-              let sub_fee fee bal =
-                Option.value_exn (Balance.sub_amount bal (Amount.of_fee fee))
-              in
+              let fee_payer_account = Option.value_exn fee_payer_account in
+              let source_account = Option.value_exn source_account in
               let expected_fee_payer_balance =
                 accounts.(0).balance |> sub_fee fee
               in
@@ -3711,56 +3802,33 @@ let%test_module "transaction_snark" =
       Test_util.with_randomness 123456789 (fun () ->
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               let wallets = random_wallets ~n:2 () in
-              let signer =
-                Keypair.of_private_key_exn wallets.(0).private_key
-              in
-              let fee_payer_pk = Public_key.compress signer.public_key in
+              let signer = wallets.(0).private_key in
+              let fee_payer_pk = wallets.(0).account.public_key in
               let source_pk = fee_payer_pk in
               let receiver_pk = wallets.(1).account.public_key in
               let fee_token = Token_id.default in
               let token_id =
                 Quickcheck.random_value Token_id.gen_non_default
               in
-              let fee_payer = Account_id.create fee_payer_pk fee_token in
-              let source = Account_id.create source_pk token_id in
-              let receiver = Account_id.create receiver_pk token_id in
-              let create_account aid balance =
-                Account.create aid (Balance.of_int balance)
-              in
               let accounts =
-                [| create_account fee_payer 20_000_000_000
-                 ; create_account source 30_000_000_000
-                 ; create_account receiver 0 |]
+                [| create_account fee_payer_pk fee_token 20_000_000_000
+                 ; create_account source_pk token_id 30_000_000_000
+                 ; create_account receiver_pk token_id 0 |]
               in
               let fee = Fee.of_int (random_int_incl 2 15 * 1_000_000_000) in
               let amount =
                 Amount.of_int (random_int_incl 0 30 * 1_000_000_000)
               in
-              let valid_until = Global_slot.max_value in
-              let nonce = accounts.(0).nonce in
-              let () =
+              let ( `Fee_payer_account fee_payer_account
+                  , `Source_account source_account
+                  , `Receiver_account receiver_account ) =
                 test_user_command_with_accounts ~constraint_constants ~ledger
-                  ~accounts ~signer ~fee ~fee_payer_pk ~fee_token ~valid_until
-                  ~nonce
+                  ~accounts ~signer ~fee ~fee_payer_pk ~fee_token
                   (Payment {source_pk; receiver_pk; token_id; amount})
               in
-              let get_account aid =
-                Option.bind
-                  (Ledger.location_of_account ledger aid)
-                  ~f:(Ledger.get ledger)
-              in
-              let fee_payer_account =
-                Option.value_exn (get_account fee_payer)
-              in
-              let source_account = Option.value_exn (get_account source) in
-              let receiver_account = Option.value_exn (get_account receiver) in
-              let sub_amount amt bal =
-                Option.value_exn (Balance.sub_amount bal amt)
-              in
-              let add_amount amt bal =
-                Option.value_exn (Balance.add_amount bal amt)
-              in
-              let sub_fee fee = sub_amount (Amount.of_fee fee) in
+              let fee_payer_account = Option.value_exn fee_payer_account in
+              let source_account = Option.value_exn source_account in
+              let receiver_account = Option.value_exn receiver_account in
               let expected_fee_payer_balance =
                 accounts.(0).balance |> sub_fee fee
               in
@@ -3784,52 +3852,31 @@ let%test_module "transaction_snark" =
       Test_util.with_randomness 123456789 (fun () ->
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               let wallets = random_wallets ~n:2 () in
-              let signer =
-                Keypair.of_private_key_exn wallets.(0).private_key
-              in
-              let fee_payer_pk = Public_key.compress signer.public_key in
+              let signer = wallets.(0).private_key in
+              let fee_payer_pk = wallets.(0).account.public_key in
               let source_pk = fee_payer_pk in
               let receiver_pk = wallets.(1).account.public_key in
               let fee_token = Token_id.default in
               let token_id =
                 Quickcheck.random_value Token_id.gen_non_default
               in
-              let fee_payer = Account_id.create fee_payer_pk fee_token in
-              let source = Account_id.create source_pk token_id in
-              let receiver = Account_id.create receiver_pk token_id in
-              let create_account aid balance =
-                Account.create aid (Balance.of_int balance)
-              in
               let accounts =
-                [| create_account fee_payer 20_000_000_000
-                 ; create_account source 30_000_000_000 |]
+                [| create_account fee_payer_pk fee_token 20_000_000_000
+                 ; create_account source_pk token_id 30_000_000_000 |]
               in
               let fee = Fee.of_int 20_000_000_000 in
               let amount =
                 Amount.of_int (random_int_incl 0 30 * 1_000_000_000)
               in
-              let valid_until = Global_slot.max_value in
-              let nonce = accounts.(0).nonce in
-              let () =
+              let ( `Fee_payer_account fee_payer_account
+                  , `Source_account source_account
+                  , `Receiver_account receiver_account ) =
                 test_user_command_with_accounts ~constraint_constants ~ledger
-                  ~accounts ~signer ~fee ~fee_payer_pk ~fee_token ~valid_until
-                  ~nonce
+                  ~accounts ~signer ~fee ~fee_payer_pk ~fee_token
                   (Payment {source_pk; receiver_pk; token_id; amount})
               in
-              let get_account aid =
-                Option.bind
-                  (Ledger.location_of_account ledger aid)
-                  ~f:(Ledger.get ledger)
-              in
-              let fee_payer_account =
-                Option.value_exn (get_account fee_payer)
-              in
-              let source_account = Option.value_exn (get_account source) in
-              let receiver_account = get_account receiver in
-              let sub_amount amt bal =
-                Option.value_exn (Balance.sub_amount bal amt)
-              in
-              let sub_fee fee = sub_amount (Amount.of_fee fee) in
+              let fee_payer_account = Option.value_exn fee_payer_account in
+              let source_account = Option.value_exn source_account in
               let expected_fee_payer_balance =
                 accounts.(0).balance |> sub_fee fee
               in
@@ -3846,50 +3893,29 @@ let%test_module "transaction_snark" =
       Test_util.with_randomness 123456789 (fun () ->
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               let wallets = random_wallets ~n:2 () in
-              let signer =
-                Keypair.of_private_key_exn wallets.(0).private_key
-              in
-              let fee_payer_pk = Public_key.compress signer.public_key in
+              let signer = wallets.(0).private_key in
+              let fee_payer_pk = wallets.(0).account.public_key in
               let source_pk = fee_payer_pk in
               let receiver_pk = wallets.(1).account.public_key in
               let fee_token = Token_id.default in
               let token_id =
                 Quickcheck.random_value Token_id.gen_non_default
               in
-              let fee_payer = Account_id.create fee_payer_pk fee_token in
-              let source = Account_id.create source_pk token_id in
-              let receiver = Account_id.create receiver_pk token_id in
-              let create_account aid balance =
-                Account.create aid (Balance.of_int balance)
-              in
               let accounts =
-                [| create_account fee_payer 20_000_000_000
-                 ; create_account source 30_000_000_000 |]
+                [| create_account fee_payer_pk fee_token 20_000_000_000
+                 ; create_account source_pk token_id 30_000_000_000 |]
               in
               let fee = Fee.of_int (random_int_incl 2 15 * 1_000_000_000) in
               let amount = Amount.of_int 40_000_000_000 in
-              let valid_until = Global_slot.max_value in
-              let nonce = accounts.(0).nonce in
-              let () =
+              let ( `Fee_payer_account fee_payer_account
+                  , `Source_account source_account
+                  , `Receiver_account receiver_account ) =
                 test_user_command_with_accounts ~constraint_constants ~ledger
-                  ~accounts ~signer ~fee ~fee_payer_pk ~fee_token ~valid_until
-                  ~nonce
+                  ~accounts ~signer ~fee ~fee_payer_pk ~fee_token
                   (Payment {source_pk; receiver_pk; token_id; amount})
               in
-              let get_account aid =
-                Option.bind
-                  (Ledger.location_of_account ledger aid)
-                  ~f:(Ledger.get ledger)
-              in
-              let fee_payer_account =
-                Option.value_exn (get_account fee_payer)
-              in
-              let source_account = Option.value_exn (get_account source) in
-              let receiver_account = get_account receiver in
-              let sub_amount amt bal =
-                Option.value_exn (Balance.sub_amount bal amt)
-              in
-              let sub_fee fee = sub_amount (Amount.of_fee fee) in
+              let fee_payer_account = Option.value_exn fee_payer_account in
+              let source_account = Option.value_exn source_account in
               let expected_fee_payer_balance =
                 accounts.(0).balance |> sub_fee fee
               in
@@ -3905,47 +3931,27 @@ let%test_module "transaction_snark" =
       Test_util.with_randomness 123456789 (fun () ->
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               let wallets = random_wallets ~n:2 () in
-              let signer =
-                Keypair.of_private_key_exn wallets.(0).private_key
-              in
-              let fee_payer_pk = Public_key.compress signer.public_key in
+              let signer = wallets.(0).private_key in
+              let fee_payer_pk = wallets.(0).account.public_key in
               let source_pk = fee_payer_pk in
               let receiver_pk = wallets.(1).account.public_key in
               let fee_token = Token_id.default in
               let token_id =
                 Quickcheck.random_value Token_id.gen_non_default
               in
-              let fee_payer = Account_id.create fee_payer_pk fee_token in
-              let source = Account_id.create source_pk token_id in
-              let receiver = Account_id.create receiver_pk token_id in
-              let create_account aid balance =
-                Account.create aid (Balance.of_int balance)
+              let accounts =
+                [|create_account fee_payer_pk fee_token 20_000_000_000|]
               in
-              let accounts = [|create_account fee_payer 20_000_000_000|] in
               let fee = Fee.of_int (random_int_incl 2 15 * 1_000_000_000) in
               let amount = Amount.of_int 20_000_000_000 in
-              let valid_until = Global_slot.max_value in
-              let nonce = accounts.(0).nonce in
-              let () =
+              let ( `Fee_payer_account fee_payer_account
+                  , `Source_account source_account
+                  , `Receiver_account receiver_account ) =
                 test_user_command_with_accounts ~constraint_constants ~ledger
-                  ~accounts ~signer ~fee ~fee_payer_pk ~fee_token ~valid_until
-                  ~nonce
+                  ~accounts ~signer ~fee ~fee_payer_pk ~fee_token
                   (Payment {source_pk; receiver_pk; token_id; amount})
               in
-              let get_account aid =
-                Option.bind
-                  (Ledger.location_of_account ledger aid)
-                  ~f:(Ledger.get ledger)
-              in
-              let fee_payer_account =
-                Option.value_exn (get_account fee_payer)
-              in
-              let source_account = get_account source in
-              let receiver_account = get_account receiver in
-              let sub_amount amt bal =
-                Option.value_exn (Balance.sub_amount bal amt)
-              in
-              let sub_fee fee = sub_amount (Amount.of_fee fee) in
+              let fee_payer_account = Option.value_exn fee_payer_account in
               let expected_fee_payer_balance =
                 accounts.(0).balance |> sub_fee fee
               in
@@ -3959,50 +3965,29 @@ let%test_module "transaction_snark" =
       Test_util.with_randomness 123456789 (fun () ->
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               let wallets = random_wallets ~n:3 () in
-              let signer =
-                Keypair.of_private_key_exn wallets.(0).private_key
-              in
-              let fee_payer_pk = Public_key.compress signer.public_key in
+              let signer = wallets.(0).private_key in
+              let fee_payer_pk = wallets.(0).account.public_key in
               let source_pk = wallets.(1).account.public_key in
               let receiver_pk = wallets.(2).account.public_key in
               let fee_token = Token_id.default in
               let token_id =
                 Quickcheck.random_value Token_id.gen_non_default
               in
-              let fee_payer = Account_id.create fee_payer_pk fee_token in
-              let source = Account_id.create source_pk token_id in
-              let receiver = Account_id.create receiver_pk token_id in
-              let create_account aid balance =
-                Account.create aid (Balance.of_int balance)
-              in
               let accounts =
-                [| create_account fee_payer 20_000_000_000
-                 ; create_account source 30_000_000_000 |]
+                [| create_account fee_payer_pk fee_token 20_000_000_000
+                 ; create_account source_pk token_id 30_000_000_000 |]
               in
               let fee = Fee.of_int (random_int_incl 2 15 * 1_000_000_000) in
               let amount = Amount.of_int 20_000_000_000 in
-              let valid_until = Global_slot.max_value in
-              let nonce = accounts.(0).nonce in
-              let () =
+              let ( `Fee_payer_account fee_payer_account
+                  , `Source_account source_account
+                  , `Receiver_account receiver_account ) =
                 test_user_command_with_accounts ~constraint_constants ~ledger
-                  ~accounts ~signer ~fee ~fee_payer_pk ~fee_token ~valid_until
-                  ~nonce
+                  ~accounts ~signer ~fee ~fee_payer_pk ~fee_token
                   (Payment {source_pk; receiver_pk; token_id; amount})
               in
-              let get_account aid =
-                Option.bind
-                  (Ledger.location_of_account ledger aid)
-                  ~f:(Ledger.get ledger)
-              in
-              let fee_payer_account =
-                Option.value_exn (get_account fee_payer)
-              in
-              let source_account = Option.value_exn (get_account source) in
-              let receiver_account = get_account receiver in
-              let sub_amount amt bal =
-                Option.value_exn (Balance.sub_amount bal amt)
-              in
-              let sub_fee fee = sub_amount (Amount.of_fee fee) in
+              let fee_payer_account = Option.value_exn fee_payer_account in
+              let source_account = Option.value_exn source_account in
               let expected_fee_payer_balance =
                 accounts.(0).balance |> sub_fee fee
               in
@@ -4018,50 +4003,29 @@ let%test_module "transaction_snark" =
       Test_util.with_randomness 123456789 (fun () ->
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               let wallets = random_wallets ~n:3 () in
-              let signer =
-                Keypair.of_private_key_exn wallets.(0).private_key
-              in
-              let fee_payer_pk = Public_key.compress signer.public_key in
+              let signer = wallets.(0).private_key in
+              let fee_payer_pk = wallets.(0).account.public_key in
               let source_pk = wallets.(1).account.public_key in
               let receiver_pk = wallets.(2).account.public_key in
               let fee_token = Token_id.default in
               let token_id = Token_id.default in
-              let fee_payer = Account_id.create fee_payer_pk fee_token in
-              let source = Account_id.create source_pk token_id in
-              let receiver = Account_id.create receiver_pk token_id in
-              let create_account aid balance =
-                Account.create aid (Balance.of_int balance)
-              in
               let accounts =
-                [| create_account fee_payer 20_000_000_000
-                 ; create_account source 30_000_000_000
-                 ; create_account receiver 30_000_000_000 |]
+                [| create_account fee_payer_pk fee_token 20_000_000_000
+                 ; create_account source_pk token_id 30_000_000_000
+                 ; create_account receiver_pk token_id 30_000_000_000 |]
               in
               let fee = Fee.of_int (random_int_incl 2 15 * 1_000_000_000) in
-              let valid_until = Global_slot.max_value in
-              let nonce = accounts.(0).nonce in
-              let () =
+              let ( `Fee_payer_account fee_payer_account
+                  , `Source_account source_account
+                  , `Receiver_account receiver_account ) =
                 test_user_command_with_accounts ~constraint_constants ~ledger
-                  ~accounts ~signer ~fee ~fee_payer_pk ~fee_token ~valid_until
-                  ~nonce
+                  ~accounts ~signer ~fee ~fee_payer_pk ~fee_token
                   (Stake_delegation
                      (Set_delegate
                         {delegator= source_pk; new_delegate= receiver_pk}))
               in
-              let get_account aid =
-                Option.bind
-                  (Ledger.location_of_account ledger aid)
-                  ~f:(Ledger.get ledger)
-              in
-              let fee_payer_account =
-                Option.value_exn (get_account fee_payer)
-              in
-              let source_account = Option.value_exn (get_account source) in
-              let receiver_account = get_account receiver in
-              let sub_amount amt bal =
-                Option.value_exn (Balance.sub_amount bal amt)
-              in
-              let sub_fee fee = sub_amount (Amount.of_fee fee) in
+              let fee_payer_account = Option.value_exn fee_payer_account in
+              let source_account = Option.value_exn source_account in
               let expected_fee_payer_balance =
                 accounts.(0).balance |> sub_fee fee
               in
@@ -4077,46 +4041,26 @@ let%test_module "transaction_snark" =
       Test_util.with_randomness 123456789 (fun () ->
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               let wallets = random_wallets ~n:2 () in
-              let signer =
-                Keypair.of_private_key_exn wallets.(0).private_key
-              in
-              let fee_payer_pk = Public_key.compress signer.public_key in
+              let signer = wallets.(0).private_key in
+              let fee_payer_pk = wallets.(0).account.public_key in
               let source_pk = fee_payer_pk in
               let receiver_pk = wallets.(1).account.public_key in
               let fee_token = Token_id.default in
-              let token_id = Token_id.default in
-              let fee_payer = Account_id.create fee_payer_pk fee_token in
-              let source = Account_id.create source_pk token_id in
-              let receiver = Account_id.create receiver_pk token_id in
-              let create_account aid balance =
-                Account.create aid (Balance.of_int balance)
+              let accounts =
+                [|create_account fee_payer_pk fee_token 20_000_000_000|]
               in
-              let accounts = [|create_account fee_payer 20_000_000_000|] in
               let fee = Fee.of_int (random_int_incl 2 15 * 1_000_000_000) in
-              let valid_until = Global_slot.max_value in
-              let nonce = accounts.(0).nonce in
-              let () =
+              let ( `Fee_payer_account fee_payer_account
+                  , `Source_account source_account
+                  , `Receiver_account receiver_account ) =
                 test_user_command_with_accounts ~constraint_constants ~ledger
-                  ~accounts ~signer ~fee ~fee_payer_pk ~fee_token ~valid_until
-                  ~nonce
+                  ~accounts ~signer ~fee ~fee_payer_pk ~fee_token
                   (Stake_delegation
                      (Set_delegate
                         {delegator= source_pk; new_delegate= receiver_pk}))
               in
-              let get_account aid =
-                Option.bind
-                  (Ledger.location_of_account ledger aid)
-                  ~f:(Ledger.get ledger)
-              in
-              let fee_payer_account =
-                Option.value_exn (get_account fee_payer)
-              in
-              let source_account = Option.value_exn (get_account source) in
-              let receiver_account = get_account receiver in
-              let sub_amount amt bal =
-                Option.value_exn (Balance.sub_amount bal amt)
-              in
-              let sub_fee fee = sub_amount (Amount.of_fee fee) in
+              let fee_payer_account = Option.value_exn fee_payer_account in
+              let source_account = Option.value_exn source_account in
               let expected_fee_payer_balance =
                 accounts.(0).balance |> sub_fee fee
               in
@@ -4132,49 +4076,27 @@ let%test_module "transaction_snark" =
       Test_util.with_randomness 123456789 (fun () ->
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               let wallets = random_wallets ~n:3 () in
-              let signer =
-                Keypair.of_private_key_exn wallets.(0).private_key
-              in
-              let fee_payer_pk = Public_key.compress signer.public_key in
+              let signer = wallets.(0).private_key in
+              let fee_payer_pk = wallets.(0).account.public_key in
               let source_pk = wallets.(1).account.public_key in
               let receiver_pk = wallets.(2).account.public_key in
               let fee_token = Token_id.default in
               let token_id = Token_id.default in
-              let fee_payer = Account_id.create fee_payer_pk fee_token in
-              let source = Account_id.create source_pk token_id in
-              let receiver = Account_id.create receiver_pk token_id in
-              let create_account aid balance =
-                Account.create aid (Balance.of_int balance)
-              in
               let accounts =
-                [| create_account fee_payer 20_000_000_000
-                 ; create_account receiver 30_000_000_000 |]
+                [| create_account fee_payer_pk fee_token 20_000_000_000
+                 ; create_account receiver_pk token_id 30_000_000_000 |]
               in
               let fee = Fee.of_int (random_int_incl 2 15 * 1_000_000_000) in
-              let valid_until = Global_slot.max_value in
-              let nonce = accounts.(0).nonce in
-              let () =
+              let ( `Fee_payer_account fee_payer_account
+                  , `Source_account source_account
+                  , `Receiver_account receiver_account ) =
                 test_user_command_with_accounts ~constraint_constants ~ledger
-                  ~accounts ~signer ~fee ~fee_payer_pk ~fee_token ~valid_until
-                  ~nonce
+                  ~accounts ~signer ~fee ~fee_payer_pk ~fee_token
                   (Stake_delegation
                      (Set_delegate
                         {delegator= source_pk; new_delegate= receiver_pk}))
               in
-              let get_account aid =
-                Option.bind
-                  (Ledger.location_of_account ledger aid)
-                  ~f:(Ledger.get ledger)
-              in
-              let fee_payer_account =
-                Option.value_exn (get_account fee_payer)
-              in
-              let source_account = get_account source in
-              let receiver_account = get_account receiver in
-              let sub_amount amt bal =
-                Option.value_exn (Balance.sub_amount bal amt)
-              in
-              let sub_fee fee = sub_amount (Amount.of_fee fee) in
+              let fee_payer_account = Option.value_exn fee_payer_account in
               let expected_fee_payer_balance =
                 accounts.(0).balance |> sub_fee fee
               in
@@ -4250,6 +4172,316 @@ let%test_module "transaction_snark" =
                 - (amount + txn_fee) * txns_per_receiver
                   * List.length receivers )
                 ledger ) )
+
+    let%test_unit "create own new token" =
+      Test_util.with_randomness 123456789 (fun () ->
+          Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
+              let wallets = random_wallets ~n:1 () in
+              let signer = wallets.(0).private_key in
+              (* Fee payer is the new token owner. *)
+              let fee_payer_pk = wallets.(0).account.public_key in
+              let token_owner_pk = fee_payer_pk in
+              let fee_token = Token_id.default in
+              let accounts =
+                [|create_account fee_payer_pk fee_token 20_000_000_000|]
+              in
+              let fee = Fee.of_int (random_int_incl 2 15 * 1_000_000_000) in
+              let ( `Fee_payer_account fee_payer_account
+                  , `Source_account token_owner_account
+                  , `Receiver_account _also_token_owner_account ) =
+                test_user_command_with_accounts ~constraint_constants ~ledger
+                  ~accounts ~signer ~fee ~fee_payer_pk ~fee_token
+                  (Create_new_token {token_owner_pk})
+              in
+              let fee_payer_account = Option.value_exn fee_payer_account in
+              let token_owner_account = Option.value_exn token_owner_account in
+              let expected_fee_payer_balance =
+                accounts.(0).balance |> sub_fee fee
+                |> sub_fee constraint_constants.account_creation_fee
+              in
+              assert (
+                Balance.equal fee_payer_account.balance
+                  expected_fee_payer_balance ) ;
+              assert (Balance.(equal zero) token_owner_account.balance) ;
+              assert (
+                Public_key.Compressed.(equal empty)
+                  token_owner_account.delegate ) ;
+              assert token_owner_account.token_owner ) )
+
+    let%test_unit "create new token for a different pk" =
+      Test_util.with_randomness 123456789 (fun () ->
+          Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
+              let wallets = random_wallets ~n:2 () in
+              let signer = wallets.(0).private_key in
+              (* Fee payer and new token owner are distinct. *)
+              let fee_payer_pk = wallets.(0).account.public_key in
+              let token_owner_pk = wallets.(1).account.public_key in
+              let fee_token = Token_id.default in
+              let accounts =
+                [|create_account fee_payer_pk fee_token 20_000_000_000|]
+              in
+              let fee = Fee.of_int (random_int_incl 2 15 * 1_000_000_000) in
+              let ( `Fee_payer_account fee_payer_account
+                  , `Source_account token_owner_account
+                  , `Receiver_account _also_token_owner_account ) =
+                test_user_command_with_accounts ~constraint_constants ~ledger
+                  ~accounts ~signer ~fee ~fee_payer_pk ~fee_token
+                  (Create_new_token {token_owner_pk})
+              in
+              let fee_payer_account = Option.value_exn fee_payer_account in
+              let token_owner_account = Option.value_exn token_owner_account in
+              let expected_fee_payer_balance =
+                accounts.(0).balance |> sub_fee fee
+                |> sub_fee constraint_constants.account_creation_fee
+              in
+              assert (
+                Balance.equal fee_payer_account.balance
+                  expected_fee_payer_balance ) ;
+              assert (Balance.(equal zero) token_owner_account.balance) ;
+              assert (
+                Public_key.Compressed.(equal empty)
+                  token_owner_account.delegate ) ;
+              assert token_owner_account.token_owner ) )
+
+    let%test_unit "create own new token account" =
+      Test_util.with_randomness 123456789 (fun () ->
+          Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
+              let wallets = random_wallets ~n:2 () in
+              let signer = wallets.(0).private_key in
+              (* Fee-payer and receiver are the same, token owner differs. *)
+              let fee_payer_pk = wallets.(0).account.public_key in
+              let token_owner_pk = wallets.(1).account.public_key in
+              let receiver_pk = fee_payer_pk in
+              let fee_token = Token_id.default in
+              let token_id =
+                Quickcheck.random_value Token_id.gen_non_default
+              in
+              let accounts =
+                [| create_account fee_payer_pk fee_token 20_000_000_000
+                 ; { (create_account token_owner_pk token_id 0) with
+                     token_owner= true } |]
+              in
+              let fee = Fee.of_int (random_int_incl 2 15 * 1_000_000_000) in
+              let ( `Fee_payer_account fee_payer_account
+                  , `Source_account token_owner_account
+                  , `Receiver_account receiver_account ) =
+                test_user_command_with_accounts ~constraint_constants ~ledger
+                  ~accounts ~signer ~fee ~fee_payer_pk ~fee_token
+                  (Create_token_account {token_owner_pk; token_id; receiver_pk})
+              in
+              let fee_payer_account = Option.value_exn fee_payer_account in
+              let token_owner_account = Option.value_exn token_owner_account in
+              let receiver_account = Option.value_exn receiver_account in
+              let expected_fee_payer_balance =
+                accounts.(0).balance |> sub_fee fee
+                |> sub_fee constraint_constants.account_creation_fee
+              in
+              assert (
+                Balance.equal fee_payer_account.balance
+                  expected_fee_payer_balance ) ;
+              assert (Balance.(equal zero) token_owner_account.balance) ;
+              assert (Balance.(equal zero) receiver_account.balance) ;
+              assert (
+                Public_key.Compressed.(equal empty) receiver_account.delegate
+              ) ;
+              assert (not receiver_account.token_owner) ) )
+
+    let%test_unit "create new token account for a different pk" =
+      Test_util.with_randomness 123456789 (fun () ->
+          Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
+              let wallets = random_wallets ~n:3 () in
+              let signer = wallets.(0).private_key in
+              (* Fee-payer, receiver, and token owner differ. *)
+              let fee_payer_pk = wallets.(0).account.public_key in
+              let token_owner_pk = wallets.(1).account.public_key in
+              let receiver_pk = wallets.(2).account.public_key in
+              let fee_token = Token_id.default in
+              let token_id =
+                Quickcheck.random_value Token_id.gen_non_default
+              in
+              let accounts =
+                [| create_account fee_payer_pk fee_token 20_000_000_000
+                 ; { (create_account token_owner_pk token_id 0) with
+                     token_owner= true } |]
+              in
+              let fee = Fee.of_int (random_int_incl 2 15 * 1_000_000_000) in
+              let ( `Fee_payer_account fee_payer_account
+                  , `Source_account token_owner_account
+                  , `Receiver_account receiver_account ) =
+                test_user_command_with_accounts ~constraint_constants ~ledger
+                  ~accounts ~signer ~fee ~fee_payer_pk ~fee_token
+                  (Create_token_account {token_owner_pk; token_id; receiver_pk})
+              in
+              let fee_payer_account = Option.value_exn fee_payer_account in
+              let token_owner_account = Option.value_exn token_owner_account in
+              let receiver_account = Option.value_exn receiver_account in
+              let expected_fee_payer_balance =
+                accounts.(0).balance |> sub_fee fee
+                |> sub_fee constraint_constants.account_creation_fee
+              in
+              assert (
+                Balance.equal fee_payer_account.balance
+                  expected_fee_payer_balance ) ;
+              assert (Balance.(equal zero) token_owner_account.balance) ;
+              assert (Balance.(equal zero) receiver_account.balance) ;
+              assert (
+                Public_key.Compressed.(equal empty) receiver_account.delegate
+              ) ;
+              assert (not receiver_account.token_owner) ) )
+
+    let%test_unit "create new token account fails if account exists" =
+      Test_util.with_randomness 123456789 (fun () ->
+          Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
+              let wallets = random_wallets ~n:3 () in
+              let signer = wallets.(0).private_key in
+              (* Fee-payer, receiver, and token owner differ. *)
+              let fee_payer_pk = wallets.(0).account.public_key in
+              let token_owner_pk = wallets.(1).account.public_key in
+              let receiver_pk = wallets.(2).account.public_key in
+              let fee_token = Token_id.default in
+              let token_id =
+                Quickcheck.random_value Token_id.gen_non_default
+              in
+              let accounts =
+                [| create_account fee_payer_pk fee_token 20_000_000_000
+                 ; { (create_account token_owner_pk token_id 0) with
+                     token_owner= true }
+                 ; create_account receiver_pk token_id 0 |]
+              in
+              let fee = Fee.of_int (random_int_incl 2 15 * 1_000_000_000) in
+              let ( `Fee_payer_account fee_payer_account
+                  , `Source_account token_owner_account
+                  , `Receiver_account receiver_account ) =
+                test_user_command_with_accounts ~constraint_constants ~ledger
+                  ~accounts ~signer ~fee ~fee_payer_pk ~fee_token
+                  (Create_token_account {token_owner_pk; token_id; receiver_pk})
+              in
+              let fee_payer_account = Option.value_exn fee_payer_account in
+              let token_owner_account = Option.value_exn token_owner_account in
+              let receiver_account = Option.value_exn receiver_account in
+              (* No account creation fee: the command fails. *)
+              let expected_fee_payer_balance =
+                accounts.(0).balance |> sub_fee fee
+              in
+              assert (
+                Balance.equal fee_payer_account.balance
+                  expected_fee_payer_balance ) ;
+              assert (Balance.(equal zero) token_owner_account.balance) ;
+              assert (Balance.(equal zero) receiver_account.balance) ) )
+
+    let%test_unit "create new token account fails if receiver is token owner" =
+      Test_util.with_randomness 123456789 (fun () ->
+          Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
+              let wallets = random_wallets ~n:2 () in
+              let signer = wallets.(0).private_key in
+              (* Receiver and token owner are the same, fee-payer differs. *)
+              let fee_payer_pk = wallets.(0).account.public_key in
+              let token_owner_pk = wallets.(1).account.public_key in
+              let receiver_pk = token_owner_pk in
+              let fee_token = Token_id.default in
+              let token_id =
+                Quickcheck.random_value Token_id.gen_non_default
+              in
+              let accounts =
+                [| create_account fee_payer_pk fee_token 20_000_000_000
+                 ; { (create_account token_owner_pk token_id 0) with
+                     token_owner= true } |]
+              in
+              let fee = Fee.of_int (random_int_incl 2 15 * 1_000_000_000) in
+              let ( `Fee_payer_account fee_payer_account
+                  , `Source_account token_owner_account
+                  , `Receiver_account receiver_account ) =
+                test_user_command_with_accounts ~constraint_constants ~ledger
+                  ~accounts ~signer ~fee ~fee_payer_pk ~fee_token
+                  (Create_token_account {token_owner_pk; token_id; receiver_pk})
+              in
+              let fee_payer_account = Option.value_exn fee_payer_account in
+              let token_owner_account = Option.value_exn token_owner_account in
+              let receiver_account = Option.value_exn receiver_account in
+              (* No account creation fee: the command fails. *)
+              let expected_fee_payer_balance =
+                accounts.(0).balance |> sub_fee fee
+              in
+              assert (
+                Balance.equal fee_payer_account.balance
+                  expected_fee_payer_balance ) ;
+              assert (Balance.(equal zero) token_owner_account.balance) ;
+              assert (Balance.(equal zero) receiver_account.balance) ) )
+
+    let%test_unit "create new token account fails if claimed token owner \
+                   doesn't own the token" =
+      Test_util.with_randomness 123456789 (fun () ->
+          Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
+              let wallets = random_wallets ~n:3 () in
+              let signer = wallets.(0).private_key in
+              (* Fee-payer, receiver, and token owner differ. *)
+              let fee_payer_pk = wallets.(0).account.public_key in
+              let token_owner_pk = wallets.(1).account.public_key in
+              let receiver_pk = wallets.(2).account.public_key in
+              let fee_token = Token_id.default in
+              let token_id =
+                Quickcheck.random_value Token_id.gen_non_default
+              in
+              let accounts =
+                [| create_account fee_payer_pk fee_token 20_000_000_000
+                 ; create_account token_owner_pk token_id 0 |]
+              in
+              let fee = Fee.of_int (random_int_incl 2 15 * 1_000_000_000) in
+              let ( `Fee_payer_account fee_payer_account
+                  , `Source_account token_owner_account
+                  , `Receiver_account receiver_account ) =
+                test_user_command_with_accounts ~constraint_constants ~ledger
+                  ~accounts ~signer ~fee ~fee_payer_pk ~fee_token
+                  (Create_token_account {token_owner_pk; token_id; receiver_pk})
+              in
+              let fee_payer_account = Option.value_exn fee_payer_account in
+              let token_owner_account = Option.value_exn token_owner_account in
+              (* No account creation fee: the command fails. *)
+              let expected_fee_payer_balance =
+                accounts.(0).balance |> sub_fee fee
+              in
+              assert (
+                Balance.equal fee_payer_account.balance
+                  expected_fee_payer_balance ) ;
+              assert (Balance.(equal zero) token_owner_account.balance) ;
+              assert (Option.is_none receiver_account) ) )
+
+    let%test_unit "create new token account works for default token" =
+      Test_util.with_randomness 123456789 (fun () ->
+          Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
+              let wallets = random_wallets ~n:2 () in
+              let signer = wallets.(0).private_key in
+              (* Fee-payer and receiver are the same, token owner differs. *)
+              let fee_payer_pk = wallets.(0).account.public_key in
+              let token_owner_pk = fee_payer_pk in
+              let receiver_pk = wallets.(1).account.public_key in
+              let fee_token = Token_id.default in
+              let token_id = Token_id.default in
+              let accounts =
+                [|create_account fee_payer_pk fee_token 20_000_000_000|]
+              in
+              let fee = Fee.of_int (random_int_incl 2 15 * 1_000_000_000) in
+              let ( `Fee_payer_account fee_payer_account
+                  , `Source_account _token_owner_account
+                  , `Receiver_account receiver_account ) =
+                test_user_command_with_accounts ~constraint_constants ~ledger
+                  ~accounts ~signer ~fee ~fee_payer_pk ~fee_token
+                  (Create_token_account {token_owner_pk; token_id; receiver_pk})
+              in
+              let fee_payer_account = Option.value_exn fee_payer_account in
+              let receiver_account = Option.value_exn receiver_account in
+              let expected_fee_payer_balance =
+                accounts.(0).balance |> sub_fee fee
+                |> sub_fee constraint_constants.account_creation_fee
+              in
+              assert (
+                Balance.equal fee_payer_account.balance
+                  expected_fee_payer_balance ) ;
+              assert (Balance.(equal zero) receiver_account.balance) ;
+              assert (
+                Public_key.Compressed.equal receiver_pk
+                  receiver_account.delegate ) ;
+              assert (not receiver_account.token_owner) ) )
   end )
 
 let%test_module "account timing check" =

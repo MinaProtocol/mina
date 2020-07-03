@@ -45,6 +45,18 @@ module Body = struct
         ; receiver_pk= new_delegate
         ; token_id= Token_id.default
         ; amount= Currency.Amount.zero }
+    | Create_new_token {token_owner_pk} ->
+        { tag= Tag.Create_account
+        ; source_pk= token_owner_pk
+        ; receiver_pk= token_owner_pk
+        ; token_id= Token_id.invalid
+        ; amount= Currency.Amount.zero }
+    | Create_token_account {token_id; token_owner_pk; receiver_pk} ->
+        { tag= Tag.Create_account
+        ; source_pk= token_owner_pk
+        ; receiver_pk
+        ; token_id
+        ; amount= Currency.Amount.zero }
 
   let gen ~fee =
     let open Quickcheck.Generator.Let_syntax in

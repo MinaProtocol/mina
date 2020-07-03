@@ -59,8 +59,8 @@ module Stable = struct
     include Comparable.Make (T)
     include Hashable.Make (T)
 
-    let accounts_accessed ({payload; _} : t) =
-      Payload.accounts_accessed payload
+    let accounts_accessed ~next_available_token ({payload; _} : t) =
+      Payload.accounts_accessed ~next_available_token payload
   end
 end]
 
@@ -96,11 +96,13 @@ let token ({payload; _} : t) = Payload.token payload
 
 let source_pk ({payload; _} : t) = Payload.source_pk payload
 
-let source ({payload; _} : t) = Payload.source payload
+let source ~next_available_token ({payload; _} : t) =
+  Payload.source ~next_available_token payload
 
 let receiver_pk ({payload; _} : t) = Payload.receiver_pk payload
 
-let receiver ({payload; _} : t) = Payload.receiver payload
+let receiver ~next_available_token ({payload; _} : t) =
+  Payload.receiver ~next_available_token payload
 
 let amount = Fn.compose Payload.amount payload
 
@@ -111,6 +113,9 @@ let valid_until = Fn.compose Payload.valid_until payload
 let tag ({payload; _} : t) = Payload.tag payload
 
 let tag_string t = Transaction_union_tag.to_string (tag t)
+
+let next_available_token ({payload; _} : t) tid =
+  Payload.next_available_token payload tid
 
 let to_input (payload : Payload.t) =
   Transaction_union_payload.(to_input (of_user_command_payload payload))
@@ -394,7 +399,7 @@ let forget_check t = t
 let filter_by_participant user_commands public_key =
   List.filter user_commands ~f:(fun user_command ->
       Core_kernel.List.exists
-        (accounts_accessed user_command)
+        (accounts_accessed ~next_available_token:Token_id.invalid user_command)
         ~f:
           (Fn.compose
              (Public_key.Compressed.equal public_key)

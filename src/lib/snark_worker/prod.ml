@@ -104,8 +104,10 @@ module Inputs = struct
                           { Transaction_protocol_state.Poly.transaction= t
                           ; block_data= w.protocol_state_body }
                           ~init_stack:w.init_stack
-                          ~next_available_token:
+                          ~next_available_token_before:
                             input.next_available_token_before
+                          ~next_available_token_after:
+                            input.next_available_token_after
                           ~pending_coinbase_stack_state:
                             input
                               .Transaction_snark.Statement

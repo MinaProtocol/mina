@@ -190,10 +190,14 @@ let create_expected_statement ~constraint_constants
     Sparse_ledger.next_available_token ledger_witness
   in
   let%bind transaction = Ledger.Undo.transaction transaction_with_info in
+  let txn_global_slot =
+    (* TODO: Get from protocol state. *)
+    Coda_numbers.Global_slot.zero
+  in
   let%bind after =
     Or_error.try_with (fun () ->
         Sparse_ledger.apply_transaction_exn ~constraint_constants
-          ledger_witness transaction )
+          ~txn_global_slot ledger_witness transaction )
   in
   let target =
     Frozen_ledger_hash.of_ledger_hash @@ Sparse_ledger.merkle_root after
