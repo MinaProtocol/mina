@@ -3753,6 +3753,12 @@ let%test_module "transaction_snark" =
 
     let random_int_incl l u = Quickcheck.random_value (Int.gen_incl l u)
 
+    let sub_amount amt bal = Option.value_exn (Balance.sub_amount bal amt)
+
+    let add_amount amt bal = Option.value_exn (Balance.add_amount bal amt)
+
+    let sub_fee fee = sub_amount (Amount.of_fee fee)
+
     let%test_unit "transfer non-default tokens to a new account: fails but \
                    charges fee" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -3783,9 +3789,6 @@ let%test_module "transaction_snark" =
               in
               let fee_payer_account = Option.value_exn fee_payer_account in
               let source_account = Option.value_exn source_account in
-              let sub_fee fee bal =
-                Option.value_exn (Balance.sub_amount bal (Amount.of_fee fee))
-              in
               let expected_fee_payer_balance =
                 accounts.(0).balance |> sub_fee fee
               in
@@ -3826,13 +3829,6 @@ let%test_module "transaction_snark" =
               let fee_payer_account = Option.value_exn fee_payer_account in
               let source_account = Option.value_exn source_account in
               let receiver_account = Option.value_exn receiver_account in
-              let sub_amount amt bal =
-                Option.value_exn (Balance.sub_amount bal amt)
-              in
-              let add_amount amt bal =
-                Option.value_exn (Balance.add_amount bal amt)
-              in
-              let sub_fee fee = sub_amount (Amount.of_fee fee) in
               let expected_fee_payer_balance =
                 accounts.(0).balance |> sub_fee fee
               in
@@ -3881,10 +3877,6 @@ let%test_module "transaction_snark" =
               in
               let fee_payer_account = Option.value_exn fee_payer_account in
               let source_account = Option.value_exn source_account in
-              let sub_amount amt bal =
-                Option.value_exn (Balance.sub_amount bal amt)
-              in
-              let sub_fee fee = sub_amount (Amount.of_fee fee) in
               let expected_fee_payer_balance =
                 accounts.(0).balance |> sub_fee fee
               in
@@ -3924,10 +3916,6 @@ let%test_module "transaction_snark" =
               in
               let fee_payer_account = Option.value_exn fee_payer_account in
               let source_account = Option.value_exn source_account in
-              let sub_amount amt bal =
-                Option.value_exn (Balance.sub_amount bal amt)
-              in
-              let sub_fee fee = sub_amount (Amount.of_fee fee) in
               let expected_fee_payer_balance =
                 accounts.(0).balance |> sub_fee fee
               in
@@ -3964,10 +3952,6 @@ let%test_module "transaction_snark" =
                   (Payment {source_pk; receiver_pk; token_id; amount})
               in
               let fee_payer_account = Option.value_exn fee_payer_account in
-              let sub_amount amt bal =
-                Option.value_exn (Balance.sub_amount bal amt)
-              in
-              let sub_fee fee = sub_amount (Amount.of_fee fee) in
               let expected_fee_payer_balance =
                 accounts.(0).balance |> sub_fee fee
               in
@@ -4004,10 +3988,6 @@ let%test_module "transaction_snark" =
               in
               let fee_payer_account = Option.value_exn fee_payer_account in
               let source_account = Option.value_exn source_account in
-              let sub_amount amt bal =
-                Option.value_exn (Balance.sub_amount bal amt)
-              in
-              let sub_fee fee = sub_amount (Amount.of_fee fee) in
               let expected_fee_payer_balance =
                 accounts.(0).balance |> sub_fee fee
               in
@@ -4046,10 +4026,6 @@ let%test_module "transaction_snark" =
               in
               let fee_payer_account = Option.value_exn fee_payer_account in
               let source_account = Option.value_exn source_account in
-              let sub_amount amt bal =
-                Option.value_exn (Balance.sub_amount bal amt)
-              in
-              let sub_fee fee = sub_amount (Amount.of_fee fee) in
               let expected_fee_payer_balance =
                 accounts.(0).balance |> sub_fee fee
               in
@@ -4085,10 +4061,6 @@ let%test_module "transaction_snark" =
               in
               let fee_payer_account = Option.value_exn fee_payer_account in
               let source_account = Option.value_exn source_account in
-              let sub_amount amt bal =
-                Option.value_exn (Balance.sub_amount bal amt)
-              in
-              let sub_fee fee = sub_amount (Amount.of_fee fee) in
               let expected_fee_payer_balance =
                 accounts.(0).balance |> sub_fee fee
               in
@@ -4125,10 +4097,6 @@ let%test_module "transaction_snark" =
                         {delegator= source_pk; new_delegate= receiver_pk}))
               in
               let fee_payer_account = Option.value_exn fee_payer_account in
-              let sub_amount amt bal =
-                Option.value_exn (Balance.sub_amount bal amt)
-              in
-              let sub_fee fee = sub_amount (Amount.of_fee fee) in
               let expected_fee_payer_balance =
                 accounts.(0).balance |> sub_fee fee
               in
@@ -4227,9 +4195,6 @@ let%test_module "transaction_snark" =
               in
               let fee_payer_account = Option.value_exn fee_payer_account in
               let token_owner_account = Option.value_exn token_owner_account in
-              let sub_fee fee bal =
-                Option.value_exn (Balance.sub_amount bal (Amount.of_fee fee))
-              in
               let expected_fee_payer_balance =
                 accounts.(0).balance |> sub_fee fee
                 |> sub_fee constraint_constants.account_creation_fee
@@ -4265,9 +4230,6 @@ let%test_module "transaction_snark" =
               in
               let fee_payer_account = Option.value_exn fee_payer_account in
               let token_owner_account = Option.value_exn token_owner_account in
-              let sub_fee fee bal =
-                Option.value_exn (Balance.sub_amount bal (Amount.of_fee fee))
-              in
               let expected_fee_payer_balance =
                 accounts.(0).balance |> sub_fee fee
                 |> sub_fee constraint_constants.account_creation_fee
@@ -4310,9 +4272,6 @@ let%test_module "transaction_snark" =
               let fee_payer_account = Option.value_exn fee_payer_account in
               let token_owner_account = Option.value_exn token_owner_account in
               let receiver_account = Option.value_exn receiver_account in
-              let sub_fee fee bal =
-                Option.value_exn (Balance.sub_amount bal (Amount.of_fee fee))
-              in
               let expected_fee_payer_balance =
                 accounts.(0).balance |> sub_fee fee
                 |> sub_fee constraint_constants.account_creation_fee
@@ -4356,9 +4315,6 @@ let%test_module "transaction_snark" =
               let fee_payer_account = Option.value_exn fee_payer_account in
               let token_owner_account = Option.value_exn token_owner_account in
               let receiver_account = Option.value_exn receiver_account in
-              let sub_fee fee bal =
-                Option.value_exn (Balance.sub_amount bal (Amount.of_fee fee))
-              in
               let expected_fee_payer_balance =
                 accounts.(0).balance |> sub_fee fee
                 |> sub_fee constraint_constants.account_creation_fee
@@ -4403,9 +4359,6 @@ let%test_module "transaction_snark" =
               let fee_payer_account = Option.value_exn fee_payer_account in
               let token_owner_account = Option.value_exn token_owner_account in
               let receiver_account = Option.value_exn receiver_account in
-              let sub_fee fee bal =
-                Option.value_exn (Balance.sub_amount bal (Amount.of_fee fee))
-              in
               (* No account creation fee: the command fails. *)
               let expected_fee_payer_balance =
                 accounts.(0).balance |> sub_fee fee
@@ -4445,9 +4398,6 @@ let%test_module "transaction_snark" =
               let fee_payer_account = Option.value_exn fee_payer_account in
               let token_owner_account = Option.value_exn token_owner_account in
               let receiver_account = Option.value_exn receiver_account in
-              let sub_fee fee bal =
-                Option.value_exn (Balance.sub_amount bal (Amount.of_fee fee))
-              in
               (* No account creation fee: the command fails. *)
               let expected_fee_payer_balance =
                 accounts.(0).balance |> sub_fee fee
@@ -4486,9 +4436,6 @@ let%test_module "transaction_snark" =
               in
               let fee_payer_account = Option.value_exn fee_payer_account in
               let token_owner_account = Option.value_exn token_owner_account in
-              let sub_fee fee bal =
-                Option.value_exn (Balance.sub_amount bal (Amount.of_fee fee))
-              in
               (* No account creation fee: the command fails. *)
               let expected_fee_payer_balance =
                 accounts.(0).balance |> sub_fee fee
@@ -4523,9 +4470,6 @@ let%test_module "transaction_snark" =
               in
               let fee_payer_account = Option.value_exn fee_payer_account in
               let receiver_account = Option.value_exn receiver_account in
-              let sub_fee fee bal =
-                Option.value_exn (Balance.sub_amount bal (Amount.of_fee fee))
-              in
               let expected_fee_payer_balance =
                 accounts.(0).balance |> sub_fee fee
                 |> sub_fee constraint_constants.account_creation_fee
