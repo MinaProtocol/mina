@@ -4210,9 +4210,10 @@ let%test_module "transaction_snark" =
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               let wallets = random_wallets ~n:1 () in
               let signer = wallets.(0).private_key in
+              (* Fee payer is the new token owner. *)
               let fee_payer_pk = wallets.(0).account.public_key in
-              let fee_token = Token_id.default in
               let token_owner_pk = fee_payer_pk in
+              let fee_token = Token_id.default in
               let accounts =
                 [|create_account fee_payer_pk fee_token 20_000_000_000|]
               in
@@ -4247,9 +4248,10 @@ let%test_module "transaction_snark" =
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               let wallets = random_wallets ~n:2 () in
               let signer = wallets.(0).private_key in
+              (* Fee payer and new token owner are distinct. *)
               let fee_payer_pk = wallets.(0).account.public_key in
-              let fee_token = Token_id.default in
               let token_owner_pk = wallets.(1).account.public_key in
+              let fee_token = Token_id.default in
               let accounts =
                 [|create_account fee_payer_pk fee_token 20_000_000_000|]
               in
@@ -4284,9 +4286,9 @@ let%test_module "transaction_snark" =
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               let wallets = random_wallets ~n:2 () in
               let signer = wallets.(0).private_key in
+              (* Fee-payer and receiver are the same, token owner differs. *)
               let fee_payer_pk = wallets.(0).account.public_key in
-              let token_owner_account = wallets.(1).account in
-              let token_owner_pk = token_owner_account.public_key in
+              let token_owner_pk = wallets.(1).public_key in
               let receiver_pk = fee_payer_pk in
               let fee_token = Token_id.default in
               let token_id =
@@ -4330,9 +4332,9 @@ let%test_module "transaction_snark" =
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               let wallets = random_wallets ~n:3 () in
               let signer = wallets.(0).private_key in
+              (* Fee-payer, receiver, and token owner differ. *)
               let fee_payer_pk = wallets.(0).account.public_key in
-              let token_owner_account = wallets.(1).account in
-              let token_owner_pk = token_owner_account.public_key in
+              let token_owner_pk = wallets.(1).account.public_key in
               let receiver_pk = wallets.(2).account.public_key in
               let fee_token = Token_id.default in
               let token_id =
@@ -4376,9 +4378,9 @@ let%test_module "transaction_snark" =
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               let wallets = random_wallets ~n:3 () in
               let signer = wallets.(0).private_key in
+              (* Fee-payer, receiver, and token owner differ. *)
               let fee_payer_pk = wallets.(0).account.public_key in
-              let token_owner_account = wallets.(1).account in
-              let token_owner_pk = token_owner_account.public_key in
+              let token_owner_pk = wallets.(1).account.public_key in
               let receiver_pk = wallets.(2).account.public_key in
               let fee_token = Token_id.default in
               let token_id =
@@ -4418,9 +4420,9 @@ let%test_module "transaction_snark" =
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               let wallets = random_wallets ~n:2 () in
               let signer = wallets.(0).private_key in
+              (* Receiver and token owner are the same, fee-payer differs. *)
               let fee_payer_pk = wallets.(0).account.public_key in
-              let token_owner_account = wallets.(1).account in
-              let token_owner_pk = token_owner_account.public_key in
+              let token_owner_pk = wallets.(1).account.public_key in
               let receiver_pk = token_owner_pk in
               let fee_token = Token_id.default in
               let token_id =
@@ -4460,6 +4462,7 @@ let%test_module "transaction_snark" =
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               let wallets = random_wallets ~n:3 () in
               let signer = wallets.(0).private_key in
+              (* Fee-payer, receiver, and token owner differ. *)
               let fee_payer_pk = wallets.(0).account.public_key in
               let token_owner_pk = wallets.(1).account.public_key in
               let receiver_pk = wallets.(2).account.public_key in
@@ -4498,8 +4501,8 @@ let%test_module "transaction_snark" =
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               let wallets = random_wallets ~n:2 () in
               let signer = wallets.(0).private_key in
+              (* Fee-payer and receiver are the same, token owner differs. *)
               let fee_payer_pk = wallets.(0).account.public_key in
-              (* Any existing account will work for this. *)
               let token_owner_pk = fee_payer_pk in
               let receiver_pk = wallets.(1).account.public_key in
               let fee_token = Token_id.default in
