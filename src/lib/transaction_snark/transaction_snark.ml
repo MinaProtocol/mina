@@ -3735,6 +3735,7 @@ let%test_module "transaction_snark" =
         User_command.Payload.create ~fee ~fee_payer_pk ~fee_token ~nonce
           ~valid_until ~memo ~body
       in
+      let signer = Keypair.of_private_key_exn signer in
       let user_command = User_command.sign signer payload in
       let next_available_token = Ledger.next_available_token ledger in
       test_transaction ~constraint_constants ledger (User_command user_command) ;
@@ -3757,10 +3758,8 @@ let%test_module "transaction_snark" =
       Test_util.with_randomness 123456789 (fun () ->
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               let wallets = random_wallets ~n:2 () in
-              let signer =
-                Keypair.of_private_key_exn wallets.(0).private_key
-              in
-              let fee_payer_pk = Public_key.compress signer.public_key in
+              let signer = wallets.(0).private_key in
+              let fee_payer_pk = wallets.(0).account.public_key in
               let source_pk = fee_payer_pk in
               let receiver_pk = wallets.(1).account.public_key in
               let fee_token = Token_id.default in
@@ -3800,10 +3799,8 @@ let%test_module "transaction_snark" =
       Test_util.with_randomness 123456789 (fun () ->
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               let wallets = random_wallets ~n:2 () in
-              let signer =
-                Keypair.of_private_key_exn wallets.(0).private_key
-              in
-              let fee_payer_pk = Public_key.compress signer.public_key in
+              let signer = wallets.(0).private_key in
+              let fee_payer_pk = wallets.(0).account.public_key in
               let source_pk = fee_payer_pk in
               let receiver_pk = wallets.(1).account.public_key in
               let fee_token = Token_id.default in
@@ -3859,10 +3856,8 @@ let%test_module "transaction_snark" =
       Test_util.with_randomness 123456789 (fun () ->
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               let wallets = random_wallets ~n:2 () in
-              let signer =
-                Keypair.of_private_key_exn wallets.(0).private_key
-              in
-              let fee_payer_pk = Public_key.compress signer.public_key in
+              let signer = wallets.(0).private_key in
+              let fee_payer_pk = wallets.(0).account.public_key in
               let source_pk = fee_payer_pk in
               let receiver_pk = wallets.(1).account.public_key in
               let fee_token = Token_id.default in
@@ -3906,10 +3901,8 @@ let%test_module "transaction_snark" =
       Test_util.with_randomness 123456789 (fun () ->
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               let wallets = random_wallets ~n:2 () in
-              let signer =
-                Keypair.of_private_key_exn wallets.(0).private_key
-              in
-              let fee_payer_pk = Public_key.compress signer.public_key in
+              let signer = wallets.(0).private_key in
+              let fee_payer_pk = wallets.(0).account.public_key in
               let source_pk = fee_payer_pk in
               let receiver_pk = wallets.(1).account.public_key in
               let fee_token = Token_id.default in
@@ -3950,10 +3943,8 @@ let%test_module "transaction_snark" =
       Test_util.with_randomness 123456789 (fun () ->
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               let wallets = random_wallets ~n:2 () in
-              let signer =
-                Keypair.of_private_key_exn wallets.(0).private_key
-              in
-              let fee_payer_pk = Public_key.compress signer.public_key in
+              let signer = wallets.(0).private_key in
+              let fee_payer_pk = wallets.(0).account.public_key in
               let source_pk = fee_payer_pk in
               let receiver_pk = wallets.(1).account.public_key in
               let fee_token = Token_id.default in
@@ -3990,10 +3981,8 @@ let%test_module "transaction_snark" =
       Test_util.with_randomness 123456789 (fun () ->
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               let wallets = random_wallets ~n:3 () in
-              let signer =
-                Keypair.of_private_key_exn wallets.(0).private_key
-              in
-              let fee_payer_pk = Public_key.compress signer.public_key in
+              let signer = wallets.(0).private_key in
+              let fee_payer_pk = wallets.(0).account.public_key in
               let source_pk = wallets.(1).account.public_key in
               let receiver_pk = wallets.(2).account.public_key in
               let fee_token = Token_id.default in
@@ -4034,10 +4023,8 @@ let%test_module "transaction_snark" =
       Test_util.with_randomness 123456789 (fun () ->
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               let wallets = random_wallets ~n:3 () in
-              let signer =
-                Keypair.of_private_key_exn wallets.(0).private_key
-              in
-              let fee_payer_pk = Public_key.compress signer.public_key in
+              let signer = wallets.(0).private_key in
+              let fee_payer_pk = wallets.(0).account.public_key in
               let source_pk = wallets.(1).account.public_key in
               let receiver_pk = wallets.(2).account.public_key in
               let fee_token = Token_id.default in
@@ -4078,10 +4065,8 @@ let%test_module "transaction_snark" =
       Test_util.with_randomness 123456789 (fun () ->
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               let wallets = random_wallets ~n:2 () in
-              let signer =
-                Keypair.of_private_key_exn wallets.(0).private_key
-              in
-              let fee_payer_pk = Public_key.compress signer.public_key in
+              let signer = wallets.(0).private_key in
+              let fee_payer_pk = wallets.(0).account.public_key in
               let source_pk = fee_payer_pk in
               let receiver_pk = wallets.(1).account.public_key in
               let fee_token = Token_id.default in
@@ -4119,10 +4104,8 @@ let%test_module "transaction_snark" =
       Test_util.with_randomness 123456789 (fun () ->
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               let wallets = random_wallets ~n:3 () in
-              let signer =
-                Keypair.of_private_key_exn wallets.(0).private_key
-              in
-              let fee_payer_pk = Public_key.compress signer.public_key in
+              let signer = wallets.(0).private_key in
+              let fee_payer_pk = wallets.(0).account.public_key in
               let source_pk = wallets.(1).account.public_key in
               let receiver_pk = wallets.(2).account.public_key in
               let fee_token = Token_id.default in
@@ -4226,10 +4209,8 @@ let%test_module "transaction_snark" =
       Test_util.with_randomness 123456789 (fun () ->
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               let wallets = random_wallets ~n:1 () in
-              let signer =
-                Keypair.of_private_key_exn wallets.(0).private_key
-              in
-              let fee_payer_pk = Public_key.compress signer.public_key in
+              let signer = wallets.(0).private_key in
+              let fee_payer_pk = wallets.(0).account.public_key in
               let fee_token = Token_id.default in
               let token_owner_pk = fee_payer_pk in
               let accounts =
@@ -4265,10 +4246,8 @@ let%test_module "transaction_snark" =
       Test_util.with_randomness 123456789 (fun () ->
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               let wallets = random_wallets ~n:2 () in
-              let signer =
-                Keypair.of_private_key_exn wallets.(0).private_key
-              in
-              let fee_payer_pk = Public_key.compress signer.public_key in
+              let signer = wallets.(0).private_key in
+              let fee_payer_pk = wallets.(0).account.public_key in
               let fee_token = Token_id.default in
               let token_owner_pk = wallets.(1).account.public_key in
               let accounts =
@@ -4304,10 +4283,8 @@ let%test_module "transaction_snark" =
       Test_util.with_randomness 123456789 (fun () ->
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               let wallets = random_wallets ~n:2 () in
-              let signer =
-                Keypair.of_private_key_exn wallets.(0).private_key
-              in
-              let fee_payer_pk = Public_key.compress signer.public_key in
+              let signer = wallets.(0).private_key in
+              let fee_payer_pk = wallets.(0).account.public_key in
               let token_owner_account = wallets.(1).account in
               let token_owner_pk = token_owner_account.public_key in
               let receiver_pk = fee_payer_pk in
@@ -4352,10 +4329,8 @@ let%test_module "transaction_snark" =
       Test_util.with_randomness 123456789 (fun () ->
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               let wallets = random_wallets ~n:3 () in
-              let signer =
-                Keypair.of_private_key_exn wallets.(0).private_key
-              in
-              let fee_payer_pk = Public_key.compress signer.public_key in
+              let signer = wallets.(0).private_key in
+              let fee_payer_pk = wallets.(0).account.public_key in
               let token_owner_account = wallets.(1).account in
               let token_owner_pk = token_owner_account.public_key in
               let receiver_pk = wallets.(2).account.public_key in
@@ -4400,10 +4375,8 @@ let%test_module "transaction_snark" =
       Test_util.with_randomness 123456789 (fun () ->
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               let wallets = random_wallets ~n:3 () in
-              let signer =
-                Keypair.of_private_key_exn wallets.(0).private_key
-              in
-              let fee_payer_pk = Public_key.compress signer.public_key in
+              let signer = wallets.(0).private_key in
+              let fee_payer_pk = wallets.(0).account.public_key in
               let token_owner_account = wallets.(1).account in
               let token_owner_pk = token_owner_account.public_key in
               let receiver_pk = wallets.(2).account.public_key in
@@ -4444,10 +4417,8 @@ let%test_module "transaction_snark" =
       Test_util.with_randomness 123456789 (fun () ->
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               let wallets = random_wallets ~n:2 () in
-              let signer =
-                Keypair.of_private_key_exn wallets.(0).private_key
-              in
-              let fee_payer_pk = Public_key.compress signer.public_key in
+              let signer = wallets.(0).private_key in
+              let fee_payer_pk = wallets.(0).account.public_key in
               let token_owner_account = wallets.(1).account in
               let token_owner_pk = token_owner_account.public_key in
               let receiver_pk = token_owner_pk in
@@ -4488,10 +4459,8 @@ let%test_module "transaction_snark" =
       Test_util.with_randomness 123456789 (fun () ->
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               let wallets = random_wallets ~n:3 () in
-              let signer =
-                Keypair.of_private_key_exn wallets.(0).private_key
-              in
-              let fee_payer_pk = Public_key.compress signer.public_key in
+              let signer = wallets.(0).private_key in
+              let fee_payer_pk = wallets.(0).account.public_key in
               let token_owner_pk = wallets.(1).account.public_key in
               let receiver_pk = wallets.(2).account.public_key in
               let fee_token = Token_id.default in
@@ -4528,10 +4497,8 @@ let%test_module "transaction_snark" =
       Test_util.with_randomness 123456789 (fun () ->
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               let wallets = random_wallets ~n:2 () in
-              let signer =
-                Keypair.of_private_key_exn wallets.(0).private_key
-              in
-              let fee_payer_pk = Public_key.compress signer.public_key in
+              let signer = wallets.(0).private_key in
+              let fee_payer_pk = wallets.(0).account.public_key in
               (* Any existing account will work for this. *)
               let token_owner_pk = fee_payer_pk in
               let receiver_pk = wallets.(1).account.public_key in
