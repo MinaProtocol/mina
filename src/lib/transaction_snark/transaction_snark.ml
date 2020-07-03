@@ -3695,7 +3695,7 @@ let%test_module "transaction_snark" =
         ~carryforward1:false ~carryforward2:false
 
     let test_user_command_with_accounts ~constraint_constants ~ledger ~accounts
-        ~signer ~fee ~fee_payer_pk ~fee_token ?memo ~valid_until ~nonce body =
+        ~signer ~fee ~fee_payer_pk ~fee_token ?memo ~valid_until ?nonce body =
       let memo =
         match memo with
         | Some memo ->
@@ -3709,6 +3709,24 @@ let%test_module "transaction_snark" =
           Ledger.create_new_account_exn ledger
             (Account.identifier account)
             account ) ;
+      let get_account aid =
+        Option.bind
+          (Ledger.location_of_account ledger aid)
+          ~f:(Ledger.get ledger)
+      in
+      let nonce =
+        match nonce with
+        | Some nonce ->
+            nonce
+        | None -> (
+          match get_account (Account_id.create fee_payer_pk fee_token) with
+          | Some {nonce; _} ->
+              nonce
+          | None ->
+              failwith
+                "Could not infer a valid nonce for this test. Provide one \
+                 explicitly" )
+      in
       let payload =
         User_command.Payload.create ~fee ~fee_payer_pk ~fee_token ~nonce
           ~valid_until ~memo ~body
@@ -3716,11 +3734,6 @@ let%test_module "transaction_snark" =
       let user_command = User_command.sign signer payload in
       let next_available_token = Ledger.next_available_token ledger in
       test_transaction ~constraint_constants ledger (User_command user_command) ;
-      let get_account aid =
-        Option.bind
-          (Ledger.location_of_account ledger aid)
-          ~f:(Ledger.get ledger)
-      in
       let fee_payer = User_command.Payload.fee_payer payload in
       let source = User_command.Payload.source ~next_available_token payload in
       let receiver =
@@ -3764,13 +3777,11 @@ let%test_module "transaction_snark" =
                 Amount.of_int (random_int_incl 0 30 * 1_000_000_000)
               in
               let valid_until = Global_slot.max_value in
-              let nonce = accounts.(0).nonce in
               let ( `Fee_payer_account fee_payer_account
                   , `Source_account source_account
                   , `Receiver_account receiver_account ) =
                 test_user_command_with_accounts ~constraint_constants ~ledger
                   ~accounts ~signer ~fee ~fee_payer_pk ~fee_token ~valid_until
-                  ~nonce
                   (Payment {source_pk; receiver_pk; token_id; amount})
               in
               let fee_payer_account = Option.value_exn fee_payer_account in
@@ -3817,13 +3828,11 @@ let%test_module "transaction_snark" =
                 Amount.of_int (random_int_incl 0 30 * 1_000_000_000)
               in
               let valid_until = Global_slot.max_value in
-              let nonce = accounts.(0).nonce in
               let ( `Fee_payer_account fee_payer_account
                   , `Source_account source_account
                   , `Receiver_account receiver_account ) =
                 test_user_command_with_accounts ~constraint_constants ~ledger
                   ~accounts ~signer ~fee ~fee_payer_pk ~fee_token ~valid_until
-                  ~nonce
                   (Payment {source_pk; receiver_pk; token_id; amount})
               in
               let fee_payer_account = Option.value_exn fee_payer_account in
@@ -3883,13 +3892,11 @@ let%test_module "transaction_snark" =
                 Amount.of_int (random_int_incl 0 30 * 1_000_000_000)
               in
               let valid_until = Global_slot.max_value in
-              let nonce = accounts.(0).nonce in
               let ( `Fee_payer_account fee_payer_account
                   , `Source_account source_account
                   , `Receiver_account receiver_account ) =
                 test_user_command_with_accounts ~constraint_constants ~ledger
                   ~accounts ~signer ~fee ~fee_payer_pk ~fee_token ~valid_until
-                  ~nonce
                   (Payment {source_pk; receiver_pk; token_id; amount})
               in
               let fee_payer_account = Option.value_exn fee_payer_account in
@@ -3936,13 +3943,11 @@ let%test_module "transaction_snark" =
               let fee = Fee.of_int (random_int_incl 2 15 * 1_000_000_000) in
               let amount = Amount.of_int 40_000_000_000 in
               let valid_until = Global_slot.max_value in
-              let nonce = accounts.(0).nonce in
               let ( `Fee_payer_account fee_payer_account
                   , `Source_account source_account
                   , `Receiver_account receiver_account ) =
                 test_user_command_with_accounts ~constraint_constants ~ledger
                   ~accounts ~signer ~fee ~fee_payer_pk ~fee_token ~valid_until
-                  ~nonce
                   (Payment {source_pk; receiver_pk; token_id; amount})
               in
               let fee_payer_account = Option.value_exn fee_payer_account in
@@ -3984,13 +3989,11 @@ let%test_module "transaction_snark" =
               let fee = Fee.of_int (random_int_incl 2 15 * 1_000_000_000) in
               let amount = Amount.of_int 20_000_000_000 in
               let valid_until = Global_slot.max_value in
-              let nonce = accounts.(0).nonce in
               let ( `Fee_payer_account fee_payer_account
                   , `Source_account source_account
                   , `Receiver_account receiver_account ) =
                 test_user_command_with_accounts ~constraint_constants ~ledger
                   ~accounts ~signer ~fee ~fee_payer_pk ~fee_token ~valid_until
-                  ~nonce
                   (Payment {source_pk; receiver_pk; token_id; amount})
               in
               let fee_payer_account = Option.value_exn fee_payer_account in
@@ -4033,13 +4036,11 @@ let%test_module "transaction_snark" =
               let fee = Fee.of_int (random_int_incl 2 15 * 1_000_000_000) in
               let amount = Amount.of_int 20_000_000_000 in
               let valid_until = Global_slot.max_value in
-              let nonce = accounts.(0).nonce in
               let ( `Fee_payer_account fee_payer_account
                   , `Source_account source_account
                   , `Receiver_account receiver_account ) =
                 test_user_command_with_accounts ~constraint_constants ~ledger
                   ~accounts ~signer ~fee ~fee_payer_pk ~fee_token ~valid_until
-                  ~nonce
                   (Payment {source_pk; receiver_pk; token_id; amount})
               in
               let fee_payer_account = Option.value_exn fee_payer_account in
@@ -4084,13 +4085,11 @@ let%test_module "transaction_snark" =
               in
               let fee = Fee.of_int (random_int_incl 2 15 * 1_000_000_000) in
               let valid_until = Global_slot.max_value in
-              let nonce = accounts.(0).nonce in
               let ( `Fee_payer_account fee_payer_account
                   , `Source_account source_account
                   , `Receiver_account receiver_account ) =
                 test_user_command_with_accounts ~constraint_constants ~ledger
                   ~accounts ~signer ~fee ~fee_payer_pk ~fee_token ~valid_until
-                  ~nonce
                   (Stake_delegation
                      (Set_delegate
                         {delegator= source_pk; new_delegate= receiver_pk}))
@@ -4130,13 +4129,11 @@ let%test_module "transaction_snark" =
               let accounts = [|create_account fee_payer 20_000_000_000|] in
               let fee = Fee.of_int (random_int_incl 2 15 * 1_000_000_000) in
               let valid_until = Global_slot.max_value in
-              let nonce = accounts.(0).nonce in
               let ( `Fee_payer_account fee_payer_account
                   , `Source_account source_account
                   , `Receiver_account receiver_account ) =
                 test_user_command_with_accounts ~constraint_constants ~ledger
                   ~accounts ~signer ~fee ~fee_payer_pk ~fee_token ~valid_until
-                  ~nonce
                   (Stake_delegation
                      (Set_delegate
                         {delegator= source_pk; new_delegate= receiver_pk}))
@@ -4181,13 +4178,11 @@ let%test_module "transaction_snark" =
               in
               let fee = Fee.of_int (random_int_incl 2 15 * 1_000_000_000) in
               let valid_until = Global_slot.max_value in
-              let nonce = accounts.(0).nonce in
               let ( `Fee_payer_account fee_payer_account
                   , `Source_account source_account
                   , `Receiver_account receiver_account ) =
                 test_user_command_with_accounts ~constraint_constants ~ledger
                   ~accounts ~signer ~fee ~fee_payer_pk ~fee_token ~valid_until
-                  ~nonce
                   (Stake_delegation
                      (Set_delegate
                         {delegator= source_pk; new_delegate= receiver_pk}))
@@ -4290,13 +4285,11 @@ let%test_module "transaction_snark" =
               let accounts = [|create_account fee_payer 20_000_000_000|] in
               let fee = Fee.of_int (random_int_incl 2 15 * 1_000_000_000) in
               let valid_until = Global_slot.max_value in
-              let nonce = accounts.(0).nonce in
               let ( `Fee_payer_account fee_payer_account
                   , `Source_account token_owner_account
                   , `Receiver_account _also_token_owner_account ) =
                 test_user_command_with_accounts ~constraint_constants ~ledger
                   ~accounts ~signer ~fee ~fee_payer_pk ~fee_token ~valid_until
-                  ~nonce
                   (Create_new_token {token_owner_pk})
               in
               let fee_payer_account = Option.value_exn fee_payer_account in
@@ -4334,13 +4327,11 @@ let%test_module "transaction_snark" =
               let accounts = [|create_account fee_payer 20_000_000_000|] in
               let fee = Fee.of_int (random_int_incl 2 15 * 1_000_000_000) in
               let valid_until = Global_slot.max_value in
-              let nonce = accounts.(0).nonce in
               let ( `Fee_payer_account fee_payer_account
                   , `Source_account token_owner_account
                   , `Receiver_account _also_token_owner_account ) =
                 test_user_command_with_accounts ~constraint_constants ~ledger
                   ~accounts ~signer ~fee ~fee_payer_pk ~fee_token ~valid_until
-                  ~nonce
                   (Create_new_token {token_owner_pk})
               in
               let fee_payer_account = Option.value_exn fee_payer_account in
@@ -4387,13 +4378,11 @@ let%test_module "transaction_snark" =
               in
               let fee = Fee.of_int (random_int_incl 2 15 * 1_000_000_000) in
               let valid_until = Global_slot.max_value in
-              let nonce = accounts.(0).nonce in
               let ( `Fee_payer_account fee_payer_account
                   , `Source_account token_owner_account
                   , `Receiver_account receiver_account ) =
                 test_user_command_with_accounts ~constraint_constants ~ledger
                   ~accounts ~signer ~fee ~fee_payer_pk ~fee_token ~valid_until
-                  ~nonce
                   (Create_token_account {token_owner_pk; token_id; receiver_pk})
               in
               let fee_payer_account = Option.value_exn fee_payer_account in
@@ -4442,13 +4431,11 @@ let%test_module "transaction_snark" =
               in
               let fee = Fee.of_int (random_int_incl 2 15 * 1_000_000_000) in
               let valid_until = Global_slot.max_value in
-              let nonce = accounts.(0).nonce in
               let ( `Fee_payer_account fee_payer_account
                   , `Source_account token_owner_account
                   , `Receiver_account receiver_account ) =
                 test_user_command_with_accounts ~constraint_constants ~ledger
                   ~accounts ~signer ~fee ~fee_payer_pk ~fee_token ~valid_until
-                  ~nonce
                   (Create_token_account {token_owner_pk; token_id; receiver_pk})
               in
               let fee_payer_account = Option.value_exn fee_payer_account in
@@ -4499,13 +4486,11 @@ let%test_module "transaction_snark" =
               in
               let fee = Fee.of_int (random_int_incl 2 15 * 1_000_000_000) in
               let valid_until = Global_slot.max_value in
-              let nonce = accounts.(0).nonce in
               let ( `Fee_payer_account fee_payer_account
                   , `Source_account token_owner_account
                   , `Receiver_account receiver_account ) =
                 test_user_command_with_accounts ~constraint_constants ~ledger
                   ~accounts ~signer ~fee ~fee_payer_pk ~fee_token ~valid_until
-                  ~nonce
                   (Create_token_account {token_owner_pk; token_id; receiver_pk})
               in
               let fee_payer_account = Option.value_exn fee_payer_account in
@@ -4549,13 +4534,11 @@ let%test_module "transaction_snark" =
               in
               let fee = Fee.of_int (random_int_incl 2 15 * 1_000_000_000) in
               let valid_until = Global_slot.max_value in
-              let nonce = accounts.(0).nonce in
               let ( `Fee_payer_account fee_payer_account
                   , `Source_account token_owner_account
                   , `Receiver_account receiver_account ) =
                 test_user_command_with_accounts ~constraint_constants ~ledger
                   ~accounts ~signer ~fee ~fee_payer_pk ~fee_token ~valid_until
-                  ~nonce
                   (Create_token_account {token_owner_pk; token_id; receiver_pk})
               in
               let fee_payer_account = Option.value_exn fee_payer_account in
@@ -4599,13 +4582,11 @@ let%test_module "transaction_snark" =
               in
               let fee = Fee.of_int (random_int_incl 2 15 * 1_000_000_000) in
               let valid_until = Global_slot.max_value in
-              let nonce = accounts.(0).nonce in
               let ( `Fee_payer_account fee_payer_account
                   , `Source_account token_owner_account
                   , `Receiver_account receiver_account ) =
                 test_user_command_with_accounts ~constraint_constants ~ledger
                   ~accounts ~signer ~fee ~fee_payer_pk ~fee_token ~valid_until
-                  ~nonce
                   (Create_token_account {token_owner_pk; token_id; receiver_pk})
               in
               let fee_payer_account = Option.value_exn fee_payer_account in
@@ -4642,13 +4623,11 @@ let%test_module "transaction_snark" =
               let accounts = [|create_account fee_payer 20_000_000_000|] in
               let fee = Fee.of_int (random_int_incl 2 15 * 1_000_000_000) in
               let valid_until = Global_slot.max_value in
-              let nonce = accounts.(0).nonce in
               let ( `Fee_payer_account fee_payer_account
                   , `Source_account _token_owner_account
                   , `Receiver_account receiver_account ) =
                 test_user_command_with_accounts ~constraint_constants ~ledger
                   ~accounts ~signer ~fee ~fee_payer_pk ~fee_token ~valid_until
-                  ~nonce
                   (Create_token_account {token_owner_pk; token_id; receiver_pk})
               in
               let fee_payer_account = Option.value_exn fee_payer_account in
