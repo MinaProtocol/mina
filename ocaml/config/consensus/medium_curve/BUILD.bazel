@@ -1,0 +1,14 @@
+load("@bazel_skylib//rules:common_settings.bzl", "int_setting", "string_setting")
+
+string_setting( name = "mechanism", build_setting_default = "proof_of_stake",
+                visibility = ["//visibility:public"])
+
+int_setting( name = "k", build_setting_default = 3,
+             visibility = ["//visibility:public"])
+
+int_setting( name = "c", build_setting_default = 8,
+             visibility = ["//visibility:public"])
+
+int_setting( name = "delta", build_setting_default = 2,
+             visibility = ["//visibility:public"])
+

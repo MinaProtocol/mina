@@ -1,0 +1,13 @@
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
+
+bool_flag( name = "logs", build_setting_default = True,
+           visibility = ["//visibility:public"])
+bool_flag( name = "call_logger", build_setting_default = True,
+           visibility = ["//visibility:public"])
+bool_flag( name = "tracing", build_setting_default = False,
+           visibility = ["//visibility:public"])
+bool_flag( name = "cache_exceptions", build_setting_default = False,
+           visibility = ["//visibility:public"])
+bool_flag( name = "record_async_backtraces", build_setting_default = True,
+           visibility = ["//visibility:public"])
+

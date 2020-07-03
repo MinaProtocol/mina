@@ -1,0 +1,13 @@
+load("@bazel_skylib//rules:common_settings.bzl",
+     "bool_setting", "int_setting")
+
+bool_setting( name = "with_tps_goal", build_setting_default = True,
+          visibility = ["//visibility:public"])
+
+int_setting( name = "tps_goal_x10", build_setting_default = 1,
+             visibility = ["//visibility:public"])
+int_setting( name = "txn_capacity_log2", build_setting_default = 2,
+             visibility = ["//visibility:public"])
+int_setting( name = "work_delay", build_setting_default = 2,
+             visibility = ["//visibility:public"])
+

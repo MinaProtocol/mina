@@ -1,0 +1,10 @@
+load("@bazel_skylib//rules:common_settings.bzl", "string_flag")
+
+string_flag( name = "account_creation", build_setting_default = "2",
+             visibility = ["//visibility:public"])
+string_flag( name = "txn", build_setting_default = "5",
+             visibility = ["//visibility:public"])
+string_flag( name = "snark_worker", build_setting_default = "1",
+             visibility = ["//visibility:public"])
+string_flag( name = "min_user_cmd", build_setting_default = "2",
+             visibility = ["//visibility:public"])

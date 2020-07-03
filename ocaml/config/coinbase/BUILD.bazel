@@ -1,0 +1,10 @@
+load("@bazel_skylib//rules:common_settings.bzl", "int_flag", "int_setting")
+
+int_flag( name = "coinbase", build_setting_default = 20,
+          visibility = ["//visibility:public"])
+
+int_setting( name = "standard", build_setting_default = 20,
+             visibility = ["//visibility:public"])
+int_setting( name = "realistic", build_setting_default = 20,
+             visibility = ["//visibility:public"])
+

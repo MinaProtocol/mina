@@ -1,0 +1,151 @@
+load("@obazl//ocaml:build.bzl",
+     "ocaml_binary",
+     "ocaml_library",
+     "ppx_binary",
+     "ppx_library")
+
+load("//ocaml/config:config.bzl",
+     "coda_config",
+     "coda_test_config")
+
+######## BUILD SETTINGS (uncategorized) ########
+load("@bazel_skylib//rules:common_settings.bzl",
+     "bool_flag", "bool_setting",
+     "int_flag", "int_setting",
+     "string_flag", "string_setting")
+
+# default values taken from config/dev.mlh
+string_flag( name = "protocol_version", build_setting_default = "0.1.0",
+             values = ["0.1.0"],
+             visibility = ["//visibility:public"])
+string_setting( name = "protocol_version_0_1_0", build_setting_default = "0.1.0",
+                visibility = ["//visibility:public"])
+
+bool_flag( name = "time_offsets", build_setting_default = True,
+           visibility = ["//visibility:public"])
+bool_setting( name = "time_offsets_true", build_setting_default = True,
+              visibility = ["//visibility:public"])
+bool_setting( name = "time_offsets_false", build_setting_default = True,
+              visibility = ["//visibility:public"])
+
+bool_flag( name = "with_fake_hash", build_setting_default = False,
+           visibility = ["//visibility:public"])
+bool_setting( name = "fake_hash_true", build_setting_default = True,
+              visibility = ["//visibility:public"])
+
+int_flag( name = "block_window_duration", build_setting_default = 2000,
+             visibility = ["//visibility:public"])
+int_setting( name = "block_window_duration_600", build_setting_default = 600,
+             visibility = ["//visibility:public"])
+int_setting( name = "block_window_duration_20000", build_setting_default = 20000,
+             visibility = ["//visibility:public"])
+
+bool_flag( name = "integration_tests", build_setting_default = True,
+           visibility = ["//visibility:public"])
+bool_setting( name = "integration_tests_false", build_setting_default = False,
+              visibility = ["//visibility:public"])
+
+bool_flag( name = "force_updates", build_setting_default = False,
+           visibility = ["//visibility:public"])
+bool_setting( name = "force_updates_true", build_setting_default = True,
+              visibility = ["//visibility:public"])
+
+bool_flag( name = "mock_frontend_data", build_setting_default = False,
+           visibility = ["//visibility:public"])
+bool_setting( name = "mock_frontend_data_true", build_setting_default = True,
+              visibility = ["//visibility:public"])
+
+bool_flag( name = "print_versioned_types", build_setting_default = False,
+           visibility = ["//visibility:public"])
+bool_setting( name = "print_versioned_types_true", build_setting_default = True,
+              visibility = ["//visibility:public"])
+
+string_flag( name = "daemon_expiry", build_setting_default = "never",
+             visibility = ["//visibility:public"])
+string_setting( name = "daemon_expiry_never", build_setting_default = "never",
+                visibility = ["//visibility:public"])
+string_setting( name = "daemon_expiry_2024",
+                build_setting_default = "2024-12-10 14:00:00-07:00",
+                visibility = ["//visibility:public"])
+
+bool_flag( name = "test_full_epoch", build_setting_default = False,
+           visibility = ["//visibility:public"])
+bool_setting( name = "test_full_epoch_true", build_setting_default = True,
+              visibility = ["//visibility:public"])
+
+
+################ PROFILE SELECTION ################
+# to support selection by profile we need a config setting for each
+# profile:
+config_setting( name = "config_dev",
+                flag_values = { "//ocaml/profile": "dev" })
+config_setting( name = "config_debug",
+                flag_values = { "//ocaml/profile": "debug" })
+config_setting( name = "config_fake_hash",
+                flag_values = { "//ocaml/profile": "fake_hash" })
+config_setting( name = "config_testnet_public",
+                flag_values = { "//ocaml/profile": "testnet_public" })
+
+# config_setting( name = "config_custom",
+#                 flag_values = { "//dev/profile": "any" })
+
+# build this target to verify that selecting by profile works:
+coda_test_config(
+    name="config",
+    config = select({
+        ":config_dev": ":dev",
+        ":config_debug": ":debug",
+        ":config_fake_hash": ":fake_hash",
+        ":config_testnet_public": ":testnet_public",
+        # "//conditions:default": ":config"
+    })
+)
+
+# convenience target, so //src/config will build //src/config:dev
+# alias(name = "config", actual = ":dev",
+#       visibility = ["//visibility:public"])
+
+coda_config(name="dev", # default values: dev.mlh
+            visibility = ["//visibility:public"])
+
+coda_config(
+    name = "debug", # src/config/debug.mlh
+    visibility = ["//visibility:public"],
+    # scan_state/standard.mlh
+    scan_state_transaction_capacity_log_2 = "//ocaml/config/scan_state/std:txn_capacity_log2", # 7,
+    scan_state_work_delay = "//ocaml/config/scan_state/std:work_delay", # 7, # scan_state/standard.mlh
+    debug_logs = "//ocaml/config/debug/all:logs",  # debug_level/all.mlh
+    call_logger = "//ocaml/config/debug/all:call_logger",
+    record_async_backtraces = "//ocaml/config/debug/all:record_async_backtraces",
+
+    account_creation_fee_int = "//ocaml/config/fees/std:account_creation",
+    time_offsets = "//ocaml/config:time_offsets_false"
+)
+
+coda_config(
+    name = "fake_hash",
+    visibility = ["//visibility:public"],
+    ledger_depth = "//ocaml/config/ledger_depth:tiny",
+    consensus_k = "//ocaml/config/consensus/tiny:k",
+    # scan_state/medium.mlh
+    scan_state_transaction_capacity_log_2 = "//ocaml/config/scan_state/medium:txn_capacity_log2",
+    proof_level = "//ocaml/config/proof_level:none",
+    fake_hash = ":fake_hash_true", # src/config/fake_hash.mlh
+    block_window_duration = ":block_window_duration_600"
+)
+
+coda_config(
+    name = "testnet_public",    # testnet_public.mlh
+    visibility = ["//visibility:public"],
+    ledger_depth = "//ocaml/config/ledger_depth:full",
+    consensus_k = "//ocaml/config/consensus/tiny:k",
+    # scan_state/std.mlh
+    scan_state_transaction_capacity_log_2 = "//ocaml/config/scan_state/std:txn_capacity_log2",
+    proof_level = "//ocaml/config/proof_level:full",
+    account_creation_fee_int = "//ocaml/config/fees/std:account_creation",
+    time_offsets = "//ocaml/config:time_offsets_false",
+    genesis_ledger = "//ocaml/config/genesis/ledger:testnet_postake",
+    block_window_duration = ":block_window_duration_20000",
+    integration_tests = ":integration_tests_false",
+    force_updates = ":force_updates_true"
+)

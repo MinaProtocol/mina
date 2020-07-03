@@ -1,0 +1,13 @@
+load("@bazel_skylib//rules:common_settings.bzl", "string_flag", "string_setting")
+
+string_flag( name = "proof_level", build_setting_default = "check",
+             values = ["none", "check", "full"],
+             visibility = ["//visibility:public"])
+
+string_setting( name = "none", build_setting_default = "none",
+                visibility = ["//visibility:public"])
+string_setting( name = "check", build_setting_default = "check",
+                visibility = ["//visibility:public"])
+string_setting( name = "full", build_setting_default = "full",
+                visibility = ["//visibility:public"])
+

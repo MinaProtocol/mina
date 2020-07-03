@@ -1,0 +1,21 @@
+load("@bazel_skylib//rules:common_settings.bzl",
+     "int_flag",
+     "int_setting",
+     "string_setting")
+
+# consensus mechanism is a fixed setting, only one possibility atm
+# e.g. --//ocaml/config/consensus:k=16
+int_flag( name = "k", build_setting_default = 24,
+             visibility = ["//visibility:public"])
+int_flag( name = "c", build_setting_default = 8,
+             visibility = ["//visibility:public"])
+int_flag( name = "delta", build_setting_default = 3,
+             visibility = ["//visibility:public"])
+
+# consensus:mechanism is fixed string_setting, cannot be set by command line.
+# used by profiles.
+string_setting(
+    name = "mechanism",
+    visibility = ["//visibility:public"],
+    build_setting_default = "proof_of_stake"
+)

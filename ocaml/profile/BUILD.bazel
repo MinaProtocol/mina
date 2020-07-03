@@ -1,0 +1,10 @@
+load("@bazel_skylib//rules:common_settings.bzl",
+     "bool_flag",
+     "string_flag")
+
+string_flag(
+    name = "profile",
+    visibility = ["//visibility:public"],
+    values = ["dev", "debug", "fake_hash", "testnet_public"],
+    build_setting_default = "dev",
+)
