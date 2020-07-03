@@ -238,10 +238,16 @@ let%test_module "Pagination" =
       List.map transactions_with_dates ~f:(fun (txn, _) -> txn)
 
     let add_all_transactions (t : Pagination.t) transactions_with_dates =
-      List.iter transactions_with_dates ~f:(fun (txn, time) ->
-          if Option.is_none @@ Hashtbl.find t.all_values.table txn then
-            Pagination.add t (User_command.accounts_accessed txn) txn txn time
-      )
+      ignore
+      @@ List.fold
+           ~init:Token_id.(next default)
+           transactions_with_dates
+           ~f:(fun next_available_token (txn, time) ->
+             if Option.is_none @@ Hashtbl.find t.all_values.table txn then
+               Pagination.add t
+                 (User_command.accounts_accessed ~next_available_token txn)
+                 txn txn time ;
+             User_command.next_available_token txn next_available_token )
 
     let%test_unit "We can get all values associated with a public key" =
       let trials = 10 in
@@ -256,11 +262,16 @@ let%test_module "Pagination" =
           let t = Pagination.create () in
           add_all_transactions t
             (List.map user_commands ~f:(fun txn -> (txn, time))) ;
+          let next_available_token = ref Token_id.(next default) in
           let pk1_expected_transactions =
             List.filter user_commands ~f:(fun user_command ->
                 let participants =
-                  User_command.accounts_accessed user_command
+                  User_command.accounts_accessed
+                    ~next_available_token:!next_available_token user_command
                 in
+                next_available_token :=
+                  User_command.next_available_token user_command
+                    !next_available_token ;
                 List.mem participants account_id1 ~equal:Account_id.equal )
           in
           let pk1_queried_transactions =

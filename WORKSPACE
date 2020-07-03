@@ -1141,8 +1141,6 @@ git_repository(
     name = "obazl",
     remote = "https://github.com/mobileink/obazl",
     branch = "master",
-    # commit = "e848f42ed169f69fd12d1dbacf49d5d6e38dbe15",
-    # shallow_since = "1593486114 -0500"
 )
 
 load("@obazl//ocaml:deps.bzl",

@@ -499,6 +499,8 @@ type t = Stable.Latest.t [@@deriving sexp, eq, hash, compare, yojson]
 [%%define_locally
 Stable.Latest.(public_key)]
 
+let token {Poly.token_id; _} = token_id
+
 let identifier ({public_key; token_id; _} : t) =
   Account_id.create public_key token_id
 
