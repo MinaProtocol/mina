@@ -668,7 +668,11 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           if not (receiver_location = `New) then
             failwith
               "Token owner account for newly created token already exists?!?!" ;
-          let receiver_account = {receiver_account with token_owner= true} in
+          let receiver_account =
+            { receiver_account with
+              token_permissions=
+                Token_permissions.Token_owned {disable_new_accounts= false} }
+          in
           ( [ (fee_payer_location, fee_payer_account)
             ; (receiver_location, receiver_account) ]
           , `Source_timing receiver_account.timing
@@ -702,21 +706,21 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               | `New ->
                   Or_error.errorf "Token owner account does not exist"
               | `Existing _ ->
-                  if source_account.token_owner then return source_account
-                  else
-                    Or_error.errorf
-                      "Token owner account does not own the token"
+                  return source_account
           in
           let%bind () =
-            let should_check_predicate =
-              (* TODO: Token owner permissions. *)
-              false
-            in
-            if (not should_check_predicate) || predicate_passed then return ()
-            else
-              Or_error.errorf
-                "The fee-payer is not authorised to create token accounts for \
-                 this token"
+            match source_account.token_permissions with
+            | Token_owned {disable_new_accounts} ->
+                if disable_new_accounts && not predicate_passed then
+                  Or_error.errorf
+                    "The fee-payer is not authorised to create token accounts \
+                     for this token"
+                else return ()
+            | Not_owned _ ->
+                if Token_id.(equal default) (Account_id.token_id receiver) then
+                  return ()
+                else
+                  Or_error.errorf "Token owner account does not own the token"
           in
           let source_timing = source_account.timing in
           let%map source_account =
@@ -773,12 +777,14 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                   Or_error.errorf "The token owner account does not exist"
             in
             let%bind () =
-              if account.token_owner then return ()
-              else
-                Or_error.errorf
-                  !"The claimed token owner %{sexp: Account_id.t} does not \
-                    own the token %{sexp: Token_id.t}"
-                  source token
+              match account.token_permissions with
+              | Token_owned _ ->
+                  return ()
+              | Not_owned _ ->
+                  Or_error.errorf
+                    !"The claimed token owner %{sexp: Account_id.t} does not \
+                      own the token %{sexp: Token_id.t}"
+                    source token
             in
             let source_timing = account.timing in
             let%map timing =
