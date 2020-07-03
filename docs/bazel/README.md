@@ -3,6 +3,7 @@
 **ToC**
 * [Prerequisites](#prerequisites)
 * [Getting Started](#getting-started)
+* [Configuration](#configuration)
 * [Development](development.md)
 * [Status](status.md)
 
