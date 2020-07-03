@@ -9,7 +9,7 @@ WARNING: this document is outdated by a few weeks.  Check back in a few days.
   * [OCaml](#tasks_ocaml)
   * [Go](#tasks_go)
   * [Rust](#tasks_rust)
-  * [Javascript](*tasks_js)
+  * [Javascript](#tasks_js)
   * [Integration](#tasks_integration)
 * [Status](#status)
 * [Schedule](#schedule)
