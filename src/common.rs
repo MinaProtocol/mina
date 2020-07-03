@@ -22,6 +22,12 @@ pub fn batch_dlog_accumulator_check<G: CommitmentCurve>(
     chals : &Vec<G::ScalarField>) -> bool {
 
     let k = comms.len();
+
+    if k == 0 {
+        assert_eq!(chals.len(), 0);
+        return true;
+    }
+
     let rounds = chals.len() / k;
     assert_eq!(chals.len() % rounds, 0);
 
