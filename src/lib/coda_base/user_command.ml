@@ -120,6 +120,20 @@ let next_available_token ({payload; _} : t) tid =
 let to_input (payload : Payload.t) =
   Transaction_union_payload.(to_input (of_user_command_payload payload))
 
+let check_tokens ({payload= {common= {fee_token; _}; body}; _} : t) =
+  (not (Token_id.(equal invalid) fee_token))
+  &&
+  match body with
+  | Payment {token_id; _} ->
+      not (Token_id.(equal invalid) token_id)
+  | Stake_delegation _ ->
+      true
+  | Create_new_token _ | Create_token_account _ ->
+      Token_id.(equal default) fee_token
+  | Mint_tokens {token_id; _} ->
+      (not (Token_id.(equal invalid) token_id))
+      && not (Token_id.(equal default) token_id)
+
 let sign_payload (private_key : Signature_lib.Private_key.t)
     (payload : Payload.t) : Signature.t =
   Signature_lib.Schnorr.sign private_key (to_input payload)

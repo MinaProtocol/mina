@@ -826,6 +826,8 @@ module Types = struct
               with
               | Payment {Payment_payload.Poly.amount; _} ->
                   Ok (amount |> Currency.Amount.to_uint64)
+              | Mint_tokens {amount; _} ->
+                  Ok (amount |> Currency.Amount.to_uint64)
               | Stake_delegation _
               | Create_new_token _
               | Create_token_account _ ->

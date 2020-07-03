@@ -48,6 +48,7 @@ let is_valid_user_command t (txn : User_command.t) account_opt =
   let remainder =
     let open Option.Let_syntax in
     let%bind account = account_opt
+    and () = Option.some_if (User_command.check_tokens txn) ()
     and cost =
       let fee = txn.payload.common.fee in
       match txn.payload.body with
@@ -61,6 +62,8 @@ let is_valid_user_command t (txn : User_command.t) account_opt =
               .account_creation_fee
           in
           Currency.Amount.(add_fee (of_fee account_creation_fee) fee)
+      | Mint_tokens _ ->
+          Some (Currency.Amount.of_fee fee)
     in
     Currency.Balance.sub_amount account.Account.Poly.balance cost
   in

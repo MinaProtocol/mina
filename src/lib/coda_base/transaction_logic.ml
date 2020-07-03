@@ -68,6 +68,7 @@ module Undo = struct
                 { previous_delegate: Public_key.Compressed.Stable.V1.t }
             | Create_new_token of {created_token: Token_id.Stable.V1.t}
             | Create_token_account
+            | Mint_tokens
             | Failed
           [@@deriving sexp]
 
@@ -80,6 +81,7 @@ module Undo = struct
         | Stake_delegation of {previous_delegate: Public_key.Compressed.t}
         | Create_new_token of {created_token: Token_id.t}
         | Create_token_account
+        | Mint_tokens
         | Failed
       [@@deriving sexp]
     end
@@ -194,6 +196,7 @@ module type S = sig
           | Stake_delegation of {previous_delegate: Public_key.Compressed.t}
           | Create_new_token of {created_token: Token_id.t}
           | Create_token_account
+          | Mint_tokens
           | Failed
         [@@deriving sexp]
       end
@@ -543,7 +546,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                 false
               in
               return predicate_result
-          | Payment _ | Stake_delegation _ ->
+          | Payment _ | Stake_delegation _ | Mint_tokens _ ->
               (* TODO(#4554): Hook predicate evaluation in here once implemented. *)
               Or_error.errorf
                 "The fee-payer is not authorised to issue commands for the \
@@ -736,6 +739,58 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           ( located_accounts
           , `Source_timing source_timing
           , Undo.User_command_undo.Body.Create_token_account )
+      | Mint_tokens {token_id= token; amount; _} ->
+          let%bind () =
+            if Token_id.(equal default) token then
+              Or_error.errorf "Cannot mint more of the default token"
+            else return ()
+          in
+          let%bind receiver_location, receiver_account =
+            get_with_location ledger receiver
+          in
+          let%bind () =
+            match receiver_location with
+            | `Existing _ ->
+                return ()
+            | `New ->
+                Or_error.errorf "The receiving account does not exist"
+          in
+          let%bind receiver_account =
+            let%map balance = add_amount receiver_account.balance amount in
+            {receiver_account with balance}
+          in
+          let%map source_location, source_timing, source_account =
+            let%bind location, account =
+              if Account_id.equal source receiver then
+                return (receiver_location, receiver_account)
+              else get_with_location ledger source
+            in
+            let%bind () =
+              match location with
+              | `Existing _ ->
+                  return ()
+              | `New ->
+                  Or_error.errorf "The token owner account does not exist"
+            in
+            let%bind () =
+              if account.token_owner then return ()
+              else
+                Or_error.errorf
+                  !"The claimed token owner %{sexp: Account_id.t} does not \
+                    own the token %{sexp: Token_id.t}"
+                  source token
+            in
+            let source_timing = account.timing in
+            let%map timing =
+              validate_timing ~txn_amount:Amount.zero
+                ~txn_global_slot:current_global_slot ~account
+            in
+            (location, source_timing, {account with timing})
+          in
+          ( [ (receiver_location, receiver_account)
+            ; (source_location, source_account) ]
+          , `Source_timing source_timing
+          , Undo.User_command_undo.Body.Mint_tokens )
     in
     match compute_updates () with
     | Ok (located_accounts, `Source_timing source_timing, undo_body) ->
@@ -1095,6 +1150,37 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
            the [next_available_token] did not change.
         *)
         set_next_available_token ledger next_available_token
+    | Mint_tokens {amount; _}, Mint_tokens ->
+        let receiver =
+          User_command.receiver ~next_available_token user_command
+        in
+        let%bind receiver_location, receiver_account =
+          let%bind location =
+            location_of_account' ledger "receiver" receiver
+          in
+          let%map account = get' ledger "receiver" location in
+          let balance =
+            Option.value_exn (Balance.sub_amount account.balance amount)
+          in
+          (location, {account with balance})
+        in
+        let%map source_location, source_account =
+          let%map location, account =
+            if Account_id.equal source receiver then
+              return (receiver_location, receiver_account)
+            else
+              let%bind location =
+                location_of_account' ledger "source" source
+              in
+              let%map account = get' ledger "source" location in
+              (location, account)
+          in
+          ( location
+          , { account with
+              timing= Option.value ~default:account.timing source_timing } )
+        in
+        set ledger receiver_location receiver_account ;
+        set ledger source_location source_account
     | _, _ ->
         failwith "Undo/command mismatch"
 
