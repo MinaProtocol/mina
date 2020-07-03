@@ -31,11 +31,11 @@ let%test_module "proof-tests" =
     *)
 
     [%%if
-    curve_size = 382]
+    curve_size = 255]
 
     let%test "proof serialization v1" =
-      let proof = dummy in
-      let known_good_digest = "80043203dfe5eedf7d22998c83d03be1" in
+      let proof = blockchain_dummy in
+      let known_good_digest = "c4ba03d2ffa30347cc354fa82ee25640" in
       Ppx_version.Serialization.check_serialization
         (module Stable.V1)
         proof known_good_digest
