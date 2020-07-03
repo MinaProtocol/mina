@@ -56,7 +56,7 @@ module Core = {
      or a string (for a formula).
    */
   let decodeGoogleSheets = sheetsData => {
-    sheetsData
+    sheetsData->Belt.Array.keep(row => Array.length(row) > 0)
     |> Array.map(row => {
          Array.map(
            cell => {
