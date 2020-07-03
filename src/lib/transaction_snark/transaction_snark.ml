@@ -3694,6 +3694,9 @@ let%test_module "transaction_snark" =
       test_base_and_merge ~state_hash_and_body1 ~state_hash_and_body2
         ~carryforward1:false ~carryforward2:false
 
+    let create_account pk token balance =
+      Account.create (Account_id.create pk token) (Balance.of_int balance)
+
     let test_user_command_with_accounts ~constraint_constants ~ledger ~accounts
         ~signer ~fee ~fee_payer_pk ~fee_token ?memo
         ?(valid_until = Global_slot.max_value) ?nonce body =
@@ -3764,14 +3767,9 @@ let%test_module "transaction_snark" =
               let token_id =
                 Quickcheck.random_value Token_id.gen_non_default
               in
-              let fee_payer = Account_id.create fee_payer_pk fee_token in
-              let source = Account_id.create source_pk token_id in
-              let create_account aid balance =
-                Account.create aid (Balance.of_int balance)
-              in
               let accounts =
-                [| create_account fee_payer 20_000_000_000
-                 ; create_account source 30_000_000_000 |]
+                [| create_account fee_payer_pk fee_token 20_000_000_000
+                 ; create_account source_pk token_id 30_000_000_000 |]
               in
               let fee = Fee.of_int (random_int_incl 2 15 * 1_000_000_000) in
               let amount =
@@ -3812,16 +3810,10 @@ let%test_module "transaction_snark" =
               let token_id =
                 Quickcheck.random_value Token_id.gen_non_default
               in
-              let fee_payer = Account_id.create fee_payer_pk fee_token in
-              let source = Account_id.create source_pk token_id in
-              let receiver = Account_id.create receiver_pk token_id in
-              let create_account aid balance =
-                Account.create aid (Balance.of_int balance)
-              in
               let accounts =
-                [| create_account fee_payer 20_000_000_000
-                 ; create_account source 30_000_000_000
-                 ; create_account receiver 0 |]
+                [| create_account fee_payer_pk fee_token 20_000_000_000
+                 ; create_account source_pk token_id 30_000_000_000
+                 ; create_account receiver_pk token_id 0 |]
               in
               let fee = Fee.of_int (random_int_incl 2 15 * 1_000_000_000) in
               let amount =
@@ -3877,14 +3869,9 @@ let%test_module "transaction_snark" =
               let token_id =
                 Quickcheck.random_value Token_id.gen_non_default
               in
-              let fee_payer = Account_id.create fee_payer_pk fee_token in
-              let source = Account_id.create source_pk token_id in
-              let create_account aid balance =
-                Account.create aid (Balance.of_int balance)
-              in
               let accounts =
-                [| create_account fee_payer 20_000_000_000
-                 ; create_account source 30_000_000_000 |]
+                [| create_account fee_payer_pk fee_token 20_000_000_000
+                 ; create_account source_pk token_id 30_000_000_000 |]
               in
               let fee = Fee.of_int 20_000_000_000 in
               let amount =
@@ -3929,14 +3916,9 @@ let%test_module "transaction_snark" =
               let token_id =
                 Quickcheck.random_value Token_id.gen_non_default
               in
-              let fee_payer = Account_id.create fee_payer_pk fee_token in
-              let source = Account_id.create source_pk token_id in
-              let create_account aid balance =
-                Account.create aid (Balance.of_int balance)
-              in
               let accounts =
-                [| create_account fee_payer 20_000_000_000
-                 ; create_account source 30_000_000_000 |]
+                [| create_account fee_payer_pk fee_token 20_000_000_000
+                 ; create_account source_pk token_id 30_000_000_000 |]
               in
               let fee = Fee.of_int (random_int_incl 2 15 * 1_000_000_000) in
               let amount = Amount.of_int 40_000_000_000 in
@@ -3978,11 +3960,9 @@ let%test_module "transaction_snark" =
               let token_id =
                 Quickcheck.random_value Token_id.gen_non_default
               in
-              let fee_payer = Account_id.create fee_payer_pk fee_token in
-              let create_account aid balance =
-                Account.create aid (Balance.of_int balance)
+              let accounts =
+                [|create_account fee_payer_pk fee_token 20_000_000_000|]
               in
-              let accounts = [|create_account fee_payer 20_000_000_000|] in
               let fee = Fee.of_int (random_int_incl 2 15 * 1_000_000_000) in
               let amount = Amount.of_int 20_000_000_000 in
               let ( `Fee_payer_account fee_payer_account
@@ -4020,14 +4000,9 @@ let%test_module "transaction_snark" =
               let token_id =
                 Quickcheck.random_value Token_id.gen_non_default
               in
-              let fee_payer = Account_id.create fee_payer_pk fee_token in
-              let source = Account_id.create source_pk token_id in
-              let create_account aid balance =
-                Account.create aid (Balance.of_int balance)
-              in
               let accounts =
-                [| create_account fee_payer 20_000_000_000
-                 ; create_account source 30_000_000_000 |]
+                [| create_account fee_payer_pk fee_token 20_000_000_000
+                 ; create_account source_pk token_id 30_000_000_000 |]
               in
               let fee = Fee.of_int (random_int_incl 2 15 * 1_000_000_000) in
               let amount = Amount.of_int 20_000_000_000 in
@@ -4067,16 +4042,10 @@ let%test_module "transaction_snark" =
               let receiver_pk = wallets.(2).account.public_key in
               let fee_token = Token_id.default in
               let token_id = Token_id.default in
-              let fee_payer = Account_id.create fee_payer_pk fee_token in
-              let source = Account_id.create source_pk token_id in
-              let receiver = Account_id.create receiver_pk token_id in
-              let create_account aid balance =
-                Account.create aid (Balance.of_int balance)
-              in
               let accounts =
-                [| create_account fee_payer 20_000_000_000
-                 ; create_account source 30_000_000_000
-                 ; create_account receiver 30_000_000_000 |]
+                [| create_account fee_payer_pk fee_token 20_000_000_000
+                 ; create_account source_pk token_id 30_000_000_000
+                 ; create_account receiver_pk token_id 30_000_000_000 |]
               in
               let fee = Fee.of_int (random_int_incl 2 15 * 1_000_000_000) in
               let ( `Fee_payer_account fee_payer_account
@@ -4116,11 +4085,9 @@ let%test_module "transaction_snark" =
               let source_pk = fee_payer_pk in
               let receiver_pk = wallets.(1).account.public_key in
               let fee_token = Token_id.default in
-              let fee_payer = Account_id.create fee_payer_pk fee_token in
-              let create_account aid balance =
-                Account.create aid (Balance.of_int balance)
+              let accounts =
+                [|create_account fee_payer_pk fee_token 20_000_000_000|]
               in
-              let accounts = [|create_account fee_payer 20_000_000_000|] in
               let fee = Fee.of_int (random_int_incl 2 15 * 1_000_000_000) in
               let ( `Fee_payer_account fee_payer_account
                   , `Source_account source_account
@@ -4160,14 +4127,9 @@ let%test_module "transaction_snark" =
               let receiver_pk = wallets.(2).account.public_key in
               let fee_token = Token_id.default in
               let token_id = Token_id.default in
-              let fee_payer = Account_id.create fee_payer_pk fee_token in
-              let receiver = Account_id.create receiver_pk token_id in
-              let create_account aid balance =
-                Account.create aid (Balance.of_int balance)
-              in
               let accounts =
-                [| create_account fee_payer 20_000_000_000
-                 ; create_account receiver 30_000_000_000 |]
+                [| create_account fee_payer_pk fee_token 20_000_000_000
+                 ; create_account receiver_pk token_id 30_000_000_000 |]
               in
               let fee = Fee.of_int (random_int_incl 2 15 * 1_000_000_000) in
               let ( `Fee_payer_account fee_payer_account
@@ -4269,12 +4231,10 @@ let%test_module "transaction_snark" =
               in
               let fee_payer_pk = Public_key.compress signer.public_key in
               let fee_token = Token_id.default in
-              let fee_payer = Account_id.create fee_payer_pk fee_token in
               let token_owner_pk = fee_payer_pk in
-              let create_account aid balance =
-                Account.create aid (Balance.of_int balance)
+              let accounts =
+                [|create_account fee_payer_pk fee_token 20_000_000_000|]
               in
-              let accounts = [|create_account fee_payer 20_000_000_000|] in
               let fee = Fee.of_int (random_int_incl 2 15 * 1_000_000_000) in
               let ( `Fee_payer_account fee_payer_account
                   , `Source_account token_owner_account
@@ -4310,12 +4270,10 @@ let%test_module "transaction_snark" =
               in
               let fee_payer_pk = Public_key.compress signer.public_key in
               let fee_token = Token_id.default in
-              let fee_payer = Account_id.create fee_payer_pk fee_token in
               let token_owner_pk = wallets.(1).account.public_key in
-              let create_account aid balance =
-                Account.create aid (Balance.of_int balance)
+              let accounts =
+                [|create_account fee_payer_pk fee_token 20_000_000_000|]
               in
-              let accounts = [|create_account fee_payer 20_000_000_000|] in
               let fee = Fee.of_int (random_int_incl 2 15 * 1_000_000_000) in
               let ( `Fee_payer_account fee_payer_account
                   , `Source_account token_owner_account
@@ -4357,14 +4315,10 @@ let%test_module "transaction_snark" =
               let token_id =
                 Quickcheck.random_value Token_id.gen_non_default
               in
-              let fee_payer = Account_id.create fee_payer_pk fee_token in
-              let token_owner = Account_id.create token_owner_pk token_id in
-              let create_account aid balance =
-                Account.create aid (Balance.of_int balance)
-              in
               let accounts =
-                [| create_account fee_payer 20_000_000_000
-                 ; {(create_account token_owner 0) with token_owner= true} |]
+                [| create_account fee_payer_pk fee_token 20_000_000_000
+                 ; { (create_account token_owner_pk token_id 0) with
+                     token_owner= true } |]
               in
               let fee = Fee.of_int (random_int_incl 2 15 * 1_000_000_000) in
               let ( `Fee_payer_account fee_payer_account
@@ -4409,14 +4363,10 @@ let%test_module "transaction_snark" =
               let token_id =
                 Quickcheck.random_value Token_id.gen_non_default
               in
-              let fee_payer = Account_id.create fee_payer_pk fee_token in
-              let token_owner = Account_id.create token_owner_pk token_id in
-              let create_account aid balance =
-                Account.create aid (Balance.of_int balance)
-              in
               let accounts =
-                [| create_account fee_payer 20_000_000_000
-                 ; {(create_account token_owner 0) with token_owner= true} |]
+                [| create_account fee_payer_pk fee_token 20_000_000_000
+                 ; { (create_account token_owner_pk token_id 0) with
+                     token_owner= true } |]
               in
               let fee = Fee.of_int (random_int_incl 2 15 * 1_000_000_000) in
               let ( `Fee_payer_account fee_payer_account
@@ -4461,16 +4411,11 @@ let%test_module "transaction_snark" =
               let token_id =
                 Quickcheck.random_value Token_id.gen_non_default
               in
-              let fee_payer = Account_id.create fee_payer_pk fee_token in
-              let token_owner = Account_id.create token_owner_pk token_id in
-              let receiver = Account_id.create receiver_pk token_id in
-              let create_account aid balance =
-                Account.create aid (Balance.of_int balance)
-              in
               let accounts =
-                [| create_account fee_payer 20_000_000_000
-                 ; {(create_account token_owner 0) with token_owner= true}
-                 ; create_account receiver 0 |]
+                [| create_account fee_payer_pk fee_token 20_000_000_000
+                 ; { (create_account token_owner_pk token_id 0) with
+                     token_owner= true }
+                 ; create_account receiver_pk token_id 0 |]
               in
               let fee = Fee.of_int (random_int_incl 2 15 * 1_000_000_000) in
               let ( `Fee_payer_account fee_payer_account
@@ -4510,14 +4455,10 @@ let%test_module "transaction_snark" =
               let token_id =
                 Quickcheck.random_value Token_id.gen_non_default
               in
-              let fee_payer = Account_id.create fee_payer_pk fee_token in
-              let token_owner = Account_id.create token_owner_pk token_id in
-              let create_account aid balance =
-                Account.create aid (Balance.of_int balance)
-              in
               let accounts =
-                [| create_account fee_payer 20_000_000_000
-                 ; {(create_account token_owner 0) with token_owner= true} |]
+                [| create_account fee_payer_pk fee_token 20_000_000_000
+                 ; { (create_account token_owner_pk token_id 0) with
+                     token_owner= true } |]
               in
               let fee = Fee.of_int (random_int_incl 2 15 * 1_000_000_000) in
               let ( `Fee_payer_account fee_payer_account
@@ -4557,14 +4498,9 @@ let%test_module "transaction_snark" =
               let token_id =
                 Quickcheck.random_value Token_id.gen_non_default
               in
-              let fee_payer = Account_id.create fee_payer_pk fee_token in
-              let token_owner = Account_id.create token_owner_pk token_id in
-              let create_account aid balance =
-                Account.create aid (Balance.of_int balance)
-              in
               let accounts =
-                [| create_account fee_payer 20_000_000_000
-                 ; create_account token_owner 0 |]
+                [| create_account fee_payer_pk fee_token 20_000_000_000
+                 ; create_account token_owner_pk token_id 0 |]
               in
               let fee = Fee.of_int (random_int_incl 2 15 * 1_000_000_000) in
               let ( `Fee_payer_account fee_payer_account
@@ -4601,11 +4537,9 @@ let%test_module "transaction_snark" =
               let receiver_pk = wallets.(1).account.public_key in
               let fee_token = Token_id.default in
               let token_id = Token_id.default in
-              let fee_payer = Account_id.create fee_payer_pk fee_token in
-              let create_account aid balance =
-                Account.create aid (Balance.of_int balance)
+              let accounts =
+                [|create_account fee_payer_pk fee_token 20_000_000_000|]
               in
-              let accounts = [|create_account fee_payer 20_000_000_000|] in
               let fee = Fee.of_int (random_int_incl 2 15 * 1_000_000_000) in
               let ( `Fee_payer_account fee_payer_account
                   , `Source_account _token_owner_account
