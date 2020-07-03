@@ -66,7 +66,7 @@ let main = () => {
       Some(totalBlocks),
     );
 
-    UploadLeaderboardData.uploadUserPointsDataSheet(spreadsheetId);
+    UploadLeaderboardData.uploadUserProfileData(spreadsheetId);
   | Error(error) => failwith(error)
   };
 };
