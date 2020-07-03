@@ -172,6 +172,8 @@ jobs:
                   command:  bash -c 'eval `opam config env` && LIBP2P_NIXLESS=1 make build_archive'
                   environment:
                     DUNE_PROFILE: testnet_postake_medium_curves
+                  paths:
+                    - "/home/opam/.cargo"
             # NOTE: If we were using a machine executor we would be able to mount the sql file in
             # as a volume for the container to seed itself, this is the workaround.
             # Ideally this DB setup step would be handled by the archive process itself.
@@ -310,6 +312,8 @@ jobs:
             - run:
                   name: Compare test signatures for consensus, nonconsensus code
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'eval `opam config env` && ./scripts/compare_test_signatures.sh'
+                  paths:
+                    - "/home/opam/.cargo"
     update-branch-protection:
         docker:
             - image: python:3
@@ -586,6 +590,8 @@ jobs:
                   environment:
                     DUNE_PROFILE: testnet_postake_medium_curves
                     EXTRA_NIX_ARGS: --option sandbox false
+                  paths:
+                    - "/home/opam/.cargo"
                   no_output_timeout: 20m
             - run:
                   name: Upload generated PV keys
