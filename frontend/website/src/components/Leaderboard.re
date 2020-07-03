@@ -1,9 +1,12 @@
 type member = {
-  rank: int,
   name: string,
-  phase: int,
-  release: int,
-  allTime: int,
+  genesisMember: bool,
+  phasePoints: int,
+  releasePoints: int,
+  allTimePoints: int,
+  releaseRank: int,
+  phaseRank: int,
+  allTimeRank: int,
 };
 
 type entry = array(string);
@@ -30,14 +33,17 @@ let fetchLeaderboard = () => {
   |> Promise.map(res => {
        Array.map(parseEntry, res)
        |> Array.map(entry => {
-            Js.log(entry);
             {
-              rank: safeParseInt(safeArrayGet(5, entry)),
-              name: safeArrayGet(0, entry),
-              phase: safeParseInt(safeArrayGet(3, entry)),
-              release: safeParseInt(safeArrayGet(4, entry)),
-              allTime: safeParseInt(safeArrayGet(2, entry)),
-            };
+              name: entry |> safeArrayGet(0),
+              genesisMember:
+                entry |> safeArrayGet(1) |> String.length == 0 ? false : true,
+              allTimePoints: entry |> safeArrayGet(2) |> safeParseInt,
+              phasePoints: entry |> safeArrayGet(3) |> safeParseInt,
+              releasePoints: entry |> safeArrayGet(4) |> safeParseInt,
+              allTimeRank: entry |> safeArrayGet(5) |> safeParseInt,
+              phaseRank: entry |> safeArrayGet(6) |> safeParseInt,
+              releaseRank: entry |> safeArrayGet(7) |> safeParseInt,
+            }
           })
      })
   |> Js.Promise.catch(_ => Promise.return([||]));
@@ -137,13 +143,13 @@ module LeaderboardRow = {
         </span>
         <span className=Styles.username> {React.string(member.name)} </span>
         <span className=Styles.activePointsCell>
-          {React.string(string_of_int(member.release))}
+          {React.string(string_of_int(member.releasePoints))}
         </span>
         <span className=Styles.inactivePointsCell>
-          {React.string(string_of_int(member.phase))}
+          {React.string(string_of_int(member.phasePoints))}
         </span>
         <span className=Styles.inactivePointsCell>
-          {React.string(string_of_int(member.allTime))}
+          {React.string(string_of_int(member.allTimePoints))}
         </span>
       </div>
     </>;
@@ -197,8 +203,8 @@ let make = () => {
       {Array.map(
          member =>
            <LeaderboardRow
-             key={string_of_int(member.rank)}
-             rank={member.rank}
+             key={string_of_int(member.allTimeRank)}
+             rank={member.allTimeRank}
              member
            />,
          Array.length(state.members) > 0

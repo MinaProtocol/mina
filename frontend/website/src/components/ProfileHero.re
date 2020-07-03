@@ -261,29 +261,29 @@ module Points = {
   };
 
   [@react.component]
-  let make = (~pointsForRelease, ~pointsForPhase, ~pointsAllTime) => {
+  let make = (~member: Leaderboard.member) => {
     <div className=Styles.pointsRow>
       <PointsColumn
         pointType="This Release"
-        rank="1"
-        points={string_of_int(pointsForRelease)}
+        rank={string_of_int(member.releaseRank)}
+        points={string_of_int(member.releasePoints)}
       />
       <PointsColumn
         pointType="This Phase"
-        rank="19"
-        points={string_of_int(pointsForPhase)}
+        rank={string_of_int(member.phaseRank)}
+        points={string_of_int(member.phasePoints)}
       />
       <PointsColumn
         pointType="All Time"
-        rank="101"
-        points={string_of_int(pointsAllTime)}
+        rank={string_of_int(member.allTimeRank)}
+        points={string_of_int(member.allTimePoints)}
       />
     </div>;
   };
 };
 
 [@react.component]
-let make = (~name, ~release, ~phase, ~allTime) => {
+let make = (~member: Leaderboard.member) => {
   <div className=Styles.linkRow>
     <Next.Link href="/testnet">
       <a className=Theme.Link.basic> {React.string("Testnet")} </a>
@@ -296,14 +296,7 @@ let make = (~name, ~release, ~phase, ~allTime) => {
     <span className=Styles.participantDetails>
       {React.string("Participant Details")}
     </span>
-    <p className=Styles.header> {React.string(name)} </p>
-    <div className=Styles.middleRow>
-      <Points
-        pointsForRelease=release
-        pointsForPhase=phase
-        pointsAllTime=allTime
-      />
-      <Links />
-    </div>
+    <p className=Styles.header> {React.string(member.name)} </p>
+    <div className=Styles.middleRow> <Points member /> <Links /> </div>
   </div>;
 };

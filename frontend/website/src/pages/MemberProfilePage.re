@@ -97,7 +97,7 @@ let fetchReleases = name => {
   let releases = [|
     ("Release 3.1", "3.1!B3:Z", 4), /* offset for challenge titles in 3.1 starts on the 4th column */
     ("Release 3.2a", "3.2a!B3:Z", 2), /* offset for challenge titles in 3.2a starts on the 2nd column */
-    ("Release 3.2b", "3.2b!B3:Z", 2) /* offset for challenge titles in 3.1 starts on the 2nd column */
+    ("Release 3.2b", "3.2b!B3:Z", 2) /* offset for challenge titles in 3.2b starts on the 2nd column */
   |];
   releases |> Array.map(release => fetchRelease(name, release));
 };
@@ -127,14 +127,17 @@ let make = () => {
 
   /* using a random member from the leaderboards to test table fetching/rendering */
   let testMember = {
-    Leaderboard.rank: 1,
-    name: "Matt Harrop / Figment Network#7027",
-    phase: 10000,
-    release: 5000,
-    allTime: 10500,
+    Leaderboard.name: "Matt Harrop / Figment Network#7027",
+    genesisMember: true,
+    phasePoints: 10000,
+    releasePoints: 5000,
+    allTimePoints: 10500,
+    allTimeRank: 1,
+    phaseRank: 5,
+    releaseRank: 10,
   };
 
-  let {Leaderboard.name, phase, release, allTime} = testMember;
+  let {Leaderboard.name} = testMember;
 
   React.useEffect0(() => {
     fetchReleases(name)
@@ -154,7 +157,7 @@ let make = () => {
   <Page title="Member Profile">
     <Wrapped>
       <div className=Styles.page>
-        <div> <ProfileHero name release phase allTime /> </div>
+        <div> <ProfileHero member=testMember /> </div>
         {state.releases
          |> Array.map((release: ChallengePointsTable.release) => {
               <div key={release.name}>
