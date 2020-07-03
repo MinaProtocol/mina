@@ -4250,7 +4250,7 @@ let%test_module "transaction_snark" =
               let signer = wallets.(0).private_key in
               (* Fee-payer and receiver are the same, token owner differs. *)
               let fee_payer_pk = wallets.(0).account.public_key in
-              let token_owner_pk = wallets.(1).public_key in
+              let token_owner_pk = wallets.(1).account.public_key in
               let receiver_pk = fee_payer_pk in
               let fee_token = Token_id.default in
               let token_id =
