@@ -1,0 +1,38 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "codanet",  ## "go_default_library",
+    srcs = [
+        "codanet.go",
+        "mplex.go",
+    ],
+    importpath = "codanet",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "@com_github_ipfs_go_ds_badger//:go_default_library",
+        "@com_github_ipfs_go_log//:go_default_library",
+        "@com_github_libp2p_go_buffer_pool//:go_default_library",
+        "@com_github_libp2p_go_libp2p//:go_default_library",
+        "@com_github_libp2p_go_libp2p//config:go_default_library",
+        "@com_github_libp2p_go_libp2p//p2p/discovery:go_default_library",
+        "@com_github_libp2p_go_libp2p_core//crypto:go_default_library",
+        "@com_github_libp2p_go_libp2p_core//host:go_default_library",
+        "@com_github_libp2p_go_libp2p_core//mux:go_default_library",
+        "@com_github_libp2p_go_libp2p_core//peer:go_default_library",
+        "@com_github_libp2p_go_libp2p_core//routing:go_default_library",
+        "@com_github_libp2p_go_libp2p_discovery//:go_default_library",
+        "@com_github_libp2p_go_libp2p_kad_dht//:go_default_library",
+        "@com_github_libp2p_go_libp2p_kad_dht//opts:go_default_library",
+        "@com_github_libp2p_go_libp2p_peerstore//pstoreds:go_default_library",
+        "@com_github_libp2p_go_libp2p_pnet//:go_default_library",
+        "@com_github_libp2p_go_libp2p_pubsub//:go_default_library",
+        "@com_github_libp2p_go_libp2p_record//:go_default_library",
+        "@com_github_libp2p_go_libp2p_secio//:go_default_library",
+        "@com_github_libp2p_go_maddr_filter//:go_default_library",
+        "@com_github_libp2p_go_stream_muxer//:go_default_library",
+        "@com_github_libp2p_go_tcp_transport//:go_default_library",
+        "@com_github_libp2p_go_ws_transport//:go_default_library",
+        "@com_github_multiformats_go_multiaddr//:go_default_library",
+        "@org_golang_x_crypto//blake2b:go_default_library",
+    ],
+)
