@@ -374,7 +374,7 @@ let%test_module "predicates" =
       test_predicate Unpacked.is_create_account (( = ) Create_account)
 
     let%test_unit "is_mint_tokens" =
-      test_predicate Unpacked.is_create_account (( = ) Mint_tokens)
+      test_predicate Unpacked.is_mint_tokens (( = ) Mint_tokens)
 
     let%test_unit "is_fee_transfer" =
       test_predicate Unpacked.is_fee_transfer (( = ) Fee_transfer)
