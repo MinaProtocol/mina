@@ -685,7 +685,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           then
             raise
               (Reject
-                 (Error.errorf
+                 (Error.createf
                     "Cannot open a disabled account in the default token")) ;
           let fee_payer_account =
             try charge_account_creation_fee_exn fee_payer_account
