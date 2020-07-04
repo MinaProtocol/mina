@@ -908,10 +908,13 @@ module Base = struct
                   public_key= Account_id.public_key receiver
                 ; token_id= Account_id.token_id receiver
                 ; token_permissions=
-                    ( if creating_new_token then
+                    ( if receiver_exists then receiver_account.token_permissions
+                    else if creating_new_token then
                       Token_permissions.Token_owned
-                        {disable_new_accounts= false}
-                    else receiver_account.token_permissions ) }
+                        {disable_new_accounts= payload.body.token_locked}
+                    else
+                      Token_permissions.Not_owned
+                        {account_disabled= payload.body.token_locked} ) }
               in
               let source_account =
                 if Account_id.equal source fee_payer then fee_payer_account
@@ -930,7 +933,11 @@ module Base = struct
                 else
                   match source_account.token_permissions with
                   | Token_owned {disable_new_accounts} ->
-                      (disable_new_accounts && not predicate_result, false)
+                      ( not
+                          ( Bool.equal payload.body.token_locked
+                              disable_new_accounts
+                          || predicate_result )
+                      , false )
                   | Not_owned {account_disabled} ->
                       (* NOTE: This [token_auth] value doesn't matter, since we
                          know that there will be a [not_token_owner] failure
@@ -938,7 +945,11 @@ module Base = struct
                          check above in the snark representation of accounts,
                          and so simplifies the snark code.
                       *)
-                      (account_disabled && not predicate_result, true)
+                      ( not
+                          ( Bool.equal payload.body.token_locked
+                              account_disabled
+                          || predicate_result )
+                      , true )
               in
               { predicate_failed= false
               ; source_not_present
@@ -1230,6 +1241,12 @@ module Base = struct
     in
     let%bind token_default =
       Token_id.(Checked.equal token (var_of_t default))
+    in
+    let%bind () =
+      [%with_label
+        "Token_locked value is compatible with the transaction kind"]
+        (Boolean.Assert.any
+           [Boolean.not payload.body.token_locked; is_create_account])
     in
     let%bind () =
       [%with_label "Validate tokens"]
@@ -1696,7 +1713,8 @@ module Base = struct
                Boolean.if_ is_empty_and_writeable ~then_:creating_new_token
                  ~else_:account.token_permissions.token_owner
              and token_locked =
-               Boolean.if_ is_empty_and_writeable ~then_:Boolean.false_
+               Boolean.if_ is_empty_and_writeable
+                 ~then_:payload.body.token_locked
                  ~else_:account.token_permissions.token_locked
              in
              { Account.Poly.balance
@@ -1812,10 +1830,16 @@ module Base = struct
              in
              let%bind () =
                [%with_label "Check that token_auth failure matches predicted"]
-                 (let%bind token_auth_failed =
+                 (let%bind token_auth_needed =
+                    Field.Checked.equal
+                      (payload.body.token_locked :> Field.Var.t)
+                      (account.token_permissions.token_locked :> Field.Var.t)
+                    >>| Boolean.not
+                  in
+                  let%bind token_auth_failed =
                     Boolean.(
                       all
-                        [ account.token_permissions.token_locked
+                        [ token_auth_needed
                         ; not token_default
                         ; is_create_account
                         ; not creating_new_token
@@ -4279,7 +4303,8 @@ let%test_module "transaction_snark" =
                   , `Receiver_account _also_token_owner_account ) =
                 test_user_command_with_accounts ~constraint_constants ~ledger
                   ~accounts ~signer ~fee ~fee_payer_pk ~fee_token
-                  (Create_new_token {token_owner_pk})
+                  (Create_new_token
+                     {token_owner_pk; disable_new_accounts= false})
               in
               let fee_payer_account = Option.value_exn fee_payer_account in
               let token_owner_account = Option.value_exn token_owner_account in
@@ -4316,7 +4341,8 @@ let%test_module "transaction_snark" =
                   , `Receiver_account _also_token_owner_account ) =
                 test_user_command_with_accounts ~constraint_constants ~ledger
                   ~accounts ~signer ~fee ~fee_payer_pk ~fee_token
-                  (Create_new_token {token_owner_pk})
+                  (Create_new_token
+                     {token_owner_pk; disable_new_accounts= false})
               in
               let fee_payer_account = Option.value_exn fee_payer_account in
               let token_owner_account = Option.value_exn token_owner_account in
@@ -4360,7 +4386,11 @@ let%test_module "transaction_snark" =
                   , `Receiver_account receiver_account ) =
                 test_user_command_with_accounts ~constraint_constants ~ledger
                   ~accounts ~signer ~fee ~fee_payer_pk ~fee_token
-                  (Create_token_account {token_owner_pk; token_id; receiver_pk})
+                  (Create_token_account
+                     { token_owner_pk
+                     ; token_id
+                     ; receiver_pk
+                     ; account_disabled= false })
               in
               let fee_payer_account = Option.value_exn fee_payer_account in
               let token_owner_account = Option.value_exn token_owner_account in
@@ -4406,7 +4436,11 @@ let%test_module "transaction_snark" =
                   , `Receiver_account receiver_account ) =
                 test_user_command_with_accounts ~constraint_constants ~ledger
                   ~accounts ~signer ~fee ~fee_payer_pk ~fee_token
-                  (Create_token_account {token_owner_pk; token_id; receiver_pk})
+                  (Create_token_account
+                     { token_owner_pk
+                     ; token_id
+                     ; receiver_pk
+                     ; account_disabled= false })
               in
               let fee_payer_account = Option.value_exn fee_payer_account in
               let token_owner_account = Option.value_exn token_owner_account in
@@ -4453,7 +4487,11 @@ let%test_module "transaction_snark" =
                   , `Receiver_account receiver_account ) =
                 test_user_command_with_accounts ~constraint_constants ~ledger
                   ~accounts ~signer ~fee ~fee_payer_pk ~fee_token
-                  (Create_token_account {token_owner_pk; token_id; receiver_pk})
+                  (Create_token_account
+                     { token_owner_pk
+                     ; token_id
+                     ; receiver_pk
+                     ; account_disabled= false })
               in
               let fee_payer_account = Option.value_exn fee_payer_account in
               let token_owner_account = Option.value_exn token_owner_account in
@@ -4500,7 +4538,11 @@ let%test_module "transaction_snark" =
                   , `Receiver_account receiver_account ) =
                 test_user_command_with_accounts ~constraint_constants ~ledger
                   ~accounts ~signer ~fee ~fee_payer_pk ~fee_token
-                  (Create_token_account {token_owner_pk; token_id; receiver_pk})
+                  (Create_token_account
+                     { token_owner_pk
+                     ; token_id
+                     ; receiver_pk
+                     ; account_disabled= false })
               in
               let fee_payer_account = Option.value_exn fee_payer_account in
               let token_owner_account = Option.value_exn token_owner_account in
@@ -4539,7 +4581,11 @@ let%test_module "transaction_snark" =
                   , `Receiver_account receiver_account ) =
                 test_user_command_with_accounts ~constraint_constants ~ledger
                   ~accounts ~signer ~fee ~fee_payer_pk ~fee_token
-                  (Create_token_account {token_owner_pk; token_id; receiver_pk})
+                  (Create_token_account
+                     { token_owner_pk
+                     ; token_id
+                     ; receiver_pk
+                     ; account_disabled= false })
               in
               let fee_payer_account = Option.value_exn fee_payer_account in
               let token_owner_account = Option.value_exn token_owner_account in
@@ -4579,7 +4625,11 @@ let%test_module "transaction_snark" =
                   , `Receiver_account receiver_account ) =
                 test_user_command_with_accounts ~constraint_constants ~ledger
                   ~accounts ~signer ~fee ~fee_payer_pk ~fee_token
-                  (Create_token_account {token_owner_pk; token_id; receiver_pk})
+                  (Create_token_account
+                     { token_owner_pk
+                     ; token_id
+                     ; receiver_pk
+                     ; account_disabled= false })
               in
               let fee_payer_account = Option.value_exn fee_payer_account in
               let token_owner_account = Option.value_exn token_owner_account in
@@ -4618,7 +4668,11 @@ let%test_module "transaction_snark" =
                   , `Receiver_account receiver_account ) =
                 test_user_command_with_accounts ~constraint_constants ~ledger
                   ~accounts ~signer ~fee ~fee_payer_pk ~fee_token
-                  (Create_token_account {token_owner_pk; token_id; receiver_pk})
+                  (Create_token_account
+                     { token_owner_pk
+                     ; token_id
+                     ; receiver_pk
+                     ; account_disabled= false })
               in
               let fee_payer_account = Option.value_exn fee_payer_account in
               let token_owner_account = Option.value_exn token_owner_account in
@@ -4652,7 +4706,11 @@ let%test_module "transaction_snark" =
                   , `Receiver_account receiver_account ) =
                 test_user_command_with_accounts ~constraint_constants ~ledger
                   ~accounts ~signer ~fee ~fee_payer_pk ~fee_token
-                  (Create_token_account {token_owner_pk; token_id; receiver_pk})
+                  (Create_token_account
+                     { token_owner_pk
+                     ; token_id
+                     ; receiver_pk
+                     ; account_disabled= false })
               in
               let fee_payer_account = Option.value_exn fee_payer_account in
               let receiver_account = Option.value_exn receiver_account in

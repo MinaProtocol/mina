@@ -656,7 +656,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             ; (source_location, source_account) ]
           , `Source_timing source_timing
           , Undo.User_command_undo.Body.Payment {previous_empty_accounts} )
-      | Create_new_token _ ->
+      | Create_new_token {disable_new_accounts; _} ->
           (* NOTE: source and receiver are definitionally equal here. *)
           let fee_payer_account =
             try charge_account_creation_fee_exn fee_payer_account
@@ -671,14 +671,14 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           let receiver_account =
             { receiver_account with
               token_permissions=
-                Token_permissions.Token_owned {disable_new_accounts= false} }
+                Token_permissions.Token_owned {disable_new_accounts} }
           in
           ( [ (fee_payer_location, fee_payer_account)
             ; (receiver_location, receiver_account) ]
           , `Source_timing receiver_account.timing
           , Undo.User_command_undo.Body.Create_new_token
               {created_token= next_available_token} )
-      | Create_token_account _ ->
+      | Create_token_account {account_disabled; _} ->
           let fee_payer_account =
             try charge_account_creation_fee_exn fee_payer_account
             with exn -> raise (Reject (Error.of_exn exn))
@@ -711,7 +711,11 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           let%bind () =
             match source_account.token_permissions with
             | Token_owned {disable_new_accounts} ->
-                if disable_new_accounts && not predicate_passed then
+                if
+                  not
+                    ( Bool.equal account_disabled disable_new_accounts
+                    || predicate_passed )
+                then
                   Or_error.errorf
                     "The fee-payer is not authorised to create token accounts \
                      for this token"
