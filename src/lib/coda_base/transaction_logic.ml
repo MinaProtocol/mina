@@ -694,6 +694,11 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                 Or_error.errorf
                   "Attempted to create an account that already exists"
           in
+          let receiver_account =
+            { receiver_account with
+              token_permissions= Token_permissions.Not_owned {account_disabled}
+            }
+          in
           let%bind source_location, source_account =
             get_with_location ledger source
           in

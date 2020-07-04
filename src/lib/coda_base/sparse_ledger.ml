@@ -342,6 +342,11 @@ let apply_user_command_exn
         in
         if action = `Existed then
           failwith "Attempted to create an account that already exists" ;
+        let receiver_account =
+          { receiver_account with
+            token_permissions= Token_permissions.Not_owned {account_disabled}
+          }
+        in
         let source_idx = find_index_exn t source in
         let source_account =
           if Account_id.equal source receiver then receiver_account
