@@ -1243,10 +1243,15 @@ module Base = struct
       Token_id.(Checked.equal token (var_of_t default))
     in
     let%bind () =
-      [%with_label
-        "Token_locked value is compatible with the transaction kind"]
-        (Boolean.Assert.any
-           [Boolean.not payload.body.token_locked; is_create_account])
+      Checked.all_unit
+        [ [%with_label
+            "Token_locked value is compatible with the transaction kind"]
+            (Boolean.Assert.any
+               [Boolean.not payload.body.token_locked; is_create_account])
+        ; [%with_label "Token_locked cannot be used with the default token"]
+            (Boolean.Assert.any
+               [ Boolean.not payload.body.token_locked
+               ; Boolean.not token_default ]) ]
     in
     let%bind () =
       [%with_label "Validate tokens"]

@@ -332,6 +332,13 @@ let apply_user_command_exn
         in
         [(fee_payer_idx, fee_payer_account); (receiver_idx, receiver_account)]
     | Create_token_account {account_disabled; _} ->
+        if
+          account_disabled
+          && not (Token_id.(equal default) (Account_id.token_id receiver))
+        then
+          raise
+            (Reject
+               (Failure "Cannot open a disabled account in the default token")) ;
         let fee_payer_account =
           try charge_account_creation_fee_exn fee_payer_account
           with exn -> raise (Reject exn)

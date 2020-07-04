@@ -679,6 +679,14 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           , Undo.User_command_undo.Body.Create_new_token
               {created_token= next_available_token} )
       | Create_token_account {account_disabled; _} ->
+          if
+            account_disabled
+            && not (Token_id.(equal default) (Account_id.token_id receiver))
+          then
+            raise
+              (Reject
+                 (Error.errorf
+                    "Cannot open a disabled account in the default token")) ;
           let fee_payer_account =
             try charge_account_creation_fee_exn fee_payer_account
             with exn -> raise (Reject (Error.of_exn exn))
