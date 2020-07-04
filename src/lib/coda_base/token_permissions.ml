@@ -3,6 +3,13 @@
 
 open Core_kernel
 
+[%%ifndef
+consensus_mechanism]
+
+open Import
+
+[%%endif]
+
 [%%versioned
 module Stable = struct
   module V1 = struct
@@ -21,6 +28,12 @@ type t = Stable.Latest.t =
 [@@deriving compare, eq, sexp, hash, yojson]
 
 let default = Not_owned {account_disabled= false}
+
+let to_input = function
+  | Token_owned {disable_new_accounts} ->
+      Random_oracle.Input.bitstring [true; disable_new_accounts]
+  | Not_owned {account_disabled} ->
+      Random_oracle.Input.bitstring [false; account_disabled]
 
 [%%ifdef
 consensus_mechanism]
@@ -67,12 +80,6 @@ let typ : (var, t) Typ.t =
         fun {token_owner; token_locked} ->
           all_unit
             [Boolean.typ.check token_owner; Boolean.typ.check token_locked]) }
-
-let to_input = function
-  | Token_owned {disable_new_accounts} ->
-      Random_oracle.Input.bitstring [true; disable_new_accounts]
-  | Not_owned {account_disabled} ->
-      Random_oracle.Input.bitstring [false; account_disabled]
 
 let var_to_input {token_owner; token_locked} =
   Random_oracle.Input.bitstring [token_owner; token_locked]
