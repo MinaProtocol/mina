@@ -137,7 +137,7 @@ module LeaderboardRow = {
   [@react.component]
   let make = (~rank, ~member) => {
     let userSlug =
-      "/leaderboard"
+      "/memberProfile"
       ++ "?allTimeRank="
       ++ member.allTimeRank->string_of_int
       ++ "&allTimePoints="
