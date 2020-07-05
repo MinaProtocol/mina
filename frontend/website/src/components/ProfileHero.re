@@ -260,23 +260,27 @@ module Points = {
     };
   };
 
+  let parsePointOrRank = n => {
+    n == 0 ? "N/A" : string_of_int(n);
+  };
+
   [@react.component]
   let make = (~member: Leaderboard.member) => {
     <div className=Styles.pointsRow>
       <PointsColumn
         pointType="This Release"
-        rank={string_of_int(member.releaseRank)}
-        points={string_of_int(member.releasePoints)}
+        rank={parsePointOrRank(member.releaseRank)}
+        points={parsePointOrRank(member.releasePoints)}
       />
       <PointsColumn
         pointType="This Phase"
-        rank={string_of_int(member.phaseRank)}
-        points={string_of_int(member.phasePoints)}
+        rank={parsePointOrRank(member.phaseRank)}
+        points={parsePointOrRank(member.phasePoints)}
       />
       <PointsColumn
         pointType="All Time"
-        rank={string_of_int(member.allTimeRank)}
-        points={string_of_int(member.allTimePoints)}
+        rank={parsePointOrRank(member.allTimeRank)}
+        points={parsePointOrRank(member.allTimePoints)}
       />
     </div>;
   };
