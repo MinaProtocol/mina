@@ -49,7 +49,7 @@ let computeMapping = (usernameIndex, users, propertyMap) => {
          let property = StringMap.find(username, propertyMap);
          Belt.Array.concat(userRow, [|Some(property)|]);
        } else {
-         userRow;
+         Belt.Array.concat(userRow, [|None|]);
        };
      });
 };
