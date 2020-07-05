@@ -136,22 +136,44 @@ module Styles = {
 module LeaderboardRow = {
   [@react.component]
   let make = (~rank, ~member) => {
+    let userSlug =
+      "/leaderboard"
+      ++ "?allTimeRank="
+      ++ member.allTimeRank->string_of_int
+      ++ "&allTimePoints="
+      ++ member.allTimePoints->string_of_int
+      ++ "&phaseRank="
+      ++ member.phaseRank->string_of_int
+      ++ "&phasePoints="
+      ++ member.phasePoints->string_of_int
+      ++ "&releaseRank="
+      ++ member.releaseRank->string_of_int
+      ++ "&releasePoints="
+      ++ member.releasePoints->string_of_int
+      ++ "&genesisMember="
+      ++ member.genesisMember->string_of_bool
+      ++ "&name="
+      ++ member.name
+      |> Js.String.replaceByRe([%re "/#/g"], "%23"); /* replace "#" with percent encoding for the URL to properly parse */
+
     <>
-      <div className=Styles.leaderboardRow>
-        <span className=Styles.rank>
-          {React.string(string_of_int(rank))}
-        </span>
-        <span className=Styles.username> {React.string(member.name)} </span>
-        <span className=Styles.activePointsCell>
-          {React.string(string_of_int(member.releasePoints))}
-        </span>
-        <span className=Styles.inactivePointsCell>
-          {React.string(string_of_int(member.phasePoints))}
-        </span>
-        <span className=Styles.inactivePointsCell>
-          {React.string(string_of_int(member.allTimePoints))}
-        </span>
-      </div>
+      <Next.Link href=userSlug _as=userSlug>
+        <div className=Styles.leaderboardRow>
+          <span className=Styles.rank>
+            {React.string(string_of_int(rank))}
+          </span>
+          <span className=Styles.username> {React.string(member.name)} </span>
+          <span className=Styles.activePointsCell>
+            {React.string(string_of_int(member.releasePoints))}
+          </span>
+          <span className=Styles.inactivePointsCell>
+            {React.string(string_of_int(member.phasePoints))}
+          </span>
+          <span className=Styles.inactivePointsCell>
+            {React.string(string_of_int(member.allTimePoints))}
+          </span>
+        </div>
+      </Next.Link>
     </>;
   };
 };

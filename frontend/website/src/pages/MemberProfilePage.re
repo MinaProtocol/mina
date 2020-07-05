@@ -14,12 +14,6 @@ module Styles = {
       color(Theme.Colors.leaderboardMidnight),
       textAlign(`center),
     ]);
-
-  let divider =
-    style([
-      width(`percent(100.)),
-      border(`px(1), `dashed, `hex("C8C8C8")),
-    ]);
 };
 
 /* Adds the remaining length to the array parameter.
@@ -34,7 +28,7 @@ let normalizeGoogleSheets = (length, a) => {
   };
 };
 
-let fetchRelease = (name, release) => {
+let fetchRelease = (username, release) => {
   let (releaseName, range, challengeColumnOffset) = release;
   Sheets.fetchRange(
     ~sheet="1Nq_Y76ALzSVJRhSFZZm4pfuGbPkZs2vTtCnVQ1ehujE",
@@ -59,7 +53,8 @@ let fetchRelease = (name, release) => {
        let userInfo =
          rows
          ->Belt.Array.keep(entry =>
-             String.lowercase_ascii(entry[0]) == String.lowercase_ascii(name)
+             String.lowercase_ascii(entry[0])
+             == String.lowercase_ascii(username)
            )
          ->Array.get(0)
          ->Belt.Array.slice(
@@ -94,30 +89,34 @@ let fetchRelease = (name, release) => {
 };
 
 let fetchReleases = name => {
-  let releases = [|
+  [|
     ("Release 3.1", "3.1!B3:Z", 4), /* offset for challenge titles in 3.1 starts on the 4th column */
     ("Release 3.2a", "3.2a!B3:Z", 2), /* offset for challenge titles in 3.2a starts on the 2nd column */
     ("Release 3.2b", "3.2b!B3:Z", 2) /* offset for challenge titles in 3.2b starts on the 2nd column */
-  |];
-  releases |> Array.map(release => fetchRelease(name, release));
+  |]
+  |> Array.map(release => fetchRelease(name, release));
 };
 
 type state = {
   loading: bool,
   releases: array(ChallengePointsTable.release),
+  currentMember: option(Leaderboard.member),
 };
 
-let initialState = {loading: true, releases: [||]};
+let initialState = {loading: true, releases: [||], currentMember: None};
 
 type actions =
-  | UpdateReleaseInfo(array(ChallengePointsTable.release));
+  | UpdateReleaseInfo(array(ChallengePointsTable.release))
+  | UpdateCurrentUser(Leaderboard.member);
 
 let reducer = (prevState, action) => {
   switch (action) {
   | UpdateReleaseInfo(releases) => {
+      ...prevState,
       loading: false,
       releases: Belt.Array.concat(prevState.releases, releases),
     }
+  | UpdateCurrentUser(member) => {...prevState, currentMember: Some(member)}
   };
 };
 
@@ -125,39 +124,61 @@ let reducer = (prevState, action) => {
 let make = () => {
   let (state, dispatch) = React.useReducer(reducer, initialState);
 
-  /* using a random member from the leaderboards to test table fetching/rendering */
-  let testMember = {
-    Leaderboard.name: "Matt Harrop / Figment Network#7027",
-    genesisMember: true,
-    phasePoints: 10000,
-    releasePoints: 5000,
-    allTimePoints: 10500,
-    allTimeRank: 1,
-    phaseRank: 5,
-    releaseRank: 10,
-  };
+  let router = Next.Router.useRouter();
 
-  let {Leaderboard.name} = testMember;
-
-  React.useEffect0(() => {
-    fetchReleases(name)
-    |> Array.iter(e => {
-         e
-         |> Promise.iter(releaseInfo => {
-              switch (releaseInfo) {
-              | Some(releaseInfo) =>
-                dispatch(UpdateReleaseInfo([|releaseInfo|]))
-              | None => ()
-              }
-            })
-       });
-    None;
-  });
+  React.useEffect1(
+    () => {
+      if (router.query |> Js.Dict.values |> Array.length > 0) {
+        let member = {
+          Leaderboard.name:
+            Js.Dict.get(router.query, "name")->Belt.Option.getExn,
+          genesisMember:
+            Js.Dict.get(router.query, "genesisMember")->Belt.Option.getExn
+            |> bool_of_string,
+          phasePoints:
+            Js.Dict.get(router.query, "phasePoints")->Belt.Option.getExn
+            |> int_of_string,
+          releasePoints:
+            Js.Dict.get(router.query, "releasePoints")->Belt.Option.getExn
+            |> int_of_string,
+          allTimePoints:
+            Js.Dict.get(router.query, "allTimePoints")->Belt.Option.getExn
+            |> int_of_string,
+          allTimeRank:
+            Js.Dict.get(router.query, "allTimeRank")->Belt.Option.getExn
+            |> int_of_string,
+          phaseRank:
+            Js.Dict.get(router.query, "phaseRank")->Belt.Option.getExn
+            |> int_of_string,
+          releaseRank:
+            Js.Dict.get(router.query, "releaseRank")->Belt.Option.getExn
+            |> int_of_string,
+        };
+        dispatch(UpdateCurrentUser(member));
+        fetchReleases(member.name)
+        |> Array.iter(e => {
+             e
+             |> Promise.iter(releaseInfo => {
+                  switch (releaseInfo) {
+                  | Some(releaseInfo) =>
+                    dispatch(UpdateReleaseInfo([|releaseInfo|]))
+                  | None => ()
+                  }
+                })
+           });
+      };
+      None;
+    },
+    [|router.query|],
+  );
 
   <Page title="Member Profile">
     <Wrapped>
       <div className=Styles.page>
-        <div> <ProfileHero member=testMember /> </div>
+        {switch (state.currentMember) {
+         | Some(member) => <div> <ProfileHero member /> </div>
+         | None => React.null
+         }}
         {state.releases
          |> Array.map((release: ChallengePointsTable.release) => {
               <div key={release.name}>
@@ -169,7 +190,10 @@ let make = () => {
             })
          |> React.array}
         {state.loading
-           ? <div> {React.string("Loading...")} </div> : React.null}
+           ? <div className=Styles.loading>
+               {React.string("Loading...")}
+             </div>
+           : React.null}
       </div>
     </Wrapped>
   </Page>;
