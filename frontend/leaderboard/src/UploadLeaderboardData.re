@@ -93,37 +93,10 @@ let computeUsers = (userIndex, userData) => {
      );
 };
 
-let computeRank = (pointIndex, userIndex, pointData, users) => {
-  Belt.SortArray.stableSortBy(pointData, (firstUser, secondUser) => {
-    switch (
-      Belt.Array.get(firstUser, pointIndex),
-      Belt.Array.get(secondUser, pointIndex),
-    ) {
-    | (Some(firstUserPoints), Some(secondUserPoints)) =>
-      compare(
-        int_of_string(Belt.Option.getExn(secondUserPoints)),
-        int_of_string(Belt.Option.getExn(firstUserPoints)),
-      )
-    | (_, _) => 0
-    }
-  })
-  |> Array.mapi((place, userRow) => {
-       let username = Belt.Option.getExn(userRow[userIndex]);
-       (username, string_of_int(place + 1));
-     })
-  |> Array.fold_left(
-       (map, user) => {
-         let (name, place) = user;
-         StringMap.add(name, place, map);
-       },
-       StringMap.empty,
-     )
-  |> computeMapping(0, users);
-};
-
-let computeMemberProfileData = (allTimeData, phaseData) => {
-  let allTimeUserIndex = 4; /* usernames are located in the 4th column */
-  let phaseUserIndex = 2; /* usernames are located in the 2nd column */
+let computeMemberProfileData = (allTimeData, phaseData, releaseData) => {
+  let allTimeUserIndex = 4; /* usernames are located in the 5th column */
+  let phaseUserIndex = 2; /* usernames are located in the 3rd column */
+  let releaseUserIndex = 1; /* usernames are located in the 2nd column */
 
   /* compute users */
   computeUsers(allTimeUserIndex, allTimeData)
@@ -140,12 +113,12 @@ let computeMemberProfileData = (allTimeData, phaseData) => {
   /* compute phase rank */
   |> computeProperty(0, phaseUserIndex, phaseData)
   /* compute release rank */
-  |> computeRank(6, phaseUserIndex, phaseData);
+  |> computeProperty(0, releaseUserIndex, releaseData);
 };
 
 let uploadUserProfileData = spreadsheetId => {
   let client = createClient();
-  /* Fetch All-Time leaderboard data */
+  /* Fetch all-time leaderboard data */
   getRange(
     client,
     initSheetsQuery(
@@ -157,7 +130,7 @@ let uploadUserProfileData = spreadsheetId => {
     switch (result) {
     | Ok(allTimeResult) =>
       let allTimeData = allTimeResult |> decodeGoogleSheets;
-      /* Fetch current Phase leaderboard data */
+      /* Fetch current phase leaderboard data */
       getRange(
         client,
         initSheetsQuery(
@@ -169,24 +142,34 @@ let uploadUserProfileData = spreadsheetId => {
         switch (result) {
         | Ok(phaseResult) =>
           let phaseData = phaseResult |> decodeGoogleSheets;
-
-          let data = computeMemberProfileData(allTimeData, phaseData);
-
-          updateRange(
+          /* Fetch current release leaderboard data */
+          getRange(
             client,
-            initSheetsUpdate(
-              spreadsheetId,
-              "Member_Profile_Data!A2:Z",
-              "USER_ENTERED",
-              data,
-            ),
+            initSheetsQuery(spreadsheetId, "3.2b!A4:B", "FORMATTED_VALUE"),
             result => {
             switch (result) {
-            | Ok(_) => Js.log({j|Uploaded member data|j})
+            | Ok(releaseResult) =>
+              let releaseData = releaseResult |> decodeGoogleSheets;
+              let data =
+                computeMemberProfileData(allTimeData, phaseData, releaseData);
+
+              updateRange(
+                client,
+                initSheetsUpdate(
+                  spreadsheetId,
+                  "Member_Profile_Data!A2:Z",
+                  "USER_ENTERED",
+                  data,
+                ),
+                result => {
+                switch (result) {
+                | Ok(_) => Js.log({j|Uploaded member data|j})
+                | Error(error) => Js.log(error)
+                }
+              });
             | Error(error) => Js.log(error)
             }
           });
-          ();
         | Error(error) => Js.log(error)
         }
       });
