@@ -477,7 +477,7 @@ let make = () => {
       />
       <Member
         name="Sherry Lin"
-        title="Community Manager"
+        title="Marketing Manager"
         description="Sherry is a marketing and communications professional who enjoys \
        telling stories that resonate. Her previous experiences have been in the hardware \
        (semiconductor) space, but she is really interested in how blockchain can solve problems \
