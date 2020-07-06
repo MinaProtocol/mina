@@ -7,28 +7,29 @@ module Styles = {
       media(Theme.MediaQuery.tablet, [maxWidth(`rem(89.))]),
     ]);
 
+  let border =
+    selector(
+      "> :not(:last-child)",
+      [
+        after([
+          unsafe("content", ""),
+          display(`flex),
+          justifyContent(`center),
+          marginLeft(`zero),
+          marginRight(`zero),
+          borderBottom(`px(1), `dashed, `rgb((200, 200, 200))),
+          media(
+            Theme.MediaQuery.desktop,
+            [marginLeft(`percent(16.)), marginRight(`percent(7.))],
+          ),
+        ]),
+      ],
+    );
+
   let table =
     style([
       selector("> div", [marginTop(`rem(5.))]),
-      media(
-        Theme.MediaQuery.notMobile,
-        [
-          /* This is the bottom border under the challenge point tables */
-          selector(
-            "> :not(:last-child)",
-            [
-              after([
-                unsafe("content", ""),
-                display(`flex),
-                justifyContent(`center),
-                marginLeft(`percent(16.)),
-                marginRight(`percent(7.)),
-                borderBottom(`px(1), `dashed, `rgb((200, 200, 200))),
-              ]),
-            ],
-          ),
-        ],
-      ),
+      media(Theme.MediaQuery.notMobile, [border]),
     ]);
 
   let loading =
@@ -121,6 +122,46 @@ let fetchReleases = name => {
   |> Array.map(release => fetchRelease(name, release));
 };
 
+let parseMember = map => {
+  let memberProperties = [|
+    Js.Dict.get(map, "genesisMember"),
+    Js.Dict.get(map, "phasePoints"),
+    Js.Dict.get(map, "releasePoints"),
+    Js.Dict.get(map, "allTimePoints"),
+    Js.Dict.get(map, "allTimeRank"),
+    Js.Dict.get(map, "phaseRank"),
+    Js.Dict.get(map, "releaseRank"),
+  |];
+
+  /* Return None if a property is not present in the URL */
+  if (Belt.Array.keep(memberProperties, property => {
+        Belt.Option.isNone(property)
+      })
+      |> Array.length > 0) {
+    None;
+  } else {
+    {
+      Leaderboard.name: Js.Dict.get(map, "name")->Belt.Option.getExn,
+      genesisMember:
+        Js.Dict.get(map, "genesisMember")->Belt.Option.getExn
+        |> bool_of_string,
+      phasePoints:
+        Js.Dict.get(map, "phasePoints")->Belt.Option.getExn |> int_of_string,
+      releasePoints:
+        Js.Dict.get(map, "releasePoints")->Belt.Option.getExn |> int_of_string,
+      allTimePoints:
+        Js.Dict.get(map, "allTimePoints")->Belt.Option.getExn |> int_of_string,
+      allTimeRank:
+        Js.Dict.get(map, "allTimeRank")->Belt.Option.getExn |> int_of_string,
+      phaseRank:
+        Js.Dict.get(map, "phaseRank")->Belt.Option.getExn |> int_of_string,
+      releaseRank:
+        Js.Dict.get(map, "releaseRank")->Belt.Option.getExn |> int_of_string,
+    }
+    ->Some;
+  };
+};
+
 type state = {
   loading: bool,
   releases: array(ChallengePointsTable.release),
@@ -147,37 +188,12 @@ let reducer = (prevState, action) => {
 [@react.component]
 let make = () => {
   let (state, dispatch) = React.useReducer(reducer, initialState);
-
   let router = Next.Router.useRouter();
 
   React.useEffect1(
     () => {
-      if (router.query |> Js.Dict.values |> Array.length > 0) {
-        let member = {
-          Leaderboard.name:
-            Js.Dict.get(router.query, "name")->Belt.Option.getExn,
-          genesisMember:
-            Js.Dict.get(router.query, "genesisMember")->Belt.Option.getExn
-            |> bool_of_string,
-          phasePoints:
-            Js.Dict.get(router.query, "phasePoints")->Belt.Option.getExn
-            |> int_of_string,
-          releasePoints:
-            Js.Dict.get(router.query, "releasePoints")->Belt.Option.getExn
-            |> int_of_string,
-          allTimePoints:
-            Js.Dict.get(router.query, "allTimePoints")->Belt.Option.getExn
-            |> int_of_string,
-          allTimeRank:
-            Js.Dict.get(router.query, "allTimeRank")->Belt.Option.getExn
-            |> int_of_string,
-          phaseRank:
-            Js.Dict.get(router.query, "phaseRank")->Belt.Option.getExn
-            |> int_of_string,
-          releaseRank:
-            Js.Dict.get(router.query, "releaseRank")->Belt.Option.getExn
-            |> int_of_string,
-        };
+      switch (parseMember(router.query)) {
+      | Some(member) =>
         dispatch(UpdateCurrentUser(member));
         fetchReleases(member.name)
         |> Array.iter(e => {
@@ -190,6 +206,7 @@ let make = () => {
                   }
                 })
            });
+      | None => ()
       };
       None;
     },
