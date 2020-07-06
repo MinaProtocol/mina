@@ -1753,8 +1753,11 @@ module Base = struct
                Boolean.if_ is_empty_and_writeable ~then_:creating_new_token
                  ~else_:account.token_permissions.token_owner
              and token_locked =
+               let%bind may_set_token_permissions =
+                 Boolean.(is_set_token_permissions && not user_command_fails)
+               in
                let%bind update =
-                 Boolean.(is_empty_and_writeable || is_set_token_permissions)
+                 Boolean.(is_empty_and_writeable || may_set_token_permissions)
                in
                Boolean.if_ update ~then_:payload.body.token_locked
                  ~else_:account.token_permissions.token_locked
