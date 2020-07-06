@@ -112,7 +112,18 @@ let valid_until = Fn.compose Payload.valid_until payload
 
 let tag ({payload; _} : t) = Payload.tag payload
 
-let tag_string t = Transaction_union_tag.to_string (tag t)
+let tag_string (t : t) =
+  match t.payload.body with
+  | Payment _ ->
+      "payment"
+  | Stake_delegation _ ->
+      "delegation"
+  | Create_new_token _ ->
+      "create_token"
+  | Create_token_account _ ->
+      "create_account"
+  | Mint_tokens _ ->
+      "mint_tokens"
 
 let next_available_token ({payload; _} : t) tid =
   Payload.next_available_token payload tid
