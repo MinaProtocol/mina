@@ -37,7 +37,7 @@ module Network_manager : Test_intf.Network_manager_intf = struct
 
   type network_config = Network_config.t
 
-  type daemon_config = Demon_config.t
+  type daemon_config = Daemon_config.t
 
   let deploy _network_config _daemon_config = Deferred.Or_error.return ()
 
