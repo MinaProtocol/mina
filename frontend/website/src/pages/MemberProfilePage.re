@@ -164,15 +164,22 @@ let parseMember = map => {
 
 type state = {
   loading: bool,
+  error: bool,
   releases: array(ChallengePointsTable.release),
   currentMember: option(Leaderboard.member),
 };
 
-let initialState = {loading: true, releases: [||], currentMember: None};
+let initialState = {
+  loading: true,
+  error: false,
+  releases: [||],
+  currentMember: None,
+};
 
 type actions =
   | UpdateReleaseInfo(array(ChallengePointsTable.release))
-  | UpdateCurrentUser(Leaderboard.member);
+  | UpdateCurrentUser(Leaderboard.member)
+  | UpdateError(bool);
 
 let reducer = (prevState, action) => {
   switch (action) {
@@ -182,6 +189,7 @@ let reducer = (prevState, action) => {
       releases: Belt.Array.concat(prevState.releases, releases),
     }
   | UpdateCurrentUser(member) => {...prevState, currentMember: Some(member)}
+  | UpdateError(error) => {...prevState, error}
   };
 };
 
@@ -194,19 +202,19 @@ let make = () => {
     () => {
       switch (parseMember(router.query)) {
       | Some(member) =>
-        dispatch(UpdateCurrentUser(member));
         fetchReleases(member.name)
         |> Array.iter(e => {
              e
              |> Promise.iter(releaseInfo => {
                   switch (releaseInfo) {
                   | Some(releaseInfo) =>
-                    dispatch(UpdateReleaseInfo([|releaseInfo|]))
+                    dispatch(UpdateCurrentUser(member));
+                    dispatch(UpdateReleaseInfo([|releaseInfo|]));
                   | None => ()
                   }
                 })
-           });
-      | None => ()
+           })
+      | None => dispatch(UpdateError(true))
       };
       None;
     },
@@ -232,9 +240,14 @@ let make = () => {
               })
            |> React.array}
         </div>
-        {state.loading
+        {!state.error && state.loading
            ? <div className=Styles.loading>
                {React.string("Loading...")}
+             </div>
+           : React.null}
+        {state.error
+           ? <div className=Styles.loading>
+               {React.string("User Not Available")}
              </div>
            : React.null}
       </div>
