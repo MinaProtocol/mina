@@ -334,7 +334,7 @@ let apply_user_command_exn
     | Create_token_account {account_disabled; _} ->
         if
           account_disabled
-          && not (Token_id.(equal default) (Account_id.token_id receiver))
+          && Token_id.(equal default) (Account_id.token_id receiver)
         then
           raise
             (Reject
