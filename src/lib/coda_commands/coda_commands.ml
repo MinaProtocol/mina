@@ -62,7 +62,7 @@ let is_valid_user_command t (txn : User_command.t) account_opt =
               .account_creation_fee
           in
           Currency.Amount.(add_fee (of_fee account_creation_fee) fee)
-      | Mint_tokens _ ->
+      | Mint_tokens _ | Set_token_permissions _ | Set_account_permissions _ ->
           Some (Currency.Amount.of_fee fee)
     in
     Currency.Balance.sub_amount account.Account.Poly.balance cost

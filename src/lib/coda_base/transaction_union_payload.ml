@@ -75,6 +75,21 @@ module Body = struct
         ; token_id
         ; amount
         ; token_locked= false }
+    | Set_token_permissions {token_id; token_owner_pk; disable_new_accounts} ->
+        { tag= Tag.Set_token_permissions
+        ; source_pk= token_owner_pk
+        ; receiver_pk= token_owner_pk
+        ; token_id
+        ; amount= Currency.Amount.zero
+        ; token_locked= disable_new_accounts }
+    | Set_account_permissions {token_id; token_owner_pk; target_pk; disabled}
+      ->
+        { tag= Tag.Set_token_permissions
+        ; source_pk= token_owner_pk
+        ; receiver_pk= target_pk
+        ; token_id
+        ; amount= Currency.Amount.zero
+        ; token_locked= disabled }
 
   let gen ~fee =
     let open Quickcheck.Generator.Let_syntax in
