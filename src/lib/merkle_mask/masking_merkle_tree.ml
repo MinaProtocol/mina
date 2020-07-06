@@ -441,17 +441,19 @@ module Make (Inputs : Inputs_intf.S) = struct
 
       let set_raw_account_batch t locations_and_accounts =
         let next_available_token = next_available_token t in
-        let new_next_available_token = ref next_available_token in
-        List.iter locations_and_accounts ~f:(fun (location, account) ->
-            let token = Account.token account in
-            new_next_available_token :=
-              Token_id.max token (Token_id.next !new_next_available_token) ;
-            if Account.token_owner account then
-              Token_id.Table.set t.token_owners ~key:token
-                ~data:(Account_id.public_key (Account.identifier account)) ;
-            self_set_account t location account ) ;
-        if Token_id.(next_available_token < !new_next_available_token) then
-          set_next_available_token t !new_next_available_token
+        let new_next_available_token =
+          List.fold ~init:next_available_token locations_and_accounts
+            ~f:(fun next_available_token (location, account) ->
+              let account_token = Account.token account in
+              if Account.token_owner account then
+                Token_id.Table.set t.token_owners ~key:account_token
+                  ~data:(Account_id.public_key (Account.identifier account)) ;
+              self_set_account t location account ;
+              Token_id.max next_available_token (Token_id.next account_token)
+          )
+        in
+        if Token_id.(next_available_token < new_next_available_token) then
+          set_next_available_token t new_next_available_token
     end)
 
     let set_batch_accounts t addresses_and_accounts =

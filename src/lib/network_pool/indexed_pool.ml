@@ -45,8 +45,10 @@ type t =
    Returns None in case of overflow.
 *)
 let currency_consumed :
-    User_command.With_valid_signature.t -> Currency.Amount.t option =
- fun cmd ->
+       constraint_constants:Genesis_constants.Constraint_constants.t
+    -> User_command.With_valid_signature.t
+    -> Currency.Amount.t option =
+ fun ~constraint_constants cmd ->
   let cmd' = User_command.forget_check cmd in
   let fee_amt = Currency.Amount.of_fee @@ User_command.fee cmd' in
   Currency.Amount.(
@@ -63,12 +65,20 @@ let currency_consumed :
         else (* The payment won't affect the balance of this account. *)
           zero
     | Stake_delegation _ ->
-        zero)
+        zero
+    | Create_new_token _ ->
+        Currency.Amount.of_fee constraint_constants.account_creation_fee
+    | Create_token_account _ ->
+        Currency.Amount.of_fee constraint_constants.account_creation_fee)
 
 let currency_consumed' :
-       User_command.With_valid_signature.t
+       constraint_constants:Genesis_constants.Constraint_constants.t
+    -> User_command.With_valid_signature.t
     -> (Currency.Amount.t, [> `Overflow]) Result.t =
- fun cmd -> cmd |> currency_consumed |> Result.of_option ~error:`Overflow
+ fun ~constraint_constants cmd ->
+  cmd
+  |> currency_consumed ~constraint_constants
+  |> Result.of_option ~error:`Overflow
 
 module For_tests = struct
   (* Check the invariants of the pool structure as listed in the comment above.
@@ -78,7 +88,7 @@ module For_tests = struct
        ; all_by_sender
        ; all_by_fee
        ; size
-       ; constraint_constants= _ } ->
+       ; constraint_constants } ->
     let assert_all_by_fee tx =
       if
         Set.mem
@@ -133,10 +143,12 @@ module For_tests = struct
               ( User_command.nonce unchecked
               , Option.value_exn
                   Currency.Amount.(
-                    Option.value_exn (currency_consumed tx) + currency_acc) )
-              )
+                    Option.value_exn
+                      (currency_consumed ~constraint_constants tx)
+                    + currency_acc) ) )
             ( User_command.nonce applicable_unchecked
-            , Option.value_exn (currency_consumed applicable) )
+            , Option.value_exn
+                (currency_consumed ~constraint_constants applicable) )
             inapplicables
         in
         [%test_eq: Currency.Amount.t] currency_reserved currency_reserved' ) ;
@@ -222,7 +234,7 @@ let remove_with_dependents_exn :
        t
     -> User_command.With_valid_signature.t
     -> User_command.With_valid_signature.t Sequence.t * t =
- fun t cmd ->
+ fun ({constraint_constants; _} as t) cmd ->
   let unchecked = User_command.forget_check cmd in
   let sender = User_command.fee_payer unchecked in
   let sender_queue, reserved_currency = Map.find_exn t.all_by_sender sender in
@@ -243,7 +255,7 @@ let remove_with_dependents_exn :
         Option.value_exn
           (* safe because we check for overflow when we add commands. *)
           (let open Option.Let_syntax in
-          let%bind consumed = currency_consumed cmd' in
+          let%bind consumed = currency_consumed ~constraint_constants cmd' in
           Currency.Amount.(consumed + acc)) )
       Currency.Amount.zero drop_queue
   in
@@ -276,12 +288,13 @@ let remove_with_dependents_exn :
 (** Drop commands from the end of the queue until the total currency consumed is
     <= the current balance. *)
 let drop_until_sufficient_balance :
-       User_command.With_valid_signature.t F_sequence.t * Currency.Amount.t
+       constraint_constants:Genesis_constants.Constraint_constants.t
+    -> User_command.With_valid_signature.t F_sequence.t * Currency.Amount.t
     -> Currency.Amount.t
     -> User_command.With_valid_signature.t F_sequence.t
        * Currency.Amount.t
        * User_command.With_valid_signature.t Sequence.t =
- fun (queue, currency_reserved) current_balance ->
+ fun ~constraint_constants (queue, currency_reserved) current_balance ->
   let rec go queue' currency_reserved' dropped_so_far =
     if Currency.Amount.(currency_reserved' <= current_balance) then
       (queue', currency_reserved', dropped_so_far)
@@ -293,7 +306,9 @@ let drop_until_sufficient_balance :
              sufficient balance"
           (F_sequence.unsnoc queue')
       in
-      let consumed = Option.value_exn (currency_consumed liat) in
+      let consumed =
+        Option.value_exn (currency_consumed ~constraint_constants liat)
+      in
       go daeh
         (Option.value_exn Currency.Amount.(currency_reserved' - consumed))
         (Sequence.append dropped_so_far @@ Sequence.singleton liat)
@@ -307,7 +322,7 @@ let revalidate :
        t
     -> (Account_id.t -> Account_nonce.t * Currency.Amount.t)
     -> t * User_command.With_valid_signature.t Sequence.t =
- fun t f ->
+ fun ({constraint_constants; _} as t) f ->
   Map.fold t.all_by_sender ~init:(t, Sequence.empty)
     ~f:(fun ~key:sender
        ~data:(queue, currency_reserved)
@@ -327,12 +342,14 @@ let revalidate :
           F_sequence.foldl
             (fun c cmd ->
               Option.value_exn
-                Currency.Amount.(c - Option.value_exn (currency_consumed cmd))
-              )
+                Currency.Amount.(
+                  c
+                  - Option.value_exn
+                      (currency_consumed ~constraint_constants cmd)) )
             currency_reserved drop_queue
         in
         let keep_queue', currency_reserved'', dropped_for_balance =
-          drop_until_sufficient_balance
+          drop_until_sufficient_balance ~constraint_constants
             (keep_queue, currency_reserved')
             current_balance
         in
@@ -363,7 +380,7 @@ let handle_committed_txn :
        , [ `Queued_txns_by_sender of
            string * User_command.With_valid_signature.t Sequence.t ] )
        Result.t =
- fun t committed ~fee_payer_balance ->
+ fun ({constraint_constants; _} as t) committed ~fee_payer_balance ->
   let committed' = User_command.forget_check committed in
   let fee_payer = User_command.fee_payer committed' in
   let nonce_to_remove = User_command.nonce committed' in
@@ -384,7 +401,7 @@ let handle_committed_txn :
       else
         let first_cmd_consumed =
           (* safe since we checked this when we added it to the pool originally *)
-          Option.value_exn (currency_consumed first_cmd)
+          Option.value_exn (currency_consumed ~constraint_constants first_cmd)
         in
         let currency_reserved' =
           (* safe since the sum reserved must be >= reserved by any individual
@@ -398,7 +415,7 @@ let handle_committed_txn :
           |> Fn.flip remove_all_by_fee_exn first_cmd
         in
         let new_queued_cmds, currency_reserved'', dropped_cmds =
-          drop_until_sufficient_balance
+          drop_until_sufficient_balance ~constraint_constants
             (rest_cmds, currency_reserved')
             fee_payer_balance
         in
@@ -486,7 +503,7 @@ let rec add_from_gossip_exn :
   (* Result errors indicate problems with the command, while assert failures
      indicate bugs in Coda. *)
   let open Result.Let_syntax in
-  let%bind consumed = currency_consumed' cmd in
+  let%bind consumed = currency_consumed' ~constraint_constants cmd in
   (* C4 *)
   match Map.find t.all_by_sender fee_payer with
   | None ->
@@ -623,7 +640,9 @@ let add_from_backtrack : t -> User_command.With_valid_signature.t -> t =
   let unchecked = User_command.forget_check cmd in
   let fee_payer = User_command.fee_payer unchecked in
   let fee = User_command.fee unchecked in
-  let consumed = Option.value_exn (currency_consumed cmd) in
+  let consumed =
+    Option.value_exn (currency_consumed ~constraint_constants cmd)
+  in
   match Map.find t.all_by_sender fee_payer with
   | None ->
       { all_by_sender=
@@ -700,7 +719,7 @@ let%test_module _ =
               (Currency.Amount.of_int 500)
           in
           if
-            Option.value_exn (currency_consumed cmd)
+            Option.value_exn (currency_consumed ~constraint_constants cmd)
             |> Currency.Amount.to_int > 500
           then
             match add_res with
@@ -853,7 +872,9 @@ let%test_module _ =
             let cmd' =
               User_command.For_tests.fake_sign sender modified_payload
             in
-            let consumed = Option.value_exn (currency_consumed cmd') in
+            let consumed =
+              Option.value_exn (currency_consumed ~constraint_constants cmd')
+            in
             let%map rest =
               go
                 (Account_nonce.succ current_nonce)
@@ -928,7 +949,7 @@ let%test_module _ =
               ~f:(fun consumed_so_far cmd ->
                 Option.value_exn
                   Option.(
-                    currency_consumed cmd
+                    currency_consumed ~constraint_constants cmd
                     >>= fun consumed ->
                     Currency.Amount.(consumed + consumed_so_far)) )
           in
@@ -938,10 +959,11 @@ let%test_module _ =
             Option.value_exn
               (let open Option.Let_syntax in
               let%bind replaced_currency_consumed =
-                currency_consumed @@ List.nth_exn setup_cmds replaced_idx
+                currency_consumed ~constraint_constants
+                @@ List.nth_exn setup_cmds replaced_idx
               in
               let%bind replacer_currency_consumed =
-                currency_consumed replace_cmd
+                currency_consumed ~constraint_constants replace_cmd
               in
               let%bind a =
                 Currency.Amount.(

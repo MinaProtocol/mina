@@ -64,12 +64,17 @@ type t = Stable.Latest.t =
   ; snark_jobs: Transaction_snark_work.Info.t list
   ; proof: Proof.t }
 
-let participants {transactions= {user_commands; fee_transfers; _}; creator; _}
-    =
+let participants ~next_available_token
+    {transactions= {user_commands; fee_transfers; _}; creator; _} =
   let open Account_id.Set in
-  let user_command_set =
-    List.fold user_commands ~init:empty ~f:(fun set user_command ->
-        union set (of_list @@ User_command.accounts_accessed user_command) )
+  let _next_available_token, user_command_set =
+    List.fold user_commands ~init:(next_available_token, empty)
+      ~f:(fun (next_available_token, set) user_command ->
+        ( User_command.next_available_token user_command next_available_token
+        , union set
+            ( of_list
+            @@ User_command.accounts_accessed ~next_available_token
+                 user_command ) ) )
   in
   let fee_transfer_participants =
     List.fold fee_transfers ~init:empty ~f:(fun set ft ->
@@ -86,7 +91,8 @@ let participant_pks
     List.fold user_commands ~init:empty ~f:(fun set user_command ->
         union set @@ of_list
         @@ List.map ~f:Account_id.public_key
-        @@ User_command.accounts_accessed user_command )
+        @@ User_command.accounts_accessed
+             ~next_available_token:Token_id.invalid user_command )
   in
   let fee_transfer_participants =
     List.fold fee_transfers ~init:empty ~f:(fun set ft ->
@@ -114,62 +120,78 @@ let of_transition external_transition tracked_participants
     ; consensus_state=
         External_transition.Validated.consensus_state external_transition }
   in
-  let transactions =
+  let next_available_token =
+    protocol_state.blockchain_state.snarked_next_available_token
+  in
+  let transactions, _next_available_token =
     List.fold calculated_transactions
       ~init:
-        { Transactions.user_commands= []
-        ; fee_transfers= []
-        ; coinbase= Currency.Amount.zero
-        ; coinbase_receiver= None } ~f:(fun acc_transactions -> function
-      | User_command checked_user_command -> (
-          let user_command = User_command.forget_check checked_user_command in
-          let should_include_transaction user_command participants =
-            List.exists (User_command.accounts_accessed user_command)
-              ~f:(fun account_id ->
-                Public_key.Compressed.Set.mem participants
-                  (Account_id.public_key account_id) )
-          in
-          match tracked_participants with
-          | `Some interested_participants
-            when not
-                   (should_include_transaction user_command
-                      interested_participants) ->
-              acc_transactions
-          | _ ->
-              { acc_transactions with
-                user_commands= user_command :: acc_transactions.user_commands
-              } )
-      | Fee_transfer fee_transfer ->
-          let fee_transfer_list =
-            Coda_base.Fee_transfer.to_list fee_transfer
-          in
-          let fee_transfers =
+        ( { Transactions.user_commands= []
+          ; fee_transfers= []
+          ; coinbase= Currency.Amount.zero
+          ; coinbase_receiver= None }
+        , next_available_token )
+      ~f:(fun (acc_transactions, next_available_token) -> function
+        | User_command checked_user_command -> (
+            let user_command =
+              User_command.forget_check checked_user_command
+            in
+            let should_include_transaction user_command participants =
+              List.exists
+                (User_command.accounts_accessed ~next_available_token
+                   user_command) ~f:(fun account_id ->
+                  Public_key.Compressed.Set.mem participants
+                    (Account_id.public_key account_id) )
+            in
             match tracked_participants with
-            | `All ->
-                fee_transfer_list
-            | `Some interested_participants ->
-                List.filter
-                  ~f:(fun {receiver_pk= pk; _} ->
-                    Public_key.Compressed.Set.mem interested_participants pk )
+            | `Some interested_participants
+              when not
+                     (should_include_transaction user_command
+                        interested_participants) ->
+                ( acc_transactions
+                , User_command.next_available_token user_command
+                    next_available_token )
+            | `All | `Some _ ->
+                (* Should include this command. *)
+                ( { acc_transactions with
+                    user_commands=
+                      user_command :: acc_transactions.user_commands }
+                , User_command.next_available_token user_command
+                    next_available_token ) ) | Fee_transfer fee_transfer ->
+            let fee_transfer_list =
+              Coda_base.Fee_transfer.to_list fee_transfer
+            in
+            let fee_transfers =
+              match tracked_participants with
+              | `All ->
                   fee_transfer_list
-          in
-          { acc_transactions with
-            fee_transfers= fee_transfers @ acc_transactions.fee_transfers }
-      | Coinbase {Coinbase.amount; fee_transfer; receiver} ->
-          let fee_transfer =
-            Option.map ~f:Coinbase_fee_transfer.to_fee_transfer fee_transfer
-          in
-          let fee_transfers =
-            List.append
-              (Option.to_list fee_transfer)
-              acc_transactions.fee_transfers
-          in
-          { acc_transactions with
-            fee_transfers
-          ; coinbase_receiver= Some receiver
-          ; coinbase=
-              Currency.Amount.(
-                Option.value_exn (add amount acc_transactions.coinbase)) } )
+              | `Some interested_participants ->
+                  List.filter
+                    ~f:(fun {receiver_pk= pk; _} ->
+                      Public_key.Compressed.Set.mem interested_participants pk
+                      )
+                    fee_transfer_list
+            in
+            ( { acc_transactions with
+                fee_transfers= fee_transfers @ acc_transactions.fee_transfers
+              }
+            , next_available_token )
+        | Coinbase {Coinbase.amount; fee_transfer; receiver} ->
+            let fee_transfer =
+              Option.map ~f:Coinbase_fee_transfer.to_fee_transfer fee_transfer
+            in
+            let fee_transfers =
+              List.append
+                (Option.to_list fee_transfer)
+                acc_transactions.fee_transfers
+            in
+            ( { acc_transactions with
+                fee_transfers
+              ; coinbase_receiver= Some receiver
+              ; coinbase=
+                  Currency.Amount.(
+                    Option.value_exn (add amount acc_transactions.coinbase)) }
+            , next_available_token ) )
   in
   let snark_jobs =
     List.map

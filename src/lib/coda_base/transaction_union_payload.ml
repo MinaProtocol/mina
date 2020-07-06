@@ -45,6 +45,18 @@ module Body = struct
         ; receiver_pk= new_delegate
         ; token_id= Token_id.default
         ; amount= Currency.Amount.zero }
+    | Create_new_token {token_owner_pk} ->
+        { tag= Tag.Create_account
+        ; source_pk= token_owner_pk
+        ; receiver_pk= token_owner_pk
+        ; token_id= Token_id.invalid
+        ; amount= Currency.Amount.zero }
+    | Create_token_account {token_id; token_owner_pk; receiver_pk} ->
+        { tag= Tag.Create_account
+        ; source_pk= token_owner_pk
+        ; receiver_pk
+        ; token_id
+        ; amount= Currency.Amount.zero }
 
   let gen ~fee =
     let open Quickcheck.Generator.Let_syntax in
@@ -231,3 +243,14 @@ let supply_increase (payload : payload) =
       payload.body.amount
   | Payment | Stake_delegation | Create_account | Fee_transfer ->
       Amount.zero
+
+let next_available_token (payload : payload) tid =
+  match payload.body.tag with
+  | Payment | Stake_delegation | Coinbase | Fee_transfer ->
+      tid
+  | Create_account when Token_id.(equal invalid) payload.body.token_id ->
+      (* Creating a new token. *)
+      Token_id.next tid
+  | Create_account ->
+      (* Creating an account for an existing token. *)
+      tid
