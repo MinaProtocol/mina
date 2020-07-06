@@ -9,7 +9,7 @@ let JobSpec = ../Pipeline/JobSpec.dhall
 
 let Command = ../Command/Base.dhall
 let OpamInit = ../Command/OpamInit.dhall
-let Docker = ../Command/Docker/Type.dhall
+let Summon = ../Command/Summon/Type.dhall
 let Size = ../Command/Size.dhall
 let Libp2p = ../Command/Libp2pHelperBuild.dhall
 
@@ -37,7 +37,7 @@ Pipeline.build
           label = "Build artifacts",
           key = "artifacts-build",
           target = Size.Large,
-          docker = None Docker.Type
+          summon = Some Summon::{=}
         }
     ]
   }
