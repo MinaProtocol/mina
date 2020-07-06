@@ -5161,6 +5161,188 @@ let%test_module "transaction_snark" =
                 Balance.equal accounts.(1).balance token_owner_account.balance
               ) ;
               assert (Option.is_none receiver_account) ) )
+
+    let%test_unit "set token permissions" =
+      Test_util.with_randomness 123456789 (fun () ->
+          Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
+              let wallets = random_wallets ~n:1 () in
+              let signer = wallets.(0).private_key in
+              let fee_payer_pk = wallets.(0).account.public_key in
+              let token_owner_pk = fee_payer_pk in
+              let fee_token = Token_id.default in
+              let token_id =
+                Quickcheck.random_value Token_id.gen_non_default
+              in
+              let accounts =
+                [| create_account fee_payer_pk fee_token 20_000_000_000
+                 ; { (create_account token_owner_pk token_id 0) with
+                     token_permissions=
+                       Token_owned {disable_new_accounts= false} } |]
+              in
+              let fee = Fee.of_int (random_int_incl 2 15 * 1_000_000_000) in
+              let ( `Fee_payer_account fee_payer_account
+                  , `Source_account _also_token_owner_account
+                  , `Receiver_account token_owner_account ) =
+                test_user_command_with_accounts ~constraint_constants ~ledger
+                  ~accounts ~signer ~fee ~fee_payer_pk ~fee_token
+                  (Set_token_permissions
+                     {token_owner_pk; token_id; disable_new_accounts= true})
+              in
+              let fee_payer_account = Option.value_exn fee_payer_account in
+              let token_owner_account = Option.value_exn token_owner_account in
+              let expected_fee_payer_balance =
+                accounts.(0).balance |> sub_fee fee
+              in
+              assert (
+                Balance.equal fee_payer_account.balance
+                  expected_fee_payer_balance ) ;
+              assert (
+                Balance.equal accounts.(1).balance token_owner_account.balance
+              ) ;
+              assert (
+                Token_permissions.equal
+                  (Token_owned {disable_new_accounts= true})
+                  token_owner_account.token_permissions ) ) )
+
+    let%test_unit "set token permissions fails if not owner" =
+      Test_util.with_randomness 123456789 (fun () ->
+          Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
+              let wallets = random_wallets ~n:1 () in
+              let signer = wallets.(0).private_key in
+              (* Fee-payer and fee payer are the same, receiver differs. *)
+              let fee_payer_pk = wallets.(0).account.public_key in
+              let token_owner_pk = fee_payer_pk in
+              let fee_token = Token_id.default in
+              let token_id =
+                Quickcheck.random_value Token_id.gen_non_default
+              in
+              let accounts =
+                [| create_account fee_payer_pk fee_token 20_000_000_000
+                 ; { (create_account token_owner_pk token_id 0) with
+                     token_permissions= Not_owned {account_disabled= false} }
+                |]
+              in
+              let fee = Fee.of_int (random_int_incl 2 15 * 1_000_000_000) in
+              let ( `Fee_payer_account fee_payer_account
+                  , `Source_account _also_token_owner_account
+                  , `Receiver_account token_owner_account ) =
+                test_user_command_with_accounts ~constraint_constants ~ledger
+                  ~accounts ~signer ~fee ~fee_payer_pk ~fee_token
+                  (Set_token_permissions
+                     {token_owner_pk; token_id; disable_new_accounts= true})
+              in
+              let fee_payer_account = Option.value_exn fee_payer_account in
+              let token_owner_account = Option.value_exn token_owner_account in
+              let expected_fee_payer_balance =
+                accounts.(0).balance |> sub_fee fee
+              in
+              assert (
+                Balance.equal fee_payer_account.balance
+                  expected_fee_payer_balance ) ;
+              assert (
+                Balance.equal accounts.(1).balance token_owner_account.balance
+              ) ;
+              assert (
+                Token_permissions.equal
+                  (Not_owned {account_disabled= false})
+                  token_owner_account.token_permissions ) ) )
+
+    let%test_unit "set account permissions" =
+      Test_util.with_randomness 123456789 (fun () ->
+          Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
+              let wallets = random_wallets ~n:2 () in
+              let signer = wallets.(0).private_key in
+              (* Fee-payer and fee payer are the same, receiver differs. *)
+              let fee_payer_pk = wallets.(0).account.public_key in
+              let token_owner_pk = fee_payer_pk in
+              let target_pk = wallets.(1).account.public_key in
+              let fee_token = Token_id.default in
+              let token_id =
+                Quickcheck.random_value Token_id.gen_non_default
+              in
+              let accounts =
+                [| create_account fee_payer_pk fee_token 20_000_000_000
+                 ; { (create_account token_owner_pk token_id 0) with
+                     token_permissions=
+                       Token_owned {disable_new_accounts= false} }
+                 ; { (create_account target_pk token_id 0) with
+                     token_permissions= Not_owned {account_disabled= true} }
+                |]
+              in
+              let fee = Fee.of_int (random_int_incl 2 15 * 1_000_000_000) in
+              let ( `Fee_payer_account fee_payer_account
+                  , `Source_account token_owner_account
+                  , `Receiver_account target_account ) =
+                test_user_command_with_accounts ~constraint_constants ~ledger
+                  ~accounts ~signer ~fee ~fee_payer_pk ~fee_token
+                  (Set_account_permissions
+                     {token_owner_pk; token_id; target_pk; disabled= false})
+              in
+              let fee_payer_account = Option.value_exn fee_payer_account in
+              let token_owner_account = Option.value_exn token_owner_account in
+              let target_account = Option.value_exn target_account in
+              let expected_fee_payer_balance =
+                accounts.(0).balance |> sub_fee fee
+              in
+              assert (
+                Balance.equal fee_payer_account.balance
+                  expected_fee_payer_balance ) ;
+              assert (
+                Balance.equal accounts.(1).balance token_owner_account.balance
+              ) ;
+              assert (Balance.equal accounts.(2).balance target_account.balance) ;
+              assert (
+                Token_permissions.equal
+                  (Not_owned {account_disabled= false})
+                  target_account.token_permissions ) ) )
+
+    let%test_unit "set account permissions fails if not token owner" =
+      Test_util.with_randomness 123456789 (fun () ->
+          Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
+              let wallets = random_wallets ~n:2 () in
+              let signer = wallets.(0).private_key in
+              (* Fee-payer and fee payer are the same, receiver differs. *)
+              let fee_payer_pk = wallets.(0).account.public_key in
+              let token_owner_pk = fee_payer_pk in
+              let target_pk = wallets.(1).account.public_key in
+              let fee_token = Token_id.default in
+              let token_id =
+                Quickcheck.random_value Token_id.gen_non_default
+              in
+              let accounts =
+                [| create_account fee_payer_pk fee_token 20_000_000_000
+                 ; { (create_account token_owner_pk token_id 0) with
+                     token_permissions= Not_owned {account_disabled= false} }
+                 ; { (create_account target_pk token_id 0) with
+                     token_permissions= Not_owned {account_disabled= true} }
+                |]
+              in
+              let fee = Fee.of_int (random_int_incl 2 15 * 1_000_000_000) in
+              let ( `Fee_payer_account fee_payer_account
+                  , `Source_account token_owner_account
+                  , `Receiver_account target_account ) =
+                test_user_command_with_accounts ~constraint_constants ~ledger
+                  ~accounts ~signer ~fee ~fee_payer_pk ~fee_token
+                  (Set_account_permissions
+                     {token_owner_pk; token_id; target_pk; disabled= false})
+              in
+              let fee_payer_account = Option.value_exn fee_payer_account in
+              let token_owner_account = Option.value_exn token_owner_account in
+              let target_account = Option.value_exn target_account in
+              let expected_fee_payer_balance =
+                accounts.(0).balance |> sub_fee fee
+              in
+              assert (
+                Balance.equal fee_payer_account.balance
+                  expected_fee_payer_balance ) ;
+              assert (
+                Balance.equal accounts.(1).balance token_owner_account.balance
+              ) ;
+              assert (Balance.equal accounts.(2).balance target_account.balance) ;
+              assert (
+                Token_permissions.equal
+                  (Not_owned {account_disabled= true})
+                  target_account.token_permissions ) ) )
   end )
 
 let%test_module "account timing check" =
