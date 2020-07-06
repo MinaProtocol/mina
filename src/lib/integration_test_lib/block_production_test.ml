@@ -3,9 +3,9 @@ open Async_kernel
 module Node : Test_intf.Node_intf = struct
   type t = unit
 
-  let start _t = Deferred.Or_error.unit
+  let start _t = Deferred.Or_error.return ()
 
-  let stop _t = Deferred.Or_error.unit
+  let stop _t = Deferred.Or_error.return ()
 
   let send_payment _t _input = Deferred.Or_error.error_string "Not implemented"
 end
@@ -39,9 +39,9 @@ module Network_manager : Test_intf.Network_manager_intf = struct
 
   type daemon_config = Demon_config.t
 
-  let deploy _network_config _daemon_config = Deferred.unit
+  let deploy _network_config _daemon_config = Deferred.Or_error.return ()
 
-  let destroy _testnet = Deferred.unit
+  let destroy _testnet = Deferred.Or_error.return ()
 end
 
 module Log_engine = Stack_driver_log_engine.Make (Testnet)
