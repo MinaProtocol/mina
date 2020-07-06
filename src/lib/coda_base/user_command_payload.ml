@@ -217,7 +217,8 @@ module Body = struct
     let new_token_gen =
       match source_pk with
       | Some token_owner_pk ->
-          return {New_token_payload.token_owner_pk}
+          map New_token_payload.gen ~f:(fun payload ->
+              {payload with token_owner_pk} )
       | None ->
           New_token_payload.gen
     in

@@ -139,8 +139,11 @@ let check_tokens ({payload= {common= {fee_token; _}; body}; _} : t) =
       not (Token_id.(equal invalid) token_id)
   | Stake_delegation _ ->
       true
-  | Create_new_token _ | Create_token_account _ ->
+  | Create_new_token _ ->
       Token_id.(equal default) fee_token
+  | Create_token_account {token_id; account_disabled; _} ->
+      Token_id.(equal default) fee_token
+      && not (Token_id.(equal default) token_id && account_disabled)
   | Mint_tokens {token_id; _} ->
       (not (Token_id.(equal invalid) token_id))
       && not (Token_id.(equal default) token_id)

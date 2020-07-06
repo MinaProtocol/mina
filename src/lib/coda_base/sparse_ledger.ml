@@ -309,7 +309,7 @@ let apply_user_command_exn
             raise (Reject exn)
         in
         [(receiver_idx, receiver_account); (source_idx, source_account)]
-    | Create_new_token _ ->
+    | Create_new_token {disable_new_accounts; _} ->
         (* NOTE: source and receiver are definitionally equal here. *)
         let fee_payer_account =
           try charge_account_creation_fee_exn fee_payer_account
@@ -328,10 +328,17 @@ let apply_user_command_exn
         let receiver_account =
           { receiver_account with
             token_permissions=
-              Token_permissions.Token_owned {disable_new_accounts= false} }
+              Token_permissions.Token_owned {disable_new_accounts} }
         in
         [(fee_payer_idx, fee_payer_account); (receiver_idx, receiver_account)]
-    | Create_token_account _ ->
+    | Create_token_account {account_disabled; _} ->
+        if
+          account_disabled
+          && not (Token_id.(equal default) (Account_id.token_id receiver))
+        then
+          raise
+            (Reject
+               (Failure "Cannot open a disabled account in the default token")) ;
         let fee_payer_account =
           try charge_account_creation_fee_exn fee_payer_account
           with exn -> raise (Reject exn)
@@ -342,6 +349,11 @@ let apply_user_command_exn
         in
         if action = `Existed then
           failwith "Attempted to create an account that already exists" ;
+        let receiver_account =
+          { receiver_account with
+            token_permissions= Token_permissions.Not_owned {account_disabled}
+          }
+        in
         let source_idx = find_index_exn t source in
         let source_account =
           if Account_id.equal source receiver then receiver_account
@@ -356,7 +368,11 @@ let apply_user_command_exn
         let () =
           match source_account.token_permissions with
           | Token_owned {disable_new_accounts} ->
-              if disable_new_accounts && not predicate_passed then
+              if
+                not
+                  ( Bool.equal account_disabled disable_new_accounts
+                  || predicate_passed )
+              then
                 failwith
                   "The fee-payer is not authorised to create token accounts \
                    for this token"
