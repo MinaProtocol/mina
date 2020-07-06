@@ -5,11 +5,35 @@ module Styles = {
       maxWidth(`rem(58.0)),
       margin(`auto),
       media(Theme.MediaQuery.tablet, [maxWidth(`rem(89.))]),
-      selector("> :not(:first-child)", [marginTop(`rem(5.))]),
+    ]);
+
+  let table =
+    style([
+      selector("> div", [marginTop(`rem(5.))]),
+      media(
+        Theme.MediaQuery.notMobile,
+        [
+          /* This is the bottom border under the challenge point tables */
+          selector(
+            "> :not(:last-child)",
+            [
+              after([
+                unsafe("content", ""),
+                display(`flex),
+                justifyContent(`center),
+                marginLeft(`percent(16.)),
+                marginRight(`percent(7.)),
+                borderBottom(`px(1), `dashed, `rgb((200, 200, 200))),
+              ]),
+            ],
+          ),
+        ],
+      ),
     ]);
 
   let loading =
     style([
+      Theme.Typeface.ibmplexsans,
       padding(`rem(5.)),
       color(Theme.Colors.leaderboardMidnight),
       textAlign(`center),
@@ -179,16 +203,18 @@ let make = () => {
          | Some(member) => <div> <ProfileHero member /> </div>
          | None => React.null
          }}
-        {state.releases
-         |> Array.map((release: ChallengePointsTable.release) => {
-              <div key={release.name}>
-                <ChallengePointsTable
-                  releaseTitle={release.name}
-                  challenges={release.challenges}
-                />
-              </div>
-            })
-         |> React.array}
+        <div className=Styles.table>
+          {state.releases
+           |> Array.map((release: ChallengePointsTable.release) => {
+                <div key={release.name}>
+                  <ChallengePointsTable
+                    releaseTitle={release.name}
+                    challenges={release.challenges}
+                  />
+                </div>
+              })
+           |> React.array}
+        </div>
         {state.loading
            ? <div className=Styles.loading>
                {React.string("Loading...")}

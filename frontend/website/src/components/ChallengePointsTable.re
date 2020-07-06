@@ -159,6 +159,7 @@ module Styles = {
       justifyContent(`flexStart),
       fontSize(`rem(1.)),
       marginTop(`rem(1.)),
+      marginBottom(`rem(5.)),
       media(Theme.MediaQuery.notMobile, [justifyContent(`flexEnd)]),
     ]);
   };
