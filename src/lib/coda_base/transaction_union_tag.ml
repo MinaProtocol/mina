@@ -16,7 +16,12 @@ module Random_oracle = Random_oracle_nonconsensus
 
 [%%endif]
 
-type t = Payment | Stake_delegation | Fee_transfer | Coinbase
+type t =
+  | Payment
+  | Stake_delegation
+  | Create_account
+  | Fee_transfer
+  | Coinbase
 [@@deriving enum, eq, sexp]
 
 let to_string = function
@@ -24,6 +29,8 @@ let to_string = function
       "payment"
   | Stake_delegation ->
       "delegation"
+  | Create_account ->
+      "create_account"
   | Fee_transfer ->
       "fee-transfer"
   | Coinbase ->
@@ -45,6 +52,8 @@ module Bits = struct
   let payment = of_t Payment
 
   let stake_delegation = of_t Stake_delegation
+
+  let create_account = of_t Create_account
 
   let fee_transfer = of_t Fee_transfer
 
@@ -73,6 +82,7 @@ module Unpacked = struct
     type 'bool t =
       { is_payment: 'bool
       ; is_stake_delegation: 'bool
+      ; is_create_account: 'bool
       ; is_fee_transfer: 'bool
       ; is_coinbase: 'bool
       ; is_user_command: 'bool }
@@ -84,12 +94,14 @@ module Unpacked = struct
     let to_hlist
         { is_payment
         ; is_stake_delegation
+        ; is_create_account
         ; is_fee_transfer
         ; is_coinbase
         ; is_user_command } =
       H_list.
         [ is_payment
         ; is_stake_delegation
+        ; is_create_account
         ; is_fee_transfer
         ; is_coinbase
         ; is_user_command ]
@@ -97,19 +109,21 @@ module Unpacked = struct
     let of_hlist
         ([ is_payment
          ; is_stake_delegation
+         ; is_create_account
          ; is_fee_transfer
          ; is_coinbase
          ; is_user_command ] :
           (unit, _) H_list.t) =
       { is_payment
       ; is_stake_delegation
+      ; is_create_account
       ; is_fee_transfer
       ; is_coinbase
       ; is_user_command }
 
     let typ (bool : ('bool_var, 'bool) Typ.t) : ('bool_var t, 'bool t) Typ.t =
       Typ.of_hlistable
-        [bool; bool; bool; bool; bool]
+        [bool; bool; bool; bool; bool; bool]
         ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
         ~value_of_hlist:of_hlist
 
@@ -122,6 +136,7 @@ module Unpacked = struct
   let empty : t =
     { is_payment= false
     ; is_stake_delegation= false
+    ; is_create_account= false
     ; is_fee_transfer= false
     ; is_coinbase= false
     ; is_user_command= false }
@@ -130,6 +145,9 @@ module Unpacked = struct
 
   let stake_delegation =
     {empty with is_stake_delegation= true; is_user_command= true}
+
+  let create_account =
+    {empty with is_create_account= true; is_user_command= true}
 
   let fee_transfer = {empty with is_fee_transfer= true; is_user_command= false}
 
@@ -140,6 +158,7 @@ module Unpacked = struct
       List.Assoc.find ~equal:Bits.equal
         [ (Bits.payment, payment)
         ; (Bits.stake_delegation, stake_delegation)
+        ; (Bits.create_account, create_account)
         ; (Bits.fee_transfer, fee_transfer)
         ; (Bits.coinbase, coinbase) ]
         bits
@@ -154,6 +173,7 @@ module Unpacked = struct
       List.Assoc.find ~equal
         [ (payment, Bits.payment)
         ; (stake_delegation, Bits.stake_delegation)
+        ; (create_account, Bits.create_account)
         ; (fee_transfer, Bits.fee_transfer)
         ; (coinbase, Bits.coinbase) ]
         t
@@ -171,6 +191,7 @@ module Unpacked = struct
   let to_bits_var
       ({ is_payment
        ; is_stake_delegation
+       ; is_create_account
        ; is_fee_transfer
        ; is_coinbase
        ; is_user_command= _ } :
@@ -187,6 +208,7 @@ module Unpacked = struct
         ~init:Field.(Var.(constant zero, constant zero, constant zero))
         [ (Bits.payment, is_payment)
         ; (Bits.stake_delegation, is_stake_delegation)
+        ; (Bits.create_account, is_create_account)
         ; (Bits.fee_transfer, is_fee_transfer)
         ; (Bits.coinbase, is_coinbase) ]
         ~f:(fun (acc1, acc2, acc3) ((bit1, bit2, bit3), bool_var) ->
@@ -204,6 +226,7 @@ module Unpacked = struct
       check=
         (fun ( { is_payment
                ; is_stake_delegation
+               ; is_create_account
                ; is_fee_transfer
                ; is_coinbase
                ; is_user_command } as t ) ->
@@ -212,7 +235,11 @@ module Unpacked = struct
           let%bind () =
             [%with_label "Only one tag is set"]
               (Boolean.Assert.exactly_one
-                 [is_payment; is_stake_delegation; is_fee_transfer; is_coinbase])
+                 [ is_payment
+                 ; is_stake_delegation
+                 ; is_create_account
+                 ; is_fee_transfer
+                 ; is_coinbase ])
           in
           [%with_label "User command flag is correctly set"]
             (Boolean.Assert.exactly_one
@@ -221,12 +248,14 @@ module Unpacked = struct
   let constant
       ({ is_payment
        ; is_stake_delegation
+       ; is_create_account
        ; is_fee_transfer
        ; is_coinbase
        ; is_user_command } :
         t) : var =
     { is_payment= Boolean.var_of_value is_payment
     ; is_stake_delegation= Boolean.var_of_value is_stake_delegation
+    ; is_create_account= Boolean.var_of_value is_create_account
     ; is_fee_transfer= Boolean.var_of_value is_fee_transfer
     ; is_coinbase= Boolean.var_of_value is_coinbase
     ; is_user_command= Boolean.var_of_value is_user_command }
@@ -235,6 +264,8 @@ module Unpacked = struct
 
   let is_stake_delegation ({is_stake_delegation; _} : var) =
     is_stake_delegation
+
+  let is_create_account ({is_create_account; _} : var) = is_create_account
 
   let is_fee_transfer ({is_fee_transfer; _} : var) = is_fee_transfer
 
@@ -254,6 +285,8 @@ let unpacked_t_of_t = function
       Unpacked.payment
   | Stake_delegation ->
       Unpacked.stake_delegation
+  | Create_account ->
+      Unpacked.create_account
   | Fee_transfer ->
       Unpacked.fee_transfer
   | Coinbase ->
@@ -271,6 +304,7 @@ let t_of_unpacked_t (unpacked : Unpacked.t) : t =
     List.Assoc.find ~equal:Unpacked.equal
       [ (Unpacked.payment, Payment)
       ; (Unpacked.stake_delegation, Stake_delegation)
+      ; (Unpacked.create_account, Create_account)
       ; (Unpacked.fee_transfer, Fee_transfer)
       ; (Unpacked.coinbase, Coinbase) ]
       unpacked
@@ -310,6 +344,9 @@ let%test_module "predicates" =
     let%test_unit "is_stake_delegation" =
       test_predicate Unpacked.is_stake_delegation (( = ) Stake_delegation)
 
+    let%test_unit "is_create_account" =
+      test_predicate Unpacked.is_create_account (( = ) Create_account)
+
     let%test_unit "is_fee_transfer" =
       test_predicate Unpacked.is_fee_transfer (( = ) Fee_transfer)
 
@@ -318,7 +355,7 @@ let%test_module "predicates" =
 
     let%test_unit "is_user_command" =
       test_predicate Unpacked.is_user_command
-        (one_of [Payment; Stake_delegation])
+        (one_of [Payment; Stake_delegation; Create_account])
 
     let%test_unit "not_user_command" =
       test_predicate

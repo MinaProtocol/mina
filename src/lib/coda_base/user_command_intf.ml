@@ -110,11 +110,11 @@ module type S = sig
 
   val source_pk : t -> Public_key.Compressed.t
 
-  val source : t -> Account_id.t
+  val source : next_available_token:Token_id.t -> t -> Account_id.t
 
   val receiver_pk : t -> Public_key.Compressed.t
 
-  val receiver : t -> Account_id.t
+  val receiver : next_available_token:Token_id.t -> t -> Account_id.t
 
   val amount : t -> Currency.Amount.t option
 
@@ -130,6 +130,8 @@ module type S = sig
   val tag : t -> Transaction_union_tag.t
 
   val tag_string : t -> string
+
+  val next_available_token : t -> Token_id.t -> Token_id.t
 
   include Gen_intf with type t := t
 
@@ -176,7 +178,8 @@ module type S = sig
   (** Forget the signature check. *)
   val forget_check : With_valid_signature.t -> t
 
-  val accounts_accessed : t -> Account_id.t list
+  val accounts_accessed :
+    next_available_token:Token_id.t -> t -> Account_id.t list
 
   val filter_by_participant : t list -> Public_key.Compressed.t -> t list
 

@@ -8,7 +8,8 @@ module Stable = struct
     type t =
       ( Ledger_hash.Stable.V1.t
       , Account_id.Stable.V1.t
-      , Account.Stable.V1.t )
+      , Account.Stable.V1.t
+      , Token_id.Stable.V1.t )
       Sparse_ledger_lib.Sparse_ledger.T.Stable.V1.t
     [@@deriving to_yojson, sexp]
 
@@ -30,7 +31,8 @@ module Account = struct
   let data_hash = Fn.compose Ledger_hash.of_digest Account.digest
 end
 
-module M = Sparse_ledger_lib.Sparse_ledger.Make (Hash) (Account_id) (Account)
+module M =
+  Sparse_ledger_lib.Sparse_ledger.Make (Hash) (Token_id) (Account_id) (Account)
 
 [%%define_locally
 M.
@@ -42,19 +44,25 @@ M.
   , find_index_exn
   , add_path
   , merkle_root
-  , iteri )]
+  , iteri
+  , next_available_token )]
 
-let of_root ~depth (h : Ledger_hash.t) =
-  of_hash ~depth (Ledger_hash.of_digest (h :> Random_oracle.Digest.t))
+let of_root ~depth ~next_available_token (h : Ledger_hash.t) =
+  of_hash ~depth ~next_available_token
+    (Ledger_hash.of_digest (h :> Random_oracle.Digest.t))
 
 let of_ledger_root ledger =
-  of_root ~depth:(Ledger.depth ledger) (Ledger.merkle_root ledger)
+  of_root ~depth:(Ledger.depth ledger)
+    ~next_available_token:(Ledger.next_available_token ledger)
+    (Ledger.merkle_root ledger)
 
 let of_any_ledger (ledger : Ledger.Any_ledger.witness) =
   Ledger.Any_ledger.M.foldi ledger
     ~init:
       (of_root
          ~depth:(Ledger.Any_ledger.M.depth ledger)
+         ~next_available_token:
+           (Ledger.Any_ledger.M.next_available_token ledger)
          (Ledger.Any_ledger.M.merkle_root ledger))
     ~f:(fun _addr sparse_ledger account ->
       let loc =
@@ -97,6 +105,8 @@ let of_ledger_index_subset_exn (ledger : Ledger.Any_ledger.witness) indexes =
     ~init:
       (of_root
          ~depth:(Ledger.Any_ledger.M.depth ledger)
+         ~next_available_token:
+           (Ledger.Any_ledger.M.next_available_token ledger)
          (Ledger.Any_ledger.M.merkle_root ledger))
     ~f:(fun acc i ->
       let account = Ledger.Any_ledger.M.get_at_index_exn ledger i in
@@ -142,12 +152,11 @@ let sub_account_creation_fee
         sub amount (of_fee constraint_constants.account_creation_fee))
   else amount
 
-let apply_user_command_exn ~constraint_constants t
+let apply_user_command_exn ~constraint_constants ~txn_global_slot t
     ({signer; payload; signature= _} as user_command : User_command.t) =
   let open Currency in
   let signer_pk = Public_key.compress signer in
-  (* TODO: Put actual value here. See issue #4036. *)
-  let current_global_slot = Coda_numbers.Global_slot.zero in
+  let current_global_slot = txn_global_slot in
   (* Fee-payer information *)
   let fee_token = User_command.fee_token user_command in
   let fee_payer = User_command.fee_payer user_command in
@@ -177,8 +186,9 @@ let apply_user_command_exn ~constraint_constants t
   in
   (* Charge the fee. *)
   let t = set_exn t fee_payer_idx fee_payer_account in
-  let source = User_command.source user_command in
-  let receiver = User_command.receiver user_command in
+  let next_available_token = next_available_token t in
+  let source = User_command.source ~next_available_token user_command in
+  let receiver = User_command.receiver ~next_available_token user_command in
   let exception Reject of exn in
   let compute_updates () =
     (* Raise an exception if any of the invariants for the user command are not
@@ -187,12 +197,33 @@ let apply_user_command_exn ~constraint_constants t
        This must re-check the conditions in Transaction_logic, to ensure that
        the failure cases are consistent.
     *)
-    let () =
-      (* TODO: Predicates. *)
-      assert (
+    let predicate_passed =
+      if
         Public_key.Compressed.equal
           (User_command.fee_payer_pk user_command)
-          (User_command.source_pk user_command) )
+          (User_command.source_pk user_command)
+      then true
+      else
+        match payload.body with
+        | Create_new_token _ ->
+            (* Any account is allowed to create a new token associated with a
+               public key.
+            *)
+            true
+        | Create_token_account _ ->
+            (* Predicate failure is deferred here. It will be checked later. *)
+            let predicate_result =
+              (* TODO(#4554): Hook predicate evaluation in here once
+                 implemented.
+              *)
+              false
+            in
+            predicate_result
+        | Payment _ | Stake_delegation _ ->
+            (* TODO(#4554): Hook predicate evaluation in here once implemented. *)
+            failwith
+              "The fee-payer is not authorised to issue commands for the \
+               source account"
     in
     match User_command.Payload.body payload with
     | Stake_delegation _ ->
@@ -262,6 +293,100 @@ let apply_user_command_exn ~constraint_constants t
             raise (Reject exn)
         in
         [(receiver_idx, receiver_account); (source_idx, source_account)]
+    | Create_new_token _ ->
+        (* NOTE: source and receiver are definitionally equal here. *)
+        let fee_payer_account =
+          try
+            let balance =
+              Option.value_exn
+                (Balance.sub_amount fee_payer_account.balance
+                   (Amount.of_fee constraint_constants.account_creation_fee))
+            in
+            let fee_payer_account = {fee_payer_account with balance} in
+            let timing =
+              Or_error.ok_exn
+                (Transaction_logic.validate_timing ~txn_amount:Amount.zero
+                   ~txn_global_slot:current_global_slot
+                   ~account:fee_payer_account)
+            in
+            {fee_payer_account with timing}
+          with exn -> raise (Reject exn)
+        in
+        let receiver_idx = find_index_exn t receiver in
+        let action, receiver_account =
+          get_or_initialize_exn receiver t receiver_idx
+        in
+        if not (action = `Added) then
+          raise
+            (Reject
+               (Failure
+                  "Token owner account for newly created token already \
+                   exists?!?!")) ;
+        let receiver_account = {receiver_account with token_owner= true} in
+        [(fee_payer_idx, fee_payer_account); (receiver_idx, receiver_account)]
+    | Create_token_account _ ->
+        let fee_payer_account =
+          try
+            let balance =
+              Option.value_exn
+                (Balance.sub_amount fee_payer_account.balance
+                   (Amount.of_fee constraint_constants.account_creation_fee))
+            in
+            let fee_payer_account = {fee_payer_account with balance} in
+            let timing =
+              Or_error.ok_exn
+                (Transaction_logic.validate_timing ~txn_amount:Amount.zero
+                   ~txn_global_slot:current_global_slot
+                   ~account:fee_payer_account)
+            in
+            {fee_payer_account with timing}
+          with exn -> raise (Reject exn)
+        in
+        let receiver_idx = find_index_exn t receiver in
+        let action, receiver_account =
+          get_or_initialize_exn receiver t receiver_idx
+        in
+        if action = `Existed then
+          failwith "Attempted to create an account that already exists" ;
+        let source_idx = find_index_exn t source in
+        let source_account =
+          if Token_id.(equal default) (Account_id.token_id receiver) then
+            receiver_account
+          else
+            let action, source_account =
+              get_or_initialize_exn receiver t source_idx
+            in
+            if action = `Added then failwith "Source account does not exist" ;
+            if not source_account.token_owner then
+              failwith "Token owner account does not own the token" ;
+            source_account
+        in
+        let () =
+          let should_check_predicate =
+            (* TODO: Token owner permissions. *)
+            false
+          in
+          if (not should_check_predicate) || predicate_passed then ()
+          else
+            failwith
+              "The fee-payer is not authorised to create token accounts for \
+               this token"
+        in
+        let source_account =
+          let timing =
+            Or_error.ok_exn
+            @@ Transaction_logic.validate_timing ~txn_amount:Amount.zero
+                 ~txn_global_slot:current_global_slot ~account:source_account
+          in
+          {source_account with timing}
+        in
+        if Account_id.equal source receiver then
+          (* For token_id= default, we allow this *)
+          [(fee_payer_idx, fee_payer_account); (source_idx, source_account)]
+        else
+          [ (receiver_idx, receiver_account)
+          ; (fee_payer_idx, fee_payer_account)
+          ; (source_idx, source_account) ]
   in
   try
     let indexed_accounts = compute_updates () in
@@ -325,13 +450,14 @@ let apply_coinbase_exn ~constraint_constants t
   let receiver_id = Account_id.create receiver Token_id.default in
   add_to_balance t receiver_id receiver_reward
 
-let apply_transaction_exn ~constraint_constants t (transition : Transaction.t)
-    =
+let apply_transaction_exn ~constraint_constants ~txn_global_slot t
+    (transition : Transaction.t) =
   match transition with
   | Fee_transfer tr ->
       apply_fee_transfer_exn ~constraint_constants t tr
   | User_command cmd ->
-      apply_user_command_exn ~constraint_constants t (cmd :> User_command.t)
+      apply_user_command_exn ~constraint_constants ~txn_global_slot t
+        (cmd :> User_command.t)
   | Coinbase c ->
       apply_coinbase_exn ~constraint_constants t c
 

@@ -227,6 +227,8 @@ let make = (~lastManualUpdatedDate) => {
         <ToggleButtons currentToggle={state.currentToggle} onTogglePress />
         <FilterDropdown currentFilter={state.currentFilter} onFilterPress />
       </div>
+      <Spacer height=1.5 />
+      <Leaderboard />
     </Wrapped>
   </Page>;
 };
