@@ -54,19 +54,19 @@ let verify_transition ~logger ~consensus_constants ~trust_system ~verifier
     ~frontier ~unprocessed_transition_cache enveloped_transition =
   let sender = Envelope.Incoming.sender enveloped_transition in
   let genesis_state_hash = Transition_frontier.genesis_state_hash frontier in
-  let transition_with_hash = Envelope.Incoming.data enveloped_transition in
   let cached_initially_validated_transition_result =
     let open Deferred.Result.Let_syntax in
+    let transition = Envelope.Incoming.data enveloped_transition in
     let%bind initially_validated_transition =
-      External_transition.Validation.wrap transition_with_hash
+      External_transition.Validation.wrap transition
       |> External_transition.skip_time_received_validation
            `This_transition_was_not_received_via_gossip
+      |> External_transition.skip_protocol_versions_validation
+           `This_transition_has_valid_protocol_versions
       |> Fn.compose Deferred.return
            (External_transition.validate_genesis_protocol_state
               ~genesis_state_hash)
       >>= External_transition.validate_proof ~verifier
-      >>= Fn.compose Deferred.return
-            External_transition.validate_protocol_versions
       >>= Fn.compose Deferred.return
             External_transition.validate_delta_transition_chain
     in
@@ -129,42 +129,6 @@ let verify_transition ~logger ~consensus_constants ~trust_system ~verifier
           , Some ("invalid delta transition chain witness", []) )
       in
       Error (Error.of_string "invalid delta transition chain witness")
-  | Error `Invalid_protocol_version ->
-      let transition = With_hash.data transition_with_hash in
-      let%map () =
-        Trust_system.record_envelope_sender trust_system logger sender
-          ( Trust_system.Actions.Sent_invalid_protocol_version
-          , Some
-              ( "Invalid current or proposed protocol version in catchup block"
-              , [ ( "current_protocol_version"
-                  , `String
-                      ( External_transition.current_protocol_version transition
-                      |> Protocol_version.to_string ) )
-                ; ( "proposed_protocol_version"
-                  , `String
-                      ( External_transition.proposed_protocol_version_opt
-                          transition
-                      |> Option.value_map ~default:"<None>"
-                           ~f:Protocol_version.to_string ) ) ] ) )
-      in
-      Error (Error.of_string "invalid protocol version")
-  | Error `Mismatched_protocol_version ->
-      let transition = With_hash.data transition_with_hash in
-      let%map () =
-        Trust_system.record_envelope_sender trust_system logger sender
-          ( Trust_system.Actions.Sent_mismatched_protocol_version
-          , Some
-              ( "Current protocol version in catchup block does not match \
-                 daemon protocol version"
-              , [ ( "block_current_protocol_version"
-                  , `String
-                      ( External_transition.current_protocol_version transition
-                      |> Protocol_version.to_string ) )
-                ; ( "daemon_current_protocol_version"
-                  , `String Protocol_version.(get_current () |> to_string) ) ]
-              ) )
-      in
-      Error (Error.of_string "mismatched protocol version")
   | Error `Disconnected ->
       Deferred.Or_error.fail @@ Error.of_string "disconnected chain"
 
