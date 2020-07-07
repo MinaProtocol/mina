@@ -166,28 +166,24 @@ let%snarkydef step ~(logger : Logger.t)
             txn_snark.pending_coinbase_stack_state.source
             pending_coinbase_source_stack
         ; Pending_coinbase.Stack.equal_var
-            txn_snark.pending_coinbase_stack_state.target deleted_stack 
-        ; Token_id.Checked.equal
-            txn_snark.next_available_token_before
+            txn_snark.pending_coinbase_stack_state.target deleted_stack
+        ; Token_id.Checked.equal txn_snark.next_available_token_before
             ( previous_state |> Protocol_state.blockchain_state
             |> Blockchain_state.snarked_next_available_token )
-        ; Token_id.Checked.equal
-            txn_snark.next_available_token_after
-               ( transition |> Snark_transition.blockchain_state
-               |> Blockchain_state.snarked_next_available_token )
-        ]
+        ; Token_id.Checked.equal txn_snark.next_available_token_after
+            ( transition |> Snark_transition.blockchain_state
+            |> Blockchain_state.snarked_next_available_token ) ]
       >>= Boolean.all
     in
     let%bind nothing_changed =
       let%bind next_available_token_didn't_change =
-        Token_id.Checked.equal
-          txn_snark.next_available_token_after
+        Token_id.Checked.equal txn_snark.next_available_token_after
           txn_snark.next_available_token_before
       in
       Boolean.all
         [ ledger_hash_didn't_change
         ; supply_increase_is_zero
-        ; no_coinbases_popped 
+        ; no_coinbases_popped
         ; next_available_token_didn't_change ]
     in
     let%bind correct_coinbase_status =

@@ -67,15 +67,16 @@ module Worker_state = struct
         Ledger_proof.
           ({(statement t) with sok_digest= sok_digest t}, underlying_proof t)
     | None ->
-        let lh x =
-          Blockchain_state.snarked_ledger_hash
-            (Protocol_state.blockchain_state x)
-        in
+        let bs = Protocol_state.blockchain_state in
+        let lh x = Blockchain_state.snarked_ledger_hash (bs x) in
+        let tok x = Blockchain_state.snarked_next_available_token (bs x) in
         ( { source= lh chain.state
           ; target= lh next_state
           ; supply_increase= Currency.Amount.zero
           ; fee_excess= Fee_excess.zero
           ; sok_digest= Sok_message.Digest.default
+          ; next_available_token_before= tok chain.state
+          ; next_available_token_after= tok next_state
           ; pending_coinbase_stack_state=
               { source= Pending_coinbase.Stack.empty
               ; target= Pending_coinbase.Stack.empty } }

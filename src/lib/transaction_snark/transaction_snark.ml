@@ -216,7 +216,8 @@ module Statement = struct
       ; next_available_token_after
       ; sok_digest }
 
-    let typ ledger_hash amount pending_coinbase fee_excess token_id sok_digest =
+    let typ ledger_hash amount pending_coinbase fee_excess token_id sok_digest
+        =
       Tick.Typ.of_hlistable
         [ ledger_hash
         ; ledger_hash
@@ -507,15 +508,13 @@ let sok_digest t = t.statement.sok_digest
 let to_yojson = Stable.Latest.to_yojson
 
 let create ~source ~target ~supply_increase ~pending_coinbase_stack_state
-    ~fee_excess 
-  ~next_available_token_before
-  ~next_available_token_after
+    ~fee_excess ~next_available_token_before ~next_available_token_after
     ~sok_digest ~proof =
   { statement=
       { source
       ; target
-      ;next_available_token_before
-      ;next_available_token_after
+      ; next_available_token_before
+      ; next_available_token_after
       ; supply_increase
       ; pending_coinbase_stack_state
       ; fee_excess
@@ -530,7 +529,6 @@ module Base = struct
     | Transaction : Transaction_union.t Snarky.Request.t
     | State_body : Coda_state.Protocol_state.Body.Value.t Snarky.Request.t
     | Init_stack : Pending_coinbase.Stack.t Snarky.Request.t
-(*     | Next_available_token : Token_id.t Snarky.Request.t *)
 
   module User_command_failure = struct
     (** The various ways that a user command may fail. These should be computed
@@ -1834,7 +1832,8 @@ module Base = struct
              , next_available_token_after ) =
       apply_tagged_transaction ~constraint_constants
         (module Shifted)
-        statement.source pending_coinbase_init pc.source pc.target statement.next_available_token_before state_body t
+        statement.source pending_coinbase_init pc.source pc.target
+        statement.next_available_token_before state_body t
       (* 
         root_before pending_coinbase_init pending_coinbase_before
         pending_coinbase_after state_body te*)
@@ -1862,10 +1861,9 @@ module Base = struct
       [ Frozen_ledger_hash.assert_equal root_after statement.target
       ; Currency.Amount.Checked.assert_equal supply_increase
           statement.supply_increase
-      ; Fee_excess.assert_equal_checked fee_excess statement.fee_excess 
+      ; Fee_excess.assert_equal_checked fee_excess statement.fee_excess
       ; Token_id.Checked.Assert.equal next_available_token_after
-          statement.next_available_token_after
-      ]
+          statement.next_available_token_after ]
 
   let rule ~constraint_constants : _ Pickles.Inductive_rule.t =
     { prevs= []
@@ -1877,8 +1875,7 @@ module Base = struct
 
   let transaction_union_handler handler (transaction : Transaction_union.t)
       (state_body : Coda_state.Protocol_state.Body.Value.t)
-      (init_stack : Pending_coinbase.Stack.t)
-       : Snarky.Request.request -> _ =
+      (init_stack : Pending_coinbase.Stack.t) : Snarky.Request.request -> _ =
    fun (With {request; respond} as r) ->
     match request with
     | Transaction ->
@@ -1940,17 +1937,13 @@ module Merge = struct
       ; Amount.Checked.assert_equal supply_increase s.supply_increase
       ; Frozen_ledger_hash.assert_equal s.source s1.source
       ; Frozen_ledger_hash.assert_equal s1.target s2.source
-      ; Frozen_ledger_hash.assert_equal s2.target s.target 
-      ; Token_id.Checked.Assert.equal
-          s.next_available_token_before
+      ; Frozen_ledger_hash.assert_equal s2.target s.target
+      ; Token_id.Checked.Assert.equal s.next_available_token_before
           s1.next_available_token_before
-      ; Token_id.Checked.Assert.equal
-          s1.next_available_token_after
+      ; Token_id.Checked.Assert.equal s1.next_available_token_after
           s2.next_available_token_before
-      ; Token_id.Checked.Assert.equal
-          s2.next_available_token_after
-          s.next_available_token_after
-      ]
+      ; Token_id.Checked.Assert.equal s2.next_available_token_after
+          s.next_available_token_after ]
 
   let rule self : _ Pickles.Inductive_rule.t =
     let prev_should_verify =
@@ -2190,16 +2183,15 @@ module Make () = struct
     && Proof.verify
          (List.map ts ~f:(fun ({statement; proof}, _) -> (statement, proof)))
 
-  let of_transaction_union sok_digest source target
-      ~init_stack  ~pending_coinbase_stack_state 
-      ~next_available_token_before ~next_available_token_after transaction
-      state_body handler
-      =
+  let of_transaction_union sok_digest source target ~init_stack
+      ~pending_coinbase_stack_state ~next_available_token_before
+      ~next_available_token_after transaction state_body handler =
     let s =
       { Statement.source
       ; target
       ; sok_digest
-      ; next_available_token_before ; next_available_token_after 
+      ; next_available_token_before
+      ; next_available_token_after
       ; fee_excess= Transaction_union.fee_excess transaction
       ; supply_increase= Transaction_union.supply_increase transaction
       ; pending_coinbase_stack_state }
@@ -2215,7 +2207,7 @@ module Make () = struct
   let of_transaction ~sok_digest ~source ~target ~init_stack
       ~pending_coinbase_stack_state ~next_available_token_before
       ~next_available_token_after transaction_in_block handler =
-(*
+    (*
 
   let of_transaction_union ?preeval ~constraint_constants sok_digest source
       target ~init_stack ~pending_coinbase_stack_state
@@ -2249,8 +2241,8 @@ module Make () = struct
       Transaction_protocol_state.block_data transaction_in_block
     in
     of_transaction_union sok_digest source target ~init_stack
-      ~pending_coinbase_stack_state
-      ~next_available_token_before ~next_available_token_after
+      ~pending_coinbase_stack_state ~next_available_token_before
+      ~next_available_token_after
       (Transaction_union.of_transaction transaction)
       state_body handler
 
