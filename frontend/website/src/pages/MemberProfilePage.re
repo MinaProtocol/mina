@@ -295,8 +295,7 @@ let make = () => {
            ? <div className=Styles.loading>
                {React.string("User Not Available")}
              </div>
-           : React.null}
-        <Footer />
+           : <Footer />}
       </div>
     </Wrapped>
   </Page>;
