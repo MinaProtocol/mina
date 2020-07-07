@@ -8,4 +8,5 @@
   (preprocess (pps
     ppx_deriving_yojson
     ppx_deriving.show
+    ppx_version
   )))
