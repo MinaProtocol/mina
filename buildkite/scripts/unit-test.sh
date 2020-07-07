@@ -21,4 +21,4 @@ echo "--- Make build"
 time make build
 
 echo "--- Run unit tests"
-time dune runtest "${path}" --profile="${profile}" -j1 || (./scripts/link-coredumps.sh && false)
+time dune runtest "${path}" --profile="${profile}" -j16 || (./scripts/link-coredumps.sh && false)
