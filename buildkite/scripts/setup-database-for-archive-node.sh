@@ -1,6 +1,6 @@
  #!/bin/bash
 
-set -eu pipefail
+set -e pipefail
 
 user=$1
 password=$2
