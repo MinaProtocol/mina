@@ -1178,7 +1178,8 @@ let%test_module _ =
       , Account.Poly.Stable.Latest.
           { public_key= Public_key.compress @@ test_keys.(i).public_key
           ; token_id= Token_id.default
-          ; token_owner= false
+          ; token_permissions=
+              Token_permissions.Not_owned {account_disabled= false}
           ; balance= Currency.Balance.of_int balance
           ; nonce= Account.Nonce.of_int nonce
           ; receipt_chain_hash= Receipt.Chain_hash.empty

@@ -24,45 +24,57 @@ module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 module Tag = Transaction_union_tag
 
 module Body = struct
-  type ('tag, 'public_key, 'token_id, 'amount) t_ =
+  type ('tag, 'public_key, 'token_id, 'amount, 'bool) t_ =
     { tag: 'tag
     ; source_pk: 'public_key
     ; receiver_pk: 'public_key
     ; token_id: 'token_id
-    ; amount: 'amount }
+    ; amount: 'amount
+    ; token_locked: 'bool }
   [@@deriving sexp]
 
-  type t = (Tag.t, Public_key.Compressed.t, Token_id.t, Currency.Amount.t) t_
+  type t =
+    (Tag.t, Public_key.Compressed.t, Token_id.t, Currency.Amount.t, bool) t_
   [@@deriving sexp]
 
   let of_user_command_payload_body = function
     | User_command_payload.Body.Payment
         {source_pk; receiver_pk; token_id; amount} ->
-        {tag= Tag.Payment; source_pk; receiver_pk; token_id; amount}
+        { tag= Tag.Payment
+        ; source_pk
+        ; receiver_pk
+        ; token_id
+        ; amount
+        ; token_locked= false }
     | Stake_delegation (Set_delegate {delegator; new_delegate}) ->
         { tag= Tag.Stake_delegation
         ; source_pk= delegator
         ; receiver_pk= new_delegate
         ; token_id= Token_id.default
-        ; amount= Currency.Amount.zero }
-    | Create_new_token {token_owner_pk} ->
+        ; amount= Currency.Amount.zero
+        ; token_locked= false }
+    | Create_new_token {token_owner_pk; disable_new_accounts} ->
         { tag= Tag.Create_account
         ; source_pk= token_owner_pk
         ; receiver_pk= token_owner_pk
         ; token_id= Token_id.invalid
-        ; amount= Currency.Amount.zero }
-    | Create_token_account {token_id; token_owner_pk; receiver_pk} ->
+        ; amount= Currency.Amount.zero
+        ; token_locked= disable_new_accounts }
+    | Create_token_account
+        {token_id; token_owner_pk; receiver_pk; account_disabled} ->
         { tag= Tag.Create_account
         ; source_pk= token_owner_pk
         ; receiver_pk
         ; token_id
-        ; amount= Currency.Amount.zero }
+        ; amount= Currency.Amount.zero
+        ; token_locked= account_disabled }
     | Mint_tokens {token_id; token_owner_pk; receiver_pk; amount} ->
         { tag= Tag.Mint_tokens
         ; source_pk= token_owner_pk
         ; receiver_pk
         ; token_id
-        ; amount }
+        ; amount
+        ; token_locked= false }
 
   let gen ~fee =
     let open Quickcheck.Generator.Let_syntax in
@@ -91,6 +103,20 @@ module Body = struct
             (Amount.zero, Amount.max_int)
       in
       Amount.gen_incl min max
+    and token_locked =
+      match tag with
+      | Payment ->
+          return false
+      | Stake_delegation ->
+          return false
+      | Create_account ->
+          Quickcheck.Generator.bool
+      | Fee_transfer ->
+          return false
+      | Coinbase ->
+          return false
+      | Mint_tokens ->
+          return false
     and source_pk = Public_key.Compressed.gen
     and receiver_pk = Public_key.Compressed.gen
     and token_id =
@@ -108,7 +134,7 @@ module Body = struct
       | Coinbase ->
           return Token_id.default
     in
-    {tag; source_pk; receiver_pk; token_id; amount}
+    {tag; source_pk; receiver_pk; token_id; amount; token_locked}
 
   [%%ifdef
   consensus_mechanism]
@@ -117,11 +143,12 @@ module Body = struct
     ( Tag.Unpacked.var
     , Public_key.Compressed.var
     , Token_id.var
-    , Currency.Amount.var )
+    , Currency.Amount.var
+    , Boolean.var )
     t_
 
-  let to_hlist {tag; source_pk; receiver_pk; token_id; amount} =
-    H_list.[tag; source_pk; receiver_pk; token_id; amount]
+  let to_hlist {tag; source_pk; receiver_pk; token_id; amount; token_locked} =
+    H_list.[tag; source_pk; receiver_pk; token_id; amount; token_locked]
 
   let spec =
     Data_spec.
@@ -129,44 +156,53 @@ module Body = struct
       ; Public_key.Compressed.typ
       ; Public_key.Compressed.typ
       ; Token_id.typ
-      ; Currency.Amount.typ ]
+      ; Currency.Amount.typ
+      ; Boolean.typ ]
 
   let typ =
     Typ.of_hlistable spec ~var_to_hlist:to_hlist ~value_to_hlist:to_hlist
       ~var_of_hlist:
-        (fun H_list.[tag; source_pk; receiver_pk; token_id; amount] ->
-        {tag; source_pk; receiver_pk; token_id; amount} )
+        (fun H_list.
+               [tag; source_pk; receiver_pk; token_id; amount; token_locked] ->
+        {tag; source_pk; receiver_pk; token_id; amount; token_locked} )
       ~value_of_hlist:
-        (fun H_list.[tag; source_pk; receiver_pk; token_id; amount] ->
-        {tag; source_pk; receiver_pk; token_id; amount} )
+        (fun H_list.
+               [tag; source_pk; receiver_pk; token_id; amount; token_locked] ->
+        {tag; source_pk; receiver_pk; token_id; amount; token_locked} )
 
   module Checked = struct
-    let constant ({tag; source_pk; receiver_pk; token_id; amount} : t) : var =
+    let constant
+        ({tag; source_pk; receiver_pk; token_id; amount; token_locked} : t) :
+        var =
       { tag= Tag.unpacked_of_t tag
       ; source_pk= Public_key.Compressed.var_of_t source_pk
       ; receiver_pk= Public_key.Compressed.var_of_t receiver_pk
       ; token_id= Token_id.var_of_t token_id
-      ; amount= Currency.Amount.var_of_t amount }
+      ; amount= Currency.Amount.var_of_t amount
+      ; token_locked= Boolean.var_of_value token_locked }
 
-    let to_input {tag; source_pk; receiver_pk; token_id; amount} =
+    let to_input {tag; source_pk; receiver_pk; token_id; amount; token_locked}
+        =
       let%map token_id = Token_id.Checked.to_input token_id in
       Array.reduce_exn ~f:Random_oracle.Input.append
         [| Tag.Unpacked.to_input tag
          ; Public_key.Compressed.Checked.to_input source_pk
          ; Public_key.Compressed.Checked.to_input receiver_pk
          ; token_id
-         ; Currency.Amount.var_to_input amount |]
+         ; Currency.Amount.var_to_input amount
+         ; Random_oracle.Input.bitstring [token_locked] |]
   end
 
   [%%endif]
 
-  let to_input {tag; source_pk; receiver_pk; token_id; amount} =
+  let to_input {tag; source_pk; receiver_pk; token_id; amount; token_locked} =
     Array.reduce_exn ~f:Random_oracle.Input.append
       [| Tag.to_input tag
        ; Public_key.Compressed.to_input source_pk
        ; Public_key.Compressed.to_input receiver_pk
        ; Token_id.to_input token_id
-       ; Currency.Amount.to_input amount |]
+       ; Currency.Amount.to_input amount
+       ; Random_oracle.Input.bitstring [token_locked] |]
 end
 
 type t = (User_command_payload.Common.t, Body.t) User_command_payload.Poly.t
