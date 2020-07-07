@@ -1,14 +1,24 @@
 type member = {
-  rank: int,
   name: string,
-  phase: int,
-  release: int,
-  allTime: int,
+  genesisMember: bool,
+  phasePoints: int,
+  releasePoints: int,
+  allTimePoints: int,
+  releaseRank: int,
+  phaseRank: int,
+  allTimeRank: int,
 };
 
 type entry = array(string);
 
 external parseEntry: Js.Json.t => entry = "%identity";
+
+let safeArrayGet = (index, a) => {
+  switch (Belt.Array.get(a, index)) {
+  | Some(v) => v
+  | None => ""
+  };
+};
 
 let safeParseInt = str =>
   try(int_of_string(str)) {
@@ -18,17 +28,21 @@ let safeParseInt = str =>
 let fetchLeaderboard = () => {
   Sheets.fetchRange(
     ~sheet="1Nq_Y76ALzSVJRhSFZZm4pfuGbPkZs2vTtCnVQ1ehujE",
-    ~range="B4:H",
+    ~range="Member_Profile_Data!A2:Z",
   )
   |> Promise.map(res => {
        Array.map(parseEntry, res)
        |> Array.map(entry => {
             {
-              rank: safeParseInt(entry[0]),
-              name: entry[2],
-              phase: safeParseInt(entry[3]),
-              release: safeParseInt(entry[6]),
-              allTime: safeParseInt(entry[3]),
+              name: entry |> safeArrayGet(0),
+              genesisMember:
+                entry |> safeArrayGet(1) |> String.length == 0 ? false : true,
+              allTimePoints: entry |> safeArrayGet(2) |> safeParseInt,
+              phasePoints: entry |> safeArrayGet(3) |> safeParseInt,
+              releasePoints: entry |> safeArrayGet(4) |> safeParseInt,
+              allTimeRank: entry |> safeArrayGet(5) |> safeParseInt,
+              phaseRank: entry |> safeArrayGet(6) |> safeParseInt,
+              releaseRank: entry |> safeArrayGet(7) |> safeParseInt,
             }
           })
      })
@@ -41,7 +55,6 @@ module Styles = {
   let leaderboardContainer =
     style([
       width(`percent(100.)),
-      // maxWidth(rem(41.)),
       margin2(~v=`zero, ~h=`auto),
       selector("hr", [margin(`zero)]),
     ]);
@@ -64,6 +77,7 @@ module Styles = {
 
   let leaderboardRow =
     style([
+      cursor(`pointer),
       padding2(~v=`rem(1.), ~h=`rem(1.)),
       display(`grid),
       gridColumnGap(rem(1.5)),
@@ -122,22 +136,44 @@ module Styles = {
 module LeaderboardRow = {
   [@react.component]
   let make = (~rank, ~member) => {
+    let userSlug =
+      "/memberProfile"
+      ++ "?allTimeRank="
+      ++ member.allTimeRank->string_of_int
+      ++ "&allTimePoints="
+      ++ member.allTimePoints->string_of_int
+      ++ "&phaseRank="
+      ++ member.phaseRank->string_of_int
+      ++ "&phasePoints="
+      ++ member.phasePoints->string_of_int
+      ++ "&releaseRank="
+      ++ member.releaseRank->string_of_int
+      ++ "&releasePoints="
+      ++ member.releasePoints->string_of_int
+      ++ "&genesisMember="
+      ++ member.genesisMember->string_of_bool
+      ++ "&name="
+      ++ member.name
+      |> Js.String.replaceByRe([%re "/#/g"], "%23"); /* replace "#" with percent encoding for the URL to properly parse */
+
     <>
-      <div className=Styles.leaderboardRow>
-        <span className=Styles.rank>
-          {React.string(string_of_int(rank))}
-        </span>
-        <span className=Styles.username> {React.string(member.name)} </span>
-        <span className=Styles.activePointsCell>
-          {React.string(string_of_int(member.release))}
-        </span>
-        <span className=Styles.inactivePointsCell>
-          {React.string(string_of_int(member.phase))}
-        </span>
-        <span className=Styles.inactivePointsCell>
-          {React.string(string_of_int(member.allTime))}
-        </span>
-      </div>
+      <Next.Link href=userSlug _as=userSlug>
+        <div className=Styles.leaderboardRow>
+          <span className=Styles.rank>
+            {React.string(string_of_int(rank))}
+          </span>
+          <span className=Styles.username> {React.string(member.name)} </span>
+          <span className=Styles.activePointsCell>
+            {React.string(string_of_int(member.releasePoints))}
+          </span>
+          <span className=Styles.inactivePointsCell>
+            {React.string(string_of_int(member.phasePoints))}
+          </span>
+          <span className=Styles.inactivePointsCell>
+            {React.string(string_of_int(member.allTimePoints))}
+          </span>
+        </div>
+      </Next.Link>
     </>;
   };
 };
@@ -189,8 +225,8 @@ let make = () => {
       {Array.map(
          member =>
            <LeaderboardRow
-             key={string_of_int(member.rank)}
-             rank={member.rank}
+             key={string_of_int(member.allTimeRank)}
+             rank={member.allTimeRank}
              member
            />,
          Array.length(state.members) > 0
