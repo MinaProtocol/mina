@@ -39,7 +39,12 @@ module Network_manager : Test_intf.Network_manager_intf = struct
 
   type daemon_config = Daemon_config.t
 
-  let deploy _network_config _daemon_config = Deferred.Or_error.return ()
+  let deploy _network_config _daemon_config =
+    Deferred.Or_error.return
+      { Testnet.block_producers= []
+      ; snark_coordinators= []
+      ; archive_nodes= []
+      ; testnet_log_filter= "" }
 
   let destroy _testnet = Deferred.Or_error.return ()
 end
