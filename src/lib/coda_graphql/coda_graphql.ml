@@ -2361,14 +2361,9 @@ module Queries = struct
       ~resolve:tracked_accounts_resolver
 
   let account_resolver {ctx= coda; _} () pk =
-    let block_production_pubkeys = Coda_lib.block_production_pubkeys coda in
-    let wallets = Coda_lib.wallets coda in
     Some
-      { Types.AccountObj.account= Types.AccountObj.Partial_account.of_pk coda pk
-      ; locked= Secrets.Wallets.check_locked wallets ~needle:pk
-      ; is_actively_staking=
-          Public_key.Compressed.Set.mem block_production_pubkeys pk
-      ; path= Secrets.Wallets.get_path wallets pk }
+      (Types.AccountObj.lift coda pk
+         (Types.AccountObj.Partial_account.of_pk coda pk))
 
   let wallet =
     field "wallet" ~doc:"Find any wallet via a public key"
@@ -2386,8 +2381,47 @@ module Queries = struct
       ~args:
         Arg.
           [ arg "publicKey" ~doc:"Public key of account being retrieved"
+              ~typ:(non_null Types.Input.public_key_arg)
+          ; arg' "token" ~doc:"Token of account being retrieved"
+              ~typ:Types.Input.token_arg ~default:Token_id.default ]
+      ~resolve:(fun {ctx= coda; _} () pk token ->
+        Some
+          ( Account_id.create pk token
+          |> Types.AccountObj.Partial_account.of_account_id coda
+          |> Types.AccountObj.lift coda pk ) )
+
+  let owned_tokens =
+    field "tokenAccounts" ~doc:"Find the tokens owned by a public key"
+      ~typ:(non_null @@ list @@ non_null @@ Types.token_id)
+      ~args:
+        Arg.
+          [ arg "publicKey" ~doc:"Public key to find tokens for"
               ~typ:(non_null Types.Input.public_key_arg) ]
-      ~resolve:account_resolver
+      ~resolve:(fun {ctx= coda; _} () pk ->
+        coda |> Coda_lib.best_tip |> Participating_state.active
+        |> Option.map ~f:(fun tip ->
+               let ledger =
+                 Transition_frontier.Breadcrumb.staged_ledger tip
+                 |> Staged_ledger.ledger
+               in
+               Ledger.tokens ledger pk |> Set.to_list )
+        |> Option.value ~default:[] )
+
+  let token_owner =
+    field "tokenOwner" ~doc:"Find the public key that owns a given token"
+      ~typ:Types.public_key
+      ~args:
+        Arg.
+          [ arg "token" ~doc:"Token to find the owner for"
+              ~typ:(non_null Types.Input.token_arg) ]
+      ~resolve:(fun {ctx= coda; _} () token ->
+        coda |> Coda_lib.best_tip |> Participating_state.active
+        |> Option.bind ~f:(fun tip ->
+               let ledger =
+                 Transition_frontier.Breadcrumb.staged_ledger tip
+                 |> Staged_ledger.ledger
+               in
+               Ledger.token_owner ledger token ) )
 
   let transaction_status =
     result_field "transactionStatus" ~doc:"Get the status of a transaction"
@@ -2511,6 +2545,8 @@ module Queries = struct
     ; tracked_accounts
     ; wallet (* deprecated *)
     ; account
+    ; owned_tokens
+    ; token_owner
     ; current_snark_worker
     ; best_chain
     ; blocks
