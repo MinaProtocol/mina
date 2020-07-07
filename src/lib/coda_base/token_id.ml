@@ -46,6 +46,8 @@ let gen = gen_ge 1L
 
 let gen_non_default = gen_ge 2L
 
+let gen_with_invalid = gen_ge 0L
+
 let unpack = T.to_bits
 
 include Hashable.Make_binable (Stable.Latest)

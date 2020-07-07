@@ -16,6 +16,22 @@ module Style = {
           borderRadius(`px(4)),
         ],
       ),
+      selector(
+        "table",
+        [
+          fontFamily("IBM Plex Sans, Sans-Serif"),
+          color(Theme.Colors.saville),
+          width(`percent(100.)),
+        ],
+      ),
+      selector(
+        "table, th, td",
+        [
+          border(`px(1), solid, Theme.Colors.saville),
+          borderCollapse(`collapse),
+          padding(`px(4)),
+        ],
+      ),
     ]);
 
   let page =

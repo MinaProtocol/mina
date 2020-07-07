@@ -69,7 +69,9 @@ let currency_consumed :
     | Create_new_token _ ->
         Currency.Amount.of_fee constraint_constants.account_creation_fee
     | Create_token_account _ ->
-        Currency.Amount.of_fee constraint_constants.account_creation_fee)
+        Currency.Amount.of_fee constraint_constants.account_creation_fee
+    | Mint_tokens _ ->
+        zero)
 
 let currency_consumed' :
        constraint_constants:Genesis_constants.Constraint_constants.t
@@ -493,7 +495,9 @@ let rec add_from_gossip_exn :
            [`Balance of Currency.Amount.t] * Currency.Amount.t
          | `Insufficient_replace_fee of
            [`Replace_fee of Currency.Fee.t] * Currency.Fee.t
-         | `Overflow ] )
+         | `Overflow
+         | `Bad_token
+         | `Unwanted_fee_token of Token_id.t ] )
        Result.t =
  fun ({constraint_constants; _} as t) cmd current_nonce balance ->
   let unchecked = User_command.forget_check cmd in
@@ -504,6 +508,15 @@ let rec add_from_gossip_exn :
      indicate bugs in Coda. *)
   let open Result.Let_syntax in
   let%bind consumed = currency_consumed' ~constraint_constants cmd in
+  let%bind () =
+    if User_command.check_tokens unchecked then return () else Error `Bad_token
+  in
+  let%bind () =
+    (* TODO: Proper exchange rate mechanism. *)
+    let fee_token = User_command.fee_token unchecked in
+    if Token_id.(equal default) fee_token then return ()
+    else Error (`Unwanted_fee_token fee_token)
+  in
   (* C4 *)
   match Map.find t.all_by_sender fee_payer with
   | None ->
@@ -817,7 +830,14 @@ let%test_module _ =
                         %{sexp:Currency.Fee.t}."
                       rfee fee ()
                 | Error `Overflow ->
-                    failwith "Overflow." )
+                    failwith "Overflow."
+                | Error `Bad_token ->
+                    failwith "Token is incompatible with the command."
+                | Error (`Unwanted_fee_token fee_token) ->
+                    failwithf
+                      !"Bad fee token. The fees are paid in token %{sexp: \
+                        Token_id.t}, which we are not accepting fees in."
+                      fee_token () )
           in
           go cmds )
 

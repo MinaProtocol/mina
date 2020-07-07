@@ -22,6 +22,7 @@ module Body : sig
     | Stake_delegation of Stake_delegation.t
     | Create_new_token of New_token_payload.t
     | Create_token_account of New_account_payload.t
+    | Mint_tokens of Minting_payload.t
   [@@deriving eq, sexp, hash, yojson]
 
   [%%versioned:

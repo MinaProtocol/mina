@@ -80,7 +80,12 @@ module Ledger_inner = struct
 
         let empty = Account.empty
 
-        let token_owner Account.Poly.{token_owner; _} = token_owner
+        let token_owner ({token_permissions; _} : t) =
+          match token_permissions with
+          | Token_owned _ ->
+              true
+          | Not_owned _ ->
+              false
       end
     end]
 

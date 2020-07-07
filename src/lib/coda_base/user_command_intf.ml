@@ -133,6 +133,11 @@ module type S = sig
 
   val next_available_token : t -> Token_id.t -> Token_id.t
 
+  (** Check that the command is used with compatible tokens. This check is fast
+      and cheap, to be used for filtering.
+  *)
+  val check_tokens : t -> bool
+
   include Gen_intf with type t := t
 
   module With_valid_signature : sig
