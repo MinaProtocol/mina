@@ -25,11 +25,11 @@ Pipeline.build
       Command.build
         Command.Config::{
           commands = [
-            Cmd.run "buildkite-agent artifact download DOCKER_DEPLOY_ENV .",
+            Cmd.run "buildkite-agent artifact download DOCKER_DEPLOY_ENV . --build $BUILDKITE_TRIGGERED_FROM_BUILD_ID",
             Cmd.run "scripts/release-docker.sh -s coda-daemon -v $CODA_GIT_TAG-$CODA_GIT_BRANCH-$CODA_GIT_HASH --extra-args '--build-arg coda_version=$CODA_DEB_VERSION --build-arg deb_repo=$CODA_DEB_REPO'"
           ],
           label = "Build and release Docker artifacts",
-          key = "build-docker-artifacts",
+          key = "docker-artifact-release",
           target = Size.Large,
           docker_login = Some DockerLogin::{=}
         }
