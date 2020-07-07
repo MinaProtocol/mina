@@ -366,7 +366,7 @@ jobs:
                     sudo apt update && sudo apt install nodejs yarn
             - run:
                   name: Build And Test Client SDK
-                  command: cd frontend/client_sdk && yarn prepublishOnly
+                  command: eval `opam config env` && cd frontend/client_sdk && yarn prepublishOnly
     build-artifacts--testnet_postake_medium_curves:
         resource_class: xlarge
         docker:
