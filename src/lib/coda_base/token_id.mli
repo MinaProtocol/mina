@@ -51,6 +51,11 @@ val gen : t Quickcheck.Generator.t
 *)
 val gen_non_default : t Quickcheck.Generator.t
 
+(** Generates a random token ID. This may be any value, including [default] or
+    [invalid].
+*)
+val gen_with_invalid : t Quickcheck.Generator.t
+
 val unpack : t -> bool list
 
 include Comparable.S_binable with type t := t
