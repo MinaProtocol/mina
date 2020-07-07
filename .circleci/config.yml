@@ -127,6 +127,7 @@ jobs:
             - run:
                   name: Build and Release Archives
                   command: ./scripts/archive/build-release-archives.sh
+
     lint:
         docker:
             - image: codaprotocol/coda:toolchain-eb73e64d524c906384e9dbb23e9d0b8ae2be9e9e
@@ -355,6 +356,15 @@ jobs:
                   environment:
                     DUNE_PROFILE: nonconsensus_medium_curves
                   no_output_timeout: 10m
+            - run:
+                  name: Get Yarn
+                  command:
+                    - curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add -
+                    - echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list
+                    - sudo apt update && sudo apt install yarn
+            - run:
+                  name: Build And Test Client SDK
+                  command: cd frontend/client_sdk && yarn prepublishOnly
     build-artifacts--testnet_postake_medium_curves:
         resource_class: xlarge
         docker:
