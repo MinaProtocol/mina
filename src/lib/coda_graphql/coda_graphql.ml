@@ -2134,7 +2134,7 @@ module Mutations = struct
         )
 
   let mint_tokens =
-    io_field "createTokenAccount" ~doc:"Create a new account for a token"
+    io_field "mintTokens" ~doc:"Mint more of a token"
       ~typ:(non_null Types.Payload.mint_tokens)
       ~args:
         Arg.
