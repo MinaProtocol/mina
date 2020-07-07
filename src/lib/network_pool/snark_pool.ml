@@ -276,7 +276,8 @@ module Make (Transition_frontier : Transition_frontier_intf) :
         in
         Deferred.don't_wait_for tf_deferred
 
-      let create ~frontier_broadcast_pipe ~config ~logger ~tf_diff_writer =
+      let create ~constraint_constants:_ ~frontier_broadcast_pipe ~config
+          ~logger ~tf_diff_writer =
         let t =
           { snark_tables=
               { all= Statement_table.create ()
@@ -516,8 +517,7 @@ let%test_module "random set test" =
         Mock_snark_pool.Resource_pool.Diff.Add_solved_work
           (work, {Priced_proof.Stable.Latest.proof= proof work; fee})
       in
-      Mock_snark_pool.Resource_pool.Diff.unsafe_apply ~constraint_constants
-        resource_pool
+      Mock_snark_pool.Resource_pool.Diff.unsafe_apply resource_pool
         {Envelope.Incoming.data= diff; sender}
 
     let config verifier =

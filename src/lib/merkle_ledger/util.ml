@@ -18,6 +18,7 @@ module type Inputs_intf = sig
     Intf.Account
     with type balance := Balance.t
      and type account_id := Account_id.t
+     and type token_id := Token_id.t
 
   module Hash : Intf.Hash with type account := Account.t
 
