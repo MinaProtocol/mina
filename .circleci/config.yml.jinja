@@ -85,7 +85,7 @@ jobs:
     test-archive:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-7be71ffdf7a704211c07e87e516224a0e82b5ff8
               environment:
                 CODA_DOCKER: true
             - image: postgres:12
@@ -111,7 +111,7 @@ jobs:
     build-archive:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-7be71ffdf7a704211c07e87e516224a0e82b5ff8
               environment:
                 CODA_DOCKER: true
                 HASURA_PORT: 8080
@@ -160,7 +160,7 @@ jobs:
                   command: ./scripts/archive/build-release-archives.sh
     lint:
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-7be71ffdf7a704211c07e87e516224a0e82b5ff8
         steps:
             {{ checkout_no_lfs }}
             {{ opam_init_linux }}
@@ -187,7 +187,7 @@ jobs:
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c './scripts/require-ppx-version.py'
     lint-opt:
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-7be71ffdf7a704211c07e87e516224a0e82b5ff8
         steps:
             {{ checkout_no_lfs }}
             - run:
@@ -202,7 +202,7 @@ jobs:
                   command: ./scripts/compare_ci_diff_binables.sh
     compare-test-signatures:
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-7be71ffdf7a704211c07e87e516224a0e82b5ff8
         steps:
             {{ checkout_no_lfs }}
             {{ opam_init_linux }}
@@ -382,7 +382,7 @@ jobs:
     build-client-sdk:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-7be71ffdf7a704211c07e87e516224a0e82b5ff8
         steps:
             {{ checkout_no_lfs }}
             - run:
@@ -401,7 +401,7 @@ jobs:
     build-artifacts--{{profile}}:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-7be71ffdf7a704211c07e87e516224a0e82b5ff8
         steps:
             {{ checkout_no_lfs }}
             - run:
@@ -416,7 +416,7 @@ jobs:
             # See https://bkase.dev/posts/ocaml-writer#fn-3 for rationale
             - run:
                   name: Generate PV keys
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; eval `opam config env` && LIBP2P_NIXLESS=1 make build_pv_keys 2>&1 | tee /tmp/artifacts/buildocaml.log'
+                  command: echo $PATH && echo $HOME && env && pwd && ls /home/ && (ls $HOME/.cargo; echo '') && ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; eval `opam config env` && LIBP2P_NIXLESS=1 make build_pv_keys 2>&1 | tee /tmp/artifacts/buildocaml.log'
                   environment:
                     DUNE_PROFILE: {{profile}}
                     EXTRA_NIX_ARGS: --option sandbox false
@@ -490,7 +490,7 @@ jobs:
     build-artifacts-docker--{{profile}}--{{docker_image}}:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-7be71ffdf7a704211c07e87e516224a0e82b5ff8
         steps:
             - restore_cache:
                 name: Restore cache - docker deploy env
@@ -526,7 +526,7 @@ jobs:
     test-unit--{{profile}}:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-7be71ffdf7a704211c07e87e516224a0e82b5ff8
         steps:
             {{ checkout_no_lfs }}
             - run: ulimit -c unlimited
@@ -550,7 +550,7 @@ jobs:
     test-unit--nonconsensus_medium_curves:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-7be71ffdf7a704211c07e87e516224a0e82b5ff8
         steps:
             {{ checkout_no_lfs }}
             - run: ulimit -c unlimited
@@ -573,7 +573,7 @@ jobs:
     test-unit--{{profile}}:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-7be71ffdf7a704211c07e87e516224a0e82b5ff8
         steps:
             {{ checkout_no_lfs }}
             - run: ulimit -c unlimited
@@ -597,7 +597,7 @@ jobs:
     test--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-7be71ffdf7a704211c07e87e516224a0e82b5ff8
         steps:
             {{ checkout_no_lfs }}
             {{ opam_init_linux }}
@@ -617,7 +617,7 @@ jobs:
     test--{{profile}}:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-7be71ffdf7a704211c07e87e516224a0e82b5ff8
         steps:
             {{ checkout_no_lfs }}
             {{ opam_init_linux }}
