@@ -97,3 +97,6 @@ let fee_excess (t : t) = Transaction_union_payload.fee_excess t.payload
 
 let supply_increase (t : t) =
   Transaction_union_payload.supply_increase t.payload
+
+let next_available_token (t : t) tid =
+  Transaction_union_payload.next_available_token t.payload tid

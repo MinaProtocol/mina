@@ -45,6 +45,24 @@ module Body = struct
         ; receiver_pk= new_delegate
         ; token_id= Token_id.default
         ; amount= Currency.Amount.zero }
+    | Create_new_token {token_owner_pk} ->
+        { tag= Tag.Create_account
+        ; source_pk= token_owner_pk
+        ; receiver_pk= token_owner_pk
+        ; token_id= Token_id.invalid
+        ; amount= Currency.Amount.zero }
+    | Create_token_account {token_id; token_owner_pk; receiver_pk} ->
+        { tag= Tag.Create_account
+        ; source_pk= token_owner_pk
+        ; receiver_pk
+        ; token_id
+        ; amount= Currency.Amount.zero }
+    | Mint_tokens {token_id; token_owner_pk; receiver_pk; amount} ->
+        { tag= Tag.Mint_tokens
+        ; source_pk= token_owner_pk
+        ; receiver_pk
+        ; token_id
+        ; amount }
 
   let gen ~fee =
     let open Quickcheck.Generator.Let_syntax in
@@ -59,7 +77,9 @@ module Body = struct
         | Payment ->
             (Amount.zero, max_amount_without_overflow)
         | Stake_delegation ->
-            (Amount.zero, max_amount_without_overflow)
+            (Amount.zero, Amount.zero)
+        | Create_account ->
+            (Amount.zero, Amount.zero)
         | Fee_transfer ->
             (Amount.zero, max_amount_without_overflow)
         | Coinbase ->
@@ -67,12 +87,26 @@ module Body = struct
              amount - fee should be defined. In other words,
              amount >= fee *)
             (Amount.of_fee fee, Amount.max_int)
+        | Mint_tokens ->
+            (Amount.zero, Amount.max_int)
       in
       Amount.gen_incl min max
     and source_pk = Public_key.Compressed.gen
     and receiver_pk = Public_key.Compressed.gen
     and token_id =
-      match tag with Payment -> Token_id.gen | _ -> return Token_id.default
+      match tag with
+      | Payment ->
+          Token_id.gen
+      | Stake_delegation ->
+          return Token_id.default
+      | Create_account ->
+          Token_id.gen_with_invalid
+      | Mint_tokens ->
+          Token_id.gen_non_default
+      | Fee_transfer ->
+          return Token_id.default
+      | Coinbase ->
+          return Token_id.default
     in
     {tag; source_pk; receiver_pk; token_id; amount}
 
@@ -197,9 +231,8 @@ let excess (payload : t) : Amount.Signed.t =
   let fee = payload.common.fee in
   let amount = payload.body.amount in
   match tag with
-  | Payment ->
-      Amount.Signed.of_unsigned (Amount.of_fee fee)
-  | Stake_delegation ->
+  | Payment | Stake_delegation | Create_account | Mint_tokens ->
+      (* For all user commands, the fee excess is just the fee. *)
       Amount.Signed.of_unsigned (Amount.of_fee fee)
   | Fee_transfer ->
       Option.value_exn (Amount.add_fee amount fee)
@@ -209,7 +242,8 @@ let excess (payload : t) : Amount.Signed.t =
 
 let fee_excess ({body= {tag; amount; _}; common= {fee_token; fee; _}} : t) =
   match tag with
-  | Payment | Stake_delegation ->
+  | Payment | Stake_delegation | Create_account | Mint_tokens ->
+      (* For all user commands, the fee excess is just the fee. *)
       Fee_excess.of_single (fee_token, Fee.Signed.of_unsigned fee)
   | Fee_transfer ->
       let excess =
@@ -225,5 +259,16 @@ let supply_increase (payload : payload) =
   match tag with
   | Coinbase ->
       payload.body.amount
-  | Payment | Stake_delegation | Fee_transfer ->
+  | Payment | Stake_delegation | Create_account | Mint_tokens | Fee_transfer ->
       Amount.zero
+
+let next_available_token (payload : payload) tid =
+  match payload.body.tag with
+  | Payment | Stake_delegation | Mint_tokens | Coinbase | Fee_transfer ->
+      tid
+  | Create_account when Token_id.(equal invalid) payload.body.token_id ->
+      (* Creating a new token. *)
+      Token_id.next tid
+  | Create_account ->
+      (* Creating an account for an existing token. *)
+      tid

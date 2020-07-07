@@ -345,8 +345,8 @@ module Types = struct
             ~args:Arg.[]
             ~resolve:
               (fun _
-                   { Transaction_snark.Statement.fee_excess= {fee_excess_l; _}
-                   ; _ } ->
+                   ({fee_excess= {fee_excess_l; _}; _} :
+                     Transaction_snark.Statement.t) ->
               (* TODO: Expose full fee excess data. *)
               fee_excess_l )
         ; field "supplyIncrease" ~typ:(non_null uint64)
@@ -783,7 +783,7 @@ module Types = struct
               with
               | Stake_delegation _ ->
                   true
-              | Payment _ ->
+              | _ ->
                   false )
         ; field "nonce" ~typ:(non_null int) ~doc:"Nonce of the transaction"
             ~args:Arg.[]
@@ -826,8 +826,12 @@ module Types = struct
               with
               | Payment {Payment_payload.Poly.amount; _} ->
                   Ok (amount |> Currency.Amount.to_uint64)
-              | Stake_delegation _ ->
-                  (* Stake delegation does not have an amount, so we set it to 0 *)
+              | Mint_tokens {amount; _} ->
+                  Ok (amount |> Currency.Amount.to_uint64)
+              | Stake_delegation _
+              | Create_new_token _
+              | Create_token_account _ ->
+                  (* These commands do not have an amount, so we set it to 0 *)
                   Ok Unsigned.UInt64.zero )
         ; field "fee" ~typ:(non_null uint64)
             ~doc:"Fee that sender is willing to pay for making the transaction"
