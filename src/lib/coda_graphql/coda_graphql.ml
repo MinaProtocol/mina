@@ -1288,6 +1288,27 @@ module Types = struct
               ~args:Arg.[]
               ~resolve:(fun _ -> Fn.id) ] )
 
+    let create_token =
+      obj "SendCreateTokenPayload" ~fields:(fun _ ->
+          [ field "createNewToken" ~typ:(non_null user_command)
+              ~doc:"Token creation command that was sent"
+              ~args:Arg.[]
+              ~resolve:(fun _ -> Fn.id) ] )
+
+    let create_token_account =
+      obj "SendCreateTokenAccountPayload" ~fields:(fun _ ->
+          [ field "createNewTokenAccount" ~typ:(non_null user_command)
+              ~doc:"Token account creation command that was sent"
+              ~args:Arg.[]
+              ~resolve:(fun _ -> Fn.id) ] )
+
+    let mint_tokens =
+      obj "SendMintTokensPayload" ~fields:(fun _ ->
+          [ field "mintTokens" ~typ:(non_null user_command)
+              ~doc:"Token minting command that was sent"
+              ~args:Arg.[]
+              ~resolve:(fun _ -> Fn.id) ] )
+
     let add_payment_receipt =
       obj "AddPaymentReceiptPayload" ~fields:(fun _ ->
           [ field "payment" ~typ:(non_null user_command)
@@ -1350,6 +1371,18 @@ module Types = struct
           | _ ->
               Error "Invalid format for public key." )
 
+    let token_arg =
+      scalar "Token"
+        ~doc:"String representation of a token's UInt64 identifier"
+        ~coerce:(fun token ->
+          try
+            match token with
+            | `String token ->
+                Ok (Token_id.of_string token)
+            | _ ->
+                Error "Invalid format for token."
+          with _ -> Error "Invalid format for token." )
+
     module type Numeric_type = sig
       type t
 
@@ -1402,6 +1435,19 @@ module Types = struct
 
       let to_ ~doc = arg "to" ~typ:(non_null public_key_arg) ~doc
 
+      let token ~doc = arg "token" ~typ:(non_null token_arg) ~doc
+
+      let token_opt ~doc = arg "token" ~typ:token_arg ~doc
+
+      let token_owner ~doc =
+        arg "tokenOwner" ~typ:(non_null public_key_arg) ~doc
+
+      let receiver ~doc = arg "receiver" ~typ:(non_null public_key_arg) ~doc
+
+      let receiver_opt ~doc = arg "receiver" ~typ:public_key_arg ~doc
+
+      let fee_payer_opt ~doc = arg "feePayer" ~typ:public_key_arg ~doc
+
       let fee ~doc = arg "fee" ~typ:(non_null uint64_arg) ~doc
 
       let memo =
@@ -1431,11 +1477,12 @@ module Types = struct
     let send_payment =
       let open Fields in
       obj "SendPaymentInput"
-        ~coerce:(fun from to_ amount fee valid_until memo nonce ->
-          (from, to_, amount, fee, valid_until, memo, nonce) )
+        ~coerce:(fun from to_ token amount fee valid_until memo nonce ->
+          (from, to_, token, amount, fee, valid_until, memo, nonce) )
         ~fields:
           [ from ~doc:"Public key of sender of payment"
           ; to_ ~doc:"Public key of recipient of payment"
+          ; token_opt ~doc:"Token to send"
           ; arg "amount" ~doc:"Amount of coda to send to to receiver"
               ~typ:(non_null uint64_arg)
           ; fee ~doc:"Fee amount in order to send payment"
@@ -1452,6 +1499,66 @@ module Types = struct
           [ from ~doc:"Public key of sender of a stake delegation"
           ; to_ ~doc:"Public key of the account being delegated to"
           ; fee ~doc:"Fee amount in order to send a stake delegation"
+          ; valid_until
+          ; memo
+          ; nonce ]
+
+    let create_token =
+      let open Fields in
+      obj "SendCreateTokenInput"
+        ~coerce:(fun token_owner fee valid_until memo nonce ->
+          (token_owner, fee, valid_until, memo, nonce) )
+        ~fields:
+          [ token_owner ~doc:"Public key to create the token for"
+          ; fee ~doc:"Fee amount in order to create a token"
+          ; valid_until
+          ; memo
+          ; nonce ]
+
+    let create_token_account =
+      let open Fields in
+      obj "SendCreateTokenAccountInput"
+        ~coerce:
+          (fun token_owner token receiver fee fee_payer valid_until memo nonce ->
+          ( token_owner
+          , token
+          , receiver
+          , fee
+          , fee_payer
+          , valid_until
+          , memo
+          , nonce ) )
+        ~fields:
+          [ token_owner ~doc:"Public key of the token's owner"
+          ; token ~doc:"Token to create an account for"
+          ; receiver ~doc:"Public key to create the account for"
+          ; fee ~doc:"Fee amount in order to create a token account"
+          ; fee_payer_opt
+              ~doc:
+                "Public key to pay the fees from and sign the transaction \
+                 with (defaults to the receiver)"
+          ; valid_until
+          ; memo
+          ; nonce ]
+
+    let mint_tokens =
+      let open Fields in
+      obj "SendMintTokensInput"
+        ~coerce:
+          (fun token_owner token receiver amount fee valid_until memo nonce ->
+          (token_owner, token, receiver, amount, fee, valid_until, memo, nonce)
+          )
+        ~fields:
+          [ token_owner ~doc:"Public key of the token's owner"
+          ; token ~doc:"Token to mint more of"
+          ; receiver_opt
+              ~doc:
+                "Public key to mint the new tokens for (defaults to token \
+                 owner's account)"
+          ; arg "amount"
+              ~doc:"Amount of token to create in the receiver's account"
+              ~typ:(non_null uint64_arg)
+          ; fee ~doc:"Fee amount in order to mint tokens"
           ; valid_until
           ; memo
           ; nonce ]
@@ -1925,7 +2032,6 @@ module Mutations = struct
           User_command_payload.Body.Stake_delegation
             (Set_delegate {delegator= from; new_delegate= to_})
         in
-        (* TODO: Multiple tokens. *)
         let fee_token = Token_id.default in
         match signature with
         | None ->
@@ -1944,13 +2050,13 @@ module Mutations = struct
           ; Types.Input.Fields.signature ]
       ~resolve:
         (fun {ctx= coda; _} ()
-             (from, to_, amount, fee, valid_until, memo, nonce_opt) signature ->
-        (* TODO: Multiple tokens. *)
+             (from, to_, token_id, amount, fee, valid_until, memo, nonce_opt)
+             signature ->
         let body =
           User_command_payload.Body.Payment
             { source_pk= from
             ; receiver_pk= to_
-            ; token_id= Token_id.default
+            ; token_id= Option.value ~default:Token_id.default token_id
             ; amount= Amount.of_uint64 amount }
         in
         let fee_token = Token_id.default in
@@ -1961,6 +2067,106 @@ module Mutations = struct
         | Some signature ->
             send_signed_user_command ~coda ~nonce_opt ~signer:from ~memo ~fee
               ~fee_token ~fee_payer_pk:from ~valid_until ~body ~signature )
+
+  let create_token =
+    io_field "createToken" ~doc:"Create a new token"
+      ~typ:(non_null Types.Payload.create_token)
+      ~args:
+        Arg.
+          [ arg "input" ~typ:(non_null Types.Input.create_token)
+          ; Types.Input.Fields.signature ]
+      ~resolve:
+        (fun {ctx= coda; _} () (token_owner, fee, valid_until, memo, nonce_opt)
+             signature ->
+        let body =
+          User_command_payload.Body.Create_new_token
+            { token_owner_pk= token_owner
+            ; disable_new_accounts=
+                (* TODO(5274): Expose when permissions commands are merged. *)
+                false }
+        in
+        let fee_token = Token_id.default in
+        match signature with
+        | None ->
+            send_unsigned_user_command ~coda ~nonce_opt ~signer:token_owner
+              ~memo ~fee ~fee_token ~fee_payer_pk:token_owner ~valid_until
+              ~body
+        | Some signature ->
+            send_signed_user_command ~coda ~nonce_opt ~signer:token_owner ~memo
+              ~fee ~fee_token ~fee_payer_pk:token_owner ~valid_until ~body
+              ~signature )
+
+  let create_token_account =
+    io_field "createTokenAccount" ~doc:"Create a new account for a token"
+      ~typ:(non_null Types.Payload.create_token_account)
+      ~args:
+        Arg.
+          [ arg "input" ~typ:(non_null Types.Input.create_token_account)
+          ; Types.Input.Fields.signature ]
+      ~resolve:
+        (fun {ctx= coda; _} ()
+             ( token_owner
+             , token
+             , receiver
+             , fee
+             , fee_payer
+             , valid_until
+             , memo
+             , nonce_opt ) signature ->
+        let body =
+          User_command_payload.Body.Create_token_account
+            { token_id= token
+            ; token_owner_pk= token_owner
+            ; receiver_pk= receiver
+            ; account_disabled=
+                (* TODO(5274): Expose when permissions commands are merged. *)
+                false }
+        in
+        let fee_token = Token_id.default in
+        let fee_payer_pk = Option.value ~default:receiver fee_payer in
+        match signature with
+        | None ->
+            send_unsigned_user_command ~coda ~nonce_opt ~signer:fee_payer_pk
+              ~memo ~fee ~fee_token ~fee_payer_pk ~valid_until ~body
+        | Some signature ->
+            send_signed_user_command ~coda ~nonce_opt ~signer:fee_payer_pk
+              ~memo ~fee ~fee_token ~fee_payer_pk ~valid_until ~body ~signature
+        )
+
+  let mint_tokens =
+    io_field "createTokenAccount" ~doc:"Create a new account for a token"
+      ~typ:(non_null Types.Payload.mint_tokens)
+      ~args:
+        Arg.
+          [ arg "input" ~typ:(non_null Types.Input.mint_tokens)
+          ; Types.Input.Fields.signature ]
+      ~resolve:
+        (fun {ctx= coda; _} ()
+             ( token_owner
+             , token
+             , receiver
+             , amount
+             , fee
+             , valid_until
+             , memo
+             , nonce_opt ) signature ->
+        let body =
+          User_command_payload.Body.Mint_tokens
+            { token_id= token
+            ; token_owner_pk= token_owner
+            ; receiver_pk= Option.value ~default:token_owner receiver
+            ; amount= Amount.of_uint64 amount }
+        in
+        let fee_token = Token_id.default in
+        match signature with
+        | None ->
+            send_unsigned_user_command ~coda ~nonce_opt ~signer:token_owner
+              ~memo ~fee ~fee_token ~fee_payer_pk:token_owner ~valid_until
+              ~body
+        | Some signature ->
+            send_signed_user_command ~coda ~nonce_opt ~signer:token_owner ~memo
+              ~fee ~fee_token ~fee_payer_pk:token_owner ~valid_until ~body
+              ~signature )
 
   let add_payment_receipt =
     result_field "addPaymentReceipt"
@@ -2047,6 +2253,9 @@ module Mutations = struct
     ; reload_wallets
     ; send_payment
     ; send_delegation
+    ; create_token
+    ; create_token_account
+    ; mint_tokens
     ; add_payment_receipt
     ; set_staking
     ; set_snark_worker
