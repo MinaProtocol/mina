@@ -22,7 +22,7 @@ Pipeline.build
      , steps =
          [ Command.build
              Command.Config::
-               { commands = OpamInit.andThenRunInDocker "./scripts/compare_test_signatures.sh"
+               { commands = OpamInit.andThenRunInDocker ([] : List Text) "./scripts/compare_test_signatures.sh"
                , label = "Compare test signatures"
                , key = "compare-test-signatures"
                , target = Size.Large
