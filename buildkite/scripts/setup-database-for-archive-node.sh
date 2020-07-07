@@ -1,3 +1,5 @@
+ #!/bin/bash
+
 set -eou pipefail
 
 user=$1
