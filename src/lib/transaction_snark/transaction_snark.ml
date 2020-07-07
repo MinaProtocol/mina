@@ -656,13 +656,13 @@ module Base = struct
     type 'bool t =
       { predicate_failed: 'bool (* All *)
       ; source_not_present: 'bool (* All *)
-      ; receiver_not_present: 'bool (* Delegate only *)
+      ; receiver_not_present: 'bool (* Delegate, Mint_tokens *)
       ; amount_insufficient_to_create: 'bool (* Payment only *)
       ; token_cannot_create: 'bool (* Payment only, token<>default *)
       ; source_insufficient_balance: 'bool (* Payment only *)
       ; source_bad_timing: 'bool (* Payment only *)
       ; receiver_exists: 'bool (* Create_account only *)
-      ; not_token_owner: 'bool (* Create_account only *) }
+      ; not_token_owner: 'bool (* Create_account, Mint_tokens *) }
 
     let num_fields = 9
 
@@ -776,7 +776,7 @@ module Base = struct
                     false
                   in
                   (false, predicate_result)
-              | Payment | Stake_delegation ->
+              | Payment | Stake_delegation | Mint_tokens ->
                   (* TODO(#4554): Hook predicate evaluation in here once
                      implemented.
                   *)
@@ -936,6 +936,33 @@ module Base = struct
               ; source_insufficient_balance= false
               ; source_bad_timing= false
               ; receiver_exists
+              ; not_token_owner }
+          | Mint_tokens ->
+              let receiver_account =
+                if Account_id.equal receiver fee_payer then fee_payer_account
+                else receiver_account
+              in
+              let receiver_not_present =
+                let id = Account.identifier receiver_account in
+                if Account_id.equal Account_id.empty id then true
+                else if Account_id.equal receiver id then false
+                else fail "bad receiver account ID"
+              in
+              let source_not_present =
+                let id = Account.identifier source_account in
+                if Account_id.equal Account_id.empty id then true
+                else if Account_id.equal source id then false
+                else fail "bad source account ID"
+              in
+              let not_token_owner = not source_account.token_owner in
+              { predicate_failed
+              ; source_not_present
+              ; receiver_not_present
+              ; amount_insufficient_to_create= false
+              ; token_cannot_create= false
+              ; source_insufficient_balance= false
+              ; source_bad_timing= false
+              ; receiver_exists= false
               ; not_token_owner } )
 
     let%snarkydef compute_as_prover ~constraint_constants ~txn_global_slot
@@ -1161,6 +1188,7 @@ module Base = struct
     in
     (* Compute transaction kind. *)
     let is_payment = Transaction_union.Tag.Unpacked.is_payment tag in
+    let is_mint_tokens = Transaction_union.Tag.Unpacked.is_mint_tokens tag in
     let is_stake_delegation =
       Transaction_union.Tag.Unpacked.is_stake_delegation tag
     in
@@ -1193,6 +1221,7 @@ module Base = struct
                (Boolean.Assert.any
                   [ fee_token_default
                   ; is_payment
+                  ; is_mint_tokens
                   ; is_stake_delegation
                   ; is_fee_transfer ])
            ; (* TODO: Remove this check and update the transaction snark once we
@@ -1208,6 +1237,7 @@ module Base = struct
                   [ token_default
                   ; is_payment
                   ; is_create_account
+                  ; is_mint_tokens
                     (* TODO: Enable this when fees in tokens are enabled. *)
                     (*; is_fee_transfer*) ])
            ; [%with_label
@@ -1385,6 +1415,7 @@ module Base = struct
                - the fee-payer for payments
                - the fee-payer for stake delegation
                - the fee-payer for account creation
+               - the fee-payer for token minting
                - the fee-receiver for a coinbase
                - the second receiver for a fee transfer
              *)
@@ -1492,6 +1523,7 @@ module Base = struct
       (* - payments:         payload.body.amount
          - stake delegation: 0
          - account creation: 0
+         - token minting:    payload.body.amount
          - coinbase:         payload.body.amount - payload.common.fee
          - fee transfer:     payload.body.amount
       *)
@@ -1521,15 +1553,19 @@ module Base = struct
                - the receiver for payments
                - the delegated-to account for stake delegation
                - the created account for an account creation
+               - the receiver for minted tokens
                - the receiver for a coinbase
                - the first receiver for a fee transfer
              *)
-             let%bind is_empty_delegatee =
-               Boolean.(is_empty_and_writeable && is_stake_delegation)
+             let%bind is_empty_failure =
+               let%bind must_not_be_empty =
+                 Boolean.(is_stake_delegation || is_mint_tokens)
+               in
+               Boolean.(is_empty_and_writeable && must_not_be_empty)
              in
              let%bind () =
                [%with_label "Receiver existence failure matches predicted"]
-                 (Boolean.Assert.( = ) is_empty_delegatee
+                 (Boolean.Assert.( = ) is_empty_failure
                     user_command_failure.receiver_not_present)
              in
              let%bind () =
@@ -1541,10 +1577,10 @@ module Base = struct
                     user_command_failure.receiver_exists)
              in
              let is_empty_and_writeable =
-               (* is_empty_and_writable && not is_stake_delegation *)
+               (* is_empty_and_writable && not is_empty_failure *)
                Boolean.Unsafe.of_cvar
                @@ Field.Var.(
-                    sub (is_empty_and_writeable :> t) (is_empty_delegatee :> t))
+                    sub (is_empty_and_writeable :> t) (is_empty_failure :> t))
              in
              let%bind should_pay_to_create =
                Boolean.(is_empty_and_writeable && not is_create_account)
@@ -1653,6 +1689,7 @@ module Base = struct
                - the source for payments
                - the delegator for stake delegation
                - the token owner for account creation
+               - the token owner for token minting
                - the fee-receiver for a coinbase
                - the second receiver for a fee transfer
              *)
@@ -1727,11 +1764,14 @@ module Base = struct
              let%bind () =
                [%with_label "Check not_token_owner failure matches predicted"]
                  (let%bind token_owner_ok =
+                    let%bind command_needs_token_owner =
+                      Boolean.(is_create_account || is_mint_tokens)
+                    in
                     Boolean.(
                       any
                         [ account.token_owner
                         ; token_default
-                        ; not is_create_account ])
+                        ; not command_needs_token_owner ])
                   in
                   Boolean.(
                     Assert.( = ) (not token_owner_ok)
@@ -1760,6 +1800,7 @@ module Base = struct
       (* - payments:         payload.common.fee
          - stake delegation: payload.common.fee
          - account creation: payload.common.fee
+         - token minting:    payload.common.fee
          - coinbase:         0 (fee already paid above)
          - fee transfer:     - payload.body.amount - payload.common.fee
       *)
@@ -4482,6 +4523,276 @@ let%test_module "transaction_snark" =
                 Public_key.Compressed.equal receiver_pk
                   receiver_account.delegate ) ;
               assert (not receiver_account.token_owner) ) )
+
+    let%test_unit "mint tokens in owner's account" =
+      Test_util.with_randomness 123456789 (fun () ->
+          Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
+              let wallets = random_wallets ~n:1 () in
+              let signer = wallets.(0).private_key in
+              (* Fee-payer, receiver, and token owner are the same. *)
+              let fee_payer_pk = wallets.(0).account.public_key in
+              let token_owner_pk = fee_payer_pk in
+              let receiver_pk = fee_payer_pk in
+              let fee_token = Token_id.default in
+              let token_id =
+                Quickcheck.random_value Token_id.gen_non_default
+              in
+              let amount =
+                Amount.of_int (random_int_incl 2 15 * 1_000_000_000)
+              in
+              let accounts =
+                [| create_account fee_payer_pk fee_token 20_000_000_000
+                 ; { (create_account token_owner_pk token_id 0) with
+                     token_owner= true } |]
+              in
+              let fee = Fee.of_int (random_int_incl 2 15 * 1_000_000_000) in
+              let ( `Fee_payer_account fee_payer_account
+                  , `Source_account _token_owner_account
+                  , `Receiver_account receiver_account ) =
+                test_user_command_with_accounts ~constraint_constants ~ledger
+                  ~accounts ~signer ~fee ~fee_payer_pk ~fee_token
+                  (Mint_tokens {token_owner_pk; token_id; receiver_pk; amount})
+              in
+              let fee_payer_account = Option.value_exn fee_payer_account in
+              let receiver_account = Option.value_exn receiver_account in
+              let expected_fee_payer_balance =
+                accounts.(0).balance |> sub_fee fee
+              in
+              let expected_receiver_balance =
+                accounts.(1).balance |> add_amount amount
+              in
+              assert (
+                Balance.equal fee_payer_account.balance
+                  expected_fee_payer_balance ) ;
+              assert (
+                Balance.equal expected_receiver_balance
+                  receiver_account.balance ) ) )
+
+    let%test_unit "mint tokens in another pk's account" =
+      Test_util.with_randomness 123456789 (fun () ->
+          Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
+              let wallets = random_wallets ~n:2 () in
+              let signer = wallets.(0).private_key in
+              (* Fee-payer and token owner are the same, receiver differs. *)
+              let fee_payer_pk = wallets.(0).account.public_key in
+              let token_owner_pk = fee_payer_pk in
+              let receiver_pk = wallets.(1).account.public_key in
+              let fee_token = Token_id.default in
+              let token_id =
+                Quickcheck.random_value Token_id.gen_non_default
+              in
+              let amount =
+                Amount.of_int (random_int_incl 2 15 * 1_000_000_000)
+              in
+              let accounts =
+                [| create_account fee_payer_pk fee_token 20_000_000_000
+                 ; { (create_account token_owner_pk token_id 0) with
+                     token_owner= true }
+                 ; create_account receiver_pk token_id 0 |]
+              in
+              let fee = Fee.of_int (random_int_incl 2 15 * 1_000_000_000) in
+              let ( `Fee_payer_account fee_payer_account
+                  , `Source_account token_owner_account
+                  , `Receiver_account receiver_account ) =
+                test_user_command_with_accounts ~constraint_constants ~ledger
+                  ~accounts ~signer ~fee ~fee_payer_pk ~fee_token
+                  (Mint_tokens {token_owner_pk; token_id; receiver_pk; amount})
+              in
+              let fee_payer_account = Option.value_exn fee_payer_account in
+              let receiver_account = Option.value_exn receiver_account in
+              let token_owner_account = Option.value_exn token_owner_account in
+              let expected_fee_payer_balance =
+                accounts.(0).balance |> sub_fee fee
+              in
+              let expected_receiver_balance =
+                accounts.(2).balance |> add_amount amount
+              in
+              assert (
+                Balance.equal fee_payer_account.balance
+                  expected_fee_payer_balance ) ;
+              assert (
+                Balance.equal accounts.(1).balance token_owner_account.balance
+              ) ;
+              assert (
+                Balance.equal expected_receiver_balance
+                  receiver_account.balance ) ) )
+
+    let%test_unit "mint tokens fails if the claimed token owner is not the \
+                   token owner" =
+      Test_util.with_randomness 123456789 (fun () ->
+          Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
+              let wallets = random_wallets ~n:2 () in
+              let signer = wallets.(0).private_key in
+              (* Fee-payer and token owner are the same, receiver differs. *)
+              let fee_payer_pk = wallets.(0).account.public_key in
+              let token_owner_pk = fee_payer_pk in
+              let receiver_pk = wallets.(1).account.public_key in
+              let fee_token = Token_id.default in
+              let token_id =
+                Quickcheck.random_value Token_id.gen_non_default
+              in
+              let amount =
+                Amount.of_int (random_int_incl 2 15 * 1_000_000_000)
+              in
+              let accounts =
+                [| create_account fee_payer_pk fee_token 20_000_000_000
+                 ; create_account token_owner_pk token_id 0
+                 ; create_account receiver_pk token_id 0 |]
+              in
+              let fee = Fee.of_int (random_int_incl 2 15 * 1_000_000_000) in
+              let ( `Fee_payer_account fee_payer_account
+                  , `Source_account token_owner_account
+                  , `Receiver_account receiver_account ) =
+                test_user_command_with_accounts ~constraint_constants ~ledger
+                  ~accounts ~signer ~fee ~fee_payer_pk ~fee_token
+                  (Mint_tokens {token_owner_pk; token_id; receiver_pk; amount})
+              in
+              let fee_payer_account = Option.value_exn fee_payer_account in
+              let receiver_account = Option.value_exn receiver_account in
+              let token_owner_account = Option.value_exn token_owner_account in
+              let expected_fee_payer_balance =
+                accounts.(0).balance |> sub_fee fee
+              in
+              assert (
+                Balance.equal fee_payer_account.balance
+                  expected_fee_payer_balance ) ;
+              assert (
+                Balance.equal accounts.(1).balance token_owner_account.balance
+              ) ;
+              assert (
+                Balance.equal accounts.(2).balance receiver_account.balance )
+          ) )
+
+    let%test_unit "mint tokens fails if the token owner account is not present"
+        =
+      Test_util.with_randomness 123456789 (fun () ->
+          Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
+              let wallets = random_wallets ~n:2 () in
+              let signer = wallets.(0).private_key in
+              (* Fee-payer and token owner are the same, receiver differs. *)
+              let fee_payer_pk = wallets.(0).account.public_key in
+              let token_owner_pk = fee_payer_pk in
+              let receiver_pk = wallets.(1).account.public_key in
+              let fee_token = Token_id.default in
+              let token_id =
+                Quickcheck.random_value Token_id.gen_non_default
+              in
+              let amount =
+                Amount.of_int (random_int_incl 2 15 * 1_000_000_000)
+              in
+              let accounts =
+                [| create_account fee_payer_pk fee_token 20_000_000_000
+                 ; create_account receiver_pk token_id 0 |]
+              in
+              let fee = Fee.of_int (random_int_incl 2 15 * 1_000_000_000) in
+              let ( `Fee_payer_account fee_payer_account
+                  , `Source_account token_owner_account
+                  , `Receiver_account receiver_account ) =
+                test_user_command_with_accounts ~constraint_constants ~ledger
+                  ~accounts ~signer ~fee ~fee_payer_pk ~fee_token
+                  (Mint_tokens {token_owner_pk; token_id; receiver_pk; amount})
+              in
+              let fee_payer_account = Option.value_exn fee_payer_account in
+              let receiver_account = Option.value_exn receiver_account in
+              let expected_fee_payer_balance =
+                accounts.(0).balance |> sub_fee fee
+              in
+              assert (
+                Balance.equal fee_payer_account.balance
+                  expected_fee_payer_balance ) ;
+              assert (Option.is_none token_owner_account) ;
+              assert (
+                Balance.equal accounts.(1).balance receiver_account.balance )
+          ) )
+
+    let%test_unit "mint tokens fails if the fee-payer does not have \
+                   permission to mint" =
+      Test_util.with_randomness 123456789 (fun () ->
+          Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
+              let wallets = random_wallets ~n:2 () in
+              let signer = wallets.(0).private_key in
+              (* Fee-payer and receiver are the same, token owner differs. *)
+              let fee_payer_pk = wallets.(0).account.public_key in
+              let token_owner_pk = wallets.(1).account.public_key in
+              let receiver_pk = fee_payer_pk in
+              let fee_token = Token_id.default in
+              let token_id =
+                Quickcheck.random_value Token_id.gen_non_default
+              in
+              let amount =
+                Amount.of_int (random_int_incl 2 15 * 1_000_000_000)
+              in
+              let accounts =
+                [| create_account fee_payer_pk fee_token 20_000_000_000
+                 ; { (create_account token_owner_pk token_id 0) with
+                     token_owner= true }
+                 ; create_account receiver_pk token_id 0 |]
+              in
+              let fee = Fee.of_int (random_int_incl 2 15 * 1_000_000_000) in
+              let ( `Fee_payer_account fee_payer_account
+                  , `Source_account token_owner_account
+                  , `Receiver_account receiver_account ) =
+                test_user_command_with_accounts ~constraint_constants ~ledger
+                  ~accounts ~signer ~fee ~fee_payer_pk ~fee_token
+                  (Mint_tokens {token_owner_pk; token_id; receiver_pk; amount})
+              in
+              let fee_payer_account = Option.value_exn fee_payer_account in
+              let receiver_account = Option.value_exn receiver_account in
+              let token_owner_account = Option.value_exn token_owner_account in
+              let expected_fee_payer_balance =
+                accounts.(0).balance |> sub_fee fee
+              in
+              assert (
+                Balance.equal fee_payer_account.balance
+                  expected_fee_payer_balance ) ;
+              assert (
+                Balance.equal accounts.(1).balance token_owner_account.balance
+              ) ;
+              assert (
+                Balance.equal accounts.(2).balance receiver_account.balance )
+          ) )
+
+    let%test_unit "mint tokens fails if the receiver account is not present" =
+      Test_util.with_randomness 123456789 (fun () ->
+          Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
+              let wallets = random_wallets ~n:2 () in
+              let signer = wallets.(0).private_key in
+              (* Fee-payer and fee payer are the same, receiver differs. *)
+              let fee_payer_pk = wallets.(0).account.public_key in
+              let token_owner_pk = fee_payer_pk in
+              let receiver_pk = wallets.(1).account.public_key in
+              let fee_token = Token_id.default in
+              let token_id =
+                Quickcheck.random_value Token_id.gen_non_default
+              in
+              let amount =
+                Amount.of_int (random_int_incl 2 15 * 1_000_000_000)
+              in
+              let accounts =
+                [| create_account fee_payer_pk fee_token 20_000_000_000
+                 ; { (create_account token_owner_pk token_id 0) with
+                     token_owner= true } |]
+              in
+              let fee = Fee.of_int (random_int_incl 2 15 * 1_000_000_000) in
+              let ( `Fee_payer_account fee_payer_account
+                  , `Source_account token_owner_account
+                  , `Receiver_account receiver_account ) =
+                test_user_command_with_accounts ~constraint_constants ~ledger
+                  ~accounts ~signer ~fee ~fee_payer_pk ~fee_token
+                  (Mint_tokens {token_owner_pk; token_id; receiver_pk; amount})
+              in
+              let fee_payer_account = Option.value_exn fee_payer_account in
+              let token_owner_account = Option.value_exn token_owner_account in
+              let expected_fee_payer_balance =
+                accounts.(0).balance |> sub_fee fee
+              in
+              assert (
+                Balance.equal fee_payer_account.balance
+                  expected_fee_payer_balance ) ;
+              assert (
+                Balance.equal accounts.(1).balance token_owner_account.balance
+              ) ;
+              assert (Option.is_none receiver_account) ) )
   end )
 
 let%test_module "account timing check" =

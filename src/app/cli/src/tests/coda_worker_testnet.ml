@@ -681,7 +681,10 @@ end = struct
           | Payment payment_payload ->
               ( Public_key.compress user_command.signer
               , payment_payload.receiver_pk )
-          | Stake_delegation _ | Create_new_token _ | Create_token_account _ ->
+          | Stake_delegation _
+          | Create_new_token _
+          | Create_token_account _
+          | Mint_tokens _ ->
               failwith "Expected a list of payments" )
       |> List.unzip
     in

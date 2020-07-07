@@ -219,7 +219,7 @@ let apply_user_command_exn ~constraint_constants ~txn_global_slot t
               false
             in
             predicate_result
-        | Payment _ | Stake_delegation _ ->
+        | Payment _ | Stake_delegation _ | Mint_tokens _ ->
             (* TODO(#4554): Hook predicate evaluation in here once implemented. *)
             failwith
               "The fee-payer is not authorised to issue commands for the \
@@ -387,6 +387,36 @@ let apply_user_command_exn ~constraint_constants ~txn_global_slot t
           [ (receiver_idx, receiver_account)
           ; (fee_payer_idx, fee_payer_account)
           ; (source_idx, source_account) ]
+    | Mint_tokens {token_id= token; amount; _} ->
+        assert (not (Token_id.(equal default) token)) ;
+        let receiver_idx = find_index_exn t receiver in
+        let action, receiver_account =
+          get_or_initialize_exn receiver t receiver_idx
+        in
+        assert (action = `Existed) ;
+        let receiver_account =
+          { receiver_account with
+            balance=
+              Balance.add_amount receiver_account.balance amount
+              |> Option.value_exn ?here:None ?error:None ?message:None }
+        in
+        let source_idx = find_index_exn t source in
+        let source_account =
+          let account =
+            if Account_id.equal source receiver then receiver_account
+            else get_exn t source_idx
+          in
+          (* Check that source account exists. *)
+          assert (not Public_key.Compressed.(equal empty account.public_key)) ;
+          (* Check that source account owns the token. *)
+          assert account.token_owner ;
+          { account with
+            timing=
+              Or_error.ok_exn
+              @@ Transaction_logic.validate_timing ~txn_amount:Amount.zero
+                   ~txn_global_slot:current_global_slot ~account }
+        in
+        [(receiver_idx, receiver_account); (source_idx, source_account)]
   in
   try
     let indexed_accounts = compute_updates () in

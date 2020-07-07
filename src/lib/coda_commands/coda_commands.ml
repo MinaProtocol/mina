@@ -44,28 +44,6 @@ let record_payment t (txn : User_command.t) account =
          collision should not happen." ;
       Core.exit 1
 
-let is_valid_user_command t (txn : User_command.t) account_opt =
-  let remainder =
-    let open Option.Let_syntax in
-    let%bind account = account_opt
-    and cost =
-      let fee = txn.payload.common.fee in
-      match txn.payload.body with
-      | Stake_delegation (Set_delegate _) ->
-          Some (Currency.Amount.of_fee fee)
-      | Payment {amount; _} ->
-          Currency.Amount.add_fee amount fee
-      | Create_new_token _ | Create_token_account _ ->
-          let account_creation_fee =
-            (Coda_lib.config t).precomputed_values.constraint_constants
-              .account_creation_fee
-          in
-          Currency.Amount.(add_fee (of_fee account_creation_fee) fee)
-    in
-    Currency.Balance.sub_amount account.Account.Poly.balance cost
-  in
-  Option.is_some remainder
-
 let get_account t (addr : Account_id.t) =
   let open Participating_state.Let_syntax in
   let%map ledger = Coda_lib.best_ledger t in

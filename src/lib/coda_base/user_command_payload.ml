@@ -188,6 +188,7 @@ module Body = struct
         | Stake_delegation of Stake_delegation.Stable.V1.t
         | Create_new_token of New_token_payload.Stable.V1.t
         | Create_token_account of New_account_payload.Stable.V1.t
+        | Mint_tokens of Minting_payload.Stable.V1.t
       [@@deriving compare, eq, sexp, hash, yojson]
 
       let to_latest = Fn.id
@@ -199,6 +200,7 @@ module Body = struct
     | Stake_delegation of Stake_delegation.t
     | Create_new_token of New_token_payload.t
     | Create_token_account of New_account_payload.t
+    | Mint_tokens of Minting_payload.t
   [@@deriving eq, sexp, hash, yojson]
 
   module Tag = Transaction_union_tag
@@ -227,10 +229,18 @@ module Body = struct
       | None ->
           New_account_payload.gen
     in
+    let mint_tokens_gen =
+      match source_pk with
+      | Some token_owner_pk ->
+          map Minting_payload.gen ~f:(fun payload ->
+              {payload with token_owner_pk} )
+      | None ->
+          Minting_payload.gen
+    in
     map
-      (variant4
+      (variant5
          (Payment_payload.gen ?source_pk ~max_amount)
-         stake_delegation_gen new_token_gen token_account_gen)
+         stake_delegation_gen new_token_gen token_account_gen mint_tokens_gen)
       ~f:(function
         | `A p ->
             Payment p
@@ -239,7 +249,9 @@ module Body = struct
         | `C payload ->
             Create_new_token payload
         | `D payload ->
-            Create_token_account payload )
+            Create_token_account payload
+        | `E payload ->
+            Mint_tokens payload )
 
   let source_pk (t : t) =
     match t with
@@ -251,6 +263,8 @@ module Body = struct
         New_token_payload.source_pk payload
     | Create_token_account payload ->
         New_account_payload.source_pk payload
+    | Mint_tokens payload ->
+        Minting_payload.source_pk payload
 
   let receiver_pk (t : t) =
     match t with
@@ -262,6 +276,8 @@ module Body = struct
         New_token_payload.receiver_pk payload
     | Create_token_account payload ->
         New_account_payload.receiver_pk payload
+    | Mint_tokens payload ->
+        Minting_payload.receiver_pk payload
 
   let token (t : t) =
     match t with
@@ -273,6 +289,8 @@ module Body = struct
         New_token_payload.token payload
     | Create_token_account payload ->
         New_account_payload.token payload
+    | Mint_tokens payload ->
+        Minting_payload.token payload
 
   let source ~next_available_token t =
     match t with
@@ -284,6 +302,8 @@ module Body = struct
         New_token_payload.source ~next_available_token payload
     | Create_token_account payload ->
         New_account_payload.source payload
+    | Mint_tokens payload ->
+        Minting_payload.source payload
 
   let receiver ~next_available_token t =
     match t with
@@ -295,6 +315,8 @@ module Body = struct
         New_token_payload.receiver ~next_available_token payload
     | Create_token_account payload ->
         New_account_payload.receiver payload
+    | Mint_tokens payload ->
+        Minting_payload.receiver payload
 
   let tag = function
     | Payment _ ->
@@ -305,6 +327,8 @@ module Body = struct
         Transaction_union_tag.Create_account
     | Create_token_account _ ->
         Transaction_union_tag.Create_account
+    | Mint_tokens _ ->
+        Transaction_union_tag.Mint_tokens
 end
 
 module Poly = struct
@@ -383,6 +407,8 @@ let amount (t : t) =
       None
   | Create_token_account _ ->
       None
+  | Mint_tokens payload ->
+      Some payload.Minting_payload.amount
 
 let fee_excess (t : t) =
   Fee_excess.of_single (fee_token t, Currency.Fee.Signed.of_unsigned (fee t))
