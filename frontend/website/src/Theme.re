@@ -61,7 +61,7 @@ module Colors = {
 
   let blueBlue = `rgb((42, 81, 224));
   let midnight = `rgb((31, 45, 61));
-  let leaderboardMidnight = `hex("344B65");
+  let leaderboardMidnight = `rgb((52, 75, 101));
 
   let india = `rgb((242, 183, 5));
   let indiaAlpha = a => `rgba((242, 183, 5, a));
@@ -421,13 +421,13 @@ module Body = {
       color(Colors.saville),
     ]);
 
-let medium =
+  let medium =
     style([
       Typeface.ibmplexsans,
       fontStyle(`normal),
       fontSize(`px(16)),
       lineHeight(`px(24)),
-      color(Colors.teal)
+      color(Colors.teal),
     ]);
 };
 

@@ -92,6 +92,10 @@ module Inputs = struct
                           { Transaction_protocol_state.Poly.transaction= t
                           ; block_data= w.protocol_state_body }
                           ~init_stack:w.init_stack
+                          ~next_available_token_before:
+                            input.next_available_token_before
+                          ~next_available_token_after:
+                            input.next_available_token_after
                           ~pending_coinbase_stack_state:
                             input
                               .Transaction_snark.Statement
@@ -114,6 +118,8 @@ module Inputs = struct
                  ~supply_increase:stmt.supply_increase
                  ~pending_coinbase_stack_state:
                    stmt.pending_coinbase_stack_state
+                 ~next_available_token_before:stmt.next_available_token_before
+                 ~next_available_token_after:stmt.next_available_token_after
                  ~fee_excess:stmt.fee_excess ~sok_digest
                  ~proof:Proof.transaction_dummy
              , Time.Span.zero )

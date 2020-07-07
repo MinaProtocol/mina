@@ -63,7 +63,8 @@ let of_transaction : Transaction.t -> t = function
               ; receiver_pk= receiver
               ; token_id= Token_id.default
               ; amount
-              ; tag= Tag.Coinbase } }
+              ; tag= Tag.Coinbase
+              ; token_locked= false } }
       ; signer= Public_key.decompress_exn other_pk
       ; signature= Signature.dummy }
   | Fee_transfer tr -> (
@@ -82,7 +83,8 @@ let of_transaction : Transaction.t -> t = function
                 ; receiver_pk= pk1
                 ; token_id
                 ; amount= Amount.of_fee fee1
-                ; tag= Tag.Fee_transfer } }
+                ; tag= Tag.Fee_transfer
+                ; token_locked= false } }
         ; signer= Public_key.decompress_exn pk2
         ; signature= Signature.dummy }
       in
@@ -97,3 +99,6 @@ let fee_excess (t : t) = Transaction_union_payload.fee_excess t.payload
 
 let supply_increase (t : t) =
   Transaction_union_payload.supply_increase t.payload
+
+let next_available_token (t : t) tid =
+  Transaction_union_payload.next_available_token t.payload tid

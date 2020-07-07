@@ -77,6 +77,7 @@ module Statement : sig
              , 'amount
              , 'pending_coinbase
              , 'fee_excess
+             , 'token_id
              , 'sok_digest )
              t =
           { source: 'ledger_hash
@@ -84,6 +85,8 @@ module Statement : sig
           ; supply_increase: 'amount
           ; pending_coinbase_stack_state: 'pending_coinbase
           ; fee_excess: 'fee_excess
+          ; next_available_token_before: 'token_id
+          ; next_available_token_after: 'token_id
           ; sok_digest: 'sok_digest }
         [@@deriving compare, equal, hash, sexp, yojson]
 
@@ -92,27 +95,37 @@ module Statement : sig
           -> ('amount -> 'amount')
           -> ('pending_coinbase -> 'pending_coinbase')
           -> ('fee_excess -> 'fee_excess')
+          -> ('token_id -> 'token_id')
           -> ('sok_digest -> 'sok_digest')
           -> ( 'ledger_hash
              , 'amount
              , 'pending_coinbase
              , 'fee_excess
+             , 'token_id
              , 'sok_digest )
              t
           -> ( 'ledger_hash'
              , 'amount'
              , 'pending_coinbase'
              , 'fee_excess'
+             , 'token_id'
              , 'sok_digest' )
              t
       end
     end]
 
-    type ('ledger_hash, 'amount, 'pending_coinbase, 'fee_excess, 'sok_digest) t =
+    type ( 'ledger_hash
+         , 'amount
+         , 'pending_coinbase
+         , 'fee_excess
+         , 'token_id
+         , 'sok_digest )
+         t =
           ( 'ledger_hash
           , 'amount
           , 'pending_coinbase
           , 'fee_excess
+          , 'token_id
           , 'sok_digest )
           Stable.Latest.t =
       { source: 'ledger_hash
@@ -120,6 +133,8 @@ module Statement : sig
       ; supply_increase: 'amount
       ; pending_coinbase_stack_state: 'pending_coinbase
       ; fee_excess: 'fee_excess
+      ; next_available_token_before: 'token_id
+      ; next_available_token_after: 'token_id
       ; sok_digest: 'sok_digest }
     [@@deriving compare, equal, hash, sexp, yojson]
   end
@@ -128,12 +143,14 @@ module Statement : sig
        , 'amount
        , 'pending_coinbase
        , 'fee_excess
+       , 'token_id
        , 'sok_digest )
        poly =
         ( 'ledger_hash
         , 'amount
         , 'pending_coinbase
         , 'fee_excess
+        , 'token_id
         , 'sok_digest )
         Poly.t =
     { source: 'ledger_hash
@@ -141,6 +158,8 @@ module Statement : sig
     ; supply_increase: 'amount
     ; pending_coinbase_stack_state: 'pending_coinbase
     ; fee_excess: 'fee_excess
+    ; next_available_token_before: 'token_id
+    ; next_available_token_after: 'token_id
     ; sok_digest: 'sok_digest }
   [@@deriving compare, equal, hash, sexp, yojson]
 
@@ -152,6 +171,7 @@ module Statement : sig
         , Currency.Amount.Stable.V1.t
         , Pending_coinbase_stack_state.Stable.V1.t
         , Fee_excess.Stable.V1.t
+        , Token_id.Stable.V1.t
         , unit )
         Poly.Stable.V1.t
       [@@deriving compare, equal, hash, sexp, yojson]
@@ -163,6 +183,7 @@ module Statement : sig
     , Currency.Amount.t
     , Pending_coinbase_stack_state.t
     , Fee_excess.t
+    , Token_id.t
     , unit )
     Poly.t
   [@@deriving sexp, hash, compare, yojson]
@@ -176,6 +197,7 @@ module Statement : sig
           , Currency.Amount.Stable.V1.t
           , Pending_coinbase_stack_state.Stable.V1.t
           , Fee_excess.Stable.V1.t
+          , Token_id.Stable.V1.t
           , Sok_message.Digest.Stable.V1.t )
           Poly.Stable.V1.t
         [@@deriving compare, equal, hash, sexp, to_yojson]
@@ -187,6 +209,7 @@ module Statement : sig
       , Currency.Amount.t
       , Pending_coinbase_stack_state.t
       , Fee_excess.t
+      , Token_id.t
       , Sok_message.Digest.t )
       Poly.t
     [@@deriving sexp, hash, compare, to_yojson]
@@ -196,6 +219,7 @@ module Statement : sig
       , Currency.Amount.var
       , Pending_coinbase_stack_state.var
       , Fee_excess.var
+      , Token_id.var
       , Sok_message.Digest.Checked.t )
       Poly.Stable.V1.t
 
@@ -242,6 +266,8 @@ val create :
   -> supply_increase:Currency.Amount.t
   -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
   -> fee_excess:Fee_excess.t
+  -> next_available_token_before:Token_id.t
+  -> next_available_token_after:Token_id.t
   -> sok_digest:Sok_message.Digest.t
   -> proof:Coda_base.Proof.t
   -> t
@@ -285,6 +311,8 @@ val check_transaction :
   -> target:Frozen_ledger_hash.t
   -> init_stack:Pending_coinbase.Stack.t
   -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
+  -> next_available_token_before:Token_id.t
+  -> next_available_token_after:Token_id.t
   -> Transaction.t Transaction_protocol_state.t
   -> Tick.Handler.t
   -> unit
@@ -295,7 +323,9 @@ val check_user_command :
   -> source:Frozen_ledger_hash.t
   -> target:Frozen_ledger_hash.t
   -> init_stack:Pending_coinbase.Stack.t
-  -> Pending_coinbase_stack_state.t
+  -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
+  -> next_available_token_before:Token_id.t
+  -> next_available_token_after:Token_id.t
   -> User_command.With_valid_signature.t Transaction_protocol_state.t
   -> Tick.Handler.t
   -> unit
@@ -307,7 +337,9 @@ val generate_transaction_witness :
   -> source:Frozen_ledger_hash.t
   -> target:Frozen_ledger_hash.t
   -> init_stack:Pending_coinbase.Stack.t
-  -> Pending_coinbase_stack_state.t
+  -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
+  -> next_available_token_before:Token_id.t
+  -> next_available_token_after:Token_id.t
   -> Transaction.t Transaction_protocol_state.t
   -> Tick.Handler.t
   -> unit
@@ -323,6 +355,8 @@ module type S = sig
     -> target:Frozen_ledger_hash.t
     -> init_stack:Pending_coinbase.Stack.t
     -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
+    -> next_available_token_before:Token_id.t
+    -> next_available_token_after:Token_id.t
     -> Transaction.t Transaction_protocol_state.t
     -> Tick.Handler.t
     -> t
@@ -333,6 +367,8 @@ module type S = sig
     -> target:Frozen_ledger_hash.t
     -> init_stack:Pending_coinbase.Stack.t
     -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
+    -> next_available_token_before:Token_id.t
+    -> next_available_token_after:Token_id.t
     -> User_command.With_valid_signature.t Transaction_protocol_state.t
     -> Tick.Handler.t
     -> t
@@ -343,6 +379,8 @@ module type S = sig
     -> target:Frozen_ledger_hash.t
     -> init_stack:Pending_coinbase.Stack.t
     -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
+    -> next_available_token_before:Token_id.t
+    -> next_available_token_after:Token_id.t
     -> Fee_transfer.t Transaction_protocol_state.t
     -> Tick.Handler.t
     -> t

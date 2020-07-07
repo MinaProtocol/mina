@@ -132,7 +132,9 @@ module Body = struct
 
   let var_to_input
       {Poly.genesis_state_hash; blockchain_state; consensus_state; constants} =
-    let blockchain_state = Blockchain_state.var_to_input blockchain_state in
+    let%bind blockchain_state =
+      Blockchain_state.var_to_input blockchain_state
+    in
     let%bind constants = Protocol_constants_checked.var_to_input constants in
     let%map consensus_state =
       Consensus.Data.Consensus_state.var_to_input consensus_state
@@ -291,6 +293,9 @@ let negative_one ~genesis_ledger ~constraint_constants ~consensus_constants =
           Blockchain_state.negative_one ~constraint_constants
             ~genesis_ledger_hash:
               (Coda_base.Ledger.merkle_root (Lazy.force genesis_ledger))
+            ~snarked_next_available_token:
+              (Coda_base.Ledger.next_available_token
+                 (Lazy.force genesis_ledger))
       ; genesis_state_hash= State_hash.of_hash Outside_hash_image.t
       ; consensus_state=
           Consensus.Data.Consensus_state.negative_one ~genesis_ledger

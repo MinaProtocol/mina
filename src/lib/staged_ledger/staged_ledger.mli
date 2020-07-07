@@ -87,6 +87,7 @@ val of_scan_state_and_ledger :
   -> constraint_constants:Genesis_constants.Constraint_constants.t
   -> verifier:Verifier.t
   -> snarked_ledger_hash:Frozen_ledger_hash.t
+  -> snarked_next_available_token:Token_id.t
   -> ledger:Ledger.t
   -> scan_state:Scan_state.t
   -> pending_coinbase_collection:Pending_coinbase.t
@@ -95,6 +96,7 @@ val of_scan_state_and_ledger :
 val of_scan_state_and_ledger_unchecked :
      constraint_constants:Genesis_constants.Constraint_constants.t
   -> snarked_ledger_hash:Frozen_ledger_hash.t
+  -> snarked_next_available_token:Token_id.t
   -> ledger:Ledger.t
   -> scan_state:Scan_state.t
   -> pending_coinbase_collection:Pending_coinbase.t

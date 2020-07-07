@@ -34,10 +34,13 @@ module Prod : Ledger_proof_intf.S with type t = Transaction_snark.t = struct
                  ; target
                  ; supply_increase
                  ; fee_excess
+                 ; next_available_token_before
+                 ; next_available_token_after
                  ; pending_coinbase_stack_state
                  ; sok_digest= () } ~sok_digest ~proof =
     Transaction_snark.create ~source ~target ~pending_coinbase_stack_state
-      ~supply_increase ~fee_excess ~sok_digest ~proof
+      ~supply_increase ~fee_excess ~next_available_token_before
+      ~next_available_token_after ~sok_digest ~proof
 end
 
 module Debug :
