@@ -32,7 +32,10 @@ module Testnet : Test_intf.Testnet_intf = struct
     ; testnet_log_filter: string }
 end
 
-module Network_manager : Test_intf.Network_manager_intf = struct
+module Network_manager :
+  Test_intf.Network_manager_intf
+  with type network_config = Network_config.t
+   and type daemon_config = Daemon_config.t = struct
   type testnet = Testnet.t
 
   type network_config = Network_config.t
