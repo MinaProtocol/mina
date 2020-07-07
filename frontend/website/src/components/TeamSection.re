@@ -411,17 +411,6 @@ let make = () => {
        implementing a toy dependently typed language called Pie."
       />
       <Member
-        name="Avery Morin"
-        title="Protocol Engineer"
-        description="Avery first encountered OCaml during his BSc in software engineering \
-       at McGill University. Since graduating, he's been involved in the \
-       ReasonML community in his free time. He's worked on several projects \
-       including Reprocessing, a cross-platform port of Processing designed \
-       for beginners to the language. Avery is interested in making the \
-       helpful aspects of functional programming and type systems more \
-       accessible to people who aren't already taking advantage of them."
-      />
-      <Member
         name="Carey Janecka"
         title="Product Engineer"
         description="Carey loves working on crazy ideas. He's designed and \
@@ -488,7 +477,7 @@ let make = () => {
       />
       <Member
         name="Sherry Lin"
-        title="Community Manager"
+        title="Marketing Manager"
         description="Sherry is a marketing and communications professional who enjoys \
        telling stories that resonate. Her previous experiences have been in the hardware \
        (semiconductor) space, but she is really interested in how blockchain can solve problems \
@@ -508,7 +497,7 @@ let make = () => {
       <Member
         name="Ahmad Wilson"
         title="Protocol Reliability Eng"
-        description="Ahmad is a computer scientist and self-proclaimed “tech-head” \
+        description="Ahmad is a computer scientist and self-proclaimed \"tech-head\" \
         interested in software infrastructure, user-interfaces and AI/automation. \
         He holds a MSc in HCI & AI from Brown University, and a BS in CS from Morehouse College. \
         He has developed software for startups and larger corporations such as Yelp and Microsoft for over a decade. \

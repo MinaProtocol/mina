@@ -1,19 +1,84 @@
-open Core
+open Core_kernel
 open Async
-open Cli_lib
+
+let router ~graphql_uri ~db ~logger route body =
+  match route with
+  | "network" :: tl ->
+      Network.router tl body ~db ~graphql_uri ~logger
+  | _ ->
+      Deferred.return (Error `Page_not_found)
+
+let server_handler ~db ~graphql_uri ~logger ~body _ req =
+  let uri = Cohttp_async.Request.uri req in
+  let%bind body = Cohttp_async.Body.to_string body in
+  printf "Route: %s\n" (Uri.path uri) ;
+  let route = List.tl_exn (String.split ~on:'/' (Uri.path uri)) in
+  let%bind result =
+    match Yojson.Safe.from_string body with
+    | body ->
+        router route body ~db ~graphql_uri ~logger
+    | exception Yojson.Json_error "Blank input data" ->
+        router route `Null ~db ~graphql_uri ~logger
+    | exception Yojson.Json_error err ->
+        Error (Errors.create ("Error parsing JSON body (" ^ err ^ ")"))
+        |> Deferred.return
+  in
+  match result with
+  | Ok json ->
+      Cohttp_async.Server.respond_string
+        (Yojson.Safe.to_string json)
+        ~headers:(Cohttp.Header.of_list [("Content-Type", "application/json")])
+  | Error `Page_not_found ->
+      Cohttp_async.Server.respond (Cohttp.Code.status_of_code 404)
+  | Error (`Error error) ->
+      let error_code = error.Models.Error.code in
+      let metadata = [("error", Models.Error.to_yojson error)] in
+      if Int32.equal error_code (Int32.of_int_exn 400) then
+        Logger.warn logger ~module_:__MODULE__ ~location:__LOC__ ~metadata
+          "Failed to connect to postgresql database. Error: $error" ;
+      if Int32.compare error_code (Int32.of_int_exn 500) >= 0 then
+        Logger.error logger ~module_:__MODULE__ ~location:__LOC__ ~metadata
+          "Failed to connect to postgresql database. Error: $error" ;
+      Cohttp_async.Server.respond_string
+        ~status:(Cohttp.Code.status_of_code 500)
+        (Yojson.Safe.to_string (Models.Error.to_yojson error))
+        ~headers:(Cohttp.Header.of_list [("Content-Type", "application/json")])
 
 let command =
   let open Command.Let_syntax in
-  let%map_open log_json = Flag.Log.json and log_level = Flag.Log.level in
+  let%map_open archive_uri =
+    flag "archive-uri"
+      ~doc:"Postgres connection string URI corresponding to archive node"
+      Cli.required_uri
+  and graphql_uri =
+    flag "graphql-uri" ~doc:"URI of Coda GraphQL endpoint to connect to"
+      Cli.required_uri
+  and log_json =
+    flag "log-json" ~doc:"Print log output as JSON (default: plain text)"
+      no_arg
+  and log_level =
+    flag "log-level" ~doc:"Set log level (default: Info)" Cli.log_level
+  and port = flag "port" ~doc:"Port to expose Rosetta server" (required int) in
+  let open Deferred.Let_syntax in
   fun () ->
     let logger = Logger.create () in
-    Stdout_log.setup log_json log_level ;
-    Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-      "Failed to connect to postgresql database" ;
-    Deferred.unit
+    Cli.logger_setup log_json log_level ;
+    match%bind Caqti_async.connect archive_uri with
+    | Error e ->
+        Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+          ~metadata:[("error", `String (Caqti_error.show e))]
+          "Failed to connect to postgresql database. Error: $error" ;
+        Deferred.unit
+    | Ok db ->
+        let%map _ =
+          Cohttp_async.Server.create ~on_handler_error:`Raise
+            (Async.Tcp.Where_to_listen.bind_to Localhost (On_port port))
+            (server_handler ~db ~graphql_uri ~logger)
+        in
+        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+          ~metadata:[("port", `Int port)]
+          "Rosetta process running on http://localhost:$port"
 
 let () =
   Command.run
-    (Command.async
-       ~summary:"Run an archive process that can store all of the data of Coda"
-       command)
+    (Command.async ~summary:"Run Rosetta process on top of Coda" command)

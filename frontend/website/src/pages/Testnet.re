@@ -119,9 +119,7 @@ module Styles = {
         marginLeft(`auto),
         marginRight(`auto),
         marginBottom(`rem(1.5)),
-        width(`rem(10.)),
-        height(`rem(2.5)),
-        display(`block),
+        display(`flex),
         cursor(`pointer),
         borderRadius(`px(4)),
         padding2(~v=`rem(0.25), ~h=`rem(3.)),
@@ -230,21 +228,14 @@ module Section = {
        } else {
          <>
            <div className=Styles.gradientSection> children </div>
-           <span
+           <div
              className=Styles.expandButton
              onClick={_ => setExpanded(_ => true)}>
-             {React.string("Expand " ++ name)}
-             <div
-               className=Css.(
-                 style([
-                   position(`relative),
-                   bottom(`rem(2.6)),
-                   left(`rem(9.6)),
-                 ])
-               )>
+             <div> {React.string("Expand " ++ name)} </div>
+             <div className=Css.(style([marginLeft(`rem(0.5))]))>
                {React.string({js| ↓|js})}
              </div>
-           </span>
+           </div>
          </>;
        }}
     </div>;

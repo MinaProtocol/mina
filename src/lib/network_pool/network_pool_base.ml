@@ -41,10 +41,7 @@ end)
         valid_cb true ;
         Linear_pipe.write t.write_broadcasts diff' )
     in
-    match%bind
-      Resource_pool.Diff.unsafe_apply
-        ~constraint_constants:t.constraint_constants t.resource_pool pool_diff
-    with
+    match%bind Resource_pool.Diff.unsafe_apply t.resource_pool pool_diff with
     | Ok res ->
         rebroadcast res
     | Error (`Locally_generated res) ->
@@ -141,8 +138,8 @@ end)
     in
     let t =
       of_resource_pool_and_diffs
-        (Resource_pool.create ~config ~logger ~frontier_broadcast_pipe
-           ~tf_diff_writer)
+        (Resource_pool.create ~constraint_constants ~config ~logger
+           ~frontier_broadcast_pipe ~tf_diff_writer)
         ~constraint_constants ~incoming_diffs ~local_diffs ~logger
         ~tf_diffs:tf_diff_reader
     in
