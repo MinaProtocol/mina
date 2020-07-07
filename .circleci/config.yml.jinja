@@ -142,7 +142,7 @@ jobs:
                   environment:
                     DUNE_PROFILE: testnet_postake_medium_curves
                   paths:
-                    - "/home/opam/.cargo"
+                    - "/home/opam/.cargo/bin"
             # NOTE: If we were using a machine executor we would be able to mount the sql file in
             # as a volume for the container to seed itself, this is the workaround.
             # Ideally this DB setup step would be handled by the archive process itself.
@@ -210,7 +210,7 @@ jobs:
                   name: Compare test signatures for consensus, nonconsensus code
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'eval `opam config env` && ./scripts/compare_test_signatures.sh'
                   paths:
-                    - "/home/opam/.cargo"
+                    - "/home/opam/.cargo/bin"
     update-branch-protection:
         docker:
             - image: python:3
@@ -416,12 +416,12 @@ jobs:
             # See https://bkase.dev/posts/ocaml-writer#fn-3 for rationale
             - run:
                   name: Generate PV keys
-                  command: echo $PATH && echo $HOME && env && pwd && ls /home/ && (ls $HOME/.cargo; echo '') && ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; eval `opam config env` && LIBP2P_NIXLESS=1 make build_pv_keys 2>&1 | tee /tmp/artifacts/buildocaml.log'
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; eval `opam config env` && LIBP2P_NIXLESS=1 make build_pv_keys 2>&1 | tee /tmp/artifacts/buildocaml.log'
                   environment:
                     DUNE_PROFILE: {{profile}}
                     EXTRA_NIX_ARGS: --option sandbox false
                   paths:
-                    - "/home/opam/.cargo"
+                    - "/home/opam/.cargo/bin"
                   no_output_timeout: 20m
             - run:
                   name: Upload generated PV keys
