@@ -1,22 +1,24 @@
 open Core
 open Snark_params.Tick
 
+[%%versioned:
 module Stable : sig
   module V1 : sig
     type t =
       ( Ledger_hash.Stable.V1.t
       , Account_id.Stable.V1.t
-      , Account.Stable.V1.t )
+      , Account.Stable.V1.t
+      , Token_id.Stable.V1.t )
       Sparse_ledger_lib.Sparse_ledger.T.Stable.V1.t
-    [@@deriving bin_io, sexp, to_yojson, version]
+    [@@deriving sexp, to_yojson]
   end
-
-  module Latest = V1
-end
+end]
 
 type t = Stable.Latest.t [@@deriving to_yojson, sexp]
 
 val merkle_root : t -> Ledger_hash.t
+
+val next_available_token : t -> Token_id.t
 
 val get_exn : t -> int -> Account.t
 
@@ -25,16 +27,19 @@ val path_exn :
 
 val find_index_exn : t -> Account_id.t -> int
 
-val of_root : depth:int -> Ledger_hash.t -> t
+val of_root :
+  depth:int -> next_available_token:Token_id.t -> Ledger_hash.t -> t
 
 val apply_user_command_exn :
      constraint_constants:Genesis_constants.Constraint_constants.t
+  -> txn_global_slot:Coda_numbers.Global_slot.t
   -> t
   -> User_command.t
   -> t
 
 val apply_transaction_exn :
      constraint_constants:Genesis_constants.Constraint_constants.t
+  -> txn_global_slot:Coda_numbers.Global_slot.t
   -> t
   -> Transaction.t
   -> t

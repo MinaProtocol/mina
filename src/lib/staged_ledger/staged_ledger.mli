@@ -6,19 +6,16 @@ open Signature_lib
 type t [@@deriving sexp]
 
 module Scan_state : sig
-  type t [@@deriving sexp]
+  [%%versioned:
+  module Stable : sig
+    module V1 : sig
+      type t [@@deriving sexp]
 
-  module Stable :
-    sig
-      module V1 : sig
-        type t [@@deriving sexp, bin_io, version]
-
-        val hash : t -> Staged_ledger_hash.Aux_hash.t
-      end
-
-      module Latest = V1
+      val hash : t -> Staged_ledger_hash.Aux_hash.t
     end
-    with type V1.t = t
+  end]
+
+  type t = Stable.Latest.t [@@deriving sexp]
 
   module Job_view : sig
     type t [@@deriving sexp, to_yojson]
@@ -90,6 +87,7 @@ val of_scan_state_and_ledger :
   -> constraint_constants:Genesis_constants.Constraint_constants.t
   -> verifier:Verifier.t
   -> snarked_ledger_hash:Frozen_ledger_hash.t
+  -> snarked_next_available_token:Token_id.t
   -> ledger:Ledger.t
   -> scan_state:Scan_state.t
   -> pending_coinbase_collection:Pending_coinbase.t
@@ -98,6 +96,7 @@ val of_scan_state_and_ledger :
 val of_scan_state_and_ledger_unchecked :
      constraint_constants:Genesis_constants.Constraint_constants.t
   -> snarked_ledger_hash:Frozen_ledger_hash.t
+  -> snarked_next_available_token:Token_id.t
   -> ledger:Ledger.t
   -> scan_state:Scan_state.t
   -> pending_coinbase_collection:Pending_coinbase.t

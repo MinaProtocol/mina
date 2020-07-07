@@ -223,7 +223,8 @@ module For_tests = struct
         in
         User_command.sign sender_keypair payload )
 
-  let gen ?(logger = Logger.null ()) ~proof_level ~precomputed_values ?verifier
+  let gen ?(logger = Logger.null ())
+      ~(precomputed_values : Precomputed_values.t) ?verifier
       ?(trust_system = Trust_system.null ()) ~accounts_with_secret_keys :
       (t -> t Deferred.t) Quickcheck.Generator.t =
     let open Quickcheck.Let_syntax in
@@ -233,7 +234,8 @@ module For_tests = struct
           verifier
       | None ->
           Async.Thread_safe.block_on_async_exn (fun () ->
-              Verifier.create ~logger ~proof_level ~conf_dir:None
+              Verifier.create ~logger
+                ~proof_level:precomputed_values.proof_level ~conf_dir:None
                 ~pids:(Child_processes.Termination.create_pid_table ()) )
     in
     let gen_slot_advancement = Int.gen_incl 1 10 in
@@ -320,10 +322,18 @@ module For_tests = struct
             Ledger_proof.statement proof |> Ledger_proof.statement_target )
           ~default:previous_ledger_hash
       in
+      let snarked_next_available_token =
+        match ledger_proof_opt with
+        | Some (proof, _) ->
+            (Ledger_proof.statement proof).next_available_token_after
+        | None ->
+            previous_protocol_state |> Protocol_state.blockchain_state
+            |> Blockchain_state.snarked_next_available_token
+      in
       let next_blockchain_state =
         Blockchain_state.create_value
           ~timestamp:(Block_time.now @@ Block_time.Controller.basic ~logger)
-          ~snarked_ledger_hash:next_ledger_hash
+          ~snarked_ledger_hash:next_ledger_hash ~snarked_next_available_token
           ~staged_ledger_hash:next_staged_ledger_hash
       in
       let previous_state_hash = Protocol_state.hash previous_protocol_state in
@@ -377,21 +387,21 @@ module For_tests = struct
       | Error (`Invalid_staged_ledger_hash e) ->
           failwithf !"Invalid staged ledger hash: %{sexp:Error.t}" e ()
 
-  let gen_non_deferred ?logger ~proof_level ~precomputed_values ?verifier
-      ?trust_system ~accounts_with_secret_keys =
+  let gen_non_deferred ?logger ~precomputed_values ?verifier ?trust_system
+      ~accounts_with_secret_keys =
     let open Quickcheck.Generator.Let_syntax in
     let%map make_deferred =
-      gen ?logger ?verifier ~proof_level ~precomputed_values ?trust_system
+      gen ?logger ?verifier ~precomputed_values ?trust_system
         ~accounts_with_secret_keys
     in
     fun x -> Async.Thread_safe.block_on_async_exn (fun () -> make_deferred x)
 
-  let gen_seq ?logger ~proof_level ~precomputed_values ?verifier ?trust_system
+  let gen_seq ?logger ~precomputed_values ?verifier ?trust_system
       ~accounts_with_secret_keys n =
     let open Quickcheck.Generator.Let_syntax in
     let gen_list =
       List.gen_with_length n
-        (gen ?logger ~proof_level ~precomputed_values ?verifier ?trust_system
+        (gen ?logger ~precomputed_values ?verifier ?trust_system
            ~accounts_with_secret_keys)
     in
     let%map breadcrumbs_constructors = gen_list in

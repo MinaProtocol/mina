@@ -42,3 +42,23 @@ let supply_increase = function
       Ok Currency.Amount.zero
   | Coinbase t ->
       Coinbase.supply_increase t
+
+let accounts_accessed ~next_available_token = function
+  | User_command cmd ->
+      User_command.accounts_accessed ~next_available_token
+        (User_command.forget_check cmd)
+  | Fee_transfer ft ->
+      Fee_transfer.receivers ft
+  | Coinbase cb ->
+      Coinbase.accounts_accessed cb
+
+let next_available_token t next_available_token =
+  match t with
+  | User_command cmd ->
+      User_command.next_available_token
+        (User_command.forget_check cmd)
+        next_available_token
+  | Fee_transfer _ ->
+      next_available_token
+  | Coinbase _ ->
+      next_available_token
