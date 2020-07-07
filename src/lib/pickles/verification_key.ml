@@ -53,6 +53,7 @@ type t =
   ; step_domains: Domains.t array
   ; index: Impls.Wrap.Verification_key.t
   ; data: Data.t }
+[@@deriving fields]
 
 let of_repr urs {Repr.commitments= c; step_domains; data= d} =
   let u = Unsigned.Size_t.of_int in

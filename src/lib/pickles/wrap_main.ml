@@ -140,18 +140,23 @@ let wrap_main
     (module Max_branching : Nat.Add.Intf with type n = max_branching) :
     (max_branching, max_local_max_branchings) Requests.Wrap.t
     * ((_, _, _, _, _, _, _, _, _, _) Types.Dlog_based.Statement.t -> unit) =
+  Timer.clock __LOC__ ;
   let wrap_domains =
     check_wrap_domains prev_wrap_domains ;
     Common.wrap_domains
   in
+  Timer.clock __LOC__ ;
   let T = Max_branching.eq in
   let branches = Hlist.Length.to_nat pi_branches in
+  Timer.clock __LOC__ ;
   let (module Req) =
     Requests.Wrap.((create () : (max_branching, max_local_max_branchings) t))
   in
+  Timer.clock __LOC__ ;
   let {Full_signature.padded; maxes= (module Max_widths_by_slot)} =
     full_signature
   in
+  Timer.clock __LOC__ ;
   let main
       ({ proof_state=
            { deferred_values=
@@ -380,4 +385,5 @@ let wrap_main
       sponge_digest_before_evaluations_actual ;
     ()
   in
+  Timer.clock __LOC__ ;
   ((module Req), main)

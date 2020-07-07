@@ -35,7 +35,8 @@ module Data = struct
         Dlog_marlin_types.Poly_comm.Without_degree_bound.t
         Abc.t
         Matrix_evals.t
-    ; wrap_vk: Impls.Wrap.Verification_key.t
+        Lazy.t
+    ; wrap_vk: Impls.Wrap.Verification_key.t Lazy.t
     ; wrap_domains: Domains.t
     ; step_domains: (Domains.t, 'branches) Vector.t }
 
@@ -77,7 +78,7 @@ module Data = struct
       ; a_value_to_field_elements
       ; a_var_to_field_elements
       ; wrap_key=
-          Matrix_evals.map wrap_key
+          Matrix_evals.map (Lazy.force wrap_key)
             ~f:
               (Abc.map
                  ~f:

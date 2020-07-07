@@ -327,7 +327,7 @@ struct
                 (self_dlog_vk, self_dlog_marlin_index)
               else
                 let d = Types_map.lookup t in
-                (d.wrap_vk, d.wrap_key)
+                (Lazy.force d.wrap_vk, Lazy.force d.wrap_key)
             in
             let `Sg sg, u, s, x, w = f max dlog_vk dlog_index p t ~must_verify
             and sgs, us, ss, xs, ws = go ps maxes ts must_verifys l in

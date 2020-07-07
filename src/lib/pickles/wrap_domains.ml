@@ -1,5 +1,6 @@
 open Core_kernel
 open Pickles_types
+open Import
 open Hlist
 
 (* Compute the domains corresponding to wrap_main *)
@@ -32,8 +33,17 @@ module Make (A : T0) (A_value : T0) = struct
     in
     M.f choices
 
-  let f full_signature num_choices choices_length ~self ~choices ~max_branching
-      =
+  let result =
+    lazy
+      (let x =
+         let (T (typ, conv)) = Impls.Wrap.input () in
+         Domain.Pow_2_roots_of_unity
+           (Int.ceil_log2 (1 + Impls.Wrap.Data_spec.size [typ]))
+       in
+       {Common.wrap_domains with x})
+
+  let f_debug full_signature num_choices choices_length ~self ~choices
+      ~max_branching =
     let num_choices = Hlist.Length.to_nat choices_length in
     let dummy_step_domains =
       Vector.init num_choices ~f:(fun _ -> Fix_domains.rough_domains)
@@ -64,4 +74,15 @@ module Make (A : T0) (A_value : T0) = struct
       Fix_domains.domains (module Impls.Wrap) (Impls.Wrap.input ()) main
     in
     Timer.clock __LOC__ ; t
+
+  let f full_signature num_choices choices_length ~self ~choices ~max_branching
+      =
+    let res = Lazy.force result in
+    ( if debug then
+      let res' =
+        f_debug full_signature num_choices choices_length ~self ~choices
+          ~max_branching
+      in
+      [%test_eq: Domains.t] res res' ) ;
+    res
 end

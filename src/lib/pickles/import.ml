@@ -6,3 +6,5 @@ module Digest = Types.Digest
 module Spec = Types.Spec
 module Bulletproof_challenge = Types.Bulletproof_challenge
 module Domain = Marlin_checks.Domain
+
+let debug = false

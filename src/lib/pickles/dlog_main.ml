@@ -92,8 +92,6 @@ struct
     let pack : Unpacked.t -> Packed.t = Field.project
   end
 
-  let debug = false
-
   let print_g1 lab (x, y) =
     if debug then
       as_prover

@@ -67,18 +67,18 @@ module Step = struct
             (r, `Generated_something) )
     in
     let vk =
-      let k_v = Lazy.force k_v in
       lazy
-        ( match
-            Common.time "step vk read" (fun () ->
-                Key_cache.Sync.read cache s_v k_v )
-          with
-        | Ok (vk, _) ->
-            vk
-        | Error _e ->
-            let vk = Lazy.force pk |> fst |> Keypair.vk in
-            let _ = Key_cache.Sync.write cache s_v k_v vk in
-            vk )
+        (let k_v = Lazy.force k_v in
+         match
+           Common.time "step vk read" (fun () ->
+               Key_cache.Sync.read cache s_v k_v )
+         with
+         | Ok (vk, _) ->
+             vk
+         | Error _e ->
+             let vk = Lazy.force pk |> fst |> Keypair.vk in
+             let _ = Key_cache.Sync.write cache s_v k_v vk in
+             vk)
     in
     (pk, vk)
 end
@@ -137,35 +137,35 @@ module Wrap = struct
              (r, `Generated_something))
     in
     let vk =
-      let k_v = Lazy.force k_v in
-      let s_v =
-        Key_cache.Sync.Disk_storable.of_binable Key.Verification.to_string
-          (module Vk)
-      in
       lazy
-        ( match Key_cache.Sync.read cache s_v k_v with
-        | Ok (vk, _) ->
-            vk
-        | Error _e ->
-            let kp, _dirty = Lazy.force pk in
-            let vk = Keypair.vk kp in
-            let pk = Keypair.pk kp in
-            let vk : Vk.t =
-              { index= vk
-              ; commitments= Backend.Tock.Keypair.vk_commitments vk
-              ; step_domains
-              ; data=
-                  (let open Snarky_bn382.Tweedle.Dee.Field_index in
-                  let n = Unsigned.Size_t.to_int in
-                  let variables = n (num_variables pk) in
-                  { public_inputs= n (public_inputs pk)
-                  ; variables
-                  ; constraints= variables
-                  ; nonzero_entries= n (nonzero_entries pk)
-                  ; max_degree= n (max_degree pk) }) }
-            in
-            let _ = Key_cache.Sync.write cache s_v k_v vk in
-            vk )
+        (let k_v = Lazy.force k_v in
+         let s_v =
+           Key_cache.Sync.Disk_storable.of_binable Key.Verification.to_string
+             (module Vk)
+         in
+         match Key_cache.Sync.read cache s_v k_v with
+         | Ok (vk, _) ->
+             vk
+         | Error _e ->
+             let kp, _dirty = Lazy.force pk in
+             let vk = Keypair.vk kp in
+             let pk = Keypair.pk kp in
+             let vk : Vk.t =
+               { index= vk
+               ; commitments= Backend.Tock.Keypair.vk_commitments vk
+               ; step_domains
+               ; data=
+                   (let open Snarky_bn382.Tweedle.Dee.Field_index in
+                   let n = Unsigned.Size_t.to_int in
+                   let variables = n (num_variables pk) in
+                   { public_inputs= n (public_inputs pk)
+                   ; variables
+                   ; constraints= variables
+                   ; nonzero_entries= n (nonzero_entries pk)
+                   ; max_degree= n (max_degree pk) }) }
+             in
+             let _ = Key_cache.Sync.write cache s_v k_v vk in
+             vk)
     in
     (pk, vk)
 end

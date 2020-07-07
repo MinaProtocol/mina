@@ -42,8 +42,6 @@ struct
     let to_bits (x, b) = Field.unpack x ~length:(Field.size_in_bits - 1) @ [b]
   end
 
-  let debug = false
-
   let print_g lab g =
     if debug then
       as_prover

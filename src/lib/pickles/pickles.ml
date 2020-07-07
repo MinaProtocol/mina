@@ -416,6 +416,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
       in
       M.f choices
     in
+    Timer.clock __LOC__ ;
     let step_domains =
       let module M =
         H4.Map
@@ -430,6 +431,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
     in
     let cache_handle = ref (Lazy.return `Cache_hit) in
     let accum_dirty t = cache_handle := Cache_handle.(!cache_handle + t) in
+    Timer.clock __LOC__ ;
     let step_keypairs =
       let disk_keys =
         Option.map disk_keys ~f:(fun (xs, _) -> Vector.to_array xs)
@@ -463,7 +465,8 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
                        (x, y, R1CS_constraint_system.digest z))
               in
               let ((pk, _) as res) =
-                Cache.Step.read_or_generate cache k_p k_v typ main
+                Common.time "step read or generate" (fun () ->
+                    Cache.Step.read_or_generate cache k_p k_v typ main )
               in
               accum_dirty (Lazy.map pk ~f:snd) ;
               res
@@ -471,13 +474,16 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
       in
       M.f step_data
     in
+    Timer.clock __LOC__ ;
     let step_vks =
       let module V = H4.To_vector (Lazy_keys) in
       lazy
         (Vector.map (V.f prev_varss_length step_keypairs) ~f:(fun (_, vk) ->
              Tick.Keypair.vk_commitments (Lazy.force vk) ))
     in
+    Timer.clock __LOC__ ;
     let wrap_requests, wrap_main =
+      Timer.clock __LOC__ ;
       let prev_wrap_domains =
         let module M =
           H4.Map
@@ -504,10 +510,12 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
         in
         M.f choices
       in
+      Timer.clock __LOC__ ;
       Wrap_main.wrap_main full_signature prev_varss_length step_vks step_widths
         step_domains prev_wrap_domains
         (module Max_branching)
     in
+    Timer.clock __LOC__ ;
     let (wrap_pk, wrap_vk), disk_key =
       let open Impls.Wrap in
       let (T (typ, conv)) = input () in
@@ -526,12 +534,14 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
                (id, R1CS_constraint_system.digest cs))
       in
       let r =
-        Cache.Wrap.read_or_generate
-          (Vector.to_array step_domains)
-          cache disk_key_prover disk_key_verifier typ main
+        Common.time "wrap read or generate " (fun () ->
+            Cache.Wrap.read_or_generate
+              (Vector.to_array step_domains)
+              cache disk_key_prover disk_key_verifier typ main )
       in
       (r, disk_key_verifier)
     in
+    Timer.clock __LOC__ ;
     accum_dirty (Lazy.map wrap_pk ~f:snd) ;
     let module S = Step.Make (A) (A_value) (Max_branching) in
     let provers =
@@ -620,19 +630,20 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
       in
       go step_data step_keypairs
     in
+    Timer.clock __LOC__ ;
     let data : _ Types_map.Data.t =
-      let wrap_vk = Lazy.force wrap_vk in
       { branches= Branches.n
       ; branchings= step_widths
       ; max_branching= (module Max_branching)
       ; typ
       ; a_value_to_field_elements= A_value.to_field_elements
       ; a_var_to_field_elements= A.to_field_elements
-      ; wrap_key= wrap_vk.commitments
-      ; wrap_vk= wrap_vk.index
+      ; wrap_key= Lazy.map wrap_vk ~f:Verification_key.commitments
+      ; wrap_vk= Lazy.map wrap_vk ~f:Verification_key.index
       ; wrap_domains
       ; step_domains }
     in
+    Timer.clock __LOC__ ;
     Types_map.add_exn self data ;
     (provers, wrap_vk, disk_key, !cache_handle)
 end
@@ -697,23 +708,7 @@ let compile
 
     module Max_local_max_branching = Max_branching
     module Max_branching_vec = Nvector (Max_branching)
-
-    (*     module MLMB_vec = Nvector (Max_local_max_branching) *)
-
     include Proof.Make (Max_branching) (Max_local_max_branching)
-
-    (*
-    type t =
-      ( unit
-      , ( Tock.Inner_curve.Affine.t
-        , Tock.Inner_curve.Affine.t Int.Map.t
-        , Reduced_me_only.Dlog_based.Challenges_vector.t MLMB_vec.t )
-        Me_only.Dlog_based.t
-      , Tick.Inner_curve.Affine.t Max_branching_vec.t )
-      Proof_.Dlog_based.t
-    [@@deriving bin_io]
-
-*)
     module Marlin = Types.Dlog_based.Proof_state.Deferred_values.Marlin
 
     let id = wrap_disk_key
@@ -870,4 +865,4 @@ let%test_module "test" =
 
     let%test_unit "verify" = assert (Blockchain_snark.Proof.verify xs)
   end )
-*)
+   *)

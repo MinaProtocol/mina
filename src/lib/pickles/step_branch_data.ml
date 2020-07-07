@@ -60,6 +60,7 @@ let create
     ~(branchings : (int, branches) Vector.t) ~(branches : branches Nat.t) ~typ
     a_var_to_field_elements a_value_to_field_elements
     (rule : _ Inductive_rule.t) =
+  Timer.clock __LOC__ ;
   let module HT = H4.T (Tag) in
   let (T (self_width, branching)) = HT.length rule.prevs in
   let rec extract_lengths : type a b n m k.
@@ -81,11 +82,13 @@ let create
             let T = M.eq in
             (M.n :: ns, d.branches :: ms, S len_ns, S len_ms) )
   in
+  Timer.clock __LOC__ ;
   let widths, heights, local_signature_length, local_branches_length =
     extract_lengths rule.prevs branching
   in
   let lte = Nat.lte_exn self_width max_branching in
   let requests = Requests.Step.create () in
+  Timer.clock __LOC__ ;
   let step ~step_domains =
     Step_main.step_main requests
       (Nat.Add.create max_branching)
@@ -102,6 +105,7 @@ let create
       ~lte ~self
     |> unstage
   in
+  Timer.clock __LOC__ ;
   let own_domains =
     let main =
       step
@@ -113,6 +117,7 @@ let create
     in
     Fix_domains.domains (module Impls.Step) etyp main
   in
+  Timer.clock __LOC__ ;
   T
     { branching= (self_width, branching)
     ; index
