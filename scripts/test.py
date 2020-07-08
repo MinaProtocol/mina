@@ -56,7 +56,7 @@ small_curves_tests = {
     'test_postake':
     simple_tests,
     'test_postake_catchup': ['coda-restart-node-test'],
-    'test_postake_bootstrap':
+    'not_test_postake_bootstrap':
     ['coda-bootstrap-test'],
     'test_postake_three_producers': ['coda-txns-and-restart-non-producers'],
     'test_postake_delegation': ['coda-delegation-test'],
