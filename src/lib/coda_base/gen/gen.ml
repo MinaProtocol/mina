@@ -17,25 +17,19 @@ let keypairs =
   in
   (*
   let () =
-    Core.printf "key0 ex: %s\n%!"
-      (Private_key.to_base58_check (Private_key.create ())) ;
-    let pk =
-      Private_key.of_base58_check_exn
-        "21mS8Wb8E2FctkfR2cZcxCJSGRnyNQsLatRHiT1WYiXtdaRJSxPbPx"
-      (*        non-raw binio  "Z2iaxFLZ3Xnb3mHYg56vwrbCdC5Y7ZQo1FUf31j8L18cW7XWH7GYxFxkZgztD6DXxQpNBs5FnD4" *)
-      (*         "6BnSKU5GQjgvEPbM45Qzazsf6M8eCrQdpL7x4jAvA4sr8Ga3FAx8AxdgWcqN7uNGu1SthMgDeMSUvEbkY9a56UxwmJpTzhzVUjfgfFsjJSVp9H1yWHt6H5couPNpF7L7e5u7NBGYnDMhx" *)
-    in
+    let pk = Private_key.create () in
     let pubkey = Public_key.of_private_key_exn pk in
+    Core.printf !"privkey base58 %s\n%!" (Private_key.to_base58_check pk) ;
     Core.printf !"privkey0 %{sexp:Private_key.t}\n%!" pk ;
     Core.printf !"pubkey0 %{sexp:Public_key.t}\n%!" pubkey
   in
-*)
+  *)
   List.cons
     (* FIXME #2936: remove this "precomputed VRF keypair" *)
     (* This key is also at the start of all the release ledgers. It's needed to generate a valid genesis transition *)
     (Keypair.of_private_key_exn
        (Private_key.of_base58_check_exn
-          "21mS8Wb8E2FctkfR2cZcxCJSGRnyNQsLatRHiT1WYiXtdaRJSxPbPx"))
+          "EKEjf4cZcaUScpV3iAE8r9PaEj4dbPbyUhzWryhhxQqjTTSCfyo8"))
     generated_keypairs
 
 let expr ~loc =

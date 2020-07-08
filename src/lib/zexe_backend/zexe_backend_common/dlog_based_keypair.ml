@@ -81,19 +81,21 @@ module Make (Inputs : Inputs_intf) = struct
 
   type t = Index.t
 
+  let name = sprintf "%s_%d" name (Pickles_types.Nat.to_int Rounds.n)
+
   let set_urs_info, load_urs =
     let urs_info = Set_once.create () in
     let urs = ref None in
+    let degree = 1 lsl Pickles_types.Nat.to_int Rounds.n in
     let set_urs_info specs =
-      let degree = 1 lsl Pickles_types.Nat.to_int Rounds.n in
-      Set_once.set_exn urs_info Lexing.dummy_pos (degree, specs)
+      Set_once.set_exn urs_info Lexing.dummy_pos specs
     in
     let load () =
       match !urs with
       | Some urs ->
           urs
       | None ->
-          let degree, specs =
+          let specs =
             match Set_once.get urs_info with
             | None ->
                 failwith "Dlog_based.urs: Info not set"

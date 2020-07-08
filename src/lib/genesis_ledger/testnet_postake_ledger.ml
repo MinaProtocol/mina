@@ -1,10 +1,11 @@
-open Intf.Public_accounts
 module Public_key = Signature_lib.Public_key
 
 let name = "testnet_postake"
 
-let accounts =
-  lazy
+let accounts = lazy []
+
+(*
+open Intf.Public_accounts
     [ { pk=
           Public_key.Compressed.of_base58_check_exn
             "4vsRCVw9P7XQFJWS4FsAsiXRSJyEKiVLCnVw2mRreE7iWout75RvZnm9q46sed2GvBF9Rh972AJrnuhrpPfCDGyhgsJm6kxZGhP5x9CTdty4cpFA8FmxNL8gB2UPTweGnQ1svjTVgUAbb8qB"
@@ -368,3 +369,4 @@ let accounts =
             (Public_key.Compressed.of_base58_check_exn
                "4vsRCVWRSCQNrGSNoojhp258eeKCeXL8JVefQ8KpZ9DJhFE7AkcFm3czHcddUUbkmpavwuKW4o2QsexWzHnjwuD3ejGkGjqha3n2omrt1fCHN9NWN24jfrqrDTkoZDhm4RNKpRMX4jixX631")
       } ]
+*)

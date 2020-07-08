@@ -222,7 +222,11 @@ module Register (Accounts : Intf.Named_accounts_intf) :
   include Accounts
 end
 
-module Testnet_postake = Register (Public_accounts (Testnet_postake_ledger))
+module Testnet_postake = Register (Balances (struct
+  let name = "testnet_postake"
+
+  let balances = Test_ledger.balances
+end))
 
 module Testnet_postake_many_producers = Register (Balances (struct
   let name = "testnet_postake_many_producers"

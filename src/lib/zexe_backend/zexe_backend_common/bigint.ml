@@ -90,15 +90,38 @@ module Make
 
   let t_of_sexp s = of_hex_string (String.t_of_sexp s)
 
-  include Binable.Of_binable
-            (Bigstring.Stable.V1)
-            (struct
-              type nonrec t = t
+  include Bin_prot.Utils.Of_minimal (struct
+    type nonrec t = t
 
-              let to_binable = to_bigstring
+    let bin_shape_t =
+      Bin_prot.Shape.basetype
+        (Bin_prot.Shape.Uuid.of_string
+           (sprintf "zexe_backend_bigint_%d" M.length_in_bytes))
+        []
 
-              let of_binable = of_bigstring
-            end)
+    let __bin_read_t__ _buf ~pos_ref _vint =
+      Bin_prot.Common.raise_variant_wrong_type "Bigint.t" !pos_ref
+
+    let bin_size_t _ = M.length_in_bytes
+
+    let bin_write_t buf ~pos t =
+      let len = M.length_in_bytes in
+      let limbs = to_data t in
+      let bs = Ctypes.bigarray_of_ptr Ctypes.array1 len Bigarray.Char limbs in
+      Bigstring.blit ~src:bs ~dst:buf ~src_pos:0 ~dst_pos:pos ~len ;
+      pos + len
+
+    let bin_read_t buf ~pos_ref =
+      let remaining_bytes = Bigstring.length buf - !pos_ref in
+      if remaining_bytes < M.length_in_bytes then
+        failwithf "Bigint.bin_read_t: Expected %d bytes, got %d"
+          M.length_in_bytes remaining_bytes () ;
+      let ptr = Ctypes.(bigarray_start array1 buf +@ !pos_ref) in
+      let t = of_data ptr in
+      Caml.Gc.finalise delete t ;
+      pos_ref := M.length_in_bytes + !pos_ref ;
+      t
+  end)
 
   let test_bit = test_bit
 
@@ -113,10 +136,3 @@ module Make
   let compare x y =
     match Unsigned.UInt8.to_int (compare x y) with 255 -> -1 | x -> x
 end
-
-(*
-module T384 : Intf with type t = Snarky_bn382.Bigint384.t = 
-  Make(Bigint384)(struct
-    let length_in_bytes = 48
-  end)
-*)

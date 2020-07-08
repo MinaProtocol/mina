@@ -295,6 +295,13 @@ module Make (F : Input_intf) :
     let t = random () in
     assert (equal t (t_of_sexp (sexp_of_t t)))
 
+  let%test_unit "bin_io round trip" =
+    let t = random () in
+    [%test_eq: Stable.Latest.t] t
+      (Binable.of_string
+         (module Stable.Latest)
+         (Binable.to_string (module Stable.Latest) t))
+
   let negate = gc1 negate
 
   let ( + ) = add
