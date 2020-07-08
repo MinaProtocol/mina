@@ -28,7 +28,7 @@ in Pipeline.build
     steps = [
       Command.build
         Command.Config::{
-          commands = OpamInit.andThenRunInDocker (
+          commands = OpamInit.andThenRunInDocker ([] : List Text) (
             "./buildkite/scripts/lint-check-format.sh && " ++
             "./scripts/require-ppx-version.py"),
           label = "OCaml Lints; Check-format, Require-ppx-version",
