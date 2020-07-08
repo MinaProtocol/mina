@@ -1,7 +1,5 @@
  #!/bin/bash
 
-set -e pipefail
-
 user=$1
 password=$2
 db=$3
