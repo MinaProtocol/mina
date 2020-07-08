@@ -3,8 +3,20 @@ let S = ../Lib/SelectFiles.dhall
 let Pipeline = ../Pipeline/Dsl.dhall
 let JobSpec = ../Pipeline/JobSpec.dhall
 
+let Cmd = ../Lib/Cmds.dhall
+
+let Command = ../Command/Base.dhall
 let Size = ../Command/Size.dhall
 let DockerArtifact = ../Command/DockerArtifact.dhall
+
+let uploadDeployEnv =
+  Command.build
+      Command.Config::{
+        commands = [ Cmd.run "cd buildkite && buildkite-agent artifact upload DOCKER_DEPLOY_ENV" ],
+        label = "Upload modified deploy environment",
+        key = "upload-deploy-env",
+        target = Size.Small
+      }
 
 in
 
@@ -18,7 +30,7 @@ Pipeline.build
             name = "DockerTriggeredRelease"
         },
     steps = [
-      -- TODO: add step to render DOCKER_DEPLOY_ENV locally or download artifact from triggered build
+      uploadDeployEnv,
       DockerArtifact.step
     ]
   }
