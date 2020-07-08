@@ -6,11 +6,14 @@ let name = "coda-five-nodes-test"
 
 let main () =
   let logger = Logger.create () in
+  let precomputed_values = Lazy.force Precomputed_values.compiled in
   let n = 5 in
   let snark_work_public_keys = function
     | 0 ->
         Some
-          ( List.nth_exn (Lazy.force Test_genesis_ledger.accounts) 5
+          ( List.nth_exn
+              (Lazy.force (Precomputed_values.accounts precomputed_values))
+              5
           |> snd |> Account.public_key )
     | _ ->
         None

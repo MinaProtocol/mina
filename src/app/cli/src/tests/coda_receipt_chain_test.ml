@@ -19,12 +19,12 @@ let main () =
   let consensus_constants = precomputed_values.consensus_constants in
   let logger = Logger.create () in
   let sender_sk, largest_account =
-    Test_genesis_ledger.largest_account_exn ()
+    Precomputed_values.largest_account_exn precomputed_values
   in
   let receiver_pk =
-    Test_genesis_ledger.find_new_account_record_exn_
+    Precomputed_values.find_new_account_record_exn_ precomputed_values
       [Account.public_key largest_account]
-    |> Test_genesis_ledger.pk_of_account_record
+    |> Precomputed_values.pk_of_account_record
   in
   let block_production_interval =
     consensus_constants.block_window_duration_ms |> Block_time.Span.to_ms
