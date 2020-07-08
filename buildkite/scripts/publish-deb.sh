@@ -14,25 +14,6 @@ DEBS3='deb-s3 upload '\
 
 DEBS='_build/coda-*.deb'
 
-usage() {
-    echo "Usage: $0 [-r REPONAME] [-d DEBNAME]" 1>&2;
-    echo "eg:    $0 -r unstable -d my.deb" 1>&2;
-    exit 1;
-}
-
-# command line options
-while getopts ":r:d" o; do
-    case "${o}" in
-        r)
-            CODENAME=${OPTARG} ;;
-        d)
-            DEBS=${OPTARG} ;;
-        *)
-            usage ;;
-    esac
-done
-shift $((OPTIND-1))
-
 # check for AWS Creds
 if [ -z "$AWS_ACCESS_KEY_ID" ]; then
     echo "WARNING: AWS_ACCESS_KEY_ID not set, publish commands not run"
@@ -43,13 +24,13 @@ fi
 #GITBRANCH=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD |  sed 's!/!-!; s!_!-!g' )
 case $BUILDKITE_BRANCH in
     master)
-        CODENAME=${CODENAME:-release} ;;
+        CODENAME=release ;;
 #    develop)
-#        CODENAME=${CODENAME:-develop} ;;
+#        CODENAME=develop ;;
 #    release*)
-#        CODENAME=${CODENAME:-stable} ;;
+#        CODENAME=stable ;;
     *)
-        CODENAME=${CODENAME:-unstable} ;;
+        CODENAME=unstable ;;
 esac
 
 echo "Publishing debs: ${DEBS}"
