@@ -8,6 +8,8 @@ let Size = ./Size.dhall
 
 let Cmd = ../Lib/Cmds.dhall
 
+let DockerLogin = ../Command/DockerLogin/Type.dhall
+
 let commands : List Cmd.Type =
     [
         Cmd.run (
@@ -31,7 +33,7 @@ let cmdConfig =
       label = "Docker artifact build/release commands",
       key = "docker-artifact",
       target = Size.Large,
-      docker = None Docker.Type
+      docker_login = Some DockerLogin::{=}
     }
 
 in
