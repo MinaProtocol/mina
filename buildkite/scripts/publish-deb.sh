@@ -15,13 +15,13 @@ DEBS3='deb-s3 upload '\
 DEBS='_build/coda-*.deb'
 
 usage() {
-    echo "Usage: $0 [-f] [-r REPONAME] [-d DEBNAME]" 1>&2;
-    echo "eg:    $0 -f -r unstable -d my.deb" 1>&2;
+    echo "Usage: $0 [-r REPONAME] [-d DEBNAME]" 1>&2;
+    echo "eg:    $0 -r unstable -d my.deb" 1>&2;
     exit 1;
 }
 
 # command line options
-while getopts ":r:d:f" o; do
+while getopts ":r:d" o; do
     case "${o}" in
         r)
             CODENAME=${OPTARG} ;;
@@ -29,8 +29,6 @@ while getopts ":r:d:f" o; do
             DEBS=${OPTARG} ;;
         *)
             usage ;;
-#        f)  # FORCE
-#            CIRCLE_JOB='FORCED' ;;
     esac
 done
 shift $((OPTIND-1))
@@ -42,8 +40,8 @@ if [ -z "$AWS_ACCESS_KEY_ID" ]; then
 fi
 
 # Determine deb repo to use
-GITBRANCH=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD |  sed 's!/!-!; s!_!-!g' )
-case $GITBRANCH in
+#GITBRANCH=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD |  sed 's!/!-!; s!_!-!g' )
+case $BUILDKITE_BRANCH in
     master)
         CODENAME=${CODENAME:-release} ;;
 #    develop)
