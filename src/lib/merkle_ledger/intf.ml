@@ -78,13 +78,19 @@ end
 module type Account = sig
   type t [@@deriving bin_io, eq, sexp, compare]
 
+  type token_id
+
   type account_id
 
   type balance
 
+  val token : t -> token_id
+
   val identifier : t -> account_id
 
   val balance : t -> balance
+
+  val token_owner : t -> bool
 
   val empty : t
 end

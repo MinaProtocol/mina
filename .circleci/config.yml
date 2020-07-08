@@ -7,13 +7,22 @@
 
 
 
+
+
 version: 3
 jobs:
     tracetool:
         docker:
             - image: codaprotocol/coda:toolchain-rust-e855336d087a679f76f2dd2bbdc3fdfea9303be3
         steps:
+            
+            - run:
+                name: Disable LFS checkout
+                command: |
+                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                    git config --global lfs.fetchexclude "*"
             - checkout
+
             - run:
                   name: Update submodules
                   command: git submodule sync && git submodule update --init --recursive
@@ -68,7 +77,14 @@ jobs:
                 POSTGRES_USER: admin
                 POSTGRES_DB: archiver
         steps:
+            
+            - run:
+                name: Disable LFS checkout
+                command: |
+                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                    git config --global lfs.fetchexclude "*"
             - checkout
+
             
             - run:
                   name: Update Submodules
@@ -119,7 +135,14 @@ jobs:
                 HASURA_GRAPHQL_ENABLE_CONSOLE: "true"
                 HASURA_GRAPHQL_ENABLED_LOG_TYPES: startup, http-log, webhook-log, websocket-log, query-log
         steps:
+            
+            - run:
+                name: Disable LFS checkout
+                command: |
+                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                    git config --global lfs.fetchexclude "*"
             - checkout
+
             
             - run:
                   name: Update Submodules
@@ -168,7 +191,14 @@ jobs:
         docker:
             - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
         steps:
+            
+            - run:
+                name: Disable LFS checkout
+                command: |
+                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                    git config --global lfs.fetchexclude "*"
             - checkout
+
             
             - run:
                   name: Update Submodules
@@ -212,7 +242,14 @@ jobs:
         docker:
             - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
         steps:
+            
+            - run:
+                name: Disable LFS checkout
+                command: |
+                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                    git config --global lfs.fetchexclude "*"
             - checkout
+
             - run:
                 name: Show USER
                 command: echo $USER
@@ -244,7 +281,14 @@ jobs:
         docker:
             - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
         steps:
+            
+            - run:
+                name: Disable LFS checkout
+                command: |
+                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                    git config --global lfs.fetchexclude "*"
             - checkout
+
             
             - run:
                   name: Update Submodules
@@ -273,7 +317,14 @@ jobs:
             - run:
                 name: Install dependencies
                 command: pip install --user requests jinja2 readchar
+            
+            - run:
+                name: Disable LFS checkout
+                command: |
+                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                    git config --global lfs.fetchexclude "*"
             - checkout
+
             - run:
                   name: Update branch protection rule from test configuration
                   command: ./scripts/test.py required-status >required_status && cat required_status && ./scripts/update_branch_rule.py required_status
@@ -282,7 +333,14 @@ jobs:
         docker:
             - image: node:14.4.0
         steps:
+            
+            - run:
+                name: Disable LFS checkout
+                command: |
+                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                    git config --global lfs.fetchexclude "*"
             - checkout
+
             - run:
                 name: Update the Leaderboard
                 command: cd frontend/leaderboard && yarn && yarn build
@@ -308,7 +366,14 @@ jobs:
                     sudo rm -rf /Library/Developer/CoreSimulator/Profiles/Runtimes/
                     df -h
                 background: true
+            
+            - run:
+                name: Disable LFS checkout
+                command: |
+                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                    git config --global lfs.fetchexclude "*"
             - checkout
+
             - run:
                   name: Update submodules
                   command: git submodule sync && git submodule update --init --recursive
@@ -439,7 +504,14 @@ jobs:
         docker:
             - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
         steps:
+            
+            - run:
+                name: Disable LFS checkout
+                command: |
+                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                    git config --global lfs.fetchexclude "*"
             - checkout
+
             - run:
                   name: Artifacts Path
                   command: |
@@ -468,12 +540,33 @@ jobs:
                   environment:
                     DUNE_PROFILE: nonconsensus_medium_curves
                   no_output_timeout: 10m
+            - run:
+                  name: Get Yarn
+                  command: |
+                    sudo apt install apt-transport-https
+                    curl -sL https://deb.nodesource.com/setup_14.x | sudo -E bash -
+                    curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add -
+                    echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list
+                    sudo apt update && sudo apt install nodejs yarn
+            - run:
+                  name: Yarn deps
+                  command: cd frontend/client_sdk && yarn install
+            - run:
+                  name: Build And Test Client SDK
+                  command: eval `opam config env` && cd frontend/client_sdk && yarn prepublishOnly
     build-artifacts--testnet_postake_medium_curves:
         resource_class: xlarge
         docker:
             - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
         steps:
+            
+            - run:
+                name: Disable LFS checkout
+                command: |
+                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                    git config --global lfs.fetchexclude "*"
             - checkout
+
             - run:
                   name: Artifacts Path
                   command: |
@@ -632,7 +725,14 @@ jobs:
         docker:
             - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
         steps:
+            
+            - run:
+                name: Disable LFS checkout
+                command: |
+                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                    git config --global lfs.fetchexclude "*"
             - checkout
+
             - run: ulimit -c unlimited
             
             - run:
@@ -672,7 +772,14 @@ jobs:
         docker:
             - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
         steps:
+            
+            - run:
+                name: Disable LFS checkout
+                command: |
+                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                    git config --global lfs.fetchexclude "*"
             - checkout
+
             - run: ulimit -c unlimited
             
             - run:
@@ -710,7 +817,14 @@ jobs:
         docker:
             - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
         steps:
+            
+            - run:
+                name: Disable LFS checkout
+                command: |
+                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                    git config --global lfs.fetchexclude "*"
             - checkout
+
             - run: ulimit -c unlimited
             
             - run:
@@ -748,7 +862,14 @@ jobs:
         docker:
             - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
         steps:
+            
+            - run:
+                name: Disable LFS checkout
+                command: |
+                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                    git config --global lfs.fetchexclude "*"
             - checkout
+
             
             - run:
                   name: Update Submodules
@@ -780,7 +901,14 @@ jobs:
         docker:
             - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
         steps:
+            
+            - run:
+                name: Disable LFS checkout
+                command: |
+                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                    git config --global lfs.fetchexclude "*"
             - checkout
+
             
             - run:
                   name: Update Submodules
@@ -815,7 +943,14 @@ jobs:
         docker:
             - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
         steps:
+            
+            - run:
+                name: Disable LFS checkout
+                command: |
+                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                    git config --global lfs.fetchexclude "*"
             - checkout
+
             
             - run:
                   name: Update Submodules
@@ -847,7 +982,14 @@ jobs:
         docker:
             - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
         steps:
+            
+            - run:
+                name: Disable LFS checkout
+                command: |
+                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                    git config --global lfs.fetchexclude "*"
             - checkout
+
             
             - run:
                   name: Update Submodules
@@ -879,7 +1021,14 @@ jobs:
         docker:
             - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
         steps:
+            
+            - run:
+                name: Disable LFS checkout
+                command: |
+                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                    git config --global lfs.fetchexclude "*"
             - checkout
+
             
             - run:
                   name: Update Submodules
@@ -911,7 +1060,14 @@ jobs:
         docker:
             - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
         steps:
+            
+            - run:
+                name: Disable LFS checkout
+                command: |
+                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                    git config --global lfs.fetchexclude "*"
             - checkout
+
             
             - run:
                   name: Update Submodules
@@ -943,7 +1099,14 @@ jobs:
         docker:
             - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
         steps:
+            
+            - run:
+                name: Disable LFS checkout
+                command: |
+                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                    git config --global lfs.fetchexclude "*"
             - checkout
+
             
             - run:
                   name: Update Submodules
@@ -978,7 +1141,14 @@ jobs:
         docker:
             - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
         steps:
+            
+            - run:
+                name: Disable LFS checkout
+                command: |
+                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                    git config --global lfs.fetchexclude "*"
             - checkout
+
             
             - run:
                   name: Update Submodules
@@ -1010,7 +1180,14 @@ jobs:
         docker:
             - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
         steps:
+            
+            - run:
+                name: Disable LFS checkout
+                command: |
+                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                    git config --global lfs.fetchexclude "*"
             - checkout
+
             
             - run:
                   name: Update Submodules
@@ -1060,7 +1237,14 @@ jobs:
         docker:
             - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
         steps:
+            
+            - run:
+                name: Disable LFS checkout
+                command: |
+                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                    git config --global lfs.fetchexclude "*"
             - checkout
+
             
             - run:
                   name: Update Submodules
@@ -1092,7 +1276,14 @@ jobs:
         docker:
             - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
         steps:
+            
+            - run:
+                name: Disable LFS checkout
+                command: |
+                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                    git config --global lfs.fetchexclude "*"
             - checkout
+
             
             - run:
                   name: Update Submodules
@@ -1127,7 +1318,14 @@ jobs:
         docker:
             - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
         steps:
+            
+            - run:
+                name: Disable LFS checkout
+                command: |
+                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                    git config --global lfs.fetchexclude "*"
             - checkout
+
             
             - run:
                   name: Update Submodules
@@ -1159,7 +1357,14 @@ jobs:
         docker:
             - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
         steps:
+            
+            - run:
+                name: Disable LFS checkout
+                command: |
+                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                    git config --global lfs.fetchexclude "*"
             - checkout
+
             
             - run:
                   name: Update Submodules
@@ -1196,7 +1401,14 @@ jobs:
         docker:
             - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
         steps:
+            
+            - run:
+                name: Disable LFS checkout
+                command: |
+                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                    git config --global lfs.fetchexclude "*"
             - checkout
+
             
             - run:
                   name: Update Submodules
@@ -1231,7 +1443,14 @@ jobs:
         docker:
             - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
         steps:
+            
+            - run:
+                name: Disable LFS checkout
+                command: |
+                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                    git config --global lfs.fetchexclude "*"
             - checkout
+
             
             - run:
                   name: Update Submodules
@@ -1296,17 +1515,6 @@ workflows:
             - test--test_postake_split_snarkless
             - test--test_postake_three_producers
             - test--test_postake_txns
-
-    leaderboard:
-        triggers:
-          - schedule:
-              cron: "0 1 * * *"
-              filters:
-                branches:
-                  only:
-                    - develop
-        jobs:
-          - run-leaderboard
 
     daily:
         triggers:

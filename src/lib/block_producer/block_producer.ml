@@ -192,6 +192,14 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
                   )
                 ~default:previous_ledger_hash
             in
+            let snarked_next_available_token =
+              match ledger_proof_opt with
+              | Some (proof, _) ->
+                  (Ledger_proof.statement proof).next_available_token_after
+              | None ->
+                  previous_protocol_state |> Protocol_state.blockchain_state
+                  |> Blockchain_state.snarked_next_available_token
+            in
             let supply_increase =
               Option.value_map ledger_proof_opt
                 ~f:(fun (proof, _) ->
@@ -209,6 +217,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
               *)
               Blockchain_state.create_value ~timestamp:scheduled_time
                 ~snarked_ledger_hash:next_ledger_hash
+                ~snarked_next_available_token
                 ~staged_ledger_hash:next_staged_ledger_hash
             in
             let current_time =

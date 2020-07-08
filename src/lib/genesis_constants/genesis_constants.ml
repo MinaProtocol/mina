@@ -69,7 +69,7 @@ module Constraint_constants = struct
     ; pending_coinbase_depth: int
     ; coinbase_amount: Currency.Amount.t
     ; account_creation_fee: Currency.Fee.t }
-  [@@deriving sexp]
+  [@@deriving sexp, eq]
 
   (* Generate the compile-time constraint constants, using a signature to hide
      the optcomp constants that we import.

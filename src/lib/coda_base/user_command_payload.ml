@@ -186,6 +186,9 @@ module Body = struct
       type t =
         | Payment of Payment_payload.Stable.V1.t
         | Stake_delegation of Stake_delegation.Stable.V1.t
+        | Create_new_token of New_token_payload.Stable.V1.t
+        | Create_token_account of New_account_payload.Stable.V1.t
+        | Mint_tokens of Minting_payload.Stable.V1.t
       [@@deriving compare, eq, sexp, hash, yojson]
 
       let to_latest = Fn.id
@@ -195,6 +198,9 @@ module Body = struct
   type t = Stable.Latest.t =
     | Payment of Payment_payload.t
     | Stake_delegation of Stake_delegation.t
+    | Create_new_token of New_token_payload.t
+    | Create_token_account of New_account_payload.t
+    | Mint_tokens of Minting_payload.t
   [@@deriving eq, sexp, hash, yojson]
 
   module Tag = Transaction_union_tag
@@ -208,18 +214,58 @@ module Body = struct
       | None ->
           Stake_delegation.gen
     in
+    let new_token_gen =
+      match source_pk with
+      | Some token_owner_pk ->
+          map New_token_payload.gen ~f:(fun payload ->
+              {payload with token_owner_pk} )
+      | None ->
+          New_token_payload.gen
+    in
+    let token_account_gen =
+      match source_pk with
+      | Some token_owner_pk ->
+          map New_account_payload.gen ~f:(fun payload ->
+              {payload with token_owner_pk} )
+      | None ->
+          New_account_payload.gen
+    in
+    let mint_tokens_gen =
+      match source_pk with
+      | Some token_owner_pk ->
+          map Minting_payload.gen ~f:(fun payload ->
+              {payload with token_owner_pk} )
+      | None ->
+          Minting_payload.gen
+    in
     map
-      (variant2
+      (variant5
          (Payment_payload.gen ?source_pk ~max_amount)
-         stake_delegation_gen)
-      ~f:(function `A p -> Payment p | `B d -> Stake_delegation d)
+         stake_delegation_gen new_token_gen token_account_gen mint_tokens_gen)
+      ~f:(function
+        | `A p ->
+            Payment p
+        | `B d ->
+            Stake_delegation d
+        | `C payload ->
+            Create_new_token payload
+        | `D payload ->
+            Create_token_account payload
+        | `E payload ->
+            Mint_tokens payload )
 
   let source_pk (t : t) =
     match t with
     | Payment payload ->
         payload.source_pk
-    | Stake_delegation (Set_delegate payload) ->
-        payload.delegator
+    | Stake_delegation payload ->
+        Stake_delegation.source_pk payload
+    | Create_new_token payload ->
+        New_token_payload.source_pk payload
+    | Create_token_account payload ->
+        New_account_payload.source_pk payload
+    | Mint_tokens payload ->
+        Minting_payload.source_pk payload
 
   let receiver_pk (t : t) =
     match t with
@@ -227,6 +273,12 @@ module Body = struct
         payload.receiver_pk
     | Stake_delegation payload ->
         Stake_delegation.receiver_pk payload
+    | Create_new_token payload ->
+        New_token_payload.receiver_pk payload
+    | Create_token_account payload ->
+        New_account_payload.receiver_pk payload
+    | Mint_tokens payload ->
+        Minting_payload.receiver_pk payload
 
   let token (t : t) =
     match t with
@@ -234,16 +286,50 @@ module Body = struct
         payload.token_id
     | Stake_delegation _ ->
         Token_id.default
+    | Create_new_token payload ->
+        New_token_payload.token payload
+    | Create_token_account payload ->
+        New_account_payload.token payload
+    | Mint_tokens payload ->
+        Minting_payload.token payload
 
-  let source t = Account_id.create (source_pk t) (token t)
+  let source ~next_available_token t =
+    match t with
+    | Payment payload ->
+        Account_id.create payload.source_pk payload.token_id
+    | Stake_delegation payload ->
+        Stake_delegation.source payload
+    | Create_new_token payload ->
+        New_token_payload.source ~next_available_token payload
+    | Create_token_account payload ->
+        New_account_payload.source payload
+    | Mint_tokens payload ->
+        Minting_payload.source payload
 
-  let receiver t = Account_id.create (receiver_pk t) (token t)
+  let receiver ~next_available_token t =
+    match t with
+    | Payment payload ->
+        Account_id.create payload.receiver_pk payload.token_id
+    | Stake_delegation payload ->
+        Stake_delegation.receiver payload
+    | Create_new_token payload ->
+        New_token_payload.receiver ~next_available_token payload
+    | Create_token_account payload ->
+        New_account_payload.receiver payload
+    | Mint_tokens payload ->
+        Minting_payload.receiver payload
 
   let tag = function
     | Payment _ ->
         Transaction_union_tag.Payment
     | Stake_delegation _ ->
         Transaction_union_tag.Stake_delegation
+    | Create_new_token _ ->
+        Transaction_union_tag.Create_account
+    | Create_token_account _ ->
+        Transaction_union_tag.Create_account
+    | Mint_tokens _ ->
+        Transaction_union_tag.Mint_tokens
 end
 
 module Poly = struct
@@ -300,11 +386,13 @@ let body (t : t) = t.body
 
 let source_pk (t : t) = Body.source_pk t.body
 
-let source (t : t) = Body.source t.body
+let source ~next_available_token (t : t) =
+  Body.source ~next_available_token t.body
 
 let receiver_pk (t : t) = Body.receiver_pk t.body
 
-let receiver (t : t) = Body.receiver t.body
+let receiver ~next_available_token (t : t) =
+  Body.receiver ~next_available_token t.body
 
 let token (t : t) = Body.token t.body
 
@@ -316,14 +404,23 @@ let amount (t : t) =
       Some payload.Payment_payload.Poly.amount
   | Stake_delegation _ ->
       None
+  | Create_new_token _ ->
+      None
+  | Create_token_account _ ->
+      None
+  | Mint_tokens payload ->
+      Some payload.Minting_payload.amount
 
 let fee_excess (t : t) =
   Fee_excess.of_single (fee_token t, Currency.Fee.Signed.of_unsigned (fee t))
 
-let is_payment (t : t) =
-  match t.body with Payment _ -> true | Stake_delegation _ -> false
+let accounts_accessed ~next_available_token (t : t) =
+  [ fee_payer t
+  ; source ~next_available_token t
+  ; receiver ~next_available_token t ]
 
-let accounts_accessed (t : t) = [fee_payer t; source t; receiver t]
+let next_available_token (t : t) token =
+  match t.body with Create_new_token _ -> Token_id.next token | _ -> token
 
 let dummy : t =
   { common=

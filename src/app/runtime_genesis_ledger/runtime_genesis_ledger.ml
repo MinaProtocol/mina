@@ -20,11 +20,10 @@ let main ~config_file ~genesis_dir ~proof_level () =
     | None ->
         return Runtime_config.default
   in
-  let constraint_constants = Genesis_constants.Constraint_constants.compiled in
   Deferred.Or_error.ok_exn @@ Deferred.Or_error.ignore
   @@ Genesis_ledger_helper.init_from_config_file ?genesis_dir
-       ~logger:(Logger.create ()) ~may_generate:true ~constraint_constants
-       ~proof_level ~genesis_constants:Genesis_constants.compiled config
+       ~logger:(Logger.create ()) ~may_generate:true ~proof_level
+       ~genesis_constants:Genesis_constants.compiled config
 
 let () =
   Command.run

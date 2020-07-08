@@ -1,19 +1,16 @@
 open Core_kernel
 open Coda_base
 
-type t [@@deriving sexp]
+[%%versioned:
+module Stable : sig
+  module V1 : sig
+    type t [@@deriving sexp]
 
-module Stable :
-  sig
-    module V1 : sig
-      type t [@@deriving sexp, bin_io, version]
-
-      val hash : t -> Staged_ledger_hash.Aux_hash.t
-    end
-
-    module Latest = V1
+    val hash : t -> Staged_ledger_hash.Aux_hash.t
   end
-  with type V1.t = t
+end]
+
+type t = Stable.Latest.t [@@deriving sexp]
 
 module Transaction_with_witness : sig
   (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)
@@ -74,6 +71,8 @@ module Make_statement_scanner
     -> error_prefix:string
     -> ledger_hash_end:Frozen_ledger_hash.t
     -> ledger_hash_begin:Frozen_ledger_hash.t option
+    -> next_available_token_before:Token_id.t
+    -> next_available_token_after:Token_id.t
     -> (unit, Error.t) result M.t
 end
 

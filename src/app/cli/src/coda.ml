@@ -430,14 +430,11 @@ let daemon logger =
            | _ ->
                Runtime_config.default
          in
-         let constraint_constants =
-           Genesis_constants.Constraint_constants.compiled
-         in
          let genesis_dir = Option.value ~default:conf_dir genesis_dir in
          let%bind precomputed_values =
            match%map
              Genesis_ledger_helper.init_from_config_file ~genesis_dir ~logger
-               ~may_generate ~constraint_constants ~proof_level
+               ~may_generate ~proof_level
                ~genesis_constants:Genesis_constants.compiled config
            with
            | Ok (precomputed_values, _) ->
@@ -735,7 +732,7 @@ let daemon logger =
            ; time_controller
            ; consensus_local_state
            ; genesis_ledger_hash
-           ; constraint_constants
+           ; constraint_constants= precomputed_values.constraint_constants
            ; log_gossip_heard
            ; is_seed
            ; creatable_gossip_net=
@@ -994,7 +991,40 @@ let internal_commands =
                  in
                  Prover.prove_from_input_sexp prover sexp >>| ignore
              | `Eof ->
-                 failwith "early EOF while reading sexp" )) ) ]
+                 failwith "early EOF while reading sexp" )) )
+  ; ( "dump-structured-events"
+    , Command.async ~summary:"Dump the registered structured events"
+        (let open Command.Let_syntax in
+        let%map outfile =
+          Core_kernel.Command.Param.flag "-out-file"
+            (Core_kernel.Command.Flag.optional Core_kernel.Command.Param.string)
+            ~doc:"FILENAME File to output to. Defaults to stdout"
+        and pretty =
+          Core_kernel.Command.Param.flag "-pretty"
+            Core_kernel.Command.Param.no_arg
+            ~doc:"  Set to output 'pretty' JSON"
+        in
+        fun () ->
+          let out_channel =
+            match outfile with
+            | Some outfile ->
+                Core_kernel.Out_channel.create outfile
+            | None ->
+                Core_kernel.Out_channel.stdout
+          in
+          let json =
+            Structured_log_events.dump_registered_events ()
+            |> [%derive.to_yojson:
+                 (string * Structured_log_events.id * string list) list]
+          in
+          if pretty then Yojson.Safe.pretty_to_channel out_channel json
+          else Yojson.Safe.to_channel out_channel json ;
+          ( match outfile with
+          | Some _ ->
+              Core_kernel.Out_channel.close out_channel
+          | None ->
+              () ) ;
+          Deferred.return ()) ) ]
 
 let coda_commands logger =
   [ ("accounts", Client.accounts)
