@@ -308,10 +308,8 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
 
   module Lazy_keys = struct
     type t =
-      ( Impls.Step.Keypair.t
-      * [`Cache_hit | `Generated_something | `Locally_generated] )
-      Lazy.t
-      * Snarky_bn382.Tweedle.Dum.Field_verifier_index.t Lazy.t
+      (Impls.Step.Keypair.t * Dirty.t) Lazy.t
+      * (Snarky_bn382.Tweedle.Dum.Field_verifier_index.t * Dirty.t) Lazy.t
 
     (* TODO Think this is right.. *)
   end
@@ -464,11 +462,12 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
                       (let x, y, z = Lazy.force k_p in
                        (x, y, R1CS_constraint_system.digest z))
               in
-              let ((pk, _) as res) =
+              let ((pk, vk) as res) =
                 Common.time "step read or generate" (fun () ->
                     Cache.Step.read_or_generate cache k_p k_v typ main )
               in
               accum_dirty (Lazy.map pk ~f:snd) ;
+              accum_dirty (Lazy.map vk ~f:snd) ;
               res
           end)
       in
@@ -479,7 +478,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
       let module V = H4.To_vector (Lazy_keys) in
       lazy
         (Vector.map (V.f prev_varss_length step_keypairs) ~f:(fun (_, vk) ->
-             Tick.Keypair.vk_commitments (Lazy.force vk) ))
+             Tick.Keypair.vk_commitments (fst (Lazy.force vk)) ))
     in
     Timer.clock __LOC__ ;
     let wrap_requests, wrap_main =
@@ -566,7 +565,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
             (Impls.Step.Keypair.pk (fst (Lazy.force step_pk)))
             wrap_vk.index prevs
         in
-        let pairing_vk = Lazy.force step_vk in
+        let pairing_vk = fst (Lazy.force step_vk) in
         let wrap ?handler prevs next_state =
           let wrap_vk = Lazy.force wrap_vk in
           let prevs =

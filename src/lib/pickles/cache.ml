@@ -74,11 +74,12 @@ module Step = struct
                Key_cache.Sync.read cache s_v k_v )
          with
          | Ok (vk, _) ->
-             vk
+             (vk, `Cache_hit)
          | Error _e ->
-             let vk = Lazy.force pk |> fst |> Keypair.vk in
+             let pk, c = Lazy.force pk in
+             let vk = Keypair.vk pk in
              let _ = Key_cache.Sync.write cache s_v k_v vk in
-             vk)
+             (vk, c))
     in
     (pk, vk)
 end
