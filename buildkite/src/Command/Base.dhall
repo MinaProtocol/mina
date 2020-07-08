@@ -11,6 +11,7 @@ let Map = Prelude.Map
 
 let Cmd = ../Lib/Cmds.dhall
 let Decorate = ../Lib/Decorate.dhall
+let SelectFiles = ../Lib/SelectFiles.dhall
 
 let Docker = ./Docker/Type.dhall
 let Summon= ./Summon/Type.dhall
@@ -58,6 +59,7 @@ let Config =
   { Type =
       { commands : List Cmd.Type
       , depends_on : List TaggedKey.Type
+      , artifact_paths : List SelectFiles.Type
       , label : Text
       , key : Text
       , target : Size
@@ -66,6 +68,7 @@ let Config =
       }
   , default =
     { depends_on = [] : List TaggedKey.Type
+    , artifact_paths = [] : List SelectFiles.Type
     , docker = None Docker.Type
     , summon = None Summon.Type
     }
