@@ -134,6 +134,7 @@ module Sync : S with module M := Or_error = struct
             | Spec.On_disk {directory; _} ->
                 (on_disk to_string r w directory).read k
             | S3 {bucket_prefix; install_path} ->
+                Unix.mkdir_p install_path ;
                 (s3 to_string r ~bucket_prefix ~install_path).read k
           in
           match res with
