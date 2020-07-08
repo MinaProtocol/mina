@@ -526,7 +526,7 @@ let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
        , unit )
        Strict_pipe.Writer.t) ~unprocessed_transition_cache : unit =
   let num_peers = 8 in
-  let maximum_download_size = 100 in
+  let maximum_download_size = 1 in
   don't_wait_for
     (Strict_pipe.Reader.iter_without_pushback catchup_job_reader
        ~f:(fun (target_hash, subtrees) ->
@@ -568,11 +568,15 @@ let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
                   Core.printf "verify and build done, length %d\n%!"
                     (List.length breadcrumbs_chunks)
                 in *)
+                let _ =
+                  Core.printf "length %d\n%!" (List.length breadcrumbs_chunks)
+                in
                 let%bind () =
                   Deferred.List.iter ~how:`Sequential
                     (List.rev breadcrumbs_chunks)
                     ~f:(fun trees_of_breadcrumbs ->
-                      (* Core.printf "breadcrumbs length: %d \n%!" (List.length trees_of_breadcrumbs); *)
+                      Core.printf "breadcrumbs length: %d \n%!"
+                        (List.length trees_of_breadcrumbs) ;
                       Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
                         ~metadata:
                           [ ( "hashes of transitions"
