@@ -2,6 +2,6 @@
  (name ppx_coda)
  (public_name ppx_coda)
  (kind ppx_deriver)
- (libraries compiler-libs.common ppxlib ppx_deriving.api ppx_bin_prot ppx_register_event core_kernel)
+ (libraries compiler-libs.common ppxlib ppx_deriving.api ppx_bin_prot ppx_register_event ppx_dhall_type core_kernel)
  (preprocessor_deps ../../config.mlh)
  (preprocess (pps ppx_version ppxlib.metaquot ppx_optcomp)))
