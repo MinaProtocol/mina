@@ -197,6 +197,10 @@ module Async : S with module M := Async.Deferred.Or_error = struct
       let uri_string = bucket_prefix ^/ label in
       let file_path = install_path ^/ label in
       let open Deferred.Or_error.Let_syntax in
+      Logger.debug ~module_:__MODULE__ ~location:__LOC__ (Logger.create ())
+        "Running curl"
+        ~metadata:
+          [("url", `String uri_string); ("local_file_path", `String file_path)] ;
       let%bind result =
         Process.run ~prog:"curl"
           ~args:["--fail"; "-o"; file_path; uri_string]
