@@ -41,11 +41,12 @@ let expr ~loc =
     E.pexp_array
       (List.map keypairs ~f:(fun {public_key; private_key} ->
            Core.printf
-             !"keypair gen privkey %s %{sexp:Private_key.t}\n%!"
-             __LOC__ private_key ;
-           Core.printf
-             !"keypair gen %s %{sexp:Public_key.t}\n%!"
-             __LOC__ public_key ;
+             !"keypair gen privkey %s %s\n%!"
+             __LOC__
+             (Private_key.to_base58_check private_key) ;
+           Core.printf !"keypair gen %s %s\n%!" __LOC__
+             (Public_key.Compressed.to_base58_check
+                (Public_key.compress public_key)) ;
            E.pexp_tuple
              [ estring
                  (Binable.to_string
