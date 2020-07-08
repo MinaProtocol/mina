@@ -752,8 +752,9 @@ let load_config_file filename =
           Or_error.error_string err )
 
 let init_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
-    ~may_generate ~proof_level ~genesis_constants (config : Runtime_config.t) =
+    ~may_generate ~proof_level (config : Runtime_config.t) =
   let open Deferred.Or_error.Let_syntax in
+  let genesis_constants = Genesis_constants.compiled in
   let proof_level =
     List.find_map_exn ~f:Fn.id
       [ proof_level
