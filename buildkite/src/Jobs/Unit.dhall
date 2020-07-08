@@ -16,7 +16,7 @@ let Size = ../Command/Size.dhall
 let buildTestCmd : Text -> Text -> Command.Type = \(profile : Text) -> \(path : Text) ->
   Command.build
     Command.Config::{
-      commands = OpamInit.andThenRunInDocker "buildkite/scripts/unit-test.sh ${profile} ${path}",
+      commands = OpamInit.andThenRunInDocker ([] : List Text) "buildkite/scripts/unit-test.sh ${profile} ${path}",
       label = "Run ${profile} unit-tests",
       key = "unit-test-${profile}",
       target = Size.Experimental,
