@@ -30,13 +30,13 @@ let rec dhall_type_of_core_type core_type =
   let open Ast_builder in
   match core_type.ptyp_desc with
   | Ptyp_constr (lident, []) when is_bool_lident lident ->
-      [%expr Bool]
+      [%expr Ppx_dhall_type.Dhall_type.Bool]
   | Ptyp_constr (lident, []) when is_int_lident lident ->
-      [%expr Integer]
+      [%expr Ppx_dhall_type.Dhall_type.Integer]
   | Ptyp_constr (lident, []) when is_float_lident lident ->
-      [%expr Double]
+      [%expr Ppx_dhall_type.Dhall_type.Double]
   | Ptyp_constr (lident, []) when is_string_lident lident ->
-      [%expr Text]
+      [%expr Ppx_dhall_type.Dhall_type.Text]
   | Ptyp_constr ({txt= Lident id; _}, []) ->
       evar (id ^ "_dhall_type")
   | Ptyp_constr ({txt= Ldot (prefix, nm); _}, []) ->
@@ -44,9 +44,10 @@ let rec dhall_type_of_core_type core_type =
       if String.equal nm "t" then evar (mod_path ^ ".dhall_type")
       else evar (mod_path ^ "." ^ nm ^ "_dhall_type")
   | Ptyp_constr (lident, [ty]) when is_option_lident lident ->
-      [%expr Optional [%e dhall_type_of_core_type ty]]
+      [%expr
+        Ppx_dhall_type.Dhall_type.Optional [%e dhall_type_of_core_type ty]]
   | Ptyp_constr (lident, [ty]) when is_list_lident lident ->
-      [%expr List [%e dhall_type_of_core_type ty]]
+      [%expr Ppx_dhall_type.Dhall_type.List [%e dhall_type_of_core_type ty]]
   | _ ->
       Location.raise_errorf ~loc:core_type.ptyp_loc "Unsupported type"
 
@@ -87,14 +88,14 @@ let generate_dhall_type type_decl =
           dhall_type_of_core_type core_type )
     | Ptype_variant ctor_decls ->
         [%expr
-          Union
+          Ppx_dhall_type.Dhall_type.Union
             [%e
               elist
                 (List.map ctor_decls
                    ~f:dhall_variant_from_constructor_declaration)]]
     | Ptype_record label_decls ->
         [%expr
-          Record
+          Ppx_dhall_type.Dhall_type.Record
             [%e
               elist
                 (List.map label_decls ~f:dhall_field_from_label_declaration)]]
@@ -109,10 +110,7 @@ let generate_dhall_type type_decl =
     | nm ->
         pvar (nm ^ "_dhall_type")
   in
-  [%stri
-    let [%p ty_name] =
-      let open Ppx_dhall_type.Dhall_type in
-      [%e dhall_type]]
+  [%stri let [%p ty_name] = [%e dhall_type]]
 
 let generate_dhall_types ~loc:_ ~path:_ (_rec_flag, type_decls) =
   List.map type_decls ~f:generate_dhall_type
