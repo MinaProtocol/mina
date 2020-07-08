@@ -29,7 +29,8 @@ module Input = struct
     ; max_concurrent_connections: int option
     ; is_archive_rocksdb: bool
     ; is_seed: bool
-    ; archive_process_location: Core.Host_and_port.t option }
+    ; archive_process_location: Core.Host_and_port.t option
+    ; runtime_config: Runtime_config.t }
   [@@deriving bin_io_unversioned]
 end
 
