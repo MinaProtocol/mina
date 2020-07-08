@@ -231,9 +231,10 @@ build_pv_keys:
 	$(info Keys built)
 
 publish_deb:
-	@./buildkite/scripts/publish-deb.sh
+	@./scripts/publish-deb.sh
 
-publish_debs: publish_deb
+publish_debs:
+	@./buildkite/scripts/publish-deb.sh
 
 genesiskeys:
 	@mkdir -p /tmp/artifacts

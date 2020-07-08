@@ -32,7 +32,7 @@ echo "--- Store genesis keys"
 make genesiskeys
 
 echo "--- Upload deb to repo"
-make publish_deb
+make publish_debs
 
 echo "--- Copy artifacts to cloud"
 #make publish_deb
