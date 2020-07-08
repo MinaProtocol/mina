@@ -231,7 +231,7 @@ build_pv_keys:
 	$(info Keys built)
 
 publish_deb:
-	@./scripts/publish-deb.sh
+	@./buildkite/scripts/publish-deb.sh
 
 publish_debs: publish_deb
 

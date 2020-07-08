@@ -35,6 +35,6 @@ echo "--- Upload deb to repo"
 make publish_deb
 
 echo "--- Copy artifacts to cloud"
-make publish_deb
+#make publish_deb
 
 # TODO save docker cache
