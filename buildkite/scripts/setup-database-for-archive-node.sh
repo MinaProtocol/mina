@@ -4,7 +4,7 @@ user=$1
 password=$2
 db=$3
 
-echo "${user} ${password} ${db}"
+set -euo pipefail
 
 sudo apt-get install -y postgresql
 sudo service postgresql start
