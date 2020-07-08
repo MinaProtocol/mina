@@ -91,7 +91,7 @@ module Compressed = struct
           Quickcheck.random_value
             ~seed:(`Deterministic "nonzero_curve_point_compressed-seed") V1.gen
         in
-        let known_good_digest = "038f3153aa36387b23b54af004de82c8" in
+        let known_good_digest = "951b667e8f1216097665190fc0a7b78a" in
         Ppx_version.Serialization.check_serialization
           (module V1)
           point known_good_digest
