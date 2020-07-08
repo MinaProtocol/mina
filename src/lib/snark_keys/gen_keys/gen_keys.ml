@@ -138,6 +138,7 @@ let str ~loc =
           ~f:Cache_handle.generate_or_load
         |> List.reduce_exn ~f:Dirty.( + ))
   in*)
+  let%map () = Deferred.return () in
   let module E = Ppxlib.Ast_builder.Make (struct
     let loc = loc
   end) in
