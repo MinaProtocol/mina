@@ -62,5 +62,5 @@ let main () =
   let daemon_config = Daemon_config.create () in
   let%bind testnet = Network_manager.deploy network_config daemon_config in
   let%bind log_engine = Log_engine.create ~logger testnet in
-  let%bind () = wait_for ~blocks:1 log_engine in
+  let%bind () = Log_engine.wait_for ~blocks:1 log_engine in
   Network_manager.destroy testnet
