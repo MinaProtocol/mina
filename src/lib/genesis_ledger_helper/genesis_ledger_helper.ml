@@ -280,21 +280,31 @@ module Ledger = struct
     let%map () = Tar.create ~root:dirname ~file:tar_path ~directory:"." () in
     tar_path
 
-  let load ~genesis_dir ~logger ~constraint_constants
+  let load ~proof_level ~genesis_dir ~logger ~constraint_constants
       (config : Runtime_config.Ledger.t) =
     Monitor.try_with_join_or_error (fun () ->
         let add_genesis_winner_account accounts =
-          let pk, _ = Coda_state.Consensus_state_hooks.genesis_winner in
-          match accounts with
-          | (_, account) :: _
-            when Public_key.Compressed.equal (Account.public_key account) pk ->
-              accounts
-          | _ ->
-              ( None
-              , Account.create
-                  (Account_id.create pk Token_id.default)
-                  (Currency.Balance.of_int 1000) )
-              :: accounts
+          let add_genesis_winner_account =
+            match config.add_genesis_winner with
+            | Some add_genesis_winner ->
+                add_genesis_winner
+            | None ->
+                Genesis_constants.Proof_level.equal Full proof_level
+          in
+          if add_genesis_winner_account then
+            let pk, _ = Coda_state.Consensus_state_hooks.genesis_winner in
+            match accounts with
+            | (_, account) :: _
+              when Public_key.Compressed.equal (Account.public_key account) pk
+              ->
+                accounts
+            | _ ->
+                ( None
+                , Account.create
+                    (Account_id.create pk Token_id.default)
+                    (Currency.Balance.of_int 1000) )
+                :: accounts
+          else accounts
         in
         let accounts =
           match config.base with
@@ -800,13 +810,14 @@ let init_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
           (str proof_level) (str compiled)
   in
   let%bind genesis_ledger, ledger_config, ledger_file =
-    Ledger.load ~genesis_dir ~logger ~constraint_constants
+    Ledger.load ~proof_level ~genesis_dir ~logger ~constraint_constants
       (Option.value config.ledger
          ~default:
            { base= Named Coda_compile_config.genesis_ledger
            ; num_accounts= None
            ; hash= None
-           ; name= None })
+           ; name= None
+           ; add_genesis_winner= None })
   in
   let config =
     {config with ledger= Option.map config.ledger ~f:(fun _ -> ledger_config)}
@@ -947,4 +958,12 @@ let extract_runtime_config (precomputed_values : Precomputed_values.t) :
             Some
               ( precomputed_values |> Precomputed_values.genesis_ledger
               |> Lazy.force |> Coda_base.Ledger.merkle_root
-              |> State_hash.to_string ) } }
+              |> State_hash.to_string )
+        ; add_genesis_winner=
+            Some
+              ( Lazy.force (Precomputed_values.accounts precomputed_values)
+              |> List.hd
+              |> Option.map ~f:(Fn.compose Account.public_key snd)
+              |> Option.value ~default:Public_key.Compressed.empty
+              |> Public_key.Compressed.equal
+                   (fst Coda_state.Consensus_state_hooks.genesis_winner) ) } }
