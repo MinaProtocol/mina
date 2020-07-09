@@ -24,7 +24,7 @@ module Json_layout = struct
       type t =
         { pk: (string option[@default None])
         ; sk: (string option[@default None])
-        ; balance: Currency.Balance.Stable.Latest.t
+        ; balance: Currency.Balance.t
         ; delegate: (string option[@default None]) }
       [@@deriving yojson, dhall_type]
 
@@ -70,10 +70,8 @@ module Json_layout = struct
       ; work_delay: (int option[@default None])
       ; block_window_duration_ms: (int option[@default None])
       ; transaction_capacity: (Transaction_capacity.t option[@default None])
-      ; coinbase_amount:
-          (Currency.Amount.Stable.Latest.t option[@default None])
-      ; account_creation_fee:
-          (Currency.Fee.Stable.Latest.t option[@default None]) }
+      ; coinbase_amount: (Currency.Amount.t option[@default None])
+      ; account_creation_fee: (Currency.Fee.t option[@default None]) }
     [@@deriving yojson, dhall_type]
 
     let fields =
