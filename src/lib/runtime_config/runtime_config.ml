@@ -17,7 +17,7 @@ module Accounts = struct
     ; sk: string option [@default None]
     ; balance: Currency.Balance.t
     ; delegate: string option [@default None] }
-  [@@deriving yojson]
+  [@@deriving yojson, dhall_type]
 
   let single_of_yojson json =
     single_of_yojson
@@ -25,7 +25,7 @@ module Accounts = struct
          ~keep_fields:[|"pk"; "sk"; "balance"; "delegate"|]
          json
 
-  type t = single list [@@deriving yojson]
+  type t = single list [@@deriving yojson, dhall_type]
 end
 
 module Ledger = struct
@@ -33,12 +33,14 @@ module Ledger = struct
     | Named of string  (** One of the named ledgers in [Genesis_ledger] *)
     | Accounts of Accounts.t  (** A ledger generated from the given accounts *)
     | Hash of string  (** The ledger with the given root hash *)
+  [@@deriving dhall_type]
 
   type t =
     { base: base
     ; num_accounts: int option
     ; hash: string option
     ; name: string option }
+  [@@deriving dhall_type]
 
   let base_to_yojson_field = function
     | Named name ->
@@ -166,7 +168,7 @@ end
 
 module Proof_keys = struct
   module Level = struct
-    type t = Full | Check | None
+    type t = Full | Check | None [@@deriving dhall_type]
 
     let to_yojson = function
       | Full ->
@@ -197,6 +199,7 @@ module Proof_keys = struct
 
   module Transaction_capacity = struct
     type t = Log_2 of int | Txns_per_second_x10 of int
+    [@@deriving dhall_type]
 
     let to_yojson = function
       | Log_2 i ->
@@ -247,7 +250,7 @@ module Proof_keys = struct
     ; transaction_capacity: Transaction_capacity.t option [@default None]
     ; coinbase_amount: Currency.Amount.t option [@default None]
     ; account_creation_fee: Currency.Fee.t option [@default None] }
-  [@@deriving yojson]
+  [@@deriving yojson, dhall_type]
 
   let of_yojson json =
     of_yojson
@@ -286,7 +289,7 @@ module Genesis = struct
     { k: int option [@default None]
     ; delta: int option [@default None]
     ; genesis_state_timestamp: string option [@default None] }
-  [@@deriving yojson]
+  [@@deriving yojson, dhall_type]
 
   let of_yojson json =
     of_yojson
@@ -303,7 +306,8 @@ module Genesis = struct
 end
 
 module Daemon = struct
-  type t = {txpool_max_size: int option [@default None]} [@@deriving yojson]
+  type t = {txpool_max_size: int option [@default None]}
+  [@@deriving yojson, dhall_type]
 
   let of_yojson json =
     of_yojson @@ yojson_strip_fields ~keep_fields:[|"txpool_max_size"|] json
@@ -353,7 +357,7 @@ type t =
   ; genesis: Genesis.t option [@default None]
   ; proof: Proof_keys.t option [@default None]
   ; ledger: Ledger.t option [@default None] }
-[@@deriving yojson]
+[@@deriving yojson, dhall_type]
 
 let keep_fields = [|"ledger"; "genesis"; "proof"|]
 
