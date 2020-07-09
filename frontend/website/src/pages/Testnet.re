@@ -57,8 +57,7 @@ module Styles = {
       maxWidth(`rem(58.)),
     ]);
 
-  let leaderboardCopy =
-    style([maxWidth(`rem(36.5)), margin2(~v=`zero, ~h=auto)]);
+  let leaderboardCopy = style([maxWidth(`rem(36.5))]);
 
   let rowStyles = [
     display(`grid),
