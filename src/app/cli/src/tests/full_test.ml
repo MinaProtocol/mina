@@ -38,7 +38,7 @@ let with_check = false
 [%%endif]
 
 [%%if
-curve_size = 382]
+curve_size = 255]
 
 let medium_curves = true
 

@@ -314,11 +314,11 @@ module Types = struct
         [enum_value "PLUS" ~value:Sgn.Pos; enum_value "MINUS" ~value:Sgn.Neg]
 
   let signed_amount =
-    obj "SignedFee" ~doc:"Signed fee" ~fields:(fun _ ->
+    obj "SignedAm'unt" ~doc:"Signed amount" ~fields:(fun _ ->
         [ field "sign" ~typ:(non_null sign) ~doc:"+/-"
             ~args:Arg.[]
             ~resolve:(fun _ fee -> Currency.Amount.Signed.sgn fee)
-        ; field "feeMagnitude" ~typ:(non_null uint64) ~doc:"Amount"
+        ; field "amountMagnitude" ~typ:(non_null uint64) ~doc:"Amount"
             ~args:Arg.[]
             ~resolve:(fun _ fee ->
               Currency.Amount.(to_uint64 (Signed.magnitude fee)) ) ] )
