@@ -206,7 +206,7 @@ module Accounts = struct
   type single = Single.t =
     { pk: string option
     ; sk: string option
-    ; balance: Currency.Balance.Stable.Latest.t
+    ; balance: Currency.Balance.t
     ; delegate: string option }
 
   type t = Single.t list [@@deriving bin_io_unversioned]
