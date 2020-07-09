@@ -136,7 +136,7 @@ module Styles = {
 module LeaderboardRow = {
   [@react.component]
   let make = (~rank, ~member) => {
-    let userSlug =
+    let _userSlug =
       "/memberProfile"
       ++ "?allTimeRank="
       ++ member.allTimeRank->string_of_int
@@ -156,25 +156,23 @@ module LeaderboardRow = {
       ++ member.name
       |> Js.String.replaceByRe([%re "/#/g"], "%23"); /* replace "#" with percent encoding for the URL to properly parse */
 
-    <>
-      <Next.Link href=userSlug _as=userSlug>
-        <div className=Styles.leaderboardRow>
-          <span className=Styles.rank>
-            {React.string(string_of_int(rank))}
-          </span>
-          <span className=Styles.username> {React.string(member.name)} </span>
-          <span className=Styles.activePointsCell>
-            {React.string(string_of_int(member.releasePoints))}
-          </span>
-          <span className=Styles.inactivePointsCell>
-            {React.string(string_of_int(member.phasePoints))}
-          </span>
-          <span className=Styles.inactivePointsCell>
-            {React.string(string_of_int(member.allTimePoints))}
-          </span>
-        </div>
-      </Next.Link>
-    </>;
+    // <Next.Link href=userSlug _as=userSlug>
+    <div className=Styles.leaderboardRow>
+      <span className=Styles.rank>
+        {React.string(string_of_int(rank))}
+      </span>
+      <span className=Styles.username> {React.string(member.name)} </span>
+      <span className=Styles.activePointsCell>
+        {React.string(string_of_int(member.releasePoints))}
+      </span>
+      <span className=Styles.inactivePointsCell>
+        {React.string(string_of_int(member.phasePoints))}
+      </span>
+      <span className=Styles.inactivePointsCell>
+        {React.string(string_of_int(member.allTimePoints))}
+      </span>
+    </div>;
+    // </Next.Link>
   };
 };
 
@@ -229,8 +227,9 @@ let make = () => {
              rank={member.allTimeRank}
              member
            />,
-         Array.length(state.members) > 0
-           ? Array.sub(state.members, 0, 10) : state.members,
+         // Array.length(state.members) > 0
+         //  ? Array.sub(state.members, 0, 10) : state.members,
+         state.members,
        )
        |> React.array}
       {state.loading
