@@ -1,4 +1,6 @@
-function cleanup()
+#!/bin/bash
+
+function cleanup
 {
   kill $(jobs -p)
   /etc/init.d/postgresql stop
@@ -15,9 +17,9 @@ coda-archive \
 
 sleep 5
 
-coda daemon \
-    -peer $PEER1 -peer $PEER2 \
+/run-demo.sh \
     -archive-address 3086 \
     -config-directory /data/coda-config &
 
-ls
+sleep 600000
+
