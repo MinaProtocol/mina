@@ -6,7 +6,7 @@ export HOMEBREW_NO_AUTO_UPDATE=1
 # re-reads /usr/local/Homebrew if a cache has been put in place
 brew update-reset
 
-NEEDED_PACKAGES=" bash boost cmake gmp gpatch jemalloc libffi libomp libsodium opam openssl@1.1 pkg-config zlib libpq postgresql python3"
+NEEDED_PACKAGES=" bash boost cmake gmp gpatch jemalloc libffi libomp libsodium opam openssl@1.1 pkg-config zlib libpq postgresql"
 echo "Needed:  ${NEEDED_PACKAGES}"
 
 CURRENT_PACKAGES=$(brew list | xargs)
@@ -27,6 +27,8 @@ brew uninstall --force python@2
 if [[ $NEEDED_PACKAGES = *[![:space:]]* ]]; then
   yes | brew install $NEEDED_PACKAGES
   brew update
+  # Install python3 separately so that it picks up openssl@1.1
+  brew install python3
 else
   echo 'All required brew packages have already been installed.'
 fi
