@@ -193,7 +193,8 @@ struct
                      let%bind top_hash = read Field.typ top_hash in
                      let updated = State.sexp_of_value in_snark_next_state in
                      let original = State.sexp_of_value expected_next_state in
-                     ( if not (Field.equal next_top_hash top_hash) then
+                     if Field.equal next_top_hash top_hash then return ()
+                     else
                        let diff =
                          Sexp_diff_kernel.Algo.diff ~original ~updated ()
                        in
@@ -205,28 +206,28 @@ struct
                              , `String
                                  (Sexp_diff_kernel.Display
                                   .display_as_plain_string diff) ) ]
-                         ~location:__LOC__ ~module_:__MODULE__ ) ;
-                     (* Fail here: the error raised in the snark below is
-                        strictly less informative, displaying only the hashes
-                        and their representation as constraint system
-                        variables.
-                     *)
-                     failwithf
-                       !"Out-of-SNARK and in-SNARK calculations of the next \
-                         top hash differ:\n\
-                         out of SNARK: %{sexp: Field.t}\n\
-                         in SNARK: %{sexp: Field.t}\n\n\
-                         (Caution: in the below, the fields of the non-SNARK \
-                         part of the staged ledger hash -- namely \
-                         ledger_hash, aux_hash, and pending_coinbase_aux -- \
-                         are replaced with dummy values in the snark, and \
-                         will necessarily differ.)\n\
-                         Out of SNARK state:\n\
-                         %{sexp: State.value}\n\n\
-                         In SNARK state:\n\
-                         %{sexp: State.value}"
-                       top_hash next_top_hash expected_next_state
-                       in_snark_next_state ()
+                         ~location:__LOC__ ~module_:__MODULE__ ;
+                       (* Fail here: the error raised in the snark below is
+                          strictly less informative, displaying only the hashes
+                          and their representation as constraint system
+                          variables.
+                       *)
+                       failwithf
+                         !"Out-of-SNARK and in-SNARK calculations of the next \
+                           top hash differ:\n\
+                           out of SNARK: %{sexp: Field.t}\n\
+                           in SNARK: %{sexp: Field.t}\n\n\
+                           (Caution: in the below, the fields of the \
+                           non-SNARK part of the staged ledger hash -- namely \
+                           ledger_hash, aux_hash, and pending_coinbase_aux -- \
+                           are replaced with dummy values in the snark, and \
+                           will necessarily differ.)\n\
+                           Out of SNARK state:\n\
+                           %{sexp: State.value}\n\n\
+                           In SNARK state:\n\
+                           %{sexp: State.value}"
+                         top_hash next_top_hash expected_next_state
+                         in_snark_next_state ()
                  | None ->
                      Logger.error logger
                        "From the current prover state, got None for the \
