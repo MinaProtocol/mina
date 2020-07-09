@@ -2620,9 +2620,10 @@ module Hooks = struct
     let from_genesis_epoch =
       Length.equal consensus_state.epoch_count Length.zero
     in
+    let in_initial_epoch = Epoch.(equal zero) epoch in
     if in_next_epoch then
       Ok (Epoch_data.next_to_staking consensus_state.next_epoch_data)
-    else if in_same_epoch || from_genesis_epoch then
+    else if in_same_epoch || (from_genesis_epoch && in_initial_epoch) then
       Ok consensus_state.staking_epoch_data
     else Error ()
 
