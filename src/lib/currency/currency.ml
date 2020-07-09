@@ -190,7 +190,7 @@ end = struct
   module Signed = struct
     type ('magnitude, 'sgn) typ = ('magnitude, 'sgn) Signed_poly.t =
       {magnitude: 'magnitude; sgn: 'sgn}
-    [@@deriving sexp, hash, compare, yojson]
+    [@@deriving sexp, hash, compare, yojson, hlist]
 
     type t = (Unsigned.t, Sgn.t) Signed_poly.t
     [@@deriving sexp, hash, compare, eq, yojson]
@@ -246,15 +246,10 @@ end = struct
 
     type nonrec var = (var, Sgn.var) Signed_poly.t
 
-    let of_hlist : (unit, 'a -> 'b -> unit) Snarky.H_list.t -> ('a, 'b) typ =
-      Snarky.H_list.(fun [magnitude; sgn] -> {magnitude; sgn})
-
-    let to_hlist {magnitude; sgn} = Snarky.H_list.[magnitude; sgn]
-
     let typ =
-      Typ.of_hlistable [typ; Sgn.typ] ~var_to_hlist:to_hlist
-        ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
-        ~value_of_hlist:of_hlist
+      Typ.of_hlistable [typ; Sgn.typ] ~var_to_hlist:typ_to_hlist
+        ~var_of_hlist:typ_of_hlist ~value_to_hlist:typ_to_hlist
+        ~value_of_hlist:typ_of_hlist
 
     module Checked = struct
       let to_bits {magnitude; sgn} =

@@ -24,17 +24,11 @@ module Group = struct
 end
 
 module Message = struct
-  type 'state_hash t = {state_hash: 'state_hash}
+  type 'state_hash t = {state_hash: 'state_hash} [@@deriving hlist]
 
   type value = Coda_base.State_hash.t t
 
   type var = Coda_base.State_hash.var t
-
-  let to_hlist {state_hash} = Coda_base.H_list.[state_hash]
-
-  let of_hlist :
-      (unit, 'state_hash -> unit) Coda_base.H_list.t -> 'state_hash t =
-   fun Coda_base.H_list.[state_hash] -> {state_hash}
 
   let data_spec = Tick.Data_spec.[Coda_base.State_hash.typ]
 
