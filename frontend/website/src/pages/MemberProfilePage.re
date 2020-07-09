@@ -193,6 +193,52 @@ let reducer = (prevState, action) => {
   };
 };
 
+module Footer = {
+  module Styles = {
+    open Css;
+    let footer =
+      style([
+        width(`percent(100.)),
+        background(`rgba((242, 183, 5, 0.1))),
+        color(Theme.Colors.saville),
+        padding(`rem(1.)),
+      ]);
+    let header = merge([Theme.H5.semiBold, style([fontSize(`rem(1.5))])]);
+    let copy =
+      merge([
+        Theme.H5.semiBold,
+        style([fontSize(`rem(1.5)), fontWeight(`light)]),
+      ]);
+
+    let bold = merge([header, style([fontSize(`rem(1.25))])]);
+    let disclaimer = merge([copy, style([fontSize(`rem(1.1))])]);
+  };
+  [@react.component]
+  let make = () => {
+    <div className=Styles.footer>
+      <p className=Styles.header>
+        {React.string(
+           "Testnet points are displayed for releases in the current testnet phase.",
+         )}
+      </p>
+      <p className=Styles.copy>
+        {React.string(
+           "Point totals from all testnet phases are included when calculating total testnet points.",
+         )}
+      </p>
+      <Spacer height=1. />
+      <p className=Styles.bold> {React.string("* Testnet Points")} </p>
+      <p className=Styles.disclaimer>
+        {React.string(
+           "Testnet Points (abbreviated 'pts') are designed solely to track contributions to the \
+           Testnet and Testnet Points have no cash or other monetary value. Testnet Points are not \
+           transferable and are not redeemable or exchangeable for any cryptocurrency or digital assets. \
+           We may at any time amend or eliminate Testnet Points.",
+         )}
+      </p>
+    </div>;
+  };
+};
 [@react.component]
 let make = () => {
   let (state, dispatch) = React.useReducer(reducer, initialState);
@@ -249,7 +295,7 @@ let make = () => {
            ? <div className=Styles.loading>
                {React.string("User Not Available")}
              </div>
-           : React.null}
+           : <Footer />}
       </div>
     </Wrapped>
   </Page>;
