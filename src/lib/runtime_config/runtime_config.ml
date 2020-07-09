@@ -26,7 +26,7 @@ module Json_layout = struct
         ; sk: (string option[@default None])
         ; balance: Currency.Balance.Stable.Latest.t
         ; delegate: (string option[@default None]) }
-      [@@deriving yojson]
+      [@@deriving yojson, dhall_type]
 
       let fields = [|"pk"; "sk"; "balance"; "delegate"|]
 
@@ -34,7 +34,7 @@ module Json_layout = struct
         of_yojson @@ yojson_strip_fields ~keep_fields:fields json
     end
 
-    type t = Single.t list [@@deriving yojson]
+    type t = Single.t list [@@deriving yojson, dhall_type]
   end
 
   module Ledger = struct
@@ -44,7 +44,7 @@ module Json_layout = struct
       ; hash: (string option[@default None])
       ; name: (string option[@default None])
       ; add_genesis_winner: (bool option[@default None]) }
-    [@@deriving yojson]
+    [@@deriving yojson, dhall_type]
 
     let fields =
       [|"accounts"; "num_accounts"; "hash"; "name"; "add_genesis_winner"|]
@@ -58,7 +58,7 @@ module Json_layout = struct
       type t =
         { log_2: (int option[@default None]) [@key "2_to_the"]
         ; txns_per_second_x10: (int option[@default None]) }
-      [@@deriving yojson]
+      [@@deriving yojson, dhall_type]
 
       let fields = [|"2_to_the"; "txns_per_second_x10"|]
     end
@@ -74,7 +74,7 @@ module Json_layout = struct
           (Currency.Amount.Stable.Latest.t option[@default None])
       ; account_creation_fee:
           (Currency.Fee.Stable.Latest.t option[@default None]) }
-    [@@deriving yojson]
+    [@@deriving yojson, dhall_type]
 
     let fields =
       [| "level"
@@ -92,7 +92,7 @@ module Json_layout = struct
       { k: (int option[@default None])
       ; delta: (int option[@default None])
       ; genesis_state_timestamp: (string option[@default None]) }
-    [@@deriving yojson]
+    [@@deriving yojson, dhall_type]
 
     let fields = [|"k"; "delta"; "genesis_state_timestamp"|]
 
@@ -101,7 +101,8 @@ module Json_layout = struct
   end
 
   module Daemon = struct
-    type t = {txpool_max_size: (int option[@default None])} [@@deriving yojson]
+    type t = {txpool_max_size: (int option[@default None])}
+    [@@deriving yojson, dhall_type]
 
     let fields = [|"txpool_max_size"|]
 
@@ -114,7 +115,7 @@ module Json_layout = struct
     ; genesis: (Genesis.t option[@default None])
     ; proof: (Proof_keys.t option[@default None])
     ; ledger: (Ledger.t option[@default None]) }
-  [@@deriving yojson]
+  [@@deriving yojson, dhall_type]
 
   let fields = [|"daemon"; "ledger"; "genesis"; "proof"|]
 
