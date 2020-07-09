@@ -9,6 +9,7 @@
     caqti-async
     caqti-driver-postgresql
     cohttp
+    ctypes
     cohttp-async
     core_kernel
     logger

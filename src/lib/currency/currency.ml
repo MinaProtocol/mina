@@ -57,6 +57,9 @@ end = struct
 
   type t = Unsigned.t [@@deriving sexp, compare, hash]
 
+  (* can't be automatically derived *)
+  let dhall_type = Ppx_dhall_type.Dhall_type.Text
+
   [%%define_locally
   Unsigned.(to_uint64, of_uint64, of_int, to_int, of_string, to_string)]
 
