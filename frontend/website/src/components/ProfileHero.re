@@ -111,6 +111,10 @@ module Styles = {
         ),
       ]),
     ]);
+
+  let nameContainer = style([display(`flex)]);
+
+  let username = merge([header, style([marginRight(`rem(1.))])]);
 };
 
 module Links = {
@@ -286,6 +290,22 @@ module Points = {
   };
 };
 
+let renderBadges = (member: Leaderboard.member) => {
+  let icons = [||];
+  if (member.technicalMVP && member.communityMVP) {
+    Js.Array.push(Icons.technicalAndCommunityMVPBadge, icons) |> ignore;
+  } else if (member.technicalMVP) {
+    Js.Array.push(Icons.technicalMVPBadge, icons) |> ignore;
+  } else if (member.communityMVP) {
+    Js.Array.push(Icons.communityMVPBadge, icons) |> ignore;
+  };
+  /* Genesis badge is added last */
+  if (member.genesisMember) {
+    Js.Array.push(Icons.genesisMemberBadge, icons) |> ignore;
+  };
+  icons |> Array.map(icon => {<Badge icon />}) |> React.array;
+};
+
 [@react.component]
 let make = (~member: Leaderboard.member) => {
   <div className=Styles.linkRow>
@@ -300,7 +320,10 @@ let make = (~member: Leaderboard.member) => {
     <span className=Styles.participantDetails>
       {React.string("Participant Details")}
     </span>
-    <p className=Styles.header> {React.string(member.name)} </p>
+    <div className=Styles.nameContainer>
+      <p className=Styles.username> {React.string(member.name)} </p>
+      {renderBadges(member)}
+    </div>
     <div className=Styles.middleRow> <Points member /> <Links /> </div>
   </div>;
 };
