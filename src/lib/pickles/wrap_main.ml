@@ -162,7 +162,7 @@ let wrap_main
            { deferred_values=
                { marlin
                ; xi
-               ; (* TODO:remove r; *) combined_inner_product
+               ; combined_inner_product
                ; b
                ; which_branch
                ; bulletproof_challenges
