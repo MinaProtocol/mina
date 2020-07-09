@@ -114,7 +114,7 @@ module Styles = {
 
   let nameContainer = style([display(`flex)]);
 
-  let username = merge([header, style([marginRight(`rem(1.))])]);
+  let username = merge([header, style([marginRight(`rem(1.5))])]);
 };
 
 module Links = {

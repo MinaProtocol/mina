@@ -157,6 +157,7 @@ module Styles = {
           width(`percent(100.)),
           gridTemplateColumns([
             rem(3.5),
+            rem(6.),
             `auto,
             rem(9.),
             rem(8.),
@@ -209,7 +210,7 @@ module Styles = {
   let cell =
     style([height(`rem(2.)), whiteSpace(`nowrap), overflowX(`hidden)]);
   let flexEnd = style([justifySelf(`flexEnd)]);
-  let rank = merge([cell, flexEnd]);
+  let rank = merge([cell, flexEnd, style([gridColumn(0, 1)])]);
   let username =
     merge([cell, style([textOverflow(`ellipsis), fontWeight(`semiBold)])]);
   let pointsCell = merge([cell, style([justifySelf(`flexEnd)])]);
@@ -451,8 +452,12 @@ let make =
     <div id="testnet-leaderboard" className=Styles.leaderboard>
       <div className=Styles.headerRow>
         <span className=Styles.flexEnd> {React.string("Rank")} </span>
-        <span> {React.string("Name")} </span>
-        {Array.map(renderColumnHeader, Filter.filters) |> React.array}
+        <span style={ReactDOMRe.Style.make(~gridColumn="3 / 4", ())}>
+          {React.string("Name")}
+        </span>
+        <span className=Styles.flexEnd> {React.string("This Release")} </span>
+        <span className=Styles.flexEnd> {React.string("This Phase")} </span>
+        <span className=Styles.flexEnd> {React.string("All Time")} </span>
       </div>
       <hr />
       <div className=Styles.topTen />
