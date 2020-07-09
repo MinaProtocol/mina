@@ -16,7 +16,7 @@ make build 2>&1 | tee /tmp/artifacts/buildocaml2.log
 echo "--- Build generate-keypair binary"
 dune build src/app/generate_keypair/generate_keypair.exe
 
-echo "--- Build generate-keypair binary"
+echo "--- Build runtime_genesis_ledger binary"
 dune exec --profile=$DUNE_PROFILE src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe
 
 echo "--- Generate runtime_genesis_ledger with 10k accounts"
