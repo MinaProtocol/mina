@@ -2,7 +2,7 @@
 
 open Core
 
-(* Dhall types (as OCaml values) and their names to be used Dhall *)
+(* Dhall types (as OCaml values) and their names to be used in Dhall *)
 let types_and_files = [(Runtime_config.dhall_type, "runtime_config")]
 
 let print_dhall_type (ty, nm) =
