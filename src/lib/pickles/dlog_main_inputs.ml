@@ -179,7 +179,7 @@ let sponge_params =
 module Sponge = struct
   module S = Sponge.Make_sponge (Sponge.Poseidon (Sponge_inputs.Make (Impl)))
 
-  include Sponge.Make_bit_sponge (struct
+  include Sponge.Bit_sponge.Make (struct
               type t = Impl.Boolean.var
             end)
             (struct
