@@ -5,7 +5,8 @@ module Styles = {
       display(`flex),
       justifyContent(`center),
       alignItems(`center),
-      margin2(~v=`zero, ~h=`px(4)),
+      marginLeft(`rem(0.5)),
+      marginRight(`rem(0.5)),
       position(`relative),
       top(`px(1)),
     ]);
@@ -13,5 +14,5 @@ module Styles = {
 
 [@react.component]
 let make = (~icon) => {
-  <div className=Styles.icon> icon </div>;
+  <span className=Styles.icon> icon </span>;
 };
