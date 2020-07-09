@@ -27,6 +27,8 @@ brew uninstall --force python@2
 if [[ $NEEDED_PACKAGES = *[![:space:]]* ]]; then
   yes | brew install $NEEDED_PACKAGES
   brew update
+  # Python needs a reinstall to pick up openssl@1.1 if we've upgraded it
+  brew reinstall python3
 else
   echo 'All required brew packages have already been installed.'
 fi
