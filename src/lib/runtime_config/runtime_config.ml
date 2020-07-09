@@ -8,6 +8,19 @@ let yojson_strip_fields ~keep_fields = function
   | json ->
       json
 
+let yojson_rename_fields ~alternates = function
+  | `Assoc l ->
+      `Assoc
+        (List.map l ~f:(fun (fld, json) ->
+             let fld =
+               Option.value ~default:fld
+                 (Array.find_map alternates ~f:(fun (alt, orig) ->
+                      if String.equal fld alt then Some orig else None ))
+             in
+             (fld, json) ))
+  | json ->
+      json
+
 let opt_fallthrough ~default x2 =
   Option.value_map ~default x2 ~f:(fun x -> Some x)
 
@@ -56,11 +69,20 @@ module Json_layout = struct
   module Proof_keys = struct
     module Transaction_capacity = struct
       type t =
-        { log_2: (int option[@default None]) [@key "2_to_the"]
+        { log_2: (int option[@default None])
+              [@key "2_to_the"] [@dhall_type.key "two_to_the"]
         ; txns_per_second_x10: (int option[@default None]) }
       [@@deriving yojson, dhall_type]
 
       let fields = [|"2_to_the"; "txns_per_second_x10"|]
+
+      let alternates = [|("two_to_the", "2_to_the"); ("log_2", "2_to_the")|]
+
+      let of_yojson json =
+        json
+        |> yojson_rename_fields ~alternates
+        |> yojson_strip_fields ~keep_fields:fields
+        |> of_yojson
     end
 
     type t =
@@ -83,6 +105,9 @@ module Json_layout = struct
        ; "transaction_capacity"
        ; "coinbase_amount"
        ; "account_creation_fee" |]
+
+    let of_yojson json =
+      of_yojson @@ yojson_strip_fields ~keep_fields:fields json
   end
 
   module Genesis = struct
