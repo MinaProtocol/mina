@@ -1,6 +1,8 @@
 type member = {
   name: string,
   genesisMember: bool,
+  technicalMVP: bool,
+  communityMVP: bool,
   phasePoints: int,
   releasePoints: int,
   allTimePoints: int,
@@ -35,14 +37,18 @@ let fetchLeaderboard = () => {
        |> Array.map(entry => {
             {
               name: entry |> safeArrayGet(0),
+              allTimePoints: entry |> safeArrayGet(1) |> safeParseInt,
+              phasePoints: entry |> safeArrayGet(2) |> safeParseInt,
+              releasePoints: entry |> safeArrayGet(3) |> safeParseInt,
+              allTimeRank: entry |> safeArrayGet(4) |> safeParseInt,
+              phaseRank: entry |> safeArrayGet(5) |> safeParseInt,
+              releaseRank: entry |> safeArrayGet(6) |> safeParseInt,
               genesisMember:
-                entry |> safeArrayGet(1) |> String.length == 0 ? false : true,
-              allTimePoints: entry |> safeArrayGet(2) |> safeParseInt,
-              phasePoints: entry |> safeArrayGet(3) |> safeParseInt,
-              releasePoints: entry |> safeArrayGet(4) |> safeParseInt,
-              allTimeRank: entry |> safeArrayGet(5) |> safeParseInt,
-              phaseRank: entry |> safeArrayGet(6) |> safeParseInt,
-              releaseRank: entry |> safeArrayGet(7) |> safeParseInt,
+                entry |> safeArrayGet(7) |> String.length == 0 ? false : true,
+              technicalMVP:
+                entry |> safeArrayGet(8) |> String.length == 0 ? false : true,
+              communityMVP:
+                entry |> safeArrayGet(9) |> String.length == 0 ? false : true,
             }
           })
      })

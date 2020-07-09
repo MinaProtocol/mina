@@ -129,7 +129,10 @@ let fetchReleases = name => {
 
 let parseMember = map => {
   let memberProperties = [|
+    Js.Dict.get(map, "name"),
     Js.Dict.get(map, "genesisMember"),
+    Js.Dict.get(map, "technicalMVP"),
+    Js.Dict.get(map, "communityMVP"),
     Js.Dict.get(map, "phasePoints"),
     Js.Dict.get(map, "releasePoints"),
     Js.Dict.get(map, "allTimePoints"),
@@ -146,22 +149,16 @@ let parseMember = map => {
     None;
   } else {
     {
-      Leaderboard.name: Js.Dict.get(map, "name")->Belt.Option.getExn,
-      genesisMember:
-        Js.Dict.get(map, "genesisMember")->Belt.Option.getExn
-        |> bool_of_string,
-      phasePoints:
-        Js.Dict.get(map, "phasePoints")->Belt.Option.getExn |> int_of_string,
-      releasePoints:
-        Js.Dict.get(map, "releasePoints")->Belt.Option.getExn |> int_of_string,
-      allTimePoints:
-        Js.Dict.get(map, "allTimePoints")->Belt.Option.getExn |> int_of_string,
-      allTimeRank:
-        Js.Dict.get(map, "allTimeRank")->Belt.Option.getExn |> int_of_string,
-      phaseRank:
-        Js.Dict.get(map, "phaseRank")->Belt.Option.getExn |> int_of_string,
-      releaseRank:
-        Js.Dict.get(map, "releaseRank")->Belt.Option.getExn |> int_of_string,
+      Leaderboard.name: memberProperties[0]->Belt.Option.getExn,
+      genesisMember: memberProperties[1]->Belt.Option.getExn |> bool_of_string,
+      technicalMVP: memberProperties[2]->Belt.Option.getExn |> bool_of_string,
+      communityMVP: memberProperties[3]->Belt.Option.getExn |> bool_of_string,
+      phasePoints: memberProperties[4]->Belt.Option.getExn |> int_of_string,
+      releasePoints: memberProperties[5]->Belt.Option.getExn |> int_of_string,
+      allTimePoints: memberProperties[6]->Belt.Option.getExn |> int_of_string,
+      allTimeRank: memberProperties[7]->Belt.Option.getExn |> int_of_string,
+      phaseRank: memberProperties[8]->Belt.Option.getExn |> int_of_string,
+      releaseRank: memberProperties[9]->Belt.Option.getExn |> int_of_string,
     }
     ->Some;
   };
