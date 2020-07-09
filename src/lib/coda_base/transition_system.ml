@@ -179,40 +179,61 @@ struct
            compute_top_hash wrap_vk_section next_state_hash)
       in
       let%bind () =
-        as_prover
-          As_prover.(
-            Let_syntax.(
-              let%bind prover_state = get_state in
-              match Prover_state.expected_next_state prover_state with
-              | Some expected_next_state ->
-                  let%bind in_snark_next_state =
-                    read (State.typ ~constraint_constants) next_state
-                  in
-                  let%bind next_top_hash = read Field.typ next_top_hash in
-                  let%bind top_hash = read Field.typ top_hash in
-                  let updated = State.sexp_of_value in_snark_next_state in
-                  let original = State.sexp_of_value expected_next_state in
-                  ( if not (Field.equal next_top_hash top_hash) then
-                    let diff =
-                      Sexp_diff_kernel.Algo.diff ~original ~updated ()
-                    in
-                    Logger.fatal logger
-                      "Out-of-SNARK and in-SNARK calculations of the next top \
-                       hash differ"
-                      ~metadata:
-                        [ ( "state_sexp_diff"
-                          , `String
-                              (Sexp_diff_kernel.Display.display_as_plain_string
-                                 diff) ) ]
-                      ~location:__LOC__ ~module_:__MODULE__ ) ;
-                  return ()
-              | None ->
-                  Logger.error logger
-                    "From the current prover state, got None for the expected \
-                     next state, which should be true only when calculating \
-                     precomputed values"
-                    ~location:__LOC__ ~module_:__MODULE__ ;
-                  return ()))
+        [%with_label "Check top hashes match as prover"]
+          (as_prover
+             As_prover.(
+               Let_syntax.(
+                 let%bind prover_state = get_state in
+                 match Prover_state.expected_next_state prover_state with
+                 | Some expected_next_state ->
+                     let%bind in_snark_next_state =
+                       read (State.typ ~constraint_constants) next_state
+                     in
+                     let%bind next_top_hash = read Field.typ next_top_hash in
+                     let%bind top_hash = read Field.typ top_hash in
+                     let updated = State.sexp_of_value in_snark_next_state in
+                     let original = State.sexp_of_value expected_next_state in
+                     ( if not (Field.equal next_top_hash top_hash) then
+                       let diff =
+                         Sexp_diff_kernel.Algo.diff ~original ~updated ()
+                       in
+                       Logger.fatal logger
+                         "Out-of-SNARK and in-SNARK calculations of the next \
+                          top hash differ"
+                         ~metadata:
+                           [ ( "state_sexp_diff"
+                             , `String
+                                 (Sexp_diff_kernel.Display
+                                  .display_as_plain_string diff) ) ]
+                         ~location:__LOC__ ~module_:__MODULE__ ) ;
+                     (* Fail here: the error raised in the snark below is
+                        strictly less informative, displaying only the hashes
+                        and their representation as constraint system
+                        variables.
+                     *)
+                     failwithf
+                       !"Out-of-SNARK and in-SNARK calculations of the next \
+                         top hash differ:\n\
+                         out of SNARK: %{sexp: Field.t}\n\
+                         in SNARK: %{sexp: Field.t}\n\n\
+                         (Caution: in the below, the fields of the non-SNARK \
+                         part of the staged ledger hash -- namely \
+                         ledger_hash, aux_hash, and pending_coinbase_aux -- \
+                         are replaced with dummy values in the snark, and \
+                         will necessarily differ.)\n\
+                         Out of SNARK state:\n\
+                         %{sexp: State.value}\n\n\
+                         In SNARK state:\n\
+                         %{sexp: State.value}"
+                       top_hash next_top_hash expected_next_state
+                       in_snark_next_state ()
+                 | None ->
+                     Logger.error logger
+                       "From the current prover state, got None for the \
+                        expected next state, which should be true only when \
+                        calculating precomputed values"
+                       ~location:__LOC__ ~module_:__MODULE__ ;
+                     return ())))
       in
       let%bind () =
         with_label __LOC__ Field.Checked.Assert.(equal next_top_hash top_hash)
