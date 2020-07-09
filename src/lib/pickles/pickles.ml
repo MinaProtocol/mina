@@ -441,7 +441,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
           (struct
             let etyp =
               Impls.Step.input ~branching:Max_branching.n
-                ~bulletproof_log2:Rounds.n
+                ~wrap_rounds:Tock.Rounds.n
 
             let f (T b : _ Branch_data.t) =
               let (T (typ, conv)) = etyp in
@@ -728,7 +728,6 @@ let compile
 module Provers = H3_2.T (Prover)
 module Proof0 = Proof
 
-(*
 let%test_module "test" =
   ( module struct
     let () =
@@ -738,8 +737,6 @@ let%test_module "test" =
     let () =
       Tick.Keypair.set_urs_info
         [On_disk {directory= "/tmp/"; should_write= true}]
-
-    (*     let () = assert (Pairing_acc.batch_check [Lazy.force Dummy.pairing_acc]) *)
 
     open Impls.Step
 
@@ -864,4 +861,3 @@ let%test_module "test" =
 
     let%test_unit "verify" = assert (Blockchain_snark.Proof.verify xs)
   end )
-   *)

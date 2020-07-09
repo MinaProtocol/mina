@@ -45,11 +45,10 @@ let domain (type t) ((module F) : t field) (domain : Domain.t) : t domain =
 let all_but m = List.filter Abc.Label.all ~f:(( <> ) m)
 
 let actual_evaluation (type f) (module Field : Field_intf with type t = f)
-    (e : Field.t array) (pt : Field.t) : Field.t =
+    (e : Field.t array) (pt : Field.t) ~rounds : Field.t =
   let pt_n =
-    let max_degree_log2 = Nat.to_int Backend.Rounds.n in
     let rec go acc i = if i = 0 then acc else go Field.(acc * acc) (i - 1) in
-    go pt max_degree_log2
+    go pt rounds
   in
   match List.rev (Array.to_list e) with
   | e :: es ->
@@ -58,8 +57,8 @@ let actual_evaluation (type f) (module Field : Field_intf with type t = f)
       failwith "empty list"
 
 let evals_of_split_evals field (b1, b2, b3)
-    ((e1, e2, e3) : _ Dlog_marlin_types.Evals.t Tuple_lib.Triple.t) =
-  let e = actual_evaluation field in
+    ((e1, e2, e3) : _ Dlog_marlin_types.Evals.t Tuple_lib.Triple.t) ~rounds =
+  let e = actual_evaluation field ~rounds in
   let abc es = Abc.map es ~f:(Fn.flip e b3) in
   { Pairing_marlin_types.Evals.w_hat= e e1.w_hat b1
   ; z_hat_a= e e1.z_hat_a b1

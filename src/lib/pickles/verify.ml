@@ -57,7 +57,7 @@ let verify (type a n) (module Max_branching : Nat.Intf with type n = n)
         let marlin_checks =
           let open Marlin_checks in
           checks tick_field marlin
-            (evals_of_split_evals
+            (evals_of_split_evals ~rounds:(Nat.to_int Tick.Rounds.n)
                (module Tick.Field)
                (marlin.beta_1, marlin.beta_2, marlin.beta_3)
                evals)

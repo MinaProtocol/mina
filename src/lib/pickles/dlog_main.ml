@@ -442,6 +442,7 @@ struct
       let lengths =
         let f field = map step_domains ~f:(Fn.compose Domain.size field) in
         Commitment_lengths.generic map ~h:(f Domains.h) ~k:(f Domains.k)
+          ~max_degree:Common.Max_degree.step
       in
       mask_messages ~lengths which_branch messages
     in
@@ -568,8 +569,6 @@ struct
           ; beta_2
           ; beta_3 } ) )
 
-  let crs_max_degree = 1 lsl Nat.to_int Backend.Rounds.n
-
   module Split_evaluations = struct
     let combine_split_evaluations' s =
       Pcs_batch.combine_split_evaluations s
@@ -577,7 +576,9 @@ struct
         ~mul_and_add:(fun ~acc ~xi (keep, fx) ->
           Field.if_ keep ~then_:Field.(fx + (xi * acc)) ~else_:acc )
         ~init:(fun (_, fx) -> fx)
-        ~shifted_pow:(Pseudo.Degree_bound.shifted_pow ~crs_max_degree)
+        ~shifted_pow:
+          (Pseudo.Degree_bound.shifted_pow
+             ~crs_max_degree:Common.Max_degree.wrap)
   end
 
   let mask_evals (type n) ~(lengths : (int, n) Vector.t Evals.t)
@@ -592,7 +593,8 @@ struct
     let open Field in
     Pcs_batch.combine_split_evaluations ~mul ~last:Array.last
       ~mul_and_add:(fun ~acc ~xi fx -> fx + (xi * acc))
-      ~shifted_pow:(Pseudo.Degree_bound.shifted_pow ~crs_max_degree)
+      ~shifted_pow:
+        (Pseudo.Degree_bound.shifted_pow ~crs_max_degree:Common.Max_degree.wrap)
       ~init:Fn.id ~evaluation_point ~xi
       (Common.dlog_pcs_batch b_plus_19 ~h_minus_1 ~k_minus_1)
       without_degree_bound with_degree_bound
@@ -616,7 +618,7 @@ struct
 
   let actual_evaluation (e : Field.t array) (pt : Field.t) : Field.t =
     let pt_n =
-      let max_degree_log2 = Int.ceil_log2 crs_max_degree in
+      let max_degree_log2 = Int.ceil_log2 Common.Max_degree.wrap in
       let rec go acc i =
         if i = 0 then acc else go (Field.square acc) (i - 1)
       in

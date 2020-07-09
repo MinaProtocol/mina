@@ -34,9 +34,9 @@ module Step = struct
   module Digest = Digest.Make (Impl)
   module Challenge = Challenge.Make (Impl)
 
-  let input ~branching ~bulletproof_log2 =
+  let input ~branching ~wrap_rounds =
     let open Types.Pairing_based.Statement in
-    let spec = spec branching bulletproof_log2 in
+    let spec = spec branching wrap_rounds in
     let (T (typ, f)) =
       Spec.packed_typ (module Impl) (T (Other_field.typ, Fn.id)) spec
     in

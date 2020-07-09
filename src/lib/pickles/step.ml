@@ -112,7 +112,7 @@ struct
         , ( Challenge.Constant.t Scalar_challenge.t
           , bool )
           Bulletproof_challenge.t
-          Bp_vec.t
+          Step_bp_vec.t
         , Index.t )
         Dlog_based.Statement.t
     end in
@@ -226,7 +226,7 @@ struct
               ( Array.map prechals ~f:(fun (x, is_square) ->
                     {Bulletproof_challenge.prechallenge= x; is_square} )
               |> Array.to_list )
-              Rounds.n
+              Tock.Rounds.n
           in
           (prechals, b)
         in
@@ -276,7 +276,7 @@ struct
               ~evaluation_point:pt
               ~shifted_pow:(fun deg x ->
                 Pcs_batch.pow ~one ~mul x
-                  Int.(crs_max_degree - (deg mod crs_max_degree)) )
+                  Int.(Max_degree.wrap - (deg mod Max_degree.wrap)) )
               v b
           in
           let open Tock.Field in
@@ -367,7 +367,7 @@ struct
             ( Challenge.Constant.t Scalar_challenge.t
             , bool )
             Bulletproof_challenge.t
-            Bp_vec.t
+            Step_bp_vec.t
         end in
         let module M =
           H3.Map
@@ -407,7 +407,7 @@ struct
     in
     let (next_proof : Tick.Proof.t) =
       let (T (input, conv)) =
-        Impls.Step.input ~branching:Max_branching.n ~bulletproof_log2:Rounds.n
+        Impls.Step.input ~branching:Max_branching.n ~wrap_rounds:Tock.Rounds.n
       in
       let rec pad : type n k maxes pvals lws lhs.
              (Digest.Constant.t, k) Vector.t

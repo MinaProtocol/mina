@@ -346,8 +346,6 @@ struct
 
   module Pseudo = Pseudo.Make (Impl)
 
-  let crs_max_degree = 1 lsl Nat.to_int Backend.Rounds.n
-
   module Split_evaluations = struct
     open Dlog_marlin_types
 
@@ -380,7 +378,8 @@ struct
           Field.if_ keep ~then_:Field.(fx + (xi * acc)) ~else_:acc )
         ~init:(fun (_, fx) -> fx)
         (Common.dlog_pcs_batch b_plus_19 ~h_minus_1 ~k_minus_1)
-        ~shifted_pow:(Pseudo.Degree_bound.shifted_pow ~crs_max_degree)
+        ~shifted_pow:
+          (Pseudo.Degree_bound.shifted_pow ~crs_max_degree:Max_degree.step)
 
     let mask_evals (type n) ~(lengths : (int, n) Vector.t Evals.t)
         (choice : n One_hot_vector.T(Impl).t) (e : Field.t array Evals.t) :
@@ -395,7 +394,8 @@ struct
     let open Field in
     Pcs_batch.combine_split_evaluations ~mul
       ~mul_and_add:(fun ~acc ~xi fx -> fx + (xi * acc))
-      ~shifted_pow:(Pseudo.Degree_bound.shifted_pow ~crs_max_degree)
+      ~shifted_pow:
+        (Pseudo.Degree_bound.shifted_pow ~crs_max_degree:Max_degree.step)
       ~init:Fn.id ~evaluation_point ~xi
       (Common.dlog_pcs_batch b_plus_19 ~h_minus_1 ~k_minus_1)
       without_degree_bound with_degree_bound
@@ -409,7 +409,7 @@ struct
   let actual_evaluation (e : (Boolean.var * Field.t) array) (pt : Field.t) :
       Field.t =
     let pt_n =
-      let max_degree_log2 = Int.ceil_log2 crs_max_degree in
+      let max_degree_log2 = Int.ceil_log2 Max_degree.step in
       let rec go acc i =
         if i = 0 then acc else go (Field.square acc) (i - 1)
       in
@@ -482,7 +482,7 @@ struct
     let ks = map step_domains ~f:(fun {Domains.k; _} -> k) in
     let lengths =
       Commitment_lengths.generic map ~h:(map hs ~f:Domain.size)
-        ~k:(map ks ~f:Domain.size)
+        ~max_degree:Max_degree.step ~k:(map ks ~f:Domain.size)
     in
     let (beta_1_evals, x_hat1), (beta_2_evals, x_hat2), (beta_3_evals, x_hat3)
         =

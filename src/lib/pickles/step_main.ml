@@ -131,7 +131,9 @@ let step_main
             (Matrix_evals.typ
                (Abc.typ
                   (Typ.array Inner_curve.typ
-                     ~length:(index_commitment_length basic.wrap_domains.k))))
+                     ~length:
+                       (index_commitment_length ~max_degree:Max_degree.wrap
+                          basic.wrap_domains.k))))
         in
         let app_state = exists basic.typ ~request:(fun () -> Req.App_state) in
         let datas =

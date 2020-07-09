@@ -42,7 +42,7 @@ module Base = struct
           , ( Challenge.Constant.t Scalar_challenge.Stable.Latest.t
             , bool )
             Bulletproof_challenge.t
-            Bp_vec.t
+            Step_bp_vec.t
           , Index.t )
           Types.Dlog_based.Statement.t
       ; prev_evals:
@@ -61,7 +61,7 @@ type ('s, 'mlmb, _) with_data =
         , ( ( Challenge.Constant.t Scalar_challenge.Stable.Latest.t
             , bool )
             Bulletproof_challenge.t
-            Bp_vec.t
+            Step_bp_vec.t
           , 'most_recent_width )
           Vector.t )
         Base.Me_only.Pairing_based.t )
@@ -81,7 +81,9 @@ let dummy (type w h r) (w : w Nat.t) (h : h Nat.t)
   let g len = Array.create ~len g0 in
   let tock len = Array.init len ~f:(fun _ -> tock ()) in
   let tick_arr len = Array.init len ~f:(fun _ -> tick ()) in
-  let lengths = Commitment_lengths.of_domains Common.wrap_domains in
+  let lengths =
+    Commitment_lengths.of_domains wrap_domains ~max_degree:Max_degree.wrap
+  in
   T
     { statement=
         { proof_state=
@@ -133,7 +135,8 @@ let dummy (type w h r) (w : w Nat.t) (h : h Nat.t)
                 , ({unshifted= g lengths.g_3; shifted= g0}, g lengths.h_3) ) }
         ; openings=
             { proof=
-                { lr= Array.init (Nat.to_int Rounds.n) ~f:(fun _ -> (g0, g0))
+                { lr=
+                    Array.init (Nat.to_int Tock.Rounds.n) ~f:(fun _ -> (g0, g0))
                 ; z_1= Ro.tock ()
                 ; z_2= Ro.tock ()
                 ; delta= g0
@@ -160,7 +163,7 @@ module Make (W : Nat.Intf) (MLMB : Nat.Intf) = struct
         , ( Challenge.Constant.t Scalar_challenge.Stable.Latest.t
           , bool )
           Bulletproof_challenge.t
-          Bp_vec.t
+          Step_bp_vec.t
           Max_branching_at_most.t )
         Base.Me_only.Pairing_based.t )
       Base.Dlog_based.t

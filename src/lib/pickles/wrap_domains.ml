@@ -58,7 +58,9 @@ module Make (A : T0) (A_value : T0) = struct
              let g =
                Array.create g
                  ~len:
-                   (Common.index_commitment_length Fix_domains.rough_domains.k)
+                   (Common.index_commitment_length
+                      ~max_degree:Common.Max_degree.step
+                      Fix_domains.rough_domains.k)
              in
              let t : _ Abc.t = {a= g; b= g; c= g} in
              {Matrix_evals.row= t; col= t; value= t; rc= t} ))

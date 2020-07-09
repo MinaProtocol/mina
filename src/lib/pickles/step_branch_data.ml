@@ -113,7 +113,8 @@ let create
           (Vector.init branches ~f:(fun _ -> Fix_domains.rough_domains))
     in
     let etyp =
-      Impls.Step.input ~branching:max_branching ~bulletproof_log2:Rounds.n
+      Impls.Step.input ~branching:max_branching
+        ~wrap_rounds:Backend.Tock.Rounds.n
     in
     Fix_domains.domains (module Impls.Step) etyp main
   in
