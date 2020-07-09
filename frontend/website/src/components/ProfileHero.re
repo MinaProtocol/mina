@@ -290,22 +290,6 @@ module Points = {
   };
 };
 
-let renderBadges = (member: Leaderboard.member) => {
-  let icons = [||];
-  if (member.technicalMVP && member.communityMVP) {
-    Js.Array.push(Icons.technicalAndCommunityMVPBadge, icons) |> ignore;
-  } else if (member.technicalMVP) {
-    Js.Array.push(Icons.technicalMVPBadge, icons) |> ignore;
-  } else if (member.communityMVP) {
-    Js.Array.push(Icons.communityMVPBadge, icons) |> ignore;
-  };
-  /* Genesis badge is added last */
-  if (member.genesisMember) {
-    Js.Array.push(Icons.genesisMemberBadge, icons) |> ignore;
-  };
-  icons |> Array.map(icon => {<Badge icon />}) |> React.array;
-};
-
 [@react.component]
 let make = (~member: Leaderboard.member) => {
   <div className=Styles.linkRow>
@@ -322,7 +306,7 @@ let make = (~member: Leaderboard.member) => {
     </span>
     <div className=Styles.nameContainer>
       <p className=Styles.username> {React.string(member.name)} </p>
-      {renderBadges(member)}
+      {Leaderboard.renderBadges(member)}
     </div>
     <div className=Styles.middleRow> <Points member /> <Links /> </div>
   </div>;
