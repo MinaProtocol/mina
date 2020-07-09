@@ -123,7 +123,7 @@ module Styles = {
       after([
         position(`absolute),
         left(`percent(100.)),
-        contentRule({""}),
+        contentRule(""),
         height(`rem(1.5)),
         width(`rem(1.5)),
         backgroundImage(`url("/static/img/arrowDown.svg")),
