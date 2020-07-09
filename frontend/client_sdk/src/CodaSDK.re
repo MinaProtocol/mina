@@ -121,6 +121,7 @@ let value = (~default: 'a, option: option('a)): 'a => {
 type common_payload_js = {
   .
   "fee": string,
+  "feePayer": publicKey,
   "nonce": string,
   "validUntil": string,
   "memo": string,
@@ -131,15 +132,22 @@ type payment_js = {
   "common": common_payload_js,
   "paymentPayload": {
     .
+    "source": publicKey,
     "receiver": publicKey,
     "amount": string,
   },
 };
 
+type delegation_payload_js = {
+  .
+  "delegator": publicKey,
+  "newDelegate": publicKey,
+};
+
 type stake_delegation_js = {
   .
   "common": common_payload_js,
-  "newDelegate": publicKey,
+  "delegationPayload": delegation_payload_js,
 };
 
 type signed_js = {
@@ -192,11 +200,13 @@ let signPayment =
           {
             "common": {
               "fee": fee,
+              "feePayer": key.publicKey,
               "nonce": nonce,
               "validUntil": validUntil,
               "memo": memo,
             },
             "paymentPayload": {
+              "source": payment.from,
               "receiver": payment.to_,
               "amount": amount,
             },
@@ -251,11 +261,15 @@ let signStakeDelegation =
           {
             "common": {
               "fee": fee,
+              "feePayer": key.publicKey,
               "nonce": nonce,
               "validUntil": validUntil,
               "memo": memo,
             },
-            "newDelegate": stakeDelegation.to_,
+            "delegationPayload": {
+              "newDelegate": stakeDelegation.to_,
+              "delegator": stakeDelegation.from,
+            }
           },
         )##signature,
     };

@@ -17,7 +17,6 @@ module Extend_blockchain_input = struct
         ; block: Snark_transition.Value.Stable.V1.t
         ; prover_state: Consensus.Data.Prover_state.Stable.V1.t
         ; pending_coinbase: Pending_coinbase_witness.Stable.V1.t }
-      [@@deriving sexp]
 
       let to_latest = Fn.id
     end
