@@ -24,6 +24,9 @@ module type Basic = sig
 
   type magnitude = t [@@deriving sexp, compare]
 
+  (* not automatically derived *)
+  val dhall_type : Ppx_dhall_type.Dhall_type.t
+
   val max_int : t
 
   val length_in_bits : int
