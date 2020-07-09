@@ -44,6 +44,37 @@ let domain (type t) ((module F) : t field) (domain : Domain.t) : t domain =
 
 let all_but m = List.filter Abc.Label.all ~f:(( <> ) m)
 
+let actual_evaluation (type f) (module Field : Field_intf with type t = f)
+    (e : Field.t array) (pt : Field.t) : Field.t =
+  let pt_n =
+    let max_degree_log2 = Nat.to_int Backend.Rounds.n in
+    let rec go acc i = if i = 0 then acc else go Field.(acc * acc) (i - 1) in
+    go pt max_degree_log2
+  in
+  match List.rev (Array.to_list e) with
+  | e :: es ->
+      List.fold ~init:e es ~f:(fun acc fx -> Field.(fx + (pt_n * acc)))
+  | [] ->
+      failwith "empty list"
+
+let evals_of_split_evals field (b1, b2, b3)
+    ((e1, e2, e3) : _ Dlog_marlin_types.Evals.t Tuple_lib.Triple.t) =
+  let e = actual_evaluation field in
+  let abc es = Abc.map es ~f:(Fn.flip e b3) in
+  { Pairing_marlin_types.Evals.w_hat= e e1.w_hat b1
+  ; z_hat_a= e e1.z_hat_a b1
+  ; z_hat_b= e e1.z_hat_b b1
+  ; g_1= e e1.g_1 b1
+  ; h_1= e e1.h_1 b1
+  ; g_2= e e2.g_2 b2
+  ; h_2= e e2.h_2 b2
+  ; g_3= e e3.g_3 b3
+  ; h_3= e e3.h_3 b3
+  ; row= abc e3.row
+  ; col= abc e3.col
+  ; value= abc e3.value
+  ; rc= abc e3.rc }
+
 (* These correspond to the blue equations on [page 32 here](https://eprint.iacr.org/2019/1047.pdf),
    with a few modifications:
 
@@ -134,11 +165,11 @@ let checked (type t) (module Impl : Snarky.Snark_intf.Run with type field = t)
               let x = read_var x in
               let y = read_var y in
               if not (Field.Constant.equal x y) then (
-                Core.printf "bad marlin %d\n%!" i ;
+                printf "bad marlin %d\n%!" i ;
                 Field.Constant.print x ;
-                Core.printf "%!" ;
+                printf "%!" ;
                 Field.Constant.print y ;
-                Core.printf "%!" )) ;
+                printf "%!" )) ;
       Field.equal x y )
     eqns
   |> Boolean.all

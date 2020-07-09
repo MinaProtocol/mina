@@ -1,6 +1,7 @@
 open Core_kernel
 open Pickles_types
 open Hlist
+module Backend = Backend
 module Sponge_inputs = Sponge_inputs
 module Impls = Impls
 module Inductive_rule = Inductive_rule
@@ -15,10 +16,10 @@ module type Statement_intf = sig
 end
 
 module type Statement_var_intf =
-  Statement_intf with type field := Impls.Pairing_based.Field.t
+  Statement_intf with type field := Impls.Step.Field.t
 
 module type Statement_value_intf =
-  Statement_intf with type field := Impls.Pairing_based.field
+  Statement_intf with type field := Impls.Step.field
 
 module Verification_key : sig
   include Binable.S
@@ -52,7 +53,7 @@ end
 module Proof : sig
   type ('max_width, 'mlmb) t
 
-  val dummy : 'w Nat.t -> 'm Nat.t -> ('w, 'm) t
+  val dummy : 'w Nat.t -> 'm Nat.t -> _ Nat.t -> ('w, 'm) t
 
   module Make (W : Nat.Intf) (MLMB : Nat.Intf) : sig
     type nonrec t = (W.n, MLMB.n) t [@@deriving bin_io, sexp, compare, yojson]
@@ -105,7 +106,7 @@ val compile :
                 * Cache.Wrap.Key.Verification.t
   -> (module Statement_var_intf with type t = 'a_var)
   -> (module Statement_value_intf with type t = 'a_value)
-  -> typ:('a_var, 'a_value) Impls.Pairing_based.Typ.t
+  -> typ:('a_var, 'a_value) Impls.Step.Typ.t
   -> branches:(module Nat.Intf with type n = 'branches)
   -> max_branching:(module Nat.Add.Intf with type n = 'max_branching)
   -> name:string
