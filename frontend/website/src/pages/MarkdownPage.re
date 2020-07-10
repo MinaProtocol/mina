@@ -24,6 +24,14 @@ module Style = {
           width(`percent(100.)),
         ],
       ),
+      selector(
+        "table, th, td",
+        [
+          border(`px(1), solid, Theme.Colors.saville),
+          borderCollapse(`collapse),
+          padding(`px(4)),
+        ],
+      ),
     ]);
 
   let page =

@@ -7,7 +7,7 @@ module Payload = Transaction_union_payload
 
 type ('payload, 'pk, 'signature) t_ =
   {payload: 'payload; signer: 'pk; signature: 'signature}
-[@@deriving eq, sexp, hash]
+[@@deriving eq, sexp, hash, hlist]
 
 type t = (Payload.t, Public_key.t, Signature.t) t_
 
@@ -15,16 +15,8 @@ type var = (Payload.var, Public_key.var, Signature.var) t_
 
 let typ : (var, t) Typ.t =
   let spec = Data_spec.[Payload.typ; Public_key.typ; Schnorr.Signature.typ] in
-  let of_hlist
-        : 'a 'b 'c. (unit, 'a -> 'b -> 'c -> unit) H_list.t -> ('a, 'b, 'c) t_
-      =
-    H_list.(fun [payload; signer; signature] -> {payload; signer; signature})
-  in
-  let to_hlist {payload; signer; signature} =
-    H_list.[payload; signer; signature]
-  in
-  Typ.of_hlistable spec ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
-    ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+  Typ.of_hlistable spec ~var_to_hlist:t__to_hlist ~var_of_hlist:t__of_hlist
+    ~value_to_hlist:t__to_hlist ~value_of_hlist:t__of_hlist
 
 (** For SNARK purposes, we inject [Transaction.t]s into a single-variant 'tagged-union' record capable of
     representing all the variants. We interpret the fields of this union in different ways depending on

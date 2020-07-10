@@ -5,7 +5,7 @@ type uint64 = Unsigned.uint64
 type uint32 = Unsigned.uint32
 
 module type S = sig
-  type t [@@deriving sexp, hash, compare, eq, yojson]
+  type t [@@deriving sexp, hash, compare, yojson]
 
   val length_in_bits : int
 

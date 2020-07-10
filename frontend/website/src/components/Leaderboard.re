@@ -1,14 +1,24 @@
 type member = {
-  rank: int,
   name: string,
-  phase: int,
-  release: int,
-  allTime: int,
+  genesisMember: bool,
+  phasePoints: int,
+  releasePoints: int,
+  allTimePoints: int,
+  releaseRank: int,
+  phaseRank: int,
+  allTimeRank: int,
 };
 
 type entry = array(string);
 
 external parseEntry: Js.Json.t => entry = "%identity";
+
+let safeArrayGet = (index, a) => {
+  switch (Belt.Array.get(a, index)) {
+  | Some(v) => v
+  | None => ""
+  };
+};
 
 let safeParseInt = str =>
   try(int_of_string(str)) {
@@ -18,17 +28,21 @@ let safeParseInt = str =>
 let fetchLeaderboard = () => {
   Sheets.fetchRange(
     ~sheet="1Nq_Y76ALzSVJRhSFZZm4pfuGbPkZs2vTtCnVQ1ehujE",
-    ~range="B4:H",
+    ~range="Member_Profile_Data!A2:Z",
   )
   |> Promise.map(res => {
        Array.map(parseEntry, res)
        |> Array.map(entry => {
             {
-              rank: safeParseInt(entry[0]),
-              name: entry[2],
-              phase: safeParseInt(entry[3]),
-              release: safeParseInt(entry[6]),
-              allTime: safeParseInt(entry[3]),
+              name: entry |> safeArrayGet(0),
+              genesisMember:
+                entry |> safeArrayGet(1) |> String.length == 0 ? false : true,
+              allTimePoints: entry |> safeArrayGet(2) |> safeParseInt,
+              phasePoints: entry |> safeArrayGet(3) |> safeParseInt,
+              releasePoints: entry |> safeArrayGet(4) |> safeParseInt,
+              allTimeRank: entry |> safeArrayGet(5) |> safeParseInt,
+              phaseRank: entry |> safeArrayGet(6) |> safeParseInt,
+              releaseRank: entry |> safeArrayGet(7) |> safeParseInt,
             }
           })
      })
@@ -41,7 +55,6 @@ module Styles = {
   let leaderboardContainer =
     style([
       width(`percent(100.)),
-      // maxWidth(rem(41.)),
       margin2(~v=`zero, ~h=`auto),
       selector("hr", [margin(`zero)]),
     ]);
@@ -64,7 +77,9 @@ module Styles = {
 
   let leaderboardRow =
     style([
+      cursor(`pointer),
       padding2(~v=`rem(1.), ~h=`rem(1.)),
+      height(`rem(3.5)),
       display(`grid),
       gridColumnGap(rem(1.5)),
       gridTemplateColumns([
@@ -101,7 +116,26 @@ module Styles = {
       ]),
     ]);
 
-  let cell = style([whiteSpace(`nowrap), overflow(`hidden)]);
+  let activeColumn =
+    style([
+      position(`relative),
+      justifySelf(`flexEnd),
+      after([
+        position(`absolute),
+        left(`percent(100.)),
+        contentRule(""),
+        height(`rem(1.5)),
+        width(`rem(1.5)),
+        backgroundImage(`url("/static/img/arrowDown.svg")),
+        backgroundRepeat(`noRepeat),
+        backgroundPosition(`px(4), `px(9)),
+      ]),
+    ]);
+
+  let topTen = style([position(`absolute)]);
+
+  let cell =
+    style([height(`rem(2.)), whiteSpace(`nowrap), overflowX(`hidden)]);
   let flexEnd = style([justifySelf(`flexEnd)]);
   let rank = merge([cell, flexEnd]);
   let username =
@@ -119,29 +153,6 @@ module Styles = {
     ]);
 };
 
-module LeaderboardRow = {
-  [@react.component]
-  let make = (~rank, ~member) => {
-    <>
-      <div className=Styles.leaderboardRow>
-        <span className=Styles.rank>
-          {React.string(string_of_int(rank))}
-        </span>
-        <span className=Styles.username> {React.string(member.name)} </span>
-        <span className=Styles.activePointsCell>
-          {React.string(string_of_int(member.release))}
-        </span>
-        <span className=Styles.inactivePointsCell>
-          {React.string(string_of_int(member.phase))}
-        </span>
-        <span className=Styles.inactivePointsCell>
-          {React.string(string_of_int(member.allTime))}
-        </span>
-      </div>
-    </>;
-  };
-};
-
 type filter =
   | All
   | Genesis
@@ -152,23 +163,90 @@ type sort =
   | Phase
   | AllTime;
 
+let pointsColumns = [|Release, Phase, AllTime|];
+
+module LeaderboardRow = {
+  [@react.component]
+  let make = (~sort, ~member) => {
+    let userSlug =
+      "/memberProfile"
+      ++ "?allTimeRank="
+      ++ member.allTimeRank->string_of_int
+      ++ "&allTimePoints="
+      ++ member.allTimePoints->string_of_int
+      ++ "&phaseRank="
+      ++ member.phaseRank->string_of_int
+      ++ "&phasePoints="
+      ++ member.phasePoints->string_of_int
+      ++ "&releaseRank="
+      ++ member.releaseRank->string_of_int
+      ++ "&releasePoints="
+      ++ member.releasePoints->string_of_int
+      ++ "&genesisMember="
+      ++ member.genesisMember->string_of_bool
+      ++ "&name="
+      ++ member.name
+      |> Js.String.replaceByRe([%re "/#/g"], "%23"); /* replace "#" with percent encoding for the URL to properly parse */
+
+    let rank =
+      switch (sort) {
+      | Phase => member.phaseRank
+      | Release => member.releaseRank
+      | AllTime => member.allTimeRank
+      };
+
+    let points = column =>
+      switch (column) {
+      | Phase => member.phasePoints
+      | Release => member.releasePoints
+      | AllTime => member.allTimePoints
+      };
+
+    let renderPoints = column =>
+      <span
+        className=Styles.(
+          sort === column ? activePointsCell : inactivePointsCell
+        )>
+        {React.string(string_of_int(points(column)))}
+      </span>;
+
+    <Next.Link href=userSlug _as=userSlug>
+      <div className=Styles.leaderboardRow>
+        <span className=Styles.rank>
+          {React.string(string_of_int(rank))}
+        </span>
+        <span className=Styles.username> {React.string(member.name)} </span>
+        {Array.map(renderPoints, pointsColumns) |> React.array}
+      </div>
+    </Next.Link>;
+  };
+};
+
 type state = {
+  sort,
   loading: bool,
   members: array(member),
 };
-let initialState = {loading: true, members: [||]};
 
 type actions =
-  | UpdateMembers(array(member));
+  | UpdateMembers(array(member))
+  | UpdateSort(sort);
 
-let reducer = (_, action) => {
+let reducer = (prevState, action) => {
   switch (action) {
-  | UpdateMembers(members) => {loading: false, members}
+  | UpdateMembers(members) => {sort: prevState.sort, loading: false, members}
+  | UpdateSort(sort) => {
+      sort,
+      loading: prevState.loading,
+      members: prevState.members,
+    }
   };
 };
 
 [@react.component]
-let make = () => {
+let make =
+    (~filter: filter=All, ~sortDefault: sort=Release, ~search: string="") => {
+  let initialState = {sort: sortDefault, loading: true, members: [||]};
   let (state, dispatch) = React.useReducer(reducer, initialState);
 
   React.useEffect0(() => {
@@ -176,30 +254,62 @@ let make = () => {
     None;
   });
 
+  let sortRank = member =>
+    switch (state.sort) {
+    | Phase => member.phaseRank
+    | Release => member.releaseRank
+    | AllTime => member.allTimeRank
+    };
+
+  Array.sort((a, b) => sortRank(a) - sortRank(b), state.members);
+
+  let filteredMembers =
+    Js.Array.filter(
+      member =>
+        switch (filter) {
+        | All => true
+        | Genesis => member.genesisMember
+        | NonGenesis => !member.genesisMember
+        },
+      state.members,
+    )
+    |> Js.Array.filter(member =>
+         search === "" ? true : Js.String.includes(search, member.name)
+       )
+    |> Js.Array.filter(member => sortRank(member) !== 0);
+
+  let renderRow = member =>
+    <LeaderboardRow
+      key={string_of_int(member.allTimeRank)}
+      sort={state.sort}
+      member
+    />;
+
+  let renderColumnHeader = column =>
+    <span
+      onClick={_ => dispatch(UpdateSort(column))}
+      className={column === state.sort ? Styles.activeColumn : Styles.flexEnd}>
+      {React.string(
+         switch (column) {
+         | Phase => "This Phase"
+         | Release => "This Release"
+         | AllTime => "All Time"
+         },
+       )}
+    </span>;
+
   <div className=Styles.leaderboardContainer>
     <div id="testnet-leaderboard" className=Styles.leaderboard>
       <div className=Styles.headerRow>
         <span className=Styles.flexEnd> {React.string("Rank")} </span>
         <span> {React.string("Name")} </span>
-        <span className=Styles.flexEnd> {React.string("This Release")} </span>
-        <span className=Styles.flexEnd> {React.string("This Phase")} </span>
-        <span className=Styles.flexEnd> {React.string("All Time")} </span>
+        {Array.map(renderColumnHeader, pointsColumns) |> React.array}
       </div>
       <hr />
-      {Array.map(
-         member =>
-           <LeaderboardRow
-             key={string_of_int(member.rank)}
-             rank={member.rank}
-             member
-           />,
-         Array.length(state.members) > 0
-           ? Array.sub(state.members, 0, 10) : state.members,
-       )
-       |> React.array}
+      <div className=Styles.topTen />
       {state.loading
          ? <div className=Styles.loading> {React.string("Loading...")} </div>
-         : React.null}
+         : Array.map(renderRow, filteredMembers) |> React.array}
     </div>
   </div>;
 };

@@ -55,7 +55,7 @@ module Common = struct
       ; nonce: 'nonce
       ; valid_until: 'global_slot
       ; memo: 'memo }
-    [@@deriving eq, sexp, hash, yojson]
+    [@@deriving eq, sexp, hash, yojson, hlist]
   end
 
   [%%versioned
@@ -123,23 +123,6 @@ module Common = struct
     , Memo.Checked.t )
     Poly.t
 
-  let to_hlist Poly.{fee; fee_token; fee_payer_pk; nonce; valid_until; memo} =
-    H_list.[fee; fee_token; fee_payer_pk; nonce; valid_until; memo]
-
-  let of_hlist : type fee public_key token_id nonce memo global_slot.
-         ( unit
-         ,    fee
-           -> token_id
-           -> public_key
-           -> nonce
-           -> global_slot
-           -> memo
-           -> unit )
-         H_list.t
-      -> (fee, public_key, token_id, nonce, global_slot, memo) Poly.t =
-   fun H_list.[fee; fee_token; fee_payer_pk; nonce; valid_until; memo] ->
-    {fee; fee_token; fee_payer_pk; nonce; valid_until; memo}
-
   let typ =
     Typ.of_hlistable
       [ Currency.Fee.typ
@@ -148,8 +131,8 @@ module Common = struct
       ; Account_nonce.typ
       ; Global_slot.typ
       ; Memo.typ ]
-      ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
-      ~value_of_hlist:of_hlist
+      ~var_to_hlist:Poly.to_hlist ~var_of_hlist:Poly.of_hlist
+      ~value_to_hlist:Poly.to_hlist ~value_of_hlist:Poly.of_hlist
 
   module Checked = struct
     let constant ({fee; fee_token; fee_payer_pk; nonce; valid_until; memo} : t)
@@ -348,7 +331,7 @@ module Poly = struct
 
   type ('common, 'body) t = ('common, 'body) Stable.Latest.t =
     {common: 'common; body: 'body}
-  [@@deriving eq, sexp, hash, yojson, compare]
+  [@@deriving eq, sexp, hash, yojson, compare, hlist]
 end
 
 [%%versioned
