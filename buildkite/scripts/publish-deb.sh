@@ -38,6 +38,6 @@ set -x
 ${DEBS3} --codename "${CODENAME}" "${DEBS}"
 echo "Exporting Variables: "
 # Export Variables for Downstream Steps
-echo "export CODA_DEB_REPO=$CODENAME" >> /tmp/DOCKER_DEPLOY_ENV
-echo "export CODA_WAS_PUBLISHED=true" >> /tmp/DOCKER_DEPLOY_ENV
+echo "export CODA_DEB_REPO=$CODENAME" >> ./DOCKER_DEPLOY_ENV
+echo "export CODA_WAS_PUBLISHED=true" >> ./DOCKER_DEPLOY_ENV
 set +x
