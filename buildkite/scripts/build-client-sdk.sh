@@ -7,8 +7,11 @@ mkdir -p /tmp/artifacts
 make client_sdk 2>&1 | tee /tmp/artifacts/buildclientsdk.log
 
 echo "--- Yarn deps"
-cd frontend/client_sdk && yarn install
+pushd frontend/client_sdk && yarn install && popd
 
 echo "--- Build and test Client SDK"
-eval `opam config env` && cd frontend/client_sdk && yarn prepublishOnly
+eval `opam config env` && \
+  pushd frontend/client_sdk && \
+  yarn prepublishOnly && \
+  popd
 
