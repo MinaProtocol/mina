@@ -9,13 +9,9 @@ module Stable = struct
 end]
 
 type 'a t = 'a Stable.Latest.t = {a: 'a; b: 'a; c: 'a}
-[@@deriving fields, sexp, compare, yojson]
+[@@deriving fields, sexp, compare, yojson, hlist]
 
 module H_list = Snarky.H_list
-
-let to_hlist {a; b; c} = H_list.[a; b; c]
-
-let of_hlist ([a; b; c] : (unit, _) H_list.t) = {a; b; c}
 
 let typ (type a b f) (g : (a, b, f) Snarky.Typ.t) : (a t, b t, f) Snarky.Typ.t
     =
