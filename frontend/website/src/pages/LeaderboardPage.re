@@ -74,11 +74,13 @@ module SearchBar = {
   [@react.component]
   let make = (~onUsernameEntered, ~username) => {
     <div className=Styles.searchBar>
-      <span className=Theme.H5.semiBold> {React.string("Find")} </span>
+      <span className=Theme.H5.semiBold>
+        {React.string("Find Participant")}
+      </span>
       <input
         type_="text"
         value=username
-        placeholder="SEARCH:"
+        placeholder="NAME"
         onChange={e => {
           let value = ReactEvent.Form.target(e)##value;
           onUsernameEntered(value);
