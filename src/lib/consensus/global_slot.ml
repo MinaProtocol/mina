@@ -18,7 +18,7 @@ module Poly = struct
   type ('slot_number, 'slots_per_epoch) t =
         ('slot_number, 'slots_per_epoch) Stable.Latest.t =
     {slot_number: 'slot_number; slots_per_epoch: 'slots_per_epoch}
-  [@@deriving sexp, eq, compare, hash, yojson]
+  [@@deriving sexp, eq, compare, hash, yojson, hlist]
 end
 
 [%%versioned
@@ -37,17 +37,12 @@ type value = t [@@deriving sexp, eq, compare, hash, yojson]
 
 type var = (T.Checked.t, Length.Checked.t) Poly.t
 
-let to_hlist ({slot_number; slots_per_epoch} : _ Poly.t) =
-  H_list.[slot_number; slots_per_epoch]
-
-let of_hlist : (unit, _) H_list.t -> _ Poly.t =
- fun H_list.[slot_number; slots_per_epoch] -> {slot_number; slots_per_epoch}
-
 let data_spec = Data_spec.[T.Checked.typ; Length.Checked.typ]
 
 let typ =
-  Typ.of_hlistable data_spec ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
-    ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+  Typ.of_hlistable data_spec ~var_to_hlist:Poly.to_hlist
+    ~var_of_hlist:Poly.of_hlist ~value_to_hlist:Poly.to_hlist
+    ~value_of_hlist:Poly.of_hlist
 
 let to_input (t : value) =
   Random_oracle.Input.bitstrings
