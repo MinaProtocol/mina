@@ -20,7 +20,8 @@ let buildTestCmd : Text -> Text -> Command.Type = \(profile : Text) -> \(path : 
       label = "Run ${profile} unit-tests",
       key = "unit-test-${profile}",
       target = Size.Experimental,
-      docker = None Docker.Type
+      docker = None Docker.Type,
+      artifact_paths = [ S.strictlyStart (S.contains "core_dumps") ]
     }
 
 in
