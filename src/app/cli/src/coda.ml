@@ -711,14 +711,19 @@ let daemon logger =
              "Starting node as a seed node"
          else if List.is_empty initial_peers then
            failwith "no seed or initial peer flags passed" ;
+         let chain_id =
+           chain_id ~genesis_state_hash
+             ~genesis_constants:precomputed_values.genesis_constants
+         in
+         Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+           "Generated network ID: $network_id "
+           ~metadata:[("network_id", `String chain_id)] ;
          let gossip_net_params =
            Gossip_net.Libp2p.Config.
              { timeout= Time.Span.of_sec 3.
              ; logger
              ; conf_dir
-             ; chain_id=
-                 chain_id ~genesis_state_hash
-                   ~genesis_constants:precomputed_values.genesis_constants
+             ; chain_id
              ; unsafe_no_trust_ip= false
              ; initial_peers
              ; addrs_and_ports
