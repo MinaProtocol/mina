@@ -77,7 +77,7 @@ tasks are relatively simple, though.
 Rescuing transactions
 ---------------------
 
-Both alternatives for the safe case make use of the root scan state
+Both alternatives for the safe case make use of the root breadcrumb
 across the fork, but we're explicitly discarding transactions in other
 breadcrumbs.  We have transaction SNARK proofs for them, and it's
 wasteful, and may be upsetting if those transactions are rolled back.
@@ -85,7 +85,7 @@ wasteful, and may be upsetting if those transactions are rolled back.
 The other breadcrumbs in this node's transition frontier reflect a
 particular view of a best tip; other nodes may have different best
 tips. The node can query peers to get their transition frontier
-breadcrumbs, and we can make such queries recursively to all
+breadcrumbs, and we can make such queries recursively to some or all
 reachable nodes. From those breadcrumbs, we can calculate a
 longest common prefix, which can be persisted, and placed
 in the transition frontier after the fork.
@@ -124,18 +124,36 @@ to users.
 Alternative: re-prove the scan state(s)
 ---------------------------------------
 
-We could retain the scan state and staged ledger, by generating new
-proofs offline, to replace the existing proofs. The fee transfers in
-the scan state would be retained in that way, so that SNARK workers
-who generated the original proofs will still get paid.
+We could retain the scan state and staged ledger, by discarding the
+original proofs, and generating new proofs.
 
-This approach introduces some of the same distaste of
+The new proofs could be created online, by carrying over the scan
+state, but with the proofs discarded, when the network resumes.
+
+The new proofs could be created offline, to replace the existing
+proofs.  This approach introduces some of the same distaste of
 "behind-the-scenes" proving mentioned in the scan state completion for
 the safe case.
 
-With this approach, we could also rescue transactions as described above,
-but reprove those scan states contained in them to generate new breadcrumbs
-to be saved and loaded to the transition frontier after the fork.
+Whether the new transaction proofs are created online or offline, the
+fee transfers in the scan state would be retained, so that SNARK
+workers who generated the original proofs will still get paid.
+
+With the online approach, the scan state needs to be persisted, so
+it can be used by the post-fork binary.
+
+With the offline approach, we could also rescue transactions as described
+above, but reprove those transactions contained in them to generate new
+breadcrumbs to be saved and loaded to the transition frontier after
+the fork.
+
+Choices for mainnet
+===================
+
+For mainnet, we're focusing on the unsafe case. And for that case, the
+engineering team's choice is to carry over the scan state, with proofs
+removed, to the post-fork binary (the `online` case). The new proofs
+can be provided without cost by O(1) or other altruistic parties.
 
 ## Drawbacks
 [drawbacks]: #drawbacks
