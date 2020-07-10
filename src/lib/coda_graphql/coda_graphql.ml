@@ -1007,6 +1007,7 @@ module Types = struct
             ~doc:"Public key to set as the owner of the new token"
             ~resolve:(fun _ cmd -> User_command.source_pk cmd)
           :: field "newAccountsDisabled" ~typ:bool ~args:[]
+               ~doc:"Whether new accounts created in this token are disabled"
                ~resolve:(fun _ cmd ->
                  match
                    User_command_payload.body @@ User_command.payload cmd
@@ -1021,12 +1022,18 @@ module Types = struct
 
     let create_token_account =
       obj "UserCommandNewAccount" ~fields:(fun _ ->
-          field "tokenOwner" ~typ:(non_null AccountObj.account) ~args:[]
+          field "tokenOwner" ~typ:(non_null AccountObj.account)
+            ~args:[] ~doc:"The account that owns the token for the new account"
             ~resolve:(fun {ctx= coda; _} cmd ->
               AccountObj.get_best_ledger_account coda
                 (User_command.source ~next_available_token:Token_id.invalid cmd)
           )
-          :: field "disabled" ~typ:bool ~args:[] ~resolve:(fun _ cmd ->
+          :: field "disabled" ~typ:bool ~args:[]
+               ~doc:
+                 "Whether this account should be disabled upon creation. If \
+                  this command was not issued by the token owner, it should \
+                  match the 'newAccountsDisabled' property set in the token \
+                  owner's account." ~resolve:(fun _ cmd ->
                  match
                    User_command_payload.body @@ User_command.payload cmd
                  with
@@ -1041,7 +1048,8 @@ module Types = struct
 
     let mint_tokens =
       obj "UserCommandMintTokens" ~fields:(fun _ ->
-          field "tokenOwner" ~typ:(non_null AccountObj.account) ~args:[]
+          field "tokenOwner" ~typ:(non_null AccountObj.account)
+            ~args:[] ~doc:"The account that owns the token to mint"
             ~resolve:(fun {ctx= coda; _} cmd ->
               AccountObj.get_best_ledger_account coda
                 (User_command.source ~next_available_token:Token_id.invalid cmd)
