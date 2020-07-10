@@ -138,6 +138,26 @@ module Styles = {
       color(Theme.Colors.leaderboardMidnight),
       textAlign(`center),
     ]);
+
+  let badges = style([display(`flex), justifyContent(`flexEnd)]);
+};
+
+let renderBadges = member => {
+  let icons = [||];
+
+  if (member.technicalMVP && member.communityMVP) {
+    Js.Array.push(Icons.technicalAndCommunityMVPBadge, icons) |> ignore;
+  } else if (member.technicalMVP) {
+    Js.Array.push(Icons.technicalMVPBadge, icons) |> ignore;
+  } else if (member.communityMVP) {
+    Js.Array.push(Icons.communityMVPBadge, icons) |> ignore;
+  };
+
+  /* Genesis badge is added last so it's always the rightmost badge in the leaderboard */
+  if (member.genesisMember) {
+    Js.Array.push(Icons.genesisMemberBadge, icons) |> ignore;
+  };
+  icons |> Array.map(icon => {<Badge icon />}) |> React.array;
 };
 
 module LeaderboardRow = {
@@ -159,6 +179,10 @@ module LeaderboardRow = {
       ++ member.releasePoints->string_of_int
       ++ "&genesisMember="
       ++ member.genesisMember->string_of_bool
+      ++ "&technicalMVP="
+      ++ member.technicalMVP->string_of_bool
+      ++ "&communityMVP="
+      ++ member.communityMVP->string_of_bool
       ++ "&name="
       ++ member.name
       |> Js.String.replaceByRe([%re "/#/g"], "%23"); /* replace "#" with percent encoding for the URL to properly parse */
@@ -168,6 +192,7 @@ module LeaderboardRow = {
       <span className=Styles.rank>
         {React.string(string_of_int(rank))}
       </span>
+      <span className=Styles.badges> {renderBadges(member)} </span>
       <span className=Styles.username> {React.string(member.name)} </span>
       <span className=Styles.activePointsCell>
         {React.string(string_of_int(member.releasePoints))}
@@ -221,7 +246,7 @@ let make = () => {
     <div id="testnet-leaderboard" className=Styles.leaderboard>
       <div className=Styles.headerRow>
         <span className=Styles.flexEnd> {React.string("Rank")} </span>
-        <span style={ReactDOMRe.Style.make(~gridColumn="3 / 4", ())}>
+        <span className=Css.(style([gridColumn(3, 4)]))>
           {React.string("Name")}
         </span>
         <span className=Styles.flexEnd> {React.string("This Release")} </span>
