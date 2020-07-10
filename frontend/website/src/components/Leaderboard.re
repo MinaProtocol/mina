@@ -116,7 +116,7 @@ module Styles = {
     ]);
 
   let cell = style([whiteSpace(`nowrap), overflow(`hidden)]);
-  let flexEnd = style([justifySelf(`flexEnd)]);
+  let flexEnd = style([justifySelf(`flexEnd), cursor(`default)]);
   let rank = merge([cell, flexEnd]);
   let username =
     merge([cell, style([textOverflow(`ellipsis), fontWeight(`semiBold)])]);
@@ -214,7 +214,9 @@ let make = () => {
     <div id="testnet-leaderboard" className=Styles.leaderboard>
       <div className=Styles.headerRow>
         <span className=Styles.flexEnd> {React.string("Rank")} </span>
-        <span> {React.string("Name")} </span>
+        <span className={Css.style([Css.cursor(`default)])}>
+          {React.string("Name")}
+        </span>
         <span className=Styles.flexEnd> {React.string("This Release")} </span>
         <span className=Styles.flexEnd> {React.string("This Phase")} </span>
         <span className=Styles.flexEnd> {React.string("All Time")} </span>
