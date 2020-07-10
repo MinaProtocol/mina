@@ -2304,10 +2304,7 @@ module Queries = struct
         in
         ( match opt_pk with
         | None ->
-            Network_pool.Transaction_pool.Resource_pool.transactions
-              ~logger:(Coda_lib.top_level_logger coda)
-              resource_pool
-            |> Sequence.to_list
+            Network_pool.Transaction_pool.Resource_pool.get_all resource_pool
         | Some pk ->
             let account_id = Account_id.create pk Token_id.default in
             Network_pool.Transaction_pool.Resource_pool.all_from_account
