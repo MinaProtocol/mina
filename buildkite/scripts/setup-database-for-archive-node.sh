@@ -4,6 +4,14 @@ user=$1
 password=$2
 db=$3
 
+echo "WHICH SET: "
+which set
+echo
+
+echo "BASH VERSION: "
+bash --version
+echo
+
 set -euo pipefail
 
 sudo apt-get install -y postgresql
