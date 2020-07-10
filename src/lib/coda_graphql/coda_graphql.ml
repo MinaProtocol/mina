@@ -1388,8 +1388,8 @@ module Types = struct
           | _ ->
               Error "Invalid format for public key." )
 
-    let token_arg =
-      scalar "Token"
+    let token_id_arg =
+      scalar "TokenId"
         ~doc:"String representation of a token's UInt64 identifier"
         ~coerce:(fun token ->
           try
@@ -1452,9 +1452,9 @@ module Types = struct
 
       let to_ ~doc = arg "to" ~typ:(non_null public_key_arg) ~doc
 
-      let token ~doc = arg "token" ~typ:(non_null token_arg) ~doc
+      let token ~doc = arg "token" ~typ:(non_null token_id_arg) ~doc
 
-      let token_opt ~doc = arg "token" ~typ:token_arg ~doc
+      let token_opt ~doc = arg "token" ~typ:token_id_arg ~doc
 
       let token_owner ~doc =
         arg "tokenOwner" ~typ:(non_null public_key_arg) ~doc
@@ -2404,7 +2404,7 @@ module Queries = struct
           [ arg "publicKey" ~doc:"Public key of account being retrieved"
               ~typ:(non_null Types.Input.public_key_arg)
           ; arg' "token" ~doc:"Token of account being retrieved"
-              ~typ:Types.Input.token_arg ~default:Token_id.default ]
+              ~typ:Types.Input.token_id_arg ~default:Token_id.default ]
       ~resolve:(fun {ctx= coda; _} () pk token ->
         Some
           ( Account_id.create pk token
@@ -2434,7 +2434,7 @@ module Queries = struct
       ~args:
         Arg.
           [ arg "token" ~doc:"Token to find the owner for"
-              ~typ:(non_null Types.Input.token_arg) ]
+              ~typ:(non_null Types.Input.token_id_arg) ]
       ~resolve:(fun {ctx= coda; _} () token ->
         coda |> Coda_lib.best_tip |> Participating_state.active
         |> Option.bind ~f:(fun tip ->
