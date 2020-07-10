@@ -32,7 +32,7 @@ module ButtonStyles = {
     merge([
       button,
       style([
-        boxShadow(~blur=`px(8), ~inset=true, Theme.Colors.blackAlpha(0.1)),
+        boxShadow(~blur=`px(30), Theme.Colors.blackAlpha(0.1)),
         textShadow(~y=`px(1), Theme.Colors.blackAlpha(0.25)),
         backgroundColor(Theme.Colors.hyperlink),
         color(Theme.Colors.white),

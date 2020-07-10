@@ -34,7 +34,8 @@ module Stable : sig
 
     include Hashable.S with type t := t
 
-    val accounts_accessed : t -> Account_id.t list
+    val accounts_accessed :
+      next_available_token:Token_id.t -> t -> Account_id.t list
   end
 end]
 
