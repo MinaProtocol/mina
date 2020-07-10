@@ -233,43 +233,25 @@ module Styles = {
       textAlign(`center),
     ]);
 
-  let desktopLayout =
-    style([
-      display(`none),
-      media(Theme.MediaQuery.notMobile, [display(`unset)]),
-    ]);
+  let badges = style([display(`flex), justifyContent(`flexEnd)]);
+};
 
-  let mobileLayout =
-    style([
-      display(`unset),
-      media(Theme.MediaQuery.notMobile, [display(`none)]),
-    ]);
+let renderBadges = member => {
+  let icons = [||];
 
-  let mobileLeaderboardRow =
-    style([
-      display(`grid),
-      gridTemplateColumns([rem(5.), `auto]),
-      gridColumnGap(rem(1.5)),
-      cursor(`pointer),
-      padding2(~v=`rem(1.), ~h=`rem(1.)),
-      fontWeight(`semiBold),
-      fontSize(`px(16)),
-      lineHeight(`px(24)),
-    ]);
+  if (member.technicalMVP && member.communityMVP) {
+    Js.Array.push(Icons.technicalAndCommunityMVPBadge, icons) |> ignore;
+  } else if (member.technicalMVP) {
+    Js.Array.push(Icons.technicalMVPBadge, icons) |> ignore;
+  } else if (member.communityMVP) {
+    Js.Array.push(Icons.communityMVPBadge, icons) |> ignore;
+  };
 
-  let firstColumn = style([textAlign(`right), color(`hex("757575"))]);
-
-  let mobilePointStar =
-    merge([
-      firstColumn,
-      style([
-        before([
-          contentRule("*"),
-          color(Css_Colors.red),
-          marginRight(`rem(0.5)),
-        ]),
-      ]),
-    ]);
+  /* Genesis badge is added last so it's always the rightmost badge in the leaderboard */
+  if (member.genesisMember) {
+    Js.Array.push(Icons.genesisMemberBadge, icons) |> ignore;
+  };
+  icons |> Array.map(icon => {<Badge icon />}) |> React.array;
 };
 
 module LeaderboardRow = {
@@ -359,17 +341,47 @@ module LeaderboardRow = {
   };
 
   [@react.component]
-  let make = (~sort, ~member) => {
-    let _userSlug = getUserSlug(member);
-    let rank = getRank(sort, member);
+  let make = (~rank, ~member) => {
+    let _userSlug =
+      "/memberProfile"
+      ++ "?allTimeRank="
+      ++ member.allTimeRank->string_of_int
+      ++ "&allTimePoints="
+      ++ member.allTimePoints->string_of_int
+      ++ "&phaseRank="
+      ++ member.phaseRank->string_of_int
+      ++ "&phasePoints="
+      ++ member.phasePoints->string_of_int
+      ++ "&releaseRank="
+      ++ member.releaseRank->string_of_int
+      ++ "&releasePoints="
+      ++ member.releasePoints->string_of_int
+      ++ "&genesisMember="
+      ++ member.genesisMember->string_of_bool
+      ++ "&technicalMVP="
+      ++ member.technicalMVP->string_of_bool
+      ++ "&communityMVP="
+      ++ member.communityMVP->string_of_bool
+      ++ "&name="
+      ++ member.name
+      |> Js.String.replaceByRe([%re "/#/g"], "%23"); /* replace "#" with percent encoding for the URL to properly parse */
 
-    <div>
-      <div className=Styles.desktopLayout>
-        <DesktopLayout sort rank member />
-      </div>
-      <div className=Styles.mobileLayout>
-        <MobileLayout sort rank member />
-      </div>
+    // <Next.Link href=userSlug _as=userSlug>
+    <div className=Styles.leaderboardRow>
+      <span className=Styles.rank>
+        {React.string(string_of_int(rank))}
+      </span>
+      <span className=Styles.badges> {renderBadges(member)} </span>
+      <span className=Styles.username> {React.string(member.name)} </span>
+      <span className=Styles.activePointsCell>
+        {React.string(string_of_int(member.releasePoints))}
+      </span>
+      <span className=Styles.inactivePointsCell>
+        {React.string(string_of_int(member.phasePoints))}
+      </span>
+      <span className=Styles.inactivePointsCell>
+        {React.string(string_of_int(member.allTimePoints))}
+      </span>
     </div>;
   };
 };
@@ -452,7 +464,7 @@ let make =
     <div id="testnet-leaderboard" className=Styles.leaderboard>
       <div className=Styles.headerRow>
         <span className=Styles.flexEnd> {React.string("Rank")} </span>
-        <span style={ReactDOMRe.Style.make(~gridColumn="3 / 4", ())}>
+        <span className=Css.(style([gridColumn(3, 4)]))>
           {React.string("Name")}
         </span>
         <span className=Styles.flexEnd> {React.string("This Release")} </span>
