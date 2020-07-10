@@ -30,6 +30,9 @@ brew uninstall openssl
 if [[ $NEEDED_PACKAGES = *[![:space:]]* ]]; then
   yes | brew install $NEEDED_PACKAGES
   brew update
+
+  # Upgrade to newer python3, using openssl1.1
+  brew upgrade python3
 else
   echo 'All required brew packages have already been installed.'
 fi
