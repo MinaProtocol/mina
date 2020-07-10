@@ -215,6 +215,10 @@ let all_from_account :
     ~f:(fun (user_commands, _) ->
       Sequence.to_list @@ F_sequence.to_seq user_commands )
 
+let get_all {all_by_fee; _} : User_command.With_valid_signature.t list =
+  Map.fold_right all_by_fee ~init:[] ~f:(fun ~key:_ ~data acc ->
+      Set.fold_right data ~init:acc ~f:(fun txn acc -> txn :: acc) )
+
 (* Remove a command from the applicable_by_fee field. This may break an
    invariant. *)
 let remove_applicable_exn : t -> User_command.With_valid_signature.t -> t =
