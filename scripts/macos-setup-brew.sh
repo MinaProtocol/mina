@@ -33,3 +33,6 @@ if [[ $NEEDED_PACKAGES = *[![:space:]]* ]]; then
 else
   echo 'All required brew packages have already been installed.'
 fi
+
+echo 'export PKG_CONFIG_PATH=$(brew --prefix openssl)/lib/pkgconfig' >> /Users/distiller/.bash_profile
+echo 'export PATH="$(brew --prefix openssl)/bin:$PATH"' >> /Users/distiller/.bash_profile
