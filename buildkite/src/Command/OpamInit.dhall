@@ -12,13 +12,14 @@ let unpackageScript : Text = "tar xfz ${file} --strip-components=2 -C /home/opam
 
 let exposeOpamEnv : Text = "eval `opam config env`"
 
-let commands : List Cmd.Type =
+let commands : List Text -> List Cmd.Type = \(environment : List Text) ->
   [
     r ("cat scripts/setup-opam.sh src/opam.export <(date +%Y-%m)" ++
           "> opam_ci_cache.sig"),
     Cmd.cacheThrough
       Cmd.Docker::{
-        image = (../Constants/ContainerImages.dhall).codaToolchain
+        image = (../Constants/ContainerImages.dhall).codaToolchain,
+        extraEnv = environment
       }
       file
       Cmd.CacheSetupCmd::{
@@ -28,12 +29,11 @@ let commands : List Cmd.Type =
   ]
 
 let andThenRunInDocker : List Text -> Text -> List Cmd.Type =
-  \(envVars : List Text) ->
+  \(environment : List Text) ->
   \(innerScript : Text) ->
-    [ Coda.fixPermissionsCommand ] # commands # [
+    [ Coda.fixPermissionsCommand ] # (commands environment) # [
       Cmd.runInDocker
-        (Cmd.Docker::{ image = (../Constants/ContainerImages.dhall).codaToolchain
-                     , extraEnv = envVars })
+        (Cmd.Docker::{ image = (../Constants/ContainerImages.dhall).codaToolchain, extraEnv = environment })
         (unpackageScript ++ " && " ++ exposeOpamEnv ++ " && " ++ innerScript)
     ]
 

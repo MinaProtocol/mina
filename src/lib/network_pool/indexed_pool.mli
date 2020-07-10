@@ -70,7 +70,9 @@ val add_from_gossip_exn :
           each other that way! *)
          `Insufficient_replace_fee of
          [`Replace_fee of Currency.Fee.t] * Currency.Fee.t
-       | `Overflow ] )
+       | `Overflow
+       | `Bad_token
+       | `Unwanted_fee_token of Token_id.t ] )
      Result.t
 (** Returns the commands dropped as a result of adding the command, which will
     be empty unless we're replacing one. *)

@@ -23,10 +23,19 @@ echo "Todo:    ${NEEDED_PACKAGES}"
 # https://discourse.brew.sh/t/python-2-eol-2020/4647
 brew uninstall --force python@2
 
+# Remove old openssl.
+brew uninstall openssl
+
 # only run if there's work to do
 if [[ $NEEDED_PACKAGES = *[![:space:]]* ]]; then
   yes | brew install $NEEDED_PACKAGES
   brew update
+
+  # Upgrade to newer python3, using openssl1.1
+  brew upgrade python3
 else
   echo 'All required brew packages have already been installed.'
 fi
+
+echo 'export PKG_CONFIG_PATH=$(brew --prefix openssl)/lib/pkgconfig' >> /Users/distiller/.bash_profile
+echo 'export PATH="$(brew --prefix openssl)/bin:$PATH"' >> /Users/distiller/.bash_profile

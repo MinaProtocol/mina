@@ -462,7 +462,7 @@ module Types = struct
       let to_full_account
           { Account.Poly.public_key
           ; token_id
-          ; token_owner
+          ; token_permissions
           ; nonce
           ; balance
           ; receipt_chain_hash
@@ -471,7 +471,7 @@ module Types = struct
           ; timing } =
         let open Option.Let_syntax in
         let%bind public_key = public_key in
-        let%bind token_owner = token_owner in
+        let%bind token_permissions = token_permissions in
         let%bind nonce = nonce in
         let%bind receipt_chain_hash = receipt_chain_hash in
         let%bind delegate = delegate in
@@ -479,7 +479,7 @@ module Types = struct
         let%map timing = timing in
         { Account.Poly.public_key
         ; token_id
-        ; token_owner
+        ; token_permissions
         ; nonce
         ; balance
         ; receipt_chain_hash
@@ -490,7 +490,7 @@ module Types = struct
       let of_full_account
           { Account.Poly.public_key
           ; token_id
-          ; token_owner
+          ; token_permissions
           ; nonce
           ; balance
           ; receipt_chain_hash
@@ -499,7 +499,7 @@ module Types = struct
           ; timing } blockchain_length =
         { Account.Poly.public_key= Some public_key
         ; token_id
-        ; token_owner= Some token_owner
+        ; token_permissions= Some token_permissions
         ; nonce= Some nonce
         ; balance=
             { AnnotatedBalance.total= balance
@@ -529,7 +529,7 @@ module Types = struct
         | Some
             ( { Account.Poly.public_key
               ; token_id
-              ; token_owner
+              ; token_permissions
               ; nonce
               ; balance
               ; receipt_chain_hash
@@ -539,7 +539,7 @@ module Types = struct
             , blockchain_length ) ->
             { Account.Poly.public_key= Some public_key
             ; token_id
-            ; token_owner= Some token_owner
+            ; token_permissions= Some token_permissions
             ; nonce= Some nonce
             ; delegate= Some delegate
             ; balance=
@@ -553,7 +553,7 @@ module Types = struct
             Account.
               { Poly.public_key= Some (Account_id.public_key account_id)
               ; token_id= Account_id.token_id account_id
-              ; token_owner= None
+              ; token_permissions= None
               ; nonce= None
               ; delegate= None
               ; balance=
@@ -577,7 +577,7 @@ module Types = struct
       { account:
           ( Public_key.Compressed.t option
           , Token_id.t
-          , bool option
+          , Token_permissions.t option
           , AnnotatedBalance.t
           , Account.Nonce.t option
           , Receipt.Chain_hash.t option
@@ -825,6 +825,8 @@ module Types = struct
                 User_command_payload.body (User_command.payload payment)
               with
               | Payment {Payment_payload.Poly.amount; _} ->
+                  Ok (amount |> Currency.Amount.to_uint64)
+              | Mint_tokens {amount; _} ->
                   Ok (amount |> Currency.Amount.to_uint64)
               | Stake_delegation _
               | Create_new_token _

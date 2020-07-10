@@ -232,6 +232,8 @@ module type Transaction_pool_diff_intf = sig
       | Insufficient_funds
       | Insufficient_fee
       | Overflow
+      | Bad_token
+      | Unwanted_fee_token
     [@@deriving sexp, yojson]
   end
 
