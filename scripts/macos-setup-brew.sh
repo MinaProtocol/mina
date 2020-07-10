@@ -6,6 +6,9 @@ export HOMEBREW_NO_AUTO_UPDATE=1
 # re-reads /usr/local/Homebrew if a cache has been put in place
 brew update-reset
 
+# Remove old openssl. Do it twice.
+brew uninstall openssl; brew uninstall openssl
+
 NEEDED_PACKAGES=" bash boost cmake gmp gpatch jemalloc libffi libomp libsodium opam openssl@1.1 pkg-config zlib libpq postgresql"
 echo "Needed:  ${NEEDED_PACKAGES}"
 
@@ -22,9 +25,6 @@ echo "Todo:    ${NEEDED_PACKAGES}"
 # Remove old python (uses force to always return true)
 # https://discourse.brew.sh/t/python-2-eol-2020/4647
 brew uninstall --force python@2
-
-# Remove old openssl. Do it twice.
-brew uninstall openssl; brew uninstall openssl
 
 # only run if there's work to do
 if [[ $NEEDED_PACKAGES = *[![:space:]]* ]]; then
