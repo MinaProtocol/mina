@@ -21,21 +21,14 @@ module Make (Inputs : Inputs_intf) = struct
   module Verification_key = struct
     type ('g1, 'g2, 'fqk) t_ =
       {query_base: 'g1; query: 'g1 list; delta: 'g2; alpha_beta: 'fqk}
-    [@@deriving fields]
-
-    let to_hlist {query_base; query; delta; alpha_beta} =
-      Snarky.H_list.[query_base; query; delta; alpha_beta]
-
-    let of_hlist : (unit, _ -> _ -> _ -> _ -> unit) Snarky.H_list.t -> _ =
-     fun Snarky.H_list.[query_base; query; delta; alpha_beta] ->
-      {query_base; query; delta; alpha_beta}
+    [@@deriving fields, hlist]
 
     let typ ~input_size =
       let spec =
         Data_spec.[G1.typ; Typ.list ~length:input_size G1.typ; G2.typ; Fqk.typ]
       in
-      Typ.of_hlistable spec ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
-        ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+      Typ.of_hlistable spec ~var_to_hlist:t__to_hlist ~var_of_hlist:t__of_hlist
+        ~value_to_hlist:t__to_hlist ~value_of_hlist:t__of_hlist
 
     let to_field_elements {query_base; query; delta; alpha_beta} =
       let g1 (x, y) = [|x; y|] in
@@ -96,22 +89,13 @@ module Make (Inputs : Inputs_intf) = struct
 
   module Proof = struct
     type ('g1, 'g2) t_ = {a: 'g1; b: 'g2; c: 'g1; delta_prime: 'g2; z: 'g1}
-    [@@deriving sexp]
-
-    let to_hlist {a; b; c; delta_prime; z} =
-      Snarky.H_list.[a; b; c; delta_prime; z]
-
-    let of_hlist :
-           (unit, 'a -> 'b -> 'a -> 'b -> 'a -> unit) Snarky.H_list.t
-        -> ('a, 'b) t_ = function
-      | [a; b; c; delta_prime; z] ->
-          {a; b; c; delta_prime; z}
+    [@@deriving sexp, hlist]
 
     let typ =
       Typ.of_hlistable
         Data_spec.[G1.typ; G2.typ; G1.typ; G2.typ; G1.typ]
-        ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
-        ~value_of_hlist:of_hlist
+        ~var_to_hlist:t__to_hlist ~var_of_hlist:t__of_hlist
+        ~value_to_hlist:t__to_hlist ~value_of_hlist:t__of_hlist
   end
 
   let verify ?message (vk : (_, _, _) Verification_key.t_)
