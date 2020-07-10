@@ -105,7 +105,56 @@ module User_command = struct
     ; fee: int
     ; memo: string
     ; hash: string }
-  [@@deriving hlist]
+
+  let to_hlist
+      { typ
+      ; fee_payer_id
+      ; source_id
+      ; receiver_id
+      ; fee_token
+      ; token
+      ; nonce
+      ; amount
+      ; fee
+      ; memo
+      ; hash } =
+    H_list.
+      [ typ
+      ; fee_payer_id
+      ; source_id
+      ; receiver_id
+      ; fee_token
+      ; token
+      ; nonce
+      ; amount
+      ; fee
+      ; memo
+      ; hash ]
+
+  let of_hlist
+      ([ typ
+       ; fee_payer_id
+       ; source_id
+       ; receiver_id
+       ; fee_token
+       ; token
+       ; nonce
+       ; amount
+       ; fee
+       ; memo
+       ; hash ] :
+        (unit, _) H_list.t) =
+    { typ
+    ; fee_payer_id
+    ; source_id
+    ; receiver_id
+    ; fee_token
+    ; token
+    ; nonce
+    ; amount
+    ; fee
+    ; memo
+    ; hash }
 
   let typ =
     let open Caqti_type_spec in
@@ -287,7 +336,44 @@ module Block = struct
     ; height: int
     ; timestamp: int64
     ; coinbase_id: int option }
-  [@@deriving hlist]
+
+  let to_hlist
+      { state_hash
+      ; parent_id
+      ; creator_id
+      ; snarked_ledger_hash_id
+      ; ledger_hash
+      ; height
+      ; timestamp
+      ; coinbase_id } =
+    H_list.
+      [ state_hash
+      ; parent_id
+      ; creator_id
+      ; snarked_ledger_hash_id
+      ; ledger_hash
+      ; height
+      ; timestamp
+      ; coinbase_id ]
+
+  let of_hlist
+      ([ state_hash
+       ; parent_id
+       ; creator_id
+       ; snarked_ledger_hash_id
+       ; ledger_hash
+       ; height
+       ; timestamp
+       ; coinbase_id ] :
+        (unit, _) H_list.t) =
+    { state_hash
+    ; parent_id
+    ; creator_id
+    ; snarked_ledger_hash_id
+    ; ledger_hash
+    ; height
+    ; timestamp
+    ; coinbase_id }
 
   let typ =
     let open Caqti_type_spec in
