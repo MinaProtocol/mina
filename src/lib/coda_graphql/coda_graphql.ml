@@ -1006,16 +1006,19 @@ module Types = struct
           field "tokenOwner" ~typ:(non_null public_key) ~args:[]
             ~doc:"Public key to set as the owner of the new token"
             ~resolve:(fun _ cmd -> User_command.source_pk cmd)
-          :: field "newAccountsDisabled" ~typ:bool ~args:[]
+          :: field "newAccountsDisabled" ~typ:(non_null bool) ~args:[]
                ~doc:"Whether new accounts created in this token are disabled"
                ~resolve:(fun _ cmd ->
                  match
                    User_command_payload.body @@ User_command.payload cmd
                  with
                  | Create_new_token {disable_new_accounts; _} ->
-                     Some disable_new_accounts
+                     disable_new_accounts
                  | _ ->
-                     None )
+                     (* We cannot exclude this at the type level. *)
+                     failwith
+                       "Type error: Expected a Create_new_token user command"
+             )
           :: user_command_shared_fields )
 
     let mk_create_new_token = add_type user_command_interface create_new_token
@@ -1028,7 +1031,7 @@ module Types = struct
               AccountObj.get_best_ledger_account coda
                 (User_command.source ~next_available_token:Token_id.invalid cmd)
           )
-          :: field "disabled" ~typ:bool ~args:[]
+          :: field "disabled" ~typ:(non_null bool) ~args:[]
                ~doc:
                  "Whether this account should be disabled upon creation. If \
                   this command was not issued by the token owner, it should \
@@ -1038,9 +1041,12 @@ module Types = struct
                    User_command_payload.body @@ User_command.payload cmd
                  with
                  | Create_token_account {account_disabled; _} ->
-                     Some account_disabled
+                     account_disabled
                  | _ ->
-                     None )
+                     (* We cannot exclude this at the type level. *)
+                     failwith
+                       "Type error: Expected a Create_new_token user command"
+             )
           :: user_command_shared_fields )
 
     let mk_create_token_account =
