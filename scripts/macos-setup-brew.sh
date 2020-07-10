@@ -23,8 +23,8 @@ echo "Todo:    ${NEEDED_PACKAGES}"
 # https://discourse.brew.sh/t/python-2-eol-2020/4647
 brew uninstall --force python@2
 
-# Remove old openssl. Do it twice.
-brew uninstall openssl; brew uninstall openssl
+# Remove old openssl.
+brew uninstall openssl
 
 # only run if there's work to do
 if [[ $NEEDED_PACKAGES = *[![:space:]]* ]]; then
