@@ -31,5 +31,5 @@ else
   echo 'All required brew packages have already been installed.'
 fi
 
-# Link openssl@1.1 so that it will be found by non-brew code
-brew link --force --overwrite openssl@1.1
+# Brew stubbornly refuses to overwrite Mac's openssl. Add it to the path.
+echo 'export PATH="/usr/local/opt/openssl@1.1/bin:$PATH"' >> /Users/distiller/.bash_profile
