@@ -430,8 +430,17 @@ let make =
     <div id="testnet-leaderboard" className=Styles.leaderboard>
       <div className=Styles.headerRow>
         <span className=Styles.flexEnd> {React.string("Rank")} </span>
+<<<<<<< HEAD
         <span> {React.string("Name")} </span>
         {Array.map(renderColumnHeader, Filter.filters) |> React.array}
+=======
+        <span className={Css.style([Css.cursor(`default)])}>
+          {React.string("Name")}
+        </span>
+        <span className=Styles.flexEnd> {React.string("This Release")} </span>
+        <span className=Styles.flexEnd> {React.string("This Phase")} </span>
+        <span className=Styles.flexEnd> {React.string("All Time")} </span>
+>>>>>>> 88de53000... cursor to default when user hovers over rank and name
       </div>
       <hr />
       <div className=Styles.topTen />
