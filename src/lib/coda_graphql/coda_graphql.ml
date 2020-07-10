@@ -1304,21 +1304,24 @@ module Types = struct
 
     let create_token =
       obj "SendCreateTokenPayload" ~fields:(fun _ ->
-          [ field "createNewToken" ~typ:(non_null user_command)
+          [ field "createNewToken"
+              ~typ:(non_null UserCommand.create_new_token)
               ~doc:"Token creation command that was sent"
               ~args:Arg.[]
               ~resolve:(fun _ -> Fn.id) ] )
 
     let create_token_account =
       obj "SendCreateTokenAccountPayload" ~fields:(fun _ ->
-          [ field "createNewTokenAccount" ~typ:(non_null user_command)
+          [ field "createNewTokenAccount"
+              ~typ:(non_null UserCommand.create_token_account)
               ~doc:"Token account creation command that was sent"
               ~args:Arg.[]
               ~resolve:(fun _ -> Fn.id) ] )
 
     let mint_tokens =
       obj "SendMintTokensPayload" ~fields:(fun _ ->
-          [ field "mintTokens" ~typ:(non_null user_command)
+          [ field "mintTokens"
+              ~typ:(non_null UserCommand.mint_tokens)
               ~doc:"Token minting command that was sent"
               ~args:Arg.[]
               ~resolve:(fun _ -> Fn.id) ] )
@@ -1958,7 +1961,7 @@ module Mutations = struct
     | `Active f -> (
         match%map f with
         | Ok (user_command, _receipt) ->
-            Ok (Types.UserCommand.mk_user_command user_command)
+            Ok user_command
         | Error e ->
             Error ("Couldn't send user_command: " ^ Error.to_string_hum e) )
     | `Bootstrapping ->
@@ -2051,9 +2054,11 @@ module Mutations = struct
         | None ->
             send_unsigned_user_command ~coda ~nonce_opt ~signer:from ~memo ~fee
               ~fee_token ~fee_payer_pk:from ~valid_until ~body
+            |> Deferred.Result.map ~f:Types.UserCommand.mk_user_command
         | Some signature ->
             send_signed_user_command ~coda ~nonce_opt ~signer:from ~memo ~fee
-              ~fee_token ~fee_payer_pk:from ~valid_until ~body ~signature )
+              ~fee_token ~fee_payer_pk:from ~valid_until ~body ~signature
+            |> Deferred.Result.map ~f:Types.UserCommand.mk_user_command )
 
   let send_payment =
     io_field "sendPayment" ~doc:"Send a payment"
@@ -2078,9 +2083,11 @@ module Mutations = struct
         | None ->
             send_unsigned_user_command ~coda ~nonce_opt ~signer:from ~memo ~fee
               ~fee_token ~fee_payer_pk:from ~valid_until ~body
+            |> Deferred.Result.map ~f:Types.UserCommand.mk_user_command
         | Some signature ->
             send_signed_user_command ~coda ~nonce_opt ~signer:from ~memo ~fee
-              ~fee_token ~fee_payer_pk:from ~valid_until ~body ~signature )
+              ~fee_token ~fee_payer_pk:from ~valid_until ~body ~signature
+            |> Deferred.Result.map ~f:Types.UserCommand.mk_user_command )
 
   let create_token =
     io_field "createToken" ~doc:"Create a new token"
