@@ -41,7 +41,8 @@ RUN sudo apt-get update && sudo apt-get install --yes \
     python3-pip \
     rubygems \
     zlib1g-dev \
-    libbz2-dev
+    libbz2-dev \
+    apt-transport-https
 
 RUN sudo pip install awscli readchar
 
@@ -65,6 +66,12 @@ RUN chmod +x /tmp/rust_install.sh
 RUN /tmp/rust_install.sh -y
 RUN export PATH="$PATH:$HOME/.cargo/bin"
 RUN echo 'export PATH="$PATH:$HOME/.cargo/bin"' >> /home/opam/.bashrc
+
+# Get yarn + nodejs
+RUN curl -sL https://deb.nodesource.com/setup_14.x | sudo -E bash -
+RUN curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add -
+RUN echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list
+RUN sudo apt update && sudo apt install nodejs yarn
 
 # Source copy of rocksdb
 RUN sudo git clone https://github.com/facebook/rocksdb -b v5.17.2 /rocksdb
