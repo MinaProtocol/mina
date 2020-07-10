@@ -65,7 +65,7 @@ We anticipate the snarketplace to dynamically rebalance — eg. follow the simpl
     - Basically, the way a block producer pays a snark worker is through a special type of transaction called a fee transfer. The BP's incentive is to minimize the number of fee transfers, as each is a discrete transaction that needs to be added to a block (and consequently offset by more snark work). Thus, the best case scenario is to buy a bundle of snark work from the same snark worker.
 - some snark work will be more important to complete ahead of other work, as it would free up an entire tree worth of memory (see the video above for more details). This is made possible by different work selection methods. Currently, the two methods supported natively are sequential and random. Neither of these however takes advantage of dynamic markets, which is an area of improvement that the Coda community can develop solutions for.
 
-Since all the data around snarks and prices are public, there are several ways to inspect the snarketplace. One example is [using the GraphQL API](https://www.youtube.com/watch?v=pIeo5GO8w8w), and other options include using the CLI, or rolling a custom solution that tracks snarks in the snark mempool.
+Since all the data around snarks and prices are public, there are several ways to inspect the snarketplace. One example is [using the GraphQL API](https://youtu.be/XQlfX-LnK_A), and other options include using the CLI, or rolling a custom solution that tracks snarks in the snark mempool.
 
 Stay tuned for more detailed analysis on snarketplace dynamics. We will also be releasing an economic whitepaper shortly that will provide more context.
 

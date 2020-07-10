@@ -46,7 +46,7 @@ module Poly = struct
     ; coinbase_receiver: 'producer_pk
     ; coinbase_amount: 'amount
     ; pending_coinbase_action: 'pending_coinbase_action }
-  [@@deriving sexp, to_yojson, fields]
+  [@@deriving sexp, to_yojson, fields, hlist]
 end
 
 module Value = struct
@@ -79,7 +79,9 @@ Poly.
   , supply_increase
   , coinbase_receiver
   , coinbase_amount
-  , pending_coinbase_action )]
+  , pending_coinbase_action
+  , to_hlist
+  , of_hlist )]
 
 type value = Value.t
 
@@ -109,6 +111,8 @@ let genesis ~constraint_constants ~genesis_ledger : value =
   { Poly.blockchain_state=
       Blockchain_state.genesis ~constraint_constants
         ~genesis_ledger_hash:(Ledger.merkle_root genesis_ledger)
+        ~snarked_next_available_token:
+          (Ledger.next_available_token genesis_ledger)
   ; consensus_transition= Consensus.Data.Consensus_transition.genesis
   ; supply_increase= Currency.Amount.zero
   ; sok_digest=
@@ -120,44 +124,6 @@ let genesis ~constraint_constants ~genesis_ledger : value =
   ; coinbase_receiver= Signature_lib.Public_key.Compressed.empty
   ; coinbase_amount= Currency.Amount.zero
   ; pending_coinbase_action= Pending_coinbase.Update.Action.Update_none }
-
-let to_hlist
-    { Poly.blockchain_state
-    ; consensus_transition
-    ; sok_digest
-    ; supply_increase
-    ; ledger_proof
-    ; coinbase_receiver
-    ; coinbase_amount
-    ; pending_coinbase_action } =
-  Snarky.H_list.
-    [ blockchain_state
-    ; consensus_transition
-    ; sok_digest
-    ; supply_increase
-    ; ledger_proof
-    ; coinbase_receiver
-    ; coinbase_amount
-    ; pending_coinbase_action ]
-
-let of_hlist
-    ([ blockchain_state
-     ; consensus_transition
-     ; sok_digest
-     ; supply_increase
-     ; ledger_proof
-     ; coinbase_receiver
-     ; coinbase_amount
-     ; pending_coinbase_action ] :
-      (unit, _) Snarky.H_list.t) =
-  { Poly.blockchain_state
-  ; consensus_transition
-  ; sok_digest
-  ; supply_increase
-  ; ledger_proof
-  ; coinbase_receiver
-  ; coinbase_amount
-  ; pending_coinbase_action }
 
 let typ =
   let open Snark_params.Tick.Typ in

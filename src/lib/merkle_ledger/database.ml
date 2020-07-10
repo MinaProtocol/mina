@@ -267,95 +267,89 @@ module Make (Inputs : Inputs_intf) :
           Some parsed_location
   end
 
-  module Token_owner = struct
-    let build_location token_id =
-      Location.build_generic
-        (Bigstring.of_string
-           (Format.sprintf !"$tid!%{sexp: Token_id.t}" token_id))
-
-    (* The location to store the highest token stored so far. *)
-    let last_location () =
-      Location.build_generic (Bigstring.of_string "last_token")
-
-    (* Update the highest token. *)
-    let update_last_location mdb tid =
-      let location = last_location () in
-      let should_update =
-        match get_bin mdb location Token_id.Stable.Latest.bin_read_t with
-        | Some prev_tid ->
-            prev_tid < tid
-        | None ->
-            true
-      in
-      if should_update then
-        set_bin mdb location Token_id.Stable.Latest.bin_size_t
-          Token_id.Stable.Latest.bin_write_t tid
-
-    let last_token mdb =
-      Option.value ~default:Token_id.default
-      @@ get_bin mdb (last_location ()) Token_id.Stable.Latest.bin_read_t
-
-    let get mdb token_id =
-      get_bin mdb (build_location token_id) Key.Stable.Latest.bin_read_t
-
-    let _set mdb token_id public_key =
-      update_last_location mdb token_id ;
-      set_bin mdb (build_location token_id) Key.Stable.Latest.bin_size_t
-        Key.Stable.Latest.bin_write_t public_key
-
-    let _delete mdb token_id = delete_raw mdb (build_location token_id)
-
-    let foldi t ~init ~f =
-      let last_token = last_token t in
-      (* This assumes that token owners are dense in the interval
-         [default+1, last_token]. Otherwise, we should track an indirection,
-         like we do with accounts.
-      *)
-      let rec go acc tid =
-        let tid = Token_id.next tid in
-        if Token_id.(tid <= last_token) then
-          let acc =
-            Option.fold ~init:acc
-              ~f:(fun acc pk -> f ~key:tid ~data:pk acc)
-              (get t tid)
-          in
-          go acc tid
-      in
-      go init Token_id.default
-
-    let _iteri t ~f = foldi t ~init:() ~f:(fun ~key ~data () -> f ~key ~data)
-
-    let get_all t =
-      let last_token = last_token t in
-      (* This assumes that token owners are dense in the interval
-         [default+1, last_token]. Otherwise, we should track an indirection,
-         like we do with accounts.
-      *)
-      let rec go tid =
-        let tid = Token_id.next tid in
-        if Token_id.(tid <= last_token) then
-          match get t tid with
-          | Some pk ->
-              (tid, pk) :: go tid
-          | None ->
-              go tid
-        else []
-      in
-      go Token_id.default
-  end
-
   (** The tokens associated with each public key.
 
       These are represented as a [Token_id.Set.t], which is represented by an
       ordered list.
   *)
   module Tokens = struct
+    let next_available_key =
+      Memo.unit (fun () ->
+          Location.build_generic (Bigstring.of_string "next_available_token")
+      )
+
+    let next_available mdb =
+      Option.value
+        ~default:Token_id.(next default)
+        (get_bin mdb (next_available_key ()) Token_id.Stable.Latest.bin_read_t)
+
+    let next_available_kv ~ledger_depth tid =
+      let token_buf =
+        Bin_prot.Common.create_buf (Token_id.Stable.Latest.bin_size_t tid)
+      in
+      ignore (Token_id.Stable.Latest.bin_write_t token_buf ~pos:0 tid) ;
+      (Location.serialize ~ledger_depth (next_available_key ()), token_buf)
+
+    let set_next_available mdb tid =
+      set_bin mdb (next_available_key ()) Token_id.Stable.Latest.bin_size_t
+        Token_id.Stable.Latest.bin_write_t tid
+
+    let update_next_available_token mdb tid =
+      if Token_id.(next_available mdb <= tid) then
+        set_next_available mdb Token_id.(next tid)
+
+    module Owner = struct
+      let build_location token_id =
+        Location.build_generic
+          (Bigstring.of_string
+             (Format.sprintf !"$tid!%{sexp: Token_id.t}" token_id))
+
+      let serialize_kv ~ledger_depth (tid, pk) =
+        let pk_buf =
+          Bin_prot.Common.create_buf (Key.Stable.Latest.bin_size_t pk)
+        in
+        ignore (Key.Stable.Latest.bin_write_t pk_buf ~pos:0 pk) ;
+        (Location.serialize ~ledger_depth (build_location tid), pk_buf)
+
+      let get mdb token_id =
+        get_bin mdb (build_location token_id) Key.Stable.Latest.bin_read_t
+
+      let set mdb token_id public_key =
+        set_bin mdb (build_location token_id) Key.Stable.Latest.bin_size_t
+          Key.Stable.Latest.bin_write_t public_key
+
+      let remove mdb token_id = delete_raw mdb (build_location token_id)
+
+      let foldi t ~init ~f =
+        let next_available_token = next_available t in
+        let rec go acc tid =
+          let tid = Token_id.next tid in
+          if Token_id.(tid < next_available_token) then
+            let acc =
+              Option.fold ~init:acc
+                ~f:(fun acc pk -> f ~key:tid ~data:pk acc)
+                (get t tid)
+            in
+            go acc tid
+          else acc
+        in
+        go init Token_id.default
+
+      let _iteri t ~f = foldi t ~init:() ~f:(fun ~key ~data () -> f ~key ~data)
+
+      (* Newest tokens come first, but this should be fine. *)
+      let get_all t =
+        foldi t ~init:[] ~f:(fun ~key ~data acc -> (key, data) :: acc)
+    end
+
     let build_location pk =
       Location.build_generic
         (Bigstring.of_string (Format.sprintf !"$tids!%{sexp: Key.t}" pk))
 
     let serialize_kv ~ledger_depth (pk, tids) =
-      let tokens_buf = Bigstring.create (Token_id.Set.bin_size_t tids) in
+      let tokens_buf =
+        Bin_prot.Common.create_buf (Token_id.Set.bin_size_t tids)
+      in
       ignore (Token_id.Set.bin_write_t tokens_buf ~pos:0 tids) ;
       (Location.serialize ~ledger_depth (build_location pk), tokens_buf)
 
@@ -394,8 +388,12 @@ module Make (Inputs : Inputs_intf) :
       update mdb pk ~f:(fun tids ->
           Set.union tids (Token_id.Set.of_list new_tids) )
 
-    let add_account mdb aid =
-      add mdb (Account_id.public_key aid) (Account_id.token_id aid)
+    let add_account mdb aid account =
+      let token = Account_id.token_id aid in
+      let key = Account_id.public_key aid in
+      add mdb key token ;
+      update_next_available_token mdb token ;
+      if Account.token_owner account then Owner.set mdb token key
 
     let remove mdb pk tid = update mdb pk ~f:(fun tids -> Set.remove tids tid)
 
@@ -404,7 +402,11 @@ module Make (Inputs : Inputs_intf) :
           Set.diff tids (Token_id.Set.of_list rem_tids) )
 
     let remove_account mdb aid =
-      remove mdb (Account_id.public_key aid) (Account_id.token_id aid)
+      let token = Account_id.token_id aid in
+      let key = Account_id.public_key aid in
+      remove mdb key token ;
+      if Option.equal Key.equal (Owner.get mdb token) (Some key) then
+        Owner.remove mdb token
 
     (** Generate a batch of database changes to add the given tokens. *)
     let add_batch_create mdb pks_to_tokens =
@@ -430,13 +432,17 @@ module Make (Inputs : Inputs_intf) :
   let last_filled t = Account_location.last_location t
 
   let token_owners t =
-    Token_owner.get_all t
+    Tokens.Owner.get_all t
     |> List.map ~f:(fun (tid, pk) -> Account_id.create pk tid)
     |> Account_id.Set.of_list
 
-  let token_owner = Token_owner.get
+  let token_owner = Tokens.Owner.get
 
   let tokens = Tokens.get
+
+  let next_available_token = Tokens.next_available
+
+  let set_next_available_token = Tokens.set_next_available
 
   include Util.Make (struct
     module Key = Key
@@ -471,29 +477,53 @@ module Make (Inputs : Inputs_intf) :
       let last_location_key_value =
         (Account_location.last_location_key (), last_location)
       in
+      let next_available_token = Tokens.next_available mdb in
       let key_to_location_list = Non_empty_list.to_list key_to_location_list in
-      let account_tokens =
-        List.fold ~init:Key.Map.empty key_to_location_list
-          ~f:(fun map (aid, _) ->
-            Map.update map (Account_id.public_key aid) ~f:(function
-              | Some set ->
-                  Set.add set (Account_id.token_id aid)
-              | None ->
-                  Token_id.Set.singleton (Account_id.token_id aid) ) )
+      let account_tokens, new_next_available_token =
+        List.fold ~init:(Key.Map.empty, next_available_token)
+          key_to_location_list ~f:(fun (map, next_available_token) (aid, _) ->
+            ( Map.update map (Account_id.public_key aid) ~f:(function
+                | Some set ->
+                    Set.add set (Account_id.token_id aid)
+                | None ->
+                    Token_id.Set.singleton (Account_id.token_id aid) )
+            , (* If the token is present in an account, it is no longer
+                 available.
+              *)
+              Token_id.max next_available_token
+                (Token_id.next (Account_id.token_id aid)) ) )
+      in
+      let next_available_token_change =
+        if new_next_available_token > next_available_token then
+          [ Tokens.next_available_kv ~ledger_depth:mdb.depth
+              new_next_available_token ]
+        else []
       in
       let batched_changes =
-        Account_location.serialize_last_account_kv ~ledger_depth:mdb.depth
-          last_location_key_value
-        :: ( Tokens.add_batch_create mdb account_tokens
-           @ Account_location.set_batch_create ~ledger_depth:mdb.depth
-               key_to_location_list )
+        next_available_token_change
+        @ Account_location.serialize_last_account_kv ~ledger_depth:mdb.depth
+            last_location_key_value
+          :: ( Tokens.add_batch_create mdb account_tokens
+             @ Account_location.set_batch_create ~ledger_depth:mdb.depth
+                 key_to_location_list )
       in
       Kvdb.set_batch mdb.kvdb ~remove_keys:[] ~key_data_pairs:batched_changes
 
     let set_raw_account_batch mdb
         (addresses_and_accounts : (location * Account.t) list) =
       set_bin_batch mdb Account.bin_size_t Account.bin_write_t
-        addresses_and_accounts
+        addresses_and_accounts ;
+      let token_owner_changes =
+        List.filter_map addresses_and_accounts ~f:(fun (_, account) ->
+            if Account.token_owner account then
+              let aid = Account.identifier account in
+              Some
+                (Tokens.Owner.serialize_kv ~ledger_depth:mdb.depth
+                   (Account_id.token_id aid, Account_id.public_key aid))
+            else None )
+      in
+      Kvdb.set_batch mdb.kvdb ~remove_keys:[]
+        ~key_data_pairs:token_owner_changes
   end)
 
   let set_hash mdb location new_hash = set_hash_batch mdb [(location, new_hash)]
@@ -536,7 +566,7 @@ module Make (Inputs : Inputs_intf) :
       match Account_location.allocate mdb account_id with
       | Ok location ->
           set mdb location account ;
-          Tokens.add_account mdb account_id ;
+          Tokens.add_account mdb account_id account ;
           Ok (`Added, location)
       | Error err ->
           Error (Error.create "get_or_create_account" err Db_error.sexp_of_t) )

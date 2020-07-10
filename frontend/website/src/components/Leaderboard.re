@@ -1,40 +1,50 @@
 type member = {
-  username: string,
-  nickname: string,
-  id: int,
+  name: string,
+  genesisMember: bool,
+  phasePoints: int,
+  releasePoints: int,
+  allTimePoints: int,
+  releaseRank: int,
+  phaseRank: int,
+  allTimeRank: int,
 };
 
 type entry = array(string);
 
 external parseEntry: Js.Json.t => entry = "%identity";
 
-let fetchLeaderboard = () => {
-  ReFetch.fetch(
-    "https://sheets.googleapis.com/v4/spreadsheets/1Nq_Y76ALzSVJRhSFZZm4pfuGbPkZs2vTtCnVQ1ehujE/values/D4:Z?key="
-    ++ Next.Config.google_api_key,
-    ~method_=Get,
-    ~headers={
-      "Accept": "application/json",
-      "Content-Type": "application/json",
-    },
-  )
-  |> Promise.bind(Bs_fetch.Response.json)
-  |> Promise.map(r => {
-       let results =
-         Option.bind(Js.Json.decodeObject(r), o => Js.Dict.get(o, "values"));
+let safeArrayGet = (index, a) => {
+  switch (Belt.Array.get(a, index)) {
+  | Some(v) => v
+  | None => ""
+  };
+};
 
-       switch (Option.bind(results, Js.Json.decodeArray)) {
-       | Some(resultsArr) =>
-         let arr = Array.map(parseEntry, resultsArr);
-         arr
-         |> Array.sort((e1, e2) => {
-              let len = Array.length;
-              int_of_string(e2[len(e2) - 1])
-              - int_of_string(e1[len(e1) - 1]);
-            });
-         arr;
-       | None => [||]
-       };
+let safeParseInt = str =>
+  try(int_of_string(str)) {
+  | Failure(_) => 0
+  };
+
+let fetchLeaderboard = () => {
+  Sheets.fetchRange(
+    ~sheet="1Nq_Y76ALzSVJRhSFZZm4pfuGbPkZs2vTtCnVQ1ehujE",
+    ~range="Member_Profile_Data!A2:Z",
+  )
+  |> Promise.map(res => {
+       Array.map(parseEntry, res)
+       |> Array.map(entry => {
+            {
+              name: entry |> safeArrayGet(0),
+              genesisMember:
+                entry |> safeArrayGet(1) |> String.length == 0 ? false : true,
+              allTimePoints: entry |> safeArrayGet(2) |> safeParseInt,
+              phasePoints: entry |> safeArrayGet(3) |> safeParseInt,
+              releasePoints: entry |> safeArrayGet(4) |> safeParseInt,
+              allTimeRank: entry |> safeArrayGet(5) |> safeParseInt,
+              phaseRank: entry |> safeArrayGet(6) |> safeParseInt,
+              releaseRank: entry |> safeArrayGet(7) |> safeParseInt,
+            }
+          })
      })
   |> Js.Promise.catch(_ => Promise.return([||]));
 };
@@ -45,36 +55,51 @@ module Styles = {
   let leaderboardContainer =
     style([
       width(`percent(100.)),
-      maxWidth(rem(41.)),
       margin2(~v=`zero, ~h=`auto),
+      selector("hr", [margin(`zero)]),
     ]);
 
   let leaderboard =
     style([
-      background(Theme.Colors.hyperlinkAlpha(0.15)),
+      background(white),
       width(`percent(100.)),
       borderRadius(px(3)),
       paddingTop(`rem(1.)),
-      Theme.Typeface.pragmataPro,
+      Theme.Typeface.ibmplexsans,
+      fontSize(rem(1.5)),
       lineHeight(rem(1.5)),
-      color(Theme.Colors.midnight),
+      color(Theme.Colors.leaderboardMidnight),
       selector(
         "div:nth-child(even)",
-        [backgroundColor(`rgba((71, 130, 130, 0.1)))],
+        [backgroundColor(`rgba((245, 245, 245, 1.)))],
       ),
     ]);
 
   let leaderboardRow =
     style([
-      padding2(~v=`zero, ~h=`rem(1.)),
+      cursor(`pointer),
+      padding2(~v=`rem(1.), ~h=`rem(1.)),
+      height(`rem(3.5)),
       display(`grid),
       gridColumnGap(rem(1.5)),
-      gridTemplateColumns([rem(1.), rem(5.5), rem(5.5), rem(3.5)]),
+      gridTemplateColumns([
+        rem(1.),
+        rem(5.5),
+        rem(5.5),
+        rem(3.5),
+        rem(3.5),
+      ]),
       media(
         Theme.MediaQuery.notMobile,
         [
           width(`percent(100.)),
-          gridTemplateColumns([rem(2.5), `auto, rem(6.), rem(3.5)]),
+          gridTemplateColumns([
+            rem(3.5),
+            `auto,
+            rem(9.),
+            rem(8.),
+            rem(8.),
+          ]),
         ],
       ),
     ]);
@@ -82,65 +107,209 @@ module Styles = {
   let headerRow =
     merge([
       leaderboardRow,
-      Theme.Body.basic_semibold,
-      style([color(Theme.Colors.midnight)]),
+      style([
+        paddingBottom(`rem(0.5)),
+        fontSize(`rem(1.)),
+        fontWeight(`semiBold),
+        textTransform(`uppercase),
+        letterSpacing(`rem(0.125)),
+      ]),
     ]);
 
-  let cell = style([whiteSpace(`nowrap), overflow(`hidden)]);
+  let activeColumn =
+    style([
+      position(`relative),
+      justifySelf(`flexEnd),
+      after([
+        position(`absolute),
+        left(`percent(100.)),
+        contentRule(""),
+        height(`rem(1.5)),
+        width(`rem(1.5)),
+        backgroundImage(`url("/static/img/arrowDown.svg")),
+        backgroundRepeat(`noRepeat),
+        backgroundPosition(`px(4), `px(9)),
+      ]),
+    ]);
+
+  let topTen = style([position(`absolute)]);
+
+  let cell =
+    style([height(`rem(2.)), whiteSpace(`nowrap), overflowX(`hidden)]);
   let flexEnd = style([justifySelf(`flexEnd)]);
   let rank = merge([cell, flexEnd]);
-  let username = merge([cell, style([textOverflow(`ellipsis)])]);
-  let current = merge([cell, style([justifySelf(`flexEnd)])]);
-  let total = merge([cell, style([opacity(0.5)])]);
+  let username =
+    merge([cell, style([textOverflow(`ellipsis), fontWeight(`semiBold)])]);
+  let pointsCell = merge([cell, style([justifySelf(`flexEnd)])]);
+  let activePointsCell =
+    merge([cell, style([justifySelf(`flexEnd), fontWeight(`semiBold)])]);
+  let inactivePointsCell = merge([pointsCell, style([opacity(0.5)])]);
+
+  let loading =
+    style([
+      padding(`rem(5.)),
+      color(Theme.Colors.leaderboardMidnight),
+      textAlign(`center),
+    ]);
 };
+
+type filter =
+  | All
+  | Genesis
+  | NonGenesis;
+
+type sort =
+  | Release
+  | Phase
+  | AllTime;
+
+let pointsColumns = [|Release, Phase, AllTime|];
 
 module LeaderboardRow = {
   [@react.component]
-  let make = (~rank, ~entry) => {
-    <>
+  let make = (~sort, ~member) => {
+    let userSlug =
+      "/memberProfile"
+      ++ "?allTimeRank="
+      ++ member.allTimeRank->string_of_int
+      ++ "&allTimePoints="
+      ++ member.allTimePoints->string_of_int
+      ++ "&phaseRank="
+      ++ member.phaseRank->string_of_int
+      ++ "&phasePoints="
+      ++ member.phasePoints->string_of_int
+      ++ "&releaseRank="
+      ++ member.releaseRank->string_of_int
+      ++ "&releasePoints="
+      ++ member.releasePoints->string_of_int
+      ++ "&genesisMember="
+      ++ member.genesisMember->string_of_bool
+      ++ "&name="
+      ++ member.name
+      |> Js.String.replaceByRe([%re "/#/g"], "%23"); /* replace "#" with percent encoding for the URL to properly parse */
+
+    let rank =
+      switch (sort) {
+      | Phase => member.phaseRank
+      | Release => member.releaseRank
+      | AllTime => member.allTimeRank
+      };
+
+    let points = column =>
+      switch (column) {
+      | Phase => member.phasePoints
+      | Release => member.releasePoints
+      | AllTime => member.allTimePoints
+      };
+
+    let renderPoints = column =>
+      <span
+        className=Styles.(
+          sort === column ? activePointsCell : inactivePointsCell
+        )>
+        {React.string(string_of_int(points(column)))}
+      </span>;
+
+    <Next.Link href=userSlug _as=userSlug>
       <div className=Styles.leaderboardRow>
         <span className=Styles.rank>
           {React.string(string_of_int(rank))}
         </span>
-        <span className=Styles.username> {React.string(entry[0])} </span>
-        <span className=Styles.current>
-          {React.string(entry[Array.length(entry) - 1])}
-        </span>
-        <span className=Styles.total> {React.string(entry[1])} </span>
+        <span className=Styles.username> {React.string(member.name)} </span>
+        {Array.map(renderPoints, pointsColumns) |> React.array}
       </div>
-    </>;
+    </Next.Link>;
+  };
+};
+
+type state = {
+  sort,
+  loading: bool,
+  members: array(member),
+};
+
+type actions =
+  | UpdateMembers(array(member))
+  | UpdateSort(sort);
+
+let reducer = (prevState, action) => {
+  switch (action) {
+  | UpdateMembers(members) => {sort: prevState.sort, loading: false, members}
+  | UpdateSort(sort) => {
+      sort,
+      loading: prevState.loading,
+      members: prevState.members,
+    }
   };
 };
 
 [@react.component]
-let make = () => {
-  let (entries, setEntries) =
-    React.useState(() => [|[|"Loading...", ""|]|]);
+let make =
+    (~filter: filter=All, ~sortDefault: sort=Release, ~search: string="") => {
+  let initialState = {sort: sortDefault, loading: true, members: [||]};
+  let (state, dispatch) = React.useReducer(reducer, initialState);
 
   React.useEffect0(() => {
-    fetchLeaderboard() |> Promise.iter(e => setEntries(_ => e));
+    fetchLeaderboard() |> Promise.iter(e => dispatch(UpdateMembers(e)));
     None;
   });
+
+  let sortRank = member =>
+    switch (state.sort) {
+    | Phase => member.phaseRank
+    | Release => member.releaseRank
+    | AllTime => member.allTimeRank
+    };
+
+  Array.sort((a, b) => sortRank(a) - sortRank(b), state.members);
+
+  let filteredMembers =
+    Js.Array.filter(
+      member =>
+        switch (filter) {
+        | All => true
+        | Genesis => member.genesisMember
+        | NonGenesis => !member.genesisMember
+        },
+      state.members,
+    )
+    |> Js.Array.filter(member =>
+         search === "" ? true : Js.String.includes(search, member.name)
+       )
+    |> Js.Array.filter(member => sortRank(member) !== 0);
+
+  let renderRow = member =>
+    <LeaderboardRow
+      key={string_of_int(member.allTimeRank)}
+      sort={state.sort}
+      member
+    />;
+
+  let renderColumnHeader = column =>
+    <span
+      onClick={_ => dispatch(UpdateSort(column))}
+      className={column === state.sort ? Styles.activeColumn : Styles.flexEnd}>
+      {React.string(
+         switch (column) {
+         | Phase => "This Phase"
+         | Release => "This Release"
+         | AllTime => "All Time"
+         },
+       )}
+    </span>;
 
   <div className=Styles.leaderboardContainer>
     <div id="testnet-leaderboard" className=Styles.leaderboard>
       <div className=Styles.headerRow>
-        <span className=Styles.flexEnd> {React.string("#")} </span>
-        <span> {React.string("Username")} </span>
-        <span className=Styles.flexEnd> {React.string("Current")} </span>
-        <span> {React.string("Total")} </span>
+        <span className=Styles.flexEnd> {React.string("Rank")} </span>
+        <span> {React.string("Name")} </span>
+        {Array.map(renderColumnHeader, pointsColumns) |> React.array}
       </div>
       <hr />
-      {Array.mapi(
-         (i, entry) =>
-           <LeaderboardRow
-             key={entry[0] ++ string_of_int(i)}
-             rank={i + 1}
-             entry
-           />,
-         entries,
-       )
-       |> React.array}
+      <div className=Styles.topTen />
+      {state.loading
+         ? <div className=Styles.loading> {React.string("Loading...")} </div>
+         : Array.map(renderRow, filteredMembers) |> React.array}
     </div>
   </div>;
 };

@@ -1,0 +1,24 @@
+# This dockerfile is part of a temporary hack for integration tests. Do not use
+# this dockerfile in a production environment. See `coda_daemon_puppeteer.py`
+# for more details.
+
+ARG coda_version
+FROM codaprotocol/coda-daemon:${coda_version}
+
+RUN echo '#!/bin/bash\n\
+pgrep -f --newest "python3 /root/coda_daemon_puppeteer.py"'\
+> find_puppeteer.sh
+
+RUN echo '#!/bin/bash\n\
+kill -s SIGUSR2 $(./find_puppeteer.sh)'\
+> start.sh
+
+RUN echo '#!/bin/bash\n\
+kill -s SIGUSR1 $(./find_puppeteer.sh)'\
+> stop.sh
+
+RUN chmod +x find_puppeteer.sh start.sh stop.sh
+
+ADD coda_daemon_puppeteer.py .
+
+ENTRYPOINT ["/usr/bin/dumb-init", "python3", "/root/coda_daemon_puppeteer.py"]

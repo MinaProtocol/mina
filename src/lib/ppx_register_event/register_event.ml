@@ -3,18 +3,11 @@ open Ppxlib
 
 let deriver = "register_event"
 
-(* module in Structured_log_events library *)
-let module_name = "Structured_log_events"
-
-let hash name =
-  let open Digestif.SHA256 in
-  let ctx0 = init () in
-  let ctx1 = feed_string ctx0 name in
-  get ctx1 |> to_raw_string
+let digest s = Md5.digest_string s |> Md5.to_hex
 
 let check_interpolations ~loc msg label_names =
-  match msg.pexp_desc with
-  | Pexp_constant (Pconst_string (s, _)) -> (
+  match Ast_convenience.get_str msg with
+  | Some s -> (
     (* check that every interpolation point $foo in msg has a matching label;
        OK to have extra labels not mentioned in message
     *)
@@ -36,18 +29,14 @@ let check_interpolations ~loc msg label_names =
       ()
 
 let generate_loggers_and_parsers ~loc:_ ~path ty_ext msg_opt =
-  let add_module_qualifier s = String.concat ~sep:"." [module_name; s] in
-  let ctor, ctor_args, label_decls =
+  let ctor, label_decls =
     match ty_ext.ptyext_constructors with
     (* record argument *)
-    | [ { pext_name
-        ; pext_kind= Pext_decl ((Pcstr_record labels as record), None)
-        ; _ } ] ->
-        (pext_name.txt, record, labels)
+    | [{pext_name; pext_kind= Pext_decl (Pcstr_record labels, None); _}] ->
+        (pext_name.txt, labels)
     (* no arguments *)
-    | [{pext_name; pext_kind= Pext_decl ((Pcstr_tuple [] as tuple), None); _}]
-      ->
-        (pext_name.txt, tuple, [])
+    | [{pext_name; pext_kind= Pext_decl (Pcstr_tuple [], None); _}] ->
+        (pext_name.txt, [])
     | _ ->
         Location.raise_errorf ~loc:ty_ext.ptyext_path.loc
           "Constructor in type extension must take a single record argument, \
@@ -106,114 +95,93 @@ let generate_loggers_and_parsers ~loc:_ ~path ty_ext msg_opt =
   in
   check_interpolations ~loc:msg_loc msg label_names ;
   let event_name = String.lowercase ctor in
-  let identifying = path ^ "." ^ event_name in
-  let id_string = hash identifying in
-  let core_type_of_string s =
-    ptyp_constr {txt= Longident.parse s; loc= Location.none} []
-  in
-  let id_name = event_name ^ "_structured_events_id" in
-  let id_type = core_type_of_string (add_module_qualifier "id") in
-  let id_of_string = add_module_qualifier "id_of_string" in
-  let event_id =
-    [%stri
-      let ([%p pvar id_name] : [%t id_type]) =
-        [%e evar id_of_string] [%e estring id_string]]
-  in
-  let repr_name = event_name ^ "_structured_events_repr" in
-  (* constructor declaration to build pattern *)
-  let ctor_decl =
-    { pcd_name= {txt= ctor; loc= Location.none}
-    ; pcd_args= ctor_args
-    ; pcd_res= None
-    ; pcd_loc= Location.none
-    ; pcd_attributes= [] }
-  in
-  let json_pairs =
-    List.map label_decls ~f:(fun decl ->
-        let name = estring decl.pld_name.txt in
-        let var = evar decl.pld_name.txt in
-        let to_json_var = Ppx_deriving_yojson.ser_expr_of_typ decl.pld_type in
-        pexp_tuple [name; eapply to_json_var [var]] )
-  in
-  let parse_args =
-    List.map label_names ~f:(fun label -> ppat_tuple [pstring label; pvar label]
-    )
-  in
-  let parse_args_pat =
-    List.fold_right parse_args
-      ~init:[%pat? []]
-      ~f:(fun hd tl -> [%pat? [%p hd] :: [%p tl]])
-  in
-  let equal_id = evar (add_module_qualifier "equal_id") in
-  let repr_type = core_type_of_string (add_module_qualifier "repr") in
+  let event_path = path ^ "." ^ ctor in
   let split_path = String.split path ~on:'.' in
-  let wrap_in_result_binds expr =
-    List.fold_right label_decls
-      ~init:[%expr Result.return [%e expr]]
-      ~f:(fun decl acc ->
-        [%expr
-          Result.bind
-            ([%e
-               Ppx_deriving_yojson.desu_expr_of_typ
-                 ~path:(split_path @ [ctor; decl.pld_name.txt])
-                 decl.pld_type]
-               [%e evar decl.pld_name.txt])
-            ~f:(fun [%p pvar decl.pld_name.txt] -> [%e acc])] )
-  in
-  let event_expr =
-    if has_record_arg then
-      let fields =
-        List.map label_names ~f:(fun label ->
-            ({txt= Lident label; loc= Location.none}, evar label) )
-      in
-      let record = pexp_record fields None in
-      econstruct ctor_decl (Some record)
-    else econstruct ctor_decl None
-  in
-  let binds = wrap_in_result_binds event_expr in
-  let register_constructor = add_module_qualifier "register_constructor" in
-  let args_pattern =
-    if has_record_arg then
-      let pat_args =
-        let ids =
+  let to_yojson = Ppx_deriving_yojson.ser_expr_of_typ in
+  let of_yojson = Ppx_deriving_yojson.desu_expr_of_typ in
+  let elist ~f l = elist (List.map ~f l) in
+  let plist ~f l = plist (List.map ~f l) in
+  let record_pattern =
+    let open Ast_helper.Pat in
+    let arg =
+      if has_record_arg then
+        let fields =
           List.map label_names ~f:(fun label ->
-              ({txt= Lident label; loc= Location.none}, pvar label) )
+              (Located.mk (Lident label), pvar label) )
         in
-        { ppat_desc= Ppat_record (ids, Closed)
-        ; ppat_loc= Location.none
-        ; ppat_attributes= [] }
-      in
-      pconstruct ctor_decl (Some pat_args)
-    else pconstruct ctor_decl None
+        Some (record fields Closed)
+      else None
+    in
+    construct (Located.mk (Lident ctor)) arg
   in
-  let repr =
-    [%stri
-      let ([%p pvar repr_name] : [%t repr_type]) =
-        { log=
+  let record_expr =
+    let open Ast_helper.Exp in
+    let arg =
+      if has_record_arg then
+        let fields =
+          List.map label_names ~f:(fun label ->
+              (Located.mk (Lident label), evar label) )
+        in
+        Some (record fields None)
+      else None
+    in
+    construct (Located.mk (Lident ctor)) arg
+  in
+  [ [%stri
+      let ([%p pvar (event_name ^ "_structured_events_id")] :
+            Structured_log_events.id) =
+        Structured_log_events.id_of_string [%e estring (digest event_path)]]
+  ; [%stri
+      let ([%p pvar (event_name ^ "_structured_events_repr")] :
+            Structured_log_events.repr) =
+        { id= [%e evar (event_name ^ "_structured_events_id")]
+        ; event_name= [%e estring event_path]
+        ; arguments=
+            Core_kernel.String.Set.of_list [%e elist ~f:estring label_names]
+        ; log=
             (function
-            | [%p args_pattern] ->
-                Some ([%e msg], [%e evar id_name], [%e elist json_pairs])
+            | [%p record_pattern] ->
+                Some
+                  ( [%e msg]
+                  , [%e
+                      elist label_decls
+                        ~f:(fun {pld_name= {txt= name; _}; pld_type; _} ->
+                          [%expr
+                            [%e estring name]
+                            , [%e to_yojson pld_type] [%e evar name]] )] )
             | _ ->
                 None )
         ; parse=
-            (fun id args ->
-              if [%e equal_id] id [%e evar id_name] then
-                let result =
-                  match args with
-                  | [%p parse_args_pat] ->
-                      [%e binds]
-                  | _ ->
-                      failwith
-                        (sprintf "%s, parse: unexpected arguments"
-                           [%e estring ctor])
-                in
-                match result with Ok ev -> Some ev | Error _ -> None
-              else None ) }]
-  in
-  let registration =
-    [%stri let () = [%e evar register_constructor] [%e evar repr_name]]
-  in
-  [event_id; repr; registration]
+            (fun args ->
+              let result =
+                match args with
+                | [%p
+                    plist label_names ~f:(fun label ->
+                        [%pat? [%p pstring label], [%p pvar label]] )] ->
+                    [%e
+                      List.fold_right label_decls
+                        ~f:(fun {pld_name= {txt= name; _}; pld_type; _} acc ->
+                          [%expr
+                            Core_kernel.Result.bind
+                              ([%e
+                                 of_yojson
+                                   ~path:(split_path @ [ctor; name])
+                                   pld_type]
+                                 [%e evar name])
+                              ~f:(fun [%p pvar name] -> [%e acc])] )
+                        ~init:
+                          [%expr Core_kernel.Result.return [%e record_expr]]]
+                | _ ->
+                    failwith
+                      [%e
+                        estring
+                          (sprintf "%s, parse: unexpected arguments" event_path)]
+              in
+              match result with Ok ev -> Some ev | Error _ -> None ) }]
+  ; [%stri
+      let () =
+        Structured_log_events.register_constructor
+          [%e evar (event_name ^ "_structured_events_repr")]] ]
 
 let str_type_ext =
   let args =

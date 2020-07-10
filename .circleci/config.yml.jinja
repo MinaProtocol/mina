@@ -24,13 +24,22 @@
                 command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
 {%endset%}
 
+{% set checkout_no_lfs %}
+            - run:
+                name: Disable LFS checkout
+                command: |
+                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                    git config --global lfs.fetchexclude "*"
+            - checkout
+{%endset%}
+
 version: 3
 jobs:
     tracetool:
         docker:
             - image: codaprotocol/coda:toolchain-rust-e855336d087a679f76f2dd2bbdc3fdfea9303be3
         steps:
-            - checkout
+            {{ checkout_no_lfs }}
             - run:
                   name: Update submodules
                   command: git submodule sync && git submodule update --init --recursive
@@ -76,7 +85,7 @@ jobs:
     test-archive:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
               environment:
                 CODA_DOCKER: true
             - image: postgres:12
@@ -85,7 +94,7 @@ jobs:
                 POSTGRES_USER: admin
                 POSTGRES_DB: archiver
         steps:
-            - checkout
+            {{ checkout_no_lfs }}
             {{ opam_init_linux }}
             - run:
                 name: Build libp2p_helper
@@ -102,7 +111,7 @@ jobs:
     build-archive:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
               environment:
                 CODA_DOCKER: true
                 HASURA_PORT: 8080
@@ -119,7 +128,7 @@ jobs:
                 HASURA_GRAPHQL_ENABLE_CONSOLE: "true"
                 HASURA_GRAPHQL_ENABLED_LOG_TYPES: startup, http-log, webhook-log, websocket-log, query-log
         steps:
-            - checkout
+            {{ checkout_no_lfs }}
             {{ opam_init_linux }}
             - save_cache:
                 name: Save cache - opam
@@ -149,9 +158,9 @@ jobs:
                   command: ./scripts/archive/build-release-archives.sh
     lint:
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
         steps:
-            - checkout
+            {{ checkout_no_lfs }}
             {{ opam_init_linux }}
             - run:
                   name: Check circle CI configuration rendering
@@ -176,9 +185,9 @@ jobs:
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c './scripts/require-ppx-version.py'
     lint-opt:
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
         steps:
-            - checkout
+            {{ checkout_no_lfs }}
             - run:
                 name: Show USER
                 command: echo $USER
@@ -191,9 +200,9 @@ jobs:
                   command: ./scripts/compare_ci_diff_binables.sh
     compare-test-signatures:
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
         steps:
-            - checkout
+            {{ checkout_no_lfs }}
             {{ opam_init_linux }}
             - run:
                   name: Compare test signatures for consensus, nonconsensus code
@@ -205,7 +214,7 @@ jobs:
             - run:
                 name: Install dependencies
                 command: pip install --user requests jinja2 readchar
-            - checkout
+            {{ checkout_no_lfs }}
             - run:
                   name: Update branch protection rule from test configuration
                   command: ./scripts/test.py required-status >required_status && cat required_status && ./scripts/update_branch_rule.py required_status
@@ -214,7 +223,7 @@ jobs:
         docker:
             - image: node:14.4.0
         steps:
-            - checkout
+            {{ checkout_no_lfs }}
             - run:
                 name: Update the Leaderboard
                 command: cd frontend/leaderboard && yarn && yarn build
@@ -223,7 +232,7 @@ jobs:
                 command: cd frontend/leaderboard/lib/js/src/ && mkdir blocks && gsutil -m rsync gs://points-data-hack-april20/v1/32b-joyous-occasion blocks
             - run:
                 name: Run the Leaderboard
-                run: node frontend/leaderboard/lib/js/src/Main.bs.js
+                command: node frontend/leaderboard/lib/js/src/Main.bs.js
 
     build-macos:
         macos:
@@ -240,7 +249,7 @@ jobs:
                     sudo rm -rf /Library/Developer/CoreSimulator/Profiles/Runtimes/
                     df -h
                 background: true
-            - checkout
+            {{ checkout_no_lfs }}
             - run:
                   name: Update submodules
                   command: git submodule sync && git submodule update --init --recursive
@@ -289,7 +298,7 @@ jobs:
             - run:
                 name: Install nix and cachix
                 command: |
-                    curl https://nixos.org/nix/install | sh
+                    curl -L https://nixos.org/nix/install | sh
                     . ~/.nix-profile/etc/profile.d/nix.sh
                     nix-env -iA cachix -f https://cachix.org/api/v1/install
             ### dune
@@ -369,9 +378,9 @@ jobs:
     build-client-sdk:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
         steps:
-            - checkout
+            {{ checkout_no_lfs }}
             - run:
                   name: Artifacts Path
                   command: |
@@ -383,14 +392,20 @@ jobs:
                   environment:
                     DUNE_PROFILE: nonconsensus_medium_curves
                   no_output_timeout: 10m
+            - run:
+                  name: Yarn deps
+                  command: cd frontend/client_sdk && yarn install
+            - run:
+                  name: Build And Test Client SDK
+                  command: eval `opam config env` && cd frontend/client_sdk && yarn prepublishOnly
 
     {%- for profile in build_artifact_profiles %}
     build-artifacts--{{profile}}:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
         steps:
-            - checkout
+            {{ checkout_no_lfs }}
             - run:
                   name: Artifacts Path
                   command: |
@@ -475,7 +490,7 @@ jobs:
     build-artifacts-docker--{{profile}}--{{docker_image}}:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
         steps:
             - restore_cache:
                 name: Restore cache - docker deploy env
@@ -511,9 +526,9 @@ jobs:
     test-unit--{{profile}}:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
         steps:
-            - checkout
+            {{ checkout_no_lfs }}
             - run: ulimit -c unlimited
             {{ opam_init_linux }}
             - run:
@@ -535,9 +550,9 @@ jobs:
     test-unit--nonconsensus_medium_curves:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
         steps:
-            - checkout
+            {{ checkout_no_lfs }}
             - run: ulimit -c unlimited
             {{ opam_init_linux }}
             - run:
@@ -558,9 +573,9 @@ jobs:
     test-unit--{{profile}}:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
         steps:
-            - checkout
+            {{ checkout_no_lfs }}
             - run: ulimit -c unlimited
             {{ opam_init_linux }}
             - run:
@@ -582,9 +597,9 @@ jobs:
     test--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
         steps:
-            - checkout
+            {{ checkout_no_lfs }}
             {{ opam_init_linux }}
             - run:
                 name: Build libp2p_helper
@@ -602,9 +617,9 @@ jobs:
     test--{{profile}}:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
         steps:
-            - checkout
+            {{ checkout_no_lfs }}
             {{ opam_init_linux }}
             - run:
                 name: Build libp2p_helper
@@ -657,17 +672,6 @@ workflows:
             {%- for profile in small_curves_tests.keys() | sort %}
             - test--{{profile}}
             {%- endfor %}
-
-    leaderboard:
-        triggers:
-          - schedule:
-              cron: "0 1 * * *"
-              filters:
-                branches:
-                  only:
-                    - develop
-        jobs:
-          - run-leaderboard
 
     daily:
         triggers:

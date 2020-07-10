@@ -209,7 +209,7 @@ module Make (Inputs : Intf.Inputs_intf) :
           ~doc:"HOST-AND-PORT address daemon is listening on"
       and proof_level =
         flag "proof-level"
-          (required (Arg_type.create Genesis_constants.Proof_level.of_string))
+          (optional (Arg_type.create Genesis_constants.Proof_level.of_string))
           ~doc:"full|check|none"
       and shutdown_on_disconnect =
         flag "shutdown-on-disconnect" (optional bool)
@@ -225,6 +225,10 @@ module Make (Inputs : Intf.Inputs_intf) :
               !"Received signal to terminate. Aborting snark worker process"
               ~module_:__MODULE__ ~location:__LOC__ ;
             Core.exit 0 ) ;
+        let proof_level =
+          Option.value ~default:Genesis_constants.Proof_level.compiled
+            proof_level
+        in
         main
           (module Rpcs_versioned)
           ~logger ~proof_level

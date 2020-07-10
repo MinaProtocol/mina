@@ -2,10 +2,14 @@
 let Prelude = ../External/Prelude.dhall
 let P = Prelude
 let List/map = P.List.map
+let List/null = P.List.null
 let Optional/toList = P.Optional.toList
+let Optional/default = P.Optional.default
 let Optional/map = P.Optional.map
 let List/concatMap = P.List.concatMap
+let List/concat = P.List.concat
 let Text/concatSep = P.Text.concatSep
+let Text/concatMap = P.Text.concatMap
 
 -- abstract out defaultEnv so tests are less verbose
 let module = \(environment : List Text) ->
@@ -33,14 +37,14 @@ let module = \(environment : List Text) ->
     \(docker : Docker.Type) ->
     \(inner : Cmd) ->
     let envVars =
-      P.Text.concatMap
+      Text/concatMap
         Text
         (\(var : Text) -> " --env ${var}")
         (docker.extraEnv # environment)
     let outerDir : Text =
-      "/var/buildkite/builds/\$BUILDKITE_AGENT_NAME/\$BUILDKITE_ORGANIZATION_SLUG/\$BUILDKITE_PIPELINE_SLUG"
+      "/var/buildkite/builds/\\\$BUILDKITE_AGENT_NAME/\\\$BUILDKITE_ORGANIZATION_SLUG/\\\$BUILDKITE_PIPELINE_SLUG"
     in
-    { line = "docker run -it --rm --init --volume ${outerDir}:/workdir --workdir /workdir${envVars} ${docker.image} bash -c '${inner.line}'"
+    { line = "docker run -it --rm --init --volume ${outerDir}:/workdir --workdir /workdir${envVars} ${docker.image} /bin/sh -c '${inner.line}'"
     , readable = Optional/map Text Text (\(readable : Text) -> "Docker@${docker.image} ( ${readable} )") inner.readable
     }
 
@@ -49,11 +53,12 @@ let module = \(environment : List Text) ->
     \(script : Text) ->
     inDocker docker (run script)
 
-  let CompoundCmd = {
+  let CacheSetupCmd = {
     Type = {
-      preprocess : Cmd,
-      postprocess : Cmd,
-      inner : Cmd
+      -- run your command to create data (only on miss)
+      create : Cmd,
+      -- package data before an upload to gcloud (only on miss)
+      package : Cmd
     },
     default = {=}
   }
@@ -61,27 +66,30 @@ let module = \(environment : List Text) ->
   let format : Cmd -> Text =
     \(cmd : Cmd) -> cmd.line
 
-  -- Loads through cache, innards with docker, buildkite-agent interactions outside
-  let cacheThrough : Docker.Type -> Text -> CompoundCmd.Type -> Cmd =
+  -- Loads through cache, innards with docker, buildkite-agent interactions outside, continues in docker after hit or miss with continuation
+  let cacheThrough : Docker.Type -> Text -> CacheSetupCmd.Type -> Cmd =
     \(docker : Docker.Type) ->
     \(cachePath : Text) ->
-    \(cmd : CompoundCmd.Type) ->
-      let script =
-        "( ${format cmd.postprocess} || true ) && " ++
-        ( format cmd.inner ) ++ " && " ++
-        ( format cmd.preprocess )
+    \(cmd : CacheSetupCmd.Type) ->
+      let missScript =
+        ( format cmd.create ) ++ " && " ++
+        ( format cmd.package )
+      let missCmd =
+        runInDocker docker missScript
       in
-      let cmd =
-        runInDocker docker script
-      in
-      { line = "./buildkite/scripts/cache-through.sh ${cachePath} \"${format ( runInDocker docker script )}\""
-      , readable = Optional/map Text Text (\(readable : Text) -> "Cache@${cachePath} ( ${readable} ) ") cmd.readable
+      { line = "./buildkite/scripts/cache-through.sh ${cachePath} \"${format missCmd}\""
+      , readable =
+          Optional/map
+            Text
+            Text
+            (\(readable : Text) -> "Cache@${cachePath} ( onMiss = ${readable} )")
+            missCmd.readable
       }
   in
 
   { Type = Cmd
   , Docker = Docker
-  , CompoundCmd = CompoundCmd
+  , CacheSetupCmd = CacheSetupCmd
   , quietly = quietly
   , run = run
   , true = true
@@ -97,7 +105,7 @@ let tests =
 
   let dockerExample = assert :
   { line =
-"docker run -it --rm --init --volume /var/buildkite/builds/$BUILDKITE_AGENT_NAME/$BUILDKITE_ORGANIZATION_SLUG/$BUILDKITE_PIPELINE_SLUG:/workdir --workdir /workdir --env ENV1 --env ENV2 --env TEST foo/bar:tag bash -c 'echo hello'"
+"docker run -it --rm --init --volume /var/buildkite/builds/\\\$BUILDKITE_AGENT_NAME/\\\$BUILDKITE_ORGANIZATION_SLUG/\\\$BUILDKITE_PIPELINE_SLUG:/workdir --workdir /workdir --env ENV1 --env ENV2 --env TEST foo/bar:tag /bin/sh -c 'echo hello'"
   , readable =
     Some "Docker@foo/bar:tag ( echo hello )"
   }
@@ -111,8 +119,8 @@ let tests =
 
   let cacheExample = assert :
 ''
-  ./buildkite/scripts/cache-through.sh data.tar "docker run -it --rm --init --volume /var/buildkite/builds/$BUILDKITE_AGENT_NAME/$BUILDKITE_ORGANIZATION_SLUG/$BUILDKITE_PIPELINE_SLUG:/workdir --workdir /workdir --env ENV1 --env ENV2 --env TEST foo/bar:tag bash -c '( tar xvf data.tar -C /tmp/data || true ) && echo hello > /tmp/data/foo.txt && tar cvf data.tar /tmp/data'"''
-===
+  ./buildkite/scripts/cache-through.sh data.tar "docker run -it --rm --init --volume /var/buildkite/builds/\$BUILDKITE_AGENT_NAME/\$BUILDKITE_ORGANIZATION_SLUG/\$BUILDKITE_PIPELINE_SLUG:/workdir --workdir /workdir --env ENV1 --env ENV2 --env TEST foo/bar:tag /bin/sh -c 'echo hello > /tmp/data/foo.txt && tar cvf data.tar /tmp/data'"''
+  ===
   M.format (
     M.cacheThrough
       M.Docker::{
@@ -120,10 +128,9 @@ let tests =
         extraEnv = [ "ENV1", "ENV2" ]
       }
       "data.tar"
-      M.CompoundCmd::{
-        preprocess = M.run "tar cvf data.tar /tmp/data",
-        postprocess = M.run "tar xvf data.tar -C /tmp/data",
-        inner = M.run "echo hello > /tmp/data/foo.txt"
+      M.CacheSetupCmd::{
+        create = M.run "echo hello > /tmp/data/foo.txt",
+        package = M.run "tar cvf data.tar /tmp/data"
       }
   )
   in

@@ -9,7 +9,7 @@ let%test_module "network pool test" =
 
     let logger = Logger.null ()
 
-    let proof_level = Genesis_constants.Proof_level.Check
+    let proof_level = Genesis_constants.Proof_level.for_unit_tests
 
     let constraint_constants =
       Genesis_constants.Constraint_constants.for_unit_tests

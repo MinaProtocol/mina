@@ -546,13 +546,8 @@ let cancel_transaction_graphql =
        fee larger than the cancelled transaction."
     (Cli_lib.Background_daemon.graphql_init txn_id_flag
        ~f:(fun graphql_endpoint user_command ->
-         let receiver =
-           user_command |> User_command.payload |> User_command.Payload.body
-           |> User_command.Payload.Body.receiver
-         in
-         let receiver_pk = Account_id.public_key receiver in
-         let cancel_sender = User_command.fee_payer user_command in
-         let cancel_sender_pk = Account_id.public_key cancel_sender in
+         let receiver_pk = User_command.receiver_pk user_command in
+         let cancel_sender_pk = User_command.fee_payer_pk user_command in
          let open Deferred.Let_syntax in
          let%bind nonce_response =
            let open Graphql_client.Encoders in

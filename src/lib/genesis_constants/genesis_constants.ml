@@ -31,6 +31,8 @@ module Proof_level = struct
   "compiled", proof_level]
 
   let compiled = of_string compiled
+
+  let for_unit_tests = Check
 end
 
 (** Constants that affect the constraint systems for proofs (and thus also key
@@ -67,7 +69,7 @@ module Constraint_constants = struct
     ; pending_coinbase_depth: int
     ; coinbase_amount: Currency.Amount.t
     ; account_creation_fee: Currency.Fee.t }
-  [@@deriving sexp]
+  [@@deriving sexp, eq]
 
   (* Generate the compile-time constraint constants, using a signature to hide
      the optcomp constants that we import.
@@ -208,7 +210,7 @@ module Protocol = struct
     type ('k, 'delta, 'genesis_state_timestamp) t =
           ('k, 'delta, 'genesis_state_timestamp) Stable.Latest.t =
       {k: 'k; delta: 'delta; genesis_state_timestamp: 'genesis_state_timestamp}
-    [@@deriving eq]
+    [@@deriving eq, hlist]
   end
 
   [%%versioned_asserted

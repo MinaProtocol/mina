@@ -31,13 +31,17 @@ module type Blockchain_state = sig
     [%%versioned:
     module Stable : sig
       module V1 : sig
-        type ('staged_ledger_hash, 'snarked_ledger_hash, 'time) t
+        type ('staged_ledger_hash, 'snarked_ledger_hash, 'token_id, 'time) t
         [@@deriving sexp]
       end
     end]
 
-    type ('staged_ledger_hash, 'snarked_ledger_hash, 'time) t =
-      ('staged_ledger_hash, 'snarked_ledger_hash, 'time) Stable.Latest.t
+    type ('staged_ledger_hash, 'snarked_ledger_hash, 'token_id, 'time) t =
+      ( 'staged_ledger_hash
+      , 'snarked_ledger_hash
+      , 'token_id
+      , 'time )
+      Stable.Latest.t
     [@@deriving sexp]
   end
 
@@ -46,7 +50,11 @@ module type Blockchain_state = sig
     module Stable : sig
       module V1 : sig
         type t =
-          (Staged_ledger_hash.t, Frozen_ledger_hash.t, Block_time.t) Poly.t
+          ( Staged_ledger_hash.t
+          , Frozen_ledger_hash.t
+          , Token_id.t
+          , Block_time.t )
+          Poly.t
         [@@deriving sexp]
       end
     end]
@@ -57,22 +65,26 @@ module type Blockchain_state = sig
   type var =
     ( Staged_ledger_hash.var
     , Frozen_ledger_hash.var
+    , Token_id.var
     , Block_time.Unpacked.var )
     Poly.t
 
   val create_value :
        staged_ledger_hash:Staged_ledger_hash.t
     -> snarked_ledger_hash:Frozen_ledger_hash.t
+    -> snarked_next_available_token:Token_id.t
     -> timestamp:Block_time.t
     -> Value.t
 
   val staged_ledger_hash :
-    ('staged_ledger_hash, _, _) Poly.t -> 'staged_ledger_hash
+    ('staged_ledger_hash, _, _, _) Poly.t -> 'staged_ledger_hash
 
   val snarked_ledger_hash :
-    (_, 'frozen_ledger_hash, _) Poly.t -> 'frozen_ledger_hash
+    (_, 'frozen_ledger_hash, _, _) Poly.t -> 'frozen_ledger_hash
 
-  val timestamp : (_, _, 'time) Poly.t -> 'time
+  val snarked_next_available_token : (_, _, 'token_id, _) Poly.t -> 'token_id
+
+  val timestamp : (_, _, _, 'time) Poly.t -> 'time
 end
 
 module type Protocol_state = sig
@@ -361,7 +373,7 @@ module type S = sig
       [%%versioned:
       module Stable : sig
         module V1 : sig
-          type t [@@deriving sexp, to_yojson]
+          type t
         end
       end]
 

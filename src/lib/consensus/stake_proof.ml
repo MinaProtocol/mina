@@ -9,7 +9,6 @@ module Stable = struct
       ; ledger: Sparse_ledger.Stable.V1.t
       ; private_key: Signature_lib.Private_key.Stable.V1.t
       ; public_key: Signature_lib.Public_key.Stable.V1.t }
-    [@@deriving sexp, to_yojson]
 
     let to_latest = Fn.id
   end

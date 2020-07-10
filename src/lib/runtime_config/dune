@@ -1,5 +1,5 @@
 (library
  (name runtime_config)
  (public_name coda_runtime_config)
- (libraries core_kernel currency)
- (preprocess (pps ppx_let ppx_deriving_yojson ppx_version)))
+ (libraries core_kernel currency ppx_dhall_type)
+ (preprocess (pps ppx_let ppx_deriving_yojson ppx_dhall_type ppx_version)))

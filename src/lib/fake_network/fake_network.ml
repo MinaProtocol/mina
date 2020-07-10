@@ -149,12 +149,11 @@ module Generator = struct
   open Generator.Let_syntax
 
   type peer_config =
-       proof_level:Genesis_constants.Proof_level.t
-    -> precomputed_values:Precomputed_values.t
+       precomputed_values:Precomputed_values.t
     -> max_frontier_length:int
     -> peer_state Generator.t
 
-  let fresh_peer ~proof_level ~precomputed_values ~max_frontier_length =
+  let fresh_peer ~precomputed_values ~max_frontier_length =
     let genesis_ledger =
       Precomputed_values.genesis_ledger precomputed_values
     in
@@ -163,12 +162,12 @@ module Generator = struct
         ~genesis_ledger
     in
     let%map frontier =
-      Transition_frontier.For_tests.gen ~proof_level ~precomputed_values
+      Transition_frontier.For_tests.gen ~precomputed_values
         ~consensus_local_state ~max_length:max_frontier_length ~size:0 ()
     in
     {frontier; consensus_local_state}
 
-  let peer_with_branch ~frontier_branch_size ~proof_level ~precomputed_values
+  let peer_with_branch ~frontier_branch_size ~precomputed_values
       ~max_frontier_length =
     let genesis_ledger =
       Precomputed_values.genesis_ledger precomputed_values
@@ -178,8 +177,8 @@ module Generator = struct
         ~genesis_ledger
     in
     let%map frontier, branch =
-      Transition_frontier.For_tests.gen_with_branch ~proof_level
-        ~precomputed_values ~max_length:max_frontier_length ~frontier_size:0
+      Transition_frontier.For_tests.gen_with_branch ~precomputed_values
+        ~max_length:max_frontier_length ~frontier_size:0
         ~branch_size:frontier_branch_size ~consensus_local_state ()
     in
     Async.Thread_safe.block_on_async_exn (fun () ->
@@ -187,11 +186,11 @@ module Generator = struct
           ~f:(Transition_frontier.add_breadcrumb_exn frontier) ) ;
     {frontier; consensus_local_state}
 
-  let gen ~proof_level ~precomputed_values ~max_frontier_length configs =
+  let gen ~precomputed_values ~max_frontier_length configs =
     let open Quickcheck.Generator.Let_syntax in
     let%map states =
       Vect.Quickcheck_generator.map configs ~f:(fun config ->
-          config ~proof_level ~precomputed_values ~max_frontier_length )
+          config ~precomputed_values ~max_frontier_length )
     in
     setup ~precomputed_values states
 end
