@@ -5,7 +5,7 @@
  (library_flags -linkall)
  (libraries core genesis_constants snarky snarky_curves test_util)
  (preprocess
-  (pps ppx_version ppx_jane ppx_bench ppx_deriving.eq bisect_ppx -- -conditional))
+  (pps ppx_version ppx_jane ppx_bench ppx_deriving.eq h_list.ppx bisect_ppx -- -conditional))
  (modules integrated standalone)
  (synopsis "VRF instantiation"))
 
@@ -17,5 +17,5 @@
  (libraries core snarky snarky_curves test_util signature_lib snark_params
    vrf_lib coda_base random_oracle fold_lib)
  (preprocess
-  (pps ppx_version ppx_version ppx_jane ppx_bench ppx_deriving.eq bisect_ppx -- -conditional))
+  (pps ppx_version ppx_version ppx_jane ppx_bench h_list.ppx ppx_deriving.eq bisect_ppx -- -conditional))
  (modules integrated_test))

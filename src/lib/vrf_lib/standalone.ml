@@ -2,7 +2,7 @@ open Core
 
 module Context = struct
   type ('message, 'pk) t = {message: 'message; public_key: 'pk}
-  [@@deriving sexp]
+  [@@deriving sexp, hlist]
 end
 
 module Evaluation = struct
@@ -176,15 +176,10 @@ end = struct
     type var = (Message.var, Public_key.var) Context.t
 
     let typ =
-      let open Snarky.H_list in
       Impl.Typ.of_hlistable
         [Message.typ; Public_key.typ]
-        ~var_to_hlist:(fun {Context.message; public_key} ->
-          [message; public_key] )
-        ~var_of_hlist:(fun [message; public_key] -> {message; public_key})
-        ~value_to_hlist:(fun {Context.message; public_key} ->
-          [message; public_key] )
-        ~value_of_hlist:(fun [message; public_key] -> {message; public_key})
+        ~var_to_hlist:Context.to_hlist ~var_of_hlist:Context.of_hlist
+        ~value_to_hlist:Context.to_hlist ~value_of_hlist:Context.of_hlist
   end
 
   module Private_key = Scalar
@@ -193,7 +188,7 @@ end = struct
     module Discrete_log_equality = struct
       type 'scalar t_ = 'scalar Evaluation.Discrete_log_equality.Poly.t =
         {c: 'scalar; s: 'scalar}
-      [@@deriving sexp]
+      [@@deriving sexp, hlist]
 
       type t = Scalar.t t_ [@@deriving sexp]
 
@@ -202,12 +197,9 @@ end = struct
       open Impl
 
       let typ : (var, t) Typ.t =
-        let open Snarky.H_list in
-        Typ.of_hlistable [Scalar.typ; Scalar.typ]
-          ~var_to_hlist:(fun {c; s} -> [c; s])
-          ~var_of_hlist:(fun [c; s] -> {c; s})
-          ~value_to_hlist:(fun {c; s} -> [c; s])
-          ~value_of_hlist:(fun [c; s] -> {c; s})
+        Typ.of_hlistable [Scalar.typ; Scalar.typ] ~var_to_hlist:t__to_hlist
+          ~var_of_hlist:t__of_hlist ~value_to_hlist:t__to_hlist
+          ~value_of_hlist:t__of_hlist
     end
 
     type ('group, 'dleq) t_ = ('group, 'dleq) Evaluation.Poly.t =
