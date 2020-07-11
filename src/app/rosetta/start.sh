@@ -1,25 +1,47 @@
 #!/bin/bash
 
+set -eou pipefail
+
 function cleanup
 {
-  kill $(jobs -p)
-  /etc/init.d/postgresql stop
+  echo "Cleaning up backgrounded processes"
+  kill $(ps aux | egrep '_build.*archive\.exe' | grep -v grep | awk '{ print $2 }')
+  kill $(ps aux | egrep '_build.*coda\.exe' | grep -v grep | awk '{ print $2 }')
+  kill $(ps aux | egrep '_build.*rosetta\.exe' | grep -v grep | awk '{ print $2 }')
   exit
 }
 
 trap cleanup TERM
+trap cleanup INT
 
-/etc/init.d/postgresql start
+PG_CONN=postgres://$USER:$USER@localhost:5432/archiver
 
-coda-archive \
-  -postgres-uri postgres://pguser:pguser@localhost:5432/archiver \
+# rebuild
+pushd ../../../
+PATH=/usr/local/bin:$PATH dune b src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe src/app/cli/src/coda.exe src/app/archive/archive.exe src/app/rosetta/rosetta.exe
+popd
+
+# make genesis
+./make-runtime-genesis.sh
+
+# archive
+../../../_build/default/src/app/archive/archive.exe \
+  -postgres-uri $PG_CONN \
   -server-port 3086 &
 
+# wait for it to settle
 sleep 5
 
-/run-demo.sh \
-    -archive-address 3086 \
-    -config-directory /data/coda-config &
+# demo node
+./run-demo.sh \
+    -archive-address 3086 -log-level debug &
 
-sleep 600000
+# rosetta
+../../../_build/default/src/app/rosetta/rosetta.exe \
+  -archive-uri $PG_CONN \
+  -graphql-uri https://localhost:3085/graphql \
+  -port 3087 &
+
+# wait for a signal
+sleep infinity
 
