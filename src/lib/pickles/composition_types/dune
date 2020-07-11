@@ -2,7 +2,7 @@
   (name composition_types)
   (public_name pickles.composition_types)
   (flags -warn-error -27)
-  (preprocess (pps ppx_version ppx_coda ppx_jane ppx_deriving.std ppx_deriving_yojson ))
+  (preprocess (pps ppx_version ppx_coda ppx_jane ppx_deriving.std ppx_deriving_yojson h_list.ppx ))
   (libraries
     limb_vector
     zexe_backend

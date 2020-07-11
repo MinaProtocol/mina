@@ -210,7 +210,7 @@ module Protocol = struct
     type ('k, 'delta, 'genesis_state_timestamp) t =
           ('k, 'delta, 'genesis_state_timestamp) Stable.Latest.t =
       {k: 'k; delta: 'delta; genesis_state_timestamp: 'genesis_state_timestamp}
-    [@@deriving eq]
+    [@@deriving eq, hlist]
   end
 
   [%%versioned_asserted

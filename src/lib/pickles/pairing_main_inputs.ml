@@ -4,10 +4,13 @@ open Zexe_backend
 module Impl = Impls.Pairing_based
 open Import
 
+let high_entropy_bits = 256
+
 let sponge_params_constant =
   Sponge.Params.(map bn382_p ~f:Impl.Field.Constant.of_string)
 
-let fp_random_oracle ?length s = Fp.of_bits (bits_random_oracle ?length s)
+let fp_random_oracle ?(length = high_entropy_bits) s =
+  Fp.of_bits (bits_random_oracle ~length s)
 
 let unrelated_g =
   let group_map = unstage (group_map (module Fp) ~a:G.Params.a ~b:G.Params.b)
@@ -42,7 +45,7 @@ let sponge_params =
 module Sponge = struct
   module S = Sponge.Make_sponge (Sponge.Poseidon (Sponge_inputs.Make (Impl)))
 
-  include Sponge.Make_bit_sponge (struct
+  include Sponge.Bit_sponge.Make (struct
               type t = Impl.Boolean.var
             end)
             (struct
@@ -51,6 +54,8 @@ module Sponge = struct
               let to_bits t =
                 Bitstring_lib.Bitstring.Lsb_first.to_list
                   (Impl.Field.unpack_full t)
+
+              let high_entropy_bits = high_entropy_bits
             end)
             (Impl.Field)
             (S)
