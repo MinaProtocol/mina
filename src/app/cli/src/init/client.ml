@@ -1269,11 +1269,12 @@ let compile_time_constants =
          let open Async in
          let%map ({consensus_constants; _} as precomputed_values), _ =
            config_file |> Genesis_ledger_helper.load_config_json
-           >>| Or_error.ok_exn >>| Runtime_config.of_yojson
-           >>| Result.ok_or_failwith
+           >>| Or_error.ok
+           >>| Option.value ~default:(`Assoc [])
+           >>| Runtime_config.of_yojson >>| Result.ok
+           >>| Option.value ~default:Runtime_config.default
            >>= Genesis_ledger_helper.init_from_config_file ~genesis_dir
-                 ~logger:(Logger.create ()) ~may_generate:false
-                 ~proof_level:None
+                 ~logger:(Logger.null ()) ~may_generate:false ~proof_level:None
                  ~genesis_constants:Genesis_constants.compiled
            >>| Or_error.ok_exn
          in
