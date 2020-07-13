@@ -153,6 +153,13 @@ module Styles = {
     style([fontWeight(`normal), justifySelf(`center)]);
   };
 
+  let points = {
+    style([
+      textAlign(`right),
+      media(Theme.MediaQuery.notMobile, [paddingRight(`rem(6.))]),
+    ]);
+  };
+
   let disclaimer = {
     style([
       display(`flex),
@@ -179,7 +186,7 @@ module Row = {
         {React.string(string_of_int(rank))}
       </span>
       <span> {React.string(name)} </span>
-      <span>
+      <span className=Styles.points>
         {switch (points) {
          | Some(points) => React.string(string_of_int(points))
          | None => React.null
