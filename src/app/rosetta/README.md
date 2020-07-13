@@ -17,7 +17,7 @@ Note: Coda is in the `dev` profile, so snarks are turned off and every runs very
 If everything is working:
 
 ```
-𝝺 ./test/network_list.sh
+𝝺 cd test && ./network_list.sh
 {"network_identifiers":[{"blockchain":"coda","network":"testnet"}]}
 ```
 

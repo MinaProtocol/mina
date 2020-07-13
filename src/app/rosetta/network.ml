@@ -41,9 +41,15 @@ module Get_network =
   }
 |}]
 
+(* TODO: Make genesis block at height 0 see #5361 *)
 let genesis_block_query =
   Caqti_request.find Caqti_type.unit Caqti_type.string
     "SELECT state_hash FROM blocks WHERE height = 1 LIMIT 1"
+
+let oldest_block_query =
+  Caqti_request.find Caqti_type.unit
+    (Caqti_type.tup2 Caqti_type.int64 Caqti_type.string)
+    "SELECT height, state_hash FROM blocks ORDER BY timestamp ASC LIMIT 1"
 
 let network_tag_of_graphql res =
   match res#initialPeers with
@@ -102,9 +108,10 @@ let router ~graphql_uri ~logger ~db (route : string list) body =
           | Some chain ->
               Ok (Array.last chain) )
       in
-      let%map genesis_block_state_hash =
+      let%bind genesis_block_state_hash =
         Errors.map_sql @@ Db.find genesis_block_query ()
       in
+      let%map oldest_block = Errors.map_sql @@ Db.find oldest_block_query () in
       Network_status_response.to_yojson
         { Network_status_response.current_block_identifier=
             Block_identifier.create
@@ -113,7 +120,15 @@ let router ~graphql_uri ~logger ~db (route : string list) body =
         ; current_block_timestamp=
             ((latest_block#protocolState)#blockchainState)#utcDate
         ; genesis_block_identifier=
-            Block_identifier.create Int64.zero genesis_block_state_hash
+            (* TODO: Also change this to zero when #5361 finishes *)
+            Block_identifier.create Int64.one genesis_block_state_hash
+        ; oldest_block_identifier=
+            ( if String.equal (snd oldest_block) genesis_block_state_hash then
+              None
+            else
+              Some
+                (Block_identifier.create (fst oldest_block) (snd oldest_block))
+            )
         ; peers=
             (res#daemonStatus)#peers |> Array.to_list
             |> List.map ~f:Peer.create }
@@ -125,7 +140,10 @@ let router ~graphql_uri ~logger ~db (route : string list) body =
             Version.create "1.4.0"
               (Option.value ~default:"unknown" res#version)
             (* TODO: Fill in allow field *)
-        ; allow= {Allow.operation_statuses= []; operation_types= []; errors= []}
-        }
+        ; allow=
+            { Allow.operation_statuses= []
+            ; operation_types= []
+            ; errors= []
+            ; historical_balance_lookup= false } }
   | _ ->
       Deferred.return (Error `Page_not_found)
