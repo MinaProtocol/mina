@@ -567,6 +567,78 @@ module Block = struct
               (coinbase_id, block_id)
         in
         return block_id
+
+  let delete_if_older_than ?height ?num_blocks ?timestamp
+      (module Conn : CONNECTION) =
+    let open Deferred.Result.Let_syntax in
+    let%bind height =
+      match (height, num_blocks) with
+      | Some height, _ ->
+          return height
+      | None, Some num_blocks -> (
+          match%map
+            Conn.find_opt
+              (Caqti_request.find_opt Caqti_type.unit Caqti_type.int
+                 "SELECT MAX(height) FROM blocks")
+              ()
+          with
+          | Some max_block_height ->
+              max_block_height - num_blocks
+          | _ ->
+              0 )
+      | None, None ->
+          return 0
+    in
+    let timestamp = Option.value ~default:Int64.zero timestamp in
+    let%bind () =
+      (* Delete user commands *)
+      Conn.exec
+        (Caqti_request.exec
+           Caqti_type.(tup2 int int64)
+           "DELETE FROM user_commands INNER JOIN (blocks_user_commands INNER \
+            JOIN blocks ON blocks.id = blocks_user_commands.block_id) ON \
+            user_commands.id = blocks_user_commands.user_command_id WHERE \
+            blocks.height < ? OR blocks.timestamp < ?")
+        (height, timestamp)
+    in
+    let%bind () =
+      (* Delete internal commands *)
+      Conn.exec
+        (Caqti_request.exec
+           Caqti_type.(tup2 int int64)
+           "DELETE FROM internal_commands INNER JOIN \
+            (blocks_internal_commands INNER JOIN blocks ON blocks.id = \
+            blocks_internal_commands.block_id) ON internal_commands.id = \
+            blocks_user_commands.internal_command_id WHERE blocks.height < ? \
+            OR blocks.timestamp < ?")
+        (height, timestamp)
+    in
+    let%bind () =
+      (* Delete block user command relationship *)
+      Conn.exec
+        (Caqti_request.exec
+           Caqti_type.(tup2 int int64)
+           "DELETE FROM blocks_user_commands INNER JOIN blocks ON blocks.id = \
+            blocks_user_commands.block_id WHERE blocks.height < ? OR \
+            blocks.timestamp < ?")
+        (height, timestamp)
+    in
+    let%bind () =
+      (* Delete block internal command relationship *)
+      Conn.exec
+        (Caqti_request.exec
+           Caqti_type.(tup2 int int64)
+           "DELETE FROM blocks_internal_commands INNER JOIN blocks ON \
+            blocks.id = blocks_internal_commands.block_id WHERE blocks.height \
+            < ? OR blocks.timestamp < ?")
+        (height, timestamp)
+    in
+    (* Delete blocks *)
+    Conn.exec
+      (Caqti_request.exec
+         Caqti_type.(tup2 int int64)
+         "DELETE FROM blocks WHERE blocks.height < ? OR blocks.timestamp < ?")
+      (height, timestamp)
 end
 
 let run (module Conn : CONNECTION) reader ~constraint_constants ~logger =
