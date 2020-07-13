@@ -70,14 +70,15 @@ let command =
           "Failed to connect to postgresql database. Error: $error" ;
         Deferred.unit
     | Ok db ->
-        let%map _ =
+        let%bind server =
           Cohttp_async.Server.create ~on_handler_error:`Raise
             (Async.Tcp.Where_to_listen.bind_to Localhost (On_port port))
             (server_handler ~db ~graphql_uri ~logger)
         in
         Logger.info logger ~module_:__MODULE__ ~location:__LOC__
           ~metadata:[("port", `Int port)]
-          "Rosetta process running on http://localhost:$port"
+          "Rosetta process running on http://localhost:$port" ;
+        Cohttp_async.Server.close_finished server
 
 let () =
   Command.run

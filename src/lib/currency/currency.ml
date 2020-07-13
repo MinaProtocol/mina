@@ -294,6 +294,25 @@ end = struct
 
       let ( + ) = add
 
+      let assert_equal (t1 : var) (t2 : var) =
+        let%map () =
+          Field.Checked.Assert.equal (pack_var t1.magnitude)
+            (pack_var t2.magnitude)
+        and () =
+          Field.Checked.Assert.equal
+            (t1.sgn :> Field.Var.t)
+            (t2.sgn :> Field.Var.t)
+        in
+        ()
+
+      let equal (t1 : var) (t2 : var) =
+        let%bind b1 =
+          Field.Checked.equal (pack_var t1.magnitude) (pack_var t2.magnitude)
+        and b2 =
+          Field.Checked.equal (t1.sgn :> Field.Var.t) (t2.sgn :> Field.Var.t)
+        in
+        Boolean.all [b1; b2]
+
       let cswap_field (b : Boolean.var) (x, y) =
         (* (x + b(y - x), y + b(x - y)) *)
         let open Field.Checked in
@@ -360,6 +379,10 @@ end = struct
         Field.Checked.unpack_flagged z ~length:length_in_bits
       in
       (bits, `Underflow (Boolean.not no_underflow))
+
+    let assert_equal x y = Field.Checked.Assert.equal (pack_var x) (pack_var y)
+
+    let equal x y = Field.Checked.equal (pack_var x) (pack_var y)
 
     (* Unpacking protects against overflow *)
     let add (x : Unpacked.var) (y : Unpacked.var) =
@@ -525,7 +548,7 @@ module Fee = struct
       [@@deriving sexp, compare, hash, eq]
 
       [%%define_from_scope
-      to_yojson, of_yojson]
+      to_yojson, of_yojson, dhall_type]
 
       let to_latest = Fn.id
     end
@@ -565,7 +588,7 @@ module Amount = struct
       [@@deriving sexp, compare, hash, eq, yojson]
 
       [%%define_from_scope
-      to_yojson, of_yojson]
+      to_yojson, of_yojson, dhall_type]
 
       let to_latest = Fn.id
     end
@@ -601,6 +624,9 @@ module Balance = struct
       type t = Amount.Stable.V1.t [@@deriving sexp, compare, hash, yojson, eq]
 
       let to_latest = Fn.id
+
+      (* can't be automatically derived *)
+      let dhall_type = Ppx_dhall_type.Dhall_type.Text
     end
   end]
 
