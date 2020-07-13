@@ -21,14 +21,9 @@ if [ -z "$AWS_ACCESS_KEY_ID" ]; then
 fi
 
 # Determine deb repo to use
-#GITBRANCH=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD |  sed 's!/!-!; s!_!-!g' )
 case $BUILDKITE_BRANCH in
     master)
         CODENAME=release ;;
-#    develop)
-#        CODENAME=develop ;;
-#    release*)
-#        CODENAME=stable ;;
     *)
         CODENAME=unstable ;;
 esac

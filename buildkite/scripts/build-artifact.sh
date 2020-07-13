@@ -35,6 +35,6 @@ echo "--- Upload deb to repo"
 make publish_debs
 
 echo "--- Copy artifacts to cloud"
-#make publish_deb
+# buildkite-agent artifact upload occurs outside of docker after this script exits
 
 # TODO save docker cache
