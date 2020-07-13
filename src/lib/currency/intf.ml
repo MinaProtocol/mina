@@ -24,6 +24,9 @@ module type Basic = sig
 
   type magnitude = t [@@deriving sexp, compare]
 
+  (* not automatically derived *)
+  val dhall_type : Ppx_dhall_type.Dhall_type.t
+
   val max_int : t
 
   val length_in_bits : int
@@ -141,6 +144,10 @@ module type Signed_intf = sig
 
     val add : var -> var -> (var, _) Checked.t
 
+    val assert_equal : var -> var -> (unit, _) Checked.t
+
+    val equal : var -> var -> (Boolean.var, _) Checked.t
+
     val ( + ) : var -> var -> (var, _) Checked.t
 
     val to_field_var : var -> (Field.Var.t, _) Checked.t
@@ -186,6 +193,10 @@ module type Checked_arithmetic_intf = sig
   val ( - ) : var -> var -> (var, _) Checked.t
 
   val add_signed : var -> signed_var -> (var, _) Checked.t
+
+  val assert_equal : var -> var -> (unit, _) Checked.t
+
+  val equal : var -> var -> (Boolean.var, _) Checked.t
 
   val scale : Field.Var.t -> var -> (var, _) Checked.t
 end

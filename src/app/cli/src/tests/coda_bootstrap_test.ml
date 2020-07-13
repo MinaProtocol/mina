@@ -5,10 +5,12 @@ let name = "coda-bootstrap-test"
 
 let main () =
   let logger = Logger.create () in
+  let precomputed_values = Lazy.force Precomputed_values.compiled in
   let n = 2 in
   let block_production_keys i = Some i in
   let snark_work_public_keys i =
-    if i = 0 then Some (Test_genesis_ledger.largest_account_pk_exn ())
+    if i = 0 then
+      Some (Precomputed_values.largest_account_pk_exn precomputed_values)
     else None
   in
   let%bind testnet =
