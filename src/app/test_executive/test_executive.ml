@@ -35,7 +35,7 @@ let main inputs () =
          ~network_config:(network_config_from_inputs inputs)
      in
      let%bind () = Network.deploy net in
-     (* TODO: here is where we execute the test *)
+     (* TODO: here is where we create the log engine and execute the test *)
      let%bind () = after (Time.Span.of_sec 1800.0) in
      let%bind () = Network.cleanup net in
      exit 0)

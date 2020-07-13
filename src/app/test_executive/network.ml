@@ -88,12 +88,6 @@ let create ~coda_automation_location ~testnet_name ~network_config =
     ~f:(fun ch ->
       Network_config.render direct_network_config
       |> Out_channel.output_string ch ) ;
-  (*
-  Out_channel.with_file ~fail_if_exists:true (testnet_dir ^/ "daemon.json") ~f:(fun ch ->
-    Runtime_config.to_yojson runtime_config
-    |> Yojson.Safe.to_string
-    |> Out_channel.output_string ch);
-  *)
   let%bind () =
     Deferred.List.iter keypairs ~f:(fun (secret_name, keypair) ->
         Secrets.Keypair.write_exn keypair

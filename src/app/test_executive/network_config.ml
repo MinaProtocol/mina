@@ -360,15 +360,6 @@ let testnet_blocks (network_config : Direct.t) =
       ; source= "../../modules/kubernetes/testnet"
       ; args= Direct.to_assoc network_config } ]
 
-(*
-  ; Block.Data
-      { Block.Data.data_source = "aws_route53_zone"
-      ; local_name = "selected"
-      ; args = [("name", `String "o1test.net.")] }
-  ; Block.Resource (seed_resource network_config.testnet_name "one")
-  ; Block.Resource (seed_resource network_config.testnet_name "two") ]
-  *)
-
 let render network_config =
   testnet_blocks network_config
   |> Terraform.to_yojson |> Yojson.Safe.pretty_to_string
