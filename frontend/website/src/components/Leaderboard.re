@@ -71,7 +71,10 @@ module Styles = {
       color(Theme.Colors.leaderboardMidnight),
       selector(
         "div:nth-child(even)",
-        [backgroundColor(`rgba((245, 245, 245, 1.)))],
+        [
+          backgroundColor(`rgba((245, 245, 245, 1.))),
+          hover([backgroundColor(`hex("E0E0E0"))]),
+        ],
       ),
     ]);
 
@@ -88,6 +91,7 @@ module Styles = {
         rem(3.5),
         rem(3.5),
       ]),
+      hover([backgroundColor(`hex("E0E0E0"))]),
       media(
         Theme.MediaQuery.notMobile,
         [
@@ -112,6 +116,7 @@ module Styles = {
         fontWeight(`semiBold),
         textTransform(`uppercase),
         letterSpacing(`rem(0.125)),
+        hover([backgroundColor(white)]),
       ]),
     ]);
 
