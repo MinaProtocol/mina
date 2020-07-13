@@ -350,8 +350,24 @@ let make = (~challenges as _, ~testnetName as _) => {
             </a>
           </div>
           <div className=Styles.content>
-            <span className=Styles.leaderboardCopy>
-              <p className=Theme.Body.big_semibold>
+            <Leaderboard onFilterPress={_ => {()}} />
+            <div className=Styles.copy>
+              <h4 className=Styles.sidebarHeader>
+                {React.string("Testnet Points")}
+              </h4>
+              <p className=Styles.markdownStyles>
+                {React.string("The goal of Testnet Points")}
+                <a href="#disclaimer" onClick={_ => setExpanded(_ => true)}>
+                  {React.string("*")}
+                </a>
+                {React.string(
+                   " is to recognize Coda community members who are actively involved in the network. There will be regular challenges to make it fun, interesting, and foster some friendly competition! Points can be won in several ways like being first to complete a challenge, contributing code to Coda, or being an excellent community member and helping others out.",
+                 )}
+              </p>
+              // <Challenges challenges testnetName />
+              // Temporarily hardcode the following message instead of the "Challenge" component
+              <h4> {React.string("Genesis Token Program")} </h4>
+              <p className=Styles.markdownStyles>
                 {React.string(
                    "Coda rewards community members with testnet points for completing challenges that \
                   contribute to the development of the protocol. *",
