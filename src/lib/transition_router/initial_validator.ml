@@ -46,7 +46,7 @@ let handle_validation_error ~logger ~trust_system ~sender ~state_hash ~delta
     | `Invalid_proof ->
         [("reason", `String "invalid proof")]
     | `Invalid_delta_transition_chain_proof ->
-        [("reason", `String "invalid_delta_transition_chain_proof")]
+        [("reason", `String "invalid delta transition chain proof")]
     | `Verifier_error err ->
         [ ("reason", `String "verifier error")
         ; ("error", `String (Error.to_string_hum err)) ]
