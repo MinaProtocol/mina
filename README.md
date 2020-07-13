@@ -35,7 +35,7 @@ The [Developer docs](https://codaprotocol.com/docs/developers/) contain all the 
 
 #### Quick Links:
 * [Developer readme](README-dev.md)
-* [Running a demo node](https://github.com/CodaProtocol/coda/blob/master/README-dev.md#building-coda)
+* [Running a demo node](docs/demo.md)
 * [Directory structure](frontend/website/docs/developers/directory-structure.mdx)
 * [Lifecycle of a payment](frontend/website/docs/architecture/lifecycle-payment.mdx)
 
