@@ -542,7 +542,8 @@ module Merkle_tree_versioned = struct
       type t =
         ( Hash_versioned.Stable.V1.t
         , Stack_id.Stable.V1.t
-        , Stack_versioned.Stable.V1.t )
+        , Stack_versioned.Stable.V1.t
+        , unit )
         Sparse_ledger_lib.Sparse_ledger.T.Stable.V1.t
       [@@deriving sexp, to_yojson]
 
@@ -557,7 +558,8 @@ module Merkle_tree_versioned = struct
       t =
       ( Hash_versioned.t
       , Stack_id.t
-      , Stack_versioned.t )
+      , Stack_versioned.t
+      , unit )
       Sparse_ledger_lib.Sparse_ledger.T.t
 end
 
@@ -708,6 +710,9 @@ module T = struct
 
       let if_ = if_
     end
+
+    (* Dummy value for Sparse_ledger *)
+    let token _ = ()
   end
 
   module Hash = struct
@@ -738,9 +743,19 @@ module T = struct
     type _unused = unit
       constraint
         t =
-        (Hash.t, Stack_id.t, Stack.t) Sparse_ledger_lib.Sparse_ledger.T.t
+        (Hash.t, Stack_id.t, Stack.t, unit) Sparse_ledger_lib.Sparse_ledger.T.t
 
-    module M = Sparse_ledger_lib.Sparse_ledger.Make (Hash) (Stack_id) (Stack)
+    module Dummy_token = struct
+      type t = unit [@@deriving sexp, to_yojson]
+
+      let max () () = ()
+
+      let next () = ()
+    end
+
+    module M =
+      Sparse_ledger_lib.Sparse_ledger.Make (Hash) (Dummy_token) (Stack_id)
+        (Stack)
 
     [%%define_locally
     M.
@@ -1007,7 +1022,10 @@ module T = struct
           (Or_error.ok_exn (Stack_id.incr_by_one key))
     in
     let root_hash = hash_at_level depth in
-    { Poly.tree= make_tree (Merkle_tree.of_hash ~depth root_hash) Stack_id.zero
+    { Poly.tree=
+        make_tree
+          (Merkle_tree.of_hash ~depth ~next_available_token:() root_hash)
+          Stack_id.zero
     ; pos_list= []
     ; new_pos= Stack_id.zero }
 

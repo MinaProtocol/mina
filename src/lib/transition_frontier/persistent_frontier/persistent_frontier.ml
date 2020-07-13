@@ -17,6 +17,10 @@ let construct_staged_ledger_at_root
     External_transition.Validated.blockchain_state root_transition
     |> Blockchain_state.snarked_ledger_hash
   in
+  let snarked_next_available_token =
+    External_transition.Validated.blockchain_state root_transition
+    |> Blockchain_state.snarked_next_available_token
+  in
   let scan_state = scan_state root in
   let pending_coinbase = pending_coinbase root in
   let protocol_states_map =
@@ -65,7 +69,7 @@ let construct_staged_ledger_at_root
            () ))
   in
   Staged_ledger.of_scan_state_and_ledger_unchecked ~snarked_ledger_hash
-    ~ledger:mask ~scan_state
+    ~snarked_next_available_token ~ledger:mask ~scan_state
     ~constraint_constants:precomputed_values.constraint_constants
     ~pending_coinbase_collection:pending_coinbase
 

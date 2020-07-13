@@ -12,7 +12,8 @@ module Make (Transaction : sig
 
   include Hashable.S with type t := t
 
-  val accounts_accessed : t -> Account_id.t list
+  val accounts_accessed :
+    next_available_token:Token_id.t -> t -> Account_id.t list
 end) (Time : sig
   type t [@@deriving bin_io, compare, sexp]
 
@@ -25,8 +26,13 @@ struct
   type t = {database: Database.t; pagination: Pagination.t; logger: Logger.t}
 
   let add_user_transaction (pagination : Pagination.t) (transaction, date) =
+    (* No source of truth for [next_available_token], so we stub it with
+       [invalid]. Token creation transactions can still be queried for a public
+       key by using the invalid token.
+    *)
     Pagination.add pagination
-      (Transaction.accounts_accessed transaction)
+      (Transaction.accounts_accessed ~next_available_token:Token_id.invalid
+         transaction)
       transaction transaction date
 
   let create ~logger directory =

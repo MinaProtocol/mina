@@ -93,7 +93,7 @@ module Styles = {
       unsafe("width", "fit-content"),
       media(
         Theme.MediaQuery.tablet,
-        [paddingLeft(`zero), marginBottom(`rem(3.)), alignItems(`center)],
+        [paddingLeft(`zero), marginBottom(`rem(8.)), alignItems(`center)],
       ),
     ]);
   let flexColumn =
@@ -227,14 +227,14 @@ let make = (~lastManualUpdatedDate) => {
       <div className=Styles.heroRight>
         <div className=Styles.buttonRow>
           <Button
-            link=""
+            link="https://bit.ly/3dNmPle"
             label="Current Challenges"
             bgColor=Theme.Colors.clover
             bgColorHover=Theme.Colors.jungle
           />
           <Spacer width=2.0 height=1.0 />
           <Button
-            link=""
+            link="/genesis"
             label="Genesis Program"
             bgColor=Theme.Colors.clover
             bgColorHover=Theme.Colors.jungle

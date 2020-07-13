@@ -24,13 +24,22 @@
                 command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
 {%endset%}
 
+{% set checkout_no_lfs %}
+            - run:
+                name: Disable LFS checkout
+                command: |
+                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                    git config --global lfs.fetchexclude "*"
+            - checkout
+{%endset%}
+
 version: 3
 jobs:
     tracetool:
         docker:
             - image: codaprotocol/coda:toolchain-rust-e855336d087a679f76f2dd2bbdc3fdfea9303be3
         steps:
-            - checkout
+            {{ checkout_no_lfs }}
             - run:
                   name: Update submodules
                   command: git submodule sync && git submodule update --init --recursive
@@ -85,7 +94,7 @@ jobs:
                 POSTGRES_USER: admin
                 POSTGRES_DB: archiver
         steps:
-            - checkout
+            {{ checkout_no_lfs }}
             {{ opam_init_linux }}
             - run:
                 name: Build libp2p_helper
@@ -119,7 +128,7 @@ jobs:
                 HASURA_GRAPHQL_ENABLE_CONSOLE: "true"
                 HASURA_GRAPHQL_ENABLED_LOG_TYPES: startup, http-log, webhook-log, websocket-log, query-log
         steps:
-            - checkout
+            {{ checkout_no_lfs }}
             {{ opam_init_linux }}
             - save_cache:
                 name: Save cache - opam
@@ -151,7 +160,7 @@ jobs:
         docker:
             - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
         steps:
-            - checkout
+            {{ checkout_no_lfs }}
             {{ opam_init_linux }}
             - run:
                   name: Check circle CI configuration rendering
@@ -178,7 +187,7 @@ jobs:
         docker:
             - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
         steps:
-            - checkout
+            {{ checkout_no_lfs }}
             - run:
                 name: Show USER
                 command: echo $USER
@@ -193,7 +202,7 @@ jobs:
         docker:
             - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
         steps:
-            - checkout
+            {{ checkout_no_lfs }}
             {{ opam_init_linux }}
             - run:
                   name: Compare test signatures for consensus, nonconsensus code
@@ -205,7 +214,7 @@ jobs:
             - run:
                 name: Install dependencies
                 command: pip install --user requests jinja2 readchar
-            - checkout
+            {{ checkout_no_lfs }}
             - run:
                   name: Update branch protection rule from test configuration
                   command: ./scripts/test.py required-status >required_status && cat required_status && ./scripts/update_branch_rule.py required_status
@@ -214,7 +223,7 @@ jobs:
         docker:
             - image: node:14.4.0
         steps:
-            - checkout
+            {{ checkout_no_lfs }}
             - run:
                 name: Update the Leaderboard
                 command: cd frontend/leaderboard && yarn && yarn build
@@ -240,7 +249,7 @@ jobs:
                     sudo rm -rf /Library/Developer/CoreSimulator/Profiles/Runtimes/
                     df -h
                 background: true
-            - checkout
+            {{ checkout_no_lfs }}
             - run:
                   name: Update submodules
                   command: git submodule sync && git submodule update --init --recursive
@@ -371,7 +380,7 @@ jobs:
         docker:
             - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
         steps:
-            - checkout
+            {{ checkout_no_lfs }}
             - run:
                   name: Artifacts Path
                   command: |
@@ -383,6 +392,20 @@ jobs:
                   environment:
                     DUNE_PROFILE: nonconsensus_medium_curves
                   no_output_timeout: 10m
+            - run:
+                  name: Get Yarn
+                  command: |
+                    sudo apt install apt-transport-https
+                    curl -sL https://deb.nodesource.com/setup_14.x | sudo -E bash -
+                    curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add -
+                    echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list
+                    sudo apt update && sudo apt install nodejs yarn
+            - run:
+                  name: Yarn deps
+                  command: cd frontend/client_sdk && yarn install
+            - run:
+                  name: Build And Test Client SDK
+                  command: eval `opam config env` && cd frontend/client_sdk && yarn prepublishOnly
 
     {%- for profile in build_artifact_profiles %}
     build-artifacts--{{profile}}:
@@ -390,7 +413,7 @@ jobs:
         docker:
             - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
         steps:
-            - checkout
+            {{ checkout_no_lfs }}
             - run:
                   name: Artifacts Path
                   command: |
@@ -513,7 +536,7 @@ jobs:
         docker:
             - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
         steps:
-            - checkout
+            {{ checkout_no_lfs }}
             - run: ulimit -c unlimited
             {{ opam_init_linux }}
             - run:
@@ -537,7 +560,7 @@ jobs:
         docker:
             - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
         steps:
-            - checkout
+            {{ checkout_no_lfs }}
             - run: ulimit -c unlimited
             {{ opam_init_linux }}
             - run:
@@ -560,7 +583,7 @@ jobs:
         docker:
             - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
         steps:
-            - checkout
+            {{ checkout_no_lfs }}
             - run: ulimit -c unlimited
             {{ opam_init_linux }}
             - run:
@@ -584,7 +607,7 @@ jobs:
         docker:
             - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
         steps:
-            - checkout
+            {{ checkout_no_lfs }}
             {{ opam_init_linux }}
             - run:
                 name: Build libp2p_helper
@@ -604,7 +627,7 @@ jobs:
         docker:
             - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
         steps:
-            - checkout
+            {{ checkout_no_lfs }}
             {{ opam_init_linux }}
             - run:
                 name: Build libp2p_helper
@@ -657,17 +680,6 @@ workflows:
             {%- for profile in small_curves_tests.keys() | sort %}
             - test--{{profile}}
             {%- endfor %}
-
-    leaderboard:
-        triggers:
-          - schedule:
-              cron: "0 1 * * *"
-              filters:
-                branches:
-                  only:
-                    - develop
-        jobs:
-          - run-leaderboard
 
     daily:
         triggers:

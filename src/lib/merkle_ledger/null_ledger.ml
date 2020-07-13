@@ -109,6 +109,11 @@ end = struct
 
   let tokens _t _pk = Token_id.Set.empty
 
+  let next_available_token _t = Token_id.(next default)
+
+  let set_next_available_token _t _tid =
+    failwith "set_next_available_token: null ledgers cannot be mutated"
+
   let iteri _t ~f:_ = ()
 
   let fold_until _t ~init ~f:_ ~finish = finish init

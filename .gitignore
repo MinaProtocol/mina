@@ -1,8 +1,11 @@
+.bazel
+user.bazelrc
 _build*
 *.pdf
 *.install
 .merlin*
 result
+*.ignore
 *.log
 *.aux
 src/config.mlh
@@ -19,3 +22,9 @@ node_modules/
 accounts.json
 src/app/libp2p_helper/src/generate_methodidx/generate_methodidx
 src/app/libp2p_helper/src/libp2p_helper/libp2p_helper
+src/app/validation/_build
+src/app/validation/config/local.exs
+src/app/validation/cover
+src/app/validation/deps
+src/app/validation/doc
+src/app/validation/priv/plts

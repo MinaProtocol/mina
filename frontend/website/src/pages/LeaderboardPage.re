@@ -13,6 +13,7 @@ module Styles = {
       media(Theme.MediaQuery.notMobile, [flexDirection(`row)]),
       justifyContent(`spaceBetween),
       width(`percent(100.)),
+      marginTop(`rem(2.)),
     ]);
   let searchBar =
     style([
@@ -21,9 +22,8 @@ module Styles = {
       marginTop(`rem(3.)),
       media(
         Theme.MediaQuery.notMobile,
-        [marginTop(`zero), marginRight(`rem(1.))],
+        [marginTop(`zero), marginRight(`rem(1.)), width(`percent(48.))],
       ),
-      width(`percent(100.)),
     ]);
   let textField =
     style([
@@ -62,7 +62,7 @@ module Styles = {
         Theme.MediaQuery.tablet,
         [
           width(`percent(100.)),
-          maxWidth(`rem(27.)),
+          maxWidth(`rem(38.5)),
           marginRight(`rem(1.)),
         ],
       ),
@@ -90,16 +90,21 @@ module SearchBar = {
 };
 
 module ToggleButtons = {
-  module ToggleStyles = {
+  module Styles = {
     open Css;
 
     let flexColumn =
       style([
-        display(`flex),
-        flexDirection(`column),
-        justifyContent(`center),
-        height(`rem(4.5)),
-        media("(max-width: 960px)", [display(`none)]),
+        display(`none),
+        media(
+          Theme.MediaQuery.tablet,
+          [
+            display(`flex),
+            flexDirection(`column),
+            justifyContent(`center),
+            height(`rem(4.5)),
+          ],
+        ),
       ]);
 
     let buttonRow =
@@ -124,55 +129,92 @@ module ToggleButtons = {
   |];
 
   [@react.component]
-  let make = (~currentOption, ~onTogglePress) => {
+  let make = (~currentToggle, ~onTogglePress) => {
     let renderToggleButtons = () => {
       toggleLabels
       |> Array.map(label => {
-           <ToggleButton currentOption onTogglePress label key=label />
+           <ToggleButton currentToggle onTogglePress label key=label />
          })
       |> React.array;
     };
 
-    <div className=ToggleStyles.flexColumn>
+    <div className=Styles.flexColumn>
       <h3 className=Theme.H5.semiBold> {React.string("View")} </h3>
       <Spacer height=0.5 />
-      <div className=ToggleStyles.buttonRow> {renderToggleButtons()} </div>
+      <div className=Styles.buttonRow> {renderToggleButtons()} </div>
+    </div>;
+  };
+};
+
+module FilterDropdown = {
+  module Styles = {
+    open Css;
+    let flexColumn =
+      style([
+        display(`flex),
+        flexDirection(`column),
+        justifyContent(`center),
+        height(`rem(4.5)),
+        width(`percent(100.)),
+        marginTop(`rem(2.0)),
+        media(Theme.MediaQuery.tablet, [display(`none)]),
+        media(
+          Theme.MediaQuery.notMobile,
+          [width(`percent(48.)), marginTop(`zero)],
+        ),
+      ]);
+  };
+
+  let filterLabels = [|"This Release", "Previous Phase", "All Time"|];
+  [@react.component]
+  let make = (~currentFilter, ~onFilterPress) => {
+    <div className=Styles.flexColumn>
+      <h3 className=Theme.H5.semiBold> {React.string("View")} </h3>
+      <Spacer height=0.5 />
+      <Dropdown
+        items=filterLabels
+        currentItem=currentFilter
+        onItemPress=onFilterPress
+      />
     </div>;
   };
 };
 
 type state = {
-  currentOption: string,
+  currentToggle: string,
+  currentFilter: string,
   username: string,
 };
 let initialState = {
-  currentOption: ToggleButtons.toggleLabels[0],
+  currentToggle: ToggleButtons.toggleLabels[0],
+  currentFilter: FilterDropdown.filterLabels[0],
   username: "",
 };
 
 type action =
   | Toggled(string)
+  | Filtered(string)
   | UsernameEntered(string);
 
-let reducer = (previousState, action) => {
+let reducer = (prevState, action) => {
   switch (action) {
-  | Toggled(option) => {
-      currentOption: option,
-      username: previousState.username,
-    }
-  | UsernameEntered(input) => {
-      currentOption: previousState.currentOption,
-      username: input,
-    }
+  | Toggled(toggle) => {...prevState, currentToggle: toggle}
+  | Filtered(filter) => {...prevState, currentFilter: filter}
+  | UsernameEntered(input) => {...prevState, username: input}
   };
 };
 
 [@react.component]
 let make = (~lastManualUpdatedDate) => {
   let (state, dispatch) = React.useReducer(reducer, initialState);
-  let onTogglePress = s => {
-    dispatch(Toggled(s));
+  let onTogglePress = toggle => {
+    dispatch(Toggled(toggle));
   };
+
+  let onFilterPress = filter => {
+    dispatch(Filtered(filter));
+  };
+
   let onUsernameEntered = username => {
     dispatch(UsernameEntered(username));
   };
@@ -182,8 +224,11 @@ let make = (~lastManualUpdatedDate) => {
       <div className=Styles.page> <Summary lastManualUpdatedDate /> </div>
       <div className=Styles.filters>
         <SearchBar onUsernameEntered username={state.username} />
-        <ToggleButtons currentOption={state.currentOption} onTogglePress />
+        <ToggleButtons currentToggle={state.currentToggle} onTogglePress />
+        <FilterDropdown currentFilter={state.currentFilter} onFilterPress />
       </div>
+      <Spacer height=1.5 />
+      <Leaderboard />
     </Wrapped>
   </Page>;
 };
