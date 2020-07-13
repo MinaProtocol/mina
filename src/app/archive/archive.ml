@@ -9,7 +9,13 @@ let command_run =
     (let%map_open log_json = Flag.Log.json
      and log_level = Flag.Log.level
      and server_port = Flag.Port.Archive.server
-     and postgres = Flag.Uri.Archive.postgres in
+     and postgres = Flag.Uri.Archive.postgres
+     and delete_older_than =
+       flag "-delete-older-than" (optional int)
+         ~doc:
+           "int Delete bloks that are more than n blocks lower than the \
+            maximum seen block."
+     in
      fun () ->
        let logger = Logger.create () in
        Stdout_log.setup log_json log_level ;
@@ -17,7 +23,8 @@ let command_run =
          ~constraint_constants:Genesis_constants.Constraint_constants.compiled
          ~postgres_address:postgres.value
          ~server_port:
-           (Option.value server_port.value ~default:server_port.default))
+           (Option.value server_port.value ~default:server_port.default)
+         ~delete_older_than)
 
 let time_arg =
   (* Same timezone as Genesis_constants.genesis_state_timestamp. *)

@@ -138,7 +138,7 @@ let%test_module "Archive node unit tests" =
           let processor_deferred_computation =
             Processor.run
               ~constraint_constants:precomputed_values.constraint_constants
-              conn reader ~logger
+              conn reader ~logger ~delete_older_than:None
           in
           let diffs =
             List.map
@@ -176,6 +176,89 @@ let%test_module "Archive node unit tests" =
                     else Deferred.Result.return ()
                 | None ->
                     failwith "Failed to find saved block in database" )
+          with
+          | Ok () ->
+              ()
+          | Error e ->
+              failwith @@ Caqti_error.show e )
+
+    let%test_unit "Block: read and write with deletions" =
+      let conn = Lazy.force conn_lazy in
+      Quickcheck.test ~trials:20
+        ( Quickcheck.Generator.with_size ~size:10
+        @@ Quickcheck_lib.gen_imperative_list
+             (Transition_frontier.For_tests.gen_genesis_breadcrumb
+                ~precomputed_values ())
+             (Transition_frontier.Breadcrumb.For_tests.gen_non_deferred
+                ?logger:None ~precomputed_values ?verifier:None
+                ?trust_system:None
+                ~accounts_with_secret_keys:(Lazy.force Genesis_ledger.accounts))
+        )
+        ~f:(fun breadcrumbs ->
+          Thread_safe.block_on_async_exn
+          @@ fun () ->
+          let reader, writer =
+            Strict_pipe.create ~name:"archive"
+              (Buffered (`Capacity 100, `Overflow Crash))
+          in
+          let processor_deferred_computation =
+            Processor.run
+              ~constraint_constants:precomputed_values.constraint_constants
+              conn reader ~logger ~delete_older_than:(Some 1)
+          in
+          let diffs =
+            List.map
+              ~f:(fun breadcrumb ->
+                Diff.Transition_frontier
+                  (Diff.Builder.breadcrumb_added breadcrumb) )
+              breadcrumbs
+          in
+          let max_timestamp =
+            List.fold ~init:0L breadcrumbs ~f:(fun prev_max breadcrumb ->
+                breadcrumb |> Transition_frontier.Breadcrumb.protocol_state
+                |> Coda_state.Protocol_state.blockchain_state
+                |> Coda_state.Blockchain_state.timestamp |> Block_time.to_int64
+                |> Int64.max prev_max )
+          in
+          List.iter diffs ~f:(Strict_pipe.Writer.write writer) ;
+          Strict_pipe.Writer.close writer ;
+          let%bind () = processor_deferred_computation in
+          match%map
+            Processor.deferred_result_list_fold breadcrumbs ~init:()
+              ~f:(fun () breadcrumb ->
+                let open Deferred.Result.Let_syntax in
+                let timestamp =
+                  breadcrumb |> Transition_frontier.Breadcrumb.protocol_state
+                  |> Coda_state.Protocol_state.blockchain_state
+                  |> Coda_state.Blockchain_state.timestamp
+                  |> Block_time.to_int64
+                in
+                match%bind
+                  Processor.Block.find conn
+                    ~state_hash:
+                      (Transition_frontier.Breadcrumb.state_hash breadcrumb)
+                with
+                | Some id ->
+                    if Int64.(timestamp < max_timestamp - 1L) then
+                      failwith "This block was not erased correctly" ;
+                    let%bind Processor.Block.{parent_id; _} =
+                      Processor.Block.load conn ~id
+                    in
+                    if
+                      Transition_frontier.Breadcrumb.blockchain_length
+                        breadcrumb
+                      > Unsigned.UInt32.of_int 1
+                    then
+                      Processor.For_test.assert_parent_exist ~parent_id
+                        ~parent_hash:
+                          (Transition_frontier.Breadcrumb.parent_hash
+                             breadcrumb)
+                        conn
+                    else Deferred.Result.return ()
+                | None ->
+                    if Int64.(timestamp >= max_timestamp - 1L) then
+                      failwith "Failed to find saved block in database"
+                    else Deferred.Result.return () )
           with
           | Ok () ->
               ()

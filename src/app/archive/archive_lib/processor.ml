@@ -641,13 +641,23 @@ module Block = struct
       (height, timestamp)
 end
 
-let run (module Conn : CONNECTION) reader ~constraint_constants ~logger =
+let run (module Conn : CONNECTION) reader ~constraint_constants ~logger
+    ~delete_older_than =
   Strict_pipe.Reader.iter reader ~f:(function
     | Diff.Transition_frontier (Breadcrumb_added {block; _}) -> (
         match%bind
           let open Deferred.Result.Let_syntax in
           let%bind () = Conn.start () in
-          Block.add_if_doesn't_exist ~constraint_constants (module Conn) block
+          let%bind _ =
+            Block.add_if_doesn't_exist ~constraint_constants
+              (module Conn)
+              block
+          in
+          match delete_older_than with
+          | Some num_blocks ->
+              Block.delete_if_older_than ~num_blocks (module Conn)
+          | None ->
+              return ()
         with
         | Error e ->
             Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
@@ -665,7 +675,8 @@ let run (module Conn : CONNECTION) reader ~constraint_constants ~logger =
             User_command.add_if_doesn't_exist (module Conn) user_command
             >>| ignore ) )
 
-let setup_server ~constraint_constants ~logger ~postgres_address ~server_port =
+let setup_server ~constraint_constants ~logger ~postgres_address ~server_port
+    ~delete_older_than =
   let where_to_listen =
     Async.Tcp.Where_to_listen.bind_to All_addresses (On_port server_port)
   in
@@ -681,7 +692,8 @@ let setup_server ~constraint_constants ~logger ~postgres_address ~server_port =
         ~metadata:[("error", `String (Caqti_error.show e))] ;
       Deferred.unit
   | Ok conn ->
-      run ~constraint_constants conn reader ~logger |> don't_wait_for ;
+      run ~constraint_constants conn reader ~logger ~delete_older_than
+      |> don't_wait_for ;
       Deferred.ignore
       @@ Tcp.Server.create
            ~on_handler_error:
