@@ -55,11 +55,18 @@ let command_prune =
            Caqti_async.connect postgres.value
          in
          let%bind () = Conn.start () in
-         let%bind () =
-           Archive_lib.Processor.Block.delete_if_older_than ?height ?num_blocks
-             ?timestamp conn
-         in
-         Conn.commit ()
+         match%bind.Async
+           let%bind () =
+             Archive_lib.Processor.Block.delete_if_older_than ?height
+               ?num_blocks ?timestamp conn
+           in
+           Conn.commit ()
+         with
+         | Ok () ->
+             return ()
+         | Error err ->
+             let%bind.Async _ = Conn.rollback () in
+             Deferred.Result.fail err
        in
        let logger = Logger.create () in
        let cmd_metadata =
