@@ -191,7 +191,6 @@ module Styles = {
       ]),
     ]);
 
-<<<<<<< HEAD
   let inactiveColumn =
     style([
       display(`none),
@@ -204,10 +203,6 @@ module Styles = {
   let cell =
     style([height(`rem(2.)), whiteSpace(`nowrap), overflowX(`hidden)]);
   let flexEnd = style([justifySelf(`flexEnd)]);
-=======
-  let cell = style([whiteSpace(`nowrap), overflow(`hidden)]);
-  let flexEnd = style([justifySelf(`flexEnd), cursor(`default)]);
->>>>>>> cursor to default when user hovers over rank and name
   let rank = merge([cell, flexEnd]);
   let username =
     merge([cell, style([textOverflow(`ellipsis), fontWeight(`semiBold)])]);
