@@ -112,7 +112,8 @@ module Styles = {
     ]);
 
   let link = merge([Theme.Link.basic, style([lineHeight(`px(28))])]);
-  let updatedDate = style([color(Theme.Colors.teal)]);
+  let updatedDate =
+    merge([Theme.Body.basic, style([color(Theme.Colors.teal)])]);
   let icon =
     style([marginRight(`px(8)), position(`relative), top(`px(1))]);
 };
