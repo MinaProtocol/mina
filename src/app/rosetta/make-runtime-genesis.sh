@@ -14,6 +14,6 @@ mkdir -p /tmp/keys \
   && mkdir -p ~/.coda-config/wallets/store \
   && echo "$PK" >  ~/.coda-config/wallets/store/$PK.pub \
   && cp /tmp/keys/demo-block-producer ~/.coda-config/wallets/store/$PK \
-  && rm -rf /tmp/s3_cache_dir/genesis* \
+  && rm -rf ~/.coda-config/genesis* \
   && echo '{"ledger":{"accounts":[{"pk":"'$PK'","balance":"66000","sk":null,"delegate":null}]}}' > /tmp/config.json \
-  && ../../../_build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe --genesis-dir /tmp/s3_cache_dir --config-file /tmp/config.json
+  && ../../../_build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe --config-file /tmp/config.json

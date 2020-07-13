@@ -66,8 +66,8 @@ module Singleton_scheduler : sig
 
   val create : Time.Controller.t -> t
 
-  (** If you reschedule when already scheduled, take the min of the two schedulings *)
   val schedule : t -> Time.t -> f:(unit -> unit) -> unit
+  (** If you reschedule when already scheduled, take the min of the two schedulings *)
 end = struct
   type t =
     { mutable timeout: unit Time.Timeout.t option
@@ -620,11 +620,13 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                   Transition_frontier.best_tip transition_frontier
                   |> Breadcrumb.consensus_state
                 in
-                (*                assert (
+                (* TODO: Re-enable this assertion when it doesn't fail dev demos
+                 *       (see #5354)
+                 * assert (
                   Consensus.Hooks.required_local_state_sync
                     ~constants:consensus_constants ~consensus_state
                     ~local_state:consensus_local_state
-                  = None ) ;*)
+                  = None ) ; *)
                 let now = Time.now time_controller in
                 let next_producer_timing =
                   measure "asking consensus what to do" (fun () ->
