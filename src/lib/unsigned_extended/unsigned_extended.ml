@@ -36,8 +36,6 @@ module Extend
 
     let compare = Unsigned.compare
 
-    let equal t1 t2 = compare t1 t2 = 0
-
     let hash_fold_t s t = Int64.hash_fold_t s (Unsigned.to_int64 t)
 
     let hash t = Int64.hash (Unsigned.to_int64 t)
