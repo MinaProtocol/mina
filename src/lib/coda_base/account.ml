@@ -143,54 +143,7 @@ module Poly = struct
     ; delegate: 'pk
     ; voting_for: 'state_hash
     ; timing: 'timing }
-  [@@deriving sexp, eq, compare, hash, yojson, fields]
-
-  [%%ifdef
-  consensus_mechanism]
-
-  let of_hlist
-      ([ public_key
-       ; token_id
-       ; token_permissions
-       ; balance
-       ; nonce
-       ; receipt_chain_hash
-       ; delegate
-       ; voting_for
-       ; timing ] :
-        (unit, _) H_list.t) =
-    { public_key
-    ; token_id
-    ; token_permissions
-    ; balance
-    ; nonce
-    ; receipt_chain_hash
-    ; delegate
-    ; voting_for
-    ; timing }
-
-  let to_hlist
-      { public_key
-      ; token_id
-      ; token_permissions
-      ; balance
-      ; nonce
-      ; receipt_chain_hash
-      ; delegate
-      ; voting_for
-      ; timing } =
-    H_list.
-      [ public_key
-      ; token_id
-      ; token_permissions
-      ; balance
-      ; nonce
-      ; receipt_chain_hash
-      ; delegate
-      ; voting_for
-      ; timing ]
-
-  [%%endif]
+  [@@deriving sexp, eq, compare, hash, yojson, fields, hlist]
 end
 
 module Key = struct
@@ -268,6 +221,7 @@ module Timing = struct
       ; cliff_time: 'slot
       ; vesting_period: 'slot
       ; vesting_increment: 'amount }
+    [@@deriving hlist]
   end
 
   (* convert sum type to record format, useful for to_bits and typ *)
@@ -401,43 +355,8 @@ module Timing = struct
         ; vesting_period
         ; vesting_increment ]
     in
-    let var_of_hlist :
-           ( unit
-           ,    Boolean.var
-             -> Balance.var
-             -> Global_slot.Checked.var
-             -> Global_slot.Checked.var
-             -> Amount.var
-             -> unit )
-           H_list.t
-        -> var =
-      let open H_list in
-      fun [ is_timed
-          ; initial_minimum_balance
-          ; cliff_time
-          ; vesting_period
-          ; vesting_increment ] ->
-        ( { is_timed
-          ; initial_minimum_balance
-          ; cliff_time
-          ; vesting_period
-          ; vesting_increment }
-          : var )
-    in
-    let var_to_hlist
-        As_record.
-          { is_timed
-          ; initial_minimum_balance
-          ; cliff_time
-          ; vesting_period
-          ; vesting_increment } =
-      H_list.
-        [ is_timed
-        ; initial_minimum_balance
-        ; cliff_time
-        ; vesting_period
-        ; vesting_increment ]
-    in
+    let var_of_hlist = As_record.of_hlist in
+    let var_to_hlist = As_record.to_hlist in
     Typ.of_hlistable spec ~var_to_hlist ~var_of_hlist ~value_to_hlist
       ~value_of_hlist
 

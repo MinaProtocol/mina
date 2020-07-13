@@ -25,7 +25,7 @@ Pipeline.build
     steps = [
     Command.build
       Command.Config::{
-        commands = OpamInit.andThenRunInDocker "./buildkite/scripts/build-client-sdk.sh",
+        commands = OpamInit.andThenRunInDocker ([] : List Text) "./buildkite/scripts/build-client-sdk.sh",
         label = "Build client-sdk",
         key = "build-client-sdk",
         target = Size.Large,
