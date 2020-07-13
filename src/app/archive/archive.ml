@@ -36,16 +36,16 @@ let command_prune =
   let open Command.Let_syntax in
   Command.async ~summary:"Prune old blocks and their transactions"
     (let%map_open height =
-       flag "--height" (optional int)
+       flag "-height" (optional int)
          ~doc:"int Delete blocks with height lower than the given height"
      and num_blocks =
-       flag "--num-blocks" (optional int)
+       flag "-num-blocks" (optional int)
          ~doc:
            "int Delete blocks that are more than n blocks lower than the \
             maximum seen block. This argument is ignored if the --height \
             argument is also given"
      and timestamp =
-       flag "--timestamp" (optional time_arg)
+       flag "-timestamp" (optional time_arg)
          ~doc:
            "timestamp Delete blocks that are older than the given timestamp. \
             Format: 2000-00-00 12:00:00+0100"
