@@ -182,7 +182,7 @@ let%test_module "Archive node unit tests" =
           | Error e ->
               failwith @@ Caqti_error.show e )
 
-    let%test_unit "Block: read and write with deletions" =
+    let%test_unit "Block: read and write with pruning" =
       let conn = Lazy.force conn_lazy in
       Quickcheck.test ~trials:20
         ( Quickcheck.Generator.with_size ~size:10
@@ -201,10 +201,12 @@ let%test_module "Archive node unit tests" =
             Strict_pipe.create ~name:"archive"
               (Buffered (`Capacity 100, `Overflow Crash))
           in
+          let delete_older_than = 1L in
           let processor_deferred_computation =
             Processor.run
               ~constraint_constants:precomputed_values.constraint_constants
-              conn reader ~logger ~delete_older_than:(Some 1)
+              conn reader ~logger
+              ~delete_older_than:(Some (Int64.to_int_exn delete_older_than))
           in
           let diffs =
             List.map
@@ -214,7 +216,8 @@ let%test_module "Archive node unit tests" =
               breadcrumbs
           in
           let max_timestamp =
-            List.fold ~init:0L breadcrumbs ~f:(fun prev_max breadcrumb ->
+            List.fold ~init:Int64.min_value breadcrumbs
+              ~f:(fun prev_max breadcrumb ->
                 breadcrumb |> Transition_frontier.Breadcrumb.protocol_state
                 |> Coda_state.Protocol_state.blockchain_state
                 |> Coda_state.Blockchain_state.timestamp |> Block_time.to_int64
@@ -239,15 +242,15 @@ let%test_module "Archive node unit tests" =
                       (Transition_frontier.Breadcrumb.state_hash breadcrumb)
                 with
                 | Some id ->
-                    if Int64.(timestamp < max_timestamp - 1L) then
-                      failwith "This block was not erased correctly" ;
+                    if Int64.(timestamp < max_timestamp - delete_older_than)
+                    then failwith "This block was not pruned correctly" ;
                     let%bind Processor.Block.{parent_id; _} =
                       Processor.Block.load conn ~id
                     in
                     if
                       Transition_frontier.Breadcrumb.blockchain_length
                         breadcrumb
-                      > Unsigned.UInt32.of_int 1
+                      > Unsigned.UInt32.one
                     then
                       Processor.For_test.assert_parent_exist ~parent_id
                         ~parent_hash:
@@ -256,8 +259,8 @@ let%test_module "Archive node unit tests" =
                         conn
                     else Deferred.Result.return ()
                 | None ->
-                    if Int64.(timestamp >= max_timestamp - 1L) then
-                      failwith "Failed to find saved block in database"
+                    if Int64.(timestamp >= max_timestamp - delete_older_than)
+                    then failwith "Failed to find saved block in database"
                     else Deferred.Result.return () )
           with
           | Ok () ->

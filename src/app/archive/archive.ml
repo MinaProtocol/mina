@@ -13,7 +13,7 @@ let command_run =
      and delete_older_than =
        flag "-delete-older-than" (optional int)
          ~doc:
-           "int Delete bloks that are more than n blocks lower than the \
+           "int Delete blocks that are more than n blocks lower than the \
             maximum seen block."
      in
      fun () ->
