@@ -34,11 +34,6 @@ make genesiskeys
 echo "--- Upload deb to repo"
 make publish_debs
 
-echo "--- Copy DOCKER_DEPLOY_ENV artifact to buildkite"
-if [ -f /tmp/DOCKER_DEPLOY_ENV ]; then
-  buildkite-agent artifact upload /tmp/DOCKER_DEPLOY_ENV;
-fi
-
 echo "--- Copy artifacts to cloud"
 #make publish_deb
 

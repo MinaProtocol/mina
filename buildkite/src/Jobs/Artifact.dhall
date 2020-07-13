@@ -35,7 +35,7 @@ Pipeline.build
             "DUNE_PROFILE=testnet_postake_medium_curves",
             "AWS_ACCESS_KEY_ID",
             "AWS_SECRET_ACCESS_KEY"
-          ] "./buildkite/scripts/build-artifact.sh",
+          ] "./buildkite/scripts/build-artifact.sh" # "buildkite-agent artifact upload ./DOCKER_DEPLOY_ENV" ,
           label = "Build artifacts",
           key = "artifacts-build",
           target = Size.Large
