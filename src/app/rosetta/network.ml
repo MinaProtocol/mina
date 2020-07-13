@@ -97,7 +97,7 @@ let router ~graphql_uri ~logger ~db (route : string list) body =
                 (Errors.create
                    "Could not get chain information. This probably means you \
                     are bootstrapping -- bootstrapping is the process of \
-                    synchronizing to peers that are way ahead of you on the \
+                    synchronizing with peers that are way ahead of you on the \
                     chain. Try again in a few seconds.")
           | Some chain ->
               Ok (Array.last chain) )
