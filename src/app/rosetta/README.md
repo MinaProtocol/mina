@@ -17,7 +17,7 @@ Note: Coda is in the `dev` profile, so snarks are turned off and every runs very
 If everything is working:
 
 ```
-𝝺 curl localhost:3087/network/list -X POST -d '{ metadata : {} }'
+𝝺 ./test/network_list.sh
 {"network_identifiers":[{"blockchain":"coda","network":"testnet"}]}
 ```
 
@@ -28,7 +28,7 @@ To regenerate the models:
 ```
 git clone https://github.com/coinbase/rosetta-specifications.git
 cd rosetta-specifications
-`brew install openapi`
+`brew install openapi-generator`
 openapi-generator generate -i api.json -g ocaml
 mv src/models $CODA/src/app/rosetta/models
 ```
