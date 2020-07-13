@@ -548,7 +548,7 @@ module Fee = struct
       [@@deriving sexp, compare, hash, eq]
 
       [%%define_from_scope
-      to_yojson, of_yojson]
+      to_yojson, of_yojson, dhall_type]
 
       let to_latest = Fn.id
     end
@@ -588,7 +588,7 @@ module Amount = struct
       [@@deriving sexp, compare, hash, eq, yojson]
 
       [%%define_from_scope
-      to_yojson, of_yojson]
+      to_yojson, of_yojson, dhall_type]
 
       let to_latest = Fn.id
     end
@@ -624,6 +624,9 @@ module Balance = struct
       type t = Amount.Stable.V1.t [@@deriving sexp, compare, hash, yojson, eq]
 
       let to_latest = Fn.id
+
+      (* can't be automatically derived *)
+      let dhall_type = Ppx_dhall_type.Dhall_type.Text
     end
   end]
 
