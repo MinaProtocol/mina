@@ -49,6 +49,58 @@ let fetchLeaderboard = () => {
   |> Js.Promise.catch(_ => Promise.return([||]));
 };
 
+module Toggle = {
+  type t =
+    | All
+    | Genesis
+    | NonGenesis;
+
+  let toggles = [|All, Genesis, NonGenesis|];
+
+  let toggle_of_string = toggle => {
+    switch (toggle) {
+    | "All Participants" => All
+    | "Genesis Members" => Genesis
+    | "Non-Genesis Members" => NonGenesis
+    | _ => All
+    };
+  };
+
+  let string_of_toggle = toggle => {
+    switch (toggle) {
+    | All => "All Participants"
+    | Genesis => "Genesis Members"
+    | NonGenesis => "Non-Genesis Members"
+    };
+  };
+};
+
+module Filter = {
+  type t =
+    | Release
+    | Phase
+    | AllTime;
+
+  let string_of_filter = filter => {
+    switch (filter) {
+    | Release => "This Release"
+    | Phase => "This Phase"
+    | AllTime => "All Time"
+    };
+  };
+
+  let filter_of_string = filter => {
+    switch (filter) {
+    | "This Release" => Release
+    | "This Phase" => Phase
+    | "All Time" => AllTime
+    | _ => AllTime
+    };
+  };
+
+  let filters = [|Release, Phase, AllTime|];
+};
+
 module Styles = {
   open Css;
 
@@ -75,22 +127,17 @@ module Styles = {
       ),
     ]);
 
-  let leaderboardRow =
+  let desktopLeaderboardRow =
     style([
       cursor(`pointer),
       padding2(~v=`rem(1.), ~h=`rem(1.)),
       height(`rem(3.5)),
       display(`grid),
       gridColumnGap(rem(1.5)),
-      gridTemplateColumns([
-        rem(1.),
-        rem(5.5),
-        rem(5.5),
-        rem(3.5),
-        rem(3.5),
-      ]),
+      width(`percent(100.)),
+      gridTemplateColumns([rem(3.5), `auto, rem(9.)]),
       media(
-        Theme.MediaQuery.notMobile,
+        Theme.MediaQuery.tablet,
         [
           width(`percent(100.)),
           gridTemplateColumns([
@@ -106,13 +153,15 @@ module Styles = {
 
   let headerRow =
     merge([
-      leaderboardRow,
+      desktopLeaderboardRow,
       style([
+        display(`none),
         paddingBottom(`rem(0.5)),
         fontSize(`rem(1.)),
         fontWeight(`semiBold),
         textTransform(`uppercase),
         letterSpacing(`rem(0.125)),
+        media(Theme.MediaQuery.notMobile, [display(`grid)]),
       ]),
     ]);
 
@@ -132,6 +181,13 @@ module Styles = {
       ]),
     ]);
 
+  let inactiveColumn =
+    style([
+      display(`none),
+      justifySelf(`flexEnd),
+      media(Theme.MediaQuery.tablet, [display(`inline)]),
+    ]);
+
   let topTen = style([position(`absolute)]);
 
   let cell =
@@ -143,7 +199,15 @@ module Styles = {
   let pointsCell = merge([cell, style([justifySelf(`flexEnd)])]);
   let activePointsCell =
     merge([cell, style([justifySelf(`flexEnd), fontWeight(`semiBold)])]);
-  let inactivePointsCell = merge([pointsCell, style([opacity(0.5)])]);
+  let inactivePointsCell =
+    merge([
+      pointsCell,
+      style([
+        media(Theme.MediaQuery.tablet, [display(`inline)]),
+        display(`none),
+        opacity(0.5),
+      ]),
+    ]);
 
   let loading =
     style([
@@ -151,102 +215,171 @@ module Styles = {
       color(Theme.Colors.leaderboardMidnight),
       textAlign(`center),
     ]);
+
+  let desktopLayout =
+    style([
+      display(`none),
+      media(Theme.MediaQuery.notMobile, [display(`unset)]),
+    ]);
+
+  let mobileLayout =
+    style([
+      display(`unset),
+      media(Theme.MediaQuery.notMobile, [display(`none)]),
+    ]);
+
+  let mobileLeaderboardRow =
+    style([
+      display(`grid),
+      gridTemplateColumns([rem(5.), `auto]),
+      gridColumnGap(rem(1.5)),
+      cursor(`pointer),
+      padding2(~v=`rem(1.), ~h=`rem(1.)),
+      fontWeight(`semiBold),
+      fontSize(`px(16)),
+      lineHeight(`px(24)),
+    ]);
+
+  let firstColumn = style([textAlign(`right), color(`hex("757575"))]);
+
+  let mobilePointStar =
+    merge([
+      firstColumn,
+      style([
+        before([
+          contentRule("*"),
+          color(Css_Colors.red),
+          marginRight(`rem(0.5)),
+        ]),
+      ]),
+    ]);
 };
 
-type filter =
-  | All
-  | Genesis
-  | NonGenesis;
-
-type sort =
-  | Release
-  | Phase
-  | AllTime;
-
-let pointsColumns = [|Release, Phase, AllTime|];
-
 module LeaderboardRow = {
+  open Filter;
+  let getRank = (sort, member) => {
+    switch (sort) {
+    | Phase => member.phaseRank
+    | Release => member.releaseRank
+    | AllTime => member.allTimeRank
+    };
+  };
+
+  let getPoints = (column, member) =>
+    switch (column) {
+    | Phase => member.phasePoints
+    | Release => member.releasePoints
+    | AllTime => member.allTimePoints
+    };
+
+  let renderPoints = (sort, column, member) => {
+    <span
+      key={member.name ++ string_of_filter(column)}
+      className=Styles.(
+        sort === column ? activePointsCell : inactivePointsCell
+      )>
+      {React.string(string_of_int(getPoints(column, member)))}
+    </span>;
+  };
+
+  let getUserSlug = member => {
+    "/memberProfile"
+    ++ "?allTimeRank="
+    ++ member.allTimeRank->string_of_int
+    ++ "&allTimePoints="
+    ++ member.allTimePoints->string_of_int
+    ++ "&phaseRank="
+    ++ member.phaseRank->string_of_int
+    ++ "&phasePoints="
+    ++ member.phasePoints->string_of_int
+    ++ "&releaseRank="
+    ++ member.releaseRank->string_of_int
+    ++ "&releasePoints="
+    ++ member.releasePoints->string_of_int
+    ++ "&genesisMember="
+    ++ member.genesisMember->string_of_bool
+    ++ "&name="
+    ++ member.name
+    |> Js.String.replaceByRe([%re "/#/g"], "%23"); /* replace "#" with percent encoding for the URL to properly parse */
+  };
+
+  module DesktopLayout = {
+    [@react.component]
+    let make = (~userSlug, ~sort, ~rank, ~member) => {
+      <Next.Link href=userSlug _as=userSlug>
+        <div className=Styles.desktopLeaderboardRow>
+          <span className=Styles.rank>
+            {React.string(string_of_int(rank))}
+          </span>
+          <span className=Styles.username> {React.string(member.name)} </span>
+          {Array.map(column => {renderPoints(sort, column, member)}, filters)
+           |> React.array}
+        </div>
+      </Next.Link>;
+    };
+  };
+
+  module MobileLayout = {
+    [@react.component]
+    let make = (~userSlug, ~sort, ~rank, ~member) => {
+      <Next.Link href=userSlug _as=userSlug>
+        <div className=Styles.mobileLeaderboardRow>
+          <span className=Styles.firstColumn> {React.string("Rank")} </span>
+          <span> {React.string("#" ++ string_of_int(rank))} </span>
+          <span className=Styles.firstColumn> {React.string("Name")} </span>
+          <span> {React.string(member.name)} </span>
+          <span className=Styles.mobilePointStar>
+            {React.string("Points")}
+          </span>
+          <span>
+            {React.string(string_of_int(getPoints(sort, member)))}
+          </span>
+        </div>
+      </Next.Link>;
+    };
+  };
+
   [@react.component]
   let make = (~sort, ~member) => {
-    let userSlug =
-      "/memberProfile"
-      ++ "?allTimeRank="
-      ++ member.allTimeRank->string_of_int
-      ++ "&allTimePoints="
-      ++ member.allTimePoints->string_of_int
-      ++ "&phaseRank="
-      ++ member.phaseRank->string_of_int
-      ++ "&phasePoints="
-      ++ member.phasePoints->string_of_int
-      ++ "&releaseRank="
-      ++ member.releaseRank->string_of_int
-      ++ "&releasePoints="
-      ++ member.releasePoints->string_of_int
-      ++ "&genesisMember="
-      ++ member.genesisMember->string_of_bool
-      ++ "&name="
-      ++ member.name
-      |> Js.String.replaceByRe([%re "/#/g"], "%23"); /* replace "#" with percent encoding for the URL to properly parse */
+    let userSlug = getUserSlug(member);
+    let rank = getRank(sort, member);
 
-    let rank =
-      switch (sort) {
-      | Phase => member.phaseRank
-      | Release => member.releaseRank
-      | AllTime => member.allTimeRank
-      };
-
-    let points = column =>
-      switch (column) {
-      | Phase => member.phasePoints
-      | Release => member.releasePoints
-      | AllTime => member.allTimePoints
-      };
-
-    let renderPoints = column =>
-      <span
-        className=Styles.(
-          sort === column ? activePointsCell : inactivePointsCell
-        )>
-        {React.string(string_of_int(points(column)))}
-      </span>;
-
-    <Next.Link href=userSlug _as=userSlug>
-      <div className=Styles.leaderboardRow>
-        <span className=Styles.rank>
-          {React.string(string_of_int(rank))}
-        </span>
-        <span className=Styles.username> {React.string(member.name)} </span>
-        {Array.map(renderPoints, pointsColumns) |> React.array}
+    <div>
+      <div className=Styles.desktopLayout>
+        <DesktopLayout userSlug sort rank member />
       </div>
-    </Next.Link>;
+      <div className=Styles.mobileLayout>
+        <MobileLayout userSlug sort rank member />
+      </div>
+    </div>;
   };
 };
 
 type state = {
-  sort,
   loading: bool,
   members: array(member),
 };
 
 type actions =
-  | UpdateMembers(array(member))
-  | UpdateSort(sort);
+  | UpdateMembers(array(member));
 
-let reducer = (prevState, action) => {
+let reducer = (_, action) => {
   switch (action) {
-  | UpdateMembers(members) => {sort: prevState.sort, loading: false, members}
-  | UpdateSort(sort) => {
-      sort,
-      loading: prevState.loading,
-      members: prevState.members,
-    }
+  | UpdateMembers(members) => {loading: false, members}
   };
 };
 
 [@react.component]
 let make =
-    (~filter: filter=All, ~sortDefault: sort=Release, ~search: string="") => {
-  let initialState = {sort: sortDefault, loading: true, members: [||]};
+    (
+      ~filter: Filter.t=Release,
+      ~toggle: Toggle.t=All,
+      ~search: string="",
+      ~onFilterPress,
+    ) => {
+  open Toggle;
+  open Filter;
+  let initialState = {loading: true, members: [||]};
   let (state, dispatch) = React.useReducer(reducer, initialState);
 
   React.useEffect0(() => {
@@ -255,7 +388,7 @@ let make =
   });
 
   let sortRank = member =>
-    switch (state.sort) {
+    switch (filter) {
     | Phase => member.phaseRank
     | Release => member.releaseRank
     | AllTime => member.allTimeRank
@@ -266,7 +399,7 @@ let make =
   let filteredMembers =
     Js.Array.filter(
       member =>
-        switch (filter) {
+        switch (toggle) {
         | All => true
         | Genesis => member.genesisMember
         | NonGenesis => !member.genesisMember
@@ -279,23 +412,16 @@ let make =
     |> Js.Array.filter(member => sortRank(member) !== 0);
 
   let renderRow = member =>
-    <LeaderboardRow
-      key={string_of_int(member.allTimeRank)}
-      sort={state.sort}
-      member
-    />;
+    <LeaderboardRow key={member.name} sort=filter member />;
 
   let renderColumnHeader = column =>
     <span
-      onClick={_ => dispatch(UpdateSort(column))}
-      className={column === state.sort ? Styles.activeColumn : Styles.flexEnd}>
-      {React.string(
-         switch (column) {
-         | Phase => "This Phase"
-         | Release => "This Release"
-         | AllTime => "All Time"
-         },
-       )}
+      key={Filter.string_of_filter(column)}
+      onClick={_ => {onFilterPress(string_of_filter(column))}}
+      className={
+        column === filter ? Styles.activeColumn : Styles.inactiveColumn
+      }>
+      {React.string(string_of_filter(column))}
     </span>;
 
   <div className=Styles.leaderboardContainer>
@@ -303,7 +429,7 @@ let make =
       <div className=Styles.headerRow>
         <span className=Styles.flexEnd> {React.string("Rank")} </span>
         <span> {React.string("Name")} </span>
-        {Array.map(renderColumnHeader, pointsColumns) |> React.array}
+        {Array.map(renderColumnHeader, Filter.filters) |> React.array}
       </div>
       <hr />
       <div className=Styles.topTen />

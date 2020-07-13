@@ -345,7 +345,7 @@ let make = (~challenges as _, ~testnetName as _) => {
             </a>
           </div>
           <div className=Styles.content>
-            <Leaderboard />
+            <Leaderboard onFilterPress={_ => {()}} />
             <div className=Styles.copy>
               <h4 className=Styles.sidebarHeader>
                 {React.string("Testnet Points")}
