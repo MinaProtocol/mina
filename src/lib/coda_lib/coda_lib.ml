@@ -644,7 +644,7 @@ let request_work t =
     | `Active staged_ledger ->
         Some staged_ledger
     | `Bootstrapping ->
-        Logger.info t.config.logger ~module_:__MODULE__ ~location:__LOC__
+        Logger.trace t.config.logger ~module_:__MODULE__ ~location:__LOC__
           "Snark-work-request error: Could not retrieve staged_ledger due to \
            bootstrapping" ;
         None
