@@ -42,7 +42,7 @@ module Stable = struct
     let to_yojson
         { protocol_state
         ; protocol_state_proof= _
-        ; staged_ledger_diff= _
+        ; staged_ledger_diff
         ; delta_transition_chain_proof= _
         ; current_protocol_version
         ; proposed_protocol_version_opt
@@ -50,7 +50,8 @@ module Stable = struct
       `Assoc
         [ ("protocol_state", Protocol_state.value_to_yojson protocol_state)
         ; ("protocol_state_proof", `String "<opaque>")
-        ; ("staged_ledger_diff", `String "<opaque>")
+        ; ( "staged_ledger_diff"
+          , Staged_ledger_diff.to_yojson staged_ledger_diff )
         ; ("delta_transition_chain_proof", `String "<opaque>")
         ; ( "current_protocol_version"
           , `String (Protocol_version.to_string current_protocol_version) )

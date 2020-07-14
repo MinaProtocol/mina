@@ -1821,7 +1821,7 @@ module Data = struct
               ; ( "sub_window_densities"
                 , `List (List.map ~f:Length.to_yojson t.sub_window_densities)
                 )
-              ; ("last_vrf_output", `String "<opaque>")
+              ; ("last_vrf_output", `String t.last_vrf_output)
               ; ("total_currency", Amount.to_yojson t.total_currency)
               ; ("curr_global_slot", Global_slot.to_yojson t.curr_global_slot)
               ; ( "staking_epoch_data"
