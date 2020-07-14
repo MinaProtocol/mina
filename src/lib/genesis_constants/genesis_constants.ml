@@ -7,13 +7,13 @@ module Proof_level = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = Full | Check | None
+      type t = Full | Check | None [@@deriving eq]
 
       let to_latest = Fn.id
     end
   end]
 
-  type t = Stable.Latest.t = Full | Check | None
+  type t = Stable.Latest.t = Full | Check | None [@@deriving eq]
 
   let to_string = function Full -> "full" | Check -> "check" | None -> "none"
 
