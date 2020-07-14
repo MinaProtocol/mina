@@ -219,6 +219,22 @@ let make = (~lastManualUpdatedDate) => {
     dispatch(UsernameEntered(username));
   };
 
+  let sortValue =
+    switch (state.currentFilter) {
+    | "This Release" => Leaderboard.Release
+    | "Previous Phase" => Leaderboard.Phase
+    | "All Time" => Leaderboard.AllTime
+    | _ => Leaderboard.AllTime
+    };
+
+  let filterValue =
+    switch (state.currentToggle) {
+    | "All Participants" => Leaderboard.All
+    | "Genesis Members" => Leaderboard.Genesis
+    | "Non-Genesis Members" => Leaderboard.NonGenesis
+    | _ => Leaderboard.All
+    };
+
   <Page title="Testnet Leaderboard">
     <Wrapped>
       <div className=Styles.page> <Summary lastManualUpdatedDate /> </div>
@@ -227,6 +243,12 @@ let make = (~lastManualUpdatedDate) => {
         <ToggleButtons currentToggle={state.currentToggle} onTogglePress />
         <FilterDropdown currentFilter={state.currentFilter} onFilterPress />
       </div>
+      <Spacer height=1.5 />
+      <Leaderboard
+        search={state.username}
+        sortDefault=sortValue
+        filter=filterValue
+      />
     </Wrapped>
   </Page>;
 };

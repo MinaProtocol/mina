@@ -546,13 +546,8 @@ let cancel_transaction_graphql =
        fee larger than the cancelled transaction."
     (Cli_lib.Background_daemon.graphql_init txn_id_flag
        ~f:(fun graphql_endpoint user_command ->
-         let receiver =
-           user_command |> User_command.payload |> User_command.Payload.body
-           |> User_command.Payload.Body.receiver
-         in
-         let receiver_pk = Account_id.public_key receiver in
-         let cancel_sender = User_command.fee_payer user_command in
-         let cancel_sender_pk = Account_id.public_key cancel_sender in
+         let receiver_pk = User_command.receiver_pk user_command in
+         let cancel_sender_pk = User_command.fee_payer_pk user_command in
          let open Deferred.Let_syntax in
          let%bind nonce_response =
            let open Graphql_client.Encoders in
@@ -1254,6 +1249,75 @@ let trustlist_list =
              eprintf "Unknown error doing daemon RPC: %s"
                (Error.to_string_hum e) ))
 
+let compile_time_constants =
+  Command.async
+    ~summary:"Print a JSON map of the compile-time consensus parameters"
+    (Command.Param.return (fun () ->
+         let home = Core.Sys.home_directory () in
+         let conf_dir = home ^/ Cli_lib.Default.conf_dir_name in
+         let genesis_dir =
+           let home = Core.Sys.home_directory () in
+           home ^/ Cli_lib.Default.conf_dir_name
+         in
+         let config_file =
+           match Sys.getenv "CODA_CONFIG_FILE" with
+           | Some config_file ->
+               config_file
+           | None ->
+               conf_dir ^/ "daemon.json"
+         in
+         let open Async in
+         let%map ({consensus_constants; _} as precomputed_values), _ =
+           config_file |> Genesis_ledger_helper.load_config_json
+           >>| Or_error.ok
+           >>| Option.value ~default:(`Assoc [])
+           >>| Runtime_config.of_yojson >>| Result.ok
+           >>| Option.value ~default:Runtime_config.default
+           >>= Genesis_ledger_helper.init_from_config_file ~genesis_dir
+                 ~logger:(Logger.null ()) ~may_generate:false ~proof_level:None
+                 ~genesis_constants:Genesis_constants.compiled
+           >>| Or_error.ok_exn
+         in
+         let all_constants =
+           `Assoc
+             [ ( "genesis_state_timestamp"
+               , `String
+                   ( Block_time.to_time
+                       consensus_constants.genesis_state_timestamp
+                   |> Core.Time.to_string_iso8601_basic
+                        ~zone:Core.Time.Zone.utc ) )
+             ; ("k", `Int (Unsigned.UInt32.to_int consensus_constants.k))
+             ; ( "coinbase"
+               , `String
+                   (Currency.Amount.to_formatted_string
+                      precomputed_values.constraint_constants.coinbase_amount)
+               )
+             ; ( "block_window_duration_ms"
+               , `Int
+                   precomputed_values.constraint_constants
+                     .block_window_duration_ms )
+             ; ( "delta"
+               , `Int (Unsigned.UInt32.to_int consensus_constants.delta) )
+             ; ("c", `Int (Unsigned.UInt32.to_int consensus_constants.c))
+             ; ( "sub_windows_per_window"
+               , `Int
+                   (Unsigned.UInt32.to_int
+                      consensus_constants.sub_windows_per_window) )
+             ; ( "slots_per_sub_window"
+               , `Int
+                   (Unsigned.UInt32.to_int
+                      consensus_constants.slots_per_sub_window) )
+             ; ( "slots_per_window"
+               , `Int
+                   (Unsigned.UInt32.to_int consensus_constants.slots_per_window)
+               )
+             ; ( "slots_per_epoch"
+               , `Int
+                   (Unsigned.UInt32.to_int consensus_constants.slots_per_epoch)
+               ) ]
+         in
+         Core.printf "%s\n%!" (Yojson.Safe.to_string all_constants) ))
+
 let telemetry =
   let open Command.Param in
   let open Deferred.Let_syntax in
@@ -1399,6 +1463,7 @@ let advanced =
     ; ("snark-pool-list", snark_pool_list)
     ; ("pending-snark-work", pending_snark_work)
     ; ("generate-libp2p-keypair", generate_libp2p_keypair)
+    ; ("compile-time-constants", compile_time_constants)
     ; ("telemetry", telemetry)
     ; ("visualization", Visualization.command_group)
     ; ("generate-receipt", generate_receipt)

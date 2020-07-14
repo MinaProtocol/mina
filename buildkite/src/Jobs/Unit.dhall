@@ -1,3 +1,4 @@
+-- comment to trigger tests
 let Prelude = ../External/Prelude.dhall
 
 let Cmd = ../Lib/Cmds.dhall
@@ -15,14 +16,10 @@ let Size = ../Command/Size.dhall
 let buildTestCmd : Text -> Text -> Command.Type = \(profile : Text) -> \(path : Text) ->
   Command.build
     Command.Config::{
-      commands =
-        OpamInit.andThenRunInDocker (
-          "source ~/.profile && make build && (dune runtest ${path} --profile=${profile} -j8" ++
-          " || (./scripts/link-coredumps.sh && false))"
-        ),
+      commands = OpamInit.andThenRunInDocker ([] : List Text) "buildkite/scripts/unit-test.sh ${profile} ${path}",
       label = "Run ${profile} unit-tests",
       key = "unit-test-${profile}",
-      target = Size.Large,
+      target = Size.Experimental,
       docker = None Docker.Type
     }
 

@@ -192,6 +192,14 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
                   )
                 ~default:previous_ledger_hash
             in
+            let snarked_next_available_token =
+              match ledger_proof_opt with
+              | Some (proof, _) ->
+                  (Ledger_proof.statement proof).next_available_token_after
+              | None ->
+                  previous_protocol_state |> Protocol_state.blockchain_state
+                  |> Blockchain_state.snarked_next_available_token
+            in
             let supply_increase =
               Option.value_map ledger_proof_opt
                 ~f:(fun (proof, _) ->
@@ -209,6 +217,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
               *)
               Blockchain_state.create_value ~timestamp:scheduled_time
                 ~snarked_ledger_hash:next_ledger_hash
+                ~snarked_next_available_token
                 ~staged_ledger_hash:next_staged_ledger_hash
             in
             let current_time =
@@ -611,11 +620,13 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                   Transition_frontier.best_tip transition_frontier
                   |> Breadcrumb.consensus_state
                 in
-                assert (
+                (* TODO: Re-enable this assertion when it doesn't fail dev demos
+                 *       (see #5354)
+                 * assert (
                   Consensus.Hooks.required_local_state_sync
                     ~constants:consensus_constants ~consensus_state
                     ~local_state:consensus_local_state
-                  = None ) ;
+                  = None ) ; *)
                 let now = Time.now time_controller in
                 let next_producer_timing =
                   measure "asking consensus what to do" (fun () ->
