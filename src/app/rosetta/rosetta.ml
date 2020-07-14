@@ -11,7 +11,6 @@ let router ~graphql_uri ~db ~logger route body =
 let server_handler ~db ~graphql_uri ~logger ~body _ req =
   let uri = Cohttp_async.Request.uri req in
   let%bind body = Cohttp_async.Body.to_string body in
-  printf "Route: %s\n" (Uri.path uri) ;
   let route = List.tl_exn (String.split ~on:'/' (Uri.path uri)) in
   let%bind result =
     match Yojson.Safe.from_string body with
@@ -35,10 +34,10 @@ let server_handler ~db ~graphql_uri ~logger ~body _ req =
       let metadata = [("error", Models.Error.to_yojson error)] in
       if Int32.equal error_code (Int32.of_int_exn 400) then
         Logger.warn logger ~module_:__MODULE__ ~location:__LOC__ ~metadata
-          "Failed to connect to postgresql database. Error: $error" ;
+          "400 Error: $error" ;
       if Int32.compare error_code (Int32.of_int_exn 500) >= 0 then
         Logger.error logger ~module_:__MODULE__ ~location:__LOC__ ~metadata
-          "Failed to connect to postgresql database. Error: $error" ;
+          "500 Error: $error" ;
       Cohttp_async.Server.respond_string
         ~status:(Cohttp.Code.status_of_code 500)
         (Yojson.Safe.to_string (Models.Error.to_yojson error))
