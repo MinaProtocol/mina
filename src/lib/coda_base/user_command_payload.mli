@@ -22,6 +22,7 @@ module Body : sig
     | Stake_delegation of Stake_delegation.t
     | Create_new_token of New_token_payload.t
     | Create_token_account of New_account_payload.t
+    | Mint_tokens of Minting_payload.t
   [@@deriving eq, sexp, hash, yojson]
 
   [%%versioned:
@@ -141,7 +142,7 @@ module Poly : sig
 
   type ('common, 'body) t = ('common, 'body) Stable.Latest.t =
     {common: 'common; body: 'body}
-  [@@deriving eq, sexp, hash, yojson, compare]
+  [@@deriving eq, sexp, hash, yojson, compare, hlist]
 end
 
 [%%versioned:

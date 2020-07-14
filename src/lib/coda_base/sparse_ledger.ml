@@ -152,7 +152,9 @@ let sub_account_creation_fee
         sub amount (of_fee constraint_constants.account_creation_fee))
   else amount
 
-let apply_user_command_exn ~constraint_constants ~txn_global_slot t
+let apply_user_command_exn
+    ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+    ~txn_global_slot t
     ({signer; payload; signature= _} as user_command : User_command.t) =
   let open Currency in
   let signer_pk = Public_key.compress signer in
@@ -190,6 +192,20 @@ let apply_user_command_exn ~constraint_constants ~txn_global_slot t
   let source = User_command.source ~next_available_token user_command in
   let receiver = User_command.receiver ~next_available_token user_command in
   let exception Reject of exn in
+  let charge_account_creation_fee_exn (account : Account.t) =
+    let balance =
+      Option.value_exn
+        (Balance.sub_amount account.balance
+           (Amount.of_fee constraint_constants.account_creation_fee))
+    in
+    let account = {account with balance} in
+    let timing =
+      Or_error.ok_exn
+        (Transaction_logic.validate_timing ~txn_amount:Amount.zero
+           ~txn_global_slot:current_global_slot ~account)
+    in
+    {account with timing}
+  in
   let compute_updates () =
     (* Raise an exception if any of the invariants for the user command are not
        satisfied, so that the command will not go through.
@@ -219,7 +235,7 @@ let apply_user_command_exn ~constraint_constants ~txn_global_slot t
               false
             in
             predicate_result
-        | Payment _ | Stake_delegation _ ->
+        | Payment _ | Stake_delegation _ | Mint_tokens _ ->
             (* TODO(#4554): Hook predicate evaluation in here once implemented. *)
             failwith
               "The fee-payer is not authorised to issue commands for the \
@@ -293,23 +309,10 @@ let apply_user_command_exn ~constraint_constants ~txn_global_slot t
             raise (Reject exn)
         in
         [(receiver_idx, receiver_account); (source_idx, source_account)]
-    | Create_new_token _ ->
+    | Create_new_token {disable_new_accounts; _} ->
         (* NOTE: source and receiver are definitionally equal here. *)
         let fee_payer_account =
-          try
-            let balance =
-              Option.value_exn
-                (Balance.sub_amount fee_payer_account.balance
-                   (Amount.of_fee constraint_constants.account_creation_fee))
-            in
-            let fee_payer_account = {fee_payer_account with balance} in
-            let timing =
-              Or_error.ok_exn
-                (Transaction_logic.validate_timing ~txn_amount:Amount.zero
-                   ~txn_global_slot:current_global_slot
-                   ~account:fee_payer_account)
-            in
-            {fee_payer_account with timing}
+          try charge_account_creation_fee_exn fee_payer_account
           with exn -> raise (Reject exn)
         in
         let receiver_idx = find_index_exn t receiver in
@@ -322,24 +325,22 @@ let apply_user_command_exn ~constraint_constants ~txn_global_slot t
                (Failure
                   "Token owner account for newly created token already \
                    exists?!?!")) ;
-        let receiver_account = {receiver_account with token_owner= true} in
+        let receiver_account =
+          { receiver_account with
+            token_permissions=
+              Token_permissions.Token_owned {disable_new_accounts} }
+        in
         [(fee_payer_idx, fee_payer_account); (receiver_idx, receiver_account)]
-    | Create_token_account _ ->
+    | Create_token_account {account_disabled; _} ->
+        if
+          account_disabled
+          && Token_id.(equal default) (Account_id.token_id receiver)
+        then
+          raise
+            (Reject
+               (Failure "Cannot open a disabled account in the default token")) ;
         let fee_payer_account =
-          try
-            let balance =
-              Option.value_exn
-                (Balance.sub_amount fee_payer_account.balance
-                   (Amount.of_fee constraint_constants.account_creation_fee))
-            in
-            let fee_payer_account = {fee_payer_account with balance} in
-            let timing =
-              Or_error.ok_exn
-                (Transaction_logic.validate_timing ~txn_amount:Amount.zero
-                   ~txn_global_slot:current_global_slot
-                   ~account:fee_payer_account)
-            in
-            {fee_payer_account with timing}
+          try charge_account_creation_fee_exn fee_payer_account
           with exn -> raise (Reject exn)
         in
         let receiver_idx = find_index_exn t receiver in
@@ -348,29 +349,37 @@ let apply_user_command_exn ~constraint_constants ~txn_global_slot t
         in
         if action = `Existed then
           failwith "Attempted to create an account that already exists" ;
+        let receiver_account =
+          { receiver_account with
+            token_permissions= Token_permissions.Not_owned {account_disabled}
+          }
+        in
         let source_idx = find_index_exn t source in
         let source_account =
-          if Token_id.(equal default) (Account_id.token_id receiver) then
-            receiver_account
+          if Account_id.equal source receiver then receiver_account
+          else if Account_id.equal source fee_payer then fee_payer_account
           else
-            let action, source_account =
-              get_or_initialize_exn receiver t source_idx
-            in
-            if action = `Added then failwith "Source account does not exist" ;
-            if not source_account.token_owner then
-              failwith "Token owner account does not own the token" ;
-            source_account
+            match get_or_initialize_exn receiver t source_idx with
+            | `Added, _ ->
+                failwith "Source account does not exist"
+            | `Existed, source_account ->
+                source_account
         in
         let () =
-          let should_check_predicate =
-            (* TODO: Token owner permissions. *)
-            false
-          in
-          if (not should_check_predicate) || predicate_passed then ()
-          else
-            failwith
-              "The fee-payer is not authorised to create token accounts for \
-               this token"
+          match source_account.token_permissions with
+          | Token_owned {disable_new_accounts} ->
+              if
+                not
+                  ( Bool.equal account_disabled disable_new_accounts
+                  || predicate_passed )
+              then
+                failwith
+                  "The fee-payer is not authorised to create token accounts \
+                   for this token"
+          | Not_owned _ ->
+              if Token_id.(equal default) (Account_id.token_id receiver) then
+                ()
+              else failwith "Token owner account does not own the token"
         in
         let source_account =
           let timing =
@@ -387,6 +396,45 @@ let apply_user_command_exn ~constraint_constants ~txn_global_slot t
           [ (receiver_idx, receiver_account)
           ; (fee_payer_idx, fee_payer_account)
           ; (source_idx, source_account) ]
+    | Mint_tokens {token_id= token; amount; _} ->
+        assert (not (Token_id.(equal default) token)) ;
+        let receiver_idx = find_index_exn t receiver in
+        let action, receiver_account =
+          get_or_initialize_exn receiver t receiver_idx
+        in
+        assert (action = `Existed) ;
+        let receiver_account =
+          { receiver_account with
+            balance=
+              Balance.add_amount receiver_account.balance amount
+              |> Option.value_exn ?here:None ?error:None ?message:None }
+        in
+        let source_idx = find_index_exn t source in
+        let source_account =
+          let account =
+            if Account_id.equal source receiver then receiver_account
+            else get_exn t source_idx
+          in
+          (* Check that source account exists. *)
+          assert (not Public_key.Compressed.(equal empty account.public_key)) ;
+          (* Check that source account owns the token. *)
+          let () =
+            match account.token_permissions with
+            | Token_owned _ ->
+                ()
+            | Not_owned _ ->
+                failwithf
+                  !"The claimed token owner %{sexp: Account_id.t} does not \
+                    own the token %{sexp: Token_id.t}"
+                  source token ()
+          in
+          { account with
+            timing=
+              Or_error.ok_exn
+              @@ Transaction_logic.validate_timing ~txn_amount:Amount.zero
+                   ~txn_global_slot:current_global_slot ~account }
+        in
+        [(receiver_idx, receiver_account); (source_idx, source_account)]
   in
   try
     let indexed_accounts = compute_updates () in
