@@ -42,7 +42,7 @@ CLI command to save state
 
 The Coda developers will choose a node with a root to represent the
 starting point of the hard fork. The choice of node is beyond the scope of
-this RFC, but one reasonable choice is an archive node run by Coda developers.
+this RFC.
 
 The CLI command can be in the `internal` group of commands, since
 it's meant for use in extraordinary circumstances. A suggested
