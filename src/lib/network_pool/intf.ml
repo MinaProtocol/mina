@@ -263,4 +263,6 @@ module type Transaction_resource_pool_intf = sig
 
   val all_from_account :
     t -> Account_id.t -> User_command.With_valid_signature.t list
+
+  val get_all : t -> User_command.With_valid_signature.t list
 end

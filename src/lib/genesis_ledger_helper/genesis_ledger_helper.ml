@@ -284,6 +284,14 @@ module Ledger = struct
       (config : Runtime_config.Ledger.t) =
     Monitor.try_with_join_or_error (fun () ->
         let add_genesis_winner_account accounts =
+          (* We allow configurations to explicitly override adding the genesis
+             winner, so that we can guarantee a certain ledger layout for
+             integration tests.
+             If the configuration does not include this setting, we add the
+             genesis winner when we have [proof_level = Full] so that we can
+             create a genesis proof. For all other proof levels, we do not add
+             the winner.
+          *)
           let add_genesis_winner_account =
             match config.add_genesis_winner with
             | Some add_genesis_winner ->
@@ -306,7 +314,7 @@ module Ledger = struct
                 :: accounts
           else accounts
         in
-        let accounts =
+        let accounts_opt =
           match config.base with
           | Hash _ ->
               None
@@ -326,14 +334,14 @@ module Ledger = struct
                   ~metadata:[("ledger_name", `String name)] ;
                 None )
         in
-        let accounts =
+        let padded_accounts_opt =
           Option.map
             ~f:
               (Lazy.map
                  ~f:
                    (Accounts.pad_to
                       (Option.value ~default:0 config.num_accounts)))
-            accounts
+            accounts_opt
         in
         let open Deferred.Let_syntax in
         let%bind tar_path =
@@ -343,7 +351,7 @@ module Ledger = struct
         | Some tar_path -> (
             match%map
               load_from_tar ~genesis_dir ~logger ~constraint_constants
-                ?accounts tar_path
+                ?accounts:padded_accounts_opt tar_path
             with
             | Ok ledger ->
                 Ok (ledger, config, tar_path)
@@ -355,7 +363,7 @@ module Ledger = struct
                     ; ("error", `String (Error.to_string_hum err)) ] ;
                 Error err )
         | None -> (
-          match accounts with
+          match padded_accounts_opt with
           | None -> (
             match config.base with
             | Accounts _ ->

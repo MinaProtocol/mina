@@ -24,7 +24,7 @@ module Dlog_based = struct
           ; beta_1: 'scalar_challenge
           ; beta_2: 'scalar_challenge
           ; beta_3: 'scalar_challenge }
-        [@@deriving bin_io, sexp, compare, yojson]
+        [@@deriving bin_io, sexp, compare, yojson, hlist]
 
         let map_challenges
             { sigma_2
@@ -48,31 +48,6 @@ module Dlog_based = struct
 
         open Snarky.H_list
 
-        let to_hlist
-            { sigma_2
-            ; sigma_3
-            ; alpha
-            ; eta_a
-            ; eta_b
-            ; eta_c
-            ; beta_1
-            ; beta_2
-            ; beta_3 } =
-          [sigma_2; sigma_3; alpha; eta_a; eta_b; eta_c; beta_1; beta_2; beta_3]
-
-        let of_hlist
-            ([ sigma_2
-             ; sigma_3
-             ; alpha
-             ; eta_a
-             ; eta_b
-             ; eta_c
-             ; beta_1
-             ; beta_2
-             ; beta_3 ] :
-              (unit, _) t) =
-          {sigma_2; sigma_3; alpha; eta_a; eta_b; eta_c; beta_1; beta_2; beta_3}
-
         let typ chal fp =
           Snarky.Typ.of_hlistable
             [ fp
@@ -93,20 +68,13 @@ module Dlog_based = struct
         ; r: 'scalar_challenge
         ; r_xi_sum: 'fp
         ; marlin: ('challenge, 'scalar_challenge, 'fp) Marlin.t }
-      [@@deriving bin_io, sexp, compare, yojson]
+      [@@deriving bin_io, sexp, compare, yojson, hlist]
 
       let map_challenges {xi; r; r_xi_sum; marlin} ~f ~scalar =
         { xi= scalar xi
         ; r= scalar r
         ; r_xi_sum
         ; marlin= Marlin.map_challenges marlin ~f ~scalar }
-
-      open Snarky.H_list
-
-      let to_hlist {xi; r; r_xi_sum; marlin} = [xi; r; r_xi_sum; marlin]
-
-      let of_hlist ([xi; r; r_xi_sum; marlin] : (unit, _) t) =
-        {xi; r; r_xi_sum; marlin}
 
       let typ chal fp fq =
         Snarky.Typ.of_hlistable
@@ -123,7 +91,7 @@ module Dlog_based = struct
         { pairing_marlin_acc:
             ('g1, 'unshifted) Pairing_marlin_types.Accumulator.Stable.Latest.t
         ; old_bulletproof_challenges: 'bulletproof_challenges }
-      [@@deriving bin_io, sexp, compare, yojson]
+      [@@deriving bin_io, sexp, compare, yojson, hlist]
 
       let to_field_elements
           { pairing_marlin_acc=
@@ -141,15 +109,6 @@ module Dlog_based = struct
                  |> Sequence.map ~f:snd |> Sequence.to_array ))
               ~f:(fun g -> Array.of_list (g1_to_field_elements g)) ]
 
-      open Snarky.H_list
-
-      let to_hlist {pairing_marlin_acc; old_bulletproof_challenges} =
-        [pairing_marlin_acc; old_bulletproof_challenges]
-
-      let of_hlist
-          ([pairing_marlin_acc; old_bulletproof_challenges] : (unit, _) t) =
-        {pairing_marlin_acc; old_bulletproof_challenges}
-
       let typ g1 chal domain_sizes ~length =
         Snarky.Typ.of_hlistable
           [ Pairing_marlin_types.Accumulator.typ domain_sizes g1
@@ -165,30 +124,7 @@ module Dlog_based = struct
       ; sponge_digest_before_evaluations: 'digest
             (* Not needed by other proof system *)
       ; me_only: 'me_only }
-    [@@deriving bin_io, sexp, compare, yojson]
-
-    open Snarky.H_list
-
-    let to_hlist
-        { deferred_values
-        ; was_base_case
-        ; sponge_digest_before_evaluations
-        ; me_only } =
-      [ deferred_values
-      ; was_base_case
-      ; sponge_digest_before_evaluations
-      ; me_only ]
-
-    let of_hlist
-        ([ deferred_values
-         ; was_base_case
-         ; sponge_digest_before_evaluations
-         ; me_only ] :
-          (unit, _) t) =
-      { deferred_values
-      ; was_base_case
-      ; sponge_digest_before_evaluations
-      ; me_only }
+    [@@deriving bin_io, sexp, compare, yojson, hlist]
 
     let typ chal fp bool fq me_only digest =
       Snarky.Typ.of_hlistable
@@ -341,13 +277,7 @@ module Pairing_based = struct
         
           It doesn't need to be sent on the wire, but it does need to be provided to the verifier
         *)
-        type ('fq, 'g) t = {b: 'fq}
-
-        open Snarky.H_list
-
-        let to_hlist {b} = [b]
-
-        let of_hlist ([b] : (unit, _) t) = {b}
+        type ('fq, 'g) t = {b: 'fq} [@@deriving hlist]
 
         let typ fq g =
           let open Snarky.Typ in

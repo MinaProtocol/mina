@@ -118,6 +118,7 @@ module Wrap_input = struct
     open Tock0
 
     type var = {low_bits: Field.Var.t; high_bit: Boolean.var}
+    [@@deriving hlist]
 
     type t = Tick0.Field.t
 
@@ -138,10 +139,7 @@ module Wrap_input = struct
     let of_tick_field (x : Tick0.Field.t) : t = x
 
     let typ : (var, t) Typ.t =
-      Typ.of_hlistable spec
-        ~var_to_hlist:(fun {low_bits; high_bit} -> [low_bits; high_bit])
-        ~var_of_hlist:(fun Snarky.H_list.[low_bits; high_bit] ->
-          {low_bits; high_bit} )
+      Typ.of_hlistable spec ~var_to_hlist ~var_of_hlist
         ~value_to_hlist:(fun (x : Tick0.Field.t) ->
           let low_bits, high_bit = split_last_exn (Tick0.Field.unpack x) in
           [Tock0.Field.project low_bits; high_bit] )

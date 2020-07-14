@@ -45,7 +45,7 @@ module Poly = struct
     ; epoch_duration: 'timespan
     ; delta_duration: 'timespan
     ; genesis_state_timestamp: 'time }
-  [@@deriving sexp, eq, to_yojson]
+  [@@deriving sexp, eq, to_yojson, hlist]
 end
 
 [%%versioned
@@ -267,73 +267,6 @@ let for_unit_tests =
 let to_protocol_constants ({k; delta; genesis_state_timestamp; _} : _ Poly.t) =
   {Coda_base.Protocol_constants_checked.Poly.k; delta; genesis_state_timestamp}
 
-let to_hlist
-    ({ k
-     ; c
-     ; delta
-     ; slots_per_sub_window
-     ; slots_per_window
-     ; sub_windows_per_window
-     ; slots_per_epoch
-     ; epoch_size
-     ; checkpoint_window_slots_per_year
-     ; checkpoint_window_size_in_slots
-     ; block_window_duration_ms
-     ; slot_duration_ms
-     ; epoch_duration
-     ; delta_duration
-     ; genesis_state_timestamp } :
-      _ Poly.t) =
-  H_list.
-    [ k
-    ; c
-    ; delta
-    ; slots_per_sub_window
-    ; slots_per_window
-    ; sub_windows_per_window
-    ; slots_per_epoch
-    ; epoch_size
-    ; checkpoint_window_slots_per_year
-    ; checkpoint_window_size_in_slots
-    ; block_window_duration_ms
-    ; slot_duration_ms
-    ; epoch_duration
-    ; delta_duration
-    ; genesis_state_timestamp ]
-
-let of_hlist : (unit, _) H_list.t -> _ Poly.t =
- fun H_list.
-       [ k
-       ; c
-       ; delta
-       ; slots_per_sub_window
-       ; slots_per_window
-       ; sub_windows_per_window
-       ; slots_per_epoch
-       ; epoch_size
-       ; checkpoint_window_slots_per_year
-       ; checkpoint_window_size_in_slots
-       ; block_window_duration_ms
-       ; slot_duration_ms
-       ; epoch_duration
-       ; delta_duration
-       ; genesis_state_timestamp ] ->
-  { k
-  ; c
-  ; delta
-  ; slots_per_sub_window
-  ; slots_per_window
-  ; sub_windows_per_window
-  ; slots_per_epoch
-  ; epoch_size
-  ; checkpoint_window_slots_per_year
-  ; checkpoint_window_size_in_slots
-  ; block_window_duration_ms
-  ; slot_duration_ms
-  ; epoch_duration
-  ; delta_duration
-  ; genesis_state_timestamp }
-
 let data_spec =
   Data_spec.
     [ Length.Checked.typ
@@ -353,8 +286,9 @@ let data_spec =
     ; Block_time.Unpacked.typ ]
 
 let typ =
-  Typ.of_hlistable data_spec ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
-    ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+  Typ.of_hlistable data_spec ~var_to_hlist:Poly.to_hlist
+    ~var_of_hlist:Poly.of_hlist ~value_to_hlist:Poly.to_hlist
+    ~value_of_hlist:Poly.of_hlist
 
 let to_input (t : t) =
   let u = Length.to_bits in

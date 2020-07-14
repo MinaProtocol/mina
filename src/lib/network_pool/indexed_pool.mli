@@ -85,9 +85,12 @@ val add_from_backtrack : t -> User_command.With_valid_signature.t -> t
 (** Check whether a command is in the pool *)
 val member : t -> User_command.With_valid_signature.t -> bool
 
-(* Get all the user commands sent by a user with a particular account *)
+(** Get all the user commands sent by a user with a particular account *)
 val all_from_account :
   t -> Account_id.t -> User_command.With_valid_signature.t list
+
+(** Get all user commands in the pool. *)
+val get_all : t -> User_command.With_valid_signature.t list
 
 (** Check the contents of the pool are valid against the current ledger. Call
     this whenever the transition frontier is (re)created.
