@@ -1,15 +1,15 @@
 module Util = struct
   let rev_concat l =
-    let rec rev_concat acc l =
+    let rec go acc l =
       match l with
       | [] ->
           acc
       | [] :: l ->
-          rev_concat acc l
+          go acc l
       | (x :: xs) :: l ->
-          rev_concat (x :: acc) (xs :: l)
+          go (x :: acc) (xs :: l)
     in
-    rev_concat [] l
+    go [] l
 end
 
 let unit_to_representatives = lazy [()]
