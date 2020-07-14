@@ -68,7 +68,7 @@ jobs:
     test-archive:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
               environment:
                 CODA_DOCKER: true
             - image: postgres:12
@@ -118,7 +118,7 @@ jobs:
     build-archive:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
               environment:
                 CODA_DOCKER: true
                 HASURA_PORT: 8080
@@ -189,7 +189,7 @@ jobs:
                   command: ./scripts/archive/build-release-archives.sh
     lint:
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
         steps:
             
             - run:
@@ -240,7 +240,7 @@ jobs:
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c './scripts/require-ppx-version.py'
     lint-opt:
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
         steps:
             
             - run:
@@ -279,7 +279,7 @@ jobs:
                   command: ./scripts/compare_ci_diff_binables.sh
     compare-test-signatures:
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
         steps:
             
             - run:
@@ -502,7 +502,7 @@ jobs:
     build-client-sdk:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
         steps:
             
             - run:
@@ -540,10 +540,16 @@ jobs:
                   environment:
                     DUNE_PROFILE: nonconsensus_medium_curves
                   no_output_timeout: 10m
+            - run:
+                  name: Yarn deps
+                  command: cd frontend/client_sdk && yarn install
+            - run:
+                  name: Build And Test Client SDK
+                  command: eval `opam config env` && cd frontend/client_sdk && yarn prepublishOnly
     build-artifacts--testnet_postake_medium_curves:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
         steps:
             
             - run:
@@ -647,7 +653,7 @@ jobs:
     build-artifacts-docker--testnet_postake_medium_curves--coda-daemon:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
         steps:
             - restore_cache:
                 name: Restore cache - docker deploy env
@@ -678,7 +684,7 @@ jobs:
     build-artifacts-docker--testnet_postake_medium_curves--coda-demo:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
         steps:
             - restore_cache:
                 name: Restore cache - docker deploy env
@@ -709,7 +715,7 @@ jobs:
     test-unit--dev:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
         steps:
             
             - run:
@@ -756,7 +762,7 @@ jobs:
     test-unit--nonconsensus_medium_curves:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
         steps:
             
             - run:
@@ -801,7 +807,7 @@ jobs:
     test-unit--dev_medium_curves:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
         steps:
             
             - run:
@@ -846,7 +852,7 @@ jobs:
     test--fake_hash:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
         steps:
             
             - run:
@@ -885,7 +891,7 @@ jobs:
     test--test_postake:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
         steps:
             
             - run:
@@ -927,7 +933,7 @@ jobs:
     test--test_postake_bootstrap:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
         steps:
             
             - run:
@@ -966,7 +972,7 @@ jobs:
     test--test_postake_catchup:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
         steps:
             
             - run:
@@ -1005,7 +1011,7 @@ jobs:
     test--test_postake_delegation:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
         steps:
             
             - run:
@@ -1044,7 +1050,7 @@ jobs:
     test--test_postake_five_even_txns:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
         steps:
             
             - run:
@@ -1083,7 +1089,7 @@ jobs:
     test--test_postake_snarkless:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
         steps:
             
             - run:
@@ -1125,7 +1131,7 @@ jobs:
     test--test_postake_split:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
         steps:
             
             - run:
@@ -1164,7 +1170,7 @@ jobs:
     test--test_postake_split_snarkless:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
         steps:
             
             - run:
@@ -1221,7 +1227,7 @@ jobs:
     test--test_postake_three_producers:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
         steps:
             
             - run:
@@ -1260,7 +1266,7 @@ jobs:
     test--test_postake_txns:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
         steps:
             
             - run:
@@ -1302,7 +1308,7 @@ jobs:
     test--test_postake_full_epoch:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
         steps:
             
             - run:
@@ -1341,7 +1347,7 @@ jobs:
     test--test_postake_medium_curves:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
         steps:
             
             - run:
@@ -1385,7 +1391,7 @@ jobs:
     test--test_postake_snarkless_medium_curves:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
         steps:
             
             - run:
@@ -1427,7 +1433,7 @@ jobs:
     test--test_postake_split_medium_curves:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
         steps:
             
             - run:

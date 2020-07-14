@@ -3,9 +3,9 @@ open Async_kernel
 module type Node_intf = sig
   type t
 
-  val start : t -> unit Deferred.t
+  val start : t -> unit Deferred.Or_error.t
 
-  val stop : t -> unit Deferred.t
+  val stop : t -> unit Deferred.Or_error.t
 
   val send_payment :
     t -> User_command_input.t -> Coda_base.User_command.t Deferred.Or_error.t
@@ -13,10 +13,14 @@ end
 
 module type Network_config_intf = sig
   type t
+
+  val create : unit -> t
 end
 
 module type Daemon_config_intf = sig
   type t
+
+  val create : unit -> t
 end
 
 module type Testnet_intf = sig
@@ -37,10 +41,10 @@ module type Network_manager_intf = sig
   type daemon_config
 
   (* Deploy the network*)
-  val deploy : network_config -> daemon_config -> testnet Deferred.t
+  val deploy : network_config -> daemon_config -> testnet Deferred.Or_error.t
 
   (*Tear down the network*)
-  val destroy : testnet -> unit Deferred.t
+  val destroy : testnet -> unit Deferred.Or_error.t
 end
 
 module type Log_engine_intf = sig
