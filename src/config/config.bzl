@@ -114,92 +114,92 @@ coda_config = rule(
     implementation = _coda_config_impl,
     # defaults are from src/config/dev.mlh
     attrs = {
-        "ledger_depth": attr.label(default="//ocaml/config/ledger_depth"),
-        "curve_size": attr.label(default="//ocaml/config/curve_size"),
-        "coinbase": attr.label(default="//ocaml/config/coinbase"),
+        "ledger_depth": attr.label(default="//src/config/ledger_depth"),
+        "curve_size": attr.label(default="//src/config/curve_size"),
+        "coinbase": attr.label(default="//src/config/coinbase"),
 
-        "consensus_mechanism": attr.label(default="//ocaml/config/consensus:mechanism"),
-        "consensus_k": attr.label(default="//ocaml/config/consensus:k"),
-        "consensus_c": attr.label(default="//ocaml/config/consensus:c"),
-        "consensus_delta": attr.label(default="//ocaml/config/consensus:delta"),
+        "consensus_mechanism": attr.label(default="//src/config/consensus:mechanism"),
+        "consensus_k": attr.label(default="//src/config/consensus:k"),
+        "consensus_c": attr.label(default="//src/config/consensus:c"),
+        "consensus_delta": attr.label(default="//src/config/consensus:delta"),
 
         # defaults = scan_state/medium.mlh
         "scan_state_with_tps_goal": attr.label(
-            default="//ocaml/config/scan_state:with_tps_goal"
+            default="//src/config/scan_state:with_tps_goal"
         ),
         "scan_state_transaction_capacity_log_2": attr.label(
-            default="//ocaml/config/scan_state:txn_capacity_log2"
+            default="//src/config/scan_state:txn_capacity_log2"
         ),
         "scan_state_work_delay": attr.label(
-            default="//ocaml/config/scan_state:work_delay"
+            default="//src/config/scan_state:work_delay"
         ),
         ## WARNING: the following is only set by a few include files in scan_state/
         ## It is not set for dev.mlh
         "scan_state_tps_goal_x10": attr.label(
-            default="//ocaml/config/scan_state:tps_goal_x10"
+            default="//src/config/scan_state:tps_goal_x10"
         ),
 
         # debug defaults: debug/level/some.mlh
-        "debug_logs": attr.label(default="//ocaml/config/debug:logs"),
-        "call_logger": attr.label(default="//ocaml/config/debug:call_logger"),
-        "tracing": attr.label(default="//ocaml/config/debug:tracing"),
+        "debug_logs": attr.label(default="//src/config/debug:logs"),
+        "call_logger": attr.label(default="//src/config/debug:call_logger"),
+        "tracing": attr.label(default="//src/config/debug:tracing"),
         "cache_exceptions": attr.label(
-            default="//ocaml/config/debug:cache_exceptions"
+            default="//src/config/debug:cache_exceptions"
         ),
         "record_async_backtraces": attr.label(
-            default="//ocaml/config/debug:record_async_backtraces"
+            default="//src/config/debug:record_async_backtraces"
         ),
 
         "proof_level":  attr.label(
-            default="//ocaml/config/proof_level"
+            default="//src/config/proof_level"
         ),
 
-        "pool_max_size": attr.label(default="//ocaml/config/txn_pool:max_size"),
+        "pool_max_size": attr.label(default="//src/config/txn_pool:max_size"),
 
         "account_creation_fee_int": attr.label(
-            default="//ocaml/config/fees:account_creation"
+            default="//src/config/fees:account_creation"
         ),
         "default_transaction_fee": attr.label(
-            default="//ocaml/config/fees:txn"
+            default="//src/config/fees:txn"
         ),
         "default_snark_worker_fee": attr.label(
-            default="//ocaml/config/fees:snark_worker"
+            default="//src/config/fees:snark_worker"
         ),
         "minimum_user_command_fee": attr.label(
-            default="//ocaml/config/fees:min_user_cmd"
+            default="//src/config/fees:min_user_cmd"
         ),
 
         "current_protocol_version": attr.label(
-            default="//ocaml/config:protocol_version",
+            default="//src/config:protocol_version",
         ),
 
         ## src/config/dev.mlh:
-        "time_offsets": attr.label(default = "//ocaml/config:time_offsets"),
-        "fake_hash": attr.label(default = "//ocaml/config:with_fake_hash"),
+        "time_offsets": attr.label(default = "//src/config:time_offsets"),
+        "fake_hash": attr.label(default = "//src/config:with_fake_hash"),
         "genesis_ledger": attr.label(
-            default = "//ocaml/config/genesis/ledger" # default: "test"
+            default = "//src/config/genesis/ledger" # default: "test"
         ),
         "genesis_state_timestamp": attr.label(
-            default = "//ocaml/config/genesis:state_timestamp"
+            default = "//src/config/genesis:state_timestamp"
         ),
         "block_window_duration": attr.label(
-            default = "//ocaml/config:block_window_duration"
+            default = "//src/config:block_window_duration"
         ),
         "integration_tests": attr.label(
-            default = "//ocaml/config:integration_tests"
+            default = "//src/config:integration_tests"
         ),
-        "force_updates": attr.label(default = "//ocaml/config:force_updates"),
+        "force_updates": attr.label(default = "//src/config:force_updates"),
         "mock_frontend_data": attr.label(
-            default = "//ocaml/config:mock_frontend_data"
+            default = "//src/config:mock_frontend_data"
         ),
         "print_versioned_types": attr.label(
-            default = "//ocaml/config:print_versioned_types"
+            default = "//src/config:print_versioned_types"
         ),
         "daemon_expiry": attr.label(
-            default = "//ocaml/config:daemon_expiry"
+            default = "//src/config:daemon_expiry"
         ),
         "test_full_epoch": attr.label(
-            default = "//ocaml/config:test_full_epoch"
+            default = "//src/config:test_full_epoch"
         ),
 
         "_template": attr.label(

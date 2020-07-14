@@ -4,7 +4,7 @@ load("@obazl_rules_ocaml//ocaml:build.bzl",
      "ppx_binary",
      "ppx_library")
 
-load("//ocaml/config:config.bzl",
+load("config.bzl",
      "coda_config",
      "coda_test_config")
 
@@ -78,13 +78,13 @@ bool_setting( name = "test_full_epoch_true", build_setting_default = True,
 # to support selection by profile we need a config setting for each
 # profile:
 config_setting( name = "config_dev",
-                flag_values = { "//ocaml/profile": "dev" })
+                flag_values = { "//src/profile": "dev" })
 config_setting( name = "config_debug",
-                flag_values = { "//ocaml/profile": "debug" })
+                flag_values = { "//src/profile": "debug" })
 config_setting( name = "config_fake_hash",
-                flag_values = { "//ocaml/profile": "fake_hash" })
+                flag_values = { "//src/profile": "fake_hash" })
 config_setting( name = "config_testnet_public",
-                flag_values = { "//ocaml/profile": "testnet_public" })
+                flag_values = { "//src/profile": "testnet_public" })
 
 # config_setting( name = "config_custom",
 #                 flag_values = { "//dev/profile": "any" })
@@ -112,24 +112,24 @@ coda_config(
     name = "debug", # src/config/debug.mlh
     visibility = ["//visibility:public"],
     # scan_state/standard.mlh
-    scan_state_transaction_capacity_log_2 = "//ocaml/config/scan_state/std:txn_capacity_log2", # 7,
-    scan_state_work_delay = "//ocaml/config/scan_state/std:work_delay", # 7, # scan_state/standard.mlh
-    debug_logs = "//ocaml/config/debug/all:logs",  # debug_level/all.mlh
-    call_logger = "//ocaml/config/debug/all:call_logger",
-    record_async_backtraces = "//ocaml/config/debug/all:record_async_backtraces",
+    scan_state_transaction_capacity_log_2 = "//src/config/scan_state/std:txn_capacity_log2", # 7,
+    scan_state_work_delay = "//src/config/scan_state/std:work_delay", # 7, # scan_state/standard.mlh
+    debug_logs = "//src/config/debug/all:logs",  # debug_level/all.mlh
+    call_logger = "//src/config/debug/all:call_logger",
+    record_async_backtraces = "//src/config/debug/all:record_async_backtraces",
 
-    account_creation_fee_int = "//ocaml/config/fees/std:account_creation",
-    time_offsets = "//ocaml/config:time_offsets_false"
+    account_creation_fee_int = "//src/config/fees/std:account_creation",
+    time_offsets = "//src/config:time_offsets_false"
 )
 
 coda_config(
     name = "fake_hash",
     visibility = ["//visibility:public"],
-    ledger_depth = "//ocaml/config/ledger_depth:tiny",
-    consensus_k = "//ocaml/config/consensus/tiny:k",
+    ledger_depth = "//src/config/ledger_depth:tiny",
+    consensus_k = "//src/config/consensus/tiny:k",
     # scan_state/medium.mlh
-    scan_state_transaction_capacity_log_2 = "//ocaml/config/scan_state/medium:txn_capacity_log2",
-    proof_level = "//ocaml/config/proof_level:none",
+    scan_state_transaction_capacity_log_2 = "//src/config/scan_state/medium:txn_capacity_log2",
+    proof_level = "//src/config/proof_level:none",
     fake_hash = ":fake_hash_true", # src/config/fake_hash.mlh
     block_window_duration = ":block_window_duration_600"
 )
@@ -137,14 +137,14 @@ coda_config(
 coda_config(
     name = "testnet_public",    # testnet_public.mlh
     visibility = ["//visibility:public"],
-    ledger_depth = "//ocaml/config/ledger_depth:full",
-    consensus_k = "//ocaml/config/consensus/tiny:k",
+    ledger_depth = "//src/config/ledger_depth:full",
+    consensus_k = "//src/config/consensus/tiny:k",
     # scan_state/std.mlh
-    scan_state_transaction_capacity_log_2 = "//ocaml/config/scan_state/std:txn_capacity_log2",
-    proof_level = "//ocaml/config/proof_level:full",
-    account_creation_fee_int = "//ocaml/config/fees/std:account_creation",
-    time_offsets = "//ocaml/config:time_offsets_false",
-    genesis_ledger = "//ocaml/config/genesis/ledger:testnet_postake",
+    scan_state_transaction_capacity_log_2 = "//src/config/scan_state/std:txn_capacity_log2",
+    proof_level = "//src/config/proof_level:full",
+    account_creation_fee_int = "//src/config/fees/std:account_creation",
+    time_offsets = "//src/config:time_offsets_false",
+    genesis_ledger = "//src/config/genesis/ledger:testnet_postake",
     block_window_duration = ":block_window_duration_20000",
     integration_tests = ":integration_tests_false",
     force_updates = ":force_updates_true"
