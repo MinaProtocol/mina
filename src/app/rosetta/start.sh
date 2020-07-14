@@ -36,7 +36,8 @@ sleep 3
 
 # demo node
 ./run-demo.sh \
-    -archive-address 3086 -log-level debug &
+    -archive-address 3086 \
+    -log-level debug &
 
 # wait for it to settle
 sleep 3
@@ -44,7 +45,8 @@ sleep 3
 # rosetta
 ../../../_build/default/src/app/rosetta/rosetta.exe \
   -archive-uri $PG_CONN \
-  -graphql-uri https://localhost:3085/graphql \
+  -graphql-uri http://localhost:3085/graphql \
+  -log-level debug \
   -port 3087 &
 
 # wait for a signal
