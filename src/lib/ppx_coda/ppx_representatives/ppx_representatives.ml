@@ -64,7 +64,15 @@ let rec core_type ~loc (typ : core_type) : expression =
           [ [%e
               pexp_fun ~loc label None
                 [%pat? _]
-                [%expr failwith "Functional type"]] ]]
+                [%expr
+                  Stdlib.failwith
+                    [%e
+                      estring ~loc
+                        (Stdlib.Format.asprintf
+                           "%s: Illegal call to dummy functional value \
+                            defined by %a"
+                           deriver_name Ocaml_common.Location.print_loc
+                           typ.ptyp_loc)]]] ]]
   | Ptyp_tuple typs ->
       let exprs = List.map ~f:(core_type ~loc) typs in
       let mk_name i =
