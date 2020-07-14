@@ -2490,6 +2490,42 @@ module Queries = struct
           Auxiliary_database.External_transition_database.get_value db
             state_hash) )
 
+  let genesis_block =
+    field "block" ~typ:(non_null Types.block) ~args:[]
+      ~doc:"Get the genesis block" ~resolve:(fun {ctx= coda; _} () ->
+        let open Coda_state in
+        let { Precomputed_values.genesis_ledger
+            ; constraint_constants
+            ; consensus_constants
+            ; genesis_proof
+            ; _ } =
+          (Coda_lib.config coda).precomputed_values
+        in
+        let {With_hash.data= genesis_state; hash} =
+          Genesis_protocol_state.t
+            ~genesis_ledger:(Genesis_ledger.Packed.t genesis_ledger)
+            ~constraint_constants ~consensus_constants
+        in
+        { With_hash.data=
+            { Auxiliary_database.Filtered_external_transition.creator=
+                fst Consensus_state_hooks.genesis_winner
+            ; protocol_state=
+                { previous_state_hash=
+                    Protocol_state.previous_state_hash genesis_state
+                ; blockchain_state=
+                    Protocol_state.blockchain_state genesis_state
+                ; consensus_state= Protocol_state.consensus_state genesis_state
+                }
+            ; transactions=
+                { user_commands= []
+                ; fee_transfers= []
+                ; coinbase= constraint_constants.coinbase_amount
+                ; coinbase_receiver=
+                    Some (fst Consensus_state_hooks.genesis_winner) }
+            ; snark_jobs= []
+            ; proof= genesis_proof }
+        ; hash } )
+
   let best_chain =
     field "bestChain"
       ~doc:
@@ -2569,6 +2605,7 @@ module Queries = struct
     ; best_chain
     ; blocks
     ; block
+    ; genesis_block
     ; initial_peers
     ; pooled_user_commands
     ; transaction_status

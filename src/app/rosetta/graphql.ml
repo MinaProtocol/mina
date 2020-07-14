@@ -39,7 +39,8 @@ let query ?retriable query_obj uri =
           ~body:(Cohttp_async.Body.of_string body_string)
           uri )
     |> Deferred.Result.map_error ~f:(fun e ->
-           Errors.create ?retriable (Error.to_string_hum e) )
+           Errors.create ?retriable
+             (sprintf "GraphQL query failed: %s" (Error.to_string_hum e)) )
   in
   let%bind body_str =
     Cohttp_async.Body.to_string body |> Deferred.map ~f:Result.return
