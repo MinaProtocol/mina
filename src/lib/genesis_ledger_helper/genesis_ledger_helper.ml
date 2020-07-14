@@ -820,6 +820,15 @@ let init_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
     Genesis_proof.generate_inputs ~proof_level ~ledger:genesis_ledger
       ~constraint_constants ~genesis_constants
   in
+  Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
+    ~metadata:
+      [ ( "genesis_protocol_state"
+        , Coda_state.Protocol_state.Value.to_yojson
+            (With_hash.data proof_inputs.protocol_state_with_hash) )
+      ; ( "genesis_state_hash"
+        , State_hash.to_yojson
+            (With_hash.hash proof_inputs.protocol_state_with_hash) ) ]
+    "Generated genesis protocol state" ;
   let open Deferred.Or_error.Let_syntax in
   let%map values, proof_file =
     Genesis_proof.load_or_generate ~genesis_dir ~logger ~may_generate

@@ -133,6 +133,14 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
               ~transactions_by_fee:transactions ~get_completed_work
               ~log_block_creation )
       in
+      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+        ~metadata:
+          [ ( "diff"
+            , Staged_ledger_diff.With_valid_signatures_and_proofs.to_yojson
+                diff )
+          ; ( "prev_slot_number"
+            , Coda_numbers.Global_slot.to_yojson previous_global_slot ) ]
+        "Block producer created the diff" ;
       match%map
         Staged_ledger.apply_diff_unchecked staged_ledger ~constraint_constants
           diff ~logger ~current_global_slot:previous_global_slot
