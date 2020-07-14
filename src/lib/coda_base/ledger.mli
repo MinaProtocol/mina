@@ -119,6 +119,7 @@ module Undo : sig
         | Stake_delegation of {previous_delegate: Public_key.Compressed.t}
         | Create_new_token of {created_token: Token_id.t}
         | Create_token_account
+        | Mint_tokens
         | Failed
       [@@deriving sexp]
     end

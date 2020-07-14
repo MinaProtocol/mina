@@ -28,7 +28,12 @@ module Account = struct
 
   let token Coda_base.Account.Poly.{token_id; _} = token_id
 
-  let token_owner Coda_base.Account.Poly.{token_owner; _} = token_owner
+  let token_owner Coda_base.Account.Poly.{token_permissions; _} =
+    match token_permissions with
+    | Coda_base.Token_permissions.Token_owned _ ->
+        true
+    | Not_owned _ ->
+        false
 end
 
 module Receipt = Coda_base.Receipt

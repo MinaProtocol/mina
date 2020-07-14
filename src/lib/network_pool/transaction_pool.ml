@@ -58,6 +58,8 @@ module Diff_versioned = struct
           | Insufficient_funds
           | Insufficient_fee
           | Overflow
+          | Bad_token
+          | Unwanted_fee_token
         [@@deriving sexp, yojson]
 
         let to_latest = Fn.id
@@ -73,6 +75,8 @@ module Diff_versioned = struct
       | Insufficient_funds
       | Insufficient_fee
       | Overflow
+      | Bad_token
+      | Unwanted_fee_token
     [@@deriving sexp, yojson]
   end
 
@@ -216,6 +220,8 @@ struct
     let transactions ~logger t = transactions' ~logger t.pool
 
     let all_from_account {pool; _} = Indexed_pool.all_from_account pool
+
+    let get_all {pool; _} = Indexed_pool.get_all pool
 
     (** Get the best tip ledger*)
     let get_best_tip_ledger frontier =
@@ -583,6 +589,8 @@ struct
           | Insufficient_funds
           | Insufficient_fee
           | Overflow
+          | Bad_token
+          | Unwanted_fee_token
         [@@deriving sexp, yojson]
       end
 
@@ -701,6 +709,12 @@ struct
                                     ; ("fee", fee_json fee) ] )
                               | `Overflow ->
                                   (Overflow, [])
+                              | `Bad_token ->
+                                  (Bad_token, [])
+                              | `Unwanted_fee_token fee_token ->
+                                  ( Unwanted_fee_token
+                                  , [ ( "fee_token"
+                                      , Token_id.to_yojson fee_token ) ] )
                             in
                             let yojson_fail_reason =
                               Fn.compose
@@ -713,7 +727,11 @@ struct
                                   | `Insufficient_replace_fee _ ->
                                       "insufficient replace fee"
                                   | `Overflow ->
-                                      "overflow" )
+                                      "overflow"
+                                  | `Bad_token ->
+                                      "bad token"
+                                  | `Unwanted_fee_token _ ->
+                                      "unwanted fee token" )
                             in
                             match add_res with
                             | Ok (pool', dropped) ->
@@ -812,6 +830,28 @@ struct
                                   , ( tx
                                     , Diff_versioned.Diff_error
                                       .Insufficient_replace_fee )
+                                    :: rejected )
+                            | Error (`Unwanted_fee_token fee_token) ->
+                                (* We can't punish peers for this, since these
+                                   are our specific preferences.
+                                *)
+                                let f_log =
+                                  if is_sender_local then Logger.error
+                                  else Logger.debug
+                                in
+                                f_log t.logger ~module_:__MODULE__
+                                  ~location:__LOC__
+                                  "rejecting $cmd because we don't accept \
+                                   fees in $token"
+                                  ~metadata:
+                                    [ ("cmd", User_command.to_yojson tx)
+                                    ; ("token", Token_id.to_yojson fee_token)
+                                    ] ;
+                                go txs'' pool
+                                  ( accepted
+                                  , ( tx
+                                    , Diff_versioned.Diff_error
+                                      .Unwanted_fee_token )
                                     :: rejected )
                             | Error err ->
                                 let diff_err, err_extra =
@@ -1140,7 +1180,8 @@ let%test_module _ =
       , Account.Poly.Stable.Latest.
           { public_key= Public_key.compress @@ test_keys.(i).public_key
           ; token_id= Token_id.default
-          ; token_owner= false
+          ; token_permissions=
+              Token_permissions.Not_owned {account_disabled= false}
           ; balance= Currency.Balance.of_int balance
           ; nonce= Account.Nonce.of_int nonce
           ; receipt_chain_hash= Receipt.Chain_hash.empty
@@ -1342,7 +1383,9 @@ let%test_module _ =
                   Stake_delegation
                     (Set_delegate {payload with delegator= sender_pk}) }
           | { common
-            ; body= (Create_new_token _ | Create_token_account _) as body } ->
+            ; body=
+                (Create_new_token _ | Create_token_account _ | Mint_tokens _)
+                as body } ->
               {common= {common with fee_payer_pk= sender_pk}; body}
         in
         User_command.forget_check @@ User_command.sign sender_kp payload

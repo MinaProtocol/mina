@@ -4,9 +4,9 @@
  (library_flags -linkall)
  (inline_tests)
  (libraries core_kernel fold_lib tuple_lib snark_bits_nonconsensus bignum_bigint random_oracle_nonconsensus sgn_nonconsensus snark_params_nonconsensus
-   unsigned_extended_nonconsensus codable)
+   unsigned_extended_nonconsensus codable ppx_dhall_type)
  (preprocessor_deps ../../config.mlh)
  (preprocess
-  (pps ppx_coda ppx_version ppx_let ppx_assert ppx_bin_prot ppx_sexp_conv ppx_compare ppx_hash ppx_optcomp ppx_custom_printf ppx_deriving.std ppx_deriving_yojson ppx_inline_test bisect_ppx --
+  (pps ppx_coda ppx_version ppx_let ppx_assert ppx_bin_prot ppx_sexp_conv ppx_compare ppx_hash ppx_optcomp ppx_custom_printf ppx_deriving.std ppx_deriving_yojson h_list.ppx ppx_inline_test bisect_ppx --
     -conditional))
  (synopsis "Currency types"))

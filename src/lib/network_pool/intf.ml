@@ -232,6 +232,8 @@ module type Transaction_pool_diff_intf = sig
       | Insufficient_funds
       | Insufficient_fee
       | Overflow
+      | Bad_token
+      | Unwanted_fee_token
     [@@deriving sexp, yojson]
   end
 
@@ -261,4 +263,6 @@ module type Transaction_resource_pool_intf = sig
 
   val all_from_account :
     t -> Account_id.t -> User_command.With_valid_signature.t list
+
+  val get_all : t -> User_command.With_valid_signature.t list
 end

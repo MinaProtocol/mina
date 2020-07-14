@@ -12,7 +12,10 @@ let main () =
   let block_production_keys i =
     if i = snark_worker_and_block_producer_id then Some i else None
   in
-  let largest_public_key = Test_genesis_ledger.largest_account_pk_exn () in
+  let precomputed_values = Lazy.force Precomputed_values.compiled in
+  let largest_public_key =
+    Precomputed_values.largest_account_pk_exn precomputed_values
+  in
   let snark_work_public_keys i =
     if i = snark_worker_and_block_producer_id then Some largest_public_key
     else None
@@ -63,8 +66,9 @@ let main () =
     wait_for_snark_worker_proof new_block_pipe1 largest_public_key
   in
   let new_snark_worker =
-    Test_genesis_ledger.find_new_account_record_exn_ [largest_public_key]
-    |> Test_genesis_ledger.pk_of_account_record
+    Precomputed_values.find_new_account_record_exn_ precomputed_values
+      [largest_public_key]
+    |> Precomputed_values.pk_of_account_record
   in
   Logger.trace logger "Setting new snark worker key"
     ~metadata:
