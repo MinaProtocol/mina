@@ -71,8 +71,12 @@ let router ~graphql_uri ~logger ~db (route : string list) body =
     ~metadata:[("route", `List (List.map route ~f:(fun s -> `String s)))] ;
   match route with
   | ["list"] ->
-      let%bind _meta = Errors.map_parse @@ Metadata_request.of_yojson body in
-      let%map res = Graphql.query (Get_network.make ()) graphql_uri in
+      let%bind _meta =
+        Errors.Lift.parse ~context:"Request" @@ Metadata_request.of_yojson body
+      in
+      let%map res =
+        Graphql.query ~retriable:true (Get_network.make ()) graphql_uri
+      in
       (* HACK: If initialPeers + peers are both empty, assume we're on debug ; otherwise testnet or devnet *)
       let network = network_tag_of_graphql res in
       Network_list_response.to_yojson
@@ -81,37 +85,38 @@ let router ~graphql_uri ~logger ~db (route : string list) body =
               ; network
               ; sub_network_identifier= None } ] }
   | ["status"] ->
-      let%bind network = Errors.map_parse @@ Network_request.of_yojson body in
-      let%bind res = Graphql.query (Get_status.make ()) graphql_uri in
+      let%bind network =
+        Errors.Lift.parse ~context:"Request" @@ Network_request.of_yojson body
+      in
+      let%bind res =
+        Graphql.query ~retriable:true (Get_status.make ()) graphql_uri
+      in
       let network_tag = network_tag_of_graphql res in
       let requested_tag = network.Network_request.network_identifier.network in
       let%bind () =
         if not (String.equal requested_tag network_tag) then
           Deferred.Result.fail
             (Errors.create ~retriable:false
-               (Core_kernel.sprintf
-                  !"You are requesting the status for the network %s but you \
-                    are connected to the network %s\n"
-                  requested_tag network_tag))
+               (`Network_doesn't_exist (requested_tag, network_tag)))
         else return ()
       in
       let%bind latest_block =
         Deferred.return
           ( match res#bestChain with
           | None | Some [||] ->
-              Error
-                (Errors.create
-                   "Could not get chain information. This probably means you \
-                    are bootstrapping -- bootstrapping is the process of \
-                    synchronizing with peers that are way ahead of you on the \
-                    chain. Try again in a few seconds.")
+              Error (Errors.create ~retriable:true `Chain_info_missing)
           | Some chain ->
               Ok (Array.last chain) )
       in
       let%bind genesis_block_state_hash =
-        Errors.map_sql @@ Db.find genesis_block_query ()
+        Errors.Lift.sql ~context:"Genesis block state hash query"
+          ~retriable:true
+        @@ Db.find genesis_block_query ()
       in
-      let%map oldest_block = Errors.map_sql @@ Db.find oldest_block_query () in
+      let%map oldest_block =
+        Errors.Lift.sql ~context:"Oldest block query" ~retriable:true
+        @@ Db.find oldest_block_query ()
+      in
       Network_status_response.to_yojson
         { Network_status_response.current_block_identifier=
             Block_identifier.create
@@ -133,8 +138,12 @@ let router ~graphql_uri ~logger ~db (route : string list) body =
             (res#daemonStatus)#peers |> Array.to_list
             |> List.map ~f:Peer.create }
   | ["options"] ->
-      let%bind _network = Errors.map_parse @@ Network_request.of_yojson body in
-      let%map res = Graphql.query (Get_version.make ()) graphql_uri in
+      let%bind _network =
+        Errors.Lift.parse ~context:"Request" @@ Network_request.of_yojson body
+      in
+      let%map res =
+        Graphql.query ~retriable:true (Get_version.make ()) graphql_uri
+      in
       Network_options_response.to_yojson
         { Network_options_response.version=
             Version.create "1.4.0"
