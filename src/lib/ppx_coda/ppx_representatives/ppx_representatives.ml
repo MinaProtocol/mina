@@ -22,10 +22,25 @@ let constr_of_decl ~loc decl =
     (List.map ~f:fst decl.ptype_params)
 
 let is_builtin = function
-  | "unit" | "bool" | "int" | "string" | "char" ->
+  | "unit" | "bool" | "int" | "string" | "char" | "bytes" ->
+      true
+  | "int32" | "int64" | "nativeint" ->
       true
   | _ ->
       false
+
+let is_builtin_with_arg = function
+  | "list" | "option" | "array" ->
+      true
+  | _ ->
+      false
+
+let mk_builtin ~loc name =
+  Ast_builder.Default.pexp_ident ~loc
+    (Loc.make ~loc
+       (Ldot
+          ( Lident "Ppx_representatives_runtime"
+          , mangle ~suffix:deriver_name name )))
 
 (* The way that we expand representatives below makes it extremely easy to blow
    the stack if we're not tail-recursive. All generated list iterators should
@@ -72,24 +87,10 @@ let rec core_type ~loc (typ : core_type) : expression =
                     (Stdlib.List.rev_map
                        (fun [%p pvar ~loc (mk_name i)] -> [%e expr])
                        (Stdlib.Lazy.force [%e arg]))] )]]
-  | Ptyp_constr ({txt= Lident name; _}, []) when is_builtin name -> (
-    match name with
-    | "unit" ->
-        [%expr Ppx_representatives_runtime.unit_to_representatives]
-    | "bool" ->
-        [%expr Ppx_representatives_runtime.bool_to_representatives]
-    | "int" ->
-        [%expr Ppx_representatives_runtime.int_to_representatives]
-    | "string" ->
-        [%expr Ppx_representatives_runtime.string_to_representatives]
-    | "char" ->
-        [%expr Ppx_representatives_runtime.char_to_representatives]
-    | _ ->
-        assert false )
-  | Ptyp_constr ({txt= Lident "list"; _}, [_]) ->
-      [%expr Ppx_representatives_runtime.list_to_representatives ()]
-  | Ptyp_constr ({txt= Lident "option"; _}, [_]) ->
-      [%expr Ppx_representatives_runtime.option_to_representatives ()]
+  | Ptyp_constr ({txt= Lident name; _}, []) when is_builtin name ->
+      mk_builtin ~loc name
+  | Ptyp_constr ({txt= Lident name; _}, [_]) when is_builtin_with_arg name ->
+      [%expr [%e mk_builtin ~loc name] ()]
   | Ptyp_constr (lid, typs) ->
       let exprs = List.map ~f:(core_type ~loc) typs in
       pexp_apply ~loc
