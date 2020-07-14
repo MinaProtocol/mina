@@ -12,9 +12,11 @@ type t =
   ; (* Message is a network-specific error message. *)
     message: string
   ; (* An error is retriable if the same request may succeed if submitted again. *)
-    retriable: bool }
+    retriable: bool
+  ; (* Often times it is useful to return context specific to the request that caused the error (i.e. a sample of the stack trace or impacted account) in addition to the standard error message. *)
+    details: Yojson.Safe.t option [@default None] }
 [@@deriving yojson {strict= false}, show]
 
 (** Instead of utilizing HTTP status codes to describe node errors (which often do not have a good analog), rich errors are returned using this object. *)
 let create (code : int32) (message : string) (retriable : bool) : t =
-  {code; message; retriable}
+  {code; message; retriable; details= None}
