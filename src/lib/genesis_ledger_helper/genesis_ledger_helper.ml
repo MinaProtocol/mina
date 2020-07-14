@@ -284,6 +284,14 @@ module Ledger = struct
       (config : Runtime_config.Ledger.t) =
     Monitor.try_with_join_or_error (fun () ->
         let add_genesis_winner_account accounts =
+          (* We allow configurations to explicitly override adding the genesis
+             winner, so that we can guarantee a certain ledger layout for
+             integration tests.
+             If the configuration does not include this setting, we add the
+             genesis winner when we have [proof_level = Full] so that we can
+             create a genesis proof. For all other proof levels, we do not add
+             the winner.
+          *)
           let add_genesis_winner_account =
             match config.add_genesis_winner with
             | Some add_genesis_winner ->
