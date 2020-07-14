@@ -11,7 +11,7 @@
     },
     default = {
         username = "coda",
-        `password-env` = "DOCKER_LOGIN_PASSWORD",
+        `password-env` = "DOCKER_PASSWORD",
         server = ""
     }
 }
