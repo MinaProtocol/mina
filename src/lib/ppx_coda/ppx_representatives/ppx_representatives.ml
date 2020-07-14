@@ -51,7 +51,8 @@ let rec core_type ~loc (typ : core_type) : expression =
   let open Ast_builder.Default in
   match typ.ptyp_desc with
   | Ptyp_any ->
-      [%expr Stdlib.Lazy.from_fun (fun () -> failwith "Unknown type")]
+      Location.raise_errorf ~loc:typ.ptyp_loc
+        "Cannot derive %s for anonymous type variables" deriver_name
   | Ptyp_var name ->
       (* Names for type variables should be placed in context at the type
         declaration level.
