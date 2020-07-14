@@ -49,24 +49,24 @@ end = struct
         5
 
   let message = function
-    | `Sql msg ->
-        sprintf "SQL failure: %s" msg
-    | `Json_parse msg ->
-        sprintf "JSON parse: %s" msg
-    | `Graphql_coda_query msg ->
-        sprintf "GraphQL query failed: %s" msg
+    | `Sql _ ->
+        "SQL failure"
+    | `Json_parse _ ->
+        "JSON parse error"
+    | `Graphql_coda_query _ ->
+        "GraphQL query failed"
     | `Network_doesn't_exist _ ->
         "Network doesn't exist"
     | `Chain_info_missing ->
         "Chain info missing"
 
   let context = function
-    | `Sql _ ->
-        None
-    | `Json_parse _ ->
-        None
-    | `Graphql_coda_query _ ->
-        None
+    | `Sql msg ->
+        Some msg
+    | `Json_parse msg ->
+        Some msg
+    | `Graphql_coda_query msg ->
+        Some msg
     | `Network_doesn't_exist (req, conn) ->
         Some
           (sprintf
