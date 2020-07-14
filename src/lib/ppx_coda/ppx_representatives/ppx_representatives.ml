@@ -61,10 +61,10 @@ let rec core_type ~loc (typ : core_type) : expression =
   | Ptyp_arrow (label, _, _) ->
       [%expr
         lazy
-          [%e
-            pexp_fun ~loc label None
-              [%pat? _]
-              [%expr failwith "Functional type"]]]
+          [ [%e
+              pexp_fun ~loc label None
+                [%pat? _]
+                [%expr failwith "Functional type"]] ]]
   | Ptyp_tuple typs ->
       let exprs = List.map ~f:(core_type ~loc) typs in
       let mk_name i =
