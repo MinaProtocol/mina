@@ -10,24 +10,24 @@ let JobSpec = ../Pipeline/JobSpec.dhall
 in
 
 Pipeline.build
-   Pipeline.Config::
-     { spec =
-         JobSpec::
-           { dirtyWhen = OpamInit.dirtyWhen #
-               [ S.strictlyStart (S.contains "buildkite/src/Jobs/CompareSignatures")
-               , S.strictlyStart (S.contains "src")
-               ]
-           , name = "CompareSignatures"
-           }
-     , steps =
-         [ Command.build
-             Command.Config::
-               { commands = OpamInit.andThenRunInDocker ([] : List Text) "./scripts/compare_test_signatures.sh"
-               , label = "Compare test signatures"
-               , key = "compare-test-signatures"
-               , target = Size.Large
-               , docker = None Docker.Type
-               }
-         ]
-     }
+  Pipeline.Config::
+    { spec =
+      JobSpec::
+        { dirtyWhen = OpamInit.dirtyWhen #
+          [ S.strictlyStart (S.contains "buildkite/src/Jobs/CompareSignatures")
+          , S.strictlyStart (S.contains "src")
+          ]
+        , name = "CompareSignatures"
+        }
+    , steps =
+      [ Command.build
+          Command.Config::
+            { commands = OpamInit.andThenRunInDocker ([] : List Text) "./scripts/compare_test_signatures.sh"
+            , label = "Compare test signatures"
+            , key = "compare-test-signatures"
+            , target = Size.Large
+            , docker = None Docker.Type
+            }
+      ]
+    }
 
