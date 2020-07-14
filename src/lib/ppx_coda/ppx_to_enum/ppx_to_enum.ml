@@ -42,7 +42,7 @@ let str_decl ~loc (decl : type_declaration) : structure_item =
                    ; pc_guard= None
                    ; pc_rhs=
                        pexp_constant ~loc
-                         (Pconst_integer (Int.to_string (i + 1), None)) } ))]]
+                         (Pconst_integer (Int.to_string i, None)) } ))]]
   | { ptype_kind= Ptype_abstract
     ; ptype_name= name
     ; ptype_manifest= Some {ptyp_desc= Ptyp_constr (lid, _); _}
@@ -84,7 +84,7 @@ let str_decl ~loc (decl : type_declaration) : structure_item =
                        ; pc_guard= None
                        ; pc_rhs=
                            pexp_constant ~loc
-                             (Pconst_integer (Int.to_string (i + 1), None)) }
+                             (Pconst_integer (Int.to_string i, None)) }
                    | Rinherit typ ->
                        Location.raise_errorf ~loc:typ.ptyp_loc
                          "Cannot derive %s for this type: inherited fields \
