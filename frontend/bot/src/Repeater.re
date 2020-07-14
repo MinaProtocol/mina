@@ -16,7 +16,7 @@ let start = (~fromKey, ~toKey, ~amount, ~fee, ~timeout, ~password) => {
       |> Wonka.forEach((. {ReasonUrql.Client.ClientTypes.response}) =>
            switch (response) {
            | Data(data) =>
-             let payment = data##sendPayment##payment;
+             let (`UserCommand payment) = data##sendPayment##payment;
              log(`Info, "Sent: %s", payment##id);
            | Error(e) =>
              log(
