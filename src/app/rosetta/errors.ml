@@ -14,7 +14,7 @@ end
 module T : sig
   type t [@@deriving yojson, show]
 
-  val create : retriable:bool -> ?context:string -> Variant.t -> [> `App of t]
+  val create : ?context:string -> Variant.t -> [> `App of t]
 
   val erase : t -> Models.Error.t
 
@@ -26,12 +26,11 @@ module T : sig
 
     val sql :
          ?context:string
-      -> ?retriable:bool
       -> ('a, [< Caqti_error.t]) Deferred.Result.t
       -> ('a, [> `App of t]) Deferred.Result.t
   end
 end = struct
-  type t = {extra_context: string option; kind: Variant.t; retriable: bool}
+  type t = {extra_context: string option; kind: Variant.t}
   [@@deriving yojson, show]
 
   (* TODO: One of the ppx masters should make an "special_enum" ppx that will
@@ -80,13 +79,24 @@ end = struct
            with peers that are way ahead of you on the chain. Try again in a \
            few seconds."
 
-  let create ~retriable ?context kind =
-    `App {extra_context= context; kind; retriable}
+  let retriable = function
+    | `Sql _ ->
+        false
+    | `Json_parse _ ->
+        false
+    | `Graphql_coda_query _ ->
+        false
+    | `Network_doesn't_exist _ ->
+        false
+    | `Chain_info_missing ->
+        true
+
+  let create ?context kind = `App {extra_context= context; kind}
 
   let erase (t : t) =
     { Models.Error.code= Int32.of_int_exn (code t.kind)
     ; message= message t.kind
-    ; retriable= t.retriable
+    ; retriable= retriable t.kind
     ; details=
         ( match (context t.kind, t.extra_context) with
         | None, None ->
@@ -105,13 +115,11 @@ end = struct
   module Lift = struct
     let parse ?context res =
       Deferred.return
-        (Result.map_error
-           ~f:(fun s -> create ~retriable:false ?context (`Json_parse s))
-           res)
+        (Result.map_error ~f:(fun s -> create ?context (`Json_parse s)) res)
 
-    let sql ?context ?(retriable = false) res =
+    let sql ?context res =
       Deferred.Result.map_error
-        ~f:(fun e -> create ~retriable ?context (`Sql (Caqti_error.show e)))
+        ~f:(fun e -> create ?context (`Sql (Caqti_error.show e)))
         res
   end
 end

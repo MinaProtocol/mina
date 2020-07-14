@@ -19,8 +19,7 @@ let server_handler ~db ~graphql_uri ~logger ~body _ req =
     | exception Yojson.Json_error "Blank input data" ->
         router route `Null ~db ~graphql_uri ~logger
     | exception Yojson.Json_error err ->
-        Errors.create ~retriable:false ~context:"JSON in request malformed"
-          (`Json_parse err)
+        Errors.create ~context:"JSON in request malformed" (`Json_parse err)
         |> Deferred.Result.fail
   in
   match result with
