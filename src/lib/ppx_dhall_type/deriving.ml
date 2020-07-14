@@ -10,6 +10,11 @@ open Ppxlib
 
 let deriver = "dhall_type"
 
+let field_key_attr =
+  Attribute.declare (deriver ^ ".key") Attribute.Context.Label_declaration
+    Ast_pattern.(single_expr_payload (estring __))
+    Fn.id
+
 let make_lident_cmp items lident =
   List.mem items (Longident.name lident.txt) ~equal:String.equal
 
@@ -70,7 +75,13 @@ let dhall_variant_from_constructor_declaration ctor_decl =
 let dhall_field_from_label_declaration label_decl =
   let (module Ast_builder) = Ast_builder.make label_decl.pld_name.loc in
   let open Ast_builder in
-  let name = estring label_decl.pld_name.txt in
+  let name =
+    match Attribute.get field_key_attr label_decl with
+    | Some name ->
+        estring name
+    | None ->
+        estring label_decl.pld_name.txt
+  in
   let ty = dhall_type_of_core_type label_decl.pld_type in
   [%expr [%e name], [%e ty]]
 
@@ -115,6 +126,9 @@ let generate_dhall_type type_decl =
 let generate_dhall_types ~loc:_ ~path:_ (_rec_flag, type_decls) =
   List.map type_decls ~f:generate_dhall_type
 
-let str_type_decl = Deriving.Generator.make_noarg generate_dhall_types
+let attributes = [Attribute.T field_key_attr]
+
+let str_type_decl =
+  Deriving.Generator.make_noarg ~attributes generate_dhall_types
 
 let () = Deriving.add deriver ~str_type_decl |> Ppxlib.Deriving.ignore
