@@ -92,44 +92,10 @@ module Unpacked = struct
       ; is_fee_transfer: 'bool
       ; is_coinbase: 'bool
       ; is_user_command: 'bool }
-    [@@deriving eq]
+    [@@deriving eq, hlist]
 
     [%%ifdef
     consensus_mechanism]
-
-    let to_hlist
-        { is_payment
-        ; is_stake_delegation
-        ; is_create_account
-        ; is_mint_tokens
-        ; is_fee_transfer
-        ; is_coinbase
-        ; is_user_command } =
-      H_list.
-        [ is_payment
-        ; is_stake_delegation
-        ; is_create_account
-        ; is_mint_tokens
-        ; is_fee_transfer
-        ; is_coinbase
-        ; is_user_command ]
-
-    let of_hlist
-        ([ is_payment
-         ; is_stake_delegation
-         ; is_create_account
-         ; is_mint_tokens
-         ; is_fee_transfer
-         ; is_coinbase
-         ; is_user_command ] :
-          (unit, _) H_list.t) =
-      { is_payment
-      ; is_stake_delegation
-      ; is_create_account
-      ; is_mint_tokens
-      ; is_fee_transfer
-      ; is_coinbase
-      ; is_user_command }
 
     let typ (bool : ('bool_var, 'bool) Typ.t) : ('bool_var t, 'bool t) Typ.t =
       Typ.of_hlistable

@@ -221,6 +221,8 @@ struct
 
     let all_from_account {pool; _} = Indexed_pool.all_from_account pool
 
+    let get_all {pool; _} = Indexed_pool.get_all pool
+
     (** Get the best tip ledger*)
     let get_best_tip_ledger frontier =
       Transition_frontier.best_tip frontier

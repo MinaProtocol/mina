@@ -25,7 +25,7 @@ module Poly = struct
     ; snarked_ledger_hash: 'snarked_ledger_hash
     ; snarked_next_available_token: 'token_id
     ; timestamp: 'time }
-  [@@deriving sexp, fields, eq, compare, hash, yojson]
+  [@@deriving sexp, fields, eq, compare, hash, yojson, hlist]
 end
 
 [%%define_locally
@@ -33,7 +33,9 @@ Poly.
   ( staged_ledger_hash
   , snarked_ledger_hash
   , snarked_next_available_token
-  , timestamp )]
+  , timestamp
+  , to_hlist
+  , of_hlist )]
 
 module Value = struct
   [%%versioned
@@ -64,28 +66,6 @@ type var =
 let create_value ~staged_ledger_hash ~snarked_ledger_hash
     ~snarked_next_available_token ~timestamp =
   { Poly.staged_ledger_hash
-  ; snarked_ledger_hash
-  ; snarked_next_available_token
-  ; timestamp }
-
-let to_hlist
-    Poly.
-      { staged_ledger_hash
-      ; snarked_ledger_hash
-      ; snarked_next_available_token
-      ; timestamp } =
-  H_list.
-    [ staged_ledger_hash
-    ; snarked_ledger_hash
-    ; snarked_next_available_token
-    ; timestamp ]
-
-let of_hlist : (unit, _) H_list.t -> _ Poly.t =
- fun [ staged_ledger_hash
-     ; snarked_ledger_hash
-     ; snarked_next_available_token
-     ; timestamp ] ->
-  { staged_ledger_hash
   ; snarked_ledger_hash
   ; snarked_next_available_token
   ; timestamp }

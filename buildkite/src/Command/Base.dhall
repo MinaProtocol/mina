@@ -11,6 +11,7 @@ let Map = Prelude.Map
 
 let Cmd = ../Lib/Cmds.dhall
 let Decorate = ../Lib/Decorate.dhall
+let SelectFiles = ../Lib/SelectFiles.dhall
 
 let Docker = ./Docker/Type.dhall
 let Summon= ./Summon/Type.dhall
@@ -38,6 +39,8 @@ let B/DependsOn =
           (List/map Text InnerUnion/Type (\(k: Text) -> InnerUnion/Type.DependsOn/Type { allow_failure = None Bool, step = Some k }) keys)
   }
 
+let B/ArtifactPaths = B.definitions/commandStep/properties/artifact_paths/Type
+
 -- A type to make sure we don't accidentally forget the prefix on keys
 let TaggedKey = {
   Type = {
@@ -58,6 +61,7 @@ let Config =
   { Type =
       { commands : List Cmd.Type
       , depends_on : List TaggedKey.Type
+      , artifact_paths : List SelectFiles.Type
       , label : Text
       , key : Text
       , target : Size
@@ -68,6 +72,7 @@ let Config =
     { depends_on = [] : List TaggedKey.Type
     , docker = None Docker.Type
     , summon = None Summon.Type
+    , artifact_paths = [] : List SelectFiles.Type
     }
   }
 
@@ -97,6 +102,9 @@ let build : Config.Type -> B/Command.Type = \(c : Config.Type) ->
         None B/DependsOn.Type
       else
         Some (B/DependsOn.depends flattened),
+    artifact_paths = if Prelude.List.null SelectFiles.Type c.artifact_paths
+                     then None B/ArtifactPaths
+                     else Some (B/ArtifactPaths.String (SelectFiles.compile c.artifact_paths)),
     key = Some c.key,
     label = Some c.label,
     plugins =
