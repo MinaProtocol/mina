@@ -39,7 +39,8 @@ module Ledger = struct
     { base: base
     ; num_accounts: int option
     ; hash: string option
-    ; name: string option }
+    ; name: string option
+    ; add_genesis_winner: bool option }
   [@@deriving dhall_type, bin_io_unversioned]
 
   let base_to_yojson_field = function
@@ -90,7 +91,7 @@ module Ledger = struct
                "Runtime_config.Ledger.of_yojson: Expected a field 'accounts', \
                 'name' or 'hash'") ) ]
 
-  let to_yojson {base; num_accounts; hash; name} =
+  let to_yojson {base; num_accounts; hash; name; add_genesis_winner} =
     let fields =
       List.filter_opt
         [ Option.map num_accounts ~f:(fun i -> ("num_accounts", `Int i))
@@ -105,7 +106,9 @@ module Ledger = struct
               | Named _ ->
                   None
               | _ ->
-                  Some ("name", `String name) ) ]
+                  Some ("name", `String name) )
+        ; Option.map add_genesis_winner ~f:(fun b ->
+              ("add_genesis_winner", `Bool b) ) ]
     in
     `Assoc (base_to_yojson_field base :: fields)
 
@@ -143,7 +146,7 @@ module Ledger = struct
                                fld))
                  else None )
         in
-        let%map hash =
+        let%bind hash =
           match base with
           | Hash hash ->
               return (Some hash)
@@ -161,14 +164,29 @@ module Ledger = struct
                                  the field 'hash' to contain a string")
                      else None )
         in
-        {base; num_accounts; hash; name}
+        let%map add_genesis_winner =
+          Option.value ~default:(return None)
+          @@ List.find_map l ~f:(fun (fld, value) ->
+                 if String.equal fld "add_genesis_winner" then
+                   match value with
+                   | `Bool b ->
+                       Some (return (Some b))
+                   | _ ->
+                       Some
+                         (Error
+                            "Runtime_config.Ledger.of_yojson: Expected the \
+                             field 'add_genesis_winner' to contain a boolean")
+                 else None )
+        in
+        {base; num_accounts; hash; name; add_genesis_winner}
     | _ ->
         Error "Runtime_config.Ledger.of_yojson: Expected a JSON object"
 end
 
 module Proof_keys = struct
   module Level = struct
-    type t = Full | Check | None [@@deriving dhall_type, bin_io_unversioned]
+    type t = Full | Check | None
+    [@@deriving dhall_type, bin_io_unversioned, eq]
 
     let to_yojson = function
       | Full ->
