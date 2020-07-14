@@ -3731,8 +3731,8 @@ let%test_module "transaction_snark" =
       let state_hash_and_body1 =
         let state_body0 =
           Coda_state.Protocol_state.negative_one
-            ~genesis_ledger:Test_genesis_ledger.t ~constraint_constants
-            ~consensus_constants
+            ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
+            ~constraint_constants ~consensus_constants
           |> Coda_state.Protocol_state.body
         in
         let state_body_hash0 =
@@ -3752,8 +3752,8 @@ let%test_module "transaction_snark" =
       let state_hash_and_body1 =
         let state_body0 =
           Coda_state.Protocol_state.negative_one
-            ~genesis_ledger:Test_genesis_ledger.t ~constraint_constants
-            ~consensus_constants
+            ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
+            ~constraint_constants ~consensus_constants
           |> Coda_state.Protocol_state.body
         in
         let state_body_hash0 =
