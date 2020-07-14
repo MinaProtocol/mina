@@ -315,25 +315,27 @@ module LeaderboardRow = {
 
   module DesktopLayout = {
     [@react.component]
-    let make = (~userSlug, ~sort, ~rank, ~member) => {
-      <Next.Link href=userSlug _as=userSlug>
-        <div className=Styles.desktopLeaderboardRow>
+    let make = (~sort, ~rank, ~member) => {
+      //<Next.Link href=""_as=userSlug>
+      <div className=Styles.desktopLeaderboardRow>
+
           <span className=Styles.rank>
             {React.string(string_of_int(rank))}
           </span>
           <span className=Styles.username> {React.string(member.name)} </span>
           {Array.map(column => {renderPoints(sort, column, member)}, filters)
            |> React.array}
-        </div>
-      </Next.Link>;
+        </div>;
+        // </Next.Link>;
     };
   };
 
   module MobileLayout = {
     [@react.component]
-    let make = (~userSlug, ~sort, ~rank, ~member) => {
-      <Next.Link href=userSlug _as=userSlug>
-        <div className=Styles.mobileLeaderboardRow>
+    let make = (~sort, ~rank, ~member) => {
+      //<Next.Link href=""_as=userSlug>
+      <div className=Styles.mobileLeaderboardRow>
+
           <span className=Styles.firstColumn> {React.string("Rank")} </span>
           <span> {React.string("#" ++ string_of_int(rank))} </span>
           <span className=Styles.firstColumn> {React.string("Name")} </span>
@@ -344,22 +346,22 @@ module LeaderboardRow = {
           <span>
             {React.string(string_of_int(getPoints(sort, member)))}
           </span>
-        </div>
-      </Next.Link>;
+        </div>;
+        //</Next.Link>;
     };
   };
 
   [@react.component]
   let make = (~sort, ~member) => {
-    let userSlug = getUserSlug(member);
+    let _userSlug = getUserSlug(member);
     let rank = getRank(sort, member);
 
     <div>
       <div className=Styles.desktopLayout>
-        <DesktopLayout userSlug sort rank member />
+        <DesktopLayout sort rank member />
       </div>
       <div className=Styles.mobileLayout>
-        <MobileLayout userSlug sort rank member />
+        <MobileLayout sort rank member />
       </div>
     </div>;
   };
