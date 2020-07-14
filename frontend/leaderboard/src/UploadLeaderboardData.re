@@ -37,6 +37,7 @@ let uploadData = (spreadsheetId, totalBlocks) => {
 
       let statisticsData = [|
         data->Belt.Array.keep(row => {
+          /* The 4th column indicates whether the user is a genesis member */
           switch (Belt.Array.get(row, 3)) {
           | Some(genesisMember) =>
             String.length(Belt.Option.getExn(genesisMember)) == 0
