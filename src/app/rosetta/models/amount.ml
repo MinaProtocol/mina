@@ -7,7 +7,7 @@
  *)
 
 type t =
-  { (* Value of the transaction in atomic units represented as an arbitrary-sized signed integer.  For example, 1 BTC would be represented by a value of 100000000. *)
+  { (* Value of the transaction in atomic units represented as an arbitrary-sized signed integer. For example, 1 BTC would be represented by a value of 100000000. *)
     value: string
   ; currency: Currency.t
   ; metadata: Yojson.Safe.t option [@default None] }
