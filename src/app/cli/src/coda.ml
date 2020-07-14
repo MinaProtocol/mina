@@ -438,6 +438,11 @@ let daemon logger =
                ~genesis_constants:Genesis_constants.compiled config
            with
            | Ok (precomputed_values, _) ->
+               Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                 "Precomputed values: $precomputed_values"
+                 ~metadata:
+                   [ ( "precomputed_values"
+                     , Genesis_proof.to_yojson precomputed_values ) ] ;
                precomputed_values
            | Error err ->
                Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__

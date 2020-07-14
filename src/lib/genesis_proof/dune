@@ -8,4 +8,4 @@
    keys_lib
    genesis_constants
    with_hash)
- (preprocess (pps ppx_version)))
+ (preprocess (pps ppx_version ppx_deriving_yojson)))

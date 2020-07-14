@@ -25,6 +25,18 @@ module T = struct
     ; base_hash: State_hash.t
     ; genesis_proof: Proof.t }
 
+  let to_yojson t =
+    `Assoc
+      [ ( "constrain_constants"
+        , Genesis_constants.Constraint_constants.to_yojson
+            t.constraint_constants )
+      ; ("genesis_constants", Genesis_constants.to_yojson t.genesis_constants)
+      ; ( "proof_level"
+        , `String (Genesis_constants.Proof_level.to_string t.proof_level) )
+      ; ( "protocol_state_with_hash"
+        , With_hash.to_yojson Coda_state.Protocol_state.Value.to_yojson
+            State_hash.to_yojson t.protocol_state_with_hash ) ]
+
   let constraint_constants {constraint_constants; _} = constraint_constants
 
   let genesis_constants {genesis_constants; _} = genesis_constants
