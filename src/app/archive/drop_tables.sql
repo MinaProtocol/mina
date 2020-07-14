@@ -16,7 +16,7 @@ drop type internal_command_type;
 
 drop table user_commands;
 
-drop table user_command_type;
+drop type user_command_type;
 
 drop index idx_snarked_ledger_hashes_value;
 
