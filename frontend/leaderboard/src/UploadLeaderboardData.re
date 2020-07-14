@@ -12,27 +12,55 @@ open Sheets.Bindings;
 open Sheets.Core;
 
 /*
-   Upload the total block count to the "Data" sheet
+   Upload "Genesis Members", "Block Count", and "Participants" to the Data tab
  */
-let uploadTotalBlocks = (spreadsheetId, totalBlocks) => {
+let uploadData = (spreadsheetId, totalBlocks) => {
   let client = createClient();
+
   getRange(
-    client, initSheetsQuery(spreadsheetId, "Data!A1:B", "FORMULA"), result => {
+    client,
+    initSheetsQuery(
+      spreadsheetId,
+      "All-Time Leaderboard!C4:G",
+      "FORMATTED_VALUE",
+    ),
+    result => {
     switch (result) {
     | Ok(sheetsData) =>
-      let newSheetsData = sheetsData |> decodeGoogleSheets;
-      newSheetsData[0][1] = totalBlocks;
+      let data = sheetsData |> decodeGoogleSheets;
+
+      let columnHeaders = [|
+        "Genesis Members",
+        "Block Count",
+        "Participants",
+      |];
+
+      let statisticsData = [|
+        data->Belt.Array.keep(row => {
+          switch (Belt.Array.get(row, 3)) {
+          | Some(genesisMember) =>
+            String.length(Belt.Option.getExn(genesisMember)) == 0
+              ? false : true
+          | None => false
+          }
+        })
+        |> Array.length
+        |> string_of_int,
+        totalBlocks,
+        data |> Array.length |> string_of_int,
+      |];
+
       updateRange(
         client,
         initSheetsUpdate(
           spreadsheetId,
-          "Data!A1:B",
+          "Data!A1:C",
           "USER_ENTERED",
-          newSheetsData,
+          Array.append([|columnHeaders|], [|statisticsData|]),
         ),
         result => {
         switch (result) {
-        | Ok(_) => Js.log({j|Uploaded total blocks|j})
+        | Ok(_) => Js.log({j|Uploaded to Data spreadsheet|j})
         | Error(error) => Js.log(error)
         }
       });
@@ -159,7 +187,7 @@ let uploadUserProfileData = spreadsheetId => {
                   spreadsheetId,
                   "Member_Profile_Data!A2:Z",
                   "USER_ENTERED",
-                  data,
+                  encodeGoogleSheets(data),
                 ),
                 result => {
                 switch (result) {
