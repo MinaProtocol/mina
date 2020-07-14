@@ -314,7 +314,7 @@ module Ledger = struct
                 :: accounts
           else accounts
         in
-        let accounts =
+        let accounts_opt =
           match config.base with
           | Hash _ ->
               None
@@ -334,14 +334,14 @@ module Ledger = struct
                   ~metadata:[("ledger_name", `String name)] ;
                 None )
         in
-        let accounts =
+        let padded_accounts_opt =
           Option.map
             ~f:
               (Lazy.map
                  ~f:
                    (Accounts.pad_to
                       (Option.value ~default:0 config.num_accounts)))
-            accounts
+            accounts_opt
         in
         let open Deferred.Let_syntax in
         let%bind tar_path =
@@ -351,7 +351,7 @@ module Ledger = struct
         | Some tar_path -> (
             match%map
               load_from_tar ~genesis_dir ~logger ~constraint_constants
-                ?accounts tar_path
+                ?accounts:padded_accounts_opt tar_path
             with
             | Ok ledger ->
                 Ok (ledger, config, tar_path)
@@ -363,7 +363,7 @@ module Ledger = struct
                     ; ("error", `String (Error.to_string_hum err)) ] ;
                 Error err )
         | None -> (
-          match accounts with
+          match padded_accounts_opt with
           | None -> (
             match config.base with
             | Accounts _ ->
