@@ -590,42 +590,52 @@ module Block = struct
           return 0
     in
     let timestamp = Option.value ~default:Int64.zero timestamp in
-    let%bind () =
-      (* Delete block user command relationship *)
-      Conn.exec
-        (Caqti_request.exec
-           Caqti_type.(tup2 int int64)
-           "DELETE FROM blocks_user_commands USING blocks WHERE blocks.id = \
-            blocks_user_commands.block_id AND (blocks.height < ? OR \
-            blocks.timestamp < ?)")
-        (height, timestamp)
-    in
-    let%bind () =
-      (* Delete block internal command relationship *)
-      Conn.exec
-        (Caqti_request.exec
-           Caqti_type.(tup2 int int64)
-           "DELETE FROM blocks_internal_commands USING blocks WHERE blocks.id \
-            = blocks_internal_commands.block_id AND (blocks.height < ? OR \
-            blocks.timestamp < ?)")
-        (height, timestamp)
-    in
-    let%bind () =
-      (* Remove block references. *)
-      Conn.exec
-        (Caqti_request.exec
-           Caqti_type.(tup2 int int64)
-           "UPDATE blocks AS b SET parent_id = NULL FROM blocks WHERE \
-            b.parent_id = blocks.id AND (blocks.height < ? OR \
-            blocks.timestamp < ?)")
-        (height, timestamp)
-    in
-    (* Delete blocks *)
-    Conn.exec
-      (Caqti_request.exec
-         Caqti_type.(tup2 int int64)
-         "DELETE FROM blocks WHERE blocks.height < ? OR blocks.timestamp < ?")
-      (height, timestamp)
+    if height > 0 || Int64.(timestamp > 0L) then
+      Deferred.all_unit
+        [ (* Delete user commands from old blocks. *)
+          Conn.exec
+            (Caqti_request.exec
+               Caqti_type.(tup2 int int64)
+               "DELETE FROM user_commands\n\
+                WHERE id IN\n\
+                (SELECT user_command_id FROM blocks_user_commands\n\
+                INNER JOIN blocks ON blocks.id = block_id\n\
+                WHERE (blocks.height < ? OR blocks.timestamp < ?))")
+            (height, timestamp)
+        ; (* Delete old blocks. *)
+          Conn.exec
+            (Caqti_request.exec
+               Caqti_type.(tup2 int int64)
+               "DELETE FROM blocks WHERE blocks.height < ? OR \
+                blocks.timestamp < ?")
+            (height, timestamp)
+        ; (* Delete orphaned internal commands. *)
+          Conn.exec
+            (Caqti_request.exec Caqti_type.unit
+               "DELETE FROM internal_commands\n\
+                WHERE id NOT IN\n\
+                (SELECT internal_commands.id FROM internal_commands\n\
+                INNER JOIN blocks_internal_commands ON\n\
+                internal_command_id = internal_commands.id)")
+            ()
+        ; (* Delete orphaned snarked ledger hashes. *)
+          Conn.exec
+            (Caqti_request.exec Caqti_type.unit
+               "DELETE FROM snarked_ledger_hashes\n\
+                WHERE id NOT IN\n\
+                (SELECT snarked_ledger_hash_id FROM blocks)")
+            ()
+        ; (* Delete orphaned public keys. *)
+          Conn.exec
+            (Caqti_request.exec Caqti_type.unit
+               "DELETE FROM public_keys\n\
+                WHERE id NOT IN (SELECT fee_payer_id FROM user_commands)\n\
+                AND id NOT IN (SELECT source_id FROM user_commands)\n\
+                AND id NOT IN (SELECT receiver_id FROM user_commands)\n\
+                AND id NOT IN (SELECT receiver_id FROM internal_commands)\n\
+                AND id NOT IN (SELECT creator_id FROM blocks)")
+            () ]
+    else return ()
 end
 
 let run (module Conn : CONNECTION) reader ~constraint_constants ~logger

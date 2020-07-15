@@ -43,7 +43,7 @@ CREATE TABLE internal_commands
 CREATE TABLE blocks
 ( id                     serial PRIMARY KEY
 , state_hash             text   NOT NULL UNIQUE
-, parent_id              int                    REFERENCES blocks(id)
+, parent_id              int                    REFERENCES blocks(id) ON DELETE SET NULL
 , creator_id             int    NOT NULL        REFERENCES public_keys(id)
 , snarked_ledger_hash_id int    NOT NULL        REFERENCES snarked_ledger_hashes(id)
 , ledger_hash            text   NOT NULL
@@ -57,13 +57,13 @@ CREATE INDEX idx_blocks_creator_id ON blocks(creator_id);
 CREATE INDEX idx_blocks_height     ON blocks(height);
 
 CREATE TABLE blocks_user_commands
-( block_id        int NOT NULL REFERENCES blocks(id)
+( block_id        int NOT NULL REFERENCES blocks(id) ON DELETE CASCADE
 , user_command_id int NOT NULL REFERENCES user_commands(id) ON DELETE CASCADE
 , PRIMARY KEY (block_id, user_command_id)
 );
 
 CREATE TABLE blocks_internal_commands
-( block_id            int NOT NULL REFERENCES blocks(id)
+( block_id            int NOT NULL REFERENCES blocks(id) ON DELETE CASCADE
 , internal_command_id int NOT NULL REFERENCES internal_commands(id) ON DELETE CASCADE
 , PRIMARY KEY (block_id, internal_command_id)
 );
