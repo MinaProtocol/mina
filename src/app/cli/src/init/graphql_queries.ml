@@ -181,11 +181,9 @@ query nonce($public_key: PublicKey) {
 }
 |}]
 
-module Pooled_user_commands = struct
-  open Graphql_client.User_command
-
-  include [%graphql
-  {|
+module Pooled_user_commands =
+[%graphql
+{|
 query user_commands($public_key: PublicKey) {
   pooledUserCommands(publicKey: $public_key) @bsRecord {
     id
@@ -199,4 +197,3 @@ query user_commands($public_key: PublicKey) {
   }
 }
 |}]
-end
