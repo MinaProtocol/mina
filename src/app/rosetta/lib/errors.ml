@@ -7,12 +7,14 @@ module Variant = struct
     | `Json_parse of string
     | `Graphql_coda_query of string
     | `Network_doesn't_exist of string * string
-    | `Chain_info_missing ]
-  [@@deriving yojson, show]
+    | `Chain_info_missing
+    | `Account_not_found of string
+    | `Invariant_violation ]
+  [@@deriving yojson, show, eq]
 end
 
 module T : sig
-  type t [@@deriving yojson, show]
+  type t [@@deriving yojson, show, eq]
 
   val create : ?context:string -> Variant.t -> [> `App of t]
 
@@ -31,7 +33,7 @@ module T : sig
   end
 end = struct
   type t = {extra_context: string option; kind: Variant.t}
-  [@@deriving yojson, show]
+  [@@deriving yojson, show, eq]
 
   (* TODO: One of the ppx masters should make an "special_enum" ppx that will
      * do this for us. Jane Street's enum only works on argumentless variants *)
@@ -46,6 +48,10 @@ end = struct
         4
     | `Chain_info_missing ->
         5
+    | `Account_not_found _ ->
+        6
+    | `Invariant_violation ->
+        7
 
   let message = function
     | `Sql _ ->
@@ -58,6 +64,10 @@ end = struct
         "Network doesn't exist"
     | `Chain_info_missing ->
         "Chain info missing"
+    | `Account_not_found _ ->
+        "Account not found"
+    | `Invariant_violation ->
+        "Internal invariant violation (you found a bug)"
 
   let context = function
     | `Sql msg ->
@@ -78,6 +88,13 @@ end = struct
            bootstrapping -- bootstrapping is the process of synchronizing \
            with peers that are way ahead of you on the chain. Try again in a \
            few seconds."
+    | `Account_not_found addr ->
+        Some
+          (sprintf
+             !"You attempt to lookup %s but we couldn't find it in the ledger."
+             addr)
+    | `Invariant_violation ->
+        None
 
   let retriable = function
     | `Sql _ ->
@@ -90,6 +107,10 @@ end = struct
         false
     | `Chain_info_missing ->
         true
+    | `Account_not_found _ ->
+        true
+    | `Invariant_violation ->
+        false
 
   let create ?context kind = `App {extra_context= context; kind}
 
