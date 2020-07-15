@@ -387,7 +387,7 @@ let make =
       ~filter: Filter.t=Release,
       ~toggle: Toggle.t=All,
       ~search: string="",
-      ~onFilterPress,
+      ~onFilterPress: string => unit=?,
     ) => {
   open Toggle;
   open Filter;
