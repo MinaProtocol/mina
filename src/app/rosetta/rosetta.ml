@@ -5,6 +5,8 @@ let router ~graphql_uri ~db ~logger route body =
   match route with
   | "network" :: tl ->
       Network.router tl body ~db ~graphql_uri ~logger
+  | "account" :: tl ->
+      Account.router tl body ~db ~graphql_uri ~logger
   | _ ->
       Deferred.return (Error `Page_not_found)
 
