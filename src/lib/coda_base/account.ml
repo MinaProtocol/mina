@@ -30,7 +30,7 @@ module Index = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = int [@@deriving to_yojson, sexp]
+      type t = string [@@deriving to_yojson, sexp]
 
       let to_latest = Fn.id
     end
