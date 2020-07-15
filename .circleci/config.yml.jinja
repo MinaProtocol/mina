@@ -607,6 +607,58 @@ jobs:
                 path: core_dumps
     {%- endfor %}
 
+    {%- for profile in compile_config_agnostic_profiles %}
+    build-binaries--{{profile}}:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
+        steps:
+            {{ checkout_no_lfs }}
+            - run: ulimit -c unlimited
+            {{ opam_init_linux }}
+            - run:
+                name: Build libp2p_helper
+                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
+            - run:
+                  name: Build OCaml
+                  command: |
+                      ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && make build'
+                      ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'echo built > should_run_tests'
+                  environment:
+                    DUNE_PROFILE: {{profile}}
+                    LIBP2P_NIXLESS: 1
+                    GO: /usr/lib/go/bin/go
+            - save_cache:
+                name: Store config-agnostic test binaries
+                key: {{profile}}-build-binaries-v1-{{'{{'}} .Revision {{'}}'}}
+                paths:
+                    - "src/app/libp2p_helper/result"
+                    - "_build/default/src/app/cli/src/coda.exe"
+                    - "_build/default/src/app/logproc/logproc.exe"
+                    - "scripts"
+                    - "should_run_tests"
+
+    {%- for test in compile_config_agnostic_tests %}
+    test--{{profile}}--{{test.replace(' ','_')}}:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
+        steps:
+            - restore_cache:
+                name: Restore cache - opam
+                keys:
+                    -  {{profile}}-build-binaries-v1-{{'{{'}} .Revision {{'}}'}}
+            - run:
+                  name: Running test -- {{profile}}:{{test}}
+                  command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "{{profile}}:{{test}}"; fi
+                  environment:
+                    LIBP2P_NIXLESS: 1
+                    CODA_LIBP2P_HELPER_PATH: /home/opam/project/src/app/libp2p_helper/result/bin/libp2p_helper
+                    GO: /usr/lib/go/bin/go
+    {%- endfor %}
+    {%- endfor %}
+
+
     {%- for profile in small_curves_tests.keys() | sort %}
     test--{{profile}}:
         resource_class: large
@@ -685,6 +737,14 @@ workflows:
             - test-unit--nonconsensus_medium_curves
             {%- for profile in small_curves_tests.keys() | sort %}
             - test--{{profile}}
+            {%- endfor %}
+            {%- for profile in compile_config_agnostic_profiles %}
+            - build-binaries--{{profile}}
+            {%- for test in compile_config_agnostic_tests %}
+            - test--{{profile}}--{{test.replace(' ','_')}}:
+                requires:
+                  - build-binaries--{{profile}}
+            {%- endfor %}
             {%- endfor %}
 
     daily:

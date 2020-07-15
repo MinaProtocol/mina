@@ -44,6 +44,19 @@ integration_tests = [
 
 all_tests = simple_tests + integration_tests
 
+compile_config_agnostic_tests = [
+    'coda-bootstrap-test',
+]
+
+compile_config_agnostic_profiles = [
+    'dev'
+]
+
+required_config_agnostic_tests = {
+    'dev':
+      [ 'coda-bootstrap-test' ]
+}
+
 # dictionary mapping configs to lists of tests
 small_curves_tests = {
     'fake_hash': ['full-test'],
@@ -56,8 +69,6 @@ small_curves_tests = {
     'test_postake':
     simple_tests,
     'test_postake_catchup': ['coda-restart-node-test'],
-    'not_test_postake_bootstrap':
-    ['coda-bootstrap-test'],
     'test_postake_three_producers': ['coda-txns-and-restart-non-producers'],
     'test_postake_delegation': ['coda-delegation-test'],
     'test_postake_txns': ['coda-shared-state-test', 'coda-batch-payment-test'],
@@ -406,6 +417,8 @@ def run(args):
     all_tests = small_curves_tests
     all_tests.update(medium_curves_and_other_tests)
     all_tests.update(archive_processor_test)
+    all_tests.update({profile:compile_config_agnostic_tests
+                      for profile in compile_config_agnostic_profiles})
     all_tests = filter_tests(all_tests, args.includes_patterns, args.excludes_patterns)
     if len(all_tests) == 0:
         if args.includes_patterns != ['*']:
@@ -466,7 +479,10 @@ def get_required_status():
                                          "test-unit--%s" % profile
                                          for profile in unit_test_profiles),
                                     ("build-artifacts--%s" % profile
-                                     for profile in build_artifact_profiles))),
+                                     for profile in build_artifact_profiles),
+                                    ("test--%s--%s" % (profile, name)
+                                     for profile in required_config_agnostic_tests
+                                     for name in required_config_agnostic_tests[profile]))),
                   extra_required_status_checks)))
 
 
@@ -491,7 +507,9 @@ def render(args):
         unit_test_profiles_medium_curves=unit_test_profiles_medium_curves,
         small_curves_tests=tests,
         medium_curves_and_other_tests=medium_curves_and_other_tests,
-        medium_curve_profiles=medium_curve_profiles_full)
+        medium_curve_profiles=medium_curve_profiles_full,
+        compile_config_agnostic_profiles=compile_config_agnostic_profiles,
+        compile_config_agnostic_tests=compile_config_agnostic_tests)
 
     if args.check:
         with open(output_file, 'r') as file:
