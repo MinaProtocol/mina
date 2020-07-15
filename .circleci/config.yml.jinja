@@ -33,7 +33,7 @@
             - checkout
 {%endset%}
 
-version: 3
+version: 2.1
 jobs:
     tracetool:
         docker:
@@ -85,7 +85,7 @@ jobs:
     test-archive:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
               environment:
                 CODA_DOCKER: true
             - image: postgres:12
@@ -105,13 +105,23 @@ jobs:
                     sudo apt-get install -y postgresql
                     PGPASSWORD=codarules psql -h localhost -p 5432 -U admin -d archiver -a -f src/app/archive/create_schema.sql
             - run:
+                  name: Archive node unit tests
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'eval `opam config env`; dune runtest src/app/archive'
+                  environment:
+                    DUNE_PROFILE: test_archive_processor
+            - run:
+                  name: Clean Up Database
+                  command: |
+                    PGPASSWORD=codarules psql -h localhost -p 5432 -U admin -d archiver -a -f src/app/archive/drop_tables.sql
+                    PGPASSWORD=codarules psql -h localhost -p 5432 -U admin -d archiver -a -f src/app/archive/create_schema.sql
+            - run:
                   name: Running test -- test_archive_processor:coda-archive-processor-test
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_archive_processor:coda-archive-processor-test"'
 
     build-archive:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
               environment:
                 CODA_DOCKER: true
                 HASURA_PORT: 8080
@@ -158,7 +168,7 @@ jobs:
                   command: ./scripts/archive/build-release-archives.sh
     lint:
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
         steps:
             {{ checkout_no_lfs }}
             {{ opam_init_linux }}
@@ -185,7 +195,7 @@ jobs:
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c './scripts/require-ppx-version.py'
     lint-opt:
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
         steps:
             {{ checkout_no_lfs }}
             - run:
@@ -194,13 +204,17 @@ jobs:
             {{ opam_init_linux }}
             - run:
                   name: Compare versioned types in PR
+                  environment:
+                    BASE_BRANCH_NAME: << pipeline.git.base_revision >>
                   command: ./scripts/compare_ci_diff_types.sh
             - run:
                   name: Compare binable functors in PR
+                  environment:
+                    BASE_BRANCH_NAME: << pipeline.git.base_revision >>
                   command: ./scripts/compare_ci_diff_binables.sh
     compare-test-signatures:
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
         steps:
             {{ checkout_no_lfs }}
             {{ opam_init_linux }}
@@ -359,7 +373,7 @@ jobs:
             - run:
                 name: Decode Apple Certificates
                 context: org-global
-                command: bash -c '[ -z $APPLE_CERTIFICATES ] || base64 -D -o frontend/wallet/Certificates.p12 <<< $APPLE_CERTIFICATES'
+                command: bash -c '[ -z $APPLE_CERTIFICATES ] || base64 -D -o frontend/wallet/Certificates.p12 \<<< $APPLE_CERTIFICATES'
             - run:
                 name: Fastlane
                 context: org-global
@@ -378,7 +392,7 @@ jobs:
     build-client-sdk:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
         steps:
             {{ checkout_no_lfs }}
             - run:
@@ -393,14 +407,6 @@ jobs:
                     DUNE_PROFILE: nonconsensus_medium_curves
                   no_output_timeout: 10m
             - run:
-                  name: Get Yarn
-                  command: |
-                    sudo apt install apt-transport-https
-                    curl -sL https://deb.nodesource.com/setup_14.x | sudo -E bash -
-                    curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add -
-                    echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list
-                    sudo apt update && sudo apt install nodejs yarn
-            - run:
                   name: Yarn deps
                   command: cd frontend/client_sdk && yarn install
             - run:
@@ -411,7 +417,7 @@ jobs:
     build-artifacts--{{profile}}:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
         steps:
             {{ checkout_no_lfs }}
             - run:
@@ -498,7 +504,7 @@ jobs:
     build-artifacts-docker--{{profile}}--{{docker_image}}:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
         steps:
             - restore_cache:
                 name: Restore cache - docker deploy env
@@ -534,7 +540,7 @@ jobs:
     test-unit--{{profile}}:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
         steps:
             {{ checkout_no_lfs }}
             - run: ulimit -c unlimited
@@ -558,7 +564,7 @@ jobs:
     test-unit--nonconsensus_medium_curves:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
         steps:
             {{ checkout_no_lfs }}
             - run: ulimit -c unlimited
@@ -581,7 +587,7 @@ jobs:
     test-unit--{{profile}}:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
         steps:
             {{ checkout_no_lfs }}
             - run: ulimit -c unlimited
@@ -605,7 +611,7 @@ jobs:
     test--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
         steps:
             {{ checkout_no_lfs }}
             {{ opam_init_linux }}
@@ -625,7 +631,7 @@ jobs:
     test--{{profile}}:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
         steps:
             {{ checkout_no_lfs }}
             {{ opam_init_linux }}

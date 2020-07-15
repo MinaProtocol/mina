@@ -194,7 +194,7 @@ let pointsColumns = [|Release, Phase, AllTime|];
 module LeaderboardRow = {
   [@react.component]
   let make = (~sort, ~member) => {
-    let userSlug =
+    let _userSlug =
       "/memberProfile"
       ++ "?allTimeRank="
       ++ member.allTimeRank->string_of_int
@@ -239,8 +239,7 @@ module LeaderboardRow = {
         )>
         {React.string(string_of_int(points(column)))}
       </span>;
-
-    <Next.Link href=userSlug _as=userSlug>
+    <div>
       <div className=Styles.leaderboardRow>
         <span className=Styles.rank>
           {React.string(string_of_int(rank))}
@@ -249,7 +248,9 @@ module LeaderboardRow = {
         <span className=Styles.username> {React.string(member.name)} </span>
         {Array.map(renderPoints, pointsColumns) |> React.array}
       </div>
-    </Next.Link>;
+    </div>;
+    /* <Next.Link href=userSlug _as=userSlug> */
+    /* </Next.Link>; */
   };
 };
 

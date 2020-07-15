@@ -3,7 +3,8 @@
 open Core
 
 (* Dhall types (as OCaml values) and their names to be used in Dhall *)
-let types_and_files = [(Runtime_config.dhall_type, "runtime_config")]
+let types_and_files =
+  [(Runtime_config.Json_layout.dhall_type, "runtime_config")]
 
 let print_dhall_type (ty, nm) =
   let s = Ppx_dhall_type.Dhall_type.to_string ty in

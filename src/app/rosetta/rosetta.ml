@@ -5,13 +5,14 @@ let router ~graphql_uri ~db ~logger route body =
   match route with
   | "network" :: tl ->
       Network.router tl body ~db ~graphql_uri ~logger
+  | "account" :: tl ->
+      Account.router tl body ~db ~graphql_uri ~logger
   | _ ->
       Deferred.return (Error `Page_not_found)
 
 let server_handler ~db ~graphql_uri ~logger ~body _ req =
   let uri = Cohttp_async.Request.uri req in
   let%bind body = Cohttp_async.Body.to_string body in
-  printf "Route: %s\n" (Uri.path uri) ;
   let route = List.tl_exn (String.split ~on:'/' (Uri.path uri)) in
   let%bind result =
     match Yojson.Safe.from_string body with
@@ -20,8 +21,8 @@ let server_handler ~db ~graphql_uri ~logger ~body _ req =
     | exception Yojson.Json_error "Blank input data" ->
         router route `Null ~db ~graphql_uri ~logger
     | exception Yojson.Json_error err ->
-        Error (Errors.create ("Error parsing JSON body (" ^ err ^ ")"))
-        |> Deferred.return
+        Errors.create ~context:"JSON in request malformed" (`Json_parse err)
+        |> Deferred.Result.fail
   in
   match result with
   | Ok json ->
@@ -30,15 +31,11 @@ let server_handler ~db ~graphql_uri ~logger ~body _ req =
         ~headers:(Cohttp.Header.of_list [("Content-Type", "application/json")])
   | Error `Page_not_found ->
       Cohttp_async.Server.respond (Cohttp.Code.status_of_code 404)
-  | Error (`Error error) ->
-      let error_code = error.Models.Error.code in
+  | Error (`App app_error) ->
+      let error = Errors.erase app_error in
       let metadata = [("error", Models.Error.to_yojson error)] in
-      if Int32.equal error_code (Int32.of_int_exn 400) then
-        Logger.warn logger ~module_:__MODULE__ ~location:__LOC__ ~metadata
-          "Failed to connect to postgresql database. Error: $error" ;
-      if Int32.compare error_code (Int32.of_int_exn 500) >= 0 then
-        Logger.error logger ~module_:__MODULE__ ~location:__LOC__ ~metadata
-          "Failed to connect to postgresql database. Error: $error" ;
+      Logger.warn logger ~module_:__MODULE__ ~location:__LOC__ ~metadata
+        "Error response: $error" ;
       Cohttp_async.Server.respond_string
         ~status:(Cohttp.Code.status_of_code 500)
         (Yojson.Safe.to_string (Models.Error.to_yojson error))
@@ -70,14 +67,15 @@ let command =
           "Failed to connect to postgresql database. Error: $error" ;
         Deferred.unit
     | Ok db ->
-        let%map _ =
+        let%bind server =
           Cohttp_async.Server.create ~on_handler_error:`Raise
             (Async.Tcp.Where_to_listen.bind_to Localhost (On_port port))
             (server_handler ~db ~graphql_uri ~logger)
         in
         Logger.info logger ~module_:__MODULE__ ~location:__LOC__
           ~metadata:[("port", `Int port)]
-          "Rosetta process running on http://localhost:$port"
+          "Rosetta process running on http://localhost:$port" ;
+        Cohttp_async.Server.close_finished server
 
 let () =
   Command.run
