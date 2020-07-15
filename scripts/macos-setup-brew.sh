@@ -6,7 +6,7 @@ export HOMEBREW_NO_AUTO_UPDATE=1
 # re-reads /usr/local/Homebrew if a cache has been put in place
 brew update-reset
 
-brew uninstall python2 || true
+brew uninstall python@2 || true
 
 brew bundle install --file=scripts/Brewfile
 
