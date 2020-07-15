@@ -11,7 +11,6 @@ import json
 exit_code = 0
 
 
-# pr_url is of form https://github.com/CodaProtocol/coda/pull/n
 def run_comparison(base, compare_script):
     cwd = os.getcwd()
     # create a copy of the repo at base branch
