@@ -19,6 +19,7 @@ def run_comparison(base_commit, compare_script):
     os.chdir('base')
     # it would be faster to do a clone of the local repo, but there's "smudge error" (?)
     subprocess.run(['git', 'clone', 'git@github.com:CodaProtocol/coda.git'])
+    os.chdir('coda')
     subprocess.run(['git', 'checkout', base_commit])
     os.chdir(cwd)
     # changed files in the PR
