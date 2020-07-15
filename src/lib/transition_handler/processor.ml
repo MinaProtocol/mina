@@ -74,6 +74,11 @@ let add_and_finalize ~logger ~frontier ~catchup_scheduler
       in
       Coda_metrics.Block_latency.Inclusion_time.update
         (Block_time.Span.to_time_span time_elapsed) ) ;
+  Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+    ~metadata:
+      [ ( "external_transition"
+        , External_transition.Validated.to_yojson transition ) ]
+    "writing transition to processed transition writer" ;
   Writer.write processed_transition_writer
     (`Transition transition, `Source source) ;
   Catchup_scheduler.notify catchup_scheduler
