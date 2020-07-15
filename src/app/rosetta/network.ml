@@ -27,9 +27,15 @@ module Get_status =
   }
 |}]
 
-module Get_version = [%graphql {|
+module Get_version =
+[%graphql
+{|
   query {
     version
+    daemonStatus {
+      peers
+    }
+    initialPeers
   }
 |}]
 
@@ -66,6 +72,15 @@ let network_tag_of_graphql res =
       then "testnet"
       else "dev"
 
+let validate_network_choice ~network_identifier ~gql_response =
+  let open Async.Deferred.Result.Let_syntax in
+  let network_tag = network_tag_of_graphql gql_response in
+  let requested_tag = network_identifier.Network_identifier.network in
+  if not (String.equal requested_tag network_tag) then
+    Deferred.Result.fail
+      (Errors.create (`Network_doesn't_exist (requested_tag, network_tag)))
+  else return ()
+
 let router ~graphql_uri ~logger ~db (route : string list) body =
   let (module Db : Caqti_async.CONNECTION) = db in
   let open Async.Deferred.Result.Let_syntax in
@@ -90,14 +105,9 @@ let router ~graphql_uri ~logger ~db (route : string list) body =
         Errors.Lift.parse ~context:"Request" @@ Network_request.of_yojson body
       in
       let%bind res = Graphql.query (Get_status.make ()) graphql_uri in
-      let network_tag = network_tag_of_graphql res in
-      let requested_tag = network.Network_request.network_identifier.network in
       let%bind () =
-        if not (String.equal requested_tag network_tag) then
-          Deferred.Result.fail
-            (Errors.create
-               (`Network_doesn't_exist (requested_tag, network_tag)))
-        else return ()
+        validate_network_choice ~gql_response:res
+          ~network_identifier:network.network_identifier
       in
       let%bind latest_block =
         Deferred.return
@@ -133,10 +143,14 @@ let router ~graphql_uri ~logger ~db (route : string list) body =
             (res#daemonStatus)#peers |> Array.to_list
             |> List.map ~f:Peer.create }
   | ["options"] ->
-      let%bind _network =
+      let%bind network =
         Errors.Lift.parse ~context:"Request" @@ Network_request.of_yojson body
       in
-      let%map res = Graphql.query (Get_version.make ()) graphql_uri in
+      let%bind res = Graphql.query (Get_version.make ()) graphql_uri in
+      let%map () =
+        validate_network_choice ~gql_response:res
+          ~network_identifier:network.network_identifier
+      in
       Network_options_response.to_yojson
         { Network_options_response.version=
             Version.create "1.4.0"
@@ -148,4 +162,4 @@ let router ~graphql_uri ~logger ~db (route : string list) body =
             ; errors= []
             ; historical_balance_lookup= false } }
   | _ ->
-      Deferred.return (Error `Page_not_found)
+      Deferred.Result.fail `Page_not_found
