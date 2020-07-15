@@ -12,19 +12,7 @@ exit_code = 0
 
 
 # pr_url is of form https://github.com/CodaProtocol/coda/pull/n
-def run_comparison(pr_url, compare_script):
-    pr_number = os.path.basename(pr_url)
-    api_url = 'https://api.github.com/repos/CodaProtocol/coda/pulls/' + pr_number
-    pr_json = 'pr.json'
-    if os.path.exists(pr_json):
-        os.remove(pr_json)
-    subprocess.run([
-        'curl', api_url, '-H', 'Accept: application/vnd.github.v3.json', '-o',
-        pr_json
-    ])
-    with open(pr_json, 'r') as fp:
-        json_obj = json.load(fp, encoding='utf-8')
-    base = json_obj['base']['ref']
+def run_comparison(base, compare_script):
     cwd = os.getcwd()
     # create a copy of the repo at base branch
     if os.path.exists('base'):
