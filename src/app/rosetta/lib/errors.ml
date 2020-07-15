@@ -18,7 +18,7 @@ end
 module T : sig
   type t [@@deriving yojson, show, eq]
 
-  val create : ?context:string -> Variant.t -> [> `App of t]
+  val create : ?context:string -> Variant.t -> t
 
   val erase : t -> Models.Error.t
 
@@ -26,14 +26,15 @@ module T : sig
 
   module Lift : sig
     val parse :
-         ?context:string
-      -> ('a, string) Result.t
-      -> ('a, [> `App of t]) Deferred.Result.t
+      ?context:string -> ('a, string) Result.t -> ('a, t) Deferred.Result.t
 
     val sql :
          ?context:string
       -> ('a, [< Caqti_error.t]) Deferred.Result.t
-      -> ('a, [> `App of t]) Deferred.Result.t
+      -> ('a, t) Deferred.Result.t
+
+    val wrap :
+      ('a, t) Deferred.Result.t -> ('a, [> `App of t]) Deferred.Result.t
   end
 end = struct
   type t = {extra_context: string option; kind: Variant.t}
@@ -100,7 +101,7 @@ end = struct
     | `Invariant_violation ->
         false
 
-  let create ?context kind = `App {extra_context= context; kind}
+  let create ?context kind = {extra_context= context; kind}
 
   let erase (t : t) =
     { Models.Error.code= Int32.of_int_exn (code t.kind)
@@ -123,10 +124,7 @@ end = struct
 
   let all_errors =
     Variant.to_representatives
-    |> Lazy.map ~f:(fun vs ->
-           List.map vs ~f:(fun k ->
-               let (`App e) = create k in
-               erase e ) )
+    |> Lazy.map ~f:(fun vs -> List.map vs ~f:(Fn.compose erase create))
 
   module Lift = struct
     let parse ?context res =
@@ -137,6 +135,8 @@ end = struct
       Deferred.Result.map_error
         ~f:(fun e -> create ?context (`Sql (Caqti_error.show e)))
         res
+
+    let wrap t = Deferred.Result.map_error ~f:(fun e -> `App e) t
   end
 end
 
