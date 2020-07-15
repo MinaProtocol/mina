@@ -13,6 +13,6 @@ module Styles = {
 };
 
 [@react.component]
-let make = (~icon) => {
-  <span className=Styles.icon> icon </span>;
+let make = (~icon, ~title: string=?) => {
+  <span title className=Styles.icon> icon </span>;
 };

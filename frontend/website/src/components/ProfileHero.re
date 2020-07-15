@@ -306,7 +306,7 @@ let make = (~member: Leaderboard.member) => {
     </span>
     <div className=Styles.nameContainer>
       <p className=Styles.username> {React.string(member.name)} </p>
-      {Leaderboard.renderBadges(member)}
+      {Leaderboard.LeaderboardRow.DesktopLayout.renderBadges(member)}
     </div>
     <div className=Styles.middleRow> <Points member /> <Links /> </div>
   </div>;

@@ -30,7 +30,7 @@ let safeParseInt = str =>
 let fetchLeaderboard = () => {
   Sheets.fetchRange(
     ~sheet="1Nq_Y76ALzSVJRhSFZZm4pfuGbPkZs2vTtCnVQ1ehujE",
-    ~range="Member_Profile_Data!A2:Z",
+    ~range="Copy of Member_Profile_Data!A2:Z",
   )
   |> Promise.map(res => {
        Array.map(parseEntry, res)
@@ -53,6 +53,58 @@ let fetchLeaderboard = () => {
           })
      })
   |> Js.Promise.catch(_ => Promise.return([||]));
+};
+
+module Toggle = {
+  type t =
+    | All
+    | Genesis
+    | NonGenesis;
+
+  let toggles = [|All, Genesis, NonGenesis|];
+
+  let toggle_of_string = toggle => {
+    switch (toggle) {
+    | "All Participants" => All
+    | "Genesis Members" => Genesis
+    | "Non-Genesis Members" => NonGenesis
+    | _ => All
+    };
+  };
+
+  let string_of_toggle = toggle => {
+    switch (toggle) {
+    | All => "All Participants"
+    | Genesis => "Genesis Members"
+    | NonGenesis => "Non-Genesis Members"
+    };
+  };
+};
+
+module Filter = {
+  type t =
+    | Release
+    | Phase
+    | AllTime;
+
+  let string_of_filter = filter => {
+    switch (filter) {
+    | Release => "This Release"
+    | Phase => "This Phase"
+    | AllTime => "All Time"
+    };
+  };
+
+  let filter_of_string = filter => {
+    switch (filter) {
+    | "This Release" => Release
+    | "This Phase" => Phase
+    | "All Time" => AllTime
+    | _ => AllTime
+    };
+  };
+
+  let filters = [|Release, Phase, AllTime|];
 };
 
 module Styles = {
@@ -81,22 +133,17 @@ module Styles = {
       ),
     ]);
 
-  let leaderboardRow =
+  let desktopLeaderboardRow =
     style([
       cursor(`pointer),
       padding2(~v=`rem(1.), ~h=`rem(1.)),
       height(`rem(3.5)),
       display(`grid),
       gridColumnGap(rem(1.5)),
-      gridTemplateColumns([
-        rem(1.),
-        rem(5.5),
-        rem(5.5),
-        rem(3.5),
-        rem(3.5),
-      ]),
+      width(`percent(100.)),
+      gridTemplateColumns([rem(3.5), rem(6.), `auto, rem(9.)]),
       media(
-        Theme.MediaQuery.notMobile,
+        Theme.MediaQuery.tablet,
         [
           width(`percent(100.)),
           gridTemplateColumns([
@@ -111,15 +158,31 @@ module Styles = {
       ),
     ]);
 
+  let mobileLeaderboardRow =
+    style([
+      display(`grid),
+      gridTemplateColumns([`rem(5.), `auto]),
+      gridColumnGap(`rem(1.5)),
+      cursor(`pointer),
+      padding2(~v=`rem(1.), ~h=`rem(1.)),
+      fontWeight(`semiBold),
+      fontSize(`px(16)),
+      height(`percent(100.)),
+      width(`percent(100.)),
+      lineHeight(`px(24)),
+    ]);
+
   let headerRow =
     merge([
-      leaderboardRow,
+      desktopLeaderboardRow,
       style([
+        display(`none),
         paddingBottom(`rem(0.5)),
         fontSize(`rem(1.)),
         fontWeight(`semiBold),
         textTransform(`uppercase),
         letterSpacing(`rem(0.125)),
+        media(Theme.MediaQuery.notMobile, [display(`grid)]),
       ]),
     ]);
 
@@ -139,6 +202,13 @@ module Styles = {
       ]),
     ]);
 
+  let inactiveColumn =
+    style([
+      display(`none),
+      justifySelf(`flexEnd),
+      media(Theme.MediaQuery.tablet, [display(`inline)]),
+    ]);
+
   let topTen = style([position(`absolute)]);
 
   let cell =
@@ -150,7 +220,15 @@ module Styles = {
   let pointsCell = merge([cell, style([justifySelf(`flexEnd)])]);
   let activePointsCell =
     merge([cell, style([justifySelf(`flexEnd), fontWeight(`semiBold)])]);
-  let inactivePointsCell = merge([pointsCell, style([opacity(0.5)])]);
+  let inactivePointsCell =
+    merge([
+      pointsCell,
+      style([
+        media(Theme.MediaQuery.tablet, [display(`inline)]),
+        display(`none),
+        opacity(0.5),
+      ]),
+    ]);
 
   let loading =
     style([
@@ -160,124 +238,260 @@ module Styles = {
     ]);
 
   let badges = style([display(`flex), justifyContent(`flexEnd)]);
+
+  let desktopLayout =
+    style([
+      display(`none),
+      media(Theme.MediaQuery.notMobile, [display(`unset)]),
+    ]);
+
+  let mobileLayout =
+    style([
+      display(`unset),
+      media(Theme.MediaQuery.notMobile, [display(`none)]),
+    ]);
+
+  let mobileFirstColumn =
+    style([textAlign(`right), color(`hex("757575"))]);
+
+  let mobileSecondColumn =
+    style([
+      display(`flex),
+      justifyContent(`flexStart),
+      flexDirection(`row),
+      textAlign(`left),
+      height(`percent(100.)),
+    ]);
+
+  let mobilePointStar =
+    merge([
+      mobileFirstColumn,
+      style([
+        before([
+          contentRule("*"),
+          color(Css_Colors.red),
+          marginRight(`rem(0.5)),
+        ]),
+      ]),
+    ]);
 };
-
-let renderBadges = member => {
-  let icons = [||];
-  if (member.technicalMVP && member.communityMVP) {
-    Js.Array.push(Icons.technicalAndCommunityMVPBadge, icons) |> ignore;
-  } else if (member.technicalMVP) {
-    Js.Array.push(Icons.technicalMVPBadge, icons) |> ignore;
-  } else if (member.communityMVP) {
-    Js.Array.push(Icons.communityMVPBadge, icons) |> ignore;
-  };
-
-  /* Genesis badge is added last so it's always the rightmost badge in the leaderboard */
-  if (member.genesisMember) {
-    Js.Array.push(Icons.genesisMemberBadge, icons) |> ignore;
-  };
-  icons |> Array.map(icon => {<Badge icon />}) |> React.array;
-};
-
-type filter =
-  | All
-  | Genesis
-  | NonGenesis;
-
-type sort =
-  | Release
-  | Phase
-  | AllTime;
-
-let pointsColumns = [|Release, Phase, AllTime|];
 
 module LeaderboardRow = {
+  open Filter;
+
+  let getRank = (sort, member) => {
+    switch (sort) {
+    | Phase => member.phaseRank
+    | Release => member.releaseRank
+    | AllTime => member.allTimeRank
+    };
+  };
+
+  let getPoints = (column, member) =>
+    switch (column) {
+    | Phase => member.phasePoints
+    | Release => member.releasePoints
+    | AllTime => member.allTimePoints
+    };
+
+  let renderPoints = (sort, column, member) => {
+    <span
+      key={member.name ++ string_of_filter(column)}
+      className=Styles.(
+        sort === column ? activePointsCell : inactivePointsCell
+      )>
+      {React.string(string_of_int(getPoints(column, member)))}
+    </span>;
+  };
+
+  let getUserSlug = member => {
+    "/memberProfile"
+    ++ "?allTimeRank="
+    ++ member.allTimeRank->string_of_int
+    ++ "&allTimePoints="
+    ++ member.allTimePoints->string_of_int
+    ++ "&phaseRank="
+    ++ member.phaseRank->string_of_int
+    ++ "&phasePoints="
+    ++ member.phasePoints->string_of_int
+    ++ "&releaseRank="
+    ++ member.releaseRank->string_of_int
+    ++ "&releasePoints="
+    ++ member.releasePoints->string_of_int
+    ++ "&genesisMember="
+    ++ member.genesisMember->string_of_bool
+    ++ "&name="
+    ++ member.name
+    |> Js.String.replaceByRe([%re "/#/g"], "%23"); /* replace "#" with percent encoding for the URL to properly parse */
+  };
+
+  module DesktopLayout = {
+    let renderBadges = member => {
+      let icons = [||];
+      if (member.technicalMVP && member.communityMVP) {
+        Js.Array.push(
+          <Badge
+            icon=Icons.technicalAndCommunityMVPBadge
+            title="Technical & Community MVP"
+          />,
+          icons,
+        )
+        |> ignore;
+      } else if (member.technicalMVP) {
+        Js.Array.push(
+          <Badge icon=Icons.technicalMVPBadge title="Technical MVP" />,
+          icons,
+        )
+        |> ignore;
+      } else if (member.communityMVP) {
+        Js.Array.push(
+          <Badge icon=Icons.communityMVPBadge title="Community MVP" />,
+          icons,
+        )
+        |> ignore;
+      };
+
+      /* Genesis badge is added last so it's always the rightmost badge in the leaderboard */
+      if (member.genesisMember) {
+        Js.Array.push(
+          <Badge
+            icon=Icons.genesisMemberBadge
+            title="Genesis Founding Member"
+          />,
+          icons,
+        )
+        |> ignore;
+      };
+      icons |> React.array;
+    };
+
+    [@react.component]
+    let make = (~sort, ~rank, ~member) => {
+      //<Next.Link href=""_as=userSlug>
+      <div className=Styles.desktopLeaderboardRow>
+
+          <span className=Styles.rank>
+            {React.string(string_of_int(rank))}
+          </span>
+          <span className=Styles.badges> {renderBadges(member)} </span>
+          <span className=Styles.username> {React.string(member.name)} </span>
+          {Array.map(column => {renderPoints(sort, column, member)}, filters)
+           |> React.array}
+        </div>;
+        // </Next.Link>;
+    };
+  };
+
+  module MobileLayout = {
+    let renderBadges = member => {
+      let icons = [||];
+      if (member.technicalMVP && member.communityMVP) {
+        Js.Array.push(
+          <Badge
+            icon=Icons.technicalAndCommunityMVPBadgeMobile
+            title="Technical & Community MVP"
+          />,
+          icons,
+        )
+        |> ignore;
+      } else if (member.technicalMVP) {
+        Js.Array.push(
+          <Badge icon=Icons.technicalMVPBadgeMobile title="Technical MVP" />,
+          icons,
+        )
+        |> ignore;
+      } else if (member.communityMVP) {
+        Js.Array.push(
+          <Badge icon=Icons.communityMVPBadgeMobile title="Community MVP" />,
+          icons,
+        )
+        |> ignore;
+      };
+
+      /* Genesis badge is added last so it's always the rightmost badge in the leaderboard */
+      if (member.genesisMember) {
+        Js.Array.push(
+          <Badge
+            icon=Icons.genesisMemberBadgeMobile
+            title="Genesis Founding Member"
+          />,
+          icons,
+        )
+        |> ignore;
+      };
+      icons |> React.array;
+    };
+
+    [@react.component]
+    let make = (~sort, ~rank, ~member) => {
+      //<Next.Link href=""_as=userSlug>
+      <div className=Styles.mobileLeaderboardRow>
+
+          <span className=Styles.mobileFirstColumn>
+            {React.string("Rank")}
+          </span>
+          <span className=Styles.mobileSecondColumn>
+            {React.string("#" ++ string_of_int(rank))}
+            <span className=Css.(style([display(`flex)]))>
+              {renderBadges(member)}
+            </span>
+          </span>
+          <span className=Styles.mobileFirstColumn>
+            {React.string("Name")}
+          </span>
+          <span> {React.string(member.name)} </span>
+          <span className=Styles.mobilePointStar>
+            {React.string("Points")}
+          </span>
+          <span>
+            {React.string(string_of_int(getPoints(sort, member)))}
+          </span>
+        </div>;
+        //</Next.Link>;
+    };
+  };
+
   [@react.component]
   let make = (~sort, ~member) => {
-    let userSlug =
-      "/memberProfile"
-      ++ "?allTimeRank="
-      ++ member.allTimeRank->string_of_int
-      ++ "&allTimePoints="
-      ++ member.allTimePoints->string_of_int
-      ++ "&phaseRank="
-      ++ member.phaseRank->string_of_int
-      ++ "&phasePoints="
-      ++ member.phasePoints->string_of_int
-      ++ "&releaseRank="
-      ++ member.releaseRank->string_of_int
-      ++ "&releasePoints="
-      ++ member.releasePoints->string_of_int
-      ++ "&genesisMember="
-      ++ member.genesisMember->string_of_bool
-      ++ "&technicalMVP="
-      ++ member.technicalMVP->string_of_bool
-      ++ "&communityMVP="
-      ++ member.communityMVP->string_of_bool
-      ++ "&name="
-      ++ member.name
-      |> Js.String.replaceByRe([%re "/#/g"], "%23"); /* replace "#" with percent encoding for the URL to properly parse */
+    let _userSlug = getUserSlug(member);
+    let rank = getRank(sort, member);
 
-    let rank =
-      switch (sort) {
-      | Phase => member.phaseRank
-      | Release => member.releaseRank
-      | AllTime => member.allTimeRank
-      };
-
-    let points = column =>
-      switch (column) {
-      | Phase => member.phasePoints
-      | Release => member.releasePoints
-      | AllTime => member.allTimePoints
-      };
-
-    let renderPoints = column =>
-      <span
-        className=Styles.(
-          sort === column ? activePointsCell : inactivePointsCell
-        )>
-        {React.string(string_of_int(points(column)))}
-      </span>;
-
-    <Next.Link href=userSlug _as=userSlug>
-      <div className=Styles.leaderboardRow>
-        <span className=Styles.rank>
-          {React.string(string_of_int(rank))}
-        </span>
-        <span className=Styles.badges> {renderBadges(member)} </span>
-        <span className=Styles.username> {React.string(member.name)} </span>
-        {Array.map(renderPoints, pointsColumns) |> React.array}
+    <div>
+      <div className=Styles.desktopLayout>
+        <DesktopLayout sort rank member />
       </div>
-    </Next.Link>;
+      <div className=Styles.mobileLayout>
+        <MobileLayout sort rank member />
+      </div>
+    </div>;
   };
 };
 
 type state = {
-  sort,
   loading: bool,
   members: array(member),
 };
 
 type actions =
-  | UpdateMembers(array(member))
-  | UpdateSort(sort);
+  | UpdateMembers(array(member));
 
-let reducer = (prevState, action) => {
+let reducer = (_, action) => {
   switch (action) {
-  | UpdateMembers(members) => {sort: prevState.sort, loading: false, members}
-  | UpdateSort(sort) => {
-      sort,
-      loading: prevState.loading,
-      members: prevState.members,
-    }
+  | UpdateMembers(members) => {loading: false, members}
   };
 };
 
 [@react.component]
 let make =
-    (~filter: filter=All, ~sortDefault: sort=Release, ~search: string="") => {
-  let initialState = {sort: sortDefault, loading: true, members: [||]};
+    (
+      ~filter: Filter.t=Release,
+      ~toggle: Toggle.t=All,
+      ~search: string="",
+      ~onFilterPress: string => unit=?,
+    ) => {
+  open Toggle;
+  open Filter;
+  let initialState = {loading: true, members: [||]};
   let (state, dispatch) = React.useReducer(reducer, initialState);
 
   React.useEffect0(() => {
@@ -286,7 +500,7 @@ let make =
   });
 
   let sortRank = member =>
-    switch (state.sort) {
+    switch (filter) {
     | Phase => member.phaseRank
     | Release => member.releaseRank
     | AllTime => member.allTimeRank
@@ -297,7 +511,7 @@ let make =
   let filteredMembers =
     Js.Array.filter(
       member =>
-        switch (filter) {
+        switch (toggle) {
         | All => true
         | Genesis => member.genesisMember
         | NonGenesis => !member.genesisMember
@@ -310,29 +524,24 @@ let make =
     |> Js.Array.filter(member => sortRank(member) !== 0);
 
   let renderRow = member =>
-    <LeaderboardRow key={member.name} sort={state.sort} member />;
+    <LeaderboardRow key={member.name} sort=filter member />;
 
   let renderColumnHeader = column =>
     <span
-      onClick={_ => dispatch(UpdateSort(column))}
-      className={column === state.sort ? Styles.activeColumn : Styles.flexEnd}>
-      {React.string(
-         switch (column) {
-         | Phase => "This Phase"
-         | Release => "This Release"
-         | AllTime => "All Time"
-         },
-       )}
+      key={Filter.string_of_filter(column)}
+      onClick={_ => {onFilterPress(string_of_filter(column))}}
+      className={
+        column === filter ? Styles.activeColumn : Styles.inactiveColumn
+      }>
+      {React.string(string_of_filter(column))}
     </span>;
 
   <div className=Styles.leaderboardContainer>
     <div id="testnet-leaderboard" className=Styles.leaderboard>
       <div className=Styles.headerRow>
         <span className=Styles.flexEnd> {React.string("Rank")} </span>
-        <span className=Css.(style([gridColumn(3, 4)]))>
-          {React.string("Name")}
-        </span>
-        {Array.map(renderColumnHeader, pointsColumns) |> React.array}
+        <span> {React.string("Name")} </span>
+        {Array.map(renderColumnHeader, Filter.filters) |> React.array}
       </div>
       <hr />
       <div className=Styles.topTen />
