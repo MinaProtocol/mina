@@ -932,6 +932,8 @@ jobs:
                     LIBP2P_NIXLESS: 1
                     CODA_LIBP2P_HELPER_PATH: /home/opam/project/src/app/libp2p_helper/result/bin/libp2p_helper
                     GO: /usr/lib/go/bin/go
+            - store_artifacts:
+                  path: test_output/artifacts
     test--fake_hash:
         resource_class: large
         docker:
