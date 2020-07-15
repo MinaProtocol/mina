@@ -6,7 +6,6 @@ import os
 import sys
 import shutil
 import subprocess
-import json
 
 exit_code = 0
 
