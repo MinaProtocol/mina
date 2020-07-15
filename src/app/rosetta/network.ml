@@ -6,6 +6,9 @@ module Get_status =
 [%graphql
 {|
   query {
+    genesisBlock {
+      stateHash
+    }
     bestChain {
       stateHash
       protocolState {
@@ -104,10 +107,7 @@ let router ~graphql_uri ~logger ~db (route : string list) body =
           | Some chain ->
               Ok (Array.last chain) )
       in
-      let%bind genesis_block_state_hash =
-        Errors.Lift.sql ~context:"Genesis block state hash query"
-        @@ Db.find genesis_block_query ()
-      in
+      let genesis_block_state_hash = (res#genesisBlock)#stateHash in
       let%map oldest_block =
         Errors.Lift.sql ~context:"Oldest block query"
         @@ Db.find oldest_block_query ()
