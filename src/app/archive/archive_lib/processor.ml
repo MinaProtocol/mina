@@ -633,6 +633,16 @@ module Block = struct
             blocks.timestamp < ?)")
         (height, timestamp)
     in
+    let%bind () =
+      (* Remove block references. *)
+      Conn.exec
+        (Caqti_request.exec
+           Caqti_type.(tup2 int int64)
+           "UPDATE blocks AS b SET parent_id = NULL FROM blocks WHERE \
+            b.parent_id = blocks.id AND (blocks.height < ? OR \
+            blocks.timestamp < ?)")
+        (height, timestamp)
+    in
     (* Delete blocks *)
     Conn.exec
       (Caqti_request.exec
