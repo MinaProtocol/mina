@@ -74,9 +74,7 @@ let router ~graphql_uri ~logger:_ ~db (route : string list) body =
         ; balances=
             [ { Amount.value= Unsigned.UInt64.to_string (account#balance)#total
               ; currency=
-                  { Currency.symbol= "CODA"
-                  ; decimals= Int32.of_int_exn 9
-                  ; metadata= None }
+                  {Currency.symbol= "CODA"; decimals= 9l; metadata= None}
               ; metadata= None } ]
         ; metadata=
             Option.map
