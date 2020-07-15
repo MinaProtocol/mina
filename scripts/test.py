@@ -346,6 +346,11 @@ class CodaProject:
         self.executive.run_cmd(cmd, directory=self.root, log=build_log)
         self.current_profile = profile
 
+    def no_build(self, profile='dev'):
+        print('Skipping build')
+        self.current_profile = profile
+
+
     def run_test(self, test, test_log):
         if self.current_profile == None:
             self.executive.fail('run_test initiated without building')
@@ -425,11 +430,14 @@ def run(args):
 
     for profile in all_tests.keys():
         print('- %s:' % profile)
-        build_log_name = '%s.log' % profile
-        build_log = os.path.join(out_dir.build_logs, build_log_name)
-        executive.reserve_file(build_log)
-        executive.register_artifact_collector(SingleArtifactCollector(out_dir.build_logs, 'build', build_log_name))
-        project.build(build_log, profile)
+        if args.no_build:
+            project.no_build(profile)
+        else:
+            build_log_name = '%s.log' % profile
+            build_log = os.path.join(out_dir.build_logs, build_log_name)
+            executive.reserve_file(build_log)
+            executive.register_artifact_collector(SingleArtifactCollector(out_dir.build_logs, 'build', build_log_name))
+            project.build(build_log, profile)
 
         for test in all_tests[profile]:
             print('  - %s' % test)
@@ -590,6 +598,11 @@ def main():
             Specify a pattern of tests to exclude from running. This flag can be
             provided multiple times to specify a series of patterns'
         '''
+    )
+    run_parser.add_argument(
+        '--no-build',
+        action='store_true',
+        help='Run tests using an existing built binary.'
     )
     run_parser.add_argument(
         'includes_patterns',
