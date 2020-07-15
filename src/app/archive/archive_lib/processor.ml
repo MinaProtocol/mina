@@ -595,10 +595,10 @@ module Block = struct
       Conn.exec
         (Caqti_request.exec
            Caqti_type.(tup2 int int64)
-           "DELETE FROM user_commands INNER JOIN (blocks_user_commands INNER \
-            JOIN blocks ON blocks.id = blocks_user_commands.block_id) ON \
-            user_commands.id = blocks_user_commands.user_command_id WHERE \
-            blocks.height < ? OR blocks.timestamp < ?")
+           "DELETE FROM user_commands USING blocks_user_commands, blocks \
+            WHERE blocks.id = blocks_user_commands.block_id AND \
+            user_commands.id = blocks_user_commands.user_command_id AND \
+            (blocks.height < ? OR blocks.timestamp < ?)")
         (height, timestamp)
     in
     let%bind () =
@@ -606,11 +606,11 @@ module Block = struct
       Conn.exec
         (Caqti_request.exec
            Caqti_type.(tup2 int int64)
-           "DELETE FROM internal_commands INNER JOIN \
-            (blocks_internal_commands INNER JOIN blocks ON blocks.id = \
-            blocks_internal_commands.block_id) ON internal_commands.id = \
-            blocks_user_commands.internal_command_id WHERE blocks.height < ? \
-            OR blocks.timestamp < ?")
+           "DELETE FROM internal_commands USING blocks_internal_commands, \
+            blocks WHERE blocks.id = blocks_internal_commands.block_id AND \
+            internal_commands.id = \
+            blocks_internal_commands.internal_command_id AND (blocks.height < \
+            ? OR blocks.timestamp < ?)")
         (height, timestamp)
     in
     let%bind () =
@@ -618,9 +618,9 @@ module Block = struct
       Conn.exec
         (Caqti_request.exec
            Caqti_type.(tup2 int int64)
-           "DELETE FROM blocks_user_commands INNER JOIN blocks ON blocks.id = \
-            blocks_user_commands.block_id WHERE blocks.height < ? OR \
-            blocks.timestamp < ?")
+           "DELETE FROM blocks_user_commands USING blocks WHERE blocks.id = \
+            blocks_user_commands.block_id AND (blocks.height < ? OR \
+            blocks.timestamp < ?)")
         (height, timestamp)
     in
     let%bind () =
@@ -628,9 +628,9 @@ module Block = struct
       Conn.exec
         (Caqti_request.exec
            Caqti_type.(tup2 int int64)
-           "DELETE FROM blocks_internal_commands INNER JOIN blocks ON \
-            blocks.id = blocks_internal_commands.block_id WHERE blocks.height \
-            < ? OR blocks.timestamp < ?")
+           "DELETE FROM blocks_internal_commands USING blocks WHERE blocks.id \
+            = blocks_internal_commands.block_id AND (blocks.height < ? OR \
+            blocks.timestamp < ?)")
         (height, timestamp)
     in
     (* Delete blocks *)
