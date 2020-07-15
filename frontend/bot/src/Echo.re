@@ -28,7 +28,7 @@ module ListenBlocks = [%graphql
 module BlockSet = Belt.MutableSet.String;
 let processedBlocks = BlockSet.make();
 
-let sendEcho = (echoKey, fee, password, `UserCommand obj) => {
+let sendEcho = (echoKey, fee, password, `UserCommand(obj)) => {
   let amount = obj##amount;
   let userKey = obj##from;
   if (amount > fee) {
@@ -42,8 +42,20 @@ let sendEcho = (echoKey, fee, password, `UserCommand obj) => {
     |> Wonka.forEach((. {ReasonUrql.Client.ClientTypes.response}) =>
          switch (response) {
          | Data(data) =>
-           let x : {.. "payment": [ `UserCommand({ .. "id": string, "to_": Js.String.t }) ]} = data##sendPayment
-           let (`UserCommand payment) = x##payment;
+           let x: {
+             ..
+             "payment": [
+               | `UserCommand(
+                   {
+                     ..
+                     "id": string,
+                     "to_": Js.String.t,
+                   },
+                 )
+             ],
+           } =
+             data##sendPayment;
+           let `UserCommand(payment) = x##payment;
            log(`Info, "Sent (to %s): %s", payment##to_, payment##id);
          | Error(e) =>
            log(
@@ -58,7 +70,7 @@ let sendEcho = (echoKey, fee, password, `UserCommand obj) => {
            // Shouldn't happen
            log(`Error, "Got 'NotFound' sending to %s", userKey)
          }
-    );
+       );
   } else {
     log(
       `Info,
@@ -98,14 +110,28 @@ let start = (echoKey, fee, password) => {
   |> Wonka.forEach((. {ReasonUrql.Client.ClientTypes.response}) =>
        switch (response) {
        | Data(d) =>
-        let userCommands: array([`UserCommand({.. "to_": Js.String.t, "isDelegation": bool, "from": Js.String.t, "amount": int64 })]) = d##newBlock##transactions##userCommands;
+         let userCommands:
+           array(
+             [
+               | `UserCommand(
+                   {
+                     ..
+                     "to_": Js.String.t,
+                     "isDelegation": bool,
+                     "from": Js.String.t,
+                     "amount": int64,
+                   },
+                 )
+             ],
+           ) =
+           d##newBlock##transactions##userCommands;
 
          userCommands
          |> Array.to_list
-         |> List.filter((`UserCommand cmd) => {
+         |> List.filter((`UserCommand(cmd)) =>
               cmd##to_ == echoKey && !cmd##isDelegation
-         })
-         |> List.iter(sendEcho(echoKey, fee, password))
+            )
+         |> List.iter(sendEcho(echoKey, fee, password));
        | Error(e) =>
          log(`Error, "Error retrieving new block. Message: %s", e.message)
        | NotFound =>
