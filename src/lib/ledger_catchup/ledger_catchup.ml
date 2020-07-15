@@ -434,10 +434,10 @@ let verify_transitions_and_build_breadcrumbs ~logger
   in
   let open Deferred.Let_syntax in
   match%bind
-    Transition_handler.Breadcrumb_builder.build_subtrees_of_breadcrumbs_in_sequence ~logger
-      ~precomputed_values ~verifier ~trust_system ~frontier
-      ~initial_hash:passed_initial_hash ~initial_breadcrumb:prev_breadcrumb
-      trees_of_transitions
+    Transition_handler.Breadcrumb_builder
+    .build_subtrees_of_breadcrumbs_in_sequence ~logger ~precomputed_values
+      ~verifier ~trust_system ~frontier ~initial_hash:passed_initial_hash
+      ~initial_breadcrumb:prev_breadcrumb trees_of_transitions
   with
   | Ok result ->
       Deferred.Or_error.return (passed_initial_hash, result)
@@ -475,17 +475,16 @@ let verify_transitions_and_build_breadcrumbs_in_chunks ~logger
         if index <> List.length modified_transitions_chunks - 1 then []
         else subtrees
       in
-      let prev_breadcrumb = List.nth (!previous_trees_of_breadcrumbs) 0 in
+      let prev_breadcrumb = List.nth !previous_trees_of_breadcrumbs 0 in
       match%bind
         verify_transitions_and_build_breadcrumbs ~logger ~precomputed_values
           ~trust_system ~verifier ~frontier ~unprocessed_transition_cache
           ~transitions:transitions_chunk ~target_hash ~prev_breadcrumb
-          ~prev_hash:(!previous_initial_hash)
-          ~subtrees:current_subtrees
+          ~prev_hash:!previous_initial_hash ~subtrees:current_subtrees
       with
       | Ok (initial_hash, trees_of_breadcrumbs) ->
           Core.printf "Success on one\n%!" ;
-          previous_initial_hash := Some initial_hash;
+          previous_initial_hash := Some initial_hash ;
           previous_trees_of_breadcrumbs :=
             trees_of_breadcrumbs :: !previous_trees_of_breadcrumbs ;
           Deferred.Or_error.return (trees_of_breadcrumbs :: acc)
