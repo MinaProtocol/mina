@@ -1115,6 +1115,13 @@ let create (config : Config.t) =
                            Transition_frontier.Breadcrumb.validated_transition
                              breadcrumb
                          in
+                         Logger.info config.logger ~module_:__MODULE__
+                           ~location:__LOC__
+                           ~metadata:
+                             [ ( "external_transition"
+                               , External_transition.Validated.to_yojson et )
+                             ]
+                           "Setting the callback for produced transition" ;
                          External_transition.Validated.poke_validation_callback
                            et (fun v ->
                              if v then
@@ -1150,6 +1157,13 @@ let create (config : Config.t) =
                   let hash =
                     External_transition.Validated.state_hash transition
                   in
+                  Logger.info config.logger ~module_:__MODULE__
+                    ~location:__LOC__
+                    ~metadata:
+                      [ ( "external_transition"
+                        , External_transition.Validated.to_yojson transition )
+                      ]
+                    "Received produced transition to broadcast" ;
                   let consensus_state =
                     transition |> External_transition.Validated.consensus_state
                   in
@@ -1187,6 +1201,9 @@ let create (config : Config.t) =
                           )
                         ; ("timing", timing_error_json) ]
                       in
+                      Logger.info config.logger ~module_:__MODULE__
+                        ~location:__LOC__ ~metadata
+                        "Produced trasition failed with timing error" ;
                       External_transition.Validated.don't_broadcast transition ;
                       match source with
                       | `Catchup ->
