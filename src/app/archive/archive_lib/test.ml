@@ -270,10 +270,9 @@ let%test_module "Archive node unit tests" =
                     then
                       Error.raise
                         (Error.createf
-                           !"The block with id %i was pruned incorrectly: \
-                             timestamp %{sexp: Int64.t} < max_timestamp \
-                             %{sexp: Int64.t} - delete_older_than %{sexp: \
-                             Int64.t}"
+                           !"A block was pruned incorrectly: timestamp \
+                             %{sexp: Int64.t} < max_timestamp %{sexp: \
+                             Int64.t} - delete_older_than %{sexp: Int64.t}"
                            id timestamp max_timestamp delete_older_than)
                     else Deferred.Result.return () )
           with
