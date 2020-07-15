@@ -742,8 +742,7 @@ let pooled_user_commands =
   in
   Command.async
     ~summary:
-      "Retrieve all the user commands submitted by the current daemon that \
-       are pending inclusion"
+      "Retrieve all the user commands that are pending inclusion"
     (Cli_lib.Background_daemon.graphql_init public_key_flag
        ~f:(fun graphql_endpoint maybe_public_key ->
          let public_key =
