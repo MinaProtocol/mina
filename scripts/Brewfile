@@ -1,4 +1,5 @@
 brew "bash"
+brew "yarn"
 brew "boost"
 brew "cmake"
 brew "gmp"
