@@ -10,11 +10,11 @@ module Variant = struct
     | `Chain_info_missing
     | `Account_not_found of string
     | `Invariant_violation ]
-  [@@deriving yojson, show]
+  [@@deriving yojson, show, eq]
 end
 
 module T : sig
-  type t [@@deriving yojson, show]
+  type t [@@deriving yojson, show, eq]
 
   val create : ?context:string -> Variant.t -> [> `App of t]
 
@@ -33,7 +33,7 @@ module T : sig
   end
 end = struct
   type t = {extra_context: string option; kind: Variant.t}
-  [@@deriving yojson, show]
+  [@@deriving yojson, show, eq]
 
   (* TODO: One of the ppx masters should make an "special_enum" ppx that will
      * do this for us. Jane Street's enum only works on argumentless variants *)
