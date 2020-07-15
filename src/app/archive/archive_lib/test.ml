@@ -248,20 +248,7 @@ let%test_module "Archive node unit tests" =
                            id
                            (Unsigned.UInt32.to_int height)
                            (Unsigned.UInt32.to_int max_height)
-                           delete_older_than) ;
-                    let%bind Processor.Block.{parent_id; _} =
-                      Processor.Block.load conn ~id
-                    in
-                    if
-                      Transition_frontier.Breadcrumb.blockchain_length
-                        breadcrumb
-                      > Unsigned.UInt32.one
-                    then
-                      Processor.For_test.assert_parent_exist ~parent_id
-                        ~parent_hash:
-                          (Transition_frontier.Breadcrumb.parent_hash
-                             breadcrumb)
-                        conn
+                           delete_older_than)
                     else Deferred.Result.return ()
                 | None ->
                     if
