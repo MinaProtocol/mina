@@ -11,7 +11,7 @@ import json
 exit_code = 0
 
 
-def run_comparison(base, compare_script):
+def run_comparison(base_commit, compare_script):
     cwd = os.getcwd()
     # create a copy of the repo at base branch
     if os.path.exists('base'):
@@ -20,10 +20,11 @@ def run_comparison(base, compare_script):
     os.chdir('base')
     # it would be faster to do a clone of the local repo, but there's "smudge error" (?)
     subprocess.run(['git', 'clone', 'git@github.com:CodaProtocol/coda.git'])
+    subprocess.run(['git', 'checkout', base_commit])
     os.chdir(cwd)
     # changed files in the PR
     diffs_raw = subprocess.check_output(
-        ['git', 'diff', '--name-only', 'origin/' + base])
+        ['git', 'diff', '--name-only', base_commit])
     diffs_decoded = diffs_raw.decode('UTF-8')
     diffs = diffs_decoded.split('\n')
     for diff in diffs:
