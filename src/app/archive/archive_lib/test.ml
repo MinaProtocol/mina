@@ -243,7 +243,14 @@ let%test_module "Archive node unit tests" =
                 with
                 | Some id ->
                     if Int64.(timestamp < max_timestamp - delete_older_than)
-                    then failwith "This block was not pruned correctly" ;
+                    then
+                      Error.raise
+                        (Error.createf
+                           !"The block with id %i was not pruned correctly: \
+                             timestamp %{sexp: Int64.t} >= max_timestamp \
+                             %{sexp: Int64.t} - delete_older_than %{sexp: \
+                             Int64.t}"
+                           id timestamp max_timestamp delete_older_than) ;
                     let%bind Processor.Block.{parent_id; _} =
                       Processor.Block.load conn ~id
                     in
@@ -260,7 +267,14 @@ let%test_module "Archive node unit tests" =
                     else Deferred.Result.return ()
                 | None ->
                     if Int64.(timestamp >= max_timestamp - delete_older_than)
-                    then failwith "Failed to find saved block in database"
+                    then
+                      Error.raise
+                        (Error.createf
+                           !"The block with id %i was pruned incorrectly: \
+                             timestamp %{sexp: Int64.t} < max_timestamp \
+                             %{sexp: Int64.t} - delete_older_than %{sexp: \
+                             Int64.t}"
+                           id timestamp max_timestamp delete_older_than)
                     else Deferred.Result.return () )
           with
           | Ok () ->
