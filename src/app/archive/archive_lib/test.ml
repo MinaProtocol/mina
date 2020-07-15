@@ -201,12 +201,11 @@ let%test_module "Archive node unit tests" =
             Strict_pipe.create ~name:"archive"
               (Buffered (`Capacity 100, `Overflow Crash))
           in
-          let delete_older_than = 1L in
+          let delete_older_than = 1 in
           let processor_deferred_computation =
             Processor.run
               ~constraint_constants:precomputed_values.constraint_constants
-              conn reader ~logger
-              ~delete_older_than:(Some (Int64.to_int_exn delete_older_than))
+              conn reader ~logger ~delete_older_than:(Some 1)
           in
           let diffs =
             List.map
@@ -215,13 +214,11 @@ let%test_module "Archive node unit tests" =
                   (Diff.Builder.breadcrumb_added breadcrumb) )
               breadcrumbs
           in
-          let max_timestamp =
-            List.fold ~init:Int64.min_value breadcrumbs
+          let max_height =
+            List.fold ~init:Unsigned.UInt32.zero breadcrumbs
               ~f:(fun prev_max breadcrumb ->
-                breadcrumb |> Transition_frontier.Breadcrumb.protocol_state
-                |> Coda_state.Protocol_state.blockchain_state
-                |> Coda_state.Blockchain_state.timestamp |> Block_time.to_int64
-                |> Int64.max prev_max )
+                breadcrumb |> Transition_frontier.Breadcrumb.blockchain_length
+                |> Unsigned.UInt32.max prev_max )
           in
           List.iter diffs ~f:(Strict_pipe.Writer.write writer) ;
           Strict_pipe.Writer.close writer ;
@@ -230,11 +227,9 @@ let%test_module "Archive node unit tests" =
             Processor.deferred_result_list_fold breadcrumbs ~init:()
               ~f:(fun () breadcrumb ->
                 let open Deferred.Result.Let_syntax in
-                let timestamp =
-                  breadcrumb |> Transition_frontier.Breadcrumb.protocol_state
-                  |> Coda_state.Protocol_state.blockchain_state
-                  |> Coda_state.Blockchain_state.timestamp
-                  |> Block_time.to_int64
+                let height =
+                  breadcrumb
+                  |> Transition_frontier.Breadcrumb.blockchain_length
                 in
                 match%bind
                   Processor.Block.find conn
@@ -242,15 +237,18 @@ let%test_module "Archive node unit tests" =
                       (Transition_frontier.Breadcrumb.state_hash breadcrumb)
                 with
                 | Some id ->
-                    if Int64.(timestamp < max_timestamp - delete_older_than)
+                    if
+                      Unsigned.UInt32.(
+                        height < sub max_height (of_int delete_older_than))
                     then
                       Error.raise
                         (Error.createf
                            !"The block with id %i was not pruned correctly: \
-                             timestamp %{sexp: Int64.t} < max_timestamp \
-                             %{sexp: Int64.t} - delete_older_than %{sexp: \
-                             Int64.t}"
-                           id timestamp max_timestamp delete_older_than) ;
+                             height %i < max_height %i - delete_older_than %i"
+                           id
+                           (Unsigned.UInt32.to_int height)
+                           (Unsigned.UInt32.to_int max_height)
+                           delete_older_than) ;
                     let%bind Processor.Block.{parent_id; _} =
                       Processor.Block.load conn ~id
                     in
@@ -266,14 +264,17 @@ let%test_module "Archive node unit tests" =
                         conn
                     else Deferred.Result.return ()
                 | None ->
-                    if Int64.(timestamp >= max_timestamp - delete_older_than)
+                    if
+                      Unsigned.UInt32.(
+                        height >= sub max_height (of_int delete_older_than))
                     then
                       Error.raise
                         (Error.createf
-                           !"A block was pruned incorrectly: timestamp \
-                             %{sexp: Int64.t} >= max_timestamp %{sexp: \
-                             Int64.t} - delete_older_than %{sexp: Int64.t}"
-                           timestamp max_timestamp delete_older_than)
+                           !"A block was pruned incorrectly: height %i >= \
+                             max_height %i - delete_older_than %i"
+                           (Unsigned.UInt32.to_int height)
+                           (Unsigned.UInt32.to_int max_height)
+                           delete_older_than)
                     else Deferred.Result.return () )
           with
           | Ok () ->
