@@ -272,20 +272,18 @@ jobs:
             - restore_cache:
                 name: Restore cache - homebrew
                 keys:
-                    - homebrew-v10-{{'{{'}} checksum "brew_ci_cache.sig" {{'}}'}}-{{'{{'}} checksum "scripts/Brewfile" {{'}}'}}
-                    - homebrew-v10-{{'{{'}} checksum "brew_ci_cache.sig" {{'}}'}}
+                    - homebrew-v9-{{'{{'}} checksum "brew_ci_cache.sig" {{'}}'}}-{{'{{'}} checksum "scripts/Brewfile" {{'}}'}}
+                    - homebrew-v9-{{'{{'}} checksum "brew_ci_cache.sig" {{'}}'}}
             - run:
                 name: Install macos dependencies - homebrew - macos-setup-brew.sh
                 command: |
                     ./scripts/skip_if_only_frontend_or_rfcs.sh ./scripts/macos-setup-brew.sh
             - save_cache:
                 name: Save cache - homebrew
-                key: homebrew-v10-{{'{{'}} checksum "brew_ci_cache.sig" {{'}}'}}-{{'{{'}} checksum "scripts/Brewfile" {{'}}'}}
+                key: homebrew-v9-{{'{{'}} checksum "brew_ci_cache.sig" {{'}}'}}-{{'{{'}} checksum "scripts/Brewfile" {{'}}'}}
                 paths:
                     - "/usr/local/Homebrew"
                     - "/Users/distiller/Library/Caches/Homebrew"
-                    - "/usr/local/Cellar"
-                    - "/usr/local/opt"
             ### opam
             - run:
                 name: Create opam cache signature file including a year/date stamp to ensure occasional rebuilds
