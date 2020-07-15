@@ -29,7 +29,10 @@ let sendFaucetCoda = (userId, msg, pk, password) => {
        let replyText =
          switch (response) {
          | Data(data) =>
-           let id = data##sendPayment##payment##id;
+           let id = {
+             let `UserCommand(x) = data##sendPayment##payment;
+             x##id;
+           };
            log(`Info, "Sent (to %s): %s", pk, id);
            Messages.faucetSentNotification(~id);
          | Error(e) =>

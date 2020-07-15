@@ -2491,7 +2491,7 @@ module Queries = struct
             state_hash) )
 
   let genesis_block =
-    field "block" ~typ:(non_null Types.block) ~args:[]
+    field "genesisBlock" ~typ:(non_null Types.block) ~args:[]
       ~doc:"Get the genesis block" ~resolve:(fun {ctx= coda; _} () ->
         let open Coda_state in
         let { Precomputed_values.genesis_ledger
