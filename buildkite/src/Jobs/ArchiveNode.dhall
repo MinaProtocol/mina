@@ -45,7 +45,7 @@ Pipeline.build
             , key = "build-client-sdk"
             , target = Size.Large
             , docker = None Docker.Type
-            , artifact_paths = [ S.strictlyStart "/var/buildkite/test_output" ]
+            , artifact_paths = [ S.contains "/var/buildkite/test_output" ]
             }
       ]
     }
