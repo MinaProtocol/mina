@@ -397,8 +397,6 @@ jobs:
                 name: Restore cache - homebrew
                 keys:
                     - homebrew-v9-{{ checksum "brew_ci_cache.sig" }}-{{ checksum "scripts/Brewfile" }}
-                    - homebrew-v9-{{ checksum "brew_ci_cache.sig" }}
-                    - homebrew-v8-{{ checksum "brew_ci_cache.sig" }}
             - run:
                 name: Install macos dependencies - homebrew - macos-setup-brew.sh
                 command: |
