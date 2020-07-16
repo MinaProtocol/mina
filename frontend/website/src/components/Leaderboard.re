@@ -417,7 +417,12 @@ let make =
       state.members,
     )
     |> Js.Array.filter(member =>
-         search === "" ? true : Js.String.includes(search, member.name)
+         search === ""
+           ? true
+           : Js.String.includes(
+               String.lowercase_ascii(search),
+               String.lowercase_ascii(member.name),
+             )
        )
     |> Js.Array.filter(member => sortRank(member) !== 0);
 
