@@ -10,7 +10,7 @@
         server: Text
     },
     default = {
-        username = "coda",
+        username = "o1bot",
         `password-env` = "DOCKER_PASSWORD",
         server = ""
     }
