@@ -13,14 +13,14 @@ let DockerLogin = ../Command/DockerLogin/Type.dhall
 let commands : List Cmd.Type =
     [
         Cmd.run (
-            "if [ ! -f DOCKER_DEPLOY_ENV ]; then" ++
+            "if [ ! -f DOCKER_DEPLOY_ENV ]; then " ++
                 "buildkite-agent artifact download DOCKER_DEPLOY_ENV .; " ++
             "fi"
         ),
         Cmd.run (
             "source DOCKER_DEPLOY_ENV && scripts/release-docker.sh" ++
-                " -s $CODA_SERVICE -v $CODA_GIT_TAG-$CODA_GIT_BRANCH-$CODA_GIT_HASH" ++
-                " --extra-args '--build-arg coda_version=$CODA_DEB_VERSION --build-arg deb_repo=$CODA_DEB_REPO'"
+                " -s $CODA_SERVICE -v $CODA_VERSION" ++
+                " --extra-args '--build-arg coda_version=$CODA_VERSION --build-arg deb_repo=$CODA_DEB_REPO'"
         )
     ]
 
