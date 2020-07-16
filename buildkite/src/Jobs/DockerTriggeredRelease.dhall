@@ -14,7 +14,7 @@ let uploadDeployEnv =
       Command.Config::{
         commands = [ Cmd.run "cd buildkite && buildkite-agent artifact upload DOCKER_DEPLOY_ENV" ],
         label = "Upload modified deploy environment",
-        key = "upload-deploy-env",
+        key = "artifact_upload",
         target = Size.Small
       }
 

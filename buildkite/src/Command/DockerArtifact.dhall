@@ -18,7 +18,7 @@ let commands : List Cmd.Type =
             "fi"
         ),
         Cmd.run (
-            "source DOCKER_DEPLOY_ENV && scripts/release-docker.sh" ++
+            "source DOCKER_DEPLOY_ENV; scripts/release-docker.sh" ++
                 " -s $CODA_SERVICE -v $CODA_VERSION" ++
                 " --extra-args '--build-arg coda_version=$CODA_VERSION --build-arg deb_repo=$CODA_DEB_REPO'"
         )
@@ -33,7 +33,8 @@ let cmdConfig =
       label = "Docker artifact build/release commands",
       key = "docker-artifact",
       target = Size.Large,
-      docker_login = Some DockerLogin::{=}
+      docker_login = Some DockerLogin::{=},
+      depends_on = [ { name = "artifact-upload", key = "_artifact-upload" } ]
     }
 
 in
