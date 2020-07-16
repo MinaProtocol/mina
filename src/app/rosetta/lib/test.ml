@@ -5,22 +5,19 @@ let assert_ ~f ~expected ~actual =
     match (x, y) with
     | Ok x, Ok y ->
         Yojson.Safe.equal x y
-    | Error (`App x), Error (`App y) ->
+    | Error x, Error y ->
         Errors.equal x y
     | _ ->
         false
   in
-  let to_yojson = function
-    | Ok x ->
-        x
-    | Error (`App y) ->
-        Errors.to_yojson y
-  in
+  let to_yojson = function Ok x -> x | Error y -> Errors.to_yojson y in
   let expected = Result.map ~f expected in
   let actual = Result.map ~f actual in
   if eq expected actual then ()
   else
-    failwith
-      (Yojson.Safe.pretty_to_string
-         (`Assoc
-           [("expected", to_yojson expected); ("actual", to_yojson actual)]))
+    let output =
+      Yojson.Safe.pretty_to_string
+        (`Assoc
+          [("expected", to_yojson expected); ("actual", to_yojson actual)])
+    in
+    eprintf "%s" output ; failwith output
