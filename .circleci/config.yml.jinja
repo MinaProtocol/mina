@@ -411,7 +411,7 @@ jobs:
                   command: cd frontend/client_sdk && yarn install
             - run:
                   name: Build And Test Client SDK
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; eval `opam config env` && cd frontend/client_sdk && yarn prepublishOnly
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; eval `opam config env` && cd frontend/client_sdk && yarn prepublishOnly'
 
     {%- for profile in build_artifact_profiles %}
     build-artifacts--{{profile}}:
