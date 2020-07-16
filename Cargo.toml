@@ -15,20 +15,22 @@ crate-type = ["staticlib"]
 
 [dependencies]
 libc = { version = "0.2.0" }
-algebra = { git = "https://github.com/o1-labs/zexe/" }
-ff-fft = { git = "https://github.com/o1-labs/zexe/" }
+groupmap = { git = "https://github.com/o1-labs/zexe/", branch = "dlog-only-clean-cargo" }
+algebra = { git = "https://github.com/o1-labs/zexe/", branch = "dlog-only-clean-cargo", features = [ "asm", "parallel", "bn_382", "tweedle" ] }
+ff-fft = { git = "https://github.com/o1-labs/zexe/", branch = "dlog-only-clean-cargo" }
 rand = { version = "0.7" }
 num-bigint = { version = "0.2.3" }
 sprs = { version = "0.7.1" }
 rand_core = { version = "0.5" }
+rayon = { version = "1" }
 
-oracle = { git = "https://github.com/o1-labs/marlin/" }
-evaluation_domains = { git = "https://github.com/o1-labs/marlin/" }
+oracle = { git = "https://github.com/o1-labs/marlin/", branch = "dlog-only-clean-cargo" }
+evaluation_domains = { git = "https://github.com/o1-labs/marlin/", branch = "dlog-only-clean-cargo" }
 
-circuits_pairing = { git = "https://github.com/o1-labs/marlin/" }
-commitment_pairing = { git = "https://github.com/o1-labs/marlin/" }
-protocol_pairing = { git = "https://github.com/o1-labs/marlin/" }
+circuits_pairing = { git = "https://github.com/o1-labs/marlin/", branch = "dlog-only-clean-cargo" }
+commitment_pairing = { git = "https://github.com/o1-labs/marlin/", branch = "dlog-only-clean-cargo" }
+protocol_pairing = { git = "https://github.com/o1-labs/marlin/", branch = "dlog-only-clean-cargo" }
 
-circuits_dlog = { git = "https://github.com/o1-labs/marlin/" }
-commitment_dlog = { git = "https://github.com/o1-labs/marlin/" }
-protocol_dlog = { git = "https://github.com/o1-labs/marlin/" }
+circuits_dlog = { git = "https://github.com/o1-labs/marlin/", branch = "dlog-only-clean-cargo" }
+commitment_dlog = { git = "https://github.com/o1-labs/marlin/", branch = "dlog-only-clean-cargo" }
+protocol_dlog = { git = "https://github.com/o1-labs/marlin/", branch = "dlog-only-clean-cargo" }

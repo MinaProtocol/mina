@@ -8,17 +8,24 @@
    (source_tree src)
    (source_tree ../../marlin)
    (source_tree ../algebra)
+   (source_tree ../algebra-core)
+   (source_tree ../algebra-benches)
    (source_tree ../bench-utils)
+   (source_tree ../cp-benches)
+   (source_tree ../ff-fft-benches)
    (source_tree ../crypto-primitives)
    (source_tree ../dpc)
    (source_tree ../ff-fft)
    (source_tree ../gm17)
    (source_tree ../groth16)
+   (source_tree ../groupmap)
    (source_tree ../r1cs-core)
    (source_tree ../r1cs-std))
  (action
   (progn
-   (run cargo build --release)
+   (run env)
+   (setenv RUSTFLAGS "-C target-feature=+bmi2,+adx"
+    (run cargo build --release))
    (run cp ../target/release/libsnarky_bn382_stubs_stubs.a .))))
 
 (rule
