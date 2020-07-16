@@ -18,7 +18,8 @@ module T = struct
   module Staged_ledger_error = struct
     type t =
       | Non_zero_fee_excess of
-          Scan_state.Space_partition.t * Transaction.t list
+          Scan_state.Space_partition.t
+          * Transaction.t User_command_status.With_status.t list
       | Invalid_proofs of
           ( Ledger_proof.t
           * Transaction_snark.Statement.t
@@ -33,8 +34,9 @@ module T = struct
       | Non_zero_fee_excess (partition, txns) ->
           Format.asprintf
             !"Fee excess is non-zero for the transactions: %{sexp: \
-              Transaction.t list} and the current queue with slots \
-              partitioned as %{sexp: Scan_state.Space_partition.t} \n"
+              Transaction.t User_command_status.With_status.t list} and the \
+              current queue with slots partitioned as %{sexp: \
+              Scan_state.Space_partition.t} \n"
             txns partition
       | Pre_diff pre_diff_error ->
           Format.asprintf
@@ -305,12 +307,22 @@ module T = struct
       Deferred.Or_error.List.iter txs_with_protocol_state
         ~f:(fun (tx, protocol_state) ->
           let%map.Async () = Async.Scheduler.yield () in
-          Or_error.ignore_m
-          @@ Ledger.apply_transaction ~constraint_constants
-               ~txn_global_slot:
-                 ( Coda_state.Protocol_state.consensus_state protocol_state
-                 |> Consensus.Data.Consensus_state.curr_global_slot )
-               snarked_ledger tx )
+          let%bind.Or_error.Let_syntax txn_with_info =
+            Ledger.apply_transaction ~constraint_constants
+              ~txn_global_slot:
+                ( Coda_state.Protocol_state.consensus_state protocol_state
+                |> Consensus.Data.Consensus_state.curr_global_slot )
+              snarked_ledger tx.data
+          in
+          let computed_status =
+            Ledger.Undo.user_command_status txn_with_info
+          in
+          if User_command_status.equal tx.status computed_status then Ok ()
+          else
+            Or_error.errorf
+              !"Mismatched user command status. Expected: %{sexp: \
+                User_command_status.t} Got: %{sexp: User_command_status.t}"
+              tx.status computed_status )
     in
     let%bind () =
       let staged_ledger_hash = Ledger.merkle_root snarked_ledger in
@@ -544,10 +556,10 @@ module T = struct
     in
     let total_fee_excess txns =
       List.fold_until txns ~init:Fee_excess.empty ~finish:Or_error.return
-        ~f:(fun acc (txn : Transaction.t) ->
+        ~f:(fun acc (txn : Transaction.t User_command_status.With_status.t) ->
           match
             let open Or_error.Let_syntax in
-            let%bind fee_excess = Transaction.fee_excess txn in
+            let%bind fee_excess = Transaction.fee_excess txn.data in
             Fee_excess.combine acc fee_excess
           with
           | Ok fee_excess ->
@@ -1914,7 +1926,10 @@ let%test_module "test" =
 
     (* Fee excess at top level ledger proofs should always be zero *)
     let assert_fee_excess :
-        (Ledger_proof.t * (Transaction.t * _) list) option -> unit =
+           ( Ledger_proof.t
+           * (Transaction.t User_command_status.With_status.t * _) list )
+           option
+        -> unit =
      fun proof_opt ->
       let fee_excess =
         Option.value_map ~default:Fee_excess.zero proof_opt

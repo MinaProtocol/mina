@@ -40,7 +40,9 @@ module Undo = struct
       module Stable = struct
         module V1 = struct
           type t =
-            { user_command: User_command.Stable.V1.t
+            { user_command:
+                User_command.Stable.V1.t
+                User_command_status.With_status.Stable.V1.t
             ; previous_receipt_chain_hash: Receipt.Chain_hash.Stable.V1.t
             ; fee_payer_timing: Account.Timing.Stable.V1.t
             ; source_timing: Account.Timing.Stable.V1.t option }
@@ -51,7 +53,7 @@ module Undo = struct
       end]
 
       type t = Stable.Latest.t =
-        { user_command: User_command.t
+        { user_command: User_command.t User_command_status.With_status.t
         ; previous_receipt_chain_hash: Receipt.Chain_hash.t
         ; fee_payer_timing: Account.Timing.t
         ; source_timing: Account.Timing.t option }
@@ -183,7 +185,7 @@ module type S = sig
     module User_command_undo : sig
       module Common : sig
         type t = Undo.User_command_undo.Common.t =
-          { user_command: User_command.t
+          { user_command: User_command.t User_command_status.With_status.t
           ; previous_receipt_chain_hash: Receipt.Chain_hash.t
           ; fee_payer_timing: Account.Timing.t
           ; source_timing: Account.Timing.t option }
@@ -229,7 +231,10 @@ module type S = sig
     type t = Undo.t = {previous_hash: Ledger_hash.t; varying: Varying.t}
     [@@deriving sexp]
 
-    val transaction : t -> Transaction.t Or_error.t
+    val transaction :
+      t -> Transaction.t User_command_status.With_status.t Or_error.t
+
+    val user_command_status : t -> User_command_status.t
   end
 
   val apply_user_command :
@@ -413,17 +418,30 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
   module Undo = struct
     include Undo
 
-    let transaction : t -> Transaction.t Or_error.t =
+    let transaction :
+        t -> Transaction.t User_command_status.With_status.t Or_error.t =
      fun {varying; _} ->
       match varying with
-      | User_command tr ->
-          Option.value_map ~default:(Or_error.error_string "Bad signature")
-            (UC.check tr.common.user_command) ~f:(fun x ->
-              Ok (Transaction.User_command x) )
+      | User_command uc ->
+          User_command_status.With_status.map_result uc.common.user_command
+            ~f:(fun cmd ->
+              Option.value_map ~default:(Or_error.error_string "Bad signature")
+                (UC.check cmd) ~f:(fun cmd -> Ok (Transaction.User_command cmd))
+          )
       | Fee_transfer f ->
-          Ok (Fee_transfer f.fee_transfer)
+          Ok {data= Fee_transfer f.fee_transfer; status= Applied}
       | Coinbase c ->
-          Ok (Coinbase c.coinbase)
+          Ok {data= Coinbase c.coinbase; status= Applied}
+
+    let user_command_status : t -> User_command_status.t =
+     fun {varying; _} ->
+      match varying with
+      | User_command {common= {user_command= {status; _}; _}; _} ->
+          status
+      | Fee_transfer _ ->
+          Applied
+      | Coinbase _ ->
+          Applied
   end
 
   let previous_empty_accounts action pk = if action = `Added then [pk] else []
@@ -483,7 +501,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           ~account
       in
       let undo_common : Undo.User_command_undo.Common.t =
-        { user_command
+        { user_command= {data= user_command; status= Applied}
         ; previous_receipt_chain_hash= account.receipt_chain_hash
         ; fee_payer_timing
         ; source_timing= None }
@@ -855,8 +873,12 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         in
         return
           ({common= undo_common; body= undo_body} : Undo.User_command_undo.t)
-    | Error _ ->
+    | Error failure ->
         (* Do not update the ledger. *)
+        let undo_common =
+          { undo_common with
+            user_command= {data= user_command; status= Failed failure} }
+        in
         return ({common= undo_common; body= Failed} : Undo.User_command_undo.t)
     | exception Reject err ->
         (* TODO: These transactions should never reach this stage, this error
@@ -1072,7 +1094,9 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
   let undo_user_command
       ~(constraint_constants : Genesis_constants.Constraint_constants.t) ledger
       { Undo.User_command_undo.common=
-          { user_command= {payload; signer= _; signature= _} as user_command
+          { user_command=
+              { data= {payload; signer= _; signature= _} as user_command
+              ; status= _ }
           ; previous_receipt_chain_hash
           ; fee_payer_timing
           ; source_timing }

@@ -15,8 +15,7 @@ module Failure = struct
         | Not_token_owner
         | Mismatched_token_permissions
         | Overflow
-
-      (* TODO: Handle this in txn snark *)
+      [@@deriving sexp, yojson, eq]
 
       let to_latest = Fn.id
     end
@@ -33,8 +32,7 @@ module Failure = struct
     | Not_token_owner
     | Mismatched_token_permissions
     | Overflow
-
-  (* TODO: Handle this in txn snark *)
+  [@@deriving sexp, yojson, eq]
 
   let to_latest = Fn.id
 
@@ -114,9 +112,33 @@ end
 module Stable = struct
   module V1 = struct
     type t = Applied | Failed of Failure.Stable.V1.t
+    [@@deriving sexp, yojson, eq]
 
     let to_latest = Fn.id
   end
 end]
 
 type t = Stable.Latest.t = Applied | Failed of Failure.t
+[@@deriving sexp, yojson, eq]
+
+type status = t [@@deriving sexp, yojson, eq]
+
+module With_status = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type 'a t = {data: 'a; status: Stable.V1.t} [@@deriving sexp, eq]
+    end
+  end]
+
+  type 'a t = 'a Stable.Latest.t = {data: 'a; status: status}
+  [@@deriving sexp, eq]
+
+  let map ~f {data; status} = {data= f data; status}
+
+  let map_opt ~f {data; status} =
+    Option.map (f data) ~f:(fun data -> {data; status})
+
+  let map_result ~f {data; status} =
+    Result.map (f data) ~f:(fun data -> {data; status})
+end

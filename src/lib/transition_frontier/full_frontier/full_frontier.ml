@@ -426,7 +426,7 @@ let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
                (Ledger.apply_transaction
                   ~constraint_constants:
                     t.precomputed_values.constraint_constants ~txn_global_slot
-                  mt txn)) ) ;
+                  mt txn.data)) ) ;
       (* STEP 6 *)
       Ledger.commit mt ;
       (* STEP 7 *)
