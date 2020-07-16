@@ -171,7 +171,7 @@ module Styles = {
         textTransform(`uppercase),
         letterSpacing(`rem(0.125)),
         media(Theme.MediaQuery.notMobile, [display(`grid)]),
-          hover([backgroundColor(white)]),
+        hover([backgroundColor(white)]),
       ]),
     ]);
 
@@ -188,7 +188,6 @@ module Styles = {
         backgroundImage(`url("/static/img/arrowDown.svg")),
         backgroundRepeat(`noRepeat),
         backgroundPosition(`px(4), `px(9)),
-      
       ]),
     ]);
 
