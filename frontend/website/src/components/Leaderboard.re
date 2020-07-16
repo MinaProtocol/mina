@@ -123,7 +123,10 @@ module Styles = {
       color(Theme.Colors.leaderboardMidnight),
       selector(
         "div:nth-child(even)",
-        [backgroundColor(`rgba((245, 245, 245, 1.)))],
+        [
+          backgroundColor(`rgba((245, 245, 245, 1.))),
+          hover([backgroundColor(`hex("E0E0E0"))]),
+        ],
       ),
     ]);
 
@@ -134,8 +137,14 @@ module Styles = {
       height(`rem(3.5)),
       display(`grid),
       gridColumnGap(rem(1.5)),
-      width(`percent(100.)),
-      gridTemplateColumns([rem(3.5), `auto, rem(9.)]),
+      gridTemplateColumns([
+        rem(1.),
+        rem(5.5),
+        rem(5.5),
+        rem(3.5),
+        rem(3.5),
+      ]),
+      hover([backgroundColor(`hex("E0E0E0"))]),
       media(
         Theme.MediaQuery.tablet,
         [
@@ -162,6 +171,7 @@ module Styles = {
         textTransform(`uppercase),
         letterSpacing(`rem(0.125)),
         media(Theme.MediaQuery.notMobile, [display(`grid)]),
+        hover([backgroundColor(white)]),
       ]),
     ]);
 
