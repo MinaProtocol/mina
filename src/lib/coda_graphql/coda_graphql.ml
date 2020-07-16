@@ -508,7 +508,7 @@ module Types = struct
         ; voting_for
         ; timing }
 
-      let of_full_account
+      let of_full_account ?breadcrumb
           { Account.Poly.public_key
           ; token_id
           ; token_permissions
@@ -523,9 +523,7 @@ module Types = struct
         ; token_permissions= Some token_permissions
         ; nonce= Some nonce
         ; balance=
-            { AnnotatedBalance.total= balance
-            ; unknown= balance
-            ; breadcrumb= None }
+            {AnnotatedBalance.total= balance; unknown= balance; breadcrumb}
         ; receipt_chain_hash= Some receipt_chain_hash
         ; delegate= Some delegate
         ; voting_for= Some voting_for
@@ -544,8 +542,8 @@ module Types = struct
                  |> Option.map ~f:(fun account -> (account, tip)) )
         in
         match account with
-        | Some (account, blockchain_length) ->
-            of_full_account account blockchain_length
+        | Some (account, breadcrumb) ->
+            of_full_account ~breadcrumb account
         | None ->
             Account.
               { Poly.public_key= Some (Account_id.public_key account_id)
@@ -2413,9 +2411,9 @@ module Queries = struct
           |> Option.map ~f:(fun tip ->
                  ( Transition_frontier.Breadcrumb.staged_ledger tip
                    |> Staged_ledger.ledger
-                 , Transition_frontier.Breadcrumb.blockchain_length tip ) )
+                 , tip ) )
         with
-        | Some (ledger, blockchain_length) ->
+        | Some (ledger, breadcrumb) ->
             let tokens = Ledger.tokens ledger pk |> Set.to_list in
             List.filter_map tokens ~f:(fun token ->
                 let open Option.Let_syntax in
@@ -2424,8 +2422,8 @@ module Queries = struct
                     (Account_id.create pk token)
                 in
                 let%map account = Ledger.get ledger location in
-                Types.AccountObj.Partial_account.of_full_account account
-                  blockchain_length
+                Types.AccountObj.Partial_account.of_full_account ~breadcrumb
+                  account
                 |> Types.AccountObj.lift coda pk )
         | None ->
             [] )
