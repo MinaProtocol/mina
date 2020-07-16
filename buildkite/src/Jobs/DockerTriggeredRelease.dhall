@@ -18,6 +18,8 @@ let uploadDeployEnv =
         target = Size.Small
       }
 
+let updatedDependsOn = [{ depends_on =  [ { name = "DockerTriggeredRelease", key = "artifact-upload" } ] }]
+
 in
 
 Pipeline.build

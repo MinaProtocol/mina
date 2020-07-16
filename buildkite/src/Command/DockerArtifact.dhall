@@ -30,11 +30,10 @@ let cmdConfig =
   Command.build
     Command.Config::{
       commands  = commands,
-      label = "Docker artifact build/release commands",
+      label = "Build and release Docker artifacts",
       key = "docker-artifact",
       target = Size.Large,
-      docker_login = Some DockerLogin::{=},
-      depends_on = [ { name = "DockerTriggeredRelease", key = "artifact-upload" } ]
+      docker_login = Some DockerLogin::{=}
     }
 
 in
