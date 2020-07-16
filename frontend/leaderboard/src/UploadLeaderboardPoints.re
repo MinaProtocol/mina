@@ -124,7 +124,12 @@ let updateChallengeSheet = (client, spreadsheetId, range, userMap, metricsMap) =
 
       updateRange(
         client,
-        initSheetsUpdate(spreadsheetId, range, "USER_ENTERED", sheetsData),
+        initSheetsUpdate(
+          spreadsheetId,
+          range,
+          "USER_ENTERED",
+          encodeGoogleSheets(sheetsData),
+        ),
         result => {
         switch (result) {
         | Ok(_) => Js.log({j|Data uploaded points for 3.2b|j})

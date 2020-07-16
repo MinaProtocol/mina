@@ -64,7 +64,7 @@ module Core = {
           range: "Member_Profile_Data!A2:Z",
         }
       | Users => {name: "Users", range: "Users!A2:B"}
-      | Data => {name: "Data", range: "Data!A1:B"}
+      | Data => {name: "Data", range: "Data!A1:C"}
       };
     };
   };
@@ -149,7 +149,7 @@ module Core = {
   };
 
   let initSheetsUpdate = (spreadsheetId, range, valueInputOption, data) => {
-    let resource: sheetsUploadData = {values: encodeGoogleSheets(data)};
+    let resource: sheetsUploadData = {values: data};
     {spreadsheetId, range, valueInputOption, resource};
   };
 };

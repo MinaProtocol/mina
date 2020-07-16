@@ -119,7 +119,12 @@ let fetchReleases = name => {
     ("Release 3.2a", "3.2a!B3:Z", 2), /* offset for challenge titles in 3.2a starts on the 2nd column */
     ("Release 3.2b", "3.2b!B3:Z", 2) /* offset for challenge titles in 3.2b starts on the 2nd column */
   |]
-  |> Array.map(release => fetchRelease(name, release));
+  |> Array.map(release => fetchRelease(name, release))
+  |> Js.Promise.all
+  |> Js.Promise.then_(releaseValues => {
+       Belt.Array.keepMap(releaseValues, release => release)
+       |> Js.Promise.resolve
+     });
 };
 
 let parseMember = map => {
@@ -176,16 +181,22 @@ let initialState = {
 type actions =
   | UpdateReleaseInfo(array(ChallengePointsTable.release))
   | UpdateCurrentUser(Leaderboard.member)
+  | UpdateCurrentReleaseAndUser(
+      array(ChallengePointsTable.release),
+      Leaderboard.member,
+    )
   | UpdateError(bool);
 
 let reducer = (prevState, action) => {
   switch (action) {
-  | UpdateReleaseInfo(releases) => {
-      ...prevState,
-      loading: false,
-      releases: Belt.Array.concat(prevState.releases, releases),
-    }
+  | UpdateReleaseInfo(releases) => {...prevState, loading: false, releases}
   | UpdateCurrentUser(member) => {...prevState, currentMember: Some(member)}
+  | UpdateCurrentReleaseAndUser(releases, member) => {
+      loading: false,
+      error: false,
+      currentMember: Some(member),
+      releases,
+    }
   | UpdateError(error) => {...prevState, error}
   };
 };
@@ -246,17 +257,9 @@ let make = () => {
       switch (parseMember(router.query)) {
       | Some(member) =>
         fetchReleases(member.name)
-        |> Array.iter(e => {
-             e
-             |> Promise.iter(releaseInfo => {
-                  switch (releaseInfo) {
-                  | Some(releaseInfo) =>
-                    dispatch(UpdateCurrentUser(member));
-                    dispatch(UpdateReleaseInfo([|releaseInfo|]));
-                  | None => ()
-                  }
-                })
-           })
+        |> Promise.iter(releases =>
+             dispatch(UpdateCurrentReleaseAndUser(releases, member))
+           )
       | None => dispatch(UpdateError(true))
       };
       None;

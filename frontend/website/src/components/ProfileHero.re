@@ -45,7 +45,7 @@ module Styles = {
   let link = merge([Theme.Link.basic, style([lineHeight(`px(28))])]);
   let participantDetails =
     merge([
-      link,
+      Theme.Body.basic_semibold,
       style([
         display(`none),
         media(

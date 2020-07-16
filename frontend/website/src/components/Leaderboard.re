@@ -129,7 +129,10 @@ module Styles = {
       color(Theme.Colors.leaderboardMidnight),
       selector(
         "div:nth-child(even)",
-        [backgroundColor(`rgba((245, 245, 245, 1.)))],
+        [
+          backgroundColor(`rgba((245, 245, 245, 1.))),
+          hover([backgroundColor(`hex("E0E0E0"))]),
+        ],
       ),
     ]);
 
@@ -142,6 +145,7 @@ module Styles = {
       gridColumnGap(rem(1.5)),
       width(`percent(100.)),
       gridTemplateColumns([`rem(3.5), `rem(6.), `auto, `rem(9.)]),
+      hover([backgroundColor(`hex("E0E0E0"))]),
       media(
         Theme.MediaQuery.tablet,
         [
@@ -183,6 +187,7 @@ module Styles = {
         textTransform(`uppercase),
         letterSpacing(`rem(0.125)),
         media(Theme.MediaQuery.notMobile, [display(`grid)]),
+        hover([backgroundColor(white)]),
       ]),
     ]);
 
@@ -502,7 +507,12 @@ let make =
       state.members,
     )
     |> Js.Array.filter(member =>
-         search === "" ? true : Js.String.includes(search, member.name)
+         search === ""
+           ? true
+           : Js.String.includes(
+               String.lowercase_ascii(search),
+               String.lowercase_ascii(member.name),
+             )
        )
     |> Js.Array.filter(member => sortRank(member) !== 0);
 

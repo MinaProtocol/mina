@@ -12,28 +12,51 @@ open Sheets.Bindings;
 open Sheets.Core;
 
 /*
-   Upload the total block count to the "Data" sheet
+   Upload "Genesis Members", "Block Count", and "Participants" to the Data tab
  */
 let uploadTotalBlocks = (spreadsheetId, totalBlocks) => {
   let dataSheet = Sheets.getSheet(Sheets.Data);
   let client = createClient();
+
   getRange(
     client, initSheetsQuery(spreadsheetId, dataSheet.range, "FORMULA"), result => {
     switch (result) {
     | Ok(sheetsData) =>
-      let newSheetsData = sheetsData |> decodeGoogleSheets;
-      newSheetsData[0][1] = totalBlocks;
+      let data = sheetsData |> decodeGoogleSheets;
+
+      let columnHeaders = [|
+        "Genesis Members",
+        "Block Count",
+        "Participants",
+      |];
+
+      let statisticsData = [|
+        data->Belt.Array.keep(row => {
+          /* The 4th column indicates whether the user is a genesis member */
+          switch (Belt.Array.get(row, 3)) {
+          | Some(genesisMember) =>
+            String.length(Belt.Option.getExn(genesisMember)) == 0
+              ? false : true
+          | None => false
+          }
+        })
+        |> Array.length
+        |> string_of_int,
+        totalBlocks,
+        data |> Array.length |> string_of_int,
+      |];
+
       updateRange(
         client,
         initSheetsUpdate(
           spreadsheetId,
           dataSheet.range,
           "USER_ENTERED",
-          newSheetsData,
+          Array.append([|columnHeaders|], [|statisticsData|]),
         ),
         result => {
         switch (result) {
-        | Ok(_) => Js.log({j|Uploaded total blocks|j})
+        | Ok(_) => Js.log({j|Uploaded to Data spreadsheet|j})
         | Error(error) => Js.log(error)
         }
       });
@@ -186,7 +209,7 @@ let uploadUserProfileData = spreadsheetId => {
                       spreadsheetId,
                       Sheets.getSheet(Sheets.MemberProfileData).range,
                       "USER_ENTERED",
-                      data,
+                      encodeGoogleSheets(data),
                     ),
                     result => {
                     switch (result) {
