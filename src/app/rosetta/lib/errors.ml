@@ -2,6 +2,8 @@ open Core_kernel
 open Async
 
 module Variant = struct
+  (* DO NOT change the order of this variant, the generated error code relies
+   * on it and we want that to remain stable *)
   type t =
     [ `Sql of string
     | `Json_parse of string
@@ -10,48 +12,35 @@ module Variant = struct
     | `Chain_info_missing
     | `Account_not_found of string
     | `Invariant_violation ]
-  [@@deriving yojson, show, eq]
+  [@@deriving yojson, show, eq, to_enum, to_representatives]
 end
 
 module T : sig
   type t [@@deriving yojson, show, eq]
 
-  val create : ?context:string -> Variant.t -> [> `App of t]
+  val create : ?context:string -> Variant.t -> t
 
   val erase : t -> Models.Error.t
 
+  val all_errors : Models.Error.t list lazy_t
+
   module Lift : sig
     val parse :
-         ?context:string
-      -> ('a, string) Result.t
-      -> ('a, [> `App of t]) Deferred.Result.t
+      ?context:string -> ('a, string) Result.t -> ('a, t) Deferred.Result.t
 
     val sql :
          ?context:string
       -> ('a, [< Caqti_error.t]) Deferred.Result.t
-      -> ('a, [> `App of t]) Deferred.Result.t
+      -> ('a, t) Deferred.Result.t
+
+    val wrap :
+      ('a, t) Deferred.Result.t -> ('a, [> `App of t]) Deferred.Result.t
   end
 end = struct
   type t = {extra_context: string option; kind: Variant.t}
   [@@deriving yojson, show, eq]
 
-  (* TODO: One of the ppx masters should make an "special_enum" ppx that will
-     * do this for us. Jane Street's enum only works on argumentless variants *)
-  let code = function
-    | `Sql _ ->
-        1
-    | `Json_parse _ ->
-        2
-    | `Graphql_coda_query _ ->
-        3
-    | `Network_doesn't_exist _ ->
-        4
-    | `Chain_info_missing ->
-        5
-    | `Account_not_found _ ->
-        6
-    | `Invariant_violation ->
-        7
+  let code = Fn.compose (fun x -> x + 1) Variant.to_enum
 
   let message = function
     | `Sql _ ->
@@ -112,7 +101,7 @@ end = struct
     | `Invariant_violation ->
         false
 
-  let create ?context kind = `App {extra_context= context; kind}
+  let create ?context kind = {extra_context= context; kind}
 
   let erase (t : t) =
     { Models.Error.code= Int32.of_int_exn (code t.kind)
@@ -133,6 +122,10 @@ end = struct
                 ; ("error", `String context1)
                 ; ("extra", `String context2) ]) ) }
 
+  let all_errors =
+    Variant.to_representatives
+    |> Lazy.map ~f:(fun vs -> List.map vs ~f:(Fn.compose erase create))
+
   module Lift = struct
     let parse ?context res =
       Deferred.return
@@ -142,6 +135,8 @@ end = struct
       Deferred.Result.map_error
         ~f:(fun e -> create ?context (`Sql (Caqti_error.show e)))
         res
+
+    let wrap t = Deferred.Result.map_error ~f:(fun e -> `App e) t
   end
 end
 
