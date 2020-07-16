@@ -226,6 +226,10 @@ module Styles = {
       textAlign(`center),
     ]);
 
+  let badges = style([display(`flex), justifyContent(`flexEnd)]);
+  let mobileBadges =
+    style([display(`flex), marginLeft(`rem(0.5)), paddingBottom(px(5))]);
+
   let desktopLayout =
     style([
       display(`none),
@@ -313,6 +317,63 @@ module LeaderboardRow = {
     |> Js.String.replaceByRe([%re "/#/g"], "%23"); /* replace "#" with percent encoding for the URL to properly parse */
   };
 
+  let renderBadges = (member, height, width) => {
+    let icons = [||];
+    if (member.technicalMVP && member.communityMVP) {
+      Js.Array.push(
+        <Badge
+          src="/static/img/LeaderboardAwardDoubleMVP.png"
+          title="Technical & Community MVP"
+          alt="Technical & Community MVP"
+          height
+          width
+        />,
+        icons,
+      )
+      |> ignore;
+    } else if (member.technicalMVP) {
+      Js.Array.push(
+        <Badge
+          src="/static/img/LeaderboardAwardTechnicalMVP.png"
+          title="Technical MVP"
+          alt="Technical MVP"
+          height
+          width
+        />,
+        icons,
+      )
+      |> ignore;
+    } else if (member.communityMVP) {
+      Js.Array.push(
+        <Badge
+          src="/static/img/LeaderboardAwardCommunityMVP.png"
+          title="Community MVP"
+          alt="Community MVP"
+          height
+          width
+        />,
+        icons,
+      )
+      |> ignore;
+    };
+
+    /* Genesis badge is added last so it's always the rightmost badge in the leaderboard */
+    if (member.genesisMember) {
+      Js.Array.push(
+        <Badge
+          src="/static/img/LeaderboardAwardGenesisMember.png"
+          title="Genesis Program Founding Member"
+          alt="Genesis Program Founding Member"
+          height
+          width
+        />,
+        icons,
+      )
+      |> ignore;
+    };
+    icons |> React.array;
+  };
+
   module DesktopLayout = {
     [@react.component]
     let make = (~sort, ~rank, ~member) => {
@@ -321,6 +382,9 @@ module LeaderboardRow = {
 
           <span className=Styles.rank>
             {React.string(string_of_int(rank))}
+          </span>
+          <span className=Styles.badges>
+            {renderBadges(member, 2., 2.)}
           </span>
           <span className=Styles.username> {React.string(member.name)} </span>
           {Array.map(column => {renderPoints(sort, column, member)}, filters)
@@ -332,13 +396,21 @@ module LeaderboardRow = {
 
   module MobileLayout = {
     [@react.component]
-    let make = (~sort, ~rank, ~member) => {
-      //<Next.Link href=""_as=userSlug>
-      <div className=Styles.mobileLeaderboardRow>
-
-          <span className=Styles.firstColumn> {React.string("Rank")} </span>
-          <span> {React.string("#" ++ string_of_int(rank))} </span>
-          <span className=Styles.firstColumn> {React.string("Name")} </span>
+    let make = (~userSlug, ~sort, ~rank, ~member) => {
+      <Next.Link href=userSlug _as=userSlug>
+        <div className=Styles.mobileLeaderboardRow>
+          <span className=Styles.mobileFirstColumn>
+            {React.string("Rank")}
+          </span>
+          <span className=Styles.mobileSecondColumn>
+            {React.string("#" ++ string_of_int(rank))}
+            <span className=Styles.mobileBadges>
+              {renderBadges(member, 1., 1.)}
+            </span>
+          </span>
+          <span className=Styles.mobileFirstColumn>
+            {React.string("Name")}
+          </span>
           <span> {React.string(member.name)} </span>
           <span className=Styles.mobilePointStar>
             {React.string("Points")}
@@ -357,11 +429,11 @@ module LeaderboardRow = {
     let rank = getRank(sort, member);
 
     <div>
-      <div className=Styles.desktopLayout>
-        <DesktopLayout sort rank member />
-      </div>
       <div className=Styles.mobileLayout>
-        <MobileLayout sort rank member />
+        <MobileLayout userSlug sort rank member />
+      </div>
+      <div className=Styles.desktopLayout>
+        <DesktopLayout userSlug sort rank member />
       </div>
     </div>;
   };
