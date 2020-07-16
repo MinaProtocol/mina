@@ -322,6 +322,7 @@ module LeaderboardRow = {
     if (member.technicalMVP && member.communityMVP) {
       Js.Array.push(
         <Badge
+          key={member.name ++ "Technical & Community MVP"}
           src="/static/img/LeaderboardAwardDoubleMVP.png"
           title="Technical & Community MVP"
           alt="Technical & Community MVP"
@@ -334,6 +335,7 @@ module LeaderboardRow = {
     } else if (member.technicalMVP) {
       Js.Array.push(
         <Badge
+          key={member.name ++ "Technical MVP"}
           src="/static/img/LeaderboardAwardTechnicalMVP.png"
           title="Technical MVP"
           alt="Technical MVP"
@@ -346,6 +348,7 @@ module LeaderboardRow = {
     } else if (member.communityMVP) {
       Js.Array.push(
         <Badge
+          key={member.name ++ "Community MVP"}
           src="/static/img/LeaderboardAwardCommunityMVP.png"
           title="Community MVP"
           alt="Community MVP"
@@ -361,6 +364,7 @@ module LeaderboardRow = {
     if (member.genesisMember) {
       Js.Array.push(
         <Badge
+          key={member.name ++ "Genesis Founding Member"}
           src="/static/img/LeaderboardAwardGenesisMember.png"
           title="Genesis Program Founding Member"
           alt="Genesis Program Founding Member"
