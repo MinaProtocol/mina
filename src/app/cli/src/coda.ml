@@ -878,6 +878,10 @@ let daemon logger =
            =
          coda_initialization_deferred ()
        in
+       don't_wait_for
+         (Pipe_lib.Strict_pipe.Reader.iter_without_pushback
+            (Coda_lib.validated_transitions coda)
+            ~f:ignore) ;
        coda_ref := Some coda ;
        let%bind () = maybe_sleep 3. in
        Coda_run.setup_local_server ?client_trustlist ~rest_server_port

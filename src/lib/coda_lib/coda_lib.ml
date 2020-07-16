@@ -1124,6 +1124,14 @@ let create (config : Config.t) =
                            "Setting the callback for produced transition" ;
                          External_transition.Validated.poke_validation_callback
                            et (fun v ->
+                             Logger.info config.logger ~module_:__MODULE__
+                               ~location:__LOC__
+                               ~metadata:
+                                 [ ( "external_transition"
+                                   , External_transition.Validated.to_yojson et
+                                   )
+                                 ; ("validation", `Bool v) ]
+                               "callback executing" ;
                              if v then
                                Coda_networking.broadcast_state net
                                @@ External_transition.Validation
