@@ -19,7 +19,13 @@ let uploadData = (spreadsheetId, totalBlocks) => {
   let client = createClient();
 
   getRange(
-    client, initSheetsQuery(spreadsheetId, dataSheet.range, "FORMULA"), result => {
+    client,
+    initSheetsQuery(
+      spreadsheetId,
+      Sheets.getSheet(Sheets.AllTimeLeaderboard).range,
+      "FORMATTED_VALUE",
+    ),
+    result => {
     switch (result) {
     | Ok(sheetsData) =>
       let data = sheetsData |> decodeGoogleSheets;
