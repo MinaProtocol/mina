@@ -87,7 +87,9 @@ end
 module Wrap = struct
   module Key = struct
     module Verification = struct
-      type t = Type_equal.Id.Uid.t * Md5.t [@@deriving sexp, eq]
+      type t = Type_equal.Id.Uid.t * Md5.t [@@deriving sexp]
+
+      let equal (_, x1) (_, x2) = Md5.equal x1 x2
 
       let to_string : t -> _ = function
         | _id, h ->
