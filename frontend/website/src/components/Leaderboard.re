@@ -30,7 +30,7 @@ let safeParseInt = str =>
 let fetchLeaderboard = () => {
   Sheets.fetchRange(
     ~sheet="1Nq_Y76ALzSVJRhSFZZm4pfuGbPkZs2vTtCnVQ1ehujE",
-    ~range="Copy of Member_Profile_Data!A2:Z",
+    ~range="Member_Profile_Data!A2:Z",
   )
   |> Promise.map(res => {
        Array.map(parseEntry, res)
