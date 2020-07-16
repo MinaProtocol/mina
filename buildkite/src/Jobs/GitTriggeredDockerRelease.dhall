@@ -18,7 +18,7 @@ let uploadDeployEnv =
         target = Size.Small
       }
 
-let updatedDependsOn = [{ depends_on =  [ { name = "DockerTriggeredRelease", key = "artifact-upload" } ] }]
+let updatedDependsOn = [{ depends_on =  [ { name = "GitTriggeredDockerRelease", key = "artifact-upload" } ] }]
 
 in
 
@@ -29,7 +29,7 @@ Pipeline.build
             dirtyWhen = [
                 S.strictlyStart (S.contains "buildkite/DOCKER_DEPLOY_ENV")
             ],
-            name = "DockerTriggeredRelease"
+            name = "GitTriggeredDockerRelease"
         },
     steps = [
       uploadDeployEnv,
