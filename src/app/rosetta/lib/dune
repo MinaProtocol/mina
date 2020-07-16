@@ -4,6 +4,7 @@
   (inline_tests)
   (libraries
      async
+     async_ssl
     caqti
     caqti-async
     caqti-driver-postgresql
