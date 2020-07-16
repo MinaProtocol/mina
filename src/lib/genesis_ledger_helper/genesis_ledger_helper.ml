@@ -434,15 +434,35 @@ module Ledger = struct
                   return (Error err) ) ) )
 end
 
-module Genesis_proof = struct
-  let filename ~id =
-    let hash =
-      Pickles.Verification_key.Id.sexp_of_t id
-      |> Sexp.to_string |> Blake2.digest_string |> Blake2.to_hex
-    in
-    "genesis_proof_" ^ hash
+(* This hash encodes the data that determines a genesis proof:
+   1. The blockchain snark constraint system
+   2. The genesis protocol state (including the genesis ledger)
 
-  let find_file ~logger ~id =
+   It is used to determine whether we should make a new genesis proof, or use the
+   one generated at compile-time.
+*)
+module Base_hash : sig
+  type t [@@deriving eq, yojson]
+
+  val create : id:Pickles.Verification_key.Id.t -> state_hash:State_hash.t -> t
+
+  val to_string : t -> string
+end = struct
+  type t = string [@@deriving eq, yojson]
+
+  let to_string = Fn.id
+
+  let create ~id ~state_hash =
+    Pickles.Verification_key.Id.sexp_of_t id
+    |> Sexp.to_string
+    |> ( ^ ) (State_hash.to_string state_hash)
+    |> Blake2.digest_string |> Blake2.to_hex
+end
+
+module Genesis_proof = struct
+  let filename ~base_hash = "genesis_proof_" ^ Base_hash.to_string base_hash
+
+  let find_file ~logger ~base_hash =
     let search_paths = Cache_dir.possible_paths "" in
     let file_exists filename path =
       let filename = path ^/ filename in
@@ -457,7 +477,7 @@ module Genesis_proof = struct
           ~metadata:[("path", `String filename)] ;
         None )
     in
-    let filename = filename ~id in
+    let filename = filename ~base_hash in
     match%bind
       Deferred.List.find_map ~f:(file_exists filename) search_paths
     with
@@ -542,7 +562,16 @@ module Genesis_proof = struct
   let load_or_generate ~genesis_dir ~logger ~may_generate
       (inputs : Genesis_proof.Inputs.t) =
     let compiled = Precomputed_values.compiled in
-    match%bind find_file ~logger ~id:inputs.blockchain_proof_system_id with
+    let base_hash =
+      Base_hash.create ~id:inputs.blockchain_proof_system_id
+        ~state_hash:inputs.protocol_state_with_hash.hash
+    in
+    let compiled_base_hash =
+      Base_hash.create
+        ~id:(Precomputed_values.blockchain_proof_system_id ())
+        ~state_hash:(Lazy.force compiled).protocol_state_with_hash.hash
+    in
+    match%bind find_file ~logger ~base_hash with
     | Some file -> (
         match%map load file with
         | Ok genesis_proof ->
@@ -563,21 +592,15 @@ module Genesis_proof = struct
                 [ ("path", `String file)
                 ; ("error", `String (Error.to_string_hum err)) ] ;
             Error err )
-    | None
-      when Pickles.Verification_key.Id.equal inputs.blockchain_proof_system_id
-             (Precomputed_values.blockchain_proof_system_id ()) ->
+    | None when Base_hash.equal base_hash compiled_base_hash ->
         let compiled = Lazy.force compiled in
         Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
           "Base hash $computed_hash matches compile-time $compiled_hash, \
            using precomputed genesis proof"
           ~metadata:
-            [ ("computed_hash", id_to_json inputs.blockchain_proof_system_id)
-            ; ( "compiled_hash"
-              , id_to_json (Precomputed_values.blockchain_proof_system_id ())
-              ) ] ;
-        let filename =
-          genesis_dir ^/ filename ~id:inputs.blockchain_proof_system_id
-        in
+            [ ("computed_hash", Base_hash.to_yojson base_hash)
+            ; ("compiled_hash", Base_hash.to_yojson compiled_base_hash) ] ;
+        let filename = genesis_dir ^/ filename ~base_hash in
         let values =
           { Genesis_proof.constraint_constants= inputs.constraint_constants
           ; proof_level= inputs.proof_level
@@ -604,13 +627,11 @@ module Genesis_proof = struct
         Ok (values, filename)
     | None when may_generate ->
         Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
-          "No genesis proof file was found for $id, generating a new genesis \
-           proof"
-          ~metadata:[("id", id_to_json inputs.blockchain_proof_system_id)] ;
+          "No genesis proof file was found for $base_hash, generating a new \
+           genesis proof"
+          ~metadata:[("base_hash", Base_hash.to_yojson base_hash)] ;
         let values = generate inputs in
-        let filename =
-          genesis_dir ^/ filename ~id:inputs.blockchain_proof_system_id
-        in
+        let filename = genesis_dir ^/ filename ~base_hash in
         let%map () =
           match%map store ~filename values.genesis_proof with
           | Ok () ->
@@ -629,8 +650,7 @@ module Genesis_proof = struct
         Logger.error ~module_:__MODULE__ ~location:__LOC__ logger
           "No genesis proof file was found for $base_hash and not allowed to \
            generate a new genesis proof"
-          ~metadata:
-            [("base_hash", id_to_json inputs.blockchain_proof_system_id)] ;
+          ~metadata:[("base_hash", Base_hash.to_yojson base_hash)] ;
         Deferred.Or_error.errorf
           "No genesis proof file was found and not allowed to generate a new \
            genesis proof"
