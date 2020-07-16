@@ -141,7 +141,7 @@ module Styles = {
       display(`grid),
       gridColumnGap(rem(1.5)),
       width(`percent(100.)),
-      gridTemplateColumns([rem(3.5), rem(6.), `auto, rem(9.)]),
+      gridTemplateColumns([`rem(3.5), `rem(6.), `auto, `rem(9.)]),
       media(
         Theme.MediaQuery.tablet,
         [
@@ -166,10 +166,10 @@ module Styles = {
       cursor(`pointer),
       padding2(~v=`rem(1.), ~h=`rem(1.)),
       fontWeight(`semiBold),
-      fontSize(`px(16)),
+      fontSize(`rem(1.)),
       height(`percent(100.)),
       width(`percent(100.)),
-      lineHeight(`px(24)),
+      lineHeight(`rem(1.5)),
     ]);
 
   let headerRow =
@@ -242,12 +242,12 @@ module Styles = {
   let desktopLayout =
     style([
       display(`none),
-      media(Theme.MediaQuery.notMobile, [display(`unset)]),
+      media(Theme.MediaQuery.notMobile, [display(`block)]),
     ]);
 
   let mobileLayout =
     style([
-      display(`unset),
+      display(`block),
       media(Theme.MediaQuery.notMobile, [display(`none)]),
     ]);
 
@@ -260,7 +260,6 @@ module Styles = {
       justifyContent(`flexStart),
       flexDirection(`row),
       textAlign(`left),
-      height(`percent(100.)),
     ]);
 
   let mobilePointStar =
@@ -278,7 +277,6 @@ module Styles = {
 
 module LeaderboardRow = {
   open Filter;
-
   let getRank = (sort, member) => {
     switch (sort) {
     | Phase => member.phaseRank
@@ -320,6 +318,10 @@ module LeaderboardRow = {
     ++ member.releasePoints->string_of_int
     ++ "&genesisMember="
     ++ member.genesisMember->string_of_bool
+    ++ "&communityMVP="
+    ++ member.communityMVP->string_of_bool
+    ++ "&technicalMVP="
+    ++ member.technicalMVP->string_of_bool
     ++ "&name="
     ++ member.name
     |> Js.String.replaceByRe([%re "/#/g"], "%23"); /* replace "#" with percent encoding for the URL to properly parse */
@@ -331,6 +333,7 @@ module LeaderboardRow = {
       if (member.technicalMVP && member.communityMVP) {
         Js.Array.push(
           <Badge
+            key={member.name ++ "Desktop-Technical & Community MVP"}
             icon=Icons.technicalAndCommunityMVPBadge
             title="Technical & Community MVP"
           />,
@@ -339,13 +342,21 @@ module LeaderboardRow = {
         |> ignore;
       } else if (member.technicalMVP) {
         Js.Array.push(
-          <Badge icon=Icons.technicalMVPBadge title="Technical MVP" />,
+          <Badge
+            key={member.name ++ "Desktop-Technical MVP"}
+            icon=Icons.technicalMVPBadge
+            title="Technical MVP"
+          />,
           icons,
         )
         |> ignore;
       } else if (member.communityMVP) {
         Js.Array.push(
-          <Badge icon=Icons.communityMVPBadge title="Community MVP" />,
+          <Badge
+            key={member.name ++ "Desktop-Community MVP"}
+            icon=Icons.communityMVPBadge
+            title="Community MVP"
+          />,
           icons,
         )
         |> ignore;
@@ -355,6 +366,7 @@ module LeaderboardRow = {
       if (member.genesisMember) {
         Js.Array.push(
           <Badge
+            key={member.name ++ "Desktop-GenesisFoundingMember"}
             icon=Icons.genesisMemberBadge
             title="Genesis Founding Member"
           />,
@@ -366,10 +378,9 @@ module LeaderboardRow = {
     };
 
     [@react.component]
-    let make = (~sort, ~rank, ~member) => {
-      //<Next.Link href=""_as=userSlug>
-      <div className=Styles.desktopLeaderboardRow>
-
+    let make = (~userSlug, ~sort, ~rank, ~member) => {
+      <Next.Link href=userSlug _as=userSlug>
+        <div className=Styles.desktopLeaderboardRow>
           <span className=Styles.rank>
             {React.string(string_of_int(rank))}
           </span>
@@ -377,8 +388,8 @@ module LeaderboardRow = {
           <span className=Styles.username> {React.string(member.name)} </span>
           {Array.map(column => {renderPoints(sort, column, member)}, filters)
            |> React.array}
-        </div>;
-        // </Next.Link>;
+        </div>
+      </Next.Link>;
     };
   };
 
@@ -388,6 +399,7 @@ module LeaderboardRow = {
       if (member.technicalMVP && member.communityMVP) {
         Js.Array.push(
           <Badge
+            key={member.name ++ "Mobile-Technical & Community MVP"}
             icon=Icons.technicalAndCommunityMVPBadgeMobile
             title="Technical & Community MVP"
           />,
@@ -396,13 +408,21 @@ module LeaderboardRow = {
         |> ignore;
       } else if (member.technicalMVP) {
         Js.Array.push(
-          <Badge icon=Icons.technicalMVPBadgeMobile title="Technical MVP" />,
+          <Badge
+            key={member.name ++ "Mobile-Technical MVP"}
+            icon=Icons.technicalMVPBadgeMobile
+            title="Technical MVP"
+          />,
           icons,
         )
         |> ignore;
       } else if (member.communityMVP) {
         Js.Array.push(
-          <Badge icon=Icons.communityMVPBadgeMobile title="Community MVP" />,
+          <Badge
+            key={member.name ++ "Mobile-Community MVP"}
+            icon=Icons.communityMVPBadgeMobile
+            title="Community MVP"
+          />,
           icons,
         )
         |> ignore;
@@ -412,6 +432,7 @@ module LeaderboardRow = {
       if (member.genesisMember) {
         Js.Array.push(
           <Badge
+            key={member.name ++ "Mobile-GenesisFoundingMember"}
             icon=Icons.genesisMemberBadgeMobile
             title="Genesis Founding Member"
           />,
@@ -423,17 +444,24 @@ module LeaderboardRow = {
     };
 
     [@react.component]
-    let make = (~sort, ~rank, ~member) => {
-      //<Next.Link href=""_as=userSlug>
-      <div className=Styles.mobileLeaderboardRow>
-
+    let make = (~userSlug, ~sort, ~rank, ~member) => {
+      <Next.Link href=userSlug _as=userSlug>
+        <div className=Styles.mobileLeaderboardRow>
           <span className=Styles.mobileFirstColumn>
             {React.string("Rank")}
           </span>
           <span className=Styles.mobileSecondColumn>
             {React.string("#" ++ string_of_int(rank))}
-            <span className=Css.(style([display(`flex)]))>
-              {renderBadges(member)}
+            <span
+              className=Css.(
+                style([
+                  display(`flex),
+                  width(`percent(100.)),
+                  height(`auto),
+                  paddingBottom(px(5)),
+                ])
+              )>
+              {DesktopLayout.renderBadges(member)}
             </span>
           </span>
           <span className=Styles.mobileFirstColumn>
@@ -446,23 +474,23 @@ module LeaderboardRow = {
           <span>
             {React.string(string_of_int(getPoints(sort, member)))}
           </span>
-        </div>;
-        //</Next.Link>;
+        </div>
+      </Next.Link>;
     };
   };
 
   [@react.component]
   let make = (~sort, ~member) => {
-    let _userSlug = getUserSlug(member);
+    let userSlug = getUserSlug(member);
     let rank = getRank(sort, member);
 
     <div>
-      <div className=Styles.desktopLayout>
-        <DesktopLayout sort rank member />
-      </div>
-      <div className=Styles.mobileLayout>
-        <MobileLayout sort rank member />
-      </div>
+      <span className=Styles.desktopLayout>
+        <DesktopLayout userSlug sort rank member />
+      </span>
+      <span className=Styles.mobileLayout>
+        <MobileLayout userSlug sort rank member />
+      </span>
     </div>;
   };
 };
@@ -540,7 +568,9 @@ let make =
     <div id="testnet-leaderboard" className=Styles.leaderboard>
       <div className=Styles.headerRow>
         <span className=Styles.flexEnd> {React.string("Rank")} </span>
-        <span> {React.string("Name")} </span>
+        <span className=Css.(style([gridColumn(3, 4)]))>
+          {React.string("Name")}
+        </span>
         {Array.map(renderColumnHeader, Filter.filters) |> React.array}
       </div>
       <hr />
