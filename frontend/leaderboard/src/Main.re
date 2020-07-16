@@ -61,10 +61,7 @@ let main = () => {
     |> Metrics.calculateMetrics
     |> UploadLeaderboardPoints.uploadChallengePoints(spreadsheetId);
 
-    UploadLeaderboardData.uploadTotalBlocks(
-      spreadsheetId,
-      Some(totalBlocks),
-    );
+    UploadLeaderboardData.uploadData(spreadsheetId, totalBlocks);
 
     UploadLeaderboardData.uploadUserProfileData(spreadsheetId);
   | Error(error) => failwith(error)
