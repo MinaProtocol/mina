@@ -29,6 +29,7 @@ Pipeline.build
       [ Command.build
           Command.Config::
             { commands =
+              [ Cmd.run "mkdir -p /var/buildkite/test_output && chmod 0777 /var/buildkite/test_output" ] #
               OpamInit.andThenRunInDocker
                 [ "POSTGRES_PASSWORD=${password}"
                 , "POSTGRES_USER=${user}"
