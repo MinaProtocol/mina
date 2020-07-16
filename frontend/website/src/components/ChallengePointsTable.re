@@ -156,7 +156,7 @@ module Styles = {
   let points = {
     style([
       textAlign(`right),
-      media(Theme.MediaQuery.notMobile, [paddingRight(`rem(6.))]),
+      media(Theme.MediaQuery.notMobile, [paddingRight(`rem(5.))]),
     ]);
   };
 
