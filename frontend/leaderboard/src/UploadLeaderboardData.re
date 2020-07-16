@@ -14,7 +14,7 @@ open Sheets.Core;
 /*
    Upload "Genesis Members", "Block Count", and "Participants" to the Data tab
  */
-let uploadTotalBlocks = (spreadsheetId, totalBlocks) => {
+let uploadData = (spreadsheetId, totalBlocks) => {
   let dataSheet = Sheets.getSheet(Sheets.Data);
   let client = createClient();
 
