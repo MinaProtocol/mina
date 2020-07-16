@@ -508,7 +508,7 @@ module Types = struct
         ; voting_for
         ; timing }
 
-      let of_full_account
+      let of_full_account ?breadcrumb
           { Account.Poly.public_key
           ; token_id
           ; token_permissions
@@ -523,9 +523,7 @@ module Types = struct
         ; token_permissions= Some token_permissions
         ; nonce= Some nonce
         ; balance=
-            { AnnotatedBalance.total= balance
-            ; unknown= balance
-            ; breadcrumb= None }
+            {AnnotatedBalance.total= balance; unknown= balance; breadcrumb}
         ; receipt_chain_hash= Some receipt_chain_hash
         ; delegate= Some delegate
         ; voting_for= Some voting_for
@@ -544,29 +542,8 @@ module Types = struct
                  |> Option.map ~f:(fun account -> (account, tip)) )
         in
         match account with
-        | Some
-            ( { Account.Poly.public_key
-              ; token_id
-              ; token_permissions
-              ; nonce
-              ; balance
-              ; receipt_chain_hash
-              ; delegate
-              ; voting_for
-              ; timing }
-            , breadcrumb ) ->
-            { Account.Poly.public_key= Some public_key
-            ; token_id
-            ; token_permissions= Some token_permissions
-            ; nonce= Some nonce
-            ; delegate= Some delegate
-            ; balance=
-                { AnnotatedBalance.total= balance
-                ; unknown= balance
-                ; breadcrumb= Some breadcrumb }
-            ; receipt_chain_hash= Some receipt_chain_hash
-            ; voting_for= Some voting_for
-            ; timing }
+        | Some (account, breadcrumb) ->
+            of_full_account ~breadcrumb account
         | None ->
             Account.
               { Poly.public_key= Some (Account_id.public_key account_id)
@@ -2421,22 +2398,35 @@ module Queries = struct
           |> Types.AccountObj.Partial_account.of_account_id coda
           |> Types.AccountObj.lift coda pk ) )
 
-  let owned_tokens =
-    field "tokenAccounts" ~doc:"Find the tokens owned by a public key"
-      ~typ:(non_null @@ list @@ non_null @@ Types.token_id)
+  let accounts_for_pk =
+    field "accounts" ~doc:"Find all accounts for a public key"
+      ~typ:(non_null (list (non_null Types.AccountObj.account)))
       ~args:
         Arg.
-          [ arg "publicKey" ~doc:"Public key to find tokens for"
+          [ arg "publicKey" ~doc:"Public key to find accounts for"
               ~typ:(non_null Types.Input.public_key_arg) ]
       ~resolve:(fun {ctx= coda; _} () pk ->
-        coda |> Coda_lib.best_tip |> Participating_state.active
-        |> Option.map ~f:(fun tip ->
-               let ledger =
-                 Transition_frontier.Breadcrumb.staged_ledger tip
-                 |> Staged_ledger.ledger
-               in
-               Ledger.tokens ledger pk |> Set.to_list )
-        |> Option.value ~default:[] )
+        match
+          coda |> Coda_lib.best_tip |> Participating_state.active
+          |> Option.map ~f:(fun tip ->
+                 ( Transition_frontier.Breadcrumb.staged_ledger tip
+                   |> Staged_ledger.ledger
+                 , tip ) )
+        with
+        | Some (ledger, breadcrumb) ->
+            let tokens = Ledger.tokens ledger pk |> Set.to_list in
+            List.filter_map tokens ~f:(fun token ->
+                let open Option.Let_syntax in
+                let%bind location =
+                  Ledger.location_of_account ledger
+                    (Account_id.create pk token)
+                in
+                let%map account = Ledger.get ledger location in
+                Types.AccountObj.Partial_account.of_full_account ~breadcrumb
+                  account
+                |> Types.AccountObj.lift coda pk )
+        | None ->
+            [] )
 
   let token_owner =
     field "tokenOwner" ~doc:"Find the public key that owns a given token"
@@ -2612,7 +2602,7 @@ module Queries = struct
     ; tracked_accounts
     ; wallet (* deprecated *)
     ; account
-    ; owned_tokens
+    ; accounts_for_pk
     ; token_owner
     ; current_snark_worker
     ; best_chain
