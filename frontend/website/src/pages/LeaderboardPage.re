@@ -83,8 +83,7 @@ module SearchBar = {
         placeholder="NAME"
         onChange={e => {
           let value = ReactEvent.Form.target(e)##value;
-          let lowerCaseValue = Js.String.toLowerCase(value);
-          onUsernameEntered(lowerCaseValue);
+          onUsernameEntered(value);
         }}
         className=Styles.textField
       />
