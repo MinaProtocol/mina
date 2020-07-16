@@ -155,11 +155,11 @@ let router ~graphql_uri ~logger ~db (route : string list) body =
         { Network_options_response.version=
             Version.create "1.4.0"
               (Option.value ~default:"unknown" res#version)
-            (* TODO: Fill in allow field *)
         ; allow=
-            { Allow.operation_statuses= []
-            ; operation_types= []
-            ; errors= []
+            { Allow.operation_statuses=
+                [{Operation_status.status= "SUCCESS"; successful= true}]
+            ; operation_types= ["TRANSFER"]
+            ; errors= Lazy.force Errors.all_errors
             ; historical_balance_lookup= false } }
   | _ ->
       Deferred.Result.fail `Page_not_found
