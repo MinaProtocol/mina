@@ -40,7 +40,7 @@ module Poly = struct
     ; receiver_pk: 'public_key
     ; token_id: 'token_id
     ; amount: 'amount }
-  [@@deriving eq, sexp, hash, yojson, compare]
+  [@@deriving eq, sexp, hash, yojson, compare, hlist]
 end
 
 [%%versioned
@@ -81,18 +81,8 @@ let typ : (var, t) Typ.t =
     ; Token_id.typ
     ; Amount.typ ]
   in
-  let of_hlist
-        : 'pk 'tid 'amt.    (unit, 'pk -> 'pk -> 'tid -> 'amt -> unit) H_list.t
-          -> ('pk, 'tid, 'amt) Poly.t =
-    let open H_list in
-    fun [source_pk; receiver_pk; token_id; amount] ->
-      {source_pk; receiver_pk; token_id; amount}
-  in
-  let to_hlist Poly.{source_pk; receiver_pk; token_id; amount} =
-    H_list.[source_pk; receiver_pk; token_id; amount]
-  in
-  Typ.of_hlistable spec ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
-    ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+  Typ.of_hlistable spec ~var_to_hlist:Poly.to_hlist ~var_of_hlist:Poly.of_hlist
+    ~value_to_hlist:Poly.to_hlist ~value_of_hlist:Poly.of_hlist
 
 let to_input {Poly.source_pk; receiver_pk; token_id; amount} =
   Array.reduce_exn ~f:Random_oracle.Input.append

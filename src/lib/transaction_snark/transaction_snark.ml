@@ -72,11 +72,7 @@ module Pending_coinbase_stack_state = struct
 
     type 'pending_coinbase t = 'pending_coinbase Stable.Latest.t =
       {source: 'pending_coinbase; target: 'pending_coinbase}
-    [@@deriving sexp, hash, compare, eq, fields, yojson]
-
-    let to_hlist {source; target} = H_list.[source; target]
-
-    let of_hlist ([source; target] : (unit, _) H_list.t) = {source; target}
+    [@@deriving sexp, hash, compare, eq, fields, yojson, hlist]
 
     let typ pending_coinbase =
       Tick.Typ.of_hlistable
@@ -193,49 +189,7 @@ module Statement = struct
       ; next_available_token_after: 'token_id
       ; proof_type: 'proof_type
       ; sok_digest: 'sok_digest }
-    [@@deriving compare, equal, hash, sexp, yojson]
-
-    let to_hlist
-        { source
-        ; target
-        ; supply_increase
-        ; pending_coinbase_stack_state
-        ; fee_excess
-        ; next_available_token_before
-        ; next_available_token_after
-        ; proof_type
-        ; sok_digest } =
-      H_list.
-        [ source
-        ; target
-        ; supply_increase
-        ; pending_coinbase_stack_state
-        ; fee_excess
-        ; next_available_token_before
-        ; next_available_token_after
-        ; proof_type
-        ; sok_digest ]
-
-    let of_hlist
-        ([ source
-         ; target
-         ; supply_increase
-         ; pending_coinbase_stack_state
-         ; fee_excess
-         ; next_available_token_before
-         ; next_available_token_after
-         ; proof_type
-         ; sok_digest ] :
-          (unit, _) H_list.t) =
-      { source
-      ; target
-      ; supply_increase
-      ; pending_coinbase_stack_state
-      ; fee_excess
-      ; next_available_token_before
-      ; next_available_token_after
-      ; proof_type
-      ; sok_digest }
+    [@@deriving compare, equal, hash, sexp, yojson, hlist]
 
     let typ ledger_hash amount pending_coinbase fee_excess token_id proof_type
         sok_digest =
@@ -3777,8 +3731,8 @@ let%test_module "transaction_snark" =
       let state_hash_and_body1 =
         let state_body0 =
           Coda_state.Protocol_state.negative_one
-            ~genesis_ledger:Test_genesis_ledger.t ~constraint_constants
-            ~consensus_constants
+            ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
+            ~constraint_constants ~consensus_constants
           |> Coda_state.Protocol_state.body
         in
         let state_body_hash0 =
@@ -3798,8 +3752,8 @@ let%test_module "transaction_snark" =
       let state_hash_and_body1 =
         let state_body0 =
           Coda_state.Protocol_state.negative_one
-            ~genesis_ledger:Test_genesis_ledger.t ~constraint_constants
-            ~consensus_constants
+            ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
+            ~constraint_constants ~consensus_constants
           |> Coda_state.Protocol_state.body
         in
         let state_body_hash0 =

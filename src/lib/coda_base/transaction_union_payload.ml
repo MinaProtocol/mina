@@ -31,7 +31,7 @@ module Body = struct
     ; token_id: 'token_id
     ; amount: 'amount
     ; token_locked: 'bool }
-  [@@deriving sexp]
+  [@@deriving sexp, hlist]
 
   type t =
     (Tag.t, Public_key.Compressed.t, Token_id.t, Currency.Amount.t, bool) t_
@@ -147,9 +147,6 @@ module Body = struct
     , Boolean.var )
     t_
 
-  let to_hlist {tag; source_pk; receiver_pk; token_id; amount; token_locked} =
-    H_list.[tag; source_pk; receiver_pk; token_id; amount; token_locked]
-
   let spec =
     Data_spec.
       [ Tag.unpacked_typ
@@ -160,15 +157,8 @@ module Body = struct
       ; Boolean.typ ]
 
   let typ =
-    Typ.of_hlistable spec ~var_to_hlist:to_hlist ~value_to_hlist:to_hlist
-      ~var_of_hlist:
-        (fun H_list.
-               [tag; source_pk; receiver_pk; token_id; amount; token_locked] ->
-        {tag; source_pk; receiver_pk; token_id; amount; token_locked} )
-      ~value_of_hlist:
-        (fun H_list.
-               [tag; source_pk; receiver_pk; token_id; amount; token_locked] ->
-        {tag; source_pk; receiver_pk; token_id; amount; token_locked} )
+    Typ.of_hlistable spec ~var_to_hlist:t__to_hlist ~value_to_hlist:t__to_hlist
+      ~var_of_hlist:t__of_hlist ~value_of_hlist:t__of_hlist
 
   module Checked = struct
     let constant
@@ -229,14 +219,9 @@ type var =
 
 type payload_var = var
 
-let to_hlist ({common; body} : (_, _) User_command_payload.Poly.t) =
-  H_list.[common; body]
-
-let of_hlist : type c v.
-    (unit, c -> v -> unit) H_list.t -> (c, v) User_command_payload.Poly.t =
- fun H_list.[common; body] -> {common; body}
-
 let typ : (var, t) Typ.t =
+  let to_hlist = User_command_payload.Poly.to_hlist in
+  let of_hlist = User_command_payload.Poly.of_hlist in
   Typ.of_hlistable
     [User_command_payload.Common.typ; Body.typ]
     ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
