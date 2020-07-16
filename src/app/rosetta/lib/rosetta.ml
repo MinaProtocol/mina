@@ -22,7 +22,7 @@ let server_handler ~db ~graphql_uri ~logger ~body _ req =
         router route `Null ~db ~graphql_uri ~logger
     | exception Yojson.Json_error err ->
         Errors.create ~context:"JSON in request malformed" (`Json_parse err)
-        |> Deferred.Result.fail
+        |> Deferred.Result.fail |> Errors.Lift.wrap
   in
   match result with
   | Ok json ->
