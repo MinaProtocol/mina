@@ -5,6 +5,7 @@
   (modes native)
   (libraries
     async
+    async_ssl
     caqti
     caqti-async
     caqti-driver-postgresql
