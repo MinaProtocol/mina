@@ -15,7 +15,7 @@ module Failure = struct
         | Not_token_owner
         | Mismatched_token_permissions
         | Overflow
-      [@@deriving sexp, yojson, eq]
+      [@@deriving sexp, yojson, eq, compare]
 
       let to_latest = Fn.id
     end
@@ -32,7 +32,7 @@ module Failure = struct
     | Not_token_owner
     | Mismatched_token_permissions
     | Overflow
-  [@@deriving sexp, yojson, eq]
+  [@@deriving sexp, yojson, eq, compare]
 
   let to_latest = Fn.id
 
@@ -112,27 +112,28 @@ end
 module Stable = struct
   module V1 = struct
     type t = Applied | Failed of Failure.Stable.V1.t
-    [@@deriving sexp, yojson, eq]
+    [@@deriving sexp, yojson, eq, compare]
 
     let to_latest = Fn.id
   end
 end]
 
 type t = Stable.Latest.t = Applied | Failed of Failure.t
-[@@deriving sexp, yojson, eq]
+[@@deriving sexp, yojson, eq, compare]
 
-type status = t [@@deriving sexp, yojson, eq]
+type status = t [@@deriving sexp, yojson, eq, compare]
 
 module With_status = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type 'a t = {data: 'a; status: Stable.V1.t} [@@deriving sexp, eq]
+      type 'a t = {data: 'a; status: Stable.V1.t}
+      [@@deriving sexp, yojson, eq, compare]
     end
   end]
 
   type 'a t = 'a Stable.Latest.t = {data: 'a; status: status}
-  [@@deriving sexp, eq]
+  [@@deriving sexp, yojson, eq, compare]
 
   let map ~f {data; status} = {data= f data; status}
 

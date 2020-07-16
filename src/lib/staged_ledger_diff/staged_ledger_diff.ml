@@ -111,7 +111,8 @@ module Pre_diff_with_at_most_two_coinbase = struct
     module V1 = struct
       type t =
         ( Transaction_snark_work.Stable.V1.t
-        , User_command.Stable.V1.t )
+        , User_command.Stable.V1.t User_command_status.With_status.Stable.V1.t
+        )
         Pre_diff_two.Stable.V1.t
       [@@deriving sexp, to_yojson]
 
@@ -128,7 +129,8 @@ module Pre_diff_with_at_most_one_coinbase = struct
     module V1 = struct
       type t =
         ( Transaction_snark_work.Stable.V1.t
-        , User_command.Stable.V1.t )
+        , User_command.Stable.V1.t User_command_status.With_status.Stable.V1.t
+        )
         Pre_diff_one.Stable.V1.t
       [@@deriving sexp, to_yojson]
 
@@ -177,13 +179,13 @@ type t = Stable.Latest.t =
 module With_valid_signatures_and_proofs = struct
   type pre_diff_with_at_most_two_coinbase =
     ( Transaction_snark_work.Checked.t
-    , User_command.With_valid_signature.t )
+    , User_command.With_valid_signature.t User_command_status.With_status.t )
     Pre_diff_two.t
   [@@deriving sexp, to_yojson]
 
   type pre_diff_with_at_most_one_coinbase =
     ( Transaction_snark_work.Checked.t
-    , User_command.With_valid_signature.t )
+    , User_command.With_valid_signature.t User_command_status.With_status.t )
     Pre_diff_one.t
   [@@deriving sexp, to_yojson]
 
@@ -208,13 +210,13 @@ let forget_cw cw_list = List.map ~f:Transaction_snark_work.forget cw_list
 module With_valid_signatures = struct
   type pre_diff_with_at_most_two_coinbase =
     ( Transaction_snark_work.t
-    , User_command.With_valid_signature.t )
+    , User_command.With_valid_signature.t User_command_status.With_status.t )
     Pre_diff_two.t
   [@@deriving sexp, to_yojson]
 
   type pre_diff_with_at_most_one_coinbase =
     ( Transaction_snark_work.t
-    , User_command.With_valid_signature.t )
+    , User_command.With_valid_signature.t User_command_status.With_status.t )
     Pre_diff_one.t
   [@@deriving sexp, to_yojson]
 
@@ -232,13 +234,15 @@ end
 
 let validate_user_commands (t : t)
     ~(check : User_command.t -> User_command.With_valid_signature.t option) :
-    (With_valid_signatures.t, User_command.t) result =
+    ( With_valid_signatures.t
+    , User_command.t User_command_status.With_status.t )
+    result =
   let open Result.Let_syntax in
   let validate user_commands =
     let%map user_commands' =
       List.fold_until user_commands ~init:[]
         ~f:(fun acc t ->
-          match check t with
+          match User_command_status.With_status.map_opt ~f:check t with
           | Some t ->
               Continue (t :: acc)
           | None ->
@@ -288,14 +292,18 @@ let forget_pre_diff_with_at_most_two
       With_valid_signatures_and_proofs.pre_diff_with_at_most_two_coinbase) :
     Pre_diff_with_at_most_two_coinbase.t =
   { completed_works= forget_cw pre_diff.completed_works
-  ; user_commands= (pre_diff.user_commands :> User_command.t list)
+  ; user_commands=
+      ( pre_diff.user_commands
+        :> User_command.t User_command_status.With_status.t list )
   ; coinbase= pre_diff.coinbase }
 
 let forget_pre_diff_with_at_most_one
     (pre_diff :
       With_valid_signatures_and_proofs.pre_diff_with_at_most_one_coinbase) =
   { Pre_diff_one.completed_works= forget_cw pre_diff.completed_works
-  ; user_commands= (pre_diff.user_commands :> User_command.t list)
+  ; user_commands=
+      ( pre_diff.user_commands
+        :> User_command.t User_command_status.With_status.t list )
   ; coinbase= pre_diff.coinbase }
 
 let forget (t : With_valid_signatures_and_proofs.t) =

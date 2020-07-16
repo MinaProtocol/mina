@@ -511,7 +511,8 @@ module T = struct
             ~f:(fun (acc, pending_coinbase_stack_state) t ->
               match%map.Async
                 apply_transaction_and_get_witness ~constraint_constants ledger
-                  pending_coinbase_stack_state t current_global_slot
+                  pending_coinbase_stack_state
+                  t.User_command_status.With_status.data current_global_slot
                   state_and_body_hash
               with
               | Ok (res, updated_pending_coinbase_stack_state) ->
@@ -587,7 +588,7 @@ module T = struct
     let coinbase_exists txns =
       List.fold_until ~init:false txns
         ~f:(fun acc t ->
-          match t with
+          match t.User_command_status.With_status.data with
           | Transaction.Coinbase _ ->
               Stop true
           | _ ->
@@ -847,7 +848,9 @@ module T = struct
     let open Or_error.Let_syntax in
     let user_commands = Staged_ledger_diff.user_commands witness in
     let work = Staged_ledger_diff.completed_works witness in
-    let%bind total_txn_fee = sum_fees user_commands ~f:User_command.fee in
+    let%bind total_txn_fee =
+      sum_fees user_commands ~f:(fun {data= cmd; _} -> User_command.fee cmd)
+    in
     let%bind total_snark_fee = sum_fees work ~f:Transaction_snark_work.fee in
     let%bind () = Scan_state.update_metrics t.scan_state in
     Or_error.try_with (fun () ->
@@ -902,7 +905,10 @@ module T = struct
   module Resources = struct
     module Discarded = struct
       type t =
-        { user_commands_rev: User_command.With_valid_signature.t Sequence.t
+        { user_commands_rev:
+            User_command.With_valid_signature.t
+            User_command_status.With_status.t
+            Sequence.t
         ; completed_work: Transaction_snark_work.Checked.t Sequence.t }
       [@@deriving sexp_of]
 
@@ -921,7 +927,9 @@ module T = struct
       { max_space: int (*max space available currently*)
       ; max_jobs: int
             (*Required amount of work for max_space that can be purchased*)
-      ; user_commands_rev: User_command.With_valid_signature.t Sequence.t
+      ; user_commands_rev:
+          User_command.With_valid_signature.t User_command_status.With_status.t
+          Sequence.t
       ; completed_work_rev: Transaction_snark_work.Checked.t Sequence.t
       ; fee_transfers: Fee.t Public_key.Compressed.Map.t
       ; add_coinbase: bool
@@ -1057,8 +1065,9 @@ module T = struct
       (coinbase, singles)
 
     let init ~constraint_constants
-        (uc_seq : User_command.With_valid_signature.t Sequence.t)
-        (cw_seq : Transaction_snark_work.Checked.t Sequence.t)
+        (uc_seq :
+          User_command.With_valid_signature.t User_command_status.With_status.t
+          Sequence.t) (cw_seq : Transaction_snark_work.Checked.t Sequence.t)
         (slots, job_count) ~receiver_pk ~add_coinbase logger
         ~is_coinbase_reciever_new =
       let seq_rev seq =
@@ -1082,7 +1091,7 @@ module T = struct
       let budget =
         Or_error.map2
           (sum_fees (Sequence.to_list uc_seq) ~f:(fun t ->
-               User_command.fee (t :> User_command.t) ))
+               User_command.fee (t.data :> User_command.t) ))
           (sum_fees
              (List.filter
                 ~f:(fun (k, _) ->
@@ -1157,7 +1166,7 @@ module T = struct
       let open Or_error.Let_syntax in
       let payment_fees =
         sum_fees (Sequence.to_list t.user_commands_rev) ~f:(fun t ->
-            User_command.fee (t :> User_command.t) )
+            User_command.fee (t.data :> User_command.t) )
       in
       let prover_fee_others =
         Public_key.Compressed.Map.fold t.fee_transfers ~init:(Ok Fee.zero)
@@ -1288,7 +1297,7 @@ module T = struct
             match t.budget with
             | Ok b ->
                 option "Fee insufficient"
-                  (Fee.sub b (User_command.fee (uc :> User_command.t)))
+                  (Fee.sub b (User_command.fee (uc.data :> User_command.t)))
             | _ ->
                 rebudget new_t
           in
@@ -1377,7 +1386,7 @@ module T = struct
           check_constraints_and_update ~constraint_constants resources'
             (Option.value_map uc_opt ~default:log ~f:(fun uc ->
                  Diff_creation_log.discard_user_command `No_space
-                   (User_command.forget_check uc)
+                   (User_command.forget_check uc.data)
                    log ))
       else
         (* insufficient budget; reduce the cost*)
@@ -1389,12 +1398,12 @@ module T = struct
                Diff_creation_log.discard_completed_work `Insufficient_fees work
                  log ))
     else
-      (* There isn't enough work for the transactions. Discard a trasnaction and check again *)
+      (* There isn't enough work for the transactions. Discard a transaction and check again *)
       let resources', uc_opt = Resources.discard_user_command resources in
       check_constraints_and_update ~constraint_constants resources'
         (Option.value_map uc_opt ~default:log ~f:(fun uc ->
              Diff_creation_log.discard_user_command `No_work
-               (User_command.forget_check uc)
+               (User_command.forget_check uc.data)
                log ))
 
   let one_prediff ~constraint_constants cw_seq ts_seq ~receiver ~add_coinbase
@@ -1642,8 +1651,13 @@ module T = struct
                     , User_command.With_valid_signature.to_yojson txn ) ]
                 !"%s" error_message ;
               Stop seq
-          | Ok _ ->
-              let seq' = Sequence.append (Sequence.singleton txn) seq in
+          | Ok status ->
+              let txn_with_status =
+                {User_command_status.With_status.data= txn; status}
+              in
+              let seq' =
+                Sequence.append (Sequence.singleton txn_with_status) seq
+              in
               if Sequence.length seq' = Scan_state.free_space t.scan_state then
                 Stop seq'
               else Continue seq' )
@@ -2022,7 +2036,8 @@ let%test_module "test" =
                 assert (
                   cmds_applied_this_iter <= Sequence.length cmds_this_iter ) ;
                 [%test_eq: User_command.t list]
-                  (Staged_ledger_diff.user_commands diff)
+                  (List.map (Staged_ledger_diff.user_commands diff)
+                     ~f:(fun {User_command_status.With_status.data; _} -> data))
                   ( Sequence.take cmds_this_iter cmds_applied_this_iter
                     |> Sequence.to_list
                     :> User_command.t list )
@@ -2241,9 +2256,15 @@ let%test_module "test" =
                           ; prover= snark_worker_pk } )
                         work
                     in
+                    let cmds_this_iter =
+                      cmds_this_iter |> Sequence.to_list
+                      |> List.map ~f:(fun cmd ->
+                             { User_command_status.With_status.data=
+                                 (cmd :> User_command.t)
+                             ; status= Applied } )
+                    in
                     let diff =
-                      create_diff_with_non_zero_fee_excess
-                        (Sequence.to_list cmds_this_iter :> User_command.t list)
+                      create_diff_with_non_zero_fee_excess cmds_this_iter
                         work_done partitions
                     in
                     let%bind verifier =

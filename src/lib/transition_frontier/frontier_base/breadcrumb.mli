@@ -59,9 +59,9 @@ val parent_hash : t -> State_hash.t
 
 val block_producer : t -> Signature_lib.Public_key.Compressed.t
 
-val user_commands : t -> User_command.t list
+val user_commands : t -> User_command.t User_command_status.With_status.t list
 
-val payments : t -> User_command.t list
+val payments : t -> User_command.t User_command_status.With_status.t list
 
 val mask : t -> Ledger.Mask.Attached.t
 

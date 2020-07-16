@@ -551,14 +551,20 @@ module Root_diff = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = {user_commands: User_command.Stable.V1.t list; root_length: int}
+      type t =
+        { user_commands:
+            User_command.Stable.V1.t
+            User_command_status.With_status.Stable.V1.t
+            list
+        ; root_length: int }
 
       let to_latest = Fn.id
     end
   end]
 
   type t = Stable.Latest.t =
-    {user_commands: User_command.t list; root_length: int}
+    { user_commands: User_command.t User_command_status.With_status.t list
+    ; root_length: int }
 end
 
 let initialization_finish_signal t = t.initialization_finish_signal
