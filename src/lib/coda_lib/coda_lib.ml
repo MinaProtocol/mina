@@ -1164,13 +1164,15 @@ let create (config : Config.t) =
                       consensus_state
                   with
                   | Ok () ->
-                      Logger.Str.trace config.logger ~module_:__MODULE__
-                        ~location:__LOC__
-                        ~metadata:
-                          [ ( "external_transition"
-                            , External_transition.Validated.to_yojson
-                                transition ) ]
-                        (Rebroadcast_transition {state_hash= hash}) ;
+                      (*Don't log rebroadcast message if it is internally generated; There is a broadcast log for it*)
+                      if not (source = `Internal) then
+                        Logger.Str.trace config.logger ~module_:__MODULE__
+                          ~location:__LOC__
+                          ~metadata:
+                            [ ( "external_transition"
+                              , External_transition.Validated.to_yojson
+                                  transition ) ]
+                          (Rebroadcast_transition {state_hash= hash}) ;
                       External_transition.Validated.broadcast transition
                   | Error reason -> (
                       let timing_error_json =
