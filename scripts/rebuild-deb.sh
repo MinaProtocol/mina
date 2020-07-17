@@ -17,10 +17,13 @@ PVKEYHASH=$(./default/src/app/cli/src/coda.exe internal snark-hashes | sort | md
 
 PROJECT="coda-$(echo "$DUNE_PROFILE" | tr _ -)"
 
+BUILD_NUM=${BUILDKITE_BUILD_NUM}
+BUILD_URL=${BUILDKITE_BUILD_URL}
+
 if [ "$GITBRANCH" == "master" ]; then
     VERSION="${GITTAG}-${GITHASH}"
 else
-    VERSION="${GITTAG}+${CIRCLE_BUILD_NUM}-${GITBRANCH}-${GITHASH}-PV${PVKEYHASH}"
+    VERSION="${GITTAG}+${BUILD_NUM}-${GITBRANCH}-${GITHASH}-PV${PVKEYHASH}"
 fi
 
 # Export variables for use with downstream steps
@@ -46,7 +49,7 @@ Homepage: https://codaprotocol.com/
 Maintainer: o(1)Labs <build@o1labs.org>
 Description: Coda Client and Daemon
  Coda Protocol Client and Daemon
- Built from ${GITHASH} by ${CIRCLE_BUILD_URL}
+ Built from ${GITHASH} by ${BUILD_URL}
 EOF
 
 echo "------------------------------------------------------------"
@@ -159,7 +162,7 @@ Homepage: https://codaprotocol.com/
 Maintainer: o(1)Labs <build@o1labs.org>
 Description: Coda Client and Daemon
  Coda Protocol Client and Daemon
- Built from ${GITHASH} by ${CIRCLE_BUILD_URL}
+ Built from ${GITHASH} by ${BUILD_URL}
 EOF
 
 # remove proving keys

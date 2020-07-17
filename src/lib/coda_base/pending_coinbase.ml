@@ -248,7 +248,7 @@ module State_stack = struct
 
     type 'stack_hash t = 'stack_hash Stable.Latest.t =
       {init: 'stack_hash; curr: 'stack_hash}
-    [@@deriving sexp, compare, hash, yojson]
+    [@@deriving sexp, compare, hash, yojson, hlist]
   end
 
   [%%versioned
@@ -285,18 +285,12 @@ module State_stack = struct
   let var_of_t (t : t) =
     {Poly.init= Stack_hash.var_of_t t.init; curr= Stack_hash.var_of_t t.curr}
 
-  let to_hlist {Poly.init; curr} = H_list.[init; curr]
-
-  let of_hlist :
-      (unit, 'state_hash -> 'state_hash -> unit) H_list.t -> 'state_hash Poly.t
-      =
-   fun H_list.[init; curr] -> {init; curr}
-
   let data_spec = Snark_params.Tick.Data_spec.[Stack_hash.typ; Stack_hash.typ]
 
   let typ : (var, t) Typ.t =
-    Snark_params.Tick.Typ.of_hlistable data_spec ~var_to_hlist:to_hlist
-      ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+    Snark_params.Tick.Typ.of_hlistable data_spec ~var_to_hlist:Poly.to_hlist
+      ~var_of_hlist:Poly.of_hlist ~value_to_hlist:Poly.to_hlist
+      ~value_of_hlist:Poly.of_hlist
 
   let to_bits (t : t) = Stack_hash.to_bits t.init @ Stack_hash.to_bits t.curr
 
@@ -577,7 +571,7 @@ module T = struct
       type ('data_stack, 'state_stack) t =
             ('data_stack, 'state_stack) Stack_versioned.Poly.t =
         {data: 'data_stack; state: 'state_stack}
-      [@@deriving yojson, hash, sexp, compare]
+      [@@deriving yojson, hash, sexp, compare, hlist]
     end
 
     type t = Stack_versioned.t [@@deriving yojson, eq, compare, sexp, hash]
@@ -617,20 +611,13 @@ module T = struct
       let%map state = State_stack.gen in
       {Poly.data; state}
 
-    let to_hlist {Poly.data; state} = H_list.[data; state]
-
-    let of_hlist :
-           (unit, 'data -> 'state_hash -> unit) H_list.t
-        -> ('data, 'state_hash) Poly.t =
-     fun H_list.[data; state] -> {data; state}
-
     let data_spec =
       Snark_params.Tick.Data_spec.[Coinbase_stack.typ; State_stack.typ]
 
     let typ : (var, t) Typ.t =
-      Snark_params.Tick.Typ.of_hlistable data_spec ~var_to_hlist:to_hlist
-        ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
-        ~value_of_hlist:of_hlist
+      Snark_params.Tick.Typ.of_hlistable data_spec ~var_to_hlist:Poly.to_hlist
+        ~var_of_hlist:Poly.of_hlist ~value_to_hlist:Poly.to_hlist
+        ~value_of_hlist:Poly.of_hlist
 
     let num_pad_bits =
       let len = List.length Coinbase_stack.(to_bits empty) in
