@@ -142,7 +142,7 @@ module Poly : sig
 
   type ('common, 'body) t = ('common, 'body) Stable.Latest.t =
     {common: 'common; body: 'body}
-  [@@deriving eq, sexp, hash, yojson, compare]
+  [@@deriving eq, sexp, hash, yojson, compare, hlist]
 end
 
 [%%versioned:

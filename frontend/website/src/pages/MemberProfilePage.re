@@ -119,12 +119,20 @@ let fetchReleases = name => {
     ("Release 3.2a", "3.2a!B3:Z", 2), /* offset for challenge titles in 3.2a starts on the 2nd column */
     ("Release 3.2b", "3.2b!B3:Z", 2) /* offset for challenge titles in 3.2b starts on the 2nd column */
   |]
-  |> Array.map(release => fetchRelease(name, release));
+  |> Array.map(release => fetchRelease(name, release))
+  |> Js.Promise.all
+  |> Js.Promise.then_(releaseValues => {
+       Belt.Array.keepMap(releaseValues, release => release)
+       |> Js.Promise.resolve
+     });
 };
 
 let parseMember = map => {
   let memberProperties = [|
+    Js.Dict.get(map, "name"),
     Js.Dict.get(map, "genesisMember"),
+    Js.Dict.get(map, "technicalMVP"),
+    Js.Dict.get(map, "communityMVP"),
     Js.Dict.get(map, "phasePoints"),
     Js.Dict.get(map, "releasePoints"),
     Js.Dict.get(map, "allTimePoints"),
@@ -141,22 +149,16 @@ let parseMember = map => {
     None;
   } else {
     {
-      Leaderboard.name: Js.Dict.get(map, "name")->Belt.Option.getExn,
-      genesisMember:
-        Js.Dict.get(map, "genesisMember")->Belt.Option.getExn
-        |> bool_of_string,
-      phasePoints:
-        Js.Dict.get(map, "phasePoints")->Belt.Option.getExn |> int_of_string,
-      releasePoints:
-        Js.Dict.get(map, "releasePoints")->Belt.Option.getExn |> int_of_string,
-      allTimePoints:
-        Js.Dict.get(map, "allTimePoints")->Belt.Option.getExn |> int_of_string,
-      allTimeRank:
-        Js.Dict.get(map, "allTimeRank")->Belt.Option.getExn |> int_of_string,
-      phaseRank:
-        Js.Dict.get(map, "phaseRank")->Belt.Option.getExn |> int_of_string,
-      releaseRank:
-        Js.Dict.get(map, "releaseRank")->Belt.Option.getExn |> int_of_string,
+      Leaderboard.name: memberProperties[0]->Belt.Option.getExn,
+      genesisMember: memberProperties[1]->Belt.Option.getExn |> bool_of_string,
+      technicalMVP: memberProperties[2]->Belt.Option.getExn |> bool_of_string,
+      communityMVP: memberProperties[3]->Belt.Option.getExn |> bool_of_string,
+      phasePoints: memberProperties[4]->Belt.Option.getExn |> int_of_string,
+      releasePoints: memberProperties[5]->Belt.Option.getExn |> int_of_string,
+      allTimePoints: memberProperties[6]->Belt.Option.getExn |> int_of_string,
+      allTimeRank: memberProperties[7]->Belt.Option.getExn |> int_of_string,
+      phaseRank: memberProperties[8]->Belt.Option.getExn |> int_of_string,
+      releaseRank: memberProperties[9]->Belt.Option.getExn |> int_of_string,
     }
     ->Some;
   };
@@ -179,20 +181,72 @@ let initialState = {
 type actions =
   | UpdateReleaseInfo(array(ChallengePointsTable.release))
   | UpdateCurrentUser(Leaderboard.member)
+  | UpdateCurrentReleaseAndUser(
+      array(ChallengePointsTable.release),
+      Leaderboard.member,
+    )
   | UpdateError(bool);
 
 let reducer = (prevState, action) => {
   switch (action) {
-  | UpdateReleaseInfo(releases) => {
-      ...prevState,
-      loading: false,
-      releases: Belt.Array.concat(prevState.releases, releases),
-    }
+  | UpdateReleaseInfo(releases) => {...prevState, loading: false, releases}
   | UpdateCurrentUser(member) => {...prevState, currentMember: Some(member)}
+  | UpdateCurrentReleaseAndUser(releases, member) => {
+      loading: false,
+      error: false,
+      currentMember: Some(member),
+      releases,
+    }
   | UpdateError(error) => {...prevState, error}
   };
 };
 
+module Footer = {
+  module Styles = {
+    open Css;
+    let footer =
+      style([
+        width(`percent(100.)),
+        background(`rgba((242, 183, 5, 0.1))),
+        color(Theme.Colors.saville),
+        padding(`rem(1.)),
+      ]);
+    let header = merge([Theme.H5.semiBold, style([fontSize(`rem(1.5))])]);
+    let copy =
+      merge([
+        Theme.H5.semiBold,
+        style([fontSize(`rem(1.5)), fontWeight(`light)]),
+      ]);
+
+    let bold = merge([header, style([fontSize(`rem(1.25))])]);
+    let disclaimer = merge([copy, style([fontSize(`rem(1.1))])]);
+  };
+  [@react.component]
+  let make = () => {
+    <div className=Styles.footer>
+      <p className=Styles.header>
+        {React.string(
+           "Testnet points are displayed for releases in the current testnet phase.",
+         )}
+      </p>
+      <p className=Styles.copy>
+        {React.string(
+           "Point totals from all testnet phases are included when calculating total testnet points.",
+         )}
+      </p>
+      <Spacer height=1. />
+      <p className=Styles.bold> {React.string("* Testnet Points")} </p>
+      <p className=Styles.disclaimer>
+        {React.string(
+           "Testnet Points (abbreviated 'pts') are designed solely to track contributions to the \
+           Testnet and Testnet Points have no cash or other monetary value. Testnet Points are not \
+           transferable and are not redeemable or exchangeable for any cryptocurrency or digital assets. \
+           We may at any time amend or eliminate Testnet Points.",
+         )}
+      </p>
+    </div>;
+  };
+};
 [@react.component]
 let make = () => {
   let (state, dispatch) = React.useReducer(reducer, initialState);
@@ -203,17 +257,9 @@ let make = () => {
       switch (parseMember(router.query)) {
       | Some(member) =>
         fetchReleases(member.name)
-        |> Array.iter(e => {
-             e
-             |> Promise.iter(releaseInfo => {
-                  switch (releaseInfo) {
-                  | Some(releaseInfo) =>
-                    dispatch(UpdateCurrentUser(member));
-                    dispatch(UpdateReleaseInfo([|releaseInfo|]));
-                  | None => ()
-                  }
-                })
-           })
+        |> Promise.iter(releases =>
+             dispatch(UpdateCurrentReleaseAndUser(releases, member))
+           )
       | None => dispatch(UpdateError(true))
       };
       None;
@@ -249,7 +295,7 @@ let make = () => {
            ? <div className=Styles.loading>
                {React.string("User Not Available")}
              </div>
-           : React.null}
+           : <Footer />}
       </div>
     </Wrapped>
   </Page>;

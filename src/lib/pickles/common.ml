@@ -77,7 +77,7 @@ let time lab f =
 
 let bits_random_oracle =
   let h = Digestif.blake2s 32 in
-  fun ?(length = 256) s ->
+  fun ~length s ->
     Digestif.digest_string h s |> Digestif.to_raw_string h |> String.to_list
     |> List.concat_map ~f:(fun c ->
            let c = Char.to_int c in

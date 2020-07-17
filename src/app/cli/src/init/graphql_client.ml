@@ -52,6 +52,16 @@ module User_command = struct
     ; fee: Currency.Fee.t
     ; memo: User_command_memo.t }
   [@@deriving yojson]
+
+  let of_obj x =
+    { id= x#id
+    ; isDelegation= x#isDelegation
+    ; nonce= x#nonce
+    ; from= x#from
+    ; to_= x#to_
+    ; amount= x#amount
+    ; fee= x#fee
+    ; memo= x#memo }
 end
 
 module Encoders = struct

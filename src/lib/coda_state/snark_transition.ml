@@ -37,7 +37,7 @@ module Poly = struct
     ; coinbase_receiver: 'producer_pk
     ; coinbase_amount: 'amount
     ; pending_coinbase_action: 'pending_coinbase_action }
-  [@@deriving sexp, to_yojson, fields]
+  [@@deriving sexp, to_yojson, fields, hlist]
 end
 
 module Value = struct
@@ -66,7 +66,9 @@ Poly.
   , consensus_transition
   , coinbase_receiver
   , coinbase_amount
-  , pending_coinbase_action )]
+  , pending_coinbase_action
+  , to_hlist
+  , of_hlist )]
 
 type value = Value.t
 
@@ -97,32 +99,6 @@ let genesis ~constraint_constants ~genesis_ledger : value =
   ; coinbase_receiver= Signature_lib.Public_key.Compressed.empty
   ; coinbase_amount= Currency.Amount.zero
   ; pending_coinbase_action= Pending_coinbase.Update.Action.Update_none }
-
-let to_hlist
-    { Poly.blockchain_state
-    ; consensus_transition
-    ; coinbase_receiver
-    ; coinbase_amount
-    ; pending_coinbase_action } =
-  Snarky.H_list.
-    [ blockchain_state
-    ; consensus_transition
-    ; coinbase_receiver
-    ; coinbase_amount
-    ; pending_coinbase_action ]
-
-let of_hlist
-    ([ blockchain_state
-     ; consensus_transition
-     ; coinbase_receiver
-     ; coinbase_amount
-     ; pending_coinbase_action ] :
-      (unit, _) Snarky.H_list.t) =
-  { Poly.blockchain_state
-  ; consensus_transition
-  ; coinbase_receiver
-  ; coinbase_amount
-  ; pending_coinbase_action }
 
 let typ =
   let open Snark_params.Tick.Typ in

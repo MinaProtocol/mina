@@ -5,14 +5,17 @@
   (modes native)
   (libraries
     async
+    async_ssl
     caqti
     caqti-async
     caqti-driver-postgresql
     cohttp
+    ctypes
     cohttp-async
     core_kernel
     logger
     models
+    lib
     ppx_deriving_yojson.runtime
     yojson
     )

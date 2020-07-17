@@ -12,27 +12,57 @@ open Sheets.Bindings;
 open Sheets.Core;
 
 /*
-   Upload the total block count to the "Data" sheet
+   Upload "Genesis Members", "Block Count", and "Participants" to the Data tab
  */
-let uploadTotalBlocks = (spreadsheetId, totalBlocks) => {
+let uploadData = (spreadsheetId, totalBlocks) => {
+  let dataSheet = Sheets.getSheet(Sheets.Data);
   let client = createClient();
+
   getRange(
-    client, initSheetsQuery(spreadsheetId, "Data!A1:B", "FORMULA"), result => {
+    client,
+    initSheetsQuery(
+      spreadsheetId,
+      Sheets.getSheet(Sheets.AllTimeLeaderboard).range,
+      "FORMATTED_VALUE",
+    ),
+    result => {
     switch (result) {
     | Ok(sheetsData) =>
-      let newSheetsData = sheetsData |> decodeGoogleSheets;
-      newSheetsData[0][1] = totalBlocks;
+      let data = sheetsData |> decodeGoogleSheets;
+
+      let columnHeaders = [|
+        "Genesis Members",
+        "Block Count",
+        "Participants",
+      |];
+
+      let statisticsData = [|
+        data->Belt.Array.keep(row => {
+          /* The 4th column indicates whether the user is a genesis member */
+          switch (Belt.Array.get(row, 3)) {
+          | Some(genesisMember) =>
+            String.length(Belt.Option.getExn(genesisMember)) == 0
+              ? false : true
+          | None => false
+          }
+        })
+        |> Array.length
+        |> string_of_int,
+        totalBlocks,
+        data |> Array.length |> string_of_int,
+      |];
+
       updateRange(
         client,
         initSheetsUpdate(
           spreadsheetId,
-          "Data!A1:B",
+          dataSheet.range,
           "USER_ENTERED",
-          newSheetsData,
+          Array.append([|columnHeaders|], [|statisticsData|]),
         ),
         result => {
         switch (result) {
-        | Ok(_) => Js.log({j|Uploaded total blocks|j})
+        | Ok(_) => Js.log({j|Uploaded to Data spreadsheet|j})
         | Error(error) => Js.log(error)
         }
       });
@@ -93,77 +123,106 @@ let computeUsers = (userIndex, userData) => {
      );
 };
 
-let computeMemberProfileData = (allTimeData, phaseData, releaseData) => {
+let computeMemberProfileData = (mainData, allTimeData, phaseData, releaseData) => {
+  let mainUserIndex = 0; /* usernames are located in the 1st column */
   let allTimeUserIndex = 4; /* usernames are located in the 5th column */
   let phaseUserIndex = 2; /* usernames are located in the 3rd column */
   let releaseUserIndex = 1; /* usernames are located in the 2nd column */
 
   /* compute users */
-  computeUsers(allTimeUserIndex, allTimeData)
-  /* compute genesis */
-  |> computeProperty(3, allTimeUserIndex, allTimeData)
+  computeUsers(mainUserIndex, mainData)
   /* compute all time points */
   |> computeProperty(5, allTimeUserIndex, allTimeData)
   /* compute phase points */
   |> computeProperty(3, phaseUserIndex, phaseData)
   /* compute release points */
-  |> computeProperty(6, phaseUserIndex, phaseData)
+  |> computeProperty(2, releaseUserIndex, releaseData)
   /* compute all time rank */
   |> computeProperty(0, allTimeUserIndex, allTimeData)
   /* compute phase rank */
   |> computeProperty(0, phaseUserIndex, phaseData)
   /* compute release rank */
-  |> computeProperty(0, releaseUserIndex, releaseData);
+  |> computeProperty(0, releaseUserIndex, releaseData)
+  /* compute genesis member badge*/
+  |> computeProperty(4, mainUserIndex, mainData)
+  /* compute technical MVP badge */
+  |> computeProperty(5, mainUserIndex, mainData)
+  /* compute community MVP badge */
+  |> computeProperty(6, mainUserIndex, mainData);
 };
 
 let uploadUserProfileData = spreadsheetId => {
   let client = createClient();
-  /* Fetch all-time leaderboard data */
+
+  /* Fetch main leaderboard data */
   getRange(
     client,
     initSheetsQuery(
       spreadsheetId,
-      "All-Time Leaderboard!C4:H",
+      Sheets.getSheet(Sheets.Main).range,
       "FORMATTED_VALUE",
     ),
     result => {
     switch (result) {
-    | Ok(allTimeResult) =>
-      let allTimeData = allTimeResult |> decodeGoogleSheets;
-      /* Fetch current phase leaderboard data */
+    | Ok(mainResult) =>
+      let mainData = mainResult |> decodeGoogleSheets;
+      /* Fetch all-time leaderboard data */
       getRange(
         client,
         initSheetsQuery(
           spreadsheetId,
-          "Phase 3 Leaderboard!B4:Z",
+          Sheets.getSheet(Sheets.AllTimeLeaderboard).range,
           "FORMATTED_VALUE",
         ),
         result => {
         switch (result) {
-        | Ok(phaseResult) =>
-          let phaseData = phaseResult |> decodeGoogleSheets;
-          /* Fetch current release leaderboard data */
+        | Ok(allTimeResult) =>
+          let allTimeData = allTimeResult |> decodeGoogleSheets;
+          /* Fetch current phase leaderboard data */
           getRange(
             client,
-            initSheetsQuery(spreadsheetId, "3.2b!A4:B", "FORMATTED_VALUE"),
+            initSheetsQuery(
+              spreadsheetId,
+              Sheets.getSheet(Sheets.CurrentPhaseLeaderboard).range,
+              "FORMATTED_VALUE",
+            ),
             result => {
             switch (result) {
-            | Ok(releaseResult) =>
-              let releaseData = releaseResult |> decodeGoogleSheets;
-              let data =
-                computeMemberProfileData(allTimeData, phaseData, releaseData);
-
-              updateRange(
+            | Ok(phaseResult) =>
+              let phaseData = phaseResult |> decodeGoogleSheets;
+              /* Fetch current release leaderboard data */
+              getRange(
                 client,
-                initSheetsUpdate(
+                initSheetsQuery(
                   spreadsheetId,
-                  "Member_Profile_Data!A2:Z",
-                  "USER_ENTERED",
-                  data,
+                  Sheets.getSheet(Sheets.CurrentReleaseLeaderboard).range,
+                  "FORMATTED_VALUE",
                 ),
                 result => {
                 switch (result) {
-                | Ok(_) => Js.log({j|Uploaded member data|j})
+                | Ok(releaseResult) =>
+                  let releaseData = releaseResult |> decodeGoogleSheets;
+                  let data =
+                    computeMemberProfileData(
+                      mainData,
+                      allTimeData,
+                      phaseData,
+                      releaseData,
+                    );
+                  updateRange(
+                    client,
+                    initSheetsUpdate(
+                      spreadsheetId,
+                      Sheets.getSheet(Sheets.MemberProfileData).range,
+                      "USER_ENTERED",
+                      encodeGoogleSheets(data),
+                    ),
+                    result => {
+                    switch (result) {
+                    | Ok(_) => Js.log({j|Uploaded member data|j})
+                    | Error(error) => Js.log(error)
+                    }
+                  });
                 | Error(error) => Js.log(error)
                 }
               });

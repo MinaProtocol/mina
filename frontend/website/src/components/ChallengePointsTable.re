@@ -87,7 +87,7 @@ module Styles = {
         Theme.MediaQuery.notMobile,
         [
           gridTemplateColumns([
-            `percent(12.5),
+            `percent(8.),
             `percent(5.),
             `auto,
             `percent(20.),
@@ -129,28 +129,19 @@ module Styles = {
     ]);
   };
 
-  let challengeLabel = {
-    style([gridColumn(3, 4)]);
-  };
-
-  let pointsLabel = {
-    style([gridColumn(4, 5)]);
-  };
-
-  let totalPointsTextLabel = {
-    style([gridColumn(3, 4)]);
-  };
-
-  let totalPointsLabel = {
-    style([gridColumn(4, 5)]);
-  };
-
   let star = {
     style([justifySelf(`flexEnd)]);
   };
 
   let rank = {
     style([fontWeight(`normal), justifySelf(`center)]);
+  };
+
+  let points = {
+    style([
+      textAlign(`right),
+      media(Theme.MediaQuery.notMobile, [paddingRight(`rem(5.))]),
+    ]);
   };
 
   let disclaimer = {
@@ -179,7 +170,7 @@ module Row = {
         {React.string(string_of_int(rank))}
       </span>
       <span> {React.string(name)} </span>
-      <span>
+      <span className=Styles.points>
         {switch (points) {
          | Some(points) => React.string(string_of_int(points))
          | None => React.null
@@ -232,19 +223,21 @@ let make = (~releaseTitle, ~challenges) => {
     <div className=Styles.releaseTitle> {React.string(releaseTitle)} </div>
     <div className=Styles.tableContainer>
       <div className=Styles.topRow>
-        <span className=Styles.challengeLabel>
+        <span className=Css.(style([gridColumn(3, 4)]))>
           {React.string("Challenge Name")}
         </span>
-        <span className=Styles.pointsLabel> {React.string("* Points")} </span>
+        <span className=Css.(style([gridColumn(4, 5)]))>
+          {React.string("* Points")}
+        </span>
       </div>
       <div className=Styles.gridContainer>
         {renderChallengePointsTable()}
       </div>
       <div className=Styles.bottomRow>
-        <span className=Styles.totalPointsTextLabel>
+        <span className=Css.(style([gridColumn(3, 4)]))>
           {React.string("Total Points *")}
         </span>
-        <span className=Styles.totalPointsLabel>
+        <span className=Css.(style([gridColumn(4, 5)]))>
           {React.string(calculateTotalPoints())}
         </span>
       </div>

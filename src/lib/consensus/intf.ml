@@ -374,7 +374,7 @@ module type S = sig
       [%%versioned:
       module Stable : sig
         module V1 : sig
-          type t [@@deriving sexp, to_yojson]
+          type t
         end
       end]
 

@@ -91,7 +91,7 @@ module Compressed = struct
           Quickcheck.random_value
             ~seed:(`Deterministic "nonzero_curve_point_compressed-seed") V1.gen
         in
-        let known_good_digest = "038f3153aa36387b23b54af004de82c8" in
+        let known_good_digest = "951b667e8f1216097665190fc0a7b78a" in
         Ppx_version.Serialization.check_serialization
           (module V1)
           point known_good_digest
@@ -132,14 +132,10 @@ module Compressed = struct
 
   type var = (Field.Var.t, Boolean.var) Poly.t
 
-  let to_hlist Poly.Stable.Latest.{x; is_odd} = Snarky.H_list.[x; is_odd]
-
-  let of_hlist : (unit, 'a -> 'b -> unit) Snarky.H_list.t -> ('a, 'b) Poly.t =
-    Snarky.H_list.(fun [x; is_odd] -> {x; is_odd})
-
   let typ : (var, t) Typ.t =
-    Typ.of_hlistable [Field.typ; Boolean.typ] ~var_to_hlist:to_hlist
-      ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+    Typ.of_hlistable [Field.typ; Boolean.typ] ~var_to_hlist:Poly.to_hlist
+      ~var_of_hlist:Poly.of_hlist ~value_to_hlist:Poly.to_hlist
+      ~value_of_hlist:Poly.of_hlist
 
   let var_of_t ({x; is_odd} : t) : var =
     {x= Field.Var.constant x; is_odd= Boolean.var_of_value is_odd}

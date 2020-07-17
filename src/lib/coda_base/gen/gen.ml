@@ -15,15 +15,6 @@ let keypairs =
     in
     List.map sks ~f:Keypair.of_private_key_exn
   in
-  (*
-  let () =
-    let pk = Private_key.create () in
-    let pubkey = Public_key.of_private_key_exn pk in
-    Core.printf !"privkey base58 %s\n%!" (Private_key.to_base58_check pk) ;
-    Core.printf !"privkey0 %{sexp:Private_key.t}\n%!" pk ;
-    Core.printf !"pubkey0 %{sexp:Public_key.t}\n%!" pubkey
-  in
-  *)
   List.cons
     (* FIXME #2936: remove this "precomputed VRF keypair" *)
     (* This key is also at the start of all the release ledgers. It's needed to generate a valid genesis transition *)
@@ -40,13 +31,6 @@ let expr ~loc =
   let earray =
     E.pexp_array
       (List.map keypairs ~f:(fun {public_key; private_key} ->
-           Core.printf
-             !"keypair gen privkey %s %s\n%!"
-             __LOC__
-             (Private_key.to_base58_check private_key) ;
-           Core.printf !"keypair gen %s %s\n%!" __LOC__
-             (Public_key.Compressed.to_base58_check
-                (Public_key.compress public_key)) ;
            E.pexp_tuple
              [ estring
                  (Binable.to_string

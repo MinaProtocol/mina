@@ -91,7 +91,7 @@ module Poly = struct
     ; fee_excess_l: 'fee
     ; fee_token_r: 'token
     ; fee_excess_r: 'fee }
-  [@@deriving compare, equal, hash, sexp]
+  [@@deriving compare, equal, hash, sexp, hlist]
 
   let to_yojson = Stable.Latest.to_yojson
 
@@ -99,14 +99,6 @@ module Poly = struct
 
   [%%ifdef
   consensus_mechanism]
-
-  let to_hlist {fee_token_l; fee_excess_l; fee_token_r; fee_excess_r} =
-    H_list.[fee_token_l; fee_excess_l; fee_token_r; fee_excess_r]
-
-  let of_hlist
-      (H_list.[fee_token_l; fee_excess_l; fee_token_r; fee_excess_r] :
-        (unit, _) H_list.t) =
-    {fee_token_l; fee_excess_l; fee_token_r; fee_excess_r}
 
   let typ (token_typ : ('token_var, 'token) Typ.t)
       (fee_typ : ('fee_var, 'fee) Typ.t) :

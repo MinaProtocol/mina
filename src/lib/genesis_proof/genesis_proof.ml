@@ -46,11 +46,17 @@ module T = struct
   let find_new_account_record_exn {genesis_ledger; _} =
     Genesis_ledger.Packed.find_new_account_record_exn genesis_ledger
 
+  let find_new_account_record_exn_ {genesis_ledger; _} =
+    Genesis_ledger.Packed.find_new_account_record_exn_ genesis_ledger
+
   let largest_account_exn {genesis_ledger; _} =
     Genesis_ledger.Packed.largest_account_exn genesis_ledger
 
   let largest_account_keypair_exn {genesis_ledger; _} =
     Genesis_ledger.Packed.largest_account_keypair_exn genesis_ledger
+
+  let largest_account_pk_exn {genesis_ledger; _} =
+    Genesis_ledger.Packed.largest_account_pk_exn genesis_ledger
 
   let consensus_constants {consensus_constants; _} = consensus_constants
 
@@ -98,10 +104,8 @@ let base_proof (module B : Blockchain_snark.Blockchain_snark_state.S)
   B.step
     ~handler:
       (Consensus.Data.Prover_state.precomputed_handler ~constraint_constants
-         ~genesis_ledger:Test_genesis_ledger.t)
-    { transition=
-        Snark_transition.genesis ~constraint_constants
-          ~genesis_ledger:Test_genesis_ledger.t
+         ~genesis_ledger)
+    { transition= Snark_transition.genesis ~constraint_constants ~genesis_ledger
     ; prev_state }
     [(prev_state, blockchain_dummy); (dummy_txn_stmt, txn_dummy)]
     t.protocol_state_with_hash.data

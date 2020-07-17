@@ -15,7 +15,7 @@
   random_oracle
   tuple_lib)
  (preprocess
-  (pps ppx_version ppx_jane bisect_ppx -- -conditional))
+  (pps ppx_version ppx_jane h_list.ppx bisect_ppx -- -conditional))
  (synopsis "Cryptographic parameters"))
 
 (rule

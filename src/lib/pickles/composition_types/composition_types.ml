@@ -26,7 +26,7 @@ module Dlog_based = struct
           ; beta_1: 'scalar_challenge
           ; beta_2: 'scalar_challenge
           ; beta_3: 'scalar_challenge }
-        [@@deriving bin_io, sexp, compare, yojson]
+        [@@deriving bin_io, sexp, compare, yojson, hlist]
 
         let map_challenges
             { sigma_2
@@ -49,31 +49,6 @@ module Dlog_based = struct
           ; beta_3= scalar beta_3 }
 
         open Snarky.H_list
-
-        let to_hlist
-            { sigma_2
-            ; sigma_3
-            ; alpha
-            ; eta_a
-            ; eta_b
-            ; eta_c
-            ; beta_1
-            ; beta_2
-            ; beta_3 } =
-          [sigma_2; sigma_3; alpha; eta_a; eta_b; eta_c; beta_1; beta_2; beta_3]
-
-        let of_hlist
-            ([ sigma_2
-             ; sigma_3
-             ; alpha
-             ; eta_a
-             ; eta_b
-             ; eta_c
-             ; beta_1
-             ; beta_2
-             ; beta_3 ] :
-              (unit, _) t) =
-          {sigma_2; sigma_3; alpha; eta_a; eta_b; eta_c; beta_1; beta_2; beta_3}
 
         let typ chal fp =
           Snarky.Typ.of_hlistable
@@ -103,7 +78,7 @@ module Dlog_based = struct
         ; xi: 'scalar_challenge
         ; bulletproof_challenges: 'bulletproof_challenges
         ; which_branch: 'index }
-      [@@deriving bin_io, sexp, compare, yojson]
+      [@@deriving bin_io, sexp, compare, yojson, hlist]
 
       let map_challenges
           { marlin
@@ -116,37 +91,6 @@ module Dlog_based = struct
         ; combined_inner_product
         ; b
         ; marlin= Marlin.map_challenges marlin ~f ~scalar
-        ; bulletproof_challenges
-        ; which_branch }
-
-      open Snarky.H_list
-
-      let to_hlist
-          { marlin
-          ; combined_inner_product
-          ; b
-          ; xi
-          ; bulletproof_challenges
-          ; which_branch } =
-        [ marlin
-        ; combined_inner_product
-        ; b
-        ; xi
-        ; bulletproof_challenges
-        ; which_branch ]
-
-      let of_hlist
-          ([ marlin
-           ; combined_inner_product
-           ; b
-           ; xi
-           ; bulletproof_challenges
-           ; which_branch ] :
-            (unit, _) t) =
-        { marlin
-        ; combined_inner_product
-        ; b
-        ; xi
         ; bulletproof_challenges
         ; which_branch }
 
@@ -167,7 +111,7 @@ module Dlog_based = struct
     module Me_only = struct
       type ('g1, 'bulletproof_challenges) t =
         {sg: 'g1; old_bulletproof_challenges: 'bulletproof_challenges}
-      [@@deriving bin_io, sexp, compare, yojson]
+      [@@deriving bin_io, sexp, compare, yojson, hlist]
 
       let to_field_elements {sg; old_bulletproof_challenges}
           ~g1:g1_to_field_elements =
@@ -175,14 +119,6 @@ module Dlog_based = struct
           [ Vector.to_array old_bulletproof_challenges
             |> Array.concat_map ~f:Vector.to_array
           ; Array.of_list (g1_to_field_elements sg) ]
-
-      open Snarky.H_list
-
-      let to_hlist {sg; old_bulletproof_challenges} =
-        [sg; old_bulletproof_challenges]
-
-      let of_hlist ([sg; old_bulletproof_challenges] : (unit, _) t) =
-        {sg; old_bulletproof_challenges}
 
       let typ g1 chal ~length =
         Snarky.Typ.of_hlistable
@@ -213,30 +149,7 @@ module Dlog_based = struct
       ; sponge_digest_before_evaluations: 'digest
             (* Not needed by other proof system *)
       ; me_only: 'me_only }
-    [@@deriving bin_io, sexp, compare, yojson]
-
-    open Snarky.H_list
-
-    let to_hlist
-        { deferred_values
-        ; was_base_case
-        ; sponge_digest_before_evaluations
-        ; me_only } =
-      [ deferred_values
-      ; was_base_case
-      ; sponge_digest_before_evaluations
-      ; me_only ]
-
-    let of_hlist
-        ([ deferred_values
-         ; was_base_case
-         ; sponge_digest_before_evaluations
-         ; me_only ] :
-          (unit, _) t) =
-      { deferred_values
-      ; was_base_case
-      ; sponge_digest_before_evaluations
-      ; me_only }
+    [@@deriving bin_io, sexp, compare, yojson, hlist]
 
     let typ chal fp bool fq me_only digest index =
       Snarky.Typ.of_hlistable
@@ -428,13 +341,7 @@ module Pairing_based = struct
         
           It doesn't need to be sent on the wire, but it does need to be provided to the verifier
         *)
-        type ('fq, 'g) t = {b: 'fq}
-
-        open Snarky.H_list
-
-        let to_hlist {b} = [b]
-
-        let of_hlist ([b] : (unit, _) t) = {b}
+        type ('fq, 'g) t = {b: 'fq} [@@deriving hlist]
 
         let typ fq g =
           let open Snarky.Typ in
