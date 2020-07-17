@@ -425,6 +425,7 @@ let daemon logger =
                    "Could not parse configuration from $config_file: $error"
                    ~metadata:
                      [ ("config_file", `String config_file)
+                     ; ("config_json", config_json)
                      ; ("error", `String err) ] ;
                  failwithf "Could not parse configuration: %s" err () )
            | _ ->
