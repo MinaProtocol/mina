@@ -171,7 +171,7 @@ module Styles = {
         textTransform(`uppercase),
         letterSpacing(`rem(0.125)),
         media(Theme.MediaQuery.notMobile, [display(`grid)]),
-        hover([backgroundColor(white)]),
+        hover([backgroundColor(white), cursor(`default)]),
       ]),
     ]);
 
