@@ -17,11 +17,7 @@ let commands : List Cmd.Type =
                 "buildkite-agent artifact download DOCKER_DEPLOY_ENV .; " ++
             "fi"
         ),
-        Cmd.run (
-            "source DOCKER_DEPLOY_ENV; env | grep -i coda; scripts/release-docker.sh" ++
-                " -s $$CODA_SERVICE -v $$CODA_VERSION" ++
-                " --extra-args '--build-arg coda_version=$CODA_DEB_VERSION --build-arg deb_repo=$CODA_DEB_REPO'"
-        )
+        Cmd.run "./buildkite/scripts/docker-artifact.sh"
     ]
 
 in
