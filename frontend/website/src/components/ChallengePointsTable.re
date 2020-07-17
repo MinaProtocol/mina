@@ -87,7 +87,7 @@ module Styles = {
         Theme.MediaQuery.notMobile,
         [
           gridTemplateColumns([
-            `percent(8.),
+            `percent(12.5),
             `percent(5.),
             `auto,
             `percent(20.),
@@ -127,6 +127,22 @@ module Styles = {
       tableRow,
       style([marginTop(`rem(0.5)), textTransform(`uppercase)]),
     ]);
+  };
+
+  let challengeLabel = {
+    style([gridColumn(3, 4)]);
+  };
+
+  let pointsLabel = {
+    style([gridColumn(4, 5)]);
+  };
+
+  let totalPointsTextLabel = {
+    style([gridColumn(3, 4)]);
+  };
+
+  let totalPointsLabel = {
+    style([gridColumn(4, 5)]);
   };
 
   let star = {
@@ -223,21 +239,19 @@ let make = (~releaseTitle, ~challenges) => {
     <div className=Styles.releaseTitle> {React.string(releaseTitle)} </div>
     <div className=Styles.tableContainer>
       <div className=Styles.topRow>
-        <span className=Css.(style([gridColumn(3, 4)]))>
+        <span className=Styles.challengeLabel>
           {React.string("Challenge Name")}
         </span>
-        <span className=Css.(style([gridColumn(4, 5)]))>
-          {React.string("* Points")}
-        </span>
+        <span className=Styles.pointsLabel> {React.string("* Points")} </span>
       </div>
       <div className=Styles.gridContainer>
         {renderChallengePointsTable()}
       </div>
       <div className=Styles.bottomRow>
-        <span className=Css.(style([gridColumn(3, 4)]))>
+        <span className=Styles.totalPointsTextLabel>
           {React.string("Total Points *")}
         </span>
-        <span className=Css.(style([gridColumn(4, 5)]))>
+        <span className=Styles.totalPointsLabel>
           {React.string(calculateTotalPoints())}
         </span>
       </div>

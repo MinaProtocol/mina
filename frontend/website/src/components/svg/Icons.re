@@ -134,14 +134,15 @@ let externalLink =
   </svg>;
 
 let rightCarrot =
-  <svg
-    width="10"
-    height="11"
-    viewBox="0 0 10 15"
-    fill="none"
-    xmlns="http://www.w3.org/2000/svg">
-    <path
-      d="M0 11.208L6.48 7.248V7.08L0 3.12V0L9.648 6.144V8.16L0 14.352V11.208Z"
-      fill="#3D5878"
-    />
-  </svg>;
+ 
+<svg
+  width="10"
+  height="11"
+  viewBox="0 0 10 15"
+  fill="none"
+  xmlns="http://www.w3.org/2000/svg">
+  <path
+    d="M0 11.208L6.48 7.248V7.08L0 3.12V0L9.648 6.144V8.16L0 14.352V11.208Z"
+    fill="#3D5878"
+  />
+</svg>;
