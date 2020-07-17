@@ -98,8 +98,8 @@ module User_command = struct
     ; fee_payer_id: int
     ; source_id: int
     ; receiver_id: int
-    ; fee_token: string
-    ; token: string
+    ; fee_token: int
+    ; token: int
     ; nonce: int
     ; amount: int option
     ; fee: int
@@ -117,8 +117,8 @@ module User_command = struct
         ; int
         ; int
         ; int
-        ; string
-        ; string
+        ; int
+        ; int
         ; int
         ; option int
         ; int
@@ -160,6 +160,7 @@ module User_command = struct
             (module Conn)
             (User_command.receiver_pk t)
         in
+        (* TODO: Converting these uint64s to int can overflow; see #5419 *)
         Conn.find
           (Caqti_request.find typ Caqti_type.int
              "INSERT INTO user_commands (type, fee_payer_id, source_id, \
@@ -170,8 +171,12 @@ module User_command = struct
           ; fee_payer_id
           ; source_id
           ; receiver_id
-          ; fee_token= User_command.fee_token t |> Token_id.to_string
-          ; token= User_command.token t |> Token_id.to_string
+          ; fee_token=
+              User_command.fee_token t |> Token_id.to_uint64
+              |> Unsigned.UInt64.to_int
+          ; token=
+              User_command.token t |> Token_id.to_uint64
+              |> Unsigned.UInt64.to_int
           ; nonce= User_command.nonce t |> Unsigned.UInt32.to_int
           ; amount=
               User_command.amount t
