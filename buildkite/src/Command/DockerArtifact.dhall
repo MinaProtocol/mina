@@ -20,7 +20,7 @@ let commands : List Cmd.Type =
         Cmd.run (
             "source DOCKER_DEPLOY_ENV && scripts/release-docker.sh" ++
                 " -s $$CODA_SERVICE -v $$CODA_VERSION" ++
-                " --extra-args '--build-arg coda_version=$$CODA_DEB_VERSION --build-arg deb_repo=$$CODA_DEB_REPO'"
+                " --extra-args '--build-arg coda_version=$CODA_DEB_VERSION --build-arg deb_repo=$CODA_DEB_REPO'"
         )
     ]
 
