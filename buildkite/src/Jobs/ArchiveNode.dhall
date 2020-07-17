@@ -26,10 +26,12 @@ Pipeline.build
         , name = "ArchiveNode"
         }
     , steps =
+    let outerDir : Text =
+            "/var/buildkite/builds/\\\$BUILDKITE_AGENT_NAME/\\\$BUILDKITE_ORGANIZATION_SLUG/\\\$BUILDKITE_PIPELINE_SLUG"
+    in
       [ Command.build
           Command.Config::
             { commands =
-              [ Cmd.run "mkdir -p /var/buildkite/test_output && chmod 0777 /var/buildkite/test_output" ] #
               OpamInit.andThenRunInDocker
                 [ "POSTGRES_PASSWORD=${password}"
                 , "POSTGRES_USER=${user}"
@@ -39,13 +41,13 @@ Pipeline.build
                   [ "bash buildkite/scripts/setup-database-for-archive-node.sh ${user} ${password} ${db}"
                   , "PGPASSWORD=${password} psql -h localhost -p 5432 -U ${user} -d ${db} -a -f src/app/archive/create_schema.sql"
                   , "LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper"
-                  , "./scripts/test.py run --non-interactive --collect-artifacts --yes --out-dir '/var/buildkite/test_output' 'test_archive_processor:coda-archive-processor-test'"
+                  , "./scripts/test.py run --non-interactive --collect-artifacts --yes --out-dir '/workdir/test_output' 'test_archive_processor:coda-archive-processor-test'"
                   ])
             , label = "Archive-node unit tests"
             , key = "build-client-sdk"
             , target = Size.Large
             , docker = None Docker.Type
-            , artifact_paths = [ S.contains "/var/buildkite/test_output" ]
+            , artifact_paths = [ S.contains "${outerDir}/test_output" ]
             }
       ]
     }
