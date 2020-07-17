@@ -41,7 +41,8 @@ RUN apt-get update && \
     curl \
     sudo \
     rsync \
-    unzip
+    unzip \
+    file
 
 
 # Golang install of a given GO_VERSION (add -v for spam output of each file from the go dist)
@@ -137,9 +138,9 @@ ARG EXTERNAL_PKG_DIR=$CODA_DIR/src/external
 ARG OPAMKEEPBUILDDIR=false
 ARG OPAMREUSEBUILDDIR=false
 
-RUN sudo git clone https://github.com/CodaProtocol/coda "${CODA_DIR}"
+RUN git clone https://github.com/CodaProtocol/coda "${CODA_DIR}" && git checkout rosetta/dockerfile
 WORKDIR ${CODA_DIR}
-RUN sudo git submodule update --init --recursive
+RUN git submodule update --init --recursive
 
 # All our ocaml packages
 RUN opam switch import src/opam.export && eval $(opam config env)
