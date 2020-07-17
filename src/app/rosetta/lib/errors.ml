@@ -6,7 +6,7 @@ module Variant = struct
    * on it and we want that to remain stable *)
   type t =
     [ `Sql of string
-    | `Json_parse of string
+    | `Json_parse of string option
     | `Graphql_coda_query of string
     | `Network_doesn't_exist of string * string
     | `Chain_info_missing
@@ -61,8 +61,8 @@ end = struct
   let context = function
     | `Sql msg ->
         Some msg
-    | `Json_parse msg ->
-        Some msg
+    | `Json_parse optional_msg ->
+        optional_msg
     | `Graphql_coda_query msg ->
         Some msg
     | `Network_doesn't_exist (req, conn) ->
@@ -129,7 +129,9 @@ end = struct
   module Lift = struct
     let parse ?context res =
       Deferred.return
-        (Result.map_error ~f:(fun s -> create ?context (`Json_parse s)) res)
+        (Result.map_error
+           ~f:(fun s -> create ?context (`Json_parse (Some s)))
+           res)
 
     let sql ?context res =
       Deferred.Result.map_error
