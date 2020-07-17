@@ -471,8 +471,7 @@ end = struct
   let to_string = Fn.id
 
   let create ~id ~state_hash =
-    Pickles.Verification_key.Id.sexp_of_t id
-    |> Sexp.to_string
+    Pickles.Verification_key.Id.to_string id
     |> ( ^ ) (State_hash.to_string state_hash)
     |> Blake2.digest_string |> Blake2.to_hex
 end

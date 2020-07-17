@@ -91,6 +91,8 @@ module Worker_state = struct
 
                module B = Blockchain_snark.Blockchain_snark_state.Make (T)
 
+               let _ = Pickles.Cache_handle.generate_or_load B.cache_handle
+
                let extend_blockchain (chain : Blockchain.t)
                    (next_state : Protocol_state.Value.t)
                    (block : Snark_transition.value) (t : Ledger_proof.t option)
