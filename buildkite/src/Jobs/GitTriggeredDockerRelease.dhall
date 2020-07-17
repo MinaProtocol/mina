@@ -11,28 +11,28 @@ let DockerArtifact = ../Command/DockerArtifact.dhall
 
 let uploadDeployEnv =
   Command.build
-      Command.Config::{
-        commands = [ Cmd.run "cd buildkite && buildkite-agent artifact upload DOCKER_DEPLOY_ENV" ],
-        label = "Upload modified deploy environment",
-        key = "artifact-upload",
-        target = Size.Small
-      }
+    Command.Config::{
+      commands = [ Cmd.run "cd buildkite && buildkite-agent artifact upload DOCKER_DEPLOY_ENV" ],
+      label = "Upload modified deploy environment",
+      key = "artifact-upload",
+      target = Size.Small
+    }
 
-let updatedDependsOn = [{ depends_on =  [ { name = "GitTriggeredDockerRelease", key = "artifact-upload" } ] }]
+let dependsOn = [ { name = "GitTriggeredDockerRelease", key = "artifact-upload" } ]
 
 in
 
 Pipeline.build
   Pipeline.Config::{
-      spec =
-        JobSpec::{
-            dirtyWhen = [
-                S.strictlyStart (S.contains "buildkite/DOCKER_DEPLOY_ENV")
-            ],
-            name = "GitTriggeredDockerRelease"
-        },
+    spec =
+      JobSpec::{
+          dirtyWhen = [
+              S.strictlyStart (S.contains "buildkite/DOCKER_DEPLOY_ENV")
+          ],
+          name = "GitTriggeredDockerRelease"
+      },
     steps = [
       uploadDeployEnv,
-      DockerArtifact.step
+      DockerArtifact.generateStep dependsOn
     ]
   }

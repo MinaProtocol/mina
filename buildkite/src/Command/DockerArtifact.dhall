@@ -26,16 +26,17 @@ let commands : List Cmd.Type =
 
 in
 
-let cmdConfig =
-  Command.build
-    Command.Config::{
-      commands  = commands,
-      label = "Build and release Docker artifacts",
-      key = "docker-artifact",
-      target = Size.Large,
-      docker_login = Some DockerLogin::{=}
-    }
+let generateStep = \(deps : List Command.TaggedKey.Type) ->
+    Command.build
+      Command.Config::{
+        commands  = commands,
+        label = "Build and release Docker artifacts",
+        key = "docker-artifact",
+        target = Size.Large,
+        docker_login = Some DockerLogin::{=},
+        depends_on = deps
+      }
 
 in
 
-{ step = cmdConfig }
+{ generateStep = generateStep }
