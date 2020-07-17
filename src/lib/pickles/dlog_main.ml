@@ -389,6 +389,8 @@ struct
         type t = Field.t
 
         let to_bits = Field.choose_preimage_var ~length:Field.size_in_bits
+
+        let high_entropy_bits = Wrap_main_inputs.high_entropy_bits
       end)
       (struct
         type t = Boolean.var * Field.t

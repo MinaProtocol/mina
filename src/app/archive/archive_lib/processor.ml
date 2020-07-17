@@ -567,15 +567,104 @@ module Block = struct
               (coinbase_id, block_id)
         in
         return block_id
+
+  let delete_if_older_than ?height ?num_blocks ?timestamp
+      (module Conn : CONNECTION) =
+    let open Deferred.Result.Let_syntax in
+    let%bind height =
+      match (height, num_blocks) with
+      | Some height, _ ->
+          return height
+      | None, Some num_blocks -> (
+          match%map
+            Conn.find_opt
+              (Caqti_request.find_opt Caqti_type.unit Caqti_type.int
+                 "SELECT MAX(height) FROM blocks")
+              ()
+          with
+          | Some max_block_height ->
+              max_block_height - num_blocks
+          | _ ->
+              0 )
+      | None, None ->
+          return 0
+    in
+    let timestamp = Option.value ~default:Int64.zero timestamp in
+    if height > 0 || Int64.(timestamp > 0L) then
+      let%bind () =
+        (* Delete user commands from old blocks. *)
+        Conn.exec
+          (Caqti_request.exec
+             Caqti_type.(tup2 int int64)
+             "DELETE FROM user_commands\n\
+              WHERE id IN\n\
+              (SELECT user_command_id FROM blocks_user_commands\n\
+              INNER JOIN blocks ON blocks.id = block_id\n\
+              WHERE (blocks.height < ? OR blocks.timestamp < ?))")
+          (height, timestamp)
+      in
+      let%bind () =
+        (* Delete old blocks. *)
+        Conn.exec
+          (Caqti_request.exec
+             Caqti_type.(tup2 int int64)
+             "DELETE FROM blocks WHERE blocks.height < ? OR blocks.timestamp \
+              < ?")
+          (height, timestamp)
+      in
+      let%bind () =
+        (* Delete orphaned internal commands. *)
+        Conn.exec
+          (Caqti_request.exec Caqti_type.unit
+             "DELETE FROM internal_commands\n\
+              WHERE id NOT IN\n\
+              (SELECT internal_commands.id FROM internal_commands\n\
+              INNER JOIN blocks_internal_commands ON\n\
+              internal_command_id = internal_commands.id)")
+          ()
+      in
+      let%bind () =
+        (* Delete orphaned snarked ledger hashes. *)
+        Conn.exec
+          (Caqti_request.exec Caqti_type.unit
+             "DELETE FROM snarked_ledger_hashes\n\
+              WHERE id NOT IN\n\
+              (SELECT snarked_ledger_hash_id FROM blocks)")
+          ()
+      in
+      let%bind () =
+        (* Delete orphaned public keys. *)
+        Conn.exec
+          (Caqti_request.exec Caqti_type.unit
+             "DELETE FROM public_keys\n\
+              WHERE id NOT IN (SELECT fee_payer_id FROM user_commands)\n\
+              AND id NOT IN (SELECT source_id FROM user_commands)\n\
+              AND id NOT IN (SELECT receiver_id FROM user_commands)\n\
+              AND id NOT IN (SELECT receiver_id FROM internal_commands)\n\
+              AND id NOT IN (SELECT creator_id FROM blocks)")
+          ()
+      in
+      return ()
+    else return ()
 end
 
-let run (module Conn : CONNECTION) reader ~constraint_constants ~logger =
+let run (module Conn : CONNECTION) reader ~constraint_constants ~logger
+    ~delete_older_than =
   Strict_pipe.Reader.iter reader ~f:(function
     | Diff.Transition_frontier (Breadcrumb_added {block; _}) -> (
         match%bind
           let open Deferred.Result.Let_syntax in
           let%bind () = Conn.start () in
-          Block.add_if_doesn't_exist ~constraint_constants (module Conn) block
+          let%bind _ =
+            Block.add_if_doesn't_exist ~constraint_constants
+              (module Conn)
+              block
+          in
+          match delete_older_than with
+          | Some num_blocks ->
+              Block.delete_if_older_than ~num_blocks (module Conn)
+          | None ->
+              return ()
         with
         | Error e ->
             Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
@@ -593,7 +682,8 @@ let run (module Conn : CONNECTION) reader ~constraint_constants ~logger =
             User_command.add_if_doesn't_exist (module Conn) user_command
             >>| ignore ) )
 
-let setup_server ~constraint_constants ~logger ~postgres_address ~server_port =
+let setup_server ~constraint_constants ~logger ~postgres_address ~server_port
+    ~delete_older_than =
   let where_to_listen =
     Async.Tcp.Where_to_listen.bind_to All_addresses (On_port server_port)
   in
@@ -609,7 +699,8 @@ let setup_server ~constraint_constants ~logger ~postgres_address ~server_port =
         ~metadata:[("error", `String (Caqti_error.show e))] ;
       Deferred.unit
   | Ok conn ->
-      run ~constraint_constants conn reader ~logger |> don't_wait_for ;
+      run ~constraint_constants conn reader ~logger ~delete_older_than
+      |> don't_wait_for ;
       Deferred.ignore
       @@ Tcp.Server.create
            ~on_handler_error:

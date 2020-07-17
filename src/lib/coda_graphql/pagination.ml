@@ -42,7 +42,14 @@ module type Inputs_intf = sig
   module Type : sig
     type t
 
-    val typ : (Coda_lib.t, t option) typ
+    (** Representative type in the GraphQL API. This may be an [abstract_value]
+        if the [typ] below is an interface instead of a direct declaration.
+    *)
+    type repr
+
+    val conv : t -> repr
+
+    val typ : (Coda_lib.t, repr option) typ
 
     val name : string
   end
@@ -84,7 +91,7 @@ module Make (Inputs : Inputs_intf) = struct
             ~resolve:(fun _ {Edge.cursor; _} -> cursor)
         ; field "node" ~typ:(non_null Type.typ)
             ~args:Arg.[]
-            ~resolve:(fun _ {Edge.node; _} -> node) ] )
+            ~resolve:(fun _ {Edge.node; _} -> Type.conv node) ] )
 
   let connection : (Coda_lib.t, Type.t Connection.t option) typ =
     obj (Type.name ^ "Connection")
@@ -98,7 +105,7 @@ module Make (Inputs : Inputs_intf) = struct
             ~typ:(non_null @@ list @@ non_null Type.typ)
             ~args:Arg.[]
             ~resolve:(fun _ {Connection.edges; _} ->
-              List.map edges ~f:(fun {Edge.node; _} -> node) )
+              List.map edges ~f:(fun {Edge.node; _} -> Type.conv node) )
         ; field "totalCount" ~typ:(non_null int)
             ~args:Arg.[]
             ~resolve:(fun _ {Connection.total_count; _} -> total_count)

@@ -9,12 +9,7 @@ module Stable = struct
 end]
 
 type 'a t = 'a Stable.Latest.t = {row: 'a; col: 'a; value: 'a; rc: 'a}
-[@@deriving sexp, fields]
-
-let to_hlist {row; col; value; rc} = H_list.[row; col; value; rc]
-
-let of_hlist ([row; col; value; rc] : (unit, _) H_list.t) =
-  {row; col; value; rc}
+[@@deriving sexp, fields, hlist]
 
 let typ g =
   Snarky.Typ.of_hlistable [g; g; g; g] ~var_to_hlist:to_hlist

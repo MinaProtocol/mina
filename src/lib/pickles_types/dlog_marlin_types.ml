@@ -186,14 +186,7 @@ module Openings = struct
 
     type ('g, 'fq) t = ('g, 'fq) Stable.Latest.t =
       {lr: ('g * 'g) array; z_1: 'fq; z_2: 'fq; delta: 'g; sg: 'g}
-    [@@deriving sexp, compare, yojson]
-
-    open Snarky.H_list
-
-    let to_hlist {lr; z_1; z_2; delta; sg} = [lr; z_1; z_2; delta; sg]
-
-    let of_hlist ([lr; z_1; z_2; delta; sg] : (unit, _) t) =
-      {lr; z_1; z_2; delta; sg}
+    [@@deriving sexp, compare, yojson, hlist]
 
     let typ fq g ~length =
       let open Snarky.Typ in
@@ -219,11 +212,7 @@ module Openings = struct
   type ('g, 'fq, 'fqv) t = ('g, 'fq, 'fqv) Stable.Latest.t =
     { proof: ('g, 'fq) Bulletproof.t
     ; evals: 'fqv Evals.t * 'fqv Evals.t * 'fqv Evals.t }
-  [@@deriving sexp, compare, yojson]
-
-  let to_hlist {proof; evals} = Snarky.H_list.[proof; evals]
-
-  let of_hlist ([proof; evals] : (unit, _) Snarky.H_list.t) = {proof; evals}
+  [@@deriving sexp, compare, yojson, hlist]
 
   let typ (type g gv) (g : (gv, g, 'f) Snarky.Typ.t) fq ~bulletproof_rounds
       ~commitment_lengths ~dummy_group_element =
@@ -247,12 +236,7 @@ module Poly_comm = struct
     end]
 
     type 'g t = 'g Stable.Latest.t = {unshifted: 'g array; shifted: 'g}
-    [@@deriving sexp, compare, yojson]
-
-    let to_hlist {unshifted; shifted} = Snarky.H_list.[unshifted; shifted]
-
-    let of_hlist ([unshifted; shifted] : (unit, _) Snarky.H_list.t) =
-      {unshifted; shifted}
+    [@@deriving sexp, compare, yojson, hlist]
 
     let typ ?(array = Snarky.Typ.array) g ~length =
       Snarky.Typ.of_hlistable [array ~length g; g] ~var_to_hlist:to_hlist
@@ -307,15 +291,7 @@ module Messages = struct
     ; gh_1: 'g With_degree_bound.t * 'g Without_degree_bound.t
     ; sigma_gh_2: 'fq * ('g With_degree_bound.t * 'g Without_degree_bound.t)
     ; sigma_gh_3: 'fq * ('g With_degree_bound.t * 'g Without_degree_bound.t) }
-  [@@deriving sexp, compare, yojson, fields]
-
-  let to_hlist {w_hat; z_hat_a; z_hat_b; gh_1; sigma_gh_2; sigma_gh_3} =
-    Snarky.H_list.[w_hat; z_hat_a; z_hat_b; gh_1; sigma_gh_2; sigma_gh_3]
-
-  let of_hlist
-      ([w_hat; z_hat_a; z_hat_b; gh_1; sigma_gh_2; sigma_gh_3] :
-        (unit, _) Snarky.H_list.t) =
-    {w_hat; z_hat_a; z_hat_b; gh_1; sigma_gh_2; sigma_gh_3}
+  [@@deriving sexp, compare, yojson, fields, hlist]
 
   let typ (type n) fq g ~dummy
       ~(commitment_lengths : (int, n) Vector.t Evals.t) =
@@ -361,10 +337,5 @@ module Proof = struct
 
   type ('g, 'fq, 'fqv) t = ('g, 'fq, 'fqv) Stable.Latest.t =
     {messages: ('g, 'fq) Messages.t; openings: ('g, 'fq, 'fqv) Openings.t}
-  [@@deriving sexp, compare, yojson]
-
-  let to_hlist {messages; openings} = Snarky.H_list.[messages; openings]
-
-  let of_hlist ([messages; openings] : (unit, _) Snarky.H_list.t) =
-    {messages; openings}
+  [@@deriving sexp, compare, yojson, hlist]
 end
