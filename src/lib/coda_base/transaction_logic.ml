@@ -40,9 +40,7 @@ module Undo = struct
       module Stable = struct
         module V1 = struct
           type t =
-            { user_command:
-                User_command.Stable.V1.t
-                User_command_status.With_status.Stable.V1.t
+            { user_command: User_command.Stable.V1.t With_status.Stable.V1.t
             ; previous_receipt_chain_hash: Receipt.Chain_hash.Stable.V1.t
             ; fee_payer_timing: Account.Timing.Stable.V1.t
             ; source_timing: Account.Timing.Stable.V1.t option }
@@ -53,7 +51,7 @@ module Undo = struct
       end]
 
       type t = Stable.Latest.t =
-        { user_command: User_command.t User_command_status.With_status.t
+        { user_command: User_command.t With_status.t
         ; previous_receipt_chain_hash: Receipt.Chain_hash.t
         ; fee_payer_timing: Account.Timing.t
         ; source_timing: Account.Timing.t option }
@@ -185,7 +183,7 @@ module type S = sig
     module User_command_undo : sig
       module Common : sig
         type t = Undo.User_command_undo.Common.t =
-          { user_command: User_command.t User_command_status.With_status.t
+          { user_command: User_command.t With_status.t
           ; previous_receipt_chain_hash: Receipt.Chain_hash.t
           ; fee_payer_timing: Account.Timing.t
           ; source_timing: Account.Timing.t option }
@@ -231,8 +229,7 @@ module type S = sig
     type t = Undo.t = {previous_hash: Ledger_hash.t; varying: Varying.t}
     [@@deriving sexp]
 
-    val transaction :
-      t -> Transaction.t User_command_status.With_status.t Or_error.t
+    val transaction : t -> Transaction.t With_status.t Or_error.t
 
     val user_command_status : t -> User_command_status.t
   end
@@ -418,13 +415,11 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
   module Undo = struct
     include Undo
 
-    let transaction :
-        t -> Transaction.t User_command_status.With_status.t Or_error.t =
+    let transaction : t -> Transaction.t With_status.t Or_error.t =
      fun {varying; _} ->
       match varying with
       | User_command uc ->
-          User_command_status.With_status.map_result uc.common.user_command
-            ~f:(fun cmd ->
+          With_status.map_result uc.common.user_command ~f:(fun cmd ->
               Option.value_map ~default:(Or_error.error_string "Bad signature")
                 (UC.check cmd) ~f:(fun cmd -> Ok (Transaction.User_command cmd))
           )

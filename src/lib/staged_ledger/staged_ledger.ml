@@ -18,8 +18,7 @@ module T = struct
   module Staged_ledger_error = struct
     type t =
       | Non_zero_fee_excess of
-          Scan_state.Space_partition.t
-          * Transaction.t User_command_status.With_status.t list
+          Scan_state.Space_partition.t * Transaction.t With_status.t list
       | Invalid_proofs of
           ( Ledger_proof.t
           * Transaction_snark.Statement.t
@@ -34,9 +33,8 @@ module T = struct
       | Non_zero_fee_excess (partition, txns) ->
           Format.asprintf
             !"Fee excess is non-zero for the transactions: %{sexp: \
-              Transaction.t User_command_status.With_status.t list} and the \
-              current queue with slots partitioned as %{sexp: \
-              Scan_state.Space_partition.t} \n"
+              Transaction.t With_status.t list} and the current queue with \
+              slots partitioned as %{sexp: Scan_state.Space_partition.t} \n"
             txns partition
       | Pre_diff pre_diff_error ->
           Format.asprintf
@@ -511,9 +509,8 @@ module T = struct
             ~f:(fun (acc, pending_coinbase_stack_state) t ->
               match%map.Async
                 apply_transaction_and_get_witness ~constraint_constants ledger
-                  pending_coinbase_stack_state
-                  t.User_command_status.With_status.data current_global_slot
-                  state_and_body_hash
+                  pending_coinbase_stack_state t.With_status.data
+                  current_global_slot state_and_body_hash
               with
               | Ok (res, updated_pending_coinbase_stack_state) ->
                   (res :: acc, updated_pending_coinbase_stack_state)
@@ -557,7 +554,7 @@ module T = struct
     in
     let total_fee_excess txns =
       List.fold_until txns ~init:Fee_excess.empty ~finish:Or_error.return
-        ~f:(fun acc (txn : Transaction.t User_command_status.With_status.t) ->
+        ~f:(fun acc (txn : Transaction.t With_status.t) ->
           match
             let open Or_error.Let_syntax in
             let%bind fee_excess = Transaction.fee_excess txn.data in
@@ -588,7 +585,7 @@ module T = struct
     let coinbase_exists txns =
       List.fold_until ~init:false txns
         ~f:(fun acc t ->
-          match t.User_command_status.With_status.data with
+          match t.With_status.data with
           | Transaction.Coinbase _ ->
               Stop true
           | _ ->
@@ -906,9 +903,7 @@ module T = struct
     module Discarded = struct
       type t =
         { user_commands_rev:
-            User_command.With_valid_signature.t
-            User_command_status.With_status.t
-            Sequence.t
+            User_command.With_valid_signature.t With_status.t Sequence.t
         ; completed_work: Transaction_snark_work.Checked.t Sequence.t }
       [@@deriving sexp_of]
 
@@ -928,8 +923,7 @@ module T = struct
       ; max_jobs: int
             (*Required amount of work for max_space that can be purchased*)
       ; user_commands_rev:
-          User_command.With_valid_signature.t User_command_status.With_status.t
-          Sequence.t
+          User_command.With_valid_signature.t With_status.t Sequence.t
       ; completed_work_rev: Transaction_snark_work.Checked.t Sequence.t
       ; fee_transfers: Fee.t Public_key.Compressed.Map.t
       ; add_coinbase: bool
@@ -1065,9 +1059,8 @@ module T = struct
       (coinbase, singles)
 
     let init ~constraint_constants
-        (uc_seq :
-          User_command.With_valid_signature.t User_command_status.With_status.t
-          Sequence.t) (cw_seq : Transaction_snark_work.Checked.t Sequence.t)
+        (uc_seq : User_command.With_valid_signature.t With_status.t Sequence.t)
+        (cw_seq : Transaction_snark_work.Checked.t Sequence.t)
         (slots, job_count) ~receiver_pk ~add_coinbase logger
         ~is_coinbase_reciever_new =
       let seq_rev seq =
@@ -1652,9 +1645,7 @@ module T = struct
                 !"%s" error_message ;
               Stop seq
           | Ok status ->
-              let txn_with_status =
-                {User_command_status.With_status.data= txn; status}
-              in
+              let txn_with_status = {With_status.data= txn; status} in
               let seq' =
                 Sequence.append (Sequence.singleton txn_with_status) seq
               in
@@ -1940,9 +1931,7 @@ let%test_module "test" =
 
     (* Fee excess at top level ledger proofs should always be zero *)
     let assert_fee_excess :
-           ( Ledger_proof.t
-           * (Transaction.t User_command_status.With_status.t * _) list )
-           option
+           (Ledger_proof.t * (Transaction.t With_status.t * _) list) option
         -> unit =
      fun proof_opt ->
       let fee_excess =
@@ -2037,7 +2026,7 @@ let%test_module "test" =
                   cmds_applied_this_iter <= Sequence.length cmds_this_iter ) ;
                 [%test_eq: User_command.t list]
                   (List.map (Staged_ledger_diff.user_commands diff)
-                     ~f:(fun {User_command_status.With_status.data; _} -> data))
+                     ~f:(fun {With_status.data; _} -> data))
                   ( Sequence.take cmds_this_iter cmds_applied_this_iter
                     |> Sequence.to_list
                     :> User_command.t list )
@@ -2259,8 +2248,7 @@ let%test_module "test" =
                     let cmds_this_iter =
                       cmds_this_iter |> Sequence.to_list
                       |> List.map ~f:(fun cmd ->
-                             { User_command_status.With_status.data=
-                                 (cmd :> User_command.t)
+                             { With_status.data= (cmd :> User_command.t)
                              ; status= Applied } )
                     in
                     let diff =

@@ -23,9 +23,8 @@ module type Transition_frontier_intf = sig
   end
 
   type best_tip_diff =
-    { new_user_commands: User_command.t User_command_status.With_status.t list
-    ; removed_user_commands:
-        User_command.t User_command_status.With_status.t list
+    { new_user_commands: User_command.t With_status.t list
+    ; removed_user_commands: User_command.t With_status.t list
     ; reorg_best_tip: bool }
 
   val best_tip : t -> Breadcrumb.t
@@ -277,15 +276,11 @@ struct
           [ ( "removed"
             , `List
                 (List.map removed_user_commands
-                   ~f:
-                     (User_command_status.With_status.to_yojson
-                        User_command.to_yojson)) )
+                   ~f:(With_status.to_yojson User_command.to_yojson)) )
           ; ( "added"
             , `List
                 (List.map new_user_commands
-                   ~f:
-                     (User_command_status.With_status.to_yojson
-                        User_command.to_yojson)) ) ]
+                   ~f:(With_status.to_yojson User_command.to_yojson)) ) ]
         "Diff: removed: $removed added: $added from best tip" ;
       let pool', dropped_backtrack =
         Sequence.fold
@@ -363,9 +358,7 @@ struct
                 Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
                   "Locally generated command $cmd committed in a block!"
                   ~metadata:
-                    [ ( "cmd"
-                      , User_command_status.With_status.to_yojson
-                          User_command.to_yojson cmd ) ] ;
+                    [("cmd", With_status.to_yojson User_command.to_yojson cmd)] ;
                 Hashtbl.add_exn t.locally_generated_committed ~key:cmd'
                   ~data:time_added ) ;
             let p', dropped =
@@ -379,8 +372,7 @@ struct
                     "Error handling committed transaction $cmd: $error "
                     ~metadata:
                       [ ( "cmd"
-                        , User_command_status.With_status.to_yojson
-                            User_command.to_yojson cmd )
+                        , With_status.to_yojson User_command.to_yojson cmd )
                       ; ("error", `String error_str)
                       ; ( "queue"
                         , `List
@@ -977,10 +969,8 @@ include Make
             include Transition_frontier
 
             type best_tip_diff = Extensions.Best_tip_diff.view =
-              { new_user_commands:
-                  User_command.t User_command_status.With_status.t list
-              ; removed_user_commands:
-                  User_command.t User_command_status.With_status.t list
+              { new_user_commands: User_command.t With_status.t list
+              ; removed_user_commands: User_command.t With_status.t list
               ; reorg_best_tip: bool }
 
             let best_tip_diff_pipe t =
@@ -1020,10 +1010,8 @@ let%test_module _ =
       end
 
       type best_tip_diff =
-        { new_user_commands:
-            User_command.t User_command_status.With_status.t list
-        ; removed_user_commands:
-            User_command.t User_command_status.With_status.t list
+        { new_user_commands: User_command.t With_status.t list
+        ; removed_user_commands: User_command.t With_status.t list
         ; reorg_best_tip: bool }
 
       type t = best_tip_diff Broadcast_pipe.Reader.t * Breadcrumb.t ref
@@ -1151,8 +1139,7 @@ let%test_module _ =
 
     let accepted_user_commands = Result.map ~f:fst
 
-    let mk_with_status cmd =
-      {User_command_status.With_status.data= cmd; status= Applied}
+    let mk_with_status cmd = {With_status.data= cmd; status= Applied}
 
     let%test_unit "transactions are removed in linear case" =
       Thread_safe.block_on_async_exn (fun () ->

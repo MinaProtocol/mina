@@ -106,7 +106,7 @@ module Undo : sig
   module User_command_undo : sig
     module Common : sig
       type t = Undo.User_command_undo.Common.t =
-        { user_command: User_command.t User_command_status.With_status.t
+        { user_command: User_command.t With_status.t
         ; previous_receipt_chain_hash: Receipt.Chain_hash.t
         ; fee_payer_timing: Account.Timing.t
         ; source_timing: Account.Timing.t option }
@@ -151,8 +151,7 @@ module Undo : sig
   type t = Undo.t = {previous_hash: Ledger_hash.t; varying: Varying.t}
   [@@deriving sexp]
 
-  val transaction :
-    t -> Transaction.t User_command_status.With_status.t Or_error.t
+  val transaction : t -> Transaction.t With_status.t Or_error.t
 
   val user_command_status : t -> User_command_status.t
 end

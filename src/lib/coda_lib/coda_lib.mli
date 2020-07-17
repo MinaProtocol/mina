@@ -99,10 +99,7 @@ module Root_diff : sig
   module Stable : sig
     module V1 : sig
       type t =
-        { user_commands:
-            User_command.Stable.V1.t
-            User_command_status.With_status.Stable.V1.t
-            list
+        { user_commands: User_command.Stable.V1.t With_status.Stable.V1.t list
         ; root_length: int }
     end
   end]

@@ -96,9 +96,7 @@ val fill_work_and_enqueue_transactions :
      t
   -> Transaction_with_witness.t list
   -> Transaction_snark_work.t list
-  -> ( ( Ledger_proof.t
-       * (Transaction.t User_command_status.With_status.t * State_hash.t) list
-       )
+  -> ( (Ledger_proof.t * (Transaction.t With_status.t * State_hash.t) list)
        option
      * t )
      Or_error.t
@@ -106,7 +104,7 @@ val fill_work_and_enqueue_transactions :
 val latest_ledger_proof :
      t
   -> ( Ledger_proof_with_sok_message.t
-     * (Transaction.t User_command_status.With_status.t * State_hash.t) list )
+     * (Transaction.t With_status.t * State_hash.t) list )
      option
 
 val free_space : t -> int
@@ -118,16 +116,13 @@ val hash : t -> Staged_ledger_hash.Aux_hash.t
 val target_merkle_root : t -> Frozen_ledger_hash.t option
 
 (** All the transactions in the order in which they were applied*)
-val staged_transactions :
-  t -> Transaction.t User_command_status.With_status.t list Or_error.t
+val staged_transactions : t -> Transaction.t With_status.t list Or_error.t
 
 (** All the transactions with parent protocol state of the block in which they were included in the order in which they were applied*)
 val staged_transactions_with_protocol_states :
      t
   -> get_state:(State_hash.t -> Coda_state.Protocol_state.value Or_error.t)
-  -> ( Transaction.t User_command_status.With_status.t
-     * Coda_state.Protocol_state.value )
-     list
+  -> (Transaction.t With_status.t * Coda_state.Protocol_state.value) list
      Or_error.t
 
 (** Available space and the corresponding required work-count in one and/or two trees (if the slots to be occupied are in two different trees)*)

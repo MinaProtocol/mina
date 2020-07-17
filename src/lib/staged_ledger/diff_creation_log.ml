@@ -56,8 +56,7 @@ module Summary = struct
   let init_resources
       ~(completed_work : Transaction_snark_work.Checked.t Sequence.t)
       ~(user_commands :
-         User_command.With_valid_signature.t User_command_status.With_status.t
-         Sequence.t)
+         User_command.With_valid_signature.t With_status.t Sequence.t)
       ~(coinbase : Coinbase.Fee_transfer.t Staged_ledger_diff.At_most_two.t) =
     let completed_work =
       ( Sequence.length completed_work
@@ -77,8 +76,7 @@ module Summary = struct
 
   let init ~(completed_work : Transaction_snark_work.Checked.t Sequence.t)
       ~(user_commands :
-         User_command.With_valid_signature.t User_command_status.With_status.t
-         Sequence.t)
+         User_command.With_valid_signature.t With_status.t Sequence.t)
       ~(coinbase : Coinbase.Fee_transfer.t Staged_ledger_diff.At_most_two.t)
       ~partition ~available_slots ~required_work_count =
     let start_resources =
@@ -103,8 +101,7 @@ module Summary = struct
 
   let end_log t ~(completed_work : Transaction_snark_work.Checked.t Sequence.t)
       ~(user_commands :
-         User_command.With_valid_signature.t User_command_status.With_status.t
-         Sequence.t)
+         User_command.With_valid_signature.t With_status.t Sequence.t)
       ~(coinbase : Coinbase.Fee_transfer.t Staged_ledger_diff.At_most_two.t) =
     end_resources.set
       (init_resources ~completed_work ~user_commands ~coinbase)
@@ -149,8 +146,7 @@ module Detail = struct
 
   let init ~(completed_work : Transaction_snark_work.Checked.t Sequence.t)
       ~(user_commands :
-         User_command.With_valid_signature.t User_command_status.With_status.t
-         Sequence.t)
+         User_command.With_valid_signature.t With_status.t Sequence.t)
       ~(coinbase : Coinbase.Fee_transfer.t Staged_ledger_diff.At_most_two.t) =
     let init =
       Summary.init_resources ~completed_work ~user_commands ~coinbase
@@ -211,8 +207,7 @@ type detail_list = Detail.t list [@@deriving sexp, to_yojson]
 
 let init ~(completed_work : Transaction_snark_work.Checked.t Sequence.t)
     ~(user_commands :
-       User_command.With_valid_signature.t User_command_status.With_status.t
-       Sequence.t)
+       User_command.With_valid_signature.t With_status.t Sequence.t)
     ~(coinbase : Coinbase.Fee_transfer.t Staged_ledger_diff.At_most_two.t)
     ~partition ~available_slots ~required_work_count =
   let summary =
@@ -234,8 +229,7 @@ let discard_completed_work why completed_work t =
 
 let end_log ~(completed_work : Transaction_snark_work.Checked.t Sequence.t)
     ~(user_commands :
-       User_command.With_valid_signature.t User_command_status.With_status.t
-       Sequence.t)
+       User_command.With_valid_signature.t With_status.t Sequence.t)
     ~(coinbase : Coinbase.Fee_transfer.t Staged_ledger_diff.At_most_two.t) t =
   let summary =
     Summary.end_log (fst t) ~completed_work ~user_commands ~coinbase

@@ -35,12 +35,11 @@ module type External_transition_common_intf = sig
   val transactions :
        constraint_constants:Genesis_constants.Constraint_constants.t
     -> t
-    -> Transaction.t User_command_status.With_status.t list
+    -> Transaction.t With_status.t list
 
-  val user_commands :
-    t -> User_command.t User_command_status.With_status.t list
+  val user_commands : t -> User_command.t With_status.t list
 
-  val payments : t -> User_command.t User_command_status.With_status.t list
+  val payments : t -> User_command.t With_status.t list
 
   val delta_transition_chain_proof : t -> State_hash.t * State_body_hash.t list
 

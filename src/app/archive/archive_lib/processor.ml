@@ -424,11 +424,11 @@ module Block = struct
           Core.List.fold transactions ~init:([], [], [])
             ~f:(fun (acc_user_commands, acc_fee_transfers, acc_coinbases) ->
             function
-            | { Coda_base.User_command_status.With_status.status
+            | { Coda_base.With_status.status
               ; data= Coda_base.Transaction.User_command user_command_checked
               } ->
                 let user_command =
-                  { Coda_base.User_command_status.With_status.status
+                  { Coda_base.With_status.status
                   ; data=
                       Coda_base.User_command.forget_check user_command_checked
                   }

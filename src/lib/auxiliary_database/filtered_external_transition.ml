@@ -110,8 +110,7 @@ let validate_transactions external_transition =
   Staged_ledger.Pre_diff_info.get_transactions staged_ledger_diff
 
 let of_transition external_transition tracked_participants
-    (calculated_transactions :
-      Transaction.t User_command_status.With_status.t list) =
+    (calculated_transactions : Transaction.t With_status.t list) =
   let open External_transition.Validated in
   let creator = block_producer external_transition in
   let protocol_state =
