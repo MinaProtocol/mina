@@ -1,8 +1,6 @@
 type member = {
   name: string,
   genesisMember: bool,
-  technicalMVP: bool,
-  communityMVP: bool,
   phasePoints: int,
   releasePoints: int,
   allTimePoints: int,
@@ -37,18 +35,14 @@ let fetchLeaderboard = () => {
        |> Array.map(entry => {
             {
               name: entry |> safeArrayGet(0),
-              allTimePoints: entry |> safeArrayGet(1) |> safeParseInt,
-              phasePoints: entry |> safeArrayGet(2) |> safeParseInt,
-              releasePoints: entry |> safeArrayGet(3) |> safeParseInt,
-              allTimeRank: entry |> safeArrayGet(4) |> safeParseInt,
-              phaseRank: entry |> safeArrayGet(5) |> safeParseInt,
-              releaseRank: entry |> safeArrayGet(6) |> safeParseInt,
               genesisMember:
-                entry |> safeArrayGet(7) |> String.length == 0 ? false : true,
-              technicalMVP:
-                entry |> safeArrayGet(8) |> String.length == 0 ? false : true,
-              communityMVP:
-                entry |> safeArrayGet(9) |> String.length == 0 ? false : true,
+                entry |> safeArrayGet(1) |> String.length == 0 ? false : true,
+              allTimePoints: entry |> safeArrayGet(2) |> safeParseInt,
+              phasePoints: entry |> safeArrayGet(3) |> safeParseInt,
+              releasePoints: entry |> safeArrayGet(4) |> safeParseInt,
+              allTimeRank: entry |> safeArrayGet(5) |> safeParseInt,
+              phaseRank: entry |> safeArrayGet(6) |> safeParseInt,
+              releaseRank: entry |> safeArrayGet(7) |> safeParseInt,
             }
           })
      })
@@ -143,8 +137,13 @@ module Styles = {
       height(`rem(3.5)),
       display(`grid),
       gridColumnGap(rem(1.5)),
-      width(`percent(100.)),
-      gridTemplateColumns([`rem(3.5), `rem(6.), `auto, `rem(9.)]),
+      gridTemplateColumns([
+        rem(1.),
+        rem(5.5),
+        rem(5.5),
+        rem(3.5),
+        rem(3.5),
+      ]),
       hover([backgroundColor(`hex("E0E0E0"))]),
       media(
         Theme.MediaQuery.tablet,
@@ -152,7 +151,6 @@ module Styles = {
           width(`percent(100.)),
           gridTemplateColumns([
             rem(3.5),
-            rem(6.),
             `auto,
             rem(9.),
             rem(8.),
@@ -160,20 +158,6 @@ module Styles = {
           ]),
         ],
       ),
-    ]);
-
-  let mobileLeaderboardRow =
-    style([
-      display(`grid),
-      gridTemplateColumns([`rem(5.), `auto]),
-      gridColumnGap(`rem(1.5)),
-      cursor(`pointer),
-      padding2(~v=`rem(1.), ~h=`rem(1.)),
-      fontWeight(`semiBold),
-      fontSize(`rem(1.)),
-      height(`percent(100.)),
-      width(`percent(100.)),
-      lineHeight(`rem(1.5)),
     ]);
 
   let headerRow =
@@ -219,7 +203,7 @@ module Styles = {
   let cell =
     style([height(`rem(2.)), whiteSpace(`nowrap), overflowX(`hidden)]);
   let flexEnd = style([justifySelf(`flexEnd)]);
-  let rank = merge([cell, flexEnd, style([gridColumn(0, 1)])]);
+  let rank = merge([cell, flexEnd]);
   let username =
     merge([cell, style([textOverflow(`ellipsis), fontWeight(`semiBold)])]);
   let pointsCell = merge([cell, style([justifySelf(`flexEnd)])]);
@@ -242,10 +226,6 @@ module Styles = {
       textAlign(`center),
     ]);
 
-  let badges = style([display(`flex), justifyContent(`flexEnd)]);
-  let mobileBadges =
-    style([display(`flex), marginLeft(`rem(0.5)), paddingBottom(px(5))]);
-
   let desktopLayout =
     style([
       display(`none),
@@ -258,20 +238,23 @@ module Styles = {
       media(Theme.MediaQuery.notMobile, [display(`none)]),
     ]);
 
-  let mobileFirstColumn =
-    style([textAlign(`right), color(`hex("757575"))]);
-
-  let mobileSecondColumn =
+  let mobileLeaderboardRow =
     style([
-      display(`flex),
-      justifyContent(`flexStart),
-      flexDirection(`row),
-      textAlign(`left),
+      display(`grid),
+      gridTemplateColumns([rem(5.), `auto]),
+      gridColumnGap(rem(1.5)),
+      cursor(`pointer),
+      padding2(~v=`rem(1.), ~h=`rem(1.)),
+      fontWeight(`semiBold),
+      fontSize(`px(16)),
+      lineHeight(`px(24)),
     ]);
+
+  let firstColumn = style([textAlign(`right), color(`hex("757575"))]);
 
   let mobilePointStar =
     merge([
-      mobileFirstColumn,
+      firstColumn,
       style([
         before([
           contentRule("*"),
@@ -325,112 +308,37 @@ module LeaderboardRow = {
     ++ member.releasePoints->string_of_int
     ++ "&genesisMember="
     ++ member.genesisMember->string_of_bool
-    ++ "&communityMVP="
-    ++ member.communityMVP->string_of_bool
-    ++ "&technicalMVP="
-    ++ member.technicalMVP->string_of_bool
     ++ "&name="
     ++ member.name
     |> Js.String.replaceByRe([%re "/#/g"], "%23"); /* replace "#" with percent encoding for the URL to properly parse */
   };
 
-  let renderBadges = (member, height, width) => {
-    let icons = [||];
-    if (member.technicalMVP && member.communityMVP) {
-      Js.Array.push(
-        <Badge
-          key={member.name ++ "Technical & Community MVP"}
-          src="/static/img/LeaderboardAwardDoubleMVP.png"
-          title="Technical & Community MVP"
-          alt="Technical & Community MVP"
-          height
-          width
-        />,
-        icons,
-      )
-      |> ignore;
-    } else if (member.technicalMVP) {
-      Js.Array.push(
-        <Badge
-          key={member.name ++ "Technical MVP"}
-          src="/static/img/LeaderboardAwardTechnicalMVP.png"
-          title="Technical MVP"
-          alt="Technical MVP"
-          height
-          width
-        />,
-        icons,
-      )
-      |> ignore;
-    } else if (member.communityMVP) {
-      Js.Array.push(
-        <Badge
-          key={member.name ++ "Community MVP"}
-          src="/static/img/LeaderboardAwardCommunityMVP.png"
-          title="Community MVP"
-          alt="Community MVP"
-          height
-          width
-        />,
-        icons,
-      )
-      |> ignore;
-    };
-
-    /* Genesis badge is added last so it's always the rightmost badge in the leaderboard */
-    if (member.genesisMember) {
-      Js.Array.push(
-        <Badge
-          key={member.name ++ "Genesis Founding Member"}
-          src="/static/img/LeaderboardAwardGenesisMember.png"
-          title="Genesis Program Founding Member"
-          alt="Genesis Program Founding Member"
-          height
-          width
-        />,
-        icons,
-      )
-      |> ignore;
-    };
-    icons |> React.array;
-  };
-
   module DesktopLayout = {
     [@react.component]
-    let make = (~userSlug, ~sort, ~rank, ~member) => {
-      <Next.Link href=userSlug _as=userSlug>
-        <div className=Styles.desktopLeaderboardRow>
+    let make = (~sort, ~rank, ~member) => {
+      //<Next.Link href=""_as=userSlug>
+      <div className=Styles.desktopLeaderboardRow>
+
           <span className=Styles.rank>
             {React.string(string_of_int(rank))}
-          </span>
-          <span className=Styles.badges>
-            {renderBadges(member, 2., 2.)}
           </span>
           <span className=Styles.username> {React.string(member.name)} </span>
           {Array.map(column => {renderPoints(sort, column, member)}, filters)
            |> React.array}
-        </div>
-      </Next.Link>;
+        </div>;
+        // </Next.Link>;
     };
   };
 
   module MobileLayout = {
     [@react.component]
-    let make = (~userSlug, ~sort, ~rank, ~member) => {
-      <Next.Link href=userSlug _as=userSlug>
-        <div className=Styles.mobileLeaderboardRow>
-          <span className=Styles.mobileFirstColumn>
-            {React.string("Rank")}
-          </span>
-          <span className=Styles.mobileSecondColumn>
-            {React.string("#" ++ string_of_int(rank))}
-            <span className=Styles.mobileBadges>
-              {renderBadges(member, 1., 1.)}
-            </span>
-          </span>
-          <span className=Styles.mobileFirstColumn>
-            {React.string("Name")}
-          </span>
+    let make = (~sort, ~rank, ~member) => {
+      //<Next.Link href=""_as=userSlug>
+      <div className=Styles.mobileLeaderboardRow>
+
+          <span className=Styles.firstColumn> {React.string("Rank")} </span>
+          <span> {React.string("#" ++ string_of_int(rank))} </span>
+          <span className=Styles.firstColumn> {React.string("Name")} </span>
           <span> {React.string(member.name)} </span>
           <span className=Styles.mobilePointStar>
             {React.string("Points")}
@@ -438,22 +346,22 @@ module LeaderboardRow = {
           <span>
             {React.string(string_of_int(getPoints(sort, member)))}
           </span>
-        </div>
-      </Next.Link>;
+        </div>;
+        //</Next.Link>;
     };
   };
 
   [@react.component]
   let make = (~sort, ~member) => {
-    let userSlug = getUserSlug(member);
+    let _userSlug = getUserSlug(member);
     let rank = getRank(sort, member);
 
     <div>
-      <div className=Styles.mobileLayout>
-        <MobileLayout userSlug sort rank member />
-      </div>
       <div className=Styles.desktopLayout>
-        <DesktopLayout userSlug sort rank member />
+        <DesktopLayout sort rank member />
+      </div>
+      <div className=Styles.mobileLayout>
+        <MobileLayout sort rank member />
       </div>
     </div>;
   };
@@ -537,9 +445,7 @@ let make =
     <div id="testnet-leaderboard" className=Styles.leaderboard>
       <div className=Styles.headerRow>
         <span className=Styles.flexEnd> {React.string("Rank")} </span>
-        <span className=Css.(style([gridColumn(3, 4)]))>
-          {React.string("Name")}
-        </span>
+        <span> {React.string("Name")} </span>
         {Array.map(renderColumnHeader, Filter.filters) |> React.array}
       </div>
       <hr />

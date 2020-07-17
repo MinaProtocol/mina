@@ -144,13 +144,7 @@ let updateChallengeSheet = (client, spreadsheetId, range, userMap, metricsMap) =
 let uploadChallengePoints = (spreadsheetId, metricsMap) => {
   let client = createClient();
   getRange(
-    client,
-    initSheetsQuery(
-      spreadsheetId,
-      Sheets.getSheet(Sheets.Users).range,
-      "FORMULA",
-    ),
-    result => {
+    client, initSheetsQuery(spreadsheetId, "Users!A2:B", "FORMULA"), result => {
     switch (result) {
     /* userData is a 2d array of usernames and public keys to represent each user */
     | Ok(userData) =>
@@ -160,7 +154,7 @@ let uploadChallengePoints = (spreadsheetId, metricsMap) => {
       updateChallengeSheet(
         client,
         spreadsheetId,
-        Sheets.getSheet(Sheets.CurrentReleaseLeaderboard).name ++ "!A3:M",
+        "3.2b!A3:M",
         userMap,
         metricsMap,
       );
