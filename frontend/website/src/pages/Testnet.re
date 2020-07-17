@@ -50,12 +50,15 @@ module Styles = {
   let content =
     style([
       display(`flex),
-      flexDirection(`columnReverse),
       justifyContent(`center),
+      flexDirection(`column),
       width(`percent(100.)),
       marginBottom(`rem(1.5)),
-      media(Theme.MediaQuery.somewhatLarge, [flexDirection(`row)]),
+      maxWidth(`rem(58.)),
     ]);
+
+  let leaderboardCopy =
+    style([maxWidth(`rem(36.5)), margin2(~v=`zero, ~h=`auto)]);
 
   let rowStyles = [
     display(`grid),
@@ -85,7 +88,7 @@ module Styles = {
       Theme.H3.basic,
       style([
         fontWeight(`semiBold),
-        marginTop(rem(0.75)),
+        marginTop(rem(1.5)),
         marginLeft(rem(1.75)),
       ]),
     ]);
@@ -99,7 +102,7 @@ module Styles = {
   let dashboardHeader =
     merge([
       header,
-      style([marginTop(rem(1.5)), marginBottom(rem(2.25))]),
+      style([marginTop(rem(1.5)), marginBottom(`rem(1.5))]),
     ]);
 
   let dashboard =
@@ -217,6 +220,8 @@ module Styles = {
 
   let heroText =
     merge([header, style([maxWidth(`px(500)), textAlign(`left)])]);
+  let disclaimer =
+    merge([Theme.Body.small, style([color(Theme.Colors.midnight)])]);
 };
 
 module Section = {
@@ -345,86 +350,23 @@ let make = (~challenges as _, ~testnetName as _) => {
             </a>
           </div>
           <div className=Styles.content>
+            <span className=Styles.leaderboardCopy>
+              <p className=Theme.Body.big_semibold>
+                {React.string(
+                   "Coda rewards community members with testnet points for completing challenges that \
+                  contribute to the development of the protocol. *",
+                 )}
+              </p>
+              <p className=Styles.disclaimer>
+                {React.string(
+                   "* Testnet Points are designed solely to track contributions to the Testnet \
+                 and Testnet Points have no cash or other monetary value. Testnet Points and \
+                 are not transferable and are not redeemable or exchangeable for any cryptocurrency \
+                 or digital assets. We may at any time amend or eliminate Testnet Points.",
+                 )}
+              </p>
+            </span>
             <Leaderboard />
-            <div className=Styles.copy>
-              <h4 className=Styles.sidebarHeader>
-                {React.string("Testnet Points")}
-              </h4>
-              <p className=Styles.markdownStyles>
-                {React.string("The goal of Testnet Points")}
-                <a href="#disclaimer" onClick={_ => setExpanded(_ => true)}>
-                  {React.string("*")}
-                </a>
-                {React.string(
-                   " is to recognize Coda community members who are actively involved in the network. There will be regular challenges to make it fun, interesting, and foster some friendly competition! Points can be won in several ways like being first to complete a challenge, contributing code to Coda, or being an excellent community member and helping others out.",
-                 )}
-              </p>
-              // <Challenges challenges testnetName />
-              // Temporarily hardcode the following message instead of the "Challenge" component
-              <h4> {React.string("Genesis Token Program")} </h4>
-              <p className=Styles.markdownStyles>
-                {React.string(
-                   "By completing challenges on testnet, you're preparing to become the first block producers upon mainnet launch. You're demonstrating that you have the skills and know-how to operate the Coda Protocol, the main purpose of ",
-                 )}
-                <a href="http://codaprotocol.com/genesis">
-                  {React.string("Genesis")}
-                </a>
-                {React.string(".")}
-              </p>
-              <h4> {React.string("Testnet Challenges")} </h4>
-              <p className=Styles.markdownStyles>
-                {React.string(
-                   "Learn how to operate the protocol, while contributing to Coda's network resilience. There are different ways for everyone to be involved. There are three categories of testnet challenges to earn testnet points",
-                 )}
-                <a href="#disclaimer" onClick={_ => setExpanded(_ => true)}>
-                  {React.string("*")}
-                </a>
-                {React.string(".")}
-              </p>
-              <ul className=Styles.markdownStyles>
-                <li>
-                  {React.string("Entry level challenges (up to 1000 pts")}
-                  <a href="#disclaimer" onClick={_ => setExpanded(_ => true)}>
-                    {React.string("*")}
-                  </a>
-                  {React.string(") per challenge.")}
-                </li>
-                <li>
-                  {React.string(
-                     "Challenges for people who want to try out more features of the succinct blockchain (up to 4000 pts",
-                   )}
-                  <a href="#disclaimer" onClick={_ => setExpanded(_ => true)}>
-                    {React.string("*")}
-                  </a>
-                  {React.string(") per challenge.")}
-                </li>
-                <li>
-                  {React.string(
-                     "Community challenges which require no technical skills (win Community MVP and up to 4000 pts",
-                   )}
-                  <a href="#disclaimer" onClick={_ => setExpanded(_ => true)}>
-                    {React.string("*")}
-                  </a>
-                  {React.string(") per challenge.")}
-                </li>
-              </ul>
-              <p className=Styles.markdownStyles>
-                {React.string("Check out all challenges ")}
-                <a href="https://bit.ly/3dNmPle">
-                  {React.string(" here ")}
-                </a>
-                {React.string("and join ")}
-                <a href="http://bit.ly/CodaDiscord">
-                  {React.string("http://bit.ly/CodaDiscord")}
-                </a>
-                {React.string(" for the latest updates!")}
-              </p>
-              <p id="disclaimer" className=Css.(style([fontStyle(`italic)]))>
-                {React.string(
-                   "* Testnet Points are designed solely to track contributions to the Testnet and Testnet Points have no cash or other monetary value. Testnet Points and are not transferable and are not redeemable or exchangeable for any cryptocurrency or digital assets. We may at any time amend or eliminate Testnet Points.",
-                 )}
-              </p>
-            </div>
           </div>
         </Section>
         <hr />
