@@ -4,8 +4,10 @@ set -o pipefail
 
 eval `opam config env`
 
+export LIBP2P_NIXLESS=1
+
 echo "--- Explicitly generate PV-keys and upload before building"
-LIBP2P_NIXLESS=1 make build_pv_keys
+make build_pv_keys
 
 #echo "--- Publish pvkeys"
 #./scripts/publish-pvkeys.sh

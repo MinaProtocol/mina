@@ -122,13 +122,13 @@ RUN git clone git://github.com/ocaml/opam-repository /home/opam/opam-repository 
 # The "opam-deps" Stage
 # - Continues from the build-deps image
 # - Installs all opam dependencies and pins from coda's github
-# - Includes the entire coda codebase and submodules in "${CODA_DIR}"
+# - Includes the entire coda codebase and submodules in "${CODA_DIR}" (must be writable by opam user)
 # - Largely mirrors/replaces ./scripts/setup-opam.sh
 #################################################################################################
 FROM build-deps AS opam-deps
 
 # location of repo used for pins and external package commits
-ARG CODA_DIR=/coda
+ARG CODA_DIR=~/coda
 
 # location of external packages
 ARG EXTERNAL_PKG_DIR=$CODA_DIR/src/external
@@ -138,16 +138,12 @@ ARG EXTERNAL_PKG_DIR=$CODA_DIR/src/external
 ARG OPAMKEEPBUILDDIR=false
 ARG OPAMREUSEBUILDDIR=false
 
-RUN git clone https://github.com/CodaProtocol/coda "${CODA_DIR}" && git checkout rosetta/dockerfile
-WORKDIR ${CODA_DIR}
-RUN git submodule update --init --recursive
+RUN mkdir -p $CODA_DIR
+WORKDIR $CODA_DIR
+RUN git clone -b rosetta/dockerfile https://github.com/CodaProtocol/coda ./ && git submodule update --init --recursive
 
 # All our ocaml packages
 RUN opam switch import src/opam.export && eval $(opam config env)
-
-# Extlib gets automatically installed, but we want our pin, so we should
-# uninstall here
-RUN opam uninstall extlib
 
 # Our pins
 RUN opam pin add src/external/ocaml-extlib && \
