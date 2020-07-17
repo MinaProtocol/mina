@@ -128,7 +128,7 @@ RUN git clone git://github.com/ocaml/opam-repository /home/opam/opam-repository 
 FROM build-deps AS opam-deps
 
 # location of repo used for pins and external package commits
-ARG CODA_DIR=~/coda
+ARG CODA_DIR=coda
 
 # location of external packages
 ARG EXTERNAL_PKG_DIR=$CODA_DIR/src/external
@@ -138,15 +138,17 @@ ARG EXTERNAL_PKG_DIR=$CODA_DIR/src/external
 ARG OPAMKEEPBUILDDIR=false
 ARG OPAMREUSEBUILDDIR=false
 
-RUN mkdir -p $CODA_DIR
-WORKDIR $CODA_DIR
+RUN mkdir ./$CODA_DIR
+WORKDIR $HOME/$CODA_DIR
 RUN git clone -b rosetta/dockerfile https://github.com/CodaProtocol/coda ./ && git submodule update --init --recursive
 
+# TODO: handle this opam work without cloning the full repository (directly pull src/opam.export)
 # All our ocaml packages
-RUN opam switch import src/opam.export && eval $(opam config env)
+RUN opam switch import src/opam.export
 
 # Our pins
-RUN opam pin add src/external/ocaml-extlib && \
+RUN eval $(opam config env) && \
+  opam pin add src/external/ocaml-extlib && \
   opam pin add src/external/ocaml-sodium && \
   opam pin add src/external/rpc_parallel && \
   opam pin add src/external/digestif && \
@@ -164,3 +166,5 @@ RUN sudo chmod -R u+rw ~/.opam && eval $(opam config env)
 # - should not include any data related to joining a specific network, only the node software itself
 #################################################################################################
 FROM opam-deps AS builder
+ARG DUNE_PROFILE=testnet_postake_medium_curves
+RUN ./build-everything-rosetta.sh

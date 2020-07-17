@@ -27,11 +27,11 @@ dune exec --profile=$DUNE_PROFILE src/app/runtime_genesis_ledger/runtime_genesis
 #echo "--- Upload genesis data"
 #./scripts/upload-genesis.sh
 
-echo "--- Build deb package with pvkeys"
-make deb
+#echo "--- Build deb package with pvkeys"
+#make deb
 
-echo "--- Store genesis keys"
-make genesiskeys
+#echo "--- Store genesis keys"
+#make genesiskeys
 
 #echo "--- Upload deb to repo"
 #make publish_debs
