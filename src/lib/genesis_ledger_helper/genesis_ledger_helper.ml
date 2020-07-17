@@ -479,8 +479,8 @@ end
 module Genesis_proof = struct
   let filename ~base_hash = "genesis_proof_" ^ Base_hash.to_string base_hash
 
-  let find_file ~logger ~base_hash =
-    let search_paths = Cache_dir.possible_paths "" in
+  let find_file ~logger ~base_hash ~genesis_dir =
+    let search_paths = genesis_dir :: Cache_dir.possible_paths "" in
     let file_exists filename path =
       let filename = path ^/ filename in
       if%map file_exists ~follow_symlinks:true filename then (
@@ -588,7 +588,7 @@ module Genesis_proof = struct
         ~id:(Precomputed_values.blockchain_proof_system_id ())
         ~state_hash:(Lazy.force compiled).protocol_state_with_hash.hash
     in
-    match%bind find_file ~logger ~base_hash with
+    match%bind find_file ~logger ~base_hash ~genesis_dir with
     | Some file -> (
         match%map load file with
         | Ok genesis_proof ->
