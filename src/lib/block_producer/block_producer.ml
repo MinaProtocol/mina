@@ -532,7 +532,8 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                                 Logger.Str.trace logger ~module_:__MODULE__
                                   ~location:__LOC__
                                   ~metadata:
-                                    [("breadcrumb", Breadcrumb.to_yojson crumb)]
+                                    [ ( "breadcrumb"
+                                      , Breadcrumb.to_yojson breadcrumb ) ]
                                   Block_produced ;
                                 let metadata =
                                   [ ( "state_hash"
