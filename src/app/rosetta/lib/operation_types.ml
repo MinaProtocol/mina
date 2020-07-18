@@ -2,7 +2,7 @@ open Core_kernel
 
 type t =
   [ `Fee_payer_dec
-  | `Fee_creator_inc
+  | `Fee_receiver_inc
   | `Coinbase_inc
   | `Account_creation_fee_via_payment
   | `Account_creation_fee_via_fee_payer
@@ -16,8 +16,8 @@ type t =
 let name = function
   | `Fee_payer_dec ->
       "fee_payer_dec"
-  | `Fee_creator_inc ->
-      "fee_creator_inc"
+  | `Fee_receiver_inc ->
+      "fee_receiver_inc"
   | `Coinbase_inc ->
       "coinbase_inc"
   | `Account_creation_fee_via_payment ->

@@ -1,7 +1,8 @@
 open Core_kernel
 open Models
 
-type t = [`Success | `Pending | `Missing] [@@deriving to_representatives]
+type t = [`Success | `Pending | `Missing | `Failed]
+[@@deriving to_representatives]
 
 let name = function
   | `Success ->
@@ -10,6 +11,8 @@ let name = function
       "Pending"
   | `Missing ->
       "Missing"
+  | `Failed ->
+      "Failed"
 
 let successful = function
   | `Success ->
@@ -17,6 +20,8 @@ let successful = function
   | `Pending ->
       false
   | `Missing ->
+      false
+  | `Failed ->
       false
 
 let operation t = {Operation_status.status= name t; successful= successful t}
