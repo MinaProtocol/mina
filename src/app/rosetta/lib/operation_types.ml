@@ -4,12 +4,12 @@ type t =
   [ `Fee_payer_dec
   | `Fee_creator_inc
   | `Coinbase_inc
-  | `Account_creation_fee
+  | `Account_creation_fee_via_payment
+  | `Account_creation_fee_via_fee_payer
   | `Payment_source_dec
   | `Payment_receiver_inc
   | `Delegate_change
   | `Create_token
-  | `Create_account
   | `Mint_tokens ]
 [@@deriving to_representatives]
 
@@ -20,8 +20,10 @@ let name = function
       "fee_creator_inc"
   | `Coinbase_inc ->
       "coinbase_inc"
-  | `Account_creation_fee ->
-      "account_creation_fee"
+  | `Account_creation_fee_via_payment ->
+      "account_creation_fee_via_payment"
+  | `Account_creation_fee_via_fee_payer ->
+      "account_creation_fee_via_fee_payer"
   | `Payment_source_dec ->
       "payment_source_dec"
   | `Payment_receiver_inc ->
@@ -30,8 +32,6 @@ let name = function
       "delegate_change"
   | `Create_token ->
       "create_token"
-  | `Create_account ->
-      "create_account"
   | `Mint_tokens ->
       "mint_tokens"
 
