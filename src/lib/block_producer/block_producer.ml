@@ -227,13 +227,8 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
             measure "consensus generate_transition" (fun () ->
                 Consensus_state_hooks.generate_transition
                   ~previous_protocol_state ~blockchain_state ~current_time
-                  ~block_data
-                  ~transactions:
-                    ( Staged_ledger_diff.With_valid_signatures_and_proofs
-                      .user_commands diff
-                      :> User_command.t list )
-                  ~snarked_ledger_hash:previous_ledger_hash ~supply_increase
-                  ~logger ~constraint_constants ) )
+                  ~block_data ~snarked_ledger_hash:previous_ledger_hash
+                  ~supply_increase ~logger ~constraint_constants ) )
       in
       lift_sync (fun () ->
           measure "making Snark and Internal transitions" (fun () ->
@@ -537,7 +532,8 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                                 Logger.Str.trace logger ~module_:__MODULE__
                                   ~location:__LOC__
                                   ~metadata:
-                                    [("breadcrumb", Breadcrumb.to_yojson crumb)]
+                                    [ ( "breadcrumb"
+                                      , Breadcrumb.to_yojson breadcrumb ) ]
                                   Block_produced ;
                                 let metadata =
                                   [ ( "state_hash"

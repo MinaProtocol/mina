@@ -9,7 +9,7 @@
 
 
 
-version: 3
+version: 2.1
 jobs:
     tracetool:
         docker:
@@ -283,9 +283,13 @@ jobs:
 
             - run:
                   name: Compare versioned types in PR
+                  environment:
+                    BASE_BRANCH_NAME: << pipeline.git.base_revision >>
                   command: ./scripts/compare_ci_diff_types.sh
             - run:
                   name: Compare binable functors in PR
+                  environment:
+                    BASE_BRANCH_NAME: << pipeline.git.base_revision >>
                   command: ./scripts/compare_ci_diff_binables.sh
     compare-test-signatures:
         docker:
@@ -497,7 +501,7 @@ jobs:
             - run:
                 name: Decode Apple Certificates
                 context: org-global
-                command: bash -c '[ -z $APPLE_CERTIFICATES ] || base64 -D -o frontend/wallet/Certificates.p12 <<< $APPLE_CERTIFICATES'
+                command: bash -c '[ -z $APPLE_CERTIFICATES ] || base64 -D -o frontend/wallet/Certificates.p12 \<<< $APPLE_CERTIFICATES'
             - run:
                 name: Fastlane
                 context: org-global
@@ -559,7 +563,7 @@ jobs:
                   command: cd frontend/client_sdk && yarn install
             - run:
                   name: Build And Test Client SDK
-                  command: eval `opam config env` && cd frontend/client_sdk && yarn prepublishOnly
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; eval `opam config env` && cd frontend/client_sdk && yarn prepublishOnly'
     build-artifacts--testnet_postake_medium_curves:
         resource_class: xlarge
         docker:

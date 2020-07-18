@@ -401,6 +401,8 @@ let get_nonce_exn ~rpc public_key port =
   | Ok nonce ->
       return nonce
 
+let unwrap_user_command (`UserCommand x) = x
+
 let batch_send_payments =
   let module Payment_info = struct
     type t =
@@ -504,7 +506,7 @@ let send_payment_graphql =
              graphql_endpoint
          in
          printf "Dispatched payment with ID %s\n"
-           ((response#sendPayment)#payment)#id ))
+           ((response#sendPayment)#payment |> unwrap_user_command)#id ))
 
 let delegate_stake_graphql =
   let open Command.Param in
@@ -532,7 +534,7 @@ let delegate_stake_graphql =
              graphql_endpoint
          in
          printf "Dispatched stake delegation with ID %s\n"
-           ((response#sendDelegation)#delegation)#id ))
+           ((response#sendDelegation)#delegation |> unwrap_user_command)#id ))
 
 let cancel_transaction_graphql =
   let txn_id_flag =
@@ -599,7 +601,7 @@ let cancel_transaction_graphql =
            Graphql_client.query_exn cancel_query graphql_endpoint
          in
          printf "🛑 Cancelled transaction! Cancel ID: %s\n"
-           ((cancel_response#sendPayment)#payment)#id ))
+           ((cancel_response#sendPayment)#payment |> unwrap_user_command)#id ))
 
 let get_transaction_status =
   Command.async ~summary:"Get the status of a transaction"
@@ -739,9 +741,7 @@ let pooled_user_commands =
       anon @@ maybe @@ ("public-key" %: Cli_lib.Arg_type.public_key_compressed))
   in
   Command.async
-    ~summary:
-      "Retrieve all the user commands submitted by the current daemon that \
-       are pending inclusion"
+    ~summary:"Retrieve all the user commands that are pending inclusion"
     (Cli_lib.Background_daemon.graphql_init public_key_flag
        ~f:(fun graphql_endpoint maybe_public_key ->
          let public_key =
@@ -756,7 +756,11 @@ let pooled_user_commands =
          in
          let json_response : Yojson.Safe.t =
            `List
-             ( List.map ~f:Graphql_client.User_command.to_yojson
+             ( List.map
+                 ~f:
+                   (Fn.compose Graphql_client.User_command.to_yojson
+                      (Fn.compose Graphql_client.User_command.of_obj
+                         unwrap_user_command))
              @@ Array.to_list response#pooledUserCommands )
          in
          print_string (Yojson.Safe.to_string json_response) ))

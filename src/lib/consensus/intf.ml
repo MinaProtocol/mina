@@ -251,7 +251,6 @@ module type State_hooks = sig
     -> blockchain_state:blockchain_state
     -> current_time:Unix_timestamp.t
     -> block_data:block_data
-    -> transactions:Coda_base.User_command.t list
     -> snarked_ledger_hash:Coda_base.Frozen_ledger_hash.t
     -> supply_increase:Currency.Amount.t
     -> logger:Logger.t
