@@ -2,6 +2,10 @@ open Core_kernel
 open Models
 
 module Token_id = struct
+  let default = Unsigned.UInt64.one
+
+  let is_default token_id = Unsigned.UInt64.equal default token_id
+
   let encode token_id =
     `Assoc [("token_id", `String (Unsigned.UInt64.to_string token_id))]
 
@@ -28,6 +32,9 @@ module Token_id = struct
           M.return None
   end
 end
+
+let negated (t : Amount.t) =
+  {t with value= (Int64.to_string @@ Int64.(neg @@ of_string t.value))}
 
 let coda total =
   { Amount.value= Unsigned.UInt64.to_string total
