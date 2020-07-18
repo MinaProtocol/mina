@@ -19,7 +19,7 @@ module type S = sig
   val get :
        constraint_constants:Genesis_constants.Constraint_constants.t
     -> Staged_ledger_diff.t
-    -> ( Transaction.t list
+    -> ( Transaction.t With_status.t list
          * Transaction_snark_work.t list
          * int
          * Currency.Amount.t list
@@ -29,7 +29,7 @@ module type S = sig
   val get_unchecked :
        constraint_constants:Genesis_constants.Constraint_constants.t
     -> Staged_ledger_diff.With_valid_signatures_and_proofs.t
-    -> ( Transaction.t list
+    -> ( Transaction.t With_status.t list
          * Transaction_snark_work.t list
          * int
          * Currency.Amount.t list
@@ -39,7 +39,7 @@ module type S = sig
   val get_transactions :
        constraint_constants:Genesis_constants.Constraint_constants.t
     -> Staged_ledger_diff.t
-    -> (Transaction.t list, Error.t) result
+    -> (Transaction.t With_status.t list, Error.t) result
 end
 
 module Error = struct
@@ -69,7 +69,7 @@ module Error = struct
 end
 
 type t =
-  { transactions: Transaction.t list
+  { transactions: Transaction.t With_status.t list
   ; work: Transaction_snark_work.t list
   ; user_commands_count: int
   ; coinbases: Currency.Amount.t list }
@@ -179,11 +179,13 @@ let sum_fees xs ~f =
 let to_staged_ledger_or_error =
   Result.map_error ~f:(fun error -> Error.Unexpected error)
 
-let fee_remainder (user_commands : User_command.With_valid_signature.t list)
+let fee_remainder
+    (user_commands : User_command.With_valid_signature.t With_status.t list)
     completed_works coinbase_fee =
   let open Result.Let_syntax in
   let%bind budget =
-    sum_fees user_commands ~f:(fun t -> User_command.fee (t :> User_command.t))
+    sum_fees user_commands ~f:(fun {data= t; _} ->
+        User_command.fee (t :> User_command.t) )
     |> to_staged_ledger_or_error
   in
   let%bind work_fee =
@@ -261,9 +263,12 @@ let get_individual_info ~constraint_constants coinbase_parts ~receiver
     create_fee_transfers txn_works_others delta receiver coinbase_fts
   in
   let transactions =
-    List.map user_commands ~f:(fun t -> Transaction.User_command t)
-    @ List.map coinbase_parts ~f:(fun t -> Transaction.Coinbase t)
-    @ List.map fee_transfers ~f:(fun t -> Transaction.Fee_transfer t)
+    List.map user_commands
+      ~f:(With_status.map ~f:(fun t -> Transaction.User_command t))
+    @ List.map coinbase_parts ~f:(fun t ->
+          {With_status.data= Transaction.Coinbase t; status= Applied} )
+    @ List.map fee_transfers ~f:(fun t ->
+          {With_status.data= Transaction.Fee_transfer t; status= Applied} )
   in
   { transactions
   ; work= completed_works
@@ -335,7 +340,7 @@ let get ~constraint_constants t =
   | Ok diff ->
       get' ~constraint_constants diff
   | Error uc ->
-      Error (Error.Bad_signature uc)
+      Error (Error.Bad_signature uc.data)
 
 let get_unchecked ~constraint_constants
     (t : With_valid_signatures_and_proofs.t) =

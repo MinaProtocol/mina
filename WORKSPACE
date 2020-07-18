@@ -21,20 +21,10 @@ ocaml_configure_tooling()
 
 ocaml_register_toolchains(installation="host")
 
-git_repository(
-    name = "digestif",
-    branch = "bazel",
-    remote = "https://github.com/mobileink/digestif",
-)
-
-git_repository(
-    name = "ppx_optcomp",
-    branch = "bazel",
-    remote = "https://github.com/mobileink/ppx_optcomp"
-)
-
-git_repository(
-    name = "ppx_version",
-    branch = "bazel",
-    remote = "https://github.com/mobileink/ppx_version",
-)
+local_repository( name = "async_kernel" , path = "src/external/async_kernel")
+local_repository( name = "digestif"     , path = "src/external/digestif")
+local_repository( name = "graphql_ppx"  , path = "src/external/graphql_ppx")
+local_repository( name = "ocaml_extlib" , path = "src/external/ocaml_extlib")
+local_repository( name = "ppx_optcomp"  , path = "src/external/ppx_optcomp")
+local_repository( name = "ppx_version"  , path = "src/external/ppx_version")
+local_repository( name = "rpc_parallel" , path = "src/external/rpc_parallel")

@@ -27,7 +27,7 @@ popd
 ./make-runtime-genesis.sh
 
 # archive
-../../../_build/default/src/app/archive/archive.exe \
+../../../_build/default/src/app/archive/archive.exe run \
   -postgres-uri $PG_CONN \
   -server-port 3086 &
 

@@ -138,7 +138,7 @@ let%test_module "Archive node unit tests" =
           let processor_deferred_computation =
             Processor.run
               ~constraint_constants:precomputed_values.constraint_constants
-              conn reader ~logger
+              conn reader ~logger ~delete_older_than:None
           in
           let diffs =
             List.map
@@ -176,6 +176,137 @@ let%test_module "Archive node unit tests" =
                     else Deferred.Result.return ()
                 | None ->
                     failwith "Failed to find saved block in database" )
+          with
+          | Ok () ->
+              ()
+          | Error e ->
+              failwith @@ Caqti_error.show e )
+
+    let%test_unit "Block: read and write with pruning" =
+      let conn = Lazy.force conn_lazy in
+      Quickcheck.test ~trials:20
+        ( Quickcheck.Generator.with_size ~size:10
+        @@ Quickcheck_lib.gen_imperative_list
+             (Transition_frontier.For_tests.gen_genesis_breadcrumb
+                ~precomputed_values ())
+             (Transition_frontier.Breadcrumb.For_tests.gen_non_deferred
+                ?logger:None ~precomputed_values ?verifier:None
+                ?trust_system:None
+                ~accounts_with_secret_keys:(Lazy.force Genesis_ledger.accounts))
+        )
+        ~f:(fun breadcrumbs ->
+          Thread_safe.block_on_async_exn
+          @@ fun () ->
+          let reader, writer =
+            Strict_pipe.create ~name:"archive"
+              (Buffered (`Capacity 100, `Overflow Crash))
+          in
+          let delete_older_than = 7 in
+          let processor_deferred_computation =
+            Processor.run
+              ~constraint_constants:precomputed_values.constraint_constants
+              conn reader ~logger ~delete_older_than:(Some delete_older_than)
+          in
+          let diffs =
+            List.map
+              ~f:(fun breadcrumb ->
+                Diff.Transition_frontier
+                  (Diff.Builder.breadcrumb_added breadcrumb) )
+              breadcrumbs
+          in
+          let max_height =
+            List.fold ~init:Unsigned.UInt32.zero breadcrumbs
+              ~f:(fun prev_max breadcrumb ->
+                breadcrumb |> Transition_frontier.Breadcrumb.blockchain_length
+                |> Unsigned.UInt32.max prev_max )
+          in
+          List.iter diffs ~f:(Strict_pipe.Writer.write writer) ;
+          Strict_pipe.Writer.close writer ;
+          let%bind () = processor_deferred_computation in
+          match%map
+            Processor.deferred_result_list_fold breadcrumbs ~init:()
+              ~f:(fun () breadcrumb ->
+                let open Deferred.Result.Let_syntax in
+                let height =
+                  breadcrumb
+                  |> Transition_frontier.Breadcrumb.blockchain_length
+                in
+                match%bind
+                  Processor.Block.find conn
+                    ~state_hash:
+                      (Transition_frontier.Breadcrumb.state_hash breadcrumb)
+                with
+                | Some id ->
+                    if
+                      Unsigned.UInt32.(
+                        height < sub max_height (of_int delete_older_than))
+                    then
+                      Error.raise
+                        (Error.createf
+                           !"The block with id %i was not pruned correctly: \
+                             height %i < max_height %i - delete_older_than %i"
+                           id
+                           (Unsigned.UInt32.to_int height)
+                           (Unsigned.UInt32.to_int max_height)
+                           delete_older_than)
+                    else
+                      let%map.Async () =
+                        Deferred.List.iter
+                          (Transition_frontier.Breadcrumb.user_commands
+                             breadcrumb) ~f:(fun cmd ->
+                            match%map.Async
+                              Processor.User_command.find conn
+                                ~transaction_hash:
+                                  (Transaction_hash.hash_user_command cmd.data)
+                            with
+                            | Ok (Some _) ->
+                                ()
+                            | Ok None ->
+                                Error.raise
+                                  (Error.createf
+                                     !"The user command %{sexp: \
+                                       User_command.t} was pruned when it \
+                                       should not have been"
+                                     cmd.data)
+                            | Error e ->
+                                failwith @@ Caqti_error.show e )
+                      in
+                      Ok ()
+                | None ->
+                    if
+                      Unsigned.UInt32.(
+                        height >= sub max_height (of_int delete_older_than))
+                    then
+                      Error.raise
+                        (Error.createf
+                           !"A block was pruned incorrectly: height %i >= \
+                             max_height %i - delete_older_than %i "
+                           (Unsigned.UInt32.to_int height)
+                           (Unsigned.UInt32.to_int max_height)
+                           delete_older_than)
+                    else
+                      let%map.Async () =
+                        Deferred.List.iter
+                          (Transition_frontier.Breadcrumb.user_commands
+                             breadcrumb) ~f:(fun cmd ->
+                            match%map.Async
+                              Processor.User_command.find conn
+                                ~transaction_hash:
+                                  (Transaction_hash.hash_user_command cmd.data)
+                            with
+                            | Ok None ->
+                                ()
+                            | Ok (Some _) ->
+                                Error.raise
+                                  (Error.createf
+                                     !"The user command %{sexp: \
+                                       User_command.t} was not pruned when it \
+                                       should have been"
+                                     cmd.data)
+                            | Error e ->
+                                failwith @@ Caqti_error.show e )
+                      in
+                      Ok () )
           with
           | Ok () ->
               ()
