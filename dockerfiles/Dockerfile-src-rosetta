@@ -44,6 +44,29 @@ RUN apt-get update && \
     unzip \
     file
 
+# Create opam user (for later) and give sudo to make opam happy
+RUN adduser --uid 1000 --disabled-password --gecos '' opam && \
+  passwd -l opam && \
+  chown -R opam:opam /home/opam && \
+  echo 'opam ALL=(ALL:ALL) NOPASSWD:ALL' > /etc/sudoers.d/opam && \
+  chmod 440 /etc/sudoers.d/opam && \
+  chown root:root /etc/sudoers.d/opam && \
+  chmod 777 /tmp
+
+# Opam install of a given OPAM_VERSION from github release
+RUN curl -sL \
+  "https://github.com/ocaml/opam/releases/download/${OPAM_VERSION}/opam-${OPAM_VERSION}-x86_64-linux" \
+  -o /usr/bin/opam && \
+  chmod +x /usr/bin/opam
+
+# bubblewrap was disabled in other builds via the dockerfile-toolchain images, and in the default opam2 image.
+# Importantly, this also allows the entire container to be built with a permissionless builder, avoiding docker-in-docker
+# Keeping the exact install steps from the official opam image in case we want to re-enable in the future.
+#RUN curl -fL https://github.com/projectatomic/bubblewrap/releases/download/v0.4.1/bubblewrap-0.4.1.tar.xz | \
+#   tar -xJ && \
+#   cd bubblewrap-0.4.1 && ./configure --prefix=/usr/local && make && sudo make install && \
+#   cd - && rm -rf bubblewrap-0.4.1
+
 
 # Golang install of a given GO_VERSION (add -v for spam output of each file from the go dist)
 # TODO: rosetta requires binary file downloads of this sort to be hashed + validated
@@ -61,20 +84,9 @@ RUN curl --proto '=https' --tlsv1.2 -sSf -o /tmp/rustup-init \
 # As opposed to introducing another shell script here (that mostly just determines the platform)
 # we just download the binary for the only platform we care about in this docker environment
 
-
-# Opam install of a given OPAM_VERSION from github release
-RUN curl -sL "https://github.com/ocaml/opam/releases/download/${OPAM_VERSION}/opam-${OPAM_VERSION}-x86_64-linux" -o /usr/bin/opam
-RUN chmod +x /usr/bin/opam
-
-
-# Create opam user and give sudo to make opam happy
-RUN adduser --uid 1000 --disabled-password --gecos '' opam && \
-  passwd -l opam && \
-  chown -R opam:opam /home/opam && \
-  echo 'opam ALL=(ALL:ALL) NOPASSWD:ALL' > /etc/sudoers.d/opam && \
-  chmod 440 /etc/sudoers.d/opam && \
-  chown root:root /etc/sudoers.d/opam
-
+###########################################################################################
+# Initialize opam in a minimal fashion
+###########################################################################################
 
 # Set up environment for running as opam user
 WORKDIR /home/opam
@@ -91,22 +103,16 @@ RUN mkdir --mode=700 ~/.gnupg && \
   echo 'ulimit -s unlimited' >> ~/.bashrc && \
   echo "disable-ipv6" >> ~/.gnupg/dirmngr.conf
 
-
-# bubblewrap was disabled in other builds via the dockerfile-toolchain images, and in the default opam2 image.
-# Importantly, this also allows the entire container to be built with a permissionless builder, avoiding docker-in-docker
-# Keeping the exact install steps from the official opam image in case we want to re-enable in the future.
-#RUN curl -fL https://github.com/projectatomic/bubblewrap/releases/download/v0.4.1/bubblewrap-0.4.1.tar.xz | \
-#   tar -xJ && \
-#   cd bubblewrap-0.4.1 && ./configure --prefix=/usr/local && make && sudo make install && \
-#   cd - && rm -rf bubblewrap-0.4.1
-
+ENV PATH "$PATH:/usr/lib/go/bin:$HOME/.cargo/bin"
 
 # Avoid the need to pass -y everywhere, although we still do because its not hard
 ENV OPAMYES 1
 
 # Ocaml install of a given OCAML_VERSION via opam switch
 # additionally initializes opam with sandboxing disabled, as we did not install bubblewrap above.
-RUN git clone git://github.com/ocaml/opam-repository /home/opam/opam-repository && \
+RUN git clone git://github.com/ocaml/opam-repository \
+  --depth 1 \
+  /home/opam/opam-repository && \
   opam init --disable-sandboxing -k git -a ~/opam-repository --bare && \
   opam switch create "${OCAML_VERSION}" "ocaml-base-compiler.${OCAML_VERSION}${OCAML_REVISION}" && \
   opam switch "${OCAML_VERSION}"
@@ -129,22 +135,31 @@ FROM build-deps AS opam-deps
 
 # location of repo used for pins and external package commits
 ARG CODA_DIR=coda
+# branch to checkout on first clone (this will be the only availible branch in the container)
+# can also be a tagged release
+ARG CODA_BRANCH=rosetta/dockerfile
 
 # location of external packages
 ARG EXTERNAL_PKG_DIR=$CODA_DIR/src/external
 
 # don't keep sources, to force reinstall of pinned packages from Coda sources
 # and to keep Docker image reasonable size
-ARG OPAMKEEPBUILDDIR=false
-ARG OPAMREUSEBUILDDIR=false
+ENV OPAMKEEPBUILDDIR false
+ENV OPAMREUSEBUILDDIR false
 
-RUN mkdir ./$CODA_DIR
+# git will clone into an empty dir, but this also helps us set the workdir in advance
+RUN git clone \
+  -b "${CODA_BRANCH}" \
+  --depth 1 \
+  --shallow-submodules \
+  --recurse-submodules \
+  https://github.com/CodaProtocol/coda ${HOME}/${CODA_DIR}
+
 WORKDIR $HOME/$CODA_DIR
-RUN git clone -b rosetta/dockerfile https://github.com/CodaProtocol/coda ./ && git submodule update --init --recursive
 
 # TODO: handle this opam work without cloning the full repository (directly pull src/opam.export)
 # All our ocaml packages
-RUN opam switch import src/opam.export
+RUN opam switch import src/opam.export --strict && opam clean --unused-repositories --logs -cs
 
 # Our pins
 RUN eval $(opam config env) && \
@@ -154,11 +169,14 @@ RUN eval $(opam config env) && \
   opam pin add src/external/digestif && \
   opam pin add src/external/async_kernel && \
   opam pin add src/external/coda_base58 && \
-  opam pin add src/external/graphql_ppx
+  opam pin add src/external/graphql_ppx && \
+  opam clean --unused-repositories --logs -cs
+  #&& \
+  #rm -rf src/external
 
 # workaround a permissions problem in rpc_parallel .git
 # TODO: Does this issue still exist?
-RUN sudo chmod -R u+rw ~/.opam && eval $(opam config env)
+#RUN sudo chmod -R u+rw ~/.opam && eval $(opam config env)
 
 #################################################################################################
 # The "builder" Stage
@@ -166,5 +184,33 @@ RUN sudo chmod -R u+rw ~/.opam && eval $(opam config env)
 # - should not include any data related to joining a specific network, only the node software itself
 #################################################################################################
 FROM opam-deps AS builder
+
 ARG DUNE_PROFILE=testnet_postake_medium_curves
-RUN ./build-everything-rosetta.sh
+ENV LIBP2P_NIXLESS 1
+
+# Set up environment again for running as opam user, to make sure its working properly
+#USER opam
+#ENV HOME /home/opam
+#WORKDIR ${HOME}/${CODA_DIR}
+
+RUN eval $(opam config env) && make build_pv_keys
+
+RUN cd src/app/libp2p_helper && \
+   rm -rf result && \
+   mkdir -p result/bin && \
+   cd src && \
+   go mod download && \
+   cd generate_methodidx && go build -o ../../result/bin/generate_methodidx && cd - && \
+   cd libp2p_helper && go build -o ../../result/bin/libp2p_helper
+
+#RUN eval $(opam config env) && make build
+RUN eval $(opam config env) && \
+  dune build src/app/generate_keypair/generate_keypair.exe
+RUN eval $(opam config env) && \
+  dune exec --profile=${DUNE_PROFILE} \
+  src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe
+RUN eval $(opam config env) && \
+  dune exec --profile=${DUNE_PROFILE} \
+  src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -- \
+  --config-file genesis_ledgers/phase_three/config.json
+#RUN eval $(opam config env) && make deb
