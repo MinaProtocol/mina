@@ -43,8 +43,9 @@ let module = \(environment : List Text) ->
         (docker.extraEnv # environment)
     let outerDir : Text =
       "/var/buildkite/builds/\\\$BUILDKITE_AGENT_NAME/\\\$BUILDKITE_ORGANIZATION_SLUG/\\\$BUILDKITE_PIPELINE_SLUG"
+    let sharedDir : Text = "/var/buildkite/shared"
     in
-    { line = "docker run -it --rm --init --volume ${outerDir}:/workdir --workdir /workdir${envVars} ${docker.image} /bin/sh -c '${inner.line}'"
+    { line = "docker run -it --rm --init --volume /var/buildkite:${sharedDir} --volume ${outerDir}:/workdir --workdir /workdir${envVars} ${docker.image} /bin/sh -c '${inner.line}'"
     , readable = Optional/map Text Text (\(readable : Text) -> "Docker@${docker.image} ( ${readable} )") inner.readable
     }
 
