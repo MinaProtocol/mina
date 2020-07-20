@@ -186,20 +186,52 @@ module User_command = struct
       (status : User_command_status.t) =
     let open Deferred.Result.Let_syntax in
     let%bind user_command_id = add_if_doesn't_exist (module Conn) t in
-    let status_str, failure_reason =
+    let ( status_str
+        , failure_reason
+        , fee_payer_account_creation_fee_paid
+        , receiver_account_creation_fee_paid
+        , created_token ) =
       match status with
-      | Applied ->
-          ("applied", None)
+      | Applied
+          { fee_payer_account_creation_fee_paid
+          ; receiver_account_creation_fee_paid
+          ; created_token } ->
+          let amount_to_int64 x =
+            Unsigned.UInt64.to_int64 (Currency.Amount.to_uint64 x)
+          in
+          ( "applied"
+          , None
+          , Option.map ~f:amount_to_int64 fee_payer_account_creation_fee_paid
+          , Option.map ~f:amount_to_int64 receiver_account_creation_fee_paid
+          , Option.map created_token ~f:(fun tid ->
+                Unsigned.UInt64.to_int64 (Token_id.to_uint64 tid) ) )
       | Failed failure ->
-          ("failed", Some (User_command_status.Failure.to_string failure))
+          ( "failed"
+          , Some (User_command_status.Failure.to_string failure)
+          , None
+          , None
+          , None )
     in
     let%map () =
       Conn.exec
         (Caqti_request.exec
-           Caqti_type.(tup3 (option string) (option string) int)
-           "UPDATE user_commands SET status = ?, failure_reason = ? \n\
+           Caqti_type.(
+             tup3
+               (tup2 (option string) (option string))
+               (tup3 (option int64) (option int64) (option int64))
+               int)
+           "UPDATE user_commands \n\
+            SET status = ?, \n\
+           \    failure_reason = ?, \n\
+           \    fee_payer_account_creation_fee_paid = ?, \n\
+           \    receiver_account_creation_fee_paid = ?, \n\
+           \    created_token = ? \n\
             WHERE id = ?")
-        (Some status_str, failure_reason, user_command_id)
+        ( (Some status_str, failure_reason)
+        , ( fee_payer_account_creation_fee_paid
+          , receiver_account_creation_fee_paid
+          , created_token )
+        , user_command_id )
     in
     user_command_id
 end

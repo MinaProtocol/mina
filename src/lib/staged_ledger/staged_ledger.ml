@@ -2249,7 +2249,10 @@ let%test_module "test" =
                       cmds_this_iter |> Sequence.to_list
                       |> List.map ~f:(fun cmd ->
                              { With_status.data= (cmd :> User_command.t)
-                             ; status= Applied } )
+                             ; status=
+                                 Applied
+                                   User_command_status.Auxiliary_data.empty }
+                         )
                     in
                     let diff =
                       create_diff_with_non_zero_fee_excess cmds_this_iter
