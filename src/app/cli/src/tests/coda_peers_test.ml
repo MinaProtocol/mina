@@ -32,6 +32,8 @@ let main () =
       ~block_production_keys:(Fn.const None) ~work_selection_method
       ~trace_dir:(Unix.getenv "CODA_TRACING")
       ~max_concurrent_connections:None
+      ~runtime_config:
+        (Genesis_ledger_helper.extract_runtime_config precomputed_values)
   in
   let%bind workers = Coda_processes.spawn_local_processes_exn configs in
   let _, expected_peers = (List.hd_exn configs).net_configs in

@@ -97,7 +97,7 @@ type extractedResponse = {
   pending: array(TransactionCell.Transaction.t),
 };
 
-let gqlUserCommandToRecord = (userCommand, maybeDate) =>
+let gqlUserCommandToRecord = ((`UserCommand userCommand), maybeDate) =>
   TransactionCell.Transaction.(
     UserCommand({
       PaymentDetails.isDelegation: userCommand##isDelegation,

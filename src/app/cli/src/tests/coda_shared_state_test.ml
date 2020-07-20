@@ -5,21 +5,24 @@ let name = "coda-shared-state-test"
 
 let main () =
   let logger = Logger.create () in
+  let precomputed_values = Lazy.force Precomputed_values.compiled in
   let n = 2 in
   let keypairs =
     List.map
-      (Lazy.force Test_genesis_ledger.accounts)
-      ~f:Test_genesis_ledger.keypair_of_account_record_exn
+      (Lazy.force (Precomputed_values.accounts precomputed_values))
+      ~f:Precomputed_values.keypair_of_account_record_exn
   in
   let public_keys =
-    List.map ~f:Test_genesis_ledger.pk_of_account_record
-      (Lazy.force Test_genesis_ledger.accounts)
+    List.map ~f:Precomputed_values.pk_of_account_record
+      (Lazy.force (Precomputed_values.accounts precomputed_values))
   in
   let snark_work_public_keys i = Some (List.nth_exn public_keys i) in
   let%bind testnet =
     Coda_worker_testnet.test ~name logger n Option.some snark_work_public_keys
       Cli_lib.Arg_type.Work_selection_method.Sequence
       ~max_concurrent_connections:None
+      ~runtime_config:
+        (Genesis_ledger_helper.extract_runtime_config precomputed_values)
   in
   let%bind () =
     Coda_worker_testnet.Payments.send_several_payments testnet ~node:0

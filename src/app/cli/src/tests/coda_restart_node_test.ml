@@ -7,7 +7,10 @@ include Heartbeat.Make ()
 
 let main () =
   let logger = Logger.create () in
-  let largest_account_pk = Test_genesis_ledger.largest_account_pk_exn () in
+  let precomputed_values = Lazy.force Precomputed_values.compiled in
+  let largest_account_pk =
+    Precomputed_values.largest_account_pk_exn precomputed_values
+  in
   Deferred.don't_wait_for (print_heartbeat logger) ;
   let n = 2 in
   let block_production_keys i = if i = 0 then Some i else None in
@@ -18,6 +21,8 @@ let main () =
     Coda_worker_testnet.test ~name logger n block_production_keys
       snark_work_public_keys Cli_lib.Arg_type.Work_selection_method.Sequence
       ~max_concurrent_connections:None
+      ~runtime_config:
+        (Genesis_ledger_helper.extract_runtime_config precomputed_values)
   in
   let%bind () =
     Coda_worker_testnet.Restarts.trigger_catchup testnet ~logger ~node:1

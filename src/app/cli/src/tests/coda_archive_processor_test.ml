@@ -8,7 +8,8 @@ let main () =
   let postgres_address =
     Uri.of_string "postgres://admin:codarules@localhost:5432/archiver"
   in
-  let constraint_constants = Genesis_constants.Constraint_constants.compiled in
+  let precomputed_values = Lazy.force Precomputed_values.compiled in
+  let constraint_constants = precomputed_values.constraint_constants in
   let%bind conn =
     match%map Caqti_async.connect postgres_address with
     | Ok conn ->
@@ -20,8 +21,11 @@ let main () =
   Archive_lib.Processor.setup_server ~logger ~constraint_constants
     ~postgres_address
     ~server_port:(Host_and_port.port archive_address)
+    ~delete_older_than:None
   |> don't_wait_for ;
-  let public_key = Test_genesis_ledger.largest_account_pk_exn () in
+  let public_key =
+    Precomputed_values.largest_account_pk_exn precomputed_values
+  in
   let n = 2 in
   let block_production_keys i = if i = 0 then Some i else None in
   let snark_work_public_keys i = if i = 0 then Some public_key else None in
@@ -34,6 +38,8 @@ let main () =
       snark_work_public_keys Cli_lib.Arg_type.Work_selection_method.Sequence
       ~max_concurrent_connections:None ~is_archive_rocksdb
       ~archive_process_location
+      ~runtime_config:
+        (Genesis_ledger_helper.extract_runtime_config precomputed_values)
   in
   let%bind new_block_pipe =
     let%map pipe = Coda_worker_testnet.Api.new_block testnet 1 public_key in

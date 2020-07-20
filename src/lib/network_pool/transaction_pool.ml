@@ -23,8 +23,8 @@ module type Transition_frontier_intf = sig
   end
 
   type best_tip_diff =
-    { new_user_commands: User_command.t list
-    ; removed_user_commands: User_command.t list
+    { new_user_commands: User_command.t With_status.t list
+    ; removed_user_commands: User_command.t With_status.t list
     ; reorg_best_tip: bool }
 
   val best_tip : t -> Breadcrumb.t
@@ -274,10 +274,13 @@ struct
       Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
         ~metadata:
           [ ( "removed"
-            , `List (List.map removed_user_commands ~f:User_command.to_yojson)
-            )
+            , `List
+                (List.map removed_user_commands
+                   ~f:(With_status.to_yojson User_command.to_yojson)) )
           ; ( "added"
-            , `List (List.map new_user_commands ~f:User_command.to_yojson) ) ]
+            , `List
+                (List.map new_user_commands
+                   ~f:(With_status.to_yojson User_command.to_yojson)) ) ]
         "Diff: removed: $removed added: $added from best tip" ;
       let pool', dropped_backtrack =
         Sequence.fold
@@ -287,7 +290,7 @@ struct
                    ~message:
                      "somehow user command from the frontier has an invalid \
                       signature!"
-                   (User_command.check unchecked) ) )
+                   (User_command.check unchecked.data) ) )
           ~init:(t.pool, Sequence.empty)
           ~f:(fun (pool, dropped_so_far) cmd ->
             ( match
@@ -338,12 +341,12 @@ struct
                   in
                   acc.balance
             in
-            let fee_payer = User_command.fee_payer cmd in
+            let fee_payer = User_command.fee_payer cmd.data in
             let fee_payer_balance =
               Currency.Balance.to_amount (balance fee_payer)
             in
             let cmd' =
-              User_command.check cmd
+              User_command.check cmd.data
               |> Option.value_exn ~message:"user command was invalid"
             in
             ( match
@@ -354,7 +357,8 @@ struct
             | Some time_added ->
                 Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
                   "Locally generated command $cmd committed in a block!"
-                  ~metadata:[("cmd", User_command.to_yojson cmd)] ;
+                  ~metadata:
+                    [("cmd", With_status.to_yojson User_command.to_yojson cmd)] ;
                 Hashtbl.add_exn t.locally_generated_committed ~key:cmd'
                   ~data:time_added ) ;
             let p', dropped =
@@ -367,7 +371,8 @@ struct
                   Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__
                     "Error handling committed transaction $cmd: $error "
                     ~metadata:
-                      [ ("cmd", User_command.to_yojson cmd)
+                      [ ( "cmd"
+                        , With_status.to_yojson User_command.to_yojson cmd )
                       ; ("error", `String error_str)
                       ; ( "queue"
                         , `List
@@ -964,8 +969,8 @@ include Make
             include Transition_frontier
 
             type best_tip_diff = Extensions.Best_tip_diff.view =
-              { new_user_commands: User_command.t list
-              ; removed_user_commands: User_command.t list
+              { new_user_commands: User_command.t With_status.t list
+              ; removed_user_commands: User_command.t With_status.t list
               ; reorg_best_tip: bool }
 
             let best_tip_diff_pipe t =
@@ -1005,8 +1010,8 @@ let%test_module _ =
       end
 
       type best_tip_diff =
-        { new_user_commands: User_command.t list
-        ; removed_user_commands: User_command.t list
+        { new_user_commands: User_command.t With_status.t list
+        ; removed_user_commands: User_command.t With_status.t list
         ; reorg_best_tip: bool }
 
       type t = best_tip_diff Broadcast_pipe.Reader.t * Breadcrumb.t ref
@@ -1134,6 +1139,8 @@ let%test_module _ =
 
     let accepted_user_commands = Result.map ~f:fst
 
+    let mk_with_status cmd = {With_status.data= cmd; status= Applied}
+
     let%test_unit "transactions are removed in linear case" =
       Thread_safe.block_on_async_exn (fun () ->
           let%bind assert_pool_txs, pool, best_tip_diff_w, _frontier =
@@ -1150,7 +1157,8 @@ let%test_module _ =
           assert_pool_txs independent_cmds ;
           let%bind () =
             Broadcast_pipe.Writer.write best_tip_diff_w
-              { new_user_commands= [List.hd_exn independent_cmds]
+              { new_user_commands=
+                  [mk_with_status (List.hd_exn independent_cmds)]
               ; removed_user_commands= []
               ; reorg_best_tip= false }
           in
@@ -1158,7 +1166,9 @@ let%test_module _ =
           assert_pool_txs (List.tl_exn independent_cmds) ;
           let%bind () =
             Broadcast_pipe.Writer.write best_tip_diff_w
-              { new_user_commands= List.take (List.tl_exn independent_cmds) 2
+              { new_user_commands=
+                  List.map ~f:mk_with_status
+                    (List.take (List.tl_exn independent_cmds) 2)
               ; removed_user_commands= []
               ; reorg_best_tip= false }
           in
@@ -1210,8 +1220,11 @@ let%test_module _ =
             map_set_multi !best_tip_ref [mk_account 1 1_000_000_000_000 1] ;
           let%bind () =
             Broadcast_pipe.Writer.write best_tip_diff_w
-              { new_user_commands= List.take independent_cmds 1
-              ; removed_user_commands= [List.nth_exn independent_cmds 1]
+              { new_user_commands=
+                  List.map ~f:mk_with_status @@ List.take independent_cmds 1
+              ; removed_user_commands=
+                  List.map ~f:mk_with_status
+                  @@ [List.nth_exn independent_cmds 1]
               ; reorg_best_tip= true }
           in
           assert_pool_txs (List.tl_exn independent_cmds) ;
@@ -1270,7 +1283,8 @@ let%test_module _ =
             map_set_multi !best_tip_ref [mk_account 0 1_000_000_000_000 1] ;
           let%bind _ =
             Broadcast_pipe.Writer.write best_tip_diff_w
-              { new_user_commands= List.take independent_cmds 2
+              { new_user_commands=
+                  List.map ~f:mk_with_status @@ List.take independent_cmds 2
               ; removed_user_commands= []
               ; reorg_best_tip= false }
           in
@@ -1295,8 +1309,11 @@ let%test_module _ =
           best_tip_ref := map_set_multi !best_tip_ref [mk_account 0 0 1] ;
           let%bind _ =
             Broadcast_pipe.Writer.write best_tip_diff_w
-              { new_user_commands= cmd2 :: List.drop independent_cmds 2
-              ; removed_user_commands= List.take independent_cmds 2
+              { new_user_commands=
+                  List.map ~f:mk_with_status
+                  @@ (cmd2 :: List.drop independent_cmds 2)
+              ; removed_user_commands=
+                  List.map ~f:mk_with_status @@ List.take independent_cmds 2
               ; reorg_best_tip= true }
           in
           assert_pool_txs [List.nth_exn independent_cmds 1] ;
@@ -1447,7 +1464,7 @@ let%test_module _ =
         map_set_multi !best_tip_ref [mk_account 0 970_000_000_000 1] ;
       let%bind () =
         Broadcast_pipe.Writer.write best_tip_diff_w
-          { new_user_commands= [committed_tx]
+          { new_user_commands= List.map ~f:mk_with_status @@ [committed_tx]
           ; removed_user_commands= []
           ; reorg_best_tip= false }
       in
@@ -1564,7 +1581,8 @@ let%test_module _ =
           let%bind () =
             Broadcast_pipe.Writer.write best_tip_diff_w
               { new_user_commands=
-                  List.take local_cmds 2 @ List.take remote_cmds 3
+                  List.map ~f:mk_with_status @@ List.take local_cmds 2
+                  @ List.take remote_cmds 3
               ; removed_user_commands= []
               ; reorg_best_tip= false }
           in
@@ -1574,8 +1592,10 @@ let%test_module _ =
              rebroadcastable pool, if they were removed and not re-added *)
           let%bind () =
             Broadcast_pipe.Writer.write best_tip_diff_w
-              { new_user_commands= List.take local_cmds 1
-              ; removed_user_commands= List.take local_cmds 2
+              { new_user_commands=
+                  List.map ~f:mk_with_status @@ List.take local_cmds 1
+              ; removed_user_commands=
+                  List.map ~f:mk_with_status @@ List.take local_cmds 2
               ; reorg_best_tip= true }
           in
           assert_pool_txs (List.tl_exn local_cmds @ List.drop remote_cmds 3) ;
@@ -1584,7 +1604,8 @@ let%test_module _ =
           let%bind () =
             Broadcast_pipe.Writer.write best_tip_diff_w
               { new_user_commands=
-                  List.tl_exn local_cmds @ List.drop remote_cmds 3
+                  List.map ~f:mk_with_status @@ List.tl_exn local_cmds
+                  @ List.drop remote_cmds 3
               ; removed_user_commands= []
               ; reorg_best_tip= false }
           in
@@ -1595,7 +1616,9 @@ let%test_module _ =
           let%bind () =
             Broadcast_pipe.Writer.write best_tip_diff_w
               { new_user_commands= []
-              ; removed_user_commands= List.drop local_cmds 3 @ remote_cmds
+              ; removed_user_commands=
+                  List.map ~f:mk_with_status @@ List.drop local_cmds 3
+                  @ remote_cmds
               ; reorg_best_tip= true }
           in
           assert_pool_txs (List.drop local_cmds 3 @ remote_cmds) ;
@@ -1604,7 +1627,8 @@ let%test_module _ =
              two step reorg processes) *)
           let%bind () =
             Broadcast_pipe.Writer.write best_tip_diff_w
-              { new_user_commands= [List.nth_exn local_cmds 3]
+              { new_user_commands=
+                  List.map ~f:mk_with_status @@ [List.nth_exn local_cmds 3]
               ; removed_user_commands= []
               ; reorg_best_tip= false }
           in

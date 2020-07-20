@@ -426,7 +426,7 @@ module Types = struct
             ~args:Arg.[]
             ~resolve:(fun _ t -> t.consensus_state) ] )
 
-  let chain_reorganization_status : ('context, [`Changed] option) typ =
+  let chain_reorganization_status : ('contxt, [`Changed] option) typ =
     enum "ChainReorganizationStatus"
       ~doc:"Status for whenever the blockchain is reorganized"
       ~values:[enum_value "CHANGED" ~value:`Changed]
@@ -436,7 +436,7 @@ module Types = struct
       type t =
         { total: Balance.t
         ; unknown: Balance.t
-        ; blockchain_length: Unsigned.uint32 }
+        ; breadcrumb: Transition_frontier.Breadcrumb.t option }
 
       let obj =
         obj "AnnotatedBalance"
@@ -454,10 +454,29 @@ module Types = struct
                 ~deprecated:(Deprecated None)
                 ~args:Arg.[]
                 ~resolve:(fun _ (b : t) -> Balance.to_uint64 b.unknown)
+              (* TODO: Mutually recurse with "block" instead -- #5396 *)
             ; field "blockHeight" ~typ:(non_null uint32)
                 ~doc:"Block height at which balance was measured"
                 ~args:Arg.[]
-                ~resolve:(fun _ (b : t) -> b.blockchain_length) ] )
+                ~resolve:(fun _ (b : t) ->
+                  match b.breadcrumb with
+                  | None ->
+                      Unsigned.UInt32.zero
+                  | Some crumb ->
+                      Transition_frontier.Breadcrumb.blockchain_length crumb )
+            ; field "stateHash" ~typ:string
+                ~doc:
+                  "Hash of block at which balance was measured. Can be null \
+                   if bootstrapping. Guaranteed to be non-null for direct \
+                   account lookup queries when not bootstrapping. Can also be \
+                   null when accessed as nested properties (eg. via \
+                   delegators). "
+                ~args:Arg.[]
+                ~resolve:(fun _ (b : t) ->
+                  Option.map b.breadcrumb ~f:(fun crumb ->
+                      State_hash.to_base58_check
+                      @@ Transition_frontier.Breadcrumb.state_hash crumb ) ) ]
+        )
     end
 
     module Partial_account = struct
@@ -489,7 +508,7 @@ module Types = struct
         ; voting_for
         ; timing }
 
-      let of_full_account
+      let of_full_account ?breadcrumb
           { Account.Poly.public_key
           ; token_id
           ; token_permissions
@@ -498,15 +517,13 @@ module Types = struct
           ; receipt_chain_hash
           ; delegate
           ; voting_for
-          ; timing } blockchain_length =
+          ; timing } =
         { Account.Poly.public_key= Some public_key
         ; token_id
         ; token_permissions= Some token_permissions
         ; nonce= Some nonce
         ; balance=
-            { AnnotatedBalance.total= balance
-            ; unknown= balance
-            ; blockchain_length }
+            {AnnotatedBalance.total= balance; unknown= balance; breadcrumb}
         ; receipt_chain_hash= Some receipt_chain_hash
         ; delegate= Some delegate
         ; voting_for= Some voting_for
@@ -522,35 +539,11 @@ module Types = struct
                  in
                  Ledger.location_of_account ledger account_id
                  |> Option.bind ~f:(Ledger.get ledger)
-                 |> Option.map ~f:(fun account ->
-                        ( account
-                        , Transition_frontier.Breadcrumb.blockchain_length tip
-                        ) ) )
+                 |> Option.map ~f:(fun account -> (account, tip)) )
         in
         match account with
-        | Some
-            ( { Account.Poly.public_key
-              ; token_id
-              ; token_permissions
-              ; nonce
-              ; balance
-              ; receipt_chain_hash
-              ; delegate
-              ; voting_for
-              ; timing }
-            , blockchain_length ) ->
-            { Account.Poly.public_key= Some public_key
-            ; token_id
-            ; token_permissions= Some token_permissions
-            ; nonce= Some nonce
-            ; delegate= Some delegate
-            ; balance=
-                { AnnotatedBalance.total= balance
-                ; unknown= balance
-                ; blockchain_length }
-            ; receipt_chain_hash= Some receipt_chain_hash
-            ; voting_for= Some voting_for
-            ; timing }
+        | Some (account, breadcrumb) ->
+            of_full_account ~breadcrumb account
         | None ->
             Account.
               { Poly.public_key= Some (Account_id.public_key account_id)
@@ -561,7 +554,7 @@ module Types = struct
               ; balance=
                   { AnnotatedBalance.total= Balance.zero
                   ; unknown= Balance.zero
-                  ; blockchain_length= Unsigned.UInt32.zero }
+                  ; breadcrumb= None }
               ; receipt_chain_hash= None
               ; voting_for= None
               ; timing= Timing.Untimed }
@@ -720,9 +713,7 @@ module Types = struct
                    in
                    List.map
                      ~f:(fun a ->
-                       { account=
-                           Partial_account.of_full_account a
-                             Unsigned.UInt32.zero
+                       { account= Partial_account.of_full_account a
                        ; locked= None
                        ; is_actively_staking= true
                        ; path= "" } )
@@ -743,9 +734,7 @@ module Types = struct
                    in
                    List.map
                      ~f:(fun a ->
-                       { account=
-                           Partial_account.of_full_account a
-                             Unsigned.UInt32.zero
+                       { account= Partial_account.of_full_account a
                        ; locked= None
                        ; is_actively_staking= true
                        ; path= "" } )
@@ -2400,7 +2389,8 @@ module Queries = struct
         Arg.
           [ arg "publicKey" ~doc:"Public key of account being retrieved"
               ~typ:(non_null Types.Input.public_key_arg)
-          ; arg' "token" ~doc:"Token of account being retrieved"
+          ; arg' "token"
+              ~doc:"Token of account being retrieved (defaults to CODA)"
               ~typ:Types.Input.token_id_arg ~default:Token_id.default ]
       ~resolve:(fun {ctx= coda; _} () pk token ->
         Some
@@ -2408,22 +2398,35 @@ module Queries = struct
           |> Types.AccountObj.Partial_account.of_account_id coda
           |> Types.AccountObj.lift coda pk ) )
 
-  let owned_tokens =
-    field "tokenAccounts" ~doc:"Find the tokens owned by a public key"
-      ~typ:(non_null @@ list @@ non_null @@ Types.token_id)
+  let accounts_for_pk =
+    field "accounts" ~doc:"Find all accounts for a public key"
+      ~typ:(non_null (list (non_null Types.AccountObj.account)))
       ~args:
         Arg.
-          [ arg "publicKey" ~doc:"Public key to find tokens for"
+          [ arg "publicKey" ~doc:"Public key to find accounts for"
               ~typ:(non_null Types.Input.public_key_arg) ]
       ~resolve:(fun {ctx= coda; _} () pk ->
-        coda |> Coda_lib.best_tip |> Participating_state.active
-        |> Option.map ~f:(fun tip ->
-               let ledger =
-                 Transition_frontier.Breadcrumb.staged_ledger tip
-                 |> Staged_ledger.ledger
-               in
-               Ledger.tokens ledger pk |> Set.to_list )
-        |> Option.value ~default:[] )
+        match
+          coda |> Coda_lib.best_tip |> Participating_state.active
+          |> Option.map ~f:(fun tip ->
+                 ( Transition_frontier.Breadcrumb.staged_ledger tip
+                   |> Staged_ledger.ledger
+                 , tip ) )
+        with
+        | Some (ledger, breadcrumb) ->
+            let tokens = Ledger.tokens ledger pk |> Set.to_list in
+            List.filter_map tokens ~f:(fun token ->
+                let open Option.Let_syntax in
+                let%bind location =
+                  Ledger.location_of_account ledger
+                    (Account_id.create pk token)
+                in
+                let%map account = Ledger.get ledger location in
+                Types.AccountObj.Partial_account.of_full_account ~breadcrumb
+                  account
+                |> Types.AccountObj.lift coda pk )
+        | None ->
+            [] )
 
   let token_owner =
     field "tokenOwner" ~doc:"Find the public key that owns a given token"
@@ -2489,6 +2492,42 @@ module Queries = struct
           in
           Auxiliary_database.External_transition_database.get_value db
             state_hash) )
+
+  let genesis_block =
+    field "genesisBlock" ~typ:(non_null Types.block) ~args:[]
+      ~doc:"Get the genesis block" ~resolve:(fun {ctx= coda; _} () ->
+        let open Coda_state in
+        let { Precomputed_values.genesis_ledger
+            ; constraint_constants
+            ; consensus_constants
+            ; genesis_proof
+            ; _ } =
+          (Coda_lib.config coda).precomputed_values
+        in
+        let {With_hash.data= genesis_state; hash} =
+          Genesis_protocol_state.t
+            ~genesis_ledger:(Genesis_ledger.Packed.t genesis_ledger)
+            ~constraint_constants ~consensus_constants
+        in
+        { With_hash.data=
+            { Auxiliary_database.Filtered_external_transition.creator=
+                fst Consensus_state_hooks.genesis_winner
+            ; protocol_state=
+                { previous_state_hash=
+                    Protocol_state.previous_state_hash genesis_state
+                ; blockchain_state=
+                    Protocol_state.blockchain_state genesis_state
+                ; consensus_state= Protocol_state.consensus_state genesis_state
+                }
+            ; transactions=
+                { user_commands= []
+                ; fee_transfers= []
+                ; coinbase= constraint_constants.coinbase_amount
+                ; coinbase_receiver=
+                    Some (fst Consensus_state_hooks.genesis_winner) }
+            ; snark_jobs= []
+            ; proof= genesis_proof }
+        ; hash } )
 
   let best_chain =
     field "bestChain"
@@ -2563,12 +2602,13 @@ module Queries = struct
     ; tracked_accounts
     ; wallet (* deprecated *)
     ; account
-    ; owned_tokens
+    ; accounts_for_pk
     ; token_owner
     ; current_snark_worker
     ; best_chain
     ; blocks
     ; block
+    ; genesis_block
     ; initial_peers
     ; pooled_user_commands
     ; transaction_status

@@ -6,7 +6,10 @@ let name = "coda-archive-node-test"
 
 let main () =
   let logger = Logger.create () in
-  let public_key = Test_genesis_ledger.largest_account_pk_exn () in
+  let precomputed_values = Lazy.force Precomputed_values.compiled in
+  let public_key =
+    Precomputed_values.largest_account_pk_exn precomputed_values
+  in
   let n = 2 in
   let block_production_keys i = if i = 0 then Some i else None in
   let snark_work_public_keys i = if i = 0 then Some public_key else None in
@@ -15,6 +18,8 @@ let main () =
     Coda_worker_testnet.test ~name logger n block_production_keys
       snark_work_public_keys Cli_lib.Arg_type.Work_selection_method.Sequence
       ~max_concurrent_connections:None ~is_archive_rocksdb
+      ~runtime_config:
+        (Genesis_ledger_helper.extract_runtime_config precomputed_values)
   in
   let%bind new_block_pipe =
     let%map pipe = Coda_worker_testnet.Api.new_block testnet 1 public_key in
