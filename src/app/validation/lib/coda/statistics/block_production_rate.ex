@@ -1,5 +1,5 @@
 defmodule Coda.Statistics.BlockProductionRate do
-  @moduledoc "A scalar stastics that monitors the block production rate of a block producer"
+  @moduledoc "A scalar statistic that monitors the block production rate of a block producer"
 
   alias Architecture.ResourceSet
   alias Architecture.Statistic
@@ -7,7 +7,7 @@ defmodule Coda.Statistics.BlockProductionRate do
   use Statistic
 
   @impl true
-  def log_providers, do: [Coda.Providers.BlockProduced]
+  def providers, do: [Coda.Providers.BlockProduced]
   @impl true
   def resources(resource_db),
     do: ResourceSet.select(resource_db, Coda.Resources.BlockProducer)
@@ -51,7 +51,7 @@ defmodule Coda.Statistics.BlockProductionRate do
   def update(_resource, state), do: update_time(state)
 
   @impl true
-  def handle_log(_resource, state, Coda.Providers.BlockProduced, _log) do
+  def handle_message(_resource, state, Coda.Providers.BlockProduced, _log) do
     %State{state | blocks_produced: state.blocks_produced + 1}
   end
 end
