@@ -34,6 +34,7 @@ let uploadData = (spreadsheetId, totalBlocks) => {
         "Genesis Members",
         "Block Count",
         "Participants",
+        "Last Updated",
       |];
 
       let statisticsData = [|
