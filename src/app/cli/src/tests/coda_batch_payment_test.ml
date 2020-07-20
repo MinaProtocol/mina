@@ -4,11 +4,42 @@ open Signature_lib
 
 let name = "coda-batch-payment-test"
 
+let runtime_config =
+  lazy
+    ( (* test_postake_txns *)
+      {json|
+  { "daemon":
+      { "txpool_max_size": 3000 }
+  , "genesis":
+      { "k": 6
+      , "delta": 3
+      , "genesis_state_timestamp": "2019-01-30 12:00:00-08:00" }
+  , "proof":
+      { "level": "check"
+      , "c": 8
+      , "ledger_depth": 6
+      , "work_delay": 2
+      , "block_window_duration_ms": 15000
+      , "transaction_capacity": {"2_to_the": 3}
+      , "coinbase_amount": "20"
+      , "account_creation_fee": "1" }
+  , "ledger":
+      { "name": "test_split_two_stakers"
+      , "add_genesis_winner": false } }
+      |json}
+    |> Yojson.Safe.from_string |> Runtime_config.of_yojson
+    |> Result.ok_or_failwith )
+
 let main () =
   Core.Backtrace.elide := false ;
   Async.Scheduler.set_record_backtraces true ;
   let logger = Logger.create () in
-  let precomputed_values = Lazy.force Precomputed_values.compiled in
+  let%bind precomputed_values, _runtime_config =
+    Genesis_ledger_helper.init_from_config_file ~logger ~may_generate:false
+      ~proof_level:None
+      (Lazy.force runtime_config)
+    >>| Or_error.ok_exn
+  in
   let (module Genesis_ledger) = precomputed_values.genesis_ledger in
   let keypairs =
     List.map
