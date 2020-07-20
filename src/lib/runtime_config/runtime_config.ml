@@ -522,3 +522,28 @@ let combine t1 t2 =
   ; genesis= merge ~combine:Genesis.combine t1.genesis t2.genesis
   ; proof= merge ~combine:Proof_keys.combine t1.proof t2.proof
   ; ledger= opt_fallthrough ~default:t1.ledger t2.ledger }
+
+module Test_configs = struct
+  let bootstrap =
+    lazy
+      ( (* test_postake_bootstrap *)
+        {json|
+  { "daemon":
+      { "txpool_max_size": 3000 }
+  , "genesis":
+      { "k": 6
+      , "delta": 3
+      , "genesis_state_timestamp": "2019-01-30 12:00:00-08:00" }
+  , "proof":
+      { "level": "none"
+      , "c": 8
+      , "ledger_depth": 6
+      , "work_delay": 2
+      , "block_window_duration_ms": 1500
+      , "transaction_capacity": {"2_to_the": 3}
+      , "coinbase_amount": "20"
+      , "account_creation_fee": "1" }
+  , "ledger": { "name": "test", "add_genesis_winner": false } }
+      |json}
+      |> Yojson.Safe.from_string |> of_yojson |> Result.ok_or_failwith )
+end

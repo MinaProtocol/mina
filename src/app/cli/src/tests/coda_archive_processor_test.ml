@@ -21,6 +21,7 @@ let main () =
   Archive_lib.Processor.setup_server ~logger ~constraint_constants
     ~postgres_address
     ~server_port:(Host_and_port.port archive_address)
+    ~delete_older_than:None
   |> don't_wait_for ;
   let public_key =
     Precomputed_values.largest_account_pk_exn precomputed_values
@@ -37,6 +38,8 @@ let main () =
       snark_work_public_keys Cli_lib.Arg_type.Work_selection_method.Sequence
       ~max_concurrent_connections:None ~is_archive_rocksdb
       ~archive_process_location
+      ~runtime_config:
+        (Genesis_ledger_helper.extract_runtime_config precomputed_values)
   in
   let%bind new_block_pipe =
     let%map pipe = Coda_worker_testnet.Api.new_block testnet 1 public_key in
