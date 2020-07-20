@@ -58,9 +58,7 @@ let main () =
   let%bind testnet =
     Coda_worker_testnet.test ~name logger num_nodes block_production_keys
       snark_work_public_keys Cli_lib.Arg_type.Work_selection_method.Sequence
-      ~max_concurrent_connections:None
-      ~runtime_config:
-        (Genesis_ledger_helper.extract_runtime_config precomputed_values)
+      ~max_concurrent_connections:None ~precomputed_values
   in
   let%bind payments =
     Coda_worker_testnet.Payments.send_batch_consecutive_payments testnet
