@@ -257,7 +257,7 @@ let%test_module "Archive node unit tests" =
                             match%map.Async
                               Processor.User_command.find conn
                                 ~transaction_hash:
-                                  (Transaction_hash.hash_user_command cmd)
+                                  (Transaction_hash.hash_user_command cmd.data)
                             with
                             | Ok (Some _) ->
                                 ()
@@ -267,7 +267,7 @@ let%test_module "Archive node unit tests" =
                                      !"The user command %{sexp: \
                                        User_command.t} was pruned when it \
                                        should not have been"
-                                     cmd)
+                                     cmd.data)
                             | Error e ->
                                 failwith @@ Caqti_error.show e )
                       in
@@ -292,7 +292,7 @@ let%test_module "Archive node unit tests" =
                             match%map.Async
                               Processor.User_command.find conn
                                 ~transaction_hash:
-                                  (Transaction_hash.hash_user_command cmd)
+                                  (Transaction_hash.hash_user_command cmd.data)
                             with
                             | Ok None ->
                                 ()
@@ -302,7 +302,7 @@ let%test_module "Archive node unit tests" =
                                      !"The user command %{sexp: \
                                        User_command.t} was not pruned when it \
                                        should have been"
-                                     cmd)
+                                     cmd.data)
                             | Error e ->
                                 failwith @@ Caqti_error.show e )
                       in

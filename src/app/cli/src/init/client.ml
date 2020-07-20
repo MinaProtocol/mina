@@ -1279,7 +1279,6 @@ let compile_time_constants =
            >>| Option.value ~default:Runtime_config.default
            >>= Genesis_ledger_helper.init_from_config_file ~genesis_dir
                  ~logger:(Logger.null ()) ~may_generate:false ~proof_level:None
-                 ~genesis_constants:Genesis_constants.compiled
            >>| Or_error.ok_exn
          in
          let all_constants =

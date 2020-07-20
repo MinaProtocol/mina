@@ -102,7 +102,7 @@ module Stable = struct
 
     let payments external_transition =
       List.filter (user_commands external_transition) ~f:(function
-        | {payload= {body= Payment _; _}; _} ->
+        | {data= {payload= {body= Payment _; _}; _}; _} ->
             true
         | _ ->
             false )

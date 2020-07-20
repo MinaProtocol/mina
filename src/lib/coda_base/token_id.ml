@@ -30,6 +30,10 @@ let to_string = T.to_string
 
 let of_string = T.of_string
 
+let to_uint64 = Fn.id
+
+let of_uint64 = Fn.id
+
 let next = T.succ
 
 let invalid = T.of_uint64 Unsigned.UInt64.zero

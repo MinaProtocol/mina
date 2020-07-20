@@ -551,14 +551,16 @@ module Root_diff = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = {user_commands: User_command.Stable.V1.t list; root_length: int}
+      type t =
+        { user_commands: User_command.Stable.V1.t With_status.Stable.V1.t list
+        ; root_length: int }
 
       let to_latest = Fn.id
     end
   end]
 
   type t = Stable.Latest.t =
-    {user_commands: User_command.t list; root_length: int}
+    {user_commands: User_command.t With_status.t list; root_length: int}
 end
 
 let initialization_finish_signal t = t.initialization_finish_signal
@@ -1186,13 +1188,15 @@ let create (config : Config.t) =
                       consensus_state
                   with
                   | Ok () ->
-                      Logger.Str.trace config.logger ~module_:__MODULE__
-                        ~location:__LOC__
-                        ~metadata:
-                          [ ( "external_transition"
-                            , External_transition.Validated.to_yojson
-                                transition ) ]
-                        (Rebroadcast_transition {state_hash= hash}) ;
+                      (*Don't log rebroadcast message if it is internally generated; There is a broadcast log for it*)
+                      if not (source = `Internal) then
+                        Logger.Str.trace config.logger ~module_:__MODULE__
+                          ~location:__LOC__
+                          ~metadata:
+                            [ ( "external_transition"
+                              , External_transition.Validated.to_yojson
+                                  transition ) ]
+                          (Rebroadcast_transition {state_hash= hash}) ;
                       External_transition.Validated.broadcast transition
                   | Error reason -> (
                       let timing_error_json =
