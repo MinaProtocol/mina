@@ -276,15 +276,15 @@ jobs:
             - restore_cache:
                 name: Restore cache - homebrew
                 keys:
+                    - homebrew-v9-{{'{{'}} checksum "brew_ci_cache.sig" {{'}}'}}-{{'{{'}} checksum "scripts/Brewfile" {{'}}'}}
                     - homebrew-v9-{{'{{'}} checksum "brew_ci_cache.sig" {{'}}'}}
-                    - homebrew-v8-{{'{{'}} checksum "brew_ci_cache.sig" {{'}}'}}
             - run:
                 name: Install macos dependencies - homebrew - macos-setup-brew.sh
                 command: |
                     ./scripts/skip_if_only_frontend_or_rfcs.sh ./scripts/macos-setup-brew.sh
             - save_cache:
                 name: Save cache - homebrew
-                key: homebrew-v9-{{'{{'}} checksum "brew_ci_cache.sig" {{'}}'}}
+                key: homebrew-v9-{{'{{'}} checksum "brew_ci_cache.sig" {{'}}'}}-{{'{{'}} checksum "scripts/Brewfile" {{'}}'}}
                 paths:
                     - "/usr/local/Homebrew"
                     - "/Users/distiller/Library/Caches/Homebrew"
@@ -298,13 +298,17 @@ jobs:
             - restore_cache:
                 name: Restore cache - opam
                 keys:
-                    - opam-v8-{{'{{'}} checksum "opam_ci_cache.sig" {{'}}'}}
+                    # Depend on the Brewfile, since brew installs opam and
+                    # we'll need a refresh if we change version
+                    - opam-v8-{{'{{'}} checksum "opam_ci_cache.sig" {{'}}'}}-{{'{{'}} checksum "scripts/Brewfile" {{'}}'}}
+
             - run:
                 name: Install macos dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
                 command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
             - save_cache:
                 name: Save cache - opam
-                key: opam-v8-{{'{{'}} checksum "opam_ci_cache.sig" {{'}}'}}
+                key: opam-v8-{{'{{'}} checksum "opam_ci_cache.sig" {{'}}'}}-{{'{{'}} checksum "scripts/Brewfile" {{'}}'}}
+
                 paths:
                     - "/Users/distiller/.opam"
                 no_output_timeout: 1h
@@ -411,7 +415,7 @@ jobs:
                   command: cd frontend/client_sdk && yarn install
             - run:
                   name: Build And Test Client SDK
-                  command: eval `opam config env` && cd frontend/client_sdk && yarn prepublishOnly
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; eval `opam config env` && cd frontend/client_sdk && yarn prepublishOnly'
 
     {%- for profile in build_artifact_profiles %}
     build-artifacts--{{profile}}:

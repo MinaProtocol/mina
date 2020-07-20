@@ -21,6 +21,7 @@ let main () =
   Archive_lib.Processor.setup_server ~logger ~constraint_constants
     ~postgres_address
     ~server_port:(Host_and_port.port archive_address)
+    ~delete_older_than:None
   |> don't_wait_for ;
   let public_key =
     Precomputed_values.largest_account_pk_exn precomputed_values

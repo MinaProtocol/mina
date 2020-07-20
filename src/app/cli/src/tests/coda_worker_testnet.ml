@@ -396,13 +396,13 @@ let start_payment_check logger root_pipe (testnet : Api.t) =
                      expected_deadline root_length ;
                    exit 9 |> ignore ) ) ;
              List.iter user_commands ~f:(fun user_cmd ->
-                 Hashtbl.change user_cmds_under_inspection user_cmd
+                 Hashtbl.change user_cmds_under_inspection user_cmd.data
                    ~f:(function
                    | Some {passed_root; _} ->
                        Ivar.fill passed_root () ;
                        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
                          ~metadata:
-                           [ ("user_cmd", User_command.to_yojson user_cmd)
+                           [ ("user_cmd", User_command.to_yojson user_cmd.data)
                            ; ("worker_id", `Int worker_id)
                            ; ("length", `Int root_length) ]
                          "Transaction $user_cmd finally gets into the root of \
