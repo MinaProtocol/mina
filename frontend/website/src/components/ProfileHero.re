@@ -316,7 +316,15 @@ let make = (~member: Leaderboard.member) => {
     <div className=Styles.nameContainer>
       <p className=Styles.username> {React.string(member.name)} </p>
       <span className=Css.(style([display(`flex), paddingTop(`rem(0.5))]))>
-        {Leaderboard.LeaderboardRow.renderBadges(member, 2., 2.)}
+        {Leaderboard.LeaderboardRow.renderBadges(
+           ~marginLeft=0.5,
+           ~marginRight=0.5,
+           ~mobileMarginLeft=0.,
+           ~mobileMarginRight=1.,
+           ~height=2.,
+           ~width=2.,
+           member,
+         )}
       </span>
     </div>
     <div className=Styles.middleRow> <Points member /> <Links /> </div>

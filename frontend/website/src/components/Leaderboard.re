@@ -259,6 +259,7 @@ module Styles = {
 
   let badges =
     style([display(`flex), justifyContent(`flexEnd), alignItems(`center)]);
+
   let mobileBadges =
     merge([flexAlignItems, style([marginLeft(`rem(0.3))])]);
 
@@ -351,7 +352,16 @@ module LeaderboardRow = {
     |> Js.String.replaceByRe([%re "/#/g"], "%23"); /* replace "#" with percent encoding for the URL to properly parse */
   };
 
-  let renderBadges = (member, height, width) => {
+  let renderBadges =
+      (
+        ~marginLeft=0.5,
+        ~marginRight=0.5,
+        ~mobileMarginLeft=0.5,
+        ~mobileMarginRight=0.5,
+        ~height,
+        ~width,
+        member,
+      ) => {
     let icons = [||];
     if (member.technicalMVP && member.communityMVP) {
       Js.Array.push(
@@ -362,6 +372,10 @@ module LeaderboardRow = {
           alt="Technical & Community MVP"
           height
           width
+          marginLeft
+          marginRight
+          mobileMarginLeft
+          mobileMarginRight
         />,
         icons,
       )
@@ -375,6 +389,10 @@ module LeaderboardRow = {
           alt="Technical MVP"
           height
           width
+          marginLeft
+          marginRight
+          mobileMarginLeft
+          mobileMarginRight
         />,
         icons,
       )
@@ -388,6 +406,10 @@ module LeaderboardRow = {
           alt="Community MVP"
           height
           width
+          marginLeft
+          marginRight
+          mobileMarginLeft
+          mobileMarginRight
         />,
         icons,
       )
@@ -404,6 +426,10 @@ module LeaderboardRow = {
           alt="Genesis Program Founding Member"
           height
           width
+          marginLeft
+          marginRight
+          mobileMarginLeft
+          mobileMarginRight
         />,
         icons,
       )
@@ -421,7 +447,7 @@ module LeaderboardRow = {
             {React.string(string_of_int(rank))}
           </span>
           <span className=Styles.badges>
-            {renderBadges(member, 2., 2.)}
+            {renderBadges(~height=2., ~width=2., member)}
           </span>
           <span className=Styles.username> {React.string(member.name)} </span>
           {Array.map(column => {renderPoints(sort, column, member)}, filters)
@@ -442,7 +468,7 @@ module LeaderboardRow = {
           <span className=Styles.mobileSecondColumn>
             {React.string("#" ++ string_of_int(rank))}
             <span className=Styles.mobileBadges>
-              {renderBadges(member, 1., 1.)}
+              {renderBadges(~height=1., ~width=1., member)}
             </span>
           </span>
           <span className=Styles.mobileFirstColumn>

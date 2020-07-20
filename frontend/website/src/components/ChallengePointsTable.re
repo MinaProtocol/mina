@@ -120,6 +120,7 @@ module Styles = {
   let points = {
     style([
       textAlign(`right),
+      paddingRight(`rem(1.5)),
       media(Theme.MediaQuery.notMobile, [paddingRight(`rem(5.))]),
     ]);
   };
