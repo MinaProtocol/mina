@@ -140,8 +140,9 @@ module Styles = {
     style([
       cursor(`pointer),
       padding2(~v=`rem(1.), ~h=`rem(1.)),
-      height(`rem(3.5)),
+      height(`rem(4.)),
       display(`grid),
+      alignItems(`center),
       gridColumnGap(rem(1.5)),
       width(`percent(100.)),
       gridTemplateColumns([`rem(3.5), `rem(6.), `auto, `rem(9.)]),
@@ -219,17 +220,31 @@ module Styles = {
   let cell =
     style([height(`rem(2.)), whiteSpace(`nowrap), overflowX(`hidden)]);
   let flexEnd = style([justifySelf(`flexEnd)]);
-  let rank = merge([cell, flexEnd, style([gridColumn(0, 1)])]);
+  let flexAlignItems = style([display(`flex), alignItems(`center)]);
+  let rank =
+    merge([cell, flexEnd, flexAlignItems, style([gridColumn(0, 1)])]);
   let username =
-    merge([cell, style([textOverflow(`ellipsis), fontWeight(`semiBold)])]);
-  let pointsCell = merge([cell, style([justifySelf(`flexEnd)])]);
+    merge([
+      cell,
+      flexAlignItems,
+      style([textOverflow(`ellipsis), fontWeight(`semiBold)]),
+    ]);
+  let pointsCell =
+    merge([cell, flexAlignItems, style([justifySelf(`flexEnd)])]);
   let activePointsCell =
-    merge([cell, style([justifySelf(`flexEnd), fontWeight(`semiBold)])]);
+    merge([
+      cell,
+      flexAlignItems,
+      style([justifySelf(`flexEnd), fontWeight(`semiBold)]),
+    ]);
   let inactivePointsCell =
     merge([
       pointsCell,
       style([
-        media(Theme.MediaQuery.tablet, [display(`inline)]),
+        media(
+          Theme.MediaQuery.tablet,
+          [display(`flex), alignItems(`center)],
+        ),
         display(`none),
         opacity(0.5),
       ]),
@@ -242,9 +257,10 @@ module Styles = {
       textAlign(`center),
     ]);
 
-  let badges = style([display(`flex), justifyContent(`flexEnd)]);
+  let badges =
+    style([display(`flex), justifyContent(`flexEnd), alignItems(`center)]);
   let mobileBadges =
-    style([display(`flex), marginLeft(`rem(0.5)), paddingBottom(px(5))]);
+    merge([flexAlignItems, style([marginLeft(`rem(0.3))])]);
 
   let desktopLayout =
     style([
@@ -265,6 +281,7 @@ module Styles = {
     style([
       display(`flex),
       justifyContent(`flexStart),
+      alignItems(`center),
       flexDirection(`row),
       textAlign(`left),
     ]);
