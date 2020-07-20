@@ -112,7 +112,16 @@ module Styles = {
       ]),
     ]);
 
-  let nameContainer = style([display(`flex), alignItems(`center)]);
+  let nameContainer =
+    style([
+      display(`flex),
+      flexDirection(`column),
+      alignItems(`flexStart),
+      media(
+        Theme.MediaQuery.notMobile,
+        [flexDirection(`row), alignItems(`center)],
+      ),
+    ]);
 
   let username = merge([header, style([marginRight(`rem(1.5))])]);
 };
@@ -306,7 +315,17 @@ let make = (~member: Leaderboard.member) => {
     </span>
     <div className=Styles.nameContainer>
       <p className=Styles.username> {React.string(member.name)} </p>
-      {Leaderboard.LeaderboardRow.renderBadges(member, 2., 2.)}
+      <span className=Css.(style([display(`flex), paddingTop(`rem(0.5))]))>
+        {Leaderboard.LeaderboardRow.renderBadges(
+           ~marginLeft=0.5,
+           ~marginRight=0.5,
+           ~mobileMarginLeft=0.,
+           ~mobileMarginRight=1.,
+           ~height=2.,
+           ~width=2.,
+           member,
+         )}
+      </span>
     </div>
     <div className=Styles.middleRow> <Points member /> <Links /> </div>
   </div>;

@@ -1,5 +1,16 @@
 [@react.component]
-let make = (~src, ~width=2., ~height=2., ~title: string=?, ~alt: string=?) => {
+let make =
+    (
+      ~src,
+      ~width=2.,
+      ~height=2.,
+      ~marginLeft=0.5,
+      ~marginRight=0.5,
+      ~mobileMarginLeft=0.5,
+      ~mobileMarginRight=0.5,
+      ~title: string=?,
+      ~alt: string=?,
+    ) => {
   <img
     src
     title
@@ -11,10 +22,16 @@ let make = (~src, ~width=2., ~height=2., ~title: string=?, ~alt: string=?) => {
         Css.display(`flex),
         Css.justifyContent(`center),
         Css.alignItems(`center),
-        Css.marginLeft(`rem(0.5)),
-        Css.marginRight(`rem(0.5)),
+        Css.marginRight(`rem(mobileMarginRight)),
+        Css.marginLeft(`rem(mobileMarginLeft)),
         Css.position(`relative),
-        Css.top(`px(1)),
+        Css.media(
+          Theme.MediaQuery.notMobile,
+          [
+            Css.marginRight(`rem(marginRight)),
+            Css.marginLeft(`rem(marginLeft)),
+          ],
+        ),
       ]),
     ])}
   />;

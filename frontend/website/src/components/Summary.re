@@ -9,12 +9,13 @@ type statistics = {
   genesisMembers: string,
   blockCount: string,
   participants: string,
+  date: string,
 };
 
 let fetchStatistics = () => {
   Sheets.fetchRange(
     ~sheet="1Nq_Y76ALzSVJRhSFZZm4pfuGbPkZs2vTtCnVQ1ehujE",
-    ~range="Data!A2:C",
+    ~range="Data!A2:D",
   )
   |> Promise.bind(res => {
        let entry = Leaderboard.parseEntry(res[0]);
@@ -22,6 +23,7 @@ let fetchStatistics = () => {
          genesisMembers: entry |> Leaderboard.safeArrayGet(0),
          blockCount: entry |> Leaderboard.safeArrayGet(1),
          participants: entry |> Leaderboard.safeArrayGet(2),
+         date: entry |> Leaderboard.safeArrayGet(3),
        }
        ->Some
        ->Promise.return;
@@ -260,10 +262,8 @@ let reducer = (_, action) => {
 };
 
 [@react.component]
-let make = (~lastManualUpdatedDate) => {
+let make = () => {
   let (state, dispatch) = React.useReducer(reducer, initialState);
-  let dateAsMoment = momentWithDate(lastManualUpdatedDate);
-  let date = format(dateAsMoment, "MMMM Do YYYY");
 
   React.useEffect0(() => {
     fetchStatistics()
@@ -333,7 +333,16 @@ let make = (~lastManualUpdatedDate) => {
                 dims=(1.0, 1.0)
                 alt="a undercase letter i inside a blue circle"
               />
-              {React.string("Last manual update " ++ date)}
+              {switch (state.statistics) {
+               | Some(statistics) =>
+                 let date =
+                   statistics.date
+                   ->Js.Date.fromString
+                   ->momentWithDate
+                   ->format("MMMM Do YYYY");
+                 React.string("Last manual update " ++ date);
+               | None => React.null
+               }}
             </span>
           </div>
         </div>
