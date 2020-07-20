@@ -42,6 +42,7 @@ Pipeline.build
                   , "PGPASSWORD=${password} psql -h localhost -p 5432 -U ${user} -d ${db} -a -f src/app/archive/create_schema.sql"
                   , "LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper"
                   , "./scripts/test.py run --non-interactive --collect-artifacts --yes --out-dir '/workdir/test_output' 'test_archive_processor:coda-archive-processor-test'"
+                  , "ls /workdir/test_output"
                   ]) #
               [ Cmd.run "buildkite-agent artifact upload /var/buildkite/builds/$BUILDKITE_AGENT_NAME/$BUILDKITE_ORGANIZATION_SLUG/$BUILDKITE_PIPELINE_SLUG/test_output/*" ]
             , label = "Archive-node unit tests"
