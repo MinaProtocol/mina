@@ -121,8 +121,8 @@ is run, the daemon saves the following data:
    because the scan states contained in breadcrumbs can be large, do this
     computation lazily:
     - find a common prefix of breadcrumb hashes
-	- obtain the breadcrumbs corresponding to those hashes from a
-	   representative node
+       - obtain the breadcrumbs corresponding to those hashes from a
+          representative node
    N.B.: it is possible that there is no common prefix beyond the root breadcrumb
 
 The in-memory values (that is, those other than the epoch ledgers) can
@@ -155,9 +155,10 @@ If the fork is safe, then like the SNARKed ledger, we can compile
 the saved root breadcrumb into the binary. The breadcrumb data would be
 passed in the `~root_data` argument to `Full_frontier.create`.
 
-If provided, the breadcrumb chain can also be saved into the binary.
-We'd use the chain it to populate the `table` part of the full frontier
-(`Full_frontier.create` could be modified to accept a `table` argument).
+If provided, the breadcrumb chain can be used to populate an initial
+transaction pool in the binary. Each breadcrumb contains an block;
+there's a function `External_transition.transactions` to get its
+transactions.
 
 It might be that the SNARKed ledger and breadcrumbs are too large to
 include in the binary. In that case, we could provide serialized
@@ -186,12 +187,12 @@ version. In the safe case, the patch version may be updated. In the
 unsafe case, the major version or minor versions must be updated,
 forcing a software upgrade.
 
-Currently, verifying the blockchain for ordinary blocks is done using `update`
-in the functor `Blockchain_snark.Blockchain_snark_state.Make`,
+Currently, verifying the blockchain for ordinary blocks is done using
+`update` in the functor `Blockchain_snark.Blockchain_snark_state.Make`,
 which relies on a `Snark_transition.t` input derived from a block.
-For a hard fork, we'd write a new function that verifies that
-the protocol state is the same as the old state, except for
-those pieces denoted by unsafe bits.
+For a hard fork, we'd write a new function that verifies that the
+protocol state is the same as the old state, except for those pieces
+denoted by unsafe bits.
 
 Nodes running the new software won't accept other blocks until
 they've received the special block, and time has reached the
@@ -203,6 +204,12 @@ designated epoch and slot.
 In the best case, the network will run smoothly, making preparations
 for a hard fork gratuitious, and the software unnecessarily
 complex. That said, the cost of forgoing those preparations is high.
+
+By starting from the transition frontier root, we are explicitly
+discarding blocks in the transition frontier past the root (k such
+blocks, from the consensus parameters). The transactions in those
+blocks are not finalized. We avoid that loss if we add these
+transactions back to the transaction pool.
 
 ## Rationale and alternatives
 [rationale-and-alternatives]: #rationale-and-alternatives
@@ -228,11 +235,6 @@ hard forks.
 
 What unsafe bits are there in the protocol state, and what do
 they denote?
-
-Is saving and restoring a transition frontier best tip?
-
-For the best tip, is it practical to download breadcrumbs, is there
-too much data?
 
 Will the network actually resume, if this plan is followed?
 
