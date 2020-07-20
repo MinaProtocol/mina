@@ -32,7 +32,10 @@ simple_tests = [
     'transaction-snark-profiler -k 2',
 ]
 
-integration_tests = [
+compile_config_agnostic_tests = [
+    'coda-bootstrap-test',
+    'coda-shared-state-test',
+    'coda-batch-payment-test',
     'coda-peers-test',
     'coda-transitive-peers-test',
     'coda-block-production-test',
@@ -40,14 +43,6 @@ integration_tests = [
     'coda-shared-prefix-test -who-produces 1',
     'coda-change-snark-worker-test',
     'coda-archive-node-test'
-]
-
-all_tests = simple_tests + integration_tests
-
-compile_config_agnostic_tests = [
-    'coda-bootstrap-test',
-    'coda-shared-state-test',
-    'coda-batch-payment-test',
 ]
 
 compile_config_agnostic_profiles = [
@@ -67,8 +62,6 @@ small_curves_tests = {
     'fake_hash': ['full-test'],
     'test_postake_snarkless':
     simple_tests,
-    'test_postake_split_snarkless':
-    integration_tests,
     'test_postake_split':
     ['coda-shared-prefix-multiproducer-test -num-block-producers 2'],
     'test_postake':
