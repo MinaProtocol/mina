@@ -64,7 +64,7 @@ module Core = {
           range: "Member_Profile_Data!A2:Z",
         }
       | Users => {name: "Users", range: "Users!A2:B"}
-      | Data => {name: "Data", range: "Data!A1:C"}
+      | Data => {name: "Data", range: "Data!A1:D"}
       };
     };
   };
