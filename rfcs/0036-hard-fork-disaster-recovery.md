@@ -22,7 +22,8 @@ When it becomes evident that the network is failing, the Coda
 developers will perform the following tasks:
 
  - on some node, run a CLI command to persist enough state to re-start the
-    network
+    network; to choose a node, we may wish to query a set of nodes to find
+	the best state, and use a representative node
 
  - run a tool to transform the persisted state into data needed for the
     Coda binary
@@ -175,7 +176,10 @@ some of those bits may be `true`.
 
 In the case of a "safe" hard fork, where no unsafe bits are set, the
 hard fork block contains the root protocol state we saved and its
-proof. In the case of an unsafe hard fork, there can be a dummy proof.
+proof. In the case of an unsafe hard fork, the unsafe bits indicate
+which parts of the protocol state can be bypassed in the proof.
+In the unsafe case, different proof and verification keys may be needed
+across the fork.
 
 Like an ordinary block, the special block contains a current protocol
 version. In the safe case, the patch version may be updated. In the
