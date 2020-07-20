@@ -106,7 +106,7 @@ let tests =
 
   let dockerExample = assert :
   { line =
-"docker run -it --rm --init --volume /var/buildkite/builds/\\\$BUILDKITE_AGENT_NAME/\\\$BUILDKITE_ORGANIZATION_SLUG/\\\$BUILDKITE_PIPELINE_SLUG:/workdir --workdir /workdir --env ENV1 --env ENV2 --env TEST foo/bar:tag /bin/sh -c 'echo hello'"
+"docker run -it --rm --init --volume /var/buildkite:/var/buildkite/shared --volume /var/buildkite/builds/\\\$BUILDKITE_AGENT_NAME/\\\$BUILDKITE_ORGANIZATION_SLUG/\\\$BUILDKITE_PIPELINE_SLUG:/workdir --workdir /workdir --env ENV1 --env ENV2 --env TEST foo/bar:tag /bin/sh -c 'echo hello'"
   , readable =
     Some "Docker@foo/bar:tag ( echo hello )"
   }
@@ -120,7 +120,7 @@ let tests =
 
   let cacheExample = assert :
 ''
-  ./buildkite/scripts/cache-through.sh data.tar "docker run -it --rm --init --volume /var/buildkite/builds/\$BUILDKITE_AGENT_NAME/\$BUILDKITE_ORGANIZATION_SLUG/\$BUILDKITE_PIPELINE_SLUG:/workdir --workdir /workdir --env ENV1 --env ENV2 --env TEST foo/bar:tag /bin/sh -c 'echo hello > /tmp/data/foo.txt && tar cvf data.tar /tmp/data'"''
+  ./buildkite/scripts/cache-through.sh data.tar "docker run -it --rm --init --volume /var/buildkite:/var/buildkite/shared --volume /var/buildkite/builds/\$BUILDKITE_AGENT_NAME/\$BUILDKITE_ORGANIZATION_SLUG/\$BUILDKITE_PIPELINE_SLUG:/workdir --workdir /workdir --env ENV1 --env ENV2 --env TEST foo/bar:tag /bin/sh -c 'echo hello > /tmp/data/foo.txt && tar cvf data.tar /tmp/data'"''
   ===
   M.format (
     M.cacheThrough
