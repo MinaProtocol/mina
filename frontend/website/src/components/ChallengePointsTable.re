@@ -99,7 +99,7 @@ module Styles = {
           Theme.MediaQuery.notMobile,
           [
             display(`grid),
-            gridTemplateColumns([`percent(11.), `auto, `percent(23.)]),
+            gridTemplateColumns([`percent(11.), `auto, `percent(25.)]),
           ],
         ),
       ]),
