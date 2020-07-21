@@ -131,7 +131,7 @@ module Links = {
   let make = () => {
     <div className=Styles.buttonAndLinks>
       <Button
-        link=""
+        link="https://forums.codaprotocol.com/t/testnet-beta-release-3-2b-challenges/435"
         label="Current Challenges"
         bgColor=Theme.Colors.clover
         bgColorHover=Theme.Colors.jungle
