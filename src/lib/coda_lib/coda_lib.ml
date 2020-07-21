@@ -778,7 +778,10 @@ let start t =
     ~transition_writer:t.pipes.producer_transition_writer
     ~log_block_creation:t.config.log_block_creation
     ~precomputed_values:t.config.precomputed_values ;
-  Snark_worker.start t
+  Deferred.unit
+
+(*;
+  Snark_worker.start t*)
 
 let create (config : Config.t) =
   let constraint_constants = config.precomputed_values.constraint_constants in
