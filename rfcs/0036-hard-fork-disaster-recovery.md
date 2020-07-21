@@ -112,8 +112,9 @@ is run, the daemon saves the following data:
    The breadcrumb contains a validated block, and a staged ledger,
    which contains a scan state.
 
-   As of this writing, there's no serialization code to fully capture a
-   breadcrumb; that would have to be written.
+   From the breadcrumb, we need only save the scan state: the staged ledger
+   can be reconstructed from the SNARKed ledger and the scan state.
+   See `Persistent_frontier.construct_staged_ledger_at_root`.
 
  - optionally, a chain of breadcrumbs between the root and best tip
 
