@@ -182,6 +182,10 @@ module Styles = {
     merge([
       desktopLeaderboardRow,
       style([
+        position(`sticky),
+        backgroundColor(white),
+        top(`zero),
+        zIndex(99),
         display(`none),
         paddingBottom(`rem(0.5)),
         fontSize(`rem(1.)),
