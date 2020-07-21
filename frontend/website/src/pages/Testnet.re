@@ -236,10 +236,7 @@ module Section = {
            <div
              className=Styles.expandButton
              onClick={_ => setExpanded(_ => true)}>
-             <div> {React.string("View " ++ name)} </div>
-             <div className=Css.(style([marginLeft(`rem(0.5))]))>
-               {React.string({js| ↓|js})}
-             </div>
+             <div> {React.string("View Full " ++ name)} </div>
            </div>
          </>;
        }}
