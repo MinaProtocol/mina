@@ -29,6 +29,10 @@ val to_string : t -> string
 
 val of_string : string -> t
 
+val to_uint64 : t -> Unsigned.UInt64.t
+
+val of_uint64 : Unsigned.UInt64.t -> t
+
 (** The default token ID, associated with the native coda token.
 
     This ID should be used for fee and coinbase transactions.
