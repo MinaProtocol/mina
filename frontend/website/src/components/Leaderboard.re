@@ -115,6 +115,7 @@ module Styles = {
       width(`percent(100.)),
       margin2(~v=`zero, ~h=`auto),
       selector("hr", [margin(`zero)]),
+      minHeight(`rem(153.)),
     ]);
 
   let leaderboard =
