@@ -100,6 +100,15 @@ is run, the daemon saves the following data:
         `staking_epoch_snapshot` and `previous_epoch_snapshot` (not implemented
 	    in the PR)
 
+ - the protocol states for the scan state at the root
+
+   this is a list of `Protocol_state.value`, retrievable via
+   ```ocaml
+     let full = Transition_frontier.full_frontier frontier in
+     let state_map = full.protocol_states_for_root_scan_state in
+     State_hash.Map.data state_map
+   ```
+
  - the breadcrumb at the root
 
    this is an instance of `Breadcrumb.t`, retrievable via
@@ -109,13 +118,16 @@ is run, the daemon saves the following data:
 	 let root = full.root in
      Full_frontier.find_exn full root
    ```
-   The breadcrumb contains a validated block, and a staged ledger,
-   which contains a scan state.
+   The breadcrumb contains a validated block and a staged ledger.
 
-   From the breadcrumb, we need to save the scan state and pending
-   coinbase (both part of the contained staged ledger): the staged ledger
-   can be reconstructed from the SNARKed ledger and the scan state.
-   See `Persistent_frontier.construct_staged_ledger_at_root`.
+   From the breadcrumb, we need to save:
+
+     - the scan state and pending coinbase (both part of the contained
+	    staged ledger)
+     - the root transition
+
+   The staged ledger can be reconstructed from the SNARKed ledger, the scan state,
+   and the protocol states. See `Persistent_frontier.construct_staged_ledger_at_root`.
 
  - optionally, a chain of breadcrumbs between the root and best tip
 
