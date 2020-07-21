@@ -65,7 +65,7 @@ module Stable = struct
           V1.gen
       in
       let known_good_digest = "65c75a7d10b6ce193f0c0e296611a935" in
-      Ppx_version.Serialization.check_serialization
+      Ppx_version_runtime.Serialization.check_serialization
         (module V1)
         pk known_good_digest
 
