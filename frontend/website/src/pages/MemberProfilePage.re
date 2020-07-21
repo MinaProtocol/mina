@@ -286,6 +286,7 @@ let make = () => {
               })
            |> React.array}
         </div>
+        {!state.loading ? <Footer /> : React.null}
         {!state.error && state.loading
            ? <div className=Styles.loading>
                {React.string("Loading...")}
@@ -295,7 +296,7 @@ let make = () => {
            ? <div className=Styles.loading>
                {React.string("User Not Available")}
              </div>
-           : <Footer />}
+           : React.null}
       </div>
     </Wrapped>
   </Page>;
