@@ -148,7 +148,7 @@ module Links = {
             {React.string("Leaderboard FAQ")}
           </a>
         </Next.Link>
-        <Next.Link href=" https://bit.ly/CodaDiscord ">
+        <Next.Link href="https://bit.ly/CodaDiscord">
           <a className=Styles.link>
             <Svg
               link="/static/img/Icon.Link.svg"
