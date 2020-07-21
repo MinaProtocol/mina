@@ -112,7 +112,8 @@ is run, the daemon saves the following data:
    The breadcrumb contains a validated block, and a staged ledger,
    which contains a scan state.
 
-   From the breadcrumb, we need only save the scan state: the staged ledger
+   From the breadcrumb, we need to save the scan state and pending
+   coinbase (both part of the contained staged ledger): the staged ledger
    can be reconstructed from the SNARKed ledger and the scan state.
    See `Persistent_frontier.construct_staged_ledger_at_root`.
 
