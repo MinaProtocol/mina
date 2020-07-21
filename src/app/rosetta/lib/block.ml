@@ -50,10 +50,9 @@ module User_command_info = struct
     ; nonce: Unsigned.UInt32.t
     ; amount: Unsigned.UInt64.t option
     ; hash: string
-    ; failure_status: Failure_status.t }
+    ; failure_status: Failure_status.t option }
 
-  let to_operations ~account_creation_fee ~block_creator_pk (t : t) :
-      Operation.t list =
+  let to_operations ~account_creation_fee (t : t) : Operation.t list =
     (* First build a plan. The plan specifies all operations ahead of time so
      * we can later compute indices and relations when we're building the full
      * models.
@@ -66,8 +65,8 @@ module User_command_info = struct
        * which has an increase in the receiver and decrease in the source
        * (2 ops)
        * *)
-      [ {Op.label= `Fee_payer_dec; related_to= None}
-      ; {Op.label= `Fee_receiver_inc; related_to= Some `Fee_payer_dec} ]
+      (* TODO: Relate fee_payer_dec with fee_receiver_inc across user_commands and internal commands *)
+      [{Op.label= `Fee_payer_dec; related_to= None}]
       @
       (* TODO: How do we identify account creation fee failures from failure_status? *)
       match t.kind with
@@ -106,19 +105,21 @@ module User_command_info = struct
       ~a_eq:
         [%eq:
           [ `Fee_payer_dec
-          | `Fee_receiver_inc
           | `Payment_source_dec of Unsigned.UInt64.t
           | `Payment_receiver_inc of Unsigned.UInt64.t ]] ~plan
       ~f:(fun ~related_operations ~operation_identifier op ->
         let status, metadata =
           match (op.label, t.failure_status) with
+          (* If we're looking at mempool transactions, it's always pending *)
+          | _, None ->
+              (Operation_statuses.name `Pending, None)
           (* Fee transfers always succeed even if the command fails, if it's in a block.
            * TODO: Reviewer, please check me. *)
-          | `Fee_receiver_inc, _ | `Fee_payer_dec, _ ->
+          | `Fee_payer_dec, _ ->
               (Operation_statuses.name `Success, None)
-          | _, `Applied ->
+          | _, Some `Applied ->
               (Operation_statuses.name `Success, None)
-          | _, `Failed reason ->
+          | _, Some (`Failed reason) ->
               ( Operation_statuses.name `Failed
               , Some (`Assoc [("reason", `String reason)]) )
         in
@@ -141,14 +142,6 @@ module User_command_info = struct
             ; account= Some (account_id t.fee_payer t.fee_token)
             ; _type= Operation_types.name `Fee_payer_dec
             ; amount= Some Amount_of.(negated @@ token t.fee_token t.fee)
-            ; metadata }
-        | `Fee_receiver_inc ->
-            { Operation.operation_identifier
-            ; related_operations
-            ; status
-            ; account= Some (account_id block_creator_pk t.fee_token)
-            ; _type= Operation_types.name `Fee_receiver_inc
-            ; amount= Some (Amount_of.token t.fee_token t.fee)
             ; metadata }
         | `Payment_source_dec amount ->
             { Operation.operation_identifier
@@ -231,7 +224,7 @@ module User_command_info = struct
       ; fee_token= Unsigned.UInt64.of_int 1
       ; nonce= Unsigned.UInt32.of_int 3
       ; amount= Some (Unsigned.UInt64.of_int 2_000_000_000)
-      ; failure_status= `Applied
+      ; failure_status= Some `Applied
       ; hash= "TXN_1_HASH" }
     ; { kind= `Payment (* failed payment *)
       ; fee_payer= `Pk "Alice"
@@ -242,7 +235,7 @@ module User_command_info = struct
       ; fee_token= Unsigned.UInt64.of_int 1
       ; nonce= Unsigned.UInt32.of_int 3
       ; amount= Some (Unsigned.UInt64.of_int 2_000_000_000)
-      ; failure_status= `Failed "Failure"
+      ; failure_status= Some (`Failed "Failure")
       ; hash= "TXN_1fail_HASH" }
     ; { kind= `Payment (* custom token *)
       ; fee_payer= `Pk "Alice"
@@ -253,7 +246,7 @@ module User_command_info = struct
       ; fee_token= Unsigned.UInt64.of_int 1
       ; nonce= Unsigned.UInt32.of_int 3
       ; amount= Some (Unsigned.UInt64.of_int 2_000_000_000)
-      ; failure_status= `Applied
+      ; failure_status= Some `Applied
       ; hash= "TXN_1a_HASH" }
     ; { kind= `Payment (* custom fee-token *)
       ; fee_payer= `Pk "Alice"
@@ -264,7 +257,7 @@ module User_command_info = struct
       ; fee_token= Unsigned.UInt64.of_int 3
       ; nonce= Unsigned.UInt32.of_int 3
       ; amount= Some (Unsigned.UInt64.of_int 2_000_000_000)
-      ; failure_status= `Applied
+      ; failure_status= Some `Applied
       ; hash= "TXN_1b_HASH" }
     ; { kind= `Delegation
       ; fee_payer= `Pk "Alice"
@@ -275,7 +268,7 @@ module User_command_info = struct
       ; fee_token= Unsigned.UInt64.of_int 1
       ; nonce= Unsigned.UInt32.of_int 3
       ; amount= None
-      ; failure_status= `Applied
+      ; failure_status= Some `Applied
       ; hash= "TXN_2_HASH" }
     ; { kind= `Create_token
       ; fee_payer= `Pk "Alice"
@@ -286,7 +279,7 @@ module User_command_info = struct
       ; fee_token= Unsigned.UInt64.of_int 1
       ; nonce= Unsigned.UInt32.of_int 3
       ; amount= None
-      ; failure_status= `Applied
+      ; failure_status= Some `Applied
       ; hash= "TXN_3_HASH" }
     ; { kind= `Create_account
       ; fee_payer= `Pk "Alice"
@@ -297,7 +290,7 @@ module User_command_info = struct
       ; fee_token= Unsigned.UInt64.of_int 1
       ; nonce= Unsigned.UInt32.of_int 3
       ; amount= None
-      ; failure_status= `Applied
+      ; failure_status= Some `Applied
       ; hash= "TXN_4_HASH" }
     ; { kind= `Mint_tokens
       ; fee_payer= `Pk "Alice"
@@ -308,7 +301,7 @@ module User_command_info = struct
       ; fee_token= Unsigned.UInt64.of_int 1
       ; nonce= Unsigned.UInt32.of_int 3
       ; amount= Some (Unsigned.UInt64.of_int 30_000)
-      ; failure_status= `Applied
+      ; failure_status= Some `Applied
       ; hash= "TXN_5_HASH" } ]
 end
 
@@ -326,12 +319,9 @@ module Internal_command_info = struct
 
   let to_operations ~user_commands ~coinbase ~block_creator_pk (t : t) :
       Operation.t list =
-    (* We choose to represent fee transfers from txns from the canonical user
-     * command that created them so we are able consistently produce the balance
-     * changing operations in the mempool or a block.
-     *
-     * This means we only produce an operation from an internal command if
-     * it's a coinbase, or a snark worker fee transfer.
+    (* We choose to represent the dec-side of fee transfers from txns from the
+     * canonical user command that created them so we are able consistently
+     * produce more balance changing operations in the mempool or a block.
      * *)
     let plan : 'a Op.t list =
       match t.kind with
@@ -349,7 +339,11 @@ module Internal_command_info = struct
           then
             [ {Op.label= `Fee_payer_dec; related_to= None}
             ; {Op.label= `Fee_receiver_inc; related_to= Some `Fee_payer_dec} ]
-          else []
+          else
+            (* Otherwise we only have the receiver inc side *)
+            (* TODO: Relate fee_payer_dec with fee_receiver_inc across
+             * user_commands and internal commands *)
+            [{Op.label= `Fee_receiver_inc; related_to= Some `Fee_payer_dec}]
     in
     Op.build ~a_eq:[%eq: [`Coinbase_inc | `Fee_payer_dec | `Fee_receiver_inc]]
       ~plan ~f:(fun ~related_operations ~operation_identifier op ->
@@ -478,7 +472,7 @@ module Specific = struct
                         {Transaction_identifier.hash= info.hash}
                     ; operations=
                         User_command_info.to_operations ~account_creation_fee
-                          ~block_creator_pk:block_info.creator info
+                          info
                     ; metadata= None } )
           ; metadata= None }
       ; other_transactions= [] }
