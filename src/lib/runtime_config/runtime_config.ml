@@ -546,4 +546,29 @@ module Test_configs = struct
   , "ledger": { "name": "test", "add_genesis_winner": false } }
       |json}
       |> Yojson.Safe.from_string |> of_yojson |> Result.ok_or_failwith )
+
+  let transactions =
+    lazy
+      ( (* test_postake_txns *)
+        {json|
+  { "daemon":
+      { "txpool_max_size": 3000 }
+  , "genesis":
+      { "k": 6
+      , "delta": 3
+      , "genesis_state_timestamp": "2019-01-30 12:00:00-08:00" }
+  , "proof":
+      { "level": "check"
+      , "c": 8
+      , "ledger_depth": 6
+      , "work_delay": 2
+      , "block_window_duration_ms": 15000
+      , "transaction_capacity": {"2_to_the": 3}
+      , "coinbase_amount": "20"
+      , "account_creation_fee": "1" }
+  , "ledger":
+      { "name": "test_split_two_stakers"
+      , "add_genesis_winner": false } }
+      |json}
+      |> Yojson.Safe.from_string |> of_yojson |> Result.ok_or_failwith )
 end

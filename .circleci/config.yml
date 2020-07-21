@@ -938,6 +938,42 @@ jobs:
                     GO: /usr/lib/go/bin/go
             - store_artifacts:
                   path: test_output/artifacts
+    test--dev--coda-shared-state-test:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
+        steps:
+            - restore_cache:
+                name: Restore cache - opam
+                keys:
+                    -  dev-build-binaries-v1-{{ .Revision }}
+            - run:
+                  name: Running test -- dev:coda-shared-state-test
+                  command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-shared-state-test"; fi
+                  environment:
+                    LIBP2P_NIXLESS: 1
+                    CODA_LIBP2P_HELPER_PATH: /home/opam/project/src/app/libp2p_helper/result/bin/libp2p_helper
+                    GO: /usr/lib/go/bin/go
+            - store_artifacts:
+                  path: test_output/artifacts
+    test--dev--coda-batch-payment-test:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
+        steps:
+            - restore_cache:
+                name: Restore cache - opam
+                keys:
+                    -  dev-build-binaries-v1-{{ .Revision }}
+            - run:
+                  name: Running test -- dev:coda-batch-payment-test
+                  command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-batch-payment-test"; fi
+                  environment:
+                    LIBP2P_NIXLESS: 1
+                    CODA_LIBP2P_HELPER_PATH: /home/opam/project/src/app/libp2p_helper/result/bin/libp2p_helper
+                    GO: /usr/lib/go/bin/go
+            - store_artifacts:
+                  path: test_output/artifacts
     test--fake_hash:
         resource_class: large
         docker:
@@ -1313,48 +1349,6 @@ jobs:
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_three_producers:coda-txns-and-restart-non-producers"'
             - store_artifacts:
                   path: test_output/artifacts
-    test--test_postake_txns:
-        resource_class: large
-        docker:
-            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
-        steps:
-            
-            - run:
-                name: Disable LFS checkout
-                command: |
-                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
-                    git config --global lfs.fetchexclude "*"
-            - checkout
-
-            
-            - run:
-                  name: Update Submodules
-                  command: git submodule sync && git submodule update --init --recursive
-            - run:
-                name: Create opam cache signature file including a year/date stamp to ensure occasional rebuilds
-                command: |
-                    cat scripts/setup-opam.sh > opam_ci_cache.sig
-                    cat src/opam.export >> opam_ci_cache.sig
-                    date +%Y-%m >> opam_ci_cache.sig
-            - restore_cache:
-                name: Restore cache - opam
-                keys:
-                    - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
-            - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
-
-            - run:
-                name: Build libp2p_helper
-                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
-            - run:
-                  name: Running test -- test_postake_txns:coda-shared-state-test
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_txns:coda-shared-state-test"'
-            - run:
-                  name: Running test -- test_postake_txns:coda-batch-payment-test
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_txns:coda-batch-payment-test"'
-            - store_artifacts:
-                  path: test_output/artifacts
     test--test_postake_full_epoch:
         resource_class: xlarge
         docker:
@@ -1555,9 +1549,14 @@ workflows:
             - test--test_postake_split
             - test--test_postake_split_snarkless
             - test--test_postake_three_producers
-            - test--test_postake_txns
             - build-binaries--dev
             - test--dev--coda-bootstrap-test:
+                requires:
+                  - build-binaries--dev
+            - test--dev--coda-shared-state-test:
+                requires:
+                  - build-binaries--dev
+            - test--dev--coda-batch-payment-test:
                 requires:
                   - build-binaries--dev
 
