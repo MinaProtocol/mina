@@ -210,6 +210,7 @@ module Styles = {
         fontWeight(`semiBold),
         textTransform(`uppercase),
         letterSpacing(`rem(0.125)),
+        borderBottom(`px(1), `solid, Theme.Colors.leaderboardMidnight),
         media(Theme.MediaQuery.notMobile, [display(`grid)]),
         hover([backgroundColor(white), cursor(`default)]),
       ]),
@@ -642,20 +643,22 @@ let make =
         </span>
         {Array.map(renderColumnHeader, Filter.filters) |> React.array}
       </div>
-      <hr />
       {state.loading
          ? <div className=Styles.loading> {React.string("Loading...")} </div>
          : Array.concat([
-             Array.length(topTen) > 0 ? [|
-               <div className=Styles.topTen>
-                 <img src="/static/img/star.svg" alt="Star icon" />
-                 <p> {React.string("Top 10")} </p>
-               </div>,
-             |] : [||],
+             Array.length(topTen) > 0
+               ? [|
+                 <div className=Styles.topTen>
+                   <img src="/static/img/star.svg" alt="Star icon" />
+                   <p> {React.string("Top 10")} </p>
+                 </div>,
+               |]
+               : [||],
              Array.map(renderRow, topTen),
+             Array.length(topFifty) > 0 && Array.length(topTen) > 0
+               ? [|<hr />|] : [||],
              Array.length(topFifty) > 0
                ? [|
-                 <hr />,
                  <div className=Styles.topTen>
                    <img src="/static/img/star.svg" alt="Star icon" />
                    <p> {React.string("Top 50")} </p>
@@ -663,7 +666,9 @@ let make =
                |]
                : [||],
              Array.map(renderRow, topFifty),
-             Array.length(theRest) > 0 ? [|<hr />|] : [||],
+             Array.length(theRest) > 0
+             && max(Array.length(topFifty), Array.length(topTen)) > 0
+               ? [|<hr />|] : [||],
              Array.map(renderRow, theRest),
            ])
            |> React.array}
