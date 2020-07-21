@@ -196,7 +196,7 @@ let make = (~releaseTitle, ~challenges) => {
           {React.string("Challenge Name")}
         </span>
         <span className=Css.(style([gridColumn(3, 4)]))>
-          {React.string("* Points")}
+          {React.string("Points *")}
         </span>
       </div>
       <div className=Styles.gridContainer>
