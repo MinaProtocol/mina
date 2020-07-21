@@ -252,7 +252,7 @@ module Styles = {
         width(`rem(6.25)),
         height(`rem(1.5)),
         marginTop(`px(-2)),
-        background(white),
+        important(background(white)),
         textTransform(`uppercase),
         right(`zero),
         selector("p", [paddingLeft(`px(5))]),
