@@ -105,7 +105,7 @@ module Compressed = struct
             ~seed:(`Deterministic "nonzero_curve_point_compressed-seed") V1.gen
         in
         let known_good_digest = "067f8be67e5cc31f5c5ac4be91d5f6db" in
-        Ppx_version.Serialization.check_serialization
+        Ppx_version_runtime.Serialization.check_serialization
           (module V1)
           point known_good_digest
 
