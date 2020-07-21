@@ -11,9 +11,7 @@ let main () =
   let%bind testnet =
     Coda_worker_testnet.test ~name logger n Option.some snark_work_public_keys
       Cli_lib.Arg_type.Work_selection_method.Sequence
-      ~max_concurrent_connections:None
-      ~runtime_config:
-        (Genesis_ledger_helper.extract_runtime_config precomputed_values)
+      ~max_concurrent_connections:None ~precomputed_values
   in
   let%bind () = after (Time.Span.of_sec 30.) in
   Coda_worker_testnet.Api.teardown testnet ~logger

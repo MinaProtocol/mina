@@ -4,11 +4,18 @@ open Signature_lib
 
 let name = "coda-batch-payment-test"
 
+let runtime_config = Runtime_config.Test_configs.transactions
+
 let main () =
   Core.Backtrace.elide := false ;
   Async.Scheduler.set_record_backtraces true ;
   let logger = Logger.create () in
-  let precomputed_values = Lazy.force Precomputed_values.compiled in
+  let%bind precomputed_values, _runtime_config =
+    Genesis_ledger_helper.init_from_config_file ~logger ~may_generate:false
+      ~proof_level:None
+      (Lazy.force runtime_config)
+    >>| Or_error.ok_exn
+  in
   let (module Genesis_ledger) = precomputed_values.genesis_ledger in
   let keypairs =
     List.map
@@ -27,9 +34,7 @@ let main () =
   let%bind testnet =
     Coda_worker_testnet.test ~name logger num_nodes block_production_keys
       snark_work_public_keys Cli_lib.Arg_type.Work_selection_method.Sequence
-      ~max_concurrent_connections:None
-      ~runtime_config:
-        (Genesis_ledger_helper.extract_runtime_config precomputed_values)
+      ~max_concurrent_connections:None ~precomputed_values
   in
   let%bind payments =
     Coda_worker_testnet.Payments.send_batch_consecutive_payments testnet
