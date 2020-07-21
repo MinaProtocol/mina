@@ -21,7 +21,7 @@ let buildTestCmd : Text -> Text -> Command.Type = \(profile : Text) -> \(path : 
       key = "unit-test-${profile}",
       target = Size.Experimental,
       docker = None Docker.Type,
-      artifact_paths = [ S.strictlyStart (S.contains "core_dumps") ]
+      artifact_paths = [ S.contains "core_dumps/*" ]
     }
 
 in
