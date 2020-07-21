@@ -424,9 +424,13 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                 (UC.check cmd) ~f:(fun cmd -> Ok (Transaction.User_command cmd))
           )
       | Fee_transfer f ->
-          Ok {data= Fee_transfer f.fee_transfer; status= Applied}
+          Ok
+            { data= Fee_transfer f.fee_transfer
+            ; status= Applied User_command_status.Auxiliary_data.empty }
       | Coinbase c ->
-          Ok {data= Coinbase c.coinbase; status= Applied}
+          Ok
+            { data= Coinbase c.coinbase
+            ; status= Applied User_command_status.Auxiliary_data.empty }
 
     let user_command_status : t -> User_command_status.t =
      fun {varying; _} ->
@@ -434,9 +438,9 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       | User_command {common= {user_command= {status; _}; _}; _} ->
           status
       | Fee_transfer _ ->
-          Applied
+          Applied User_command_status.Auxiliary_data.empty
       | Coinbase _ ->
-          Applied
+          Applied User_command_status.Auxiliary_data.empty
   end
 
   let previous_empty_accounts action pk = if action = `Added then [pk] else []
@@ -496,7 +500,9 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           ~account
       in
       let undo_common : Undo.User_command_undo.Common.t =
-        { user_command= {data= user_command; status= Applied}
+        { user_command=
+            { data= user_command
+            ; status= Applied User_command_status.Auxiliary_data.empty }
         ; previous_receipt_chain_hash= account.receipt_chain_hash
         ; fee_payer_timing
         ; source_timing= None }
@@ -606,6 +612,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           in
           ( [(source_location, source_account)]
           , `Source_timing source_timing
+          , User_command_status.Auxiliary_data.empty
           , Undo.User_command_undo.Body.Stake_delegation {previous_delegate} )
       | Payment {amount; token_id= token; _} ->
           let receiver_location, receiver_account =
@@ -684,16 +691,22 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                           (User_command_status.Failure.describe failure)))
             else ret
           in
-          let previous_empty_accounts =
+          let previous_empty_accounts, auxiliary_data =
             match receiver_location with
             | `Existing _ ->
-                []
+                ([], User_command_status.Auxiliary_data.empty)
             | `New ->
-                [receiver]
+                ( [receiver]
+                , { User_command_status.Auxiliary_data.empty with
+                    receiver_account_creation_fee_paid=
+                      Some
+                        (Amount.of_fee
+                           constraint_constants.account_creation_fee) } )
           in
           ( [ (receiver_location, receiver_account)
             ; (source_location, source_account) ]
           , `Source_timing source_timing
+          , auxiliary_data
           , Undo.User_command_undo.Body.Payment {previous_empty_accounts} )
       | Create_new_token {disable_new_accounts; _} ->
           (* NOTE: source and receiver are definitionally equal here. *)
@@ -717,6 +730,11 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             ( [ (fee_payer_location, fee_payer_account)
               ; (receiver_location, receiver_account) ]
             , `Source_timing receiver_account.timing
+            , { User_command_status.Auxiliary_data.empty with
+                fee_payer_account_creation_fee_paid=
+                  Some
+                    (Amount.of_fee constraint_constants.account_creation_fee)
+              ; created_token= Some next_available_token }
             , Undo.User_command_undo.Body.Create_new_token
                 {created_token= next_available_token} )
       | Create_token_account {account_disabled; _} ->
@@ -800,6 +818,10 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           in
           ( located_accounts
           , `Source_timing source_timing
+          , { User_command_status.Auxiliary_data.empty with
+              fee_payer_account_creation_fee_paid=
+                Some (Amount.of_fee constraint_constants.account_creation_fee)
+            }
           , Undo.User_command_undo.Body.Create_token_account )
       | Mint_tokens {token_id= token; amount; _} ->
           let%bind () =
@@ -856,15 +878,23 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           ( [ (receiver_location, receiver_account)
             ; (source_location, source_account) ]
           , `Source_timing source_timing
+          , User_command_status.Auxiliary_data.empty
           , Undo.User_command_undo.Body.Mint_tokens )
     in
     match compute_updates () with
-    | Ok (located_accounts, `Source_timing source_timing, undo_body) ->
+    | Ok
+        ( located_accounts
+        , `Source_timing source_timing
+        , auxiliary_data
+        , undo_body ) ->
         (* Update the ledger. *)
         List.iter located_accounts ~f:(fun (location, account) ->
             set_with_location ledger location account ) ;
         let undo_common =
-          {undo_common with source_timing= Some source_timing}
+          { undo_common with
+            source_timing= Some source_timing
+          ; user_command= {data= user_command; status= Applied auxiliary_data}
+          }
         in
         return
           ({common= undo_common; body= undo_body} : Undo.User_command_undo.t)

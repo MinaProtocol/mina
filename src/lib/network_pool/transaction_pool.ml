@@ -1175,7 +1175,9 @@ let%test_module _ =
 
     let accepted_user_commands = Result.map ~f:fst
 
-    let mk_with_status cmd = {With_status.data= cmd; status= Applied}
+    let mk_with_status cmd =
+      { With_status.data= cmd
+      ; status= Applied User_command_status.Auxiliary_data.empty }
 
     let%test_unit "transactions are removed in linear case" =
       Thread_safe.block_on_async_exn (fun () ->

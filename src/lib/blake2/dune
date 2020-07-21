@@ -6,5 +6,5 @@
   (libraries
     core_kernel
     coda_digestif
-    ppx_version
+    ppx_version.runtime
   ))
