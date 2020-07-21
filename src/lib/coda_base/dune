@@ -43,6 +43,7 @@
     trust_system
     unsigned_extended
     visualization
+    with_hash
     yojson
     )
  (preprocessor_deps ../../config.mlh)
