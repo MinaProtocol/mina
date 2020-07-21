@@ -174,11 +174,15 @@ struct
     type t =
       { mutable pool: Indexed_pool.t
       ; locally_generated_uncommitted:
-          (User_command.With_valid_signature.t, Time.t) Hashtbl.t
+          ( Transaction_hash.User_command_with_valid_signature.t
+          , Time.t )
+          Hashtbl.t
             (** Commands generated on this machine, that are not included in the
                 current best tip, along with the time they were added. *)
       ; locally_generated_committed:
-          (User_command.With_valid_signature.t, Time.t) Hashtbl.t
+          ( Transaction_hash.User_command_with_valid_signature.t
+          , Time.t )
+          Hashtbl.t
             (** Ones that are included in the current best tip. *)
       ; config: Config.t
       ; logger: Logger.t sexp_opaque
@@ -206,13 +210,16 @@ struct
                 Logger.error logger ~module_:__MODULE__ ~location:__LOC__
                   "Error handling committed transaction $cmd: $error "
                   ~metadata:
-                    [ ("cmd", User_command.With_valid_signature.to_yojson cmd)
+                    [ ( "cmd"
+                      , Transaction_hash.User_command_with_valid_signature
+                        .to_yojson cmd )
                     ; ("error", `String error_str)
                     ; ( "queue"
                       , `List
                           (List.map (Sequence.to_list queued_cmds) ~f:(fun c ->
-                               User_command.With_valid_signature.to_yojson c ))
-                      ) ] ;
+                               Transaction_hash
+                               .User_command_with_valid_signature
+                               .to_yojson c )) ) ] ;
                 failwith error_str )
           | None ->
               None )
@@ -231,7 +238,8 @@ struct
     let drop_until_below_max_size :
            pool_max_size:int
         -> Indexed_pool.t
-        -> Indexed_pool.t * User_command.With_valid_signature.t Sequence.t =
+        -> Indexed_pool.t
+           * Transaction_hash.User_command_with_valid_signature.t Sequence.t =
      fun ~pool_max_size pool ->
       let rec go pool' dropped =
         if Indexed_pool.size pool' > pool_max_size then (
@@ -286,11 +294,13 @@ struct
         Sequence.fold
           ( removed_user_commands |> List.rev |> Sequence.of_list
           |> Sequence.map ~f:(fun unchecked ->
-                 Option.value_exn
-                   ~message:
-                     "somehow user command from the frontier has an invalid \
-                      signature!"
-                   (User_command.check unchecked.data) ) )
+                 unchecked.data |> User_command.check
+                 |> Option.value_exn
+                      ~message:
+                        "somehow user command from the frontier has an \
+                         invalid signature!"
+                 |> Transaction_hash.User_command_with_valid_signature.create
+             ) )
           ~init:(t.pool, Sequence.empty)
           ~f:(fun (pool, dropped_so_far) cmd ->
             ( match
@@ -302,9 +312,9 @@ struct
                 Hashtbl.add_exn t.locally_generated_uncommitted ~key:cmd
                   ~data:time_added ) ;
             let pool', dropped_seq =
-              drop_until_below_max_size
-                (Indexed_pool.add_from_backtrack pool cmd)
-                ~pool_max_size
+              cmd
+              |> Indexed_pool.add_from_backtrack pool
+              |> drop_until_below_max_size ~pool_max_size
             in
             (pool', Sequence.append dropped_so_far dropped_seq) )
       in
@@ -322,8 +332,10 @@ struct
           ~metadata:
             [ ( "cmds"
               , `List
-                  (List.map ~f:User_command.With_valid_signature.to_yojson
-                     locally_generated_dropped) ) ] ;
+                  (List.map
+                     ~f:
+                       Transaction_hash.User_command_with_valid_signature
+                       .to_yojson locally_generated_dropped) ) ] ;
       let pool'', dropped_commit_conflicts =
         List.fold new_user_commands ~init:(pool', Sequence.empty)
           ~f:(fun (p, dropped_so_far) cmd ->
@@ -348,6 +360,7 @@ struct
             let cmd' =
               User_command.check cmd.data
               |> Option.value_exn ~message:"user command was invalid"
+              |> Transaction_hash.User_command_with_valid_signature.create
             in
             ( match
                 Hashtbl.find_and_remove t.locally_generated_uncommitted cmd'
@@ -378,8 +391,9 @@ struct
                         , `List
                             (List.map (Sequence.to_list queued_cmds)
                                ~f:(fun c ->
-                                 User_command.With_valid_signature.to_yojson c
-                             )) ) ] ;
+                                 Transaction_hash
+                                 .User_command_with_valid_signature
+                                 .to_yojson c )) ) ] ;
                   failwith error_str
             in
             (p', Sequence.append dropped_so_far dropped) )
@@ -398,7 +412,9 @@ struct
               , `List
                   (Sequence.to_list
                      (Sequence.map commit_conflicts_locally_generated
-                        ~f:User_command.With_valid_signature.to_yojson)) ) ] ;
+                        ~f:
+                          Transaction_hash.User_command_with_valid_signature
+                          .to_yojson)) ) ] ;
       Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
         !"Finished handling diff. Old pool size %i, new pool size %i. Dropped \
           %i commands during backtracking to maintain max size."
@@ -420,14 +436,16 @@ struct
                against new ledger."
               ~metadata:
                 [ ( "cmd"
-                  , User_command.to_yojson (User_command.forget_check cmd) ) ] ;
+                  , Transaction_hash.User_command_with_valid_signature
+                    .to_yojson cmd ) ] ;
             remove_cmd ()
           in
           if not (Hashtbl.mem t.locally_generated_committed cmd) then
             if
               not
                 (has_sufficient_fee t.pool
-                   (User_command.forget_check cmd)
+                   (Transaction_hash.User_command_with_valid_signature.command
+                      cmd)
                    ~pool_max_size)
             then (
               Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
@@ -435,14 +453,16 @@ struct
                  insufficient fee"
                 ~metadata:
                   [ ( "cmd"
-                    , User_command.to_yojson (User_command.forget_check cmd) )
-                  ] ;
+                    , Transaction_hash.User_command_with_valid_signature
+                      .to_yojson cmd ) ] ;
               remove_cmd () )
             else
               match
                 Option.bind
                   (Base_ledger.location_of_account best_tip_ledger
-                     (User_command.fee_payer (User_command.forget_check cmd)))
+                     (User_command.fee_payer
+                        (Transaction_hash.User_command_with_valid_signature
+                         .command cmd)))
                   ~f:(Base_ledger.get best_tip_ledger)
               with
               | Some acct -> (
@@ -458,8 +478,8 @@ struct
                        pool after reorg"
                       ~metadata:
                         [ ( "cmd"
-                          , User_command.to_yojson
-                              (User_command.forget_check cmd) ) ] ;
+                          , Transaction_hash.User_command_with_valid_signature
+                            .to_yojson cmd ) ] ;
                     t.pool <- pool''' )
               | None ->
                   log_invalid () ) ;
@@ -470,9 +490,13 @@ struct
       let t =
         { pool= Indexed_pool.empty ~constraint_constants
         ; locally_generated_uncommitted=
-            Hashtbl.create (module User_command.With_valid_signature)
+            Hashtbl.create
+              ( module Transaction_hash.User_command_with_valid_signature.Stable
+                       .Latest )
         ; locally_generated_committed=
-            Hashtbl.create (module User_command.With_valid_signature)
+            Hashtbl.create
+              ( module Transaction_hash.User_command_with_valid_signature.Stable
+                       .Latest )
         ; config
         ; logger
         ; best_tip_diff_relay= None
@@ -560,8 +584,10 @@ struct
                          , `List
                              (List.map
                                 (Sequence.to_list dropped_locally_generated)
-                                ~f:User_command.With_valid_signature.to_yojson)
-                         ) ] ;
+                                ~f:
+                                  Transaction_hash
+                                  .User_command_with_valid_signature
+                                  .to_yojson) ) ] ;
                  Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
                    !"Re-validated transaction pool after restart: dropped %i \
                      of %i previously in pool"
@@ -649,6 +675,10 @@ struct
                       (sprintf !"invalid signature %s"
                          (Yojson.Safe.to_string (User_command.to_yojson tx)))
                 | Some tx' -> (
+                    let tx' =
+                      Transaction_hash.User_command_with_valid_signature.create
+                        tx'
+                    in
                     if Indexed_pool.member pool tx' then
                       let%bind _ =
                         trust_record
@@ -762,7 +792,8 @@ struct
                                       to_list
                                       @@ map
                                            ~f:
-                                             User_command.With_valid_signature
+                                             Transaction_hash
+                                             .User_command_with_valid_signature
                                              .to_yojson seq)
                                 in
                                 if not (Sequence.is_empty dropped) then
@@ -805,8 +836,8 @@ struct
                                         , `List
                                             (List.map
                                                ~f:
-                                                 User_command
-                                                 .With_valid_signature
+                                                 Transaction_hash
+                                                 .User_command_with_valid_signature
                                                  .to_yojson
                                                locally_generated_dropped) ) ] ;
                                 go txs'' pool'' (tx :: accepted, rejected)
@@ -908,8 +939,9 @@ struct
     end
 
     let get_rebroadcastable (t : t) ~is_expired =
-      let metadata ~(key : User_command.With_valid_signature.t) ~data =
-        [ ("cmd", User_command.to_yojson (User_command.forget_check key))
+      let metadata ~key ~data =
+        [ ( "cmd"
+          , Transaction_hash.User_command_with_valid_signature.to_yojson key )
         ; ("time", `String (Time.to_string_abs ~zone:Time.Zone.utc data)) ]
       in
       let added_str =
@@ -938,7 +970,9 @@ struct
               true ) ;
       (* Important to maintain ordering here *)
       let rebroadcastable_txs =
-        (Hashtbl.keys t.locally_generated_uncommitted :> User_command.t list)
+        Hashtbl.keys t.locally_generated_uncommitted
+        |> List.map
+             ~f:Transaction_hash.User_command_with_valid_signature.command
       in
       if List.is_empty rebroadcastable_txs then []
       else
@@ -1057,9 +1091,10 @@ let%test_module _ =
           pool.locally_generated_uncommitted ~f:(fun ~key -> function
           | `Both (committed, uncommitted) ->
               failwithf
-                !"Command %{sexp:User_command.With_valid_signature.t} in both \
-                  locally generated committed and uncommitted with times %s \
-                  and %s"
+                !"Command \
+                  %{sexp:Transaction_hash.User_command_with_valid_signature.t} \
+                  in both locally generated committed and uncommitted with \
+                  times %s and %s"
                 key (Time.to_string committed)
                 (Time.to_string uncommitted)
                 ()
@@ -1099,7 +1134,8 @@ let%test_module _ =
           assert_locally_generated pool ;
           [%test_eq: User_command.t List.t]
             ( Test.Resource_pool.transactions ~logger pool
-            |> Sequence.map ~f:User_command.forget_check
+            |> Sequence.map
+                 ~f:Transaction_hash.User_command_with_valid_signature.command
             |> Sequence.to_list
             |> List.sort ~compare:User_command.compare )
             (List.sort ~compare:User_command.compare txs) )
@@ -1344,7 +1380,9 @@ let%test_module _ =
           let assert_pool_txs txs =
             [%test_eq: User_command.t List.t]
               ( Test.Resource_pool.transactions ~logger pool
-              |> Sequence.map ~f:User_command.forget_check
+              |> Sequence.map
+                   ~f:
+                     Transaction_hash.User_command_with_valid_signature.command
               |> Sequence.to_list
               |> List.sort ~compare:User_command.compare )
             @@ List.sort ~compare:User_command.compare txs
