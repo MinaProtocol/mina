@@ -108,15 +108,45 @@ module Failure = struct
         "The resulting balance is too large to store"
 end
 
+module Auxiliary_data = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t =
+        { fee_payer_account_creation_fee_paid:
+            Currency.Amount.Stable.V1.t option
+        ; receiver_account_creation_fee_paid:
+            Currency.Amount.Stable.V1.t option
+        ; created_token: Token_id.Stable.V1.t option }
+      [@@deriving sexp, yojson, eq, compare]
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  type t = Stable.Latest.t =
+    { fee_payer_account_creation_fee_paid: Currency.Amount.t option
+    ; receiver_account_creation_fee_paid: Currency.Amount.t option
+    ; created_token: Token_id.t option }
+  [@@deriving sexp, yojson, eq, compare]
+
+  let empty =
+    { fee_payer_account_creation_fee_paid= None
+    ; receiver_account_creation_fee_paid= None
+    ; created_token= None }
+end
+
 [%%versioned
 module Stable = struct
   module V1 = struct
-    type t = Applied | Failed of Failure.Stable.V1.t
+    type t =
+      | Applied of Auxiliary_data.Stable.V1.t
+      | Failed of Failure.Stable.V1.t
     [@@deriving sexp, yojson, eq, compare]
 
     let to_latest = Fn.id
   end
 end]
 
-type t = Stable.Latest.t = Applied | Failed of Failure.t
+type t = Stable.Latest.t = Applied of Auxiliary_data.t | Failed of Failure.t
 [@@deriving sexp, yojson, eq, compare]

@@ -475,7 +475,7 @@ let start_checks logger (workers : Coda_process.t array) start_reader testnet
    *   change network connectivity *)
 let test ?archive_process_location ?is_archive_rocksdb ~name logger n
     block_production_keys snark_work_public_keys work_selection_method
-    ~max_concurrent_connections =
+    ~max_concurrent_connections ~runtime_config =
   let logger = Logger.extend logger [("worker_testnet", `Bool true)] in
   let block_production_interval = Constants.block_window_duration_ms in
   let acceptable_delay =
@@ -491,6 +491,7 @@ let test ?archive_process_location ?is_archive_rocksdb ~name logger n
       ~work_selection_method
       ~trace_dir:(Unix.getenv "CODA_TRACING")
       ~max_concurrent_connections ?is_archive_rocksdb ?archive_process_location
+      ~runtime_config
   in
   let%bind workers = Coda_processes.spawn_local_processes_exn configs in
   let workers = List.to_array workers in
