@@ -29,6 +29,70 @@ module Block_query = struct
   end
 end
 
+module Sql = struct
+  module Block = struct
+    let typ = Caqti_type.(tup2 int Archive_lib.Processor.Block.typ)
+
+    let query_height =
+      Caqti_request.find Caqti_type.int64 typ
+        {|
+WITH RECURSIVE chain AS (
+  SELECT id, state_hash, parent_id, creator_id, snarked_ledger_hash_id, ledger_hash, height, timestamp, coinbase_id FROM blocks WHERE height = (select MAX(height) from blocks)
+
+  UNION ALL
+
+  SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, b.ledger_hash, b.height, b.timestamp, b.coinbase_id FROM blocks b
+  INNER JOIN chain
+  ON b.id = chain.parent_id
+) SELECT id, state_hash, parent_id, creator_id, snarked_ledger_hash_id, ledger_hash, height, timestamp, coinbase_id FROM chain WHERE height = ?
+      |}
+
+    let query_hash =
+      Caqti_request.find Caqti_type.string typ
+        {| SELECT id, state_hash, parent_id, creator_id, snarked_ledger_hash_id, ledger_hash, height, timestamp, coinbase_id FROM blocks WHERE state_hash = ? |}
+
+    let query_both =
+      Caqti_request.find
+        Caqti_type.(tup2 string int64)
+        typ
+        {| SELECT id, state_hash, parent_id, creator_id, snarked_ledger_hash_id, ledger_hash, height, timestamp, coinbase_id FROM blocks WHERE state_hash = ? AND height = ? |}
+
+    let run (module Conn : Caqti_async.CONNECTION) = function
+      | `This (`Height h) ->
+          Conn.find query_height h
+      | `That (`Hash h) ->
+          Conn.find query_hash h
+      | `Those (`Height height, `Hash hash) ->
+          Conn.find query_both (hash, height)
+  end
+
+  module User_commands = struct
+    let typ = Caqti_type.(tup2 int Archive_lib.Processor.User_command.typ)
+
+    let query =
+      Caqti_request.find Caqti_type.int typ
+        {| SELECT user_commands.* FROM user_commands, blocks_user_commands LEFT JOIN blocks ON blocks_user_commands.block_id = ? |}
+  end
+
+  module Internal_commands = struct
+    (* TODO *)
+    let typ = Caqti_type.(tup2 int Archive_lib.Processor.Internal_command.typ)
+
+    let query =
+      Caqti_request.find Caqti_type.int typ
+        {| SELECT internal_commands.* FROM internal_commands, blocks_internal_commands LEFT JOIN blocks ON blocks_internal_commands.block_id = ? |}
+  end
+
+  module Public_keys = struct
+    (* TODO: Make this more efficient by batching or getting all in one query *)
+    let typ = Caqti_type.int
+
+    let query_one =
+      Caqti_request.find Caqti_type.int typ
+        {| SELECT value FROM public_keys WHERE id = ? |}
+  end
+end
+
 module Op = struct
   type 'a t = {label: 'a; related_to: 'a option} [@@deriving eq]
 
@@ -471,9 +535,31 @@ module Specific = struct
     let real :
         db:(module Caqti_async.CONNECTION) -> graphql_uri:Uri.t -> 'gql Real.t
         =
-     fun ~db:_ ~graphql_uri ->
+     fun ~db ~graphql_uri ->
       { gql= (fun () -> Graphql.query (Network.Get_network.make ()) graphql_uri)
-      ; db_block= (fun _query -> failwith "Figure out how to do the sql")
+      ; db_block=
+          (fun _query ->
+            let _db = db in
+            (*
+            let (module Conn: Caqti_async.CONNECTION) = db in
+            let open Deferred.Result.Let_syntax in
+            let%bind () =
+              match%bind.Deferred
+                Conn.start ()
+           let%bind block =
+             Sql.Block.query_both
+
+        with
+          | Error e ->
+            Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+              ~metadata:
+                [ ("block", With_hash.hash block |> State_hash.to_yojson)
+                ; ("error", `String (Caqti_error.show e)) ]
+              "Failed to load block: $block, see $error" ;
+            Conn.rollback ()
+          | Ok _ ->
+            Conn.commit () *)
+            failwith "TODO" )
       ; validate_network_choice= Network.Validate_choice.Real.validate }
 
     let mock : 'gql Mock.t =
@@ -530,7 +616,7 @@ module Specific = struct
       module Mock = Impl (Result)
 
       (* This test intentionally fails as there has not been time to implement
-       * it properly yet *)
+     * it properly yet *)
       (*
       let%test_unit "all dummies" =
         Test.assert_ ~f:Block_response.to_yojson

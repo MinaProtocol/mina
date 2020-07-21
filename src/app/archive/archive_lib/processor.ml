@@ -242,6 +242,17 @@ module User_command = struct
 end
 
 module Internal_command = struct
+  type t =
+    {typ: string; receiver_id: int; fee: int; token: string; hash: string}
+
+  let typ =
+    let encode t = Ok ((t.typ, t.receiver_id, t.fee, t.token), t.hash) in
+    let decode ((typ, receiver_id, fee, token), hash) =
+      Ok {typ; receiver_id; fee; token; hash}
+    in
+    let rep = Caqti_type.(tup2 (tup4 string int int string) string) in
+    Caqti_type.custom ~encode ~decode rep
+
   let find (module Conn : CONNECTION) ~(transaction_hash : Transaction_hash.t)
       =
     Conn.find_opt
@@ -512,8 +523,8 @@ module Block = struct
               >>| ignore )
         in
         (* For technique reasons, there might be multiple fee transfers for
-           one receiver. As suggested by deepthi, I combine all the fee transfer
-           that goes to one public key here *)
+         one receiver. As suggested by deepthi, I combine all the fee transfer
+         that goes to one public key here *)
         let fee_transfer_table = Core.Hashtbl.create (module Account_id) in
         let () =
           let open Coda_base in
@@ -550,8 +561,8 @@ module Block = struct
               >>| ignore )
         in
         (* For technical reasons, each block might have up to 2 coinbases.
-           I would combine the coinbases if there are 2 of them.
-        *)
+         I would combine the coinbases if there are 2 of them.
+      *)
         let%bind () =
           if List.length coinbases = 0 then return ()
           else
