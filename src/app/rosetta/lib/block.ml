@@ -7,6 +7,28 @@ let account_id (`Pk pk) token_id =
   ; sub_account= None
   ; metadata= Some (Amount_of.Token_id.encode token_id) }
 
+module Block_query = struct
+  type t = ([`Height of int64], [`Hash of string]) These.t
+
+  module T (M : Monad_fail.S) = struct
+    let of_partial_identifier (identifier : Partial_block_identifier.t) =
+      match (identifier.index, identifier.hash) with
+      | None, None ->
+          M.fail
+            (Errors.create
+               ~context:
+                 "Partial block identifier must have at least an index or a \
+                  hash, it cannot be empty"
+               (`Json_parse None))
+      | Some index, None ->
+          M.return (`This (`Height index))
+      | None, Some hash ->
+          M.return (`That (`Hash hash))
+      | Some index, Some hash ->
+          M.return (`Those (`Height index, `Hash hash))
+  end
+end
+
 module Op = struct
   type 'a t = {label: 'a; related_to: 'a option} [@@deriving eq]
 
@@ -35,8 +57,17 @@ module User_command_info = struct
       [`Payment | `Delegation | `Create_token | `Create_account | `Mint_tokens]
   end
 
+  module Account_creation_fees_paid = struct
+    type t =
+      | By_no_one
+      | By_fee_payer of Unsigned.UInt64.t
+      | By_receiver of Unsigned.UInt64.t
+    [@@deriving eq]
+  end
+
   module Failure_status = struct
-    type t = [`Applied | `Failed of string] [@@deriving eq]
+    type t = [`Applied of Account_creation_fees_paid.t | `Failed of string]
+    [@@deriving eq]
   end
 
   type t =
@@ -52,7 +83,7 @@ module User_command_info = struct
     ; hash: string
     ; failure_status: Failure_status.t option }
 
-  let to_operations ~account_creation_fee (t : t) : Operation.t list =
+  let to_operations (t : t) : Operation.t list =
     (* First build a plan. The plan specifies all operations ahead of time so
      * we can later compute indices and relations when we're building the full
      * models.
@@ -61,38 +92,35 @@ module User_command_info = struct
      * transfer. ie. Source decreases, and receiver increases.
     *)
     let plan : 'a Op.t list =
-      (* there is always a fee transfer
-       * which has an increase in the receiver and decrease in the source
-       * (2 ops)
-       * *)
+      (* The dec side of a user command's fee transfer is here *)
       (* TODO: Relate fee_payer_dec with fee_receiver_inc across user_commands and internal commands *)
       [{Op.label= `Fee_payer_dec; related_to= None}]
+      @ ( match t.failure_status with
+        | Some (`Applied (Account_creation_fees_paid.By_receiver amount)) ->
+            [ { Op.label= `Account_creation_fee_via_payment amount
+              ; related_to= None } ]
+        | Some (`Applied (Account_creation_fees_paid.By_fee_payer amount)) ->
+            [ { Op.label= `Account_creation_fee_via_fee_payer amount
+              ; related_to= None } ]
+        | _ ->
+            [] )
       @
-      (* TODO: How do we identify account creation fee failures from failure_status? *)
       match t.kind with
       | `Payment -> (
-          if Amount_of.Token_id.is_default t.token then
-            [{Op.label= `Account_creation_fee_via_payment; related_to= None}]
-          else
-            []
-            @
-            (* When amount is not none, we move the amount from source to receiver *)
-            match t.amount with
-            | Some amount ->
-                [ {Op.label= `Payment_source_dec amount; related_to= None}
-                ; { Op.label= `Payment_receiver_inc amount
-                  ; related_to= Some (`Payment_source_dec amount) } ]
-            | None ->
-                [] )
+        (* When amount is not none, we move the amount from source to receiver *)
+        match t.amount with
+        | Some amount ->
+            [ {Op.label= `Payment_source_dec amount; related_to= None}
+            ; { Op.label= `Payment_receiver_inc amount
+              ; related_to= Some (`Payment_source_dec amount) } ]
+        | None ->
+            [] )
       | `Delegation ->
           [{Op.label= `Delegate_change; related_to= None}]
       | `Create_token ->
-          [ {Op.label= `Account_creation_fee_via_fee_payer; related_to= None}
-          ; {Op.label= `Create_token; related_to= None} ]
+          [{Op.label= `Create_token; related_to= None}]
       | `Create_account ->
-          if Amount_of.Token_id.is_default t.fee_token then
-            [{Op.label= `Account_creation_fee_via_fee_payer; related_to= None}]
-          else []
+          [] (* Covered by account creation fee *)
       | `Mint_tokens -> (
         (* When amount is not none, we move the amount from source to receiver *)
         match t.amount with
@@ -114,10 +142,10 @@ module User_command_info = struct
           | _, None ->
               (Operation_statuses.name `Pending, None)
           (* Fee transfers always succeed even if the command fails, if it's in a block.
-           * TODO: Reviewer, please check me. *)
+                 * TODO: Reviewer, please check me. *)
           | `Fee_payer_dec, _ ->
               (Operation_statuses.name `Success, None)
-          | _, Some `Applied ->
+          | _, Some (`Applied _) ->
               (Operation_statuses.name `Success, None)
           | _, Some (`Failed reason) ->
               ( Operation_statuses.name `Failed
@@ -159,7 +187,7 @@ module User_command_info = struct
             ; _type= Operation_types.name `Payment_receiver_inc
             ; amount= Some (Amount_of.token t.token amount)
             ; metadata }
-        | `Account_creation_fee_via_payment ->
+        | `Account_creation_fee_via_payment account_creation_fee ->
             { Operation.operation_identifier
             ; related_operations
             ; status
@@ -167,7 +195,7 @@ module User_command_info = struct
             ; _type= Operation_types.name `Account_creation_fee_via_payment
             ; amount= Some Amount_of.(negated @@ coda account_creation_fee)
             ; metadata }
-        | `Account_creation_fee_via_fee_payer ->
+        | `Account_creation_fee_via_fee_payer account_creation_fee ->
             { Operation.operation_identifier
             ; related_operations
             ; status
@@ -224,8 +252,23 @@ module User_command_info = struct
       ; fee_token= Unsigned.UInt64.of_int 1
       ; nonce= Unsigned.UInt32.of_int 3
       ; amount= Some (Unsigned.UInt64.of_int 2_000_000_000)
-      ; failure_status= Some `Applied
+      ; failure_status= Some (`Applied Account_creation_fees_paid.By_no_one)
       ; hash= "TXN_1_HASH" }
+    ; { kind= `Payment (* new account created *)
+      ; fee_payer= `Pk "Alice"
+      ; source= `Pk "Alice"
+      ; token= Unsigned.UInt64.of_int 1
+      ; fee= Unsigned.UInt64.of_int 2_000_000_000
+      ; receiver= `Pk "Bob"
+      ; fee_token= Unsigned.UInt64.of_int 1
+      ; nonce= Unsigned.UInt32.of_int 3
+      ; amount= Some (Unsigned.UInt64.of_int 2_000_000_000)
+      ; failure_status=
+          Some
+            (`Applied
+              (Account_creation_fees_paid.By_receiver
+                 (Unsigned.UInt64.of_int 1_000_000)))
+      ; hash= "TXN_1new_HASH" }
     ; { kind= `Payment (* failed payment *)
       ; fee_payer= `Pk "Alice"
       ; source= `Pk "Alice"
@@ -246,7 +289,7 @@ module User_command_info = struct
       ; fee_token= Unsigned.UInt64.of_int 1
       ; nonce= Unsigned.UInt32.of_int 3
       ; amount= Some (Unsigned.UInt64.of_int 2_000_000_000)
-      ; failure_status= Some `Applied
+      ; failure_status= Some (`Applied Account_creation_fees_paid.By_no_one)
       ; hash= "TXN_1a_HASH" }
     ; { kind= `Payment (* custom fee-token *)
       ; fee_payer= `Pk "Alice"
@@ -257,7 +300,7 @@ module User_command_info = struct
       ; fee_token= Unsigned.UInt64.of_int 3
       ; nonce= Unsigned.UInt32.of_int 3
       ; amount= Some (Unsigned.UInt64.of_int 2_000_000_000)
-      ; failure_status= Some `Applied
+      ; failure_status= Some (`Applied Account_creation_fees_paid.By_no_one)
       ; hash= "TXN_1b_HASH" }
     ; { kind= `Delegation
       ; fee_payer= `Pk "Alice"
@@ -268,9 +311,9 @@ module User_command_info = struct
       ; fee_token= Unsigned.UInt64.of_int 1
       ; nonce= Unsigned.UInt32.of_int 3
       ; amount= None
-      ; failure_status= Some `Applied
+      ; failure_status= Some (`Applied Account_creation_fees_paid.By_no_one)
       ; hash= "TXN_2_HASH" }
-    ; { kind= `Create_token
+    ; { kind= `Create_token (* no new account *)
       ; fee_payer= `Pk "Alice"
       ; source= `Pk "Alice"
       ; token= Unsigned.UInt64.of_int 1
@@ -279,8 +322,23 @@ module User_command_info = struct
       ; fee_token= Unsigned.UInt64.of_int 1
       ; nonce= Unsigned.UInt32.of_int 3
       ; amount= None
-      ; failure_status= Some `Applied
-      ; hash= "TXN_3_HASH" }
+      ; failure_status= Some (`Applied Account_creation_fees_paid.By_no_one)
+      ; hash= "TXN_3a_HASH" }
+    ; { kind= `Create_token (* new account fee *)
+      ; fee_payer= `Pk "Alice"
+      ; source= `Pk "Alice"
+      ; token= Unsigned.UInt64.of_int 1
+      ; fee= Unsigned.UInt64.of_int 2_000_000_000
+      ; receiver= `Pk "Bob"
+      ; fee_token= Unsigned.UInt64.of_int 1
+      ; nonce= Unsigned.UInt32.of_int 3
+      ; amount= None
+      ; failure_status=
+          Some
+            (`Applied
+              (Account_creation_fees_paid.By_fee_payer
+                 (Unsigned.UInt64.of_int 3_000)))
+      ; hash= "TXN_3b_HASH" }
     ; { kind= `Create_account
       ; fee_payer= `Pk "Alice"
       ; source= `Pk "Alice"
@@ -290,7 +348,7 @@ module User_command_info = struct
       ; fee_token= Unsigned.UInt64.of_int 1
       ; nonce= Unsigned.UInt32.of_int 3
       ; amount= None
-      ; failure_status= Some `Applied
+      ; failure_status= Some (`Applied Account_creation_fees_paid.By_no_one)
       ; hash= "TXN_4_HASH" }
     ; { kind= `Mint_tokens
       ; fee_payer= `Pk "Alice"
@@ -301,7 +359,7 @@ module User_command_info = struct
       ; fee_token= Unsigned.UInt64.of_int 1
       ; nonce= Unsigned.UInt32.of_int 3
       ; amount= Some (Unsigned.UInt64.of_int 30_000)
-      ; failure_status= Some `Applied
+      ; failure_status= Some (`Applied Account_creation_fees_paid.By_no_one)
       ; hash= "TXN_5_HASH" } ]
 end
 
@@ -337,12 +395,15 @@ module Internal_command_info = struct
                 && [%eq: [`Pk of string]] info.receiver t.receiver )
             |> Option.is_none
           then
+            (* In this case we make a "synthetic" fee subtraction from block
+           * creator even though this is implicit in our blocks. We need this
+           * so the balance always sums to zero. *)
             [ {Op.label= `Fee_payer_dec; related_to= None}
             ; {Op.label= `Fee_receiver_inc; related_to= Some `Fee_payer_dec} ]
           else
             (* Otherwise we only have the receiver inc side *)
             (* TODO: Relate fee_payer_dec with fee_receiver_inc across
-             * user_commands and internal commands *)
+           * user_commands and internal commands *)
             [{Op.label= `Fee_receiver_inc; related_to= Some `Fee_payer_dec}]
     in
     Op.build ~a_eq:[%eq: [`Coinbase_inc | `Fee_payer_dec | `Fee_receiver_inc]]
@@ -410,7 +471,7 @@ module Specific = struct
     module T (M : Monad_fail.S) = struct
       type 'gql t =
         { gql: unit -> ('gql, Errors.t) M.t
-        ; db_block: unit -> (Block_info.t, Errors.t) M.t
+        ; db_block: Block_query.t -> (Block_info.t, Errors.t) M.t
         ; validate_network_choice: 'gql Network.Validate_choice.Impl(M).t }
     end
 
@@ -425,7 +486,7 @@ module Specific = struct
         =
      fun ~db:_ ~graphql_uri ->
       { gql= (fun () -> Graphql.query (Network.Get_network.make ()) graphql_uri)
-      ; db_block= (fun () -> failwith "Figure out how to do the sql")
+      ; db_block= (fun _query -> failwith "Figure out how to do the sql")
       ; validate_network_choice= Network.Validate_choice.Real.validate }
 
     let mock : 'gql Mock.t =
@@ -433,27 +494,28 @@ module Specific = struct
           (fun () ->
             (* TODO: Add variants to cover every branch *)
             Result.return @@ object end )
-      ; db_block= (fun () -> Result.return @@ Block_info.dummy)
+      ; db_block= (fun _query -> Result.return @@ Block_info.dummy)
       ; validate_network_choice= Network.Validate_choice.Mock.succeed }
   end
 
   module Impl (M : Monad_fail.S) = struct
-    module E = Env.T (M)
+    module Query = Block_query.T (M)
 
     let handle :
-        env:'gql E.t -> Block_request.t -> (Block_response.t, Errors.t) M.t =
+           env:'gql Env.T(M).t
+        -> Block_request.t
+        -> (Block_response.t, Errors.t) M.t =
      fun ~env req ->
       let open M.Let_syntax in
-      (* TODO: Support alternate tokens *)
+      let%bind query = Query.of_partial_identifier req.block_identifier in
       let%bind res = env.gql () in
       let%bind () =
         env.validate_network_choice ~network_identifier:req.network_identifier
           ~gql_response:res
       in
-      (* TODO: Pull account creation fee and coinbase from graphql #5435 *)
-      let account_creation_fee = Unsigned.UInt64.of_int 1_000 in
+      (* TODO: Pull account coinbase from graphql #5435 *)
       let coinbase = Unsigned.UInt64.of_int 20_000_000_000 in
-      let%map block_info = env.db_block () in
+      let%map block_info = env.db_block query in
       { Block_response.block=
           { Block.block_identifier= block_info.block_identifier
           ; parent_block_identifier= block_info.parent_block_identifier
@@ -470,9 +532,7 @@ module Specific = struct
               @ List.map block_info.user_commands ~f:(fun info ->
                     { Transaction.transaction_identifier=
                         {Transaction_identifier.hash= info.hash}
-                    ; operations=
-                        User_command_info.to_operations ~account_creation_fee
-                          info
+                    ; operations= User_command_info.to_operations info
                     ; metadata= None } )
           ; metadata= None }
       ; other_transactions= [] }

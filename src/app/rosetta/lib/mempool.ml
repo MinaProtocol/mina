@@ -272,8 +272,6 @@ module Transaction = struct
         env.validate_network_choice ~network_identifier:req.network_identifier
           ~gql_response:res
       in
-      (* TODO: Pull account creation fee from graphql #5435 *)
-      let account_creation_fee = Unsigned.UInt64.of_int 1_000 in
       let%bind user_command_obj =
         (* TODO: Move to checking the option once #5415 lands *)
         if Array.is_empty res#pooledUserCommands then
@@ -288,9 +286,7 @@ module Transaction = struct
       { Mempool_transaction_response.transaction=
           { Transaction.transaction_identifier=
               {Transaction_identifier.hash= req.transaction_identifier.hash}
-          ; operations=
-              user_command_info
-              |> User_command_info.to_operations ~account_creation_fee
+          ; operations= user_command_info |> User_command_info.to_operations
           ; metadata= None }
       ; metadata= None }
   end
