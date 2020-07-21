@@ -3,9 +3,16 @@ open Async
 
 let name = "coda-shared-prefix-test"
 
+let runtime_config = Runtime_config.Test_configs.split_snarkless
+
 let main who_produces () =
   let logger = Logger.create () in
-  let precomputed_values = Lazy.force Precomputed_values.compiled in
+  let%bind precomputed_values, _runtime_config =
+    Genesis_ledger_helper.init_from_config_file ~logger ~may_generate:false
+      ~proof_level:None
+      (Lazy.force runtime_config)
+    >>| Or_error.ok_exn
+  in
   let n = 2 in
   let block_producers i = if i = who_produces then Some i else None in
   let snark_work_public_keys _ = None in

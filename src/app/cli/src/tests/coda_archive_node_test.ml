@@ -4,9 +4,16 @@ open Coda_base
 
 let name = "coda-archive-node-test"
 
+let runtime_config = Runtime_config.Test_configs.split_snarkless
+
 let main () =
   let logger = Logger.create () in
-  let precomputed_values = Lazy.force Precomputed_values.compiled in
+  let%bind precomputed_values, _runtime_config =
+    Genesis_ledger_helper.init_from_config_file ~logger ~may_generate:false
+      ~proof_level:None
+      (Lazy.force runtime_config)
+    >>| Or_error.ok_exn
+  in
   let public_key =
     Precomputed_values.largest_account_pk_exn precomputed_values
   in
