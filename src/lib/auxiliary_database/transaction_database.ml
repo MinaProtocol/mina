@@ -94,7 +94,8 @@ module Transaction_with_hash = struct
 end
 
 module Block_time = Block_time
-module T = Make (Transaction_with_hash.Stable.V1) (Block_time.Time.Stable.V1)
+module T =
+  Make (Transaction_with_hash.Stable.Latest) (Block_time.Time.Stable.Latest)
 include T
 
 module For_tests = struct
