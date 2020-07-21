@@ -148,7 +148,7 @@ module Links = {
             {React.string("Leaderboard FAQ")}
           </a>
         </Next.Link>
-        <Next.Link href="">
+        <Next.Link href=" https://bit.ly/CodaDiscord ">
           <a className=Styles.link>
             <Svg
               link="/static/img/Icon.Link.svg"
@@ -156,7 +156,7 @@ module Links = {
               className=Styles.icon
               alt="an arrow pointing to the right with a square around it"
             />
-            {React.string("Discord #Leaderboard Channel")}
+            {React.string("Discord #leaderboard-qa Channel")}
           </a>
         </Next.Link>
       </div>
