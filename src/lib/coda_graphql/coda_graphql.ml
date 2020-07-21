@@ -431,15 +431,15 @@ module Types = struct
       ~doc:"Status for whenever the blockchain is reorganized"
       ~values:[enum_value "CHANGED" ~value:`Changed]
 
-  let protocol_amounts =
-    obj "ProtocolAmounts" ~fields:(fun _ ->
+  let genesis_constants =
+    obj "GenesisConstants" ~fields:(fun _ ->
         [ field "accountCreationFee" ~typ:(non_null uint64)
             ~doc:"The fee charged to create a new account"
             ~args:Arg.[]
             ~resolve:(fun {ctx= coda; _} () ->
               (Coda_lib.config coda).precomputed_values.constraint_constants
                 .account_creation_fee |> Currency.Fee.to_uint64 )
-        ; field "coinbaseReward" ~typ:(non_null uint64)
+        ; field "coinbase" ~typ:(non_null uint64)
             ~doc:
               "The amount received as a coinbase reward for producing a block"
             ~args:Arg.[]
@@ -2610,11 +2610,13 @@ module Queries = struct
         | None ->
             [] )
 
-  let protocol_amounts =
-    field "protocolAmounts"
-      ~doc:"The currency amounts for different events in the protocol"
+  let genesis_constants =
+    field "genesisConstants"
+      ~doc:
+        "The constants used to determine the configuration of the genesis \
+         block and all of its transitive dependencies"
       ~args:Arg.[]
-      ~typ:(non_null Types.protocol_amounts)
+      ~typ:(non_null Types.genesis_constants)
       ~resolve:(fun _ () -> ())
 
   let commands =
@@ -2639,7 +2641,7 @@ module Queries = struct
     ; trust_status_all
     ; snark_pool
     ; pending_snark_work
-    ; protocol_amounts ]
+    ; genesis_constants ]
 end
 
 let schema =
