@@ -120,6 +120,7 @@ module Styles = {
 
   let leaderboard =
     style([
+      position(`relative),
       background(white),
       width(`percent(100.)),
       borderRadius(px(3)),
@@ -140,7 +141,12 @@ module Styles = {
   let desktopLeaderboardRow =
     style([
       cursor(`pointer),
-      padding2(~v=`rem(1.), ~h=`rem(1.)),
+      padding4(
+        ~top=`rem(1.),
+        ~right=`rem(9.),
+        ~bottom=`rem(1.),
+        ~left=`rem(1.),
+      ),
       height(`rem(4.)),
       display(`grid),
       alignItems(`center),
@@ -162,6 +168,18 @@ module Styles = {
           ]),
         ],
       ),
+    ]);
+
+  let orangeEvenLeaderboardRow =
+    merge([
+      desktopLeaderboardRow,
+      style([backgroundColor(`rgba((248, 248, 243, 1.)))]),
+    ]);
+
+  let orangeLeaderboardRow =
+    merge([
+      desktopLeaderboardRow,
+      style([backgroundColor(`rgba((241, 239, 235, 1.)))]),
     ]);
 
   let mobileLeaderboardRow =
@@ -220,7 +238,25 @@ module Styles = {
       media(Theme.MediaQuery.tablet, [display(`inline)]),
     ]);
 
-  let topTen = style([position(`absolute)]);
+  let topTen =
+    merge([
+      Theme.H6.extraSmall,
+      style([
+        display(`none),
+        media(Theme.MediaQuery.notMobile, [display(`flex)]),
+        alignItems(`center),
+        justifyContent(`center),
+        border(`px(1), `solid, Theme.Colors.leaderboardMidnight),
+        position(`absolute),
+        width(`rem(6.25)),
+        height(`rem(1.5)),
+        marginTop(`px(-2)),
+        background(white),
+        textTransform(`uppercase),
+        right(`zero),
+        selector("p", [paddingLeft(`px(5))]),
+      ]),
+    ]);
 
   let cell =
     style([height(`rem(2.)), whiteSpace(`nowrap), overflowX(`hidden)]);
@@ -447,7 +483,14 @@ module LeaderboardRow = {
     [@react.component]
     let make = (~userSlug, ~sort, ~rank, ~member) => {
       <Next.Link href=userSlug _as=userSlug>
-        <div className=Styles.desktopLeaderboardRow>
+        <div
+          className={
+            rank > 10 && rank <= 50
+              ? rank mod 2 == 0
+                  ? Styles.orangeEvenLeaderboardRow
+                  : Styles.orangeLeaderboardRow
+              : Styles.desktopLeaderboardRow
+          }>
           <span className=Styles.rank>
             {React.string(string_of_int(rank))}
           </span>
@@ -515,6 +558,7 @@ type state = {
 type actions =
   | UpdateMembers(array(member));
 
+<p> {React.string("Top 10")} </p>;
 let reducer = (_, action) => {
   switch (action) {
   | UpdateMembers(members) => {loading: false, members}
@@ -568,6 +612,14 @@ let make =
        )
     |> Js.Array.filter(member => sortRank(member) !== 0);
 
+  let topTen = Js.Array.filter(mem => sortRank(mem) <= 10, filteredMembers);
+  let topFifty =
+    Js.Array.filter(
+      mem => sortRank(mem) > 10 && sortRank(mem) <= 50,
+      filteredMembers,
+    );
+  let theRest = Js.Array.filter(mem => sortRank(mem) > 50, filteredMembers);
+
   let renderRow = member =>
     <LeaderboardRow key={member.name} sort=filter member />;
 
@@ -591,10 +643,30 @@ let make =
         {Array.map(renderColumnHeader, Filter.filters) |> React.array}
       </div>
       <hr />
-      <div className=Styles.topTen />
       {state.loading
          ? <div className=Styles.loading> {React.string("Loading...")} </div>
-         : Array.map(renderRow, filteredMembers) |> React.array}
+         : Array.concat([
+             Array.length(topTen) > 0 ? [|
+               <div className=Styles.topTen>
+                 <img src="/static/img/star.svg" alt="Star icon" />
+                 <p> {React.string("Top 10")} </p>
+               </div>,
+             |] : [||],
+             Array.map(renderRow, topTen),
+             Array.length(topFifty) > 0
+               ? [|
+                 <hr />,
+                 <div className=Styles.topTen>
+                   <img src="/static/img/star.svg" alt="Star icon" />
+                   <p> {React.string("Top 50")} </p>
+                 </div>,
+               |]
+               : [||],
+             Array.map(renderRow, topFifty),
+             Array.length(theRest) > 0 ? [|<hr />|] : [||],
+             Array.map(renderRow, theRest),
+           ])
+           |> React.array}
     </div>
   </div>;
 };
