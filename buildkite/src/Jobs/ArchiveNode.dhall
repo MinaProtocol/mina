@@ -48,12 +48,14 @@ Pipeline.build
                   , "ls /workdir/test_output"
                   ]) # [ Cmd.run "pwd"
                        , Cmd.run "ls ."
-                       , Cmd.run "ls test_output" ]
+                       , Cmd.run "ls test_output"
+                       , Cmd.run "echo 'outerDir'"
+                       , Cmd.run "ls ${outerDir}/test_output" ]
             , label = "Archive-node unit tests"
             , key = "build-client-sdk"
             , target = Size.Large
             , docker = None Docker.Type
-            , artifact_paths = [ S.contains "test_output" ]
+            , artifact_paths = [ S.contains "test_output/**/*" ]
             }
       ]
     }
