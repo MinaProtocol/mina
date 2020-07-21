@@ -25,7 +25,7 @@ let cmdConfig =
       commands  = commands,
       label = "Build Libp2p helper",
       key = "libp2p-helper",
-      target = Size.Large,
+      target = Size.Large
     }
 
 in
