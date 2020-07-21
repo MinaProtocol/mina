@@ -57,6 +57,24 @@ required_config_agnostic_tests = {
       ]
 }
 
+compile_config_agnostic_tests = [
+    'coda-bootstrap-test',
+    'coda-shared-state-test',
+    'coda-batch-payment-test',
+]
+
+compile_config_agnostic_profiles = [
+    'dev'
+]
+
+required_config_agnostic_tests = {
+    'dev': [
+        'coda-bootstrap-test',
+        'coda-shared-state-test',
+        'coda-batch-payment-test',
+      ]
+}
+
 # dictionary mapping configs to lists of tests
 small_curves_tests = {
     'fake_hash': ['full-test'],

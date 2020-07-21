@@ -48,7 +48,7 @@ module Stable = struct
           ~seed:(`Deterministic "signature serialization") V1.gen
       in
       let known_good_digest = "5581d593702a09f4418fe46bde1ca116" in
-      Ppx_version.Serialization.check_serialization
+      Ppx_version_runtime.Serialization.check_serialization
         (module V1)
         signature known_good_digest
 
@@ -61,7 +61,7 @@ module Stable = struct
           ~seed:(`Deterministic "signature serialization") V1.gen
       in
       let known_good_digest = "7cc56fd93cef313e1eef9fc83f55aedb" in
-      Ppx_version.Serialization.check_serialization
+      Ppx_version_runtime.Serialization.check_serialization
         (module V1)
         signature known_good_digest
 
