@@ -543,7 +543,7 @@ module Verification_keys = struct
         let merge = Tick.Verification_key.of_string "merge key" in
         let keys = V1.{base; wrap; merge} in
         let known_good_digest = "1cade6287d659338ae1f2c3971ee8d06" in
-        Ppx_version.Serialization.check_serialization
+        Ppx_version_runtime.Serialization.check_serialization
           (module V1)
           keys known_good_digest
     end
@@ -1311,7 +1311,7 @@ module Base = struct
 
     (* These are all the possible cases:
 
-       Init_stack     Source                 Target 
+       Init_stack     Source                 Target
       --------------------------------------------------------------
         i               i                       i + state
         i               i                       i + state + coinbase

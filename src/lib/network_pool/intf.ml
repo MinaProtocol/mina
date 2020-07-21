@@ -256,13 +256,18 @@ module type Transaction_resource_pool_intf = sig
   val make_config :
     trust_system:Trust_system.t -> pool_max_size:int -> Config.t
 
-  val member : t -> User_command.With_valid_signature.t -> bool
+  val member :
+    t -> Transaction_hash.User_command_with_valid_signature.t -> bool
 
   val transactions :
-    logger:Logger.t -> t -> User_command.With_valid_signature.t Sequence.t
+       logger:Logger.t
+    -> t
+    -> Transaction_hash.User_command_with_valid_signature.t Sequence.t
 
   val all_from_account :
-    t -> Account_id.t -> User_command.With_valid_signature.t list
+       t
+    -> Account_id.t
+    -> Transaction_hash.User_command_with_valid_signature.t list
 
-  val get_all : t -> User_command.With_valid_signature.t list
+  val get_all : t -> Transaction_hash.User_command_with_valid_signature.t list
 end

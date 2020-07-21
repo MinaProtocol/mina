@@ -4,9 +4,16 @@ open Coda_base
 
 let name = "coda-archive-node-test"
 
+let runtime_config = Runtime_config.Test_configs.split_snarkless
+
 let main () =
   let logger = Logger.create () in
-  let precomputed_values = Lazy.force Precomputed_values.compiled in
+  let%bind precomputed_values, _runtime_config =
+    Genesis_ledger_helper.init_from_config_file ~logger ~may_generate:false
+      ~proof_level:None
+      (Lazy.force runtime_config)
+    >>| Or_error.ok_exn
+  in
   let public_key =
     Precomputed_values.largest_account_pk_exn precomputed_values
   in
@@ -17,9 +24,7 @@ let main () =
   let%bind testnet =
     Coda_worker_testnet.test ~name logger n block_production_keys
       snark_work_public_keys Cli_lib.Arg_type.Work_selection_method.Sequence
-      ~max_concurrent_connections:None ~is_archive_rocksdb
-      ~runtime_config:
-        (Genesis_ledger_helper.extract_runtime_config precomputed_values)
+      ~max_concurrent_connections:None ~is_archive_rocksdb ~precomputed_values
   in
   let%bind new_block_pipe =
     let%map pipe = Coda_worker_testnet.Api.new_block testnet 1 public_key in
