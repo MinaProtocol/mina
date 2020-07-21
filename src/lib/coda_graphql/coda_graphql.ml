@@ -2308,19 +2308,44 @@ module Queries = struct
       ~args:
         Arg.
           [ arg "publicKey" ~doc:"Public key of sender of pooled user commands"
-              ~typ:Types.Input.public_key_arg ]
-      ~resolve:(fun {ctx= coda; _} () opt_pk ->
+              ~typ:Types.Input.public_key_arg
+          ; arg "hashes" ~doc:"Hashes of the commands to find in the pool"
+              ~typ:(list (non_null string)) ]
+      ~resolve:(fun {ctx= coda; _} () opt_pk opt_hashes ->
         let transaction_pool = Coda_lib.transaction_pool coda in
         let resource_pool =
           Network_pool.Transaction_pool.resource_pool transaction_pool
         in
-        ( match opt_pk with
-        | None ->
+        ( match (opt_pk, opt_hashes) with
+        | None, None ->
             Network_pool.Transaction_pool.Resource_pool.get_all resource_pool
-        | Some pk ->
+        | Some pk, None ->
             let account_id = Account_id.create pk Token_id.default in
             Network_pool.Transaction_pool.Resource_pool.all_from_account
-              resource_pool account_id )
+              resource_pool account_id
+        | _, Some hashes ->
+            List.filter_map hashes ~f:(fun hash ->
+                let txn =
+                  hash |> Transaction_hash.of_base58_check
+                  |> Result.map
+                       ~f:
+                         (Network_pool.Transaction_pool.Resource_pool
+                          .find_by_hash resource_pool)
+                in
+                match (txn, opt_pk) with
+                | Ok (Some txn), Some pk ->
+                    (* Filter by fee-payer pk. *)
+                    if
+                      txn
+                      |> Transaction_hash.User_command_with_valid_signature
+                         .command |> User_command.fee_payer_pk
+                      |> Public_key.Compressed.equal pk
+                    then Some txn
+                    else None
+                | Ok (Some txn), None ->
+                    Some txn
+                | _ ->
+                    None ) )
         |> List.map
              ~f:
                (Fn.compose Types.UserCommand.mk_user_command
