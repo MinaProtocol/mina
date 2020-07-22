@@ -576,7 +576,7 @@ WITH RECURSIVE chain AS (
 
     let query =
       Caqti_request.collect Caqti_type.int typ
-        {| SELECT user_commands.* FROM user_commands, blocks_user_commands LEFT JOIN blocks ON blocks_user_commands.block_id = ? |}
+        {| SELECT user_commands.* FROM user_commands LEFT JOIN blocks_user_commands ON blocks_user_commands.block_id = ? |}
 
     let run (module Conn : Caqti_async.CONNECTION) id =
       Conn.collect_list query id
@@ -588,7 +588,7 @@ WITH RECURSIVE chain AS (
 
     let query =
       Caqti_request.collect Caqti_type.int typ
-        {| SELECT internal_commands.* FROM internal_commands, blocks_internal_commands LEFT JOIN blocks ON blocks_internal_commands.block_id = ? |}
+        {| SELECT internal_commands.* FROM internal_commands LEFT JOIN blocks_internal_commands ON blocks_internal_commands.block_id = ? |}
 
     let run (module Conn : Caqti_async.CONNECTION) id =
       Conn.collect_list query id
@@ -620,205 +620,210 @@ WITH RECURSIVE chain AS (
       end
     end in
     let open M.Let_syntax in
-    match%bind
-      Block.run (module Conn) input |> Errors.Lift.sql ~context:"Finding block"
-    with
-    | None ->
-        M.fail (Errors.create `Block_missing)
-    | Some (block_id, raw_block) -> (
-        match%bind
-          Block.run_by_id (module Conn) block_id
-          |> Errors.Lift.sql ~context:"Finding parent block"
-        with
-        | None ->
-            M.fail (Errors.create ~context:"Parent block" `Block_missing)
-        | Some (_, raw_parent_block) ->
-            let%bind raw_user_commands =
-              User_commands.run (module Conn) block_id
-              |> Errors.Lift.sql ~context:"Finding user commands within block"
-            in
-            let%bind raw_internal_commands =
-              Internal_commands.run (module Conn) block_id
-              |> Errors.Lift.sql
-                   ~context:"Finding internal commands within block"
-            in
-            let public_key_ids =
-              Int.Set.union_list
-                [ Int.Set.singleton raw_block.creator_id
-                ; List.fold raw_user_commands ~init:Int.Set.empty
-                    ~f:(fun acc (_id, uc, _) ->
-                      Int.Set.union acc
-                        (Int.Set.of_list
-                           [ uc.Archive_lib.Processor.User_command.fee_payer_id
-                           ; uc.source_id
-                           ; uc.receiver_id ]) )
-                ; List.fold raw_internal_commands ~init:Int.Set.empty
-                    ~f:(fun acc (_id, ic) ->
-                      Int.Set.union acc
-                        (Int.Set.singleton
-                           ic
-                             .Archive_lib.Processor.Internal_command
-                              .receiver_id) ) ]
-            in
-            let%bind public_keys =
-              (* TODO: N+1 problem *)
-              Int.Set.fold public_key_ids ~init:(M.return Int.Map.empty)
-                ~f:(fun acc id ->
-                  let%bind pks = acc in
-                  let%map pk =
-                    match%bind
-                      Public_keys.run (module Conn) id
-                      |> Errors.Lift.sql
-                           ~context:"Finding public key within block"
-                    with
-                    | Some pk ->
-                        M.return (`Pk pk)
-                    | None ->
-                        M.fail
-                          (Errors.create
-                             ~context:
-                               (sprintf
-                                  "A public key id %d doesn't exist in the \
-                                   archive database but if we're requesting \
-                                   it it should."
-                                  id)
-                             `Invariant_violation)
-                  in
-                  Int.Map.add_exn ~key:id ~data:pk pks )
-            in
-            let load_pk source id =
-              match Int.Map.find public_keys id with
-              | None ->
+    let%bind block_id, raw_block =
+      match%bind
+        Block.run (module Conn) input
+        |> Errors.Lift.sql ~context:"Finding block"
+      with
+      | None ->
+          M.fail (Errors.create `Block_missing)
+      | Some (block_id, raw_block) ->
+          M.return (block_id, raw_block)
+    in
+    let%bind parent_id =
+      match raw_block.parent_id with
+      | None ->
+          M.fail
+            (Errors.create ~context:"Parent block is null because genesis"
+               `Block_missing)
+      | Some id ->
+          M.return id
+    in
+    let%bind raw_parent_block =
+      match%bind
+        Block.run_by_id (module Conn) parent_id
+        |> Errors.Lift.sql ~context:"Finding parent block"
+      with
+      | None ->
+          M.fail (Errors.create ~context:"Parent block" `Block_missing)
+      | Some (_, raw_parent_block) ->
+          M.return raw_parent_block
+    in
+    let%bind raw_user_commands =
+      User_commands.run (module Conn) block_id
+      |> Errors.Lift.sql ~context:"Finding user commands within block"
+    in
+    let%bind raw_internal_commands =
+      Internal_commands.run (module Conn) block_id
+      |> Errors.Lift.sql ~context:"Finding internal commands within block"
+    in
+    let public_key_ids =
+      Int.Set.union_list
+        [ Int.Set.singleton raw_block.creator_id
+        ; List.fold raw_user_commands ~init:Int.Set.empty
+            ~f:(fun acc (_id, uc, _) ->
+              Int.Set.union acc
+                (Int.Set.of_list
+                   [ uc.Archive_lib.Processor.User_command.fee_payer_id
+                   ; uc.source_id
+                   ; uc.receiver_id ]) )
+        ; List.fold raw_internal_commands ~init:Int.Set.empty
+            ~f:(fun acc (_id, ic) ->
+              Int.Set.union acc
+                (Int.Set.singleton
+                   ic.Archive_lib.Processor.Internal_command.receiver_id) ) ]
+    in
+    let%bind public_keys =
+      (* TODO: N+1 problem *)
+      Int.Set.fold public_key_ids ~init:(M.return Int.Map.empty)
+        ~f:(fun acc id ->
+          let%bind pks = acc in
+          let%map pk =
+            match%bind
+              Public_keys.run (module Conn) id
+              |> Errors.Lift.sql ~context:"Finding public key within block"
+            with
+            | Some pk ->
+                M.return (`Pk pk)
+            | None ->
+                M.fail
+                  (Errors.create
+                     ~context:
+                       (sprintf
+                          "A public key id %d doesn't exist in the archive \
+                           database but if we're requesting it it should."
+                          id)
+                     `Invariant_violation)
+          in
+          Int.Map.add_exn ~key:id ~data:pk pks )
+    in
+    let load_pk source id =
+      match Int.Map.find public_keys id with
+      | None ->
+          M.fail
+            (Errors.create
+               ~context:
+                 (sprintf
+                    "The public key %d associated with this %s doesn't exist \
+                     in the archive database"
+                    id source)
+               `Invariant_violation)
+      | Some pk ->
+          M.return pk
+    in
+    let%bind internal_commands =
+      M.List.map raw_internal_commands ~f:(fun (_, ic) ->
+          let%bind kind =
+            match ic.Archive_lib.Processor.Internal_command.typ with
+            | "fee_transfer" ->
+                M.return `Fee_transfer
+            | "coinbase" ->
+                M.return `Coinbase
+            | other ->
+                M.fail
+                  (Errors.create
+                     ~context:
+                       (sprintf
+                          "The archive database is storing internal commands \
+                           with %s; this is neither fee_transfer nor \
+                           coinbase. Please report a bug!"
+                          other)
+                     `Invariant_violation)
+          in
+          let%map receiver = load_pk "internal command" ic.receiver_id in
+          { Internal_command_info.kind
+          ; receiver
+          ; fee= Unsigned.UInt64.of_int ic.fee
+          ; token= Unsigned.UInt64.of_int64 ic.token
+          ; hash= ic.hash } )
+    in
+    let%bind user_commands =
+      M.List.map raw_user_commands ~f:(fun (_, uc, extras) ->
+          let open M.Let_syntax in
+          let%bind kind =
+            match uc.Archive_lib.Processor.User_command.typ with
+            | "payment" ->
+                M.return `Payment
+            | "delegation" ->
+                M.return `Delegation
+            | "create_token" ->
+                M.return `Create_token
+            | "create_account" ->
+                M.return `Create_account
+            | "mint_tokens" ->
+                M.return `Mint_tokens
+            | other ->
+                M.fail
+                  (Errors.create
+                     ~context:
+                       (sprintf
+                          "The archive database is storing user commands with \
+                           %s; this is not a known type. Please report a bug!"
+                          other)
+                     `Invariant_violation)
+          in
+          let%bind failure_status =
+            match uc.failure_reason with
+            | None -> (
+              match
+                ( User_commands.Extras.fee_payer_account_creation_fee_paid
+                    extras
+                , User_commands.Extras.receiver_account_creation_fee_paid
+                    extras )
+              with
+              | None, None ->
+                  M.return
+                  @@ `Applied
+                       User_command_info.Account_creation_fees_paid.By_no_one
+              | Some fee_payer, None ->
+                  M.return
+                  @@ `Applied
+                       (User_command_info.Account_creation_fees_paid
+                        .By_fee_payer
+                          (Unsigned.UInt64.of_int64 fee_payer))
+              | None, Some receiver ->
+                  M.return
+                  @@ `Applied
+                       (User_command_info.Account_creation_fees_paid
+                        .By_receiver
+                          (Unsigned.UInt64.of_int64 receiver))
+              | Some _, Some _ ->
                   M.fail
                     (Errors.create
                        ~context:
-                         (sprintf
-                            "The public key %d associated with this %s \
-                             doesn't exist in the archive database"
-                            id source)
-                       `Invariant_violation)
-              | Some pk ->
-                  M.return pk
-            in
-            let%bind internal_commands =
-              M.List.map raw_internal_commands ~f:(fun (_, ic) ->
-                  let%bind kind =
-                    match ic.Archive_lib.Processor.Internal_command.typ with
-                    | "fee_transfer" ->
-                        M.return `Fee_transfer
-                    | "coinbase" ->
-                        M.return `Coinbase
-                    | other ->
-                        M.fail
-                          (Errors.create
-                             ~context:
-                               (sprintf
-                                  "The archive database is storing internal \
-                                   commands with %s; this is neither \
-                                   fee_transfer nor coinbase. Please report a \
-                                   bug!"
-                                  other)
-                             `Invariant_violation)
-                  in
-                  let%map receiver =
-                    load_pk "internal command" ic.receiver_id
-                  in
-                  { Internal_command_info.kind
-                  ; receiver
-                  ; fee= Unsigned.UInt64.of_int ic.fee
-                  ; token= Unsigned.UInt64.of_int64 ic.token
-                  ; hash= ic.hash } )
-            in
-            let%bind user_commands =
-              M.List.map raw_user_commands ~f:(fun (_, uc, extras) ->
-                  let open M.Let_syntax in
-                  let%bind kind =
-                    match uc.Archive_lib.Processor.User_command.typ with
-                    | "payment" ->
-                        M.return `Payment
-                    | "delegation" ->
-                        M.return `Delegation
-                    | "create_token" ->
-                        M.return `Create_token
-                    | "create_account" ->
-                        M.return `Create_account
-                    | "mint_tokens" ->
-                        M.return `Mint_tokens
-                    | other ->
-                        M.fail
-                          (Errors.create
-                             ~context:
-                               (sprintf
-                                  "The archive database is storing user \
-                                   commands with %s; this is not a known \
-                                   type. Please report a bug!"
-                                  other)
-                             `Invariant_violation)
-                  in
-                  let%bind failure_status =
-                    match uc.failure_reason with
-                    | None -> (
-                      match
-                        ( User_commands.Extras
-                          .fee_payer_account_creation_fee_paid extras
-                        , User_commands.Extras
-                          .receiver_account_creation_fee_paid extras )
-                      with
-                      | None, None ->
-                          M.return
-                          @@ `Applied
-                               User_command_info.Account_creation_fees_paid
-                               .By_no_one
-                      | Some fee_payer, None ->
-                          M.return
-                          @@ `Applied
-                               (User_command_info.Account_creation_fees_paid
-                                .By_fee_payer
-                                  (Unsigned.UInt64.of_int64 fee_payer))
-                      | None, Some receiver ->
-                          M.return
-                          @@ `Applied
-                               (User_command_info.Account_creation_fees_paid
-                                .By_receiver
-                                  (Unsigned.UInt64.of_int64 receiver))
-                      | Some _, Some _ ->
-                          M.fail
-                            (Errors.create
-                               ~context:
-                                 "The archive database is storing creation \
-                                  fees paid by two different pks. This is \
-                                  impossible."
-                               `Invariant_violation) )
-                    | Some status ->
-                        M.return @@ `Failed status
-                  in
-                  let load = load_pk "user command" in
-                  let%bind fee_payer = load uc.fee_payer_id in
-                  let%bind source = load uc.source_id in
-                  let%map receiver = load uc.receiver_id in
-                  { User_command_info.kind
-                  ; fee_payer
-                  ; source
-                  ; receiver
-                  ; fee_token= Unsigned.UInt64.of_int uc.fee_token
-                  ; token= Unsigned.UInt64.of_int uc.token
-                  ; nonce= Unsigned.UInt32.of_int uc.nonce
-                  ; amount= Option.map ~f:Unsigned.UInt64.of_int uc.amount
-                  ; fee= Unsigned.UInt64.of_int uc.fee
-                  ; hash= uc.hash
-                  ; failure_status= Some failure_status } )
-            in
-            let%map creator = load_pk "block" raw_block.creator_id in
-            { Block_info.block_identifier=
-                { Block_identifier.index= Int64.of_int raw_block.height
-                ; hash= raw_block.state_hash }
-            ; creator
-            ; parent_block_identifier=
-                { Block_identifier.index= Int64.of_int raw_parent_block.height
-                ; hash= raw_parent_block.state_hash }
-            ; timestamp= raw_block.timestamp
-            ; internal_info= internal_commands
-            ; user_commands } )
+                         "The archive database is storing creation fees paid \
+                          by two different pks. This is impossible."
+                       `Invariant_violation) )
+            | Some status ->
+                M.return @@ `Failed status
+          in
+          let load = load_pk "user command" in
+          let%bind fee_payer = load uc.fee_payer_id in
+          let%bind source = load uc.source_id in
+          let%map receiver = load uc.receiver_id in
+          { User_command_info.kind
+          ; fee_payer
+          ; source
+          ; receiver
+          ; fee_token= Unsigned.UInt64.of_int uc.fee_token
+          ; token= Unsigned.UInt64.of_int uc.token
+          ; nonce= Unsigned.UInt32.of_int uc.nonce
+          ; amount= Option.map ~f:Unsigned.UInt64.of_int uc.amount
+          ; fee= Unsigned.UInt64.of_int uc.fee
+          ; hash= uc.hash
+          ; failure_status= Some failure_status } )
+    in
+    let%map creator = load_pk "block" raw_block.creator_id in
+    { Block_info.block_identifier=
+        { Block_identifier.index= Int64.of_int raw_block.height
+        ; hash= raw_block.state_hash }
+    ; creator
+    ; parent_block_identifier=
+        { Block_identifier.index= Int64.of_int raw_parent_block.height
+        ; hash= raw_parent_block.state_hash }
+    ; timestamp= raw_block.timestamp
+    ; internal_info= internal_commands
+    ; user_commands }
 end
 
 module Specific = struct
