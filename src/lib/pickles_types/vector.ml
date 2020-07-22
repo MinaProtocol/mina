@@ -122,10 +122,17 @@ let rec of_list_and_length_exn : type a n. a list -> n nat -> (a, n) t =
   | x :: xs, S n ->
       x :: of_list_and_length_exn xs n
   | _ ->
-      failwith "Length mismatch"
+      failwith "Vector: Length mismatch"
 
 let of_list_and_length xs n =
   Core_kernel.Option.try_with (fun () -> of_list_and_length_exn xs n)
+
+let of_array_and_length_exn : type a n. a array -> n nat -> (a, n) t =
+ fun xs n ->
+  if Array.length xs <> Nat.to_int n then
+    Core_kernel.failwithf "of_array_and_length_exn: got %d (expected %d)"
+      (Array.length xs) (Nat.to_int n) () ;
+  init n ~f:(Array.get xs)
 
 let reverse t =
   let (T xs) = of_list (List.rev (to_list t)) in
@@ -150,6 +157,9 @@ let rec fold : type acc a n. (a, n) t -> f:(acc -> a -> acc) -> init:acc -> acc
   | x :: xs ->
       let acc = f init x in
       fold xs ~f ~init:acc
+
+let foldi t ~f ~init =
+  snd (fold t ~f:(fun (i, acc) x -> (i + 1, f i acc x)) ~init:(0, init))
 
 let reduce (init :: xs) ~f = fold xs ~f ~init
 
