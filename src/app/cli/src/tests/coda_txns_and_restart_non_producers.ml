@@ -16,9 +16,7 @@ let main () =
   let%bind testnet =
     Coda_worker_testnet.test ~name logger 5 producers snark_work_public_keys
       Cli_lib.Arg_type.Work_selection_method.Sequence
-      ~max_concurrent_connections:None
-      ~runtime_config:
-        (Genesis_ledger_helper.extract_runtime_config precomputed_values)
+      ~max_concurrent_connections:None ~precomputed_values
   in
   (* send txns *)
   let keypairs =
