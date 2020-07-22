@@ -14,7 +14,7 @@ module type Inputs_intf = sig
 
     val write : t -> string -> unit
 
-    val create : Unsigned.Size_t.t -> t
+    val create_without_finaliser : Unsigned.Size_t.t -> t
   end
 
   module Index : sig
@@ -22,7 +22,7 @@ module type Inputs_intf = sig
 
     val delete : t -> unit
 
-    val create :
+    val create_without_finaliser :
          Constraint_matrix.t
       -> Constraint_matrix.t
       -> Constraint_matrix.t
@@ -49,7 +49,9 @@ module type Inputs_intf = sig
   module Verifier_index : sig
     type t
 
-    val create : Index.t -> t
+    val delete : t -> unit
+
+    val create_without_finaliser : Index.t -> t
 
     val a_row_comm : t -> Poly_comm.Backend.t
 
@@ -115,7 +117,11 @@ module Make (Inputs : Inputs_intf) = struct
             | Ok (u, _) ->
                 u
             | Error _e ->
-                let urs = Urs.create (Unsigned.Size_t.of_int degree) in
+                (* TODO: We can't just attach the delete finaliser here because the Urs is used by reference in
+                 Index.t values *)
+                let urs =
+                  Urs.create_without_finaliser (Unsigned.Size_t.of_int degree)
+                in
                 let _ =
                   Key_cache.Sync.write
                     (List.filter specs ~f:(function
@@ -132,6 +138,8 @@ module Make (Inputs : Inputs_intf) = struct
     in
     (set_urs_info, load)
 
+  let gc delete t = Caml.Gc.finalise delete t ; t
+
   let create
       { R1cs_constraint_system.public_input_size
       ; auxiliary_input_size
@@ -139,16 +147,14 @@ module Make (Inputs : Inputs_intf) = struct
       ; m= {a; b; c}
       ; weight } =
     let vars = 1 + public_input_size + auxiliary_input_size in
-    let t =
-      Index.create a b c
-        (Unsigned.Size_t.of_int vars)
-        (Unsigned.Size_t.of_int (public_input_size + 1))
-        (load_urs ())
-    in
-    Caml.Gc.finalise Index.delete t ;
-    t
+    Index.create_without_finaliser a b c
+      (Unsigned.Size_t.of_int vars)
+      (Unsigned.Size_t.of_int (public_input_size + 1))
+      (load_urs ())
+    |> gc Index.delete
 
-  let vk t = Verifier_index.create t
+  let vk t =
+    Verifier_index.create_without_finaliser t |> gc Verifier_index.delete
 
   let pk = Fn.id
 

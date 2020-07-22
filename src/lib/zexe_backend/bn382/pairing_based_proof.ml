@@ -47,15 +47,16 @@ let to_backend primary_input
       t) =
   let g (a, b) =
     let open Snarky_bn382.G1.Affine in
-    let t = create a b in
+    let t = create_without_finaliser a b in
     Caml.Gc.finalise delete t ; t
   in
   let t =
-    Snarky_bn382.Fp_proof.make primary_input (g w_comm) (g za_comm) (g zb_comm)
-      (g h1_comm) (g g1_comm_0) (g g1_comm_1) (g h2_comm) (g g2_comm_0)
-      (g g2_comm_1) (g h3_comm) (g g3_comm_0) (g g3_comm_1) (g proof1)
-      (g proof2) (g proof3) sigma2 sigma3 w za zb h1 g1 h2 g2 h3 g3 row_0 row_1
-      row_2 col_0 col_1 col_2 val_0 val_1 val_2 rc_0 rc_1 rc_2
+    Snarky_bn382.Fp_proof.make_without_finaliser primary_input (g w_comm)
+      (g za_comm) (g zb_comm) (g h1_comm) (g g1_comm_0) (g g1_comm_1)
+      (g h2_comm) (g g2_comm_0) (g g2_comm_1) (g h3_comm) (g g3_comm_0)
+      (g g3_comm_1) (g proof1) (g proof2) (g proof3) sigma2 sigma3 w za zb h1
+      g1 h2 g2 h3 g3 row_0 row_1 row_2 col_0 col_1 col_2 val_0 val_1 val_2 rc_0
+      rc_1 rc_2
   in
   Caml.Gc.finalise Snarky_bn382.Fp_proof.delete t ;
   t
@@ -121,7 +122,9 @@ let of_backend t : t =
 type message = unit
 
 let create ?message:_ pk ~primary ~auxiliary =
-  let res = Snarky_bn382.Fp_proof.create pk primary auxiliary in
+  let res =
+    Snarky_bn382.Fp_proof.create_without_finaliser pk primary auxiliary
+  in
   let t = of_backend res in
   Snarky_bn382.Fp_proof.delete res ;
   t

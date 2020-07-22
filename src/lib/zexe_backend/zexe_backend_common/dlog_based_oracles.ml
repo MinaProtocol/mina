@@ -7,7 +7,7 @@ module type Inputs_intf = sig
     include Type_with_delete
 
     module Vector : sig
-      include Vector with type elt = t
+      include Vector_with_gc with type elt = t
 
       module Triple : Triple with type elt := t
     end
@@ -29,7 +29,7 @@ module type Inputs_intf = sig
   module Backend : sig
     include Type_with_delete
 
-    val create : Verifier_index.t -> Proof.Backend.t -> t
+    val create_without_finaliser : Verifier_index.t -> Proof.Backend.t -> t
 
     val alpha : t -> Field.t
 
@@ -62,7 +62,7 @@ module Make (Inputs : Inputs_intf) = struct
 
   let create vk prev_challenge input (pi : Proof.t) =
     let pi = Proof.to_backend prev_challenge input pi in
-    let t = Backend.create vk pi in
+    let t = Backend.create_without_finaliser vk pi in
     Caml.Gc.finalise Backend.delete t ;
     t
 

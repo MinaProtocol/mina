@@ -74,10 +74,16 @@ module Input_domain = struct
                    (Zexe_backend.Tweedle.Dee_based.Keypair.load_urs ())
                    (u domain_size) (u i)
                  |> Snarky_bn382.Tweedle.Dee.Field_poly_comm.unshifted
+                 (* This is a leak *)
                in
                assert (Tick.Inner_curve.Affine.Backend.Vector.length v = 1) ;
-               Tick.Inner_curve.Affine.Backend.Vector.get v 0
-               |> Tick.Inner_curve.Affine.of_backend ) ))
+               let input =
+                 Tick.Inner_curve.Affine.Backend.Vector.get_without_finaliser v
+                   0
+               in
+               let res = Tick.Inner_curve.Affine.of_backend input in
+               Tick.Inner_curve.Affine.Backend.delete input ;
+               res ) ))
 end
 
 module Inner_curve = struct

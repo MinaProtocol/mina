@@ -51,6 +51,10 @@ module Make
 
   let delete = delete
 
+  let gc t = Caml.Gc.finalise delete t ; t
+
+  let gc1 f x = gc (f x)
+
   let to_ptr = to_data
 
   let of_ptr = of_data
@@ -74,8 +78,7 @@ module Make
 
   let of_bigstring s =
     let ptr = Ctypes.bigarray_start Ctypes.array1 s in
-    let t = of_data ptr in
-    Caml.Gc.finalise delete t ; t
+    gc (of_data ptr)
 
   let of_hex_string s =
     assert (s.[0] = '0' && s.[1] = 'x') ;
@@ -129,9 +132,9 @@ module Make
     assert (bitcount <= length_in_bytes * 8) ;
     of_bigstring bs
 
-  let of_decimal_string = of_decimal_string
+  let of_decimal_string = gc1 of_decimal_string
 
-  let of_numeral s ~base = of_numeral s (String.length s) base
+  let of_numeral s ~base = gc (of_numeral s (String.length s) base)
 
   let compare x y =
     match Unsigned.UInt8.to_int (compare x y) with 255 -> -1 | x -> x
