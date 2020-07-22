@@ -121,7 +121,7 @@ module Styles = {
     style([
       textAlign(`right),
       paddingRight(`rem(1.5)),
-      media(Theme.MediaQuery.notMobile, [paddingRight(`rem(5.))]),
+      media(Theme.MediaQuery.notMobile, [paddingRight(`rem(3.))]),
     ]);
   };
 
