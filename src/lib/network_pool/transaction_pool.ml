@@ -230,6 +230,8 @@ struct
 
     let get_all {pool; _} = Indexed_pool.get_all pool
 
+    let find_by_hash {pool; _} hash = Indexed_pool.find_by_hash pool hash
+
     (** Get the best tip ledger*)
     let get_best_tip_ledger frontier =
       Transition_frontier.best_tip frontier

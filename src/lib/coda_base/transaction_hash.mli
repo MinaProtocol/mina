@@ -21,6 +21,8 @@ val hash_fee_transfer : Fee_transfer.Single.t -> t
 
 val hash_coinbase : Coinbase.t -> t
 
+include Comparable.S with type t := t
+
 module User_command_with_valid_signature : sig
   type hash = t [@@deriving sexp, compare, hash, yojson]
 
