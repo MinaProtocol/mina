@@ -502,13 +502,17 @@ module Block_info = struct
   type t =
     { block_identifier: Block_identifier.t
     ; parent_block_identifier: Block_identifier.t
+    ; creator: [`Pk of string]
     ; timestamp: int64
     ; internal_info: Internal_command_info.t list
     ; user_commands: User_command_info.t list }
 
+  let creator_metadata {creator= `Pk pk; _} = `Assoc [("creator", `String pk)]
+
   let dummy =
     { block_identifier=
         Block_identifier.create (Int64.of_int_exn 4) "STATE_HASH_BLOCK"
+    ; creator= `Pk "Alice"
     ; parent_block_identifier=
         Block_identifier.create (Int64.of_int_exn 3) "STATE_HASH_PARENT"
     ; timestamp= Int64.of_int_exn 1594937771
@@ -518,35 +522,60 @@ end
 
 module Sql = struct
   module Block = struct
-    let typ = Caqti_type.(tup2 int Archive_lib.Processor.Block.typ)
+    module Extras = struct
+      let creator x = `Pk x
+
+      let typ = Caqti_type.string
+    end
+
+    let typ = Caqti_type.(tup3 int Archive_lib.Processor.Block.typ Extras.typ)
 
     let query_height =
       Caqti_request.find_opt Caqti_type.int64 typ
+        (* According to the clarification of the Rosetta spec here
+         * https://community.rosetta-api.org/t/querying-block-by-just-its-index/84/3 ,
+         * it is important to select only the block on the canonical chain for a
+         * given height, and not an arbitrary one.
+         *
+         * This query recursively traverses the blockchain from the longest tip
+         * backwards until it reaches a block of the given height. *)
         {|
 WITH RECURSIVE chain AS (
-  SELECT id, state_hash, parent_id, creator_id, snarked_ledger_hash_id, ledger_hash, height, timestamp, coinbase_id FROM blocks WHERE height = (select MAX(height) from blocks)
+  SELECT id, state_hash, parent_id, creator_id, snarked_ledger_hash_id, ledger_hash, height, timestamp, coinbase_id FROM blocks b WHERE height = (select MAX(height) from blocks)
 
   UNION ALL
 
   SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, b.ledger_hash, b.height, b.timestamp, b.coinbase_id FROM blocks b
   INNER JOIN chain
   ON b.id = chain.parent_id
-) SELECT id, state_hash, parent_id, creator_id, snarked_ledger_hash_id, ledger_hash, height, timestamp, coinbase_id FROM chain WHERE height = ?
+) SELECT c.id, c.state_hash, c.parent_id, c.creator_id, c.snarked_ledger_hash_id, c.ledger_hash, c.height, c.timestamp, c.coinbase_id, pk.value as creator FROM chain c
+  INNER JOIN public_keys pk
+  ON pk.id = c.creator_id
+  WHERE c.height = ?
       |}
 
     let query_hash =
       Caqti_request.find_opt Caqti_type.string typ
-        {| SELECT id, state_hash, parent_id, creator_id, snarked_ledger_hash_id, ledger_hash, height, timestamp, coinbase_id FROM blocks WHERE state_hash = ? |}
+        {| SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, b.ledger_hash, b.height, b.timestamp, b.coinbase_id, pk.value as creator FROM blocks b
+        INNER JOIN public_keys pk
+        ON pk.id = b.creator_id
+        WHERE b.state_hash = ? |}
 
     let query_both =
       Caqti_request.find_opt
         Caqti_type.(tup2 string int64)
         typ
-        {| SELECT id, state_hash, parent_id, creator_id, snarked_ledger_hash_id, ledger_hash, height, timestamp, coinbase_id FROM blocks WHERE state_hash = ? AND height = ? |}
+        {| SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, b.ledger_hash, b.height, b.timestamp, b.coinbase_id, pk.value as creator FROM blocks b
+        INNER JOIN public_keys pk
+        ON pk.id = b.creator_id
+        WHERE b.state_hash = ? AND b.height = ? |}
 
     let query_by_id =
       Caqti_request.find_opt Caqti_type.int typ
-        {| SELECT id, state_hash, parent_id, creator_id, snarked_ledger_hash_id, ledger_hash, height, timestamp, coinbase_id FROM blocks WHERE id = ? |}
+        {| SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, b.ledger_hash, b.height, b.timestamp, b.coinbase_id, pk.value as creator FROM blocks b
+        INNER JOIN public_keys pk
+        ON pk.id = b.creator_id
+        WHERE b.id = ? |}
 
     let run_by_id (module Conn : Caqti_async.CONNECTION) id =
       Conn.find_opt query_by_id id
@@ -562,13 +591,22 @@ WITH RECURSIVE chain AS (
 
   module User_commands = struct
     module Extras = struct
-      let fee_payer_account_creation_fee_paid (x, _, _) = x
+      let fee_payer_account_creation_fee_paid (x, _, _, _) = x
 
-      let receiver_account_creation_fee_paid (_, y, _) = y
+      let receiver_account_creation_fee_paid (_, y, _, _) = y
 
-      let created_token (_, _, z) = z
+      let created_token (_, _, z, _) = z
 
-      let typ = Caqti_type.(tup3 (option int64) (option int64) (option int64))
+      let fee_payer (_, _, _, (x, _, _)) = `Pk x
+
+      let source (_, _, _, (_, y, _)) = `Pk y
+
+      let receiver (_, _, _, (_, _, z)) = `Pk z
+
+      let typ =
+        Caqti_type.(
+          tup4 (option int64) (option int64) (option int64)
+            (tup3 string string string))
     end
 
     let typ =
@@ -576,34 +614,37 @@ WITH RECURSIVE chain AS (
 
     let query =
       Caqti_request.collect Caqti_type.int typ
-        {| SELECT user_commands.* FROM user_commands LEFT JOIN blocks_user_commands ON blocks_user_commands.block_id = ? |}
+        {| SELECT u.id, u.type, u.fee_payer_id, u.source_id, u.receiver_id, u.fee_token, u.token, u.nonce, u.amount, u.fee, u.memo, u.hash, u.status, u.failure_reason, u.fee_payer_account_creation_fee_paid, u.receiver_account_creation_fee_paid, u.created_token, pk1.value as fee_payer, pk2.value as receiver, pk3.value as source FROM user_commands u
+        LEFT JOIN blocks_user_commands ON blocks_user_commands.block_id = ? 
+        INNER JOIN public_keys pk1 ON pk1.id = u.fee_payer_id
+        INNER JOIN public_keys pk2 ON pk2.id = u.receiver_id
+        INNER JOIN public_keys pk3 ON pk3.id = u.source_id
+      |}
 
     let run (module Conn : Caqti_async.CONNECTION) id =
       Conn.collect_list query id
   end
 
   module Internal_commands = struct
-    (* TODO *)
-    let typ = Caqti_type.(tup2 int Archive_lib.Processor.Internal_command.typ)
+    module Extras = struct
+      let receiver x = `Pk x
+
+      let typ = Caqti_type.string
+    end
+
+    let typ =
+      Caqti_type.(
+        tup3 int Archive_lib.Processor.Internal_command.typ Extras.typ)
 
     let query =
       Caqti_request.collect Caqti_type.int typ
-        {| SELECT internal_commands.* FROM internal_commands LEFT JOIN blocks_internal_commands ON blocks_internal_commands.block_id = ? |}
+        {| SELECT i.id, i.type, i.receiver_id, i.fee, i.token, i.hash, pk.value as receiver FROM internal_commands i
+        LEFT JOIN blocks_internal_commands ON blocks_internal_commands.block_id = ?
+        INNER JOIN public_keys pk ON pk.id = i.receiver_id
+      |}
 
     let run (module Conn : Caqti_async.CONNECTION) id =
       Conn.collect_list query id
-  end
-
-  module Public_keys = struct
-    (* TODO: Make this more efficient by batching or getting all in one query *)
-    let typ = Caqti_type.string
-
-    let query_one =
-      Caqti_request.find_opt Caqti_type.int typ
-        {| SELECT value FROM public_keys WHERE id = ? |}
-
-    let run (module Conn : Caqti_async.CONNECTION) id =
-      Conn.find_opt query_one id
   end
 
   let run (module Conn : Caqti_async.CONNECTION) input =
@@ -620,15 +661,15 @@ WITH RECURSIVE chain AS (
       end
     end in
     let open M.Let_syntax in
-    let%bind block_id, raw_block =
+    let%bind block_id, raw_block, block_extras =
       match%bind
         Block.run (module Conn) input
         |> Errors.Lift.sql ~context:"Finding block"
       with
       | None ->
           M.fail (Errors.create `Block_missing)
-      | Some (block_id, raw_block) ->
-          M.return (block_id, raw_block)
+      | Some (block_id, raw_block, block_extras) ->
+          M.return (block_id, raw_block, block_extras)
     in
     let%bind parent_id =
       match raw_block.parent_id with
@@ -639,15 +680,15 @@ WITH RECURSIVE chain AS (
       | Some id ->
           M.return id
     in
-    let%bind raw_parent_block =
+    let%bind raw_parent_block, _parent_block_extras =
       match%bind
         Block.run_by_id (module Conn) parent_id
         |> Errors.Lift.sql ~context:"Finding parent block"
       with
       | None ->
           M.fail (Errors.create ~context:"Parent block" `Block_missing)
-      | Some (_, raw_parent_block) ->
-          M.return raw_parent_block
+      | Some (_, raw_parent_block, parent_block_extras) ->
+          M.return (raw_parent_block, parent_block_extras)
     in
     let%bind raw_user_commands =
       User_commands.run (module Conn) block_id
@@ -657,63 +698,9 @@ WITH RECURSIVE chain AS (
       Internal_commands.run (module Conn) block_id
       |> Errors.Lift.sql ~context:"Finding internal commands within block"
     in
-    let public_key_ids =
-      Int.Set.union_list
-        [ Int.Set.singleton raw_block.creator_id
-        ; List.fold raw_user_commands ~init:Int.Set.empty
-            ~f:(fun acc (_id, uc, _) ->
-              Int.Set.union acc
-                (Int.Set.of_list
-                   [ uc.Archive_lib.Processor.User_command.fee_payer_id
-                   ; uc.source_id
-                   ; uc.receiver_id ]) )
-        ; List.fold raw_internal_commands ~init:Int.Set.empty
-            ~f:(fun acc (_id, ic) ->
-              Int.Set.union acc
-                (Int.Set.singleton
-                   ic.Archive_lib.Processor.Internal_command.receiver_id) ) ]
-    in
-    let%bind public_keys =
-      (* TODO: N+1 problem *)
-      Int.Set.fold public_key_ids ~init:(M.return Int.Map.empty)
-        ~f:(fun acc id ->
-          let%bind pks = acc in
-          let%map pk =
-            match%bind
-              Public_keys.run (module Conn) id
-              |> Errors.Lift.sql ~context:"Finding public key within block"
-            with
-            | Some pk ->
-                M.return (`Pk pk)
-            | None ->
-                M.fail
-                  (Errors.create
-                     ~context:
-                       (sprintf
-                          "A public key id %d doesn't exist in the archive \
-                           database but if we're requesting it it should."
-                          id)
-                     `Invariant_violation)
-          in
-          Int.Map.add_exn ~key:id ~data:pk pks )
-    in
-    let load_pk source id =
-      match Int.Map.find public_keys id with
-      | None ->
-          M.fail
-            (Errors.create
-               ~context:
-                 (sprintf
-                    "The public key %d associated with this %s doesn't exist \
-                     in the archive database"
-                    id source)
-               `Invariant_violation)
-      | Some pk ->
-          M.return pk
-    in
     let%bind internal_commands =
-      M.List.map raw_internal_commands ~f:(fun (_, ic) ->
-          let%bind kind =
+      M.List.map raw_internal_commands ~f:(fun (_, ic, extras) ->
+          let%map kind =
             match ic.Archive_lib.Processor.Internal_command.typ with
             | "fee_transfer" ->
                 M.return `Fee_transfer
@@ -730,9 +717,8 @@ WITH RECURSIVE chain AS (
                           other)
                      `Invariant_violation)
           in
-          let%map receiver = load_pk "internal command" ic.receiver_id in
           { Internal_command_info.kind
-          ; receiver
+          ; receiver= Internal_commands.Extras.receiver extras
           ; fee= Unsigned.UInt64.of_int ic.fee
           ; token= Unsigned.UInt64.of_int64 ic.token
           ; hash= ic.hash } )
@@ -762,7 +748,7 @@ WITH RECURSIVE chain AS (
                           other)
                      `Invariant_violation)
           in
-          let%bind failure_status =
+          let%map failure_status =
             match uc.failure_reason with
             | None -> (
               match
@@ -797,14 +783,10 @@ WITH RECURSIVE chain AS (
             | Some status ->
                 M.return @@ `Failed status
           in
-          let load = load_pk "user command" in
-          let%bind fee_payer = load uc.fee_payer_id in
-          let%bind source = load uc.source_id in
-          let%map receiver = load uc.receiver_id in
           { User_command_info.kind
-          ; fee_payer
-          ; source
-          ; receiver
+          ; fee_payer= User_commands.Extras.fee_payer extras
+          ; source= User_commands.Extras.source extras
+          ; receiver= User_commands.Extras.receiver extras
           ; fee_token= Unsigned.UInt64.of_int uc.fee_token
           ; token= Unsigned.UInt64.of_int uc.token
           ; nonce= Unsigned.UInt32.of_int uc.nonce
@@ -816,6 +798,7 @@ WITH RECURSIVE chain AS (
     { Block_info.block_identifier=
         { Block_identifier.index= Int64.of_int raw_block.height
         ; hash= raw_block.state_hash }
+    ; creator= Block.Extras.creator block_extras
     ; parent_block_identifier=
         { Block_identifier.index= Int64.of_int raw_parent_block.height
         ; hash= raw_parent_block.state_hash }
@@ -894,7 +877,7 @@ module Specific = struct
                         {Transaction_identifier.hash= info.hash}
                     ; operations= User_command_info.to_operations info
                     ; metadata= None } )
-          ; metadata= None }
+          ; metadata= Some (Block_info.creator_metadata block_info) }
       ; other_transactions= [] }
   end
 
