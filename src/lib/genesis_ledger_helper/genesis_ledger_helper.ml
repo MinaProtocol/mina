@@ -919,7 +919,7 @@ let upgrade_old_config ~logger filename json =
       (* This error will get handled properly elsewhere, do nothing here. *)
       return json
 
-let extract_runtime_config (precomputed_values : Precomputed_values.t) :
+let inferred_runtime_config (precomputed_values : Precomputed_values.t) :
     Runtime_config.t =
   let genesis_constants = precomputed_values.genesis_constants in
   let constraint_constants = precomputed_values.constraint_constants in
