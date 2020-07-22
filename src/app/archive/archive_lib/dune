@@ -4,5 +4,5 @@
   (libraries core async coda_base coda_transition one_or_two transition_frontier caqti-async caqti caqti-driver-postgresql)
   (inline_tests)
   (modes native)
-  (preprocess (pps ppx_version ppx_jane)))
+  (preprocess (pps ppx_version ppx_jane ppx_custom_printf h_list.ppx)))
   

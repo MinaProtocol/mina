@@ -3,7 +3,8 @@ open Coda_state
 
 module Inputs = struct
   type t =
-    { constraint_constants: Genesis_constants.Constraint_constants.t
+    { runtime_config: Runtime_config.t
+    ; constraint_constants: Genesis_constants.Constraint_constants.t
     ; proof_level: Genesis_constants.Proof_level.t
     ; genesis_constants: Genesis_constants.t
     ; genesis_ledger: Genesis_ledger.Packed.t
@@ -15,7 +16,8 @@ end
 
 module T = struct
   type t =
-    { constraint_constants: Genesis_constants.Constraint_constants.t
+    { runtime_config: Runtime_config.t
+    ; constraint_constants: Genesis_constants.Constraint_constants.t
     ; genesis_constants: Genesis_constants.t
     ; proof_level: Genesis_constants.Proof_level.t
     ; genesis_ledger: Genesis_ledger.Packed.t
@@ -24,6 +26,8 @@ module T = struct
         (Protocol_state.value, State_hash.t) With_hash.t
     ; base_hash: State_hash.t
     ; genesis_proof: Proof.t }
+
+  let runtime_config {runtime_config; _} = runtime_config
 
   let constraint_constants {constraint_constants; _} = constraint_constants
 
@@ -47,11 +51,17 @@ module T = struct
   let find_new_account_record_exn {genesis_ledger; _} =
     Genesis_ledger.Packed.find_new_account_record_exn genesis_ledger
 
+  let find_new_account_record_exn_ {genesis_ledger; _} =
+    Genesis_ledger.Packed.find_new_account_record_exn_ genesis_ledger
+
   let largest_account_exn {genesis_ledger; _} =
     Genesis_ledger.Packed.largest_account_exn genesis_ledger
 
   let largest_account_keypair_exn {genesis_ledger; _} =
     Genesis_ledger.Packed.largest_account_keypair_exn genesis_ledger
+
+  let largest_account_pk_exn {genesis_ledger; _} =
+    Genesis_ledger.Packed.largest_account_pk_exn genesis_ledger
 
   let consensus_constants {consensus_constants; _} = consensus_constants
 
@@ -114,7 +124,8 @@ let base_proof ?(logger = Logger.create ())
   wrap ~keys t.base_hash tick
 
 let create_values ?logger ~keys (t : Inputs.t) =
-  { constraint_constants= t.constraint_constants
+  { runtime_config= t.runtime_config
+  ; constraint_constants= t.constraint_constants
   ; proof_level= t.proof_level
   ; genesis_constants= t.genesis_constants
   ; genesis_ledger= t.genesis_ledger

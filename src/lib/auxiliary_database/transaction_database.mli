@@ -5,7 +5,10 @@ open Signature_lib
 include
   Intf.Transaction
   with type time := Block_time.Time.Stable.V1.t
-   and type transaction := User_command.Stable.V1.t
+   and type transaction :=
+              ( User_command.Stable.V1.t
+              , Transaction_hash.Stable.V1.t )
+              With_hash.Stable.V1.t
 
 module For_tests : sig
   val populate_database :

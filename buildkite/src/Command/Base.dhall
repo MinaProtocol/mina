@@ -11,14 +11,17 @@ let Map = Prelude.Map
 
 let Cmd = ../Lib/Cmds.dhall
 let Decorate = ../Lib/Decorate.dhall
+let SelectFiles = ../Lib/SelectFiles.dhall
 
 let Docker = ./Docker/Type.dhall
+let DockerLogin = ./DockerLogin/Type.dhall
 let Summon= ./Summon/Type.dhall
 let Size = ./Size.dhall
 
 -- If you are adding a new type of plugin, stick it here
 let Plugins =
   < Docker : Docker.Type
+  | DockerLogin : DockerLogin.Type
   | Summon : Summon.Type
   >
 
@@ -37,6 +40,8 @@ let B/DependsOn =
         OuterUnion/Type.ListDependsOn/Type
           (List/map Text InnerUnion/Type (\(k: Text) -> InnerUnion/Type.DependsOn/Type { allow_failure = None Bool, step = Some k }) keys)
   }
+
+let B/ArtifactPaths = B.definitions/commandStep/properties/artifact_paths/Type
 
 -- A type to make sure we don't accidentally forget the prefix on keys
 let TaggedKey = {
@@ -58,16 +63,20 @@ let Config =
   { Type =
       { commands : List Cmd.Type
       , depends_on : List TaggedKey.Type
+      , artifact_paths : List SelectFiles.Type
       , label : Text
       , key : Text
       , target : Size
       , docker : Optional Docker.Type
+      , docker_login : Optional DockerLogin.Type
       , summon : Optional Summon.Type
       }
   , default =
     { depends_on = [] : List TaggedKey.Type
     , docker = None Docker.Type
+    , docker_login = None DockerLogin.Type
     , summon = None Summon.Type
+    , artifact_paths = [] : List SelectFiles.Type
     }
   }
 
@@ -97,6 +106,9 @@ let build : Config.Type -> B/Command.Type = \(c : Config.Type) ->
         None B/DependsOn.Type
       else
         Some (B/DependsOn.depends flattened),
+    artifact_paths = if Prelude.List.null SelectFiles.Type c.artifact_paths
+                     then None B/ArtifactPaths
+                     else Some (B/ArtifactPaths.String (SelectFiles.compile c.artifact_paths)),
     key = Some c.key,
     label = Some c.label,
     plugins =
@@ -109,6 +121,15 @@ let build : Config.Type -> B/Command.Type = \(c : Config.Type) ->
             (\(docker: Docker.Type) ->
               toMap { `docker#v3.5.0` = Plugins.Docker docker })
             c.docker)
+      let dockerLoginPart =
+        Optional/toList
+          (Map.Type Text Plugins)
+          (Optional/map
+            DockerLogin.Type
+            (Map.Type Text Plugins)
+            (\(dockerLogin: DockerLogin.Type) ->
+              toMap { `docker-login#v2.0.1` = Plugins.DockerLogin dockerLogin })
+            c.docker_login)
       let summonPart =
         Optional/toList
           (Map.Type Text Plugins)
@@ -121,7 +142,7 @@ let build : Config.Type -> B/Command.Type = \(c : Config.Type) ->
 
       -- Add more plugins here as needed, empty list omits that part from the
       -- plugins map
-      let allPlugins = List/concat (Map.Entry Text Plugins) (dockerPart # summonPart) in
+      let allPlugins = List/concat (Map.Entry Text Plugins) (dockerPart # summonPart # dockerLoginPart) in
       if Prelude.List.null (Map.Entry Text Plugins) allPlugins then None B/Plugins else Some (B/Plugins.Plugins/Type allPlugins)
   }
 

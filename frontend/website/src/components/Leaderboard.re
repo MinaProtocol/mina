@@ -49,6 +49,58 @@ let fetchLeaderboard = () => {
   |> Js.Promise.catch(_ => Promise.return([||]));
 };
 
+module Toggle = {
+  type t =
+    | All
+    | Genesis
+    | NonGenesis;
+
+  let toggles = [|All, Genesis, NonGenesis|];
+
+  let toggle_of_string = toggle => {
+    switch (toggle) {
+    | "All Participants" => All
+    | "Genesis Members" => Genesis
+    | "Non-Genesis Members" => NonGenesis
+    | _ => All
+    };
+  };
+
+  let string_of_toggle = toggle => {
+    switch (toggle) {
+    | All => "All Participants"
+    | Genesis => "Genesis Members"
+    | NonGenesis => "Non-Genesis Members"
+    };
+  };
+};
+
+module Filter = {
+  type t =
+    | Release
+    | Phase
+    | AllTime;
+
+  let string_of_filter = filter => {
+    switch (filter) {
+    | Release => "This Release"
+    | Phase => "This Phase"
+    | AllTime => "All Time"
+    };
+  };
+
+  let filter_of_string = filter => {
+    switch (filter) {
+    | "This Release" => Release
+    | "This Phase" => Phase
+    | "All Time" => AllTime
+    | _ => AllTime
+    };
+  };
+
+  let filters = [|Release, Phase, AllTime|];
+};
+
 module Styles = {
   open Css;
 
@@ -71,14 +123,18 @@ module Styles = {
       color(Theme.Colors.leaderboardMidnight),
       selector(
         "div:nth-child(even)",
-        [backgroundColor(`rgba((245, 245, 245, 1.)))],
+        [
+          backgroundColor(`rgba((245, 245, 245, 1.))),
+          hover([backgroundColor(`hex("E0E0E0"))]),
+        ],
       ),
     ]);
 
-  let leaderboardRow =
+  let desktopLeaderboardRow =
     style([
       cursor(`pointer),
       padding2(~v=`rem(1.), ~h=`rem(1.)),
+      height(`rem(3.5)),
       display(`grid),
       gridColumnGap(rem(1.5)),
       gridTemplateColumns([
@@ -88,8 +144,9 @@ module Styles = {
         rem(3.5),
         rem(3.5),
       ]),
+      hover([backgroundColor(`hex("E0E0E0"))]),
       media(
-        Theme.MediaQuery.notMobile,
+        Theme.MediaQuery.tablet,
         [
           width(`percent(100.)),
           gridTemplateColumns([
@@ -105,17 +162,46 @@ module Styles = {
 
   let headerRow =
     merge([
-      leaderboardRow,
+      desktopLeaderboardRow,
       style([
+        display(`none),
         paddingBottom(`rem(0.5)),
         fontSize(`rem(1.)),
         fontWeight(`semiBold),
         textTransform(`uppercase),
         letterSpacing(`rem(0.125)),
+        media(Theme.MediaQuery.notMobile, [display(`grid)]),
+        hover([backgroundColor(white)]),
       ]),
     ]);
 
-  let cell = style([whiteSpace(`nowrap), overflow(`hidden)]);
+  let activeColumn =
+    style([
+      position(`relative),
+      justifySelf(`flexEnd),
+      after([
+        position(`absolute),
+        left(`percent(100.)),
+        contentRule(""),
+        height(`rem(1.5)),
+        width(`rem(1.5)),
+        backgroundImage(`url("/static/img/arrowDown.svg")),
+        backgroundRepeat(`noRepeat),
+        backgroundPosition(`px(4), `px(9)),
+      ]),
+    ]);
+
+  let inactiveColumn =
+    style([
+      display(`none),
+      justifySelf(`flexEnd),
+      media(Theme.MediaQuery.tablet, [display(`inline)]),
+    ]);
+
+  let topTen = style([position(`absolute)]);
+
+  let cell =
+    style([height(`rem(2.)), whiteSpace(`nowrap), overflowX(`hidden)]);
   let flexEnd = style([justifySelf(`flexEnd)]);
   let rank = merge([cell, flexEnd]);
   let username =
@@ -123,7 +209,15 @@ module Styles = {
   let pointsCell = merge([cell, style([justifySelf(`flexEnd)])]);
   let activePointsCell =
     merge([cell, style([justifySelf(`flexEnd), fontWeight(`semiBold)])]);
-  let inactivePointsCell = merge([pointsCell, style([opacity(0.5)])]);
+  let inactivePointsCell =
+    merge([
+      pointsCell,
+      style([
+        media(Theme.MediaQuery.tablet, [display(`inline)]),
+        display(`none),
+        opacity(0.5),
+      ]),
+    ]);
 
   let loading =
     style([
@@ -131,66 +225,152 @@ module Styles = {
       color(Theme.Colors.leaderboardMidnight),
       textAlign(`center),
     ]);
+
+  let desktopLayout =
+    style([
+      display(`none),
+      media(Theme.MediaQuery.notMobile, [display(`unset)]),
+    ]);
+
+  let mobileLayout =
+    style([
+      display(`unset),
+      media(Theme.MediaQuery.notMobile, [display(`none)]),
+    ]);
+
+  let mobileLeaderboardRow =
+    style([
+      display(`grid),
+      gridTemplateColumns([rem(5.), `auto]),
+      gridColumnGap(rem(1.5)),
+      cursor(`pointer),
+      padding2(~v=`rem(1.), ~h=`rem(1.)),
+      fontWeight(`semiBold),
+      fontSize(`px(16)),
+      lineHeight(`px(24)),
+    ]);
+
+  let firstColumn = style([textAlign(`right), color(`hex("757575"))]);
+
+  let mobilePointStar =
+    merge([
+      firstColumn,
+      style([
+        before([
+          contentRule("*"),
+          color(Css_Colors.red),
+          marginRight(`rem(0.5)),
+        ]),
+      ]),
+    ]);
 };
 
 module LeaderboardRow = {
-  [@react.component]
-  let make = (~rank, ~member) => {
-    let _userSlug =
-      "/memberProfile"
-      ++ "?allTimeRank="
-      ++ member.allTimeRank->string_of_int
-      ++ "&allTimePoints="
-      ++ member.allTimePoints->string_of_int
-      ++ "&phaseRank="
-      ++ member.phaseRank->string_of_int
-      ++ "&phasePoints="
-      ++ member.phasePoints->string_of_int
-      ++ "&releaseRank="
-      ++ member.releaseRank->string_of_int
-      ++ "&releasePoints="
-      ++ member.releasePoints->string_of_int
-      ++ "&genesisMember="
-      ++ member.genesisMember->string_of_bool
-      ++ "&name="
-      ++ member.name
-      |> Js.String.replaceByRe([%re "/#/g"], "%23"); /* replace "#" with percent encoding for the URL to properly parse */
+  open Filter;
+  let getRank = (sort, member) => {
+    switch (sort) {
+    | Phase => member.phaseRank
+    | Release => member.releaseRank
+    | AllTime => member.allTimeRank
+    };
+  };
 
-    // <Next.Link href=userSlug _as=userSlug>
-    <div className=Styles.leaderboardRow>
-      <span className=Styles.rank>
-        {React.string(string_of_int(rank))}
-      </span>
-      <span className=Styles.username> {React.string(member.name)} </span>
-      <span className=Styles.activePointsCell>
-        {React.string(string_of_int(member.releasePoints))}
-      </span>
-      <span className=Styles.inactivePointsCell>
-        {React.string(string_of_int(member.phasePoints))}
-      </span>
-      <span className=Styles.inactivePointsCell>
-        {React.string(string_of_int(member.allTimePoints))}
-      </span>
+  let getPoints = (column, member) =>
+    switch (column) {
+    | Phase => member.phasePoints
+    | Release => member.releasePoints
+    | AllTime => member.allTimePoints
+    };
+
+  let renderPoints = (sort, column, member) => {
+    <span
+      key={member.name ++ string_of_filter(column)}
+      className=Styles.(
+        sort === column ? activePointsCell : inactivePointsCell
+      )>
+      {React.string(string_of_int(getPoints(column, member)))}
+    </span>;
+  };
+
+  let getUserSlug = member => {
+    "/memberProfile"
+    ++ "?allTimeRank="
+    ++ member.allTimeRank->string_of_int
+    ++ "&allTimePoints="
+    ++ member.allTimePoints->string_of_int
+    ++ "&phaseRank="
+    ++ member.phaseRank->string_of_int
+    ++ "&phasePoints="
+    ++ member.phasePoints->string_of_int
+    ++ "&releaseRank="
+    ++ member.releaseRank->string_of_int
+    ++ "&releasePoints="
+    ++ member.releasePoints->string_of_int
+    ++ "&genesisMember="
+    ++ member.genesisMember->string_of_bool
+    ++ "&name="
+    ++ member.name
+    |> Js.String.replaceByRe([%re "/#/g"], "%23"); /* replace "#" with percent encoding for the URL to properly parse */
+  };
+
+  module DesktopLayout = {
+    [@react.component]
+    let make = (~sort, ~rank, ~member) => {
+      //<Next.Link href=""_as=userSlug>
+      <div className=Styles.desktopLeaderboardRow>
+
+          <span className=Styles.rank>
+            {React.string(string_of_int(rank))}
+          </span>
+          <span className=Styles.username> {React.string(member.name)} </span>
+          {Array.map(column => {renderPoints(sort, column, member)}, filters)
+           |> React.array}
+        </div>;
+        // </Next.Link>;
+    };
+  };
+
+  module MobileLayout = {
+    [@react.component]
+    let make = (~sort, ~rank, ~member) => {
+      //<Next.Link href=""_as=userSlug>
+      <div className=Styles.mobileLeaderboardRow>
+
+          <span className=Styles.firstColumn> {React.string("Rank")} </span>
+          <span> {React.string("#" ++ string_of_int(rank))} </span>
+          <span className=Styles.firstColumn> {React.string("Name")} </span>
+          <span> {React.string(member.name)} </span>
+          <span className=Styles.mobilePointStar>
+            {React.string("Points")}
+          </span>
+          <span>
+            {React.string(string_of_int(getPoints(sort, member)))}
+          </span>
+        </div>;
+        //</Next.Link>;
+    };
+  };
+
+  [@react.component]
+  let make = (~sort, ~member) => {
+    let _userSlug = getUserSlug(member);
+    let rank = getRank(sort, member);
+
+    <div>
+      <div className=Styles.desktopLayout>
+        <DesktopLayout sort rank member />
+      </div>
+      <div className=Styles.mobileLayout>
+        <MobileLayout sort rank member />
+      </div>
     </div>;
-    // </Next.Link>
   };
 };
-
-type filter =
-  | All
-  | Genesis
-  | NonGenesis;
-
-type sort =
-  | Release
-  | Phase
-  | AllTime;
 
 type state = {
   loading: bool,
   members: array(member),
 };
-let initialState = {loading: true, members: [||]};
 
 type actions =
   | UpdateMembers(array(member));
@@ -202,7 +382,16 @@ let reducer = (_, action) => {
 };
 
 [@react.component]
-let make = () => {
+let make =
+    (
+      ~filter: Filter.t=Release,
+      ~toggle: Toggle.t=All,
+      ~search: string="",
+      ~onFilterPress: string => unit=?,
+    ) => {
+  open Toggle;
+  open Filter;
+  let initialState = {loading: true, members: [||]};
   let (state, dispatch) = React.useReducer(reducer, initialState);
 
   React.useEffect0(() => {
@@ -210,31 +399,60 @@ let make = () => {
     None;
   });
 
+  let sortRank = member =>
+    switch (filter) {
+    | Phase => member.phaseRank
+    | Release => member.releaseRank
+    | AllTime => member.allTimeRank
+    };
+
+  Array.sort((a, b) => sortRank(a) - sortRank(b), state.members);
+
+  let filteredMembers =
+    Js.Array.filter(
+      member =>
+        switch (toggle) {
+        | All => true
+        | Genesis => member.genesisMember
+        | NonGenesis => !member.genesisMember
+        },
+      state.members,
+    )
+    |> Js.Array.filter(member =>
+         search === ""
+           ? true
+           : Js.String.includes(
+               String.lowercase_ascii(search),
+               String.lowercase_ascii(member.name),
+             )
+       )
+    |> Js.Array.filter(member => sortRank(member) !== 0);
+
+  let renderRow = member =>
+    <LeaderboardRow key={member.name} sort=filter member />;
+
+  let renderColumnHeader = column =>
+    <span
+      key={Filter.string_of_filter(column)}
+      onClick={_ => {onFilterPress(string_of_filter(column))}}
+      className={
+        column === filter ? Styles.activeColumn : Styles.inactiveColumn
+      }>
+      {React.string(string_of_filter(column))}
+    </span>;
+
   <div className=Styles.leaderboardContainer>
     <div id="testnet-leaderboard" className=Styles.leaderboard>
       <div className=Styles.headerRow>
         <span className=Styles.flexEnd> {React.string("Rank")} </span>
         <span> {React.string("Name")} </span>
-        <span className=Styles.flexEnd> {React.string("This Release")} </span>
-        <span className=Styles.flexEnd> {React.string("This Phase")} </span>
-        <span className=Styles.flexEnd> {React.string("All Time")} </span>
+        {Array.map(renderColumnHeader, Filter.filters) |> React.array}
       </div>
       <hr />
-      {Array.map(
-         member =>
-           <LeaderboardRow
-             key={string_of_int(member.allTimeRank)}
-             rank={member.allTimeRank}
-             member
-           />,
-         // Array.length(state.members) > 0
-         //  ? Array.sub(state.members, 0, 10) : state.members,
-         state.members,
-       )
-       |> React.array}
+      <div className=Styles.topTen />
       {state.loading
          ? <div className=Styles.loading> {React.string("Loading...")} </div>
-         : React.null}
+         : Array.map(renderRow, filteredMembers) |> React.array}
     </div>
   </div>;
 };

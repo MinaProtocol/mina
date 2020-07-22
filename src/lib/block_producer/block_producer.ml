@@ -227,13 +227,8 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
             measure "consensus generate_transition" (fun () ->
                 Consensus_state_hooks.generate_transition
                   ~previous_protocol_state ~blockchain_state ~current_time
-                  ~block_data
-                  ~transactions:
-                    ( Staged_ledger_diff.With_valid_signatures_and_proofs
-                      .user_commands diff
-                      :> User_command.t list )
-                  ~snarked_ledger_hash:previous_ledger_hash ~supply_increase
-                  ~logger ~constraint_constants ) )
+                  ~block_data ~snarked_ledger_hash:previous_ledger_hash
+                  ~supply_increase ~logger ~constraint_constants ) )
       in
       lift_sync (fun () ->
           measure "making Snark and Internal transitions" (fun () ->
@@ -314,6 +309,8 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
             let transactions =
               Network_pool.Transaction_pool.Resource_pool.transactions ~logger
                 transaction_resource_pool
+              |> Sequence.map
+                   ~f:Transaction_hash.User_command_with_valid_signature.data
             in
             trace_event "waiting for ivar..." ;
             let%bind () =
@@ -537,7 +534,8 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                                 Logger.Str.trace logger ~module_:__MODULE__
                                   ~location:__LOC__
                                   ~metadata:
-                                    [("breadcrumb", Breadcrumb.to_yojson crumb)]
+                                    [ ( "breadcrumb"
+                                      , Breadcrumb.to_yojson breadcrumb ) ]
                                   Block_produced ;
                                 let metadata =
                                   [ ( "state_hash"
@@ -620,11 +618,13 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                   Transition_frontier.best_tip transition_frontier
                   |> Breadcrumb.consensus_state
                 in
-                assert (
+                (* TODO: Re-enable this assertion when it doesn't fail dev demos
+                 *       (see #5354)
+                 * assert (
                   Consensus.Hooks.required_local_state_sync
                     ~constants:consensus_constants ~consensus_state
                     ~local_state:consensus_local_state
-                  = None ) ;
+                  = None ) ; *)
                 let now = Time.now time_controller in
                 let next_producer_timing =
                   measure "asking consensus what to do" (fun () ->

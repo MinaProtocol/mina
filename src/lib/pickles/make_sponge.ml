@@ -7,6 +7,8 @@ module Rounds = struct
   let rounds_partial = 30
 end
 
+let high_entropy_bits = 128
+
 module Make (Field : Zexe_backend.Field.S) = struct
   module Inputs = struct
     include Rounds
@@ -38,8 +40,17 @@ module Make (Field : Zexe_backend.Field.S) = struct
   end
 
   module Field = Sponge.Make_sponge (Sponge.Poseidon (Inputs))
+
   module Bits =
-    Sponge.Bit_sponge.Make (Bool) (Inputs.Field) (Inputs.Field) (Field)
+    Sponge.Bit_sponge.Make
+      (Bool)
+      (struct
+        include Inputs.Field
+
+        let high_entropy_bits = high_entropy_bits
+      end)
+      (Inputs.Field)
+      (Field)
 
   let digest params elts =
     let sponge = Bits.create params in

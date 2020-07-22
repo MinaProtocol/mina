@@ -112,7 +112,7 @@ module Core = {
   };
 
   let initSheetsUpdate = (spreadsheetId, range, valueInputOption, data) => {
-    let resource: sheetsUploadData = {values: encodeGoogleSheets(data)};
+    let resource: sheetsUploadData = {values: data};
     {spreadsheetId, range, valueInputOption, resource};
   };
 };

@@ -4,11 +4,13 @@ open Backend
 module Impl = Impls.Step
 open Import
 
+let high_entropy_bits = 128
+
 let sponge_params_constant =
   Sponge.Params.(map tweedle_q ~f:Impl.Field.Constant.of_string)
 
-let tick_field_random_oracle ?length s =
-  Tick.Field.of_bits (bits_random_oracle ?length s)
+let tick_field_random_oracle ?(length = Tick.Field.size_in_bits - 1) s =
+  Tick.Field.of_bits (bits_random_oracle ~length s)
 
 let unrelated_g =
   let group_map =
@@ -44,6 +46,8 @@ module Sponge = struct
               let to_bits t =
                 Bitstring_lib.Bitstring.Lsb_first.to_list
                   (Impl.Field.unpack_full t)
+
+              let high_entropy_bits = high_entropy_bits
             end)
             (Impl.Field)
             (S)

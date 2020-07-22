@@ -385,7 +385,7 @@ module Data = struct
       type ('ledger_hash, 'amount) t =
             ('ledger_hash, 'amount) Stable.Latest.t =
         {hash: 'ledger_hash; total_currency: 'amount}
-      [@@deriving sexp, eq, compare, hash, to_yojson]
+      [@@deriving sexp, eq, compare, hash, to_yojson, hlist]
     end
 
     module Value = struct
@@ -426,21 +426,13 @@ module Data = struct
 
     type var = (Coda_base.Frozen_ledger_hash.var, Amount.var) Poly.t
 
-    let to_hlist {Poly.hash; total_currency} =
-      Coda_base.H_list.[hash; total_currency]
-
-    let of_hlist :
-           (unit, 'ledger_hash -> 'total_currency -> unit) Coda_base.H_list.t
-        -> ('ledger_hash, 'total_currency) Poly.t =
-     fun Coda_base.H_list.[hash; total_currency] -> {hash; total_currency}
-
     let data_spec =
       Tick.Data_spec.[Coda_base.Frozen_ledger_hash.typ; Amount.typ]
 
     let typ : (var, Value.t) Typ.t =
-      Tick.Typ.of_hlistable data_spec ~var_to_hlist:to_hlist
-        ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
-        ~value_of_hlist:of_hlist
+      Tick.Typ.of_hlistable data_spec ~var_to_hlist:Poly.to_hlist
+        ~var_of_hlist:Poly.of_hlist ~value_to_hlist:Poly.to_hlist
+        ~value_of_hlist:Poly.of_hlist
 
     let var_to_input ({Poly.hash; total_currency} : var) =
       { Random_oracle.Input.field_elements=
@@ -498,6 +490,7 @@ module Data = struct
 
       type ('global_slot, 'epoch_seed, 'delegator) t =
         {global_slot: 'global_slot; seed: 'epoch_seed; delegator: 'delegator}
+      [@@deriving hlist]
 
       type value = (Global_slot.t, Epoch_seed.t, Coda_base.Account.Index.t) t
 
@@ -516,17 +509,6 @@ module Data = struct
              ; Coda_base.Account.Index.to_bits
                  ~ledger_depth:constraint_constants.ledger_depth delegator |]
         }
-
-      let to_hlist {global_slot; seed; delegator} =
-        Coda_base.H_list.[global_slot; seed; delegator]
-
-      let of_hlist :
-             ( unit
-             , 'global_slot -> 'epoch_seed -> 'del -> unit )
-             Coda_base.H_list.t
-          -> ('global_slot, 'epoch_seed, 'del) t =
-       fun Coda_base.H_list.[global_slot; seed; delegator] ->
-        {global_slot; seed; delegator}
 
       let data_spec
           ~(constraint_constants : Genesis_constants.Constraint_constants.t) =
@@ -994,7 +976,7 @@ module Data = struct
         ; start_checkpoint: 'start_checkpoint
         ; lock_checkpoint: 'lock_checkpoint
         ; epoch_length: 'length }
-      [@@deriving sexp, compare, hash, to_yojson, fields]
+      [@@deriving sexp, compare, hash, to_yojson, fields, hlist]
     end
 
     type var =
@@ -1021,30 +1003,6 @@ module Data = struct
           ~else_:else_.epoch_length
       in
       {Poly.ledger; seed; start_checkpoint; lock_checkpoint; epoch_length}
-
-    let to_hlist
-        {Poly.ledger; seed; start_checkpoint; lock_checkpoint; epoch_length} =
-      Coda_base.H_list.
-        [ledger; seed; start_checkpoint; lock_checkpoint; epoch_length]
-
-    let of_hlist :
-           ( unit
-           ,    'ledger
-             -> 'seed
-             -> 'start_checkpoint
-             -> 'lock_checkpoint
-             -> 'length
-             -> unit )
-           Coda_base.H_list.t
-        -> ( 'ledger
-           , 'seed
-           , 'start_checkpoint
-           , 'lock_checkpoint
-           , 'length )
-           Poly.t =
-     fun Coda_base.H_list.
-           [ledger; seed; start_checkpoint; lock_checkpoint; epoch_length] ->
-      {ledger; seed; start_checkpoint; lock_checkpoint; epoch_length}
 
     module Make (Lock_checkpoint : sig
       type t [@@deriving sexp, compare, hash, to_yojson]
@@ -1085,9 +1043,9 @@ module Data = struct
         ; Length.typ ]
 
       let typ : (var, Value.t) Typ.t =
-        Typ.of_hlistable data_spec ~var_to_hlist:to_hlist
-          ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
-          ~value_of_hlist:of_hlist
+        Typ.of_hlistable data_spec ~var_to_hlist:Poly.to_hlist
+          ~var_of_hlist:Poly.of_hlist ~value_to_hlist:Poly.to_hlist
+          ~value_of_hlist:Poly.of_hlist
 
       let graphql_type name =
         let open Graphql_async in
@@ -1793,7 +1751,7 @@ module Data = struct
         ; staking_epoch_data: 'staking_epoch_data
         ; next_epoch_data: 'next_epoch_data
         ; has_ancestor_in_same_checkpoint_window: 'bool }
-      [@@deriving sexp, compare, hash, to_yojson, fields]
+      [@@deriving sexp, compare, hash, to_yojson, fields, hlist]
     end
 
     module Value = struct
@@ -1859,73 +1817,6 @@ module Data = struct
       , Boolean.var )
       Poly.t
 
-    let to_hlist
-        { Poly.blockchain_length
-        ; epoch_count
-        ; min_window_density
-        ; sub_window_densities
-        ; last_vrf_output
-        ; total_currency
-        ; curr_global_slot
-        ; staking_epoch_data
-        ; next_epoch_data
-        ; has_ancestor_in_same_checkpoint_window } =
-      let open Coda_base.H_list in
-      [ blockchain_length
-      ; epoch_count
-      ; min_window_density
-      ; sub_window_densities
-      ; last_vrf_output
-      ; total_currency
-      ; curr_global_slot
-      ; staking_epoch_data
-      ; next_epoch_data
-      ; has_ancestor_in_same_checkpoint_window ]
-
-    let of_hlist :
-           ( unit
-           ,    'length
-             -> 'length
-             -> 'length
-             -> 'length list
-             -> 'vrf_output
-             -> 'amount
-             -> 'global_slot
-             -> 'staking_epoch_data
-             -> 'next_epoch_data
-             -> 'bool
-             -> unit )
-           Coda_base.H_list.t
-        -> ( 'length
-           , 'vrf_output
-           , 'amount
-           , 'global_slot
-           , 'staking_epoch_data
-           , 'next_epoch_data
-           , 'bool )
-           Poly.t =
-     fun Coda_base.H_list.
-           [ blockchain_length
-           ; epoch_count
-           ; min_window_density
-           ; sub_window_densities
-           ; last_vrf_output
-           ; total_currency
-           ; curr_global_slot
-           ; staking_epoch_data
-           ; next_epoch_data
-           ; has_ancestor_in_same_checkpoint_window ] ->
-      { blockchain_length
-      ; epoch_count
-      ; min_window_density
-      ; sub_window_densities
-      ; last_vrf_output
-      ; total_currency
-      ; curr_global_slot
-      ; staking_epoch_data
-      ; next_epoch_data
-      ; has_ancestor_in_same_checkpoint_window }
-
     let data_spec
         ~(constraint_constants : Genesis_constants.Constraint_constants.t) =
       let open Snark_params.Tick.Data_spec in
@@ -1944,8 +1835,8 @@ module Data = struct
     let typ ~constraint_constants : (var, Value.t) Typ.t =
       Snark_params.Tick.Typ.of_hlistable
         (data_spec ~constraint_constants)
-        ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
-        ~value_of_hlist:of_hlist
+        ~var_to_hlist:Poly.to_hlist ~var_of_hlist:Poly.of_hlist
+        ~value_to_hlist:Poly.to_hlist ~value_of_hlist:Poly.of_hlist
 
     let to_input
         ({ Poly.blockchain_length
@@ -2620,9 +2511,10 @@ module Hooks = struct
     let from_genesis_epoch =
       Length.equal consensus_state.epoch_count Length.zero
     in
+    let in_initial_epoch = Epoch.(equal zero) epoch in
     if in_next_epoch then
       Ok (Epoch_data.next_to_staking consensus_state.next_epoch_data)
-    else if in_same_epoch || from_genesis_epoch then
+    else if in_same_epoch || (from_genesis_epoch && in_initial_epoch) then
       Ok consensus_state.staking_epoch_data
     else Error ()
 
@@ -3175,8 +3067,7 @@ module Hooks = struct
 
     let generate_transition ~(previous_protocol_state : Protocol_state.Value.t)
         ~blockchain_state ~current_time ~(block_data : Block_data.t)
-        ~transactions:_ ~snarked_ledger_hash ~supply_increase ~logger
-        ~constraint_constants =
+        ~snarked_ledger_hash ~supply_increase ~logger ~constraint_constants =
       let previous_consensus_state =
         Protocol_state.consensus_state previous_protocol_state
       in

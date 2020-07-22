@@ -164,8 +164,9 @@ let display t =
 let all_user_commands breadcrumbs =
   Sequence.fold (Sequence.of_list breadcrumbs) ~init:User_command.Set.empty
     ~f:(fun acc_set breadcrumb ->
-      let user_commands = user_commands breadcrumb in
-      Set.union acc_set (User_command.Set.of_list user_commands) )
+      breadcrumb |> user_commands
+      |> List.map ~f:(fun {data; _} -> data)
+      |> User_command.Set.of_list |> Set.union acc_set )
 
 module For_tests = struct
   open Currency
