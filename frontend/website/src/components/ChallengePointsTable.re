@@ -99,7 +99,7 @@ module Styles = {
           Theme.MediaQuery.notMobile,
           [
             display(`grid),
-            gridTemplateColumns([`percent(11.), `auto, `percent(25.)]),
+            gridTemplateColumns([`percent(11.), `auto, `percent(38.)]),
           ],
         ),
       ]),
@@ -195,7 +195,14 @@ let make = (~releaseTitle, ~challenges) => {
         <span className=Css.(style([gridColumn(2, 3)]))>
           {React.string("Challenge Name")}
         </span>
-        <span className=Css.(style([gridColumn(3, 4)]))>
+        <span
+          className=Css.(
+            style([
+              textAlign(`right),
+              gridColumn(3, 4),
+              paddingRight(`rem(2.5)),
+            ])
+          )>
           {React.string("Points *")}
         </span>
       </div>
