@@ -110,8 +110,9 @@ module Filter = {
 module Styles = {
   open Css;
 
-  let leaderboardContainer =
+  let leaderboardContainer = interactive =>
     style([
+      pointerEvents(interactive ? `auto : `none),
       width(`percent(100.)),
       margin2(~v=`zero, ~h=`auto),
       selector("hr", [margin(`zero)]),
@@ -552,7 +553,6 @@ type state = {
 type actions =
   | UpdateMembers(array(member));
 
-<p> {React.string("Top 10")} </p>;
 let reducer = (_, action) => {
   switch (action) {
   | UpdateMembers(members) => {loading: false, members}
@@ -565,6 +565,7 @@ let make =
       ~filter: Filter.t=Release,
       ~toggle: Toggle.t=All,
       ~search: string="",
+      ~interactive: bool=true,
       ~onFilterPress: string => unit=?,
     ) => {
   open Toggle;
@@ -627,7 +628,7 @@ let make =
       {React.string(string_of_filter(column))}
     </span>;
 
-  <div className=Styles.leaderboardContainer>
+  <div className=Styles.leaderboardContainer(interactive)>
     <div id="testnet-leaderboard" className=Styles.leaderboard>
       <div className=Styles.headerRow>
         <span className=Styles.flexEnd> {React.string("Rank")} </span>
