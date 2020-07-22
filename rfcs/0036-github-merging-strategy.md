@@ -84,22 +84,53 @@ This is a simple configuration change in the GitHub settings for the repo.
 
 #### We lose a linear `git` history (from `git log` and friends)
 
-We could mitigate this by running a branch in parallel with `develop` that
-'squashes' each merge commit after-the-fact with
-```bash
-git co develop-pretty
-git diff develop~ develop | git apply
-git commit -C develop
-```
+Locally, developers can use `git log -m --first-parent` to view only the merge
+commits. `git log -m --first-parent --patch` shows the changes from commits
+beneath the merge commit, as expected.
 
-Locally, developers can also use `git log -m --first-parent` to view only the
-merge commits. `git log -m --first-parent --patch` shows the changes from
-commits beneath the merge commit, as expected.
+To generate a linear history from any branch between commits `aaaaaa` and
+`ffffff`, run the commands
+```bash
+git checkout aaaaaa
+for commit_id in $(git rev-list --reverse --topo-order --first-parent aaaaaa..ffffff); do
+  git read-tree $commit_id && git checkout-index -f -a && git update-index -q --refresh && git commit --no-verify -a -C $commit_id;
+done
+```
 
 #### `git blame` identifies the commit within PRs instead of the merge commit
 
 Similar to the above, developers can locally use `git blame -m --first-parent`,
 or blame on the 'prettified' branch.
+
+#### `git bisect` will explore some non-merge commits
+
+We can set `git bisect` to ignore any non-merge commits by running a script
+`bisect-non-merge.sh bad_commit good_commit` with
+
+```bash
+#!/bin/bash
+set -euv
+git bisect start $1 $2
+git bisect skip $(git rev-list --no-merges $2..$1)
+```
+
+To include commits from before the switch from squash to merge, this can be
+modified to
+
+```bash
+#!/bin/bash
+set -euv
+git bisect start $1 $2
+git bisect skip $(git rev-list --no-merges ^ffffff $2..$1)
+```
+
+where `ffffff` is the last commit where we used the squash merge strategy.
+
+##### Manual bisection
+
+For any scripts where we want to implement bisect ourselves, we can instead use
+`git rev-list --first-parent aaaaaa..ffffff` to get the full list of commits
+from `aaaaaa` (non-inclusive) to `ffffff` that we want to bisect over.
 
 #### The history will contain bad or useless commit messages
 
