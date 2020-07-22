@@ -245,8 +245,7 @@ module Styles = {
     merge([
       Theme.H6.extraSmall,
       style([
-        display(`none),
-        media(Theme.MediaQuery.notMobile, [display(`flex)]),
+        display(`flex),
         alignItems(`center),
         justifyContent(`center),
         border(`px(1), `solid, Theme.Colors.leaderboardMidnight),
