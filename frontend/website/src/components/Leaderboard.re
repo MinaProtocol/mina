@@ -195,7 +195,6 @@ module Styles = {
       width(`percent(100.)),
       lineHeight(`rem(1.5)),
     ]);
-
   let headerRow =
     merge([
       desktopLeaderboardRow,
@@ -219,6 +218,7 @@ module Styles = {
     style([
       position(`relative),
       justifySelf(`flexEnd),
+      cursor(`pointer),
       after([
         position(`absolute),
         left(`percent(100.)),
@@ -235,6 +235,7 @@ module Styles = {
     style([
       display(`none),
       justifySelf(`flexEnd),
+      cursor(`pointer),
       media(Theme.MediaQuery.tablet, [display(`inline)]),
     ]);
 
@@ -316,7 +317,10 @@ module Styles = {
       media(Theme.MediaQuery.notMobile, [display(`none)]),
     ]);
 
-  let mobileLeaderboardRow =
+  let mobileFirstColumn =
+    style([textAlign(`right), color(`hex("757575")), cursor(`default)]);
+
+  let mobileSecondColumn =
     style([
       display(`flex),
       justifyContent(`flexStart),
@@ -628,7 +632,7 @@ let make =
       {React.string(string_of_filter(column))}
     </span>;
 
-  <div className=Styles.leaderboardContainer(interactive)>
+  <div className={Styles.leaderboardContainer(interactive)}>
     <div id="testnet-leaderboard" className=Styles.leaderboard>
       <div className=Styles.headerRow>
         <span className=Styles.flexEnd> {React.string("Rank")} </span>
