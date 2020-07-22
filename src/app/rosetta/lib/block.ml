@@ -141,8 +141,7 @@ module User_command_info = struct
           (* If we're looking at mempool transactions, it's always pending *)
           | _, None ->
               (Operation_statuses.name `Pending, None)
-          (* Fee transfers always succeed even if the command fails, if it's in a block.
-                 * TODO: Reviewer, please check me. *)
+          (* Fee transfers always succeed even if the command fails, if it's in a block. *)
           | `Fee_payer_dec, _ ->
               (Operation_statuses.name `Success, None)
           | _, Some (`Applied _) ->
@@ -375,8 +374,7 @@ module Internal_command_info = struct
     ; token: Unsigned.UInt64.t
     ; hash: string }
 
-  let to_operations ~user_commands ~coinbase ~block_creator_pk (t : t) :
-      Operation.t list =
+  let to_operations ~coinbase (t : t) : Operation.t list =
     (* We choose to represent the dec-side of fee transfers from txns from the
      * canonical user command that created them so we are able consistently
      * produce more balance changing operations in the mempool or a block.
@@ -386,28 +384,10 @@ module Internal_command_info = struct
       | `Coinbase ->
           [{Op.label= `Coinbase_inc; related_to= None}]
       | `Fee_transfer ->
-          (* Detect if a fee transfer comes from a snark worker payment by
-         * failing to find the user command that caused it *)
-          if
-            List.find user_commands ~f:(fun (info : User_command_info.t) ->
-                Unsigned.UInt64.equal info.fee t.fee
-                && Unsigned.UInt64.equal info.token t.token
-                && [%eq: [`Pk of string]] info.receiver t.receiver )
-            |> Option.is_none
-          then
-            (* In this case we make a "synthetic" fee subtraction from block
-           * creator even though this is implicit in our blocks. We need this
-           * so the balance always sums to zero. *)
-            [ {Op.label= `Fee_payer_dec; related_to= None}
-            ; {Op.label= `Fee_receiver_inc; related_to= Some `Fee_payer_dec} ]
-          else
-            (* Otherwise we only have the receiver inc side *)
-            (* TODO: Relate fee_payer_dec with fee_receiver_inc across
-           * user_commands and internal commands *)
-            [{Op.label= `Fee_receiver_inc; related_to= Some `Fee_payer_dec}]
+          [{Op.label= `Fee_receiver_inc; related_to= None}]
     in
-    Op.build ~a_eq:[%eq: [`Coinbase_inc | `Fee_payer_dec | `Fee_receiver_inc]]
-      ~plan ~f:(fun ~related_operations ~operation_identifier op ->
+    Op.build ~a_eq:[%eq: [`Coinbase_inc | `Fee_receiver_inc]] ~plan
+      ~f:(fun ~related_operations ~operation_identifier op ->
         (* All internal commands succeed if they're in blocks *)
         let status = Operation_statuses.name `Success in
         match op.label with
@@ -415,18 +395,9 @@ module Internal_command_info = struct
             { Operation.operation_identifier
             ; related_operations
             ; status
-            ; account=
-                Some (account_id block_creator_pk Amount_of.Token_id.default)
+            ; account= Some (account_id t.receiver Amount_of.Token_id.default)
             ; _type= Operation_types.name `Coinbase_inc
             ; amount= Some (Amount_of.coda coinbase)
-            ; metadata= None }
-        | `Fee_payer_dec ->
-            { Operation.operation_identifier
-            ; related_operations
-            ; status
-            ; account= Some (account_id block_creator_pk t.token)
-            ; _type= Operation_types.name `Fee_payer_dec
-            ; amount= Some Amount_of.(negated @@ token t.token t.fee)
             ; metadata= None }
         | `Fee_receiver_inc ->
             { Operation.operation_identifier
@@ -442,13 +413,17 @@ module Internal_command_info = struct
       ; receiver= `Pk "Eve"
       ; fee= Unsigned.UInt64.of_int 20_000_000_000
       ; token= Unsigned.UInt64.of_int 1
-      ; hash= "COINBASE_1" } ]
+      ; hash= "COINBASE_1" }
+    ; { kind= `Fee_transfer
+      ; receiver= `Pk "Alice"
+      ; fee= Unsigned.UInt64.of_int 30_000_000_000
+      ; token= Unsigned.UInt64.of_int 1
+      ; hash= "FEE_TRANSFER" } ]
 end
 
 module Block_info = struct
   type t =
     { block_identifier: Block_identifier.t
-    ; creator: [`Pk of string]
     ; parent_block_identifier: Block_identifier.t
     ; timestamp: int64
     ; internal_info: Internal_command_info.t list
@@ -457,7 +432,6 @@ module Block_info = struct
   let dummy =
     { block_identifier=
         Block_identifier.create (Int64.of_int_exn 4) "STATE_HASH_BLOCK"
-    ; creator= `Pk "Eve"
     ; parent_block_identifier=
         Block_identifier.create (Int64.of_int_exn 3) "STATE_HASH_PARENT"
     ; timestamp= Int64.of_int_exn 1594937771
@@ -525,9 +499,7 @@ module Specific = struct
                   { Transaction.transaction_identifier=
                       {Transaction_identifier.hash= info.hash}
                   ; operations=
-                      Internal_command_info.to_operations
-                        ~user_commands:block_info.user_commands ~coinbase
-                        ~block_creator_pk:block_info.creator info
+                      Internal_command_info.to_operations ~coinbase info
                   ; metadata= None } )
               @ List.map block_info.user_commands ~f:(fun info ->
                     { Transaction.transaction_identifier=
