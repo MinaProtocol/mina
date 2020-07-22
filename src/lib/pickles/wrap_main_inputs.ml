@@ -63,11 +63,17 @@ module Input_domain = struct
     let u = Unsigned.Size_t.of_int in
     time "lagrange" (fun () ->
         Array.init domain_size ~f:(fun i ->
-            Snarky_bn382.Tweedle.Dum.Field_urs.lagrange_commitment
-              (Tick.Keypair.load_urs ()) (u domain_size) (u i)
-            |> Snarky_bn382.Tweedle.Dum.Field_poly_comm.unshifted
-            |> Fn.flip Me.Inner_curve.Affine.Backend.Vector.get 0
-            |> Me.Inner_curve.Affine.of_backend ) )
+            let input =
+              Snarky_bn382.Tweedle.Dum.Field_urs.lagrange_commitment
+                (Tick.Keypair.load_urs ()) (u domain_size) (u i)
+              |> Snarky_bn382.Tweedle.Dum.Field_poly_comm.unshifted
+              (* This call to unshifted has a leak *)
+              |> Fn.flip
+                   Me.Inner_curve.Affine.Backend.Vector.get_without_finaliser 0
+            in
+            let res = Me.Inner_curve.Affine.of_backend input in
+            Me.Inner_curve.Affine.Backend.delete input ;
+            res ) )
 end
 
 module Inner_curve = struct

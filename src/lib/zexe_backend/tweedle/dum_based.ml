@@ -17,8 +17,15 @@ end
 
 let field_size : Bigint.R.t = Field.size
 
-module R1CS_constraint_system =
-  R1cs_constraint_system.Make (Field) (T.Fq.Constraint_matrix)
+module Mat = struct
+  include T.Fq.Constraint_matrix
+
+  let create () =
+    let t = create_without_finaliser () in
+    Caml.Gc.finalise delete t ; t
+end
+
+module R1CS_constraint_system = R1cs_constraint_system.Make (Field) (Mat)
 module Var = Var
 
 module Verification_key = struct
@@ -73,7 +80,7 @@ module Keypair = Dlog_based_keypair.Make (struct
   module Curve = Curve
   module Poly_comm = Fq_poly_comm
   module Verifier_index = B.Field_verifier_index
-  module Constraint_matrix = T.Fq.Constraint_matrix
+  module Constraint_matrix = Mat
 end)
 
 module Oracles = Dlog_based_oracles.Make (struct

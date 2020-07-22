@@ -74,7 +74,7 @@ struct
       in
       t |> one a |> one b |> one c
 
-    let empty = H.feed_string H.empty "r1cs_constraint_system"
+    let empty = H.feed_string H.empty "pickles"
   end
 
   type nonrec t = Mat.t t
@@ -209,13 +209,15 @@ struct
 
   let add_r1cs t (a, b, c) =
     let append m v =
-      let indices = Snarky_bn382.Usize_vector.create () in
-      let coeffs = Fp.Vector.create () in
+      let indices = Snarky_bn382.Usize_vector.create_without_finaliser () in
+      let coeffs = Fp.Vector.create_without_finaliser () in
       List.iter v ~f:(fun (x, i) ->
           Snarky_bn382.Usize_vector.emplace_back indices
             (Unsigned.Size_t.of_int i) ;
           Fp.Vector.emplace_back coeffs x ) ;
-      Mat.append_row m indices coeffs
+      Mat.append_row m indices coeffs ;
+      Snarky_bn382.Usize_vector.delete indices ;
+      Fp.Vector.delete coeffs
     in
     t.constraints <- t.constraints + 1 ;
     append t.m.a a ;

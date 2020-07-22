@@ -58,7 +58,7 @@ module type Input_intf = sig
   val copy : t -> t -> unit
 
   module Vector : sig
-    include Snarky.Vector.S with type elt := t
+    include Intf.Vector with type elt := t
 
     module Triple : Intf.Triple with type elt := t
   end
@@ -152,7 +152,11 @@ module type S = sig
 
     val create : unit -> t
 
+    val create_without_finaliser : unit -> t
+
     val get : t -> int -> elt
+
+    val get_without_finaliser : t -> int -> elt
 
     val emplace_back : t -> elt -> unit
 
@@ -339,7 +343,15 @@ module Make (F : Input_intf) :
 
     include Vector
 
-    (* TODO: Leaky *)
+    let gc t = Caml.Gc.finalise delete t ; t
+
+    let create () = gc (create_without_finaliser ())
+
+    let get t i =
+      let x = get_without_finaliser t i in
+      Caml.Gc.finalise F.delete x ;
+      x
+
     let of_array a =
       let t = create () in
       Array.iter a ~f:(emplace_back t) ;
