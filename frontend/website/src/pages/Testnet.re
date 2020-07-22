@@ -227,7 +227,7 @@ module Styles = {
 
 module Section = {
   [@react.component]
-  let make = (~name, ~expanded, ~setExpanded, ~children) => {
+  let make = (~name, ~expanded, ~setExpanded, ~children, ~link=?) => {
     <div className=Css.(style([display(`flex), flexDirection(`column)]))>
       {if (expanded) {
          <div className=Styles.gradientSectionExpanded> children </div>;
@@ -236,7 +236,12 @@ module Section = {
            <div className=Styles.gradientSection> children </div>
            <div
              className=Styles.expandButton
-             onClick={_ => setExpanded(_ => true)}>
+             onClick={_ =>
+               switch (link) {
+               | Some(dest) => ReasonReactRouter.push(dest)
+               | None => setExpanded(_ => true)
+               }
+             }>
              <div> {React.string("View Full " ++ name)} </div>
            </div>
          </>;
@@ -334,7 +339,7 @@ let make = (~challenges as _, ~testnetName as _) => {
           </div>
         </div>
         <hr />
-        <Section name="Leaderboard" expanded setExpanded>
+        <Section name="Leaderboard" expanded setExpanded link="/leaderboard">
           <div className=Styles.dashboardHeader>
             <h1 className=Theme.H1.hero>
               {React.string("Testnet Leaderboard")}
@@ -388,7 +393,10 @@ let make = (~challenges as _, ~testnetName as _) => {
             <h1 className=Theme.H1.hero>
               {React.string("Network Dashboard")}
             </h1>
-            <a href="/leaderboard" className=Styles.headerLink>
+            <a
+              href="https://o1testnet.grafana.net/d/Rgo87HhWz/block-producer-dashboard?orgId=1"
+              target="_blank"
+              className=Styles.headerLink>
               {React.string({j|View Full Dashboard\u00A0→|j})}
             </a>
           </div>
