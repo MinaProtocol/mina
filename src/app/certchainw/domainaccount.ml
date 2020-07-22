@@ -1,5 +1,7 @@
 (* account.ml *)
 
+open Coda_base
+open Core
 
 
 open Core_kernel
@@ -17,16 +19,13 @@ open Fold_lib
 open Import
 
 module Index = struct
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type t = int [@@deriving to_yojson, sexp]
 
-      let to_latest = Fn.id
-    end
-  end]
+  type t = int [@@deriving to_yojson, sexp]
 
-  type t = Stable.Latest.t [@@deriving to_yojson, sexp]
+  let to_latest = Fn.id
+
+
+
 
   let to_int = Int.to_int
 
@@ -60,139 +59,80 @@ module Index = struct
 
   let fold ~ledger_depth t =
     Fold.group3 ~default:false (fold_bits ~ledger_depth t)
-
-  [%%ifdef
-  consensus_mechanism]
-
-  module Unpacked = struct
-    type var = Tick.Boolean.var list
-
-    type value = Vector.t
-
-    let typ ~ledger_depth : (var, value) Tick.Typ.t =
-      Typ.transport
-        (Typ.list ~length:ledger_depth Boolean.typ)
-        ~there:(to_bits ~ledger_depth) ~back:of_bits
-  end
-
-  [%%endif]
 end
 
-module Nonce = Account_nonce
+(*module Nonce = Account_nonce*)
 
 module Poly = struct
-  [%%versioned
   module Stable = struct
     module V1 = struct
-      type ( 'pk
-           , 'tid
-           , 'token_permissions
-           , 'amount
-           , 'nonce
+      type ( 'domain
+           , 'pkd
+           , 'cert
            , 'receipt_chain_hash
-           , 'state_hash
-           , 'timing )
+           , 'state_hash)
            t =
-        { public_key: 'pk
-        ; token_id: 'tid
-        ; token_permissions: 'token_permissions
-        ; balance: 'amount
-        ; nonce: 'nonce
+        { domain: 'domain
+        ; public_key: 'pkd
+        ; signature: 'cert
         ; receipt_chain_hash: 'receipt_chain_hash
-        ; delegate: 'pk
-        ; voting_for: 'state_hash
-        ; timing: 'timing }
+        ; voting_for: 'state_hash }
       [@@deriving sexp, eq, compare, hash, yojson]
     end
-  end]
+  end
 
-  type ( 'pk
-       , 'tid
-       , 'token_permissions
-       , 'amount
-       , 'nonce
-       , 'receipt_chain_hash
-       , 'state_hash
-       , 'timing )
-       t =
-        ( 'pk
-        , 'tid
-        , 'token_permissions
-        , 'amount
-        , 'nonce
+  type ( 'domain
+        , 'pkd
+        , 'cert
         , 'receipt_chain_hash
-        , 'state_hash
-        , 'timing )
-        Stable.Latest.t =
-    { public_key: 'pk
-    ; token_id: 'tid
-    ; token_permissions: 'token_permissions
-    ; balance: 'amount
-    ; nonce: 'nonce
+        , 'state_hash )
+       t =
+    { domain: 'domain
+    ; public_key: 'pkd
+    ; signature: 'cert
     ; receipt_chain_hash: 'receipt_chain_hash
-    ; delegate: 'pk
-    ; voting_for: 'state_hash
-    ; timing: 'timing }
+    ; voting_for: 'state_hash }
   [@@deriving sexp, eq, compare, hash, yojson, fields]
 
-  [%%ifdef
-  consensus_mechanism]
+
 
   let of_hlist
-      ([ public_key
-       ; token_id
-       ; token_permissions
-       ; balance
-       ; nonce
+      ([ domain
+       ; public_key
+       ; signature
        ; receipt_chain_hash
-       ; delegate
-       ; voting_for
-       ; timing ] :
+       ; voting_for ] :
         (unit, _) H_list.t) =
-    { public_key
-    ; token_id
-    ; token_permissions
-    ; balance
-    ; nonce
+    { domain
+    ; public_key
+    ; signature
     ; receipt_chain_hash
-    ; delegate
-    ; voting_for
-    ; timing }
+    ; voting_for }
 
   let to_hlist
-      { public_key
-      ; token_id
-      ; token_permissions
-      ; balance
-      ; nonce
+      { domain
+      ; public_key
+      ; signature
       ; receipt_chain_hash
-      ; delegate
-      ; voting_for
-      ; timing } =
+      ; voting_for } =
     H_list.
-      [ public_key
-      ; token_id
-      ; token_permissions
-      ; balance
-      ; nonce
+      [ domain
+      ; public_key
+      ; signature
       ; receipt_chain_hash
-      ; delegate
-      ; voting_for
-      ; timing ]
+      ; voting_for ]
 
-  [%%endif]
 end
 
 module Key = struct
-  [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = Public_key.Compressed.Stable.V1.t
+      type t = Certchainw.Domain.t
       [@@deriving sexp, eq, hash, compare, yojson]
 
       let to_latest = Fn.id
     end
-  end]
+  end
 end
 
 module Identifier = Account_id
