@@ -270,4 +270,9 @@ module type Transaction_resource_pool_intf = sig
     -> Transaction_hash.User_command_with_valid_signature.t list
 
   val get_all : t -> Transaction_hash.User_command_with_valid_signature.t list
+
+  val find_by_hash :
+       t
+    -> Transaction_hash.t
+    -> Transaction_hash.User_command_with_valid_signature.t option
 end
