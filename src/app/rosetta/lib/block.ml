@@ -516,6 +516,311 @@ module Block_info = struct
     ; user_commands= User_command_info.dummies }
 end
 
+module Sql = struct
+  module Block = struct
+    let typ = Caqti_type.(tup2 int Archive_lib.Processor.Block.typ)
+
+    let query_height =
+      Caqti_request.find_opt Caqti_type.int64 typ
+        {|
+WITH RECURSIVE chain AS (
+  SELECT id, state_hash, parent_id, creator_id, snarked_ledger_hash_id, ledger_hash, height, timestamp, coinbase_id FROM blocks WHERE height = (select MAX(height) from blocks)
+
+  UNION ALL
+
+  SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, b.ledger_hash, b.height, b.timestamp, b.coinbase_id FROM blocks b
+  INNER JOIN chain
+  ON b.id = chain.parent_id
+) SELECT id, state_hash, parent_id, creator_id, snarked_ledger_hash_id, ledger_hash, height, timestamp, coinbase_id FROM chain WHERE height = ?
+      |}
+
+    let query_hash =
+      Caqti_request.find_opt Caqti_type.string typ
+        {| SELECT id, state_hash, parent_id, creator_id, snarked_ledger_hash_id, ledger_hash, height, timestamp, coinbase_id FROM blocks WHERE state_hash = ? |}
+
+    let query_both =
+      Caqti_request.find_opt
+        Caqti_type.(tup2 string int64)
+        typ
+        {| SELECT id, state_hash, parent_id, creator_id, snarked_ledger_hash_id, ledger_hash, height, timestamp, coinbase_id FROM blocks WHERE state_hash = ? AND height = ? |}
+
+    let query_by_id =
+      Caqti_request.find_opt Caqti_type.int typ
+        {| SELECT id, state_hash, parent_id, creator_id, snarked_ledger_hash_id, ledger_hash, height, timestamp, coinbase_id FROM blocks WHERE id = ? |}
+
+    let run_by_id (module Conn : Caqti_async.CONNECTION) id =
+      Conn.find_opt query_by_id id
+
+    let run (module Conn : Caqti_async.CONNECTION) = function
+      | `This (`Height h) ->
+          Conn.find_opt query_height h
+      | `That (`Hash h) ->
+          Conn.find_opt query_hash h
+      | `Those (`Height height, `Hash hash) ->
+          Conn.find_opt query_both (hash, height)
+  end
+
+  module User_commands = struct
+    module Extras = struct
+      let fee_payer_account_creation_fee_paid (x, _, _) = x
+
+      let receiver_account_creation_fee_paid (_, y, _) = y
+
+      let created_token (_, _, z) = z
+
+      let typ = Caqti_type.(tup3 (option int64) (option int64) (option int64))
+    end
+
+    let typ =
+      Caqti_type.(tup3 int Archive_lib.Processor.User_command.typ Extras.typ)
+
+    let query =
+      Caqti_request.collect Caqti_type.int typ
+        {| SELECT user_commands.* FROM user_commands, blocks_user_commands LEFT JOIN blocks ON blocks_user_commands.block_id = ? |}
+
+    let run (module Conn : Caqti_async.CONNECTION) id =
+      Conn.collect_list query id
+  end
+
+  module Internal_commands = struct
+    (* TODO *)
+    let typ = Caqti_type.(tup2 int Archive_lib.Processor.Internal_command.typ)
+
+    let query =
+      Caqti_request.collect Caqti_type.int typ
+        {| SELECT internal_commands.* FROM internal_commands, blocks_internal_commands LEFT JOIN blocks ON blocks_internal_commands.block_id = ? |}
+
+    let run (module Conn : Caqti_async.CONNECTION) id =
+      Conn.collect_list query id
+  end
+
+  module Public_keys = struct
+    (* TODO: Make this more efficient by batching or getting all in one query *)
+    let typ = Caqti_type.string
+
+    let query_one =
+      Caqti_request.find_opt Caqti_type.int typ
+        {| SELECT value FROM public_keys WHERE id = ? |}
+
+    let run (module Conn : Caqti_async.CONNECTION) id =
+      Conn.find_opt query_one id
+  end
+
+  let run (module Conn : Caqti_async.CONNECTION) input =
+    let module M = struct
+      include Deferred.Result
+
+      module List = struct
+        let map ~f =
+          List.fold ~init:(return []) ~f:(fun acc x ->
+              let open Let_syntax in
+              let%bind xs = acc in
+              let%map y = f x in
+              y :: xs )
+      end
+    end in
+    let open M.Let_syntax in
+    match%bind
+      Block.run (module Conn) input |> Errors.Lift.sql ~context:"Finding block"
+    with
+    | None ->
+        M.fail (Errors.create `Block_missing)
+    | Some (block_id, raw_block) -> (
+        match%bind
+          Block.run_by_id (module Conn) block_id
+          |> Errors.Lift.sql ~context:"Finding parent block"
+        with
+        | None ->
+            M.fail (Errors.create ~context:"Parent block" `Block_missing)
+        | Some (_, raw_parent_block) ->
+            let%bind raw_user_commands =
+              User_commands.run (module Conn) block_id
+              |> Errors.Lift.sql ~context:"Finding user commands within block"
+            in
+            let%bind raw_internal_commands =
+              Internal_commands.run (module Conn) block_id
+              |> Errors.Lift.sql
+                   ~context:"Finding internal commands within block"
+            in
+            let public_key_ids =
+              Int.Set.union_list
+                [ Int.Set.singleton raw_block.creator_id
+                ; List.fold raw_user_commands ~init:Int.Set.empty
+                    ~f:(fun acc (_id, uc, _) ->
+                      Int.Set.union acc
+                        (Int.Set.of_list
+                           [ uc.Archive_lib.Processor.User_command.fee_payer_id
+                           ; uc.source_id
+                           ; uc.receiver_id ]) )
+                ; List.fold raw_internal_commands ~init:Int.Set.empty
+                    ~f:(fun acc (_id, ic) ->
+                      Int.Set.union acc
+                        (Int.Set.singleton
+                           ic
+                             .Archive_lib.Processor.Internal_command
+                              .receiver_id) ) ]
+            in
+            let%bind public_keys =
+              (* TODO: N+1 problem *)
+              Int.Set.fold public_key_ids ~init:(M.return Int.Map.empty)
+                ~f:(fun acc id ->
+                  let%bind pks = acc in
+                  let%map pk =
+                    match%bind
+                      Public_keys.run (module Conn) id
+                      |> Errors.Lift.sql
+                           ~context:"Finding public key within block"
+                    with
+                    | Some pk ->
+                        M.return (`Pk pk)
+                    | None ->
+                        M.fail
+                          (Errors.create
+                             ~context:
+                               (sprintf
+                                  "A public key id %d doesn't exist in the \
+                                   archive database but if we're requesting \
+                                   it it should."
+                                  id)
+                             `Invariant_violation)
+                  in
+                  Int.Map.add_exn ~key:id ~data:pk pks )
+            in
+            let load_pk source id =
+              match Int.Map.find public_keys id with
+              | None ->
+                  M.fail
+                    (Errors.create
+                       ~context:
+                         (sprintf
+                            "The public key %d associated with this %s \
+                             doesn't exist in the archive database"
+                            id source)
+                       `Invariant_violation)
+              | Some pk ->
+                  M.return pk
+            in
+            let%bind internal_commands =
+              M.List.map raw_internal_commands ~f:(fun (_, ic) ->
+                  let%bind kind =
+                    match ic.Archive_lib.Processor.Internal_command.typ with
+                    | "fee_transfer" ->
+                        M.return `Fee_transfer
+                    | "coinbase" ->
+                        M.return `Coinbase
+                    | other ->
+                        M.fail
+                          (Errors.create
+                             ~context:
+                               (sprintf
+                                  "The archive database is storing internal \
+                                   commands with %s; this is neither \
+                                   fee_transfer nor coinbase. Please report a \
+                                   bug!"
+                                  other)
+                             `Invariant_violation)
+                  in
+                  let%map receiver =
+                    load_pk "internal command" ic.receiver_id
+                  in
+                  { Internal_command_info.kind
+                  ; receiver
+                  ; fee= Unsigned.UInt64.of_int ic.fee
+                  ; token= Unsigned.UInt64.of_int64 ic.token
+                  ; hash= ic.hash } )
+            in
+            let%bind user_commands =
+              M.List.map raw_user_commands ~f:(fun (_, uc, extras) ->
+                  let open M.Let_syntax in
+                  let%bind kind =
+                    match uc.Archive_lib.Processor.User_command.typ with
+                    | "payment" ->
+                        M.return `Payment
+                    | "delegation" ->
+                        M.return `Delegation
+                    | "create_token" ->
+                        M.return `Create_token
+                    | "create_account" ->
+                        M.return `Create_account
+                    | "mint_tokens" ->
+                        M.return `Mint_tokens
+                    | other ->
+                        M.fail
+                          (Errors.create
+                             ~context:
+                               (sprintf
+                                  "The archive database is storing user \
+                                   commands with %s; this is not a known \
+                                   type. Please report a bug!"
+                                  other)
+                             `Invariant_violation)
+                  in
+                  let%bind failure_status =
+                    match uc.failure_reason with
+                    | None -> (
+                      match
+                        ( User_commands.Extras
+                          .fee_payer_account_creation_fee_paid extras
+                        , User_commands.Extras
+                          .receiver_account_creation_fee_paid extras )
+                      with
+                      | None, None ->
+                          M.return
+                          @@ `Applied
+                               User_command_info.Account_creation_fees_paid
+                               .By_no_one
+                      | Some fee_payer, None ->
+                          M.return
+                          @@ `Applied
+                               (User_command_info.Account_creation_fees_paid
+                                .By_fee_payer
+                                  (Unsigned.UInt64.of_int64 fee_payer))
+                      | None, Some receiver ->
+                          M.return
+                          @@ `Applied
+                               (User_command_info.Account_creation_fees_paid
+                                .By_receiver
+                                  (Unsigned.UInt64.of_int64 receiver))
+                      | Some _, Some _ ->
+                          M.fail
+                            (Errors.create
+                               ~context:
+                                 "The archive database is storing creation \
+                                  fees paid by two different pks. This is \
+                                  impossible."
+                               `Invariant_violation) )
+                    | Some status ->
+                        M.return @@ `Failed status
+                  in
+                  let load = load_pk "user command" in
+                  let%bind fee_payer = load uc.fee_payer_id in
+                  let%bind source = load uc.source_id in
+                  let%map receiver = load uc.receiver_id in
+                  { User_command_info.kind
+                  ; fee_payer
+                  ; source
+                  ; receiver
+                  ; fee_token= Unsigned.UInt64.of_int uc.fee_token
+                  ; token= Unsigned.UInt64.of_int uc.token
+                  ; nonce= Unsigned.UInt32.of_int uc.nonce
+                  ; amount= Option.map ~f:Unsigned.UInt64.of_int uc.amount
+                  ; fee= Unsigned.UInt64.of_int uc.fee
+                  ; hash= uc.hash
+                  ; failure_status= Some failure_status } )
+            in
+            let%map creator = load_pk "block" raw_block.creator_id in
+            { Block_info.block_identifier=
+                { Block_identifier.index= Int64.of_int raw_block.height
+                ; hash= raw_block.state_hash }
+            ; creator
+            ; parent_block_identifier=
+                { Block_identifier.index= Int64.of_int raw_parent_block.height
+                ; hash= raw_parent_block.state_hash }
+            ; timestamp= raw_block.timestamp
+            ; internal_info= internal_commands
+            ; user_commands } )
+end
+
 module Specific = struct
   module Env = struct
     (* All side-effects go in the env so we can mock them out later *)
@@ -538,28 +843,9 @@ module Specific = struct
      fun ~db ~graphql_uri ->
       { gql= (fun () -> Graphql.query (Network.Get_network.make ()) graphql_uri)
       ; db_block=
-          (fun _query ->
-            let _db = db in
-            (*
-            let (module Conn: Caqti_async.CONNECTION) = db in
-            let open Deferred.Result.Let_syntax in
-            let%bind () =
-              match%bind.Deferred
-                Conn.start ()
-           let%bind block =
-             Sql.Block.query_both
-
-        with
-          | Error e ->
-            Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
-              ~metadata:
-                [ ("block", With_hash.hash block |> State_hash.to_yojson)
-                ; ("error", `String (Caqti_error.show e)) ]
-              "Failed to load block: $block, see $error" ;
-            Conn.rollback ()
-          | Ok _ ->
-            Conn.commit () *)
-            failwith "TODO" )
+          (fun query ->
+            let (module Conn : Caqti_async.CONNECTION) = db in
+            Sql.run (module Conn) query )
       ; validate_network_choice= Network.Validate_choice.Real.validate }
 
     let mock : 'gql Mock.t =

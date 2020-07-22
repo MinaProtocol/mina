@@ -242,15 +242,14 @@ module User_command = struct
 end
 
 module Internal_command = struct
-  type t =
-    {typ: string; receiver_id: int; fee: int; token: string; hash: string}
+  type t = {typ: string; receiver_id: int; fee: int; token: int64; hash: string}
 
   let typ =
     let encode t = Ok ((t.typ, t.receiver_id, t.fee, t.token), t.hash) in
     let decode ((typ, receiver_id, fee, token), hash) =
       Ok {typ; receiver_id; fee; token; hash}
     in
-    let rep = Caqti_type.(tup2 (tup4 string int int string) string) in
+    let rep = Caqti_type.(tup2 (tup4 string int int int64) string) in
     Caqti_type.custom ~encode ~decode rep
 
   let find (module Conn : CONNECTION) ~(transaction_hash : Transaction_hash.t)
@@ -262,7 +261,7 @@ module Internal_command = struct
 end
 
 module Fee_transfer = struct
-  type t = {receiver_id: int; fee: int; token: string; hash: string}
+  type t = {receiver_id: int; fee: int; token: int64; hash: string}
 
   let typ =
     let encode t =
@@ -271,7 +270,7 @@ module Fee_transfer = struct
     let decode ((_, receiver_id, fee, token), hash) =
       Ok {receiver_id; fee; token; hash}
     in
-    let rep = Caqti_type.(tup2 (tup4 string int int string) string) in
+    let rep = Caqti_type.(tup2 (tup4 string int int int64) string) in
     Caqti_type.custom ~encode ~decode rep
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
@@ -293,7 +292,7 @@ module Fee_transfer = struct
               hash) VALUES (?, ?, ?, ?, ?) RETURNING id")
           { receiver_id
           ; fee= Fee_transfer.Single.fee t |> Currency.Fee.to_int
-          ; token= Token_id.to_string t.fee_token
+          ; token= Token_id.to_string t.fee_token |> Int64.of_string
           ; hash= transaction_hash |> Transaction_hash.to_base58_check }
 end
 
@@ -303,13 +302,16 @@ module Coinbase = struct
   let typ =
     let encode t =
       Ok
-        ( ("coinbase", t.receiver_id, t.amount, Token_id.(to_string default))
+        ( ( "coinbase"
+          , t.receiver_id
+          , t.amount
+          , Token_id.(to_string default) |> Int64.of_string )
         , t.hash )
     in
     let decode ((_, receiver_id, amount, _), hash) =
       Ok {receiver_id; amount; hash}
     in
-    let rep = Caqti_type.(tup2 (tup4 string int int string) string) in
+    let rep = Caqti_type.(tup2 (tup4 string int int int64) string) in
     Caqti_type.custom ~encode ~decode rep
 
   let add_if_doesn't_exist (module Conn : CONNECTION) (t : Coinbase.t) =
