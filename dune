@@ -23,7 +23,6 @@
    (source_tree ../r1cs-std))
  (action
   (progn
-   (run env)
    (setenv RUSTFLAGS "-C target-feature=+bmi2,+adx"
     (run cargo build --release))
    (run cp ../target/release/libsnarky_bn382_stubs_stubs.a .))))
