@@ -101,10 +101,21 @@ defmodule ArchitectureTests.StatisticTest do
     check_cycle(statistics,MapSet.new)
   end
 
-  test "statistics with cycle", _context do
+  test "statistics with cycle starting at Stat3", _context do
     try do
       # Stat3 depends on Stat4 depends on Stat3
       statistics = [Stat3]
+      check_cycle(statistics,MapSet.new)
+      assert(false)
+    rescue
+      _ -> :ok
+    end
+  end
+
+  test "statistics with cycle starting at Stat4", _context do
+    try do
+      # Stat4 depends on Stat3 depends on Stat4
+      statistics = [Stat4]
       check_cycle(statistics,MapSet.new)
       assert(false)
     rescue
