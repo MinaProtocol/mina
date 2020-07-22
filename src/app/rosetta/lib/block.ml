@@ -737,7 +737,7 @@ WITH RECURSIVE chain AS (
           ; token= Unsigned.UInt64.of_int64 ic.token
           ; hash= ic.hash } )
     in
-    let%bind user_commands =
+    let%map user_commands =
       M.List.map raw_user_commands ~f:(fun (_, uc, extras) ->
           let open M.Let_syntax in
           let%bind kind =
@@ -813,11 +813,9 @@ WITH RECURSIVE chain AS (
           ; hash= uc.hash
           ; failure_status= Some failure_status } )
     in
-    let%map creator = load_pk "block" raw_block.creator_id in
     { Block_info.block_identifier=
         { Block_identifier.index= Int64.of_int raw_block.height
         ; hash= raw_block.state_hash }
-    ; creator
     ; parent_block_identifier=
         { Block_identifier.index= Int64.of_int raw_parent_block.height
         ; hash= raw_parent_block.state_hash }
