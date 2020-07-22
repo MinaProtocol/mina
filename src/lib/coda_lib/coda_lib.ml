@@ -488,7 +488,9 @@ let get_inferred_nonce_from_transaction_pool_and_ledger t
   let txn_pool_nonce =
     let nonces =
       List.map pooled_transactions
-        ~f:(Fn.compose User_command.nonce User_command.forget_check)
+        ~f:
+          (Fn.compose User_command.nonce
+             Transaction_hash.User_command_with_valid_signature.command)
     in
     (* The last nonce gives us the maximum nonce in the transaction pool *)
     List.last nonces

@@ -27,7 +27,7 @@
     one_or_two
     o1trace
     outside_hash_image
-    ppx_version
+    ppx_version.runtime
     quickcheck_lib
     random_oracle
     rocksdb
@@ -43,6 +43,7 @@
     trust_system
     unsigned_extended
     visualization
+    with_hash
     yojson
     )
  (preprocessor_deps ../../config.mlh)

@@ -19,9 +19,7 @@ let main () =
   let%bind testnet =
     Coda_worker_testnet.test ~name logger num_block_producers Option.some
       snark_work_public_keys Cli_lib.Arg_type.Work_selection_method.Sequence
-      ~max_concurrent_connections:None
-      ~runtime_config:
-        (Genesis_ledger_helper.extract_runtime_config precomputed_values)
+      ~max_concurrent_connections:None ~precomputed_values
   in
   Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "Started test net" ;
   (* keep CI alive *)

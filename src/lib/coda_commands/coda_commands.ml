@@ -389,11 +389,10 @@ module For_tests = struct
       Coda_lib.external_transition_database coda
     in
     let user_commands =
-      List.concat_map
-        ~f:
-          (Fn.compose
-             Auxiliary_database.Filtered_external_transition.user_commands
-             With_hash.data)
+      List.concat_map ~f:(fun transition ->
+          transition |> With_hash.data
+          |> Auxiliary_database.Filtered_external_transition.user_commands
+          |> List.map ~f:With_hash.data )
       @@ Auxiliary_database.External_transition_database.get_all_values
            external_transition_database (Some account_id)
     in
