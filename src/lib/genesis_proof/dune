@@ -7,5 +7,6 @@
    consensus
    keys_lib
    genesis_constants
+   runtime_config
    with_hash)
  (preprocess (pps ppx_version)))
