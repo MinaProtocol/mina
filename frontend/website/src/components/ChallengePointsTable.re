@@ -200,7 +200,7 @@ let make = (~releaseTitle, ~challenges) => {
             style([
               textAlign(`right),
               gridColumn(3, 4),
-              paddingRight(`rem(2.5)),
+              paddingRight(`rem(3.5)),
             ])
           )>
           {React.string("Points *")}
