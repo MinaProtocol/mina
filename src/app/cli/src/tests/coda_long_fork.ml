@@ -12,14 +12,14 @@ let main n waiting_time () =
   let logger = Logger.create () in
   let public_keys =
     List.map
-      (Lazy.force Test_genesis_ledger.accounts)
-      ~f:Test_genesis_ledger.pk_of_account_record
+      (Lazy.force (Precomputed_values.accounts precomputed_values))
+      ~f:Precomputed_values.pk_of_account_record
   in
   let snark_work_public_keys i = Some (List.nth_exn public_keys i) in
   let%bind testnet =
     Coda_worker_testnet.test ~name logger n Option.some snark_work_public_keys
       Cli_lib.Arg_type.Work_selection_method.Sequence
-      ~max_concurrent_connections:None
+      ~max_concurrent_connections:None ~precomputed_values
   in
   let epoch_duration =
     let block_window_duration_ms =

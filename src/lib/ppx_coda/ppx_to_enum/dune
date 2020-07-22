@@ -1,0 +1,6 @@
+(library
+ (name ppx_to_enum)
+ (public_name ppx_to_enum)
+ (kind ppx_deriver)
+ (libraries compiler-libs.common ppxlib)
+ (preprocess (pps ppxlib.metaquot)))

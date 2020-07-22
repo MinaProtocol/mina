@@ -12,7 +12,8 @@ module Make (Transaction : sig
 
   include Hashable.S with type t := t
 
-  val accounts_accessed : t -> Account_id.t list
+  val accounts_accessed :
+    next_available_token:Token_id.t -> t -> Account_id.t list
 end) (Time : sig
   type t [@@deriving bin_io, compare, sexp]
 
@@ -25,8 +26,13 @@ struct
   type t = {database: Database.t; pagination: Pagination.t; logger: Logger.t}
 
   let add_user_transaction (pagination : Pagination.t) (transaction, date) =
+    (* No source of truth for [next_available_token], so we stub it with
+       [invalid]. Token creation transactions can still be queried for a public
+       key by using the invalid token.
+    *)
     Pagination.add pagination
-      (Transaction.accounts_accessed transaction)
+      (Transaction.accounts_accessed ~next_available_token:Token_id.invalid
+         transaction)
       transaction transaction date
 
   let create ~logger directory =
@@ -58,8 +64,38 @@ struct
   let query {pagination; _} = Pagination.query pagination
 end
 
+module Transaction_with_hash = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type t =
+          ( (User_command.Stable.V1.t[@hash.ignore])
+          , (Transaction_hash.Stable.V1.t[@to_yojson
+                                           Transaction_hash.to_yojson]) )
+          With_hash.Stable.V1.t
+        [@@deriving sexp, compare, hash, to_yojson]
+      end
+
+      include T
+
+      let to_latest = Fn.id
+
+      let accounts_accessed ~next_available_token ({data; _} : t) =
+        User_command.accounts_accessed ~next_available_token data
+
+      include Comparable.Make (T)
+      include Hashable.Make (T)
+    end
+  end]
+
+  let create cmd =
+    {With_hash.data= cmd; hash= Transaction_hash.hash_user_command cmd}
+end
+
 module Block_time = Block_time
-module T = Make (User_command.Stable.V1) (Block_time.Time.Stable.V1)
+module T =
+  Make (Transaction_with_hash.Stable.Latest) (Block_time.Time.Stable.Latest)
 include T
 
 module For_tests = struct
@@ -100,9 +136,11 @@ module For_tests = struct
     in
     let payment_gen =
       User_command.Gen.payment ~key_gen ~max_amount ~max_fee ()
+      |> Quickcheck.Generator.map ~f:Transaction_with_hash.create
     in
     let delegation_gen =
       User_command.Gen.stake_delegation ~key_gen ~max_fee ()
+      |> Quickcheck.Generator.map ~f:Transaction_with_hash.create
     in
     let command_gen =
       Quickcheck.Generator.weighted_union
@@ -137,12 +175,14 @@ module For_tests = struct
         in
         let%bind delegation_with_time =
           tuple2
-            (User_command.Gen.stake_delegation ~key_gen ~max_fee ())
+            ( User_command.Gen.stake_delegation ~key_gen ~max_fee ()
+            |> Quickcheck.Generator.map ~f:Transaction_with_hash.create )
             time_gen
         in
         let%map payment_with_time =
           tuple2
-            (User_command.Gen.payment ~key_gen ~max_amount ~max_fee ())
+            ( User_command.Gen.payment ~key_gen ~max_amount ~max_fee ()
+            |> Quickcheck.Generator.map ~f:Transaction_with_hash.create )
             time_gen
         in
         [payment_with_time; delegation_with_time]

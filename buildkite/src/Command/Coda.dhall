@@ -6,6 +6,7 @@ let Map = Prelude.Map
 
 let Cmd = ../Lib/Cmds.dhall
 let Docker = ./Docker/Type.dhall
+let Summon = ./Summon/Type.dhall
 let Base = ./Base.dhall
 
 let Size = ./Size.dhall

@@ -17,6 +17,10 @@ let construct_staged_ledger_at_root
     External_transition.Validated.blockchain_state root_transition
     |> Blockchain_state.snarked_ledger_hash
   in
+  let snarked_next_available_token =
+    External_transition.Validated.blockchain_state root_transition
+    |> Blockchain_state.snarked_next_available_token
+  in
   let scan_state = scan_state root in
   let pending_coinbase = pending_coinbase root in
   let protocol_states_map =
@@ -48,24 +52,31 @@ let construct_staged_ledger_at_root
   in
   let mask = Ledger.of_database root_ledger in
   let%bind () =
-    Deferred.return
-      (List.fold transactions_with_protocol_state ~init:(Or_error.return ())
-         ~f:(fun acc (txn, protocol_state) ->
-           let open Or_error.Let_syntax in
-           let%bind () = acc in
-           let%map _ =
+    Deferred.Or_error.List.iter transactions_with_protocol_state
+      ~f:(fun (txn, protocol_state) ->
+        Deferred.return
+        @@ let%bind.Or_error.Let_syntax txn_with_info =
              Ledger.apply_transaction
                ~constraint_constants:precomputed_values.constraint_constants
                mask
                ~txn_global_slot:
                  ( Protocol_state.consensus_state protocol_state
                  |> Consensus.Data.Consensus_state.curr_global_slot )
-               txn
+               txn.data
            in
-           () ))
+           let computed_status =
+             Ledger.Undo.user_command_status txn_with_info
+           in
+           if User_command_status.equal txn.status computed_status then
+             Or_error.return ()
+           else
+             Or_error.errorf
+               !"Mismatched user command status. Expected: %{sexp: \
+                 User_command_status.t} Got: %{sexp: User_command_status.t}"
+               txn.status computed_status )
   in
   Staged_ledger.of_scan_state_and_ledger_unchecked ~snarked_ledger_hash
-    ~ledger:mask ~scan_state
+    ~snarked_next_available_token ~ledger:mask ~scan_state
     ~constraint_constants:precomputed_values.constraint_constants
     ~pending_coinbase_collection:pending_coinbase
 

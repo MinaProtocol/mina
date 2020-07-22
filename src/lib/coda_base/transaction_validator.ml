@@ -2,7 +2,9 @@ open Base
 
 module Hashless_ledger = struct
   type t =
-    {base: Ledger.t; overlay: (Account.Identifier.t, Account.t) Hashtbl.t}
+    { base: Ledger.t
+    ; overlay: (Account.Identifier.t, Account.t) Hashtbl.t
+    ; mutable next_available_token: Token_id.t }
 
   type location = Ours of Account.Identifier.t | Theirs of Ledger.Location.t
 
@@ -34,6 +36,8 @@ module Hashless_ledger = struct
           (Ledger.location_of_account t.base key)
 
   let set t loc acct =
+    if Token_id.(t.next_available_token <= Account.token acct) then
+      t.next_available_token <- Token_id.next (Account.token acct) ;
     match loc with
     | Ours key ->
         Hashtbl.set t.overlay ~key ~data:acct
@@ -64,12 +68,19 @@ module Hashless_ledger = struct
   (* Without undo validating that the hashes match, Transaction_logic doesn't really care what this is. *)
   let merkle_root _t = Ledger_hash.empty_hash
 
-  let create l = {base= l; overlay= Hashtbl.create (module Account_id)}
+  let create l =
+    { base= l
+    ; overlay= Hashtbl.create (module Account_id)
+    ; next_available_token= Ledger.next_available_token l }
 
   let with_ledger ~depth ~f =
     Ledger.with_ledger ~depth ~f:(fun l ->
         let t = create l in
         f t )
+
+  let next_available_token {next_available_token; _} = next_available_token
+
+  let set_next_available_token t tid = t.next_available_token <- tid
 end
 
 include Transaction_logic.Make (Hashless_ledger)
@@ -77,9 +88,10 @@ include Transaction_logic.Make (Hashless_ledger)
 let create = Hashless_ledger.create
 
 let apply_user_command ~constraint_constants ~txn_global_slot l uc =
-  Result.map ~f:(Fn.const ())
+  Result.map
+    ~f:(fun undo -> undo.Undo.User_command_undo.common.user_command.status)
     (apply_user_command l ~constraint_constants ~txn_global_slot uc)
 
 let apply_transaction ~constraint_constants ~txn_global_slot l txn =
-  Result.map ~f:(Fn.const ())
+  Result.map ~f:Undo.user_command_status
     (apply_transaction l ~constraint_constants ~txn_global_slot txn)

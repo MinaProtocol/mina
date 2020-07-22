@@ -161,6 +161,12 @@ module Make_base (Inputs : Inputs_intf) :
 
     let token_owners (T ((module Base), t)) = Base.token_owners t
 
+    let next_available_token (T ((module Base), t)) =
+      Base.next_available_token t
+
+    let set_next_available_token (T ((module Base), t)) =
+      Base.set_next_available_token t
+
     let iteri (T ((module Base), t)) = Base.iteri t
 
     (* ignored_keys must be Base.Keys.Set.t, but that isn't necessarily the same as Keys.Set.t for the

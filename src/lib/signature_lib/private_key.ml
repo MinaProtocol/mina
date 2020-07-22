@@ -18,17 +18,9 @@ open Snark_params_nonconsensus
 [%%versioned_asserted
 module Stable = struct
   module V1 = struct
-    type t = Inner_curve.Scalar.t [@@deriving sexp]
+    type t = Inner_curve.Scalar.t
 
     let to_latest = Fn.id
-
-    let to_yojson t = `String (Inner_curve.Scalar.to_string t)
-
-    let of_yojson = function
-      | `String s ->
-          Ok (Inner_curve.Scalar.of_string s)
-      | _ ->
-          Error "Private_key.of_yojson expected `String"
 
     [%%ifdef
     consensus_mechanism]
@@ -60,7 +52,7 @@ module Stable = struct
           V1.gen
       in
       let known_good_digest = "4bbc6cd7832cfc67f0fe3abcd7f765df" in
-      Ppx_version.Serialization.check_serialization
+      Ppx_version_runtime.Serialization.check_serialization
         (module V1)
         pk known_good_digest
 
@@ -73,7 +65,7 @@ module Stable = struct
           V1.gen
       in
       let known_good_digest = "65c75a7d10b6ce193f0c0e296611a935" in
-      Ppx_version.Serialization.check_serialization
+      Ppx_version_runtime.Serialization.check_serialization
         (module V1)
         pk known_good_digest
 
@@ -86,7 +78,7 @@ module Stable = struct
   end
 end]
 
-type t = Stable.Latest.t [@@deriving yojson, sexp]
+type t = Stable.Latest.t
 
 [%%define_locally
 Stable.Latest.(gen)]
@@ -120,3 +112,19 @@ let to_base58_check t =
 let of_base58_check_exn s =
   let decoded = Base58_check.decode_exn s in
   decoded |> Bigstring.of_string |> of_bigstring_exn
+
+let sexp_of_t t = to_base58_check t |> Sexp.of_string
+
+let t_of_sexp sexp = Sexp.to_string sexp |> of_base58_check_exn
+
+let to_yojson t = `String (to_base58_check t)
+
+let of_yojson = function
+  | `String x -> (
+    try Ok (of_base58_check_exn x) with
+    | Failure str ->
+        Error str
+    | exn ->
+        Error ("Signature_lib.Private_key.of_yojson: " ^ Exn.to_string exn) )
+  | _ ->
+      Error "Signature_lib.Private_key.of_yojson: Expected a string"

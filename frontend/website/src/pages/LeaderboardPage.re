@@ -13,6 +13,7 @@ module Styles = {
       media(Theme.MediaQuery.notMobile, [flexDirection(`row)]),
       justifyContent(`spaceBetween),
       width(`percent(100.)),
+      marginTop(`rem(2.)),
     ]);
   let searchBar =
     style([
@@ -21,9 +22,8 @@ module Styles = {
       marginTop(`rem(3.)),
       media(
         Theme.MediaQuery.notMobile,
-        [marginTop(`zero), marginRight(`rem(1.))],
+        [marginTop(`zero), marginRight(`rem(1.)), width(`percent(48.))],
       ),
-      width(`percent(100.)),
     ]);
   let textField =
     style([
@@ -62,7 +62,7 @@ module Styles = {
         Theme.MediaQuery.tablet,
         [
           width(`percent(100.)),
-          maxWidth(`rem(27.)),
+          maxWidth(`rem(38.5)),
           marginRight(`rem(1.)),
         ],
       ),
@@ -74,11 +74,13 @@ module SearchBar = {
   [@react.component]
   let make = (~onUsernameEntered, ~username) => {
     <div className=Styles.searchBar>
-      <span className=Theme.H5.semiBold> {React.string("Find")} </span>
+      <span className=Theme.H5.semiBold>
+        {React.string("Find Participant")}
+      </span>
       <input
         type_="text"
         value=username
-        placeholder="SEARCH:"
+        placeholder="NAME"
         onChange={e => {
           let value = ReactEvent.Form.target(e)##value;
           onUsernameEntered(value);
@@ -90,16 +92,21 @@ module SearchBar = {
 };
 
 module ToggleButtons = {
-  module ToggleStyles = {
+  module Styles = {
     open Css;
 
     let flexColumn =
       style([
-        display(`flex),
-        flexDirection(`column),
-        justifyContent(`center),
-        height(`rem(4.5)),
-        media("(max-width: 960px)", [display(`none)]),
+        display(`none),
+        media(
+          Theme.MediaQuery.tablet,
+          [
+            display(`flex),
+            flexDirection(`column),
+            justifyContent(`center),
+            height(`rem(4.5)),
+          ],
+        ),
       ]);
 
     let buttonRow =
@@ -117,62 +124,91 @@ module ToggleButtons = {
       ]);
   };
 
-  let toggleLabels = [|
-    "All Participants",
-    "Genesis Members",
-    "Non-Genesis Members",
-  |];
-
   [@react.component]
-  let make = (~currentOption, ~onTogglePress) => {
+  let make = (~currentToggle, ~onTogglePress, ~toggleLabels) => {
     let renderToggleButtons = () => {
       toggleLabels
       |> Array.map(label => {
-           <ToggleButton currentOption onTogglePress label key=label />
+           <ToggleButton currentToggle onTogglePress label key=label />
          })
       |> React.array;
     };
 
-    <div className=ToggleStyles.flexColumn>
+    <div className=Styles.flexColumn>
       <h3 className=Theme.H5.semiBold> {React.string("View")} </h3>
       <Spacer height=0.5 />
-      <div className=ToggleStyles.buttonRow> {renderToggleButtons()} </div>
+      <div className=Styles.buttonRow> {renderToggleButtons()} </div>
+    </div>;
+  };
+};
+
+module FilterDropdown = {
+  module Styles = {
+    open Css;
+    let flexColumn =
+      style([
+        display(`flex),
+        flexDirection(`column),
+        justifyContent(`center),
+        height(`rem(4.5)),
+        width(`percent(100.)),
+        marginTop(`rem(2.0)),
+        media(Theme.MediaQuery.tablet, [display(`none)]),
+        media(
+          Theme.MediaQuery.notMobile,
+          [width(`percent(48.)), marginTop(`zero)],
+        ),
+      ]);
+  };
+
+  [@react.component]
+  let make = (~currentFilter, ~onFilterPress, ~filterLabels) => {
+    <div className=Styles.flexColumn>
+      <h3 className=Theme.H5.semiBold> {React.string("View")} </h3>
+      <Spacer height=0.5 />
+      <Dropdown
+        items=filterLabels
+        currentItem=currentFilter
+        onItemPress=onFilterPress
+      />
     </div>;
   };
 };
 
 type state = {
-  currentOption: string,
+  currentToggle: Leaderboard.Toggle.t,
+  currentFilter: Leaderboard.Filter.t,
   username: string,
 };
-let initialState = {
-  currentOption: ToggleButtons.toggleLabels[0],
-  username: "",
-};
+
+let initialState = {currentToggle: All, currentFilter: Release, username: ""};
 
 type action =
-  | Toggled(string)
+  | Toggled(Leaderboard.Toggle.t)
+  | Filtered(Leaderboard.Filter.t)
   | UsernameEntered(string);
 
-let reducer = (previousState, action) => {
+let reducer = (prevState, action) => {
   switch (action) {
-  | Toggled(option) => {
-      currentOption: option,
-      username: previousState.username,
-    }
-  | UsernameEntered(input) => {
-      currentOption: previousState.currentOption,
-      username: input,
-    }
+  | Toggled(toggle) => {...prevState, currentToggle: toggle}
+  | Filtered(filter) => {...prevState, currentFilter: filter}
+  | UsernameEntered(input) => {...prevState, username: input}
   };
 };
 
 [@react.component]
 let make = (~lastManualUpdatedDate) => {
+  open Leaderboard.Toggle;
+  open Leaderboard.Filter;
   let (state, dispatch) = React.useReducer(reducer, initialState);
-  let onTogglePress = s => {
-    dispatch(Toggled(s));
+  let onTogglePress = toggle => {
+    toggle->toggle_of_string->Toggled->dispatch;
   };
+
+  let onFilterPress = filter => {
+    filter->filter_of_string->Filtered->dispatch;
+  };
+
   let onUsernameEntered = username => {
     dispatch(UsernameEntered(username));
   };
@@ -182,8 +218,30 @@ let make = (~lastManualUpdatedDate) => {
       <div className=Styles.page> <Summary lastManualUpdatedDate /> </div>
       <div className=Styles.filters>
         <SearchBar onUsernameEntered username={state.username} />
-        <ToggleButtons currentOption={state.currentOption} onTogglePress />
+        <ToggleButtons
+          currentToggle={string_of_toggle(state.currentToggle)}
+          onTogglePress
+          toggleLabels={Array.map(
+            toggle => {string_of_toggle(toggle)},
+            toggles,
+          )}
+        />
+        <FilterDropdown
+          currentFilter={string_of_filter(state.currentFilter)}
+          onFilterPress
+          filterLabels={Array.map(
+            filter => {string_of_filter(filter)},
+            filters,
+          )}
+        />
       </div>
+      <Spacer height=1.5 />
+      <Leaderboard
+        search={state.username}
+        filter={state.currentFilter}
+        toggle={state.currentToggle}
+        onFilterPress
+      />
     </Wrapped>
   </Page>;
 };

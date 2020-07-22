@@ -3,11 +3,7 @@ open Ppxlib
 
 let deriver = "register_event"
 
-let hash name =
-  let open Digestif.SHA256 in
-  let ctx0 = init () in
-  let ctx1 = feed_string ctx0 name in
-  get ctx1 |> to_raw_string
+let digest s = Md5.digest_string s |> Md5.to_hex
 
 let check_interpolations ~loc msg label_names =
   match Ast_convenience.get_str msg with
@@ -99,7 +95,7 @@ let generate_loggers_and_parsers ~loc:_ ~path ty_ext msg_opt =
   in
   check_interpolations ~loc:msg_loc msg label_names ;
   let event_name = String.lowercase ctor in
-  let event_path = path ^ "." ^ event_name in
+  let event_path = path ^ "." ^ ctor in
   let split_path = String.split path ~on:'.' in
   let to_yojson = Ppx_deriving_yojson.ser_expr_of_typ in
   let of_yojson = Ppx_deriving_yojson.desu_expr_of_typ in
@@ -134,7 +130,7 @@ let generate_loggers_and_parsers ~loc:_ ~path ty_ext msg_opt =
   [ [%stri
       let ([%p pvar (event_name ^ "_structured_events_id")] :
             Structured_log_events.id) =
-        Structured_log_events.id_of_string [%e estring (hash event_path)]]
+        Structured_log_events.id_of_string [%e estring (digest event_path)]]
   ; [%stri
       let ([%p pvar (event_name ^ "_structured_events_repr")] :
             Structured_log_events.repr) =

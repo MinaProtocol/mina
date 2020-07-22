@@ -106,7 +106,7 @@ module Undo : sig
   module User_command_undo : sig
     module Common : sig
       type t = Undo.User_command_undo.Common.t =
-        { user_command: User_command.t
+        { user_command: User_command.t With_status.t
         ; previous_receipt_chain_hash: Receipt.Chain_hash.t
         ; fee_payer_timing: Account.Timing.t
         ; source_timing: Account.Timing.t option }
@@ -117,6 +117,9 @@ module Undo : sig
       type t = Undo.User_command_undo.Body.t =
         | Payment of {previous_empty_accounts: Account_id.t list}
         | Stake_delegation of {previous_delegate: Public_key.Compressed.t}
+        | Create_new_token of {created_token: Token_id.t}
+        | Create_token_account
+        | Mint_tokens
         | Failed
       [@@deriving sexp]
     end
@@ -148,7 +151,9 @@ module Undo : sig
   type t = Undo.t = {previous_hash: Ledger_hash.t; varying: Varying.t}
   [@@deriving sexp]
 
-  val transaction : t -> Transaction.t Or_error.t
+  val transaction : t -> Transaction.t With_status.t Or_error.t
+
+  val user_command_status : t -> User_command_status.t
 end
 
 val create_new_account_exn : t -> Account_id.t -> Account.t -> unit
@@ -178,7 +183,7 @@ val merkle_root_after_user_command_exn :
   -> txn_global_slot:Coda_numbers.Global_slot.t
   -> t
   -> User_command.With_valid_signature.t
-  -> Ledger_hash.t
+  -> Ledger_hash.t * [`Next_available_token of Token_id.t]
 
 val create_empty : t -> Account_id.t -> Path.t * Account.t
 

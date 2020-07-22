@@ -71,6 +71,8 @@ module Make_statement_scanner
     -> error_prefix:string
     -> ledger_hash_end:Frozen_ledger_hash.t
     -> ledger_hash_begin:Frozen_ledger_hash.t option
+    -> next_available_token_before:Token_id.t
+    -> next_available_token_after:Token_id.t
     -> (unit, Error.t) result M.t
 end
 
@@ -94,12 +96,15 @@ val fill_work_and_enqueue_transactions :
      t
   -> Transaction_with_witness.t list
   -> Transaction_snark_work.t list
-  -> ((Ledger_proof.t * (Transaction.t * State_hash.t) list) option * t)
+  -> ( (Ledger_proof.t * (Transaction.t With_status.t * State_hash.t) list)
+       option
+     * t )
      Or_error.t
 
 val latest_ledger_proof :
      t
-  -> (Ledger_proof_with_sok_message.t * (Transaction.t * State_hash.t) list)
+  -> ( Ledger_proof_with_sok_message.t
+     * (Transaction.t With_status.t * State_hash.t) list )
      option
 
 val free_space : t -> int
@@ -111,13 +116,14 @@ val hash : t -> Staged_ledger_hash.Aux_hash.t
 val target_merkle_root : t -> Frozen_ledger_hash.t option
 
 (** All the transactions in the order in which they were applied*)
-val staged_transactions : t -> Transaction.t list Or_error.t
+val staged_transactions : t -> Transaction.t With_status.t list Or_error.t
 
 (** All the transactions with parent protocol state of the block in which they were included in the order in which they were applied*)
 val staged_transactions_with_protocol_states :
      t
   -> get_state:(State_hash.t -> Coda_state.Protocol_state.value Or_error.t)
-  -> (Transaction.t * Coda_state.Protocol_state.value) list Or_error.t
+  -> (Transaction.t With_status.t * Coda_state.Protocol_state.value) list
+     Or_error.t
 
 (** Available space and the corresponding required work-count in one and/or two trees (if the slots to be occupied are in two different trees)*)
 val partition_if_overflowing : t -> Space_partition.t

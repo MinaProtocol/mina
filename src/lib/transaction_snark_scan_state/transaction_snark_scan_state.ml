@@ -186,15 +186,25 @@ let create_expected_statement ~constraint_constants
     Frozen_ledger_hash.of_ledger_hash
     @@ Sparse_ledger.merkle_root ledger_witness
   in
-  let%bind transaction = Ledger.Undo.transaction transaction_with_info in
+  let next_available_token_before =
+    Sparse_ledger.next_available_token ledger_witness
+  in
+  let%bind {data= transaction; status= _} =
+    Ledger.Undo.transaction transaction_with_info
+  in
+  let txn_global_slot =
+    (* TODO: Get from protocol state. *)
+    Coda_numbers.Global_slot.zero
+  in
   let%bind after =
     Or_error.try_with (fun () ->
         Sparse_ledger.apply_transaction_exn ~constraint_constants
-          ledger_witness transaction )
+          ~txn_global_slot ledger_witness transaction )
   in
   let target =
     Frozen_ledger_hash.of_ledger_hash @@ Sparse_ledger.merkle_root after
   in
+  let next_available_token_after = Sparse_ledger.next_available_token after in
   let%bind pending_coinbase_before =
     match init_stack with
     | Base source ->
@@ -220,11 +230,14 @@ let create_expected_statement ~constraint_constants
   { Transaction_snark.Statement.source
   ; target
   ; fee_excess
+  ; next_available_token_before
+  ; next_available_token_after
   ; supply_increase
   ; pending_coinbase_stack_state=
       { statement.pending_coinbase_stack_state with
         target= pending_coinbase_after }
-  ; proof_type= `Base }
+  ; proof_type= `Base
+  ; sok_digest= () }
 
 let completed_work_to_scanable_work (job : job) (fee, current_proof, prover) :
     'a Or_error.t =
@@ -247,16 +260,27 @@ let completed_work_to_scanable_work (job : job) (fee, current_proof, prover) :
             s'.pending_coinbase_stack_state.source
         then Ok ()
         else Or_error.error_string "Invalid pending coinbase stack state"
+      and () =
+        if
+          Token_id.equal s.next_available_token_after
+            s'.next_available_token_before
+        then Ok ()
+        else
+          Or_error.error_string
+            "Statements have incompatible next_available_token state"
       in
-      let statement =
-        { Transaction_snark.Statement.source= s.source
+      let statement : Transaction_snark.Statement.t =
+        { source= s.source
         ; target= s'.target
         ; supply_increase
         ; pending_coinbase_stack_state=
             { source= s.pending_coinbase_stack_state.source
             ; target= s'.pending_coinbase_stack_state.target }
         ; fee_excess
-        ; proof_type= `Merge }
+        ; next_available_token_before= s.next_available_token_before
+        ; next_available_token_after= s'.next_available_token_after
+        ; proof_type= `Merge
+        ; sok_digest= () }
       in
       ( Ledger_proof.create ~statement ~sok_digest ~proof
       , Sok_message.create ~fee ~prover )
@@ -376,7 +400,9 @@ struct
 
   let check_invariants t ~constraint_constants ~verifier ~error_prefix
       ~ledger_hash_end:current_ledger_hash
-      ~ledger_hash_begin:snarked_ledger_hash =
+      ~ledger_hash_begin:snarked_ledger_hash
+      ~next_available_token_before:next_tkn1
+      ~next_available_token_after:next_tkn2 =
     let clarify_error cond err =
       if not cond then Or_error.errorf "%s : %s" error_prefix err else Ok ()
     in
@@ -394,9 +420,12 @@ struct
         { fee_excess= {fee_token_l; fee_excess_l; fee_token_r; fee_excess_r}
         ; source
         ; target
+        ; next_available_token_before
+        ; next_available_token_after
         ; supply_increase= _
         ; pending_coinbase_stack_state= _ (*TODO: check pending coinbases?*)
-        ; proof_type= _ } ->
+        ; proof_type= _
+        ; sok_digest= () } ->
         let open Or_error.Let_syntax in
         let%map () =
           Option.value_map ~default:(Ok ()) snarked_ledger_hash ~f:(fun hash ->
@@ -423,6 +452,14 @@ struct
           clarify_error
             (Token_id.equal Token_id.default fee_token_r)
             "nondefault fee token"
+        and () =
+          clarify_error
+            Token_id.(next_available_token_before = next_tkn1)
+            "next available token before does not match"
+        and () =
+          clarify_error
+            Token_id.(next_available_token_after = next_tkn2)
+            "next available token after does not match"
         in
         ()
 end
@@ -457,15 +494,24 @@ let statement_of_job : job -> Transaction_snark.Statement.t option = function
             None
       and supply_increase =
         Currency.Amount.add stmt1.supply_increase stmt2.supply_increase
+      and () =
+        Option.some_if
+          (Token_id.equal stmt1.next_available_token_after
+             stmt2.next_available_token_before)
+          ()
       in
-      { Transaction_snark.Statement.source= stmt1.source
-      ; target= stmt2.target
-      ; supply_increase
-      ; pending_coinbase_stack_state=
-          { source= stmt1.pending_coinbase_stack_state.source
-          ; target= stmt2.pending_coinbase_stack_state.target }
-      ; fee_excess
-      ; proof_type= `Merge }
+      ( { source= stmt1.source
+        ; target= stmt2.target
+        ; supply_increase
+        ; pending_coinbase_stack_state=
+            { source= stmt1.pending_coinbase_stack_state.source
+            ; target= stmt2.pending_coinbase_stack_state.target }
+        ; fee_excess
+        ; next_available_token_before= stmt1.next_available_token_before
+        ; next_available_token_after= stmt2.next_available_token_after
+        ; proof_type= `Merge
+        ; sok_digest= () }
+        : Transaction_snark.Statement.t )
 
 let create ~work_delay ~transaction_capacity_log_2 =
   let k = Int.pow 2 transaction_capacity_log_2 in
@@ -619,7 +665,9 @@ let all_work_pairs t
         , state_hash
         , ledger_witness
         , init_stack ) ->
-        let%bind transaction = Ledger.Undo.transaction transaction_with_info in
+        let%bind {data= transaction; status} =
+          Ledger.Undo.transaction transaction_with_info
+        in
         let%bind protocol_state_body =
           let%map state = get_state (fst state_hash) in
           Coda_state.Protocol_state.body state
@@ -636,7 +684,8 @@ let all_work_pairs t
           , transaction
           , { Transaction_witness.ledger= ledger_witness
             ; protocol_state_body
-            ; init_stack } )
+            ; init_stack
+            ; status } )
     | Second (p1, p2) ->
         let%map merged =
           Transaction_snark.Statement.merge
