@@ -89,7 +89,7 @@ defmodule Architecture.Statistic do
     def update(server), do: GenServer.call(server, :update)
 
     @impl true
-    def init({params,spec}) do
+    def init(params) do
       Logger.metadata(context: __MODULE__)
       Logger.info("subscribing to providers", process_module: __MODULE__)
       Enum.each(params.mod.providers(),
@@ -103,27 +103,8 @@ defmodule Architecture.Statistic do
 	      raise "#{provider} must be an instance of either Log_provider or Statistic"
 	  end
 	end)
-      run(spec)
-    end
-
-    @spec run(Statistic.Spec.t()) :: nil
-    def run(spec) do
-      Subscription.pull_and_process(spec.conn, spec.subscription, &handle_message/1)
-      run(spec)
-    end
-
-    @spec handle_message(map) :: :ok
-    def handle_message(message) do
-      resource =
-        try do
-          # TODO: implement dynamic resource classification
-          Coda.ResourceClassifier.classify_resource(message)
-        rescue
-          e ->
-            Logger.error("failed to classify resource")
-            reraise e, __STACKTRACE__
-        end
-      Statistic.Junction.broadcast(__MODULE__, resource, message)
+      state = params.mod.init(params.resource)
+      {:ok, {params,state}}
     end
 
     @impl true
