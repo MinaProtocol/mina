@@ -8,7 +8,11 @@ module Transactions = struct
   module Stable = struct
     module V1 = struct
       type t =
-        { user_commands: User_command.Stable.V1.t list
+        { user_commands:
+            ( User_command.Stable.V1.t
+            , Transaction_hash.Stable.V1.t )
+            With_hash.Stable.V1.t
+            list
         ; fee_transfers: Fee_transfer.Single.Stable.V1.t list
         ; coinbase: Currency.Amount.Stable.V1.t
         ; coinbase_receiver: Public_key.Compressed.Stable.V1.t option }
@@ -18,7 +22,7 @@ module Transactions = struct
   end]
 
   type t = Stable.Latest.t =
-    { user_commands: User_command.t list
+    { user_commands: (User_command.t, Transaction_hash.t) With_hash.t list
     ; fee_transfers: Fee_transfer.Single.t list
     ; coinbase: Currency.Amount.t
     ; coinbase_receiver: Public_key.Compressed.t option }
@@ -70,11 +74,12 @@ let participants ~next_available_token
   let _next_available_token, user_command_set =
     List.fold user_commands ~init:(next_available_token, empty)
       ~f:(fun (next_available_token, set) user_command ->
-        ( User_command.next_available_token user_command next_available_token
+        ( User_command.next_available_token user_command.data
+            next_available_token
         , union set
             ( of_list
             @@ User_command.accounts_accessed ~next_available_token
-                 user_command ) ) )
+                 user_command.data ) ) )
   in
   let fee_transfer_participants =
     List.fold fee_transfers ~init:empty ~f:(fun set ft ->
@@ -92,7 +97,7 @@ let participant_pks
         union set @@ of_list
         @@ List.map ~f:Account_id.public_key
         @@ User_command.accounts_accessed
-             ~next_available_token:Token_id.invalid user_command )
+             ~next_available_token:Token_id.invalid user_command.data )
   in
   let fee_transfer_participants =
     List.fold fee_transfers ~init:empty ~f:(fun set ft ->
@@ -155,7 +160,10 @@ let of_transition external_transition tracked_participants
                 (* Should include this command. *)
                 ( { acc_transactions with
                     user_commands=
-                      user_command :: acc_transactions.user_commands }
+                      { With_hash.data= user_command
+                      ; hash= Transaction_hash.hash_user_command user_command
+                      }
+                      :: acc_transactions.user_commands }
                 , User_command.next_available_token user_command
                     next_available_token ) )
         | {data= Fee_transfer fee_transfer; _} ->
