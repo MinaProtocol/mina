@@ -54,7 +54,6 @@ module Styles = {
       flexDirection(`column),
       width(`percent(100.)),
       marginBottom(`rem(1.5)),
-      maxWidth(`rem(58.)),
     ]);
 
   let leaderboardCopy =
@@ -222,6 +221,8 @@ module Styles = {
     merge([header, style([maxWidth(`px(500)), textAlign(`left)])]);
   let disclaimer =
     merge([Theme.Body.small, style([color(Theme.Colors.midnight)])]);
+
+  let leaderboardLink = style([textDecoration(`none)]);
 };
 
 module Section = {
@@ -339,10 +340,7 @@ let make = (~challenges as _, ~testnetName as _) => {
               {React.string("Testnet Leaderboard")}
             </h1>
             // href="https://testnet-points-frontend-dot-o1labs-192920.appspot.com/"
-            <a
-              href="https://bit.ly/TestnetLeaderboard"
-              target="_blank"
-              className=Styles.headerLink>
+            <a href="/leaderboard" className=Styles.headerLink>
               {React.string({j|View Full Leaderboard\u00A0→|j})}
             </a>
           </div>
@@ -363,7 +361,9 @@ let make = (~challenges as _, ~testnetName as _) => {
                  )}
               </p>
             </span>
-            <Leaderboard />
+            <a href="/leaderboard" className=Styles.leaderboardLink>
+              <Leaderboard interactive=false />
+            </a>
           </div>
         </Section>
         <hr />
@@ -372,10 +372,7 @@ let make = (~challenges as _, ~testnetName as _) => {
             <h1 className=Theme.H1.hero>
               {React.string("Network Dashboard")}
             </h1>
-            <a
-              href="https://o1testnet.grafana.net/d/Rgo87HhWz/block-producer-dashboard?orgId=1"
-              target="_blank"
-              className=Styles.headerLink>
+            <a href="/leaderboard" className=Styles.headerLink>
               {React.string({j|View Full Dashboard\u00A0→|j})}
             </a>
           </div>
