@@ -171,8 +171,9 @@ WORKDIR $HOME/$CODA_DIR
 
 # TODO: handle this opam work without cloning the full repository (directly pull src/opam.export)
 # All our ocaml packages
-RUN opam switch import src/opam.export --strict -y \
-  && opam clean --unused-repositories --logs -csy
+RUN opam switch import src/opam.export --strict -y
+  #&& opam clean --logs -csy --unused-repositories
+
 
 ENV OPAMYES 1
 
@@ -184,8 +185,8 @@ RUN eval $(opam config env) \
   && opam pin add src/external/digestif \
   && opam pin add src/external/async_kernel \
   && opam pin add src/external/coda_base58 \
-  && opam pin add src/external/graphql_ppx \
-  && opam clean --unused-repositories --logs -cs
+  && opam pin add src/external/graphql_ppx
+  #&& opam clean --logs -csy --unused-repositories
   #&& rm -rf src/external
 
 #################################################################################################
@@ -247,6 +248,7 @@ RUN apt-get -y update \
     libffi6 \
     libgmp10 \
     libgomp1 \
+    libjemalloc-dev \
     libssl1.1 \
     postgresql \
     postgresql-contrib \
@@ -285,4 +287,6 @@ RUN pg_dropcluster --stop 11 main \
 ENV USER pguser
 USER root
 
-ENTRYPOINT ["bash", "/app/rosetta/start.sh"]
+WORKDIR /app/rosetta
+
+ENTRYPOINT ["bash", "./start.sh"]

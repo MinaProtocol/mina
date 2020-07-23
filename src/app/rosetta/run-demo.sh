@@ -3,6 +3,7 @@
 set -e
 
 BIN=../../../_build/default/src/app/cli/src/coda.exe
+BIN=/coda-bin/cli/src/coda.exe
 PK=ZsMSUuKL9zLAF7sMn951oakTFRCCDw9rDfJgqJ55VMtPXaPa5vPwntQRFJzsHyeh8R8
 
 genesis_time=$(date -d '2019-01-30 20:00:00.000000Z' '+%s')
