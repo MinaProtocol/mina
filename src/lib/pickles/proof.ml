@@ -90,7 +90,8 @@ let dummy (type w h r) (w : w Nat.t) (h : h Nat.t)
                 ; combined_inner_product= tick ()
                 ; b= tick ()
                 ; which_branch= Option.value_exn (Index.of_int 0)
-                ; bulletproof_challenges= Dummy.Ipa.Step.challenges
+                ; bulletproof_challenges=
+                    Dummy.Ipa.Step.challenges (* TODO: Should this be step? *)
                 ; marlin=
                     { sigma_2= tick ()
                     ; sigma_3= tick ()
@@ -114,6 +115,7 @@ let dummy (type w h r) (w : w Nat.t) (h : h Nat.t)
                 (* Not sure if this should be w or h honestly ...*)
                 Vector.init most_recent_width ~f:(fun _ ->
                     Dummy.Ipa.Step.challenges )
+                (* TODO: Should this be wrap? *)
             ; sg=
                 Vector.init most_recent_width ~f:(fun _ ->
                     Lazy.force Dummy.Ipa.Wrap.sg ) } }

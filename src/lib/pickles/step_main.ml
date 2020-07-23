@@ -112,6 +112,19 @@ let step_main
     let open Impls.Step in
     with_label "step_main" (fun () ->
         let T = Max_branching.eq in
+        (*
+        let me_only =
+          with_label "me_only" (fun () ->
+              exists
+                ~request:(fun () -> Req.Me_only)
+                (Types.Pairing_based.Proof_state.Me_only.typ
+                   (Typ.array Inner_curve.typ
+                      ~length:(index_commitment_length basic.wrap_domains.k))
+                   Inner_curve.typ basic.typ 
+                   (* Not sure about this... *)
+                   (Vector.typ Field.typ Rounds.n)
+                   Max_branching.n) )
+        in *)
         let dlog_marlin_index =
           exists
             ~request:(fun () -> Req.Wrap_index)

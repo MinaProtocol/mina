@@ -13,23 +13,13 @@ module type Vector = sig
 
   include Type_with_delete
 
-  val typ : t Ctypes.typ
-
-  val create_without_finaliser : unit -> t
+  val create : unit -> t
 
   val emplace_back : t -> elt -> unit
 
   val length : t -> int
 
-  val get_without_finaliser : t -> int -> elt
-end
-
-module type Vector_with_gc = sig
-  include Vector
-
   val get : t -> int -> elt
-
-  val create : unit -> t
 end
 
 module type Triple = sig
@@ -47,11 +37,11 @@ end
 module type Pair = sig
   type elt
 
-  include Type_with_delete
+  type t
 
   module Vector : Vector with type elt = t
 
-  val make_without_finaliser : elt -> elt -> t
+  val make : elt -> elt -> t
 
   val f0 : t -> elt
 

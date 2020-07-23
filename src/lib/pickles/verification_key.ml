@@ -59,13 +59,12 @@ let of_repr urs {Repr.commitments= c; step_domains; data= d} =
   let u = Unsigned.Size_t.of_int in
   let g = Zexe_backend.Tweedle.Fp_poly_comm.without_degree_bound_to_backend in
   let t =
-    Snarky_bn382.Tweedle.Dee.Field_verifier_index.make_without_finaliser
-      (u d.public_inputs) (u d.variables) (u d.constraints)
-      (u d.nonzero_entries) (u d.max_degree) urs (g c.row.a) (g c.col.a)
-      (g c.value.a) (g c.rc.a) (g c.row.b) (g c.col.b) (g c.value.b) (g c.rc.b)
-      (g c.row.c) (g c.col.c) (g c.value.c) (g c.rc.c)
+    Snarky_bn382.Tweedle.Dee.Field_verifier_index.make (u d.public_inputs)
+      (u d.variables) (u d.constraints) (u d.nonzero_entries) (u d.max_degree)
+      urs (g c.row.a) (g c.col.a) (g c.value.a) (g c.rc.a) (g c.row.b)
+      (g c.col.b) (g c.value.b) (g c.rc.b) (g c.row.c) (g c.col.c)
+      (g c.value.c) (g c.rc.c)
   in
-  Caml.Gc.finalise Snarky_bn382.Tweedle.Dee.Field_verifier_index.delete t ;
   {commitments= c; step_domains; data= d; index= t}
 
 include Binable.Of_binable
@@ -84,10 +83,6 @@ let dummy =
   let lengths = Commitment_lengths.of_domains Common.wrap_domains in
   let g = Dee.(to_affine_exn one) in
   let e = Abc.map lengths.row ~f:(fun len -> Array.create ~len g) in
-  let dummy_urs =
-    Snarky_bn382.Tweedle.Dee.Field_urs.create_without_finaliser
-      Unsigned.Size_t.one
-  in
   { Repr.commitments= {row= e; col= e; value= e; rc= e}
   ; step_domains= [||]
   ; data=
@@ -96,4 +91,4 @@ let dummy =
       ; constraints= 0
       ; nonzero_entries= 0
       ; max_degree= 0 } }
-  |> of_repr dummy_urs
+  |> of_repr (Snarky_bn382.Tweedle.Dee.Field_urs.create Unsigned.Size_t.one)

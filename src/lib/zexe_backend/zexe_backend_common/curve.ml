@@ -19,11 +19,11 @@ module type Input_intf = sig
 
     val is_zero : t -> bool
 
-    val create_without_finaliser : BaseField.t -> BaseField.t -> t
+    val create : BaseField.t -> BaseField.t -> t
 
     val delete : t -> unit
 
-    module Vector : Intf.Vector with type elt = t
+    module Vector : Snarky.Vector.S with type elt = t
 
     module Pair : Intf.Pair with type elt := t
   end
@@ -100,7 +100,7 @@ struct
     include Stable.Latest
 
     let to_backend (x, y) =
-      let t = C.Affine.create_without_finaliser x y in
+      let t = C.Affine.create x y in
       Caml.Gc.finalise C.Affine.delete t ;
       t
 

@@ -129,13 +129,8 @@ module Ipa = struct
           (Backend.Tock.Field.Vector.of_array
              (Vector.to_array (compute_challenges chals)))
       in
-      let input =
-        Backend.Tock.Curve.Affine.Backend.Vector.get_without_finaliser
-          (unshifted comm) 0
-      in
-      let res = Backend.Tock.Curve.Affine.of_backend input in
-      Backend.Tock.Curve.Affine.Backend.delete input ;
-      res
+      Backend.Tock.Curve.Affine.Backend.Vector.get (unshifted comm) 0
+      |> Backend.Tock.Curve.Affine.of_backend
   end
 
   module Step = struct
@@ -156,13 +151,8 @@ module Ipa = struct
           (Backend.Tick.Field.Vector.of_array
              (Vector.to_array (compute_challenges chals)))
       in
-      let input =
-        Backend.Tick.Curve.Affine.Backend.Vector.get_without_finaliser
-          (unshifted comm) 0
-      in
-      let res = Backend.Tick.Curve.Affine.of_backend input in
-      Backend.Tick.Curve.Affine.Backend.delete input ;
-      res
+      Backend.Tick.Curve.Affine.Backend.Vector.get (unshifted comm) 0
+      |> Backend.Tick.Curve.Affine.of_backend
 
     let accumulator_check comm_chals =
       let open Snarky_bn382.Tweedle.Dum.Field_poly_comm in
@@ -176,10 +166,9 @@ module Ipa = struct
       let comms =
         let open Backend.Tick.Curve.Affine in
         let open Backend.Vector in
-        let v = create_without_finaliser () in
+        let v = create () in
         List.iter comm_chals ~f:(fun (comm, _) ->
             emplace_back v (to_backend comm) ) ;
-        Caml.Gc.finalise delete v ;
         v
       in
       Snarky_bn382.Tweedle.Dum.Field_urs.batch_accumulator_check
