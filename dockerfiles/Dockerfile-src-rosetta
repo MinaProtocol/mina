@@ -15,6 +15,9 @@ ARG GO_VERSION=1.13.10
 # Rust Version passed into rustup-init, can also be "stable", "nightly" or similar
 ARG RUST_VERSION=1.43.0
 
+# Rocksdb commit tag/branch to clone
+ARG ROCKSDB_VERSION=v5.17.2
+
 # OS package dependencies
 # First add support for https and pkg-config for apt, then install everything else
 ENV DEBIAN_FRONTEND=noninteractive
@@ -84,6 +87,16 @@ RUN curl --proto '=https' --tlsv1.2 -sSf -o /tmp/rustup-init \
 # As opposed to introducing another shell script here (that mostly just determines the platform)
 # we just download the binary for the only platform we care about in this docker environment
 
+
+# This builds and installs just the rocksdb static lib for us, and cleans up after itself
+RUN git clone https://github.com/facebook/rocksdb \
+  --depth 1 --shallow-submodules \
+  -b "${ROCKSDB_VERSION}" /rocksdb && \
+  make -C /rocksdb static_lib PORTABLE=1 -j$(nproc) && \
+  cp /rocksdb/librocksdb.a /usr/local/lib/librocksdb_coda.a && \
+  rm -rf /rocksdb && \
+  sudo strip -S /usr/local/lib/librocksdb_coda.a
+
 ###########################################################################################
 # Initialize opam in a minimal fashion
 ###########################################################################################
@@ -137,7 +150,7 @@ FROM build-deps AS opam-deps
 ARG CODA_DIR=coda
 # branch to checkout on first clone (this will be the only availible branch in the container)
 # can also be a tagged release
-ARG CODA_BRANCH=rosetta/dockerfile
+ARG CODA_BRANCH=develop
 
 # location of external packages
 ARG EXTERNAL_PKG_DIR=$CODA_DIR/src/external
@@ -174,10 +187,6 @@ RUN eval $(opam config env) && \
   #&& \
   #rm -rf src/external
 
-# workaround a permissions problem in rpc_parallel .git
-# TODO: Does this issue still exist?
-#RUN sudo chmod -R u+rw ~/.opam && eval $(opam config env)
-
 #################################################################################################
 # The "builder" Stage
 # - builds coda and any other binaries required to run a node
@@ -186,14 +195,16 @@ RUN eval $(opam config env) && \
 FROM opam-deps AS builder
 
 ARG DUNE_PROFILE=testnet_postake_medium_curves
-ENV LIBP2P_NIXLESS 1
 
 # Set up environment again for running as opam user, to make sure its working properly
 #USER opam
 #ENV HOME /home/opam
 #WORKDIR ${HOME}/${CODA_DIR}
 
-RUN eval $(opam config env) && make build_pv_keys
+# don't keep sources, to force reinstall of pinned packages from Coda sources
+# and to keep Docker image reasonable size
+ENV OPAMKEEPBUILDDIR false
+ENV OPAMREUSEBUILDDIR false
 
 RUN cd src/app/libp2p_helper && \
    rm -rf result && \
@@ -201,16 +212,18 @@ RUN cd src/app/libp2p_helper && \
    cd src && \
    go mod download && \
    cd generate_methodidx && go build -o ../../result/bin/generate_methodidx && cd - && \
-   cd libp2p_helper && go build -o ../../result/bin/libp2p_helper
+   cd libp2p_helper && go build -o ../../result/bin/libp2p_helper && \
+   go clean --cache --modcache --testcache -r
 
-#RUN eval $(opam config env) && make build
 RUN eval $(opam config env) && \
-  dune build src/app/generate_keypair/generate_keypair.exe
-RUN eval $(opam config env) && \
-  dune exec --profile=${DUNE_PROFILE} \
-  src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe
-RUN eval $(opam config env) && \
-  dune exec --profile=${DUNE_PROFILE} \
-  src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -- \
-  --config-file genesis_ledgers/phase_three/config.json
+  dune build --profile=${DUNE_PROFILE} \
+  src/app/generate_keypair/generate_keypair.exe \
+  src/app/cli/src/coda.exe \
+  src/app/archive/archive.exe \
+  src/app/rosetta/rosetta.exe && \
+  dune cache trim --size=0B && \
+  opam clean --unused-repositories --logs -cs && \
+  rm -rf /tmp && \
+  rm -rf $HOME/.opam
+
 #RUN eval $(opam config env) && make deb
