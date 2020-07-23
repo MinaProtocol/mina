@@ -1,4 +1,4 @@
-[%%define ledger_depth 16]
+[%%define ledger_depth 15]
 [%%import "/src/config/curve/medium.mlh"]
 [%%import "/src/config/coinbase/realistic.mlh"]
 [%%import "/src/config/scan_state/point2tps.mlh"]
@@ -22,7 +22,7 @@
 
 [%%define genesis_ledger "testnet_postake"]
 
-[%%define genesis_state_timestamp "2020-07-22 22:40:00-07:00"]
+[%%define genesis_state_timestamp "2020-07-23 05:30:00-07:00"]
 [%%define block_window_duration 180000]
 
 [%%define integration_tests false]
