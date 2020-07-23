@@ -1570,8 +1570,8 @@ workflows:
     version: 2
     coda_parallel:
         when:
-            # We do seem to need a useless `or true` here
-            or:
+            # We do seem to need a useless `and true` here
+            and:
               - true
               - << pipeline.parameters.run-ci >>
         jobs:
