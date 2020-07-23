@@ -74,11 +74,6 @@ let add_and_finalize ~logger ~frontier ~catchup_scheduler
       in
       Coda_metrics.Block_latency.Inclusion_time.update
         (Block_time.Span.to_time_span time_elapsed) ) ;
-  Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-    ~metadata:
-      [ ( "external_transition"
-        , External_transition.Validated.to_yojson transition ) ]
-    "writing transition to processed transition writer" ;
   Writer.write processed_transition_writer
     (`Transition transition, `Source source) ;
   Catchup_scheduler.notify catchup_scheduler
@@ -325,12 +320,6 @@ let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
                    |> Protocol_state.blockchain_state
                    |> Blockchain_state.timestamp |> Block_time.to_time
                  in
-                 Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-                   ~metadata:
-                     [ ( "external_transition"
-                       , External_transition.Validated.to_yojson transition )
-                     ]
-                   "Produced transiton in processor" ;
                  Perf_histograms.add_span
                    ~name:"accepted_transition_local_latency"
                    (Core_kernel.Time.diff

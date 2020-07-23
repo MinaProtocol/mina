@@ -49,13 +49,9 @@ let start_transition_frontier_controller ~logger ~trust_system ~verifier
           ~producer_transition_reader ~clear_reader ~precomputed_values )
   in
   Strict_pipe.Reader.iter new_verified_transition_reader
-    ~f:(fun ((`Transition t, `Source _source) as transition) ->
-      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-        ~metadata:
-          [("external_transition", External_transition.Validated.to_yojson t)]
-        "writing transition to verified transition writer" ;
-      Deferred.return
-        (Strict_pipe.Writer.write verified_transition_writer transition) )
+    ~f:
+      (Fn.compose Deferred.return
+         (Strict_pipe.Writer.write verified_transition_writer))
   |> don't_wait_for
 
 let start_bootstrap_controller ~logger ~trust_system ~verifier ~network
