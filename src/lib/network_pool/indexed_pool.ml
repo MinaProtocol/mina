@@ -15,6 +15,7 @@ let replace_fee : Currency.Fee.t = Currency.Fee.of_int 5_000_000_000
 
 (* Invariants, maintained whenever a t is exposed from this module:
    * Iff a command is in all_by_fee it is also in all_by_sender.
+   * Iff a command is in all_by_fee it is also in all_by_hash.
    * Iff a command is at the head of its sender's queue it is also in
      applicable_by_fee.
    * Sequences in all_by_sender are ordered by nonce and "dense".
@@ -41,6 +42,9 @@ type t =
       Transaction_hash.User_command_with_valid_signature.Set.t
       Currency.Fee.Map.t
         (** All transactions in the pool indexed by fee. *)
+  ; all_by_hash:
+      Transaction_hash.User_command_with_valid_signature.t
+      Transaction_hash.Map.t
   ; size: int
   ; constraint_constants: Genesis_constants.Constraint_constants.t }
 [@@deriving sexp_of]
@@ -93,6 +97,7 @@ module For_tests = struct
    fun { applicable_by_fee
        ; all_by_sender
        ; all_by_fee
+       ; all_by_hash
        ; size
        ; constraint_constants } ->
     let assert_all_by_fee tx =
@@ -110,6 +115,11 @@ module For_tests = struct
                Transaction_hash.User_command_with_valid_signature.t }"
              tx
     in
+    let assert_all_by_hash tx =
+      [%test_eq: Transaction_hash.User_command_with_valid_signature.t] tx
+        (Map.find_exn all_by_hash
+           (Transaction_hash.User_command_with_valid_signature.hash tx))
+    in
     Map.iteri applicable_by_fee ~f:(fun ~key ~data ->
         Set.iter data ~f:(fun tx ->
             let unchecked =
@@ -122,7 +132,8 @@ module For_tests = struct
             in
             [%test_eq: Transaction_hash.User_command_with_valid_signature.t] tx
               tx' ;
-            assert_all_by_fee tx ) ) ;
+            assert_all_by_fee tx ;
+            assert_all_by_hash tx ) ) ;
     Map.iteri all_by_sender
       ~f:(fun ~key:fee_payer ~data:(tx_seq, currency_reserved) ->
         assert (F_sequence.length tx_seq > 0) ;
@@ -131,7 +142,8 @@ module For_tests = struct
             ( Transaction_hash.User_command_with_valid_signature.command tx
             |> User_command.fee_payer )
             fee_payer ;
-          assert_all_by_fee tx
+          assert_all_by_fee tx ;
+          assert_all_by_hash tx
         in
         let applicable, inapplicables =
           Option.value_exn (F_sequence.uncons tx_seq)
@@ -167,48 +179,54 @@ module For_tests = struct
             inapplicables
         in
         [%test_eq: Currency.Amount.t] currency_reserved currency_reserved' ) ;
+    let check_sender_applicable fee tx =
+      let unchecked =
+        Transaction_hash.User_command_with_valid_signature.command tx
+      in
+      [%test_eq: Currency.Fee.t] fee (User_command.fee unchecked) ;
+      let sender_txs, _currency_reserved =
+        Map.find_exn all_by_sender (User_command.fee_payer unchecked)
+      in
+      let applicable, _inapplicables =
+        Option.value_exn (F_sequence.uncons sender_txs)
+      in
+      assert (
+        Set.mem
+          (Map.find_exn applicable_by_fee
+             ( applicable
+             |> Transaction_hash.User_command_with_valid_signature.command
+             |> User_command.fee ))
+          applicable ) ;
+      let first_nonce =
+        applicable
+        |> Transaction_hash.User_command_with_valid_signature.command
+        |> User_command.nonce |> Account_nonce.to_int
+      in
+      let _split_l, split_r =
+        F_sequence.split_at sender_txs
+          (Account_nonce.to_int (User_command.nonce unchecked) - first_nonce)
+      in
+      let tx' = F_sequence.head_exn split_r in
+      [%test_eq: Transaction_hash.User_command_with_valid_signature.t] tx tx'
+    in
     Map.iteri all_by_fee ~f:(fun ~key:fee ~data:tx_set ->
         Set.iter tx_set ~f:(fun tx ->
-            let unchecked =
-              Transaction_hash.User_command_with_valid_signature.command tx
-            in
-            [%test_eq: Currency.Fee.t] fee (User_command.fee unchecked) ;
-            let sender_txs, _currency_reserved =
-              Map.find_exn all_by_sender (User_command.fee_payer unchecked)
-            in
-            let applicable, _inapplicables =
-              Option.value_exn (F_sequence.uncons sender_txs)
-            in
-            assert (
-              Set.mem
-                (Map.find_exn applicable_by_fee
-                   ( applicable
-                   |> Transaction_hash.User_command_with_valid_signature
-                      .command |> User_command.fee ))
-                applicable ) ;
-            let first_nonce =
-              applicable
-              |> Transaction_hash.User_command_with_valid_signature.command
-              |> User_command.nonce |> Account_nonce.to_int
-            in
-            let _split_l, split_r =
-              F_sequence.split_at sender_txs
-                ( Account_nonce.to_int (User_command.nonce unchecked)
-                - first_nonce )
-            in
-            let tx' = F_sequence.head_exn split_r in
-            [%test_eq: Transaction_hash.User_command_with_valid_signature.t] tx
-              tx' ) ) ;
-    [%test_eq: int]
-      (Map.fold all_by_fee ~init:0 ~f:(fun ~key:_ ~data:cmd_set acc ->
-           Set.length cmd_set + acc ))
-      size
+            check_sender_applicable fee tx ;
+            assert_all_by_hash tx ) ) ;
+    Map.iter all_by_hash ~f:(fun tx ->
+        check_sender_applicable
+          (User_command.fee
+             (Transaction_hash.User_command_with_valid_signature.command tx))
+          tx ;
+        assert_all_by_fee tx ) ;
+    [%test_eq: int] (Map.length all_by_hash) size
 end
 
 let empty ~constraint_constants : t =
   { applicable_by_fee= Currency.Fee.Map.empty
   ; all_by_sender= Account_id.Map.empty
   ; all_by_fee= Currency.Fee.Map.empty
+  ; all_by_hash= Transaction_hash.Map.empty
   ; size= 0
   ; constraint_constants }
 
@@ -220,15 +238,9 @@ let min_fee : t -> Currency.Fee.t option =
 let member : t -> Transaction_hash.User_command_with_valid_signature.t -> bool
     =
  fun t cmd ->
-  match
-    Map.find t.all_by_fee
-      ( Transaction_hash.User_command_with_valid_signature.command cmd
-      |> User_command.fee )
-  with
-  | None ->
-      false
-  | Some cmds_at_fee ->
-      Set.mem cmds_at_fee cmd
+  Option.is_some
+    (Map.find t.all_by_hash
+       (Transaction_hash.User_command_with_valid_signature.hash cmd))
 
 let all_from_account :
        t
@@ -239,11 +251,15 @@ let all_from_account :
     ~f:(fun (user_commands, _) ->
       Sequence.to_list @@ F_sequence.to_seq user_commands )
 
-let get_all {all_by_fee; _} :
+let get_all {all_by_hash; _} :
     Transaction_hash.User_command_with_valid_signature.t list =
-  Map.fold_right all_by_fee ~init:[] ~f:(fun ~key:_ ~data acc_txns ->
-      Set.fold_right data ~init:acc_txns ~f:(fun txn acc_txns ->
-          txn :: acc_txns ) )
+  Map.data all_by_hash
+
+let find_by_hash :
+       t
+    -> Transaction_hash.t
+    -> Transaction_hash.User_command_with_valid_signature.t option =
+ fun {all_by_hash; _} hash -> Map.find all_by_hash hash
 
 (* Remove a command from the applicable_by_fee field. This may break an
    invariant. *)
@@ -256,16 +272,21 @@ let remove_applicable_exn :
   in
   {t with applicable_by_fee= Map_set.remove_exn t.applicable_by_fee fee cmd}
 
-(* Remove a command from the all_by_fee field and decrement size. This may break
-   an invariant. *)
-let remove_all_by_fee_exn :
+(* Remove a command from the all_by_fee and all_by_hash fields, and decrement
+   size. This may break an invariant. *)
+let remove_all_by_fee_and_hash_exn :
     t -> Transaction_hash.User_command_with_valid_signature.t -> t =
  fun t cmd ->
   let fee =
     Transaction_hash.User_command_with_valid_signature.command cmd
     |> User_command.fee
   in
-  {t with all_by_fee= Map_set.remove_exn t.all_by_fee fee cmd; size= t.size - 1}
+  { t with
+    all_by_fee= Map_set.remove_exn t.all_by_fee fee cmd
+  ; all_by_hash=
+      Map.remove t.all_by_hash
+        (Transaction_hash.User_command_with_valid_signature.hash cmd)
+  ; size= t.size - 1 }
 
 (* Remove a given command from the pool, as well as any commands that depend on
    it. Called from revalidate and remove_lowest_fee, and when replacing
@@ -308,7 +329,7 @@ let remove_with_dependents_exn :
   in
   let t' =
     F_sequence.foldl
-      (fun acc cmd' -> remove_all_by_fee_exn acc cmd')
+      (fun acc cmd' -> remove_all_by_fee_and_hash_exn acc cmd')
       t drop_queue
   in
   ( F_sequence.to_seq drop_queue
@@ -412,8 +433,10 @@ let revalidate :
             let t'' =
               Sequence.fold tail
                 ~init:
-                  (remove_all_by_fee_exn (remove_applicable_exn t' head) head)
-                ~f:remove_all_by_fee_exn
+                  (remove_all_by_fee_and_hash_exn
+                     (remove_applicable_exn t' head)
+                     head)
+                ~f:remove_all_by_fee_and_hash_exn
             in
             ( { t'' with
                 all_by_sender=
@@ -466,7 +489,7 @@ let handle_committed_txn :
         let t1 =
           t
           |> Fn.flip remove_applicable_exn first_cmd
-          |> Fn.flip remove_all_by_fee_exn first_cmd
+          |> Fn.flip remove_all_by_fee_and_hash_exn first_cmd
         in
         let new_queued_cmds, currency_reserved'', dropped_cmds =
           drop_until_sufficient_balance ~constraint_constants
@@ -474,7 +497,7 @@ let handle_committed_txn :
             fee_payer_balance
         in
         let t2 =
-          Sequence.fold dropped_cmds ~init:t1 ~f:remove_all_by_fee_exn
+          Sequence.fold dropped_cmds ~init:t1 ~f:remove_all_by_fee_and_hash_exn
         in
         let set_all_by_sender account_id commands currency_reserved t =
           match F_sequence.uncons commands with
@@ -604,6 +627,11 @@ let rec add_from_gossip_exn :
               Map_set.insert
                 (module Transaction_hash.User_command_with_valid_signature)
                 t.all_by_fee fee cmd
+          ; all_by_hash=
+              Map.set t.all_by_hash
+                ~key:
+                  (Transaction_hash.User_command_with_valid_signature.hash cmd)
+                ~data:cmd
           ; size= t.size + 1
           ; constraint_constants }
         , Sequence.empty )
@@ -637,6 +665,12 @@ let rec add_from_gossip_exn :
                 Map_set.insert
                   (module Transaction_hash.User_command_with_valid_signature)
                   t.all_by_fee fee cmd
+            ; all_by_hash=
+                Map.set t.all_by_hash
+                  ~key:
+                    (Transaction_hash.User_command_with_valid_signature.hash
+                       cmd)
+                  ~data:cmd
             ; size= t.size + 1 }
           , Sequence.empty )
       else
@@ -735,6 +769,10 @@ let add_from_backtrack :
           Map_set.insert
             (module Transaction_hash.User_command_with_valid_signature)
             t.all_by_fee fee cmd
+      ; all_by_hash=
+          Map.set t.all_by_hash
+            ~key:(Transaction_hash.User_command_with_valid_signature.hash cmd)
+            ~data:cmd
       ; applicable_by_fee=
           Map_set.insert
             (module Transaction_hash.User_command_with_valid_signature)
@@ -767,6 +805,10 @@ let add_from_backtrack :
           Map_set.insert
             (module Transaction_hash.User_command_with_valid_signature)
             t'.all_by_fee fee cmd
+      ; all_by_hash=
+          Map.set t.all_by_hash
+            ~key:(Transaction_hash.User_command_with_valid_signature.hash cmd)
+            ~data:cmd
       ; all_by_sender=
           Map.set t'.all_by_sender ~key:fee_payer
             ~data:

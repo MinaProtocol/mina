@@ -16,7 +16,7 @@ type ( 'a_var
      t =
   | T :
       { branching: 'branching Nat.t * ('prev_vars, 'branching) Hlist.Length.t
-      ; index: int
+      ; index: Types.Index.t
       ; lte: ('branching, 'max_branching) Nat.Lte.t
       ; domains: Domains.t
       ; rule:
@@ -30,8 +30,8 @@ type ( 'a_var
       ; main:
              step_domains:(Domains.t, 'branches) Vector.t
           -> ( (Unfinalized.t, 'max_branching) Vector.t
-             , Impls.Pairing_based.Field.t
-             , (Impls.Pairing_based.Field.t, 'max_branching) Vector.t )
+             , Impls.Step.Field.t
+             , (Impls.Step.Field.t, 'max_branching) Vector.t )
              Types.Pairing_based.Statement.t
           -> unit
       ; requests:
@@ -56,9 +56,11 @@ let create
     (type branches max_branching local_signature local_branches a_var a_value
     prev_vars prev_values) ~index
     ~(self : (a_var, a_value, max_branching, branches) Tag.t) ~wrap_domains
-    ~(max_branching : max_branching Nat.t) ~(branches : branches Nat.t) ~typ
+    ~(max_branching : max_branching Nat.t)
+    ~(branchings : (int, branches) Vector.t) ~(branches : branches Nat.t) ~typ
     a_var_to_field_elements a_value_to_field_elements
     (rule : _ Inductive_rule.t) =
+  Timer.clock __LOC__ ;
   let module HT = H4.T (Tag) in
   let (T (self_width, branching)) = HT.length rule.prevs in
   let rec extract_lengths : type a b n m k.
@@ -80,17 +82,20 @@ let create
             let T = M.eq in
             (M.n :: ns, d.branches :: ms, S len_ns, S len_ms) )
   in
+  Timer.clock __LOC__ ;
   let widths, heights, local_signature_length, local_branches_length =
     extract_lengths rule.prevs branching
   in
   let lte = Nat.lte_exn self_width max_branching in
   let requests = Requests.Step.create () in
+  Timer.clock __LOC__ ;
   let step ~step_domains =
     Step_main.step_main requests
       (Nat.Add.create max_branching)
       rule
       ~basic:
         { typ
+        ; branchings
         ; a_var_to_field_elements
         ; a_value_to_field_elements
         ; wrap_domains
@@ -100,6 +105,7 @@ let create
       ~lte ~self
     |> unstage
   in
+  Timer.clock __LOC__ ;
   let own_domains =
     let main =
       step
@@ -107,11 +113,11 @@ let create
           (Vector.init branches ~f:(fun _ -> Fix_domains.rough_domains))
     in
     let etyp =
-      Impls.Pairing_based.input ~branching:max_branching
-        ~bulletproof_log2:Rounds.n
+      Impls.Step.input ~branching:max_branching ~bulletproof_log2:Rounds.n
     in
-    Fix_domains.domains (module Impls.Pairing_based) etyp main
+    Fix_domains.domains (module Impls.Step) etyp main
   in
+  Timer.clock __LOC__ ;
   T
     { branching= (self_width, branching)
     ; index
