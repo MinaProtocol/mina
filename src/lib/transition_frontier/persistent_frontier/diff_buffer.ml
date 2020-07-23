@@ -49,7 +49,7 @@ end
 type work = {diffs: Diff.Lite.E.t list; target_hash: Frontier_hash.t}
 
 type t =
-  { diff_array: Diff.Lite.E.t DynArray.t
+  { diff_array: Diff.Lite.E.t Dyn_array.t
   ; worker: Worker.t
         (* timer unfortunately needs to be mutable to break recursion *)
   ; mutable timer: Timer.t option
@@ -58,16 +58,16 @@ type t =
   ; mutable closed: bool }
 
 let check_for_overflow t =
-  if DynArray.length t.diff_array > Capacity.max then
+  if Dyn_array.length t.diff_array > Capacity.max then
     failwith "persistence buffer overflow"
 
-let should_flush t = DynArray.length t.diff_array >= Capacity.flush
+let should_flush t = Dyn_array.length t.diff_array >= Capacity.flush
 
 let flush t =
   let rec flush_job t =
-    let diffs = DynArray.to_list t.diff_array in
-    DynArray.clear t.diff_array ;
-    DynArray.compact t.diff_array ;
+    let diffs = Dyn_array.to_list t.diff_array in
+    Dyn_array.clear t.diff_array ;
+    Dyn_array.compact t.diff_array ;
     let%bind () = Worker.dispatch t.worker (diffs, t.target_hash) in
     if should_flush t then flush_job t
     else (
@@ -75,12 +75,12 @@ let flush t =
       Deferred.unit )
   in
   assert (t.flush_job = None) ;
-  if DynArray.length t.diff_array > 0 then t.flush_job <- Some (flush_job t)
+  if Dyn_array.length t.diff_array > 0 then t.flush_job <- Some (flush_job t)
 
 let create ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     ~time_controller ~base_hash ~worker =
   let t =
-    { diff_array= DynArray.create ()
+    { diff_array= Dyn_array.create ()
     ; worker
     ; timer= None
     ; target_hash= base_hash
@@ -101,7 +101,7 @@ let write t ~diffs ~hash_transition =
   if not (Frontier_hash.equal t.target_hash hash_transition.source) then
     failwith "invalid hash transition received by persistence buffer" ;
   t.target_hash <- hash_transition.target ;
-  List.iter diffs ~f:(DynArray.add t.diff_array) ;
+  List.iter diffs ~f:(Dyn_array.add t.diff_array) ;
   if should_flush t && t.flush_job = None then flush t
   else check_for_overflow t
 

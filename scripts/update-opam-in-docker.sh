@@ -37,7 +37,7 @@ function uptodate () {
 }
 
 # submodules
-for pkg in async_kernel digestif graphql_ppx ocaml-extlib rpc_parallel ; do
+for pkg in async_kernel digestif graphql_ppx rpc_parallel ; do
     CURRENT_COMMIT=$(git submodule status src/external/$pkg | awk '{print $1}')
     DOCKER_COMMIT=$(cat ~opam/opam-repository/$pkg.commit)
     if [ $CURRENT_COMMIT != $DOCKER_COMMIT ] ; then

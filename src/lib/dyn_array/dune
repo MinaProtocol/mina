@@ -3,7 +3,7 @@
  (public_name dyn_array)
  (library_flags -linkall)
  (inline_tests)
- (libraries core extlib)
+ (libraries core batteries)
  (preprocess
   (pps ppx_version ppx_jane bisect_ppx -- -conditional))
  (synopsis

@@ -5,7 +5,6 @@
  (libraries
   ;; opam deps
   core
-  extlib
   integers
   rocks
   ;; libraries

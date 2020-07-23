@@ -45,14 +45,9 @@ fi
 opam switch import src/opam.export
 eval $(opam config env)
 
-# Extlib gets automatically installed, but we want our pin, so we should
-# uninstall here
-opam uninstall extlib
-
 # Our pins
 opam pin add src/external/ocaml-sodium
 opam pin add src/external/rpc_parallel
-opam pin add src/external/ocaml-extlib
 opam pin add src/external/digestif
 
 # workaround a permissions problem in rpc_parallel .git
