@@ -5,6 +5,27 @@ const { httpsRequest } = require("./util/httpsRequest");
 const axios = require("axios");
 
 const apiKey = process.env.BUILDKITE_API_ACCESS_TOKEN;
+const circleApiKey = process.env.CIRCLECI_API_ACCESS_TOKEN;
+
+const runCircleBuild = async (github) => {
+  const postData = JSON.stringify({
+    branch: github.pull_request.head.ref,
+  });
+
+  const options = {
+    hostname: "circleci.com",
+    port: 443,
+    path: `/api/v2/project/github/CodaProtocol/coda/pipeline`,
+    method: "POST",
+    headers: {
+      "Circle-token": circleApiKey,
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+  };
+  const request = await httpsRequest(options, postData);
+  return request;
+};
 
 const runBuild = async (github) => {
   const postData = JSON.stringify({
@@ -43,7 +64,6 @@ const getRequest = async (url) => {
 
 const handler = async (event, req) => {
   const buildkiteTrigger = {};
-  let request;
   if (event == "pull_request") {
     if (
       // if PR has ci-build-me label
@@ -56,8 +76,9 @@ const handler = async (event, req) => {
       req.body.pull_request.head.user.login ==
         req.body.pull_request.base.user.login
     ) {
-      request = await runBuild(req.body);
-      return request;
+      const buildkite = await runBuild(req.body);
+      const circle = await runCircleBuild(req.body);
+      return [buildkite, circle];
     }
   } else if (event == "issue_comment") {
     if (
@@ -75,15 +96,18 @@ const handler = async (event, req) => {
         orgData.data.filter((org) => org.login == "CodaProtocol").length > 0
       ) {
         const prData = await getRequest(req.body.issue.pull_request.url);
-        const request = await runBuild({
+        const buildkite = await runBuild({
           sender: req.body.sender,
           pull_request: prData.data,
         });
-        return request;
+        const circle = await runCircleBuild({
+          pull_request: prData.data,
+        });
+        return [buildkite, circle];
       }
     }
   }
-  return null;
+  return [null, null];
 };
 
 /**
@@ -112,17 +136,24 @@ exports.githubWebhookHandler = async (req, res) => {
     github.validateWebhook(req);
 
     const githubEvent = req.headers["x-github-event"];
-    const request = await handler(githubEvent, req);
-    if (request && request.web_url) {
-      console.info(`Triggered build at ${request.web_url}`);
+    const [buildkite, circle] = await handler(githubEvent, req);
+    if (buildkite && buildkite.web_url) {
+      console.info(`Triggered buildkite build at ${buildkite.web_url}`);
     } else {
-      console.error("Failed to trigger build for some reason:");
-      console.error(request);
+      console.error(`Failed to trigger buildkite build for some reason:`);
+      console.error(data);
+    }
+
+    if (circle && circle.number) {
+      console.info(`Triggered circle build #${circle.number}`);
+    } else {
+      console.error(`Failed to trigger circle build for some reason:`);
+      console.error(circle);
     }
 
     res.status(200);
     console.info(`HTTP 200: ${githubEvent} event`);
-    res.send(request || {});
+    res.send({ buildkite, circle } || {});
   } catch (e) {
     if (e instanceof HTTPError) {
       res.status(e.statusCode).send(e.message);
