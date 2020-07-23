@@ -716,8 +716,7 @@ workflows:
     version: 2
     coda_parallel:
         when:
-            condition:
-                - << pipeline.parameters.run-ci >>
+            - << pipeline.parameters.run-ci >>
         jobs:
             - lint
             - lint-opt
