@@ -193,12 +193,14 @@ module Gen = struct
       gen_inner sign' ~key_gen ?nonce ?fee_token ~max_fee
       @@ fun {public_key= signer; _} {public_key= receiver; _} ->
       let open Quickcheck.Generator.Let_syntax in
-      let%map amount = Int.gen_incl 1 max_amount >>| Currency.Amount.of_int in
+      let%map amount = Int.gen_incl 1 max_amount >>| Currency.Amount.of_int
+      and do_not_pay_creation_fee = Quickcheck.Generator.bool in
       User_command_payload.Body.Payment
         { receiver_pk= Public_key.compress receiver
         ; source_pk= Public_key.compress signer
         ; token_id= payment_token
-        ; amount }
+        ; amount
+        ; do_not_pay_creation_fee }
 
     let gen ?(sign_type = `Fake) =
       match sign_type with
@@ -336,7 +338,8 @@ module Gen = struct
                    { source_pk= sender_pk
                    ; receiver_pk= receiver
                    ; token_id= Token_id.default
-                   ; amount })
+                   ; amount
+                   ; do_not_pay_creation_fee= false })
           in
           let sign' =
             match sign_type with `Fake -> For_tests.fake_sign | `Real -> sign

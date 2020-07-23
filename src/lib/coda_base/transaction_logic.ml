@@ -614,7 +614,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           , `Source_timing source_timing
           , User_command_status.Auxiliary_data.empty
           , Undo.User_command_undo.Body.Stake_delegation {previous_delegate} )
-      | Payment {amount; token_id= token; _} ->
+      | Payment {amount; token_id= token; do_not_pay_creation_fee; _} ->
           let receiver_location, receiver_account =
             get_with_location ledger receiver |> ok_or_reject
           in
@@ -624,7 +624,9 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             | `Existing _ ->
                 return amount
             | `New ->
-                if Token_id.(equal default) token then
+                if do_not_pay_creation_fee then
+                  Result.fail User_command_status.Failure.Receiver_not_present
+                else if Token_id.(equal default) token then
                   (* Subtract the creation fee from the transaction amount. *)
                   sub_account_creation_fee ~constraint_constants `Added amount
                   |> Result.map_error ~f:(fun _ ->

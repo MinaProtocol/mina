@@ -30,7 +30,8 @@ module Body = struct
     ; receiver_pk: 'public_key
     ; token_id: 'token_id
     ; amount: 'amount
-    ; token_locked: 'bool }
+    ; token_locked: 'bool
+    ; do_not_pay_creation_fee: 'bool }
   [@@deriving sexp, hlist]
 
   type t =
@@ -39,27 +40,30 @@ module Body = struct
 
   let of_user_command_payload_body = function
     | User_command_payload.Body.Payment
-        {source_pk; receiver_pk; token_id; amount} ->
+        {source_pk; receiver_pk; token_id; amount; do_not_pay_creation_fee} ->
         { tag= Tag.Payment
         ; source_pk
         ; receiver_pk
         ; token_id
         ; amount
-        ; token_locked= false }
+        ; token_locked= false
+        ; do_not_pay_creation_fee }
     | Stake_delegation (Set_delegate {delegator; new_delegate}) ->
         { tag= Tag.Stake_delegation
         ; source_pk= delegator
         ; receiver_pk= new_delegate
         ; token_id= Token_id.default
         ; amount= Currency.Amount.zero
-        ; token_locked= false }
+        ; token_locked= false
+        ; do_not_pay_creation_fee= false }
     | Create_new_token {token_owner_pk; disable_new_accounts} ->
         { tag= Tag.Create_account
         ; source_pk= token_owner_pk
         ; receiver_pk= token_owner_pk
         ; token_id= Token_id.invalid
         ; amount= Currency.Amount.zero
-        ; token_locked= disable_new_accounts }
+        ; token_locked= disable_new_accounts
+        ; do_not_pay_creation_fee= false }
     | Create_token_account
         {token_id; token_owner_pk; receiver_pk; account_disabled} ->
         { tag= Tag.Create_account
@@ -67,14 +71,16 @@ module Body = struct
         ; receiver_pk
         ; token_id
         ; amount= Currency.Amount.zero
-        ; token_locked= account_disabled }
+        ; token_locked= account_disabled
+        ; do_not_pay_creation_fee= false }
     | Mint_tokens {token_id; token_owner_pk; receiver_pk; amount} ->
         { tag= Tag.Mint_tokens
         ; source_pk= token_owner_pk
         ; receiver_pk
         ; token_id
         ; amount
-        ; token_locked= false }
+        ; token_locked= false
+        ; do_not_pay_creation_fee= false }
 
   let gen ~fee =
     let open Quickcheck.Generator.Let_syntax in
@@ -133,8 +139,28 @@ module Body = struct
           return Token_id.default
       | Coinbase ->
           return Token_id.default
+    and do_not_pay_creation_fee =
+      match tag with
+      | Payment ->
+          Quickcheck.Generator.bool
+      | Stake_delegation ->
+          return false
+      | Create_account ->
+          return false
+      | Mint_tokens ->
+          return false
+      | Fee_transfer ->
+          return false
+      | Coinbase ->
+          return false
     in
-    {tag; source_pk; receiver_pk; token_id; amount; token_locked}
+    { tag
+    ; source_pk
+    ; receiver_pk
+    ; token_id
+    ; amount
+    ; token_locked
+    ; do_not_pay_creation_fee }
 
   [%%ifdef
   consensus_mechanism]
@@ -154,6 +180,7 @@ module Body = struct
       ; Public_key.Compressed.typ
       ; Token_id.typ
       ; Currency.Amount.typ
+      ; Boolean.typ
       ; Boolean.typ ]
 
   let typ =
@@ -162,17 +189,31 @@ module Body = struct
 
   module Checked = struct
     let constant
-        ({tag; source_pk; receiver_pk; token_id; amount; token_locked} : t) :
-        var =
+        ({ tag
+         ; source_pk
+         ; receiver_pk
+         ; token_id
+         ; amount
+         ; token_locked
+         ; do_not_pay_creation_fee } :
+          t) : var =
       { tag= Tag.unpacked_of_t tag
       ; source_pk= Public_key.Compressed.var_of_t source_pk
       ; receiver_pk= Public_key.Compressed.var_of_t receiver_pk
       ; token_id= Token_id.var_of_t token_id
       ; amount= Currency.Amount.var_of_t amount
-      ; token_locked= Boolean.var_of_value token_locked }
+      ; token_locked= Boolean.var_of_value token_locked
+      ; do_not_pay_creation_fee= Boolean.var_of_value do_not_pay_creation_fee
+      }
 
-    let to_input {tag; source_pk; receiver_pk; token_id; amount; token_locked}
-        =
+    let to_input
+        { tag
+        ; source_pk
+        ; receiver_pk
+        ; token_id
+        ; amount
+        ; token_locked
+        ; do_not_pay_creation_fee } =
       let%map token_id = Token_id.Checked.to_input token_id in
       Array.reduce_exn ~f:Random_oracle.Input.append
         [| Tag.Unpacked.to_input tag
@@ -180,19 +221,28 @@ module Body = struct
          ; Public_key.Compressed.Checked.to_input receiver_pk
          ; token_id
          ; Currency.Amount.var_to_input amount
-         ; Random_oracle.Input.bitstring [token_locked] |]
+         ; Random_oracle.Input.bitstring [token_locked]
+         ; Random_oracle.Input.bitstring [do_not_pay_creation_fee] |]
   end
 
   [%%endif]
 
-  let to_input {tag; source_pk; receiver_pk; token_id; amount; token_locked} =
+  let to_input
+      { tag
+      ; source_pk
+      ; receiver_pk
+      ; token_id
+      ; amount
+      ; token_locked
+      ; do_not_pay_creation_fee } =
     Array.reduce_exn ~f:Random_oracle.Input.append
       [| Tag.to_input tag
        ; Public_key.Compressed.to_input source_pk
        ; Public_key.Compressed.to_input receiver_pk
        ; Token_id.to_input token_id
        ; Currency.Amount.to_input amount
-       ; Random_oracle.Input.bitstring [token_locked] |]
+       ; Random_oracle.Input.bitstring [token_locked]
+       ; Random_oracle.Input.bitstring [do_not_pay_creation_fee] |]
 end
 
 type t = (User_command_payload.Common.t, Body.t) User_command_payload.Poly.t

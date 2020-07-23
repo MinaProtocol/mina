@@ -610,7 +610,7 @@ module Base = struct
     type 'bool t =
       { predicate_failed: 'bool (* All *)
       ; source_not_present: 'bool (* All *)
-      ; receiver_not_present: 'bool (* Delegate, Mint_tokens *)
+      ; receiver_not_present: 'bool (* Payment, Delegate, Mint_tokens *)
       ; amount_insufficient_to_create: 'bool (* Payment only *)
       ; token_cannot_create: 'bool (* Payment only, token<>default *)
       ; source_insufficient_balance: 'bool (* Payment only *)
@@ -800,6 +800,9 @@ module Base = struct
                 && Option.is_none
                      (Amount.sub payload.body.amount creation_amount)
               in
+              let receiver_not_present =
+                receiver_needs_creating && payload.body.do_not_pay_creation_fee
+              in
               let fee_payer_is_source = Account_id.equal fee_payer source in
               let source_account =
                 if fee_payer_is_source then fee_payer_account
@@ -838,7 +841,7 @@ module Base = struct
               in
               { predicate_failed
               ; source_not_present
-              ; receiver_not_present= false
+              ; receiver_not_present
               ; amount_insufficient_to_create
               ; token_cannot_create
               ; source_insufficient_balance
@@ -1565,7 +1568,13 @@ module Base = struct
              *)
              let%bind is_empty_failure =
                let%bind must_not_be_empty =
-                 Boolean.(is_stake_delegation || is_mint_tokens)
+                 let%bind disallowed_payment_creation =
+                   Boolean.(is_payment && payload.body.do_not_pay_creation_fee)
+                 in
+                 Boolean.any
+                   [ disallowed_payment_creation
+                   ; is_stake_delegation
+                   ; is_mint_tokens ]
                in
                Boolean.(is_empty_and_writeable && must_not_be_empty)
              in
@@ -3082,8 +3091,8 @@ let%test_module "transaction_snark" =
       in
       Array.init n ~f:(fun _ -> random_wallet ())
 
-    let user_command ~fee_payer ~source_pk ~receiver_pk ~fee_token ~token amt
-        fee nonce memo =
+    let user_command ?(do_not_pay_creation_fee = false) ~fee_payer ~source_pk
+        ~receiver_pk ~fee_token ~token amt fee nonce memo =
       let payload : User_command.Payload.t =
         User_command.Payload.create ~fee ~fee_token
           ~fee_payer_pk:(Account.public_key fee_payer.account)
@@ -3093,7 +3102,8 @@ let%test_module "transaction_snark" =
                { source_pk
                ; receiver_pk
                ; token_id= token
-               ; amount= Amount.of_int amt })
+               ; amount= Amount.of_int amt
+               ; do_not_pay_creation_fee })
       in
       let signature =
         User_command.sign_payload fee_payer.private_key payload
@@ -3856,7 +3866,52 @@ let%test_module "transaction_snark" =
                   , `Receiver_account receiver_account ) =
                 test_user_command_with_accounts ~constraint_constants ~ledger
                   ~accounts ~signer ~fee ~fee_payer_pk ~fee_token
-                  (Payment {source_pk; receiver_pk; token_id; amount})
+                  (Payment
+                     { source_pk
+                     ; receiver_pk
+                     ; token_id
+                     ; amount
+                     ; do_not_pay_creation_fee= false })
+              in
+              let fee_payer_account = Option.value_exn fee_payer_account in
+              let source_account = Option.value_exn source_account in
+              let expected_fee_payer_balance =
+                accounts.(0).balance |> sub_fee fee
+              in
+              assert (
+                Balance.equal fee_payer_account.balance
+                  expected_fee_payer_balance ) ;
+              assert (Balance.equal accounts.(1).balance source_account.balance) ;
+              assert (Option.is_none receiver_account) ) )
+
+    let%test_unit "do_not_pay_creation_fee= true" =
+      Test_util.with_randomness 123456789 (fun () ->
+          Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
+              let wallets = random_wallets ~n:2 () in
+              let signer = wallets.(0).private_key in
+              let fee_payer_pk = wallets.(0).account.public_key in
+              let source_pk = fee_payer_pk in
+              let receiver_pk = wallets.(1).account.public_key in
+              let fee_token = Token_id.default in
+              let token_id = Token_id.default in
+              let accounts =
+                [|create_account fee_payer_pk fee_token 50_000_000_000|]
+              in
+              let fee = Fee.of_int (random_int_incl 2 15 * 1_000_000_000) in
+              let amount =
+                Amount.of_int (random_int_incl 0 30 * 1_000_000_000)
+              in
+              let ( `Fee_payer_account fee_payer_account
+                  , `Source_account source_account
+                  , `Receiver_account receiver_account ) =
+                test_user_command_with_accounts ~constraint_constants ~ledger
+                  ~accounts ~signer ~fee ~fee_payer_pk ~fee_token
+                  (Payment
+                     { source_pk
+                     ; receiver_pk
+                     ; token_id
+                     ; amount
+                     ; do_not_pay_creation_fee= true })
               in
               let fee_payer_account = Option.value_exn fee_payer_account in
               let source_account = Option.value_exn source_account in
@@ -3895,7 +3950,12 @@ let%test_module "transaction_snark" =
                   , `Receiver_account receiver_account ) =
                 test_user_command_with_accounts ~constraint_constants ~ledger
                   ~accounts ~signer ~fee ~fee_payer_pk ~fee_token
-                  (Payment {source_pk; receiver_pk; token_id; amount})
+                  (Payment
+                     { source_pk
+                     ; receiver_pk
+                     ; token_id
+                     ; amount
+                     ; do_not_pay_creation_fee= false })
               in
               let fee_payer_account = Option.value_exn fee_payer_account in
               let source_account = Option.value_exn source_account in
@@ -3944,7 +4004,12 @@ let%test_module "transaction_snark" =
                   , `Receiver_account receiver_account ) =
                 test_user_command_with_accounts ~constraint_constants ~ledger
                   ~accounts ~signer ~fee ~fee_payer_pk ~fee_token
-                  (Payment {source_pk; receiver_pk; token_id; amount})
+                  (Payment
+                     { source_pk
+                     ; receiver_pk
+                     ; token_id
+                     ; amount
+                     ; do_not_pay_creation_fee= false })
               in
               let fee_payer_account = Option.value_exn fee_payer_account in
               let source_account = Option.value_exn source_account in
@@ -3983,7 +4048,12 @@ let%test_module "transaction_snark" =
                   , `Receiver_account receiver_account ) =
                 test_user_command_with_accounts ~constraint_constants ~ledger
                   ~accounts ~signer ~fee ~fee_payer_pk ~fee_token
-                  (Payment {source_pk; receiver_pk; token_id; amount})
+                  (Payment
+                     { source_pk
+                     ; receiver_pk
+                     ; token_id
+                     ; amount
+                     ; do_not_pay_creation_fee= false })
               in
               let fee_payer_account = Option.value_exn fee_payer_account in
               let source_account = Option.value_exn source_account in
@@ -4020,7 +4090,12 @@ let%test_module "transaction_snark" =
                   , `Receiver_account receiver_account ) =
                 test_user_command_with_accounts ~constraint_constants ~ledger
                   ~accounts ~signer ~fee ~fee_payer_pk ~fee_token
-                  (Payment {source_pk; receiver_pk; token_id; amount})
+                  (Payment
+                     { source_pk
+                     ; receiver_pk
+                     ; token_id
+                     ; amount
+                     ; do_not_pay_creation_fee= false })
               in
               let fee_payer_account = Option.value_exn fee_payer_account in
               let expected_fee_payer_balance =
@@ -4055,7 +4130,12 @@ let%test_module "transaction_snark" =
                   , `Receiver_account receiver_account ) =
                 test_user_command_with_accounts ~constraint_constants ~ledger
                   ~accounts ~signer ~fee ~fee_payer_pk ~fee_token
-                  (Payment {source_pk; receiver_pk; token_id; amount})
+                  (Payment
+                     { source_pk
+                     ; receiver_pk
+                     ; token_id
+                     ; amount
+                     ; do_not_pay_creation_fee= false })
               in
               let fee_payer_account = Option.value_exn fee_payer_account in
               let source_account = Option.value_exn source_account in

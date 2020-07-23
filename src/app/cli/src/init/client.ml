@@ -460,7 +460,8 @@ let batch_send_payments =
                  ; receiver_pk=
                      Public_key.Compressed.of_base58_check_exn receiver
                  ; token_id= Token_id.default
-                 ; amount })
+                 ; amount
+                 ; do_not_pay_creation_fee= false })
             ~sign_choice:(User_command_input.Sign_choice.Keypair keypair) () )
     in
     Daemon_rpcs.Client.dispatch_with_message Daemon_rpcs.Send_user_commands.rpc

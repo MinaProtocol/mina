@@ -265,13 +265,16 @@ let apply_user_command_exn
           {source_account with delegate= Account_id.public_key receiver; timing}
         in
         [(source_idx, source_account)]
-    | Payment {amount; token_id= token; _} ->
+    | Payment {amount; token_id= token; do_not_pay_creation_fee; _} ->
         let receiver_idx = find_index_exn t receiver in
         let action, receiver_account =
           get_or_initialize_exn receiver t receiver_idx
         in
         let receiver_amount =
-          if Token_id.(equal default) token then
+          if do_not_pay_creation_fee then
+            failwith
+              "Receiver account does not exist, but we do not want to create it"
+          else if Token_id.(equal default) token then
             sub_account_creation_fee ~constraint_constants action amount
           else if action = `Added then
             failwith "Receiver account does not exist, and we cannot create it"

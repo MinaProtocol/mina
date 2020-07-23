@@ -626,7 +626,8 @@ module T = struct
                      { source_pk= sender_pk
                      ; receiver_pk
                      ; token_id= Token_id.default
-                     ; amount })
+                     ; amount
+                     ; do_not_pay_creation_fee= false })
                 ~sign_choice:
                   (User_command_input.Sign_choice.Keypair
                      (Keypair.of_private_key_exn sender_sk))

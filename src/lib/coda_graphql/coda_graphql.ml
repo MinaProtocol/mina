@@ -1501,8 +1501,8 @@ module Types = struct
     let send_payment =
       let open Fields in
       obj "SendPaymentInput"
-        ~coerce:(fun from to_ token amount fee valid_until memo nonce ->
-          (from, to_, token, amount, fee, valid_until, memo, nonce) )
+        ~coerce:(fun from to_ token amount fee valid_until memo nonce dnp ->
+          (from, to_, token, amount, fee, valid_until, memo, nonce, dnp) )
         ~fields:
           [ from ~doc:"Public key of sender of payment"
           ; to_ ~doc:"Public key of recipient of payment"
@@ -1512,7 +1512,12 @@ module Types = struct
           ; fee ~doc:"Fee amount in order to send payment"
           ; valid_until
           ; memo
-          ; nonce ]
+          ; nonce
+          ; arg "do_not_pay_creation_fee"
+              ~doc:
+                "Do not create an account or pay the creation fee if the \
+                 receiver account does not exist. Default value is false"
+              ~typ:bool ]
 
     let send_delegation =
       let open Fields in
@@ -2081,14 +2086,22 @@ module Mutations = struct
           ; Types.Input.Fields.signature ]
       ~resolve:
         (fun {ctx= coda; _} ()
-             (from, to_, token_id, amount, fee, valid_until, memo, nonce_opt)
-             signature ->
+             ( from
+             , to_
+             , token_id
+             , amount
+             , fee
+             , valid_until
+             , memo
+             , nonce_opt
+             , dnp ) signature ->
         let body =
           User_command_payload.Body.Payment
             { source_pk= from
             ; receiver_pk= to_
             ; token_id= Option.value ~default:Token_id.default token_id
-            ; amount= Amount.of_uint64 amount }
+            ; amount= Amount.of_uint64 amount
+            ; do_not_pay_creation_fee= Option.value ~default:false dnp }
         in
         let fee_token = Token_id.default in
         match signature with

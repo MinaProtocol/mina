@@ -384,7 +384,7 @@ let tag (t : t) = Body.tag t.body
 let amount (t : t) =
   match t.body with
   | Payment payload ->
-      Some payload.Payment_payload.Poly.amount
+      Some payload.Payment_payload.amount
   | Stake_delegation _ ->
       None
   | Create_new_token _ ->

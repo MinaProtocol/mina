@@ -56,7 +56,8 @@ let of_transaction : Transaction.t -> t = function
               ; token_id= Token_id.default
               ; amount
               ; tag= Tag.Coinbase
-              ; token_locked= false } }
+              ; token_locked= false
+              ; do_not_pay_creation_fee= false } }
       ; signer= Public_key.decompress_exn other_pk
       ; signature= Signature.dummy }
   | Fee_transfer tr -> (
@@ -76,7 +77,8 @@ let of_transaction : Transaction.t -> t = function
                 ; token_id
                 ; amount= Amount.of_fee fee1
                 ; tag= Tag.Fee_transfer
-                ; token_locked= false } }
+                ; token_locked= false
+                ; do_not_pay_creation_fee= false } }
         ; signer= Public_key.decompress_exn pk2
         ; signature= Signature.dummy }
       in

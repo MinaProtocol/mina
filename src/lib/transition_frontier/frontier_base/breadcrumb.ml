@@ -220,7 +220,8 @@ module For_tests = struct
                  { source_pk= sender_pk
                  ; receiver_pk
                  ; token_id= token
-                 ; amount= send_amount })
+                 ; amount= send_amount
+                 ; do_not_pay_creation_fee= false })
         in
         User_command.sign sender_keypair payload )
 

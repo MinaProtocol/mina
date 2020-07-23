@@ -1310,7 +1310,8 @@ let%test_module _ =
                    { source_pk= get_pk sender_idx
                    ; receiver_pk= get_pk receiver_idx
                    ; token_id= Token_id.default
-                   ; amount= Currency.Amount.of_int amount }))
+                   ; amount= Currency.Amount.of_int amount
+                   ; do_not_pay_creation_fee= false }))
 
     let%test_unit "Now-invalid transactions are removed from the pool on fork \
                    changes" =

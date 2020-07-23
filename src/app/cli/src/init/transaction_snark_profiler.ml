@@ -36,7 +36,8 @@ let create_ledger_and_transactions num_transitions =
              { source_pk= from_pk
              ; receiver_pk= to_pk
              ; token_id= Token_id.default
-             ; amount })
+             ; amount
+             ; do_not_pay_creation_fee= false })
     in
     User_command.sign from_kp payload
   in

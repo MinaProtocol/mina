@@ -172,7 +172,12 @@ module Api = struct
       ~memo:(User_command_memo.create_from_string_exn (sprintf "pay%i" i))
       t i sender_sk fee valid_until
       ~body:
-        (Payment {source_pk; receiver_pk; token_id= Token_id.default; amount})
+        (Payment
+           { source_pk
+           ; receiver_pk
+           ; token_id= Token_id.default
+           ; amount
+           ; do_not_pay_creation_fee= false })
 
   (* TODO: resulting_receipt should be replaced with the sender's pk so that we prove the
      merkle_list of receipts up to the current state of a sender's receipt_chain hash for some blockchain.
