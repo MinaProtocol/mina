@@ -223,7 +223,7 @@ RUN eval $(opam config env) && \
   src/app/rosetta/rosetta.exe && \
   dune cache trim --size=0B && \
   opam clean --unused-repositories --logs -cs && \
-  rm -rf /tmp && \
+  sudo rm -rf /tmp && \
   rm -rf $HOME/.opam
 
 #RUN eval $(opam config env) && make deb
