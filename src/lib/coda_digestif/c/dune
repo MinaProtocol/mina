@@ -3,4 +3,5 @@
   (name coda_digestif_c)
   (libraries digestif.c)
   (implements coda_digestif)
-  (modes native))
+  (modes native)
+  (preprocess (pps ppx_version)))
