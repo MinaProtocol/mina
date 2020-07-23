@@ -44,6 +44,7 @@ compile_config_agnostic_tests = [
     'coda-change-snark-worker-test',
     'coda-archive-node-test',
     'coda-delegation-test',
+    'coda-restart-node-test',
 ]
 
 compile_config_agnostic_profiles = [
@@ -68,7 +69,6 @@ small_curves_tests = {
     ['coda-shared-prefix-multiproducer-test -num-block-producers 2'],
     'test_postake':
     simple_tests,
-    'test_postake_catchup': ['coda-restart-node-test'],
     'test_postake_three_producers': ['coda-txns-and-restart-non-producers'],
     'test_postake_five_even_txns':
     ['coda-shared-prefix-multiproducer-test -num-block-producers 5 -payments'],
