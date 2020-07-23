@@ -92,9 +92,9 @@ defmodule Architecture.Statistic do
 	fn provider ->
 	  cond do
 	    Util.has_behaviour?(provider,Architecture.Log_provider) ->
-	      &LogProvider.Junction.subscribe(&1, params.resource)
+	      LogProvider.Junction.subscribe(provider, params.resource)
 	    Util.has_behaviour?(provider,Architecture.Statistic) ->
-	      &Statistic.Junction.subscribe(&1, params.resource)
+	      Statistic.Junction.subscribe(provider, params.resource)
 	    true ->
 	      raise "#{provider} must be an instance of either Log_provider or Statistic"
 	  end
