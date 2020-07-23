@@ -19,15 +19,15 @@ trap cleanup INT
 PG_CONN=postgres://$USER:$USER@localhost:5432/archiver
 
 # rebuild
-pushd ../../../
-PATH=/usr/local/bin:$PATH dune b src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe src/app/cli/src/coda.exe src/app/archive/archive.exe src/app/rosetta/rosetta.exe
-popd
+#pushd ../../../
+#PATH=/usr/local/bin:$PATH dune b src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe src/app/cli/src/coda.exe src/app/archive/archive.exe src/app/rosetta/rosetta.exe
+#popd
 
 # make genesis (synchronously)
-./make-runtime-genesis.sh
+#./make-runtime-genesis.sh
 
 # archive
-../../../_build/default/src/app/archive/archive.exe run \
+/coda-bin/archive/archive.exe run \
   -postgres-uri $PG_CONN \
   -server-port 3086 &
 
@@ -43,7 +43,7 @@ sleep 3
 sleep 3
 
 # rosetta
-../../../_build/default/src/app/rosetta/rosetta.exe \
+/coda-bin/rosetta/rosetta.exe \
   -archive-uri $PG_CONN \
   -graphql-uri http://localhost:3085/graphql \
   -log-level debug \

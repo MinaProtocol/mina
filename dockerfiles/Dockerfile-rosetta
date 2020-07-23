@@ -282,6 +282,7 @@ RUN pg_dropcluster --stop 11 main \
     && createdb -O pguser archiver \
     && psql postgresql://pguser:pguser@localhost:5432/archiver -f /app/archive/create_schema.sql
 
+ENV USER pguser
 USER root
 
 ENTRYPOINT ["bash", "/app/rosetta/start.sh"]
