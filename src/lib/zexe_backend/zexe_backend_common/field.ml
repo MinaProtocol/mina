@@ -7,6 +7,10 @@ module type Input_intf = sig
 
   module Bigint : Bigint.Intf
 
+  val size : unit -> Bigint.t
+
+  val size_in_bits : unit -> int
+
   val to_bigint : t -> Bigint.t
 
   val of_bigint : Bigint.t -> t
@@ -53,24 +57,21 @@ module type Input_intf = sig
 
   val copy : t -> t -> unit
 
-  module Vector :
-    Snarky.Vector.S with type elt := t and type t = unit Ctypes.ptr
+  module Vector : sig
+    include Snarky.Vector.S with type elt := t
+
+    module Triple : Intf.Triple with type elt := t
+  end
 end
 
 module type S = sig
+  type t [@@deriving sexp, compare, yojson, bin_io]
+
   module Bigint : Bigint.Intf
 
-  module Stable : sig
-    module V1 : sig
-      type t [@@deriving version, sexp, bin_io, compare, yojson]
-    end
-
-    module Latest = V1
-  end
-
-  type t = Stable.Latest.t [@@deriving sexp, compare, yojson, bin_io]
-
   val to_bigint : t -> Bigint.t
+
+  val size : Bigint.t
 
   val to_bigint_raw_noalloc : t -> Bigint.t
 
@@ -143,7 +144,7 @@ module type S = sig
   module Vector : sig
     type elt = t
 
-    type t = unit Ctypes.ptr
+    type t
 
     val typ : t Ctypes.typ
 
@@ -158,13 +159,36 @@ module type S = sig
     val length : t -> int
 
     val of_array : elt array -> t
+
+    module Triple : Intf.Triple with type elt := t
   end
 end
 
+module type S_with_version = sig
+  module Stable : sig
+    module V1 : sig
+      type t [@@deriving version, sexp, bin_io, compare, yojson]
+    end
+
+    module Latest = V1
+  end
+
+  include S with type t = Stable.Latest.t
+end
+
 module Make (F : Input_intf) :
-  S with type Stable.V1.t = F.t and module Bigint = F.Bigint = struct
+  S_with_version
+  with type Stable.V1.t = F.t
+   and module Bigint = F.Bigint
+   and type Vector.t = F.Vector.t
+   and type Vector.Triple.t = F.Vector.Triple.t = struct
   open F
   module Bigint = Bigint
+
+  let size =
+    let t = size () in
+    Caml.Gc.finalise Bigint.delete t ;
+    t
 
   let gc2 op x1 x2 =
     let r = op x1 x2 in
@@ -189,15 +213,14 @@ module Make (F : Input_intf) :
     module V1 = struct
       type t = F.t [@@deriving version {asserted}]
 
-      (* TODO: Don't allocate the bigint when writing and reading *)
       include Binable.Of_binable
                 (Bigint)
                 (struct
                   type nonrec t = t
 
-                  let to_binable = to_bigint_raw_noalloc
+                  let to_binable = to_bigint
 
-                  let of_binable = of_bigint_raw
+                  let of_binable = of_bigint
                 end)
 
       include Sexpable.Of_sexpable
@@ -252,7 +275,7 @@ module Make (F : Input_intf) :
 
   let equal = equal
 
-  let size_in_bits = 382
+  let size_in_bits = size_in_bits ()
 
   let to_bits t =
     (* Avoids allocation *)
@@ -271,6 +294,13 @@ module Make (F : Input_intf) :
   let%test_unit "sexp round trip" =
     let t = random () in
     assert (equal t (t_of_sexp (sexp_of_t t)))
+
+  let%test_unit "bin_io round trip" =
+    let t = random () in
+    [%test_eq: Stable.Latest.t] t
+      (Binable.of_string
+         (module Stable.Latest)
+         (Binable.to_string (module Stable.Latest) t))
 
   let negate = gc1 negate
 
