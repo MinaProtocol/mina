@@ -1570,7 +1570,10 @@ workflows:
     version: 2
     coda_parallel:
         when:
-            - << pipeline.parameters.run-ci >>
+            # We do seem to need a useless `or true` here
+            or:
+              - true
+              - << pipeline.parameters.run-ci >>
         jobs:
             - lint
             - lint-opt
