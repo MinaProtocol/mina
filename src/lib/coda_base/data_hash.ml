@@ -170,7 +170,7 @@ module T0 = struct
 
     let%test "Binable from stringable V1" =
       let known_good_digest = "66e2f2648cf3d2c39465ddbe4f05202a" in
-      Ppx_version.Serialization.check_serialization
+      Ppx_version_runtime.Serialization.check_serialization
         (module Stable.V1)
         field known_good_digest
 
@@ -179,7 +179,7 @@ module T0 = struct
 
     let%test "Binable from stringable V1" =
       let known_good_digest = "0e586911e7deaf7e5b49c801bf248c92" in
-      Ppx_version.Serialization.check_serialization
+      Ppx_version_runtime.Serialization.check_serialization
         (module Stable.V1)
         field known_good_digest
 

@@ -268,7 +268,7 @@ module Protocol = struct
         in
         (*from the print statement in Serialization.check_serialization*)
         let known_good_digest = "2b1a964e0fea8c31fdf76e7f5bebcdd6" in
-        Ppx_version.Serialization.check_serialization
+        Ppx_version_runtime.Serialization.check_serialization
           (module V1)
           t known_good_digest
     end

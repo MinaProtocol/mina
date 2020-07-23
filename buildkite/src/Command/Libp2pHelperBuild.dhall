@@ -23,10 +23,9 @@ let cmdConfig =
   Command.build
     Command.Config::{
       commands  = commands,
-      label = "Libp2p helper commands",
+      label = "Build Libp2p helper",
       key = "libp2p-helper",
-      target = Size.Large,
-      docker = None Docker.Type
+      target = Size.Large
     }
 
 in

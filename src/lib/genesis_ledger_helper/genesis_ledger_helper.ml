@@ -494,8 +494,8 @@ module Genesis_proof = struct
                 ; ("error", `String (Error.to_string_hum e)) ] ;
             return None )
 
-  let generate_inputs ~proof_level ~ledger ~constraint_constants
-      ~(genesis_constants : Genesis_constants.t) =
+  let generate_inputs ~runtime_config ~proof_level ~ledger
+      ~constraint_constants ~(genesis_constants : Genesis_constants.t) =
     let consensus_constants =
       Consensus.Constants.create ~constraint_constants
         ~protocol_constants:genesis_constants.protocol
@@ -512,7 +512,8 @@ module Genesis_proof = struct
       | _ ->
           return Snark_params.Tick.Field.zero
     in
-    { Genesis_proof.Inputs.constraint_constants
+    { Genesis_proof.Inputs.runtime_config
+    ; constraint_constants
     ; proof_level
     ; genesis_ledger= ledger
     ; consensus_constants
@@ -527,7 +528,8 @@ module Genesis_proof = struct
         Genesis_proof.create_values ~keys inputs
     | _ ->
         return
-          { Genesis_proof.constraint_constants= inputs.constraint_constants
+          { Genesis_proof.runtime_config= inputs.runtime_config
+          ; constraint_constants= inputs.constraint_constants
           ; proof_level= inputs.proof_level
           ; genesis_constants= inputs.genesis_constants
           ; genesis_ledger= inputs.genesis_ledger
@@ -557,8 +559,8 @@ module Genesis_proof = struct
         match%map load file with
         | Ok genesis_proof ->
             Ok
-              ( { Genesis_proof.constraint_constants=
-                    inputs.constraint_constants
+              ( { Genesis_proof.runtime_config= inputs.runtime_config
+                ; constraint_constants= inputs.constraint_constants
                 ; proof_level= inputs.proof_level
                 ; genesis_constants= inputs.genesis_constants
                 ; genesis_ledger= inputs.genesis_ledger
@@ -586,7 +588,8 @@ module Genesis_proof = struct
             ; ("compiled_hash", Ledger_hash.to_yojson compiled.base_hash) ] ;
         let filename = genesis_dir ^/ filename ~base_hash:inputs.base_hash in
         let values =
-          { Genesis_proof.constraint_constants= inputs.constraint_constants
+          { Genesis_proof.runtime_config= inputs.runtime_config
+          ; constraint_constants= inputs.constraint_constants
           ; proof_level= inputs.proof_level
           ; genesis_constants= inputs.genesis_constants
           ; genesis_ledger= inputs.genesis_ledger
@@ -840,8 +843,8 @@ let init_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
   in
   let open Deferred.Let_syntax in
   let%bind proof_inputs =
-    Genesis_proof.generate_inputs ~proof_level ~ledger:genesis_ledger
-      ~constraint_constants ~genesis_constants
+    Genesis_proof.generate_inputs ~runtime_config:config ~proof_level
+      ~ledger:genesis_ledger ~constraint_constants ~genesis_constants
   in
   Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
     ~metadata:
@@ -925,7 +928,7 @@ let upgrade_old_config ~logger filename json =
       (* This error will get handled properly elsewhere, do nothing here. *)
       return json
 
-let extract_runtime_config (precomputed_values : Precomputed_values.t) :
+let inferred_runtime_config (precomputed_values : Precomputed_values.t) :
     Runtime_config.t =
   let genesis_constants = precomputed_values.genesis_constants in
   let constraint_constants = precomputed_values.constraint_constants in
