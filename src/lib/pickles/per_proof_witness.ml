@@ -1,53 +1,81 @@
+open Backend
 open Pickles_types
 open Import
-module Impl = Impls.Pairing_based
+module Impl = Impls.Step
 module One_hot_vector = One_hot_vector.Make (Impl)
 
 type ('local_statement, 'local_max_branching, 'local_num_branches) t =
   'local_statement
-  * 'local_num_branches One_hot_vector.t
   * ( Challenge.Make(Impl).t
     , Challenge.Make(Impl).t Scalar_challenge.t
-    , Pairing_main.Make(Pairing_main_inputs).Fp.t
+    , Impl.Field.t
     , Impl.Boolean.var
-    , Pairing_main.Make(Pairing_main_inputs).Fq.t
+    , Pairing_main.Make(Step_main_inputs).Other_field.t
     , unit
-    , Digest.Make(Impl).t )
+    , Digest.Make(Impl).t
+    , ( Challenge.Make(Impl).t Scalar_challenge.t
+      , Impl.Boolean.var )
+      Types.Bulletproof_challenge.t
+      Types.Bp_vec.t
+    , 'local_num_branches One_hot_vector.t )
     Types.Dlog_based.Proof_state.t
-  * (Impl.Field.t Pairing_marlin_types.Evals.t * Impl.Field.t)
-  * (Pairing_main_inputs.G.t, 'local_max_branching) Vector.t
-  * Dlog_proof.var
+  * (Impl.Field.t array Dlog_marlin_types.Evals.t * Impl.Field.t)
+    Tuple_lib.Triple.t
+  * (Step_main_inputs.Inner_curve.t, 'local_max_branching) Vector.t
+  * ((Impl.Field.t, Rounds.n) Vector.t, 'local_max_branching) Vector.t
+  * Wrap_proof.var
 
 module Constant = struct
   open Zexe_backend
 
   type ('local_statement, 'local_max_branching, _) t =
     'local_statement
-    * One_hot_vector.Constant.t
     * ( Challenge.Constant.t
       , Challenge.Constant.t Scalar_challenge.t
-      , Fp.t
+      , Tick.Field.t
       , bool
-      , Fq.t
+      , Tock.Field.t
       , unit
-      , Digest.Constant.t )
+      , Digest.Constant.t
+      , ( Challenge.Constant.t Scalar_challenge.t
+        , bool )
+        Types.Bulletproof_challenge.t
+        Types.Bp_vec.t
+      , Types.Index.t )
       Types.Dlog_based.Proof_state.t
-    * (Fp.t Pairing_marlin_types.Evals.t * Fp.t)
-    * (G.Affine.t, 'local_max_branching) Vector.t
-    * Dlog_proof.t
+    * (Tick.Field.t array Dlog_marlin_types.Evals.t * Tick.Field.t)
+      Tuple_lib.Triple.t
+    * (Tick.Inner_curve.Affine.t, 'local_max_branching) Vector.t
+    * ((Tick.Field.t, Rounds.n) Vector.t, 'local_max_branching) Vector.t
+    * Wrap_proof.t
 end
 
-let typ (type n avar aval m)
-    (statement : (avar, aval) Impls.Pairing_based.Typ.t)
-    (local_max_branching : n Nat.t) (local_branches : m Nat.t) :
-    ((avar, n, m) t, (aval, n, m) Constant.t) Impls.Pairing_based.Typ.t =
-  let open Impls.Pairing_based in
-  let open Pairing_main_inputs in
+open Core_kernel
+
+let typ (type n avar aval m) (statement : (avar, aval) Impls.Step.Typ.t)
+    (local_max_branching : n Nat.t) (local_branches : m Nat.t) ~step_domains :
+    ((avar, n, m) t, (aval, n, m) Constant.t) Impls.Step.Typ.t =
+  let open Impls.Step in
+  let open Step_main_inputs in
   let open Pairing_main in
+  let index =
+    Typ.transport (One_hot_vector.typ local_branches) ~there:Types.Index.to_int
+      ~back:(fun x -> Option.value_exn (Types.Index.of_int x))
+  in
   Snarky.Typ.tuple6 statement
-    (One_hot_vector.typ local_branches)
-    (Types.Dlog_based.Proof_state.typ Challenge.typ Fp.typ Boolean.typ Fq.typ
-       (Snarky.Typ.unit ()) Digest.typ)
-    (Typ.tuple2 (Pairing_marlin_types.Evals.typ Field.typ) Field.typ)
-    (Vector.typ G.typ local_max_branching)
-    Dlog_proof.typ
+    (Types.Dlog_based.Proof_state.typ Challenge.typ Fp.typ Boolean.typ
+       Other_field.typ (Snarky.Typ.unit ()) Digest.typ index)
+    (let lengths =
+       Commitment_lengths.of_domains_vector step_domains
+       |> Dlog_marlin_types.Evals.map ~f:(Vector.reduce_exn ~f:Core.Int.max)
+     in
+     let t =
+       Typ.tuple2
+         (Dlog_marlin_types.Evals.typ ~default:Field.Constant.zero lengths
+            Field.typ)
+         Field.typ
+     in
+     Typ.tuple3 t t t)
+    (Vector.typ Inner_curve.typ local_max_branching)
+    (Vector.typ (Vector.typ Field.typ Rounds.n) local_max_branching)
+    Wrap_proof.typ

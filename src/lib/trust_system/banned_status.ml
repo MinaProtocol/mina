@@ -30,7 +30,7 @@ module Stable = struct
       let tm = Time.of_string "2019-10-08 17:51:23.050849Z" in
       let status = V1.Banned_until tm in
       let known_good_digest = "99a12fdb97c62ceba0c4d4f5879b0cdc" in
-      Ppx_version.Serialization.check_serialization
+      Ppx_version_runtime.Serialization.check_serialization
         (module V1)
         status known_good_digest
   end

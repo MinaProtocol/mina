@@ -68,7 +68,7 @@ let%test_module "proof-tests" =
     let%test "proof serialization v1" =
       let proof = Tock_backend.Proof.get_dummy () in
       let known_good_digest = "7b2f3495a9b190a72e134bc5a5c7d53f" in
-      Ppx_version.Serialization.check_serialization
+      Ppx_version_runtime.Serialization.check_serialization
         (module Stable.V1)
         proof known_good_digest
 
@@ -78,7 +78,7 @@ let%test_module "proof-tests" =
     let%test "proof serialization v1" =
       let proof = Tock_backend.Proof.get_dummy () in
       let known_good_digest = "4e54b20026fe9e66fcb432ff6772bd7c" in
-      Ppx_version.Serialization.check_serialization
+      Ppx_version_runtime.Serialization.check_serialization
         (module Stable.V1)
         proof known_good_digest
 

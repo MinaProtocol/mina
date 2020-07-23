@@ -5,7 +5,7 @@ module Domain = Marlin_checks.Domain
 module Make (Impl : Snarky.Snark_intf.Run) = struct
   open Impl
 
-  type ('a, 'n) t = (Boolean.var, 'n) Vector.t * ('a, 'n) Vector.t
+  type ('a, 'n) t = 'n One_hot_vector.T(Impl).t * ('a, 'n) Vector.t
 
   (* TODO: Put this in a common module. *)
   let seal x =
@@ -18,6 +18,7 @@ module Make (Impl : Snarky.Snark_intf.Run) = struct
 
   let choose : type a n. (a, n) t -> f:(a -> Field.t) -> Field.t =
    fun (bits, xs) ~f ->
+    let bits = (bits :> (Boolean.var, n) Vector.t) in
     Vector.map (Vector.zip bits xs) ~f:(fun (b, x) -> Field.((b :> t) * f x))
     |> Vector.fold ~init:Field.zero ~f:Field.( + )
 

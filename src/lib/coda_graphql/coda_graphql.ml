@@ -826,10 +826,16 @@ module Types = struct
           `Mint_tokens
 
     let user_command_interface :
-        ('context, ('context, User_command.t) abstract_value option) typ =
+        ( 'context
+        , ( 'context
+          , (User_command.t, Transaction_hash.t) With_hash.t )
+          abstract_value
+          option )
+        typ =
       interface "UserCommand" ~doc:"Common interface for user commands"
         ~fields:(fun _ ->
           [ abstract_field "id" ~typ:(non_null guid) ~args:[]
+          ; abstract_field "hash" ~typ:(non_null string) ~args:[]
           ; abstract_field "kind" ~typ:(non_null kind) ~args:[]
               ~doc:"String describing the kind of user command"
           ; abstract_field "nonce" ~typ:(non_null int) ~args:[]
@@ -877,60 +883,67 @@ module Types = struct
               ~args:[] ~doc:"Account of the receiver"
               ~deprecated:(Deprecated (Some "use receiver field instead")) ] )
 
-    let user_command_shared_fields =
+    let user_command_shared_fields :
+        (Coda_lib.t, (User_command.t, Transaction_hash.t) With_hash.t) field
+        list =
       [ field "id" ~typ:(non_null guid) ~args:[]
           ~resolve:(fun _ user_command ->
-            User_command.to_base58_check user_command )
+            User_command.to_base58_check user_command.With_hash.data )
+      ; field "hash" ~typ:(non_null string) ~args:[]
+          ~resolve:(fun _ user_command ->
+            Transaction_hash.to_base58_check user_command.With_hash.hash )
       ; field "kind" ~typ:(non_null kind) ~args:[]
           ~doc:"String describing the kind of user command"
-          ~resolve:(fun _ cmd -> to_kind cmd)
+          ~resolve:(fun _ cmd -> to_kind cmd.With_hash.data)
       ; field "nonce" ~typ:(non_null int) ~args:[]
           ~doc:"Sequence number of command for the fee-payer's account"
           ~resolve:(fun _ payment ->
-            User_command_payload.nonce @@ User_command.payload payment
+            User_command_payload.nonce
+            @@ User_command.payload payment.With_hash.data
             |> Account.Nonce.to_int )
       ; field "source" ~typ:(non_null AccountObj.account)
           ~args:[] ~doc:"Account that the command is sent from"
           ~resolve:(fun {ctx= coda; _} cmd ->
             AccountObj.get_best_ledger_account coda
-              (User_command.source ~next_available_token:Token_id.invalid cmd)
-        )
+              (User_command.source ~next_available_token:Token_id.invalid
+                 cmd.With_hash.data) )
       ; field "receiver" ~typ:(non_null AccountObj.account)
           ~args:[] ~doc:"Account that the command applies to"
           ~resolve:(fun {ctx= coda; _} cmd ->
             AccountObj.get_best_ledger_account coda
-              (User_command.receiver ~next_available_token:Token_id.invalid cmd)
-        )
+              (User_command.receiver ~next_available_token:Token_id.invalid
+                 cmd.With_hash.data) )
       ; field "feePayer" ~typ:(non_null AccountObj.account)
           ~args:[] ~doc:"Account that pays the fees for the command"
           ~resolve:(fun {ctx= coda; _} cmd ->
             AccountObj.get_best_ledger_account coda
-              (User_command.fee_payer cmd) )
+              (User_command.fee_payer cmd.With_hash.data) )
       ; field "token" ~typ:(non_null token_id) ~args:[]
           ~doc:"Token used for the transaction" ~resolve:(fun _ cmd ->
-            User_command.token cmd )
+            User_command.token cmd.With_hash.data )
       ; field "amount" ~typ:(non_null uint64) ~args:[]
           ~doc:
             "Amount that the source is sending to receiver - this is 0 for \
              commands that are not associated with an amount"
           ~resolve:(fun _ cmd ->
-            match User_command.amount cmd with
+            match User_command.amount cmd.With_hash.data with
             | Some amount ->
                 Currency.Amount.to_uint64 amount
             | None ->
                 Unsigned.UInt64.zero )
       ; field "feeToken" ~typ:(non_null token_id) ~args:[]
           ~doc:"Token used to pay the fee" ~resolve:(fun _ cmd ->
-            User_command.fee_token cmd )
+            User_command.fee_token cmd.With_hash.data )
       ; field "fee" ~typ:(non_null uint64) ~args:[]
           ~doc:
             "Fee that the fee-payer is willing to pay for making the \
              transaction" ~resolve:(fun _ cmd ->
-            User_command.fee cmd |> Currency.Fee.to_uint64 )
+            User_command.fee cmd.With_hash.data |> Currency.Fee.to_uint64 )
       ; field "memo" ~typ:(non_null string) ~args:[]
           ~doc:"Short arbitrary message provided by the sender"
           ~resolve:(fun _ payment ->
-            User_command_payload.memo @@ User_command.payload payment
+            User_command_payload.memo
+            @@ User_command.payload payment.With_hash.data
             |> User_command_memo.to_string )
       ; field "isDelegation" ~typ:(non_null bool) ~args:[]
           ~doc:
@@ -939,7 +952,8 @@ module Types = struct
           ~deprecated:(Deprecated (Some "use kind field instead"))
           ~resolve:(fun _ user_command ->
             match
-              User_command.Payload.body @@ User_command.payload user_command
+              User_command.Payload.body
+              @@ User_command.payload user_command.With_hash.data
             with
             | Stake_delegation _ ->
                 true
@@ -948,17 +962,17 @@ module Types = struct
       ; field "from" ~typ:(non_null public_key) ~args:[]
           ~doc:"Public key of the sender"
           ~deprecated:(Deprecated (Some "use feePayer field instead"))
-          ~resolve:(fun _ cmd -> User_command.fee_payer_pk cmd)
+          ~resolve:(fun _ cmd -> User_command.fee_payer_pk cmd.With_hash.data)
       ; field "fromAccount" ~typ:(non_null AccountObj.account)
           ~args:[] ~doc:"Account of the sender"
           ~deprecated:(Deprecated (Some "use feePayer field instead"))
           ~resolve:(fun {ctx= coda; _} payment ->
             AccountObj.get_best_ledger_account coda
-            @@ User_command.fee_payer payment )
+            @@ User_command.fee_payer payment.With_hash.data )
       ; field "to" ~typ:(non_null public_key) ~args:[]
           ~doc:"Public key of the receiver"
           ~deprecated:(Deprecated (Some "use receiver field instead"))
-          ~resolve:(fun _ cmd -> User_command.receiver_pk cmd)
+          ~resolve:(fun _ cmd -> User_command.receiver_pk cmd.With_hash.data)
       ; field "toAccount"
           ~typ:(non_null AccountObj.account)
           ~doc:"Account of the receiver"
@@ -966,8 +980,8 @@ module Types = struct
           ~args:Arg.[]
           ~resolve:(fun {ctx= coda; _} cmd ->
             AccountObj.get_best_ledger_account coda
-            @@ User_command.receiver ~next_available_token:Token_id.invalid cmd
-            ) ]
+            @@ User_command.receiver ~next_available_token:Token_id.invalid
+                 cmd.With_hash.data ) ]
 
     let payment =
       obj "UserCommandPayment" ~fields:(fun _ -> user_command_shared_fields)
@@ -979,13 +993,14 @@ module Types = struct
           field "delegator" ~typ:(non_null AccountObj.account) ~args:[]
             ~resolve:(fun {ctx= coda; _} cmd ->
               AccountObj.get_best_ledger_account coda
-                (User_command.source ~next_available_token:Token_id.invalid cmd)
-          )
+                (User_command.source ~next_available_token:Token_id.invalid
+                   cmd.With_hash.data) )
           :: field "delegatee" ~typ:(non_null AccountObj.account) ~args:[]
                ~resolve:(fun {ctx= coda; _} cmd ->
                  AccountObj.get_best_ledger_account coda
                    (User_command.receiver
-                      ~next_available_token:Token_id.invalid cmd) )
+                      ~next_available_token:Token_id.invalid cmd.With_hash.data)
+             )
           :: user_command_shared_fields )
 
     let mk_stake_delegation = add_type user_command_interface stake_delegation
@@ -994,12 +1009,13 @@ module Types = struct
       obj "UserCommandNewToken" ~fields:(fun _ ->
           field "tokenOwner" ~typ:(non_null public_key) ~args:[]
             ~doc:"Public key to set as the owner of the new token"
-            ~resolve:(fun _ cmd -> User_command.source_pk cmd)
+            ~resolve:(fun _ cmd -> User_command.source_pk cmd.With_hash.data)
           :: field "newAccountsDisabled" ~typ:(non_null bool) ~args:[]
                ~doc:"Whether new accounts created in this token are disabled"
                ~resolve:(fun _ cmd ->
                  match
-                   User_command_payload.body @@ User_command.payload cmd
+                   User_command_payload.body
+                   @@ User_command.payload cmd.With_hash.data
                  with
                  | Create_new_token {disable_new_accounts; _} ->
                      disable_new_accounts
@@ -1018,8 +1034,8 @@ module Types = struct
             ~args:[] ~doc:"The account that owns the token for the new account"
             ~resolve:(fun {ctx= coda; _} cmd ->
               AccountObj.get_best_ledger_account coda
-                (User_command.source ~next_available_token:Token_id.invalid cmd)
-          )
+                (User_command.source ~next_available_token:Token_id.invalid
+                   cmd.With_hash.data) )
           :: field "disabled" ~typ:(non_null bool) ~args:[]
                ~doc:
                  "Whether this account should be disabled upon creation. If \
@@ -1027,7 +1043,8 @@ module Types = struct
                   match the 'newAccountsDisabled' property set in the token \
                   owner's account." ~resolve:(fun _ cmd ->
                  match
-                   User_command_payload.body @@ User_command.payload cmd
+                   User_command_payload.body
+                   @@ User_command.payload cmd.With_hash.data
                  with
                  | Create_token_account {account_disabled; _} ->
                      account_disabled
@@ -1047,14 +1064,15 @@ module Types = struct
             ~args:[] ~doc:"The account that owns the token to mint"
             ~resolve:(fun {ctx= coda; _} cmd ->
               AccountObj.get_best_ledger_account coda
-                (User_command.source ~next_available_token:Token_id.invalid cmd)
-          )
+                (User_command.source ~next_available_token:Token_id.invalid
+                   cmd.With_hash.data) )
           :: user_command_shared_fields )
 
     let mk_mint_tokens = add_type user_command_interface mint_tokens
 
-    let mk_user_command cmd =
-      match User_command_payload.body @@ User_command.payload cmd with
+    let mk_user_command
+        (cmd : (User_command.t, Transaction_hash.t) With_hash.t) =
+      match User_command_payload.body @@ User_command.payload cmd.data with
       | Payment _ ->
           mk_payment cmd
       | Stake_delegation _ ->
@@ -1671,7 +1689,7 @@ module Types = struct
     module User_command = struct
       module Inputs = struct
         module Type = struct
-          type t = User_command.t
+          type t = (User_command.t, Transaction_hash.t) With_hash.t
 
           type repr = (Coda_lib.t, t) abstract_value
 
@@ -1683,14 +1701,17 @@ module Types = struct
         end
 
         module Cursor = struct
-          type t = User_command.t
+          type t = (User_command.t, Transaction_hash.t) With_hash.t
 
-          let serialize = User_command.to_base58_check
+          let serialize ({data; _} : t) = User_command.to_base58_check data
 
           let deserialize ?error serialized_payment =
             result_of_or_error
               (User_command.of_base58_check serialized_payment)
               ~error:(Option.value error ~default:"Invalid cursor")
+            |> Result.map ~f:(fun cmd ->
+                   { With_hash.data= cmd
+                   ; hash= Transaction_hash.hash_user_command cmd } )
 
           let doc = Doc.bin_prot "Opaque pagination cursor for a user command"
         end
@@ -2003,7 +2024,8 @@ module Mutations = struct
         ~sign_choice:(User_command_input.Sign_choice.Signature signature)
       |> Deferred.return
     in
-    send_user_command coda user_command_input
+    let%map cmd = send_user_command coda user_command_input in
+    {With_hash.data= cmd; hash= Transaction_hash.hash_user_command cmd}
 
   let send_unsigned_user_command ~coda ~nonce_opt ~signer ~memo ~fee ~fee_token
       ~fee_payer_pk ~valid_until ~body =
@@ -2021,7 +2043,8 @@ module Mutations = struct
         ~fee_payer_pk ~valid_until ~body ~sign_choice)
       |> Deferred.return
     in
-    send_user_command coda user_command_input
+    let%map cmd = send_user_command coda user_command_input in
+    {With_hash.data= cmd; hash= Transaction_hash.hash_user_command cmd}
 
   let send_delegation =
     io_field "sendDelegation"
@@ -2285,23 +2308,49 @@ module Queries = struct
       ~args:
         Arg.
           [ arg "publicKey" ~doc:"Public key of sender of pooled user commands"
-              ~typ:Types.Input.public_key_arg ]
-      ~resolve:(fun {ctx= coda; _} () opt_pk ->
+              ~typ:Types.Input.public_key_arg
+          ; arg "hashes" ~doc:"Hashes of the commands to find in the pool"
+              ~typ:(list (non_null string)) ]
+      ~resolve:(fun {ctx= coda; _} () opt_pk opt_hashes ->
         let transaction_pool = Coda_lib.transaction_pool coda in
         let resource_pool =
           Network_pool.Transaction_pool.resource_pool transaction_pool
         in
-        ( match opt_pk with
-        | None ->
+        ( match (opt_pk, opt_hashes) with
+        | None, None ->
             Network_pool.Transaction_pool.Resource_pool.get_all resource_pool
-        | Some pk ->
+        | Some pk, None ->
             let account_id = Account_id.create pk Token_id.default in
             Network_pool.Transaction_pool.Resource_pool.all_from_account
-              resource_pool account_id )
+              resource_pool account_id
+        | _, Some hashes ->
+            List.filter_map hashes ~f:(fun hash ->
+                let txn =
+                  hash |> Transaction_hash.of_base58_check
+                  |> Result.map
+                       ~f:
+                         (Network_pool.Transaction_pool.Resource_pool
+                          .find_by_hash resource_pool)
+                in
+                match (txn, opt_pk) with
+                | Ok (Some txn), Some pk ->
+                    (* Filter by fee-payer pk. *)
+                    if
+                      txn
+                      |> Transaction_hash.User_command_with_valid_signature
+                         .command |> User_command.fee_payer_pk
+                      |> Public_key.Compressed.equal pk
+                    then Some txn
+                    else None
+                | Ok (Some txn), None ->
+                    Some txn
+                | _ ->
+                    None ) )
         |> List.map
              ~f:
                (Fn.compose Types.UserCommand.mk_user_command
-                  User_command.forget_check) )
+                  Transaction_hash.User_command_with_valid_signature
+                  .forget_check) )
 
   let sync_state =
     result_field_no_inputs "syncStatus" ~doc:"Network sync status" ~args:[]
@@ -2458,7 +2507,7 @@ module Queries = struct
         let transaction_pool = Coda_lib.transaction_pool coda in
         Result.map_error
           (Transaction_status.get_status ~frontier_broadcast_pipe
-             ~transaction_pool payment)
+             ~transaction_pool payment.data)
           ~f:Error.to_string_hum )
 
   let current_snark_worker =
