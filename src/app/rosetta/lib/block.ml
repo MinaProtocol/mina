@@ -93,8 +93,10 @@ module User_command_info = struct
     *)
     let plan : 'a Op.t list =
       (* The dec side of a user command's fee transfer is here *)
-      (* TODO: Relate fee_payer_dec with fee_receiver_inc across user_commands and internal commands *)
-      [{Op.label= `Fee_payer_dec; related_to= None}]
+      (* TODO: Relate fee_payer_dec here with fee_receiver_inc in internal commands *)
+      ( if not Unsigned.UInt64.(equal t.fee zero) then
+        [{Op.label= `Fee_payer_dec; related_to= None}]
+      else [] )
       @ ( match t.failure_status with
         | Some (`Applied (Account_creation_fees_paid.By_receiver amount)) ->
             [ { Op.label= `Account_creation_fee_via_payment amount
@@ -122,7 +124,7 @@ module User_command_info = struct
       | `Create_account ->
           [] (* Covered by account creation fee *)
       | `Mint_tokens -> (
-        (* When amount is not none, we move the amount from source to receiver *)
+        (* When amount is not none, the amount goes to receiver's account *)
         match t.amount with
         | Some amount ->
             [{Op.label= `Mint_tokens amount; related_to= None}]
@@ -382,12 +384,15 @@ module Internal_command_info = struct
     let plan : 'a Op.t list =
       match t.kind with
       | `Coinbase ->
-          [{Op.label= `Coinbase_inc; related_to= None}]
+          (* The coinbase transaction is really incrementing by the coinbase
+           * amount and then decrementing by the fees paid. *)
+          [ {Op.label= `Coinbase_inc; related_to= None}
+          ; {Op.label= `Fee_payer_dec; related_to= Some `Coinbase_inc} ]
       | `Fee_transfer ->
           [{Op.label= `Fee_receiver_inc; related_to= None}]
     in
-    Op.build ~a_eq:[%eq: [`Coinbase_inc | `Fee_receiver_inc]] ~plan
-      ~f:(fun ~related_operations ~operation_identifier op ->
+    Op.build ~a_eq:[%eq: [`Coinbase_inc | `Fee_payer_dec | `Fee_receiver_inc]]
+      ~plan ~f:(fun ~related_operations ~operation_identifier op ->
         (* All internal commands succeed if they're in blocks *)
         let status = Operation_statuses.name `Success in
         match op.label with
@@ -398,6 +403,14 @@ module Internal_command_info = struct
             ; account= Some (account_id t.receiver Amount_of.Token_id.default)
             ; _type= Operation_types.name `Coinbase_inc
             ; amount= Some (Amount_of.coda coinbase)
+            ; metadata= None }
+        | `Fee_payer_dec ->
+            { Operation.operation_identifier
+            ; related_operations
+            ; status
+            ; account= Some (account_id t.receiver Amount_of.Token_id.default)
+            ; _type= Operation_types.name `Fee_payer_dec
+            ; amount= Some Amount_of.(negated (coda t.fee))
             ; metadata= None }
         | `Fee_receiver_inc ->
             { Operation.operation_identifier
