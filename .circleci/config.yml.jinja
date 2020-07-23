@@ -34,6 +34,10 @@
 {%endset%}
 
 version: 2.1
+parameters:
+  run-ci:
+    type: boolean
+    default: false
 jobs:
     tracetool:
         docker:
@@ -711,6 +715,9 @@ jobs:
 workflows:
     version: 2
     coda_parallel:
+        when:
+            condition:
+                - << pipeline.parameters.run-ci >>
         jobs:
             - lint
             - lint-opt
