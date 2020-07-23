@@ -6,12 +6,31 @@ defmodule Architecture.Statistic do
   alias Architecture.ResourceSet
   alias Architecture.Timer
 
-  @callback log_providers :: [module]
+  @type t :: module
+  @type message :: any
+
+  @callback providers :: [module] # log providers or other statistics
   @callback resources(ResourceSet.t()) :: ResourceSet.t()
   @callback init(Resource.t()) :: struct
   @callback update(Resource.t(), state) :: state when state: struct
-  @callback handle_log(Resource.t(), state, LogProvider.t(), LogProvider.log()) :: state
+  @callback handle_message(Resource.t(), state, t(), message()) :: state
             when state: struct
+
+  # a statistic can depend on a statistic provider, so cycles are possible
+  @spec check_cycle([module],MapSet.t()) :: :ok
+  def check_cycle(providers,seen) do
+    Enum.each(providers,
+      fn prov ->
+	if MapSet.member?(seen,prov) do
+          raise "Found a Statistics provider cycle containing #{prov}"
+        end
+	# a Log_provider has no provider dependencies
+	if Util.has_behaviour?(prov,Architecture.Statistic) do
+	  check_cycle(prov.providers,MapSet.put(seen,prov))
+	end
+      end)
+    :ok
+  end
 
   defmacro __using__(_params) do
     quote do
@@ -68,15 +87,25 @@ defmodule Architecture.Statistic do
     @impl true
     def init(params) do
       Logger.metadata(context: __MODULE__)
-      Logger.info("subscribing to log providers", process_module: __MODULE__)
-      Enum.each(params.mod.log_providers(), &LogProvider.Junction.subscribe(&1, params.resource))
+      Logger.info("subscribing to providers", process_module: __MODULE__)
+      Enum.each(params.mod.providers(),
+	fn provider ->
+	  cond do
+	    Util.has_behaviour?(provider,Architecture.Log_provider) ->
+	      LogProvider.Junction.subscribe(provider, params.resource)
+	    Util.has_behaviour?(provider,Architecture.Statistic) ->
+	      Statistic.Junction.subscribe(provider, params.resource)
+	    true ->
+	      raise "#{provider} must be an instance of either Log_provider or Statistic"
+	  end
+	end)
       state = params.mod.init(params.resource)
-      {:ok, {params, state}}
+      {:ok, {params,state}}
     end
 
     @impl true
     def handle_cast({:subscription, provider, message}, {params, state}) do
-      state = params.mod.handle_log(params.resource, state, provider, message)
+      state = params.mod.handle_message(params.resource, state, provider, message)
       Statistic.Junction.broadcast(__MODULE__, params.resource, state)
       {:noreply, {params, state}}
     end

@@ -1,5 +1,6 @@
 open Core_kernel
 open Pickles_types
+open Basic
 
 [%%versioned
 module Stable = struct
@@ -127,10 +128,10 @@ let create ?message:_ pk ~primary ~auxiliary =
 
 let verify ?message:_ proof vk (primary : Fp.Vector.t) =
   let t =
-    let v = Fq.Vector.create () in
-    Fq.Vector.emplace_back v Fq.one ;
-    for i = 0 to Fq.Vector.length primary - 1 do
-      Fq.Vector.emplace_back v (Fq.Vector.get primary i)
+    let v = Fp.Vector.create () in
+    Fp.Vector.emplace_back v Fp.one ;
+    for i = 0 to Fp.Vector.length primary - 1 do
+      Fp.Vector.emplace_back v (Fp.Vector.get primary i)
     done ;
     to_backend v proof
   in

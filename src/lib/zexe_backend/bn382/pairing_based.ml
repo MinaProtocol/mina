@@ -1,3 +1,5 @@
+open Basic
+
 module Bigint = struct
   module R = struct
     include Fp.Bigint
@@ -50,14 +52,16 @@ module Verification_key = struct
 end
 
 module R1CS_constraint_system =
-  R1cs_constraint_system.Make (Fp) (Snarky_bn382.Fp.Constraint_matrix)
-module Var = Var
+  Zexe_backend_common.R1cs_constraint_system.Make
+    (Fp)
+    (Snarky_bn382.Fp.Constraint_matrix)
+module Var = Zexe_backend_common.Var
 
 module Oracles = struct
   open Snarky_bn382
 
-  let create vk input (pi : Proof.t) =
-    let t = Fp_oracles.create vk (Proof.to_backend input pi) in
+  let create vk input (pi : Pairing_based_proof.t) =
+    let t = Fp_oracles.create vk (Pairing_based_proof.to_backend input pi) in
     Caml.Gc.finalise Fp_oracles.delete t ;
     t
 
@@ -120,32 +124,29 @@ module Keypair = struct
                 t
           in
           let store =
-            Key_cache.Disk_storable.simple
+            Key_cache.Sync.Disk_storable.simple
               (fun () -> "fp-urs")
               (fun () ~path -> Snarky_bn382.Fp_urs.read path)
               Snarky_bn382.Fp_urs.write
           in
           let u =
-            Async.Thread_safe.block_on_async_exn (fun () ->
-                let open Async in
-                match%bind Key_cache.read specs store () with
-                | Ok (u, _) ->
-                    return u
-                | Error _e ->
-                    let urs =
-                      Snarky_bn382.Fp_urs.create
-                        (Unsigned.Size_t.of_int degree)
-                    in
-                    let%map _ =
-                      Key_cache.write
-                        (List.filter specs ~f:(function
-                          | On_disk _ ->
-                              true
-                          | S3 _ ->
-                              false ))
-                        store () urs
-                    in
-                    urs )
+            match Key_cache.Sync.read specs store () with
+            | Ok (u, _) ->
+                u
+            | Error _e ->
+                let urs =
+                  Snarky_bn382.Fp_urs.create (Unsigned.Size_t.of_int degree)
+                in
+                let _ =
+                  Key_cache.Sync.write
+                    (List.filter specs ~f:(function
+                      | On_disk _ ->
+                          true
+                      | S3 _ ->
+                          false ))
+                    store () urs
+                in
+                urs
           in
           urs := Some u ;
           u
@@ -153,7 +154,7 @@ module Keypair = struct
     (set_urs_info, load)
 
   let create
-      { R1cs_constraint_system.public_input_size
+      { Zexe_backend_common.R1cs_constraint_system.public_input_size
       ; auxiliary_input_size
       ; m= {a; b; c}
       ; weight } =
@@ -178,4 +179,4 @@ module Keypair = struct
     |> Matrix_evals.map ~f:(Abc.map ~f:G1.Affine.of_backend)
 end
 
-module Proof = Proof
+module Proof = Pairing_based_proof
