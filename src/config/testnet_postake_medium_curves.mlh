@@ -1,7 +1,7 @@
 [%%define ledger_depth 14]
 [%%import "/src/config/curve/medium.mlh"]
 [%%import "/src/config/coinbase/realistic.mlh"]
-[%%import "/src/config/scan_state/point2tps.mlh"]
+[%%import "/src/config/scan_state/standard.mlh"]
 [%%import "/src/config/debug_level/some.mlh"]
 [%%import "/src/config/proof_level/full.mlh"]
 [%%import "/src/config/txpool_size.mlh"]
