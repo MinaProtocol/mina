@@ -84,7 +84,7 @@ defmodule Coda.Application do
       # in theory, resource db queries can be performed separately for each stat config
       %Architecture.Statistic.Spec{
         statistic: Coda.Statistics.BlockProductionRate,
-        resource_db: resource_db
+        resource_db: resource_db,
       }
     ]
 
