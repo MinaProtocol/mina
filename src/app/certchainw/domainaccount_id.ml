@@ -20,7 +20,7 @@ end
 
 type t = Stable.Latest.t [@@deriving sexp, equal, compare, hash, yojson]
 
-let create key tid = (key, tid)
+let create domain = (key, tid)
 
 let empty = (Public_key.Compressed.empty, Token_id.default)
 
