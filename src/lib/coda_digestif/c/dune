@@ -1,0 +1,6 @@
+(library
+  (public_name coda_digestif.c)
+  (name coda_digestif_c)
+  (libraries digestif.c)
+  (implements coda_digestif)
+  (modes native))

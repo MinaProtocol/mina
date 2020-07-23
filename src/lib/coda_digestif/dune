@@ -1,63 +1,6 @@
-(* -*- tuareg -*- *)
-
-(* This disgusting hack of a file recursively invokes dune to build
-config.mlh, so we can read it to figure out if we should depend on digestif.c
-or digestif.ocaml. We only depend on digestif.c when fake_hash is set. This
-means `make web` will be entirely broken, but we shouldn't need it in those
-contexts anyway.
-
-If https://github.com/ocaml/dune/issues/1776 were implemented, we would
-not need this.
-
-We break the recursion with an environment variable. Otherwise we'd be
-infinitely invoking dune, and you'd run out of memory, file descriptors,
-or process table entries.
-
-*)
-
-#load "unix.cma"
-
-let base =
-  "(library\n     (name coda_digestif)\n     (libraries digestif.ocaml))"
-
-let make_dune digestif_name =
-  "(library\n\
-  \     (name coda_digestif)\n\
-  \     (public_name coda_digestif)\n\
-  \     (libraries " ^ digestif_name ^ "))"
-
-let detect_fake_hash lines =
-  List.exists (String.equal "[%%define fake_hash true]") lines
-
-let dune_build_install_dir =
-  List.hd (String.split_on_char ':' (Unix.getenv "OCAMLFIND_IGNORE_DUPS_IN"))
-
-(* this became necessary sometime between dune 1.6.3 and 1.9.1 *)
-let _ = Unix.system ("mkdir -p \"" ^ dune_build_install_dir ^ "\"")
-
-let dune_string =
-  if
-    try Unix.getenv "CODA_HACK_BREAK_RECURSION" = "1" with Not_found -> false
-  then base
-  else
-    match
-      Unix.system
-        "cd ../../ && CODA_HACK_BREAK_RECURSION=1 dune build config.mlh"
-    with
-    | WEXITED 0 ->
-        let fd =
-          Unix.openfile "../../_build/default/config.mlh" [Unix.O_RDONLY] 0
-        in
-        let ich = Unix.in_channel_of_descr fd in
-        let rec read_lines_rev acc =
-          try read_lines_rev (input_line ich :: acc) with End_of_file -> acc
-        in
-        let res =
-          if detect_fake_hash (read_lines_rev []) then make_dune "digestif.c"
-          else make_dune "digestif.ocaml"
-        in
-        close_in ich ; res
-    | _ ->
-        failwith "recursive dune invocation failed for some reason."
-
-let () = Jbuild_plugin.V1.send dune_string
+(library
+  (public_name coda_digestif)
+  (name coda_digestif)
+  (libraries digestif)
+  (virtual_modules coda_digestif)
+  (default_implementation coda_digestif.c))

@@ -1,0 +1,5 @@
+(library
+  (public_name coda_digestif.ocaml)
+  (name coda_digestif_ocaml)
+  (libraries digestif.ocaml)
+  (implements coda_digestif))
