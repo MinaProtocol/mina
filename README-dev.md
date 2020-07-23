@@ -200,13 +200,13 @@ in the form of `dune exec coda -- integration-tests $SOME_TEST`.
 You might see a build error like this:
 
 ```text
-Error: Files external/digestif/src-c/.digestif_c.objs/digestif.cmx
-       and external/digestif/src-c/.digestif_c.objs/rakia.cmx
-       make inconsistent assumptions over implementation Rakia
+Error: Files src/lib/coda_base/coda_base.objs/account.cmx
+       and src/lib/coda_base/coda_base.objs/token_id.cmx
+       make inconsistent assumptions over implementation Crypto_params
 ```
 
-You can work around it with `rm -r src/_build/default/src/$OFFENDING_PATH` and a rebuild.
-Here, the offending path is `external/digestif/src-c/.diestif_c.objs`.
+You can work around it with `rm -r src/_build/default/$OFFENDING_PATH` and a rebuild.
+Here, the offending path is `src/lib/coda_base/coda_base.objs`.
 
 ## Docker Image Family Tree
 
