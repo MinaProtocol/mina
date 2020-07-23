@@ -1,8 +1,6 @@
 defmodule Architecture.Statistic do
   @moduledoc "Behaviour for statistics."
 
-  alias Cloud.Google.Subscription
-
   alias Architecture.LogProvider
   alias Architecture.Resource
   alias Architecture.ResourceSet
@@ -56,9 +54,7 @@ defmodule Architecture.Statistic do
 
     defclass(
       statistic: module,
-      resource_db: ResourceSet.t(),
-      conn: Cloud.Google.pubsub_conn(),
-      subscription: Subscription.t()
+      resource_db: ResourceSet.t()
     )
   end
 

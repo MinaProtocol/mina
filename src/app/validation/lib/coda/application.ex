@@ -6,8 +6,6 @@ defmodule Coda.Application do
   alias Architecture.LogFilter
   alias Architecture.ResourceSet
   alias Cloud.Google.LogPipeline
-  alias Cloud.Google.Subscription
-  alias Cloud.Google.Topic
   alias Coda.Resources
 
   use Application
@@ -82,15 +80,11 @@ defmodule Coda.Application do
       }
     ]
 
-    statistics_topic = Topic.create(api_conns.pubsub,"statistics_topic")
-
     statistics_spec = [
       # in theory, resource db queries can be performed separately for each stat config
       %Architecture.Statistic.Spec{
         statistic: Coda.Statistics.BlockProductionRate,
         resource_db: resource_db,
-	subscription: Subscription.create(api_conns.pubsub, "statistics", statistics_topic),
-        conn: api_conns.pubsub
       }
     ]
 
