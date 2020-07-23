@@ -4,10 +4,17 @@ open Coda_base
 
 let name = "coda-txns-and-restart-non-producers"
 
+let runtime_config = Runtime_config.Test_configs.three_producers
+
 let main () =
   let wait_time = Time.Span.of_min 2. in
   let logger = Logger.create () in
-  let precomputed_values = Lazy.force Precomputed_values.compiled in
+  let%bind precomputed_values, _runtime_config =
+    Genesis_ledger_helper.init_from_config_file ~logger ~may_generate:false
+      ~proof_level:None
+      (Lazy.force runtime_config)
+    >>| Or_error.ok_exn
+  in
   let accounts = Lazy.force (Precomputed_values.accounts precomputed_values) in
   let snark_work_public_keys =
     Fn.const @@ Some (List.nth_exn accounts 5 |> snd |> Account.public_key)
