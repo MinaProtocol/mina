@@ -486,9 +486,7 @@ let test ?archive_process_location ?is_archive_rocksdb ~name logger n
   in
   let%bind program_dir = Unix.getcwd () in
   Coda_processes.init () ;
-  let runtime_config =
-    Genesis_ledger_helper.extract_runtime_config precomputed_values
-  in
+  let runtime_config = precomputed_values.runtime_config in
   let%bind configs =
     Coda_processes.local_configs n ~block_production_interval ~program_dir
       ~block_production_keys ~acceptable_delay ~chain_id:name

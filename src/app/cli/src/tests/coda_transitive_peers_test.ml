@@ -37,8 +37,7 @@ let main () =
       ~acceptable_delay ~chain_id:name ~snark_worker_public_keys:None
       ~block_production_keys:(Fn.const None) ~work_selection_method ~trace_dir
       ~max_concurrent_connections
-      ~runtime_config:
-        (Genesis_ledger_helper.extract_runtime_config precomputed_values)
+      ~runtime_config:precomputed_values.runtime_config
   in
   let%bind workers = Coda_processes.spawn_local_processes_exn configs in
   let%bind net_configs = Coda_processes.net_configs (n + 1) in
@@ -63,8 +62,7 @@ let main () =
       ~work_selection_method ~trace_dir ~offset:Time.Span.zero ()
       ~max_concurrent_connections ~is_archive_rocksdb:false
       ~archive_process_location:None
-      ~runtime_config:
-        (Genesis_ledger_helper.extract_runtime_config precomputed_values)
+      ~runtime_config:precomputed_values.runtime_config
   in
   let%bind worker = Coda_process.spawn_exn config in
   let%bind _ = after (Time.Span.of_sec 10.) in

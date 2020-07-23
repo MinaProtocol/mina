@@ -99,6 +99,11 @@ val all_from_account :
 (** Get all user commands in the pool. *)
 val get_all : t -> Transaction_hash.User_command_with_valid_signature.t list
 
+val find_by_hash :
+     t
+  -> Transaction_hash.t
+  -> Transaction_hash.User_command_with_valid_signature.t option
+
 (** Check the contents of the pool are valid against the current ledger. Call
     this whenever the transition frontier is (re)created.
 *)
