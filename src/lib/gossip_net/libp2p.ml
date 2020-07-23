@@ -441,7 +441,12 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
             (* call itself failed *)
             (* TODO: learn what other exceptions are raised here *)
             let exn = Monitor.extract_exn monitor_exn in
-            match exn with
+            match Error.sexp_of_t (Error.of_exn exn) with
+            | Sexp.List (Sexp.Atom "connection attempt timeout" :: _) ->
+                Logger.debug t.config.logger ~module_:__MODULE__
+                  ~location:__LOC__ "RPC call raised an exception: $exn"
+                  ~metadata:[("exn", `String (Exn.to_string exn))] ;
+                Deferred.return (Or_error.of_exn exn)
             | _ ->
                 Logger.error t.config.logger ~module_:__MODULE__
                   ~location:__LOC__ "RPC call raised an exception: $exn"
