@@ -1,3 +1,4 @@
+module D = Composition_types.Digest
 open Core_kernel
 
 module Rounds = struct
@@ -6,7 +7,7 @@ module Rounds = struct
   let rounds_partial = 30
 end
 
-let high_entropy_bits = 256
+let high_entropy_bits = 128
 
 module Make (Field : Zexe_backend.Field.S) = struct
   module Inputs = struct
@@ -54,5 +55,5 @@ module Make (Field : Zexe_backend.Field.S) = struct
   let digest params elts =
     let sponge = Bits.create params in
     Array.iter elts ~f:(Bits.absorb sponge) ;
-    Bits.squeeze sponge ~length:256
+    Bits.squeeze_field sponge |> Inputs.Field.to_bits |> D.Constant.of_bits
 end
