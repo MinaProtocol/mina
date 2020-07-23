@@ -18,7 +18,6 @@
 [%%define record_async_backtraces false]
 [%%define time_offsets true]
 [%%define cache_exceptions false]
-[%%define fake_hash false]
 
 [%%define genesis_ledger "testnet_postake"]
 

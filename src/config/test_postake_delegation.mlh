@@ -11,7 +11,6 @@
 [%%import "/src/config/protocol_version/current.mlh"]
 
 [%%define time_offsets true]
-[%%define fake_hash false]
 
 [%%define genesis_ledger "test_delegation"]
 [%%define genesis_state_timestamp "2019-01-30 12:00:00-08:00"]

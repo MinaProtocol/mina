@@ -77,7 +77,6 @@ required_config_agnostic_tests = {
 
 # dictionary mapping configs to lists of tests
 small_curves_tests = {
-    'fake_hash': ['full-test'],
     'test_postake_snarkless':
     simple_tests,
     'test_postake_split':
