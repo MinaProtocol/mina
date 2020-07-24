@@ -31,6 +31,9 @@ CREATE TABLE user_commands
 , hash           text                NOT NULL UNIQUE
 , status         user_command_status
 , failure_reason text
+, fee_payer_account_creation_fee_paid  bigint
+, receiver_account_creation_fee_paid   bigint
+, created_token  bigint
 );
 
 CREATE TYPE internal_command_type AS ENUM ('fee_transfer', 'coinbase');

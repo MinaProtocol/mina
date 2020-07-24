@@ -546,4 +546,79 @@ module Test_configs = struct
   , "ledger": { "name": "test", "add_genesis_winner": false } }
       |json}
       |> Yojson.Safe.from_string |> of_yojson |> Result.ok_or_failwith )
+
+  let transactions =
+    lazy
+      ( (* test_postake_txns *)
+        {json|
+  { "daemon":
+      { "txpool_max_size": 3000 }
+  , "genesis":
+      { "k": 6
+      , "delta": 3
+      , "genesis_state_timestamp": "2019-01-30 12:00:00-08:00" }
+  , "proof":
+      { "level": "check"
+      , "c": 8
+      , "ledger_depth": 6
+      , "work_delay": 2
+      , "block_window_duration_ms": 15000
+      , "transaction_capacity": {"2_to_the": 3}
+      , "coinbase_amount": "20"
+      , "account_creation_fee": "1" }
+  , "ledger":
+      { "name": "test_split_two_stakers"
+      , "add_genesis_winner": false } }
+      |json}
+      |> Yojson.Safe.from_string |> of_yojson |> Result.ok_or_failwith )
+
+  let split_snarkless =
+    lazy
+      ( (* test_postake_split_snarkless *)
+        {json|
+  { "daemon":
+      { "txpool_max_size": 3000 }
+  , "genesis":
+      { "k": 24
+      , "delta": 3
+      , "genesis_state_timestamp": "2019-01-30 12:00:00-08:00" }
+  , "proof":
+      { "level": "check"
+      , "c": 8
+      , "ledger_depth": 30
+      , "work_delay": 1
+      , "block_window_duration_ms": 10000
+      , "transaction_capacity": {"2_to_the": 2}
+      , "coinbase_amount": "20"
+      , "account_creation_fee": "1" }
+  , "ledger":
+      { "name": "test_split_two_stakers"
+      , "add_genesis_winner": false } }
+      |json}
+      |> Yojson.Safe.from_string |> of_yojson |> Result.ok_or_failwith )
+
+  let delegation =
+    lazy
+      ( (* test_postake_delegation *)
+        {json|
+  { "daemon":
+      { "txpool_max_size": 3000 }
+  , "genesis":
+      { "k": 6
+      , "delta": 3
+      , "genesis_state_timestamp": "2019-01-30 12:00:00-08:00" }
+  , "proof":
+      { "level": "check"
+      , "c": 1
+      , "ledger_depth": 6
+      , "work_delay": 1
+      , "block_window_duration_ms": 10000
+      , "transaction_capacity": {"2_to_the": 2}
+      , "coinbase_amount": "20"
+      , "account_creation_fee": "1" }
+  , "ledger":
+      { "name": "test_delegation"
+      , "add_genesis_winner": false } }
+      |json}
+      |> Yojson.Safe.from_string |> of_yojson |> Result.ok_or_failwith )
 end

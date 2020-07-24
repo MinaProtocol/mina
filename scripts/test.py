@@ -32,20 +32,18 @@ simple_tests = [
     'transaction-snark-profiler -k 2',
 ]
 
-integration_tests = [
+compile_config_agnostic_tests = [
+    'coda-bootstrap-test',
+    'coda-shared-state-test',
+    'coda-batch-payment-test',
     'coda-peers-test',
     'coda-transitive-peers-test',
     'coda-block-production-test',
     'coda-shared-prefix-test -who-produces 0',
     'coda-shared-prefix-test -who-produces 1',
     'coda-change-snark-worker-test',
-    'coda-archive-node-test'
-]
-
-all_tests = simple_tests + integration_tests
-
-compile_config_agnostic_tests = [
-    'coda-bootstrap-test',
+    'coda-archive-node-test',
+    'coda-delegation-test',
 ]
 
 compile_config_agnostic_profiles = [
@@ -53,8 +51,12 @@ compile_config_agnostic_profiles = [
 ]
 
 required_config_agnostic_tests = {
-    'dev':
-      [ 'coda-bootstrap-test' ]
+    'dev': [
+        'coda-bootstrap-test',
+        'coda-shared-state-test',
+        'coda-batch-payment-test',
+        'coda-delegation-test',
+      ]
 }
 
 # dictionary mapping configs to lists of tests
@@ -62,16 +64,12 @@ small_curves_tests = {
     'fake_hash': ['full-test'],
     'test_postake_snarkless':
     simple_tests,
-    'test_postake_split_snarkless':
-    integration_tests,
     'test_postake_split':
     ['coda-shared-prefix-multiproducer-test -num-block-producers 2'],
     'test_postake':
     simple_tests,
     'test_postake_catchup': ['coda-restart-node-test'],
     'test_postake_three_producers': ['coda-txns-and-restart-non-producers'],
-    'test_postake_delegation': ['coda-delegation-test'],
-    'test_postake_txns': ['coda-shared-state-test', 'coda-batch-payment-test'],
     'test_postake_five_even_txns':
     ['coda-shared-prefix-multiproducer-test -num-block-producers 5 -payments'],
 }

@@ -31,6 +31,7 @@ let get_status ~frontier_broadcast_pipe ~transaction_pool cmd =
   let%map check_cmd =
     Result.of_option (User_command.check cmd)
       ~error:(Error.of_string "Invalid signature")
+    |> Result.map ~f:Transaction_hash.User_command_with_valid_signature.create
   in
   let resource_pool = Transaction_pool.resource_pool transaction_pool in
   match Broadcast_pipe.Reader.peek frontier_broadcast_pipe with
