@@ -27,13 +27,13 @@ open Signature_lib
 
 let signer_pk =
   Public_key.Compressed.of_base58_check_exn
-    "B62qom56dHZvJvuZRZ2cCGRqB2UdCjoDRQjQRKfZyxX1SBTbF24L7Pt"
+    "B62qkef7po74VEvJYcLYsdZ83FuKidgNZ8Xiaitzo8gKJXaxLwxgG7T"
 
 (* signer *)
 let keypair =
   let private_key =
     Private_key.of_base58_check_exn
-      "EKEjf4cZcaUScpV3iAE8r9PaEj4dbPbyUhzWryhhxQqjTTSCfyo8"
+      "EKFdTXQKPsEi2JUSE3JkmKtKFu8uDcgc5MmR5zj6nz5FUWPVuK6c"
   in
   let public_key = Public_key.decompress_exn signer_pk in
   Keypair.{public_key; private_key}
@@ -41,12 +41,12 @@ let keypair =
 (* payment receiver *)
 let receiver =
   Public_key.Compressed.of_base58_check_exn
-    "B62qkZCRBPiTtcq62o9G4NAuAb12ZzUobicLLvNkcWZjxymxKDVd7pv"
+    "B62qnekV6LVbEttV7j3cxJmjSbxDWuXa5h3KeVEXHPGKTzthQaBufrY"
 
 (* delegatee *)
 let new_delegate =
   Public_key.Compressed.of_base58_check_exn
-    "B62qo4biEn36khSQcQiCioznuqXFE5nyUasEfUXVqyxdPissUEReCvL"
+    "B62qoW9n8n54FqHV8dPp7eCtpAZS1Jw9zsK7AHHiYmUzi6Wvms8reqt"
 
 let make_common ~fee ~fee_payer_pk ~nonce ~valid_until memo =
   let fee = Currency.Fee.of_int fee in

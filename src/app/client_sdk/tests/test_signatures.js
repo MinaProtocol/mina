@@ -2,16 +2,16 @@ var coda = require("../../../../_build/default/src/app/client_sdk/client_sdk.bc.
 
 var keypair = {
   privateKey:
-    "EKEjf4cZcaUScpV3iAE8r9PaEj4dbPbyUhzWryhhxQqjTTSCfyo8",
+    "EKFdTXQKPsEi2JUSE3JkmKtKFu8uDcgc5MmR5zj6nz5FUWPVuK6c",
   publicKey:
-    "B62qom56dHZvJvuZRZ2cCGRqB2UdCjoDRQjQRKfZyxX1SBTbF24L7Pt",
+    "B62qkef7po74VEvJYcLYsdZ83FuKidgNZ8Xiaitzo8gKJXaxLwxgG7T",
 };
 
 var receiver =
-  "B62qkZCRBPiTtcq62o9G4NAuAb12ZzUobicLLvNkcWZjxymxKDVd7pv";
+  "B62qnekV6LVbEttV7j3cxJmjSbxDWuXa5h3KeVEXHPGKTzthQaBufrY";
 
 var newDelegate =
-  "B62qo4biEn36khSQcQiCioznuqXFE5nyUasEfUXVqyxdPissUEReCvL";
+  "B62qoW9n8n54FqHV8dPp7eCtpAZS1Jw9zsK7AHHiYmUzi6Wvms8reqt";
 
 var payments = [
     {
