@@ -1,0 +1,5 @@
+(library
+ (name list_with_length)
+ (public_name list_with_length)
+ (libraries core_kernel)
+ (preprocess (pps ppx_version)))
