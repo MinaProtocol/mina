@@ -170,9 +170,30 @@ RUN git clone \
 WORKDIR $HOME/$CODA_DIR
 
 # TODO: handle this opam work without cloning the full repository (directly pull src/opam.export)
-# All our ocaml packages
-RUN opam install uri.2.2.1 base.v0.12.0 stdio.v0.12.0 ppx_sexp_conv.v0.12.0 ppxlib.0.8.1 --yes \
-  && opam switch import src/opam.export --yes --inplace-build \
+# Installs uri.2.2.1 and its dependencies so that build succeeds, then installs the rest of the deps
+RUN opam install --yes \
+  uri.2.2.1 \
+  base.v0.12.0 \
+  stdio.v0.12.0 \
+  ppx_sexp_conv.v0.12.0 \
+  ppxlib.0.8.1 \
+  ocaml-compiler-libs.v0.11.0 \
+  ocaml-migrate-parsetree.1.5.0 \
+  dune.2.5.1 \
+  ocamlfind.1.8.0 \
+  base-bytes.base \
+  ppx_derivers.1.2.1 \
+  re.1.9.0 \
+  result.1.3 \
+  stringext.1.5.0 \
+  && opam pin add src/external/ocaml-extlib \
+  && opam pin add src/external/ocaml-sodium \
+  && opam pin add src/external/rpc_parallel \
+  && opam pin add src/external/digestif \
+  && opam pin add src/external/async_kernel \
+  && opam pin add src/external/coda_base58 \
+  && opam pin add src/external/graphql_ppx \
+  && opam switch import src/opam.export --yes --skip-update \
   && opam clean --logs -cs --unused-repositories --yes
 
 #  && sudo chmod -R u+rw ~/.opam \
@@ -180,14 +201,7 @@ RUN opam install uri.2.2.1 base.v0.12.0 stdio.v0.12.0 ppx_sexp_conv.v0.12.0 ppxl
 ENV OPAMYES 1
 
 # Our pins
-RUN eval $(opam config env) \
-  && opam pin add src/external/ocaml-extlib \
-  && opam pin add src/external/ocaml-sodium \
-  && opam pin add src/external/rpc_parallel \
-  && opam pin add src/external/digestif \
-  && opam pin add src/external/async_kernel \
-  && opam pin add src/external/coda_base58 \
-  && opam pin add src/external/graphql_ppx
+#RUN eval $(opam config env) \
   #&& opam clean --logs -csy --unused-repositories
   #&& rm -rf src/external
 

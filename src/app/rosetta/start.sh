@@ -34,8 +34,21 @@ PG_CONN=postgres://$USER:$USER@localhost:5432/archiver
 # wait for it to settle
 sleep 3
 
+genesis_time=$(date -d '2019-01-30 20:00:00.000000Z' '+%s')
+now_time=$(date '+%s')
+
+export CODA_PRIVKEY_PASS=""
+export CODA_TIMEOFFSET=$(( $now_time - $genesis_time ))
+export CODA_CONFIG_FILE=/tmp/config.json
+PK=ZsMSUuKL9zLAF7sMn951oakTFRCCDw9rDfJgqJ55VMtPXaPa5vPwntQRFJzsHyeh8R8
+
 # demo node
-./run-demo.sh \
+/coda-bin/cli/src/coda.exe daemon \
+    -seed -demo-mode \
+    -block-producer-key /tmp/keys/demo-block-producer \
+    -run-snark-worker $PK \
+    -config-file /tmp/config.json \
+    -insecure-rest-server \
     -archive-address 3086 \
     -log-level debug &
 
