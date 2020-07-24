@@ -12,22 +12,21 @@ module Get_all_transactions =
         peers
       }
       pooledUserCommands(publicKey: null) {
-        id
+        hash
       }
     }
 |}]
 
-(* TODO: Change this to get transactions by hash #5415 *)
-module Get_transactions_by_pk =
+module Get_transactions_by_hash =
 [%graphql
 {|
-    query all_transactions_by_pk($publicKey: PublicKey!) {
+    query all_transactions_by_hash($hashes: [String!]) {
       initialPeers
       daemonStatus {
         peers
       }
-      pooledUserCommands(publicKey: $publicKey) {
-        id
+      pooledUserCommands(hashes: $hashes) {
+        hash
         amount @bsDecoder(fn: "Decoders.uint64")
         fee @bsDecoder(fn: "Decoders.uint64")
         kind
@@ -76,11 +75,11 @@ module All = struct
                  method pooledUserCommands =
                    [| `UserCommand
                         (object
-                           method id = "TXN_1"
+                           method hash = "TXN_1"
                         end)
                     ; `UserCommand
                         (object
-                           method id = "TXN_2"
+                           method hash = "TXN_2"
                         end) |]
                end )
       ; validate_network_choice= Network.Validate_choice.Mock.succeed }
@@ -102,7 +101,7 @@ module All = struct
       { Mempool_response.transaction_identifiers=
           res#pooledUserCommands |> Array.to_list
           |> List.map ~f:(fun (`UserCommand obj) ->
-                 {Transaction_identifier.hash= obj#id} ) }
+                 {Transaction_identifier.hash= obj#hash} ) }
   end
 
   module Real = Impl (Deferred.Result)
@@ -126,7 +125,7 @@ module Transaction = struct
   module Env = struct
     module T (M : Monad_fail.S) = struct
       type 'gql t =
-        { gql: public_key:string -> ('gql, Errors.t) M.t
+        { gql: hash:string -> ('gql, Errors.t) M.t
         ; validate_network_choice: 'gql Network.Validate_choice.Impl(M).t }
     end
 
@@ -136,16 +135,15 @@ module Transaction = struct
     let real : graphql_uri:Uri.t -> 'gql Real.t =
      fun ~graphql_uri ->
       { gql=
-          (fun ~public_key ->
+          (fun ~hash ->
             Graphql.query
-              (Get_transactions_by_pk.make ~publicKey:(`String public_key) ())
+              (Get_transactions_by_hash.make ~hashes:[|hash|] ())
               graphql_uri )
       ; validate_network_choice= Network.Validate_choice.Real.validate }
 
     let obj_of_user_command_info (user_command_info : User_command_info.t) =
       object
-        (* TODO: Swap Id with hash *)
-        method id = user_command_info.hash
+        method hash = user_command_info.hash
 
         method amount =
           Option.value ~default:Unsigned.UInt64.zero user_command_info.amount
@@ -195,7 +193,7 @@ module Transaction = struct
 
     let mock : 'gql Mock.t =
       { gql=
-          (fun ~public_key:_ ->
+          (fun ~hash:_ ->
             Result.return
             @@ object
                  method pooledUserCommands =
@@ -259,7 +257,7 @@ module Transaction = struct
       ; nonce= Unsigned.UInt32.of_int obj#nonce
       ; amount= Some obj#amount
       ; failure_status= None
-      ; hash= obj#id (* TODO: Replace with hash once #5415 lands *) }
+      ; hash= obj#hash }
 
     let handle :
            env:'gql Env.T(M).t
@@ -267,13 +265,12 @@ module Transaction = struct
         -> (Mempool_transaction_response.t, Errors.t) M.t =
      fun ~env req ->
       let open M.Let_syntax in
-      let%bind res = env.gql ~public_key:req.transaction_identifier.hash in
+      let%bind res = env.gql ~hash:req.transaction_identifier.hash in
       let%bind () =
         env.validate_network_choice ~network_identifier:req.network_identifier
           ~gql_response:res
       in
       let%bind user_command_obj =
-        (* TODO: Move to checking the option once #5415 lands *)
         if Array.is_empty res#pooledUserCommands then
           M.fail
             (Errors.create
@@ -298,7 +295,7 @@ module Transaction = struct
       module Mock = Impl (Result)
 
       (* This test intentionally fails as there has not been time to implement
-       * it properly yet *)
+     * it properly yet *)
       (*
       let%test_unit "all dummies" =
         Test.assert_ ~f:Mempool_transaction_response.to_yojson

@@ -2,6 +2,20 @@ open Core_kernel
 open Async
 open Models
 
+module Get_coinbase =
+[%graphql
+{|
+  query {
+    daemonStatus {
+      peers
+    }
+    initialPeers
+    genesisConstants {
+      coinbase @bsDecoder(fn: "Decoders.uint64")
+    }
+  }
+|}]
+
 let account_id (`Pk pk) token_id =
   { Account_identifier.address= pk
   ; sub_account= None
@@ -50,7 +64,7 @@ module Op = struct
     )
 end
 
-(* TODO: Populate postgres DB with at least one of each kind of transaction and then make sure ops make sense *)
+(* TODO: Populate postgres DB with at least one of each kind of transaction and then make sure ops make sense: #5501 *)
 module User_command_info = struct
   module Kind = struct
     type t =
@@ -385,7 +399,7 @@ module Internal_command_info = struct
       match t.kind with
       | `Coinbase ->
           (* The coinbase transaction is really incrementing by the coinbase
-           * amount and then decrementing by the fees paid. *)
+         * amount and then decrementing by the fees paid. *)
           [ {Op.label= `Coinbase_inc; related_to= None}
           ; {Op.label= `Fee_payer_dec; related_to= Some `Coinbase_inc} ]
       | `Fee_transfer ->
@@ -763,7 +777,7 @@ module Specific = struct
         db:(module Caqti_async.CONNECTION) -> graphql_uri:Uri.t -> 'gql Real.t
         =
      fun ~db ~graphql_uri ->
-      { gql= (fun () -> Graphql.query (Network.Get_network.make ()) graphql_uri)
+      { gql= (fun () -> Graphql.query (Get_coinbase.make ()) graphql_uri)
       ; db_block=
           (fun query ->
             let (module Conn : Caqti_async.CONNECTION) = db in
@@ -773,8 +787,14 @@ module Specific = struct
     let mock : 'gql Mock.t =
       { gql=
           (fun () ->
-            (* TODO: Add variants to cover every branch *)
-            Result.return @@ object end )
+            Result.return
+            @@ object
+                 method genesisConstants =
+                   object
+                     method coinbase = Unsigned.UInt64.of_int 20_000_000_000
+                   end
+               end )
+          (* TODO: Add variants to cover every branch *)
       ; db_block= (fun _query -> Result.return @@ Block_info.dummy)
       ; validate_network_choice= Network.Validate_choice.Mock.succeed }
   end
@@ -794,8 +814,7 @@ module Specific = struct
         env.validate_network_choice ~network_identifier:req.network_identifier
           ~gql_response:res
       in
-      (* TODO: Pull account coinbase from graphql #5435 *)
-      let coinbase = Unsigned.UInt64.of_int 20_000_000_000 in
+      let coinbase = (res#genesisConstants)#coinbase in
       let%map block_info = env.db_block query in
       { Block_response.block=
           { Block.block_identifier= block_info.block_identifier
