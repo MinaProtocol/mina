@@ -3902,7 +3902,7 @@ let%test_module "transaction_snark" =
                 Amount.of_int (random_int_incl 0 30 * 1_000_000_000)
               in
               let ( `Fee_payer_account fee_payer_account
-                  , `Source_account source_account
+                  , `Source_account _source_account
                   , `Receiver_account receiver_account ) =
                 test_user_command_with_accounts ~constraint_constants ~ledger
                   ~accounts ~signer ~fee ~fee_payer_pk ~fee_token
@@ -3914,7 +3914,6 @@ let%test_module "transaction_snark" =
                      ; do_not_pay_creation_fee= true })
               in
               let fee_payer_account = Option.value_exn fee_payer_account in
-              let source_account = Option.value_exn source_account in
               let expected_fee_payer_balance =
                 accounts.(0).balance |> sub_fee fee
               in
