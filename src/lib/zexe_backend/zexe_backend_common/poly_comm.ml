@@ -16,7 +16,7 @@ module type Inputs_intf = sig
       module Backend : sig
         include Type_with_delete
 
-        val create : Base_field.t -> Base_field.t -> t
+        val create_without_finaliser : Base_field.t -> Base_field.t -> t
 
         module Vector : Vector with type elt := t
       end
@@ -28,7 +28,7 @@ module type Inputs_intf = sig
   module Backend : sig
     include Type_with_delete
 
-    val make :
+    val make_without_finaliser :
       Curve.Affine.Backend.Vector.t -> Curve.Affine.Backend.t option -> t
 
     val shifted : t -> Curve.Affine.Backend.t option
@@ -52,30 +52,32 @@ module Make (Inputs : Inputs_intf) = struct
 
   let g (a, b) =
     let open G_affine in
-    let t = create a b in
+    let t = create_without_finaliser a b in
     Caml.Gc.finalise delete t ; t
 
   let g_vec arr =
-    let v = G_affine.Vector.create () in
+    let v = G_affine.Vector.create_without_finaliser () in
     Array.iter arr ~f:(fun c ->
         (* Very leaky *)
         G_affine.Vector.emplace_back v (g c) ) ;
     Caml.Gc.finalise G_affine.Vector.delete v ;
     v
 
-  let with_degree_bound_to_backend
-      (commitment :
-        (Base_field.t * Base_field.t)
-        Dlog_marlin_types.Poly_comm.With_degree_bound.t) : Backend.t =
-    Backend.make (g_vec commitment.unshifted) (Some (g commitment.shifted))
-
-  let without_degree_bound_to_backend
-      (commitment :
-        (Base_field.t * Base_field.t)
-        Dlog_marlin_types.Poly_comm.Without_degree_bound.t) : Backend.t =
-    Backend.make (g_vec commitment) None
-
   let to_backend (t : t) : Backend.t =
+    let with_degree_bound_to_backend
+        (commitment :
+          (Base_field.t * Base_field.t)
+          Dlog_marlin_types.Poly_comm.With_degree_bound.t) : Backend.t =
+      Backend.make_without_finaliser
+        (g_vec commitment.unshifted)
+        (Some (g commitment.shifted))
+    in
+    let without_degree_bound_to_backend
+        (commitment :
+          (Base_field.t * Base_field.t)
+          Dlog_marlin_types.Poly_comm.Without_degree_bound.t) : Backend.t =
+      Backend.make_without_finaliser (g_vec commitment) None
+    in
     let t =
       match t with
       | `With_degree_bound t ->
@@ -87,15 +89,18 @@ module Make (Inputs : Inputs_intf) = struct
     t
 
   let of_backend (t : Backend.t) =
+    (* TODO: Just use delete immediately on all these intermediate values instead of attaching finalisers.  *)
     let open Backend in
     let unshifted =
-      (* TODO: Leaky? *)
       let v = unshifted t in
+      Caml.Gc.finalise G_affine.Vector.delete v ;
       Array.init (G_affine.Vector.length v) (fun i ->
-          Curve.Affine.of_backend (G_affine.Vector.get v i) )
+          let g = G_affine.Vector.get_without_finaliser v i in
+          Caml.Gc.finalise G_affine.delete g ;
+          Curve.Affine.of_backend g )
     in
-    (* TODO: Leaky? *)
     let shifted = shifted t in
+    Option.iter ~f:(Caml.Gc.finalise G_affine.delete) shifted ;
     let open Dlog_marlin_types.Poly_comm in
     match shifted with
     | Some g ->

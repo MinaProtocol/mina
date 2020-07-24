@@ -21,7 +21,7 @@ module Mat = struct
   include T.Fp.Constraint_matrix
 
   let create () =
-    let t = create () in
+    let t = create_without_finaliser () in
     Caml.Gc.finalise delete t ; t
 end
 

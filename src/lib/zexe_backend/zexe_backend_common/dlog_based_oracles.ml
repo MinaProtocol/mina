@@ -7,7 +7,7 @@ module type Inputs_intf = sig
     include Type_with_delete
 
     module Vector : sig
-      include Vector with type elt = t
+      include Vector_gced with type elt = t
 
       module Triple : Triple with type elt := t
     end
@@ -29,7 +29,7 @@ module type Inputs_intf = sig
   module Backend : sig
     include Type_with_delete
 
-    val create : Verifier_index.t -> Proof.Backend.t -> t
+    val create_without_finaliser : Verifier_index.t -> Proof.Backend.t -> t
 
     val alpha : t -> Field.t
 
@@ -62,7 +62,7 @@ module Make (Inputs : Inputs_intf) = struct
 
   let create vk prev_challenge input (pi : Proof.t) =
     let pi = Proof.to_backend prev_challenge input pi in
-    let t = Backend.create vk pi in
+    let t = Backend.create_without_finaliser vk pi in
     Caml.Gc.finalise Backend.delete t ;
     t
 
@@ -98,9 +98,8 @@ module Make (Inputs : Inputs_intf) = struct
 
   let evals = scalar_challenge evals
 
-  (* TODO: Leaky *)
   let opening_prechallenges t =
-    let t = opening_prechallenges t in
+    let t = fieldvec opening_prechallenges t in
     Array.init (Field.Vector.length t) (fun i ->
         Pickles_types.Scalar_challenge.create (Field.Vector.get t i) )
 

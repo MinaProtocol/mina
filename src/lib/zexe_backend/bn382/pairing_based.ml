@@ -55,7 +55,7 @@ module Mat = struct
   include Snarky_bn382.Fp.Constraint_matrix
 
   let create () =
-    let t = create () in
+    let t = create_without_finaliser () in
     Caml.Gc.finalise delete t ; t
 end
 
@@ -67,7 +67,10 @@ module Oracles = struct
   open Snarky_bn382
 
   let create vk input (pi : Pairing_based_proof.t) =
-    let t = Fp_oracles.create vk (Pairing_based_proof.to_backend input pi) in
+    let t =
+      Fp_oracles.create_without_finaliser vk
+        (Pairing_based_proof.to_backend input pi)
+    in
     Caml.Gc.finalise Fp_oracles.delete t ;
     t
 
@@ -141,7 +144,8 @@ module Keypair = struct
                 u
             | Error _e ->
                 let urs =
-                  Snarky_bn382.Fp_urs.create (Unsigned.Size_t.of_int degree)
+                  Snarky_bn382.Fp_urs.create_without_finaliser
+                    (Unsigned.Size_t.of_int degree)
                 in
                 let _ =
                   Key_cache.Sync.write
@@ -165,12 +169,19 @@ module Keypair = struct
       ; m= {a; b; c}
       ; weight } =
     let vars = 1 + public_input_size + auxiliary_input_size in
-    Fp_index.create a b c
-      (Unsigned.Size_t.of_int vars)
-      (Unsigned.Size_t.of_int (public_input_size + 1))
-      (load_urs ())
+    let t =
+      Fp_index.create_without_finaliser a b c
+        (Unsigned.Size_t.of_int vars)
+        (Unsigned.Size_t.of_int (public_input_size + 1))
+        (load_urs ())
+    in
+    Caml.Gc.finalise Fp_index.delete t ;
+    t
 
-  let vk t = Fp_verifier_index.create t
+  let vk t =
+    let t = Fp_verifier_index.create_without_finaliser t in
+    Caml.Gc.finalise Fp_verifier_index.delete t ;
+    t
 
   let pk = Fn.id
 
