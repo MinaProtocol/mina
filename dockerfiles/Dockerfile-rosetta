@@ -169,9 +169,10 @@ RUN git clone \
 
 WORKDIR $HOME/$CODA_DIR
 
+ENV OPAMYES 1
 # TODO: handle this opam work without cloning the full repository (directly pull src/opam.export)
 # Installs uri.2.2.1 and its dependencies so that build succeeds, then installs the rest of the deps
-RUN opam install --yes \
+RUN opam install \
   uri.2.2.1 \
   base.v0.12.0 \
   stdio.v0.12.0 \
@@ -193,12 +194,10 @@ RUN opam install --yes \
   && opam pin add src/external/async_kernel \
   && opam pin add src/external/coda_base58 \
   && opam pin add src/external/graphql_ppx \
-  && opam switch import src/opam.export --yes --skip-update \
-  && opam clean --logs -cs --unused-repositories --yes
+  && opam switch import src/opam.export --skip-update \
+  && opam clean --logs -cs --unused-repositories
 
 #  && sudo chmod -R u+rw ~/.opam \
-
-ENV OPAMYES 1
 
 # Our pins
 #RUN eval $(opam config env) \
