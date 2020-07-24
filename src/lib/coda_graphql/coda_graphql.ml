@@ -431,6 +431,22 @@ module Types = struct
       ~doc:"Status for whenever the blockchain is reorganized"
       ~values:[enum_value "CHANGED" ~value:`Changed]
 
+  let genesis_constants =
+    obj "GenesisConstants" ~fields:(fun _ ->
+        [ field "accountCreationFee" ~typ:(non_null uint64)
+            ~doc:"The fee charged to create a new account"
+            ~args:Arg.[]
+            ~resolve:(fun {ctx= coda; _} () ->
+              (Coda_lib.config coda).precomputed_values.constraint_constants
+                .account_creation_fee |> Currency.Fee.to_uint64 )
+        ; field "coinbase" ~typ:(non_null uint64)
+            ~doc:
+              "The amount received as a coinbase reward for producing a block"
+            ~args:Arg.[]
+            ~resolve:(fun {ctx= coda; _} () ->
+              (Coda_lib.config coda).precomputed_values.constraint_constants
+                .coinbase_amount |> Currency.Amount.to_uint64 ) ] )
+
   module AccountObj = struct
     module AnnotatedBalance = struct
       type t =
@@ -2643,6 +2659,15 @@ module Queries = struct
         | None ->
             [] )
 
+  let genesis_constants =
+    field "genesisConstants"
+      ~doc:
+        "The constants used to determine the configuration of the genesis \
+         block and all of its transitive dependencies"
+      ~args:Arg.[]
+      ~typ:(non_null Types.genesis_constants)
+      ~resolve:(fun _ () -> ())
+
   let commands =
     [ sync_state
     ; daemon_status
@@ -2664,7 +2689,8 @@ module Queries = struct
     ; trust_status
     ; trust_status_all
     ; snark_pool
-    ; pending_snark_work ]
+    ; pending_snark_work
+    ; genesis_constants ]
 end
 
 let schema =

@@ -7,9 +7,16 @@ let name = "coda-delegation-test"
 
 include Heartbeat.Make ()
 
+let runtime_config = Runtime_config.Test_configs.delegation
+
 let main () =
   let logger = Logger.create () in
-  let precomputed_values = Lazy.force Precomputed_values.compiled in
+  let%bind precomputed_values, _runtime_config =
+    Genesis_ledger_helper.init_from_config_file ~logger ~may_generate:false
+      ~proof_level:None
+      (Lazy.force runtime_config)
+    >>| Or_error.ok_exn
+  in
   let num_block_producers = 3 in
   let accounts = Lazy.force (Precomputed_values.accounts precomputed_values) in
   let snark_work_public_keys ndx =
