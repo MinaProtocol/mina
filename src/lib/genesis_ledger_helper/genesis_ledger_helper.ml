@@ -544,6 +544,7 @@ module Genesis_proof = struct
           Genesis_proof.create_values
             (module B)
             { genesis_ledger= inputs.genesis_ledger
+            ; runtime_config = inputs.runtime_config
             ; proof_level= inputs.proof_level
             ; blockchain_proof_system_id= Lazy.force B.Proof.id
             ; protocol_state_with_hash= inputs.protocol_state_with_hash
