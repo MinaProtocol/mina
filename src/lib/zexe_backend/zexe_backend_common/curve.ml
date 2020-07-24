@@ -19,11 +19,11 @@ module type Input_intf = sig
 
     val is_zero : t -> bool
 
-    val create_without_finaliser : BaseField.t -> BaseField.t -> t
+    val create : BaseField.t -> BaseField.t -> t
 
     val delete : t -> unit
 
-    module Vector : Intf.Vector with type elt = t
+    module Vector : Snarky.Vector.S with type elt = t
 
     module Pair : Intf.Pair with type elt := t
   end
@@ -86,40 +86,7 @@ module Make
           and module ScalarField := ScalarField) =
 struct
   module Affine = struct
-    module Backend = struct
-      open C.Affine
-
-      type nonrec t = t
-
-      let delete = delete
-
-      let create_without_finaliser = create_without_finaliser
-
-      module Pair = Pair
-
-      module Vector = struct
-        type t = Vector.t
-
-        let create () =
-          let t = Vector.create_without_finaliser () in
-          Caml.Gc.finalise Vector.delete t ;
-          t
-
-        let get v i =
-          let x = Vector.get_without_finaliser v i in
-          Caml.Gc.finalise delete x ; x
-
-        let create_without_finaliser = Vector.create_without_finaliser
-
-        let get_without_finaliser = Vector.get_without_finaliser
-
-        let delete = Vector.delete
-
-        let emplace_back = Vector.emplace_back
-
-        let length = Vector.length
-      end
-    end
+    module Backend = C.Affine
 
     module Stable = struct
       module V1 = struct
@@ -133,7 +100,7 @@ struct
     include Stable.Latest
 
     let to_backend (x, y) =
-      let t = C.Affine.create_without_finaliser x y in
+      let t = C.Affine.create x y in
       Caml.Gc.finalise C.Affine.delete t ;
       t
 

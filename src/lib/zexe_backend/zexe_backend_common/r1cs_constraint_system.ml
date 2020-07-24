@@ -209,8 +209,8 @@ struct
 
   let add_r1cs t (a, b, c) =
     let append m v =
-      let indices = Snarky_bn382.Usize_vector.create_without_finaliser () in
-      let coeffs = Fp.Vector.create_without_finaliser () in
+      let indices = Snarky_bn382.Usize_vector.create () in
+      let coeffs = Fp.Vector.create () in
       List.iter v ~f:(fun (x, i) ->
           Snarky_bn382.Usize_vector.emplace_back indices
             (Unsigned.Size_t.of_int i) ;

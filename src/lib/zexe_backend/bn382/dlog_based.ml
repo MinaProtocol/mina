@@ -18,7 +18,7 @@ module Mat = struct
   include Snarky_bn382.Fq.Constraint_matrix
 
   let create () =
-    let t = create_without_finaliser () in
+    let t = create () in
     Caml.Gc.finalise delete t ; t
 end
 

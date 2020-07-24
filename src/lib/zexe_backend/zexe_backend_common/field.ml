@@ -58,9 +58,7 @@ module type Input_intf = sig
   val copy : t -> t -> unit
 
   module Vector : sig
-    include Intf.Vector with type elt := t
-
-    val typ : t Ctypes.typ
+    include Snarky.Vector.S with type elt := t
 
     module Triple : Intf.Triple with type elt := t
   end
@@ -153,8 +151,6 @@ module type S = sig
     val delete : t -> unit
 
     val create : unit -> t
-
-    val create_without_finaliser : unit -> t
 
     val get : t -> int -> elt
 
@@ -342,15 +338,6 @@ module Make (F : Input_intf) :
     type elt = t
 
     include Vector
-
-    let get t i =
-      let x = get_without_finaliser t i in
-      Caml.Gc.finalise F.delete x ;
-      x
-
-    let create () =
-      let t = create_without_finaliser () in
-      Caml.Gc.finalise delete t ; t
 
     (* TODO: Leaky *)
     let of_array a =

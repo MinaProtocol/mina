@@ -24,7 +24,7 @@ module type Inputs_intf = sig
     val one : t
 
     module Vector : sig
-      include Vector_gced with type elt := t
+      include Vector with type elt = t
 
       module Triple : Triple with type elt := t
     end
@@ -37,7 +37,7 @@ module type Inputs_intf = sig
       module Backend : sig
         include Type_with_delete
 
-        module Vector : Vector_gced with type elt := t
+        module Vector : Vector with type elt = t
 
         module Pair : Intf.Pair with type elt := t
       end
@@ -75,9 +75,7 @@ module type Inputs_intf = sig
   module Evaluations_backend : sig
     type t
 
-    val delete : t -> unit
-
-    val make_without_finaliser :
+    val make :
          Scalar_field.Vector.t
       -> Scalar_field.Vector.t
       -> Scalar_field.Vector.t
@@ -143,7 +141,7 @@ module type Inputs_intf = sig
 
     module Vector : Vector with type elt := t
 
-    val make_without_finaliser :
+    val make :
          Scalar_field.Vector.t
       -> Poly_comm.Backend.t
       -> Poly_comm.Backend.t
@@ -168,7 +166,7 @@ module type Inputs_intf = sig
       -> Curve.Affine.Backend.Vector.t
       -> t
 
-    val create_without_finaliser :
+    val create :
          Index.t
       -> Scalar_field.Vector.t
       -> Scalar_field.Vector.t
@@ -281,14 +279,17 @@ module Make (Inputs : Inputs_intf) = struct
   let fq_array_to_vec arr =
     let vec = Fq.Vector.create () in
     Array.iter arr ~f:(fun fe -> Fq.Vector.emplace_back vec fe) ;
+    Caml.Gc.finalise Fq.Vector.delete vec ;
     vec
 
   let g_array_to_vec arr =
     let module V = G.Affine.Backend.Vector in
     let vec = V.create () in
     Array.iter arr ~f:(fun fe -> V.emplace_back vec fe) ;
+    Caml.Gc.finalise V.delete vec ;
     vec
 
+  (* TODO: Leaky? *)
   let evalvec arr =
     let vec = Fq.Vector.create () in
     Array.iter arr ~f:(fun fe -> Fq.Vector.emplace_back vec fe) ;
@@ -296,13 +297,9 @@ module Make (Inputs : Inputs_intf) = struct
 
   let gpair (type a) (t : a) (f : a -> G.Affine.Backend.Pair.t) :
       G.Affine.t * G.Affine.t =
+    (* TODO: Leak? *)
     let t = f t in
-    (* TODO: Just delete the pair immediately *)
-    Caml.Gc.finalise G.Affine.Backend.Pair.delete t ;
-    let g x =
-      let res = G.Affine.of_backend x in
-      G.Affine.Backend.delete x ; res
-    in
+    let g = G.Affine.of_backend in
     G.Affine.Backend.Pair.(g (f0 t), g (f1 t))
 
   let opening_proof_of_backend (t : Opening_proof_backend.t) =
@@ -312,8 +309,7 @@ module Make (Inputs : Inputs_intf) = struct
     let lr =
       let v = lr t in
       Array.init (G.Affine.Backend.Pair.Vector.length v) (fun i ->
-          gpair v (fun v ->
-              G.Affine.Backend.Pair.Vector.get_without_finaliser v i ) )
+          gpair v (fun v -> G.Affine.Backend.Pair.Vector.get v i) )
     in
     { Dlog_marlin_types.Openings.Bulletproof.lr
     ; z_1= fq z1
@@ -372,6 +368,7 @@ module Make (Inputs : Inputs_intf) = struct
         ; sigma_gh_3= (fq sigma3, (w g3_comm_nocopy, wo h3_comm)) }
     ; openings= {proof; evals} }
 
+  (* TODO: Leaky? *)
   let eval_to_backend
       { Dlog_marlin_types.Evals.w_hat
       ; z_hat_a
@@ -386,24 +383,23 @@ module Make (Inputs : Inputs_intf) = struct
       ; g_1
       ; g_2
       ; g_3 } =
-    let t =
-      Evaluations_backend.make_without_finaliser (evalvec w_hat)
-        (evalvec z_hat_a) (evalvec z_hat_b) (evalvec h_1) (evalvec g_1)
-        (evalvec h_2) (evalvec g_2) (evalvec h_3) (evalvec g_3) (evalvec row_a)
-        (evalvec row_b) (evalvec row_c) (evalvec col_a) (evalvec col_b)
-        (evalvec col_c) (evalvec value_a) (evalvec value_b) (evalvec value_c)
-        (evalvec rc_a) (evalvec rc_b) (evalvec rc_c)
-    in
-    Caml.Gc.finalise Evaluations_backend.delete t ;
-    t
+    Evaluations_backend.make (evalvec w_hat) (evalvec z_hat_a)
+      (evalvec z_hat_b) (evalvec h_1) (evalvec g_1) (evalvec h_2) (evalvec g_2)
+      (evalvec h_3) (evalvec g_3) (evalvec row_a) (evalvec row_b)
+      (evalvec row_c) (evalvec col_a) (evalvec col_b) (evalvec col_c)
+      (evalvec value_a) (evalvec value_b) (evalvec value_c) (evalvec rc_a)
+      (evalvec rc_b) (evalvec rc_c)
 
   let field_vector_of_list xs =
     let v = Fq.Vector.create () in
     List.iter ~f:(Fq.Vector.emplace_back v) xs ;
     v
 
-  let to_backend_without_finaliser (chal_polys : Challenge_polynomial.t list)
-      primary_input
+  let vec_to_array (type t elt)
+      (module V : Intf.Vector with type t = t and type elt = elt) (v : t) =
+    Array.init (V.length v) ~f:(V.get v)
+
+  let to_backend' (chal_polys : Challenge_polynomial.t list) primary_input
       ({ messages=
            { w_hat= w_comm
            ; z_hat_a= za_comm
@@ -418,16 +414,11 @@ module Make (Inputs : Inputs_intf) = struct
     let pcw t = Poly_comm.to_backend (`With_degree_bound t) in
     let pcwo t = Poly_comm.to_backend (`Without_degree_bound t) in
     let lr =
-      let v = G.Affine.Backend.Pair.Vector.create_without_finaliser () in
-      Caml.Gc.finalise G.Affine.Backend.Pair.Vector.delete v ;
+      let v = G.Affine.Backend.Pair.Vector.create () in
       Array.iter lr ~f:(fun (l, r) ->
           (* Very leaky *)
-          let pair =
-            G.Affine.Backend.Pair.make_without_finaliser (g l) (g r)
-          in
-          (* TODO: Just delete immediately. *)
-          Caml.Gc.finalise G.Affine.Backend.Pair.delete pair ;
-          G.Affine.Backend.Pair.Vector.emplace_back v pair ) ;
+          G.Affine.Backend.Pair.Vector.emplace_back v
+            (G.Affine.Backend.Pair.make (g l) (g r)) ) ;
       v
     in
     let challenges =
@@ -441,20 +432,15 @@ module Make (Inputs : Inputs_intf) = struct
           G.Affine.to_backend commitment )
       |> g_array_to_vec
     in
-    Backend.make_without_finaliser primary_input (pcwo w_comm) (pcwo za_comm)
-      (pcwo zb_comm) (pcwo h1_comm) (pcw g1_comm) (pcwo h2_comm) (pcw g2_comm)
-      (pcwo h3_comm) (pcw g3_comm) sigma2 sigma3 lr z_1 z_2 (g delta) (g sg)
-      (eval_to_backend evals0) (eval_to_backend evals1)
-      (eval_to_backend evals2) challenges commitments
+    Backend.make primary_input (pcwo w_comm) (pcwo za_comm) (pcwo zb_comm)
+      (pcwo h1_comm) (pcw g1_comm) (pcwo h2_comm) (pcw g2_comm) (pcwo h3_comm)
+      (pcw g3_comm) sigma2 sigma3 lr z_1 z_2 (g delta) (g sg)
+      (* Leaky! *)
+      (eval_to_backend evals0)
+      (eval_to_backend evals1) (eval_to_backend evals2) challenges commitments
 
   let to_backend chal_polys primary_input t =
-    let t =
-      to_backend_without_finaliser chal_polys
-        (field_vector_of_list primary_input)
-        t
-    in
-    Caml.Gc.finalise Backend.delete t ;
-    t
+    to_backend' chal_polys (field_vector_of_list primary_input) t
 
   let create ?message pk ~primary ~auxiliary =
     let chal_polys =
@@ -471,20 +457,15 @@ module Make (Inputs : Inputs_intf) = struct
           G.Affine.to_backend commitment )
       |> g_array_to_vec
     in
-    let res =
-      Backend.create_without_finaliser pk primary auxiliary challenges
-        commitments
-    in
+    let res = Backend.create pk primary auxiliary challenges commitments in
     let t = of_backend res in
     Backend.delete res ; t
 
   let batch_verify' (conv : 'a -> Fq.Vector.t)
       (ts : (t * 'a * message option) list) (vk : Verifier_index.t) =
-    let v = Backend.Vector.create_without_finaliser () in
+    let v = Backend.Vector.create () in
     List.iter ts ~f:(fun (t, xs, m) ->
-        let p =
-          to_backend_without_finaliser (Option.value ~default:[] m) (conv xs) t
-        in
+        let p = to_backend' (Option.value ~default:[] m) (conv xs) t in
         Backend.Vector.emplace_back v p ;
         Backend.delete p ) ;
     let res = Backend.batch_verify vk v in
