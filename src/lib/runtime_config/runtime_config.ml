@@ -31,6 +31,11 @@ let result_opt ~f x =
   | None ->
       Result.return None
 
+let dump_on_error yojson x =
+  Result.map_error x ~f:(fun str ->
+      str ^ "\n\nCould not parse JSON:\n" ^ Yojson.Safe.pretty_to_string yojson
+  )
+
 module Json_layout = struct
   module Accounts = struct
     module Single = struct
@@ -44,7 +49,8 @@ module Json_layout = struct
       let fields = [|"pk"; "sk"; "balance"; "delegate"|]
 
       let of_yojson json =
-        of_yojson @@ yojson_strip_fields ~keep_fields:fields json
+        dump_on_error json @@ of_yojson
+        @@ yojson_strip_fields ~keep_fields:fields json
     end
 
     type t = Single.t list [@@deriving yojson, dhall_type]
@@ -63,7 +69,8 @@ module Json_layout = struct
       [|"accounts"; "num_accounts"; "hash"; "name"; "add_genesis_winner"|]
 
     let of_yojson json =
-      of_yojson @@ yojson_strip_fields ~keep_fields:fields json
+      dump_on_error json @@ of_yojson
+      @@ yojson_strip_fields ~keep_fields:fields json
   end
 
   module Proof_keys = struct
@@ -82,7 +89,7 @@ module Json_layout = struct
         json
         |> yojson_rename_fields ~alternates
         |> yojson_strip_fields ~keep_fields:fields
-        |> of_yojson
+        |> of_yojson |> dump_on_error json
     end
 
     type t =
@@ -107,7 +114,8 @@ module Json_layout = struct
        ; "account_creation_fee" |]
 
     let of_yojson json =
-      of_yojson @@ yojson_strip_fields ~keep_fields:fields json
+      dump_on_error json @@ of_yojson
+      @@ yojson_strip_fields ~keep_fields:fields json
   end
 
   module Genesis = struct
@@ -120,7 +128,8 @@ module Json_layout = struct
     let fields = [|"k"; "delta"; "genesis_state_timestamp"|]
 
     let of_yojson json =
-      of_yojson @@ yojson_strip_fields ~keep_fields:fields json
+      dump_on_error json @@ of_yojson
+      @@ yojson_strip_fields ~keep_fields:fields json
   end
 
   module Daemon = struct
@@ -130,7 +139,8 @@ module Json_layout = struct
     let fields = [|"txpool_max_size"|]
 
     let of_yojson json =
-      of_yojson @@ yojson_strip_fields ~keep_fields:fields json
+      dump_on_error json @@ of_yojson
+      @@ yojson_strip_fields ~keep_fields:fields json
   end
 
   type t =
@@ -143,7 +153,8 @@ module Json_layout = struct
   let fields = [|"daemon"; "ledger"; "genesis"; "proof"|]
 
   let of_yojson json =
-    of_yojson @@ yojson_strip_fields ~keep_fields:fields json
+    dump_on_error json @@ of_yojson
+    @@ yojson_strip_fields ~keep_fields:fields json
 end
 
 (** JSON representation:
@@ -593,6 +604,31 @@ module Test_configs = struct
       , "account_creation_fee": "1" }
   , "ledger":
       { "name": "test_split_two_stakers"
+      , "add_genesis_winner": false } }
+      |json}
+      |> Yojson.Safe.from_string |> of_yojson |> Result.ok_or_failwith )
+
+  let delegation =
+    lazy
+      ( (* test_postake_delegation *)
+        {json|
+  { "daemon":
+      { "txpool_max_size": 3000 }
+  , "genesis":
+      { "k": 6
+      , "delta": 3
+      , "genesis_state_timestamp": "2019-01-30 12:00:00-08:00" }
+  , "proof":
+      { "level": "check"
+      , "c": 1
+      , "ledger_depth": 6
+      , "work_delay": 1
+      , "block_window_duration_ms": 10000
+      , "transaction_capacity": {"2_to_the": 2}
+      , "coinbase_amount": "20"
+      , "account_creation_fee": "1" }
+  , "ledger":
+      { "name": "test_delegation"
       , "add_genesis_winner": false } }
       |json}
       |> Yojson.Safe.from_string |> of_yojson |> Result.ok_or_failwith )
