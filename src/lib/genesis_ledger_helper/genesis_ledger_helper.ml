@@ -514,8 +514,8 @@ module Genesis_proof = struct
                 ; ("error", `String (Error.to_string_hum e)) ] ;
             return None )
 
-  let generate_inputs ~proof_level ~ledger ~constraint_constants
-      ~(genesis_constants : Genesis_constants.t) =
+  let generate_inputs ~runtime_config ~proof_level ~ledger
+      ~constraint_constants ~(genesis_constants : Genesis_constants.t) =
     let consensus_constants =
       Consensus.Constants.create ~constraint_constants
         ~protocol_constants:genesis_constants.protocol
@@ -525,7 +525,8 @@ module Genesis_proof = struct
         ~genesis_ledger:(Genesis_ledger.Packed.t ledger)
         ~constraint_constants ~consensus_constants
     in
-    { Genesis_proof.Inputs.constraint_constants
+    { Genesis_proof.Inputs.runtime_config
+    ; constraint_constants
     ; proof_level
     ; blockchain_proof_system_id= Snark_keys.blockchain_verification_key_id ()
     ; genesis_ledger= ledger
@@ -552,7 +553,8 @@ module Genesis_proof = struct
         in
         computed_values
     | _ ->
-        { Genesis_proof.constraint_constants= inputs.constraint_constants
+        { Genesis_proof.runtime_config= inputs.runtime_config
+        ; constraint_constants= inputs.constraint_constants
         ; proof_level= inputs.proof_level
         ; genesis_constants= inputs.genesis_constants
         ; genesis_ledger= inputs.genesis_ledger
@@ -593,8 +595,8 @@ module Genesis_proof = struct
         match%map load file with
         | Ok genesis_proof ->
             Ok
-              ( { Genesis_proof.constraint_constants=
-                    inputs.constraint_constants
+              ( { Genesis_proof.runtime_config= inputs.runtime_config
+                ; constraint_constants= inputs.constraint_constants
                 ; proof_level= inputs.proof_level
                 ; genesis_constants= inputs.genesis_constants
                 ; genesis_ledger= inputs.genesis_ledger
@@ -619,7 +621,8 @@ module Genesis_proof = struct
             ; ("compiled_hash", Base_hash.to_yojson compiled_base_hash) ] ;
         let filename = genesis_dir ^/ filename ~base_hash in
         let values =
-          { Genesis_proof.constraint_constants= inputs.constraint_constants
+          { Genesis_proof.runtime_config= inputs.runtime_config
+          ; constraint_constants= inputs.constraint_constants
           ; proof_level= inputs.proof_level
           ; genesis_constants= inputs.genesis_constants
           ; genesis_ledger= inputs.genesis_ledger
@@ -784,11 +787,12 @@ let load_config_file filename =
           Or_error.error_string err )
 
 let init_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
-    ~may_generate ~proof_level ~genesis_constants (config : Runtime_config.t) =
+    ~may_generate ~proof_level (config : Runtime_config.t) =
   Logger.info logger ~module_:__MODULE__ ~location:__LOC__
     "Initializing with runtime configuration $config"
     ~metadata:[("config", Runtime_config.to_yojson config)] ;
   let open Deferred.Or_error.Let_syntax in
+  let genesis_constants = Genesis_constants.compiled in
   let proof_level =
     List.find_map_exn ~f:Fn.id
       [ proof_level
@@ -870,8 +874,8 @@ let init_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
     @@ make_genesis_constants ~logger ~default:genesis_constants config
   in
   let proof_inputs =
-    Genesis_proof.generate_inputs ~proof_level ~ledger:genesis_ledger
-      ~constraint_constants ~genesis_constants
+    Genesis_proof.generate_inputs ~runtime_config:config ~proof_level
+      ~ledger:genesis_ledger ~constraint_constants ~genesis_constants
   in
   let open Deferred.Or_error.Let_syntax in
   let%map values, proof_file =
@@ -946,7 +950,7 @@ let upgrade_old_config ~logger filename json =
       (* This error will get handled properly elsewhere, do nothing here. *)
       return json
 
-let extract_runtime_config (precomputed_values : Precomputed_values.t) :
+let inferred_runtime_config (precomputed_values : Precomputed_values.t) :
     Runtime_config.t =
   let genesis_constants = precomputed_values.genesis_constants in
   let constraint_constants = precomputed_values.constraint_constants in

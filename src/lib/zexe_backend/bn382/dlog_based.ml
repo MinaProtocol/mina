@@ -77,7 +77,7 @@ module Keypair = Dlog_based_keypair.Make (struct
   module Curve = G
   module Poly_comm = Fq_poly_comm
   module Verifier_index = Snarky_bn382.Fq_verifier_index
-  module Constraint_matrix = Snarky_bn382.Fq.Constraint_matrix
+  module Constraint_matrix = Mat
 end)
 
 module Oracles = Dlog_based_oracles.Make (struct

@@ -1197,7 +1197,7 @@ module Base = struct
 
     (* These are all the possible cases:
 
-       Init_stack     Source                 Target 
+       Init_stack     Source                 Target
       --------------------------------------------------------------
         i               i                       i + state
         i               i                       i + state + coinbase

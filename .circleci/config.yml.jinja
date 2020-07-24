@@ -34,6 +34,10 @@
 {%endset%}
 
 version: 2.1
+parameters:
+  run-ci:
+    type: boolean
+    default: false
 jobs:
     tracetool:
         docker:
@@ -280,15 +284,15 @@ jobs:
             - restore_cache:
                 name: Restore cache - homebrew
                 keys:
+                    - homebrew-v9-{{'{{'}} checksum "brew_ci_cache.sig" {{'}}'}}-{{'{{'}} checksum "scripts/Brewfile" {{'}}'}}
                     - homebrew-v9-{{'{{'}} checksum "brew_ci_cache.sig" {{'}}'}}
-                    - homebrew-v8-{{'{{'}} checksum "brew_ci_cache.sig" {{'}}'}}
             - run:
                 name: Install macos dependencies - homebrew - macos-setup-brew.sh
                 command: |
                     ./scripts/skip_if_only_frontend_or_rfcs.sh ./scripts/macos-setup-brew.sh
             - save_cache:
                 name: Save cache - homebrew
-                key: homebrew-v9-{{'{{'}} checksum "brew_ci_cache.sig" {{'}}'}}
+                key: homebrew-v9-{{'{{'}} checksum "brew_ci_cache.sig" {{'}}'}}-{{'{{'}} checksum "scripts/Brewfile" {{'}}'}}
                 paths:
                     - "/usr/local/Homebrew"
                     - "/Users/distiller/Library/Caches/Homebrew"
@@ -302,13 +306,17 @@ jobs:
             - restore_cache:
                 name: Restore cache - opam
                 keys:
-                    - opam-v8-{{'{{'}} checksum "opam_ci_cache.sig" {{'}}'}}
+                    # Depend on the Brewfile, since brew installs opam and
+                    # we'll need a refresh if we change version
+                    - opam-v8-{{'{{'}} checksum "opam_ci_cache.sig" {{'}}'}}-{{'{{'}} checksum "scripts/Brewfile" {{'}}'}}
+
             - run:
                 name: Install macos dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
                 command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
             - save_cache:
                 name: Save cache - opam
-                key: opam-v8-{{'{{'}} checksum "opam_ci_cache.sig" {{'}}'}}
+                key: opam-v8-{{'{{'}} checksum "opam_ci_cache.sig" {{'}}'}}-{{'{{'}} checksum "scripts/Brewfile" {{'}}'}}
+
                 paths:
                     - "/Users/distiller/.opam"
                 no_output_timeout: 1h
@@ -613,6 +621,60 @@ jobs:
                 path: core_dumps
     {%- endfor %}
 
+    {%- for profile in compile_config_agnostic_profiles %}
+    build-binaries--{{profile}}:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
+        steps:
+            {{ checkout_no_lfs }}
+            - run: ulimit -c unlimited
+            {{ opam_init_linux }}
+            - run:
+                name: Build libp2p_helper
+                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
+            - run:
+                  name: Build OCaml
+                  command: |
+                      ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && make build'
+                      ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'echo built > should_run_tests'
+                  environment:
+                    DUNE_PROFILE: {{profile}}
+                    LIBP2P_NIXLESS: 1
+                    GO: /usr/lib/go/bin/go
+            - save_cache:
+                name: Store config-agnostic test binaries
+                key: {{profile}}-build-binaries-v1-{{'{{'}} .Revision {{'}}'}}
+                paths:
+                    - "src/app/libp2p_helper/result"
+                    - "_build/default/src/app/cli/src/coda.exe"
+                    - "_build/default/src/app/logproc/logproc.exe"
+                    - "scripts"
+                    - "should_run_tests"
+
+    {%- for test in compile_config_agnostic_tests %}
+    test--{{profile}}--{{test.replace(' ','_')}}:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
+        steps:
+            - restore_cache:
+                name: Restore cache - opam
+                keys:
+                    -  {{profile}}-build-binaries-v1-{{'{{'}} .Revision {{'}}'}}
+            - run:
+                  name: Running test -- {{profile}}:{{test}}
+                  command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "{{profile}}:{{test}}"; fi
+                  environment:
+                    LIBP2P_NIXLESS: 1
+                    CODA_LIBP2P_HELPER_PATH: /home/opam/project/src/app/libp2p_helper/result/bin/libp2p_helper
+                    GO: /usr/lib/go/bin/go
+            - store_artifacts:
+                  path: test_output/artifacts
+    {%- endfor %}
+    {%- endfor %}
+
+
     {%- for profile in small_curves_tests.keys() | sort %}
     test--{{profile}}:
         resource_class: large
@@ -659,6 +721,11 @@ jobs:
 workflows:
     version: 2
     coda_parallel:
+        when:
+            # We do seem to need a useless `and true` here
+            and:
+              - true
+              - << pipeline.parameters.run-ci >>
         jobs:
             - lint
             - lint-opt
@@ -691,6 +758,14 @@ workflows:
             - test-unit--nonconsensus_medium_curves
             {%- for profile in small_curves_tests.keys() | sort %}
             - test--{{profile}}
+            {%- endfor %}
+            {%- for profile in compile_config_agnostic_profiles %}
+            - build-binaries--{{profile}}
+            {%- for test in compile_config_agnostic_tests %}
+            - test--{{profile}}--{{test.replace(' ','_')}}:
+                requires:
+                  - build-binaries--{{profile}}
+            {%- endfor %}
             {%- endfor %}
 
     daily:

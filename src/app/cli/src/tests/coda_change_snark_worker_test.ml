@@ -5,6 +5,8 @@ open Async
 
 let name = "coda-change-snark-worker-test"
 
+let runtime_config = Runtime_config.Test_configs.split_snarkless
+
 let main () =
   let snark_worker_and_block_producer_id = 0 in
   let logger = Logger.create () in
@@ -12,7 +14,12 @@ let main () =
   let block_production_keys i =
     if i = snark_worker_and_block_producer_id then Some i else None
   in
-  let precomputed_values = Lazy.force Precomputed_values.compiled in
+  let%bind precomputed_values, _runtime_config =
+    Genesis_ledger_helper.init_from_config_file ~logger ~may_generate:false
+      ~proof_level:None
+      (Lazy.force runtime_config)
+    >>| Or_error.ok_exn
+  in
   let largest_public_key =
     Precomputed_values.largest_account_pk_exn precomputed_values
   in
@@ -23,7 +30,7 @@ let main () =
   let%bind testnet =
     Coda_worker_testnet.test ~name logger n block_production_keys
       snark_work_public_keys Cli_lib.Arg_type.Work_selection_method.Sequence
-      ~max_concurrent_connections:None
+      ~max_concurrent_connections:None ~precomputed_values
   in
   let%bind new_block_pipe1, new_block_pipe2 =
     let%map pipe =

@@ -36,12 +36,12 @@ type Structured_log_events.t +=
   | Gossip_transaction_pool_diff of
       { txns: Transaction_pool.Resource_pool.Diff.t }
   [@@deriving
-    register_event {msg= "Broadcasting snark pool diff over gossip net"}]
+    register_event {msg= "Broadcasting transaction pool diff over gossip net"}]
 
 type Structured_log_events.t +=
   | Gossip_snark_pool_diff of {work: Snark_pool.Resource_pool.Diff.compact}
   [@@deriving
-    register_event {msg= "Broadcasting transaction pool diff over gossip net"}]
+    register_event {msg= "Broadcasting snark pool diff over gossip net"}]
 
 (* INSTRUCTIONS FOR ADDING A NEW RPC:
  *   - define a new module under the Rpcs module

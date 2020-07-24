@@ -56,9 +56,10 @@ let add_user_blocks (pagination : Pagination.t)
     @@ List.fold ~init:([], next_available_token) transactions.user_commands
          ~f:(fun (participants, next_available_token) txn ->
            ( List.rev_append
-               (User_command.accounts_accessed ~next_available_token txn)
+               (User_command.accounts_accessed ~next_available_token txn.data)
                participants
-           , User_command.next_available_token txn next_available_token ) )
+           , User_command.next_available_token txn.data next_available_token )
+       )
   in
   let creator_aid = Account_id.create creator Token_id.default in
   Pagination.add pagination

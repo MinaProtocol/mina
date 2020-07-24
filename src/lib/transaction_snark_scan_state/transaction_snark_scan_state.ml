@@ -189,7 +189,9 @@ let create_expected_statement ~constraint_constants
   let next_available_token_before =
     Sparse_ledger.next_available_token ledger_witness
   in
-  let%bind transaction = Ledger.Undo.transaction transaction_with_info in
+  let%bind {data= transaction; status= _} =
+    Ledger.Undo.transaction transaction_with_info
+  in
   let txn_global_slot =
     (* TODO: Get from protocol state. *)
     Coda_numbers.Global_slot.zero
@@ -659,7 +661,9 @@ let all_work_pairs t
         , state_hash
         , ledger_witness
         , init_stack ) ->
-        let%bind transaction = Ledger.Undo.transaction transaction_with_info in
+        let%bind {data= transaction; status} =
+          Ledger.Undo.transaction transaction_with_info
+        in
         let%bind protocol_state_body =
           let%map state = get_state (fst state_hash) in
           Coda_state.Protocol_state.body state
@@ -676,7 +680,8 @@ let all_work_pairs t
           , transaction
           , { Transaction_witness.ledger= ledger_witness
             ; protocol_state_body
-            ; init_stack } )
+            ; init_stack
+            ; status } )
     | Second (p1, p2) ->
         let%map merged =
           Transaction_snark.Statement.merge

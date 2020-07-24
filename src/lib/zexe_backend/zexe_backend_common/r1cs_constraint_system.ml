@@ -74,7 +74,7 @@ struct
       in
       t |> one a |> one b |> one c
 
-    let empty = H.feed_string H.empty "test"
+    let empty = H.feed_string H.empty "r1cs_constraint_system"
   end
 
   type nonrec t = Mat.t t

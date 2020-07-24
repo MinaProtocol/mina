@@ -6,5 +6,6 @@
    coda_state
    blockchain_snark
    genesis_constants
+   runtime_config
    with_hash)
  (preprocess (pps ppx_version)))

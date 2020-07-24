@@ -435,8 +435,7 @@ let daemon logger =
          let%bind precomputed_values =
            match%map
              Genesis_ledger_helper.init_from_config_file ~genesis_dir ~logger
-               ~may_generate ~proof_level
-               ~genesis_constants:Genesis_constants.compiled config
+               ~may_generate ~proof_level config
            with
            | Ok (precomputed_values, _) ->
                precomputed_values

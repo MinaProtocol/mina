@@ -104,57 +104,10 @@ module User_command = struct
     ; amount: int option
     ; fee: int
     ; memo: string
-    ; hash: string }
-
-  let to_hlist
-      { typ
-      ; fee_payer_id
-      ; source_id
-      ; receiver_id
-      ; fee_token
-      ; token
-      ; nonce
-      ; amount
-      ; fee
-      ; memo
-      ; hash } =
-    H_list.
-      [ typ
-      ; fee_payer_id
-      ; source_id
-      ; receiver_id
-      ; fee_token
-      ; token
-      ; nonce
-      ; amount
-      ; fee
-      ; memo
-      ; hash ]
-
-  let of_hlist
-      ([ typ
-       ; fee_payer_id
-       ; source_id
-       ; receiver_id
-       ; fee_token
-       ; token
-       ; nonce
-       ; amount
-       ; fee
-       ; memo
-       ; hash ] :
-        (unit, _) H_list.t) =
-    { typ
-    ; fee_payer_id
-    ; source_id
-    ; receiver_id
-    ; fee_token
-    ; token
-    ; nonce
-    ; amount
-    ; fee
-    ; memo
-    ; hash }
+    ; hash: string
+    ; status: string option
+    ; failure_reason: string option }
+  [@@deriving hlist]
 
   let typ =
     let open Caqti_type_spec in
@@ -170,7 +123,9 @@ module User_command = struct
         ; option int
         ; int
         ; string
-        ; string ]
+        ; string
+        ; option string
+        ; option string ]
     in
     let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
     let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
@@ -208,8 +163,9 @@ module User_command = struct
         Conn.find
           (Caqti_request.find typ Caqti_type.int
              "INSERT INTO user_commands (type, fee_payer_id, source_id, \
-              receiver_id, fee_token, token, nonce, amount, fee, memo, hash) \
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id")
+              receiver_id, fee_token, token, nonce, amount, fee, memo, hash, \
+              status, failure_reason) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, \
+              ?, ?, ?) RETURNING id")
           { typ= User_command.tag_string t
           ; fee_payer_id
           ; source_id
@@ -222,7 +178,62 @@ module User_command = struct
               |> Core.Option.map ~f:Currency.Amount.to_int
           ; fee= User_command.fee t |> Currency.Fee.to_int
           ; memo= User_command.memo t |> User_command_memo.to_string
-          ; hash= transaction_hash |> Transaction_hash.to_base58_check }
+          ; hash= transaction_hash |> Transaction_hash.to_base58_check
+          ; status= None
+          ; failure_reason= None }
+
+  let add_with_status (module Conn : CONNECTION) (t : User_command.t)
+      (status : User_command_status.t) =
+    let open Deferred.Result.Let_syntax in
+    let%bind user_command_id = add_if_doesn't_exist (module Conn) t in
+    let ( status_str
+        , failure_reason
+        , fee_payer_account_creation_fee_paid
+        , receiver_account_creation_fee_paid
+        , created_token ) =
+      match status with
+      | Applied
+          { fee_payer_account_creation_fee_paid
+          ; receiver_account_creation_fee_paid
+          ; created_token } ->
+          let amount_to_int64 x =
+            Unsigned.UInt64.to_int64 (Currency.Amount.to_uint64 x)
+          in
+          ( "applied"
+          , None
+          , Option.map ~f:amount_to_int64 fee_payer_account_creation_fee_paid
+          , Option.map ~f:amount_to_int64 receiver_account_creation_fee_paid
+          , Option.map created_token ~f:(fun tid ->
+                Unsigned.UInt64.to_int64 (Token_id.to_uint64 tid) ) )
+      | Failed failure ->
+          ( "failed"
+          , Some (User_command_status.Failure.to_string failure)
+          , None
+          , None
+          , None )
+    in
+    let%map () =
+      Conn.exec
+        (Caqti_request.exec
+           Caqti_type.(
+             tup3
+               (tup2 (option string) (option string))
+               (tup3 (option int64) (option int64) (option int64))
+               int)
+           "UPDATE user_commands \n\
+            SET status = ?, \n\
+           \    failure_reason = ?, \n\
+           \    fee_payer_account_creation_fee_paid = ?, \n\
+           \    receiver_account_creation_fee_paid = ?, \n\
+           \    created_token = ? \n\
+            WHERE id = ?")
+        ( (Some status_str, failure_reason)
+        , ( fee_payer_account_creation_fee_paid
+          , receiver_account_creation_fee_paid
+          , created_token )
+        , user_command_id )
+    in
+    user_command_id
 end
 
 module Internal_command = struct
@@ -445,21 +456,26 @@ module Block = struct
           Core.List.fold transactions ~init:([], [], [])
             ~f:(fun (acc_user_commands, acc_fee_transfers, acc_coinbases) ->
             function
-            | Coda_base.Transaction.User_command user_command_checked ->
+            | { Coda_base.With_status.status
+              ; data= Coda_base.Transaction.User_command user_command_checked
+              } ->
                 let user_command =
-                  Coda_base.User_command.forget_check user_command_checked
+                  { Coda_base.With_status.status
+                  ; data=
+                      Coda_base.User_command.forget_check user_command_checked
+                  }
                 in
                 ( user_command :: acc_user_commands
                 , acc_fee_transfers
                 , acc_coinbases )
-            | Fee_transfer fee_transfer_bundled ->
+            | {data= Fee_transfer fee_transfer_bundled; status= _} ->
                 let fee_transfers =
                   Coda_base.Fee_transfer.to_list fee_transfer_bundled
                 in
                 ( acc_user_commands
                 , fee_transfers @ acc_fee_transfers
                 , acc_coinbases )
-            | Coinbase coinbase -> (
+            | {data= Coinbase coinbase; status= _} -> (
               match Coda_base.Coinbase.fee_transfer coinbase with
               | None ->
                   ( acc_user_commands
@@ -476,7 +492,9 @@ module Block = struct
           deferred_result_list_fold user_commands ~init:[]
             ~f:(fun acc user_command ->
               let%map id =
-                User_command.add_if_doesn't_exist (module Conn) user_command
+                User_command.add_with_status
+                  (module Conn)
+                  user_command.data user_command.status
               in
               id :: acc )
         in
