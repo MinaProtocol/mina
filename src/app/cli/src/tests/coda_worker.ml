@@ -515,7 +515,7 @@ module T = struct
               ; chain_id
               ; logger
               ; unsafe_no_trust_ip= true
-              ; flood= false
+              ; gossip_type= `Gossipsub
               ; trust_system
               ; keypair= Some libp2p_keypair }
           in

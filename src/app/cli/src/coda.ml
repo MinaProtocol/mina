@@ -205,8 +205,7 @@ let daemon logger =
      and enable_flooding =
        flag "enable-flooding"
          ~doc:
-           "Enable pubsub flooding, gossiping every message to every peer \
-            (uses lots of bandwidth! default: false)"
+           "true|false Deprecated and unused"
          no_arg
      and libp2p_peers_raw =
        flag "peer"
@@ -722,7 +721,7 @@ let daemon logger =
              ; initial_peers
              ; addrs_and_ports
              ; trust_system
-             ; flood= enable_flooding
+             ; gossip_type= `Gossipsub
              ; keypair= libp2p_keypair }
          in
          let net_config =
