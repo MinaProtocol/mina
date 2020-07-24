@@ -3921,7 +3921,6 @@ let%test_module "transaction_snark" =
               assert (
                 Balance.equal fee_payer_account.balance
                   expected_fee_payer_balance ) ;
-              assert (Balance.equal accounts.(1).balance source_account.balance) ;
               assert (Option.is_none receiver_account) ) )
 
     let%test_unit "transfer non-default tokens to an existing account" =
