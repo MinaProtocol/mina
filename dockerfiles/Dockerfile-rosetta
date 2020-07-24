@@ -171,9 +171,11 @@ WORKDIR $HOME/$CODA_DIR
 
 # TODO: handle this opam work without cloning the full repository (directly pull src/opam.export)
 # All our ocaml packages
-RUN opam switch import src/opam.export --strict -y
-  #&& opam clean --logs -csy --unused-repositories
+RUN opam install uri.2.2.1 base.v0.12.0 stdio.v0.12.0 ppx_sexp_conv.v0.12.0 ppxlib.0.8.1 --yes \
+  && opam switch import src/opam.export --yes --inplace-build \
+  && opam clean --logs -cs --unused-repositories --yes
 
+#  && sudo chmod -R u+rw ~/.opam \
 
 ENV OPAMYES 1
 
