@@ -73,6 +73,8 @@ module Domain = struct
       let list_of_chars = List.init (String.length d) (String.get d) in
       let list_of_bits = List.concat_map list_of_chars char_bits in
       list_of_bits
+
+  let gen () = string_of_int (1+ (Random.int 999)) ;;
 end
 
 module Certificate_authority : sig
@@ -236,7 +238,7 @@ module Merkle_tree =
       let if_ = Field.Checked.if_
     end)
     (struct
-      include Account
+      include Domainaccount (** VERIFY *)
 
       let hash = Checked.digest
     end)

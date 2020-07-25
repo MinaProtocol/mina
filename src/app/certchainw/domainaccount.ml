@@ -155,7 +155,7 @@ type key = Key.t [@@deriving sexp, eq, hash, compare, yojson]
 
 
 
-
+ 
 
 
 
@@ -172,41 +172,30 @@ type value =
   Poly.t
 [@@deriving sexp]
 
-let key_gen = Public_key.Compressed.gen
+(*let key_gen = Public_key.Compressed.gen*)
 
 let initialize account_id : t =
-  let public_key = Account_id.public_key account_id in
-  let token_id = Account_id.token_id account_id in
-  let delegate =
-    (* Only allow delegation if this account is for the default token. *)
-    if Token_id.(equal default) token_id then public_key
-    else Public_key.Compressed.empty
-  in
-  { public_key
-  ; token_id
-  ; token_permissions= Token_permissions.default
-  ; balance= Balance.zero
-  ; nonce= Nonce.zero
+  let domain =  account_id in
+  { domain
+  ; public_key = Public_key.Compressed.empty
+  ; signature = Signature_lib.Schnorr.Signature.t (* ATTN: change it to dummy signature *))
   ; receipt_chain_hash= Receipt.Chain_hash.empty
-  ; delegate
-  ; voting_for= State_hash.dummy
-  ; timing= Timing.Untimed }
+  ; voting_for= State_hash.dummy}
+  
 
 let to_input (t : t) =
   let open Random_oracle.Input in
   let f mk acc field = mk (Core_kernel.Field.get field t) :: acc in
   let bits conv = f (Fn.compose bitstring conv) in
   Poly.Fields.fold ~init:[]
+    ~domain:(bits Certchainw.Domain.to_bits)
     ~public_key:(f Public_key.Compressed.to_input)
-    ~token_id:(f Token_id.to_input) ~balance:(bits Balance.to_bits)
-    ~token_permissions:(f Token_permissions.to_input)
-    ~nonce:(bits Nonce.Bits.to_bits)
+    ~signature:(bits Signature_lib.Schnorr.Signature.to_bits) (*ATTN: implement to_bits for Signatue*)
     ~receipt_chain_hash:(f Receipt.Chain_hash.to_input)
-    ~delegate:(f Public_key.Compressed.to_input)
-    ~voting_for:(f State_hash.to_input) ~timing:(bits Timing.to_bits)
+    ~voting_for:(f State_hash.to_input) 
   |> List.reduce_exn ~f:append
 
-let crypto_hash_prefix = Hash_prefix.account
+let crypto_hash_prefix = Random_oracle.salt (domainaccount :> string)
 
 let crypto_hash t =
   Random_oracle.hash ~init:crypto_hash_prefix
@@ -216,55 +205,41 @@ let crypto_hash t =
 consensus_mechanism]
 
 type var =
-  ( Public_key.Compressed.var
-  , Token_id.var
-  , Token_permissions.var
-  , Balance.var
-  , Nonce.Checked.t
+  ( Certchainw.Domain.var (** ATTN todo: implement var in domain *))
+  , Public_key.Compressed.var
+  , Signature_lib.Schnorr.Signature.var
   , Receipt.Chain_hash.var
-  , State_hash.var
-  , Timing.var )
+  , State_hash.var)
   Poly.t
 
-let identifier_of_var ({public_key; token_id; _} : var) =
-  Account_id.Checked.create public_key token_id
+let identifier_of_var ({domain;  _} : var) =
+  Domainaccount_id.Checked.create domain
 
 let typ : (var, value) Typ.t =
   let spec =
     Data_spec.
-      [ Public_key.Compressed.typ
-      ; Token_id.typ
-      ; Token_permissions.typ
-      ; Balance.typ
-      ; Nonce.typ
+      [ Certchainw.Domain.typ (* ATTN: todo implement typ for domain *))
+      ; Public_key.Compressed.typ
+      ; Signature_lib.Schnorr.Signature.typ
       ; Receipt.Chain_hash.typ
       ; Public_key.Compressed.typ
-      ; State_hash.typ
-      ; Timing.typ ]
+      ; State_hash.typ]
   in
   Typ.of_hlistable spec ~var_to_hlist:Poly.to_hlist ~var_of_hlist:Poly.of_hlist
     ~value_to_hlist:Poly.to_hlist ~value_of_hlist:Poly.of_hlist
 
 let var_of_t
-    ({ public_key
-     ; token_id
-     ; token_permissions
-     ; balance
-     ; nonce
+    ({ domain
+     ; public_key
+     ; signature
      ; receipt_chain_hash
-     ; delegate
-     ; voting_for
-     ; timing } :
+     ; voting_for} :
       value) =
-  { Poly.public_key= Public_key.Compressed.var_of_t public_key
-  ; token_id= Token_id.var_of_t token_id
-  ; token_permissions= Token_permissions.var_of_t token_permissions
-  ; balance= Balance.var_of_t balance
-  ; nonce= Nonce.Checked.constant nonce
+  { Poly.domain = Certchainw.Domain.var_of_t domain
+  ; public_key= Public_key.Compressed.var_of_t public_key
+  ; signature = Signature_lib.Schnorr.Signature.var_of_t signature (* Attn: todo implemnt var_of_t *)
   ; receipt_chain_hash= Receipt.Chain_hash.var_of_t receipt_chain_hash
-  ; delegate= Public_key.Compressed.var_of_t delegate
-  ; voting_for= State_hash.var_of_t voting_for
-  ; timing= Timing.var_of_t timing }
+  ; voting_for= State_hash.var_of_t voting_for  }
 
 module Checked = struct
   let to_input (t : var) =
@@ -278,19 +253,11 @@ module Checked = struct
     make_checked (fun () ->
         List.reduce_exn ~f:append
           (Poly.Fields.fold ~init:[]
+             ~domain: (bits Certchainw.Domain.var_to_bits) (** ATTN todo: implement *))
              ~public_key:(f Public_key.Compressed.Checked.to_input)
-             ~token_id:
-               (* We use [run_checked] here to avoid routing the [Checked.t]
-                  monad throughout this calculation.
-               *)
-               (f (fun x -> Run.run_checked (Token_id.Checked.to_input x)))
-             ~token_permissions:(f Token_permissions.var_to_input)
-             ~balance:(bits Balance.var_to_bits)
-             ~nonce:(bits !Nonce.Checked.to_bits)
+             ~signature:(f Signature_lib.Schnorr.Signature.var_to_input) (** ATTN todo: implement *))
              ~receipt_chain_hash:(f Receipt.Chain_hash.var_to_input)
-             ~delegate:(f Public_key.Compressed.Checked.to_input)
-             ~voting_for:(f State_hash.var_to_input)
-             ~timing:(bits Timing.var_to_bits)) )
+             ~voting_for:(f State_hash.var_to_input) )
 
   let digest t =
     make_checked (fun () ->
@@ -304,100 +271,29 @@ end
 let digest = crypto_hash
 
 let empty =
-  { Poly.public_key= Public_key.Compressed.empty
-  ; token_id= Token_id.default
-  ; token_permissions= Token_permissions.default
-  ; balance= Balance.zero
-  ; nonce= Nonce.zero
+  { Poly.domain = Certchainw.Domain.empty (*ATTN: todo implement * *))
+  ; public_key= Public_key.Compressed.empty
+  ; signature = Signature_lib.Schnorr.Signature.dummy (*ATTN: todo implement * *))
   ; receipt_chain_hash= Receipt.Chain_hash.empty
-  ; delegate= Public_key.Compressed.empty
-  ; voting_for= State_hash.dummy
-  ; timing= Timing.Untimed }
+  ; voting_for= State_hash.dummy }
 
 let empty_digest = digest empty
 
-let create account_id balance =
-  let public_key = Account_id.public_key account_id in
-  let token_id = Account_id.token_id account_id in
-  let delegate =
-    (* Only allow delegation if this account is for the default token. *)
-    if Token_id.(equal default) token_id then public_key
-    else Public_key.Compressed.empty
-  in
-  { Poly.public_key
-  ; token_id
-  ; token_permissions= Token_permissions.default
-  ; balance
-  ; nonce= Nonce.zero
+let create domainaccount_id (pkd, signature) =
+  let domain = domainaccount_id in
+  let public_key = pkd in
+  { Poly.domain
+  ; public_key
+  ; signature
   ; receipt_chain_hash= Receipt.Chain_hash.empty
-  ; delegate
-  ; voting_for= State_hash.dummy
-  ; timing= Timing.Untimed }
+  ; voting_for= State_hash.dummy  }
 
-let create_timed account_id balance ~initial_minimum_balance ~cliff_time
-    ~vesting_period ~vesting_increment =
-  if Balance.(initial_minimum_balance > balance) then
-    Or_error.errorf
-      !"create_timed: initial minimum balance %{sexp: Balance.t} greater than \
-        balance %{sexp: Balance.t}"
-      initial_minimum_balance balance
-  else if Global_slot.(equal vesting_period zero) then
-    Or_error.errorf "create_timed: vesting period must be greater than zero"
-  else
-    let public_key = Account_id.public_key account_id in
-    let token_id = Account_id.token_id account_id in
-    let delegate =
-      (* Only allow delegation if this account is for the default token. *)
-      if Token_id.(equal default) token_id then public_key
-      else Public_key.Compressed.empty
-    in
-    Or_error.return
-      { Poly.public_key
-      ; token_id
-      ; token_permissions= Token_permissions.default
-      ; balance
-      ; nonce= Nonce.zero
-      ; receipt_chain_hash= Receipt.Chain_hash.empty
-      ; delegate
-      ; voting_for= State_hash.dummy
-      ; timing=
-          Timing.Timed
-            { initial_minimum_balance
-            ; cliff_time
-            ; vesting_period
-            ; vesting_increment } }
 
-(* no vesting after cliff time + 1 slot *)
-let create_time_locked public_key balance ~initial_minimum_balance ~cliff_time
-    =
-  create_timed public_key balance ~initial_minimum_balance ~cliff_time
-    ~vesting_period:Global_slot.(succ zero)
-    ~vesting_increment:initial_minimum_balance
 
 let gen =
   let open Quickcheck.Let_syntax in
+  let%bind domain = Certchainw.Domain.gen in (** ATTN: should this be a random string? todo *)
   let%bind public_key = Public_key.Compressed.gen in
-  let%bind token_id = Token_id.gen in
-  let%map balance = Currency.Balance.gen in
-  create (Account_id.create public_key token_id) balance
+  let%bind signature = Signature_lib.Schnorr.Signature.dummy in
+  create (Domainaccount_id.create domain) (public_key,signature)
 
-let gen_timed =
-  let open Quickcheck.Let_syntax in
-  let%bind public_key = Public_key.Compressed.gen in
-  let%bind token_id = Token_id.gen in
-  let account_id = Account_id.create public_key token_id in
-  let%bind balance = Currency.Balance.gen in
-  (* initial min balance <= balance *)
-  let%bind min_diff_int = Int.gen_incl 0 (Balance.to_int balance) in
-  let min_diff = Amount.of_int min_diff_int in
-  let initial_minimum_balance =
-    Option.value_exn Balance.(balance - min_diff)
-  in
-  let%bind cliff_time = Global_slot.gen in
-  (* vesting period must be at least one to avoid division by zero *)
-  let%bind vesting_period =
-    Int.gen_incl 1 100 >>= Fn.compose return Global_slot.of_int
-  in
-  let%map vesting_increment = Amount.gen in
-  create_timed account_id balance ~initial_minimum_balance ~cliff_time
-    ~vesting_period ~vesting_increment
