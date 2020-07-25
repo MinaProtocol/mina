@@ -43,7 +43,7 @@ let build_list_of_breadcrumbs_in_sequence ~logger ~precomputed_values ~verifier
   let%bind init_breadcrumb =
     match initial_breadcrumb with
     | Some breadcrumb ->
-        Deferred.return breadcrumb
+        Deferred.Or_error.return breadcrumb
     | None ->
         breadcrumb_if_present
           (Logger.extend logger
