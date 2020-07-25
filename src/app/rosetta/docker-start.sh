@@ -40,10 +40,12 @@ now_time=$(date '+%s')
 export CODA_PRIVKEY_PASS=""
 export CODA_TIMEOFFSET=$(( $now_time - $genesis_time ))
 export CODA_CONFIG_FILE=${CODA_CONFIG_FILE:=/data/config.json}
+export CODA_LIBP2P_HELPER_PATH=/coda-bin/libp2p_helper
 PK=${CODA_PK:=ZsMSUuKL9zLAF7sMn951oakTFRCCDw9rDfJgqJ55VMtPXaPa5vPwntQRFJzsHyeh8R8}
 
 # Daemon w/ mounted config file, initial file is phase 3 config.json
 /coda-bin/cli/src/coda.exe daemon \
+    -seed -demo-mode \
     -config-file ${CODA_CONFIG_FILE} \
     -insecure-rest-server \
     -archive-address 3086 \
@@ -51,7 +53,6 @@ PK=${CODA_PK:=ZsMSUuKL9zLAF7sMn951oakTFRCCDw9rDfJgqJ55VMtPXaPa5vPwntQRFJzsHyeh8R
 
 # Demo mode flags
 #    -run-snark-worker $PK \
-#    -seed -demo-mode \
 #    -block-producer-key /tmp/keys/demo-block-producer \
 
 
