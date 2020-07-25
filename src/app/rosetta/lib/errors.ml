@@ -6,12 +6,13 @@ module Variant = struct
    * on it and we want that to remain stable *)
   type t =
     [ `Sql of string
-    | `Json_parse of string
+    | `Json_parse of string option
     | `Graphql_coda_query of string
     | `Network_doesn't_exist of string * string
     | `Chain_info_missing
     | `Account_not_found of string
-    | `Invariant_violation ]
+    | `Invariant_violation
+    | `Transaction_not_found of string ]
   [@@deriving yojson, show, eq, to_enum, to_representatives]
 end
 
@@ -57,12 +58,14 @@ end = struct
         "Account not found"
     | `Invariant_violation ->
         "Internal invariant violation (you found a bug)"
+    | `Transaction_not_found _ ->
+        "Transaction not found"
 
   let context = function
     | `Sql msg ->
         Some msg
-    | `Json_parse msg ->
-        Some msg
+    | `Json_parse optional_msg ->
+        optional_msg
     | `Graphql_coda_query msg ->
         Some msg
     | `Network_doesn't_exist (req, conn) ->
@@ -84,6 +87,14 @@ end = struct
              addr)
     | `Invariant_violation ->
         None
+    | `Transaction_not_found hash ->
+        Some
+          (sprintf
+             !"You attempt to lookup %s but it is missing from the mempool. \
+               This may be due to it's inclusion in a block -- try looking \
+               for this transaction in a recent block. It also could be due \
+               to the transaction being evicted from the mempool."
+             hash)
 
   let retriable = function
     | `Sql _ ->
@@ -100,6 +111,8 @@ end = struct
         true
     | `Invariant_violation ->
         false
+    | `Transaction_not_found _ ->
+        true
 
   let create ?context kind = {extra_context= context; kind}
 
@@ -129,7 +142,9 @@ end = struct
   module Lift = struct
     let parse ?context res =
       Deferred.return
-        (Result.map_error ~f:(fun s -> create ?context (`Json_parse s)) res)
+        (Result.map_error
+           ~f:(fun s -> create ?context (`Json_parse (Some s)))
+           res)
 
     let sql ?context res =
       Deferred.Result.map_error
