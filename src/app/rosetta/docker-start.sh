@@ -5,11 +5,13 @@ set -eou pipefail
 function cleanup
 {
   echo "Killing archive.exe"
-  kill $(ps aux | egrep 'coda-bin/.*archive.exe' | grep -v grep | awk '{ print $2 }') || true
+  kill $(ps aux | egrep '/coda-bin/.*archive.exe' | grep -v grep | awk '{ print $2 }') || true
   echo "Killing coda.exe"
-  kill $(ps aux | egrep 'coda-bin/.*coda.exe'    | grep -v grep | awk '{ print $2 }') || true
+  kill $(ps aux | egrep '/coda-bin/.*coda.exe'    | grep -v grep | awk '{ print $2 }') || true
   echo "Killing rosetta.exe"
-  kill $(ps aux | egrep 'coda-bin/rosetta'       | grep -v grep | awk '{ print $2 }') || true
+  kill $(ps aux | egrep '/coda-bin/rosetta'       | grep -v grep | awk '{ print $2 }') || true
+  echo "Stopping postgres"
+  pg_ctlcluster 11 main stop
   exit
 }
 

@@ -274,13 +274,13 @@ RUN apt-get -y update \
 #  && apt-get install --force-yes coda-testnet-postake-medium-curves=0.0.12-beta+403845-develop-0116d7c-PV947be79c -y \
 #  && apt-get install --force-yes coda-archive -y
 
+RUN mkdir -p ${POSTGRES_DATA_DIR} \
+    && chown postgres ${POSTGRES_DATA_DIR} \
+
 COPY --from=builder /home/opam/app /coda-bin
 COPY --from=builder /home/opam/coda/src/app /app
 COPY --from=builder /home/opam/coda/genesis_ledgers/phase_three/config.json /data/config.json
-
-RUN mkdir -p /data/coda-config \
-    && mkdir -p ${POSTGRES_DATA_DIR} \
-    && chown postgres ${POSTGRES_DATA_DIR}
+COPY --from=builder /tmp/s3_cache_dir /tmp/s3_cache_dir
 
 USER postgres
 
