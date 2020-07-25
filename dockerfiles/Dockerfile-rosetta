@@ -20,9 +20,9 @@ ARG ROCKSDB_VERSION=v5.17.2
 
 # OS package dependencies
 # First add support for https and pkg-config for apt, then install everything else
+# TODO: make sure this is the minimum compile-time deps
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update \
-  && apt-get install --yes apt-transport-https pkg-config \
   && apt-get install --yes \
     build-essential \
     libboost-dev \
@@ -38,6 +38,7 @@ RUN apt-get update \
     zlib1g-dev \
     libbz2-dev \
     libcap-dev \
+    pkg-config \
     cmake \
     m4 \
     git \
@@ -201,11 +202,6 @@ RUN eval $(opam config env) \
   && opam clean --logs -cs
 
 
-# Our pins
-#RUN eval $(opam config env) \
-  #&& opam clean --logs -csy --unused-repositories
-  #&& rm -rf src/external
-
 #################################################################################################
 # The "builder" Stage
 # - builds coda and any other binaries required to run a node
@@ -214,11 +210,6 @@ RUN eval $(opam config env) \
 FROM opam-deps AS builder
 
 ARG DUNE_PROFILE=testnet_postake_medium_curves
-
-# Set up environment again for running as opam user, to make sure its working properly
-#USER opam
-#ENV HOME /home/opam
-#WORKDIR ${HOME}/${CODA_DIR}
 
 ENV PATH "$PATH:/usr/lib/go/bin:$HOME/.cargo/bin"
 
@@ -244,6 +235,8 @@ RUN eval $(opam config env) \
   && mv _build/default/src/app $HOME/app \
   && rm -rf _build
 
+# TODO: consider making a coda-rosetta package with the minimum coda binaries/configs for rosetta.
+# Right now make deb is overkill
 #RUN eval $(opam config env) && make deb
 
 #################################################################################################
@@ -257,6 +250,7 @@ ENV DEBIAN_FRONTEND noninteractive
 
 # Dependencies
 # buster-slim configures apt to not store any cache, so no need to rm it
+# TODO: make sure this is the minimum runtime deps
 RUN apt-get -y update \
   && apt -y install \
     ca-certificates \
@@ -271,11 +265,10 @@ RUN apt-get -y update \
     postgresql-contrib \
     tzdata
 
-#     libprocps6 \
-
 
 # don't use the released package for the rosetta image as we just built it in docker
-# coda and archive packages
+# we could use a deb package pulled from the builder though, especially if the deb includes other useful items for
+# rosetta. Currently we're not building the deb here as it requires a tools that we /dont/ need in rosetta.
 #RUN echo "deb [trusted=yes] http://packages.o1test.net $deb_repo main" > /etc/apt/sources.list.d/coda.list \
 #  && apt-get update \
 #  && apt-get install --force-yes coda-testnet-postake-medium-curves=0.0.12-beta+403845-develop-0116d7c-PV947be79c -y \
@@ -283,6 +276,7 @@ RUN apt-get -y update \
 
 COPY --from=builder /home/opam/app /coda-bin
 COPY --from=builder /home/opam/coda/src/app /app
+COPY --from=builder /home/opam/coda/genesis_ledgers/phase_three/config.json /data/config.json
 
 RUN mkdir -p /data/coda-config \
     && mkdir -p ${POSTGRES_DATA_DIR} \
@@ -306,4 +300,4 @@ USER root
 
 WORKDIR /app/rosetta
 
-ENTRYPOINT ["bash", "./start.sh"]
+ENTRYPOINT ["bash", "./docker-start.sh"]

@@ -18,32 +18,53 @@ trap cleanup INT
 
 PG_CONN=postgres://$USER:$USER@localhost:5432/archiver
 
+# Start postgres
+pg_ctlcluster 11 main start
+
+# wait for it to settle
+sleep 3
+
 # rebuild
-pushd ../../../
-PATH=/usr/local/bin:$PATH dune b src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe src/app/cli/src/coda.exe src/app/archive/archive.exe src/app/rosetta/rosetta.exe
-popd
+#pushd ../../../
+#PATH=/usr/local/bin:$PATH dune b src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe src/app/cli/src/coda.exe src/app/archive/archive.exe src/app/rosetta/rosetta.exe
+#popd
 
 # make genesis (synchronously)
-./make-runtime-genesis.sh
+#./make-runtime-genesis.sh
 
 # archive
-../../../_build/default/src/app/archive/archive.exe run \
+/coda-bin/archive/archive.exe run \
   -postgres-uri $PG_CONN \
   -server-port 3086 &
 
 # wait for it to settle
 sleep 3
 
+genesis_time=$(date -d '2019-01-30 20:00:00.000000Z' '+%s')
+now_time=$(date '+%s')
+
+export CODA_PRIVKEY_PASS=""
+export CODA_TIMEOFFSET=$(( $now_time - $genesis_time ))
+export CODA_CONFIG_FILE=${CODA_CONFIG_FILE:=/data/config.json}
+PK=${CODA_PK:=ZsMSUuKL9zLAF7sMn951oakTFRCCDw9rDfJgqJ55VMtPXaPa5vPwntQRFJzsHyeh8R8}
+
 # demo node
-./run-demo.sh \
+/coda-bin/cli/src/coda.exe daemon \
+    -config-file ${CODA_CONFIG_FILE} \
+    -insecure-rest-server \
     -archive-address 3086 \
     -log-level debug &
+
+#    -run-snark-worker $PK \
+#    -seed -demo-mode \
+#    -block-producer-key /tmp/keys/demo-block-producer \
+
 
 # wait for it to settle
 sleep 3
 
 # rosetta
-../../../_build/default/src/app/rosetta/rosetta.exe \
+/coda-bin/rosetta/rosetta.exe \
   -archive-uri $PG_CONN \
   -graphql-uri http://localhost:3085/graphql \
   -log-level debug \
