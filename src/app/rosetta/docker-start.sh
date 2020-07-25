@@ -5,11 +5,11 @@ set -eou pipefail
 function cleanup
 {
   echo "Killing archive.exe"
-  kill $(ps aux | egrep '_build/default/src/app/.*archive.exe' | grep -v grep | awk '{ print $2 }') || true
+  kill $(ps aux | egrep 'coda-bin/.*archive.exe' | grep -v grep | awk '{ print $2 }') || true
   echo "Killing coda.exe"
-  kill $(ps aux | egrep '_build/default/src/app/.*coda.exe'    | grep -v grep | awk '{ print $2 }') || true
+  kill $(ps aux | egrep 'coda-bin/.*coda.exe'    | grep -v grep | awk '{ print $2 }') || true
   echo "Killing rosetta.exe"
-  kill $(ps aux | egrep '_build/default/src/app/rosetta'       | grep -v grep | awk '{ print $2 }') || true
+  kill $(ps aux | egrep 'coda-bin/rosetta'       | grep -v grep | awk '{ print $2 }') || true
   exit
 }
 
@@ -23,14 +23,6 @@ pg_ctlcluster 11 main start
 
 # wait for it to settle
 sleep 3
-
-# rebuild
-#pushd ../../../
-#PATH=/usr/local/bin:$PATH dune b src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe src/app/cli/src/coda.exe src/app/archive/archive.exe src/app/rosetta/rosetta.exe
-#popd
-
-# make genesis (synchronously)
-#./make-runtime-genesis.sh
 
 # archive
 /coda-bin/archive/archive.exe run \
@@ -48,13 +40,14 @@ export CODA_TIMEOFFSET=$(( $now_time - $genesis_time ))
 export CODA_CONFIG_FILE=${CODA_CONFIG_FILE:=/data/config.json}
 PK=${CODA_PK:=ZsMSUuKL9zLAF7sMn951oakTFRCCDw9rDfJgqJ55VMtPXaPa5vPwntQRFJzsHyeh8R8}
 
-# demo node
+# Daemon w/ mounted config file, initial file is phase 3 config.json
 /coda-bin/cli/src/coda.exe daemon \
     -config-file ${CODA_CONFIG_FILE} \
     -insecure-rest-server \
     -archive-address 3086 \
     -log-level debug &
 
+# Demo mode flags
 #    -run-snark-worker $PK \
 #    -seed -demo-mode \
 #    -block-producer-key /tmp/keys/demo-block-producer \
