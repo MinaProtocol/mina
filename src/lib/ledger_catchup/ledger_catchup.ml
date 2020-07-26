@@ -473,7 +473,7 @@ let garbage_collect_subtrees ~logger ~subtrees =
   Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
     "garbage collected failed cached transitions"
 
-let garbage_collect_list_or_trees ~logger ~target =
+(* let garbage_collect_list_or_trees ~logger ~target =
   ( match target with
   | T breadcrumb_subtrees ->
       List.iter breadcrumb_subtrees ~f:(fun subtree ->
@@ -482,7 +482,7 @@ let garbage_collect_list_or_trees ~logger ~target =
       List.iter breadcrumb_list ~f:(fun breadcrumb ->
           Cached.invalidate_with_failure breadcrumb |> ignore ) ) ;
   Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-    "garbage collected failed cached transitions"
+    "garbage collected failed cached transitions" *)
 
 let garbage_collect_lists ~logger ~lists =
   List.iter lists ~f:(fun breadcrumb ->
@@ -505,7 +505,7 @@ let verify_transitions_and_build_breadcrumbs_in_chunks ~logger
     if List.length transitions_chunks = 0 then [[]] else transitions_chunks
   in
   let open Deferred.Or_error.Let_syntax in
-  let%bind breadcrumbs_chunks =
+  let%bind _ =
     Deferred.Or_error.List.foldi modified_transitions_chunks ~init:[]
       ~f:(fun index acc transitions_chunk ->
         let _ =
