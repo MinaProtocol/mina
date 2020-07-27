@@ -16,6 +16,7 @@
     models
     ppx_deriving_yojson.runtime
     yojson
+    archive_lib
     )
   (preprocess (pps
     graphql_ppx
