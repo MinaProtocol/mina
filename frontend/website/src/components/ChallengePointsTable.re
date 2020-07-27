@@ -77,11 +77,11 @@ module Styles = {
       padding2(~v=`zero, ~h=`rem(1.)),
       padding(`px(8)),
       display(`grid),
-      gridTemplateColumns([`percent(12.), `auto, `percent(20.)]),
+      gridTemplateColumns([`percent(12.), `auto, `percent(30.)]),
       gridColumnGap(`rem(1.5)),
       media(
         Theme.MediaQuery.notMobile,
-        [gridTemplateColumns([`percent(10.), `auto, `percent(20.)])],
+        [gridTemplateColumns([`percent(10.), `auto, `percent(30.)])],
       ),
     ]);
   };
@@ -99,7 +99,7 @@ module Styles = {
           Theme.MediaQuery.notMobile,
           [
             display(`grid),
-            gridTemplateColumns([`percent(11.), `auto, `percent(25.)]),
+            gridTemplateColumns([`percent(11.), `auto, `percent(38.)]),
           ],
         ),
       ]),
@@ -195,7 +195,14 @@ let make = (~releaseTitle, ~challenges) => {
         <span className=Css.(style([gridColumn(2, 3)]))>
           {React.string("Challenge Name")}
         </span>
-        <span className=Css.(style([gridColumn(3, 4)]))>
+        <span
+          className=Css.(
+            style([
+              textAlign(`right),
+              gridColumn(3, 4),
+              paddingRight(`rem(3.5)),
+            ])
+          )>
           {React.string("Points *")}
         </span>
       </div>
