@@ -20,10 +20,11 @@ let init_plugins ~logger coda plugin_paths =
         Logger.info logger "Plugin successfully loaded from $path"
           ~module_:__MODULE__ ~location:__LOC__
           ~metadata:[("path", `String path)]
-      with Dynlink.Error err ->
+      with Dynlink.Error err as exn ->
         Logger.error logger "Failed to load plugin from $path: $error"
           ~module_:__MODULE__ ~location:__LOC__
           ~metadata:
             [ ("path", `String path)
-            ; ("error", `String (Dynlink.error_message err)) ] ) ;
+            ; ("error", `String (Dynlink.error_message err)) ] ;
+        raise exn ) ;
   coda_lib' := None
