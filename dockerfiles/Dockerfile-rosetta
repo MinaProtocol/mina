@@ -309,7 +309,7 @@ USER root
 
 WORKDIR /app/rosetta
 
-EXPOSE 3085-3087
+EXPOSE 3087
 EXPOSE 10101
 
 ENTRYPOINT ["bash", "./docker-start.sh"]
