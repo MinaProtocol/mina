@@ -6,8 +6,7 @@
   (inline_tests)
   (libraries
     core_kernel
-    sponge_params
-    curve_choice
+    pickles
     o1trace
     snarky
     sponge ))
