@@ -53,7 +53,6 @@ opam uninstall extlib
 opam pin add src/external/ocaml-sodium
 opam pin add src/external/rpc_parallel
 opam pin add src/external/ocaml-extlib
-opam pin add src/external/digestif
 
 # workaround a permissions problem in rpc_parallel .git
 sudo chmod -R u+rw ~/.opam

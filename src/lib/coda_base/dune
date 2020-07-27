@@ -11,7 +11,7 @@
     block_time
     coda_compile_config
     genesis_constants
-    coda_digestif
+    digestif
     coda_numbers
     codable
     core
