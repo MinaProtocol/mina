@@ -34,11 +34,7 @@ sleep 3
 # wait for it to settle
 sleep 3
 
-genesis_time=$(date -d '2019-01-30 20:00:00.000000Z' '+%s')
-now_time=$(date '+%s')
-
 export CODA_PRIVKEY_PASS=""
-export CODA_TIMEOFFSET=$(( $now_time - $genesis_time ))
 export CODA_CONFIG_FILE=${CODA_CONFIG_FILE:=/data/config.json}
 export PEER_ID=${PEER_ID:=/ip4/35.229.37.63/tcp/10001/ipfs/12D3KooWAFFq2yEQFFzhU5dt64AWqawRuomG9hL8rSmm5vxhAsgr/}
 DEFAULT_FLAGS="-generate-genesis-proof true -peer ${PEER_ID} -archive-address 0.0.0.0:3086 -insecure-rest-server -log-level debug -external-port 10101"

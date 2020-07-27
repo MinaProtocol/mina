@@ -288,8 +288,8 @@ COPY --from=builder /home/opam/coda/src/app/rosetta/config.json /data/config.jso
 # because all s3-cached files will be downloaded as needed at runtime
 
 # Remove these to optimize image size, start up time is already bad because testnets each need their own genesis proof
-#COPY --from=builder /tmp/s3_cache_dir /tmp/s3_cache_dir
-#COPY --from=builder /tmp/coda_cache_dir /tmp/coda_cache_dir
+COPY --from=builder /tmp/s3_cache_dir /tmp/s3_cache_dir
+COPY --from=builder /tmp/coda_cache_dir /tmp/coda_cache_dir
 
 USER postgres
 
