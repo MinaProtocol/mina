@@ -1570,6 +1570,7 @@ jobs:
 
 workflows:
     version: 2
+    # only run these jobs when we opt-in (controlled via ci-build-me bot)
     coda_parallel:
         when:
             # We do seem to need a useless `and true` here
@@ -1642,9 +1643,9 @@ workflows:
                   - build-binaries--dev
 
 
+    # always run these jobs on develop
     coda_parallel_develop:
         when:
-            # We do seem to need a useless `and true` here
             and:
               - true
               - equal: [ develop, << pipeline.git.branch >> ]
