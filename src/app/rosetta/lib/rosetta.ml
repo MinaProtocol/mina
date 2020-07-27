@@ -74,7 +74,7 @@ let command =
     | Ok db ->
         let%bind server =
           Cohttp_async.Server.create ~on_handler_error:`Raise
-            (Async.Tcp.Where_to_listen.bind_to Localhost (On_port port))
+            (Async.Tcp.Where_to_listen.bind_to All_addresses (On_port port))
             (server_handler ~db ~graphql_uri ~logger)
         in
         Logger.info logger ~module_:__MODULE__ ~location:__LOC__
