@@ -448,7 +448,6 @@ module T = struct
       ; supply_increase
       ; pending_coinbase_stack_state=
           {pending_coinbase_stack_state.pc with target= pending_coinbase_target}
-      ; proof_type= `Base
       ; sok_digest= () }
     , { Stack_state_with_init_stack.pc=
           {source= pending_coinbase_target; target= pending_coinbase_target}
@@ -1851,7 +1850,8 @@ let%test_module "test" =
     let proofs stmts : Ledger_proof.t One_or_two.t =
       let sok_digest = Sok_message.Digest.default in
       One_or_two.map stmts ~f:(fun statement ->
-          Ledger_proof.create ~statement ~sok_digest ~proof:Proof.dummy )
+          Ledger_proof.create ~statement ~sok_digest
+            ~proof:Proof.transaction_dummy )
 
     let stmt_to_work_random_prover (stmts : Transaction_snark_work.Statement.t)
         : Transaction_snark_work.Checked.t option =

@@ -124,11 +124,8 @@ module Make (Inputs : Intf.Inputs_intf) :
   let main
       (module Rpcs_versioned : Intf.Rpcs_versioned_S
         with type Work.ledger_proof = Inputs.Ledger_proof.t) ~logger
-      ~proof_level ~constraint_constants daemon_address shutdown_on_disconnect
-      =
-    let%bind state =
-      Worker_state.create ~proof_level ~constraint_constants ()
-    in
+      ~proof_level daemon_address shutdown_on_disconnect =
+    let%bind state = Worker_state.create ~proof_level () in
     let wait ?(sec = 0.5) () = after (Time.Span.of_sec sec) in
     (* retry interval with jitter *)
     let retry_pause sec = Random.float_range (sec -. 2.0) (sec +. 2.0) in
@@ -231,9 +228,7 @@ module Make (Inputs : Intf.Inputs_intf) :
         in
         main
           (module Rpcs_versioned)
-          ~logger ~proof_level
-          ~constraint_constants:Genesis_constants.Constraint_constants.compiled
-          daemon_port
+          ~logger ~proof_level daemon_port
           (Option.value ~default:true shutdown_on_disconnect))
 
   let arguments ~proof_level ~daemon_address ~shutdown_on_disconnect =
