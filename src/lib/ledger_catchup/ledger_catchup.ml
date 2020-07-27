@@ -403,7 +403,7 @@ let verify_transitions_and_build_breadcrumbs ~logger
             transition
         with
         | Error e ->
-            Core.printf "vtbb error: %s\n%!" (Error.to_string_hum e) ;
+            (* Core.printf "vtbb error: %s\n%!" (Error.to_string_hum e) ; *)
             List.map acc ~f:Cached.invalidate_with_failure |> ignore ;
             Deferred.Or_error.fail e
         | Ok (`In_frontier initial_hash) ->
@@ -493,10 +493,10 @@ let garbage_collect_lists ~logger ~lists =
 let verify_transitions_and_build_breadcrumbs_in_chunks ~logger
     ~precomputed_values ~trust_system ~verifier ~frontier
     ~unprocessed_transition_cache ~transitions_chunks ~target_hash ~subtrees =
-  let _ =
+  (* let _ =
     Core.printf "Start verifying and building, length %d\n%!"
       (List.length transitions_chunks)
-  in
+  in *)
   let previous_list_of_breadcrumbs = ref [] in
   let previous_initial_hash = ref None in
   let previous_breadcrumb = ref None in
@@ -508,10 +508,10 @@ let verify_transitions_and_build_breadcrumbs_in_chunks ~logger
   let%bind _ =
     Deferred.Or_error.List.foldi modified_transitions_chunks ~init:[]
       ~f:(fun index acc transitions_chunk ->
-        let _ =
+        (* let _ =
           Core.printf "Working on index %d with length %d:\n%!" index
             (List.length transitions_chunk)
-        in
+        in *)
         let current_subtrees =
           if index <> List.length modified_transitions_chunks - 1 then None
           else Some subtrees
@@ -525,7 +525,7 @@ let verify_transitions_and_build_breadcrumbs_in_chunks ~logger
             ~prev_hash:!previous_initial_hash ~subtrees:current_subtrees
         with
         | Ok (T (initial_hash, trees_of_breadcrumbs)) ->
-            Core.printf "Success on one\n%!" ;
+            (* Core.printf "Success on one\n%!" ; *)
             previous_initial_hash := Some initial_hash ;
             last_one_as_trees := trees_of_breadcrumbs ;
             Deferred.Or_error.return (T trees_of_breadcrumbs :: acc)
@@ -541,8 +541,8 @@ let verify_transitions_and_build_breadcrumbs_in_chunks ~logger
                    None) ;
             Deferred.Or_error.return (L list_of_breadcrumbs :: acc)
         | Error e ->
-            Core.printf "building breadcrumbs error: %s\n%!"
-              (Error.to_string_hum e) ;
+            (* Core.printf "building breadcrumbs error: %s\n%!"
+              (Error.to_string_hum e) ; *)
             List.map !previous_list_of_breadcrumbs ~f:(fun lists ->
                 garbage_collect_lists ~logger ~lists )
             |> ignore ;
@@ -656,9 +656,9 @@ let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
        , Strict_pipe.crash Strict_pipe.buffered
        , unit )
        Strict_pipe.Writer.t) ~unprocessed_transition_cache : unit =
-  let _ = Core.printf "    Start a test...\n%!" in
+  (* let _ = Core.printf "    Start a test...\n%!" in *)
   let num_peers = 8 in
-  let maximum_download_size = 5 in
+  let maximum_download_size = 100 in
   don't_wait_for
     (Strict_pipe.Reader.iter_without_pushback catchup_job_reader
        ~f:(fun (target_hash, subtrees) ->
@@ -728,8 +728,8 @@ let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
                       Core.Time.(Span.to_ms @@ diff (now ()) start_time)) ;
                   Catchup_jobs.decr ()
             | Error e ->
-                let _ = Core.printf "Error in run \n%!" in
-                let _ = Core.printf "Error: %s\n%!" (Error.to_string_hum e) in
+                (* let _ = Core.printf "Error in run \n%!" in *)
+                (* let _ = Core.printf "Error: %s\n%!" (Error.to_string_hum e) in *)
                 Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
                   ~metadata:[("error", `String (Error.to_string_hum e))]
                   "Catchup process failed -- unable to receive valid data \
@@ -840,15 +840,14 @@ let%test_module "Ledger_catchup tests" =
           ~timeout_duration:(Block_time.Span.of_ms 100000L)
           ( match%map Strict_pipe.Reader.read breadcrumbs_reader with
           | `Eof ->
-              Core.printf "unexpected EOF\n%!" ;
+              (* Core.printf "unexpected EOF\n%!" ; *)
               failwith "unexpected EOF"
           | `Ok (_, `Catchup_scheduler) ->
-              Core.printf "did not expect a catchup scheduler action\n%!" ;
+              (* Core.printf "did not expect a catchup scheduler action\n%!" ; *)
               failwith "did not expect a catchup scheduler action"
           | `Ok (breadcrumbs, `Ledger_catchup ivar) ->
-              Core.printf "success on first timeout error\n%!" ;
-              Ivar.fill ivar () ;
-              List.hd_exn breadcrumbs )
+              (* Core.printf "success on first timeout error\n%!" ; *)
+              Ivar.fill ivar () ; List.hd_exn breadcrumbs )
       in
       let catchup_breadcrumbs =
         Rose_tree.map cached_catchup_breadcrumbs
