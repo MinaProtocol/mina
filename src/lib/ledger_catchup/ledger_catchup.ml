@@ -658,7 +658,7 @@ let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
        Strict_pipe.Writer.t) ~unprocessed_transition_cache : unit =
   (* let _ = Core.printf "    Start a test...\n%!" in *)
   let num_peers = 8 in
-  let maximum_download_size = 5 in
+  let maximum_download_size = 100 in
   don't_wait_for
     (Strict_pipe.Reader.iter_without_pushback catchup_job_reader
        ~f:(fun (target_hash, subtrees) ->
