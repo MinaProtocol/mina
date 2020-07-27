@@ -4,8 +4,8 @@
  (library_flags -linkall)
  (inline_tests)
  (libraries sponge group_map fold_lib o1trace coda_digestif tuple_lib bitstring_lib
-   snarky_group_map core_kernel snarky snarky_verifier snarky_field_extensions snarky_curves
-   snarky_pairing snark_bits dummy_values crypto_params)
+   snarky_group_map core_kernel snarky snarky_curves
+   snark_bits pickles crypto_params)
  (preprocess
   (pps ppx_version ppx_assert ppx_base ppx_bench ppx_let ppx_deriving.std ppx_deriving_yojson ppx_sexp_conv ppx_bin_prot
     ppx_custom_printf ppx_inline_test ppx_optcomp ppx_snarky bisect_ppx --
