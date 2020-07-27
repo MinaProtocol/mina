@@ -278,7 +278,7 @@ RUN mkdir -p /tmp/s3_cache_dir \
     && mkdir -p ${POSTGRES_DATA_DIR} \
     && chown postgres ${POSTGRES_DATA_DIR}
 
-COPY --from=builder /home/opam/app /coda-bin
+COPY --from=builder /home/opam/app/* /coda-bin/
 COPY --from=builder /home/opam/coda/src/app /app
 COPY --from=builder /home/opam/coda/genesis_ledgers/phase_three/config.json /data/config.json
 
