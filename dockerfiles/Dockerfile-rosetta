@@ -214,7 +214,8 @@ ARG DUNE_PROFILE=testnet_postake_medium_curves
 ENV PATH "$PATH:/usr/lib/go/bin:$HOME/.cargo/bin"
 
 # Build libp2p_helper and clear go module caches
-RUN cd src/app/libp2p_helper/src \
+RUN git pull \
+   && cd src/app/libp2p_helper/src \
    && go mod download \
    && cd generate_methodidx \
    && go build -o ${HOME}/app/generate_methodidx \
@@ -224,6 +225,7 @@ RUN cd src/app/libp2p_helper/src \
 
 # Make rosetta-crucial components and the generate_keypair tool
 RUN eval $(opam config env) \
+  && git pull \
   && dune build --profile=${DUNE_PROFILE} \
     src/app/generate_keypair/generate_keypair.exe \
     src/app/cli/src/coda.exe \
