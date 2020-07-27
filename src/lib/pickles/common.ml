@@ -14,7 +14,10 @@ end
 let wrap_domains =
   { Domains.h= Pow_2_roots_of_unity 18
   ; k= Pow_2_roots_of_unity 19
-  ; x= Pow_2_roots_of_unity 0 }
+  ; x=
+      Pow_2_roots_of_unity
+        (let (T (typ, _)) = Impls.Wrap.input () in
+         Int.ceil_log2 (1 + Impls.Wrap.Data_spec.size [typ])) }
 
 let hash_pairing_me_only ~app_state
     (t : _ Types.Pairing_based.Proof_state.Me_only.t) =
