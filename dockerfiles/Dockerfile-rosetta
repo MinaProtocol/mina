@@ -282,7 +282,7 @@ RUN mkdir -p /tmp/s3_cache_dir \
 
 COPY --from=builder /home/opam/app/* /coda-bin/
 COPY --from=builder /home/opam/coda/src/app /app
-COPY --from=builder /home/opam/coda/genesis_ledgers/phase_three/config.json /data/config.json
+COPY --from=builder /home/opam/coda/src/app/rosetta/config.json /data/config.json
 
 # Initial image could be made smaller at the expense of start up time by removing these
 # because all s3-cached files will be downloaded as needed at runtime
