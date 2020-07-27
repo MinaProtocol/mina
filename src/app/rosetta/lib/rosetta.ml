@@ -9,6 +9,8 @@ let router ~graphql_uri ~db ~logger route body =
       Account.router tl body ~db ~graphql_uri ~logger
   | "mempool" :: tl ->
       Mempool.router tl body ~db ~graphql_uri ~logger
+  | "block" :: tl ->
+      Block.router tl body ~db ~graphql_uri ~logger
   | _ ->
       Deferred.return (Error `Page_not_found)
 

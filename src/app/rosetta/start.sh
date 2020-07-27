@@ -36,6 +36,7 @@ sleep 3
 
 # demo node
 ./run-demo.sh \
+    -external-ip 127.0.0.1 \
     -archive-address 3086 \
     -log-level debug &
 
