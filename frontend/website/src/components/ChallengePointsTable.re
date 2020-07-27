@@ -77,11 +77,11 @@ module Styles = {
       padding2(~v=`zero, ~h=`rem(1.)),
       padding(`px(8)),
       display(`grid),
-      gridTemplateColumns([`percent(12.), `auto, `percent(20.)]),
+      gridTemplateColumns([`percent(12.), `auto, `percent(30.)]),
       gridColumnGap(`rem(1.5)),
       media(
         Theme.MediaQuery.notMobile,
-        [gridTemplateColumns([`percent(10.), `auto, `percent(20.)])],
+        [gridTemplateColumns([`percent(10.), `auto, `percent(30.)])],
       ),
     ]);
   };
