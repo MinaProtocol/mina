@@ -9,71 +9,62 @@ open Signature_lib
 
 
 
-module Stable = struct
-  module V1 = struct
-    type t = Public_key.Compressed.Stable.V1.t * Token_id.Stable.V1.t
-    [@@deriving sexp, equal, compare, hash, yojson]
 
-    let to_latest = Fn.id
-  end
-end
+type t = Certchainw.Domain.t
+[@@deriving sexp, equal, compare, hash, yojson]
 
-type t = Stable.Latest.t [@@deriving sexp, equal, compare, hash, yojson]
+let to_latest = Fn.id
 
-let create domain = (key, tid)
 
-let empty = (Public_key.Compressed.empty, Token_id.default)
 
-let public_key (key, _tid) = key
 
-let token_id (_key, tid) = tid
+let create domain = domain
 
-let to_input (key, tid) =
-  Random_oracle.Input.append
-    (Public_key.Compressed.to_input key)
-    (Token_id.to_input tid)
+let empty = Certchainw.Domain.empty
+
+(*let public_key (key, _tid) = key*)
+
+(*let token_id (_key, tid) = tid*)
+
+let to_input domain = Certchainw.Domain.string_to_input domain
+
 
 let gen =
   let open Quickcheck.Let_syntax in
-  let%map key = Public_key.Compressed.gen and tid = Token_id.gen in
-  (key, tid)
+  let%map domain = Certchainw.Domain.gen in
+  domain
 
 include Comparable.Make_binable (Stable.Latest)
 include Hashable.Make_binable (Stable.Latest)
 
 
 
-type var = Public_key.Compressed.var * Token_id.var
+type var = Certchainw.Domain.var (*ATTN : todo implement var*)
 
-let typ = Snarky.Typ.(Public_key.Compressed.typ * Token_id.typ)
+let typ = Snarky.Typ.(Certchainw.Domain.typ) (*ATTN : todo implement typ*)
 
-let var_of_t (key, tid) =
-  (Public_key.Compressed.var_of_t key, Token_id.var_of_t tid)
+let var_of_t domain =
+  Certchainw.Domain.var_of_t domain (*ATTN : todo implement var_of_t*)
 
 module Checked = struct
   open Snark_params
   open Tick
 
-  let create key tid = (key, tid)
+  let create key = key
 
-  let public_key (key, _tid) = key
 
-  let token_id (_key, tid) = tid
+  let to_input domain =
+    let%map domainc = Certchainw.Domain.Checked.to_input domain in
+    domain
 
-  let to_input (key, tid) =
-    let%map tid = Token_id.Checked.to_input tid in
-    Random_oracle.Input.append (Public_key.Compressed.Checked.to_input key) tid
+  let equal domain1 domain2 =
+    let%bind dm_equal = Certchainw.Domain.Checked.equal domain1 domain2 in
+    dm_equal
 
-  let equal (pk1, tid1) (pk2, tid2) =
-    let%bind pk_equal = Public_key.Compressed.Checked.equal pk1 pk2 in
-    let%bind tid_equal = Token_id.Checked.equal tid1 tid2 in
-    Tick.Boolean.(pk_equal && tid_equal)
-
-  let if_ b ~then_:(pk_then, tid_then) ~else_:(pk_else, tid_else) =
-    let%bind pk =
-      Public_key.Compressed.Checked.if_ b ~then_:pk_then ~else_:pk_else
+  let if_ b ~then_:domain_then ~else_:domain_else =
+    let%bind domain =
+      Certchainw.Domain.Checked.if_ b ~then_:domain_then ~else_:domain_else
     in
-    let%map tid = Token_id.Checked.if_ b ~then_:tid_then ~else_:tid_else in
-    (pk, tid)
+    domain
 end
 
