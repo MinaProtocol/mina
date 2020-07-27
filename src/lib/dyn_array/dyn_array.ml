@@ -1,4 +1,3 @@
-open Extlib
 open Core
 include DynArray
 

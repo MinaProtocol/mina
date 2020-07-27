@@ -10,7 +10,7 @@ compiler: [
 roots: [
   "angstrom.0.11.2"
   "async_ssl.v0.12.0"
-  "batteries.3.0.0"
+  "extlib.1.7.6"
   "bignum.v0.12.0"
   "bisect_ppx.1.4.1"
   "bitstring.3.1.1"
@@ -57,7 +57,7 @@ installed: [
   "base64.3.4.0"
   "base_bigstring.v0.12.0"
   "base_quickcheck.v0.12.1"
-  "batteries.3.0.0"
+  "extlib.1.7.6"
   "bignum.v0.12.0"
   "bigstringaf.0.5.0"
   "bin_prot.v0.12.0"
