@@ -712,15 +712,7 @@ jobs:
                   path: test_output/artifacts
     {%- endfor %}
 
-workflows:
-    version: 2
-    coda_parallel:
-        when:
-            # We do seem to need a useless `and true` here
-            and:
-              - true
-              - << pipeline.parameters.run-ci >>
-        jobs:
+{% set coda_jobs %}
             - lint
             - lint-opt
             - compare-test-signatures
@@ -761,6 +753,25 @@ workflows:
                   - build-binaries--{{profile}}
             {%- endfor %}
             {%- endfor %}
+{% endset %}
+
+workflows:
+    version: 2
+    coda_parallel:
+        when:
+            # We do seem to need a useless `and true` here
+            and:
+              - true
+              - << pipeline.parameters.run-ci >>
+        jobs:{{ coda_jobs }}
+
+    coda_parallel_develop:
+        when:
+            # We do seem to need a useless `and true` here
+            and:
+              - true
+              - equal: [ develop, << pipeline.git.branch >> ]
+        jobs:{{ coda_jobs }}
 
     daily:
         triggers:

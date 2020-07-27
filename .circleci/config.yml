@@ -1566,6 +1566,8 @@ jobs:
             - store_artifacts:
                   path: test_output/artifacts
 
+
+
 workflows:
     version: 2
     coda_parallel:
@@ -1638,6 +1640,79 @@ workflows:
             - test--dev--coda-delegation-test:
                 requires:
                   - build-binaries--dev
+
+
+    coda_parallel_develop:
+        when:
+            # We do seem to need a useless `and true` here
+            and:
+              - true
+              - equal: [ develop, << pipeline.git.branch >> ]
+        jobs:
+            - lint
+            - lint-opt
+            - compare-test-signatures
+            - update-branch-protection:
+                filters:
+                  branches:
+                    only: develop
+            - tracetool
+            - build-wallet
+            - test-archive
+            - build-archive
+            - build-macos
+            - build-client-sdk
+            - build-artifacts--testnet_postake_medium_curves
+            - build-artifacts-docker--testnet_postake_medium_curves--coda-daemon:
+                requires:
+                  - build-artifacts--testnet_postake_medium_curves
+            - build-artifacts-docker--testnet_postake_medium_curves--coda-demo:
+                requires:
+                  - build-artifacts--testnet_postake_medium_curves
+            - test-unit--dev
+            - test-unit--nonconsensus_medium_curves
+            - test--fake_hash
+            - test--test_postake
+            - test--test_postake_catchup
+            - test--test_postake_five_even_txns
+            - test--test_postake_snarkless
+            - test--test_postake_split
+            - test--test_postake_three_producers
+            - build-binaries--dev
+            - test--dev--coda-bootstrap-test:
+                requires:
+                  - build-binaries--dev
+            - test--dev--coda-shared-state-test:
+                requires:
+                  - build-binaries--dev
+            - test--dev--coda-batch-payment-test:
+                requires:
+                  - build-binaries--dev
+            - test--dev--coda-peers-test:
+                requires:
+                  - build-binaries--dev
+            - test--dev--coda-transitive-peers-test:
+                requires:
+                  - build-binaries--dev
+            - test--dev--coda-block-production-test:
+                requires:
+                  - build-binaries--dev
+            - test--dev--coda-shared-prefix-test_-who-produces_0:
+                requires:
+                  - build-binaries--dev
+            - test--dev--coda-shared-prefix-test_-who-produces_1:
+                requires:
+                  - build-binaries--dev
+            - test--dev--coda-change-snark-worker-test:
+                requires:
+                  - build-binaries--dev
+            - test--dev--coda-archive-node-test:
+                requires:
+                  - build-binaries--dev
+            - test--dev--coda-delegation-test:
+                requires:
+                  - build-binaries--dev
+
 
     daily:
         triggers:
