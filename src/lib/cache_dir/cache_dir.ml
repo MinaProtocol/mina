@@ -5,6 +5,9 @@ let autogen_path = Filename.temp_dir_name ^/ "coda_cache_dir"
 
 let s3_install_path = "/tmp/s3_cache_dir"
 
+let s3_keys_bucket_prefix =
+  "https://s3-us-west-2.amazonaws.com/snark-keys.o1test.net"
+
 let manual_install_path = "/var/lib/coda"
 
 let brew_install_path =
@@ -17,6 +20,15 @@ let brew_install_path =
       brew ^ "/var/coda"
   | _ ->
       "/usr/local/var/coda"
+
+let cache =
+  let dir d w = Key_cache.Spec.On_disk {directory= d; should_write= w} in
+  [ dir manual_install_path false
+  ; dir brew_install_path false
+  ; dir s3_install_path false
+  ; dir autogen_path true
+  ; Key_cache.Spec.S3
+      {bucket_prefix= s3_keys_bucket_prefix; install_path= s3_install_path} ]
 
 let env_path =
   match Sys.getenv "CODA_KEYS_PATH" with
