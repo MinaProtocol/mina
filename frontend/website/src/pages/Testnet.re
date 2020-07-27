@@ -227,23 +227,18 @@ module Styles = {
 
 module Section = {
   [@react.component]
-  let make = (~name, ~expanded, ~setExpanded, ~children, ~link=?) => {
+  let make = (~name, ~expanded, ~setExpanded as _, ~children) => {
     <div className=Css.(style([display(`flex), flexDirection(`column)]))>
       {if (expanded) {
          <div className=Styles.gradientSectionExpanded> children </div>;
        } else {
          <>
            <div className=Styles.gradientSection> children </div>
-           <div
-             className=Styles.expandButton
-             onClick={_ =>
-               switch (link) {
-               | Some(dest) => ReasonReactRouter.push(dest)
-               | None => setExpanded(_ => true)
-               }
-             }>
-             <div> {React.string("View Full " ++ name)} </div>
-           </div>
+           <Next.Link href="/leaderboard">
+             <a className=Styles.expandButton>
+               {React.string("View Full " ++ name ++ {j|\u00A0→|j})}
+             </a>
+           </Next.Link>
          </>;
        }}
     </div>;
