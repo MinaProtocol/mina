@@ -407,9 +407,8 @@ module Options = struct
       { Network_options_response.version=
           Version.create "1.4.0" (Option.value ~default:"unknown" res#version)
       ; allow=
-          { Allow.operation_statuses=
-              [{Operation_status.status= "SUCCESS"; successful= true}]
-          ; operation_types= ["TRANSFER"]
+          { Allow.operation_statuses= Lazy.force Operation_statuses.all
+          ; operation_types= Lazy.force Operation_types.all
           ; errors= Lazy.force Errors.all_errors
           ; historical_balance_lookup= false } }
   end
@@ -436,9 +435,8 @@ module Options = struct
             ( Result.return
             @@ { Network_options_response.version= Version.create "1.4.0" "v1.0"
                ; allow=
-                   { Allow.operation_statuses=
-                       [{Operation_status.status= "SUCCESS"; successful= true}]
-                   ; operation_types= ["TRANSFER"]
+                   { Allow.operation_statuses= Lazy.force Operation_statuses.all
+                   ; operation_types= Lazy.force Operation_types.all
                    ; errors= Lazy.force Errors.all_errors
                    ; historical_balance_lookup= false } } )
     end )
