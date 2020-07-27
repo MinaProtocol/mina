@@ -157,26 +157,15 @@ function integers_uint64_add(x, y) {
 }
 
 //Provides: integers_uint64_div
-//Requires: caml_raise_zero_divide, caml_int64_is_zero, caml_int64_udivmod
+//Requires: caml_raise_zero_divide
 function integers_uint64_div(x, y) {
-    if (x instanceof Array) {
-        // Old version
-        if (caml_int64_is_zero(y)) {
-            caml_raise_zero_divide();
-        }
-        x[3] = x[3] >>> 0;
-        y[3] = y[3] >>> 0;
-        return caml_int64_udivmod(x, y)[1];
-    } else {
-        // New version
-        if (y.isZero()) {
-            caml_raise_zero_divide();
-        }
-        // Coerce the high parts to be unsigned before division.
-        x.hi = x.hi >>> 0;
-        y.hi = y.hi >>> 0;
-        return x.udivmod(y).quotient;
+    if (y.isZero()) {
+        caml_raise_zero_divide();
     }
+    // Coerce the high parts to be unsigned before division.
+    x.hi = x.hi >>> 0;
+    y.hi = y.hi >>> 0;
+    return x.udivmod(y).quotient;
 }
 
 //Provides: integers_uint64_logand
@@ -201,13 +190,7 @@ function integers_uint64_logxor(x, y) {
 //Requires: caml_int64_create_lo_mi_hi
 function integers_uint64_max(unit) {
     var x = caml_int64_create_lo_mi_hi(0xffffff, 0xffffff, 0xffff);
-    if (x instanceof Array) {
-        // Old version
-        x[3] = x[3] >>> 0;
-    } else {
-        // New version
-        x.hi = x.hi >>> 0;
-    }
+    x.hi = x.hi >>> 0;
     return x;
 }
 
@@ -226,17 +209,11 @@ function integers_uint64_of_int(i) {
 //Provides: integers_uint64_of_int64
 //Requires: caml_int64_create_lo_mi_hi
 function integers_uint64_of_int64(i) {
-    if (i instanceof Array) {
-        // Old version
-        return caml_int64_create_lo_mi_hi(i[1], i[2], i[3] >>> 0);
-    } else {
-        // New version
-        return caml_int64_create_lo_mi_hi(i.lo, i.mi, i.hi >>> 0);
-    }
+    return caml_int64_create_lo_mi_hi(i.lo, i.mi, i.hi >>> 0);
 }
 
 //Provides: integers_uint_of_string
-//Requires: caml_ml_string_length, caml_failwith, caml_string_unsafe_get, caml_int64_create_lo_mi_hi, caml_int64_of_int32, caml_parse_digit, caml_int64_ult, caml_int64_add, caml_int64_mul, caml_int64_neg, caml_int64_udivmod
+//Requires: caml_ml_string_length, caml_failwith, caml_string_unsafe_get, caml_int64_create_lo_mi_hi, caml_int64_of_int32, caml_parse_digit, caml_int64_ult, caml_int64_add, caml_int64_mul, caml_int64_neg
 function integers_uint_of_string(s, max_val) {
     // Note: This code matches the behaviour of the C function.
     // In particular,
@@ -244,99 +221,50 @@ function integers_uint_of_string(s, max_val) {
     // - negative numbers are accepted and coerced to 2's-complement uint64
     // - the longest numeric prefix is accepted, only raising an error when there
     //   isn't a numeric prefix
-    if (max_val instanceof Array) {
-        // Old version
-        var i = 0, len = caml_ml_string_length(s), negative = false;
-        if (i >= len) {
-            caml_failwith("int_of_string");
-        }
-        var c = caml_string_unsafe_get(s, i);
-        if (c === 45) { // Minus sign
-            i++;
-            negative = true;
-        } else if (c === 43) { // Plus sign
-            i++;
-        }
-        var no_digits = true;
-        // Ensure that the high byte is unsigned before division.
-        max_val[3] = max_val[3] >>> 0;
-        var ten = caml_int64_of_int32(10);
-        var max_base_10 = caml_int64_udivmod(max_val,ten)[1];
-        var res = caml_int64_of_int32(0);
-        for (; i < len; i++) {
-            var c = caml_string_unsafe_get(s, i);
-            var d = caml_parse_digit(c);
-            if (d < 0 || d >= 10) {
-                break;
-            }
-            no_digits = false;
-            // Any digit here would overflow. Pin to the maximum value.
-            if (caml_int64_ult(max_base_10, res)) {
-                return max_val;
-            }
-            d = caml_int64_of_int32(d);
-            res = caml_int64_add(caml_int64_mul(ten, res), d);
-            // The given digit was too large. Pin to the maximum value.
-            if (caml_int64_ult(res, d)) {
-                return max_val;
-            }
-        }
-        if (no_digits) {
-            caml_failwith("int_of_string");
-        }
-        if (negative) {
-            res = caml_int64_neg(res);
-        }
-        // Set the high byte as unsigned.
-        res[3] = res[3] >>> 0;
-        return res;
-    } else {
-        // New version
-        var i = 0, len = caml_ml_string_length(s), negative = false;
-        if (i >= len) {
-            caml_failwith("int_of_string");
-        }
-        var c = caml_string_unsafe_get(s, i);
-        if (c === 45) { // Minus sign
-            i++;
-            negative = true;
-        } else if (c === 43) { // Plus sign
-            i++;
-        }
-        var no_digits = true;
-        // Ensure that the high byte is unsigned before division.
-        max_val.hi = max_val.hi >>> 0;
-        var ten = caml_int64_of_int32(10);
-        var max_base_10 = max_val.udivmod(ten).quotient;
-        var res = caml_int64_of_int32(0);
-        for (; i < len; i++) {
-            var c = caml_string_unsafe_get(s, i);
-            var d = caml_parse_digit(c);
-            if (d < 0 || d >= 10) {
-                break;
-            }
-            no_digits = false;
-            // Any digit here would overflow. Pin to the maximum value.
-            if (caml_int64_ult(max_base_10, res)) {
-                return max_val;
-            }
-            d = caml_int64_of_int32(d);
-            res = caml_int64_add(caml_int64_mul(ten, res), d);
-            // The given digit was too large. Pin to the maximum value.
-            if (caml_int64_ult(res, d)) {
-                return max_val;
-            }
-        }
-        if (no_digits) {
-            caml_failwith("int_of_string");
-        }
-        if (negative) {
-            res = caml_int64_neg(res);
-        }
-        // Set the high byte as unsigned.
-        res.hi = res.hi >>> 0;
-        return res;
+    var i = 0, len = caml_ml_string_length(s), negative = false;
+    if (i >= len) {
+        caml_failwith("int_of_string");
     }
+    var c = caml_string_unsafe_get(s, i);
+    if (c === 45) { // Minus sign
+        i++;
+        negative = true;
+    } else if (c === 43) { // Plus sign
+        i++;
+    }
+    var no_digits = true;
+    // Ensure that the high byte is unsigned before division.
+    max_val.hi = max_val.hi >>> 0;
+    var ten = caml_int64_of_int32(10);
+    var max_base_10 = max_val.udivmod(ten).quotient;
+    var res = caml_int64_of_int32(0);
+    for (; i < len; i++) {
+        var c = caml_string_unsafe_get(s, i);
+        var d = caml_parse_digit(c);
+        if (d < 0 || d >= 10) {
+            break;
+        }
+        no_digits = false;
+        // Any digit here would overflow. Pin to the maximum value.
+        if (caml_int64_ult(max_base_10, res)) {
+            return max_val;
+        }
+        d = caml_int64_of_int32(d);
+        res = caml_int64_add(caml_int64_mul(ten, res), d);
+        // The given digit was too large. Pin to the maximum value.
+        if (caml_int64_ult(res, d)) {
+            return max_val;
+        }
+    }
+    if (no_digits) {
+        caml_failwith("int_of_string");
+    }
+    if (negative) {
+        res = caml_int64_neg(res);
+    }
+    // Set the high byte as unsigned.
+    res.hi = res.hi >>> 0;
+    return res;
 }
 
 //Provides: integers_uint64_of_string
@@ -347,26 +275,15 @@ function integers_uint64_of_string(s) {
 }
 
 //Provides: integers_uint64_rem
-//Requires: caml_raise_zero_divide, caml_int64_is_zero, caml_int64_udivmod
+//Requires: caml_raise_zero_divide, caml_int64_is_zero
 function integers_uint64_rem(x, y) {
-    if (x instanceof Array) {
-        // Old version
-        if (caml_int64_is_zero(y)) {
-            caml_raise_zero_divide();
-        }
-        x[3] = x[3] >>> 0;
-        y[3] = y[3] >>> 0;
-        return caml_int64_udivmod(x, y)[2];
-    } else {
-        // New version
-        if (y.isZero()) {
-            caml_raise_zero_divide();
-        }
-        // Coerce the high parts to be unsigned before division.
-        x.hi = x.hi >>> 0;
-        y.hi = y.hi >>> 0;
-        return x.udivmod(y).modulus;
+    if (y.isZero()) {
+        caml_raise_zero_divide();
     }
+    // Coerce the high parts to be unsigned before division.
+    x.hi = x.hi >>> 0;
+    y.hi = y.hi >>> 0;
+    return x.udivmod(y).modulus;
 }
 
 //Provides: integers_uint64_shift_left
@@ -496,15 +413,7 @@ function integers_uint32_compare(x, y) {
 //Provides: integers_uint64_compare
 //Requires: caml_int64_compare
 function integers_uint64_compare(x, y) {
-    if (x instanceof Array) {
-        // Old version
-        x[3] = x[3] >>> 0;
-        y[3] = y[3] >>> 0;
-        return caml_int64_compare(x, y);
-    } else {
-        // New version
-        x.hi = x.hi >>> 0;
-        y.hi = y.hi >>> 0;
-        return x.ucompare(y);
-    }
+    x.hi = x.hi >>> 0;
+    y.hi = y.hi >>> 0;
+    return x.ucompare(y);
 }
