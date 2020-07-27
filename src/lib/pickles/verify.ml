@@ -62,7 +62,9 @@ let verify (type a n) (module Max_branching : Nat.Intf with type n = n)
                (marlin.beta_1, marlin.beta_2, marlin.beta_3)
                evals)
             ~x_hat_beta_1
-            ~input_domain:(domain tick_field step_domains.x)
+            ~input_domain:
+              ( domain tick_field step_domains.x
+                :> _ Marlin_checks.vanishing_polynomial_domain )
             ~domain_h:(domain tick_field step_domains.h)
             ~domain_k:(domain tick_field step_domains.k)
         in

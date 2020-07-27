@@ -286,7 +286,8 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
               (E04 (Int))
               (struct
                 let f (type a b c d) (t : (a, b, c, d) Tag.t) : int =
-                  if Type_equal.Id.same t self then Nat.to_int Max_branching.n
+                  if Type_equal.Id.same t.id self then
+                    Nat.to_int Max_branching.n
                   else
                     let (module M) = Types_map.max_branching t in
                     Nat.to_int M.n
@@ -345,7 +346,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
     let padded, (module Maxes) =
       max_local_max_branchings
         (module Max_branching)
-        prev_varss_length choices ~self
+        prev_varss_length choices ~self:self.id
     in
     let full_signature = {Full_signature.padded; maxes= (module Maxes)} in
     Timer.clock __LOC__ ;
@@ -449,7 +450,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
               let open Impls.Step in
               let k_p =
                 lazy
-                  ( Type_equal.Id.uid self
+                  ( Type_equal.Id.uid self.id
                   , Index.to_int b.index
                   , constraint_system ~exposing:[typ] main )
               in
@@ -500,8 +501,12 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
                        (struct
                          let f (type a b c d) (t : (a, b, c, d) Tag.t) :
                              Domains.t =
-                           Types_map.lookup_map t ~self ~default:wrap_domains
-                             ~f:(fun d -> d.wrap_domains)
+                           Types_map.lookup_map t ~self:self.id
+                             ~default:wrap_domains ~f:(function
+                             | `Compiled d ->
+                                 d.wrap_domains
+                             | `Side_loaded _ ->
+                                 Common.wrap_domains )
                        end)
                    in
                    M.f rule.Inductive_rule.prevs
@@ -519,7 +524,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
       let open Impls.Wrap in
       let (T (typ, conv)) = input () in
       let main x () : unit = wrap_main (conv x) in
-      let self_id = Type_equal.Id.uid self in
+      let self_id = Type_equal.Id.uid self.id in
       let disk_key_prover =
         lazy (self_id, constraint_system ~exposing:[typ] main)
       in
@@ -630,13 +635,13 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
       go step_data step_keypairs
     in
     Timer.clock __LOC__ ;
-    let data : _ Types_map.Data.t =
+    let data : _ Types_map.Compiled.t =
       { branches= Branches.n
       ; branchings= step_widths
       ; max_branching= (module Max_branching)
       ; typ
-      ; a_value_to_field_elements= A_value.to_field_elements
-      ; a_var_to_field_elements= A.to_field_elements
+      ; value_to_field_elements= A_value.to_field_elements
+      ; var_to_field_elements= A.to_field_elements
       ; wrap_key= Lazy.map wrap_vk ~f:Verification_key.commitments
       ; wrap_vk= Lazy.map wrap_vk ~f:Verification_key.index
       ; wrap_domains
@@ -645,6 +650,36 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
     Timer.clock __LOC__ ;
     Types_map.add_exn self data ;
     (provers, wrap_vk, disk_key, !cache_handle)
+end
+
+module Side_loaded = struct
+  module Verification_key = struct
+    include Side_loaded_verification_key
+
+    let of_compiled tag =
+      let d = Types_map.lookup_compiled tag.Tag.id in
+      { Side_loaded_verification_key.wrap_vk= Lazy.force d.wrap_vk
+      ; wrap_index= Lazy.force d.wrap_key
+      ; max_width= Width.of_int_exn (Nat.to_int (Nat.Add.n d.max_branching))
+      ; step_data=
+          At_most.of_vector
+            (Vector.map2 d.branchings d.step_domains ~f:(fun width ds ->
+                 ({Domains.h= ds.h; k= ds.k}, Width.of_int_exn width) ))
+            (Nat.lte_exn (Vector.length d.step_domains) Max_branches.n) }
+  end
+
+  let in_circuit tag vk = Types_map.set_ephemeral tag {index= `In_circuit vk}
+
+  let in_prover tag vk = Types_map.set_ephemeral tag {index= `In_prover vk}
+
+  let create ~name ~max_branching ~value_to_field_elements
+      ~var_to_field_elements ~typ =
+    Types_map.add_side_loaded ~name
+      { max_branching
+      ; value_to_field_elements
+      ; var_to_field_elements
+      ; typ
+      ; branches= Verification_key.Max_branches.n }
 end
 
 let compile
@@ -683,7 +718,7 @@ let compile
   let self =
     match self with
     | None ->
-        Type_equal.Id.create ~name sexp_of_opaque
+        {Tag.id= Type_equal.Id.create ~name sexp_of_opaque; kind= Compiled}
     | Some self ->
         self
   in
@@ -753,12 +788,76 @@ let%test_module "test" =
         end
       end
 
-      let tag, _, p, Provers.[base; merge] =
+      (* A snark proving one knows a preimage of a hash *)
+      module Know_preimage = struct
+        module Statement = Statement
+
+        type _ Snarky.Request.t +=
+          | Preimage : Field.Constant.t Snarky.Request.t
+
+        let hash_checked x =
+          let open Step_main_inputs in
+          let s = Sponge.create sponge_params in
+          Sponge.absorb s (`Field x) ;
+          Sponge.squeeze_field s
+
+        let hash x =
+          let open Tick_field_sponge in
+          let s = Field.create params in
+          Field.absorb s x ; Field.squeeze s
+
+        let tag, _, p, Provers.[prove; _] =
+          compile
+            (module Statement)
+            (module Statement.Constant)
+            ~typ:Field.typ
+            ~branches:(module Nat.N2) (* Should be able to set to 1 *)
+            ~max_branching:
+              (module Nat.N2) (* TODO: Should be able to set this to 0 *)
+            ~name:"preimage"
+            ~choices:(fun ~self ->
+              (* TODO: Make it possible to have a system that doesn't use its "self" *)
+              [ { prevs= []
+                ; main_value= (fun [] _ -> [])
+                ; main=
+                    (fun [] s ->
+                      let x = exists ~request:(fun () -> Preimage) Field.typ in
+                      Field.Assert.equal s (hash_checked x) ;
+                      [] ) }
+                (* TODO: Shouldn't have to have this dummy *)
+              ; { prevs= [self; self]
+                ; main_value= (fun [_; _] _ -> [true; true])
+                ; main=
+                    (fun [_; _] s ->
+                      Boolean.Assert.is_true Boolean.false_ ;
+                      [Boolean.true_; Boolean.true_] ) } ] )
+
+        let prove ~preimage =
+          let h = hash preimage in
+          ( h
+          , prove [] h ~handler:(fun (With {request; respond}) ->
+                match request with
+                | Preimage ->
+                    respond (Provide preimage)
+                | _ ->
+                    unhandled ) )
+
+        let side_loaded_vk = Side_loaded.Verification_key.of_compiled tag
+      end
+
+      let side_loaded =
+        Side_loaded.create
+          ~max_branching:(module Nat.N2) (* TODO: Make this = N2 *)
+          ~name:"side-loaded"
+          ~value_to_field_elements:Statement.to_field_elements
+          ~var_to_field_elements:Statement.to_field_elements ~typ:Field.typ
+
+      let tag, _, p, Provers.[base; preimage_base; merge] =
         compile
           (module Statement)
           (module Statement.Constant)
           ~typ:Field.typ
-          ~branches:(module Nat.N2)
+          ~branches:(module Nat.N3)
           ~max_branching:(module Nat.N2)
           ~name:"txn-snark"
           ~choices:(fun ~self ->
@@ -771,6 +870,15 @@ let%test_module "test" =
                     done ;
                     [] )
               ; main_value= (fun [] _ -> []) }
+            ; { prevs= [side_loaded]
+              ; main=
+                  (fun [hash] x ->
+                    Side_loaded.in_circuit side_loaded
+                      (exists Side_loaded_verification_key.typ
+                         ~compute:(fun () -> Know_preimage.side_loaded_vk)) ;
+                    Field.Assert.equal hash x ;
+                    [Boolean.true_] )
+              ; main_value= (fun [_] _ -> [true]) }
             ; { prevs= [self; self]
               ; main=
                   (fun [l; r] res ->
@@ -782,10 +890,16 @@ let%test_module "test" =
     end
 
     let t_proof =
-      let base1 = Field.Constant.of_int 4 in
+      let preimage = Field.Constant.of_int 10 in
+      let base1, preimage_proof = Txn_snark.Know_preimage.prove ~preimage in
       let base2 = Field.Constant.of_int 9 in
       let base12 = Field.Constant.(base1 * base2) in
-      let t1 = Common.time "t1" (fun () -> Txn_snark.base [] base1) in
+      let t1 =
+        Common.time "t1" (fun () ->
+            Side_loaded.in_prover Txn_snark.side_loaded
+              Txn_snark.Know_preimage.side_loaded_vk ;
+            Txn_snark.preimage_base [(base1, preimage_proof)] base1 )
+      in
       let module M = struct
         type t = Field.Constant.t * Txn_snark.Proof.t [@@deriving bin_io]
       end in
@@ -829,7 +943,6 @@ let%test_module "test" =
                         let proof_must_verify = Boolean.not is_base_case in
                         Boolean.Assert.any
                           [Field.(equal (one + prev) self); is_base_case] ;
-                        Boolean.Assert.is_true (Field.is_square txn_snark) ;
                         [proof_must_verify; proof_must_verify] )
                   ; main_value=
                       (fun _ self ->

@@ -301,9 +301,11 @@ let wrap_main
             let verified, chals =
               finalize_other_proof
                 (Nat.Add.create max_local_max_branching)
-                ~actual_branching ~h_minus_1 ~k_minus_1 ~input_domain ~domain_k
-                ~domain_h ~sponge deferred_values ~old_bulletproof_challenges
-                evals
+                ~actual_branching ~h_minus_1 ~k_minus_1
+                ~input_domain:
+                  (input_domain :> _ Marlin_checks.vanishing_polynomial_domain)
+                ~domain_k ~domain_h ~sponge deferred_values
+                ~old_bulletproof_challenges evals
             in
             Boolean.(Assert.any [not should_verify; verified]) ;
             chals )
@@ -364,14 +366,6 @@ let wrap_main
              (pack_statement Max_branching.n prev_statement))
         ~sg_old:prev_step_accs ~combined_inner_product ~advice:{b} ~messages
         ~which_branch ~openings_proof
-      (*
-      incrementally_verify_pairings ~step_domains ~pairing_acc:prev_pairing_acc
-        ~xi ~r ~r_xi_sum ~verification_key:pairing_marlin_index ~sponge
-        ~public_input:
-          (Array.append
-             [|[Boolean.true_]|]
-             (pack_statement Max_branching.n prev_statement))
-        ~messages ~opening_proofs *)
     in
     Boolean.Assert.is_true bulletproof_success ;
     assert_eq_marlin marlin marlin_actual ;

@@ -131,7 +131,7 @@ struct
              * X_hat.t
              * (value, local_max_branching, m) Per_proof_witness.Constant.t =
        fun max dlog_vk dlog_index (T t) tag ~must_verify ->
-        let data = Types_map.lookup tag in
+        let data = Types_map.lookup_basic tag in
         let (module Local_max_branching) = data.max_branching in
         let T = Local_max_branching.eq in
         let statement = t.statement in
@@ -145,7 +145,7 @@ struct
               Common.hash_pairing_me_only
                 (Reduced_me_only.Pairing_based.prepare
                    ~dlog_marlin_index:dlog_index statement.pass_through)
-                ~app_state:data.a_value_to_field_elements
+                ~app_state:data.value_to_field_elements
           ; proof_state=
               { statement.proof_state with
                 me_only=
@@ -323,11 +323,11 @@ struct
             ([], [], [], [], [])
         | p :: ps, max :: maxes, t :: ts, must_verify :: must_verifys, S l ->
             let dlog_vk, dlog_index =
-              if Type_equal.Id.same self t then
+              if Type_equal.Id.same self.Tag.id t.id then
                 (self_dlog_vk, self_dlog_marlin_index)
               else
-                let d = Types_map.lookup t in
-                (Lazy.force d.wrap_vk, Lazy.force d.wrap_key)
+                let d = Types_map.lookup_basic t in
+                (d.wrap_vk, d.wrap_key)
             in
             let `Sg sg, u, s, x, w = f max dlog_vk dlog_index p t ~must_verify
             and sgs, us, ss, xs, ws = go ps maxes ts must_verifys l in

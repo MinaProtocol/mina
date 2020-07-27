@@ -11,7 +11,7 @@ let high_entropy_bits = 128
 let sponge_params_constant =
   Sponge.Params.(map tweedle_p ~f:Impl.Field.Constant.of_string)
 
-let field_random_oracle ?(length=Me.Field.size_in_bits - 1) s =
+let field_random_oracle ?(length = Me.Field.size_in_bits - 1) s =
   Me.Field.of_bits (bits_random_oracle ~length s)
 
 let unrelated_g =
@@ -46,6 +46,7 @@ module Sponge = struct
               include Impl.Field
 
               let high_entropy_bits = high_entropy_bits
+
               let to_bits t =
                 Bitstring_lib.Bitstring.Lsb_first.to_list
                   (Impl.Field.unpack_full t)
@@ -55,8 +56,6 @@ module Sponge = struct
 end
 
 module Input_domain = struct
-  let domain = Domain.Pow_2_roots_of_unity 7
-
   let lagrange_commitments domain : Me.Inner_curve.Affine.t array =
     let domain_size = Domain.size domain in
     let u = Unsigned.Size_t.of_int in
@@ -67,6 +66,8 @@ module Input_domain = struct
             |> Snarky_bn382.Tweedle.Dum.Field_poly_comm.unshifted
             |> Fn.flip Me.Inner_curve.Affine.Backend.Vector.get 0
             |> Me.Inner_curve.Affine.of_backend ) )
+
+  let domain = Domain.Pow_2_roots_of_unity 7
 end
 
 module Inner_curve = struct

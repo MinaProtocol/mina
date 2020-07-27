@@ -9,7 +9,7 @@ let high_entropy_bits = 128
 let sponge_params_constant =
   Sponge.Params.(map tweedle_q ~f:Impl.Field.Constant.of_string)
 
-let tick_field_random_oracle ?(length=Tick.Field.size_in_bits - 1) s =
+let tick_field_random_oracle ?(length = Tick.Field.size_in_bits - 1) s =
   Tick.Field.of_bits (bits_random_oracle ~length s)
 
 let unrelated_g =

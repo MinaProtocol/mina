@@ -30,7 +30,7 @@ let step_main
              , a_value
              , max_branching
              , self_branches )
-             Types_map.Data.basic
+             Types_map.Compiled.basic
     -> self:(a_var, a_value, max_branching, self_branches) Tag.t
     -> ( prev_vars
        , prev_values
@@ -53,7 +53,6 @@ let step_main
       | Other of ('a, 'b, 'n, 'm) F.t
       | Self : (a_var, a_value, max_branching, self_branches) t
   end in
-  let module D = T (Types_map.Data) in
   let module Typ_with_max_branching = struct
     type ('var, 'value, 'local_max_branching, 'local_branches) t =
       ( ('var, 'local_max_branching, 'local_branches) Per_proof_witness.t
@@ -80,12 +79,22 @@ let step_main
           let step_domains, typ =
             (fun (type var value n m) (d : (var, value, n, m) Tag.t) ->
               let typ : (_, m) Vector.t * (var, value) Typ.t =
-                match Type_equal.Id.same_witness self d with
+                match Type_equal.Id.same_witness self.id d.id with
                 | Some T ->
                     (basic.step_domains, basic.typ)
-                | None ->
-                    let d = Types_map.lookup d in
-                    (d.step_domains, d.typ)
+                | None -> (
+                  (* TODO: Abstract this into a function in Types_map *)
+                  match d.kind with
+                  | Compiled ->
+                      let d = Types_map.lookup_compiled d.id in
+                      (d.step_domains, d.typ)
+                  | Side_loaded ->
+                      let d = Types_map.lookup_side_loaded d.id in
+                      (* TODO: This replication to please the type checker is
+                       pointless... *)
+                      ( Vector.init d.permanent.branches ~f:(fun _ ->
+                            Side_loaded_verification_key.max_domains_with_x )
+                      , d.permanent.typ ) )
               in
               typ )
               d
@@ -136,48 +145,10 @@ let step_main
                           basic.wrap_domains.k))))
         in
         let app_state = exists basic.typ ~request:(fun () -> Req.App_state) in
-        let datas =
-          let self_data :
-              ( a_var
-              , a_value
-              , max_branching
-              , self_branches )
-              Types_map.Data.For_step.t =
-            { branches= self_branches
-            ; branchings= basic.branchings
-            ; max_branching= (module Max_branching)
-            ; typ= basic.typ
-            ; a_var_to_field_elements= basic.a_var_to_field_elements
-            ; a_value_to_field_elements= basic.a_value_to_field_elements
-            ; wrap_domains= basic.wrap_domains
-            ; step_domains= basic.step_domains
-            ; wrap_key= dlog_marlin_index }
-          in
-          let module M =
-            H4.Map (Tag) (Types_map.Data.For_step)
-              (struct
-                let f : type a b n m.
-                       (a, b, n, m) Tag.t
-                    -> (a, b, n, m) Types_map.Data.For_step.t =
-                 fun tag ->
-                  match Type_equal.Id.same_witness self tag with
-                  | Some T ->
-                      self_data
-                  | None ->
-                      Types_map.Data.For_step.create (Types_map.lookup tag)
-              end)
-          in
-          M.f rule.prevs
-        in
         let prevs =
           exists (Prev_typ.f prev_typs) ~request:(fun () ->
               Req.Proof_with_datas )
         in
-        let unfinalized_proofs =
-          let module H = H1.Of_vector (Unfinalized) in
-          H.f branching (Vector.trim stmt.proof_state.unfinalized_proofs lte)
-        in
-        let module Packed_digest = Field in
         let prev_statements =
           let module M =
             H3.Map1_to_H1 (Per_proof_witness) (Id)
@@ -191,6 +162,50 @@ let step_main
         let proofs_should_verify =
           with_label "rule_main" (fun () -> rule.main prev_statements app_state)
         in
+        let datas =
+          let self_data :
+              ( a_var
+              , a_value
+              , max_branching
+              , self_branches )
+              Types_map.For_step.t =
+            { branches= self_branches
+            ; branchings= Vector.map basic.branchings ~f:Field.of_int
+            ; max_branching= (module Max_branching)
+            ; max_width= None
+            ; typ= basic.typ
+            ; var_to_field_elements= basic.var_to_field_elements
+            ; value_to_field_elements= basic.value_to_field_elements
+            ; wrap_domains= basic.wrap_domains
+            ; step_domains= `Known basic.step_domains
+            ; wrap_key= dlog_marlin_index }
+          in
+          let module M =
+            H4.Map (Tag) (Types_map.For_step)
+              (struct
+                let f : type a b n m.
+                    (a, b, n, m) Tag.t -> (a, b, n, m) Types_map.For_step.t =
+                 fun tag ->
+                  match Type_equal.Id.same_witness self.id tag.id with
+                  | Some T ->
+                      self_data
+                  | None -> (
+                    match tag.kind with
+                    | Compiled ->
+                        Types_map.For_step.of_compiled
+                          (Types_map.lookup_compiled tag.id)
+                    | Side_loaded ->
+                        Types_map.For_step.of_side_loaded
+                          (Types_map.lookup_side_loaded tag.id) )
+              end)
+          in
+          M.f rule.prevs
+        in
+        let unfinalized_proofs =
+          let module H = H1.Of_vector (Unfinalized) in
+          H.f branching (Vector.trim stmt.proof_state.unfinalized_proofs lte)
+        in
+        let module Packed_digest = Field in
         let module Proof = struct
           type t = Wrap_proof.var
         end in
@@ -218,7 +233,7 @@ let step_main
           with_label "prevs_verified" (fun () ->
               let rec go : type vars vals ns1 ns2 n.
                      (vars, ns1, ns2) H3.T(Per_proof_witness).t
-                  -> (vars, vals, ns1, ns2) H4.T(Types_map.Data.For_step).t
+                  -> (vars, vals, ns1, ns2) H4.T(Types_map.For_step).t
                   -> vars H1.T(E01(Digest)).t
                   -> vars H1.T(E01(Unfinalized)).t
                   -> vars H1.T(E01(B)).t
@@ -261,6 +276,7 @@ let step_main
                         S.Bit_sponge.map sponge
                           ~f:Opt_sponge.Underlying.of_sponge
                       in
+                      (*
                       let [domain_h; domain_k; input_domain] =
                         Vector.map
                           Domains.[h; k; x]
@@ -268,11 +284,12 @@ let step_main
                             Pseudo.Domain.to_domain
                               ( state.deferred_values.which_branch
                               , Vector.map d.step_domains ~f ) )
-                      in
-                      finalize_other_proof d.max_branching ~input_domain
-                        ~step_widths:d.branchings ~step_domains:d.step_domains
-                        ~sponge ~old_bulletproof_challenges
-                        state.deferred_values prev_evals
+                      in *)
+                      finalize_other_proof d.max_branching
+                        ~max_width:d.max_width ~step_widths:d.branchings
+                        ~step_domains:d.step_domains ~sponge
+                        ~old_bulletproof_challenges state.deferred_values
+                        prev_evals
                     in
                     let which_branch = state.deferred_values.which_branch in
                     let state =
@@ -292,7 +309,7 @@ let step_main
                           (* TODO: Don't rehash when it's not necessary *)
                           unstage
                             (hash_me_only_opt ~index:d.wrap_key
-                               d.a_var_to_field_elements)
+                               d.var_to_field_elements)
                         in
                         hash ~widths:d.branchings
                           ~max_width:(Nat.Add.n d.max_branching)
@@ -343,7 +360,7 @@ let step_main
               let hash_me_only =
                 unstage
                   (hash_me_only ~index:dlog_marlin_index
-                     basic.a_var_to_field_elements)
+                     basic.var_to_field_elements)
               in
               Field.Assert.equal stmt.proof_state.me_only
                 (hash_me_only

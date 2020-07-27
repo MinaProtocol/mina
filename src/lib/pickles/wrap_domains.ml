@@ -15,8 +15,12 @@ module Make (A : T0) (A_value : T0) = struct
         (struct
           let f : type a b c d. (a, b, c, d) Tag.t -> Domains.t =
            fun t ->
-            Types_map.lookup_map t ~self ~default:Common.wrap_domains
-              ~f:(fun d -> d.wrap_domains)
+            Types_map.lookup_map t ~self:self.Tag.id
+              ~default:Common.wrap_domains ~f:(function
+              | `Side_loaded _ ->
+                  Common.wrap_domains
+              | `Compiled d ->
+                  d.wrap_domains )
         end)
     in
     let module M =
