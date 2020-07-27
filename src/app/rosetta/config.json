@@ -1,7 +1,7 @@
 {
   "daemon": {},
   "genesis": {
-    "genesis_state_timestamp": "2020-07-27T18:54:49Z",
+    "genesis_state_timestamp": "2020-07-27T22:53:52Z",
     "k": 20,
     "delta": 3
   },
