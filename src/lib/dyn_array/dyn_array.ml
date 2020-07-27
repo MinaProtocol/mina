@@ -1,4 +1,4 @@
-open Core
+open Core_kernel
 include DynArray
 
 let sexp_of_t sexp_of_a t = [%sexp_of: a list] (DynArray.to_list t)
