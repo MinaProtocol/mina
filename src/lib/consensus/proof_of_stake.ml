@@ -71,7 +71,7 @@ let compute_delegatee_table_sparse_ledger keys ledger =
 
 module Segment_id = Coda_numbers.Nat.Make32 ()
 
-module Typ = Crypto_params.Tick0.Typ
+module Typ = Snark_params.Tick.Typ
 
 module Configuration = struct
   [%%versioned
@@ -490,9 +490,10 @@ module Data = struct
 
       type ('global_slot, 'epoch_seed, 'delegator) t =
         {global_slot: 'global_slot; seed: 'epoch_seed; delegator: 'delegator}
-      [@@deriving hlist]
+      [@@deriving sexp, hlist]
 
       type value = (Global_slot.t, Epoch_seed.t, Coda_base.Account.Index.t) t
+      [@@deriving sexp]
 
       type var =
         ( Global_slot.Checked.t
@@ -525,10 +526,9 @@ module Data = struct
           ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
       let hash_to_group ~constraint_constants msg =
-        Group_map.to_group
-          (Random_oracle.hash ~init:Coda_base.Hash_prefix.vrf_message
-             (Random_oracle.pack_input (to_input ~constraint_constants msg)))
-        |> Tick.Inner_curve.of_affine
+        Random_oracle.hash ~init:Coda_base.Hash_prefix.vrf_message
+          (Random_oracle.pack_input (to_input ~constraint_constants msg))
+        |> Group_map.to_group |> Tick.Inner_curve.of_affine
 
       module Checked = struct
         open Tick
@@ -544,10 +544,10 @@ module Data = struct
         let hash_to_group msg =
           let%bind input = to_input msg in
           Tick.make_checked (fun () ->
-              Group_map.Checked.to_group
-                (Random_oracle.Checked.hash
-                   ~init:Coda_base.Hash_prefix.vrf_message
-                   (Random_oracle.Checked.pack_input input)) )
+              Random_oracle.Checked.hash
+                ~init:Coda_base.Hash_prefix.vrf_message
+                (Random_oracle.Checked.pack_input input)
+              |> Group_map.Checked.to_group )
       end
 
       let gen
@@ -583,22 +583,24 @@ module Data = struct
           let description = "Vrf Truncated Output"
         end)
 
-        let length_in_bytes = 32
-
-        let length_in_bits = 8 * length_in_bytes
-
         open Tick
+
+        let length_in_bits = Int.min 256 (Field.size_in_bits - 2)
 
         type var = Boolean.var array
 
         let typ : (var, t) Typ.t =
           Typ.array ~length:length_in_bits Boolean.typ
-          |> Typ.transport ~there:Blake2.string_to_bits
+          |> Typ.transport
+               ~there:(fun s ->
+                 Array.sub (Blake2.string_to_bits s) ~pos:0 ~len:length_in_bits
+                 )
                ~back:Blake2.bits_to_string
 
-        let dummy = String.init length_in_bytes ~f:(fun _ -> '\000')
+        let dummy = String.init 32 ~f:(fun _ -> '\000')
 
-        let to_bits t = Fold.(to_list (string_bits t))
+        let to_bits t =
+          Fold.(to_list (string_bits t)) |> Fn.flip List.take length_in_bits
       end
 
       open Tick
@@ -746,7 +748,7 @@ module Data = struct
     end
 
     module T =
-      Vrf_lib.Integrated.Make (Snark_params.Tick) (Scalar) (Group) (Message)
+      Vrf_lib.Integrated.Make (Tick) (Scalar) (Group) (Message)
         (struct
           type value = Snark_params.Tick.Field.t
 
