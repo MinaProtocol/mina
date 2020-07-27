@@ -12,6 +12,7 @@
 
 [%%define time_offsets true]
 [%%define fake_hash true]
+
 [%%define plugins false]
 
 [%%define genesis_ledger "test"]
