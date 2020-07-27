@@ -2,6 +2,9 @@ open Core_kernel
 open Pickles_types
 module Domain = Domain
 
+type 'field vanishing_polynomial_domain =
+  < vanishing_polynomial: 'field -> 'field >
+
 type 'field domain = < size: 'field ; vanishing_polynomial: 'field -> 'field >
 
 let debug = false
@@ -81,8 +84,9 @@ let evals_of_split_evals field (b1, b2, b3)
    - our [sigma_3] is the paper's [sigma_3 / domain_k#size]
    - our Marlin variant does not have [h_0] and so the last equation on that page can be omitted.
 *)
-let checks (type t) (module F : Field_intf with type t = t) ~input_domain
-    ~domain_h ~domain_k ~x_hat_beta_1
+let checks (type t) (module F : Field_intf with type t = t)
+    ~(input_domain : t vanishing_polynomial_domain) ~domain_h ~domain_k
+    ~x_hat_beta_1
     { Composition_types.Dlog_based.Proof_state.Deferred_values.Marlin.sigma_2
     ; sigma_3
     ; alpha
