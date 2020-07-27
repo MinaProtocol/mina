@@ -102,8 +102,6 @@ module Styles = {
       style([
         position(`relative),
         marginTop(`rem(2.)),
-        left(`rem(2.0)),
-        width(`rem(18.)),
         media(Theme.MediaQuery.notMobile, [marginTop(`zero)]),
         media(
           Theme.MediaQuery.veryVeryLarge,
