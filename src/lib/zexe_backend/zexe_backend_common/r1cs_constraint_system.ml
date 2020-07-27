@@ -215,7 +215,9 @@ struct
           Snarky_bn382.Usize_vector.emplace_back indices
             (Unsigned.Size_t.of_int i) ;
           Fp.Vector.emplace_back coeffs x ) ;
-      Mat.append_row m indices coeffs
+      Mat.append_row m indices coeffs ;
+      Snarky_bn382.Usize_vector.delete indices ;
+      Fp.Vector.delete coeffs
     in
     t.constraints <- t.constraints + 1 ;
     append t.m.a a ;
