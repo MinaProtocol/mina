@@ -581,6 +581,9 @@ module Genesis_proof = struct
 
   let load_or_generate ~genesis_dir ~logger ~may_generate
       (inputs : Genesis_proof.Inputs.t) =
+    let proof_needed =
+      match inputs.proof_level with Full -> true | _ -> false
+    in
     let compiled = Precomputed_values.compiled in
     let base_hash =
       Base_hash.create ~id:inputs.blockchain_proof_system_id
@@ -612,7 +615,8 @@ module Genesis_proof = struct
                 [ ("path", `String file)
                 ; ("error", `String (Error.to_string_hum err)) ] ;
             Error err )
-    | None when Base_hash.equal base_hash compiled_base_hash ->
+    | None
+      when Base_hash.equal base_hash compiled_base_hash || not proof_needed ->
         let compiled = Lazy.force compiled in
         Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
           "Base hash $computed_hash matches compile-time $compiled_hash, \
