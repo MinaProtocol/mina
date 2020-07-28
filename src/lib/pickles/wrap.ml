@@ -49,7 +49,7 @@ let combined_inner_product (type actual_branching)
       ~last:Array.last ~evaluation_point:pt
       ~shifted_pow:(fun deg x ->
         Pcs_batch.pow ~one ~mul x
-          Int.(crs_max_degree - (deg mod crs_max_degree)) )
+          Int.(Max_degree.step - (deg mod Max_degree.step)) )
       v b
   in
   let open Tick.Field in
@@ -266,7 +266,7 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
             ; b
             ; bulletproof_challenges=
                 Vector.of_array_and_length_exn new_bulletproof_challenges
-                  Rounds.n
+                  Tick.Rounds.n
             ; combined_inner_product
             ; which_branch= which_index
             ; marlin=

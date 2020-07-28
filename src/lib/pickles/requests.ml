@@ -35,7 +35,7 @@ module Wrap = struct
               , ( ( Challenge.Constant.t Scalar_challenge.t
                   , bool )
                   Bulletproof_challenge.t
-                , Rounds.n )
+                , Tock.Rounds.n )
                 Vector.t
               , Digest.Constant.t )
               Types.Pairing_based.Proof_state.Per_proof.t
@@ -89,7 +89,7 @@ module Wrap = struct
                 , ( ( Challenge.Constant.t Scalar_challenge.t
                     , bool )
                     Bulletproof_challenge.t
-                  , Rounds.n )
+                  , Tock.Rounds.n )
                   Vector.t
                 , Digest.Constant.t )
                 Types.Pairing_based.Proof_state.Per_proof.t
