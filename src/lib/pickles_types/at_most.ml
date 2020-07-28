@@ -8,12 +8,32 @@ let rec to_list : type a n. (a, n) t -> a list = function
   | x :: xs ->
       x :: to_list xs
 
+let rec length : type a n. (a, n) t -> int = function
+  | [] ->
+      0
+  | _ :: xs ->
+      1 + length xs
+
 let rec to_vector : type a n. (a, n) t -> a Vector.e = function
   | [] ->
       T []
   | x :: xs ->
       let (T xs) = to_vector xs in
       T (x :: xs)
+
+let rec map : type a b n. (a, n) t -> f:(a -> b) -> (b, n) t =
+ fun xs ~f -> match xs with [] -> [] | x :: xs -> f x :: map xs ~f
+
+let rec extend_to_vector : type a n.
+    (a, n) t -> a -> n Nat.t -> (a, n) Vector.t =
+ fun v a n ->
+  match (v, n) with
+  | [], Z ->
+      []
+  | [], S n ->
+      a :: extend_to_vector [] a n
+  | x :: xs, S n ->
+      x :: extend_to_vector xs a n
 
 let rec of_vector : type a n m. (a, n) Vector.t -> (n, m) Nat.Lte.t -> (a, m) t
     =

@@ -54,7 +54,9 @@ let rec mapn : type xs y n.
       []
   | (_ :: _) :: _ ->
       let hds, tls = hhead_off xss in
-      f hds :: mapn tls ~f
+      let y = f hds in
+      let ys = mapn tls ~f in
+      y :: ys
   | [] ->
       failwith "mapn: Empty args"
 
