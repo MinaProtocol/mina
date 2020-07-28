@@ -38,7 +38,7 @@ Pipeline.build
       ]
 
       -- TODO: re-enable Unit tests once sufficient infrastructure resources are provisioned 
-      let overrideDisableWhen = [ S.strictlyStart (S.contains "buildkite/src/Jobs/UnitTest.override")]
+      let overrideDisableWhen = [ S.strictlyStart (S.contains "buildkite/src/Jobs/UnitTest.override") ]
 
       in
 
