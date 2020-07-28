@@ -175,7 +175,7 @@ let main () =
   let fmt =
     Format.formatter_of_out_channel (Out_channel.create "snark_keys.ml")
   in
-  let%bind str = str ~loc:Location.none in
+  let%map str = str ~loc:Location.none in
   Pprintast.top_phrase fmt (Ptop_def str) ;
   exit 0
 
