@@ -2,7 +2,7 @@ import Page from '@reason/pages/Docs';
 export default Page({title: "Snapps: SNARK Powered Applications"});
 
 # Snapps: SNARK Powered Applications
-## Snapps = Dapps + Privacy + Off-Chain Debate + Scalability
+### Snapps = Dapps + Privacy + Off-Chain Debate + Scalability
 
 As the world’s lightest blockchain, Coda enables an entirely new category of applications called Snapps: Snarkified Applications. Snapps are featurewise similar to Dapps on Ethereum, but are superior thanks to three specific properties:
 
@@ -28,7 +28,7 @@ In general, a Snapp on Coda has the following workflow:
 6. Attach the SNARK proof returned from the function to a Coda address
 7. Coda executes transactions based on result of the SNARK proof
 
-**Technical overview**
+## Technical overview
 
 As currently designed, Coda’s Snapps functionality will work as follows. 
 
@@ -70,7 +70,9 @@ O(1) Labs is currently developing tooling for app developers, which includes exi
 Let’s dive into a couple examples that will showcase the true power of Snapps.
 
 
-## Example 1: Proof of Credit Score
+## Examples 
+
+### Example 1: Proof of Credit Score
 
 **Value Proposition: **Providing borrowers with a way to prove their credit score is above a certain threshold, without disclosing the score itself, and thus be able to borrow funds without posting any collateral. 
 
@@ -88,7 +90,7 @@ Let’s dive into a couple examples that will showcase the true power of Snapps.
 **How Snapp Toolset Is Used: **Developer of Snapp uses the toolset to integrate a specific program that has the user download a signed credit score from provider, check locally on the user’s computer that the score meets criteria, and locally generate a proof for the check, which is subsequently shared back with the developer. The toolset also provides the user with a Coda address behind the scenes, which is used to provide a time stamp to the computation via the block number on the Coda blockchain. They also use the toolset to integrate a SNARK verifier into their own backend to confirm the validity of the local computation. 
 
 
-## Example 2: Proof of Authentic Identity Document
+### Example 2: Proof of Authentic Identity Document
 
 **Value Proposition: **Proving that the owner of a Coda address has access to an authentic identity document (such as driver’s license), without disclosing the document itself, starting with a certain block height. The validity of the identity document would be checked by a standardized open source algorithm.
 
@@ -105,7 +107,7 @@ Let’s dive into a couple examples that will showcase the true power of Snapps.
 **How Snapp Toolset Is Used: **Snapp toolset provides the developer with an SDK to embed into their app the SNARK proof generator and hash generator, along with a Coda interface. Snapp toolset also provides any other developer that wants to be able to verify said ID authentications with a SNARK verifier. 
 
 
-## Example 3: Proof of Coinbase Balance
+### Example 3: Proof of Coinbase Balance
 
 **Value Proposition: **Providing third parties with proof of funds meeting a certain criteria (e.g. >$10,000) in a Coinbase account belonging to a specific email, without disclosing the actual deposit amount. 
 
@@ -123,7 +125,7 @@ Let’s dive into a couple examples that will showcase the true power of Snapps.
 **How Snapp Toolset Is Used: **Developer of Snapp uses the toolset to integrate a specific program that has the user OAuth into their Coinbase account, query their account balance for a signed balance information, the account’s email address, and a time stamp. The toolset allows a SNARK proof to be generated locally, without sharing any information with the backend of the service provider, so all balance info stays private. The developer also uses the toolset to integrate a SNARK verifier into their own backend to confirm the validity of the local computation. 
 
 
-## Example 4: Private Voting
+### Example 4: Private Voting
 
 **Value Proposition:** Allowing a set of eligible voters (e.g. any Twitter account with >100 followers) to vote privately, without disclosing who they are and what they voted for. Anyone would easily be able to verify the outcome of the entire vote once the voting period is over. 
 
@@ -137,7 +139,7 @@ Let’s dive into a couple examples that will showcase the true power of Snapps.
 *   When viewing the results of the election, the user obtains the main Coda blockchain proof, which certifies the validity of the entire Coda merkle tree, including the leaf corresponding to the election state. They also obtain a merkle path into this leaf so that they can view the state.
 
 
-## Other Ideas
+### Other Ideas
 
 The design space for Snapps is huge, and will consist of many other innovative ideas entrepreneurs will come up with as the framework is better understood. Some other examples we have thought of:
 
@@ -154,4 +156,4 @@ The design space for Snapps is huge, and will consist of many other innovative i
 
 O(1) Labs is working hard to build the Snapp toolset which will make the above examples possible on the Coda blockchain, and partner with talented developers to build the first proof of concept implementations.
 
-However, the sky's the limit for Snapps. As such, we would like to invite the Coda community to join us in ideating different Snapp use cases and user flows, as well as helping us develop the tools and apps by contributing to the code. If you would like to join the exploration of this entirely new design space for confidential and verifiable applications, start by filling out this form.
+However, the sky's the limit for Snapps. As such, we would like to invite the Coda community to join us in ideating different Snapp use cases and user flows, as well as helping us develop the tools and apps by contributing to the code. If you would like to join the exploration of this entirely new design space for confidential and verifiable applications, start by filling out this [form](https://forms.gle/PsM1AmZMveE3RhaV8).
