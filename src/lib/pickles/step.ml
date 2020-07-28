@@ -449,12 +449,6 @@ struct
         let module V = H3.To_vector (Tick.Curve.Affine) in
         V.f prev_values_length (M.f prev_with_proofs)
       in
-      let pass_through =
-        (* TODO: Use the same pad_pass_through function as in wrap *)
-        pad
-          (Vector.map statements_with_hashes ~f:(fun s -> s.proof_state.me_only))
-          Maxes.maxes Maxes.length
-      in
       ksprintf Common.time "step-prover %d (%d, %d, %d)"
         (Index.to_int branch_data.index)
         (Domain.size h) (Domain.size k) (Domain.size x) (fun () ->
