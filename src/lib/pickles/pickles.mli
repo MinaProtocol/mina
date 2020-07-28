@@ -30,8 +30,6 @@ module Verification_key : sig
     type t [@@deriving sexp, eq]
 
     val dummy : unit -> t
-
-    val to_string : t -> string
   end
 
   val load :
@@ -96,6 +94,40 @@ module Cache_handle : sig
   type t
 
   val generate_or_load : t -> Dirty.t
+end
+
+module Side_loaded : sig
+  module Verification_key : sig
+    type t
+
+    module Checked : sig
+      type t
+    end
+
+    val typ : (Checked.t, t) Impls.Step.Typ.t
+
+    module Max_branches : Nat.Add.Intf
+  end
+
+  val create :
+       name:string
+    -> max_branching:(module Nat.Add.Intf with type n = 'n1)
+    -> value_to_field_elements:('value -> Impls.Step.Field.Constant.t array)
+    -> var_to_field_elements:('var -> Impls.Step.Field.t array)
+    -> typ:('var, 'value) Impls.Step.Typ.t
+    -> ('var, 'value, 'n1, Verification_key.Max_branches.n) Tag.t
+
+  (* Must be called in the inductive rule snarky function defining a
+   rule for which this tag is used as a predecessor. *)
+  val in_circuit :
+       ('var, 'value, 'n1, 'n2) Tag.t
+    -> Side_loaded_verification_key.Checked.t
+    -> unit
+
+  (* Must be called immediately before calling the prover for the inductive rule
+    for which this tag is used as a predecessor. *)
+  val in_prover :
+    ('var, 'value, 'n1, 'n2) Tag.t -> Side_loaded_verification_key.t -> unit
 end
 
 (** This compiles a series of inductive rules defining a set into a proof

@@ -58,8 +58,7 @@ let create
     ~(self : (a_var, a_value, max_branching, branches) Tag.t) ~wrap_domains
     ~(max_branching : max_branching Nat.t)
     ~(branchings : (int, branches) Vector.t) ~(branches : branches Nat.t) ~typ
-    a_var_to_field_elements a_value_to_field_elements
-    (rule : _ Inductive_rule.t) =
+    var_to_field_elements value_to_field_elements (rule : _ Inductive_rule.t) =
   Timer.clock __LOC__ ;
   let module HT = H4.T (Tag) in
   let (T (self_width, branching)) = HT.length rule.prevs in
@@ -73,14 +72,21 @@ let create
         ([], [], Z, Z)
     | t :: ts, S len -> (
         let ns, ms, len_ns, len_ms = extract_lengths ts len in
-        match Type_equal.Id.same_witness self t with
+        match Type_equal.Id.same_witness self.id t.id with
         | Some T ->
             (max_branching :: ns, branches :: ms, S len_ns, S len_ms)
         | None ->
-            let d = Types_map.lookup t in
-            let (module M) = d.max_branching in
+            let (module M), branches =
+              match t.kind with
+              | Compiled ->
+                  let d = Types_map.lookup_compiled t.id in
+                  (d.max_branching, d.branches)
+              | Side_loaded ->
+                  let d = Types_map.lookup_side_loaded t.id in
+                  (d.permanent.max_branching, d.permanent.branches)
+            in
             let T = M.eq in
-            (M.n :: ns, d.branches :: ms, S len_ns, S len_ms) )
+            (M.n :: ns, branches :: ms, S len_ns, S len_ms) )
   in
   Timer.clock __LOC__ ;
   let widths, heights, local_signature_length, local_branches_length =
@@ -96,8 +102,8 @@ let create
       ~basic:
         { typ
         ; branchings
-        ; a_var_to_field_elements
-        ; a_value_to_field_elements
+        ; var_to_field_elements
+        ; value_to_field_elements
         ; wrap_domains
         ; step_domains }
       ~self_branches:branches ~branching ~local_signature:widths
@@ -113,7 +119,8 @@ let create
           (Vector.init branches ~f:(fun _ -> Fix_domains.rough_domains))
     in
     let etyp =
-      Impls.Step.input ~branching:max_branching ~bulletproof_log2:Rounds.n
+      Impls.Step.input ~branching:max_branching
+        ~wrap_rounds:Backend.Tock.Rounds.n
     in
     Fix_domains.domains (module Impls.Step) etyp main
   in
