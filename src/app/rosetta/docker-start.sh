@@ -47,7 +47,7 @@ echo "CODA Flags: $CODA_FLAGS -config-file ${CODA_CONFIG_FILE}"
 # Daemon w/ mounted config file, initial file is phase 3 config.json
 /coda-bin/cli/src/coda.exe daemon \
     -config-file ${CODA_CONFIG_FILE} \
-    ${CODA_FLAGS} &
+    ${CODA_FLAGS} $@ &
 
 # wait for it to settle
 sleep 3
