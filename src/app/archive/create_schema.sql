@@ -22,8 +22,8 @@ CREATE TABLE user_commands
 , fee_payer_id   int                 NOT NULL REFERENCES public_keys(id)
 , source_id      int                 NOT NULL REFERENCES public_keys(id)
 , receiver_id    int                 NOT NULL REFERENCES public_keys(id)
-, fee_token      text                NOT NULL
-, token          text                NOT NULL
+, fee_token      bigint              NOT NULL
+, token          bigint              NOT NULL
 , nonce          bigint              NOT NULL
 , amount         bigint
 , fee            bigint              NOT NULL
@@ -43,7 +43,7 @@ CREATE TABLE internal_commands
 , type        internal_command_type NOT NULL
 , receiver_id int                   NOT NULL REFERENCES public_keys(id)
 , fee         bigint                NOT NULL
-, token       text                  NOT NULL
+, token       bigint                NOT NULL
 , hash        text                  NOT NULL UNIQUE
 );
 

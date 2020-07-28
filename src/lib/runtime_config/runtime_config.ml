@@ -31,6 +31,11 @@ let result_opt ~f x =
   | None ->
       Result.return None
 
+let dump_on_error yojson x =
+  Result.map_error x ~f:(fun str ->
+      str ^ "\n\nCould not parse JSON:\n" ^ Yojson.Safe.pretty_to_string yojson
+  )
+
 module Json_layout = struct
   module Accounts = struct
     module Single = struct
@@ -44,7 +49,8 @@ module Json_layout = struct
       let fields = [|"pk"; "sk"; "balance"; "delegate"|]
 
       let of_yojson json =
-        of_yojson @@ yojson_strip_fields ~keep_fields:fields json
+        dump_on_error json @@ of_yojson
+        @@ yojson_strip_fields ~keep_fields:fields json
     end
 
     type t = Single.t list [@@deriving yojson, dhall_type]
@@ -63,7 +69,8 @@ module Json_layout = struct
       [|"accounts"; "num_accounts"; "hash"; "name"; "add_genesis_winner"|]
 
     let of_yojson json =
-      of_yojson @@ yojson_strip_fields ~keep_fields:fields json
+      dump_on_error json @@ of_yojson
+      @@ yojson_strip_fields ~keep_fields:fields json
   end
 
   module Proof_keys = struct
@@ -82,7 +89,7 @@ module Json_layout = struct
         json
         |> yojson_rename_fields ~alternates
         |> yojson_strip_fields ~keep_fields:fields
-        |> of_yojson
+        |> of_yojson |> dump_on_error json
     end
 
     type t =
@@ -107,7 +114,8 @@ module Json_layout = struct
        ; "account_creation_fee" |]
 
     let of_yojson json =
-      of_yojson @@ yojson_strip_fields ~keep_fields:fields json
+      dump_on_error json @@ of_yojson
+      @@ yojson_strip_fields ~keep_fields:fields json
   end
 
   module Genesis = struct
@@ -120,7 +128,8 @@ module Json_layout = struct
     let fields = [|"k"; "delta"; "genesis_state_timestamp"|]
 
     let of_yojson json =
-      of_yojson @@ yojson_strip_fields ~keep_fields:fields json
+      dump_on_error json @@ of_yojson
+      @@ yojson_strip_fields ~keep_fields:fields json
   end
 
   module Daemon = struct
@@ -130,7 +139,8 @@ module Json_layout = struct
     let fields = [|"txpool_max_size"|]
 
     let of_yojson json =
-      of_yojson @@ yojson_strip_fields ~keep_fields:fields json
+      dump_on_error json @@ of_yojson
+      @@ yojson_strip_fields ~keep_fields:fields json
   end
 
   type t =
@@ -143,7 +153,8 @@ module Json_layout = struct
   let fields = [|"daemon"; "ledger"; "genesis"; "proof"|]
 
   let of_yojson json =
-    of_yojson @@ yojson_strip_fields ~keep_fields:fields json
+    dump_on_error json @@ of_yojson
+    @@ yojson_strip_fields ~keep_fields:fields json
 end
 
 (** JSON representation:
