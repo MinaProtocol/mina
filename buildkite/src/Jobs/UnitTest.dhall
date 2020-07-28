@@ -33,15 +33,18 @@ Pipeline.build
         S.strictlyStart (S.contains "src/lib"),
         S.strictlyStart (S.contains "src/nonconsensus"),
         S.strictly (S.contains "Makefile"),
-        S.strictlyStart (S.contains "buildkite/src/Jobs/Unit"),
+        S.strictlyStart (S.contains "buildkite/src/Jobs/UnitTest"),
         S.exactly "scripts/link-coredumps" "sh"
       ]
+
+      -- TODO: re-enable Unit tests once sufficient infrastructure resources are provisioned 
+      let overrideDisableWhen = [ S.strictlyStart (S.contains "buildkite/src/Jobs/UnitTest.override")]
 
       in
 
       JobSpec::{
-        dirtyWhen = unitDirtyWhen,
-        name = "Unit"
+        dirtyWhen = overrideDisableWhen,
+        name = "UnitTest"
       },
     steps = [
       buildTestCmd "dev" "src/lib",
