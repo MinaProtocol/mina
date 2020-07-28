@@ -129,15 +129,14 @@ let handle_dirty dirty =
 let str ~loc =
   let module T = Transaction_snark.Make () in
   let module B = Blockchain_snark.Blockchain_snark_state.Make (T) in
-  (* DO NOT MERGE THIS PR UNTIL THIS IS FIXED. *)
-  (*let%map () =
+  let%map () =
     handle_dirty
       Pickles.(
         List.map
           [T.cache_handle; B.cache_handle]
           ~f:Cache_handle.generate_or_load
         |> List.reduce_exn ~f:Dirty.( + ))
-  in*)
+  in
   let%map () = Deferred.return () in
   let module E = Ppxlib.Ast_builder.Make (struct
     let loc = loc
