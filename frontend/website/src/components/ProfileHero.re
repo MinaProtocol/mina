@@ -135,7 +135,7 @@ module Links = {
         bgColorHover=Theme.Colors.jungle
       />
       <div className=Styles.linksColumn>
-        <Next.Link href="">
+        <Next.Link href="https://bit.ly/leaderboardFAQ">
           <a className=Styles.link>
             <Svg
               link="/static/img/Icon.Link.svg"

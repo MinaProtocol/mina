@@ -304,7 +304,7 @@ let make = () => {
         <Spacer height=4.8 />
         <div className=Styles.heroLinks>
           <div className=Styles.flexColumn>
-            <Next.Link href="">
+            <Next.Link href="https://bit.ly/leaderboardFAQ">
               <a className=Styles.link>
                 <Svg
                   link="/static/img/Icon.Link.svg"
