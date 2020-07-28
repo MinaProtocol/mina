@@ -126,28 +126,18 @@ module Sync : S with module M := Or_error = struct
   end
 
   let read spec {Disk_storable.to_string; read= r; write= w} k =
-    let errs = ref [] in
-    match
-      List.find_mapi spec ~f:(fun i s ->
-          let res =
-            match s with
-            | Spec.On_disk {directory; _} ->
-                (on_disk to_string r w directory).read k
-            | S3 {bucket_prefix; install_path} ->
-                Unix.mkdir_p install_path ;
-                (s3 to_string r ~bucket_prefix ~install_path).read k
-          in
-          match res with
-          | Error e ->
-              errs := e :: !errs ;
-              None
-          | Ok x ->
-              Some (i, x) )
-    with
-    | Some (i, x) ->
-        Ok (x, if i = 0 then `Cache_hit else `Locally_generated)
-    | None ->
-        Error (Error.of_list !errs)
+    Or_error.find_map_ok spec ~f:(fun s ->
+        let res, cache_hit =
+          match s with
+          | Spec.On_disk {directory; should_write} ->
+              ( (on_disk to_string r w directory).read k
+              , if should_write then `Locally_generated else `Cache_hit )
+          | S3 {bucket_prefix; install_path} ->
+              Unix.mkdir_p install_path ;
+              ((s3 to_string r ~bucket_prefix ~install_path).read k, `Cache_hit)
+        in
+        let%map.Or_error.Let_syntax res = res in
+        (res, cache_hit) )
 
   let write spec {Disk_storable.to_string; read= r; write= w} k v =
     let errs =
@@ -237,27 +227,18 @@ module Async : S with module M := Async.Deferred.Or_error = struct
   end
 
   let read spec {Disk_storable.to_string; read= r; write= w} k =
-    let errs = ref [] in
-    match%map
-      Deferred.List.find_mapi spec ~f:(fun i s ->
-          let res =
-            match s with
-            | Spec.On_disk {directory; _} ->
-                (on_disk to_string r w directory).read k
-            | S3 {bucket_prefix; install_path} ->
-                (s3 to_string r ~bucket_prefix ~install_path).read k
-          in
-          match%map res with
-          | Error e ->
-              errs := e :: !errs ;
-              None
-          | Ok x ->
-              Some (i, x) )
-    with
-    | Some (i, x) ->
-        Ok (x, if i = 0 then `Cache_hit else `Locally_generated)
-    | None ->
-        Error (Error.of_list !errs)
+    Deferred.Or_error.find_map_ok spec ~f:(fun s ->
+        let open Deferred.Or_error.Let_syntax in
+        match s with
+        | Spec.On_disk {directory; should_write} ->
+            let%map res = (on_disk to_string r w directory).read k in
+            (res, if should_write then `Locally_generated else `Cache_hit)
+        | S3 {bucket_prefix; install_path} ->
+            let%bind.Async () = Unix.mkdir ~p:() install_path in
+            let%map res =
+              (s3 to_string r ~bucket_prefix ~install_path).read k
+            in
+            (res, `Cache_hit) )
 
   let write spec {Disk_storable.to_string; read= r; write= w} k v =
     let%map errs =
