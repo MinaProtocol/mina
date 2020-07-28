@@ -25,6 +25,7 @@ module Input = Input
 let params : Field.t Sponge.Params.t =
   Sponge.Params.(map tweedle_q ~f:Field.of_string)
 
+(* TODO: Unify with Bn382_inputs in the sponge lib *)
 module Inputs = struct
   module Field = Field
 
@@ -35,6 +36,7 @@ module Inputs = struct
   [%%ifdef
   consensus_mechanism]
 
+  (* Computes x^17 *)
   let to_the_alpha x =
     let open Field in
     let res = square x in
@@ -50,6 +52,7 @@ module Inputs = struct
 
   [%%else]
 
+  (* Computes x^17 *)
   let to_the_alpha x =
     let open Field in
     let res = x in

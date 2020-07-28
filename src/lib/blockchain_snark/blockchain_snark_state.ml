@@ -33,7 +33,9 @@ let blockchain_handler on_unhandled {Witness.prev_state; transition} =
 let wrap_handler h w =
   match h with
   | None ->
-      blockchain_handler (fun _ -> failwith "Unknown request") w
+      blockchain_handler
+        (fun (Snarky.Request.With {respond; _}) -> respond Unhandled)
+        w
   | Some h ->
       (* TODO: Clean up the handler composition interface. *)
       fun r -> blockchain_handler h w r

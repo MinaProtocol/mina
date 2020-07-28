@@ -137,7 +137,6 @@ let str ~loc =
           ~f:Cache_handle.generate_or_load
         |> List.reduce_exn ~f:Dirty.( + ))
   in
-  let%map () = Deferred.return () in
   let module E = Ppxlib.Ast_builder.Make (struct
     let loc = loc
   end) in
@@ -175,7 +174,7 @@ let main () =
   let fmt =
     Format.formatter_of_out_channel (Out_channel.create "snark_keys.ml")
   in
-  let%map str = str ~loc:Location.none in
+  let%bind str = str ~loc:Location.none in
   Pprintast.top_phrase fmt (Ptop_def str) ;
   exit 0
 

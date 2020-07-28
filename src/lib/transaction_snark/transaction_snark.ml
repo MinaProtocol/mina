@@ -1792,9 +1792,6 @@ module Base = struct
         (module Shifted)
         statement.source pending_coinbase_init pc.source pc.target
         statement.next_available_token_before state_body t
-      (* 
-        root_before pending_coinbase_init pending_coinbase_before
-        pending_coinbase_after state_body te*)
     in
     let%bind fee_excess =
       (* Use the default token for the fee excess if it is zero.
