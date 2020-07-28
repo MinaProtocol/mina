@@ -69,7 +69,7 @@ module Proving_key = struct
   let of_string _ = failwith "TODO"
 end
 
-module Rounds = Rounds
+module Rounds = Rounds.Wrap
 
 module Keypair = Dlog_based_keypair.Make (struct
   let name = "tweedledee"
