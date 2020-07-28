@@ -13,7 +13,7 @@ module Step = struct
     end
 
     module Verification = struct
-      type t = Type_equal.Id.Uid.t * int * Md5.t
+      type t = Type_equal.Id.Uid.t * int * Md5.t [@@deriving sexp]
 
       let to_string : t -> _ = function
         | _id, _n, h ->
@@ -24,11 +24,15 @@ module Step = struct
   let storable =
     Key_cache.Sync.Disk_storable.simple Key.Proving.to_string
       (fun (_, _, t) ~path ->
-        Snarky_bn382.Tweedle.Dum.Field_index.read
-          (Backend.Tick.Keypair.load_urs ())
-          t.m.a t.m.b t.m.c
-          (Unsigned.Size_t.of_int (1 + t.public_input_size))
-          path )
+        let t =
+          Snarky_bn382.Tweedle.Dum.Field_index.read
+            (Backend.Tick.Keypair.load_urs ())
+            t.m.a t.m.b t.m.c
+            (Unsigned.Size_t.of_int (1 + t.public_input_size))
+            path
+        in
+        Caml.Gc.finalise Snarky_bn382.Tweedle.Dum.Field_index.delete t ;
+        t )
       Snarky_bn382.Tweedle.Dum.Field_index.write
 
   let vk_storable =
@@ -87,7 +91,9 @@ end
 module Wrap = struct
   module Key = struct
     module Verification = struct
-      type t = Type_equal.Id.Uid.t * Md5.t [@@deriving sexp, eq]
+      type t = Type_equal.Id.Uid.t * Md5.t [@@deriving sexp]
+
+      let equal (_, x1) (_, x2) = Md5.equal x1 x2
 
       let to_string : t -> _ = function
         | _id, h ->
@@ -107,11 +113,15 @@ module Wrap = struct
   let storable =
     Key_cache.Sync.Disk_storable.simple Key.Proving.to_string
       (fun (_, t) ~path ->
-        Snarky_bn382.Tweedle.Dee.Field_index.read
-          (Backend.Tock.Keypair.load_urs ())
-          t.m.a t.m.b t.m.c
-          (Unsigned.Size_t.of_int (1 + t.public_input_size))
-          path )
+        let t =
+          Snarky_bn382.Tweedle.Dee.Field_index.read
+            (Backend.Tock.Keypair.load_urs ())
+            t.m.a t.m.b t.m.c
+            (Unsigned.Size_t.of_int (1 + t.public_input_size))
+            path
+        in
+        Caml.Gc.finalise Snarky_bn382.Tweedle.Dee.Field_index.delete t ;
+        t )
       Snarky_bn382.Tweedle.Dee.Field_index.write
 
   let vk_storable =

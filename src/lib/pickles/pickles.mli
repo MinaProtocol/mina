@@ -30,6 +30,8 @@ module Verification_key : sig
     type t [@@deriving sexp, eq]
 
     val dummy : unit -> t
+
+    val to_string : t -> string
   end
 
   val load :
