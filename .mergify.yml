@@ -22,7 +22,7 @@ pull_request_rules:
           - label=ready-to-merge
       actions:
           merge:
-              method: squash
+              method: merge
               strict: smart
           delete_head_branch: {}
     - name: automatically merge approved PRs into develop with the ready-to-merge-into-develop label
@@ -49,6 +49,6 @@ pull_request_rules:
           - base=develop
       actions:
           merge:
-              method: squash
+              method: merge
               strict: smart
           delete_head_branch: {}

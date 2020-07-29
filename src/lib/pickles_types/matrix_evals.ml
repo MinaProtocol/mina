@@ -4,7 +4,7 @@ module H_list = Snarky.H_list
 [%%versioned
 module Stable = struct
   module V1 = struct
-    type 'a t = {row: 'a; col: 'a; value: 'a; rc: 'a} [@@deriving sexp]
+    type 'a t = {row: 'a; col: 'a; value: 'a; rc: 'a} [@@deriving sexp, fields]
   end
 end]
 
