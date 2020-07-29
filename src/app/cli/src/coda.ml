@@ -222,7 +222,7 @@ let daemon logger =
      and libp2p_peers_raw =
        flag "peer"
          ~doc:
-           "/ip4/IPADDR/tcp/PORT/ipfs/PEERID initial \"bootstrap\" peers for \
+           "/ip4/IPADDR/tcp/PORT/p2p/PEERID initial \"bootstrap\" peers for \
             discovery"
          (listed string)
      and curr_protocol_version =
