@@ -507,6 +507,11 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                   Deferred.unit )
                 else
                   Rpc.Connection.server_with_close reader writer
+                    ~handshake_timeout:(Time.Span.of_sec 60.0)
+                    ~heartbeat_config:
+                      (Rpc.Connection.Heartbeat_config.create
+                         ~timeout:(Time_ns.Span.of_sec 60.0)
+                         ~send_every:(Time_ns.Span.of_sec 10.0))
                     ~implementations:
                       (Rpc.Implementations.create_exn
                          ~implementations:(client_impls @ snark_worker_impls)
