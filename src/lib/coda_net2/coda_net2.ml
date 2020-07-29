@@ -61,14 +61,13 @@ module Go_log = struct
   let ours_of_go lvl =
     let open Logger.Level in
     match lvl with
-    | 0 (* Critical gets mapped to error *) | 1 ->
+    | "error" | "panic" | "fatal" ->
         Error
-    | 2 ->
+    | "warn" ->
         Warn
-    | 3 (* Notice gets mapped to info (I can't find any use of notice?) *) | 4
-      ->
+    | "info" ->
         Info
-    | 5 ->
+    | "debug" ->
         Debug
     | _ ->
         Spam
@@ -76,25 +75,24 @@ module Go_log = struct
   (* there should be no other levels. *)
 
   type record =
-    { id: int64
-    ; time: string
-    ; module_: string [@key "module"]
-    ; level: int
-    ; message: string }
+    { ts: string
+    ; module_: string [@key "logger"]
+    ; level: string
+    ; msg: string
+    ; error: string [@default ""] }
   [@@deriving of_yojson]
 
   let record_to_message r =
     Logger.Message.
-      { timestamp= Time.of_string r.time
+      { timestamp= Time.of_string r.ts
       ; level= ours_of_go r.level
       ; source=
           Some
             (Logger.Source.create
                ~module_:(sprintf "Libp2p_helper.Go.%s" r.module_)
                ~location:"(not tracked)")
-      ; message= r.message
-      ; metadata=
-          String.Map.singleton "go_message_id" (`String (Int64.to_string r.id))
+      ; message= r.msg
+      ; metadata= String.Map.empty
       ; event_id= None }
 end
 
@@ -1376,8 +1374,22 @@ let create ~logger ~conf_dir =
       Strict_pipe.Reader.iter (Child_processes.stderr_lines subprocess)
         ~f:(fun line ->
           ( match Go_log.record_of_yojson (Yojson.Safe.from_string line) with
-          | Ok record ->
-              Logger.raw logger Go_log.(record_to_message record)
+          | Ok record -> (
+              let r = Go_log.(record_to_message record) in
+              let r =
+                if
+                  String.( = ) r.message "failed when refreshing routing table"
+                then {r with level= Info}
+                else r
+              in
+              let shortline = String.split_lines r.message |> List.hd_exn in
+              try Logger.raw logger r
+              with _exn ->
+                Logger.raw logger
+                  { r with
+                    message= sprintf "%s (see metadata for details)" shortline
+                  ; metadata= String.Map.singleton "line" (`String r.message)
+                  } )
           | Error err ->
               Logger.error logger ~module_:__MODULE__ ~location:__LOC__
                 ~metadata:[("line", `String line); ("error", `String err)]

@@ -232,9 +232,10 @@ func (m *configureMsg) run(app *app) (interface{}, error) {
 		return nil, badHelper(err)
 	}
 
-	// SOMEDAY: stop putting block content on the mesh
-	// bigger than 4MiB block size?
-	opts := pubsub.WithMaxMessageSize(1024 * 1024 * 4)
+	// SOMEDAY:
+	// - stop putting block content on the mesh.
+	// - bigger than 16MiB block size?
+	opts := pubsub.WithMaxMessageSize(1024 * 1024 * 16)
 	var ps *pubsub.PubSub
 	if m.GossipType == "gossipsub" {
 		ps, err = pubsub.NewGossipSub(app.Ctx, helper.Host, opts)
@@ -338,6 +339,7 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 	if app.P2p.Dht == nil {
 		return nil, needsDHT()
 	}
+	app.P2p.Pubsub.Join(s.Topic)
 	err := app.P2p.Pubsub.RegisterTopicValidator(s.Topic, func(ctx context.Context, id peer.ID, msg *pubsub.Message) bool {
 		if id == app.P2p.Me {
 			// messages from ourself are valid.
@@ -396,7 +398,7 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 			return false
 		case res := <-ch:
 			if !res {
-				app.P2p.Logger.Error("why u fail to validate :(")
+				app.P2p.Logger.Info("why u fail to validate :(")
 			} else {
 				app.P2p.Logger.Info("validated!")
 			}
@@ -812,7 +814,7 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 	app.P2p.DiscoveredPeers = discovered
 
 	foundPeer := func(info peer.AddrInfo, source string) {
-		if info.ID != "" && len(info.Addrs) != 0 {
+		if info.ID != "" && len(info.Addrs) != 0 && info.ID != app.P2p.Me {
 			ctx, cancel := context.WithTimeout(app.Ctx, 15*time.Second)
 			defer cancel()
 			if err := app.P2p.Host.Connect(ctx, info); err != nil {
@@ -862,7 +864,7 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 			for info := range dhtpeers {
 				foundPeer(info, "dht")
 			}
-			time.Sleep(30 * time.Second)
+			time.Sleep(2 * time.Minute)
 		}
 	}()
 
@@ -1004,12 +1006,12 @@ type successResult struct {
 }
 
 func main() {
-	logging.SetupLogging(logging.Config {
+	logging.SetupLogging(logging.Config{
 		Format: logging.JSONOutput,
 		Stderr: true,
 		Stdout: false,
-		Level: logging.LevelInfo,
-		File: "",
+		Level:  logging.LevelInfo,
+		File:   "",
 	})
 	helperLog := logging.Logger("helper top-level JSON handling")
 
