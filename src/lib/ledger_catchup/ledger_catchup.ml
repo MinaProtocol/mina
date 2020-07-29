@@ -623,7 +623,7 @@ let%test_module "Ledger_catchup tests" =
       (* TODO: expose Strict_pipe.read *)
       let%map cached_catchup_breadcrumbs =
         Block_time.Timeout.await_exn time_controller
-          ~timeout_duration:(Block_time.Span.of_ms 100000L)
+          ~timeout_duration:(Block_time.Span.of_ms 30000L)
           ( match%map Strict_pipe.Reader.read breadcrumbs_reader with
           | `Eof ->
               (* Core.printf "unexpected EOF\n%!" ; *)
@@ -736,7 +736,7 @@ let%test_module "Ledger_catchup tests" =
                    cached_failing_transition) ;
               let%map result =
                 Block_time.Timeout.await_exn time_controller
-                  ~timeout_duration:(Block_time.Span.of_ms 100000L)
+                  ~timeout_duration:(Block_time.Span.of_ms 10000L)
                   (Ivar.read (Cache_lib.Cached.final_state cached_transition))
               in
               if result <> `Failed then
