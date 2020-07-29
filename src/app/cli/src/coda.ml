@@ -46,6 +46,21 @@ let chain_id ~genesis_state_hash ~genesis_constants =
 [%%inject
 "compile_time_current_protocol_version", current_protocol_version]
 
+[%%if
+plugins]
+
+let plugin_flag =
+  let open Command.Param in
+  flag "load-plugin" (listed string)
+    ~doc:
+      "PATH The path to load a .cmxs plugin from. May be passed multiple times"
+
+[%%else]
+
+let plugin_flag = Command.Param.return []
+
+[%%endif]
+
 let daemon logger =
   let open Command.Let_syntax in
   let open Cli_lib.Arg_type in
@@ -237,7 +252,7 @@ let daemon logger =
        flag "proof-level"
          (optional (Arg_type.create Genesis_constants.Proof_level.of_string))
          ~doc:"full|check|none"
-     in
+     and plugins = plugin_flag in
      fun () ->
        let open Deferred.Let_syntax in
        let compute_conf_dir home =
@@ -878,6 +893,7 @@ let daemon logger =
              Coda_metrics.server ~port ~logger >>| ignore )
          |> Option.value ~default:Deferred.unit
        in
+       let () = Coda_plugins.init_plugins ~logger coda plugins in
        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
          "Daemon ready. Clients can now connect" ;
        Async.never ())
