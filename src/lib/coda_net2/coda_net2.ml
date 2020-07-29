@@ -1114,8 +1114,14 @@ let configure net ~me ~external_maddr ~maddrs ~network_id ~on_new_peer
       ; external_maddr= Multiaddr.to_string external_maddr
       ; network_id
       ; unsafe_no_trust_ip
-      ; gossip_type= match gossip_type with `Gossipsub -> "gossipsub" | `Flood -> "flood" | `Random -> "random"
-       }
+      ; gossip_type=
+          ( match gossip_type with
+          | `Gossipsub ->
+              "gossipsub"
+          | `Flood ->
+              "flood"
+          | `Random ->
+              "random" ) }
   with
   | Ok "configure success" ->
       Ivar.fill net.me_keypair me ;
@@ -1425,12 +1431,14 @@ let%test_module "coda network tests" =
       let%bind kp_b = Keypair.random a in
       let maddrs = ["/ip4/127.0.0.1/tcp/0"] in
       let%bind () =
-        configure a ~gossip_type:`Gossipsub ~external_maddr:(List.hd_exn maddrs) ~me:kp_a
-          ~maddrs ~network_id ~on_new_peer:Fn.ignore ~unsafe_no_trust_ip:true
+        configure a ~gossip_type:`Gossipsub
+          ~external_maddr:(List.hd_exn maddrs) ~me:kp_a ~maddrs ~network_id
+          ~on_new_peer:Fn.ignore ~unsafe_no_trust_ip:true
         >>| Or_error.ok_exn
       and () =
-        configure b ~gossip_type:`Gossipsub ~external_maddr:(List.hd_exn maddrs) ~me:kp_b
-          ~maddrs ~network_id ~on_new_peer:Fn.ignore ~unsafe_no_trust_ip:true
+        configure b ~gossip_type:`Gossipsub
+          ~external_maddr:(List.hd_exn maddrs) ~me:kp_b ~maddrs ~network_id
+          ~on_new_peer:Fn.ignore ~unsafe_no_trust_ip:true
         >>| Or_error.ok_exn
       in
       let%bind a_advert = begin_advertising a
