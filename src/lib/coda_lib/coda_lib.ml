@@ -137,7 +137,7 @@ module Snark_worker = struct
   let run_process ~logger ~proof_level client_port kill_ivar num_threads =
     let env =
       Option.map
-        ~f:(fun num -> `Extend [("OMP_NUM_THREADS", string_of_int num)])
+        ~f:(fun num -> `Extend [("RAYON_NUM_THREADS", string_of_int num)])
         num_threads
     in
     let%map snark_worker_process =
