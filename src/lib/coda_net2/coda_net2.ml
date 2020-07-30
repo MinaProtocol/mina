@@ -92,7 +92,10 @@ module Go_log = struct
                ~module_:(sprintf "Libp2p_helper.Go.%s" r.module_)
                ~location:"(not tracked)")
       ; message= r.msg
-      ; metadata= String.Map.empty
+      ; metadata=
+          ( if r.error <> "" then
+            String.Map.singleton "go_error" (`String r.error)
+          else String.Map.empty )
       ; event_id= None }
 end
 
