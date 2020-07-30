@@ -1,17 +1,47 @@
 import Page from '@reason/pages/Docs';
 export default Page({title: "Archive Node"});
 
-# Archive Node 
+# Archive Node
 
-# What is the archive node? 
+Need to access historical blockchain data? Query for historical blockchain data using the Archive node.
+The Archive node is comprised of three parts:
+1. Coda daemon 
+2. Lightweight archive process 
+3. Postgres database 
 
-# Prerequisites 
-1. Have a working version of Coda installed. See the [docs](/docs/getting-started) 
-2. Install Postgres [here](https://www.postgresql.org/download/). 
+## Prerequisites
+1. You'll need a working version of Coda installed. Get the latest version of the daemon [here](/docs/getting-started).
+2. Install the correct Postgres database package for your operating system. [here](https://www.postgresql.org/download/).
+    - For MacOS users, you can install it with ```brew install postgresql```
+    - For Windows and Linux installers, follow [here](https://www.postgresql.org/download/windows/).
+    
+## Installation
+(insert steps here)
+### macOS
+### Windows 
 
-# How to run the archive node 
-1. Create a new database in Postgres. 
-2. Start the archive node and point it to the Postgres database. 
-3. Start the coda daemon and point it to the archive node. 
+## Running the archive node
+1. First, you'll need to create a new database in Postgres.
+    (insert commands here)
+2. Start the archive node and point it to the Postgres database.
+3. Start the coda daemon and point it to the archive node.
 
-# Example Queries
+## Try a query
+### Example 1: Find the block that contains a specific transaction
+(insert query for finding a specific transaction)
+
+### Example 2: Recursively traverse blockchain
+This query recursively traverses the blockchain from the longest tip
+backwards until it reaches a block of the given height. 
+
+WITH RECURSIVE chain AS (
+SELECT id, state_hash, parent_id, creator_id, snarked_ledger_hash_id, ledger_hash, height, timestamp, coinbase_id FROM blocks b WHERE height = (select MAX(height) from blocks)
+UNION ALL
+SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, b.ledger_hash, b.height, b.timestamp, b.coinbase_id FROM blocks b
+INNER JOIN chain
+ON b.id = chain.parent_id
+) SELECT c.id, c.state_hash, c.parent_id, c.creator_id, c.snarked_ledger_hash_id, c.ledger_hash, c.height, c.timestamp, c.coinbase_id, pk.value as creator FROM chain c
+INNER JOIN public_keys pk
+ON pk.id = c.creator_id
+WHERE c.height = ?
+|}
