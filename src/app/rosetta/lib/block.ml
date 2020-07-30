@@ -185,6 +185,7 @@ module User_command_info = struct
             ; account= Some (account_id t.fee_payer t.fee_token)
             ; _type= Operation_types.name `Fee_payer_dec
             ; amount= Some Amount_of.(negated @@ token t.fee_token t.fee)
+            ; coin_change= None
             ; metadata }
         | `Payment_source_dec amount ->
             { Operation.operation_identifier
@@ -193,6 +194,7 @@ module User_command_info = struct
             ; account= Some (account_id t.source t.token)
             ; _type= Operation_types.name `Payment_source_dec
             ; amount= Some Amount_of.(negated @@ token t.token amount)
+            ; coin_change= None
             ; metadata }
         | `Payment_receiver_inc amount ->
             { Operation.operation_identifier
@@ -201,6 +203,7 @@ module User_command_info = struct
             ; account= Some (account_id t.source t.token)
             ; _type= Operation_types.name `Payment_receiver_inc
             ; amount= Some (Amount_of.token t.token amount)
+            ; coin_change= None
             ; metadata }
         | `Account_creation_fee_via_payment account_creation_fee ->
             { Operation.operation_identifier
@@ -209,6 +212,7 @@ module User_command_info = struct
             ; account= Some (account_id t.receiver t.token)
             ; _type= Operation_types.name `Account_creation_fee_via_payment
             ; amount= Some Amount_of.(negated @@ coda account_creation_fee)
+            ; coin_change= None
             ; metadata }
         | `Account_creation_fee_via_fee_payer account_creation_fee ->
             { Operation.operation_identifier
@@ -217,6 +221,7 @@ module User_command_info = struct
             ; account= Some (account_id t.fee_payer t.fee_token)
             ; _type= Operation_types.name `Account_creation_fee_via_fee_payer
             ; amount= Some Amount_of.(negated @@ coda account_creation_fee)
+            ; coin_change= None
             ; metadata }
         | `Create_token ->
             { Operation.operation_identifier
@@ -225,6 +230,7 @@ module User_command_info = struct
             ; account= None
             ; _type= Operation_types.name `Create_token
             ; amount= None
+            ; coin_change= None
             ; metadata }
         | `Delegate_change ->
             { Operation.operation_identifier
@@ -233,6 +239,7 @@ module User_command_info = struct
             ; account= Some (account_id t.source Amount_of.Token_id.default)
             ; _type= Operation_types.name `Delegate_change
             ; amount= None
+            ; coin_change= None
             ; metadata=
                 merge_metadata metadata
                   (Some
@@ -248,6 +255,7 @@ module User_command_info = struct
             ; account= Some (account_id t.receiver t.token)
             ; _type= Operation_types.name `Mint_tokens
             ; amount= Some (Amount_of.token t.token amount)
+            ; coin_change= None
             ; metadata=
                 merge_metadata metadata
                   (Some
@@ -417,6 +425,7 @@ module Internal_command_info = struct
             ; account= Some (account_id t.receiver Amount_of.Token_id.default)
             ; _type= Operation_types.name `Coinbase_inc
             ; amount= Some (Amount_of.coda coinbase)
+            ; coin_change= None
             ; metadata= None }
         | `Fee_payer_dec ->
             { Operation.operation_identifier
@@ -425,6 +434,7 @@ module Internal_command_info = struct
             ; account= Some (account_id t.receiver Amount_of.Token_id.default)
             ; _type= Operation_types.name `Fee_payer_dec
             ; amount= Some Amount_of.(negated (coda t.fee))
+            ; coin_change= None
             ; metadata= None }
         | `Fee_receiver_inc ->
             { Operation.operation_identifier
@@ -433,6 +443,7 @@ module Internal_command_info = struct
             ; account= Some (account_id t.receiver t.token)
             ; _type= Operation_types.name `Fee_receiver_inc
             ; amount= Some (Amount_of.token t.token t.fee)
+            ; coin_change= None
             ; metadata= None } )
 
   let dummies =
@@ -857,9 +868,12 @@ module Specific = struct
     end )
 end
 
-let router ~graphql_uri ~logger:_ ~db (route : string list) body =
+let router ~graphql_uri ~logger ~db (route : string list) body =
   let (module Db : Caqti_async.CONNECTION) = db in
   let open Async.Deferred.Result.Let_syntax in
+  Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+    "Handling /block/ $route"
+    ~metadata:[("route", `List (List.map route ~f:(fun s -> `String s)))] ;
   match route with
   | [] ->
       let%bind req =
