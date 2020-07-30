@@ -86,9 +86,13 @@ module Make (Inputs : Intf.Inputs_intf) :
 
   let dispatch rpc shutdown_on_disconnect query address =
     let%map res =
-      Rpc.Connection.with_client
-        (Tcp.Where_to_connect.of_host_and_port address) (fun conn ->
-          Rpc.Rpc.dispatch rpc conn query )
+      Rpc.Connection.with_client ~handshake_timeout:(Time.Span.of_sec 60.0)
+        ~heartbeat_config:
+          (Rpc.Connection.Heartbeat_config.create
+             ~timeout:(Time_ns.Span.of_sec 60.0)
+             ~send_every:(Time_ns.Span.of_sec 10.0))
+        (Tcp.Where_to_connect.of_host_and_port address)
+        (fun conn -> Rpc.Rpc.dispatch rpc conn query)
     in
     match res with
     | Error exn ->
