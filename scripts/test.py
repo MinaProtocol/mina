@@ -67,7 +67,7 @@ small_curves_tests = {
     'test_postake_split':
     ['coda-shared-prefix-multiproducer-test -num-block-producers 2'],
     'test_postake':
-    simple_tests,
+    ['transaction-snark-profiler -k 1'],
     'test_postake_catchup': ['coda-restart-node-test'],
     'test_postake_three_producers': ['coda-txns-and-restart-non-producers'],
     'test_postake_five_even_txns':
