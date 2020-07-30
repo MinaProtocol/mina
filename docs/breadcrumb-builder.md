@@ -1,0 +1,11 @@
+## Breadcrumb Builder
+`src/lib/transition_handler/breadcrumb_builder.ml` contains three functions, all of which builds breadcrumbs based on given transitions. However, they take in different datatypes and return different datatypes. They also have different preconditions.
+
+### build_subtrees_of_breadcrumbs
+The basic one is `build_subtrees_of_breadcrumbs`. It takes in a list of trees of cached transitions and requires the initial transition (the parent of all the root transition of trees) in the transition frontier. Then it will build the breadcrumbs in the order of the tree from root to leaf. After this process, it will check again to make sure the initial transition is still in the transition frontier. Finally, it will return a list of trees of cached breadcrumbs.
+
+### build_subtrees_of_breadcrumbs_in_sequence
+This one still takes in a list of trees of cached transitions. However, to serve the requirement of building breadcrumbs in chunks, it does not require the initial transition is in the transition frontier if its breadcrumb (`initial_breadcrumb`) is provided. In this situation, `initial_hash` does not refer to the initial breadcrumb. Instead, it refers to the initial one of all going-on chunks (the parent of the very first chunk). After the breadcrumbs built still in order of the tree, it will check if the initial transition (the parent transition of the very first chunk) is still in the transition frontier. Finally, it will return a list of trees of cached breadcrumbs.
+
+### build_list_of_breadcrumbs_in_sequence
+Instead of taking in a list of trees of cached transitions, this function takes in a list of cached transitions. `initial_hash` and `initial_breadcrumb` serves the same purpose as `build_subtrees_of_breadcrumbs_in_sequence`. This function will return a list of breadcrumbs. Notice that this list is in reversed order compared to the given list of transitions, making it convenient for the caller to take the last breadcrumb as the initial one for the next chunk.

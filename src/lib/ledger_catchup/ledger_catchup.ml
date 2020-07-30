@@ -247,7 +247,7 @@ let rec partition size = function
       let sub, rest = List.split_n ls size in
       sub :: partition size rest
 
-(* returns a list of transitions with old ones comes first *)
+(* returns a list of lists of transitions with old ones comes first *)
 let download_transitions_in_chunks ~logger ~trust_system ~network ~num_peers
     ~preferred_peer ~maximum_download_size ~hashes_of_missing_transitions =
   let%bind random_peers = Coda_networking.random_peers network num_peers in
@@ -288,6 +288,8 @@ let download_transitions_in_chunks ~logger ~trust_system ~network ~num_peers
                      ~sender:(Envelope.Sender.Remote (peer.host, peer.peer_id))
                ) ) )
 
+(* Build result will be a list of breadcrumbs if it is not the last chunk.
+ * Otherwise, it will be a list of subtrees, as usual. *)
 type ('a, 'b) build_result_t = T of 'a | L of 'b
 
 let verify_transitions_and_build_breadcrumbs ~logger
