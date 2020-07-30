@@ -372,38 +372,11 @@ module Data = struct
   end
 
   module Epoch_ledger = struct
-    module Poly = struct
-      [%%versioned
-      module Stable = struct
-        module V1 = struct
-          type ('ledger_hash, 'amount) t =
-            {hash: 'ledger_hash; total_currency: 'amount}
-          [@@deriving sexp, eq, compare, hash, to_yojson]
-        end
-      end]
+    include Coda_base.Epoch_ledger
 
-      type ('ledger_hash, 'amount) t =
-            ('ledger_hash, 'amount) Stable.Latest.t =
-        {hash: 'ledger_hash; total_currency: 'amount}
-      [@@deriving sexp, eq, compare, hash, to_yojson, hlist]
-    end
-
-    module Value = struct
-      [%%versioned
-      module Stable = struct
-        module V1 = struct
-          type t =
-            ( Coda_base.Frozen_ledger_hash.Stable.V1.t
-            , Amount.Stable.V1.t )
-            Poly.Stable.V1.t
-          [@@deriving sexp, eq, compare, hash, to_yojson]
-
-          let to_latest = Fn.id
-        end
-      end]
-
-      type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash, to_yojson]
-    end
+    let genesis ~ledger =
+      { Poly.hash= genesis_ledger_hash ~ledger
+      ; total_currency= genesis_ledger_total_currency ~ledger }
 
     let graphql_type () : ('ctx, Value.t option) Graphql_async.Schema.typ =
       let open Graphql_async in
@@ -418,45 +391,6 @@ module Data = struct
               ~args:Arg.[]
               ~resolve:(fun _ {Poly.total_currency; _} ->
                 Amount.to_uint64 total_currency ) ] )
-
-    let to_input ({hash; total_currency} : Value.t) =
-      let open Snark_params.Tick in
-      { Random_oracle.Input.field_elements= [|(hash :> Field.t)|]
-      ; bitstrings= [|Amount.to_bits total_currency|] }
-
-    type var = (Coda_base.Frozen_ledger_hash.var, Amount.var) Poly.t
-
-    let data_spec =
-      Tick.Data_spec.[Coda_base.Frozen_ledger_hash.typ; Amount.typ]
-
-    let typ : (var, Value.t) Typ.t =
-      Tick.Typ.of_hlistable data_spec ~var_to_hlist:Poly.to_hlist
-        ~var_of_hlist:Poly.of_hlist ~value_to_hlist:Poly.to_hlist
-        ~value_of_hlist:Poly.of_hlist
-
-    let var_to_input ({Poly.hash; total_currency} : var) =
-      { Random_oracle.Input.field_elements=
-          [|Coda_base.Frozen_ledger_hash.var_to_hash_packed hash|]
-      ; bitstrings=
-          [|Bitstring.Lsb_first.to_list (Amount.var_to_bits total_currency)|]
-      }
-
-    let if_ cond
-        ~(then_ : (Coda_base.Frozen_ledger_hash.var, Amount.var) Poly.t)
-        ~(else_ : (Coda_base.Frozen_ledger_hash.var, Amount.var) Poly.t) =
-      let open Tick.Checked.Let_syntax in
-      let%map hash =
-        Coda_base.Frozen_ledger_hash.if_ cond ~then_:then_.hash
-          ~else_:else_.hash
-      and total_currency =
-        Amount.Checked.if_ cond ~then_:then_.total_currency
-          ~else_:else_.total_currency
-      in
-      {Poly.hash; total_currency}
-
-    let genesis ~ledger =
-      { Poly.hash= genesis_ledger_hash ~ledger
-      ; total_currency= genesis_ledger_total_currency ~ledger }
   end
 
   module Vrf = struct
