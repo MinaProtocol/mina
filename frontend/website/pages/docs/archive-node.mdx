@@ -12,7 +12,7 @@ The Archive node is comprised of three parts:
 ## Prerequisites
 1. You'll need a working version of Coda installed. Get the latest version of the daemon [here](/docs/getting-started).
 2. Install the correct Postgres database package for your operating system. [here](https://www.postgresql.org/download/).
-    - For MacOS users, you can install it with ```brew install postgresql```
+    - For MacOS users, you can install Postgres with ```brew install postgresql```. That will give you both the Postgres server and the command line console (psql). 
     - For Windows and Linux installers, follow [here](https://www.postgresql.org/download/windows/).
     
 ## Installation
@@ -21,14 +21,13 @@ The Archive node is comprised of three parts:
 ### Windows 
 
 ## Running the archive node
-1. First, you'll need to create a new database in Postgres.
-    (insert commands here)
-2. Start the archive node and point it to the Postgres database.
+1. Run ```createdb archiver``` to create a new Postgres database. 
+2. Start the archive node. 
 3. Start the coda daemon and point it to the archive node.
+4. Run ```psql -d archiver``` to connect to the archiver database. 
 
 ## Try a query
 ### Example 1: Find the block that contains a specific transaction
-(insert query for finding a specific transaction)
 
 ### Example 2: Recursively traverse blockchain
 This query recursively traverses the blockchain from the longest tip
