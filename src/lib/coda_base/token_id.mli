@@ -29,6 +29,10 @@ val to_string : t -> string
 
 val of_string : string -> t
 
+val to_uint64 : t -> Unsigned.UInt64.t
+
+val of_uint64 : Unsigned.UInt64.t -> t
+
 (** The default token ID, associated with the native coda token.
 
     This ID should be used for fee and coinbase transactions.
@@ -51,6 +55,11 @@ val gen : t Quickcheck.Generator.t
 *)
 val gen_non_default : t Quickcheck.Generator.t
 
+(** Generates a random token ID. This may be any value, including [default] or
+    [invalid].
+*)
+val gen_with_invalid : t Quickcheck.Generator.t
+
 val unpack : t -> bool list
 
 include Comparable.S_binable with type t := t
@@ -70,6 +79,8 @@ module Checked : sig
     var -> ((Field.Var.t, Boolean.var) Random_oracle.Input.t, _) Tick.Checked.t
 
   val next : var -> (var, _) Checked.t
+
+  val next_if : var -> Boolean.var -> (var, _) Checked.t
 
   val equal : var -> var -> (Boolean.var, _) Checked.t
 

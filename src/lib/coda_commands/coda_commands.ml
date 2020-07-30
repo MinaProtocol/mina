@@ -44,22 +44,6 @@ let record_payment t (txn : User_command.t) account =
          collision should not happen." ;
       Core.exit 1
 
-let is_valid_user_command _t (txn : User_command.t) account_opt =
-  let remainder =
-    let open Option.Let_syntax in
-    let%bind account = account_opt
-    and cost =
-      let fee = txn.payload.common.fee in
-      match txn.payload.body with
-      | Stake_delegation (Set_delegate _) ->
-          Some (Currency.Amount.of_fee fee)
-      | Payment {amount; _} ->
-          Currency.Amount.add_fee amount fee
-    in
-    Currency.Balance.sub_amount account.Account.Poly.balance cost
-  in
-  Option.is_some remainder
-
 let get_account t (addr : Account_id.t) =
   let open Participating_state.Let_syntax in
   let%map ledger = Coda_lib.best_ledger t in
@@ -405,11 +389,10 @@ module For_tests = struct
       Coda_lib.external_transition_database coda
     in
     let user_commands =
-      List.concat_map
-        ~f:
-          (Fn.compose
-             Auxiliary_database.Filtered_external_transition.user_commands
-             With_hash.data)
+      List.concat_map ~f:(fun transition ->
+          transition |> With_hash.data
+          |> Auxiliary_database.Filtered_external_transition.user_commands
+          |> List.map ~f:With_hash.data )
       @@ Auxiliary_database.External_transition_database.get_all_values
            external_transition_database (Some account_id)
     in

@@ -34,7 +34,6 @@ module Stable = struct
       { snark_transition: Snark_transition.Value.Stable.V1.t
       ; prover_state: Consensus.Data.Prover_state.Stable.V1.t
       ; staged_ledger_diff: Staged_ledger_diff.Stable.V1.t }
-    [@@deriving sexp, to_yojson, fields]
 
     let to_latest = Fn.id
   end

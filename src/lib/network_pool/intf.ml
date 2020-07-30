@@ -24,7 +24,8 @@ module type Resource_pool_base_intf = sig
     transition_frontier_diff -> t -> unit Deferred.t
 
   val create :
-       frontier_broadcast_pipe:transition_frontier Option.t
+       constraint_constants:Genesis_constants.Constraint_constants.t
+    -> frontier_broadcast_pipe:transition_frontier Option.t
                                Broadcast_pipe.Reader.t
     -> config:Config.t
     -> logger:Logger.t
@@ -53,8 +54,7 @@ module type Resource_pool_diff_intf = sig
   conincides with applying locally generated diffs or diffs from the network
   or diffs from transition frontier extensions.*)
   val unsafe_apply :
-       constraint_constants:Genesis_constants.Constraint_constants.t
-    -> pool
+       pool
     -> t Envelope.Incoming.t
     -> ( t * rejected
        , [`Locally_generated of t * rejected | `Other of Error.t] )
@@ -228,12 +228,12 @@ module type Transaction_pool_diff_intf = sig
       | Invalid_signature
       | Duplicate
       | Sender_account_does_not_exist
-      | Insufficient_amount_for_account_creation
-      | Delegate_not_found
       | Invalid_nonce
       | Insufficient_funds
       | Insufficient_fee
       | Overflow
+      | Bad_token
+      | Unwanted_fee_token
     [@@deriving sexp, yojson]
   end
 
@@ -256,11 +256,23 @@ module type Transaction_resource_pool_intf = sig
   val make_config :
     trust_system:Trust_system.t -> pool_max_size:int -> Config.t
 
-  val member : t -> User_command.With_valid_signature.t -> bool
+  val member :
+    t -> Transaction_hash.User_command_with_valid_signature.t -> bool
 
   val transactions :
-    logger:Logger.t -> t -> User_command.With_valid_signature.t Sequence.t
+       logger:Logger.t
+    -> t
+    -> Transaction_hash.User_command_with_valid_signature.t Sequence.t
 
   val all_from_account :
-    t -> Account_id.t -> User_command.With_valid_signature.t list
+       t
+    -> Account_id.t
+    -> Transaction_hash.User_command_with_valid_signature.t list
+
+  val get_all : t -> Transaction_hash.User_command_with_valid_signature.t list
+
+  val find_by_hash :
+       t
+    -> Transaction_hash.t
+    -> Transaction_hash.User_command_with_valid_signature.t option
 end

@@ -61,8 +61,7 @@ module Make
           ~f:Snark_work_lib.Work.Single.Spec.statement
       , {proof= res.proofs; fee= {fee= res.spec.fee; prover= res.prover}} )
 
-  let unsafe_apply ~constraint_constants:_ (pool : Pool.t)
-      (t : t Envelope.Incoming.t) =
+  let unsafe_apply (pool : Pool.t) (t : t Envelope.Incoming.t) =
     let {Envelope.Incoming.data= diff; sender} = t in
     let is_local = match sender with Local -> true | _ -> false in
     let to_or_error = function

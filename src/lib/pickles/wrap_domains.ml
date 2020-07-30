@@ -1,4 +1,6 @@
+open Core_kernel
 open Pickles_types
+open Import
 open Hlist
 
 (* Compute the domains corresponding to wrap_main *)
@@ -13,7 +15,7 @@ module Make (A : T0) (A_value : T0) = struct
         (struct
           let f : type a b c d. (a, b, c, d) Tag.t -> Domains.t =
            fun t ->
-            Types_map.lookup_map t ~self ~default:Fix_domains.rough_domains
+            Types_map.lookup_map t ~self ~default:Common.wrap_domains
               ~f:(fun d -> d.wrap_domains)
         end)
     in
@@ -31,31 +33,56 @@ module Make (A : T0) (A_value : T0) = struct
     in
     M.f choices
 
-  let f full_signature num_choices choices_length ~self ~choices ~max_branching
-      =
+  let result =
+    lazy
+      (let x =
+         let (T (typ, conv)) = Impls.Wrap.input () in
+         Domain.Pow_2_roots_of_unity
+           (Int.ceil_log2 (1 + Impls.Wrap.Data_spec.size [typ]))
+       in
+       {Common.wrap_domains with x})
+
+  let f_debug full_signature num_choices choices_length ~self ~choices
+      ~max_branching =
     let num_choices = Hlist.Length.to_nat choices_length in
+    let dummy_step_domains =
+      Vector.init num_choices ~f:(fun _ -> Fix_domains.rough_domains)
+    in
+    let dummy_step_widths =
+      Vector.init num_choices ~f:(fun _ -> Nat.to_int (Nat.Add.n max_branching))
+    in
     let dummy_step_keys =
       lazy
         (Vector.init num_choices ~f:(fun _ ->
-             let g = Zexe_backend.G1.(to_affine_exn one) in
+             let g = Backend.Tock.Inner_curve.(to_affine_exn one) in
+             let g =
+               Array.create g
+                 ~len:
+                   (Common.index_commitment_length Fix_domains.rough_domains.k)
+             in
              let t : _ Abc.t = {a= g; b= g; c= g} in
              {Matrix_evals.row= t; col= t; value= t; rc= t} ))
-    in
-    let dummy_step_domains =
-      Vector.init num_choices ~f:(fun _ -> Fix_domains.rough_domains)
     in
     let prev_domains = prev ~self ~choices in
     Timer.clock __LOC__ ;
     let _, main =
       Wrap_main.wrap_main full_signature choices_length dummy_step_keys
-        dummy_step_domains prev_domains max_branching
+        dummy_step_widths dummy_step_domains prev_domains max_branching
     in
     Timer.clock __LOC__ ;
     let t =
-      Fix_domains.domains
-        (module Impls.Dlog_based)
-        (Impls.Dlog_based.input ())
-        main
+      Fix_domains.domains (module Impls.Wrap) (Impls.Wrap.input ()) main
     in
     Timer.clock __LOC__ ; t
+
+  let f full_signature num_choices choices_length ~self ~choices ~max_branching
+      =
+    let res = Lazy.force result in
+    ( if debug then
+      let res' =
+        f_debug full_signature num_choices choices_length ~self ~choices
+          ~max_branching
+      in
+      [%test_eq: Domains.t] res res' ) ;
+    res
 end

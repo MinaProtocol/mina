@@ -46,6 +46,21 @@ let chain_id ~genesis_state_hash ~genesis_constants =
 [%%inject
 "compile_time_current_protocol_version", current_protocol_version]
 
+[%%if
+plugins]
+
+let plugin_flag =
+  let open Command.Param in
+  flag "load-plugin" (listed string)
+    ~doc:
+      "PATH The path to load a .cmxs plugin from. May be passed multiple times"
+
+[%%else]
+
+let plugin_flag = Command.Param.return []
+
+[%%endif]
+
 let daemon logger =
   let open Command.Let_syntax in
   let open Cli_lib.Arg_type in
@@ -241,7 +256,7 @@ let daemon logger =
        flag "proof-level"
          (optional (Arg_type.create Genesis_constants.Proof_level.of_string))
          ~doc:"full|check|none"
-     in
+     and plugins = plugin_flag in
      fun () ->
        let open Deferred.Let_syntax in
        let compute_conf_dir home =
@@ -434,8 +449,7 @@ let daemon logger =
          let%bind precomputed_values =
            match%map
              Genesis_ledger_helper.init_from_config_file ~genesis_dir ~logger
-               ~may_generate ~proof_level
-               ~genesis_constants:Genesis_constants.compiled config
+               ~may_generate ~proof_level config
            with
            | Ok (precomputed_values, _) ->
                precomputed_values
@@ -869,6 +883,11 @@ let daemon logger =
          coda_initialization_deferred ()
        in
        coda_ref := Some coda ;
+       (*This pipe is consumed only by integration tests*)
+       don't_wait_for
+         (Pipe_lib.Strict_pipe.Reader.iter_without_pushback
+            (Coda_lib.validated_transitions coda)
+            ~f:ignore) ;
        let%bind () = maybe_sleep 3. in
        Coda_run.setup_local_server ?client_trustlist ~rest_server_port
          ~insecure_rest_server coda ;
@@ -878,6 +897,7 @@ let daemon logger =
              Coda_metrics.server ~port ~logger >>| ignore )
          |> Option.value ~default:Deferred.unit
        in
+       let () = Coda_plugins.init_plugins ~logger coda plugins in
        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
          "Daemon ready. Clients can now connect" ;
        Async.never ())

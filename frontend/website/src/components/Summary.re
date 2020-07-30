@@ -1,3 +1,34 @@
+module Moment = {
+  type t;
+};
+
+[@bs.module] external momentWithDate: Js.Date.t => Moment.t = "moment";
+[@bs.send] external format: (Moment.t, string) => string = "format";
+
+type statistics = {
+  genesisMembers: string,
+  blockCount: string,
+  participants: string,
+};
+
+let fetchStatistics = () => {
+  Sheets.fetchRange(
+    ~sheet="1Nq_Y76ALzSVJRhSFZZm4pfuGbPkZs2vTtCnVQ1ehujE",
+    ~range="Data!A2:C",
+  )
+  |> Promise.bind(res => {
+       let entry = Leaderboard.parseEntry(res[0]);
+       {
+         genesisMembers: entry |> Leaderboard.safeArrayGet(0),
+         blockCount: entry |> Leaderboard.safeArrayGet(1),
+         participants: entry |> Leaderboard.safeArrayGet(2),
+       }
+       ->Some
+       ->Promise.return;
+     })
+  |> Js.Promise.catch(_ => Promise.return(None));
+};
+
 module Styles = {
   open Css;
 
@@ -112,7 +143,8 @@ module Styles = {
     ]);
 
   let link = merge([Theme.Link.basic, style([lineHeight(`px(28))])]);
-  let coloredLink = merge([link, style([color(Theme.Colors.teal)])]);
+  let updatedDate =
+    merge([Theme.Body.basic, style([color(Theme.Colors.teal)])]);
   let icon =
     style([marginRight(`px(8)), position(`relative), top(`px(1))]);
 };
@@ -166,21 +198,27 @@ module StatisticsRow = {
       ]);
   };
   [@react.component]
-  let make = (~participants="456", ~blocks="123", ~genesisMembers="121") => {
+  let make = (~statistics) => {
     <div className=Styles.container>
       <div className=Styles.flexColumn>
         <h2 className=Styles.statistic> {React.string("Participants")} </h2>
-        <span className=Styles.value> {React.string(participants)} </span>
+        <span className=Styles.value>
+          {React.string(statistics.participants)}
+        </span>
       </div>
       <div className=Styles.flexColumn>
         <h2 className=Styles.statistic> {React.string("Blocks")} </h2>
-        <span className=Styles.value> {React.string(blocks)} </span>
+        <span className=Styles.value>
+          {React.string(statistics.blockCount)}
+        </span>
       </div>
       <div className=Styles.lastStatistic>
         <span className=Styles.statistic>
           {React.string("Genesis Members")}
         </span>
-        <span className=Styles.value> {React.string(genesisMembers)} </span>
+        <span className=Styles.value>
+          {React.string(statistics.genesisMembers)}
+        </span>
       </div>
     </div>;
   };
@@ -209,32 +247,55 @@ module HeroText = {
   };
 };
 
-module Moment = {
-  type t;
-};
+type state = {statistics: option(statistics)};
+let initialState = {statistics: None};
 
-[@bs.module] external momentWithDate: Js.Date.t => Moment.t = "moment";
-[@bs.send] external format: (Moment.t, string) => string = "format";
+type actions =
+  | UpdateStatistics(statistics);
+
+let reducer = (_, action) => {
+  switch (action) {
+  | UpdateStatistics(statistics) => {statistics: Some(statistics)}
+  };
+};
 
 [@react.component]
 let make = (~lastManualUpdatedDate) => {
+  let (state, dispatch) = React.useReducer(reducer, initialState);
   let dateAsMoment = momentWithDate(lastManualUpdatedDate);
   let date = format(dateAsMoment, "MMMM Do YYYY");
+
+  React.useEffect0(() => {
+    fetchStatistics()
+    |> Promise.iter(e =>
+         Belt.Option.mapWithDefault(e, (), statistics =>
+           dispatch(UpdateStatistics(statistics))
+         )
+       );
+    None;
+  });
+
   <>
     <h1 className=Styles.header> {React.string("Testnet Leaderboard")} </h1>
     <div className=Styles.heroRow>
-      <div className=Styles.heroLeft> <StatisticsRow /> <HeroText /> </div>
+      <div className=Styles.heroLeft>
+        {switch (state.statistics) {
+         | Some(statistics) => <StatisticsRow statistics />
+         | None => React.null
+         }}
+        <HeroText />
+      </div>
       <div className=Styles.heroRight>
         <div className=Styles.buttonRow>
           <Button
-            link=""
+            link="https://bit.ly/3dNmPle"
             label="Current Challenges"
             bgColor=Theme.Colors.clover
             bgColorHover=Theme.Colors.jungle
           />
           <Spacer width=2.0 height=1.0 />
           <Button
-            link=""
+            link="/genesis"
             label="Genesis Program"
             bgColor=Theme.Colors.clover
             bgColorHover=Theme.Colors.jungle
@@ -265,7 +326,7 @@ let make = (~lastManualUpdatedDate) => {
                 {React.string("Discord #Leaderboard Channel")}
               </a>
             </Next.Link>
-            <span className=Styles.coloredLink>
+            <span className=Styles.updatedDate>
               <Svg
                 link="/static/img/Icon.Info.svg"
                 className=Styles.icon

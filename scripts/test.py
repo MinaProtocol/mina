@@ -32,35 +32,44 @@ simple_tests = [
     'transaction-snark-profiler -k 2',
 ]
 
-integration_tests = [
+compile_config_agnostic_tests = [
+    'coda-bootstrap-test',
+    'coda-shared-state-test',
+    'coda-batch-payment-test',
     'coda-peers-test',
     'coda-transitive-peers-test',
     'coda-block-production-test',
     'coda-shared-prefix-test -who-produces 0',
     'coda-shared-prefix-test -who-produces 1',
     'coda-change-snark-worker-test',
-    'coda-archive-node-test'
+    'coda-archive-node-test',
+    'coda-delegation-test',
 ]
 
-all_tests = simple_tests + integration_tests
+compile_config_agnostic_profiles = [
+    'dev'
+]
+
+required_config_agnostic_tests = {
+    'dev': [
+        'coda-bootstrap-test',
+        'coda-shared-state-test',
+        'coda-batch-payment-test',
+        'coda-delegation-test',
+      ]
+}
 
 # dictionary mapping configs to lists of tests
 small_curves_tests = {
     'fake_hash': ['full-test'],
     'test_postake_snarkless':
     simple_tests,
-    'test_postake_split_snarkless':
-    integration_tests,
     'test_postake_split':
     ['coda-shared-prefix-multiproducer-test -num-block-producers 2'],
     'test_postake':
     simple_tests,
     'test_postake_catchup': ['coda-restart-node-test'],
-    'test_postake_bootstrap':
-    ['coda-bootstrap-test'],
     'test_postake_three_producers': ['coda-txns-and-restart-non-producers'],
-    'test_postake_delegation': ['coda-delegation-test'],
-    'test_postake_txns': ['coda-shared-state-test', 'coda-batch-payment-test'],
     'test_postake_five_even_txns':
     ['coda-shared-prefix-multiproducer-test -num-block-producers 5 -payments'],
 }
@@ -347,6 +356,11 @@ class CodaProject:
         self.executive.run_cmd(cmd, directory=self.root, log=build_log)
         self.current_profile = profile
 
+    def no_build(self, profile='dev'):
+        print('Skipping build')
+        self.current_profile = profile
+
+
     def run_test(self, test, test_log):
         if self.current_profile == None:
             self.executive.fail('run_test initiated without building')
@@ -402,6 +416,8 @@ def run(args):
     all_tests = small_curves_tests
     all_tests.update(medium_curves_and_other_tests)
     all_tests.update(archive_processor_test)
+    all_tests.update({profile:compile_config_agnostic_tests
+                      for profile in compile_config_agnostic_profiles})
     all_tests = filter_tests(all_tests, args.includes_patterns, args.excludes_patterns)
     if len(all_tests) == 0:
         if args.includes_patterns != ['*']:
@@ -426,11 +442,14 @@ def run(args):
 
     for profile in all_tests.keys():
         print('- %s:' % profile)
-        build_log_name = '%s.log' % profile
-        build_log = os.path.join(out_dir.build_logs, build_log_name)
-        executive.reserve_file(build_log)
-        executive.register_artifact_collector(SingleArtifactCollector(out_dir.build_logs, 'build', build_log_name))
-        project.build(build_log, profile)
+        if args.no_build:
+            project.no_build(profile)
+        else:
+            build_log_name = '%s.log' % profile
+            build_log = os.path.join(out_dir.build_logs, build_log_name)
+            executive.reserve_file(build_log)
+            executive.register_artifact_collector(SingleArtifactCollector(out_dir.build_logs, 'build', build_log_name))
+            project.build(build_log, profile)
 
         for test in all_tests[profile]:
             print('  - %s' % test)
@@ -459,7 +478,10 @@ def get_required_status():
                                          "test-unit--%s" % profile
                                          for profile in unit_test_profiles),
                                     ("build-artifacts--%s" % profile
-                                     for profile in build_artifact_profiles))),
+                                     for profile in build_artifact_profiles),
+                                    ("test--%s--%s" % (profile, name)
+                                     for profile in required_config_agnostic_tests
+                                     for name in required_config_agnostic_tests[profile]))),
                   extra_required_status_checks)))
 
 
@@ -484,7 +506,9 @@ def render(args):
         unit_test_profiles_medium_curves=unit_test_profiles_medium_curves,
         small_curves_tests=tests,
         medium_curves_and_other_tests=medium_curves_and_other_tests,
-        medium_curve_profiles=medium_curve_profiles_full)
+        medium_curve_profiles=medium_curve_profiles_full,
+        compile_config_agnostic_profiles=compile_config_agnostic_profiles,
+        compile_config_agnostic_tests=compile_config_agnostic_tests)
 
     if args.check:
         with open(output_file, 'r') as file:
@@ -591,6 +615,11 @@ def main():
             Specify a pattern of tests to exclude from running. This flag can be
             provided multiple times to specify a series of patterns'
         '''
+    )
+    run_parser.add_argument(
+        '--no-build',
+        action='store_true',
+        help='Run tests using an existing built binary.'
     )
     run_parser.add_argument(
         'includes_patterns',

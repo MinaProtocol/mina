@@ -20,6 +20,9 @@ module Body : sig
   type t =
     | Payment of Payment_payload.t
     | Stake_delegation of Stake_delegation.t
+    | Create_new_token of New_token_payload.t
+    | Create_token_account of New_account_payload.t
+    | Mint_tokens of Minting_payload.t
   [@@deriving eq, sexp, hash, yojson]
 
   [%%versioned:
@@ -31,7 +34,13 @@ module Body : sig
 
   val tag : t -> Transaction_union_tag.t
 
-  val receiver : t -> Account_id.t
+  val receiver_pk : t -> Signature_lib.Public_key.Compressed.t
+
+  val receiver : next_available_token:Token_id.t -> t -> Account_id.t
+
+  val source_pk : t -> Signature_lib.Public_key.Compressed.t
+
+  val source : next_available_token:Token_id.t -> t -> Account_id.t
 
   val token : t -> Token_id.t
 end
@@ -133,7 +142,7 @@ module Poly : sig
 
   type ('common, 'body) t = ('common, 'body) Stable.Latest.t =
     {common: 'common; body: 'body}
-  [@@deriving eq, sexp, hash, yojson, compare]
+  [@@deriving eq, sexp, hash, yojson, compare, hlist]
 end
 
 [%%versioned:
@@ -178,19 +187,20 @@ val body : t -> Body.t
 
 val receiver_pk : t -> Public_key.Compressed.t
 
-val receiver : t -> Account_id.t
+val receiver : next_available_token:Token_id.t -> t -> Account_id.t
 
 val source_pk : t -> Public_key.Compressed.t
 
-val source : t -> Account_id.t
+val source : next_available_token:Token_id.t -> t -> Account_id.t
 
 val token : t -> Token_id.t
 
 val amount : t -> Currency.Amount.t option
 
-val is_payment : t -> bool
+val accounts_accessed :
+  next_available_token:Token_id.t -> t -> Account_id.t list
 
-val accounts_accessed : t -> Account_id.t list
+val next_available_token : t -> Token_id.t -> Token_id.t
 
 val tag : t -> Transaction_union_tag.t
 

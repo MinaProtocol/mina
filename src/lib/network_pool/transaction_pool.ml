@@ -23,8 +23,8 @@ module type Transition_frontier_intf = sig
   end
 
   type best_tip_diff =
-    { new_user_commands: User_command.t list
-    ; removed_user_commands: User_command.t list
+    { new_user_commands: User_command.t With_status.t list
+    ; removed_user_commands: User_command.t With_status.t list
     ; reorg_best_tip: bool }
 
   val best_tip : t -> Breadcrumb.t
@@ -54,12 +54,12 @@ module Diff_versioned = struct
           | Invalid_signature
           | Duplicate
           | Sender_account_does_not_exist
-          | Insufficient_amount_for_account_creation
-          | Delegate_not_found
           | Invalid_nonce
           | Insufficient_funds
           | Insufficient_fee
           | Overflow
+          | Bad_token
+          | Unwanted_fee_token
         [@@deriving sexp, yojson]
 
         let to_latest = Fn.id
@@ -71,12 +71,12 @@ module Diff_versioned = struct
       | Invalid_signature
       | Duplicate
       | Sender_account_does_not_exist
-      | Insufficient_amount_for_account_creation
-      | Delegate_not_found
       | Invalid_nonce
       | Insufficient_funds
       | Insufficient_fee
       | Overflow
+      | Bad_token
+      | Unwanted_fee_token
     [@@deriving sexp, yojson]
   end
 
@@ -174,11 +174,15 @@ struct
     type t =
       { mutable pool: Indexed_pool.t
       ; locally_generated_uncommitted:
-          (User_command.With_valid_signature.t, Time.t) Hashtbl.t
+          ( Transaction_hash.User_command_with_valid_signature.t
+          , Time.t )
+          Hashtbl.t
             (** Commands generated on this machine, that are not included in the
                 current best tip, along with the time they were added. *)
       ; locally_generated_committed:
-          (User_command.With_valid_signature.t, Time.t) Hashtbl.t
+          ( Transaction_hash.User_command_with_valid_signature.t
+          , Time.t )
+          Hashtbl.t
             (** Ones that are included in the current best tip. *)
       ; config: Config.t
       ; logger: Logger.t sexp_opaque
@@ -199,7 +203,6 @@ struct
                    in the pool are always valid against the best tip, so
                    no need to check balances here *)
                 ~fee_payer_balance:Currency.Amount.max_int
-                ~source_balance:Currency.Amount.max_int
             with
             | Ok (t, _) ->
                 Some (cmd, t)
@@ -207,13 +210,16 @@ struct
                 Logger.error logger ~module_:__MODULE__ ~location:__LOC__
                   "Error handling committed transaction $cmd: $error "
                   ~metadata:
-                    [ ("cmd", User_command.With_valid_signature.to_yojson cmd)
+                    [ ( "cmd"
+                      , Transaction_hash.User_command_with_valid_signature
+                        .to_yojson cmd )
                     ; ("error", `String error_str)
                     ; ( "queue"
                       , `List
                           (List.map (Sequence.to_list queued_cmds) ~f:(fun c ->
-                               User_command.With_valid_signature.to_yojson c ))
-                      ) ] ;
+                               Transaction_hash
+                               .User_command_with_valid_signature
+                               .to_yojson c )) ) ] ;
                 failwith error_str )
           | None ->
               None )
@@ -221,6 +227,10 @@ struct
     let transactions ~logger t = transactions' ~logger t.pool
 
     let all_from_account {pool; _} = Indexed_pool.all_from_account pool
+
+    let get_all {pool; _} = Indexed_pool.get_all pool
+
+    let find_by_hash {pool; _} hash = Indexed_pool.find_by_hash pool hash
 
     (** Get the best tip ledger*)
     let get_best_tip_ledger frontier =
@@ -230,7 +240,8 @@ struct
     let drop_until_below_max_size :
            pool_max_size:int
         -> Indexed_pool.t
-        -> Indexed_pool.t * User_command.With_valid_signature.t Sequence.t =
+        -> Indexed_pool.t
+           * Transaction_hash.User_command_with_valid_signature.t Sequence.t =
      fun ~pool_max_size pool ->
       let rec go pool' dropped =
         if Indexed_pool.size pool' > pool_max_size then (
@@ -273,20 +284,25 @@ struct
       Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
         ~metadata:
           [ ( "removed"
-            , `List (List.map removed_user_commands ~f:User_command.to_yojson)
-            )
+            , `List
+                (List.map removed_user_commands
+                   ~f:(With_status.to_yojson User_command.to_yojson)) )
           ; ( "added"
-            , `List (List.map new_user_commands ~f:User_command.to_yojson) ) ]
+            , `List
+                (List.map new_user_commands
+                   ~f:(With_status.to_yojson User_command.to_yojson)) ) ]
         "Diff: removed: $removed added: $added from best tip" ;
       let pool', dropped_backtrack =
         Sequence.fold
           ( removed_user_commands |> List.rev |> Sequence.of_list
           |> Sequence.map ~f:(fun unchecked ->
-                 Option.value_exn
-                   ~message:
-                     "somehow user command from the frontier has an invalid \
-                      signature!"
-                   (User_command.check unchecked) ) )
+                 unchecked.data |> User_command.check
+                 |> Option.value_exn
+                      ~message:
+                        "somehow user command from the frontier has an \
+                         invalid signature!"
+                 |> Transaction_hash.User_command_with_valid_signature.create
+             ) )
           ~init:(t.pool, Sequence.empty)
           ~f:(fun (pool, dropped_so_far) cmd ->
             ( match
@@ -298,9 +314,9 @@ struct
                 Hashtbl.add_exn t.locally_generated_uncommitted ~key:cmd
                   ~data:time_added ) ;
             let pool', dropped_seq =
-              drop_until_below_max_size
-                (Indexed_pool.add_from_backtrack pool cmd)
-                ~pool_max_size
+              cmd
+              |> Indexed_pool.add_from_backtrack pool
+              |> drop_until_below_max_size ~pool_max_size
             in
             (pool', Sequence.append dropped_so_far dropped_seq) )
       in
@@ -318,8 +334,10 @@ struct
           ~metadata:
             [ ( "cmds"
               , `List
-                  (List.map ~f:User_command.With_valid_signature.to_yojson
-                     locally_generated_dropped) ) ] ;
+                  (List.map
+                     ~f:
+                       Transaction_hash.User_command_with_valid_signature
+                       .to_yojson locally_generated_dropped) ) ] ;
       let pool'', dropped_commit_conflicts =
         List.fold new_user_commands ~init:(pool', Sequence.empty)
           ~f:(fun (p, dropped_so_far) cmd ->
@@ -337,15 +355,14 @@ struct
                   in
                   acc.balance
             in
-            let fee_payer = User_command.fee_payer cmd in
+            let fee_payer = User_command.fee_payer cmd.data in
             let fee_payer_balance =
               Currency.Balance.to_amount (balance fee_payer)
             in
-            let source = User_command.source cmd in
-            let source_balance = Currency.Balance.to_amount (balance source) in
             let cmd' =
-              User_command.check cmd
+              User_command.check cmd.data
               |> Option.value_exn ~message:"user command was invalid"
+              |> Transaction_hash.User_command_with_valid_signature.create
             in
             ( match
                 Hashtbl.find_and_remove t.locally_generated_uncommitted cmd'
@@ -355,13 +372,13 @@ struct
             | Some time_added ->
                 Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
                   "Locally generated command $cmd committed in a block!"
-                  ~metadata:[("cmd", User_command.to_yojson cmd)] ;
+                  ~metadata:
+                    [("cmd", With_status.to_yojson User_command.to_yojson cmd)] ;
                 Hashtbl.add_exn t.locally_generated_committed ~key:cmd'
                   ~data:time_added ) ;
             let p', dropped =
               match
                 Indexed_pool.handle_committed_txn p cmd' ~fee_payer_balance
-                  ~source_balance
               with
               | Ok res ->
                   res
@@ -369,14 +386,16 @@ struct
                   Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__
                     "Error handling committed transaction $cmd: $error "
                     ~metadata:
-                      [ ("cmd", User_command.to_yojson cmd)
+                      [ ( "cmd"
+                        , With_status.to_yojson User_command.to_yojson cmd )
                       ; ("error", `String error_str)
                       ; ( "queue"
                         , `List
                             (List.map (Sequence.to_list queued_cmds)
                                ~f:(fun c ->
-                                 User_command.With_valid_signature.to_yojson c
-                             )) ) ] ;
+                                 Transaction_hash
+                                 .User_command_with_valid_signature
+                                 .to_yojson c )) ) ] ;
                   failwith error_str
             in
             (p', Sequence.append dropped_so_far dropped) )
@@ -395,7 +414,9 @@ struct
               , `List
                   (Sequence.to_list
                      (Sequence.map commit_conflicts_locally_generated
-                        ~f:User_command.With_valid_signature.to_yojson)) ) ] ;
+                        ~f:
+                          Transaction_hash.User_command_with_valid_signature
+                          .to_yojson)) ) ] ;
       Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
         !"Finished handling diff. Old pool size %i, new pool size %i. Dropped \
           %i commands during backtracking to maintain max size."
@@ -417,14 +438,16 @@ struct
                against new ledger."
               ~metadata:
                 [ ( "cmd"
-                  , User_command.to_yojson (User_command.forget_check cmd) ) ] ;
+                  , Transaction_hash.User_command_with_valid_signature
+                    .to_yojson cmd ) ] ;
             remove_cmd ()
           in
           if not (Hashtbl.mem t.locally_generated_committed cmd) then
             if
               not
                 (has_sufficient_fee t.pool
-                   (User_command.forget_check cmd)
+                   (Transaction_hash.User_command_with_valid_signature.command
+                      cmd)
                    ~pool_max_size)
             then (
               Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
@@ -432,14 +455,16 @@ struct
                  insufficient fee"
                 ~metadata:
                   [ ( "cmd"
-                    , User_command.to_yojson (User_command.forget_check cmd) )
-                  ] ;
+                    , Transaction_hash.User_command_with_valid_signature
+                      .to_yojson cmd ) ] ;
               remove_cmd () )
             else
               match
                 Option.bind
                   (Base_ledger.location_of_account best_tip_ledger
-                     (User_command.fee_payer (User_command.forget_check cmd)))
+                     (User_command.fee_payer
+                        (Transaction_hash.User_command_with_valid_signature
+                         .command cmd)))
                   ~f:(Base_ledger.get best_tip_ledger)
               with
               | Some acct -> (
@@ -455,20 +480,25 @@ struct
                        pool after reorg"
                       ~metadata:
                         [ ( "cmd"
-                          , User_command.to_yojson
-                              (User_command.forget_check cmd) ) ] ;
+                          , Transaction_hash.User_command_with_valid_signature
+                            .to_yojson cmd ) ] ;
                     t.pool <- pool''' )
               | None ->
                   log_invalid () ) ;
       Deferred.unit
 
-    let create ~frontier_broadcast_pipe ~config ~logger ~tf_diff_writer =
+    let create ~constraint_constants ~frontier_broadcast_pipe ~config ~logger
+        ~tf_diff_writer =
       let t =
-        { pool= Indexed_pool.empty
+        { pool= Indexed_pool.empty ~constraint_constants
         ; locally_generated_uncommitted=
-            Hashtbl.create (module User_command.With_valid_signature)
+            Hashtbl.create
+              ( module Transaction_hash.User_command_with_valid_signature.Stable
+                       .Latest )
         ; locally_generated_committed=
-            Hashtbl.create (module User_command.With_valid_signature)
+            Hashtbl.create
+              ( module Transaction_hash.User_command_with_valid_signature.Stable
+                       .Latest )
         ; config
         ; logger
         ; best_tip_diff_relay= None
@@ -556,8 +586,10 @@ struct
                          , `List
                              (List.map
                                 (Sequence.to_list dropped_locally_generated)
-                                ~f:User_command.With_valid_signature.to_yojson)
-                         ) ] ;
+                                ~f:
+                                  Transaction_hash
+                                  .User_command_with_valid_signature
+                                  .to_yojson) ) ] ;
                  Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
                    !"Re-validated transaction pool after restart: dropped %i \
                      of %i previously in pool"
@@ -586,12 +618,12 @@ struct
           | Invalid_signature
           | Duplicate
           | Sender_account_does_not_exist
-          | Insufficient_amount_for_account_creation
-          | Delegate_not_found
           | Invalid_nonce
           | Insufficient_funds
           | Insufficient_fee
           | Overflow
+          | Bad_token
+          | Unwanted_fee_token
         [@@deriving sexp, yojson]
       end
 
@@ -608,9 +640,7 @@ struct
 
       let is_empty t = List.is_empty t
 
-      let apply
-          ~(constraint_constants : Genesis_constants.Constraint_constants.t) t
-          env =
+      let apply t env =
         let txs = Envelope.Incoming.data env in
         let sender = Envelope.Incoming.sender env in
         let is_sender_local = Envelope.Sender.(equal sender Local) in
@@ -647,6 +677,10 @@ struct
                       (sprintf !"invalid signature %s"
                          (Yojson.Safe.to_string (User_command.to_yojson tx)))
                 | Some tx' -> (
+                    let tx' =
+                      Transaction_hash.User_command_with_valid_signature.create
+                        tx'
+                    in
                     if Indexed_pool.member pool tx' then
                       let%bind _ =
                         trust_record
@@ -679,43 +713,11 @@ struct
                               :: rejected )
                       | Some sender_account ->
                           if has_sufficient_fee pool tx ~pool_max_size then (
-                            let validate_receiver =
-                              match
-                                account ledger (User_command.receiver tx)
-                              with
-                              | None -> (
-                                (*receiver account is new*)
-                                match User_command.amount tx with
-                                | None ->
-                                    (* When tx is for stake delegation. The new Delegate should be in the ledger*)
-                                    Error `Delegate_not_found
-                                | Some receiver_amount ->
-                                    (*amount should be at least account_creation_fee for transactions that create new accounts*)
-                                    let receiver_amount_to_fee =
-                                      Currency.Amount.to_fee receiver_amount
-                                    in
-                                    if
-                                      Currency.Fee.(
-                                        receiver_amount_to_fee
-                                        >= constraint_constants
-                                             .account_creation_fee)
-                                    then Ok ()
-                                    else
-                                      Error
-                                        `Insufficient_amount_for_account_creation
-                                )
-                              | Some _ ->
-                                  Ok ()
-                            in
                             let add_res =
-                              Result.bind
-                                ( Indexed_pool.add_from_gossip_exn pool tx'
-                                    sender_account.nonce
-                                @@ Currency.Balance.to_amount
-                                     sender_account.balance )
-                                ~f:(fun res ->
-                                  Result.map validate_receiver ~f:(fun _ -> res)
-                                  )
+                              Indexed_pool.add_from_gossip_exn pool tx'
+                                sender_account.nonce
+                              @@ Currency.Balance.to_amount
+                                   sender_account.balance
                             in
                             let of_indexed_pool_error = function
                               | `Invalid_nonce (`Between (low, hi), nonce) ->
@@ -744,10 +746,12 @@ struct
                                     ; ("fee", fee_json fee) ] )
                               | `Overflow ->
                                   (Overflow, [])
-                              | `Delegate_not_found ->
-                                  (Delegate_not_found, [])
-                              | `Insufficient_amount_for_account_creation ->
-                                  (Insufficient_amount_for_account_creation, [])
+                              | `Bad_token ->
+                                  (Bad_token, [])
+                              | `Unwanted_fee_token fee_token ->
+                                  ( Unwanted_fee_token
+                                  , [ ( "fee_token"
+                                      , Token_id.to_yojson fee_token ) ] )
                             in
                             let yojson_fail_reason =
                               Fn.compose
@@ -761,12 +765,10 @@ struct
                                       "insufficient replace fee"
                                   | `Overflow ->
                                       "overflow"
-                                  | `Delegate_not_found ->
-                                      "delegate not found"
-                                  | `Insufficient_amount_for_account_creation
-                                    ->
-                                      "insufficient amount for reciever \
-                                       account creation" )
+                                  | `Bad_token ->
+                                      "bad token"
+                                  | `Unwanted_fee_token _ ->
+                                      "unwanted fee token" )
                             in
                             match add_res with
                             | Ok (pool', dropped) ->
@@ -792,7 +794,8 @@ struct
                                       to_list
                                       @@ map
                                            ~f:
-                                             User_command.With_valid_signature
+                                             Transaction_hash
+                                             .User_command_with_valid_signature
                                              .to_yojson seq)
                                 in
                                 if not (Sequence.is_empty dropped) then
@@ -835,8 +838,8 @@ struct
                                         , `List
                                             (List.map
                                                ~f:
-                                                 User_command
-                                                 .With_valid_signature
+                                                 Transaction_hash
+                                                 .User_command_with_valid_signature
                                                  .to_yojson
                                                locally_generated_dropped) ) ] ;
                                 go txs'' pool'' (tx :: accepted, rejected)
@@ -865,6 +868,28 @@ struct
                                   , ( tx
                                     , Diff_versioned.Diff_error
                                       .Insufficient_replace_fee )
+                                    :: rejected )
+                            | Error (`Unwanted_fee_token fee_token) ->
+                                (* We can't punish peers for this, since these
+                                   are our specific preferences.
+                                *)
+                                let f_log =
+                                  if is_sender_local then Logger.error
+                                  else Logger.debug
+                                in
+                                f_log t.logger ~module_:__MODULE__
+                                  ~location:__LOC__
+                                  "rejecting $cmd because we don't accept \
+                                   fees in $token"
+                                  ~metadata:
+                                    [ ("cmd", User_command.to_yojson tx)
+                                    ; ("token", Token_id.to_yojson fee_token)
+                                    ] ;
+                                go txs'' pool
+                                  ( accepted
+                                  , ( tx
+                                    , Diff_versioned.Diff_error
+                                      .Unwanted_fee_token )
                                     :: rejected )
                             | Error err ->
                                 let diff_err, err_extra =
@@ -911,17 +936,14 @@ struct
             in
             go txs t.pool ([], [])
 
-      let unsafe_apply ~constraint_constants t env =
-        match%map apply ~constraint_constants t env with
-        | Ok e ->
-            Ok e
-        | Error e ->
-            Error (`Other e)
+      let unsafe_apply t env =
+        match%map apply t env with Ok e -> Ok e | Error e -> Error (`Other e)
     end
 
     let get_rebroadcastable (t : t) ~is_expired =
-      let metadata ~(key : User_command.With_valid_signature.t) ~data =
-        [ ("cmd", User_command.to_yojson (User_command.forget_check key))
+      let metadata ~key ~data =
+        [ ( "cmd"
+          , Transaction_hash.User_command_with_valid_signature.to_yojson key )
         ; ("time", `String (Time.to_string_abs ~zone:Time.Zone.utc data)) ]
       in
       let added_str =
@@ -950,7 +972,9 @@ struct
               true ) ;
       (* Important to maintain ordering here *)
       let rebroadcastable_txs =
-        (Hashtbl.keys t.locally_generated_uncommitted :> User_command.t list)
+        Hashtbl.keys t.locally_generated_uncommitted
+        |> List.map
+             ~f:Transaction_hash.User_command_with_valid_signature.command
       in
       if List.is_empty rebroadcastable_txs then []
       else
@@ -981,8 +1005,8 @@ include Make
             include Transition_frontier
 
             type best_tip_diff = Extensions.Best_tip_diff.view =
-              { new_user_commands: User_command.t list
-              ; removed_user_commands: User_command.t list
+              { new_user_commands: User_command.t With_status.t list
+              ; removed_user_commands: User_command.t With_status.t list
               ; reorg_best_tip: bool }
 
             let best_tip_diff_pipe t =
@@ -1022,8 +1046,8 @@ let%test_module _ =
       end
 
       type best_tip_diff =
-        { new_user_commands: User_command.t list
-        ; removed_user_commands: User_command.t list
+        { new_user_commands: User_command.t With_status.t list
+        ; removed_user_commands: User_command.t With_status.t list
         ; reorg_best_tip: bool }
 
       type t = best_tip_diff Broadcast_pipe.Reader.t * Breadcrumb.t ref
@@ -1069,9 +1093,10 @@ let%test_module _ =
           pool.locally_generated_uncommitted ~f:(fun ~key -> function
           | `Both (committed, uncommitted) ->
               failwithf
-                !"Command %{sexp:User_command.With_valid_signature.t} in both \
-                  locally generated committed and uncommitted with times %s \
-                  and %s"
+                !"Command \
+                  %{sexp:Transaction_hash.User_command_with_valid_signature.t} \
+                  in both locally generated committed and uncommitted with \
+                  times %s and %s"
                 key (Time.to_string committed)
                 (Time.to_string uncommitted)
                 ()
@@ -1111,7 +1136,8 @@ let%test_module _ =
           assert_locally_generated pool ;
           [%test_eq: User_command.t List.t]
             ( Test.Resource_pool.transactions ~logger pool
-            |> Sequence.map ~f:User_command.forget_check
+            |> Sequence.map
+                 ~f:Transaction_hash.User_command_with_valid_signature.command
             |> Sequence.to_list
             |> List.sort ~compare:User_command.compare )
             (List.sort ~compare:User_command.compare txs) )
@@ -1151,6 +1177,10 @@ let%test_module _ =
 
     let accepted_user_commands = Result.map ~f:fst
 
+    let mk_with_status cmd =
+      { With_status.data= cmd
+      ; status= Applied User_command_status.Auxiliary_data.empty }
+
     let%test_unit "transactions are removed in linear case" =
       Thread_safe.block_on_async_exn (fun () ->
           let%bind assert_pool_txs, pool, best_tip_diff_w, _frontier =
@@ -1158,7 +1188,7 @@ let%test_module _ =
           in
           assert_pool_txs [] ;
           let%bind apply_res =
-            Test.Resource_pool.Diff.unsafe_apply ~constraint_constants pool
+            Test.Resource_pool.Diff.unsafe_apply pool
               (Envelope.Incoming.local independent_cmds)
           in
           [%test_eq: pool_apply]
@@ -1167,7 +1197,8 @@ let%test_module _ =
           assert_pool_txs independent_cmds ;
           let%bind () =
             Broadcast_pipe.Writer.write best_tip_diff_w
-              { new_user_commands= [List.hd_exn independent_cmds]
+              { new_user_commands=
+                  [mk_with_status (List.hd_exn independent_cmds)]
               ; removed_user_commands= []
               ; reorg_best_tip= false }
           in
@@ -1175,7 +1206,9 @@ let%test_module _ =
           assert_pool_txs (List.tl_exn independent_cmds) ;
           let%bind () =
             Broadcast_pipe.Writer.write best_tip_diff_w
-              { new_user_commands= List.take (List.tl_exn independent_cmds) 2
+              { new_user_commands=
+                  List.map ~f:mk_with_status
+                    (List.take (List.tl_exn independent_cmds) 2)
               ; removed_user_commands= []
               ; reorg_best_tip= false }
           in
@@ -1197,7 +1230,8 @@ let%test_module _ =
       , Account.Poly.Stable.Latest.
           { public_key= Public_key.compress @@ test_keys.(i).public_key
           ; token_id= Token_id.default
-          ; token_owner= false
+          ; token_permissions=
+              Token_permissions.Not_owned {account_disabled= false}
           ; balance= Currency.Balance.of_int balance
           ; nonce= Account.Nonce.of_int nonce
           ; receipt_chain_hash= Receipt.Chain_hash.empty
@@ -1214,7 +1248,7 @@ let%test_module _ =
           in
           assert_pool_txs [] ;
           let%bind apply_res =
-            Test.Resource_pool.Diff.unsafe_apply ~constraint_constants pool
+            Test.Resource_pool.Diff.unsafe_apply pool
               ( Envelope.Incoming.local
               @@ (List.hd_exn independent_cmds :: List.drop independent_cmds 2)
               )
@@ -1226,8 +1260,11 @@ let%test_module _ =
             map_set_multi !best_tip_ref [mk_account 1 1_000_000_000_000 1] ;
           let%bind () =
             Broadcast_pipe.Writer.write best_tip_diff_w
-              { new_user_commands= List.take independent_cmds 1
-              ; removed_user_commands= [List.nth_exn independent_cmds 1]
+              { new_user_commands=
+                  List.map ~f:mk_with_status @@ List.take independent_cmds 1
+              ; removed_user_commands=
+                  List.map ~f:mk_with_status
+                  @@ [List.nth_exn independent_cmds 1]
               ; reorg_best_tip= true }
           in
           assert_pool_txs (List.tl_exn independent_cmds) ;
@@ -1250,7 +1287,7 @@ let%test_module _ =
               ; reorg_best_tip= false }
           in
           let%bind apply_res =
-            Test.Resource_pool.Diff.unsafe_apply ~constraint_constants pool
+            Test.Resource_pool.Diff.unsafe_apply pool
             @@ Envelope.Incoming.local independent_cmds
           in
           [%test_eq: pool_apply]
@@ -1286,7 +1323,8 @@ let%test_module _ =
             map_set_multi !best_tip_ref [mk_account 0 1_000_000_000_000 1] ;
           let%bind _ =
             Broadcast_pipe.Writer.write best_tip_diff_w
-              { new_user_commands= List.take independent_cmds 2
+              { new_user_commands=
+                  List.map ~f:mk_with_status @@ List.take independent_cmds 2
               ; removed_user_commands= []
               ; reorg_best_tip= false }
           in
@@ -1302,7 +1340,7 @@ let%test_module _ =
                  ~max_fee:10_000_000_000 ())
           in
           let%bind apply_res =
-            Test.Resource_pool.Diff.unsafe_apply ~constraint_constants pool
+            Test.Resource_pool.Diff.unsafe_apply pool
             @@ Envelope.Incoming.local [cmd1]
           in
           [%test_eq: pool_apply] (accepted_user_commands apply_res) (Ok [cmd1]) ;
@@ -1311,8 +1349,11 @@ let%test_module _ =
           best_tip_ref := map_set_multi !best_tip_ref [mk_account 0 0 1] ;
           let%bind _ =
             Broadcast_pipe.Writer.write best_tip_diff_w
-              { new_user_commands= cmd2 :: List.drop independent_cmds 2
-              ; removed_user_commands= List.take independent_cmds 2
+              { new_user_commands=
+                  List.map ~f:mk_with_status
+                  @@ (cmd2 :: List.drop independent_cmds 2)
+              ; removed_user_commands=
+                  List.map ~f:mk_with_status @@ List.take independent_cmds 2
               ; reorg_best_tip= true }
           in
           assert_pool_txs [List.nth_exn independent_cmds 1] ;
@@ -1343,7 +1384,9 @@ let%test_module _ =
           let assert_pool_txs txs =
             [%test_eq: User_command.t List.t]
               ( Test.Resource_pool.transactions ~logger pool
-              |> Sequence.map ~f:User_command.forget_check
+              |> Sequence.map
+                   ~f:
+                     Transaction_hash.User_command_with_valid_signature.command
               |> Sequence.to_list
               |> List.sort ~compare:User_command.compare )
             @@ List.sort ~compare:User_command.compare txs
@@ -1356,7 +1399,7 @@ let%test_module _ =
             Broadcast_pipe.Writer.write frontier_pipe_w (Some frontier1)
           in
           let%bind _ =
-            Test.Resource_pool.Diff.unsafe_apply ~constraint_constants pool
+            Test.Resource_pool.Diff.unsafe_apply pool
               (Envelope.Incoming.local independent_cmds)
           in
           assert_pool_txs @@ independent_cmds ;
@@ -1398,6 +1441,11 @@ let%test_module _ =
               ; body=
                   Stake_delegation
                     (Set_delegate {payload with delegator= sender_pk}) }
+          | { common
+            ; body=
+                (Create_new_token _ | Create_token_account _ | Mint_tokens _)
+                as body } ->
+              {common= {common with fee_payer_pk= sender_pk}; body}
         in
         User_command.forget_check @@ User_command.sign sender_kp payload
       in
@@ -1411,7 +1459,7 @@ let%test_module _ =
       let txs3 = List.map ~f:(set_sender 3) txs0 in
       let txs_all = txs0 @ txs1 @ txs2 @ txs3 in
       let%bind apply_res =
-        Test.Resource_pool.Diff.unsafe_apply ~constraint_constants pool
+        Test.Resource_pool.Diff.unsafe_apply pool
           (Envelope.Incoming.local txs_all)
       in
       [%test_eq: pool_apply] (Ok txs_all) (accepted_user_commands apply_res) ;
@@ -1427,7 +1475,7 @@ let%test_module _ =
           mk_payment 3 10_000_000_000 1 4 927_000_000_000 ]
       in
       let%bind apply_res_2 =
-        Test.Resource_pool.Diff.unsafe_apply ~constraint_constants pool
+        Test.Resource_pool.Diff.unsafe_apply pool
           (Envelope.Incoming.local replace_txs)
       in
       [%test_eq: pool_apply]
@@ -1449,7 +1497,7 @@ let%test_module _ =
       in
       let committed_tx = mk_payment 0 5_000_000_000 0 2 25_000_000_000 in
       let%bind apply_res =
-        Test.Resource_pool.Diff.unsafe_apply ~constraint_constants pool
+        Test.Resource_pool.Diff.unsafe_apply pool
         @@ Envelope.Incoming.local txs
       in
       [%test_eq: pool_apply] (Ok txs) (accepted_user_commands apply_res) ;
@@ -1458,7 +1506,7 @@ let%test_module _ =
         map_set_multi !best_tip_ref [mk_account 0 970_000_000_000 1] ;
       let%bind () =
         Broadcast_pipe.Writer.write best_tip_diff_w
-          { new_user_commands= [committed_tx]
+          { new_user_commands= List.map ~f:mk_with_status @@ [committed_tx]
           ; removed_user_commands= []
           ; reorg_best_tip= false }
       in
@@ -1508,13 +1556,13 @@ let%test_module _ =
               in
               let cmds1, cmds2 = List.split_n cmds pool_max_size in
               let%bind apply_res1 =
-                Test.Resource_pool.Diff.unsafe_apply ~constraint_constants pool
+                Test.Resource_pool.Diff.unsafe_apply pool
                   (Envelope.Incoming.local cmds1)
               in
               assert (Result.is_ok apply_res1) ;
               [%test_eq: int] pool_max_size (Indexed_pool.size pool.pool) ;
               let%map _apply_res2 =
-                Test.Resource_pool.Diff.unsafe_apply ~constraint_constants pool
+                Test.Resource_pool.Diff.unsafe_apply pool
                   (Envelope.Incoming.local cmds2)
               in
               (* N.B. Adding a transaction when the pool is full may drop > 1
@@ -1551,7 +1599,7 @@ let%test_module _ =
           let remote_cmds = List.drop independent_cmds 5 in
           (* Locally generated transactions are rebroadcastable *)
           let%bind apply_res_1 =
-            Test.Resource_pool.Diff.unsafe_apply ~constraint_constants pool
+            Test.Resource_pool.Diff.unsafe_apply pool
               (Envelope.Incoming.local local_cmds)
           in
           [%test_eq: pool_apply]
@@ -1562,7 +1610,7 @@ let%test_module _ =
           (* Adding non-locally-generated transactions doesn't affect
              rebroadcastable pool *)
           let%bind apply_res_2 =
-            Test.Resource_pool.Diff.unsafe_apply ~constraint_constants pool
+            Test.Resource_pool.Diff.unsafe_apply pool
               (Envelope.Incoming.wrap ~data:remote_cmds ~sender:mock_sender)
           in
           [%test_eq: pool_apply]
@@ -1575,7 +1623,8 @@ let%test_module _ =
           let%bind () =
             Broadcast_pipe.Writer.write best_tip_diff_w
               { new_user_commands=
-                  List.take local_cmds 2 @ List.take remote_cmds 3
+                  List.map ~f:mk_with_status @@ List.take local_cmds 2
+                  @ List.take remote_cmds 3
               ; removed_user_commands= []
               ; reorg_best_tip= false }
           in
@@ -1585,8 +1634,10 @@ let%test_module _ =
              rebroadcastable pool, if they were removed and not re-added *)
           let%bind () =
             Broadcast_pipe.Writer.write best_tip_diff_w
-              { new_user_commands= List.take local_cmds 1
-              ; removed_user_commands= List.take local_cmds 2
+              { new_user_commands=
+                  List.map ~f:mk_with_status @@ List.take local_cmds 1
+              ; removed_user_commands=
+                  List.map ~f:mk_with_status @@ List.take local_cmds 2
               ; reorg_best_tip= true }
           in
           assert_pool_txs (List.tl_exn local_cmds @ List.drop remote_cmds 3) ;
@@ -1595,7 +1646,8 @@ let%test_module _ =
           let%bind () =
             Broadcast_pipe.Writer.write best_tip_diff_w
               { new_user_commands=
-                  List.tl_exn local_cmds @ List.drop remote_cmds 3
+                  List.map ~f:mk_with_status @@ List.tl_exn local_cmds
+                  @ List.drop remote_cmds 3
               ; removed_user_commands= []
               ; reorg_best_tip= false }
           in
@@ -1606,7 +1658,9 @@ let%test_module _ =
           let%bind () =
             Broadcast_pipe.Writer.write best_tip_diff_w
               { new_user_commands= []
-              ; removed_user_commands= List.drop local_cmds 3 @ remote_cmds
+              ; removed_user_commands=
+                  List.map ~f:mk_with_status @@ List.drop local_cmds 3
+                  @ remote_cmds
               ; reorg_best_tip= true }
           in
           assert_pool_txs (List.drop local_cmds 3 @ remote_cmds) ;
@@ -1615,7 +1669,8 @@ let%test_module _ =
              two step reorg processes) *)
           let%bind () =
             Broadcast_pipe.Writer.write best_tip_diff_w
-              { new_user_commands= [List.nth_exn local_cmds 3]
+              { new_user_commands=
+                  List.map ~f:mk_with_status @@ [List.nth_exn local_cmds 3]
               ; removed_user_commands= []
               ; reorg_best_tip= false }
           in

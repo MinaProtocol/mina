@@ -152,9 +152,19 @@ module Evals = struct
     ; g_2
     ; g_3 }
 
-  let typ (lengths : int t) (g : ('a, 'b, 'f) Snarky.Typ.t) :
+  let typ (lengths : int t) (g : ('a, 'b, 'f) Snarky.Typ.t) ~default :
       ('a array t, 'b array t, 'f) Snarky.Typ.t =
-    let v ls = Vector.map ls ~f:(fun length -> Snarky.Typ.array ~length g) in
+    let v ls =
+      Vector.map ls ~f:(fun length ->
+          let t = Snarky.Typ.array ~length g in
+          { t with
+            store=
+              (fun arr ->
+                t.store
+                  (Array.append arr
+                     (Array.create ~len:(length - Array.length arr) default))
+                ) } )
+    in
     let t =
       let l1, l2 = to_vectors lengths in
       Snarky.Typ.tuple2 (Vector.typ' (v l1)) (Vector.typ' (v l2))
@@ -176,14 +186,7 @@ module Openings = struct
 
     type ('g, 'fq) t = ('g, 'fq) Stable.Latest.t =
       {lr: ('g * 'g) array; z_1: 'fq; z_2: 'fq; delta: 'g; sg: 'g}
-    [@@deriving sexp, compare, yojson]
-
-    open Snarky.H_list
-
-    let to_hlist {lr; z_1; z_2; delta; sg} = [lr; z_1; z_2; delta; sg]
-
-    let of_hlist ([lr; z_1; z_2; delta; sg] : (unit, _) t) =
-      {lr; z_1; z_2; delta; sg}
+    [@@deriving sexp, compare, yojson, hlist]
 
     let typ fq g ~length =
       let open Snarky.Typ in
@@ -209,19 +212,15 @@ module Openings = struct
   type ('g, 'fq, 'fqv) t = ('g, 'fq, 'fqv) Stable.Latest.t =
     { proof: ('g, 'fq) Bulletproof.t
     ; evals: 'fqv Evals.t * 'fqv Evals.t * 'fqv Evals.t }
-  [@@deriving sexp, compare, yojson]
-
-  let to_hlist {proof; evals} = Snarky.H_list.[proof; evals]
-
-  let of_hlist ([proof; evals] : (unit, _) Snarky.H_list.t) = {proof; evals}
+  [@@deriving sexp, compare, yojson, hlist]
 
   let typ (type g gv) (g : (gv, g, 'f) Snarky.Typ.t) fq ~bulletproof_rounds
-      ~commitment_lengths =
+      ~commitment_lengths ~dummy_group_element =
     let open Snarky.Typ in
     let triple x = tuple3 x x x in
     of_hlistable
       [ Bulletproof.typ fq g ~length:bulletproof_rounds
-      ; triple (Evals.typ commitment_lengths g) ]
+      ; triple (Evals.typ ~default:dummy_group_element commitment_lengths g) ]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
 end
@@ -237,16 +236,10 @@ module Poly_comm = struct
     end]
 
     type 'g t = 'g Stable.Latest.t = {unshifted: 'g array; shifted: 'g}
-    [@@deriving sexp, compare, yojson]
+    [@@deriving sexp, compare, yojson, hlist]
 
-    let to_hlist {unshifted; shifted} = Snarky.H_list.[unshifted; shifted]
-
-    let of_hlist ([unshifted; shifted] : (unit, _) Snarky.H_list.t) =
-      {unshifted; shifted}
-
-    let typ g ~length =
-      let open Snarky.Typ in
-      of_hlistable [array ~length g; g] ~var_to_hlist:to_hlist
+    let typ ?(array = Snarky.Typ.array) g ~length =
+      Snarky.Typ.of_hlistable [array ~length g; g] ~var_to_hlist:to_hlist
         ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
         ~value_of_hlist:of_hlist
   end
@@ -298,23 +291,28 @@ module Messages = struct
     ; gh_1: 'g With_degree_bound.t * 'g Without_degree_bound.t
     ; sigma_gh_2: 'fq * ('g With_degree_bound.t * 'g Without_degree_bound.t)
     ; sigma_gh_3: 'fq * ('g With_degree_bound.t * 'g Without_degree_bound.t) }
-  [@@deriving sexp, compare, yojson, fields]
+  [@@deriving sexp, compare, yojson, fields, hlist]
 
-  let to_hlist {w_hat; z_hat_a; z_hat_b; gh_1; sigma_gh_2; sigma_gh_3} =
-    Snarky.H_list.[w_hat; z_hat_a; z_hat_b; gh_1; sigma_gh_2; sigma_gh_3]
-
-  let of_hlist
-      ([w_hat; z_hat_a; z_hat_b; gh_1; sigma_gh_2; sigma_gh_3] :
-        (unit, _) Snarky.H_list.t) =
-    {w_hat; z_hat_a; z_hat_b; gh_1; sigma_gh_2; sigma_gh_3}
-
-  let typ fq g ~(commitment_lengths : int Evals.t) =
+  let typ (type n) fq g ~dummy
+      ~(commitment_lengths : (int, n) Vector.t Evals.t) =
     let open Snarky.Typ in
     let {Evals.w_hat; z_hat_a; z_hat_b; h_1; h_2; h_3; g_1; g_2; g_3; _} =
       commitment_lengths
     in
-    let wo n = Without_degree_bound.typ g ~length:n in
-    let w n = With_degree_bound.typ g ~length:n in
+    let array ~length elt =
+      let typ = Snarky.Typ.array ~length elt in
+      { typ with
+        store=
+          (fun a ->
+            let n = Array.length a in
+            if n > length then failwithf "Expected %d <= %d" n length () ;
+            typ.store (Array.append a (Array.create ~len:(length - n) dummy))
+            ) }
+    in
+    let wo n = array ~length:(Vector.reduce_exn n ~f:Int.max) g in
+    let w n =
+      With_degree_bound.typ ~array g ~length:(Vector.reduce_exn n ~f:Int.max)
+    in
     of_hlistable
       [ wo w_hat
       ; wo z_hat_a
@@ -339,17 +337,5 @@ module Proof = struct
 
   type ('g, 'fq, 'fqv) t = ('g, 'fq, 'fqv) Stable.Latest.t =
     {messages: ('g, 'fq) Messages.t; openings: ('g, 'fq, 'fqv) Openings.t}
-  [@@deriving sexp, compare, yojson]
-
-  let to_hlist {messages; openings} = Snarky.H_list.[messages; openings]
-
-  let of_hlist ([messages; openings] : (unit, _) Snarky.H_list.t) =
-    {messages; openings}
-
-  let typ g fq ~bulletproof_rounds ~commitment_lengths =
-    Snarky.Typ.of_hlistable
-      [ Messages.typ g fq ~commitment_lengths
-      ; Openings.typ g fq ~bulletproof_rounds ~commitment_lengths ]
-      ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
-      ~value_of_hlist:of_hlist
+  [@@deriving sexp, compare, yojson, hlist]
 end

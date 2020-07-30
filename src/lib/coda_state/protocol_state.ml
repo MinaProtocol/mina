@@ -23,7 +23,7 @@ module Poly = struct
 
   type ('state_hash, 'body) t = ('state_hash, 'body) Stable.Latest.t =
     {previous_state_hash: 'state_hash; body: 'body}
-  [@@deriving sexp]
+  [@@deriving sexp, hlist]
 end
 
 let hash_abstract ~hash_body
@@ -57,7 +57,7 @@ module Body = struct
       ; blockchain_state: 'blockchain_state
       ; consensus_state: 'consensus_state
       ; constants: 'constants }
-    [@@deriving sexp]
+    [@@deriving sexp, hlist]
   end
 
   module Value = struct
@@ -94,17 +94,6 @@ module Body = struct
     , Protocol_constants_checked.var )
     Poly.t
 
-  let to_hlist
-      {Poly.genesis_state_hash; blockchain_state; consensus_state; constants} =
-    H_list.[genesis_state_hash; blockchain_state; consensus_state; constants]
-
-  let of_hlist :
-         (unit, 'sh -> 'bs -> 'cs -> 'cc -> unit) H_list.t
-      -> ('sh, 'bs, 'cs, 'cc) Poly.t =
-   fun H_list.
-         [genesis_state_hash; blockchain_state; consensus_state; constants] ->
-    {genesis_state_hash; blockchain_state; consensus_state; constants}
-
   let data_spec ~constraint_constants =
     Data_spec.
       [ State_hash.typ
@@ -115,8 +104,8 @@ module Body = struct
   let typ ~constraint_constants =
     Typ.of_hlistable
       (data_spec ~constraint_constants)
-      ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
-      ~value_of_hlist:of_hlist
+      ~var_to_hlist:Poly.to_hlist ~var_of_hlist:Poly.of_hlist
+      ~value_to_hlist:Poly.to_hlist ~value_of_hlist:Poly.of_hlist
 
   let to_input
       { Poly.genesis_state_hash: State_hash.t
@@ -132,7 +121,9 @@ module Body = struct
 
   let var_to_input
       {Poly.genesis_state_hash; blockchain_state; consensus_state; constants} =
-    let blockchain_state = Blockchain_state.var_to_input blockchain_state in
+    let%bind blockchain_state =
+      Blockchain_state.var_to_input blockchain_state
+    in
     let%bind constants = Protocol_constants_checked.var_to_input constants in
     let%map consensus_state =
       Consensus.Data.Consensus_state.var_to_input consensus_state
@@ -223,20 +214,14 @@ consensus_mechanism]
 
 let create_var = create'
 
-let to_hlist {Poly.Stable.Latest.previous_state_hash; body} =
-  H_list.[previous_state_hash; body]
-
-let of_hlist : (unit, 'psh -> 'body -> unit) H_list.t -> ('psh, 'body) Poly.t =
- fun H_list.[previous_state_hash; body] -> {previous_state_hash; body}
-
 let data_spec ~constraint_constants =
   Data_spec.[State_hash.typ; Body.typ ~constraint_constants]
 
 let typ ~constraint_constants =
   Typ.of_hlistable
     (data_spec ~constraint_constants)
-    ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
-    ~value_of_hlist:of_hlist
+    ~var_to_hlist:Poly.to_hlist ~var_of_hlist:Poly.of_hlist
+    ~value_to_hlist:Poly.to_hlist ~value_of_hlist:Poly.of_hlist
 
 let hash_checked ({previous_state_hash; body} : var) =
   let%bind body = Body.hash_checked body in
@@ -291,6 +276,9 @@ let negative_one ~genesis_ledger ~constraint_constants ~consensus_constants =
           Blockchain_state.negative_one ~constraint_constants
             ~genesis_ledger_hash:
               (Coda_base.Ledger.merkle_root (Lazy.force genesis_ledger))
+            ~snarked_next_available_token:
+              (Coda_base.Ledger.next_available_token
+                 (Lazy.force genesis_ledger))
       ; genesis_state_hash= State_hash.of_hash Outside_hash_image.t
       ; consensus_state=
           Consensus.Data.Consensus_state.negative_one ~genesis_ledger

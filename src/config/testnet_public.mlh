@@ -1,0 +1,31 @@
+[%%import "/src/config/ledger_depth/full.mlh"]
+[%%import "/src/config/curve/small.mlh"]
+[%%import "/src/config/coinbase/standard.mlh"]
+[%%import "/src/config/consensus/postake_short.mlh"]
+[%%import "/src/config/scan_state/standard.mlh"]
+[%%import "/src/config/debug_level/some.mlh"]
+[%%import "/src/config/proof_level/full.mlh"]
+[%%import "/src/config/txpool_size.mlh"]
+[%%import "/src/config/account_creation_fee/standard.mlh"]
+[%%import "/src/config/amount_defaults/standard.mlh"]
+[%%import "/src/config/protocol_version/current.mlh"]
+
+[%%define time_offsets false]
+[%%define cache_exceptions false]
+[%%define fake_hash false]
+
+[%%define plugins false]
+
+[%%define genesis_ledger "testnet_postake"]
+[%%define genesis_state_timestamp "2019-01-30 12:00:00-08:00"]
+[%%define block_window_duration 20000]
+
+[%%define integration_tests false]
+[%%define force_updates true]
+
+[%%define mock_frontend_data false]
+
+[%%define print_versioned_types false]
+
+[%%define daemon_expiry "never"]
+[%%define test_full_epoch false]

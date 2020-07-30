@@ -3,7 +3,7 @@
 Coda is a new cryptocurrency protocol with a lightweight, constant-sized blockchain.
 
 * [Developer homepage](https://codaprotocol.com/code.html)
-* [Roadmap](https://github.com/orgs/CodaProtocol/projects/1)
+* [Roadmap](https://codaprotocol.com/docs/developers)
 * [Repository Readme](README.md)
 
 If you haven't seen it yet, [CONTRIBUTING.md](CONTRIBUTING.md) has information
@@ -60,7 +60,7 @@ of the repo.
 
 * Pull down developer container image  (~2GB download, go stretch your legs)
 
-`docker pull codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea`
+`docker pull codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171`
 
 * Create local builder image
 

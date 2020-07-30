@@ -100,9 +100,11 @@ module Stable = struct
       Staged_ledger_diff.user_commands staged_ledger_diff
 
     let payments external_transition =
-      List.filter
-        (user_commands external_transition)
-        ~f:(Fn.compose User_command_payload.is_payment User_command.payload)
+      List.filter (user_commands external_transition) ~f:(function
+        | {data= {payload= {body= Payment _; _}; _}; _} ->
+            true
+        | _ ->
+            false )
 
     let equal =
       Comparable.lift Consensus.Data.Consensus_state.Value.equal

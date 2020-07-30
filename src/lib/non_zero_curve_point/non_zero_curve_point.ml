@@ -92,7 +92,7 @@ module Compressed = struct
             ~seed:(`Deterministic "nonzero_curve_point_compressed-seed") V1.gen
         in
         let known_good_digest = "437f5bc6710b6a8fda8f9e8cf697fc2c" in
-        Ppx_version.Serialization.check_serialization
+        Ppx_version_runtime.Serialization.check_serialization
           (module V1)
           point known_good_digest
 
@@ -105,7 +105,7 @@ module Compressed = struct
             ~seed:(`Deterministic "nonzero_curve_point_compressed-seed") V1.gen
         in
         let known_good_digest = "067f8be67e5cc31f5c5ac4be91d5f6db" in
-        Ppx_version.Serialization.check_serialization
+        Ppx_version_runtime.Serialization.check_serialization
           (module V1)
           point known_good_digest
 
@@ -145,14 +145,10 @@ module Compressed = struct
 
   type var = (Field.Var.t, Boolean.var) Poly.t
 
-  let to_hlist Poly.Stable.Latest.{x; is_odd} = Snarky.H_list.[x; is_odd]
-
-  let of_hlist : (unit, 'a -> 'b -> unit) Snarky.H_list.t -> ('a, 'b) Poly.t =
-    Snarky.H_list.(fun [x; is_odd] -> {x; is_odd})
-
   let typ : (var, t) Typ.t =
-    Typ.of_hlistable [Field.typ; Boolean.typ] ~var_to_hlist:to_hlist
-      ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+    Typ.of_hlistable [Field.typ; Boolean.typ] ~var_to_hlist:Poly.to_hlist
+      ~var_of_hlist:Poly.of_hlist ~value_to_hlist:Poly.to_hlist
+      ~value_of_hlist:Poly.of_hlist
 
   let var_of_t ({x; is_odd} : t) : var =
     {x= Field.Var.constant x; is_odd= Boolean.var_of_value is_odd}

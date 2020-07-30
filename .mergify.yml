@@ -6,14 +6,15 @@ pull_request_rules:
           - "status-success=ci/circleci: build-wallet"
           - "status-success=ci/circleci: compare-test-signatures"
           - "status-success=ci/circleci: lint"
+          - "status-success=ci/circleci: test--dev--coda-batch-payment-test"
+          - "status-success=ci/circleci: test--dev--coda-bootstrap-test"
+          - "status-success=ci/circleci: test--dev--coda-delegation-test"
+          - "status-success=ci/circleci: test--dev--coda-shared-state-test"
           - "status-success=ci/circleci: test--fake_hash"
           - "status-success=ci/circleci: test--test_postake"
-          - "status-success=ci/circleci: test--test_postake_bootstrap"
-          - "status-success=ci/circleci: test--test_postake_delegation"
           - "status-success=ci/circleci: test--test_postake_five_even_txns"
           - "status-success=ci/circleci: test--test_postake_snarkless"
           - "status-success=ci/circleci: test--test_postake_split"
-          - "status-success=ci/circleci: test--test_postake_txns"
           - "status-success=ci/circleci: test-unit--dev"
           - "status-success=ci/circleci: test-unit--nonconsensus_medium_curves"
           - "status-success=ci/circleci: tracetool"
@@ -21,7 +22,7 @@ pull_request_rules:
           - label=ready-to-merge
       actions:
           merge:
-              method: squash
+              method: merge
               strict: smart
           delete_head_branch: {}
     - name: automatically merge approved PRs into develop with the ready-to-merge-into-develop label
@@ -31,14 +32,15 @@ pull_request_rules:
           - "status-success=ci/circleci: build-wallet"
           - "status-success=ci/circleci: compare-test-signatures"
           - "status-success=ci/circleci: lint"
+          - "status-success=ci/circleci: test--dev--coda-batch-payment-test"
+          - "status-success=ci/circleci: test--dev--coda-bootstrap-test"
+          - "status-success=ci/circleci: test--dev--coda-delegation-test"
+          - "status-success=ci/circleci: test--dev--coda-shared-state-test"
           - "status-success=ci/circleci: test--fake_hash"
           - "status-success=ci/circleci: test--test_postake"
-          - "status-success=ci/circleci: test--test_postake_bootstrap"
-          - "status-success=ci/circleci: test--test_postake_delegation"
           - "status-success=ci/circleci: test--test_postake_five_even_txns"
           - "status-success=ci/circleci: test--test_postake_snarkless"
           - "status-success=ci/circleci: test--test_postake_split"
-          - "status-success=ci/circleci: test--test_postake_txns"
           - "status-success=ci/circleci: test-unit--dev"
           - "status-success=ci/circleci: test-unit--nonconsensus_medium_curves"
           - "status-success=ci/circleci: tracetool"
@@ -47,6 +49,6 @@ pull_request_rules:
           - base=develop
       actions:
           merge:
-              method: squash
+              method: merge
               strict: smart
           delete_head_branch: {}

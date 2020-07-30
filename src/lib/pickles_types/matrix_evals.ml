@@ -4,17 +4,12 @@ module H_list = Snarky.H_list
 [%%versioned
 module Stable = struct
   module V1 = struct
-    type 'a t = {row: 'a; col: 'a; value: 'a; rc: 'a} [@@deriving sexp]
+    type 'a t = {row: 'a; col: 'a; value: 'a; rc: 'a} [@@deriving sexp, fields]
   end
 end]
 
 type 'a t = 'a Stable.Latest.t = {row: 'a; col: 'a; value: 'a; rc: 'a}
-[@@deriving sexp]
-
-let to_hlist {row; col; value; rc} = H_list.[row; col; value; rc]
-
-let of_hlist ([row; col; value; rc] : (unit, _) H_list.t) =
-  {row; col; value; rc}
+[@@deriving sexp, fields, hlist]
 
 let typ g =
   Snarky.Typ.of_hlistable [g; g; g; g] ~var_to_hlist:to_hlist
