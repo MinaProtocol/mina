@@ -141,6 +141,7 @@ module Balance = struct
             | Some token_id ->
                 Amount_of.token token_id )
               (account#balance)#total ]
+      ; coins= []
       ; metadata=
           Option.map
             ~f:(fun nonce -> `Assoc [("nonce", `Intlit nonce)])
@@ -170,13 +171,17 @@ module Balance = struct
                      ; currency=
                          {Currency.symbol= "CODA"; decimals= 9l; metadata= None}
                      ; metadata= None } ]
+               ; coins= []
                ; metadata= Some (`Assoc [("nonce", `Intlit "2")]) })
     end )
 end
 
-let router ~graphql_uri ~logger:_ ~db (route : string list) body =
+let router ~graphql_uri ~logger ~db (route : string list) body =
   let (module Db : Caqti_async.CONNECTION) = db in
   let open Async.Deferred.Result.Let_syntax in
+  Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+    "Handling /account/ $route"
+    ~metadata:[("route", `List (List.map route ~f:(fun s -> `String s)))] ;
   match route with
   | ["balance"] ->
       let%bind req =
