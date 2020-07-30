@@ -659,7 +659,9 @@ module Side_loaded = struct
     let of_compiled tag =
       let d = Types_map.lookup_compiled tag.Tag.id in
       { Side_loaded_verification_key.wrap_vk= Lazy.force d.wrap_vk
-      ; wrap_index= Lazy.force d.wrap_key
+      ; wrap_index=
+          Lazy.force d.wrap_key
+          |> Matrix_evals.map ~f:(Abc.map ~f:Array.to_list)
       ; max_width= Width.of_int_exn (Nat.to_int (Nat.Add.n d.max_branching))
       ; step_data=
           At_most.of_vector

@@ -9,8 +9,6 @@ open Common
 open Import
 module S = Sponge
 
-let max_log2_degree = 32
-
 module Make
     (Inputs : Intf.Pairing_main_inputs.S
               with type Impl.field = Backend.Tick.Field.t
