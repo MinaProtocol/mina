@@ -45,21 +45,19 @@ module Account = struct
   module Unlock =
   [%graphql
   {|
-      mutation unlock($public_key: PublicKey!) {
-        unlockAccount(input: {publicKey: $public_key, password: ""}) {
-          account {
-            balance {
-              total
-            }
-          }
+      mutation ($password: String!, $public_key: PublicKey!) {
+        unlockAccount(input: {password: $password, publicKey: $public_key }) {
+          publicKey
         }
       }
     |}]
 
-  let unlock ~public_key ~graphql_uri =
+  let unlock ~graphql_uri =
     let open Deferred.Result.Let_syntax in
-    let%map res = Graphql.query (Unlock.make ~public_key ()) graphql_uri in
-    (((res#unlockAccount)#account)#balance)#total
+    let%map res =
+      Graphql.query (Unlock.make ~password:"" ~public_key:pk ()) graphql_uri
+    in
+    (res#unlockAccount)#publicKey
 end
 
 module SendTransaction = struct
