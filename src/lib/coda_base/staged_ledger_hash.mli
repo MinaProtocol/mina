@@ -1,5 +1,4 @@
 open Core
-open Coda_base
 open Snark_params.Tick
 
 type t [@@deriving sexp, eq, compare, hash, yojson]

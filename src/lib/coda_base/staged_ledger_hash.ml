@@ -2,7 +2,6 @@
 "../../config.mlh"]
 
 open Core
-open Coda_base
 open Fold_lib
 open Snark_params.Tick
 open Coda_digestif
@@ -111,7 +110,7 @@ module Non_snark = struct
 
   let dummy : t Lazy.t =
     lazy
-      { ledger_hash= Coda_base.Ledger_hash.empty_hash
+      { ledger_hash= Ledger_hash.empty_hash
       ; aux_hash= Aux_hash.dummy
       ; pending_coinbase_aux= Pending_coinbase_aux.dummy }
 
