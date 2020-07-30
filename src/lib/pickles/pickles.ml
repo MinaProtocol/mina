@@ -847,7 +847,7 @@ let%test_module "test" =
 
       let side_loaded =
         Side_loaded.create
-          ~max_branching:(module Nat.N2) (* TODO: Make this = N2 *)
+          ~max_branching:(module Nat.N2)
           ~name:"side-loaded"
           ~value_to_field_elements:Statement.to_field_elements
           ~var_to_field_elements:Statement.to_field_elements ~typ:Field.typ

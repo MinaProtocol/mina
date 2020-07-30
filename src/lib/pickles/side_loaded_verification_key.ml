@@ -5,7 +5,7 @@ module Ds = Domains
 
 let input_size ~of_int ~add ~mul w =
   let open Composition_types in
-  (* This should be an affine function in a *)
+  (* This should be an affine function in [a]. *)
   let size a =
     let (T (typ, conv)) =
       Impls.Step.input ~branching:a ~wrap_rounds:Backend.Tock.Rounds.n
