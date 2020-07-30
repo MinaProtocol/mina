@@ -507,7 +507,8 @@ module Types = struct
           ; receipt_chain_hash
           ; delegate
           ; voting_for
-          ; timing } =
+          ; timing
+          ; snapp } =
         let open Option.Let_syntax in
         let%bind public_key = public_key in
         let%bind token_permissions = token_permissions in
@@ -515,7 +516,8 @@ module Types = struct
         let%bind receipt_chain_hash = receipt_chain_hash in
         let%bind delegate = delegate in
         let%bind voting_for = voting_for in
-        let%map timing = timing in
+        let%bind timing = timing in
+        let%map snapp = snapp in
         { Account.Poly.public_key
         ; token_id
         ; token_permissions
@@ -524,7 +526,8 @@ module Types = struct
         ; receipt_chain_hash
         ; delegate
         ; voting_for
-        ; timing }
+        ; timing
+        ; snapp }
 
       let of_full_account ?breadcrumb
           { Account.Poly.public_key
@@ -535,7 +538,8 @@ module Types = struct
           ; receipt_chain_hash
           ; delegate
           ; voting_for
-          ; timing } =
+          ; timing
+          ; snapp } =
         { Account.Poly.public_key= Some public_key
         ; token_id
         ; token_permissions= Some token_permissions
@@ -545,7 +549,8 @@ module Types = struct
         ; receipt_chain_hash= Some receipt_chain_hash
         ; delegate= Some delegate
         ; voting_for= Some voting_for
-        ; timing }
+        ; timing
+        ; snapp }
 
       let of_account_id coda account_id =
         let account =
@@ -575,7 +580,8 @@ module Types = struct
                   ; breadcrumb= None }
               ; receipt_chain_hash= None
               ; voting_for= None
-              ; timing= Timing.Untimed }
+              ; timing= Timing.Untimed
+              ; snapp= None }
 
       let of_pk coda pk =
         of_account_id coda (Account_id.create pk Token_id.default)
@@ -595,7 +601,8 @@ module Types = struct
           , Account.Nonce.t option
           , Receipt.Chain_hash.t option
           , State_hash.t option
-          , Account.Timing.t )
+          , Account.Timing.t
+          , Snapp_account.t option )
           Account.Poly.t
       ; locked: bool option
       ; is_actively_staking: bool

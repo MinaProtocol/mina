@@ -73,3 +73,5 @@ let epoch_seed = salt epoch_seed
 let transition_system_snark = salt transition_system_snark
 
 let account = salt account
+
+let snapp_account = salt snapp_account

@@ -39,6 +39,8 @@ val transition_system_snark : Field.t State.t
 
 val account : Field.t State.t
 
+val snapp_account : Field.t State.t
+
 val receipt_chain : Field.t State.t
 
 val pending_coinbases : Field.t State.t

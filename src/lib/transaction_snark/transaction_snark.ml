@@ -1409,7 +1409,8 @@ module Base = struct
              ; receipt_chain_hash
              ; delegate
              ; voting_for= account.voting_for
-             ; timing } ))
+             ; timing
+             ; snapp= account.snapp } ))
     in
     let%bind receiver_increase =
       (* - payments:         payload.body.amount
@@ -1570,7 +1571,8 @@ module Base = struct
              ; receipt_chain_hash= account.receipt_chain_hash
              ; delegate
              ; voting_for= account.voting_for
-             ; timing= account.timing } ))
+             ; timing= account.timing
+             ; snapp= account.snapp } ))
     in
     let%bind fee_payer_is_source = Account_id.Checked.equal fee_payer source in
     let%bind root_after_source_update =
@@ -1710,7 +1712,8 @@ module Base = struct
              ; receipt_chain_hash= account.receipt_chain_hash
              ; delegate
              ; voting_for= account.voting_for
-             ; timing } ))
+             ; timing
+             ; snapp= account.snapp } ))
     in
     let%bind fee_excess =
       (* - payments:         payload.common.fee

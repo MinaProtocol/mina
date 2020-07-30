@@ -101,7 +101,8 @@ module Poly = struct
            , 'nonce
            , 'receipt_chain_hash
            , 'state_hash
-           , 'timing )
+           , 'timing
+           , 'snapp_opt )
            t =
         { public_key: 'pk
         ; token_id: 'tid
@@ -111,7 +112,8 @@ module Poly = struct
         ; receipt_chain_hash: 'receipt_chain_hash
         ; delegate: 'pk
         ; voting_for: 'state_hash
-        ; timing: 'timing }
+        ; timing: 'timing
+        ; snapp: 'snapp_opt }
       [@@deriving sexp, eq, compare, hash, yojson]
     end
   end]
@@ -123,7 +125,8 @@ module Poly = struct
        , 'nonce
        , 'receipt_chain_hash
        , 'state_hash
-       , 'timing )
+       , 'timing
+       , 'snapp_opt )
        t =
         ( 'pk
         , 'tid
@@ -132,7 +135,8 @@ module Poly = struct
         , 'nonce
         , 'receipt_chain_hash
         , 'state_hash
-        , 'timing )
+        , 'timing
+        , 'snapp_opt )
         Stable.Latest.t =
     { public_key: 'pk
     ; token_id: 'tid
@@ -142,7 +146,8 @@ module Poly = struct
     ; receipt_chain_hash: 'receipt_chain_hash
     ; delegate: 'pk
     ; voting_for: 'state_hash
-    ; timing: 'timing }
+    ; timing: 'timing
+    ; snapp: 'snapp_opt }
   [@@deriving sexp, eq, compare, hash, yojson, fields, hlist]
 end
 
@@ -403,7 +408,8 @@ module Stable = struct
       , Nonce.Stable.V1.t
       , Receipt.Chain_hash.Stable.V1.t
       , State_hash.Stable.V1.t
-      , Timing.Stable.V1.t )
+      , Timing.Stable.V1.t
+      , Snapp_account.Stable.V1.t option )
       Poly.Stable.V1.t
     [@@deriving sexp, eq, hash, compare, yojson]
 
@@ -431,13 +437,16 @@ type value =
   , Nonce.t
   , Receipt.Chain_hash.t
   , State_hash.t
-  , Timing.t )
+  , Timing.t
+  , Snapp_account.t option )
   Poly.t
 [@@deriving sexp]
 
 let key_gen = Public_key.Compressed.gen
 
-let initialize account_id : t =
+let snapp_account_opt_typ = Typ.transport
+
+let initialize ?snapp account_id : t =
   let public_key = Account_id.public_key account_id in
   let token_id = Account_id.token_id account_id in
   let delegate =
@@ -453,7 +462,15 @@ let initialize account_id : t =
   ; receipt_chain_hash= Receipt.Chain_hash.empty
   ; delegate
   ; voting_for= State_hash.dummy
-  ; timing= Timing.Untimed }
+  ; timing= Timing.Untimed
+  ; snapp }
+
+let hash_snapp_account_opt = function
+  | None ->
+      Field.zero
+  | Some a ->
+      Random_oracle.hash ~init:Hash_prefix_states.snapp_account
+        (Random_oracle.pack_input (Snapp_account.to_input a))
 
 let to_input (t : t) =
   let open Random_oracle.Input in
@@ -467,6 +484,7 @@ let to_input (t : t) =
     ~receipt_chain_hash:(f Receipt.Chain_hash.to_input)
     ~delegate:(f Public_key.Compressed.to_input)
     ~voting_for:(f State_hash.to_input) ~timing:(bits Timing.to_bits)
+    ~snapp:(f (Fn.compose field hash_snapp_account_opt))
   |> List.reduce_exn ~f:append
 
 let crypto_hash_prefix = Hash_prefix.account
@@ -486,7 +504,8 @@ type var =
   , Nonce.Checked.t
   , Receipt.Chain_hash.var
   , State_hash.var
-  , Timing.var )
+  , Timing.var
+  , Field.Var.t )
   Poly.t
 
 let identifier_of_var ({public_key; token_id; _} : var) =
@@ -503,7 +522,9 @@ let typ : (var, value) Typ.t =
       ; Receipt.Chain_hash.typ
       ; Public_key.Compressed.typ
       ; State_hash.typ
-      ; Timing.typ ]
+      ; Timing.typ
+      ; Typ.transport Field.typ ~there:hash_snapp_account_opt ~back:(fun _ ->
+            failwith "unimplemented" ) ]
   in
   Typ.of_hlistable spec ~var_to_hlist:Poly.to_hlist ~var_of_hlist:Poly.of_hlist
     ~value_to_hlist:Poly.to_hlist ~value_of_hlist:Poly.of_hlist
@@ -517,7 +538,8 @@ let var_of_t
      ; receipt_chain_hash
      ; delegate
      ; voting_for
-     ; timing } :
+     ; timing
+     ; snapp } :
       value) =
   { Poly.public_key= Public_key.Compressed.var_of_t public_key
   ; token_id= Token_id.var_of_t token_id
@@ -527,7 +549,8 @@ let var_of_t
   ; receipt_chain_hash= Receipt.Chain_hash.var_of_t receipt_chain_hash
   ; delegate= Public_key.Compressed.var_of_t delegate
   ; voting_for= State_hash.var_of_t voting_for
-  ; timing= Timing.var_of_t timing }
+  ; timing= Timing.var_of_t timing
+  ; snapp= Field.Var.constant (hash_snapp_account_opt snapp) }
 
 module Checked = struct
   let to_input (t : var) =
@@ -540,7 +563,7 @@ module Checked = struct
     in
     make_checked (fun () ->
         List.reduce_exn ~f:append
-          (Poly.Fields.fold ~init:[]
+          (Poly.Fields.fold ~init:[] ~snapp:(f field)
              ~public_key:(f Public_key.Compressed.Checked.to_input)
              ~token_id:
                (* We use [run_checked] here to avoid routing the [Checked.t]
@@ -575,7 +598,8 @@ let empty =
   ; receipt_chain_hash= Receipt.Chain_hash.empty
   ; delegate= Public_key.Compressed.empty
   ; voting_for= State_hash.dummy
-  ; timing= Timing.Untimed }
+  ; timing= Timing.Untimed
+  ; snapp= None }
 
 let empty_digest = digest empty
 
@@ -595,7 +619,8 @@ let create account_id balance =
   ; receipt_chain_hash= Receipt.Chain_hash.empty
   ; delegate
   ; voting_for= State_hash.dummy
-  ; timing= Timing.Untimed }
+  ; timing= Timing.Untimed
+  ; snapp= None }
 
 let create_timed account_id balance ~initial_minimum_balance ~cliff_time
     ~vesting_period ~vesting_increment =
@@ -623,6 +648,7 @@ let create_timed account_id balance ~initial_minimum_balance ~cliff_time
       ; receipt_chain_hash= Receipt.Chain_hash.empty
       ; delegate
       ; voting_for= State_hash.dummy
+      ; snapp= None
       ; timing=
           Timing.Timed
             { initial_minimum_balance

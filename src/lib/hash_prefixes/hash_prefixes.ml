@@ -26,6 +26,8 @@ let protocol_state_body = create "CodaProtoStateBody"
 
 let account = create "CodaAccount"
 
+let snapp_account = create "CodaSnappAccount"
+
 let merkle_tree i = create (Printf.sprintf "CodaMklTree%03d" i)
 
 let coinbase_merkle_tree i = create (Printf.sprintf "CodaCbMklTree%03d" i)
