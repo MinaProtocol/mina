@@ -148,6 +148,8 @@ FROM build-deps AS opam-deps
 ARG CODA_DIR=coda
 # branch to checkout on first clone (this will be the only availible branch in the container)
 # can also be a tagged release
+# TODO: change this to two distinct variables, one for opam/dependency clone
+#       and a distinct one for the coda codebase in the next stage
 ARG CODA_BRANCH=develop
 
 # location of external packages
@@ -172,6 +174,7 @@ WORKDIR $HOME/$CODA_DIR
 
 ENV OPAMYES 1
 # TODO: handle this opam work without cloning the full repository (directly pull src/opam.export)
+# TODO: handle uri's build failure in a more flexible manner
 # Installs uri.2.2.1 and its dependencies so that build succeeds, then installs the rest of the deps
 RUN opam install \
   uri.2.2.1 \
@@ -191,6 +194,8 @@ RUN opam install \
   && opam switch import src/opam.export \
   && sudo chmod -R u+rw ~/.opam
 
+# TODO: Get pins from a script that can be easily updated if more pins are needed
+# Would be really nice to pull this script, the git submodules, and src/opam.export exclusively in this stage
 RUN eval $(opam config env) \
   && opam pin add src/external/ocaml-extlib \
   && opam pin add src/external/ocaml-sodium \
@@ -214,6 +219,7 @@ ARG DUNE_PROFILE=testnet_postake_medium_curves
 ENV PATH "$PATH:/usr/lib/go/bin:$HOME/.cargo/bin"
 
 # Build libp2p_helper and clear go module caches
+# Could maybe also delete go during this step / build it as part of the deps stage?
 RUN git pull \
    && cd src/app/libp2p_helper/src \
    && go mod download \
@@ -244,6 +250,7 @@ RUN eval $(opam config env) \
 #################################################################################################
 FROM debian:buster-slim AS production
 ARG POSTGRES_DATA_DIR=/data/postgresql
+ARG CODA_DAEMON_PORT=10101
 
 ENV DEBIAN_FRONTEND noninteractive
 
@@ -265,15 +272,6 @@ RUN apt-get -y update \
     postgresql-contrib \
     tzdata
 
-
-# don't use the released package for the rosetta image as we just built it in docker
-# we could use a deb package pulled from the builder though, especially if the deb includes other useful items for
-# rosetta. Currently we're not building the deb here as it requires a tools that we /dont/ need in rosetta.
-#RUN echo "deb [trusted=yes] http://packages.o1test.net $deb_repo main" > /etc/apt/sources.list.d/coda.list \
-#  && apt-get update \
-#  && apt-get install --force-yes coda-testnet-postake-medium-curves=0.0.12-beta+403845-develop-0116d7c-PV947be79c -y \
-#  && apt-get install --force-yes coda-archive -y
-
 # Make all directories for configuration and empty s3 cache dirs
 RUN mkdir -p /tmp/s3_cache_dir \
     &&  mkdir -p /tmp/coda_cache_dir \
@@ -284,16 +282,16 @@ COPY --from=builder /home/opam/app/* /coda-bin/
 COPY --from=builder /home/opam/coda/src/app /app
 COPY --from=builder /home/opam/coda/src/app/rosetta/config.json /data/config.json
 
-# Initial image could be made smaller at the expense of start up time by removing these
-# because all s3-cached files will be downloaded as needed at runtime
+# all s3-cached files will be downloaded as needed at runtime
 
-# Remove these to optimize image size, start up time is already bad because testnets each need their own genesis proof
-COPY --from=builder /tmp/s3_cache_dir /tmp/s3_cache_dir
-COPY --from=builder /tmp/coda_cache_dir /tmp/coda_cache_dir
+# Uncomment these to optimize start up time at the expense of image size
+# COPY --from=builder /tmp/s3_cache_dir /tmp/s3_cache_dir
+# COPY --from=builder /tmp/coda_cache_dir /tmp/coda_cache_dir
 
 USER postgres
 
 # TODO: use POSTGRES_DATA_DIR variable more consistently and ensure proper escaping
+# TODO: move this to a more useful and easy to maintain script in the rosetta directory for this purpose
 RUN pg_dropcluster --stop 11 main \
     && pg_createcluster --start 11 -d ${POSTGRES_DATA_DIR} main \
     && echo "data_directory = '/data/postgresql'" >> /etc/postgresql/11/main/postgresql.conf \
@@ -310,7 +308,7 @@ USER root
 WORKDIR /app/rosetta
 
 EXPOSE 3087
-EXPOSE 10101
+EXPOSE $CODA_DAEMON_PORT
 
 ENTRYPOINT ["bash", "./docker-start.sh"]
 
