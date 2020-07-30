@@ -213,3 +213,5 @@ let tick_public_input_of_statement ~max_branching
 
 let index_commitment_length k ~max_degree =
   Int.round_up ~to_multiple_of:max_degree (Domain.size k) / max_degree
+
+let max_log2_degree = 32
