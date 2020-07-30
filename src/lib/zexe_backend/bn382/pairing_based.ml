@@ -51,10 +51,16 @@ module Verification_key = struct
   let of_string _ = failwith "TODO"
 end
 
+module Mat = struct
+  include Snarky_bn382.Fp.Constraint_matrix
+
+  let create () =
+    let t = create () in
+    Caml.Gc.finalise delete t ; t
+end
+
 module R1CS_constraint_system =
-  Zexe_backend_common.R1cs_constraint_system.Make
-    (Fp)
-    (Snarky_bn382.Fp.Constraint_matrix)
+  Zexe_backend_common.R1cs_constraint_system.Make (Fp) (Mat)
 module Var = Zexe_backend_common.Var
 
 module Oracles = struct
