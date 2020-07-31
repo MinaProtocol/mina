@@ -203,4 +203,4 @@ module Time = struct
 end
 
 include Time
-module Timeout = Timeout.Make (Time)
+module Timeout = Timeout_lib.Make (Time)
