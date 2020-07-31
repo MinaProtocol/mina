@@ -1,7 +1,6 @@
 /* This module is just a copy so modifying the parsing doesn't break everything */
 module Block = {
-  type account = {publicKey: string};
-
+  // TODO: snarkJobs isn't implemented in the archive API yet
   // type snarkJobs = {
   //   prover: string,
   //   fee: string,
@@ -22,11 +21,6 @@ module Block = {
     token: option(string),
   };
 
-  // type feeTransfer = {
-  //   fee: string,
-  //   recipient: string,
-  // };
-
   type blockchainState = {
     timestamp: string,
     height: string,
@@ -36,9 +30,9 @@ module Block = {
     blockId: int,
     blockchainState,
     creatorAccount: string,
-    //snarkJobs: array(snarkJobs),
     userCommands: array(userCommand),
     internalCommands: array(internalCommand),
+    //snarkJobs: array(snarkJobs),
   };
 
   module Decode = {
