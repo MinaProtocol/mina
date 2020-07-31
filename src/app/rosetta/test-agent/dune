@@ -26,5 +26,6 @@
     ppx_deriving_yojson
     ppx_jane
     ppx_version
+    ppx_deriving.eq
     ))
   )
