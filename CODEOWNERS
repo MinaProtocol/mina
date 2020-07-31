@@ -34,7 +34,7 @@
 /src/lib/crypto_params/ @CodaProtocol/crypto-eng-reviewers
 /src/lib/dummy_values/ @CodaProtocol/crypto-eng-reviewers
 /src/lib/hash_prefixes/ @CodaProtocol/crypto-eng-reviewers
-/src/lib/keys_lib/ @CodaProtocol/crypto-eng-reviewers
+/src/lib/pickles/ @CodaProtocol/crypto-eng-reviewers
 /src/lib/non_zero_curve_point/ @CodaProtocol/crypto-eng-reviewers
 /src/lib/outside_hash_image/ @CodaProtocol/crypto-eng-reviewers
 /src/lib/pokolog/ @CodaProtocol/crypto-eng-reviewers
