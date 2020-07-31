@@ -10,36 +10,32 @@
   the execution fails and reports an error.
  */
 
-let blockDirectory =
-  ([%bs.node __dirname] |> Belt.Option.getExn |> Filename.dirname)
-  ++ "/src/blocks/";
+let getEnvOrFail = name =>
+  switch (Js.Dict.get(Node.Process.process##env, name)) {
+  | Some(value) => value
+  | None => failwith({j|Couldn't find env var: `$name`"|j})
+  };
 
-[@bs.val]
-external credentials: Js.Undefined.t(string) =
-  "process.env.GOOGLE_APPLICATION_CREDENTIALS";
+let getEnv = (~default, name) =>
+  Js.Dict.get(Node.Process.process##env, name)
+  ->Belt.Option.getWithDefault(default)
+  ->Js.String.trim;
 
-[@bs.val]
-external spreadsheetId: Js.Undefined.t(string) = "process.env.SPREADSHEET_ID";
+let getEnvOpt = name =>
+  Js.Dict.get(Node.Process.process##env, name)
+  ->Belt.Option.map(Js.String.trim);
 
-let blocks =
-  blockDirectory
-  |> Node.Fs.readdirSync
-  |> Array.map(file => {
-       let fileContents = Node.Fs.readFileAsUtf8Sync(blockDirectory ++ file);
-       let blockData = Js.Json.parseExn(fileContents);
-       let block = Types.NewBlock.unsafeJSONToNewBlock(blockData);
-       block.data.newBlock;
-     });
+let credentials = getEnvOpt("GOOGLE_APPLICATION_CREDENTIALS");
+let spreadsheetId = getEnvOpt("SPREADSHEET_ID");
+let pgConn = getEnvOpt("PGCONN");
 
-let totalBlocks =
-  blockDirectory |> Node.Fs.readdirSync |> Array.length |> string_of_int;
+let parseBlocks = blocks => {
+  blocks |> Array.iter(blocks => Js.log(blocks));
+};
 
 let setSheetsCredentials = () => {
-  switch (
-    Js.undefinedToOption(credentials),
-    Js.undefinedToOption(spreadsheetId),
-  ) {
-  | (Some(validCredentials), Some(spreadsheetId)) =>
+  switch (credentials) {
+  | Some(validCredentials) =>
     Node.Fs.writeFileAsUtf8Sync(
       "./google_sheets_credentials.json",
       validCredentials,
@@ -48,24 +44,30 @@ let setSheetsCredentials = () => {
       "GOOGLE_APPLICATION_CREDENTIALS",
       "./google_sheets_credentials.json",
     );
-    Ok(spreadsheetId);
-  | (None, _) => Error("Invalid credentials environment variable")
-  | (_, None) => Error("Invalid spreadsheet environment variable")
+    Ok();
+  | None => Error()
   };
 };
 
 let main = () => {
   switch (setSheetsCredentials()) {
-  | Ok(spreadsheetId) =>
-    blocks
-    |> Metrics.calculateMetrics
-    |> UploadLeaderboardPoints.uploadChallengePoints(spreadsheetId);
-
-    UploadLeaderboardData.uploadData(spreadsheetId, totalBlocks);
-
-    UploadLeaderboardData.uploadUserProfileData(spreadsheetId);
-  | Error(error) => failwith(error)
+  | Ok () =>
+    let pool = Postgres.createPool(Belt.Option.getExn(pgConn));
+    Postgres.makeQuery(pool, Postgres.getBlocks, result => {
+      switch (result) {
+      | Ok(blocks) => parseBlocks(blocks)
+      | Error(error) => Js.log(error)
+      }
+    });
+    ();
+  | Error(_) => ()
   };
 };
+
+// blocks
+// |> Metrics.calculateMetrics
+// |> UploadLeaderboardPoints.uploadChallengePoints(spreadsheetId);
+// UploadLeaderboardData.uploadData(spreadsheetId, totalBlocks);
+//UploadLeaderboardData.uploadUserProfileData(spreadsheetId);
 
 main();
