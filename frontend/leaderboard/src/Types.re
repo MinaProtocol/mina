@@ -7,6 +7,7 @@ module Block = {
   // };
 
   type userCommand = {
+    id: option(int),
     type_: option(string),
     fromAccount: option(string),
     toAccount: option(string),
@@ -15,6 +16,7 @@ module Block = {
   };
 
   type internalCommand = {
+    id: option(int),
     type_: option(string),
     receiverAccount: option(string),
     fee: option(int),
@@ -27,12 +29,19 @@ module Block = {
   };
 
   type t = {
-    blockId: int,
+    id: int,
     blockchainState,
     creatorAccount: string,
     userCommands: array(userCommand),
     internalCommands: array(internalCommand),
     //snarkJobs: array(snarkJobs),
+  };
+
+  let addCommandIfExists = (command, commandId, commands) => {
+    switch (commandId) {
+    | Some(_) => Js.Array.push(command, commands) |> ignore
+    | None => ()
+    };
   };
 
   module Decode = {
@@ -42,7 +51,9 @@ module Block = {
       timestamp: json |> field("timestamp", string),
       height: json |> field("height", string),
     };
+
     let userCommand = json => {
+      id: json |> optional(field("usercommandid", int)),
       type_: json |> optional(field("usercommandtype", string)),
       fromAccount: json |> optional(field("usercommandfromaccount", string)),
       toAccount: json |> optional(field("usercommandtoaccount", string)),
@@ -51,6 +62,7 @@ module Block = {
     };
 
     let internalCommand = json => {
+      id: json |> optional(field("internalcommandid", int)),
       type_: json |> optional(field("internalcommandtype", string)),
       receiverAccount:
         json |> optional(field("internalcommandrecipient", string)),
@@ -59,7 +71,7 @@ module Block = {
     };
 
     let block = json => {
-      blockId: json |> field("id", int),
+      id: json |> field("blockid", int),
       creatorAccount: json |> field("blockcreatoraccount", string),
       blockchainState: json |> blockchainState,
       userCommands: [||],
@@ -75,37 +87,38 @@ module Block = {
            let userCommand = Decode.userCommand(block);
            let internalCommand = Decode.internalCommand(block);
 
-           /* Don't add unless these fields are present */
-           Js.Array.some(
-             (!==)(None),
-             [|
-               userCommand.type_,
-               userCommand.toAccount,
-               userCommand.fromAccount,
-             |],
-           )
-             ? Js.Array.push(userCommand, newBlock.userCommands) |> ignore
-             : ();
-
-           /* Don't add unless these fields are present */
-           Js.Array.some(
-             (!==)(None),
-             [|internalCommand.type_, internalCommand.receiverAccount|],
-           )
-             ? Js.Array.push(internalCommand, newBlock.internalCommands)
-               |> ignore
-             : ();
-
-           /* Add new block to map, otherwise update with new information */
-           if (Belt.Map.Int.has(map, newBlock.blockId)) {
-             Belt.Map.Int.update(map, newBlock.blockId, value => {
-               switch (value) {
-               | Some(_) => Some(newBlock)
-               | None => None
-               }
+           if (Belt.Map.Int.has(map, newBlock.id)) {
+             Belt.Map.Int.update(map, newBlock.id, value => {
+               Belt.Option.mapWithDefault(
+                 value,
+                 None,
+                 currentBlock => {
+                   addCommandIfExists(
+                     userCommand,
+                     userCommand.id,
+                     currentBlock.userCommands,
+                   );
+                   addCommandIfExists(
+                     internalCommand,
+                     internalCommand.id,
+                     currentBlock.internalCommands,
+                   );
+                   Some(currentBlock);
+                 },
+               )
              });
            } else {
-             Belt.Map.Int.set(map, newBlock.blockId, newBlock);
+             addCommandIfExists(
+               userCommand,
+               userCommand.id,
+               newBlock.userCommands,
+             );
+             addCommandIfExists(
+               internalCommand,
+               internalCommand.id,
+               newBlock.internalCommands,
+             );
+             Belt.Map.Int.set(map, newBlock.id, newBlock);
            };
          },
          Belt.Map.Int.empty,
