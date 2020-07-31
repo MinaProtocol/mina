@@ -20,6 +20,8 @@ module type Inputs_intf = sig
   module Index : sig
     type t
 
+    val delete : t -> unit
+
     val create :
          Constraint_matrix.t
       -> Constraint_matrix.t
@@ -137,10 +139,14 @@ module Make (Inputs : Inputs_intf) = struct
       ; m= {a; b; c}
       ; weight } =
     let vars = 1 + public_input_size + auxiliary_input_size in
-    Index.create a b c
-      (Unsigned.Size_t.of_int vars)
-      (Unsigned.Size_t.of_int (public_input_size + 1))
-      (load_urs ())
+    let t =
+      Index.create a b c
+        (Unsigned.Size_t.of_int vars)
+        (Unsigned.Size_t.of_int (public_input_size + 1))
+        (load_urs ())
+    in
+    Caml.Gc.finalise Index.delete t ;
+    t
 
   let vk t = Verifier_index.create t
 
