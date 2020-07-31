@@ -6,23 +6,25 @@ defmodule Coda.Validations.BlockProductionRate do
 
   use Architecture.Validation
 
-  # TODO
-  defp slot_time, do: 3 * 60 * 1000
-  defp grace_window(_state), do: 20 * 60 * 1000
-  defp acceptable_margin, do: 0.05
+  import Coda.Validations.Configuration
 
-  defp win_rate(_), do: raise("TODO")
+  require Logger
 
   @impl true
   def statistic, do: Coda.Statistics.BlockProductionRate
 
   @impl true
-  def validate(_resource, Coda.Statistics.BlockProductionRate, state) do
+  def validate({Coda.Statistics.BlockProductionRate,resource}, state) do
     # implication
-    if state.elapsed_time < grace_window(state) do
+
+    if Time.compare(state.elapsed_time,grace_window(state)) == :lt do
       :valid
     else
-      slots_elapsed = state.elapsed_ns / slot_time()
+      # PR reviewer: check my math
+      tm = state.elapsed_time
+      elapsed_sec = tm.hour * 60 * 60 + tm.minute * 60 + tm.second
+      slots_elapsed = elapsed_sec / slot_time()
+
       slot_production_ratio = state.blocks_produced / slots_elapsed
 
       # putting the call to acceptable_margin() here make dialyzer happy
@@ -30,12 +32,12 @@ defmodule Coda.Validations.BlockProductionRate do
 
       cond do
         slot_production_ratio >= 1 ->
-          {:invalid, "wow, something is *really* broken"}
+          {:invalid, "unexpected, slot production ratio is 1 or greater"}
 
-        slot_production_ratio < win_rate(state.stake_ratio) - margin ->
+        slot_production_ratio < resource.expected_win_rate - margin ->
           {:invalid, "not producing enough blocks"}
 
-        slot_production_ratio > win_rate(state.stake_ratio) + margin ->
+        slot_production_ratio > resource.expected_win_rate + margin ->
           {:invalid, "producing more blocks than expected"}
 
         true ->
