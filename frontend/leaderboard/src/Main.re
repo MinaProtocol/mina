@@ -29,10 +29,6 @@ let credentials = getEnvOpt("GOOGLE_APPLICATION_CREDENTIALS");
 let spreadsheetId = getEnvOpt("SPREADSHEET_ID");
 let pgConn = getEnvOpt("PGCONN");
 
-let parseBlocks = blocks => {
-  blocks |> Array.iter(blocks => Js.log(blocks));
-};
-
 let setSheetsCredentials = () => {
   switch (credentials) {
   | Some(validCredentials) =>
@@ -55,7 +51,7 @@ let main = () => {
     let pool = Postgres.createPool(Belt.Option.getExn(pgConn));
     Postgres.makeQuery(pool, Postgres.getBlocks, result => {
       switch (result) {
-      | Ok(blocks) => parseBlocks(blocks)
+      | Ok(blocks) => Types.Block.decodeBlocks(blocks) |> ignore
       | Error(error) => Js.log(error)
       }
     });
