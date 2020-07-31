@@ -67,7 +67,7 @@ defmodule Coda.Application do
 
     global_filter = filter do
       resource.labels.project_id == "#{Coda.project_id()}"
-      resource.labels.location == "#{Coda.location()}"
+      resource.labels.location == "#{Coda.region()}"
       resource.labels.cluster_name == "#{Coda.cluster()}"
       resource.labels.namespace_name == "#{Coda.testnet()}"
     end

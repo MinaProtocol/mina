@@ -20,7 +20,6 @@ defmodule Coda.Validations.BlockProductionRate do
     if Time.compare(state.elapsed_time,grace_window(state)) == :lt do
       :valid
     else
-      # PR reviewer: check my math
       tm = state.elapsed_time
       elapsed_sec = tm.hour * 60 * 60 + tm.minute * 60 + tm.second
       slots_elapsed = elapsed_sec / slot_time()
