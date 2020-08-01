@@ -1,26 +1,99 @@
-/* This module is just a copy so modifying the parsing doesn't break everything */
 module Block = {
-  // TODO: snarkJobs isn't implemented in the archive API yet
-  // type snarkJobs = {
-  //   prover: string,
-  //   fee: string,
-  // };
+  module UserCommand = {
+    type userCommandType =
+      | Payment
+      | Delegation
+      | CreateToken
+      | CreateAccount
+      | MintTokens
+      | Unknown;
 
-  type userCommand = {
-    id: option(int),
-    type_: option(string),
-    fromAccount: option(string),
-    toAccount: option(string),
-    fee: option(int),
-    amount: option(int),
+    /* These strings match the types returned from the archive DB */
+    let userCommandTypeOfString = s => {
+      switch (s) {
+      | "payment" => Payment
+      | "delegation" => Delegation
+      | "create_token" => CreateToken
+      | "create_account" => CreateAccount
+      | "mint_tokens" => MintTokens
+      | _ => Unknown
+      };
+    };
+
+    type t = {
+      id: int,
+      type_: userCommandType,
+      fromAccount: string,
+      toAccount: string,
+      fee: string,
+      amount: string,
+    };
+
+    module Decode = {
+      open Json.Decode;
+      let userCommand = json =>
+        switch (json |> field("usercommandid", int)) {
+        | id =>
+          {
+            id,
+            type_:
+              json
+              |> field("usercommandtype", string)
+              |> userCommandTypeOfString,
+            fromAccount: json |> field("usercommandfromaccount", string),
+            toAccount: json |> field("usercommandtoaccount", string),
+            fee: json |> field("usercommandfee", string),
+            amount: json |> field("usercommandamount", string),
+          }
+          ->Some
+        | exception (DecodeError(_)) => None
+        };
+    };
   };
 
-  type internalCommand = {
-    id: option(int),
-    type_: option(string),
-    receiverAccount: option(string),
-    fee: option(int),
-    token: option(string),
+  module InternalCommand = {
+    type internalCommandType =
+      | FeeTransfer
+      | Coinbase
+      | Unknown;
+
+    /* These strings match the types returned from the archive DB */
+    let internalCommandTypeOfString = s => {
+      switch (s) {
+      | "fee_transfer" => FeeTransfer
+      | "coinbase" => Coinbase
+      | _ => Unknown
+      };
+    };
+
+    type t = {
+      id: int,
+      type_: internalCommandType,
+      receiverAccount: string,
+      fee: string,
+      token: string,
+    };
+
+    module Decode = {
+      open Json.Decode;
+      let internalCommand = json =>
+        switch (json |> field("internalcommandid", int)) {
+        | id =>
+          {
+            id,
+            type_:
+              json
+              |> field("internalcommandtype", string)
+              |> internalCommandTypeOfString,
+            receiverAccount:
+              json |> field("internalcommandrecipient", string),
+            fee: json |> field("internalcommandfee", string),
+            token: json |> field("internalcommandtoken", string),
+          }
+          ->Some
+        | exception (DecodeError(_)) => None
+        };
+    };
   };
 
   type blockchainState = {
@@ -32,14 +105,13 @@ module Block = {
     id: int,
     blockchainState,
     creatorAccount: string,
-    userCommands: array(userCommand),
-    internalCommands: array(internalCommand),
-    //snarkJobs: array(snarkJobs),
+    userCommands: array(UserCommand.t),
+    internalCommands: array(InternalCommand.t),
   };
 
-  let addCommandIfExists = (command, commandId, commands) => {
-    switch (commandId) {
-    | Some(_) => Js.Array.push(command, commands) |> ignore
+  let addCommandIfSome = (command, commands) => {
+    switch (command) {
+    | Some(command) => Js.Array.push(command, commands) |> ignore
     | None => ()
     };
   };
@@ -52,24 +124,6 @@ module Block = {
       height: json |> field("height", string),
     };
 
-    let userCommand = json => {
-      id: json |> optional(field("usercommandid", int)),
-      type_: json |> optional(field("usercommandtype", string)),
-      fromAccount: json |> optional(field("usercommandfromaccount", string)),
-      toAccount: json |> optional(field("usercommandtoaccount", string)),
-      fee: json |> optional(field("usercommandfee", int)),
-      amount: json |> optional(field("usercommandamount", int)),
-    };
-
-    let internalCommand = json => {
-      id: json |> optional(field("internalcommandid", int)),
-      type_: json |> optional(field("internalcommandtype", string)),
-      receiverAccount:
-        json |> optional(field("internalcommandrecipient", string)),
-      fee: json |> optional(field("internalcommandfee", int)),
-      token: json |> optional(field("internalcommandtoken", string)),
-    };
-
     let block = json => {
       id: json |> field("blockid", int),
       creatorAccount: json |> field("blockcreatoraccount", string),
@@ -79,92 +133,40 @@ module Block = {
     };
   };
 
-  let decodeBlocks = blocks => {
-    blocks
-    |> Array.fold_left(
-         (map, block) => {
-           let newBlock = Decode.block(block);
-           let userCommand = Decode.userCommand(block);
-           let internalCommand = Decode.internalCommand(block);
+  let parseBlocks = blocks => {
+    Belt.Map.Int.(
+      blocks
+      |> Array.fold_left(
+           (map, block) => {
+             let newBlock = Decode.block(block);
+             let userCommand = UserCommand.Decode.userCommand(block);
+             let internalCommand =
+               InternalCommand.Decode.internalCommand(block);
 
-           if (Belt.Map.Int.has(map, newBlock.id)) {
-             Belt.Map.Int.update(map, newBlock.id, value => {
-               Belt.Option.mapWithDefault(
-                 value,
-                 None,
-                 currentBlock => {
-                   addCommandIfExists(
-                     userCommand,
-                     userCommand.id,
-                     currentBlock.userCommands,
-                   );
-                   addCommandIfExists(
+             if (has(map, newBlock.id)) {
+               update(map, newBlock.id, block => {
+                 switch (block) {
+                 | Some(currentBlock) =>
+                   addCommandIfSome(userCommand, currentBlock.userCommands);
+                   addCommandIfSome(
                      internalCommand,
-                     internalCommand.id,
                      currentBlock.internalCommands,
                    );
                    Some(currentBlock);
-                 },
-               )
-             });
-           } else {
-             addCommandIfExists(
-               userCommand,
-               userCommand.id,
-               newBlock.userCommands,
-             );
-             addCommandIfExists(
-               internalCommand,
-               internalCommand.id,
-               newBlock.internalCommands,
-             );
-             Belt.Map.Int.set(map, newBlock.id, newBlock);
-           };
-         },
-         Belt.Map.Int.empty,
-       )
-    |> Belt.Map.Int.valuesToArray;
+                 | None => None
+                 }
+               });
+             } else {
+               addCommandIfSome(userCommand, newBlock.userCommands);
+               addCommandIfSome(internalCommand, newBlock.internalCommands);
+               set(map, newBlock.id, newBlock);
+             };
+           },
+           empty,
+         )
+      |> valuesToArray
+    );
   };
-};
-
-// TODO: replace this module
-module NewBlock = {
-  type account = {publicKey: string};
-
-  type snarkJobs = {
-    prover: string,
-    fee: string,
-  };
-
-  type userCommands = {
-    fromAccount: account,
-    toAccount: account,
-  };
-
-  type feeTransfer = {
-    fee: string,
-    recipient: string,
-  };
-  type transactions = {
-    userCommands: array(userCommands),
-    feeTransfer: array(feeTransfer),
-    coinbaseReceiverAccount: Js.Nullable.t(account),
-  };
-
-  type blockchainState = {date: string};
-
-  type data = {
-    creatorAccount: account,
-    snarkJobs: array(snarkJobs),
-    transactions,
-    protocolState: blockchainState,
-  };
-
-  type newBlock = {newBlock: data};
-
-  type t = {data: newBlock};
-
-  external unsafeJSONToNewBlock: Js.Json.t => t = "%identity";
 };
 
 module Metrics = {
@@ -180,7 +182,7 @@ module Metrics = {
   type metricRecord = {
     blocksCreated: option(int),
     transactionSent: option(int),
-    snarkWorkCreated: option(int),
+    //snarkWorkCreated: option(int),
     snarkFeesCollected: option(int64),
     highestSnarkFeeCollected: option(int64),
     transactionsReceivedByEcho: option(int),

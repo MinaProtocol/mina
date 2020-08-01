@@ -1,6 +1,6 @@
 open Bindings.Postgres;
 
-let getBlocks = "SELECT b.id AS blockid, uc.id AS userCommandId, ic.id AS internalCommandId, b.state_hash, pk1.value AS blockcreatorAccount, b.height, b.timestamp, ic.type as internalCommandType, pk2.value AS internalCommandRecipient, ic.fee as interalCommandFee, ic.token AS internalCommandToken, uc.type as userCommandType, uc.amount AS userCommandAmount, uc.fee AS userCommandFee, uc.source_id as userCommandFromAccount, uc.receiver_id as userCommandToAccount, uc.memo AS userCommandMemo
+let getBlocks = "SELECT b.id AS blockid, uc.id AS userCommandId, ic.id AS internalCommandId, b.state_hash, pk1.value AS blockcreatorAccount, b.height, b.timestamp, ic.type as internalCommandType, pk2.value AS internalCommandRecipient, ic.fee as internalCommandFee, ic.token AS internalCommandToken, uc.type as userCommandType, uc.amount AS userCommandAmount, uc.fee AS userCommandFee, uc.source_id as userCommandFromAccount, uc.receiver_id as userCommandToAccount, uc.memo AS userCommandMemo
 FROM blocks as b
 
 INNER JOIN public_keys AS pk1 ON b.creator_id = pk1.id
@@ -18,6 +18,10 @@ LEFT JOIN public_keys AS pk5 ON uc.receiver_id = pk5.id";
 
 let createPool = pgConn => {
   makePool({connectionString: pgConn});
+};
+
+let endPool = pool => {
+  endPool(pool);
 };
 
 let makeQuery = (pool, queryText, cb) => {
