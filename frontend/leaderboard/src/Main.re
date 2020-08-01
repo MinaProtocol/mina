@@ -1,14 +1,11 @@
 /*
-  Main.re is the entry point of the leaderboard project.
+ Main.re is the entry point of the leaderboard project.
 
-  Main.re has the responsibilities for reading in a directory of blocks and
-  packing it up to be handed to Metrics.re. Blocks are defined in a json format.
-  The parsed fields for blocks are defined in Types/NewBlock.
+ Main.re has the responsibilities for querying the archive postgres database for
+ all the blockchain data and parsing the rows into blocks.
 
-  Additionally, Main.re expects to have the credentials and spreadsheet id
-  available in the form of environment variables. If no blocks are found,
-  the execution fails and reports an error.
- */
+ Additionally, Main.re expects to have the credentials, spreadsheet id, and postgres
+ connection string available in the form of environment variables.  */
 
 let getEnvOrFail = name =>
   switch (Js.Dict.get(Node.Process.process##env, name)) {
@@ -16,54 +13,36 @@ let getEnvOrFail = name =>
   | None => failwith({j|Couldn't find env var: `$name`"|j})
   };
 
-let getEnv = (~default, name) =>
-  Js.Dict.get(Node.Process.process##env, name)
-  ->Belt.Option.getWithDefault(default)
-  ->Js.String.trim;
+let credentials = getEnvOrFail("GOOGLE_APPLICATION_CREDENTIALS");
+let spreadsheetId = getEnvOrFail("SPREADSHEET_ID");
+let pgConn = getEnvOrFail("PGCONN");
 
-let getEnvOpt = name =>
-  Js.Dict.get(Node.Process.process##env, name)
-  ->Belt.Option.map(Js.String.trim);
-
-let credentials = getEnvOpt("GOOGLE_APPLICATION_CREDENTIALS");
-let spreadsheetId = getEnvOpt("SPREADSHEET_ID");
-let pgConn = getEnvOpt("PGCONN");
-
-let setSheetsCredentials = () => {
-  switch (credentials) {
-  | Some(validCredentials) =>
-    Node.Fs.writeFileAsUtf8Sync(
-      "./google_sheets_credentials.json",
-      validCredentials,
-    );
-    Node.Process.putEnvVar(
-      "GOOGLE_APPLICATION_CREDENTIALS",
-      "./google_sheets_credentials.json",
-    );
-    Ok();
-  | None => Error()
-  };
-};
+Node.Fs.writeFileAsUtf8Sync("./google_sheets_credentials.json", credentials);
+Node.Process.putEnvVar(
+  "GOOGLE_APPLICATION_CREDENTIALS",
+  "./google_sheets_credentials.json",
+);
 
 let main = () => {
-  switch (setSheetsCredentials()) {
-  | Ok () =>
-    let pool = Postgres.createPool(Belt.Option.getExn(pgConn));
-    Postgres.makeQuery(pool, Postgres.getBlocks, result => {
-      switch (result) {
-      | Ok(blocks) => Types.Block.decodeBlocks(blocks) |> ignore
-      | Error(error) => Js.log(error)
-      }
-    });
-    ();
-  | Error(_) => ()
-  };
-};
+  let pool = Postgres.createPool(pgConn);
+  Postgres.makeQuery(pool, Postgres.getBlocks, result => {
+    switch (result) {
+    | Ok(blocks) =>
+      Types.Block.parseBlocks(blocks)
+      |> Metrics.calculateMetrics
+      |> UploadLeaderboardPoints.uploadChallengePoints(spreadsheetId);
 
-// blocks
-// |> Metrics.calculateMetrics
-// |> UploadLeaderboardPoints.uploadChallengePoints(spreadsheetId);
-// UploadLeaderboardData.uploadData(spreadsheetId, totalBlocks);
-//UploadLeaderboardData.uploadUserProfileData(spreadsheetId);
+      UploadLeaderboardData.uploadData(
+        spreadsheetId,
+        blocks |> Array.length |> string_of_int,
+      );
+
+      UploadLeaderboardData.uploadUserProfileData(spreadsheetId);
+
+    | Error(error) => Js.log(error)
+    }
+  });
+  Postgres.endPool(pool);
+};
 
 main();

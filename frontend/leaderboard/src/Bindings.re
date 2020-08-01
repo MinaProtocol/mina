@@ -11,6 +11,8 @@ module Postgres = {
     (pool, string, (~error: Js.Nullable.t(string), ~res: dbResult) => unit) =>
     unit =
     "query";
+
+  [@bs.send] external endPool: pool => unit = "end";
 };
 
 module GoogleSheets = {

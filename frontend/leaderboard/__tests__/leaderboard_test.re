@@ -2,21 +2,108 @@ open Jest;
 open Expect;
 module StringMap = Map.Make(String);
 
-let blockChallenge = "Stake your Coda and produce blocks";
-
-let blockDirectory =
-  ([%bs.node __dirname] |> Belt.Option.getExn |> Filename.dirname)
-  ++ "/../../__tests__/blocks/";
-
-let blocks =
-  blockDirectory
-  |> Node.Fs.readdirSync
-  |> Array.map(file => {
-       let fileContents = Node.Fs.readFileAsUtf8Sync(blockDirectory ++ file);
-       let blockData = Js.Json.parseExn(fileContents);
-       let block = Types.NewBlock.unsafeJSONToNewBlock(blockData);
-       block.data.newBlock;
-     });
+let blocks = [|
+  {
+    Types.Block.id: 1,
+    blockchainState: {
+      timestamp: "0",
+      height: "1",
+    },
+    creatorAccount: "publickey1",
+    userCommands: [||],
+    internalCommands: [||],
+  },
+  {
+    id: 2,
+    blockchainState: {
+      timestamp: "1548878462542",
+      height: "2",
+    },
+    creatorAccount: "publickey1",
+    userCommands: [||],
+    internalCommands: [||],
+  },
+  {
+    id: 3,
+    blockchainState: {
+      timestamp: "1548878464058",
+      height: "3",
+    },
+    creatorAccount: "publickey1",
+    userCommands: [||],
+    internalCommands: [||],
+  },
+  {
+    id: 4,
+    blockchainState: {
+      timestamp: "1548878466000",
+      height: "4",
+    },
+    creatorAccount: "publickey1",
+    userCommands: [||],
+    internalCommands: [||],
+  },
+  {
+    id: 5,
+    blockchainState: {
+      timestamp: "1548878468000",
+      height: "5",
+    },
+    creatorAccount: "publickey2",
+    userCommands: [||],
+    internalCommands: [||],
+  },
+  {
+    id: 6,
+    blockchainState: {
+      timestamp: "1548878470000",
+      height: "6",
+    },
+    creatorAccount: "publickey2",
+    userCommands: [||],
+    internalCommands: [||],
+  },
+  {
+    id: 7,
+    blockchainState: {
+      timestamp: "1548878472000",
+      height: "7",
+    },
+    creatorAccount: "publickey2",
+    userCommands: [||],
+    internalCommands: [||],
+  },
+  {
+    id: 8,
+    blockchainState: {
+      timestamp: "1548878474000",
+      height: "8",
+    },
+    creatorAccount: "publickey3",
+    userCommands: [||],
+    internalCommands: [||],
+  },
+  {
+    id: 9,
+    blockchainState: {
+      timestamp: "1548878476000",
+      height: "9",
+    },
+    creatorAccount: "publickey3",
+    userCommands: [||],
+    internalCommands: [||],
+  },
+  {
+    id: 10,
+    blockchainState: {
+      timestamp: "1548878478000",
+      height: "10",
+    },
+    creatorAccount: "publickey4",
+    userCommands: [||],
+    internalCommands: [||],
+  },
+|];
 
 describe("Metrics", () => {
   describe("blocksCreatedMetric", () => {
