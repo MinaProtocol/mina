@@ -17,6 +17,7 @@ let credentials = getEnvOrFail("GOOGLE_APPLICATION_CREDENTIALS");
 let spreadsheetId = getEnvOrFail("SPREADSHEET_ID");
 let pgConn = getEnvOrFail("PGCONN");
 
+/* The Google Sheets API expects the credentials to be a local file instead of a parameter */
 Node.Fs.writeFileAsUtf8Sync("./google_sheets_credentials.json", credentials);
 Node.Process.putEnvVar(
   "GOOGLE_APPLICATION_CREDENTIALS",
@@ -38,7 +39,6 @@ let main = () => {
       );
 
       UploadLeaderboardData.uploadUserProfileData(spreadsheetId);
-
     | Error(error) => Js.log(error)
     }
   });
