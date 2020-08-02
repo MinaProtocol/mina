@@ -8,7 +8,6 @@ module Block = {
       | MintTokens
       | Unknown;
 
-    /* These strings match the types returned from the archive DB */
     let userCommandTypeOfString = s => {
       switch (s) {
       | "payment" => Payment
@@ -26,7 +25,7 @@ module Block = {
       fromAccount: string,
       toAccount: string,
       fee: string,
-      amount: string,
+      amount: option(string),
     };
 
     module Decode = {
@@ -43,7 +42,7 @@ module Block = {
             fromAccount: json |> field("usercommandfromaccount", string),
             toAccount: json |> field("usercommandtoaccount", string),
             fee: json |> field("usercommandfee", string),
-            amount: json |> field("usercommandamount", string),
+            amount: json |> optional(field("usercommandamount", string)),
           }
           ->Some
         | exception (DecodeError(_)) => None
@@ -57,7 +56,6 @@ module Block = {
       | Coinbase
       | Unknown;
 
-    /* These strings match the types returned from the archive DB */
     let internalCommandTypeOfString = s => {
       switch (s) {
       | "fee_transfer" => FeeTransfer
@@ -96,17 +94,38 @@ module Block = {
     };
   };
 
-  type blockchainState = {
-    timestamp: string,
-    height: string,
+  module BlockChainState = {
+    type t = {
+      timestamp: string,
+      height: string,
+      creatorAccount: string,
+    };
+
+    module Decode = {
+      open Json.Decode;
+      let blockchainState = json => {
+        creatorAccount: json |> field("blockcreatoraccount", string),
+        timestamp: json |> field("timestamp", string),
+        height: json |> field("height", string),
+      };
+    };
   };
 
   type t = {
     id: int,
-    blockchainState,
-    creatorAccount: string,
+    blockchainState: BlockChainState.t,
     userCommands: array(UserCommand.t),
     internalCommands: array(InternalCommand.t),
+  };
+
+  module Decode = {
+    open Json.Decode;
+    let block = json => {
+      id: json |> field("blockid", int),
+      blockchainState: json |> BlockChainState.Decode.blockchainState,
+      userCommands: [||],
+      internalCommands: [||],
+    };
   };
 
   let addCommandIfSome = (command, commands) => {
@@ -116,23 +135,13 @@ module Block = {
     };
   };
 
-  module Decode = {
-    open Json.Decode;
-
-    let blockchainState = json => {
-      timestamp: json |> field("timestamp", string),
-      height: json |> field("height", string),
-    };
-
-    let block = json => {
-      id: json |> field("blockid", int),
-      creatorAccount: json |> field("blockcreatoraccount", string),
-      blockchainState: json |> blockchainState,
-      userCommands: [||],
-      internalCommands: [||],
-    };
-  };
-
+  /*
+   Because UserCommands and InternalCommands have a one to many
+   relationship with a block, there will be duplicate blocks ids
+   with different UserCommands and InternalCommands as a result of
+   the SQL query. parseBlocks() does the parsing to associate
+   each UserCommand and InternalCommand to it's associated block.
+    */
   let parseBlocks = blocks => {
     Belt.Map.Int.(
       blocks
@@ -173,7 +182,6 @@ module Metrics = {
   type t =
     | BlocksCreated
     | TransactionsSent
-    | SnarkWorkCreated
     | SnarkFeesCollected
     | HighestSnarkFeeCollected
     | TransactionsReceivedByEcho
@@ -182,7 +190,6 @@ module Metrics = {
   type metricRecord = {
     blocksCreated: option(int),
     transactionSent: option(int),
-    //snarkWorkCreated: option(int),
     snarkFeesCollected: option(int64),
     highestSnarkFeeCollected: option(int64),
     transactionsReceivedByEcho: option(int),

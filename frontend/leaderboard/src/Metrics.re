@@ -51,12 +51,10 @@ let max = (a, b) => {
 };
 
 let filterBlocksByTimeWindow = (startTime, endTime, blocks) => {
-  Array.to_list(blocks)
-  |> List.filter((block: Types.Block.t) => {
-       endTime < block.blockchainState.timestamp
-       && block.blockchainState.timestamp > startTime
-     })
-  |> Array.of_list;
+  blocks->Belt.Array.keep((block: Types.Block.t) => {
+    endTime < block.blockchainState.timestamp
+    && block.blockchainState.timestamp > startTime
+  });
 };
 
 // Gather metrics
@@ -64,7 +62,7 @@ let getBlocksCreatedByUser = blocks => {
   blocks
   |> Array.fold_left(
        (map, block: Types.Block.t) => {
-         incrementMapValue(block.creatorAccount, map)
+         incrementMapValue(block.blockchainState.creatorAccount, map)
        },
        StringMap.empty,
      );
@@ -88,7 +86,6 @@ let getTransactionSentByUser = blocks => {
   Due to snarkJobs not being apart of the archive API, we calculate
   snark fees differently in the meantime.
 
-
   Snark fees will be calculated by inspecting fees paid out to snark
   workers inside blocks. This means that if you get more than one
   snark work included in a block we will measure as the sum of all fees
@@ -100,7 +97,7 @@ let calculateSnarkFeeSum = (map, block: Types.Block.t) => {
        (map, command: Types.Block.InternalCommand.t) => {
          switch (
            command.type_,
-           command.receiverAccount != block.creatorAccount,
+           command.receiverAccount !== block.blockchainState.creatorAccount,
          ) {
          | (FeeTransfer, true) =>
            map
@@ -131,7 +128,7 @@ let calculateHighestSnarkFeeCollected = (map, block: Types.Block.t) => {
        (map, command: Types.Block.InternalCommand.t) => {
          switch (
            command.type_,
-           command.receiverAccount != block.creatorAccount,
+           command.receiverAccount != block.blockchainState.creatorAccount,
          ) {
          | (FeeTransfer, true) =>
            map
@@ -183,7 +180,11 @@ let calculateCoinbaseReceiverChallenge = (map, block: Types.Block.t) => {
          | Coinbase =>
            StringMap.update(
              command.receiverAccount,
-             _ => Some(command.receiverAccount !== block.creatorAccount),
+             _ =>
+               Some(
+                 command.receiverAccount
+                 !== block.blockchainState.creatorAccount,
+               ),
              map,
            )
          | _ => map
