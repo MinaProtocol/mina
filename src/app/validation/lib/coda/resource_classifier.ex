@@ -13,7 +13,11 @@ defmodule Coda.ResourceClassifier do
     labels = message["labels"]
 
     if labels["k8s-pod/role"] == "block-producer" do
-      Resources.BlockProducer.build(labels["k8s-pod/class"], labels["k8s-pod/id"])
+      app = labels["k8s-pod/app"] # e.g., whale-block-producer-4
+      id = String.split(app,"-") |> List.last |> String.to_integer
+      win_rate = Enum.fetch!(Coda.Validations.Configuration.whale_win_rates,id - 1)
+      # class, id, expected_win_rate
+      Resources.BlockProducer.build(labels["k8s-pod/class"], id, win_rate)
     else
       Resources.CodaNode.build(labels["k8s-pods/name"])
     end
