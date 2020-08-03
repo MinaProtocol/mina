@@ -6,7 +6,7 @@
   (preprocess (pps ppx_version ppx_jane ppx_deriving_yojson ppx_deriving.std))
   (libraries
     hex
-    coda_digestif
+    digestif
     pickles_types
     snarky_bn382
     key_cache
