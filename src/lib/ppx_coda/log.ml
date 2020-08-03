@@ -31,23 +31,7 @@ end
 module Make (Info : Ppxinfo) = struct
   let prime s = s ^ "'"
 
-  let expand_capture_logger ~loc ~path:_ (log_level : longident) =
-    let module E = Ppxlib.Ast_builder.Make (struct
-      let loc = loc
-    end) in
-    let open E in
-    let level_name = Longident.name log_level in
-    let log_level_id =
-      Info.logger_module ^ "." ^ level_name |> Longident.parse
-    in
-    let log_level_expr = pexp_ident (Located.mk log_level_id) in
-    (* spam logs don't contain module, location *)
-    if String.equal level_name "spam" then [%expr [%e log_level_expr] logger]
-    else
-      [%expr [%e log_level_expr] logger ~module_:__MODULE__ ~location:__LOC__]
-
-  let expand_explicit_logger ~loc ~path:_ (log_level : longident)
-      (_, (logger : expression)) =
+  let expand ~loc (log_level : longident) (logger : expression) =
     let module E = Ppxlib.Ast_builder.Make (struct
       let loc = loc
     end) in
@@ -63,6 +47,13 @@ module Make (Info : Ppxinfo) = struct
     else
       [%expr
         [%e log_level_expr] [%e logger] ~module_:__MODULE__ ~location:__LOC__]
+
+  let expand_capture_logger ~loc ~path:_ log_level =
+    expand ~loc log_level [%expr logger]
+
+  let expand_explicit_logger ~loc ~path:_ (log_level : longident)
+      (_, (logger : expression)) =
+    expand ~loc log_level logger
 
   let ext_capture_logger =
     Extension.declare Info.name Extension.Context.expression
