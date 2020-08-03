@@ -13,6 +13,8 @@
 [%%define time_offsets true]
 [%%define cache_exceptions false]
 
+[%%define plugins false]
+
 [%%define genesis_ledger "testnet_postake_many_producers"]
 [%%define genesis_state_timestamp "2019-01-30 12:00:00-08:00"]
 [%%define block_window_duration 300000]
