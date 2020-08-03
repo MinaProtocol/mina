@@ -8,6 +8,7 @@ let Cmd = ../Lib/Cmds.dhall
 
 let commands : List Cmd.Type =
   [
+    Cmd.run "sudo chown -R nobody src/app/libp2p_helper",
     Cmd.runInDocker
       Cmd.Docker::{
         image = (../Constants/ContainerImages.dhall).codaToolchain,
