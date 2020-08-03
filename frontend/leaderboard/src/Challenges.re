@@ -53,14 +53,12 @@ let applyTopNPoints =
            let (place, points) = threshholdPointsList[counter^];
            if (place == i) {
              counter := counter^ + 1;
-             (username, points);
-           } else {
-             (username, points);
            };
+           (username, points);
          }
        );
 
-  Belt.Array.keep(topNArrayWithPoints, ((_, points)) => {points !== 0})
+  Belt.Array.keep(topNArrayWithPoints, ((_, points)) => {points != 0})
   |> Array.fold_left(
        (map, (userPublicKey, userPoints)) => {
          StringMap.add(userPublicKey, userPoints, map)
@@ -88,7 +86,7 @@ let sumPointsMaps = maps => {
 let echoServiceChallenge = metricsMap => {
   metricsMap
   |> addPointsToUsersWithAtleastN(
-       (metricRecord: Types.Metrics.metricRecord) =>
+       (metricRecord: Types.Metrics.t) =>
          metricRecord.transactionsReceivedByEcho,
        1,
        500,
@@ -106,7 +104,7 @@ let bonusBlocksChallenge = metricsMap => {
       (101, 1000) // Top 100: 1000 pts
     |],
     metricsMap,
-    (metricRecord: Types.Metrics.metricRecord) => metricRecord.blocksCreated,
+    (metricRecord: Types.Metrics.t) => metricRecord.blocksCreated,
     compare,
   );
 };
@@ -115,16 +113,14 @@ let blocksChallenge = metricsMap => {
   [
     // Produce 1 block and get them accepted in the main chain for 1000 pts
     addPointsToUsersWithAtleastN(
-      (metricRecord: Types.Metrics.metricRecord) =>
-        metricRecord.blocksCreated,
+      (metricRecord: Types.Metrics.t) => metricRecord.blocksCreated,
       1,
       1000,
       metricsMap,
     ),
     // Anyone who produces at least 3 blocks will earn an additional 1000 pts.
     addPointsToUsersWithAtleastN(
-      (metricRecord: Types.Metrics.metricRecord) =>
-        metricRecord.blocksCreated,
+      (metricRecord: Types.Metrics.t) => metricRecord.blocksCreated,
       3,
       1000,
       metricsMap,
@@ -146,7 +142,7 @@ let bonusZkSnarkChallenge = metricsMap => {
         (101, 1000) // Top 100: 1000 pts
       |],
       metricsMap,
-      (metricRecord: Types.Metrics.metricRecord) =>
+      (metricRecord: Types.Metrics.t) =>
         switch (metricRecord.snarkFeesCollected) {
         | Some(snarkFeesCollected) => snarkFeesCollected
         | None => Int64.zero
@@ -157,7 +153,7 @@ let bonusZkSnarkChallenge = metricsMap => {
     applyTopNPoints(
       [|(0, 500)|],
       metricsMap,
-      (metricRecord: Types.Metrics.metricRecord) =>
+      (metricRecord: Types.Metrics.t) =>
         switch (metricRecord.highestSnarkFeeCollected) {
         | Some(highestSnarkFee) => highestSnarkFee
         | None => Int64.zero
@@ -172,7 +168,7 @@ let zkSnarksChallenge = metricsMap => {
   [
     // Earn 3 fees by producing and selling zk-SNARKs on the snarketplace: 1000 pts
     addPointsToUsersWithAtleastN(
-      (metricRecord: Types.Metrics.metricRecord) =>
+      (metricRecord: Types.Metrics.t) =>
         switch (metricRecord.snarkFeesCollected) {
         | Some(snarkFeesCollected) => Some(snarkFeesCollected)
         | None => Some(Int64.zero)
@@ -183,7 +179,7 @@ let zkSnarksChallenge = metricsMap => {
     ),
     // Anyone who earned 50 fees will be rewarded with an additional 1000 pts.
     addPointsToUsersWithAtleastN(
-      (metricRecord: Types.Metrics.metricRecord) =>
+      (metricRecord: Types.Metrics.t) =>
         switch (metricRecord.snarkFeesCollected) {
         | Some(snarkFeesCollected) => Some(snarkFeesCollected)
         | None => Some(Int64.zero)
