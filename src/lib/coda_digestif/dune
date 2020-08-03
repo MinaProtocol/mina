@@ -1,7 +1,0 @@
-(library
-  (public_name coda_digestif)
-  (name coda_digestif)
-  (libraries digestif)
-  (virtual_modules coda_digestif)
-  (default_implementation coda_digestif.c)
-  (preprocess (pps ppx_version)))

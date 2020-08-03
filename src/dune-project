@@ -1,3 +1,2 @@
 (lang dune 2.5)
 (allow_approximate_merlin)
-(using library_variants 0.1)
