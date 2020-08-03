@@ -11,7 +11,6 @@
 [%%import "/src/config/protocol_version/current.mlh"]
 
 [%%define time_offsets true]
-[%%define fake_hash false]
 
 [%%define plugins false]
 

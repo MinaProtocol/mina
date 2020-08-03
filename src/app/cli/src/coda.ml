@@ -19,17 +19,6 @@ let () = Async.Scheduler.set_record_backtraces true
 
 [%%endif]
 
-[%%if
-fake_hash]
-
-let maybe_sleep s = after (Time.Span.of_sec s)
-
-[%%else]
-
-let maybe_sleep _ = Deferred.unit
-
-[%%endif]
-
 let chain_id ~genesis_state_hash ~genesis_constants =
   let genesis_state_hash = State_hash.to_base58_check genesis_state_hash in
   let genesis_constants_hash = Genesis_constants.hash genesis_constants in
@@ -884,7 +873,6 @@ let daemon logger =
          (Pipe_lib.Strict_pipe.Reader.iter_without_pushback
             (Coda_lib.validated_transitions coda)
             ~f:ignore) ;
-       let%bind () = maybe_sleep 3. in
        Coda_run.setup_local_server ?client_trustlist ~rest_server_port
          ~insecure_rest_server coda ;
        let%bind () = Coda_lib.start coda in
