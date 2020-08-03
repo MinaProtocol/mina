@@ -215,7 +215,7 @@ function integers_uint64_of_int64(i) {
 //Provides: integers_uint_of_string
 //Requires: caml_ml_string_length, caml_failwith, caml_string_unsafe_get, caml_int64_create_lo_mi_hi, caml_int64_of_int32, caml_parse_digit, caml_int64_ult, caml_int64_add, caml_int64_mul, caml_int64_neg
 function integers_uint_of_string(s, max_val) {
-    // Note: This code matches the behaviour of the C function.
+    // Note: This code matches the behavior of the C function.
     // In particular,
     // - only base-10 numbers are accepted
     // - negative numbers are accepted and coerced to 2's-complement uint64
