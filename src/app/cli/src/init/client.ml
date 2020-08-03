@@ -486,13 +486,18 @@ let send_payment_graphql =
     flag "amount" ~doc:"VALUE Payment amount you want to send"
       (required txn_amount)
   in
+  let token_flag =
+    flag "token" ~doc:"TOKEN_ID The ID of the token to transfer"
+      (optional token_id)
+  in
   let args =
-    Args.zip3 Cli_lib.Flag.user_command_common receiver_flag amount_flag
+    Args.zip4 Cli_lib.Flag.user_command_common receiver_flag amount_flag
+      token_flag
   in
   Command.async ~summary:"Send payment to an address"
     (Cli_lib.Background_daemon.graphql_init args
        ~f:(fun graphql_endpoint
-          ({Cli_lib.Flag.sender; fee; nonce; memo}, receiver, amount)
+          ({Cli_lib.Flag.sender; fee; nonce; memo}, receiver, amount, token)
           ->
          let%map response =
            Graphql_client.(
@@ -501,6 +506,7 @@ let send_payment_graphql =
                   ~receiver:(Encoders.public_key receiver)
                   ~sender:(Encoders.public_key sender)
                   ~amount:(Encoders.amount amount) ~fee:(Encoders.fee fee)
+                  ?token:(Option.map ~f:Encoders.token token)
                   ?nonce:(Option.map nonce ~f:Encoders.nonce)
                   ?memo ()))
              graphql_endpoint

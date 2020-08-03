@@ -142,11 +142,12 @@ module Send_payment =
 mutation ($sender: PublicKey!,
           $receiver: PublicKey!,
           $amount: UInt64!,
+          $token: UInt64,
           $fee: UInt64!,
           $nonce: UInt32,
           $memo: String) {
   sendPayment(input:
-    {from: $sender, to: $receiver, amount: $amount, fee: $fee, nonce: $nonce, memo: $memo}) {
+    {from: $sender, to: $receiver, amount: $amount, token: $token, fee: $fee, nonce: $nonce, memo: $memo}) {
     payment {
       id
     }
