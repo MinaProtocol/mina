@@ -22,24 +22,19 @@ let account_id (`Pk pk) token_id =
   ; metadata= Some (Amount_of.Token_id.encode token_id) }
 
 module Block_query = struct
-  type t = ([`Height of int64], [`Hash of string]) These.t
+  type t = ([`Height of int64], [`Hash of string]) These.t option
 
   module T (M : Monad_fail.S) = struct
     let of_partial_identifier (identifier : Partial_block_identifier.t) =
       match (identifier.index, identifier.hash) with
       | None, None ->
-          M.fail
-            (Errors.create
-               ~context:
-                 "Partial block identifier must have at least an index or a \
-                  hash, it cannot be empty"
-               (`Json_parse None))
+          M.return None
       | Some index, None ->
-          M.return (`This (`Height index))
+          M.return (Some (`This (`Height index)))
       | None, Some hash ->
-          M.return (`That (`Hash hash))
+          M.return (Some (`That (`Hash hash)))
       | Some index, Some hash ->
-          M.return (`Those (`Height index, `Hash hash))
+          M.return (Some (`Those (`Height index, `Hash hash)))
   end
 end
 
@@ -538,16 +533,27 @@ WITH RECURSIVE chain AS (
         ON pk.id = b.creator_id
         WHERE b.id = ? |}
 
+    let query_best =
+      Caqti_request.find_opt Caqti_type.unit typ
+        {|
+SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, b.ledger_hash, b.height, b.timestamp, b.coinbase_id, pk.value as creator FROM blocks b
+      INNER JOIN public_keys pk
+      ON pk.id = b.creator_id
+      WHERE b.height = (select MAX(b.height) from blocks b)
+        |}
+
     let run_by_id (module Conn : Caqti_async.CONNECTION) id =
       Conn.find_opt query_by_id id
 
     let run (module Conn : Caqti_async.CONNECTION) = function
-      | `This (`Height h) ->
+      | Some (`This (`Height h)) ->
           Conn.find_opt query_height h
-      | `That (`Hash h) ->
+      | Some (`That (`Hash h)) ->
           Conn.find_opt query_hash h
-      | `Those (`Height height, `Hash hash) ->
+      | Some (`Those (`Height height, `Hash hash)) ->
           Conn.find_opt query_both (hash, height)
+      | None ->
+          Conn.find_opt query_best ()
   end
 
   module User_commands = struct
