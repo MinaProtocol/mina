@@ -145,7 +145,7 @@ mutation ($sender: PublicKey!,
           $fee: UInt64!,
           $nonce: UInt32,
           $memo: String) {
-  sendPayment(input: 
+  sendPayment(input:
     {from: $sender, to: $receiver, amount: $amount, fee: $fee, nonce: $nonce, memo: $memo}) {
     payment {
       id
@@ -162,12 +162,75 @@ mutation ($sender: PublicKey!,
           $fee: UInt64!,
           $nonce: UInt32,
           $memo: String) {
-  sendDelegation(input: 
+  sendDelegation(input:
     {from: $sender, to: $receiver, fee: $fee, nonce: $nonce, memo: $memo}) {
     delegation {
       id
     }
   }
+}
+|}]
+
+module Send_create_token =
+[%graphql
+{|
+mutation ($sender: PublicKey,
+          $receiver: PublicKey!,
+          $fee: UInt64!,
+          $nonce: UInt32,
+          $memo: String) {
+  createToken(input:
+    {feePayer: $sender, tokenOwner: $receiver, fee: $fee, nonce: $nonce, memo: $memo}) {
+    createNewToken {
+      id
+    }
+  }
+}
+|}]
+
+module Send_create_token_account =
+[%graphql
+{|
+mutation ($sender: PublicKey,
+          $tokenOwner: PublicKey!,
+          $receiver: PublicKey!,
+          $token: TokenId!,
+          $fee: UInt64!,
+          $nonce: UInt32,
+          $memo: String) {
+  createTokenAccount(input:
+    {feePayer: $sender, tokenOwner: $tokenOwner, receiver: $receiver, token: $token, fee: $fee, nonce: $nonce, memo: $memo}) {
+    createNewTokenAccount {
+      id
+    }
+  }
+}
+|}]
+
+module Send_mint_tokens =
+[%graphql
+{|
+mutation ($sender: PublicKey!,
+          $receiver: PublicKey,
+          $token: TokenId!,
+          $amount: UInt64!,
+          $fee: UInt64!,
+          $nonce: UInt32,
+          $memo: String) {
+  mintTokens(input:
+    {tokenOwner: $sender, receiver: $receiver, token: $token, amount: $amount, fee: $fee, nonce: $nonce, memo: $memo}) {
+    mintTokens {
+      id
+    }
+  }
+}
+|}]
+
+module Get_token_owner =
+[%graphql
+{|
+query tokenOwner($token: TokenId!) {
+  tokenOwner(token: $token)
 }
 |}]
 
