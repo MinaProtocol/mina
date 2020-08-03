@@ -1,6 +1,6 @@
 (executable
  (name gen)
- (libraries async core crs coda_digestif fold_lib snarky tuple_lib ppxlib group_map
+ (libraries async core crs digestif fold_lib snarky tuple_lib ppxlib group_map
    curve_choice)
  (preprocessor_deps ../../../config.mlh)
  (preprocess
