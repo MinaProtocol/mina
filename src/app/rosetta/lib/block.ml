@@ -185,6 +185,7 @@ module User_command_info = struct
             ; account= Some (account_id t.fee_payer t.fee_token)
             ; _type= Operation_types.name `Fee_payer_dec
             ; amount= Some Amount_of.(negated @@ token t.fee_token t.fee)
+            ; coin_change= None
             ; metadata }
         | `Payment_source_dec amount ->
             { Operation.operation_identifier
@@ -193,6 +194,7 @@ module User_command_info = struct
             ; account= Some (account_id t.source t.token)
             ; _type= Operation_types.name `Payment_source_dec
             ; amount= Some Amount_of.(negated @@ token t.token amount)
+            ; coin_change= None
             ; metadata }
         | `Payment_receiver_inc amount ->
             { Operation.operation_identifier
@@ -201,6 +203,7 @@ module User_command_info = struct
             ; account= Some (account_id t.source t.token)
             ; _type= Operation_types.name `Payment_receiver_inc
             ; amount= Some (Amount_of.token t.token amount)
+            ; coin_change= None
             ; metadata }
         | `Account_creation_fee_via_payment account_creation_fee ->
             { Operation.operation_identifier
@@ -209,6 +212,7 @@ module User_command_info = struct
             ; account= Some (account_id t.receiver t.token)
             ; _type= Operation_types.name `Account_creation_fee_via_payment
             ; amount= Some Amount_of.(negated @@ coda account_creation_fee)
+            ; coin_change= None
             ; metadata }
         | `Account_creation_fee_via_fee_payer account_creation_fee ->
             { Operation.operation_identifier
@@ -217,6 +221,7 @@ module User_command_info = struct
             ; account= Some (account_id t.fee_payer t.fee_token)
             ; _type= Operation_types.name `Account_creation_fee_via_fee_payer
             ; amount= Some Amount_of.(negated @@ coda account_creation_fee)
+            ; coin_change= None
             ; metadata }
         | `Create_token ->
             { Operation.operation_identifier
@@ -225,6 +230,7 @@ module User_command_info = struct
             ; account= None
             ; _type= Operation_types.name `Create_token
             ; amount= None
+            ; coin_change= None
             ; metadata }
         | `Delegate_change ->
             { Operation.operation_identifier
@@ -233,6 +239,7 @@ module User_command_info = struct
             ; account= Some (account_id t.source Amount_of.Token_id.default)
             ; _type= Operation_types.name `Delegate_change
             ; amount= None
+            ; coin_change= None
             ; metadata=
                 merge_metadata metadata
                   (Some
@@ -248,6 +255,7 @@ module User_command_info = struct
             ; account= Some (account_id t.receiver t.token)
             ; _type= Operation_types.name `Mint_tokens
             ; amount= Some (Amount_of.token t.token amount)
+            ; coin_change= None
             ; metadata=
                 merge_metadata metadata
                   (Some
@@ -417,6 +425,7 @@ module Internal_command_info = struct
             ; account= Some (account_id t.receiver Amount_of.Token_id.default)
             ; _type= Operation_types.name `Coinbase_inc
             ; amount= Some (Amount_of.coda coinbase)
+            ; coin_change= None
             ; metadata= None }
         | `Fee_payer_dec ->
             { Operation.operation_identifier
@@ -425,6 +434,7 @@ module Internal_command_info = struct
             ; account= Some (account_id t.receiver Amount_of.Token_id.default)
             ; _type= Operation_types.name `Fee_payer_dec
             ; amount= Some Amount_of.(negated (coda t.fee))
+            ; coin_change= None
             ; metadata= None }
         | `Fee_receiver_inc ->
             { Operation.operation_identifier
@@ -433,6 +443,7 @@ module Internal_command_info = struct
             ; account= Some (account_id t.receiver t.token)
             ; _type= Operation_types.name `Fee_receiver_inc
             ; amount= Some (Amount_of.token t.token t.fee)
+            ; coin_change= None
             ; metadata= None } )
 
   let dummies =
@@ -452,18 +463,309 @@ module Block_info = struct
   type t =
     { block_identifier: Block_identifier.t
     ; parent_block_identifier: Block_identifier.t
+    ; creator: [`Pk of string]
     ; timestamp: int64
     ; internal_info: Internal_command_info.t list
     ; user_commands: User_command_info.t list }
 
+  let creator_metadata {creator= `Pk pk; _} = `Assoc [("creator", `String pk)]
+
   let dummy =
     { block_identifier=
         Block_identifier.create (Int64.of_int_exn 4) "STATE_HASH_BLOCK"
+    ; creator= `Pk "Alice"
     ; parent_block_identifier=
         Block_identifier.create (Int64.of_int_exn 3) "STATE_HASH_PARENT"
     ; timestamp= Int64.of_int_exn 1594937771
     ; internal_info= Internal_command_info.dummies
     ; user_commands= User_command_info.dummies }
+end
+
+module Sql = struct
+  module Block = struct
+    module Extras = struct
+      let creator x = `Pk x
+
+      let typ = Caqti_type.string
+    end
+
+    let typ = Caqti_type.(tup3 int Archive_lib.Processor.Block.typ Extras.typ)
+
+    let query_height =
+      Caqti_request.find_opt Caqti_type.int64 typ
+        (* According to the clarification of the Rosetta spec here
+         * https://community.rosetta-api.org/t/querying-block-by-just-its-index/84/3 ,
+         * it is important to select only the block on the canonical chain for a
+         * given height, and not an arbitrary one.
+         *
+         * This query recursively traverses the blockchain from the longest tip
+         * backwards until it reaches a block of the given height. *)
+        {|
+WITH RECURSIVE chain AS (
+  SELECT id, state_hash, parent_id, creator_id, snarked_ledger_hash_id, ledger_hash, height, timestamp, coinbase_id FROM blocks b WHERE height = (select MAX(height) from blocks)
+
+  UNION ALL
+
+  SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, b.ledger_hash, b.height, b.timestamp, b.coinbase_id FROM blocks b
+  INNER JOIN chain
+  ON b.id = chain.parent_id
+) SELECT c.id, c.state_hash, c.parent_id, c.creator_id, c.snarked_ledger_hash_id, c.ledger_hash, c.height, c.timestamp, c.coinbase_id, pk.value as creator FROM chain c
+  INNER JOIN public_keys pk
+  ON pk.id = c.creator_id
+  WHERE c.height = ?
+      |}
+
+    let query_hash =
+      Caqti_request.find_opt Caqti_type.string typ
+        {| SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, b.ledger_hash, b.height, b.timestamp, b.coinbase_id, pk.value as creator FROM blocks b
+        INNER JOIN public_keys pk
+        ON pk.id = b.creator_id
+        WHERE b.state_hash = ? |}
+
+    let query_both =
+      Caqti_request.find_opt
+        Caqti_type.(tup2 string int64)
+        typ
+        {| SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, b.ledger_hash, b.height, b.timestamp, b.coinbase_id, pk.value as creator FROM blocks b
+        INNER JOIN public_keys pk
+        ON pk.id = b.creator_id
+        WHERE b.state_hash = ? AND b.height = ? |}
+
+    let query_by_id =
+      Caqti_request.find_opt Caqti_type.int typ
+        {| SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, b.ledger_hash, b.height, b.timestamp, b.coinbase_id, pk.value as creator FROM blocks b
+        INNER JOIN public_keys pk
+        ON pk.id = b.creator_id
+        WHERE b.id = ? |}
+
+    let run_by_id (module Conn : Caqti_async.CONNECTION) id =
+      Conn.find_opt query_by_id id
+
+    let run (module Conn : Caqti_async.CONNECTION) = function
+      | `This (`Height h) ->
+          Conn.find_opt query_height h
+      | `That (`Hash h) ->
+          Conn.find_opt query_hash h
+      | `Those (`Height height, `Hash hash) ->
+          Conn.find_opt query_both (hash, height)
+  end
+
+  module User_commands = struct
+    module Extras = struct
+      let fee_payer_account_creation_fee_paid (x, _, _, _) = x
+
+      let receiver_account_creation_fee_paid (_, y, _, _) = y
+
+      let created_token (_, _, z, _) = z
+
+      let fee_payer (_, _, _, (x, _, _)) = `Pk x
+
+      let source (_, _, _, (_, y, _)) = `Pk y
+
+      let receiver (_, _, _, (_, _, z)) = `Pk z
+
+      let typ =
+        Caqti_type.(
+          tup4 (option int64) (option int64) (option int64)
+            (tup3 string string string))
+    end
+
+    let typ =
+      Caqti_type.(tup3 int Archive_lib.Processor.User_command.typ Extras.typ)
+
+    let query =
+      Caqti_request.collect Caqti_type.int typ
+        {| SELECT u.id, u.type, u.fee_payer_id, u.source_id, u.receiver_id, u.fee_token, u.token, u.nonce, u.amount, u.fee, u.memo, u.hash, u.status, u.failure_reason, u.fee_payer_account_creation_fee_paid, u.receiver_account_creation_fee_paid, u.created_token, pk1.value as fee_payer, pk2.value as receiver, pk3.value as source FROM user_commands u
+        LEFT JOIN blocks_user_commands ON blocks_user_commands.block_id = ? 
+        INNER JOIN public_keys pk1 ON pk1.id = u.fee_payer_id
+        INNER JOIN public_keys pk2 ON pk2.id = u.receiver_id
+        INNER JOIN public_keys pk3 ON pk3.id = u.source_id
+      |}
+
+    let run (module Conn : Caqti_async.CONNECTION) id =
+      Conn.collect_list query id
+  end
+
+  module Internal_commands = struct
+    module Extras = struct
+      let receiver x = `Pk x
+
+      let typ = Caqti_type.string
+    end
+
+    let typ =
+      Caqti_type.(
+        tup3 int Archive_lib.Processor.Internal_command.typ Extras.typ)
+
+    let query =
+      Caqti_request.collect Caqti_type.int typ
+        {| SELECT i.id, i.type, i.receiver_id, i.fee, i.token, i.hash, pk.value as receiver FROM internal_commands i
+        LEFT JOIN blocks_internal_commands ON blocks_internal_commands.block_id = ?
+        INNER JOIN public_keys pk ON pk.id = i.receiver_id
+      |}
+
+    let run (module Conn : Caqti_async.CONNECTION) id =
+      Conn.collect_list query id
+  end
+
+  let run (module Conn : Caqti_async.CONNECTION) input =
+    let module M = struct
+      include Deferred.Result
+
+      module List = struct
+        let map ~f =
+          List.fold ~init:(return []) ~f:(fun acc x ->
+              let open Let_syntax in
+              let%bind xs = acc in
+              let%map y = f x in
+              y :: xs )
+      end
+    end in
+    let open M.Let_syntax in
+    let%bind block_id, raw_block, block_extras =
+      match%bind
+        Block.run (module Conn) input
+        |> Errors.Lift.sql ~context:"Finding block"
+      with
+      | None ->
+          M.fail (Errors.create `Block_missing)
+      | Some (block_id, raw_block, block_extras) ->
+          M.return (block_id, raw_block, block_extras)
+    in
+    let%bind parent_id =
+      match raw_block.parent_id with
+      | None ->
+          M.fail
+            (Errors.create ~context:"Parent block is null because genesis"
+               `Block_missing)
+      | Some id ->
+          M.return id
+    in
+    let%bind raw_parent_block, _parent_block_extras =
+      match%bind
+        Block.run_by_id (module Conn) parent_id
+        |> Errors.Lift.sql ~context:"Finding parent block"
+      with
+      | None ->
+          M.fail (Errors.create ~context:"Parent block" `Block_missing)
+      | Some (_, raw_parent_block, parent_block_extras) ->
+          M.return (raw_parent_block, parent_block_extras)
+    in
+    let%bind raw_user_commands =
+      User_commands.run (module Conn) block_id
+      |> Errors.Lift.sql ~context:"Finding user commands within block"
+    in
+    let%bind raw_internal_commands =
+      Internal_commands.run (module Conn) block_id
+      |> Errors.Lift.sql ~context:"Finding internal commands within block"
+    in
+    let%bind internal_commands =
+      M.List.map raw_internal_commands ~f:(fun (_, ic, extras) ->
+          let%map kind =
+            match ic.Archive_lib.Processor.Internal_command.typ with
+            | "fee_transfer" ->
+                M.return `Fee_transfer
+            | "coinbase" ->
+                M.return `Coinbase
+            | other ->
+                M.fail
+                  (Errors.create
+                     ~context:
+                       (sprintf
+                          "The archive database is storing internal commands \
+                           with %s; this is neither fee_transfer nor \
+                           coinbase. Please report a bug!"
+                          other)
+                     `Invariant_violation)
+          in
+          { Internal_command_info.kind
+          ; receiver= Internal_commands.Extras.receiver extras
+          ; fee= Unsigned.UInt64.of_int ic.fee
+          ; token= Unsigned.UInt64.of_int64 ic.token
+          ; hash= ic.hash } )
+    in
+    let%map user_commands =
+      M.List.map raw_user_commands ~f:(fun (_, uc, extras) ->
+          let open M.Let_syntax in
+          let%bind kind =
+            match uc.Archive_lib.Processor.User_command.typ with
+            | "payment" ->
+                M.return `Payment
+            | "delegation" ->
+                M.return `Delegation
+            | "create_token" ->
+                M.return `Create_token
+            | "create_account" ->
+                M.return `Create_account
+            | "mint_tokens" ->
+                M.return `Mint_tokens
+            | other ->
+                M.fail
+                  (Errors.create
+                     ~context:
+                       (sprintf
+                          "The archive database is storing user commands with \
+                           %s; this is not a known type. Please report a bug!"
+                          other)
+                     `Invariant_violation)
+          in
+          let%map failure_status =
+            match uc.failure_reason with
+            | None -> (
+              match
+                ( User_commands.Extras.fee_payer_account_creation_fee_paid
+                    extras
+                , User_commands.Extras.receiver_account_creation_fee_paid
+                    extras )
+              with
+              | None, None ->
+                  M.return
+                  @@ `Applied
+                       User_command_info.Account_creation_fees_paid.By_no_one
+              | Some fee_payer, None ->
+                  M.return
+                  @@ `Applied
+                       (User_command_info.Account_creation_fees_paid
+                        .By_fee_payer
+                          (Unsigned.UInt64.of_int64 fee_payer))
+              | None, Some receiver ->
+                  M.return
+                  @@ `Applied
+                       (User_command_info.Account_creation_fees_paid
+                        .By_receiver
+                          (Unsigned.UInt64.of_int64 receiver))
+              | Some _, Some _ ->
+                  M.fail
+                    (Errors.create
+                       ~context:
+                         "The archive database is storing creation fees paid \
+                          by two different pks. This is impossible."
+                       `Invariant_violation) )
+            | Some status ->
+                M.return @@ `Failed status
+          in
+          { User_command_info.kind
+          ; fee_payer= User_commands.Extras.fee_payer extras
+          ; source= User_commands.Extras.source extras
+          ; receiver= User_commands.Extras.receiver extras
+          ; fee_token= Unsigned.UInt64.of_int uc.fee_token
+          ; token= Unsigned.UInt64.of_int uc.token
+          ; nonce= Unsigned.UInt32.of_int uc.nonce
+          ; amount= Option.map ~f:Unsigned.UInt64.of_int uc.amount
+          ; fee= Unsigned.UInt64.of_int uc.fee
+          ; hash= uc.hash
+          ; failure_status= Some failure_status } )
+    in
+    { Block_info.block_identifier=
+        { Block_identifier.index= Int64.of_int raw_block.height
+        ; hash= raw_block.state_hash }
+    ; creator= Block.Extras.creator block_extras
+    ; parent_block_identifier=
+        { Block_identifier.index= Int64.of_int raw_parent_block.height
+        ; hash= raw_parent_block.state_hash }
+    ; timestamp= raw_block.timestamp
+    ; internal_info= internal_commands
+    ; user_commands }
 end
 
 module Specific = struct
@@ -485,9 +787,12 @@ module Specific = struct
     let real :
         db:(module Caqti_async.CONNECTION) -> graphql_uri:Uri.t -> 'gql Real.t
         =
-     fun ~db:_ ~graphql_uri ->
+     fun ~db ~graphql_uri ->
       { gql= (fun () -> Graphql.query (Get_coinbase.make ()) graphql_uri)
-      ; db_block= (fun _query -> failwith "Figure out how to do the sql")
+      ; db_block=
+          (fun query ->
+            let (module Conn : Caqti_async.CONNECTION) = db in
+            Sql.run (module Conn) query )
       ; validate_network_choice= Network.Validate_choice.Real.validate }
 
     let mock : 'gql Mock.t =
@@ -538,7 +843,7 @@ module Specific = struct
                         {Transaction_identifier.hash= info.hash}
                     ; operations= User_command_info.to_operations info
                     ; metadata= None } )
-          ; metadata= None }
+          ; metadata= Some (Block_info.creator_metadata block_info) }
       ; other_transactions= [] }
   end
 
@@ -563,9 +868,12 @@ module Specific = struct
     end )
 end
 
-let router ~graphql_uri ~logger:_ ~db (route : string list) body =
+let router ~graphql_uri ~logger ~db (route : string list) body =
   let (module Db : Caqti_async.CONNECTION) = db in
   let open Async.Deferred.Result.Let_syntax in
+  Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+    "Handling /block/ $route"
+    ~metadata:[("route", `List (List.map route ~f:(fun s -> `String s)))] ;
   match route with
   | [] ->
       let%bind req =
