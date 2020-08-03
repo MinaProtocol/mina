@@ -8,7 +8,7 @@ let Cmd = ../Lib/Cmds.dhall
 
 let commands : List Cmd.Type =
   [
-    Cmd.run "chown -R nobody src/app/libp2p_helper",
+    Cmd.run "chmod -R 777 src/app/libp2p_helper",
     Cmd.runInDocker
       Cmd.Docker::{
         image = (../Constants/ContainerImages.dhall).codaToolchain,
