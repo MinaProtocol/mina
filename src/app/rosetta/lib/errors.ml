@@ -12,7 +12,8 @@ module Variant = struct
     | `Chain_info_missing
     | `Account_not_found of string
     | `Invariant_violation
-    | `Transaction_not_found of string ]
+    | `Transaction_not_found of string
+    | `Block_missing ]
   [@@deriving yojson, show, eq, to_enum, to_representatives]
 end
 
@@ -60,6 +61,8 @@ end = struct
         "Internal invariant violation (you found a bug)"
     | `Transaction_not_found _ ->
         "Transaction not found"
+    | `Block_missing ->
+        "Block not found"
 
   let context = function
     | `Sql msg ->
@@ -95,6 +98,9 @@ end = struct
                for this transaction in a recent block. It also could be due \
                to the transaction being evicted from the mempool."
              hash)
+    | `Block_missing ->
+        (* TODO: Add context around the query made *)
+        None
 
   let retriable = function
     | `Sql _ ->
@@ -112,6 +118,8 @@ end = struct
     | `Invariant_violation ->
         false
     | `Transaction_not_found _ ->
+        true
+    | `Block_missing ->
         true
 
   let create ?context kind = {extra_context= context; kind}
