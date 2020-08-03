@@ -159,7 +159,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
       | Error (Staged_ledger.Staged_ledger_error.Unexpected e) ->
           raise (Error.to_exn e)
       | Error e ->
-          Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+          [%log error]
             ~metadata:
               [ ( "error"
                 , `String (Staged_ledger.Staged_ledger_error.to_string e) )
@@ -278,8 +278,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
       let constraint_constants = precomputed_values.constraint_constants in
       let consensus_constants = precomputed_values.consensus_constants in
       let log_bootstrap_mode () =
-        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-          "Pausing block production while bootstrapping"
+        [%log info] "Pausing block production while bootstrapping"
       in
       let module Breadcrumb = Transition_frontier.Breadcrumb in
       let produce ivar (keypair, scheduled_time, block_data) =
@@ -295,7 +294,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                 Transition_registry
             in
             let crumb = Transition_frontier.best_tip frontier in
-            Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+            [%log trace]
               ~metadata:[("breadcrumb", Breadcrumb.to_yojson crumb)]
               "Producing new block with parent $breadcrumb%!" ;
             let previous_protocol_state, previous_protocol_state_proof =
@@ -369,7 +368,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                           pending_coinbase_witness )
                   with
                   | Error err ->
-                      Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+                      [%log error]
                         "Prover failed to prove freshly generated transition: \
                          $error"
                         ~metadata:
@@ -390,7 +389,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                       return ()
                   | Ok protocol_state_proof -> (
                       let span = Time.diff (Time.now time_controller) t0 in
-                      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                      [%log info]
                         ~metadata:
                           [ ( "proving_time"
                             , `Int (Time.Span.to_ms span |> Int64.to_int_exn)
@@ -455,8 +454,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                             Fn.compose State_hash.to_yojson
                               Protocol_state.genesis_state_hash
                           in
-                          Logger.warn logger ~module_:__MODULE__
-                            ~location:__LOC__
+                          [%log warn]
                             ~metadata:
                               [ ( "expected"
                                 , state_yojson previous_protocol_state )
@@ -470,8 +468,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                             ~consensus_constants
                         with
                         | Error `Already_in_frontier ->
-                            Logger.error logger ~module_:__MODULE__
-                              ~location:__LOC__
+                            [%log error]
                               ~metadata:
                                 [ ( "protocol_state"
                                   , Protocol_state.value_to_yojson
@@ -480,15 +477,13 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                               error_msg_prefix ;
                             return ()
                         | Error `Not_selected_over_frontier_root ->
-                            Logger.warn logger ~module_:__MODULE__
-                              ~location:__LOC__
+                            [%log warn]
                               "%sproduced transition is not selected over the \
                                root of transition frontier.%s"
                               error_msg_prefix reason_for_failure ;
                             return ()
                         | Error `Parent_missing_from_frontier ->
-                            Logger.warn logger ~module_:__MODULE__
-                              ~location:__LOC__
+                            [%log warn]
                               "%sparent of produced transition is missing \
                                from the frontier.%s"
                               error_msg_prefix reason_for_failure ;
@@ -519,8 +514,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                                      (Error.to_string_hum e))
                             | Error (`Invalid_staged_ledger_diff e) ->
                                 (*Unexpected errors from staged_ledger are captured in `Fatal_error*)
-                                Logger.error logger ~module_:__MODULE__
-                                  ~location:__LOC__
+                                [%log error]
                                   ~metadata:
                                     [ ("error", `String (Error.to_string_hum e))
                                     ; ( "diff"
@@ -531,8 +525,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                                     diff: $error" ;
                                 return ()
                             | Ok breadcrumb -> (
-                                Logger.Str.trace logger ~module_:__MODULE__
-                                  ~location:__LOC__
+                                [%str_log trace]
                                   ~metadata:
                                     [ ( "breadcrumb"
                                       , Breadcrumb.to_yojson breadcrumb ) ]
@@ -548,8 +541,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                                   Strict_pipe.Writer.write transition_writer
                                     breadcrumb
                                 in
-                                Logger.debug logger ~module_:__MODULE__
-                                  ~location:__LOC__ ~metadata
+                                [%log debug] ~metadata
                                   "Waiting for block $state_hash to be \
                                    inserted into frontier" ;
                                 Deferred.choose
@@ -568,14 +560,12 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                                       (Fn.const `Timed_out) ]
                                 >>| function
                                 | `Transition_accepted ->
-                                    Logger.info logger ~module_:__MODULE__
-                                      ~location:__LOC__ ~metadata
+                                    [%log info] ~metadata
                                       "Generated transition $state_hash was \
                                        accepted into transition frontier"
                                 | `Timed_out ->
                                     (* FIXME #3167: this should be fatal, and more importantly, shouldn't happen. *)
-                                    Logger.fatal logger ~module_:__MODULE__
-                                      ~location:__LOC__ ~metadata
+                                    [%log fatal] ~metadata
                                       "Timed out waiting for generated \
                                        transition $state_hash to enter \
                                        transition frontier. Continuing to \
@@ -679,7 +669,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
       if Time.( >= ) now genesis_state_timestamp then start ()
       else
         let time_till_genesis = Time.diff genesis_state_timestamp now in
-        Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+        [%log warn]
           ~metadata:
             [ ( "time_till_genesis"
               , `Int (Int64.to_int_exn (Time.Span.to_ms time_till_genesis)) )

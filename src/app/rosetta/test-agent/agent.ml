@@ -40,7 +40,7 @@ let check_new_account_payment ~logger ~rosetta_uri ~graphql_uri =
   (* Figure out our network identifier *)
   let%bind network_response = Peek.Network.list ~rosetta_uri ~logger in
   (* Wait until we are "synced" -- on debug nets this is when block production begins *)
-  Logger.debug logger ~module_:__MODULE__ ~location:__LOC__ "pre status" ;
+  [%log debug] "pre status" ;
   let%bind () =
     keep_trying
       ~step:(fun () ->
@@ -59,10 +59,10 @@ let check_new_account_payment ~logger ~rosetta_uri ~graphql_uri =
       ~retry_count:45 ~initial_delay:(Span.of_sec 2.0)
       ~each_delay:(Span.of_sec 2.0) ~failure_reason:"Took too long to sync"
   in
-  Logger.debug logger ~module_:__MODULE__ ~location:__LOC__ "post status" ;
+  [%log debug] "post status" ;
   (* Unlock the account *)
   let%bind _ = Poke.Account.unlock ~graphql_uri in
-  Logger.debug logger ~module_:__MODULE__ ~location:__LOC__ "unlocked account" ;
+  [%log debug] "unlocked account" ;
   (* Send a payment *)
   let%bind hash =
     Poke.SendTransaction.payment ~fee:(`Int 2_000_000_000)
@@ -72,10 +72,10 @@ let check_new_account_payment ~logger ~rosetta_uri ~graphql_uri =
           "ZsMSUtsVDsfGXFf2jMerfdLemdhu4NRrmA8T948sB5WfKNrrHuwLPj4Pjk34CrfJTVy")
       ~graphql_uri ()
   in
-  Logger.debug logger ~module_:__MODULE__ ~location:__LOC__ "made payment" ;
+  [%log debug] "made payment" ;
   let%bind () = wait (Span.of_sec 2.0) in
   (* Grab the mempool and find the payment inside *)
-  Logger.debug logger ~module_:__MODULE__ ~location:__LOC__ "hitting mempool" ;
+  [%log debug] "hitting mempool" ;
   let%bind () =
     keep_trying
       ~step:(fun () ->
@@ -152,8 +152,7 @@ let check_new_account_payment ~logger ~rosetta_uri ~graphql_uri =
 let run ~logger ~rosetta_uri ~graphql_uri =
   let open Deferred.Result.Let_syntax in
   let%bind () = check_new_account_payment ~logger ~rosetta_uri ~graphql_uri in
-  Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-    "Finished running test-agent" ;
+  [%log info] "Finished running test-agent" ;
   return ()
 
 let command =
@@ -174,16 +173,14 @@ let command =
   fun () ->
     let logger = Logger.create () in
     Cli.logger_setup log_json log_level ;
-    Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-      "Rosetta test-agent starting" ;
+    [%log info] "Rosetta test-agent starting" ;
     match%bind run ~logger ~rosetta_uri ~graphql_uri with
     | Ok () ->
-        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-          "Rosetta test-agent stopping successfully" ;
+        [%log info] "Rosetta test-agent stopping successfully" ;
         return ()
     | Error e ->
-        Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-          "Rosetta test-agent stopping with a failure: %s" (Errors.show e) ;
+        [%log error] "Rosetta test-agent stopping with a failure: %s"
+          (Errors.show e) ;
         exit 1
 
 let () =

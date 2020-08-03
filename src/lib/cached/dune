@@ -5,5 +5,5 @@
  (inline_tests)
  (libraries core storage async cache_dir)
  (preprocess
-  (pps ppx_version ppx_jane bisect_ppx -- -conditional))
+  (pps ppx_coda ppx_version ppx_jane bisect_ppx -- -conditional))
  (synopsis "Cache computation results on disk"))

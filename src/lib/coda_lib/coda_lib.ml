@@ -157,30 +157,27 @@ module Snark_worker = struct
       | Ok signal_or_error -> (
         match signal_or_error with
         | Ok () ->
-            Logger.info logger "Snark worker process died" ~module_:__MODULE__
-              ~location:__LOC__ ;
+            [%log info] "Snark worker process died" ;
             Ivar.fill kill_ivar () ;
             Deferred.unit
         | Error (`Exit_non_zero non_zero_error) ->
-            Logger.fatal logger
+            [%log fatal]
               !"Snark worker process died with a nonzero error %i"
-              non_zero_error ~module_:__MODULE__ ~location:__LOC__ ;
+              non_zero_error ;
             raise (Snark_worker_error non_zero_error)
         | Error (`Signal signal) ->
-            Logger.info logger
+            [%log info]
               !"Snark worker died with signal %{sexp:Signal.t}. Aborting daemon"
-              signal ~module_:__MODULE__ ~location:__LOC__ ;
+              signal ;
             raise (Snark_worker_signal_interrupt signal) )
       | Error exn ->
-          Logger.info logger
+          [%log info]
             !"Exception when waiting for snark worker process to terminate: \
               $exn"
-            ~module_:__MODULE__ ~location:__LOC__
             ~metadata:[("exn", `String (Exn.to_string exn))] ;
           Deferred.unit ) ;
-    Logger.trace logger
+    [%log trace]
       !"Created snark worker with pid: %i"
-      ~module_:__MODULE__ ~location:__LOC__
       (Pid.to_int @@ Process.pid snark_worker_process) ;
     (* We want these to be printfs so we don't double encode our logs here *)
     Pipe.iter_without_pushback
@@ -196,43 +193,38 @@ module Snark_worker = struct
   let start t =
     match t.processes.snark_worker with
     | `On ({process= process_ivar; kill_ivar; _}, _) ->
-        Logger.debug t.config.logger
-          !"Starting snark worker process"
-          ~module_:__MODULE__ ~location:__LOC__ ;
+        [%log' debug t.config.logger] !"Starting snark worker process" ;
         let%map snark_worker_process =
           run_process ~logger:t.config.logger
             ~proof_level:t.config.precomputed_values.proof_level
             t.config.gossip_net_params.addrs_and_ports.client_port kill_ivar
             t.config.snark_worker_config.num_threads
         in
-        Logger.debug t.config.logger ~module_:__MODULE__ ~location:__LOC__
+        [%log' debug t.config.logger]
           ~metadata:
             [ ( "snark_worker_pid"
               , `Int (Pid.to_int (Process.pid snark_worker_process)) ) ]
           "Started snark worker process with pid: $snark_worker_pid" ;
         Ivar.fill process_ivar snark_worker_process
     | `Off _ ->
-        Logger.info t.config.logger
+        [%log' info t.config.logger]
           !"Attempted to turn on snark worker, but snark worker key is set to \
-            none"
-          ~module_:__MODULE__ ~location:__LOC__ ;
+            none" ;
         Deferred.unit
 
   let stop ?(should_wait_kill = false) t =
     match t.processes.snark_worker with
     | `On ({public_key= _; process; kill_ivar}, _) ->
         let%bind process = Ivar.read process in
-        Logger.info t.config.logger
+        [%log' info t.config.logger]
           "Killing snark worker process with pid: $snark_worker_pid"
-          ~module_:__MODULE__ ~location:__LOC__
           ~metadata:
             [("snark_worker_pid", `Int (Pid.to_int (Process.pid process)))] ;
         Signal.send_exn Signal.term (`Pid (Process.pid process)) ;
         if should_wait_kill then Ivar.read kill_ivar else Deferred.unit
     | `Off _ ->
-        Logger.warn t.config.logger
-          "Attempted to turn off snark worker, but no snark worker was running"
-          ~module_:__MODULE__ ~location:__LOC__ ;
+        [%log' warn t.config.logger]
+          "Attempted to turn off snark worker, but no snark worker was running" ;
         Deferred.unit
 
   let get_key {processes= {snark_worker; _}; _} =
@@ -246,10 +238,9 @@ module Snark_worker = struct
       new_key =
     match (snark_worker, new_key) with
     | `Off _, None ->
-        Logger.info logger
+        [%log info]
           "Snark work is still not happening since keys snark worker keys are \
-           still set to None"
-          ~module_:__MODULE__ ~location:__LOC__ ;
+           still set to None" ;
         Deferred.unit
     | `Off fee, Some new_key ->
         let process = Ivar.create () in
@@ -258,12 +249,11 @@ module Snark_worker = struct
         <- `On ({public_key= new_key; process; kill_ivar}, fee) ;
         start t
     | `On ({public_key= old; process; kill_ivar}, fee), Some new_key ->
-        Logger.debug logger
+        [%log debug]
           !"Changing snark worker key from $old to $new"
           ~metadata:
             [ ("old", Public_key.Compressed.to_yojson old)
-            ; ("new", Public_key.Compressed.to_yojson new_key) ]
-          ~module_:__MODULE__ ~location:__LOC__ ;
+            ; ("new", Public_key.Compressed.to_yojson new_key) ] ;
         t.processes.snark_worker
         <- `On ({public_key= new_key; process; kill_ivar}, fee) ;
         Deferred.unit
@@ -391,28 +381,25 @@ let create_sync_status_observer ~logger ~demo_mode
           match online_status with
           | `Offline ->
               if `Empty = first_connection then (
-                Logger.Structured.info logger ~module_:__MODULE__
-                  ~location:__LOC__ Connecting ;
+                [%str_log info] Connecting ;
                 `Connecting )
               else if `Empty = first_message then (
-                Logger.Structured.info logger ~module_:__MODULE__
-                  ~location:__LOC__ Listening ;
+                [%str_log info] Listening ;
                 `Listening )
               else `Offline
           | `Online -> (
             match active_status with
             | None ->
-                Logger.Structured.info (Logger.create ()) ~module_:__MODULE__
-                  ~location:__LOC__ Bootstrapping ;
+                let logger = Logger.create () in
+                [%str_log info] Bootstrapping ;
                 `Bootstrap
             | Some (_, catchup_jobs) ->
+                let logger = Logger.create () in
                 if catchup_jobs > 0 then (
-                  Logger.Structured.info (Logger.create ()) ~module_:__MODULE__
-                    ~location:__LOC__ Ledger_catchup ;
+                  [%str_log info] Ledger_catchup ;
                   `Catchup )
                 else (
-                  Logger.Structured.info (Logger.create ()) ~module_:__MODULE__
-                    ~location:__LOC__ Synced ;
+                  [%str_log info] Synced ;
                   `Synced ) ) )
   in
   let observer = observe incremental_status in
@@ -648,7 +635,7 @@ let request_work t =
     | `Active staged_ledger ->
         Some staged_ledger
     | `Bootstrapping ->
-        Logger.trace t.config.logger ~module_:__MODULE__ ~location:__LOC__
+        [%log' trace t.config.logger]
           "Snark-work-request error: Could not retrieve staged_ledger due to \
            bootstrapping" ;
         None
@@ -663,7 +650,7 @@ let request_work t =
     | Ok (res, seen_jobs) ->
         set_seen_jobs t seen_jobs ; res
     | Error e ->
-        Logger.error t.config.logger ~module_:__MODULE__ ~location:__LOC__
+        [%log' error t.config.logger]
           ~metadata:[("error", `String (Error.to_string_hum e))]
           "Snark-work-request error: $error" ;
         None
@@ -793,9 +780,8 @@ let create (config : Config.t) =
               ~rest:
                 (`Call
                   (fun exn ->
-                    Logger.warn config.logger
+                    [%log' warn config.logger]
                       "unhandled exception from daemon-side prover server: $exn"
-                      ~module_:__MODULE__ ~location:__LOC__
                       ~metadata:[("exn", `String (Exn.to_string_mach exn))] ))
               (fun () ->
                 trace "prover" (fun () ->
@@ -810,10 +796,9 @@ let create (config : Config.t) =
               ~rest:
                 (`Call
                   (fun exn ->
-                    Logger.warn config.logger
+                    [%log' warn config.logger]
                       "unhandled exception from daemon-side verifier server: \
                        $exn"
-                      ~module_:__MODULE__ ~location:__LOC__
                       ~metadata:[("exn", `String (Exn.to_string_mach exn))] ))
               (fun () ->
                 trace "verifier" (fun () ->
@@ -890,9 +875,8 @@ let create (config : Config.t) =
               match !net_ref with
               | None ->
                   (* essentially unreachable; without a network, we wouldn't receive this RPC call *)
-                  Logger.info config.logger
-                    "Network not instantiated when telemetry data requested"
-                    ~module_:__MODULE__ ~location:__LOC__ ;
+                  [%log' info config.logger]
+                    "Network not instantiated when telemetry data requested" ;
                   Deferred.return
                   @@ Error
                        (Error.of_string
@@ -967,8 +951,7 @@ let create (config : Config.t) =
                         (Staged_ledger.Scan_state.hash scan_state)
                         expected_merkle_root pending_coinbases
                     in
-                    Logger.debug config.logger ~module_:__MODULE__
-                      ~location:__LOC__
+                    [%log' debug config.logger]
                       ~metadata:
                         [ ( "staged_ledger_hash"
                           , Staged_ledger_hash.to_yojson staged_ledger_hash )
@@ -1056,9 +1039,8 @@ let create (config : Config.t) =
                     Strict_pipe.Writer.write local_txns_writer
                       (user_commands, result_cb)
               | Error e ->
-                  Logger.error config.logger
+                  [%log' error config.logger]
                     "Failed to submit user commands: $error"
-                    ~module_:__MODULE__ ~location:__LOC__
                     ~metadata:[("error", `String (Error.to_string_hum e))] ;
                   result_cb (Error e) ;
                   Deferred.unit )
@@ -1169,15 +1151,14 @@ let create (config : Config.t) =
                   with
                   | Ok () ->
                       (*Don't log rebroadcast message if it is internally generated; There is a broadcast log for it*)
-                      if not (source = `Internal) then
-                        Logger.Str.trace config.logger ~module_:__MODULE__
-                          ~location:__LOC__
+                      if not (source = `Internal) then (
+                        [%str_log' trace config.logger]
                           ~metadata:
                             [ ( "external_transition"
                               , External_transition.Validated.to_yojson
                                   transition ) ]
                           (Rebroadcast_transition {state_hash= hash}) ;
-                      External_transition.Validated.broadcast transition
+                        External_transition.Validated.broadcast transition )
                   | Error reason -> (
                       let timing_error_json =
                         match reason with
@@ -1198,14 +1179,12 @@ let create (config : Config.t) =
                       | `Catchup ->
                           ()
                       | `Internal ->
-                          Logger.error config.logger ~module_:__MODULE__
-                            ~location:__LOC__ ~metadata
+                          [%log' error config.logger] ~metadata
                             "Internally generated block $state_hash cannot be \
                              rebroadcast because it's not a valid time to do \
                              so ($timing)"
                       | `Gossip ->
-                          Logger.warn config.logger ~module_:__MODULE__
-                            ~location:__LOC__ ~metadata
+                          [%log' warn config.logger] ~metadata
                             "Not rebroadcasting block $state_hash because it \
                              was received $timing" ) ) ) ;
           don't_wait_for
@@ -1260,7 +1239,7 @@ let create (config : Config.t) =
           in
           Option.iter config.archive_process_location
             ~f:(fun archive_process_port ->
-              Logger.info config.logger ~module_:__MODULE__ ~location:__LOC__
+              [%log' info config.logger]
                 "Communicating with the archive process"
                 ~metadata:
                   [ ( "Host"

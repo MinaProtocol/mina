@@ -29,7 +29,7 @@ let transfer ~logger ~archive_location
           | Ok () ->
               ()
           | Error e ->
-              Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+              [%log warn]
                 ~metadata:
                   [ ("error", `String (Error.to_string_hum e))
                   ; ( "breadcrumb"
