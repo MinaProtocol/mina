@@ -6,5 +6,5 @@
   (libraries
     snarky
     blake2
-    coda_digestif
+    digestif
     core_kernel ))
