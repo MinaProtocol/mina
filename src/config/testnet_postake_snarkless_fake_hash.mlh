@@ -13,7 +13,6 @@
 [%%define time_offsets false]
 [%%define delta 8]
 [%%define cache_exceptions false]
-[%%define fake_hash true]
 
 [%%define plugins false]
 
