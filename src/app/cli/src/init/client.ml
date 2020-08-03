@@ -541,7 +541,7 @@ let create_new_token_graphql =
   let open Cli_lib.Arg_type in
   let receiver_flag =
     flag "receiver" ~doc:"PUBLICKEY Public key to create the new token for"
-      (required public_key_compressed)
+      (optional public_key_compressed)
   in
   let args = Args.zip2 Cli_lib.Flag.user_command_common receiver_flag in
   Command.async ~summary:"Create a new token"
@@ -549,6 +549,7 @@ let create_new_token_graphql =
        ~f:(fun graphql_endpoint
           ({Cli_lib.Flag.sender; fee; nonce; memo}, receiver)
           ->
+         let receiver = Option.value ~default:sender receiver in
          let%map response =
            Graphql_client.(
              Graphql_client.query_exn
