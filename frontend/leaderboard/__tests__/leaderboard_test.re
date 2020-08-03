@@ -138,8 +138,7 @@ describe("Points functions", () => {
     describe("adds correct number of points with atleast 1", () => {
       let blockPoints =
         Challenges.addPointsToUsersWithAtleastN(
-          (metricRecord: Types.Metrics.metricRecord) =>
-            metricRecord.blocksCreated,
+          (metricRecord: Types.Metrics.t) => metricRecord.blocksCreated,
           1,
           1000,
           blockMetrics,
@@ -164,8 +163,7 @@ describe("Points functions", () => {
     describe("adds correct number of points with atleast 3", () => {
       let blockPoints =
         Challenges.addPointsToUsersWithAtleastN(
-          (metricRecord: Types.Metrics.metricRecord) =>
-            metricRecord.blocksCreated,
+          (metricRecord: Types.Metrics.t) => metricRecord.blocksCreated,
           3,
           1000,
           blockMetrics,
@@ -190,8 +188,7 @@ describe("Points functions", () => {
         Challenges.applyTopNPoints(
           [|(2, 1000)|],
           blockMetrics,
-          (metricRecord: Types.Metrics.metricRecord) =>
-            metricRecord.blocksCreated,
+          (metricRecord: Types.Metrics.t) => metricRecord.blocksCreated,
           compare,
         );
       test("correct number of points given to publickey1", () => {
@@ -215,8 +212,7 @@ describe("Points functions", () => {
         Challenges.applyTopNPoints(
           [|(0, 2000), (2, 1000)|],
           blockMetrics,
-          (metricRecord: Types.Metrics.metricRecord) =>
-            metricRecord.blocksCreated,
+          (metricRecord: Types.Metrics.t) => metricRecord.blocksCreated,
           compare,
         );
       test("correct number of points given to publickey1", () => {
@@ -241,8 +237,7 @@ describe("Points functions", () => {
         Challenges.applyTopNPoints(
           [|(0, 3000), (1, 2000), (5, 1000)|],
           blockMetrics,
-          (metricRecord: Types.Metrics.metricRecord) =>
-            metricRecord.blocksCreated,
+          (metricRecord: Types.Metrics.t) => metricRecord.blocksCreated,
           compare,
         );
       test("correct number of points given to publickey1", () => {

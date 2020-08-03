@@ -146,14 +146,14 @@ module Block = {
     Belt.Map.Int.(
       blocks
       |> Array.fold_left(
-           (map, block) => {
+           (blockMap, block) => {
              let newBlock = Decode.block(block);
              let userCommand = UserCommand.Decode.userCommand(block);
              let internalCommand =
                InternalCommand.Decode.internalCommand(block);
 
-             if (has(map, newBlock.id)) {
-               update(map, newBlock.id, block => {
+             if (has(blockMap, newBlock.id)) {
+               update(blockMap, newBlock.id, block => {
                  switch (block) {
                  | Some(currentBlock) =>
                    addCommandIfSome(userCommand, currentBlock.userCommands);
@@ -168,7 +168,7 @@ module Block = {
              } else {
                addCommandIfSome(userCommand, newBlock.userCommands);
                addCommandIfSome(internalCommand, newBlock.internalCommands);
-               set(map, newBlock.id, newBlock);
+               set(blockMap, newBlock.id, newBlock);
              };
            },
            empty,
@@ -179,7 +179,7 @@ module Block = {
 };
 
 module Metrics = {
-  type t =
+  type metricToCompute =
     | BlocksCreated
     | TransactionsSent
     | SnarkFeesCollected
@@ -187,7 +187,7 @@ module Metrics = {
     | TransactionsReceivedByEcho
     | CoinbaseReceiver;
 
-  type metricRecord = {
+  type t = {
     blocksCreated: option(int),
     transactionSent: option(int),
     snarkFeesCollected: option(int64),

@@ -97,7 +97,7 @@ let calculateSnarkFeeSum = (map, block: Types.Block.t) => {
        (map, command: Types.Block.InternalCommand.t) => {
          switch (
            command.type_,
-           command.receiverAccount !== block.blockchainState.creatorAccount,
+           command.receiverAccount != block.blockchainState.creatorAccount,
          ) {
          | (FeeTransfer, true) =>
            map
@@ -183,7 +183,7 @@ let calculateCoinbaseReceiverChallenge = (map, block: Types.Block.t) => {
              _ =>
                Some(
                  command.receiverAccount
-                 !== block.blockchainState.creatorAccount,
+                 != block.blockchainState.creatorAccount,
                ),
              map,
            )
