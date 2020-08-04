@@ -59,6 +59,8 @@ val work_selection_method : t -> (module Work_selector.Selection_method_intf)
 
 val add_work : t -> Snark_worker.Work.Result.t -> unit
 
+val snark_job_state : t -> Work_selector.State.t
+
 val add_transactions :
      t
   -> User_command_input.t list
