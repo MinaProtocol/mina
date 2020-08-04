@@ -375,7 +375,7 @@ module For_tests = struct
           ~sender:None
       with
       | Ok new_breadcrumb ->
-          Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+          [%log info]
             ~metadata:
               [ ( "state_hash"
                 , state_hash new_breadcrumb |> State_hash.to_yojson ) ]

@@ -18,7 +18,7 @@ let register_process t process kind =
 let check_terminated_child t child_pid logger =
   if Pid.Table.mem t child_pid then (
     let kind = Pid.Table.find_exn t child_pid in
-    Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+    [%log error]
       "Child process of kind $process_kind with pid $child_pid has terminated"
       ~metadata:
         [ ("child_pid", `Int (Pid.to_int child_pid))
