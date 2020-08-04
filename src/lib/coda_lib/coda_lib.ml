@@ -1151,14 +1151,14 @@ let create (config : Config.t) =
                   with
                   | Ok () ->
                       (*Don't log rebroadcast message if it is internally generated; There is a broadcast log for it*)
-                      if not (source = `Internal) then (
+                      if not (source = `Internal) then
                         [%str_log' trace config.logger]
                           ~metadata:
                             [ ( "external_transition"
                               , External_transition.Validated.to_yojson
                                   transition ) ]
                           (Rebroadcast_transition {state_hash= hash}) ;
-                        External_transition.Validated.broadcast transition )
+                      External_transition.Validated.broadcast transition
                   | Error reason -> (
                       let timing_error_json =
                         match reason with
