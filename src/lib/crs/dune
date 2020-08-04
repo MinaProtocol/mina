@@ -3,5 +3,5 @@
  (public_name crs)
  (preprocess (pps ppx_version))
  (library_flags -linkall)
- (libraries digestif)
+ (libraries digestif.ocaml)
  (synopsis "Common random string generation library"))
