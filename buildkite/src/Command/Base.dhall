@@ -52,6 +52,8 @@ let TaggedKey = {
   default = {=}
 }
 
+let B/Retry = B.definitions/commandStep/properties/retry/Type
+
 -- Everything here is taken directly from the buildkite Command documentation
 -- https://buildkite.com/docs/pipelines/command-step#command-step-attributes
 -- except "target" replaces "agents"
@@ -67,6 +69,7 @@ let Config =
       , label : Text
       , key : Text
       , target : Size
+      , retry : B/Retry.Type
       , docker : Optional Docker.Type
       , docker_login : Optional DockerLogin.Type
       , summon : Optional Summon.Type
@@ -77,6 +80,10 @@ let Config =
     , docker_login = None DockerLogin.Type
     , summon = None Summon.Type
     , artifact_paths = [] : List SelectFiles.Type
+    , retry =
+        { automatic = None ((B.definitions/commandStep/properties/retry/properties/automatic/Type ))
+        , manual = None ((B.definitions/commandStep/properties/retry/properties/manual/Type ))
+        }
     }
   }
 
