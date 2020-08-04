@@ -22,7 +22,7 @@ module State = struct
   let map2 = map2_exn
 end
 
-module Input = Input
+module Input = Random_oracle_input
 
 let params : _ Sponge.Params.t =
   let open Sponge_params in

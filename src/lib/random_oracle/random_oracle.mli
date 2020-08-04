@@ -10,7 +10,7 @@ open Snark_params_nonconsensus
 
 [%%endif]
 
-module Input = Input
+module Input = Random_oracle_input
 
 module State : sig
   type 'a t [@@deriving eq, sexp, compare]
