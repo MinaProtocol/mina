@@ -2256,6 +2256,16 @@ module Mutations = struct
               | None ->
                   `Snd pk )
         in
+        Logger.info
+          (Coda_lib.top_level_logger coda)
+          ~module_:__MODULE__ ~location:__LOC__
+          ~metadata:
+            [ ( "old"
+              , [%to_yojson: Public_key.Compressed.t list]
+                  (Public_key.Compressed.Set.to_list old_block_production_keys)
+              )
+            ; ("new", [%to_yojson: Public_key.Compressed.t list] pks) ]
+          !"Block production key replacement; old: $old, new: $new" ;
         ignore
         @@ Coda_lib.replace_block_production_keypairs coda
              (Keypair.And_compressed_pk.Set.of_list unlocked) ;

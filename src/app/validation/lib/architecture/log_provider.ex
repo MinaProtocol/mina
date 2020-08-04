@@ -79,13 +79,13 @@ defmodule Architecture.LogProvider do
 
     @spec run(LogProvider.Spec.t()) :: nil
     def run(spec) do
-      Subscription.pull_and_process(spec.conn, spec.subscription, &handle_message/1)
+      Subscription.pull_and_process(spec.conn, spec.subscription, fn msg -> handle_message(msg, spec.log_provider) end)
       run(spec)
     end
 
     # TODO: properly define message schema as a type
-    @spec handle_message(map) :: :ok
-    def handle_message(message) do
+    @spec handle_message(map,module) :: :ok
+    def handle_message(message,log_provider) do
       resource =
         try do
           # TODO: implement dynamic resource classification
@@ -96,7 +96,7 @@ defmodule Architecture.LogProvider do
             reraise e, __STACKTRACE__
         end
 
-      LogProvider.Junction.broadcast(__MODULE__, resource, message)
+      LogProvider.Junction.broadcast(log_provider, resource, message)
     end
   end
 

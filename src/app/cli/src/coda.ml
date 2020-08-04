@@ -19,17 +19,6 @@ let () = Async.Scheduler.set_record_backtraces true
 
 [%%endif]
 
-[%%if
-fake_hash]
-
-let maybe_sleep s = after (Time.Span.of_sec s)
-
-[%%else]
-
-let maybe_sleep _ = Deferred.unit
-
-[%%endif]
-
 let chain_id ~genesis_state_hash ~genesis_constants =
   let genesis_state_hash = State_hash.to_base58_check genesis_state_hash in
   let genesis_constants_hash = Genesis_constants.hash genesis_constants in
@@ -45,6 +34,21 @@ let chain_id ~genesis_state_hash ~genesis_constants =
 
 [%%inject
 "compile_time_current_protocol_version", current_protocol_version]
+
+[%%if
+plugins]
+
+let plugin_flag =
+  let open Command.Param in
+  flag "load-plugin" (listed string)
+    ~doc:
+      "PATH The path to load a .cmxs plugin from. May be passed multiple times"
+
+[%%else]
+
+let plugin_flag = Command.Param.return []
+
+[%%endif]
 
 let daemon logger =
   let open Command.Let_syntax in
@@ -241,7 +245,7 @@ let daemon logger =
        flag "proof-level"
          (optional (Arg_type.create Genesis_constants.Proof_level.of_string))
          ~doc:"full|check|none"
-     in
+     and plugins = plugin_flag in
      fun () ->
        let open Deferred.Let_syntax in
        let compute_conf_dir home =
@@ -873,7 +877,6 @@ let daemon logger =
          (Pipe_lib.Strict_pipe.Reader.iter_without_pushback
             (Coda_lib.validated_transitions coda)
             ~f:ignore) ;
-       let%bind () = maybe_sleep 3. in
        Coda_run.setup_local_server ?client_trustlist ~rest_server_port
          ~insecure_rest_server coda ;
        let%bind () = Coda_lib.start coda in
@@ -882,6 +885,7 @@ let daemon logger =
              Coda_metrics.server ~port ~logger >>| ignore )
          |> Option.value ~default:Deferred.unit
        in
+       let () = Coda_plugins.init_plugins ~logger coda plugins in
        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
          "Daemon ready. Clients can now connect" ;
        Async.never ())

@@ -11,7 +11,8 @@
 [%%import "/src/config/protocol_version/current.mlh"]
 
 [%%define time_offsets true]
-[%%define fake_hash true]
+
+[%%define plugins false]
 
 [%%define genesis_ledger "test_five_even_stakes"]
 [%%define genesis_state_timestamp "2019-01-30 12:00:00-08:00"]
