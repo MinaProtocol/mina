@@ -73,8 +73,7 @@ module Subscription = struct
         ()
     in
     let%bind response_json = Deferred.return @@ load_config_json response in
-    Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-      "Create sink response: $response"
+    [%log debug] "Create sink response: $response"
       ~metadata:[("response", response_json)] ;
     match
       Yojson.Safe.Util.(to_option Fn.id (member "error" response_json))
@@ -350,8 +349,7 @@ module Make (Testnet : Test_intf.Testnet_intf) :
     | Ok _ ->
         Ok ()
     | Error e' ->
-        Logger.fatal t.logger ~module_:__MODULE__ ~location:__LOC__
-          "Error deleting subscriptions: $error"
+        [%log' fatal t.logger] "Error deleting subscriptions: $error"
           ~metadata:[("error", `String (Error.to_string_hum e'))] ;
         Error e'
 
@@ -438,8 +436,7 @@ module Make (Testnet : Test_intf.Testnet_intf) :
     | Ok _ ->
         Deferred.Or_error.ok_unit
     | Error e ->
-        Logger.fatal t.logger ~module_:__MODULE__ ~location:__LOC__
-          "wait_for failed with error: $error"
+        [%log' fatal t.logger] "wait_for failed with error: $error"
           ~metadata:[("error", `String (Error.to_string_hum e))] ;
         let%map res = delete t in
         Or_error.combine_errors_unit [Error e; res]

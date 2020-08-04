@@ -51,8 +51,7 @@ let load_from_s3 s3_bucket_prefix s3_install_path ~logger =
                ~args:["--fail"; "-o"; file_path; uri_string]
                ()
            in
-           Logger.debug ~module_:__MODULE__ ~location:__LOC__ logger
-             "Curl finished"
+           [%log debug] "Curl finished"
              ~metadata:
                [ ("url", `String uri_string)
                ; ("local_file_path", `String file_path)

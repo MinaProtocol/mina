@@ -112,14 +112,12 @@ module Make (Inputs : Intf.Inputs_intf) :
             Coda_metrics.(
               Cryptography.Snark_work_histogram.observe
                 Cryptography.snark_work_merge_time_sec (Time.Span.to_sec time)) ;
-            Logger.Structured.info logger ~module_:__MODULE__ ~location:__LOC__
-              (Merge_snark_generated {time})
+            [%str_log info] (Merge_snark_generated {time})
         | `Transition ->
             Coda_metrics.(
               Cryptography.Snark_work_histogram.observe
                 Cryptography.snark_work_base_time_sec (Time.Span.to_sec time)) ;
-            Logger.Structured.info logger ~module_:__MODULE__ ~location:__LOC__
-              (Base_snark_generated {time}) )
+            [%str_log info] (Base_snark_generated {time}) )
 
   let main
       (module Rpcs_versioned : Intf.Rpcs_versioned_S
@@ -136,13 +134,10 @@ module Make (Inputs : Intf.Inputs_intf) :
            If the string becomes too long, chop off the first 10 lines and include
            only that *)
       ( if String.length error_str < 4096 then
-        Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-          !"Error %s: %{sexp:Error.t}"
-          label error
+        [%log error] !"Error %s: %{sexp:Error.t}" label error
       else
         let lines = String.split ~on:'\n' error_str in
-        Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-          !"Error %s: %s" label
+        [%log error] !"Error %s: %s" label
           (String.concat ~sep:"\\n" (List.take lines 10)) ) ;
       let%bind () = wait ~sec () in
       (* FIXME: Use a backoff algo here *)
@@ -164,7 +159,7 @@ module Make (Inputs : Intf.Inputs_intf) :
           let%bind () = wait ~sec:random_delay () in
           go ()
       | Ok (Some (work, public_key)) -> (
-          Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+          [%log info]
             "SNARK work received from $address. Starting proof generation"
             ~metadata:
               [("address", `String (Host_and_port.to_string daemon_address))] ;
@@ -175,8 +170,7 @@ module Make (Inputs : Intf.Inputs_intf) :
               log_and_retry "performing work" e (retry_pause 10.) go
           | Ok result ->
               emit_proof_metrics result.metrics logger ;
-              Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-                "Submitted completed SNARK work to $address"
+              [%log info] "Submitted completed SNARK work to $address"
                 ~metadata:
                   [ ( "address"
                     , `String (Host_and_port.to_string daemon_address) ) ] ;
@@ -218,9 +212,8 @@ module Make (Inputs : Intf.Inputs_intf) :
           Logger.create () ~metadata:[("process", `String "Snark Worker")]
         in
         Signal.handle [Signal.term] ~f:(fun _signal ->
-            Logger.info logger
-              !"Received signal to terminate. Aborting snark worker process"
-              ~module_:__MODULE__ ~location:__LOC__ ;
+            [%log info]
+              !"Received signal to terminate. Aborting snark worker process" ;
             Core.exit 0 ) ;
         let proof_level =
           Option.value ~default:Genesis_constants.Proof_level.compiled

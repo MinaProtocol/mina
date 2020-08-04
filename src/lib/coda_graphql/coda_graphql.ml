@@ -686,9 +686,7 @@ module Types = struct
                      let delegate_key = delegate_account.public_key in
                      Some (get_best_ledger_account_pk coda delegate_key)
                    with e ->
-                     Logger.warn
-                       (Coda_lib.top_level_logger coda)
-                       ~module_:__MODULE__ ~location:__LOC__
+                     [%log' warn (Coda_lib.top_level_logger coda)]
                        ~metadata:[("error", `String (Exn.to_string e))]
                        "Could not retrieve delegate account from sparse \
                         ledger. The account may not be in the ledger: $error" ;
@@ -2225,9 +2223,7 @@ module Mutations = struct
               | None ->
                   `Snd pk )
         in
-        Logger.info
-          (Coda_lib.top_level_logger coda)
-          ~module_:__MODULE__ ~location:__LOC__
+        [%log' info (Coda_lib.top_level_logger coda)]
           ~metadata:
             [ ( "old"
               , [%to_yojson: Public_key.Compressed.t list]
