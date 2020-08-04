@@ -50,8 +50,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
         ~f:(fun frontier_opt ->
           ( match frontier_opt with
           | None ->
-              Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-                "No frontier, setting available work to be empty" ;
+              [%log debug] "No frontier, setting available work to be empty" ;
               t.available_jobs <- []
           | Some frontier ->
               Pipe_lib.Broadcast_pipe.Reader.iter
@@ -60,6 +59,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
                   let best_tip_staged_ledger =
                     Inputs.Transition_frontier.best_tip_staged_ledger frontier
                   in
+                  let start_time = Time.now () in
                   ( match
                       Inputs.Staged_ledger.all_work_pairs
                         best_tip_staged_ledger
@@ -68,10 +68,17 @@ module Make (Inputs : Intf.Inputs_intf) = struct
                              frontier)
                     with
                   | Error e ->
-                      Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+                      [%log fatal]
                         "Error occured when updating available work: $error"
                         ~metadata:[("error", `String (Error.to_string_hum e))]
                   | Ok new_available_jobs ->
+                      let end_time = Time.now () in
+                      [%log info] "Updating new available work took $time ms"
+                        ~metadata:
+                          [ ( "time"
+                            , `Float
+                                ( Time.diff end_time start_time
+                                |> Time.Span.to_ms ) ) ] ;
                       t.available_jobs <- new_available_jobs ) ;
                   Deferred.unit )
               |> Deferred.don't_wait_for ) ;
@@ -92,7 +99,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
               Job_status.is_old status ~now
                 ~reassignment_wait:t.reassignment_wait
             then (
-              Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+              [%log info]
                 ~metadata:[("work", Seen_key.to_yojson work)]
                 "Waited too long to get work for $work. Ready to be reassigned" ;
               Coda_metrics.(

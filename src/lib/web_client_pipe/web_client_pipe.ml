@@ -46,13 +46,11 @@ end)
                  | Ok () ->
                      ()
                  | Error e ->
-                     Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-                       "Error writing Web client pipe data: $error"
+                     [%log error] "Error writing Web client pipe data: $error"
                        ~metadata:[("error", `String (Error.to_string_hum e))]
              ))
       | Error e ->
-          Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-            "Unable to create request: %s" (Error.to_string_hum e)
+          [%log error] "Unable to create request: %s" (Error.to_string_hum e)
     in
     t
 

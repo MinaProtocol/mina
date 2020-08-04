@@ -40,8 +40,7 @@ let log_memory_stats logger ~process =
      in
      let log_stats suffix =
        let stat = Gc.stat () in
-       Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-         "OCaml memory statistics, %s" suffix
+       [%log debug] "OCaml memory statistics, %s" suffix
          ~metadata:
            [ ("process", `String process)
            ; ("heap_size", `Int (stat.heap_words * bytes_per_word))
@@ -52,8 +51,7 @@ let log_memory_stats logger ~process =
        let {Jemalloc.active; resident; allocated; mapped} =
          Jemalloc.get_memory_stats ()
        in
-       Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-         "Jemalloc memory statistics (in bytes)"
+       [%log debug] "Jemalloc memory statistics (in bytes)"
          ~metadata:
            [ ("process", `String process)
            ; ("active", `Int active)

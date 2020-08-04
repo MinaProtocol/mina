@@ -8,7 +8,7 @@ let try_load bin path =
   let controller = Storage.Disk.Controller.create ~logger bin in
   match%map Storage.Disk.load_with_checksum controller path with
   | Ok {Storage.Checked_data.data; checksum} ->
-      Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+      [%log trace]
         ~metadata:[("path", `String path)]
         "Loaded value successfully from $path" ;
       Ok {path; value= data; checksum}
