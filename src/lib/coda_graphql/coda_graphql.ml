@@ -340,7 +340,7 @@ module Types = struct
             ~args:Arg.[]
             ~resolve:(fun _ {Transaction_snark.Statement.target; _} ->
               Frozen_ledger_hash.to_string target )
-        ; field "feeExcess" ~typ:(non_null signed_amount)
+        ; field "feeExcess" ~typ:(non_null signed_fee)
             ~doc:
               "Total transaction fee that is not accounted for in the \
                transition from source ledger to target ledger"
