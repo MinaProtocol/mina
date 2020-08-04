@@ -13,7 +13,7 @@ defmodule Architecture.Statistic do
   @callback resources(ResourceSet.t()) :: ResourceSet.t()
   @callback init(Resource.t()) :: struct
   @callback update(Resource.t(), state) :: state when state: struct
-  @callback handle_message(Resource.t(), state, t(), message()) :: state
+  @callback handle_message(Resource.t(), state, {module, t()}, message()) :: state
             when state: struct
 
   # a statistic can depend on a statistic provider, so cycles are possible
@@ -91,12 +91,12 @@ defmodule Architecture.Statistic do
       Enum.each(params.mod.providers(),
 	fn provider ->
 	  cond do
-	    Util.has_behaviour?(provider,Architecture.Log_provider) ->
+	    Util.has_behaviour?(provider,Architecture.LogProvider) ->
 	      LogProvider.Junction.subscribe(provider, params.resource)
 	    Util.has_behaviour?(provider,Architecture.Statistic) ->
 	      Statistic.Junction.subscribe(provider, params.resource)
 	    true ->
-	      raise "#{provider} must be an instance of either Log_provider or Statistic"
+	      raise "#{provider} does not have the behaviour of either LogProvider or Statistic"
 	  end
 	end)
       state = params.mod.init(params.resource)
@@ -106,7 +106,7 @@ defmodule Architecture.Statistic do
     @impl true
     def handle_cast({:subscription, provider, message}, {params, state}) do
       state = params.mod.handle_message(params.resource, state, provider, message)
-      Statistic.Junction.broadcast(__MODULE__, params.resource, state)
+      Statistic.Junction.broadcast(params.mod, params.resource, state)
       {:noreply, {params, state}}
     end
 

@@ -10,7 +10,7 @@ defmodule Architecture.Validation do
   require Logger
 
   @callback statistic :: module
-  @callback validate(Resource.t(), module, any) :: :valid | {:invalid, String.t()}
+  @callback validate({module,Resource.t()},any) :: :valid | {:invalid, String.t()}
 
   defmacro __using__(_params) do
     quote do
@@ -69,10 +69,10 @@ defmodule Architecture.Validation do
     end
 
     @impl true
-    def handle_cast({:subscription, statistic, state}, {mod, resource}) do
-      Logger.info("received new state from #{statistic}")
+    def handle_cast({:subscription, {statistic,_res}, state}, {mod, resource}) do
+      Logger.info("received new state from statistic #{statistic}")
 
-      case mod.validate(resource, state) do
+      case mod.validate({statistic,resource}, state) do
         :valid ->
           Logger.info("validation successful")
           {:noreply, {mod, resource}}

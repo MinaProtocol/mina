@@ -372,13 +372,6 @@ Base58_check.(to_base58_check, of_base58_check, of_base58_check_exn)]
 [%%define_locally
 Base58_check.String_ops.(to_string, of_string)]
 
-[%%if
-fake_hash]
-
-let check_signature _ = true
-
-[%%else]
-
 [%%ifdef
 consensus_mechanism]
 
@@ -393,8 +386,6 @@ let check_signature ({payload; signer; signature} : t) =
   Signature_lib_nonconsensus.Schnorr.verify signature
     (Snark_params_nonconsensus.Inner_curve.of_affine signer)
     (to_input payload)
-
-[%%endif]
 
 [%%endif]
 

@@ -3,7 +3,7 @@
  (public_name snark_params)
  (library_flags -linkall)
  (inline_tests)
- (libraries sponge group_map fold_lib o1trace coda_digestif tuple_lib bitstring_lib
+ (libraries sponge group_map fold_lib o1trace digestif tuple_lib bitstring_lib
    snarky_group_map core_kernel snarky snarky_curves
    snark_bits pickles crypto_params)
  (preprocess
