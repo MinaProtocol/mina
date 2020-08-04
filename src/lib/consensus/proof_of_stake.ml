@@ -891,7 +891,7 @@ module Data = struct
                   {global_slot; seed; delegator}
               in
               let truncated_vrf_result = Output.truncate vrf_result in
-              Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+              [%log debug]
                 "VRF result for delegator: $delegator, balance: $balance, \
                  amount: $amount, result: $result"
                 ~metadata:
@@ -2423,7 +2423,7 @@ module Hooks = struct
         let open Local_state in
         let open Snapshot in
         Deferred.create (fun ivar ->
-            Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+            [%log info]
               ~metadata:
                 [ ("peer", Network_peer.Peer.to_yojson conn)
                 ; ("ledger_hash", Coda_base.Ledger_hash.to_yojson ledger_hash)
@@ -2448,7 +2448,7 @@ module Hooks = struct
                 |> Result.of_option ~error:"epoch ledger not found"
             in
             Result.iter_error response ~f:(fun err ->
-                Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                [%log info]
                   ~metadata:
                     [ ("peer", Network_peer.Peer.to_yojson conn)
                     ; ("error", `String err)
@@ -2608,9 +2608,8 @@ module Hooks = struct
     let open Snapshot in
     let open Deferred.Let_syntax in
     let requested_syncs = Non_empty_list.to_list requested_syncs in
-    Logger.info logger
+    [%log info]
       "Syncing local state; requesting $num_requested snapshots from peers"
-      ~location:__LOC__ ~module_:__MODULE__
       ~metadata:
         [ ("num_requested", `Int (List.length requested_syncs))
         ; ( "requested_syncs"
@@ -2655,24 +2654,21 @@ module Hooks = struct
                 return true
             | Connected {data= Ok (Error err); _} ->
                 (* TODO figure out punishments here. *)
-                Logger.faulty_peer_without_punishment logger
-                  ~module_:__MODULE__ ~location:__LOC__
+                [%log faulty_peer_without_punishment]
                   ~metadata:
                     [ ("peer", Network_peer.Peer.to_yojson peer)
                     ; ("error", `String err) ]
                   "Peer $peer failed to serve requested epoch ledger: $error" ;
                 return false
             | Connected {data= Error err; _} ->
-                Logger.faulty_peer_without_punishment logger
-                  ~module_:__MODULE__ ~location:__LOC__
+                [%log faulty_peer_without_punishment]
                   ~metadata:
                     [ ("peer", Network_peer.Peer.to_yojson peer)
                     ; ("error", `String (Error.to_string_mach err)) ]
                   "Peer $peer failed to serve requested epoch ledger: $error" ;
                 return false
             | Failed_to_connect err ->
-                Logger.faulty_peer_without_punishment logger
-                  ~module_:__MODULE__ ~location:__LOC__
+                [%log faulty_peer_without_punishment]
                   ~metadata:
                     [ ("peer", Network_peer.Peer.to_yojson peer)
                     ; ("error", `String (Error.to_string_hum err)) ]
@@ -2727,8 +2723,7 @@ module Hooks = struct
   let select ~constants ~existing ~candidate ~logger =
     let string_of_choice = function `Take -> "Take" | `Keep -> "Keep" in
     let log_result choice msg =
-      Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-        "Select result: $choice -- $message"
+      [%log debug] "Select result: $choice -- $message"
         ~metadata:
           [ ("choice", `String (string_of_choice choice))
           ; ("message", `String msg) ]
@@ -2744,8 +2739,7 @@ module Hooks = struct
       let msg = Printf.sprintf "(%s) && (%s)" precondition_msg choice_msg in
       log_result choice msg
     in
-    Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-      "Selecting best consensus state"
+    [%log debug] "Selecting best consensus state"
       ~metadata:
         [ ("existing", Consensus_state.Value.to_yojson existing)
         ; ("candidate", Consensus_state.Value.to_yojson candidate) ] ;
@@ -2799,8 +2793,7 @@ module Hooks = struct
 
   let next_producer_timing ~constraint_constants ~(constants : Constants.t) now
       (state : Consensus_state.Value.t) ~local_state ~keypairs ~logger =
-    Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-      "Determining next slot to produce block" ;
+    [%log info] "Determining next slot to produce block" ;
     let curr_epoch, curr_slot =
       Epoch.epoch_and_slot_of_time_exn ~constants
         (Block_time.of_span_since_epoch (Block_time.Span.of_ms now))
@@ -2812,7 +2805,7 @@ module Hooks = struct
       then Epoch.incr ~constants (curr_epoch, curr_slot)
       else (curr_epoch, curr_slot)
     in
-    Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+    [%log debug]
       "Systime: %d, epoch-slot@systime: %08d-%04d, starttime@epoch@systime: %d"
       (Int64.to_int now) (Epoch.to_int epoch) (Slot.to_int slot)
       ( Int64.to_int @@ Time.Span.to_ms @@ Time.to_span_since_epoch
@@ -2820,12 +2813,11 @@ module Hooks = struct
     let ms_since_epoch = Fn.compose Time.Span.to_ms Time.to_span_since_epoch in
     let epoch_end_time = Epoch.end_time ~constants epoch |> ms_since_epoch in
     if Keypair.And_compressed_pk.Set.is_empty keypairs then (
-      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-        "No block producers running, skipping check for now." ;
+      [%log info] "No block producers running, skipping check for now." ;
       `Check_again epoch_end_time )
     else
       let next_slot =
-        Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+        [%log debug]
           !"Selecting correct epoch data from state -- epoch by time: %d, \
             state epoch: %d, state epoch count: %d"
           (Epoch.to_int epoch)
@@ -2836,7 +2828,7 @@ module Hooks = struct
           | Ok epoch_data ->
               epoch_data
           | Error () ->
-              Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+              [%log fatal]
                 "An empty epoch is detected! This could be caused by the \
                  following reasons: system time is out of sync with protocol \
                  state time; or internet connection is down or unstable; or \
@@ -2854,7 +2846,7 @@ module Hooks = struct
             select_epoch_snapshot ~constants ~consensus_state:state
               ~local_state ~epoch
           in
-          Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+          [%log debug]
             !"Using %s_epoch_snapshot root hash %{sexp:Coda_base.Ledger_hash.t}"
             (epoch_snapshot_name source)
             (Coda_base.Sparse_ledger.merkle_root snapshot.ledger) ;
@@ -2875,7 +2867,7 @@ module Hooks = struct
                 let global_slot =
                   Global_slot.of_epoch_and_slot ~constants (epoch, slot)
                 in
-                Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                [%log info]
                   "Checking VRF evaluations at epoch: $epoch, slot: $slot"
                   ~metadata:
                     [ ("epoch", `Int (Epoch.to_int epoch))
@@ -2911,8 +2903,7 @@ module Hooks = struct
       in
       match next_slot with
       | Some (next_slot, keypair, data) ->
-          Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-            "Producing block in %d slots"
+          [%log info] "Producing block in %d slots"
             (Slot.to_int next_slot - Slot.to_int slot) ;
           if Slot.equal curr_slot next_slot then `Produce_now (keypair, data)
           else
@@ -2925,7 +2916,7 @@ module Hooks = struct
           let epoch_end_time =
             Epoch.end_time ~constants epoch |> ms_since_epoch
           in
-          Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+          [%log info]
             "No slots won in this epoch. Waiting for next epoch to check \
              again, @%d"
             (Int64.to_int epoch_end_time) ;
@@ -3060,7 +3051,7 @@ module Hooks = struct
              (Global_slot.slot_number global_slot)
              block_data.global_slot)
       then
-        Logger.error ~module_:__MODULE__ ~location:__LOC__ logger
+        [%log error]
           !"VRF was evaluated at (epoch, slot) %{sexp:Epoch_and_slot.t} but \
             the corresponding block was produced at a time corresponding to \
             %{sexp:Epoch_and_slot.t}. This means that generating the block \

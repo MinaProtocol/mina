@@ -198,15 +198,14 @@ struct
                        let diff =
                          Sexp_diff_kernel.Algo.diff ~original ~updated ()
                        in
-                       Logger.fatal logger
+                       [%log fatal]
                          "Out-of-SNARK and in-SNARK calculations of the next \
                           top hash differ"
                          ~metadata:
                            [ ( "state_sexp_diff"
                              , `String
                                  (Sexp_diff_kernel.Display
-                                  .display_as_plain_string diff) ) ]
-                         ~location:__LOC__ ~module_:__MODULE__ ;
+                                  .display_as_plain_string diff) ) ] ;
                        (* Fail here: the error raised in the snark below is
                           strictly less informative, displaying only the hashes
                           and their representation as constraint system
@@ -229,11 +228,10 @@ struct
                          top_hash next_top_hash expected_next_state
                          in_snark_next_state ()
                  | None ->
-                     Logger.error logger
+                     [%log error]
                        "From the current prover state, got None for the \
                         expected next state, which should be true only when \
-                        calculating precomputed values"
-                       ~location:__LOC__ ~module_:__MODULE__ ;
+                        calculating precomputed values" ;
                      return ())))
       in
       let%bind () =
@@ -254,11 +252,10 @@ struct
               and success = read Boolean.typ success
               and is_base_case = read Boolean.typ is_base_case in
               let result = (prev_valid && success) || is_base_case in
-              Logger.trace logger
+              [%log trace]
                 "transition system debug state: (previous valid=$prev_valid \
                  ∧ update success=$success) ∨ base case=$is_base_case = \
                  $result"
-                ~location:__LOC__ ~module_:__MODULE__
                 ~metadata:
                   [ ("prev_valid", `Bool prev_valid)
                   ; ("success", `Bool success)

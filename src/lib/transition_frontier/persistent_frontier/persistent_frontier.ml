@@ -33,7 +33,7 @@ let construct_staged_ledger_at_root
   let get_state hash =
     match Map.find protocol_states_map hash with
     | None ->
-        Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+        [%log error]
           ~metadata:[("state_hash", State_hash.to_yojson hash)]
           "Protocol state (for scan state transactions) for $state_hash not \
            found when loading persisted transition frontier" ;
@@ -141,7 +141,7 @@ module Instance = struct
 
   let destroy t =
     let open Deferred.Let_syntax in
-    Logger.trace t.factory.logger ~module_:__MODULE__ ~location:__LOC__
+    [%log' trace t.factory.logger]
       "Destroying transition frontier persistence instance" ;
     let%map () =
       if Option.is_some t.sync then
@@ -186,7 +186,7 @@ module Instance = struct
         (Frontier_hash.equal frontier_hash target_root.frontier_hash)
         ~error:`Frontier_hash_does_not_match
     else (
-      Logger.warn t.factory.logger ~module_:__MODULE__ ~location:__LOC__
+      [%log' warn t.factory.logger]
         ~metadata:
           [ ("current_root", State_hash.to_yojson root_hash)
           ; ("target_root", State_hash.to_yojson target_root.state_hash) ]
@@ -325,8 +325,7 @@ module Instance = struct
     in
     let%map () = apply_diff Diff.(E (Best_tip_changed best_tip)) in
     (* reset the frontier hash at the end so it matches the persistent frontier hash (for future sanity checks) *)
-    Logger.trace t.factory.logger ~module_:__MODULE__ ~location:__LOC__
-      "Pinning frontier hash at %s"
+    [%log' trace t.factory.logger] "Pinning frontier hash at %s"
       (Frontier_hash.to_string base_hash) ;
     Full_frontier.set_hash_unsafe frontier (`I_promise_this_is_safe base_hash) ;
     (frontier, extensions)
@@ -356,7 +355,7 @@ let with_instance_exn t ~f =
 let reset_database_exn t ~root_data =
   let open Root_data.Limited in
   let open Deferred.Let_syntax in
-  Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
+  [%log' info t.logger]
     ~metadata:
       [ ( "state_hash"
         , State_hash.to_yojson

@@ -1,10 +1,10 @@
 (library
   (name coda_graphql)
   (public_name coda_graphql)
-  (libraries 
+  (libraries
     ; opam deps
     async node_addrs_and_ports network_peer core cohttp graphql-async graphql-cohttp
     ; libs
     ppx_deriving_yojson.runtime
     auxiliary_database coda_base coda_commands user_command_input coda_lib)
-  (preprocess (pps ppx_version ppx_jane ppx_deriving_yojson)))
+  (preprocess (pps ppx_coda ppx_version ppx_jane ppx_deriving_yojson)))

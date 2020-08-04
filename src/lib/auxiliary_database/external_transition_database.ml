@@ -78,10 +78,9 @@ let add {database; pagination; logger}
     transition_with_hash ) date =
   match Hashtbl.find pagination.all_values.table state_hash with
   | Some _ ->
-      Logger.trace logger
+      [%log trace]
         !"Not adding transition into external transition database since it \
           already exists: $state_hash"
-        ~module_:__MODULE__ ~location:__LOC__
         ~metadata:[("state_hash", State_hash.to_yojson state_hash)]
   | None ->
       Database.set database ~key:state_hash

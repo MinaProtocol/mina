@@ -28,7 +28,7 @@ let main () =
       snark_work_public_keys Cli_lib.Arg_type.Work_selection_method.Sequence
       ~max_concurrent_connections:None ~precomputed_values
   in
-  Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "Started test net" ;
+  [%log info] "Started test net" ;
   (* keep CI alive *)
   Deferred.don't_wait_for (print_heartbeat logger) ;
   (* dump account info to log *)
@@ -40,8 +40,7 @@ let main () =
         | None ->
             `Null
       in
-      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-        "Account: $account_number"
+      [%log info] "Account: $account_number"
         ~metadata:
           [ ("account_number", `Int ndx)
           ; ("private_key", sk)
@@ -77,8 +76,7 @@ let main () =
        ~f:(fun {With_hash.data= transition; _} ->
          if Public_key.Compressed.equal transition.creator delegator_pubkey
          then (
-           Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-             "Observed block produced by delegator $delegator"
+           [%log info] "Observed block produced by delegator $delegator"
              ~metadata:
                [ ( "delegator"
                  , `String
@@ -89,8 +87,7 @@ let main () =
            if Int.equal !delegator_production_count delegator_production_goal
            then Ivar.fill delegator_ivar () ) ;
          return () )) ;
-  Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-    "Started delegator transition reader" ;
+  [%log info] "Started delegator transition reader" ;
   let%bind delegatee_transition_reader =
     Coda_process.new_block_exn worker delegatee_pubkey
   in
@@ -104,8 +101,7 @@ let main () =
        ~f:(fun {With_hash.data= transition; _} ->
          if Public_key.Compressed.equal transition.creator delegatee_pubkey
          then (
-           Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-             "Observed block produced by delegatee $delegatee"
+           [%log info] "Observed block produced by delegatee $delegatee"
              ~metadata:
                [ ( "delegatee"
                  , `String
@@ -116,12 +112,11 @@ let main () =
            if Int.equal !delegatee_production_count delegatee_production_goal
            then Ivar.fill delegatee_ivar () ) ;
          return () )) ;
-  Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-    "Started delegatee transition reader" ;
+  [%log info] "Started delegatee transition reader" ;
   (* wait for delegator to produce some blocks *)
   let%bind () = Ivar.read delegator_ivar in
   assert (Int.equal !delegatee_production_count 0) ;
-  Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+  [%log info]
     "Before delegation, got $delegator_production_count blocks from delegator \
      (and none from delegatee)"
     ~metadata:[("delegator_production_count", `Int !delegator_production_count)] ;
@@ -129,12 +124,10 @@ let main () =
     Coda_worker_testnet.Delegation.delegate_stake testnet ~node:0
       ~delegator:delegator_keypair.private_key ~delegatee:delegatee_pubkey
   in
-  Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-    "Ran delegation command" ;
+  [%log info] "Ran delegation command" ;
   (* wait for delegatee to produce a few blocks *)
   let%bind () = Ivar.read delegatee_ivar in
-  Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-    "Saw $delegatee_production_count blocks produced by delegatee"
+  [%log info] "Saw $delegatee_production_count blocks produced by delegatee"
     ~metadata:[("delegatee_production_count", `Int !delegatee_production_count)] ;
   heartbeat_flag := false ;
   Coda_worker_testnet.Api.teardown testnet ~logger
