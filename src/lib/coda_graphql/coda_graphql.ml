@@ -2654,20 +2654,14 @@ module Queries = struct
       ~args:Arg.[]
       ~typ:(non_null @@ list @@ non_null Types.pending_work)
       ~resolve:(fun {ctx= coda; _} () ->
-        match
-          Coda_lib.best_staged_ledger coda |> Participating_state.active
-        with
-        | Some staged_ledger ->
-            let snark_pool = Coda_lib.snark_pool coda in
-            let fee_opt =
-              Coda_lib.(
-                Option.map (snark_worker_key coda) ~f:(fun _ ->
-                    snark_work_fee coda ))
-            in
-            let (module S) = Coda_lib.work_selection_method coda in
-            S.pending_work_statements ~snark_pool ~fee_opt ~staged_ledger
-        | None ->
-            [] )
+        let snark_jobs = Coda_lib.snark_jobs coda in
+        let snark_pool = Coda_lib.snark_pool coda in
+        let fee_opt =
+          Coda_lib.(
+            Option.map (snark_worker_key coda) ~f:(fun _ -> snark_work_fee coda))
+        in
+        let (module S) = Coda_lib.work_selection_method coda in
+        S.pending_work_statements ~snark_pool ~fee_opt snark_jobs )
 
   let genesis_constants =
     field "genesisConstants"

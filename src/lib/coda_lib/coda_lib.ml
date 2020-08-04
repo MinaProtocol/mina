@@ -102,7 +102,7 @@ type t =
   ; coinbase_receiver: [`Producer | `Other of Public_key.Compressed.t]
   ; block_production_keypairs:
       (Agent.read_write Agent.flag, Keypair.And_compressed_pk.Set.t) Agent.t
-  ; mutable seen_jobs: Work_selector.State.t
+  ; snark_jobs: Work_selector.State.t
   ; mutable next_producer_timing: Consensus.Hooks.block_producer_timing option
   ; subscriptions: Coda_subscriptions.t
   ; sync_status: Sync_status.t Coda_incremental.Status.Observer.t }
@@ -309,27 +309,6 @@ let best_ledger_opt t =
   let%map staged_ledger = best_staged_ledger_opt t in
   Staged_ledger.ledger staged_ledger
 
-let get_protocol_state t state_hash =
-  let open Or_error.Let_syntax in
-  let to_or_error opt ~error_string =
-    match opt with
-    | Some value ->
-        Ok value
-    | None ->
-        Or_error.error_string error_string
-  in
-  let%bind frontier =
-    to_or_error
-      (Broadcast_pipe.Reader.peek t.components.transition_frontier)
-      ~error_string:"Could not retrieve transition frontier"
-  in
-  to_or_error
-    (Transition_frontier.find_protocol_state frontier state_hash)
-    ~error_string:
-      (sprintf
-         !"Protocol state with hash %{sexp: State_hash.t} not found"
-         state_hash)
-
 let compose_of_option f =
   Fn.compose
     (Option.value_map ~default:`Bootstrapping ~f:(fun x -> `Active x))
@@ -503,15 +482,13 @@ let get_inferred_nonce_from_transaction_pool_and_ledger t
       let%map account = get_account account_id in
       account.Account.Poly.nonce
 
-let seen_jobs t = t.seen_jobs
+let snark_jobs t = t.snark_jobs
 
 let add_block_subscriber t public_key =
   Coda_subscriptions.add_block_subscriber t.subscriptions public_key
 
 let add_payment_subscriber t public_key =
   Coda_subscriptions.add_payment_subscriber t.subscriptions public_key
-
-let set_seen_jobs t seen_jobs = t.seen_jobs <- seen_jobs
 
 let transaction_pool t = t.components.transaction_pool
 
@@ -641,32 +618,11 @@ let best_chain t =
   :: Transition_frontier.best_tip_path frontier
 
 let request_work t =
-  let open Option.Let_syntax in
   let (module Work_selection_method) = t.config.work_selection_method in
-  let%bind sl =
-    match best_staged_ledger t with
-    | `Active staged_ledger ->
-        Some staged_ledger
-    | `Bootstrapping ->
-        Logger.trace t.config.logger ~module_:__MODULE__ ~location:__LOC__
-          "Snark-work-request error: Could not retrieve staged_ledger due to \
-           bootstrapping" ;
-        None
-  in
   let fee = snark_work_fee t in
   let instances_opt =
-    match
-      Work_selection_method.work ~logger:t.config.logger ~fee
-        ~snark_pool:(snark_pool t) ~get_protocol_state:(get_protocol_state t)
-        sl (seen_jobs t)
-    with
-    | Ok (res, seen_jobs) ->
-        set_seen_jobs t seen_jobs ; res
-    | Error e ->
-        Logger.error t.config.logger ~module_:__MODULE__ ~location:__LOC__
-          ~metadata:[("error", `String (Error.to_string_hum e))]
-          "Snark-work-request error: $error" ;
-        None
+    Work_selection_method.work ~logger:t.config.logger ~fee
+      ~snark_pool:(snark_pool t) (snark_jobs t)
   in
   Option.map instances_opt ~f:(fun instances ->
       {Snark_work_lib.Work.Spec.instances; fee} )
@@ -676,24 +632,20 @@ let work_selection_method t = t.config.work_selection_method
 let add_work t (work : Snark_worker_lib.Work.Result.t) =
   let (module Work_selection_method) = t.config.work_selection_method in
   let update_metrics () =
-    match best_staged_ledger t |> Participating_state.active with
-    | Some staged_ledger ->
-        let snark_pool = snark_pool t in
-        let fee_opt =
-          Option.map (snark_worker_key t) ~f:(fun _ -> snark_work_fee t)
-        in
-        let pending_work =
-          Work_selection_method.pending_work_statements ~snark_pool ~fee_opt
-            ~staged_ledger
-          |> List.length
-        in
-        Coda_metrics.(
-          Gauge.set Snark_work.pending_snark_work (Int.to_float pending_work))
-    | None ->
-        ()
+    let snark_pool = snark_pool t in
+    let fee_opt =
+      Option.map (snark_worker_key t) ~f:(fun _ -> snark_work_fee t)
+    in
+    let pending_work =
+      Work_selection_method.pending_work_statements ~snark_pool ~fee_opt
+        t.snark_jobs
+      |> List.length
+    in
+    Coda_metrics.(
+      Gauge.set Snark_work.pending_snark_work (Int.to_float pending_work))
   in
   let spec = work.spec.instances in
-  set_seen_jobs t (Work_selection_method.remove (seen_jobs t) spec) ;
+  Work_selection_method.remove t.snark_jobs spec ;
   let _ = Or_error.try_with (fun () -> update_metrics ()) in
   Strict_pipe.Writer.write t.pipes.local_snark_work_writer
     (Network_pool.Snark_pool.Resource_pool.Diff.of_result work, Fn.const ())
@@ -1240,6 +1192,12 @@ let create (config : Config.t) =
               ~local_diffs:local_snark_work_reader
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
           in
+          let snark_jobs_state =
+            Work_selector.State.init
+              ~reassignment_wait:config.work_reassignment_wait
+              ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
+              ~logger:config.logger
+          in
           let%bind wallets =
             Secrets.Wallets.load ~logger:config.logger
               ~disk_location:config.wallets_disk_location
@@ -1330,9 +1288,7 @@ let create (config : Config.t) =
             ; wallets
             ; block_production_keypairs
             ; coinbase_receiver= config.coinbase_receiver
-            ; seen_jobs=
-                Work_selector.State.init
-                  ~reassignment_wait:config.work_reassignment_wait
+            ; snark_jobs= snark_jobs_state
             ; subscriptions
             ; sync_status } ) )
 

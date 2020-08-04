@@ -1,4 +1,4 @@
-open Core_kernel
+(*open Core_kernel
 open Async
 open Currency
 
@@ -33,12 +33,7 @@ struct
                 ~message:"Exceeded time expected to exhaust work" ~expect:true
                 (i <= p) ;
               let stuff, seen =
-                Selection_method.work ~snark_pool ~fee sl seen ~logger
-                  ~get_protocol_state:(fun _ ->
-                    Ok
-                      (Lazy.force precomputed_values).protocol_state_with_hash
-                        .data )
-                |> Or_error.ok_exn
+                Selection_method.work ~snark_pool ~fee seen ~logger
               in
               match stuff with None -> return () | _ -> go (i + 1) seen
             in
@@ -52,11 +47,7 @@ struct
     let send_work sl seen =
       let rec go seen all_work =
         let stuff, seen =
-          Selection_method.work ~snark_pool ~fee sl seen ~logger
-            ~get_protocol_state:(fun _ ->
-              Ok (Lazy.force precomputed_values).protocol_state_with_hash.data
-          )
-          |> Or_error.ok_exn
+          Selection_method.work ~snark_pool ~fee seen ~logger
         in
         match stuff with
         | None ->
@@ -132,12 +123,7 @@ struct
                 ~message:"Exceeded time expected to exhaust work" ~expect:true
                 (i <= p) ;
               let work, seen =
-                Selection_method.work ~snark_pool ~fee:my_fee sl seen ~logger
-                  ~get_protocol_state:(fun _ ->
-                    Ok
-                      (Lazy.force precomputed_values).protocol_state_with_hash
-                        .data )
-                |> Or_error.ok_exn
+                Selection_method.work ~snark_pool ~fee:my_fee seen ~logger
               in
               match work with
               | None ->
@@ -151,4 +137,4 @@ struct
                   go (i + 1) seen
             in
             go 0 (Lib.State.init ~reassignment_wait) ) )
-end
+end*)
