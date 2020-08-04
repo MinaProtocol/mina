@@ -20,7 +20,7 @@ module State = struct
   let map2 = map2_exn
 end
 
-module Input = Input
+module Input = Random_oracle_input
 
 let params : Field.t Sponge.Params.t =
   Sponge.Params.(map tweedle_q ~f:Field.of_string)

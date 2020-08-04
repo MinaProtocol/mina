@@ -6,7 +6,8 @@
   (inline_tests)
   (libraries
     core_kernel
-    pickles
     o1trace
+    pickles
+    random_oracle_input
     snarky
     sponge ))

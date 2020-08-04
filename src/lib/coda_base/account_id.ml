@@ -2,18 +2,7 @@
 "/src/config.mlh"]
 
 open Core_kernel
-
-[%%ifdef
-consensus_mechanism]
-
-open Signature_lib
-
-[%%else]
-
-module Random_oracle = Random_oracle_nonconsensus
-open Signature_lib_nonconsensus
-
-[%%endif]
+open Import
 
 [%%versioned
 module Stable = struct
