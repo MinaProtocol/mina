@@ -37,11 +37,10 @@ module Prod : Ledger_proof_intf.S with type t = Transaction_snark.t = struct
                  ; next_available_token_before
                  ; next_available_token_after
                  ; pending_coinbase_stack_state
-                 ; proof_type
                  ; sok_digest= () } ~sok_digest ~proof =
     Transaction_snark.create ~source ~target ~pending_coinbase_stack_state
       ~supply_increase ~fee_excess ~next_available_token_before
-      ~next_available_token_after ~sok_digest ~proof ~proof_type
+      ~next_available_token_after ~sok_digest ~proof
 end
 
 module Debug :
@@ -66,7 +65,7 @@ struct
 
   let statement ((t, _) : t) : Transaction_snark.Statement.t = t
 
-  let underlying_proof (_ : t) = Proof.dummy
+  let underlying_proof (_ : t) = Proof.transaction_dummy
 
   let statement_target (t : Transaction_snark.Statement.t) = t.target
 
@@ -96,5 +95,6 @@ type with_witness = With_witness : 't * 't type_witness -> with_witness
 
 module For_tests = struct
   let mk_dummy_proof statement =
-    create ~statement ~sok_digest:Sok_message.Digest.default ~proof:Proof.dummy
+    create ~statement ~sok_digest:Sok_message.Digest.default
+      ~proof:Proof.transaction_dummy
 end

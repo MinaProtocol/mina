@@ -15,6 +15,7 @@ module Extend_blockchain_input = struct
         { chain: Blockchain.Stable.V1.t
         ; next_state: Protocol_state.Value.Stable.V1.t
         ; block: Snark_transition.Value.Stable.V1.t
+        ; ledger_proof: Ledger_proof.Stable.V1.t option
         ; prover_state: Consensus.Data.Prover_state.Stable.V1.t
         ; pending_coinbase: Pending_coinbase_witness.Stable.V1.t }
 
@@ -26,6 +27,7 @@ module Extend_blockchain_input = struct
     { chain: Blockchain.t
     ; next_state: Protocol_state.Value.t
     ; block: Snark_transition.Value.t
+    ; ledger_proof: Ledger_proof.t option
     ; prover_state: Consensus.Data.Prover_state.t
     ; pending_coinbase: Pending_coinbase_witness.t }
   [@@deriving sexp]
@@ -36,12 +38,11 @@ module Blockchain = Blockchain
 
 module Worker_state = struct
   module type S = sig
-    module Transaction_snark : Transaction_snark.Verification.S
-
     val extend_blockchain :
          Blockchain.t
       -> Protocol_state.Value.t
       -> Snark_transition.value
+      -> Ledger_proof.t option
       -> Consensus.Data.Prover_state.t
       -> Pending_coinbase_witness.t
       -> Blockchain.t Or_error.t
@@ -58,63 +59,58 @@ module Worker_state = struct
         Genesis_constants.Constraint_constants.Stable.Latest.t }
   [@@deriving bin_io_unversioned]
 
-  type t = (module S) Deferred.t
+  type t = (module S)
+
+  let ledger_proof_opt (chain : Blockchain.t) next_state = function
+    | Some t ->
+        Ledger_proof.
+          ({(statement t) with sok_digest= sok_digest t}, underlying_proof t)
+    | None ->
+        let bs = Protocol_state.blockchain_state in
+        let lh x = Blockchain_state.snarked_ledger_hash (bs x) in
+        let tok x = Blockchain_state.snarked_next_available_token (bs x) in
+        ( { source= lh chain.state
+          ; target= lh next_state
+          ; supply_increase= Currency.Amount.zero
+          ; fee_excess= Fee_excess.zero
+          ; sok_digest= Sok_message.Digest.default
+          ; next_available_token_before= tok chain.state
+          ; next_available_token_after= tok next_state
+          ; pending_coinbase_stack_state=
+              { source= Pending_coinbase.Stack.empty
+              ; target= Pending_coinbase.Stack.empty } }
+        , Proof.transaction_dummy )
 
   let create {logger; proof_level; constraint_constants; _} : t Deferred.t =
     Deferred.return
-      (let%map (module Keys) = Keys_lib.Keys.create () in
-       let module Transaction_snark =
-       Transaction_snark.Verification.Make (struct
-         let keys = Keys.transaction_snark_keys
-       end) in
-       let m =
+      (let m =
          match proof_level with
          | Genesis_constants.Proof_level.Full ->
              ( module struct
-               open Snark_params
-               open Keys
-               module Transaction_snark = Transaction_snark
+               module T = Transaction_snark.Make ()
 
-               let wrap hash proof =
-                 let module Wrap = Keys.Wrap in
-                 Tock.prove
-                   (Tock.Keypair.pk Wrap.keys)
-                   Wrap.input {Wrap.Prover_state.proof} Wrap.main
-                   (Wrap_input.of_tick_field hash)
+               module B = Blockchain_snark.Blockchain_snark_state.Make (T)
+
+               let _ = Pickles.Cache_handle.generate_or_load B.cache_handle
 
                let extend_blockchain (chain : Blockchain.t)
                    (next_state : Protocol_state.Value.t)
-                   (block : Snark_transition.value) state_for_handler
-                   pending_coinbase =
-                 let next_state_top_hash =
-                   Keys.Step.instance_hash next_state
-                 in
-                 let prover_state =
-                   { Keys.Step.Prover_state.prev_proof= chain.proof
-                   ; wrap_vk= Tock.Keypair.vk Keys.Wrap.keys
-                   ; prev_state= chain.state
-                   ; genesis_state_hash=
-                       Coda_state.Protocol_state.genesis_state_hash chain.state
-                   ; expected_next_state= Some next_state
-                   ; update= block }
-                 in
-                 let main x =
-                   Tick.handle
-                     (Keys.Step.main ~logger ~proof_level ~constraint_constants
-                        x)
-                     (Consensus.Data.Prover_state.handler ~constraint_constants
-                        state_for_handler ~pending_coinbase)
-                 in
+                   (block : Snark_transition.value) (t : Ledger_proof.t option)
+                   state_for_handler pending_coinbase =
                  let res =
                    Or_error.try_with (fun () ->
-                       let prev_proof =
-                         Tick.prove
-                           (Tick.Keypair.pk Keys.Step.keys)
-                           (Keys.Step.input ()) prover_state main
-                           next_state_top_hash
+                       let t = ledger_proof_opt chain next_state t in
+                       let proof =
+                         B.step
+                           ~handler:
+                             (Consensus.Data.Prover_state.handler
+                                ~constraint_constants state_for_handler
+                                ~pending_coinbase)
+                           {transition= block; prev_state= chain.state}
+                           [(chain.state, chain.proof); t]
+                           next_state
                        in
-                       { Blockchain.state= next_state
-                       ; proof= wrap next_state_top_hash prev_proof } )
+                       {Blockchain.state= next_state; proof} )
                  in
                  Or_error.iter_error res ~f:(fun e ->
                      [%log error]
@@ -122,49 +118,30 @@ module Worker_state = struct
                        "Prover threw an error while extending block: $error" ) ;
                  res
 
-               let verify state proof =
-                 Tock.verify proof
-                   (Tock.Keypair.vk Wrap.keys)
-                   Wrap.input
-                   (Wrap_input.of_tick_field (Keys.Step.instance_hash state))
+               let verify state proof = B.Proof.verify [(state, proof)]
              end
              : S )
          | Check ->
              ( module struct
-               open Snark_params
                module Transaction_snark = Transaction_snark
 
                let extend_blockchain (chain : Blockchain.t)
                    (next_state : Protocol_state.Value.t)
-                   (block : Snark_transition.value) state_for_handler
-                   pending_coinbase =
-                 let next_state_top_hash =
-                   Keys.Step.instance_hash next_state
-                 in
-                 let prover_state =
-                   { Keys.Step.Prover_state.prev_proof= chain.proof
-                   ; wrap_vk= Tock.Keypair.vk Keys.Wrap.keys
-                   ; prev_state= chain.state
-                   ; genesis_state_hash=
-                       Coda_state.Protocol_state.genesis_state_hash chain.state
-                   ; expected_next_state= Some next_state
-                   ; update= block }
-                 in
-                 let main x =
-                   Tick.handle
-                     (Keys.Step.main ~logger ~proof_level ~constraint_constants
-                        x)
-                     (Consensus.Data.Prover_state.handler ~constraint_constants
-                        state_for_handler ~pending_coinbase)
-                 in
+                   (block : Snark_transition.value) (t : Ledger_proof.t option)
+                   state_for_handler pending_coinbase =
+                 let t, _proof = ledger_proof_opt chain next_state t in
                  let res =
-                   Or_error.map
-                     (Tick.check
-                        (main @@ Tick.Field.Var.constant next_state_top_hash)
-                        prover_state)
-                     ~f:(fun () ->
-                       { Blockchain.state= next_state
-                       ; proof= Dummy_values.Tock.Bowe_gabizon18.proof } )
+                   Blockchain_snark.Blockchain_snark_state.check ~proof_level
+                     ~constraint_constants
+                     {transition= block; prev_state= chain.state}
+                     ~handler:
+                       (Consensus.Data.Prover_state.handler state_for_handler
+                          ~constraint_constants ~pending_coinbase)
+                     t
+                     (Protocol_state.hash next_state)
+                   |> Or_error.map ~f:(fun () ->
+                          { Blockchain.state= next_state
+                          ; proof= Precomputed_values.compiled_base_proof } )
                  in
                  Or_error.iter_error res ~f:(fun e ->
                      [%log error]
@@ -179,10 +156,10 @@ module Worker_state = struct
              ( module struct
                module Transaction_snark = Transaction_snark
 
-               let extend_blockchain _chain next_state _block
+               let extend_blockchain _chain next_state _block _ledger_proof
                    _state_for_handler _pending_coinbase =
                  Ok
-                   { Blockchain.proof= Dummy_values.Tock.Bowe_gabizon18.proof
+                   { Blockchain.proof= Coda_base.Proof.blockchain_dummy
                    ; state= next_state }
 
                let verify _ _ = true
@@ -205,22 +182,25 @@ module Functions = struct
 
   let initialized =
     create bin_unit [%bin_type_class: [`Initialized]] (fun w () ->
-        let%map (module W) = Worker_state.get w in
-        `Initialized )
+        let (module W) = Worker_state.get w in
+        Deferred.return `Initialized )
 
   let extend_blockchain =
     create Extend_blockchain_input.Stable.Latest.bin_t
       [%bin_type_class: Blockchain.Stable.Latest.t Or_error.t]
-      (fun w {chain; next_state; block; prover_state; pending_coinbase} ->
-        let%map (module W) = Worker_state.get w in
-        W.extend_blockchain chain next_state block prover_state
-          pending_coinbase )
+      (fun w
+      {chain; next_state; ledger_proof; block; prover_state; pending_coinbase}
+      ->
+        let (module W) = Worker_state.get w in
+        W.extend_blockchain chain next_state block ledger_proof prover_state
+          pending_coinbase
+        |> Deferred.return )
 
   let verify_blockchain =
     create Blockchain.Stable.Latest.bin_t bin_bool
       (fun w {Blockchain.state; proof} ->
-        let%map (module W) = Worker_state.get w in
-        W.verify state proof )
+        let (module W) = Worker_state.get w in
+        W.verify state proof |> Deferred.return )
 end
 
 module Worker = struct
@@ -335,11 +315,12 @@ let prove_from_input_sexp {connection; logger; _} sexp =
       false
 
 let extend_blockchain {connection; logger; _} chain next_state block
-    prover_state pending_coinbase =
+    ledger_proof prover_state pending_coinbase =
   let input =
     { Extend_blockchain_input.chain
     ; next_state
     ; block
+    ; ledger_proof
     ; prover_state
     ; pending_coinbase }
   in
@@ -358,9 +339,10 @@ let extend_blockchain {connection; logger; _} chain next_state block
                 (Sexp.to_string (Extend_blockchain_input.sexp_of_t input)) )
           ; ( "input-bin-io"
             , `String
-                (Binable.to_string
-                   (module Extend_blockchain_input.Stable.Latest)
-                   input) )
+                (Base64.encode_exn
+                   (Binable.to_string
+                      (module Extend_blockchain_input.Stable.Latest)
+                      input)) )
           ; ("error", `String (Error.to_string_hum e)) ]
         "Prover failed: $error" ;
       Error e
@@ -374,6 +356,7 @@ let prove t ~prev_state ~prev_state_proof ~next_state
       (Blockchain.create ~proof:prev_state_proof ~state:prev_state)
       next_state
       (Internal_transition.snark_transition transition)
+      (Internal_transition.ledger_proof transition)
       (Internal_transition.prover_state transition)
       pending_coinbase
   in

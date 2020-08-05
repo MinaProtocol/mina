@@ -117,3 +117,21 @@ module Mempool = struct
     Lift.res res ~logger ~of_yojson:Mempool_transaction_response.of_yojson
     |> Lift.successfully
 end
+
+module Block = struct
+  open Deferred.Result.Let_syntax
+
+  let newest_block ~rosetta_uri ~network_response ~logger =
+    let%map res =
+      post ~rosetta_uri ~logger
+        ~body:
+          Block_request.(
+            create
+              (List.hd_exn
+                 network_response.Network_list_response.network_identifiers)
+              (Partial_block_identifier.create ())
+            |> to_yojson)
+        ~path:"block/"
+    in
+    Lift.res ~logger res ~of_yojson:Block_response.of_yojson
+end
