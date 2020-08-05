@@ -64,9 +64,65 @@ coda daemon \
   -archive-address 3086\
 ```
 
+## Using the Archive Node
 
-## Try a query!  
+Now that we've got the archive node running, let's take a look at the tables in the database. 
 
-Now that we've got the archive node running, let's make a query to view some historical data about the network. 
- 
-**Example 1:** Find the block that contains a specific transaction
+To list the tables in the database, you can run the ``\dt`` command, in psql.
+You can view the full schema (here)[https://github.com/CodaProtocol/coda/blob/develop/src/app/archive/create_schema.sql].
+
+### Table 1: user_commands
+This table keeps track of transactions made on the network. 
+```
+...
+  user_command_type          Type of transaction being made
+                             Possible values: `'payment', 'delegation', 'create_token', 'create_account', 'mint_tokens'`
+                             To see a specific type of transaction, i.e. payments or creating a token, specify this field in your queries.
+  source_id                  public key of the sender 
+  receiver_id                public key of the receiver 
+  amount                     amount being sent from the sender to the receiver
+  token                      ID of a token **If you are querying for different type of token transactions, specify this field.**
+```
+
+### Table 2: internal_commands
+This table keeps track of rewards earned from snark work or block producing. 
+```
+...
+  internal_command_type      represents whether the command is a `fee_transfer` from snark work or a `coinbase` reward from block producing. 
+                             Use this field for information about block rewards and snark rewards (there is also an extra fee_transfer added to support sending all the transaction fees summed together to the block_creator)
+  receiver_id                public key ID of the receiver 
+  fee                        amount being sent from the protocol to the receiver
+  token                      ID of a token **If you are querying for different type of token transactions, specify this field.**
+```
+
+### Table 3: blocks
+```
+  id        
+  parent_id                  ID of the previous block in the blockchain
+                             Use this field for information about block rewards and snark rewards (there is also an extra fee_transfer added to support sending all the transaction fees summed together to the block_creator)
+  creator_id                 public key of the block creator 
+```
+
+## Try a query 
+
+Now that we've taken a look at the structure of the data, let's try a query. 
+
+**Example 1:** Find all blocks that have been created by your public key
+```
+SELECT *
+FROM blocks AS b
+INNER JOIN public_keys AS pk1 ON b.creator_id = pk1.id
+WHERE value = 'MY_PK'
+```
+
+**Example 2:** Find all payments you’ve received by your public key
+SELECT *
+FROM user_commands AS uc
+JOIN blocks_user_commands AS buc ON uc.id = buc.user_command_id
+JOIN public_keys AS pk ON uc.receiver_id = pk.id
+WHERE value = 'MY_PK'
+AND type = 'payment'
+```
+
+
+
