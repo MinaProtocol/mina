@@ -163,7 +163,7 @@ let record_envelope_sender :
   match sender with
   | Local ->
       let action_fmt, action_metadata = Actions.to_log action in
-      Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+      [%log debug]
         ~metadata:(("action", `String action_fmt) :: action_metadata)
         "Attempted to record trust action of ourselves: $action" ;
       Deferred.unit

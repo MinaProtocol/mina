@@ -117,7 +117,7 @@ jobs:
                     PGPASSWORD=codarules psql -h localhost -p 5432 -U admin -d archiver -a -f src/app/archive/create_schema.sql
             - run:
                   name: Archive node unit tests
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'eval `opam config env`; dune runtest src/app/archive'
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'eval `opam config env`; export PATH="$HOME/.cargo/bin:$PATH" && dune runtest src/app/archive'
                   environment:
                     DUNE_PROFILE: test_archive_processor
             - run:
@@ -183,7 +183,7 @@ jobs:
                 no_output_timeout: 1h
             - run:
                   name: Build Archive Process
-                  command:  bash -c 'eval `opam config env` && LIBP2P_NIXLESS=1 make build_archive'
+                  command:  bash -c 'eval `opam config env` && export PATH="$HOME/.cargo/bin:$PATH" && LIBP2P_NIXLESS=1 make build_archive'
                   environment:
                     DUNE_PROFILE: testnet_postake_medium_curves
             # NOTE: If we were using a machine executor we would be able to mount the sql file in
@@ -327,7 +327,7 @@ jobs:
 
             - run:
                   name: Compare test signatures for consensus, nonconsensus code
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'eval `opam config env` && ./scripts/compare_test_signatures.sh'
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'eval `opam config env` && export PATH="$HOME/.cargo/bin:$PATH" && ./scripts/compare_test_signatures.sh'
     update-branch-protection:
         docker:
             - image: python:3
@@ -610,7 +610,7 @@ jobs:
             # See https://bkase.dev/posts/ocaml-writer#fn-3 for rationale
             - run:
                   name: Generate PV keys
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; eval `opam config env` && LIBP2P_NIXLESS=1 make build_pv_keys 2>&1 | tee /tmp/artifacts/buildocaml.log'
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; eval `opam config env` && PATH="$HOME/.cargo/bin:$PATH" LIBP2P_NIXLESS=1 make build_pv_keys 2>&1 | tee /tmp/artifacts/buildocaml.log'
                   environment:
                     DUNE_PROFILE: testnet_postake_medium_curves
                     EXTRA_NIX_ARGS: --option sandbox false
@@ -621,8 +621,8 @@ jobs:
             - run:
                   name: Rebuild for pvkey changes
                   command: |
-                    ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml2.log'
-                    ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'eval `opam config env` && dune build src/app/generate_keypair/generate_keypair.exe'
+                    ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; eval `opam config env` && export PATH="$HOME/.cargo/bin:$PATH" && make build 2>&1 | tee /tmp/artifacts/buildocaml2.log'
+                    ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'eval `opam config env` && export PATH="$HOME/.cargo/bin:$PATH" && dune build src/app/generate_keypair/generate_keypair.exe'
                   environment:
                     DUNE_PROFILE: testnet_postake_medium_curves
                     EXTRA_NIX_ARGS: --option sandbox false
@@ -633,11 +633,11 @@ jobs:
             - run:
                 name: Output compiled ledger and genesis proof
                 command: |
-                  ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'eval `opam config env` && dune exec --profile=testnet_postake_medium_curves src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe'
+                  ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'eval `opam config env` && export PATH="$HOME/.cargo/bin:$PATH" && dune exec --profile=testnet_postake_medium_curves src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe'
             - run:
                 name: Generate runtime ledger with 10k accounts
                 command: |
-                  ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'eval `opam config env` && dune exec --profile=testnet_postake_medium_curves src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -- --config-file genesis_ledgers/phase_three/config.json'
+                  ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'eval `opam config env` && export PATH="$HOME/.cargo/bin:$PATH" && dune exec --profile=testnet_postake_medium_curves src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -- --config-file genesis_ledgers/phase_three/config.json'
                 no_output_timeout: 20m
             - run:
                 name: Upload genesis data
@@ -1122,87 +1122,6 @@ jobs:
                     GO: /usr/lib/go/bin/go
             - store_artifacts:
                   path: test_output/artifacts
-    test--fake_hash:
-        resource_class: large
-        docker:
-            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
-        steps:
-            
-            - run:
-                name: Disable LFS checkout
-                command: |
-                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
-                    git config --global lfs.fetchexclude "*"
-            - checkout
-
-            
-            - run:
-                  name: Update Submodules
-                  command: git submodule sync && git submodule update --init --recursive
-            - run:
-                name: Create opam cache signature file including a year/date stamp to ensure occasional rebuilds
-                command: |
-                    cat scripts/setup-opam.sh > opam_ci_cache.sig
-                    cat src/opam.export >> opam_ci_cache.sig
-                    date +%Y-%m >> opam_ci_cache.sig
-            - restore_cache:
-                name: Restore cache - opam
-                keys:
-                    - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
-            - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
-
-            - run:
-                name: Build libp2p_helper
-                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
-            - run:
-                  name: Running test -- fake_hash:full-test
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "fake_hash:full-test"'
-            - store_artifacts:
-                  path: test_output/artifacts
-    test--test_postake:
-        resource_class: large
-        docker:
-            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
-        steps:
-            
-            - run:
-                name: Disable LFS checkout
-                command: |
-                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
-                    git config --global lfs.fetchexclude "*"
-            - checkout
-
-            
-            - run:
-                  name: Update Submodules
-                  command: git submodule sync && git submodule update --init --recursive
-            - run:
-                name: Create opam cache signature file including a year/date stamp to ensure occasional rebuilds
-                command: |
-                    cat scripts/setup-opam.sh > opam_ci_cache.sig
-                    cat src/opam.export >> opam_ci_cache.sig
-                    date +%Y-%m >> opam_ci_cache.sig
-            - restore_cache:
-                name: Restore cache - opam
-                keys:
-                    - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
-            - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
-
-            - run:
-                name: Build libp2p_helper
-                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
-            - run:
-                  name: Running test -- test_postake:full-test
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake:full-test"'
-            - run:
-                  name: Running test -- test_postake:transaction-snark-profiler -k 2
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake:transaction-snark-profiler -k 2"'
-            - store_artifacts:
-                  path: test_output/artifacts
     test--test_postake_catchup:
         resource_class: large
         docker:
@@ -1597,8 +1516,6 @@ workflows:
                   - build-artifacts--testnet_postake_medium_curves
             - test-unit--dev
             - test-unit--nonconsensus_medium_curves
-            - test--fake_hash
-            - test--test_postake
             - test--test_postake_catchup
             - test--test_postake_five_even_txns
             - test--test_postake_snarkless

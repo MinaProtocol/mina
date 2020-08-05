@@ -4,8 +4,7 @@
  (libraries
    coda_base
    coda_state
-   consensus
-   keys_lib
+   blockchain_snark
    genesis_constants
    runtime_config
    with_hash)

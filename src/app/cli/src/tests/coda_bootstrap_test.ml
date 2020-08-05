@@ -32,7 +32,7 @@ let main () =
    in
    Pipe_lib.Linear_pipe.iter (Option.value_exn sync_status_pipe_opt)
      ~f:(fun sync_status ->
-       Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+       [%log trace]
          ~metadata:[("status", Sync_status.to_yojson sync_status)]
          "Bootstrap node received status: $status" ;
        Hash_set.add previous_status sync_status ;

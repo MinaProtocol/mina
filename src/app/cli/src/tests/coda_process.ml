@@ -185,8 +185,7 @@ let disconnect ((conn, proc, _) as t) ~logger =
     | Ok () ->
         ()
     | Error exn ->
-        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-          "Harmless error when stopping snark worker: $exn"
+        [%log info] "Harmless error when stopping snark worker: $exn"
           ~metadata:[("exn", `String (Exn.to_string exn))]
   in
   let%bind () = Coda_worker.Connection.close conn in
@@ -194,6 +193,6 @@ let disconnect ((conn, proc, _) as t) ~logger =
   | Ok _ ->
       ()
   | Error e ->
-      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+      [%log info]
         ~metadata:[("e", `String (Exn.to_string e))]
         "Harmless error when stopping test node: $exn"
