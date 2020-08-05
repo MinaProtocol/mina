@@ -207,7 +207,7 @@ def create_genesis_ledger(
         for row in reader:
             discord_username = row[1]
             public_key = row[2]
-            if public_key.startswith("4vsRC"):
+            if public_key.startswith("B62qr"):
                 ledger_public_keys["staker_keys"].append(public_key)
                 ledger_public_keys["stakers"].append({
                     "discord_username": discord_username, 

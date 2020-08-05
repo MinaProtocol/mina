@@ -10,7 +10,10 @@ config :logger, :console,
   metadata: [:pid, :context]
 
 config :coda_validation,
-  project_id: "o1labs-192920"
+  project_id: "o1labs-192920",
+  region: "us-east1",
+  cluster: "coda-infra-east",
+  testnet: "regeneration"
 
 if File.exists?("config/local.exs") do
   import_config "local.exs"

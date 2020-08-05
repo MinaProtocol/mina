@@ -95,8 +95,8 @@ module Sync : S with module M := Or_error = struct
               Error.createf "died after receiving %s (signal number %d)"
                 (Signal.to_string s) (Signal.to_system_int s) )
       in
-      Logger.debug ~module_:__MODULE__ ~location:__LOC__ (Logger.create ())
-        "Curl finished"
+      let logger = Logger.create () in
+      [%log debug] "Curl finished"
         ~metadata:
           [("url", `String uri_string); ("local_file_path", `String file_path)] ;
       read k ~path:file_path
@@ -188,8 +188,8 @@ module Async : S with module M := Async.Deferred.Or_error = struct
       let uri_string = bucket_prefix ^/ label in
       let file_path = install_path ^/ label in
       let open Deferred.Or_error.Let_syntax in
-      Logger.debug ~module_:__MODULE__ ~location:__LOC__ (Logger.create ())
-        "Running curl"
+      let logger = Logger.create () in
+      [%log debug] "Running curl"
         ~metadata:
           [("url", `String uri_string); ("local_file_path", `String file_path)] ;
       let%bind result =
@@ -197,8 +197,7 @@ module Async : S with module M := Async.Deferred.Or_error = struct
           ~args:["--fail"; "-o"; file_path; uri_string]
           ()
       in
-      Logger.debug ~module_:__MODULE__ ~location:__LOC__ (Logger.create ())
-        "Curl finished"
+      [%log debug] "Curl finished"
         ~metadata:
           [ ("url", `String uri_string)
           ; ("local_file_path", `String file_path)

@@ -1192,8 +1192,7 @@ let generate_libp2p_keypair =
               in
               printf "libp2p keypair:\n%s\n" (Coda_net2.Keypair.to_string me)
           | Error e ->
-              Logger.fatal logger "failed to generate libp2p keypair: $error"
-                ~module_:__MODULE__ ~location:__LOC__
+              [%log fatal] "failed to generate libp2p keypair: $error"
                 ~metadata:[("error", `String (Error.to_string_hum e))] ;
               exit 20 )))
 

@@ -45,7 +45,7 @@ module Worker_state = struct
                | Ok result ->
                    result
                | Error e ->
-                   Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+                   [%log error]
                      ~metadata:[("error", `String (Error.to_string_hum e))]
                      "Verifier threw an exception while verifying transaction \
                       snark" ;
@@ -121,8 +121,7 @@ module Worker = struct
               (Logger.Transport.File_system.dumb_logrotate
                  ~directory:(Option.value_exn conf_dir)
                  ~log_filename:"coda-verifier.log" ~max_size) ) ;
-        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-          "Verifier started" ;
+        [%log info] "Verifier started" ;
         Worker_state.create {conf_dir; logger; proof_level}
 
       let init_connection_state ~connection:_ ~worker_state:_ () =
@@ -138,8 +137,7 @@ type t = Worker.Connection.t
 (* TODO: investigate why conf_dir wasn't being used *)
 let create ~logger ~proof_level ~pids ~conf_dir =
   let on_failure err =
-    Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-      "Verifier process failed with error $err"
+    [%log error] "Verifier process failed with error $err"
       ~metadata:[("err", `String (Error.to_string_hum err))] ;
     Error.raise err
   in
@@ -148,7 +146,7 @@ let create ~logger ~proof_level ~pids ~conf_dir =
       ~on_failure ~shutdown_on:Disconnect ~connection_state_init_arg:()
       {conf_dir; logger; proof_level}
   in
-  Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+  [%log info]
     "Daemon started process of kind $process_kind with pid $verifier_pid"
     ~metadata:
       [ ("verifier_pid", `Int (Process.pid process |> Pid.to_int))
@@ -161,16 +159,14 @@ let create ~logger ~proof_level ~pids ~conf_dir =
        (Process.stdout process |> Reader.pipe)
        ~f:(fun stdout ->
          return
-         @@ Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-              "Verifier stdout: $stdout"
+         @@ [%log debug] "Verifier stdout: $stdout"
               ~metadata:[("stdout", `String stdout)] ) ;
   don't_wait_for
   @@ Pipe.iter
        (Process.stderr process |> Reader.pipe)
        ~f:(fun stderr ->
          return
-         @@ Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-              "Verifier stderr: $stderr"
+         @@ [%log error] "Verifier stderr: $stderr"
               ~metadata:[("stderr", `String stderr)] ) ;
   connection
 

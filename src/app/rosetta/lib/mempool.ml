@@ -309,11 +309,13 @@ module Transaction = struct
     end )
 end
 
-let router ~graphql_uri ~logger:_ ~db (route : string list) body =
+let router ~graphql_uri ~logger ~db (route : string list) body =
   let (module Db : Caqti_async.CONNECTION) = db in
   let open Async.Deferred.Result.Let_syntax in
+  [%log debug] "Handling /mempool/ $route"
+    ~metadata:[("route", `List (List.map route ~f:(fun s -> `String s)))] ;
   match route with
-  | [] ->
+  | [] | [""] ->
       let%bind req =
         Errors.Lift.parse ~context:"Request" @@ Network_request.of_yojson body
         |> Errors.Lift.wrap

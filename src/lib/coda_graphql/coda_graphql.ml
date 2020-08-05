@@ -315,12 +315,12 @@ module Types = struct
       ~values:
         [enum_value "PLUS" ~value:Sgn.Pos; enum_value "MINUS" ~value:Sgn.Neg]
 
-  let signed_amount =
-    obj "SignedAmount" ~doc:"Signed amount" ~fields:(fun _ ->
+  let signed_fee =
+    obj "SignedFee" ~doc:"Signed fee" ~fields:(fun _ ->
         [ field "sign" ~typ:(non_null sign) ~doc:"+/-"
             ~args:Arg.[]
             ~resolve:(fun _ fee -> Currency.Amount.Signed.sgn fee)
-        ; field "amountMagnitude" ~typ:(non_null uint64) ~doc:"Amount"
+        ; field "feeMagnitude" ~typ:(non_null uint64) ~doc:"Fee"
             ~args:Arg.[]
             ~resolve:(fun _ fee ->
               Currency.Amount.(to_uint64 (Signed.magnitude fee)) ) ] )
@@ -340,7 +340,7 @@ module Types = struct
             ~args:Arg.[]
             ~resolve:(fun _ {Transaction_snark.Statement.target; _} ->
               Frozen_ledger_hash.to_string target )
-        ; field "feeExcess" ~typ:(non_null signed_amount)
+        ; field "feeExcess" ~typ:(non_null signed_fee)
             ~doc:
               "Total transaction fee that is not accounted for in the \
                transition from source ledger to target ledger"
@@ -686,9 +686,7 @@ module Types = struct
                      let delegate_key = delegate_account.public_key in
                      Some (get_best_ledger_account_pk coda delegate_key)
                    with e ->
-                     Logger.warn
-                       (Coda_lib.top_level_logger coda)
-                       ~module_:__MODULE__ ~location:__LOC__
+                     [%log' warn (Coda_lib.top_level_logger coda)]
                        ~metadata:[("error", `String (Exn.to_string e))]
                        "Could not retrieve delegate account from sparse \
                         ledger. The account may not be in the ledger: $error" ;
@@ -2225,6 +2223,14 @@ module Mutations = struct
               | None ->
                   `Snd pk )
         in
+        [%log' info (Coda_lib.top_level_logger coda)]
+          ~metadata:
+            [ ( "old"
+              , [%to_yojson: Public_key.Compressed.t list]
+                  (Public_key.Compressed.Set.to_list old_block_production_keys)
+              )
+            ; ("new", [%to_yojson: Public_key.Compressed.t list] pks) ]
+          !"Block production key replacement; old: $old, new: $new" ;
         ignore
         @@ Coda_lib.replace_block_production_keypairs coda
              (Keypair.And_compressed_pk.Set.of_list unlocked) ;

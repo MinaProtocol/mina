@@ -4,6 +4,6 @@
   (foreign_stubs (language c) (names caml_syslimits))
   (inline_tests)
   (preprocess (pps
-    ppx_assert ppx_version ppx_custom_printf ppx_deriving.show ppx_inline_test ppx_let
+    ppx_assert ppx_coda ppx_version ppx_custom_printf ppx_deriving.show ppx_inline_test ppx_let
     ppx_pipebang))
   (libraries async core ctypes ctypes.foreign file_system logger pipe_lib))

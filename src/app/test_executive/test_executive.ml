@@ -23,8 +23,8 @@ let network_config_from_inputs {coda_image; _} =
   ; num_snark_workers= 4
   ; snark_worker_fee= "0.025"
   ; snark_worker_public_key=
-      "4vsRCVQZ41uqXfVVfkBNUuNNS7PgSJGdMDNAyKGDdU1WkdxxyxQ7oMdFcjDRf45fiGKkdYKkLPBrE1KnxmyBuvaTW97A5C8XjNSiJmvo9oHa4AwyVsZ3ACaspgQ3EyxQXk6uujaxzvQhbLDx"
-  }
+      (* NB: This is currently a dummy key (the key from the demo node) *)
+      "B62qmV8K4tpFaDhda9RvnG4H8H4z4cxUxGRsifwtbLT7jt1JpXbz6Hw" }
 
 let main inputs () =
   don't_wait_for

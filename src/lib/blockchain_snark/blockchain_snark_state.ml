@@ -216,14 +216,13 @@ let%snarkydef step ~(logger : Logger.t)
             and correct_coinbase_status =
               read Boolean.typ correct_coinbase_status
             and result = read Boolean.typ result in
-            Logger.trace logger
+            [%log trace]
               "blockchain snark update success: $result = \
                (transaction_snark_input_correct=$transaction_snark_input_correct \
                ∨ nothing_changed \
                (no_coinbases_popped=$no_coinbases_popped)=$nothing_changed) \
                ∧ updated_consensus_state=$updated_consensus_state ∧ \
                correct_coinbase_status=$correct_coinbase_status"
-              ~module_:__MODULE__ ~location:__LOC__
               ~metadata:
                 [ ( "transaction_snark_input_correct"
                   , `Bool txn_snark_input_correct )
@@ -287,9 +286,6 @@ let rule ~proof_level ~constraint_constants transaction_snark self :
         [b1; b2] )
   ; main_value=
       (fun [prev; (txn : Transaction_snark.Statement.With_sok.t)] curr ->
-        Core.printf
-          !"new state out of snark %{sexp:Protocol_state.Value.t}\n%!"
-          curr ;
         let lh t =
           Protocol_state.blockchain_state t
           |> Blockchain_state.snarked_ledger_hash
