@@ -1,3 +1,5 @@
+-- BENCHMARKING
+
 let Prelude =  ../External/Prelude.dhall
 let S = ../Lib/SelectFiles.dhall
 let Cmd =  ../Lib/Cmds.dhall
@@ -26,7 +28,7 @@ Pipeline.build
             { commands = OpamInit.andThenRunInDocker ([] : List Text) "./buildkite/scripts/compare_test_signatures.sh"
             , label = "Compare test signatures"
             , key = "compare-test-signatures"
-            , target = Size.Medium
+            , target = Size.Large
             , docker = None Docker.Type
             }
       ]

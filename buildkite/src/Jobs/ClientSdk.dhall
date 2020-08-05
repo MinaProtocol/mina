@@ -1,3 +1,5 @@
+-- BENCHMARKING
+
 let Prelude = ../External/Prelude.dhall
 let S = ../Lib/SelectFiles.dhall
 
@@ -28,7 +30,7 @@ Pipeline.build
         commands = OpamInit.andThenRunInDocker ([] : List Text) "./buildkite/scripts/build-client-sdk.sh",
         label = "Build client-sdk",
         key = "build-client-sdk",
-        target = Size.Medium,
+        target = Size.Large,
         docker = None Docker.Type
       }
     ]
