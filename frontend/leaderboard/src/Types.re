@@ -8,6 +8,10 @@ module Block = {
       | MintTokens
       | Unknown;
 
+    type userCommandStatus =
+      | Applied
+      | Failed;
+
     let userCommandTypeOfString = s => {
       switch (s) {
       | "payment" => Payment
@@ -19,9 +23,20 @@ module Block = {
       };
     };
 
+    let userCommandStatusOfString = s => {
+      Belt.Option.mapWithDefault(s, None, status => {
+        switch (status) {
+        | "applied" => Some(Applied)
+        | "failed" => Some(Failed)
+        | _ => None
+        }
+      });
+    };
+
     type t = {
       id: int,
       type_: userCommandType,
+      status: option(userCommandStatus),
       fromAccount: string,
       toAccount: string,
       fee: string,
@@ -39,6 +54,10 @@ module Block = {
               json
               |> field("usercommandtype", string)
               |> userCommandTypeOfString,
+            status:
+              json
+              |> optional(field("usercommandstatus", string))
+              |> userCommandStatusOfString,
             fromAccount: json |> field("usercommandfromaccount", string),
             toAccount: json |> field("usercommandtoaccount", string),
             fee: json |> field("usercommandfee", string),
