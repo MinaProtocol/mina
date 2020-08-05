@@ -160,6 +160,7 @@ ARG EXTERNAL_PKG_DIR=$CODA_DIR/src/external
 ENV OPAMKEEPBUILDDIR false
 ENV OPAMREUSEBUILDDIR false
 
+ENV HOME /home/opam
 ENV PATH "$PATH:/usr/lib/go/bin:$HOME/.cargo/bin"
 
 # git will clone into an empty dir, but this also helps us set the workdir in advance
@@ -184,7 +185,7 @@ RUN opam install \
   ppxlib.0.8.1 \
   ocaml-compiler-libs.v0.11.0 \
   ocaml-migrate-parsetree.1.5.0 \
-  dune.2.5.1 \
+  dune.2.6.1 \
   ocamlfind.1.8.0 \
   base-bytes.base \
   ppx_derivers.1.2.1 \
@@ -216,6 +217,7 @@ FROM opam-deps AS builder
 # Use --build-arg "DUNE_PROFILE=dev" to build a dev image or for CI
 ARG DUNE_PROFILE=testnet_postake_medium_curves
 
+ENV HOME /home/opam
 ENV PATH "$PATH:/usr/lib/go/bin:$HOME/.cargo/bin"
 
 # Build libp2p_helper and clear go module caches
@@ -258,9 +260,9 @@ FROM debian:buster-slim AS production
 
 ARG POSTGRES_DATA_DIR=/data/postgresql
 ARG CODA_DAEMON_PORT=10101
-ARG CODA_CONFIG_DIR=/root/.coda-config
+ARG CODA_CONFIG_DIR=/root/.coda-demo-config
 # Sample public key for use in dev profile / demo mode genesis block
-ARG PK=ZsMSUuKL9zLAF7sMn951oakTFRCCDw9rDfJgqJ55VMtPXaPa5vPwntQRFJzsHyeh8R8
+ARG PK=B62qrPN5Y5yq8kGE3FbVKbGTdTAJNdtNtB5sNVpxyRwWGcDEhpMzc8g
 
 ENV DEBIAN_FRONTEND noninteractive
 
@@ -301,11 +303,11 @@ COPY --from=builder /home/opam/coda/src/app/rosetta/config.json /data/config.jso
 
 # Set up coda config dir with demo mode keys and genesis
 COPY --from=builder /home/opam/demo-genesis ${CODA_CONFIG_DIR}/demo-genesis
-COPY --from=builder /home/opam/coda/src/app/rosetta/demo-config.json ${CODA_CONFIG_DIR}/config.json
+COPY --from=builder /home/opam/coda/src/app/rosetta/demo-config.json ${CODA_CONFIG_DIR}/daemon.json
 
 RUN mkdir -p ${CODA_CONFIG_DIR}/wallets/store/ \
   && echo "$PK" >  ${CODA_CONFIG_DIR}/wallets/store/$PK.pub \
-  && echo '{"box_primitive":"xsalsa20poly1305","pw_primitive":"argon2i","nonce":"7UMMcQYuXzDWx3zv4HyCxkk9JvUyiWrP6Rje12a","pwsalt":"Ac6n4NVqq2BvnqbmGfYzrZSSRFMe","pwdiff":[134217728,6],"ciphertext":"mzkgEY94mo27CycKXyMhJqAZTRniUiEAWEbj2PA1zDe5hmJqHic4zwdg5tavr9Mcdt6qisT64QMQux8P7ASG8"}' \
+  && echo '{"box_primitive":"xsalsa20poly1305","pw_primitive":"argon2i","nonce":"8jGuTAxw3zxtWasVqcD1H6rEojHLS1yJmG3aHHd","pwsalt":"AiUCrMJ6243h3TBmZ2rqt3Voim1Y","pwdiff":[134217728,6],"ciphertext":"DbAy736GqEKWe9NQWT4yaejiZUo9dJ6rsK7cpS43APuEf5AH1Qw6xb1s35z8D2akyLJBrUr6m"}' \
   > ${CODA_CONFIG_DIR}/wallets/store/${PK} \
   && chmod go-rwx ${CODA_CONFIG_DIR}/wallets/store/${PK}
 
