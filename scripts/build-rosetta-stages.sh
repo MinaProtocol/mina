@@ -1,3 +1,7 @@
+#!/bin/bash
+
+set -eou pipefail
+
 GITBRANCH=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD)
 TAG=$(echo ${GITBRANCH} | sed 's!/!-!; s!_!-!g')
 time cat dockerfiles/Dockerfile-rosetta | docker build \
