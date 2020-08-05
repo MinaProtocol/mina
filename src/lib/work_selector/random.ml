@@ -20,7 +20,7 @@ struct
   let pending_work_statements = Lib.pending_work_statements
 end
 
-(*let%test_module "test" =
+let%test_module "test" =
   ( module struct
     module Test = Test.Make_test (Make)
-  end )*)
+  end )

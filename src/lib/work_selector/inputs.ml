@@ -75,7 +75,7 @@ module Test_inputs = struct
 
     let best_tip_staged_ledger = Fn.id
 
-    let protocol_states _t _hash =
+    let get_protocol_state _t _hash =
       Ok
         (Lazy.force Precomputed_values.for_unit_tests).protocol_state_with_hash
           .data
