@@ -18,6 +18,21 @@
 
 module StringMap = Map.Make(String);
 
+let addPointsForExtraMetrics = (getMetricValue, threshold, points, metricsMap) => {
+  StringMap.fold(
+    (key, metric, map) => {
+      switch (getMetricValue(metric)) {
+      | Some(metricValue) =>
+        metricValue > threshold
+          ? StringMap.add(key, points * (metricValue - threshold), map) : map
+      | None => map
+      }
+    },
+    metricsMap,
+    StringMap.empty,
+  );
+};
+
 let addPointsToUsersWithAtleastN =
     (getMetricValue, threshold, points, metricsMap) => {
   StringMap.fold(
@@ -137,6 +152,13 @@ let blocksChallenge = metricsMap => {
       (metricRecord: Types.Metrics.t) => metricRecord.blocksCreated,
       3,
       1000,
+      metricsMap,
+    ),
+    // For every next block you produce, you will earn 100 pts*.
+    addPointsForExtraMetrics(
+      (metricRecord: Types.Metrics.t) => metricRecord.blocksCreated,
+      3,
+      100,
       metricsMap,
     ),
     bonusBlocksChallenge(metricsMap),
