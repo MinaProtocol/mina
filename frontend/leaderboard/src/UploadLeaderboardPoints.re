@@ -13,7 +13,7 @@
   */
 
 module StringMap = Map.Make(String);
-open Sheets.Bindings;
+open Sheets;
 open Sheets.Core;
 
 let createPublickeyUsernameMap = sheetsData => {
