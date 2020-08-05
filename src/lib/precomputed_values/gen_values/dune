@@ -1,5 +1,6 @@
 (executable
  (name gen_values)
+ (flags -warn-error -22)
  (libraries
    ;; opam deps
    async
@@ -9,13 +10,11 @@
    coda_base
    genesis_proof
    global_signer_private_key
-   keys_lib
    ppxlib
    ppx_util
    snark_keys
    snark_params
-   snarky
-   staged_ledger)
+   snarky )
  (preprocessor_deps ../../../config.mlh)
  (preprocess
   (pps ppx_version ppx_optcomp ppx_let ppxlib.metaquot))

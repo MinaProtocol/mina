@@ -234,17 +234,6 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
           measure "making Snark and Internal transitions" (fun () ->
               let snark_transition =
                 Snark_transition.create_value
-                  ?sok_digest:
-                    (Option.map ledger_proof_opt ~f:(fun (proof, _) ->
-                         Ledger_proof.sok_digest proof ))
-                  ?ledger_proof:
-                    (Option.map ledger_proof_opt ~f:(fun (proof, _) ->
-                         Ledger_proof.underlying_proof proof ))
-                  ~supply_increase:
-                    (Option.value_map ~default:Currency.Amount.zero
-                       ~f:(fun (proof, _) ->
-                         (Ledger_proof.statement proof).supply_increase )
-                       ledger_proof_opt)
                   ~blockchain_state:
                     (Protocol_state.blockchain_state protocol_state)
                   ~consensus_transition:consensus_transition_data
@@ -261,6 +250,8 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
                   ~prover_state:
                     (Consensus.Data.Block_data.prover_state block_data)
                   ~staged_ledger_diff:(Staged_ledger_diff.forget diff)
+                  ~ledger_proof:
+                    (Option.map ledger_proof_opt ~f:(fun (proof, _) -> proof))
               in
               let witness =
                 { Pending_coinbase_witness.pending_coinbases=

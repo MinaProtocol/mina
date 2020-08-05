@@ -11,7 +11,6 @@
     coda_genesis_proof
     coda_state
     genesis_ledger_helper
-    keys_lib
     coda_runtime_config
     snark_keys
     snark_params
