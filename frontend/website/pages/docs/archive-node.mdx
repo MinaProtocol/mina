@@ -40,6 +40,7 @@ Note: Some of these instructions may depend on how your operating system install
 ```
 postgres -p 5432 -D /usr/local/var/postgres
 ```
+For macOS, run ```brew services start postgres``` to start a local postgres server.
 
 2. Create database (here called `archiver`) on server and load the schema into it. This will only need to be done the first time the archive node is set up.
 ```
@@ -47,6 +48,7 @@ createdb -h localhost -p 5432 -e archiver
 
 psql -h localhost -p 5432 -d archiver -f <(curl -Ls https://raw.githubusercontent.com/CodaProtocol/coda/master/src/app/archive/create_schema.sql)
 ```
+TODO: above needs to change to point to the branch of Coda that we ship for 3.3 
 
 3. Start archive process on port 3086, connecting to the postgres database we started on port 5432 in step 1.
 ```
@@ -56,10 +58,11 @@ coda-archive \
 ```
 
 4. Start the daemon, connecting it to the archive process that we just started on port 3086. If you want to connect to an archive process on another machine, you can specify a hostname as well, like `localhost:3086`.
-
-<DaemonCommandExample args={[
-  "-archive-address 3086"
-]} />
+```
+coda daemon \
+    .....
+  -archive-address 3086\
+```
 
 
 ## Try a query!  
