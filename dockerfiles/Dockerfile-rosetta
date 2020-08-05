@@ -177,20 +177,7 @@ ENV OPAMYES 1
 # TODO: handle uri's build failure in a more flexible manner
 # Installs uri.2.2.1 and its dependencies so that build succeeds, then installs the rest of the deps
 RUN opam install \
-  uri.2.2.1 \
-  base.v0.12.0 \
-  stdio.v0.12.0 \
-  ppx_sexp_conv.v0.12.0 \
-  ppxlib.0.8.1 \
-  ocaml-compiler-libs.v0.11.0 \
-  ocaml-migrate-parsetree.1.5.0 \
-  dune.2.5.1 \
-  ocamlfind.1.8.0 \
-  base-bytes.base \
-  ppx_derivers.1.2.1 \
-  re.1.9.0 \
-  result.1.3 \
-  stringext.1.5.0 \
+  $(scripts/select-opam-deps.sh uri base stdio ppx_sexp_conv ppxlib ocaml-compiler-libs ocaml-migrate-parsetree dune ocamlfind base-bytes ppx_derivers re result stringext) \
   && opam switch import src/opam.export \
   && sudo chmod -R u+rw ~/.opam
 
