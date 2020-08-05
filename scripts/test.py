@@ -99,7 +99,8 @@ ci_excludes = [
 required_excludes = [
     'test_postake_catchup:*',
     'test_postake_three_producers:*',
-    'test_postake_split_snarkless:*'
+    'test_postake_split_snarkless:*',
+    'test_postake:*' # TODO: Reenable when plonk lands
 ]
 
 # these extra jobs are not filters, they are full status check names
