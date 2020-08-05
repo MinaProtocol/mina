@@ -15,7 +15,7 @@ let getEnvOrFail = name =>
 
 let credentials = getEnvOrFail("GOOGLE_APPLICATION_CREDENTIALS");
 let spreadsheetId = getEnvOrFail("SPREADSHEET_ID");
-let pgConn = getEnvOrFail("PGCONN");
+let pgConnection = getEnvOrFail("PGCONN");
 
 /* The Google Sheets API expects the credentials to be a local file instead of a parameter */
 Node.Fs.writeFileAsUtf8Sync("./google_sheets_credentials.json", credentials);
@@ -25,7 +25,7 @@ Node.Process.putEnvVar(
 );
 
 let main = () => {
-  let pool = Postgres.createPool(pgConn);
+  let pool = Postgres.createPool(pgConnection);
   Postgres.makeQuery(pool, Postgres.getBlocks, result => {
     switch (result) {
     | Ok(blocks) =>
