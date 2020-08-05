@@ -95,7 +95,8 @@ let Config =
     , docker_login = None DockerLogin.Type
     , summon = None Summon.Type
     , artifact_paths = [] : List SelectFiles.Type
-    , retry = None Retry.Type
+    -- per https://buildkite.com/docs/agent/v3#exit-codes, ensure automatic retries on -1 exit status (infra error)
+    , retry = Some { exit_status = "-1", limit = Some 3 }
     }
   }
 
