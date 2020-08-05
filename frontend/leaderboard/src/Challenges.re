@@ -207,24 +207,14 @@ let zkSnarksChallenge = metricsMap => {
   |> sumPointsMaps;
 };
 
-let calculatePoints = (challengeID, metricsMap) => {
+let calculatePoints = (challengeName, metricsMap) => {
   // Regex grabs last string after a "Challenge #"
-  switch (
-    Js.String.match(
-      [%re "/\s*([a-zA-z\s-*]+)\s*(?!.*\s*([a-zA-z\s-*]+)\s*)/"],
-      challengeID,
-    )
-  ) {
-  | Some(res) =>
-    switch (String.lowercase_ascii(res[1])) {
-    | "stake your coda and produce blocks" =>
-      Some(blocksChallenge(metricsMap))
-    | "create and sell zk-snarks on coda" =>
-      Some(zkSnarksChallenge(metricsMap))
-    | "connect to testnet and send coda" =>
-      Some(echoServiceChallenge(metricsMap))
-    | _ => None
-    }
-  | None => None
+  switch (String.lowercase_ascii(challengeName)) {
+  | "stake your coda and produce blocks" => Some(blocksChallenge(metricsMap))
+  | "create and sell zk-snarks on coda" =>
+    Some(zkSnarksChallenge(metricsMap))
+  | "connect to testnet and send coda" =>
+    Some(echoServiceChallenge(metricsMap))
+  | _ => None
   };
 };
