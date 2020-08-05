@@ -1,0 +1,105 @@
+import Page from '@reason/pages/Docs';
+export default Page({title: "Tokens"});
+
+# Tokens  
+
+Using the Coda CLI (command-line interface) is the primary way to create new token accounts, create new tokens, and mint tokens on the Coda blockchain. 
+
+In this section, you will find out how to use the Coda CLI to create new tokens, create new token accounts, and mint non-default tokens!
+
+## Creating Tokens
+
+With the CLI, you are able to create your own layer 2 tokens! Layer 2 tokens are a new type of token that is introduced to the Coda blockchain. These new types of tokens have a unique identifier that differentiate them from all other tokens in the blockchain. Users with an associated token account can then receive/send this new type of token that is totally separate from the native Coda token itself!  When you create a new token, you are then able to mint more of the token to be used (see below in Minting Tokens). 
+
+When creating a new token, a new token ID is created as well as a token account public key. This token account owns the token and can mint more of the token. The account will also (eventually) have the power to enable/disable accounts, and to set whether new accounts may be created for the token.
+
+
+There is a fee to create a new token. The fee is the amount you are willing to pay to process the transaction. If this flag is not specified, the default value is 5 Coda. Additionally, the fee for creating the new token account is charged in addition to the transaction fee. 
+
+
+### Create a new token
+
+```
+$ coda client create-token -sender <PUBLIC_KEY>
+```
+
+<Alert>
+
+The required field for creating a new token account is: 
+
+- sender : The public key from which you want to send the transaction
+
+</Alert>
+
+See 
+```
+$ coda client create-token -help
+```
+ 
+to learn more about how to use the command.
+
+
+
+## Creating Token Accounts
+
+With the CLI, you are able to create a token account for existing tokens. Token accounts are like regular accounts but solely meant to interact with the layer 2 tokens that exist in the Coda protocol. There is a unique token account for each type of token you wish to interact with. 
+
+<Alert kind="warning">
+
+To send or receive an existing token, you must have a token account with the specified token. If there is no valid token account with the token, the transaction will fail
+
+</Alert> 
+
+### Create a new token account 
+
+```
+
+$ coda client create-token-account -token-owner <PUBLICKEY> -receiver <PUBLICKEY> -sender <KEY> -token <TOKEN_ID>
+
+```
+
+
+<Alert>
+
+The CLI requires that the token-owner to be passed explicitly. If the token owner is not given, the CLI will query to find the token owner. If no owner is found, the command will fail with an error. 
+
+The required fields for creating a new token account are:
+
+-receiver : The public key to create the new account for
+
+-sender : The public key from which you want to send the transaction
+
+-token : The ID of the token from which you want to send the transaction
+
+</Alert> 
+
+See 
+```
+$ coda client create-token-account -help
+```
+ 
+to learn more about how to use the command
+
+## Minting Tokens
+
+With the CLI, you are able to mint your own tokens! Minting your own tokens simply increases the supply of a particular token. Minting tokens is how all non-default tokens are created, there are no other protocol-events or commands that can create non-default tokens. This command may only be issued by the token owner, but the tokens may be minted in any existing account for that token.
+
+
+### Mint a token
+
+```
+$ coda client mint-tokens -amount <VALUE> -sender <PUBLIC-KEY> -token <TOKEN_ID>
+```
+
+<Alert>
+
+The required fields for creating a new token account are:
+
+-amount : Number of new tokens to create
+
+-sender : Public key from which you want to send the transaction
+
+-token : The ID of the token to mint
+
+
+</Alert>
