@@ -330,15 +330,21 @@ module Make (Transition_frontier : Transition_frontier_intf) :
                       work ) ] ;
           `Statement_not_referenced )
 
+      (* At this point, verification already has happened *)
       let verify_and_act t ~work ~sender =
         let statements, priced_proof = work in
-        let open Deferred.Or_error.Let_syntax in
         let {Priced_proof.proof= proofs; fee= {prover; fee}} = priced_proof in
         let trust_record =
           Trust_system.record_envelope_sender t.config.trust_system t.logger
             sender
         in
         let log_and_punish ?(punish = true) statement e =
+          (* TODO: For now, we must not punish since we batch across messages received from
+             different senders and we don't isolate the bad proof in a batch, so we cannot
+             properly attribute blame.
+          *)
+          ignore punish ;
+          let punish = false in
           let metadata =
             [ ("work_id", `Int (Transaction_snark.Statement.hash statement))
             ; ("prover", Signature_lib.Public_key.Compressed.to_yojson prover)
@@ -371,7 +377,7 @@ module Make (Transition_frontier : Transition_frontier_intf) :
                 Deferred.List.iter bad_statements ~f:(fun s ->
                     log_and_punish s e )
               in
-              Error e
+              false
           | [] -> (
               let log ?punish e =
                 Deferred.List.iter proofs ~f:(fun (_, s) ->
@@ -382,19 +388,25 @@ module Make (Transition_frontier : Transition_frontier_intf) :
                   (List.map proofs ~f:(fun (p, _) -> (p, message)))
               with
               | Ok true ->
-                  Deferred.Or_error.return ()
+                  Deferred.return true
               | Ok false ->
                   (*Invalid proof*)
                   let e = Error.of_string "Invalid proof" in
                   let%map () = log e in
-                  Error e
+                  false
               | Error e ->
                   (* Verifier crashed or other errors at our end. Don't punish the peer*)
                   let%map () = log ~punish:false e in
-                  Error e )
+                  false )
         in
-        let%bind pairs = One_or_two.zip proofs statements |> Deferred.return in
-        verify (One_or_two.to_list pairs)
+        match One_or_two.zip proofs statements with
+        | Ok pairs ->
+            verify (One_or_two.to_list pairs)
+        | Error e ->
+            [%log' error t.logger]
+              ~metadata:[("error", `String (Error.to_string_hum e))]
+              "One_or_two length mismatch: $error" ;
+            Deferred.return false
     end
 
     include T
