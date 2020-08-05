@@ -28,6 +28,10 @@ popd
 # make genesis (synchronously)
 ./make-runtime-genesis.sh
 
+# drop tables and recreate
+psql -d archiver < drop_tables.sql
+psql -d archiver < create_schema.sql
+
 # archive
 ../../../_build/default/src/app/archive/archive.exe run \
   -postgres-uri $PG_CONN \
