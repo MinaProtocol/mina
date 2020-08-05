@@ -267,8 +267,8 @@ module For_tests = struct
             ; proofs=
                 One_or_two.map stmts ~f:(fun statement ->
                     Ledger_proof.create ~statement
-                      ~sok_digest:Sok_message.Digest.default ~proof:Proof.dummy
-                )
+                      ~sok_digest:Sok_message.Digest.default
+                      ~proof:Proof.transaction_dummy )
             ; prover }
       in
       let current_global_slot, state_and_body_hash =
@@ -356,7 +356,7 @@ module For_tests = struct
       Protocol_version.(set_current zero) ;
       let next_external_transition =
         External_transition.For_tests.create ~protocol_state
-          ~protocol_state_proof:Proof.dummy
+          ~protocol_state_proof:Proof.blockchain_dummy
           ~staged_ledger_diff:(Staged_ledger_diff.forget staged_ledger_diff)
           ~validation_callback:Fn.ignore
           ~delta_transition_chain_proof:(previous_state_hash, []) ()
