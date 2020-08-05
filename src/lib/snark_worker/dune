@@ -6,10 +6,18 @@
  (libraries core async cli_lib currency snark_work_lib coda_base
    blockchain_snark transaction_snark perf_histograms
    core_kernel.hash_heap sparse_ledger_lib ledger_proof transaction_witness)
- (preprocess (pps
-   ppx_coda ppx_version ppx_sexp_conv ppx_optcomp
-   ppx_sexp_conv ppx_bin_prot ppx_let ppx_custom_printf
-   ppx_inline_test bisect_ppx ppx_register_event
-   ppx_deriving_yojson -- -conditional))
+ (preprocess
+  (pps
+   bisect_ppx -conditional
+   ppx_bin_prot
+   ppx_coda
+   ppx_custom_printf
+   ppx_deriving_yojson
+   ppx_inline_test
+   ppx_let
+   ppx_optcomp
+   ppx_register_event
+   ppx_sexp_conv
+   ppx_version))
  (preprocessor_deps "../../config.mlh")
  (synopsis "Lib powering the snark_worker interactions with the daemon"))
