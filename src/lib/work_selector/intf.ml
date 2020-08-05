@@ -151,13 +151,13 @@ module type Lib_intf = sig
     -> State.t
     -> Transaction_snark.Statement.t One_or_two.t list
 
-  (*module For_tests : sig
+  module For_tests : sig
     val does_not_have_better_fee :
          snark_pool:Snark_pool.t
       -> fee:Fee.t
       -> Transaction_snark_work.Statement.t
       -> bool
-  end*)
+  end
 end
 
 module type Selection_method_intf = sig
