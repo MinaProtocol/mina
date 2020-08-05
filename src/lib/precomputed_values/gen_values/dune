@@ -1,6 +1,5 @@
 (executable
  (name gen_values)
- (flags -warn-error -22)
  (libraries
    ;; opam deps
    async
