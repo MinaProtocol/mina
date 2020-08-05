@@ -244,12 +244,13 @@ module Initialization_query = struct
     type t = {pod_id: string}
   end
 
+  (* TODO: this is technically the participation query right now; this can retrigger if bootstrap is toggled *)
   let filter testnet_log_filter =
     (*TODO: Structured logging: Block Produced*)
     String.concat ~sep:"\n"
       [ testnet_log_filter
       ; "resource.labels.container_name=\"coda\""
-      ; "\"Coda daemon is now listening\"" ]
+      ; "\"Starting Transition Frontier Controller phase\"" ]
 
   let parse log =
     let open Json_parsing in
@@ -344,7 +345,8 @@ module Block_produced_query = struct
       find bool json (breadcrumb @ ["just_emitted_a_proof"])
     in
     let%bind block_height =
-      find int json (breadcrumb_consensus_state @ ["blockchain_length"])
+      find string json (breadcrumb_consensus_state @ ["blockchain_length"])
+      >>| int_of_string
     in
     let%bind global_slot =
       find int json

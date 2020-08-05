@@ -134,6 +134,7 @@ module Network_config = struct
       ; ledger=
           Some
             { base= Accounts runtime_accounts
+            ; add_genesis_winner= None
             ; num_accounts= None
             ; hash= None
             ; name= None } }
