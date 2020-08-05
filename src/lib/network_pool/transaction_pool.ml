@@ -931,6 +931,9 @@ struct
 
       let unsafe_apply t env =
         match%map apply t env with Ok e -> Ok e | Error e -> Error (`Other e)
+
+      (* Transaction verification currently happens in apply. In the future we could batch it. *)
+      let verify _ _ = Deferred.return true
     end
 
     let get_rebroadcastable (t : t) ~is_expired =
