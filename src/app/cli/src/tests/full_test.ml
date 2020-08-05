@@ -74,8 +74,7 @@ let heartbeat_flag = ref true
 let print_heartbeat logger =
   let rec loop () =
     if !heartbeat_flag then (
-      Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
-        "Heartbeat for CI" ;
+      [%log warn] "Heartbeat for CI" ;
       let%bind () = after (Time.Span.of_min 1.) in
       loop () )
     else return ()
@@ -104,6 +103,7 @@ let run_test () : unit Deferred.t =
             Deferred.unit
       in
       let trace_database_initialization typ location =
+        (* can't use %log here, using passed-in location *)
         Logger.trace logger "Creating %s at %s" ~module_:__MODULE__ ~location
           typ
       in

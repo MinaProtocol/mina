@@ -55,14 +55,14 @@ let handle_validation_error ~logger ~trust_system ~sender ~state_hash ~delta
     | `Invalid_protocol_version ->
         [("reason", `String "invalid protocol version")]
   in
-  Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+  [%log error]
     ~metadata:(("state_hash", State_hash.to_yojson state_hash) :: metadata)
     "Validation error: external transition with state hash $state_hash was \
      rejected for reason $reason" ;
   match error with
   | `Verifier_error err ->
       let error_metadata = [("error", `String (Error.to_string_hum err))] in
-      Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+      [%log fatal]
         ~metadata:
           (error_metadata @ [("state_hash", State_hash.to_yojson state_hash)])
         "Error in verifier verifying blockchain proof for $state_hash: $error" ;
@@ -152,7 +152,7 @@ module Duplicate_block_detector = struct
         t.table <- Map.add_exn t.table ~key:block ~data:protocol_state_hash
     | Some hash ->
         if not (State_hash.equal hash protocol_state_hash) then
-          Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+          [%log error]
             ~metadata:
               [ ( "block_producer"
                 , Public_key.Compressed.to_yojson block_producer )

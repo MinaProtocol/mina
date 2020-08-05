@@ -284,7 +284,7 @@ let initialize t ~root_data ~base_hash =
   let {With_hash.hash= root_state_hash; data= root_transition}, _ =
     External_transition.Validated.erase (transition root_data)
   in
-  Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
+  [%log' trace t.logger]
     ~metadata:
       [ ("root_data", Root_data.Limited.to_yojson root_data)
       ; ("frontier_hash", Frontier_hash.to_yojson base_hash) ]

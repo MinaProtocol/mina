@@ -60,6 +60,8 @@ let check_new_account_payment ~logger ~rosetta_uri ~graphql_uri =
   in
   (* Unlock the account *)
   let%bind _ = Poke.Account.unlock ~graphql_uri in
+  (* Unlock the account *)
+  let%bind _ = Poke.Account.unlock ~graphql_uri in
   (* Send a payment *)
   let%bind hash =
     Poke.SendTransaction.payment ~fee:(`Int 2_000_000_000)
@@ -185,8 +187,7 @@ let check_new_account_payment ~logger ~rosetta_uri ~graphql_uri =
 let run ~logger ~rosetta_uri ~graphql_uri =
   let open Deferred.Result.Let_syntax in
   let%bind () = check_new_account_payment ~logger ~rosetta_uri ~graphql_uri in
-  Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-    "Finished running test-agent" ;
+  [%log info] "Finished running test-agent" ;
   return ()
 
 let command =
@@ -207,16 +208,14 @@ let command =
   fun () ->
     let logger = Logger.create () in
     Cli.logger_setup log_json log_level ;
-    Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-      "Rosetta test-agent starting" ;
+    [%log info] "Rosetta test-agent starting" ;
     match%bind run ~logger ~rosetta_uri ~graphql_uri with
     | Ok () ->
-        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-          "Rosetta test-agent stopping successfully" ;
+        [%log info] "Rosetta test-agent stopping successfully" ;
         return ()
     | Error e ->
-        Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-          "Rosetta test-agent stopping with a failure: %s" (Errors.show e) ;
+        [%log error] "Rosetta test-agent stopping with a failure: %s"
+          (Errors.show e) ;
         exit 1
 
 let () =

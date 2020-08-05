@@ -73,8 +73,8 @@ module Inputs = struct
             let start = Time.now () in
             match k () with
             | Error e ->
-                Logger.error (Logger.create ()) ~module_:__MODULE__
-                  ~location:__LOC__ "SNARK worker failed: $error"
+                let logger = Logger.create () in
+                [%log error] "SNARK worker failed: $error"
                   ~metadata:
                     [ ("error", `String (Error.to_string_hum e))
                     ; ( "spec"

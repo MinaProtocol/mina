@@ -6,8 +6,9 @@
   (inline_tests)
   (libraries
     core_kernel
-    sponge_params
     curve_choice
     o1trace
+    random_oracle_input
     snarky
-    sponge ))
+    sponge
+    sponge_params ))
