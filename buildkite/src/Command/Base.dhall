@@ -7,6 +7,10 @@ let Optional/map = Prelude.Optional.map
 let Optional/toList = Prelude.Optional.toList
 let B = ../External/Buildkite.dhall
 let B/Plugins/Partial = B.definitions/commandStep/properties/plugins/Type
+-- Retry bits
+let B/ExitStatus = B.definitions/automaticRetry/properties/exit_status/Type
+let B/Retry = B.definitions/commandStep/properties/retry/properties/automatic/Type
+let B/Manual = B.definitions/commandStep/properties/retry/properties/manual/Type
 let Map = Prelude.Map
 
 let Cmd = ../Lib/Cmds.dhall
@@ -52,6 +56,19 @@ let TaggedKey = {
   default = {=}
 }
 
+-- Retry requires you feed an exit status (as a string so we can support
+-- negative codes), and optionally a limit to the number of times this command
+-- should be retried.
+let Retry = {
+  Type = {
+    exit_status : Text,
+    limit : Optional Natural
+  },
+  default = {
+    limit = None Natural
+  }
+}
+
 -- Everything here is taken directly from the buildkite Command documentation
 -- https://buildkite.com/docs/pipelines/command-step#command-step-attributes
 -- except "target" replaces "agents"
@@ -70,6 +87,7 @@ let Config =
       , docker : Optional Docker.Type
       , docker_login : Optional DockerLogin.Type
       , summon : Optional Summon.Type
+      , retry : Optional Retry.Type
       }
   , default =
     { depends_on = [] : List TaggedKey.Type
@@ -77,6 +95,7 @@ let Config =
     , docker_login = None DockerLogin.Type
     , summon = None Summon.Type
     , artifact_paths = [] : List SelectFiles.Type
+    , retry = None Retry.Type
     }
   }
 
@@ -111,6 +130,24 @@ let build : Config.Type -> B/Command.Type = \(c : Config.Type) ->
                      else Some (B/ArtifactPaths.String (SelectFiles.compile c.artifact_paths)),
     key = Some c.key,
     label = Some c.label,
+    retry =
+      -- if c.retry is none, then retry here will be none
+      Optional/map
+        Retry.Type
+        { automatic : Optional B/Retry, manual : Optional B/Manual }
+        (\(retry : Retry.Type) ->
+          {
+              -- otherwise, we only consider automatic retries
+              automatic = Some (
+                B/Retry.AutomaticRetry/Type {
+                    -- and always require the exit status
+                    exit_status = Some (B/ExitStatus.String retry.exit_status),
+                    -- but limit is optional too
+                    limit = retry.limit
+                }),
+              manual = None B/Manual
+          })
+        c.retry,
     plugins =
       let dockerPart =
         Optional/toList
