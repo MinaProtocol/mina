@@ -56,25 +56,29 @@ let similar t (op : Operation.t) =
 (** Result of the first expected operation that is wrong. Shows the "closest"
  * match by selecting the one with minimal error reasons *)
 let assert_similar_operations ~situation ~expected ~actual =
-  List.fold expected ~init:(Result.return ()) ~f:(fun acc t ->
-      let open Result.Let_syntax in
-      let%bind () = acc in
-      let validation, op =
-        (* Test against all actuals *)
-        List.map actual ~f:(fun op -> (similar t op, op))
-        (* Take the "best" *)
-        |> List.max_elt ~compare:(fun (v1, _) (v2, _) ->
-               match (v1, v2) with
-               | Ok _, _ ->
-                   1
-               | _, Ok _ ->
-                   -1
-               | Error es, Error es' ->
-                   -1 * (List.length es - List.length es') )
-        |> Option.value_exn
-      in
-      Result.map_error validation ~f:(fun e -> (e, op)) )
-  |> Result.map_error ~f:(fun (es, op) ->
+  let rec choose_similar t least_bad_err rest = function
+    | [] ->
+        (* TODO: This may raise if we are expecting more ops than we get *)
+        Error (fst (Option.value_exn least_bad_err))
+    | op :: ops -> (
+      match similar t op with
+      | Ok _ ->
+          (* Return the operations with this one removed *)
+          Ok (rest @ ops)
+      | Error es ->
+          let l = List.length es in
+          let least_bad_err =
+            match least_bad_err with
+            | Some (_, l') when l' <= l ->
+                least_bad_err
+            | _ ->
+                Some ((op, es), l)
+          in
+          choose_similar t least_bad_err (op :: rest) ops )
+  in
+  List.fold_result expected ~init:actual ~f:(fun actual t ->
+      choose_similar t None [] actual )
+  |> Result.map_error ~f:(fun (op, es) ->
          Errors.create
            ~context:
              (sprintf
@@ -82,4 +86,4 @@ let assert_similar_operations ~situation ~expected ~actual =
                   list}, raw: %s"
                 situation es (Operation.show op))
            `Invariant_violation )
-  |> Deferred.return
+  |> Result.ignore |> Deferred.return
