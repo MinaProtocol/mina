@@ -160,8 +160,6 @@ module Make
         val scale : t -> Scalar.t -> t
 
         val to_affine_exn : t -> Field.t * Field.t
-
-        val to_affine : t -> (Field.t * Field.t) option
     end)
     (Message : Message_intf
                with type boolean_var := Impl.Boolean.var
@@ -224,11 +222,11 @@ module Make
   let verify ((r, s) : Signature.t) (pk : Public_key.t) (m : Message.t) =
     let e = Message.hash ~public_key:pk ~r m in
     let r_pt = Curve.(scale one s + negate (scale pk e)) in
-    match Curve.to_affine r_pt with
-    | None ->
-        false
-    | Some (rx, ry) ->
+    match Curve.to_affine_exn r_pt with
+    | rx, ry ->
         is_even ry && Field.equal rx r
+    | exception _ ->
+        false
 
   [%%if
   call_logger]
@@ -354,8 +352,6 @@ module Make
         val scale : t -> Scalar.t -> t
 
         val to_affine_exn : t -> Field.t * Field.t
-
-        val to_affine : t -> (Field.t * Field.t) option
     end)
     (Message : Message_intf
                with type curve := Curve.t
@@ -400,11 +396,11 @@ module Make
   let verify ((r, s) : Signature.t) (pk : Public_key.t) (m : Message.t) =
     let e = Message.hash ~public_key:pk ~r m in
     let r_pt = Curve.(scale one s + negate (scale pk e)) in
-    match Curve.to_affine r_pt with
-    | None ->
-        false
-    | Some (rx, ry) ->
+    match Curve.to_affine_exn r_pt with
+    | rx, ry ->
         is_even ry && Impl.Field.(equal rx r)
+    | exception _ ->
+        false
 end
 
 module Tick = Snark_params_nonconsensus
@@ -416,7 +412,7 @@ open Hash_prefix_states_nonconsensus
 module Message = struct
   open Tick
 
-  type t = (Field.t, bool) Random_oracle.Input.t
+  type t = (Field.t, bool) Random_oracle.Input.t [@@deriving sexp]
 
   let challenge_length = 128
 
@@ -430,6 +426,7 @@ module Message = struct
     Random_oracle.Input.to_bits ~unpack:Field.unpack input
     |> Array.of_list |> Blake2.bits_to_string |> Blake2.digest_string
     |> Blake2.to_raw_string |> Blake2.string_to_bits |> Array.to_list
+    |> Fn.flip List.take (Int.min 256 (Tock.Field.size_in_bits - 1))
     |> Tock.Field.project
 
   let hash t ~public_key ~r =

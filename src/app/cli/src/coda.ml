@@ -22,7 +22,7 @@ let () = Async.Scheduler.set_record_backtraces true
 let chain_id ~genesis_state_hash ~genesis_constants =
   let genesis_state_hash = State_hash.to_base58_check genesis_state_hash in
   let genesis_constants_hash = Genesis_constants.hash genesis_constants in
-  let all_snark_keys = String.concat ~sep:"" Snark_keys.key_hashes in
+  let all_snark_keys = String.concat ~sep:"" Precomputed_values.key_hashes in
   let b2 =
     Blake2.digest_string
       (genesis_state_hash ^ all_snark_keys ^ genesis_constants_hash)
@@ -425,6 +425,7 @@ let daemon logger =
                    "Could not parse configuration from $config_file: $error"
                    ~metadata:
                      [ ("config_file", `String config_file)
+                     ; ("config_json", config_json)
                      ; ("error", `String err) ] ;
                  failwithf "Could not parse configuration: %s" err () )
            | _ ->
@@ -956,6 +957,9 @@ let ensure_testnet_id_still_good _ = Deferred.unit
 [%%endif]
 
 let snark_hashes =
+  let module Hashes = struct
+    type t = string list [@@deriving to_yojson]
+  end in
   let open Command.Let_syntax in
   Command.basic ~summary:"List hashes of proving and verification keys"
     [%map_open
@@ -965,8 +969,8 @@ let snark_hashes =
         if json then
           print
             (Yojson.Safe.to_string
-               (Snark_keys.key_hashes_to_yojson Snark_keys.key_hashes))
-        else List.iter Snark_keys.key_hashes ~f:print]
+               (Hashes.to_yojson Precomputed_values.key_hashes))
+        else List.iter Precomputed_values.key_hashes ~f:print]
 
 let internal_commands =
   [ (Snark_worker.Intf.command_name, Snark_worker.command)
@@ -1032,7 +1036,6 @@ let coda_commands logger =
   ; ("advanced", Client.advanced)
   ; ("internal", Command.group ~summary:"Internal commands" internal_commands)
   ; (Parallel.worker_command_name, Parallel.worker_command)
-  ; (Snark_flame_graphs.name, Snark_flame_graphs.command)
   ; ("transaction-snark-profiler", Transaction_snark_profiler.command) ]
 
 [%%if
@@ -1067,7 +1070,6 @@ let coda_commands logger =
         ; (module Coda_change_snark_worker_test)
         ; (module Full_test)
         ; (module Transaction_snark_profiler)
-        ; (module Snark_flame_graphs)
         ; (module Coda_archive_node_test)
         ; (module Coda_archive_processor_test) ]
         : (module Integration_test) list )

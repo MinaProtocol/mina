@@ -4,7 +4,7 @@
  (library_flags -linkall)
  (inline_tests)
  (libraries core async cli_lib currency snark_work_lib coda_base
-   blockchain_snark transaction_snark keys_lib perf_histograms
+   blockchain_snark transaction_snark perf_histograms
    core_kernel.hash_heap sparse_ledger_lib ledger_proof transaction_witness)
  (preprocess
   (pps

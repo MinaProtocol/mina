@@ -686,7 +686,7 @@ let constraint_system_digests =
     (Command.Param.return (fun () ->
          let all =
            Transaction_snark.constraint_system_digests ()
-           @ Blockchain_snark.Blockchain_transition.constraint_system_digests
+           @ Blockchain_snark.Blockchain_snark_state.constraint_system_digests
                ()
          in
          let all =

@@ -2,7 +2,7 @@
  (name blockchain_snark)
  (public_name blockchain_snark)
  (library_flags -linkall)
- (libraries core cached cache_dir snarky snark_params coda_base coda_state
+ (libraries core cache_dir snarky snark_params coda_base coda_state
    transaction_snark bignum_bigint consensus)
  (inline_tests)
  (preprocess

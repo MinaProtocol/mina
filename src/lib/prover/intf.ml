@@ -30,6 +30,7 @@ module type S = sig
     -> Blockchain.t
     -> Protocol_state.Value.t
     -> Snark_transition.value
+    -> Ledger_proof.t option
     -> Consensus.Data.Prover_state.t
     -> Pending_coinbase_witness.t
     -> Blockchain.t Deferred.Or_error.t
