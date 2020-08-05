@@ -32,7 +32,6 @@
  *)
 
 open Core_kernel
-open Coda_digestif
 
 module Sequence_number : sig
   [%%versioned:

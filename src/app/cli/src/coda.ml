@@ -19,17 +19,6 @@ let () = Async.Scheduler.set_record_backtraces true
 
 [%%endif]
 
-[%%if
-fake_hash]
-
-let maybe_sleep s = after (Time.Span.of_sec s)
-
-[%%else]
-
-let maybe_sleep _ = Deferred.unit
-
-[%%endif]
-
 let chain_id ~genesis_state_hash ~genesis_constants =
   let genesis_state_hash = State_hash.to_base58_check genesis_state_hash in
   let genesis_constants_hash = Genesis_constants.hash genesis_constants in
@@ -286,15 +275,14 @@ let daemon logger =
          ~transport:
            (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
               ~log_filename:"coda.log" ~max_size:logrotate_max_size) ;
-       Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
+       [%log info]
          "Coda daemon is booting up; built with commit $commit on branch \
           $branch"
          ~metadata:
            [ ("commit", `String Coda_version.commit_id)
            ; ("branch", `String Coda_version.branch) ] ;
        if not @@ String.equal daemon_expiry "never" then (
-         Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
-           "Daemon will expire at $exp"
+         [%log info] "Daemon will expire at $exp"
            ~metadata:[("exp", `String daemon_expiry)] ;
          let tm =
            (* same approach as in Genesis_constants.genesis_state_timestamp *)
@@ -304,12 +292,10 @@ let daemon logger =
          in
          Clock.run_at tm
            (fun () ->
-             Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
-               "Daemon has expired, shutting down" ;
+             [%log info] "Daemon has expired, shutting down" ;
              Core.exit 0 )
            () ) ;
-       Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
-         "Booting may take several seconds, please wait" ;
+       [%log info] "Booting may take several seconds, please wait" ;
        let%bind libp2p_keypair =
          let libp2p_keypair_old_format =
            Option.bind libp2p_keypair ~f:(fun s ->
@@ -318,10 +304,9 @@ let daemon logger =
                    Some kp
                | Error _ ->
                    if String.contains s ',' then
-                     Logger.warn logger
+                     [%log warn]
                        "I think -discovery-keypair is in the old format, but \
-                        I failed to parse it! Using it as a path..."
-                       ~module_:__MODULE__ ~location:__LOC__ ;
+                        I failed to parse it! Using it as a path..." ;
                    None )
          in
          match libp2p_keypair_old_format with
@@ -361,16 +346,16 @@ let daemon logger =
          | Ok c ->
              if String.equal c Coda_version.commit_id then return ()
              else (
-               Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+               [%log warn]
                  "Different version of Coda detected in config directory \
                   $config_directory, removing existing configuration"
                  ~metadata:[("config_directory", `String conf_dir)] ;
                make_version ~wipe_dir:true )
          | Error e ->
-             Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+             [%log trace]
                ~metadata:[("error", `String (Error.to_string_mach e))]
                "Error reading coda.version: $error" ;
-             Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+             [%log debug]
                "Failed to read coda.version, cleaning up the config directory \
                 $config_directory"
                ~metadata:[("config_directory", `String conf_dir)] ;
@@ -404,14 +389,14 @@ let daemon logger =
            | Ok config ->
                Some config
            | Error err when must_find_config_file ->
-               Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+               [%log fatal]
                  "Failed reading configuration from $config_file: $error"
                  ~metadata:
                    [ ("config_file", `String config_file)
                    ; ("error", `String (Error.to_string_hum err)) ] ;
                Error.raise err
            | Error err ->
-               Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+               [%log warn]
                  "Failed reading configuration from $config_file: $error"
                  ~metadata:
                    [ ("config_file", `String config_file)
@@ -436,7 +421,7 @@ let daemon logger =
              | Ok config ->
                  config
              | Error err ->
-                 Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+                 [%log fatal]
                    "Could not parse configuration from $config_file: $error"
                    ~metadata:
                      [ ("config_file", `String config_file)
@@ -454,7 +439,7 @@ let daemon logger =
            | Ok (precomputed_values, _) ->
                precomputed_values
            | Error err ->
-               Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+               [%log fatal]
                  "Failed initializing with configuration $config: $error"
                  ~metadata:
                    [ ("config", Runtime_config.to_yojson config)
@@ -478,8 +463,7 @@ let daemon logger =
                let%bind json_val =
                  to_option Fn.id (member keyname daemon_config)
                in
-               Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-                 "Key $key being used from config file"
+               [%log debug] "Key $key being used from config file"
                  ~metadata:[("key", `String keyname)] ;
                f json_val
          in
@@ -488,7 +472,7 @@ let daemon logger =
            | Some x ->
                x
            | None ->
-               Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+               [%log trace]
                  "Key '$key' not found in the config file, using default"
                  ~metadata:[("key", `String keyname)] ;
                default
@@ -558,8 +542,7 @@ let daemon logger =
                   | Ok key ->
                       Some key
                   | Error e ->
-                      Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-                        "Error decoding public key ($key): $error"
+                      [%log error] "Error decoding public key ($key): $error"
                         ~metadata:
                           [ ("key", `String pk_str)
                           ; ("error", `String (Error.to_string_hum e)) ] ;
@@ -607,7 +590,7 @@ let daemon logger =
            ~f:(fun password ->
              match Sys.getenv Secrets.Keypair.env with
              | Some env_pass when env_pass <> password ->
-                 Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+                 [%log warn]
                    "$envkey environment variable doesn't match value provided \
                     on command-line or daemon.json. Using value from $envkey"
                    ~metadata:[("envkey", `String Secrets.Keypair.env)]
@@ -657,7 +640,7 @@ let daemon logger =
               ~at_least:(sec 0.5 |> Time_ns.Span.of_span_float_round_nearest))
            ~f:(fun span ->
              let secs = Time_ns.Span.to_sec span in
-             Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+             [%log debug]
                ~metadata:[("long_async_cycle", `Float secs)]
                "Long async cycle, $long_async_cycle seconds" ;
              Coda_metrics.(
@@ -667,7 +650,7 @@ let daemon logger =
            Async_kernel.Async_kernel_scheduler.(long_jobs_with_context @@ t ())
            ~f:(fun (context, span) ->
              let secs = Time_ns.Span.to_sec span in
-             Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+             [%log debug]
                ~metadata:
                  [ ("long_async_job", `Float secs)
                  ; ( "most_recent_2_backtrace"
@@ -682,7 +665,8 @@ let daemon logger =
                Runtime.Long_job_histogram.observe Runtime.long_async_job secs)
              ) ;
          let trace_database_initialization typ location =
-           Logger.trace logger "Creating %s at %s" ~module_:__MODULE__
+           (* can't use %log ppx here, because we're using the passed-in location *)
+           Logger.trace logger ~module_:__MODULE__ "Creating %s at %s"
              ~location typ
          in
          let trust_dir = conf_dir ^/ "trust" in
@@ -720,9 +704,7 @@ let daemon logger =
                     "peers" None ~default:[] ]
          in
          if enable_tracing then Coda_tracing.start conf_dir |> don't_wait_for ;
-         if is_seed then
-           Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-             "Starting node as a seed node"
+         if is_seed then [%log info] "Starting node as a seed node"
          else if List.is_empty initial_peers then
            failwith "no seed or initial peer flags passed" ;
          let gossip_net_params =
@@ -804,21 +786,21 @@ let daemon logger =
                in
                ( match exit_or_signal with
                | Ok () ->
-                   Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                   [%log info]
                      "Daemon child process $child_pid terminated with exit \
                       code 0"
                      ~metadata:child_pid_metadata
                | Error err -> (
                  match err with
                  | `Signal signal ->
-                     Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                     [%log info]
                        "Daemon child process $child_pid terminated after \
                         receiving signal $signal"
                        ~metadata:
                          ( ("signal", `String (Signal.to_string signal))
                          :: child_pid_metadata )
                  | `Exit_non_zero exit_code ->
-                     Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                     [%log info]
                        "Daemon child process $child_pid terminated with \
                         nonzero exit code $exit_code"
                        ~metadata:
@@ -888,7 +870,6 @@ let daemon logger =
          (Pipe_lib.Strict_pipe.Reader.iter_without_pushback
             (Coda_lib.validated_transitions coda)
             ~f:ignore) ;
-       let%bind () = maybe_sleep 3. in
        Coda_run.setup_local_server ?client_trustlist ~rest_server_port
          ~insecure_rest_server coda ;
        let%bind () = Coda_lib.start coda in
@@ -898,8 +879,7 @@ let daemon logger =
          |> Option.value ~default:Deferred.unit
        in
        let () = Coda_plugins.init_plugins ~logger coda plugins in
-       Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-         "Daemon ready. Clients can now connect" ;
+       [%log info] "Daemon ready. Clients can now connect" ;
        Async.never ())
 
 [%%if
@@ -920,7 +900,7 @@ let rec ensure_testnet_id_still_good logger =
         Client.get (Uri.of_string "http://updates.o1test.net/testnet_id") )
   with
   | Error e ->
-      Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+      [%log error]
         "Exception while trying to fetch testnet_id: $error. Trying again in \
          $retry_minutes minutes"
         ~metadata:
@@ -930,7 +910,7 @@ let rec ensure_testnet_id_still_good logger =
       Deferred.unit
   | Ok (resp, body) -> (
       if resp.status <> `OK then (
-        Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+        [%log error]
           "HTTP response status $HTTP_status while getting testnet id, \
            checking again in $retry_minutes minutes."
           ~metadata:
@@ -1000,8 +980,7 @@ let internal_commands =
              match%bind Reader.read_sexp (Lazy.force Reader.stdin) with
              | `Ok sexp ->
                  let%bind conf_dir = Unix.mkdtemp "/tmp/coda-prover" in
-                 Logger.info logger "Prover state being logged to %s" conf_dir
-                   ~module_:__MODULE__ ~location:__LOC__ ;
+                 [%log info] "Prover state being logged to %s" conf_dir ;
                  let%bind prover =
                    Prover.create ~logger
                      ~proof_level:Genesis_constants.Proof_level.compiled

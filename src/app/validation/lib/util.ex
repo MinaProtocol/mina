@@ -45,6 +45,7 @@ defmodule Util do
     ArgumentError ->
       # at this point, the module just doesn't exist
       false
+
   end
 
   defmodule ForMacros do

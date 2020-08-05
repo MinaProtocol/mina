@@ -157,14 +157,13 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
                 and correct_coinbase_status =
                   read Boolean.typ correct_coinbase_status
                 and result = read Boolean.typ result in
-                Logger.trace logger
+                [%log trace]
                   "blockchain snark update success: $result = \
                    (correct_transaction_snark=$correct_transaction_snark ∨ \
                    nothing_changed \
                    (no_coinbases_popped=$no_coinbases_popped)=$nothing_changed) \
                    ∧ updated_consensus_state=$updated_consensus_state ∧ \
                    correct_coinbase_status=$correct_coinbase_status"
-                  ~module_:__MODULE__ ~location:__LOC__
                   ~metadata:
                     [ ( "correct_transaction_snark"
                       , `Bool correct_transaction_snark )

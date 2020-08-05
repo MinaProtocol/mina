@@ -8,15 +8,19 @@ defmodule Coda.Application do
   alias Cloud.Google.LogPipeline
   alias Coda.Resources
 
+  import LogFilter.Language
+
   use Application
 
   def resource_db_entries do
+    win_rates = Coda.Validations.Configuration.whale_win_rates
     [
-      Resources.BlockProducer.build("whale", 1),
-      Resources.BlockProducer.build("whale", 2),
-      Resources.BlockProducer.build("whale", 3),
-      Resources.BlockProducer.build("whale", 4),
-      Resources.BlockProducer.build("whale", 5)
+      # class, id, expected_win_rate
+      Resources.BlockProducer.build("whale", 1, Enum.fetch!(win_rates,0)),
+      Resources.BlockProducer.build("whale", 2, Enum.fetch!(win_rates,1)),
+      Resources.BlockProducer.build("whale", 3, Enum.fetch!(win_rates,2)),
+      Resources.BlockProducer.build("whale", 4, Enum.fetch!(win_rates,3)),
+      Resources.BlockProducer.build("whale", 5, Enum.fetch!(win_rates,4))
       # Resources.BlockProducer.build("fish", 1),
       # Resources.BlockProducer.build("fish", 2),
       # Resources.BlockProducer.build("fish", 3)
@@ -59,10 +63,19 @@ defmodule Coda.Application do
     #   {Providers.BlockFrontierDiffApplied, resources}
     # ]
 
-    filter = Architecture.LogProvider.log_filter(Coda.Providers.BlockProduced, resource_db)
+    resource_filter = Architecture.LogProvider.log_filter(Coda.Providers.BlockProduced, resource_db)
+
+    global_filter = filter do
+      resource.labels.project_id == "#{Coda.project_id()}"
+      resource.labels.location == "#{Coda.region()}"
+      resource.labels.cluster_name == "#{Coda.cluster()}"
+      resource.labels.namespace_name == "#{Coda.testnet()}"
+    end
+
+    log_filter = Architecture.LogFilter.adjoin(global_filter, resource_filter)
 
     IO.puts("LOG FILTER:")
-    IO.puts(LogFilter.render(filter))
+    IO.puts(LogFilter.render(log_filter))
     IO.puts("===========")
 
     log_pipeline =
@@ -70,7 +83,7 @@ defmodule Coda.Application do
         api_conns.pubsub,
         api_conns.logging,
         "blocks-produced",
-        LogFilter.render(filter)
+        LogFilter.render(log_filter)
       )
 
     validations_spec = [
@@ -90,7 +103,7 @@ defmodule Coda.Application do
 
     log_providers_spec = [
       %Architecture.LogProvider.Spec{
-        log_provider: Coda.LogProvider.BlockProduced,
+        log_provider: Coda.Providers.BlockProduced,
         subscription: log_pipeline.subscription,
         conn: api_conns.pubsub
       }
