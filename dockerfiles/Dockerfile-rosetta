@@ -76,13 +76,12 @@ RUN curl -sL \
 # TODO: rosetta requires binary file downloads of this sort to be hashed + validated
 RUN curl -s "https://dl.google.com/go/go${GO_VERSION}.linux-amd64.tar.gz" | tar -xz -C /usr/lib/
 
-
 # Rust install via rustup-init to a given RUST_VERSION
 # TODO: rosetta requires binary file downloads of this sort to be hashed + validated
 RUN curl --proto '=https' --tlsv1.2 -sSf -o /tmp/rustup-init \
   https://static.rust-lang.org/rustup/dist/x86_64-unknown-linux-gnu/rustup-init \
   && chmod +x /tmp/rustup-init \
-  && /tmp/rustup-init -y --default-toolchain "${RUST_VERSION}" --profile minimal \
+  && CARGO_HOME=/home/opam /tmp/rustup-init -y --default-toolchain "${RUST_VERSION}" --profile minimal \
   && rm /tmp/rustup-init
 # For more about rustup-init see: https://github.com/rust-lang/rustup/blob/master/README.md
 # As opposed to introducing another shell script here (that mostly just determines the platform)
@@ -160,9 +159,6 @@ ARG EXTERNAL_PKG_DIR=$CODA_DIR/src/external
 ENV OPAMKEEPBUILDDIR false
 ENV OPAMREUSEBUILDDIR false
 
-ENV HOME /home/opam
-ENV PATH "$PATH:/usr/lib/go/bin:$HOME/.cargo/bin"
-
 # git will clone into an empty dir, but this also helps us set the workdir in advance
 RUN git clone \
   -b "${CODA_BRANCH}" \
@@ -218,7 +214,6 @@ FROM opam-deps AS builder
 # Use --build-arg "DUNE_PROFILE=dev" to build a dev image or for CI
 ARG DUNE_PROFILE=testnet_postake_medium_curves
 
-ENV HOME /home/opam
 ENV PATH "$PATH:/usr/lib/go/bin:$HOME/.cargo/bin"
 
 # Build libp2p_helper and clear go module caches
