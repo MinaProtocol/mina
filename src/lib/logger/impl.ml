@@ -342,7 +342,12 @@ let raw ({id; _} as t) msg =
     Consumer_registry.broadcast_log_message ~id msg
   else failwithf "invalid log call \"%s\"" (String.escaped msg.message) ()
 
-let log t ~level ~module_ ~location ?(metadata = []) ?event_id fmt =
+let log t ~level ~module_ ~location ?tags ?(metadata = []) ?event_id fmt =
+  let metadata =
+    Option.value_map tags ~default:metadata ~f:(fun tags ->
+        let tags_item = ("tags", `List (List.map tags ~f:Tags.to_yojson)) in
+        tags_item :: metadata )
+  in
   let f message =
     raw t
     @@ make_message t ~level ~module_ ~location ~metadata ~message ~event_id
@@ -353,6 +358,7 @@ type 'a log_function =
      t
   -> module_:string
   -> location:string
+  -> ?tags:Tags.t list
   -> ?metadata:(string, Yojson.Safe.t) List.Assoc.t
   -> ?event_id:Structured_log_events.id
   -> ('a, unit, string, unit) format4
@@ -382,13 +388,19 @@ module Structured = struct
        t
     -> module_:string
     -> location:string
+    -> ?tags:Tags.t list
     -> ?metadata:(string, Yojson.Safe.t) List.Assoc.t
     -> Structured_log_events.t
     -> unit
 
-  let log t ~level ~module_ ~location ?(metadata = []) event =
+  let log t ~level ~module_ ~location ?tags ?(metadata = []) event =
     let message, event_id, str_metadata = Structured_log_events.log event in
     let event_id = Some event_id in
+    let metadata =
+      Option.value_map tags ~default:metadata ~f:(fun tags ->
+          let tags_item = ("tags", `List (List.map tags ~f:Tags.to_yojson)) in
+          tags_item :: metadata )
+    in
     let metadata = str_metadata @ metadata in
     raw t
     @@ make_message t ~level ~module_ ~location ~metadata ~message ~event_id
