@@ -47,7 +47,9 @@ val add_block_subscriber :
 
 val add_payment_subscriber : t -> Account.key -> User_command.t Pipe.Reader.t
 
-val snark_worker_key : t -> Public_key.Compressed.Stable.V1.t option
+val snark_worker_key : t -> Public_key.Compressed.t option
+
+val snark_coordinator_key : t -> Public_key.Compressed.t option
 
 val snark_work_fee : t -> Currency.Fee.t
 
