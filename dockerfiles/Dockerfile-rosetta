@@ -302,7 +302,7 @@ COPY --from=builder /home/opam/coda/src/app/rosetta/config.json /data/config.jso
 COPY --from=builder /home/opam/demo-genesis ${CODA_CONFIG_DIR}/demo-genesis
 COPY --from=builder /home/opam/coda/src/app/rosetta/demo-config.json ${CODA_CONFIG_DIR}/daemon.json
 
-RUN mkdir -p ${CODA_CONFIG_DIR}/wallets/store/ \
+RUN mkdir -p --mode=700 ${CODA_CONFIG_DIR}/wallets/store/ \
   && echo "$PK" >  ${CODA_CONFIG_DIR}/wallets/store/$PK.pub \
   && echo '{"box_primitive":"xsalsa20poly1305","pw_primitive":"argon2i","nonce":"8jGuTAxw3zxtWasVqcD1H6rEojHLS1yJmG3aHHd","pwsalt":"AiUCrMJ6243h3TBmZ2rqt3Voim1Y","pwdiff":[134217728,6],"ciphertext":"DbAy736GqEKWe9NQWT4yaejiZUo9dJ6rsK7cpS43APuEf5AH1Qw6xb1s35z8D2akyLJBrUr6m"}' \
   > ${CODA_CONFIG_DIR}/wallets/store/${PK} \
