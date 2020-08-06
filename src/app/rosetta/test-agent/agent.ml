@@ -5,6 +5,8 @@ open Lib
 open Async
 open Models
 
+let other_pk = "B62qoDWfBZUxKpaoQCoFqr12wkaY84FrhxXNXzgBkMUi2Tz4K8kBDiv"
+
 let wait span = Async.after span |> Deferred.map ~f:Result.return
 
 (* Keep trying to run `step` `retry_count` many times initially waiting for `initial_delay` and each time waiting `each_delay` *)
@@ -65,11 +67,7 @@ let check_new_account_payment ~logger ~rosetta_uri ~graphql_uri =
   (* Send a payment *)
   let%bind hash =
     Poke.SendTransaction.payment ~fee:(`Int 2_000_000_000)
-      ~amount:(`Int 5_000_000_000)
-      ~to_:
-        (`String
-          "ZsMSUtsVDsfGXFf2jMerfdLemdhu4NRrmA8T948sB5WfKNrrHuwLPj4Pjk34CrfJTVy")
-      ~graphql_uri ()
+      ~amount:(`Int 5_000_000_000) ~to_:(`String other_pk) ~graphql_uri ()
   in
   let%bind () = wait (Span.of_sec 2.0) in
   (* Grab the mempool and find the payment inside *)
@@ -103,26 +101,17 @@ let check_new_account_payment ~logger ~rosetta_uri ~graphql_uri =
     Operation_expectation.
       [ { amount= Some (-2_000_000_000)
         ; account=
-            Some
-              { Account.pk=
-                  "ZsMSUuKL9zLAF7sMn951oakTFRCCDw9rDfJgqJ55VMtPXaPa5vPwntQRFJzsHyeh8R8"
-              ; token_id= Unsigned.UInt64.of_int 1 }
+            Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
         ; status= "Pending"
         ; _type= "fee_payer_dec" }
       ; { amount= Some (-5_000_000_000)
         ; account=
-            Some
-              { Account.pk=
-                  "ZsMSUuKL9zLAF7sMn951oakTFRCCDw9rDfJgqJ55VMtPXaPa5vPwntQRFJzsHyeh8R8"
-              ; token_id= Unsigned.UInt64.of_int 1 }
+            Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
         ; status= "Pending"
         ; _type= "payment_source_dec" }
       ; { amount= Some 5_000_000_000
         ; account=
-            Some
-              { Account.pk=
-                  "ZsMSUtsVDsfGXFf2jMerfdLemdhu4NRrmA8T948sB5WfKNrrHuwLPj4Pjk34CrfJTVy"
-              ; token_id= Unsigned.UInt64.of_int 1 }
+            Some {Account.pk= other_pk; token_id= Unsigned.UInt64.of_int 1}
         ; status= "Pending"
         ; _type= "payment_receiver_inc" } ]
   in
@@ -170,10 +159,7 @@ let check_new_account_payment ~logger ~rosetta_uri ~graphql_uri =
         @ Operation_expectation.
             [ { amount= Some 20_000_000_000
               ; account=
-                  Some
-                    { Account.pk=
-                        "ZsMSUuKL9zLAF7sMn951oakTFRCCDw9rDfJgqJ55VMtPXaPa5vPwntQRFJzsHyeh8R8"
-                    ; token_id= Unsigned.UInt64.of_int 1 }
+                  Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
               ; status= "Success"
               ; _type= "coinbase_inc" } ] )
       ~actual:
