@@ -42,6 +42,7 @@ module Block = {
       feePayerAccount: string,
       fee: string,
       amount: option(string),
+      token: string,
     };
 
     module Decode = {
@@ -65,6 +66,7 @@ module Block = {
               json |> field("usercommandfeepayeraccount", string),
             fee: json |> field("usercommandfee", string),
             amount: json |> optional(field("usercommandamount", string)),
+            token: json |> field("usercommandtoken", string),
           }
           ->Some
         | exception (DecodeError(_)) => None
@@ -207,7 +209,9 @@ module Metrics = {
     | SnarkFeesCollected
     | HighestSnarkFeeCollected
     | TransactionsReceivedByEcho
-    | CoinbaseReceiver;
+    | CoinbaseReceiver
+    | CreateAndSendToken
+    | ReceiveToken;
 
   type t = {
     blocksCreated: option(int),
@@ -216,5 +220,6 @@ module Metrics = {
     highestSnarkFeeCollected: option(int64),
     transactionsReceivedByEcho: option(int),
     coinbaseReceiver: option(bool),
+    createAndSendToken: option(int),
   };
 };
