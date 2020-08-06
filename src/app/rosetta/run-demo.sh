@@ -3,7 +3,7 @@
 set -e
 
 BIN=../../../_build/default/src/app/cli/src/coda.exe
-PK=ZsMSUuKL9zLAF7sMn951oakTFRCCDw9rDfJgqJ55VMtPXaPa5vPwntQRFJzsHyeh8R8
+PK=B62qrPN5Y5yq8kGE3FbVKbGTdTAJNdtNtB5sNVpxyRwWGcDEhpMzc8g
 
 genesis_time=$(date -d '2019-01-30 20:00:00.000000Z' '+%s')
 now_time=$(date +%s)
