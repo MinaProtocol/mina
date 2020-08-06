@@ -87,16 +87,16 @@ module Make
               Error (`Locally_generated (diff, ())) )
             else Error (`Other (Error.of_string reason))
           in
-          let check_and_add () =
+          let add_to_pool () =
             Pool.add_snark ~is_local pool ~work ~proof ~fee |> to_or_error
           in
           match Pool.request_proof pool work with
           | None ->
-              check_and_add ()
+              add_to_pool ()
           | Some {fee= {fee= prev; _}; _} -> (
             match Currency.Fee.compare fee.fee prev with
             | -1 ->
-                check_and_add ()
+                add_to_pool ()
             | 0 ->
                 reject_and_log_if_local "fee equal to cheapest work we have"
             | 1 ->

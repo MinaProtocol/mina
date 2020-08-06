@@ -330,7 +330,6 @@ module Make (Transition_frontier : Transition_frontier_intf) :
                       work ) ] ;
           `Statement_not_referenced )
 
-      (* At this point, verification already has happened *)
       let verify_and_act t ~work ~sender =
         let statements, priced_proof = work in
         let {Priced_proof.proof= proofs; fee= {prover; fee}} = priced_proof in
