@@ -37,13 +37,13 @@ sleep 3
 sleep 3
 
 # Setup and run demo-node
-PK=ZsMSUuKL9zLAF7sMn951oakTFRCCDw9rDfJgqJ55VMtPXaPa5vPwntQRFJzsHyeh8R8
+PK=B62qrPN5Y5yq8kGE3FbVKbGTdTAJNdtNtB5sNVpxyRwWGcDEhpMzc8g
 genesis_time=$(date -d '2019-01-30 20:00:00.000000Z' '+%s')
 now_time=$(date +%s)
 export CODA_TIME_OFFSET=$(( $now_time - $genesis_time ))
 export CODA_PRIVKEY_PASS=""
 export CODA_CONFIG_FILE=/root/.coda-config/config.json
-echo '{"box_primitive":"xsalsa20poly1305","pw_primitive":"argon2i","nonce":"7UMMcQYuXzDWx3zv4HyCxkk9JvUyiWrP6Rje12a","pwsalt":"Ac6n4NVqq2BvnqbmGfYzrZSSRFMe","pwdiff":[134217728,6],"ciphertext":"mzkgEY94mo27CycKXyMhJqAZTRniUiEAWEbj2PA1zDe5hmJqHic4zwdg5tavr9Mcdt6qisT64QMQux8P7ASG8"}' > /root/.coda-config/demo-block-producer-key
+echo '{"box_primitive":"xsalsa20poly1305","pw_primitive":"argon2i","nonce":"8jGuTAxw3zxtWasVqcD1H6rEojHLS1yJmG3aHHd","pwsalt":"AiUCrMJ6243h3TBmZ2rqt3Voim1Y","pwdiff":[134217728,6],"ciphertext":"DbAy736GqEKWe9NQWT4yaejiZUo9dJ6rsK7cpS43APuEf5AH1Qw6xb1s35z8D2akyLJBrUr6m"}' > /root/.coda-config/demo-block-producer-key
 
 /coda-bin/cli/src/coda.exe daemon \
   -seed \
