@@ -10,7 +10,7 @@
       "type": "dev"
     }
   ],
-  "bs-dependencies": ["bsc-stdlib-polyfill", "bs-fetch"],
+  "bs-dependencies": ["bsc-stdlib-polyfill", "bs-fetch", "@glennsl/bs-json"],
   "reason": {
     "react-jsx": 3
   },
