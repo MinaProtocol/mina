@@ -1,6 +1,6 @@
 open Bindings.Postgres;
 
-let getBlocks = "SELECT b.id AS blockid, uc.id AS userCommandId, ic.id AS internalCommandId, b.state_hash, pk1.value AS blockcreatorAccount, b.height, b.timestamp, ic.type AS internalCommandType, pk2.value AS internalCommandRecipient, ic.fee as internalCommandFee, ic.token AS internalCommandToken, uc.type AS userCommandType, uc.status AS userCommandStatus, uc.amount AS userCommandAmount, uc.fee AS userCommandFee, pk3.value AS userCommandFeePayerAccount, pk4.value AS userCommandFromAccount, pk5.value AS userCommandToAccount, uc.memo AS userCommandMemo
+let getBlocks = "SELECT b.id AS blockid, uc.id AS userCommandId, ic.id AS internalCommandId, b.state_hash, pk1.value AS blockcreatorAccount, b.height, b.timestamp, ic.type AS internalCommandType, pk2.value AS internalCommandRecipient, ic.fee as internalCommandFee, ic.token AS internalCommandToken, uc.type AS userCommandType, uc.status AS userCommandStatus, uc.amount AS userCommandAmount, uc.fee AS userCommandFee, pk3.value AS userCommandFeePayerAccount, pk4.value AS userCommandFromAccount, pk5.value AS userCommandToAccount, uc.memo AS userCommandMemo, uc.token AS userCommandToken
 
 FROM blocks AS b
 

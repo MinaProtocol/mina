@@ -132,7 +132,7 @@ let updateChallengeSheet = (client, spreadsheetId, range, userMap, metricsMap) =
         ),
         result => {
         switch (result) {
-        | Ok(_) => Js.log({j|Data uploaded points for 3.2b|j})
+        | Ok(_) => Js.log({j|Data uploaded points for $range|j})
         | Error(error) => Js.log(error)
         }
       });
@@ -154,7 +154,7 @@ let uploadChallengePoints = (spreadsheetId, metricsMap) => {
       updateChallengeSheet(
         client,
         spreadsheetId,
-        "3.2b!A3:M",
+        "3.3!A3:M",
         userMap,
         metricsMap,
       );

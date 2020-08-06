@@ -174,7 +174,7 @@ let uploadUserProfileData = spreadsheetId => {
           /* Fetch current release leaderboard data */
           getRange(
             client,
-            initSheetsQuery(spreadsheetId, "3.2b!A4:B", "FORMATTED_VALUE"),
+            initSheetsQuery(spreadsheetId, "3.3!A5:B", "FORMATTED_VALUE"),
             result => {
             switch (result) {
             | Ok(releaseResult) =>
