@@ -257,7 +257,7 @@ FROM debian:buster-slim AS production
 
 ARG POSTGRES_DATA_DIR=/data/postgresql
 ARG CODA_DAEMON_PORT=10101
-ARG CODA_CONFIG_DIR=/root/.coda-demo-config
+ARG CODA_CONFIG_DIR=/root/.coda-config
 # Sample public key for use in dev profile / demo mode genesis block
 ARG PK=B62qrPN5Y5yq8kGE3FbVKbGTdTAJNdtNtB5sNVpxyRwWGcDEhpMzc8g
 
