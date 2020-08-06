@@ -2,13 +2,13 @@
 
 set -eou pipefail
 
-PK=ZsMSUuKL9zLAF7sMn951oakTFRCCDw9rDfJgqJ55VMtPXaPa5vPwntQRFJzsHyeh8R8
+PK=B62qkV77S1iHryAAWRdRAp4HDBXfQhka3wYmMQSWhoHc8ftNpR44Zct
 
 mkdir -p /tmp/s3_cache_dir/
 
 mkdir -p /tmp/keys \
   && chmod go-rwx /tmp/keys \
-  && echo '{"box_primitive":"xsalsa20poly1305","pw_primitive":"argon2i","nonce":"7UMMcQYuXzDWx3zv4HyCxkk9JvUyiWrP6Rje12a","pwsalt":"Ac6n4NVqq2BvnqbmGfYzrZSSRFMe","pwdiff":[134217728,6],"ciphertext":"mzkgEY94mo27CycKXyMhJqAZTRniUiEAWEbj2PA1zDe5hmJqHic4zwdg5tavr9Mcdt6qisT64QMQux8P7ASG8"}' > /tmp/keys/demo-block-producer \
+  && echo '{"box_primitive":"xsalsa20poly1305","pw_primitive":"argon2i","nonce":"6kT7zxuBrqxvZh5wDYQTkEBzoGzkDCeyMtKT7yt","pwsalt":"8mnVVB1CnfBx7rT1KPLeugzcpbGZ","pwdiff":[134217728,6],"ciphertext":"BQndafcHzrmeV53H2LpwGTYohiKYco3heT746sn87agBgMyw6jNNcWyTv4fEH9wVS4e59y6mb"}' > /tmp/keys/demo-block-producer \
   && chmod go-rwx /tmp/keys/demo-block-producer \
   && rm -rf ~/.coda-config \
   && mkdir -p ~/.coda-config/wallets/store \

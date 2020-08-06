@@ -6,8 +6,7 @@ open Lib
 open Async
 
 (* TODO: Parameterize this against prod/test networks *)
-let pk =
-  `String "ZsMSUuKL9zLAF7sMn951oakTFRCCDw9rDfJgqJ55VMtPXaPa5vPwntQRFJzsHyeh8R8"
+let pk = "B62qkV77S1iHryAAWRdRAp4HDBXfQhka3wYmMQSWhoHc8ftNpR44Zct"
 
 module Staking = struct
   module Disable =
@@ -37,7 +36,9 @@ module Staking = struct
 
   let enable ~graphql_uri =
     let open Deferred.Result.Let_syntax in
-    let%map res = Graphql.query (Enable.make ~publicKey:pk ()) graphql_uri in
+    let%map res =
+      Graphql.query (Enable.make ~publicKey:(`String pk) ()) graphql_uri
+    in
     (res#setStaking)#lastStaking
 end
 
@@ -55,7 +56,9 @@ module Account = struct
   let unlock ~graphql_uri =
     let open Deferred.Result.Let_syntax in
     let%map res =
-      Graphql.query (Unlock.make ~password:"" ~public_key:pk ()) graphql_uri
+      Graphql.query
+        (Unlock.make ~password:"" ~public_key:(`String pk) ())
+        graphql_uri
     in
     (res#unlockAccount)#publicKey
 end
@@ -77,7 +80,7 @@ module SendTransaction = struct
     let open Deferred.Result.Let_syntax in
     let%map res =
       Graphql.query
-        (Payment.make ~fee ~amount ?token ~to_ ~from:pk ())
+        (Payment.make ~fee ~amount ?token ~to_ ~from:(`String pk) ())
         graphql_uri
     in
     let (`UserCommand x) = (res#sendPayment)#payment in
