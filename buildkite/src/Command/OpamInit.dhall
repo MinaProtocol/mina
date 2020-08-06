@@ -10,7 +10,7 @@ let file =
 
 let unpackageScript : Text = "tar xfz ${file} --strip-components=2 -C /home/opam"
 
-let exposeOpamEnv : Text = "eval \\\"\\\\\$(opam config env)\\\""
+let exposeOpamEnv : Text = "eval '\$(opam config env)'"
 
 let commands : List Text -> List Cmd.Type = \(environment : List Text) ->
   [
