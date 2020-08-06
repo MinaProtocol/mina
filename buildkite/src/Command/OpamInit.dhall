@@ -10,8 +10,6 @@ let file =
 
 let unpackageScript : Text = "tar xfz ${file} --strip-components=2 -C /home/opam"
 
-let exposeOpamEnv : Text = "eval '\$(opam config env)'"
-
 let commands : List Text -> List Cmd.Type = \(environment : List Text) ->
   [
     r ("cat scripts/setup-opam.sh src/opam.export <(date +%Y-%m)" ++
@@ -34,7 +32,7 @@ let andThenRunInDocker : List Text -> Text -> List Cmd.Type =
     [ Coda.fixPermissionsCommand ] # (commands environment) # [
       Cmd.runInDocker
         (Cmd.Docker::{ image = (../Constants/ContainerImages.dhall).codaToolchain, extraEnv = environment })
-        (unpackageScript ++ " && " ++ exposeOpamEnv ++ " && " ++ innerScript)
+        (unpackageScript ++ " && " ++ innerScript)
     ]
 
 in
