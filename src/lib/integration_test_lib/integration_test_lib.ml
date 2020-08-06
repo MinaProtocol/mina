@@ -147,12 +147,12 @@ end
 
 (* NB: until the DSL is actually implemented, a test just takes in the engine
  * implementation directly. *)
-module type Test_functor = functor (Engine : Engine_intf) -> Test_intf
-                                                             with type network =
-                                                                         Engine
-                                                                         .Network
-                                                                         .t
-                                                              and type log_engine =
-                                                                         Engine
-                                                                         .Log_engine
-                                                                         .t
+module type Test_functor_intf = functor (Engine : Engine_intf) -> Test_intf
+                                                                  with type network =
+                                                                              Engine
+                                                                              .Network
+                                                                              .t
+                                                                   and type log_engine =
+                                                                              Engine
+                                                                              .Log_engine
+                                                                              .t
