@@ -48,7 +48,7 @@ CODA_CONFIG_DIR=/root/.coda-config
 /coda-bin/cli/src/coda.exe daemon \
   -seed \
   -demo-mode \
-  -block-producer-key "$CODA_CONFIG_DIR/wallets/$PK" \
+  -block-producer-key "$CODA_CONFIG_DIR/wallets/store/$PK" \
   -run-snark-worker $PK \
   -config-file "$CODA_CONFIG_DIR/daemon.json" \
   -config-dir "$CODA_CONFIG_DIR" \
