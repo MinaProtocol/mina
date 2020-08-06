@@ -39,6 +39,7 @@ module Block = {
       status: option(userCommandStatus),
       fromAccount: string,
       toAccount: string,
+      feePayerAccount: string,
       fee: string,
       amount: option(string),
     };
@@ -60,6 +61,8 @@ module Block = {
               |> userCommandStatusOfString,
             fromAccount: json |> field("usercommandfromaccount", string),
             toAccount: json |> field("usercommandtoaccount", string),
+            feePayerAccount:
+              json |> field("usercommandfeepayeraccount", string),
             fee: json |> field("usercommandfee", string),
             amount: json |> optional(field("usercommandamount", string)),
           }
