@@ -211,12 +211,15 @@ let wait_for_high_connectivity ~logger ~network ~is_seed =
             "Will start initialization without connecting with too many peers"
       ) ]
 
-let initialize ~logger ~network ~is_seed ~verifier ~trust_system
+let initialize ~logger ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
     ~time_controller ~frontier_w ~producer_transition_reader ~clear_reader
     ~verified_transition_writer ~transition_reader_ref ~transition_writer_ref
     ~most_recent_valid_block_writer ~persistent_root ~persistent_frontier
     ~consensus_local_state ~precomputed_values =
-  let%bind () = wait_for_high_connectivity ~logger ~network ~is_seed in
+  let%bind () =
+    if is_demo_mode then return ()
+    else wait_for_high_connectivity ~logger ~network ~is_seed
+  in
   let genesis_constants =
     Precomputed_values.genesis_constants precomputed_values
   in
@@ -335,8 +338,8 @@ let wait_till_genesis ~logger ~time_controller
       (logger_loop ())
     |> Deferred.ignore
 
-let run ~logger ~trust_system ~verifier ~network ~is_seed ~time_controller
-    ~consensus_local_state ~persistent_root_location
+let run ~logger ~trust_system ~verifier ~network ~is_seed ~is_demo_mode
+    ~time_controller ~consensus_local_state ~persistent_root_location
     ~persistent_frontier_location
     ~frontier_broadcast_pipe:(frontier_r, frontier_w)
     ~network_transition_reader ~producer_transition_reader
@@ -373,9 +376,9 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~time_controller
           ~ledger_depth:(Precomputed_values.ledger_depth precomputed_values)
       in
       upon
-        (initialize ~logger ~network ~is_seed ~verifier ~trust_system
-           ~persistent_frontier ~persistent_root ~time_controller ~frontier_w
-           ~producer_transition_reader ~clear_reader
+        (initialize ~logger ~network ~is_seed ~is_demo_mode ~verifier
+           ~trust_system ~persistent_frontier ~persistent_root ~time_controller
+           ~frontier_w ~producer_transition_reader ~clear_reader
            ~verified_transition_writer ~transition_reader_ref
            ~transition_writer_ref ~most_recent_valid_block_writer
            ~consensus_local_state ~precomputed_values) (fun () ->
