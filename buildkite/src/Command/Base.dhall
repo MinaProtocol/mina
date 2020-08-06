@@ -148,7 +148,7 @@ let build : Config.Type -> B/Command.Type = \(c : Config.Type) ->
                         limit = retry.limit
                     })
                     -- per https://buildkite.com/docs/agent/v3#exit-codes, ensure automatic retries on -1 exit status (infra error)
-                    ([Retry::{ exit_status = "-1", limit = Some 3 }] #
+                    ([Retry::{ exit_status = "*", limit = Some 2 }] #
                     -- and the retries that are passed in (if any)
                     c.retries)
                 in
