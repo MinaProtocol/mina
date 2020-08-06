@@ -62,7 +62,7 @@ let TaggedKey = {
 -- should be retried.
 let Retry = {
   Type = {
-    exit_status : Text,
+    exit_status : Integer,
     limit : Optional Natural
   },
   default = {
@@ -143,12 +143,17 @@ let build : Config.Type -> B/Command.Type = \(c : Config.Type) ->
                       (\(retry : Retry.Type) ->
                       {
                         -- we always require the exit status
-                        exit_status = Some (B/ExitStatus.String retry.exit_status),
+                        exit_status = Some (B/ExitStatus.Integer retry.exit_status),
                         -- but limit is optional
-                        limit = retry.limit
+                        limit =
+                          Optional/map
+                          Natural
+                          Integer
+                          Natural/toInteger
+                          retry.limit
                     })
                     -- per https://buildkite.com/docs/agent/v3#exit-codes, ensure automatic retries on -1 exit status (infra error)
-                    ([Retry::{ exit_status = "*", limit = Some 2 }] #
+                    ([Retry::{ exit_status = -1, limit = Some 2 }] #
                     -- and the retries that are passed in (if any)
                     c.retries)
                 in
