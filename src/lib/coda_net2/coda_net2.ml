@@ -405,7 +405,7 @@ module Helper = struct
           ; ("body", M.input_to_yojson body) ]
       in
       let rpc = Yojson.Safe.to_string actual_obj in
-      Logger.spam t.logger "sending line to libp2p_helper: $line"
+      [%log' spam t.logger] "sending line to libp2p_helper: $line"
         ~metadata:
           [ ( "line"
             , `String (String.slice rpc 0 (Int.min (String.length rpc) 2048))
@@ -422,10 +422,9 @@ module Helper = struct
   let stream_state_invariant stream logger =
     let us_closed = Pipe.is_closed stream.outgoing_w in
     let them_closed = Pipe.is_closed stream.incoming_w in
-    Logger.trace logger "%sus_closed && %sthem_closed"
+    [%log trace] "%sus_closed && %sthem_closed"
       (if us_closed then "" else "not ")
-      (if them_closed then "" else "not ")
-      ~module_:__MODULE__ ~location:__LOC__ ;
+      (if them_closed then "" else "not ") ;
     match stream.state with
     | FullyOpen ->
         (not us_closed) && not them_closed
@@ -487,7 +486,7 @@ module Helper = struct
               Deferred.unit
         in
         let double_close () =
-          Logger.error net.logger ~module_:__MODULE__ ~location:__LOC__
+          [%log' error net.logger]
             "stream with index $index closed twice by $party"
             ~metadata:
               [ ("index", `Int stream.idx)
@@ -503,9 +502,8 @@ module Helper = struct
           | Some _ ->
               ()
           | None ->
-              Logger.error net.logger
+              [%log' error net.logger]
                 "tried to release stream $idx but it was already gone"
-                ~module_:__MODULE__ ~location:__LOC__
                 ~metadata:[("idx", `Int stream.idx)]
         in
         stream.state
@@ -520,10 +518,9 @@ module Helper = struct
                double_close () ) ;
         (* TODO: maybe we can check some invariants on the Go side too? *)
         if not (stream_state_invariant stream net.logger) then
-          Logger.error net.logger
+          [%log' error net.logger]
             "after $who_closed closed the stream, stream state invariant \
              broke (previous state: $old_stream_state)"
-            ~location:__LOC__ ~module_:__MODULE__
             ~metadata:
               [ ("who_closed", `String (name_participant who_closed))
               ; ("old_stream_state", `String (show_stream_state old_state)) ]
@@ -573,9 +570,8 @@ module Helper = struct
                 failwithf "helper broke RPC protocol: sendStreamMsg got %s" v
                   ()
             | Error e ->
-                Logger.error net.logger
+                [%log' error net.logger]
                   "error sending message on stream $idx: $error"
-                  ~module_:__MODULE__ ~location:__LOC__
                   ~metadata:
                     [ ("idx", `Int idx)
                     ; ("error", `String (Error.to_string_hum e)) ] ;
@@ -611,9 +607,8 @@ module Helper = struct
           Or_error.errorf "spurious reply to RPC #%d: %s" seq
             (Yojson.Safe.to_string v)
     else (
-      Logger.error t.logger "important info from helper: %s"
-        (Yojson.Safe.to_string err)
-        ~module_:__MODULE__ ~location:__LOC__ ;
+      [%log' error t.logger] "important info from helper: %s"
+        (Yojson.Safe.to_string err) ;
       Ok () )
 
   (** Parses an "upcall" and performs it.
@@ -714,9 +709,8 @@ module Helper = struct
           Option.fold m.sender ~init:false ~f:(fun _ sender ->
               Peer.Id.equal sender.peer_id me.peer_id )
         then (
-          Logger.trace t.logger
-            "not handling published message originated from me"
-            ~module_:__MODULE__ ~location:__LOC__ ;
+          [%log trace]
+            "not handling published message originated from me";
           (* elide messages that we sent *) return () )
         else*)
         let idx = m.subscription_idx in
@@ -740,10 +734,9 @@ module Helper = struct
                       ()
                   | `Call f ->
                       f (wrap m.sender raw_data) e ) ;
-                  Logger.error t.logger
+                  [%log' error t.logger]
                     "failed to decode message published on subscription \
                      $topic ($idx): $error"
-                    ~module_:__MODULE__ ~location:__LOC__
                     ~metadata:
                       [ ("topic", `String sub.topic)
                       ; ("idx", `Int idx)
@@ -752,10 +745,9 @@ module Helper = struct
               (* TODO: add sender to Publish.t and include it here. *)
               (* TODO: think about exposing the PeerID of the originator as well? *) )
             else
-              Logger.debug t.logger
+              [%log' debug t.logger]
                 "received msg for subscription $sub after unsubscribe, was it \
                  still in the stdout pipe?"
-                ~module_:__MODULE__ ~location:__LOC__
                 ~metadata:[("sub", `Int idx)] ;
             Ok ()
         | None ->
@@ -781,10 +773,9 @@ module Helper = struct
                       ()
                   | `Call f ->
                       f (wrap m.sender raw_data) e ) ;
-                  Logger.error t.logger
+                  [%log' error t.logger]
                     "failed to decode message published on subscription \
                      $topic ($idx): $error"
-                    ~module_:__MODULE__ ~location:__LOC__
                     ~metadata:
                       [ ("topic", `String sub.topic)
                       ; ("idx", `Int idx)
@@ -800,10 +791,9 @@ module Helper = struct
                 failwithf
                   "helper broke RPC protocol: validationComplete got %s" v ()
             | Error e ->
-                Logger.error t.logger
+                [%log' error t.logger]
                   "error during validationComplete, ignoring and continuing: \
                    $error"
-                  ~module_:__MODULE__ ~location:__LOC__
                   ~metadata:[("error", `String (Error.to_string_hum e))])
             |> don't_wait_for ;
             Ok ()
@@ -877,9 +867,8 @@ module Helper = struct
     | "streamLost" ->
         let%bind m = Stream_lost.of_yojson v |> or_error in
         let stream_idx = m.stream_idx in
-        Logger.trace t.logger
+        [%log' trace t.logger]
           "Encountered error while reading stream $idx: $error"
-          ~module_:__MODULE__ ~location:__LOC__
           ~metadata:[("error", `String m.reason); ("idx", `Int stream_idx)] ;
         Ok ()
     (* The remote peer closed its write end of one of our streams *)
@@ -965,9 +954,8 @@ module Pubsub = struct
     | Ok v ->
         failwithf "helper broke RPC protocol: publish got %s" v ()
     | Error e ->
-        Logger.error net.logger
-          "error while publishing message on $topic: $err" ~module_:__MODULE__
-          ~location:__LOC__
+        [%log' error net.logger]
+          "error while publishing message on $topic: $err"
           ~metadata:
             [("topic", `String topic); ("err", `String (Error.to_string_hum e))]
 
@@ -1214,10 +1202,9 @@ module Protocol_handler = struct
         close_connections net protocol_name ;
         failwithf "helper broke RPC protocol: addStreamHandler got %s" v ()
     | Error e ->
-        Logger.info net.logger
+        [%log' info net.logger]
           "error while closing handler for $protocol, closing connections \
            anyway: $err"
-          ~module_:__MODULE__ ~location:__LOC__
           ~metadata:
             [ ("protocol", `String protocol_name)
             ; ("err", `String (Error.to_string_hum e)) ] ;
@@ -1337,17 +1324,17 @@ let create ~logger ~conf_dir =
             then (
               match e with
               | Error (`Exit_non_zero _) | Error (`Signal _) ->
-                  Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+                  [%log fatal]
                     !"libp2p_helper process died unexpectedly: %s"
                     (Unix.Exit_or_signal.to_string_hum e) ;
                   raise Child_processes.Child_died
               | Ok () ->
-                  Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+                  [%log error]
                     "libp2p helper process exited peacefully but it should \
                      have been killed by shutdown!" ;
                   Deferred.unit )
             else (
-              Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+              [%log info]
                 !"libp2p_helper process killed successfully: %s"
                 (Unix.Exit_or_signal.to_string_hum e) ;
               Deferred.unit ) ))
@@ -1394,7 +1381,7 @@ let create ~logger ~conf_dir =
                   ; metadata= String.Map.singleton "line" (`String r.message)
                   } )
           | Error err ->
-              Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+              [%log error]
                 ~metadata:[("line", `String line); ("error", `String err)]
                 "failed to parse log line from helper stderr" ) ;
           Deferred.unit )
@@ -1410,8 +1397,7 @@ let create ~logger ~conf_dir =
           | Ok () ->
               ()
           | Error e ->
-              Logger.error logger "handling line from helper failed! $err"
-                ~module_:__MODULE__ ~location:__LOC__
+              [%log error] "handling line from helper failed! $err"
                 ~metadata:
                   [ ("line", `String line)
                   ; ("err", `String (Error.to_string_hum e)) ] ) ;
@@ -1534,8 +1520,7 @@ let%test_module "coda network tests" =
       let%bind b_sub = M.subscribe b "test" |> Deferred.Or_error.ok_exn in
       let%bind a_peers = peers a in
       let%bind b_peers = peers b in
-      Logger.fatal logger "a peers = $apeers, b peers = $bpeers"
-        ~module_:__MODULE__ ~location:__LOC__
+      [%log fatal] "a peers = $apeers, b peers = $bpeers"
         ~metadata:
           [ ("apeers", `List (List.map ~f:Peer.to_yojson a_peers))
           ; ("bpeers", `List (List.map ~f:Peer.to_yojson b_peers)) ] ;

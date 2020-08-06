@@ -5,5 +5,5 @@
  (inline_tests)
  (libraries core rocksdb coda_base coda_transition secrets staged_ledger)
  (preprocess
-  (pps ppx_jane ppx_version ppx_deriving_yojson))
+  (pps ppx_jane ppx_coda ppx_version ppx_deriving_yojson))
  (synopsis "A set of databases that the daemon stores. It's namely for GraphQL to make queries about past events that occurred with the daemon"))

@@ -85,11 +85,9 @@ let command_prune =
        in
        match%map.Async go () with
        | Ok () ->
-           Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-             "Successfully purged blocks." ~metadata:cmd_metadata
+           [%log info] "Successfully purged blocks." ~metadata:cmd_metadata
        | Error err ->
-           Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-             "Failed to purge blocks"
+           [%log error] "Failed to purge blocks"
              ~metadata:
                (("error", `String (Caqti_error.show err)) :: cmd_metadata))
 

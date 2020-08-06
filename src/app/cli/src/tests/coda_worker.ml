@@ -461,6 +461,7 @@ module T = struct
             Unix.mkdtemp @@ conf_dir ^/ "external_transition"
           in
           let trace_database_initialization typ location =
+            (* can't use %log because location is passed-in *)
             Logger.trace logger "Creating %s at %s" ~module_:__MODULE__
               ~location typ
           in
@@ -581,14 +582,12 @@ module T = struct
               (fun () ->
                 let%map coda = coda_deferred () in
                 coda_ref := Some coda ;
-                Logger.info logger "Setting up snark worker "
-                  ~module_:__MODULE__ ~location:__LOC__ ;
+                [%log info] "Setting up snark worker " ;
                 Coda_run.setup_local_server coda ;
                 coda )
               ()
           in
-          Logger.info logger "Worker finish setting up coda"
-            ~module_:__MODULE__ ~location:__LOC__ ;
+          [%log info] "Worker finish setting up coda" ;
           let coda_peers () = Coda_lib.peers coda in
           let coda_start () = Coda_lib.start coda in
           let coda_get_all_transitions pk =
@@ -650,7 +649,7 @@ module T = struct
                 ~resulting_receipt
             with
             | Ok proof ->
-                Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                [%log info]
                   !"Constructed proof for receipt: $receipt_chain_hash"
                   ~metadata:
                     [ ( "receipt_chain_hash"
@@ -692,7 +691,7 @@ module T = struct
                    let prev_state_hash = State_hash.to_bits prev_state_hash in
                    let state_hash = State_hash.to_bits state_hash in
                    if Pipe.is_closed w then
-                     Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+                     [%log error]
                        "why is this w pipe closed? did someone close the \
                         reader end? dropping this write..." ;
                    Linear_pipe.write_without_pushback_if_open w
@@ -709,7 +708,7 @@ module T = struct
               (Strict_pipe.Reader.iter (Coda_lib.root_diff coda)
                  ~f:(fun diff ->
                    if Pipe.is_closed w then
-                     Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+                     [%log error]
                        "[coda_root_diff] why is this w pipe closed? did \
                         someone close the reader end? dropping this write..." ;
                    Linear_pipe.write_if_open w diff )) ;

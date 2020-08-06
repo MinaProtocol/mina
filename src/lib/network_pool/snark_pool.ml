@@ -321,7 +321,7 @@ module Make (Transition_frontier : Transition_frontier_intf) :
           `Added )
         else (
           if is_local then
-            Logger.warn t.logger ~module_:__MODULE__ ~location:__LOC__
+            [%log' warn t.logger]
               "Rejecting locally generated snark work $stmt, statement not \
                referenced"
               ~metadata:
@@ -345,7 +345,7 @@ module Make (Transition_frontier : Transition_frontier_intf) :
             ; ("fee", Currency.Fee.to_yojson fee)
             ; ("error", `String (Error.to_string_hum e)) ]
           in
-          Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__ ~metadata
+          [%log' error t.logger] ~metadata
             "Error verifying transaction snark: $error" ;
           if punish then
             trust_record
@@ -405,7 +405,7 @@ module Make (Transition_frontier : Transition_frontier_intf) :
         ~f:(fun ~key:stmt ~data:(_proof, time) ->
           match is_expired time with
           | `Expired ->
-              Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
+              [%log' debug t.logger]
                 "No longer rebroadcasting SNARK with statement $stmt, it was \
                  added at $time its rebroadcast period is now expired"
                 ~metadata:
@@ -587,7 +587,8 @@ let%test_module "random set test" =
               ( work
               , One_or_two.map work ~f:(fun statement ->
                     Ledger_proof.create ~statement
-                      ~sok_digest:invalid_sok_digest ~proof:Proof.dummy )
+                      ~sok_digest:invalid_sok_digest
+                      ~proof:Proof.transaction_dummy )
               , fee
               , some_other_pk )
               :: acc )

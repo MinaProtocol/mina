@@ -124,8 +124,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                    (Peer.create config.addrs_and_ports.bind_ip
                       ~libp2p_port:config.addrs_and_ports.libp2p_port
                       ~peer_id:my_peer_id) ) ;
-          Logger.info config.logger "libp2p peer ID this session is $peer_id"
-            ~location:__LOC__ ~module_:__MODULE__
+          [%log' info config.logger] "libp2p peer ID this session is $peer_id"
             ~metadata:[("peer_id", `String my_peer_id)] ;
           let ctr = ref 0 in
           let throttle =
@@ -223,10 +222,9 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                       in
                       match%map Coda_net2.Stream.reset stream with
                       | Error e ->
-                          Logger.info config.logger
+                          [%log' info config.logger]
                             "failed to reset stream (this means it was \
                              probably closed successfully): $error"
-                            ~module_:__MODULE__ ~location:__LOC__
                             ~metadata:
                               [("error", `String (Error.to_string_hum e))]
                       | Ok () ->
@@ -406,8 +404,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
             Deferred.return (Ok result)
         | Ok (Error err) -> (
             (* call succeeded, result is an error *)
-            Logger.error t.config.logger ~module_:__MODULE__ ~location:__LOC__
-              "RPC call error: $error"
+            [%log' error t.config.logger] "RPC call error: $error"
               ~metadata:[("error", `String (Error.to_string_hum err))] ;
             match (Error.to_exn err, Error.sexp_of_t err) with
             | ( _
@@ -443,8 +440,8 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
             let exn = Monitor.extract_exn monitor_exn in
             match exn with
             | _ ->
-                Logger.error t.config.logger ~module_:__MODULE__
-                  ~location:__LOC__ "RPC call raised an exception: $exn"
+                [%log' error t.config.logger]
+                  "RPC call raised an exception: $exn"
                   ~metadata:[("exn", `String (Exn.to_string exn))] ;
                 Deferred.return (Or_error.of_exn exn) )
       in
@@ -471,7 +468,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
 
     let query_random_peers t n rpc query =
       let%map peers = random_peers t n in
-      Logger.trace t.config.logger ~module_:__MODULE__ ~location:__LOC__
+      [%log' trace t.config.logger]
         !"Querying random peers: %s"
         (Peer.pretty_list peers) ;
       List.map peers ~f:(fun peer -> query_peer t peer.peer_id rpc query)

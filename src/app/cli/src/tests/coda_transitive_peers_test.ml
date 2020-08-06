@@ -52,9 +52,7 @@ let main () =
     |> fst |> Node_addrs_and_ports.to_display
   in
   let libp2p_keypair = List.nth_exn addrs_and_ports_list n |> snd in
-  Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-    !"connecting to peers %{sexp: string list}\n"
-    peers ;
+  [%log debug] !"connecting to peers %{sexp: string list}\n" peers ;
   let config =
     Coda_process.local_config ~is_seed:true ~peers ~addrs_and_ports
       ~acceptable_delay ~chain_id:name ~libp2p_keypair ~net_configs
@@ -67,7 +65,7 @@ let main () =
   let%bind worker = Coda_process.spawn_exn config in
   let%bind _ = after (Time.Span.of_sec 10.) in
   let%bind peers = Coda_process.peers_exn worker in
-  Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+  [%log debug]
     !"got peers %{sexp: Network_peer.Peer.t list} %{sexp: \
       Node_addrs_and_ports.t list}\n"
     peers expected_peers ;

@@ -41,7 +41,7 @@ module Time = struct
            | Some tm ->
                Int.of_string tm
            | None ->
-               Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+               [%log debug]
                  "Environment variable CODA_TIME_OFFSET not found, using \
                   default of 0" ;
                0

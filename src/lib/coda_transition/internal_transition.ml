@@ -16,11 +16,14 @@ module type S = sig
 
   val create :
        snark_transition:Snark_transition.Value.t
+    -> ledger_proof:Ledger_proof.t option
     -> prover_state:Consensus.Data.Prover_state.t
     -> staged_ledger_diff:Staged_ledger_diff.t
     -> t
 
   val snark_transition : t -> Snark_transition.Value.t
+
+  val ledger_proof : t -> Ledger_proof.t option
 
   val prover_state : t -> Consensus.Data.Prover_state.t
 
@@ -32,6 +35,7 @@ module Stable = struct
   module V1 = struct
     type t =
       { snark_transition: Snark_transition.Value.Stable.V1.t
+      ; ledger_proof: Ledger_proof.Stable.V1.t option
       ; prover_state: Consensus.Data.Prover_state.Stable.V1.t
       ; staged_ledger_diff: Staged_ledger_diff.Stable.V1.t }
 
@@ -42,9 +46,13 @@ end]
 (* bin_io, version omitted *)
 type t = Stable.Latest.t =
   { snark_transition: Snark_transition.Value.t
+  ; ledger_proof: Ledger_proof.t option
   ; prover_state: Consensus.Data.Prover_state.t
   ; staged_ledger_diff: Staged_ledger_diff.t }
 [@@deriving sexp, fields, to_yojson]
 
-let create ~snark_transition ~prover_state ~staged_ledger_diff =
-  {Stable.Latest.snark_transition; staged_ledger_diff; prover_state}
+let create ~snark_transition ~ledger_proof ~prover_state ~staged_ledger_diff =
+  { Stable.Latest.snark_transition
+  ; ledger_proof
+  ; staged_ledger_diff
+  ; prover_state }

@@ -30,13 +30,12 @@ end)
     let rebroadcast (diff', rejected) =
       result_cb (Ok (diff', rejected)) ;
       if Resource_pool.Diff.is_empty diff' then (
-        Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
+        [%log' debug t.logger]
           "Refusing to rebroadcast. Pool diff apply feedback: empty diff" ;
         valid_cb false ;
         Deferred.unit )
       else (
-        Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
-          "Broadcasting %s"
+        [%log' trace t.logger] "Broadcasting %s"
           (Resource_pool.Diff.summary diff') ;
         valid_cb true ;
         Linear_pipe.write t.write_broadcasts diff' )
@@ -49,7 +48,7 @@ end)
     | Error (`Other e) ->
         valid_cb false ;
         result_cb (Error e) ;
-        Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
+        [%log' debug t.logger]
           "Refusing to rebroadcast. Pool diff apply feedback: %s"
           (Error.to_string_hum e) ;
         Deferred.unit
@@ -106,13 +105,10 @@ end)
       let rebroadcastable =
         Resource_pool.get_rebroadcastable t.resource_pool ~is_expired
       in
-      let log (log_func : 'a Logger.log_function) =
-        log_func logger ~location:__LOC__ ~module_:__MODULE__
-      in
       if List.is_empty rebroadcastable then
-        log Logger.trace "Nothing to rebroadcast"
+        [%log trace] "Nothing to rebroadcast"
       else
-        log Logger.debug
+        [%log debug]
           "Preparing to rebroadcast locally generated resource pool diffs \
            $diffs"
           ~metadata:

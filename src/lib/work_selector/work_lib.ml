@@ -34,7 +34,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
       let jobs_seen =
         Map.filteri jobs_seen ~f:(fun ~key:work ~data:status ->
             if Job_status.is_old status ~now ~reassignment_wait then (
-              Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+              [%log info]
                 ~metadata:[("work", Seen_key.to_yojson work)]
                 "Waited too long to get work for $work. Ready to be reassigned" ;
               Coda_metrics.(

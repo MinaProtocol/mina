@@ -2,5 +2,4 @@
   (name key_cache)
   (public_name key_cache)
   (libraries core async logger)
-  (preprocess (pps ppx_version ppx_base ppx_let ppx_custom_printf )))
-
+  (preprocess (pps ppx_coda ppx_version ppx_base ppx_let ppx_custom_printf )))

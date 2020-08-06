@@ -2,7 +2,7 @@
 
 [%%ifdef consensus_mechanism]
 
-open Curve_choice.Tick0
+open Pickles.Impls.Step.Internal_Basic
 
 [%%else]
 
@@ -10,7 +10,7 @@ open Snark_params_nonconsensus
 
 [%%endif]
 
-module Input = Input
+module Input = Random_oracle_input
 
 module State : sig
   type 'a t [@@deriving eq, sexp, compare]

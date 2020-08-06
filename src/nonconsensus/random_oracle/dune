@@ -6,6 +6,6 @@
   (inline_tests)
   (libraries
     core_kernel
-    sponge_params_nonconsensus
+    random_oracle_input
     snark_params_nonconsensus
     sponge ))
