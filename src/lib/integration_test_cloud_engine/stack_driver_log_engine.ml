@@ -212,22 +212,31 @@ module Subscription = struct
 end
 
 module Json_parsing = struct
-  type 'a parser = Yojson.Safe.t -> 'a option
+  open Yojson.Safe.Util
 
-  let bool : bool parser = Yojson.Safe.Util.to_bool_option
+  type 'a parser = Yojson.Safe.t -> 'a
 
-  let string : string parser = Yojson.Safe.Util.to_string_option
+  let bool : bool parser = to_bool
 
-  let int : int parser = Yojson.Safe.Util.to_int_option
+  let string : string parser = to_string
 
-  let float : float parser = Yojson.Safe.Util.to_float_option
+  let int : int parser =
+   fun x -> try to_int x with Type_error _ -> int_of_string (to_string x)
+
+  let float : float parser =
+   fun x -> try to_float x with Type_error _ -> float_of_string (to_string x)
 
   let rec find (parser : 'a parser) (json : Yojson.Safe.t) (path : string list)
       : 'a Or_error.t =
     let open Or_error.Let_syntax in
     match (path, json) with
-    | [], _ ->
-        or_error_of_option (parser json) "failed to parse json value"
+    | [], _ -> (
+      try Ok (parser json)
+      with exn ->
+        Error
+          (Error.of_string
+             (Printf.sprintf "failed to parse json value: %s"
+                (Exn.to_string exn))) )
     | key :: path', `Assoc assoc ->
         let%bind entry =
           or_error_of_option
@@ -267,6 +276,7 @@ module Block_produced_query = struct
         ; epoch: int
         ; global_slot: int
         ; snarked_ledger_generated: bool }
+      [@@deriving to_yojson]
     end
 
     include T
@@ -345,8 +355,7 @@ module Block_produced_query = struct
       find bool json (breadcrumb @ ["just_emitted_a_proof"])
     in
     let%bind block_height =
-      find string json (breadcrumb_consensus_state @ ["blockchain_length"])
-      >>| int_of_string
+      find int json (breadcrumb_consensus_state @ ["blockchain_length"])
     in
     let%bind global_slot =
       find int json
@@ -370,8 +379,13 @@ end
 type subscriptions =
   {initialization: Subscription.t; blocks_produced: Subscription.t}
 
+type constants =
+  { constraints: Genesis_constants.Constraint_constants.t
+  ; genesis: Genesis_constants.t }
+
 type t =
   { testnet_log_filter: string
+  ; constants: constants
   ; subscriptions: subscriptions
   ; initialization: unit Ivar.t String.Map.t
   ; cancel_initialization_task: unit Ivar.t
@@ -416,6 +430,8 @@ let rec watch_for_initialization ~logger initialization_table
         (Error.of_string
            "received initialization for node that has already initialized")
   in
+  Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+    "Pulling initialization subscription" ;
   let%bind results =
     uninterruptible
       (let open Deferred.Or_error.Let_syntax in
@@ -431,13 +447,13 @@ let rec watch_for_initialization ~logger initialization_table
   watch_for_initialization ~logger initialization_table
     initialization_subscription
 
-let create ~logger (testnet : Kubernetes_network.t) =
+let create ~logger (network : Kubernetes_network.t) =
   let initialization =
-    Kubernetes_network.all_nodes testnet
+    Kubernetes_network.all_nodes network
     |> List.map ~f:(fun node -> (node, Ivar.create ()))
     |> String.Map.of_alist_exn
   in
-  match%map subscription_list ~logger testnet.testnet_log_filter with
+  match%map subscription_list ~logger network.testnet_log_filter with
   | Ok subscriptions ->
       let cancel_initialization_task = Ivar.create () in
       Interruptible.don't_wait_for
@@ -449,7 +465,10 @@ let create ~logger (testnet : Kubernetes_network.t) =
         watch_for_initialization ~logger initialization
           subscriptions.initialization) ;
       Ok
-        { testnet_log_filter= testnet.testnet_log_filter
+        { testnet_log_filter= network.testnet_log_filter
+        ; constants=
+            { constraints= network.constraint_constants
+            ; genesis= network.genesis_constants }
         ; subscriptions
         ; initialization
         ; cancel_initialization_task
@@ -484,8 +503,28 @@ let wait_for' :
   else
     let now = Time.now () in
     let timeout_safety =
-      (*Don't wait for more than an hour in any case. TODO: make this an argument or compute using the query timeout*)
-      Time.add now (Time.Span.of_ms (Int64.to_float 300000L))
+      let ( ! ) = Int64.of_int in
+      let ( * ) = Int64.( * ) in
+      let estimated_time =
+        match timeout with
+        | `Slots n ->
+            !n * !(t.constants.constraints.block_window_duration_ms)
+        | `Epochs n ->
+            !n * 3L
+            * !(t.constants.genesis.protocol.k)
+            * !(t.constants.constraints.c)
+            * !(t.constants.constraints.block_window_duration_ms)
+        | `Snarked_ledgers_generated n ->
+            (* TODO *)
+            !n * 2L * 3L
+            * !(t.constants.genesis.protocol.k)
+            * !(t.constants.constraints.c)
+            * !(t.constants.constraints.block_window_duration_ms)
+        | `Milliseconds n ->
+            n
+      in
+      let hard_timeout = estimated_time * 2L in
+      Time.add now (Time.Span.of_ms (Int64.to_float hard_timeout))
     in
     let query_timeout_ms =
       match timeout with
@@ -506,36 +545,52 @@ let wait_for' :
           Time.( > ) (Time.now ()) (Option.value_exn query_timeout_ms)
     in
     let conditions_passed (res : Block_produced_query.Result.t) =
+      Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
+        ~metadata:
+          [ ("result", Block_produced_query.Result.to_yojson res)
+          ; ("blocks", `Int blocks)
+          ; ("epoch_reached", `Int epoch_reached) ]
+        "Checking if conditions passed for $result [blocks=$blocks, \
+         epoch_reached=$epoch_reached]" ;
       res.block_height >= blocks && res.epoch >= epoch_reached
     in
     (*TODO: this should be block window duration once the constraint constants are added to runtime config*)
-    let block_window_duration =
-      Genesis_constants.Constraint_constants.compiled.block_window_duration_ms
-    in
     let open Deferred.Or_error.Let_syntax in
     let rec go aggregated_res : unit Deferred.Or_error.t =
       if Time.( > ) (Time.now ()) timeout_safety then
         Deferred.Or_error.error_string "wait_for took too long to complete"
       else if timed_out aggregated_res then Deferred.Or_error.ok_unit
-      else
+      else (
+        Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
+          "Pulling blocks produced subscription" ;
         let%bind logs = Subscription.pull t.subscriptions.blocks_produced in
-        let%bind aggregated_res' =
+        Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
+          ~metadata:[("n", `Int (List.length logs)); ("logs", `List logs)]
+          "Pulled $n logs for blocks produced: $logs" ;
+        let%bind finished, aggregated_res' =
           Deferred.return
-            (or_error_list_fold_left_while logs ~init:aggregated_res
-               ~f:(fun acc log ->
+            (or_error_list_fold_left_while logs ~init:(false, aggregated_res)
+               ~f:(fun (_, acc) log ->
                  let open Or_error.Let_syntax in
                  let%map result = Block_produced_query.parse log in
-                 if conditions_passed result then `Stop acc
+                 if conditions_passed result then `Stop (true, acc)
                  else
-                   `Continue (Block_produced_query.Result.aggregate acc result)
+                   `Continue
+                     (false, Block_produced_query.Result.aggregate acc result)
              ))
         in
-        let%bind () =
-          Deferred.map
-            (Async.after (Time.Span.of_ms (Int.to_float block_window_duration)))
-            ~f:Or_error.return
-        in
-        go aggregated_res'
+        if not finished then
+          let%bind () =
+            Deferred.map
+              (Async.after
+                 (Time.Span.of_ms
+                    ( Int.to_float
+                        t.constants.constraints.block_window_duration_ms
+                    /. 2.0 )))
+              ~f:Or_error.return
+          in
+          go aggregated_res'
+        else Deferred.Or_error.return () )
     in
     go Block_produced_query.Result.Aggregated.empty
 
@@ -549,6 +604,22 @@ let wait_for :
     -> t
     -> unit Deferred.Or_error.t =
  fun ?(blocks = 0) ?(epoch_reached = 0) ?(timeout = `Milliseconds 300000L) t ->
+  Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
+    ~metadata:
+      [ ("blocks", `Int blocks)
+      ; ("epoch", `Int epoch_reached)
+      ; ( "timeout"
+        , `String
+            ( match timeout with
+            | `Slots n ->
+                Printf.sprintf "%d slots" n
+            | `Epochs n ->
+                Printf.sprintf "%d epochs" n
+            | `Snarked_ledgers_generated n ->
+                Printf.sprintf "%d snarked ledgers emitted" n
+            | `Milliseconds n ->
+                Printf.sprintf "%Ld ms" n ) ) ]
+    "Waiting for $blocks blocks, $epoch epoch, with timeout $timeout" ;
   match%bind wait_for' ~blocks ~epoch_reached ~timeout t with
   | Ok _ ->
       Deferred.Or_error.ok_unit
@@ -561,6 +632,9 @@ let wait_for :
 
 let wait_for_init (node : Kubernetes_network.Node.t) t =
   let open Deferred.Or_error.Let_syntax in
+  Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
+    ~metadata:[("node", `String node)]
+    "Waiting for $node to initialize" ;
   let%bind init =
     Deferred.return
       (or_error_of_option

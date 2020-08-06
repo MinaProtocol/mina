@@ -51,7 +51,9 @@ module type Engine_intf = sig
 
   module Network : sig
     type t =
-      { block_producers: Node.t list
+      { constraint_constants: Genesis_constants.Constraint_constants.t
+      ; genesis_constants: Genesis_constants.t
+      ; block_producers: Node.t list
       ; snark_coordinators: Node.t list
       ; archive_nodes: Node.t list
       ; testnet_log_filter: string }
@@ -61,7 +63,8 @@ module type Engine_intf = sig
     type t
 
     val expand :
-         test_name:string
+         logger:Logger.t
+      -> test_name:string
       -> test_config:Test_config.t
       -> images:Container_images.t
       -> t

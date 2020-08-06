@@ -31,7 +31,8 @@ let main inputs =
     ; points= "codaprotocol/coda-points-hack:32b.4" }
   in
   let network_config =
-    Engine.Network_config.expand ~test_name ~test_config:T.config ~images
+    Engine.Network_config.expand ~logger ~test_name ~test_config:T.config
+      ~images
   in
   don't_wait_for
     (* TODO: here is where we would collect the Network_config.Abstract.t for the test we want to execute *)

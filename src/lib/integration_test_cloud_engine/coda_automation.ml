@@ -51,6 +51,8 @@ module Network_config = struct
     ; project_id: string
     ; cluster_id: string
     ; keypairs: (string * Keypair.t) list
+    ; constraint_constants: Genesis_constants.Constraint_constants.t
+    ; genesis_constants: Genesis_constants.t
     ; terraform: terraform_config }
   [@@deriving to_yojson]
 
@@ -60,7 +62,7 @@ module Network_config = struct
     in
     assoc
 
-  let expand ~test_name ~(test_config : Test_config.t)
+  let expand ~logger ~test_name ~(test_config : Test_config.t)
       ~(images : Container_images.t) =
     let { Test_config.k
         ; delta
@@ -109,28 +111,27 @@ module Network_config = struct
            (List.take keypairs (List.length block_producers)))
       |> List.unzip
     in
-    (* RUNTIME CONFIG *)
+    (* DEAMON CONFIG *)
+    let proof_config =
+      (* TODO: lift configuration of these up Test_config.t *)
+      { Runtime_config.Proof_keys.level= Some proof_level
+      ; c= None
+      ; ledger_depth= None
+      ; work_delay= None
+      ; block_window_duration_ms= None
+      ; transaction_capacity= None
+      ; coinbase_amount= None
+      ; account_creation_fee= None }
+    in
     let runtime_config =
-      let open Runtime_config in
-      { daemon= Some {txpool_max_size= Some txpool_max_size}
+      { Runtime_config.daemon= Some {txpool_max_size= Some txpool_max_size}
       ; genesis=
           Some
             { k= Some k
             ; delta= Some delta
             ; genesis_state_timestamp=
                 Some Core.Time.(to_string_abs ~zone:Zone.utc (now ())) }
-      ; proof=
-          (* TODO: lift configuration of these up Test_config.t *)
-          Some
-            { level= Some proof_level
-            ; c= None
-            ; ledger_depth= None
-            ; work_delay= None
-            ; block_window_duration_ms= None
-            ; transaction_capacity= None
-            ; coinbase_amount= None
-            ; account_creation_fee= None }
-          (* TODO: prebake ledger and only set hash *)
+      ; proof= Some proof_config (* TODO: prebake ledger and only set hash *)
       ; ledger=
           Some
             { base= Accounts runtime_accounts
@@ -138,6 +139,15 @@ module Network_config = struct
             ; num_accounts= None
             ; hash= None
             ; name= None } }
+    in
+    let constraint_constants =
+      Genesis_ledger_helper.make_constraint_constants
+        ~default:Genesis_constants.Constraint_constants.compiled proof_config
+    in
+    let genesis_constants =
+      Or_error.ok_exn
+        (Genesis_ledger_helper.make_genesis_constants ~logger
+           ~default:Genesis_constants.compiled runtime_config)
     in
     (* BLOCK PRODUCER CONFIG *)
     let base_port = 10001 in
@@ -155,6 +165,8 @@ module Network_config = struct
     ; project_id
     ; cluster_id
     ; keypairs= block_producer_keypairs
+    ; constraint_constants
+    ; genesis_constants
     ; terraform=
         { cluster_name
         ; cluster_region
@@ -237,6 +249,8 @@ module Network_manager = struct
     ; keypair_secrets: string list
     ; testnet_dir: string
     ; testnet_log_filter: string
+    ; constraint_constants: Genesis_constants.Constraint_constants.t
+    ; genesis_constants: Genesis_constants.t
     ; block_producer_pod_names: string list
     ; snark_coordinator_pod_names: string list
     ; mutable deployed: bool }
@@ -341,6 +355,8 @@ module Network_manager = struct
       ; namespace= network_config.terraform.testnet_name
       ; testnet_dir
       ; testnet_log_filter
+      ; constraint_constants= network_config.constraint_constants
+      ; genesis_constants= network_config.genesis_constants
       ; keypair_secrets= List.map network_config.keypairs ~f:fst
       ; block_producer_pod_names
       ; snark_coordinator_pod_names
@@ -366,7 +382,9 @@ module Network_manager = struct
             ; "--from-file=pub=" ^ secret ^ ".pub" ] )
     in
     t.deployed <- true ;
-    { Kubernetes_network.block_producers= t.block_producer_pod_names
+    { Kubernetes_network.constraint_constants= t.constraint_constants
+    ; genesis_constants= t.genesis_constants
+    ; block_producers= t.block_producer_pod_names
     ; snark_coordinators= t.snark_coordinator_pod_names
     ; archive_nodes= []
     ; testnet_log_filter= t.testnet_log_filter }
