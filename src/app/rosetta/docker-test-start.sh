@@ -42,15 +42,17 @@ genesis_time=$(date -d '2019-01-30 20:00:00.000000Z' '+%s')
 now_time=$(date +%s)
 export CODA_TIME_OFFSET=$(( $now_time - $genesis_time ))
 export CODA_PRIVKEY_PASS=""
-export CODA_CONFIG_FILE=/root/.coda-config/config.json
-echo '{"box_primitive":"xsalsa20poly1305","pw_primitive":"argon2i","nonce":"8jGuTAxw3zxtWasVqcD1H6rEojHLS1yJmG3aHHd","pwsalt":"AiUCrMJ6243h3TBmZ2rqt3Voim1Y","pwdiff":[134217728,6],"ciphertext":"DbAy736GqEKWe9NQWT4yaejiZUo9dJ6rsK7cpS43APuEf5AH1Qw6xb1s35z8D2akyLJBrUr6m"}' > /root/.coda-config/demo-block-producer-key
+export CODA_LIBP2P_HELPER_PATH=/coda-bin/libp2p_helper
+CODA_CONFIG_DIR=/root/.coda-config
 
+# CODA_CONFIG_DIR is exposed by the dockerfile and contains demo mode essentials
 /coda-bin/cli/src/coda.exe daemon \
   -seed \
   -demo-mode \
-  -block-producer-key /root/.coda-config/demo-block-producer-key \
+  -block-producer-key "$CODA_CONFIG_DIR/wallets/store/$PK" \
   -run-snark-worker $PK \
-  -config-file /root/.coda-config/config.json \
+  -config-file "$CODA_CONFIG_DIR/daemon.json" \
+  -config-dir "$CODA_CONFIG_DIR" \
   -insecure-rest-server \
   -external-ip 127.0.0.1 \
   -archive-address 3086 \
