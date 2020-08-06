@@ -145,11 +145,11 @@ module Make_real () = struct
   let base_proof_expr =
     [%expr
       Core.Binable.of_string
-        (module Coda_base.Proof.Stable.V1)
+        (module Coda_base.Proof.Stable.Latest)
         [%e
           estring
             (Binable.to_string
-               (module Coda_base.Proof.Stable.V1)
+               (module Coda_base.Proof.Stable.Latest)
                compiled_values.genesis_proof)]]
 end
 

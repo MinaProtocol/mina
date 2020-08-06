@@ -21,20 +21,14 @@ trap cleanup INT
 
 PG_CONN=postgres://$USER:$USER@localhost:5432/archiver
 
-# rebuild
-pushd ../../../
-PATH=/usr/local/bin:$PATH dune b src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe src/app/cli/src/coda.exe src/app/archive/archive.exe src/app/rosetta/rosetta.exe src/app/rosetta/test-agent/agent.exe
-popd
+# Start postgres
+pg_ctlcluster 11 main start
 
-# make genesis (synchronously)
-./make-runtime-genesis.sh
-
-# drop tables and recreate
-psql -d archiver < drop_tables.sql
-psql -d archiver < create_schema.sql
+# wait for it to settle
+sleep 3
 
 # archive
-../../../_build/default/src/app/archive/archive.exe run \
+/coda-bin/archive/archive.exe run \
   -postgres-uri $PG_CONN \
   -log-json \
   -server-port 3086 &
@@ -42,18 +36,34 @@ psql -d archiver < create_schema.sql
 # wait for it to settle
 sleep 3
 
-# demo node
-./run-demo.sh \
-    -external-ip 127.0.0.1 \
-    -archive-address 3086 \
-    -log-json \
-    -log-level debug &
+# Setup and run demo-node
+PK=${PK:-B62qrPN5Y5yq8kGE3FbVKbGTdTAJNdtNtB5sNVpxyRwWGcDEhpMzc8g}
+genesis_time=$(date -d '2019-01-30 20:00:00.000000Z' '+%s')
+now_time=$(date +%s)
+export CODA_TIME_OFFSET=$(( $now_time - $genesis_time ))
+export CODA_PRIVKEY_PASS=""
+export CODA_LIBP2P_HELPER_PATH=/coda-bin/libp2p_helper
+CODA_CONFIG_DIR=/root/.coda-config
+
+# CODA_CONFIG_DIR is exposed by the dockerfile and contains demo mode essentials
+/coda-bin/cli/src/coda.exe daemon \
+  -seed \
+  -demo-mode \
+  -block-producer-key "$CODA_CONFIG_DIR/wallets/store/$PK" \
+  -run-snark-worker $PK \
+  -config-file "$CODA_CONFIG_DIR/daemon.json" \
+  -config-dir "$CODA_CONFIG_DIR" \
+  -insecure-rest-server \
+  -external-ip 127.0.0.1 \
+  -archive-address 3086 \
+  -log-json \
+  -log-level debug &
 
 # wait for it to settle
 sleep 3
 
 # rosetta
-../../../_build/default/src/app/rosetta/rosetta.exe \
+/coda-bin/rosetta/rosetta.exe \
   -archive-uri $PG_CONN \
   -graphql-uri http://localhost:3085/graphql \
   -log-level debug \
@@ -64,7 +74,7 @@ sleep 3
 sleep 3
 
 # test agent
-../../../_build/default/src/app/rosetta/test-agent/agent.exe \
+/coda-bin/rosetta/test-agent/agent.exe \
   -graphql-uri http://localhost:3085/graphql \
   -rosetta-uri http://localhost:3087/ \
   -log-level Trace \
