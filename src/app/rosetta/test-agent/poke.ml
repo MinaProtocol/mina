@@ -6,7 +6,7 @@ open Lib
 open Async
 
 (* TODO: Parameterize this against prod/test networks *)
-let pk = "B62qkV77S1iHryAAWRdRAp4HDBXfQhka3wYmMQSWhoHc8ftNpR44Zct"
+let pk = "B62qrPN5Y5yq8kGE3FbVKbGTdTAJNdtNtB5sNVpxyRwWGcDEhpMzc8g"
 
 module Staking = struct
   module Disable =

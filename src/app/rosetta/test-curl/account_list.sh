@@ -2,5 +2,5 @@
 
 . lib.sh
 
-req /account/balance '{ network_identifier: { blockchain: "coda", network: "debug" }, account_identifier: { "address": "B62qkV77S1iHryAAWRdRAp4HDBXfQhka3wYmMQSWhoHc8ftNpR44Zct" },  metadata: {} }'
+req /account/balance '{ network_identifier: { blockchain: "coda", network: "debug" }, account_identifier: { "address": "B62qrPN5Y5yq8kGE3FbVKbGTdTAJNdtNtB5sNVpxyRwWGcDEhpMzc8g" },  metadata: {} }'
 
