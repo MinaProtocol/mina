@@ -69,7 +69,9 @@ coda daemon \
 Now that we've got the archive node running, let's take a look at the tables in the database. 
 
 To list the tables in the database, you can run the ``\dt`` command, in psql.
-You can view the full schema (here)[https://github.com/CodaProtocol/coda/blob/develop/src/app/archive/create_schema.sql].
+View the full schema of the tables [here](https://github.com/CodaProtocol/coda/blob/develop/src/app/archive/create_schema.sql).
+
+Below are some notable fields in each table. 
 
 ### Table 1: user_commands
 This table keeps track of transactions made on the network. 
@@ -97,6 +99,7 @@ This table keeps track of rewards earned from snark work or block producing.
 
 ### Table 3: blocks
 ```
+...
   id        
   parent_id                  ID of the previous block in the blockchain
                              Use this field for information about block rewards and snark rewards (there is also an extra fee_transfer added to support sending all the transaction fees summed together to the block_creator)
@@ -116,6 +119,7 @@ WHERE value = 'MY_PK'
 ```
 
 **Example 2:** Find all payments you’ve received by your public key
+```
 SELECT *
 FROM user_commands AS uc
 JOIN blocks_user_commands AS buc ON uc.id = buc.user_command_id
@@ -123,6 +127,4 @@ JOIN public_keys AS pk ON uc.receiver_id = pk.id
 WHERE value = 'MY_PK'
 AND type = 'payment'
 ```
-
-
 
