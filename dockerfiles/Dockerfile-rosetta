@@ -13,7 +13,7 @@ ARG OPAM_VERSION=2.0.7
 ARG GO_VERSION=1.13.10
 
 # Rust Version passed into rustup-init, can also be "stable", "nightly" or similar
-ARG RUST_VERSION=1.43.0
+ARG RUST_VERSION=1.45.2
 
 # Rocksdb commit tag/branch to clone
 ARG ROCKSDB_VERSION=v5.17.2
