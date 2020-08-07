@@ -22,24 +22,19 @@ let account_id (`Pk pk) token_id =
   ; metadata= Some (Amount_of.Token_id.encode token_id) }
 
 module Block_query = struct
-  type t = ([`Height of int64], [`Hash of string]) These.t
+  type t = ([`Height of int64], [`Hash of string]) These.t option
 
   module T (M : Monad_fail.S) = struct
     let of_partial_identifier (identifier : Partial_block_identifier.t) =
       match (identifier.index, identifier.hash) with
       | None, None ->
-          M.fail
-            (Errors.create
-               ~context:
-                 "Partial block identifier must have at least an index or a \
-                  hash, it cannot be empty"
-               (`Json_parse None))
+          M.return None
       | Some index, None ->
-          M.return (`This (`Height index))
+          M.return (Some (`This (`Height index)))
       | None, Some hash ->
-          M.return (`That (`Hash hash))
+          M.return (Some (`That (`Hash hash)))
       | Some index, Some hash ->
-          M.return (`Those (`Height index, `Hash hash))
+          M.return (Some (`Those (`Height index, `Hash hash)))
   end
 end
 
@@ -200,7 +195,7 @@ module User_command_info = struct
             { Operation.operation_identifier
             ; related_operations
             ; status
-            ; account= Some (account_id t.source t.token)
+            ; account= Some (account_id t.receiver t.token)
             ; _type= Operation_types.name `Payment_receiver_inc
             ; amount= Some (Amount_of.token t.token amount)
             ; coin_change= None
@@ -538,16 +533,27 @@ WITH RECURSIVE chain AS (
         ON pk.id = b.creator_id
         WHERE b.id = ? |}
 
+    let query_best =
+      Caqti_request.find_opt Caqti_type.unit typ
+        {|
+SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, b.ledger_hash, b.height, b.timestamp, b.coinbase_id, pk.value as creator FROM blocks b
+      INNER JOIN public_keys pk
+      ON pk.id = b.creator_id
+      WHERE b.height = (select MAX(b.height) from blocks b)
+        |}
+
     let run_by_id (module Conn : Caqti_async.CONNECTION) id =
       Conn.find_opt query_by_id id
 
     let run (module Conn : Caqti_async.CONNECTION) = function
-      | `This (`Height h) ->
+      | Some (`This (`Height h)) ->
           Conn.find_opt query_height h
-      | `That (`Hash h) ->
+      | Some (`That (`Hash h)) ->
           Conn.find_opt query_hash h
-      | `Those (`Height height, `Hash hash) ->
+      | Some (`Those (`Height height, `Hash hash)) ->
           Conn.find_opt query_both (hash, height)
+      | None ->
+          Conn.find_opt query_best ()
   end
 
   module User_commands = struct
@@ -575,11 +581,11 @@ WITH RECURSIVE chain AS (
 
     let query =
       Caqti_request.collect Caqti_type.int typ
-        {| SELECT u.id, u.type, u.fee_payer_id, u.source_id, u.receiver_id, u.fee_token, u.token, u.nonce, u.amount, u.fee, u.memo, u.hash, u.status, u.failure_reason, u.fee_payer_account_creation_fee_paid, u.receiver_account_creation_fee_paid, u.created_token, pk1.value as fee_payer, pk2.value as receiver, pk3.value as source FROM user_commands u
-        LEFT JOIN blocks_user_commands ON blocks_user_commands.block_id = ? 
+        {| SELECT u.id, u.type, u.fee_payer_id, u.source_id, u.receiver_id, u.fee_token, u.token, u.nonce, u.amount, u.fee, u.memo, u.hash, u.status, u.failure_reason, u.fee_payer_account_creation_fee_paid, u.receiver_account_creation_fee_paid, u.created_token, pk1.value as fee_payer, pk2.value as source, pk3.value as receiver FROM user_commands u
+        LEFT JOIN blocks_user_commands ON blocks_user_commands.block_id = ?
         INNER JOIN public_keys pk1 ON pk1.id = u.fee_payer_id
-        INNER JOIN public_keys pk2 ON pk2.id = u.receiver_id
-        INNER JOIN public_keys pk3 ON pk3.id = u.source_id
+        INNER JOIN public_keys pk2 ON pk2.id = u.source_id
+        INNER JOIN public_keys pk3 ON pk3.id = u.receiver_id
       |}
 
     let run (module Conn : Caqti_async.CONNECTION) id =
@@ -871,11 +877,10 @@ end
 let router ~graphql_uri ~logger ~db (route : string list) body =
   let (module Db : Caqti_async.CONNECTION) = db in
   let open Async.Deferred.Result.Let_syntax in
-  Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-    "Handling /block/ $route"
+  [%log debug] "Handling /block/ $route"
     ~metadata:[("route", `List (List.map route ~f:(fun s -> `String s)))] ;
   match route with
-  | [] ->
+  | [] | [""] ->
       let%bind req =
         Errors.Lift.parse ~context:"Request" @@ Block_request.of_yojson body
         |> Errors.Lift.wrap

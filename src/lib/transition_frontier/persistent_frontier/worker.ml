@@ -50,8 +50,7 @@ module Worker = struct
       (mutant, apply_diff_error) Result.t =
     let map_error result ~diff_type ~diff_type_name =
       Result.map_error result ~f:(fun err ->
-          Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__
-            "error applying %s diff: %s" diff_type_name
+          [%log' error t.logger] "error applying %s diff: %s" diff_type_name
             (apply_diff_error_internal_to_string err) ;
           `Apply_diff diff_type )
     in
@@ -109,7 +108,7 @@ module Worker = struct
           ( Database.get_frontier_hash t.db
             :> (Frontier_hash.t, perform_error) Result.t )
       in
-      Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
+      [%log' trace t.logger]
         "Applying %d diffs to the persistent frontier (%s --> %s)"
         (List.length diffs)
         (Frontier_hash.to_string base_hash)
