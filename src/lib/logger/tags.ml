@@ -3,4 +3,4 @@
 (* tags should be items that are not otherwise easily
    searchable in log message text
 *)
-type t = Libp2p [@@deriving yojson]
+type t = Block_production | Libp2p [@@deriving yojson]
