@@ -26,9 +26,6 @@ Pipeline.build
         , name = "ArchiveNode"
         }
     , steps =
-    let outerDir : Text =
-            "/var/buildkite/builds/\\\$BUILDKITE_AGENT_NAME/\\\$BUILDKITE_ORGANIZATION_SLUG/\\\$BUILDKITE_PIPELINE_SLUG"
-    in
       [ Command.build
           Command.Config::
             { commands =
