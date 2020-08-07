@@ -133,6 +133,22 @@ let block_production_pubkeys t : Public_key.Compressed.Set.t =
 let replace_block_production_keypairs t kps =
   Agent.update t.block_production_keypairs kps
 
+let log_snark_worker_warning t =
+  if Option.is_some t.config.snark_coordinator_key then
+    [%log' warn t.config.logger]
+      "The snark coordinator flag is set; running a snark worker will \
+       override the snark coordinator key"
+
+let log_snark_coordinator_warning (config : Config.t) snark_worker =
+  if Option.is_some config.snark_coordinator_key then
+    match snark_worker with
+    | `On _ ->
+        [%log' warn config.logger]
+          "The snark coordinator key will be ignored because the snark worker \
+           key is set "
+    | _ ->
+        ()
+
 module Snark_worker = struct
   let run_process ~logger ~proof_level client_port kill_ivar num_threads =
     let env =
@@ -194,6 +210,7 @@ module Snark_worker = struct
     match t.processes.snark_worker with
     | `On ({process= process_ivar; kill_ivar; _}, _) ->
         [%log' debug t.config.logger] !"Starting snark worker process" ;
+        log_snark_worker_warning t ;
         let%map snark_worker_process =
           run_process ~logger:t.config.logger
             ~proof_level:t.config.precomputed_values.proof_level
@@ -265,6 +282,8 @@ end
 let replace_snark_worker_key = Snark_worker.replace_key
 
 let snark_worker_key = Snark_worker.get_key
+
+let snark_coordinator_key t = t.config.snark_coordinator_key
 
 let stop_snark_worker = Snark_worker.stop
 
@@ -769,6 +788,7 @@ let create (config : Config.t) =
                     ; kill_ivar= Ivar.create () }
                   , config.snark_work_fee ) )
           in
+          log_snark_coordinator_warning config snark_worker ;
           Protocol_version.set_current config.initial_protocol_version ;
           Protocol_version.set_proposed_opt
             config.proposed_protocol_version_opt ;
