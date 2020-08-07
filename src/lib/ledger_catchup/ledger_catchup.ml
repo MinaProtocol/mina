@@ -189,7 +189,7 @@ let rec fold_until ~(init : 'accum)
       | Continue_or_stop.Continue init ->
           fold_until ~init ~f ~finish xs )
 
-(* returns a list of state-hashes with the older ones at the front *)
+(** returns a list of state-hashes with the older ones at the front *)
 let download_state_hashes ~logger ~trust_system ~network ~frontier ~num_peers
     ~target_hash =
   let%bind peers = Coda_networking.random_peers network num_peers in
@@ -247,7 +247,7 @@ let rec partition size = function
       let sub, rest = List.split_n ls size in
       sub :: partition size rest
 
-(* returns a list of lists of transitions with old ones comes first *)
+(** returns a list of lists of transitions with old ones comes first *)
 let download_transitions_in_chunks ~logger ~trust_system ~network ~num_peers
     ~preferred_peer ~maximum_download_size ~hashes_of_missing_transitions =
   let%bind random_peers = Coda_networking.random_peers network num_peers in
@@ -288,7 +288,7 @@ let download_transitions_in_chunks ~logger ~trust_system ~network ~num_peers
                      ~sender:(Envelope.Sender.Remote (peer.host, peer.peer_id))
                ) ) )
 
-(* Build result will be a list of breadcrumbs if it is not the last chunk.
+(** Build result will be a list of breadcrumbs if it is not the last chunk.
  * Otherwise, it will be a list of subtrees, as usual. *)
 type ('a, 'b) build_result_t = T of 'a | L of 'b
 
