@@ -1,8 +1,9 @@
 #!/bin/bash
 
-set -o pipefail
+set -eo pipefail
 
 eval `opam config env`
+export PATH=$HOME/.cargo/bin:$PATH
 
 echo "--- Explicitly generate PV-keys and upload before building"
 LIBP2P_NIXLESS=1 make build_pv_keys 2>&1 | tee /tmp/artifacts/buildocaml.log
