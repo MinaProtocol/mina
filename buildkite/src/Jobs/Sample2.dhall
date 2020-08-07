@@ -12,7 +12,8 @@ let c1 = Command.Config::{
         commands = [ Cmd.run "echo \"hello2\"" ],
         label = "Test Echo2", key = "hello2",
         target = Size.Small,
-        docker = Some Docker::{ image = (../Constants/ContainerImages.dhall).toolchainBase }
+        docker = Some Docker::{
+           image = (../Constants/ContainerImages.dhall).toolchainBase }
         }
 
 let name = "Sample2"

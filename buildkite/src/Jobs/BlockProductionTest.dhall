@@ -6,26 +6,42 @@ let Docker = ../Command/Docker/Type.dhall
 let Size =  ../Command/Size.dhall
 let Cmd = ../Lib/Cmds.dhall
 let S  = ../Lib/SelectFiles.dhall
-in 
-
+let DockerArtifact = ../Command/DockerArtifact.dhall
+let OpamInit = ../Command/OpamInit.dhall
+in
+let name = "BlockProductionTest"
+let uploadDeployEnv =
+  Command.build
+    Command.Config::
+      { commands = [ Cmd.run "bash buildkite/script/export-docker-env.sh" ]
+      , label = "Upload DOCKER_DEPLOY_ENV for coda-daemon container"
+      , key = "artifact-upload"
+      , target = Size.Small
+      }
+let buildTestExecutive =
+  Command.build
+    Command.Config::
+      { commands = OpamInit.andThenRunInDocker ([] : List Text) "dune build --profile=testnet_postake_medium_curves src/app/test_executive/test_executive.exe"
+      , label = "Build and run test-executive"
+      , key = "build-test-executive"
+      , target = Size.Large
+      , docker = None Docker.Type
+      , depends_on = [ { name = name, key = "docker-artifact" } ]
+      }
+in
 Pipeline.build
   Pipeline.Config::
     { spec =
       JobSpec::
         { dirtyWhen =
           [ S.strictlyStart (S.contains "buildkite/src/Jobs/BlockProductionTest")
+          , S.strictlyStart (S.contains "buildkite/script/export-docker-env.sh")
           , S.strictlyStart (S.contains "src/lib") ]
         , name = "Block Production Test"
         }
     , steps =
-      [ Command.build Command.Config::
-          { commands = [ Cmd.run "bash buildkite/script/export-docker-env.sh"
-                       , Cmd.run "echo $CODA_VERSION" ]
-          , label = "Block Production Test"
-          , key = "test"
-          , target = Size.Large
-          , docker = Some Docker::
-            { image = (../Constants/ContainerImages.dhall).codaToolchain }
-          }
+      [ uploadDeployEnv
+      , DockerArtifact.generateStep [ {name = name, key = "artifact-upload"} ]
+      , buildTestExecutive
       ]
     }
