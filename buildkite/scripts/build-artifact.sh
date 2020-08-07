@@ -14,8 +14,9 @@ make build_pv_keys 2>&1 | tee /tmp/buildocaml.log
 echo "--- Publish pvkeys"
 ./scripts/publish-pvkeys.sh
 
-echo "--- Rebuild for pvkey changes"
-make build 2>&1 | tee /tmp/buildocaml2.log
+# TODO: Investigate if this adds any value, but its never worked properly in CI
+# echo "--- Rebuild for pvkey changes"
+# make build 2>&1 | tee /tmp/buildocaml2.log
 
 echo "--- Build generate-keypair binary"
 dune build src/app/generate_keypair/generate_keypair.exe
