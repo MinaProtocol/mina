@@ -26,7 +26,6 @@ let buildTestExecutive =
       , key = "build-test-executive"
       , target = Size.Large
       , docker = None Docker.Type
-      , depends_on = [ { name = name, key = "docker-artifact" } ]
       }
 in
 Pipeline.build
