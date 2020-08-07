@@ -610,7 +610,7 @@ let%test_module "random set test" =
                 @@ Signature_lib.Public_key.Compressed.equal mal_pk fee.prover
             ) )
       in
-      Quickcheck.test
+      Quickcheck.test ~trials:5
         ~sexp_of:
           [%sexp_of:
             Mock_snark_pool.Resource_pool.t Deferred.t
@@ -629,11 +629,16 @@ let%test_module "random set test" =
               let%map () =
                 Deferred.List.iter invalid_work_lst
                   ~f:(fun (statements, proofs, fee, _) ->
-                    let%map res =
-                      apply_diff t statements ~proof:(fun _ -> proofs) fee
+                    let diff =
+                      Mock_snark_pool.Resource_pool.Diff.Add_solved_work
+                        ( statements
+                        , {Priced_proof.Stable.Latest.proof= proofs; fee} )
+                      |> Envelope.Incoming.local
                     in
-                    assert (Result.is_error res) ;
-                    () )
+                    let%map res =
+                      Mock_snark_pool.Resource_pool.Diff.verify t diff
+                    in
+                    assert (not res) )
               in
               [%test_eq: Transaction_snark_work.Info.t list] completed_works
                 (Mock_snark_pool.Resource_pool.all_completed_work t) ) )
