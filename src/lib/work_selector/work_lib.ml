@@ -1,5 +1,6 @@
 open Core_kernel
 open Currency
+open Async
 
 module Make (Inputs : Intf.Inputs_intf) = struct
   module Work_spec = Snark_work_lib.Work.Single.Spec
@@ -17,44 +18,103 @@ module Make (Inputs : Intf.Inputs_intf) = struct
     module Seen_key = struct
       module T = struct
         type t = Transaction_snark.Statement.t One_or_two.t
-        [@@deriving compare, sexp, to_yojson]
+        [@@deriving compare, sexp, to_yojson, hash]
       end
 
       include T
       include Comparable.Make (T)
     end
 
-    type t = {jobs_seen: Job_status.t Seen_key.Map.t; reassignment_wait: int}
+    type t =
+      { mutable available_jobs:
+          ( Inputs.Transaction.t
+          , Inputs.Transaction_witness.t
+          , Inputs.Ledger_proof.t )
+          Work_spec.t
+          One_or_two.t
+          list
+      ; jobs_seen: (Seen_key.t, Job_status.t) Hashtbl.t
+      ; reassignment_wait: int }
 
-    let init ~reassignment_wait =
-      {jobs_seen= Seen_key.Map.empty; reassignment_wait}
-
-    let remove_old_assignments {jobs_seen; reassignment_wait} ~logger =
-      let now = Time.now () in
-      let jobs_seen =
-        Map.filteri jobs_seen ~f:(fun ~key:work ~data:status ->
-            if Job_status.is_old status ~now ~reassignment_wait then (
-              [%log info]
-                ~metadata:[("work", Seen_key.to_yojson work)]
-                "Waited too long to get work for $work. Ready to be reassigned" ;
-              Coda_metrics.(
-                Counter.inc_one Snark_work.snark_work_timed_out_rpc) ;
-              false )
-            else true )
+    let init :
+           reassignment_wait:int
+        -> frontier_broadcast_pipe:Inputs.Transition_frontier.t option
+                                   Pipe_lib.Broadcast_pipe.Reader.t
+        -> logger:Logger.t
+        -> t =
+     fun ~reassignment_wait ~frontier_broadcast_pipe ~logger ->
+      let t =
+        { available_jobs= []
+        ; jobs_seen= Hashtbl.create (module Seen_key)
+        ; reassignment_wait }
       in
-      {jobs_seen; reassignment_wait}
+      Pipe_lib.Broadcast_pipe.Reader.iter frontier_broadcast_pipe
+        ~f:(fun frontier_opt ->
+          ( match frontier_opt with
+          | None ->
+              [%log debug] "No frontier, setting available work to be empty" ;
+              t.available_jobs <- []
+          | Some frontier ->
+              Pipe_lib.Broadcast_pipe.Reader.iter
+                (Inputs.Transition_frontier.best_tip_pipe frontier)
+                ~f:(fun _ ->
+                  let best_tip_staged_ledger =
+                    Inputs.Transition_frontier.best_tip_staged_ledger frontier
+                  in
+                  let start_time = Time.now () in
+                  ( match
+                      Inputs.Staged_ledger.all_work_pairs
+                        best_tip_staged_ledger
+                        ~get_state:
+                          (Inputs.Transition_frontier.get_protocol_state
+                             frontier)
+                    with
+                  | Error e ->
+                      [%log fatal]
+                        "Error occured when updating available work: $error"
+                        ~metadata:[("error", `String (Error.to_string_hum e))]
+                  | Ok new_available_jobs ->
+                      let end_time = Time.now () in
+                      [%log info] "Updating new available work took $time ms"
+                        ~metadata:
+                          [ ( "time"
+                            , `Float
+                                ( Time.diff end_time start_time
+                                |> Time.Span.to_ms ) ) ] ;
+                      t.available_jobs <- new_available_jobs ) ;
+                  Deferred.unit )
+              |> Deferred.don't_wait_for ) ;
+          Deferred.unit )
+      |> Deferred.don't_wait_for ;
+      t
+
+    let all_unseen_works t =
+      List.filter t.available_jobs ~f:(fun js ->
+          not
+          @@ Hashtbl.mem t.jobs_seen (One_or_two.map ~f:Work_spec.statement js)
+      )
+
+    let remove_old_assignments t ~logger =
+      let now = Time.now () in
+      Hashtbl.filteri_inplace t.jobs_seen ~f:(fun ~key:work ~data:status ->
+          if
+            Job_status.is_old status ~now
+              ~reassignment_wait:t.reassignment_wait
+          then (
+            [%log info]
+              ~metadata:[("work", Seen_key.to_yojson work)]
+              "Waited too long to get work for $work. Ready to be reassigned" ;
+            Coda_metrics.(Counter.inc_one Snark_work.snark_work_timed_out_rpc) ;
+            false )
+          else true )
 
     let remove t x =
-      { t with
-        jobs_seen=
-          Map.remove t.jobs_seen (One_or_two.map ~f:Work_spec.statement x) }
+      Hashtbl.remove t.jobs_seen (One_or_two.map ~f:Work_spec.statement x)
 
     let set t x =
-      { t with
-        jobs_seen=
-          Map.set t.jobs_seen
-            ~key:(One_or_two.map ~f:Work_spec.statement x)
-            ~data:(Job_status.Assigned (Time.now ())) }
+      Hashtbl.set t.jobs_seen
+        ~key:(One_or_two.map ~f:Work_spec.statement x)
+        ~data:(Job_status.Assigned (Time.now ()))
   end
 
   let does_not_have_better_fee ~snark_pool ~fee
@@ -80,25 +140,10 @@ module Make (Inputs : Intf.Inputs_intf) = struct
     List.filter statements ~f:(fun st ->
         Option.is_none (Inputs.Snark_pool.get_completed_work snark_pool st) )
 
-  let all_unseen_works ~get_protocol_state
-      (staged_ledger : Inputs.Staged_ledger.t) (state : State.t) =
-    let open Or_error.Let_syntax in
-    let%map all_jobs =
-      Inputs.Staged_ledger.all_work_pairs staged_ledger
-        ~get_state:get_protocol_state
-    in
-    let unseen_jobs =
-      List.filter all_jobs ~f:(fun js ->
-          not
-          @@ Map.mem state.jobs_seen (One_or_two.map ~f:Work_spec.statement js)
-      )
-    in
-    unseen_jobs
-
   (*Seen/Unseen jobs that are not in the snark pool yet*)
-  let pending_work_statements ~snark_pool ~fee_opt ~staged_ledger =
+  let pending_work_statements ~snark_pool ~fee_opt (state : State.t) =
     let all_todo_statements =
-      Inputs.Staged_ledger.all_work_statements_exn staged_ledger
+      List.map state.available_jobs ~f:(One_or_two.map ~f:Work_spec.statement)
     in
     let expensive_work statements ~fee =
       List.filter statements ~f:(does_not_have_better_fee ~snark_pool ~fee)
