@@ -505,7 +505,19 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                       [("$address", `String (Unix.Inet_addr.to_string address))] ;
                   Deferred.unit )
                 else
-                  Rpc.Connection.server_with_close reader writer
+                  Rpc.Connection.server_with_close
+                    ~handshake_timeout:
+                      (Time.Span.of_sec
+                         Coda_compile_config.rpc_handshake_timeout_sec)
+                    ~heartbeat_config:
+                      (Rpc.Connection.Heartbeat_config.create
+                         ~timeout:
+                           (Time_ns.Span.of_sec
+                              Coda_compile_config.rpc_heartbeat_timeout_sec)
+                         ~send_every:
+                           (Time_ns.Span.of_sec
+                              Coda_compile_config.rpc_heartbeat_send_every_sec))
+                    reader writer
                     ~implementations:
                       (Rpc.Implementations.create_exn
                          ~implementations:(client_impls @ snark_worker_impls)
