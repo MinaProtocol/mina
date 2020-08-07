@@ -528,8 +528,14 @@ let%test_module "random set test" =
         Mock_snark_pool.Resource_pool.Diff.Add_solved_work
           (work, {Priced_proof.Stable.Latest.proof= proof work; fee})
       in
-      Mock_snark_pool.Resource_pool.Diff.unsafe_apply resource_pool
-        {Envelope.Incoming.data= diff; sender}
+      let enveloped_diff = {Envelope.Incoming.data= diff; sender} in
+      let%bind valid_diff =
+        Mock_snark_pool.Resource_pool.Diff.verify resource_pool enveloped_diff
+      in
+      if valid_diff then
+        Mock_snark_pool.Resource_pool.Diff.unsafe_apply resource_pool
+          enveloped_diff
+      else Deferred.return (Error (`Other (Error.of_string "Invalid diff")))
 
     let config verifier =
       Mock_snark_pool.Resource_pool.make_config ~verifier ~trust_system
