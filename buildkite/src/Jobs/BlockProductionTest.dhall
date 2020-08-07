@@ -13,7 +13,8 @@ Pipeline.build
     { spec =
       JobSpec::
         { dirtyWhen =
-          [ S.exactly "buildkite/src/Jobs/BlockProductionTest" "dhall" ]
+          [ S.strictlyStart (S.contains "buildkite/src/Jobs/BlockProductionTest")
+          , S.strictlyStart (S.contains "src/lib") ]
         , name = "Block Production Test"
         }
     , steps =
