@@ -23,7 +23,7 @@ time cat dockerfiles/Dockerfile-rosetta | docker build \
 docker push gcr.io/o1labs-192920/coda-rosetta-builder:dev-$TAG
 time cat dockerfiles/Dockerfile-rosetta | docker build \
   --target production \
-  -t gcr.io/o1labs-192920/coda-rosetta:$TAG \
+  -t gcr.io/o1labs-192920/coda-rosetta:dev-$TAG \
   --cache-from gcr.io/o1labs-192920/coda-rosetta-builder:dev-$TAG \
   --build-arg "DUNE_PROFILE=dev" \
   --build-arg "CODA_BRANCH=${GITBRANCH}" -
