@@ -6,13 +6,13 @@ eval `opam config env`
 export PATH=$HOME/.cargo/bin:$PATH
 
 echo "--- Explicitly generate PV-keys and upload before building"
-LIBP2P_NIXLESS=1 make build_pv_keys 2>&1 | tee /tmp/artifacts/buildocaml.log
+LIBP2P_NIXLESS=1 make build_pv_keys 2>&1 | tee /tmp/buildocaml.log
 
 echo "--- Publish pvkeys"
 ./scripts/publish-pvkeys.sh
 
 echo "--- Rebuild for pvkey changes"
-make build 2>&1 | tee /tmp/artifacts/buildocaml2.log
+make build 2>&1 | tee /tmp/buildocaml2.log
 
 echo "--- Build generate-keypair binary"
 dune build src/app/generate_keypair/generate_keypair.exe
