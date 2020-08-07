@@ -36,7 +36,7 @@ Pipeline.build
           [ S.strictlyStart (S.contains "buildkite/src/Jobs/BlockProductionTest")
           , S.strictlyStart (S.contains "buildkite/script/export-docker-env.sh")
           , S.strictlyStart (S.contains "src/lib") ]
-        , name = "Block Production Test"
+        , name = name
         }
     , steps =
       [ uploadDeployEnv
