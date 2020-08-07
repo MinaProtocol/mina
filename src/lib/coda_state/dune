@@ -3,5 +3,5 @@
   (public_name coda_state)
   (inline_tests)
   (preprocessor_deps ../../config.mlh)
-  (preprocess (pps ppx_coda ppx_version ppx_snarky ppx_optcomp ppx_bin_prot ppx_compare ppx_sexp_conv ppx_hash ppx_fields_conv ppx_let ppx_inline_test ppx_assert ppx_deriving.std ppx_deriving_yojson h_list.ppx))
+  (preprocess (pps ppx_custom_printf ppx_coda ppx_version ppx_snarky ppx_optcomp ppx_bin_prot ppx_compare ppx_sexp_conv ppx_hash ppx_fields_conv ppx_let ppx_inline_test ppx_assert ppx_deriving.std ppx_deriving_yojson h_list.ppx))
   (libraries core_kernel coda_base snark_params consensus test_genesis_ledger bitstring_lib fold_lib tuple_lib with_hash))

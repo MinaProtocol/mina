@@ -5,10 +5,10 @@ If all you need is a running daemon and some blocks, the
 configuration as the testnet, but instead of the community participants ledger
 it uses a simple ledger with a single demo account.
 
-The public key of the demo account is `4vsRCVMNTrCx4NpN6kKTkFKLcFN4vXUP5RB9PqSZe1qsyDs4AW5XeNgAf16WUPRBCakaPiXcxjp6JUpGNQ6fdU977x5LntvxrSg11xrmK6ZDaGSMEGj12dkeEpyKcEpkzcKwYWZ2Yf2vpwQP`, with the following private key file (the password is the empty string):
+The public key of the demo account is `B62qrPN5Y5yq8kGE3FbVKbGTdTAJNdtNtB5sNVpxyRwWGcDEhpMzc8g`, with the following private key file (the password is the empty string):
 
 ```
-{"box_primitive":"xsalsa20poly1305","pw_primitive":"argon2i","nonce":"7S1YA5PinXhnLgLJ3xemVnVPWdJdhKZ9RSNQbns","pwsalt":"AzDoECCYyJL8KuoB2vrsVc9Wg3xJ","pwdiff":[134217728,6],"ciphertext":"5UQuiQVbXPmR63ikri792dWR6Dz5dYZm8dLzwDyqWovdP5CzrLY6Fjw3QTHXA9J3PDkPZpvhrQfGkgU81kr9184dfoJDhn5EXxJMCAM44SZdmBYVszEQaSQnyy4BwsbRXmfjBMSW9ooGu2a5dFi5KHX5na6fr62VUB"}
+{"box_primitive":"xsalsa20poly1305","pw_primitive":"argon2i","nonce":"8jGuTAxw3zxtWasVqcD1H6rEojHLS1yJmG3aHHd","pwsalt":"AiUCrMJ6243h3TBmZ2rqt3Voim1Y","pwdiff":[134217728,6],"ciphertext":"DbAy736GqEKWe9NQWT4yaejiZUo9dJ6rsK7cpS43APuEf5AH1Qw6xb1s35z8D2akyLJBrUr6m"}
 ```
 
 This account has 100% of the stake.

@@ -12,7 +12,7 @@ open Snark_params.Tick
 
 [%%else]
 
-module Random_oracle = Random_oracle_nonconsensus
+open Import
 
 [%%endif]
 

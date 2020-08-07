@@ -181,7 +181,7 @@ module Vrf_distribution = struct
           Option.map (Hashtbl.find dist slot) ~f:Hashtbl.data
         with
         | None -> all_possible_chains (slot + 1) pred
-        | Some potential_succ_proposals -> 
+        | Some potential_succ_proposals ->
             List.bind potential_succs_proposals ~f:(fun (succ_proposer, succ_proposal) ->
               if Public_key.equal pred_proposer.keypair.public_key succ_proposer.keypair.public_key then
                 compute_branches succ
@@ -310,7 +310,7 @@ let prove_blockchain ~logger (module Keys : Keys_lib.Keys.S)
         ; proof= wrap next_state_top_hash prev_proof } )
   in
   Or_error.iter_error res ~f:(fun e ->
-      Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+      [%log error]
         ~metadata:[("error", `String (Error.to_string_hum e))]
         "Prover threw an error while extending block: $error" ) ;
   res
@@ -344,7 +344,7 @@ let prove_blockchain ~logger (module Keys : Keys_lib.Keys.S)
         )
   in
   Or_error.iter_error res ~f:(fun e ->
-      Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+      [%log error]
         ~metadata:[("error", `String (Error.to_string_hum e))]
         "Prover threw an error while extending block: $error" ) ;
   res

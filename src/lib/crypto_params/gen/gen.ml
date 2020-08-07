@@ -6,17 +6,17 @@ open Asttypes
 open Parsetree
 open Longident
 open Core
-module Impl = Curve_choice.Tick0
-module Group = Curve_choice.Tick_backend.Inner_curve
+module Impl = Pickles.Impls.Step.Internal_Basic
+module Group = Pickles.Backend.Tick.Inner_curve
 
 let group_map_params =
   Group_map.Params.create
-    (module Curve_choice.Tick0.Field)
-    Curve_choice.Tick_backend.Inner_curve.Coefficients.{a; b}
+    (module Pickles.Backend.Tick.Field)
+    Group.Params.{a; b}
 
 let group_map_params_structure ~loc =
   let module T = struct
-    type t = Curve_choice.Tick_backend.Field.t Group_map.Params.t
+    type t = Pickles.Backend.Tick.Field.Stable.Latest.t Group_map.Params.t
     [@@deriving bin_io_unversioned]
   end in
   let module E = Ppxlib.Ast_builder.Make (struct
@@ -27,7 +27,8 @@ let group_map_params_structure ~loc =
     let params =
       lazy
         (let module T = struct
-           type t = Curve_choice.Tick_backend.Field.t Group_map.Params.t
+           type t =
+             Pickles.Backend.Tick.Field.Stable.Latest.t Group_map.Params.t
            [@@deriving bin_io_unversioned]
          end in
         Core.Binable.of_string

@@ -703,7 +703,7 @@ let run (module Conn : CONNECTION) reader ~constraint_constants ~logger
               return ()
         with
         | Error e ->
-            Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+            [%log warn]
               ~metadata:
                 [ ("block", With_hash.hash block |> State_hash.to_yojson)
                 ; ("error", `String (Caqti_error.show e)) ]
@@ -730,7 +730,7 @@ let setup_server ~constraint_constants ~logger ~postgres_address ~server_port
   in
   match%bind Caqti_async.connect postgres_address with
   | Error e ->
-      Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+      [%log error]
         "Failed to connect to postgresql database, see error: $error"
         ~metadata:[("error", `String (Caqti_error.show e))] ;
       Deferred.unit
@@ -742,7 +742,7 @@ let setup_server ~constraint_constants ~logger ~postgres_address ~server_port
            ~on_handler_error:
              (`Call
                (fun _net exn ->
-                 Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+                 [%log error]
                    "Exception while handling TCP server request: $error"
                    ~metadata:
                      [ ("error", `String (Core.Exn.to_string_mach exn))
@@ -758,7 +758,7 @@ let setup_server ~constraint_constants ~logger ~postgres_address ~server_port
                ~on_handshake_error:
                  (`Call
                    (fun exn ->
-                     Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+                     [%log error]
                        "Exception while handling RPC server request from \
                         $address: $error"
                        ~metadata:
@@ -768,8 +768,7 @@ let setup_server ~constraint_constants ~logger ~postgres_address ~server_port
                            , `String (Unix.Inet_addr.to_string address) ) ] ;
                      Deferred.unit )) )
       |> don't_wait_for ;
-      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-        "Archive process ready. Clients can now connect" ;
+      [%log info] "Archive process ready. Clients can now connect" ;
       Async.never ()
 
 module For_test = struct

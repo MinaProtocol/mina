@@ -7,6 +7,11 @@ let Optional/map = Prelude.Optional.map
 let Optional/toList = Prelude.Optional.toList
 let B = ../External/Buildkite.dhall
 let B/Plugins/Partial = B.definitions/commandStep/properties/plugins/Type
+-- Retry bits
+let B/ExitStatus = B.definitions/automaticRetry/properties/exit_status/Type
+let B/AutoRetryChunk = B.definitions/automaticRetry/Type.Type
+let B/Retry = B.definitions/commandStep/properties/retry/properties/automatic/Type
+let B/Manual = B.definitions/commandStep/properties/retry/properties/manual/Type
 let Map = Prelude.Map
 
 let Cmd = ../Lib/Cmds.dhall
@@ -52,6 +57,19 @@ let TaggedKey = {
   default = {=}
 }
 
+-- Retry requires you feed an exit status (as a string so we can support
+-- negative codes), and optionally a limit to the number of times this command
+-- should be retried.
+let Retry = {
+  Type = {
+    exit_status : Integer,
+    limit : Optional Natural
+  },
+  default = {
+    limit = None Natural
+  }
+}
+
 -- Everything here is taken directly from the buildkite Command documentation
 -- https://buildkite.com/docs/pipelines/command-step#command-step-attributes
 -- except "target" replaces "agents"
@@ -70,6 +88,7 @@ let Config =
       , docker : Optional Docker.Type
       , docker_login : Optional DockerLogin.Type
       , summon : Optional Summon.Type
+      , retries : List Retry.Type
       }
   , default =
     { depends_on = [] : List TaggedKey.Type
@@ -77,6 +96,7 @@ let Config =
     , docker_login = None DockerLogin.Type
     , summon = None Summon.Type
     , artifact_paths = [] : List SelectFiles.Type
+    , retries = [] : List Retry.Type
     }
   }
 
@@ -111,6 +131,35 @@ let build : Config.Type -> B/Command.Type = \(c : Config.Type) ->
                      else Some (B/ArtifactPaths.String (SelectFiles.compile c.artifact_paths)),
     key = Some c.key,
     label = Some c.label,
+    retry =
+          Some {
+              -- we only consider automatic retries
+              automatic = Some (
+                -- and for every retry
+                let xs : List B/AutoRetryChunk =
+                    List/map
+                      Retry.Type
+                      B/AutoRetryChunk
+                      (\(retry : Retry.Type) ->
+                      {
+                        -- we always require the exit status
+                        exit_status = Some (B/ExitStatus.Integer retry.exit_status),
+                        -- but limit is optional
+                        limit =
+                          Optional/map
+                          Natural
+                          Integer
+                          Natural/toInteger
+                          retry.limit
+                    })
+                    -- per https://buildkite.com/docs/agent/v3#exit-codes, ensure automatic retries on -1 exit status (infra error)
+                    ([Retry::{ exit_status = -1, limit = Some 2 }] #
+                    -- and the retries that are passed in (if any)
+                    c.retries)
+                in
+                B/Retry.ListAutomaticRetry/Type xs),
+              manual = None B/Manual
+          },
     plugins =
       let dockerPart =
         Optional/toList
