@@ -75,34 +75,77 @@ Before the derivation step, we need to generate a keypair. We'll use the private
 
 [derivation]: #derivation
 
-Derivation demands that the public key expected as input be a hex-encoded byte-array value. So we'll [add functionality](#marshallkeys) to the [client-sdk](#marshallkeyssdk), the [generate-keypair binary](#marshallkeysbin), and the offcial [Coda CLI](#marshallkeysdaemon) to marshall the `Fq.t * Fq.t` pair.
+Derivation demands that the public key expected as input be a hex-encoded byte-array value. So we'll [add functionality](#marshalkeys) to the [client-sdk](#marshalkeys), the [generate-keypair binary](#marshalkeys), and the offcial [Coda CLI](#marshalkeys) to marshall the `Fq.t * Fq.t` pair.
 
-The [derivation endpoint](#derivationendpoint) would be responsible for reading in the uncompressed public key bytes which [requires adjusting the Rosetta spec](#addcurves), compressing the public key, and base58-encoding it inline with how we currently represent public keys in serialized form.
+The [derivation endpoint](#derivation-endpoint) would be responsible for reading in the uncompressed public key bytes which [requires adjusting the Rosetta spec](#addcurves), compressing the public key, and base58-encoding it inline with how we currently represent public keys in serialized form.
 
-**Preprocess**
+#### Preprocess
 
 [preprocess]: #preprocess
 
-The [preprocess endpoint](#preprocessendpoint) takes a proposed set of operations for which we'll need to [clearly specify examples for different transactions]. It returns an input that is needed for the [metadata](#metadata) phase during which we can gather info on-chain.
+The [preprocess endpoint](#preprocess-endpoint) takes a proposed set of operations for which we'll need to [clearly specify examples for different transactions](#operations-docs). It assures they can be [converted into transactions](#inverted-operations-map) and it returns an input that is needed for the [metadata](#metadata) phase during which we can gather info on-chain. In our case, this is just the sender's public key.
 
-**Metadata**
+#### Metadata
 
 [metadata]: #metadata
 
+The [metadata endpoint](#metadata-endpoint) takes the senders public key and finds what nonce to use for transaction construction.
+
+#### Payloads
+
+[payloads]: #payloads
+
+The [payloads endpoint](#payloads-endpoint) takes the metadata and the operations and returns a [encoded unsigned transaction]. A [test] should be included that ensures that after such a transaction is signed and included in the mempool the operations returned are a superset of the ones provided. After it is in a block it is also a superset of the ones provided as input to the endpoint.
+
+#### Parse
+
+[parse]: #parse
+
+The [parse endpoint](#parse-endpoint) takes a possibly signed transaction and parses it. The implementation will use the same logic as the Data API transaction -> operations logic and so we do not need an extra task to make this happen.
+
+#### Combine
+
+[combine]: #combine
+
+The [combine endpoint](#combine-endpoint) takes an unsigned transaction and the signature and returns an [encoded signed transaction].
+
+#### Hash
+
+[hash]: #hash
+
+The [hash endpoint](#hash-endpoint) takes the signed transaction and returns the hash.
+
+#### Submit
+
+[submit]: #submit
+
+The [submit endpoint](#submit-endpoint) takes a signed transaction and broadcasts it over the network. Upon skimming our GraphQL implementation, it seems like it is already succeeding only if the transaction is successfully added to the mempool, but it important we more carefully [audit the implementation to ensure this is the case].
+
+#### Testing
+
+A [test] should be included that ensures:
+
+1. The unsigned transaction output by payloads parses into the same operations provided
+2. The signed transaction output by combine parses into the same operations provided
+3. After the signed transaction is in the mempool, the result from the data api is a superset of the operations provided originally
+4. After the signed transaction is in a block, the result from the data api is a superset of the operations provided orginally
+
 ### Work items
 
-1. Add support for creating/marshalling public keys ([via Derivation](#derivation))
+#### Marshal Keys
 
-[marshallkeys]: #marshallkeys
+[marshalkeys]: #marshalkeys
+
+Add support for creating/marshalling public keys ([via Derivation](#derivation))
 
 **Format**
 
-Public keys are reprsented as hex-encoded, little-endian, byte-padded `Fq.t` pairs.
+Public keys are reprsented as hex-encoded, little-endian, `Fq.t` pairs.
 
 TODO: Find `x`, see unanswered questions below
 
 ```
-|----- fst Fq.t (x bytes) ---------|----- snd Fq.t (x bytes) ------|
+|----- fst pk : Fq.t (32 bytes) ---------|----- snd pk : Fq.t (32 bytes) ------|
 ```
 
 Example:
@@ -111,15 +154,15 @@ Example:
 
 is encoded as the string:
 
-`0001E0F3000392FA`
+`000000000000000000000000000000000000000000000000000000000001E0F300000000000000000000000000000000000000000000000000000000000392FA`
+
+(abbreviated as `...01E0F3...0392FA` for the purposes of this doc)
 
 **Name**
 
 We'll call this the "raw" format for our public keys. In most places, we can get away with just adding a `-raw` flag in some form to support this new kind of representation.
 
 a. Change the Client-SDK
-
-[marshallkeyssdk]: #marshallkeyssdk
 
 i. Add a `rawPublicKeyOfPrivateKey` method to the exposed `client_sdk.ml` module that returns `of_private_key_exn s` which is then marshalled to a string according to the above specification.
 
@@ -129,31 +172,81 @@ iii. Add new documentation for this change.
 
 b. Change the generate-keypair binary
 
-[marshallkeysbin]: #marshallkeysbin
-
 i. Also print out the raw representation after generating the keypair on a new line:
 
-`Raw public key: 0001E0F3000392FA`
+`Raw public key: ...01E0F3...0392FA`
 
 ii. Add a new subcommand `show-public-key` which takes the private key file as input and prints the same output as running the generate command.
 
 c. Change coda cli
 
-[marshallkeysdaemon]: #marshallkeysdaemon
-
 i. Add a new subcommand `show-public-key` as a subcommand to `coda accounts` (reuse the implementation in (b.ii)
 
-2. Derivation endpoint ([via Derivation](#derivation))
+#### Derivation endpoint
+
+[derivation-endpoint]: #derivation-endpoint
+
+[via Derivation](#derivation)
 
 Read in the bytes, compress the public key, and base58-encoding it inline with how we currently represent public keys in serialized form. Adding errors apprioriately for malformed keys.
 
-3. Add support for our curves and signature to Rosetta ([via Derivation](#derivation))
+#### Add curves
 
 [addcurves]: #addcurves
 
+Add support for our curves and signature to Rosetta ([via Derivation](#derivation))
+
 Follow the instructions on [this forum post](https://community.rosetta-api.org/t/add-secp256r1-to-curvetype/130/2) to add support for the [tweedle curves and schnorr signatures](https://github.com/CodaProtocol/signer-reference). This entails updating the rosetta specification with documentation about this curve, and changing the rosetta-sdk-go implementation to recognize the new curve and signature types. Do not worry about adding the implementation to the keys package of rosetta-cli for now.
 
-4. Preprocess endpoint ([via Preprocess](#preprocess))
+#### Operations docs
+
+[operations-docs]: #operations-docs
+
+Add examples of each kind of transaction that one may want to construct as JSON files. Eventually we'd want one for each type of transaction, but for now it suffices to just include a payment.
+
+For example: The following expressrion would be saved in `payment.json`
+
+```json
+[{
+  "operation_identifier": ...,
+  "amount": ...,
+  "type": "Payment_source_dec"
+},
+{
+  "operation_identifier": ...,
+  "amount": ...,
+  "type": "Payment_receiver_inc"
+},
+...
+]
+```
+
+This is useful for manual testing purposes and sets us up for integration with the [construction-portion of rosetta-cli integration](https://community.rosetta-api.org/t/feedback-request-automated-construction-api-testing-improvements/146/4).
+
+#### Inverted operations map
+
+[inverted-operations-map]: #inverted-operations-map
+
+[via Preprocess](#preprocess)
+
+Write a function that recovers the transactions that are associated with some set of operations. We should create a test `forall (t : Transaction). op^-1(op(t)) ~= t` which enumerates all the kinds of transactions. For an initial release it suffices to test this for payments.
+
+#### Preprocess Endpoint
+
+[preprocess-endpoint]: #preprocess-endpoint
+
+[via Preprocess](#preprocess)
+
+First [invert the operations](#inverted-operations-map) into a transaction, we find the sender and include the public key in the response. The options type will be defined as follows:
+
+```ocaml
+module Options = struct
+  type t =
+    { sender : string (* base58-ecoded compressed public key *)
+    }
+    [@@deriving yojson]
+end
+```
 
 ## Drawbacks
 
@@ -181,9 +274,9 @@ Discuss prior art, both the good and the bad, in relation to this proposal.
 
 [unresolved-questions]: #unresolved-questions
 
-- How many bits long is `Snarky_bn382.Tweedle.Fq.t`?
+- Is it necessary to precompute the next-token-id for creating new tokens during metadata?
 
-It's not immediately obvious from reading through the header in the snarky_bn382 lib. I'd like to know to better fully specify the serialization format.
+If the transaction involves minting a new token we also lookup the next-token-id.
 
 - What parts of the design do you expect to resolve through the RFC process before this gets merged?
 - What parts of the design do you expect to resolve through the implementation of this feature before merge?
