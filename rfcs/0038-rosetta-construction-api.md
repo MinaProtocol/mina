@@ -151,8 +151,6 @@ Add support for creating/marshalling public keys ([via Derivation](#derivation))
 
 Public keys are reprsented as hex-encoded, little-endian, `Fq.t` pairs.
 
-TODO: Find `x`, see unanswered questions below
-
 ```
 |----- fst pk : Fq.t (32 bytes) ---------|----- snd pk : Fq.t (32 bytes) ------|
 ```
