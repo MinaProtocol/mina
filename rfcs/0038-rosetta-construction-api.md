@@ -213,7 +213,7 @@ Add examples of each kind of transaction that one may want to construct as JSON 
 
 For example: The following expressrion would be saved in `payment.json`
 
-```json
+```
 [{
   "operation_identifier": ...,
   "amount": ...,
@@ -316,7 +316,7 @@ First [convert the operations](#inverted-operations-map) embedding the correct s
 
 Since we'll later be broadcasting the signed transaction via GraphQL, our signed transaction encoding is precicesly the union of the format required for the sendPayment mutation and the sendDelegation mutation (stringified):
 
-```json
+```
 {
   signature: Signature, // defined in graphql
   sendPaymentInput: SendPaymentInput?, // defined in graphql
