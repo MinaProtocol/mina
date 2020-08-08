@@ -352,17 +352,23 @@ The hash endpoint takes the signed transaction and returns the hash. This can be
 
 [audit-transaction-broadcast]: #audit-transaction-broadcast
 
+[via Submit](#submit)
+
 Upon skimming our GraphQL implementation, it seems like it is already succeeding only if the transaction is successfully added to the mempool, but it important we more carefully audit the implementation to ensure this is the case as it's an explicit requirement in the spec.
 
 #### Submit
 
 [submit-endpoint]: #submit-endpoint
 
+[via Submit](#submit)
+
 The submit endpoint takes a signed transaction and broadcasts it over the network. We can do this by calling the `sendPayment` or `sendDelegation` mutation depending on the state of the input.
 
 #### Test integrate construction
 
 [test-integrate-construction]: #test-integrate-construction
+
+[via Testing](#testing)
 
 The existing Rosetta test-agent tests our Data API implementation by running a demo instance of Coda and mutating its state with GraphQL mutations and then querying with the Data API to see if the data that comes out is equivalent to what we put in.
 
@@ -378,6 +384,8 @@ We also should include logic that verifies the following:
 #### Test Rosetta CLI
 
 [test-rosetta-cli]: #test-rosetta-cli
+
+[via Testing](#testing)
 
 The [rosetta-cli](https://github.com/coinbase/rosetta-cli) is used to verify correctness of implementations of the rosetta spec. This should be run in CI against our demo node and against live qa and testnets. We can release a version on a testnet before we've fully verified the implementation against rosetta-cli, but the project is not considered "done" until we've done this properly.
 
