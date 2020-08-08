@@ -83,13 +83,11 @@ USER opam
 RUN curl --proto '=https' --tlsv1.2 -sSf -o /tmp/rustup-init \
   https://static.rust-lang.org/rustup/dist/x86_64-unknown-linux-gnu/rustup-init \
   && chmod +x /tmp/rustup-init \
-  && CARGO_HOME=/home/opam/.cargo RUSTUP_HOME=/home/opam/.rustup /tmp/rustup-init -y --default-toolchain "${RUST_VERSION}" --profile minimal \
+  && /tmp/rustup-init -y --default-toolchain "${RUST_VERSION}" --profile minimal \
   && rm /tmp/rustup-init
 # For more about rustup-init see: https://github.com/rust-lang/rustup/blob/master/README.md
 # As opposed to introducing another shell script here (that mostly just determines the platform)
 # we just download the binary for the only platform we care about in this docker environment
-
-#  && chown -R opam:opam /home/opam/.cargo /home/opam/.rustup \
 
 USER root
 # This builds and installs just the rocksdb static lib for us, and cleans up after itself
@@ -194,7 +192,6 @@ RUN opam install \
   result \
   stringext) \
   && opam switch import src/opam.export
-#  && sudo chmod -R u+rw ~/.opam
 
 # TODO: Get pins from a script that can be easily updated if more pins are needed
 # Would be really nice to pull this script, the git submodules, and src/opam.export exclusively in this stage
