@@ -10,7 +10,7 @@ The [Rosetta Construction API](https://www.rosetta-api.org/docs/construction_api
 
 We wish to support Rosetta as it enables clients to build once and support multiple chains. Many vendors that wish to build on top of our protocol are asking for full Rosetta support. Not just the read-half (the Data API) but also the write-half.
 
-The outcome is a full to-spec Construction API implementation.
+The desired outcome is a full to-spec Construction API implementation.
 
 ## Detailed design
 
