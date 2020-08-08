@@ -1,1 +1,1 @@
-https://raw.githubusercontent.com/bkase/jsonschema-to-dhall/34d5895e218c7b4aefbee07eb3c418eb6173418d/out/top_level/Type sha256:9f50e366260e7d7beac79e4f08b2303aab6217400a34399d6e5ee77e468b9d44
+https://raw.githubusercontent.com/bkase/jsonschema-to-dhall/88299aa6e021ec85e2661bea5cfdc4483aa62b4b/out/top_level/Type sha256:8d6a62cc593cf00025e7db7b2ce52398ba073c385522879c5d2047f7686b3499
