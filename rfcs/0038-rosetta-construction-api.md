@@ -65,6 +65,8 @@ Broadcast Signed Transaction X to monitor status                     |
 
 This flow chart will guide our explanation of what is needed to build a full to-spec implementation of the API. Afterwards, we'll list out each proposed piece of work with details of how it should be implemented. Upon mergin of this RFC, each work item will become an issue on GitHub.
 
+The initial version of the construction API will _only_ support payments. We can quickly follow with a version that will support delgation as well. This RFC will talk about all the tasks assuming both payments and delegations are supported. All token-specific transactions (and any future transactions) are not yet supported and out-of-scope for this RFC.
+
 ### Flow chart
 
 #### Before Derivation
@@ -95,19 +97,25 @@ The [metadata endpoint](#metadata-endpoint) takes the senders public key and fin
 
 [payloads]: #payloads
 
-The [payloads endpoint](#payloads-endpoint) takes the metadata and the operations and returns a [encoded unsigned transaction]. A [test] should be included that ensures that after such a transaction is signed and included in the mempool the operations returned are a superset of the ones provided. After it is in a block it is also a superset of the ones provided as input to the endpoint.
+The [payloads endpoint](#payloads-endpoint) takes the metadata and the operations and returns a [encoded unsigned transaction](#encoded-unsigned-transaction).
+
+#### After Payloads
+
+[after-payloads]: #after-payloads
+
+After the payloads endpoint, folks must sign the transaction. In the future, we should build support for this natively, but for now our client-sdk's signing mechanism suffices. As such, we don't need to do much here other than [encode the signed transaction properly](#encoded-signed-transaction).
 
 #### Parse
 
 [parse]: #parse
 
-The [parse endpoint](#parse-endpoint) takes a possibly signed transaction and parses it. The implementation will use the same logic as the Data API transaction -> operations logic and so we do not need an extra task to make this happen.
+The [parse endpoint](#parse-endpoint) takes a possibly signed transaction and parses it into operations.
 
 #### Combine
 
 [combine]: #combine
 
-The [combine endpoint](#combine-endpoint) takes an unsigned transaction and the signature and returns an [encoded signed transaction].
+The [combine endpoint](#combine-endpoint) takes an unsigned transaction and the signature and returns an [encoded signed transaction](#encoded-signed-transaction).
 
 #### Hash
 
@@ -119,18 +127,19 @@ The [hash endpoint](#hash-endpoint) takes the signed transaction and returns the
 
 [submit]: #submit
 
-The [submit endpoint](#submit-endpoint) takes a signed transaction and broadcasts it over the network. Upon skimming our GraphQL implementation, it seems like it is already succeeding only if the transaction is successfully added to the mempool, but it important we more carefully [audit the implementation to ensure this is the case].
+The [submit endpoint](#submit-endpoint) takes a signed transaction and broadcasts it over the network. We also should [audit broadcast behavior to ensure errors are returned when mempool add fails](#audit-transaction-broadcast).
 
 #### Testing
 
-A [test] should be included that ensures:
+We should [integrate the construction calls](#test-integrate-construction) into the existing `test-agent`. By doing this, we don't need to worry about getting this into CI since it is already there (or will be by the time this RFC lands, thanks @lk86 !).
 
-1. The unsigned transaction output by payloads parses into the same operations provided
-2. The signed transaction output by combine parses into the same operations provided
-3. After the signed transaction is in the mempool, the result from the data api is a superset of the operations provided originally
-4. After the signed transaction is in a block, the result from the data api is a superset of the operations provided orginally
+We also will want to [integrate the official rosetta-cli](#test-rosetta-cli) to verify our implementation.
+
+In addition, we'll manually test on subsequent QA and Testnets.
 
 ### Work items
+
+Think of these as the tasks necessary to complete this project. Each item here will turn into a GitHub issue when this RFC lands.
 
 #### Marshal Keys
 
@@ -248,6 +257,134 @@ module Options = struct
 end
 ```
 
+#### Metadata Endpoint
+
+[preprocess-endpoint]: #preprocess-endpoint
+
+[via Metadata](#metadata)
+
+This is a simple GraphQL query. This endpoint should be easy to implement.
+
+#### Unsigned transaction encoding
+
+[encoded-unsigned-transaction]: #encoded-unsigned-transaction
+
+[via Payloads](#payloads)
+
+The Rosetta spec leaves the encoding of unsigned transactions implementation-defined. Since we'll default to using our client-sdk's signing mechanism our encoding will be precicesly the JSON input (stringified) demanded by the "unsafe" method of the client-sdk API:
+
+```reasonml
+// Taken from Client-SDK code
+
+type stakeDelegation = {
+  [@bs.as "to"]
+  to_: publicKey,
+  from: publicKey,
+  fee: uint64,
+  nonce: uint32,
+  memo: option(string),
+  validUntil: option(uint32),
+};
+
+type payment = {
+  [@bs.as "to"]
+  to_: publicKey,
+  from: publicKey,
+  fee: uint64,
+  amount: uint64,
+  nonce: uint32,
+  memo: option(string),
+  validUntil: option(uint32),
+};
+
+type transaction = stakeDelegation | payment
+```
+
+Note that our client-sdk only has support for signing payments and delegations but this version of the construction API only supports those transactions types as well.
+
+#### Payloads Endpoint
+
+[payloads-endpoint]: #payloads-endpoint
+
+[via Payloads](#payloads)
+
+First [convert the operations](#inverted-operations-map) embedding the correct sender nonce from the metadata. Return an [encoded unsigned transaction](#encoded-unsigned-transaction) as described above.
+
+#### Signed transaction encoding
+
+[encoded-signed-transaction]: #encoded-signed-transaction
+
+[via After Payloads](#after-payloads)
+
+Since we'll later be broadcasting the signed transaction via GraphQL, our signed transaction encoding is precicesly the union of the format required for the sendPayment mutation and the sendDelegation mutation (stringified):
+
+```json
+{
+  signature: Signature, // defined in graphql
+  sendPaymentInput: SendPaymentInput?, // defined in graphql
+  sendDelegationInput: SendDelegationInput? // defined in graphql
+}
+```
+
+#### Parse Endpoint
+
+[parse-endpoint]: #parse-endpoint
+
+[via Parse](#parse)
+
+The parse endpoint takes the transaction and needs to return the operations. The implementation will use the same logic as the Data API transaction -> operations logic and so we do not need an extra task to make this happen.
+
+#### Combine Endpoint
+
+[combine-endpoint]: #combine-endpoint
+
+[via Combine](#combine)
+
+The combine endpoint [encodes the signed transaction](#encoded-signed-transaction) according to the schema defined above.
+
+#### Hash Endpoint
+
+[hash-endpoint]: #hash-endpoint
+
+[via Hash](#hash)
+
+The hash endpoint takes the signed transaction and returns the hash. This can be done by pulling in `Coda_base` into Rosetta and calling hash on the transaction.
+
+#### Audit transaction broadcast
+
+[audit-transaction-broadcast]: #audit-transaction-broadcast
+
+Upon skimming our GraphQL implementation, it seems like it is already succeeding only if the transaction is successfully added to the mempool, but it important we more carefully audit the implementation to ensure this is the case as it's an explicit requirement in the spec.
+
+#### Submit
+
+[submit-endpoint]: #submit-endpoint
+
+The submit endpoint takes a signed transaction and broadcasts it over the network. We can do this by calling the `sendPayment` or `sendDelegation` mutation depending on the state of the input.
+
+#### Test integrate construction
+
+[test-integrate-construction]: #test-integrate-construction
+
+The existing Rosetta test-agent tests our Data API implementation by running a demo instance of Coda and mutating its state with GraphQL mutations and then querying with the Data API to see if the data that comes out is equivalent to what we put in.
+
+We can extend the test-agent to also send construction API requests. We should at least add behavior to send a payment and delegation constructed using this API. We can shell out to a subprocess to handle the "off-api" pieces of keypair generation and signing.
+
+We also should include logic that verifies the following:
+
+1. The unsigned transaction output by payloads parses into the same operations provided
+2. The signed transaction output by combine parses into the same operations provided
+3. After the signed transaction is in the mempool, the result from the data api is a superset of the operations provided originally
+4. After the signed transaction is in a block, the result from the data api is a superset of the operations provided orginally
+
+#### Test Rosetta CLI
+
+[test-rosetta-cli]: #test-rosetta-cli
+
+The [rosetta-cli](https://github.com/coinbase/rosetta-cli) is used to verify correctness of implementations of the rosetta spec. This should be run in CI against our demo node and against live qa and testnets. We can release a version on a testnet before we've fully verified the implementation against rosetta-cli, but the project is not considered "done" until we've done this properly.
+
+It's worth noting that the rosetta-cli is [about to get new features to be more flexible at testing other construction API scenarios](https://community.rosetta-api.org/t/feedback-request-automated-construction-api-testing-improvements/146/4). These changes will certainly support payments and delegations. We don't need to wait for the implementation of this new system to support payments today.
+
 ## Drawbacks
 
 [drawbacks]: #drawbacks
@@ -258,26 +395,24 @@ It's extra work, but we really wish to enable folks to build on our protocol in 
 
 [rationale-and-alternatives]: #rationale-and-alternatives
 
-- Why is this design the best in the space of possible designs?
-- What other designs have been considered and what is the rationale for not choosing them?
-- What is the impact of not doing this?
+Decisions were made here to limit scope where possible to enable shipping an MVP as soon as possible. This is why we are explicitly not supporting extra transactions on top of payments (initially) and payments+delegations (closely afterwards).
 
-In [1.c.](#marshallkeysdaemon), we could also change commands that accept public keys to also accept this new format. Additionally, we could change the GraphQL API to support this new format too. I think both of these changes are unnecessary to prioritize as the normal flows will still be fine and we'll still encourage folks to pass around the standard base58-encoded compressed public keys as they are shorter.
+Luckily Rosetta has a very clear specification, so our designs are mostly constrained by the decisions made in that API.
+
+In [marshal keys (c)](#marshalkeys), we could also change commands that accept public keys to also accept this new format. Additionally, we could change the GraphQL API to support this new format too. I think both of these changes are unnecessary to prioritize as the normal flows will still be fine and we'll still encourage folks to pass around the standard base58-encoded compressed public keys as they are shorter.
+
+In the sections about [encoding unsigned transactions](#encoded-unsigned-transaction) and [encoding signed transactions](#encoded-signed-transaction), we make an explicit decision to pick a format that fits what our client-sdk expects. This was done to improve implementation velocity and because we did conciously choose that interface with usability in mind. Additionaly, using a readable JSON string makes it easy to audit, debug, and understand our implementation. This design does subsequently require extra processing for other signers (like a ledger hardware device or a native binary).
 
 ## Prior art
 
 [prior-art]: #prior-art
 
-Discuss prior art, both the good and the bad, in relation to this proposal.
+The [spec](https://www.rosetta-api.org/docs/construction_api_introduction.html)
 
 ## Unresolved questions
 
 [unresolved-questions]: #unresolved-questions
 
-- Is it necessary to precompute the next-token-id for creating new tokens during metadata?
+There are no unresolved questions at this time that I'd like to answer before merging this RFC.
 
-If the transaction involves minting a new token we also lookup the next-token-id.
-
-- What parts of the design do you expect to resolve through the RFC process before this gets merged?
-- What parts of the design do you expect to resolve through the implementation of this feature before merge?
-- What related issues do you consider out of scope for this RFC that could be addressed in the future independently of the solution that comes out of this RFC?
+As stated above, explicitly out-of-scope is any future changes to the Data API portion of Rosetta and Construction API support for transactions other than payments and delegations.
