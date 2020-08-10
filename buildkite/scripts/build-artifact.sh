@@ -1,17 +1,22 @@
 #!/bin/bash
 
-set -o pipefail
+set -eo pipefail
 
 eval `opam config env`
+export PATH=$HOME/.cargo/bin:$PATH
+
+# TODO: Stop building lib_p2p multiple times (due to excessive dependencies in make)
+export LIBP2P_NIXLESS=1
 
 echo "--- Explicitly generate PV-keys and upload before building"
-LIBP2P_NIXLESS=1 make build_pv_keys 2>&1 | tee /tmp/artifacts/buildocaml.log
+make build_pv_keys 2>&1 | tee /tmp/buildocaml.log
 
 echo "--- Publish pvkeys"
 ./scripts/publish-pvkeys.sh
 
-echo "--- Rebuild for pvkey changes"
-make build 2>&1 | tee /tmp/artifacts/buildocaml2.log
+# TODO: Investigate if this adds any value, but its never worked properly in CI
+# echo "--- Rebuild for pvkey changes"
+# make build 2>&1 | tee /tmp/buildocaml2.log
 
 echo "--- Build generate-keypair binary"
 dune build src/app/generate_keypair/generate_keypair.exe
