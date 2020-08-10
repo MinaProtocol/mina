@@ -146,8 +146,8 @@ struct
   let canonicalize x =
     let c, terms =
       Fp.(
-        Snarky.Cvar.to_constant_and_terms ~add ~mul ~zero:(of_int 0) ~equal
-          ~one:(of_int 1))
+        Snarky_backendless.Cvar.to_constant_and_terms ~add ~mul
+          ~zero:(of_int 0) ~equal ~one:(of_int 1))
         x
     in
     let terms =
@@ -225,7 +225,8 @@ struct
     append t.m.c c
 
   let add_constraint ?label:_ t
-      (constr : Fp.t Snarky.Cvar.t Snarky.Constraint.basic) =
+      (constr :
+        Fp.t Snarky_backendless.Cvar.t Snarky_backendless.Constraint.basic) =
     let var = canonicalize in
     let var_exn t = Option.value_exn (var t) in
     let choose_best opts terms =
@@ -234,9 +235,9 @@ struct
       t.weight <- new_weight ;
       add_r1cs t constr
     in
-    let open Snarky.Constraint in
+    let open Snarky_backendless.Constraint in
     match constr with
-    | Snarky.Constraint.Boolean x ->
+    | Snarky_backendless.Constraint.Boolean x ->
         let x, x_weight, x_has_constant_term = var_exn x in
         let x_minus_1_weight =
           x_weight + if x_has_constant_term then 0 else 1
@@ -251,7 +252,7 @@ struct
                 (x, x, x)
             | `x_xMinus1_0 ->
                 (x, decr_constant_term x, []) )
-    | Snarky.Constraint.Equal (x, y) ->
+    | Snarky_backendless.Constraint.Equal (x, y) ->
         (* x * 1 = y
            y * 1 = x
            (x - y) * 1 = 0
@@ -274,11 +275,11 @@ struct
               (y_terms, one, x_terms)
           | `x_minus_y_1_zero ->
               (sub_terms x_terms y_terms, one, []) )
-    | Snarky.Constraint.Square (x, z) ->
+    | Snarky_backendless.Constraint.Square (x, z) ->
         let x, x_weight, _ = var_exn x in
         let z, z_weight, _ = var_exn z in
         choose_best [((), (x_weight, x_weight, z_weight))] (fun () -> (x, x, z))
-    | Snarky.Constraint.R1CS (a, b, c) ->
+    | Snarky_backendless.Constraint.R1CS (a, b, c) ->
         let a, a_weight, _ = var_exn a in
         let b, b_weight, _ = var_exn b in
         let c, c_weight, _ = var_exn c in

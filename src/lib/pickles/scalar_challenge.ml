@@ -7,7 +7,7 @@ module SC = Pickles_types.Scalar_challenge
 *)
 
 let to_field_checked (type f)
-    (module Impl : Snarky.Snark_intf.Run with type field = f) ~endo
+    (module Impl : Snarky_backendless.Snark_intf.Run with type field = f) ~endo
     (SC.Scalar_challenge bits) =
   let bits = Array.of_list bits in
   let module F = Impl.Field in
@@ -44,7 +44,7 @@ let to_field_constant (type f) ~endo
   F.((!a * endo) + !b)
 
 module Make
-    (Impl : Snarky.Snark_intf.Run)
+    (Impl : Snarky_backendless.Snark_intf.Run)
     (G : Intf.Group(Impl).S with type t = Impl.Field.t * Impl.Field.t)
     (Challenge : Challenge.S with module Impl := Impl) (Endo : sig
         val base : Impl.Field.Constant.t

@@ -2,7 +2,7 @@ open Core
 
 let%test_module "merkle_tree" =
   ( module struct
-    open Snarky.Merkle_tree
+    open Snarky_backendless.Merkle_tree
 
     let merge x y = Free_hash.Merge (x, y)
 

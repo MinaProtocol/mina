@@ -1,7 +1,7 @@
 open Core_kernel
 
 module type S = sig
-  module Impl : Snarky.Snark_intf.S
+  module Impl : Snarky_backendless.Snark_intf.S
 
   open Impl
 
@@ -15,7 +15,8 @@ module type S = sig
     -> (Boolean.var array, _) Checked.t
 end
 
-module Make (Impl : Snarky.Snark_intf.S) : S with module Impl := Impl = struct
+module Make (Impl : Snarky_backendless.Snark_intf.S) :
+  S with module Impl := Impl = struct
   open Impl
   open Let_syntax
   module UInt32 = Uint32.Make (Impl)
@@ -204,7 +205,8 @@ end
 let%test_module "blake2-equality test" =
   ( module struct
     (* Delete once the snarky pr lands *)
-    module Impl = Snarky.Snark0.Make (Snarky.Backends.Bn128.Default)
+    module Impl =
+      Snarky_backendless.Snark0.Make (Snarky_backendless.Backends.Bn128.Default)
     include Make (Impl)
 
     let checked_to_unchecked typ1 typ2 checked input =

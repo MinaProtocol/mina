@@ -1,7 +1,7 @@
 (library
  (name remove_snark_keys_trigger)
  ; Remove keys when snarky gets recompiled
- (libraries snarky)
+ (libraries snarky.backendless)
  (preprocess (pps ppx_version)))
 
 (rule

@@ -100,7 +100,7 @@ let var_to_input (var : var) =
 let%test_unit "value = var" =
   let compiled = Genesis_constants.for_unit_tests.protocol in
   let test protocol_constants =
-    let open Snarky in
+    let open Snarky_backendless in
     let p_var =
       let%map p = exists typ ~compute:(As_prover.return protocol_constants) in
       As_prover.read typ p

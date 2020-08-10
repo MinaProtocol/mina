@@ -6,7 +6,7 @@ module type Field = sig
   val square : t -> t
 end
 
-module Make (Impl : Snarky.Snark_intf.Run) = struct
+module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
   open Impl
   open Field
   module Field = Field
