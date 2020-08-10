@@ -16,7 +16,7 @@ The desired outcome is a full to-spec Construction API implementation.
 
 [detailed-design]: #detailed-design
 
-The following flow chart is pulled from the Rosetta documentation, but useful for understanding the different pieces necessary for the implementation:
+The following flow chart is pulled from the [Rosetta documentation](https://www.rosetta-api.org/docs/construction_api_introduction.html), but useful for understanding the different pieces necessary for the implementation:
 
 ```
                                Caller (i.e. Coinbase)                + Construction API Implementation
