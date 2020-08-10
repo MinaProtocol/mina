@@ -385,6 +385,14 @@ module Statement = struct
           !"Next available token is inconsistent between transitions (%{sexp: \
             Token_id.t} vs %{sexp: Token_id.t})"
           s1.next_available_token_after s2.next_available_token_before
+    and () =
+      if Frozen_ledger_hash.equal s1.target s2.source then return ()
+      else
+        Or_error.errorf
+          !"Target ledger hash of statement 1 (%{sexp: Frozen_ledger_hash.t}) \
+            does not match source ledger hash of statement 2 (%{sexp: \
+            Frozen_ledger_hash.t})"
+          s1.target s2.source
     in
     ( { source= s1.source
       ; target= s2.target

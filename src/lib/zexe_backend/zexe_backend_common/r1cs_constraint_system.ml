@@ -226,7 +226,9 @@ struct
 
   let add_constraint ?label:_ t
       (constr :
-        Fp.t Snarky_backendless.Cvar.t Snarky_backendless.Constraint.basic) =
+        ( Fp.t Snarky_backendless.Cvar.t
+        , Fp.t )
+        Snarky_backendless.Constraint.basic) =
     let var = canonicalize in
     let var_exn t = Option.value_exn (var t) in
     let choose_best opts terms =
