@@ -13,7 +13,7 @@ let name = "BlockProductionTest"
 let uploadDeployEnv =
   Command.build
     Command.Config::
-      { commands = [ Cmd.run "bash buildkite/script/export-docker-env.sh" ]
+      { commands = [ Cmd.run "bash buildkite/scripts/export-docker-env.sh" ]
       , label = "Upload DOCKER_DEPLOY_ENV for coda-daemon container"
       , key = "artifact-upload"
       , target = Size.Small
