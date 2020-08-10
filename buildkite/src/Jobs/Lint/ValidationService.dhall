@@ -56,7 +56,7 @@ in Pipeline.build Pipeline.Config::{
       commands = commands,
       label = "Validation service lint steps; employs various forms static analysis on the elixir codebase",
       key = "lint",
-      target = Size.Large,
+      target = Size.Experimental,
       docker = None Docker.Type
     }
   ]

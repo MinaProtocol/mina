@@ -26,7 +26,7 @@ let config : Pipeline.Config.Type = Pipeline.Config::{
       ],
       label = "Prepare monorepo triage",
       key = "monorepo",
-      target = Size.Small,
+      target = Size.Experimental,
       docker = Some Docker::{ image = (./Constants/ContainerImages.dhall).toolchainBase }
     }
   ]

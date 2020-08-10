@@ -38,7 +38,7 @@ Pipeline.build
           ] "./buildkite/scripts/build-artifact.sh" # [ Cmd.run "buildkite-agent artifact upload ./DOCKER_DEPLOY_ENV" ],
           label = "Build artifacts",
           key = "artifacts-build",
-          target = Size.Large
+          target = Size.Experimental
         }
     ]
   }

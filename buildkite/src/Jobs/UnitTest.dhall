@@ -19,7 +19,7 @@ let buildTestCmd : Text -> Text -> Command.Type = \(profile : Text) -> \(path : 
       commands = OpamInit.andThenRunInDocker ([] : List Text) "buildkite/scripts/unit-test.sh ${profile} ${path}",
       label = "Run ${profile} unit-tests",
       key = "unit-test-${profile}",
-      target = Size.XLarge,
+      target = Size.Experimental,
       docker = None Docker.Type,
       artifact_paths = [ S.contains "core_dumps/*" ]
     }

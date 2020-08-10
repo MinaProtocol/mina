@@ -15,7 +15,7 @@ let uploadDeployEnv =
       commands = [ Cmd.run "cd buildkite && buildkite-agent artifact upload DOCKER_DEPLOY_ENV" ],
       label = "Upload deploy environment",
       key = "artifact-upload",
-      target = Size.Small
+      target = Size.Experimental
     }
 
 let dependsOn = [ { name = "GitTriggeredDockerRelease", key = "artifact-upload" } ]

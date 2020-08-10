@@ -25,7 +25,7 @@ in Pipeline.build Pipeline.Config::{
       ],
       label = "Validation service tests; executes the ExUnit test suite",
       key = "test",
-      target = Size.Small,
+      target = Size.Experimental,
       docker = Some Docker::{ image = ValidationService.containerImage }
     }
   ]

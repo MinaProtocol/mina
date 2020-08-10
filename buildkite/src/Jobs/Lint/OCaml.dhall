@@ -33,7 +33,7 @@ in Pipeline.build
             "./scripts/require-ppx-version.py"),
           label = "OCaml Lints; Check-format, Require-ppx-version",
           key = "check",
-          target = Size.Large,
+          target = Size.Experimental,
           docker = None Docker.Type
         }
     ]
