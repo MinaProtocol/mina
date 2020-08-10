@@ -21,8 +21,7 @@ import (
 	"encoding/base64"
 
 	"github.com/go-errors/errors"
-	logging "github.com/ipfs/go-log"
-	logwriter "github.com/ipfs/go-log/writer"
+	logging "github.com/ipfs/go-log/v2"
 	crypto "github.com/libp2p/go-libp2p-core/crypto"
 	net "github.com/libp2p/go-libp2p-core/network"
 	peer "github.com/libp2p/go-libp2p-core/peer"
@@ -32,7 +31,6 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	filter "github.com/libp2p/go-maddr-filter"
 	"github.com/multiformats/go-multiaddr"
-	logging2 "github.com/whyrusleeping/go-logging"
 )
 
 type subscription struct {
@@ -197,7 +195,7 @@ type configureMsg struct {
 	ListenOn        []string `json:"ifaces"`
 	External        string   `json:"external_maddr"`
 	UnsafeNoTrustIP bool     `json:"unsafe_no_trust_ip"`
-	Flood           bool     `json:"flood_gossip"`
+	GossipType      string   `json:"gossip_type"`
 }
 
 type discoveredPeerUpcall struct {
@@ -234,11 +232,20 @@ func (m *configureMsg) run(app *app) (interface{}, error) {
 		return nil, badHelper(err)
 	}
 
+	// SOMEDAY:
+	// - stop putting block content on the mesh.
+	// - bigger than 16MiB block size?
+	opts := pubsub.WithMaxMessageSize(1024 * 1024 * 16)
 	var ps *pubsub.PubSub
-	if m.Flood {
-		ps, err = pubsub.NewFloodSub(app.Ctx, helper.Host, pubsub.WithStrictSignatureVerification(true), pubsub.WithMessageSigning(true))
+	if m.GossipType == "gossipsub" {
+		ps, err = pubsub.NewGossipSub(app.Ctx, helper.Host, opts)
+	} else if m.GossipType == "flood" {
+		ps, err = pubsub.NewFloodSub(app.Ctx, helper.Host, opts)
+	} else if m.GossipType == "random" {
+		// networks of size 100 aren't very large, but we shouldn't be using randomsub!
+		ps, err = pubsub.NewRandomSub(app.Ctx, helper.Host, 10, opts)
 	} else {
-		ps, err = pubsub.NewRandomSub(app.Ctx, helper.Host, pubsub.WithStrictSignatureVerification(true), pubsub.WithMessageSigning(true))
+		return nil, badHelper(errors.New("unknown gossip type"))
 	}
 
 	if err != nil {
@@ -332,6 +339,7 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 	if app.P2p.Dht == nil {
 		return nil, needsDHT()
 	}
+	app.P2p.Pubsub.Join(s.Topic)
 	err := app.P2p.Pubsub.RegisterTopicValidator(s.Topic, func(ctx context.Context, id peer.ID, msg *pubsub.Message) bool {
 		if id == app.P2p.Me {
 			// messages from ourself are valid.
@@ -390,7 +398,7 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 			return false
 		case res := <-ch:
 			if !res {
-				app.P2p.Logger.Error("why u fail to validate :(")
+				app.P2p.Logger.Info("why u fail to validate :(")
 			} else {
 				app.P2p.Logger.Info("validated!")
 			}
@@ -806,7 +814,7 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 	app.P2p.DiscoveredPeers = discovered
 
 	foundPeer := func(info peer.AddrInfo, source string) {
-		if info.ID != "" && len(info.Addrs) != 0 {
+		if info.ID != "" && len(info.Addrs) != 0 && info.ID != app.P2p.Me {
 			ctx, cancel := context.WithTimeout(app.Ctx, 15*time.Second)
 			defer cancel()
 			if err := app.P2p.Host.Connect(ctx, info); err != nil {
@@ -856,7 +864,7 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 			for info := range dhtpeers {
 				foundPeer(info, "dht")
 			}
-			time.Sleep(30 * time.Second)
+			time.Sleep(2 * time.Minute)
 		}
 	}()
 
@@ -998,9 +1006,13 @@ type successResult struct {
 }
 
 func main() {
-	logwriter.Configure(logwriter.Output(os.Stderr), logwriter.LdJSONFormatter)
-	log.SetOutput(os.Stderr)
-	logging.SetAllLoggers(logging2.INFO)
+	logging.SetupLogging(logging.Config{
+		Format: logging.JSONOutput,
+		Stderr: true,
+		Stdout: false,
+		Level:  logging.LevelInfo,
+		File:   "",
+	})
 	helperLog := logging.Logger("helper top-level JSON handling")
 
 	go func() {

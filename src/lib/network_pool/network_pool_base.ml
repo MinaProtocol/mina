@@ -63,13 +63,30 @@ end)
       ; write_broadcasts
       ; constraint_constants }
     in
+    let filter_verified pipe ~f =
+      let r, w =
+        Strict_pipe.create ~name:"verified network pool diffs"
+          (Buffered (`Capacity 1024, `Overflow Drop_head))
+      in
+      Strict_pipe.Reader.iter_without_pushback pipe ~f:(fun ((d, _) as x) ->
+          don't_wait_for
+            ( match%map Resource_pool.Diff.verify resource_pool (f d) with
+            | true ->
+                Strict_pipe.Writer.write w x
+            | false ->
+                () ) )
+      |> don't_wait_for ;
+      r
+    in
     (*proiority: Transition frontier diffs > local diffs > incomming diffs*)
     Strict_pipe.Reader.Merge.iter
       [ Strict_pipe.Reader.map tf_diffs ~f:(fun diff ->
             `Transition_frontier_extension diff )
-      ; Strict_pipe.Reader.map local_diffs ~f:(fun diff -> `Local diff)
-      ; Strict_pipe.Reader.map incoming_diffs ~f:(fun diff -> `Incoming diff)
-      ]
+      ; Strict_pipe.Reader.map
+          (filter_verified local_diffs ~f:Envelope.Incoming.local)
+          ~f:(fun diff -> `Local diff)
+      ; Strict_pipe.Reader.map (filter_verified incoming_diffs ~f:Fn.id)
+          ~f:(fun diff -> `Incoming diff) ]
       ~f:(fun diff_source ->
         match diff_source with
         | `Incoming (diff, cb) ->
