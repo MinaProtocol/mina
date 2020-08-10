@@ -1,5 +1,5 @@
 #!/bin/bash
-set -o pipefail
+set -eo pipefail
 
 source DOCKER_DEPLOY_ENV
 
