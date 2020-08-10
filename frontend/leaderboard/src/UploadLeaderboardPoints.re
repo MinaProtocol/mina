@@ -13,7 +13,7 @@
   */
 
 module StringMap = Map.Make(String);
-open Sheets.Bindings;
+open Sheets;
 open Sheets.Core;
 
 let createPublickeyUsernameMap = sheetsData => {
@@ -144,13 +144,7 @@ let updateChallengeSheet = (client, spreadsheetId, range, userMap, metricsMap) =
 let uploadChallengePoints = (spreadsheetId, metricsMap) => {
   let client = createClient();
   getRange(
-    client,
-    initSheetsQuery(
-      spreadsheetId,
-      Sheets.getSheet(Sheets.Users).range,
-      "FORMULA",
-    ),
-    result => {
+    client, initSheetsQuery(spreadsheetId, "Users!A2:B", "FORMULA"), result => {
     switch (result) {
     /* userData is a 2d array of usernames and public keys to represent each user */
     | Ok(userData) =>

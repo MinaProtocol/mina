@@ -5,6 +5,8 @@ open Async
 
 let name = "coda-change-snark-worker-test"
 
+let runtime_config = Runtime_config.Test_configs.split_snarkless
+
 let main () =
   let snark_worker_and_block_producer_id = 0 in
   let logger = Logger.create () in
@@ -12,7 +14,12 @@ let main () =
   let block_production_keys i =
     if i = snark_worker_and_block_producer_id then Some i else None
   in
-  let precomputed_values = Lazy.force Precomputed_values.compiled in
+  let%bind precomputed_values, _runtime_config =
+    Genesis_ledger_helper.init_from_config_file ~logger ~may_generate:false
+      ~proof_level:None
+      (Lazy.force runtime_config)
+    >>| Or_error.ok_exn
+  in
   let largest_public_key =
     Precomputed_values.largest_account_pk_exn precomputed_values
   in
@@ -23,7 +30,7 @@ let main () =
   let%bind testnet =
     Coda_worker_testnet.test ~name logger n block_production_keys
       snark_work_public_keys Cli_lib.Arg_type.Work_selection_method.Sequence
-      ~max_concurrent_connections:None
+      ~max_concurrent_connections:None ~precomputed_values
   in
   let%bind new_block_pipe1, new_block_pipe2 =
     let%map pipe =
@@ -42,13 +49,11 @@ let main () =
         if
           List.exists completed_works
             ~f:(fun {Transaction_snark_work.prover; _} ->
-              Logger.trace logger "Prover of completed work"
-                ~module_:__MODULE__ ~location:__LOC__
+              [%log trace] "Prover of completed work"
                 ~metadata:[("Prover", Public_key.Compressed.to_yojson prover)] ;
               Public_key.Compressed.equal prover public_key )
         then (
-          Logger.trace logger "Found snark prover ivar filled"
-            ~module_:__MODULE__ ~location:__LOC__
+          [%log trace] "Found snark prover ivar filled"
             ~metadata:
               [("public key", Public_key.Compressed.to_yojson public_key)] ;
           Ivar.fill_if_empty found_snark_prover_ivar () )
@@ -57,8 +62,7 @@ let main () =
     |> don't_wait_for ;
     Ivar.read found_snark_prover_ivar
   in
-  Logger.trace logger "Waiting to get snark work from largest public key"
-    ~module_:__MODULE__ ~location:__LOC__
+  [%log trace] "Waiting to get snark work from largest public key"
     ~metadata:
       [ ( "largest public key"
         , Public_key.Compressed.to_yojson largest_public_key ) ] ;
@@ -70,10 +74,9 @@ let main () =
       [largest_public_key]
     |> Precomputed_values.pk_of_account_record
   in
-  Logger.trace logger "Setting new snark worker key"
+  [%log trace] "Setting new snark worker key"
     ~metadata:
-      [("new snark worker", Public_key.Compressed.to_yojson new_snark_worker)]
-    ~module_:__MODULE__ ~location:__LOC__ ;
+      [("new snark worker", Public_key.Compressed.to_yojson new_snark_worker)] ;
   let%bind () =
     let%map opt =
       Coda_worker_testnet.Api.replace_snark_worker_key testnet
@@ -82,8 +85,7 @@ let main () =
     Option.value_exn opt
   in
   let%bind () = wait_for_snark_worker_proof new_block_pipe2 new_snark_worker in
-  Logger.trace logger "Finished waiting for snark work with updated key"
-    ~module_:__MODULE__ ~location:__LOC__ ;
+  [%log trace] "Finished waiting for snark work with updated key" ;
   (* Testing that nothing should break if the snark worker is set to None *)
   let%bind () =
     let%map opt =

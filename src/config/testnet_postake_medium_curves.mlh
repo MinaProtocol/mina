@@ -18,11 +18,12 @@
 [%%define record_async_backtraces false]
 [%%define time_offsets true]
 [%%define cache_exceptions false]
-[%%define fake_hash false]
+
+[%%define plugins false]
 
 [%%define genesis_ledger "testnet_postake"]
 
-[%%define genesis_state_timestamp "2020-05-12 10:00:00-07:00"]
+[%%define genesis_state_timestamp "2020-07-24 12:40:00-07:00"]
 [%%define block_window_duration 180000]
 
 [%%define integration_tests false]

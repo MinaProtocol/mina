@@ -2,4 +2,4 @@
   (name fake_network)
   (public_name fake_network)
   (libraries async core gadt_lib gossip_net coda_networking sync_handler)
-  (preprocess (pps ppx_version ppx_jane ppx_deriving.std)))
+  (preprocess (pps ppx_coda ppx_version ppx_jane ppx_deriving.std)))

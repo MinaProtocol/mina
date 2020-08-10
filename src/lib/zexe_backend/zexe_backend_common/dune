@@ -1,0 +1,17 @@
+(library
+  (inline_tests)
+  (name zexe_backend_common)
+  (public_name zexe_backend.common)
+  (flags -warn-error -27)
+  (preprocess (pps ppx_version ppx_jane ppx_deriving_yojson ppx_deriving.std))
+  (libraries
+    hex
+    digestif
+    pickles_types
+    snarky_bn382
+    key_cache
+    sgn_type
+    snarky
+    sponge
+    snarkette
+    core ))

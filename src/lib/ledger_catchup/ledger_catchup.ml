@@ -90,22 +90,21 @@ let verify_transition ~logger ~consensus_constants ~trust_system ~verifier
   | Ok x ->
       Deferred.return @@ Ok (`Building_path x)
   | Error (`In_frontier hash) ->
-      Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+      [%log trace]
         "transition queried during ledger catchup has already been seen" ;
       Deferred.return @@ Ok (`In_frontier hash)
   | Error (`In_process consumed_state) -> (
-      Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+      [%log trace]
         "transition queried during ledger catchup is still in process in one \
          of the components in transition_frontier" ;
       match%map Ivar.read consumed_state with
       | `Failed ->
-          Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-            "transition queried during ledger catchup failed" ;
+          [%log trace] "transition queried during ledger catchup failed" ;
           Error (Error.of_string "Previous transition failed")
       | `Success hash ->
           Ok (`In_frontier hash) )
   | Error (`Verifier_error error) ->
-      Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+      [%log warn]
         ~metadata:[("error", `String (Error.to_string_hum error))]
         "verifier threw an error while verifying transiton queried during \
          ledger catchup: $error" ;
@@ -193,7 +192,7 @@ let rec fold_until ~(init : 'accum)
 let download_state_hashes ~logger ~trust_system ~network ~frontier ~num_peers
     ~target_hash =
   let%bind peers = Coda_networking.random_peers network num_peers in
-  Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+  [%log debug]
     ~metadata:[("target_hash", State_hash.to_yojson target_hash)]
     "Doing a catchup job with target $target_hash" ;
   Deferred.Or_error.find_map_ok peers ~f:(fun peer ->
@@ -347,8 +346,7 @@ let verify_transitions_and_build_breadcrumbs ~logger
 let garbage_collect_subtrees ~logger ~subtrees =
   List.iter subtrees ~f:(fun subtree ->
       Rose_tree.map subtree ~f:Cached.invalidate_with_failure |> ignore ) ;
-  Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-    "garbage collected failed cached transitions"
+  [%log trace] "garbage collected failed cached transitions"
 
 let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
     ~catchup_job_reader
@@ -376,7 +374,7 @@ let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
               let num_of_missing_transitions =
                 List.length hashes_of_missing_transitions
               in
-              Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+              [%log debug]
                 ~metadata:
                   [ ( "hashes_of_missing_transitions"
                     , `List
@@ -398,7 +396,7 @@ let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
                 ~subtrees
             with
             | Ok trees_of_breadcrumbs ->
-                Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+                [%log trace]
                   ~metadata:
                     [ ( "hashes of transitions"
                       , `List
@@ -411,7 +409,7 @@ let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
                                  tree )) ) ]
                   "about to write to the catchup breadcrumbs pipe" ;
                 if Strict_pipe.Writer.is_closed catchup_breadcrumbs_writer then (
-                  Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+                  [%log trace]
                     "catchup breadcrumbs pipe was closed; attempt to write to \
                      closed pipe" ;
                   garbage_collect_subtrees ~logger
@@ -430,7 +428,7 @@ let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
                       Core.Time.(Span.to_ms @@ diff (now ()) start_time)) ;
                   Catchup_jobs.decr ()
             | Error e ->
-                Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+                [%log warn]
                   ~metadata:[("error", `String (Error.to_string_hum e))]
                   "Catchup process failed -- unable to receive valid data \
                    from peers or transition frontier progressed faster than \

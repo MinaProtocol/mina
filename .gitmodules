@@ -13,9 +13,6 @@
 [submodule "src/external/rpc_parallel"]
 	path = src/external/rpc_parallel
 	url = https://github.com/CodaProtocol/rpc_parallel.git
-[submodule "src/external/digestif"]
-	path = src/external/digestif
-	url = https://github.com/CodaProtocol/digestif.git
 [submodule "frontend/wallet/tablecloth"]
 	path = frontend/wallet/tablecloth
 	url = https://github.com/bkase/tablecloth

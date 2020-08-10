@@ -62,10 +62,10 @@ let create ~logger ~constraint_constants ~wallets ~time_controller
         Hashtbl.find_and_call subscribed_payment_users participant
           ~if_not_found:ignore ~if_found:(fun (_, writer) ->
             let user_commands =
-              User_command.filter_by_participant
-                (Filtered_external_transition.user_commands
-                   filtered_external_transition)
-                participant
+              filtered_external_transition
+              |> Filtered_external_transition.user_commands
+              |> List.map ~f:(fun {With_hash.data; _} -> data)
+              |> Fn.flip User_command.filter_by_participant participant
             in
             List.iter user_commands ~f:(fun user_command ->
                 Pipe.write_without_pushback writer user_command ) ) )
@@ -139,7 +139,7 @@ let create ~logger ~constraint_constants ~wallets ~time_controller
                 verified_transactions participants ;
               Deferred.unit
           | Error e ->
-              Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+              [%log error]
                 ~metadata:
                   [ ( "error"
                     , `String (Staged_ledger.Pre_diff_info.Error.to_string e)

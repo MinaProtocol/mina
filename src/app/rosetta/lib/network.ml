@@ -23,9 +23,24 @@ module Get_status =
     daemonStatus {
       peers
     }
+    syncStatus
     initialPeers
   }
 |}]
+
+let sync_status_to_string = function
+  | `BOOTSTRAP ->
+      "Bootstrap"
+  | `CATCHUP ->
+      "Catchup"
+  | `CONNECTING ->
+      "Connecting"
+  | `LISTENING ->
+      "Listening"
+  | `OFFLINE ->
+      "Offline"
+  | `SYNCED ->
+      "Synced"
 
 module Get_version =
 [%graphql
@@ -275,7 +290,12 @@ module Status = struct
           )
       ; peers=
           (res#daemonStatus)#peers |> Array.to_list |> List.map ~f:Peer.create
-      }
+      ; sync_status=
+          Some
+            { Sync_status.current_index=
+                ((latest_block#protocolState)#consensusState)#blockHeight
+            ; target_index= None
+            ; stage= Some (sync_status_to_string res#syncStatus) } }
   end
 
   module Real = Impl (Deferred.Result)
@@ -316,6 +336,8 @@ module Status = struct
             object
               method peers = [|"dev.o1test.net"|]
             end
+
+          method syncStatus = `SYNCED
         end
 
       let no_chain_info_env : 'gql Env.Mock.t =
@@ -349,7 +371,12 @@ module Status = struct
                    { Block_identifier.index= Int64.of_int_exn 1
                    ; hash= "GENESIS_HASH" }
                ; peers= [{Peer.peer_id= "dev.o1test.net"; metadata= None}]
-               ; oldest_block_identifier= None } )
+               ; oldest_block_identifier= None
+               ; sync_status=
+                   Some
+                     { Sync_status.current_index= Int64.of_int_exn 4
+                     ; target_index= None
+                     ; stage= Some "Synced" } } )
 
       let oldest_block_is_different_env : 'gql Env.Mock.t =
         { gql= (fun () -> Result.return @@ build ~best_chain_missing:false)
@@ -375,7 +402,12 @@ module Status = struct
                ; oldest_block_identifier=
                    Some
                      { Block_identifier.index= Int64.of_int_exn 3
-                     ; hash= "SOME_HASH" } } )
+                     ; hash= "SOME_HASH" }
+               ; sync_status=
+                   Some
+                     { Sync_status.current_index= Int64.of_int_exn 4
+                     ; target_index= None
+                     ; stage= Some "Synced" } } )
     end )
 end
 
@@ -405,11 +437,10 @@ module Options = struct
           ~network_identifier:network.network_identifier
       in
       { Network_options_response.version=
-          Version.create "1.4.0" (Option.value ~default:"unknown" res#version)
+          Version.create "1.4.1" (Option.value ~default:"unknown" res#version)
       ; allow=
-          { Allow.operation_statuses=
-              [{Operation_status.status= "SUCCESS"; successful= true}]
-          ; operation_types= ["TRANSFER"]
+          { Allow.operation_statuses= Lazy.force Operation_statuses.all
+          ; operation_types= Lazy.force Operation_types.all
           ; errors= Lazy.force Errors.all_errors
           ; historical_balance_lookup= false } }
   end
@@ -434,11 +465,10 @@ module Options = struct
           ~actual:(Mock.handle ~env dummy_network_request)
           ~expected:
             ( Result.return
-            @@ { Network_options_response.version= Version.create "1.4.0" "v1.0"
+            @@ { Network_options_response.version= Version.create "1.4.1" "v1.0"
                ; allow=
-                   { Allow.operation_statuses=
-                       [{Operation_status.status= "SUCCESS"; successful= true}]
-                   ; operation_types= ["TRANSFER"]
+                   { Allow.operation_statuses= Lazy.force Operation_statuses.all
+                   ; operation_types= Lazy.force Operation_types.all
                    ; errors= Lazy.force Errors.all_errors
                    ; historical_balance_lookup= false } } )
     end )
@@ -447,8 +477,7 @@ end
 let router ~graphql_uri ~logger ~db (route : string list) body =
   let (module Db : Caqti_async.CONNECTION) = db in
   let open Async.Deferred.Result.Let_syntax in
-  Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-    "Handling /network/ $route"
+  [%log debug] "Handling /network/ $route"
     ~metadata:[("route", `List (List.map route ~f:(fun s -> `String s)))] ;
   match route with
   | ["list"] ->

@@ -6,8 +6,8 @@ module T = struct
   type t = {logger: Logger.t}
 
   type view =
-    { new_user_commands: User_command.t list
-    ; removed_user_commands: User_command.t list
+    { new_user_commands: User_command.t With_status.t list
+    ; removed_user_commands: User_command.t With_status.t list
     ; reorg_best_tip: bool }
 
   let create ~logger frontier =
@@ -34,9 +34,7 @@ module T = struct
       in
       go t2 []
     in
-    Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
-      !"Common ancestor: %{sexp: State_hash.t}"
-      ancestor ;
+    [%log' debug t.logger] !"Common ancestor: %{sexp: State_hash.t}" ancestor ;
     ( path_from_to (Full_frontier.find_exn frontier ancestor) bc1
     , path_from_to (Full_frontier.find_exn frontier ancestor) bc2 )
 
@@ -64,7 +62,7 @@ module T = struct
               let added_to_best_tip_path, removed_from_best_tip_path =
                 get_path_diff t frontier new_best_tip_breadcrumb old_best_tip
               in
-              Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
+              [%log' debug t.logger]
                 "added %d breadcrumbs and removed %d making path to new best \
                  tip"
                 (List.length added_to_best_tip_path)

@@ -103,56 +103,24 @@ struct
   let equal_var x y = Field.Checked.equal x.digest y.digest
 
   let typ : (var, t) Typ.t =
-    let store (t : t) =
-      let open Typ.Store.Let_syntax in
-      let n = Bigint.of_field t in
-      let rec go i acc =
-        if Int.(i < 0) then return (Bitstring.Lsb_first.of_list acc)
-        else
-          let%bind b = Boolean.typ.store (Bigint.test_bit n i) in
-          go Int.(i - 1) (b :: acc)
-      in
-      let%map bits = go (Field.size_in_bits - 1) [] in
-      {bits= Some bits; digest= Field.Var.project (bits :> Boolean.var list)}
-    in
-    let read (t : var) = Field.typ.read t.digest in
-    let alloc =
-      let open Typ.Alloc.Let_syntax in
-      let rec go i acc =
-        if Int.(i < 0) then return (Bitstring.Lsb_first.of_list acc)
-        else
-          let%bind b = Boolean.typ.alloc in
-          go Int.(i - 1) (b :: acc)
-      in
-      let%map bits = go (Field.size_in_bits - 1) [] in
-      {bits= Some bits; digest= Field.Var.project (bits :> Boolean.var list)}
-    in
-    let check {bits; _} =
-      Checked.List.iter
-        (Option.value_exn bits :> Boolean.var list)
-        ~f:Boolean.typ.check
-    in
-    {store; read; alloc; check}
+    Typ.transport_var Typ.field
+      ~there:(fun {digest; bits= _} -> digest)
+      ~back:(fun digest -> {digest; bits= None})
 
   [%%endif]
 end
 
 module T0 = struct
-  [%%versioned_binable
+  [%%versioned_asserted
   module Stable = struct
     module V1 = struct
-      type t = Field.t [@@deriving sexp, compare, hash]
+      type t = Field.t
+      [@@deriving sexp, compare, hash, version {asserted}, bin_io]
 
       let to_latest = Fn.id
-
-      module Arg = struct
-        type nonrec t = t
-
-        [%%define_locally Field.(to_string, of_string)]
-      end
-
-      include Binable.Of_stringable (Arg)
     end
+
+    module Tests = struct end
   end]
 
   module Tests = struct
@@ -166,20 +134,11 @@ module T0 = struct
         Field.gen
 
     [%%if
-    curve_size = 298]
+    curve_size = 255]
 
     let%test "Binable from stringable V1" =
-      let known_good_digest = "66e2f2648cf3d2c39465ddbe4f05202a" in
-      Ppx_version.Serialization.check_serialization
-        (module Stable.V1)
-        field known_good_digest
-
-    [%%elif
-    curve_size = 753]
-
-    let%test "Binable from stringable V1" =
-      let known_good_digest = "0e586911e7deaf7e5b49c801bf248c92" in
-      Ppx_version.Serialization.check_serialization
+      let known_good_digest = "8fffa8b873e2f0600ad8327fa5423859" in
+      Ppx_version_runtime.Serialization.check_serialization
         (module Stable.V1)
         field known_good_digest
 

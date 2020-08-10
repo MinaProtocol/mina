@@ -164,8 +164,9 @@ let display t =
 let all_user_commands breadcrumbs =
   Sequence.fold (Sequence.of_list breadcrumbs) ~init:User_command.Set.empty
     ~f:(fun acc_set breadcrumb ->
-      let user_commands = user_commands breadcrumb in
-      Set.union acc_set (User_command.Set.of_list user_commands) )
+      breadcrumb |> user_commands
+      |> List.map ~f:(fun {data; _} -> data)
+      |> User_command.Set.of_list |> Set.union acc_set )
 
 module For_tests = struct
   open Currency
@@ -266,8 +267,8 @@ module For_tests = struct
             ; proofs=
                 One_or_two.map stmts ~f:(fun statement ->
                     Ledger_proof.create ~statement
-                      ~sok_digest:Sok_message.Digest.default ~proof:Proof.dummy
-                )
+                      ~sok_digest:Sok_message.Digest.default
+                      ~proof:Proof.transaction_dummy )
             ; prover }
       in
       let current_global_slot, state_and_body_hash =
@@ -355,7 +356,7 @@ module For_tests = struct
       Protocol_version.(set_current zero) ;
       let next_external_transition =
         External_transition.For_tests.create ~protocol_state
-          ~protocol_state_proof:Proof.dummy
+          ~protocol_state_proof:Proof.blockchain_dummy
           ~staged_ledger_diff:(Staged_ledger_diff.forget staged_ledger_diff)
           ~validation_callback:Fn.ignore
           ~delta_transition_chain_proof:(previous_state_hash, []) ()
@@ -374,7 +375,7 @@ module For_tests = struct
           ~sender:None
       with
       | Ok new_breadcrumb ->
-          Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+          [%log info]
             ~metadata:
               [ ( "state_hash"
                 , state_hash new_breadcrumb |> State_hash.to_yojson ) ]

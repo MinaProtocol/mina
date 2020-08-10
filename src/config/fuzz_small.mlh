@@ -1,5 +1,5 @@
 [%%import "/src/config/ledger_depth/tiny.mlh"]
-[%%import "/src/config/curve/small.mlh"]
+[%%import "/src/config/curve/medium.mlh"]
 [%%import "/src/config/coinbase/standard.mlh"]
 [%%import "/src/config/consensus/postake_short.mlh"]
 [%%import "/src/config/scan_state/medium.mlh"]
@@ -11,7 +11,8 @@
 [%%import "/src/config/protocol_version/current.mlh"]
 
 [%%define time_offsets true]
-[%%define fake_hash false]
+
+[%%define plugins false]
 
 [%%define genesis_ledger "fuzz"]
 [%%define genesis_state_timestamp "2019-01-30 12:00:00-08:00"]

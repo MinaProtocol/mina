@@ -31,6 +31,7 @@ let get_status ~frontier_broadcast_pipe ~transaction_pool cmd =
   let%map check_cmd =
     Result.of_option (User_command.check cmd)
       ~error:(Error.of_string "Invalid signature")
+    |> Result.map ~f:Transaction_hash.User_command_with_valid_signature.create
   in
   let resource_pool = Transaction_pool.resource_pool transaction_pool in
   match Broadcast_pipe.Reader.peek frontier_broadcast_pipe with
@@ -41,21 +42,17 @@ let get_status ~frontier_broadcast_pipe ~transaction_pool cmd =
           let best_tip_path =
             Transition_frontier.best_tip_path transition_frontier
           in
-          let best_tip_user_commands =
-            Sequence.fold (Sequence.of_list best_tip_path)
-              ~init:User_command.Set.empty ~f:(fun acc_set breadcrumb ->
-                let user_commands =
-                  Transition_frontier.Breadcrumb.user_commands breadcrumb
-                in
-                List.fold user_commands ~init:acc_set ~f:Set.add )
+          let in_breadcrumb breadcrumb =
+            List.exists
+              (Transition_frontier.Breadcrumb.user_commands breadcrumb)
+              ~f:(fun {data= cmd'; _} -> User_command.equal cmd cmd')
           in
-          if Set.mem best_tip_user_commands cmd then return State.Included ;
-          let all_transactions =
-            Transition_frontier.(
-              Breadcrumb.all_user_commands
-                (Transition_frontier.all_breadcrumbs transition_frontier))
-          in
-          if Set.mem all_transactions cmd then return State.Pending ;
+          if List.exists ~f:in_breadcrumb best_tip_path then
+            return State.Included ;
+          if
+            List.exists ~f:in_breadcrumb
+              (Transition_frontier.all_breadcrumbs transition_frontier)
+          then return State.Pending ;
           if Transaction_pool.Resource_pool.member resource_pool check_cmd then
             return State.Pending ;
           State.Unknown )
@@ -116,10 +113,9 @@ let%test_module "transaction_status" =
       don't_wait_for
       @@ Linear_pipe.iter (Transaction_pool.broadcasts transaction_pool)
            ~f:(fun transactions ->
-             Logger.trace logger
+             [%log trace]
                "Transactions have been applied successfully and is propagated \
                 throughout the 'network'"
-               ~module_:__MODULE__ ~location:__LOC__
                ~metadata:
                  [ ( "transactions"
                    , Transaction_pool.Resource_pool.Diff.to_yojson transactions
@@ -142,8 +138,7 @@ let%test_module "transaction_status" =
                   ([user_command], Fn.const ())
               in
               let%map () = Async.Scheduler.yield_until_no_jobs_remain () in
-              Logger.info logger "Checking status" ~module_:__MODULE__
-                ~location:__LOC__ ;
+              [%log info] "Checking status" ;
               [%test_eq: State.t] ~equal:State.equal State.Unknown
                 ( Or_error.ok_exn
                 @@ get_status ~frontier_broadcast_pipe ~transaction_pool
@@ -172,8 +167,7 @@ let%test_module "transaction_status" =
                 @@ get_status ~frontier_broadcast_pipe ~transaction_pool
                      user_command
               in
-              Logger.info logger "Computing status" ~module_:__MODULE__
-                ~location:__LOC__ ;
+              [%log info] "Computing status" ;
               [%test_eq: State.t] ~equal:State.equal State.Pending status ) )
 
     let%test_unit "An unknown transaction does not appear in the transition \
@@ -205,8 +199,7 @@ let%test_module "transaction_status" =
                   (pool_user_commands, Fn.const ())
               in
               let%map () = Async.Scheduler.yield_until_no_jobs_remain () in
-              Logger.info logger "Computing status" ~module_:__MODULE__
-                ~location:__LOC__ ;
+              [%log info] "Computing status" ;
               [%test_eq: State.t] ~equal:State.equal State.Unknown
                 ( Or_error.ok_exn
                 @@ get_status ~frontier_broadcast_pipe ~transaction_pool

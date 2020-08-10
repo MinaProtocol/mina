@@ -189,7 +189,9 @@ let create_expected_statement ~constraint_constants
   let next_available_token_before =
     Sparse_ledger.next_available_token ledger_witness
   in
-  let%bind transaction = Ledger.Undo.transaction transaction_with_info in
+  let%bind {data= transaction; status= _} =
+    Ledger.Undo.transaction transaction_with_info
+  in
   let txn_global_slot =
     (* TODO: Get from protocol state. *)
     Coda_numbers.Global_slot.zero
@@ -234,7 +236,6 @@ let create_expected_statement ~constraint_constants
   ; pending_coinbase_stack_state=
       { statement.pending_coinbase_stack_state with
         target= pending_coinbase_after }
-  ; proof_type= `Base
   ; sok_digest= () }
 
 let completed_work_to_scanable_work (job : job) (fee, current_proof, prover) :
@@ -277,7 +278,6 @@ let completed_work_to_scanable_work (job : job) (fee, current_proof, prover) :
         ; fee_excess
         ; next_available_token_before= s.next_available_token_before
         ; next_available_token_after= s'.next_available_token_after
-        ; proof_type= `Merge
         ; sok_digest= () }
       in
       ( Ledger_proof.create ~statement ~sok_digest ~proof
@@ -422,7 +422,6 @@ struct
         ; next_available_token_after
         ; supply_increase= _
         ; pending_coinbase_stack_state= _ (*TODO: check pending coinbases?*)
-        ; proof_type= _
         ; sok_digest= () } ->
         let open Or_error.Let_syntax in
         let%map () =
@@ -507,7 +506,6 @@ let statement_of_job : job -> Transaction_snark.Statement.t option = function
         ; fee_excess
         ; next_available_token_before= stmt1.next_available_token_before
         ; next_available_token_after= stmt2.next_available_token_after
-        ; proof_type= `Merge
         ; sok_digest= () }
         : Transaction_snark.Statement.t )
 
@@ -663,7 +661,9 @@ let all_work_pairs t
         , state_hash
         , ledger_witness
         , init_stack ) ->
-        let%bind transaction = Ledger.Undo.transaction transaction_with_info in
+        let%bind {data= transaction; status} =
+          Ledger.Undo.transaction transaction_with_info
+        in
         let%bind protocol_state_body =
           let%map state = get_state (fst state_hash) in
           Coda_state.Protocol_state.body state
@@ -680,7 +680,8 @@ let all_work_pairs t
           , transaction
           , { Transaction_witness.ledger= ledger_witness
             ; protocol_state_body
-            ; init_stack } )
+            ; init_stack
+            ; status } )
     | Second (p1, p2) ->
         let%map merged =
           Transaction_snark.Statement.merge

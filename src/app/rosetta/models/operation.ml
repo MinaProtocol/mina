@@ -16,6 +16,7 @@ type t =
     status: string
   ; account: Account_identifier.t option [@default None]
   ; amount: Amount.t option [@default None]
+  ; coin_change: Coin_change.t option [@default None]
   ; metadata: Yojson.Safe.t option [@default None] }
 [@@deriving yojson {strict= false}, show]
 
@@ -28,4 +29,5 @@ let create (operation_identifier : Operation_identifier.t) (_type : string)
   ; status
   ; account= None
   ; amount= None
+  ; coin_change= None
   ; metadata= None }

@@ -50,6 +50,9 @@ module type Resource_pool_diff_intf = sig
 
   val summary : t -> string
 
+  (** Warning: It must be safe to call this function asynchronously! *)
+  val verify : pool -> t Envelope.Incoming.t -> bool Deferred.t
+
   (** Warning: Using this directly could corrupt the resource pool if it
   conincides with applying locally generated diffs or diffs from the network
   or diffs from transition frontier extensions.*)
@@ -166,17 +169,17 @@ module type Snark_resource_pool_intf = sig
     -> fee:Fee_with_prover.t
     -> [`Added | `Statement_not_referenced]
 
+  val request_proof :
+       t
+    -> Transaction_snark_work.Statement.t
+    -> Ledger_proof.t One_or_two.t Priced_proof.t option
+
   val verify_and_act :
        t
     -> work:Transaction_snark_work.Statement.t
             * Ledger_proof.t One_or_two.t Priced_proof.t
     -> sender:Envelope.Sender.t
-    -> unit Deferred.Or_error.t
-
-  val request_proof :
-       t
-    -> Transaction_snark_work.Statement.t
-    -> Ledger_proof.t One_or_two.t Priced_proof.t option
+    -> bool Deferred.t
 
   val snark_pool_json : t -> Yojson.Safe.t
 
@@ -256,13 +259,23 @@ module type Transaction_resource_pool_intf = sig
   val make_config :
     trust_system:Trust_system.t -> pool_max_size:int -> Config.t
 
-  val member : t -> User_command.With_valid_signature.t -> bool
+  val member :
+    t -> Transaction_hash.User_command_with_valid_signature.t -> bool
 
   val transactions :
-    logger:Logger.t -> t -> User_command.With_valid_signature.t Sequence.t
+       logger:Logger.t
+    -> t
+    -> Transaction_hash.User_command_with_valid_signature.t Sequence.t
 
   val all_from_account :
-    t -> Account_id.t -> User_command.With_valid_signature.t list
+       t
+    -> Account_id.t
+    -> Transaction_hash.User_command_with_valid_signature.t list
 
-  val get_all : t -> User_command.With_valid_signature.t list
+  val get_all : t -> Transaction_hash.User_command_with_valid_signature.t list
+
+  val find_by_hash :
+       t
+    -> Transaction_hash.t
+    -> Transaction_hash.User_command_with_valid_signature.t option
 end

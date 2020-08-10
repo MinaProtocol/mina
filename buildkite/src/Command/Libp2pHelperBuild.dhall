@@ -8,6 +8,7 @@ let Cmd = ../Lib/Cmds.dhall
 
 let commands : List Cmd.Type =
   [
+    Cmd.run "chmod -R 777 src/app/libp2p_helper",
     Cmd.runInDocker
       Cmd.Docker::{
         image = (../Constants/ContainerImages.dhall).codaToolchain,
@@ -23,10 +24,9 @@ let cmdConfig =
   Command.build
     Command.Config::{
       commands  = commands,
-      label = "Libp2p helper commands",
+      label = "Build Libp2p helper",
       key = "libp2p-helper",
-      target = Size.Large,
-      docker = None Docker.Type
+      target = Size.Large
     }
 
 in

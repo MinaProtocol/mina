@@ -29,13 +29,13 @@ RUN echo "deb [trusted=yes] http://packages.o1test.net $deb_repo main" > /etc/ap
   && apt-get install --force-yes coda-testnet-postake-medium-curves=$coda_version -y \
   && mkdir /root/keys \
   && chmod go-rwx /root/keys \
-  && echo '{"box_primitive":"xsalsa20poly1305","pw_primitive":"argon2i","nonce":"7S1YA5PinXhnLgLJ3xemVnVPWdJdhKZ9RSNQbns","pwsalt":"AzDoECCYyJL8KuoB2vrsVc9Wg3xJ","pwdiff":[134217728,6],"ciphertext":"5UQuiQVbXPmR63ikri792dWR6Dz5dYZm8dLzwDyqWovdP5CzrLY6Fjw3QTHXA9J3PDkPZpvhrQfGkgU81kr9184dfoJDhn5EXxJMCAM44SZdmBYVszEQaSQnyy4BwsbRXmfjBMSW9ooGu2a5dFi5KHX5na6fr62VUB"}' > /root/keys/demo-block-producer \
+  && echo '{"box_primitive":"xsalsa20poly1305","pw_primitive":"argon2i","nonce":"8jGuTAxw3zxtWasVqcD1H6rEojHLS1yJmG3aHHd","pwsalt":"AiUCrMJ6243h3TBmZ2rqt3Voim1Y","pwdiff":[134217728,6],"ciphertext":"DbAy736GqEKWe9NQWT4yaejiZUo9dJ6rsK7cpS43APuEf5AH1Qw6xb1s35z8D2akyLJBrUr6m"}' > /root/keys/demo-block-producer \
   && chmod go-rwx /root/keys/demo-block-producer \
   && mkdir -p ~/.coda-config/wallets/store \
-  && echo '4vsRCVMNTrCx4NpN6kKTkFKLcFN4vXUP5RB9PqSZe1qsyDs4AW5XeNgAf16WUPRBCakaPiXcxjp6JUpGNQ6fdU977x5LntvxrSg11xrmK6ZDaGSMEGj12dkeEpyKcEpkzcKwYWZ2Yf2vpwQP' >  ~/.coda-config/wallets/store/4vsRCVMNTrCx4NpN6kKTkFKLcFN4vXUP5RB9PqSZe1qsyDs4AW5XeNgAf16WUPRBCakaPiXcxjp6JUpGNQ6fdU977x5LntvxrSg11xrmK6ZDaGSMEGj12dkeEpyKcEpkzcKwYWZ2Yf2vpwQP.pub \
-  && cp /root/keys/demo-block-producer ~/.coda-config/wallets/store/4vsRCVMNTrCx4NpN6kKTkFKLcFN4vXUP5RB9PqSZe1qsyDs4AW5XeNgAf16WUPRBCakaPiXcxjp6JUpGNQ6fdU977x5LntvxrSg11xrmK6ZDaGSMEGj12dkeEpyKcEpkzcKwYWZ2Yf2vpwQP \
+  && echo 'B62qrPN5Y5yq8kGE3FbVKbGTdTAJNdtNtB5sNVpxyRwWGcDEhpMzc8g' >  ~/.coda-config/wallets/store/B62qrPN5Y5yq8kGE3FbVKbGTdTAJNdtNtB5sNVpxyRwWGcDEhpMzc8g.pub \
+  && cp /root/keys/demo-block-producer ~/.coda-config/wallets/store/B62qrPN5Y5yq8kGE3FbVKbGTdTAJNdtNtB5sNVpxyRwWGcDEhpMzc8g \
   && rm /var/lib/coda/genesis* \
-  && echo '{"ledger":{"accounts":[{"pk":"4vsRCVMNTrCx4NpN6kKTkFKLcFN4vXUP5RB9PqSZe1qsyDs4AW5XeNgAf16WUPRBCakaPiXcxjp6JUpGNQ6fdU977x5LntvxrSg11xrmK6ZDaGSMEGj12dkeEpyKcEpkzcKwYWZ2Yf2vpwQP","balance":"66000","sk":null,"delegate":null}]}}' > /config.json \
+  && echo '{"ledger":{"accounts":[{"pk":"B62qrPN5Y5yq8kGE3FbVKbGTdTAJNdtNtB5sNVpxyRwWGcDEhpMzc8g","balance":"66000","sk":null,"delegate":null}]}}' > /config.json \
   && coda-create-genesis --genesis-dir /var/lib/coda --config-file /config.json
 
 
