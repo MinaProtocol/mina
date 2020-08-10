@@ -26,11 +26,6 @@ module Poly = struct
       [@@deriving compare, sexp, hash, yojson, eq]
     end
   end]
-
-  type ('payload, 'pk, 'signature) t =
-        ('payload, 'pk, 'signature) Stable.Latest.t =
-    {payload: 'payload; signer: 'pk; signature: 'signature}
-  [@@deriving compare, eq, sexp, hash, yojson]
 end
 
 [%%versioned
@@ -63,8 +58,6 @@ module Stable = struct
       Payload.accounts_accessed ~next_available_token payload
   end
 end]
-
-type t = Stable.Latest.t [@@deriving sexp, yojson, hash]
 
 type _unused = unit
   constraint (Payload.t, Public_key.t, Signature.t) Poly.t = t
@@ -357,8 +350,6 @@ module With_valid_signature = struct
       module Gen = Gen
     end
   end]
-
-  type t = Stable.Latest.t [@@deriving sexp, yojson, hash]
 
   module Gen = Stable.Latest.Gen
   include Comparable.Make (Stable.Latest)

@@ -543,6 +543,8 @@ module Fee = struct
 
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t = Unsigned_extended.UInt64.Stable.V1.t
       [@@deriving sexp, compare, hash, eq]
@@ -583,6 +585,8 @@ module Amount = struct
 
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t = Unsigned_extended.UInt64.Stable.V1.t
       [@@deriving sexp, compare, hash, eq, yojson]
@@ -633,11 +637,11 @@ module Balance = struct
   [%%ifdef
   consensus_mechanism]
 
-  include (Amount : Basic with type t = Amount.t with type var = Amount.var)
+  include (Amount : Basic with type t := t with type var = Amount.var)
 
   [%%else]
 
-  include (Amount : Basic with type t = Amount.t)
+  include (Amount : Basic with type t := t)
 
   [%%endif]
 

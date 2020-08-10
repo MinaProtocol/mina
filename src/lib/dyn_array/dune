@@ -2,6 +2,7 @@
  (name dyn_array)
  (public_name dyn_array)
  (library_flags -linkall)
+ (flags -warn-error -22)
  (inline_tests)
  (libraries core extlib)
  (preprocess

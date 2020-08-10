@@ -19,12 +19,6 @@ module Stable = struct
   end
 end]
 
-type t = Stable.Latest.t =
-  { receiver: Public_key.Compressed.t
-  ; amount: Currency.Amount.t
-  ; fee_transfer: Fee_transfer.t option }
-[@@deriving sexp, compare, eq, hash, yojson]
-
 module Base58_check = Codable.Make_base58_check (Stable.Latest)
 
 [%%define_locally

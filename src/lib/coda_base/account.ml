@@ -36,8 +36,6 @@ module Index = struct
     end
   end]
 
-  type t = Stable.Latest.t [@@deriving to_yojson, sexp]
-
   let to_int = Int.to_int
 
   let gen ~ledger_depth = Int.gen_incl 0 ((1 lsl ledger_depth) - 1)
@@ -112,38 +110,9 @@ module Poly = struct
         ; delegate: 'pk
         ; voting_for: 'state_hash
         ; timing: 'timing }
-      [@@deriving sexp, eq, compare, hash, yojson]
+      [@@deriving sexp, eq, compare, hash, yojson, fields, hlist]
     end
   end]
-
-  type ( 'pk
-       , 'tid
-       , 'token_permissions
-       , 'amount
-       , 'nonce
-       , 'receipt_chain_hash
-       , 'state_hash
-       , 'timing )
-       t =
-        ( 'pk
-        , 'tid
-        , 'token_permissions
-        , 'amount
-        , 'nonce
-        , 'receipt_chain_hash
-        , 'state_hash
-        , 'timing )
-        Stable.Latest.t =
-    { public_key: 'pk
-    ; token_id: 'tid
-    ; token_permissions: 'token_permissions
-    ; balance: 'amount
-    ; nonce: 'nonce
-    ; receipt_chain_hash: 'receipt_chain_hash
-    ; delegate: 'pk
-    ; voting_for: 'state_hash
-    ; timing: 'timing }
-  [@@deriving sexp, eq, compare, hash, yojson, fields, hlist]
 end
 
 module Key = struct
@@ -177,15 +146,6 @@ module Timing = struct
         [@@deriving sexp, eq, hash, compare, yojson]
       end
     end]
-
-    type ('slot, 'balance, 'amount) t =
-          ('slot, 'balance, 'amount) Stable.Latest.t =
-      | Untimed
-      | Timed of
-          { initial_minimum_balance: 'balance
-          ; cliff_time: 'slot
-          ; vesting_period: 'slot
-          ; vesting_increment: 'amount }
   end
 
   [%%versioned
@@ -209,9 +169,6 @@ module Timing = struct
         ; cliff_time: 'slot
         ; vesting_period: 'slot
         ; vesting_increment: 'amount }
-  [@@deriving sexp, eq, hash, compare, yojson]
-
-  type t = (Global_slot.t, Balance.t, Amount.t) tt
   [@@deriving sexp, eq, hash, compare, yojson]
 
   module As_record = struct
@@ -412,8 +369,6 @@ module Stable = struct
     let public_key (t : t) : key = t.public_key
   end
 end]
-
-type t = Stable.Latest.t [@@deriving sexp, eq, hash, compare, yojson]
 
 [%%define_locally
 Stable.Latest.(public_key)]

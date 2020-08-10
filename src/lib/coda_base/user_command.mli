@@ -11,15 +11,12 @@ module Poly : sig
       [@@deriving sexp, hash, yojson, eq, compare]
     end
   end]
-
-  type ('payload, 'pk, 'signature) t =
-        ('payload, 'pk, 'signature) Stable.Latest.t =
-    {payload: 'payload; signer: 'pk; signature: 'signature}
-  [@@deriving sexp, hash, yojson, eq, compare]
 end
 
 [%%versioned:
 module Stable : sig
+  [@@@no_toplevel_latest_type]
+
   module V1 : sig
     type t =
       ( Payload.Stable.V1.t

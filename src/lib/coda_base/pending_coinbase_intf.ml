@@ -92,18 +92,13 @@ module type S = sig
         type nonrec t = Hash.t [@@deriving sexp, compare, eq, yojson, hash]
       end
     end]
-
-    type nonrec t = Stable.Latest.t
-    [@@deriving sexp, compare, eq, yojson, hash]
   end
 
   module Stack_versioned : sig
-    type t [@@deriving sexp, compare, eq, yojson, hash]
-
     [%%versioned:
     module Stable : sig
       module V1 : sig
-        type nonrec t = t [@@deriving sexp, compare, eq, yojson, hash]
+        type nonrec t [@@deriving sexp, compare, eq, yojson, hash]
       end
     end]
   end
@@ -181,13 +176,6 @@ module type S = sig
           [@@deriving sexp, to_yojson]
         end
       end]
-
-      type t = Stable.Latest.t =
-        | Update_none
-        | Update_one
-        | Update_two_coinbase_in_first
-        | Update_two_coinbase_in_second
-      [@@deriving sexp]
 
       type var = Boolean.var * Boolean.var
 

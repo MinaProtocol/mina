@@ -40,8 +40,6 @@ module Value = struct
     end
   end]
 
-  type t = Stable.Latest.t [@@deriving to_yojson, eq, sexp, compare]
-
   let gen : t Quickcheck.Generator.t =
     let open Quickcheck.Let_syntax in
     let%bind k = Int.gen_incl 1 5000 in

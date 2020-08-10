@@ -4,12 +4,9 @@ open Core_kernel
 module Stable = struct
   module V1 = struct
     type 'a t = {a: 'a; b: 'a; c: 'a}
-    [@@deriving fields, sexp, compare, yojson]
+    [@@deriving fields, sexp, compare, yojson, hlist]
   end
 end]
-
-type 'a t = 'a Stable.Latest.t = {a: 'a; b: 'a; c: 'a}
-[@@deriving fields, sexp, compare, yojson, hlist]
 
 module H_list = Snarky.H_list
 

@@ -27,16 +27,6 @@ module Snark_tables = struct
       let to_latest = Fn.id
     end
   end]
-
-  type t = Stable.Latest.t =
-    { all:
-        Ledger_proof.t One_or_two.t Priced_proof.t
-        Transaction_snark_work.Statement.Table.t
-    ; rebroadcastable:
-        ( Ledger_proof.t One_or_two.t Priced_proof.t
-        * Time.Stable.With_utc_sexp.V2.t )
-        Transaction_snark_work.Statement.Table.t }
-  [@@deriving sexp]
 end
 
 module type S = sig
@@ -486,6 +476,8 @@ end)
 module Diff_versioned = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t = Resource_pool.Diff.t =
         | Add_solved_work of

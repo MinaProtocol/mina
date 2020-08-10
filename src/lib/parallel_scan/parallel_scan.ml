@@ -24,8 +24,6 @@ module Sequence_number = struct
       let to_latest = Fn.id
     end
   end]
-
-  type t = Stable.Latest.t [@@deriving sexp]
 end
 
 (**Each node on the tree is viewed as a job that needs to be completed. When a
@@ -40,8 +38,6 @@ module Job_status = struct
     end
   end]
 
-  type t = Stable.Latest.t = Todo | Done [@@deriving sexp]
-
   let to_string = function Todo -> "Todo" | Done -> "Done"
 end
 
@@ -51,6 +47,8 @@ end
 module Weight = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t = {base: int; merge: int} [@@deriving sexp]
 
@@ -74,8 +72,6 @@ module Base = struct
         [@@deriving sexp]
       end
     end]
-
-    type 'base t = 'base Stable.Latest.t [@@deriving sexp]
   end
 
   module Job = struct
@@ -87,9 +83,6 @@ module Base = struct
       end
     end]
 
-    type 'base t = 'base Stable.Latest.t = Empty | Full of 'base Record.t
-    [@@deriving sexp]
-
     let job_str = function Empty -> "Base.Empty" | Full _ -> "Base.Full"
   end
 
@@ -100,8 +93,6 @@ module Base = struct
       [@@deriving sexp]
     end
   end]
-
-  type 'base t = 'base Stable.Latest.t [@@deriving sexp]
 end
 
 (** For merge proofs: Merging two base proofs or two merge proofs*)
@@ -118,8 +109,6 @@ module Merge = struct
         [@@deriving sexp]
       end
     end]
-
-    type 'merge t = 'merge Stable.Latest.t [@@deriving sexp]
   end
 
   module Job = struct
@@ -133,12 +122,6 @@ module Merge = struct
         [@@deriving sexp]
       end
     end]
-
-    type 'merge t = 'merge Stable.Latest.t =
-      | Empty
-      | Part of 'merge
-      | Full of 'merge Record.t
-    [@@deriving sexp]
 
     let job_str = function
       | Empty ->
@@ -157,8 +140,6 @@ module Merge = struct
       [@@deriving sexp]
     end
   end]
-
-  type 'merge t = 'merge Stable.Latest.t [@@deriving sexp]
 end
 
 (**All the jobs on a tree that can be done. Base.Full and Merge.Full*)
@@ -187,9 +168,6 @@ module Space_partition = struct
       let to_latest = Fn.id
     end
   end]
-
-  type t = Stable.Latest.t = {first: int * int; second: (int * int) option}
-  [@@deriving sexp]
 end
 
 (**View of a job for json output*)
@@ -205,9 +183,6 @@ module Job_view = struct
         let to_latest = Fn.id
       end
     end]
-
-    type t = Stable.Latest.t = {seq_no: Sequence_number.t; status: Job_status.t}
-    [@@deriving sexp]
   end
 
   module Node = struct
@@ -223,14 +198,6 @@ module Job_view = struct
         [@@deriving sexp]
       end
     end]
-
-    type 'a t = 'a Stable.Latest.t =
-      | BEmpty
-      | BFull of ('a * Extra.t)
-      | MEmpty
-      | MPart of 'a
-      | MFull of ('a * 'a * Extra.t)
-    [@@deriving sexp]
   end
 
   [%%versioned
@@ -239,9 +206,6 @@ module Job_view = struct
       type 'a t = {position: int; value: 'a Node.Stable.V1.t} [@@deriving sexp]
     end
   end]
-
-  type 'a t = 'a Stable.Latest.t = {position: int; value: 'a Node.t}
-  [@@deriving sexp]
 end
 
 module Hash = struct
@@ -262,14 +226,6 @@ module Tree = struct
       [@@deriving sexp]
     end
   end]
-
-  type ('merge_t, 'base_t) t = ('merge_t, 'base_t) Stable.Latest.t =
-    | Leaf of 'base_t
-    | Node of
-        { depth: int
-        ; value: 'merge_t
-        ; sub_tree: ('merge_t * 'merge_t, 'base_t * 'base_t) t }
-  [@@deriving sexp]
 
   (*Eg: Tree depth = 3
 
@@ -871,15 +827,6 @@ module T = struct
                 end)
     end
   end]
-
-  type ('merge, 'base) t = ('merge, 'base) Stable.Latest.t =
-    { trees: ('merge Merge.t, 'base Base.t) Tree.t Non_empty_list.t
-    ; acc: ('merge * 'base list) option
-          (*last emitted proof and the corresponding transactions*)
-    ; curr_job_seq_no: int
-    ; max_base_jobs: int
-    ; delay: int }
-  [@@deriving sexp]
 
   [%%define_locally
   Stable.Latest.(with_leaner_trees)]

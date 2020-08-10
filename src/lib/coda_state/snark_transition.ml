@@ -16,28 +16,9 @@ module Poly = struct
         ; coinbase_receiver: 'producer_pk
         ; coinbase_amount: 'amount
         ; pending_coinbase_action: 'pending_coinbase_action }
-      [@@deriving bin_io, to_yojson, sexp, fields, version]
+      [@@deriving to_yojson, sexp, fields, hlist]
     end
   end]
-
-  type ( 'blockchain_state
-       , 'consensus_transition
-       , 'amount
-       , 'producer_pk
-       , 'pending_coinbase_action )
-       t =
-        ( 'blockchain_state
-        , 'consensus_transition
-        , 'amount
-        , 'producer_pk
-        , 'pending_coinbase_action )
-        Stable.Latest.t =
-    { blockchain_state: 'blockchain_state
-    ; consensus_transition: 'consensus_transition
-    ; coinbase_receiver: 'producer_pk
-    ; coinbase_amount: 'amount
-    ; pending_coinbase_action: 'pending_coinbase_action }
-  [@@deriving sexp, to_yojson, fields, hlist]
 end
 
 module Value = struct
@@ -56,8 +37,6 @@ module Value = struct
       let to_latest = Fn.id
     end
   end]
-
-  type t = Stable.Latest.t [@@deriving to_yojson, sexp]
 end
 
 [%%define_locally

@@ -49,8 +49,6 @@ module Node_list : sig
         type t = lite node_list
       end
     end]
-
-    type t = Stable.Latest.t
   end
 end
 
@@ -72,8 +70,6 @@ module Root_transition : sig
         type t = lite root_transition
       end
     end]
-
-    type t = Stable.Latest.t
   end
 end
 
@@ -135,8 +131,6 @@ module Lite : sig
         type t = E : (lite, 'mutant) diff -> t
       end
     end]
-
-    type t = Stable.Latest.t = E : (lite, 'mutant) diff -> t
   end
 end
 

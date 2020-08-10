@@ -3,13 +3,9 @@ open Core_kernel
 [%%versioned
 module Stable = struct
   module V1 = struct
-    type 'f t = Scalar_challenge of 'f
-    [@@deriving version, sexp, compare, eq, yojson]
+    type 'f t = Scalar_challenge of 'f [@@deriving sexp, compare, eq, yojson]
   end
 end]
-
-type 'f t = 'f Stable.Latest.t = Scalar_challenge of 'f
-[@@deriving sexp, compare, eq, yojson]
 
 let create t = Scalar_challenge t
 
