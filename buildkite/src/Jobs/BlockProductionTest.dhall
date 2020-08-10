@@ -10,20 +10,12 @@ let DockerArtifact = ../Command/DockerArtifact.dhall
 let OpamInit = ../Command/OpamInit.dhall
 in
 let name = "BlockProductionTest"
-let uploadDeployEnv =
+let runTestExecutive =
   Command.build
     Command.Config::
-      { commands = [ Cmd.run "bash buildkite/scripts/export-docker-env.sh" ]
-      , label = "Upload DOCKER_DEPLOY_ENV for coda-daemon container"
-      , key = "artifact-upload"
-      , target = Size.Small
-      }
-let buildTestExecutive =
-  Command.build
-    Command.Config::
-      { commands = OpamInit.andThenRunInDocker ([] : List Text) "dune build --profile=testnet_postake_medium_curves src/app/test_executive/test_executive.exe"
+      { commands = OpamInit.andThenRunInDocker ([] : List Text) "bash buildkite/scripts/run-test.sh"
       , label = "Build and run test-executive"
-      , key = "build-test-executive"
+      , key = "run-test-executive"
       , target = Size.Large
       , docker = None Docker.Type
       }
@@ -34,13 +26,9 @@ Pipeline.build
       JobSpec::
         { dirtyWhen =
           [ S.strictlyStart (S.contains "buildkite/src/Jobs/BlockProductionTest")
-          , S.strictlyStart (S.contains "buildkite/script/export-docker-env.sh")
+          , S.strictlyStart (S.contains "buildkite/scripts/run-test.sh")
           , S.strictlyStart (S.contains "src/lib") ]
         , name = name
         }
-    , steps =
-      [ uploadDeployEnv
-      , DockerArtifact.generateStep [ {name = name, key = "artifact-upload"} ]
-      , buildTestExecutive
-      ]
+    , steps = [ runTestExecutive ]
     }
