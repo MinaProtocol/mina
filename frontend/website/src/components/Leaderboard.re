@@ -1,6 +1,8 @@
 type member = {
   name: string,
   genesisMember: bool,
+  technicalMVP: bool,
+  communityMVP: bool,
   phasePoints: int,
   releasePoints: int,
   allTimePoints: int,
@@ -35,14 +37,18 @@ let fetchLeaderboard = () => {
        |> Array.map(entry => {
             {
               name: entry |> safeArrayGet(0),
+              allTimePoints: entry |> safeArrayGet(1) |> safeParseInt,
+              phasePoints: entry |> safeArrayGet(2) |> safeParseInt,
+              releasePoints: entry |> safeArrayGet(3) |> safeParseInt,
+              allTimeRank: entry |> safeArrayGet(4) |> safeParseInt,
+              phaseRank: entry |> safeArrayGet(5) |> safeParseInt,
+              releaseRank: entry |> safeArrayGet(6) |> safeParseInt,
               genesisMember:
-                entry |> safeArrayGet(1) |> String.length == 0 ? false : true,
-              allTimePoints: entry |> safeArrayGet(2) |> safeParseInt,
-              phasePoints: entry |> safeArrayGet(3) |> safeParseInt,
-              releasePoints: entry |> safeArrayGet(4) |> safeParseInt,
-              allTimeRank: entry |> safeArrayGet(5) |> safeParseInt,
-              phaseRank: entry |> safeArrayGet(6) |> safeParseInt,
-              releaseRank: entry |> safeArrayGet(7) |> safeParseInt,
+                entry |> safeArrayGet(7) |> String.length == 0 ? false : true,
+              technicalMVP:
+                entry |> safeArrayGet(8) |> String.length == 0 ? false : true,
+              communityMVP:
+                entry |> safeArrayGet(9) |> String.length == 0 ? false : true,
             }
           })
      })
@@ -146,13 +152,8 @@ module Styles = {
       display(`grid),
       alignItems(`center),
       gridColumnGap(rem(1.5)),
-      gridTemplateColumns([
-        rem(1.),
-        rem(5.5),
-        rem(5.5),
-        rem(3.5),
-        rem(3.5),
-      ]),
+      width(`percent(100.)),
+      gridTemplateColumns([`rem(3.5), `rem(6.), `auto, `rem(9.)]),
       hover([backgroundColor(`hex("E0E0E0"))]),
       media(
         Theme.MediaQuery.tablet,
@@ -160,6 +161,7 @@ module Styles = {
           width(`percent(100.)),
           gridTemplateColumns([
             rem(3.5),
+            rem(6.),
             `auto,
             rem(9.),
             rem(8.),
@@ -386,6 +388,10 @@ module LeaderboardRow = {
     ++ member.releasePoints->string_of_int
     ++ "&genesisMember="
     ++ member.genesisMember->string_of_bool
+    ++ "&technicalMVP="
+    ++ member.technicalMVP->string_of_bool
+    ++ "&communityMVP="
+    ++ member.communityMVP->string_of_bool
     ++ "&name="
     ++ member.name
     |> Js.String.replaceByRe([%re "/#/g"], "%23"); /* replace "#" with percent encoding for the URL to properly parse */
@@ -539,10 +545,10 @@ module LeaderboardRow = {
 
     <div>
       <div className=Styles.desktopLayout>
-        <DesktopLayout sort rank member />
+        <DesktopLayout userSlug sort rank member />
       </div>
       <div className=Styles.mobileLayout>
-        <MobileLayout sort rank member />
+        <MobileLayout userSlug sort rank member />
       </div>
     </div>;
   };
@@ -635,7 +641,9 @@ let make =
     <div id="testnet-leaderboard" className=Styles.leaderboard>
       <div className=Styles.headerRow>
         <span className=Styles.flexEnd> {React.string("Rank")} </span>
-        <span> {React.string("Name")} </span>
+        <span className=Css.(style([gridColumn(3, 4)]))>
+          {React.string("Name")}
+        </span>
         {Array.map(renderColumnHeader, Filter.filters) |> React.array}
       </div>
       {state.loading
