@@ -182,15 +182,11 @@ let uploadUserProfileData = spreadsheetId => {
           /* Fetch current phase leaderboard data */
           getRange(
             client,
-<<<<<<< HEAD
             initSheetsQuery(
               spreadsheetId,
               Sheets.getSheet(Sheets.CurrentPhaseLeaderboard).range,
               "FORMATTED_VALUE",
             ),
-=======
-            initSheetsQuery(spreadsheetId, "3.3!A5:B", "FORMATTED_VALUE"),
->>>>>>> a3b367624... 3.3 challenges implemented
             result => {
             switch (result) {
             | Ok(phaseResult) =>

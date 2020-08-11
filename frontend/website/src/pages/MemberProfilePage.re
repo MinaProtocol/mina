@@ -115,6 +115,7 @@ let fetchRelease = (username, release) => {
 
 let fetchReleases = name => {
   [|
+    ("Release 3.3", "3.3!B4:Z", 2), /* offset for challenge titles in 3.2b starts on the 2nd column */
     ("Release 3.2b", "3.2b!B4:Z", 2), /* offset for challenge titles in 3.2b starts on the 2nd column */
     ("Release 3.2a", "3.2a!B4:Z", 2), /* offset for challenge titles in 3.2a starts on the 2nd column */
     ("Release 3.1", "3.1!B4:Z", 4) /* offset for challenge titles in 3.1 starts on the 4th column */
