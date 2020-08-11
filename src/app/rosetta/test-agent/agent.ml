@@ -128,14 +128,11 @@ let check_new_account_payment ~logger ~rosetta_uri ~graphql_uri =
         in
         match
           Result.map block_r ~f:(fun block ->
-              let index = block.Block_response.block.block_identifier.index in
-              if Int64.(index >= of_int 2) then Some index else None )
+              block.Block_response.block.block_identifier.index )
         with
         | Error _ ->
             `Failed
-        | Ok None ->
-            `Failed
-        | Ok (Some index) ->
+        | Ok index ->
             `Succeeded index )
       ~retry_count:10 ~initial_delay:(Span.of_ms 0.0)
       ~each_delay:(Span.of_ms 250.0)
