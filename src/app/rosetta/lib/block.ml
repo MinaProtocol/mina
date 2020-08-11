@@ -2,6 +2,20 @@ open Core_kernel
 open Async
 open Models
 
+module Unsigned = struct
+  module UInt64 = struct
+    include Unsigned.UInt64
+
+    let to_yojson i = `Intlit (to_string i)
+  end
+
+  module UInt32 = struct
+    include Unsigned.UInt32
+
+    let to_yojson i = `Intlit (to_string i)
+  end
+end
+
 module Get_coinbase =
 [%graphql
 {|
@@ -64,6 +78,7 @@ module User_command_info = struct
   module Kind = struct
     type t =
       [`Payment | `Delegation | `Create_token | `Create_account | `Mint_tokens]
+    [@@deriving yojson]
   end
 
   module Account_creation_fees_paid = struct
@@ -71,12 +86,12 @@ module User_command_info = struct
       | By_no_one
       | By_fee_payer of Unsigned.UInt64.t
       | By_receiver of Unsigned.UInt64.t
-    [@@deriving eq]
+    [@@deriving eq, to_yojson]
   end
 
   module Failure_status = struct
     type t = [`Applied of Account_creation_fees_paid.t | `Failed of string]
-    [@@deriving eq]
+    [@@deriving eq, to_yojson]
   end
 
   type t =
@@ -91,6 +106,7 @@ module User_command_info = struct
     ; amount: Unsigned.UInt64.t option
     ; hash: string
     ; failure_status: Failure_status.t option }
+  [@@deriving to_yojson]
 
   let to_operations (t : t) : Operation.t list =
     (* First build a plan. The plan specifies all operations ahead of time so
@@ -383,7 +399,7 @@ end
 
 module Internal_command_info = struct
   module Kind = struct
-    type t = [`Coinbase | `Fee_transfer] [@@deriving eq]
+    type t = [`Coinbase | `Fee_transfer] [@@deriving eq, to_yojson]
   end
 
   type t =
@@ -392,6 +408,7 @@ module Internal_command_info = struct
     ; fee: Unsigned.UInt64.t
     ; token: Unsigned.UInt64.t
     ; hash: string }
+  [@@deriving to_yojson]
 
   let to_operations ~coinbase (t : t) : Operation.t list =
     (* We choose to represent the dec-side of fee transfers from txns from the
@@ -780,6 +797,7 @@ module Specific = struct
     module T (M : Monad_fail.S) = struct
       type 'gql t =
         { gql: unit -> ('gql, Errors.t) M.t
+        ; logger: Logger.t
         ; db_block: Block_query.t -> (Block_info.t, Errors.t) M.t
         ; validate_network_choice: 'gql Network.Validate_choice.Impl(M).t }
     end
@@ -791,17 +809,21 @@ module Specific = struct
     module Mock = T (Result)
 
     let real :
-        db:(module Caqti_async.CONNECTION) -> graphql_uri:Uri.t -> 'gql Real.t
-        =
-     fun ~db ~graphql_uri ->
+           logger:Logger.t
+        -> db:(module Caqti_async.CONNECTION)
+        -> graphql_uri:Uri.t
+        -> 'gql Real.t =
+     fun ~logger ~db ~graphql_uri ->
       { gql= (fun () -> Graphql.query (Get_coinbase.make ()) graphql_uri)
+      ; logger
       ; db_block=
           (fun query ->
             let (module Conn : Caqti_async.CONNECTION) = db in
             Sql.run (module Conn) query )
       ; validate_network_choice= Network.Validate_choice.Real.validate }
 
-    let mock : 'gql Mock.t =
+    let mock : logger:Logger.t -> 'gql Mock.t =
+     fun ~logger ->
       { gql=
           (fun () ->
             Result.return
@@ -812,6 +834,7 @@ module Specific = struct
                    end
                end )
           (* TODO: Add variants to cover every branch *)
+      ; logger
       ; db_block= (fun _query -> Result.return @@ Block_info.dummy)
       ; validate_network_choice= Network.Validate_choice.Mock.succeed }
   end
@@ -825,6 +848,7 @@ module Specific = struct
         -> (Block_response.t, Errors.t) M.t =
      fun ~env req ->
       let open M.Let_syntax in
+      let logger = env.logger in
       let%bind query = Query.of_partial_identifier req.block_identifier in
       let%bind res = env.gql () in
       let%bind () =
@@ -832,6 +856,7 @@ module Specific = struct
           ~gql_response:res
       in
       let coinbase = (res#genesisConstants)#coinbase in
+      [%log debug] "About to dump response" ;
       let%map block_info = env.db_block query in
       { Block_response.block=
           { Block.block_identifier= block_info.block_identifier
@@ -839,12 +864,18 @@ module Specific = struct
           ; timestamp= block_info.timestamp
           ; transactions=
               List.map block_info.internal_info ~f:(fun info ->
+                  [%log debug]
+                    ~metadata:[("info", Internal_command_info.to_yojson info)]
+                    "Block internal received $info" ;
                   { Transaction.transaction_identifier=
                       {Transaction_identifier.hash= info.hash}
                   ; operations=
                       Internal_command_info.to_operations ~coinbase info
                   ; metadata= None } )
               @ List.map block_info.user_commands ~f:(fun info ->
+                    [%log debug]
+                      ~metadata:[("info", User_command_info.to_yojson info)]
+                      "Block user received $info" ;
                     { Transaction.transaction_identifier=
                         {Transaction_identifier.hash= info.hash}
                     ; operations= User_command_info.to_operations info
@@ -860,7 +891,7 @@ module Specific = struct
       module Mock = Impl (Result)
 
       (* This test intentionally fails as there has not been time to implement
-     * it properly yet *)
+       * it properly yet *)
       (*
       let%test_unit "all dummies" =
         Test.assert_ ~f:Block_response.to_yojson
@@ -886,7 +917,9 @@ let router ~graphql_uri ~logger ~db (route : string list) body =
         |> Errors.Lift.wrap
       in
       let%map res =
-        Specific.Real.handle ~env:(Specific.Env.real ~db ~graphql_uri) req
+        Specific.Real.handle
+          ~env:(Specific.Env.real ~logger ~db ~graphql_uri)
+          req
         |> Errors.Lift.wrap
       in
       Block_response.to_yojson res

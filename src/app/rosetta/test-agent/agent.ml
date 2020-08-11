@@ -57,8 +57,8 @@ let check_new_account_payment ~logger ~rosetta_uri ~graphql_uri =
             (Ok (Some "Synced"))
         then `Succeeded ()
         else `Failed )
-      ~retry_count:45 ~initial_delay:(Span.of_sec 2.0)
-      ~each_delay:(Span.of_sec 2.0) ~failure_reason:"Took too long to sync"
+      ~retry_count:15 ~initial_delay:(Span.of_sec 0.5)
+      ~each_delay:(Span.of_sec 1.0) ~failure_reason:"Took too long to sync"
   in
   (* Unlock the account *)
   let%bind _ = Poke.Account.unlock ~graphql_uri in
@@ -69,7 +69,7 @@ let check_new_account_payment ~logger ~rosetta_uri ~graphql_uri =
     Poke.SendTransaction.payment ~fee:(`Int 2_000_000_000)
       ~amount:(`Int 5_000_000_000) ~to_:(`String other_pk) ~graphql_uri ()
   in
-  let%bind () = wait (Span.of_sec 2.0) in
+  let%bind () = wait (Span.of_sec 1.0) in
   (* Grab the mempool and find the payment inside *)
   let%bind () =
     keep_trying
@@ -99,16 +99,16 @@ let check_new_account_payment ~logger ~rosetta_uri ~graphql_uri =
   in
   let expected_mempool_ops =
     Operation_expectation.
-      [ { amount= Some (-2_000_000_000)
-        ; account=
-            Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
-        ; status= "Pending"
-        ; _type= "fee_payer_dec" }
-      ; { amount= Some (-5_000_000_000)
+      [ { amount= Some (-5_000_000_000)
         ; account=
             Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
         ; status= "Pending"
         ; _type= "payment_source_dec" }
+      ; { amount= Some (-2_000_000_000)
+        ; account=
+            Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
+        ; status= "Pending"
+        ; _type= "fee_payer_dec" }
       ; { amount= Some 5_000_000_000
         ; account=
             Some {Account.pk= other_pk; token_id= Unsigned.UInt64.of_int 1}
@@ -120,9 +120,30 @@ let check_new_account_payment ~logger ~rosetta_uri ~graphql_uri =
       ~expected:expected_mempool_ops ~actual:mempool_res.transaction.operations
       ~situation:"mempool"
   in
+  let%bind last_block_index =
+    keep_trying
+      ~step:(fun () ->
+        let%map block_r =
+          Peek.Block.newest_block ~rosetta_uri ~network_response ~logger
+        in
+        match
+          Result.map block_r ~f:(fun block ->
+              let index = block.Block_response.block.block_identifier.index in
+              if Int64.(index >= of_int 2) then Some index else None )
+        with
+        | Error _ ->
+            `Failed
+        | Ok None ->
+            `Failed
+        | Ok (Some index) ->
+            `Succeeded index )
+      ~retry_count:10 ~initial_delay:(Span.of_ms 0.0)
+      ~each_delay:(Span.of_ms 250.0)
+      ~failure_reason:"Took too long for the last block to be fetched"
+  in
   (* Start staking so we get blocks *)
   let%bind _res = Poke.Staking.enable ~graphql_uri in
-  (* Wait until the newest-block is at least index=2 *)
+  (* Wait until the newest-block is at least index>last_block_index *)
   let%bind block =
     keep_trying
       ~step:(fun () ->
@@ -133,7 +154,8 @@ let check_new_account_payment ~logger ~rosetta_uri ~graphql_uri =
           Result.map block_r ~f:(fun block ->
               if
                 Int64.(
-                  block.Block_response.block.block_identifier.index >= of_int 2)
+                  block.Block_response.block.block_identifier.index
+                  > last_block_index)
               then Some block
               else None )
         with
@@ -143,8 +165,8 @@ let check_new_account_payment ~logger ~rosetta_uri ~graphql_uri =
             `Failed
         | Ok (Some block) ->
             `Succeeded block )
-      ~retry_count:5 ~initial_delay:(Span.of_ms 100.0)
-      ~each_delay:(Span.of_sec 1.0)
+      ~retry_count:10 ~initial_delay:(Span.of_ms 50.0)
+      ~each_delay:(Span.of_ms 250.0)
       ~failure_reason:"Took too long for a block to be created"
   in
   (* Stop noisy block production *)
