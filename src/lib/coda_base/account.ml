@@ -129,7 +129,7 @@ end
 
 module Identifier = Account_id
 
-type key = Key.Stable.Latest.t [@@deriving sexp, eq, hash, compare, yojson]
+type key = Key.t [@@deriving sexp, eq, hash, compare, yojson]
 
 module Timing = struct
   module Poly = struct
