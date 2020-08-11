@@ -26,8 +26,8 @@ The short version:
      - This might fail with `git@github.com: Permission denied (publickey).`. If that happens it means
     you need to [set up SSH keys on your machine](https://help.github.com/en/articles/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent).
  4. Install Docker, GNU make, and bash
- 5. `make LIBP2P_NIXLESS=1 USEDOCKER=TRUE dev`
- 6. `make LIBP2P_NIXLESS=1 USEDOCKER=TRUE deb`
+ 5. `make USEDOCKER=TRUE dev`
+ 6. `make USEDOCKER=TRUE deb`
 
 Now you'll have a `src/_build/codaclient.deb` ready to install on Ubuntu or Debian!
 

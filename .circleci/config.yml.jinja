@@ -20,8 +20,8 @@
                 keys:
                     - opam-linux-v1-{{'{{'}} checksum "opam_ci_cache.sig" {{'}}'}}
             - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
+                name: Install opam dependencies - opam -- make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make setup-opam'
 {%endset%}
 
 {% set checkout_no_lfs %}
@@ -102,7 +102,7 @@ jobs:
             {{ opam_init_linux }}
             - run:
                 name: Build libp2p_helper
-                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
+                command: GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Set Up Database
                   command: |
@@ -152,7 +152,7 @@ jobs:
                 no_output_timeout: 1h
             - run:
                   name: Build Archive Process
-                  command:  bash -c 'eval `opam config env` && export PATH="$HOME/.cargo/bin:$PATH" && LIBP2P_NIXLESS=1 make build_archive'
+                  command:  bash -c 'eval `opam config env` && export PATH="$HOME/.cargo/bin:$PATH" && make build_archive'
                   environment:
                     DUNE_PROFILE: testnet_postake_medium_curves
             # NOTE: If we were using a machine executor we would be able to mount the sql file in
@@ -181,10 +181,10 @@ jobs:
                   command: ./scripts/test.py render --check .circleci/config.yml.jinja .mergify.yml.jinja
             - run:
                   name: OCamlformat (make check-format)
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'eval `opam config env` && LIBP2P_NIXLESS=1 make check-format'
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'eval `opam config env` && make check-format'
             - run:
                   name: Snarky tracks master (make check-snarky-submodule)
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make check-snarky-submodule'
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make check-snarky-submodule'
             - run:
                   name: Check ppx_optcomp preprocessor_deps
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c './scripts/lint_preprocessor_deps.sh'
@@ -307,8 +307,8 @@ jobs:
                     - opam-v8-{{'{{'}} checksum "opam_ci_cache.sig" {{'}}'}}-{{'{{'}} checksum "scripts/Brewfile" {{'}}'}}
 
             - run:
-                name: Install macos dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
+                name: Install macos dependencies - opam -- make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make setup-opam'
             - save_cache:
                 name: Save cache - opam
                 key: opam-v8-{{'{{'}} checksum "opam_ci_cache.sig" {{'}}'}}-{{'{{'}} checksum "scripts/Brewfile" {{'}}'}}
@@ -389,7 +389,7 @@ jobs:
             - run:
                 name: Build portable binary
                 command: |
-                    LIBP2P_NIXLESS=1 make macos-portable
+                    make macos-portable
                     cp _build/coda-daemon-macos.zip package/.
             - run:
                   name: Copy artifacts to cloud
@@ -410,7 +410,7 @@ jobs:
             {{ opam_init_linux }}
             - run:
                   name: Build client SDK for Javascript
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; eval `opam config env` && LIBP2P_NIXLESS=1 make client_sdk 2>&1 | tee /tmp/artifacts/buildclientsdk.log'
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; eval `opam config env` && make client_sdk 2>&1 | tee /tmp/artifacts/buildclientsdk.log'
                   environment:
                     DUNE_PROFILE: nonconsensus_medium_curves
                   no_output_timeout: 10m
@@ -435,12 +435,12 @@ jobs:
             {{ opam_init_linux }}
             - run:
                 name: Build libp2p_helper
-                command: GO=/usr/lib/go/bin/go LIBP2P_NIXLESS=1 make libp2p_helper
+                command: GO=/usr/lib/go/bin/go make libp2p_helper
             # Explicitly generate PV-keys and uploading before building
             # See https://bkase.dev/posts/ocaml-writer#fn-3 for rationale
             - run:
                   name: Generate PV keys
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; eval `opam config env` && PATH="$HOME/.cargo/bin:$PATH" LIBP2P_NIXLESS=1 make build_pv_keys 2>&1 | tee /tmp/artifacts/buildocaml.log'
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; eval `opam config env` && PATH="$HOME/.cargo/bin:$PATH" make build_pv_keys 2>&1 | tee /tmp/artifacts/buildocaml.log'
                   environment:
                     DUNE_PROFILE: {{profile}}
                     EXTRA_NIX_ARGS: --option sandbox false
@@ -457,7 +457,6 @@ jobs:
                     DUNE_PROFILE: {{profile}}
                     EXTRA_NIX_ARGS: --option sandbox false
                     GO: /usr/lib/go/bin/go
-                    LIBP2P_NIXLESS: 1
 
                   no_output_timeout: 20m
             - run:
@@ -477,18 +476,15 @@ jobs:
                   command:  ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make deb'
                   environment:
                     DUNE_PROFILE: {{profile}}
-                    LIBP2P_NIXLESS: 1
                   no_output_timeout: 20m
             - run:
                   name: Store genesis public/private keypairs
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make genesiskeys'
                   environment:
-                    LIBP2P_NIXLESS: 1
             - run:
                   name: Upload deb to repo
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make publish_deb'
                   environment:
-                    LIBP2P_NIXLESS: 1
                   no_output_timeout: 20m
             - run:
                   name: Copy artifacts to cloud
@@ -555,13 +551,12 @@ jobs:
             {{ opam_init_linux }}
             - run:
                 name: Build libp2p_helper
-                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
+                command: GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Run unit tests
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && make build && (dune runtest src/lib --profile={{profile}} -j8 || (./scripts/link-coredumps.sh && false))'
                   environment:
                     DUNE_PROFILE: {{profile}}
-                    LIBP2P_NIXLESS: 1
                     GO: /usr/lib/go/bin/go
                   no_output_timeout: 30m
             - store_artifacts:
@@ -579,14 +574,13 @@ jobs:
             {{ opam_init_linux }}
             - run:
                 name: Build libp2p_helper
-                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
+                command: GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Run unit tests
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && (dune runtest src/nonconsensus --profile=nonconsensus_medium_curves -j8 || (./scripts/link-coredumps.sh && false))'
                   no_output_timeout: 30m
                   environment:
                     DUNE_PROFILE: nonconsensus_medium_curves
-                    LIBP2P_NIXLESS: 1
                     GO: /usr/lib/go/bin/go
             - store_artifacts:
                 path: core_dumps
@@ -602,13 +596,12 @@ jobs:
             {{ opam_init_linux }}
             - run:
                 name: Build libp2p_helper
-                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
+                command: GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Run unit tests
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && export GO=/usr/lib/go/bin/go && make build && (dune runtest src/lib --profile={{profile}} -j8 || (./scripts/link-coredumps.sh && false))'
                   environment:
                     DUNE_PROFILE: {{profile}}
-                    LIBP2P_NIXLESS: 1
                     GO: /usr/lib/go/bin/go
                   no_output_timeout: 1h
             - store_artifacts:
@@ -626,7 +619,7 @@ jobs:
             {{ opam_init_linux }}
             - run:
                 name: Build libp2p_helper
-                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
+                command: GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Build OCaml
                   command: |
@@ -634,7 +627,6 @@ jobs:
                       ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'echo built > should_run_tests'
                   environment:
                     DUNE_PROFILE: {{profile}}
-                    LIBP2P_NIXLESS: 1
                     GO: /usr/lib/go/bin/go
             - save_cache:
                 name: Store config-agnostic test binaries
@@ -660,7 +652,6 @@ jobs:
                   name: Running test -- {{profile}}:{{test}}
                   command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "{{profile}}:{{test}}"; fi
                   environment:
-                    LIBP2P_NIXLESS: 1
                     CODA_LIBP2P_HELPER_PATH: /home/opam/project/src/app/libp2p_helper/result/bin/libp2p_helper
                     GO: /usr/lib/go/bin/go
             - store_artifacts:
@@ -679,7 +670,7 @@ jobs:
             {{ opam_init_linux }}
             - run:
                 name: Build libp2p_helper
-                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
+                command: GO=/usr/lib/go/bin/go make libp2p_helper
             {%- for test in small_curves_tests[profile] %}
             - run:
                   name: Running test -- {{profile}}:{{test}}
@@ -699,7 +690,7 @@ jobs:
             {{ opam_init_linux }}
             - run:
                 name: Build libp2p_helper
-                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
+                command: GO=/usr/lib/go/bin/go make libp2p_helper
             {%- for test in medium_curves_and_other_tests[profile] %}
             - run:
                   name: Running test -- {{profile}}:{{test}}

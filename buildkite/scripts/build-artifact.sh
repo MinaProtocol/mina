@@ -6,7 +6,6 @@ eval `opam config env`
 export PATH=$HOME/.cargo/bin:$PATH
 
 # TODO: Stop building lib_p2p multiple times (due to excessive dependencies in make)
-export LIBP2P_NIXLESS=1
 
 echo "--- Explicitly generate PV-keys and upload before building"
 make build_pv_keys 2>&1 | tee /tmp/buildocaml.log
