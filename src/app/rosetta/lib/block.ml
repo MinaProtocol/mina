@@ -856,7 +856,6 @@ module Specific = struct
           ~gql_response:res
       in
       let coinbase = (res#genesisConstants)#coinbase in
-      [%log debug] "About to dump response" ;
       let%map block_info = env.db_block query in
       { Block_response.block=
           { Block.block_identifier= block_info.block_identifier
