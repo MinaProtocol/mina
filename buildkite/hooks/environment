@@ -1,0 +1,9 @@
+#!/bin/bash
+
+set -euo pipefail
+
+if [ -n "$ENABLE_STORE" ]; then
+  echo "GS application credentials are being exposed for artifact upload/download."
+  export BUILDKITE_GS_APPLICATION_CREDENTIALS_JSON="$(cat /etc/credentials.json)"
+  export BUILDKITE_ARTIFACT_UPLOAD_DESTINATION="gs://ahmad_kube_test/${BUILDKITE_JOB_ID}"
+fi
