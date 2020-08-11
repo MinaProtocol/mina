@@ -125,11 +125,11 @@ let sendCodaChallenge = metricsMap => {
 
 let createAndSendTokenChallenge = metricsMap => {
   [
-    // you will receive 500 pts* for minting and sending your own token to another account
+    // you will receive 1000 pts for minting and sending your own token to another account
     Points.addPointsToUsersWithAtleastN(
       (metricRecord: Types.Metrics.t) => metricRecord.createAndSendToken,
       1,
-      500,
+      1000,
       metricsMap,
     ),
   ]
@@ -138,7 +138,7 @@ let createAndSendTokenChallenge = metricsMap => {
 
 let calculatePoints = (challengeName, metricsMap) => {
   switch (String.lowercase_ascii(challengeName)) {
-  | "stake your Coda and produce blocks" => Some(blocksChallenge(metricsMap))
+  | "stake your coda and produce blocks" => Some(blocksChallenge(metricsMap))
   | "send coda tokens elsewhere" => Some(sendCodaChallenge(metricsMap))
   | "connect to testnet and send coda to the echo service" =>
     Some(echoServiceChallenge(metricsMap))
