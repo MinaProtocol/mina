@@ -56,7 +56,7 @@ module Core = {
           name: "Phase 3 Leaderboard",
           range: "Phase 3 Leaderboard!B4:E",
         }
-      | CurrentReleaseLeaderboard => {name: "3.2b", range: "3.2b!A5:C"}
+      | CurrentReleaseLeaderboard => {name: "3.3", range: "3.3!A4:C"}
       | MemberProfileData => {
           name: "Member_Profile_Data",
           range: "Member_Profile_Data!A2:Z",
