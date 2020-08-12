@@ -1,17 +1,23 @@
 open Core_kernel
 open Pickles_types
-module Rounds = Backend.Rounds
 module Unshifted_acc =
   Pairing_marlin_types.Accumulator.Degree_bound_checks.Unshifted_accumulators
 open Import
 open Backend
 
-let crs_max_degree = 1 lsl Nat.to_int Rounds.n
+module Max_degree = struct
+  let step = 1 lsl Nat.to_int Backend.Tick.Rounds.n
+
+  let wrap = 1 lsl Nat.to_int Backend.Tock.Rounds.n
+end
 
 let wrap_domains =
   { Domains.h= Pow_2_roots_of_unity 18
   ; k= Pow_2_roots_of_unity 19
-  ; x= Pow_2_roots_of_unity 0 }
+  ; x=
+      Pow_2_roots_of_unity
+        (let (T (typ, _)) = Impls.Wrap.input () in
+         Int.ceil_log2 (1 + Impls.Wrap.Data_spec.size [typ])) }
 
 let hash_pairing_me_only ~app_state
     (t : _ Types.Pairing_based.Proof_state.Me_only.t) =
@@ -196,7 +202,7 @@ let tick_public_input_of_statement ~max_branching
   let open Zexe_backend in
   let input =
     let (T (input, conv)) =
-      Impls.Step.input ~branching:max_branching ~bulletproof_log2:Rounds.n
+      Impls.Step.input ~branching:max_branching ~wrap_rounds:Tock.Rounds.n
     in
     Impls.Step.generate_public_input [input] prev_statement
   in
@@ -205,5 +211,5 @@ let tick_public_input_of_statement ~max_branching
        (Backend.Tick.Field.Vector.length input)
        ~f:(Backend.Tick.Field.Vector.get input)
 
-let index_commitment_length k =
-  Int.round_up ~to_multiple_of:crs_max_degree (Domain.size k) / crs_max_degree
+let index_commitment_length k ~max_degree =
+  Int.round_up ~to_multiple_of:max_degree (Domain.size k) / max_degree
