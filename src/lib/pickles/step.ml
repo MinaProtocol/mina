@@ -393,7 +393,7 @@ struct
         ~dlog_marlin_index:self_dlog_marlin_index
         next_statement.proof_state.me_only
     in
-    let handler (Snarky.Request.With {request; respond} as r) =
+    let handler (Snarky_backendless.Request.With {request; respond} as r) =
       let k x = respond (Provide x) in
       match request with
       | Req.Proof_with_datas ->
@@ -403,7 +403,11 @@ struct
       | Req.App_state ->
           k next_me_only_prepared.app_state
       | _ -> (
-        match handler with Some f -> f r | None -> Snarky.Request.unhandled )
+        match handler with
+        | Some f ->
+            f r
+        | None ->
+            Snarky_backendless.Request.unhandled )
     in
     let (next_proof : Tick.Proof.t) =
       let (T (input, conv)) =

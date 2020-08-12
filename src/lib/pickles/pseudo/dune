@@ -7,6 +7,6 @@
     marlin_checks
     one_hot_vector
     pickles_types
-    snarky
+    snarky.backendless
     core_kernel ))
 

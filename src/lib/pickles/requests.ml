@@ -3,7 +3,7 @@ open Import
 open Types
 open Pickles_types
 open Hlist
-open Snarky.Request
+open Snarky_backendless.Request
 open Common
 open Backend
 
@@ -15,7 +15,7 @@ module Wrap = struct
 
     open Impls.Wrap
     open Wrap_main_inputs
-    open Snarky.Request
+    open Snarky_backendless.Request
 
     type _ t +=
       | Evals :
@@ -69,7 +69,7 @@ module Wrap = struct
 
       type nonrec max_local_max_branchings = ml
 
-      open Snarky.Request
+      open Snarky_backendless.Request
 
       type 'a vec = ('a, max_branching) Vector.t
 

@@ -4,6 +4,7 @@
  (library_flags -linkall)
  (inline_tests)
  (libraries core extlib)
+ (flags -warn-error -22)
  (preprocess
   (pps ppx_version ppx_jane bisect_ppx -- -conditional))
  (synopsis
