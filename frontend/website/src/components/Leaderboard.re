@@ -690,7 +690,10 @@ let make =
               <span> {React.string("release will be added shortly.")} </span>
             | Phase =>
               <span> {React.string("phase will be added shortly.")} </span>
-            | _ => React.null
+            | AllTime =>
+              <span>
+                {React.string("leaderboard will be added shortly.")}
+              </span>
             }}
          </div>;
        } else {
