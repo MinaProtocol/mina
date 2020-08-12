@@ -1,5 +1,5 @@
 module Make
-    (Impl : Snarky.Snark_intf.S) (Scalar : sig
+    (Impl : Snarky_backendless.Snark_intf.S) (Scalar : sig
         type value
 
         type var

@@ -48,10 +48,10 @@ module Dlog_based = struct
           ; beta_2= scalar beta_2
           ; beta_3= scalar beta_3 }
 
-        open Snarky.H_list
+        open Snarky_backendless.H_list
 
         let typ chal fp =
-          Snarky.Typ.of_hlistable
+          Snarky_backendless.Typ.of_hlistable
             [ fp
             ; fp
             ; chal
@@ -95,7 +95,7 @@ module Dlog_based = struct
         ; which_branch }
 
       let typ chal fp fq index bool =
-        Snarky.Typ.of_hlistable
+        Snarky_backendless.Typ.of_hlistable
           [ Marlin.typ chal fp
           ; fp
           ; fp
@@ -119,7 +119,7 @@ module Dlog_based = struct
           ; Array.of_list (g1_to_field_elements sg) ]
 
       let typ g1 chal ~length =
-        Snarky.Typ.of_hlistable
+        Snarky_backendless.Typ.of_hlistable
           [g1; Vector.typ chal length]
           ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
           ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
@@ -150,7 +150,7 @@ module Dlog_based = struct
     [@@deriving bin_io, sexp, compare, yojson, hlist]
 
     let typ chal fp bool fq me_only digest index =
-      Snarky.Typ.of_hlistable
+      Snarky_backendless.Typ.of_hlistable
         [Deferred_values.typ chal fp fq index bool; bool; digest; me_only]
         ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
         ~value_of_hlist:of_hlist
@@ -185,7 +185,7 @@ module Dlog_based = struct
         ; Vector.to_array old_bulletproof_challenges
           |> Array.concat_map ~f:Vector.to_array ]
 
-    open Snarky.H_list
+    open Snarky_backendless.H_list
 
     let to_hlist {app_state; dlog_marlin_index; sg; old_bulletproof_challenges}
         =
@@ -197,7 +197,7 @@ module Dlog_based = struct
       {app_state; dlog_marlin_index; sg; old_bulletproof_challenges}
 
     let typ comm g s chal branching =
-      Snarky.Typ.of_hlistable
+      Snarky_backendless.Typ.of_hlistable
         [s; Matrix_evals.typ (Abc.typ comm); Vector.typ g branching; chal]
         (* TODO: Should this really just be a vector typ of length Rounds.n ?*)
         ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
@@ -342,7 +342,7 @@ module Pairing_based = struct
         type ('fq, 'g) t = {b: 'fq} [@@deriving hlist]
 
         let typ fq g =
-          let open Snarky.Typ in
+          let open Snarky_backendless.Typ in
           of_hlistable [fq] ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
             ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
       end
@@ -474,8 +474,8 @@ module Pairing_based = struct
       in
       spec unfinalized_proofs (B Spec.Digest)
       |> Spec.typ impl fq
-      |> Snarky.Typ.transport ~there:to_data ~back:of_data
-      |> Snarky.Typ.transport_var ~there:to_data ~back:of_data
+      |> Snarky_backendless.Typ.transport ~there:to_data ~back:of_data
+      |> Snarky_backendless.Typ.transport_var ~there:to_data ~back:of_data
   end
 
   module Statement = struct
@@ -512,7 +512,8 @@ module Nvector = Vector.With_length
 module Bp_vec = Nvector (Backend.Rounds)
 
 module Challenges_vector = struct
-  type 'n t = (Backend.Tock.Field.t Snarky.Cvar.t Bp_vec.t, 'n) Vector.t
+  type 'n t =
+    (Backend.Tock.Field.t Snarky_backendless.Cvar.t Bp_vec.t, 'n) Vector.t
 
   module Constant = struct
     type 'n t = (Backend.Tock.Field.t Bp_vec.t, 'n) Vector.t

@@ -2,7 +2,7 @@ open Core_kernel
 open Bitstring_lib
 open Snark_bits
 
-module Make_snarkable (Impl : Snarky.Snark_intf.S) = struct
+module Make_snarkable (Impl : Snarky_backendless.Snark_intf.S) = struct
   open Impl
 
   module type S = sig
@@ -215,7 +215,7 @@ module Tick = struct
 
   module Util = Snark_util.Make (Tick0)
 
-  let m : Run.field Snarky.Snark.m = (module Run)
+  let m : Run.field Snarky_backendless.Snark.m = (module Run)
 
   let make_checked c = with_state (As_prover.return ()) (Run.make_checked c)
 end

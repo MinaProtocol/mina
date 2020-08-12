@@ -23,7 +23,13 @@ module type Input_intf = sig
 
     val delete : t -> unit
 
-    module Vector : Snarky.Vector.S with type elt = t
+    module Vector : sig
+      include Snarky_intf.Vector.S with type elt = t
+
+      val typ : t Ctypes.typ
+
+      val delete : t -> unit
+    end
 
     module Pair : Intf.Pair with type elt := t
   end

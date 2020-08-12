@@ -9,5 +9,5 @@
     o1trace
     pickles
     random_oracle_input
-    snarky
+    snarky.backendless
     sponge ))
