@@ -181,7 +181,7 @@ type state = {
   username: string,
 };
 
-let initialState = {currentToggle: All, currentFilter: Release, username: ""};
+let initialState = {currentToggle: All, currentFilter: Phase, username: ""};
 
 type action =
   | Toggled(Leaderboard.Toggle.t)
