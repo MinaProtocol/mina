@@ -440,19 +440,11 @@ jobs:
                 paths:
                     - "/Users/distiller/.opam"
                 no_output_timeout: 1h
-            ### nix/cachix
-            - run:
-                name: Install nix and cachix
-                command: |
-                    curl -L https://nixos.org/nix/install | sh
-                    . ~/.nix-profile/etc/profile.d/nix.sh
-                    nix-env -iA cachix -f https://cachix.org/api/v1/install
             ### dune
             - run:
                 name: Build ocaml
                 environment:
                     DUNE_PROFILE: testnet_postake_medium_curves
-                    EXTRA_NIX_ARGS: --option sandbox false
                 command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log'
                 no_output_timeout: 20m
             - run:
@@ -482,7 +474,6 @@ jobs:
                     echo 'libp2p_helper'
                     cp src/app/libp2p_helper/result/bin/libp2p_helper package/coda-libp2p_helper
                     chmod +w package/coda-libp2p_helper
-                    ./scripts/librewrite-macos.sh package/coda-libp2p_helper
                     echo 'coda-logproc'
                     cp _build/default/src/app/logproc/logproc.exe package/coda-logproc
                     chmod +wx package/coda-logproc
@@ -613,7 +604,6 @@ jobs:
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; eval `opam config env` && PATH="$HOME/.cargo/bin:$PATH" make build_pv_keys 2>&1 | tee /tmp/artifacts/buildocaml.log'
                   environment:
                     DUNE_PROFILE: testnet_postake_medium_curves
-                    EXTRA_NIX_ARGS: --option sandbox false
                   no_output_timeout: 20m
             - run:
                   name: Upload generated PV keys
@@ -625,7 +615,6 @@ jobs:
                     ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'eval `opam config env` && export PATH="$HOME/.cargo/bin:$PATH" && dune build src/app/generate_keypair/generate_keypair.exe'
                   environment:
                     DUNE_PROFILE: testnet_postake_medium_curves
-                    EXTRA_NIX_ARGS: --option sandbox false
                     GO: /usr/lib/go/bin/go
 
                   no_output_timeout: 20m

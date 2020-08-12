@@ -41,8 +41,6 @@ of the repo.
 ### Developer Setup (MacOS)
 
 * Invoke `make macos-setup`
-* Make sure [`nix` is installed](https://nixos.org/download.html) (if you are running the latest macOS, [this workaround](https://medium.com/@robinbb/install-nix-on-macos-catalina-ca8c03a225fc) or a similar one will be necessary).
-* Wait a long time...
 * Invoke `make build`
 * Jump to [customizing your editor for autocomplete](#dev-env)
 
@@ -152,10 +150,6 @@ you need, you run `opam switch import src/opam.export`.
 
 Some of our dependencies aren't taken from `opam`, and aren't integrated
 with `dune`, so you need to add them manually, by running `scripts/pin-external-packages.sh`.
-
-You will need to install [Nix](https://nixos.org/nix/download.html) and also
-[cachix](https://cachix.org) with `nix-env -iA cachix -f
-https://cachix.org/api/v1/install`.
 
 There are a variety of C libraries we expect to be available in the system.
 These are also listed in the dockerfiles. Unlike most of the C libraries,
