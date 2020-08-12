@@ -14,6 +14,9 @@ make build_pv_keys 2>&1 | tee /tmp/buildocaml.log
 echo "--- Publish pvkeys"
 ./scripts/publish-pvkeys.sh
 
+echo "--- Build libp2p_helper
+make libp2p_helper
+
 echo "--- Build logproc + coda"
 CODA_COMMIT_SHA1=$(git rev-parse HEAD)
 echo "Building from Commit SHA: $CODA_COMMIT_SHA1"
