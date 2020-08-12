@@ -3,7 +3,8 @@
 set -eo pipefail
 
 eval `opam config env`
-export PATH=/home/opam/.cargo/bin:$PATH
+export PATH=/home/opam/.cargo/bin:/usr/lib/go/bin:$PATH
+export GO=/usr/lib/go/bin/go
 
 CODA_COMMIT_SHA1=$(git rev-parse HEAD)
 
