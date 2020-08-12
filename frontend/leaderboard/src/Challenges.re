@@ -18,77 +18,10 @@
 
 module StringMap = Map.Make(String);
 
-let addPointsToUsersWithAtleastN =
-    (getMetricValue, threshold, points, metricsMap) => {
-  StringMap.fold(
-    (key, metric, map) => {
-      switch (getMetricValue(metric)) {
-      | Some(metricValue) =>
-        metricValue >= threshold ? StringMap.add(key, points, map) : map
-      | None => map
-      }
-    },
-    metricsMap,
-    StringMap.empty,
-  );
-};
-
-let applyTopNPoints =
-    (threshholdPointsList, metricsMap, getMetricValue, compareFunc) => {
-  let metricsArray = Array.of_list(StringMap.bindings(metricsMap));
-  let f = ((_, metricValue1), (_, metricValue2)) => {
-    compareFunc(getMetricValue(metricValue1), getMetricValue(metricValue2));
-  };
-
-  Array.sort(f, metricsArray);
-  Belt.Array.reverseInPlace(metricsArray);
-
-  let counter = ref(0);
-  let topNArrayWithPoints =
-    metricsArray
-    |> Array.mapi((i, (username, _)) =>
-         if (counter^ >= Array.length(threshholdPointsList)) {
-           (username, 0);
-         } else {
-           let (place, points) = threshholdPointsList[counter^];
-           if (place == i) {
-             counter := counter^ + 1;
-             (username, points);
-           } else {
-             (username, points);
-           };
-         }
-       );
-
-  Belt.Array.keep(topNArrayWithPoints, ((_, points)) => {points !== 0})
-  |> Array.fold_left(
-       (map, (userPublicKey, userPoints)) => {
-         StringMap.add(userPublicKey, userPoints, map)
-       },
-       StringMap.empty,
-     );
-};
-
-// Combines a list of maps of users to points and returns one map of users to points
-let sumPointsMaps = maps => {
-  maps
-  |> List.fold_left(
-       StringMap.merge((_, value, secondValue) => {
-         switch (value, secondValue) {
-         | (Some(value), Some(secondValue)) => Some(value + secondValue)
-         | (Some(value), None)
-         | (None, Some(value)) => Some(value)
-         | (None, None) => None
-         }
-       }),
-       StringMap.empty,
-     );
-};
-
 let echoServiceChallenge = metricsMap => {
   metricsMap
-  |> addPointsToUsersWithAtleastN(
-       (metricRecord: Types.Metrics.metricRecord) =>
+  |> Points.addPointsToUsersWithAtleastN(
+       (metricRecord: Types.Metrics.t) =>
          metricRecord.transactionsReceivedByEcho,
        1,
        500,
@@ -98,7 +31,7 @@ let echoServiceChallenge = metricsMap => {
 let coinbaseReceiverChallenge = (points, metricsMap) => {
   metricsMap
   |> StringMap.fold(
-       (key, metric: Types.Metrics.metricRecord, map) => {
+       (key, metric: Types.Metrics.t, map) => {
          switch (metric.coinbaseReceiver) {
          | Some(metricValue) =>
            metricValue ? StringMap.add(key, points, map) : map
@@ -110,7 +43,7 @@ let coinbaseReceiverChallenge = (points, metricsMap) => {
 };
 
 let bonusBlocksChallenge = metricsMap => {
-  applyTopNPoints(
+  Points.applyTopNPoints(
     [|
       (0, 5500), // 1st place: 5500 pts
       (1, 4000), // 2nd place: 4000 pts
@@ -120,7 +53,7 @@ let bonusBlocksChallenge = metricsMap => {
       (101, 1000) // Top 100: 1000 pts
     |],
     metricsMap,
-    (metricRecord: Types.Metrics.metricRecord) => metricRecord.blocksCreated,
+    (metricRecord: Types.Metrics.t) => metricRecord.blocksCreated,
     compare,
   );
 };
@@ -128,96 +61,88 @@ let bonusBlocksChallenge = metricsMap => {
 let blocksChallenge = metricsMap => {
   [
     // Produce 1 block and get them accepted in the main chain for 1000 pts
-    addPointsToUsersWithAtleastN(
-      (metricRecord: Types.Metrics.metricRecord) =>
-        metricRecord.blocksCreated,
+    Points.addPointsToUsersWithAtleastN(
+      (metricRecord: Types.Metrics.t) => metricRecord.blocksCreated,
       1,
       1000,
       metricsMap,
     ),
     // Anyone who produces at least 3 blocks will earn an additional 1000 pts.
-    addPointsToUsersWithAtleastN(
-      (metricRecord: Types.Metrics.metricRecord) =>
-        metricRecord.blocksCreated,
+    Points.addPointsToUsersWithAtleastN(
+      (metricRecord: Types.Metrics.t) => metricRecord.blocksCreated,
       3,
       1000,
       metricsMap,
     ),
+    // For every next block you produce, you will earn 100 pts*.
+    Points.addPointsForExtra(
+      (metricRecord: Types.Metrics.t) => metricRecord.blocksCreated,
+      3,
+      100,
+      metricsMap,
+    ),
     bonusBlocksChallenge(metricsMap),
   ]
-  |> sumPointsMaps;
+  |> Points.sumPointsMaps;
 };
 
-let bonusZkSnarkChallenge = metricsMap => {
-  [
-    applyTopNPoints(
-      [|
-        (0, 5500), // 1st place: 5500 pts
-        (1, 4000), // 2nd place: 4000 pts
-        (2, 3000), // 3rd place: 3000 pts
-        (11, 2000), // Top 10: 2000 pts.
-        (26, 1500), // Top 25: 1500 pts
-        (101, 1000) // Top 100: 1000 pts
-      |],
-      metricsMap,
-      (metricRecord: Types.Metrics.metricRecord) =>
-        switch (metricRecord.snarkFeesCollected) {
-        | Some(snarkFeesCollected) => snarkFeesCollected
-        | None => Int64.zero
-        },
-      Int64.compare,
-    ),
-    //The user who sold the most expensive SNARK will receive a bonus of 500 pts
-    applyTopNPoints(
-      [|(0, 500)|],
-      metricsMap,
-      (metricRecord: Types.Metrics.metricRecord) =>
-        switch (metricRecord.highestSnarkFeeCollected) {
-        | Some(highestSnarkFee) => highestSnarkFee
-        | None => Int64.zero
-        },
-      Int64.compare,
-    ),
-  ]
-  |> sumPointsMaps;
+let bonusSendCodaChallenge = metricsMap => {
+  Points.applyTopNPoints(
+    [|
+      (0, 5500), // 1st place: 5500 pts
+      (1, 4000), // 2nd place: 4000 pts
+      (2, 3000), // 3rd place: 3000 pts
+      (11, 2000), // Top 10: 2000 pts.
+      (26, 1500), // Top 25: 1500 pts
+      (101, 1000) // Top 100: 1000 pts
+    |],
+    metricsMap,
+    (metricRecord: Types.Metrics.t) => metricRecord.transactionSent,
+    compare,
+  );
 };
 
-let zkSnarksChallenge = metricsMap => {
+let sendCodaChallenge = metricsMap => {
   [
-    // Earn 3 fees by producing and selling zk-SNARKs on the snarketplace: 1000 pts
-    addPointsToUsersWithAtleastN(
-      (metricRecord: Types.Metrics.metricRecord) =>
-        switch (metricRecord.snarkFeesCollected) {
-        | Some(snarkFeesCollected) => Some(snarkFeesCollected)
-        | None => Some(Int64.zero)
-        },
-      3000000000L,
+    // Sent 5 transactions: 1000 pts
+    Points.addPointsToUsersWithAtleastN(
+      (metricRecord: Types.Metrics.t) => metricRecord.transactionSent,
+      5,
       1000,
       metricsMap,
     ),
-    // Anyone who earned 50 fees will be rewarded with an additional 1000 pts.
-    addPointsToUsersWithAtleastN(
-      (metricRecord: Types.Metrics.metricRecord) =>
-        switch (metricRecord.snarkFeesCollected) {
-        | Some(snarkFeesCollected) => Some(snarkFeesCollected)
-        | None => Some(Int64.zero)
-        },
-      50000000000L,
+    // Sent 50 transactions: 1000 pts
+    Points.addPointsToUsersWithAtleastN(
+      (metricRecord: Types.Metrics.t) => metricRecord.transactionSent,
+      50,
       1000,
       metricsMap,
     ),
-    bonusZkSnarkChallenge(metricsMap),
+    bonusSendCodaChallenge(metricsMap),
   ]
-  |> sumPointsMaps;
+  |> Points.sumPointsMaps;
 };
 
-let calculatePoints = (challengeID, metricsMap) => {
-  switch (String.lowercase_ascii(challengeID)) {
+let createAndSendTokenChallenge = metricsMap => {
+  [
+    // you will receive 1000 pts for minting and sending your own token to another account
+    Points.addPointsToUsersWithAtleastN(
+      (metricRecord: Types.Metrics.t) => metricRecord.createAndSendToken,
+      1,
+      1000,
+      metricsMap,
+    ),
+  ]
+  |> Points.sumPointsMaps;
+};
+
+let calculatePoints = (challengeName, metricsMap) => {
+  switch (String.lowercase_ascii(challengeName)) {
   | "stake your coda and produce blocks" => Some(blocksChallenge(metricsMap))
-  | "create and sell zk-snarks on coda" =>
-    Some(zkSnarksChallenge(metricsMap))
-  | "connect to testnet and send coda" =>
+  | "send coda tokens elsewhere" => Some(sendCodaChallenge(metricsMap))
+  | "connect to testnet and send coda to the echo service" =>
     Some(echoServiceChallenge(metricsMap))
+  | "tokens on coda" => Some(createAndSendTokenChallenge(metricsMap))
   | _ => None
   };
 };
