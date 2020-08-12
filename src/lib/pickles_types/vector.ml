@@ -136,10 +136,6 @@ let of_array_and_length_exn : type a n. a array -> n nat -> (a, n) t =
       (Array.length xs) (Nat.to_int n) () ;
   init n ~f:(Array.get xs)
 
-let reverse t =
-  let (T xs) = of_list (List.rev (to_list t)) in
-  Obj.magic xs
-
 let rec take_from_list : type a n. a list -> n nat -> (a, n) t =
  fun xs n ->
   match (xs, n) with
