@@ -18,6 +18,7 @@
     yojson
     archive_lib
     signature_lib
+    unsigned_extended
     )
   (preprocess (pps
     graphql_ppx
