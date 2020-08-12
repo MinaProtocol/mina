@@ -92,7 +92,6 @@ module All = struct
         -> (Mempool_response.t, Errors.t) M.t =
      fun ~env req ->
       let open M.Let_syntax in
-      (* TODO: Support alternate tokens *)
       let%bind res = env.gql () in
       let%map () =
         env.validate_network_choice ~network_identifier:req.network_identifier
@@ -312,8 +311,7 @@ end
 let router ~graphql_uri ~logger ~db (route : string list) body =
   let (module Db : Caqti_async.CONNECTION) = db in
   let open Async.Deferred.Result.Let_syntax in
-  Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-    "Handling /mempool/ $route"
+  [%log debug] "Handling /mempool/ $route"
     ~metadata:[("route", `List (List.map route ~f:(fun s -> `String s)))] ;
   match route with
   | [] | [""] ->

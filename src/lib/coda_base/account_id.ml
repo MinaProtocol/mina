@@ -2,18 +2,7 @@
 "/src/config.mlh"]
 
 open Core_kernel
-
-[%%ifdef
-consensus_mechanism]
-
-open Signature_lib
-
-[%%else]
-
-module Random_oracle = Random_oracle_nonconsensus
-open Signature_lib_nonconsensus
-
-[%%endif]
+open Import
 
 [%%versioned
 module Stable = struct
@@ -53,7 +42,7 @@ consensus_mechanism]
 
 type var = Public_key.Compressed.var * Token_id.var
 
-let typ = Snarky.Typ.(Public_key.Compressed.typ * Token_id.typ)
+let typ = Snarky_backendless.Typ.(Public_key.Compressed.typ * Token_id.typ)
 
 let var_of_t (key, tid) =
   (Public_key.Compressed.var_of_t key, Token_id.var_of_t tid)

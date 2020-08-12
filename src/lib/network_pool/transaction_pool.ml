@@ -207,7 +207,7 @@ struct
             | Ok (t, _) ->
                 Some (cmd, t)
             | Error (`Queued_txns_by_sender (error_str, queued_cmds)) ->
-                Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+                [%log error]
                   "Error handling committed transaction $cmd: $error "
                   ~metadata:
                     [ ( "cmd"
@@ -281,7 +281,7 @@ struct
       *)
       t.best_tip_ledger <- Some best_tip_ledger ;
       let pool_max_size = t.config.pool_max_size in
-      Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
+      [%log' trace t.logger]
         ~metadata:
           [ ( "removed"
             , `List
@@ -328,7 +328,7 @@ struct
         |> Sequence.to_list_rev
       in
       if not (List.is_empty locally_generated_dropped) then
-        Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
+        [%log' debug t.logger]
           "Dropped locally generated commands $cmds during backtracking to \
            maintain max size. Will attempt to re-add after forwardtracking."
           ~metadata:
@@ -370,7 +370,7 @@ struct
             | None ->
                 ()
             | Some time_added ->
-                Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
+                [%log' info t.logger]
                   "Locally generated command $cmd committed in a block!"
                   ~metadata:
                     [("cmd", With_status.to_yojson User_command.to_yojson cmd)] ;
@@ -383,7 +383,7 @@ struct
               | Ok res ->
                   res
               | Error (`Queued_txns_by_sender (error_str, queued_cmds)) ->
-                  Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__
+                  [%log' error t.logger]
                     "Error handling committed transaction $cmd: $error "
                     ~metadata:
                       [ ( "cmd"
@@ -406,7 +406,7 @@ struct
             |> Option.is_some )
       in
       if not @@ Sequence.is_empty commit_conflicts_locally_generated then
-        Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
+        [%log' info t.logger]
           "Locally generated commands $cmds dropped because they conflicted \
            with a committed command."
           ~metadata:
@@ -417,7 +417,7 @@ struct
                         ~f:
                           Transaction_hash.User_command_with_valid_signature
                           .to_yojson)) ) ] ;
-      Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
+      [%log' debug t.logger]
         !"Finished handling diff. Old pool size %i, new pool size %i. Dropped \
           %i commands during backtracking to maintain max size."
         (Indexed_pool.size t.pool) (Indexed_pool.size pool'')
@@ -433,7 +433,7 @@ struct
               @@ Hashtbl.find_and_remove t.locally_generated_uncommitted cmd )
           in
           let log_invalid () =
-            Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
+            [%log' debug t.logger]
               "Couldn't re-add locally generated command $cmd, not valid \
                against new ledger."
               ~metadata:
@@ -450,7 +450,7 @@ struct
                       cmd)
                    ~pool_max_size)
             then (
-              Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
+              [%log' info t.logger]
                 "Not re-adding locally generated command $cmd to pool, \
                  insufficient fee"
                 ~metadata:
@@ -475,7 +475,7 @@ struct
                 | Error _ ->
                     log_invalid ()
                 | Ok (pool''', _) ->
-                    Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
+                    [%log' debug t.logger]
                       "re-added locally generated command $cmd to transaction \
                        pool after reorg"
                       ~metadata:
@@ -509,8 +509,7 @@ struct
            ~f:(fun frontier_opt ->
              match frontier_opt with
              | None -> (
-                 Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
-                   "no frontier" ;
+                 [%log debug] "no frontier" ;
                  (* Sanity check: the view pipe should have been closed before
                     the frontier was destroyed. *)
                  match t.best_tip_diff_relay with
@@ -525,15 +524,13 @@ struct
                           is_finished := true)
                        ; (let%map () = Async.after (Time.Span.of_sec 5.) in
                           if not !is_finished then (
-                            Logger.fatal t.logger ~module_:__MODULE__
-                              ~location:__LOC__
+                            [%log fatal]
                               "Transition frontier closed without first \
                                closing best tip view pipe" ;
                             assert false )
                           else ()) ] )
              | Some frontier ->
-                 Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
-                   "Got frontier!" ;
+                 [%log debug] "Got frontier!" ;
                  let validation_ledger = get_best_tip_ledger frontier in
                  (*update our cache*)
                  t.best_tip_ledger <- Some validation_ledger ;
@@ -578,7 +575,7 @@ struct
                     committed or because they conflict with others,
                     unfortunately. *)
                  if not (Sequence.is_empty dropped_locally_generated) then
-                   Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
+                   [%log info]
                      "Dropped locally generated commands $cmds from pool when \
                       transition frontier was recreated."
                      ~metadata:
@@ -590,7 +587,7 @@ struct
                                   Transaction_hash
                                   .User_command_with_valid_signature
                                   .to_yojson) ) ] ;
-                 Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
+                 [%log debug]
                    !"Re-validated transaction pool after restart: dropped %i \
                      of %i previously in pool"
                    (Sequence.length dropped) (Indexed_pool.size t.pool) ;
@@ -799,16 +796,14 @@ struct
                                              .to_yojson seq)
                                 in
                                 if not (Sequence.is_empty dropped) then
-                                  Logger.debug t.logger ~module_:__MODULE__
-                                    ~location:__LOC__
+                                  [%log' debug t.logger]
                                     "dropped commands due to transaction \
                                      replacement: $dropped"
                                     ~metadata:
                                       [("dropped", seq_cmd_to_yojson dropped)] ;
                                 if not (Sequence.is_empty dropped_for_size)
                                 then
-                                  Logger.debug t.logger ~module_:__MODULE__
-                                    ~location:__LOC__
+                                  [%log' debug t.logger]
                                     "dropped commands to maintain max size: \
                                      $cmds"
                                     ~metadata:
@@ -828,8 +823,7 @@ struct
                                 if
                                   not (List.is_empty locally_generated_dropped)
                                 then
-                                  Logger.info t.logger ~module_:__MODULE__
-                                    ~location:__LOC__
+                                  [%log' info t.logger]
                                     "Dropped locally generated commands $cmds \
                                      from transaction pool due to replacement \
                                      or max size"
@@ -852,11 +846,11 @@ struct
                              nodes, which will then naturally gossip them.
                           *)
                                 let f_log =
-                                  if is_sender_local then Logger.error
-                                  else Logger.debug
+                                  if is_sender_local then
+                                    [%log' error t.logger]
+                                  else [%log' debug t.logger]
                                 in
-                                f_log t.logger ~module_:__MODULE__
-                                  ~location:__LOC__
+                                f_log
                                   "rejecting $cmd because of insufficient \
                                    replace fee ($rfee > $fee)"
                                   ~metadata:
@@ -874,11 +868,11 @@ struct
                                    are our specific preferences.
                                 *)
                                 let f_log =
-                                  if is_sender_local then Logger.error
-                                  else Logger.debug
+                                  if is_sender_local then
+                                    [%log' error t.logger]
+                                  else [%log' debug t.logger]
                                 in
-                                f_log t.logger ~module_:__MODULE__
-                                  ~location:__LOC__
+                                f_log
                                   "rejecting $cmd because we don't accept \
                                    fees in $token"
                                   ~metadata:
@@ -896,8 +890,7 @@ struct
                                   of_indexed_pool_error err
                                 in
                                 if is_sender_local then
-                                  Logger.error t.logger ~module_:__MODULE__
-                                    ~location:__LOC__
+                                  [%log' error t.logger]
                                     "rejecting $cmd because of $reason. \
                                      ($error_extra)"
                                     ~metadata:
@@ -938,6 +931,9 @@ struct
 
       let unsafe_apply t env =
         match%map apply t env with Ok e -> Ok e | Error e -> Error (`Other e)
+
+      (* Transaction verification currently happens in apply. In the future we could batch it. *)
+      let verify _ _ = Deferred.return true
     end
 
     let get_rebroadcastable (t : t) ~is_expired =
@@ -949,11 +945,12 @@ struct
       let added_str =
         "it was added at $time and its rebroadcast period is now expired."
       in
+      let logger = t.logger in
       Hashtbl.filteri_inplace t.locally_generated_uncommitted
         ~f:(fun ~key ~data ->
           match is_expired data with
           | `Expired ->
-              Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
+              [%log info]
                 "No longer rebroadcasting uncommitted command $cmd, %s"
                 added_str ~metadata:(metadata ~key ~data) ;
               false
@@ -963,7 +960,7 @@ struct
         ~f:(fun ~key ~data ->
           match is_expired data with
           | `Expired ->
-              Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
+              [%log debug]
                 "Removing committed locally generated command $cmd from \
                  possible rebroadcast pool, %s"
                 added_str ~metadata:(metadata ~key ~data) ;

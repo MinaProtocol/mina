@@ -30,13 +30,12 @@ end)
     let rebroadcast (diff', rejected) =
       result_cb (Ok (diff', rejected)) ;
       if Resource_pool.Diff.is_empty diff' then (
-        Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
+        [%log' debug t.logger]
           "Refusing to rebroadcast. Pool diff apply feedback: empty diff" ;
         valid_cb false ;
         Deferred.unit )
       else (
-        Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
-          "Broadcasting %s"
+        [%log' trace t.logger] "Broadcasting %s"
           (Resource_pool.Diff.summary diff') ;
         valid_cb true ;
         Linear_pipe.write t.write_broadcasts diff' )
@@ -49,7 +48,7 @@ end)
     | Error (`Other e) ->
         valid_cb false ;
         result_cb (Error e) ;
-        Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
+        [%log' debug t.logger]
           "Refusing to rebroadcast. Pool diff apply feedback: %s"
           (Error.to_string_hum e) ;
         Deferred.unit
@@ -64,13 +63,30 @@ end)
       ; write_broadcasts
       ; constraint_constants }
     in
+    let filter_verified pipe ~f =
+      let r, w =
+        Strict_pipe.create ~name:"verified network pool diffs"
+          (Buffered (`Capacity 1024, `Overflow Drop_head))
+      in
+      Strict_pipe.Reader.iter_without_pushback pipe ~f:(fun ((d, _) as x) ->
+          don't_wait_for
+            ( match%map Resource_pool.Diff.verify resource_pool (f d) with
+            | true ->
+                Strict_pipe.Writer.write w x
+            | false ->
+                () ) )
+      |> don't_wait_for ;
+      r
+    in
     (*proiority: Transition frontier diffs > local diffs > incomming diffs*)
     Strict_pipe.Reader.Merge.iter
       [ Strict_pipe.Reader.map tf_diffs ~f:(fun diff ->
             `Transition_frontier_extension diff )
-      ; Strict_pipe.Reader.map local_diffs ~f:(fun diff -> `Local diff)
-      ; Strict_pipe.Reader.map incoming_diffs ~f:(fun diff -> `Incoming diff)
-      ]
+      ; Strict_pipe.Reader.map
+          (filter_verified local_diffs ~f:Envelope.Incoming.local)
+          ~f:(fun diff -> `Local diff)
+      ; Strict_pipe.Reader.map (filter_verified incoming_diffs ~f:Fn.id)
+          ~f:(fun diff -> `Incoming diff) ]
       ~f:(fun diff_source ->
         match diff_source with
         | `Incoming (diff, cb) ->
@@ -106,13 +122,10 @@ end)
       let rebroadcastable =
         Resource_pool.get_rebroadcastable t.resource_pool ~is_expired
       in
-      let log (log_func : 'a Logger.log_function) =
-        log_func logger ~location:__LOC__ ~module_:__MODULE__
-      in
       if List.is_empty rebroadcastable then
-        log Logger.trace "Nothing to rebroadcast"
+        [%log trace] "Nothing to rebroadcast"
       else
-        log Logger.debug
+        [%log debug]
           "Preparing to rebroadcast locally generated resource pool diffs \
            $diffs"
           ~metadata:

@@ -349,6 +349,7 @@ module type Transition_router_intf = sig
     -> verifier:Verifier.t
     -> network:network
     -> is_seed:bool
+    -> is_demo_mode:bool
     -> time_controller:Block_time.Controller.t
     -> consensus_local_state:Consensus.Data.Local_state.t
     -> persistent_root_location:string

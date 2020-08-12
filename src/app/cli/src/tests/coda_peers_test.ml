@@ -48,7 +48,7 @@ let main () =
              List.map expected_peers ~f:(fun p -> p.libp2p_port)
            in
            let%map peers = Coda_process.peers_exn worker in
-           Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+           [%log debug]
              ~metadata:
                [ ( "peers"
                  , `List (List.map ~f:Network_peer.Peer.to_yojson peers) )

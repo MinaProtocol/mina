@@ -29,10 +29,6 @@ open Impl
 
 include Dlog_main.Make (struct
   include Wrap_main_inputs
-  module Bulletproof_rounds = Rounds
-
-  let crs_max_degree = crs_max_degree
-
   module Branching_pred = Nat.N0
 end)
 
@@ -121,7 +117,7 @@ let pack_statement max_branching =
     Spec.pack
       (module Impl)
       pack_fq
-      (Types.Pairing_based.Statement.spec max_branching Rounds.n)
+      (Types.Pairing_based.Statement.spec max_branching Backend.Tock.Rounds.n)
       (Types.Pairing_based.Statement.to_data t)
 
 (* The SNARK function for wrapping any proof coming from the given set of keys *)
@@ -196,7 +192,7 @@ let wrap_main
             (Challenges_vector.Constant)
             (struct
               let f (type n) (n : n Nat.t) =
-                Vector.typ (Vector.typ Field.typ Rounds.n) n
+                Vector.typ (Vector.typ Field.typ Backend.Tock.Rounds.n) n
             end)
         in
         T.f Max_widths_by_slot.maxes
@@ -233,7 +229,8 @@ let wrap_main
           let ty =
             Typ.tuple2
               (Dlog_marlin_types.Evals.typ ~default:Field.Constant.zero
-                 (Commitment_lengths.of_domains wrap_domains)
+                 (Commitment_lengths.of_domains wrap_domains
+                    ~max_degree:Max_degree.wrap)
                  Field.typ)
               Field.typ
           in
@@ -304,9 +301,11 @@ let wrap_main
             let verified, chals =
               finalize_other_proof
                 (Nat.Add.create max_local_max_branching)
-                ~actual_branching ~h_minus_1 ~k_minus_1 ~input_domain ~domain_k
-                ~domain_h ~sponge deferred_values ~old_bulletproof_challenges
-                evals
+                ~actual_branching ~h_minus_1 ~k_minus_1
+                ~input_domain:
+                  (input_domain :> _ Marlin_checks.vanishing_polynomial_domain)
+                ~domain_k ~domain_h ~sponge deferred_values
+                ~old_bulletproof_challenges evals
             in
             Boolean.(Assert.any [not should_verify; verified]) ;
             chals )
@@ -330,7 +329,8 @@ let wrap_main
     let openings_proof =
       exists
         (Dlog_marlin_types.Openings.Bulletproof.typ Other_field.Packed.typ
-           Inner_curve.typ ~length:(Nat.to_int Rounds.n))
+           Inner_curve.typ
+           ~length:(Nat.to_int Backend.Tick.Rounds.n))
         ~request:(fun () -> Req.Openings_proof)
     in
     let ( sponge_digest_before_evaluations_actual
@@ -342,7 +342,7 @@ let wrap_main
              Other_field.Packed.typ Inner_curve.typ
              ~commitment_lengths:
                (let open Vector in
-               Commitment_lengths.generic map
+               Commitment_lengths.generic map ~max_degree:Max_degree.step
                  ~h:
                    (Vector.map step_domains
                       ~f:(Fn.compose Domain.size Domains.h))

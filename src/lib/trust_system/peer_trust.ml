@@ -159,7 +159,7 @@ module Make0 (Inputs : Input_intf) = struct
         if simple_new.trust >. simple_old.trust then "Increasing"
         else "Decreasing"
       in
-      Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+      [%log debug]
         ~metadata:([("peer_id", Peer_id.to_yojson peer)] @ action_metadata)
         "%s trust for peer $peer_id due to %s. New trust is %f." verb
         action_fmt simple_new.trust
@@ -167,8 +167,7 @@ module Make0 (Inputs : Input_intf) = struct
     let%map () =
       match (simple_old.banned, simple_new.banned) with
       | Unbanned, Banned_until expiration ->
-          Logger.Str.faulty_peer_without_punishment logger ~module_:__MODULE__
-            ~location:__LOC__ ~metadata:action_metadata
+          [%str_log faulty_peer_without_punishment] ~metadata:action_metadata
             (Peer_banned {peer_id= peer; expiration; action= action_fmt}) ;
           if Option.is_some db then (
             Coda_metrics.Gauge.inc_one Coda_metrics.Trust_system.banned_peers ;

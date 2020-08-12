@@ -84,27 +84,14 @@ module Compressed = struct
        *)
 
       [%%if
-      curve_size = 298]
+      curve_size = 255]
 
       let%test "nonzero_curve_point_compressed v1" =
         let point =
           Quickcheck.random_value
             ~seed:(`Deterministic "nonzero_curve_point_compressed-seed") V1.gen
         in
-        let known_good_digest = "437f5bc6710b6a8fda8f9e8cf697fc2c" in
-        Ppx_version_runtime.Serialization.check_serialization
-          (module V1)
-          point known_good_digest
-
-      [%%elif
-      curve_size = 753]
-
-      let%test "nonzero_curve_point_compressed v1" =
-        let point =
-          Quickcheck.random_value
-            ~seed:(`Deterministic "nonzero_curve_point_compressed-seed") V1.gen
-        in
-        let known_good_digest = "067f8be67e5cc31f5c5ac4be91d5f6db" in
+        let known_good_digest = "951b667e8f1216097665190fc0a7b78a" in
         Ppx_version_runtime.Serialization.check_serialization
           (module V1)
           point known_good_digest
@@ -268,6 +255,18 @@ module Uncompressed = struct
   let%test_unit "point-compression: decompress . compress = id" =
     Quickcheck.test gen ~f:(fun pk ->
         assert (equal (decompress_exn (compress pk)) pk) )
+
+  (* TODO: Implement this properly to spec *)
+  module Hex = struct
+    let encode (a, b) = Field.to_string a ^ "," ^ Field.to_string b
+
+    let decode raw =
+      match String.split ~on:',' raw with
+      | [a; b] ->
+          Or_error.return (Field.of_string a, Field.of_string b)
+      | _ ->
+          Or_error.error_string "Malformed hex encoding"
+  end
 
   [%%ifdef
   consensus_mechanism]

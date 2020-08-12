@@ -67,7 +67,7 @@ module Make (Inputs : Inputs_intf) :
     let _, merkle_list =
       Merkle_list_prover.prove ~context:frontier best_verified_tip
     in
-    Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+    [%log debug]
       ~metadata:
         [ ( "merkle_list"
           , `List (List.map ~f:State_body_hash.to_yojson merkle_list) ) ]

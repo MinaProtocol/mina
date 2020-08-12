@@ -5,6 +5,7 @@ let Pipeline = ../Pipeline/Dsl.dhall
 let JobSpec = ../Pipeline/JobSpec.dhall
 let Command = ../Command/Base.dhall
 let OpamInit = ../Command/OpamInit.dhall
+let WithCargo = ../Command/WithCargo.dhall
 let Docker = ../Command/Docker/Type.dhall
 let Size = ../Command/Size.dhall
 in
@@ -37,7 +38,7 @@ Pipeline.build
                 (Prelude.Text.concatSep " && "
                   [ "bash buildkite/scripts/setup-database-for-archive-node.sh ${user} ${password} ${db}"
                   , "PGPASSWORD=${password} psql -h localhost -p 5432 -U ${user} -d ${db} -a -f src/app/archive/create_schema.sql"
-                  , "dune runtest src/app/archive"
+                  , WithCargo.withCargo "eval $(opam config env) && dune runtest src/app/archive"
                   , "PGPASSWORD=codarules psql -h localhost -p 5432 -U admin -d archiver -a -f src/app/archive/drop_tables.sql"
                   , "PGPASSWORD=${password} psql -h localhost -p 5432 -U ${user} -d ${db} -a -f src/app/archive/create_schema.sql"
                   , "LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper"

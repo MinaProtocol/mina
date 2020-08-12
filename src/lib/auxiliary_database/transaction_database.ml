@@ -46,10 +46,9 @@ struct
   let add {database; pagination; logger} transaction date =
     match Hashtbl.find pagination.all_values.table transaction with
     | Some _retrieved_transaction ->
-        Logger.trace logger
+        [%log trace]
           !"Not adding transaction into transaction database since it already \
             exists: $transaction"
-          ~module_:__MODULE__ ~location:__LOC__
           ~metadata:[("transaction", Transaction.to_yojson transaction)]
     | None ->
         Database.set database ~key:transaction ~data:date ;

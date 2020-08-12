@@ -19,7 +19,7 @@ let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
             "Transition frontier already garbage-collected the parent of %s"
             (Coda_base.State_hash.to_base58_check initial_hash)
         in
-        Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+        [%log error]
           ~metadata:
             [ ("state_hash", Coda_base.State_hash.to_yojson initial_hash)
             ; ( "transition_hashes"

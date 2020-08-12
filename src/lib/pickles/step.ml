@@ -112,7 +112,7 @@ struct
         , ( Challenge.Constant.t Scalar_challenge.t
           , bool )
           Bulletproof_challenge.t
-          Bp_vec.t
+          Step_bp_vec.t
         , Index.t )
         Dlog_based.Statement.t
     end in
@@ -131,7 +131,7 @@ struct
              * X_hat.t
              * (value, local_max_branching, m) Per_proof_witness.Constant.t =
        fun max dlog_vk dlog_index (T t) tag ~must_verify ->
-        let data = Types_map.lookup tag in
+        let data = Types_map.lookup_basic tag in
         let (module Local_max_branching) = data.max_branching in
         let T = Local_max_branching.eq in
         let statement = t.statement in
@@ -145,7 +145,7 @@ struct
               Common.hash_pairing_me_only
                 (Reduced_me_only.Pairing_based.prepare
                    ~dlog_marlin_index:dlog_index statement.pass_through)
-                ~app_state:data.a_value_to_field_elements
+                ~app_state:data.value_to_field_elements
           ; proof_state=
               { statement.proof_state with
                 me_only=
@@ -226,7 +226,7 @@ struct
               ( Array.map prechals ~f:(fun (x, is_square) ->
                     {Bulletproof_challenge.prechallenge= x; is_square} )
               |> Array.to_list )
-              Rounds.n
+              Tock.Rounds.n
           in
           (prechals, b)
         in
@@ -276,7 +276,7 @@ struct
               ~evaluation_point:pt
               ~shifted_pow:(fun deg x ->
                 Pcs_batch.pow ~one ~mul x
-                  Int.(crs_max_degree - (deg mod crs_max_degree)) )
+                  Int.(Max_degree.wrap - (deg mod Max_degree.wrap)) )
               v b
           in
           let open Tock.Field in
@@ -323,11 +323,11 @@ struct
             ([], [], [], [], [])
         | p :: ps, max :: maxes, t :: ts, must_verify :: must_verifys, S l ->
             let dlog_vk, dlog_index =
-              if Type_equal.Id.same self t then
+              if Type_equal.Id.same self.Tag.id t.id then
                 (self_dlog_vk, self_dlog_marlin_index)
               else
-                let d = Types_map.lookup t in
-                (Lazy.force d.wrap_vk, Lazy.force d.wrap_key)
+                let d = Types_map.lookup_basic t in
+                (d.wrap_vk, d.wrap_key)
             in
             let `Sg sg, u, s, x, w = f max dlog_vk dlog_index p t ~must_verify
             and sgs, us, ss, xs, ws = go ps maxes ts must_verifys l in
@@ -367,7 +367,7 @@ struct
             ( Challenge.Constant.t Scalar_challenge.t
             , bool )
             Bulletproof_challenge.t
-            Bp_vec.t
+            Step_bp_vec.t
         end in
         let module M =
           H3.Map
@@ -393,7 +393,7 @@ struct
         ~dlog_marlin_index:self_dlog_marlin_index
         next_statement.proof_state.me_only
     in
-    let handler (Snarky.Request.With {request; respond} as r) =
+    let handler (Snarky_backendless.Request.With {request; respond} as r) =
       let k x = respond (Provide x) in
       match request with
       | Req.Proof_with_datas ->
@@ -403,11 +403,15 @@ struct
       | Req.App_state ->
           k next_me_only_prepared.app_state
       | _ -> (
-        match handler with Some f -> f r | None -> Snarky.Request.unhandled )
+        match handler with
+        | Some f ->
+            f r
+        | None ->
+            Snarky_backendless.Request.unhandled )
     in
     let (next_proof : Tick.Proof.t) =
       let (T (input, conv)) =
-        Impls.Step.input ~branching:Max_branching.n ~bulletproof_log2:Rounds.n
+        Impls.Step.input ~branching:Max_branching.n ~wrap_rounds:Tock.Rounds.n
       in
       let rec pad : type n k maxes pvals lws lhs.
              (Digest.Constant.t, k) Vector.t
@@ -448,12 +452,6 @@ struct
         in
         let module V = H3.To_vector (Tick.Curve.Affine) in
         V.f prev_values_length (M.f prev_with_proofs)
-      in
-      let pass_through =
-        (* TODO: Use the same pad_pass_through function as in wrap *)
-        pad
-          (Vector.map statements_with_hashes ~f:(fun s -> s.proof_state.me_only))
-          Maxes.maxes Maxes.length
       in
       ksprintf Common.time "step-prover %d (%d, %d, %d)"
         (Index.to_int branch_data.index)

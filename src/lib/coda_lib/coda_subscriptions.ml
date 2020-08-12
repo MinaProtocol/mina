@@ -139,7 +139,7 @@ let create ~logger ~constraint_constants ~wallets ~time_controller
                 verified_transactions participants ;
               Deferred.unit
           | Error e ->
-              Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+              [%log error]
                 ~metadata:
                   [ ( "error"
                     , `String (Staged_ledger.Pre_diff_info.Error.to_string e)

@@ -73,7 +73,7 @@ module T = struct
              Transaction_snark.Statement.to_yojson s ))
     in
     let log_error err_str ~metadata =
-      Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+      [%log warn]
         ~metadata:
           ( [ ("statements", statements ())
             ; ("error", `String err_str)
@@ -107,7 +107,7 @@ module T = struct
       with
       | Ok b ->
           let time_ms = Time.abs_diff (Time.now ()) start |> Time.Span.to_ms in
-          Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+          [%log trace]
             ~metadata:
               [ ( "work_id"
                 , `List
@@ -117,7 +117,7 @@ module T = struct
             "Verification in apply_diff for work $work_id took $time ms" ;
           Deferred.return b
       | Error e ->
-          Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+          [%log fatal]
             ~metadata:
               [ ( "statement"
                 , `List
@@ -448,7 +448,6 @@ module T = struct
       ; supply_increase
       ; pending_coinbase_stack_state=
           {pending_coinbase_stack_state.pc with target= pending_coinbase_target}
-      ; proof_type= `Base
       ; sok_digest= () }
     , { Stack_state_with_init_stack.pc=
           {source= pending_coinbase_target; target= pending_coinbase_target}
@@ -786,7 +785,7 @@ module T = struct
                  ~f:(fun {Scan_state.Transaction_with_witness.statement; _} ->
                    Transaction_snark.Statement.to_yojson statement ))
           in
-          Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+          [%log error]
             ~metadata:
               [ ( "scan_state"
                 , `String (Scan_state.snark_job_list_json t.scan_state) )
@@ -816,7 +815,7 @@ module T = struct
           scan_state'
         >>| to_staged_ledger_or_error)
     in
-    Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+    [%log debug]
       ~metadata:
         [ ("user_command_count", `Int user_commands_count)
         ; ("coinbase_count", `Int (List.length coinbases))
@@ -880,7 +879,7 @@ module T = struct
     let () =
       Or_error.iter_error (update_metrics new_staged_ledger witness)
         ~f:(fun e ->
-          Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+          [%log error]
             ~metadata:[("error", `String (Error.to_string_hum e))]
             !"Error updating metrics after applying staged_ledger diff: $error"
       )
@@ -1347,8 +1346,7 @@ module T = struct
         | Ok res'' ->
             res''
         | Error e ->
-            Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__
-              "Error when increasing coinbase: $error"
+            [%log' error t.logger] "Error when increasing coinbase: $error"
               ~metadata:[("error", `String (Error.to_string_hum e))] ;
             res
       in
@@ -1430,7 +1428,7 @@ module T = struct
             | One x ->
                 One x
             | _ ->
-                Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+                [%log error]
                   "Error creating staged ledger diff: Should have at most one \
                    coinbase in the second pre_diff" ;
                 Zero
@@ -1596,7 +1594,7 @@ module T = struct
                   ( Sequence.append seq (Sequence.singleton cw_checked)
                   , One_or_two.length cw_checked.proofs + count )
               else (
-                Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+                [%log debug]
                   ~metadata:
                     [ ( "work"
                       , Transaction_snark_work.Checked.to_yojson cw_checked )
@@ -1610,7 +1608,7 @@ module T = struct
                     insufficient to create the snark worker account" ;
                 Stop (seq, count) )
           | None ->
-              Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+              [%log debug]
                 ~metadata:
                   [ ("statement", Transaction_snark_work.Statement.to_yojson w)
                   ; ( "work_ids"
@@ -1638,7 +1636,7 @@ module T = struct
                     was: %s, command was: $user_command"
                   (Error.to_string_hum e)
               in
-              Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+              [%log fatal]
                 ~metadata:
                   [ ( "user_command"
                     , User_command.With_valid_signature.to_yojson txn ) ]
@@ -1661,7 +1659,7 @@ module T = struct
             ~is_coinbase_reciever_new partitions )
     in
     let summaries, detailed = List.unzip log in
-    Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+    [%log debug]
       "Number of proofs ready for purchase: $proof_count Number of user \
        commands ready to be included: $txn_count Diff creation log: $diff_log"
       ~metadata:
@@ -1669,8 +1667,7 @@ module T = struct
         ; ("txn_count", `Int (Sequence.length valid_on_this_ledger))
         ; ("diff_log", Diff_creation_log.summary_list_to_yojson summaries) ] ;
     if log_block_creation then
-      Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-        "Detailed diff creation log: $diff_log"
+      [%log debug] "Detailed diff creation log: $diff_log"
         ~metadata:
           [ ( "diff_log"
             , Diff_creation_log.detail_list_to_yojson
@@ -1851,7 +1848,8 @@ let%test_module "test" =
     let proofs stmts : Ledger_proof.t One_or_two.t =
       let sok_digest = Sok_message.Digest.default in
       One_or_two.map stmts ~f:(fun statement ->
-          Ledger_proof.create ~statement ~sok_digest ~proof:Proof.dummy )
+          Ledger_proof.create ~statement ~sok_digest
+            ~proof:Proof.transaction_dummy )
 
     let stmt_to_work_random_prover (stmts : Transaction_snark_work.Statement.t)
         : Transaction_snark_work.Checked.t option =

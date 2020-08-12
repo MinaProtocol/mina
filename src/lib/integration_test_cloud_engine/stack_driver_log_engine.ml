@@ -110,8 +110,7 @@ module Subscription = struct
         ()
     in
     let%bind response_json = Deferred.return @@ load_config_json response in
-    Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-      "Create sink response: $response"
+    [%log' debug logger] "Create sink response: $response"
       ~metadata:[("response", response_json)] ;
     match
       Yojson.Safe.Util.(to_option Fn.id (member "error" response_json))
@@ -416,8 +415,7 @@ let rec watch_for_initialization ~logger initialization_table
   let handle_result result =
     let open Initialization_query.Result in
     let open Or_error.Let_syntax in
-    Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-      "Handling initialization log for \"%s\"" result.pod_id ;
+    [%log' info logger] "Handling initialization log for \"%s\"" result.pod_id ;
     let%bind ivar =
       or_error_of_option
         (String.Map.find initialization_table result.pod_id)
@@ -430,8 +428,7 @@ let rec watch_for_initialization ~logger initialization_table
         (Error.of_string
            "received initialization for node that has already initialized")
   in
-  Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-    "Pulling initialization subscription" ;
+  [%log' info logger] "Pulling initialization subscription" ;
   let%bind results =
     uninterruptible
       (let open Deferred.Or_error.Let_syntax in
@@ -482,8 +479,7 @@ let delete t : unit Deferred.Or_error.t =
   | Ok _ ->
       Ok ()
   | Error e' ->
-      Logger.fatal t.logger ~module_:__MODULE__ ~location:__LOC__
-        "Error deleting subscriptions: $error"
+      [%log' fatal t.logger] "Error deleting subscriptions: $error"
         ~metadata:[("error", `String (Error.to_string_hum e'))] ;
       Error e'
 
@@ -545,7 +541,7 @@ let wait_for' :
           Time.( > ) (Time.now ()) (Option.value_exn query_timeout_ms)
     in
     let conditions_passed (res : Block_produced_query.Result.t) =
-      Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
+      [%log' info t.logger]
         ~metadata:
           [ ("result", Block_produced_query.Result.to_yojson res)
           ; ("blocks", `Int blocks)
@@ -561,10 +557,9 @@ let wait_for' :
         Deferred.Or_error.error_string "wait_for took too long to complete"
       else if timed_out aggregated_res then Deferred.Or_error.ok_unit
       else (
-        Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
-          "Pulling blocks produced subscription" ;
+        [%log' info t.logger] "Pulling blocks produced subscription" ;
         let%bind logs = Subscription.pull t.subscriptions.blocks_produced in
-        Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
+        [%log' info t.logger]
           ~metadata:[("n", `Int (List.length logs)); ("logs", `List logs)]
           "Pulled $n logs for blocks produced: $logs" ;
         let%bind finished, aggregated_res' =
@@ -604,7 +599,7 @@ let wait_for :
     -> t
     -> unit Deferred.Or_error.t =
  fun ?(blocks = 0) ?(epoch_reached = 0) ?(timeout = `Milliseconds 300000L) t ->
-  Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
+  [%log' info t.logger]
     ~metadata:
       [ ("blocks", `Int blocks)
       ; ("epoch", `Int epoch_reached)
@@ -624,15 +619,14 @@ let wait_for :
   | Ok _ ->
       Deferred.Or_error.ok_unit
   | Error e ->
-      Logger.fatal t.logger ~module_:__MODULE__ ~location:__LOC__
-        "wait_for failed with error: $error"
+      [%log' fatal t.logger] "wait_for failed with error: $error"
         ~metadata:[("error", `String (Error.to_string_hum e))] ;
       let%map res = delete t in
       Or_error.combine_errors_unit [Error e; res]
 
 let wait_for_init (node : Kubernetes_network.Node.t) t =
   let open Deferred.Or_error.Let_syntax in
-  Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
+  [%log' info t.logger]
     ~metadata:[("node", `String node)]
     "Waiting for $node to initialize" ;
   let%bind init =

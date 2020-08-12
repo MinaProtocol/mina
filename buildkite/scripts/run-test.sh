@@ -27,10 +27,11 @@ git clone git@github.com:CodaProtocol/coda-automation.git
 
 # Set the credential for gcloud
 
-echo $BUILDKITE_GS_APPLICATION_CREDENTIALS_JSON > credential.json
+# echo $BUILDKITE_GS_APPLICATION_CREDENTIALS_JSON > credential.json
 
-export GOOGLE_APPLICATION_CREDENTIALS="credential.json"
+# export GOOGLE_APPLICATION_CREDENTIALS="credential.json"
 
 # Run test executive
 
 ./_build/default/src/app/test_executive/test_executive.exe --coda-image "$coda_daemon_image" block-production
+
