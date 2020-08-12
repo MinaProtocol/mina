@@ -7,4 +7,5 @@
     snarky.backendless
     blake2
     digestif
-    core_kernel ))
+    core_kernel
+    integers ))
