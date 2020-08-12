@@ -8,7 +8,8 @@ let wrap_domains = Common.wrap_domains
 
 let evals =
   let e =
-    Dlog_marlin_types.Evals.map (Commitment_lengths.of_domains wrap_domains)
+    Dlog_marlin_types.Evals.map
+      (Commitment_lengths.of_domains ~max_degree:Max_degree.wrap wrap_domains)
       ~f:(fun len -> Array.create ~len Backend.Tock.Field.one)
   in
   let ex = (e, Backend.Tock.Field.zero) in
@@ -17,7 +18,7 @@ let evals =
 module Ipa = struct
   module Wrap = struct
     let challenges =
-      Vector.init Rounds.n ~f:(fun _ ->
+      Vector.init Tock.Rounds.n ~f:(fun _ ->
           let prechallenge = Ro.scalar_chal () in
           { Bulletproof_challenge.is_square=
               Tock.Field.is_square (Endo.Dee.to_field prechallenge)
@@ -35,7 +36,7 @@ module Ipa = struct
 
   module Step = struct
     let challenges =
-      Vector.init Rounds.n ~f:(fun _ ->
+      Vector.init Tick.Rounds.n ~f:(fun _ ->
           let prechallenge = Ro.scalar_chal () in
           { Bulletproof_challenge.is_square=
               Tick.Field.is_square (Endo.Dum.to_field prechallenge)
