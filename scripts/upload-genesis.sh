@@ -2,8 +2,6 @@
 
 GENESIS_DIR="/tmp/coda_cache_dir/"
 
-echo "AWS Key: $AWS_ACCESS_KEY_ID"
-
 # Need AWS creds to upload
 if [ -z "$AWS_ACCESS_KEY_ID" ]; then
     echo "WARNING: AWS_ACCESS_KEY_ID is missing, not uploading files for genesis"

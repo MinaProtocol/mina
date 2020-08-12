@@ -16,7 +16,7 @@ echo "--- Publish pvkeys"
 
 # TODO: Stop building lib_p2p multiple times by pulling from buildkite-agent artifacts or docker or somewhere
 echo "--- Build libp2p_helper TODO: use the previously uploaded build artifact"
-make libp2p_helper
+LIBP2P_NIXLESS=1 make libp2p_helper
 
 echo "--- Build generate-keypair binary"
 dune build --profile=${DUNE_PROFILE} src/app/generate_keypair/generate_keypair.exe 2>&1 | tee /tmp/buildocaml2.log
