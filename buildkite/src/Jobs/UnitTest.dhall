@@ -13,13 +13,13 @@ let OpamInit = ../Command/OpamInit.dhall
 let Docker = ../Command/Docker/Type.dhall
 let Size = ../Command/Size.dhall
 
-let buildTestCmd : Text -> Text -> Command.Type = \(profile : Text) -> \(path : Text) ->
+let buildTestCmd : Text -> Text -> Size -> Command.Type = \(profile : Text) -> \(path : Text) -> \(cmd_target : Size) ->
   Command.build
     Command.Config::{
       commands = OpamInit.andThenRunInDocker ([] : List Text) "buildkite/scripts/unit-test.sh ${profile} ${path}",
       label = "Run ${profile} unit-tests",
       key = "unit-test-${profile}",
-      target = Size.XLarge,
+      target = cmd_target,
       docker = None Docker.Type,
       artifact_paths = [ S.contains "core_dumps/*" ]
     }
@@ -47,7 +47,7 @@ Pipeline.build
         name = "UnitTest"
       },
     steps = [
-      buildTestCmd "dev" "src/lib",
-      buildTestCmd "nonconsensus_medium_curves" "src/nonconsensus"
+      buildTestCmd "dev" "src/lib" Size.XLarge,
+      buildTestCmd "nonconsensus_medium_curves" "src/nonconsensus" Size.Large
     ]
   }
