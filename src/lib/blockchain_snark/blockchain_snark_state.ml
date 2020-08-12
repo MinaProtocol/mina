@@ -6,7 +6,7 @@ open Coda_state
 open Pickles_types
 
 include struct
-  open Snarky.Request
+  open Snarky_backendless.Request
 
   type _ t +=
     | Prev_state : Protocol_state.Value.t t
@@ -19,7 +19,7 @@ module Witness = struct
 end
 
 let blockchain_handler on_unhandled {Witness.prev_state; transition} =
-  let open Snarky.Request in
+  let open Snarky_backendless.Request in
   fun (With {request; respond} as r) ->
     let k x = respond (Provide x) in
     match request with
@@ -34,7 +34,8 @@ let wrap_handler h w =
   match h with
   | None ->
       blockchain_handler
-        (fun (Snarky.Request.With {respond; _}) -> respond Unhandled)
+        (fun (Snarky_backendless.Request.With {respond; _}) ->
+          respond Unhandled )
         w
   | Some h ->
       (* TODO: Clean up the handler composition interface. *)

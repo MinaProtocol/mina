@@ -11,7 +11,7 @@ module type Unchecked = sig
 end
 
 module type Checked = sig
-  module Impl : Snarky.Snark_intf.S
+  module Impl : Snarky_backendless.Snark_intf.S
 
   type group
 
@@ -25,7 +25,7 @@ module type Checked = sig
 end
 
 module type S = sig
-  module Impl : Snarky.Snark_intf.S
+  module Impl : Snarky_backendless.Snark_intf.S
 
   module Scalar : Scalar_intf.S with module Impl := Impl
 
