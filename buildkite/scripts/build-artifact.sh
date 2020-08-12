@@ -14,9 +14,10 @@ make build_pv_keys 2>&1 | tee /tmp/buildocaml.log
 echo "--- Publish pvkeys"
 ./scripts/publish-pvkeys.sh
 
-# TODO: Investigate if this adds any value, but its never worked properly in CI
-# echo "--- Rebuild for pvkey changes"
-# make build 2>&1 | tee /tmp/buildocaml2.log
+echo "--- Build logproc + coda"
+#CODA_COMMIT_SHA1=$GITLONGHASH
+echo "Building from Commit SHA: $CODA_COMMIT_SHA1"
+dune build src/app/logproc/logproc.exe src/app/cli/src/coda.exe --profile=$(DUNE_PROFILE) 2>&1 | tee /tmp/buildocaml2.log
 
 echo "--- Build generate-keypair binary"
 dune build src/app/generate_keypair/generate_keypair.exe
