@@ -13,7 +13,7 @@ type t =
   , Field.t Scalar_challenge.t
   , Other_field.t
   , ( (Field.t Scalar_challenge.t, Boolean.var) Bulletproof_challenge.t
-    , Rounds.n )
+    , Tock.Rounds.n )
     Pickles_types.Vector.t
   , Field.t )
   Types.Pairing_based.Proof_state.Per_proof.t
@@ -27,7 +27,7 @@ module Constant = struct
     , Challenge.Constant.t Scalar_challenge.t
     , Tock.Field.t
     , ( (Challenge.Constant.t Scalar_challenge.t, bool) Bulletproof_challenge.t
-      , Rounds.n )
+      , Tock.Rounds.n )
       Vector.t
     , Digest.Constant.t )
     Types.Pairing_based.Proof_state.Per_proof.t
