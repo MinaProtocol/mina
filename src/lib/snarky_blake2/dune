@@ -4,7 +4,8 @@
   (preprocess (pps ppx_version ppx_jane ppx_deriving.eq))
   (inline_tests)
   (libraries
-    snarky
+    snarky.backendless
     blake2
     digestif
-    core_kernel ))
+    core_kernel
+    integers ))

@@ -8,105 +8,106 @@ module Snarkable = struct
     type _ t
 
     val typ :
-      ('var, 'value, 'f) Snarky.Typ.t -> ('var t, 'value t, 'f) Snarky.Typ.t
+         ('var, 'value, 'f) Snarky_backendless.Typ.t
+      -> ('var t, 'value t, 'f) Snarky_backendless.Typ.t
   end
 
   module type S2 = sig
     type (_, _) t
 
     val typ :
-         ('var1, 'value1, 'f) Snarky.Typ.t
-      -> ('var2, 'value2, 'f) Snarky.Typ.t
-      -> (('var1, 'var2) t, ('value1, 'value2) t, 'f) Snarky.Typ.t
+         ('var1, 'value1, 'f) Snarky_backendless.Typ.t
+      -> ('var2, 'value2, 'f) Snarky_backendless.Typ.t
+      -> (('var1, 'var2) t, ('value1, 'value2) t, 'f) Snarky_backendless.Typ.t
   end
 
   module type S3 = sig
     type (_, _, _) t
 
     val typ :
-         ('var1, 'value1, 'f) Snarky.Typ.t
-      -> ('var2, 'value2, 'f) Snarky.Typ.t
-      -> ('var3, 'value3, 'f) Snarky.Typ.t
+         ('var1, 'value1, 'f) Snarky_backendless.Typ.t
+      -> ('var2, 'value2, 'f) Snarky_backendless.Typ.t
+      -> ('var3, 'value3, 'f) Snarky_backendless.Typ.t
       -> ( ('var1, 'var2, 'var3) t
          , ('value1, 'value2, 'value3) t
          , 'f )
-         Snarky.Typ.t
+         Snarky_backendless.Typ.t
   end
 
   module type S4 = sig
     type (_, _, _, _) t
 
     val typ :
-         ('var1, 'value1, 'f) Snarky.Typ.t
-      -> ('var2, 'value2, 'f) Snarky.Typ.t
-      -> ('var3, 'value3, 'f) Snarky.Typ.t
-      -> ('var4, 'value4, 'f) Snarky.Typ.t
+         ('var1, 'value1, 'f) Snarky_backendless.Typ.t
+      -> ('var2, 'value2, 'f) Snarky_backendless.Typ.t
+      -> ('var3, 'value3, 'f) Snarky_backendless.Typ.t
+      -> ('var4, 'value4, 'f) Snarky_backendless.Typ.t
       -> ( ('var1, 'var2, 'var3, 'var4) t
          , ('value1, 'value2, 'value3, 'value4) t
          , 'f )
-         Snarky.Typ.t
+         Snarky_backendless.Typ.t
   end
 
   module type S5 = sig
     type (_, _, _, _, _) t
 
     val typ :
-         ('var1, 'value1, 'f) Snarky.Typ.t
-      -> ('var2, 'value2, 'f) Snarky.Typ.t
-      -> ('var3, 'value3, 'f) Snarky.Typ.t
-      -> ('var4, 'value4, 'f) Snarky.Typ.t
-      -> ('var5, 'value5, 'f) Snarky.Typ.t
+         ('var1, 'value1, 'f) Snarky_backendless.Typ.t
+      -> ('var2, 'value2, 'f) Snarky_backendless.Typ.t
+      -> ('var3, 'value3, 'f) Snarky_backendless.Typ.t
+      -> ('var4, 'value4, 'f) Snarky_backendless.Typ.t
+      -> ('var5, 'value5, 'f) Snarky_backendless.Typ.t
       -> ( ('var1, 'var2, 'var3, 'var4, 'var5) t
          , ('value1, 'value2, 'value3, 'value4, 'value5) t
          , 'f )
-         Snarky.Typ.t
+         Snarky_backendless.Typ.t
   end
 
   module type S6 = sig
     type (_, _, _, _, _, _) t
 
     val typ :
-         ('var1, 'value1, 'f) Snarky.Typ.t
-      -> ('var2, 'value2, 'f) Snarky.Typ.t
-      -> ('var3, 'value3, 'f) Snarky.Typ.t
-      -> ('var4, 'value4, 'f) Snarky.Typ.t
-      -> ('var5, 'value5, 'f) Snarky.Typ.t
-      -> ('var6, 'value6, 'f) Snarky.Typ.t
+         ('var1, 'value1, 'f) Snarky_backendless.Typ.t
+      -> ('var2, 'value2, 'f) Snarky_backendless.Typ.t
+      -> ('var3, 'value3, 'f) Snarky_backendless.Typ.t
+      -> ('var4, 'value4, 'f) Snarky_backendless.Typ.t
+      -> ('var5, 'value5, 'f) Snarky_backendless.Typ.t
+      -> ('var6, 'value6, 'f) Snarky_backendless.Typ.t
       -> ( ('var1, 'var2, 'var3, 'var4, 'var5, 'var6) t
          , ('value1, 'value2, 'value3, 'value4, 'value5, 'value6) t
          , 'f )
-         Snarky.Typ.t
+         Snarky_backendless.Typ.t
   end
 
   module type S7 = sig
     type (_, _, _, _, _, _, _) t
 
     val typ :
-         ('var1, 'value1, 'f) Snarky.Typ.t
-      -> ('var2, 'value2, 'f) Snarky.Typ.t
-      -> ('var3, 'value3, 'f) Snarky.Typ.t
-      -> ('var4, 'value4, 'f) Snarky.Typ.t
-      -> ('var5, 'value5, 'f) Snarky.Typ.t
-      -> ('var6, 'value6, 'f) Snarky.Typ.t
-      -> ('var7, 'value7, 'f) Snarky.Typ.t
+         ('var1, 'value1, 'f) Snarky_backendless.Typ.t
+      -> ('var2, 'value2, 'f) Snarky_backendless.Typ.t
+      -> ('var3, 'value3, 'f) Snarky_backendless.Typ.t
+      -> ('var4, 'value4, 'f) Snarky_backendless.Typ.t
+      -> ('var5, 'value5, 'f) Snarky_backendless.Typ.t
+      -> ('var6, 'value6, 'f) Snarky_backendless.Typ.t
+      -> ('var7, 'value7, 'f) Snarky_backendless.Typ.t
       -> ( ('var1, 'var2, 'var3, 'var4, 'var5, 'var6, 'var7) t
          , ('value1, 'value2, 'value3, 'value4, 'value5, 'value6, 'value7) t
          , 'f )
-         Snarky.Typ.t
+         Snarky_backendless.Typ.t
   end
 
   module type S8 = sig
     type (_, _, _, _, _, _, _, _) t
 
     val typ :
-         ('var1, 'value1, 'f) Snarky.Typ.t
-      -> ('var2, 'value2, 'f) Snarky.Typ.t
-      -> ('var3, 'value3, 'f) Snarky.Typ.t
-      -> ('var4, 'value4, 'f) Snarky.Typ.t
-      -> ('var5, 'value5, 'f) Snarky.Typ.t
-      -> ('var6, 'value6, 'f) Snarky.Typ.t
-      -> ('var7, 'value7, 'f) Snarky.Typ.t
-      -> ('var8, 'value8, 'f) Snarky.Typ.t
+         ('var1, 'value1, 'f) Snarky_backendless.Typ.t
+      -> ('var2, 'value2, 'f) Snarky_backendless.Typ.t
+      -> ('var3, 'value3, 'f) Snarky_backendless.Typ.t
+      -> ('var4, 'value4, 'f) Snarky_backendless.Typ.t
+      -> ('var5, 'value5, 'f) Snarky_backendless.Typ.t
+      -> ('var6, 'value6, 'f) Snarky_backendless.Typ.t
+      -> ('var7, 'value7, 'f) Snarky_backendless.Typ.t
+      -> ('var8, 'value8, 'f) Snarky_backendless.Typ.t
       -> ( ('var1, 'var2, 'var3, 'var4, 'var5, 'var6, 'var7, 'var8) t
          , ( 'value1
            , 'value2
@@ -118,7 +119,7 @@ module Snarkable = struct
            , 'value8 )
            t
          , 'f )
-         Snarky.Typ.t
+         Snarky_backendless.Typ.t
   end
 end
 
@@ -134,7 +135,7 @@ module Evals = struct
   end
 end
 
-module Group (Impl : Snarky.Snark_intf.Run) = struct
+module Group (Impl : Snarky_backendless.Snark_intf.Run) = struct
   open Impl
 
   module type S = sig
@@ -158,7 +159,7 @@ module Group (Impl : Snarky.Snark_intf.Run) = struct
       val of_affine : field * field -> t
     end
 
-    val typ : (t, Constant.t, field) Snarky.Typ.t
+    val typ : (t, Constant.t, field) Snarky_backendless.Typ.t
 
     val ( + ) : t -> t -> t
 
@@ -185,7 +186,7 @@ module Group (Impl : Snarky.Snark_intf.Run) = struct
   end
 end
 
-module Sponge (Impl : Snarky.Snark_intf.Run) = struct
+module Sponge (Impl : Snarky_backendless.Snark_intf.Run) = struct
   open Impl
 
   module type S =
@@ -198,7 +199,7 @@ module Sponge (Impl : Snarky.Snark_intf.Run) = struct
 end
 
 module type Inputs_base = sig
-  module Impl : Snarky.Snark_intf.Run with type prover_state = unit
+  module Impl : Snarky_backendless.Snark_intf.Run with type prover_state = unit
 
   module Inner_curve : sig
     open Impl
@@ -300,6 +301,6 @@ module type Statement = sig
 end
 
 module type Statement_var =
-  Statement with type field := Backend.Tick.Field.t Snarky.Cvar.t
+  Statement with type field := Backend.Tick.Field.t Snarky_backendless.Cvar.t
 
 module type Statement_value = Statement with type field := Backend.Tick.Field.t

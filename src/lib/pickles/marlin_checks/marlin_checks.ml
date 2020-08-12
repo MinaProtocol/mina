@@ -148,7 +148,8 @@ let checks (type t) (module F : Field_intf with type t = t) ~input_domain
     , (h_1 * v_h_beta_1) + (beta_1 * g_1) + (sigma_2 * domain_h#size * z_hat)
     ) ]
 
-let checked (type t) (module Impl : Snarky.Snark_intf.Run with type field = t)
+let checked (type t)
+    (module Impl : Snarky_backendless.Snark_intf.Run with type field = t)
     ~input_domain ~domain_h ~domain_k ~x_hat_beta_1 marlin evals =
   let open Impl in
   let eqns =

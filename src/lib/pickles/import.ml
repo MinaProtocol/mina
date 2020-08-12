@@ -1,5 +1,5 @@
 module B = Bigint
-module H_list = Snarky.H_list
+module H_list = Snarky_backendless.H_list
 module Challenge = Limb_vector.Challenge
 module Types = Composition_types
 module Digest = Types.Digest

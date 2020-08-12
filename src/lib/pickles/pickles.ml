@@ -225,7 +225,8 @@ end
 
 module Prover = struct
   type ('prev_values, 'local_widths, 'local_heights, 'a_value, 'proof) t =
-       ?handler:(Snarky.Request.request -> Snarky.Request.response)
+       ?handler:(   Snarky_backendless.Request.request
+                 -> Snarky_backendless.Request.response)
     -> ( 'prev_values
        , 'local_widths
        , 'local_heights )
@@ -548,7 +549,8 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
       let f : type prev_vars prev_values local_widths local_heights.
              (prev_vars, prev_values, local_widths, local_heights) Branch_data.t
           -> Lazy_keys.t
-          -> ?handler:(Snarky.Request.request -> Snarky.Request.response)
+          -> ?handler:(   Snarky_backendless.Request.request
+                       -> Snarky_backendless.Request.response)
           -> ( prev_values
              , local_widths
              , local_heights )

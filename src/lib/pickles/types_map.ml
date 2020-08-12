@@ -44,7 +44,8 @@ module Data = struct
 
   module For_step = struct
     type inner_curve_var =
-      Tick.Field.t Snarky.Cvar.t * Tick.Field.t Snarky.Cvar.t
+      Tick.Field.t Snarky_backendless.Cvar.t
+      * Tick.Field.t Snarky_backendless.Cvar.t
 
     type ('a_var, 'a_value, 'max_branching, 'branches) t =
       { branches: 'branches Nat.t
