@@ -15,9 +15,9 @@ echo "--- Publish pvkeys"
 ./scripts/publish-pvkeys.sh
 
 echo "--- Build logproc + coda"
-#CODA_COMMIT_SHA1=$GITLONGHASH
+CODA_COMMIT_SHA1=${GITLONGHASH}
 echo "Building from Commit SHA: $CODA_COMMIT_SHA1"
-dune build src/app/logproc/logproc.exe src/app/cli/src/coda.exe --profile=$(DUNE_PROFILE) 2>&1 | tee /tmp/buildocaml2.log
+dune build src/app/logproc/logproc.exe src/app/cli/src/coda.exe --profile=${DUNE_PROFILE} 2>&1 | tee /tmp/buildocaml2.log
 
 echo "--- Build generate-keypair binary"
 dune build src/app/generate_keypair/generate_keypair.exe
