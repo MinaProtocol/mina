@@ -38,7 +38,7 @@ let account_id (`Pk pk) token_id =
 let token_id_of_account (account : Account_identifier.t) =
   let module Decoder = Amount_of.Token_id.T (Result) in
   Decoder.decode account.metadata
-  |> Result.map ~f:(Option.value ~default:Unsigned.UInt64.one)
+  |> Result.map ~f:(Option.value ~default:Amount_of.Token_id.default)
   |> Result.ok
 
 module Block_query = struct
@@ -128,7 +128,7 @@ module User_command_info = struct
 
     module Reason = struct
       type t =
-        | Length_off
+        | Length_mismatch
         | Fee_payer_and_source_mismatch
         | Amount_not_some
         | Account_not_some
@@ -173,7 +173,7 @@ module User_command_info = struct
       in
       let%map () =
         if Int.equal (List.length ops) 3 then V.return ()
-        else V.fail Length_off
+        else V.fail Length_mismatch
       and account_a =
         let open Result.Let_syntax in
         let%bind {account; _} = find_kind `Payment_source_dec ops
