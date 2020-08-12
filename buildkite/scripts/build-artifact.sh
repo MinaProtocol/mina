@@ -14,25 +14,25 @@ make build_pv_keys 2>&1 | tee /tmp/buildocaml.log
 echo "--- Publish pvkeys"
 ./scripts/publish-pvkeys.sh
 
-echo "--- Build libp2p_helper
+echo "--- Build libp2p_helper TODO: use the previously uploaded build artifact
 make libp2p_helper
+
+echo "--- Build generate-keypair binary"
+dune build --profile=${DUNE_PROFILE} src/app/generate_keypair/generate_keypair.exe 2>&1 | tee /tmp/buildocaml2.log
+
+echo "--- Build runtime_genesis_ledger binary"
+dune exec --profile=${DUNE_PROFILE} src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe
+
+echo "--- Generate runtime_genesis_ledger with 10k accounts"
+dune exec --profile=${DUNE_PROFILE} src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -- --config-file genesis_ledgers/phase_three/config.json
+
+echo "--- Upload genesis data"
+./scripts/upload-genesis.sh
 
 echo "--- Build logproc + coda"
 CODA_COMMIT_SHA1=$(git rev-parse HEAD)
 echo "Building from Commit SHA: $CODA_COMMIT_SHA1"
-dune build src/app/logproc/logproc.exe src/app/cli/src/coda.exe --profile=${DUNE_PROFILE} 2>&1 | tee /tmp/buildocaml2.log
-
-echo "--- Build generate-keypair binary"
-dune build src/app/generate_keypair/generate_keypair.exe
-
-echo "--- Build runtime_genesis_ledger binary"
-dune exec --profile=$DUNE_PROFILE src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe
-
-echo "--- Generate runtime_genesis_ledger with 10k accounts"
-dune exec --profile=$DUNE_PROFILE src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -- --config-file genesis_ledgers/phase_three/config.json
-
-echo "--- Upload genesis data"
-./scripts/upload-genesis.sh
+dune build --profile=${DUNE_PROFILE} src/app/logproc/logproc.exe src/app/cli/src/coda.exe 2>&1 | tee /tmp/buildocaml3.log
 
 echo "--- Build deb package with pvkeys"
 make deb
