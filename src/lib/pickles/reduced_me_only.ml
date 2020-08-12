@@ -28,11 +28,11 @@ module Dlog_based = struct
       ( Challenge.Constant.t Scalar_challenge.Stable.Latest.t
       , bool )
       Bulletproof_challenge.t
-      Bp_vec.t
+      Wrap_bp_vec.t
     [@@deriving bin_io, sexp, compare, yojson]
 
     module Prepared = struct
-      type t = (Tock.Field.t, Rounds.n) Vector.t
+      type t = (Tock.Field.t, Tock.Rounds.n) Vector.t
     end
   end
 

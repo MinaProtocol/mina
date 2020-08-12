@@ -100,7 +100,9 @@ module Dlog_based = struct
           ; fp
           ; fp
           ; Scalar_challenge.typ chal
-          ; Vector.typ (Bulletproof_challenge.typ chal bool) Backend.Rounds.n
+          ; Vector.typ
+              (Bulletproof_challenge.typ chal bool)
+              Backend.Tick.Rounds.n
           ; index ]
           ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
           ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
@@ -238,7 +240,7 @@ module Dlog_based = struct
         ; Vector (B Challenge, Nat.N4.n)
         ; Vector (Scalar Challenge, Nat.N4.n)
         ; Vector (B Digest, Nat.N3.n)
-        ; Vector (B Bulletproof_challenge, Backend.Rounds.n)
+        ; Vector (B Bulletproof_challenge, Backend.Tick.Rounds.n)
         ; Vector (B Index, Nat.N1.n) ]
 
     let to_data
@@ -470,7 +472,8 @@ module Pairing_based = struct
     let typ impl branching fq =
       let unfinalized_proofs =
         let open Spec in
-        Vector (Struct [Per_proof.spec Backend.Rounds.n; B Bool], branching)
+        Vector
+          (Struct [Per_proof.spec Backend.Tock.Rounds.n; B Bool], branching)
       in
       spec unfinalized_proofs (B Spec.Digest)
       |> Spec.typ impl fq
@@ -509,13 +512,14 @@ module Pairing_based = struct
 end
 
 module Nvector = Vector.With_length
-module Bp_vec = Nvector (Backend.Rounds)
+module Wrap_bp_vec = Nvector (Backend.Tock.Rounds)
+module Step_bp_vec = Nvector (Backend.Tick.Rounds)
 
 module Challenges_vector = struct
   type 'n t =
-    (Backend.Tock.Field.t Snarky_backendless.Cvar.t Bp_vec.t, 'n) Vector.t
+    (Backend.Tock.Field.t Snarky_backendless.Cvar.t Wrap_bp_vec.t, 'n) Vector.t
 
   module Constant = struct
-    type 'n t = (Backend.Tock.Field.t Bp_vec.t, 'n) Vector.t
+    type 'n t = (Backend.Tock.Field.t Wrap_bp_vec.t, 'n) Vector.t
   end
 end
