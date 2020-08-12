@@ -34,23 +34,36 @@ let fetchLeaderboard = () => {
   )
   |> Promise.map(res => {
        Array.map(parseEntry, res)
-       |> Array.map(entry => {
-            {
-              name: entry |> safeArrayGet(0),
-              allTimePoints: entry |> safeArrayGet(1) |> safeParseInt,
-              phasePoints: entry |> safeArrayGet(2) |> safeParseInt,
-              releasePoints: entry |> safeArrayGet(3) |> safeParseInt,
-              allTimeRank: entry |> safeArrayGet(4) |> safeParseInt,
-              phaseRank: entry |> safeArrayGet(5) |> safeParseInt,
-              releaseRank: entry |> safeArrayGet(6) |> safeParseInt,
-              genesisMember:
-                entry |> safeArrayGet(7) |> String.length == 0 ? false : true,
-              technicalMVP:
-                entry |> safeArrayGet(8) |> String.length == 0 ? false : true,
-              communityMVP:
-                entry |> safeArrayGet(9) |> String.length == 0 ? false : true,
-            }
-          })
+       |> Array.map(entry
+            /* check if the member has a username */
+            =>
+              if (entry |> safeArrayGet(0) != "") {
+                {
+                  name: entry |> safeArrayGet(0),
+                  allTimePoints: entry |> safeArrayGet(1) |> safeParseInt,
+                  phasePoints: entry |> safeArrayGet(2) |> safeParseInt,
+                  releasePoints: entry |> safeArrayGet(3) |> safeParseInt,
+                  allTimeRank: entry |> safeArrayGet(4) |> safeParseInt,
+                  phaseRank: entry |> safeArrayGet(5) |> safeParseInt,
+                  releaseRank: entry |> safeArrayGet(6) |> safeParseInt,
+                  genesisMember:
+                    entry |> safeArrayGet(7) |> String.length == 0
+                      ? false : true,
+                  technicalMVP:
+                    entry |> safeArrayGet(8) |> String.length == 0
+                      ? false : true,
+                  communityMVP:
+                    entry |> safeArrayGet(9) |> String.length == 0
+                      ? false : true,
+                }
+                ->Some;
+              } else {
+                None;
+              }
+            )
+     })
+  |> Js.Promise.then_(members => {
+       Belt.Array.keepMap(members, release => release) |> Js.Promise.resolve
      })
   |> Js.Promise.catch(_ => Promise.return([||]));
 };
@@ -341,6 +354,16 @@ module Styles = {
         ]),
       ]),
     ]);
+
+  let emptyMessage =
+    style([
+      important(backgroundColor(Theme.Colors.white)),
+      height(`rem(20.)),
+      display(`flex),
+      flexDirection(`column),
+      justifyContent(`center),
+      alignItems(`center),
+    ]);
 };
 
 module LeaderboardRow = {
@@ -569,7 +592,7 @@ let reducer = (_, action) => {
 [@react.component]
 let make =
     (
-      ~filter: Filter.t=Release,
+      ~filter: Filter.t=Phase,
       ~toggle: Toggle.t=All,
       ~search: string="",
       ~interactive: bool=true,
@@ -644,35 +667,64 @@ let make =
         </span>
         {Array.map(renderColumnHeader, Filter.filters) |> React.array}
       </div>
-      {state.loading
-         ? <div className=Styles.loading> {React.string("Loading...")} </div>
-         : Array.concat([
-             Array.length(topTen) > 0
-               ? [|
-                 <div className=Styles.topTen>
-                   <img src="/static/img/star.svg" alt="Star icon" />
-                   <p> {React.string("Top 10")} </p>
-                 </div>,
-               |]
-               : [||],
-             Array.map(renderRow, topTen),
-             Array.length(topFifty) > 0 && Array.length(topTen) > 0
-               ? [|<hr />|] : [||],
-             Array.length(topFifty) > 0
-               ? [|
-                 <div className=Styles.topTen>
-                   <img src="/static/img/star.svg" alt="Star icon" />
-                   <p> {React.string("Top 50")} </p>
-                 </div>,
-               |]
-               : [||],
-             Array.map(renderRow, topFifty),
-             Array.length(theRest) > 0
-             && max(Array.length(topFifty), Array.length(topTen)) > 0
-               ? [|<hr />|] : [||],
-             Array.map(renderRow, theRest),
-           ])
-           |> React.array}
+      {if (state.loading) {
+         <div className=Styles.loading> {React.string("Loading...")} </div>;
+       } else if (Array.length(filteredMembers) == 0) {
+         <div className=Styles.emptyMessage>
+           <Badge
+             src="/static/img/LeaderboardEmpty.png"
+             title="Empty Leaderboard"
+             alt="Empty Leaderboard"
+           />
+           <span
+             className=Css.(
+               style([fontWeight(`num(500)), marginTop(`rem(1.5))])
+             )>
+             {React.string("Please Be Patient")}
+           </span>
+           <span className=Css.(style([marginTop(`rem(1.))]))>
+             {React.string("Participant data for this")}
+           </span>
+           {switch (filter) {
+            | Release =>
+              <span> {React.string("release will be added shortly.")} </span>
+            | Phase =>
+              <span> {React.string("phase will be added shortly.")} </span>
+            | AllTime =>
+              <span>
+                {React.string("leaderboard will be added shortly.")}
+              </span>
+            }}
+         </div>;
+       } else {
+         Array.concat([
+           Array.length(topTen) > 0
+             ? [|
+               <div className=Styles.topTen>
+                 <img src="/static/img/star.svg" alt="Star icon" />
+                 <p> {React.string("Top 10")} </p>
+               </div>,
+             |]
+             : [||],
+           Array.map(renderRow, topTen),
+           Array.length(topFifty) > 0 && Array.length(topTen) > 0
+             ? [|<hr />|] : [||],
+           Array.length(topFifty) > 0
+             ? [|
+               <div className=Styles.topTen>
+                 <img src="/static/img/star.svg" alt="Star icon" />
+                 <p> {React.string("Top 50")} </p>
+               </div>,
+             |]
+             : [||],
+           Array.map(renderRow, topFifty),
+           Array.length(theRest) > 0
+           && max(Array.length(topFifty), Array.length(topTen)) > 0
+             ? [|<hr />|] : [||],
+           Array.map(renderRow, theRest),
+         ])
+         |> React.array;
+       }}
     </div>
   </div>;
 };
