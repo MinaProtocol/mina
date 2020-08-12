@@ -54,7 +54,9 @@ let rec mapn : type xs y n.
       []
   | (_ :: _) :: _ ->
       let hds, tls = hhead_off xss in
-      f hds :: mapn tls ~f
+      let y = f hds in
+      let ys = mapn tls ~f in
+      y :: ys
   | [] ->
       failwith "mapn: Empty args"
 
@@ -321,7 +323,7 @@ end
 module With_length (N : Nat.Intf) = struct
   type nonrec 'a t = ('a, N.n) t
 
-  let compare c t1 t2 = Core.List.compare c (to_list t1) (to_list t2)
+  let compare c t1 t2 = Base.List.compare c (to_list t1) (to_list t2)
 
   include Yojson (N)
   include Binable (N)
@@ -331,9 +333,9 @@ module With_length (N : Nat.Intf) = struct
 end
 
 let rec typ' : type f var value n.
-       ((var, value, f) Snarky.Typ.t, n) t
-    -> ((var, n) t, (value, n) t, f) Snarky.Typ.t =
-  let open Snarky.Typ in
+       ((var, value, f) Snarky_backendless.Typ.t, n) t
+    -> ((var, n) t, (value, n) t, f) Snarky_backendless.Typ.t =
+  let open Snarky_backendless.Typ in
   fun elts ->
     match elts with
     | elt :: elts ->

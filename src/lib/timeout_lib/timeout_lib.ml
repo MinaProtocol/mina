@@ -96,3 +96,47 @@ module Make (Time : Time_intf) : Timeout_intf(Time).S = struct
     | `Ok x ->
         x
 end
+
+module Core_time = Make (struct
+  include (
+    Core.Time :
+      module type of Core.Time
+      with module Span := Core.Time.Span
+       and type underlying = float )
+
+  module Controller = struct
+    type t = unit
+  end
+
+  module Span = struct
+    include Core.Time.Span
+
+    let to_time_ns_span = Fn.compose Core.Time_ns.Span.of_ns to_ns
+  end
+
+  let diff x y =
+    let x_ns = Span.to_ns @@ to_span_since_epoch x in
+    let y_ns = Span.to_ms @@ to_span_since_epoch y in
+    Span.of_ns (x_ns -. y_ns)
+end)
+
+module Core_time_ns = Make (struct
+  include (
+    Core.Time_ns :
+      module type of Core.Time_ns with module Span := Core.Time_ns.Span )
+
+  module Controller = struct
+    type t = unit
+  end
+
+  module Span = struct
+    include Core.Time_ns.Span
+
+    let to_time_ns_span = Fn.id
+  end
+
+  let diff x y =
+    let x_ns = Span.to_ns @@ to_span_since_epoch x in
+    let y_ns = Span.to_ms @@ to_span_since_epoch y in
+    Span.of_ns (x_ns -. y_ns)
+end)
