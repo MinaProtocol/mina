@@ -195,7 +195,7 @@ i. Add a new subcommand `show-public-key` as a subcommand to `coda accounts` (re
 
 [via Derivation](#derivation)
 
-Read in the bytes, compress the public key, and base58-encoding it inline with how we currently represent public keys in serialized form. Adding errors apprioriately for malformed keys.
+Read in the bytes, compress the public key, and base58-encoding it inline with how we currently represent public keys in serialized form. Adding errors appropriately for malformed keys.
 
 #### Add curves
 
@@ -269,7 +269,7 @@ This is a simple GraphQL query. This endpoint should be easy to implement.
 
 [via Payloads](#payloads)
 
-The Rosetta spec leaves the encoding of unsigned transactions implementation-defined. Since we'll default to using our client-sdk's signing mechanism our encoding will be precicesly the JSON input (stringified) demanded by the "unsafe" method of the client-sdk API:
+The Rosetta spec leaves the encoding of unsigned transactions implementation-defined. Since we'll default to using our client-sdk's signing mechanism our encoding will be precisely the JSON input (stringified) demanded by the "unsafe" method of the client-sdk API:
 
 ```reasonml
 // Taken from Client-SDK code
