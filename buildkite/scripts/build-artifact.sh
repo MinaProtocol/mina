@@ -9,7 +9,7 @@ export PATH=$HOME/.cargo/bin:$PATH
 export LIBP2P_NIXLESS=1
 
 echo "--- Explicitly generate PV-keys and upload before building"
-make build_pv_keys 2>&1 | tee /tmp/buildocaml.log
+make build_or_download_pv_keys 2>&1 | tee /tmp/buildocaml.log
 
 echo "--- Publish pvkeys"
 ./scripts/publish-pvkeys.sh
