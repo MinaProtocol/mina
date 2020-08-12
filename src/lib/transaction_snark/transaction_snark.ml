@@ -385,6 +385,14 @@ module Statement = struct
           !"Next available token is inconsistent between transitions (%{sexp: \
             Token_id.t} vs %{sexp: Token_id.t})"
           s1.next_available_token_after s2.next_available_token_before
+    and () =
+      if Frozen_ledger_hash.equal s1.target s2.source then return ()
+      else
+        Or_error.errorf
+          !"Target ledger hash of statement 1 (%{sexp: Frozen_ledger_hash.t}) \
+            does not match source ledger hash of statement 2 (%{sexp: \
+            Frozen_ledger_hash.t})"
+          s1.target s2.source
     in
     ( { source= s1.source
       ; target= s2.target
@@ -483,10 +491,11 @@ module Base = struct
   open Tick
   open Let_syntax
 
-  type _ Snarky.Request.t +=
-    | Transaction : Transaction_union.t Snarky.Request.t
-    | State_body : Coda_state.Protocol_state.Body.Value.t Snarky.Request.t
-    | Init_stack : Pending_coinbase.Stack.t Snarky.Request.t
+  type _ Snarky_backendless.Request.t +=
+    | Transaction : Transaction_union.t Snarky_backendless.Request.t
+    | State_body :
+        Coda_state.Protocol_state.Body.Value.t Snarky_backendless.Request.t
+    | Init_stack : Pending_coinbase.Stack.t Snarky_backendless.Request.t
 
   module User_command_failure = struct
     (** The various ways that a user command may fail. These should be computed
@@ -1830,7 +1839,8 @@ module Base = struct
 
   let transaction_union_handler handler (transaction : Transaction_union.t)
       (state_body : Coda_state.Protocol_state.Body.Value.t)
-      (init_stack : Pending_coinbase.Stack.t) : Snarky.Request.request -> _ =
+      (init_stack : Pending_coinbase.Stack.t) :
+      Snarky_backendless.Request.request -> _ =
    fun (With {request; respond} as r) ->
     match request with
     | Transaction ->
@@ -4289,13 +4299,13 @@ let%test_module "account timing check" =
       let account = Account.var_of_t account in
       let txn_amount = Amount.var_of_t txn_amount in
       let txn_global_slot = Global_slot.Checked.constant txn_global_slot in
-      let open Snarky.Checked.Let_syntax in
+      let open Snarky_backendless.Checked.Let_syntax in
       let%map _, timing =
         Base.check_timing ~balance_check:Tick.Boolean.Assert.is_true
           ~timed_balance_check:Tick.Boolean.Assert.is_true ~account ~txn_amount
           ~txn_global_slot
       in
-      Snarky.As_prover.read Account.Timing.typ timing
+      Snarky_backendless.As_prover.read Account.Timing.typ timing
 
     let run_checked_timing_and_compare account txn_amount txn_global_slot
         unchecked_timing =

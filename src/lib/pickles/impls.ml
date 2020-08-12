@@ -4,7 +4,7 @@ open Import
 open Backend
 
 module Step = struct
-  module Impl = Snarky.Snark.Run.Make (Tick) (Unit)
+  module Impl = Snarky_backendless.Snark.Run.Make (Tick) (Unit)
   include Impl
   module Fp = Field
 
@@ -45,7 +45,7 @@ module Step = struct
 end
 
 module Wrap = struct
-  module Impl = Snarky.Snark.Run.Make (Tock) (Unit)
+  module Impl = Snarky_backendless.Snark.Run.Make (Tock) (Unit)
   include Impl
   module Challenge = Challenge.Make (Impl)
   module Digest = Digest.Make (Impl)

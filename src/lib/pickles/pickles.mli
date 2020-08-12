@@ -30,6 +30,8 @@ module Verification_key : sig
     type t [@@deriving sexp, eq]
 
     val dummy : unit -> t
+
+    val to_string : t -> string
   end
 
   val load :
@@ -73,7 +75,8 @@ val verify :
 
 module Prover : sig
   type ('prev_values, 'local_widths, 'local_heights, 'a_value, 'proof) t =
-       ?handler:(Snarky.Request.request -> Snarky.Request.response)
+       ?handler:(   Snarky_backendless.Request.request
+                 -> Snarky_backendless.Request.response)
     -> ( 'prev_values
        , 'local_widths
        , 'local_heights )

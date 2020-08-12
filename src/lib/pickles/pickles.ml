@@ -225,7 +225,8 @@ end
 
 module Prover = struct
   type ('prev_values, 'local_widths, 'local_heights, 'a_value, 'proof) t =
-       ?handler:(Snarky.Request.request -> Snarky.Request.response)
+       ?handler:(   Snarky_backendless.Request.request
+                 -> Snarky_backendless.Request.response)
     -> ( 'prev_values
        , 'local_widths
        , 'local_heights )
@@ -553,7 +554,8 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
       let f : type prev_vars prev_values local_widths local_heights.
              (prev_vars, prev_values, local_widths, local_heights) Branch_data.t
           -> Lazy_keys.t
-          -> ?handler:(Snarky.Request.request -> Snarky.Request.response)
+          -> ?handler:(   Snarky_backendless.Request.request
+                       -> Snarky_backendless.Request.response)
           -> ( prev_values
              , local_widths
              , local_heights )
@@ -792,8 +794,8 @@ let%test_module "test" =
       module Know_preimage = struct
         module Statement = Statement
 
-        type _ Snarky.Request.t +=
-          | Preimage : Field.Constant.t Snarky.Request.t
+        type _ Snarky_backendless.Request.t +=
+          | Preimage : Field.Constant.t Snarky_backendless.Request.t
 
         let hash_checked x =
           let open Step_main_inputs in

@@ -1,30 +1,28 @@
 open Bindings.GoogleSheets;
 
-module Bindings = {
-  let createClient = () => {
-    googleAuth({scopes: [|"https://www.googleapis.com/auth/spreadsheets"|]});
-  };
+let createClient = () => {
+  googleAuth({scopes: [|"https://www.googleapis.com/auth/spreadsheets"|]});
+};
 
-  let getRange = (client, sheetsQuery, cb) => {
-    let sheets = sheets({version: "v4", auth: client});
-    get(sheets, sheetsQuery, (~error, ~res) => {
-      switch (Js.Nullable.toOption(error)) {
-      | None => cb(Ok(res.data.values))
-      | Some(error) => cb(Error(error))
-      }
-    });
-  };
+let getRange = (client, sheetsQuery, cb) => {
+  let sheets = sheets({version: "v4", auth: client});
+  get(sheets, sheetsQuery, (~error, ~res) => {
+    switch (Js.Nullable.toOption(error)) {
+    | None => cb(Ok(res.data.values))
+    | Some(error) => cb(Error(error))
+    }
+  });
+};
 
-  let updateRange = (client, sheetsUpdate, cb) => {
-    let sheets = sheets({version: "v4", auth: client});
+let updateRange = (client, sheetsUpdate, cb) => {
+  let sheets = sheets({version: "v4", auth: client});
 
-    update(sheets, sheetsUpdate, (~error, ~res) => {
-      switch (Js.Nullable.toOption(error)) {
-      | None => cb(Ok(res.data.values))
-      | Some(error) => cb(Error(error))
-      }
-    });
-  };
+  update(sheets, sheetsUpdate, (~error, ~res) => {
+    switch (Js.Nullable.toOption(error)) {
+    | None => cb(Ok(res.data.values))
+    | Some(error) => cb(Error(error))
+    }
+  });
 };
 
 /*

@@ -76,7 +76,7 @@ struct
         in
         let check xs_lsb =
           let open Bitstring_lib.Bitstring in
-          Snarky.Checked.all_unit
+          Snarky_backendless.Checked.all_unit
             [ typ.check xs_lsb
             ; make_checked (fun () ->
                   Bitstring_checked.lt_value

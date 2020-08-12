@@ -62,9 +62,11 @@ let typ (type n avar aval m) (statement : (avar, aval) Impls.Step.Typ.t)
     Typ.transport (One_hot_vector.typ local_branches) ~there:Types.Index.to_int
       ~back:(fun x -> Option.value_exn (Types.Index.of_int x))
   in
-  Snarky.Typ.tuple6 statement
+  Snarky_backendless.Typ.tuple6 statement
     (Types.Dlog_based.Proof_state.typ Challenge.typ Fp.typ Boolean.typ
-       Other_field.typ (Snarky.Typ.unit ()) Digest.typ index)
+       Other_field.typ
+       (Snarky_backendless.Typ.unit ())
+       Digest.typ index)
     (let lengths =
        Commitment_lengths.of_domains_vector step_domains
          ~max_degree:Common.Max_degree.step

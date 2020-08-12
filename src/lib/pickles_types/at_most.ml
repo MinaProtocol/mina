@@ -86,7 +86,7 @@ module Sexpable (N : Nat.Intf) : Sexpable.S1 with type 'a t := ('a, N.n) t =
 module With_length (N : Nat.Intf) = struct
   type nonrec 'a t = ('a, N.n) t
 
-  let compare c t1 t2 = Core.List.compare c (to_list t1) (to_list t2)
+  let compare c t1 t2 = Base.List.compare c (to_list t1) (to_list t2)
 
   include Yojson (N)
   include Binable (N)

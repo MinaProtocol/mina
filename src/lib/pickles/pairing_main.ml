@@ -22,7 +22,7 @@ struct
   module PC = Inner_curve
   module Challenge = Challenge.Make (Impl)
   module Digest = Digest.Make (Impl)
-  module Number = Snarky.Number.Run.Make (Impl)
+  module Number = Snarky_backendless.Number.Run.Make (Impl)
 
   (* Other_field.size > Field.size *)
   module Other_field = struct
