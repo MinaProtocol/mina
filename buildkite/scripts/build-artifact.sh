@@ -15,7 +15,7 @@ echo "--- Publish pvkeys"
 ./scripts/publish-pvkeys.sh
 
 echo "--- Build logproc + coda"
-CODA_COMMIT_SHA1=${GITLONGHASH}
+CODA_COMMIT_SHA1=$(git rev-parse HEAD)
 echo "Building from Commit SHA: $CODA_COMMIT_SHA1"
 dune build src/app/logproc/logproc.exe src/app/cli/src/coda.exe --profile=${DUNE_PROFILE} 2>&1 | tee /tmp/buildocaml2.log
 
