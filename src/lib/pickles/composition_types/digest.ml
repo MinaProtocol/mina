@@ -15,7 +15,7 @@ module Constant = struct
   let of_tick_field x = of_bits (Tick.Field.to_bits x)
 end
 
-module Make (Impl : Snarky.Snark_intf.Run) = struct
+module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
   open Impl
 
   type t = Field.t

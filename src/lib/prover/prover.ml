@@ -113,7 +113,7 @@ module Worker_state = struct
                        {Blockchain.state= next_state; proof} )
                  in
                  Or_error.iter_error res ~f:(fun e ->
-                     Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+                     [%log error]
                        ~metadata:[("error", `String (Error.to_string_hum e))]
                        "Prover threw an error while extending block: $error" ) ;
                  res
@@ -144,7 +144,7 @@ module Worker_state = struct
                           ; proof= Precomputed_values.compiled_base_proof } )
                  in
                  Or_error.iter_error res ~f:(fun e ->
-                     Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+                     [%log error]
                        ~metadata:[("error", `String (Error.to_string_hum e))]
                        "Prover threw an error while extending block: $error" ) ;
                  res
@@ -246,8 +246,7 @@ module Worker = struct
           ~transport:
             (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
                ~log_filename:"coda-prover.log" ~max_size) ;
-        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-          "Prover started" ;
+        [%log info] "Prover started" ;
         Worker_state.create
           {conf_dir; logger; proof_level; constraint_constants}
 
@@ -263,8 +262,7 @@ type t = {connection: Worker.Connection.t; process: Process.t; logger: Logger.t}
 
 let create ~logger ~pids ~conf_dir ~proof_level ~constraint_constants =
   let on_failure err =
-    Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-      "Prover process failed with error $err"
+    [%log error] "Prover process failed with error $err"
       ~metadata:[("err", `String (Error.to_string_hum err))] ;
     Error.raise err
   in
@@ -274,7 +272,7 @@ let create ~logger ~pids ~conf_dir ~proof_level ~constraint_constants =
       ~on_failure ~shutdown_on:Disconnect ~connection_state_init_arg:()
       {conf_dir; logger; proof_level; constraint_constants}
   in
-  Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+  [%log info]
     "Daemon started process of kind $process_kind with pid $prover_pid"
     ~metadata:
       [ ("prover_pid", `Int (Process.pid process |> Pid.to_int))
@@ -287,16 +285,14 @@ let create ~logger ~pids ~conf_dir ~proof_level ~constraint_constants =
        (Process.stdout process |> Reader.pipe)
        ~f:(fun stdout ->
          return
-         @@ Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-              "Prover stdout: $stdout"
+         @@ [%log debug] "Prover stdout: $stdout"
               ~metadata:[("stdout", `String stdout)] ) ;
   don't_wait_for
   @@ Pipe.iter
        (Process.stderr process |> Reader.pipe)
        ~f:(fun stderr ->
          return
-         @@ Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-              "Prover stderr: $stderr"
+         @@ [%log error] "Prover stderr: $stderr"
               ~metadata:[("stderr", `String stderr)] ) ;
   {connection; process; logger}
 
@@ -311,12 +307,10 @@ let prove_from_input_sexp {connection; logger; _} sexp =
     >>| Or_error.join
   with
   | Ok _ ->
-      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-        "prover succeeded :)" ;
+      [%log info] "prover succeeded :)" ;
       true
   | Error e ->
-      Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-        "prover errored :("
+      [%log error] "prover errored :("
         ~metadata:[("error", `String (Error.to_string_hum e))] ;
       false
 
@@ -338,7 +332,7 @@ let extend_blockchain {connection; logger; _} chain next_state block
   | Ok x ->
       Ok x
   | Error e ->
-      Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+      [%log error]
         ~metadata:
           [ ( "input-sexp"
             , `String

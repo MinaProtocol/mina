@@ -100,7 +100,7 @@ let create ~logger ~precomputed_values ~verifier ~trust_system ~frontier
                 Writer.write catchup_breadcrumbs_writer
                   (trees_of_breadcrumbs, `Catchup_scheduler)
             | Error err ->
-                Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+                [%log trace]
                   !"Error during buildup breadcrumbs inside \
                     catchup_scheduler: %s"
                   (Error.to_string_hum err) ;
@@ -192,7 +192,7 @@ let watch t ~timeout_duration ~cached_transition =
           Gauge.dec_one
             Transition_frontier_controller.transitions_in_catchup_scheduler) ;
         remove_tree t parent_hash ;
-        Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
+        [%log' info t.logger]
           ~metadata:
             [ ("parent_hash", Coda_base.State_hash.to_yojson parent_hash)
             ; ( "duration"
@@ -204,7 +204,7 @@ let watch t ~timeout_duration ~cached_transition =
            $duration ms, signalling a catchup job" ;
         (* it's ok to create a new thread here because the thread essentially does no work *)
         if Writer.is_closed t.catchup_job_writer then
-          Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
+          [%log' trace t.logger]
             "catchup job pipe was closed; attempt to write to closed pipe"
         else Writer.write t.catchup_job_writer forest )
   in
@@ -233,7 +233,7 @@ let watch t ~timeout_duration ~cached_transition =
             in
             State_hash.equal hash sibling_hash )
       then
-        Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
+        [%log' debug t.logger]
           ~metadata:[("state_hash", State_hash.to_yojson hash)]
           "Received request to watch transition for catchup that already is \
            being watched: $state_hash"

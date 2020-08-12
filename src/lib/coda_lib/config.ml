@@ -25,6 +25,7 @@ type t =
   ; coinbase_receiver: [`Producer | `Other of Public_key.Compressed.t]
   ; work_selection_method: (module Work_selector.Selection_method_intf)
   ; snark_worker_config: Snark_worker_config.t
+  ; snark_coordinator_key: Public_key.Compressed.t option [@default None]
   ; work_reassignment_wait: int
   ; gossip_net_params: Gossip_net.Libp2p.Config.t
   ; net_config: Coda_networking.Config.t

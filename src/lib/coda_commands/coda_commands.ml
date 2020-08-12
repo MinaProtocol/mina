@@ -18,7 +18,7 @@ let record_payment t (txn : User_command.t) account =
   let receipt_chain_database = Coda_lib.receipt_chain_database t in
   match Receipt_chain_database.add receipt_chain_database ~previous txn with
   | `Ok hash ->
-      Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+      [%log debug]
         ~metadata:
           [ ("user_command", User_command.to_yojson txn)
           ; ("receipt_chain_hash", Receipt.Chain_hash.to_yojson hash) ]
@@ -27,12 +27,12 @@ let record_payment t (txn : User_command.t) account =
          $receipt_chain_hash" ;
       hash
   | `Duplicate hash ->
-      Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+      [%log warn]
         ~metadata:[("user_command", User_command.to_yojson txn)]
         "Already sent transaction $user_command" ;
       hash
   | `Error_multiple_previous_receipts parent_hash ->
-      Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+      [%log fatal]
         ~metadata:
           [ ( "parent_receipt_chain_hash"
             , Receipt.Chain_hash.to_yojson parent_hash )
@@ -127,9 +127,7 @@ let setup_and_submit_user_command t (user_command_input : User_command_input.t)
                 .to_yojson (snd failed_txn)
               |> Yojson.Safe.to_string )))
   | Ok ([txn], []) ->
-      Logger.info
-        (Coda_lib.top_level_logger t)
-        ~module_:__MODULE__ ~location:__LOC__
+      [%log' info (Coda_lib.top_level_logger t)]
         ~metadata:[("user_command", User_command.to_yojson txn)]
         "Scheduled payment $user_command" ;
       Ok (txn, record_payment t txn (Option.value_exn account_opt))
@@ -141,9 +139,7 @@ let setup_and_submit_user_command t (user_command_input : User_command_input.t)
 let setup_and_submit_user_commands t user_command_list =
   let open Participating_state.Let_syntax in
   let%map _is_active = Coda_lib.active_or_bootstrapping t in
-  Logger.warn
-    (Coda_lib.top_level_logger t)
-    ~module_:__MODULE__ ~location:__LOC__
+  [%log' warn (Coda_lib.top_level_logger t)]
     "batch-send-payments does not yet report errors"
     ~metadata:
       [("coda_command", `String "scheduling a batch of user transactions")] ;

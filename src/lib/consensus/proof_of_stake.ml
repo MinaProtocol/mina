@@ -696,9 +696,9 @@ module Data = struct
         let input =
           (* get first params.per_term_precision bits of top / bottom.
 
-            This is equal to
+             This is equal to
 
-            floor(2^params.per_term_precision * top / bottom) / 2^params.per_term_precision
+             floor(2^params.per_term_precision * top / bottom) / 2^params.per_term_precision
           *)
           let k = params.per_term_precision in
           let top = bigint_of_uint64 (Balance.to_uint64 my_stake) in
@@ -761,10 +761,10 @@ module Data = struct
           end
         end)
 
-    type _ Snarky.Request.t +=
-      | Winner_address : Coda_base.Account.Index.t Snarky.Request.t
-      | Private_key : Scalar.value Snarky.Request.t
-      | Public_key : Public_key.t Snarky.Request.t
+    type _ Snarky_backendless.Request.t +=
+      | Winner_address : Coda_base.Account.Index.t Snarky_backendless.Request.t
+      | Private_key : Scalar.value Snarky_backendless.Request.t
+      | Public_key : Public_key.t Snarky_backendless.Request.t
 
     let%snarkydef get_vrf_evaluation
         ~(constraint_constants : Genesis_constants.Constraint_constants.t)
@@ -857,7 +857,7 @@ module Data = struct
                empty_pending_coinbase ~is_new_stack:true)
         in
         let handlers =
-          Snarky.Request.Handler.(
+          Snarky_backendless.Request.Handler.(
             push
               (push fail (create_single pending_coinbase_handler))
               (create_single ledger_handler))
@@ -873,7 +873,7 @@ module Data = struct
           | _ ->
               respond
                 (Provide
-                   (Snarky.Request.Handler.run handlers
+                   (Snarky_backendless.Request.Handler.run handlers
                       ["Ledger Handler"; "Pending Coinbase Handler"]
                       request))
     end
@@ -893,7 +893,7 @@ module Data = struct
                   {global_slot; seed; delegator}
               in
               let truncated_vrf_result = Output.truncate vrf_result in
-              Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+              [%log debug]
                 "VRF result for delegator: $delegator, balance: $balance, \
                  amount: $amount, result: $result"
                 ~metadata:
@@ -954,7 +954,7 @@ module Data = struct
             ; seed: 'epoch_seed
             ; start_checkpoint: 'start_checkpoint
                   (* The lock checkpoint is the hash of the latest state in the seed update range, not including
-              the current state. *)
+                 the current state. *)
             ; lock_checkpoint: 'lock_checkpoint
             ; epoch_length: 'length }
           [@@deriving sexp, eq, compare, hash, to_yojson, fields]
@@ -1279,7 +1279,7 @@ module Data = struct
        - passed a few sub_windows, but didn't skip a window, then
          assign 0 to all the skipped sub_window, then mark next_sub_window_length to be 1
        - skipped more than a window, set every sub_windows to be 0 and mark next_sub_window_length to be 1
-     *)
+    *)
 
     let update_min_window_density ~constants ~prev_global_slot
         ~next_global_slot ~prev_sub_window_densities ~prev_min_window_density =
@@ -1441,7 +1441,7 @@ module Data = struct
            the actual implementation. The reason this one is not implemented is because
            array-indexing is not supported in Snarky. We could use list-indexing, but it
            takes O(n) instead of O(1).
-         *)
+        *)
 
         let update_min_window_density_reference_implementation ~constants
             ~prev_global_slot ~next_global_slot ~prev_sub_window_densities
@@ -1502,7 +1502,7 @@ module Data = struct
            1/9    | [2*slots_per_sub_window, 3*slots_per_sub_window)
            ...
            1/n^2  | [n*slots_per_sub_window, (n+1)*slots_per_sub_window)
-         *)
+        *)
         let gen_slot_diff =
           let open Quickcheck.Generator in
           let to_int = Length.to_int in
@@ -2335,7 +2335,7 @@ module Data = struct
              pending_coinbases ~is_new_stack)
       in
       let handlers =
-        Snarky.Request.Handler.(
+        Snarky_backendless.Request.Handler.(
           push
             (push fail (create_single pending_coinbase_handler))
             (create_single ledger_handler))
@@ -2351,7 +2351,7 @@ module Data = struct
         | _ ->
             respond
               (Provide
-                 (Snarky.Request.Handler.run handlers
+                 (Snarky_backendless.Request.Handler.run handlers
                     ["Ledger Handler"; "Pending Coinbase Handler"]
                     request))
 
@@ -2425,7 +2425,7 @@ module Hooks = struct
         let open Local_state in
         let open Snapshot in
         Deferred.create (fun ivar ->
-            Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+            [%log info]
               ~metadata:
                 [ ("peer", Network_peer.Peer.to_yojson conn)
                 ; ("ledger_hash", Coda_base.Ledger_hash.to_yojson ledger_hash)
@@ -2450,7 +2450,7 @@ module Hooks = struct
                 |> Result.of_option ~error:"epoch ledger not found"
             in
             Result.iter_error response ~f:(fun err ->
-                Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                [%log info]
                   ~metadata:
                     [ ("peer", Network_peer.Peer.to_yojson conn)
                     ; ("error", `String err)
@@ -2610,9 +2610,8 @@ module Hooks = struct
     let open Snapshot in
     let open Deferred.Let_syntax in
     let requested_syncs = Non_empty_list.to_list requested_syncs in
-    Logger.info logger
+    [%log info]
       "Syncing local state; requesting $num_requested snapshots from peers"
-      ~location:__LOC__ ~module_:__MODULE__
       ~metadata:
         [ ("num_requested", `Int (List.length requested_syncs))
         ; ( "requested_syncs"
@@ -2657,24 +2656,21 @@ module Hooks = struct
                 return true
             | Connected {data= Ok (Error err); _} ->
                 (* TODO figure out punishments here. *)
-                Logger.faulty_peer_without_punishment logger
-                  ~module_:__MODULE__ ~location:__LOC__
+                [%log faulty_peer_without_punishment]
                   ~metadata:
                     [ ("peer", Network_peer.Peer.to_yojson peer)
                     ; ("error", `String err) ]
                   "Peer $peer failed to serve requested epoch ledger: $error" ;
                 return false
             | Connected {data= Error err; _} ->
-                Logger.faulty_peer_without_punishment logger
-                  ~module_:__MODULE__ ~location:__LOC__
+                [%log faulty_peer_without_punishment]
                   ~metadata:
                     [ ("peer", Network_peer.Peer.to_yojson peer)
                     ; ("error", `String (Error.to_string_mach err)) ]
                   "Peer $peer failed to serve requested epoch ledger: $error" ;
                 return false
             | Failed_to_connect err ->
-                Logger.faulty_peer_without_punishment logger
-                  ~module_:__MODULE__ ~location:__LOC__
+                [%log faulty_peer_without_punishment]
                   ~metadata:
                     [ ("peer", Network_peer.Peer.to_yojson peer)
                     ; ("error", `String (Error.to_string_hum err)) ]
@@ -2729,8 +2725,7 @@ module Hooks = struct
   let select ~constants ~existing ~candidate ~logger =
     let string_of_choice = function `Take -> "Take" | `Keep -> "Keep" in
     let log_result choice msg =
-      Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-        "Select result: $choice -- $message"
+      [%log debug] "Select result: $choice -- $message"
         ~metadata:
           [ ("choice", `String (string_of_choice choice))
           ; ("message", `String msg) ]
@@ -2746,8 +2741,7 @@ module Hooks = struct
       let msg = Printf.sprintf "(%s) && (%s)" precondition_msg choice_msg in
       log_result choice msg
     in
-    Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-      "Selecting best consensus state"
+    [%log debug] "Selecting best consensus state"
       ~metadata:
         [ ("existing", Consensus_state.Value.to_yojson existing)
         ; ("candidate", Consensus_state.Value.to_yojson candidate) ] ;
@@ -2801,12 +2795,7 @@ module Hooks = struct
 
   let next_producer_timing ~constraint_constants ~(constants : Constants.t) now
       (state : Consensus_state.Value.t) ~local_state ~keypairs ~logger =
-    let info_if_producing =
-      if Keypair.And_compressed_pk.Set.is_empty keypairs then Logger.debug
-      else Logger.info
-    in
-    info_if_producing logger ~module_:__MODULE__ ~location:__LOC__
-      "Determining next slot to produce block" ;
+    [%log info] "Determining next slot to produce block" ;
     let curr_epoch, curr_slot =
       Epoch.epoch_and_slot_of_time_exn ~constants
         (Block_time.of_span_since_epoch (Block_time.Span.of_ms now))
@@ -2818,116 +2807,122 @@ module Hooks = struct
       then Epoch.incr ~constants (curr_epoch, curr_slot)
       else (curr_epoch, curr_slot)
     in
-    Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+    [%log debug]
       "Systime: %d, epoch-slot@systime: %08d-%04d, starttime@epoch@systime: %d"
       (Int64.to_int now) (Epoch.to_int epoch) (Slot.to_int slot)
       ( Int64.to_int @@ Time.Span.to_ms @@ Time.to_span_since_epoch
       @@ Epoch.start_time ~constants epoch ) ;
-    let next_slot =
-      Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-        !"Selecting correct epoch data from state -- epoch by time: %d, state \
-          epoch: %d, state epoch count: %d"
-        (Epoch.to_int epoch)
-        (Epoch.to_int (Consensus_state.curr_epoch state))
-        (Length.to_int state.epoch_count) ;
-      let epoch_data =
-        match select_epoch_data ~consensus_state:state ~epoch with
-        | Ok epoch_data ->
-            epoch_data
-        | Error () ->
-            Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
-              "An empty epoch is detected! This could be caused by the \
-               following reasons: system time is out of sync with protocol \
-               state time; or internet connection is down or unstable; or the \
-               testnet has crashed. If it is the first case, please setup \
-               NTP. If it is the second case, please check the internet \
-               connection. If it is the last case, in our current version of \
-               testnet this is unrecoverable, but we will fix it in future \
-               versions once the planned change to consensus is finished." ;
-            exit 99
-      in
-      let total_stake = epoch_data.ledger.total_currency in
-      let epoch_snapshot =
-        let source, snapshot =
-          select_epoch_snapshot ~constants ~consensus_state:state ~local_state
-            ~epoch
-        in
-        Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-          !"Using %s_epoch_snapshot root hash %{sexp:Coda_base.Ledger_hash.t}"
-          (epoch_snapshot_name source)
-          (Coda_base.Sparse_ledger.merkle_root snapshot.ledger) ;
-        snapshot
-      in
-      let block_data unseen_pks slot =
-        (* Try vrfs for all keypairs that are unseen within this slot until one wins or all lose *)
-        (* TODO: Don't do this, and instead pick the one that has the highest
-         * chance of winning. See #2573 *)
-        Keypair.And_compressed_pk.Set.fold_until keypairs ~init:()
-          ~f:(fun () (keypair, public_key_compressed) ->
-            if
-              not
-              @@ Public_key.Compressed.Set.mem unseen_pks public_key_compressed
-            then Continue_or_stop.Continue ()
-            else
-              let global_slot =
-                Global_slot.of_epoch_and_slot ~constants (epoch, slot)
-              in
-              Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-                "Checking VRF evaluations at epoch: $epoch, slot: $slot"
-                ~metadata:
-                  [ ("epoch", `Int (Epoch.to_int epoch))
-                  ; ("slot", `Int (Slot.to_int slot)) ] ;
-              match
-                Vrf.check ~constraint_constants
-                  ~global_slot:(Global_slot.slot_number global_slot)
-                  ~seed:epoch_data.seed ~epoch_snapshot
-                  ~private_key:keypair.private_key
-                  ~public_key:keypair.public_key ~public_key_compressed
-                  ~total_stake ~logger
-              with
-              | None ->
-                  Continue_or_stop.Continue ()
-              | Some data ->
-                  Continue_or_stop.Stop (Some (keypair, data)) )
-          ~finish:(fun () -> None)
-      in
-      let rec find_winning_slot (slot : Slot.t) =
-        if slot >= constants.epoch_size then None
-        else
-          match Local_state.seen_slot local_state epoch slot with
-          | `All_seen ->
-              find_winning_slot (Slot.succ slot)
-          | `Unseen pks -> (
-            match block_data pks slot with
-            | None ->
-                find_winning_slot (Slot.succ slot)
-            | Some (keypair, data) ->
-                Some (slot, keypair, data) )
-      in
-      find_winning_slot slot
-    in
     let ms_since_epoch = Fn.compose Time.Span.to_ms Time.to_span_since_epoch in
-    match next_slot with
-    | Some (next_slot, keypair, data) ->
-        info_if_producing logger ~module_:__MODULE__ ~location:__LOC__
-          "Producing block in %d slots"
-          (Slot.to_int next_slot - Slot.to_int slot) ;
-        if Slot.equal curr_slot next_slot then `Produce_now (keypair, data)
-        else
-          `Produce
-            ( Epoch.slot_start_time ~constants epoch next_slot
-              |> Time.to_span_since_epoch |> Time.Span.to_ms
-            , keypair
-            , data )
-    | None ->
-        let epoch_end_time =
-          Epoch.end_time ~constants epoch |> ms_since_epoch
+    let epoch_end_time = Epoch.end_time ~constants epoch |> ms_since_epoch in
+    if Keypair.And_compressed_pk.Set.is_empty keypairs then (
+      [%log info] "No block producers running, skipping check for now." ;
+      `Check_again epoch_end_time )
+    else
+      let next_slot =
+        [%log debug]
+          !"Selecting correct epoch data from state -- epoch by time: %d, \
+            state epoch: %d, state epoch count: %d"
+          (Epoch.to_int epoch)
+          (Epoch.to_int (Consensus_state.curr_epoch state))
+          (Length.to_int state.epoch_count) ;
+        let epoch_data =
+          match select_epoch_data ~consensus_state:state ~epoch with
+          | Ok epoch_data ->
+              epoch_data
+          | Error () ->
+              [%log fatal]
+                "An empty epoch is detected! This could be caused by the \
+                 following reasons: system time is out of sync with protocol \
+                 state time; or internet connection is down or unstable; or \
+                 the testnet has crashed. If it is the first case, please \
+                 setup NTP. If it is the second case, please check the \
+                 internet connection. If it is the last case, in our current \
+                 version of testnet this is unrecoverable, but we will fix it \
+                 in future versions once the planned change to consensus is \
+                 finished." ;
+              exit 99
         in
-        info_if_producing logger ~module_:__MODULE__ ~location:__LOC__
-          "No slots won in this epoch. Waiting for next epoch to check again, \
-           @%d"
-          (Int64.to_int epoch_end_time) ;
-        `Check_again epoch_end_time
+        let total_stake = epoch_data.ledger.total_currency in
+        let epoch_snapshot =
+          let source, snapshot =
+            select_epoch_snapshot ~constants ~consensus_state:state
+              ~local_state ~epoch
+          in
+          [%log debug]
+            !"Using %s_epoch_snapshot root hash %{sexp:Coda_base.Ledger_hash.t}"
+            (epoch_snapshot_name source)
+            (Coda_base.Sparse_ledger.merkle_root snapshot.ledger) ;
+          snapshot
+        in
+        let block_data unseen_pks slot =
+          (* Try vrfs for all keypairs that are unseen within this slot until one wins or all lose *)
+          (* TODO: Don't do this, and instead pick the one that has the highest
+       * chance of winning. See #2573 *)
+          Keypair.And_compressed_pk.Set.fold_until keypairs ~init:()
+            ~f:(fun () (keypair, public_key_compressed) ->
+              if
+                not
+                @@ Public_key.Compressed.Set.mem unseen_pks
+                     public_key_compressed
+              then Continue_or_stop.Continue ()
+              else
+                let global_slot =
+                  Global_slot.of_epoch_and_slot ~constants (epoch, slot)
+                in
+                [%log info]
+                  "Checking VRF evaluations at epoch: $epoch, slot: $slot"
+                  ~metadata:
+                    [ ("epoch", `Int (Epoch.to_int epoch))
+                    ; ("slot", `Int (Slot.to_int slot)) ] ;
+                match
+                  Vrf.check ~constraint_constants
+                    ~global_slot:(Global_slot.slot_number global_slot)
+                    ~seed:epoch_data.seed ~epoch_snapshot
+                    ~private_key:keypair.private_key
+                    ~public_key:keypair.public_key ~public_key_compressed
+                    ~total_stake ~logger
+                with
+                | None ->
+                    Continue_or_stop.Continue ()
+                | Some data ->
+                    Continue_or_stop.Stop (Some (keypair, data)) )
+            ~finish:(fun () -> None)
+        in
+        let rec find_winning_slot (slot : Slot.t) =
+          if slot >= constants.epoch_size then None
+          else
+            match Local_state.seen_slot local_state epoch slot with
+            | `All_seen ->
+                find_winning_slot (Slot.succ slot)
+            | `Unseen pks -> (
+              match block_data pks slot with
+              | None ->
+                  find_winning_slot (Slot.succ slot)
+              | Some (keypair, data) ->
+                  Some (slot, keypair, data) )
+        in
+        find_winning_slot slot
+      in
+      match next_slot with
+      | Some (next_slot, keypair, data) ->
+          [%log info] "Producing block in %d slots"
+            (Slot.to_int next_slot - Slot.to_int slot) ;
+          if Slot.equal curr_slot next_slot then `Produce_now (keypair, data)
+          else
+            `Produce
+              ( Epoch.slot_start_time ~constants epoch next_slot
+                |> Time.to_span_since_epoch |> Time.Span.to_ms
+              , keypair
+              , data )
+      | None ->
+          let epoch_end_time =
+            Epoch.end_time ~constants epoch |> ms_since_epoch
+          in
+          [%log info]
+            "No slots won in this epoch. Waiting for next epoch to check \
+             again, @%d"
+            (Int64.to_int epoch_end_time) ;
+          `Check_again epoch_end_time
 
   let frontier_root_transition (prev : Consensus_state.Value.t)
       (next : Consensus_state.Value.t) ~local_state ~snarked_ledger =
@@ -3058,7 +3053,7 @@ module Hooks = struct
              (Global_slot.slot_number global_slot)
              block_data.global_slot)
       then
-        Logger.error ~module_:__MODULE__ ~location:__LOC__ logger
+        [%log error]
           !"VRF was evaluated at (epoch, slot) %{sexp:Epoch_and_slot.t} but \
             the corresponding block was produced at a time corresponding to \
             %{sexp:Epoch_and_slot.t}. This means that generating the block \

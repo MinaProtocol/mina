@@ -3,4 +3,4 @@
   (public_name prover)
   (libraries async core rpc_parallel coda_base coda_state coda_transition blockchain_snark memory_stats precomputed_values child_processes)
   (preprocessor_deps "../../config.mlh")
-  (preprocess (pps ppx_version ppx_jane)))
+  (preprocess (pps ppx_coda ppx_version ppx_jane)))

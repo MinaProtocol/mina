@@ -18,6 +18,6 @@
     group_map
     snarky_group_map
     snarky_curve
-    snarky
+    snarky.backendless
     key_cache
     core_kernel ))

@@ -2,7 +2,7 @@ open Core_kernel
 open Pickles_types
 module Domain = Marlin_checks.Domain
 
-module Make (Impl : Snarky.Snark_intf.Run) = struct
+module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
   open Impl
 
   type ('a, 'n) t = 'n One_hot_vector.T(Impl).t * ('a, 'n) Vector.t

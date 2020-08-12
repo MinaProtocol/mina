@@ -48,11 +48,15 @@ module Make (Inputs : Intf.Inputs_intf) :
           , Ledger_proof.t )
           Work.Single.Spec.t
         [@@deriving sexp, to_yojson]
+
+        let statement = Work.Single.Spec.statement
       end
     end
 
     module Spec = struct
       type t = Single.Spec.t Work.Spec.t [@@deriving sexp, to_yojson]
+
+      let instances = Work.Spec.instances
     end
 
     module Result = struct
@@ -87,8 +91,18 @@ module Make (Inputs : Intf.Inputs_intf) :
   let dispatch rpc shutdown_on_disconnect query address =
     let%map res =
       Rpc.Connection.with_client
-        (Tcp.Where_to_connect.of_host_and_port address) (fun conn ->
-          Rpc.Rpc.dispatch rpc conn query )
+        ~handshake_timeout:
+          (Time.Span.of_sec Coda_compile_config.rpc_handshake_timeout_sec)
+        ~heartbeat_config:
+          (Rpc.Connection.Heartbeat_config.create
+             ~timeout:
+               (Time_ns.Span.of_sec
+                  Coda_compile_config.rpc_heartbeat_timeout_sec)
+             ~send_every:
+               (Time_ns.Span.of_sec
+                  Coda_compile_config.rpc_heartbeat_send_every_sec))
+        (Tcp.Where_to_connect.of_host_and_port address)
+        (fun conn -> Rpc.Rpc.dispatch rpc conn query)
     in
     match res with
     | Error exn ->
@@ -112,14 +126,12 @@ module Make (Inputs : Intf.Inputs_intf) :
             Coda_metrics.(
               Cryptography.Snark_work_histogram.observe
                 Cryptography.snark_work_merge_time_sec (Time.Span.to_sec time)) ;
-            Logger.Structured.info logger ~module_:__MODULE__ ~location:__LOC__
-              (Merge_snark_generated {time})
+            [%str_log info] (Merge_snark_generated {time})
         | `Transition ->
             Coda_metrics.(
               Cryptography.Snark_work_histogram.observe
                 Cryptography.snark_work_base_time_sec (Time.Span.to_sec time)) ;
-            Logger.Structured.info logger ~module_:__MODULE__ ~location:__LOC__
-              (Base_snark_generated {time}) )
+            [%str_log info] (Base_snark_generated {time}) )
 
   let main
       (module Rpcs_versioned : Intf.Rpcs_versioned_S
@@ -136,13 +148,10 @@ module Make (Inputs : Intf.Inputs_intf) :
            If the string becomes too long, chop off the first 10 lines and include
            only that *)
       ( if String.length error_str < 4096 then
-        Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-          !"Error %s: %{sexp:Error.t}"
-          label error
+        [%log error] !"Error %s: %{sexp:Error.t}" label error
       else
         let lines = String.split ~on:'\n' error_str in
-        Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-          !"Error %s: %s" label
+        [%log error] !"Error %s: %s" label
           (String.concat ~sep:"\\n" (List.take lines 10)) ) ;
       let%bind () = wait ~sec () in
       (* FIXME: Use a backoff algo here *)
@@ -164,10 +173,15 @@ module Make (Inputs : Intf.Inputs_intf) :
           let%bind () = wait ~sec:random_delay () in
           go ()
       | Ok (Some (work, public_key)) -> (
-          Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-            "SNARK work received from $address. Starting proof generation"
+          [%log info]
+            "SNARK work $work_ids received from $address. Starting proof \
+             generation"
             ~metadata:
-              [("address", `String (Host_and_port.to_string daemon_address))] ;
+              [ ("address", `String (Host_and_port.to_string daemon_address))
+              ; ( "work_ids"
+                , Transaction_snark_work.Statement.compact_json
+                    (One_or_two.map (Work.Spec.instances work)
+                       ~f:Work.Single.Spec.statement) ) ] ;
           let%bind () = wait () in
           (* Pause to wait for stdout to flush *)
           match perform state public_key work with
@@ -175,11 +189,15 @@ module Make (Inputs : Intf.Inputs_intf) :
               log_and_retry "performing work" e (retry_pause 10.) go
           | Ok result ->
               emit_proof_metrics result.metrics logger ;
-              Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-                "Submitted completed SNARK work to $address"
+              [%log info]
+                "Submitted completed SNARK work $work_ids to $address"
                 ~metadata:
                   [ ( "address"
-                    , `String (Host_and_port.to_string daemon_address) ) ] ;
+                    , `String (Host_and_port.to_string daemon_address) )
+                  ; ( "work_ids"
+                    , Transaction_snark_work.Statement.compact_json
+                        (One_or_two.map (Work.Spec.instances work)
+                           ~f:Work.Single.Spec.statement) ) ] ;
               let rec submit_work () =
                 match%bind
                   dispatch Rpcs_versioned.Submit_work.Latest.rpc
@@ -218,9 +236,8 @@ module Make (Inputs : Intf.Inputs_intf) :
           Logger.create () ~metadata:[("process", `String "Snark Worker")]
         in
         Signal.handle [Signal.term] ~f:(fun _signal ->
-            Logger.info logger
-              !"Received signal to terminate. Aborting snark worker process"
-              ~module_:__MODULE__ ~location:__LOC__ ;
+            [%log info]
+              !"Received signal to terminate. Aborting snark worker process" ;
             Core.exit 0 ) ;
         let proof_level =
           Option.value ~default:Genesis_constants.Proof_level.compiled

@@ -15,7 +15,7 @@ let rough_domains : Domains.t =
   {h= d; k= d; x= Pow_2_roots_of_unity 6}
 
 let domains (type field a)
-    (module Impl : Snarky.Snark_intf.Run
+    (module Impl : Snarky_backendless.Snark_intf.Run
       with type field = field
        and type R1CS_constraint_system.t = a
                                            Zexe_backend.R1CS_constraint_system

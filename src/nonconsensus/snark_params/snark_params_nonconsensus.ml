@@ -52,6 +52,8 @@ module Tock = struct
 
     let unpack (t : t) = Tweedle.Fp.to_bits t
 
+    let size_in_bits = Tweedle.Fp.length_in_bits
+
     let project bits =
       Core_kernel.Option.value_exn
         ~message:"Snark_params_nonconsensus.Tock.Field.project"

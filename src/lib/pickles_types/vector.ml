@@ -327,7 +327,7 @@ module With_length (N : Nat.Intf) = struct
     module V1 = struct
       type 'a t = ('a, N.n) vec [@@deriving version {asserted}]
 
-      let compare c t1 t2 = Core.List.compare c (to_list t1) (to_list t2)
+      let compare c t1 t2 = Base.List.compare c (to_list t1) (to_list t2)
 
       let hash_fold_t f s v = List.hash_fold_t f s (to_list v)
 
@@ -347,9 +347,9 @@ module With_length (N : Nat.Intf) = struct
 end
 
 let rec typ' : type f var value n.
-       ((var, value, f) Snarky.Typ.t, n) t
-    -> ((var, n) t, (value, n) t, f) Snarky.Typ.t =
-  let open Snarky.Typ in
+       ((var, value, f) Snarky_backendless.Typ.t, n) t
+    -> ((var, n) t, (value, n) t, f) Snarky_backendless.Typ.t =
+  let open Snarky_backendless.Typ in
   fun elts ->
     match elts with
     | elt :: elts ->

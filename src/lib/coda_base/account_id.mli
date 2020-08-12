@@ -1,17 +1,15 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
+open Import
 
 [%%ifdef consensus_mechanism]
 
 open Snark_params.Tick
-open Signature_lib
 
 [%%else]
 
-module Random_oracle = Random_oracle_nonconsensus
 open Snark_params_nonconsensus
-open Signature_lib_nonconsensus
 
 [%%endif]
 
