@@ -17,6 +17,7 @@
     ppx_deriving_yojson.runtime
     yojson
     archive_lib
+    signature_lib
     )
   (preprocess (pps
     graphql_ppx

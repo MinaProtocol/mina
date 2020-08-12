@@ -29,6 +29,12 @@ end
 
 include Comparable.S_binable with type t := t
 
+module Hex : sig
+  val encode : t -> string
+
+  val decode : string -> t Or_error.t
+end
+
 [%%ifdef consensus_mechanism]
 
 type var = Field.Var.t * Field.Var.t

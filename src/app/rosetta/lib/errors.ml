@@ -13,7 +13,8 @@ module Variant = struct
     | `Account_not_found of string
     | `Invariant_violation
     | `Transaction_not_found of string
-    | `Block_missing ]
+    | `Block_missing
+    | `Malformed_public_key ]
   [@@deriving yojson, show, eq, to_enum, to_representatives]
 end
 
@@ -63,6 +64,8 @@ end = struct
         "Transaction not found"
     | `Block_missing ->
         "Block not found"
+    | `Malformed_public_key ->
+        "Malformed public key"
 
   let context = function
     | `Sql msg ->
@@ -101,6 +104,8 @@ end = struct
     | `Block_missing ->
         (* TODO: Add context around the query made *)
         None
+    | `Malformed_public_key ->
+        None
 
   let retriable = function
     | `Sql _ ->
@@ -121,6 +126,8 @@ end = struct
         true
     | `Block_missing ->
         true
+    | `Malformed_public_key ->
+        false
 
   let create ?context kind = {extra_context= context; kind}
 

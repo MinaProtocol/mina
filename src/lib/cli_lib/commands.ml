@@ -11,7 +11,8 @@ let generate_keypair =
     let open Deferred.Let_syntax in
     let kp = Keypair.create () in
     let%bind () = Secrets.Keypair.Terminal_stdin.write_exn kp ~privkey_path in
-    printf "Keypair generated\nPublic key: %s\n"
+    printf "Keypair generated\nPublic key: %s\nRaw public key: %s"
       ( kp.public_key |> Public_key.compress
-      |> Public_key.Compressed.to_base58_check ) ;
+      |> Public_key.Compressed.to_base58_check )
+      (Public_key.Hex.encode kp.public_key) ;
     exit 0)
