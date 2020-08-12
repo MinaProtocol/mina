@@ -5,8 +5,6 @@ set -eo pipefail
 eval `opam config env`
 export PATH=$HOME/.cargo/bin:$PATH
 
-# TODO: Stop building lib_p2p multiple times (due to excessive dependencies in make)
-export LIBP2P_NIXLESS=1
 
 echo "--- Explicitly generate PV-keys and upload before building"
 make build_pv_keys 2>&1 | tee /tmp/buildocaml.log
@@ -14,7 +12,8 @@ make build_pv_keys 2>&1 | tee /tmp/buildocaml.log
 echo "--- Publish pvkeys"
 ./scripts/publish-pvkeys.sh
 
-echo "--- Build libp2p_helper TODO: use the previously uploaded build artifact
+# TODO: Stop building lib_p2p multiple times by pulling from buildkite-agent artifacts or docker or somewhere
+echo "--- Build libp2p_helper TODO: use the previously uploaded build artifact"
 make libp2p_helper
 
 echo "--- Build generate-keypair binary"
