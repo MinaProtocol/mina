@@ -12,7 +12,7 @@ type t =
   ; sub_account: Sub_account_identifier.t option [@default None]
   ; (* Blockchains that utilize a username model (where the address is not a derivative of a cryptographic public key) should specify the public key(s) owned by the address in metadata. *)
     metadata: Yojson.Safe.t option [@default None] }
-[@@deriving yojson {strict= false}, show]
+[@@deriving yojson {strict= false}, show, eq]
 
 (** The account_identifier uniquely identifies an account within a network. All fields in the account_identifier are utilized to determine this uniqueness (including the metadata field, if populated). *)
 let create (address : string) : t = {address; sub_account= None; metadata= None}

@@ -75,7 +75,8 @@ val verify :
 
 module Prover : sig
   type ('prev_values, 'local_widths, 'local_heights, 'a_value, 'proof) t =
-       ?handler:(Snarky.Request.request -> Snarky.Request.response)
+       ?handler:(   Snarky_backendless.Request.request
+                 -> Snarky_backendless.Request.response)
     -> ( 'prev_values
        , 'local_widths
        , 'local_heights )

@@ -1,7 +1,7 @@
 open Core
 open Fold_lib
 
-module Make (Impl : Snarky.Snark_intf.S) = struct
+module Make (Impl : Snarky_backendless.Snark_intf.S) = struct
   let triple_string trips =
     let to_string b = if b then "1" else "0" in
     String.concat ~sep:" "

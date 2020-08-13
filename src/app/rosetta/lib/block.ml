@@ -2,6 +2,20 @@ open Core_kernel
 open Async
 open Models
 
+module Unsigned = struct
+  module UInt64 = struct
+    include Unsigned_extended.UInt64
+
+    let to_yojson i = `Intlit (to_string i)
+  end
+
+  module UInt32 = struct
+    include Unsigned_extended.UInt32
+
+    let to_yojson i = `Intlit (to_string i)
+  end
+end
+
 module Get_coinbase =
 [%graphql
 {|
@@ -21,25 +35,26 @@ let account_id (`Pk pk) token_id =
   ; sub_account= None
   ; metadata= Some (Amount_of.Token_id.encode token_id) }
 
+let token_id_of_account (account : Account_identifier.t) =
+  let module Decoder = Amount_of.Token_id.T (Result) in
+  Decoder.decode account.metadata
+  |> Result.map ~f:(Option.value ~default:Amount_of.Token_id.default)
+  |> Result.ok
+
 module Block_query = struct
-  type t = ([`Height of int64], [`Hash of string]) These.t
+  type t = ([`Height of int64], [`Hash of string]) These.t option
 
   module T (M : Monad_fail.S) = struct
     let of_partial_identifier (identifier : Partial_block_identifier.t) =
       match (identifier.index, identifier.hash) with
       | None, None ->
-          M.fail
-            (Errors.create
-               ~context:
-                 "Partial block identifier must have at least an index or a \
-                  hash, it cannot be empty"
-               (`Json_parse None))
+          M.return None
       | Some index, None ->
-          M.return (`This (`Height index))
+          M.return (Some (`This (`Height index)))
       | None, Some hash ->
-          M.return (`That (`Hash hash))
+          M.return (Some (`That (`Hash hash)))
       | Some index, Some hash ->
-          M.return (`Those (`Height index, `Hash hash))
+          M.return (Some (`Those (`Height index, `Hash hash)))
   end
 end
 
@@ -69,6 +84,7 @@ module User_command_info = struct
   module Kind = struct
     type t =
       [`Payment | `Delegation | `Create_token | `Create_account | `Mint_tokens]
+    [@@deriving yojson, eq, sexp, compare]
   end
 
   module Account_creation_fees_paid = struct
@@ -76,12 +92,12 @@ module User_command_info = struct
       | By_no_one
       | By_fee_payer of Unsigned.UInt64.t
       | By_receiver of Unsigned.UInt64.t
-    [@@deriving eq]
+    [@@deriving eq, to_yojson, sexp, compare]
   end
 
   module Failure_status = struct
     type t = [`Applied of Account_creation_fees_paid.t | `Failed of string]
-    [@@deriving eq]
+    [@@deriving eq, to_yojson, sexp, compare]
   end
 
   type t =
@@ -96,14 +112,152 @@ module User_command_info = struct
     ; amount: Unsigned.UInt64.t option
     ; hash: string
     ; failure_status: Failure_status.t option }
+  [@@deriving to_yojson, eq, sexp, compare]
+
+  module Partial = struct
+    type t =
+      { kind: Kind.t
+      ; fee_payer: [`Pk of string]
+      ; source: [`Pk of string]
+      ; receiver: [`Pk of string]
+      ; fee_token: Unsigned.UInt64.t
+      ; token: Unsigned.UInt64.t
+      ; fee: Unsigned.UInt64.t
+      ; amount: Unsigned.UInt64.t option }
+    [@@deriving to_yojson, sexp, compare]
+
+    module Reason = struct
+      type t =
+        | Length_mismatch
+        | Fee_payer_and_source_mismatch
+        | Amount_not_some
+        | Account_not_some
+        | Incorrect_token_id
+        | Amount_inc_dec_mismatch
+        | Status_not_pending
+        | Can't_find_kind of string
+      [@@deriving sexp]
+    end
+  end
+
+  let forget (t : t) : Partial.t =
+    { kind= t.kind
+    ; fee_payer= t.fee_payer
+    ; source= t.source
+    ; receiver= t.receiver
+    ; fee_token= t.fee_token
+    ; token= t.token
+    ; fee= t.fee
+    ; amount= t.amount }
+
+  let of_operations (ops : Operation.t list) :
+      (Partial.t, Partial.Reason.t) Validation.t =
+    (* TODO: If we care about DoS attacks, break early if length too large *)
+    (* For a payment we demand:
+      *
+      * ops = exactly 3
+      *
+      * payment_source_dec with account 'a, some amount 'x, status="Pending"
+      * fee_payer_dec with account 'a, some amount 'y, status="Pending"
+      * payment_receiver_inc with account 'b, some amount 'x, status="Pending"
+    *)
+    let payment =
+      let open Validation.Let_syntax in
+      let open Partial.Reason in
+      let module V = Validation in
+      (* Note: It's better to have nice errors with the validation than micro-optimize searching through a small list a minimal number of times. *)
+      let find_kind k (ops : Operation.t list) =
+        let name = Operation_types.name k in
+        List.find ops ~f:(fun op -> String.equal op.Operation._type name)
+        |> Result.of_option ~error:[Can't_find_kind name]
+      in
+      let%map () =
+        if Int.equal (List.length ops) 3 then V.return ()
+        else V.fail Length_mismatch
+      and account_a =
+        let open Result.Let_syntax in
+        let%bind {account; _} = find_kind `Payment_source_dec ops
+        and {account= account'; _} = find_kind `Fee_payer_dec ops in
+        match (account, account') with
+        | Some x, Some y when Account_identifier.equal x y ->
+            V.return x
+        | Some _, Some _ ->
+            V.fail Fee_payer_and_source_mismatch
+        | None, _ | _, None ->
+            V.fail Account_not_some
+      and token =
+        let open Result.Let_syntax in
+        let%bind {account; _} = find_kind `Payment_source_dec ops in
+        match account with
+        | Some account -> (
+          match token_id_of_account account with
+          | None ->
+              V.fail Incorrect_token_id
+          | Some token ->
+              V.return token )
+        | None ->
+            V.fail Account_not_some
+      and fee_token =
+        let open Result.Let_syntax in
+        let%bind {account; _} = find_kind `Fee_payer_dec ops in
+        match account with
+        | Some account -> (
+          match token_id_of_account account with
+          | Some token_id ->
+              V.return token_id
+          | None ->
+              V.fail Incorrect_token_id )
+        | None ->
+            V.fail Account_not_some
+      and account_b =
+        let open Result.Let_syntax in
+        let%bind {account; _} = find_kind `Payment_receiver_inc ops in
+        Result.of_option account ~error:[Account_not_some]
+      and () =
+        if List.for_all ops ~f:(fun op -> String.equal op.status "Pending")
+        then V.return ()
+        else V.fail Status_not_pending
+      and payment_amount_x =
+        let open Result.Let_syntax in
+        let%bind {amount; _} = find_kind `Payment_source_dec ops
+        and {amount= amount'; _} = find_kind `Payment_receiver_inc ops in
+        match (amount, amount') with
+        | Some x, Some y when Amount.equal (Amount_of.negated x) y ->
+            V.return y
+        | Some _, Some _ ->
+            V.fail Amount_inc_dec_mismatch
+        | None, _ | _, None ->
+            V.fail Amount_not_some
+      and payment_amount_y =
+        let open Result.Let_syntax in
+        let%bind {amount; _} = find_kind `Fee_payer_dec ops in
+        match amount with
+        | Some x ->
+            V.return (Amount_of.negated x)
+        | None ->
+            V.fail Amount_not_some
+      in
+      { Partial.kind= `Payment
+      ; fee_payer= `Pk account_a.address
+      ; source= `Pk account_a.address
+      ; receiver= `Pk account_b.address
+      ; fee_token
+      ; token (* TODO: Catch exception properly on these uint64 decodes *)
+      ; fee= Unsigned.UInt64.of_string payment_amount_y.Amount.value
+      ; amount= Some (Unsigned.UInt64.of_string payment_amount_x.Amount.value)
+      }
+    in
+    (* TODO: Handle delegation transactions *)
+    (* TODO: Handle all other  transactions *)
+    payment
 
   let to_operations (t : t) : Operation.t list =
     (* First build a plan. The plan specifies all operations ahead of time so
-     * we can later compute indices and relations when we're building the full
-     * models.
-     *
-     * For now, relations will be defined only on the two sides of a given
-     * transfer. ie. Source decreases, and receiver increases.
+       * we can later compute indices and relations when we're building the full
+       * models.
+       *
+       * For now, relations will be defined only on the two sides of a given
+       * transfer. ie. Source decreases, and receiver increases.
     *)
     let plan : 'a Op.t list =
       (* The dec side of a user command's fee transfer is here *)
@@ -185,6 +339,7 @@ module User_command_info = struct
             ; account= Some (account_id t.fee_payer t.fee_token)
             ; _type= Operation_types.name `Fee_payer_dec
             ; amount= Some Amount_of.(negated @@ token t.fee_token t.fee)
+            ; coin_change= None
             ; metadata }
         | `Payment_source_dec amount ->
             { Operation.operation_identifier
@@ -193,14 +348,16 @@ module User_command_info = struct
             ; account= Some (account_id t.source t.token)
             ; _type= Operation_types.name `Payment_source_dec
             ; amount= Some Amount_of.(negated @@ token t.token amount)
+            ; coin_change= None
             ; metadata }
         | `Payment_receiver_inc amount ->
             { Operation.operation_identifier
             ; related_operations
             ; status
-            ; account= Some (account_id t.source t.token)
+            ; account= Some (account_id t.receiver t.token)
             ; _type= Operation_types.name `Payment_receiver_inc
             ; amount= Some (Amount_of.token t.token amount)
+            ; coin_change= None
             ; metadata }
         | `Account_creation_fee_via_payment account_creation_fee ->
             { Operation.operation_identifier
@@ -209,6 +366,7 @@ module User_command_info = struct
             ; account= Some (account_id t.receiver t.token)
             ; _type= Operation_types.name `Account_creation_fee_via_payment
             ; amount= Some Amount_of.(negated @@ coda account_creation_fee)
+            ; coin_change= None
             ; metadata }
         | `Account_creation_fee_via_fee_payer account_creation_fee ->
             { Operation.operation_identifier
@@ -217,6 +375,7 @@ module User_command_info = struct
             ; account= Some (account_id t.fee_payer t.fee_token)
             ; _type= Operation_types.name `Account_creation_fee_via_fee_payer
             ; amount= Some Amount_of.(negated @@ coda account_creation_fee)
+            ; coin_change= None
             ; metadata }
         | `Create_token ->
             { Operation.operation_identifier
@@ -225,6 +384,7 @@ module User_command_info = struct
             ; account= None
             ; _type= Operation_types.name `Create_token
             ; amount= None
+            ; coin_change= None
             ; metadata }
         | `Delegate_change ->
             { Operation.operation_identifier
@@ -233,6 +393,7 @@ module User_command_info = struct
             ; account= Some (account_id t.source Amount_of.Token_id.default)
             ; _type= Operation_types.name `Delegate_change
             ; amount= None
+            ; coin_change= None
             ; metadata=
                 merge_metadata metadata
                   (Some
@@ -248,6 +409,7 @@ module User_command_info = struct
             ; account= Some (account_id t.receiver t.token)
             ; _type= Operation_types.name `Mint_tokens
             ; amount= Some (Amount_of.token t.token amount)
+            ; coin_change= None
             ; metadata=
                 merge_metadata metadata
                   (Some
@@ -256,6 +418,27 @@ module User_command_info = struct
                          , `String
                              (let (`Pk r) = t.source in
                               r) ) ])) } )
+
+  let%test_unit "payment_round_trip" =
+    let start =
+      { kind= `Payment (* default token *)
+      ; fee_payer= `Pk "Alice"
+      ; source= `Pk "Alice"
+      ; token= Unsigned.UInt64.of_int 1
+      ; fee= Unsigned.UInt64.of_int 2_000_000_000
+      ; receiver= `Pk "Bob"
+      ; fee_token= Unsigned.UInt64.of_int 1
+      ; nonce= Unsigned.UInt32.of_int 3
+      ; amount= Some (Unsigned.UInt64.of_int 5_000_000_000)
+      ; failure_status= None
+      ; hash= "TXN_1_HASH" }
+    in
+    let ops = to_operations start in
+    match of_operations ops with
+    | Ok partial ->
+        [%test_eq: Partial.t] partial (forget start)
+    | Error e ->
+        failwithf !"Mismatch because %{sexp: Partial.Reason.t list}" e ()
 
   let dummies =
     [ { kind= `Payment (* default token *)
@@ -380,7 +563,7 @@ end
 
 module Internal_command_info = struct
   module Kind = struct
-    type t = [`Coinbase | `Fee_transfer] [@@deriving eq]
+    type t = [`Coinbase | `Fee_transfer] [@@deriving eq, to_yojson]
   end
 
   type t =
@@ -389,6 +572,7 @@ module Internal_command_info = struct
     ; fee: Unsigned.UInt64.t
     ; token: Unsigned.UInt64.t
     ; hash: string }
+  [@@deriving to_yojson]
 
   let to_operations ~coinbase (t : t) : Operation.t list =
     (* We choose to represent the dec-side of fee transfers from txns from the
@@ -417,6 +601,7 @@ module Internal_command_info = struct
             ; account= Some (account_id t.receiver Amount_of.Token_id.default)
             ; _type= Operation_types.name `Coinbase_inc
             ; amount= Some (Amount_of.coda coinbase)
+            ; coin_change= None
             ; metadata= None }
         | `Fee_payer_dec ->
             { Operation.operation_identifier
@@ -425,6 +610,7 @@ module Internal_command_info = struct
             ; account= Some (account_id t.receiver Amount_of.Token_id.default)
             ; _type= Operation_types.name `Fee_payer_dec
             ; amount= Some Amount_of.(negated (coda t.fee))
+            ; coin_change= None
             ; metadata= None }
         | `Fee_receiver_inc ->
             { Operation.operation_identifier
@@ -433,6 +619,7 @@ module Internal_command_info = struct
             ; account= Some (account_id t.receiver t.token)
             ; _type= Operation_types.name `Fee_receiver_inc
             ; amount= Some (Amount_of.token t.token t.fee)
+            ; coin_change= None
             ; metadata= None } )
 
   let dummies =
@@ -527,16 +714,27 @@ WITH RECURSIVE chain AS (
         ON pk.id = b.creator_id
         WHERE b.id = ? |}
 
+    let query_best =
+      Caqti_request.find_opt Caqti_type.unit typ
+        {|
+SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, b.ledger_hash, b.height, b.timestamp, b.coinbase_id, pk.value as creator FROM blocks b
+      INNER JOIN public_keys pk
+      ON pk.id = b.creator_id
+      WHERE b.height = (select MAX(b.height) from blocks b)
+        |}
+
     let run_by_id (module Conn : Caqti_async.CONNECTION) id =
       Conn.find_opt query_by_id id
 
     let run (module Conn : Caqti_async.CONNECTION) = function
-      | `This (`Height h) ->
+      | Some (`This (`Height h)) ->
           Conn.find_opt query_height h
-      | `That (`Hash h) ->
+      | Some (`That (`Hash h)) ->
           Conn.find_opt query_hash h
-      | `Those (`Height height, `Hash hash) ->
+      | Some (`Those (`Height height, `Hash hash)) ->
           Conn.find_opt query_both (hash, height)
+      | None ->
+          Conn.find_opt query_best ()
   end
 
   module User_commands = struct
@@ -564,11 +762,11 @@ WITH RECURSIVE chain AS (
 
     let query =
       Caqti_request.collect Caqti_type.int typ
-        {| SELECT u.id, u.type, u.fee_payer_id, u.source_id, u.receiver_id, u.fee_token, u.token, u.nonce, u.amount, u.fee, u.memo, u.hash, u.status, u.failure_reason, u.fee_payer_account_creation_fee_paid, u.receiver_account_creation_fee_paid, u.created_token, pk1.value as fee_payer, pk2.value as receiver, pk3.value as source FROM user_commands u
-        LEFT JOIN blocks_user_commands ON blocks_user_commands.block_id = ? 
+        {| SELECT u.id, u.type, u.fee_payer_id, u.source_id, u.receiver_id, u.fee_token, u.token, u.nonce, u.amount, u.fee, u.memo, u.hash, u.status, u.failure_reason, u.fee_payer_account_creation_fee_paid, u.receiver_account_creation_fee_paid, u.created_token, pk1.value as fee_payer, pk2.value as source, pk3.value as receiver FROM user_commands u
+        LEFT JOIN blocks_user_commands ON blocks_user_commands.block_id = ?
         INNER JOIN public_keys pk1 ON pk1.id = u.fee_payer_id
-        INNER JOIN public_keys pk2 ON pk2.id = u.receiver_id
-        INNER JOIN public_keys pk3 ON pk3.id = u.source_id
+        INNER JOIN public_keys pk2 ON pk2.id = u.source_id
+        INNER JOIN public_keys pk3 ON pk3.id = u.receiver_id
       |}
 
     let run (module Conn : Caqti_async.CONNECTION) id =
@@ -763,6 +961,7 @@ module Specific = struct
     module T (M : Monad_fail.S) = struct
       type 'gql t =
         { gql: unit -> ('gql, Errors.t) M.t
+        ; logger: Logger.t
         ; db_block: Block_query.t -> (Block_info.t, Errors.t) M.t
         ; validate_network_choice: 'gql Network.Validate_choice.Impl(M).t }
     end
@@ -774,17 +973,21 @@ module Specific = struct
     module Mock = T (Result)
 
     let real :
-        db:(module Caqti_async.CONNECTION) -> graphql_uri:Uri.t -> 'gql Real.t
-        =
-     fun ~db ~graphql_uri ->
+           logger:Logger.t
+        -> db:(module Caqti_async.CONNECTION)
+        -> graphql_uri:Uri.t
+        -> 'gql Real.t =
+     fun ~logger ~db ~graphql_uri ->
       { gql= (fun () -> Graphql.query (Get_coinbase.make ()) graphql_uri)
+      ; logger
       ; db_block=
           (fun query ->
             let (module Conn : Caqti_async.CONNECTION) = db in
             Sql.run (module Conn) query )
       ; validate_network_choice= Network.Validate_choice.Real.validate }
 
-    let mock : 'gql Mock.t =
+    let mock : logger:Logger.t -> 'gql Mock.t =
+     fun ~logger ->
       { gql=
           (fun () ->
             Result.return
@@ -795,6 +998,7 @@ module Specific = struct
                    end
                end )
           (* TODO: Add variants to cover every branch *)
+      ; logger
       ; db_block= (fun _query -> Result.return @@ Block_info.dummy)
       ; validate_network_choice= Network.Validate_choice.Mock.succeed }
   end
@@ -808,6 +1012,7 @@ module Specific = struct
         -> (Block_response.t, Errors.t) M.t =
      fun ~env req ->
       let open M.Let_syntax in
+      let logger = env.logger in
       let%bind query = Query.of_partial_identifier req.block_identifier in
       let%bind res = env.gql () in
       let%bind () =
@@ -822,12 +1027,18 @@ module Specific = struct
           ; timestamp= block_info.timestamp
           ; transactions=
               List.map block_info.internal_info ~f:(fun info ->
+                  [%log debug]
+                    ~metadata:[("info", Internal_command_info.to_yojson info)]
+                    "Block internal received $info" ;
                   { Transaction.transaction_identifier=
                       {Transaction_identifier.hash= info.hash}
                   ; operations=
                       Internal_command_info.to_operations ~coinbase info
                   ; metadata= None } )
               @ List.map block_info.user_commands ~f:(fun info ->
+                    [%log debug]
+                      ~metadata:[("info", User_command_info.to_yojson info)]
+                      "Block user received $info" ;
                     { Transaction.transaction_identifier=
                         {Transaction_identifier.hash= info.hash}
                     ; operations= User_command_info.to_operations info
@@ -843,7 +1054,7 @@ module Specific = struct
       module Mock = Impl (Result)
 
       (* This test intentionally fails as there has not been time to implement
-     * it properly yet *)
+       * it properly yet *)
       (*
       let%test_unit "all dummies" =
         Test.assert_ ~f:Block_response.to_yojson
@@ -857,17 +1068,21 @@ module Specific = struct
     end )
 end
 
-let router ~graphql_uri ~logger:_ ~db (route : string list) body =
+let router ~graphql_uri ~logger ~db (route : string list) body =
   let (module Db : Caqti_async.CONNECTION) = db in
   let open Async.Deferred.Result.Let_syntax in
+  [%log debug] "Handling /block/ $route"
+    ~metadata:[("route", `List (List.map route ~f:(fun s -> `String s)))] ;
   match route with
-  | [] ->
+  | [] | [""] ->
       let%bind req =
         Errors.Lift.parse ~context:"Request" @@ Block_request.of_yojson body
         |> Errors.Lift.wrap
       in
       let%map res =
-        Specific.Real.handle ~env:(Specific.Env.real ~db ~graphql_uri) req
+        Specific.Real.handle
+          ~env:(Specific.Env.real ~logger ~db ~graphql_uri)
+          req
         |> Errors.Lift.wrap
       in
       Block_response.to_yojson res

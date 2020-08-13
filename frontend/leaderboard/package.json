@@ -10,11 +10,13 @@
   },
   "license": "ISC",
   "dependencies": {
+    "@glennsl/bs-jest": "^0.4.8",
+    "@glennsl/bs-json": "^5.0.2",
     "bs-fetch": "^0.5.0",
     "bsc-stdlib-polyfill": "Schmavery/bsc-stdlib-polyfill",
     "googleapis": "^50.0.0",
     "isomorphic-unfetch": "^3.0.0",
-    "@glennsl/bs-jest": "^0.4.8"
+    "pg": "^8.3.0"
   },
   "devDependencies": {
     "bs-platform": "7.0.0-dev.1"

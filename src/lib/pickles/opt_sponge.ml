@@ -13,8 +13,8 @@ let rate = m - capacity
 
 type 'f sponge_state =
   | Absorbing of
-      { next_index: 'f Snarky.Boolean.t
-      ; xs: ('f Snarky.Boolean.t * 'f) list }
+      { next_index: 'f Snarky_backendless.Boolean.t
+      ; xs: ('f Snarky_backendless.Boolean.t * 'f) list }
   | Squeezed of int
 
 type 'f t =
@@ -22,7 +22,8 @@ type 'f t =
   ; params: 'f Sponge.Params.t
   ; mutable sponge_state: 'f sponge_state }
 
-module Make (Impl : Snarky.Snark_intf.Run with type prover_state = unit) =
+module Make
+    (Impl : Snarky_backendless.Snark_intf.Run with type prover_state = unit) =
 struct
   module Inputs = Sponge_inputs.Make (Impl)
   module P = Sponge.Poseidon (Inputs)

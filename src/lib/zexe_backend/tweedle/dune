@@ -11,7 +11,7 @@
     snarky_bn382
     key_cache
     sgn_type
-    snarky
+    snarky.backendless
     sponge
     snarkette
     core ))

@@ -161,13 +161,11 @@ module Ledger = struct
     let file_exists filename path =
       let filename = path ^/ filename in
       if%map file_exists ~follow_symlinks:true filename then (
-        Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
-          "Found ledger file at $path"
+        [%log info] "Found ledger file at $path"
           ~metadata:[("path", `String filename)] ;
         Some filename )
       else (
-        Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
-          "Ledger file $path does not exist"
+        [%log info] "Ledger file $path does not exist"
           ~metadata:[("path", `String filename)] ;
         None )
     in
@@ -178,8 +176,7 @@ module Ledger = struct
       | Ok () ->
           file_exists filename Cache_dir.s3_install_path
       | Error e ->
-          Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
-            "Could not download genesis ledger from $uri: $error"
+          [%log info] "Could not download genesis ledger from $uri: $error"
             ~metadata:
               [ ("uri", `String s3_path)
               ; ("error", `String (Error.to_string_hum e)) ] ;
@@ -230,8 +227,7 @@ module Ledger = struct
   let load_from_tar ?(genesis_dir = Cache_dir.autogen_path) ~logger
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ?accounts filename =
-    Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
-      "Loading genesis ledger from $path"
+    [%log info] "Loading genesis ledger from $path"
       ~metadata:[("path", `String filename)] ;
     let dirname = Uuid.to_string (Uuid_unix.create ()) in
     (* Unpack the ledger in the autogen directory, since we know that we have
@@ -269,7 +265,7 @@ module Ledger = struct
     let root_hash = State_hash.to_string @@ Ledger.merkle_root ledger in
     let%bind () = Unix.mkdir ~p:() genesis_dir in
     let tar_path = genesis_dir ^/ hash_filename root_hash in
-    Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
+    [%log info]
       "Creating genesis ledger tar file for $root_hash at $path from database \
        at $dir"
       ~metadata:
@@ -324,12 +320,11 @@ module Ledger = struct
           | Named name -> (
             match Genesis_ledger.fetch_ledger name with
             | Some (module M) ->
-                Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
-                  "Found genesis ledger with name $ledger_name"
+                [%log info] "Found genesis ledger with name $ledger_name"
                   ~metadata:[("ledger_name", `String name)] ;
                 Some (Lazy.map ~f:add_genesis_winner_account M.accounts)
             | None ->
-                Logger.warn ~module_:__MODULE__ ~location:__LOC__ logger
+                [%log warn]
                   "Could not find a built-in genesis ledger named $ledger_name"
                   ~metadata:[("ledger_name", `String name)] ;
                 None )
@@ -356,8 +351,7 @@ module Ledger = struct
             | Ok ledger ->
                 Ok (ledger, config, tar_path)
             | Error err ->
-                Logger.error ~module_:__MODULE__ ~location:__LOC__ logger
-                  "Could not load ledger from $path: $error"
+                [%log error] "Could not load ledger from $path: $error"
                   ~metadata:
                     [ ("path", `String tar_path)
                     ; ("error", `String (Error.to_string_hum err)) ] ;
@@ -369,7 +363,7 @@ module Ledger = struct
             | Accounts _ ->
                 assert false
             | Hash hash ->
-                Logger.error ~module_:__MODULE__ ~location:__LOC__ logger
+                [%log error]
                   "Could not find or generate a ledger for $root_hash"
                   ~metadata:[("root_hash", `String hash)] ;
                 Deferred.Or_error.errorf
@@ -379,7 +373,7 @@ module Ledger = struct
                   named_filename ~constraint_constants
                     ~num_accounts:config.num_accounts ledger_name
                 in
-                Logger.error ~module_:__MODULE__ ~location:__LOC__ logger
+                [%log error]
                   "Bad config $config: genesis ledger named $ledger_name is \
                    not built in, and no ledger file was found at \
                    $ledger_filename"
@@ -431,7 +425,7 @@ module Ledger = struct
                   in
                   (* Add a symlink from the named path to the hash path. *)
                   let%map () = Unix.symlink ~target:tar_path ~link_name in
-                  Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
+                  [%log info]
                     "Linking ledger file $tar_path to $named_tar_path"
                     ~metadata:
                       [ ("tar_path", `String tar_path)
@@ -444,7 +438,7 @@ module Ledger = struct
                     State_hash.to_string @@ Ledger.merkle_root ledger
                   in
                   let tar_path = genesis_dir ^/ hash_filename root_hash in
-                  Logger.error ~module_:__MODULE__ ~location:__LOC__ logger
+                  [%log error]
                     "Could not generate a ledger file at $path: $error"
                     ~metadata:
                       [ ("path", `String tar_path)
@@ -484,13 +478,11 @@ module Genesis_proof = struct
     let file_exists filename path =
       let filename = path ^/ filename in
       if%map file_exists ~follow_symlinks:true filename then (
-        Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
-          "Found genesis proof file at $path"
+        [%log info] "Found genesis proof file at $path"
           ~metadata:[("path", `String filename)] ;
         Some filename )
       else (
-        Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
-          "Genesis proof file $path does not exist"
+        [%log info] "Genesis proof file $path does not exist"
           ~metadata:[("path", `String filename)] ;
         None )
     in
@@ -507,7 +499,7 @@ module Genesis_proof = struct
         | Ok () ->
             file_exists filename Cache_dir.s3_install_path
         | Error e ->
-            Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
+            [%log info]
               "Could not download genesis proof file from $uri: $error"
               ~metadata:
                 [ ("uri", `String s3_path)
@@ -609,8 +601,7 @@ module Genesis_proof = struct
                 ; genesis_proof }
               , file )
         | Error err ->
-            Logger.error ~module_:__MODULE__ ~location:__LOC__ logger
-              "Could not load genesis proof from $path: $error"
+            [%log error] "Could not load genesis proof from $path: $error"
               ~metadata:
                 [ ("path", `String file)
                 ; ("error", `String (Error.to_string_hum err)) ] ;
@@ -618,7 +609,7 @@ module Genesis_proof = struct
     | None
       when Base_hash.equal base_hash compiled_base_hash || not proof_needed ->
         let compiled = Lazy.force compiled in
-        Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
+        [%log info]
           "Base hash $computed_hash matches compile-time $compiled_hash, \
            using precomputed genesis proof"
           ~metadata:
@@ -638,11 +629,10 @@ module Genesis_proof = struct
         let%map () =
           match%map store ~filename values.genesis_proof with
           | Ok () ->
-              Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
-                "Compile-time genesis proof written to $path"
+              [%log info] "Compile-time genesis proof written to $path"
                 ~metadata:[("path", `String filename)]
           | Error err ->
-              Logger.warn ~module_:__MODULE__ ~location:__LOC__ logger
+              [%log warn]
                 "Compile-time genesis proof could not be written to $path: \
                  $error"
                 ~metadata:
@@ -651,7 +641,7 @@ module Genesis_proof = struct
         in
         Ok (values, filename)
     | None when may_generate ->
-        Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
+        [%log info]
           "No genesis proof file was found for $base_hash, generating a new \
            genesis proof"
           ~metadata:[("base_hash", Base_hash.to_yojson base_hash)] ;
@@ -660,19 +650,17 @@ module Genesis_proof = struct
         let%map () =
           match%map store ~filename values.genesis_proof with
           | Ok () ->
-              Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
-                "New genesis proof written to $path"
+              [%log info] "New genesis proof written to $path"
                 ~metadata:[("path", `String filename)]
           | Error err ->
-              Logger.warn ~module_:__MODULE__ ~location:__LOC__ logger
-                "Genesis proof could not be written to $path: $error"
+              [%log warn] "Genesis proof could not be written to $path: $error"
                 ~metadata:
                   [ ("path", `String filename)
                   ; ("error", `String (Error.to_string_hum err)) ]
         in
         Ok (values, filename)
     | None ->
-        Logger.error ~module_:__MODULE__ ~location:__LOC__ logger
+        [%log error]
           "No genesis proof file was found for $base_hash and not allowed to \
            generate a new genesis proof"
           ~metadata:[("base_hash", Base_hash.to_yojson base_hash)] ;
@@ -747,7 +735,7 @@ let make_genesis_constants ~logger ~(default : Genesis_constants.t)
     | Some (Ok time) ->
         Ok (Some time)
     | Some (Error msg) ->
-        Logger.error ~module_:__MODULE__ ~location:__LOC__ logger
+        [%log error]
           "Could not build genesis constants from the configuration file: \
            $error"
           ~metadata:[("error", `String msg)] ;
@@ -793,8 +781,7 @@ let load_config_file filename =
 
 let init_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
     ~may_generate ~proof_level (config : Runtime_config.t) =
-  Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-    "Initializing with runtime configuration $config"
+  [%log info] "Initializing with runtime configuration $config"
     ~metadata:[("config", Runtime_config.to_yojson config)] ;
   let open Deferred.Or_error.Let_syntax in
   let genesis_constants = Genesis_constants.compiled in
@@ -815,11 +802,10 @@ let init_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
   let constraint_constants, generated_constraint_constants =
     match config.proof with
     | None ->
-        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-          "Using the compiled constraint constants" ;
+        [%log info] "Using the compiled constraint constants" ;
         (Genesis_constants.Constraint_constants.compiled, false)
     | Some config ->
-        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+        [%log info]
           "Using the constraint constants from the configuration file" ;
         ( make_constraint_constants
             ~default:Genesis_constants.Constraint_constants.compiled config
@@ -833,13 +819,13 @@ let init_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
             Genesis_constants.Constraint_constants.(equal compiled)
               constraint_constants
           then (
-            Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+            [%log warn]
               "This binary only supports the compiled proof constants for \
                proof_level= Full. The 'proof' field in the configuration file \
                should be removed." ;
             return () )
           else (
-            Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+            [%log fatal]
               "This binary only supports the compiled proof constants for \
                proof_level= Full. The 'proof' field in the configuration file \
                does not match." ;
@@ -851,7 +837,7 @@ let init_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
         return ()
     | Full, ((Check | None) as compiled) ->
         let str = Genesis_constants.Proof_level.to_string in
-        Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+        [%log fatal]
           "Proof level $proof_level is not compatible with compile-time proof \
            level $compiled_proof_level"
           ~metadata:
@@ -887,7 +873,7 @@ let init_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
     Genesis_proof.load_or_generate ~genesis_dir ~logger ~may_generate
       proof_inputs
   in
-  Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
+  [%log info]
     "Loaded ledger from $ledger_file and genesis proof from $proof_file"
     ~metadata:
       [("ledger_file", `String ledger_file); ("proof_file", `String proof_file)] ;
@@ -928,7 +914,7 @@ let upgrade_old_config ~logger filename json =
         (* This file has already been upgraded, or was written for the new
            format. Do not accept old-style fields.
         *)
-        Logger.warn ~module_:__MODULE__ ~location:__LOC__ logger
+        [%log warn]
           "Ignoring old-format values $values from the config file $filename. \
            These flags are now fields in the 'daemon' object of the config \
            file."
@@ -937,7 +923,7 @@ let upgrade_old_config ~logger filename json =
         return (`Assoc remaining_fields) )
       else (
         (* This file was written for the old format. Upgrade it. *)
-        Logger.warn ~module_:__MODULE__ ~location:__LOC__ logger
+        [%log warn]
           "Automatically upgrading the config file $filename. The values \
            $values have been moved to the 'daemon' object."
           ~metadata:

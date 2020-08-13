@@ -163,11 +163,11 @@ module Evals = struct
     ; g_2
     ; g_3 }
 
-  let typ (lengths : int t) (g : ('a, 'b, 'f) Snarky.Typ.t) ~default :
-      ('a array t, 'b array t, 'f) Snarky.Typ.t =
+  let typ (lengths : int t) (g : ('a, 'b, 'f) Snarky_backendless.Typ.t)
+      ~default : ('a array t, 'b array t, 'f) Snarky_backendless.Typ.t =
     let v ls =
       Vector.map ls ~f:(fun length ->
-          let t = Snarky.Typ.array ~length g in
+          let t = Snarky_backendless.Typ.array ~length g in
           { t with
             store=
               (fun arr ->
@@ -178,10 +178,10 @@ module Evals = struct
     in
     let t =
       let l1, l2 = to_vectors lengths in
-      Snarky.Typ.tuple2 (Vector.typ' (v l1)) (Vector.typ' (v l2))
+      Snarky_backendless.Typ.tuple2 (Vector.typ' (v l1)) (Vector.typ' (v l2))
     in
-    Snarky.Typ.transport t ~there:to_vectors ~back:of_vectors
-    |> Snarky.Typ.transport_var ~there:to_vectors ~back:of_vectors
+    Snarky_backendless.Typ.transport t ~there:to_vectors ~back:of_vectors
+    |> Snarky_backendless.Typ.transport_var ~there:to_vectors ~back:of_vectors
 end
 
 module Openings = struct
@@ -208,7 +208,7 @@ module Openings = struct
     [@@deriving sexp, compare, yojson, hlist, hash, eq]
 
     let typ fq g ~length =
-      let open Snarky.Typ in
+      let open Snarky_backendless.Typ in
       of_hlistable
         [array ~length (g * g); fq; fq; g; g]
         ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
@@ -233,9 +233,9 @@ module Openings = struct
     ; evals: 'fqv Evals.t * 'fqv Evals.t * 'fqv Evals.t }
   [@@deriving sexp, compare, yojson, hlist, hash, eq]
 
-  let typ (type g gv) (g : (gv, g, 'f) Snarky.Typ.t) fq ~bulletproof_rounds
-      ~commitment_lengths ~dummy_group_element =
-    let open Snarky.Typ in
+  let typ (type g gv) (g : (gv, g, 'f) Snarky_backendless.Typ.t) fq
+      ~bulletproof_rounds ~commitment_lengths ~dummy_group_element =
+    let open Snarky_backendless.Typ in
     let triple x = tuple3 x x x in
     of_hlistable
       [ Bulletproof.typ fq g ~length:bulletproof_rounds
@@ -258,9 +258,9 @@ module Poly_comm = struct
       {unshifted: 'g Pc_array.Stable.V1.t; shifted: 'g}
     [@@deriving sexp, compare, yojson, hlist, hash, eq]
 
-    let typ ?(array = Snarky.Typ.array) g ~length =
-      Snarky.Typ.of_hlistable [array ~length g; g] ~var_to_hlist:to_hlist
-        ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
+    let typ ?(array = Snarky_backendless.Typ.array) g ~length =
+      Snarky_backendless.Typ.of_hlistable [array ~length g; g]
+        ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
         ~value_of_hlist:of_hlist
   end
 
@@ -275,7 +275,7 @@ module Poly_comm = struct
 
     type 'g t = 'g Stable.Latest.t [@@deriving sexp, compare, yojson]
 
-    let typ g ~length = Snarky.Typ.array ~length g
+    let typ g ~length = Snarky_backendless.Typ.array ~length g
   end
 end
 
@@ -315,12 +315,12 @@ module Messages = struct
 
   let typ (type n) fq g ~dummy
       ~(commitment_lengths : (int, n) Vector.t Evals.t) =
-    let open Snarky.Typ in
+    let open Snarky_backendless.Typ in
     let {Evals.w_hat; z_hat_a; z_hat_b; h_1; h_2; h_3; g_1; g_2; g_3; _} =
       commitment_lengths
     in
     let array ~length elt =
-      let typ = Snarky.Typ.array ~length elt in
+      let typ = Snarky_backendless.Typ.array ~length elt in
       { typ with
         store=
           (fun a ->

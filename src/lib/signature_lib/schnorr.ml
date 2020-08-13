@@ -42,7 +42,7 @@ end
 consensus_mechanism]
 
 module type S = sig
-  module Impl : Snarky.Snark_intf.S
+  module Impl : Snarky_backendless.Snark_intf.S
 
   open Impl
 
@@ -117,7 +117,7 @@ module type S = sig
 end
 
 module Make
-    (Impl : Snarky.Snark_intf.S) (Curve : sig
+    (Impl : Snarky_backendless.Snark_intf.S) (Curve : sig
         open Impl
 
         module Scalar : sig
@@ -426,7 +426,7 @@ module Message = struct
     Random_oracle.Input.to_bits ~unpack:Field.unpack input
     |> Array.of_list |> Blake2.bits_to_string |> Blake2.digest_string
     |> Blake2.to_raw_string |> Blake2.string_to_bits |> Array.to_list
-    |> Fn.flip List.take (Int.min 256 (Field.size_in_bits - 1))
+    |> Fn.flip List.take (Int.min 256 (Tock.Field.size_in_bits - 1))
     |> Tock.Field.project
 
   let hash t ~public_key ~r =

@@ -7,7 +7,8 @@
   (libraries
     random_oracle_input
     core_kernel
-    pickles
     o1trace
-    snarky
+    pickles
+    random_oracle_input
+    snarky.backendless
     sponge ))

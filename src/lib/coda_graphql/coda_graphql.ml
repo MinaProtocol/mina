@@ -315,12 +315,12 @@ module Types = struct
       ~values:
         [enum_value "PLUS" ~value:Sgn.Pos; enum_value "MINUS" ~value:Sgn.Neg]
 
-  let signed_amount =
-    obj "SignedAmount" ~doc:"Signed amount" ~fields:(fun _ ->
+  let signed_fee =
+    obj "SignedFee" ~doc:"Signed fee" ~fields:(fun _ ->
         [ field "sign" ~typ:(non_null sign) ~doc:"+/-"
             ~args:Arg.[]
             ~resolve:(fun _ fee -> Currency.Amount.Signed.sgn fee)
-        ; field "amountMagnitude" ~typ:(non_null uint64) ~doc:"Amount"
+        ; field "feeMagnitude" ~typ:(non_null uint64) ~doc:"Fee"
             ~args:Arg.[]
             ~resolve:(fun _ fee ->
               Currency.Amount.(to_uint64 (Signed.magnitude fee)) ) ] )
@@ -340,7 +340,7 @@ module Types = struct
             ~args:Arg.[]
             ~resolve:(fun _ {Transaction_snark.Statement.target; _} ->
               Frozen_ledger_hash.to_string target )
-        ; field "feeExcess" ~typ:(non_null signed_amount)
+        ; field "feeExcess" ~typ:(non_null signed_fee)
             ~doc:
               "Total transaction fee that is not accounted for in the \
                transition from source ledger to target ledger"
@@ -693,9 +693,7 @@ module Types = struct
                      let delegate_key = delegate_account.public_key in
                      Some (get_best_ledger_account_pk coda delegate_key)
                    with e ->
-                     Logger.warn
-                       (Coda_lib.top_level_logger coda)
-                       ~module_:__MODULE__ ~location:__LOC__
+                     [%log' warn (Coda_lib.top_level_logger coda)]
                        ~metadata:[("error", `String (Exn.to_string e))]
                        "Could not retrieve delegate account from sparse \
                         ledger. The account may not be in the ledger: $error" ;
@@ -1522,10 +1520,13 @@ module Types = struct
     let create_token =
       let open Fields in
       obj "SendCreateTokenInput"
-        ~coerce:(fun token_owner fee valid_until memo nonce ->
-          (token_owner, fee, valid_until, memo, nonce) )
+        ~coerce:(fun fee_payer token_owner fee valid_until memo nonce ->
+          (fee_payer, token_owner, fee, valid_until, memo, nonce) )
         ~fields:
-          [ token_owner ~doc:"Public key to create the token for"
+          [ fee_payer_opt
+              ~doc:
+                "Public key to pay the fee from (defaults to the tokenOwner)"
+          ; token_owner ~doc:"Public key to create the token for"
           ; fee ~doc:"Fee amount in order to create a token"
           ; valid_until
           ; memo
@@ -2101,8 +2102,10 @@ module Mutations = struct
           [ arg "input" ~typ:(non_null Types.Input.create_token)
           ; Types.Input.Fields.signature ]
       ~resolve:
-        (fun {ctx= coda; _} () (token_owner, fee, valid_until, memo, nonce_opt)
+        (fun {ctx= coda; _} ()
+             (fee_payer_pk, token_owner, fee, valid_until, memo, nonce_opt)
              signature ->
+        let fee_payer_pk = Option.value ~default:token_owner fee_payer_pk in
         let body =
           User_command_payload.Body.Create_new_token
             { token_owner_pk= token_owner
@@ -2114,12 +2117,10 @@ module Mutations = struct
         match signature with
         | None ->
             send_unsigned_user_command ~coda ~nonce_opt ~signer:token_owner
-              ~memo ~fee ~fee_token ~fee_payer_pk:token_owner ~valid_until
-              ~body
+              ~memo ~fee ~fee_token ~fee_payer_pk ~valid_until ~body
         | Some signature ->
             send_signed_user_command ~coda ~nonce_opt ~signer:token_owner ~memo
-              ~fee ~fee_token ~fee_payer_pk:token_owner ~valid_until ~body
-              ~signature )
+              ~fee ~fee_token ~fee_payer_pk ~valid_until ~body ~signature )
 
   let create_token_account =
     io_field "createTokenAccount" ~doc:"Create a new account for a token"
@@ -2232,6 +2233,14 @@ module Mutations = struct
               | None ->
                   `Snd pk )
         in
+        [%log' info (Coda_lib.top_level_logger coda)]
+          ~metadata:
+            [ ( "old"
+              , [%to_yojson: Public_key.Compressed.t list]
+                  (Public_key.Compressed.Set.to_list old_block_production_keys)
+              )
+            ; ("new", [%to_yojson: Public_key.Compressed.t list] pks) ]
+          !"Block production key replacement; old: $old, new: $new" ;
         ignore
         @@ Coda_lib.replace_block_production_keypairs coda
              (Keypair.And_compressed_pk.Set.of_list unlocked) ;
@@ -2620,20 +2629,14 @@ module Queries = struct
       ~args:Arg.[]
       ~typ:(non_null @@ list @@ non_null Types.pending_work)
       ~resolve:(fun {ctx= coda; _} () ->
-        match
-          Coda_lib.best_staged_ledger coda |> Participating_state.active
-        with
-        | Some staged_ledger ->
-            let snark_pool = Coda_lib.snark_pool coda in
-            let fee_opt =
-              Coda_lib.(
-                Option.map (snark_worker_key coda) ~f:(fun _ ->
-                    snark_work_fee coda ))
-            in
-            let (module S) = Coda_lib.work_selection_method coda in
-            S.pending_work_statements ~snark_pool ~fee_opt ~staged_ledger
-        | None ->
-            [] )
+        let snark_job_state = Coda_lib.snark_job_state coda in
+        let snark_pool = Coda_lib.snark_pool coda in
+        let fee_opt =
+          Coda_lib.(
+            Option.map (snark_worker_key coda) ~f:(fun _ -> snark_work_fee coda))
+        in
+        let (module S) = Coda_lib.work_selection_method coda in
+        S.pending_work_statements ~snark_pool ~fee_opt snark_job_state )
 
   let genesis_constants =
     field "genesisConstants"

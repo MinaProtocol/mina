@@ -8,7 +8,6 @@
  "public_key1": {
     blocksCreated: x,
     transactionSent: x,
-    snarkWorkCreated: x,
     snarkFeesCollected: x,
     highestSnarkFeeCollected: x,
     transactionsReceivedByEcho: x,
@@ -52,30 +51,28 @@ let max = (a, b) => {
 };
 
 let filterBlocksByTimeWindow = (startTime, endTime, blocks) => {
-  Array.to_list(blocks)
-  |> List.filter((block: Types.NewBlock.data) => {
-       endTime < block.protocolState.date
-       && block.protocolState.date > startTime
-     })
-  |> Array.of_list;
+  blocks->Belt.Array.keep((block: Types.Block.t) => {
+    endTime < block.blockchainState.timestamp
+    && block.blockchainState.timestamp > startTime
+  });
 };
 
 // Gather metrics
 let getBlocksCreatedByUser = blocks => {
   blocks
   |> Array.fold_left(
-       (map, block: Types.NewBlock.data) => {
-         incrementMapValue(block.creatorAccount.publicKey, map)
+       (map, block: Types.Block.t) => {
+         incrementMapValue(block.blockchainState.creatorAccount, map)
        },
        StringMap.empty,
      );
 };
 
-let calculateTransactionSent = (map, block: Types.NewBlock.data) => {
-  block.transactions.userCommands
+let calculateTransactionSent = (map, block: Types.Block.t) => {
+  block.userCommands
   |> Array.fold_left(
-       (transactionMap, userCommand: Types.NewBlock.userCommands) => {
-         incrementMapValue(userCommand.fromAccount.publicKey, transactionMap)
+       (transactionMap, userCommand: Types.Block.UserCommand.t) => {
+         incrementMapValue(userCommand.fromAccount, transactionMap)
        },
        map,
      );
@@ -85,35 +82,37 @@ let getTransactionSentByUser = blocks => {
   blocks |> calculateProperty(calculateTransactionSent);
 };
 
-let calculateSnarkWorkCount = (map, block: Types.NewBlock.data) => {
-  block.snarkJobs
-  |> Array.fold_left(
-       (snarkMap, snarkJob: Types.NewBlock.snarkJobs) => {
-         incrementMapValue(snarkJob.prover, snarkMap)
-       },
-       map,
-     );
-};
+/*
+  Due to snarkJobs not being apart of the archive API, we calculate
+  snark fees differently in the meantime.
 
-let getSnarkWorkCreatedByUser = blocks => {
-  blocks |> calculateProperty(calculateSnarkWorkCount);
-};
-
-let calculateSnarkFeeSum = (map, block: Types.NewBlock.data) => {
-  block.snarkJobs
+  Snark fees will be calculated by inspecting fees paid out to snark
+  workers inside blocks. This means that if you get more than one
+  snark work included in a block we will measure as the sum of all fees
+  for the work that has been included.
+ */
+let calculateSnarkFeeSum = (map, block: Types.Block.t) => {
+  block.internalCommands
   |> Array.fold_left(
-       (map, snarkJob: Types.NewBlock.snarkJobs) => {
-         StringMap.update(
-           snarkJob.prover,
-           feeSum => {
-             let snarkFee = Int64.of_string(snarkJob.fee);
-             switch (feeSum) {
-             | Some(feeSum) => Some(Int64.add(snarkFee, feeSum))
-             | None => Some(snarkFee)
-             };
-           },
-           map,
-         )
+       (map, command: Types.Block.InternalCommand.t) => {
+         switch (
+           command.type_,
+           command.receiverAccount != block.blockchainState.creatorAccount,
+         ) {
+         | (FeeTransfer, true) =>
+           map
+           |> StringMap.update(
+                command.receiverAccount,
+                feeSum => {
+                  let snarkFee = Int64.of_string(command.fee);
+                  switch (feeSum) {
+                  | Some(feeSum) => Some(Int64.add(snarkFee, feeSum))
+                  | None => Some(snarkFee)
+                  };
+                },
+              )
+         | _ => map
+         }
        },
        map,
      );
@@ -123,21 +122,28 @@ let getSnarkFeesCollected = blocks => {
   blocks |> calculateProperty(calculateSnarkFeeSum);
 };
 
-let calculateHighestSnarkFeeCollected = (map, block: Types.NewBlock.data) => {
-  block.snarkJobs
+let calculateHighestSnarkFeeCollected = (map, block: Types.Block.t) => {
+  block.internalCommands
   |> Array.fold_left(
-       (map, snarkJob: Types.NewBlock.snarkJobs) => {
-         StringMap.update(
-           snarkJob.prover,
-           feeCount => {
-             let snarkFee = Int64.of_string(snarkJob.fee);
-             switch (feeCount) {
-             | Some(feeCount) => Some(max(snarkFee, feeCount))
-             | None => Some(snarkFee)
-             };
-           },
-           map,
-         )
+       (map, command: Types.Block.InternalCommand.t) => {
+         switch (
+           command.type_,
+           command.receiverAccount != block.blockchainState.creatorAccount,
+         ) {
+         | (FeeTransfer, true) =>
+           map
+           |> StringMap.update(
+                command.receiverAccount,
+                feeCount => {
+                  let snarkFee = Int64.of_string(command.fee);
+                  switch (feeCount) {
+                  | Some(feeCount) => Some(max(snarkFee, feeCount))
+                  | None => Some(snarkFee)
+                  };
+                },
+              )
+         | _ => map
+         }
        },
        map,
      );
@@ -150,17 +156,14 @@ let getHighestSnarkFeeCollected = blocks => {
 let getTransactionsSentToAddress = (blocks, addresses) => {
   blocks
   |> Array.fold_left(
-       (map, block: Types.NewBlock.data) => {
-         block.transactions.userCommands
+       (map, block: Types.Block.t) => {
+         block.userCommands
          |> Array.fold_left(
-              (map, userCommand: Types.NewBlock.userCommands) => {
+              (map, userCommand: Types.Block.UserCommand.t) => {
                 addresses
-                |> List.filter(address => {
-                     userCommand.toAccount.publicKey === address
-                   })
+                |> List.filter(address => {userCommand.toAccount === address})
                 |> List.length > 0
-                  ? incrementMapValue(userCommand.fromAccount.publicKey, map)
-                  : map
+                  ? incrementMapValue(userCommand.fromAccount, map) : map
               },
               map,
             )
@@ -169,25 +172,30 @@ let getTransactionsSentToAddress = (blocks, addresses) => {
      );
 };
 
-let getCoinbaseReceiverChallenge = blocks => {
-  blocks
+let calculateCoinbaseReceiverChallenge = (map, block: Types.Block.t) => {
+  block.internalCommands
   |> Array.fold_left(
-       (map, block: Types.NewBlock.data) => {
-         let creatorAccount = block.creatorAccount.publicKey;
-         switch (
-           Js.Nullable.toOption(block.transactions.coinbaseReceiverAccount)
-         ) {
-         | Some(account) =>
+       (map, command: Types.Block.InternalCommand.t) => {
+         switch (command.type_) {
+         | Coinbase =>
            StringMap.update(
-             block.creatorAccount.publicKey,
-             _ => Some(account.publicKey !== creatorAccount),
+             command.receiverAccount,
+             _ =>
+               Some(
+                 command.receiverAccount
+                 != block.blockchainState.creatorAccount,
+               ),
              map,
            )
-         | None => map
-         };
+         | _ => map
+         }
        },
-       StringMap.empty,
+       map,
      );
+};
+
+let getCoinbaseReceiverChallenge = blocks => {
+  blocks |> calculateProperty(calculateCoinbaseReceiverChallenge);
 };
 
 let throwAwayValues = metrics => {
@@ -206,7 +214,6 @@ let echoBotPublicKeys = [
 let calculateMetrics = blocks => {
   let blocksCreated = getBlocksCreatedByUser(blocks);
   let transactionSent = getTransactionSentByUser(blocks);
-  let snarkWorkCreated = getSnarkWorkCreatedByUser(blocks);
   let snarkFeesCollected = getSnarkFeesCollected(blocks);
   let highestSnarkFeeCollected = getHighestSnarkFeeCollected(blocks);
   let transactionsReceivedByEcho =
@@ -216,7 +223,6 @@ let calculateMetrics = blocks => {
   calculateAllUsers([
     throwAwayValues(blocksCreated),
     throwAwayValues(transactionSent),
-    throwAwayValues(snarkWorkCreated),
     throwAwayValues(snarkFeesCollected),
     throwAwayValues(highestSnarkFeeCollected),
     throwAwayValues(transactionsReceivedByEcho),
@@ -226,7 +232,6 @@ let calculateMetrics = blocks => {
        {
          Types.Metrics.blocksCreated: StringMap.find_opt(key, blocksCreated),
          transactionSent: StringMap.find_opt(key, transactionSent),
-         snarkWorkCreated: StringMap.find_opt(key, snarkWorkCreated),
          snarkFeesCollected: StringMap.find_opt(key, snarkFeesCollected),
          highestSnarkFeeCollected:
            StringMap.find_opt(key, highestSnarkFeeCollected),

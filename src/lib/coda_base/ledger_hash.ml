@@ -1,12 +1,12 @@
 open Core
 open Import
 open Snark_params
-open Snarky
+open Snarky_backendless
 open Tick
 open Let_syntax
 
 module Merkle_tree =
-  Snarky.Merkle_tree.Checked
+  Snarky_backendless.Merkle_tree.Checked
     (Tick)
     (struct
       type value = Field.t
