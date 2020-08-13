@@ -65,7 +65,7 @@ Broadcast Signed Transaction X to monitor status                     |
 
 This flow chart will guide our explanation of what is needed to build a full to-spec implementation of the API. Afterwards, we'll list out each proposed piece of work with details of how it should be implemented. Upon mergin of this RFC, each work item will become an issue on GitHub.
 
-The initial version of the construction API will _only_ support payments. We can quickly follow with a version that will support delgation as well. This RFC will talk about all the tasks assuming both payments and delegations are supported. All token-specific transactions (and any future transactions) are not yet supported and out-of-scope for this RFC.
+The initial version of the construction API will _only_ support payments. We can quickly follow with a version that will support delgation as well. This RFC will talk about all the tasks assuming both payments and delegation are supported. All token-specific transactions (and any future transactions) are not yet supported and out-of-scope for this RFC.
 
 ### Flow chart
 
@@ -298,7 +298,7 @@ type payment = {
 type transaction = stakeDelegation | payment
 ```
 
-Note that our client-sdk only has support for signing payments and delegation but this version of the construction API only supports those transactions types as well.
+Note that our client-sdk only has support for signing payments and delegations but this version of the construction API only supports those transactions types as well.
 
 #### Payloads Endpoint
 
