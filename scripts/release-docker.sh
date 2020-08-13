@@ -53,6 +53,10 @@ coda-daemon)
 coda-demo)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-coda-demo"
   DOCKER_CONTEXT="."
+coda-rosetta)
+  DOCKERFILE_PATH="dockerfiles/Dockerfile-rosetta"
+  mkdir some_empty_dir
+  DOCKER_CONTEXT="./some_empty_dir"
   ;;
 *)
 esac
