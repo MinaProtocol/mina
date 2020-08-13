@@ -12,6 +12,9 @@ let OpamInit = ../Command/OpamInit.dhall
 let Summon = ../Command/Summon/Type.dhall
 let Size = ../Command/Size.dhall
 let Libp2p = ../Command/Libp2pHelperBuild.dhall
+let DockerArtifact = ../Command/DockerArtifact.dhall
+
+let dependsOn = [ { name = "Artifact", key = "artifacts-build" } ]
 
 in
 Pipeline.build
@@ -39,6 +42,7 @@ Pipeline.build
           label = "Build artifacts",
           key = "artifacts-build",
           target = Size.Large
-        }
+        },
+      DockerArtifact.generateStep dependsOn
     ]
   }
