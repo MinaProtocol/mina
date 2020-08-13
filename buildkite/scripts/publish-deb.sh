@@ -56,6 +56,7 @@ fi
 
 set -x
 # Export variables for use with downstream steps
+echo "export CODA_SERVICE=coda-daemon" >> ./DOCKER_DEPLOY_ENV
 echo "export CODA_VERSION=$VERSION" >> ./DOCKER_DEPLOY_ENV
 echo "export CODA_DEB_VERSION=$VERSION" >> ./DOCKER_DEPLOY_ENV
 echo "export CODA_PROJECT=$PROJECT" >> ./DOCKER_DEPLOY_ENV
