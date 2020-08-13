@@ -9,8 +9,8 @@ module Tock = struct
   let group_map_params () = Lazy.force Group_map_params.params
 
   include Full.Internal_Basic
-  module Number = Snarky.Number.Make (Full.Internal_Basic)
-  module Enumerable = Snarky.Enumerable.Make (Full.Internal_Basic)
+  module Number = Snarky_backendless.Number.Make (Full.Internal_Basic)
+  module Enumerable = Snarky_backendless.Enumerable.Make (Full.Internal_Basic)
   module Inner_curve = Pickles.Backend.Tock.Inner_curve
 end
 
@@ -24,7 +24,7 @@ module Tick = struct
       Pickles.Backend.Tock.Inner_curve.Params.{a; b}
 
   include Full.Internal_Basic
-  module Number = Snarky.Number.Make (Full.Internal_Basic)
-  module Enumerable = Snarky.Enumerable.Make (Full.Internal_Basic)
+  module Number = Snarky_backendless.Number.Make (Full.Internal_Basic)
+  module Enumerable = Snarky_backendless.Enumerable.Make (Full.Internal_Basic)
   module Inner_curve = Pickles.Backend.Tick.Inner_curve
 end

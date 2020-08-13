@@ -16,13 +16,13 @@ type ('local_statement, 'local_max_branching, 'local_num_branches) t =
     , ( Challenge.Make(Impl).t Scalar_challenge.t
       , Impl.Boolean.var )
       Types.Bulletproof_challenge.t
-      Types.Bp_vec.t
+      Types.Step_bp_vec.t
     , 'local_num_branches One_hot_vector.t )
     Types.Dlog_based.Proof_state.t
   * (Impl.Field.t array Dlog_marlin_types.Evals.t * Impl.Field.t)
     Tuple_lib.Triple.t
   * (Step_main_inputs.Inner_curve.t, 'local_max_branching) Vector.t
-  * ((Impl.Field.t, Rounds.n) Vector.t, 'local_max_branching) Vector.t
+  * ((Impl.Field.t, Tick.Rounds.n) Vector.t, 'local_max_branching) Vector.t
   * Wrap_proof.var
 
 module Constant = struct
@@ -40,13 +40,13 @@ module Constant = struct
       , ( Challenge.Constant.t Scalar_challenge.t
         , bool )
         Types.Bulletproof_challenge.t
-        Types.Bp_vec.t
+        Types.Step_bp_vec.t
       , Types.Index.t )
       Types.Dlog_based.Proof_state.t
     * (Tick.Field.t array Dlog_marlin_types.Evals.t * Tick.Field.t)
       Tuple_lib.Triple.t
     * (Tick.Inner_curve.Affine.t, 'local_max_branching) Vector.t
-    * ((Tick.Field.t, Rounds.n) Vector.t, 'local_max_branching) Vector.t
+    * ((Tick.Field.t, Tick.Rounds.n) Vector.t, 'local_max_branching) Vector.t
     * Wrap_proof.t
 end
 
@@ -62,11 +62,14 @@ let typ (type n avar aval m) (statement : (avar, aval) Impls.Step.Typ.t)
     Typ.transport (One_hot_vector.typ local_branches) ~there:Types.Index.to_int
       ~back:(fun x -> Option.value_exn (Types.Index.of_int x))
   in
-  Snarky.Typ.tuple6 statement
+  Snarky_backendless.Typ.tuple6 statement
     (Types.Dlog_based.Proof_state.typ Challenge.typ Fp.typ Boolean.typ
-       Other_field.typ (Snarky.Typ.unit ()) Digest.typ index)
+       Other_field.typ
+       (Snarky_backendless.Typ.unit ())
+       Digest.typ index)
     (let lengths =
        Commitment_lengths.of_domains_vector step_domains
+         ~max_degree:Common.Max_degree.step
        |> Dlog_marlin_types.Evals.map ~f:(Vector.reduce_exn ~f:Core.Int.max)
      in
      let t =
@@ -77,5 +80,5 @@ let typ (type n avar aval m) (statement : (avar, aval) Impls.Step.Typ.t)
      in
      Typ.tuple3 t t t)
     (Vector.typ Inner_curve.typ local_max_branching)
-    (Vector.typ (Vector.typ Field.typ Rounds.n) local_max_branching)
+    (Vector.typ (Vector.typ Field.typ Tick.Rounds.n) local_max_branching)
     Wrap_proof.typ
