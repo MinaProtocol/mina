@@ -48,12 +48,14 @@ PROJECT="coda-$(echo "$DUNE_PROFILE" | tr _ -)"
 BUILD_NUM=${BUILDKITE_BUILD_NUM}
 BUILD_URL=${BUILDKITE_BUILD_URL}
 
-if [ "$GITBRANCH" == "master" ]; then
+if [[ "$GITBRANCH" == "master" ]]; then
     VERSION="${GITTAG}-${GITHASH}"
     DOCKER_TAG="$(echo "${VERSION}" | sed 's!/!-!; s!_!-!g')"
+    BUILD_ROSETTA=true
 else
     VERSION="${GITTAG}+${BUILD_NUM}-${GITBRANCH}-${GITHASH}-PV${PVKEYHASH}"
     DOCKER_TAG="$(echo "${GITTAG}-${GITBRANCH}" | sed 's!/!-!; s!_!-!g')"
+    [[ "${GITBRANCH}" == "develop" ]] || [[ "${GITBRANCH}" == rosetta/* ]] && BUILD_ROSETTA=true
 fi
 
 set -x
@@ -67,5 +69,6 @@ echo "export CODA_GIT_BRANCH=$GITBRANCH" >> ./DOCKER_DEPLOY_ENV
 echo "export CODA_GIT_TAG=$GITTAG" >> ./DOCKER_DEPLOY_ENV
 echo "export CODA_DEB_REPO=$CODENAME" >> ./DOCKER_DEPLOY_ENV
 echo "export CODA_WAS_PUBLISHED=true" >> ./DOCKER_DEPLOY_ENV
+echo "export CODA_BUILD_ROSETTA=$ROSETTA" >> ./DOCKER_DEPLOY_ENV
 set +x
 
