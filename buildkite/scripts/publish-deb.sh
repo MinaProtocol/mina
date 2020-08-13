@@ -48,14 +48,16 @@ PROJECT="coda-$(echo "$DUNE_PROFILE" | tr _ -)"
 BUILD_NUM=${BUILDKITE_BUILD_NUM}
 BUILD_URL=${BUILDKITE_BUILD_URL}
 
+[[ -n "$BUILDKITE_BRANCH" ]] && GITBRANCH=$(echo "$BUILDKITE_BRANCH" | sed 's!/!-!; s!_!-!g')
+
 if [[ "$BUILDKITE_BRANCH" == "master" ]]; then
     VERSION="${GITTAG}-${GITHASH}"
     DOCKER_TAG="$(echo "${VERSION}" | sed 's!/!-!; s!_!-!g')"
     BUILD_ROSETTA=true
 else
-    VERSION="${GITTAG}+${BUILD_NUM}-${BUILDKITE_BRANCH}-${GITHASH}-PV${PVKEYHASH}"
-    DOCKER_TAG="$(echo "${GITTAG}-${BUILDKITE_BRANCH}" | sed 's!/!-!g; s!_!-!g')"
-    [[ "${BUILDKITE_BRANCH}" == "develop" ]] || [[ "${BUILDKITE_BRANCH}" == rosetta* ]] && BUILD_ROSETTA=true
+    VERSION="${GITTAG}+${BUILD_NUM}-${GITBRANCH}-${GITHASH}-PV${PVKEYHASH}"
+    DOCKER_TAG="$(echo "${GITTAG}-${GITBRANCH}" | sed 's!/!-!g; s!_!-!g')"
+    [[ "${BUILDKITE_BRANCH}" == "develop" ]] || [[ "${BUILDKITE_BRANCH}" == rosetta/* ]] && BUILD_ROSETTA=true
 fi
 
 set -x
