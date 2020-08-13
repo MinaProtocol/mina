@@ -17,7 +17,9 @@ open Hash_prefixes
 
 let salt (s : Hash_prefixes.t) = Random_oracle.salt (s :> string)
 
-let receipt_chain = salt receipt_chain
+let receipt_chain_user_command = salt receipt_chain_user_command
+
+let receipt_chain_snapp = salt receipt_chain_snapp
 
 let coinbase = salt coinbase
 
@@ -74,4 +76,12 @@ let transition_system_snark = salt transition_system_snark
 
 let account = salt account
 
+let side_loaded_vk = salt side_loaded_vk
+
 let snapp_account = salt snapp_account
+
+let snapp_payload = salt snapp_payload
+
+let snapp_predicate_account = salt snapp_predicate_account
+
+let snapp_predicate_protocol_state = salt snapp_predicate_protocol_state
