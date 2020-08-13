@@ -55,7 +55,7 @@ if [[ "$BUILDKITE_BRANCH" == "master" ]]; then
 else
     VERSION="${GITTAG}+${BUILD_NUM}-${BUILDKITE_BRANCH}-${GITHASH}-PV${PVKEYHASH}"
     DOCKER_TAG="$(echo "${GITTAG}-${BUILDKITE_BRANCH}" | sed 's!/!-!; s!_!-!g')"
-    [[ "${GITBRANCH}" == "develop" ]] || [[ "${BUILDKITE_BRANCH}" == rosetta/* ]] && BUILD_ROSETTA=true
+    [[ "${BUILDKITE_BRANCH}" == "develop" ]] || [[ "${BUILDKITE_BRANCH}" == rosetta/* ]] && BUILD_ROSETTA=true
 fi
 
 set -x
