@@ -8,7 +8,7 @@
    dummy_values
    genesis_proof
    snark_keys
-   snarky)
+   snarky.backendless)
  (ppx_runtime_libraries base)
  (preprocess
   (pps ppx_version ppx_jane ppxlib.metaquot)))

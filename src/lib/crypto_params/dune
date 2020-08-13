@@ -8,7 +8,7 @@
   cache_dir
   hash_prefixes
   group_map
-  snarky
+  snarky.backendless
   pickles
   bignum_bigint
   bowe_gabizon_hash

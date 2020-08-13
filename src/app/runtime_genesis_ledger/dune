@@ -14,7 +14,7 @@
     coda_runtime_config
     snark_keys
     snark_params
-    snarky
+    snarky.backendless
     staged_ledger)
   (preprocessor_deps ../../config.mlh)
   (preprocess (pps ppx_version ppx_let ppx_optcomp ppx_deriving_yojson)))

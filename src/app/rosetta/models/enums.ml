@@ -1,5 +1,5 @@
-type curvetype = [`Tweedle] [@@deriving yojson, show]
+type curvetype = (* tweedle *) string [@@deriving yojson, show]
 
-type signaturetype = [`Schnorr] [@@deriving yojson, show]
+type signaturetype = (* schnorr *) string [@@deriving yojson, show]
 
 type coinaction = () [@@deriving yojson, show]

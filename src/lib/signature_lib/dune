@@ -11,7 +11,7 @@
    ppx_version.runtime
    random_oracle
    snark_params
-   snarky
+   snarky.backendless
    yojson)
  (preprocessor_deps ../../config.mlh)
  (preprocess (pps

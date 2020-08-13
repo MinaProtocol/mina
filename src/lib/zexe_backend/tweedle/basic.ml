@@ -2,6 +2,14 @@ open Core_kernel
 open Snarky_bn382
 open Zexe_backend_common
 
+module Rounds = struct
+  open Pickles_types.Nat
+
+  module Wrap : Add.Intf_transparent = N19
+
+  module Step : Add.Intf_transparent = N19
+end
+
 module Bigint256 =
   Zexe_backend_common.Bigint.Make
     (Bigint256)
