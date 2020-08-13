@@ -279,7 +279,7 @@ Specifically this is the user command having been transformed into a `Transactio
 00 00 00 05  # 4-byte prefix for length of array (little endian)
              #
 xx xx ...    # each field encoded as a 32-bytes each one for each of the length
-yy yy ...    #     (little endian) (same represenation as above Fq.t)
+yy yy ...    #     (little endian) (same represenation as above Fq.t above)
              #
 A4 43 D4 ... # the bool list compacted into a bitstring, pad the last 1 byte with extra zeros on the right
 ```
@@ -348,7 +348,6 @@ Since we'll later be broadcasting the signed transaction via GraphQL, our signed
 // Signature encoding
 
 a signature is a field and a scalar
-        Fp                     Fq
 |----- field 32bytes ----|---- scalar 32bytes ---|
 Use the same hex-encoded little endian represenation as described above for
 the public key for these 64 bytes
