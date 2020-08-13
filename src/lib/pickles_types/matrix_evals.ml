@@ -4,12 +4,13 @@ module H_list = Snarky_backendless.H_list
 [%%versioned
 module Stable = struct
   module V1 = struct
-    type 'a t = {row: 'a; col: 'a; value: 'a; rc: 'a} [@@deriving sexp, fields]
+    type 'a t = {row: 'a; col: 'a; value: 'a; rc: 'a}
+    [@@deriving sexp, eq, compare, hash, yojson, hlist, fields]
   end
 end]
 
 type 'a t = 'a Stable.Latest.t = {row: 'a; col: 'a; value: 'a; rc: 'a}
-[@@deriving sexp, fields, hlist]
+[@@deriving sexp, eq, compare, hash, yojson, hlist, fields]
 
 let typ g =
   Snarky_backendless.Typ.of_hlistable [g; g; g; g] ~var_to_hlist:to_hlist

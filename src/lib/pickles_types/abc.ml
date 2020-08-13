@@ -4,12 +4,12 @@ open Core_kernel
 module Stable = struct
   module V1 = struct
     type 'a t = {a: 'a; b: 'a; c: 'a}
-    [@@deriving fields, sexp, compare, yojson]
+    [@@deriving sexp, eq, compare, hash, yojson, hlist, fields]
   end
 end]
 
 type 'a t = 'a Stable.Latest.t = {a: 'a; b: 'a; c: 'a}
-[@@deriving fields, sexp, compare, yojson, hlist]
+[@@deriving sexp, eq, compare, hash, yojson, hlist, fields]
 
 let typ (type a b f) (g : (a, b, f) Snarky_backendless.Typ.t) :
     (a t, b t, f) Snarky_backendless.Typ.t =
