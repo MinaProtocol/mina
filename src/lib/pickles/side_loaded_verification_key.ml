@@ -49,7 +49,7 @@ module Width : sig
 
   val typ : (Checked.t, t) Typ.t
 
-  module Max : Nat.Add.Intf
+  module Max : Nat.Add.Intf_transparent
 end = struct
   [%%versioned
   module Stable = struct

@@ -26,7 +26,7 @@ module Dlog_based = struct
           ; beta_1: 'scalar_challenge
           ; beta_2: 'scalar_challenge
           ; beta_3: 'scalar_challenge }
-        [@@deriving bin_io, sexp, compare, yojson, hlist]
+        [@@deriving bin_io, sexp, compare, yojson, hlist, hash, eq]
 
         let map_challenges
             { sigma_2
@@ -78,7 +78,7 @@ module Dlog_based = struct
         ; xi: 'scalar_challenge
         ; bulletproof_challenges: 'bulletproof_challenges
         ; which_branch: 'index }
-      [@@deriving bin_io, sexp, compare, yojson, hlist]
+      [@@deriving bin_io, sexp, compare, yojson, hlist, hash, eq]
 
       let map_challenges
           { marlin
@@ -111,7 +111,7 @@ module Dlog_based = struct
     module Me_only = struct
       type ('g1, 'bulletproof_challenges) t =
         {sg: 'g1; old_bulletproof_challenges: 'bulletproof_challenges}
-      [@@deriving bin_io, sexp, compare, yojson, hlist]
+      [@@deriving bin_io, sexp, compare, yojson, hlist, hash, eq]
 
       let to_field_elements {sg; old_bulletproof_challenges}
           ~g1:g1_to_field_elements =
@@ -149,7 +149,7 @@ module Dlog_based = struct
       ; sponge_digest_before_evaluations: 'digest
             (* Not needed by other proof system *)
       ; me_only: 'me_only }
-    [@@deriving bin_io, sexp, compare, yojson, hlist]
+    [@@deriving bin_io, sexp, compare, yojson, hlist, hash, eq]
 
     let typ chal fp bool fq me_only digest index =
       Snarky.Typ.of_hlistable
@@ -230,7 +230,7 @@ module Dlog_based = struct
           , 'index )
           Proof_state.t
       ; pass_through: 'pass_through }
-    [@@deriving bin_io, compare, yojson, sexp]
+    [@@deriving bin_io, compare, yojson, sexp, hash, eq]
 
     let spec =
       let open Spec in

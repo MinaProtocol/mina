@@ -1,7 +1,7 @@
 open Core_kernel
 open Pickles_types
 
-type t = char [@@deriving sexp, bin_io, sexp, compare, yojson]
+type t = char [@@deriving sexp, bin_io, sexp, compare, yojson, hash, eq]
 
 let of_int = Char.of_int
 

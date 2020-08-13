@@ -1,6 +1,6 @@
 open Pickles_types
 
-type t [@@deriving sexp, bin_io, sexp, compare, yojson]
+type t [@@deriving sexp, bin_io, sexp, compare, yojson, hash, eq]
 
 val of_int : int -> t option
 
