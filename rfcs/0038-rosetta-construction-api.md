@@ -272,7 +272,7 @@ This is a simple GraphQL query. This endpoint should be easy to implement.
 
 The Rosetta spec leaves the encoding of unsigned transactions implementation-defined. Since we want to make it easy for alternate signers to be created (eg. the ledger), we'll want this encoding to be some faithful representation of the bytes upon which the signature operation acts.
 
-Specifically this is the user command having been transformed into a `Transaction_union_payload.t` and then hashed into a `(field, bool) Random_oracle_input.t`. We will serialzie the Random_oracle_input with a custom protocol as defined below and send that byte-buffer as hex-encoded ascii.
+Specifically this is the user command having been transformed into a `Transaction_union_payload.t` and then hashed into a `(field, bool) Random_oracle_input.t`. We will serialize the Random_oracle_input with a custom protocol as defined below and send that byte-buffer as hex-encoded ascii.
 
 ```
 // Serialization schema for Random oracle input
@@ -285,14 +285,12 @@ yy yy ...    #     (little endian) (same represenation as above Fq.t above)
 A4 43 D4 ... # the bool list compacted into a bitstring, pad the last 1 byte with extra zeros on the right
 ```
 
-Another important property of the unsigned-transaction and signed-transaction representations is that they are reversible. As we must later implement
-
-The `unsigned_transaction_string` is then a `JSON` input (stringified) conforming to the following schema:
+Another important property of the unsigned-transaction and signed-transaction representations is that they are reversible. The `unsigned_transaction_string` is then a `JSON` input (stringified) conforming to the following schema:
 
 ```
 { randomOracleInput : string (* Random_oracle_input.t |> to_bytes |> to_hex  *)
-, stakeDelegation: StakeDelegation?
 , payment: Payment?
+, stakeDelegation: StakeDelegation?
 }
 // where stakeDelegation and payemnt are currently defined in the client-sdk shown below
 // it is an error to treat stakeDelegation / payment in any way other than a variant, but it is encoded unsafely like this becuase JSON is garbage-fire and can't represent sum types ergonomically
@@ -325,7 +323,7 @@ type payment = {
 
 Note that our client-sdk only has support for signing payments and delegations but this version of the construction API only supports those transactions types as well. We'll default to the client-sdk for now.
 
-Additionally, we should expose a new method in the client-sdk to feed the raw `Random_oracle.Input.t` to signer logic in addition to going through the normal flow. The Client-sdk implementation should enforce that these two implementations agree, and fail hard otherwise.
+Additionally, we should expose a new method in the client-sdk to feed the raw `Random_oracle.Input.t` to signer logic in addition to going through the existing signPayment and signDelegation ones. The Client-sdk implementation should enforce that these two implementations agree with an adjustment to our CI unit test.
 
 #### Payloads Endpoint
 
@@ -357,8 +355,8 @@ the public key for these 64 bytes
 ```
 {
   signature: string (* Signature as described above *),
-  sendPaymentInput: payment?,
-  sendDelegationInput: stakeDelegation?
+  payment: payment?,
+  stakeDelegation: stakeDelegation?
 }
 ```
 
