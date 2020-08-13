@@ -75,7 +75,7 @@ module Side_loaded = struct
     ; typ
     ; branches
     ; wrap_domains= Common.wrap_domains
-    ; wrap_key }
+    ; wrap_key= Matrix_evals.map ~f:(Abc.map ~f:Array.of_list) wrap_key }
 end
 
 module Compiled = struct

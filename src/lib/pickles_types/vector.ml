@@ -320,14 +320,28 @@ struct
     Common.raise_variant_wrong_type "vector" !pos_ref
 end
 
+type ('a, 'n) vec = ('a, 'n) t
+
 module With_length (N : Nat.Intf) = struct
-  type nonrec 'a t = ('a, N.n) t
+  module Stable = struct
+    module V1 = struct
+      type 'a t = ('a, N.n) vec [@@deriving version {asserted}]
 
-  let compare c t1 t2 = Base.List.compare c (to_list t1) (to_list t2)
+      let compare c t1 t2 = Base.List.compare c (to_list t1) (to_list t2)
 
-  include Yojson (N)
-  include Binable (N)
-  include Sexpable (N)
+      let hash_fold_t f s v = List.hash_fold_t f s (to_list v)
+
+      let equal f t1 t2 = List.equal f (to_list t1) (to_list t2)
+
+      include Yojson (N)
+      include Binable (N)
+      include Sexpable (N)
+    end
+
+    module Latest = V1
+  end
+
+  include Stable.Latest
 
   let map (t : 'a t) = map t
 end

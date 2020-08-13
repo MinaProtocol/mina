@@ -83,12 +83,32 @@ module Sexpable (N : Nat.Intf) : Sexpable.S1 with type 'a t := ('a, N.n) t =
       let of_sexpable xs = of_list_and_length_exn xs N.n
     end)
 
+type ('a, 'n) at_most = ('a, 'n) t
+
 module With_length (N : Nat.Intf) = struct
-  type nonrec 'a t = ('a, N.n) t
+  module Stable = struct
+    module V1 = struct
+      type 'a t = ('a, N.n) at_most [@@deriving version {asserted}]
 
-  let compare c t1 t2 = Base.List.compare c (to_list t1) (to_list t2)
+      let compare c t1 t2 = Base.List.compare c (to_list t1) (to_list t2)
 
-  include Yojson (N)
-  include Binable (N)
-  include Sexpable (N)
+      let hash_fold_t f s v = List.hash_fold_t f s (to_list v)
+
+      let equal f t1 t2 = List.equal f (to_list t1) (to_list t2)
+
+      include Binable (N)
+      include Sexpable (N)
+      include Yojson (N)
+    end
+
+    module Latest = V1
+  end
+
+  include Stable.Latest
 end
+
+let typ ~padding elt n =
+  let lte = Nat.Lte.refl n in
+  let there v = extend_to_vector v padding n in
+  let back v = of_vector v lte in
+  Vector.typ elt n |> Snarky_backendless.Typ.transport ~there ~back
