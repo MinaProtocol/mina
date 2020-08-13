@@ -4,7 +4,8 @@
 # we have to trustlist and configure image builds individually because each one is going to be slightly different. 
 # This is needed as opposed to trusting the structure of the each project to be consistent for every deployable. 
 
-set -e+x
+set -e
+set +x
 
 CLEAR='\033[0m'
 RED='\033[0;31m'
