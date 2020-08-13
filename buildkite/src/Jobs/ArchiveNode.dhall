@@ -49,7 +49,7 @@ Pipeline.build
                   ])
             , label = "Archive-node unit tests"
             , key = "build-client-sdk"
-            , target = Size.Large
+            , target = Size.Medium
             , docker = None Docker.Type
             , artifact_paths = [ S.contains "test_output/artifacts/*" ]
             }
