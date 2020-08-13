@@ -85,13 +85,13 @@ The [derivation endpoint](#derivation-endpoint) would be responsible for reading
 
 [preprocess]: #preprocess
 
-The [preprocess endpoint](#preprocess-endpoint) takes a proposed set of operations for which we'll need to [clearly specify examples for different transactions](#operations-docs). It assures they can be [converted into transactions](#inverted-operations-map) and it returns an input that is needed for the [metadata](#metadata) phase during which we can gather info on-chain. In our case, this is just the sender's public key.
+The [preprocess endpoint](#preprocess-endpoint) takes a proposed set of operations for which we'll need to [clearly specify examples for different transactions](#operations-docs). It assures they can be [converted into transactions](#inverted-operations-map) and it returns an input that is needed for the [metadata](#metadata) phase during which we can gather info on-chain. In our case, this is just the sender's public key+token_id.
 
 #### Metadata
 
 [metadata]: #metadata
 
-The [metadata endpoint](#metadata-endpoint) takes the senders public key and returns which nonce to use for transaction construction.
+The [metadata endpoint](#metadata-endpoint) takes the senders public key+token_id and returns which nonce to use for transaction construction.
 
 #### Payloads
 
@@ -244,12 +244,13 @@ Write a function that recovers the transactions that are associated with some se
 
 [via Preprocess](#preprocess)
 
-First [invert the operations](#inverted-operations-map) into a transaction, we find the sender and include the public key in the response. The options type will be defined as follows:
+First [invert the operations](#inverted-operations-map) into a transaction, we find the sender and include the address in the response (note that on our network an address is made up of a token id and a sender). The options type will be defined as follows:
 
 ```ocaml
 module Options = struct
   type t =
     { sender : string (* base58-ecoded compressed public key *)
+    ; token_id : string (* uint64 encoded as string *)
     }
     [@@deriving yojson]
 end
