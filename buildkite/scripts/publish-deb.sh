@@ -35,7 +35,7 @@ set +x
 echo "Exporting Variables: "
 
 GITHASH=$(git rev-parse --short=7 HEAD)
-GITBRANCH=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD |  sed 's!/!-!; s!_!-!g' )
+#GITBRANCH=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD |  sed 's!/!-!; s!_!-!g' )
 GITTAG=$(git describe --abbrev=0)
 
 
@@ -48,14 +48,14 @@ PROJECT="coda-$(echo "$DUNE_PROFILE" | tr _ -)"
 BUILD_NUM=${BUILDKITE_BUILD_NUM}
 BUILD_URL=${BUILDKITE_BUILD_URL}
 
-if [[ "$GITBRANCH" == "master" ]]; then
+if [[ "$BUILDKITE_BRANCH" == "master" ]]; then
     VERSION="${GITTAG}-${GITHASH}"
     DOCKER_TAG="$(echo "${VERSION}" | sed 's!/!-!; s!_!-!g')"
     BUILD_ROSETTA=true
 else
-    VERSION="${GITTAG}+${BUILD_NUM}-${GITBRANCH}-${GITHASH}-PV${PVKEYHASH}"
-    DOCKER_TAG="$(echo "${GITTAG}-${GITBRANCH}" | sed 's!/!-!; s!_!-!g')"
-    [[ "${GITBRANCH}" == "develop" ]] || [[ "${GITBRANCH}" == rosetta/* ]] && BUILD_ROSETTA=true
+    VERSION="${GITTAG}+${BUILD_NUM}-${BUILDKITE_BRANCH}-${GITHASH}-PV${PVKEYHASH}"
+    DOCKER_TAG="$(echo "${GITTAG}-${BUILDKITE_BRANCH}" | sed 's!/!-!; s!_!-!g')"
+    [[ "${GITBRANCH}" == "develop" ]] || [[ "${BUILDKITE_BRANCH}" == rosetta/* ]] && BUILD_ROSETTA=true
 fi
 
 set -x
