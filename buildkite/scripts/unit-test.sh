@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -o pipefail
+set -eo pipefail
 
 if [[ $# -ne 2 ]]; then
     echo "Usage: $0 <dune-profile> <path-to-source-tests>"
