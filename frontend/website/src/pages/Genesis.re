@@ -174,23 +174,23 @@ module Styles = {
 [@react.component]
 let make = (~profiles) => {
   <Page
-    title="Genesis"
-    description="Join Genesis. Become one of 1000 community members to receive a grant of 66,000 coda tokens. You'll participate in activities that will strengthen the Coda network and community.">
+    title="This is Genesis"
+    description="Join Genesis. We need your help to launch the world's lightest blockchain.">
     <Wrapped>
       <div className=Styles.page>
         <div className=Styles.heroRow>
           <div className=Styles.heroText>
-            <h1 className=Styles.heroHeading> {React.string("Genesis")} </h1>
+            <h1 className=Styles.heroHeading> {React.string("This is Genesis")} </h1>
             <Spacer height=2. />
             <h3 className=Styles.heroH3>
               {React.string(
-                 "Become one of 1000 community members to receive a token grant.",
+                 "We need your help to launch the world's lightest blockchain.",
                )}
             </h3>
             <Spacer height=1. />
             <p className=Styles.heroCopy>
               {React.string(
-                 "You'll complete challenges on testnet, learn how to operate the protocol, receive public recognition on our leaderboard, and help to strengthen the Coda network and community.",
+                 "A blockchain is only as strong as its community, and here at Coda our community is paramount to our success. We're looking for new Genesis founding members to join the community to learn how to operate the protocol, take part in challenges on testnet, and help to strengthen the Coda community.",
                )}
             </p>
             <Spacer height=2. />
@@ -209,14 +209,15 @@ let make = (~profiles) => {
         </div>
         <Spacer height=3. />
         <h1 className=Styles.textBlockHeading>
-          {React.string("Become a Genesis Founding Member")}
+          {React.string("Could you be our next Genesis Founding Member?")}
         </h1>
         <div className=Styles.textBlock>
           <p className=Styles.heroCopy>
             {React.string(
-               "Becoming a Genesis founding member is the highest honor in the Coda community.
-             You'll have an opportunity to strengthen and harden the protocol, create tooling
-              and documentation, and build the community.",
+               "We're offering token grants of 66,000 coda for community members \
+               who can help us strengthen the Coda Protocol, create tooling and documentation, \
+               and build the community. As a validator on Coda, you will be the backbone of a \
+               robust, decentralized blockchain and received block rewards for securing the network.",
              )}
           </p>
           <Spacer height=0.25 />
