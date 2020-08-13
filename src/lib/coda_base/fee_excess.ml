@@ -178,6 +178,13 @@ let to_input_checked {fee_token_l; fee_excess_l; fee_token_r; fee_excess_r} =
     ; fee_token_r
     ; Fee.Signed.Checked.to_input fee_excess_r ]
 
+let assert_equal_checked (t1 : var) (t2 : var) =
+  Checked.all_unit
+    [ Token_id.Checked.Assert.equal t1.fee_token_l t2.fee_token_l
+    ; Fee.Signed.Checked.assert_equal t1.fee_excess_l t2.fee_excess_l
+    ; Token_id.Checked.Assert.equal t1.fee_token_r t2.fee_token_r
+    ; Fee.Signed.Checked.assert_equal t1.fee_excess_r t2.fee_excess_r ]
+
 [%%endif]
 
 (** Eliminate a fee excess, either by combining it with one to the left/right,

@@ -82,7 +82,7 @@ let make = (~account, ~onClose, ~onSuccess) => {
             {React.string(" ")}
             <AccountName pubkey=account />
             {React.string(". ")}
-            {if (PublicKey.toString(account) == "4vsRCVMNTrCx4NpN6kKTkFKLcFN4vXUP5RB9PqSZe1qsyDs4AW5XeNgAf16WUPRBCakaPiXcxjp6JUpGNQ6fdU977x5LntvxrSg11xrmK6ZDaGSMEGj12dkeEpyKcEpkzcKwYWZ2Yf2vpwQP") {
+            {if (PublicKey.toString(account) == "B62qrPN5Y5yq8kGE3FbVKbGTdTAJNdtNtB5sNVpxyRwWGcDEhpMzc8g") {
                 <FormattedMessage
                    id="unlock-modal.please-enter-password-hack"
                    defaultMessage="Leave password blank for this account."

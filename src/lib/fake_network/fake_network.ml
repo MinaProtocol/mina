@@ -96,7 +96,7 @@ let setup (type n) ?(logger = Logger.null ())
                         (Staged_ledger.Scan_state.hash scan_state)
                         expected_merkle_root pending_coinbases
                     in
-                    Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+                    [%log debug]
                       ~metadata:
                         [ ( "staged_ledger_hash"
                           , Staged_ledger_hash.to_yojson staged_ledger_hash )

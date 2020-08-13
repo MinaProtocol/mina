@@ -1,6 +1,7 @@
 open Intf
 open Core
 open Snarky_bn382
+module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint
 
 module type Input_intf = sig
   include Type_with_delete
@@ -58,14 +59,18 @@ module type Input_intf = sig
   val copy : t -> t -> unit
 
   module Vector : sig
-    include Snarky.Vector.S with type elt := t
+    include Snarky_intf.Vector.S with type elt := t
+
+    val typ : t Ctypes.typ
+
+    val delete : t -> unit
 
     module Triple : Intf.Triple with type elt := t
   end
 end
 
 module type S = sig
-  type t [@@deriving sexp, compare, yojson, bin_io]
+  type t [@@deriving sexp, compare, yojson, bin_io, hash]
 
   module Bigint : Bigint.Intf
 
@@ -142,21 +147,11 @@ module type S = sig
   val delete : t -> unit
 
   module Vector : sig
-    type elt = t
-
-    type t
+    include Snarky_intf.Vector.S with type elt = t
 
     val typ : t Ctypes.typ
 
     val delete : t -> unit
-
-    val create : unit -> t
-
-    val get : t -> int -> elt
-
-    val emplace_back : t -> elt -> unit
-
-    val length : t -> int
 
     val of_array : elt array -> t
 
@@ -167,7 +162,7 @@ end
 module type S_with_version = sig
   module Stable : sig
     module V1 : sig
-      type t [@@deriving version, sexp, bin_io, compare, yojson]
+      type t [@@deriving version, sexp, bin_io, compare, yojson, hash, eq]
     end
 
     module Latest = V1
@@ -189,6 +184,8 @@ module Make (F : Input_intf) :
     let t = size () in
     Caml.Gc.finalise Bigint.delete t ;
     t
+
+  let size_in_bits = size_in_bits ()
 
   let gc2 op x1 x2 =
     let r = op x1 x2 in
@@ -233,7 +230,26 @@ module Make (F : Input_intf) :
                   let of_sexpable = of_bigint
                 end)
 
+      let to_bignum_bigint n =
+        let rec go i two_to_the_i acc =
+          if Int.equal i size_in_bits then acc
+          else
+            let acc' =
+              if Bigint.test_bit n i then Bignum_bigint.(acc + two_to_the_i)
+              else acc
+            in
+            go (i + 1) Bignum_bigint.(two_to_the_i + two_to_the_i) acc'
+        in
+        go 0 Bignum_bigint.one Bignum_bigint.zero
+
+      let hash_fold_t s x =
+        Bignum_bigint.hash_fold_t s (to_bignum_bigint (to_bigint x))
+
+      let hash = Hash.of_fold hash_fold_t
+
       let compare t1 t2 = Bigint.compare (to_bigint t1) (to_bigint t2)
+
+      let equal = equal
 
       let to_yojson t : Yojson.Safe.t =
         `String (Bigint.to_hex_string (to_bigint t))
@@ -272,10 +288,6 @@ module Make (F : Input_intf) :
   let sqrt = gc1 sqrt
 
   let is_square = is_square
-
-  let equal = equal
-
-  let size_in_bits = size_in_bits ()
 
   let to_bits t =
     (* Avoids allocation *)
