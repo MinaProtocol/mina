@@ -1,11 +1,40 @@
 open Coda_base
 open Signature_lib
+open Core_kernel
+
+module Timing = struct
+  type t =
+    { initial_minimum_balance: int
+    ; cliff_time: int (*slot number*)
+    ; vesting_period: int (*slots*)
+    ; vesting_increment: int }
+
+  let to_account_timing
+      {initial_minimum_balance; cliff_time; vesting_increment; vesting_period}
+      =
+    { Runtime_config.Accounts.Single.Timing.initial_minimum_balance=
+        Currency.Balance.of_int initial_minimum_balance
+    ; cliff_time= Coda_numbers.Global_slot.of_int cliff_time
+    ; vesting_increment= Currency.Amount.of_int vesting_increment
+    ; vesting_period= Coda_numbers.Global_slot.of_int vesting_period }
+
+  let gen =
+    let open Quickcheck.Generator.Let_syntax in
+    let%bind initial_minimum_balance =
+      Quickcheck.Generator.small_non_negative_int
+    in
+    let%bind cliff_time = Quickcheck.Generator.small_non_negative_int in
+    let%bind vesting_increment = Quickcheck.Generator.small_non_negative_int in
+    let%map vesting_period = Quickcheck.Generator.small_positive_int in
+    {initial_minimum_balance; cliff_time; vesting_increment; vesting_period}
+end
 
 module Public_accounts = struct
   type account_data =
     { pk: Public_key.Compressed.t
     ; balance: int
-    ; delegate: Public_key.Compressed.t option }
+    ; delegate: Public_key.Compressed.t option
+    ; timing: Timing.t option }
 
   module type S = sig
     val name : string
@@ -16,7 +45,10 @@ end
 
 module Private_accounts = struct
   type account_data =
-    {pk: Public_key.Compressed.t; sk: Private_key.t; balance: int}
+    { pk: Public_key.Compressed.t
+    ; sk: Private_key.t
+    ; balance: int
+    ; timing: Timing.t option }
 
   module type S = sig
     val name : string

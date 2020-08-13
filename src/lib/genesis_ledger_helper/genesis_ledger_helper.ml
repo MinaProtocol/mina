@@ -993,14 +993,27 @@ let inferred_runtime_config (precomputed_values : Precomputed_values.t) :
             Accounts
               (List.map
                  (Lazy.force (Precomputed_values.accounts precomputed_values))
-                 ~f:(fun (sk, {public_key; balance; delegate; _}) ->
+                 ~f:(fun (sk, {public_key; balance; delegate; timing; _}) ->
+                   let timing =
+                     match timing with
+                     | Account.Timing.Untimed ->
+                         None
+                     | Timed t ->
+                         Some
+                           { Runtime_config.Accounts.Single.Timing
+                             .initial_minimum_balance=
+                               t.initial_minimum_balance
+                           ; cliff_time= t.cliff_time
+                           ; vesting_period= t.vesting_period
+                           ; vesting_increment= t.vesting_increment }
+                   in
                    { Runtime_config.Accounts.pk=
                        Some (Public_key.Compressed.to_base58_check public_key)
                    ; sk= Option.map ~f:Private_key.to_base58_check sk
                    ; balance
                    ; delegate=
                        Some (Public_key.Compressed.to_base58_check delegate)
-                   ; timing= None } ))
+                   ; timing } ))
         ; name= None
         ; num_accounts= genesis_constants.num_accounts
         ; hash=

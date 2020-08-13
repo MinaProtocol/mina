@@ -4,17 +4,28 @@ open Signature_lib
 open Coda_base
 module Intf = Intf
 
+let account_with_timing account_id balance (timing : Intf.Timing.t option) =
+  match timing with
+  | None ->
+      Account.create account_id balance
+  | Some timing ->
+      let t = Intf.Timing.to_account_timing timing in
+      Account.create_timed account_id balance
+        ~initial_minimum_balance:t.initial_minimum_balance
+        ~cliff_time:t.cliff_time ~vesting_period:t.vesting_period
+        ~vesting_increment:t.vesting_increment
+      |> Or_error.ok_exn
+
 module Private_accounts (Accounts : Intf.Private_accounts.S) = struct
   include Accounts
 
   let accounts =
     let open Lazy.Let_syntax in
     let%map accounts = accounts in
-    List.map accounts ~f:(fun {pk; sk; balance} ->
-        ( Some sk
-        , Account.create
-            (Account_id.create pk Token_id.default)
-            (Balance.of_formatted_string (Int.to_string balance)) ) )
+    List.map accounts ~f:(fun {pk; sk; balance; timing} ->
+        let account_id = Account_id.create pk Token_id.default in
+        let balance = Balance.of_formatted_string (Int.to_string balance) in
+        (Some sk, account_with_timing account_id balance timing) )
 end
 
 module Public_accounts (Accounts : Intf.Public_accounts.S) = struct
@@ -23,9 +34,10 @@ module Public_accounts (Accounts : Intf.Public_accounts.S) = struct
   let accounts =
     let open Lazy.Let_syntax in
     let%map accounts = Accounts.accounts in
-    List.map accounts ~f:(fun {pk; balance; delegate} ->
+    List.map accounts ~f:(fun {pk; balance; delegate; timing} ->
         let account_id = Account_id.create pk Token_id.default in
-        let base_acct = Account.create account_id (Balance.of_int balance) in
+        let balance = Balance.of_int balance in
+        let base_acct = account_with_timing account_id balance timing in
         (None, {base_acct with delegate= Option.value ~default:pk delegate}) )
 end
 
@@ -43,7 +55,8 @@ module Balances (Balances : Intf.Named_balances_intf) = struct
       let%map balances = Balances.balances
       and keypairs = Coda_base.Sample_keypairs.keypairs in
       List.mapi balances ~f:(fun i b ->
-          {balance= b; pk= fst keypairs.(i); sk= snd keypairs.(i)} )
+          {balance= b; pk= fst keypairs.(i); sk= snd keypairs.(i); timing= None}
+      )
   end)
 end
 
