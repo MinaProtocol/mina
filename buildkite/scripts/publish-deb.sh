@@ -31,11 +31,38 @@ esac
 echo "Publishing debs: ${DEBS}"
 set -x
 ${DEBS3} --codename "${CODENAME}" "${DEBS}"
+set +x
 echo "Exporting Variables: "
-# Export Variables for Downstream Steps
 
-source ./DOCKER_DEPLOY_ENV
-echo "export CODA_VERSION=$CODA_DEB_VERSION" >> ./DOCKER_DEPLOY_ENV
+GITHASH=$(git rev-parse --short=7 HEAD)
+GITBRANCH=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD |  sed 's!/!-!; s!_!-!g' )
+GITTAG=$(git describe --abbrev=0)
+
+
+# Identify All Artifacts by Branch and Git Hash
+set +u
+PVKEYHASH=$(./_build/default/src/app/cli/src/coda.exe internal snark-hashes | sort | md5sum | cut -c1-8)
+
+PROJECT="coda-$(echo "$DUNE_PROFILE" | tr _ -)"
+
+BUILD_NUM=${BUILDKITE_BUILD_NUM}
+BUILD_URL=${BUILDKITE_BUILD_URL}
+
+if [ "$GITBRANCH" == "master" ]; then
+    VERSION="${GITTAG}-${GITHASH}"
+else
+    VERSION="${GITTAG}+${BUILD_NUM}-${GITBRANCH}-${GITHASH}-PV${PVKEYHASH}"
+fi
+
+set -x
+# Export variables for use with downstream steps
+echo "export CODA_VERSION=$VERSION" >> ./DOCKER_DEPLOY_ENV
+echo "export CODA_DEB_VERSION=$VERSION" >> ./DOCKER_DEPLOY_ENV
+echo "export CODA_PROJECT=$PROJECT" >> ./DOCKER_DEPLOY_ENV
+echo "export CODA_GIT_HASH=$GITHASH" >> ./DOCKER_DEPLOY_ENV
+echo "export CODA_GIT_BRANCH=$GITBRANCH" >> ./DOCKER_DEPLOY_ENV
+echo "export CODA_GIT_TAG=$GITTAG" >> ./DOCKER_DEPLOY_ENV
 echo "export CODA_DEB_REPO=$CODENAME" >> ./DOCKER_DEPLOY_ENV
 echo "export CODA_WAS_PUBLISHED=true" >> ./DOCKER_DEPLOY_ENV
 set +x
+
