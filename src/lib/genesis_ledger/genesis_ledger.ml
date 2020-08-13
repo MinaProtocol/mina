@@ -8,12 +8,15 @@ let account_with_timing account_id balance (timing : Intf.Timing.t option) =
   match timing with
   | None ->
       Account.create account_id balance
-  | Some timing ->
-      let t = Intf.Timing.to_account_timing timing in
-      Account.create_timed account_id balance
-        ~initial_minimum_balance:t.initial_minimum_balance
-        ~cliff_time:t.cliff_time ~vesting_period:t.vesting_period
-        ~vesting_increment:t.vesting_increment
+  | Some t ->
+      let initial_minimum_balance =
+        Currency.Balance.of_int t.initial_minimum_balance
+      in
+      let cliff_time = Coda_numbers.Global_slot.of_int t.cliff_time in
+      let vesting_increment = Currency.Amount.of_int t.vesting_increment in
+      let vesting_period = Coda_numbers.Global_slot.of_int t.vesting_period in
+      Account.create_timed account_id balance ~initial_minimum_balance
+        ~cliff_time ~vesting_period ~vesting_increment
       |> Or_error.ok_exn
 
 module Private_accounts (Accounts : Intf.Private_accounts.S) = struct

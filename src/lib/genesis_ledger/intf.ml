@@ -6,17 +6,8 @@ module Timing = struct
   type t =
     { initial_minimum_balance: int
     ; cliff_time: int (*slot number*)
-    ; vesting_period: int (*slots*)
+    ; vesting_period: int (*in slots*)
     ; vesting_increment: int }
-
-  let to_account_timing
-      {initial_minimum_balance; cliff_time; vesting_increment; vesting_period}
-      =
-    { Runtime_config.Accounts.Single.Timing.initial_minimum_balance=
-        Currency.Balance.of_int initial_minimum_balance
-    ; cliff_time= Coda_numbers.Global_slot.of_int cliff_time
-    ; vesting_increment= Currency.Amount.of_int vesting_increment
-    ; vesting_period= Coda_numbers.Global_slot.of_int vesting_period }
 
   let gen =
     let open Quickcheck.Generator.Let_syntax in
