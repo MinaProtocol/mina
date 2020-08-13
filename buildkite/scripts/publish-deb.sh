@@ -50,14 +50,16 @@ BUILD_URL=${BUILDKITE_BUILD_URL}
 
 if [ "$GITBRANCH" == "master" ]; then
     VERSION="${GITTAG}-${GITHASH}"
+    TAG="$(echo "${VERSION}" | sed 's!/!-!; s!_!-!g')"
 else
-    VERSION="${GITTAG}--${BUILD_NUM}-${GITBRANCH}-${GITHASH}-PV${PVKEYHASH}"
+    VERSION="${GITTAG}+${BUILD_NUM}-${GITBRANCH}-${GITHASH}-PV${PVKEYHASH}"
+    TAG="$(echo "${GITTAG}-${GITBRANCH}" | sed 's!/!-!; s!_!-!g')"
 fi
 
 set -x
 # Export variables for use with downstream steps
 echo "export CODA_SERVICE=coda-daemon" >> ./DOCKER_DEPLOY_ENV
-echo "export CODA_VERSION=$VERSION" >> ./DOCKER_DEPLOY_ENV
+echo "export CODA_VERSION=${GITTAG}-${GITHASH}" >> ./DOCKER_DEPLOY_ENV
 echo "export CODA_DEB_VERSION=$VERSION" >> ./DOCKER_DEPLOY_ENV
 echo "export CODA_PROJECT=$PROJECT" >> ./DOCKER_DEPLOY_ENV
 echo "export CODA_GIT_HASH=$GITHASH" >> ./DOCKER_DEPLOY_ENV
