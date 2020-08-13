@@ -11,9 +11,8 @@ export GITTAG=$(git describe --abbrev=0)
 
 # Identify All Artifacts by Branch and Git Hash
 set +u
-SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
 
-export PVKEYHASH=$(${SCRIPTPATH}/../_build/default/src/app/cli/src/coda.exe internal snark-hashes | sort | md5sum | cut -c1-8)
+export PVKEYHASH=$(/workdir/_build/default/src/app/cli/src/coda.exe internal snark-hashes | sort | md5sum | cut -c1-8)
 
 export PROJECT="coda-$(echo "$DUNE_PROFILE" | tr _ -)"
 
