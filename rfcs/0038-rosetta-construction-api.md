@@ -71,7 +71,7 @@ The initial version of the construction API will _only_ support payments. We can
 
 #### Before Derivation
 
-Before the derivation step, we need to generate a keypair. We'll use the private key to sign the transaction and the public key to tell others who the sender of the transaction is.
+Before the derivation step, we need to generate a keypair. We'll use the private key to sign the payment and the public key to tell others who the sender is.
 
 #### Derivation
 
@@ -91,13 +91,13 @@ The [preprocess endpoint](#preprocess-endpoint) takes a proposed set of operatio
 
 [metadata]: #metadata
 
-The [metadata endpoint](#metadata-endpoint) takes the senders public key and finds what nonce to use for transaction construction.
+The [metadata endpoint](#metadata-endpoint) takes the senders public key and returns which nonce to use for transaction construction.
 
 #### Payloads
 
 [payloads]: #payloads
 
-The [payloads endpoint](#payloads-endpoint) takes the metadata and the operations and returns a [encoded unsigned transaction](#encoded-unsigned-transaction).
+The [payloads endpoint](#payloads-endpoint) takes the metadata and the operations and returns an [encoded unsigned transaction](#encoded-unsigned-transaction).
 
 #### After Payloads
 
@@ -149,7 +149,7 @@ Add support for creating/marshalling public keys ([via Derivation](#derivation))
 
 **Format**
 
-Public keys are reprsented as hex-encoded, little-endian, `Fq.t` pairs.
+Public keys are represented as hex-encoded, little-endian, `Fq.t` pairs.
 
 ```
 |----- fst pk : Fq.t (32 bytes) ---------|----- snd pk : Fq.t (32 bytes) ------|
@@ -298,7 +298,7 @@ type payment = {
 type transaction = stakeDelegation | payment
 ```
 
-Note that our client-sdk only has support for signing payments and delegations but this version of the construction API only supports those transactions types as well.
+Note that our client-sdk only has support for signing payments and delegation but this version of the construction API only supports those transactions types as well.
 
 #### Payloads Endpoint
 
