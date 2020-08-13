@@ -269,7 +269,33 @@ This is a simple GraphQL query. This endpoint should be easy to implement.
 
 [via Payloads](#payloads)
 
-The Rosetta spec leaves the encoding of unsigned transactions implementation-defined. Since we'll default to using our client-sdk's signing mechanism our encoding will be precisely the JSON input (stringified) demanded by the "unsafe" method of the client-sdk API:
+The Rosetta spec leaves the encoding of unsigned transactions implementation-defined. Since we want to make it easy for alternate signers to be created (eg. the ledger), we'll want this encoding to be some faithful representation of the bytes upon which the signature operation acts.
+
+Specifically this is the user command having been transformed into a `Transaction_union_payload.t` and then hashed into a `(field, bool) Random_oracle_input.t`. We will serialzie the Random_oracle_input with a custom protocol as defined below and send that byte-buffer as hex-encoded ascii.
+
+```
+// Serialization schema for Random oracle input
+
+00 00 00 05  # 4-byte prefix for length of array (little endian)
+             #
+xx xx ...    # each field encoded as a 32-bytes each one for each of the length
+yy yy ...    #     (little endian) (same represenation as above Fq.t)
+             #
+A4 43 D4 ... # the bool list compacted into a bitstring, pad the last 1 byte with extra zeros on the right
+```
+
+Another important property of the unsigned-transaction and signed-transaction representations is that they are reversible. As we must later implement
+
+The `unsigned_transaction_string` is then a `JSON` input (stringified) conforming to the following schema:
+
+```
+{ randomOracleInput : string (* Random_oracle_input.t |> to_bytes |> to_hex  *)
+, stakeDelegation: StakeDelegation?
+, payment: Payment?
+}
+// where stakeDelegation and payemnt are currently defined in the client-sdk shown below
+// it is an error to treat stakeDelegation / payment in any way other than a variant, but it is encoded unsafely like this becuase JSON is garbage-fire and can't represent sum types ergonomically
+```
 
 ```reasonml
 // Taken from Client-SDK code
@@ -294,11 +320,11 @@ type payment = {
   memo: option(string),
   validUntil: option(uint32),
 };
-
-type transaction = stakeDelegation | payment
 ```
 
-Note that our client-sdk only has support for signing payments and delegations but this version of the construction API only supports those transactions types as well.
+Note that our client-sdk only has support for signing payments and delegations but this version of the construction API only supports those transactions types as well. We'll default to the client-sdk for now.
+
+Additionally, we should expose a new method in the client-sdk to feed the raw `Random_oracle.Input.t` to signer logic in addition to going through the normal flow. The Client-sdk implementation should enforce that these two implementations agree, and fail hard otherwise.
 
 #### Payloads Endpoint
 
@@ -307,6 +333,8 @@ Note that our client-sdk only has support for signing payments and delegations b
 [via Payloads](#payloads)
 
 First [convert the operations](#inverted-operations-map) embedding the correct sender nonce from the metadata. Return an [encoded unsigned transaction](#encoded-unsigned-transaction) as described above.
+
+This endpoint will also accept a query parameter `?plain_random_oracle`
 
 #### Signed transaction encoding
 
@@ -317,10 +345,20 @@ First [convert the operations](#inverted-operations-map) embedding the correct s
 Since we'll later be broadcasting the signed transaction via GraphQL, our signed transaction encoding is precicesly the union of the format required for the sendPayment mutation and the sendDelegation mutation (stringified):
 
 ```
+// Signature encoding
+
+a signature is a field and a scalar
+        Fp                     Fq
+|----- field 32bytes ----|---- scalar 32bytes ---|
+Use the same hex-encoded little endian represenation as described above for
+the public key for these 64 bytes
+```
+
+```
 {
-  signature: Signature, // defined in graphql
-  sendPaymentInput: SendPaymentInput?, // defined in graphql
-  sendDelegationInput: SendDelegationInput? // defined in graphql
+  signature: string (* Signature as described above *),
+  sendPaymentInput: payment?,
+  sendDelegationInput: stakeDelegation?
 }
 ```
 
@@ -331,6 +369,8 @@ Since we'll later be broadcasting the signed transaction via GraphQL, our signed
 [via Parse](#parse)
 
 The parse endpoint takes the transaction and needs to return the operations. The implementation will use the same logic as the Data API transaction -> operations logic and so we do not need an extra task to make this happen.
+
+Importantly, we've ensured that our unsigned and signed transaction serialized representations have enough information in them for us to recreate the transaction full values at parse time (ie. we don't only store the hash needed for signatures).
 
 #### Combine Endpoint
 
@@ -362,7 +402,7 @@ Upon skimming our GraphQL implementation, it seems like it is already succeeding
 
 [via Submit](#submit)
 
-The submit endpoint takes a signed transaction and broadcasts it over the network. We can do this by calling the `sendPayment` or `sendDelegation` mutation depending on the state of the input.
+The submit endpoint takes a signed transaction and broadcasts it over the network. We can do this by calling the `sendPayment` or `sendDelegation` mutation depending on the state of the input after parsing the given transaction.
 
 #### Test integrate construction
 
@@ -407,7 +447,7 @@ Luckily Rosetta has a very clear specification, so our designs are mostly constr
 
 In [marshal keys (c)](#marshalkeys), we could also change commands that accept public keys to also accept this new format. Additionally, we could change the GraphQL API to support this new format too. I think both of these changes are unnecessary to prioritize as the normal flows will still be fine and we'll still encourage folks to pass around the standard base58-encoded compressed public keys as they are shorter.
 
-In the sections about [encoding unsigned transactions](#encoded-unsigned-transaction) and [encoding signed transactions](#encoded-signed-transaction), we make an explicit decision to pick a format that fits what our client-sdk expects. This was done to improve implementation velocity and because we did conciously choose that interface with usability in mind. Additionaly, using a readable JSON string makes it easy to audit, debug, and understand our implementation. This design does subsequently require extra processing for other signers (like a ledger hardware device or a native binary).
+In the sections about [encoding unsigned transactions](#encoded-unsigned-transaction) and [encoding signed transactions](#encoded-signed-transaction), we make an explicit decision to pick a format that supports arbitrary signers. There is minimal change involved with the client-sdk to make that supported; additionally, this was done to improve implementation velocity and because we did conciously choose that interface with usability in mind. JSON is chosen to pack products of data as using a readable JSON string makes it easy to audit, debug, and understand our implementation.
 
 ## Prior art
 
