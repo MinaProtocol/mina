@@ -9,6 +9,5 @@
     core_kernel
     o1trace
     pickles
-    random_oracle_input
     snarky.backendless
     sponge ))
