@@ -53,12 +53,14 @@ BUILD_URL=${BUILDKITE_BUILD_URL}
 if [[ "$BUILDKITE_BRANCH" == "master" ]]; then
     VERSION="${GITTAG}-${GITHASH}"
     DOCKER_TAG="$(echo "${VERSION}" | sed 's!/!-!; s!_!-!g')"
-    BUILD_ROSETTA=true
 else
     VERSION="${GITTAG}+${BUILD_NUM}-${GITBRANCH}-${GITHASH}-PV${PVKEYHASH}"
     DOCKER_TAG="$(echo "${GITTAG}-${GITBRANCH}" | sed 's!/!-!g; s!_!-!g')"
-    [[ "${BUILDKITE_BRANCH}" == "develop" || "${GITBRANCH}" == rosetta-* ]] && BUILD_ROSETTA=true
 fi
+
+case $BUILDKITE_BRANCH in master|develop|rosetta*)
+  BUILD_ROSETTA=true
+esac
 
 set -x
 # Export variables for use with downstream steps
@@ -71,6 +73,6 @@ echo "export CODA_GIT_BRANCH=${BUILDKITE_BRANCH}" >> ./DOCKER_DEPLOY_ENV
 echo "export CODA_GIT_TAG=$GITTAG" >> ./DOCKER_DEPLOY_ENV
 echo "export CODA_DEB_REPO=$CODENAME" >> ./DOCKER_DEPLOY_ENV
 echo "export CODA_WAS_PUBLISHED=true" >> ./DOCKER_DEPLOY_ENV
-echo "export CODA_BUILD_ROSETTA=$ROSETTA" >> ./DOCKER_DEPLOY_ENV
+echo "export CODA_BUILD_ROSETTA=$BUILD_ROSETTA" >> ./DOCKER_DEPLOY_ENV
 set +x
 
