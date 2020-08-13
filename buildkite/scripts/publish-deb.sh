@@ -35,7 +35,7 @@ set +x
 echo "Exporting Variables: "
 
 GITHASH=$(git rev-parse --short=7 HEAD)
-#GITBRANCH=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD |  sed 's!/!-!; s!_!-!g' )
+GITBRANCH=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD |  sed 's!/!-!; s!_!-!g' )
 GITTAG=$(git describe --abbrev=0)
 
 
@@ -57,7 +57,7 @@ if [[ "$BUILDKITE_BRANCH" == "master" ]]; then
 else
     VERSION="${GITTAG}+${BUILD_NUM}-${GITBRANCH}-${GITHASH}-PV${PVKEYHASH}"
     DOCKER_TAG="$(echo "${GITTAG}-${GITBRANCH}" | sed 's!/!-!g; s!_!-!g')"
-    [[ "${BUILDKITE_BRANCH}" == "develop" ]] || [[ "${BUILDKITE_BRANCH}" == rosetta/* ]] && BUILD_ROSETTA=true
+    [[ "${BUILDKITE_BRANCH}" == "develop" || "${GITBRANCH}" == rosetta-* ]] && BUILD_ROSETTA=true
 fi
 
 set -x
