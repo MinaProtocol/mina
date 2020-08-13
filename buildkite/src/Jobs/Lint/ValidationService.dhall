@@ -1,5 +1,3 @@
--- BENCHMARKING
-
 let Prelude = ../../External/Prelude.dhall
 let Text/concatSep = Prelude.Text.concatSep
 let List/map = Prelude.List.map

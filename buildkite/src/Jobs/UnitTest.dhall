@@ -1,4 +1,3 @@
--- comment to trigger tests
 let Prelude = ../External/Prelude.dhall
 
 let Cmd = ../Lib/Cmds.dhall
@@ -37,13 +36,10 @@ Pipeline.build
         S.exactly "scripts/link-coredumps" "sh"
       ]
 
-      -- TODO: re-enable Unit tests once sufficient infrastructure resources are provisioned 
-      let overrideDisableWhen = [ S.strictlyStart (S.contains "buildkite/src/Jobs/UnitTest.override") ]
-
       in
 
       JobSpec::{
-        dirtyWhen = overrideDisableWhen,
+        dirtyWhen = unitDirtyWhen,
         name = "UnitTest"
       },
     steps = [

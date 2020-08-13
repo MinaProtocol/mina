@@ -1,5 +1,3 @@
--- BENCHMARKING
-
 let S = ../Lib/SelectFiles.dhall
 let D = S.PathPattern
 

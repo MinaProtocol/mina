@@ -1,5 +1,3 @@
--- BENCHMARKING
-
 let Prelude = ../External/Prelude.dhall
 let S = ../Lib/SelectFiles.dhall
 
