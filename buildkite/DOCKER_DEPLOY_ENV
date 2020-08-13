@@ -1,10 +1,5 @@
-export CODA_SERVICE=coda-daemon
-export CODA_VERSION=0.0.14-rosetta-test-build-rosetta-dockerfile-in-ci
-export CODA_DEB_VERSION=0.0.14+-rosetta-test-build-rosetta-dockerfile-in-ci-a00ddf7-PVe8e43745
-export CODA_PROJECT=coda-testnet-postake-medium-curves
-export CODA_GIT_HASH=a00ddf7
-export CODA_GIT_BRANCH=rosetta/test-build-rosetta-dockerfile-in-ci
-export CODA_GIT_TAG=0.0.14
-export CODA_DEB_REPO=unstable
-export CODA_WAS_PUBLISHED=true
-export CODA_BUILD_ROSETTA=true
+export CODA_SERVICE=coda-demo
+export CODA_VERSION=0.0.12-beta-develop-0be3e15
+export CODA_DEB_VERSION=0.0.12-beta-develop-0be3e15
+export CODA_DEB_REPO=develop
+export NOUPLOAD=1
