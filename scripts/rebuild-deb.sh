@@ -19,6 +19,7 @@ PROJECT="coda-$(echo "$DUNE_PROFILE" | tr _ -)"
 
 BUILD_NUM=${BUILDKITE_BUILD_NUM}
 BUILD_URL=${BUILDKITE_BUILD_URL}
+[[ "$BUILDKITE_BRANCH" ]] && GITBRANCH=$(echo "$BUILDKITE_BRANCH" | sed 's!/!-!; s!_!-!g' )
 
 if [ "$GITBRANCH" == "master" ]; then
     VERSION="${GITTAG}-${GITHASH}"
