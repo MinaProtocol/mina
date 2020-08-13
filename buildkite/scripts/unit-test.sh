@@ -19,6 +19,7 @@ source ~/.profile
 
 echo "--- Make build"
 export CODA_LIBP2P_HELPER_PATH="${PWD}/src/app/libp2p_helper/result/bin/libp2p_helper"
+export LIBP2P_NIXLESS=1
 time make build
 
 echo "--- Run unit tests"
