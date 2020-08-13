@@ -11,10 +11,6 @@ source "${SCRIPTPATH}/../buildkite/scripts/export-git-env-vars.sh"
 
 cd "${SCRIPTPATH}/../_build"
 
-set +u
-PVKEYHASH=$(./default/src/app/cli/src/coda.exe internal snark-hashes | sort | md5sum | cut -c1-8)
-
-
 BUILDDIR="deb_build"
 
 mkdir -p "${BUILDDIR}/DEBIAN"
