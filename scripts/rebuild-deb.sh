@@ -5,34 +5,15 @@
 set -euo pipefail
 
 SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
+
+# Load in env vars for githash/branch/etc.
+source "${SCRIPTPATH}/../buildkite/scripts/export-git-env-vars.sh"
+
 cd "${SCRIPTPATH}/../_build"
 
-GITHASH=$(git rev-parse --short=7 HEAD)
-GITBRANCH=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD |  sed 's!/!-!; s!_!-!g' )
-GITTAG=$(git describe --abbrev=0)
-
-# Identify All Artifacts by Branch and Git Hash
 set +u
 PVKEYHASH=$(./default/src/app/cli/src/coda.exe internal snark-hashes | sort | md5sum | cut -c1-8)
 
-PROJECT="coda-$(echo "$DUNE_PROFILE" | tr _ -)"
-
-BUILD_NUM=${BUILDKITE_BUILD_NUM}
-BUILD_URL=${BUILDKITE_BUILD_URL}
-[[ -n "$BUILDKITE_BRANCH" ]] && GITBRANCH=$(echo "$BUILDKITE_BRANCH" | sed 's!/!-!; s!_!-!g')
-
-if [ "$GITBRANCH" == "master" ]; then
-    VERSION="${GITTAG}-${GITHASH}"
-else
-    VERSION="${GITTAG}+${BUILD_NUM}-${GITBRANCH}-${GITHASH}-PV${PVKEYHASH}"
-fi
-
-# Export variables for use with downstream steps
-echo "export CODA_DEB_VERSION=$VERSION" >> /tmp/DOCKER_DEPLOY_ENV
-echo "export CODA_PROJECT=$PROJECT" >> /tmp/DOCKER_DEPLOY_ENV
-echo "export CODA_GIT_HASH=$GITHASH" >> /tmp/DOCKER_DEPLOY_ENV
-echo "export CODA_GIT_BRANCH=$GITBRANCH" >> /tmp/DOCKER_DEPLOY_ENV
-echo "export CODA_GIT_TAG=$GITTAG" >> /tmp/DOCKER_DEPLOY_ENV
 
 BUILDDIR="deb_build"
 

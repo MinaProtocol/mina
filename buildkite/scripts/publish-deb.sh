@@ -34,33 +34,8 @@ ${DEBS3} --codename "${CODENAME}" "${DEBS}"
 set +x
 echo "Exporting Variables: "
 
-GITHASH=$(git rev-parse --short=7 HEAD)
-GITBRANCH=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD |  sed 's!/!-!; s!_!-!g' )
-GITTAG=$(git describe --abbrev=0)
-
-
-# Identify All Artifacts by Branch and Git Hash
-set +u
-PVKEYHASH=$(./_build/default/src/app/cli/src/coda.exe internal snark-hashes | sort | md5sum | cut -c1-8)
-
-PROJECT="coda-$(echo "$DUNE_PROFILE" | tr _ -)"
-
-BUILD_NUM=${BUILDKITE_BUILD_NUM}
-BUILD_URL=${BUILDKITE_BUILD_URL}
-
-[[ -n "$BUILDKITE_BRANCH" ]] && GITBRANCH=$(echo "$BUILDKITE_BRANCH" | sed 's!/!-!; s!_!-!g')
-
-if [[ "$BUILDKITE_BRANCH" == "master" ]]; then
-    VERSION="${GITTAG}-${GITHASH}"
-    DOCKER_TAG="$(echo "${VERSION}" | sed 's!/!-!; s!_!-!g')"
-else
-    VERSION="${GITTAG}+${BUILD_NUM}-${GITBRANCH}-${GITHASH}-PV${PVKEYHASH}"
-    DOCKER_TAG="$(echo "${GITTAG}-${GITBRANCH}" | sed 's!/!-!g; s!_!-!g')"
-fi
-
-case $BUILDKITE_BRANCH in master|develop|rosetta*)
-  BUILD_ROSETTA=true
-esac
+SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
+source "${SCRIPTPATH}/export-git-env-vars.sh"
 
 set -x
 # Export variables for use with downstream steps
