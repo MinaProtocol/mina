@@ -169,6 +169,21 @@ type key = Key.Stable.Latest.t [@@deriving sexp, eq, hash, compare, yojson]
 
 module Timing = Account_timing
 
+module Snapp_account =struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = unit
+        [@@deriving sexp, eq, hash, compare, yojson]
+        let to_latest = Fn.id
+      end
+    end]
+  type t = Stable.Latest.t
+  [@@deriving sexp, eq, hash, compare, yojson]
+
+  let to_input _ = assert false
+end
+
 [%%versioned
 module Stable = struct
   module V1 = struct
