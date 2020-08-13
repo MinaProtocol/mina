@@ -445,72 +445,6 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
 
   let previous_empty_accounts action pk = if action = `Added then [pk] else []
 
-  (* Helper function for [apply_user_command_unchecked] *)
-  let pay_fee ~user_command ~signer_pk ~ledger ~current_global_slot =
-    let open Or_error.Let_syntax in
-    (* Fee-payer information *)
-    let nonce = User_command.nonce user_command in
-    let fee_payer = User_command.fee_payer user_command in
-    let%bind () =
-      let fee_token = User_command.fee_token user_command in
-      let%bind () =
-        (* TODO: Enable multi-sig. *)
-        if
-          Public_key.Compressed.equal
-            (Account_id.public_key fee_payer)
-            signer_pk
-        then return ()
-        else
-          Or_error.errorf
-            "Cannot pay fees from a public key that did not sign the \
-             transaction"
-      in
-      let%map () =
-        (* TODO: Remove this check and update the transaction snark once we have
-          an exchange rate mechanism. See issue #4447.
-        *)
-        if Token_id.equal fee_token Token_id.default then return ()
-        else
-          Or_error.errorf
-            "Cannot create transactions with fee_token different from the \
-             default"
-      in
-      ()
-    in
-    let%bind location, account = get_with_location ledger fee_payer in
-    let%bind () =
-      match location with
-      | `Existing _ ->
-          return ()
-      | `New ->
-          Or_error.errorf "The fee-payer account does not exist"
-    in
-    let fee = Amount.of_fee (User_command.fee user_command) in
-    let%bind balance = sub_amount account.balance fee in
-    let%bind () = validate_nonces nonce account.nonce in
-    let fee_payer_timing = account.timing in
-    let%map timing =
-      validate_timing ~txn_amount:fee ~txn_global_slot:current_global_slot
-        ~account
-    in
-    let undo_common : Undo.User_command_undo.Common.t =
-      { user_command=
-          { data= user_command
-          ; status= Applied User_command_status.Auxiliary_data.empty }
-      ; previous_receipt_chain_hash= account.receipt_chain_hash
-      ; fee_payer_timing
-      ; source_timing= None }
-    in
-    ( location
-    , { account with
-        balance
-      ; nonce= Account.Nonce.succ account.nonce
-      ; receipt_chain_hash=
-          Receipt.Chain_hash.cons user_command.payload
-            account.receipt_chain_hash
-      ; timing }
-    , undo_common )
-
   (* someday: It would probably be better if we didn't modify the receipt chain hash
   in the case that the sender is equal to the receiver, but it complicates the SNARK, so
   we don't for now. *)
@@ -518,7 +452,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ~txn_global_slot ledger
       ({payload; signer; signature= _} as user_command : User_command.t) =
-    let open Result.Let_syntax in
+    let open Or_error.Let_syntax in
     let signer_pk = Public_key.compress signer in
     let current_global_slot = txn_global_slot in
     let%bind () =
@@ -526,9 +460,61 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         ~valid_until:(User_command.valid_until user_command)
         ~current_global_slot
     in
+    (* Fee-payer information *)
+    let fee_token = User_command.fee_token user_command in
     let fee_payer = User_command.fee_payer user_command in
+    let nonce = User_command.nonce user_command in
+    let%bind () =
+      (* TODO: Enable multi-sig. *)
+      if
+        Public_key.Compressed.equal (Account_id.public_key fee_payer) signer_pk
+      then return ()
+      else
+        Or_error.errorf
+          "Cannot pay fees from a public key that did not sign the transaction"
+    in
+    let%bind () =
+      (* TODO: Remove this check and update the transaction snark once we have
+         an exchange rate mechanism. See issue #4447.
+      *)
+      if Token_id.equal fee_token Token_id.default then return ()
+      else
+        Or_error.errorf
+          "Cannot create transactions with fee_token different from the default"
+    in
     let%bind fee_payer_location, fee_payer_account, undo_common =
-      pay_fee ~user_command ~signer_pk ~ledger ~current_global_slot
+      let%bind location, account = get_with_location ledger fee_payer in
+      let%bind () =
+        match location with
+        | `Existing _ ->
+            return ()
+        | `New ->
+            Or_error.errorf "The fee-payer account does not exist"
+      in
+      let fee = Amount.of_fee (User_command.fee user_command) in
+      let%bind balance = sub_amount account.balance fee in
+      let%bind () = validate_nonces nonce account.nonce in
+      let fee_payer_timing = account.timing in
+      let%map timing =
+        validate_timing ~txn_amount:fee ~txn_global_slot:current_global_slot
+          ~account
+      in
+      let undo_common : Undo.User_command_undo.Common.t =
+        { user_command=
+            { data= user_command
+            ; status= Applied User_command_status.Auxiliary_data.empty }
+        ; previous_receipt_chain_hash= account.receipt_chain_hash
+        ; fee_payer_timing
+        ; source_timing= None }
+      in
+      ( location
+      , { account with
+          balance
+        ; nonce= Account.Nonce.succ account.nonce
+        ; receipt_chain_hash=
+            Receipt.Chain_hash.cons payload account.receipt_chain_hash
+        ; timing }
+      , undo_common )
     in
     (* Charge the fee. This must happen, whether or not the command itself
        succeeds, to ensure that the network is compensated for processing this
@@ -545,8 +531,6 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       | Error err ->
           raise (Reject err)
     in
-    let reject s = raise (Reject (Error.of_string s)) in
-    let fail (e : User_command_status.Failure.t) = Result.fail e in
     let charge_account_creation_fee_exn (account : Account.t) =
       let balance =
         Option.value_exn
@@ -562,6 +546,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       {account with timing}
     in
     let compute_updates () =
+      let open Result.Let_syntax in
       (* Compute the necessary changes to apply the command, failing if any of
          the conditions are not met.
       *)
@@ -589,62 +574,36 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               return predicate_result
           | Payment _ | Stake_delegation _ | Mint_tokens _ ->
               (* TODO(#4554): Hook predicate evaluation in here once implemented. *)
-              fail Predicate
-      in
-      let check_exists t e =
-        match t with `Existing _ -> return () | `New -> fail e
-      in
-      let get_existing k e =
-        let ((s, _) as t) = get_with_location ledger k |> ok_or_reject in
-        let%map () = check_exists s e in
-        t
-      in
-      let receiver_location, receiver_account =
-        get_with_location ledger receiver |> ok_or_reject
-      in
-      let get_source ?fee_payer_account:fp ?receiver_account:rc source =
-        with_return (fun {return} ->
-            List.iter
-              [ (receiver, (receiver_location, rc))
-              ; (fee_payer, (fee_payer_location, fp)) ]
-              ~f:(fun (k, (loc, d)) ->
-                Option.iter d ~f:(fun d ->
-                    if Account_id.equal source k then return (Ok (loc, d)) ) ) ;
-            get_existing source Source_not_present )
-      in
-      let with_err (e : User_command_status.Failure.t) =
-        Result.map_error ~f:(fun _ -> e)
-      in
-      let validate_timing ~amount ~account =
-        validate_timing ~txn_amount:amount ~txn_global_slot:current_global_slot
-          ~account
-        |> with_err Source_insufficient_balance
-      in
-      let check_not_default_token id =
-        if Token_id.(equal default) id then fail Not_token_owner else return ()
-      in
-      let incr_balance (acct : Account.t) amt =
-        match add_amount acct.balance amt with
-        | Ok balance ->
-            Ok {acct with balance}
-        | Error _ ->
-            fail Overflow
-      in
-      let receiver_exists =
-        check_exists receiver_location Receiver_not_present
+              Result.fail User_command_status.Failure.Predicate
       in
       match payload.body with
       | Stake_delegation _ ->
-          let%bind source_location, source_account = get_source source in
-          (* Check that receiver account exists. *)
-          let%bind () = receiver_exists in
+          let receiver_location, _receiver_account =
+            (* Check that receiver account exists. *)
+            get_with_location ledger receiver |> ok_or_reject
+          in
+          let source_location, source_account =
+            get_with_location ledger source |> ok_or_reject
+          in
+          let%bind () =
+            match (source_location, receiver_location) with
+            | `Existing _, `Existing _ ->
+                return ()
+            | `New, _ ->
+                Result.fail User_command_status.Failure.Source_not_present
+            | _, `New ->
+                Result.fail User_command_status.Failure.Receiver_not_present
+          in
           let previous_delegate = source_account.delegate in
           let source_timing = source_account.timing in
           (* Timing is always valid, but we need to record any switch from
              timed to untimed here to stay in sync with the snark.
           *)
           let%map timing =
-            validate_timing ~amount:Amount.zero ~account:source_account
+            validate_timing ~txn_amount:Amount.zero
+              ~txn_global_slot:current_global_slot ~account:source_account
+            |> Result.map_error ~f:(fun _ ->
+                   User_command_status.Failure.Source_insufficient_balance )
           in
           let source_account =
             { source_account with
@@ -656,6 +615,9 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           , User_command_status.Auxiliary_data.empty
           , Undo.User_command_undo.Body.Stake_delegation {previous_delegate} )
       | Payment {amount; token_id= token; _} ->
+          let receiver_location, receiver_account =
+            get_with_location ledger receiver |> ok_or_reject
+          in
           (* Charge the account creation fee. *)
           let%bind receiver_amount =
             match receiver_location with
@@ -665,26 +627,55 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                 if Token_id.(equal default) token then
                   (* Subtract the creation fee from the transaction amount. *)
                   sub_account_creation_fee ~constraint_constants `Added amount
-                  |> with_err Amount_insufficient_to_create_account
-                else fail Cannot_pay_creation_fee_in_token
+                  |> Result.map_error ~f:(fun _ ->
+                         User_command_status.Failure
+                         .Amount_insufficient_to_create_account )
+                else
+                  Result.fail
+                    User_command_status.Failure
+                    .Cannot_pay_creation_fee_in_token
           in
           let%bind receiver_account =
-            incr_balance receiver_account receiver_amount
+            let%map balance =
+              add_amount receiver_account.balance receiver_amount
+              |> Result.map_error ~f:(fun _ ->
+                     User_command_status.Failure.Overflow )
+            in
+            {receiver_account with balance}
           in
-          let%bind source_location, source_account =
-            get_source ~receiver_account source
-          in
-          let source_timing = source_account.timing in
-          let%map source_account =
+          let%map source_location, source_timing, source_account =
             let ret =
+              let%bind location, account =
+                if Account_id.equal source receiver then
+                  match receiver_location with
+                  | `Existing _ ->
+                      return (receiver_location, receiver_account)
+                  | `New ->
+                      Result.fail
+                        User_command_status.Failure.Source_not_present
+                else return (get_with_location ledger source |> ok_or_reject)
+              in
+              let%bind () =
+                match location with
+                | `Existing _ ->
+                    return ()
+                | `New ->
+                    Result.fail User_command_status.Failure.Source_not_present
+              in
+              let source_timing = account.timing in
               let%bind timing =
-                validate_timing ~amount ~account:source_account
+                validate_timing ~txn_amount:amount
+                  ~txn_global_slot:current_global_slot ~account
+                |> Result.map_error ~f:(fun _ ->
+                       User_command_status.Failure.Source_insufficient_balance
+                   )
               in
               let%map balance =
-                sub_amount source_account.balance amount
-                |> with_err Source_insufficient_balance
+                Result.map_error (sub_amount account.balance amount)
+                  ~f:(fun _ ->
+                    User_command_status.Failure.Source_insufficient_balance )
               in
-              {source_account with timing; balance}
+              (location, source_timing, {account with timing; balance})
             in
             if Account_id.equal fee_payer source then
               (* Don't process transactions with insufficient balance from the
@@ -694,7 +685,10 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               | Ok x ->
                   Ok x
               | Error failure ->
-                  reject (User_command_status.Failure.describe failure)
+                  raise
+                    (Reject
+                       (Error.createf "%s"
+                          (User_command_status.Failure.describe failure)))
             else ret
           in
           let previous_empty_accounts, auxiliary_data =
@@ -721,6 +715,9 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                 charge_account_creation_fee_exn fee_payer_account )
             |> ok_or_reject
           in
+          let receiver_location, receiver_account =
+            get_with_location ledger receiver |> ok_or_reject
+          in
           if not (receiver_location = `New) then
             failwith
               "Token owner account for newly created token already exists?!?!" ;
@@ -744,26 +741,44 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           if
             account_disabled
             && Token_id.(equal default) (Account_id.token_id receiver)
-          then reject "Cannot open a disabled account in the default token" ;
+          then
+            raise
+              (Reject
+                 (Error.createf
+                    "Cannot open a disabled account in the default token")) ;
           let fee_payer_account =
             Or_error.try_with (fun () ->
                 charge_account_creation_fee_exn fee_payer_account )
             |> ok_or_reject
+          in
+          let receiver_location, receiver_account =
+            get_with_location ledger receiver |> ok_or_reject
           in
           let%bind () =
             match receiver_location with
             | `New ->
                 return ()
             | `Existing _ ->
-                fail Receiver_already_exists
+                Result.fail User_command_status.Failure.Receiver_already_exists
           in
           let receiver_account =
             { receiver_account with
               token_permissions= Token_permissions.Not_owned {account_disabled}
             }
           in
-          let%bind source_location, source_account =
-            get_source source ~fee_payer_account ~receiver_account
+          let source_location, source_account =
+            get_with_location ledger source |> ok_or_reject
+          in
+          let%bind source_account =
+            if Account_id.equal source receiver then return receiver_account
+            else if Account_id.equal source fee_payer then
+              return fee_payer_account
+            else
+              match source_location with
+              | `New ->
+                  Result.fail User_command_status.Failure.Source_not_present
+              | `Existing _ ->
+                  return source_account
           in
           let%bind () =
             match source_account.token_permissions with
@@ -772,15 +787,22 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                   not
                     ( Bool.equal account_disabled disable_new_accounts
                     || predicate_passed )
-                then fail Mismatched_token_permissions
+                then
+                  Result.fail
+                    User_command_status.Failure.Mismatched_token_permissions
                 else return ()
             | Not_owned _ ->
-                check_not_default_token (Account_id.token_id receiver)
+                if Token_id.(equal default) (Account_id.token_id receiver) then
+                  return ()
+                else Result.fail User_command_status.Failure.Not_token_owner
           in
           let source_timing = source_account.timing in
           let%map source_account =
             let%map timing =
-              validate_timing ~amount:Amount.zero ~account:source_account
+              validate_timing ~txn_amount:Amount.zero
+                ~txn_global_slot:current_global_slot ~account:source_account
+              |> Result.map_error ~f:(fun _ ->
+                     User_command_status.Failure.Source_insufficient_balance )
             in
             {source_account with timing}
           in
@@ -802,20 +824,55 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             }
           , Undo.User_command_undo.Body.Create_token_account )
       | Mint_tokens {token_id= token; amount; _} ->
-          let%bind () = check_not_default_token token in
-          let%bind () = receiver_exists in
-          let%bind receiver_account = incr_balance receiver_account amount in
+          let%bind () =
+            if Token_id.(equal default) token then
+              Result.fail User_command_status.Failure.Not_token_owner
+            else return ()
+          in
+          let receiver_location, receiver_account =
+            get_with_location ledger receiver |> ok_or_reject
+          in
+          let%bind () =
+            match receiver_location with
+            | `Existing _ ->
+                return ()
+            | `New ->
+                Result.fail User_command_status.Failure.Receiver_not_present
+          in
+          let%bind receiver_account =
+            let%map balance =
+              Result.map_error (add_amount receiver_account.balance amount)
+                ~f:(fun _ -> User_command_status.Failure.Overflow)
+            in
+            {receiver_account with balance}
+          in
           let%map source_location, source_timing, source_account =
-            let%bind location, account = get_source source ~receiver_account in
+            let location, account =
+              if Account_id.equal source receiver then
+                (receiver_location, receiver_account)
+              else get_with_location ledger source |> ok_or_reject
+            in
+            let%bind () =
+              match location with
+              | `Existing _ ->
+                  return ()
+              | `New ->
+                  Result.fail User_command_status.Failure.Source_not_present
+            in
             let%bind () =
               match account.token_permissions with
               | Token_owned _ ->
                   return ()
               | Not_owned _ ->
-                  fail Not_token_owner
+                  Result.fail User_command_status.Failure.Not_token_owner
             in
             let source_timing = account.timing in
-            let%map timing = validate_timing ~amount:Amount.zero ~account in
+            let%map timing =
+              validate_timing ~txn_amount:Amount.zero
+                ~txn_global_slot:current_global_slot ~account
+              |> Result.map_error ~f:(fun _ ->
+                     User_command_status.Failure.Source_insufficient_balance )
+            in
             (location, source_timing, {account with timing})
           in
           ( [ (receiver_location, receiver_account)
