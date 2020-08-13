@@ -728,7 +728,6 @@ let compile
 module Provers = H3_2.T (Prover)
 module Proof0 = Proof
 
-(*
 let%test_module "test" =
   ( module struct
     let () =
@@ -864,4 +863,4 @@ let%test_module "test" =
 
     let%test_unit "verify" = assert (Blockchain_snark.Proof.verify xs)
   end )
-   *)
+  

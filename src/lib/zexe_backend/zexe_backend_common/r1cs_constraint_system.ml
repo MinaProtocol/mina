@@ -225,7 +225,7 @@ struct
     append t.m.c c
 
   let add_constraint ?label:_ t
-      (constr : Fp.t Snarky.Cvar.t Snarky.Constraint.basic) =
+      (constr : (Fp.t Snarky.Cvar.t, Fp.t) Snarky.Constraint.basic) =
     let var = canonicalize in
     let var_exn t = Option.value_exn (var t) in
     let choose_best opts terms =
