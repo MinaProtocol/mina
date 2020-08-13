@@ -1,5 +1,16 @@
 open Core_kernel
 
+module Pc_array = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type 'a t = 'a array [@@deriving version, compare, sexp, yojson, eq]
+
+      let hash_fold_t f s a = List.hash_fold_t f s (Array.to_list a)
+    end
+  end]
+end
+
 module Evals = struct
   [%%versioned
   module Stable = struct
@@ -18,7 +29,7 @@ module Evals = struct
         ; g_1: 'a
         ; g_2: 'a
         ; g_3: 'a }
-      [@@deriving fields, sexp, compare, yojson]
+      [@@deriving fields, sexp, compare, yojson, hash, eq]
     end
   end]
 
@@ -36,7 +47,7 @@ module Evals = struct
     ; g_1: 'a
     ; g_2: 'a
     ; g_3: 'a }
-  [@@deriving fields, sexp, compare, yojson]
+  [@@deriving fields, sexp, compare, yojson, hash, eq]
 
   let map (type a b)
       ({ w_hat
@@ -179,14 +190,22 @@ module Openings = struct
     module Stable = struct
       module V1 = struct
         type ('g, 'fq) t =
-          {lr: ('g * 'g) array; z_1: 'fq; z_2: 'fq; delta: 'g; sg: 'g}
-        [@@deriving bin_io, version, sexp, compare, yojson]
+          { lr: ('g * 'g) Pc_array.Stable.V1.t
+          ; z_1: 'fq
+          ; z_2: 'fq
+          ; delta: 'g
+          ; sg: 'g }
+        [@@deriving bin_io, version, sexp, compare, yojson, hash, eq]
       end
     end]
 
     type ('g, 'fq) t = ('g, 'fq) Stable.Latest.t =
-      {lr: ('g * 'g) array; z_1: 'fq; z_2: 'fq; delta: 'g; sg: 'g}
-    [@@deriving sexp, compare, yojson, hlist]
+      { lr: ('g * 'g) Pc_array.Stable.V1.t
+      ; z_1: 'fq
+      ; z_2: 'fq
+      ; delta: 'g
+      ; sg: 'g }
+    [@@deriving sexp, compare, yojson, hlist, hash, eq]
 
     let typ fq g ~length =
       let open Snarky.Typ in
@@ -205,14 +224,14 @@ module Openings = struct
             'fqv Evals.Stable.V1.t
             * 'fqv Evals.Stable.V1.t
             * 'fqv Evals.Stable.V1.t }
-      [@@deriving bin_io, version, sexp, compare, yojson]
+      [@@deriving bin_io, version, sexp, compare, yojson, hash, eq]
     end
   end]
 
   type ('g, 'fq, 'fqv) t = ('g, 'fq, 'fqv) Stable.Latest.t =
     { proof: ('g, 'fq) Bulletproof.t
     ; evals: 'fqv Evals.t * 'fqv Evals.t * 'fqv Evals.t }
-  [@@deriving sexp, compare, yojson, hlist]
+  [@@deriving sexp, compare, yojson, hlist, hash, eq]
 
   let typ (type g gv) (g : (gv, g, 'f) Snarky.Typ.t) fq ~bulletproof_rounds
       ~commitment_lengths ~dummy_group_element =
@@ -230,13 +249,14 @@ module Poly_comm = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type 'g t = {unshifted: 'g array; shifted: 'g}
-        [@@deriving bin_io, version, sexp, compare, yojson]
+        type 'g t = {unshifted: 'g Pc_array.Stable.V1.t; shifted: 'g}
+        [@@deriving bin_io, version, sexp, compare, yojson, hash, eq]
       end
     end]
 
-    type 'g t = 'g Stable.Latest.t = {unshifted: 'g array; shifted: 'g}
-    [@@deriving sexp, compare, yojson, hlist]
+    type 'g t = 'g Stable.Latest.t =
+      {unshifted: 'g Pc_array.Stable.V1.t; shifted: 'g}
+    [@@deriving sexp, compare, yojson, hlist, hash, eq]
 
     let typ ?(array = Snarky.Typ.array) g ~length =
       Snarky.Typ.of_hlistable [array ~length g; g] ~var_to_hlist:to_hlist
@@ -248,8 +268,8 @@ module Poly_comm = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type 'g t = 'g array
-        [@@deriving bin_io, version, sexp, compare, yojson]
+        type 'g t = 'g Pc_array.Stable.V1.t
+        [@@deriving bin_io, version, sexp, compare, yojson, hash, eq]
       end
     end]
 
@@ -280,7 +300,7 @@ module Messages = struct
             'fq
             * ( 'g With_degree_bound.Stable.V1.t
               * 'g Without_degree_bound.Stable.V1.t ) }
-      [@@deriving bin_io, version, sexp, compare, yojson, fields]
+      [@@deriving bin_io, version, sexp, compare, yojson, fields, hash, eq]
     end
   end]
 
@@ -331,7 +351,7 @@ module Proof = struct
       type ('g, 'fq, 'fqv) t =
         { messages: ('g, 'fq) Messages.Stable.V1.t
         ; openings: ('g, 'fq, 'fqv) Openings.Stable.V1.t }
-      [@@deriving bin_io, version, sexp, compare, yojson]
+      [@@deriving bin_io, version, sexp, compare, yojson, hash, eq]
     end
   end]
 

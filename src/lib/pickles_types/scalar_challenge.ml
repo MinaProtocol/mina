@@ -4,7 +4,7 @@ open Core_kernel
 module Stable = struct
   module V1 = struct
     type 'f t = Scalar_challenge of 'f
-    [@@deriving version, sexp, compare, eq, yojson]
+    [@@deriving version, sexp, compare, eq, yojson, hash]
   end
 end]
 
