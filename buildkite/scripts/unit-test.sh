@@ -19,10 +19,7 @@ cat /proc/cpuinfo
 source ~/.profile
 
 echo "--- Make build"
-export CODA_LIBP2P_HELPER_PATH="${PWD}/src/app/libp2p_helper/result/bin/libp2p_helper"
-export LIBP2P_NIXLESS=1
-export PATH=/usr/lib/go/bin:$PATH
-export GO=/usr/lib/go/bin/go
+export LIBP2P_NIXLESS=1 PATH=/usr/lib/go/bin:$PATH GO=/usr/lib/go/bin/go 
 time make build
 
 echo "--- Run unit tests"
