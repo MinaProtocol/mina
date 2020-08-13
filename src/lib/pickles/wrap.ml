@@ -12,8 +12,8 @@ open Backend
 (* This contains the "wrap" prover *)
 
 let vector_of_list (type a t)
-    (module V : Snarky.Vector.S with type elt = a and type t = t) (xs : a list)
-    : t =
+    (module V : Snarky_intf.Vector.S with type elt = a and type t = t)
+    (xs : a list) : t =
   let r = V.create () in
   List.iter xs ~f:(V.emplace_back r) ;
   r
@@ -49,7 +49,7 @@ let combined_inner_product (type actual_branching)
       ~last:Array.last ~evaluation_point:pt
       ~shifted_pow:(fun deg x ->
         Pcs_batch.pow ~one ~mul x
-          Int.(crs_max_degree - (deg mod crs_max_degree)) )
+          Int.(Max_degree.step - (deg mod Max_degree.step)) )
       v b
   in
   let open Tick.Field in
@@ -118,7 +118,7 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
         let module V = H1.To_vector (Digest.Constant) in
         V.f Max_local_max_branchings.length (M.f prev_me_only)) }
   in
-  let handler (Snarky.Request.With {request; respond}) =
+  let handler (Snarky_backendless.Request.With {request; respond}) =
     let open Req in
     let k x = respond (Provide x) in
     match request with
@@ -155,7 +155,7 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
     | Proof_state ->
         k prev_statement_with_hashes.proof_state
     | _ ->
-        Snarky.Request.unhandled
+        Snarky_backendless.Request.unhandled
   in
   let module O = Tick.Oracles in
   let public_input =
@@ -266,7 +266,7 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
             ; b
             ; bulletproof_challenges=
                 Vector.of_array_and_length_exn new_bulletproof_challenges
-                  Rounds.n
+                  Tick.Rounds.n
             ; combined_inner_product
             ; which_branch= which_index
             ; marlin=

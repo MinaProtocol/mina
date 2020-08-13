@@ -6,5 +6,5 @@
   (libraries
     backend
     pickles_types
-    snarky
+    snarky.backendless
     core_kernel ))

@@ -8,12 +8,32 @@ let rec to_list : type a n. (a, n) t -> a list = function
   | x :: xs ->
       x :: to_list xs
 
+let rec length : type a n. (a, n) t -> int = function
+  | [] ->
+      0
+  | _ :: xs ->
+      1 + length xs
+
 let rec to_vector : type a n. (a, n) t -> a Vector.e = function
   | [] ->
       T []
   | x :: xs ->
       let (T xs) = to_vector xs in
       T (x :: xs)
+
+let rec map : type a b n. (a, n) t -> f:(a -> b) -> (b, n) t =
+ fun xs ~f -> match xs with [] -> [] | x :: xs -> f x :: map xs ~f
+
+let rec extend_to_vector : type a n.
+    (a, n) t -> a -> n Nat.t -> (a, n) Vector.t =
+ fun v a n ->
+  match (v, n) with
+  | [], Z ->
+      []
+  | [], S n ->
+      a :: extend_to_vector [] a n
+  | x :: xs, S n ->
+      x :: extend_to_vector xs a n
 
 let rec of_vector : type a n m. (a, n) Vector.t -> (n, m) Nat.Lte.t -> (a, m) t
     =
@@ -63,12 +83,32 @@ module Sexpable (N : Nat.Intf) : Sexpable.S1 with type 'a t := ('a, N.n) t =
       let of_sexpable xs = of_list_and_length_exn xs N.n
     end)
 
+type ('a, 'n) at_most = ('a, 'n) t
+
 module With_length (N : Nat.Intf) = struct
-  type nonrec 'a t = ('a, N.n) t
+  module Stable = struct
+    module V1 = struct
+      type 'a t = ('a, N.n) at_most [@@deriving version {asserted}]
 
-  let compare c t1 t2 = Core.List.compare c (to_list t1) (to_list t2)
+      let compare c t1 t2 = Base.List.compare c (to_list t1) (to_list t2)
 
-  include Yojson (N)
-  include Binable (N)
-  include Sexpable (N)
+      let hash_fold_t f s v = List.hash_fold_t f s (to_list v)
+
+      let equal f t1 t2 = List.equal f (to_list t1) (to_list t2)
+
+      include Binable (N)
+      include Sexpable (N)
+      include Yojson (N)
+    end
+
+    module Latest = V1
+  end
+
+  include Stable.Latest
 end
+
+let typ ~padding elt n =
+  let lte = Nat.Lte.refl n in
+  let there v = extend_to_vector v padding n in
+  let back v = of_vector v lte in
+  Vector.typ elt n |> Snarky_backendless.Typ.transport ~there ~back

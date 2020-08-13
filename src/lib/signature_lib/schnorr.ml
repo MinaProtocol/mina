@@ -42,7 +42,7 @@ end
 consensus_mechanism]
 
 module type S = sig
-  module Impl : Snarky.Snark_intf.S
+  module Impl : Snarky_backendless.Snark_intf.S
 
   open Impl
 
@@ -117,7 +117,7 @@ module type S = sig
 end
 
 module Make
-    (Impl : Snarky.Snark_intf.S) (Curve : sig
+    (Impl : Snarky_backendless.Snark_intf.S) (Curve : sig
         open Impl
 
         module Scalar : sig

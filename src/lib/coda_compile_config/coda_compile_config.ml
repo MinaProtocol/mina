@@ -40,3 +40,9 @@ let default_snark_worker_fee =
 
 [%%inject
 "block_window_duration_ms", block_window_duration]
+
+let rpc_handshake_timeout_sec = 60.0
+
+let rpc_heartbeat_timeout_sec = 60.0
+
+let rpc_heartbeat_send_every_sec = 10.0 (*same as the default*)

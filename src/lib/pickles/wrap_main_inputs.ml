@@ -56,8 +56,6 @@ module Sponge = struct
 end
 
 module Input_domain = struct
-  let domain = Domain.Pow_2_roots_of_unity 7
-
   let lagrange_commitments domain : Me.Inner_curve.Affine.t array =
     let domain_size = Domain.size domain in
     let u = Unsigned.Size_t.of_int in
@@ -68,6 +66,8 @@ module Input_domain = struct
             |> Snarky_bn382.Tweedle.Dum.Field_poly_comm.unshifted
             |> Fn.flip Me.Inner_curve.Affine.Backend.Vector.get 0
             |> Me.Inner_curve.Affine.of_backend ) )
+
+  let domain = Domain.Pow_2_roots_of_unity 7
 end
 
 module Inner_curve = struct
