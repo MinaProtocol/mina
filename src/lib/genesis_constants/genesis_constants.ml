@@ -53,7 +53,7 @@ module Constraint_constants = struct
         ; pending_coinbase_depth: int
         ; coinbase_amount: Currency.Amount.Stable.V1.t
         ; account_creation_fee: Currency.Fee.Stable.V1.t }
-      [@@deriving sexp, eq]
+      [@@deriving sexp, eq, yojson]
 
       let to_latest = Fn.id
     end
