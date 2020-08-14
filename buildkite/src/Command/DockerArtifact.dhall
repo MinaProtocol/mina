@@ -28,7 +28,7 @@ let generateStep = \(deps : List Command.TaggedKey.Type) ->
         commands  = commands,
         label = "Build and release Docker artifacts",
         key = "docker-artifact",
-        target = Size.Large,
+        target = Size.Medium,
         docker_login = Some DockerLogin::{=},
         depends_on = deps
       }
