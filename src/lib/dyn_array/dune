@@ -2,9 +2,9 @@
  (name dyn_array)
  (public_name dyn_array)
  (library_flags -linkall)
+ (flags -warn-error -22)
  (inline_tests)
  (libraries core extlib)
- (flags -warn-error -22)
  (preprocess
   (pps ppx_version ppx_jane bisect_ppx -- -conditional))
  (synopsis

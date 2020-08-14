@@ -4,6 +4,8 @@ open Async
 module Git_sha = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t = string [@@deriving sexp, to_yojson, eq]
 
