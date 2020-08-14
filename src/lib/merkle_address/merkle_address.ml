@@ -95,8 +95,6 @@ let height ~ledger_depth path = ledger_depth - depth path
 
 let get = get
 
-type t = Stable.Latest.t
-
 [%%define_locally
 Stable.Latest.(t_of_sexp, sexp_of_t, to_yojson, compare, equal)]
 

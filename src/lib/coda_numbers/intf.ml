@@ -148,7 +148,7 @@ module type UInt32 = sig
     end
   end]
 
-  include S with type t = Stable.Latest.t
+  include S with type t := t
 
   val to_uint32 : t -> uint32
 
@@ -164,7 +164,7 @@ module type UInt64 = sig
     end
   end]
 
-  include S with type t = Stable.Latest.t
+  include S with type t := Stable.Latest.t
 
   val to_uint64 : t -> uint64
 

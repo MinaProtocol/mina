@@ -26,10 +26,6 @@ module Stable = struct
   end
 end]
 
-type t = Stable.Latest.t =
-  {fee: Currency.Fee.t; prover: Public_key.Compressed.t}
-[@@deriving sexp, yojson]
-
 include Comparable.Make (Stable.V1.T)
 
 let gen =

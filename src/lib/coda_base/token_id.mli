@@ -21,8 +21,6 @@ module Stable : sig
   end
 end]
 
-type t = Stable.Latest.t [@@deriving sexp, compare, yojson]
-
 val to_input : t -> (Field.t, bool) Random_oracle.Input.t
 
 val to_string : t -> string
