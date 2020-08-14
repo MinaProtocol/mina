@@ -44,6 +44,6 @@ Pipeline.build
       },
     steps = [
       buildTestCmd "dev" "src/lib" Size.XLarge,
-      buildTestCmd "nonconsensus_medium_curves" "src/nonconsensus" Size.Medium
+      buildTestCmd "nonconsensus_medium_curves" "src/nonconsensus" Size.Large
     ]
   }
