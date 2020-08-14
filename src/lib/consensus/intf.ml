@@ -13,8 +13,6 @@ module type Constants = sig
     end
   end]
 
-  type t = Stable.Latest.t
-
   val create : protocol_constants:Genesis_constants.Protocol.t -> t
 
   val gc_parameters :
@@ -35,14 +33,6 @@ module type Blockchain_state = sig
         [@@deriving sexp]
       end
     end]
-
-    type ('staged_ledger_hash, 'snarked_ledger_hash, 'token_id, 'time) t =
-      ( 'staged_ledger_hash
-      , 'snarked_ledger_hash
-      , 'token_id
-      , 'time )
-      Stable.Latest.t
-    [@@deriving sexp]
   end
 
   module Value : sig
@@ -58,8 +48,6 @@ module type Blockchain_state = sig
         [@@deriving sexp]
       end
     end]
-
-    type t = Stable.Latest.t [@@deriving sexp]
   end
 
   type var =
@@ -103,9 +91,6 @@ module type Protocol_state = sig
         type ('state_hash, 'body) t [@@deriving eq, hash, sexp, to_yojson]
       end
     end]
-
-    type ('state_hash, 'body) t = ('state_hash, 'body) Stable.Latest.t
-    [@@deriving sexp]
   end
 
   module Body : sig
@@ -117,14 +102,6 @@ module type Protocol_state = sig
           [@@deriving sexp]
         end
       end]
-
-      type ('state_hash, 'blockchain_state, 'consensus_state, 'constants) t =
-        ( 'state_hash
-        , 'blockchain_state
-        , 'consensus_state
-        , 'constants )
-        Stable.Latest.t
-      [@@deriving sexp]
     end
 
     module Value : sig
@@ -158,8 +135,6 @@ module type Protocol_state = sig
         [@@deriving sexp, eq, compare]
       end
     end]
-
-    type t = Stable.V1.t [@@deriving sexp, eq, compare]
   end
 
   type var = (State_hash.var, Body.var) Poly.t
@@ -318,18 +293,6 @@ module type S = sig
       end
     end]
 
-    type t = Stable.Latest.t =
-      { delta: int
-      ; k: int
-      ; c: int
-      ; c_times_k: int
-      ; slots_per_epoch: int
-      ; slot_duration: int
-      ; epoch_duration: int
-      ; genesis_state_timestamp: Block_time.t
-      ; acceptable_network_delay: int }
-    [@@deriving yojson, fields]
-
     val t :
          constraint_constants:Genesis_constants.Constraint_constants.t
       -> protocol_constants:Genesis_constants.Protocol.t
@@ -372,6 +335,8 @@ module type S = sig
     module Prover_state : sig
       [%%versioned:
       module Stable : sig
+        [@@@no_toplevel_latest_type]
+
         module V1 : sig
           type t
         end
@@ -401,8 +366,6 @@ module type S = sig
             type t [@@deriving sexp, to_yojson]
           end
         end]
-
-        type t = Stable.V1.t [@@deriving to_yojson, sexp]
       end
 
       include Snark_params.Tick.Snarkable.S with type value := Value.t
@@ -417,8 +380,6 @@ module type S = sig
           type t [@@deriving compare, sexp, yojson]
         end
       end]
-
-      type t = Stable.Latest.t [@@deriving compare, sexp, yojson]
 
       val to_string_hum : t -> string
 
@@ -448,9 +409,6 @@ module type S = sig
             type t [@@deriving hash, eq, compare, sexp, to_yojson]
           end
         end]
-
-        type t = Stable.Latest.t
-        [@@deriving hash, eq, compare, sexp, to_yojson]
 
         module For_tests : sig
           val with_curr_global_slot : t -> Global_slot.t -> t

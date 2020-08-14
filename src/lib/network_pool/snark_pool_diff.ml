@@ -8,6 +8,8 @@ open Network_peer
 module Rejected = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t = unit [@@deriving sexp, yojson]
 
