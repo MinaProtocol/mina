@@ -19,15 +19,12 @@ let input_size ~of_int ~add ~mul w =
   add (of_int f0) (mul (of_int slope) w)
 
 module Width : sig
+  [%%versioned:
   module Stable : sig
     module V1 : sig
-      type t [@@deriving bin_io, version, sexp, eq, compare, hash, yojson]
+      type t [@@deriving sexp, eq, compare, hash, yojson]
     end
-
-    module Latest = V1
-  end
-
-  type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash, yojson]
+  end]
 
   val of_int_exn : int -> t
 
@@ -59,8 +56,6 @@ end = struct
       let to_latest = Fn.id
     end
   end]
-
-  type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash, yojson]
 
   let zero = Char.of_int_exn 0
 
@@ -121,9 +116,6 @@ module Domains = struct
       [@@deriving sexp, eq, compare, hash, yojson, hlist, fields]
     end
   end]
-
-  type 'a t = 'a Stable.Latest.t = {h: 'a; k: 'a}
-  [@@deriving sexp, eq, compare, hash, yojson, hlist, fields]
 
   let typ =
     let open Impls.Step in
@@ -273,13 +265,6 @@ module Stable = struct
               end)
   end
 end]
-
-type t = Stable.Latest.t =
-  { step_data: (Marlin_checks.Domain.t Domains.t * Width.t) Max_branches_vec.T.t
-  ; max_width: Width.t
-  ; wrap_index: Backend.Tock.Curve.Affine.t list Abc.t Matrix_evals.t
-  ; wrap_vk: Vk.t }
-[@@deriving sexp, eq, compare, hash, yojson]
 
 let dummy_domains =
   { Domains.h= Marlin_checks.Domain.Pow_2_roots_of_unity 0

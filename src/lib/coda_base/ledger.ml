@@ -60,8 +60,6 @@ module Ledger_inner = struct
         let empty_account = Ledger_hash.of_digest Account.empty_digest
       end
     end]
-
-    type t = Stable.Latest.t
   end
 
   module Account = struct
@@ -88,8 +86,6 @@ module Ledger_inner = struct
               false
       end
     end]
-
-    type t = Stable.Latest.t
 
     let empty = Stable.Latest.empty
 

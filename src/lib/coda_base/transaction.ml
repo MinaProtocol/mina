@@ -2,6 +2,8 @@ open Core
 
 [%%versioned
 module Stable = struct
+  [@@@no_toplevel_latest_type]
+
   module V1 = struct
     type t =
       | User_command of User_command.With_valid_signature.Stable.V1.t

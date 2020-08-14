@@ -543,9 +543,6 @@ module Root_diff = struct
       let to_latest = Fn.id
     end
   end]
-
-  type t = Stable.Latest.t =
-    {user_commands: User_command.t With_status.t list; root_length: int}
 end
 
 let initialization_finish_signal t = t.initialization_finish_signal

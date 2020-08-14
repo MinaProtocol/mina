@@ -13,10 +13,6 @@ module Stable = struct
   end
 end]
 
-type t = Stable.Latest.t =
-  {token_owner_pk: Public_key.Compressed.t; disable_new_accounts: bool}
-[@@deriving compare, eq, sexp, hash, yojson]
-
 let receiver_pk {token_owner_pk; _} = token_owner_pk
 
 let receiver ~next_available_token {token_owner_pk; _} =
