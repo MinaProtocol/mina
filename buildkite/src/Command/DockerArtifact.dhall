@@ -11,7 +11,7 @@ let Cmd = ../Lib/Cmds.dhall
 let DockerLogin = ../Command/DockerLogin/Type.dhall
 
 
-let defaultArtifactStep = { name = "Artifacts", key = "build-artifact" }
+let defaultArtifactStep = { name = "Artifact", key = "build-artifact" }
 
 let generateStep = \(deps : List Command.TaggedKey.Type) ->
     -- assume head or first dependency specified represents the primary artifact dependency step
