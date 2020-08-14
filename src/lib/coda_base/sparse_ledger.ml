@@ -183,7 +183,8 @@ let apply_user_command_exn
           Balance.sub_amount account.balance (Amount.of_fee fee)
           |> Option.value_exn ?here:None ?error:None ?message:None
       ; receipt_chain_hash=
-          Receipt.Chain_hash.cons payload account.receipt_chain_hash
+          Receipt.Chain_hash.cons (User_command payload)
+            account.receipt_chain_hash
       ; timing } )
   in
   (* Charge the fee. *)
@@ -503,9 +504,11 @@ let apply_transaction_exn ~constraint_constants ~txn_global_slot t
   match transition with
   | Fee_transfer tr ->
       apply_fee_transfer_exn ~constraint_constants t tr
-  | User_command cmd ->
+  | Command (User_command cmd) ->
       apply_user_command_exn ~constraint_constants ~txn_global_slot t
         (cmd :> User_command.t)
+  | Command (Snapp_command _cmd) ->
+      failwith "Not yet implemented"
   | Coinbase c ->
       apply_coinbase_exn ~constraint_constants t c
 

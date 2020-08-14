@@ -128,6 +128,43 @@ module Undo : sig
     [@@deriving sexp]
   end
 
+  module Snapp_command_undo : sig
+    module Per_snapp : sig
+      type t = Undo.Snapp_command_undo.Per_snapp.t =
+        { previous_state: Snapp_state.Value.Stable.Latest.t
+        ; previous_delegate: Public_key.Compressed.t
+        ; previous_receipt_chain_hash: Receipt.Chain_hash.t }
+    end
+
+    module Body : sig
+      type t = Undo.Snapp_command_undo.Body.t =
+        | Snapp_snapp of {snapp1: Per_snapp.t; snapp2: Per_snapp.t}
+        | Snapp of {snapp: Per_snapp.t}
+        | User_to_snapp of
+            { user_previous_receipt_chain_hash: Receipt.Chain_hash.t
+            ; snapp: Per_snapp.t
+            ; previous_empty_accounts: Account_id.t list }
+        | Snapp_to_user of
+            { snapp: Per_snapp.t
+            ; previous_empty_accounts: Account_id.t list }
+        | Failed
+      [@@deriving sexp]
+    end
+
+    type t = Undo.Snapp_command_undo.t =
+      { body: Body.t
+      ; fee_payer_previous_receipt_chain_hash: Receipt.Chain_hash.t option
+      ; command: Snapp_command.t With_status.t }
+    [@@deriving sexp]
+  end
+
+  module Command_undo : sig
+    type t = Undo.Command_undo.t =
+      | User_command of User_command_undo.t
+      | Snapp_command of Snapp_command_undo.t
+    [@@deriving sexp]
+  end
+
   module Fee_transfer_undo : sig
     type t = Undo.Fee_transfer_undo.t =
       {fee_transfer: Fee_transfer.t; previous_empty_accounts: Account_id.t list}
@@ -142,7 +179,7 @@ module Undo : sig
 
   module Varying : sig
     type t = Undo.Varying.t =
-      | User_command of User_command_undo.t
+      | Command of Command_undo.t
       | Fee_transfer of Fee_transfer_undo.t
       | Coinbase of Coinbase_undo.t
     [@@deriving sexp]

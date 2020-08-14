@@ -4,7 +4,7 @@ open Core
 module Stable = struct
   module V1 = struct
     type t =
-      | User_command of User_command.With_valid_signature.Stable.V1.t
+      | Command of Command_transaction.Valid.Stable.V1.t
       | Fee_transfer of Fee_transfer.Stable.V1.t
       | Coinbase of Coinbase.Stable.V1.t
     [@@deriving sexp, compare, eq, hash, yojson]
@@ -16,7 +16,7 @@ end]
 module T = struct
   module T0 = struct
     type t = Stable.Latest.t =
-      | User_command of User_command.With_valid_signature.t
+      | Command of Command_transaction.Valid.t
       | Fee_transfer of Fee_transfer.t
       | Coinbase of Coinbase.t
     [@@deriving sexp, compare, eq, hash, yojson]
@@ -30,23 +30,27 @@ end
 include T
 
 let fee_excess : t -> Fee_excess.t Or_error.t = function
-  | User_command t ->
+  | Command (User_command t) ->
       Ok (User_command.fee_excess (User_command.forget_check t))
+  | Command (Snapp_command t) ->
+      Ok Snapp_command.(fee_excess (t :> t))
   | Fee_transfer t ->
       Fee_transfer.fee_excess t
   | Coinbase t ->
       Coinbase.fee_excess t
 
 let supply_increase = function
-  | User_command _ | Fee_transfer _ ->
+  | Command _ | Fee_transfer _ ->
       Ok Currency.Amount.zero
   | Coinbase t ->
       Coinbase.supply_increase t
 
 let accounts_accessed ~next_available_token = function
-  | User_command cmd ->
+  | Command (User_command cmd) ->
       User_command.accounts_accessed ~next_available_token
         (User_command.forget_check cmd)
+  | Command (Snapp_command t) ->
+      Snapp_command.(accounts_accessed (t :> t))
   | Fee_transfer ft ->
       Fee_transfer.receivers ft
   | Coinbase cb ->
@@ -54,10 +58,12 @@ let accounts_accessed ~next_available_token = function
 
 let next_available_token t next_available_token =
   match t with
-  | User_command cmd ->
+  | Command (User_command cmd) ->
       User_command.next_available_token
         (User_command.forget_check cmd)
         next_available_token
+  | Command (Snapp_command t) ->
+      Snapp_command.(next_available_token (t :> t)) next_available_token
   | Fee_transfer _ ->
       next_available_token
   | Coinbase _ ->

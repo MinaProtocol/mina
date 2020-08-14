@@ -101,6 +101,119 @@ module Undo = struct
     [@@deriving sexp]
   end
 
+  module Snapp_command_undo = struct
+    module Per_snapp = struct
+      [%%versioned
+      module Stable = struct
+        module V1 = struct
+          type t =
+            { previous_state: Snapp_state.Value.Stable.V1.t
+            ; previous_delegate: Public_key.Compressed.Stable.V1.t
+            ; previous_receipt_chain_hash: Receipt.Chain_hash.Stable.V1.t }
+          [@@deriving sexp]
+
+          let to_latest = Fn.id
+        end
+      end]
+
+      type t = Stable.Latest.t =
+        { previous_state: Snapp_state.Value.Stable.Latest.t
+        ; previous_delegate: Public_key.Compressed.t
+        ; previous_receipt_chain_hash: Receipt.Chain_hash.t }
+      [@@deriving sexp]
+    end
+
+    module Body = struct
+      [%%versioned
+      module Stable = struct
+        module V1 = struct
+          type t =
+            | Snapp_snapp of
+                { snapp1: Per_snapp.Stable.V1.t
+                ; snapp2: Per_snapp.Stable.V1.t }
+            | Snapp of {snapp: Per_snapp.Stable.V1.t}
+            | User_to_snapp of
+                { user_previous_receipt_chain_hash:
+                    Receipt.Chain_hash.Stable.V1.t
+                ; snapp: Per_snapp.Stable.V1.t
+                ; previous_empty_accounts: Account_id.Stable.V1.t list }
+            (* TODO
+            | Create_snapp of
+                { user_previous_receipt_chain_hash:
+                    Receipt.Chain_hash.Stable.V1.t
+                ; previous_empty_accounts: Account_id.Stable.V1.t list 
+                }
+*)
+            | Snapp_to_user of
+                { snapp: Per_snapp.Stable.V1.t
+                ; previous_empty_accounts: Account_id.Stable.V1.t list }
+            | Failed
+          [@@deriving sexp]
+
+          let to_latest = Fn.id
+        end
+      end]
+
+      type t = Stable.Latest.t =
+        | Snapp_snapp of {snapp1: Per_snapp.t; snapp2: Per_snapp.t}
+        | Snapp of {snapp: Per_snapp.t}
+        | User_to_snapp of
+            { user_previous_receipt_chain_hash: Receipt.Chain_hash.t
+            ; snapp: Per_snapp.t
+            ; previous_empty_accounts: Account_id.t list }
+        (*
+        | Create_snapp of
+            { user_previous_receipt_chain_hash: Receipt.Chain_hash.t
+            ; previous_empty_accounts: Account_id.t list }
+*)
+        | Snapp_to_user of
+            { snapp: Per_snapp.t
+            ; previous_empty_accounts: Account_id.t list }
+        | Failed
+      [@@deriving sexp]
+    end
+
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t =
+          { body: Body.Stable.V1.t
+          ; fee_payer_previous_receipt_chain_hash:
+              Receipt.Chain_hash.Stable.V1.t option
+          ; command: Snapp_command.Stable.V1.t With_status.Stable.V1.t }
+        [@@deriving sexp]
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    (* bin_io omitted *)
+    type t = Stable.Latest.t =
+      { body: Body.t
+      ; fee_payer_previous_receipt_chain_hash: Receipt.Chain_hash.t option
+      ; command: Snapp_command.t With_status.t }
+    [@@deriving sexp]
+  end
+
+  module Command_undo = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t =
+          | User_command of User_command_undo.Stable.V1.t
+          | Snapp_command of Snapp_command_undo.Stable.V1.t
+        [@@deriving sexp]
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    type t = Stable.Latest.t =
+      | User_command of User_command_undo.t
+      | Snapp_command of Snapp_command_undo.t
+    [@@deriving sexp]
+  end
+
   module Fee_transfer_undo = struct
     [%%versioned
     module Stable = struct
@@ -143,7 +256,7 @@ module Undo = struct
     module Stable = struct
       module V1 = struct
         type t =
-          | User_command of User_command_undo.Stable.V1.t
+          | Command of Command_undo.Stable.V1.t
           | Fee_transfer of Fee_transfer_undo.Stable.V1.t
           | Coinbase of Coinbase_undo.Stable.V1.t
         [@@deriving sexp]
@@ -154,7 +267,7 @@ module Undo = struct
 
     (* bin_io omitted *)
     type t = Stable.Latest.t =
-      | User_command of User_command_undo.t
+      | Command of Command_undo.t
       | Fee_transfer of Fee_transfer_undo.t
       | Coinbase of Coinbase_undo.t
     [@@deriving sexp]
@@ -205,6 +318,43 @@ module type S = sig
       [@@deriving sexp]
     end
 
+    module Snapp_command_undo : sig
+      module Per_snapp : sig
+        type t = Undo.Snapp_command_undo.Per_snapp.t =
+          { previous_state: Snapp_state.Value.Stable.Latest.t
+          ; previous_delegate: Public_key.Compressed.t
+          ; previous_receipt_chain_hash: Receipt.Chain_hash.t }
+      end
+
+      module Body : sig
+        type t = Undo.Snapp_command_undo.Body.t =
+          | Snapp_snapp of {snapp1: Per_snapp.t; snapp2: Per_snapp.t}
+          | Snapp of {snapp: Per_snapp.t}
+          | User_to_snapp of
+              { user_previous_receipt_chain_hash: Receipt.Chain_hash.t
+              ; snapp: Per_snapp.t
+              ; previous_empty_accounts: Account_id.t list }
+          | Snapp_to_user of
+              { snapp: Per_snapp.t
+              ; previous_empty_accounts: Account_id.t list }
+          | Failed
+        [@@deriving sexp]
+      end
+
+      type t = Undo.Snapp_command_undo.t =
+        { body: Body.t
+        ; fee_payer_previous_receipt_chain_hash: Receipt.Chain_hash.t option
+        ; command: Snapp_command.t With_status.t }
+      [@@deriving sexp]
+    end
+
+    module Command_undo : sig
+      type t = Undo.Command_undo.t =
+        | User_command of User_command_undo.t
+        | Snapp_command of Snapp_command_undo.t
+      [@@deriving sexp]
+    end
+
     module Fee_transfer_undo : sig
       type t = Undo.Fee_transfer_undo.t =
         { fee_transfer: Fee_transfer.t
@@ -220,7 +370,7 @@ module type S = sig
 
     module Varying : sig
       type t = Undo.Varying.t =
-        | User_command of User_command_undo.t
+        | Command of Command_undo.t
         | Fee_transfer of Fee_transfer_undo.t
         | Coinbase of Coinbase_undo.t
       [@@deriving sexp]
@@ -418,11 +568,14 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     let transaction : t -> Transaction.t With_status.t Or_error.t =
      fun {varying; _} ->
       match varying with
-      | User_command uc ->
+      | Command (User_command uc) ->
           With_status.map_result uc.common.user_command ~f:(fun cmd ->
               Option.value_map ~default:(Or_error.error_string "Bad signature")
-                (UC.check cmd) ~f:(fun cmd -> Ok (Transaction.User_command cmd))
-          )
+                (UC.check cmd) ~f:(fun cmd ->
+                  Ok (Transaction.Command (User_command cmd)) ) )
+      | Command (Snapp_command s) ->
+          With_status.map_result s.command ~f:(fun c ->
+              Ok (Transaction.Command (Snapp_command c)) )
       | Fee_transfer f ->
           Ok
             { data= Fee_transfer f.fee_transfer
@@ -435,8 +588,10 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     let user_command_status : t -> User_command_status.t =
      fun {varying; _} ->
       match varying with
-      | User_command {common= {user_command= {status; _}; _}; _} ->
+      | Command (User_command {common= {user_command= {status; _}; _}; _}) ->
           status
+      | Command (Snapp_command c) ->
+          c.command.status
       | Fee_transfer _ ->
           Applied User_command_status.Auxiliary_data.empty
       | Coinbase _ ->
@@ -444,6 +599,124 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
   end
 
   let previous_empty_accounts action pk = if action = `Added then [pk] else []
+
+  let get_user_account_with_location ledger account_id =
+    let open Or_error.Let_syntax in
+    let%bind ((_, acct) as r) = get_with_location ledger account_id in
+    let%map () =
+      check
+        (Option.is_none acct.snapp)
+        !"Expected account %{sexp: Account_id.t} to be a user account, got a \
+          snapp account."
+        account_id
+    in
+    r
+
+  let get_snapp_account_with_location ledger account_id =
+    let open Or_error.Let_syntax in
+    let%bind ((_, acct) as r) = get_with_location ledger account_id in
+    let%map snapp =
+      match acct.snapp with
+      | Some s ->
+          Ok s
+      | None ->
+          Or_error.errorf
+            !"Expected account %{sexp: Account_id.t} to be a snapp account, \
+              got a user account."
+            account_id
+    in
+    (r, snapp)
+
+  let check_exists t e =
+    match t with `Existing _ -> Ok () | `New -> Result.fail e
+
+  let failure (e : User_command_status.Failure.t) = e
+
+  let incr_balance (acct : Account.t) amt =
+    match add_amount acct.balance amt with
+    | Ok balance ->
+        Ok {acct with balance}
+    | Error _ ->
+        Result.fail (failure Overflow)
+
+  let with_err e = Result.map_error ~f:(fun _ -> failure e)
+
+  (* Helper function for [apply_user_command_unchecked] *)
+  let pay_fee' ~command ~nonce ~fee_payer ~fee ~ledger ~current_global_slot =
+    let open Or_error.Let_syntax in
+    (* Fee-payer information *)
+    let%bind location, account =
+      get_user_account_with_location ledger fee_payer
+    in
+    let%bind () =
+      match location with
+      | `Existing _ ->
+          return ()
+      | `New ->
+          Or_error.errorf "The fee-payer account does not exist"
+    in
+    let fee = Amount.of_fee fee in
+    let%bind balance = sub_amount account.balance fee in
+    let%bind () = validate_nonces nonce account.nonce in
+    let%map timing =
+      validate_timing ~txn_amount:fee ~txn_global_slot:current_global_slot
+        ~account
+    in
+    ( location
+    , account
+    , { account with
+        balance
+      ; nonce= Account.Nonce.succ account.nonce
+      ; receipt_chain_hash=
+          Receipt.Chain_hash.cons command account.receipt_chain_hash
+      ; timing } )
+
+  (* Helper function for [apply_user_command_unchecked] *)
+  let pay_fee ~user_command ~signer_pk ~ledger ~current_global_slot =
+    let open Or_error.Let_syntax in
+    (* Fee-payer information *)
+    let nonce = User_command.nonce user_command in
+    let fee_payer = User_command.fee_payer user_command in
+    let%bind () =
+      let fee_token = User_command.fee_token user_command in
+      let%bind () =
+        (* TODO: Enable multi-sig. *)
+        if
+          Public_key.Compressed.equal
+            (Account_id.public_key fee_payer)
+            signer_pk
+        then return ()
+        else
+          Or_error.errorf
+            "Cannot pay fees from a public key that did not sign the \
+             transaction"
+      in
+      let%map () =
+        (* TODO: Remove this check and update the transaction snark once we have
+          an exchange rate mechanism. See issue #4447.
+        *)
+        if Token_id.equal fee_token Token_id.default then return ()
+        else
+          Or_error.errorf
+            "Cannot create transactions with fee_token different from the \
+             default"
+      in
+      ()
+    in
+    let%map loc, account, account' =
+      pay_fee' ~command:(User_command user_command.payload) ~nonce ~fee_payer
+        ~fee:(User_command.fee user_command)
+        ~ledger ~current_global_slot
+    in
+    let undo_common : Undo.User_command_undo.Common.t =
+      { user_command=
+          { data= user_command
+          ; status= Applied User_command_status.Auxiliary_data.empty }
+      ; previous_receipt_chain_hash= account.receipt_chain_hash
+      ; fee_payer_timing= account.timing
+      ; source_timing= None }
+    in
+    (loc, account', undo_common)
 
   (* someday: It would probably be better if we didn't modify the receipt chain hash
   in the case that the sender is equal to the receiver, but it complicates the SNARK, so
@@ -461,60 +734,9 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         ~current_global_slot
     in
     (* Fee-payer information *)
-    let fee_token = User_command.fee_token user_command in
     let fee_payer = User_command.fee_payer user_command in
-    let nonce = User_command.nonce user_command in
-    let%bind () =
-      (* TODO: Enable multi-sig. *)
-      if
-        Public_key.Compressed.equal (Account_id.public_key fee_payer) signer_pk
-      then return ()
-      else
-        Or_error.errorf
-          "Cannot pay fees from a public key that did not sign the transaction"
-    in
-    let%bind () =
-      (* TODO: Remove this check and update the transaction snark once we have
-         an exchange rate mechanism. See issue #4447.
-      *)
-      if Token_id.equal fee_token Token_id.default then return ()
-      else
-        Or_error.errorf
-          "Cannot create transactions with fee_token different from the default"
-    in
     let%bind fee_payer_location, fee_payer_account, undo_common =
-      let%bind location, account = get_with_location ledger fee_payer in
-      let%bind () =
-        match location with
-        | `Existing _ ->
-            return ()
-        | `New ->
-            Or_error.errorf "The fee-payer account does not exist"
-      in
-      let fee = Amount.of_fee (User_command.fee user_command) in
-      let%bind balance = sub_amount account.balance fee in
-      let%bind () = validate_nonces nonce account.nonce in
-      let fee_payer_timing = account.timing in
-      let%map timing =
-        validate_timing ~txn_amount:fee ~txn_global_slot:current_global_slot
-          ~account
-      in
-      let undo_common : Undo.User_command_undo.Common.t =
-        { user_command=
-            { data= user_command
-            ; status= Applied User_command_status.Auxiliary_data.empty }
-        ; previous_receipt_chain_hash= account.receipt_chain_hash
-        ; fee_payer_timing
-        ; source_timing= None }
-      in
-      ( location
-      , { account with
-          balance
-        ; nonce= Account.Nonce.succ account.nonce
-        ; receipt_chain_hash=
-            Receipt.Chain_hash.cons payload account.receipt_chain_hash
-        ; timing }
-      , undo_common )
+      pay_fee ~user_command ~signer_pk ~ledger ~current_global_slot
     in
     (* Charge the fee. This must happen, whether or not the command itself
        succeeds, to ensure that the network is compensated for processing this
@@ -636,12 +858,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                     .Cannot_pay_creation_fee_in_token
           in
           let%bind receiver_account =
-            let%map balance =
-              add_amount receiver_account.balance receiver_amount
-              |> Result.map_error ~f:(fun _ ->
-                     User_command_status.Failure.Overflow )
-            in
-            {receiver_account with balance}
+            incr_balance receiver_account receiver_amount
           in
           let%map source_location, source_timing, source_account =
             let ret =
@@ -839,13 +1056,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             | `New ->
                 Result.fail User_command_status.Failure.Receiver_not_present
           in
-          let%bind receiver_account =
-            let%map balance =
-              Result.map_error (add_amount receiver_account.balance amount)
-                ~f:(fun _ -> User_command_status.Failure.Overflow)
-            in
-            {receiver_account with balance}
-          in
+          let%bind receiver_account = incr_balance receiver_account amount in
           let%map source_location, source_timing, source_account =
             let location, account =
               if Account_id.equal source receiver then
@@ -915,6 +1126,393 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       (user_command : User_command.With_valid_signature.t) =
     apply_user_command_unchecked ~constraint_constants ~txn_global_slot ledger
       (User_command.forget_check user_command)
+
+  (* Fee must get charged regardless of whether predicate verifies *)
+  let apply_snapp_command_unchecked ledger ~constraint_constants
+      ~(state_view : Snapp_predicate.Protocol_state.View.t)
+      (c : Snapp_command.t) =
+    let open Pickles_types in
+    let open Snapp_basic in
+    let current_global_slot = state_view.curr_global_slot in
+    let update_snapp (a : Account.t) (s : Snapp_account.t)
+        (u : Snapp_command.Per_account.t) =
+      { a with
+        delegate= Set_or_keep.set_or_keep u.delegate a.delegate
+      ; snapp=
+          Some
+            { s with
+              app_state=
+                Vector.map2 ~f:Set_or_keep.set_or_keep u.state s.app_state } }
+    in
+    let open Result.Let_syntax in
+    with_return (fun ({return} : _ Result.t return) ->
+        let ok_or_reject = function
+          | Ok x ->
+              x
+          | Error err ->
+              return (Error err)
+        in
+        let opt err = function
+          | Some x ->
+              x
+          | None ->
+              return (Or_error.error_string err)
+        in
+        let get_new_account account_id =
+          let loc, acct =
+            get_with_location ledger account_id |> ok_or_reject
+          in
+          let%map () =
+            match loc with
+            | `Existing _ ->
+                Error User_command_status.Failure.Receiver_already_exists
+            | `New ->
+                Ok ()
+          in
+          (loc, acct)
+        in
+        let get_existing_snapp k (e : User_command_status.Failure.t) =
+          let (((s, _), _) as t) =
+            get_snapp_account_with_location ledger k |> ok_or_reject
+          in
+          let%map () = check_exists s e in
+          t
+        in
+        let get_existing_user k (e : User_command_status.Failure.t) =
+          let ((s, _) as t) =
+            get_user_account_with_location ledger k |> ok_or_reject
+          in
+          let%map () = check_exists s e in
+          t
+        in
+        let open Snapp_command in
+        let token_id = (Snapp_command.fee_payment c).token_id in
+        let snapp_acct_id (fp : _ Fee_payment.t) (b : Snapp_body.t) =
+          Account_id.create b.pk fp.token_id
+        in
+        (* TODO: Optimize *)
+        let fee_payer_previous_receipt_chain_hash =
+          let _, a =
+            ok_or_reject (get_with_location ledger (fee_payment c).payer)
+          in
+          Some a.receipt_chain_hash
+        in
+        let check_snapp_body
+            (* The control will have been checked by this point. *)
+            ({pk= _; control= _; update= _; predicate} : Snapp_body.t) ~self
+            ~other =
+          (let%bind () =
+             Snapp_predicate.check predicate ~self ~other ~state_view
+           in
+           Ok ())
+          |> Result.map_error ~f:(fun _ ->
+                 User_command_status.Failure.Predicate )
+        in
+        let finish res =
+          match res with
+          | Error failure ->
+              Ok
+                { Undo.Snapp_command_undo.command=
+                    {data= c; status= Failed failure}
+                ; fee_payer_previous_receipt_chain_hash
+                ; body= Failed }
+          | Ok (accts, undo) ->
+              List.iter accts ~f:(fun (location, account) ->
+                  set_with_location ledger location account ) ;
+              Ok undo
+        in
+        let payload =
+          Receipt.Elt.Snapp_command
+            (Payload.digest
+               (opt "Could not convert transaction to payload" (to_payload c)))
+        in
+        let validate_timing a txn_amount =
+          Or_error.ok_exn
+            (validate_timing ~txn_amount ~txn_global_slot:current_global_slot
+               ~account:a)
+        in
+        let step ?amount (a : Account.t) =
+          { a with
+            nonce= Account.Nonce.succ a.nonce
+          ; receipt_chain_hash=
+              Receipt.Chain_hash.cons payload a.receipt_chain_hash
+          ; timing=
+              Option.value_map amount ~default:a.timing ~f:(validate_timing a)
+          }
+        in
+        let step_fee_payer a fee =
+          let f = Amount.of_fee fee in
+          { (step a ~amount:f) with
+            balance= opt "Cannot pay fee" (Balance.sub_amount a.balance f) }
+        in
+        let undo_per_snapp (a : Account.t) (snapp : Snapp_account.t) =
+          { Undo.Snapp_command_undo.Per_snapp.previous_state= snapp.app_state
+          ; previous_delegate= a.delegate
+          ; previous_receipt_chain_hash= a.receipt_chain_hash }
+        in
+        let undo fee_payer_info body =
+          { Undo.Snapp_command_undo.command=
+              { data= c
+              ; status= Applied User_command_status.Auxiliary_data.empty }
+          ; fee_payer_previous_receipt_chain_hash=
+              Option.map fee_payer_info ~f:(fun (_, (a : Account.t), _) ->
+                  a.receipt_chain_hash )
+          ; body }
+        in
+        let pay_fee ~nonce ~fee_payer =
+          let ((loc, _, acct') as info) =
+            pay_fee' ~command:payload ~nonce ~fee_payer ~fee:(fee c) ~ledger
+              ~current_global_slot
+            |> ok_or_reject
+          in
+          (* Charge the fee. This must happen, whether or not the command itself
+            succeeds, to ensure that the network is compensated for processing this
+            command.
+          *)
+          set_with_location ledger loc acct' ;
+          info
+        in
+        ( match c with
+        | Snapp {snapp; fee_payment= fp} ->
+            (* Get snapp account, assert it already exists *)
+            let%bind (loc, acct), acct_snapp =
+              get_existing_snapp (snapp_acct_id fp snapp)
+                Snapp_account_not_present
+            in
+            (* Pay the fee, step snapp account. *)
+            let acct', fee_payer_info =
+              match fp.payer with
+              | `Snapp ->
+                  let acct = step_fee_payer acct fp.fee in
+                  set_with_location ledger loc acct ;
+                  (acct, None)
+              | `Other {pk; nonce; _} ->
+                  ( step acct
+                  , Some
+                      (pay_fee ~nonce
+                         ~fee_payer:(Account_id.create pk token_id)) )
+            in
+            (* Check the predicate *)
+            let%map () = check_snapp_body snapp ~self:acct ~other:None in
+            let undo =
+              undo fee_payer_info
+                (Snapp
+                   { snapp=
+                       { previous_state= acct_snapp.app_state
+                       ; previous_delegate= acct.delegate
+                       ; previous_receipt_chain_hash= acct.receipt_chain_hash
+                       } })
+            in
+            ( ( [ ( loc (* Update snapp state *)
+                  , update_snapp acct' acct_snapp snapp.update ) ]
+              @ Option.(
+                  to_list
+                    (map fee_payer_info ~f:(fun (loc, _, fp_acct') ->
+                         (loc, fp_acct') ))) )
+            , undo )
+        | Snapp_snapp
+            {snapp1; snapp2; sender; snapp1_base_delta; fee_payment= fp} ->
+            let as_sender_receiver accts f =
+              let cswap =
+                match sender with `Snapp1 -> Fn.id | `Snapp2 -> Tuple2.swap
+              in
+              cswap (f (cswap accts))
+            in
+            (* Get both accounts, assert they exist. *)
+            let%bind ((loc1, acct1) as lacct1), acct_snapp1 =
+              get_existing_snapp (snapp_acct_id fp snapp1)
+                Snapp_account_not_present
+            and ((loc2, acct2) as lacct2), acct_snapp2 =
+              get_existing_snapp (snapp_acct_id fp snapp2)
+                Snapp_account_not_present
+            in
+            (* Pay the fee and "step" both snapp accounts by
+             - incrementing their nonces 
+             - consing the payload onto the receipt chain hash *)
+            let acct1', acct2', fee_payer_info =
+              (* Processing the fee unconditionally *)
+              match fp.payer with
+              | `Snapp ->
+                  let acct1, acct2 =
+                    as_sender_receiver (lacct1, lacct2)
+                      (fun ((loc_s, sender), (_, receiver)) ->
+                        let sender = step_fee_payer sender fp.fee in
+                        set_with_location ledger loc_s sender ;
+                        (* Step, but do not commit to the ledger, the receiver account. *)
+                        (sender, step receiver) )
+                  in
+                  (acct1, acct2, None)
+              | `Other {pk; nonce; _} ->
+                  ( step acct1
+                  , step acct2
+                  , Some
+                      (pay_fee ~nonce
+                         ~fee_payer:(Account_id.create pk token_id)) )
+            in
+            (* The predicates should be run on each account's state prior to its being stepped, but
+             the fee must be paid unconditionally, so this comes after that. 
+          *)
+            let%bind () =
+              check_snapp_body snapp1 ~self:acct1 ~other:(Some acct2)
+            and () = check_snapp_body snapp2 ~self:acct2 ~other:(Some acct1) in
+            let acct1' = update_snapp acct1' acct_snapp1 snapp1.update
+            and acct2' = update_snapp acct2' acct_snapp2 snapp2.update in
+            (* Update balances. *)
+            let%map acct1', acct2' =
+              with_return (fun {return} ->
+                  let modify_balance (a : Account.t) f
+                      (e : User_command_status.Failure.t) =
+                    match f a.balance snapp1_base_delta with
+                    | Some balance ->
+                        {a with balance}
+                    | None ->
+                        return (Error e)
+                  in
+                  Ok
+                    (as_sender_receiver (acct1', acct2')
+                       (fun (sender, receiver) ->
+                         ( modify_balance sender Balance.sub_amount
+                             Source_insufficient_balance
+                         , modify_balance receiver Balance.add_amount Overflow
+                         ) )) )
+            in
+            let undo =
+              undo fee_payer_info
+                (Snapp_snapp
+                   { snapp1= undo_per_snapp acct1 acct_snapp1
+                   ; snapp2= undo_per_snapp acct2 acct_snapp2 })
+            in
+            ([(loc1, acct1'); (loc2, acct2')], undo)
+        | User_to_snapp
+            { user_pk
+            ; user_signature= _
+            ; user_nonce
+            ; snapp
+            ; amount
+            ; fee_payment= fp } ->
+            (* Get the user account *)
+            let%bind loc_u, acct_u =
+              get_existing_user
+                (Account_id.create user_pk fp.token_id)
+                Source_not_present
+            in
+            ok_or_reject (validate_nonces acct_u.nonce user_nonce) ;
+            (* Get the snapp account *)
+            let%bind (loc_s, acct_s), acct_snapp =
+              match snapp with
+              | `Update u ->
+                  get_existing_snapp (snapp_acct_id fp u)
+                    Snapp_account_not_present
+              | `Create {pk; snapp} ->
+                  let%map loc, acct =
+                    get_new_account (Account_id.create pk fp.token_id)
+                  in
+                  ((loc, {acct with snapp= Some snapp}), snapp)
+            in
+            let id_s = Account_id.create acct_s.public_key fp.token_id in
+            (* Charge the fee and step the sender account *)
+            let acct_u', fee_payer_info =
+              match fp.payer with
+              | `User ->
+                  let acct_u' = step_fee_payer acct_u fp.fee in
+                  set_with_location ledger loc_u acct_u' ;
+                  (acct_u', None)
+              | `Other {pk; nonce; signature= _} ->
+                  ( step acct_u
+                  , Some
+                      (pay_fee ~nonce
+                         ~fee_payer:(Account_id.create pk token_id)) )
+            in
+            (* Check and update the snapp account *)
+            let%bind acct_s' =
+              match snapp with
+              | `Update snapp ->
+                  let%bind () =
+                    check_snapp_body snapp ~self:acct_s ~other:(Some acct_u)
+                  in
+                  incr_balance
+                    (step (update_snapp acct_s acct_snapp snapp.update))
+                    amount
+              | `Create {pk= _; snapp= _} ->
+                  (* It already has the correct pk and "snapp" *)
+                  sub_account_creation_fee ~constraint_constants `Added amount
+                  |> with_err Amount_insufficient_to_create_account
+                  >>= incr_balance acct_s
+            in
+            (* Subtract from the sender. Their nonce and receipt chain hash have already
+               been appropriately stepped above.
+            *)
+            let%map acct_u' =
+              let%map balance =
+                sub_amount acct_u'.balance amount
+                |> with_err Source_insufficient_balance
+              in
+              {acct_u' with balance}
+            in
+            let undo =
+              undo fee_payer_info
+                (User_to_snapp
+                   { snapp= undo_per_snapp acct_s acct_snapp
+                   ; user_previous_receipt_chain_hash=
+                       acct_u.receipt_chain_hash
+                   ; previous_empty_accounts=
+                       (match loc_s with `New -> [id_s] | `Existing _ -> []) })
+            in
+            ([(loc_s, acct_s'); (loc_u, acct_u')], undo)
+        | Snapp_to_user {user_pk; snapp; amount; fee_payment= fp} ->
+            (* Get the user account *)
+            let id_u = Account_id.create user_pk fp.token_id in
+            let loc_u, acct_u =
+              (* TODO: How to handle new accounts properly? *)
+              get_user_account_with_location ledger id_u |> ok_or_reject
+            in
+            (* Get the snapp account *)
+            let%bind (loc_s, acct_s), acct_snapp =
+              get_existing_snapp (snapp_acct_id fp snapp)
+                Snapp_account_not_present
+            in
+            (* Pay the fee, step snapp account. *)
+            let acct_s', fee_payer_info =
+              match fp.payer with
+              | `Snapp ->
+                  let acct_s' = step_fee_payer acct_s fp.fee in
+                  set_with_location ledger loc_s acct_s' ;
+                  (acct_s', None)
+              | `Other {pk; nonce; _} ->
+                  ( step acct_s
+                  , Some
+                      (pay_fee ~nonce
+                         ~fee_payer:(Account_id.create pk token_id)) )
+            in
+            (* Check and update the snapp account *)
+            let%bind acct_s' =
+              let%bind () =
+                check_snapp_body snapp ~self:acct_s ~other:(Some acct_u)
+              in
+              let%map balance =
+                sub_amount acct_s'.balance amount
+                |> with_err Source_insufficient_balance
+              in
+              {(update_snapp acct_s acct_snapp snapp.update) with balance}
+            in
+            (* Increase user balance. *)
+            let%map acct_u' =
+              sub_account_creation_fee ~constraint_constants `Added amount
+              |> with_err Amount_insufficient_to_create_account
+              >>= incr_balance acct_u
+            in
+            let undo =
+              undo fee_payer_info
+                (Snapp_to_user
+                   { snapp= undo_per_snapp acct_s acct_snapp
+                   ; previous_empty_accounts=
+                       (match loc_u with `New -> [id_u] | `Existing _ -> []) })
+            in
+            ([(loc_s, acct_s'); (loc_u, acct_u')], undo) )
+        |> finish )
+
+  (* TODO: Use this function *)
+  let _ = apply_snapp_command_unchecked
 
   let process_fee_transfer t (transfer : Fee_transfer.t) ~modify_balance =
     let open Or_error.Let_syntax in
@@ -1297,8 +1895,10 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       match undo.varying with
       | Fee_transfer u ->
           undo_fee_transfer ~constraint_constants ledger u
-      | User_command u ->
+      | Command (User_command u) ->
           undo_user_command ~constraint_constants ledger u
+      | Command (Snapp_command _u) ->
+          failwith "Not yet implemented"
       | Coinbase c ->
           undo_coinbase ~constraint_constants ledger c ;
           Ok ()
@@ -1313,10 +1913,13 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         let previous_hash = merkle_root ledger in
         Or_error.map
           ( match t with
-          | User_command txn ->
+          | Command (User_command txn) ->
               Or_error.map
                 (apply_user_command ~constraint_constants ~txn_global_slot
-                   ledger txn) ~f:(fun undo -> Undo.Varying.User_command undo)
+                   ledger txn) ~f:(fun undo ->
+                  Undo.Varying.Command (User_command undo) )
+          | Command (Snapp_command _txn) ->
+              failwith "Not yet implemented"
           | Fee_transfer t ->
               Or_error.map (apply_fee_transfer ~constraint_constants ledger t)
                 ~f:(fun undo -> Undo.Varying.Fee_transfer undo)
