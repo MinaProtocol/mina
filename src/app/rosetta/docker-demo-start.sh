@@ -24,17 +24,18 @@ echo "========================= STARTING POSTGRESQL ==========================="
 pg_ctlcluster 11 main start
 
 # wait for it to settle
-sleep 2
+sleep 3
 
 # archive
 echo "========================= STARTING ARCHIVE PROCESS ==========================="
 /coda-bin/archive/archive.exe run \
   -postgres-uri $PG_CONN \
   -server-port 3086 \
-  -log-level fatal &
+  -log-level fatal \
+  -log-json &
 
 # wait for it to settle
-sleep 2
+sleep 3
 
 # Setup and run demo-node
 PK=${PK:-B62qrPN5Y5yq8kGE3FbVKbGTdTAJNdtNtB5sNVpxyRwWGcDEhpMzc8g}
@@ -56,18 +57,24 @@ echo "========================= STARTING DAEMON ==========================="
   -config-dir "$CODA_CONFIG_DIR" \
   -insecure-rest-server \
   -external-ip 127.0.0.1 \
+  -external-port "${CODA_DAEMON_PORT:-10101}" \
   -archive-address 3086 \
-  -log-level fatal &
+  -disable-telemetry \
+  -working-dir /data/ \
+  -proof-level none \
+  -log-level fatal \
+  -log-json \
+  -background
 
 # wait for it to settle
-sleep 15
+sleep 3
 
 # rosetta
 echo "========================= STARTING ROSETTA API on PORT 3087 ==========================="
 /coda-bin/rosetta/rosetta.exe \
   -archive-uri $PG_CONN \
   -graphql-uri http://localhost:3085/graphql \
-  -log-level fatal \
+  -log-level debug \
   -port 3087 &
 
 sleep infinity
