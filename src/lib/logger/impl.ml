@@ -67,8 +67,6 @@ module Metadata = struct
 
   let of_yojson = Stable.Latest.of_yojson
 
-  type t = Stable.Latest.t
-
   let mem = String.Map.mem
 
   let extend (t : t) alist =
@@ -310,8 +308,6 @@ module Stable = struct
     let to_latest = Fn.id
   end
 end]
-
-type t = Stable.Latest.t = {null: bool; metadata: Metadata.t; id: string}
 
 let metadata t = t.metadata
 

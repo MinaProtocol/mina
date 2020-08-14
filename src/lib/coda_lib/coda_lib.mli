@@ -107,8 +107,6 @@ module Root_diff : sig
         ; root_length: int }
     end
   end]
-
-  type t = Stable.Latest.t
 end
 
 val root_diff : t -> Root_diff.t Strict_pipe.Reader.t
