@@ -10,19 +10,25 @@ let Cmd = ../Lib/Cmds.dhall
 
 let DockerLogin = ../Command/DockerLogin/Type.dhall
 
-let commands : List Cmd.Type =
+
+let defaultArtifactStep = { name = "Artifacts", key = "build-artifact" }
+
+let generateStep = \(deps : List Command.TaggedKey.Type) ->
+    -- assume head or first dependency specified represents the primary artifact dependency step
+    let stepScope = "--step ${(Prelude.Optional.default Command.TaggedKey.Type defaultArtifactStep (List/head Command.TaggedKey.Type deps)).name}"
+
+    let commands : List Cmd.Type =
     [
         Cmd.run (
             "if [ ! -f DOCKER_DEPLOY_ENV ]; then " ++
-                "buildkite-agent artifact download DOCKER_DEPLOY_ENV .; " ++
+                "buildkite-agent artifact download --step ${stepScope} DOCKER_DEPLOY_ENV .; " ++
             "fi"
         ),
         Cmd.run "./buildkite/scripts/docker-artifact.sh"
     ]
 
-in
+    in
 
-let generateStep = \(deps : List Command.TaggedKey.Type) ->
     Command.build
       Command.Config::{
         commands  = commands,
