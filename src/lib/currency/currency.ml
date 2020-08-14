@@ -691,7 +691,8 @@ let%test_module "sub_flagged module" =
 
       type magnitude = t [@@deriving sexp, compare]
 
-      type var = field Snarky.Cvar.t Snarky.Boolean.t list
+      type var =
+        field Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t list
 
       val zero : t
 
@@ -714,7 +715,7 @@ let%test_module "sub_flagged module" =
       in
       let sub_flagged_checked =
         let f (x, y) =
-          Snarky.Checked.map (M.Checked.sub_flagged x y)
+          Snarky_backendless.Checked.map (M.Checked.sub_flagged x y)
             ~f:(fun (r, `Underflow u) -> (r, u))
         in
         Test_util.checked_to_unchecked (Typ.tuple2 typ typ)

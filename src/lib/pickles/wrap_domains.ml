@@ -15,8 +15,12 @@ module Make (A : T0) (A_value : T0) = struct
         (struct
           let f : type a b c d. (a, b, c, d) Tag.t -> Domains.t =
            fun t ->
-            Types_map.lookup_map t ~self ~default:Common.wrap_domains
-              ~f:(fun d -> d.wrap_domains)
+            Types_map.lookup_map t ~self:self.Tag.id
+              ~default:Common.wrap_domains ~f:(function
+              | `Side_loaded _ ->
+                  Common.wrap_domains
+              | `Compiled d ->
+                  d.wrap_domains )
         end)
     in
     let module M =
@@ -58,7 +62,9 @@ module Make (A : T0) (A_value : T0) = struct
              let g =
                Array.create g
                  ~len:
-                   (Common.index_commitment_length Fix_domains.rough_domains.k)
+                   (Common.index_commitment_length
+                      ~max_degree:Common.Max_degree.step
+                      Fix_domains.rough_domains.k)
              in
              let t : _ Abc.t = {a= g; b= g; c= g} in
              {Matrix_evals.row= t; col= t; value= t; rc= t} ))

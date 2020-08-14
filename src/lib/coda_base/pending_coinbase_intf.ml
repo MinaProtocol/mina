@@ -12,7 +12,7 @@
 
 open Core
 open Snark_params
-open Snarky
+open Snarky_backendless
 open Tick
 open Signature_lib
 open Currency

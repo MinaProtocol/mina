@@ -1,6 +1,6 @@
 open Core_kernel
-module H_list = Snarky.H_list
-module Typ = Snarky.Typ
+module H_list = Snarky_backendless.H_list
+module Typ = Snarky_backendless.Typ
 
 module Evals = struct
   [%%versioned
@@ -270,7 +270,7 @@ module Accumulator = struct
         |> Fn.flip Sequence.zip (Sequence.of_list xs)
         |> Shift.Map.of_increasing_sequence |> Or_error.ok_exn
       in
-      Snarky.Typ.of_hlistable
+      Snarky_backendless.Typ.of_hlistable
         [ g
         ; Typ.transport (Typ.list ~length:(Set.length shifts) g) ~there ~back
           |> Typ.transport_var ~there ~back ]
@@ -326,7 +326,7 @@ module Accumulator = struct
     end]
 
     let typ g =
-      Snarky.Typ.of_hlistable [g; g] ~var_to_hlist:to_hlist
+      Snarky_backendless.Typ.of_hlistable [g; g] ~var_to_hlist:to_hlist
         ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
         ~value_of_hlist:of_hlist
 
@@ -355,7 +355,7 @@ module Accumulator = struct
   end]
 
   let typ shifts g =
-    Snarky.Typ.of_hlistable
+    Snarky_backendless.Typ.of_hlistable
       [Opening_check.typ g; Degree_bound_checks.typ shifts g]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
@@ -393,7 +393,7 @@ module Opening = struct
   end]
 
   let typ proof values =
-    Snarky.Typ.of_hlistable [proof; values] ~var_to_hlist:to_hlist
+    Snarky_backendless.Typ.of_hlistable [proof; values] ~var_to_hlist:to_hlist
       ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 end
 
@@ -408,7 +408,7 @@ module Openings = struct
   end]
 
   let typ proof fp =
-    let open Snarky.Typ in
+    let open Snarky_backendless.Typ in
     of_hlistable
       [tuple3 proof proof proof; Evals.typ fp]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
@@ -440,7 +440,7 @@ module Messages = struct
   end]
 
   let typ pc fp =
-    let open Snarky.Typ in
+    let open Snarky_backendless.Typ in
     let db = pc * pc in
     of_hlistable
       [pc; pc; pc; db * pc; fp * (db * pc); fp * (db * pc)]
@@ -459,7 +459,7 @@ module Proof = struct
   end]
 
   let typ pc fp openings =
-    Snarky.Typ.of_hlistable
+    Snarky_backendless.Typ.of_hlistable
       [Messages.typ pc fp; openings]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist

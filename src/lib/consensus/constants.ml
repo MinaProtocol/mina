@@ -1,5 +1,5 @@
 open Core_kernel
-open Snarky
+open Snarky_backendless
 open Snark_params.Tick
 open Unsigned
 module Length = Coda_numbers.Length

@@ -1,6 +1,6 @@
 open Core_kernel
 open Import
-open Snarky
+open Snarky_backendless
 module Coda_base_util = Util
 open Snark_params
 open Snark_params.Tick
@@ -731,7 +731,7 @@ module T = struct
     type var = Hash.var
 
     module Merkle_tree =
-      Snarky.Merkle_tree.Checked
+      Snarky_backendless.Merkle_tree.Checked
         (Tick)
         (struct
           type value = Field.t

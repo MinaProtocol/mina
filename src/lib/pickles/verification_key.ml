@@ -66,7 +66,10 @@ include Binable.Of_binable
           end)
 
 let dummy =
-  let lengths = Commitment_lengths.of_domains Common.wrap_domains in
+  let lengths =
+    Commitment_lengths.of_domains Common.wrap_domains
+      ~max_degree:Common.Max_degree.wrap
+  in
   let g = Dee.(to_affine_exn one) in
   let e = Abc.map lengths.row ~f:(fun len -> Array.create ~len g) in
   { Repr.commitments= {row= e; col= e; value= e; rc= e}
