@@ -62,8 +62,8 @@ Alternatively, multiaddresses of seed nodes can be obtained from the daemon comm
 ##### Multiaddress
 
 Run `coda client status` to get the IP address [IPADDR], Libp2p port [PORT] and peer id [PEERID]  and combine them in the following format:
-    `/ip4/IPADDR/tcp/PORT/ipfs/PEERID`
-For example: `/ip4/104.196.41.236/tcp/10001/ipfs/12D3KooWAFFq2yEQFFzhU5dt64AWqawRuomG9hL8rSmm5vxhAsgr`
+    `/ip4/IPADDR/tcp/PORT/p2p/PEERID`
+For example: `/ip4/104.196.41.236/tcp/10001/p2p/12D3KooWAFFq2yEQFFzhU5dt64AWqawRuomG9hL8rSmm5vxhAsgr`
 
 ##### Complete the challenges for the release
 

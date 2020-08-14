@@ -721,7 +721,7 @@ let server ~port ~logger =
   let open Cohttp in
   let open Cohttp_async in
   let handle_error _ exn =
-    Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+    [%log error]
       ~metadata:[("error", `String (Exn.to_string exn))]
       "Encountered error while handling request to prometheus server: $error"
   in

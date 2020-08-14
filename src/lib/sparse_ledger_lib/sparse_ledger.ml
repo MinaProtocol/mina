@@ -194,7 +194,7 @@ end = struct
   let find_index_exn (t : t) aid =
     List.Assoc.find_exn t.indexes ~equal:Account_id.equal aid
 
-  let get_exn {T.tree; depth; _} idx =
+  let get_exn ({T.tree; depth; _} as t) idx =
     let rec go i tree =
       match (i < 0, tree) with
       | true, Tree.Account acct ->
@@ -214,9 +214,9 @@ end = struct
                 " node"
           in
           failwithf
-            "Sparse_ledger.get: Bad index %i. Expected a%s, but got a%s at \
-             depth %i."
-            idx expected_kind kind (depth - i) ()
+            !"Sparse_ledger.get: Bad index %i. Expected a%s, but got a%s at \
+              depth %i. Tree = %{sexp:t}"
+            idx expected_kind kind (depth - i) t ()
     in
     go (depth - 1) tree
 

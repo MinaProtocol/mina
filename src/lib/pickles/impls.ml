@@ -4,7 +4,7 @@ open Import
 open Backend
 
 module Step = struct
-  module Impl = Snarky.Snark.Run.Make (Tick) (Unit)
+  module Impl = Snarky_backendless.Snark.Run.Make (Tick) (Unit)
   include Impl
   module Fp = Field
 
@@ -34,9 +34,9 @@ module Step = struct
   module Digest = Digest.Make (Impl)
   module Challenge = Challenge.Make (Impl)
 
-  let input ~branching ~bulletproof_log2 =
+  let input ~branching ~wrap_rounds =
     let open Types.Pairing_based.Statement in
-    let spec = spec branching bulletproof_log2 in
+    let spec = spec branching wrap_rounds in
     let (T (typ, f)) =
       Spec.packed_typ (module Impl) (T (Other_field.typ, Fn.id)) spec
     in
@@ -45,7 +45,7 @@ module Step = struct
 end
 
 module Wrap = struct
-  module Impl = Snarky.Snark.Run.Make (Tock) (Unit)
+  module Impl = Snarky_backendless.Snark.Run.Make (Tock) (Unit)
   include Impl
   module Challenge = Challenge.Make (Impl)
   module Digest = Digest.Make (Impl)

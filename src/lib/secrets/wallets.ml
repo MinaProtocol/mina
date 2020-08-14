@@ -34,8 +34,7 @@ let decode_public_key key file path logger =
   | Ok pk ->
       Some pk
   | Error e ->
-      Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-        "Error decoding public key at $path/$file: $error"
+      [%log error] "Error decoding public key at $path/$file: $error"
         ~metadata:
           [ ("file", `String file)
           ; ("path", `String path)

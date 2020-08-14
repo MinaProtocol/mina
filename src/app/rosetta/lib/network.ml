@@ -477,8 +477,7 @@ end
 let router ~graphql_uri ~logger ~db (route : string list) body =
   let (module Db : Caqti_async.CONNECTION) = db in
   let open Async.Deferred.Result.Let_syntax in
-  Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-    "Handling /network/ $route"
+  [%log debug] "Handling /network/ $route"
     ~metadata:[("route", `List (List.map route ~f:(fun s -> `String s)))] ;
   match route with
   | ["list"] ->

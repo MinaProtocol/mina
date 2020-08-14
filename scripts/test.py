@@ -65,8 +65,7 @@ small_curves_tests = {
     simple_tests,
     'test_postake_split':
     ['coda-shared-prefix-multiproducer-test -num-block-producers 2'],
-    'test_postake':
-    simple_tests,
+    'test_postake': [], # TODO imeckler: Change back to "simple_tests" when PLONK lands
     'test_postake_catchup': ['coda-restart-node-test'],
     'test_postake_three_producers': ['coda-txns-and-restart-non-producers'],
     'test_postake_five_even_txns':
@@ -100,7 +99,8 @@ ci_excludes = [
 required_excludes = [
     'test_postake_catchup:*',
     'test_postake_three_producers:*',
-    'test_postake_split_snarkless:*'
+    'test_postake_split_snarkless:*',
+    'test_postake:*' # TODO: Reenable when plonk lands
 ]
 
 # these extra jobs are not filters, they are full status check names

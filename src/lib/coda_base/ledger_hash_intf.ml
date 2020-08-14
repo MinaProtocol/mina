@@ -1,6 +1,6 @@
 open Core
 open Snark_params
-open Snarky
+open Snarky_backendless
 open Tick
 
 module type S = sig

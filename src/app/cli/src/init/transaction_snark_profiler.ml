@@ -145,7 +145,7 @@ let pending_coinbase_stack_target (t : Transaction.t) stack =
 (* This gives the "wall-clock time" to snarkify the given list of transactions, assuming
    unbounded parallelism. *)
 let profile (module T : Transaction_snark.S) sparse_ledger0
-    (transitions : Transaction.t list) preeval =
+    (transitions : Transaction.t list) _ =
   let constraint_constants = Genesis_constants.Constraint_constants.compiled in
   let txn_global_slot = Lazy.force curr_global_slot in
   let (base_proof_time, _, _), base_proofs =
@@ -167,8 +167,7 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
         in
         let span, proof =
           time (fun () ->
-              T.of_transaction ?preeval ~constraint_constants
-                ~sok_digest:Sok_message.Digest.default
+              T.of_transaction ~sok_digest:Sok_message.Digest.default
                 ~source:(Sparse_ledger.merkle_root sparse_ledger)
                 ~target:(Sparse_ledger.merkle_root sparse_ledger')
                 ~init_stack:coinbase_stack_source ~next_available_token_before
@@ -308,13 +307,8 @@ let run profiler num_transactions repeats preeval =
   exit 0
 
 let main num_transactions repeats preeval () =
-  Snarky.Libsnark.set_no_profiling false ;
-  Snarky.Libsnark.set_printing_off () ;
   Test_util.with_randomness 123456789 (fun () ->
-      let keys = Transaction_snark.Keys.create () in
-      let module T = Transaction_snark.Make (struct
-        let keys = keys
-      end) in
+      let module T = Transaction_snark.Make () in
       run (profile (module T)) num_transactions repeats preeval )
 
 let dry num_transactions repeats preeval () =
