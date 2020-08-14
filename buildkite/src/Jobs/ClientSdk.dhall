@@ -28,7 +28,7 @@ Pipeline.build
         commands = OpamInit.andThenRunInDocker ([] : List Text) "./buildkite/scripts/build-client-sdk.sh",
         label = "Build client-sdk",
         key = "build-client-sdk",
-        target = Size.Large,
+        target = Size.Medium,
         docker = None Docker.Type
       }
     ]
