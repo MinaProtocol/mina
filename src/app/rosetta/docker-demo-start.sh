@@ -60,11 +60,17 @@ echo "========================= STARTING DAEMON ==========================="
   -external-port "${CODA_DAEMON_PORT:-10101}" \
   -archive-address 3086 \
   -disable-telemetry \
-  -working-dir /data/ \
-  -proof-level none \
-  -log-level fatal \
+  -log-level debug \
   -log-json \
-  -background
+  -background \
+  $@
+
+# Possibly useful flags:
+#   Rosetta documentation specifies that /data/ will be a volume mount for various state
+#  -working-dir /data/ \
+#   Demo mode probably doesnt need to be super strict about proving to integrate against rosetta
+#  -proof-level none \
+
 
 # wait for it to settle
 sleep 3
