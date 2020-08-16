@@ -516,34 +516,57 @@ module Payload = struct
     end]
   end
 
-  [%%versioned
+  module T = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t =
+          ( ( Predicate.Stable.V1.t
+            , Predicate.Digested.Stable.V1.t )
+            With_hash.Stable.V1.t
+          (* account predicate hash *)
+          , Public_key.Compressed.Stable.V1.t
+          , Per_account.Stable.V1.t
+          , Amount.Stable.V1.t
+          , ( Amount.Stable.V1.t
+            , Sgn.Stable.V1.t )
+            Currency.Signed_poly.Stable.V1.t
+          , Token_id.Stable.V1.t
+          , Fee.Stable.V1.t
+          , Account_nonce.Stable.V1.t option
+          , ( Public_key.Compressed.Stable.V1.t
+            , Coda_numbers.Account_nonce.Stable.V1.t )
+            From_user.Stable.V1.t
+            option
+          , Snapp_init.Stable.V1.t option
+          , Tag.Stable.V1.t )
+          Poly.Stable.V1.t
+
+        let to_latest = Fn.id
+      end
+    end]
+  end
+
   module Stable = struct
     module V1 = struct
-      type t =
-        ( ( Predicate.Stable.V1.t
-          , Predicate.Digested.Stable.V1.t )
-          With_hash.Stable.V1.t
-        (* account predicate hash *)
-        , Public_key.Compressed.Stable.V1.t
-        , Per_account.Stable.V1.t
-        , Amount.Stable.V1.t
-        , ( Amount.Stable.V1.t
-          , Sgn.Stable.V1.t )
-          Currency.Signed_poly.Stable.V1.t
-        , Token_id.Stable.V1.t
-        , Fee.Stable.V1.t
-        , Account_nonce.Stable.V1.t option
-        , ( Public_key.Compressed.Stable.V1.t
-          , Coda_numbers.Account_nonce.Stable.V1.t )
-          From_user.Stable.V1.t
-          option
-        , Snapp_init.Stable.V1.t option
-        , Tag.Stable.V1.t )
-        Poly.Stable.V1.t
+      include T.Stable.V1
 
-      let to_latest = Fn.id
+      (* While they are not implemented, we make snapp commands un-serializable. *)
+      include Binable.Of_binable
+                (T.Stable.V1)
+                (struct
+                  include T.Stable.V1
+
+                  let to_binable _ =
+                    failwith "Serialization of snapp commands disabled"
+
+                  let of_binable _ =
+                    failwith "Serialization of snapp commands disabled"
+                end)
     end
-  end]
+
+    module Latest = V1
+  end
 
   type t = Stable.Latest.t
 

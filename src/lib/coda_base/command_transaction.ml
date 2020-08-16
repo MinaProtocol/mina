@@ -28,5 +28,7 @@ module Stable = struct
   end
 end]
 
-type t = User_command of User_command.t | Snapp_command of Snapp_command.t
+type t = Stable.Latest.t =
+  | User_command of User_command.t
+  | Snapp_command of Snapp_command.t
 [@@deriving sexp, compare, eq, hash, yojson]

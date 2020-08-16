@@ -393,7 +393,7 @@ module type S = sig
 
   val apply_transaction :
        constraint_constants:Genesis_constants.Constraint_constants.t
-    -> txn_global_slot:Global_slot.t
+    -> txn_state_view:Snapp_predicate.Protocol_state.View.t
     -> ledger
     -> Transaction.t
     -> Undo.t Or_error.t
@@ -1907,10 +1907,12 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         [%test_eq: Ledger_hash.t] undo.previous_hash (merkle_root ledger) ) ;
     res
 
-  let apply_transaction ~constraint_constants ~txn_global_slot ledger
+  let apply_transaction ~constraint_constants
+      ~(txn_state_view : Snapp_predicate.Protocol_state.View.t) ledger
       (t : Transaction.t) =
     O1trace.measure "apply_transaction" (fun () ->
         let previous_hash = merkle_root ledger in
+        let txn_global_slot = txn_state_view.curr_global_slot in
         Or_error.map
           ( match t with
           | Command (User_command txn) ->
@@ -1918,8 +1920,11 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                 (apply_user_command ~constraint_constants ~txn_global_slot
                    ledger txn) ~f:(fun undo ->
                   Undo.Varying.Command (User_command undo) )
-          | Command (Snapp_command _txn) ->
-              failwith "Not yet implemented"
+          | Command (Snapp_command txn) ->
+              Or_error.map
+                (apply_snapp_command_unchecked ~state_view:txn_state_view
+                   ~constraint_constants ledger txn) ~f:(fun undo ->
+                  Undo.Varying.Command (Snapp_command undo) )
           | Fee_transfer t ->
               Or_error.map (apply_fee_transfer ~constraint_constants ledger t)
                 ~f:(fun undo -> Undo.Varying.Fee_transfer undo)

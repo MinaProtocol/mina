@@ -148,6 +148,23 @@ module Body = struct
     Random_oracle.hash ~init:Hash_prefix.protocol_state_body
       (Random_oracle.pack_input (to_input s))
     |> State_body_hash.of_hash
+
+  let view (t : Value.t) : Snapp_predicate.Protocol_state.View.t =
+    let module C = Consensus.Proof_of_stake.Exported.Consensus_state in
+    let cs = t.consensus_state in
+    { staged_ledger_hash_ledger_hash=
+        Staged_ledger_hash.ledger_hash t.blockchain_state.staged_ledger_hash
+    ; snarked_ledger_hash= t.blockchain_state.snarked_ledger_hash
+    ; snarked_next_available_token=
+        t.blockchain_state.snarked_next_available_token
+    ; timestamp= t.blockchain_state.timestamp
+    ; blockchain_length= C.blockchain_length cs
+    ; min_window_density= C.min_window_density cs
+    ; last_vrf_output= ()
+    ; total_currency= C.total_currency cs
+    ; curr_global_slot= C.curr_global_slot cs
+    ; staking_epoch_data= C.staking_epoch_data cs
+    ; next_epoch_data= C.next_epoch_data cs }
 end
 
 module Value = struct

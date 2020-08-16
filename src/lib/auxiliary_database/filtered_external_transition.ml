@@ -137,7 +137,8 @@ let of_transition external_transition tracked_participants
           ; coinbase_receiver= None }
         , next_available_token )
       ~f:(fun (acc_transactions, next_available_token) -> function
-        | {data= User_command checked_user_command; _} -> (
+        | {data= Command (Snapp_command _); _} -> failwith "Not implemented"
+        | {data= Command (User_command checked_user_command); _} -> (
             let user_command =
               User_command.forget_check checked_user_command
             in

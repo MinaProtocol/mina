@@ -16,7 +16,10 @@ let record_payment t (txn : User_command.t) account =
   in
   let previous = account.Account.Poly.receipt_chain_hash in
   let receipt_chain_database = Coda_lib.receipt_chain_database t in
-  match Receipt_chain_database.add receipt_chain_database ~previous txn with
+  match
+    Receipt_chain_database.add receipt_chain_database ~previous
+      (User_command txn)
+  with
   | `Ok hash ->
       [%log debug]
         ~metadata:
@@ -153,8 +156,8 @@ module Receipt_chain_hash = struct
   Receipt.Chain_hash.(cons, empty)]
 end
 
-let verify_payment t (addr : Account_id.t) (verifying_txn : User_command.t)
-    (init_receipt, proof) =
+let verify_payment t (addr : Account_id.t)
+    (verifying_txn : Command_transaction.t) (init_receipt, proof) =
   let open Participating_state.Let_syntax in
   let%map account = get_account t addr in
   let account = Option.value_exn account in
@@ -165,11 +168,14 @@ let verify_payment t (addr : Account_id.t) (verifying_txn : User_command.t)
       (Receipt_chain_database.verify ~init:init_receipt proof resulting_receipt)
       ~error:(Error.createf "Merkle list proof of payment is invalid")
   in
-  if List.exists proof ~f:(fun txn -> User_command.equal verifying_txn txn)
+  if
+    List.exists proof ~f:(fun txn ->
+        Command_transaction.equal verifying_txn txn )
   then Ok ()
   else
     Or_error.errorf
-      !"Merkle list proof does not contain payment %{sexp:User_command.t}"
+      !"Merkle list proof does not contain payment \
+        %{sexp:Command_transaction.t}"
       verifying_txn
 
 let prove_receipt t ~proving_receipt ~resulting_receipt =

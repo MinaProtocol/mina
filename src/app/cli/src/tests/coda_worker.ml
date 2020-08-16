@@ -113,7 +113,7 @@ module T = struct
     ; prove_receipt:
         ( 'worker
         , Receipt.Chain_hash.t * Receipt.Chain_hash.t
-        , Receipt.Chain_hash.t * User_command.t list )
+        , Receipt.Chain_hash.t * Command_transaction.t list )
         Rpc_parallel.Function.t
     ; new_block:
         ( 'worker
@@ -166,7 +166,7 @@ module T = struct
     ; coda_initialization_finish_signal: unit -> unit Pipe.Reader.t Deferred.t
     ; coda_prove_receipt:
            Receipt.Chain_hash.t * Receipt.Chain_hash.t
-        -> (Receipt.Chain_hash.t * User_command.t list) Deferred.t
+        -> (Receipt.Chain_hash.t * Command_transaction.t list) Deferred.t
     ; coda_get_all_transitions:
            Account_id.t
         -> ( Auxiliary_database.Filtered_external_transition.t
@@ -307,7 +307,7 @@ module T = struct
         ~bin_output:
           [%bin_type_class:
             Receipt.Chain_hash.Stable.Latest.t
-            * User_command.Stable.Latest.t list] ()
+            * Command_transaction.Stable.Latest.t list] ()
 
     let new_block =
       C.create_pipe ~f:new_block_impl ~name:"new_block"

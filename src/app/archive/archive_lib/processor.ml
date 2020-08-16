@@ -474,9 +474,15 @@ module Block = struct
           Core.List.fold transactions ~init:([], [], [])
             ~f:(fun (acc_user_commands, acc_fee_transfers, acc_coinbases) ->
             function
+            | { Coda_base.With_status.status= _
+              ; data=
+                  Coda_base.Transaction.Command
+                    (Snapp_command user_command_checked) } ->
+                failwith "Not implemented"
             | { Coda_base.With_status.status
-              ; data= Coda_base.Transaction.User_command user_command_checked
-              } ->
+              ; data=
+                  Coda_base.Transaction.Command
+                    (User_command user_command_checked) } ->
                 let user_command =
                   { Coda_base.With_status.status
                   ; data=

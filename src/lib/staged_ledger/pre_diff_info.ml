@@ -264,7 +264,7 @@ let get_individual_info ~constraint_constants coinbase_parts ~receiver
   in
   let transactions =
     List.map user_commands
-      ~f:(With_status.map ~f:(fun t -> Transaction.User_command t))
+      ~f:(With_status.map ~f:(fun t -> Transaction.Command (User_command t)))
     @ List.map coinbase_parts ~f:(fun t ->
           { With_status.data= Transaction.Coinbase t
           ; status= Applied User_command_status.Auxiliary_data.empty } )

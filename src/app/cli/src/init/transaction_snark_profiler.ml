@@ -82,7 +82,7 @@ let create_ledger_and_transactions num_transitions =
         |> Or_error.ok_exn
       in
       let transitions =
-        List.map transactions ~f:(fun t -> Transaction.User_command t)
+        List.map transactions ~f:(fun t -> Transaction.Command (User_command t))
         @ [Coinbase coinbase; Fee_transfer fee_transfer]
       in
       (ledger, transitions)
@@ -98,7 +98,7 @@ let create_ledger_and_transactions num_transitions =
           Currency.Fee.zero
           (Account.Nonce.succ Account.Nonce.zero)
       in
-      (ledger, [User_command a; User_command b])
+      (ledger, [Command (User_command a); Command (User_command b)])
 
 let time thunk =
   let start = Time.now () in

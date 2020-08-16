@@ -1333,7 +1333,9 @@ module Base = struct
              in
              let%bind receipt_chain_hash =
                let current = account.receipt_chain_hash in
-               let%bind r = Receipt.Chain_hash.Checked.cons ~payload current in
+               let%bind r =
+                 Receipt.Chain_hash.Checked.cons (User_command payload) current
+               in
                Receipt.Chain_hash.Checked.if_ is_user_command ~then_:r
                  ~else_:current
              in
@@ -2072,7 +2074,7 @@ let check_user_command ~constraint_constants ~sok_message ~source ~target
   check_transaction ~constraint_constants ~sok_message ~source ~target
     ~init_stack ~pending_coinbase_stack_state ~next_available_token_before
     ~next_available_token_after
-    {t_in_block with transaction= User_command user_command}
+    {t_in_block with transaction= Command (User_command user_command)}
     handler
 
 let generate_transaction_union_witness ?(preeval = false) ~constraint_constants
@@ -2195,8 +2197,10 @@ module Make () = struct
       ~next_available_token_after
       { user_command_in_block with
         transaction=
-          User_command
-            (Transaction_protocol_state.transaction user_command_in_block) }
+          Command
+            (User_command
+               (Transaction_protocol_state.transaction user_command_in_block))
+      }
       handler
 
   let of_fee_transfer ~sok_digest ~source ~target ~init_stack
@@ -2520,8 +2524,8 @@ let%test_module "transaction_snark" =
               in
               let pending_coinbase_stack = Pending_coinbase.Stack.empty in
               let pending_coinbase_stack_target =
-                pending_coinbase_stack_target (User_command t1) state_body_hash
-                  pending_coinbase_stack
+                pending_coinbase_stack_target (Command (User_command t1))
+                  state_body_hash pending_coinbase_stack
               in
               let pending_coinbase_stack_state =
                 { Pending_coinbase_stack_state.source= pending_coinbase_stack
@@ -2541,14 +2545,10 @@ let%test_module "transaction_snark" =
       let source = Ledger.merkle_root ledger in
       let pending_coinbase_stack = Pending_coinbase.Stack.empty in
       let next_available_token = Ledger.next_available_token ledger in
-      let state_body, state_body_hash, txn_global_slot =
+      let state_body, state_body_hash =
         match txn_global_slot with
         | None ->
-            let txn_global_slot =
-              state_body |> Coda_state.Protocol_state.Body.consensus_state
-              |> Consensus.Data.Consensus_state.curr_slot
-            in
-            (state_body, state_body_hash, txn_global_slot)
+            (state_body, state_body_hash)
         | Some txn_global_slot ->
             let state_body =
               let state =
@@ -2576,7 +2576,10 @@ let%test_module "transaction_snark" =
             let state_body_hash =
               Coda_state.Protocol_state.Body.hash state_body
             in
-            (state_body, state_body_hash, txn_global_slot)
+            (state_body, state_body_hash)
+      in
+      let txn_state_view : Snapp_predicate.Protocol_state.View.t =
+        Coda_state.Protocol_state.Body.view state_body
       in
       let mentioned_keys, pending_coinbase_stack_target =
         let pending_coinbase_stack =
@@ -2584,10 +2587,12 @@ let%test_module "transaction_snark" =
             pending_coinbase_stack
         in
         match txn with
-        | Transaction.User_command uc ->
+        | Transaction.Command (User_command uc) ->
             ( User_command.accounts_accessed ~next_available_token
                 (uc :> User_command.t)
             , pending_coinbase_stack )
+        | Command (Snapp_command _) ->
+            failwith "Snapp_command not yet supported"
         | Fee_transfer ft ->
             (Fee_transfer.receivers ft, pending_coinbase_stack)
         | Coinbase cb ->
@@ -2604,7 +2609,7 @@ let%test_module "transaction_snark" =
       let _undo =
         Or_error.ok_exn
         @@ Ledger.apply_transaction ledger ~constraint_constants
-             ~txn_global_slot txn
+             ~txn_state_view txn
       in
       let target = Ledger.merkle_root ledger in
       let sok_message = Sok_message.create ~fee:Fee.zero ~prover:signer in
@@ -2655,7 +2660,7 @@ let%test_module "transaction_snark" =
               let () =
                 List.iter ucs ~f:(fun uc ->
                     test_transaction ~constraint_constants ledger
-                      (Transaction.User_command uc) )
+                      (Transaction.Command (User_command uc)) )
               in
               List.iter receivers ~f:(fun receiver ->
                   check_balance
@@ -3005,7 +3010,8 @@ let%test_module "transaction_snark" =
       let signer = Keypair.of_private_key_exn signer in
       let user_command = User_command.sign signer payload in
       let next_available_token = Ledger.next_available_token ledger in
-      test_transaction ~constraint_constants ledger (User_command user_command) ;
+      test_transaction ~constraint_constants ledger
+        (Command (User_command user_command)) ;
       let fee_payer = User_command.Payload.fee_payer payload in
       let source = User_command.Payload.source ~next_available_token payload in
       let receiver =
@@ -3426,7 +3432,7 @@ let%test_module "transaction_snark" =
               let () =
                 List.iter ucs ~f:(fun uc ->
                     test_transaction ~constraint_constants ~txn_global_slot
-                      ledger (Transaction.User_command uc) )
+                      ledger (Transaction.Command (User_command uc)) )
               in
               List.iter receivers ~f:(fun receiver ->
                   check_balance

@@ -202,6 +202,9 @@ module Eq_data = struct
     let state_hash =
       State_hash.{field with to_input_checked= var_to_input; typ; equal}
 
+    let epoch_seed =
+      Epoch_seed.{field with to_input_checked= var_to_input; typ; equal}
+
     let public_key () =
       Public_key.Compressed.
         { default= Lazy.force invalid_public_key
@@ -397,44 +400,7 @@ module Protocol_state = struct
     *)
 
   module Epoch_data = struct
-    module Poly = struct
-      [%%versioned
-      module Stable = struct
-        module V1 = struct
-          type ( 'epoch_ledger
-               , 'epoch_seed
-               , 'start_checkpoint
-               , 'lock_checkpoint
-               , 'length )
-               t =
-            { ledger: 'epoch_ledger
-            ; seed: 'epoch_seed
-            ; start_checkpoint: 'start_checkpoint
-            ; lock_checkpoint: 'lock_checkpoint
-            ; epoch_length: 'length }
-          [@@deriving hlist, sexp, eq, yojson, hash, compare]
-        end
-      end]
-
-      type ( 'epoch_ledger
-           , 'epoch_seed
-           , 'start_checkpoint
-           , 'lock_checkpoint
-           , 'length )
-           t =
-            ( 'epoch_ledger
-            , 'epoch_seed
-            , 'start_checkpoint
-            , 'lock_checkpoint
-            , 'length )
-            Stable.Latest.t =
-        { ledger: 'epoch_ledger
-        ; seed: 'epoch_seed
-        ; start_checkpoint: 'start_checkpoint
-        ; lock_checkpoint: 'lock_checkpoint
-        ; epoch_length: 'length }
-      [@@deriving hlist]
-    end
+    module Poly = Epoch_data.Poly
 
     [%%versioned
     module Stable = struct
@@ -444,7 +410,7 @@ module Protocol_state = struct
           ( ( Frozen_ledger_hash.Stable.V1.t Hash.Stable.V1.t
             , Currency.Amount.Stable.V1.t Numeric.Stable.V1.t )
             Epoch_ledger.Poly.Stable.V1.t
-          , unit (* TODO *)
+          , Epoch_seed.Stable.V1.t Hash.Stable.V1.t
           , State_hash.Stable.V1.t Hash.Stable.V1.t
           , State_hash.Stable.V1.t Hash.Stable.V1.t
           , Length.Stable.V1.t Numeric.Stable.V1.t )
@@ -459,7 +425,7 @@ module Protocol_state = struct
 
     let to_input
         ({ ledger= {hash; total_currency}
-         ; seed= ()
+         ; seed
          ; start_checkpoint
          ; lock_checkpoint
          ; epoch_length } :
@@ -468,6 +434,7 @@ module Protocol_state = struct
       List.reduce_exn ~f:append
         [ Hash.(to_input Tc.frozen_ledger_hash hash)
         ; Numeric.(to_input Tc.amount total_currency)
+        ; Hash.(to_input Tc.epoch_seed seed)
         ; Hash.(to_input Tc.state_hash start_checkpoint)
         ; Hash.(to_input Tc.state_hash lock_checkpoint)
         ; Numeric.(to_input Tc.length epoch_length) ]
@@ -477,7 +444,7 @@ module Protocol_state = struct
         ( ( Frozen_ledger_hash.var Hash.Checked.t
           , Currency.Amount.var Numeric.Checked.t )
           Epoch_ledger.Poly.t
-        , unit (* TODO *)
+        , Epoch_seed.var Hash.Checked.t
         , State_hash.var Hash.Checked.t
         , State_hash.var Hash.Checked.t
         , Length.Checked.t Numeric.Checked.t )
@@ -504,7 +471,15 @@ module Protocol_state = struct
           ; snarked_next_available_token: 'token_id
           ; timestamp: 'time
           ; blockchain_length: 'length
-          ; epoch_count: 'length
+                (* TODO: This previously had epoch_count but I removed it as I believe it is redundant
+   with curr_global_slot.
+
+   epoch_count in [a, b]
+
+   should be equivalent to
+
+   curr_global_slot in [slots_per_epoch * a, slots_per_epoch * b]
+*)
           ; min_window_density: 'length
           ; last_vrf_output: 'vrf_output
           ; total_currency: 'amount
@@ -544,7 +519,6 @@ module Protocol_state = struct
        ; snarked_next_available_token
        ; timestamp
        ; blockchain_length
-       ; epoch_count
        ; min_window_density
        ; last_vrf_output
        ; total_currency
@@ -561,7 +535,6 @@ module Protocol_state = struct
       ; Numeric.(to_input Tc.token_id snarked_next_available_token)
       ; Numeric.(to_input Tc.time timestamp)
       ; length blockchain_length
-      ; length epoch_count
       ; length min_window_density
       ; Numeric.(to_input Tc.amount total_currency)
       ; Numeric.(to_input Tc.global_slot curr_global_slot)
@@ -592,6 +565,7 @@ module Protocol_state = struct
     let ledger_hash = Hash.(typ Tc.ledger_hash) in
     let frozen_ledger_hash = Hash.(typ Tc.frozen_ledger_hash) in
     let state_hash = Hash.(typ Tc.state_hash) in
+    let epoch_seed = Hash.(typ Tc.epoch_seed) in
     let length = Numeric.(typ Tc.length) in
     let time = Numeric.(typ Tc.time) in
     let amount = Numeric.(typ Tc.amount) in
@@ -607,7 +581,7 @@ module Protocol_state = struct
       in
       let open Epoch_data.Poly in
       Typ.of_hlistable
-        [epoch_ledger; Typ.unit; state_hash; state_hash; length]
+        [epoch_ledger; epoch_seed; state_hash; state_hash; length]
         ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
         ~value_of_hlist:of_hlist
     in
@@ -616,7 +590,6 @@ module Protocol_state = struct
       ; frozen_ledger_hash
       ; token_id
       ; time
-      ; length
       ; length
       ; length
       ; Typ.unit
@@ -643,7 +616,7 @@ module Protocol_state = struct
           , ( ( Frozen_ledger_hash.Stable.V1.t
               , Currency.Amount.Stable.V1.t )
               Epoch_ledger.Poly.Stable.V1.t
-            , unit (* TODO *)
+            , Epoch_seed.Stable.V1.t
             , State_hash.Stable.V1.t
             , State_hash.Stable.V1.t
             , Length.Stable.V1.t )
@@ -661,7 +634,7 @@ module Protocol_state = struct
   let accept : t =
     let epoch_data : Epoch_data.t =
       { ledger= {hash= Ignore; total_currency= Ignore}
-      ; seed= ()
+      ; seed= Ignore
       ; start_checkpoint= Ignore
       ; lock_checkpoint= Ignore
       ; epoch_length= Ignore }
@@ -671,7 +644,6 @@ module Protocol_state = struct
     ; snarked_next_available_token= Ignore
     ; timestamp= Ignore
     ; blockchain_length= Ignore
-    ; epoch_count= Ignore
     ; min_window_density= Ignore
     ; last_vrf_output= ()
     ; total_currency= Ignore
@@ -686,7 +658,6 @@ module Protocol_state = struct
        ; snarked_next_available_token
        ; timestamp
        ; blockchain_length
-       ; epoch_count
        ; min_window_density
        ; last_vrf_output
        ; total_currency
@@ -745,9 +716,6 @@ module Protocol_state = struct
     let%bind () =
       Numeric.(check ~label:"blockchain_length" Tc.length)
         blockchain_length s.blockchain_length
-    in
-    let%bind () =
-      Numeric.(check ~label:"epoch_count" Tc.length) epoch_count s.epoch_count
     in
     let%bind () =
       Numeric.(check ~label:"min_window_density" Tc.length)

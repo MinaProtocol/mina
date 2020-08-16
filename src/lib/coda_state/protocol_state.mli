@@ -69,6 +69,8 @@ module Body : sig
   val hash_checked : var -> (State_body_hash.var, _) Checked.t
 
   val consensus_state : (_, _, 'a, _) Poly.t -> 'a
+
+  val view : Value.t -> Snapp_predicate.Protocol_state.View.t
 end
 
 module Value : sig
