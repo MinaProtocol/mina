@@ -1103,9 +1103,10 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           t
         in
         let open Snapp_command in
-        let token_id = (Snapp_command.fee_payment c).token_id in
-        let snapp_acct_id (fp : _ Fee_payment.t) (b : Snapp_body.t) =
-          Account_id.create b.pk fp.token_id
+        let fee_token_id = Snapp_command.fee_token c in
+        let snapp_acct_id =
+          let token_id = Snapp_command.token_id c in
+          fun (b : Snapp_body.t) -> Account_id.create b.pk token_id
         in
         (* TODO: Optimize *)
         let fee_payer_previous_receipt_chain_hash =
@@ -1176,10 +1177,11 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                   a.receipt_chain_hash )
           ; body }
         in
-        let pay_fee ~nonce ~fee_payer =
+        let pay_fee {Other_fee_payer.pk; nonce; _} =
           let ((loc, _, acct') as info) =
-            pay_fee' ~command:payload ~nonce ~fee_payer ~fee:(fee c) ~ledger
-              ~current_global_slot
+            pay_fee' ~command:payload ~nonce
+              ~fee_payer:(Account_id.create pk fee_token_id)
+              ~fee:(fee c) ~ledger ~current_global_slot
             |> ok_or_reject
           in
           (* Charge the fee. This must happen, whether or not the command itself
@@ -1190,10 +1192,10 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           info
         in
         ( match c with
-        | Snapp {snapp; fee_payment= fp} ->
+        | Snapp {snapp; fee_payment= fp; token_id= _} ->
             (* Get snapp account, assert it already exists *)
             let%bind (loc, acct), acct_snapp =
-              get_existing_snapp (snapp_acct_id fp snapp)
+              get_existing_snapp (snapp_acct_id snapp)
                 Snapp_account_not_present
             in
             (* Pay the fee, step snapp account. *)
@@ -1203,11 +1205,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                   let acct = step_fee_payer acct fp.fee in
                   set_with_location ledger loc acct ;
                   (acct, None)
-              | `Other {pk; nonce; _} ->
-                  ( step acct
-                  , Some
-                      (pay_fee ~nonce
-                         ~fee_payer:(Account_id.create pk token_id)) )
+              | `Other x ->
+                  (step acct, Some (pay_fee x))
             in
             (* Check the predicate *)
             let%map () = check_snapp_body snapp ~self:acct ~other:None in
@@ -1228,7 +1227,12 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                          (loc, fp_acct') ))) )
             , undo )
         | Snapp_snapp
-            {snapp1; snapp2; sender; snapp1_base_delta; fee_payment= fp} ->
+            { snapp1
+            ; snapp2
+            ; sender
+            ; snapp1_base_delta
+            ; fee_payment= fp
+            ; token_id= _ } ->
             let as_sender_receiver accts f =
               let cswap =
                 match sender with `Snapp1 -> Fn.id | `Snapp2 -> Tuple2.swap
@@ -1237,10 +1241,10 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             in
             (* Get both accounts, assert they exist. *)
             let%bind ((loc1, acct1) as lacct1), acct_snapp1 =
-              get_existing_snapp (snapp_acct_id fp snapp1)
+              get_existing_snapp (snapp_acct_id snapp1)
                 Snapp_account_not_present
             and ((loc2, acct2) as lacct2), acct_snapp2 =
-              get_existing_snapp (snapp_acct_id fp snapp2)
+              get_existing_snapp (snapp_acct_id snapp2)
                 Snapp_account_not_present
             in
             (* Pay the fee and "step" both snapp accounts by
@@ -1259,12 +1263,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                         (sender, step receiver) )
                   in
                   (acct1, acct2, None)
-              | `Other {pk; nonce; _} ->
-                  ( step acct1
-                  , step acct2
-                  , Some
-                      (pay_fee ~nonce
-                         ~fee_payer:(Account_id.create pk token_id)) )
+              | `Other x ->
+                  (step acct1, step acct2, Some (pay_fee x))
             in
             (* The predicates should be run on each account's state prior to its being stepped, but
              the fee must be paid unconditionally, so this comes after that. 
@@ -1306,11 +1306,12 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             ; user_nonce
             ; snapp
             ; amount
+            ; token_id
             ; fee_payment= fp } ->
             (* Get the user account *)
             let%bind loc_u, acct_u =
               get_existing_user
-                (Account_id.create user_pk fp.token_id)
+                (Account_id.create user_pk token_id)
                 Source_not_present
             in
             ok_or_reject (validate_nonces acct_u.nonce user_nonce) ;
@@ -1318,15 +1319,15 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             let%bind (loc_s, acct_s), acct_snapp =
               match snapp with
               | `Update u ->
-                  get_existing_snapp (snapp_acct_id fp u)
+                  get_existing_snapp (snapp_acct_id u)
                     Snapp_account_not_present
               | `Create {pk; snapp} ->
                   let%map loc, acct =
-                    get_new_account (Account_id.create pk fp.token_id)
+                    get_new_account (Account_id.create pk token_id)
                   in
                   ((loc, {acct with snapp= Some snapp}), snapp)
             in
-            let id_s = Account_id.create acct_s.public_key fp.token_id in
+            let id_s = Account_id.create acct_s.public_key token_id in
             (* Charge the fee and step the sender account *)
             let acct_u', fee_payer_info =
               match fp.payer with
@@ -1334,11 +1335,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                   let acct_u' = step_fee_payer acct_u fp.fee in
                   set_with_location ledger loc_u acct_u' ;
                   (acct_u', None)
-              | `Other {pk; nonce; signature= _} ->
-                  ( step acct_u
-                  , Some
-                      (pay_fee ~nonce
-                         ~fee_payer:(Account_id.create pk token_id)) )
+              | `Other x ->
+                  (step acct_u, Some (pay_fee x))
             in
             (* Check and update the snapp account *)
             let%bind acct_s' =
@@ -1376,16 +1374,16 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                        (match loc_s with `New -> [id_s] | `Existing _ -> []) })
             in
             ([(loc_s, acct_s'); (loc_u, acct_u')], undo)
-        | Snapp_to_user {user_pk; snapp; amount; fee_payment= fp} ->
+        | Snapp_to_user {user_pk; snapp; amount; fee_payment= fp; token_id} ->
             (* Get the user account *)
-            let id_u = Account_id.create user_pk fp.token_id in
+            let id_u = Account_id.create user_pk token_id in
             let loc_u, acct_u =
               (* TODO: How to handle new accounts properly? *)
               get_user_account_with_location ledger id_u |> ok_or_reject
             in
             (* Get the snapp account *)
             let%bind (loc_s, acct_s), acct_snapp =
-              get_existing_snapp (snapp_acct_id fp snapp)
+              get_existing_snapp (snapp_acct_id snapp)
                 Snapp_account_not_present
             in
             (* Pay the fee, step snapp account. *)
@@ -1395,11 +1393,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                   let acct_s' = step_fee_payer acct_s fp.fee in
                   set_with_location ledger loc_s acct_s' ;
                   (acct_s', None)
-              | `Other {pk; nonce; _} ->
-                  ( step acct_s
-                  , Some
-                      (pay_fee ~nonce
-                         ~fee_payer:(Account_id.create pk token_id)) )
+              | `Other x ->
+                  (step acct_s, Some (pay_fee x))
             in
             (* Check and update the snapp account *)
             let%bind acct_s' =

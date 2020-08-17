@@ -679,6 +679,16 @@ end = struct
   end]
 end
 
+let token_id = function
+  | Snapp_snapp {token_id; _} ->
+      token_id
+  | Snapp {token_id; _} ->
+      token_id
+  | User_to_snapp {token_id; _} ->
+      token_id
+  | Snapp_to_user {token_id; _} ->
+      token_id
+
 let fee_payment (t : t) : Account_id.t Fee_payment.t =
   let mk (fp : _ Fee_payment.t) (x, y) =
     {fp with payer= Account_id.create x y}
