@@ -21,25 +21,6 @@ module Poly = struct
       [@@deriving hlist, sexp, eq, compare, hash, yojson, fields]
     end
   end]
-
-  type ( 'epoch_ledger
-       , 'epoch_seed
-       , 'start_checkpoint
-       , 'lock_checkpoint
-       , 'length )
-       t =
-        ( 'epoch_ledger
-        , 'epoch_seed
-        , 'start_checkpoint
-        , 'lock_checkpoint
-        , 'length )
-        Stable.Latest.t =
-    { ledger: 'epoch_ledger
-    ; seed: 'epoch_seed
-    ; start_checkpoint: 'start_checkpoint
-    ; lock_checkpoint: 'lock_checkpoint
-    ; epoch_length: 'length }
-  [@@deriving hlist, sexp, eq, compare, hash, yojson, fields]
 end
 
 type var =
@@ -82,6 +63,4 @@ module Value = struct
       let to_latest = Fn.id
     end
   end]
-
-  type t = Stable.Latest.t
 end

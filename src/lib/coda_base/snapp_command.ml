@@ -554,6 +554,8 @@ module Payload = struct
     module Latest = V1
   end
 
+  type t = Stable.Latest.t
+
   let to_input (t : t) =
     let open Random_oracle_input in
     let f = List.reduce_exn ~f:append in

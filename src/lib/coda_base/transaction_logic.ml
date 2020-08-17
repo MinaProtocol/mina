@@ -95,12 +95,6 @@ module Undo = struct
           let to_latest = Fn.id
         end
       end]
-
-      type t = Stable.Latest.t =
-        { previous_state: Snapp_state.Value.Stable.Latest.t
-        ; previous_delegate: Public_key.Compressed.t
-        ; previous_receipt_chain_hash: Receipt.Chain_hash.t }
-      [@@deriving sexp]
     end
 
     module Body = struct
@@ -117,13 +111,6 @@ module Undo = struct
                     Receipt.Chain_hash.Stable.V1.t
                 ; snapp: Per_snapp.Stable.V1.t
                 ; previous_empty_accounts: Account_id.Stable.V1.t list }
-            (* TODO
-            | Create_snapp of
-                { user_previous_receipt_chain_hash:
-                    Receipt.Chain_hash.Stable.V1.t
-                ; previous_empty_accounts: Account_id.Stable.V1.t list 
-                }
-*)
             | Snapp_to_user of
                 { snapp: Per_snapp.Stable.V1.t
                 ; previous_empty_accounts: Account_id.Stable.V1.t list }
@@ -133,24 +120,6 @@ module Undo = struct
           let to_latest = Fn.id
         end
       end]
-
-      type t = Stable.Latest.t =
-        | Snapp_snapp of {snapp1: Per_snapp.t; snapp2: Per_snapp.t}
-        | Snapp of {snapp: Per_snapp.t}
-        | User_to_snapp of
-            { user_previous_receipt_chain_hash: Receipt.Chain_hash.t
-            ; snapp: Per_snapp.t
-            ; previous_empty_accounts: Account_id.t list }
-        (*
-        | Create_snapp of
-            { user_previous_receipt_chain_hash: Receipt.Chain_hash.t
-            ; previous_empty_accounts: Account_id.t list }
-*)
-        | Snapp_to_user of
-            { snapp: Per_snapp.t
-            ; previous_empty_accounts: Account_id.t list }
-        | Failed
-      [@@deriving sexp]
     end
 
     [%%versioned
@@ -166,13 +135,6 @@ module Undo = struct
         let to_latest = Fn.id
       end
     end]
-
-    (* bin_io omitted *)
-    type t = Stable.Latest.t =
-      { body: Body.t
-      ; fee_payer_previous_receipt_chain_hash: Receipt.Chain_hash.t option
-      ; command: Snapp_command.t With_status.t }
-    [@@deriving sexp]
   end
 
   module Command_undo = struct
@@ -187,11 +149,6 @@ module Undo = struct
         let to_latest = Fn.id
       end
     end]
-
-    type t = Stable.Latest.t =
-      | User_command of User_command_undo.t
-      | Snapp_command of Snapp_command_undo.t
-    [@@deriving sexp]
   end
 
   module Fee_transfer_undo = struct
