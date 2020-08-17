@@ -61,8 +61,6 @@ module Stable = struct
   end
 end]
 
-type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash]
-
 let dummy = (Field.one, Inner_curve.Scalar.one)
 
 [%%ifdef

@@ -2,6 +2,8 @@ open Core_kernel
 
 [%%versioned
 module Stable = struct
+  [@@@no_toplevel_latest_type]
+
   module V1 = struct
     type ('a, 'h) t = {data: 'a; hash: 'h}
     [@@deriving sexp, eq, compare, hash, yojson]

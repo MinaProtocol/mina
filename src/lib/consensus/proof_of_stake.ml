@@ -93,18 +93,6 @@ module Configuration = struct
     end
   end]
 
-  type t = Stable.Latest.t =
-    { delta: int
-    ; k: int
-    ; c: int
-    ; c_times_k: int
-    ; slots_per_epoch: int
-    ; slot_duration: int
-    ; epoch_duration: int
-    ; genesis_state_timestamp: Block_time.t
-    ; acceptable_network_delay: int }
-  [@@deriving yojson, fields]
-
   let t ~constraint_constants ~protocol_constants =
     let constants =
       Constants.create ~constraint_constants ~protocol_constants
@@ -507,8 +495,6 @@ module Data = struct
           end
         end]
 
-        type t = Stable.Latest.t [@@deriving sexp, compare, hash, yojson]
-
         include Codable.Make_base58_check (struct
           type t = Stable.Latest.t [@@deriving bin_io_unversioned]
 
@@ -869,8 +855,6 @@ module Data = struct
         let to_latest = Fn.id
       end
     end]
-
-    type t = Stable.Latest.t [@@deriving sexp, compare, hash, to_yojson]
   end
 
   module Epoch_data = struct
@@ -891,28 +875,9 @@ module Data = struct
                  the current state. *)
             ; lock_checkpoint: 'lock_checkpoint
             ; epoch_length: 'length }
-          [@@deriving sexp, eq, compare, hash, to_yojson, fields]
+          [@@deriving sexp, eq, compare, hash, to_yojson, fields, hlist]
         end
       end]
-
-      type ( 'epoch_ledger
-           , 'epoch_seed
-           , 'start_checkpoint
-           , 'lock_checkpoint
-           , 'length )
-           t =
-            ( 'epoch_ledger
-            , 'epoch_seed
-            , 'start_checkpoint
-            , 'lock_checkpoint
-            , 'length )
-            Stable.Latest.t =
-        { ledger: 'epoch_ledger
-        ; seed: 'epoch_seed
-        ; start_checkpoint: 'start_checkpoint
-        ; lock_checkpoint: 'lock_checkpoint
-        ; epoch_length: 'length }
-      [@@deriving sexp, compare, hash, to_yojson, fields, hlist]
     end
 
     type var =
@@ -1656,38 +1621,9 @@ module Data = struct
             ; staking_epoch_data: 'staking_epoch_data
             ; next_epoch_data: 'next_epoch_data
             ; has_ancestor_in_same_checkpoint_window: 'bool }
-          [@@deriving
-            sexp, bin_io, eq, compare, hash, to_yojson, version, fields]
+          [@@deriving sexp, eq, compare, hash, to_yojson, fields, hlist]
         end
       end]
-
-      type ( 'length
-           , 'vrf_output
-           , 'amount
-           , 'global_slot
-           , 'staking_epoch_data
-           , 'next_epoch_data
-           , 'bool )
-           t =
-            ( 'length
-            , 'vrf_output
-            , 'amount
-            , 'global_slot
-            , 'staking_epoch_data
-            , 'next_epoch_data
-            , 'bool )
-            Stable.Latest.t =
-        { blockchain_length: 'length
-        ; epoch_count: 'length
-        ; min_window_density: 'length
-        ; sub_window_densities: 'length list
-        ; last_vrf_output: 'vrf_output
-        ; total_currency: 'amount
-        ; curr_global_slot: 'global_slot
-        ; staking_epoch_data: 'staking_epoch_data
-        ; next_epoch_data: 'next_epoch_data
-        ; has_ancestor_in_same_checkpoint_window: 'bool }
-      [@@deriving sexp, compare, hash, to_yojson, fields, hlist]
     end
 
     module Value = struct
@@ -1726,8 +1662,6 @@ module Data = struct
                 , `Bool t.has_ancestor_in_same_checkpoint_window ) ]
         end
       end]
-
-      type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash]
 
       let to_yojson = Stable.Latest.to_yojson
 

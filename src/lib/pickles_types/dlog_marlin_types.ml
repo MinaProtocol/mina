@@ -4,11 +4,14 @@ module Pc_array = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type 'a t = 'a array [@@deriving version, compare, sexp, yojson, eq]
+      type 'a t = 'a array [@@deriving compare, sexp, yojson, eq]
 
       let hash_fold_t f s a = List.hash_fold_t f s (Array.to_list a)
     end
   end]
+
+  [%%define_locally
+  Stable.Latest.(hash_fold_t)]
 end
 
 module Evals = struct
@@ -32,22 +35,6 @@ module Evals = struct
       [@@deriving fields, sexp, compare, yojson, hash, eq]
     end
   end]
-
-  type 'a t = 'a Stable.Latest.t =
-    { w_hat: 'a
-    ; z_hat_a: 'a
-    ; z_hat_b: 'a
-    ; h_1: 'a
-    ; h_2: 'a
-    ; h_3: 'a
-    ; row: 'a Abc.t
-    ; col: 'a Abc.t
-    ; value: 'a Abc.t
-    ; rc: 'a Abc.t
-    ; g_1: 'a
-    ; g_2: 'a
-    ; g_3: 'a }
-  [@@deriving fields, sexp, compare, yojson, hash, eq]
 
   let map (type a b)
       ({ w_hat
@@ -195,17 +182,9 @@ module Openings = struct
           ; z_2: 'fq
           ; delta: 'g
           ; sg: 'g }
-        [@@deriving bin_io, version, sexp, compare, yojson, hash, eq]
+        [@@deriving sexp, compare, yojson, hash, eq, hlist]
       end
     end]
-
-    type ('g, 'fq) t = ('g, 'fq) Stable.Latest.t =
-      { lr: ('g * 'g) Pc_array.Stable.V1.t
-      ; z_1: 'fq
-      ; z_2: 'fq
-      ; delta: 'g
-      ; sg: 'g }
-    [@@deriving sexp, compare, yojson, hlist, hash, eq]
 
     let typ fq g ~length =
       let open Snarky_backendless.Typ in
@@ -224,14 +203,9 @@ module Openings = struct
             'fqv Evals.Stable.V1.t
             * 'fqv Evals.Stable.V1.t
             * 'fqv Evals.Stable.V1.t }
-      [@@deriving bin_io, version, sexp, compare, yojson, hash, eq]
+      [@@deriving sexp, compare, yojson, hash, eq, hlist]
     end
   end]
-
-  type ('g, 'fq, 'fqv) t = ('g, 'fq, 'fqv) Stable.Latest.t =
-    { proof: ('g, 'fq) Bulletproof.t
-    ; evals: 'fqv Evals.t * 'fqv Evals.t * 'fqv Evals.t }
-  [@@deriving sexp, compare, yojson, hlist, hash, eq]
 
   let typ (type g gv) (g : (gv, g, 'f) Snarky_backendless.Typ.t) fq
       ~bulletproof_rounds ~commitment_lengths ~dummy_group_element =
@@ -250,13 +224,9 @@ module Poly_comm = struct
     module Stable = struct
       module V1 = struct
         type 'g t = {unshifted: 'g Pc_array.Stable.V1.t; shifted: 'g}
-        [@@deriving bin_io, version, sexp, compare, yojson, hash, eq]
+        [@@deriving sexp, compare, yojson, hlist, hash, eq]
       end
     end]
-
-    type 'g t = 'g Stable.Latest.t =
-      {unshifted: 'g Pc_array.Stable.V1.t; shifted: 'g}
-    [@@deriving sexp, compare, yojson, hlist, hash, eq]
 
     let typ ?(array = Snarky_backendless.Typ.array) g ~length =
       Snarky_backendless.Typ.of_hlistable [array ~length g; g]
@@ -269,11 +239,9 @@ module Poly_comm = struct
     module Stable = struct
       module V1 = struct
         type 'g t = 'g Pc_array.Stable.V1.t
-        [@@deriving bin_io, version, sexp, compare, yojson, hash, eq]
+        [@@deriving sexp, compare, yojson, hash, eq]
       end
     end]
-
-    type 'g t = 'g Stable.Latest.t [@@deriving sexp, compare, yojson]
 
     let typ g ~length = Snarky_backendless.Typ.array ~length g
   end
@@ -300,18 +268,9 @@ module Messages = struct
             'fq
             * ( 'g With_degree_bound.Stable.V1.t
               * 'g Without_degree_bound.Stable.V1.t ) }
-      [@@deriving bin_io, version, sexp, compare, yojson, fields, hash, eq]
+      [@@deriving sexp, compare, yojson, fields, hash, eq, hlist]
     end
   end]
-
-  type ('g, 'fq) t = ('g, 'fq) Stable.Latest.t =
-    { w_hat: 'g Without_degree_bound.t
-    ; z_hat_a: 'g Without_degree_bound.t
-    ; z_hat_b: 'g Without_degree_bound.t
-    ; gh_1: 'g With_degree_bound.t * 'g Without_degree_bound.t
-    ; sigma_gh_2: 'fq * ('g With_degree_bound.t * 'g Without_degree_bound.t)
-    ; sigma_gh_3: 'fq * ('g With_degree_bound.t * 'g Without_degree_bound.t) }
-  [@@deriving sexp, compare, yojson, fields, hlist]
 
   let typ (type n) fq g ~dummy
       ~(commitment_lengths : (int, n) Vector.t Evals.t) =
@@ -351,11 +310,7 @@ module Proof = struct
       type ('g, 'fq, 'fqv) t =
         { messages: ('g, 'fq) Messages.Stable.V1.t
         ; openings: ('g, 'fq, 'fqv) Openings.Stable.V1.t }
-      [@@deriving bin_io, version, sexp, compare, yojson, hash, eq]
+      [@@deriving sexp, compare, yojson, hash, eq]
     end
   end]
-
-  type ('g, 'fq, 'fqv) t = ('g, 'fq, 'fqv) Stable.Latest.t =
-    {messages: ('g, 'fq) Messages.t; openings: ('g, 'fq, 'fqv) Openings.t}
-  [@@deriving sexp, compare, yojson, hlist]
 end

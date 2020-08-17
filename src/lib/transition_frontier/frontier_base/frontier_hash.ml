@@ -42,8 +42,6 @@ module Stable = struct
   end
 end]
 
-type t = Stable.Latest.t
-
 [%%define_locally
 Stable.Latest.(to_yojson, of_yojson)]
 

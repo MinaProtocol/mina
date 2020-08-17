@@ -30,17 +30,9 @@ module Poly = struct
         ; receiver_pk: 'public_key
         ; token_id: 'token_id
         ; amount: 'amount }
-      [@@deriving eq, sexp, hash, yojson, compare]
+      [@@deriving eq, sexp, hash, yojson, compare, hlist]
     end
   end]
-
-  type ('public_key, 'token_id, 'amount) t =
-        ('public_key, 'token_id, 'amount) Stable.Latest.t =
-    { source_pk: 'public_key
-    ; receiver_pk: 'public_key
-    ; token_id: 'token_id
-    ; amount: 'amount }
-  [@@deriving eq, sexp, hash, yojson, compare, hlist]
 end
 
 [%%versioned
@@ -51,13 +43,11 @@ module Stable = struct
       , Token_id.Stable.V1.t
       , Amount.Stable.V1.t )
       Poly.Stable.V1.t
-    [@@deriving compare, eq, sexp, hash, compare, yojson]
+    [@@deriving eq, sexp, hash, compare, yojson]
 
     let to_latest = Fn.id
   end
 end]
-
-type t = Stable.Latest.t [@@deriving eq, sexp, hash, yojson]
 
 let dummy =
   Poly.

@@ -24,7 +24,7 @@ module Fee : sig
     end
   end]
 
-  include Basic with type t = Stable.Latest.t
+  include Basic with type t := Stable.Latest.t
 
   include Arithmetic_intf with type t := t
 
@@ -70,7 +70,7 @@ module Amount : sig
     end
   end]
 
-  include Basic with type t = Stable.Latest.t
+  include Basic with type t := Stable.Latest.t
 
   include Arithmetic_intf with type t := t
 
@@ -127,7 +127,7 @@ module Balance : sig
     end
   end]
 
-  include Basic with type t = Stable.Latest.t
+  include Basic with type t := Stable.Latest.t
 
   val to_amount : t -> Amount.t
 

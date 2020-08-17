@@ -13,9 +13,3 @@ module Stable = struct
     let to_latest = Fn.id
   end
 end]
-
-type t = Stable.Latest.t =
-  { key: Receipt.Chain_hash.t
-  ; value: User_command.t
-  ; parent: Receipt.Chain_hash.t }
-[@@deriving sexp]
