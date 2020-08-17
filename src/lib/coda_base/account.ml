@@ -193,8 +193,6 @@ type value =
 
 let key_gen = Public_key.Compressed.gen
 
-let snapp_account_opt_typ = Typ.transport
-
 let initialize ?snapp account_id : t =
   let public_key = Account_id.public_key account_id in
   let token_id = Account_id.token_id account_id in
