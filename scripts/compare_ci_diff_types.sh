@@ -9,8 +9,8 @@ set -e
 
 # cleanup if needed
 
-git clean -dfx
-rm -rf base
+# git clean -dfx
+# rm -rf base
 
 # build print_versioned_types, then run Python script to compare versioned types in a pull request
 

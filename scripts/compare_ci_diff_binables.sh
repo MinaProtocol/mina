@@ -9,8 +9,8 @@ set -e
 
 # cleanup if needed
 
-git clean -dfx
-rm -rf base
+# git clean -dfx
+# rm -rf base
 
 # build print_binable_functors, then run Python script to compare binable functors in a pull request
 source ~/.profile && \
