@@ -17,13 +17,9 @@ module Poly = struct
     module V1 = struct
       type ('state_hash, 'body) t =
         {previous_state_hash: 'state_hash; body: 'body}
-      [@@deriving eq, ord, hash, sexp, to_yojson]
+      [@@deriving eq, ord, hash, sexp, to_yojson, hlist]
     end
   end]
-
-  type ('state_hash, 'body) t = ('state_hash, 'body) Stable.Latest.t =
-    {previous_state_hash: 'state_hash; body: 'body}
-  [@@deriving sexp, hlist]
 end
 
 let hash_abstract ~hash_body
@@ -43,21 +39,9 @@ module Body = struct
           ; blockchain_state: 'blockchain_state
           ; consensus_state: 'consensus_state
           ; constants: 'constants }
-        [@@deriving bin_io, sexp, eq, compare, to_yojson, hash, version]
+        [@@deriving sexp, eq, compare, to_yojson, hash, version, hlist]
       end
     end]
-
-    type ('state_hash, 'blockchain_state, 'consensus_state, 'constants) t =
-          ( 'state_hash
-          , 'blockchain_state
-          , 'consensus_state
-          , 'constants )
-          Stable.Latest.t =
-      { genesis_state_hash: 'state_hash
-      ; blockchain_state: 'blockchain_state
-      ; consensus_state: 'consensus_state
-      ; constants: 'constants }
-    [@@deriving sexp, hlist]
   end
 
   module Value = struct
@@ -75,8 +59,6 @@ module Body = struct
         let to_latest = Fn.id
       end
     end]
-
-    type t = Stable.Latest.t [@@deriving sexp, to_yojson]
   end
 
   type ('state_hash, 'blockchain_state, 'consensus_state, 'constants) t =
@@ -178,8 +160,6 @@ module Value = struct
       let to_latest = Fn.id
     end
   end]
-
-  type t = Stable.Latest.t [@@deriving sexp, hash, compare, eq, to_yojson]
 
   include Hashable.Make (Stable.Latest)
 end

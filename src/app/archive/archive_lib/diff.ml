@@ -25,14 +25,6 @@ module Transition_frontier = struct
       let to_latest = Fn.id
     end
   end]
-
-  type t = Stable.Latest.t =
-    | Breadcrumb_added of
-        { block: (External_transition.t, State_hash.t) With_hash.t
-        ; sender_receipt_chains_from_parent_ledger:
-            (Account_id.t * Receipt.Chain_hash.t) list }
-    | Root_transitioned of Transition_frontier.Diff.Root_transition.Lite.t
-    | Bootstrap of {lost_blocks: State_hash.t list}
 end
 
 module Transaction_pool = struct
@@ -46,9 +38,6 @@ module Transaction_pool = struct
       let to_latest = Fn.id
     end
   end]
-
-  type t = Stable.Latest.t =
-    {added: User_command.t list; removed: User_command.t list}
 end
 
 [%%versioned
@@ -61,10 +50,6 @@ module Stable = struct
     let to_latest = Fn.id
   end
 end]
-
-type t = Stable.Latest.t =
-  | Transition_frontier of Transition_frontier.t
-  | Transaction_pool of Transaction_pool.t
 
 module Builder = struct
   let breadcrumb_added breadcrumb =

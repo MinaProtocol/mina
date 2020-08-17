@@ -23,21 +23,6 @@ module Failure = struct
     end
   end]
 
-  type t = Stable.Latest.t =
-    | Predicate
-    | Source_not_present
-    | Receiver_not_present
-    | Amount_insufficient_to_create_account
-    | Cannot_pay_creation_fee_in_token
-    | Source_insufficient_balance
-    | Receiver_already_exists
-    | Not_token_owner
-    | Mismatched_token_permissions
-    | Overflow
-    | User_command_on_snapp_account
-    | Snapp_account_not_present
-  [@@deriving sexp, yojson, eq, compare]
-
   let to_latest = Fn.id
 
   let to_string = function
@@ -137,12 +122,6 @@ module Auxiliary_data = struct
     end
   end]
 
-  type t = Stable.Latest.t =
-    { fee_payer_account_creation_fee_paid: Currency.Amount.t option
-    ; receiver_account_creation_fee_paid: Currency.Amount.t option
-    ; created_token: Token_id.t option }
-  [@@deriving sexp, yojson, eq, compare]
-
   let empty =
     { fee_payer_account_creation_fee_paid= None
     ; receiver_account_creation_fee_paid= None
@@ -160,6 +139,3 @@ module Stable = struct
     let to_latest = Fn.id
   end
 end]
-
-type t = Stable.Latest.t = Applied of Auxiliary_data.t | Failed of Failure.t
-[@@deriving sexp, yojson, eq, compare]

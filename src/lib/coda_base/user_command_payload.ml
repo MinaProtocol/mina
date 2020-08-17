@@ -37,25 +37,9 @@ module Common = struct
           ; nonce: 'nonce
           ; valid_until: 'global_slot
           ; memo: 'memo }
-        [@@deriving compare, eq, sexp, hash, yojson]
+        [@@deriving compare, eq, sexp, hash, yojson, hlist]
       end
     end]
-
-    type ('fee, 'public_key, 'token_id, 'nonce, 'global_slot, 'memo) t =
-          ( 'fee
-          , 'public_key
-          , 'token_id
-          , 'nonce
-          , 'global_slot
-          , 'memo )
-          Stable.Latest.t =
-      { fee: 'fee
-      ; fee_token: 'token_id
-      ; fee_payer_pk: 'public_key
-      ; nonce: 'nonce
-      ; valid_until: 'global_slot
-      ; memo: 'memo }
-    [@@deriving eq, sexp, hash, yojson, hlist]
   end
 
   [%%versioned
@@ -74,8 +58,6 @@ module Common = struct
       let to_latest = Fn.id
     end
   end]
-
-  type t = Stable.Latest.t [@@deriving compare, eq, sexp, hash, yojson]
 
   let to_input ({fee; fee_token; fee_payer_pk; nonce; valid_until; memo} : t) =
     let bitstring = Random_oracle.Input.bitstring in
@@ -177,14 +159,6 @@ module Body = struct
       let to_latest = Fn.id
     end
   end]
-
-  type t = Stable.Latest.t =
-    | Payment of Payment_payload.t
-    | Stake_delegation of Stake_delegation.t
-    | Create_new_token of New_token_payload.t
-    | Create_token_account of New_account_payload.t
-    | Mint_tokens of Minting_payload.t
-  [@@deriving eq, sexp, hash, yojson]
 
   module Tag = Transaction_union_tag
 
@@ -320,7 +294,7 @@ module Poly = struct
   module Stable = struct
     module V1 = struct
       type ('common, 'body) t = {common: 'common; body: 'body}
-      [@@deriving eq, sexp, hash, yojson, compare]
+      [@@deriving eq, sexp, hash, yojson, compare, hlist]
 
       let of_latest common_latest body_latest {common; body} =
         let open Result.Let_syntax in
@@ -328,10 +302,6 @@ module Poly = struct
         {common; body}
     end
   end]
-
-  type ('common, 'body) t = ('common, 'body) Stable.Latest.t =
-    {common: 'common; body: 'body}
-  [@@deriving eq, sexp, hash, yojson, compare, hlist]
 end
 
 [%%versioned
@@ -343,9 +313,6 @@ module Stable = struct
     let to_latest = Fn.id
   end
 end]
-
-(* bin_io omitted *)
-type t = Stable.Latest.t [@@deriving compare, eq, sexp, hash, yojson]
 
 let create ~fee ~fee_token ~fee_payer_pk ~nonce ~valid_until ~memo ~body : t =
   {common= {fee; fee_token; fee_payer_pk; nonce; valid_until; memo}; body}

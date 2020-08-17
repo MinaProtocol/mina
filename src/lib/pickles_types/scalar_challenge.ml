@@ -8,9 +8,6 @@ module Stable = struct
   end
 end]
 
-type 'f t = 'f Stable.Latest.t = Scalar_challenge of 'f
-[@@deriving sexp, compare, eq, yojson]
-
 let create t = Scalar_challenge t
 
 let typ f =

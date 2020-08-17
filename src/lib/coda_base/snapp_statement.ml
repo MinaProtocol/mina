@@ -51,8 +51,6 @@ module Statement = struct
     end
   end]
 
-  type t = Stable.Latest.t
-
   module Checked = struct
     type t =
       ( Predicate.Checked.t

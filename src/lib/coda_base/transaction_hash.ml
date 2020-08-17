@@ -59,12 +59,6 @@ module User_command_with_valid_signature = struct
     end
   end]
 
-  type t =
-    ( User_command.With_valid_signature.t
-    , (T.t[@to_yojson hash_to_yojson]) )
-    With_hash.t
-  [@@deriving sexp, to_yojson]
-
   let create (uc : User_command.With_valid_signature.t) : t =
     {data= uc; hash= hash_user_command (User_command.forget_check uc)}
 

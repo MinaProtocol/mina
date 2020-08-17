@@ -17,8 +17,6 @@ module Stable = struct
   end
 end]
 
-type t = Stable.Latest.t [@@deriving sexp]
-
 module Hash = struct
   include Ledger_hash
 
