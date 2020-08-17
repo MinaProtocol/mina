@@ -49,26 +49,26 @@ CODA_CONFIG_DIR=/root/.coda-config
 # CODA_CONFIG_DIR is exposed by the dockerfile and contains demo mode essentials
 echo "========================= STARTING DAEMON ==========================="
 /coda-bin/cli/src/coda.exe daemon \
-  -seed \
-  -demo-mode \
+  -archive-address 3086 \
+  -background \
   -block-producer-key "$CODA_CONFIG_DIR/wallets/store/$PK" \
-  -run-snark-worker $PK \
-  -config-file "$CODA_CONFIG_DIR/daemon.json" \
   -config-dir "$CODA_CONFIG_DIR" \
-  -insecure-rest-server \
+  -config-file "$CODA_CONFIG_DIR/daemon.json" \
+  -demo-mode \
+  -disable-telemetry \
   -external-ip 127.0.0.1 \
   -external-port "${CODA_DAEMON_PORT:-10101}" \
-  -archive-address 3086 \
-  -disable-telemetry \
+  -insecure-rest-server \
   -log-level debug \
   -log-json \
-  -background \
+  -run-snark-worker $PK \
+  -seed \
   $@
 
 # Possibly useful flags:
-#   Rosetta documentation specifies that /data/ will be a volume mount for various state
+#   Rosetta documentation specifies that /data/ will be a volume mount for various state.
 #  -working-dir /data/ \
-#   Demo mode probably doesnt need to be super strict about proving to integrate against rosetta
+#   Demo mode probably doesnt need to be super strict about proving to integrate against rosetta.
 #  -proof-level none \
 
 
