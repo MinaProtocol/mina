@@ -3,7 +3,6 @@
 let Prelude = ../External/Prelude.dhall
 
 let Command = ./Base.dhall
-let Docker = ./Docker/Type.dhall
 let Size = ./Size.dhall
 
 let Cmd = ../Lib/Cmds.dhall

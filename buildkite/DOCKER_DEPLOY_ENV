@@ -1,9 +1,0 @@
-export CODA_SERVICE=coda-daemon
-export CODA_VERSION=0.0.15-beta-website-redesign-copy-folder
-export CODA_DEB_VERSION=0.0.15-beta+-website-redesign-copy-folder-806f591-PVe8e43745
-export CODA_PROJECT=coda-testnet-postake-medium-curves
-export CODA_GIT_HASH=806f591
-export CODA_GIT_BRANCH=website-redesign/copy-folder
-export CODA_GIT_TAG=0.0.15-beta
-export CODA_DEB_REPO=unstable
-export CODA_WAS_PUBLISHED=true
