@@ -11,21 +11,9 @@ module Poly = struct
         ; snarked_ledger_hash: 'snarked_ledger_hash
         ; snarked_next_available_token: 'token_id
         ; timestamp: 'time }
-      [@@deriving bin_io, sexp, fields, eq, compare, hash, yojson, version]
+      [@@deriving sexp, fields, eq, compare, hash, yojson, hlist]
     end
   end]
-
-  type ('staged_ledger_hash, 'snarked_ledger_hash, 'token_id, 'time) t =
-        ( 'staged_ledger_hash
-        , 'snarked_ledger_hash
-        , 'token_id
-        , 'time )
-        Stable.Latest.t =
-    { staged_ledger_hash: 'staged_ledger_hash
-    ; snarked_ledger_hash: 'snarked_ledger_hash
-    ; snarked_next_available_token: 'token_id
-    ; timestamp: 'time }
-  [@@deriving sexp, fields, eq, compare, hash, yojson, hlist]
 end
 
 [%%define_locally
@@ -52,8 +40,6 @@ module Value = struct
       let to_latest = Fn.id
     end
   end]
-
-  type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash, yojson]
 end
 
 type var =

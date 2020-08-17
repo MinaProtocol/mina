@@ -216,8 +216,6 @@ module Challenge_polynomial = struct
       let to_latest = Fn.id
     end
   end]
-
-  include Stable.Latest
 end
 
 module Make (Inputs : Inputs_intf) = struct
@@ -234,13 +232,11 @@ module Make (Inputs : Inputs_intf) = struct
           ( G.Affine.Stable.V1.t
           , Fq.Stable.V1.t )
           Challenge_polynomial.Stable.V1.t
-        [@@deriving version, bin_io, sexp, compare, yojson]
+        [@@deriving sexp, compare, yojson]
 
         let to_latest = Fn.id
       end
     end]
-
-    include Stable.Latest
 
     type ('g, 'fq) t_ = ('g, 'fq) Challenge_polynomial.t =
       {challenges: 'fq array; commitment: 'g}
@@ -250,13 +246,15 @@ module Make (Inputs : Inputs_intf) = struct
 
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t =
         ( G.Affine.Stable.V1.t
         , Fq.Stable.V1.t
         , Fq.Stable.V1.t array )
         Dlog_marlin_types.Proof.Stable.V1.t
-      [@@deriving bin_io, version, compare, sexp, yojson]
+      [@@deriving compare, sexp, yojson]
 
       let to_latest = Fn.id
     end

@@ -63,7 +63,8 @@ sleep 3
 # wait for it to settle
 sleep 3
 
-if [[ "$1" == "CURL" ]]; then
+ARG=${1:-NONE}
+if [[ "$ARG" == "CURL" ]]; then
   echo "Running for curl mode, no agent present"
   sleep infinity
 else

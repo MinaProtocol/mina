@@ -107,8 +107,6 @@ module Work_selection_method = struct
       let to_latest = Fn.id
     end
   end]
-
-  type t = Stable.Latest.t = Sequence | Random
 end
 
 let work_selection_method_val = function

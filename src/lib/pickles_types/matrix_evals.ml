@@ -9,9 +9,6 @@ module Stable = struct
   end
 end]
 
-type 'a t = 'a Stable.Latest.t = {row: 'a; col: 'a; value: 'a; rc: 'a}
-[@@deriving sexp, eq, compare, hash, yojson, hlist, fields]
-
 let typ g =
   Snarky_backendless.Typ.of_hlistable [g; g; g; g] ~var_to_hlist:to_hlist
     ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
