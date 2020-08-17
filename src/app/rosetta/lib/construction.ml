@@ -204,6 +204,9 @@ module Preprocess = struct
                ; token_id= partial_user_command.User_command_info.Partial.token
                }) }
   end
+
+  module Real = Impl (Deferred.Result)
+  module Mock = Impl (Result)
 end
 
 let router ~graphql_uri ~logger (route : string list) body =

@@ -1,3 +1,17 @@
+open Core_kernel
+open Models
+
+let account_id (`Pk pk) token_id =
+  { Account_identifier.address= pk
+  ; sub_account= None
+  ; metadata= Some (Amount_of.Token_id.encode token_id) }
+
+let token_id_of_account (account : Account_identifier.t) =
+  let module Decoder = Amount_of.Token_id.T (Result) in
+  Decoder.decode account.metadata
+  |> Result.map ~f:(Option.value ~default:Amount_of.Token_id.default)
+  |> Result.ok
+
 module Op = struct
   type 'a t = {label: 'a; related_to: 'a option} [@@deriving eq]
 
@@ -64,18 +78,7 @@ module Partial = struct
     ; amount: Unsigned.UInt64.t option }
   [@@deriving to_yojson, sexp, compare]
 
-  module Reason = struct
-    type t =
-      | Length_mismatch
-      | Fee_payer_and_source_mismatch
-      | Amount_not_some
-      | Account_not_some
-      | Incorrect_token_id
-      | Amount_inc_dec_mismatch
-      | Status_not_pending
-      | Can't_find_kind of string
-    [@@deriving sexp]
-  end
+  module Reason = Errors.Partial_reason
 end
 
 let forget (t : t) : Partial.t =

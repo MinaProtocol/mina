@@ -2,20 +2,6 @@ open Core_kernel
 open Async
 open Models
 
-module Unsigned = struct
-  module UInt64 = struct
-    include Unsigned_extended.UInt64
-
-    let to_yojson i = `Intlit (to_string i)
-  end
-
-  module UInt32 = struct
-    include Unsigned_extended.UInt32
-
-    let to_yojson i = `Intlit (to_string i)
-  end
-end
-
 module Get_coinbase =
 [%graphql
 {|
@@ -30,16 +16,7 @@ module Get_coinbase =
   }
 |}]
 
-let account_id (`Pk pk) token_id =
-  { Account_identifier.address= pk
-  ; sub_account= None
-  ; metadata= Some (Amount_of.Token_id.encode token_id) }
-
-let token_id_of_account (account : Account_identifier.t) =
-  let module Decoder = Amount_of.Token_id.T (Result) in
-  Decoder.decode account.metadata
-  |> Result.map ~f:(Option.value ~default:Amount_of.Token_id.default)
-  |> Result.ok
+let account_id = User_command_info.account_id
 
 module Block_query = struct
   type t = ([`Height of int64], [`Hash of string]) These.t option
