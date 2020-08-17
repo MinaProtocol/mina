@@ -14,7 +14,9 @@ module Variant = struct
     | `Invariant_violation
     | `Transaction_not_found of string
     | `Block_missing
-    | `Malformed_public_key ]
+    | `Malformed_public_key
+    | `Operations_not_valid of User_command_info.Partial.Reason.t list
+    | `Public_key_format_not_valid ]
   [@@deriving yojson, show, eq, to_enum, to_representatives]
 end
 
@@ -66,6 +68,10 @@ end = struct
         "Block not found"
     | `Malformed_public_key ->
         "Malformed public key"
+    | `Operations_not_valid ->
+        "Cannot convert operations to valid transaction"
+    | `Public_key_format_not_valid ->
+        "Invalid public key format"
 
   let context = function
     | `Sql msg ->
@@ -106,6 +112,14 @@ end = struct
         None
     | `Malformed_public_key ->
         None
+    | `Operations_not_valid reasons ->
+        Some
+          (sprintf
+             !"Cannot recover transaction for the following reasons: %{sexp: \
+               User_command_info.Partial.Reason.t list}"
+             reasons)
+    | `Public_key_format_not_valid ->
+        None
 
   let retriable = function
     | `Sql _ ->
@@ -127,6 +141,10 @@ end = struct
     | `Block_missing ->
         true
     | `Malformed_public_key ->
+        false
+    | `Operations_not_valid ->
+        false
+    | `Public_key_format_not_valid ->
         false
 
   let create ?context kind = {extra_context= context; kind}

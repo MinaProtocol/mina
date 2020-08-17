@@ -164,6 +164,48 @@ module Metadata = struct
   module Mock = Impl (Result)
 end
 
+module Preprocess = struct
+  module Env = struct
+    module T (M : Monad_fail.S) = struct
+      type t = {lift: 'a 'e. ('a, 'e) Result.t -> ('a, 'e) M.t}
+    end
+
+    module Real = T (Deferred.Result)
+    module Mock = T (Result)
+
+    let real : Real.t = {lift= Deferred.return}
+
+    let mock : Mock.t = {lift= Fn.id}
+  end
+
+  module Impl (M : Monad_fail.S) = struct
+    let lift_reason_validation_to_errors ~(env : Env.T(M).t) t =
+      Result.map_error t ~f:(fun reasons ->
+          Errors.create (`Operations_not_valid reasons) )
+      |> env.lift
+
+    let handle ~(env : Env.T(M).t) (req : Construction_preprocess_request.t) =
+      let open M.Let_syntax in
+      let%bind partial_user_command =
+        User_command_info.of_operations req.operations
+        |> lift_reason_validation_to_errors ~env
+      in
+      let%map pk =
+        let (`Pk pk) = partial_user_command.User_command_info.Partial.source in
+        Public_key.Compressed.of_base58_check pk
+        |> Result.map_error ~f:(fun _ ->
+               Errors.create `Public_key_format_not_valid )
+        |> env.lift
+      in
+      { Construction_preprocess_response.options=
+          Some
+            (Options.to_json
+               { Options.sender= pk
+               ; token_id= partial_user_command.User_command_info.Partial.token
+               }) }
+  end
+end
+
 let router ~graphql_uri ~logger (route : string list) body =
   [%log debug] "Handling /construction/ $route"
     ~metadata:[("route", `List (List.map route ~f:(fun s -> `String s)))] ;
@@ -179,6 +221,16 @@ let router ~graphql_uri ~logger (route : string list) body =
         Derive.Real.handle ~env:Derive.Env.real req |> Errors.Lift.wrap
       in
       Construction_derive_response.to_yojson res
+  | ["preprocess"] ->
+      let%bind req =
+        Errors.Lift.parse ~context:"Request"
+        @@ Construction_preprocess_request.of_yojson body
+        |> Errors.Lift.wrap
+      in
+      let%map res =
+        Preprocess.Real.handle ~env:Preprocess.Env.real req |> Errors.Lift.wrap
+      in
+      Construction_preprocess_response.to_yojson res
   | ["metadata"] ->
       let%bind req =
         Errors.Lift.parse ~context:"Request"
