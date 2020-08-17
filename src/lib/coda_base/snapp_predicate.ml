@@ -31,12 +31,9 @@ module Closed_interval = struct
   module Stable = struct
     module V1 = struct
       type 'a t = {lower: 'a; upper: 'a}
-      [@@deriving sexp, eq, compare, hash, yojson]
+      [@@deriving sexp, eq, compare, hash, yojson, hlist]
     end
   end]
-
-  type 'a t = 'a Stable.Latest.t = {lower: 'a; upper: 'a}
-  [@@deriving sexp, eq, compare, hash, yojson, hlist]
 
   let to_input {lower; upper} ~f =
     Random_oracle_input.append (f lower) (f upper)
@@ -146,8 +143,6 @@ module Numeric = struct
       [@@deriving sexp, eq, yojson, hash, compare]
     end
   end]
-
-  type 'a t = 'a Stable.Latest.t [@@deriving eq]
 
   let to_input {zero; max_value; to_input; _} (t : 'a t) =
     Closed_interval.to_input ~f:to_input
@@ -301,8 +296,6 @@ module Account = struct
     end
   end]
 
-  type t = Stable.Latest.t
-
   let accept : t =
     { balance= Ignore
     ; nonce= Ignore
@@ -415,25 +408,6 @@ module Protocol_state = struct
           [@@deriving hlist, sexp, eq, yojson, hash, compare]
         end
       end]
-
-      type ( 'epoch_ledger
-           , 'epoch_seed
-           , 'start_checkpoint
-           , 'lock_checkpoint
-           , 'length )
-           t =
-            ( 'epoch_ledger
-            , 'epoch_seed
-            , 'start_checkpoint
-            , 'lock_checkpoint
-            , 'length )
-            Stable.Latest.t =
-        { ledger: 'epoch_ledger
-        ; seed: 'epoch_seed
-        ; start_checkpoint: 'start_checkpoint
-        ; lock_checkpoint: 'lock_checkpoint
-        ; epoch_length: 'length }
-      [@@deriving hlist]
     end
 
     [%%versioned
@@ -454,8 +428,6 @@ module Protocol_state = struct
         let to_latest = Fn.id
       end
     end]
-
-    type t = Stable.Latest.t
 
     let to_input
         ({ ledger= {hash; total_currency}
@@ -535,8 +507,6 @@ module Protocol_state = struct
       let to_latest = Fn.id
     end
   end]
-
-  type t = Stable.Latest.t
 
   let to_input
       ({ staged_ledger_hash_ledger_hash
@@ -654,8 +624,6 @@ module Protocol_state = struct
         let to_latest = Fn.id
       end
     end]
-
-    type t = Stable.Latest.t
   end
 
   let accept : t =
@@ -783,9 +751,6 @@ module Account_type = struct
     end
   end]
 
-  type t = Stable.Latest.t = User | Snapp | None | Any
-  [@@deriving sexp, eq, yojson, hash, compare]
-
   let check (t : t) (a : A.t option) =
     match (a, t) with
     | _, Any ->
@@ -911,8 +876,6 @@ module Digested = struct
     end
   end]
 
-  type t = Stable.Latest.t
-
   let to_input
       ({ self_predicate
        ; other_predicate
@@ -952,8 +915,6 @@ module Digested = struct
         ; field protocol_state_predicate ]
   end
 end
-
-type t = Stable.Latest.t [@@deriving sexp, eq, yojson, hash, compare]
 
 let digest
     ({ self_predicate

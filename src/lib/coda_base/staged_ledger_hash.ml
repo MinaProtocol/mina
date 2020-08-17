@@ -40,7 +40,8 @@ module Aux_hash = struct
     end
   end]
 
-  type t = Stable.Latest.t [@@deriving sexp, compare, hash, yojson]
+  [%%define_locally
+  Stable.Latest.(to_yojson, of_yojson)]
 
   let of_bytes = Fn.id
 
@@ -84,7 +85,8 @@ module Pending_coinbase_aux = struct
     end
   end]
 
-  type t = Stable.Latest.t [@@deriving sexp, compare, hash, yojson]
+  [%%define_locally
+  Stable.Latest.(to_yojson, of_yojson)]
 
   let dummy : t = String.init length_in_bytes ~f:(fun _ -> '\000')
 end
@@ -102,8 +104,6 @@ module Non_snark = struct
       let to_latest = Fn.id
     end
   end]
-
-  type t = Stable.Latest.t [@@deriving sexp, compare, hash, yojson]
 
   type value = t [@@deriving sexp, compare, hash, yojson]
 
@@ -174,14 +174,9 @@ module Poly = struct
     module V1 = struct
       type ('non_snark, 'pending_coinbase_hash) t =
         {non_snark: 'non_snark; pending_coinbase_hash: 'pending_coinbase_hash}
-      [@@deriving sexp, eq, compare, hash, yojson]
+      [@@deriving sexp, eq, compare, hash, yojson, hlist]
     end
   end]
-
-  type ('non_snark, 'pending_coinbase_hash) t =
-        ('non_snark, 'pending_coinbase_hash) Stable.Latest.t =
-    {non_snark: 'non_snark; pending_coinbase_hash: 'pending_coinbase_hash}
-  [@@deriving sexp, compare, hash, yojson, hlist]
 end
 
 [%%versioned
@@ -201,8 +196,6 @@ module Stable = struct
     let to_latest = Fn.id
   end
 end]
-
-type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash, yojson]
 
 type ('a, 'b) t_ = ('a, 'b) Poly.t
 

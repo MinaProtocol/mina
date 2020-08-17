@@ -12,8 +12,6 @@ module type S = sig
     end
   end]
 
-  type t = Stable.Latest.t [@@deriving sexp, compare, hash]
-
   include Hashable.S with type t := t
 
   include Comparable.S with type t := t

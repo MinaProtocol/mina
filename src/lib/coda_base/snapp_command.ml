@@ -59,8 +59,6 @@ module Per_account = struct
     end
   end]
 
-  type t = Stable.Latest.t
-
   let to_input ({state; delegate} : t) =
     let open Random_oracle_input in
     List.reduce_exn ~f:append
@@ -166,8 +164,6 @@ module Fee_payment = struct
       [@@deriving sexp, eq, yojson, hash, compare]
     end
   end]
-
-  type 'a t = 'a Stable.Latest.t
 end
 
 module Snapp_body = struct
@@ -184,8 +180,6 @@ module Snapp_body = struct
       let to_latest = Fn.id
     end
   end]
-
-  type t = Stable.Latest.t
 end
 
 module Other_fee_payer = struct
@@ -261,8 +255,6 @@ module Stable = struct
   end
 end]
 
-type t = Stable.Latest.t [@@deriving sexp, eq, yojson, hash, compare]
-
 (* This type is used for hashing the snapp commands when they go into the receipt chain hash,
    and for signing snapp commands.
 *)
@@ -292,8 +284,6 @@ module Payload = struct
         let to_latest = Fn.id
       end
     end]
-
-    type t = Stable.Latest.t
 
     let to_input ({vk_digest; permissions} : t) =
       Random_oracle_input.(append (field vk_digest))
@@ -359,10 +349,7 @@ module Payload = struct
       end
     end]
 
-    type ('pubkey, 'nonce) t = ('pubkey, 'nonce) Stable.Latest.t =
-      {pk: 'pubkey; nonce: 'nonce}
-
-    let to_input ({pk; nonce} : _ Stable.Latest.t) =
+    let to_input ({pk; nonce} : _ t) =
       List.reduce_exn ~f:Random_oracle_input.append
         [Public_key.Compressed.to_input pk; Account_nonce.to_input nonce]
 
@@ -394,13 +381,6 @@ module Payload = struct
         let to_latest = Fn.id
       end
     end]
-
-    type t = Stable.Latest.t =
-      | Snapp_snapp
-      | Snapp
-      | User_to_snapp
-      | Create_snapp
-      | Snapp_to_user
 
     let gen =
       Quickcheck.Generator.(
@@ -545,8 +525,6 @@ module Payload = struct
     end
   end]
 
-  type t = Stable.Latest.t
-
   let to_input (t : t) =
     let open Random_oracle_input in
     let f = List.reduce_exn ~f:append in
@@ -651,8 +629,6 @@ module Valid : sig
       [@@deriving sexp, eq, yojson, hash, compare]
     end
   end]
-
-  type t = Stable.Latest.t [@@deriving sexp, yojson, hash, compare, eq]
 end = struct
   [%%versioned
   module Stable = struct
@@ -662,8 +638,6 @@ end = struct
       let to_latest = Stable.V1.to_latest
     end
   end]
-
-  type t = Stable.Latest.t [@@deriving sexp, yojson, hash, compare, eq]
 end
 
 let fee_payment (t : t) : Account_id.t Fee_payment.t =

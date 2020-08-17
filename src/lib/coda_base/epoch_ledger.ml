@@ -9,13 +9,9 @@ module Poly = struct
     module V1 = struct
       type ('ledger_hash, 'amount) t =
         {hash: 'ledger_hash; total_currency: 'amount}
-      [@@deriving sexp, eq, compare, hash, yojson]
+      [@@deriving sexp, eq, compare, hash, yojson, hlist]
     end
   end]
-
-  type ('ledger_hash, 'amount) t = ('ledger_hash, 'amount) Stable.Latest.t =
-    {hash: 'ledger_hash; total_currency: 'amount}
-  [@@deriving sexp, eq, compare, hash, yojson, hlist]
 end
 
 module Value = struct
@@ -29,8 +25,6 @@ module Value = struct
       let to_latest = Fn.id
     end
   end]
-
-  type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash, to_yojson]
 end
 
 let to_input ({hash; total_currency} : Value.t) =

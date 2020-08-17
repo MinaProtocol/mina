@@ -41,9 +41,6 @@ module Permissions = struct
       end
     end]
 
-    type t = Stable.Latest.t = Either | Verification_key | Private_key | Both
-    [@@deriving sexp, eq, compare, hash, yojson]
-
     module Checked = struct
       type t = {verification_key: Boolean.var; private_key: Boolean.var}
       [@@deriving hlist]
@@ -138,14 +135,9 @@ module Poly = struct
     module V1 = struct
       type ('app_state, 'perms, 'vk) t =
         {app_state: 'app_state; permissions: 'perms; verification_key: 'vk}
-      [@@deriving sexp, eq, compare, hash, yojson, hlist]
+      [@@deriving sexp, eq, compare, hash, yojson, hlist, fields]
     end
   end]
-
-  type ('app_state, 'perms, 'vk) t =
-        ('app_state, 'perms, 'vk) Stable.Latest.t =
-    {app_state: 'app_state; permissions: 'perms; verification_key: 'vk}
-  [@@deriving sexp, eq, compare, hash, yojson, hlist, fields]
 end
 
 type ('app_state, 'perms, 'vk) t_ = ('app_state, 'perms, 'vk) Poly.t =
@@ -166,8 +158,6 @@ module Stable = struct
     let to_latest = Fn.id
   end
 end]
-
-type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash, yojson]
 
 open Pickles_types
 

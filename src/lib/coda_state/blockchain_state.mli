@@ -11,21 +11,9 @@ module Poly : sig
         ; snarked_ledger_hash: 'snarked_ledger_hash
         ; snarked_next_available_token: 'token_id
         ; timestamp: 'time }
-      [@@deriving sexp, eq, compare, yojson]
+      [@@deriving sexp, eq, compare, fields, yojson]
     end
   end]
-
-  type ('staged_ledger_hash, 'snarked_ledger_hash, 'token_id, 'time) t =
-        ( 'staged_ledger_hash
-        , 'snarked_ledger_hash
-        , 'token_id
-        , 'time )
-        Stable.Latest.t =
-    { staged_ledger_hash: 'staged_ledger_hash
-    ; snarked_ledger_hash: 'snarked_ledger_hash
-    ; snarked_next_available_token: 'token_id
-    ; timestamp: 'time }
-  [@@deriving sexp, eq, compare, fields, yojson]
 end
 
 module Value : sig
@@ -41,8 +29,6 @@ module Value : sig
       [@@deriving sexp, eq, compare, hash, yojson]
     end
   end]
-
-  type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash, yojson]
 end
 
 include

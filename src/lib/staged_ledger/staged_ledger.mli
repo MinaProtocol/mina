@@ -15,8 +15,6 @@ module Scan_state : sig
     end
   end]
 
-  type t = Stable.Latest.t [@@deriving sexp]
-
   module Job_view : sig
     type t [@@deriving sexp, to_yojson]
   end
