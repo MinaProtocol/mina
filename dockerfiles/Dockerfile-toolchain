@@ -75,9 +75,9 @@ RUN sudo apt update && sudo apt install nodejs yarn
 
 # Get terraform
 RUN curl -sL \
-  "https://releases.hashicorp.com/terraform/0.12.29/terraform_0.12.29_linux_amd64.zip"
+  "https://releases.hashicorp.com/terraform/0.12.29/terraform_0.12.29_linux_amd64.zip" \
   -o /tmp/terraform.zip \
-  && sudo unzip /tmp/terraform.zip -d /usr/bin/terraform \
+  && sudo unzip /tmp/terraform.zip -d /usr/bin \
   && rm /tmp/terraform.zip
 
 # Source copy of rocksdb
