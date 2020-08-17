@@ -4,12 +4,13 @@
 # we have to trustlist and configure image builds individually because each one is going to be slightly different. 
 # This is needed as opposed to trusting the structure of the each project to be consistent for every deployable. 
 
-set -e+x
+set -eo pipefail
+set +x
 
 CLEAR='\033[0m'
 RED='\033[0;31m'
 # Array of valid service names
-VALID_SERVICES=('coda-daemon' 'bot' 'coda-demo')
+VALID_SERVICES=('coda-daemon' 'bot' 'coda-demo' 'coda-rosetta')
 
 function usage() {
   if [ -n "$1" ]; then
@@ -52,6 +53,11 @@ coda-daemon)
 coda-demo)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-coda-demo"
   DOCKER_CONTEXT="."
+  ;;
+coda-rosetta)
+  DOCKERFILE_PATH="dockerfiles/Dockerfile-rosetta"
+  mkdir some_empty_dir
+  DOCKER_CONTEXT="./some_empty_dir"
   ;;
 *)
 esac

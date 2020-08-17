@@ -101,10 +101,21 @@ end
 
 module Side_loaded : sig
   module Verification_key : sig
-    type t
+    [%%versioned:
+    module Stable : sig
+      module V1 : sig
+        type t [@@deriving sexp, eq, compare, hash, yojson]
+      end
+    end]
+
+    open Impls.Step
+
+    val to_input : t -> (Field.Constant.t, bool) Random_oracle_input.t
 
     module Checked : sig
       type t
+
+      val to_input : t -> (Field.t, Boolean.var) Random_oracle_input.t
     end
 
     val typ : (Checked.t, t) Impls.Step.Typ.t

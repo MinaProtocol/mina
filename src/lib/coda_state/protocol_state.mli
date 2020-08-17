@@ -3,18 +3,14 @@ open Coda_base
 open Snark_params.Tick
 
 module Poly : sig
+  [%%versioned:
   module Stable : sig
     module V1 : sig
       type ('state_hash, 'body) t =
         {previous_state_hash: 'state_hash; body: 'body}
-      [@@deriving eq, ord, bin_io, hash, sexp, to_yojson, version]
+      [@@deriving eq, ord, hash, sexp, to_yojson]
     end
-
-    module Latest = V1
-  end
-
-  type ('state_hash, 'body) t = ('state_hash, 'body) Stable.Latest.t
-  [@@deriving sexp]
+  end]
 end
 
 val hash_abstract :
@@ -30,8 +26,6 @@ module Body : sig
         type ('a, 'b, 'c, 'd) t [@@deriving sexp]
       end
     end]
-
-    type ('a, 'b, 'c, 'd) t = ('a, 'b, 'c, 'd) Stable.V1.t [@@deriving sexp]
   end
 
   module Value : sig
@@ -47,8 +41,6 @@ module Body : sig
         [@@deriving eq, ord, hash, sexp, to_yojson]
       end
     end]
-
-    type t = Stable.Latest.t [@@deriving sexp, to_yojson]
   end
 
   type var =
@@ -80,8 +72,6 @@ module Value : sig
       [@@deriving sexp, compare, eq, to_yojson]
     end
   end]
-
-  type t = Stable.Latest.t [@@deriving sexp, compare, eq, to_yojson]
 
   include Hashable.S with type t := t
 end

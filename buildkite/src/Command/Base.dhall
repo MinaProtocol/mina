@@ -101,9 +101,10 @@ let Config =
   }
 
 let targetToAgent = \(target : Size) ->
-  merge { Large = toMap { size = "large" },
-          Small = toMap { size = "small" },
-          Experimental = toMap { size = "experimental" }
+  merge { XLarge = toMap { size = "xlarge" },
+          Large = toMap { size = "large" },
+          Medium = toMap { size = "medium" },
+          Small = toMap { size = "small" }
         }
         target
 

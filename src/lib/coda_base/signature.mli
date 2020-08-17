@@ -22,8 +22,6 @@ module Stable : sig
   end
 end]
 
-type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash]
-
 include Codable.S with type t := t
 
 [%%ifdef consensus_mechanism]
