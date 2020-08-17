@@ -31,7 +31,7 @@ let build : Config.Type -> Base.Type = \(c : Config.Type) ->
       commands = [ Cmd.run fixPermissionsScript ] # c.commands,
       label = c.label,
       key = c.key,
-      target = Size.Large,
+      target = Size.Small,
       docker = Some Docker::{ image = dockerImage }
     }
 

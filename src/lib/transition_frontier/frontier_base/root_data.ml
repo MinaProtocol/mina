@@ -20,10 +20,6 @@ module Common = struct
     end
   end]
 
-  type t = Stable.Latest.t =
-    { scan_state: Staged_ledger.Scan_state.t
-    ; pending_coinbase: Pending_coinbase.t }
-
   let create ~scan_state ~pending_coinbase = {scan_state; pending_coinbase}
 
   let scan_state t = t.scan_state
@@ -43,11 +39,6 @@ module Historical = struct
       let to_latest = Fn.id
     end
   end]
-
-  type t = Stable.Latest.t =
-    { transition: External_transition.Validated.t
-    ; common: Common.t
-    ; staged_ledger_target_ledger_hash: Ledger_hash.t }
 
   let transition t = t.transition
 
@@ -94,12 +85,6 @@ module Limited = struct
     end
   end]
 
-  type t = Stable.Latest.t =
-    { transition: External_transition.Validated.t
-    ; protocol_states:
-        (Coda_base.State_hash.t * Coda_state.Protocol_state.Value.t) list
-    ; common: Common.t }
-
   [%%define_locally
   Stable.Latest.(to_yojson)]
 
@@ -121,6 +106,8 @@ end
 module Minimal = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t = {hash: State_hash.Stable.V1.t; common: Common.Stable.V1.t}
       [@@driving to_yojson]
