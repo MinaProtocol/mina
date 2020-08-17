@@ -15,13 +15,15 @@ let defaultArtifactStep = { name = "Artifact", key = "build-artifact" }
 
 let generateStep = \(deps : List Command.TaggedKey.Type) ->
     -- assume head or first dependency specified represents the primary artifact dependency step
-    let stepScope = "${(Prelude.Optional.default Command.TaggedKey.Type defaultArtifactStep (List/head Command.TaggedKey.Type deps)).key}"
+    let artifactUploadScope = List/head Command.TaggedKey.Type deps
+    let scopeName = "${(Prelude.Optional.default Command.TaggedKey.Type defaultArtifactStep artifactUploadScope).name}"
+    let scopeKey = "${(Prelude.Optional.default Command.TaggedKey.Type defaultArtifactStep artifactUploadScope).key}"
 
     let commands : List Cmd.Type =
     [
         Cmd.run (
             "if [ ! -f DOCKER_DEPLOY_ENV ]; then " ++
-                "buildkite-agent artifact download --step ${stepScope} DOCKER_DEPLOY_ENV .; " ++
+                "buildkite-agent artifact download --step _${scopeName}-${scopeKey} DOCKER_DEPLOY_ENV .; " ++
             "fi"
         ),
         Cmd.run "./buildkite/scripts/docker-artifact.sh"
