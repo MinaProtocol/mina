@@ -10,7 +10,7 @@ set +x
 CLEAR='\033[0m'
 RED='\033[0;31m'
 # Array of valid service names
-VALID_SERVICES=('coda-daemon' 'bot' 'coda-demo' 'coda-rosetta')
+VALID_SERVICES=('coda-daemon' 'bot' 'coda-demo' 'coda-rosetta', 'leaderboard')
 
 function usage() {
   if [ -n "$1" ]; then
@@ -58,6 +58,10 @@ coda-rosetta)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-rosetta"
   mkdir some_empty_dir
   DOCKER_CONTEXT="./some_empty_dir"
+  ;;
+leaderboard)
+  DOCKERFILE_PATH="frontend/leaderboard/Dockerfile"
+  DOCKER_CONTEXT="frontend/leaderboard"
   ;;
 *)
 esac
