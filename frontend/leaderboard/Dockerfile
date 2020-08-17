@@ -11,7 +11,7 @@ COPY bsconfig.json ./
 COPY __tests__ ./__tests__
 COPY ./src ./src
 
-RUN yarn test 
+RUN yarn build
 
 ENV SPREADSHEET_ID=1dkHatzBcaN_5rb3sQEDIcwdh0qTc_9t7pHGAVfdHACY
 
