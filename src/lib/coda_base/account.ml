@@ -271,8 +271,9 @@ let typ : (var, value) Typ.t =
       ; Public_key.Compressed.typ
       ; State_hash.typ
       ; Timing.typ
-      ; Typ.transport Field.typ ~there:hash_snapp_account_opt ~back:(fun _ ->
-            failwith "unimplemented" ) ]
+      ; Typ.transport Field.typ ~there:hash_snapp_account_opt ~back:(fun fld ->
+            if Field.(equal zero) fld then None else failwith "unimplemented"
+        ) ]
   in
   Typ.of_hlistable spec ~var_to_hlist:Poly.to_hlist ~var_of_hlist:Poly.of_hlist
     ~value_to_hlist:Poly.to_hlist ~value_of_hlist:Poly.of_hlist
