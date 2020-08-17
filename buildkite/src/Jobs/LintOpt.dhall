@@ -29,9 +29,8 @@ Pipeline.build
             , key = "lint-opt"
             , target = Size.Small
             , docker = None Docker.Type
-            }
-      ],
-      [ Command.build
+            },
+        Command.build
           Command.Config::
             { commands = OpamInit.andThenRunInDocker ([] : List Text) "BASE_BRANCH_NAME=$(pipeline.git.base_revision) ./scripts/compare_ci_diff_binables.sh"
             , label = "Compare CI diff types and binables"
@@ -39,6 +38,5 @@ Pipeline.build
             , target = Size.Small
             , docker = None Docker.Type
             }
-      ],
+      ]
     }
-
