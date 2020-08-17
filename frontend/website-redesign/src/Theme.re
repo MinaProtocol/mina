@@ -26,6 +26,31 @@ module MediaQuery = {
   let mobile= "(max-width:48rem)";
 };
 
+// module Type = {
+//   let h1jumbo = ...;
+//   let h1 = ...;
+//   let h2 = ...;
+//   let h3 = ...;
+//   let h4 = ...;
+//   let h5 = ...;
+//   let h6 = ...;
+//   let pageLabel = ...;
+//   let label = ...;
+//   let buttonLabel = ...;
+//   let navLink = ...;
+//   let sidebarLink = ...;
+//   let tooltip = ...;
+//   let creditName = ...;
+//   let metadata = ...;
+//   let announcement = ...;
+//   let pageSubhead = ...;
+//   let sectionSubhead = ...;
+//   let paragraph = ...;
+//   let paragraphSmall = ...;
+//   let paragraphMono = ...;
+//   let quote = ...;
+// };
+
 /** sets both paddingLeft and paddingRight, or paddingTop and paddingBottom as one should */
 let paddingX = m => Css.[paddingLeft(m), paddingRight(m)];
 let paddingY = m => Css.[paddingTop(m), paddingBottom(m)];
