@@ -12,8 +12,6 @@ module Valid = struct
       let to_latest = Fn.id
     end
   end]
-
-  type t = Stable.Latest.t [@@deriving sexp, compare, eq, hash, yojson]
 end
 
 [%%versioned
@@ -27,8 +25,3 @@ module Stable = struct
     let to_latest = Fn.id
   end
 end]
-
-type t = Stable.Latest.t =
-  | User_command of User_command.t
-  | Snapp_command of Snapp_command.t
-[@@deriving sexp, compare, eq, hash, yojson]

@@ -6,6 +6,8 @@ module Single = struct
   module Spec = struct
     [%%versioned
     module Stable = struct
+      [@@@no_toplevel_latest_type]
+
       module V1 = struct
         type ('transition, 'witness, 'ledger_proof) t =
           | Transition of
@@ -74,11 +76,13 @@ end
 module Spec = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type 'single t =
         { instances: 'single One_or_two.Stable.V1.t
         ; fee: Currency.Fee.Stable.V1.t }
-      [@@deriving bin_io, fields, sexp, version, to_yojson]
+      [@@deriving fields, sexp, to_yojson]
 
       let to_latest single_latest {instances; fee} =
         {instances= One_or_two.Stable.V1.to_latest single_latest instances; fee}
@@ -108,14 +112,7 @@ module Result = struct
             One_or_two.Stable.V1.t
         ; spec: 'spec
         ; prover: Signature_lib.Public_key.Compressed.Stable.V1.t }
-      [@@deriving bin_io, fields, version]
+      [@@deriving fields]
     end
   end]
-
-  type ('spec, 'single) t = ('spec, 'single) Stable.Latest.t =
-    { proofs: 'single One_or_two.t
-    ; metrics: (Time.Span.t * [`Transition | `Merge]) One_or_two.t
-    ; spec: 'spec
-    ; prover: Signature_lib.Public_key.Compressed.t }
-  [@@deriving fields]
 end

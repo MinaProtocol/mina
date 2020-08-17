@@ -15,13 +15,6 @@ module Stable = struct
   end
 end]
 
-type t = Stable.Latest.t =
-  { token_id: Token_id.t
-  ; token_owner_pk: Public_key.Compressed.t
-  ; receiver_pk: Public_key.Compressed.t
-  ; amount: Currency.Amount.t }
-[@@deriving compare, eq, sexp, hash, yojson]
-
 let receiver_pk {receiver_pk; _} = receiver_pk
 
 let receiver {token_id; receiver_pk; _} =

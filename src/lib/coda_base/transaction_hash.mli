@@ -2,6 +2,8 @@ open Core_kernel
 
 [%%versioned:
 module Stable : sig
+  [@@@no_toplevel_latest_type]
+
   module V1 : sig
     type t [@@deriving sexp, compare, hash]
   end
@@ -28,6 +30,8 @@ module User_command_with_valid_signature : sig
 
   [%%versioned:
   module Stable : sig
+    [@@@no_toplevel_latest_type]
+
     module V1 : sig
       type t =
         private

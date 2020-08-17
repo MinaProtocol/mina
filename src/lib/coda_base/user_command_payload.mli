@@ -27,6 +27,8 @@ module Body : sig
 
   [%%versioned:
   module Stable : sig
+    [@@@no_toplevel_latest_type]
+
     module V1 : sig
       type nonrec t = t [@@deriving compare, eq, sexp, hash, yojson]
     end
@@ -57,25 +59,9 @@ module Common : sig
           ; nonce: 'nonce
           ; valid_until: 'global_slot
           ; memo: 'memo }
-        [@@deriving bin_io, eq, sexp, hash, yojson, version]
+        [@@deriving eq, sexp, hash, yojson]
       end
     end]
-
-    type ('fee, 'public_key, 'token_id, 'nonce, 'global_slot, 'memo) t =
-          ( 'fee
-          , 'public_key
-          , 'token_id
-          , 'nonce
-          , 'global_slot
-          , 'memo )
-          Stable.Latest.t =
-      { fee: 'fee
-      ; fee_token: 'token_id
-      ; fee_payer_pk: 'public_key
-      ; nonce: 'nonce
-      ; valid_until: 'global_slot
-      ; memo: 'memo }
-    [@@deriving eq, sexp, hash, yojson]
   end
 
   [%%versioned:
@@ -89,11 +75,9 @@ module Common : sig
         , Coda_numbers.Global_slot.Stable.V1.t
         , User_command_memo.t )
         Poly.Stable.V1.t
-      [@@deriving eq, sexp, hash]
+      [@@deriving compare, eq, sexp, hash]
     end
   end]
-
-  type t = Stable.Latest.t [@@deriving compare, eq, sexp, hash]
 
   val to_input : t -> (Field.t, bool) Random_oracle.Input.t
 
@@ -130,7 +114,7 @@ module Poly : sig
   module Stable : sig
     module V1 : sig
       type ('common, 'body) t = {common: 'common; body: 'body}
-      [@@deriving bin_io, eq, sexp, hash, yojson, compare, version]
+      [@@deriving eq, sexp, hash, yojson, compare, hlist]
 
       val of_latest :
            ('common1 -> ('common2, 'err) Result.t)
@@ -139,10 +123,6 @@ module Poly : sig
         -> (('common2, 'body2) t, 'err) Result.t
     end
   end]
-
-  type ('common, 'body) t = ('common, 'body) Stable.Latest.t =
-    {common: 'common; body: 'body}
-  [@@deriving eq, sexp, hash, yojson, compare, hlist]
 end
 
 [%%versioned:
@@ -152,8 +132,6 @@ module Stable : sig
     [@@deriving compare, eq, sexp, hash, yojson]
   end
 end]
-
-type t = Stable.Latest.t [@@deriving compare, eq, sexp, hash]
 
 val create :
      fee:Currency.Fee.t
