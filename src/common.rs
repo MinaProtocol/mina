@@ -4,12 +4,12 @@ use algebra::{
     FromBytes, One, ToBytes, UniformRand, VariableBaseMSM, Zero,
 };
 
-use circuits_pairing::index::MatrixValues;
+use marlin_protocol_pairing::index::MatrixValues;
 use commitment_dlog::{
     commitment::{b_poly_coefficients, CommitmentCurve, PolyComm},
     srs::SRS,
 };
-use evaluation_domains::EvaluationDomains;
+use marlin_circuits::domains::EvaluationDomains;
 use ff_fft::{
     DensePolynomial, EvaluationDomain, Evaluations, GeneralEvaluationDomain,
     Radix2EvaluationDomain as Domain,
@@ -193,7 +193,7 @@ pub fn read_poly_comm<A: FromBytes + AffineCurve, R: Read>(mut r: R) -> IoResult
 }
 
 pub fn write_dlog_matrix_values<A: ToBytes + AffineCurve, W: Write>(
-    m: &circuits_dlog::index::MatrixValues<A>,
+    m: &marlin_protocol_dlog::index::MatrixValues<A>,
     mut w: W,
 ) -> IoResult<()> {
     write_poly_comm(&m.row, &mut w)?;
@@ -205,12 +205,12 @@ pub fn write_dlog_matrix_values<A: ToBytes + AffineCurve, W: Write>(
 
 pub fn read_dlog_matrix_values<A: FromBytes + AffineCurve, R: Read>(
     mut r: R,
-) -> IoResult<circuits_dlog::index::MatrixValues<A>> {
+) -> IoResult<marlin_protocol_dlog::index::MatrixValues<A>> {
     let row = read_poly_comm(&mut r)?;
     let col = read_poly_comm(&mut r)?;
     let val = read_poly_comm(&mut r)?;
     let rc = read_poly_comm(&mut r)?;
-    Ok(circuits_dlog::index::MatrixValues { row, col, val, rc })
+    Ok(marlin_protocol_dlog::index::MatrixValues { row, col, val, rc })
 }
 
 pub fn write_dense_polynomial<A: ToBytes + Field, W: Write>(

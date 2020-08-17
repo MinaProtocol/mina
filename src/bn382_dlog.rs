@@ -11,13 +11,13 @@ use algebra::{
     FromBytes, One, ToBytes, UniformRand, Zero,
 };
 
-use evaluation_domains::EvaluationDomains;
+use marlin_circuits::domains::EvaluationDomains;
 
 use ff_fft::{DensePolynomial, EvaluationDomain, Evaluations, Radix2EvaluationDomain as Domain};
 
 use oracle::{
     self,
-    marlin_sponge::{DefaultFqSponge, DefaultFrSponge, ScalarChallenge},
+    sponge::{DefaultFqSponge, DefaultFrSponge, ScalarChallenge},
 };
 
 use rand::rngs::StdRng;
@@ -31,14 +31,14 @@ use std::{
     os::raw::c_char,
 };
 
-use circuits_dlog::index::{
+use marlin_protocol_dlog::index::{
     Index as DlogIndex, SRSSpec, SRSValue, VerifierIndex as DlogVerifierIndex,
 };
 use commitment_dlog::{
     commitment::{b_poly_coefficients, product, CommitmentCurve, OpeningProof, PolyComm},
     srs::SRS,
 };
-use protocol_dlog::prover::{ProofEvaluations as DlogProofEvaluations, ProverProof as DlogProof};
+use marlin_protocol_dlog::prover::{ProofEvaluations as DlogProofEvaluations, ProverProof as DlogProof};
 
 use algebra::bn_382::g::Affine;
 
@@ -234,7 +234,7 @@ pub extern "C" fn zexe_bn382_fq_index_write<'a>(
     path: *const c_char,
 ) {
     fn write_compiled<W: Write>(
-        c: &circuits_dlog::compiled::Compiled<GAffine>,
+        c: &marlin_protocol_dlog::compiled::Compiled<GAffine>,
         mut w: W,
     ) -> IoResult<()> {
         write_poly_comm(&c.col_comm, &mut w)?;
@@ -289,7 +289,7 @@ pub extern "C" fn zexe_bn382_fq_index_read<'a>(
         ds: EvaluationDomains<Fq>,
         m: *const Vec<(Vec<usize>, Vec<Fq>)>,
         mut r: R,
-    ) -> IoResult<circuits_dlog::compiled::Compiled<GAffine>> {
+    ) -> IoResult<marlin_protocol_dlog::compiled::Compiled<GAffine>> {
         let constraints = rows_to_csmat(
             public_inputs,
             ds.h.size(),
@@ -313,7 +313,7 @@ pub extern "C" fn zexe_bn382_fq_index_read<'a>(
         let val_eval_b = read_evaluations(&mut r)?;
         let rc_eval_b = read_evaluations(&mut r)?;
 
-        Ok(circuits_dlog::compiled::Compiled {
+        Ok(marlin_protocol_dlog::compiled::Compiled {
             constraints,
             col_comm,
             row_comm,
@@ -408,19 +408,19 @@ pub extern "C" fn zexe_bn382_fq_verifier_index_make<'a>(
         domains: EvaluationDomains::create(variables, constraints, public_inputs, nonzero_entries)
             .unwrap(),
         matrix_commitments: [
-            circuits_dlog::index::MatrixValues {
+            marlin_protocol_dlog::index::MatrixValues {
                 row: (unsafe { &*row_a }).clone(),
                 col: (unsafe { &*col_a }).clone(),
                 val: (unsafe { &*val_a }).clone(),
                 rc: (unsafe { &*rc_a }).clone(),
             },
-            circuits_dlog::index::MatrixValues {
+            marlin_protocol_dlog::index::MatrixValues {
                 row: (unsafe { &*row_b }).clone(),
                 col: (unsafe { &*col_b }).clone(),
                 val: (unsafe { &*val_b }).clone(),
                 rc: (unsafe { &*rc_b }).clone(),
             },
-            circuits_dlog::index::MatrixValues {
+            marlin_protocol_dlog::index::MatrixValues {
                 row: (unsafe { &*row_c }).clone(),
                 col: (unsafe { &*col_c }).clone(),
                 val: (unsafe { &*val_c }).clone(),
@@ -1119,7 +1119,7 @@ pub extern "C" fn zexe_bn382_g_affine_vector_delete(v: *mut Vec<GAffine>) {
 
 // Fq oracles
 pub struct FqOracles {
-    o: protocol_dlog::prover::RandomOracles<Fq>,
+    o: marlin_protocol_dlog::prover::RandomOracles<Fq>,
     opening_prechallenges: Vec<ScalarChallenge<Fq>>,
 }
 

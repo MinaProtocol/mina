@@ -25,15 +25,13 @@ rand_core = { version = "0.5" }
 rayon = { version = "1" }
 
 oracle = { path = "../../marlin/oracle" }
-evaluation_domains = { path = "../../marlin/evaluation_domains" }
+marlin_circuits = { path = "../../marlin/circuits/marlin" }
 
-circuits_pairing = { path = "../../marlin/pairing/circuits" }
 commitment_pairing = { path = "../../marlin/pairing/commitment" }
-protocol_pairing = { path = "../../marlin/pairing/protocol" }
+marlin_protocol_pairing = { path = "../../marlin/pairing/marlin" }
 
-circuits_dlog = { path = "../../marlin/dlog/circuits" }
 commitment_dlog = { path = "../../marlin/dlog/commitment" }
-protocol_dlog = { path = "../../marlin/dlog/protocol" }
+marlin_protocol_dlog = { path = "../../marlin/dlog/marlin/" }
 
 #circuits = { git = "https://github.com/o1-labs/marlin/" }
 #oracle = { git = "https://github.com/o1-labs/marlin/" }

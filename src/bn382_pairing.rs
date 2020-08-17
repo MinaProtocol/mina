@@ -11,18 +11,18 @@ use algebra::{
     fields::{Field, FpParameters, PrimeField, SquareRootField},
     FromBytes, One, ToBytes, UniformRand, Zero,
 };
-use circuits_pairing::index::{Index, MatrixValues, URSSpec, VerifierIndex};
+use marlin_protocol_pairing::index::{Index, MatrixValues, URSSpec, VerifierIndex};
 use commitment_pairing::urs::URS;
-use evaluation_domains::EvaluationDomains;
+use marlin_circuits::domains::EvaluationDomains;
 use ff_fft::{DensePolynomial, EvaluationDomain, Evaluations, Radix2EvaluationDomain as Domain};
 
 use oracle::{
     self,
-    marlin_sponge::{DefaultFqSponge, DefaultFrSponge},
+    sponge::{DefaultFqSponge, DefaultFrSponge},
     poseidon,
     poseidon::Sponge,
 };
-use protocol_pairing::prover::{ProofEvaluations, ProverProof, RandomOracles};
+use marlin_protocol_pairing::prover::{ProofEvaluations, ProverProof, RandomOracles};
 use rand::rngs::StdRng;
 use rand_core;
 
@@ -37,13 +37,13 @@ use std::{
 
 #[no_mangle]
 pub extern "C" fn zexe_bn382_fp_endo_base() -> *const Fq {
-    let (endo_q, _endo_r) = circuits_pairing::index::endos::<Bn_382>();
+    let (endo_q, _endo_r) = marlin_protocol_pairing::index::endos::<Bn_382>();
     return Box::into_raw(Box::new(endo_q));
 }
 
 #[no_mangle]
 pub extern "C" fn zexe_bn382_fp_endo_scalar() -> *const Fp {
-    let (_endo_q, endo_r) = circuits_pairing::index::endos::<Bn_382>();
+    let (_endo_q, endo_r) = marlin_protocol_pairing::index::endos::<Bn_382>();
     return Box::into_raw(Box::new(endo_r));
 }
 
@@ -994,7 +994,7 @@ pub extern "C" fn zexe_bn382_fp_verifier_index_make(
     rc_c: *const G1Affine,
 ) -> *const VerifierIndex<Bn_382> {
     let urs: URS<Bn_382> = (unsafe { &*urs }).clone();
-    let (endo_q, endo_r) = circuits_pairing::index::endos::<Bn_382>();
+    let (endo_q, endo_r) = marlin_protocol_pairing::index::endos::<Bn_382>();
     let index = VerifierIndex {
         domains: EvaluationDomains::create(variables, constraints, public_inputs, nonzero_entries)
             .unwrap(),
@@ -1076,7 +1076,7 @@ pub extern "C" fn zexe_bn382_fp_verifier_index_read<'a>(
         let public_inputs = u64::read(&mut r)? as usize;
         let max_degree = u64::read(&mut r)? as usize;
         let urs = URS::<Bn_382>::read(&mut r)?;
-        let (endo_q, endo_r) = circuits_pairing::index::endos::<Bn_382>();
+        let (endo_q, endo_r) = marlin_protocol_pairing::index::endos::<Bn_382>();
         Ok(VerifierIndex {
             matrix_commitments: [m0, m1, m2],
             domains,
@@ -1425,7 +1425,7 @@ pub extern "C" fn zexe_bn382_fp_index_write<'a>(
     path: *const c_char,
 ) {
     fn write_compiled<W: Write>(
-        c: &circuits_pairing::compiled::Compiled<Bn_382>,
+        c: &marlin_protocol_pairing::compiled::Compiled<Bn_382>,
         mut w: W,
     ) -> IoResult<()> {
         c.col_comm.write(&mut w)?;
@@ -1480,7 +1480,7 @@ pub extern "C" fn zexe_bn382_fp_index_read<'a>(
         ds: EvaluationDomains<Fp>,
         m: *const Vec<(Vec<usize>, Vec<Fp>)>,
         mut r: R,
-    ) -> IoResult<circuits_pairing::compiled::Compiled<Bn_382>> {
+    ) -> IoResult<marlin_protocol_pairing::compiled::Compiled<Bn_382>> {
         let constraints = rows_to_csmat(
             public_inputs,
             ds.h.size(),
@@ -1504,7 +1504,7 @@ pub extern "C" fn zexe_bn382_fp_index_read<'a>(
         let val_eval_b = read_evaluations(&mut r)?;
         let rc_eval_b = read_evaluations(&mut r)?;
 
-        Ok(circuits_pairing::compiled::Compiled {
+        Ok(marlin_protocol_pairing::compiled::Compiled {
             constraints,
             col_comm,
             row_comm,
@@ -1539,12 +1539,12 @@ pub extern "C" fn zexe_bn382_fp_index_read<'a>(
         let c2 = read_compiled(public_inputs, domains, c, &mut r)?;
 
         let public_inputs = u64::read(&mut r)? as usize;
-        let (endo_q, endo_r) = circuits_pairing::index::endos::<Bn_382>();
+        let (endo_q, endo_r) = marlin_protocol_pairing::index::endos::<Bn_382>();
         Ok(Index::<Bn_382> {
             compiled: [c0, c1, c2],
             domains,
             public_inputs,
-            urs: circuits_pairing::index::URSValue::Ref(srs),
+            urs: marlin_protocol_pairing::index::URSValue::Ref(srs),
             fr_sponge_params: oracle::bn_382::fp::params(),
             fq_sponge_params: oracle::bn_382::fq::params(),
             endo_q,
