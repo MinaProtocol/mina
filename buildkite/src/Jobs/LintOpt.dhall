@@ -25,16 +25,16 @@ Pipeline.build
       [ Command.build
           Command.Config::
             { commands = OpamInit.andThenRunInDocker ([] : List Text) "BASE_BRANCH_NAME=$(pipeline.git.base_revision) ./scripts/compare_ci_diff_types.sh"
-            , label = "Compare CI diff types and binables"
-            , key = "lint-opt"
+            , label = "Compare CI diff types"
+            , key = "lint-diff-types"
             , target = Size.Small
             , docker = None Docker.Type
             },
         Command.build
           Command.Config::
             { commands = OpamInit.andThenRunInDocker ([] : List Text) "BASE_BRANCH_NAME=$(pipeline.git.base_revision) ./scripts/compare_ci_diff_binables.sh"
-            , label = "Compare CI diff types and binables"
-            , key = "lint-opt"
+            , label = "Compare CI diff binables"
+            , key = "lint-diff-binables"
             , target = Size.Small
             , docker = None Docker.Type
             }
