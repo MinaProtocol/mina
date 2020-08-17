@@ -106,9 +106,9 @@ let to_bits t =
   in
   is_timed
   :: ( Balance.to_bits initial_minimum_balance
-      @ Global_slot.to_bits cliff_time
-      @ Global_slot.to_bits vesting_period
-      @ Amount.to_bits vesting_increment )
+     @ Global_slot.to_bits cliff_time
+     @ Global_slot.to_bits vesting_period
+     @ Amount.to_bits vesting_increment )
 
 [%%ifdef
 consensus_mechanism]
@@ -133,7 +133,7 @@ let var_to_bits
   of_list
     ( is_timed
     :: ( initial_minimum_balance @ cliff_time @ vesting_period
-        @ vesting_increment ) )
+       @ vesting_increment ) )
 
 let var_of_t (t : t) : var =
   let As_record.
@@ -163,14 +163,14 @@ let typ : (var, t) Typ.t =
       functions to handle both types
   *)
   let value_of_hlist :
-          ( unit
-          ,    Boolean.value
-            -> Balance.t
-            -> Global_slot.t
-            -> Global_slot.t
-            -> Amount.t
-            -> unit )
-          H_list.t
+         ( unit
+         ,    Boolean.value
+           -> Balance.t
+           -> Global_slot.t
+           -> Global_slot.t
+           -> Amount.t
+           -> unit )
+         H_list.t
       -> t =
     let open H_list in
     fun [ is_timed

@@ -9,6 +9,7 @@ module Pc_array = struct
       let hash_fold_t f s a = List.hash_fold_t f s (Array.to_list a)
     end
   end]
+
   let hash_fold_t f s a = List.hash_fold_t f s (Array.to_list a)
 end
 
@@ -266,7 +267,8 @@ module Messages = struct
             'fq
             * ( 'g With_degree_bound.Stable.V1.t
               * 'g Without_degree_bound.Stable.V1.t ) }
-      [@@deriving hlist, bin_io, version, sexp, compare, yojson, fields, hash, eq]
+      [@@deriving
+        hlist, bin_io, version, sexp, compare, yojson, fields, hash, eq]
     end
   end]
 
