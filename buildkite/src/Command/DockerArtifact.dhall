@@ -15,7 +15,7 @@ let defaultArtifactStep = { name = "Artifact", key = "build-artifact" }
 
 let generateStep = \(deps : List Command.TaggedKey.Type) ->
     -- assume head or first dependency specified represents the primary artifact dependency step
-    let stepScope = "--step ${(Prelude.Optional.default Command.TaggedKey.Type defaultArtifactStep (List/head Command.TaggedKey.Type deps)).name}"
+    let stepScope = "${(Prelude.Optional.default Command.TaggedKey.Type defaultArtifactStep (List/head Command.TaggedKey.Type deps)).key}"
 
     let commands : List Cmd.Type =
     [
