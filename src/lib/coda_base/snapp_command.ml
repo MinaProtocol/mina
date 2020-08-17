@@ -59,8 +59,6 @@ module Per_account = struct
     end
   end]
 
-  type t = Stable.Latest.t
-
   let to_input ({state; delegate} : t) =
     let open Random_oracle_input in
     List.reduce_exn ~f:append
@@ -161,13 +159,10 @@ module Fee_payment = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type 'a t =
-        {fee: Fee.Stable.V1.t; token_id: Token_id.Stable.V1.t; payer: 'a}
+      type 'a t = {fee: Fee.Stable.V1.t; payer: 'a}
       [@@deriving sexp, eq, yojson, hash, compare]
     end
   end]
-
-  type 'a t = 'a Stable.Latest.t
 end
 
 module Snapp_body = struct
@@ -184,8 +179,6 @@ module Snapp_body = struct
       let to_latest = Fn.id
     end
   end]
-
-  type t = Stable.Latest.t
 end
 
 module Other_fee_payer = struct
@@ -194,6 +187,7 @@ module Other_fee_payer = struct
     module V1 = struct
       type t =
         { pk: Public_key.Compressed.Stable.V1.t
+        ; token_id: Token_id.Stable.V1.t
         ; nonce: Coda_numbers.Account_nonce.Stable.V1.t
         ; signature: Signature.Stable.V1.t }
       [@@deriving sexp, eq, yojson, hash, compare]
@@ -227,6 +221,7 @@ module Stable = struct
       | Snapp_snapp of
           { snapp1: Snapp_body.Stable.V1.t
           ; snapp2: Snapp_body.Stable.V1.t
+          ; token_id: Token_id.Stable.V1.t
           ; sender: [`Snapp1 | `Snapp2]
           ; snapp1_base_delta: Amount.Stable.V1.t
           ; fee_payment:
@@ -234,6 +229,7 @@ module Stable = struct
               Fee_payment.Stable.V1.t }
       | Snapp of
           { snapp: Snapp_body.Stable.V1.t
+          ; token_id: Token_id.Stable.V1.t
           ; fee_payment:
               [`Snapp | `Other of Other_fee_payer.Stable.V1.t]
               Fee_payment.Stable.V1.t }
@@ -241,6 +237,7 @@ module Stable = struct
           { user_pk: Public_key.Compressed.Stable.V1.t
           ; user_signature: Signature.Stable.V1.t
           ; user_nonce: Coda_numbers.Account_nonce.Stable.V1.t
+          ; token_id: Token_id.Stable.V1.t
           ; amount: Currency.Amount.Stable.V1.t
           ; fee_payment:
               [`User | `Other of Other_fee_payer.Stable.V1.t]
@@ -251,6 +248,7 @@ module Stable = struct
       | Snapp_to_user of
           { user_pk: Public_key.Compressed.Stable.V1.t
           ; snapp: Snapp_body.Stable.V1.t
+          ; token_id: Token_id.Stable.V1.t
           ; amount: Currency.Amount.Stable.V1.t
           ; fee_payment:
               [`Snapp | `Other of Other_fee_payer.Stable.V1.t]
@@ -260,8 +258,6 @@ module Stable = struct
     let to_latest = Fn.id
   end
 end]
-
-type t = Stable.Latest.t [@@deriving sexp, eq, yojson, hash, compare]
 
 (* This type is used for hashing the snapp commands when they go into the receipt chain hash,
    and for signing snapp commands.
@@ -292,8 +288,6 @@ module Payload = struct
         let to_latest = Fn.id
       end
     end]
-
-    type t = Stable.Latest.t
 
     let to_input ({vk_digest; permissions} : t) =
       Random_oracle_input.(append (field vk_digest))
@@ -359,10 +353,7 @@ module Payload = struct
       end
     end]
 
-    type ('pubkey, 'nonce) t = ('pubkey, 'nonce) Stable.Latest.t =
-      {pk: 'pubkey; nonce: 'nonce}
-
-    let to_input ({pk; nonce} : _ Stable.Latest.t) =
+    let to_input ({pk; nonce} : _ t) =
       List.reduce_exn ~f:Random_oracle_input.append
         [Public_key.Compressed.to_input pk; Account_nonce.to_input nonce]
 
@@ -394,13 +385,6 @@ module Payload = struct
         let to_latest = Fn.id
       end
     end]
-
-    type t = Stable.Latest.t =
-      | Snapp_snapp
-      | Snapp
-      | User_to_snapp
-      | Create_snapp
-      | Snapp_to_user
 
     let gen =
       Quickcheck.Generator.(
@@ -452,12 +436,13 @@ module Payload = struct
                , 'nonce_opt )
                t =
             { tag: 'tag
-            ; fee: 'fee
-            ; token_id: 'token_id
-            ; fee_payer_nonce_opt: 'nonce_opt
-            ; snapp: 'snapp
             ; user_opt: 'user_opt
-            ; snapp_init_opt: 'snapp_init_opt }
+            ; snapp: 'snapp
+            ; snapp_init_opt: 'snapp_init_opt
+            ; token_id: 'token_id
+            ; fee: 'fee
+            ; fee_token_id: 'token_id
+            ; fee_payer_nonce_opt: 'nonce_opt }
           [@@deriving hlist, sexp, eq, yojson, hash, compare]
         end
       end]
@@ -493,8 +478,9 @@ module Payload = struct
                   , 'account_update
                   , 'signed_amount )
                   Per_snapp.Stable.V1.t
-              ; fee: 'fee
               ; token_id: 'token_id
+              ; fee: 'fee
+              ; fee_token_id: 'token_id
               ; fee_payer_nonce_opt: 'nonce_opt }
           | One_snapp of
               ( 'tag
@@ -545,8 +531,6 @@ module Payload = struct
     end
   end]
 
-  type t = Stable.Latest.t
-
   let to_input (t : t) =
     let open Random_oracle_input in
     let f = List.reduce_exn ~f:append in
@@ -554,34 +538,38 @@ module Payload = struct
       {p with predicate= With_hash.hash p.predicate}
     in
     match t with
-    | Two_snapp {snapp1; snapp2; fee; token_id; fee_payer_nonce_opt} ->
+    | Two_snapp
+        {snapp1; snapp2; token_id; fee; fee_token_id; fee_payer_nonce_opt} ->
         f
           [ Per_snapp.to_input ~delta:Amount.Signed.to_input (s snapp1)
           ; Per_snapp.to_input ~delta:Amount.Signed.to_input (s snapp2)
-          ; Fee.to_input fee
           ; Token_id.to_input token_id
+          ; Fee.to_input fee
+          ; Token_id.to_input fee_token_id
           ; Account_nonce.to_input
               (Option.value fee_payer_nonce_opt ~default:Account_nonce.zero) ]
     | One_snapp
         { tag
-        ; fee
-        ; fee_payer_nonce_opt
-        ; token_id
-        ; snapp
         ; user_opt
-        ; snapp_init_opt } ->
+        ; snapp
+        ; snapp_init_opt
+        ; token_id
+        ; fee
+        ; fee_token_id
+        ; fee_payer_nonce_opt } ->
         f
           [ Tag.to_input tag
-          ; Fee.to_input fee
-          ; Token_id.to_input token_id
-          ; Per_snapp.to_input ~delta:Amount.to_input (s snapp)
           ; From_user.to_input
               (Option.value user_opt
                  ~default:
                    { pk= Lazy.force invalid_public_key
                    ; nonce= Account_nonce.zero })
+          ; Per_snapp.to_input ~delta:Amount.to_input (s snapp)
           ; Snapp_init.to_input
               (Option.value snapp_init_opt ~default:Snapp_init.dummy)
+          ; Token_id.to_input token_id
+          ; Fee.to_input fee
+          ; Token_id.to_input fee_token_id
           ; Account_nonce.to_input
               (Option.value fee_payer_nonce_opt ~default:Account_nonce.zero) ]
 
@@ -613,31 +601,35 @@ module Payload = struct
       in
       let f = List.reduce_exn ~f:append in
       match t with
-      | Two_snapp {snapp1; snapp2; fee; token_id; fee_payer_nonce_opt} ->
+      | Two_snapp
+          {snapp1; snapp2; token_id; fee; fee_token_id; fee_payer_nonce_opt} ->
           f
             [ Per_snapp.Checked.to_input ~delta:Amount.Signed.Checked.to_input
                 (s snapp1)
             ; Per_snapp.Checked.to_input ~delta:Amount.Signed.Checked.to_input
                 (s snapp2)
-            ; Fee.var_to_input fee
             ; Impl.run_checked (Token_id.Checked.to_input token_id)
+            ; Fee.var_to_input fee
+            ; Impl.run_checked (Token_id.Checked.to_input fee_token_id)
             ; Impl.run_checked
                 (Account_nonce.Checked.to_input fee_payer_nonce_opt) ]
       | One_snapp
           { tag
-          ; fee
-          ; fee_payer_nonce_opt
-          ; token_id
-          ; snapp
           ; user_opt
-          ; snapp_init_opt } ->
+          ; snapp
+          ; snapp_init_opt
+          ; token_id
+          ; fee
+          ; fee_token_id
+          ; fee_payer_nonce_opt } ->
           f
             [ Tag.Checked.to_input tag
-            ; Fee.var_to_input fee
-            ; Impl.run_checked (Token_id.Checked.to_input token_id)
-            ; Per_snapp.Checked.to_input ~delta:Amount.var_to_input (s snapp)
             ; From_user.Checked.to_input user_opt
+            ; Per_snapp.Checked.to_input ~delta:Amount.var_to_input (s snapp)
             ; Snapp_init.Checked.to_input snapp_init_opt
+            ; Impl.run_checked (Token_id.Checked.to_input token_id)
+            ; Fee.var_to_input fee
+            ; Impl.run_checked (Token_id.Checked.to_input fee_token_id)
             ; Impl.run_checked
                 (Account_nonce.Checked.to_input fee_payer_nonce_opt) ]
   end
@@ -651,8 +643,6 @@ module Valid : sig
       [@@deriving sexp, eq, yojson, hash, compare]
     end
   end]
-
-  type t = Stable.Latest.t [@@deriving sexp, yojson, hash, compare, eq]
 end = struct
   [%%versioned
   module Stable = struct
@@ -662,41 +652,45 @@ end = struct
       let to_latest = Stable.V1.to_latest
     end
   end]
-
-  type t = Stable.Latest.t [@@deriving sexp, yojson, hash, compare, eq]
 end
 
 let fee_payment (t : t) : Account_id.t Fee_payment.t =
-  let mk (p : _ Fee_payment.t) pk =
-    {p with payer= Account_id.create pk p.token_id}
+  let mk (fp : _ Fee_payment.t) (x, y) =
+    {fp with payer= Account_id.create x y}
   in
+  let other {Other_fee_payer.pk; token_id; _} = (pk, token_id) in
   match t with
-  | Snapp_snapp {fee_payment; sender; snapp1; snapp2; _} ->
+  | Snapp_snapp {fee_payment; sender; token_id; snapp1; snapp2; _} ->
       mk fee_payment
         ( match fee_payment.payer with
         | `Snapp ->
-            (match sender with `Snapp1 -> snapp1 | `Snapp2 -> snapp2).pk
-        | `Other {pk; _} ->
-            pk )
-  | Snapp {fee_payment; snapp; _} ->
+            ( (match sender with `Snapp1 -> snapp1 | `Snapp2 -> snapp2).pk
+            , token_id )
+        | `Other x ->
+            other x )
+  | Snapp {fee_payment; snapp; token_id; _} ->
       mk fee_payment
         ( match fee_payment.payer with
-        | `Other {pk; _} ->
-            pk
+        | `Other x ->
+            other x
         | `Snapp ->
-            snapp.pk )
-  | User_to_snapp {fee_payment; user_pk; _} ->
-      mk fee_payment
-        (match fee_payment.payer with `User -> user_pk | `Other {pk; _} -> pk)
-  | Snapp_to_user {fee_payment; snapp; _} ->
+            (snapp.pk, token_id) )
+  | User_to_snapp {fee_payment; user_pk; token_id; _} ->
       mk fee_payment
         ( match fee_payment.payer with
-        | `Other {pk; _} ->
-            pk
+        | `User ->
+            (user_pk, token_id)
+        | `Other x ->
+            other x )
+  | Snapp_to_user {fee_payment; token_id; snapp; _} ->
+      mk fee_payment
+        ( match fee_payment.payer with
+        | `Other x ->
+            other x
         | `Snapp ->
-            snapp.pk )
+            (snapp.pk, token_id) )
 
-let fee_token (t : t) : Token_id.t = (fee_payment t).token_id
+let fee_token (t : t) : Token_id.t = Account_id.token_id (fee_payment t).payer
 
 let accounts_accessed t =
   let tok = fee_token t in
@@ -732,14 +726,15 @@ let to_payload (t : t) : Payload.t option =
     {predicate= p predicate; update; pk; delta}
   in
   match t with
-  | Snapp_snapp {snapp1; snapp2; sender; snapp1_base_delta; fee_payment} ->
-      let%map m1, fee_payer_nonce_opt =
+  | Snapp_snapp
+      {snapp1; snapp2; token_id; sender; snapp1_base_delta; fee_payment} ->
+      let%map m1, fee_token_id, fee_payer_nonce_opt =
         match fee_payment.payer with
         | `Other fp ->
-            return (snapp1_base_delta, Some fp.nonce)
+            return (snapp1_base_delta, fp.token_id, Some fp.nonce)
         | `Snapp ->
             let%map m = Amount.add_fee snapp1_base_delta fee_payment.fee in
-            (m, None)
+            (m, token_id, None)
       in
       let delta1, delta2 =
         let cswap =
@@ -752,27 +747,35 @@ let to_payload (t : t) : Payload.t option =
         { snapp1= s snapp1 delta1
         ; snapp2= s snapp2 delta2
         ; fee= fee_payment.fee
-        ; token_id= fee_payment.token_id
+        ; fee_token_id
+        ; token_id
         ; fee_payer_nonce_opt }
-  | Snapp {snapp; fee_payment} ->
-      let delta, fee_payer_nonce_opt =
+  | Snapp {snapp; fee_payment; token_id} ->
+      let delta, fee_token_id, fee_payer_nonce_opt =
         match fee_payment.payer with
         | `Other fp ->
-            (Amount.zero, Some fp.nonce)
+            (Amount.zero, fp.token_id, Some fp.nonce)
         | `Snapp ->
-            (Amount.of_fee fee_payment.fee, None)
+            (Amount.of_fee fee_payment.fee, token_id, None)
       in
       return
         (One_snapp
            { tag= Payload.Tag.Snapp
            ; fee= fee_payment.fee
            ; fee_payer_nonce_opt
-           ; token_id= fee_payment.token_id
+           ; token_id
+           ; fee_token_id
            ; snapp= s snapp delta
            ; user_opt= None
            ; snapp_init_opt= None })
   | User_to_snapp
-      {user_pk; user_signature= _; user_nonce; snapp; fee_payment; amount} ->
+      { user_pk
+      ; user_signature= _
+      ; token_id
+      ; user_nonce
+      ; snapp
+      ; fee_payment
+      ; amount } ->
       let tag, snapp, snapp_init_opt =
         match snapp with
         | `Update snapp ->
@@ -790,37 +793,39 @@ let to_payload (t : t) : Payload.t option =
                 ( {permissions; vk_digest= verification_key.hash}
                   : Payload.Snapp_init.t ) )
       in
-      let fee_payer_nonce_opt =
+      let fee_token_id, fee_payer_nonce_opt =
         match fee_payment.payer with
         | `User ->
-            None
-        | `Other {nonce; _} ->
-            Some nonce
+            (token_id, None)
+        | `Other {nonce; token_id; _} ->
+            (token_id, Some nonce)
       in
       return
         (One_snapp
            { tag
            ; fee= fee_payment.fee
-           ; token_id= fee_payment.token_id
+           ; token_id
+           ; fee_token_id
            ; snapp= s snapp amount
            ; snapp_init_opt
            ; fee_payer_nonce_opt
            ; user_opt= Some {Payload.From_user.pk= user_pk; nonce= user_nonce}
            })
-  | Snapp_to_user {user_pk; snapp; amount; fee_payment} ->
-      let%map delta, fee_payer_nonce_opt =
+  | Snapp_to_user {user_pk; token_id; snapp; amount; fee_payment} ->
+      let%map delta, fee_token_id, fee_payer_nonce_opt =
         match fee_payment.payer with
-        | `Other {pk= _; signature= _; nonce} ->
-            return (amount, Some nonce)
+        | `Other {pk= _; signature= _; nonce; token_id} ->
+            return (amount, token_id, Some nonce)
         | `Snapp ->
             let%map x = Amount.add_fee amount fee_payment.fee in
-            (x, None)
+            (x, token_id, None)
       in
       One_snapp
         { tag= Payload.Tag.Snapp_to_user
         ; fee_payer_nonce_opt
         ; fee= fee_payment.fee
-        ; token_id= fee_payment.token_id
+        ; token_id
+        ; fee_token_id
         ; snapp= s snapp delta
         ; snapp_init_opt= None
         ; user_opt=

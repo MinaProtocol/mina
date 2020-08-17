@@ -63,8 +63,6 @@ module Time = struct
     [%%endif]
   end
 
-  type t = Stable.Latest.t [@@deriving sexp, compare, hash, yojson]
-
   module B = Bits
   module Bits = Bits.UInt64
   include B.Snarkable.UInt64 (Tick)
@@ -79,8 +77,6 @@ module Time = struct
         let to_latest = Fn.id
       end
     end]
-
-    type t = Stable.Latest.t [@@deriving sexp, compare, hash, yojson]
 
     module Bits = B.UInt64
     include B.Snarkable.UInt64 (Tick)

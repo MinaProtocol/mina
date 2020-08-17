@@ -24,6 +24,8 @@ module Time : sig
 
   [%%versioned:
   module Stable : sig
+    [@@@no_toplevel_latest_type]
+
     module V1 : sig
       type nonrec t = t [@@deriving sexp, compare, eq, hash, yojson]
 

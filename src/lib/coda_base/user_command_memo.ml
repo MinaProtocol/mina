@@ -41,8 +41,6 @@ module Stable = struct
   end
 end]
 
-type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash]
-
 [%%define_locally
 Stable.Latest.(to_yojson, of_yojson, to_string, of_string)]
 

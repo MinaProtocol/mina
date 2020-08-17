@@ -51,8 +51,6 @@ module Set_or_keep = struct
     end
   end]
 
-  type 'a t = 'a Stable.Latest.t = Set of 'a | Keep
-
   let to_option = function Set x -> Some x | Keep -> None
 
   let of_option = function Some x -> Set x | None -> Keep
@@ -107,8 +105,6 @@ module Or_ignore = struct
       [@@deriving sexp, eq, compare, hash, yojson]
     end
   end]
-
-  type 'a t = 'a Stable.Latest.t = Check of 'a | Ignore
 
   module Checked : sig
     type 'a t

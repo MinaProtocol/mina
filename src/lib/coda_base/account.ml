@@ -36,8 +36,6 @@ module Index = struct
     end
   end]
 
-  type t = Stable.Latest.t [@@deriving to_yojson, sexp]
-
   let to_int = Int.to_int
 
   let gen ~ledger_depth = Int.gen_incl 0 ((1 lsl ledger_depth) - 1)
@@ -114,41 +112,9 @@ module Poly = struct
         ; voting_for: 'state_hash
         ; timing: 'timing
         ; snapp: 'snapp_opt }
-      [@@deriving sexp, eq, compare, hash, yojson]
+      [@@deriving sexp, eq, compare, hash, yojson, fields, hlist]
     end
   end]
-
-  type ( 'pk
-       , 'tid
-       , 'token_permissions
-       , 'amount
-       , 'nonce
-       , 'receipt_chain_hash
-       , 'state_hash
-       , 'timing
-       , 'snapp_opt )
-       t =
-        ( 'pk
-        , 'tid
-        , 'token_permissions
-        , 'amount
-        , 'nonce
-        , 'receipt_chain_hash
-        , 'state_hash
-        , 'timing
-        , 'snapp_opt )
-        Stable.Latest.t =
-    { public_key: 'pk
-    ; token_id: 'tid
-    ; token_permissions: 'token_permissions
-    ; balance: 'amount
-    ; nonce: 'nonce
-    ; receipt_chain_hash: 'receipt_chain_hash
-    ; delegate: 'pk
-    ; voting_for: 'state_hash
-    ; timing: 'timing
-    ; snapp: 'snapp_opt }
-  [@@deriving sexp, eq, compare, hash, yojson, fields, hlist]
 end
 
 module Key = struct
@@ -165,7 +131,7 @@ end
 
 module Identifier = Account_id
 
-type key = Key.Stable.Latest.t [@@deriving sexp, eq, hash, compare, yojson]
+type key = Key.t [@@deriving sexp, eq, hash, compare, yojson]
 
 module Timing = Account_timing
 
@@ -190,8 +156,6 @@ module Stable = struct
     let public_key (t : t) : key = t.public_key
   end
 end]
-
-type t = Stable.Latest.t [@@deriving sexp, eq, hash, compare, yojson]
 
 [%%define_locally
 Stable.Latest.(public_key)]
