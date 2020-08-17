@@ -16,7 +16,8 @@ val verify :
 
 val check :
      Witness.t
-  -> ?handler:(Snarky.Request.request -> Snarky.Request.response)
+  -> ?handler:(   Snarky_backendless.Request.request
+               -> Snarky_backendless.Request.response)
   -> proof_level:Genesis_constants.Proof_level.t
   -> constraint_constants:Genesis_constants.Constraint_constants.t
   -> Transaction_snark.Statement.With_sok.t

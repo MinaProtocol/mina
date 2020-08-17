@@ -36,6 +36,8 @@ end
 module Diff_versioned = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t = User_command.Stable.V1.t list [@@deriving sexp, yojson]
 
@@ -48,6 +50,8 @@ module Diff_versioned = struct
   module Diff_error = struct
     [%%versioned
     module Stable = struct
+      [@@@no_toplevel_latest_type]
+
       module V1 = struct
         type t =
           | Insufficient_replace_fee
@@ -83,6 +87,8 @@ module Diff_versioned = struct
   module Rejected = struct
     [%%versioned
     module Stable = struct
+      [@@@no_toplevel_latest_type]
+
       module V1 = struct
         type t = (User_command.Stable.V1.t * Diff_error.Stable.V1.t) list
         [@@deriving sexp, yojson]
@@ -931,6 +937,9 @@ struct
 
       let unsafe_apply t env =
         match%map apply t env with Ok e -> Ok e | Error e -> Error (`Other e)
+
+      (* Transaction verification currently happens in apply. In the future we could batch it. *)
+      let verify _ _ = Deferred.return true
     end
 
     let get_rebroadcastable (t : t) ~is_expired =
@@ -1221,19 +1230,19 @@ let%test_module _ =
 
     let mk_account i balance nonce =
       ( i
-      , Account.Poly.Stable.Latest.
-          { public_key= Public_key.compress @@ test_keys.(i).public_key
-          ; token_id= Token_id.default
-          ; token_permissions=
-              Token_permissions.Not_owned {account_disabled= false}
-          ; balance= Currency.Balance.of_int balance
-          ; nonce= Account.Nonce.of_int nonce
-          ; receipt_chain_hash= Receipt.Chain_hash.empty
-          ; delegate= Public_key.Compressed.empty
-          ; voting_for=
-              Quickcheck.random_value ~seed:(`Deterministic "constant")
-                State_hash.gen
-          ; timing= Account.Timing.Untimed } )
+      , { Account.Poly.Stable.Latest.public_key=
+            Public_key.compress @@ test_keys.(i).public_key
+        ; token_id= Token_id.default
+        ; token_permissions=
+            Token_permissions.Not_owned {account_disabled= false}
+        ; balance= Currency.Balance.of_int balance
+        ; nonce= Account.Nonce.of_int nonce
+        ; receipt_chain_hash= Receipt.Chain_hash.empty
+        ; delegate= Public_key.Compressed.empty
+        ; voting_for=
+            Quickcheck.random_value ~seed:(`Deterministic "constant")
+              State_hash.gen
+        ; timing= Account.Timing.Untimed } )
 
     let%test_unit "Transactions are removed and added back in fork changes" =
       Thread_safe.block_on_async_exn (fun () ->

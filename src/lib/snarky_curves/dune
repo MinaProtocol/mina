@@ -4,6 +4,6 @@
   (preprocess (pps ppx_version ppx_snarky ppx_jane ppx_deriving.eq))
   (libraries
     snarky_field_extensions
-    snarky
+    snarky.backendless
     snarkette
     core_kernel ))

@@ -93,18 +93,6 @@ module Configuration = struct
     end
   end]
 
-  type t = Stable.Latest.t =
-    { delta: int
-    ; k: int
-    ; c: int
-    ; c_times_k: int
-    ; slots_per_epoch: int
-    ; slot_duration: int
-    ; epoch_duration: int
-    ; genesis_state_timestamp: Block_time.t
-    ; acceptable_network_delay: int }
-  [@@deriving yojson, fields]
-
   let t ~constraint_constants ~protocol_constants =
     let constants =
       Constants.create ~constraint_constants ~protocol_constants
@@ -378,14 +366,9 @@ module Data = struct
         module V1 = struct
           type ('ledger_hash, 'amount) t =
             {hash: 'ledger_hash; total_currency: 'amount}
-          [@@deriving sexp, eq, compare, hash, to_yojson]
+          [@@deriving sexp, eq, compare, hash, to_yojson, hlist]
         end
       end]
-
-      type ('ledger_hash, 'amount) t =
-            ('ledger_hash, 'amount) Stable.Latest.t =
-        {hash: 'ledger_hash; total_currency: 'amount}
-      [@@deriving sexp, eq, compare, hash, to_yojson, hlist]
     end
 
     module Value = struct
@@ -401,8 +384,6 @@ module Data = struct
           let to_latest = Fn.id
         end
       end]
-
-      type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash, to_yojson]
     end
 
     let graphql_type () : ('ctx, Value.t option) Graphql_async.Schema.typ =
@@ -572,8 +553,6 @@ module Data = struct
             let to_latest = Fn.id
           end
         end]
-
-        type t = Stable.Latest.t [@@deriving sexp, compare, hash, yojson]
 
         include Codable.Make_base58_check (struct
           type t = Stable.Latest.t [@@deriving bin_io_unversioned]
@@ -761,10 +740,10 @@ module Data = struct
           end
         end)
 
-    type _ Snarky.Request.t +=
-      | Winner_address : Coda_base.Account.Index.t Snarky.Request.t
-      | Private_key : Scalar.value Snarky.Request.t
-      | Public_key : Public_key.t Snarky.Request.t
+    type _ Snarky_backendless.Request.t +=
+      | Winner_address : Coda_base.Account.Index.t Snarky_backendless.Request.t
+      | Private_key : Scalar.value Snarky_backendless.Request.t
+      | Public_key : Public_key.t Snarky_backendless.Request.t
 
     let%snarkydef get_vrf_evaluation
         ~(constraint_constants : Genesis_constants.Constraint_constants.t)
@@ -857,7 +836,7 @@ module Data = struct
                empty_pending_coinbase ~is_new_stack:true)
         in
         let handlers =
-          Snarky.Request.Handler.(
+          Snarky_backendless.Request.Handler.(
             push
               (push fail (create_single pending_coinbase_handler))
               (create_single ledger_handler))
@@ -873,7 +852,7 @@ module Data = struct
           | _ ->
               respond
                 (Provide
-                   (Snarky.Request.Handler.run handlers
+                   (Snarky_backendless.Request.Handler.run handlers
                       ["Ledger Handler"; "Pending Coinbase Handler"]
                       request))
     end
@@ -935,8 +914,6 @@ module Data = struct
         let to_latest = Fn.id
       end
     end]
-
-    type t = Stable.Latest.t [@@deriving sexp, compare, hash, to_yojson]
   end
 
   module Epoch_data = struct
@@ -957,28 +934,9 @@ module Data = struct
                  the current state. *)
             ; lock_checkpoint: 'lock_checkpoint
             ; epoch_length: 'length }
-          [@@deriving sexp, eq, compare, hash, to_yojson, fields]
+          [@@deriving sexp, eq, compare, hash, to_yojson, fields, hlist]
         end
       end]
-
-      type ( 'epoch_ledger
-           , 'epoch_seed
-           , 'start_checkpoint
-           , 'lock_checkpoint
-           , 'length )
-           t =
-            ( 'epoch_ledger
-            , 'epoch_seed
-            , 'start_checkpoint
-            , 'lock_checkpoint
-            , 'length )
-            Stable.Latest.t =
-        { ledger: 'epoch_ledger
-        ; seed: 'epoch_seed
-        ; start_checkpoint: 'start_checkpoint
-        ; lock_checkpoint: 'lock_checkpoint
-        ; epoch_length: 'length }
-      [@@deriving sexp, compare, hash, to_yojson, fields, hlist]
     end
 
     type var =
@@ -1722,38 +1680,9 @@ module Data = struct
             ; staking_epoch_data: 'staking_epoch_data
             ; next_epoch_data: 'next_epoch_data
             ; has_ancestor_in_same_checkpoint_window: 'bool }
-          [@@deriving
-            sexp, bin_io, eq, compare, hash, to_yojson, version, fields]
+          [@@deriving sexp, eq, compare, hash, to_yojson, fields, hlist]
         end
       end]
-
-      type ( 'length
-           , 'vrf_output
-           , 'amount
-           , 'global_slot
-           , 'staking_epoch_data
-           , 'next_epoch_data
-           , 'bool )
-           t =
-            ( 'length
-            , 'vrf_output
-            , 'amount
-            , 'global_slot
-            , 'staking_epoch_data
-            , 'next_epoch_data
-            , 'bool )
-            Stable.Latest.t =
-        { blockchain_length: 'length
-        ; epoch_count: 'length
-        ; min_window_density: 'length
-        ; sub_window_densities: 'length list
-        ; last_vrf_output: 'vrf_output
-        ; total_currency: 'amount
-        ; curr_global_slot: 'global_slot
-        ; staking_epoch_data: 'staking_epoch_data
-        ; next_epoch_data: 'next_epoch_data
-        ; has_ancestor_in_same_checkpoint_window: 'bool }
-      [@@deriving sexp, compare, hash, to_yojson, fields, hlist]
     end
 
     module Value = struct
@@ -1792,8 +1721,6 @@ module Data = struct
                 , `Bool t.has_ancestor_in_same_checkpoint_window ) ]
         end
       end]
-
-      type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash]
 
       let to_yojson = Stable.Latest.to_yojson
 
@@ -2335,7 +2262,7 @@ module Data = struct
              pending_coinbases ~is_new_stack)
       in
       let handlers =
-        Snarky.Request.Handler.(
+        Snarky_backendless.Request.Handler.(
           push
             (push fail (create_single pending_coinbase_handler))
             (create_single ledger_handler))
@@ -2351,7 +2278,7 @@ module Data = struct
         | _ ->
             respond
               (Provide
-                 (Snarky.Request.Handler.run handlers
+                 (Snarky_backendless.Request.Handler.run handlers
                     ["Ledger Handler"; "Pending Coinbase Handler"]
                     request))
 

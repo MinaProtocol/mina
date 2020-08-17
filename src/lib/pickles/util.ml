@@ -33,10 +33,10 @@ let rec absorb : type a g1 f scalar.
       absorb ty1 t1 ; absorb ty2 t2
 
 let ones_vector : type f n.
-       first_zero:f Snarky.Cvar.t
-    -> (module Snarky.Snark_intf.Run with type field = f)
+       first_zero:f Snarky_backendless.Cvar.t
+    -> (module Snarky_backendless.Snark_intf.Run with type field = f)
     -> n Nat.t
-    -> (f Snarky.Cvar.t Snarky.Boolean.t, n) Vector.t =
+    -> (f Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t, n) Vector.t =
  fun ~first_zero (module Impl) n ->
   let open Impl in
   let rec go : type m.

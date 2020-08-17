@@ -1,6 +1,6 @@
 open Core
 open Snark_params
-open Snarky
+open Snarky_backendless
 open Tick
 
 module type S = sig
@@ -8,6 +8,8 @@ module type S = sig
 
   [%%versioned:
   module Stable : sig
+    [@@@no_toplevel_latest_type]
+
     module V1 : sig
       type t = Field.t [@@deriving sexp, compare, hash, yojson]
 

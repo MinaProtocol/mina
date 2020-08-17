@@ -5,7 +5,7 @@ module type Traversable_applicative = sig
 
   val map2 : 'a t -> 'b t -> f:('a -> 'b -> 'c) -> 'c t
 
-  module Impl : Snarky.Snark_intf.S
+  module Impl : Snarky_backendless.Snark_intf.S
 
   open Impl
 
@@ -13,7 +13,7 @@ module type Traversable_applicative = sig
 end
 
 module type Basic = sig
-  module Impl : Snarky.Snark_intf.S
+  module Impl : Snarky_backendless.Snark_intf.S
 
   open Impl
 

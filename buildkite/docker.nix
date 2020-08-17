@@ -1,1 +1,0 @@
-(import ./agent.nix {}).docker

@@ -1,7 +1,7 @@
 open Intf
 open Core
 open Snarky_bn382
-module Bignum_bigint = Snarky.Backend_extended.Bignum_bigint
+module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint
 
 module type Input_intf = sig
   include Type_with_delete
@@ -59,7 +59,11 @@ module type Input_intf = sig
   val copy : t -> t -> unit
 
   module Vector : sig
-    include Snarky.Vector.S with type elt := t
+    include Snarky_intf.Vector.S with type elt := t
+
+    val typ : t Ctypes.typ
+
+    val delete : t -> unit
 
     module Triple : Intf.Triple with type elt := t
   end
@@ -143,21 +147,11 @@ module type S = sig
   val delete : t -> unit
 
   module Vector : sig
-    type elt = t
-
-    type t
+    include Snarky_intf.Vector.S with type elt = t
 
     val typ : t Ctypes.typ
 
     val delete : t -> unit
-
-    val create : unit -> t
-
-    val get : t -> int -> elt
-
-    val emplace_back : t -> elt -> unit
-
-    val length : t -> int
 
     val of_array : elt array -> t
 

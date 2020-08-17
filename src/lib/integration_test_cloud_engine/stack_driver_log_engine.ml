@@ -110,7 +110,7 @@ module Subscription = struct
         ()
     in
     let%bind response_json = Deferred.return @@ load_config_json response in
-    [%log debug] logger "Create sink response: $response"
+    [%log' debug logger] "Create sink response: $response"
       ~metadata:[("response", response_json)] ;
     match
       Yojson.Safe.Util.(to_option Fn.id (member "error" response_json))
@@ -415,7 +415,7 @@ let rec watch_for_initialization ~logger initialization_table
   let handle_result result =
     let open Initialization_query.Result in
     let open Or_error.Let_syntax in
-    [%log info] logger "Handling initialization log for \"%s\"" result.pod_id ;
+    [%log' info logger] "Handling initialization log for \"%s\"" result.pod_id ;
     let%bind ivar =
       or_error_of_option
         (String.Map.find initialization_table result.pod_id)
@@ -428,7 +428,7 @@ let rec watch_for_initialization ~logger initialization_table
         (Error.of_string
            "received initialization for node that has already initialized")
   in
-  [%log info] logger "Pulling initialization subscription" ;
+  [%log' info logger] "Pulling initialization subscription" ;
   let%bind results =
     uninterruptible
       (let open Deferred.Or_error.Let_syntax in

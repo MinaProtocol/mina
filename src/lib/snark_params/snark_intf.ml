@@ -1,7 +1,7 @@
 open Snark_bits
 
 module type S = sig
-  include Snarky.Snark_intf.S
+  include Snarky_backendless.Snark_intf.S
 
   module Snarkable : sig
     module type S = sig
