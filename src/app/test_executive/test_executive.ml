@@ -18,9 +18,10 @@ let main inputs =
   (* TODO: abstract over which engine is in use, allow engine to be set form CLI *)
   let module Engine = Integration_test_cloud_engine in
   let test_name, (module Test) = inputs.test in
-  let test_name =
+  (*  let test_name =
     test_name ^ String.init 3 ~f:(fun _ -> (Int.to_string (Random.int 10)).[0])
   in
+*)
   let (module T) =
     (module Test (Engine)
     : Test_intf
