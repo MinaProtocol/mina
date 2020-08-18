@@ -64,8 +64,7 @@ RUN export CLOUD_SDK_REPO="cloud-sdk-$(lsb_release -c -s)" && \
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs -o /tmp/rust_install.sh
 RUN chmod +x /tmp/rust_install.sh
 RUN /tmp/rust_install.sh -y
-RUN export PATH="$PATH:$HOME/.cargo/bin"
-RUN echo 'export PATH="$PATH:$HOME/.cargo/bin"' >> /home/opam/.bashrc
+ENV PATH "$PATH:$HOME/.cargo/bin"
 
 # Get yarn + nodejs
 RUN curl -sL https://deb.nodesource.com/setup_14.x | sudo -E bash -
