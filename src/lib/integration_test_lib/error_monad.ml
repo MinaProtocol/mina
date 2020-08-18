@@ -54,19 +54,22 @@ module ErrorReporting = Monad.Make (struct
   let map = `Define_using_bind
 end)
 
-(* 
-
 let%test_unit "error_monad_unit_test" =
-let open Some_monad.Let_syntax in
+  let open ErrorReporting.Let_syntax in
   let test1 =
     let f nm =
       let%bind n = nm in
-      Ok {computation_result= n + 1; soft_errors= []}
+      Deferred.return
+        (Ok {Accumulator.computation_result= n + 1; soft_errors= []})
     in
     f (f (f (f (f (return 0)))))
   in
-  assert (test1 = Ok {computation_result= 5; soft_errors= []})
+  assert (
+    test1
+    = Deferred.return (Ok {Accumulator.computation_result= 5; soft_errors= []})
+  )
 
+(* 
 let test2 =
   let%bind () = Ok {result= (); soft_errors= []} in
   Ok {result= "123"; soft_errors= []}
@@ -123,34 +126,3 @@ let () =
         && ["a"; "b"] = List.map soft_errors ~f:Error.to_string_hum
     | _ ->
         false ) *)
-
-(* 
-
-let return fv v = {log= []; res= fv v; already_hit_hard= false}
-
-let bind acc fnc =
-  match acc.res with
-  | Success (Some message, a) ->
-      let message_modified = Format.sprintf "INFO: %s" message in
-      let execProg = fnc a in
-      { log= List.append (List.append acc.log [message_modified]) execProg.log
-      ; res= execProg.res
-      ; already_hit_hard= false }
-  | Success (None, a) ->
-      let execProg = fnc a in
-      { log= List.append acc.log execProg.log
-      ; res= execProg.res
-      ; already_hit_hard= false }
-  | SoftError (message, a) ->
-      let message_modified = Format.sprintf "SOFT ERROR: %s" message in
-      let execProg = fnc a in
-      { log= List.append (List.append acc.log [message_modified]) execProg.log
-      ; res= execProg.res
-      ; already_hit_hard= false }
-  | HardError message ->
-      if not acc.already_hit_hard then
-        let message_modified = Format.sprintf "HARD ERROR: %s" message in
-        { log= List.append acc.log [message_modified]
-        ; res= HardError message
-        ; already_hit_hard= true }
-      else {log= acc.log; res= HardError message; already_hit_hard= true} *)
