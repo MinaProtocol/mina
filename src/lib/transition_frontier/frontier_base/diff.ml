@@ -58,7 +58,7 @@ module Node_list = struct
           let of_binable ls = Lite ls
         end
 
-        include Binable.Of_binable (Binable_arg.Stable.V1) (T_nonbinable)
+        include Binable.Of_binable (Binable_arg.Stable.V2) (T_nonbinable)
 
         let to_latest = Fn.id
       end
