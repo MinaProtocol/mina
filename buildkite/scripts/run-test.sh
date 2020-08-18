@@ -2,6 +2,8 @@
 
 set -euo pipefail
 
+eval $(opam env)
+
 # Waiting for the coda-daemon image to be built by CircleCI (this is redundent once build-artifacts works in buildkite)
 
 git_tag=$(git describe --abbrev=0)
