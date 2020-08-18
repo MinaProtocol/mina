@@ -282,12 +282,12 @@ Specifically this is the user command having been transformed into a `Transactio
 xx xx ...    # each field encoded as a 32-bytes each one for each of the length
 yy yy ...    #     (little endian) (same represenation as above Fq.t above)
              #
-00 00 00 05  # 4-byte prefix for length of bitstring bytes (little endian)
+00 00 34 D4  # 4-byte prefix for length of bits in the bitstring (little endian)
              #
 A4 43 D4 ... # the bool list compacted into a bitstring, pad the last 1 byte with
              # extra zeros on the right if necessary
              
-// Note: Edited on 8/18 to include 4-byte length of bitstring bytes to fix ambiguity between the zero-padding and true zeros in the bitstring
+// Note: Edited on 8/18 to include 4-byte length of bits in the bitstring to fix ambiguity between the zero-padding and true zeros in the bitstring
 ```
 
 Another important property of the unsigned-transaction and signed-transaction representations is that they are reversible. The `unsigned_transaction_string` is then a `JSON` input (stringified) conforming to the following schema:
