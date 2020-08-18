@@ -602,7 +602,7 @@ module Types = struct
           , Receipt.Chain_hash.t option
           , State_hash.t option
           , Account.Timing.t
-          , Snapp_account.t option )
+          , Account.Snapp_account.t option )
           Account.Poly.t
       ; locked: bool option
       ; is_actively_staking: bool
