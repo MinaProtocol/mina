@@ -9,7 +9,8 @@ type inputs = {test: test; coda_image: string}
 
 let tests : test list =
   [ ( "block-production"
-    , (module Block_production_test.Make : Test_functor_intf) ) ]
+    , (module Block_production_test.Make : Test_functor_intf) )
+  ; ("send-payment", (module Send_payment_test.Make : Test_functor_intf)) ]
 
 let main inputs =
   let raise_error deferred_or_error =
@@ -89,7 +90,8 @@ let () =
   let test_executive_term =
     Term.(
       const start $ inputs
-      $ const (module Block_production_test.Make : Test_functor_intf))
+      $ const (module Block_production_test.Make : Test_functor_intf)
+      $ const (module Send_payment_test.Make : Test_functor_intf))
   in
   let test_executive_info =
     let doc = "Run coda integration test(s)." in

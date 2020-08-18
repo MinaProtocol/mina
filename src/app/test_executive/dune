@@ -2,6 +2,6 @@
   (name test_executive)
   (libraries
     core_kernel yojson cmdliner file_system currency coda_base
-    runtime_config signature_lib secrets integration_test_lib
+    genesis_ledger_helper runtime_config signature_lib secrets integration_test_lib
     integration_test_cloud_engine)
   (preprocess (pps ppx_jane ppx_deriving_yojson ppx_version)))

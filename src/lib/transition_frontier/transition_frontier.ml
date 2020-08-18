@@ -271,8 +271,7 @@ let add_breadcrumb_exn t breadcrumb =
     ~metadata:
       [ ( "state_hash"
         , State_hash.to_yojson
-            (Breadcrumb.state_hash @@ Full_frontier.best_tip t.full_frontier)
-        )
+            (Breadcrumb.state_hash (Full_frontier.best_tip t.full_frontier)) )
       ; ( "n"
         , `Int (List.length @@ Full_frontier.all_breadcrumbs t.full_frontier)
         ) ]
@@ -302,6 +301,17 @@ let add_breadcrumb_exn t breadcrumb =
         , `Int (List.length @@ Full_frontier.all_breadcrumbs t.full_frontier)
         ) ]
     "POST: ($state_hash, $n)" ;
+  let user_cmds =
+    Breadcrumb.user_commands @@ Full_frontier.best_tip t.full_frontier
+  in
+  if not (List.is_empty user_cmds) then
+    [%log' trace t.logger]
+      ~metadata:
+        [ ( "user_commands"
+          , `List
+              (List.map user_cmds
+                 ~f:(With_status.to_yojson User_command.to_yojson)) ) ]
+      "Added breadcrumb user commands" ;
   let lite_diffs =
     List.map diffs ~f:Diff.(fun (Full.E.E diff) -> Lite.E.E (to_lite diff))
   in

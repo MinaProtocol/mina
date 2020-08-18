@@ -63,7 +63,7 @@ let get_balance_graphql =
          let%map response =
            Graphql_client.query_exn
              (Graphql_queries.Get_tracked_account.make
-                ~public_key:(Graphql_client.Encoders.public_key public_key)
+                ~public_key:(Graphql_lib.Encoders.public_key public_key)
                 ())
              graphql_endpoint
          in
@@ -478,6 +478,7 @@ let batch_send_payments =
 let send_payment_graphql =
   let open Command.Param in
   let open Cli_lib.Arg_type in
+  let open Graphql_lib in
   let receiver_flag =
     flag "receiver" ~doc:"PUBLICKEY Public key to which you want to send money"
       (required public_key_compressed)
@@ -500,15 +501,14 @@ let send_payment_graphql =
           ({Cli_lib.Flag.sender; fee; nonce; memo}, receiver, amount, token)
           ->
          let%map response =
-           Graphql_client.(
-             Graphql_client.query_exn
-               (Graphql_queries.Send_payment.make
-                  ~receiver:(Encoders.public_key receiver)
-                  ~sender:(Encoders.public_key sender)
-                  ~amount:(Encoders.amount amount) ~fee:(Encoders.fee fee)
-                  ?token:(Option.map ~f:Encoders.token token)
-                  ?nonce:(Option.map nonce ~f:Encoders.nonce)
-                  ?memo ()))
+           Graphql_client.query_exn
+             (Graphql_queries.Send_payment.make
+                ~receiver:(Encoders.public_key receiver)
+                ~sender:(Encoders.public_key sender)
+                ~amount:(Encoders.amount amount) ~fee:(Encoders.fee fee)
+                ?token:(Option.map ~f:Encoders.token token)
+                ?nonce:(Option.map nonce ~f:Encoders.nonce)
+                ?memo ())
              graphql_endpoint
          in
          printf "Dispatched payment with ID %s\n"
@@ -517,6 +517,7 @@ let send_payment_graphql =
 let delegate_stake_graphql =
   let open Command.Param in
   let open Cli_lib.Arg_type in
+  let open Graphql_lib in
   let receiver_flag =
     flag "receiver"
       ~doc:"PUBLICKEY Public key to which you want to delegate your stake"
@@ -529,14 +530,13 @@ let delegate_stake_graphql =
           ({Cli_lib.Flag.sender; fee; nonce; memo}, receiver)
           ->
          let%map response =
-           Graphql_client.(
-             Graphql_client.query_exn
-               (Graphql_queries.Send_delegation.make
-                  ~receiver:(Encoders.public_key receiver)
-                  ~sender:(Encoders.public_key sender)
-                  ~fee:(Encoders.fee fee)
-                  ?nonce:(Option.map nonce ~f:Encoders.nonce)
-                  ?memo ()))
+           Graphql_client.query_exn
+             (Graphql_queries.Send_delegation.make
+                ~receiver:(Encoders.public_key receiver)
+                ~sender:(Encoders.public_key sender)
+                ~fee:(Encoders.fee fee)
+                ?nonce:(Option.map nonce ~f:Encoders.nonce)
+                ?memo ())
              graphql_endpoint
          in
          printf "Dispatched stake delegation with ID %s\n"
@@ -545,6 +545,7 @@ let delegate_stake_graphql =
 let create_new_token_graphql =
   let open Command.Param in
   let open Cli_lib.Arg_type in
+  let open Graphql_lib in
   let receiver_flag =
     flag "receiver" ~doc:"PUBLICKEY Public key to create the new token for"
       (optional public_key_compressed)
@@ -557,14 +558,13 @@ let create_new_token_graphql =
           ->
          let receiver = Option.value ~default:sender receiver in
          let%map response =
-           Graphql_client.(
-             Graphql_client.query_exn
-               (Graphql_queries.Send_create_token.make
-                  ~sender:(Encoders.public_key sender)
-                  ~receiver:(Encoders.public_key receiver)
-                  ~fee:(Encoders.fee fee)
-                  ?nonce:(Option.map nonce ~f:Encoders.nonce)
-                  ?memo ()))
+           Graphql_client.query_exn
+             (Graphql_queries.Send_create_token.make
+                ~sender:(Encoders.public_key sender)
+                ~receiver:(Encoders.public_key receiver)
+                ~fee:(Encoders.fee fee)
+                ?nonce:(Option.map nonce ~f:Encoders.nonce)
+                ?memo ())
              graphql_endpoint
          in
          printf "Dispatched create new token command with ID %s\n"
@@ -573,6 +573,7 @@ let create_new_token_graphql =
 let create_new_account_graphql =
   let open Command.Param in
   let open Cli_lib.Arg_type in
+  let open Graphql_lib in
   let receiver_flag =
     flag "receiver" ~doc:"PUBLICKEY Public key to create the new account for"
       (required public_key_compressed)
@@ -616,22 +617,21 @@ let create_new_account_graphql =
                in
                match token_owner#tokenOwner with
                | Some token_owner ->
-                   Graphql_client.Decoders.public_key token_owner
+                   Graphql_lib.Decoders.public_key token_owner
                | None ->
                    failwith
                      "Unknown token: Cannot find the owner for the given token"
                )
          in
          let%map response =
-           Graphql_client.(
-             Graphql_client.query_exn
-               (Graphql_queries.Send_create_token_account.make
-                  ~sender:(Encoders.public_key sender)
-                  ~receiver:(Encoders.public_key receiver)
-                  ~tokenOwner:(Encoders.public_key token_owner)
-                  ~token:(Encoders.token token) ~fee:(Encoders.fee fee)
-                  ?nonce:(Option.map nonce ~f:Encoders.nonce)
-                  ?memo ()))
+           Graphql_client.query_exn
+             (Graphql_queries.Send_create_token_account.make
+                ~sender:(Encoders.public_key sender)
+                ~receiver:(Encoders.public_key receiver)
+                ~tokenOwner:(Encoders.public_key token_owner)
+                ~token:(Encoders.token token) ~fee:(Encoders.fee fee)
+                ?nonce:(Option.map nonce ~f:Encoders.nonce)
+                ?memo ())
              graphql_endpoint
          in
          printf "Dispatched create new token command with ID %s\n"
@@ -640,6 +640,7 @@ let create_new_account_graphql =
 let mint_tokens_graphql =
   let open Command.Param in
   let open Cli_lib.Arg_type in
+  let open Graphql_lib in
   let receiver_flag =
     flag "receiver"
       ~doc:
@@ -665,15 +666,14 @@ let mint_tokens_graphql =
           ({Cli_lib.Flag.sender; fee; nonce; memo}, receiver, token, amount)
           ->
          let%map response =
-           Graphql_client.(
-             Graphql_client.query_exn
-               (Graphql_queries.Send_mint_tokens.make
-                  ~sender:(Encoders.public_key sender)
-                  ?receiver:(Option.map ~f:Encoders.public_key receiver)
-                  ~token:(Encoders.token token)
-                  ~amount:(Encoders.amount amount) ~fee:(Encoders.fee fee)
-                  ?nonce:(Option.map nonce ~f:Encoders.nonce)
-                  ?memo ()))
+           Graphql_client.query_exn
+             (Graphql_queries.Send_mint_tokens.make
+                ~sender:(Encoders.public_key sender)
+                ?receiver:(Option.map ~f:Encoders.public_key receiver)
+                ~token:(Encoders.token token) ~amount:(Encoders.amount amount)
+                ~fee:(Encoders.fee fee)
+                ?nonce:(Option.map nonce ~f:Encoders.nonce)
+                ?memo ())
              graphql_endpoint
          in
          printf "Dispatched create new token command with ID %s\n"
@@ -695,7 +695,7 @@ let cancel_transaction_graphql =
          let cancel_sender_pk = User_command.fee_payer_pk user_command in
          let open Deferred.Let_syntax in
          let%bind nonce_response =
-           let open Graphql_client.Encoders in
+           let open Graphql_lib.Encoders in
            Graphql_client.query_exn
              (Graphql_queries.Get_inferred_nonce.make
                 ~public_key:(public_key cancel_sender_pk)
@@ -729,7 +729,7 @@ let cancel_transaction_graphql =
          printf "Fee to cancel transaction is %s coda.\n"
            (Currency.Fee.to_formatted_string cancel_fee) ;
          let cancel_query =
-           let open Graphql_client.Encoders in
+           let open Graphql_lib.Encoders in
            Graphql_queries.Send_payment.make
              ~sender:(public_key cancel_sender_pk)
              ~receiver:(public_key receiver_pk) ~fee:(fee cancel_fee)
@@ -978,6 +978,7 @@ let stop_tracing =
 let set_staking_graphql =
   let open Command.Param in
   let open Cli_lib.Arg_type in
+  let open Graphql_lib in
   let pk_flag =
     flag "public-key"
       ~doc:"PUBLICKEY Public key of account with which to produce blocks"
@@ -993,11 +994,10 @@ let set_staking_graphql =
                   (Array.map ~f:Public_key.Compressed.to_base58_check arr))
          in
          let%map result =
-           Graphql_client.(
-             Graphql_client.query_exn
-               (Graphql_queries.Set_staking.make
-                  ~public_key:(Encoders.public_key public_key)
-                  ()))
+           Graphql_client.query_exn
+             (Graphql_queries.Set_staking.make
+                ~public_key:(Encoders.public_key public_key)
+                ())
              graphql_endpoint
          in
          print_message "Stopped staking with" (result#setStaking)#lastStaking ;
@@ -1024,7 +1024,7 @@ let set_snark_worker =
          let graphql =
            Graphql_queries.Set_snark_worker.make
              ~public_key:
-               Graphql_client.Encoders.(
+               Graphql_lib.Encoders.(
                  optional optional_public_key ~f:public_key)
              ()
          in
@@ -1049,7 +1049,7 @@ let set_snark_work_fee =
        ~f:(fun graphql_endpoint fee ->
          let graphql =
            Graphql_queries.Set_snark_work_fee.make
-             ~fee:(Graphql_client.Encoders.uint64 @@ Currency.Fee.to_uint64 fee)
+             ~fee:(Graphql_lib.Encoders.uint64 @@ Currency.Fee.to_uint64 fee)
              ()
          in
          Deferred.map (Graphql_client.query_exn graphql graphql_endpoint)
@@ -1245,7 +1245,8 @@ let create_hd_account =
            Graphql_client.(
              query_exn
                (Graphql_queries.Create_hd_account.make
-                  ~hd_index:(Encoders.uint32 hd_index) ()))
+                  ~hd_index:(Graphql_lib.Encoders.uint32 hd_index)
+                  ()))
              graphql_endpoint
          in
          let pk_string =
@@ -1275,7 +1276,7 @@ let unlock_account =
              let%map response =
                Graphql_client.query_exn
                  (Graphql_queries.Unlock_account.make
-                    ~public_key:(Graphql_client.Encoders.public_key pk_str)
+                    ~public_key:(Graphql_lib.Encoders.public_key pk_str)
                     ~password:(Bytes.to_string password_bytes)
                     ())
                  graphql_endpoint
@@ -1302,7 +1303,7 @@ let lock_account =
          let%map response =
            Graphql_client.query_exn
              (Graphql_queries.Lock_account.make
-                ~public_key:(Graphql_client.Encoders.public_key pk)
+                ~public_key:(Graphql_lib.Encoders.public_key pk)
                 ())
              graphql_endpoint
          in

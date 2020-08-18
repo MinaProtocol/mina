@@ -51,6 +51,10 @@ let or_error_of_option opt msg =
     ~default:(Error (Error.of_string msg))
     ~f:Or_error.return
 
+let coda_container_filter = "resource.labels.container_name=\"coda\""
+
+let block_producer_filter = "resource.labels.pod_name:\"block-producer\""
+
 module Subscription = struct
   type t = {name: string; topic: string; sink: string}
 
@@ -257,7 +261,7 @@ module Initialization_query = struct
     (*TODO: Structured logging: Block Produced*)
     String.concat ~sep:"\n"
       [ testnet_log_filter
-      ; "resource.labels.container_name=\"coda\""
+      ; coda_container_filter
       ; "\"Starting Transition Frontier Controller phase\"" ]
 
   let parse log =
@@ -333,8 +337,8 @@ module Block_produced_query = struct
     (*TODO: Structured logging: Block Produced*)
     String.concat ~sep:"\n"
       [ testnet_log_filter
-      ; "resource.labels.pod_name:\"block-producer\""
-      ; "resource.labels.container_name=\"coda\""
+      ; block_producer_filter
+      ; coda_container_filter
       ; "\"Successfully produced a new block\"" ]
 
   (*TODO: Once we transition to structured events, this should call Structured_log_event.parse_exn and match on the structured events that it returns.*)
@@ -367,6 +371,7 @@ module Block_produced_query = struct
 
   let%test_unit "parse json" =
     (* TODO: paste me back (I was breaking Nathan's syntax highlighting) *)
+    (* TODO: the structured log message doesn't contain $breadcrumb *)
     let log =
       Yojson.Safe.from_string
         {|{"insertId":"da1tjxlb148zg2r9m","jsonPayload":{"level":"Trace","message":"Successfully produced a new block: $breadcrumb","metadata":{"breadcrumb":{"just_emitted_a_proof":true,"staged_ledger":"<opaque>","validated_transition":{"data":{"current_protocol_version":"0.1.0","delta_transition_chain_proof":"<opaque>","proposed_protocol_version":"<None>","protocol_state":{"body":{"blockchain_state":{"snarked_ledger_hash":"4mKBT3x4peBudLp8p7ZV8D9qa4hXVu4Mtw8RnjnJUmuYVAmzuMB3qqG76WdN4o1bzBzkWGntjW3fskqGB7qEr14xEHGD23PqW53Pq4pac8vUBv9Wy9sYfNTXXQHUaTKs9Z3SZ4G683vWGiqrPD1CwNL1mfQcE1Y4rZs1PKXYr2Qxd1ysPSBzMdMhHRtCJ8yjL31gy8b5HLEB4TCnvmwcaFjrYqXmZ17iRTouYeAXTwiYa3QwwdLndAFS7Wf1YJwK2WavtqJjL3cHL37UP56bQdiUsDF33iRAX99LJGhFqDD4Ud765rcDrgM1yBdBkyJFAC","staged_ledger_hash":{"non_snark":{"aux_hash":"UDT5mwPQpaazURe2owQEkmhVzs89k5ZT4xiD4nShZ4qV6rPcdi","ledger_hash":"4mKBT3x7o11gxXfS2sukVKACTsUk5HsQUSWH48ycTzAymkW5G6BXLtSVfyFj7q8byjKy24VgLaEstVbke8WC8sQJPot5eBPi6BqTXQn83u2HsrFoYTrRfuC5uExzkvuEHWfg6mFCpsGntcNVvZHBZmCxckP37Ao2X29kWuhvRUjCnJ4zyEGY8Byu7Q5nzf13XXd2uzTwntQFkEUqZ5rVyVdB6KYW14E3vLjZdUF8ijbXkqGHVyLfogfdfBHauiCDsdEKMiQVCQpwVQSmonKxAV14Qvg2yUsCbSru7uLZjLz4rCeZ3A18D8TvUMKqooVEX1","pending_coinbase_aux":"WewbKnjz78S5g6GMgtv5AkaR54HuGAfAX7YHkoMxzZji8dDm82"},"pending_coinbase_hash":"A2UdxEssLAf7MRyLNuccHWj4J9Bsu1XpPVLsenZcQkHto6RkgLBg3kMZemKEaafH4E36sdzvTWQujcADhdMFHMTy2YqFrGWTVzjcQZApLCE91PyFo3Lup5tf3wa7aBTD7x2bSmCRudM93ieGXdASVHDtinSaLAcGMfaA7ioSJEH3nkkXd3zUafThJMcnQvpVR4oHeuYNbAF8dPpKhk3ZGaL6v6FmbyTKVExj3xDx8dr1P3QsAPPrVqhDCM6AU3EpLtvmrLXrzkjh2dvB8TaLgZwg85atjKhbHAX5RUR7395RvMuTLq4ae4gCPJSRhTwuS8"},"timestamp":"1593049680000"},"consensus_state":{"blockchain_length":"3005","curr_global_slot":{"slot_number":"7806","slots_per_epoch":"480"},"epoch_count":"16","has_ancestor_in_same_checkpoint_window":true,"last_vrf_output":"<opaque>","min_window_density":"160","next_epoch_data":{"epoch_length":"38","ledger":{"hash":"4mKBT3x4nFWDa4A67jeH71Jv5UY7xMdekTspnP4AF4rkhxtybgKjrb9dKkYMein6CUBcWTskzZJnZ9RN3HEod9JTWAqwk5CDCBYTVDfUpJRqHsuBZ8ezpCb9oHQfu7eFeGFjY9ijwAZqEwp3gNhNwgS31ed9TcQgEpEPGqRDRYmyCwSTvZHKG2iFqbzzPnkF8ob12R69zYnMcRZmmhpwKeoEHVU23brJmoBTCguZWPKgk7T66kTqB4wiCbrFgb1S8jJtjQynaeocXhV3mqi91hD8fdX6TikxT3YutFBGW92Bn1HfVNYDRybpnrSwH4jEUk","total_currency":"22961500002389927"},"lock_checkpoint":"3j7Fqw9d9wLyNdjTPBSVH3yPDPWMtqUC22L1JSeqnpYMBfHTK7UmtDbYbnCL9mYDccjspNy8vJEnmXMA72qgswFdMocqYWprdWRYCUmhZx2jBKQcjXMjyUm8yFFBU8HfbSHSWfWmFVEXLw15rTR5ELjFy5xQMpgaWWMELu4ArxRc4DBbDebX2ezU4AhXULwsRhgbXw3n8gf6Tfi8GFTMQ8aTfuwmGeLmDAzXY4UvaEFuzcZ4ZFrFHrLZhKXYTbYyKebTBbcYqZScQcBNp1CC76tMP6NJkAaANYMGnRC1atoBwxBx6iCAb8osx12mCYgi9","seed":"3DUfsm6DRo8H9B9evJWxP72s18BAmWbFPMjr1EphFQFF7Fjjas1H8Y3UHGLTCocUKga4Yzh9izSHTvPn7UXN8x87c6soskzRtxjzatt2nPVK7jJ3xB2jMQFKfkmXLh4baiuQkDogz8nzirjbrUDnPsGi85efffcdEdCfV9AazPpZSbJKdvxMY4KZYXmdmtASzyQxeDhfpfCgfuUwfKCdPWi2biXxTrX9GkKLVcJFVCgY1ZggSFGiMn6kB3zxtKqUEJ1KvXnfdsyLsRrQwDKGGfqGSaS2b5baosyBnML27GJUGUDhP7vNipc5EVu1BZUEL","start_checkpoint":"D2rcXVQYc5LPJkNGqsxFSD17vt9o3AkQz3zLhA4mH56MQd1mkbiyMWohyYF6XkraCxLLfrf4G28pkeM2CYCN6Xwu4Sec9jeLigUC25VYZq2N9nLDPtSR9Xrk7SfAVzjpckU9MsYoGXkzzXG6fSKC4DakPFkPy53U2uYhYR963Kypcpjg5qdzu86TzmribmSvf3QEBaxs6svLEodZesaUff8qb2xCswAoZS4FU32kn6ANqXLHZWJZbPomnav9Msmh38rC5o1CGMoYvoEEdkB1qz4PpDLCGxDyNbkJFMC75WVQXbZSMayQ6i6V1hUAsHa9fU"},"staking_epoch_data":{"epoch_length":"184","ledger":{"hash":"4mKBT3x3Jm4wrsafPgLndLRTUBPGStpddFUdyKwKSHLBQh4HfdVon9NsrTbtQBiRLbhyH3uEKgkMbVGTneBSRH1Ub6Rm17FG2JpRHmTEEjaTDFJqk3sfzSzeMA1xxz35gg2czw8Q8SUknoatQ843gkPuEyTiSBXbJTQbXgDmuJXmXSNQ4Xvy5enmAMZfX1Es7wSzjpETmpgSD7sGQXi6yv3F6DsLcHLnHrqoYiipvNvDLM7cr5axY2inWiQboPd2T3rZi2PK2jdJvFu1XRWA5sNMKSciUddq6fn62CzrCTszGm2qdnPWpCrsRLE85heDyz","total_currency":"22924300002389927"},"lock_checkpoint":"D2rcXVQbcpJXNSkH4PtMigWYCwgohjjvR5SzxQ1BXC8TB7aNi722Vd2Rzj4tUWAiZhtzVn4y35R7fJ86XSWign7Nk7uoQAstAuKT9rVsPzWC8tvaWtY21uHVWSFfN6FERmWbR8ESVYcFbMNKeXGeFEXBgiWX7qEQVReqVuapdR72YBitw3Yuh3zHy3TEhRPWecdGYELDXoqGv3H1C8MaWRTUZkXn6TddEfVdtD7SuoH3zQVTcKADBGK7BfJcrd6pU3ScgWBUoaCYND5teWD2fCHGxmjWHiLmgUbqpCaEXYjh6DrwMKdxek2T6XdBpi89Xh","seed":"3DUfsm6FqFmgdfqmKUJbZVWFE1vB3HZQithYfWitucdN24MVAATs2WkmuyLnRmmhAi2Mn7DeqARTCEZz4ZUSK8zP3uvzULWFqxyTR1AeuNwGEReySyDA2KPrTHZiSE6DFBPkxYVhTAxzCxr2s8Hg7DL4VGV36RHJqqzCJuNiur9XTt38zi2T8GEdrowfRgL7e2cKapivbCiVVE1X4XaoKZUHqEbht4YNFTCK6AndB27EvgFHZV3KoR1Ai8DYFasj1YoMw7LxRFn7DqnXnDkgyX3aKNdG2wKJKddB93pWNwgFXg1LnEMvVxjtJmBegyCvk","start_checkpoint":"D2rcXVQd7gciXqjsZrMyQVr2n5AG9vDzQnJMZxb5L8ijvX4iCVggYaaEUVdPALEaxY6uaXT9Jire3qPBb84QBfX8vQX6kV4ojvqxcTqt7gLi2GyupXS2p1u2JN6PMdciLCfmeogLSR2EaH3UdsS1TMoK72UBfFYsD6jvkFSyfNyMMHLJCjNWSwVo6apRtsG1GK7bn4g63zrvn16ezGbmgh8mCFqBzv3KM4c17QZHHEbLS2ya7U6SvtCMDwDaHPgE8Dg2QS1mEqG2DuJ2V9VNnYZshtQUPTLw4fRy4N9fDPLo73LFC1d7y3gMqEoqV2MYFa"},"sub_window_densities":["0","20","20","20","20","20","20","20"],"total_currency":"22969100.002389927"},"constants":{"delta":"3","genesis_state_timestamp":"1591644600000","k":"20"},"genesis_state_hash":"D2rcXVQa8eS14d6EWdpMVoys5aeqjiwJppFQRrdoZLpbsDUoq1a9AVYb1VQtqxPhxT87sQWHWwL7c1z7qWmC72GdedUy7RaqanKpJzCk5B4fMnxDTKFDVc53gZF3Z95pMauhWi12vAvuCK5bstGcAh3ZUJveK6RVmnN6aM2tHjTgcp1uvMfzXTjwBuxX6gGpsFKWZw5gDguQpDqhbMiYJw44Mc2ggKthUnfP2NsxJTkNzfJGknYaarK7wRZNEjHeNtrVfyxZDKyTGg6ZisfPemCYPTyXsvs9MmfmAtNhBAAUFuA1NuxnpfAjbdJ3RacHPW"},"previous_state_hash":"D2rcXVQa7HFVLxWV7V5mktEdnxK22Jp3bhfPtzaGcCmvkiFnxAtUtnfyY3CS1U4Z2qSmW7oNT3jBzGta2mTfGEALMA4NifmmoBJTWeFX1tN2FekYbjpiggBgQuGehoTtnN12w1kNRwm9KsRtqUojCsh4vWxJBk8fedsgvLKhJ8uyUybM3fqN748BTipGSrWZJg1KUgXUWXKK1QZN5xNT2CzgtN1bcDizQQMP16UUCZVgH5zY28RpzBsJYXFZbJK6pShYtiBqfMUTyY3ww2qPUBZAr7AA9buMrBCUXwT1etC5rsNp3iwpDB1feVWDAQgUvx"},"protocol_state_proof":"<opaque>","staged_ledger_diff":"<opaque>"},"hash":"D2rcXVQbc96heSMf2WYXidFqRWbQ1ktQhcjNRV86qm1YQmYGgkd3uSpgrGRb8XAT5JPiR2DdXrnkiYU9t9zpGx77mbe9G8ZW2ABi4X344R68kMamFB6fbnwMoQieVTyXLqXvFqck2cGXQcZYko8gBdusNELVyZxsgRw2pJAiAePADfy2zkxudo4P1iTaDySykXvrSNF8oekts6FcQp6fwCeePGcUm3ktomEjYWTfTwU2YCRgfx5Zn8jADmCbtAhkrX1LAM21EEbygrp2LW12QaZDUE98199UCsyVbJTG4GWswYZbbwR99twkZ3BkjbR98B"}},"host":"35.185.73.134","peer_id":"12D3KooWNqFYDkAseDUAhvTdt73iqex7ooQPKTmRByGiCBgbJvVq","pid":10,"port":10003},"source":{"location":"File \"src/lib/block_producer/block_producer.ml\", line 512, characters 44-51","module":"Block_producer"},"timestamp":"2020-06-25 01:58:02.803079Z"},"labels":{"k8s-pod/app":"whale-block-producer-3","k8s-pod/class":"whale","k8s-pod/pod-template-hash":"6cdf6f4b44","k8s-pod/role":"block-producer","k8s-pod/testnet":"joyous-occasion","k8s-pod/version":"0.0.12-beta-feature-bump-genesis-timestamp-3e9b174"},"logName":"projects/o1labs-192920/logs/stdout","receiveTimestamp":"2020-06-25T01:58:09.007727607Z","resource":{"labels":{"cluster_name":"coda-infra-east","container_name":"coda","location":"us-east1","namespace_name":"joyous-occasion","pod_name":"whale-block-producer-3-6cdf6f4b44-2nlkz","project_id":"o1labs-192920"},"type":"k8s_container"},"severity":"INFO","timestamp":"2020-06-25T01:58:03.766838494Z"}|}
@@ -375,8 +380,72 @@ module Block_produced_query = struct
     ()
 end
 
+module Breadcrumb_added_query = struct
+  open Coda_base
+
+  module Result = struct
+    type t = {user_commands: User_command.t With_status.t list}
+  end
+
+  let filter testnet_log_filter =
+    String.concat ~sep:"\n"
+      [ testnet_log_filter
+      ; coda_container_filter
+      ; "\"Added breadcrumb user commands\"" ]
+
+  let parse json : Result.t Or_error.t =
+    let open Json_parsing in
+    let open Or_error.Let_syntax in
+    (* JSON path to metadata entry *)
+    let path = ["jsonPayload"; "metadata"; "user_commands"] in
+    let parser json =
+      match json with
+      | `List cmds ->
+          let cmd_or_errors =
+            List.map cmds ~f:(With_status.of_yojson User_command.of_yojson)
+          in
+          List.fold cmd_or_errors ~init:[] ~f:(fun accum cmd_or_err ->
+              match (accum, cmd_or_err) with
+              | _, Error _ ->
+                  failwith
+                    "Breadcrumb_added_query: unable to parse JSON for user \
+                     command"
+              | cmds, Ok cmd ->
+                  cmd :: cmds )
+      | _ ->
+          failwith "Breadcrumb_added_query: expected `List"
+    in
+    let%map user_commands = find parser json path in
+    Result.{user_commands}
+end
+
+module Graphql_ready_query = struct
+  module Result = struct
+    type t = {pod_name: string; host: Core.Unix.Inet_addr.t; peer_id: string}
+  end
+
+  let filter testnet_log_filter =
+    (*TODO: Structured logging ? *)
+    String.concat ~sep:"\n"
+      [testnet_log_filter; coda_container_filter; "\"Created GraphQL server\""]
+
+  let parse log =
+    let open Json_parsing in
+    let open Or_error.Let_syntax in
+    let%bind pod_name = find string log ["resource"; "labels"; "pod_name"] in
+    let%bind host_string =
+      find string log ["jsonPayload"; "metadata"; "host"]
+    in
+    let host = Core.Unix.Inet_addr.of_string host_string in
+    let%map peer_id = find string log ["jsonPayload"; "metadata"; "peer_id"] in
+    Result.{pod_name; host; peer_id}
+end
+
 type subscriptions =
-  {initialization: Subscription.t; blocks_produced: Subscription.t}
+  { initialization: Subscription.t
+  ; graphql_ready: Subscription.t
+  ; blocks_produced: Subscription.t
+  ; breadcrumb_added: Subscription.t }
 
 type constants =
   { constraints: Genesis_constants.Constraint_constants.t
@@ -398,15 +467,26 @@ let subscription_list ~logger testnet_log_filter :
     Subscription.create ~logger ~name:"initialization"
       ~filter:(Initialization_query.filter testnet_log_filter)
   in
-  let%map blocks_produced =
+  let%bind graphql_ready =
+    Subscription.create ~logger ~name:"graphql_ready"
+      ~filter:(Graphql_ready_query.filter testnet_log_filter)
+  in
+  let%bind blocks_produced =
     Subscription.create ~logger ~name:"blocks_produced"
       ~filter:(Block_produced_query.filter testnet_log_filter)
   in
-  {initialization; blocks_produced}
+  let%map breadcrumb_added =
+    Subscription.create ~logger ~name:"breadcrumb_added"
+      ~filter:(Breadcrumb_added_query.filter testnet_log_filter)
+  in
+  {initialization; graphql_ready; blocks_produced; breadcrumb_added}
 
-let delete_subscriptions {initialization; blocks_produced} =
+let delete_subscriptions
+    {initialization; graphql_ready; blocks_produced; breadcrumb_added} =
   Deferred.Or_error.combine_errors
-    [Subscription.delete initialization; Subscription.delete blocks_produced]
+  @@ List.map
+       [initialization; graphql_ready; blocks_produced; breadcrumb_added]
+       ~f:Subscription.delete
 
 let rec watch_for_initialization ~logger initialization_table
     initialization_subscription =
@@ -623,6 +703,140 @@ let wait_for :
         ~metadata:[("error", `String (Error.to_string_hum e))] ;
       let%map res = delete t in
       Or_error.combine_errors_unit [Error e; res]
+
+let wait_for_graphql ~node t =
+  [%log' info t.logger] "Waiting for GraphQL server on pod matching $node"
+    ~metadata:[("node", `String node)] ;
+  let retry_delay_sec = 20.0 in
+  let rec go () : unit Deferred.Or_error.t =
+    match%bind Subscription.pull t.subscriptions.graphql_ready with
+    | Ok [] ->
+        [%log' info t.logger] "wait_for_graphql, got empty list, trying again" ;
+        let%bind () = after (Time.Span.of_sec retry_delay_sec) in
+        go ()
+    | Ok jsons ->
+        (* we may see GraphQL servers started from multiple pods *)
+        let found_match =
+          List.fold jsons ~init:false ~f:(fun acc json ->
+              match Graphql_ready_query.parse json with
+              | Ok {pod_name; host; peer_id}
+                when String.is_prefix pod_name ~prefix:node ->
+                  [%log' info t.logger]
+                    "wait_for_graphql, got $host, $peer_id, $pod_name, which \
+                     matches expected node $node"
+                    ~metadata:
+                      [ ("host", `String (Core.Unix.Inet_addr.to_string host))
+                      ; ("peer_id", `String peer_id)
+                      ; ("pod_name", `String pod_name)
+                      ; ("node", `String node) ] ;
+                  true
+              | Ok {pod_name; host; peer_id} ->
+                  (* don't examine entry if we've found what we're looking for *)
+                  acc
+                  ||
+                  ( [%log' info t.logger]
+                      "wait_for_graphql, got $host, $peer_id, $pod_name, \
+                       which does not match expected node $node"
+                      ~metadata:
+                        [ ("host", `String (Core.Unix.Inet_addr.to_string host))
+                        ; ("peer_id", `String peer_id)
+                        ; ("pod_name", `String pod_name)
+                        ; ("node", `String node) ] ;
+                    false )
+              | Error err ->
+                  (* don't fail if we have a matching entry *)
+                  acc
+                  ||
+                  ( [%log' error t.logger]
+                      "wait_for_graphql, failed with parse error: $error"
+                      ~metadata:[("error", `String (Error.to_string_hum err))] ;
+                    false ) )
+        in
+        if found_match then return (Ok ()) else go ()
+    | Error err ->
+        [%log' fatal t.logger]
+          "wait_for_graphql failed with subscription pull error: $error"
+          ~metadata:[("error", `String (Error.to_string_hum err))] ;
+        return (Error err)
+  in
+  go ()
+
+let wait_for_payment ?(num_tries = 30) t ~logger ~sender ~receiver ~amount () =
+  let retry_delay_sec = 30.0 in
+  let rec go n =
+    if n <= 0 then
+      return
+        (Error
+           (Error.of_string
+              (sprintf
+                 "wait_for_payment: did not find matching payment after %d \
+                  trie(s)"
+                 num_tries)))
+    else
+      let%bind results =
+        let open Deferred.Or_error.Let_syntax in
+        let%bind user_cmds_json =
+          Subscription.pull t.subscriptions.breadcrumb_added
+        in
+        Deferred.return
+          (or_error_list_map user_cmds_json ~f:Breadcrumb_added_query.parse)
+      in
+      match results with
+      | Error err ->
+          Error.raise err
+      | Ok [] ->
+          [%log info] "wait_for_payment: no added breadcrumbs, trying again" ;
+          let%bind () = after Time.Span.(of_sec retry_delay_sec) in
+          go (n - 1)
+      | Ok res ->
+          let open Coda_base in
+          let open Signature_lib in
+          (* res is a list of Breadcrumb_added_query.Result.t
+           each of those contains a list of user commands
+           fold over the fold of each list
+           as soon as we find a matching payment, don't
+            check any other commands
+        *)
+          let found =
+            List.fold res ~init:false ~f:(fun found_outer {user_commands} ->
+                if found_outer then true
+                else
+                  List.fold user_commands ~init:false
+                    ~f:(fun found_inner cmd_with_status ->
+                      if found_inner then true
+                      else
+                        (* N.B.: we're not checking fee, nonce or memo *)
+                        let cmd = cmd_with_status.With_status.data in
+                        match
+                          User_command.payload cmd |> User_command_payload.body
+                        with
+                        | Payment
+                            { source_pk
+                            ; receiver_pk
+                            ; amount= paid_amt
+                            ; token_id= _ } ->
+                            Public_key.Compressed.equal source_pk sender
+                            && Public_key.Compressed.equal receiver_pk receiver
+                            && Currency.Amount.equal paid_amt amount
+                        | _ ->
+                            false ) )
+          in
+          if found then (
+            [%log info] "wait_for_payment: found matching payment"
+              ~metadata:
+                [ ("sender", `String (Public_key.Compressed.to_string sender))
+                ; ( "receiver"
+                  , `String (Public_key.Compressed.to_string receiver) )
+                ; ("amount", `String (Currency.Amount.to_string amount)) ] ;
+            return (Ok ()) )
+          else (
+            [%log info]
+              "wait_for_payment: found added breadcrumbs, but did not find \
+               matching payment" ;
+            let%bind () = after Time.Span.(of_sec retry_delay_sec) in
+            go (n - 1) )
+  in
+  go num_tries
 
 let wait_for_init (node : Kubernetes_network.Node.t) t =
   let open Deferred.Or_error.Let_syntax in
