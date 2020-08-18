@@ -2,6 +2,6 @@
 
 {
   toolchainBase = "codaprotocol/ci-toolchain-base:v3",
-  codaToolchain = "codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171",
+  codaToolchain = "codaprotocol/coda:toolchain-5cbdc248f3cef7eef9d32f258ae7148ce9864b10",
   elixirToolchain = "elixir:1.10-alpine"
 }
