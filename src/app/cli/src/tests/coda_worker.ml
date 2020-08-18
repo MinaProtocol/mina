@@ -50,8 +50,6 @@ module Send_payment_input = struct
       let to_latest = Fn.id
     end
   end]
-
-  type t = Stable.Latest.t
 end
 
 module T = struct

@@ -84,6 +84,8 @@ module UInt64 = struct
 
   [%%versioned_binable
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t = Unsigned.UInt64.t
 
@@ -130,6 +132,8 @@ module UInt32 = struct
 
   [%%versioned_binable
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t = Unsigned.UInt32.t
 

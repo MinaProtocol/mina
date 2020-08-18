@@ -49,13 +49,6 @@ module Undo = struct
           let to_latest = Fn.id
         end
       end]
-
-      type t = Stable.Latest.t =
-        { user_command: User_command.t With_status.t
-        ; previous_receipt_chain_hash: Receipt.Chain_hash.t
-        ; fee_payer_timing: Account.Timing.t
-        ; source_timing: Account.Timing.t option }
-      [@@deriving sexp]
     end
 
     module Body = struct
@@ -75,15 +68,6 @@ module Undo = struct
           let to_latest = Fn.id
         end
       end]
-
-      type t = Stable.Latest.t =
-        | Payment of {previous_empty_accounts: Account_id.t list}
-        | Stake_delegation of {previous_delegate: Public_key.Compressed.t}
-        | Create_new_token of {created_token: Token_id.t}
-        | Create_token_account
-        | Mint_tokens
-        | Failed
-      [@@deriving sexp]
     end
 
     [%%versioned
@@ -95,10 +79,6 @@ module Undo = struct
         let to_latest = Fn.id
       end
     end]
-
-    (* bin_io omitted *)
-    type t = Stable.Latest.t = {common: Common.t; body: Body.t}
-    [@@deriving sexp]
   end
 
   module Fee_transfer_undo = struct
@@ -113,10 +93,6 @@ module Undo = struct
         let to_latest = Fn.id
       end
     end]
-
-    type t = Stable.Latest.t =
-      {fee_transfer: Fee_transfer.t; previous_empty_accounts: Account_id.t list}
-    [@@deriving sexp]
   end
 
   module Coinbase_undo = struct
@@ -131,11 +107,6 @@ module Undo = struct
         let to_latest = Fn.id
       end
     end]
-
-    (* bin_io omitted *)
-    type t = Stable.Latest.t =
-      {coinbase: Coinbase.t; previous_empty_accounts: Account_id.t list}
-    [@@deriving sexp]
   end
 
   module Varying = struct
@@ -151,13 +122,6 @@ module Undo = struct
         let to_latest = Fn.id
       end
     end]
-
-    (* bin_io omitted *)
-    type t = Stable.Latest.t =
-      | User_command of User_command_undo.t
-      | Fee_transfer of Fee_transfer_undo.t
-      | Coinbase of Coinbase_undo.t
-    [@@deriving sexp]
   end
 
   [%%versioned
@@ -170,10 +134,6 @@ module Undo = struct
       let to_latest = Fn.id
     end
   end]
-
-  (* bin_io omitted *)
-  type t = Stable.Latest.t = {previous_hash: Ledger_hash.t; varying: Varying.t}
-  [@@deriving sexp]
 end
 
 module type S = sig

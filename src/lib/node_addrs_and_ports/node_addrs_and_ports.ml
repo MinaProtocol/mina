@@ -22,19 +22,11 @@ module Display = struct
         ; peer: Peer.Display.Stable.V1.t option
         ; libp2p_port: int
         ; client_port: int }
-      [@@deriving fields, yojson, bin_io, version, sexp]
+      [@@deriving fields, yojson, sexp]
 
       let to_latest = Fn.id
     end
   end]
-
-  type t = Stable.Latest.t =
-    { external_ip: string
-    ; bind_ip: string
-    ; peer: Peer.Display.Stable.Latest.t option
-    ; libp2p_port: int
-    ; client_port: int }
-  [@@deriving fields, yojson, sexp]
 end
 
 let to_display (t : t) =
