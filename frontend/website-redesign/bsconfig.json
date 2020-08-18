@@ -1,0 +1,27 @@
+{
+  "name": "website",
+  "sources": [
+    {
+      "dir": "src",
+      "subdirs": true
+    }
+  ],
+  "bs-dependencies": [
+    "reason-react",
+    "bs-css",
+    "bsc-stdlib-polyfill",
+    "bs-fetch"
+  ],
+  "reason": {
+    "react-jsx": 3
+  },
+  "package-specs": {
+    "module": "es6"
+  },
+  "suffix": ".bs.js",
+  "bsc-flags": [
+    "-bs-super-errors",
+    "-open BscStdlibPolyfill"
+  ],
+  "refmt": 3
+}
