@@ -180,7 +180,9 @@ let make = (~profiles) => {
       <div className=Styles.page>
         <div className=Styles.heroRow>
           <div className=Styles.heroText>
-            <h1 className=Styles.heroHeading> {React.string("Genesis")} </h1>
+            <h1 className=Styles.heroHeading>
+              {React.string("This is Genesis")}
+            </h1>
             <Spacer height=2. />
             <h3 className=Styles.heroH3>
               {React.string(
