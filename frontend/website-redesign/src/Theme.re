@@ -1,3 +1,5 @@
+open Css;
+
 module Colors = {
   let orange = `hex("ff603b");
   let mint = `hex("9fe4c9");
@@ -7,7 +9,6 @@ module Colors = {
 };
 
 module Typeface = {
-  open Css;
   let monumentGrotesk = fontFamily("Monument Grotesk, serif");
   let monumentGroteskMono = fontFamily("Monument Grotesk mono, serif");
   let ibmplexsans =
@@ -18,41 +19,292 @@ module Typeface = {
 module MediaQuery = {
   let tablet = "(min-width:48rem)";
   let desktop = "(min-width:90rem)";
-  
+
   /** to add a style to tablet and desktop, but not mobile */
   let notMobile = "(min-width:23.5rem)";
-  
+
   /** to add a style just to mobile  */
-  let mobile= "(max-width:48rem)";
+  let mobile = "(max-width:48rem)";
 };
 
-// module Type = {
-//   let h1jumbo = ...;
-//   let h1 = ...;
-//   let h2 = ...;
-//   let h3 = ...;
-//   let h4 = ...;
-//   let h5 = ...;
-//   let h6 = ...;
-//   let pageLabel = ...;
-//   let label = ...;
-//   let buttonLabel = ...;
-//   let navLink = ...;
-//   let sidebarLink = ...;
-//   let tooltip = ...;
-//   let creditName = ...;
-//   let metadata = ...;
-//   let announcement = ...;
-//   let pageSubhead = ...;
-//   let sectionSubhead = ...;
-//   let paragraph = ...;
-//   let paragraphSmall = ...;
-//   let paragraphMono = ...;
-//   let quote = ...;
-// };
+/** this function is needed to include the font files with the font styles */
+let generateStyles = rules => (Css.style(rules), rules);
+
+module Type = {
+  let h1jumbo =
+    style([
+      Typeface.monumentGrotesk,
+      fontWeight(`normal),
+      fontSize(`rem(3.5)),
+      lineHeight(`rem(4.1875)),
+      color(black),
+      media(
+        MediaQuery.tablet,
+        [fontSize(`rem(4.5)), lineHeight(`rem(5.4))],
+      ),
+    ]);
+
+  let h1basic =
+    style([
+      Typeface.monumentGrotesk,
+      fontWeight(`normal),
+      fontSize(`rem(2.25)),
+      lineHeight(`rem(2.7)),
+      color(black),
+      media(
+        MediaQuery.tablet,
+        [fontSize(`rem(3.0)), lineHeight(`rem(3.6))],
+      ),
+    ]);
+
+  let h2 =
+    style([
+      Typeface.monumentGrotesk,
+      fontSize(`rem(1.875)),
+      lineHeight(`rem(2.25)),
+      color(black),
+      media(
+        MediaQuery.tablet,
+        [fontSize(`rem(2.5)), lineHeight(`rem(3.))],
+      ),
+    ]);
+
+  let h3 =
+    style([
+      Typeface.monumentGrotesk,
+      fontSize(`rem(1.6)),
+      lineHeight(`rem(2.1)),
+      color(black),
+      media(
+        MediaQuery.tablet,
+        [fontSize(`rem(2.0)), lineHeight(`rem(2.375))],
+      ),
+    ]);
+
+  let h4MonoAllCaps =
+    style([
+      Typeface.monumentGrotesk,
+      fontSize(`rem(1.125)),
+      lineHeight(`rem(1.7)),
+      textTransform(`uppercase),
+      letterSpacing(`em(0.02)),
+      color(black),
+      media(
+        MediaQuery.tablet,
+        [fontSize(`rem(1.25)), lineHeight(`rem(1.9))],
+      ),
+    ]);
+
+  let h5 =
+    style([
+      Typeface.monumentGrotesk,
+      fontSize(`rem(1.3)),
+      lineHeight(`rem(1.56)),
+      color(black),
+      media(
+        MediaQuery.tablet,
+        [fontSize(`rem(1.5)), lineHeight(`rem(1.8))],
+      ),
+    ]);
+
+  let h6 =
+    style([
+      Typeface.monumentGrotesk,
+      fontSize(`rem(1.125)),
+      lineHeight(`rem(1.375)),
+      color(black),
+      media(
+        MediaQuery.tablet,
+        [fontSize(`rem(1.125)), lineHeight(`rem(1.4))],
+      ),
+    ]);
+
+  /** the following are specific component names, but use some styles already defined  */
+  let pageLabel =
+    style([
+      Typeface.monumentGrotesk,
+      fontSize(`rem(0.9)),
+      lineHeight(`rem(1.37)),
+      textTransform(`uppercase),
+      letterSpacing(`em(0.02)),
+      color(black),
+      media(
+        MediaQuery.tablet,
+        [fontSize(`rem(1.25)), lineHeight(`rem(1.875))],
+      ),
+    ]);
+
+  let label =
+    style([
+      Typeface.monumentGrotesk,
+      fontSize(`rem(0.75)),
+      lineHeight(`rem(1.)),
+      color(black),
+      textTransform(`uppercase),
+      letterSpacing(`em(0.03)),
+      media(
+        MediaQuery.tablet,
+        [fontSize(`rem(0.88)), lineHeight(`rem(1.))],
+      ),
+    ]);
+
+  let buttonLabel =
+    style([
+      Typeface.monumentGrotesk,
+      fontSize(`rem(0.75)),
+      fontWeight(`num(500)),
+      lineHeight(`rem(1.)),
+      color(black),
+      textTransform(`uppercase),
+      letterSpacing(`px(1)),
+    ]);
+
+  let link =
+    style([
+      Typeface.monumentGrotesk,
+      fontSize(`rem(1.125)),
+      lineHeight(`rem(1.7)),
+      color(Colors.orange),
+      hover([textDecoration(`underline)]),
+    ]);
+
+  let navLink =
+    style([
+      Typeface.monumentGrotesk,
+      fontSize(`rem(1.1)),
+      lineHeight(`rem(1.1)),
+      color(black),
+    ]);
+
+  let sidebarLink =
+    style([
+      Typeface.monumentGrotesk,
+      fontSize(`rem(1.)),
+      lineHeight(`rem(1.5)),
+      color(black),
+    ]);
+
+  let tooltip =
+    style([
+      Typeface.monumentGrotesk,
+      fontSize(`px(13)),
+      lineHeight(`rem(1.)),
+      color(black),
+    ]);
+
+  let creditName =
+    style([
+      Typeface.monumentGrotesk,
+      fontSize(`px(10)),
+      lineHeight(`rem(1.)),
+      letterSpacing(`em(-0.01)),
+    ]);
+
+  let metadata =
+    style([
+      Typeface.monumentGrotesk,
+      fontSize(`px(12)),
+      lineHeight(`rem(1.)),
+      letterSpacing(`em(0.05)),
+      textTransform(`uppercase),
+    ]);
+
+  let announcement =
+    style([
+      Typeface.monumentGrotesk,
+      fontWeight(`num(500)),
+      fontSize(`px(14)),
+      lineHeight(`rem(1.5)),
+    ]);
+
+  let errorMessage =
+    style([
+      Typeface.monumentGrotesk,
+      fontSize(`px(13)),
+      lineHeight(`rem(1.)),
+      color(`hex("e93939")),
+    ]);
+
+  let pageSubhead =
+    style([
+      Typeface.monumentGrotesk,
+      fontSize(`rem(1.125)),
+      lineHeight(`rem(1.68)),
+      color(black),
+      media(
+        MediaQuery.tablet,
+        [fontSize(`rem(1.31)), lineHeight(`rem(1.93))],
+      ),
+    ]);
+
+  let sectionSubhead =
+    style([
+      Typeface.monumentGrotesk,
+      fontSize(`rem(1.)),
+      lineHeight(`rem(1.5)),
+      letterSpacing(`px(-1)),
+      color(black),
+      media(
+        MediaQuery.tablet,
+        [fontSize(`rem(1.25)), lineHeight(`rem(1.875))],
+      ),
+    ]);
+
+  let paragraph =
+    style([
+      Typeface.monumentGrotesk,
+      fontSize(`rem(1.)),
+      lineHeight(`rem(1.5)),
+      color(black),
+      media(
+        MediaQuery.tablet,
+        [fontSize(`rem(1.125)), lineHeight(`rem(1.69))],
+      ),
+    ]);
+
+  let paragraphSmall =
+    style([
+      Typeface.monumentGrotesk,
+      fontSize(`rem(0.875)),
+      lineHeight(`rem(1.31)),
+      color(black),
+      media(
+        MediaQuery.tablet,
+        [fontSize(`rem(1.)), lineHeight(`rem(1.5))],
+      ),
+    ]);
+
+  let paragraphMono =
+    style([
+      Typeface.monumentGrotesk,
+      fontSize(`rem(1.)),
+      lineHeight(`rem(1.5)),
+      letterSpacing(`rem(0.03125)),
+      color(black),
+      media(
+        MediaQuery.tablet,
+        [
+          fontSize(`rem(1.)),
+          lineHeight(`rem(1.5)),
+          letterSpacing(`px(-1)),
+        ],
+      ),
+    ]);
+
+  let quote =
+    style([
+      Typeface.monumentGrotesk,
+      fontSize(`rem(1.31)),
+      lineHeight(`rem(1.875)),
+      letterSpacing(`em(-0.03)),
+      color(black),
+      media(
+        MediaQuery.tablet,
+        [fontSize(`rem(2.5)), lineHeight(`rem(3.125))],
+      ),
+    ]);
+};
 
 /** sets both paddingLeft and paddingRight, or paddingTop and paddingBottom as one should */
 let paddingX = m => Css.[paddingLeft(m), paddingRight(m)];
 let paddingY = m => Css.[paddingTop(m), paddingBottom(m)];
-
-let generateStyles = rules => (Css.style(rules), rules);
