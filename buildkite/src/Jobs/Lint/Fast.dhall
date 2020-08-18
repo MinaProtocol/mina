@@ -1,13 +1,15 @@
 let Prelude = ../../External/Prelude.dhall
 
 let S = ../../Lib/SelectFiles.dhall
-let Cmd = ../../Lib/Cmds.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
+let JobSpec = ../../Pipeline/JobSpec.dhall
+
+let Cmd = ../../Lib/Cmds.dhall
 let Command = ../../Command/Base.dhall
 let Docker = ../../Command/Docker/Type.dhall
+let OpamInit = ../../Command/OpamInit.dhall
 let Size = ../../Command/Size.dhall
-let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let commands =
   [
@@ -27,14 +29,33 @@ Pipeline.build
       name = "Fast"
     },
     steps = [
-    Command.build
-      Command.Config::{
-        commands = commands,
-        label = "Fast lint steps; CODEOWNERs, RFCs, Check Snarky Submodule, Preprocessor Deps",
-        key = "lint",
-        target = Size.Small,
-        docker = Some Docker::{ image = (../../Constants/ContainerImages.dhall).toolchainBase }
-      }
+      Command.build
+        Command.Config::{
+          commands = commands
+          , label = "Fast lint steps; CODEOWNERs, RFCs, Check Snarky Submodule, Preprocessor Deps"
+          , key = "lint"
+          , target = Size.Small
+          , docker = Some Docker::{ image = (../../Constants/ContainerImages.dhall).toolchainBase }
+        },
+      Command.build
+        Command.Config::{
+          commands = OpamInit.andThenRunInDocker
+                          (["CI=true", "BASE_BRANCH_NAME=$BUILDKITE_PULL_REQUEST_BASE_BRANCH" ])
+                          ("./scripts/compare_ci_diff_types.sh")
+          , label = "Optional fast lint steps; versions compatability changes"
+          , key = "lint-optional-types"
+          , target = Size.Medium
+          , docker = None Docker.Type
+        },
+      Command.build
+        Command.Config::{
+          commands = OpamInit.andThenRunInDocker
+                          (["CI=true", "BASE_BRANCH_NAME=$BUILDKITE_PULL_REQUEST_BASE_BRANCH" ])
+                          ("./scripts/compare_ci_diff_binables.sh")
+          , label = "Optional fast lint steps; binable compatability changes"
+          , key = "lint-optional-binable"
+          , target = Size.Medium
+          , docker = None Docker.Type
+        }
     ]
   }
-
