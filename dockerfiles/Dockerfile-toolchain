@@ -44,11 +44,6 @@ RUN sudo apt-get update && sudo apt-get install --yes \
     libbz2-dev \
     apt-transport-https
 
-# terraform
-RUN curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo apt-key add -
-RUN sudo apt-add-repository "deb [arch=amd64] https://apt.releases.hashicorp.com $(lsb_release -cs) main"
-RUN sudo apt-get update && sudo apt-get install terraform
-
 RUN sudo pip install awscli readchar
 
 RUN sudo pip3 install sexpdata
