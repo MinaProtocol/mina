@@ -1,3 +1,4 @@
+open Core_kernel
 module Nat = Nat
 
 module type Nat_intf = Nat.Intf
@@ -65,7 +66,7 @@ let zip xs ys = map2 xs ys ~f:(fun x y -> (x, y))
 let rec to_list : type a n. (a, n) t -> a list =
  fun t -> match t with [] -> [] | x :: xs -> x :: to_list xs
 
-let sexp_of_t a _ v = Core_kernel.List.sexp_of_t a (to_list v)
+let sexp_of_t a _ v = List.sexp_of_t a (to_list v)
 
 let to_array t = Array.of_list (to_list t)
 
@@ -103,9 +104,7 @@ let mapi (type a b m) (t : (a, m) t) ~(f : int -> a -> b) =
 let unzip ts = (map ts ~f:fst, map ts ~f:snd)
 
 let unzip3 ts =
-  ( map ts ~f:Core_kernel.Tuple3.get1
-  , map ts ~f:Core_kernel.Tuple3.get2
-  , map ts ~f:Core_kernel.Tuple3.get3 )
+  (map ts ~f:Tuple3.get1, map ts ~f:Tuple3.get2, map ts ~f:Tuple3.get3)
 
 type _ e = T : ('a, 'n) t -> 'a e
 
@@ -115,6 +114,11 @@ let rec of_list : type a. a list -> a e = function
   | x :: xs ->
       let (T xs) = of_list xs in
       T (x :: xs)
+
+let to_sequence : type a n. (a, n) t -> a Sequence.t =
+ fun t ->
+  Sequence.unfold ~init:(T t) ~f:(fun (T t) ->
+      match t with [] -> None | x :: xs -> Some (x, T xs) )
 
 let rec of_list_and_length_exn : type a n. a list -> n nat -> (a, n) t =
  fun xs n ->
@@ -127,13 +131,13 @@ let rec of_list_and_length_exn : type a n. a list -> n nat -> (a, n) t =
       failwith "Vector: Length mismatch"
 
 let of_list_and_length xs n =
-  Core_kernel.Option.try_with (fun () -> of_list_and_length_exn xs n)
+  Option.try_with (fun () -> of_list_and_length_exn xs n)
 
 let of_array_and_length_exn : type a n. a array -> n nat -> (a, n) t =
  fun xs n ->
   if Array.length xs <> Nat.to_int n then
-    Core_kernel.failwithf "of_array_and_length_exn: got %d (expected %d)"
-      (Array.length xs) (Nat.to_int n) () ;
+    failwithf "of_array_and_length_exn: got %d (expected %d)" (Array.length xs)
+      (Nat.to_int n) () ;
   init n ~f:(Array.get xs)
 
 let reverse t =
@@ -171,8 +175,6 @@ let reduce_exn (type n) (t : (_, n) t) ~f =
       failwith "reduce_exn: empty list"
   | init :: xs ->
       fold xs ~f ~init
-
-open Core_kernel
 
 module Cata (F : sig
   type _ t
