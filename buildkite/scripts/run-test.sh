@@ -10,12 +10,12 @@ git_hash=$(git rev-parse --short=7 HEAD)
 
 coda_daemon_image="codaprotocol/coda-daemon:${git_tag}-${git_branch}-${git_hash}"
 
-echo "Waiting for coda-daemon image to appear in docker registry"
-for i in $(seq 60); do
-    docker pull "$coda_daemon_image" && break
-    [ "$i" != 30 ] || (echo "coda-daemon image never appeared in docker registry" && exit 1)
-    sleep 60
-done
+# echo "Waiting for coda-daemon image to appear in docker registry"
+# for i in $(seq 60); do
+#     docker pull "$coda_daemon_image" && break
+#     [ "$i" != 30 ] || (echo "coda-daemon image never appeared in docker registry" && exit 1)
+#     sleep 60
+# done
 
 # Building test-executive
 
