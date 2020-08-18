@@ -9,7 +9,6 @@ set -e
 
 # cleanup if needed
 
-ssh -o "StrictHostKeyChecking=no" git@github.com
 git clean -dfx
 rm -rf base
 
