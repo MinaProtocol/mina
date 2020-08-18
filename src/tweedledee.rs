@@ -18,6 +18,7 @@ use ff_fft::{DensePolynomial, EvaluationDomain, Evaluations, Radix2EvaluationDom
 use oracle::{
     self,
     sponge::{DefaultFqSponge, DefaultFrSponge, ScalarChallenge},
+    poseidon::{MarlinSpongeConstants},
 };
 
 use rand::rngs::StdRng;
@@ -1146,7 +1147,7 @@ pub extern "C" fn zexe_tweedle_fp_oracles_create(
     let x_hat_comm = index.srs.get_ref().commit(&x_hat, None);
 
     let (mut sponge, o) = proof
-        .oracles::<DefaultFqSponge<TweedledeeParameters>, DefaultFrSponge<Fp>>(
+        .oracles::<DefaultFqSponge<TweedledeeParameters, MarlinSpongeConstants>, DefaultFrSponge<Fp, MarlinSpongeConstants>>(
             index, x_hat_comm, &x_hat,
         );
     let opening_prechallenges = proof.proof.prechallenges(&mut sponge);
@@ -1280,7 +1281,7 @@ pub extern "C" fn zexe_tweedle_fp_proof_create(
     let rng = &mut rand_core::OsRng;
 
     let map = <GAffine as CommitmentCurve>::Map::setup();
-    let proof = DlogProof::create::<DefaultFqSponge<TweedledeeParameters>, DefaultFrSponge<Fp>>(
+    let proof = DlogProof::create::<DefaultFqSponge<TweedledeeParameters, MarlinSpongeConstants>, DefaultFrSponge<Fp, MarlinSpongeConstants>>(
         &map, &witness, &index, prev, rng,
     )
     .unwrap();
@@ -1297,7 +1298,7 @@ pub extern "C" fn zexe_tweedle_fp_proof_verify(
     let proof = unsafe { (*proof).clone() };
     let group_map = <GAffine as CommitmentCurve>::Map::setup();
 
-    DlogProof::verify::<DefaultFqSponge<TweedledeeParameters>, DefaultFrSponge<Fp>>(
+    DlogProof::verify::<DefaultFqSponge<TweedledeeParameters, MarlinSpongeConstants>, DefaultFrSponge<Fp, MarlinSpongeConstants>>(
         &group_map,
         &[proof].to_vec(),
         &index,
@@ -1315,7 +1316,7 @@ pub extern "C" fn zexe_tweedle_fp_proof_batch_verify(
     let proofs = unsafe { &(*proofs) };
     let group_map = <GAffine as CommitmentCurve>::Map::setup();
 
-    DlogProof::<GAffine>::verify::<DefaultFqSponge<TweedledeeParameters>, DefaultFrSponge<Fp>>(
+    DlogProof::<GAffine>::verify::<DefaultFqSponge<TweedledeeParameters, MarlinSpongeConstants>, DefaultFrSponge<Fp, MarlinSpongeConstants>>(
         &group_map,
         proofs,
         index,

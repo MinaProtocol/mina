@@ -12,7 +12,7 @@ use algebra::{
 };
 
 use num_bigint::BigUint;
-use oracle::{self, poseidon, poseidon::Sponge};
+use oracle::{self, poseidon, poseidon::{Sponge, MarlinSpongeConstants as SC}};
 
 // Bigint stubs
 
@@ -297,19 +297,19 @@ pub extern "C" fn camlsnark_bn382_fp_sponge_params_delete(
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_sponge_create() -> *mut poseidon::ArithmeticSponge<Fp> {
-    let ret = oracle::poseidon::ArithmeticSponge::<Fp>::new();
+pub extern "C" fn camlsnark_bn382_fp_sponge_create() -> *mut poseidon::ArithmeticSponge<Fp, SC> {
+    let ret = oracle::poseidon::ArithmeticSponge::<Fp, SC>::new();
     return Box::into_raw(Box::new(ret));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_sponge_delete(x: *mut poseidon::ArithmeticSponge<Fp>) {
+pub extern "C" fn camlsnark_bn382_fp_sponge_delete(x: *mut poseidon::ArithmeticSponge<Fp, SC>) {
     let _box = unsafe { Box::from_raw(x) };
 }
 
 #[no_mangle]
 pub extern "C" fn camlsnark_bn382_fp_sponge_absorb(
-    sponge: *mut poseidon::ArithmeticSponge<Fp>,
+    sponge: *mut poseidon::ArithmeticSponge<Fp, SC>,
     params: *const poseidon::ArithmeticSpongeParams<Fp>,
     x: *const Fp,
 ) {
@@ -322,7 +322,7 @@ pub extern "C" fn camlsnark_bn382_fp_sponge_absorb(
 
 #[no_mangle]
 pub extern "C" fn camlsnark_bn382_fp_sponge_squeeze(
-    sponge: *mut poseidon::ArithmeticSponge<Fp>,
+    sponge: *mut poseidon::ArithmeticSponge<Fp, SC>,
     params: *const poseidon::ArithmeticSpongeParams<Fp>,
 ) -> *mut Fp {
     let sponge = unsafe { &mut (*sponge) };

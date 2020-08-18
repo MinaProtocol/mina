@@ -18,6 +18,7 @@ use ff_fft::{DensePolynomial, EvaluationDomain, Evaluations, Radix2EvaluationDom
 use oracle::{
     self,
     sponge::{DefaultFqSponge, DefaultFrSponge, ScalarChallenge},
+    poseidon::{MarlinSpongeConstants as SC},
 };
 
 use rand::rngs::StdRng;
@@ -1135,7 +1136,7 @@ pub extern "C" fn zexe_bn382_fq_oracles_create(
     // TODO: Should have no degree bound when we add the correct degree bound method
     let x_hat_comm = index.srs.get_ref().commit(&x_hat, None);
 
-    let (mut sponge, o) = proof.oracles::<DefaultFqSponge<Bn_382GParameters>, DefaultFrSponge<Fq>>(
+    let (mut sponge, o) = proof.oracles::<DefaultFqSponge<Bn_382GParameters, SC>, DefaultFrSponge<Fq, SC>>(
         index, x_hat_comm, &x_hat,
     );
     let opening_prechallenges = proof.proof.prechallenges(&mut sponge);
@@ -1269,7 +1270,7 @@ pub extern "C" fn zexe_bn382_fq_proof_create(
     let rng = &mut rand_core::OsRng;
 
     let map = <Affine as CommitmentCurve>::Map::setup();
-    let proof = DlogProof::create::<DefaultFqSponge<Bn_382GParameters>, DefaultFrSponge<Fq>>(
+    let proof = DlogProof::create::<DefaultFqSponge<Bn_382GParameters, SC>, DefaultFrSponge<Fq, SC>>(
         &map, &witness, &index, prev, rng,
     )
     .unwrap();
@@ -1286,7 +1287,7 @@ pub extern "C" fn zexe_bn382_fq_proof_verify(
     let proof = unsafe { (*proof).clone() };
     let group_map = <Affine as CommitmentCurve>::Map::setup();
 
-    DlogProof::verify::<DefaultFqSponge<Bn_382GParameters>, DefaultFrSponge<Fq>>(
+    DlogProof::verify::<DefaultFqSponge<Bn_382GParameters, SC>, DefaultFrSponge<Fq, SC>>(
         &group_map,
         &[proof].to_vec(),
         &index,
@@ -1304,7 +1305,7 @@ pub extern "C" fn zexe_bn382_fq_proof_batch_verify(
     let proofs = unsafe { &(*proofs) };
     let group_map = <Affine as CommitmentCurve>::Map::setup();
 
-    DlogProof::<GAffine>::verify::<DefaultFqSponge<Bn_382GParameters>, DefaultFrSponge<Fq>>(
+    DlogProof::<GAffine>::verify::<DefaultFqSponge<Bn_382GParameters, SC>, DefaultFrSponge<Fq, SC>>(
         &group_map,
         proofs,
         index,

@@ -20,7 +20,7 @@ use oracle::{
     self,
     sponge::{DefaultFqSponge, DefaultFrSponge},
     poseidon,
-    poseidon::Sponge,
+    poseidon::{Sponge, MarlinSpongeConstants as SC},
 };
 use marlin_protocol_pairing::prover::{ProofEvaluations, ProverProof, RandomOracles};
 use rand::rngs::StdRng;
@@ -450,7 +450,7 @@ pub extern "C" fn zexe_bn382_fp_proof_create(
 
     let witness = prepare_witness(index.domains, primary_input, auxiliary_input);
 
-    let proof = ProverProof::create::<DefaultFqSponge<Bn_382G1Parameters>, DefaultFrSponge<Fp>>(
+    let proof = ProverProof::create::<DefaultFqSponge<Bn_382G1Parameters, SC>, DefaultFrSponge<Fp, SC>>(
         &witness, &index,
     )
     .unwrap();
@@ -467,7 +467,7 @@ pub extern "C" fn zexe_bn382_fp_proof_batch_verify(
     let index = unsafe { &(*index) };
     let proofs = unsafe { &(*proofs) };
 
-    match ProverProof::<Bn_382>::verify::<DefaultFqSponge<Bn_382G1Parameters>, DefaultFrSponge<Fp>>(
+    match ProverProof::<Bn_382>::verify::<DefaultFqSponge<Bn_382G1Parameters, SC>, DefaultFrSponge<Fp, SC>>(
         proofs,
         index,
         &mut rand_core::OsRng,
@@ -485,7 +485,7 @@ pub extern "C" fn zexe_bn382_fp_proof_verify(
     let index = unsafe { &(*index) };
     let proof = unsafe { (*proof).clone() };
 
-    match ProverProof::verify::<DefaultFqSponge<Bn_382G1Parameters>, DefaultFrSponge<Fp>>(
+    match ProverProof::verify::<DefaultFqSponge<Bn_382G1Parameters, SC>, DefaultFrSponge<Fp, SC>>(
         &[proof].to_vec(),
         &index,
         &mut rand_core::OsRng,
@@ -875,7 +875,7 @@ pub extern "C" fn zexe_bn382_fp_oracles_create(
     let x_hat_comm = index.urs.commit(&x_hat).unwrap();
 
     let oracles = proof
-        .oracles::<DefaultFqSponge<Bn_382G1Parameters>, DefaultFrSponge<Fp>>(
+        .oracles::<DefaultFqSponge<Bn_382G1Parameters, SC>, DefaultFrSponge<Fp, SC>>(
             index, x_hat_comm, &x_hat,
         )
         .unwrap();
@@ -1721,19 +1721,19 @@ pub extern "C" fn zexe_bn382_fq_sponge_params_delete(x: *mut poseidon::Arithmeti
 }
 
 #[no_mangle]
-pub extern "C" fn zexe_bn382_fq_sponge_create() -> *mut poseidon::ArithmeticSponge<Fq> {
-    let ret = oracle::poseidon::ArithmeticSponge::<Fq>::new();
+pub extern "C" fn zexe_bn382_fq_sponge_create() -> *mut poseidon::ArithmeticSponge<Fq, SC> {
+    let ret = oracle::poseidon::ArithmeticSponge::<Fq, SC>::new();
     return Box::into_raw(Box::new(ret));
 }
 
 #[no_mangle]
-pub extern "C" fn zexe_bn382_fq_sponge_delete(x: *mut poseidon::ArithmeticSponge<Fp>) {
+pub extern "C" fn zexe_bn382_fq_sponge_delete(x: *mut poseidon::ArithmeticSponge<Fp, SC>) {
     let _box = unsafe { Box::from_raw(x) };
 }
 
 #[no_mangle]
 pub extern "C" fn zexe_bn382_fq_sponge_absorb(
-    sponge: *mut poseidon::ArithmeticSponge<Fq>,
+    sponge: *mut poseidon::ArithmeticSponge<Fq, SC>,
     params: *const poseidon::ArithmeticSpongeParams<Fq>,
     x: *const Fq,
 ) {
@@ -1746,7 +1746,7 @@ pub extern "C" fn zexe_bn382_fq_sponge_absorb(
 
 #[no_mangle]
 pub extern "C" fn zexe_bn382_fq_sponge_squeeze(
-    sponge: *mut poseidon::ArithmeticSponge<Fq>,
+    sponge: *mut poseidon::ArithmeticSponge<Fq, SC>,
     params: *const poseidon::ArithmeticSpongeParams<Fq>,
 ) -> *mut Fq {
     let sponge = unsafe { &mut (*sponge) };
