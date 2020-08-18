@@ -131,3 +131,71 @@ module type Base58_check_intf = sig
 
   include Base58_check_base_intf with type t := t
 end
+
+module Hex = struct
+  (** Hex-encode data *)
+
+  (** to_hex : {0x0-0xff}* -> [A-F0-9]* *)
+  let to_hex (data : string) : string =
+    String.to_list data
+    |> List.map ~f:(fun c ->
+           let charify u4 =
+             match u4 with
+             | x when x <= 9 && x >= 0 ->
+                 Char.(of_int_exn @@ (x + to_int '0'))
+             | x when x <= 15 && x >= 10 ->
+                 Char.(of_int_exn @@ (x - 10 + to_int 'A'))
+             | _ ->
+                 failwith "Unexpected u4 has only 4bits of information"
+           in
+           let high = charify @@ ((Char.to_int c land 0xF0) lsr 4) in
+           let lo = charify (Char.to_int c land 0x0F) in
+           String.of_char_list [high; lo] )
+    |> String.concat
+
+  let%test_unit "to_hex sane" =
+    let start = "a" in
+    let hexified = to_hex start in
+    let expected = "61" in
+    if String.equal expected hexified then ()
+    else
+      failwithf "start: %s ; hexified : %s ; expected: %s" start hexified
+        expected ()
+
+  (** of_hex : [a-fA-F0-9]* -> {0x0-0xff}* option *)
+  let of_hex (hex : string) : string option =
+    let to_u4 c =
+      let open Char in
+      assert (is_alphanum c) ;
+      match c with
+      | _ when is_digit c ->
+          to_int c - to_int '0'
+      | _ when is_uppercase c ->
+          to_int c - to_int 'A' + 10
+      | _ (* when is_alpha *) ->
+          to_int c - to_int 'a' + 10
+    in
+    String.to_list hex |> List.chunks_of ~length:2
+    |> List.fold_result ~init:[] ~f:(fun acc chunk ->
+           match chunk with
+           | [a; b] when Char.is_alphanum a && Char.is_alphanum b ->
+               Or_error.return
+               @@ (Char.((to_u4 a lsl 4) lor to_u4 b |> of_int_exn) :: acc)
+           | _ ->
+               Or_error.error_string "invalid hex" )
+    |> Or_error.ok
+    |> Option.map ~f:(Fn.compose String.of_char_list List.rev)
+
+  let%test_unit "partial isomorphism" =
+    Quickcheck.test ~sexp_of:[%sexp_of: string] ~examples:["\243"; "abc"]
+      Quickcheck.Generator.(map (list char) ~f:String.of_char_list)
+      ~f:(fun s ->
+        let hexified = to_hex s in
+        let actual = of_hex hexified |> Option.value_exn in
+        let expected = s in
+        if String.equal actual expected then ()
+        else
+          failwithf
+            !"expected: %s ; hexified: %s ; actual: %s"
+            expected hexified actual () )
+end
