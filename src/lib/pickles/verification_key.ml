@@ -80,4 +80,6 @@ let dummy =
       ; constraints= 0
       ; nonzero_entries= 0
       ; max_degree= 0 } }
-  |> of_repr (Snarky_bn382.Tweedle.Dee.Field_urs.create Unsigned.Size_t.one)
+  |> of_repr
+       (Snarky_bn382.Tweedle.Dee.Field_urs.create Unsigned.Size_t.one
+          Unsigned.Size_t.one Unsigned.Size_t.one)
