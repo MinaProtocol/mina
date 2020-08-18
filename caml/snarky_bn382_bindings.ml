@@ -1049,7 +1049,9 @@ module Full (F : Ctypes.FOREIGN) = struct
 
       open F
 
-      let create = foreign (prefix "create") (size_t @-> returning typ)
+      let create =
+        foreign (prefix "create")
+          (size_t @-> size_t @-> size_t @-> returning typ)
 
       let read = foreign (prefix "read") (string @-> returning typ)
 
@@ -1326,7 +1328,9 @@ module Full (F : Ctypes.FOREIGN) = struct
 
       open F
 
-      let create = foreign (prefix "create") (size_t @-> returning typ)
+      let create =
+        foreign (prefix "create")
+          (size_t @-> size_t @-> size_t @-> returning typ)
 
       let read = foreign (prefix "read") (string @-> returning typ)
 

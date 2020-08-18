@@ -42,8 +42,8 @@ use marlin_protocol_dlog::prover::{ProofEvaluations as DlogProofEvaluations, Pro
 
 // Fp URS stubs
 #[no_mangle]
-pub extern "C" fn zexe_tweedle_fp_urs_create(depth: usize) -> *const SRS<GAffine> {
-    Box::into_raw(Box::new(SRS::create(depth)))
+pub extern "C" fn zexe_tweedle_fp_urs_create(depth: usize, public: usize, size: usize) -> *const SRS<GAffine> {
+    Box::into_raw(Box::new(SRS::create(depth, public, size)))
 }
 
 #[no_mangle]

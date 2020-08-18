@@ -44,8 +44,8 @@ use algebra::bn_382::g::Affine;
 
 // Fq URS stubs
 #[no_mangle]
-pub extern "C" fn zexe_bn382_fq_urs_create(depth: usize) -> *const SRS<GAffine> {
-    Box::into_raw(Box::new(SRS::create(depth)))
+pub extern "C" fn zexe_bn382_fq_urs_create(depth: usize, public: usize, size: usize) -> *const SRS<GAffine> {
+    Box::into_raw(Box::new(SRS::create(depth, public, size)))
 }
 
 #[no_mangle]

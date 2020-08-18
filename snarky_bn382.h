@@ -329,7 +329,7 @@ void* zexe_bn382_fp_urs_dummy_opening_check(void*);
 void* zexe_bn382_fp_urs_dummy_degree_bound_checks(void*, void*);
 
 // Fq URS
-void *zexe_bn382_fq_urs_create(size_t);
+void *zexe_bn382_fq_urs_create(size_t, size_t, size_t);
 void zexe_bn382_fq_urs_write(void*, char*);
 void* zexe_bn382_fq_urs_read(char*);
 void* zexe_bn382_fq_urs_lagrange_commitment(void*, size_t, size_t);
@@ -715,7 +715,7 @@ void *zexe_tweedle_fq_verifier_index_c_val_comm(void*);
 void *zexe_tweedle_fq_verifier_index_c_rc_comm(void*);
 
 // Fq URS
-void *zexe_tweedle_fq_urs_create(size_t);
+void *zexe_tweedle_fq_urs_create(size_t, size_t, size_t);
 void zexe_tweedle_fq_urs_write(void*, char*);
 void* zexe_tweedle_fq_urs_read(char*);
 void* zexe_tweedle_fq_urs_lagrange_commitment(void*, size_t, size_t);
@@ -979,7 +979,7 @@ void *zexe_tweedle_fp_verifier_index_c_val_comm(void*);
 void *zexe_tweedle_fp_verifier_index_c_rc_comm(void*);
 
 // Fq URS
-void *zexe_tweedle_fp_urs_create(size_t);
+void *zexe_tweedle_fp_urs_create(size_t, size_t, size_t);
 void zexe_tweedle_fp_urs_write(void*, char*);
 void* zexe_tweedle_fp_urs_read(char*);
 void* zexe_tweedle_fp_urs_lagrange_commitment(void*, size_t, size_t);
