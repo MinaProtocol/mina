@@ -26,7 +26,9 @@ Pipeline.build
     , steps =
       [ Command.build
           Command.Config::
-            { commands = OpamInit.andThenRunInDocker ["CI=true", "BASE_BRANCH_NAME=$BUILDKITE_PULL_REQUEST_BASE_BRANCH" ] "./scripts/compare_ci_diff_types.sh"
+            { commands = [ Cmd.run "git config http.sslVerify false" ] # OpamInit.andThenRunInDocker
+                            (["CI=true", "BASE_BRANCH_NAME=$BUILDKITE_PULL_REQUEST_BASE_BRANCH" ])
+                            ("./scripts/compare_ci_diff_types.sh")
             , label = "Compare CI diff types"
             , key = "lint-diff-types"
             , target = Size.Medium
@@ -34,7 +36,9 @@ Pipeline.build
             },
         Command.build
           Command.Config::
-            { commands = OpamInit.andThenRunInDocker ["CI=true", "BASE_BRANCH_NAME=$BUILDKITE_PULL_REQUEST_BASE_BRANCH" ] "./scripts/compare_ci_diff_binables.sh"
+            { commands = [ Cmd.run "git config http.sslVerify false" ] # OpamInit.andThenRunInDocker
+                            (["CI=true", "BASE_BRANCH_NAME=$BUILDKITE_PULL_REQUEST_BASE_BRANCH" ])
+                            ("./scripts/compare_ci_diff_binables.sh")
             , label = "Compare CI diff binables"
             , key = "lint-diff-binables"
             , target = Size.Medium
