@@ -33,6 +33,10 @@ echo $BUILDKITE_GS_APPLICATION_CREDENTIALS_JSON > credential.json
 
 export GOOGLE_APPLICATION_CREDENTIALS="credential.json"
 
+# Set default region for AWS
+
+export AWS_DEFAULT_REGION=$AWS_REGION
+
 # Run test executive
 
 ./_build/default/src/app/test_executive/test_executive.exe --coda-image "$coda_daemon_image" block-production

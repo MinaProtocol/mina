@@ -13,12 +13,17 @@ let name = "BlockProductionTest"
 let runTestExecutive =
   Command.build
     Command.Config::
-      { commands = OpamInit.andThenRunInDocker (["BUILDKITE_GS_APPLICATION_CREDENTIALS_JSON"]) "bash buildkite/scripts/run-test.sh"
+      { commands = OpamInit.andThenRunInDocker
+          ([ "BUILDKITE_GS_APPLICATION_CREDENTIALS_JSON"
+           , "AWS_ACCESS_KEY_ID"
+           , "AWS_SECRET_ACCESS_KEY"
+           , "AWS_REGION"
+           ]) "bash buildkite/scripts/run-test.sh"
       , label = "Build and run test-executive"
       , key = "run-test-executive"
       , target = Size.Large
       , docker = None Docker.Type
-      , depends_on = [ { name = "Artifact", key = "artifacts-build" } ]
+      , depends_on = [ { name = "Artifact", key = "docker-artifact" } ]
       }
 in
 Pipeline.build
