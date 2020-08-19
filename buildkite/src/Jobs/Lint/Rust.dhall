@@ -6,8 +6,11 @@ let Cmd = ../../Lib/Cmds.dhall
 let Pipeline = ../../Pipeline/Dsl.dhall
 let Command = ../../Command/Base.dhall
 let Docker = ../../Command/Docker/Type.dhall
+let OpamInit = ../../Command/OpamInit.dhall
 let Size = ../../Command/Size.dhall
 let JobSpec = ../../Pipeline/JobSpec.dhall
+
+in
 
 Pipeline.build
   Pipeline.Config::{

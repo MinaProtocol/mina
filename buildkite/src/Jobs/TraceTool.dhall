@@ -1,15 +1,17 @@
-let Prelude = ../../External/Prelude.dhall
+let Prelude = ../External/Prelude.dhall
 
-let S = ../../Lib/SelectFiles.dhall
-let Cmd = ../../Lib/Cmds.dhall
+let S = ../Lib/SelectFiles.dhall
+let Cmd = ../Lib/Cmds.dhall
 
-let Pipeline = ../../Pipeline/Dsl.dhall
-let JobSpec = ../../Pipeline/JobSpec.dhall
+let Pipeline = ../Pipeline/Dsl.dhall
+let JobSpec = ../Pipeline/JobSpec.dhall
 
-let Command = ../../Command/Base.dhall
-let Docker = ../../Command/Docker/Type.dhall
-let OpamInit = ../../Command/OpamInit.dhall
-let Size = ../../Command/Size.dhall
+let Command = ../Command/Base.dhall
+let Docker = ../Command/Docker/Type.dhall
+let OpamInit = ../Command/OpamInit.dhall
+let Size = ../Command/Size.dhall
+
+in
 
 Pipeline.build
   Pipeline.Config::{
