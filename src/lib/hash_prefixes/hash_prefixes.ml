@@ -26,6 +26,12 @@ let protocol_state_body = create "CodaProtoStateBody"
 
 let account = create "CodaAccount"
 
+let side_loaded_vk = create "CodaSideLoadedVk"
+
+let snapp_account = create "CodaSnappAccount"
+
+let snapp_payload = create "CodaSnappPayload"
+
 let merkle_tree i = create (Printf.sprintf "CodaMklTree%03d" i)
 
 let coinbase_merkle_tree i = create (Printf.sprintf "CodaCbMklTree%03d" i)
@@ -38,7 +44,9 @@ let transition_system_snark = create "CodaTransitionSnark"
 
 let signature = create "CodaSignature"
 
-let receipt_chain = create "CodaReceiptChain"
+let receipt_chain_user_command = create "CodaReceiptUC"
+
+let receipt_chain_snapp = create "CodaReceiptSnapp"
 
 let epoch_seed = create "CodaEpochSeed"
 
@@ -60,3 +68,7 @@ let coinbase = create "Coinbase"
 let checkpoint_list = create "CodaCheckpoints"
 
 let bowe_gabizon_hash = create "CodaTockBGHash"
+
+let snapp_predicate_account = create "CodaSnappPredAcct"
+
+let snapp_predicate_protocol_state = create "CodaSnappPredPS"

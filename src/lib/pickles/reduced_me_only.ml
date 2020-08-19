@@ -12,7 +12,7 @@ open Backend
 module Pairing_based = struct
   type ('s, 'sgs, 'bpcs) t =
     {app_state: 's; sg: 'sgs; old_bulletproof_challenges: 'bpcs}
-  [@@deriving sexp, bin_io, yojson, sexp, compare]
+  [@@deriving sexp, bin_io, yojson, sexp, compare, hash, eq]
 
   let prepare ~dlog_marlin_index {app_state; sg; old_bulletproof_challenges} =
     { Pairing_based.Proof_state.Me_only.app_state
@@ -29,7 +29,7 @@ module Dlog_based = struct
       , bool )
       Bulletproof_challenge.t
       Wrap_bp_vec.t
-    [@@deriving bin_io, sexp, compare, yojson]
+    [@@deriving bin_io, sexp, compare, yojson, hash, eq]
 
     module Prepared = struct
       type t = (Tock.Field.t, Tock.Rounds.n) Vector.t

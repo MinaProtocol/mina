@@ -3,7 +3,7 @@
  (public_name transaction_snark_scan_state)
  (library_flags -linkall)
  (libraries pipe_lib core async async_extra sgn parallel_scan
-   transaction_snark coda_base ledger_proof staged_ledger_hash transaction_snark_work transaction_witness snark_work_lib snark_params logger coda_state ppx_deriving_yojson.runtime
+   transaction_snark coda_base ledger_proof transaction_snark_work transaction_witness snark_work_lib snark_params logger coda_state ppx_deriving_yojson.runtime
    yojson)
  (preprocessor_deps ../../config.mlh)
  (preprocess
