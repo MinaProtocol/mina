@@ -1082,24 +1082,24 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           let%map () =
             match loc with
             | `Existing _ ->
-                Error User_command_status.Failure.Receiver_already_exists
+                Error (failure Receiver_already_exists)
             | `New ->
                 Ok ()
           in
           (loc, acct)
         in
-        let get_existing_snapp k (e : User_command_status.Failure.t) =
+        let get_existing_snapp k e =
           let (((s, _), _) as t) =
             get_snapp_account_with_location ledger k |> ok_or_reject
           in
-          let%map () = check_exists s e in
+          let%map () = check_exists s (failure e) in
           t
         in
-        let get_existing_user k (e : User_command_status.Failure.t) =
+        let get_existing_user k e =
           let ((s, _) as t) =
             get_user_account_with_location ledger k |> ok_or_reject
           in
-          let%map () = check_exists s e in
+          let%map () = check_exists s (failure e) in
           t
         in
         let open Snapp_command in
@@ -1145,9 +1145,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                (opt "Could not convert transaction to payload" (to_payload c)))
         in
         let validate_timing a txn_amount =
-          Or_error.ok_exn
-            (validate_timing ~txn_amount ~txn_global_slot:current_global_slot
-               ~account:a)
+          validate_timing ~txn_amount ~txn_global_slot:current_global_slot
+            ~account:a
         in
         let step ?amount (a : Account.t) =
           { a with
@@ -1155,8 +1154,15 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           ; receipt_chain_hash=
               Receipt.Chain_hash.cons payload a.receipt_chain_hash
           ; timing=
-              Option.value_map amount ~default:a.timing ~f:(validate_timing a)
-          }
+              Option.value_map amount ~default:a.timing
+                ~f:(Fn.compose Or_error.ok_exn (validate_timing a)) }
+        in
+        let check_timing acct amount =
+          match validate_timing acct amount with
+          | Ok timing ->
+              Ok {acct with timing}
+          | Error _ ->
+              Error (failure Source_insufficient_balance)
         in
         let step_fee_payer a fee =
           let f = Amount.of_fee fee in
@@ -1264,7 +1270,13 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                   in
                   (acct1, acct2, None)
               | `Other x ->
-                  (step acct1, step acct2, Some (pay_fee x))
+                  let acct1, acct2 =
+                    as_sender_receiver (acct1, acct2)
+                      (fun (sender, receiver) ->
+                        (step ~amount:snapp1_base_delta sender, step receiver)
+                    )
+                  in
+                  (acct1, acct2, Some (pay_fee x))
             in
             (* The predicates should be run on each account's state prior to its being stepped, but
              the fee must be paid unconditionally, so this comes after that. 
@@ -1277,17 +1289,26 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             (* Update balances. *)
             let%map acct1', acct2' =
               with_return (fun {return} ->
-                  let modify_balance (a : Account.t) f
-                      (e : User_command_status.Failure.t) =
+                  let fail (e : User_command_status.Failure.t) =
+                    return (Error e)
+                  in
+                  let modify_balance (a : Account.t) f e =
                     match f a.balance snapp1_base_delta with
                     | Some balance ->
                         {a with balance}
                     | None ->
-                        return (Error e)
+                        fail e
                   in
                   Ok
                     (as_sender_receiver (acct1', acct2')
                        (fun (sender, receiver) ->
+                         let sender =
+                           match validate_timing sender snapp1_base_delta with
+                           | Ok timing ->
+                               {sender with timing}
+                           | Error _ ->
+                               fail Source_insufficient_balance
+                         in
                          ( modify_balance sender Balance.sub_amount
                              Source_insufficient_balance
                          , modify_balance receiver Balance.add_amount Overflow
@@ -1358,6 +1379,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                been appropriately stepped above.
             *)
             let%map acct_u' =
+              (* Check the source timing. *)
+              let%bind acct_u' = check_timing acct_u' amount in
               let%map balance =
                 sub_amount acct_u'.balance amount
                 |> with_err Source_insufficient_balance
@@ -1398,6 +1421,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             in
             (* Check and update the snapp account *)
             let%bind acct_s' =
+              (* Check the source timing. *)
+              let%bind acct_s' = check_timing acct_s' amount in
               let%bind () =
                 check_snapp_body snapp ~self:acct_s ~other:(Some acct_u)
               in
