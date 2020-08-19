@@ -24,7 +24,7 @@ Pipeline.build
     steps = [
     Command.build
       Command.Config::{
-        commands = [ Cmd.runInDocker jobDocker "cd src/app/trace-tool && /home/opam/.cargo/bin/cargo build --frozen" ]
+        commands = [ Cmd.runInDocker jobDocker "cd src/app/trace-tool && cargo build --frozen" ]
         , label = "Build trace-tool"
         , key = "build-trace-tool"
         , target = Size.Medium
