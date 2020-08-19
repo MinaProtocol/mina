@@ -4,18 +4,60 @@ module Styles = {
     style([
       marginLeft(`auto),
       marginRight(`auto),
+      display(`flex),
+      width(`rem(50.)),
+      flexDirection(`column),
+      justifyContent(`spaceBetween),
+      alignContent(`spaceAround),
       media(Theme.MediaQuery.tablet, [maxWidth(`rem(68.))]),
     ]);
 };
 
 [@react.component]
-let make = (~profiles) => {
-  <Page
-    title="Genesis"
-    description="Join Genesis. Become one of 1000 community members to receive a grant of 66,000 coda tokens. You'll participate in activities that will strengthen the Coda network and community.">
-    <Wrapped>
-      <div className=Styles.page>
-       </div>
-    </Wrapped>
+let make = () => {
+  <Page title="Demo page of components">
+    <div className=Styles.page>
+      <h1 className=Theme.Type.h1jumbo> {React.string("H1 Jumbo")} </h1>
+      <h1 className=Theme.Type.h1> {React.string("H1")} </h1>
+      <h2 className=Theme.Type.h2> {React.string("H2")} </h2>
+      <h3 className=Theme.Type.h3> {React.string("H3")} </h3>
+      <h4 className=Theme.Type.h4> {React.string("H4")} </h4>
+      <h5 className=Theme.Type.h4> {React.string("H5")} </h5>
+      <h6 className=Theme.Type.h4> {React.string("H6")} </h6>
+      <div className=Theme.Type.pageLabel> {React.string("Page label")} </div>
+      <div className=Theme.Type.pageLabel> {React.string("Page label")} </div>
+      <div className=Theme.Type.label> {React.string("Label")} </div>
+      <div className=Theme.Type.buttonLabel>
+        {React.string("Button label")}
+      </div>
+      <a className=Theme.Type.link> {React.string("Link")} </a>
+      <a className=Theme.Type.navLink> {React.string("Nav Link")} </a>
+      <a className=Theme.Type.sidebarLink> {React.string("Sidebar Link")} </a>
+      <div className=Theme.Type.tooltip> {React.string("Tooltip")} </div>
+      <div className=Theme.Type.creditName>
+        {React.string("Credit name")}
+      </div>
+      <div className=Theme.Type.metadata> {React.string("Metadata")} </div>
+      <div className=Theme.Type.announcement>
+        {React.string("Announcement")}
+      </div>
+      <div className=Theme.Type.errorMessage>
+        {React.string("Error message")}
+      </div>
+      <div className=Theme.Type.pageSubhead>
+        {React.string("Page subhead")}
+      </div>
+      <div className=Theme.Type.sectionSubhead>
+        {React.string("Section Subhead")}
+      </div>
+      <p className=Theme.Type.paragraph> {React.string("Paragraph")} </p>
+      <p className=Theme.Type.paragraphSmall>
+        {React.string("Paragraph Small")}
+      </p>
+      <p className=Theme.Type.paragraphMono>
+        {React.string("Paragraph Mono")}
+      </p>
+      <p className=Theme.Type.quote> {React.string("Quote")} </p>
+    </div>
   </Page>;
 };
