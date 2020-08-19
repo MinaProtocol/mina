@@ -25,7 +25,7 @@ dune build --profile=testnet_postake_medium_curves src/app/test_executive/test_e
 
 # Clone coda-automation repo (this would be changed in future. Nathan is suggesting linking coda-automation in coda repo)
 
-git clone git@github.com:CodaProtocol/coda-automation.git
+git clone https://github.com/CodaProtocol/coda-automation.git
 
 # Set the credential for gcloud
 
