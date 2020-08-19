@@ -438,7 +438,6 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
             (* call itself failed *)
             (* TODO: learn what other exceptions are raised here *)
             let exn = Monitor.extract_exn monitor_exn in
-
             let () =
               match Error.sexp_of_t (Error.of_exn exn) with
               | Sexp.List (Sexp.Atom "connection attempt timeout" :: _) ->
@@ -451,7 +450,6 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                     ~metadata:[("exn", `String (Exn.to_string exn))]
             in
             Deferred.return (Or_error.of_exn exn)
-
       in
       call ()
 
