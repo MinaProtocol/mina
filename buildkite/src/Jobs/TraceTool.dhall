@@ -11,6 +11,8 @@ let Docker = ../Command/Docker/Type.dhall
 let OpamInit = ../Command/OpamInit.dhall
 let Size = ../Command/Size.dhall
 
+let jobDocker = Cmd.Docker::{image = (../Constants/ContainerImages.dhall).rustToolchain}
+
 in
 
 Pipeline.build
@@ -22,9 +24,7 @@ Pipeline.build
     steps = [
     Command.build
       Command.Config::{
-        commands = OpamInit.andThenRunInDocker
-                        (([] : List Text))
-                        ("cd src/app/trace-tool && /home/opam/.cargo/bin/cargo build --frozen")
+        commands = [ Cmd.runInDocker jobDocker "cd src/app/trace-tool && /home/opam/.cargo/bin/cargo build --frozen" ]
         , label = "Build trace-tool"
         , key = "build-trace-tool"
         , target = Size.Medium
