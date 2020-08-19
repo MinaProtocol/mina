@@ -3,21 +3,22 @@ open Signature_lib
 open Core_kernel
 
 module Timing = struct
-  type t =
-    { initial_minimum_balance: int
-    ; cliff_time: int (*slot number*)
-    ; vesting_period: int (*in slots*)
-    ; vesting_increment: int }
+  type t = (int, int, int) Account_timing.Poly.t
 
   let gen =
     let open Quickcheck.Generator.Let_syntax in
-    let%bind initial_minimum_balance =
-      Quickcheck.Generator.small_non_negative_int
-    in
-    let%bind cliff_time = Quickcheck.Generator.small_non_negative_int in
-    let%bind vesting_increment = Quickcheck.Generator.small_non_negative_int in
-    let%map vesting_period = Quickcheck.Generator.small_positive_int in
-    {initial_minimum_balance; cliff_time; vesting_increment; vesting_period}
+    if%bind Quickcheck.Generator.bool then return Account_timing.Poly.Untimed
+    else
+      let%bind initial_minimum_balance =
+        Quickcheck.Generator.small_non_negative_int
+      in
+      let%bind cliff_time = Quickcheck.Generator.small_non_negative_int in
+      let%bind vesting_increment =
+        Quickcheck.Generator.small_non_negative_int
+      in
+      let%map vesting_period = Quickcheck.Generator.small_positive_int in
+      Account_timing.Poly.Timed
+        {initial_minimum_balance; cliff_time; vesting_increment; vesting_period}
 end
 
 module Public_accounts = struct
@@ -25,7 +26,7 @@ module Public_accounts = struct
     { pk: Public_key.Compressed.t
     ; balance: int
     ; delegate: Public_key.Compressed.t option
-    ; timing: Timing.t option }
+    ; timing: Timing.t }
 
   module type S = sig
     val name : string
@@ -39,7 +40,7 @@ module Private_accounts = struct
     { pk: Public_key.Compressed.t
     ; sk: Private_key.t
     ; balance: int
-    ; timing: Timing.t option }
+    ; timing: Timing.t }
 
   module type S = sig
     val name : string

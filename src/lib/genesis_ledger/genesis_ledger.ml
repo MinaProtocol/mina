@@ -4,11 +4,11 @@ open Signature_lib
 open Coda_base
 module Intf = Intf
 
-let account_with_timing account_id balance (timing : Intf.Timing.t option) =
+let account_with_timing account_id balance (timing : Intf.Timing.t) =
   match timing with
-  | None ->
+  | Untimed ->
       Account.create account_id balance
-  | Some t ->
+  | Timed t ->
       let initial_minimum_balance =
         Currency.Balance.of_int t.initial_minimum_balance
       in
@@ -58,8 +58,10 @@ module Balances (Balances : Intf.Named_balances_intf) = struct
       let%map balances = Balances.balances
       and keypairs = Coda_base.Sample_keypairs.keypairs in
       List.mapi balances ~f:(fun i b ->
-          {balance= b; pk= fst keypairs.(i); sk= snd keypairs.(i); timing= None}
-      )
+          { balance= b
+          ; pk= fst keypairs.(i)
+          ; sk= snd keypairs.(i)
+          ; timing= Untimed } )
   end)
 end
 

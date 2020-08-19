@@ -39,7 +39,7 @@ let dump_on_error yojson x =
 module Json_layout = struct
   module Accounts = struct
     module Single = struct
-      module Timing = struct
+      module Timed = struct
         type t =
           { initial_minimum_balance: Currency.Balance.t
           ; cliff_time: Coda_numbers.Global_slot.t (*slot number*)
@@ -53,7 +53,7 @@ module Json_layout = struct
         ; sk: (string option[@default None])
         ; balance: Currency.Balance.t
         ; delegate: (string option[@default None])
-        ; timing: (Timing.t option[@default None]) }
+        ; timing: (Timed.t option[@default None]) }
       [@@deriving yojson, dhall_type]
 
       let fields = [|"pk"; "sk"; "balance"; "delegate"; "timing"|]
@@ -204,8 +204,8 @@ end
 
 module Accounts = struct
   module Single = struct
-    module Timing = struct
-      type t = Json_layout.Accounts.Single.Timing.t =
+    module Timed = struct
+      type t = Json_layout.Accounts.Single.Timed.t =
         { initial_minimum_balance: Currency.Balance.Stable.Latest.t
         ; cliff_time: Coda_numbers.Global_slot.Stable.Latest.t
         ; vesting_period: Coda_numbers.Global_slot.Stable.Latest.t
@@ -218,7 +218,7 @@ module Accounts = struct
       ; sk: string option
       ; balance: Currency.Balance.Stable.Latest.t
       ; delegate: string option
-      ; timing: Timing.t option }
+      ; timing: Timed.t option }
     [@@deriving bin_io_unversioned]
 
     let to_json_layout : t -> Json_layout.Accounts.Single.t = Fn.id
@@ -239,7 +239,7 @@ module Accounts = struct
     ; sk: string option
     ; balance: Currency.Balance.t
     ; delegate: string option
-    ; timing: Single.Timing.t option }
+    ; timing: Single.Timed.t option }
 
   type t = Single.t list [@@deriving bin_io_unversioned]
 

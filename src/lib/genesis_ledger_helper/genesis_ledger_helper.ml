@@ -1000,7 +1000,7 @@ let inferred_runtime_config (precomputed_values : Precomputed_values.t) :
                          None
                      | Timed t ->
                          Some
-                           { Runtime_config.Accounts.Single.Timing
+                           { Runtime_config.Accounts.Single.Timed
                              .initial_minimum_balance=
                                t.initial_minimum_balance
                            ; cliff_time= t.cliff_time
