@@ -22,11 +22,6 @@ module Stable = struct
   end
 end]
 
-type t = Stable.Latest.t =
-  | Token_owned of {disable_new_accounts: bool}
-  | Not_owned of {account_disabled: bool}
-[@@deriving compare, eq, sexp, hash, yojson]
-
 let default = Not_owned {account_disabled= false}
 
 let to_input = function

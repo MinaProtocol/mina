@@ -34,8 +34,6 @@ module Stable : sig
   end
 end]
 
-type t = Stable.Latest.t [@@deriving eq, sexp, hash, yojson]
-
 val dummy : t
 
 val token : t -> Token_id.t

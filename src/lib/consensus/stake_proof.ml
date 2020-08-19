@@ -3,6 +3,8 @@ open Coda_base
 
 [%%versioned
 module Stable = struct
+  [@@@no_toplevel_latest_type]
+
   module V1 = struct
     type t =
       { delegator: Account.Index.Stable.V1.t

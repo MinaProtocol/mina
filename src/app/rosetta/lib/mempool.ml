@@ -1,6 +1,5 @@
 open Core_kernel
 open Async
-module User_command_info = Block.User_command_info
 open Models
 
 module Get_all_transactions =

@@ -16,9 +16,6 @@ module Evaluation = struct
           let to_latest = Fn.id
         end
       end]
-
-      type 'scalar t = 'scalar Stable.Latest.t = {c: 'scalar; s: 'scalar}
-      [@@deriving sexp]
     end
   end
 
@@ -31,10 +28,6 @@ module Evaluation = struct
         [@@deriving sexp]
       end
     end]
-
-    type ('group, 'dleq) t = ('group, 'dleq) Stable.Latest.t =
-      {discrete_log_equality: 'dleq; scaled_message_hash: 'group}
-    [@@deriving sexp]
   end
 end
 

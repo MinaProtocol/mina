@@ -65,14 +65,8 @@ clean:
 	@rm -rf src/$(COVERAGE_DIR)
 
 # TEMP HACK (for circle-ci)
-ifeq ($(LIBP2P_NIXLESS),1)
 libp2p_helper:
 	$(WRAPAPP) bash -c "set -e && cd src/app/libp2p_helper && rm -rf result && mkdir -p result/bin && cd src && $(GO) mod download && cd .. && for f in generate_methodidx libp2p_helper; do cd src/\$$f && $(GO) build; cp \$$f ../../result/bin/\$$f; cd ../../; done"
-else
-libp2p_helper:
-	$(WRAPAPP) bash -c "set -o pipefail ; if [ -z \"$${USER}\" ]; then export USER=opam ; fi && source ~/.nix-profile/etc/profile.d/nix.sh && (if [ -z \"$${CACHIX_SIGNING_KEY+x}\" ]; then cd src/app/libp2p_helper && nix-build $${EXTRA_NIX_ARGS} default.nix;  else cachix use codaprotocol && cd src/app/libp2p_helper && nix-build $${EXTRA_NIX_ARGS} default.nix | cachix push codaprotocol ; fi)"
-endif
-
 
 
 GENESIS_DIR := $(TMPDIR)/coda_cache_dir
@@ -231,6 +225,11 @@ deb:
 	@cp _build/coda_pvkeys_* /tmp/artifacts/.
 
 build_pv_keys:
+	$(info Building keys)
+	ulimit -s 65532 && (ulimit -n 10240 || true) && $(WRAPAPP) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune exec --profile=$(DUNE_PROFILE) src/lib/snark_keys/gen_keys/gen_keys.exe -- --generate-keys-only
+	$(info Keys built)
+
+build_or_download_pv_keys:
 	$(info Building keys)
 	ulimit -s 65532 && (ulimit -n 10240 || true) && $(WRAPAPP) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune exec --profile=$(DUNE_PROFILE) src/lib/snark_keys/gen_keys/gen_keys.exe -- --generate-keys-only
 	$(info Keys built)

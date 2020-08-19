@@ -43,8 +43,6 @@ module Make () = struct
     end
   end]
 
-  type t = T1.t [@@deriving hash, sexp, compare]
-
   [%%define_locally
   T1.(to_raw_string, digest_string, to_hex)]
 

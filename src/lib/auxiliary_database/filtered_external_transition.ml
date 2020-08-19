@@ -20,12 +20,6 @@ module Transactions = struct
       let to_latest = Fn.id
     end
   end]
-
-  type t = Stable.Latest.t =
-    { user_commands: (User_command.t, Transaction_hash.t) With_hash.t list
-    ; fee_transfers: Fee_transfer.Single.t list
-    ; coinbase: Currency.Amount.t
-    ; coinbase_receiver: Public_key.Compressed.t option }
 end
 
 module Protocol_state = struct
@@ -40,11 +34,6 @@ module Protocol_state = struct
       let to_latest = Fn.id
     end
   end]
-
-  type t = Stable.Latest.t =
-    { previous_state_hash: State_hash.t
-    ; blockchain_state: Coda_state.Blockchain_state.Value.t
-    ; consensus_state: Consensus.Data.Consensus_state.Value.t }
 end
 
 [%%versioned
@@ -60,13 +49,6 @@ module Stable = struct
     let to_latest = Fn.id
   end
 end]
-
-type t = Stable.Latest.t =
-  { creator: Public_key.Compressed.t
-  ; protocol_state: Protocol_state.t
-  ; transactions: Transactions.t
-  ; snark_jobs: Transaction_snark_work.Info.t list
-  ; proof: Proof.t }
 
 let participants ~next_available_token
     {transactions= {user_commands; fee_transfers; _}; creator; _} =

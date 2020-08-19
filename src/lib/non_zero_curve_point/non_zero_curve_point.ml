@@ -117,9 +117,6 @@ module Compressed = struct
 
   let compress (x, y) = {Poly.x; is_odd= parity y}
 
-  (* sexp operations written manually, don't derive them *)
-  type t = (Field.t, bool) Poly.t [@@deriving eq, compare, hash]
-
   let empty = Poly.{x= Field.zero; is_odd= false}
 
   let to_input {Poly.x; is_odd} =
@@ -232,11 +229,6 @@ module Uncompressed = struct
     end
   end]
 
-  type t =
-    Field.t * Field.t
-    (* sexp operations written manually, don't derive them *)
-  [@@deriving compare, hash]
-
   (* so we can make sets of public keys *)
   include Comparable.Make_binable (Stable.Latest)
 
@@ -255,6 +247,18 @@ module Uncompressed = struct
   let%test_unit "point-compression: decompress . compress = id" =
     Quickcheck.test gen ~f:(fun pk ->
         assert (equal (decompress_exn (compress pk)) pk) )
+
+  (* TODO: Implement this properly to spec *)
+  module Hex = struct
+    let encode (a, b) = Field.to_string a ^ "," ^ Field.to_string b
+
+    let decode raw =
+      match String.split ~on:',' raw with
+      | [a; b] ->
+          Or_error.return (Field.of_string a, Field.of_string b)
+      | _ ->
+          Or_error.error_string "Malformed hex encoding"
+  end
 
   [%%ifdef
   consensus_mechanism]
