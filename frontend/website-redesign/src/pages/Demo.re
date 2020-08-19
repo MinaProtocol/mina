@@ -25,7 +25,6 @@ let make = () => {
       <h5 className=Theme.Type.h4> {React.string("H5")} </h5>
       <h6 className=Theme.Type.h4> {React.string("H6")} </h6>
       <div className=Theme.Type.pageLabel> {React.string("Page label")} </div>
-      <div className=Theme.Type.pageLabel> {React.string("Page label")} </div>
       <div className=Theme.Type.label> {React.string("Label")} </div>
       <div className=Theme.Type.buttonLabel>
         {React.string("Button label")}
