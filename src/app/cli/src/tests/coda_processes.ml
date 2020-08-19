@@ -92,7 +92,7 @@ let local_configs ?block_production_interval
   in
   configs
 
-let stabalize_and_start_or_timeout ?(timeout_ms = 120000.) nodes =
+let stabalize_and_start_or_timeout ?(timeout_ms = 180000.) nodes =
   let ready () =
     let check_ready node =
       let%map peers = Coda_process.peers_exn node in
