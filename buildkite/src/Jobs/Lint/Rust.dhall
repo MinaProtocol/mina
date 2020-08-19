@@ -24,10 +24,10 @@ Pipeline.build
           Command.Config::{
             commands = OpamInit.andThenRunInDocker
                             (([] : List Text))
-                            ("cd src/app/trace-tool ; cargo check --frozen")
+                            ("cd src/app/trace-tool ; /home/opam/.cargo/bin/cargo check --frozen")
             , label = "Rust lint steps; trace-tool"
             , key = "lint-trace-tool"
-            , target = Size.Small
+            , target = Size.Medium
             , docker = None Docker.Type
           }
     ]

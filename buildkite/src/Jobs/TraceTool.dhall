@@ -24,7 +24,7 @@ Pipeline.build
       Command.Config::{
         commands = OpamInit.andThenRunInDocker
                         (([] : List Text))
-                        ("cd src/app/trace-tool && cargo build --frozen")
+                        ("cd src/app/trace-tool && /home/opam/.cargo/bin/cargo build --frozen")
         , label = "Build trace-tool"
         , key = "build-trace-tool"
         , target = Size.Medium
