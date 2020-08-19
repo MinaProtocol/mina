@@ -22,14 +22,14 @@ Pipeline.build
       name = "TraceTool"
     },
     steps = [
-    Command.build
-      Command.Config::{
-        commands = [ Cmd.runInDocker jobDocker "cd src/app/trace-tool && cargo build --frozen" ]
-        , label = "Build trace-tool"
-        , key = "build-trace-tool"
-        , target = Size.Small
-        , docker = None Docker.Type
-        , artifact_paths = [ S.contains "src/app/trace-tool/target/debug/trace-tool" ]
-      }
+      Command.build
+        Command.Config::{
+          commands = [ Cmd.runInDocker jobDocker "cd src/app/trace-tool && cargo build --frozen" ]
+          , label = "Build trace-tool"
+          , key = "build-trace-tool"
+          , target = Size.Small
+          , docker = None Docker.Type
+          , artifact_paths = [ S.contains "src/app/trace-tool/target/debug/trace-tool" ]
+        }
     ]
   }

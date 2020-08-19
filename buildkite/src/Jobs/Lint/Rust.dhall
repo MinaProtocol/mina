@@ -22,13 +22,13 @@ Pipeline.build
       name = "Rust"
     },
     steps = [
-        Command.build
-          Command.Config::{
-            commands = [ Cmd.runInDocker jobDocker "cd src/app/trace-tool ; cargo check --frozen" ]
-            , label = "Rust lint steps; trace-tool"
-            , key = "lint-trace-tool"
-            , target = Size.Small
-            , docker = None Docker.Type
-          }
+      Command.build
+        Command.Config::{
+          commands = [ Cmd.runInDocker jobDocker "cd src/app/trace-tool ; cargo check --frozen" ]
+          , label = "Rust lint steps; trace-tool"
+          , key = "lint-trace-tool"
+          , target = Size.Small
+          , docker = None Docker.Type
+        }
     ]
   }
