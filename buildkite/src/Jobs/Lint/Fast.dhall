@@ -44,7 +44,7 @@ Pipeline.build
                           ("./scripts/compare_ci_diff_types.sh")
           , label = "Optional fast lint steps; versions compatability changes"
           , key = "lint-optional-types"
-          , target = Size.Medium
+          , target = Size.Large
           , soft_fail = Some (Command.SoftFail.Boolean True)
           , docker = None Docker.Type
         },
@@ -55,7 +55,7 @@ Pipeline.build
                           ("./scripts/compare_ci_diff_binables.sh")
           , label = "Optional fast lint steps; binable compatability changes"
           , key = "lint-optional-binable"
-          , target = Size.Medium
+          , target = Size.Large
           , soft_fail = Some (Command.SoftFail.Boolean True)
           , docker = None Docker.Type
         }
