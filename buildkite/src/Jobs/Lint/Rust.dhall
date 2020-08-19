@@ -12,7 +12,7 @@ let JobSpec = ../../Pipeline/JobSpec.dhall
 Pipeline.build
   Pipeline.Config::{
     spec = JobSpec::{
-      dirtyWhen = [ S.contains "src/app/trace-tool" ],
+      dirtyWhen = [ S.contains "src/app/trace-tool", S.strictlyStart (S.contains "buildkite/src/Jobs/Lint/Rust") ],
       path = "Lint",
       name = "Rust"
     },

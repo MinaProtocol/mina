@@ -14,7 +14,7 @@ let Size = ../../Command/Size.dhall
 Pipeline.build
   Pipeline.Config::{
     spec = JobSpec::{
-      dirtyWhen = [ S.contains "src/app/trace-tool" ],
+      dirtyWhen = [ S.contains "src/app/trace-tool", S.strictlyStart (S.contains "buildkite/src/Jobs/TraceTool") ],
       name = "TraceTool"
     },
     steps = [
