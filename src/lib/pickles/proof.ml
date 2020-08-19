@@ -26,7 +26,8 @@ module Base = struct
       ; proof: Tick.Proof.t }
   end
 
-  type 'a triple = 'a * 'a * 'a [@@deriving bin_io, compare, sexp, yojson]
+  type 'a triple = 'a * 'a * 'a
+  [@@deriving bin_io, compare, sexp, yojson, hash, eq]
 
   module Dlog_based = struct
     type ('dlog_me_only, 'pairing_me_only) t =
@@ -46,10 +47,12 @@ module Base = struct
           , Index.t )
           Types.Dlog_based.Statement.t
       ; prev_evals:
-          Tick.Field.t array Dlog_marlin_types.Evals.Stable.Latest.t triple
+          Tick.Field.t Dlog_marlin_types.Pc_array.Stable.Latest.t
+          Dlog_marlin_types.Evals.Stable.Latest.t
+          triple
       ; prev_x_hat: Tick.Field.t triple
       ; proof: Tock.Proof.t }
-    [@@deriving bin_io, compare, sexp, yojson]
+    [@@deriving bin_io, compare, sexp, yojson, hash, eq]
   end
 end
 
@@ -166,7 +169,7 @@ module Make (W : Nat.Intf) (MLMB : Nat.Intf) = struct
           Max_branching_at_most.t )
         Base.Me_only.Pairing_based.t )
       Base.Dlog_based.t
-    [@@deriving bin_io, compare, sexp, yojson]
+    [@@deriving bin_io, compare, sexp, yojson, hash, eq]
   end
 
   type nonrec t = (W.n, MLMB.n) t
@@ -201,6 +204,12 @@ module Make (W : Nat.Intf) (MLMB : Nat.Intf) = struct
       }
 
   let compare t1 t2 = Repr.compare (to_repr t1) (to_repr t2)
+
+  let equal t1 t2 = Repr.equal (to_repr t1) (to_repr t2)
+
+  let hash_fold_t s t = Repr.hash_fold_t s (to_repr t)
+
+  let hash t = Repr.hash (to_repr t)
 
   include Binable.Of_binable
             (Repr)
