@@ -4,7 +4,7 @@ open Pickles_types
 module type Stable_v1 = sig
   module Stable : sig
     module V1 : sig
-      type t [@@deriving version, bin_io, sexp, compare, yojson]
+      type t [@@deriving version, bin_io, sexp, compare, yojson, hash, eq]
     end
 
     module Latest = V1
@@ -252,9 +252,9 @@ module Make (Inputs : Inputs_intf) = struct
       type t =
         ( G.Affine.Stable.V1.t
         , Fq.Stable.V1.t
-        , Fq.Stable.V1.t array )
+        , Fq.Stable.V1.t Dlog_marlin_types.Pc_array.Stable.V1.t )
         Dlog_marlin_types.Proof.Stable.V1.t
-      [@@deriving compare, sexp, yojson]
+      [@@deriving compare, sexp, yojson, hash, eq]
 
       let to_latest = Fn.id
     end
