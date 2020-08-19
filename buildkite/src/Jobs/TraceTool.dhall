@@ -29,7 +29,7 @@ Pipeline.build
         , key = "build-trace-tool"
         , target = Size.Small
         , docker = None Docker.Type
-        , artifact_paths = [ S.contains "src/app/trace-tool/*" ]
+        , artifact_paths = [ S.contains "src/app/trace-tool/target/debug/trace-tool" ]
       }
     ]
   }
