@@ -393,7 +393,6 @@ module Network_manager = struct
     print_endline "destroying network" ;
     if not t.deployed then failwith "network not deployed" ;
     let%map () = run_cmd_exn t "terraform" ["destroy"; "-auto-approve"] in
-    print_endline "network has been successfully destroyed" ;
     t.deployed <- false
 
   let cleanup t =
