@@ -1,10 +1,20 @@
 open Core
 
+[%%import
+"/src/config.mlh"]
+
 module Spec = struct
   type t =
     | On_disk of {directory: string; should_write: bool}
     | S3 of {bucket_prefix: string; install_path: string}
 end
+
+[%%inject
+"may_download", download_snark_keys]
+
+let may_download = ref may_download
+
+let set_downloads_enabled b = may_download := b
 
 module T (M : sig
   type _ t
@@ -81,10 +91,14 @@ module Sync : S with module M := Or_error = struct
 
   let s3 to_string read ~bucket_prefix ~install_path =
     let read k =
+      let logger = Logger.create () in
       let label = to_string k in
       let uri_string = bucket_prefix ^/ label in
       let file_path = install_path ^/ label in
       let open Or_error.Let_syntax in
+      [%log debug] "Downloading key to key cache"
+        ~metadata:
+          [("url", `String uri_string); ("local_file_path", `String file_path)] ;
       let%bind () =
         Result.map_error
           (ksprintf Unix.system "curl --fail -o \"%s\" \"%s\"" file_path
@@ -94,9 +108,15 @@ module Sync : S with module M := Or_error = struct
           | `Signal s ->
               Error.createf "died after receiving %s (signal number %d)"
                 (Signal.to_string s) (Signal.to_system_int s) )
+        |> Result.map_error ~f:(fun err ->
+               [%log debug] "Could not download key to key cache"
+                 ~metadata:
+                   [ ("url", `String uri_string)
+                   ; ("local_file_path", `String file_path)
+                   ; ("err", `String (Error.to_string_hum err)) ] ;
+               err )
       in
-      let logger = Logger.create () in
-      [%log debug] "Curl finished"
+      [%log debug] "Downloaded key to key cache"
         ~metadata:
           [("url", `String uri_string); ("local_file_path", `String file_path)] ;
       read k ~path:file_path
@@ -132,6 +152,8 @@ module Sync : S with module M := Or_error = struct
           | Spec.On_disk {directory; should_write} ->
               ( (on_disk to_string r w directory).read k
               , if should_write then `Locally_generated else `Cache_hit )
+          | S3 _ when not !may_download ->
+              (Or_error.errorf "Downloading from S3 is disabled", `Cache_hit)
           | S3 {bucket_prefix; install_path} ->
               Unix.mkdir_p install_path ;
               ((s3 to_string r ~bucket_prefix ~install_path).read k, `Cache_hit)
@@ -189,15 +211,22 @@ module Async : S with module M := Async.Deferred.Or_error = struct
       let file_path = install_path ^/ label in
       let open Deferred.Or_error.Let_syntax in
       let logger = Logger.create () in
-      [%log debug] "Running curl"
+      [%log debug] "Downloading key to key cache"
         ~metadata:
           [("url", `String uri_string); ("local_file_path", `String file_path)] ;
       let%bind result =
         Process.run ~prog:"curl"
           ~args:["--fail"; "-o"; file_path; uri_string]
           ()
+        |> Deferred.Result.map_error ~f:(fun err ->
+               [%log debug] "Could not download key to key cache"
+                 ~metadata:
+                   [ ("url", `String uri_string)
+                   ; ("local_file_path", `String file_path)
+                   ; ("err", `String (Error.to_string_hum err)) ] ;
+               err )
       in
-      [%log debug] "Curl finished"
+      [%log debug] "Downloaded key to key cache"
         ~metadata:
           [ ("url", `String uri_string)
           ; ("local_file_path", `String file_path)
@@ -232,6 +261,8 @@ module Async : S with module M := Async.Deferred.Or_error = struct
         | Spec.On_disk {directory; should_write} ->
             let%map res = (on_disk to_string r w directory).read k in
             (res, if should_write then `Locally_generated else `Cache_hit)
+        | S3 _ when not !may_download ->
+            Deferred.Or_error.errorf "Downloading from S3 is disabled"
         | S3 {bucket_prefix; install_path} ->
             let%bind.Async () = Unix.mkdir ~p:() install_path in
             let%map res =
