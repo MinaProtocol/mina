@@ -42,8 +42,8 @@ end
 module Account_creation_fees_paid = struct
   type t =
     | By_no_one
-    | By_fee_payer of Unsigned.UInt64.t
-    | By_receiver of Unsigned.UInt64.t
+    | By_fee_payer of Unsigned_extended.UInt64.t
+    | By_receiver of Unsigned_extended.UInt64.t
   [@@deriving eq, to_yojson, sexp, compare]
 end
 
@@ -57,11 +57,11 @@ type t =
   ; fee_payer: [`Pk of string]
   ; source: [`Pk of string]
   ; receiver: [`Pk of string]
-  ; fee_token: Unsigned.UInt64.t
-  ; token: Unsigned.UInt64.t
-  ; fee: Unsigned.UInt64.t
-  ; nonce: Unsigned.UInt32.t
-  ; amount: Unsigned.UInt64.t option
+  ; fee_token: Unsigned_extended.UInt64.t
+  ; token: Unsigned_extended.UInt64.t
+  ; fee: Unsigned_extended.UInt64.t
+  ; nonce: Unsigned_extended.UInt32.t
+  ; amount: Unsigned_extended.UInt64.t option
   ; hash: string
   ; failure_status: Failure_status.t option }
 [@@deriving to_yojson, eq, sexp, compare]
@@ -72,10 +72,10 @@ module Partial = struct
     ; fee_payer: [`Pk of string]
     ; source: [`Pk of string]
     ; receiver: [`Pk of string]
-    ; fee_token: Unsigned.UInt64.t
-    ; token: Unsigned.UInt64.t
-    ; fee: Unsigned.UInt64.t
-    ; amount: Unsigned.UInt64.t option }
+    ; fee_token: Unsigned_extended.UInt64.t
+    ; token: Unsigned_extended.UInt64.t
+    ; fee: Unsigned_extended.UInt64.t
+    ; amount: Unsigned_extended.UInt64.t option }
   [@@deriving to_yojson, sexp, compare]
 
   module Reason = Errors.Partial_reason
