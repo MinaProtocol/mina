@@ -17,6 +17,7 @@ module Styles = {
 let make = () => {
   <Page title="Demo page of components">
     <div className=Styles.page>
+      <Button buttonLabel="Button Label" />
       <h1 className=Theme.Type.h1jumbo> {React.string("H1 Jumbo")} </h1>
       <h1 className=Theme.Type.h1> {React.string("H1")} </h1>
       <h2 className=Theme.Type.h2> {React.string("H2")} </h2>
