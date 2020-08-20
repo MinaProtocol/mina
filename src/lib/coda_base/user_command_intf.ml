@@ -72,14 +72,14 @@ module type Gen_intf = sig
       -> unit
       -> t Quickcheck.Generator.t
 
+    (** Generate a valid sequence of payments based on the initial state of a
+        ledger. Use this together with Ledger.gen_initial_ledger_state.
+    *)
     val sequence :
          ?length:int
       -> ?sign_type:[`Fake | `Real]
       -> (Signature_lib.Keypair.t * Currency.Amount.t * Account_nonce.t) array
       -> t list Quickcheck.Generator.t
-    (** Generate a valid sequence of payments based on the initial state of a
-        ledger. Use this together with Ledger.gen_initial_ledger_state.
-    *)
   end
 end
 
@@ -137,10 +137,10 @@ module type S = sig
        User_command_payload.t
     -> (Snark_params.Tick.field, bool) Random_oracle_input.t
 
-  val check_tokens : t -> bool
   (** Check that the command is used with compatible tokens. This check is fast
       and cheap, to be used for filtering.
   *)
+  val check_tokens : t -> bool
 
   include Gen_intf with type t := t
 
@@ -184,8 +184,8 @@ module type S = sig
 
   val check : t -> With_valid_signature.t option
 
-  val forget_check : With_valid_signature.t -> t
   (** Forget the signature check. *)
+  val forget_check : With_valid_signature.t -> t
 
   val accounts_accessed :
     next_available_token:Token_id.t -> t -> Account_id.t list
