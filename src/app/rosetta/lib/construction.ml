@@ -301,6 +301,61 @@ module Payloads = struct
   module Mock = Impl (Result)
 end
 
+module Parse = struct
+  module Env = struct
+    module T (M : Monad_fail.S) = struct
+      type t = {lift: 'a 'e. ('a, 'e) Result.t -> ('a, 'e) M.t}
+    end
+
+    module Real = T (Deferred.Result)
+    module Mock = T (Result)
+
+    let real : Real.t = {lift= Deferred.return}
+
+    let mock : Mock.t = {lift= Fn.id}
+  end
+
+  module Impl (M : Monad_fail.S) = struct
+    let handle ~(env : Env.T(M).t) (req : Construction_parse_request.t) =
+      let open M.Let_syntax in
+      let%bind json =
+        try M.return (Yojson.Safe.from_string req.transaction)
+        with e -> M.fail (Errors.create (`Json_parse None))
+      in
+      let%map operations, `Pk signer_pk =
+        match req.signed with
+        | true ->
+            let%map signed_transaction =
+              Unsigned_transaction.Signed.Rendered.of_yojson json
+              |> Result.map_error ~f:(fun e ->
+                     Errors.create (`Json_parse (Some e)) )
+              |> Result.bind ~f:Unsigned_transaction.Signed.of_rendered
+              |> env.lift
+            in
+            (* TODO: Get the hash in there somehow! *)
+            ( User_command_info.to_operations signed_transaction.command
+            , signed_transaction.command.source )
+        | false ->
+            let%map unsigned_transaction =
+              Unsigned_transaction.Rendered.of_yojson json
+              |> Result.map_error ~f:(fun e ->
+                     Errors.create (`Json_parse (Some e)) )
+              |> Result.bind ~f:Unsigned_transaction.of_rendered
+              |> env.lift
+            in
+            (* TODO: Get the hash in there somehow! *)
+            ( User_command_info.to_operations unsigned_transaction.command
+            , unsigned_transaction.command.source )
+      in
+      { Construction_parse_response.operations
+      ; signers= [signer_pk]
+      ; metadata= None }
+  end
+
+  module Real = Impl (Deferred.Result)
+  module Mock = Impl (Result)
+end
+
 let router ~graphql_uri ~logger (route : string list) body =
   [%log debug] "Handling /construction/ $route"
     ~metadata:[("route", `List (List.map route ~f:(fun s -> `String s)))] ;
@@ -347,5 +402,15 @@ let router ~graphql_uri ~logger (route : string list) body =
         Payloads.Real.handle ~env:Payloads.Env.real req |> Errors.Lift.wrap
       in
       Construction_payloads_response.to_yojson res
+  | ["parse"] ->
+      let%bind req =
+        Errors.Lift.parse ~context:"Request"
+        @@ Construction_parse_request.of_yojson body
+        |> Errors.Lift.wrap
+      in
+      let%map res =
+        Parse.Real.handle ~env:Parse.Env.real req |> Errors.Lift.wrap
+      in
+      Construction_parse_response.to_yojson res
   | _ ->
       Deferred.Result.fail `Page_not_found
