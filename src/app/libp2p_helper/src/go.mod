@@ -27,6 +27,7 @@ require (
 	github.com/libp2p/go-libp2p-crypto v0.1.0
 	github.com/libp2p/go-libp2p-discovery v0.5.0
 	github.com/libp2p/go-libp2p-kad-dht v0.8.2
+	github.com/libp2p/go-libp2p-kbucket v0.4.2 // indirect
 	github.com/libp2p/go-libp2p-peerstore v0.2.6
 	github.com/libp2p/go-libp2p-pnet v0.2.0
 	github.com/libp2p/go-libp2p-pubsub v0.3.2
