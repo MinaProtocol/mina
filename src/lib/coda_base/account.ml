@@ -18,6 +18,7 @@ module Coda_numbers = Coda_numbers_nonconsensus.Coda_numbers
 module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 module Coda_compile_config =
   Coda_compile_config_nonconsensus.Coda_compile_config
+open Snark_params_nonconsensus
 
 [%%endif]
 
@@ -180,8 +181,6 @@ type value =
 
 let key_gen = Public_key.Compressed.gen
 
-let snapp_account_opt_typ = Typ.transport
-
 let initialize ?snapp account_id : t =
   let public_key = Account_id.public_key account_id in
   let token_id = Account_id.token_id account_id in
@@ -259,8 +258,9 @@ let typ : (var, value) Typ.t =
       ; Public_key.Compressed.typ
       ; State_hash.typ
       ; Timing.typ
-      ; Typ.transport Field.typ ~there:hash_snapp_account_opt ~back:(fun _ ->
-            failwith "unimplemented" ) ]
+      ; Typ.transport Field.typ ~there:hash_snapp_account_opt ~back:(fun fld ->
+            if Field.(equal zero) fld then None else failwith "unimplemented"
+        ) ]
   in
   Typ.of_hlistable spec ~var_to_hlist:Poly.to_hlist ~var_of_hlist:Poly.of_hlist
     ~value_to_hlist:Poly.to_hlist ~value_of_hlist:Poly.of_hlist
@@ -362,11 +362,15 @@ let create_timed account_id balance ~initial_minimum_balance ~cliff_time
     ~vesting_period ~vesting_increment =
   if Balance.(initial_minimum_balance > balance) then
     Or_error.errorf
-      !"create_timed: initial minimum balance %{sexp: Balance.t} greater than \
-        balance %{sexp: Balance.t}"
-      initial_minimum_balance balance
+      !"Error creating timed account for account id %{sexp: Account_id.t}: \
+        initial minimum balance %{sexp: Balance.t} greater than balance \
+        %{sexp: Balance.t} for account "
+      account_id initial_minimum_balance balance
   else if Global_slot.(equal vesting_period zero) then
-    Or_error.errorf "create_timed: vesting period must be greater than zero"
+    Or_error.errorf
+      !"Error creating timed account for account id %{sexp: Account_id.t}: \
+        vesting period must be greater than zero"
+      account_id
   else
     let public_key = Account_id.public_key account_id in
     let token_id = Account_id.token_id account_id in

@@ -229,6 +229,11 @@ build_pv_keys:
 	ulimit -s 65532 && (ulimit -n 10240 || true) && $(WRAPAPP) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune exec --profile=$(DUNE_PROFILE) src/lib/snark_keys/gen_keys/gen_keys.exe -- --generate-keys-only
 	$(info Keys built)
 
+build_or_download_pv_keys:
+	$(info Building keys)
+	ulimit -s 65532 && (ulimit -n 10240 || true) && $(WRAPAPP) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune exec --profile=$(DUNE_PROFILE) src/lib/snark_keys/gen_keys/gen_keys.exe -- --generate-keys-only
+	$(info Keys built)
+
 publish_deb:
 	@./scripts/publish-deb.sh
 

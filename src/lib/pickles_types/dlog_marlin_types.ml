@@ -4,13 +4,14 @@ module Pc_array = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type 'a t = 'a array [@@deriving version, compare, sexp, yojson, eq]
+      type 'a t = 'a array [@@deriving compare, sexp, yojson, eq]
 
       let hash_fold_t f s a = List.hash_fold_t f s (Array.to_list a)
     end
   end]
 
-  let hash_fold_t f s a = List.hash_fold_t f s (Array.to_list a)
+  [%%define_locally
+  Stable.Latest.(hash_fold_t)]
 end
 
 module Evals = struct

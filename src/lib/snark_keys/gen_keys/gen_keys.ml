@@ -171,6 +171,8 @@ let str ~loc =
 [%%endif]
 
 let main () =
+  if Array.mem ~equal:String.equal Sys.argv "--download-keys" then
+    Key_cache.set_downloads_enabled true ;
   let fmt =
     Format.formatter_of_out_channel (Out_channel.create "snark_keys.ml")
   in
