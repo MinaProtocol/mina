@@ -3,11 +3,11 @@ export default Page({title: "Tokens"});
 
 # Tokens  
 
-The Coda CLI (command-line interface) is the primary way to interact with tokens on the Coda blockchain. It provides a client interface that supports functionality to create new tokens, create new token accounts, and mint non-default tokens! In addition to the tokens interface, there are other advanced client and daemon commands (see [CLI Reference](/docs/cli-reference#cli-reference)).
+In the Coda protocol, users can create their own Tokens which can be minted (or created) and sent by using special token accounts. The Coda CLI (command-line interface) is the primary way to interact with tokens on the Coda blockchain. It provides a client interface that supports functionality to create new tokens, create new token accounts, and mint non-default tokens. In addition to the tokens interface, there are other advanced client and daemon commands (see [CLI Reference](/docs/cli-reference#cli-reference)).
 
 ## Creating Tokens
 
-With the CLI, you are able to create your own tokens on Coda! Non-default tokens are a new type of token that is introduced to the Coda blockchain. These new types of tokens have a unique identifier that differentiate them from all other tokens in the blockchain. Users with an associated token account can then receive/send this new type of token that is totally separate from the native Coda token itself!  When you create a new token, you are then able to mint more of the token to be used (see below in [Minting Tokens](/docs/tokens#minting-tokens)).
+With the CLI, you are able to create your own tokens on Coda. Non-default tokens are a new type of token that is introduced to the Coda blockchain. These new types of tokens have a unique identifier that differentiate them from all other tokens in the blockchain. Users with an associated token account can then receive/send this new type of token that is totally separate from the native Coda token itself!  When you create a new token, you are then able to mint more of the token to be used (see below in [Minting Tokens](/docs/tokens#minting-tokens)).
 
 When creating a new token, a new token ID is created as well as a token account for your public key. This token account owns the token and can mint more of the token. The account will also (eventually) have the power to enable/disable accounts, and to set whether new accounts may be created for the token.
 
@@ -54,7 +54,7 @@ $ coda client create-token-account -token-owner <PUBLICKEY> -receiver <PUBLICKEY
 
 The required fields for creating a new token account are:
 
-- -**receiver** : The public key to create the new account for
+- -**receiver** : The public key to create the new account for, you can reuse your normal public key here
 
 - -**sender** : The public key for which you want to create the account
 
@@ -70,7 +70,7 @@ to learn more about how to use the command.
 
 ## Minting Tokens
 
-With the CLI, you are able to mint your own tokens! Minting your own tokens simply increases the supply of a particular token. Minting tokens is how all non-default tokens are created, there are no other protocol-events or commands that can create non-default tokens. This command may only be issued by the token owner, but the tokens may be minted in any existing account for that token.
+With the CLI, you are able to mint your own tokens. Minting your own tokens simply increases the supply of a particular token. Minting tokens is how all non-default tokens are created, there are no other protocol-events or commands that can create non-default tokens. This command may only be issued by the token owner, but the tokens may be minted in any existing account for that token.
 
 
 ### Mint a token
