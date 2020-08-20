@@ -37,8 +37,6 @@ export GOOGLE_APPLICATION_CREDENTIALS="credential.json"
 
 export AWS_DEFAULT_REGION=$AWS_REGION
 
-aws s3 cp s3://o1labs-terraform-state/terraform-funky-walnut.tfstate .
-
 # Run test executive
 
 ./_build/default/src/app/test_executive/test_executive.exe --coda-image "$coda_daemon_image" block-production
