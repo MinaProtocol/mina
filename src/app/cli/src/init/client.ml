@@ -450,10 +450,7 @@ let batch_send_payments =
           let signer_pk = Public_key.compress keypair.public_key in
           User_command_input.create ~signer:signer_pk ~fee
             ~fee_token:Token_id.default (* TODO: Multiple tokens. *)
-            ~fee_payer_pk:signer_pk ~memo:User_command_memo.empty
-            ~valid_until:
-              (Option.value valid_until
-                 ~default:Coda_numbers.Global_slot.max_value)
+            ~fee_payer_pk:signer_pk ~memo:User_command_memo.empty ~valid_until
             ~body:
               (Payment
                  { source_pk= signer_pk

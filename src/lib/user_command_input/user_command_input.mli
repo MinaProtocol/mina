@@ -59,7 +59,7 @@ val create :
   -> fee:Currency.Fee.t
   -> fee_token:Token_id.t
   -> fee_payer_pk:Public_key.Compressed.t
-  -> valid_until:Global_slot.t
+  -> valid_until:Global_slot.t option
   -> memo:User_command_memo.t
   -> body:User_command_payload.Body.t
   -> signer:Public_key.Compressed.t

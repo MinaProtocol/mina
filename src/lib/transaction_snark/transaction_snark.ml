@@ -2258,7 +2258,7 @@ let%test_module "transaction_snark" =
       let payload : User_command.Payload.t =
         User_command.Payload.create ~fee ~fee_token
           ~fee_payer_pk:(Account.public_key fee_payer.account)
-          ~nonce ~memo ~valid_until:Global_slot.max_value
+          ~nonce ~memo ~valid_until:None
           ~body:
             (Payment
                { source_pk
@@ -2913,8 +2913,7 @@ let%test_module "transaction_snark" =
       Account.create (Account_id.create pk token) (Balance.of_int balance)
 
     let test_user_command_with_accounts ~constraint_constants ~ledger ~accounts
-        ~signer ~fee ~fee_payer_pk ~fee_token ?memo
-        ?(valid_until = Global_slot.max_value) ?nonce body =
+        ~signer ~fee ~fee_payer_pk ~fee_token ?memo ?valid_until ?nonce body =
       let memo =
         match memo with
         | Some memo ->

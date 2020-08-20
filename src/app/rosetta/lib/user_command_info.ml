@@ -1,5 +1,17 @@
 open Core_kernel
+module Fee_currency = Currency.Fee
+module Amount_currency = Currency.Amount
 open Models
+module User_command = Coda_base.User_command
+module Token_id = Coda_base.Token_id
+module Public_key = Signature_lib.Public_key
+module User_command_memo = Coda_base.User_command_memo
+module Payment_payload = Coda_base.Payment_payload
+
+let pk_to_public_key ~context (`Pk pk) =
+  Public_key.Compressed.of_base58_check pk
+  |> Result.map_error ~f:(fun _ ->
+         Errors.create ~context `Public_key_format_not_valid )
 
 let account_id (`Pk pk) token_id =
   { Account_identifier.address= pk
@@ -79,6 +91,46 @@ module Partial = struct
   [@@deriving to_yojson, sexp, compare]
 
   module Reason = Errors.Partial_reason
+
+  let to_user_command_payload :
+         t
+      -> nonce:Unsigned_extended.UInt32.t
+      -> (User_command.Payload.t, Errors.t) Result.t =
+   fun t ~nonce ->
+    let open Result.Let_syntax in
+    let%bind fee_payer_pk =
+      pk_to_public_key ~context:"Fee payer" t.fee_payer
+    in
+    let%bind receiver_pk = pk_to_public_key ~context:"Receiver" t.receiver in
+    let%map body =
+      match t.kind with
+      | `Payment ->
+          let%bind source_pk = pk_to_public_key ~context:"Source" t.receiver in
+          let%map amount =
+            Result.of_option t.amount
+              ~error:
+                (Errors.create
+                   (`Operations_not_valid
+                     [Errors.Partial_reason.Amount_not_some]))
+          in
+          let payload =
+            { Payment_payload.Poly.source_pk
+            ; receiver_pk
+            ; token_id= Token_id.of_uint64 t.token
+            ; amount= Amount_currency.of_uint64 amount }
+          in
+          User_command.Payload.Body.Payment payload
+      | `Delegation ->
+          (* TODO: for #5666 *)
+          Result.fail (Errors.create `Unsupported_operation_for_construction)
+      | _ ->
+          Result.fail (Errors.create `Unsupported_operation_for_construction)
+    in
+    User_command.Payload.create
+      ~fee:(Fee_currency.of_uint64 t.fee)
+      ~fee_token:(Token_id.of_uint64 t.fee_token)
+      ~fee_payer_pk ~nonce ~body ~memo:User_command_memo.empty
+      ~valid_until:None
 end
 
 let forget (t : t) : Partial.t =
