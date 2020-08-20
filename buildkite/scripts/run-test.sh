@@ -29,9 +29,9 @@ git clone https://github.com/CodaProtocol/coda-automation.git
 
 # Set the credential for gcloud
 
-echo $BUILDKITE_GS_APPLICATION_CREDENTIALS_JSON > credential.json
+echo $BUILDKITE_GS_APPLICATION_CREDENTIALS_JSON > /tmp/credential.json
 
-export GOOGLE_APPLICATION_CREDENTIALS="credential.json"
+export GOOGLE_APPLICATION_CREDENTIALS="/tmp/credential.json"
 
 # Set default region for AWS
 
