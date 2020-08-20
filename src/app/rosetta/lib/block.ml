@@ -47,8 +47,8 @@ module Internal_command_info = struct
   type t =
     { kind: Kind.t
     ; receiver: [`Pk of string]
-    ; fee: Unsigned.UInt64.t
-    ; token: Unsigned.UInt64.t
+    ; fee: Unsigned_extended.UInt64.t
+    ; token: Unsigned_extended.UInt64.t
     ; hash: string }
   [@@deriving to_yojson]
 
