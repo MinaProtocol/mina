@@ -43,10 +43,9 @@ type kind =
 let make = (~kind, ~size=?) => {
   let size =
     switch (size) {
-    | Some(size) => size
-    | None => "24"
+    | Some(size) => Js.Int.toString(size * 16) ++ "px"
+    | None => "24px"
     };
-
   switch (kind) {
   | World => <svg height=size width=size />
   | Discord => <svg height=size width=size />
