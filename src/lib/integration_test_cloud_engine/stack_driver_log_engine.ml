@@ -1,5 +1,6 @@
 open Async
 open Core
+open Integration_test_lib
 module Timeout = Timeout_lib.Core_time
 
 (** This implements Log_engine_intf for stack driver logs for integration tests
@@ -110,7 +111,7 @@ module Subscription = struct
         ()
     in
     let%bind response_json = Deferred.return @@ load_config_json response in
-    [%log' debug logger] "Create sink response: $response"
+    [%log debug] "Create sink response: $response"
       ~metadata:[("response", response_json)] ;
     match
       Yojson.Safe.Util.(to_option Fn.id (member "error" response_json))
@@ -213,7 +214,16 @@ end
 module Json_parsing = struct
   open Yojson.Safe.Util
 
+  (* convert from Yojson or_error format to Core or_error *)
+  let lift_json_or_error = function
+    | Ok x ->
+        Ok x
+    | Error err ->
+        Error (Error.of_string err)
+
   type 'a parser = Yojson.Safe.t -> 'a
+
+  let json : Yojson.Safe.t parser = Fn.id
 
   let bool : bool parser = to_bool
 
@@ -247,10 +257,47 @@ module Json_parsing = struct
         Error (Error.of_string "expected json object when searching for path")
 end
 
+module type Query_intf = sig
+  module Result : sig
+    type t
+  end
+
+  val name : string
+
+  val filter : string -> string
+
+  val parse : Yojson.Safe.t -> Result.t Or_error.t
+end
+
+module Error_query = struct
+  module Result = struct
+    type t = {pod_id: string; message: Logger.Message.t}
+  end
+
+  let name = "error"
+
+  let filter testnet_log_filter =
+    String.concat ~sep:"\n"
+      [ testnet_log_filter
+      ; "resource.labels.container_name=\"coda\""
+      ; "jsonPayload.level=(\"Warn\" OR \"Error\" OR \"Faulty_peer\" OR \
+         \"Fatal\")" ]
+
+  let parse log =
+    let open Json_parsing in
+    let open Or_error.Let_syntax in
+    let%bind pod_id = find string log ["labels"; "k8s-pod/app"] in
+    let%bind payload = find json log ["jsonPayload"] in
+    let%map message = lift_json_or_error (Logger.Message.of_yojson payload) in
+    {Result.pod_id; message}
+end
+
 module Initialization_query = struct
   module Result = struct
     type t = {pod_id: string}
   end
+
+  let name = "initialization"
 
   (* TODO: this is technically the participation query right now; this can retrigger if bootstrap is toggled *)
   let filter testnet_log_filter =
@@ -338,7 +385,7 @@ module Block_produced_query = struct
       ; "\"Successfully produced a new block\"" ]
 
   (*TODO: Once we transition to structured events, this should call Structured_log_event.parse_exn and match on the structured events that it returns.*)
-  let parse json =
+  let parse log =
     let open Json_parsing in
     let open Or_error.Let_syntax in
     let breadcrumb = ["jsonPayload"; "metadata"; "breadcrumb"] in
@@ -351,17 +398,17 @@ module Block_produced_query = struct
         ; "consensus_state" ]
     in
     let%bind snarked_ledger_generated =
-      find bool json (breadcrumb @ ["just_emitted_a_proof"])
+      find bool log (breadcrumb @ ["just_emitted_a_proof"])
     in
     let%bind block_height =
-      find int json (breadcrumb_consensus_state @ ["blockchain_length"])
+      find int log (breadcrumb_consensus_state @ ["blockchain_length"])
     in
     let%bind global_slot =
-      find int json
+      find int log
         (breadcrumb_consensus_state @ ["curr_global_slot"; "slot_number"])
     in
     let%map epoch =
-      find int json (breadcrumb_consensus_state @ ["epoch_count"])
+      find int log (breadcrumb_consensus_state @ ["epoch_count"])
     in
     {Result.block_height; global_slot; epoch; snarked_ledger_generated}
 
@@ -375,113 +422,192 @@ module Block_produced_query = struct
     ()
 end
 
+type errors =
+  { warn: Error_query.Result.t DynArray.t
+  ; error: Error_query.Result.t DynArray.t
+  ; faulty_peer: Error_query.Result.t DynArray.t
+  ; fatal: Error_query.Result.t DynArray.t }
+
+let empty_errors () =
+  { warn= DynArray.create ()
+  ; error= DynArray.create ()
+  ; faulty_peer= DynArray.create ()
+  ; fatal= DynArray.create () }
+
 type subscriptions =
-  {initialization: Subscription.t; blocks_produced: Subscription.t}
+  { errors: Subscription.t
+  ; initialization: Subscription.t
+  ; blocks_produced: Subscription.t }
 
 type constants =
   { constraints: Genesis_constants.Constraint_constants.t
   ; genesis: Genesis_constants.t }
 
 type t =
-  { testnet_log_filter: string
+  { logger: Logger.t
+  ; testnet_log_filter: string
   ; constants: constants
   ; subscriptions: subscriptions
-  ; initialization: unit Ivar.t String.Map.t
-  ; cancel_initialization_task: unit Ivar.t
-  ; logger: Logger.t }
+  ; cancel_background_tasks: unit -> unit Deferred.t
+  ; error_accumulator: errors
+  ; initialization_table: unit Ivar.t String.Map.t }
 
-let subscription_list ~logger testnet_log_filter :
-    subscriptions Deferred.Or_error.t =
-  (*create one subscription per query*)
-  let open Deferred.Or_error.Let_syntax in
-  let%bind initialization =
-    Subscription.create ~logger ~name:"initialization"
-      ~filter:(Initialization_query.filter testnet_log_filter)
-  in
-  let%map blocks_produced =
-    Subscription.create ~logger ~name:"blocks_produced"
-      ~filter:(Block_produced_query.filter testnet_log_filter)
-  in
-  {initialization; blocks_produced}
-
-let delete_subscriptions {initialization; blocks_produced} =
+let delete_subscriptions {errors; initialization; blocks_produced} =
   Deferred.Or_error.combine_errors
-    [Subscription.delete initialization; Subscription.delete blocks_produced]
+    [ Subscription.delete errors
+    ; Subscription.delete initialization
+    ; Subscription.delete blocks_produced ]
 
-let rec watch_for_initialization ~logger initialization_table
-    initialization_subscription =
+let rec pull_subscription_in_background ~logger ~subscription_name
+    ~parse_subscription ~subscription ~handle_result =
   let open Interruptible in
   let open Interruptible.Let_syntax in
-  let handle_result result =
-    let open Initialization_query.Result in
-    let open Or_error.Let_syntax in
-    [%log' info logger] "Handling initialization log for \"%s\"" result.pod_id ;
-    let%bind ivar =
-      or_error_of_option
-        (String.Map.find initialization_table result.pod_id)
-        (Printf.sprintf "node not found in initialization table: %s"
-           result.pod_id)
-    in
-    if Ivar.is_empty ivar then ( Ivar.fill ivar () ; return () )
-    else
-      Error
-        (Error.of_string
-           "received initialization for node that has already initialized")
-  in
-  [%log' info logger] "Pulling initialization subscription" ;
   let%bind results =
     uninterruptible
       (let open Deferred.Or_error.Let_syntax in
-      let%bind logs = Subscription.pull initialization_subscription in
-      Deferred.return (or_error_list_map logs ~f:Initialization_query.parse))
+      let%bind logs = Subscription.pull subscription in
+      Deferred.return (or_error_list_map logs ~f:parse_subscription))
   in
+  [%log info] "Pulling %s subscription" subscription_name ;
   ( match results with
   | Error err ->
       Error.raise err
   | Ok res ->
       List.iter res ~f:(Fn.compose Or_error.ok_exn handle_result) ) ;
   let%bind () = uninterruptible (after (Time.Span.of_ms 10000.0)) in
-  watch_for_initialization ~logger initialization_table
-    initialization_subscription
+  (* this extra bind point allows the interruptible monad to interrupt after the timeout *)
+  let%bind () = return () in
+  pull_subscription_in_background ~logger ~subscription_name
+    ~parse_subscription ~subscription ~handle_result
 
-let create ~logger (network : Kubernetes_network.t) =
-  let initialization =
+let start_background_query (type r)
+    (module Query : Query_intf with type Result.t = r) ~logger
+    ~testnet_log_filter ~cancel_ivar ~(handle_result : r -> unit Or_error.t) =
+  let open Interruptible in
+  let open Deferred.Or_error.Let_syntax in
+  let finished_ivar = Ivar.create () in
+  let%map subscription =
+    Subscription.create ~logger ~name:Query.name
+      ~filter:(Query.filter testnet_log_filter)
+  in
+  let subscription_task =
+    let open Interruptible.Let_syntax in
+    let%bind () = lift Deferred.unit (Ivar.read cancel_ivar) in
+    pull_subscription_in_background ~logger ~subscription_name:Query.name
+      ~parse_subscription:Query.parse ~subscription ~handle_result
+  in
+  don't_wait_for
+    (finally subscription_task ~f:(fun () -> Ivar.fill finished_ivar ())) ;
+  (subscription, Ivar.read finished_ivar)
+
+let create ~logger ~(network : Kubernetes_network.t) ~on_fatal_error =
+  let open Deferred.Or_error.Let_syntax in
+  let%bind blocks_produced =
+    Subscription.create ~logger ~name:"blocks_produced"
+      ~filter:(Block_produced_query.filter network.testnet_log_filter)
+  in
+  let cancel_background_tasks_ivar = Ivar.create () in
+  let error_accumulator = empty_errors () in
+  let%bind errors, errors_task_finished =
+    start_background_query
+      (module Error_query)
+      ~logger ~testnet_log_filter:network.testnet_log_filter
+      ~cancel_ivar:cancel_background_tasks_ivar
+      ~handle_result:(fun result ->
+        let open Error_query.Result in
+        let acc =
+          match result.message.level with
+          | Warn ->
+              error_accumulator.warn
+          | Error ->
+              error_accumulator.error
+          | Faulty_peer ->
+              error_accumulator.faulty_peer
+          | Fatal ->
+              error_accumulator.fatal
+          | _ ->
+              failwith "unexpected log level encountered"
+        in
+        DynArray.add acc result ;
+        if result.message.level = Fatal then on_fatal_error () ;
+        Ok () )
+  in
+  let initialization_table =
     Kubernetes_network.all_nodes network
     |> List.map ~f:(fun node -> (node, Ivar.create ()))
     |> String.Map.of_alist_exn
   in
-  match%map subscription_list ~logger network.testnet_log_filter with
-  | Ok subscriptions ->
-      let cancel_initialization_task = Ivar.create () in
-      Interruptible.don't_wait_for
-        (let open Interruptible.Let_syntax in
-        let%bind () =
-          Interruptible.lift (Deferred.return ())
-            (Ivar.read cancel_initialization_task)
+  let%map initialization, initialization_task_finished =
+    start_background_query
+      (module Initialization_query)
+      ~logger ~testnet_log_filter:network.testnet_log_filter
+      ~cancel_ivar:cancel_background_tasks_ivar
+      ~handle_result:(fun result ->
+        let open Initialization_query.Result in
+        let open Or_error.Let_syntax in
+        [%log info] "Handling initialization log for \"%s\"" result.pod_id ;
+        let%bind ivar =
+          or_error_of_option
+            (String.Map.find initialization_table result.pod_id)
+            (Printf.sprintf "node not found in initialization table: %s"
+               result.pod_id)
         in
-        watch_for_initialization ~logger initialization
-          subscriptions.initialization) ;
-      Ok
-        { testnet_log_filter= network.testnet_log_filter
-        ; constants=
-            { constraints= network.constraint_constants
-            ; genesis= network.genesis_constants }
-        ; subscriptions
-        ; initialization
-        ; cancel_initialization_task
-        ; logger }
-  | Error e ->
-      Error e
+        if Ivar.is_empty ivar then ( Ivar.fill ivar () ; return () )
+        else
+          Error
+            (Error.of_string
+               "received initialization for node that has already initialized")
+        )
+  in
+  let cancel_background_tasks () =
+    if not (Ivar.is_full cancel_background_tasks_ivar) then
+      Ivar.fill cancel_background_tasks_ivar () ;
+    Deferred.all_unit [errors_task_finished; initialization_task_finished]
+  in
+  { testnet_log_filter= network.testnet_log_filter
+  ; constants=
+      { constraints= network.constraint_constants
+      ; genesis= network.genesis_constants }
+  ; subscriptions= {errors; initialization; blocks_produced}
+  ; cancel_background_tasks
+  ; error_accumulator
+  ; initialization_table
+  ; logger }
 
-let delete t : unit Deferred.Or_error.t =
-  Ivar.fill t.cancel_initialization_task () ;
-  match%map delete_subscriptions t.subscriptions with
-  | Ok _ ->
-      Ok ()
-  | Error e' ->
-      [%log' fatal t.logger] "Error deleting subscriptions: $error"
-        ~metadata:[("error", `String (Error.to_string_hum e'))] ;
-      Error e'
+let destroy t : Test_error.Set.t Deferred.Or_error.t =
+  let open Deferred.Or_error.Let_syntax in
+  let { testnet_log_filter= _
+      ; constants= _
+      ; logger
+      ; subscriptions
+      ; cancel_background_tasks
+      ; initialization_table= _
+      ; error_accumulator } =
+    t
+  in
+  let%bind () = Deferred.map (cancel_background_tasks ()) ~f:Or_error.return in
+  let%map () =
+    let open Deferred.Let_syntax in
+    match%map delete_subscriptions subscriptions with
+    | Ok _ ->
+        Ok ()
+    | Error e' ->
+        [%log fatal] "Error deleting subscriptions: $error"
+          ~metadata:[("error", `String (Error.to_string_hum e'))] ;
+        Ok ()
+  in
+  let lift error_array =
+    DynArray.to_list error_array
+    |> List.map ~f:(fun {Error_query.Result.pod_id; message} ->
+           Test_error.Remote_error {node_id= pod_id; error_message= message} )
+  in
+  let soft_errors =
+    lift error_accumulator.warn @ lift error_accumulator.faulty_peer
+  in
+  let hard_errors =
+    lift error_accumulator.error @ lift error_accumulator.fatal
+  in
+  {Test_error.Set.soft_errors; hard_errors}
 
 (*TODO: Node status. Should that be a part of a node query instead? or we need a new log that has status info and some node identifier*)
 let wait_for' :
@@ -621,8 +747,7 @@ let wait_for :
   | Error e ->
       [%log' fatal t.logger] "wait_for failed with error: $error"
         ~metadata:[("error", `String (Error.to_string_hum e))] ;
-      let%map res = delete t in
-      Or_error.combine_errors_unit [Error e; res]
+      Deferred.return (Error e)
 
 let wait_for_init (node : Kubernetes_network.Node.t) t =
   let open Deferred.Or_error.Let_syntax in
@@ -632,7 +757,7 @@ let wait_for_init (node : Kubernetes_network.Node.t) t =
   let%bind init =
     Deferred.return
       (or_error_of_option
-         (String.Map.find t.initialization node)
+         (String.Map.find t.initialization_table node)
          "failed to find node in initialization table")
   in
   if Ivar.is_full init then return ()

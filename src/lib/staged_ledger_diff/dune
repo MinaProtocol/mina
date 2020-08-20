@@ -1,5 +1,5 @@
 (library
   (name staged_ledger_diff)
   (public_name staged_ledger_diff)
-  (libraries core_kernel coda_base transaction_snark_work staged_ledger_hash)
+  (libraries core_kernel coda_base transaction_snark_work)
   (preprocess (pps ppx_jane ppx_version ppx_deriving_yojson)))

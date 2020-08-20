@@ -12,6 +12,7 @@ let B/ExitStatus = B.definitions/automaticRetry/properties/exit_status/Type
 let B/AutoRetryChunk = B.definitions/automaticRetry/Type.Type
 let B/Retry = B.definitions/commandStep/properties/retry/properties/automatic/Type
 let B/Manual = B.definitions/commandStep/properties/retry/properties/manual/Type
+let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 let Map = Prelude.Map
 
 let Cmd = ../Lib/Cmds.dhall
@@ -89,6 +90,7 @@ let Config =
       , docker_login : Optional DockerLogin.Type
       , summon : Optional Summon.Type
       , retries : List Retry.Type
+      , soft_fail : Optional B/SoftFail
       }
   , default =
     { depends_on = [] : List TaggedKey.Type
@@ -97,6 +99,7 @@ let Config =
     , summon = None Summon.Type
     , artifact_paths = [] : List SelectFiles.Type
     , retries = [] : List Retry.Type
+    , soft_fail = None B/SoftFail
     }
   }
 
@@ -161,6 +164,7 @@ let build : Config.Type -> B/Command.Type = \(c : Config.Type) ->
                 B/Retry.ListAutomaticRetry/Type xs),
               manual = None B/Manual
           },
+    soft_fail = c.soft_fail,
     plugins =
       let dockerPart =
         Optional/toList
@@ -196,5 +200,5 @@ let build : Config.Type -> B/Command.Type = \(c : Config.Type) ->
       if Prelude.List.null (Map.Entry Text Plugins) allPlugins then None B/Plugins else Some (B/Plugins.Plugins/Type allPlugins)
   }
 
-in {Config = Config, build = build, Type = B/Command.Type, TaggedKey = TaggedKey}
+in {Config = Config, build = build, Type = B/Command.Type, TaggedKey = TaggedKey, SoftFail = B/SoftFail}
 

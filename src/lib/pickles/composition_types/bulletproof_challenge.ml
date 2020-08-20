@@ -1,5 +1,5 @@
 type ('challenge, 'bool) t = {prechallenge: 'challenge; is_square: 'bool}
-[@@deriving bin_io, sexp, compare, yojson]
+[@@deriving bin_io, sexp, compare, yojson, hash, eq]
 
 let pack {prechallenge; is_square} = is_square :: prechallenge
 

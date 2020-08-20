@@ -3,7 +3,8 @@ open Core_kernel
 [%%versioned
 module Stable = struct
   module V1 = struct
-    type 'f t = Scalar_challenge of 'f [@@deriving sexp, compare, eq, yojson]
+    type 'f t = Scalar_challenge of 'f
+    [@@deriving sexp, compare, eq, yojson, hash]
   end
 end]
 

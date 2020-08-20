@@ -121,6 +121,19 @@ module Side_loaded : sig
     val typ : (Checked.t, t) Impls.Step.Typ.t
 
     module Max_branches : Nat.Add.Intf
+
+    module Max_width : Nat.Intf
+  end
+
+  module Proof : sig
+    [%%versioned:
+    module Stable : sig
+      module V1 : sig
+        type t =
+          (Verification_key.Max_width.n, Verification_key.Max_width.n) Proof.t
+        [@@deriving sexp, eq, yojson, hash, compare]
+      end
+    end]
   end
 
   val create :
