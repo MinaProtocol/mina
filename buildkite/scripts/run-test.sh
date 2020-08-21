@@ -7,10 +7,14 @@ eval $(opam env)
 # Waiting for the coda-daemon image to be built by CircleCI (this is redundent once build-artifacts works in buildkite)
 
 git_tag=$(git describe --abbrev=0)
-git_branch=$(git rev-parse --symbolic-full-name --abbrev-ref  HEAD  | sed 's!/!-!; s!_!-!g')
+git_branch=$(echo $BUILDKITE_BRANCH | sed 's!/!-!; s!_!-!g')
+# git_branch=$(git rev-parse --symbolic-full-name --abbrev-ref  HEAD  | sed 's!/!-!; s!_!-!g')
 git_hash=$(git rev-parse --short=7 HEAD)
 
 coda_daemon_image="codaprotocol/coda-daemon:${git_tag}-${git_branch}-${git_hash}"
+export TF_LOG=DEBUG
+
+echo "image: ${coda_daemon_image}"
 
 # echo "Waiting for coda-daemon image to appear in docker registry"
 # for i in $(seq 60); do
