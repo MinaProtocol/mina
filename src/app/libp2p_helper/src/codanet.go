@@ -93,9 +93,6 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 	rendezvousString := fmt.Sprintf("/coda/0.0.1/%s", networkID)
 
 	pnetKey := blake2b.Sum256([]byte(rendezvousString))
-	if err != nil {
-		return nil, err
-	}
 
 	rv := customValidator{Base: record.NamespacedValidator{"pk": record.PublicKeyValidator{}}}
 
@@ -106,7 +103,7 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 
 	// Make sure this doesn't get too out of sync with the defaults,
 	// NewWithoutDefaults is considered unstable.
-	host, err := p2p.NewWithoutDefaults(ctx,
+	host, err := p2p.New(ctx,
 		p2p.Transport(tcp.NewTCPTransport),
 		p2p.Transport(ws.New),
 		p2p.Muxer("/mplex/6.7.0", DefaultMplexTransport),
@@ -114,7 +111,7 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 		p2p.Identity(pk),
 		p2p.Peerstore(ps),
 		p2p.DisableRelay(),
-		p2p.ConnectionManager(connmgr.NewConnManager(15, 50, time.Duration(20*time.Second))),
+		p2p.ConnectionManager(connmgr.NewConnManager(25, 250, time.Duration(30*time.Second))),
 		p2p.ListenAddrs(listenOn...),
 		p2p.AddrsFactory(func(as []ma.Multiaddr) []ma.Multiaddr {
 			as = append(as, externalAddr)
