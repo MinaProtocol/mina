@@ -19,7 +19,7 @@ mkdir -p "${BUILDDIR}/DEBIAN"
 cat << EOF > "${BUILDDIR}/DEBIAN/control"
 
 Package: coda-generate-keypair-phase3
-Version: ${VERSION}
+Version: ${GENERATE_KEYPAIR_VERSION}
 License: Apache-2.0
 Vendor: none
 Architecture: amd64
@@ -49,7 +49,7 @@ find "${BUILDDIR}"
 
 # Build the package
 echo "------------------------------------------------------------"
-fakeroot dpkg-deb --build "${BUILDDIR}" ${PROJECT}_${VERSION}.deb
+fakeroot dpkg-deb --build "${BUILDDIR}" coda-generate-keypair_${GENERATE_KEYPAIR_VERSION}.deb
 ls -lh coda*.deb
 
 # Remove generate-keypair binary before other builds with the same dir
