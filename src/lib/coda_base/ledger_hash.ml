@@ -1,13 +1,12 @@
 open Core
 open Import
 open Snark_params
-open Snarky
+open Snarky_backendless
 open Tick
 open Let_syntax
-open Fold_lib
 
 module Merkle_tree =
-  Snarky.Merkle_tree.Checked
+  Snarky_backendless.Merkle_tree.Checked
     (Tick)
     (struct
       type value = Field.t
@@ -19,7 +18,7 @@ module Merkle_tree =
       let merge ~height h1 h2 =
         Tick.make_checked (fun () ->
             Random_oracle.Checked.hash
-              ~init:Hash_prefix.merkle_tree.(height)
+              ~init:(Hash_prefix.merkle_tree height)
               [|h1; h2|] )
 
       let assert_equal h1 h2 = Field.Checked.Assert.equal h1 h2
@@ -32,56 +31,23 @@ module Merkle_tree =
       let hash = Checked.digest
     end)
 
-let depth = Coda_compile_config.ledger_depth
-
-include Data_hash.Make_full_size (struct
-  let description = "Ledger hash"
-
-  let version_byte = Base58_check.Version_bytes.ledger_hash
-end)
-
-(* Data hash versioned boilerplate below *)
-
-[%%versioned
-module Stable = struct
-  module V1 = struct
-    module T = struct
-      type t = Field.t [@@deriving sexp, compare, hash, version {asserted}]
-    end
-
-    include T
-
-    let to_latest = Core.Fn.id
-
-    [%%define_from_scope
-    to_yojson, of_yojson]
-
-    include Comparable.Make (T)
-    include Hashable.Make_binable (T)
-  end
-end]
-
-type _unused = unit constraint t = Stable.Latest.t
+include Ledger_hash0
 
 (* End boilerplate *)
 let merge ~height (h1 : t) (h2 : t) =
   Random_oracle.hash
-    ~init:Hash_prefix.merkle_tree.(height)
+    ~init:(Hash_prefix.merkle_tree height)
     [|(h1 :> field); (h2 :> field)|]
   |> of_hash
 
-(* TODO: @ihm cryptography review *)
-let empty_hash =
-  let open Tick.Pedersen in
-  digest_fold (State.create ()) (Fold.string_triples "nothing up my sleeve")
-  |> of_hash
+let empty_hash = of_hash Outside_hash_image.t
 
 let%bench "Ledger_hash.merge ~height:1 empty_hash empty_hash" =
   merge ~height:1 empty_hash empty_hash
 
 let of_digest = Fn.compose Fn.id of_hash
 
-type path = Pedersen.Digest.t list
+type path = Random_oracle.Digest.t list
 
 type _ Request.t +=
   | Get_path : Account.Index.t -> path Request.t
@@ -100,7 +66,7 @@ let reraise_merkle_requests (With {request; respond}) =
   | _ ->
       unhandled
 
-let get t addr =
+let get ~depth t addr =
   handle
     (Merkle_tree.get_req ~depth (var_to_hash_packed t) addr)
     reraise_merkle_requests
@@ -115,10 +81,11 @@ let get t addr =
    - returns a root [t'] of a tree of depth [depth] which is [t] but with the
      account [f account] at path [addr].
 *)
-let%snarkydef modify_account t aid ~(filter : Account.var -> ('a, _) Checked.t)
-    ~f =
+let%snarkydef modify_account ~depth t aid
+    ~(filter : Account.var -> ('a, _) Checked.t) ~f =
   let%bind addr =
-    request_witness Account.Index.Unpacked.typ
+    request_witness
+      (Account.Index.Unpacked.typ ~ledger_depth:depth)
       As_prover.(map (read Account_id.typ aid) ~f:(fun s -> Find_index s))
   in
   handle
@@ -137,8 +104,8 @@ let%snarkydef modify_account t aid ~(filter : Account.var -> ('a, _) Checked.t)
    - returns a root [t'] of a tree of depth [depth] which is [t] but with the
      account [f account] at path [addr].
 *)
-let%snarkydef modify_account_send t aid ~is_writeable ~f =
-  modify_account t aid
+let%snarkydef modify_account_send ~depth t aid ~is_writeable ~f =
+  modify_account ~depth t aid
     ~filter:(fun account ->
       let%bind account_already_there =
         Account_id.Checked.equal (Account.identifier_of_var account) aid
@@ -164,8 +131,8 @@ let%snarkydef modify_account_send t aid ~is_writeable ~f =
    - returns a root [t'] of a tree of depth [depth] which is [t] but with the
      account [f account] at path [addr].
 *)
-let%snarkydef modify_account_recv t aid ~f =
-  modify_account t aid
+let%snarkydef modify_account_recv ~depth t aid ~f =
+  modify_account ~depth t aid
     ~filter:(fun account ->
       let%bind account_already_there =
         Account_id.Checked.equal (Account.identifier_of_var account) aid

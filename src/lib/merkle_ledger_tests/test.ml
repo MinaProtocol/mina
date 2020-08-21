@@ -8,7 +8,7 @@ let%test_module "Database integration test" =
       let depth = 4
     end
 
-    module Location = Merkle_ledger.Location.Make (Depth)
+    module Location = Merkle_ledger.Location.T
 
     module Location_binable = struct
       module Arg = struct
@@ -35,7 +35,6 @@ let%test_module "Database integration test" =
       module Location_binable = Location_binable
       module Kvdb = In_memory_kvdb
       module Storage_locations = Storage_locations
-      module Depth = Depth
     end
 
     module DB = Database.Make (Inputs)

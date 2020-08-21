@@ -1,15 +1,10 @@
 open Core
-open Snark_params
 open Signature_lib
 open Merkle_ledger
 
 module Ledger_inner = struct
-  module Depth = struct
-    let depth = Coda_compile_config.ledger_depth
-  end
-
   module Location_at_depth : Merkle_ledger.Location_intf.S =
-    Merkle_ledger.Location.Make (Depth)
+    Merkle_ledger.Location.T
 
   module Location_binable = struct
     module Arg = struct
@@ -62,11 +57,9 @@ module Ledger_inner = struct
 
         let hash_account = Fn.compose Ledger_hash.of_digest Account.digest
 
-        let empty_account = hash_account Account.empty
+        let empty_account = Ledger_hash.of_digest Account.empty_digest
       end
     end]
-
-    type t = Stable.Latest.t
   end
 
   module Account = struct
@@ -81,11 +74,18 @@ module Ledger_inner = struct
 
         let balance Account.Poly.{balance; _} = balance
 
+        let token Account.Poly.{token_id; _} = token_id
+
         let empty = Account.empty
+
+        let token_owner ({token_permissions; _} : t) =
+          match token_permissions with
+          | Token_owned _ ->
+              true
+          | Not_owned _ ->
+              false
       end
     end]
-
-    type t = Stable.Latest.t
 
     let empty = Stable.Latest.empty
 
@@ -99,7 +99,6 @@ module Ledger_inner = struct
     module Balance = Currency.Balance
     module Account = Account.Stable.Latest
     module Hash = Hash.Stable.Latest
-    module Depth = Depth
     module Kvdb = Kvdb
     module Location = Location_at_depth
     module Location_binable = Location_binable
@@ -246,11 +245,16 @@ module Ledger_inner = struct
 
   let create_new_account_exn t pk account =
     let action, _ = get_or_create_account_exn t pk account in
-    assert (action = `Added)
+    if action = `Existed then
+      failwith
+        (sprintf
+           !"Could not create a new account with pk \
+             %{sexp:Public_key.Compressed.t}: Account already exists"
+           (Account_id.public_key pk))
 
   (* shadows definition in MaskedLedger, extra assurance hash is of right type  *)
   let merkle_root t =
-    Ledger_hash.of_hash (merkle_root t :> Tick.Pedersen.Digest.t)
+    Ledger_hash.of_hash (merkle_root t :> Random_oracle.Digest.t)
 
   let get_or_create ledger account_id =
     let action, loc =
@@ -282,10 +286,10 @@ module Ledger_inner = struct
         match request with
         | Ledger_hash.Get_element idx ->
             let elt = get_at_index_exn t idx in
-            let path = (path_exn idx :> Pedersen.Digest.t list) in
+            let path = (path_exn idx :> Random_oracle.Digest.t list) in
             respond (Provide (elt, path))
         | Ledger_hash.Get_path idx ->
-            let path = (path_exn idx :> Pedersen.Digest.t list) in
+            let path = (path_exn idx :> Random_oracle.Digest.t list) in
             respond (Provide path)
         | Ledger_hash.Set (idx, account) ->
             set_at_index_exn t idx account ;

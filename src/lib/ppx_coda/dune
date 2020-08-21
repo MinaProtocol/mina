@@ -2,13 +2,6 @@
  (name ppx_coda)
  (public_name ppx_coda)
  (kind ppx_deriver)
- (modules (:standard \ run_ppx_coda))
- (libraries compiler-libs.common ppxlib ppx_deriving.api ppx_bin_prot core_kernel)
+ (libraries compiler-libs.common ppxlib ppx_deriving.api ppx_bin_prot ppx_register_event ppx_to_enum ppx_representatives core_kernel)
  (preprocessor_deps ../../config.mlh)
- (preprocess (pps ppxlib.metaquot ppx_optcomp)))
-
-(executable
- (name run_ppx_coda)
- (modules run_ppx_coda)
- ; we need a ppx for every type deriver that might appear in an OCaml source file
- (libraries ppx_coda ppxlib ppx_bin_prot lens.ppx_deriving ppx_deriving.api ppx_deriving.std ppx_sexp_conv ppx_compare ppx_enumerate ppx_fields_conv ppx_hash ppx_deriving_yojson core_kernel))
+ (preprocess (pps ppx_version ppxlib.metaquot ppx_optcomp)))

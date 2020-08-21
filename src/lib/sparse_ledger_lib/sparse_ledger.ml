@@ -3,6 +3,8 @@ open Core_kernel
 module Tree = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type ('hash, 'account) t =
         | Account of 'account
@@ -22,31 +24,40 @@ end
 module T = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
-      type ('hash, 'key, 'account) t =
+      type ('hash, 'key, 'account, 'token_id) t =
         { indexes: ('key * int) list
         ; depth: int
-        ; tree: ('hash, 'account) Tree.Stable.V1.t }
+        ; tree: ('hash, 'account) Tree.Stable.V1.t
+        ; next_available_token: 'token_id }
       [@@deriving sexp, to_yojson]
     end
   end]
 
-  type ('hash, 'key, 'account) t = ('hash, 'key, 'account) Stable.Latest.t =
-    {indexes: ('key * int) list; depth: int; tree: ('hash, 'account) Tree.t}
+  type ('hash, 'key, 'account, 'token_id) t =
+        ('hash, 'key, 'account, 'token_id) Stable.Latest.t =
+    { indexes: ('key * int) list
+    ; depth: int
+    ; tree: ('hash, 'account) Tree.t
+    ; next_available_token: 'token_id }
   [@@deriving sexp, to_yojson]
 end
 
 module type S = sig
   type hash
 
+  type token_id
+
   type account_id
 
   type account
 
-  type t = (hash, account_id, account) T.Stable.V1.t
+  type t = (hash, account_id, account, token_id) T.t
   [@@deriving sexp, to_yojson]
 
-  val of_hash : depth:int -> hash -> t
+  val of_hash : depth:int -> next_available_token:token_id -> hash -> t
 
   val get_exn : t -> int -> account
 
@@ -62,34 +73,48 @@ module type S = sig
   val iteri : t -> f:(int -> account -> unit) -> unit
 
   val merkle_root : t -> hash
+
+  val next_available_token : t -> token_id
 end
 
 let tree {T.tree; _} = tree
 
-let of_hash ~depth h = {T.indexes= []; depth; tree= Hash h}
+let of_hash ~depth ~next_available_token h =
+  {T.indexes= []; depth; tree= Hash h; next_available_token}
 
 module Make (Hash : sig
   type t [@@deriving eq, sexp, to_yojson, compare]
 
   val merge : height:int -> t -> t -> t
+end) (Token_id : sig
+  type t [@@deriving sexp, to_yojson]
+
+  val next : t -> t
+
+  val max : t -> t -> t
 end) (Account_id : sig
   type t [@@deriving eq, sexp, to_yojson]
 end) (Account : sig
   type t [@@deriving eq, sexp, to_yojson]
 
   val data_hash : t -> Hash.t
+
+  val token : t -> Token_id.t
 end) : sig
   include
     S
     with type hash := Hash.t
+     and type token_id := Token_id.t
      and type account_id := Account_id.t
      and type account := Account.t
 
   val hash : (Hash.t, Account.t) Tree.t -> Hash.t
 end = struct
-  type t = (Hash.t, Account_id.t, Account.t) T.t [@@deriving sexp, to_yojson]
+  type t = (Hash.t, Account_id.t, Account.t, Token_id.t) T.t
+  [@@deriving sexp, to_yojson]
 
-  let of_hash ~depth (hash : Hash.t) = of_hash ~depth hash
+  let of_hash ~depth ~next_available_token (hash : Hash.t) =
+    of_hash ~depth ~next_available_token hash
 
   let hash : (Hash.t, Account.t) Tree.t -> Hash.t = function
     | Account a ->
@@ -102,6 +127,8 @@ end = struct
   type index = int [@@deriving sexp, to_yojson]
 
   let merkle_root {T.tree; _} = hash tree
+
+  let next_available_token {T.next_available_token; _} = next_available_token
 
   let add_path depth0 tree0 path0 account =
     let rec build_tree height p =
@@ -171,7 +198,7 @@ end = struct
   let find_index_exn (t : t) aid =
     List.Assoc.find_exn t.indexes ~equal:Account_id.equal aid
 
-  let get_exn {T.tree; depth; _} idx =
+  let get_exn ({T.tree; depth; _} as t) idx =
     let rec go i tree =
       match (i < 0, tree) with
       | true, Tree.Account acct ->
@@ -191,9 +218,9 @@ end = struct
                 " node"
           in
           failwithf
-            "Spare_ledger.get: Bad index %i. Expected a%s, but got a%s at \
-             depth %i."
-            idx expected_kind kind (depth - i) ()
+            !"Sparse_ledger.get: Bad index %i. Expected a%s, but got a%s at \
+              depth %i. Tree = %{sexp:t}"
+            idx expected_kind kind (depth - i) t ()
     in
     go (depth - 1) tree
 
@@ -220,11 +247,15 @@ end = struct
                 " node"
           in
           failwithf
-            "Spare_ledger.set: Bad index %i. Expected a%s, but got a%s at \
+            "Sparse_ledger.set: Bad index %i. Expected a%s, but got a%s at \
              depth %i."
             idx expected_kind kind (t.depth - i) ()
     in
-    {t with tree= go (t.depth - 1) t.tree}
+    let acct_token = Account.token acct in
+    { t with
+      tree= go (t.depth - 1) t.tree
+    ; next_available_token=
+        Token_id.(max t.next_available_token (next acct_token)) }
 
   let path_exn {T.tree; depth; _} idx =
     let rec go acc i tree =
@@ -243,7 +274,8 @@ end = struct
     go [] (depth - 1) tree
 end
 
-type ('hash, 'key, 'account) t = ('hash, 'key, 'account) T.t
+type ('hash, 'key, 'account, 'token_id) t =
+  ('hash, 'key, 'account, 'token_id) T.t
 [@@deriving to_yojson]
 
 let%test_module "sparse-ledger-test" =
@@ -265,6 +297,14 @@ let%test_module "sparse-ledger-test" =
           ~f:Md5.digest_string
     end
 
+    module Token_id = struct
+      type t = unit [@@deriving sexp, to_yojson]
+
+      let max () () = ()
+
+      let next () = ()
+    end
+
     module Account = struct
       module T = struct
         type t = {name: string; favorite_number: int}
@@ -277,6 +317,8 @@ let%test_module "sparse-ledger-test" =
 
       let data_hash t = Md5.digest_string (Binable.to_string (module T) t)
 
+      let token _ = ()
+
       let gen =
         let open Quickcheck.Generator.Let_syntax in
         let%map name = String.quickcheck_generator
@@ -288,7 +330,7 @@ let%test_module "sparse-ledger-test" =
       type t = string [@@deriving sexp, eq, to_yojson]
     end
 
-    include Make (Hash) (Account_id) (Account)
+    include Make (Hash) (Token_id) (Account_id) (Account)
 
     let gen =
       let open Quickcheck.Generator in
@@ -329,7 +371,7 @@ let%test_module "sparse-ledger-test" =
       in
       let%bind depth = Int.gen_incl 0 16 in
       let%map tree = gen depth >>| prune_hash_branches in
-      {T.tree; depth; indexes= indexes depth tree}
+      {T.tree; depth; indexes= indexes depth tree; next_available_token= ()}
 
     let%test_unit "iteri consistent indices with t.indexes" =
       Quickcheck.test gen ~f:(fun t ->

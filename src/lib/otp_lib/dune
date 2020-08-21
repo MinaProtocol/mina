@@ -3,4 +3,4 @@
   (public_name otp_lib)
   (inline_tests)
   (libraries core_kernel async_kernel pipe_lib)
-  (preprocess (pps ppx_coda ppx_jane)))
+  (preprocess (pps ppx_version ppx_jane)))

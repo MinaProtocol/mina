@@ -41,7 +41,8 @@ RUN sudo apt-get update && sudo apt-get install --yes \
     python3-pip \
     rubygems \
     zlib1g-dev \
-    libbz2-dev
+    libbz2-dev \
+    apt-transport-https
 
 RUN sudo pip install awscli readchar
 
@@ -66,74 +67,28 @@ RUN /tmp/rust_install.sh -y
 RUN export PATH="$PATH:$HOME/.cargo/bin"
 RUN echo 'export PATH="$PATH:$HOME/.cargo/bin"' >> /home/opam/.bashrc
 
+# Get yarn + nodejs
+RUN curl -sL https://deb.nodesource.com/setup_14.x | sudo -E bash -
+RUN curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add -
+RUN echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list
+RUN sudo apt update && sudo apt install nodejs yarn
+
 # Source copy of rocksdb
 RUN sudo git clone https://github.com/facebook/rocksdb -b v5.17.2 /rocksdb
 # This builds and installs just the static lib for us
 RUN cd /rocksdb && sudo make static_lib PORTABLE=1 -j$(nproc) && sudo cp librocksdb.a /usr/local/lib/librocksdb_coda.a && sudo rm -rf /rocksdb && sudo strip -S /usr/local/lib/librocksdb_coda.a
 
-# clone Coda repo to pin external package and save their commits
-RUN sudo git clone https://github.com/CodaProtocol/coda $CODA_DIR
-
-# use HTTPS git clone for submodules
-RUN cd $CODA_DIR && sudo sed --in-place s+git@github.com:+https://github.com/+g .gitmodules
-
-# init submodules for pinning
-RUN cd $CODA_DIR && sudo git submodule update --init --recursive
-
-# save submodule commits
-RUN for pkg in async_kernel digestif graphql_ppx ocaml-extlib rpc_parallel ; do \
-      # remove leading "-" indicating uninitialized
-      cd $CODA_DIR && sudo bash -c "git submodule status src/external/$pkg | awk '{print \$1}' | sed s/-// > ~opam/opam-repository/$pkg.commit" ; \
-    done
-
-# save log commits for ocaml-sodium, coda_base58, which are not submodules
-RUN for pkg in ocaml-sodium coda_base58 ; do \
-      cd $CODA_DIR && sudo bash -c "git log --format=oneline -n 1 src/external/$pkg | awk '{print \$1}' > ~opam/opam-repository/$pkg.commit" ; \
-    done
 
 # OPAM dependencies
 RUN git -C /home/opam/opam-repository pull
 RUN opam update -y && opam upgrade -y
 
-# install vanilla OCaml compiler
-RUN opam switch create $OCAML_VERSION
-
-# Remove .git files for submodules
-RUN for pkg in async_kernel digestif graphql_ppx ocaml-extlib rpc_parallel ; do \
-      sudo rm -f $EXTERNAL_PKG_DIR/$pkg/.git ; \
-    done
-
-# use vanilla OCaml compiler
-RUN opam switch $OCAML_VERSION
-RUN eval $(opam env)
-
-# Install OPAM packages for vanilla compiler
-ADD /src/opam.export .
-RUN opam switch import opam.export ; rm opam.export
-
-# Pin packages for vanilla compiler
-RUN for pkg in ocaml-sodium rpc_parallel ocaml-extlib digestif async_kernel coda_base58 graphql_ppx ; do \
-      cd $EXTERNAL_PKG_DIR/$pkg && opam pin -y add . ; \
-    done
-
-# Install nix
-
 RUN mkdir --mode=700 /home/opam/.gnupg
 RUN echo "disable-ipv6" >> /home/opam/.gnupg/dirmngr.conf
-
-RUN sudo apt-get install gnupg2 && curl -o install-nix-2.3.2 https://releases.nixos.org/nix/nix-2.3.3/install && \
-    curl -o install-nix-2.3.2.asc https://releases.nixos.org/nix/nix-2.3.3/install.asc && \
-    gpg2 --import < $CODA_DIR/.nix-key.gpg.asc && \
-    gpg2 --recv-keys B541D55301270E0BCF15CA5D8170B4726D7198DE && \
-    gpg2 --verify ./install-nix-2.3.2.asc && \
-    sh ./install-nix-2.3.2 && \
-    USER=opam . ~/.nix-profile/etc/profile.d/nix.sh && \
-    nix-env --option sandbox false -iA cachix -f https://cachix.org/api/v1/install
 
 # we used to delete the repo here
 # we now leave it intact, in case updating OPAM in CI requires pinned package sources
 
-# TEMP HACK (for libp2p_helper nixless builds)
 RUN sudo apt-get install --yes wget 
 RUN cd /usr/lib && sudo wget https://dl.google.com/go/go1.13.10.linux-amd64.tar.gz && sudo tar -xvf go1.13.10.linux-amd64.tar.gz && sudo rm go1.13.10.linux-amd64.tar.gz
 RUN echo 'export PATH="$PATH:/usr/lib/go/bin"' >> /home/opam/.bashrc

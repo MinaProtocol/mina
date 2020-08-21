@@ -54,7 +54,7 @@ struct
       ~f:(fun x -> Bigint.(to_field (of_bignum_bigint x)))
 
   type var =
-    { digest: Pedersen.Checked.Digest.var
+    { digest: Random_oracle.Checked.Digest.t
     ; mutable bits: Boolean.var Bitstring.Lsb_first.t option }
 
   let var_of_t t =
@@ -68,17 +68,12 @@ struct
 
   open Let_syntax
 
-  let var_of_hash_unpacked unpacked =
-    { digest= Pedersen.Checked.Digest.Unpacked.project unpacked
-    ; bits= Some (Bitstring.Lsb_first.of_list (unpacked :> Boolean.var list))
-    }
-
   let var_to_hash_packed {digest; _} = digest
 
   (* TODO: Audit this usage of choose_preimage *)
   let unpack =
     if Int.( = ) length_in_bits Field.size_in_bits then fun x ->
-      Pedersen.Checked.Digest.choose_preimage x
+      Field.Checked.choose_preimage_var x ~length:length_in_bits
       >>| fun x -> (x :> Boolean.var list)
     else Field.Checked.unpack ~length:length_in_bits
 
@@ -96,63 +91,36 @@ struct
   (* TODO : use Random oracle.Digest to satisfy Bits_intf.S, move out of
      consensus_mechanism guard
   *)
-  include Pedersen.Digest.Bits
+  module Bs =
+    Snark_bits.Bits.Make_field
+      (Snark_params.Tick.Field)
+      (Snark_params.Tick.Bigint)
+
+  include (Bs : module type of Bs with type t := t)
 
   let assert_equal x y = Field.Checked.Assert.equal x.digest y.digest
 
   let equal_var x y = Field.Checked.equal x.digest y.digest
 
   let typ : (var, t) Typ.t =
-    let store (t : t) =
-      let open Typ.Store.Let_syntax in
-      let n = Bigint.of_field t in
-      let rec go i acc =
-        if Int.(i < 0) then return (Bitstring.Lsb_first.of_list acc)
-        else
-          let%bind b = Boolean.typ.store (Bigint.test_bit n i) in
-          go Int.(i - 1) (b :: acc)
-      in
-      let%map bits = go (Field.size_in_bits - 1) [] in
-      {bits= Some bits; digest= Field.Var.project (bits :> Boolean.var list)}
-    in
-    let read (t : var) = Field.typ.read t.digest in
-    let alloc =
-      let open Typ.Alloc.Let_syntax in
-      let rec go i acc =
-        if Int.(i < 0) then return (Bitstring.Lsb_first.of_list acc)
-        else
-          let%bind b = Boolean.typ.alloc in
-          go Int.(i - 1) (b :: acc)
-      in
-      let%map bits = go (Field.size_in_bits - 1) [] in
-      {bits= Some bits; digest= Field.Var.project (bits :> Boolean.var list)}
-    in
-    let check {bits; _} =
-      Checked.List.iter
-        (Option.value_exn bits :> Boolean.var list)
-        ~f:Boolean.typ.check
-    in
-    {store; read; alloc; check}
+    Typ.transport_var Typ.field
+      ~there:(fun {digest; bits= _} -> digest)
+      ~back:(fun digest -> {digest; bits= None})
 
   [%%endif]
 end
 
 module T0 = struct
-  [%%versioned_binable
+  [%%versioned_asserted
   module Stable = struct
     module V1 = struct
-      type t = Field.t [@@deriving sexp, compare, hash]
+      type t = Field.t
+      [@@deriving sexp, compare, hash, version {asserted}, bin_io]
 
       let to_latest = Fn.id
-
-      module Arg = struct
-        type nonrec t = t
-
-        [%%define_locally Field.(to_string, of_string)]
-      end
-
-      include Binable.Of_stringable (Arg)
     end
+
+    module Tests = struct end
   end]
 
   module Tests = struct
@@ -166,26 +134,13 @@ module T0 = struct
         Field.gen
 
     [%%if
-    curve_size = 298]
+    curve_size = 255]
 
     let%test "Binable from stringable V1" =
-      let known_good_hash =
-        "\x6D\xB1\xAB\x5F\x4C\xA2\x8F\xBA\xF5\x31\x2D\xE9\xEB\x07\xD1\x78\x1F\x20\xD5\x22\xA6\x9F\x5E\x0B\x77\xE0\x00\x07\x78\x85\x90\x8B"
-      in
-      Module_version.Serialization.check_serialization
+      let known_good_digest = "8fffa8b873e2f0600ad8327fa5423859" in
+      Ppx_version_runtime.Serialization.check_serialization
         (module Stable.V1)
-        field known_good_hash
-
-    [%%elif
-    curve_size = 753]
-
-    let%test "Binable from stringable V1" =
-      let known_good_hash =
-        "\x68\xDA\x30\x2C\xD0\xE5\x71\x3C\xAB\x42\x02\x8B\x31\xC1\x2E\x93\xE3\xC0\x99\x6B\xF6\xAA\xE2\x11\xF4\x2F\x88\x97\x3C\xC2\xA2\xF0"
-      in
-      Module_version.Serialization.check_serialization
-        (module Stable.V1)
-        field known_good_hash
+        field known_good_digest
 
     [%%else]
 

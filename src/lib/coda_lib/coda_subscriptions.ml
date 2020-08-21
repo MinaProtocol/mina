@@ -37,8 +37,9 @@ let add_new_subscription (t : t) ~pk =
     ~default:Pipe.create
   |> ignore
 
-let create ~logger ~wallets ~time_controller ~external_transition_database
-    ~new_blocks ~transition_frontier ~is_storing_all =
+let create ~logger ~constraint_constants ~wallets ~time_controller
+    ~external_transition_database ~new_blocks ~transition_frontier
+    ~is_storing_all =
   let subscribed_block_users =
     Optional_public_key.Table.of_alist_multi
     @@ List.map (Secrets.Wallets.pks wallets) ~f:(fun wallet ->
@@ -61,10 +62,10 @@ let create ~logger ~wallets ~time_controller ~external_transition_database
         Hashtbl.find_and_call subscribed_payment_users participant
           ~if_not_found:ignore ~if_found:(fun (_, writer) ->
             let user_commands =
-              User_command.filter_by_participant
-                (Filtered_external_transition.user_commands
-                   filtered_external_transition)
-                participant
+              filtered_external_transition
+              |> Filtered_external_transition.user_commands
+              |> List.map ~f:(fun {With_hash.data; _} -> data)
+              |> Fn.flip User_command.filter_by_participant participant
             in
             List.iter user_commands ~f:(fun user_command ->
                 Pipe.write_without_pushback writer user_command ) ) )
@@ -101,7 +102,8 @@ let create ~logger ~wallets ~time_controller ~external_transition_database
             |> Coda_transition.External_transition.Validated.state_hash
           in
           match
-            Filtered_external_transition.validate_transactions new_block
+            Filtered_external_transition.validate_transactions
+              ~constraint_constants new_block
           with
           | Ok verified_transactions ->
               let unfiltered_external_transition =
@@ -137,7 +139,7 @@ let create ~logger ~wallets ~time_controller ~external_transition_database
                 verified_transactions participants ;
               Deferred.unit
           | Error e ->
-              Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+              [%log error]
                 ~metadata:
                   [ ( "error"
                     , `String (Staged_ledger.Pre_diff_info.Error.to_string e)

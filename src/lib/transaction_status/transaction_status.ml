@@ -13,9 +13,6 @@ module State = struct
     end
   end]
 
-  type t = Stable.Latest.t = Pending | Included | Unknown
-  [@@deriving equal, sexp, compare]
-
   let to_string = function
     | Pending ->
         "PENDING"
@@ -31,6 +28,7 @@ let get_status ~frontier_broadcast_pipe ~transaction_pool cmd =
   let%map check_cmd =
     Result.of_option (User_command.check cmd)
       ~error:(Error.of_string "Invalid signature")
+    |> Result.map ~f:Transaction_hash.User_command_with_valid_signature.create
   in
   let resource_pool = Transaction_pool.resource_pool transaction_pool in
   match Broadcast_pipe.Reader.peek frontier_broadcast_pipe with
@@ -41,21 +39,17 @@ let get_status ~frontier_broadcast_pipe ~transaction_pool cmd =
           let best_tip_path =
             Transition_frontier.best_tip_path transition_frontier
           in
-          let best_tip_user_commands =
-            Sequence.fold (Sequence.of_list best_tip_path)
-              ~init:User_command.Set.empty ~f:(fun acc_set breadcrumb ->
-                let user_commands =
-                  Transition_frontier.Breadcrumb.user_commands breadcrumb
-                in
-                List.fold user_commands ~init:acc_set ~f:Set.add )
+          let in_breadcrumb breadcrumb =
+            List.exists
+              (Transition_frontier.Breadcrumb.user_commands breadcrumb)
+              ~f:(fun {data= cmd'; _} -> User_command.equal cmd cmd')
           in
-          if Set.mem best_tip_user_commands cmd then return State.Included ;
-          let all_transactions =
-            Transition_frontier.(
-              Breadcrumb.all_user_commands
-                (Transition_frontier.all_breadcrumbs transition_frontier))
-          in
-          if Set.mem all_transactions cmd then return State.Pending ;
+          if List.exists ~f:in_breadcrumb best_tip_path then
+            return State.Included ;
+          if
+            List.exists ~f:in_breadcrumb
+              (Transition_frontier.all_breadcrumbs transition_frontier)
+          then return State.Pending ;
           if Transaction_pool.Resource_pool.member resource_pool check_cmd then
             return State.Pending ;
           State.Unknown )
@@ -71,32 +65,26 @@ let%test_module "transaction_status" =
 
     let logger = Logger.null ()
 
-    let proof_level = Genesis_constants.Proof_level.Check
-
-    let constraint_constants =
-      Genesis_constants.Constraint_constants.for_unit_tests
-
     let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
+
+    module Genesis_ledger = (val precomputed_values.genesis_ledger)
 
     let trust_system = Trust_system.null ()
 
-    let pool_max_size = Genesis_constants.compiled.txpool_max_size
+    let pool_max_size = precomputed_values.genesis_constants.txpool_max_size
 
     let key_gen =
       let open Quickcheck.Generator in
       let open Quickcheck.Generator.Let_syntax in
-      let keypairs =
-        List.map (Lazy.force Test_genesis_ledger.accounts) ~f:fst
-      in
+      let keypairs = List.map (Lazy.force Genesis_ledger.accounts) ~f:fst in
       let%map random_key_opt = of_list keypairs in
-      ( Test_genesis_ledger.largest_account_keypair_exn ()
+      ( Genesis_ledger.largest_account_keypair_exn ()
       , Signature_lib.Keypair.of_private_key_exn
           (Option.value_exn random_key_opt) )
 
     let gen_frontier =
-      Transition_frontier.For_tests.gen ~logger ~proof_level
-        ~constraint_constants ~precomputed_values ~trust_system ~max_length
-        ~size:frontier_size ()
+      Transition_frontier.For_tests.gen ~logger ~precomputed_values
+        ~trust_system ~max_length ~size:frontier_size ()
 
     let gen_user_command =
       User_command.Gen.payment ~sign_type:`Real ~max_amount:100 ~max_fee:10
@@ -114,16 +102,17 @@ let%test_module "transaction_status" =
         Transaction_pool.Resource_pool.make_config ~trust_system ~pool_max_size
       in
       let transaction_pool =
-        Transaction_pool.create ~config ~incoming_diffs:pool_reader ~logger
-          ~local_diffs:local_reader ~frontier_broadcast_pipe
+        Transaction_pool.create ~config
+          ~constraint_constants:precomputed_values.constraint_constants
+          ~incoming_diffs:pool_reader ~logger ~local_diffs:local_reader
+          ~frontier_broadcast_pipe
       in
       don't_wait_for
       @@ Linear_pipe.iter (Transaction_pool.broadcasts transaction_pool)
            ~f:(fun transactions ->
-             Logger.trace logger
+             [%log trace]
                "Transactions have been applied successfully and is propagated \
                 throughout the 'network'"
-               ~module_:__MODULE__ ~location:__LOC__
                ~metadata:
                  [ ( "transactions"
                    , Transaction_pool.Resource_pool.Diff.to_yojson transactions
@@ -146,8 +135,7 @@ let%test_module "transaction_status" =
                   ([user_command], Fn.const ())
               in
               let%map () = Async.Scheduler.yield_until_no_jobs_remain () in
-              Logger.info logger "Checking status" ~module_:__MODULE__
-                ~location:__LOC__ ;
+              [%log info] "Checking status" ;
               [%test_eq: State.t] ~equal:State.equal State.Unknown
                 ( Or_error.ok_exn
                 @@ get_status ~frontier_broadcast_pipe ~transaction_pool
@@ -176,8 +164,7 @@ let%test_module "transaction_status" =
                 @@ get_status ~frontier_broadcast_pipe ~transaction_pool
                      user_command
               in
-              Logger.info logger "Computing status" ~module_:__MODULE__
-                ~location:__LOC__ ;
+              [%log info] "Computing status" ;
               [%test_eq: State.t] ~equal:State.equal State.Pending status ) )
 
     let%test_unit "An unknown transaction does not appear in the transition \
@@ -209,8 +196,7 @@ let%test_module "transaction_status" =
                   (pool_user_commands, Fn.const ())
               in
               let%map () = Async.Scheduler.yield_until_no_jobs_remain () in
-              Logger.info logger "Computing status" ~module_:__MODULE__
-                ~location:__LOC__ ;
+              [%log info] "Computing status" ;
               [%test_eq: State.t] ~equal:State.equal State.Unknown
                 ( Or_error.ok_exn
                 @@ get_status ~frontier_broadcast_pipe ~transaction_pool

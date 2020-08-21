@@ -52,6 +52,16 @@ module User_command = struct
     ; fee: Currency.Fee.t
     ; memo: User_command_memo.t }
   [@@deriving yojson]
+
+  let of_obj x =
+    { id= x#id
+    ; isDelegation= x#isDelegation
+    ; nonce= x#nonce
+    ; from= x#from
+    ; to_= x#to_
+    ; amount= x#amount
+    ; fee= x#fee
+    ; memo= x#memo }
 end
 
 module Encoders = struct
@@ -68,6 +78,8 @@ module Encoders = struct
   let uint32 value = `String (Unsigned.UInt32.to_string value)
 
   let public_key value = `String (Public_key.Compressed.to_base58_check value)
+
+  let token value = `String (Token_id.to_string value)
 end
 
 module Decoders = struct
@@ -97,4 +109,7 @@ module Decoders = struct
 
   let nonce json =
     Yojson.Basic.Util.to_string json |> Coda_base.Account.Nonce.of_string
+
+  let token json =
+    Yojson.Basic.Util.to_string json |> Coda_base.Token_id.of_string
 end

@@ -3,56 +3,54 @@
 
 open Core_kernel
 
-[%%ifdef
+[%%ifndef
 consensus_mechanism]
 
-open Snark_params.Tick
-
-[%%else]
-
-module Random_oracle = Random_oracle_nonconsensus
-open Snark_params_nonconsensus
+open Import
 
 [%%endif]
+
+module T = Coda_numbers.Nat.Make64 ()
 
 [%%versioned
 module Stable = struct
   module V1 = struct
-    type t = Field.t [@@deriving version {asserted}, sexp, eq, hash, compare]
+    type t = Unsigned_extended.UInt64.Stable.V1.t
+    [@@deriving sexp, eq, compare, hash, yojson]
 
     let to_latest = Fn.id
-
-    let to_yojson x = `String (Field.to_string x)
-
-    let of_yojson = function
-      | `String x ->
-          Ok (Field.of_string x)
-      | _ ->
-          Error "Coda_base.Account.Token_id.of_yojson"
   end
 end]
 
-type t = Stable.Latest.t [@@deriving sexp, compare]
+let to_input = T.to_input
 
-let to_input (x : t) = Random_oracle.Input.field x
+let to_string = T.to_string
 
-let to_string = Field.to_string
+let of_string = T.of_string
 
-let of_string = Field.of_string
+let to_uint64 = Fn.id
 
-let default = Field.one
+let of_uint64 = Fn.id
 
-let invalid = Field.zero
+let next = T.succ
 
-let field_max = Field.(zero - one)
+let invalid = T.of_uint64 Unsigned.UInt64.zero
 
-let next x = Field.(one + x)
+let default = T.of_uint64 Unsigned.UInt64.one
 
-let gen = Field.gen_uniform_incl default field_max
+let gen_ge minimum =
+  Quickcheck.Generator.map
+    Int64.(gen_incl (min_value + minimum) max_value)
+    ~f:(fun x ->
+      Int64.(x - min_value) |> Unsigned.UInt64.of_int64 |> T.of_uint64 )
 
-let gen_non_default = Field.gen_uniform_incl (next default) field_max
+let gen = gen_ge 1L
 
-let unpack = Field.unpack
+let gen_non_default = gen_ge 2L
+
+let gen_with_invalid = gen_ge 0L
+
+let unpack = T.to_bits
 
 include Hashable.Make_binable (Stable.Latest)
 include Comparable.Make_binable (Stable.Latest)
@@ -60,26 +58,39 @@ include Comparable.Make_binable (Stable.Latest)
 [%%ifdef
 consensus_mechanism]
 
-type var = Field.Var.t
+type var = T.Checked.t
 
-let typ = Field.typ
+let typ = T.typ
 
-let var_of_t = Field.Var.constant
+let var_of_t = T.Checked.constant
 
 module Checked = struct
   open Snark_params.Tick
 
-  let next x = Field.Var.(add x (constant Field.one))
+  let next = T.Checked.succ
 
-  let to_input (x : var) = Random_oracle.Input.field x
+  let next_if = T.Checked.succ_if
 
-  let equal = Field.Checked.equal
+  let to_input = T.Checked.to_input
 
-  let if_ = Field.Checked.if_
+  let equal = T.Checked.equal
+
+  let if_ = T.Checked.if_
 
   module Assert = struct
-    let equal = Field.Checked.Assert.equal
+    let equal x y =
+      let x = T.Checked.to_integer x |> Snarky_integer.Integer.to_field in
+      let y = T.Checked.to_integer y |> Snarky_integer.Integer.to_field in
+      Field.Checked.Assert.equal x y
   end
 end
+
+let%test_unit "var_of_t preserves the underlying value" =
+  let open Snark_params.Tick in
+  Quickcheck.test gen ~f:(fun tid ->
+      [%test_eq: t] tid
+        (Test_util.checked_to_unchecked Typ.unit typ
+           (fun () -> Snark_params.Tick.Checked.return (var_of_t tid))
+           ()) )
 
 [%%endif]

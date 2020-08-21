@@ -85,16 +85,6 @@ module Rpcs : sig
             ; k_block_hashes: State_hash.Stable.V1.t list }
         end
       end]
-
-      type t = Stable.Latest.t =
-        { node_ip_addr: Unix.Inet_addr.t
-        ; node_peer_id: Peer.Id.t
-        ; peers: Network_peer.Peer.t list
-        ; block_producers: Signature_lib.Public_key.Compressed.t list
-        ; protocol_state_hash: State_hash.t
-        ; ban_statuses:
-            (Core.Unix.Inet_addr.t * Trust_system.Peer_status.t) list
-        ; k_block_hashes: State_hash.t list }
     end
 
     type query = unit [@@deriving sexp, to_yojson]
@@ -140,6 +130,7 @@ module Config : sig
     ; time_controller: Block_time.Controller.t
     ; consensus_local_state: Consensus.Data.Local_state.t
     ; genesis_ledger_hash: Ledger_hash.t
+    ; constraint_constants: Genesis_constants.Constraint_constants.t
     ; creatable_gossip_net: Gossip_net.Any.creatable
     ; is_seed: bool
     ; log_gossip_heard: log_gossip_heard }

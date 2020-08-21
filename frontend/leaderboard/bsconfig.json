@@ -4,12 +4,13 @@
     {
       "dir": "src",
       "subdirs": true
+    },
+    {
+      "dir": "__tests__",
+      "type": "dev"
     }
   ],
-  "bs-dependencies": [
-    "bsc-stdlib-polyfill",
-    "bs-fetch"
-  ],
+  "bs-dependencies": ["bsc-stdlib-polyfill", "bs-fetch", "@glennsl/bs-json"],
   "reason": {
     "react-jsx": 3
   },
@@ -17,9 +18,7 @@
     "module": "commonjs"
   },
   "suffix": ".bs.js",
-  "bsc-flags": [
-    "-bs-super-errors",
-    "-open BscStdlibPolyfill"
-  ],
+  "bsc-flags": ["-bs-super-errors", "-open BscStdlibPolyfill"],
+  "bs-dev-dependencies": ["@glennsl/bs-jest"],
   "refmt": 3
 }

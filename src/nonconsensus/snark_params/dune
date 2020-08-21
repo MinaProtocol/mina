@@ -4,5 +4,5 @@
  (library_flags -linkall)
  (libraries core_kernel bignum_bigint snarkette)
  (preprocessor_deps ../../config.mlh)
- (preprocess (pps ppx_coda ppx_optcomp ppx_bin_prot ppx_sexp_conv ppx_let))
+ (preprocess (pps ppx_custom_printf ppx_coda ppx_version ppx_optcomp ppx_bin_prot ppx_sexp_conv ppx_let))
  (synopsis "Field definition for nonconsensus code"))

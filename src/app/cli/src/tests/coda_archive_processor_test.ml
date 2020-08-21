@@ -1,6 +1,5 @@
 open Core
 open Async
-open Signature_lib
 
 let name = "coda-archive-processor-test"
 
@@ -9,6 +8,8 @@ let main () =
   let postgres_address =
     Uri.of_string "postgres://admin:codarules@localhost:5432/archiver"
   in
+  let precomputed_values = Lazy.force Precomputed_values.compiled in
+  let constraint_constants = precomputed_values.constraint_constants in
   let%bind conn =
     match%map Caqti_async.connect postgres_address with
     | Ok conn ->
@@ -17,20 +18,17 @@ let main () =
         failwith @@ Caqti_error.show e
   in
   let logger = Logger.create () in
-  Archive_lib.Processor.setup_server ~logger ~postgres_address
+  Archive_lib.Processor.setup_server ~logger ~constraint_constants
+    ~postgres_address
     ~server_port:(Host_and_port.port archive_address)
+    ~delete_older_than:None
   |> don't_wait_for ;
-  let largest_account_keypair =
-    Test_genesis_ledger.largest_account_keypair_exn ()
-  in
-  let largest_account_public_key =
-    Public_key.compress largest_account_keypair.public_key
+  let public_key =
+    Precomputed_values.largest_account_pk_exn precomputed_values
   in
   let n = 2 in
   let block_production_keys i = if i = 0 then Some i else None in
-  let snark_work_public_keys i =
-    if i = 0 then Some largest_account_public_key else None
-  in
+  let snark_work_public_keys i = if i = 0 then Some public_key else None in
   let is_archive_rocksdb i = i = 1 in
   let archive_process_location i =
     if i = 1 then Some archive_address else None
@@ -39,12 +37,10 @@ let main () =
     Coda_worker_testnet.test ~name logger n block_production_keys
       snark_work_public_keys Cli_lib.Arg_type.Work_selection_method.Sequence
       ~max_concurrent_connections:None ~is_archive_rocksdb
-      ~archive_process_location
+      ~archive_process_location ~precomputed_values
   in
   let%bind new_block_pipe =
-    let%map pipe =
-      Coda_worker_testnet.Api.new_block testnet 1 largest_account_public_key
-    in
+    let%map pipe = Coda_worker_testnet.Api.new_block testnet 1 public_key in
     (Option.value_exn pipe).pipe
   in
   let num_blocks_to_wait = 5 in

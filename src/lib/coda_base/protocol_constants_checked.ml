@@ -40,8 +40,6 @@ module Value = struct
     end
   end]
 
-  type t = Stable.Latest.t [@@deriving to_yojson, eq, sexp, compare]
-
   let gen : t Quickcheck.Generator.t =
     let open Quickcheck.Let_syntax in
     let%bind k = Int.gen_incl 1 5000 in
@@ -79,19 +77,13 @@ defined consensus_mechanism]
 
 type var = (T.Checked.t, T.Checked.t, Block_time.Unpacked.var) Poly.t
 
-let to_hlist ({k; delta; genesis_state_timestamp} : (_, _, _) Poly.t) =
-  H_list.[k; delta; genesis_state_timestamp]
-
-let of_hlist : (unit, 'a -> 'b -> 'c -> unit) H_list.t -> ('a, 'b, 'c) Poly.t =
- fun H_list.[k; delta; genesis_state_timestamp] ->
-  {k; delta; genesis_state_timestamp}
-
 let data_spec =
   Data_spec.[T.Checked.typ; T.Checked.typ; Block_time.Unpacked.typ]
 
 let typ =
-  Typ.of_hlistable data_spec ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
-    ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+  Typ.of_hlistable data_spec ~var_to_hlist:Poly.to_hlist
+    ~var_of_hlist:Poly.of_hlist ~value_to_hlist:Poly.to_hlist
+    ~value_of_hlist:Poly.of_hlist
 
 let var_to_input (var : var) =
   let s = Bitstring_lib.Bitstring.Lsb_first.to_list in
@@ -106,7 +98,7 @@ let var_to_input (var : var) =
 let%test_unit "value = var" =
   let compiled = Genesis_constants.for_unit_tests.protocol in
   let test protocol_constants =
-    let open Snarky in
+    let open Snarky_backendless in
     let p_var =
       let%map p = exists typ ~compute:(As_prover.return protocol_constants) in
       As_prover.read typ p

@@ -2,8 +2,8 @@
  (name snarky_field_extensions)
  (public_name snarky_field_extensions)
  (inline_tests)
- (preprocess (pps ppx_coda ppx_jane ppx_deriving.eq ppx_deriving_yojson))
+ (preprocess (pps ppx_version ppx_jane ppx_deriving.eq ppx_deriving_yojson))
  (libraries
-   snarky
+   snarky.backendless
    snarkette
    core_kernel ))

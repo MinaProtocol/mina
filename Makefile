@@ -65,39 +65,30 @@ clean:
 	@rm -rf src/$(COVERAGE_DIR)
 
 # TEMP HACK (for circle-ci)
-ifeq ($(LIBP2P_NIXLESS),1)
 libp2p_helper:
 	$(WRAPAPP) bash -c "set -e && cd src/app/libp2p_helper && rm -rf result && mkdir -p result/bin && cd src && $(GO) mod download && cd .. && for f in generate_methodidx libp2p_helper; do cd src/\$$f && $(GO) build; cp \$$f ../../result/bin/\$$f; cd ../../; done"
-else
-libp2p_helper:
-	$(WRAPAPP) bash -c "set -o pipefail ; if [ -z \"$${USER}\" ]; then export USER=opam ; fi && source ~/.nix-profile/etc/profile.d/nix.sh && (if [ -z \"$${CACHIX_SIGNING_KEY+x}\" ]; then cd src/app/libp2p_helper && nix-build $${EXTRA_NIX_ARGS} default.nix;  else cachix use codaprotocol && cd src/app/libp2p_helper && nix-build $${EXTRA_NIX_ARGS} default.nix | cachix push codaprotocol ; fi)"
-endif
-
 
 
 GENESIS_DIR := $(TMPDIR)/coda_cache_dir
 
-# generate the actual ledger and store in a tar
-genesis_tar:
-	@GENESIS_FILE=$(GENESIS_DIR)/$(shell cat _build/default/src/app/runtime_genesis_ledger/genesis_filename.txt).tar.gz && \
-	if [ ! -f $$GENESIS_FILE ] || [ _build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -nt $$GENESIS_FILE ]; then \
-		./_build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe ; \
-	fi
-
-# compile the tool and write the filename to `genesis_filename.txt`
 genesis_ledger:
 	$(info Building runtime_genesis_ledger)
-	ulimit -s 65532 && (ulimit -n 10240 || true) && $(WRAPAPP) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build --profile=$(DUNE_PROFILE) src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe src/app/runtime_genesis_ledger/genesis_filename.txt && make genesis_tar
+	ulimit -s 65532 && (ulimit -n 10240 || true) && $(WRAPAPP) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune exec --profile=$(DUNE_PROFILE) src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -- --genesis-dir $(GENESIS_DIR)
 	$(info Genesis ledger and genesis proof generated)
 
 build: git_hooks reformat-diff libp2p_helper
 	$(info Starting Build)
-	ulimit -s 65532 && (ulimit -n 10240 || true) && $(WRAPAPP) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build src/app/logproc/logproc.exe src/app/cli/src/coda.exe --profile=$(DUNE_PROFILE) && make genesis_ledger
+	ulimit -s 65532 && (ulimit -n 10240 || true) && $(WRAPAPP) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build src/app/logproc/logproc.exe src/app/cli/src/coda.exe --profile=$(DUNE_PROFILE)
 	$(info Build complete)
 
 build_archive: git_hooks reformat-diff
 	$(info Starting Build)
 	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/archive/archive.exe --profile=$(DUNE_PROFILE)
+	$(info Build complete)
+
+build_rosetta:
+	$(info Starting Build)
+	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/rosetta/rosetta.exe --profile=$(DUNE_PROFILE)
 	$(info Build complete)
 
 client_sdk :
@@ -113,6 +104,11 @@ client_sdk_test_sigs :
 client_sdk_test_sigs_nonconsensus :
 	$(info Starting Build)
 	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/client_sdk/tests/test_signatures_nonconsensus.exe --profile=nonconsensus_medium_curves
+	$(info Build complete)
+
+dhall_types :
+	$(info Starting Build)
+	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/dhall_types/dump_dhall_types.exe --profile=dev
 	$(info Build complete)
 
 dev: codabuilder containerstart build
@@ -165,12 +161,12 @@ endif
 macos-setup-download:
 	./scripts/macos-setup-brew.sh
 
-macos-setup-compile:
-	./scripts/macos-setup-opam.sh
+setup-opam:
+	./scripts/setup-opam.sh
 
 macos-setup:
 	./scripts/macos-setup-brew.sh
-	./scripts/macos-setup-opam.sh
+	./scripts/setup-opam.sh
 
 ########################################
 ## Containers and container management
@@ -213,6 +209,9 @@ codabuilder: git_hooks
 containerstart: git_hooks
 	@./scripts/container.sh restart
 
+docker-rosetta:
+	docker build --file dockerfiles/Dockerfile-rosetta --tag codaprotocol/coda:rosetta-$(GITLONGHASH) .
+
 ########################################
 ## Artifacts
 
@@ -230,10 +229,16 @@ build_pv_keys:
 	ulimit -s 65532 && (ulimit -n 10240 || true) && $(WRAPAPP) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune exec --profile=$(DUNE_PROFILE) src/lib/snark_keys/gen_keys/gen_keys.exe -- --generate-keys-only
 	$(info Keys built)
 
+build_or_download_pv_keys:
+	$(info Building keys)
+	ulimit -s 65532 && (ulimit -n 10240 || true) && $(WRAPAPP) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune exec --profile=$(DUNE_PROFILE) src/lib/snark_keys/gen_keys/gen_keys.exe -- --generate-keys-only
+	$(info Keys built)
+
 publish_deb:
 	@./scripts/publish-deb.sh
 
-publish_debs: publish_deb
+publish_debs:
+	@./buildkite/scripts/publish-deb.sh
 
 genesiskeys:
 	@mkdir -p /tmp/artifacts
@@ -269,7 +274,7 @@ web:
 ## Benchmarks
 
 benchmarks:
-	dune build app/benchmarks/main.exe
+	dune build src/app/benchmarks/main.exe
 
 
 ########################################
@@ -333,4 +338,4 @@ ml-docs:
 # https://www.gnu.org/software/make/manual/html_node/Phony-Targets.html
 # HACK: cat Makefile | egrep '^\w.*' | sed 's/:/ /' | awk '{print $1}' | grep -v myprocs | sort | xargs
 
-.PHONY: all base-docker base-googlecloud base-minikube build check-format ci-base-docker clean client_sdk client_sdk_test_sigs codaslim containerstart deb dev codabuilder coda-docker coda-googlecloud coda-minikube ocaml407-googlecloud pull-ocaml407-googlecloud reformat test test-all test-coda-block-production-sig test-coda-block-production-stake test-codapeers-sig test-codapeers-stake test-full-sig test-full-stake test-runtest test-transaction-snark-profiler-sig test-transaction-snark-profiler-stake update-deps render-circleci check-render-circleci docker-toolchain-rust toolchains doc_diagrams ml-docs macos-setup macos-setup-download macos-setup-compile libp2p_helper
+.PHONY: all base-docker base-googlecloud base-minikube build check-format ci-base-docker clean client_sdk client_sdk_test_sigs codaslim containerstart deb dev codabuilder coda-docker coda-googlecloud coda-minikube ocaml407-googlecloud pull-ocaml407-googlecloud reformat test test-all test-coda-block-production-sig test-coda-block-production-stake test-codapeers-sig test-codapeers-stake test-full-sig test-full-stake test-runtest test-transaction-snark-profiler-sig test-transaction-snark-profiler-stake update-deps render-circleci check-render-circleci docker-toolchain-rust toolchains doc_diagrams ml-docs macos-setup macos-setup-download setup-opam libp2p_helper

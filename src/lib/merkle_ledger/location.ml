@@ -19,15 +19,13 @@ module Bigstring = struct
     end
   end]
 
-  type t = Stable.Latest.t [@@deriving sexp, compare]
-
   [%%define_locally
   Bigstring.(get, length, equal, create, to_string, set, blit, sub)]
 
   include Hashable.Make (Stable.Latest)
 end
 
-module Make (Depth : Intf.Depth) = struct
+module T = struct
   (* Locations are a bitstring prefixed by a byte. In the case of accounts, the prefix
    * byte is 0xfe. In the case of a hash node in the merkle tree, the prefix is between
    * 1 and N (where N is the height of the root of the merkle tree, with 1 representing
@@ -44,7 +42,7 @@ module Make (Depth : Intf.Depth) = struct
 
     let account = UInt8.of_int 0xfe
 
-    let hash depth = UInt8.of_int (Depth.depth - depth)
+    let hash ~ledger_depth depth = UInt8.of_int (ledger_depth - depth)
   end
 
   type t = Generic of Bigstring.t | Account of Addr.t | Hash of Addr.t
@@ -71,7 +69,7 @@ module Make (Depth : Intf.Depth) = struct
 
   let build_generic (data : Bigstring.t) : t = Generic data
 
-  let parse (str : Bigstring.t) : (t, unit) Result.t =
+  let parse ~ledger_depth (str : Bigstring.t) : (t, unit) Result.t =
     let prefix = Bigstring.get str 0 |> Char.to_int |> UInt8.of_int in
     let data = Bigstring.sub str ~pos:1 ~len:(Bigstring.length str - 1) in
     if prefix = Prefix.generic then Result.return (Generic data)
@@ -79,9 +77,9 @@ module Make (Depth : Intf.Depth) = struct
       let path = Addr.of_byte_string (Bigstring.to_string data) in
       let slice_path = Addr.slice path 0 in
       if prefix = Prefix.account then
-        Result.return (Account (slice_path Depth.depth))
-      else if UInt8.to_int prefix <= Depth.depth then
-        Result.return (Hash (slice_path (Depth.depth - UInt8.to_int prefix)))
+        Result.return (Account (slice_path ledger_depth))
+      else if UInt8.to_int prefix <= ledger_depth then
+        Result.return (Hash (slice_path (ledger_depth - UInt8.to_int prefix)))
       else Result.fail ()
 
   let prefix_bigstring prefix src =
@@ -101,12 +99,12 @@ module Make (Depth : Intf.Depth) = struct
     | Generic data ->
         prefix_bigstring Prefix.generic data
     | Account path ->
-        assert (Addr.depth path = Depth.depth) ;
+        assert (Addr.depth path = ledger_depth) ;
         prefix_bigstring Prefix.account (Addr.serialize ~ledger_depth path)
     | Hash path ->
-        assert (Addr.depth path <= Depth.depth) ;
+        assert (Addr.depth path <= ledger_depth) ;
         prefix_bigstring
-          (Prefix.hash (Addr.depth path))
+          (Prefix.hash ~ledger_depth (Addr.depth path))
           (Addr.serialize ~ledger_depth path)
 
   let parent : t -> t = function

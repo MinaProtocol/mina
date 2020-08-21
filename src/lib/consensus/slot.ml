@@ -9,8 +9,9 @@ include (T : module type of T with module Checked := T.Checked)
 
 let in_seed_update_range ~(constants : Constants.t) (slot : t) =
   let open UInt32.Infix in
+  (* TODO: This must be 1/3 of the epoch length *)
   let ck = constants.c * constants.k in
-  ck <= slot && slot < ck * UInt32.of_int 2
+  slot < ck * UInt32.of_int 2
 
 module Checked = struct
   include T.Checked
@@ -27,11 +28,8 @@ module Checked = struct
     in
     let two = Integer.constant ~m (Bignum_bigint.of_int 2) in
     let%bind ck_times_2 = integer_mul ck two in
-    let slot_gte_ck = Integer.gte ~m (T.Checked.to_integer slot) ck in
-    let slot_lt_ck_times_2 =
-      Integer.lt ~m (T.Checked.to_integer slot) ck_times_2
-    in
-    Boolean.(slot_gte_ck && slot_lt_ck_times_2)
+    make_checked (fun () ->
+        Integer.lt ~m (T.Checked.to_integer slot) ck_times_2 )
 end
 
 let gen (constants : Constants.t) =
@@ -42,11 +40,11 @@ let gen (constants : Constants.t) =
   Core.Int.gen_incl 0 ck3 >>| UInt32.of_int
 
 let%test_unit "in_seed_update_range unchecked vs. checked equality" =
-  let constants = Constants.for_unit_tests in
+  let constants = Lazy.force Constants.for_unit_tests in
   let module Length = Coda_numbers.Length in
   let test x =
     Test_util.test_equal
-      (Snarky.Typ.tuple2 Constants.typ typ)
+      (Snarky_backendless.Typ.tuple2 Constants.typ typ)
       Tick.Boolean.typ
       (fun (c, x) -> Checked.in_seed_update_range ~constants:c x)
       (fun (c, x) -> in_seed_update_range ~constants:c x)

@@ -1,26 +1,23 @@
 open Core_kernel
 open Coda_base
 
-type t [@@deriving sexp]
+[%%versioned:
+module Stable : sig
+  module V1 : sig
+    type t [@@deriving sexp]
 
-module Stable :
-  sig
-    module V1 : sig
-      type t [@@deriving sexp, bin_io, version]
-
-      val hash : t -> Staged_ledger_hash.Aux_hash.t
-    end
-
-    module Latest = V1
+    val hash : t -> Staged_ledger_hash.Aux_hash.t
   end
-  with type V1.t = t
+end]
 
 module Transaction_with_witness : sig
   (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)
   type t =
-    { transaction_with_info: Ledger.Undo.t Transaction_protocol_state.t
+    { transaction_with_info: Ledger.Undo.t
+    ; state_hash: State_hash.t * State_body_hash.t
     ; statement: Transaction_snark.Statement.t
-    ; witness: Transaction_witness.t }
+    ; init_stack: Transaction_snark.Pending_coinbase_stack_state.Init_stack.t
+    ; ledger_witness: Sparse_ledger.t }
   [@@deriving sexp]
 end
 
@@ -57,23 +54,23 @@ module Make_statement_scanner
         type t
 
         val verify :
-             verifier:t
-          -> proof:Ledger_proof.t
-          -> statement:Transaction_snark.Statement.t
-          -> message:Sok_message.t
-          -> sexp_bool M.t
+          verifier:t -> Ledger_proof_with_sok_message.t list -> sexp_bool M.t
     end) : sig
   val scan_statement :
-       t
+       constraint_constants:Genesis_constants.Constraint_constants.t
+    -> t
     -> verifier:Verifier.t
     -> (Transaction_snark.Statement.t, [`Empty | `Error of Error.t]) result M.t
 
   val check_invariants :
        t
+    -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> verifier:Verifier.t
     -> error_prefix:string
     -> ledger_hash_end:Frozen_ledger_hash.t
     -> ledger_hash_begin:Frozen_ledger_hash.t option
+    -> next_available_token_before:Token_id.t
+    -> next_available_token_after:Token_id.t
     -> (unit, Error.t) result M.t
 end
 
@@ -81,21 +78,32 @@ end
 module Staged_undos : sig
   type t
 
-  val apply : t -> Ledger.t -> unit Or_error.t
+  val apply :
+       constraint_constants:Genesis_constants.Constraint_constants.t
+    -> t
+    -> Ledger.t
+    -> unit Or_error.t
 end
 
 val staged_undos : t -> Staged_undos.t
 
-val empty : unit -> t
+val empty :
+  constraint_constants:Genesis_constants.Constraint_constants.t -> unit -> t
 
 val fill_work_and_enqueue_transactions :
      t
   -> Transaction_with_witness.t list
   -> Transaction_snark_work.t list
-  -> ((Ledger_proof.t * Transaction.t list) option * t) Or_error.t
+  -> ( (Ledger_proof.t * (Transaction.t With_status.t * State_hash.t) list)
+       option
+     * t )
+     Or_error.t
 
 val latest_ledger_proof :
-  t -> (Ledger_proof_with_sok_message.t * Transaction.t list) option
+     t
+  -> ( Ledger_proof_with_sok_message.t
+     * (Transaction.t With_status.t * State_hash.t) list )
+     option
 
 val free_space : t -> int
 
@@ -106,7 +114,14 @@ val hash : t -> Staged_ledger_hash.Aux_hash.t
 val target_merkle_root : t -> Frozen_ledger_hash.t option
 
 (** All the transactions in the order in which they were applied*)
-val staged_transactions : t -> Transaction.t list Or_error.t
+val staged_transactions : t -> Transaction.t With_status.t list Or_error.t
+
+(** All the transactions with parent protocol state of the block in which they were included in the order in which they were applied*)
+val staged_transactions_with_protocol_states :
+     t
+  -> get_state:(State_hash.t -> Coda_state.Protocol_state.value Or_error.t)
+  -> (Transaction.t With_status.t * Coda_state.Protocol_state.value) list
+     Or_error.t
 
 (** Available space and the corresponding required work-count in one and/or two trees (if the slots to be occupied are in two different trees)*)
 val partition_if_overflowing : t -> Space_partition.t
@@ -116,7 +131,8 @@ val statement_of_job : Available_job.t -> Transaction_snark.Statement.t option
 val snark_job_list_json : t -> string
 
 (** All the proof bundles *)
-val all_work_statements : t -> Transaction_snark.Statement.t One_or_two.t list
+val all_work_statements_exn :
+  t -> Transaction_snark.Statement.t One_or_two.t list
 
 (** Required proof bundles for a certain number of slots *)
 val required_work_pairs : t -> slots:int -> Available_job.t One_or_two.t list
@@ -144,11 +160,13 @@ val check_required_protocol_states :
   -> (State_hash.t * Coda_state.Protocol_state.value) list Or_error.t
 
 (** All the proof bundles for snark workers*)
-val all_work_pairs_exn :
+val all_work_pairs :
      t
-  -> ( Transaction.t Transaction_protocol_state.t
+  -> get_state:(State_hash.t -> Coda_state.Protocol_state.value Or_error.t)
+  -> ( Transaction.t
      , Transaction_witness.t
      , Ledger_proof.t )
      Snark_work_lib.Work.Single.Spec.t
      One_or_two.t
      list
+     Or_error.t

@@ -11,6 +11,7 @@ end
 
 val run :
      logger:Logger.t
+  -> precomputed_values:Precomputed_values.t
   -> trust_system:Trust_system.t
   -> verifier:Verifier.t
   -> network:Coda_networking.t

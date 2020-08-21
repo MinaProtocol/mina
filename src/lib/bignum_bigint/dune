@@ -5,5 +5,5 @@
  (inline_tests)
  (libraries core_kernel fold_lib async_kernel bignum)
  (preprocess
-  (pps ppx_coda ppx_jane bisect_ppx -- -conditional))
+  (pps ppx_version ppx_jane bisect_ppx -- -conditional))
  (synopsis "Bignum's bigint re-exported as Bignum_bigint"))

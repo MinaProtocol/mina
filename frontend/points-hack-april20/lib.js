@@ -66,15 +66,19 @@ const storage = new Storage({
   keyFilename: json_file_path,
 });
 
+function truncate(s, len) {
+  return s.substring(0, Math.min(len, s.length));
+}
+
 function uploadFile(result) {
   const bucketName = "points-data-hack-april20";
   const filename =
     result.data && result.data.newBlock && result.data.newBlock.stateHash
-      ? "block-success-" + result.data.newBlock.stateHash + ".json"
+      ? "block-success-" + truncate(result.data.newBlock.stateHash, 200) + ".json"
       : "block-error-" + Date.now() + ".json";
 
   const bucket = storage.bucket(bucketName);
-  const file = bucket.file("32b-" + CODA_TESTNET_NAME + "/" + filename);
+  const file = bucket.file("v1/32b-" + CODA_TESTNET_NAME + "/" + filename);
 
   const buffer = Buffer.from(JSON.stringify(result), "utf8");
   const readable = new Readable();
@@ -146,6 +150,9 @@ subscription Blocks {
     }
     transactions {
       coinbase
+      coinbaseReceiverAccount {
+        publicKey
+      }
       feeTransfer {
         fee
         recipient

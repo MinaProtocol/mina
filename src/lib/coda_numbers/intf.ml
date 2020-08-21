@@ -26,6 +26,9 @@ module type S_unchecked = sig
 
   include Hashable.S with type t := t
 
+  (* not automatically derived *)
+  val dhall_type : Ppx_dhall_type.Dhall_type.t
+
   val max_value : t
 
   val length_in_bits : int
@@ -148,7 +151,7 @@ module type UInt32 = sig
     end
   end]
 
-  include S with type t = Stable.Latest.t
+  include S with type t := t
 
   val to_uint32 : t -> uint32
 
@@ -164,7 +167,7 @@ module type UInt64 = sig
     end
   end]
 
-  include S with type t = Stable.Latest.t
+  include S with type t := Stable.Latest.t
 
   val to_uint64 : t -> uint64
 

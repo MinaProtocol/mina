@@ -3,8 +3,8 @@
  (public_name unsigned_extended)
  (library_flags -linkall)
  (inline_tests)
- (libraries core integers snark_params)
+ (libraries core integers snark_params ppx_version.runtime)
  (preprocessor_deps ../../config.mlh)
  (preprocess
-  (pps ppx_coda ppx_optcomp ppx_bin_prot ppx_sexp_conv ppx_compare ppx_hash ppx_inline_test ppx_deriving.std ppx_deriving_yojson bisect_ppx -- -conditional))
+  (pps ppx_coda ppx_version ppx_optcomp ppx_bin_prot ppx_sexp_conv ppx_compare ppx_hash ppx_inline_test ppx_deriving.std ppx_deriving_yojson bisect_ppx -- -conditional))
  (synopsis "Unsigned integer functions"))

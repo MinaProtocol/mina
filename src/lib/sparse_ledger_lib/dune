@@ -3,7 +3,7 @@
  (public_name sparse_ledger_lib)
  (library_flags -linkall)
  (inline_tests)
- (libraries core_kernel module_version logger)
+ (libraries core_kernel logger)
  (preprocess
-  (pps ppx_jane ppx_deriving.eq bisect_ppx ppx_deriving_yojson ppx_coda -- -conditional))
+  (pps ppx_jane ppx_deriving.eq bisect_ppx ppx_deriving_yojson ppx_version -- -conditional))
  (synopsis "sparse Ledger implementation"))

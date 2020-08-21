@@ -64,7 +64,7 @@ end
 module Params = struct
   type t =
     { query: string option
-    ; variables: (string * Yojson.Basic.json) list option
+    ; variables: (string * Yojson.Basic.t) list option
     ; operation_name: string option }
 
   let empty = {query= None; variables= None; operation_name= None}

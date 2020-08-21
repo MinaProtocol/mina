@@ -2,6 +2,8 @@ open Core
 
 [%%versioned
 module Stable = struct
+  [@@@no_toplevel_latest_type]
+
   module V1 = struct
     type t =
       | User_command of User_command.With_valid_signature.Stable.V1.t
@@ -29,11 +31,9 @@ end
 
 include T
 
-let fee_excess = function
+let fee_excess : t -> Fee_excess.t Or_error.t = function
   | User_command t ->
-      Ok
-        (Currency.Fee.Signed.of_unsigned
-           (User_command_payload.fee (t :> User_command.t).payload))
+      Ok (User_command.fee_excess (User_command.forget_check t))
   | Fee_transfer t ->
       Fee_transfer.fee_excess t
   | Coinbase t ->
@@ -44,3 +44,23 @@ let supply_increase = function
       Ok Currency.Amount.zero
   | Coinbase t ->
       Coinbase.supply_increase t
+
+let accounts_accessed ~next_available_token = function
+  | User_command cmd ->
+      User_command.accounts_accessed ~next_available_token
+        (User_command.forget_check cmd)
+  | Fee_transfer ft ->
+      Fee_transfer.receivers ft
+  | Coinbase cb ->
+      Coinbase.accounts_accessed cb
+
+let next_available_token t next_available_token =
+  match t with
+  | User_command cmd ->
+      User_command.next_available_token
+        (User_command.forget_check cmd)
+        next_available_token
+  | Fee_transfer _ ->
+      next_available_token
+  | Coinbase _ ->
+      next_available_token

@@ -2,7 +2,7 @@
   (name bootstrap_controller)
   (public_name bootstrap_controller)
   (inline_tests)
-  (preprocess (pps ppx_coda ppx_jane ppx_deriving.eq))
+  (preprocess (pps ppx_coda ppx_version ppx_jane ppx_deriving.eq ppx_register_event))
   (libraries
     core
     coda_base

@@ -1,9 +1,9 @@
 (library
   (name user_command_input)
   (public_name user_command_input)
-  (libraries 
+  (libraries
     ; opam deps
     core
     ; libs
-    coda_base signature_lib coda_version secrets participating_state)
-  (preprocess (pps ppx_coda ppx_deriving_yojson ppx_jane ppx_deriving.make)))
+    coda_base signature_lib secrets participating_state)
+  (preprocess (pps ppx_coda ppx_version ppx_deriving_yojson ppx_jane ppx_deriving.make)))

@@ -5,6 +5,6 @@
  (inline_tests)
  (libraries core async pipe_lib logger web_request)
  (preprocess
-  (pps ppx_coda ppx_jane ppx_deriving.std bisect_ppx -- -conditional))
+  (pps ppx_coda ppx_version ppx_jane ppx_deriving.std bisect_ppx -- -conditional))
  (synopsis
    "Transforming Coda data such that it can be easy for the Web Client to process"))

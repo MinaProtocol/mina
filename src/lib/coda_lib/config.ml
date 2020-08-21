@@ -16,7 +16,6 @@ end
 type t =
   { conf_dir: string
   ; logger: Logger.t
-  ; proof_level: Genesis_constants.Proof_level.t
   ; pids: Child_processes.Termination.t
   ; trust_system: Trust_system.t
   ; monitor: Monitor.t option
@@ -26,6 +25,7 @@ type t =
   ; coinbase_receiver: [`Producer | `Other of Public_key.Compressed.t]
   ; work_selection_method: (module Work_selector.Selection_method_intf)
   ; snark_worker_config: Snark_worker_config.t
+  ; snark_coordinator_key: Public_key.Compressed.t option [@default None]
   ; work_reassignment_wait: int
   ; gossip_net_params: Gossip_net.Libp2p.Config.t
   ; net_config: Coda_networking.Config.t
@@ -49,6 +49,5 @@ type t =
         [@default None]
   ; demo_mode: bool [@default false]
   ; log_block_creation: bool [@default false]
-  ; constraint_constants: Genesis_constants.Constraint_constants.t
   ; precomputed_values: Precomputed_values.t }
 [@@deriving make]

@@ -1,5 +1,12 @@
 (library
  (name cache_dir)
  (public_name cache_dir)
- (libraries core async coda_compile_config coda_version logger genesis_constants blake2)
- (preprocess (pps ppx_coda ppx_let ppx_custom_printf)))
+ (libraries
+   ; opam deps
+   async
+   core
+   ; libs
+   key_cache
+   blake2
+   logger)
+ (preprocess (pps ppx_coda ppx_version ppx_let ppx_custom_printf)))

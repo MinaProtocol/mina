@@ -2,9 +2,23 @@
  (name merkle_ledger)
  (public_name merkle_ledger)
  (library_flags -linkall)
- (libraries core bitstring integers extlib signature_lib immutable_array
-   dyn_array merkle_address direction rocks key_value_database empty_hashes module_version
-   visualization non_empty_list)
+ (libraries
+  ;; opam deps
+  core
+  extlib
+  integers
+  rocks
+  ;; libraries
+  bitstring
+  cache_dir
+  direction
+  empty_hashes
+  immutable_array
+  key_value_database
+  merkle_address
+  non_empty_list
+  signature_lib
+  visualization)
  (preprocess
-  (pps ppx_coda ppx_jane ppx_deriving.eq ppx_deriving.show ppx_deriving_yojson))
+  (pps ppx_coda ppx_version ppx_jane ppx_deriving.eq ppx_deriving.show ppx_deriving_yojson))
  (synopsis "Implementation of different account databases"))

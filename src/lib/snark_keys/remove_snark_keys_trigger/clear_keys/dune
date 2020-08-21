@@ -1,6 +1,6 @@
 (executable
  (name clear_keys)
- (libraries core file_system async cache_dir snarky)
+ (libraries core file_system async cache_dir snarky.backendless)
  (preprocess
-  (pps ppx_coda ppx_jane))
+  (pps ppx_version ppx_jane))
  (modes native))

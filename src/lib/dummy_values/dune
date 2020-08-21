@@ -2,10 +2,10 @@
  (name dummy_values)
  (public_name dummy_values)
  (flags :standard -short-paths)
- (libraries crypto_params snarky)
+ (libraries crypto_params snarky.backendless)
  (ppx_runtime_libraries base)
  (preprocess
-  (pps ppx_coda ppx_jane ppxlib.metaquot)))
+  (pps ppx_version ppx_jane ppxlib.metaquot)))
 
 (rule
  (targets dummy_values.ml)

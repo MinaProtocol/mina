@@ -29,7 +29,7 @@ module type Action_intf = sig
 
   (** Convert an action into a format string and a set of metadata for
       logging *)
-  val to_log : t -> string * (string, Yojson.Safe.json) List.Assoc.t
+  val to_log : t -> string * (string, Yojson.Safe.t) List.Assoc.t
 end
 
 (** Trust increment that sets a maximum rate of doing a bad thing (presuming the

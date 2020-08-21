@@ -1,16 +1,26 @@
 #!/bin/bash
 
+set -eou pipefail
+
 # Future Improvement: ensure the relative path for the "preprocessor_deps" entry
 # correctly lines up with "src/config.mlh"
 
-tmp=$(mktemp /tmp/ppx_optcomp_dune_files.XXXXXX)
+set +u
+if [[ -z "$CI" ]]; then
+  MKTEMP_FLAGS="-t "
+else
+  MKTEMP_FLAGS=""
+fi
+set -u
+
+tmp=$(mktemp ${MKTEMP_FLAGS}ppx_optcomp_dune_files.XXXX)
 
 find src/lib src/app -name '*.ml' -or -name '*.mli' \
   | xargs grep '\[%%import' \
   | cut -d: -f1 \
   | xargs -n 1 dirname \
   | uniq \
-  | xargs -i echo '{}/dune' \
+  | xargs -I{} echo '{}/dune' \
   | sort \
   > $tmp
 

@@ -2,61 +2,192 @@ open Core
 open Coda_base
 open Snark_params
 
-module Proof_type : sig
-  module Stable : sig
-    module V1 : sig
-      type t = [`Base | `Merge] [@@deriving bin_io, sexp, yojson]
-    end
-
-    module Latest = V1
-  end
-
-  type t = Stable.Latest.t [@@deriving sexp, yojson]
-end
+(** For debugging. Logs to stderr the inputs to the top hash. *)
+val with_top_hash_logging : (unit -> 'a) -> 'a
 
 module Pending_coinbase_stack_state : sig
-  module Stable : sig
-    module V1 : sig
-      type t =
-        { source: Pending_coinbase.Stack_versioned.Stable.V1.t
-        ; target: Pending_coinbase.Stack_versioned.Stable.V1.t }
-      [@@deriving bin_io, compare, eq, fields, hash, sexp, version, yojson]
-    end
-
-    module Latest = V1
+  module Init_stack : sig
+    [%%versioned:
+    module Stable : sig
+      module V1 : sig
+        type t = Base of Pending_coinbase.Stack_versioned.Stable.V1.t | Merge
+        [@@deriving sexp, hash, compare, eq, yojson]
+      end
+    end]
   end
 
-  type t = Stable.Latest.t =
-    {source: Pending_coinbase.Stack.t; target: Pending_coinbase.Stack.t}
-  [@@deriving sexp, hash, compare, eq]
+  module Poly : sig
+    [%%versioned:
+    module Stable : sig
+      module V1 : sig
+        type 'pending_coinbase t =
+          {source: 'pending_coinbase; target: 'pending_coinbase}
+        [@@deriving compare, eq, fields, hash, sexp, yojson]
+
+        val to_latest :
+             ('pending_coinbase -> 'pending_coinbase')
+          -> 'pending_coinbase t
+          -> 'pending_coinbase' t
+      end
+    end]
+
+    val typ :
+         ('pending_coinbase_var, 'pending_coinbase) Tick.Typ.t
+      -> ('pending_coinbase_var t, 'pending_coinbase t) Tick.Typ.t
+  end
+
+  type 'pending_coinbase poly = 'pending_coinbase Poly.t =
+    {source: 'pending_coinbase; target: 'pending_coinbase}
+  [@@deriving sexp, hash, compare, eq, fields, yojson]
+
+  [%%versioned:
+  module Stable : sig
+    module V1 : sig
+      type t = Pending_coinbase.Stack_versioned.Stable.V1.t Poly.Stable.V1.t
+      [@@deriving compare, eq, hash, sexp, yojson]
+    end
+  end]
+
+  type var = Pending_coinbase.Stack.var Poly.t
+
+  open Tick
+
+  val typ : (var, t) Typ.t
+
+  val to_input : t -> (Field.t, bool) Random_oracle.Input.t
+
+  val var_to_input : var -> (Field.Var.t, Boolean.var) Random_oracle.Input.t
 end
 
 module Statement : sig
+  module Poly : sig
+    [%%versioned:
+    module Stable : sig
+      module V1 : sig
+        type ( 'ledger_hash
+             , 'amount
+             , 'pending_coinbase
+             , 'fee_excess
+             , 'token_id
+             , 'sok_digest )
+             t =
+          { source: 'ledger_hash
+          ; target: 'ledger_hash
+          ; supply_increase: 'amount
+          ; pending_coinbase_stack_state: 'pending_coinbase
+          ; fee_excess: 'fee_excess
+          ; next_available_token_before: 'token_id
+          ; next_available_token_after: 'token_id
+          ; sok_digest: 'sok_digest }
+        [@@deriving compare, equal, hash, sexp, yojson]
+
+        val to_latest :
+             ('ledger_hash -> 'ledger_hash')
+          -> ('amount -> 'amount')
+          -> ('pending_coinbase -> 'pending_coinbase')
+          -> ('fee_excess -> 'fee_excess')
+          -> ('token_id -> 'token_id')
+          -> ('sok_digest -> 'sok_digest')
+          -> ( 'ledger_hash
+             , 'amount
+             , 'pending_coinbase
+             , 'fee_excess
+             , 'token_id
+             , 'sok_digest )
+             t
+          -> ( 'ledger_hash'
+             , 'amount'
+             , 'pending_coinbase'
+             , 'fee_excess'
+             , 'token_id'
+             , 'sok_digest' )
+             t
+      end
+    end]
+  end
+
+  type ( 'ledger_hash
+       , 'amount
+       , 'pending_coinbase
+       , 'fee_excess
+       , 'token_id
+       , 'sok_digest )
+       poly =
+        ( 'ledger_hash
+        , 'amount
+        , 'pending_coinbase
+        , 'fee_excess
+        , 'token_id
+        , 'sok_digest )
+        Poly.t =
+    { source: 'ledger_hash
+    ; target: 'ledger_hash
+    ; supply_increase: 'amount
+    ; pending_coinbase_stack_state: 'pending_coinbase
+    ; fee_excess: 'fee_excess
+    ; next_available_token_before: 'token_id
+    ; next_available_token_after: 'token_id
+    ; sok_digest: 'sok_digest }
+  [@@deriving compare, equal, hash, sexp, yojson]
+
   [%%versioned:
   module Stable : sig
     module V1 : sig
       type t =
-        { source: Coda_base.Frozen_ledger_hash.Stable.V1.t
-        ; target: Coda_base.Frozen_ledger_hash.Stable.V1.t
-        ; supply_increase: Currency.Amount.Stable.V1.t
-        ; pending_coinbase_stack_state: Pending_coinbase_stack_state.t
-        ; fee_excess:
-            ( Currency.Fee.Stable.V1.t
-            , Sgn.Stable.V1.t )
-            Currency.Signed_poly.Stable.V1.t
-        ; proof_type: Proof_type.Stable.V1.t }
+        ( Frozen_ledger_hash.Stable.V1.t
+        , Currency.Amount.Stable.V1.t
+        , Pending_coinbase_stack_state.Stable.V1.t
+        , Fee_excess.Stable.V1.t
+        , Token_id.Stable.V1.t
+        , unit )
+        Poly.Stable.V1.t
       [@@deriving compare, equal, hash, sexp, yojson]
     end
   end]
 
-  type t = Stable.Latest.t =
-    { source: Coda_base.Frozen_ledger_hash.t
-    ; target: Coda_base.Frozen_ledger_hash.t
-    ; supply_increase: Currency.Amount.t
-    ; pending_coinbase_stack_state: Pending_coinbase_stack_state.t
-    ; fee_excess: Currency.Fee.Signed.t
-    ; proof_type: Proof_type.t }
-  [@@deriving compare, equal, hash, sexp, yojson]
+  module With_sok : sig
+    [%%versioned:
+    module Stable : sig
+      module V1 : sig
+        type t =
+          ( Frozen_ledger_hash.Stable.V1.t
+          , Currency.Amount.Stable.V1.t
+          , Pending_coinbase_stack_state.Stable.V1.t
+          , Fee_excess.Stable.V1.t
+          , Token_id.Stable.V1.t
+          , Sok_message.Digest.Stable.V1.t )
+          Poly.Stable.V1.t
+        [@@deriving compare, equal, hash, sexp, to_yojson]
+      end
+    end]
+
+    type var =
+      ( Frozen_ledger_hash.var
+      , Currency.Amount.var
+      , Pending_coinbase_stack_state.var
+      , Fee_excess.var
+      , Token_id.var
+      , Sok_message.Digest.Checked.t )
+      Poly.Stable.V1.t
+
+    open Tick
+
+    val typ : (var, t) Typ.t
+
+    val to_input : t -> (Field.t, bool) Random_oracle.Input.t
+
+    val to_field_elements : t -> Field.t array
+
+    module Checked : sig
+      type t = var
+
+      val to_input :
+        var -> ((Field.Var.t, Boolean.var) Random_oracle.Input.t, _) Checked.t
+
+      (* This is actually a checked function. *)
+      val to_field_elements : var -> Field.Var.t array
+    end
+  end
 
   val gen : t Quickcheck.Generator.t
 
@@ -74,130 +205,86 @@ module Stable : sig
   end
 end]
 
-type t = Stable.Latest.t [@@deriving sexp, to_yojson]
-
 val create :
      source:Frozen_ledger_hash.t
   -> target:Frozen_ledger_hash.t
-  -> proof_type:Proof_type.t
   -> supply_increase:Currency.Amount.t
   -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
-  -> fee_excess:Currency.Amount.Signed.t
+  -> fee_excess:Fee_excess.t
+  -> next_available_token_before:Token_id.t
+  -> next_available_token_after:Token_id.t
   -> sok_digest:Sok_message.Digest.t
-  -> proof:Tock.Proof.t
+  -> proof:Coda_base.Proof.t
   -> t
 
-val proof : t -> Tock.Proof.t
+val proof : t -> Coda_base.Proof.t
 
 val statement : t -> Statement.t
 
 val sok_digest : t -> Sok_message.Digest.t
 
-module Keys : sig
-  module Proving : sig
-    type t =
-      { base: Tick.Proving_key.t
-      ; wrap: Tock.Proving_key.t
-      ; merge: Tick.Proving_key.t }
+open Pickles_types
 
-    val dummy : t
+type tag =
+  ( Statement.With_sok.Checked.t
+  , Statement.With_sok.t
+  , Nat.N2.n
+  , Nat.N2.n )
+  Pickles.Tag.t
 
-    module Location : Stringable.S
-
-    val load : Location.t -> (t * Md5.t) Async.Deferred.t
-  end
-
-  module Verification : sig
-    [%%versioned:
-    module Stable : sig
-      module V1 : sig
-        type t =
-          { base: Tick.Verification_key.t
-          ; wrap: Tock.Verification_key.t
-          ; merge: Tick.Verification_key.t }
-      end
-    end]
-
-    type t = Stable.Latest.t =
-      { base: Tick.Verification_key.t
-      ; wrap: Tock.Verification_key.t
-      ; merge: Tick.Verification_key.t }
-
-    val dummy : t
-
-    module Location : Stringable.S
-
-    val load : Location.t -> (t * Md5.t) Async.Deferred.t
-  end
-
-  module Location : sig
-    type t =
-      {proving: Proving.Location.t; verification: Verification.Location.t}
-
-    include Stringable.S with type t := t
-  end
-
-  module Checksum : sig
-    type t = {proving: Md5.t; verification: Md5.t}
-  end
-
-  type t = {proving: Proving.t; verification: Verification.t}
-
-  val create : unit -> t
-
-  val cached :
-       unit
-    -> (Location.t * Verification.t * Checksum.t)
-       Cached.Deferred_with_track_generated.t
-end
+val verify : (t * Sok_message.t) list -> key:Pickles.Verification_key.t -> bool
 
 module Verification : sig
   module type S = sig
-    val verify : t -> message:Sok_message.t -> bool
+    val tag : tag
+
+    val verify : (t * Sok_message.t) list -> bool
+
+    val id : Pickles.Verification_key.Id.t Lazy.t
+
+    val verification_key : Pickles.Verification_key.t Lazy.t
 
     val verify_against_digest : t -> bool
-
-    val verify_complete_merge :
-         Sok_message.Digest.Checked.t
-      -> Frozen_ledger_hash.var
-      -> Frozen_ledger_hash.var
-      -> Pending_coinbase.Stack.var
-      -> Pending_coinbase.Stack.var
-      -> Currency.Amount.var
-      -> (Tock.Proof.t, 's) Tick.As_prover.t
-      -> (Tick.Boolean.var, 's) Tick.Checked.t
   end
-
-  module Make (K : sig
-    val keys : Keys.Verification.t
-  end) : S
 end
 
 val check_transaction :
      ?preeval:bool
+  -> constraint_constants:Genesis_constants.Constraint_constants.t
   -> sok_message:Sok_message.t
   -> source:Frozen_ledger_hash.t
   -> target:Frozen_ledger_hash.t
+  -> init_stack:Pending_coinbase.Stack.t
   -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
+  -> next_available_token_before:Token_id.t
+  -> next_available_token_after:Token_id.t
   -> Transaction.t Transaction_protocol_state.t
   -> Tick.Handler.t
   -> unit
 
 val check_user_command :
-     sok_message:Sok_message.t
+     constraint_constants:Genesis_constants.Constraint_constants.t
+  -> sok_message:Sok_message.t
   -> source:Frozen_ledger_hash.t
   -> target:Frozen_ledger_hash.t
-  -> Pending_coinbase.Stack.t
+  -> init_stack:Pending_coinbase.Stack.t
+  -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
+  -> next_available_token_before:Token_id.t
+  -> next_available_token_after:Token_id.t
   -> User_command.With_valid_signature.t Transaction_protocol_state.t
   -> Tick.Handler.t
   -> unit
 
 val generate_transaction_witness :
      ?preeval:bool
+  -> constraint_constants:Genesis_constants.Constraint_constants.t
   -> sok_message:Sok_message.t
   -> source:Frozen_ledger_hash.t
   -> target:Frozen_ledger_hash.t
-  -> Pending_coinbase_stack_state.t
+  -> init_stack:Pending_coinbase.Stack.t
+  -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
+  -> next_available_token_before:Token_id.t
+  -> next_available_token_after:Token_id.t
   -> Transaction.t Transaction_protocol_state.t
   -> Tick.Handler.t
   -> unit
@@ -205,12 +292,16 @@ val generate_transaction_witness :
 module type S = sig
   include Verification.S
 
+  val cache_handle : Pickles.Cache_handle.t
+
   val of_transaction :
-       ?preeval:bool
-    -> sok_digest:Sok_message.Digest.t
+       sok_digest:Sok_message.Digest.t
     -> source:Frozen_ledger_hash.t
     -> target:Frozen_ledger_hash.t
+    -> init_stack:Pending_coinbase.Stack.t
     -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
+    -> next_available_token_before:Token_id.t
+    -> next_available_token_after:Token_id.t
     -> Transaction.t Transaction_protocol_state.t
     -> Tick.Handler.t
     -> t
@@ -219,7 +310,10 @@ module type S = sig
        sok_digest:Sok_message.Digest.t
     -> source:Frozen_ledger_hash.t
     -> target:Frozen_ledger_hash.t
+    -> init_stack:Pending_coinbase.Stack.t
     -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
+    -> next_available_token_before:Token_id.t
+    -> next_available_token_after:Token_id.t
     -> User_command.With_valid_signature.t Transaction_protocol_state.t
     -> Tick.Handler.t
     -> t
@@ -228,7 +322,10 @@ module type S = sig
        sok_digest:Sok_message.Digest.t
     -> source:Frozen_ledger_hash.t
     -> target:Frozen_ledger_hash.t
+    -> init_stack:Pending_coinbase.Stack.t
     -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
+    -> next_available_token_before:Token_id.t
+    -> next_available_token_after:Token_id.t
     -> Fee_transfer.t Transaction_protocol_state.t
     -> Tick.Handler.t
     -> t
@@ -236,8 +333,6 @@ module type S = sig
   val merge : t -> t -> sok_digest:Sok_message.Digest.t -> t Or_error.t
 end
 
-module Make (K : sig
-  val keys : Keys.t
-end) : S
+module Make () : S
 
 val constraint_system_digests : unit -> (string * Md5.t) list

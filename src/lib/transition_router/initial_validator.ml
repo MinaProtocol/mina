@@ -32,10 +32,37 @@ let handle_validation_error ~logger ~trust_system ~sender ~state_hash ~delta
     Trust_system.record_envelope_sender trust_system logger sender
       (action, Some (message', metadata))
   in
+  let metadata =
+    match error with
+    | `Invalid_time_received `Too_early ->
+        [ ("reason", `String "invalid time")
+        ; ("time_error", `String "too early") ]
+    | `Invalid_time_received (`Too_late slot_diff) ->
+        [ ("reason", `String "invalid time")
+        ; ("time_error", `String "too late")
+        ; ("slot_diff", `String (Int64.to_string slot_diff)) ]
+    | `Invalid_genesis_protocol_state ->
+        [("reason", `String "invalid genesis state")]
+    | `Invalid_proof ->
+        [("reason", `String "invalid proof")]
+    | `Invalid_delta_transition_chain_proof ->
+        [("reason", `String "invalid delta transition chain proof")]
+    | `Verifier_error err ->
+        [ ("reason", `String "verifier error")
+        ; ("error", `String (Error.to_string_hum err)) ]
+    | `Mismatched_protocol_version ->
+        [("reason", `String "protocol version mismatch")]
+    | `Invalid_protocol_version ->
+        [("reason", `String "invalid protocol version")]
+  in
+  [%log error]
+    ~metadata:(("state_hash", State_hash.to_yojson state_hash) :: metadata)
+    "Validation error: external transition with state hash $state_hash was \
+     rejected for reason $reason" ;
   match error with
   | `Verifier_error err ->
       let error_metadata = [("error", `String (Error.to_string_hum err))] in
-      Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+      [%log fatal]
         ~metadata:
           (error_metadata @ [("state_hash", State_hash.to_yojson state_hash)])
         "Error in verifier verifying blockchain proof for $state_hash: $error" ;
@@ -89,12 +116,8 @@ module Duplicate_block_detector = struct
     ; block_producer }
 
   (* every gc_interval blocks seen, discard blocks more than gc_width ago *)
-  let table_gc ~constraint_constants ~(genesis_constants : Genesis_constants.t)
-      t block =
-    let consensus_constants =
-      Consensus.Constants.create ~constraint_constants
-        ~protocol_constants:genesis_constants.protocol
-    in
+  let table_gc ~(precomputed_values : Precomputed_values.t) t block =
+    let consensus_constants = precomputed_values.consensus_constants in
     let ( `Acceptable_network_delay _
         , `Gc_width _
         , `Gc_width_epoch _
@@ -110,8 +133,7 @@ module Duplicate_block_detector = struct
 
   let create () = {table= Map.empty (module Blocks); latest_epoch= 0}
 
-  let check ~constraint_constants ~genesis_constants t logger
-      external_transition_with_hash =
+  let check ~precomputed_values t logger external_transition_with_hash =
     let external_transition = external_transition_with_hash.With_hash.data in
     let protocol_state_hash = external_transition_with_hash.hash in
     let open Consensus.Data.Consensus_state in
@@ -124,13 +146,13 @@ module Duplicate_block_detector = struct
     in
     let block = Blocks.{consensus_time; block_producer} in
     (* try table GC *)
-    table_gc ~constraint_constants ~genesis_constants t block ;
+    table_gc ~precomputed_values t block ;
     match Map.find t.table block with
     | None ->
         t.table <- Map.add_exn t.table ~key:block ~data:protocol_state_hash
     | Some hash ->
         if not (State_hash.equal hash protocol_state_hash) then
-          Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+          [%log error]
             ~metadata:
               [ ( "block_producer"
                 , Public_key.Compressed.to_yojson block_producer )
@@ -145,8 +167,8 @@ module Duplicate_block_detector = struct
 end
 
 let run ~logger ~trust_system ~verifier ~transition_reader
-    ~valid_transition_writer ~initialization_finish_signal
-    ~constraint_constants ~precomputed_values =
+    ~valid_transition_writer ~initialization_finish_signal ~precomputed_values
+    =
   let genesis_state_hash =
     Precomputed_values.genesis_state_hash precomputed_values
   in
@@ -170,8 +192,8 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                     (Fn.compose Protocol_state.hash
                        External_transition.protocol_state)
            in
-           Duplicate_block_detector.check ~constraint_constants
-             ~genesis_constants duplicate_checker logger transition_with_hash ;
+           Duplicate_block_detector.check ~precomputed_values duplicate_checker
+             logger transition_with_hash ;
            let sender = Envelope.Incoming.sender transition_env in
            let defer f = Fn.compose Deferred.return f in
            match%bind
@@ -179,8 +201,7 @@ let run ~logger ~trust_system ~verifier ~transition_reader
              External_transition.(
                Validation.wrap transition_with_hash
                |> defer
-                    (validate_time_received ~constraint_constants
-                       ~time_received)
+                    (validate_time_received ~precomputed_values ~time_received)
                >>= defer (validate_genesis_protocol_state ~genesis_state_hash)
                >>= validate_proof ~verifier
                >>= defer validate_delta_transition_chain

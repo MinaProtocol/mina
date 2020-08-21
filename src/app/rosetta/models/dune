@@ -1,0 +1,13 @@
+(library
+  (name models)
+  (public_name models)
+  (libraries
+    ppx_deriving_yojson.runtime
+    yojson
+    )
+  (preprocess (pps
+    ppx_deriving_yojson
+    ppx_deriving.show
+    ppx_version
+    ppx_deriving.eq
+  )))

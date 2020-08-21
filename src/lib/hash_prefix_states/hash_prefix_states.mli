@@ -16,9 +16,14 @@ open Random_oracle
 
 val signature : Field.t State.t
 
-val merkle_tree : Field.t State.t array
+(** [merkle_tree depth] gives the hash prefix for the given node depth.
 
-val coinbase_merkle_tree : Field.t State.t array
+    This function performs caching: all prefixes up to the given depth will be
+    computed, and subsequent calls will retrieve them with negligible cost.
+*)
+val merkle_tree : int -> Field.t State.t
+
+val coinbase_merkle_tree : int -> Field.t State.t
 
 val vrf_message : Field.t State.t
 
@@ -34,7 +39,19 @@ val transition_system_snark : Field.t State.t
 
 val account : Field.t State.t
 
-val receipt_chain : Field.t State.t
+val side_loaded_vk : Field.t State.t
+
+val snapp_account : Field.t State.t
+
+val snapp_payload : Field.t State.t
+
+val snapp_predicate_account : Field.t State.t
+
+val snapp_predicate_protocol_state : Field.t State.t
+
+val receipt_chain_user_command : Field.t State.t
+
+val receipt_chain_snapp : Field.t State.t
 
 val pending_coinbases : Field.t State.t
 

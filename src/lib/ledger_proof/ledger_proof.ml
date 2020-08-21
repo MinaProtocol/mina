@@ -6,12 +6,6 @@ open Coda_base
 
 module type S = Ledger_proof_intf.S
 
-let to_signed_amount signed_fee =
-  let magnitude =
-    Currency.Fee.Signed.magnitude signed_fee |> Currency.Amount.of_fee
-  and sgn = Currency.Fee.Signed.sgn signed_fee in
-  Currency.Amount.Signed.create ~magnitude ~sgn
-
 module Prod : Ledger_proof_intf.S with type t = Transaction_snark.t = struct
   [%%versioned
   module Stable = struct
@@ -24,8 +18,6 @@ module Prod : Ledger_proof_intf.S with type t = Transaction_snark.t = struct
       let of_latest t = Ok t
     end
   end]
-
-  type t = Stable.Latest.t [@@deriving compare, sexp, to_yojson]
 
   let statement (t : t) = Transaction_snark.statement t
 
@@ -40,12 +32,13 @@ module Prod : Ledger_proof_intf.S with type t = Transaction_snark.t = struct
                  ; target
                  ; supply_increase
                  ; fee_excess
+                 ; next_available_token_before
+                 ; next_available_token_after
                  ; pending_coinbase_stack_state
-                 ; proof_type } ~sok_digest ~proof =
+                 ; sok_digest= () } ~sok_digest ~proof =
     Transaction_snark.create ~source ~target ~pending_coinbase_stack_state
-      ~supply_increase
-      ~fee_excess:(to_signed_amount fee_excess)
-      ~sok_digest ~proof ~proof_type
+      ~supply_increase ~fee_excess ~next_available_token_before
+      ~next_available_token_after ~sok_digest ~proof
 end
 
 module Debug :
@@ -66,11 +59,9 @@ struct
     end
   end]
 
-  type t = Stable.Latest.t [@@deriving compare, sexp, yojson]
-
   let statement ((t, _) : t) : Transaction_snark.Statement.t = t
 
-  let underlying_proof (_ : t) = Proof.dummy
+  let underlying_proof (_ : t) = Proof.transaction_dummy
 
   let statement_target (t : Transaction_snark.Statement.t) = t.target
 
@@ -100,5 +91,6 @@ type with_witness = With_witness : 't * 't type_witness -> with_witness
 
 module For_tests = struct
   let mk_dummy_proof statement =
-    create ~statement ~sok_digest:Sok_message.Digest.default ~proof:Proof.dummy
+    create ~statement ~sok_digest:Sok_message.Digest.default
+      ~proof:Proof.transaction_dummy
 end

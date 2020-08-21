@@ -3,7 +3,7 @@
  (public_name test_util)
  (library_flags -linkall)
  (inline_tests)
- (libraries snark_params fold_lib core_kernel snarky)
+ (libraries snark_params fold_lib core_kernel snarky.backendless)
  (preprocess
-  (pps ppx_coda ppx_jane ppx_deriving.eq bisect_ppx -- -conditional))
+  (pps ppx_version ppx_jane ppx_deriving.eq bisect_ppx -- -conditional))
  (synopsis "test utils"))

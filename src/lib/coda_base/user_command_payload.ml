@@ -37,25 +37,9 @@ module Common = struct
           ; nonce: 'nonce
           ; valid_until: 'global_slot
           ; memo: 'memo }
-        [@@deriving compare, eq, sexp, hash, yojson]
+        [@@deriving compare, eq, sexp, hash, yojson, hlist]
       end
     end]
-
-    type ('fee, 'public_key, 'token_id, 'nonce, 'global_slot, 'memo) t =
-          ( 'fee
-          , 'public_key
-          , 'token_id
-          , 'nonce
-          , 'global_slot
-          , 'memo )
-          Stable.Latest.t =
-      { fee: 'fee
-      ; fee_token: 'token_id
-      ; fee_payer_pk: 'public_key
-      ; nonce: 'nonce
-      ; valid_until: 'global_slot
-      ; memo: 'memo }
-    [@@deriving eq, sexp, hash, yojson]
   end
 
   [%%versioned
@@ -74,8 +58,6 @@ module Common = struct
       let to_latest = Fn.id
     end
   end]
-
-  type t = Stable.Latest.t [@@deriving compare, eq, sexp, hash, yojson]
 
   let to_input ({fee; fee_token; fee_payer_pk; nonce; valid_until; memo} : t) =
     let bitstring = Random_oracle.Input.bitstring in
@@ -123,23 +105,6 @@ module Common = struct
     , Memo.Checked.t )
     Poly.t
 
-  let to_hlist Poly.{fee; fee_token; fee_payer_pk; nonce; valid_until; memo} =
-    H_list.[fee; fee_token; fee_payer_pk; nonce; valid_until; memo]
-
-  let of_hlist : type fee public_key token_id nonce memo global_slot.
-         ( unit
-         ,    fee
-           -> token_id
-           -> public_key
-           -> nonce
-           -> global_slot
-           -> memo
-           -> unit )
-         H_list.t
-      -> (fee, public_key, token_id, nonce, global_slot, memo) Poly.t =
-   fun H_list.[fee; fee_token; fee_payer_pk; nonce; valid_until; memo] ->
-    {fee; fee_token; fee_payer_pk; nonce; valid_until; memo}
-
   let typ =
     Typ.of_hlistable
       [ Currency.Fee.typ
@@ -148,8 +113,8 @@ module Common = struct
       ; Account_nonce.typ
       ; Global_slot.typ
       ; Memo.typ ]
-      ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
-      ~value_of_hlist:of_hlist
+      ~var_to_hlist:Poly.to_hlist ~var_of_hlist:Poly.of_hlist
+      ~value_to_hlist:Poly.to_hlist ~value_of_hlist:Poly.of_hlist
 
   module Checked = struct
     let constant ({fee; fee_token; fee_payer_pk; nonce; valid_until; memo} : t)
@@ -164,10 +129,11 @@ module Common = struct
     let to_input
         ({fee; fee_token; fee_payer_pk; nonce; valid_until; memo} : var) =
       let%map nonce = Account_nonce.Checked.to_input nonce
-      and valid_until = Global_slot.Checked.to_input valid_until in
+      and valid_until = Global_slot.Checked.to_input valid_until
+      and fee_token = Token_id.Checked.to_input fee_token in
       Array.reduce_exn ~f:Random_oracle.Input.append
         [| Currency.Fee.var_to_input fee
-         ; Token_id.Checked.to_input fee_token
+         ; fee_token
          ; Public_key.Compressed.Checked.to_input fee_payer_pk
          ; nonce
          ; valid_until
@@ -185,16 +151,14 @@ module Body = struct
       type t =
         | Payment of Payment_payload.Stable.V1.t
         | Stake_delegation of Stake_delegation.Stable.V1.t
+        | Create_new_token of New_token_payload.Stable.V1.t
+        | Create_token_account of New_account_payload.Stable.V1.t
+        | Mint_tokens of Minting_payload.Stable.V1.t
       [@@deriving compare, eq, sexp, hash, yojson]
 
       let to_latest = Fn.id
     end
   end]
-
-  type t = Stable.Latest.t =
-    | Payment of Payment_payload.t
-    | Stake_delegation of Stake_delegation.t
-  [@@deriving eq, sexp, hash, yojson]
 
   module Tag = Transaction_union_tag
 
@@ -207,18 +171,58 @@ module Body = struct
       | None ->
           Stake_delegation.gen
     in
+    let new_token_gen =
+      match source_pk with
+      | Some token_owner_pk ->
+          map New_token_payload.gen ~f:(fun payload ->
+              {payload with token_owner_pk} )
+      | None ->
+          New_token_payload.gen
+    in
+    let token_account_gen =
+      match source_pk with
+      | Some token_owner_pk ->
+          map New_account_payload.gen ~f:(fun payload ->
+              {payload with token_owner_pk} )
+      | None ->
+          New_account_payload.gen
+    in
+    let mint_tokens_gen =
+      match source_pk with
+      | Some token_owner_pk ->
+          map Minting_payload.gen ~f:(fun payload ->
+              {payload with token_owner_pk} )
+      | None ->
+          Minting_payload.gen
+    in
     map
-      (variant2
+      (variant5
          (Payment_payload.gen ?source_pk ~max_amount)
-         stake_delegation_gen)
-      ~f:(function `A p -> Payment p | `B d -> Stake_delegation d)
+         stake_delegation_gen new_token_gen token_account_gen mint_tokens_gen)
+      ~f:(function
+        | `A p ->
+            Payment p
+        | `B d ->
+            Stake_delegation d
+        | `C payload ->
+            Create_new_token payload
+        | `D payload ->
+            Create_token_account payload
+        | `E payload ->
+            Mint_tokens payload )
 
   let source_pk (t : t) =
     match t with
     | Payment payload ->
         payload.source_pk
-    | Stake_delegation (Set_delegate payload) ->
-        payload.delegator
+    | Stake_delegation payload ->
+        Stake_delegation.source_pk payload
+    | Create_new_token payload ->
+        New_token_payload.source_pk payload
+    | Create_token_account payload ->
+        New_account_payload.source_pk payload
+    | Mint_tokens payload ->
+        Minting_payload.source_pk payload
 
   let receiver_pk (t : t) =
     match t with
@@ -226,6 +230,12 @@ module Body = struct
         payload.receiver_pk
     | Stake_delegation payload ->
         Stake_delegation.receiver_pk payload
+    | Create_new_token payload ->
+        New_token_payload.receiver_pk payload
+    | Create_token_account payload ->
+        New_account_payload.receiver_pk payload
+    | Mint_tokens payload ->
+        Minting_payload.receiver_pk payload
 
   let token (t : t) =
     match t with
@@ -233,10 +243,50 @@ module Body = struct
         payload.token_id
     | Stake_delegation _ ->
         Token_id.default
+    | Create_new_token payload ->
+        New_token_payload.token payload
+    | Create_token_account payload ->
+        New_account_payload.token payload
+    | Mint_tokens payload ->
+        Minting_payload.token payload
 
-  let source t = Account_id.create (source_pk t) (token t)
+  let source ~next_available_token t =
+    match t with
+    | Payment payload ->
+        Account_id.create payload.source_pk payload.token_id
+    | Stake_delegation payload ->
+        Stake_delegation.source payload
+    | Create_new_token payload ->
+        New_token_payload.source ~next_available_token payload
+    | Create_token_account payload ->
+        New_account_payload.source payload
+    | Mint_tokens payload ->
+        Minting_payload.source payload
 
-  let receiver t = Account_id.create (receiver_pk t) (token t)
+  let receiver ~next_available_token t =
+    match t with
+    | Payment payload ->
+        Account_id.create payload.receiver_pk payload.token_id
+    | Stake_delegation payload ->
+        Stake_delegation.receiver payload
+    | Create_new_token payload ->
+        New_token_payload.receiver ~next_available_token payload
+    | Create_token_account payload ->
+        New_account_payload.receiver payload
+    | Mint_tokens payload ->
+        Minting_payload.receiver payload
+
+  let tag = function
+    | Payment _ ->
+        Transaction_union_tag.Payment
+    | Stake_delegation _ ->
+        Transaction_union_tag.Stake_delegation
+    | Create_new_token _ ->
+        Transaction_union_tag.Create_account
+    | Create_token_account _ ->
+        Transaction_union_tag.Create_account
+    | Mint_tokens _ ->
+        Transaction_union_tag.Mint_tokens
 end
 
 module Poly = struct
@@ -244,7 +294,7 @@ module Poly = struct
   module Stable = struct
     module V1 = struct
       type ('common, 'body) t = {common: 'common; body: 'body}
-      [@@deriving eq, sexp, hash, yojson, compare]
+      [@@deriving eq, sexp, hash, yojson, compare, hlist]
 
       let of_latest common_latest body_latest {common; body} =
         let open Result.Let_syntax in
@@ -252,10 +302,6 @@ module Poly = struct
         {common; body}
     end
   end]
-
-  type ('common, 'body) t = ('common, 'body) Stable.Latest.t =
-    {common: 'common; body: 'body}
-  [@@deriving eq, sexp, hash, yojson, compare]
 end
 
 [%%versioned
@@ -267,9 +313,6 @@ module Stable = struct
     let to_latest = Fn.id
   end
 end]
-
-(* bin_io omitted *)
-type t = Stable.Latest.t [@@deriving compare, eq, sexp, hash, yojson]
 
 let create ~fee ~fee_token ~fee_payer_pk ~nonce ~valid_until ~memo ~body : t =
   {common= {fee; fee_token; fee_payer_pk; nonce; valid_until; memo}; body}
@@ -293,13 +336,17 @@ let body (t : t) = t.body
 
 let source_pk (t : t) = Body.source_pk t.body
 
-let source (t : t) = Body.source t.body
+let source ~next_available_token (t : t) =
+  Body.source ~next_available_token t.body
 
 let receiver_pk (t : t) = Body.receiver_pk t.body
 
-let receiver (t : t) = Body.receiver t.body
+let receiver ~next_available_token (t : t) =
+  Body.receiver ~next_available_token t.body
 
 let token (t : t) = Body.token t.body
+
+let tag (t : t) = Body.tag t.body
 
 let amount (t : t) =
   match t.body with
@@ -307,11 +354,23 @@ let amount (t : t) =
       Some payload.Payment_payload.Poly.amount
   | Stake_delegation _ ->
       None
+  | Create_new_token _ ->
+      None
+  | Create_token_account _ ->
+      None
+  | Mint_tokens payload ->
+      Some payload.Minting_payload.amount
 
-let is_payment (t : t) =
-  match t.body with Payment _ -> true | Stake_delegation _ -> false
+let fee_excess (t : t) =
+  Fee_excess.of_single (fee_token t, Currency.Fee.Signed.of_unsigned (fee t))
 
-let accounts_accessed (t : t) = [fee_payer t; source t; receiver t]
+let accounts_accessed ~next_available_token (t : t) =
+  [ fee_payer t
+  ; source ~next_available_token t
+  ; receiver ~next_available_token t ]
+
+let next_available_token (t : t) token =
+  match t.body with Create_new_token _ -> Token_id.next token | _ -> token
 
 let dummy : t =
   { common=

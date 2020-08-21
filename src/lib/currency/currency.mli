@@ -18,14 +18,19 @@ module Fee : sig
   module Stable : sig
     module V1 : sig
       type t [@@deriving sexp, compare, hash, yojson, eq]
+
+      (* not automatically derived *)
+      val dhall_type : Ppx_dhall_type.Dhall_type.t
     end
   end]
 
-  include Basic with type t = Stable.Latest.t
+  include Basic with type t := Stable.Latest.t
 
   include Arithmetic_intf with type t := t
 
   include Codable.S with type t := t
+
+  val scale : t -> int -> t option
 
   (* TODO: Get rid of signed fee, use signed amount *)
   [%%ifdef consensus_mechanism]
@@ -59,10 +64,13 @@ module Amount : sig
   module Stable : sig
     module V1 : sig
       type t [@@deriving sexp, compare, hash, eq, yojson]
+
+      (* not automatically derived *)
+      val dhall_type : Ppx_dhall_type.Dhall_type.t
     end
   end]
 
-  include Basic with type t = Stable.Latest.t
+  include Basic with type t := Stable.Latest.t
 
   include Arithmetic_intf with type t := t
 
@@ -113,10 +121,13 @@ module Balance : sig
   module Stable : sig
     module V1 : sig
       type t [@@deriving sexp, compare, hash, yojson, eq]
+
+      (* not automatically derived *)
+      val dhall_type : Ppx_dhall_type.Dhall_type.t
     end
   end]
 
-  include Basic with type t = Stable.Latest.t
+  include Basic with type t := Stable.Latest.t
 
   val to_amount : t -> Amount.t
 

@@ -41,8 +41,6 @@ module Stable = struct
   end
 end]
 
-type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash]
-
 [%%define_locally
 Stable.Latest.(to_yojson, of_yojson, to_string, of_string)]
 
@@ -163,8 +161,8 @@ let to_bits t = Fold_lib.Fold.to_list (fold_bits t)
 [%%ifdef
 consensus_mechanism]
 
-module Boolean = Tick0.Boolean
-module Typ = Tick0.Typ
+module Boolean = Tick.Boolean
+module Typ = Tick.Typ
 
 (* the code below is much the same as in Random_oracle.Digest; tag and length bytes
    make it a little different
@@ -229,17 +227,18 @@ let%test_module "user_command_memo" =
       let s = "this is a string" in
       let memo = create_by_digesting_string_exn s in
       let read_constant = function
-        | Snarky.Cvar.Constant x ->
+        | Snarky_backendless.Cvar.Constant x ->
             x
         | _ ->
             assert false
       in
       let memo_var =
-        Snarky.Typ_monads.Store.run (typ.store memo) (fun x ->
-            Snarky.Cvar.Constant x )
+        Snarky_backendless.Typ_monads.Store.run (typ.store memo) (fun x ->
+            Snarky_backendless.Cvar.Constant x )
       in
       let memo_read =
-        Snarky.Typ_monads.Read.run (typ.read memo_var) read_constant
+        Snarky_backendless.Typ_monads.Read.run (typ.read memo_var)
+          read_constant
       in
       [%test_eq: string] memo memo_read
 

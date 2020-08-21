@@ -1,9 +1,9 @@
 (library
   (name snarky_taylor)
   (public_name snarky_taylor)
-  (preprocess (pps ppx_coda ppx_jane ppx_deriving.eq))
+  (preprocess (pps ppx_version ppx_jane ppx_deriving.eq))
   (inline_tests)
   (libraries
-    snarky
+    snarky.backendless
     snarky_integer
     core_kernel ))

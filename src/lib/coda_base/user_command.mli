@@ -11,15 +11,12 @@ module Poly : sig
       [@@deriving sexp, hash, yojson, eq, compare]
     end
   end]
-
-  type ('payload, 'pk, 'signature) t =
-        ('payload, 'pk, 'signature) Stable.Latest.t =
-    {payload: 'payload; signer: 'pk; signature: 'signature}
-  [@@deriving sexp, hash, yojson, eq, compare]
 end
 
 [%%versioned:
 module Stable : sig
+  [@@@no_toplevel_latest_type]
+
   module V1 : sig
     type t =
       ( Payload.Stable.V1.t
@@ -34,7 +31,8 @@ module Stable : sig
 
     include Hashable.S with type t := t
 
-    val accounts_accessed : t -> Account_id.t list
+    val accounts_accessed :
+      next_available_token:Token_id.t -> t -> Account_id.t list
   end
 end]
 

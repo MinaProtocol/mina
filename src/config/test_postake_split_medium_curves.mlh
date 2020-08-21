@@ -11,7 +11,8 @@
 [%%import "/src/config/protocol_version/current.mlh"]
 
 [%%define time_offsets true]
-[%%define fake_hash false]
+
+[%%define plugins false]
 
 [%%define genesis_ledger "test_split_two_stakers"]
 [%%define genesis_state_timestamp "2019-01-30 12:00:00-08:00"]
@@ -19,6 +20,8 @@
 
 [%%define integration_tests true]
 [%%define force_updates false]
+
+[%%define download_snark_keys false]
 
 [%%define mock_frontend_data false]
 

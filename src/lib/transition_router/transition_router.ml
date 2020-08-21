@@ -9,8 +9,8 @@ open Network_peer
 let create_bufferred_pipe ?name () =
   Strict_pipe.create ?name (Buffered (`Capacity 50, `Overflow Crash))
 
-let is_transition_for_bootstrap ~logger ~constraint_constants frontier
-    new_transition ~(genesis_constants : Genesis_constants.t) =
+let is_transition_for_bootstrap ~logger
+    ~(precomputed_values : Precomputed_values.t) frontier new_transition =
   let root_state =
     Transition_frontier.root frontier
     |> Transition_frontier.Breadcrumb.protocol_state
@@ -18,10 +18,8 @@ let is_transition_for_bootstrap ~logger ~constraint_constants frontier
   let new_state =
     External_transition.Initial_validated.protocol_state new_transition
   in
-  Consensus.Hooks.should_bootstrap
-    ~constants:
-      (Consensus.Constants.create ~constraint_constants
-         ~protocol_constants:genesis_constants.protocol)
+  let constants = precomputed_values.consensus_constants in
+  Consensus.Hooks.should_bootstrap ~constants
     ~existing:(Protocol_state.consensus_state root_state)
     ~candidate:(Protocol_state.consensus_state new_state)
     ~logger:
@@ -33,9 +31,8 @@ let start_transition_frontier_controller ~logger ~trust_system ~verifier
     ~network ~time_controller ~producer_transition_reader
     ~verified_transition_writer ~clear_reader ~collected_transitions
     ~transition_reader_ref ~transition_writer_ref ~frontier_w
-    ~constraint_constants ~genesis_constants frontier =
-  Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-    "Starting Transition Frontier Controller phase" ;
+    ~precomputed_values frontier =
+  [%log info] "Starting Transition Frontier Controller phase" ;
   let ( transition_frontier_controller_reader
       , transition_frontier_controller_writer ) =
     create_bufferred_pipe ~name:"transition frontier controller pipe" ()
@@ -48,8 +45,7 @@ let start_transition_frontier_controller ~logger ~trust_system ~verifier
         Transition_frontier_controller.run ~logger ~trust_system ~verifier
           ~network ~time_controller ~collected_transitions ~frontier
           ~network_transition_reader:!transition_reader_ref
-          ~producer_transition_reader ~clear_reader ~constraint_constants
-          ~genesis_constants )
+          ~producer_transition_reader ~clear_reader ~precomputed_values )
   in
   Strict_pipe.Reader.iter new_verified_transition_reader
     ~f:
@@ -62,9 +58,8 @@ let start_bootstrap_controller ~logger ~trust_system ~verifier ~network
     ~clear_reader ~transition_reader_ref ~transition_writer_ref
     ~consensus_local_state ~frontier_w ~initial_root_transition
     ~persistent_root ~persistent_frontier ~best_seen_transition
-    ~constraint_constants ~precomputed_values =
-  Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-    "Starting Bootstrap Controller phase" ;
+    ~precomputed_values =
+  [%log info] "Starting Bootstrap Controller phase" ;
   let bootstrap_controller_reader, bootstrap_controller_writer =
     create_bufferred_pipe ~name:"bootstrap controller pipe" ()
   in
@@ -79,31 +74,26 @@ let start_bootstrap_controller ~logger ~trust_system ~verifier ~network
         (Bootstrap_controller.run ~logger ~trust_system ~verifier ~network
            ~consensus_local_state ~transition_reader:!transition_reader_ref
            ~persistent_frontier ~persistent_root ~initial_root_transition
-           ~constraint_constants ~precomputed_values)
-        (fun (new_frontier, collected_transitions) ->
+           ~precomputed_values) (fun (new_frontier, collected_transitions) ->
           Strict_pipe.Writer.kill !transition_writer_ref ;
           start_transition_frontier_controller ~logger ~trust_system ~verifier
             ~network ~time_controller ~producer_transition_reader
             ~verified_transition_writer ~clear_reader ~collected_transitions
             ~transition_reader_ref ~transition_writer_ref ~frontier_w
-            ~constraint_constants
-            ~genesis_constants:
-              (Precomputed_values.genesis_constants precomputed_values)
-            new_frontier ) )
+            ~precomputed_values new_frontier ) )
 
 let download_best_tip ~logger ~network ~verifier ~trust_system
     ~most_recent_valid_block_writer ~genesis_constants =
   let num_peers = 8 in
   let%bind peers = Coda_networking.random_peers network num_peers in
-  Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-    "Requesting peers for their best tip to do initialization" ;
+  [%log info] "Requesting peers for their best tip to do initialization" ;
   let open Deferred.Option.Let_syntax in
   let%map best_tip =
     Deferred.List.fold peers ~init:None ~f:(fun acc peer ->
         let open Deferred.Let_syntax in
         match%bind Coda_networking.get_best_tip network peer with
         | Error e ->
-            Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+            [%log debug]
               ~metadata:
                 [ ("peer", Network_peer.Peer.to_yojson peer)
                 ; ("error", `String (Error.to_string_hum e)) ]
@@ -114,7 +104,7 @@ let download_best_tip ~logger ~network ~verifier ~trust_system
               Best_tip_prover.verify ~verifier peer_best_tip ~genesis_constants
             with
             | Error e ->
-                Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+                [%log warn]
                   ~metadata:
                     [ ("peer", Network_peer.Peer.to_yojson peer)
                     ; ("error", `String (Error.to_string_hum e)) ]
@@ -168,11 +158,10 @@ let download_best_tip ~logger ~network ~verifier ~trust_system
   best_tip
 
 let load_frontier ~logger ~verifier ~persistent_frontier ~persistent_root
-    ~consensus_local_state ~constraint_constants ~precomputed_values =
+    ~consensus_local_state ~precomputed_values =
   match%map
     Transition_frontier.load ~logger ~verifier ~consensus_local_state
-      ~persistent_root ~persistent_frontier ~constraint_constants
-      ~precomputed_values ()
+      ~persistent_root ~persistent_frontier ~precomputed_values ()
   with
   | Ok frontier ->
       Some frontier
@@ -181,7 +170,7 @@ let load_frontier ~logger ~verifier ~persistent_frontier ~persistent_root
         "persistent frontier unexpectedly malformed -- this should not happen \
          with retry enabled"
   | Error `Bootstrap_required ->
-      Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+      [%log warn]
         "Fast forward has not been implemented. Bootstrapping instead." ;
       None
   | Error (`Failure e) ->
@@ -195,8 +184,7 @@ let wait_for_high_connectivity ~logger ~network ~is_seed =
   Deferred.any
     [ ( high_connectivity
       >>| fun () ->
-      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-        "Already connected to enough peers, start initialization" )
+      [%log info] "Already connected to enough peers, start initialization" )
     ; ( after (Time_ns.Span.of_sec connectivity_time_upperbound)
       >>= fun () ->
       Coda_networking.peers network
@@ -204,18 +192,18 @@ let wait_for_high_connectivity ~logger ~network ~is_seed =
       if not @@ Deferred.is_determined high_connectivity then
         if List.length peers = 0 then
           if is_seed then
-            Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+            [%log info]
               ~metadata:
                 [ ( "max seconds to wait for high connectivity"
                   , `Float connectivity_time_upperbound ) ]
               "Will start initialization without connecting with too any peers"
           else (
-            Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+            [%log error]
               "Failed to find any peers during initialization (crashing \
                because this is not a seed node)" ;
             exit 1 )
         else
-          Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+          [%log info]
             ~metadata:
               [ ("num peers", `Int (List.length peers))
               ; ( "max seconds to wait for high connectivity"
@@ -223,12 +211,15 @@ let wait_for_high_connectivity ~logger ~network ~is_seed =
             "Will start initialization without connecting with too many peers"
       ) ]
 
-let initialize ~logger ~network ~is_seed ~verifier ~trust_system
+let initialize ~logger ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
     ~time_controller ~frontier_w ~producer_transition_reader ~clear_reader
     ~verified_transition_writer ~transition_reader_ref ~transition_writer_ref
     ~most_recent_valid_block_writer ~persistent_root ~persistent_frontier
-    ~consensus_local_state ~constraint_constants ~precomputed_values =
-  let%bind () = wait_for_high_connectivity ~logger ~network ~is_seed in
+    ~consensus_local_state ~precomputed_values =
+  let%bind () =
+    if is_demo_mode then return ()
+    else wait_for_high_connectivity ~logger ~network ~is_seed
+  in
   let genesis_constants =
     Precomputed_values.genesis_constants precomputed_values
   in
@@ -237,7 +228,7 @@ let initialize ~logger ~network ~is_seed ~verifier ~trust_system
       (download_best_tip ~logger ~network ~verifier ~trust_system
          ~most_recent_valid_block_writer ~genesis_constants)
       (load_frontier ~logger ~verifier ~persistent_frontier ~persistent_root
-         ~consensus_local_state ~constraint_constants ~precomputed_values)
+         ~consensus_local_state ~precomputed_values)
   with
   | best_tip, None ->
       let%map initial_root_transition =
@@ -250,20 +241,19 @@ let initialize ~logger ~network ~is_seed ~verifier ~trust_system
         ~verified_transition_writer ~clear_reader ~transition_reader_ref
         ~consensus_local_state ~transition_writer_ref ~frontier_w
         ~persistent_root ~persistent_frontier ~initial_root_transition
-        ~best_seen_transition:best_tip ~constraint_constants
-        ~precomputed_values
+        ~best_seen_transition:best_tip ~precomputed_values
   | None, Some frontier ->
       return
       @@ start_transition_frontier_controller ~logger ~trust_system ~verifier
            ~network ~time_controller ~producer_transition_reader
            ~verified_transition_writer ~clear_reader ~collected_transitions:[]
            ~transition_reader_ref ~transition_writer_ref ~frontier_w
-           ~constraint_constants ~genesis_constants frontier
+           ~precomputed_values frontier
   | Some best_tip, Some frontier ->
       if
         is_transition_for_bootstrap ~logger frontier
           (best_tip |> Envelope.Incoming.data)
-          ~constraint_constants ~genesis_constants
+          ~precomputed_values
       then
         let initial_root_transition =
           Transition_frontier.(Breadcrumb.validated_transition (root frontier))
@@ -274,16 +264,13 @@ let initialize ~logger ~network ~is_seed ~verifier ~trust_system
           ~verified_transition_writer ~clear_reader ~transition_reader_ref
           ~consensus_local_state ~transition_writer_ref ~frontier_w
           ~persistent_root ~persistent_frontier ~initial_root_transition
-          ~best_seen_transition:(Some best_tip) ~constraint_constants
-          ~precomputed_values
+          ~best_seen_transition:(Some best_tip) ~precomputed_values
       else
         let root = Transition_frontier.root frontier in
         let%map () =
           match
             Consensus.Hooks.required_local_state_sync
-              ~constants:
-                (Consensus.Constants.create ~constraint_constants
-                   ~protocol_constants:genesis_constants.protocol)
+              ~constants:precomputed_values.consensus_constants
               ~consensus_state:
                 (Transition_frontier.Breadcrumb.consensus_state root)
               ~local_state:consensus_local_state
@@ -312,24 +299,20 @@ let initialize ~logger ~network ~is_seed ~verifier ~trust_system
           ~network ~time_controller ~producer_transition_reader
           ~verified_transition_writer ~clear_reader
           ~collected_transitions:[best_tip] ~transition_reader_ref
-          ~transition_writer_ref ~frontier_w ~constraint_constants
-          ~genesis_constants frontier
+          ~transition_writer_ref ~frontier_w ~precomputed_values frontier
 
-let wait_till_genesis ~logger ~time_controller ~constraint_constants
-    ~(genesis_constants : Genesis_constants.t) =
+let wait_till_genesis ~logger ~time_controller
+    ~(precomputed_values : Precomputed_values.t) =
   let module Time = Block_time in
   let now = Time.now time_controller in
-  let consensus_constants =
-    Consensus.Constants.create ~constraint_constants
-      ~protocol_constants:genesis_constants.protocol
-  in
+  let consensus_constants = precomputed_values.consensus_constants in
   let genesis_state_timestamp = consensus_constants.genesis_state_timestamp in
   try
     Consensus.Hooks.is_genesis_epoch ~constants:consensus_constants now
     |> Fn.const Deferred.unit
   with Invalid_argument _ ->
     let time_till_genesis = Time.diff genesis_state_timestamp now in
-    Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+    [%log warn]
       ~metadata:
         [ ( "time_till_genesis"
           , `Int (Int64.to_int_exn (Time.Span.to_ms time_till_genesis)) ) ]
@@ -343,7 +326,7 @@ let wait_till_genesis ~logger ~time_controller ~constraint_constants
         |> Fn.const Deferred.unit
       with Invalid_argument _ ->
         let tm_remaining = Time.diff genesis_state_timestamp now in
-        Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+        [%log warn]
           "Time before genesis. Waiting $tm_remaining milliseconds before \
            running transition router"
           ~metadata:
@@ -355,14 +338,14 @@ let wait_till_genesis ~logger ~time_controller ~constraint_constants
       (logger_loop ())
     |> Deferred.ignore
 
-let run ~logger ~trust_system ~verifier ~network ~is_seed ~time_controller
-    ~consensus_local_state ~persistent_root_location
+let run ~logger ~trust_system ~verifier ~network ~is_seed ~is_demo_mode
+    ~time_controller ~consensus_local_state ~persistent_root_location
     ~persistent_frontier_location
     ~frontier_broadcast_pipe:(frontier_r, frontier_w)
     ~network_transition_reader ~producer_transition_reader
     ~most_recent_valid_block:( most_recent_valid_block_reader
                              , most_recent_valid_block_writer )
-    ~constraint_constants ~precomputed_values =
+    ~precomputed_values =
   let initialization_finish_signal = Ivar.create () in
   let clear_reader, clear_writer =
     Strict_pipe.create ~name:"clear" Synchronous
@@ -375,18 +358,14 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~time_controller
   in
   let transition_reader_ref = ref transition_reader in
   let transition_writer_ref = ref transition_writer in
-  let genesis_constants =
-    Precomputed_values.genesis_constants precomputed_values
-  in
-  upon
-    (wait_till_genesis ~logger ~time_controller ~constraint_constants
-       ~genesis_constants) (fun () ->
+  upon (wait_till_genesis ~logger ~time_controller ~precomputed_values)
+    (fun () ->
       let valid_transition_reader, valid_transition_writer =
         create_bufferred_pipe ~name:"valid transitions" ()
       in
       Initial_validator.run ~logger ~trust_system ~verifier
         ~transition_reader:network_transition_reader ~valid_transition_writer
-        ~initialization_finish_signal ~constraint_constants ~precomputed_values ;
+        ~initialization_finish_signal ~precomputed_values ;
       let persistent_frontier =
         Transition_frontier.Persistent_frontier.create ~logger ~verifier
           ~time_controller ~directory:persistent_frontier_location
@@ -397,13 +376,12 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~time_controller
           ~ledger_depth:(Precomputed_values.ledger_depth precomputed_values)
       in
       upon
-        (initialize ~logger ~network ~is_seed ~verifier ~trust_system
-           ~persistent_frontier ~persistent_root ~time_controller ~frontier_w
-           ~producer_transition_reader ~clear_reader
+        (initialize ~logger ~network ~is_seed ~is_demo_mode ~verifier
+           ~trust_system ~persistent_frontier ~persistent_root ~time_controller
+           ~frontier_w ~producer_transition_reader ~clear_reader
            ~verified_transition_writer ~transition_reader_ref
            ~transition_writer_ref ~most_recent_valid_block_writer
-           ~consensus_local_state ~constraint_constants ~precomputed_values)
-        (fun () ->
+           ~consensus_local_state ~precomputed_values) (fun () ->
           Ivar.fill_if_empty initialization_finish_signal () ;
           let valid_transition_reader1, valid_transition_reader2 =
             Strict_pipe.Reader.Fork.two valid_transition_reader
@@ -419,6 +397,7 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~time_controller
                  in
                  if
                    Consensus.Hooks.select
+                     ~constants:precomputed_values.consensus_constants
                      ~existing:
                        (External_transition.Initial_validated.consensus_state
                           current_transition)
@@ -445,8 +424,7 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~time_controller
                  | Some frontier ->
                      if
                        is_transition_for_bootstrap ~logger frontier
-                         incoming_transition ~constraint_constants
-                         ~genesis_constants
+                         incoming_transition ~precomputed_values
                      then (
                        Strict_pipe.Writer.kill !transition_writer_ref ;
                        let initial_root_transition =
@@ -465,7 +443,7 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~time_controller
                          ~consensus_local_state ~frontier_w ~persistent_root
                          ~persistent_frontier ~initial_root_transition
                          ~best_seen_transition:(Some enveloped_transition)
-                         ~constraint_constants ~precomputed_values )
+                         ~precomputed_values )
                      else Deferred.unit
                  | None ->
                      Deferred.unit ) ) ) ;

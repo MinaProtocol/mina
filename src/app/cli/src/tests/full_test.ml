@@ -38,7 +38,7 @@ let with_check = false
 [%%endif]
 
 [%%if
-curve_size = 753]
+curve_size = 255]
 
 let medium_curves = true
 
@@ -74,8 +74,7 @@ let heartbeat_flag = ref true
 let print_heartbeat logger =
   let rec loop () =
     if !heartbeat_flag then (
-      Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
-        "Heartbeat for CI" ;
+      [%log warn] "Heartbeat for CI" ;
       let%bind () = after (Time.Span.of_min 1.) in
       loop () )
     else return ()
@@ -85,13 +84,10 @@ let print_heartbeat logger =
 let run_test () : unit Deferred.t =
   let logger = Logger.create () in
   let precomputed_values = Lazy.force Precomputed_values.compiled in
+  let constraint_constants = Genesis_constants.Constraint_constants.compiled in
   let (module Genesis_ledger) = precomputed_values.genesis_ledger in
   let pids = Child_processes.Termination.create_pid_table () in
-  let consensus_constants =
-    Consensus.Constants.create
-      ~constraint_constants:Genesis_constants.Constraint_constants.compiled
-      ~protocol_constants:Genesis_constants.compiled.protocol
-  in
+  let consensus_constants = precomputed_values.consensus_constants in
   setup_time_offsets consensus_constants ;
   print_heartbeat logger |> don't_wait_for ;
   Parallel.init_master () ;
@@ -107,6 +103,7 @@ let run_test () : unit Deferred.t =
             Deferred.unit
       in
       let trace_database_initialization typ location =
+        (* can't use %log here, using passed-in location *)
         Logger.trace logger "Creating %s at %s" ~module_:__MODULE__ ~location
           typ
       in
@@ -153,7 +150,7 @@ let run_test () : unit Deferred.t =
           ; logger
           ; initial_peers= []
           ; unsafe_no_trust_ip= true
-          ; flood= false
+          ; gossip_type= `Gossipsub
           ; conf_dir= temp_conf_dir
           ; chain_id= "bogus chain id for testing"
           ; addrs_and_ports=
@@ -174,6 +171,7 @@ let run_test () : unit Deferred.t =
           ; is_seed= true
           ; genesis_ledger_hash=
               Ledger.merkle_root (Lazy.force Genesis_ledger.t)
+          ; constraint_constants
           ; log_gossip_heard=
               { snark_pool_diff= false
               ; transaction_pool_diff= false
@@ -216,10 +214,7 @@ let run_test () : unit Deferred.t =
              ~time_controller ~receipt_chain_database ~snark_work_fee
              ~consensus_local_state ~transaction_database
              ~external_transition_database ~work_reassignment_wait:420000
-             ~precomputed_values
-             ~constraint_constants:
-               Genesis_constants.Constraint_constants.compiled
-             ~proof_level:Genesis_constants.Proof_level.compiled ())
+             ~precomputed_values ())
       in
       don't_wait_for
         (Strict_pipe.Reader.iter_without_pushback

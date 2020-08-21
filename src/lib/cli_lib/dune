@@ -6,6 +6,6 @@
  (libraries core async_unix sodium ppx_deriving_yojson.runtime yojson
    coda_base secrets work_selector graphql_lib)
  (preprocess
-  (pps ppx_coda ppx_jane ppx_deriving_yojson ppx_deriving.make bisect_ppx --
+  (pps ppx_version ppx_jane ppx_deriving_yojson ppx_deriving.make bisect_ppx --
     -conditional))
  (synopsis "Library to communicate with Coda as cli as the front-end"))

@@ -1,5 +1,5 @@
 /CODEOWNERS @nholland94 @bkase @imeckler
-/.buildkite @CodaProtocol/infra-eng-reviewers
+/buildkite @CodaProtocol/infra-eng-reviewers
 /frontend/ @CodaProtocol/product-eng-reviewers
 /dockerfiles/ @CodaProtocol/infra-eng-reviewers
 /scripts/ @CodaProtocol/infra-eng-reviewers @CodaProtocol/protocol-eng-reviewers
@@ -26,7 +26,6 @@
 /src/lib/ @CodaProtocol/protocol-eng-reviewers
 
 /src/lib/blake2/ @CodaProtocol/crypto-eng-reviewers
-/src/lib/chunked_triples/ @CodaProtocol/crypto-eng-reviewers
 /src/lib/cli_lib/ @CodaProtocol/product-eng-reviewers
 /src/lib/coda_commands @CodaProtocol/product-eng-reviewers
 /src/lib/coda_graphql @CodaProtocol/product-eng-reviewers
@@ -34,13 +33,9 @@
 /src/lib/crs/ @CodaProtocol/crypto-eng-reviewers
 /src/lib/crypto_params/ @CodaProtocol/crypto-eng-reviewers
 /src/lib/dummy_values/ @CodaProtocol/crypto-eng-reviewers
-/src/lib/group_map/ @CodaProtocol/crypto-eng-reviewers
 /src/lib/hash_prefixes/ @CodaProtocol/crypto-eng-reviewers
-/src/lib/integers_stubs_js @CodaProtocol/crypto-eng-reviewers
-/src/lib/keys_lib/ @CodaProtocol/crypto-eng-reviewers
-/src/lib/lite_params/ @CodaProtocol/crypto-eng-reviewers
 /src/lib/non_zero_curve_point/ @CodaProtocol/crypto-eng-reviewers
-/src/lib/outside_pedersen_image/ @CodaProtocol/crypto-eng-reviewers
+/src/lib/outside_hash_image/ @CodaProtocol/crypto-eng-reviewers
 /src/lib/pokolog/ @CodaProtocol/crypto-eng-reviewers
 /src/lib/precomputed_values/ @CodaProtocol/crypto-eng-reviewers
 /src/lib/sha256_lib/ @CodaProtocol/crypto-eng-reviewers

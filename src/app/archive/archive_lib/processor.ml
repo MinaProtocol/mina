@@ -98,63 +98,16 @@ module User_command = struct
     ; fee_payer_id: int
     ; source_id: int
     ; receiver_id: int
-    ; fee_token: string
-    ; token: string
+    ; fee_token: int
+    ; token: int
     ; nonce: int
     ; amount: int option
     ; fee: int
     ; memo: string
-    ; hash: string }
-
-  let to_hlist
-      { typ
-      ; fee_payer_id
-      ; source_id
-      ; receiver_id
-      ; fee_token
-      ; token
-      ; nonce
-      ; amount
-      ; fee
-      ; memo
-      ; hash } =
-    H_list.
-      [ typ
-      ; fee_payer_id
-      ; source_id
-      ; receiver_id
-      ; fee_token
-      ; token
-      ; nonce
-      ; amount
-      ; fee
-      ; memo
-      ; hash ]
-
-  let of_hlist
-      ([ typ
-       ; fee_payer_id
-       ; source_id
-       ; receiver_id
-       ; fee_token
-       ; token
-       ; nonce
-       ; amount
-       ; fee
-       ; memo
-       ; hash ] :
-        (unit, _) H_list.t) =
-    { typ
-    ; fee_payer_id
-    ; source_id
-    ; receiver_id
-    ; fee_token
-    ; token
-    ; nonce
-    ; amount
-    ; fee
-    ; memo
-    ; hash }
+    ; hash: string
+    ; status: string option
+    ; failure_reason: string option }
+  [@@deriving hlist]
 
   let typ =
     let open Caqti_type_spec in
@@ -164,13 +117,15 @@ module User_command = struct
         ; int
         ; int
         ; int
-        ; string
-        ; string
+        ; int
+        ; int
         ; int
         ; option int
         ; int
         ; string
-        ; string ]
+        ; string
+        ; option string
+        ; option string ]
     in
     let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
     let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
@@ -205,27 +160,98 @@ module User_command = struct
             (module Conn)
             (User_command.receiver_pk t)
         in
+        (* TODO: Converting these uint64s to int can overflow; see #5419 *)
         Conn.find
           (Caqti_request.find typ Caqti_type.int
              "INSERT INTO user_commands (type, fee_payer_id, source_id, \
-              receiver_id, fee_token, token, nonce, amount, fee, memo, hash) \
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id")
-          { typ= (if User_command.is_payment t then "payment" else "delegation")
+              receiver_id, fee_token, token, nonce, amount, fee, memo, hash, \
+              status, failure_reason) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, \
+              ?, ?, ?) RETURNING id")
+          { typ= User_command.tag_string t
           ; fee_payer_id
           ; source_id
           ; receiver_id
-          ; fee_token= User_command.fee_token t |> Token_id.to_string
-          ; token= User_command.token t |> Token_id.to_string
+          ; fee_token=
+              User_command.fee_token t |> Token_id.to_uint64
+              |> Unsigned.UInt64.to_int
+          ; token=
+              User_command.token t |> Token_id.to_uint64
+              |> Unsigned.UInt64.to_int
           ; nonce= User_command.nonce t |> Unsigned.UInt32.to_int
           ; amount=
               User_command.amount t
               |> Core.Option.map ~f:Currency.Amount.to_int
           ; fee= User_command.fee t |> Currency.Fee.to_int
           ; memo= User_command.memo t |> User_command_memo.to_string
-          ; hash= transaction_hash |> Transaction_hash.to_base58_check }
+          ; hash= transaction_hash |> Transaction_hash.to_base58_check
+          ; status= None
+          ; failure_reason= None }
+
+  let add_with_status (module Conn : CONNECTION) (t : User_command.t)
+      (status : User_command_status.t) =
+    let open Deferred.Result.Let_syntax in
+    let%bind user_command_id = add_if_doesn't_exist (module Conn) t in
+    let ( status_str
+        , failure_reason
+        , fee_payer_account_creation_fee_paid
+        , receiver_account_creation_fee_paid
+        , created_token ) =
+      match status with
+      | Applied
+          { fee_payer_account_creation_fee_paid
+          ; receiver_account_creation_fee_paid
+          ; created_token } ->
+          let amount_to_int64 x =
+            Unsigned.UInt64.to_int64 (Currency.Amount.to_uint64 x)
+          in
+          ( "applied"
+          , None
+          , Option.map ~f:amount_to_int64 fee_payer_account_creation_fee_paid
+          , Option.map ~f:amount_to_int64 receiver_account_creation_fee_paid
+          , Option.map created_token ~f:(fun tid ->
+                Unsigned.UInt64.to_int64 (Token_id.to_uint64 tid) ) )
+      | Failed failure ->
+          ( "failed"
+          , Some (User_command_status.Failure.to_string failure)
+          , None
+          , None
+          , None )
+    in
+    let%map () =
+      Conn.exec
+        (Caqti_request.exec
+           Caqti_type.(
+             tup3
+               (tup2 (option string) (option string))
+               (tup3 (option int64) (option int64) (option int64))
+               int)
+           "UPDATE user_commands \n\
+            SET status = ?, \n\
+           \    failure_reason = ?, \n\
+           \    fee_payer_account_creation_fee_paid = ?, \n\
+           \    receiver_account_creation_fee_paid = ?, \n\
+           \    created_token = ? \n\
+            WHERE id = ?")
+        ( (Some status_str, failure_reason)
+        , ( fee_payer_account_creation_fee_paid
+          , receiver_account_creation_fee_paid
+          , created_token )
+        , user_command_id )
+    in
+    user_command_id
 end
 
 module Internal_command = struct
+  type t = {typ: string; receiver_id: int; fee: int; token: int64; hash: string}
+
+  let typ =
+    let encode t = Ok ((t.typ, t.receiver_id, t.fee, t.token), t.hash) in
+    let decode ((typ, receiver_id, fee, token), hash) =
+      Ok {typ; receiver_id; fee; token; hash}
+    in
+    let rep = Caqti_type.(tup2 (tup4 string int int int64) string) in
+    Caqti_type.custom ~encode ~decode rep
+
   let find (module Conn : CONNECTION) ~(transaction_hash : Transaction_hash.t)
       =
     Conn.find_opt
@@ -235,12 +261,16 @@ module Internal_command = struct
 end
 
 module Fee_transfer = struct
-  type t = {receiver_id: int; fee: int; hash: string}
+  type t = {receiver_id: int; fee: int; token: int64; hash: string}
 
   let typ =
-    let encode t = Ok ("fee_transfer", t.receiver_id, t.fee, t.hash) in
-    let decode (_, receiver_id, fee, hash) = Ok {receiver_id; fee; hash} in
-    let rep = Caqti_type.(tup4 string int int string) in
+    let encode t =
+      Ok (("fee_transfer", t.receiver_id, t.fee, t.token), t.hash)
+    in
+    let decode ((_, receiver_id, fee, token), hash) =
+      Ok {receiver_id; fee; token; hash}
+    in
+    let rep = Caqti_type.(tup2 (tup4 string int int int64) string) in
     Caqti_type.custom ~encode ~decode rep
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
@@ -254,14 +284,15 @@ module Fee_transfer = struct
         let%bind receiver_id =
           Public_key.add_if_doesn't_exist
             (module Conn)
-            (Fee_transfer.Single.receiver t)
+            (Fee_transfer.Single.receiver_pk t)
         in
         Conn.find
           (Caqti_request.find typ Caqti_type.int
-             "INSERT INTO internal_commands (type, receiver_id, fee, hash) \
-              VALUES (?, ?, ?, ?) RETURNING id")
+             "INSERT INTO internal_commands (type, receiver_id, fee, token, \
+              hash) VALUES (?, ?, ?, ?, ?) RETURNING id")
           { receiver_id
           ; fee= Fee_transfer.Single.fee t |> Currency.Fee.to_int
+          ; token= Token_id.to_string t.fee_token |> Int64.of_string
           ; hash= transaction_hash |> Transaction_hash.to_base58_check }
 end
 
@@ -269,11 +300,18 @@ module Coinbase = struct
   type t = {receiver_id: int; amount: int; hash: string}
 
   let typ =
-    let encode t = Ok ("coinbase", t.receiver_id, t.amount, t.hash) in
-    let decode (_, receiver_id, amount, hash) =
+    let encode t =
+      Ok
+        ( ( "coinbase"
+          , t.receiver_id
+          , t.amount
+          , Token_id.(to_string default) |> Int64.of_string )
+        , t.hash )
+    in
+    let decode ((_, receiver_id, amount, _), hash) =
       Ok {receiver_id; amount; hash}
     in
-    let rep = Caqti_type.(tup4 string int int string) in
+    let rep = Caqti_type.(tup2 (tup4 string int int int64) string) in
     Caqti_type.custom ~encode ~decode rep
 
   let add_if_doesn't_exist (module Conn : CONNECTION) (t : Coinbase.t) =
@@ -290,8 +328,8 @@ module Coinbase = struct
         in
         Conn.find
           (Caqti_request.find typ Caqti_type.int
-             "INSERT INTO internal_commands (type, receiver_id, fee, hash) \
-              VALUES (?, ?, ?, ?) RETURNING id")
+             "INSERT INTO internal_commands (type, receiver_id, fee, token, \
+              hash) VALUES (?, ?, ?, ?, ?) RETURNING id")
           { receiver_id
           ; amount= Coinbase.amount t |> Currency.Amount.to_int
           ; hash= transaction_hash |> Transaction_hash.to_base58_check }
@@ -388,7 +426,7 @@ module Block = struct
           ledger_hash, height, timestamp, coinbase_id FROM blocks WHERE id = ?")
       id
 
-  let add_if_doesn't_exist (module Conn : CONNECTION)
+  let add_if_doesn't_exist (module Conn : CONNECTION) ~constraint_constants
       ({data= t; hash} : (External_transition.t, State_hash.t) With_hash.t) =
     let open Deferred.Result.Let_syntax in
     match%bind find (module Conn) ~state_hash:hash with
@@ -429,24 +467,33 @@ module Block = struct
             ; timestamp= External_transition.timestamp t |> Block_time.to_int64
             ; coinbase_id= None }
         in
-        let transactions = External_transition.transactions t in
+        let transactions =
+          External_transition.transactions ~constraint_constants t
+        in
         let user_commands, fee_transfers, coinbases =
           Core.List.fold transactions ~init:([], [], [])
             ~f:(fun (acc_user_commands, acc_fee_transfers, acc_coinbases) ->
             function
-            | Coda_base.Transaction.User_command user_command_checked ->
+            | { Coda_base.With_status.status
+              ; data= Coda_base.Transaction.User_command user_command_checked
+              } ->
                 let user_command =
-                  Coda_base.User_command.forget_check user_command_checked
+                  { Coda_base.With_status.status
+                  ; data=
+                      Coda_base.User_command.forget_check user_command_checked
+                  }
                 in
                 ( user_command :: acc_user_commands
                 , acc_fee_transfers
                 , acc_coinbases )
-            | Fee_transfer fee_transfer_bundled ->
-                let fee_transfers = One_or_two.to_list fee_transfer_bundled in
+            | {data= Fee_transfer fee_transfer_bundled; status= _} ->
+                let fee_transfers =
+                  Coda_base.Fee_transfer.to_list fee_transfer_bundled
+                in
                 ( acc_user_commands
                 , fee_transfers @ acc_fee_transfers
                 , acc_coinbases )
-            | Coinbase coinbase -> (
+            | {data= Coinbase coinbase; status= _} -> (
               match Coda_base.Coinbase.fee_transfer coinbase with
               | None ->
                   ( acc_user_commands
@@ -454,14 +501,18 @@ module Block = struct
                   , coinbase :: acc_coinbases )
               | Some {receiver_pk; fee} ->
                   ( acc_user_commands
-                  , (receiver_pk, fee) :: acc_fee_transfers
+                  , Coda_base.Fee_transfer.Single.create ~receiver_pk ~fee
+                      ~fee_token:Token_id.default
+                    :: acc_fee_transfers
                   , coinbase :: acc_coinbases ) ) )
         in
         let%bind user_command_ids =
           deferred_result_list_fold user_commands ~init:[]
             ~f:(fun acc user_command ->
               let%map id =
-                User_command.add_if_doesn't_exist (module Conn) user_command
+                User_command.add_with_status
+                  (module Conn)
+                  user_command.data user_command.status
               in
               id :: acc )
         in
@@ -474,11 +525,9 @@ module Block = struct
               >>| ignore )
         in
         (* For technique reasons, there might be multiple fee transfers for
-           one receiver. As suggested by deepthi, I combine all the fee transfer
-           that goes to one public key here *)
-        let fee_transfer_table =
-          Core.Hashtbl.create (module Signature_lib.Public_key.Compressed)
-        in
+         one receiver. As suggested by deepthi, I combine all the fee transfer
+         that goes to one public key here *)
+        let fee_transfer_table = Core.Hashtbl.create (module Account_id) in
         let () =
           let open Coda_base in
           Core.List.iter fee_transfers ~f:(fun fee_transfer ->
@@ -487,11 +536,14 @@ module Block = struct
                 | None ->
                     fee_transfer
                 | Some acc ->
-                    ( receiver
-                    , Currency.Fee.add
-                        (Fee_transfer.Single.fee acc)
-                        (Fee_transfer.Single.fee fee_transfer)
-                      |> Core.Option.value_exn ) ) )
+                    Fee_transfer.Single.create
+                      ~receiver_pk:fee_transfer.receiver_pk
+                      ~fee_token:fee_transfer.fee_token
+                      ~fee:
+                        ( Currency.Fee.add
+                            (Fee_transfer.Single.fee acc)
+                            (Fee_transfer.Single.fee fee_transfer)
+                        |> Core.Option.value_exn ) ) )
         in
         let combined_fee_transfers = Core.Hashtbl.data fee_transfer_table in
         let%bind fee_transfer_ids =
@@ -511,8 +563,8 @@ module Block = struct
               >>| ignore )
         in
         (* For technical reasons, each block might have up to 2 coinbases.
-           I would combine the coinbases if there are 2 of them.
-        *)
+         I would combine the coinbases if there are 2 of them.
+      *)
         let%bind () =
           if List.length coinbases = 0 then return ()
           else
@@ -551,18 +603,107 @@ module Block = struct
               (coinbase_id, block_id)
         in
         return block_id
+
+  let delete_if_older_than ?height ?num_blocks ?timestamp
+      (module Conn : CONNECTION) =
+    let open Deferred.Result.Let_syntax in
+    let%bind height =
+      match (height, num_blocks) with
+      | Some height, _ ->
+          return height
+      | None, Some num_blocks -> (
+          match%map
+            Conn.find_opt
+              (Caqti_request.find_opt Caqti_type.unit Caqti_type.int
+                 "SELECT MAX(height) FROM blocks")
+              ()
+          with
+          | Some max_block_height ->
+              max_block_height - num_blocks
+          | _ ->
+              0 )
+      | None, None ->
+          return 0
+    in
+    let timestamp = Option.value ~default:Int64.zero timestamp in
+    if height > 0 || Int64.(timestamp > 0L) then
+      let%bind () =
+        (* Delete user commands from old blocks. *)
+        Conn.exec
+          (Caqti_request.exec
+             Caqti_type.(tup2 int int64)
+             "DELETE FROM user_commands\n\
+              WHERE id IN\n\
+              (SELECT user_command_id FROM blocks_user_commands\n\
+              INNER JOIN blocks ON blocks.id = block_id\n\
+              WHERE (blocks.height < ? OR blocks.timestamp < ?))")
+          (height, timestamp)
+      in
+      let%bind () =
+        (* Delete old blocks. *)
+        Conn.exec
+          (Caqti_request.exec
+             Caqti_type.(tup2 int int64)
+             "DELETE FROM blocks WHERE blocks.height < ? OR blocks.timestamp \
+              < ?")
+          (height, timestamp)
+      in
+      let%bind () =
+        (* Delete orphaned internal commands. *)
+        Conn.exec
+          (Caqti_request.exec Caqti_type.unit
+             "DELETE FROM internal_commands\n\
+              WHERE id NOT IN\n\
+              (SELECT internal_commands.id FROM internal_commands\n\
+              INNER JOIN blocks_internal_commands ON\n\
+              internal_command_id = internal_commands.id)")
+          ()
+      in
+      let%bind () =
+        (* Delete orphaned snarked ledger hashes. *)
+        Conn.exec
+          (Caqti_request.exec Caqti_type.unit
+             "DELETE FROM snarked_ledger_hashes\n\
+              WHERE id NOT IN\n\
+              (SELECT snarked_ledger_hash_id FROM blocks)")
+          ()
+      in
+      let%bind () =
+        (* Delete orphaned public keys. *)
+        Conn.exec
+          (Caqti_request.exec Caqti_type.unit
+             "DELETE FROM public_keys\n\
+              WHERE id NOT IN (SELECT fee_payer_id FROM user_commands)\n\
+              AND id NOT IN (SELECT source_id FROM user_commands)\n\
+              AND id NOT IN (SELECT receiver_id FROM user_commands)\n\
+              AND id NOT IN (SELECT receiver_id FROM internal_commands)\n\
+              AND id NOT IN (SELECT creator_id FROM blocks)")
+          ()
+      in
+      return ()
+    else return ()
 end
 
-let run (module Conn : CONNECTION) reader ~logger =
+let run (module Conn : CONNECTION) reader ~constraint_constants ~logger
+    ~delete_older_than =
   Strict_pipe.Reader.iter reader ~f:(function
     | Diff.Transition_frontier (Breadcrumb_added {block; _}) -> (
         match%bind
           let open Deferred.Result.Let_syntax in
           let%bind () = Conn.start () in
-          Block.add_if_doesn't_exist (module Conn) block
+          let%bind _ =
+            Block.add_if_doesn't_exist ~constraint_constants
+              (module Conn)
+              block
+          in
+          match delete_older_than with
+          | Some num_blocks ->
+              Block.delete_if_older_than ~num_blocks (module Conn)
+          | None ->
+              return ()
         with
         | Error e ->
-            Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+            [%log warn]
               ~metadata:
                 [ ("block", With_hash.hash block |> State_hash.to_yojson)
                 ; ("error", `String (Caqti_error.show e)) ]
@@ -577,7 +718,8 @@ let run (module Conn : CONNECTION) reader ~logger =
             User_command.add_if_doesn't_exist (module Conn) user_command
             >>| ignore ) )
 
-let setup_server ~logger ~postgres_address ~server_port =
+let setup_server ~constraint_constants ~logger ~postgres_address ~server_port
+    ~delete_older_than =
   let where_to_listen =
     Async.Tcp.Where_to_listen.bind_to All_addresses (On_port server_port)
   in
@@ -588,18 +730,19 @@ let setup_server ~logger ~postgres_address ~server_port =
   in
   match%bind Caqti_async.connect postgres_address with
   | Error e ->
-      Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+      [%log error]
         "Failed to connect to postgresql database, see error: $error"
         ~metadata:[("error", `String (Caqti_error.show e))] ;
       Deferred.unit
   | Ok conn ->
-      run conn reader ~logger |> don't_wait_for ;
+      run ~constraint_constants conn reader ~logger ~delete_older_than
+      |> don't_wait_for ;
       Deferred.ignore
       @@ Tcp.Server.create
            ~on_handler_error:
              (`Call
                (fun _net exn ->
-                 Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+                 [%log error]
                    "Exception while handling TCP server request: $error"
                    ~metadata:
                      [ ("error", `String (Core.Exn.to_string_mach exn))
@@ -615,7 +758,7 @@ let setup_server ~logger ~postgres_address ~server_port =
                ~on_handshake_error:
                  (`Call
                    (fun exn ->
-                     Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+                     [%log error]
                        "Exception while handling RPC server request from \
                         $address: $error"
                        ~metadata:
@@ -625,8 +768,7 @@ let setup_server ~logger ~postgres_address ~server_port =
                            , `String (Unix.Inet_addr.to_string address) ) ] ;
                      Deferred.unit )) )
       |> don't_wait_for ;
-      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-        "Archive process ready. Clients can now connect" ;
+      [%log info] "Archive process ready. Clients can now connect" ;
       Async.never ()
 
 module For_test = struct

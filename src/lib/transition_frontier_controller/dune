@@ -1,5 +1,5 @@
 (library
   (name transition_frontier_controller)
   (public_name transition_frontier_controller)
-  (preprocess (pps ppx_coda))
+  (preprocess (pps ppx_version))
   (libraries core_kernel consensus coda_intf coda_base syncable_ledger merkle_address merkle_mask sync_handler transition_handler test_genesis_ledger coda_networking ledger_catchup))

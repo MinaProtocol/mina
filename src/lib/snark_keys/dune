@@ -1,9 +1,9 @@
 (library
  (name snark_keys)
  (public_name snark_keys)
- (libraries async transaction_snark dummy_values blockchain_snark core)
+ (libraries async transaction_snark blockchain_snark core)
  (preprocess
-  (pps ppx_coda ppx_jane ppx_deriving_yojson)))
+  (pps ppx_version ppx_jane ppx_deriving_yojson)))
 
 (rule
  (targets snark_keys.ml)

@@ -19,10 +19,10 @@ module Transition_frontier_validation =
   External_transition.Transition_frontier_validation (Transition_frontier)
 
 (* TODO: calculate a sensible value from postake consensus arguments *)
-let catchup_timeout_duration (genesis_constants : Genesis_constants.t) =
+let catchup_timeout_duration (precomputed_values : Precomputed_values.t) =
   Block_time.Span.of_ms
-    ( genesis_constants.protocol.delta
-      * Coda_compile_config.block_window_duration_ms
+    ( precomputed_values.genesis_constants.protocol.delta
+      * precomputed_values.constraint_constants.block_window_duration_ms
     |> Int64.of_int )
 
 let cached_transform_deferred_result ~transform_cached ~transform_result cached
@@ -34,16 +34,12 @@ let cached_transform_deferred_result ~transform_cached ~transform_result cached
 (* add a breadcrumb and perform post processing *)
 let add_and_finalize ~logger ~frontier ~catchup_scheduler
     ~processed_transition_writer ~only_if_present ~time_controller ~source
-    cached_breadcrumb ~constraint_constants
-    ~(genesis_constants : Genesis_constants.t) =
+    cached_breadcrumb ~(precomputed_values : Precomputed_values.t) =
   let breadcrumb =
     if Cached.is_pure cached_breadcrumb then Cached.peek cached_breadcrumb
     else Cached.invalidate_with_success cached_breadcrumb
   in
-  let consensus_constants =
-    Consensus.Constants.create ~constraint_constants
-      ~protocol_constants:genesis_constants.protocol
-  in
+  let consensus_constants = precomputed_values.consensus_constants in
   let transition =
     Transition_frontier.Breadcrumb.validated_transition breadcrumb
   in
@@ -56,7 +52,7 @@ let add_and_finalize ~logger ~frontier ~catchup_scheduler
       | Some _ ->
           Transition_frontier.add_breadcrumb_exn frontier breadcrumb
       | None ->
-          Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+          [%log warn]
             !"When trying to add breadcrumb, its parent had been removed from \
               transition frontier: %{sexp: State_hash.t}"
             parent_hash ;
@@ -85,8 +81,7 @@ let add_and_finalize ~logger ~frontier ~catchup_scheduler
 
 let process_transition ~logger ~trust_system ~verifier ~frontier
     ~catchup_scheduler ~processed_transition_writer ~time_controller
-    ~transition:cached_initially_validated_transition ~constraint_constants
-    ~genesis_constants =
+    ~transition:cached_initially_validated_transition ~precomputed_values =
   let enveloped_initially_validated_transition =
     Cached.peek cached_initially_validated_transition
   in
@@ -105,7 +100,9 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
     let%bind mostly_validated_transition =
       let open Deferred.Let_syntax in
       match
-        Transition_frontier_validation.validate_frontier_dependencies ~logger
+        Transition_frontier_validation.validate_frontier_dependencies
+          ~consensus_constants:
+            precomputed_values.Precomputed_values.consensus_constants ~logger
           ~frontier initially_validated_transition
       with
       | Ok t ->
@@ -126,7 +123,7 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
           in
           Error ()
       | Error `Already_in_frontier ->
-          Logger.warn logger ~module_:__MODULE__ ~location:__LOC__ ~metadata
+          [%log warn] ~metadata
             "Refusing to process the transition with hash $state_hash because \
              is is already in the transition frontier" ;
           let (_ : External_transition.Initial_validated.t Envelope.Incoming.t)
@@ -153,7 +150,7 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
                   (Transition_frontier.find frontier
                      (Non_empty_list.head delta_state_hashes))
                   ~init:(Block_time.Span.of_ms 0L)
-                  ~f:(fun _ _ -> catchup_timeout_duration genesis_constants)
+                  ~f:(fun _ _ -> catchup_timeout_duration precomputed_values)
               in
               Catchup_scheduler.watch catchup_scheduler ~timeout_duration
                 ~cached_transition:cached_initially_validated_transition ;
@@ -175,13 +172,14 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
     let%bind breadcrumb =
       cached_transform_deferred_result cached_initially_validated_transition
         ~transform_cached:(fun _ ->
-          Transition_frontier.Breadcrumb.build ~logger ~verifier ~trust_system
-            ~sender:(Some sender) ~parent:parent_breadcrumb
-            ~transition:mostly_validated_transition )
+          Transition_frontier.Breadcrumb.build ~logger ~precomputed_values
+            ~verifier ~trust_system ~sender:(Some sender)
+            ~parent:parent_breadcrumb ~transition:mostly_validated_transition
+          )
         ~transform_result:(function
           | Error (`Invalid_staged_ledger_hash error)
           | Error (`Invalid_staged_ledger_diff error) ->
-              Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+              [%log error]
                 ~metadata:
                   (metadata @ [("error", `String (Error.to_string_hum error))])
                 "Error while building breadcrumb in the transition handler \
@@ -210,9 +208,9 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
     Deferred.map ~f:Result.return
       (add_and_finalize ~logger ~frontier ~catchup_scheduler
          ~processed_transition_writer ~only_if_present:false ~time_controller
-         ~source:`Gossip breadcrumb ~constraint_constants ~genesis_constants))
+         ~source:`Gossip breadcrumb ~precomputed_values))
 
-let run ~logger ~constraint_constants ~genesis_constants ~verifier
+let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
     ~trust_system ~time_controller ~frontier
     ~(primary_transition_reader :
        ( External_transition.Initial_validated.t Envelope.Incoming.t
@@ -244,18 +242,18 @@ let run ~logger ~constraint_constants ~genesis_constants ~verifier
        , unit )
        Writer.t) ~processed_transition_writer =
   let catchup_scheduler =
-    Catchup_scheduler.create ~logger ~verifier ~trust_system ~frontier
-      ~time_controller ~catchup_job_writer ~catchup_breadcrumbs_writer
-      ~clean_up_signal:clean_up_catchup_scheduler
+    Catchup_scheduler.create ~logger ~precomputed_values ~verifier
+      ~trust_system ~frontier ~time_controller ~catchup_job_writer
+      ~catchup_breadcrumbs_writer ~clean_up_signal:clean_up_catchup_scheduler
   in
   let add_and_finalize =
     add_and_finalize ~frontier ~catchup_scheduler ~processed_transition_writer
-      ~time_controller ~constraint_constants ~genesis_constants
+      ~time_controller ~precomputed_values
   in
   let process_transition =
     process_transition ~logger ~trust_system ~verifier ~frontier
       ~catchup_scheduler ~processed_transition_writer ~time_controller
-      ~constraint_constants ~genesis_constants
+      ~precomputed_values
   in
   ignore
     (Reader.Merge.iter
@@ -302,7 +300,7 @@ let run ~logger ~constraint_constants ~genesis_constants ~verifier
                                Cached.invalidate_with_failure cached_breadcrumb
                              in
                              () ) ) ;
-                     Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+                     [%log error]
                        "Error, failed to attach all catchup breadcrumbs to \
                         transition frontier: %s"
                        (Error.to_string_hum err) )
@@ -333,8 +331,7 @@ let run ~logger ~constraint_constants ~genesis_constants ~verifier
                    | Ok () ->
                        ()
                    | Error err ->
-                       Logger.error logger ~module_:__MODULE__
-                         ~location:__LOC__
+                       [%log error]
                          ~metadata:
                            [("error", `String (Error.to_string_hum err))]
                          "Error, failed to attach produced breadcrumb to \
@@ -362,12 +359,9 @@ let%test_module "Transition_handler.Processor tests" =
 
     let logger = Logger.create ()
 
-    let proof_level = Genesis_constants.Proof_level.Check
-
-    let constraint_constants =
-      Genesis_constants.Constraint_constants.for_unit_tests
-
     let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
+
+    let proof_level = precomputed_values.proof_level
 
     let time_controller = Block_time.Controller.basic ~logger
 
@@ -387,9 +381,9 @@ let%test_module "Transition_handler.Processor tests" =
       let branch_size = 10 in
       let max_length = frontier_size + branch_size in
       Quickcheck.test ~trials:4
-        (Transition_frontier.For_tests.gen_with_branch ~proof_level
-           ~constraint_constants ~precomputed_values ~max_length ~frontier_size
-           ~branch_size ()) ~f:(fun (frontier, branch) ->
+        (Transition_frontier.For_tests.gen_with_branch ~precomputed_values
+           ~max_length ~frontier_size ~branch_size ())
+        ~f:(fun (frontier, branch) ->
           assert (
             Thread_safe.block_on_async_exn (fun () ->
                 let pids = Child_processes.Termination.create_pid_table () in
@@ -421,8 +415,7 @@ let%test_module "Transition_handler.Processor tests" =
                   ~primary_transition_reader:valid_transition_reader
                   ~producer_transition_reader ~catchup_job_writer
                   ~catchup_breadcrumbs_reader ~catchup_breadcrumbs_writer
-                  ~processed_transition_writer ~constraint_constants
-                  ~genesis_constants:Genesis_constants.compiled ;
+                  ~processed_transition_writer ~precomputed_values ;
                 List.iter branch ~f:(fun breadcrumb ->
                     downcast_breadcrumb breadcrumb
                     |> Unprocessed_transition_cache.register_exn cache
@@ -444,8 +437,7 @@ let%test_module "Transition_handler.Processor tests" =
                                     next_expected_breadcrumb)
                                  (External_transition.Validated.state_hash
                                     newly_added_transition) ;
-                               Logger.info logger ~module_:__MODULE__
-                                 ~location:__LOC__
+                               [%log info]
                                  ~metadata:
                                    [ ( "height"
                                      , `Int

@@ -31,6 +31,9 @@ end)
 struct
   type t = N.t [@@deriving sexp, compare, hash, yojson]
 
+  (* can't be automatically derived *)
+  let dhall_type = Ppx_dhall_type.Dhall_type.Text
+
   let max_value = N.max_int
 
   include Comparable.Make (N)
@@ -64,8 +67,7 @@ struct
             (Bitstring_lib.Bitstring.Lsb_first.to_list bits) )
 
     let constant n =
-      Integer.constant ~length:N.length_in_bits ~m
-        (Bignum_bigint.of_int (N.to_int n))
+      Integer.constant ~length:N.length_in_bits ~m (N.to_bigint n)
 
     (* warning: this typ does not work correctly with the generic if_ *)
     let typ : (field Integer.t, t) Typ.t =
@@ -167,6 +169,8 @@ module Make32 () : UInt32 = struct
 
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t = UInt32.Stable.V1.t [@@deriving sexp, eq, compare, hash, yojson]
 
@@ -196,6 +200,8 @@ module Make64 () : UInt64 = struct
 
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t = UInt64.Stable.V1.t [@@deriving sexp, eq, compare, hash, yojson]
 

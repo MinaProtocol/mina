@@ -49,8 +49,6 @@ module Node_list : sig
         type t = lite node_list
       end
     end]
-
-    type t = Stable.Latest.t
   end
 end
 
@@ -72,8 +70,6 @@ module Root_transition : sig
         type t = lite root_transition
       end
     end]
-
-    type t = Stable.Latest.t
   end
 end
 
@@ -121,7 +117,7 @@ type ('repr, 'mutant) t =
 
 type ('repr, 'mutant) diff = ('repr, 'mutant) t
 
-val to_yojson : ('repr, 'mutant) t -> Yojson.Safe.json
+val to_yojson : ('repr, 'mutant) t -> Yojson.Safe.t
 
 val to_lite : (full, 'mutant) t -> (lite, 'mutant) t
 
@@ -135,8 +131,6 @@ module Lite : sig
         type t = E : (lite, 'mutant) diff -> t
       end
     end]
-
-    type t = Stable.Latest.t = E : (lite, 'mutant) diff -> t
   end
 end
 

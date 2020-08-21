@@ -20,16 +20,29 @@ module Body : sig
   type t =
     | Payment of Payment_payload.t
     | Stake_delegation of Stake_delegation.t
+    | Create_new_token of New_token_payload.t
+    | Create_token_account of New_account_payload.t
+    | Mint_tokens of Minting_payload.t
   [@@deriving eq, sexp, hash, yojson]
 
   [%%versioned:
   module Stable : sig
+    [@@@no_toplevel_latest_type]
+
     module V1 : sig
       type nonrec t = t [@@deriving compare, eq, sexp, hash, yojson]
     end
   end]
 
-  val receiver : t -> Account_id.t
+  val tag : t -> Transaction_union_tag.t
+
+  val receiver_pk : t -> Signature_lib.Public_key.Compressed.t
+
+  val receiver : next_available_token:Token_id.t -> t -> Account_id.t
+
+  val source_pk : t -> Signature_lib.Public_key.Compressed.t
+
+  val source : next_available_token:Token_id.t -> t -> Account_id.t
 
   val token : t -> Token_id.t
 end
@@ -46,25 +59,9 @@ module Common : sig
           ; nonce: 'nonce
           ; valid_until: 'global_slot
           ; memo: 'memo }
-        [@@deriving bin_io, eq, sexp, hash, yojson, version]
+        [@@deriving eq, sexp, hash, yojson]
       end
     end]
-
-    type ('fee, 'public_key, 'token_id, 'nonce, 'global_slot, 'memo) t =
-          ( 'fee
-          , 'public_key
-          , 'token_id
-          , 'nonce
-          , 'global_slot
-          , 'memo )
-          Stable.Latest.t =
-      { fee: 'fee
-      ; fee_token: 'token_id
-      ; fee_payer_pk: 'public_key
-      ; nonce: 'nonce
-      ; valid_until: 'global_slot
-      ; memo: 'memo }
-    [@@deriving eq, sexp, hash, yojson]
   end
 
   [%%versioned:
@@ -78,11 +75,9 @@ module Common : sig
         , Coda_numbers.Global_slot.Stable.V1.t
         , User_command_memo.t )
         Poly.Stable.V1.t
-      [@@deriving eq, sexp, hash]
+      [@@deriving compare, eq, sexp, hash]
     end
   end]
-
-  type t = Stable.Latest.t [@@deriving compare, eq, sexp, hash]
 
   val to_input : t -> (Field.t, bool) Random_oracle.Input.t
 
@@ -119,7 +114,7 @@ module Poly : sig
   module Stable : sig
     module V1 : sig
       type ('common, 'body) t = {common: 'common; body: 'body}
-      [@@deriving bin_io, eq, sexp, hash, yojson, compare, version]
+      [@@deriving eq, sexp, hash, yojson, compare, hlist]
 
       val of_latest :
            ('common1 -> ('common2, 'err) Result.t)
@@ -128,10 +123,6 @@ module Poly : sig
         -> (('common2, 'body2) t, 'err) Result.t
     end
   end]
-
-  type ('common, 'body) t = ('common, 'body) Stable.Latest.t =
-    {common: 'common; body: 'body}
-  [@@deriving eq, sexp, hash, yojson, compare]
 end
 
 [%%versioned:
@@ -141,8 +132,6 @@ module Stable : sig
     [@@deriving compare, eq, sexp, hash, yojson]
   end
 end]
-
-type t = Stable.Latest.t [@@deriving compare, eq, sexp, hash]
 
 val create :
      fee:Currency.Fee.t
@@ -164,6 +153,8 @@ val fee_payer_pk : t -> Public_key.Compressed.t
 
 val fee_payer : t -> Account_id.t
 
+val fee_excess : t -> Fee_excess.t
+
 val nonce : t -> Coda_numbers.Account_nonce.t
 
 val valid_until : t -> Coda_numbers.Global_slot.t
@@ -174,18 +165,21 @@ val body : t -> Body.t
 
 val receiver_pk : t -> Public_key.Compressed.t
 
-val receiver : t -> Account_id.t
+val receiver : next_available_token:Token_id.t -> t -> Account_id.t
 
 val source_pk : t -> Public_key.Compressed.t
 
-val source : t -> Account_id.t
+val source : next_available_token:Token_id.t -> t -> Account_id.t
 
 val token : t -> Token_id.t
 
 val amount : t -> Currency.Amount.t option
 
-val is_payment : t -> bool
+val accounts_accessed :
+  next_available_token:Token_id.t -> t -> Account_id.t list
 
-val accounts_accessed : t -> Account_id.t list
+val next_available_token : t -> Token_id.t -> Token_id.t
+
+val tag : t -> Transaction_union_tag.t
 
 val gen : t Quickcheck.Generator.t

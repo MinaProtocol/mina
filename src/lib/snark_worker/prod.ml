@@ -25,53 +25,44 @@ module Inputs = struct
     module type S = Transaction_snark.S
 
     type t =
-      { m: (module S)
+      { m: (module S) option
       ; cache: Cache.t
       ; proof_level: Genesis_constants.Proof_level.t }
 
     let create ~proof_level () =
-      let%map proving, verification =
+      let m =
         match proof_level with
         | Genesis_constants.Proof_level.Full ->
-            let%map proving = Snark_keys.transaction_proving ()
-            and verification = Snark_keys.transaction_verification () in
-            (proving, verification)
+            Some (module Transaction_snark.Make () : S)
         | Check | None ->
-            return Transaction_snark.Keys.(Proving.dummy, Verification.dummy)
+            None
       in
-      { m=
-          ( module Transaction_snark.Make (struct
-            let keys = {Transaction_snark.Keys.proving; verification}
-          end)
-          : S )
-      ; cache= Cache.create ()
-      ; proof_level }
+      Deferred.return {m; cache= Cache.create (); proof_level}
 
     let worker_wait_time = 5.
   end
 
   type single_spec =
-    ( Transaction.t Transaction_protocol_state.t
+    ( Transaction.t
     , Transaction_witness.t
     , Transaction_snark.t )
     Snark_work_lib.Work.Single.Spec.t
   [@@deriving sexp]
 
-  (* TODO: Use public_key once SoK is implemented *)
-  let perform_single ({m= (module M); cache; proof_level} : Worker_state.t)
-      ~message =
+  let perform_single ({m; cache; proof_level} : Worker_state.t) ~message =
     let open Snark_work_lib in
     let sok_digest = Coda_base.Sok_message.digest message in
     fun (single : single_spec) ->
       match proof_level with
       | Genesis_constants.Proof_level.Full -> (
+          let (module M) = Option.value_exn m in
           let statement = Work.Single.Spec.statement single in
           let process k =
             let start = Time.now () in
             match k () with
             | Error e ->
-                Logger.error (Logger.create ()) ~module_:__MODULE__
-                  ~location:__LOC__ "SNARK worker failed: $error"
+                let logger = Logger.create () in
+                [%log error] "SNARK worker failed: $error"
                   ~metadata:
                     [ ("error", `String (Error.to_string_hum e))
                     ; ( "spec"
@@ -97,7 +88,14 @@ module Inputs = struct
                     Or_error.try_with (fun () ->
                         M.of_transaction ~sok_digest
                           ~source:input.Transaction_snark.Statement.source
-                          ~target:input.target t
+                          ~target:input.target
+                          { Transaction_protocol_state.Poly.transaction= t
+                          ; block_data= w.protocol_state_body }
+                          ~init_stack:w.init_stack
+                          ~next_available_token_before:
+                            input.next_available_token_before
+                          ~next_available_token_after:
+                            input.next_available_token_after
                           ~pending_coinbase_stack_state:
                             input
                               .Transaction_snark.Statement
@@ -108,24 +106,21 @@ module Inputs = struct
                 process (fun () -> M.merge ~sok_digest proof1 proof2) ) )
       | Check | None ->
           (* Use a dummy proof. *)
-          let stmt, proof_type =
+          let stmt =
             match single with
             | Work.Single.Spec.Transition (stmt, _, _) ->
-                (stmt, `Base)
+                stmt
             | Merge (stmt, _, _) ->
-                (stmt, `Merge)
-          in
-          let fee_excess =
-            Currency.Amount.(
-              Signed.create
-                ~magnitude:(of_fee stmt.fee_excess.magnitude)
-                ~sgn:stmt.fee_excess.sgn)
+                stmt
           in
           Or_error.return
           @@ ( Transaction_snark.create ~source:stmt.source ~target:stmt.target
-                 ~proof_type ~supply_increase:stmt.supply_increase
+                 ~supply_increase:stmt.supply_increase
                  ~pending_coinbase_stack_state:
-                   stmt.pending_coinbase_stack_state ~fee_excess ~sok_digest
-                 ~proof:Precomputed_values.unit_test_base_proof
+                   stmt.pending_coinbase_stack_state
+                 ~next_available_token_before:stmt.next_available_token_before
+                 ~next_available_token_after:stmt.next_available_token_after
+                 ~fee_excess:stmt.fee_excess ~sok_digest
+                 ~proof:Proof.transaction_dummy
              , Time.Span.zero )
 end

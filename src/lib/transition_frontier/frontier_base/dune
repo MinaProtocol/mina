@@ -2,4 +2,4 @@
   (name frontier_base)
   (public_name transition_frontier_base)
   (libraries core_kernel coda_base coda_state coda_transition staged_ledger base58_check)
-  (preprocess (pps ppx_jane ppx_coda ppx_deriving.std ppx_deriving_yojson)))
+  (preprocess (pps ppx_jane ppx_coda ppx_version ppx_deriving.std ppx_deriving_yojson)))

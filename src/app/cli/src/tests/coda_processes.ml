@@ -52,15 +52,24 @@ let local_configs ?block_production_interval
     ?(is_archive_rocksdb = Fn.const false)
     ?(archive_process_location = Fn.const None) n ~acceptable_delay ~chain_id
     ~program_dir ~snark_worker_public_keys ~work_selection_method ~trace_dir
-    ~max_concurrent_connections =
+    ~max_concurrent_connections ~runtime_config =
   let%map net_configs = net_configs n in
   let addrs_and_ports_list, peers = net_configs in
   let peers = [] :: List.drop peers 1 in
   let args = List.zip_exn addrs_and_ports_list peers in
-  let consensus_constants =
-    Consensus.Constants.create
-      ~constraint_constants:Genesis_constants.Constraint_constants.compiled
-      ~protocol_constants:Genesis_constants.compiled.protocol
+  let offset =
+    let genesis_state_timestamp =
+      match
+        Option.bind runtime_config.Runtime_config.genesis
+          ~f:(fun {genesis_state_timestamp= ts; _} -> ts)
+      with
+      | Some timestamp ->
+          Genesis_constants.genesis_timestamp_of_string timestamp
+      | None ->
+          (Lazy.force Precomputed_values.compiled).consensus_constants
+            .genesis_state_timestamp |> Block_time.to_time
+    in
+    Core.Time.(diff (now ())) genesis_state_timestamp
   in
   let configs =
     List.mapi args ~f:(fun i ((addrs_and_ports, libp2p_keypair), peers) ->
@@ -79,12 +88,11 @@ let local_configs ?block_production_interval
           ~work_selection_method ~trace_dir
           ~is_archive_rocksdb:(is_archive_rocksdb i)
           ~archive_process_location:(archive_process_location i)
-          ~offset:(offset consensus_constants)
-          ~max_concurrent_connections () )
+          ~offset ~max_concurrent_connections ~runtime_config () )
   in
   configs
 
-let stabalize_and_start_or_timeout ?(timeout_ms = 20000.) nodes =
+let stabalize_and_start_or_timeout ?(timeout_ms = 180000.) nodes =
   let ready () =
     let check_ready node =
       let%map peers = Coda_process.peers_exn node in

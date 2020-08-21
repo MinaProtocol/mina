@@ -7,7 +7,7 @@ module Payload = Transaction_union_payload
 
 type ('payload, 'pk, 'signature) t_ =
   {payload: 'payload; signer: 'pk; signature: 'signature}
-[@@deriving eq, sexp, hash]
+[@@deriving eq, sexp, hash, hlist]
 
 type t = (Payload.t, Public_key.t, Signature.t) t_
 
@@ -15,16 +15,8 @@ type var = (Payload.var, Public_key.var, Signature.var) t_
 
 let typ : (var, t) Typ.t =
   let spec = Data_spec.[Payload.typ; Public_key.typ; Schnorr.Signature.typ] in
-  let of_hlist
-        : 'a 'b 'c. (unit, 'a -> 'b -> 'c -> unit) H_list.t -> ('a, 'b, 'c) t_
-      =
-    H_list.(fun [payload; signer; signature] -> {payload; signer; signature})
-  in
-  let to_hlist {payload; signer; signature} =
-    H_list.[payload; signer; signature]
-  in
-  Typ.of_hlistable spec ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
-    ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+  Typ.of_hlistable spec ~var_to_hlist:t__to_hlist ~var_of_hlist:t__of_hlist
+    ~value_to_hlist:t__to_hlist ~value_of_hlist:t__of_hlist
 
 (** For SNARK purposes, we inject [Transaction.t]s into a single-variant 'tagged-union' record capable of
     representing all the variants. We interpret the fields of this union in different ways depending on
@@ -63,35 +55,42 @@ let of_transaction : Transaction.t -> t = function
               ; receiver_pk= receiver
               ; token_id= Token_id.default
               ; amount
-              ; tag= Tag.Coinbase } }
+              ; tag= Tag.Coinbase
+              ; token_locked= false } }
       ; signer= Public_key.decompress_exn other_pk
       ; signature= Signature.dummy }
   | Fee_transfer tr -> (
-      let two (pk1, fee1) (pk2, fee2) : t =
+      let two {Fee_transfer.receiver_pk= pk1; fee= fee1; fee_token}
+          {Fee_transfer.receiver_pk= pk2; fee= fee2; fee_token= token_id} : t =
         { payload=
             { common=
                 { fee= fee2
-                ; fee_token= Token_id.default
+                ; fee_token
                 ; fee_payer_pk= pk2
                 ; nonce= Account.Nonce.zero
                 ; valid_until= Coda_numbers.Global_slot.max_value
                 ; memo= User_command_memo.empty }
             ; body=
-                { source_pk= pk2
+                { source_pk= pk1
                 ; receiver_pk= pk1
-                ; token_id= Token_id.default
+                ; token_id
                 ; amount= Amount.of_fee fee1
-                ; tag= Tag.Fee_transfer } }
+                ; tag= Tag.Fee_transfer
+                ; token_locked= false } }
         ; signer= Public_key.decompress_exn pk2
         ; signature= Signature.dummy }
       in
-      match tr with
-      | `One (pk, fee) ->
-          two (pk, fee) (pk, Fee.zero)
+      match Fee_transfer.to_singles tr with
+      | `One ({receiver_pk; fee= _; fee_token} as t) ->
+          two t
+            (Fee_transfer.Single.create ~receiver_pk ~fee:Fee.zero ~fee_token)
       | `Two (t1, t2) ->
           two t1 t2 )
 
-let excess (t : t) = Transaction_union_payload.excess t.payload
+let fee_excess (t : t) = Transaction_union_payload.fee_excess t.payload
 
 let supply_increase (t : t) =
   Transaction_union_payload.supply_increase t.payload
+
+let next_available_token (t : t) tid =
+  Transaction_union_payload.next_available_token t.payload tid

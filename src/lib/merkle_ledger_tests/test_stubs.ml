@@ -1,5 +1,4 @@
 open Core
-open Unsigned
 module Balance = Currency.Balance
 
 module Account = struct
@@ -26,70 +25,15 @@ module Account = struct
   let balance Coda_base.Account.Poly.{balance; _} = balance
 
   let update_balance t bal = {t with Coda_base.Account.Poly.balance= bal}
-end
 
-(* below are alternative modules that use strings as public keys and UInt64 as balances for
-   in accounts
+  let token Coda_base.Account.Poly.{token_id; _} = token_id
 
-   using these modules instead of Account and Balance above speeds up the
-   ledger tests
-
-   we don't use the alternatives for testing currently, because Account
-   and Balance above are the modules used for actual ledgers
- *)
-
-module Balance_not_used = struct
-  include UInt64
-  include Binable.Of_stringable (UInt64)
-
-  let sexp_of_t t = [%sexp_of: string] (to_string t)
-
-  let t_of_sexp sexp =
-    let string_balance = [%of_sexp: string] sexp in
-    of_string string_balance
-
-  let equal x y = UInt64.compare x y = 0
-
-  let gen =
-    Quickcheck.Generator.map ~f:UInt64.of_int64 Int64.quickcheck_generator
-end
-
-module Account_not_used = struct
-  type key = string
-  [@@deriving sexp, show, bin_io_unversioned, eq, compare, hash]
-
-  type t =
-    { public_key: key
-    ; balance: Balance.Stable.Latest.t
-          [@printer
-            fun fmt balance ->
-              Format.pp_print_string fmt (Balance.to_string balance)] }
-  [@@deriving bin_io_unversioned, eq, show, fields]
-
-  let sexp_of_t {public_key; balance} =
-    [%sexp_of: string * string] (public_key, Balance.to_string balance)
-
-  let t_of_sexp sexp =
-    let public_key, string_balance = [%of_sexp: string * string] sexp in
-    let balance = Balance.of_string string_balance in
-    {public_key; balance}
-
-  (* vanilla String.quickcheck_generator yields the empty string about half the time *)
-  let key_gen = String.gen_with_length 10 Char.quickcheck_generator
-
-  let set_balance {public_key; _} balance = {public_key; balance}
-
-  let create public_key balance = {public_key; balance}
-
-  let empty = {public_key= ""; balance= Balance.zero}
-
-  let gen =
-    let open Quickcheck.Let_syntax in
-    let%bind public_key = String.quickcheck_generator in
-    let%map int_balance = Int.quickcheck_generator in
-    let nat_balance = abs int_balance in
-    let balance = Balance.of_int nat_balance in
-    {public_key; balance}
+  let token_owner Coda_base.Account.Poly.{token_permissions; _} =
+    match token_permissions with
+    | Coda_base.Token_permissions.Token_owned _ ->
+        true
+    | Not_owned _ ->
+        false
 end
 
 module Receipt = Coda_base.Receipt
@@ -194,8 +138,6 @@ module Key = struct
     end
   end]
 
-  type t = Stable.Latest.t [@@deriving sexp, compare, hash]
-
   let to_string = Signature_lib.Public_key.Compressed.to_base58_check
 
   let gen = Account.key_gen
@@ -222,8 +164,6 @@ module Account_id = struct
       let to_latest = Fn.id
     end
   end]
-
-  type t = Coda_base.Account_id.t [@@deriving sexp, compare, hash]
 
   include Hashable.Make_binable (Stable.Latest)
   include Comparable.Make (Stable.Latest)

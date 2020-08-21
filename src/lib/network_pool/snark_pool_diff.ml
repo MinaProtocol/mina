@@ -8,6 +8,8 @@ open Network_peer
 module Rejected = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t = unit [@@deriving sexp, yojson]
 
@@ -29,12 +31,17 @@ module Make
 
   type rejected = Rejected.t [@@deriving sexp, yojson]
 
-  let compact_json = function
+  type compact =
+    { work: Work.t
+    ; fee: Currency.Fee.t
+    ; prover: Signature_lib.Public_key.Compressed.t }
+  [@@deriving yojson]
+
+  let to_compact = function
     | Add_solved_work (work, {proof= _; fee= {fee; prover}}) ->
-        `Assoc
-          [ ("work_ids", Work.compact_json work)
-          ; ("fee", Currency.Fee.to_yojson fee)
-          ; ("prover", Signature_lib.Public_key.Compressed.to_yojson prover) ]
+        {work; fee; prover}
+
+  let compact_json t = compact_to_yojson (to_compact t)
 
   let summary = function
     | Add_solved_work (work, {proof= _; fee}) ->
@@ -56,6 +63,11 @@ module Make
           ~f:Snark_work_lib.Work.Single.Spec.statement
       , {proof= res.proofs; fee= {fee= res.spec.fee; prover= res.prover}} )
 
+  let verify pool
+      ({data= Add_solved_work (work, p); sender} : t Envelope.Incoming.t) =
+    Pool.verify_and_act pool ~work:(work, p) ~sender
+
+  (* This is called after verification has occurred. *)
   let unsafe_apply (pool : Pool.t) (t : t Envelope.Incoming.t) =
     let {Envelope.Incoming.data= diff; sender} = t in
     let is_local = match sender with Local -> true | _ -> false in
@@ -65,39 +77,32 @@ module Make
       | `Added ->
           Ok (diff, ())
     in
-    match diff with
-    | Add_solved_work (work, ({Priced_proof.proof; fee} as p)) -> (
-        let reject_and_log_if_local reason =
-          if is_local then (
-            Logger.trace (Pool.get_logger pool) ~module_:__MODULE__
-              ~location:__LOC__
-              "Rejecting locally generated snark work $work: $reason"
-              ~metadata:
-                [("work", Work.compact_json work); ("reason", `String reason)] ;
-            Deferred.return (Error (`Locally_generated (diff, ()))) )
-          else Deferred.return (Error (`Other (Error.of_string reason)))
-        in
-        let check_and_add () =
-          match%map
-            Pool.verify_and_act pool ~work:(work, p)
-              ~sender:(Envelope.Incoming.sender t)
-          with
-          | Ok () ->
-              Pool.add_snark ~is_local pool ~work ~proof ~fee |> to_or_error
-          | Error e ->
-              Error (`Other e)
-        in
-        match Pool.request_proof pool work with
-        | None ->
-            check_and_add ()
-        | Some {fee= {fee= prev; _}; _} -> (
-          match Currency.Fee.compare fee.fee prev with
-          | -1 ->
-              check_and_add ()
-          | 0 ->
-              reject_and_log_if_local "fee equal to cheapest work we have"
-          | 1 ->
-              reject_and_log_if_local "fee higher than cheapest work we have"
-          | _ ->
-              failwith "compare didn't return -1, 0, or 1!" ) )
+    Deferred.return
+      ( match diff with
+      | Add_solved_work (work, {Priced_proof.proof; fee}) -> (
+          let reject_and_log_if_local reason =
+            if is_local then (
+              [%log' trace (Pool.get_logger pool)]
+                "Rejecting locally generated snark work $work: $reason"
+                ~metadata:
+                  [("work", Work.compact_json work); ("reason", `String reason)] ;
+              Error (`Locally_generated (diff, ())) )
+            else Error (`Other (Error.of_string reason))
+          in
+          let add_to_pool () =
+            Pool.add_snark ~is_local pool ~work ~proof ~fee |> to_or_error
+          in
+          match Pool.request_proof pool work with
+          | None ->
+              add_to_pool ()
+          | Some {fee= {fee= prev; _}; _} -> (
+            match Currency.Fee.compare fee.fee prev with
+            | -1 ->
+                add_to_pool ()
+            | 0 ->
+                reject_and_log_if_local "fee equal to cheapest work we have"
+            | 1 ->
+                reject_and_log_if_local "fee higher than cheapest work we have"
+            | _ ->
+                failwith "compare didn't return -1, 0, or 1!" ) ) )
 end

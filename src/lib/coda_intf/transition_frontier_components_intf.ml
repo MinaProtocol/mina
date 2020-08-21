@@ -189,6 +189,7 @@ module type Consensus_best_tip_prover_intf = sig
 
   val prove :
        logger:Logger.t
+    -> consensus_constants:Consensus.Constants.t
     -> frontier:transition_frontier
     -> Consensus.Data.Consensus_state.Value.t
     -> ( External_transition.t
@@ -199,6 +200,7 @@ module type Consensus_best_tip_prover_intf = sig
   val verify :
        logger:Logger.t
     -> verifier:Verifier.t
+    -> consensus_constants:Consensus.Constants.t
     -> genesis_constants:Genesis_constants.t
     -> Consensus.Data.Consensus_state.Value.t
     -> ( External_transition.t
@@ -347,6 +349,7 @@ module type Transition_router_intf = sig
     -> verifier:Verifier.t
     -> network:network
     -> is_seed:bool
+    -> is_demo_mode:bool
     -> time_controller:Block_time.Controller.t
     -> consensus_local_state:Consensus.Data.Local_state.t
     -> persistent_root_location:string
@@ -366,7 +369,6 @@ module type Transition_router_intf = sig
                                Broadcast_pipe.Reader.t
                                * External_transition.Initial_validated.t
                                  Broadcast_pipe.Writer.t
-    -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> precomputed_values:Precomputed_values.t
     -> ( [`Transition of External_transition.Validated.t]
        * [`Source of [`Gossip | `Catchup | `Internal]] )

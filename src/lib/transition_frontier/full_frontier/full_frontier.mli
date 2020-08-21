@@ -32,8 +32,7 @@ val create :
   -> base_hash:Frontier_hash.t
   -> consensus_local_state:Consensus.Data.Local_state.t
   -> max_length:int
-  -> constraint_constants:Genesis_constants.Constraint_constants.t
-  -> genesis_constants:Genesis_constants.t
+  -> precomputed_values:Precomputed_values.t
   -> t
 
 val close : t -> unit
@@ -45,6 +44,9 @@ val set_hash_unsafe : t -> [`I_promise_this_is_safe of Frontier_hash.t] -> unit
 val hash : t -> Frontier_hash.t
 
 val calculate_diffs : t -> Breadcrumb.t -> Diff.Full.E.t list
+
+val protocol_states_for_root_scan_state :
+  t -> Protocol_states_for_root_scan_state.t
 
 val apply_diffs :
      t

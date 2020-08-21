@@ -14,9 +14,10 @@ they are.
 ## Config file
 
 The daemon will look for a `$CONF_DIR/daemon.json` on startup. That file should
-be a single JSON object. These settings are overridden by their corresponding
-command-line flags. See `coda daemon -h` for more information about them.
-These flags are supported in the config file:
+be a single JSON object containing the field `daemon: {...}`. These settings
+are overridden by their corresponding command-line flags. See `coda daemon -h`
+for more information about them.
+These flags are supported in the `daemon` object of the config file:
 
 - `client-port` int
 - `libp2p-port` int

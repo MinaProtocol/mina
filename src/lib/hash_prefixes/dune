@@ -1,5 +1,5 @@
 (library
   (name hash_prefixes)
   (public_name hash_prefixes)
-  (preprocess (pps ppx_coda))
+  (preprocess (pps ppx_version))
   )

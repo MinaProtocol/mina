@@ -32,11 +32,14 @@ module type External_transition_common_intf = sig
 
   val block_producer : t -> Public_key.Compressed.t
 
-  val transactions : t -> Transaction.t list
+  val transactions :
+       constraint_constants:Genesis_constants.Constraint_constants.t
+    -> t
+    -> Transaction.t With_status.t list
 
-  val user_commands : t -> User_command.t list
+  val user_commands : t -> User_command.t With_status.t list
 
-  val payments : t -> User_command.t list
+  val payments : t -> User_command.t With_status.t list
 
   val delta_transition_chain_proof : t -> State_hash.t * State_body_hash.t list
 
@@ -52,12 +55,12 @@ module type External_transition_common_intf = sig
 end
 
 module type External_transition_base_intf = sig
-  type t [@@deriving sexp, compare, to_yojson]
-
-  include Comparable.S with type t := t
+  type t [@@deriving sexp, to_yojson, eq]
 
   [%%versioned:
   module Stable : sig
+    [@@@no_toplevel_latest_type]
+
     module V1 : sig
       type nonrec t = t [@@deriving sexp, to_yojson]
     end
@@ -321,7 +324,7 @@ module type S = sig
        Validation.with_transition
 
   val validate_time_received :
-       constraint_constants:Genesis_constants.Constraint_constants.t
+       precomputed_values:Precomputed_values.t
     -> ( [`Time_received] * unit Truth.false_t
        , 'genesis_state
        , 'proof
@@ -507,6 +510,7 @@ module type S = sig
          , 'staged_ledger_diff
          , 'protocol_versions )
          Validation.with_transition
+      -> consensus_constants:Consensus.Constants.t
       -> logger:Logger.t
       -> frontier:Transition_frontier.t
       -> ( ( 'time_received
@@ -613,6 +617,7 @@ module type S = sig
          , 'protocol_versions )
          Validation.with_transition
       -> logger:Logger.t
+      -> precomputed_values:Precomputed_values.t
       -> verifier:Verifier.t
       -> parent_staged_ledger:Staged_ledger.t
       -> parent_protocol_state:Protocol_state.value

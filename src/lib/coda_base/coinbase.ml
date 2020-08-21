@@ -19,12 +19,6 @@ module Stable = struct
   end
 end]
 
-type t = Stable.Latest.t =
-  { receiver: Public_key.Compressed.t
-  ; amount: Currency.Amount.t
-  ; fee_transfer: Fee_transfer.t option }
-[@@deriving sexp, compare, eq, hash, yojson]
-
 module Base58_check = Codable.Make_base58_check (Stable.Latest)
 
 [%%define_locally
@@ -77,15 +71,14 @@ let supply_increase {receiver= _; amount; fee_transfer} =
            ~default:(Or_error.error_string "Coinbase underflow")
 
 let fee_excess t =
-  Or_error.map (supply_increase t) ~f:(fun _increase ->
-      Currency.Fee.Signed.zero )
+  Or_error.map (supply_increase t) ~f:(fun _increase -> Fee_excess.empty)
 
 module Gen = struct
-  let gen =
+  let gen ~(constraint_constants : Genesis_constants.Constraint_constants.t) =
     let open Quickcheck.Let_syntax in
     let%bind receiver = Public_key.Compressed.gen in
     let%bind amount =
-      Currency.Amount.(gen_incl zero Coda_compile_config.coinbase)
+      Currency.Amount.(gen_incl zero constraint_constants.coinbase_amount)
     in
     let max_fee = Currency.Amount.to_fee amount in
     let%map fee_transfer =

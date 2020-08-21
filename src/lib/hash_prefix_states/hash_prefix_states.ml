@@ -17,7 +17,9 @@ open Hash_prefixes
 
 let salt (s : Hash_prefixes.t) = Random_oracle.salt (s :> string)
 
-let receipt_chain = salt receipt_chain
+let receipt_chain_user_command = salt receipt_chain_user_command
+
+let receipt_chain_snapp = salt receipt_chain_snapp
 
 let coinbase = salt coinbase
 
@@ -40,11 +42,27 @@ let protocol_state = salt protocol_state
 let protocol_state_body = salt protocol_state_body
 
 let merkle_tree =
-  Array.init Coda_compile_config.ledger_depth ~f:(fun i -> salt (merkle_tree i))
+  let f i = salt (merkle_tree i) in
+  (* Cache up to the compiled ledger depth. *)
+  let cached = ref [||] in
+  fun i ->
+    let len = Array.length !cached in
+    if i >= len then
+      cached :=
+        Array.append !cached
+          (Array.init (i + 1 - len) ~f:(fun i -> f (i + len))) ;
+    !cached.(i)
 
 let coinbase_merkle_tree =
-  Array.init Coda_compile_config.pending_coinbase_depth ~f:(fun i ->
-      salt (coinbase_merkle_tree i) )
+  let f i = salt (coinbase_merkle_tree i) in
+  let cached = ref [||] in
+  fun i ->
+    let len = Array.length !cached in
+    if i >= len then
+      cached :=
+        Array.append !cached
+          (Array.init (i + 1 - len) ~f:(fun i -> f (i + len))) ;
+    !cached.(i)
 
 let vrf_message = salt vrf_message
 
@@ -57,3 +75,13 @@ let epoch_seed = salt epoch_seed
 let transition_system_snark = salt transition_system_snark
 
 let account = salt account
+
+let side_loaded_vk = salt side_loaded_vk
+
+let snapp_account = salt snapp_account
+
+let snapp_payload = salt snapp_payload
+
+let snapp_predicate_account = salt snapp_predicate_account
+
+let snapp_predicate_protocol_state = salt snapp_predicate_protocol_state

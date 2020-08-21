@@ -65,8 +65,7 @@ type t =
       Protocol_states_for_root_scan_state.t
   ; consensus_local_state: Consensus.Data.Local_state.t
   ; max_length: int
-  ; genesis_constants: Genesis_constants.t
-  ; constraint_constants: Genesis_constants.Constraint_constants.t }
+  ; precomputed_values: Precomputed_values.t }
 
 let consensus_local_state {consensus_local_state; _} = consensus_local_state
 
@@ -97,6 +96,9 @@ let find_protocol_state (t : t) hash =
 
 let root t = find_exn t t.root
 
+let protocol_states_for_root_scan_state t =
+  t.protocol_states_for_root_scan_state
+
 let best_tip t = find_exn t t.best_tip
 
 let close t =
@@ -106,7 +108,7 @@ let close t =
        (Breadcrumb.mask (root t)))
 
 let create ~logger ~root_data ~root_ledger ~base_hash ~consensus_local_state
-    ~max_length ~constraint_constants ~genesis_constants =
+    ~max_length ~precomputed_values =
   let open Root_data in
   let root_hash =
     External_transition.Validated.state_hash root_data.transition
@@ -145,8 +147,7 @@ let create ~logger ~root_data ~root_ledger ~base_hash ~consensus_local_state
     ; table
     ; consensus_local_state
     ; max_length
-    ; genesis_constants
-    ; constraint_constants
+    ; precomputed_values
     ; protocol_states_for_root_scan_state }
   in
   t
@@ -194,7 +195,9 @@ let best_tip_path t = path_map t (best_tip t) ~f:Fn.id
 
 let hash_path t breadcrumb = path_map t breadcrumb ~f:Breadcrumb.state_hash
 
-let genesis_constants t = t.genesis_constants
+let precomputed_values t = t.precomputed_values
+
+let genesis_constants t = t.precomputed_values.genesis_constants
 
 let iter t ~f = Hashtbl.iter t.table ~f:(fun n -> f n.breadcrumb)
 
@@ -246,7 +249,7 @@ module Visualizor = struct
             | Some child_node ->
                 add_edge acc_graph node child_node
             | None ->
-                Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
+                [%log' debug t.logger]
                   ~metadata:
                     [ ("state_hash", State_hash.to_yojson successor_state_hash)
                     ; ("error", `String "missing from frontier") ]
@@ -315,7 +318,7 @@ let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
   (* The transition frontier at this point in time has the following mask topology:
    *
    *   (`s` represents a snarked ledger, `m` represents a mask)
-   * 
+   *
    *     garbage
    *     [m...]
    *       ^
@@ -409,10 +412,21 @@ let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
       (* STEP 5 *)
       Non_empty_list.iter
         (Option.value_exn
-           (Staged_ledger.proof_txns
+           (Staged_ledger.proof_txns_with_state_hashes
               (Breadcrumb.staged_ledger new_root_node.breadcrumb)))
-        ~f:(fun txn ->
-          ignore (Or_error.ok_exn (Ledger.apply_transaction mt txn)) ) ;
+        ~f:(fun (txn, state_hash) ->
+          (*Validate transactions against the protocol state associated with the transaction*)
+          let txn_global_slot =
+            find_protocol_state t state_hash
+            |> Option.value_exn |> Protocol_state.consensus_state
+            |> Consensus.Data.Consensus_state.curr_global_slot
+          in
+          ignore
+            (Or_error.ok_exn
+               (Ledger.apply_transaction
+                  ~constraint_constants:
+                    t.precomputed_values.constraint_constants ~txn_global_slot
+                  mt txn.data)) ) ;
       (* STEP 6 *)
       Ledger.commit mt ;
       (* STEP 7 *)
@@ -425,7 +439,11 @@ let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
       (Breadcrumb.validated_transition new_root_node.breadcrumb)
       new_staged_ledger
   in
-  (*Update the protocol states required for scan state at the new root*)
+  (*Update the protocol states required for scan state at the new root.
+  Note: this should be after applying the transactions to the snarked ledger (Step 5)
+  because the protocol states corresponding to those transactions won't be part
+  of the new_root_protocol_states since those transactions would have been
+  deleted from the scan state after emitting the proof*)
   let new_protocol_states_map =
     State_hash.Map.of_alist_exn new_root_protocol_states
   in
@@ -458,6 +476,7 @@ let calculate_diffs t breadcrumb =
       let diffs =
         if
           Consensus.Hooks.select
+            ~constants:t.precomputed_values.consensus_constants
             ~existing:(Breadcrumb.consensus_state current_best_tip)
             ~candidate:(Breadcrumb.consensus_state breadcrumb)
             ~logger:
@@ -568,13 +587,10 @@ let update_metrics_with_diff (type mutant) t
 
 let apply_diffs t diffs ~ignore_consensus_local_state =
   let open Root_identifier.Stable.Latest in
-  Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
-    "Applying %d diffs to full frontier (%s --> ?)" (List.length diffs)
+  [%log' trace t.logger] "Applying %d diffs to full frontier (%s --> ?)"
+    (List.length diffs)
     (Frontier_hash.to_string t.hash) ;
-  let consensus_constants =
-    Consensus.Constants.create ~constraint_constants:t.constraint_constants
-      ~protocol_constants:t.genesis_constants.protocol
-  in
+  let consensus_constants = t.precomputed_values.consensus_constants in
   let local_state_was_synced_at_start =
     Consensus.Hooks.required_local_state_sync ~constants:consensus_constants
       ~consensus_state:(Breadcrumb.consensus_state (best_tip t))
@@ -599,7 +615,7 @@ let apply_diffs t diffs ~ignore_consensus_local_state =
         (new_root, Diff.Full.With_mutant.E (diff, mutant) :: diffs_with_mutants)
     )
   in
-  Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
+  [%log' trace t.logger]
     "Reached state %s after applying diffs to full frontier"
     (Frontier_hash.to_string t.hash) ;
   if not ignore_consensus_local_state then
@@ -615,11 +631,10 @@ let apply_diffs t diffs ~ignore_consensus_local_state =
         | Some jobs ->
             (* But if there wasn't sync work to do when we started, then there shouldn't be now. *)
             if local_state_was_synced_at_start then (
-              Logger.fatal t.logger
+              [%log' fatal t.logger]
                 "after lock transition, the best tip consensus state is out \
                  of sync with the local state -- bug in either \
                  required_local_state_sync or frontier_root_transition."
-                ~module_:__MODULE__ ~location:__LOC__
                 ~metadata:
                   [ ( "sync_jobs"
                     , `List

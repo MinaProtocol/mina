@@ -20,8 +20,6 @@ import tempfile
 
 exit_code = 0
 
-run_ppx_coda='_build/default/src/lib/ppx_coda/run_ppx_coda.exe'
-
 def create_dict (items_file) :
     with open (items_file, 'r') as fp :
         items = {}
@@ -52,16 +50,18 @@ def compare_items (item_kind,fn,original,modified) :
             global exit_code
             exit_code = 1
 
-def create_items_file (ocaml,tag) :
+def create_items_file (printer,ocaml,tag) :
     out_fn = os.path.basename (ocaml) + '-' + tag
     if os.path.exists(out_fn) :
         os.remove(out_fn)
     with open (out_fn, 'w') as fp :
-        subprocess.run([run_ppx_coda,ocaml,'-o','/dev/null'],stdout=fp)
+        retval = subprocess.run([printer,ocaml,'-o','/dev/null'],stdout=fp);
+        # script should fail if printer fails
+        retval.check_returncode ()
     return out_fn
 
-def run_comparison (item_kind,original,modified) :
-    orig_items = create_items_file (original,'original')
-    mod_items = create_items_file (modified,'modified')
+def run_comparison (printer,item_kind,original,modified) :
+    orig_items = create_items_file (printer,original,'original')
+    mod_items = create_items_file (printer,modified,'modified')
     compare_items (item_kind,modified,orig_items,mod_items)
     sys.exit (exit_code)

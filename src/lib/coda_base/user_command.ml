@@ -26,11 +26,6 @@ module Poly = struct
       [@@deriving compare, sexp, hash, yojson, eq]
     end
   end]
-
-  type ('payload, 'pk, 'signature) t =
-        ('payload, 'pk, 'signature) Stable.Latest.t =
-    {payload: 'payload; signer: 'pk; signature: 'signature}
-  [@@deriving compare, eq, sexp, hash, yojson]
 end
 
 [%%versioned
@@ -59,12 +54,10 @@ module Stable = struct
     include Comparable.Make (T)
     include Hashable.Make (T)
 
-    let accounts_accessed ({payload; _} : t) =
-      Payload.accounts_accessed payload
+    let accounts_accessed ~next_available_token ({payload; _} : t) =
+      Payload.accounts_accessed ~next_available_token payload
   end
 end]
-
-type t = Stable.Latest.t [@@deriving sexp, yojson, hash]
 
 type _unused = unit
   constraint (Payload.t, Public_key.t, Signature.t) Poly.t = t
@@ -90,15 +83,19 @@ let fee_payer_pk ({payload; _} : t) = Payload.fee_payer_pk payload
 
 let fee_payer ({payload; _} : t) = Payload.fee_payer payload
 
+let fee_excess ({payload; _} : t) = Payload.fee_excess payload
+
 let token ({payload; _} : t) = Payload.token payload
 
 let source_pk ({payload; _} : t) = Payload.source_pk payload
 
-let source ({payload; _} : t) = Payload.source payload
+let source ~next_available_token ({payload; _} : t) =
+  Payload.source ~next_available_token payload
 
 let receiver_pk ({payload; _} : t) = Payload.receiver_pk payload
 
-let receiver ({payload; _} : t) = Payload.receiver payload
+let receiver ~next_available_token ({payload; _} : t) =
+  Payload.receiver ~next_available_token payload
 
 let amount = Fn.compose Payload.amount payload
 
@@ -106,10 +103,43 @@ let memo = Fn.compose Payload.memo payload
 
 let valid_until = Fn.compose Payload.valid_until payload
 
-let is_payment = Fn.compose Payload.is_payment payload
+let tag ({payload; _} : t) = Payload.tag payload
+
+let tag_string (t : t) =
+  match t.payload.body with
+  | Payment _ ->
+      "payment"
+  | Stake_delegation _ ->
+      "delegation"
+  | Create_new_token _ ->
+      "create_token"
+  | Create_token_account _ ->
+      "create_account"
+  | Mint_tokens _ ->
+      "mint_tokens"
+
+let next_available_token ({payload; _} : t) tid =
+  Payload.next_available_token payload tid
 
 let to_input (payload : Payload.t) =
   Transaction_union_payload.(to_input (of_user_command_payload payload))
+
+let check_tokens ({payload= {common= {fee_token; _}; body}; _} : t) =
+  (not (Token_id.(equal invalid) fee_token))
+  &&
+  match body with
+  | Payment {token_id; _} ->
+      not (Token_id.(equal invalid) token_id)
+  | Stake_delegation _ ->
+      true
+  | Create_new_token _ ->
+      Token_id.(equal default) fee_token
+  | Create_token_account {token_id; account_disabled; _} ->
+      Token_id.(equal default) fee_token
+      && not (Token_id.(equal default) token_id && account_disabled)
+  | Mint_tokens {token_id; _} ->
+      (not (Token_id.(equal invalid) token_id))
+      && not (Token_id.(equal default) token_id)
 
 let sign_payload (private_key : Signature_lib.Private_key.t)
     (payload : Payload.t) : Signature.t =
@@ -321,8 +351,6 @@ module With_valid_signature = struct
     end
   end]
 
-  type t = Stable.Latest.t [@@deriving sexp, yojson, hash]
-
   module Gen = Stable.Latest.Gen
   include Comparable.Make (Stable.Latest)
 end
@@ -334,13 +362,6 @@ Base58_check.(to_base58_check, of_base58_check, of_base58_check_exn)]
 
 [%%define_locally
 Base58_check.String_ops.(to_string, of_string)]
-
-[%%if
-fake_hash]
-
-let check_signature _ = true
-
-[%%else]
 
 [%%ifdef
 consensus_mechanism]
@@ -356,8 +377,6 @@ let check_signature ({payload; signer; signature} : t) =
   Signature_lib_nonconsensus.Schnorr.verify signature
     (Snark_params_nonconsensus.Inner_curve.of_affine signer)
     (to_input payload)
-
-[%%endif]
 
 [%%endif]
 
@@ -390,7 +409,7 @@ let forget_check t = t
 let filter_by_participant user_commands public_key =
   List.filter user_commands ~f:(fun user_command ->
       Core_kernel.List.exists
-        (accounts_accessed user_command)
+        (accounts_accessed ~next_available_token:Token_id.invalid user_command)
         ~f:
           (Fn.compose
              (Public_key.Compressed.equal public_key)

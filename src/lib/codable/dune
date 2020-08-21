@@ -4,5 +4,5 @@
   (library_flags (-linkall))
   (inline_tests)
   (libraries core_kernel ppx_deriving_yojson.runtime yojson base58_check)
-  (preprocess (pps ppx_coda ppx_jane ppx_deriving_yojson bisect_ppx -conditional))
+  (preprocess (pps ppx_version ppx_jane ppx_deriving_yojson bisect_ppx -conditional))
   (synopsis "Extension of Yojson to make it easy for a type to derive yojson"))

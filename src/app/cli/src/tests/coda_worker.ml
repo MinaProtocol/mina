@@ -29,7 +29,8 @@ module Input = struct
     ; max_concurrent_connections: int option
     ; is_archive_rocksdb: bool
     ; is_seed: bool
-    ; archive_process_location: Core.Host_and_port.t option }
+    ; archive_process_location: Core.Host_and_port.t option
+    ; runtime_config: Runtime_config.t }
   [@@deriving bin_io_unversioned]
 end
 
@@ -49,8 +50,6 @@ module Send_payment_input = struct
       let to_latest = Fn.id
     end
   end]
-
-  type t = Stable.Latest.t
 end
 
 module T = struct
@@ -423,6 +422,7 @@ module T = struct
         ; is_archive_rocksdb
         ; is_seed
         ; archive_process_location
+        ; runtime_config
         ; _ } =
       let logger =
         Logger.create
@@ -431,7 +431,12 @@ module T = struct
             ; ("port", `Int addrs_and_ports.libp2p_port) ]
           ()
       in
-      let precomputed_values = Lazy.force Precomputed_values.compiled in
+      let%bind precomputed_values, _runtime_config =
+        Genesis_ledger_helper.init_from_config_file ~logger ~may_generate:false
+          ~proof_level:None runtime_config
+        >>| Or_error.ok_exn
+      in
+      let constraint_constants = precomputed_values.constraint_constants in
       let (module Genesis_ledger) = precomputed_values.genesis_ledger in
       let pids = Child_processes.Termination.create_pid_table () in
       let%bind () =
@@ -454,6 +459,7 @@ module T = struct
             Unix.mkdtemp @@ conf_dir ^/ "external_transition"
           in
           let trace_database_initialization typ location =
+            (* can't use %log because location is passed-in *)
             Logger.trace logger "Creating %s at %s" ~module_:__MODULE__
               ~location typ
           in
@@ -508,7 +514,7 @@ module T = struct
               ; chain_id
               ; logger
               ; unsafe_no_trust_ip= true
-              ; flood= false
+              ; gossip_type= `Gossipsub
               ; trust_system
               ; keypair= Some libp2p_keypair }
           in
@@ -520,6 +526,7 @@ module T = struct
             ; is_seed= List.is_empty peers
             ; genesis_ledger_hash=
                 Ledger.merkle_root (Lazy.force Genesis_ledger.t)
+            ; constraint_constants
             ; log_gossip_heard=
                 { snark_pool_diff= true
                 ; transaction_pool_diff= true
@@ -563,9 +570,7 @@ module T = struct
                       ~f:(fun host_and_port ->
                         Cli_lib.Flag.Types.
                           {name= "dummy"; value= host_and_port} ))
-                 ~constraint_constants:
-                   Genesis_constants.Constraint_constants.compiled
-                 ~proof_level:Genesis_constants.Proof_level.compiled ())
+                 ())
           in
           let coda_ref : Coda_lib.t option ref = ref None in
           Coda_run.handle_shutdown ~monitor ~time_controller ~conf_dir
@@ -575,14 +580,12 @@ module T = struct
               (fun () ->
                 let%map coda = coda_deferred () in
                 coda_ref := Some coda ;
-                Logger.info logger "Setting up snark worker "
-                  ~module_:__MODULE__ ~location:__LOC__ ;
+                [%log info] "Setting up snark worker " ;
                 Coda_run.setup_local_server coda ;
                 coda )
               ()
           in
-          Logger.info logger "Worker finish setting up coda"
-            ~module_:__MODULE__ ~location:__LOC__ ;
+          [%log info] "Worker finish setting up coda" ;
           let coda_peers () = Coda_lib.peers coda in
           let coda_start () = Coda_lib.start coda in
           let coda_get_all_transitions pk =
@@ -644,7 +647,7 @@ module T = struct
                 ~resulting_receipt
             with
             | Ok proof ->
-                Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                [%log info]
                   !"Constructed proof for receipt: $receipt_chain_hash"
                   ~metadata:
                     [ ( "receipt_chain_hash"
@@ -686,7 +689,7 @@ module T = struct
                    let prev_state_hash = State_hash.to_bits prev_state_hash in
                    let state_hash = State_hash.to_bits state_hash in
                    if Pipe.is_closed w then
-                     Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+                     [%log error]
                        "why is this w pipe closed? did someone close the \
                         reader end? dropping this write..." ;
                    Linear_pipe.write_without_pushback_if_open w
@@ -703,7 +706,7 @@ module T = struct
               (Strict_pipe.Reader.iter (Coda_lib.root_diff coda)
                  ~f:(fun diff ->
                    if Pipe.is_closed w then
-                     Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+                     [%log error]
                        "[coda_root_diff] why is this w pipe closed? did \
                         someone close the reader end? dropping this write..." ;
                    Linear_pipe.write_if_open w diff )) ;

@@ -1,6 +1,6 @@
 (library
  (name coda_incremental)
  (public_name coda_incremental)
- (preprocess (pps ppx_coda))
+ (preprocess (pps ppx_version))
  (libraries incremental pipe_lib)
  )

@@ -5,22 +5,21 @@
  (library_flags -linkall)
  (inline_tests)
  (libraries
+  cache_dir
   hash_prefixes
   group_map
-  chunked_pedersen_lib
-  snarky
+  snarky.backendless
+  pickles
   bignum_bigint
-  curve_choice
-  chunk_table
   bowe_gabizon_hash
   random_oracle
   tuple_lib)
  (preprocess
-  (pps ppx_coda ppx_jane bisect_ppx -- -conditional))
+  (pps ppx_version ppx_jane h_list.ppx bisect_ppx -- -conditional))
  (synopsis "Cryptographic parameters"))
 
 (rule
- (targets pedersen_params.ml pedersen_chunk_table.ml)
+ (targets group_map_params.ml)
  (deps
   (:< gen/gen.exe))
  (action

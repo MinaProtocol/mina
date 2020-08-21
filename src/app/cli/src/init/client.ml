@@ -401,6 +401,8 @@ let get_nonce_exn ~rpc public_key port =
   | Ok nonce ->
       return nonce
 
+let unwrap_user_command (`UserCommand x) = x
+
 let batch_send_payments =
   let module Payment_info = struct
     type t =
@@ -484,13 +486,18 @@ let send_payment_graphql =
     flag "amount" ~doc:"VALUE Payment amount you want to send"
       (required txn_amount)
   in
+  let token_flag =
+    flag "token" ~doc:"TOKEN_ID The ID of the token to transfer"
+      (optional token_id)
+  in
   let args =
-    Args.zip3 Cli_lib.Flag.user_command_common receiver_flag amount_flag
+    Args.zip4 Cli_lib.Flag.user_command_common receiver_flag amount_flag
+      token_flag
   in
   Command.async ~summary:"Send payment to an address"
     (Cli_lib.Background_daemon.graphql_init args
        ~f:(fun graphql_endpoint
-          ({Cli_lib.Flag.sender; fee; nonce; memo}, receiver, amount)
+          ({Cli_lib.Flag.sender; fee; nonce; memo}, receiver, amount, token)
           ->
          let%map response =
            Graphql_client.(
@@ -499,12 +506,13 @@ let send_payment_graphql =
                   ~receiver:(Encoders.public_key receiver)
                   ~sender:(Encoders.public_key sender)
                   ~amount:(Encoders.amount amount) ~fee:(Encoders.fee fee)
+                  ?token:(Option.map ~f:Encoders.token token)
                   ?nonce:(Option.map nonce ~f:Encoders.nonce)
                   ?memo ()))
              graphql_endpoint
          in
          printf "Dispatched payment with ID %s\n"
-           ((response#sendPayment)#payment)#id ))
+           ((response#sendPayment)#payment |> unwrap_user_command)#id ))
 
 let delegate_stake_graphql =
   let open Command.Param in
@@ -532,7 +540,145 @@ let delegate_stake_graphql =
              graphql_endpoint
          in
          printf "Dispatched stake delegation with ID %s\n"
-           ((response#sendDelegation)#delegation)#id ))
+           ((response#sendDelegation)#delegation |> unwrap_user_command)#id ))
+
+let create_new_token_graphql =
+  let open Command.Param in
+  let open Cli_lib.Arg_type in
+  let receiver_flag =
+    flag "receiver" ~doc:"PUBLICKEY Public key to create the new token for"
+      (optional public_key_compressed)
+  in
+  let args = Args.zip2 Cli_lib.Flag.user_command_common receiver_flag in
+  Command.async ~summary:"Create a new token"
+    (Cli_lib.Background_daemon.graphql_init args
+       ~f:(fun graphql_endpoint
+          ({Cli_lib.Flag.sender; fee; nonce; memo}, receiver)
+          ->
+         let receiver = Option.value ~default:sender receiver in
+         let%map response =
+           Graphql_client.(
+             Graphql_client.query_exn
+               (Graphql_queries.Send_create_token.make
+                  ~sender:(Encoders.public_key sender)
+                  ~receiver:(Encoders.public_key receiver)
+                  ~fee:(Encoders.fee fee)
+                  ?nonce:(Option.map nonce ~f:Encoders.nonce)
+                  ?memo ()))
+             graphql_endpoint
+         in
+         printf "Dispatched create new token command with TRANSACTION_ID %s\n"
+           ((response#createToken)#createNewToken)#id ))
+
+let create_new_account_graphql =
+  let open Command.Param in
+  let open Cli_lib.Arg_type in
+  let receiver_flag =
+    flag "receiver" ~doc:"PUBLICKEY Public key to create the new account for"
+      (required public_key_compressed)
+  in
+  let token_owner_flag =
+    flag "token-owner" ~doc:"PUBLICKEY Public key for the owner of the token"
+      (optional public_key_compressed)
+  in
+  let token_flag =
+    flag "token" ~doc:"TOKEN_ID The ID of the token to create the account for"
+      (required token_id)
+  in
+  let args =
+    Args.zip4 Cli_lib.Flag.user_command_common receiver_flag token_owner_flag
+      token_flag
+  in
+  Command.async ~summary:"Create a new account for a token"
+    (Cli_lib.Background_daemon.graphql_init args
+       ~f:(fun graphql_endpoint
+          ( {Cli_lib.Flag.sender; fee; nonce; memo}
+          , receiver
+          , token_owner
+          , token )
+          ->
+         let%bind token_owner =
+           match token_owner with
+           | Some token_owner ->
+               Deferred.return token_owner
+           | None when Token_id.(equal default) token ->
+               (* NOTE: Doesn't matter who we say the owner is for the default
+                  token, arbitrarily choose the receiver.
+               *)
+               Deferred.return receiver
+           | None -> (
+               let%map token_owner =
+                 Graphql_client.(
+                   query_exn
+                     (Graphql_queries.Get_token_owner.make
+                        ~token:(Encoders.token token) ()))
+                   graphql_endpoint
+               in
+               match token_owner#tokenOwner with
+               | Some token_owner ->
+                   Graphql_client.Decoders.public_key token_owner
+               | None ->
+                   failwith
+                     "Unknown token: Cannot find the owner for the given token"
+               )
+         in
+         let%map response =
+           Graphql_client.(
+             Graphql_client.query_exn
+               (Graphql_queries.Send_create_token_account.make
+                  ~sender:(Encoders.public_key sender)
+                  ~receiver:(Encoders.public_key receiver)
+                  ~tokenOwner:(Encoders.public_key token_owner)
+                  ~token:(Encoders.token token) ~fee:(Encoders.fee fee)
+                  ?nonce:(Option.map nonce ~f:Encoders.nonce)
+                  ?memo ()))
+             graphql_endpoint
+         in
+         printf
+           "Dispatched create new token account command with TRANSACTION_ID %s\n"
+           ((response#createTokenAccount)#createNewTokenAccount)#id ))
+
+let mint_tokens_graphql =
+  let open Command.Param in
+  let open Cli_lib.Arg_type in
+  let receiver_flag =
+    flag "receiver"
+      ~doc:
+        "PUBLICKEY Public key of the account to create new tokens in \
+         (defaults to the sender)"
+      (optional public_key_compressed)
+  in
+  let token_flag =
+    flag "token" ~doc:"TOKEN_ID The ID of the token to mint"
+      (required token_id)
+  in
+  let amount_flag =
+    flag "amount" ~doc:"VALUE Number of new tokens to create"
+      (required txn_amount)
+  in
+  let args =
+    Args.zip4 Cli_lib.Flag.user_command_common receiver_flag token_flag
+      amount_flag
+  in
+  Command.async ~summary:"Mint more of a token owned by the command's sender"
+    (Cli_lib.Background_daemon.graphql_init args
+       ~f:(fun graphql_endpoint
+          ({Cli_lib.Flag.sender; fee; nonce; memo}, receiver, token, amount)
+          ->
+         let%map response =
+           Graphql_client.(
+             Graphql_client.query_exn
+               (Graphql_queries.Send_mint_tokens.make
+                  ~sender:(Encoders.public_key sender)
+                  ?receiver:(Option.map ~f:Encoders.public_key receiver)
+                  ~token:(Encoders.token token)
+                  ~amount:(Encoders.amount amount) ~fee:(Encoders.fee fee)
+                  ?nonce:(Option.map nonce ~f:Encoders.nonce)
+                  ?memo ()))
+             graphql_endpoint
+         in
+         printf "Dispatched mint token command with TRANSACTION_ID %s\n"
+           ((response#mintTokens)#mintTokens)#id ))
 
 let cancel_transaction_graphql =
   let txn_id_flag =
@@ -546,13 +692,8 @@ let cancel_transaction_graphql =
        fee larger than the cancelled transaction."
     (Cli_lib.Background_daemon.graphql_init txn_id_flag
        ~f:(fun graphql_endpoint user_command ->
-         let receiver =
-           user_command |> User_command.payload |> User_command.Payload.body
-           |> User_command.Payload.Body.receiver
-         in
-         let receiver_pk = Account_id.public_key receiver in
-         let cancel_sender = User_command.fee_payer user_command in
-         let cancel_sender_pk = Account_id.public_key cancel_sender in
+         let receiver_pk = User_command.receiver_pk user_command in
+         let cancel_sender_pk = User_command.fee_payer_pk user_command in
          let open Deferred.Let_syntax in
          let%bind nonce_response =
            let open Graphql_client.Encoders in
@@ -604,7 +745,7 @@ let cancel_transaction_graphql =
            Graphql_client.query_exn cancel_query graphql_endpoint
          in
          printf "🛑 Cancelled transaction! Cancel ID: %s\n"
-           ((cancel_response#sendPayment)#payment)#id ))
+           ((cancel_response#sendPayment)#payment |> unwrap_user_command)#id ))
 
 let get_transaction_status =
   Command.async ~summary:"Get the status of a transaction"
@@ -689,7 +830,7 @@ let constraint_system_digests =
     (Command.Param.return (fun () ->
          let all =
            Transaction_snark.constraint_system_digests ()
-           @ Blockchain_snark.Blockchain_transition.constraint_system_digests
+           @ Blockchain_snark.Blockchain_snark_state.constraint_system_digests
                ()
          in
          let all =
@@ -744,9 +885,7 @@ let pooled_user_commands =
       anon @@ maybe @@ ("public-key" %: Cli_lib.Arg_type.public_key_compressed))
   in
   Command.async
-    ~summary:
-      "Retrieve all the user commands submitted by the current daemon that \
-       are pending inclusion"
+    ~summary:"Retrieve all the user commands that are pending inclusion"
     (Cli_lib.Background_daemon.graphql_init public_key_flag
        ~f:(fun graphql_endpoint maybe_public_key ->
          let public_key =
@@ -759,9 +898,13 @@ let pooled_user_commands =
          let%map response =
            Graphql_client.query_exn graphql graphql_endpoint
          in
-         let json_response : Yojson.Safe.json =
+         let json_response : Yojson.Safe.t =
            `List
-             ( List.map ~f:Graphql_client.User_command.to_yojson
+             ( List.map
+                 ~f:
+                   (Fn.compose Graphql_client.User_command.to_yojson
+                      (Fn.compose Graphql_client.User_command.of_obj
+                         unwrap_user_command))
              @@ Array.to_list response#pooledUserCommands )
          in
          print_string (Yojson.Safe.to_string json_response) ))
@@ -1193,8 +1336,7 @@ let generate_libp2p_keypair =
               in
               printf "libp2p keypair:\n%s\n" (Coda_net2.Keypair.to_string me)
           | Error e ->
-              Logger.fatal logger "failed to generate libp2p keypair: $error"
-                ~module_:__MODULE__ ~location:__LOC__
+              [%log fatal] "failed to generate libp2p keypair: $error"
                 ~metadata:[("error", `String (Error.to_string_hum e))] ;
               exit 20 )))
 
@@ -1254,6 +1396,74 @@ let trustlist_list =
              eprintf "Unknown error doing daemon RPC: %s"
                (Error.to_string_hum e) ))
 
+let compile_time_constants =
+  Command.async
+    ~summary:"Print a JSON map of the compile-time consensus parameters"
+    (Command.Param.return (fun () ->
+         let home = Core.Sys.home_directory () in
+         let conf_dir = home ^/ Cli_lib.Default.conf_dir_name in
+         let genesis_dir =
+           let home = Core.Sys.home_directory () in
+           home ^/ Cli_lib.Default.conf_dir_name
+         in
+         let config_file =
+           match Sys.getenv "CODA_CONFIG_FILE" with
+           | Some config_file ->
+               config_file
+           | None ->
+               conf_dir ^/ "daemon.json"
+         in
+         let open Async in
+         let%map ({consensus_constants; _} as precomputed_values), _ =
+           config_file |> Genesis_ledger_helper.load_config_json
+           >>| Or_error.ok
+           >>| Option.value ~default:(`Assoc [])
+           >>| Runtime_config.of_yojson >>| Result.ok
+           >>| Option.value ~default:Runtime_config.default
+           >>= Genesis_ledger_helper.init_from_config_file ~genesis_dir
+                 ~logger:(Logger.null ()) ~may_generate:false ~proof_level:None
+           >>| Or_error.ok_exn
+         in
+         let all_constants =
+           `Assoc
+             [ ( "genesis_state_timestamp"
+               , `String
+                   ( Block_time.to_time
+                       consensus_constants.genesis_state_timestamp
+                   |> Core.Time.to_string_iso8601_basic
+                        ~zone:Core.Time.Zone.utc ) )
+             ; ("k", `Int (Unsigned.UInt32.to_int consensus_constants.k))
+             ; ( "coinbase"
+               , `String
+                   (Currency.Amount.to_formatted_string
+                      precomputed_values.constraint_constants.coinbase_amount)
+               )
+             ; ( "block_window_duration_ms"
+               , `Int
+                   precomputed_values.constraint_constants
+                     .block_window_duration_ms )
+             ; ( "delta"
+               , `Int (Unsigned.UInt32.to_int consensus_constants.delta) )
+             ; ("c", `Int (Unsigned.UInt32.to_int consensus_constants.c))
+             ; ( "sub_windows_per_window"
+               , `Int
+                   (Unsigned.UInt32.to_int
+                      consensus_constants.sub_windows_per_window) )
+             ; ( "slots_per_sub_window"
+               , `Int
+                   (Unsigned.UInt32.to_int
+                      consensus_constants.slots_per_sub_window) )
+             ; ( "slots_per_window"
+               , `Int
+                   (Unsigned.UInt32.to_int consensus_constants.slots_per_window)
+               )
+             ; ( "slots_per_epoch"
+               , `Int
+                   (Unsigned.UInt32.to_int consensus_constants.slots_per_epoch)
+               ) ]
+         in
+         Core.printf "%s\n%!" (Yojson.Safe.to_string all_constants) ))
+
 let telemetry =
   let open Command.Param in
   let open Deferred.Let_syntax in
@@ -1270,7 +1480,7 @@ let telemetry =
     flag "show-errors" no_arg ~doc:"Include error responses in output"
   in
   let flags = Args.zip3 daemon_peers_flag peer_ids_flag show_errors_flag in
-  Command.async ~summary:"Get the trust status associated with an IP address"
+  Command.async ~summary:"Get telemetry data for a set of peers"
     (Cli_lib.Background_daemon.rpc_init flags
        ~f:(fun port (daemon_peers, peer_ids, show_errors) ->
          if
@@ -1364,6 +1574,9 @@ let client =
     [ ("get-balance", get_balance_graphql)
     ; ("send-payment", send_payment_graphql)
     ; ("delegate-stake", delegate_stake_graphql)
+    ; ("create-token", create_new_token_graphql)
+    ; ("create-token-account", create_new_account_graphql)
+    ; ("mint-tokens", mint_tokens_graphql)
     ; ("cancel-transaction", cancel_transaction_graphql)
     ; ("set-staking", set_staking_graphql)
     ; ("set-snark-worker", set_snark_worker)
@@ -1399,6 +1612,7 @@ let advanced =
     ; ("snark-pool-list", snark_pool_list)
     ; ("pending-snark-work", pending_snark_work)
     ; ("generate-libp2p-keypair", generate_libp2p_keypair)
+    ; ("compile-time-constants", compile_time_constants)
     ; ("telemetry", telemetry)
     ; ("visualization", Visualization.command_group)
     ; ("generate-receipt", generate_receipt)

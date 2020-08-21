@@ -1,18 +1,30 @@
+module Postgres = {
+  type pool;
+  type connectionString = {connectionString: string};
+  type dbResult = {rows: array(Js.Json.t)};
+
+  [@bs.module "pg"] [@bs.new]
+  external makePool: connectionString => pool = "Pool";
+
+  [@bs.send]
+  external query:
+    (pool, string, (~error: Js.Nullable.t(string), ~res: dbResult) => unit) =>
+    unit =
+    "query";
+
+  [@bs.send] external endPool: pool => unit = "end";
+};
+
 module GoogleSheets = {
   type client;
   type sheets;
   type token = Js.Json.t;
+  type cellData;
+  type sheetsUploadData = {values: array(array(string))};
+  type sheetsData = {values: array(array(cellData))};
+  type res = {data: sheetsData};
 
-  type clientConfig = {
-    clientId: string,
-    clientSecret: string,
-    redirectURI: string,
-  };
-
-  type authUrlConfig = {
-    access_type: string,
-    scope: array(string),
-  };
+  type authConfig = {scopes: array(string)};
 
   type sheetsConfig = {
     version: string,
@@ -22,35 +34,27 @@ module GoogleSheets = {
   type sheetsQuery = {
     spreadsheetId: string,
     range: string,
+    valueRenderOption: string,
+  };
+
+  type sheetsUpdate = {
+    spreadsheetId: string,
+    range: string,
+    valueInputOption: string,
+    resource: sheetsUploadData,
   };
 
   [@bs.scope ("google", "auth")] [@bs.new] [@bs.module "googleapis"]
-  external oAuth2:
-    (~clientId: string, ~clientSecret: string, ~redirectURI: string) => client =
-    "OAuth2";
+  external googleAuth: authConfig => client = "GoogleAuth";
 
   [@bs.scope "google"] [@bs.module "googleapis"]
   external sheets: sheetsConfig => sheets = "sheets";
 
   [@bs.send]
-  external generateAuthUrl: (client, authUrlConfig) => string =
-    "generateAuthUrl";
+  external getClient:
+    (client, (~error: Js.Nullable.t(string), ~token: token) => unit) => unit =
+    "getClient";
 
-  [@bs.send]
-  external setCredentials: (client, token) => unit = "setCredentials";
-
-  [@bs.send]
-  external getToken:
-    (
-      client,
-      string,
-      (~error: Js.Nullable.t(string), ~token: token) => unit
-    ) =>
-    unit =
-    "getToken";
-
-  type data = {values: array(array(string))};
-  type res = {data};
   [@bs.scope ("spreadsheets", "values")] [@bs.send]
   external get:
     (
@@ -60,19 +64,14 @@ module GoogleSheets = {
     ) =>
     unit =
     "get";
-};
 
-module Readline = {
-  type interface;
-
-  [@bs.deriving abstract]
-  type interfaceOptions = {input: in_channel};
-
-  [@bs.module "readline"]
-  external createInterface: interfaceOptions => interface = "createInterface";
-
-  [@bs.send]
-  external question: (interface, string, string => unit) => unit = "question";
-
-  [@bs.send] external close: interface => unit = "close";
+  [@bs.scope ("spreadsheets", "values")] [@bs.send]
+  external update:
+    (
+      sheets,
+      sheetsUpdate,
+      (~error: Js.Nullable.t(string), ~res: res) => unit
+    ) =>
+    unit =
+    "update";
 };

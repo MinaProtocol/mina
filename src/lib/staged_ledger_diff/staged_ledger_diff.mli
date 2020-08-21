@@ -64,7 +64,8 @@ module Pre_diff_one : sig
 end
 
 module Pre_diff_with_at_most_two_coinbase : sig
-  type t = (Transaction_snark_work.t, User_command.t) Pre_diff_two.t
+  type t =
+    (Transaction_snark_work.t, User_command.t With_status.t) Pre_diff_two.t
   [@@deriving sexp, to_yojson]
 
   module Stable :
@@ -77,7 +78,8 @@ module Pre_diff_with_at_most_two_coinbase : sig
 end
 
 module Pre_diff_with_at_most_one_coinbase : sig
-  type t = (Transaction_snark_work.t, User_command.t) Pre_diff_one.t
+  type t =
+    (Transaction_snark_work.t, User_command.t With_status.t) Pre_diff_one.t
   [@@deriving sexp, to_yojson]
 
   module Stable :
@@ -127,13 +129,13 @@ module Stable :
 module With_valid_signatures_and_proofs : sig
   type pre_diff_with_at_most_two_coinbase =
     ( Transaction_snark_work.Checked.t
-    , User_command.With_valid_signature.t )
+    , User_command.With_valid_signature.t With_status.t )
     Pre_diff_two.t
   [@@deriving sexp, to_yojson]
 
   type pre_diff_with_at_most_one_coinbase =
     ( Transaction_snark_work.Checked.t
-    , User_command.With_valid_signature.t )
+    , User_command.With_valid_signature.t With_status.t )
     Pre_diff_one.t
   [@@deriving sexp, to_yojson]
 
@@ -148,19 +150,20 @@ module With_valid_signatures_and_proofs : sig
     ; coinbase_receiver: Public_key.Compressed.t }
   [@@deriving sexp, to_yojson]
 
-  val user_commands : t -> User_command.With_valid_signature.t list
+  val user_commands :
+    t -> User_command.With_valid_signature.t With_status.t list
 end
 
 module With_valid_signatures : sig
   type pre_diff_with_at_most_two_coinbase =
     ( Transaction_snark_work.t
-    , User_command.With_valid_signature.t )
+    , User_command.With_valid_signature.t With_status.t )
     Pre_diff_two.t
   [@@deriving sexp, to_yojson]
 
   type pre_diff_with_at_most_one_coinbase =
     ( Transaction_snark_work.t
-    , User_command.With_valid_signature.t )
+    , User_command.With_valid_signature.t With_status.t )
     Pre_diff_one.t
   [@@deriving sexp, to_yojson]
 
@@ -182,12 +185,15 @@ val forget_proof_checks :
 val validate_user_commands :
      t
   -> check:(User_command.t -> User_command.With_valid_signature.t option)
-  -> (With_valid_signatures.t, User_command.t) result
+  -> (With_valid_signatures.t, User_command.t With_status.t) result
 
 val forget : With_valid_signatures_and_proofs.t -> t
 
-val user_commands : t -> User_command.t list
+val user_commands : t -> User_command.t With_status.t list
 
 val completed_works : t -> Transaction_snark_work.t list
 
-val coinbase : t -> Currency.Amount.t
+val coinbase :
+     constraint_constants:Genesis_constants.Constraint_constants.t
+  -> t
+  -> Currency.Amount.t

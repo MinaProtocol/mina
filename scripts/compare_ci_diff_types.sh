@@ -5,13 +5,15 @@ if [ ! "$CI" = "true" ] || [ ! -f /.dockerenv ]; then
     exit 1
 fi
 
+set -e
+
 # cleanup if needed
 
 git clean -dfx
 rm -rf base
 
-# build run_ppx_coda, then run Python script to compare versioned types in a pull request
+# build print_versioned_types, then run Python script to compare versioned types in a pull request
 
 source ~/.profile && \
-    (dune build --profile=print_versioned_types src/lib/ppx_coda/run_ppx_coda.exe) && \
-    ./scripts/compare_pr_diff_types.py ${CIRCLE_PULL_REQUEST}
+    (dune build --profile=dev src/external/ppx_version/src/print_versioned_types.exe) && \
+    ./scripts/compare_pr_diff_types.py ${BASE_BRANCH_NAME:-develop}

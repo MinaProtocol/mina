@@ -4,6 +4,8 @@ open Async
 module Git_sha = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t = string [@@deriving sexp, to_yojson, eq]
 
@@ -261,6 +263,7 @@ module Status = struct
       let ms_to_string i =
         float_of_int i |> Time.Span.of_ms |> Time.Span.to_string
       in
+      (* Time.to_string is safe here because this is for display. *)
       let time_to_string = Fn.compose Time.to_string Block_time.to_time in
       let render conf =
         let fmt_field name op field = (name, op (Field.get field conf)) in

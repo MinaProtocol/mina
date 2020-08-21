@@ -13,5 +13,6 @@
   (preprocessor_deps ../../../../config.mlh)
   (preprocess (pps
     ppx_coda
+    ppx_version
     ppx_optcomp ppx_bin_prot ppx_let
     ppx_custom_printf)))

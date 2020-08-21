@@ -1,5 +1,5 @@
 (library
   (name participating_state)
   (public_name participating_state)
-  (preprocess (pps ppx_coda))
+  (preprocess (pps ppx_version))
   (libraries async_kernel core_kernel))

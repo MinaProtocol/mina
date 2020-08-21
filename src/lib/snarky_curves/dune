@@ -1,9 +1,9 @@
 (library
   (name snarky_curves)
   (public_name snarky_curves)
-  (preprocess (pps ppx_coda ppx_snarky ppx_jane ppx_deriving.eq))
+  (preprocess (pps ppx_version ppx_snarky ppx_jane ppx_deriving.eq))
   (libraries
     snarky_field_extensions
-    snarky
+    snarky.backendless
     snarkette
     core_kernel ))

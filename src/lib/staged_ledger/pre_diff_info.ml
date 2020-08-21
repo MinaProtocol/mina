@@ -17,8 +17,9 @@ module type S = sig
   end
 
   val get :
-       Staged_ledger_diff.t
-    -> ( Transaction.t list
+       constraint_constants:Genesis_constants.Constraint_constants.t
+    -> Staged_ledger_diff.t
+    -> ( Transaction.t With_status.t list
          * Transaction_snark_work.t list
          * int
          * Currency.Amount.t list
@@ -26,8 +27,9 @@ module type S = sig
        result
 
   val get_unchecked :
-       Staged_ledger_diff.With_valid_signatures_and_proofs.t
-    -> ( Transaction.t list
+       constraint_constants:Genesis_constants.Constraint_constants.t
+    -> Staged_ledger_diff.With_valid_signatures_and_proofs.t
+    -> ( Transaction.t With_status.t list
          * Transaction_snark_work.t list
          * int
          * Currency.Amount.t list
@@ -35,7 +37,9 @@ module type S = sig
        result
 
   val get_transactions :
-    Staged_ledger_diff.t -> (Transaction.t list, Error.t) result
+       constraint_constants:Genesis_constants.Constraint_constants.t
+    -> Staged_ledger_diff.t
+    -> (Transaction.t With_status.t list, Error.t) result
 end
 
 module Error = struct
@@ -65,7 +69,7 @@ module Error = struct
 end
 
 type t =
-  { transactions: Transaction.t list
+  { transactions: Transaction.t With_status.t list
   ; work: Transaction_snark_work.t list
   ; user_commands_count: int
   ; coinbases: Currency.Amount.t list }
@@ -90,9 +94,11 @@ type t =
     example, when there are three slots and maximum number of provers), in which case,
     we simply add one coinbase as part of the second prediff.
   *)
-let create_coinbase coinbase_parts ~(receiver : Public_key.Compressed.t) =
+let create_coinbase
+    ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+    coinbase_parts ~(receiver : Public_key.Compressed.t) =
   let open Result.Let_syntax in
-  let coinbase = Coda_compile_config.coinbase in
+  let coinbase = constraint_constants.coinbase_amount in
   let coinbase_or_error = function
     | Ok x ->
         Ok x
@@ -139,12 +145,12 @@ let create_coinbase coinbase_parts ~(receiver : Public_key.Compressed.t) =
       [cb]
   | `Two None ->
       two_parts
-        (Currency.Amount.of_fee Coda_compile_config.account_creation_fee)
+        (Currency.Amount.of_fee constraint_constants.account_creation_fee)
         None None
   | `Two (Some (({Coinbase.Fee_transfer.fee; _} as ft1), ft2)) ->
       let%bind amount =
         let%map fee =
-          Currency.Fee.add Coda_compile_config.account_creation_fee fee
+          Currency.Fee.add constraint_constants.account_creation_fee fee
           |> Option.value_map
                ~default:
                  (Error
@@ -153,7 +159,7 @@ let create_coinbase coinbase_parts ~(receiver : Public_key.Compressed.t) =
                           !"Overflow when trying to add account_creation_fee \
                             %{sexp: Currency.Fee.t} to a fee transfer %{sexp: \
                             Currency.Fee.t}"
-                          Coda_compile_config.account_creation_fee fee)))
+                          constraint_constants.account_creation_fee fee)))
                ~f:(fun v -> Ok v)
         in
         Currency.Amount.of_fee fee
@@ -173,11 +179,13 @@ let sum_fees xs ~f =
 let to_staged_ledger_or_error =
   Result.map_error ~f:(fun error -> Error.Unexpected error)
 
-let fee_remainder (user_commands : User_command.With_valid_signature.t list)
+let fee_remainder
+    (user_commands : User_command.With_valid_signature.t With_status.t list)
     completed_works coinbase_fee =
   let open Result.Let_syntax in
   let%bind budget =
-    sum_fees user_commands ~f:(fun t -> User_command.fee (t :> User_command.t))
+    sum_fees user_commands ~f:(fun {data= t; _} ->
+        User_command.fee (t :> User_command.t) )
     |> to_staged_ledger_or_error
   in
   let%bind work_fee =
@@ -223,15 +231,20 @@ let create_fee_transfers completed_works delta public_key coinbase_fts =
               else Public_key.Compressed.Map.remove accum receiver_pk )
       (* TODO: This creates a weird incentive to have a small public_key *)
       |> Map.to_alist ~key_order:`Increasing
-      |> One_or_two.group_list )
-  |> to_staged_ledger_or_error
+      |> List.map ~f:(fun (receiver_pk, fee) ->
+             Fee_transfer.Single.create ~receiver_pk ~fee
+               ~fee_token:Token_id.default )
+      |> One_or_two.group_list
+      |> List.map ~f:Fee_transfer.of_singles
+      |> Or_error.all )
+  |> Or_error.join |> to_staged_ledger_or_error
 
-let get_individual_info coinbase_parts ~receiver user_commands completed_works
-    =
+let get_individual_info ~constraint_constants coinbase_parts ~receiver
+    user_commands completed_works =
   let open Result.Let_syntax in
   let%bind coinbase_parts =
     O1trace.measure "create_coinbase" (fun () ->
-        create_coinbase coinbase_parts ~receiver )
+        create_coinbase ~constraint_constants coinbase_parts ~receiver )
   in
   let coinbase_fts =
     List.concat_map coinbase_parts ~f:(fun cb -> Option.to_list cb.fee_transfer)
@@ -250,9 +263,14 @@ let get_individual_info coinbase_parts ~receiver user_commands completed_works
     create_fee_transfers txn_works_others delta receiver coinbase_fts
   in
   let transactions =
-    List.map user_commands ~f:(fun t -> Transaction.User_command t)
-    @ List.map coinbase_parts ~f:(fun t -> Transaction.Coinbase t)
-    @ List.map fee_transfers ~f:(fun t -> Transaction.Fee_transfer t)
+    List.map user_commands
+      ~f:(With_status.map ~f:(fun t -> Transaction.User_command t))
+    @ List.map coinbase_parts ~f:(fun t ->
+          { With_status.data= Transaction.Coinbase t
+          ; status= Applied User_command_status.Auxiliary_data.empty } )
+    @ List.map fee_transfers ~f:(fun t ->
+          { With_status.data= Transaction.Fee_transfer t
+          ; status= Applied User_command_status.Auxiliary_data.empty } )
   in
   { transactions
   ; work= completed_works
@@ -279,7 +297,7 @@ let check_coinbase (diff : With_valid_signatures.diff) =
                 %{sexp:Coinbase.Fee_transfer.t At_most_one.t}"
               x y))
 
-let get' (t : With_valid_signatures.t) =
+let get' ~constraint_constants (t : With_valid_signatures.t) =
   let apply_pre_diff_with_at_most_two
       (t1 : With_valid_signatures.pre_diff_with_at_most_two_coinbase) =
     let coinbase_parts =
@@ -304,10 +322,12 @@ let get' (t : With_valid_signatures.t) =
   in
   let open Result.Let_syntax in
   let%bind () = check_coinbase t.diff in
-  let%bind p1 = apply_pre_diff_with_at_most_two (fst t.diff) in
+  let%bind p1 =
+    apply_pre_diff_with_at_most_two ~constraint_constants (fst t.diff)
+  in
   let%map p2 =
     Option.value_map
-      ~f:(fun d -> apply_pre_diff_with_at_most_one d)
+      ~f:(fun d -> apply_pre_diff_with_at_most_one ~constraint_constants d)
       (snd t.diff)
       ~default:
         (Ok {transactions= []; work= []; user_commands_count= 0; coinbases= []})
@@ -317,18 +337,19 @@ let get' (t : With_valid_signatures.t) =
   , p1.user_commands_count + p2.user_commands_count
   , p1.coinbases @ p2.coinbases )
 
-let get t =
+let get ~constraint_constants t =
   match validate_user_commands t ~check:User_command.check with
   | Ok diff ->
-      get' diff
+      get' ~constraint_constants diff
   | Error uc ->
-      Error (Error.Bad_signature uc)
+      Error (Error.Bad_signature uc.data)
 
-let get_unchecked (t : With_valid_signatures_and_proofs.t) =
+let get_unchecked ~constraint_constants
+    (t : With_valid_signatures_and_proofs.t) =
   let t = forget_proof_checks t in
-  get' t
+  get' ~constraint_constants t
 
-let get_transactions (sl_diff : t) =
+let get_transactions ~constraint_constants (sl_diff : t) =
   let open Result.Let_syntax in
-  let%map transactions, _, _, _ = get sl_diff in
+  let%map transactions, _, _, _ = get ~constraint_constants sl_diff in
   transactions

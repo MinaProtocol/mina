@@ -60,7 +60,7 @@ module type Shifted_intf = sig
 end
 
 module type Weierstrass_checked_intf = sig
-  module Impl : Snarky.Snark_intf.S
+  module Impl : Snarky_backendless.Snark_intf.S
 
   open Impl
 

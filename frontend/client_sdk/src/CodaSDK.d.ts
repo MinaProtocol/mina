@@ -71,7 +71,7 @@ export declare const signPayment: (payment: payment, key: keypair) => signed<pay
   * This type of transaction allows a user to delegate their
   * funds from one account to another for use in staking. The
   * account that is delegated to is then considered as having these
-  * funds when determininng whether it can produce a block in a given slot.
+  * funds when determining whether it can produce a block in a given slot.
   *
   * @param stakeDelegation - An object describing the stake delegation
   * @param key - The keypair used to sign the transaction

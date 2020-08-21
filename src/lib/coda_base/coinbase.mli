@@ -41,10 +41,12 @@ val create :
 
 val supply_increase : t -> Currency.Amount.t Or_error.t
 
-val fee_excess : t -> Currency.Fee.Signed.t Or_error.t
+val fee_excess : t -> Fee_excess.t Or_error.t
 
 module Gen : sig
-  val gen : t Quickcheck.Generator.t
+  val gen :
+       constraint_constants:Genesis_constants.Constraint_constants.t
+    -> t Quickcheck.Generator.t
 
   val with_random_receivers :
        keys:Signature_keypair.t array

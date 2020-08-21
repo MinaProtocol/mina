@@ -1,0 +1,5 @@
+(library
+  (name timeout_lib)
+  (public_name timeout_lib)
+  (libraries core async_kernel)
+  (preprocess (pps ppx_jane ppx_version)))

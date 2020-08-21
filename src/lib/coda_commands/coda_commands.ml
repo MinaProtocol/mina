@@ -18,7 +18,7 @@ let record_payment t (txn : User_command.t) account =
   let receipt_chain_database = Coda_lib.receipt_chain_database t in
   match Receipt_chain_database.add receipt_chain_database ~previous txn with
   | `Ok hash ->
-      Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+      [%log debug]
         ~metadata:
           [ ("user_command", User_command.to_yojson txn)
           ; ("receipt_chain_hash", Receipt.Chain_hash.to_yojson hash) ]
@@ -27,12 +27,12 @@ let record_payment t (txn : User_command.t) account =
          $receipt_chain_hash" ;
       hash
   | `Duplicate hash ->
-      Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+      [%log warn]
         ~metadata:[("user_command", User_command.to_yojson txn)]
         "Already sent transaction $user_command" ;
       hash
   | `Error_multiple_previous_receipts parent_hash ->
-      Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+      [%log fatal]
         ~metadata:
           [ ( "parent_receipt_chain_hash"
             , Receipt.Chain_hash.to_yojson parent_hash )
@@ -43,22 +43,6 @@ let record_payment t (txn : User_command.t) account =
          Receipt.Chain_hash is supposed to be collision resistant. This \
          collision should not happen." ;
       Core.exit 1
-
-let is_valid_user_command _t (txn : User_command.t) account_opt =
-  let remainder =
-    let open Option.Let_syntax in
-    let%bind account = account_opt
-    and cost =
-      let fee = txn.payload.common.fee in
-      match txn.payload.body with
-      | Stake_delegation (Set_delegate _) ->
-          Some (Currency.Amount.of_fee fee)
-      | Payment {amount; _} ->
-          Currency.Amount.add_fee amount fee
-    in
-    Currency.Balance.sub_amount account.Account.Poly.balance cost
-  in
-  Option.is_some remainder
 
 let get_account t (addr : Account_id.t) =
   let open Participating_state.Let_syntax in
@@ -143,9 +127,7 @@ let setup_and_submit_user_command t (user_command_input : User_command_input.t)
                 .to_yojson (snd failed_txn)
               |> Yojson.Safe.to_string )))
   | Ok ([txn], []) ->
-      Logger.info
-        (Coda_lib.top_level_logger t)
-        ~module_:__MODULE__ ~location:__LOC__
+      [%log' info (Coda_lib.top_level_logger t)]
         ~metadata:[("user_command", User_command.to_yojson txn)]
         "Scheduled payment $user_command" ;
       Ok (txn, record_payment t txn (Option.value_exn account_opt))
@@ -157,9 +139,7 @@ let setup_and_submit_user_command t (user_command_input : User_command_input.t)
 let setup_and_submit_user_commands t user_command_list =
   let open Participating_state.Let_syntax in
   let%map _is_active = Coda_lib.active_or_bootstrapping t in
-  Logger.warn
-    (Coda_lib.top_level_logger t)
-    ~module_:__MODULE__ ~location:__LOC__
+  [%log' warn (Coda_lib.top_level_logger t)]
     "batch-send-payments does not yet report errors"
     ~metadata:
       [("coda_command", `String "scheduling a batch of user transactions")] ;
@@ -214,13 +194,10 @@ type active_state_fields =
 let get_status ~flag t =
   let open Coda_lib.Config in
   let config = Coda_lib.config t in
-  let protocol_constants =
-    config.precomputed_values.genesis_constants.protocol
-  in
-  let consensus_constants =
-    Consensus.Constants.create
-      ~constraint_constants:config.constraint_constants ~protocol_constants
-  in
+  let precomputed_values = config.precomputed_values in
+  let protocol_constants = precomputed_values.genesis_constants.protocol in
+  let constraint_constants = precomputed_values.constraint_constants in
+  let consensus_constants = precomputed_values.consensus_constants in
   let uptime_secs =
     Time_ns.diff (Time_ns.now ()) start_time
     |> Time_ns.Span.to_sec |> Int.of_float
@@ -248,8 +225,7 @@ let get_status ~flag t =
       (Block_time.now time_controller)
   in
   let consensus_configuration =
-    Consensus.Configuration.t ~constraint_constants:config.constraint_constants
-      ~protocol_constants
+    Consensus.Configuration.t ~constraint_constants ~protocol_constants
   in
   let r = Perf_histograms.report in
   let histograms =
@@ -409,11 +385,10 @@ module For_tests = struct
       Coda_lib.external_transition_database coda
     in
     let user_commands =
-      List.concat_map
-        ~f:
-          (Fn.compose
-             Auxiliary_database.Filtered_external_transition.user_commands
-             With_hash.data)
+      List.concat_map ~f:(fun transition ->
+          transition |> With_hash.data
+          |> Auxiliary_database.Filtered_external_transition.user_commands
+          |> List.map ~f:With_hash.data )
       @@ Auxiliary_database.External_transition_database.get_all_values
            external_transition_database (Some account_id)
     in
