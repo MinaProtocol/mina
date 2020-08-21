@@ -234,6 +234,13 @@ jobs:
             - run:
                   name: Client SDK unit tests
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'eval `opam config env` && export PATH="$HOME/.cargo/bin:$PATH" && ./scripts/client_sdk_unit_tests.sh'
+            - run:
+                  name: Yarn deps
+                  command: cd frontend/client_sdk && yarn install
+            - run:
+                  name: Build And Test Client SDK
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; eval `opam config env` && cd frontend/client_sdk && yarn prepublishOnly'
+
     update-branch-protection:
         docker:
             - image: python:3
