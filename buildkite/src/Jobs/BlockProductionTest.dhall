@@ -18,6 +18,7 @@ let runTestExecutive =
            , "AWS_ACCESS_KEY_ID"
            , "AWS_SECRET_ACCESS_KEY"
            , "AWS_REGION"
+           , "BUILDKITE_BRANCH"
            ]) "bash buildkite/scripts/run-test.sh"
       , label = "Build and run test-executive"
       , key = "run-test-executive"
