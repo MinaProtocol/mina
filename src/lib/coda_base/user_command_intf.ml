@@ -10,7 +10,7 @@ open Core_kernel
 consensus_mechanism]
 
 open Coda_numbers
-open Snark_params
+open Snark_params.Tick
 
 [%%else]
 
