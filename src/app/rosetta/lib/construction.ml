@@ -1,6 +1,8 @@
 open Core_kernel
 open Async
+module Transaction' = Transaction
 open Models
+module Transaction = Transaction'
 module Public_key = Signature_lib.Public_key
 module User_command_payload = Coda_base.User_command_payload
 module User_command = Coda_base.User_command
@@ -277,11 +279,11 @@ module Payloads = struct
       in
       let random_oracle_input = User_command.to_input user_command_payload in
       let%map unsigned_transaction_string =
-        { Unsigned_transaction.random_oracle_input
+        { Transaction.Unsigned.random_oracle_input
         ; command= partial_user_command
         ; nonce= metadata.nonce }
-        |> Unsigned_transaction.render
-        |> Result.map ~f:Unsigned_transaction.Rendered.to_yojson
+        |> Transaction.Unsigned.render
+        |> Result.map ~f:Transaction.Unsigned.Rendered.to_yojson
         |> Result.map ~f:Yojson.Safe.to_string
         |> env.lift
       in
@@ -326,10 +328,10 @@ module Parse = struct
         match req.signed with
         | true ->
             let%map signed_transaction =
-              Unsigned_transaction.Signed.Rendered.of_yojson json
+              Transaction.Signed.Rendered.of_yojson json
               |> Result.map_error ~f:(fun e ->
                      Errors.create (`Json_parse (Some e)) )
-              |> Result.bind ~f:Unsigned_transaction.Signed.of_rendered
+              |> Result.bind ~f:Transaction.Signed.of_rendered
               |> env.lift
             in
             ( User_command_info.to_operations ~failure_status:None
@@ -337,10 +339,10 @@ module Parse = struct
             , signed_transaction.command.source )
         | false ->
             let%map unsigned_transaction =
-              Unsigned_transaction.Rendered.of_yojson json
+              Transaction.Unsigned.Rendered.of_yojson json
               |> Result.map_error ~f:(fun e ->
                      Errors.create (`Json_parse (Some e)) )
-              |> Result.bind ~f:Unsigned_transaction.of_rendered
+              |> Result.bind ~f:Transaction.Unsigned.of_rendered
               |> env.lift
             in
             ( User_command_info.to_operations ~failure_status:None
