@@ -227,6 +227,29 @@ module Coding = struct
       {field_elements= Array.of_list fields; bitstrings= [|bitstring|]}
     in
     Parser.run parser s
+
+  (** String of field as bits *)
+  let string_of_field xs =
+    List.chunks_of xs ~length:8
+    |> List.map ~f:(fun xs ->
+           let rec go i acc = function
+             | [] ->
+                 acc
+             | b :: bs ->
+                 go (i + 1) ((acc * 2) + if b then 1 else 0) bs
+           in
+           let pad = List.init (8 - List.length xs) ~f:(Fn.const false) in
+           let combined = xs @ pad in
+           assert (List.length combined = 8) ;
+           go 0 0 combined )
+    |> List.map ~f:Char.of_int_exn
+    |> String.of_char_list
+
+  (** Field of string as bits *)
+  let field_of_string s ~size_in_bits =
+    List.concat_map (String.to_list s) ~f:(bits_of_byte ~of_bool:Fn.id)
+    |> Fn.flip List.take size_in_bits
+    |> Result.return
 end
 
 let%test_module "random_oracle input" =
@@ -247,51 +270,31 @@ let%test_module "random_oracle input" =
       , { field_elements= Array.of_list field_elements
         ; bitstrings= Array.of_list bitstrings } )
 
-    let%test_unit "serialize/deserialize partial isomorphism 32byte fields" =
-      let size_in_bits = 255 in
-      (* Helpers for handling our custom fields *)
-      let string_of_field xs =
-        List.chunks_of xs ~length:8
-        |> List.map ~f:(fun xs ->
-               let rec go i acc = function
-                 | [] ->
-                     acc
-                 | b :: bs ->
-                     go (i + 1) ((acc * 2) + if b then 1 else 0) bs
-               in
-               let pad = List.init (8 - List.length xs) ~f:(Fn.const false) in
-               let combined = xs @ pad in
-               assert (List.length combined = 8) ;
-               go 0 0 combined )
-        |> List.map ~f:Char.of_int_exn
-        |> String.of_char_list
-      in
-      let field_of_string s ~size_in_bits =
-        List.concat_map (String.to_list s)
-          ~f:(Coding.bits_of_byte ~of_bool:Fn.id)
-        |> Fn.flip List.take size_in_bits
-        |> Result.return
-      in
-      (* First lets make sure our helpers form a partial isomorphism *)
+    let%test_unit "field/string partial isomorphism bitstrings" =
       Quickcheck.test ~trials:300
         Quickcheck.Generator.(list_with_length 255 bool)
         ~f:(fun input ->
-          let serialized = string_of_field input in
-          let deserialized = field_of_string serialized ~size_in_bits:255 in
+          let serialized = Coding.string_of_field input in
+          let deserialized =
+            Coding.field_of_string serialized ~size_in_bits:255
+          in
           [%test_eq: (bool list, unit) Result.t] (input |> Result.return)
-            deserialized ) ;
-      (* now let's check if we can fully serialize/deserialize roundtrip *)
+            deserialized )
+
+    let%test_unit "serialize/deserialize partial isomorphism 32byte fields" =
+      let size_in_bits = 255 in
       Quickcheck.test ~trials:3000 (gen_input ~size_in_bits ())
         ~f:(fun (_, input) ->
           let serialized =
-            Coding.serialize ~string_of_field ~to_bool:Fn.id ~of_bool:Fn.id
-              input
+            Coding.(
+              serialize ~string_of_field ~to_bool:Fn.id ~of_bool:Fn.id input)
           in
           let deserialized =
-            Coding.deserialize
-              (String.to_list serialized)
-              ~field_of_string:(field_of_string ~size_in_bits)
-              ~of_bool:Fn.id
+            Coding.(
+              deserialize
+                (String.to_list serialized)
+                ~field_of_string:(field_of_string ~size_in_bits)
+                ~of_bool:Fn.id)
           in
           let normalized t =
             { t with
@@ -319,7 +322,7 @@ let%test_module "random_oracle input" =
           let bitstring_bits =
             Array.fold ~init:bits input.field_elements ~f:(fun bits field ->
                 (* The next chunk of [size_in_bits] bits is for the field
-                       element.
+                         element.
                   *)
                 let field_bits, rest = List.split_n bits size_in_bits in
                 assert (field_bits = field) ;
@@ -349,7 +352,7 @@ let%test_module "random_oracle input" =
             Array.fold ~init:fields input.field_elements
               ~f:(fun fields input_field ->
                 (* The next field element should be the literal field element
-                               passed in.
+                                   passed in.
                     *)
                 match fields with
                 | [] ->
@@ -363,14 +366,14 @@ let%test_module "random_oracle input" =
           List.iteri bitstring_fields ~f:(fun i field_bits ->
               if i < final_field_idx then
                 (* This field should be densely packed, but should contain
-                     fewer bits than the maximum field element to ensure that it
-                     doesn't overflow, so we expect [size_in_bits - 1] bits for
-                     maximum safe density.
+                       fewer bits than the maximum field element to ensure that it
+                       doesn't overflow, so we expect [size_in_bits - 1] bits for
+                       maximum safe density.
                   *)
                 assert (List.length field_bits = size_in_bits - 1)
               else (
                 (* This field will be comprised of the remaining bits, up to a
-                     maximum of [size_in_bits - 1]. It should not be empty.
+                       maximum of [size_in_bits - 1]. It should not be empty.
                   *)
                 assert (not (List.is_empty field_bits)) ;
                 assert (List.length field_bits < size_in_bits) ) ) ;
@@ -404,7 +407,7 @@ let%test_module "random_oracle input" =
                    fields"
           in
           (* Check that the bits match between the input bitstring and the
-               remaining fields.
+                 remaining fields.
             *)
           go (Array.to_list input.bitstrings) bitstring_fields )
   end )
