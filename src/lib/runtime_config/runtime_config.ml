@@ -39,14 +39,24 @@ let dump_on_error yojson x =
 module Json_layout = struct
   module Accounts = struct
     module Single = struct
+      module Timed = struct
+        type t =
+          { initial_minimum_balance: Currency.Balance.t
+          ; cliff_time: Coda_numbers.Global_slot.t (*slot number*)
+          ; vesting_period: Coda_numbers.Global_slot.t (*slots*)
+          ; vesting_increment: Currency.Amount.t }
+        [@@deriving yojson, dhall_type]
+      end
+
       type t =
         { pk: (string option[@default None])
         ; sk: (string option[@default None])
         ; balance: Currency.Balance.t
-        ; delegate: (string option[@default None]) }
+        ; delegate: (string option[@default None])
+        ; timing: (Timed.t option[@default None]) }
       [@@deriving yojson, dhall_type]
 
-      let fields = [|"pk"; "sk"; "balance"; "delegate"|]
+      let fields = [|"pk"; "sk"; "balance"; "delegate"; "timing"|]
 
       let of_yojson json =
         dump_on_error json @@ of_yojson
@@ -194,11 +204,21 @@ end
 
 module Accounts = struct
   module Single = struct
+    module Timed = struct
+      type t = Json_layout.Accounts.Single.Timed.t =
+        { initial_minimum_balance: Currency.Balance.Stable.Latest.t
+        ; cliff_time: Coda_numbers.Global_slot.Stable.Latest.t
+        ; vesting_period: Coda_numbers.Global_slot.Stable.Latest.t
+        ; vesting_increment: Currency.Amount.Stable.Latest.t }
+      [@@deriving bin_io_unversioned]
+    end
+
     type t = Json_layout.Accounts.Single.t =
       { pk: string option
       ; sk: string option
       ; balance: Currency.Balance.Stable.Latest.t
-      ; delegate: string option }
+      ; delegate: string option
+      ; timing: Timed.t option }
     [@@deriving bin_io_unversioned]
 
     let to_json_layout : t -> Json_layout.Accounts.Single.t = Fn.id
@@ -218,7 +238,8 @@ module Accounts = struct
     { pk: string option
     ; sk: string option
     ; balance: Currency.Balance.t
-    ; delegate: string option }
+    ; delegate: string option
+    ; timing: Single.Timed.t option }
 
   type t = Single.t list [@@deriving bin_io_unversioned]
 

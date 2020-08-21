@@ -18,6 +18,7 @@ module Coda_numbers = Coda_numbers_nonconsensus.Coda_numbers
 module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 module Coda_compile_config =
   Coda_compile_config_nonconsensus.Coda_compile_config
+open Snark_params_nonconsensus
 
 [%%endif]
 
@@ -99,7 +100,8 @@ module Poly = struct
            , 'nonce
            , 'receipt_chain_hash
            , 'state_hash
-           , 'timing )
+           , 'timing
+           , 'snapp_opt )
            t =
         { public_key: 'pk
         ; token_id: 'tid
@@ -109,7 +111,8 @@ module Poly = struct
         ; receipt_chain_hash: 'receipt_chain_hash
         ; delegate: 'pk
         ; voting_for: 'state_hash
-        ; timing: 'timing }
+        ; timing: 'timing
+        ; snapp: 'snapp_opt }
       [@@deriving sexp, eq, compare, hash, yojson, fields, hlist]
     end
   end]
@@ -131,222 +134,19 @@ module Identifier = Account_id
 
 type key = Key.t [@@deriving sexp, eq, hash, compare, yojson]
 
-module Timing = struct
-  module Poly = struct
-    [%%versioned
-    module Stable = struct
-      module V1 = struct
-        type ('slot, 'balance, 'amount) t =
-          | Untimed
-          | Timed of
-              { initial_minimum_balance: 'balance
-              ; cliff_time: 'slot
-              ; vesting_period: 'slot
-              ; vesting_increment: 'amount }
-        [@@deriving sexp, eq, hash, compare, yojson]
-      end
-    end]
-  end
+module Timing = Account_timing
 
+module Snapp_account = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t =
-        ( Global_slot.Stable.V1.t
-        , Balance.Stable.V1.t
-        , Amount.Stable.V1.t )
-        Poly.Stable.V1.t
-      [@@deriving sexp, eq, hash, compare, yojson]
+      type t = unit [@@deriving sexp, eq, hash, compare, yojson]
 
       let to_latest = Fn.id
     end
   end]
 
-  type ('slot, 'balance, 'amount) tt = ('slot, 'balance, 'amount) Poly.t =
-    | Untimed
-    | Timed of
-        { initial_minimum_balance: 'balance
-        ; cliff_time: 'slot
-        ; vesting_period: 'slot
-        ; vesting_increment: 'amount }
-  [@@deriving sexp, eq, hash, compare, yojson]
-
-  module As_record = struct
-    type ('bool, 'slot, 'balance, 'amount) t =
-      { is_timed: 'bool
-      ; initial_minimum_balance: 'balance
-      ; cliff_time: 'slot
-      ; vesting_period: 'slot
-      ; vesting_increment: 'amount }
-    [@@deriving hlist]
-  end
-
-  (* convert sum type to record format, useful for to_bits and typ *)
-  let to_record t =
-    match t with
-    | Untimed ->
-        let slot_unused = Global_slot.zero in
-        let slot_one = Global_slot.(succ zero) in
-        let balance_unused = Balance.zero in
-        let amount_unused = Amount.zero in
-        As_record.
-          { is_timed= false
-          ; initial_minimum_balance= balance_unused
-          ; cliff_time= slot_unused
-          ; vesting_period= slot_one (* avoid division by zero *)
-          ; vesting_increment= amount_unused }
-    | Timed
-        {initial_minimum_balance; cliff_time; vesting_period; vesting_increment}
-      ->
-        As_record.
-          { is_timed= true
-          ; initial_minimum_balance
-          ; cliff_time
-          ; vesting_period
-          ; vesting_increment }
-
-  let to_bits t =
-    let As_record.
-          { is_timed
-          ; initial_minimum_balance
-          ; cliff_time
-          ; vesting_period
-          ; vesting_increment } =
-      to_record t
-    in
-    is_timed
-    :: ( Balance.to_bits initial_minimum_balance
-       @ Global_slot.to_bits cliff_time
-       @ Global_slot.to_bits vesting_period
-       @ Amount.to_bits vesting_increment )
-
-  [%%ifdef
-  consensus_mechanism]
-
-  type var =
-    (Boolean.var, Global_slot.Checked.var, Balance.var, Amount.var) As_record.t
-
-  let var_to_bits
-      As_record.
-        { is_timed
-        ; initial_minimum_balance
-        ; cliff_time
-        ; vesting_period
-        ; vesting_increment } =
-    let open Bitstring_lib.Bitstring.Lsb_first in
-    let initial_minimum_balance =
-      to_list @@ Balance.var_to_bits initial_minimum_balance
-    in
-    let cliff_time = to_list @@ Global_slot.var_to_bits cliff_time in
-    let vesting_period = to_list @@ Global_slot.var_to_bits vesting_period in
-    let vesting_increment = to_list @@ Amount.var_to_bits vesting_increment in
-    of_list
-      ( is_timed
-      :: ( initial_minimum_balance @ cliff_time @ vesting_period
-         @ vesting_increment ) )
-
-  let var_of_t (t : t) : var =
-    let As_record.
-          { is_timed
-          ; initial_minimum_balance
-          ; cliff_time
-          ; vesting_period
-          ; vesting_increment } =
-      to_record t
-    in
-    As_record.
-      { is_timed= Boolean.var_of_value is_timed
-      ; initial_minimum_balance= Balance.var_of_t initial_minimum_balance
-      ; cliff_time= Global_slot.Checked.constant cliff_time
-      ; vesting_period= Global_slot.Checked.constant vesting_period
-      ; vesting_increment= Amount.var_of_t vesting_increment }
-
-  let untimed_var = var_of_t Untimed
-
-  let typ : (var, t) Typ.t =
-    let spec =
-      let open Data_spec in
-      [Boolean.typ; Balance.typ; Global_slot.typ; Global_slot.typ; Amount.typ]
-    in
-    (* because we represent the types t (a sum type) and var (a record) differently,
-       we can't use the trick, used elsewhere, of polymorphic to_hlist and of_hlist
-       functions to handle both types
-    *)
-    let value_of_hlist :
-           ( unit
-           ,    Boolean.value
-             -> Balance.t
-             -> Global_slot.t
-             -> Global_slot.t
-             -> Amount.t
-             -> unit )
-           H_list.t
-        -> t =
-      let open H_list in
-      fun [ is_timed
-          ; initial_minimum_balance
-          ; cliff_time
-          ; vesting_period
-          ; vesting_increment ] ->
-        if is_timed then
-          Timed
-            { initial_minimum_balance
-            ; cliff_time
-            ; vesting_period
-            ; vesting_increment }
-        else Untimed
-    in
-    let value_to_hlist (t : t) =
-      let As_record.
-            { is_timed
-            ; initial_minimum_balance
-            ; cliff_time
-            ; vesting_period
-            ; vesting_increment } =
-        to_record t
-      in
-      H_list.
-        [ is_timed
-        ; initial_minimum_balance
-        ; cliff_time
-        ; vesting_period
-        ; vesting_increment ]
-    in
-    let var_of_hlist = As_record.of_hlist in
-    let var_to_hlist = As_record.to_hlist in
-    Typ.of_hlistable spec ~var_to_hlist ~var_of_hlist ~value_to_hlist
-      ~value_of_hlist
-
-  (* we can't use the generic if_ with the above typ, because Global_slot.typ doesn't work correctly with it
-     so we define a custom if_
-  *)
-  let if_ b ~(then_ : var) ~(else_ : var) =
-    let%bind is_timed =
-      Boolean.if_ b ~then_:then_.is_timed ~else_:else_.is_timed
-    in
-    let%bind initial_minimum_balance =
-      Balance.Checked.if_ b ~then_:then_.initial_minimum_balance
-        ~else_:else_.initial_minimum_balance
-    in
-    let%bind cliff_time =
-      Global_slot.Checked.if_ b ~then_:then_.cliff_time ~else_:else_.cliff_time
-    in
-    let%bind vesting_period =
-      Global_slot.Checked.if_ b ~then_:then_.vesting_period
-        ~else_:else_.vesting_period
-    in
-    let%map vesting_increment =
-      Amount.Checked.if_ b ~then_:then_.vesting_increment
-        ~else_:else_.vesting_increment
-    in
-    As_record.
-      { is_timed
-      ; initial_minimum_balance
-      ; cliff_time
-      ; vesting_period
-      ; vesting_increment }
-
-  [%%endif]
+  let to_input _ = assert false
 end
 
 [%%versioned
@@ -360,7 +160,8 @@ module Stable = struct
       , Nonce.Stable.V1.t
       , Receipt.Chain_hash.Stable.V1.t
       , State_hash.Stable.V1.t
-      , Timing.Stable.V1.t )
+      , Timing.Stable.V1.t
+      , Snapp_account.Stable.V1.t option )
       Poly.Stable.V1.t
     [@@deriving sexp, eq, hash, compare, yojson]
 
@@ -386,13 +187,14 @@ type value =
   , Nonce.t
   , Receipt.Chain_hash.t
   , State_hash.t
-  , Timing.t )
+  , Timing.t
+  , Snapp_account.t option )
   Poly.t
 [@@deriving sexp]
 
 let key_gen = Public_key.Compressed.gen
 
-let initialize account_id : t =
+let initialize ?snapp account_id : t =
   let public_key = Account_id.public_key account_id in
   let token_id = Account_id.token_id account_id in
   let delegate =
@@ -408,7 +210,15 @@ let initialize account_id : t =
   ; receipt_chain_hash= Receipt.Chain_hash.empty
   ; delegate
   ; voting_for= State_hash.dummy
-  ; timing= Timing.Untimed }
+  ; timing= Timing.Untimed
+  ; snapp }
+
+let hash_snapp_account_opt = function
+  | None ->
+      Field.zero
+  | Some a ->
+      Random_oracle.hash ~init:Hash_prefix_states.snapp_account
+        (Random_oracle.pack_input (Snapp_account.to_input a))
 
 let to_input (t : t) =
   let open Random_oracle.Input in
@@ -422,6 +232,7 @@ let to_input (t : t) =
     ~receipt_chain_hash:(f Receipt.Chain_hash.to_input)
     ~delegate:(f Public_key.Compressed.to_input)
     ~voting_for:(f State_hash.to_input) ~timing:(bits Timing.to_bits)
+    ~snapp:(f (Fn.compose field hash_snapp_account_opt))
   |> List.reduce_exn ~f:append
 
 let crypto_hash_prefix = Hash_prefix.account
@@ -441,7 +252,8 @@ type var =
   , Nonce.Checked.t
   , Receipt.Chain_hash.var
   , State_hash.var
-  , Timing.var )
+  , Timing.var
+  , Field.Var.t )
   Poly.t
 
 let identifier_of_var ({public_key; token_id; _} : var) =
@@ -458,7 +270,10 @@ let typ : (var, value) Typ.t =
       ; Receipt.Chain_hash.typ
       ; Public_key.Compressed.typ
       ; State_hash.typ
-      ; Timing.typ ]
+      ; Timing.typ
+      ; Typ.transport Field.typ ~there:hash_snapp_account_opt ~back:(fun fld ->
+            if Field.(equal zero) fld then None else failwith "unimplemented"
+        ) ]
   in
   Typ.of_hlistable spec ~var_to_hlist:Poly.to_hlist ~var_of_hlist:Poly.of_hlist
     ~value_to_hlist:Poly.to_hlist ~value_of_hlist:Poly.of_hlist
@@ -472,7 +287,8 @@ let var_of_t
      ; receipt_chain_hash
      ; delegate
      ; voting_for
-     ; timing } :
+     ; timing
+     ; snapp } :
       value) =
   { Poly.public_key= Public_key.Compressed.var_of_t public_key
   ; token_id= Token_id.var_of_t token_id
@@ -482,7 +298,8 @@ let var_of_t
   ; receipt_chain_hash= Receipt.Chain_hash.var_of_t receipt_chain_hash
   ; delegate= Public_key.Compressed.var_of_t delegate
   ; voting_for= State_hash.var_of_t voting_for
-  ; timing= Timing.var_of_t timing }
+  ; timing= Timing.var_of_t timing
+  ; snapp= Field.Var.constant (hash_snapp_account_opt snapp) }
 
 module Checked = struct
   let to_input (t : var) =
@@ -495,7 +312,7 @@ module Checked = struct
     in
     make_checked (fun () ->
         List.reduce_exn ~f:append
-          (Poly.Fields.fold ~init:[]
+          (Poly.Fields.fold ~init:[] ~snapp:(f field)
              ~public_key:(f Public_key.Compressed.Checked.to_input)
              ~token_id:
                (* We use [run_checked] here to avoid routing the [Checked.t]
@@ -530,7 +347,8 @@ let empty =
   ; receipt_chain_hash= Receipt.Chain_hash.empty
   ; delegate= Public_key.Compressed.empty
   ; voting_for= State_hash.dummy
-  ; timing= Timing.Untimed }
+  ; timing= Timing.Untimed
+  ; snapp= None }
 
 let empty_digest = digest empty
 
@@ -550,17 +368,22 @@ let create account_id balance =
   ; receipt_chain_hash= Receipt.Chain_hash.empty
   ; delegate
   ; voting_for= State_hash.dummy
-  ; timing= Timing.Untimed }
+  ; timing= Timing.Untimed
+  ; snapp= None }
 
 let create_timed account_id balance ~initial_minimum_balance ~cliff_time
     ~vesting_period ~vesting_increment =
   if Balance.(initial_minimum_balance > balance) then
     Or_error.errorf
-      !"create_timed: initial minimum balance %{sexp: Balance.t} greater than \
-        balance %{sexp: Balance.t}"
-      initial_minimum_balance balance
+      !"Error creating timed account for account id %{sexp: Account_id.t}: \
+        initial minimum balance %{sexp: Balance.t} greater than balance \
+        %{sexp: Balance.t} for account "
+      account_id initial_minimum_balance balance
   else if Global_slot.(equal vesting_period zero) then
-    Or_error.errorf "create_timed: vesting period must be greater than zero"
+    Or_error.errorf
+      !"Error creating timed account for account id %{sexp: Account_id.t}: \
+        vesting period must be greater than zero"
+      account_id
   else
     let public_key = Account_id.public_key account_id in
     let token_id = Account_id.token_id account_id in
@@ -578,6 +401,7 @@ let create_timed account_id balance ~initial_minimum_balance ~cliff_time
       ; receipt_chain_hash= Receipt.Chain_hash.empty
       ; delegate
       ; voting_for= State_hash.dummy
+      ; snapp= None
       ; timing=
           Timing.Timed
             { initial_minimum_balance
