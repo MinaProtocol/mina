@@ -53,7 +53,7 @@ fakeroot dpkg-deb --build "${BUILDDIR}" ${PROJECT}_${VERSION}.deb
 ls -lh coda*.deb
 
 # Remove generate-keypair binary before other builds with the same dir
-rm "${BUILDDIR}/usr/local/bin/coda-generate-keypair-phase3"
+rm -f "${BUILDDIR}/usr/local/bin/coda-generate-keypair-phase3"
 
 ##################################### END GENERATE KEYPAIR PACKAGE #######################################
 
