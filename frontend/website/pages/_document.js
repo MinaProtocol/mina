@@ -25,6 +25,7 @@ export default class MyDocument extends Document {
         <body style={{ margin: 0 + "px" }}>
           <Main />
           <NextScript />
+          <script type="text/javascript" id="hs-script-loader" async defer src="//js.hs-scripts.com/8298093.js"></script>
         </body>
       </html>
     );
