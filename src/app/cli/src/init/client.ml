@@ -634,7 +634,8 @@ let create_new_account_graphql =
                   ?memo ()))
              graphql_endpoint
          in
-         printf "Dispatched create new token account command with TRANSACTION_ID %s\n"
+         printf
+           "Dispatched create new token account command with TRANSACTION_ID %s\n"
            ((response#createTokenAccount)#createNewTokenAccount)#id ))
 
 let mint_tokens_graphql =
