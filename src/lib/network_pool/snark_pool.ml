@@ -164,8 +164,7 @@ module Make (Transition_frontier : Transition_frontier_intf) :
       Verifier.verify_transaction_snarks verifier ps
 
     (*Worst case (if all the proofs are invalid): log n * (2^(log n) + 1)
-    For better worst case we could drill down the binary tree and verify individual proof bundles (at the leaves) without verifying the batches on the intermediate nodes.
-    In the average case trying to eliminate valid branches should show better performance.
+    In the average case this should show better performance.
     We need to implement the trusted/untrusted batches from the snark pool batching RFC #4882 to avoid possible DoS/DDoS here*)
     let find_invalid_proofs ps verifier =
       let open Deferred.Or_error.Let_syntax in
@@ -218,10 +217,13 @@ module Make (Transition_frontier : Transition_frontier_intf) :
               | Ok true ->
                   return (`Invalid empty_set)
               | Ok false ->
-                  (*Find the invalid proofs*)
-                  let%map ps =
-                    find_invalid_proofs out_for_verification t.verifier
+                  (*ordering by sender with the assumption that all the proofs from a malicious sender would be invalid and therefore will increase the probability of them being in a single batch*)
+                  let ordered_list =
+                    List.sort out_for_verification ~compare:(fun e1 e2 ->
+                        Envelope.Sender.compare e1.sender e2.sender )
                   in
+                  (*Find invalid proofs*)
+                  let%map ps = find_invalid_proofs ordered_list t.verifier in
                   `Invalid ps
               | Error e ->
                   Deferred.return (Error e)
