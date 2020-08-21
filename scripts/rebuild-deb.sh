@@ -13,6 +13,50 @@ cd "${SCRIPTPATH}/../_build"
 
 BUILDDIR="deb_build"
 
+##################################### GENERATE KEYPAIR PACKAGE #######################################
+
+mkdir -p "${BUILDDIR}/DEBIAN"
+cat << EOF > "${BUILDDIR}/DEBIAN/control"
+
+Package: coda-generate-keypair-phase3
+Version: ${VERSION}
+License: Apache-2.0
+Vendor: none
+Architecture: amd64
+Maintainer: o(1)Labs <build@o1labs.org>
+Installed-Size: 
+Depends: libssl1.1, libprocps6, libgmp10, libffi6, libgomp1
+Section: base
+Priority: optional
+Homepage: https://codaprotocol.com/
+Description: Utility to generate coda private/public keys in new format
+ Utility to regenerate coda private public keys in new format
+ Built from ${GITHASH} by ${BUILD_URL}
+EOF
+
+echo "------------------------------------------------------------"
+echo "Control File:"
+cat "${BUILDDIR}/DEBIAN/control"
+
+# Binaries
+mkdir -p "${BUILDDIR}/usr/local/bin"
+cp ./default/src/app/generate_keypair/generate_keypair.exe "${BUILDDIR}/usr/local/bin/coda-generate-keypair-phase3"
+
+# echo contents of deb
+echo "------------------------------------------------------------"
+echo "Deb Contents:"
+find "${BUILDDIR}"
+
+# Build the package
+echo "------------------------------------------------------------"
+fakeroot dpkg-deb --build "${BUILDDIR}" ${PROJECT}_${VERSION}.deb
+ls -lh coda*.deb
+
+# Remove generate-keypair binary before other builds with the same dir
+rm "${BUILDDIR}/usr/local/bin/coda-generate-keypair-phase3"
+
+##################################### END GENERATE KEYPAIR PACKAGE #######################################
+
 mkdir -p "${BUILDDIR}/DEBIAN"
 cat << EOF > "${BUILDDIR}/DEBIAN/control"
 Package: ${PROJECT}
