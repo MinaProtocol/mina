@@ -225,6 +225,15 @@ jobs:
             - run:
                   name: Compare test signatures for consensus, nonconsensus code
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'eval `opam config env` && export PATH="$HOME/.cargo/bin:$PATH" && ./scripts/compare_test_signatures.sh'
+    client-sdk-unit-tests:
+        docker:
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
+        steps:
+            {{ checkout_no_lfs }}
+            {{ opam_init_linux }}
+            - run:
+                  name: Client SDK unit tests
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'eval `opam config env` && export PATH="$HOME/.cargo/bin:$PATH" && ./scripts/client_sdk_unit_tests.sh'
     update-branch-protection:
         docker:
             - image: python:3
@@ -704,6 +713,7 @@ workflows:
             - lint
             - lint-opt
             - compare-test-signatures
+            - client-sdk-unit-tests
             - update-branch-protection:
                 filters:
                   branches:
