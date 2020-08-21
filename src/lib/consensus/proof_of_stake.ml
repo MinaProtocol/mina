@@ -71,7 +71,7 @@ let compute_delegatee_table_sparse_ledger keys ledger =
 
 module Segment_id = Coda_numbers.Nat.Make32 ()
 
-module Typ = Crypto_params.Tick0.Typ
+module Typ = Snark_params.Tick.Typ
 
 module Configuration = struct
   [%%versioned
@@ -92,18 +92,6 @@ module Configuration = struct
       let to_latest = Fn.id
     end
   end]
-
-  type t = Stable.Latest.t =
-    { delta: int
-    ; k: int
-    ; c: int
-    ; c_times_k: int
-    ; slots_per_epoch: int
-    ; slot_duration: int
-    ; epoch_duration: int
-    ; genesis_state_timestamp: Block_time.t
-    ; acceptable_network_delay: int }
-  [@@deriving yojson, fields]
 
   let t ~constraint_constants ~protocol_constants =
     let constants =
@@ -372,38 +360,11 @@ module Data = struct
   end
 
   module Epoch_ledger = struct
-    module Poly = struct
-      [%%versioned
-      module Stable = struct
-        module V1 = struct
-          type ('ledger_hash, 'amount) t =
-            {hash: 'ledger_hash; total_currency: 'amount}
-          [@@deriving sexp, eq, compare, hash, to_yojson]
-        end
-      end]
+    include Coda_base.Epoch_ledger
 
-      type ('ledger_hash, 'amount) t =
-            ('ledger_hash, 'amount) Stable.Latest.t =
-        {hash: 'ledger_hash; total_currency: 'amount}
-      [@@deriving sexp, eq, compare, hash, to_yojson, hlist]
-    end
-
-    module Value = struct
-      [%%versioned
-      module Stable = struct
-        module V1 = struct
-          type t =
-            ( Coda_base.Frozen_ledger_hash.Stable.V1.t
-            , Amount.Stable.V1.t )
-            Poly.Stable.V1.t
-          [@@deriving sexp, eq, compare, hash, to_yojson]
-
-          let to_latest = Fn.id
-        end
-      end]
-
-      type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash, to_yojson]
-    end
+    let genesis ~ledger =
+      { Poly.hash= genesis_ledger_hash ~ledger
+      ; total_currency= genesis_ledger_total_currency ~ledger }
 
     let graphql_type () : ('ctx, Value.t option) Graphql_async.Schema.typ =
       let open Graphql_async in
@@ -418,45 +379,6 @@ module Data = struct
               ~args:Arg.[]
               ~resolve:(fun _ {Poly.total_currency; _} ->
                 Amount.to_uint64 total_currency ) ] )
-
-    let to_input ({hash; total_currency} : Value.t) =
-      let open Snark_params.Tick in
-      { Random_oracle.Input.field_elements= [|(hash :> Field.t)|]
-      ; bitstrings= [|Amount.to_bits total_currency|] }
-
-    type var = (Coda_base.Frozen_ledger_hash.var, Amount.var) Poly.t
-
-    let data_spec =
-      Tick.Data_spec.[Coda_base.Frozen_ledger_hash.typ; Amount.typ]
-
-    let typ : (var, Value.t) Typ.t =
-      Tick.Typ.of_hlistable data_spec ~var_to_hlist:Poly.to_hlist
-        ~var_of_hlist:Poly.of_hlist ~value_to_hlist:Poly.to_hlist
-        ~value_of_hlist:Poly.of_hlist
-
-    let var_to_input ({Poly.hash; total_currency} : var) =
-      { Random_oracle.Input.field_elements=
-          [|Coda_base.Frozen_ledger_hash.var_to_hash_packed hash|]
-      ; bitstrings=
-          [|Bitstring.Lsb_first.to_list (Amount.var_to_bits total_currency)|]
-      }
-
-    let if_ cond
-        ~(then_ : (Coda_base.Frozen_ledger_hash.var, Amount.var) Poly.t)
-        ~(else_ : (Coda_base.Frozen_ledger_hash.var, Amount.var) Poly.t) =
-      let open Tick.Checked.Let_syntax in
-      let%map hash =
-        Coda_base.Frozen_ledger_hash.if_ cond ~then_:then_.hash
-          ~else_:else_.hash
-      and total_currency =
-        Amount.Checked.if_ cond ~then_:then_.total_currency
-          ~else_:else_.total_currency
-      in
-      {Poly.hash; total_currency}
-
-    let genesis ~ledger =
-      { Poly.hash= genesis_ledger_hash ~ledger
-      ; total_currency= genesis_ledger_total_currency ~ledger }
   end
 
   module Vrf = struct
@@ -490,9 +412,10 @@ module Data = struct
 
       type ('global_slot, 'epoch_seed, 'delegator) t =
         {global_slot: 'global_slot; seed: 'epoch_seed; delegator: 'delegator}
-      [@@deriving hlist]
+      [@@deriving sexp, hlist]
 
       type value = (Global_slot.t, Epoch_seed.t, Coda_base.Account.Index.t) t
+      [@@deriving sexp]
 
       type var =
         ( Global_slot.Checked.t
@@ -525,10 +448,9 @@ module Data = struct
           ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
       let hash_to_group ~constraint_constants msg =
-        Group_map.to_group
-          (Random_oracle.hash ~init:Coda_base.Hash_prefix.vrf_message
-             (Random_oracle.pack_input (to_input ~constraint_constants msg)))
-        |> Tick.Inner_curve.of_affine
+        Random_oracle.hash ~init:Coda_base.Hash_prefix.vrf_message
+          (Random_oracle.pack_input (to_input ~constraint_constants msg))
+        |> Group_map.to_group |> Tick.Inner_curve.of_affine
 
       module Checked = struct
         open Tick
@@ -544,10 +466,10 @@ module Data = struct
         let hash_to_group msg =
           let%bind input = to_input msg in
           Tick.make_checked (fun () ->
-              Group_map.Checked.to_group
-                (Random_oracle.Checked.hash
-                   ~init:Coda_base.Hash_prefix.vrf_message
-                   (Random_oracle.Checked.pack_input input)) )
+              Random_oracle.Checked.hash
+                ~init:Coda_base.Hash_prefix.vrf_message
+                (Random_oracle.Checked.pack_input input)
+              |> Group_map.Checked.to_group )
       end
 
       let gen
@@ -573,8 +495,6 @@ module Data = struct
           end
         end]
 
-        type t = Stable.Latest.t [@@deriving sexp, compare, hash, yojson]
-
         include Codable.Make_base58_check (struct
           type t = Stable.Latest.t [@@deriving bin_io_unversioned]
 
@@ -583,22 +503,24 @@ module Data = struct
           let description = "Vrf Truncated Output"
         end)
 
-        let length_in_bytes = 32
-
-        let length_in_bits = 8 * length_in_bytes
-
         open Tick
+
+        let length_in_bits = Int.min 256 (Field.size_in_bits - 2)
 
         type var = Boolean.var array
 
         let typ : (var, t) Typ.t =
           Typ.array ~length:length_in_bits Boolean.typ
-          |> Typ.transport ~there:Blake2.string_to_bits
+          |> Typ.transport
+               ~there:(fun s ->
+                 Array.sub (Blake2.string_to_bits s) ~pos:0 ~len:length_in_bits
+                 )
                ~back:Blake2.bits_to_string
 
-        let dummy = String.init length_in_bytes ~f:(fun _ -> '\000')
+        let dummy = String.init 32 ~f:(fun _ -> '\000')
 
-        let to_bits t = Fold.(to_list (string_bits t))
+        let to_bits t =
+          Fold.(to_list (string_bits t)) |> Fn.flip List.take length_in_bits
       end
 
       open Tick
@@ -746,7 +668,7 @@ module Data = struct
     end
 
     module T =
-      Vrf_lib.Integrated.Make (Snark_params.Tick) (Scalar) (Group) (Message)
+      Vrf_lib.Integrated.Make (Tick) (Scalar) (Group) (Message)
         (struct
           type value = Snark_params.Tick.Field.t
 
@@ -759,10 +681,10 @@ module Data = struct
           end
         end)
 
-    type _ Snarky.Request.t +=
-      | Winner_address : Coda_base.Account.Index.t Snarky.Request.t
-      | Private_key : Scalar.value Snarky.Request.t
-      | Public_key : Public_key.t Snarky.Request.t
+    type _ Snarky_backendless.Request.t +=
+      | Winner_address : Coda_base.Account.Index.t Snarky_backendless.Request.t
+      | Private_key : Scalar.value Snarky_backendless.Request.t
+      | Public_key : Public_key.t Snarky_backendless.Request.t
 
     let%snarkydef get_vrf_evaluation
         ~(constraint_constants : Genesis_constants.Constraint_constants.t)
@@ -855,7 +777,7 @@ module Data = struct
                empty_pending_coinbase ~is_new_stack:true)
         in
         let handlers =
-          Snarky.Request.Handler.(
+          Snarky_backendless.Request.Handler.(
             push
               (push fail (create_single pending_coinbase_handler))
               (create_single ledger_handler))
@@ -871,7 +793,7 @@ module Data = struct
           | _ ->
               respond
                 (Provide
-                   (Snarky.Request.Handler.run handlers
+                   (Snarky_backendless.Request.Handler.run handlers
                       ["Ledger Handler"; "Pending Coinbase Handler"]
                       request))
     end
@@ -933,8 +855,6 @@ module Data = struct
         let to_latest = Fn.id
       end
     end]
-
-    type t = Stable.Latest.t [@@deriving sexp, compare, hash, to_yojson]
   end
 
   module Epoch_data = struct
@@ -955,28 +875,9 @@ module Data = struct
                  the current state. *)
             ; lock_checkpoint: 'lock_checkpoint
             ; epoch_length: 'length }
-          [@@deriving sexp, eq, compare, hash, to_yojson, fields]
+          [@@deriving sexp, eq, compare, hash, to_yojson, fields, hlist]
         end
       end]
-
-      type ( 'epoch_ledger
-           , 'epoch_seed
-           , 'start_checkpoint
-           , 'lock_checkpoint
-           , 'length )
-           t =
-            ( 'epoch_ledger
-            , 'epoch_seed
-            , 'start_checkpoint
-            , 'lock_checkpoint
-            , 'length )
-            Stable.Latest.t =
-        { ledger: 'epoch_ledger
-        ; seed: 'epoch_seed
-        ; start_checkpoint: 'start_checkpoint
-        ; lock_checkpoint: 'lock_checkpoint
-        ; epoch_length: 'length }
-      [@@deriving sexp, compare, hash, to_yojson, fields, hlist]
     end
 
     type var =
@@ -1720,38 +1621,9 @@ module Data = struct
             ; staking_epoch_data: 'staking_epoch_data
             ; next_epoch_data: 'next_epoch_data
             ; has_ancestor_in_same_checkpoint_window: 'bool }
-          [@@deriving
-            sexp, bin_io, eq, compare, hash, to_yojson, version, fields]
+          [@@deriving sexp, eq, compare, hash, to_yojson, fields, hlist]
         end
       end]
-
-      type ( 'length
-           , 'vrf_output
-           , 'amount
-           , 'global_slot
-           , 'staking_epoch_data
-           , 'next_epoch_data
-           , 'bool )
-           t =
-            ( 'length
-            , 'vrf_output
-            , 'amount
-            , 'global_slot
-            , 'staking_epoch_data
-            , 'next_epoch_data
-            , 'bool )
-            Stable.Latest.t =
-        { blockchain_length: 'length
-        ; epoch_count: 'length
-        ; min_window_density: 'length
-        ; sub_window_densities: 'length list
-        ; last_vrf_output: 'vrf_output
-        ; total_currency: 'amount
-        ; curr_global_slot: 'global_slot
-        ; staking_epoch_data: 'staking_epoch_data
-        ; next_epoch_data: 'next_epoch_data
-        ; has_ancestor_in_same_checkpoint_window: 'bool }
-      [@@deriving sexp, compare, hash, to_yojson, fields, hlist]
     end
 
     module Value = struct
@@ -1790,8 +1662,6 @@ module Data = struct
                 , `Bool t.has_ancestor_in_same_checkpoint_window ) ]
         end
       end]
-
-      type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash]
 
       let to_yojson = Stable.Latest.to_yojson
 
@@ -2333,7 +2203,7 @@ module Data = struct
              pending_coinbases ~is_new_stack)
       in
       let handlers =
-        Snarky.Request.Handler.(
+        Snarky_backendless.Request.Handler.(
           push
             (push fail (create_single pending_coinbase_handler))
             (create_single ledger_handler))
@@ -2349,7 +2219,7 @@ module Data = struct
         | _ ->
             respond
               (Provide
-                 (Snarky.Request.Handler.run handlers
+                 (Snarky_backendless.Request.Handler.run handlers
                     ["Ledger Handler"; "Pending Coinbase Handler"]
                     request))
 

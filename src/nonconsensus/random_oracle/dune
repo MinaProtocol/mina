@@ -7,6 +7,5 @@
   (libraries
     core_kernel
     random_oracle_input
-    sponge_params_nonconsensus
     snark_params_nonconsensus
     sponge ))

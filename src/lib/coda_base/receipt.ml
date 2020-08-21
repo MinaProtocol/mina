@@ -58,7 +58,7 @@ module Chain_hash = struct
           : (Field.t, bool) Input.t )
         (field (t :> Field.t)))
     |> pack_input
-    |> hash ~init:Hash_prefix.receipt_chain
+    |> hash ~init:Hash_prefix.receipt_chain_user_command
     |> of_hash
 
   [%%if
@@ -77,7 +77,7 @@ module Chain_hash = struct
       let open Checked in
       let%bind payload = Transaction_union_payload.Checked.to_input payload in
       make_checked (fun () ->
-          hash ~init:Hash_prefix.receipt_chain
+          hash ~init:Hash_prefix.receipt_chain_user_command
             (pack_input Input.(append payload (var_to_input t)))
           |> var_of_hash_packed )
   end

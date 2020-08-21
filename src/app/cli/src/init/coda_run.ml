@@ -398,13 +398,18 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
     [ implement Snark_worker.Rpcs_versioned.Get_work.Latest.rpc (fun () () ->
           Deferred.return
             (let open Option.Let_syntax in
-            let%bind snark_worker_key = Coda_lib.snark_worker_key coda in
+            let%bind key =
+              Option.merge
+                (Coda_lib.snark_worker_key coda)
+                (Coda_lib.snark_coordinator_key coda)
+                ~f:Fn.const
+            in
             let%map r = Coda_lib.request_work coda in
             [%log trace]
               ~metadata:[("work_spec", Snark_worker.Work.Spec.to_yojson r)]
               "responding to a Get_work request with some new work" ;
             Coda_metrics.(Counter.inc_one Snark_work.snark_work_assigned_rpc) ;
-            (r, snark_worker_key)) )
+            (r, key)) )
     ; implement Snark_worker.Rpcs_versioned.Submit_work.Latest.rpc
         (fun () (work : Snark_worker.Work.Result.t) ->
           Coda_metrics.(
@@ -500,7 +505,19 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                       [("$address", `String (Unix.Inet_addr.to_string address))] ;
                   Deferred.unit )
                 else
-                  Rpc.Connection.server_with_close reader writer
+                  Rpc.Connection.server_with_close
+                    ~handshake_timeout:
+                      (Time.Span.of_sec
+                         Coda_compile_config.rpc_handshake_timeout_sec)
+                    ~heartbeat_config:
+                      (Rpc.Connection.Heartbeat_config.create
+                         ~timeout:
+                           (Time_ns.Span.of_sec
+                              Coda_compile_config.rpc_heartbeat_timeout_sec)
+                         ~send_every:
+                           (Time_ns.Span.of_sec
+                              Coda_compile_config.rpc_heartbeat_send_every_sec))
+                    reader writer
                     ~implementations:
                       (Rpc.Implementations.create_exn
                          ~implementations:(client_impls @ snark_worker_impls)

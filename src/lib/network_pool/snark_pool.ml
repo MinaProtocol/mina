@@ -27,16 +27,6 @@ module Snark_tables = struct
       let to_latest = Fn.id
     end
   end]
-
-  type t = Stable.Latest.t =
-    { all:
-        Ledger_proof.t One_or_two.t Priced_proof.t
-        Transaction_snark_work.Statement.Table.t
-    ; rebroadcastable:
-        ( Ledger_proof.t One_or_two.t Priced_proof.t
-        * Time.Stable.With_utc_sexp.V2.t )
-        Transaction_snark_work.Statement.Table.t }
-  [@@deriving sexp]
 end
 
 module type S = sig
@@ -332,13 +322,18 @@ module Make (Transition_frontier : Transition_frontier_intf) :
 
       let verify_and_act t ~work ~sender =
         let statements, priced_proof = work in
-        let open Deferred.Or_error.Let_syntax in
         let {Priced_proof.proof= proofs; fee= {prover; fee}} = priced_proof in
         let trust_record =
           Trust_system.record_envelope_sender t.config.trust_system t.logger
             sender
         in
         let log_and_punish ?(punish = true) statement e =
+          (* TODO: For now, we must not punish since we batch across messages received from
+             different senders and we don't isolate the bad proof in a batch, so we cannot
+             properly attribute blame.
+          *)
+          ignore punish ;
+          let punish = false in
           let metadata =
             [ ("work_id", `Int (Transaction_snark.Statement.hash statement))
             ; ("prover", Signature_lib.Public_key.Compressed.to_yojson prover)
@@ -371,7 +366,7 @@ module Make (Transition_frontier : Transition_frontier_intf) :
                 Deferred.List.iter bad_statements ~f:(fun s ->
                     log_and_punish s e )
               in
-              Error e
+              false
           | [] -> (
               let log ?punish e =
                 Deferred.List.iter proofs ~f:(fun (_, s) ->
@@ -382,19 +377,25 @@ module Make (Transition_frontier : Transition_frontier_intf) :
                   (List.map proofs ~f:(fun (p, _) -> (p, message)))
               with
               | Ok true ->
-                  Deferred.Or_error.return ()
+                  Deferred.return true
               | Ok false ->
                   (*Invalid proof*)
                   let e = Error.of_string "Invalid proof" in
                   let%map () = log e in
-                  Error e
+                  false
               | Error e ->
                   (* Verifier crashed or other errors at our end. Don't punish the peer*)
                   let%map () = log ~punish:false e in
-                  Error e )
+                  false )
         in
-        let%bind pairs = One_or_two.zip proofs statements |> Deferred.return in
-        verify (One_or_two.to_list pairs)
+        match One_or_two.zip proofs statements with
+        | Ok pairs ->
+            verify (One_or_two.to_list pairs)
+        | Error e ->
+            [%log' error t.logger]
+              ~metadata:[("error", `String (Error.to_string_hum e))]
+              "One_or_two length mismatch: $error" ;
+            Deferred.return false
     end
 
     include T
@@ -475,6 +476,8 @@ end)
 module Diff_versioned = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t = Resource_pool.Diff.t =
         | Add_solved_work of
@@ -517,8 +520,14 @@ let%test_module "random set test" =
         Mock_snark_pool.Resource_pool.Diff.Add_solved_work
           (work, {Priced_proof.Stable.Latest.proof= proof work; fee})
       in
-      Mock_snark_pool.Resource_pool.Diff.unsafe_apply resource_pool
-        {Envelope.Incoming.data= diff; sender}
+      let enveloped_diff = {Envelope.Incoming.data= diff; sender} in
+      let%bind valid_diff =
+        Mock_snark_pool.Resource_pool.Diff.verify resource_pool enveloped_diff
+      in
+      if valid_diff then
+        Mock_snark_pool.Resource_pool.Diff.unsafe_apply resource_pool
+          enveloped_diff
+      else Deferred.return (Error (`Other (Error.of_string "Invalid diff")))
 
     let config verifier =
       Mock_snark_pool.Resource_pool.make_config ~verifier ~trust_system
@@ -587,7 +596,8 @@ let%test_module "random set test" =
               ( work
               , One_or_two.map work ~f:(fun statement ->
                     Ledger_proof.create ~statement
-                      ~sok_digest:invalid_sok_digest ~proof:Proof.dummy )
+                      ~sok_digest:invalid_sok_digest
+                      ~proof:Proof.transaction_dummy )
               , fee
               , some_other_pk )
               :: acc )
@@ -598,7 +608,7 @@ let%test_module "random set test" =
                 @@ Signature_lib.Public_key.Compressed.equal mal_pk fee.prover
             ) )
       in
-      Quickcheck.test
+      Quickcheck.test ~trials:5
         ~sexp_of:
           [%sexp_of:
             Mock_snark_pool.Resource_pool.t Deferred.t
@@ -617,11 +627,16 @@ let%test_module "random set test" =
               let%map () =
                 Deferred.List.iter invalid_work_lst
                   ~f:(fun (statements, proofs, fee, _) ->
-                    let%map res =
-                      apply_diff t statements ~proof:(fun _ -> proofs) fee
+                    let diff =
+                      Mock_snark_pool.Resource_pool.Diff.Add_solved_work
+                        ( statements
+                        , {Priced_proof.Stable.Latest.proof= proofs; fee} )
+                      |> Envelope.Incoming.local
                     in
-                    assert (Result.is_error res) ;
-                    () )
+                    let%map res =
+                      Mock_snark_pool.Resource_pool.Diff.verify t diff
+                    in
+                    assert (not res) )
               in
               [%test_eq: Transaction_snark_work.Info.t list] completed_works
                 (Mock_snark_pool.Resource_pool.all_completed_work t) ) )

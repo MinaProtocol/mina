@@ -22,7 +22,7 @@ let () = Async.Scheduler.set_record_backtraces true
 let chain_id ~genesis_state_hash ~genesis_constants =
   let genesis_state_hash = State_hash.to_base58_check genesis_state_hash in
   let genesis_constants_hash = Genesis_constants.hash genesis_constants in
-  let all_snark_keys = String.concat ~sep:"" Snark_keys.key_hashes in
+  let all_snark_keys = String.concat ~sep:"" Precomputed_values.key_hashes in
   let b2 =
     Blake2.digest_string
       (genesis_state_hash ^ all_snark_keys ^ genesis_constants_hash)
@@ -100,6 +100,12 @@ let daemon logger =
      and run_snark_worker_flag =
        flag "run-snark-worker"
          ~doc:"PUBLICKEY Run the SNARK worker with this public key"
+         (optional public_key_compressed)
+     and run_snark_coordinator_flag =
+       flag "run-snark-coordinator"
+         ~doc:
+           "PUBLICKEY Run a SNARK coordinator with this public key (ignored \
+            if the run-snark-worker is set)"
          (optional public_key_compressed)
      and snark_worker_parallelism_flag =
        flag "snark-worker-parallelism"
@@ -206,16 +212,12 @@ let daemon logger =
             generate-libp2p-keypair`) to use with libp2p discovery (default: \
             generate per-run temporary keypair)"
      and is_seed = flag "seed" ~doc:"Start the node as a seed node" no_arg
-     and enable_flooding =
-       flag "enable-flooding"
-         ~doc:
-           "Enable pubsub flooding, gossiping every message to every peer \
-            (uses lots of bandwidth! default: false)"
-         no_arg
+     and _enable_flooding =
+       flag "enable-flooding" ~doc:"true|false Deprecated and unused" no_arg
      and libp2p_peers_raw =
        flag "peer"
          ~doc:
-           "/ip4/IPADDR/tcp/PORT/ipfs/PEERID initial \"bootstrap\" peers for \
+           "/ip4/IPADDR/tcp/PORT/p2p/PEERID initial \"bootstrap\" peers for \
             discovery"
          (listed string)
      and curr_protocol_version =
@@ -425,6 +427,7 @@ let daemon logger =
                    "Could not parse configuration from $config_file: $error"
                    ~metadata:
                      [ ("config_file", `String config_file)
+                     ; ("config_json", config_json)
                      ; ("error", `String err) ] ;
                  failwithf "Could not parse configuration: %s" err () )
            | _ ->
@@ -551,6 +554,10 @@ let daemon logger =
          let run_snark_worker_flag =
            maybe_from_config json_to_publickey_compressed_option
              "run-snark-worker" run_snark_worker_flag
+         in
+         let run_snark_coordinator_flag =
+           maybe_from_config json_to_publickey_compressed_option
+             "run-snark-coordinator" run_snark_coordinator_flag
          in
          let snark_worker_parallelism_flag =
            maybe_from_config YJ.Util.to_int_option "snark-worker-parallelism"
@@ -719,7 +726,7 @@ let daemon logger =
              ; initial_peers
              ; addrs_and_ports
              ; trust_system
-             ; flood= enable_flooding
+             ; gossip_type= `Gossipsub
              ; keypair= libp2p_keypair }
          in
          let net_config =
@@ -841,6 +848,7 @@ let daemon logger =
                       run_snark_worker_flag
                   ; shutdown_on_disconnect= true
                   ; num_threads= snark_worker_parallelism_flag }
+                ~snark_coordinator_key:run_snark_coordinator_flag
                 ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
                 ~wallets_disk_location:(conf_dir ^/ "wallets")
                 ~persistent_root_location:(conf_dir ^/ "root")
@@ -956,6 +964,9 @@ let ensure_testnet_id_still_good _ = Deferred.unit
 [%%endif]
 
 let snark_hashes =
+  let module Hashes = struct
+    type t = string list [@@deriving to_yojson]
+  end in
   let open Command.Let_syntax in
   Command.basic ~summary:"List hashes of proving and verification keys"
     [%map_open
@@ -965,8 +976,8 @@ let snark_hashes =
         if json then
           print
             (Yojson.Safe.to_string
-               (Snark_keys.key_hashes_to_yojson Snark_keys.key_hashes))
-        else List.iter Snark_keys.key_hashes ~f:print]
+               (Hashes.to_yojson Precomputed_values.key_hashes))
+        else List.iter Precomputed_values.key_hashes ~f:print]
 
 let internal_commands =
   [ (Snark_worker.Intf.command_name, Snark_worker.command)
@@ -1032,7 +1043,6 @@ let coda_commands logger =
   ; ("advanced", Client.advanced)
   ; ("internal", Command.group ~summary:"Internal commands" internal_commands)
   ; (Parallel.worker_command_name, Parallel.worker_command)
-  ; (Snark_flame_graphs.name, Snark_flame_graphs.command)
   ; ("transaction-snark-profiler", Transaction_snark_profiler.command) ]
 
 [%%if
@@ -1067,7 +1077,6 @@ let coda_commands logger =
         ; (module Coda_change_snark_worker_test)
         ; (module Full_test)
         ; (module Transaction_snark_profiler)
-        ; (module Snark_flame_graphs)
         ; (module Coda_archive_node_test)
         ; (module Coda_archive_processor_test) ]
         : (module Integration_test) list )
@@ -1101,8 +1110,7 @@ let () =
   let logger = Logger.create () in
   don't_wait_for (ensure_testnet_id_still_good logger) ;
   (* Turn on snark debugging in prod for now *)
-  Snarky.Snark.set_eval_constraints true ;
-  Snarky.Libsnark.set_printing_off () ;
+  Snarky_backendless.Snark.set_eval_constraints true ;
   (* intercept command-line processing for "version", because we don't
      use the Jane Street scripts that generate their version information
    *)

@@ -85,16 +85,6 @@ module Rpcs : sig
             ; k_block_hashes: State_hash.Stable.V1.t list }
         end
       end]
-
-      type t = Stable.Latest.t =
-        { node_ip_addr: Unix.Inet_addr.t
-        ; node_peer_id: Peer.Id.t
-        ; peers: Network_peer.Peer.t list
-        ; block_producers: Signature_lib.Public_key.Compressed.t list
-        ; protocol_state_hash: State_hash.t
-        ; ban_statuses:
-            (Core.Unix.Inet_addr.t * Trust_system.Peer_status.t) list
-        ; k_block_hashes: State_hash.t list }
     end
 
     type query = unit [@@deriving sexp, to_yojson]

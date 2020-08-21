@@ -3,7 +3,7 @@
  (public_name transaction_snark)
  (library_flags -linkall)
  (inline_tests)
- (libraries core cache_dir cached snarky coda_base sgn bignum ppx_version.runtime transaction_protocol_state coda_state)
+ (libraries core cache_dir snarky.backendless coda_base sgn bignum ppx_version.runtime transaction_protocol_state coda_state)
  (preprocess
   (pps ppx_snarky ppx_version ppx_jane ppx_deriving.std ppx_deriving_yojson h_list.ppx bisect_ppx -- -conditional))
  (synopsis "Transaction state transition snarking library"))

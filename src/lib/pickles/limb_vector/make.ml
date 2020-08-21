@@ -1,7 +1,8 @@
 open Core_kernel
 open Pickles_types
 
-module T (Impl : Snarky.Snark_intf.Run) (N : Vector.Nat_intf) = struct
+module T (Impl : Snarky_backendless.Snark_intf.Run) (N : Vector.Nat_intf) =
+struct
   open Impl
 
   type t = Boolean.var list

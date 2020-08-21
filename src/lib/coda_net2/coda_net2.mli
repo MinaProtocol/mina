@@ -61,8 +61,6 @@ module Keypair : sig
     end
   end]
 
-  type t = Stable.Latest.t
-
   (** Securely generate a new keypair. *)
   val random : net -> t Deferred.t
 
@@ -86,8 +84,8 @@ end
 
   Some example multiaddrs:
 
-  - [/ipfs/QmcgpsyWgH8Y8ajJz1Cu72KnS5uo2Aa2LpzU7kinSupNKC]
-  - [/ip4/127.0.0.1/tcp/1234/ipfs/QmcgpsyWgH8Y8ajJz1Cu72KnS5uo2Aa2LpzU7kinSupNKC]
+  - [/p2p/QmcgpsyWgH8Y8ajJz1Cu72KnS5uo2Aa2LpzU7kinSupNKC]
+  - [/ip4/127.0.0.1/tcp/1234/p2p/QmcgpsyWgH8Y8ajJz1Cu72KnS5uo2Aa2LpzU7kinSupNKC]
   - [/ip6/2601:9:4f81:9700:803e:ca65:66e8:c21]
  *)
 module Multiaddr : sig
@@ -185,8 +183,6 @@ val create : logger:Logger.t -> conf_dir:string -> net Deferred.Or_error.t
   * will be called for each peer we discover. [unsafe_no_trust_ip], if true, will not attempt to
   * report trust actions for the IPs of observed connections.
   *
-  * If [flood] is true, all valid gossip will be forwarded to every node. This is expensive.
-  *
   * This fails if initializing libp2p fails for any reason.
 *)
 val configure :
@@ -197,7 +193,7 @@ val configure :
   -> network_id:string
   -> on_new_peer:(discovered_peer -> unit)
   -> unsafe_no_trust_ip:bool
-  -> flood:bool
+  -> gossip_type:[`Gossipsub | `Flood | `Random]
   -> unit Deferred.Or_error.t
 
 (** The keypair the network was configured with.

@@ -22,8 +22,6 @@ module Stable = struct
   end
 end]
 
-type t = Stable.Latest.t [@@deriving sexp, compare, yojson]
-
 let to_input = T.to_input
 
 let to_string = T.to_string

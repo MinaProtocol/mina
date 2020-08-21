@@ -543,6 +543,8 @@ module Fee = struct
 
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t = Unsigned_extended.UInt64.Stable.V1.t
       [@@deriving sexp, compare, hash, eq]
@@ -583,6 +585,8 @@ module Amount = struct
 
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t = Unsigned_extended.UInt64.Stable.V1.t
       [@@deriving sexp, compare, hash, eq, yojson]
@@ -633,11 +637,11 @@ module Balance = struct
   [%%ifdef
   consensus_mechanism]
 
-  include (Amount : Basic with type t = Amount.t with type var = Amount.var)
+  include (Amount : Basic with type t := t with type var = Amount.var)
 
   [%%else]
 
-  include (Amount : Basic with type t = Amount.t)
+  include (Amount : Basic with type t := t)
 
   [%%endif]
 
@@ -687,7 +691,8 @@ let%test_module "sub_flagged module" =
 
       type magnitude = t [@@deriving sexp, compare]
 
-      type var = field Snarky.Cvar.t Snarky.Boolean.t list
+      type var =
+        field Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t list
 
       val zero : t
 
@@ -710,7 +715,7 @@ let%test_module "sub_flagged module" =
       in
       let sub_flagged_checked =
         let f (x, y) =
-          Snarky.Checked.map (M.Checked.sub_flagged x y)
+          Snarky_backendless.Checked.map (M.Checked.sub_flagged x y)
             ~f:(fun (r, `Underflow u) -> (r, u))
         in
         Test_util.checked_to_unchecked (Typ.tuple2 typ typ)

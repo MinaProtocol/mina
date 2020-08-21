@@ -1,6 +1,5 @@
 open Core_kernel
 open Async
-module User_command_info = Block.User_command_info
 open Models
 
 module Get_all_transactions =
@@ -92,7 +91,6 @@ module All = struct
         -> (Mempool_response.t, Errors.t) M.t =
      fun ~env req ->
       let open M.Let_syntax in
-      (* TODO: Support alternate tokens *)
       let%bind res = env.gql () in
       let%map () =
         env.validate_network_choice ~network_identifier:req.network_identifier

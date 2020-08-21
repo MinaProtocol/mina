@@ -38,7 +38,7 @@ let with_check = false
 [%%endif]
 
 [%%if
-curve_size = 753]
+curve_size = 255]
 
 let medium_curves = true
 
@@ -150,7 +150,7 @@ let run_test () : unit Deferred.t =
           ; logger
           ; initial_peers= []
           ; unsafe_no_trust_ip= true
-          ; flood= false
+          ; gossip_type= `Gossipsub
           ; conf_dir= temp_conf_dir
           ; chain_id= "bogus chain id for testing"
           ; addrs_and_ports=

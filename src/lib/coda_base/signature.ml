@@ -40,27 +40,14 @@ module Stable = struct
 
   module Tests = struct
     [%%if
-    curve_size = 298]
+    curve_size = 255]
 
-    let%test "signature serialization v1 (curve_size=298)" =
+    let%test "signature serialization v1 (curve_size=255)" =
       let signature =
         Quickcheck.random_value
           ~seed:(`Deterministic "signature serialization") V1.gen
       in
-      let known_good_digest = "5581d593702a09f4418fe46bde1ca116" in
-      Ppx_version_runtime.Serialization.check_serialization
-        (module V1)
-        signature known_good_digest
-
-    [%%elif
-    curve_size = 753]
-
-    let%test "signature serialization v1 (curve_size=753)" =
-      let signature =
-        Quickcheck.random_value
-          ~seed:(`Deterministic "signature serialization") V1.gen
-      in
-      let known_good_digest = "7cc56fd93cef313e1eef9fc83f55aedb" in
+      let known_good_digest = "b991865dd2ff76596c470a72a4282cbd" in
       Ppx_version_runtime.Serialization.check_serialization
         (module V1)
         signature known_good_digest
@@ -73,8 +60,6 @@ module Stable = struct
     [%%endif]
   end
 end]
-
-type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash]
 
 let dummy = (Field.one, Inner_curve.Scalar.one)
 

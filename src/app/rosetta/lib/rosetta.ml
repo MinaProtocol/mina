@@ -11,6 +11,8 @@ let router ~graphql_uri ~db ~logger route body =
       Mempool.router tl body ~db ~graphql_uri ~logger
   | "block" :: tl ->
       Block.router tl body ~db ~graphql_uri ~logger
+  | "construction" :: tl ->
+      Construction.router tl body ~graphql_uri ~logger
   | _ ->
       Deferred.return (Error `Page_not_found)
 
@@ -73,7 +75,7 @@ let command =
     | Ok db ->
         let%bind server =
           Cohttp_async.Server.create ~on_handler_error:`Raise
-            (Async.Tcp.Where_to_listen.bind_to Localhost (On_port port))
+            (Async.Tcp.Where_to_listen.bind_to All_addresses (On_port port))
             (server_handler ~db ~graphql_uri ~logger)
         in
         [%log info]

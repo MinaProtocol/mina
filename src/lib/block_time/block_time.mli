@@ -6,6 +6,10 @@ open Snark_bits
 module Time : sig
   type t [@@deriving sexp, compare, yojson]
 
+  val zero : t
+
+  val max_value : t
+
   include Comparable.S with type t := t
 
   include Hashable.S with type t := t
@@ -20,6 +24,8 @@ module Time : sig
 
   [%%versioned:
   module Stable : sig
+    [@@@no_toplevel_latest_type]
+
     module V1 : sig
       type nonrec t = t [@@deriving sexp, compare, eq, hash, yojson]
 

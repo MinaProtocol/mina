@@ -26,7 +26,8 @@ module Base = struct
       ; proof: Tick.Proof.t }
   end
 
-  type 'a triple = 'a * 'a * 'a [@@deriving bin_io, compare, sexp, yojson]
+  type 'a triple = 'a * 'a * 'a
+  [@@deriving bin_io, compare, sexp, yojson, hash, eq]
 
   module Dlog_based = struct
     type ('dlog_me_only, 'pairing_me_only) t =
@@ -42,14 +43,16 @@ module Base = struct
           , ( Challenge.Constant.t Scalar_challenge.Stable.Latest.t
             , bool )
             Bulletproof_challenge.t
-            Bp_vec.t
+            Step_bp_vec.t
           , Index.t )
           Types.Dlog_based.Statement.t
       ; prev_evals:
-          Tick.Field.t array Dlog_marlin_types.Evals.Stable.Latest.t triple
+          Tick.Field.t Dlog_marlin_types.Pc_array.Stable.Latest.t
+          Dlog_marlin_types.Evals.Stable.Latest.t
+          triple
       ; prev_x_hat: Tick.Field.t triple
       ; proof: Tock.Proof.t }
-    [@@deriving bin_io, compare, sexp, yojson]
+    [@@deriving bin_io, compare, sexp, yojson, hash, eq]
   end
 end
 
@@ -61,7 +64,7 @@ type ('s, 'mlmb, _) with_data =
         , ( ( Challenge.Constant.t Scalar_challenge.Stable.Latest.t
             , bool )
             Bulletproof_challenge.t
-            Bp_vec.t
+            Step_bp_vec.t
           , 'most_recent_width )
           Vector.t )
         Base.Me_only.Pairing_based.t )
@@ -81,7 +84,9 @@ let dummy (type w h r) (w : w Nat.t) (h : h Nat.t)
   let g len = Array.create ~len g0 in
   let tock len = Array.init len ~f:(fun _ -> tock ()) in
   let tick_arr len = Array.init len ~f:(fun _ -> tick ()) in
-  let lengths = Commitment_lengths.of_domains Common.wrap_domains in
+  let lengths =
+    Commitment_lengths.of_domains wrap_domains ~max_degree:Max_degree.wrap
+  in
   T
     { statement=
         { proof_state=
@@ -114,6 +119,7 @@ let dummy (type w h r) (w : w Nat.t) (h : h Nat.t)
                 (* Not sure if this should be w or h honestly ...*)
                 Vector.init most_recent_width ~f:(fun _ ->
                     Dummy.Ipa.Step.challenges )
+                (* TODO: Should this be wrap? *)
             ; sg=
                 Vector.init most_recent_width ~f:(fun _ ->
                     Lazy.force Dummy.Ipa.Wrap.sg ) } }
@@ -131,7 +137,8 @@ let dummy (type w h r) (w : w Nat.t) (h : h Nat.t)
                 , ({unshifted= g lengths.g_3; shifted= g0}, g lengths.h_3) ) }
         ; openings=
             { proof=
-                { lr= Array.init (Nat.to_int Rounds.n) ~f:(fun _ -> (g0, g0))
+                { lr=
+                    Array.init (Nat.to_int Tock.Rounds.n) ~f:(fun _ -> (g0, g0))
                 ; z_1= Ro.tock ()
                 ; z_2= Ro.tock ()
                 ; delta= g0
@@ -158,11 +165,11 @@ module Make (W : Nat.Intf) (MLMB : Nat.Intf) = struct
         , ( Challenge.Constant.t Scalar_challenge.Stable.Latest.t
           , bool )
           Bulletproof_challenge.t
-          Bp_vec.t
+          Step_bp_vec.t
           Max_branching_at_most.t )
         Base.Me_only.Pairing_based.t )
       Base.Dlog_based.t
-    [@@deriving bin_io, compare, sexp, yojson]
+    [@@deriving bin_io, compare, sexp, yojson, hash, eq]
   end
 
   type nonrec t = (W.n, MLMB.n) t
@@ -197,6 +204,12 @@ module Make (W : Nat.Intf) (MLMB : Nat.Intf) = struct
       }
 
   let compare t1 t2 = Repr.compare (to_repr t1) (to_repr t2)
+
+  let equal t1 t2 = Repr.equal (to_repr t1) (to_repr t2)
+
+  let hash_fold_t s t = Repr.hash_fold_t s (to_repr t)
+
+  let hash t = Repr.hash (to_repr t)
 
   include Binable.Of_binable
             (Repr)
