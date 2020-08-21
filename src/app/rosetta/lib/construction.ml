@@ -304,6 +304,59 @@ module Payloads = struct
   module Mock = Impl (Result)
 end
 
+module Combine = struct
+  module Env = struct
+    module T (M : Monad_fail.S) = struct
+      type t = {lift: 'a 'e. ('a, 'e) Result.t -> ('a, 'e) M.t}
+    end
+
+    module Real = T (Deferred.Result)
+    module Mock = T (Result)
+
+    let real : Real.t = {lift= Deferred.return}
+
+    let mock : Mock.t = {lift= Fn.id}
+  end
+
+  module Impl (M : Monad_fail.S) = struct
+    let handle ~(env : Env.T(M).t) (req : Construction_combine_request.t) =
+      let open M.Let_syntax in
+      let%bind json =
+        try M.return (Yojson.Safe.from_string req.unsigned_transaction)
+        with _ -> M.fail (Errors.create (`Json_parse None))
+      in
+      let%bind unsigned_transaction =
+        Transaction.Unsigned.Rendered.of_yojson json
+        |> Result.map_error ~f:(fun e -> Errors.create (`Json_parse (Some e)))
+        |> Result.bind ~f:Transaction.Unsigned.of_rendered
+        |> env.lift
+      in
+      (* TODO: validate that public key is correct w.r.t. signature for this transaction *)
+      let%bind signature =
+        match req.signatures with
+        | s :: _ ->
+            M.return @@ s.signing_payload.hex_bytes
+        | _ ->
+            M.fail (Errors.create `Signature_missing)
+      in
+      let signed_transaction_full =
+        { Transaction.Signed.signature
+        ; nonce= unsigned_transaction.nonce
+        ; command= unsigned_transaction.command }
+      in
+      let%map rendered =
+        Transaction.Signed.render signed_transaction_full |> env.lift
+      in
+      let signed_transaction =
+        Transaction.Signed.Rendered.to_yojson rendered |> Yojson.Safe.to_string
+      in
+      {Construction_combine_response.signed_transaction}
+  end
+
+  module Real = Impl (Deferred.Result)
+  module Mock = Impl (Result)
+end
+
 module Parse = struct
   module Env = struct
     module T (M : Monad_fail.S) = struct
@@ -461,6 +514,16 @@ let router ~graphql_uri ~logger (route : string list) body =
         Payloads.Real.handle ~env:Payloads.Env.real req |> Errors.Lift.wrap
       in
       Construction_payloads_response.to_yojson res
+  | ["combine"] ->
+      let%bind req =
+        Errors.Lift.parse ~context:"Request"
+        @@ Construction_combine_request.of_yojson body
+        |> Errors.Lift.wrap
+      in
+      let%map res =
+        Combine.Real.handle ~env:Combine.Env.real req |> Errors.Lift.wrap
+      in
+      Construction_combine_response.to_yojson res
   | ["parse"] ->
       let%bind req =
         Errors.Lift.parse ~context:"Request"
