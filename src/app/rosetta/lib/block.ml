@@ -519,7 +519,7 @@ module Specific = struct
                       "Block user received $info" ;
                     { Transaction.transaction_identifier=
                         {Transaction_identifier.hash= info.hash}
-                    ; operations= User_command_info.to_operations info
+                    ; operations= User_command_info.to_operations' info
                     ; metadata= None } )
           ; metadata= Some (Block_info.creator_metadata block_info) }
       ; other_transactions= [] }

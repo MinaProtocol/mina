@@ -320,7 +320,7 @@ module Parse = struct
       let open M.Let_syntax in
       let%bind json =
         try M.return (Yojson.Safe.from_string req.transaction)
-        with e -> M.fail (Errors.create (`Json_parse None))
+        with _ -> M.fail (Errors.create (`Json_parse None))
       in
       let%map operations, `Pk signer_pk =
         match req.signed with
@@ -332,8 +332,8 @@ module Parse = struct
               |> Result.bind ~f:Unsigned_transaction.Signed.of_rendered
               |> env.lift
             in
-            (* TODO: Get the hash in there somehow! *)
-            ( User_command_info.to_operations signed_transaction.command
+            ( User_command_info.to_operations ~failure_status:None
+                signed_transaction.command
             , signed_transaction.command.source )
         | false ->
             let%map unsigned_transaction =
@@ -343,8 +343,8 @@ module Parse = struct
               |> Result.bind ~f:Unsigned_transaction.of_rendered
               |> env.lift
             in
-            (* TODO: Get the hash in there somehow! *)
-            ( User_command_info.to_operations unsigned_transaction.command
+            ( User_command_info.to_operations ~failure_status:None
+                unsigned_transaction.command
             , unsigned_transaction.command.source )
       in
       { Construction_parse_response.operations
