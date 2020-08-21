@@ -564,7 +564,7 @@ let create_new_token_graphql =
                   ?memo ()))
              graphql_endpoint
          in
-         printf "Dispatched create new token command with ID %s\n"
+         printf "Dispatched create new token command with TRANSACTION_ID %s\n"
            ((response#createToken)#createNewToken)#id ))
 
 let create_new_account_graphql =
@@ -631,7 +631,8 @@ let create_new_account_graphql =
                   ?memo ()))
              graphql_endpoint
          in
-         printf "Dispatched create new token command with ID %s\n"
+         printf
+           "Dispatched create new token account command with TRANSACTION_ID %s\n"
            ((response#createTokenAccount)#createNewTokenAccount)#id ))
 
 let mint_tokens_graphql =
@@ -673,7 +674,7 @@ let mint_tokens_graphql =
                   ?memo ()))
              graphql_endpoint
          in
-         printf "Dispatched create new token command with ID %s\n"
+         printf "Dispatched mint token command with TRANSACTION_ID %s\n"
            ((response#mintTokens)#mintTokens)#id ))
 
 let cancel_transaction_graphql =

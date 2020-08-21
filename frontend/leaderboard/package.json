@@ -3,10 +3,11 @@
   "version": "1.0.0",
   "scripts": {
     "dev": "bsb -clean-world -make-world -w",
-    "build": "bsb -clean-world -make-world",
+    "build": "bsb -make-world",
     "clean": "bsb -clean-world",
     "reformat": "bsrefmt --in-place src/**/*.re",
-    "test": "yarn run build && jest --root-dir lib/js/"
+    "test": "yarn run build && jest --root-dir lib/js/",
+    "start": "node ./lib/js/src/Main.bs.js"
   },
   "license": "ISC",
   "dependencies": {
