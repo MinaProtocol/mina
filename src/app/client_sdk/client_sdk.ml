@@ -40,6 +40,21 @@ let _ =
            val publicKey = pk_str_js
          end
 
+       (** return public key associated with private key in raw hex format for Rosetta *)
+       method rawPublicKeyOfPrivateKey (sk_base58_check_js : string_js) =
+         let sk =
+           Js.to_string sk_base58_check_js |> Private_key.of_base58_check_exn
+         in
+         Public_key.of_private_key_exn sk |> Raw.of_public_key
+
+       (** return public key in raw hex format for Rosetta *)
+       method rawPublicKeyOfPublicKey (pk_base58_check_js : string_js) =
+         let pk =
+           Js.to_string pk_base58_check_js
+           |> Public_key.Compressed.of_base58_check_exn
+         in
+         Raw.of_public_key_compressed pk
+
        (** sign arbitrary string with private key *)
        method signString (sk_base58_check_js : string_js) (str_js : string_js)
            =
