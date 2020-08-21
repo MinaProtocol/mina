@@ -21,9 +21,11 @@ module Make (Engine : Engine_intf) = struct
     (* namespace for this particular testnet *)
     let namespace = network.Network.namespace in
     (* node in that namespace *)
-    let node = "test-block-producer-1" in
-    (* wait for GraphQL server to start *)
-    let%bind () = Log_engine.wait_for_graphql ~node log_engine in
+    let node = Core_kernel.List.nth_exn network.block_producers 0 in
+    let logger = Logger.create () in
+    (* wait for initialization *)
+    let%bind () = Log_engine.wait_for_init node log_engine in
+    [%log info] "send_payment_test: done waiting for initialization" ;
     (* same keypairs used by Coda_automation to populate the ledger *)
     let keypairs = Lazy.force Coda_base.Sample_keypairs.keypairs in
     (* send the payment *)
@@ -31,7 +33,7 @@ module Make (Engine : Engine_intf) = struct
     let receiver, _sk2 = keypairs.(1) in
     let amount = Currency.Amount.of_int 200_000_000 in
     let fee = Currency.Fee.of_int 10_000_000 in
-    let logger = Logger.create () in
+    let node = "test-block-producer-1" in
     let%bind () =
       Node.send_payment ~logger ~namespace ~node ~sender ~receiver ~amount ~fee
     in

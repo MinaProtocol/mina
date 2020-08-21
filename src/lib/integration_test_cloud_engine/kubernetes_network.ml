@@ -147,6 +147,9 @@ module Node = struct
           [%log fatal] "Error running k8s port forwarding"
             ~metadata:[("error", `String (Error.to_string_hum err))] ;
           failwith "Could not run k8s port forwarding" ) ;
+    let sender_pk_str = Signature_lib.Public_key.Compressed.to_string sender in
+    [%log info] "send_payment: unlocking account"
+      ~metadata:[("sender_pk", `String sender_pk_str)] ;
     let unlock_sender_account_graphql () =
       let num_tries = 10 in
       let initial_delay_sec = 30.0 in
@@ -165,7 +168,7 @@ module Node = struct
           let open Deferred.Let_syntax in
           match%bind (Graphql.Client.query unlock_account_obj) Graphql.uri with
           | Ok _ ->
-              [%log info] "unlock account GraphQL succeeded" ;
+              [%log info] "unlock sender account succeeded" ;
               return (Ok ())
           | Error (`Failed_request err) ->
               [%log warn]
@@ -197,9 +200,7 @@ module Node = struct
           ~fee:(Graphql_lib.Encoders.fee fee)
           ()
       in
-      (* while we know GraphQL server is up by this point,
-         may have to wait while bootstrapping
-      *)
+      (* may have to retry if bootstrapping *)
       let open Deferred in
       let open Let_syntax in
       let rec go n =
@@ -233,7 +234,7 @@ module Node = struct
     let%map sent_payment_obj = send_payment_graphql () in
     let (`UserCommand id_obj) = (sent_payment_obj#sendPayment)#payment in
     let user_cmd_id = id_obj#id in
-    [%log info] "Send payment GraphQL succeeded"
+    [%log info] "Sent payment"
       ~metadata:[("user_command_id", `String user_cmd_id)] ;
     ()
 end

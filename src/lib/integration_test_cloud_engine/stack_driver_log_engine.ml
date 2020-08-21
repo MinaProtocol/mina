@@ -419,31 +419,8 @@ module Breadcrumb_added_query = struct
     Result.{user_commands}
 end
 
-module Graphql_ready_query = struct
-  module Result = struct
-    type t = {pod_name: string; host: Core.Unix.Inet_addr.t; peer_id: string}
-  end
-
-  let filter testnet_log_filter =
-    (*TODO: Structured logging ? *)
-    String.concat ~sep:"\n"
-      [testnet_log_filter; coda_container_filter; "\"Created GraphQL server\""]
-
-  let parse log =
-    let open Json_parsing in
-    let open Or_error.Let_syntax in
-    let%bind pod_name = find string log ["resource"; "labels"; "pod_name"] in
-    let%bind host_string =
-      find string log ["jsonPayload"; "metadata"; "host"]
-    in
-    let host = Core.Unix.Inet_addr.of_string host_string in
-    let%map peer_id = find string log ["jsonPayload"; "metadata"; "peer_id"] in
-    Result.{pod_name; host; peer_id}
-end
-
 type subscriptions =
   { initialization: Subscription.t
-  ; graphql_ready: Subscription.t
   ; blocks_produced: Subscription.t
   ; breadcrumb_added: Subscription.t }
 
@@ -467,10 +444,6 @@ let subscription_list ~logger testnet_log_filter :
     Subscription.create ~logger ~name:"initialization"
       ~filter:(Initialization_query.filter testnet_log_filter)
   in
-  let%bind graphql_ready =
-    Subscription.create ~logger ~name:"graphql_ready"
-      ~filter:(Graphql_ready_query.filter testnet_log_filter)
-  in
   let%bind blocks_produced =
     Subscription.create ~logger ~name:"blocks_produced"
       ~filter:(Block_produced_query.filter testnet_log_filter)
@@ -479,13 +452,12 @@ let subscription_list ~logger testnet_log_filter :
     Subscription.create ~logger ~name:"breadcrumb_added"
       ~filter:(Breadcrumb_added_query.filter testnet_log_filter)
   in
-  {initialization; graphql_ready; blocks_produced; breadcrumb_added}
+  {initialization; blocks_produced; breadcrumb_added}
 
-let delete_subscriptions
-    {initialization; graphql_ready; blocks_produced; breadcrumb_added} =
+let delete_subscriptions {initialization; blocks_produced; breadcrumb_added} =
   Deferred.Or_error.combine_errors
   @@ List.map
-       [initialization; graphql_ready; blocks_produced; breadcrumb_added]
+       [initialization; blocks_produced; breadcrumb_added]
        ~f:Subscription.delete
 
 let rec watch_for_initialization ~logger initialization_table
@@ -703,63 +675,6 @@ let wait_for :
         ~metadata:[("error", `String (Error.to_string_hum e))] ;
       let%map res = delete t in
       Or_error.combine_errors_unit [Error e; res]
-
-let wait_for_graphql ~node t =
-  [%log' info t.logger] "Waiting for GraphQL server on pod matching $node"
-    ~metadata:[("node", `String node)] ;
-  let retry_delay_sec = 20.0 in
-  let rec go () : unit Deferred.Or_error.t =
-    match%bind Subscription.pull t.subscriptions.graphql_ready with
-    | Ok [] ->
-        [%log' info t.logger] "wait_for_graphql, got empty list, trying again" ;
-        let%bind () = after (Time.Span.of_sec retry_delay_sec) in
-        go ()
-    | Ok jsons ->
-        (* we may see GraphQL servers started from multiple pods *)
-        let found_match =
-          List.fold jsons ~init:false ~f:(fun acc json ->
-              match Graphql_ready_query.parse json with
-              | Ok {pod_name; host; peer_id}
-                when String.is_prefix pod_name ~prefix:node ->
-                  [%log' info t.logger]
-                    "wait_for_graphql, got $host, $peer_id, $pod_name, which \
-                     matches expected node $node"
-                    ~metadata:
-                      [ ("host", `String (Core.Unix.Inet_addr.to_string host))
-                      ; ("peer_id", `String peer_id)
-                      ; ("pod_name", `String pod_name)
-                      ; ("node", `String node) ] ;
-                  true
-              | Ok {pod_name; host; peer_id} ->
-                  (* don't examine entry if we've found what we're looking for *)
-                  acc
-                  ||
-                  ( [%log' info t.logger]
-                      "wait_for_graphql, got $host, $peer_id, $pod_name, \
-                       which does not match expected node $node"
-                      ~metadata:
-                        [ ("host", `String (Core.Unix.Inet_addr.to_string host))
-                        ; ("peer_id", `String peer_id)
-                        ; ("pod_name", `String pod_name)
-                        ; ("node", `String node) ] ;
-                    false )
-              | Error err ->
-                  (* don't fail if we have a matching entry *)
-                  acc
-                  ||
-                  ( [%log' error t.logger]
-                      "wait_for_graphql, failed with parse error: $error"
-                      ~metadata:[("error", `String (Error.to_string_hum err))] ;
-                    false ) )
-        in
-        if found_match then return (Ok ()) else go ()
-    | Error err ->
-        [%log' fatal t.logger]
-          "wait_for_graphql failed with subscription pull error: $error"
-          ~metadata:[("error", `String (Error.to_string_hum err))] ;
-        return (Error err)
-  in
-  go ()
 
 let wait_for_payment ?(num_tries = 30) t ~logger ~sender ~receiver ~amount () =
   let retry_delay_sec = 30.0 in

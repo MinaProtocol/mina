@@ -117,9 +117,6 @@ module type Engine_intf = sig
 
     val wait_for_init : Node.t -> t -> unit Deferred.Or_error.t
 
-    (** wait until the GraphQL endpoint is available *)
-    val wait_for_graphql : node:string -> t -> unit Deferred.Or_error.t
-
     (** wait until a payment transaction appears in an added breadcrumb
         num_tries is the maximum number of breadcrumbs to examine
     *)
