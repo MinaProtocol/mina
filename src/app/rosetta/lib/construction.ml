@@ -171,7 +171,9 @@ module Metadata = struct
       { Construction_metadata_response.metadata=
           Metadata_data.create ~sender:options.Options.sender
             ~token_id:options.Options.token_id ~nonce
-          |> Metadata_data.to_yojson }
+          |> Metadata_data.to_yojson
+          (* TODO: Set this to our default fee, assuming it is fixed when we launch *)
+      ; suggested_fee= [Amount_of.coda (Unsigned.UInt64.of_int 100_000_000)] }
   end
 
   module Real = Impl (Deferred.Result)
