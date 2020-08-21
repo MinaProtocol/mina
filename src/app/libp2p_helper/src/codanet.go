@@ -101,12 +101,10 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 
 	filters := filters.NewFilters()
 
-	// Make sure this doesn't get too out of sync with the defaults,
-	// NewWithoutDefaults is considered unstable.
 	host, err := p2p.New(ctx,
 		p2p.Transport(tcp.NewTCPTransport),
 		p2p.Transport(ws.New),
-		p2p.Muxer("/mplex/6.7.0", DefaultMplexTransport),
+		p2p.Muxer("/coda/mplex/1.0.0", DefaultMplexTransport),
 		p2p.Security(secio.ID, secio.New),
 		p2p.Identity(pk),
 		p2p.Peerstore(ps),
@@ -125,6 +123,7 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 				go func() { kadch <- kad }()
 				return kad, err
 			})),
+		p2p.UserAgent("github.com/codaprotocol/coda/tree/master/src/app/libp2p_helper"),
 		p2p.PrivateNetwork(pnetKey[:]))
 
 	if err != nil {
