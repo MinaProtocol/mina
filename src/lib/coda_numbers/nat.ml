@@ -31,6 +31,9 @@ end)
 struct
   type t = N.t [@@deriving sexp, compare, hash, yojson]
 
+  (* can't be automatically derived *)
+  let dhall_type = Ppx_dhall_type.Dhall_type.Text
+
   let max_value = N.max_int
 
   include Comparable.Make (N)
