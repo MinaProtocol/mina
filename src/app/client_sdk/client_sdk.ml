@@ -55,6 +55,12 @@ let _ =
          in
          Raw.of_public_key_compressed pk
 
+       (** return public key, given that key in raw hex format for Rosetta *)
+       method publicKeyOfRawPublicKey (pk_raw_js : string_js) =
+         let pk_raw_str = Js.to_string pk_raw_js in
+         Raw.to_public_key_compressed pk_raw_str
+         |> Public_key.Compressed.to_base58_check |> Js.string
+
        (** sign arbitrary string with private key *)
        method signString (sk_base58_check_js : string_js) (str_js : string_js)
            =
@@ -151,4 +157,6 @@ let _ =
          in
          let signed = User_command.Poly.{payload; signer; signature} in
          User_command.check_signature signed
+
+       method runUnitTests () : bool Js.t = Raw.run_unit_tests () ; Js._true
     end)
