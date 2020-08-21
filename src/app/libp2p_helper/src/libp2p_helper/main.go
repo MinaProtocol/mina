@@ -16,19 +16,20 @@ import (
 	"sync"
 	"time"
 
-	mdns "github.com/libp2p/go-libp2p/p2p/discovery"
-
 	"encoding/base64"
 
 	"github.com/go-errors/errors"
+	"github.com/ipfs/go-ipfs/core/bootstrap"
 	logging "github.com/ipfs/go-log/v2"
 	crypto "github.com/libp2p/go-libp2p-core/crypto"
+	"github.com/libp2p/go-libp2p-core/event"
 	net "github.com/libp2p/go-libp2p-core/network"
 	peer "github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/peerstore"
+	peerstore "github.com/libp2p/go-libp2p-core/peerstore"
 	protocol "github.com/libp2p/go-libp2p-core/protocol"
-	discovery "github.com/libp2p/go-libp2p-discovery"
+	"github.com/libp2p/go-libp2p-discovery"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	mdns "github.com/libp2p/go-libp2p/p2p/discovery"
 	filter "github.com/libp2p/go-maddr-filter"
 	"github.com/multiformats/go-multiaddr"
 )
@@ -55,6 +56,8 @@ type app struct {
 	StreamsMutex    sync.Mutex
 	Out             *bufio.Writer
 	OutChan         chan interface{}
+	Bootstrapper    io.Closer
+	AddedPeers      []peer.AddrInfo
 	UnsafeNoTrustIP bool
 }
 
@@ -768,8 +771,11 @@ func (ap *addPeerMsg) run(app *app) (interface{}, error) {
 		return nil, badRPC(err)
 	}
 
-	// discovery should notice the connection event and do the dht thing
-	err = app.P2p.Host.Connect(app.Ctx, *info)
+	app.AddedPeers = append(app.AddedPeers, *info)
+	if app.Bootstrapper != nil {
+		app.Bootstrapper.Close()
+	}
+	app.Bootstrapper, err = bootstrap.Bootstrap(app.P2p.Me, app.P2p.Host, app.P2p.Dht, bootstrap.BootstrapConfigWithPeers(app.AddedPeers))
 
 	if err != nil {
 		return nil, badp2p(err)
@@ -813,21 +819,18 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 	discovered := make(chan peer.AddrInfo)
 	app.P2p.DiscoveredPeers = discovered
 
-	foundPeer := func(info peer.AddrInfo, source string) {
-		if info.ID != "" && len(info.Addrs) != 0 && info.ID != app.P2p.Me {
-			ctx, cancel := context.WithTimeout(app.Ctx, 15*time.Second)
-			defer cancel()
-			if err := app.P2p.Host.Connect(ctx, info); err != nil {
-				app.P2p.Logger.Warningf("couldn't connect to %s peer %v (maybe the network ID mismatched?): %v", source, info.Loggable(), err)
-			} else {
-				app.P2p.Logger.Infof("Found a %s peer: %s", source, info.Loggable())
-				app.P2p.Host.Peerstore().AddAddrs(info.ID, info.Addrs, peerstore.ConnectedAddrTTL)
-				addrStrings := make([]string, len(info.Addrs))
-				for i, a := range info.Addrs {
+	foundPeer := func(who peer.ID) {
+		if who.Validate() == nil && who != app.P2p.Me {
+			addrs := app.P2p.Host.Peerstore().Addrs(who)
+
+			if len(addrs) > 0 {
+				addrStrings := make([]string, len(addrs))
+				for i, a := range addrs {
 					addrStrings[i] = a.String()
 				}
+
 				app.writeMsg(discoveredPeerUpcall{
-					ID:     peer.IDB58Encode(info.ID),
+					ID:     peer.IDB58Encode(who),
 					Addrs:  addrStrings,
 					Upcall: "discoveredPeer",
 				})
@@ -835,36 +838,34 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 		}
 	}
 
+	if len(app.AddedPeers) > 0 {
+		app.Bootstrapper, err = bootstrap.Bootstrap(app.P2p.Me, app.P2p.Host, app.P2p.Dht, bootstrap.BootstrapConfigWithPeers(app.AddedPeers))
+		if err != nil {
+			return nil, badp2p(err)
+		}
+	}
+
 	// report local discovery peers
 	go func() {
 		for info := range l.FoundPeer {
-			foundPeer(info, "local")
+			app.P2p.Host.Peerstore().AddAddrs(info.ID, info.Addrs, peerstore.ConnectedAddrTTL)
+			foundPeer(info.ID)
 		}
 	}()
 
-	if err := app.P2p.Dht.Bootstrap(app.Ctx); err != nil {
-		return nil, badp2p(err)
-	}
-
 	discovery.Advertise(app.Ctx, routingDiscovery, app.P2p.Rendezvous)
 
-	// report dht peers
+	bus := app.P2p.Host.EventBus()
+	// report new peers we find peers
 	go func() {
-		// wait a bit for our advertisement to go out and get some responses
-		time.Sleep(1 * time.Second)
+		sub, err := bus.Subscribe(new(event.EvtPeerConnectednessChanged))
+		if err != nil {
+			panic(err)
+		}
 
-		for {
-			// default is to yield only 100 peers at a time. for now, always be
-			// looking... TODO: Is there a better way to use discovery? Should we only
-			// have to explicitly search once at startup?
-			dhtpeers, err := routingDiscovery.FindPeers(app.Ctx, app.P2p.Rendezvous)
-			if err != nil {
-				app.P2p.Logger.Error("failed to find DHT peers: ", err)
-			}
-			for info := range dhtpeers {
-				foundPeer(info, "dht")
-			}
-			time.Sleep(2 * time.Minute)
+		for evt := range sub.Out() {
+			e := evt.(event.EvtPeerConnectednessChanged)
+			foundPeer(e.Peer)
 		}
 	}()
 
@@ -900,7 +901,7 @@ func (lp *listPeersMsg) run(app *app) (interface{}, error) {
 
 	connsHere := app.P2p.Host.Network().Conns()
 
-	peerInfos := make([]codaPeerInfo, len(connsHere))
+	peerInfos := make([]codaPeerInfo, 0, len(connsHere))
 
 	for _, conn := range connsHere {
 		maybePeer, err := parseMultiaddrWithID(conn.RemoteMultiaddr(), conn.RemotePeer())
@@ -1039,6 +1040,7 @@ func main() {
 		Streams:        make(map[int]net.Stream),
 		OutChan:        make(chan interface{}, 4096),
 		Out:            out,
+		AddedPeers:     make([]peer.AddrInfo, 0, 512),
 	}
 
 	go func() {
@@ -1068,7 +1070,7 @@ func main() {
 
 	defer func() {
 		if r := recover(); r != nil {
-			helperLog.Error("While handling RPC:", line, "\nThe following panic occurred: ", r, "\nstack:\n", debug.Stack())
+			helperLog.Error("While handling RPC:", line, "\nThe following panic occurred: ", r, "\nstack:\n", string(debug.Stack()))
 		}
 	}()
 

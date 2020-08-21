@@ -15,9 +15,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/mux"
-
 	pool "github.com/libp2p/go-buffer-pool"
+	"github.com/multiformats/go-varint"
 )
 
 type conn struct {
@@ -76,10 +75,8 @@ func (t *MplexTransport) NewConn(nc net.Conn, isServer bool) (smux.Conn, error) 
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
-
 var mplexlog = logging.Logger("mplex")
 
-// Max message size in bytes before dropping (8MiB)
 var MaxMessageSize = 1 << 23
 
 // Max time to block waiting for a slow reader to read from a stream before
@@ -255,10 +252,14 @@ func (mp *Multiplex) handleOutgoing() {
 			return
 
 		case data := <-mp.writeCh:
-			err := mp.writeMsg(data)
+			// FIXME: https://github.com/libp2p/go-libp2p/issues/644
+			// write coalescing disabled until this can be fixed.
+			//err := mp.writeMsg(data)
+			err := mp.doWriteMsg(data)
+			pool.Put(data)
 			if err != nil {
 				// the connection is closed by this time
-				mplexlog.Warningf("error writing data: %s", err.Error())
+				mplexlog.Warnf("error writing data: %s", err.Error())
 				return
 			}
 		}
@@ -545,7 +546,7 @@ func (mp *Multiplex) handleIncoming() {
 				// closed stream, return b
 				pool.Put(b)
 
-				mplexlog.Warningf("Received data from remote after stream was closed by them. (len = %d)", len(b))
+				mplexlog.Warnf("Received data from remote after stream was closed by them. (len = %d)", len(b))
 				// go mp.sendResetMsg(msch.id.header(resetTag), false)
 				continue
 			}
@@ -557,7 +558,7 @@ func (mp *Multiplex) handleIncoming() {
 				pool.Put(b)
 			case <-recvTimeout.C:
 				pool.Put(b)
-				mplexlog.Warningf("timed out receiving message into stream queue.")
+				mplexlog.Warnf("timed out receiving message into stream queue.")
 				// Do not do this asynchronously. Otherwise, we
 				// could drop a message, then receive a message,
 				// then reset.
@@ -595,7 +596,7 @@ func (mp *Multiplex) sendResetMsg(header uint64, hard bool) {
 	err := mp.sendMsg(ctx.Done(), header, nil)
 	if err != nil && !mp.isShutdown() {
 		if hard {
-			mplexlog.Warningf("error sending reset message: %s; killing connection", err.Error())
+			mplexlog.Warnf("error sending reset message: %s; killing connection", err.Error())
 			mp.Close()
 		} else {
 			mplexlog.Debugf("error sending reset message: %s", err.Error())
@@ -604,7 +605,7 @@ func (mp *Multiplex) sendResetMsg(header uint64, hard bool) {
 }
 
 func (mp *Multiplex) readNextHeader() (uint64, uint64, error) {
-	h, err := binary.ReadUvarint(mp.buf)
+	h, err := varint.ReadUvarint(mp.buf)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -619,7 +620,7 @@ func (mp *Multiplex) readNextHeader() (uint64, uint64, error) {
 
 func (mp *Multiplex) readNext() ([]byte, error) {
 	// get length
-	l, err := binary.ReadUvarint(mp.buf)
+	l, err := varint.ReadUvarint(mp.buf)
 	if err != nil {
 		return nil, err
 	}
@@ -648,6 +649,11 @@ func isFatalNetworkError(err error) bool {
 	}
 	return false
 }
+
+var (
+	ErrStreamReset  = errors.New("stream reset")
+	ErrStreamClosed = errors.New("closed stream")
+)
 
 // streamID is a convenience type for operating on stream IDs
 type streamID struct {
@@ -711,7 +717,7 @@ func (s *Stream) waitForData() error {
 	case <-s.reset:
 		// This is the only place where it's safe to return these.
 		s.returnBuffers()
-		return mux.ErrReset
+		return ErrStreamReset
 	case read, ok := <-s.dataIn:
 		if !ok {
 			return io.EOF
@@ -749,7 +755,7 @@ func (s *Stream) returnBuffers() {
 func (s *Stream) Read(b []byte) (int, error) {
 	select {
 	case <-s.reset:
-		return 0, mux.ErrReset
+		return 0, ErrStreamReset
 	default:
 	}
 	if s.extra == nil {
@@ -797,14 +803,14 @@ func (s *Stream) Write(b []byte) (int, error) {
 
 func (s *Stream) write(b []byte) (int, error) {
 	if s.isClosed() {
-		return 0, errors.New("cannot write to closed stream")
+		return 0, ErrStreamClosed
 	}
 
 	err := s.mp.sendMsg(s.wDeadline.wait(), s.id.header(messageTag), b)
 
 	if err != nil {
 		if err == context.Canceled {
-			err = errors.New("cannot write to closed stream")
+			err = ErrStreamClosed
 		}
 		return 0, err
 	}
@@ -840,7 +846,7 @@ func (s *Stream) Close() error {
 	}
 
 	if err != nil && !s.mp.isShutdown() {
-		mplexlog.Warningf("Error closing stream: %s; killing connection", err.Error())
+		mplexlog.Warnf("Error closing stream: %s; killing connection", err.Error())
 		s.mp.Close()
 	}
 
@@ -927,6 +933,12 @@ func (s *Stream) SetWriteDeadline(t time.Time) error {
 	s.wDeadline.set(t)
 	return nil
 }
+
+// Copied from the go standard library.
+//
+// Copyright 2010 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE-BSD file.
 
 // pipeDeadline is an abstraction for handling timeouts.
 type pipeDeadline struct {
