@@ -10,10 +10,12 @@ open Core_kernel
 consensus_mechanism]
 
 open Coda_numbers
+open Snark_params.Tick
 
 [%%else]
 
 open Coda_numbers_nonconsensus.Coda_numbers
+open Snark_params_nonconsensus
 module Currency = Currency_nonconsensus.Currency
 
 [%%endif]
@@ -134,8 +136,7 @@ module type S = sig
   val next_available_token : t -> Token_id.t -> Token_id.t
 
   val to_input :
-       User_command_payload.t
-    -> (Snark_params.Tick.field, bool) Random_oracle_input.t
+    User_command_payload.t -> (Field.t, bool) Random_oracle_input.t
 
   (** Check that the command is used with compatible tokens. This check is fast
       and cheap, to be used for filtering.
