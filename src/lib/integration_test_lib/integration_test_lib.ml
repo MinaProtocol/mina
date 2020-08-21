@@ -33,6 +33,48 @@ module Test_config = struct
          Signature_lib.Public_key.Compressed.to_string pk) }
 end
 
+module Test_error = struct
+  type t =
+    | Remote_error of {node_id: string; error_message: Logger.Message.t}
+    | Internal_error of {occurrence_time: Time.t; error: Error.t}
+
+  let internal_error error =
+    Internal_error {occurrence_time= Time.now (); error}
+
+  let to_string = function
+    | Remote_error {node_id; error_message} ->
+        Printf.sprintf "[%s] %s: %s"
+          (Time.to_string error_message.timestamp)
+          node_id
+          (Yojson.Safe.to_string (Logger.Message.to_yojson error_message))
+    | Internal_error {occurrence_time; error} ->
+        Printf.sprintf "[%s] test_executive: %s"
+          (Time.to_string occurrence_time)
+          (Error.to_string_hum error)
+
+  let occurrence_time = function
+    | Remote_error {error_message; _} ->
+        error_message.timestamp
+    | Internal_error {occurrence_time; _} ->
+        occurrence_time
+
+  module Set = struct
+    type nonrec t = {soft_errors: t list; hard_errors: t list}
+
+    let empty = {soft_errors= []; hard_errors= []}
+
+    let soft_singleton err = {empty with soft_errors= [err]}
+
+    let hard_singleton err = {empty with hard_errors= [err]}
+
+    let merge a b =
+      { soft_errors= a.soft_errors @ b.soft_errors
+      ; hard_errors= a.hard_errors @ b.hard_errors }
+
+    let combine = List.fold_left ~init:empty ~f:merge
+  end
+end
+
 (** The signature of integration test engines. An integration test engine
  *  provides the core functionality for deploying, monitoring, and
  *  interacting with networks.
@@ -96,9 +138,13 @@ module type Engine_intf = sig
   module Log_engine : sig
     type t
 
-    val create : logger:Logger.t -> Network.t -> t Deferred.Or_error.t
+    val create :
+         logger:Logger.t
+      -> network:Network.t
+      -> on_fatal_error:(unit -> unit)
+      -> t Deferred.Or_error.t
 
-    val delete : t -> unit Deferred.Or_error.t
+    val destroy : t -> Test_error.Set.t Deferred.Or_error.t
 
     (** waits until a block is produced with at least one of the following conditions being true
       1. Blockchain length = blocks

@@ -2,4 +2,4 @@
   (name with_hash)
   (public_name with_hash)
   (libraries core_kernel)
-  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_version)))
+  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_deriving.std ppx_version)))
