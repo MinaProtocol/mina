@@ -21,7 +21,7 @@ RUN apt-get -y update \
     libssl1.1 \
     tzdata
 
-COPY --from=codaprotocol/coda-rosetta:0.0.15-beta-develop /coda-bin/generate_keypair/ /
+COPY --from=gcr.io/o1labs-192920/coda-rosetta:generate-keypair-deb /coda-bin/generate_keypair/ /
 
 WORKDIR /
 
