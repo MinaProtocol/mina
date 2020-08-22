@@ -1,0 +1,28 @@
+#################################################################################################
+# The "production" Stage
+# - sets up the final container with built binaries and a running postgresql archive node setup
+#################################################################################################
+FROM debian:buster-slim AS production
+
+ENV DEBIAN_FRONTEND noninteractive
+
+# Dependencies
+# buster-slim configures apt to not store any cache, so no need to rm it
+# TODO: make sure this is the minimum runtime deps
+RUN apt-get -y update \
+  && apt -y install \
+    ca-certificates \
+    dnsutils \
+    dumb-init \
+    libffi6 \
+    libgmp10 \
+    libgomp1 \
+    libjemalloc-dev \
+    libssl1.1 \
+    tzdata
+
+COPY --from=codaprotocol/coda-rosetta:0.0.15-beta-develop /coda-bin/generate_keypair/ /
+
+WORKDIR /
+
+ENTRYPOINT [ "/generate_keypair.exe" ]

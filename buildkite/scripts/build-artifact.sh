@@ -19,7 +19,11 @@ echo "--- Build libp2p_helper TODO: use the previously uploaded build artifact"
 LIBP2P_NIXLESS=1 make libp2p_helper
 
 echo "--- Build generate-keypair binary"
+# HACK: build generate-keypair without additional cpu flags
+sed -i 's/+bmi2,+adx/-bmi2,-adx/g' src/lib/zexe/snarky-bn382/dune
 dune build --profile=${DUNE_PROFILE} src/app/generate_keypair/generate_keypair.exe 2>&1 | tee /tmp/buildocaml2.log
+# Fix above HACK before building anything else
+sed -i 's/-bmi2,-adx/+bmi2,+adx/' src/lib/zexe/snarky-bn382/dune
 
 echo "--- Build runtime_genesis_ledger binary"
 dune exec --profile=${DUNE_PROFILE} src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe

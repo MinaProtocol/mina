@@ -228,6 +228,9 @@ RUN git pull \
    && go build -o ${HOME}/app/libp2p_helper \
    && go clean --cache --modcache --testcache -r
 
+# HACK: build without special cpu features to allow more people to run coda
+RUN sed -i 's/+bmi2,+adx/-bmi2,-adx/g' src/lib/zexe/snarky-bn382/dune
+
 # Make rosetta-crucial components and the generate_keypair tool
 RUN eval $(opam config env) \
   && git pull \
