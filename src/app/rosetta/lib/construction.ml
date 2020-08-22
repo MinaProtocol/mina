@@ -27,6 +27,18 @@ module Get_nonce =
      }
 |}]
 
+module Send_payment =
+[%graphql
+{|
+  mutation send($from: PublicKey!, $to_: PublicKey!, $amount: UInt64, $fee: UInt64, $nonce: UInt32!, $signature: String!) {
+    sendPayment(signature: {rawSignature: $signature}, input: {from: $from, to:$to_, amount:$amount, fee:$fee, nonce:$nonce}) {
+      payment {
+        id
+        to_: to @bsDecoder(fn: "Graphql.Decoders.publicKey")
+      }
+  }}
+  |}]
+
 module Options = struct
   type t = {sender: Public_key.Compressed.t; token_id: Unsigned.UInt64.t}
 
@@ -476,6 +488,82 @@ module Hash = struct
   module Mock = Impl (Result)
 end
 
+module Submit = struct
+  module Env = struct
+    module T (M : Monad_fail.S) = struct
+      type 'gql t =
+        { gql:
+               ?token_id:Unsigned.UInt64.t
+            -> address:Public_key.Compressed.t
+            -> unit
+            -> ('gql, Errors.t) M.t
+        ; validate_network_choice: 'gql Network.Validate_choice.Impl(M).t
+        ; lift: 'a 'e. ('a, 'e) Result.t -> ('a, 'e) M.t }
+    end
+
+    module Real = T (Deferred.Result)
+    module Mock = T (Result)
+
+    let real : graphql_uri:Uri.t -> 'gql Real.t =
+     fun ~graphql_uri ->
+      { gql=
+          (fun ?token_id ~address () ->
+            Graphql.query
+              (Get_nonce.make
+                 ~public_key:
+                   (`String (Public_key.Compressed.to_base58_check address))
+                 ~token_id:
+                   ( match token_id with
+                   | Some x ->
+                       `String (Unsigned.UInt64.to_string x)
+                   | None ->
+                       `Null )
+                 ())
+              graphql_uri )
+      ; validate_network_choice= Network.Validate_choice.Real.validate
+      ; lift= Deferred.return }
+  end
+
+  module Impl (M : Monad_fail.S) = struct
+    let handle ~(env : 'gql Env.T(M).t) (req : Construction_metadata_request.t)
+        =
+      let open M.Let_syntax in
+      let%bind options = Options.of_json req.options |> env.lift in
+      let%bind res =
+        env.gql ~token_id:options.token_id ~address:options.sender ()
+      in
+      let%bind () =
+        env.validate_network_choice ~network_identifier:req.network_identifier
+          ~gql_response:res
+      in
+      let%map account =
+        match res#account with
+        | None ->
+            M.fail
+              (Errors.create
+                 (`Account_not_found
+                   (Public_key.Compressed.to_base58_check options.sender)))
+        | Some account ->
+            M.return account
+      in
+      let nonce =
+        Option.map
+          ~f:(fun nonce -> Unsigned.UInt32.(of_string nonce |> add one))
+          account#nonce
+        |> Option.value ~default:Unsigned.UInt32.one
+      in
+      { Construction_metadata_response.metadata=
+          Metadata_data.create ~sender:options.Options.sender
+            ~token_id:options.Options.token_id ~nonce
+          |> Metadata_data.to_yojson
+          (* TODO: Set this to our default fee, assuming it is fixed when we launch *)
+      ; suggested_fee= [Amount_of.coda (Unsigned.UInt64.of_int 100_000_000)] }
+  end
+
+  module Real = Impl (Deferred.Result)
+  module Mock = Impl (Result)
+end
+
 let router ~graphql_uri ~logger (route : string list) body =
   [%log debug] "Handling /construction/ $route"
     ~metadata:[("route", `List (List.map route ~f:(fun s -> `String s)))] ;
@@ -552,5 +640,16 @@ let router ~graphql_uri ~logger (route : string list) body =
         Hash.Real.handle ~env:Hash.Env.real req |> Errors.Lift.wrap
       in
       Construction_hash_response.to_yojson res
+  | ["submit"] ->
+      let%bind req =
+        Errors.Lift.parse ~context:"Request"
+        @@ Construction_submit_request.of_yojson body
+        |> Errors.Lift.wrap
+      in
+      let%map res =
+        Submit.Real.handle ~env:(Submit.Env.real ~graphql_uri) req
+        |> Errors.Lift.wrap
+      in
+      Construction_submit_response.to_yojson res
   | _ ->
       Deferred.Result.fail `Page_not_found
