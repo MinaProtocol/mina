@@ -6,6 +6,7 @@ module Transaction = Transaction'
 module Public_key = Signature_lib.Public_key
 module User_command_payload = Coda_base.User_command_payload
 module User_command = Coda_base.User_command
+module Transaction_hash = Coda_base.Transaction_hash
 
 module Get_nonce =
 [%graphql
@@ -358,6 +359,62 @@ module Parse = struct
   module Mock = Impl (Result)
 end
 
+module Hash = struct
+  module Env = struct
+    module T (M : Monad_fail.S) = struct
+      type t = {lift: 'a 'e. ('a, 'e) Result.t -> ('a, 'e) M.t}
+    end
+
+    module Real = T (Deferred.Result)
+    module Mock = T (Result)
+
+    let real : Real.t = {lift= Deferred.return}
+
+    let mock : Mock.t = {lift= Fn.id}
+  end
+
+  module Impl (M : Monad_fail.S) = struct
+    let handle ~(env : Env.T(M).t) (req : Construction_hash_request.t) =
+      let open M.Let_syntax in
+      let%bind json =
+        try M.return (Yojson.Safe.from_string req.signed_transaction)
+        with _ -> M.fail (Errors.create (`Json_parse None))
+      in
+      let%bind signed_transaction =
+        Transaction.Signed.Rendered.of_yojson json
+        |> Result.map_error ~f:(fun e -> Errors.create (`Json_parse (Some e)))
+        |> Result.bind ~f:Transaction.Signed.of_rendered
+        |> env.lift
+      in
+      let%bind signer =
+        let (`Pk pk) = signed_transaction.command.source in
+        Public_key.Compressed.of_base58_check pk
+        |> Result.map_error ~f:(fun _ ->
+               Errors.create ~context:"compression"
+                 `Public_key_format_not_valid )
+        |> Result.bind ~f:(fun pk ->
+               Result.of_option (Public_key.decompress pk)
+                 ~error:
+                   (Errors.create ~context:"decompression"
+                      `Public_key_format_not_valid) )
+        |> env.lift
+      in
+      let%map payload =
+        User_command_info.Partial.to_user_command_payload
+          ~nonce:signed_transaction.nonce signed_transaction.command
+        |> env.lift
+      in
+      (* TODO: Implement signature coding *)
+      let signature = failwith "Implement signature coding" in
+      let full_command = {User_command.Poly.payload; signature; signer} in
+      let hash = Transaction_hash.hash_user_command full_command in
+      Construction_hash_response.create (Transaction_hash.to_base58_check hash)
+  end
+
+  module Real = Impl (Deferred.Result)
+  module Mock = Impl (Result)
+end
+
 let router ~graphql_uri ~logger (route : string list) body =
   [%log debug] "Handling /construction/ $route"
     ~metadata:[("route", `List (List.map route ~f:(fun s -> `String s)))] ;
@@ -414,5 +471,15 @@ let router ~graphql_uri ~logger (route : string list) body =
         Parse.Real.handle ~env:Parse.Env.real req |> Errors.Lift.wrap
       in
       Construction_parse_response.to_yojson res
+  | ["hash"] ->
+      let%bind req =
+        Errors.Lift.parse ~context:"Request"
+        @@ Construction_hash_request.of_yojson body
+        |> Errors.Lift.wrap
+      in
+      let%map res =
+        Hash.Real.handle ~env:Hash.Env.real req |> Errors.Lift.wrap
+      in
+      Construction_hash_response.to_yojson res
   | _ ->
       Deferred.Result.fail `Page_not_found
