@@ -77,6 +77,10 @@ module Raw = struct
         Some (Field.of_string a, Inner_curve.Scalar.of_string b)
     | _ ->
         None
+
+  let%test_unit "partial isomorphism" =
+    Quickcheck.test ~trials:300 Stable.V1.gen ~f:(fun signature ->
+        [%test_eq: t option] (Some signature) (encode signature |> decode) )
 end
 
 [%%ifdef
