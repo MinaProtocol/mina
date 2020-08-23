@@ -46,40 +46,44 @@ module Unsigned = struct
     Random_oracle_input.Coding.field_of_string s ~size_in_bits:255
     |> Result.map ~f:(fun bits -> Snark_params.Tick.Field.project bits)
 
-  let render (t : t) =
-    let open User_command_info.Partial in
+  let un_pk (`Pk pk) = pk
+
+  let render_command ~nonce (command : User_command_info.Partial.t) =
     let open Result.Let_syntax in
-    let un_pk (`Pk pk) = pk in
-    let random_oracle_input =
-      Random_oracle_input.Coding.serialize ~string_of_field ~to_bool:Fn.id
-        ~of_bool:Fn.id t.random_oracle_input
-    in
     let%bind amount =
-      Result.of_option t.command.amount
+      Result.of_option command.amount
         ~error:
           (Errors.create
              (`Operations_not_valid [Errors.Partial_reason.Amount_not_some]))
     in
-    match t.command.kind with
+    match command.kind with
     | `Payment ->
         let payment =
-          { Rendered.Payment.to_= un_pk t.command.receiver
-          ; from= un_pk t.command.source
-          ; fee= t.command.fee
-          ; nonce= t.nonce
-          ; token= t.command.token
+          { Rendered.Payment.to_= un_pk command.receiver
+          ; from= un_pk command.source
+          ; fee= command.fee
+          ; nonce
+          ; token= command.token
           ; memo= None
           ; amount
           ; valid_until= None }
         in
-        Result.return
-          { Rendered.random_oracle_input
-          ; payment= Some payment
-          ; stake_delegation= None }
+        Result.return (`Payment payment)
     | _ ->
         Result.fail
           (Errors.create ~context:"Unsigned transaction rendering"
              `Unsupported_operation_for_construction)
+
+  let render (t : t) =
+    let open Result.Let_syntax in
+    let random_oracle_input =
+      Random_oracle_input.Coding.serialize ~string_of_field ~to_bool:Fn.id
+        ~of_bool:Fn.id t.random_oracle_input
+    in
+    let%map (`Payment payment) = render_command ~nonce:t.nonce t.command in
+    { Rendered.random_oracle_input
+    ; payment= Some payment
+    ; stake_delegation= None }
 
   let of_rendered_payment (r : Rendered.Payment.t) :
       User_command_info.Partial.t =
@@ -136,6 +140,15 @@ module Signed = struct
       ; stake_delegation: Unsigned.Rendered.Delegation.t option }
     [@@deriving yojson]
   end
+
+  let render (t : t) =
+    let open Result.Let_syntax in
+    let%map (`Payment payment) =
+      Unsigned.render_command ~nonce:t.nonce t.command
+    in
+    { Rendered.signature= t.signature
+    ; payment= Some payment
+    ; stake_delegation= None }
 
   let of_rendered (r : Rendered.t) : (t, Errors.t) Result.t =
     match (r.payment, r.stake_delegation) with
