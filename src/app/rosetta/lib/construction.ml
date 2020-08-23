@@ -1,6 +1,8 @@
 open Core_kernel
 open Async
+module Transaction' = Transaction
 open Models
+module Transaction = Transaction'
 module Public_key = Signature_lib.Public_key
 module User_command_payload = Coda_base.User_command_payload
 module User_command = Coda_base.User_command
@@ -277,11 +279,11 @@ module Payloads = struct
       in
       let random_oracle_input = User_command.to_input user_command_payload in
       let%map unsigned_transaction_string =
-        { Unsigned_transaction.random_oracle_input
+        { Transaction.Unsigned.random_oracle_input
         ; command= partial_user_command
         ; nonce= metadata.nonce }
-        |> Unsigned_transaction.render
-        |> Result.map ~f:Unsigned_transaction.Rendered.to_yojson
+        |> Transaction.Unsigned.render
+        |> Result.map ~f:Transaction.Unsigned.Rendered.to_yojson
         |> Result.map ~f:Yojson.Safe.to_string
         |> env.lift
       in
@@ -295,6 +297,61 @@ module Payloads = struct
                  pk)
             ; hex_bytes= pk
             ; signature_type= Some "schnorr" } ] }
+  end
+
+  module Real = Impl (Deferred.Result)
+  module Mock = Impl (Result)
+end
+
+module Parse = struct
+  module Env = struct
+    module T (M : Monad_fail.S) = struct
+      type t = {lift: 'a 'e. ('a, 'e) Result.t -> ('a, 'e) M.t}
+    end
+
+    module Real = T (Deferred.Result)
+    module Mock = T (Result)
+
+    let real : Real.t = {lift= Deferred.return}
+
+    let mock : Mock.t = {lift= Fn.id}
+  end
+
+  module Impl (M : Monad_fail.S) = struct
+    let handle ~(env : Env.T(M).t) (req : Construction_parse_request.t) =
+      let open M.Let_syntax in
+      let%bind json =
+        try M.return (Yojson.Safe.from_string req.transaction)
+        with _ -> M.fail (Errors.create (`Json_parse None))
+      in
+      let%map operations, `Pk signer_pk =
+        match req.signed with
+        | true ->
+            let%map signed_transaction =
+              Transaction.Signed.Rendered.of_yojson json
+              |> Result.map_error ~f:(fun e ->
+                     Errors.create (`Json_parse (Some e)) )
+              |> Result.bind ~f:Transaction.Signed.of_rendered
+              |> env.lift
+            in
+            ( User_command_info.to_operations ~failure_status:None
+                signed_transaction.command
+            , signed_transaction.command.source )
+        | false ->
+            let%map unsigned_transaction =
+              Transaction.Unsigned.Rendered.of_yojson json
+              |> Result.map_error ~f:(fun e ->
+                     Errors.create (`Json_parse (Some e)) )
+              |> Result.bind ~f:Transaction.Unsigned.of_rendered
+              |> env.lift
+            in
+            ( User_command_info.to_operations ~failure_status:None
+                unsigned_transaction.command
+            , unsigned_transaction.command.source )
+      in
+      { Construction_parse_response.operations
+      ; signers= [signer_pk]
+      ; metadata= None }
   end
 
   module Real = Impl (Deferred.Result)
@@ -347,5 +404,15 @@ let router ~graphql_uri ~logger (route : string list) body =
         Payloads.Real.handle ~env:Payloads.Env.real req |> Errors.Lift.wrap
       in
       Construction_payloads_response.to_yojson res
+  | ["parse"] ->
+      let%bind req =
+        Errors.Lift.parse ~context:"Request"
+        @@ Construction_parse_request.of_yojson body
+        |> Errors.Lift.wrap
+      in
+      let%map res =
+        Parse.Real.handle ~env:Parse.Env.real req |> Errors.Lift.wrap
+      in
+      Construction_parse_response.to_yojson res
   | _ ->
       Deferred.Result.fail `Page_not_found
