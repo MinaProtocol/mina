@@ -328,6 +328,46 @@ jobs:
             - run:
                   name: Compare test signatures for consensus, nonconsensus code
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'eval `opam config env` && export PATH="$HOME/.cargo/bin:$PATH" && ./scripts/compare_test_signatures.sh'
+    client-sdk-unit-tests:
+        docker:
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
+        steps:
+            
+            - run:
+                name: Disable LFS checkout
+                command: |
+                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                    git config --global lfs.fetchexclude "*"
+            - checkout
+
+            
+            - run:
+                  name: Update Submodules
+                  command: git submodule sync && git submodule update --init --recursive
+            - run:
+                name: Create opam cache signature file including a year/date stamp to ensure occasional rebuilds
+                command: |
+                    cat scripts/setup-opam.sh > opam_ci_cache.sig
+                    cat src/opam.export >> opam_ci_cache.sig
+                    date +%Y-%m >> opam_ci_cache.sig
+            - restore_cache:
+                name: Restore cache - opam
+                keys:
+                    - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
+            - run:
+                name: Install opam dependencies - opam -- make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make setup-opam'
+
+            - run:
+                  name: Build client SDK, run unit tests
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'eval `opam config env` && export PATH="$HOME/.cargo/bin:$PATH" && ./scripts/client-sdk-unit-tests.sh'
+            - run:
+                  name: Yarn deps
+                  command: cd frontend/client_sdk && yarn install
+            - run:
+                  name: Prepublish client SDK packages
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; eval `opam config env` && cd frontend/client_sdk && yarn prepublishOnly'
+
     update-branch-protection:
         docker:
             - image: python:3
@@ -511,54 +551,6 @@ jobs:
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh scripts/artifacts.sh
             - store_artifacts:
                   path: package
-
-    build-client-sdk:
-        resource_class: large
-        docker:
-            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
-        steps:
-            
-            - run:
-                name: Disable LFS checkout
-                command: |
-                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
-                    git config --global lfs.fetchexclude "*"
-            - checkout
-
-            - run:
-                  name: Artifacts Path
-                  command: |
-                      mkdir -p /tmp/artifacts
-            
-            - run:
-                  name: Update Submodules
-                  command: git submodule sync && git submodule update --init --recursive
-            - run:
-                name: Create opam cache signature file including a year/date stamp to ensure occasional rebuilds
-                command: |
-                    cat scripts/setup-opam.sh > opam_ci_cache.sig
-                    cat src/opam.export >> opam_ci_cache.sig
-                    date +%Y-%m >> opam_ci_cache.sig
-            - restore_cache:
-                name: Restore cache - opam
-                keys:
-                    - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
-            - run:
-                name: Install opam dependencies - opam -- make setup-opam
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make setup-opam'
-
-            - run:
-                  name: Build client SDK for Javascript
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; eval `opam config env` && make client_sdk 2>&1 | tee /tmp/artifacts/buildclientsdk.log'
-                  environment:
-                    DUNE_PROFILE: nonconsensus_medium_curves
-                  no_output_timeout: 10m
-            - run:
-                  name: Yarn deps
-                  command: cd frontend/client_sdk && yarn install
-            - run:
-                  name: Build And Test Client SDK
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; eval `opam config env` && cd frontend/client_sdk && yarn prepublishOnly'
     build-artifacts--testnet_postake_medium_curves:
         resource_class: xlarge
         docker:
@@ -1467,6 +1459,7 @@ workflows:
             - lint
             - lint-opt
             - compare-test-signatures
+            - client-sdk-unit-tests
             - update-branch-protection:
                 filters:
                   branches:
@@ -1476,7 +1469,6 @@ workflows:
             - test-archive
             - build-archive
             - build-macos
-            - build-client-sdk
             - build-artifacts--testnet_postake_medium_curves
             - build-artifacts-docker--testnet_postake_medium_curves--coda-daemon:
                 requires:
