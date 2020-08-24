@@ -47,7 +47,7 @@ Pipeline.build
         },
       Command.build
         Command.Config::{
-          commands = OpamInit.andThenRunInDocker ([] : List Text) "bash source ~/.profile && cd frontend/client_sdk && yarn prepublishOnly",
+          commands = OpamInit.andThenRunInDocker ([] : List Text) "./buildkite/scripts/publish-client-sdk.sh",
           label = "Prepublish client SDK packages",
           key = "prepublish-client-sdk",
           target = Size.Medium,
