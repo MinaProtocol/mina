@@ -69,7 +69,7 @@ let%test_unit "error_monad_unit_test_1" =
         f (f (f (f (f (return 0)))))
       in
       [%test_eq: (int Accumulator.t, Hard_fail.t) Result.t] test1
-        (Ok {Accumulator.computation_result= 6; soft_errors= []}) )
+        (Ok {Accumulator.computation_result= 5; soft_errors= []}) )
 
 let%test_unit "error_monad_unit_test_2" =
   Async.Thread_safe.block_on_async_exn (fun () ->
