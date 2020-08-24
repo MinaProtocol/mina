@@ -39,19 +39,19 @@ Pipeline.build
         },
       Command.build
         Command.Config::{
-          commands = OpamInit.andThenRunInDocker ([] : List Text) "./scripts/client-sdk-unit-tests.sh",
-          label = "Build client SDK, run unit tests",
-          key = "client-sdk-build-unittests",
-          target = Size.Medium,
-          docker = None Docker.Type
+          commands = OpamInit.andThenRunInDocker ([] : List Text) "./scripts/client-sdk-unit-tests.sh"
+          , label = "Build client SDK, run unit tests"
+          , key = "client-sdk-build-unittests"
+          , target = Size.Medium
+          , docker = None Docker.Type
         },
       Command.build
         Command.Config::{
-          commands = OpamInit.andThenRunInDocker ([] : List Text) "./buildkite/scripts/client-sdk-tool.sh 'prepublishOnly'",
-          label = "Prepublish client SDK packages",
-          key = "prepublish-client-sdk",
-          target = Size.Medium,
-          docker = None Docker.Type
+          commands = OpamInit.andThenRunInDocker ([] : List Text) "./buildkite/scripts/client-sdk-tool.sh 'prepublishOnly'"
+          , label = "Prepublish client SDK packages"
+          , key = "prepublish-client-sdk"
+          , target = Size.Medium
+          , docker = None Docker.Type
         }
     ]
   }

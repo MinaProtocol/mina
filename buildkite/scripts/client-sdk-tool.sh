@@ -9,8 +9,7 @@ fi
 
 yarn_args="${1}"
 
-echo "--- Client SDK execute ${yarn_args}"
-
+echo "--- Client SDK execute: ${yarn_args}"
 eval `opam config env` && \
   pushd frontend/client_sdk && \
   yarn install && \
