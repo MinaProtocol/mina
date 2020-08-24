@@ -26,6 +26,10 @@ module Time = struct
     end
   end]
 
+  let max_value = UInt64.max_int
+
+  let zero = UInt64.zero
+
   module Controller = struct
     [%%if
     time_offsets]

@@ -170,6 +170,8 @@ module Make (Inputs : Intf.Inputs_intf) :
             +. (0.5 *. Random.float Worker_state.worker_wait_time)
           in
           (* No work to be done -- quietly take a brief nap *)
+          [%log info] "No jobs available. Napping for $time seconds"
+            ~metadata:[("time", `Float random_delay)] ;
           let%bind () = wait ~sec:random_delay () in
           go ()
       | Ok (Some (work, public_key)) -> (
