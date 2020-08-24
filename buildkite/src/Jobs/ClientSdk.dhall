@@ -47,7 +47,7 @@ Pipeline.build
         },
       Command.build
         Command.Config::{
-          commands = OpamInit.andThenRunInDocker ([] : List Text) "cd frontend/client_sdk && yarn prepublishOnly",
+          commands = OpamInit.andThenRunInDocker ([] : List Text) "opam install dune && cd frontend/client_sdk && yarn prepublishOnly",
           label = "Prepublish Client SDK packages",
           key = "prepublish-client-sdk",
           target = Size.Medium,
