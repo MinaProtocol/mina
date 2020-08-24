@@ -11,8 +11,8 @@ yarn_args="${1}"
 
 echo "--- Client SDK execute ${yarn_args}"
 
-source ~/.profile
 eval `opam config env` && \
   pushd frontend/client_sdk && \
+  yarn install && \
   yarn ${yarn_args} && \
   popd 
