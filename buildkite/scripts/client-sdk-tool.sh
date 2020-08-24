@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -o pipefail
+set -eo pipefail
 
 if [[ $# -ne 1 ]]; then
     echo "Usage: $0 '<yarn-args>'"
@@ -9,6 +9,10 @@ fi
 
 yarn_args="${1}"
 
-echo "--- (Pre)publish Client SDK"
+echo "--- Client SDK execute ${yarn_args}"
+
 source ~/.profile
-cd frontend/client_sdk && yarn ${yarn_args}
+eval `opam config env` && \
+  pushd frontend/client_sdk && \
+  yarn ${yarn_args} && \
+  popd 
