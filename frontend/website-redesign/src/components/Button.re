@@ -47,8 +47,8 @@ module Styles = {
 [@react.component]
 let make = (~href="", ~buttonLabel, ~bgColor=Theme.Colors.orange, ~dark=false) => {
   <Next.Link href>
-    <a className={Styles.button(bgColor, dark)}>
+    <button className={Styles.button(bgColor, dark)}>
       {React.string(buttonLabel)}
-    </a>
+    </button>
   </Next.Link>;
 };
