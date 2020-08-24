@@ -4,8 +4,8 @@ module Styles = {
     merge([
       Theme.Type.buttonLabel,
       style([
-        width(`rem(10.68)),
-        height(`rem(1.)),
+        width(`rem(10.9)),
+        height(`rem(3.25)),
         border(`px(1), `solid, black),
         boxShadow(~x=`px(4), ~y=`px(4), black),
         backgroundColor(bgColor),
