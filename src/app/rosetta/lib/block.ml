@@ -500,28 +500,29 @@ module Specific = struct
       let coinbase = (res#genesisConstants)#coinbase in
       let%map block_info = env.db_block query in
       { Block_response.block=
-          { Block.block_identifier= block_info.block_identifier
-          ; parent_block_identifier= block_info.parent_block_identifier
-          ; timestamp= block_info.timestamp
-          ; transactions=
-              List.map block_info.internal_info ~f:(fun info ->
-                  [%log debug]
-                    ~metadata:[("info", Internal_command_info.to_yojson info)]
-                    "Block internal received $info" ;
-                  { Transaction.transaction_identifier=
-                      {Transaction_identifier.hash= info.hash}
-                  ; operations=
-                      Internal_command_info.to_operations ~coinbase info
-                  ; metadata= None } )
-              @ List.map block_info.user_commands ~f:(fun info ->
+          Some
+            { Block.block_identifier= block_info.block_identifier
+            ; parent_block_identifier= block_info.parent_block_identifier
+            ; timestamp= block_info.timestamp
+            ; transactions=
+                List.map block_info.internal_info ~f:(fun info ->
                     [%log debug]
-                      ~metadata:[("info", User_command_info.to_yojson info)]
-                      "Block user received $info" ;
+                      ~metadata:[("info", Internal_command_info.to_yojson info)]
+                      "Block internal received $info" ;
                     { Transaction.transaction_identifier=
                         {Transaction_identifier.hash= info.hash}
-                    ; operations= User_command_info.to_operations info
+                    ; operations=
+                        Internal_command_info.to_operations ~coinbase info
                     ; metadata= None } )
-          ; metadata= Some (Block_info.creator_metadata block_info) }
+                @ List.map block_info.user_commands ~f:(fun info ->
+                      [%log debug]
+                        ~metadata:[("info", User_command_info.to_yojson info)]
+                        "Block user received $info" ;
+                      { Transaction.transaction_identifier=
+                          {Transaction_identifier.hash= info.hash}
+                      ; operations= User_command_info.to_operations' info
+                      ; metadata= None } )
+            ; metadata= Some (Block_info.creator_metadata block_info) }
       ; other_transactions= [] }
   end
 

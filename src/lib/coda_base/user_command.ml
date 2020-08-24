@@ -169,7 +169,7 @@ module Gen = struct
     let payload : Payload.t =
       Payload.create ~fee ~fee_token
         ~fee_payer_pk:(Public_key.compress signer.public_key)
-        ~nonce ~valid_until:Global_slot.max_value
+        ~nonce ~valid_until:None
         ~memo:(User_command_memo.create_by_digesting_string_exn memo)
         ~body
     in
@@ -322,8 +322,7 @@ module Gen = struct
           let payload =
             let sender_pk = Public_key.compress sender_pk.public_key in
             Payload.create ~fee ~fee_token:Token_id.default
-              ~fee_payer_pk:sender_pk ~valid_until:Global_slot.max_value ~nonce
-              ~memo
+              ~fee_payer_pk:sender_pk ~valid_until:None ~nonce ~memo
               ~body:
                 (Payment
                    { source_pk= sender_pk

@@ -281,7 +281,7 @@ module Transaction = struct
       { Mempool_transaction_response.transaction=
           { Transaction.transaction_identifier=
               {Transaction_identifier.hash= req.transaction_identifier.hash}
-          ; operations= user_command_info |> User_command_info.to_operations
+          ; operations= user_command_info |> User_command_info.to_operations'
           ; metadata= None }
       ; metadata= None }
   end
