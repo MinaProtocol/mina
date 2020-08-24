@@ -358,7 +358,6 @@ let make = (~kind, ~size=`px(24)) => {
            fill="#2D2D2D"
          />
        </svg>
-
      | ChevronDownLarge =>
        <svg>
          <rect x="3" y="8" width="1" height="1" fill="#2D2D2D" />
@@ -395,7 +394,6 @@ let make = (~kind, ~size=`px(24)) => {
          <rect x="12.5" y="13" width="1" height="1" fill="#2D2D2D" />
          <rect x="11.5" y="14" width="1" height="1" fill="#2D2D2D" />
        </svg>
-
      | ChevronUp =>
        <svg>
          <rect
@@ -487,7 +485,6 @@ let make = (~kind, ~size=`px(24)) => {
            fill="#2D2D2D"
          />
        </svg>
-
      | ChevronRight =>
        <svg>
          <rect
@@ -579,14 +576,12 @@ let make = (~kind, ~size=`px(24)) => {
            fill="#2D2D2D"
          />
        </svg>
-
      | Info =>
        <svg>
          <circle cx="12" cy="12" r="11.5" stroke="#2D2D2D" />
          <rect x="10.5" y="10.5" width="3" height="7.5" fill="#2D2D2D" />
          <rect x="10.5" y="6" width="3" height="3" fill="#2D2D2D" />
        </svg>
-
      | Plus =>
        <path
          fillRule="evenodd"
@@ -594,7 +589,6 @@ let make = (~kind, ~size=`px(24)) => {
          d="M12.5 4.5H11.5V11.5H4.5V12.5H11.5V19.5H12.5V12.5H19.5V11.5H12.5V4.5Z"
          fill="#2D2D2D"
        />
-
      | ExternalLink =>
        <path
          fillRule="evenodd"
@@ -602,12 +596,10 @@ let make = (~kind, ~size=`px(24)) => {
          d="M17 7H16H15H14H13V8H14H15V9H14V10H13V11H12V12H11V13H10V14H11V13H12V12H13V11H14V10H15V9H16V10V11H17V10V9V8V7ZM7 9H8H11V10H8V16H14V13H15V16V17H14H8H7V16V10V9Z"
          fill="#2D2D2D"
        />
-
      | BulletPoint =>
        <svg>
          <rect x="9" y="9" width="6" height="6" rx="3" fill="#2D2D2D" />
        </svg>
-
      | ArrowRightLarge =>
        <svg>
          <rect y="11" width="24" height="1" fill="#2D2D2D" />
@@ -630,7 +622,6 @@ let make = (~kind, ~size=`px(24)) => {
          <rect x="15" y="19" width="1" height="1" fill="#2D2D2D" />
          <rect x="14" y="20" width="1" height="1" fill="#2D2D2D" />
        </svg>
-
      | Copy =>
        <svg>
          <rect x="9.5" y="6.5" width="9" height="13" stroke="#2D2D2D" />
@@ -642,7 +633,6 @@ let make = (~kind, ~size=`px(24)) => {
            fill="#2D2D2D"
          />
        </svg>
-
      | NodeOperators =>
        <svg>
          <rect
@@ -656,7 +646,6 @@ let make = (~kind, ~size=`px(24)) => {
          <path d="M5.4 8.40002L9 12L5.4 15.6" stroke="#2D2D2D" />
          <line x1="10.8" y1="15.1" x2="18.6" y2="15.1" stroke="#2D2D2D" />
        </svg>
-
      | Developers =>
        <svg>
          <path d="M18 7.19995L22.8 12L18 16.7999" stroke="#2D2D2D" />
@@ -672,7 +661,6 @@ let make = (~kind, ~size=`px(24)) => {
            stroke="#2D2D2D"
          />
        </svg>
-
      | Documentation =>
        <svg
          width="24"
@@ -712,7 +700,6 @@ let make = (~kind, ~size=`px(24)) => {
            </clipPath>
          </defs>
        </svg>
-
      | GenesisProgram =>
        <svg>
          <g>
@@ -748,7 +735,6 @@ let make = (~kind, ~size=`px(24)) => {
            </clipPath>
          </defs>
        </svg>
-
      | GrantsProgram =>
        <svg>
          <rect
@@ -764,7 +750,6 @@ let make = (~kind, ~size=`px(24)) => {
            fill="#2D2D2D"
          />
        </svg>
-
      | Testnet =>
        <svg>
          <rect
@@ -781,7 +766,6 @@ let make = (~kind, ~size=`px(24)) => {
            strokeLinecap="round"
          />
        </svg>
-
      | InstallSDK =>
        <svg>
          <path
@@ -822,7 +806,6 @@ let make = (~kind, ~size=`px(24)) => {
          d="M12 20.1614C12.2601 20.1763 12.5154 20.0874 12.7099 19.9141C12.9045 19.7409 13.0222 19.4974 13.0373 19.2374L13.2 18.0001C12.4105 18.1831 11.5895 18.1831 10.8 18.0001L10.9573 19.2401C10.9768 19.4992 11.0967 19.7405 11.2915 19.9126C11.4862 20.0847 11.7404 20.1739 12 20.1614ZM19.0347 19.8947H20.9733V8.82806C20.9733 7.31739 20.2747 6.30273 19.0347 5.92006V19.8947ZM3.02667 19.8947H4.96534V5.91339C3.73334 6.29606 3.02667 7.31073 3.02667 8.82139V19.8947ZM13.2 18.0001C14.4627 17.6841 15.2973 16.7827 15.5 15.2001L16.7173 5.79873C15.3147 6.13339 14.548 7.20006 14.3227 8.93339L13.2 18.0001ZM10.8 18.0001L9.67867 8.93339C9.45201 7.20006 8.68534 6.13339 7.28801 5.79873L8.50534 15.2001C8.70801 16.7787 9.52001 17.6801 10.8053 18.0001H10.8ZM19.0347 5.91606V5.03606C19.0347 4.26939 18.584 3.83606 17.9747 3.83606C17.3653 3.83606 16.9373 4.19739 16.8253 4.98539L16.712 5.79739C17.4839 5.64564 18.2812 5.68454 19.0347 5.91073V5.91606ZM4.96534 5.91073C5.40245 5.77 5.8595 5.70111 6.31867 5.70673C6.64418 5.69997 6.9694 5.73039 7.28801 5.79739L7.17601 4.98539C7.06267 4.19739 6.63467 3.83606 6.02534 3.83606C5.41601 3.83606 4.96534 4.26406 4.96534 5.03606V5.91073Z"
          fill="#2D2D2D"
        />
-
      | Community =>
        <svg>
          <path
@@ -835,7 +818,6 @@ let make = (~kind, ~size=`px(24)) => {
          />
          <line x1="1" y1="12.5" x2="23" y2="12.5" stroke="#2D2D2D" />
        </svg>
-
      | TechnicalGrants =>
        <svg>
          <g>
@@ -853,7 +835,6 @@ let make = (~kind, ~size=`px(24)) => {
            </clipPath>
          </defs>
        </svg>
-
      | SubmitYourOwn =>
        <path
          d="M22.8 4.28567L18.9112 1.19995L1.80005 18.9428V22.7999H5.68894L22.8 4.28567Z"
@@ -861,7 +842,6 @@ let make = (~kind, ~size=`px(24)) => {
          strokeLinecap="round"
          strokeLinejoin="round"
        />
-
      | Comet =>
        <svg>
          <g>
@@ -900,7 +880,6 @@ let make = (~kind, ~size=`px(24)) => {
            </clipPath>
          </defs>
        </svg>
-
      | CommunityGrants =>
        <svg>
          <path
@@ -920,7 +899,6 @@ let make = (~kind, ~size=`px(24)) => {
            stroke="#2D2D2D"
          />
        </svg>
-
      | Browser =>
        <svg>
          <rect
