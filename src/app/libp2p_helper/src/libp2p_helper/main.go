@@ -1058,7 +1058,7 @@ func main() {
 
 	defer func() {
 		if r := recover(); r != nil {
-			helperLog.Error("While handling RPC:", line, "\nThe following panic occurred: ", r, "\nstack:\n", debug.Stack())
+			helperLog.Error("While handling RPC:", line, "\nThe following panic occurred: ", r, "\nstack:\n", string(debug.Stack()))
 		}
 	}()
 
