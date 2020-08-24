@@ -27,8 +27,6 @@ module Proof_type = struct
       let to_latest = Fn.id
     end
   end]
-
-  type t = Stable.Latest.t [@@deriving sexp, hash, compare, yojson]
 end
 
 module Pending_coinbase_stack_state = struct
@@ -42,9 +40,6 @@ module Pending_coinbase_stack_state = struct
         let to_latest = Fn.id
       end
     end]
-
-    type t = Stable.Latest.t = Base of Pending_coinbase.Stack.t | Merge
-    [@@deriving sexp, hash, compare, yojson]
   end
 
   module Poly = struct
@@ -53,16 +48,12 @@ module Pending_coinbase_stack_state = struct
       module V1 = struct
         type 'pending_coinbase t =
           {source: 'pending_coinbase; target: 'pending_coinbase}
-        [@@deriving sexp, hash, compare, eq, fields, yojson]
+        [@@deriving sexp, hash, compare, eq, fields, yojson, hlist]
 
         let to_latest pending_coinbase {source; target} =
           {source= pending_coinbase source; target= pending_coinbase target}
       end
     end]
-
-    type 'pending_coinbase t = 'pending_coinbase Stable.Latest.t =
-      {source: 'pending_coinbase; target: 'pending_coinbase}
-    [@@deriving sexp, hash, compare, eq, fields, yojson, hlist]
 
     let typ pending_coinbase =
       Tick.Typ.of_hlistable
@@ -85,8 +76,6 @@ module Pending_coinbase_stack_state = struct
       let to_latest = Fn.id
     end
   end]
-
-  type t = Stable.Latest.t [@@deriving sexp, hash, compare, yojson]
 
   type var = Pending_coinbase.Stack.var Poly.t
 
@@ -126,7 +115,7 @@ module Statement = struct
           ; next_available_token_before: 'token_id
           ; next_available_token_after: 'token_id
           ; sok_digest: 'sok_digest }
-        [@@deriving compare, equal, hash, sexp, yojson]
+        [@@deriving compare, equal, hash, sexp, yojson, hlist]
 
         let to_latest ledger_hash amount pending_coinbase fee_excess' token_id
             sok_digest'
@@ -149,30 +138,6 @@ module Statement = struct
           ; sok_digest= sok_digest' sok_digest }
       end
     end]
-
-    type ( 'ledger_hash
-         , 'amount
-         , 'pending_coinbase
-         , 'fee_excess
-         , 'token_id
-         , 'sok_digest )
-         t =
-          ( 'ledger_hash
-          , 'amount
-          , 'pending_coinbase
-          , 'fee_excess
-          , 'token_id
-          , 'sok_digest )
-          Stable.Latest.t =
-      { source: 'ledger_hash
-      ; target: 'ledger_hash
-      ; supply_increase: 'amount
-      ; pending_coinbase_stack_state: 'pending_coinbase
-      ; fee_excess: 'fee_excess
-      ; next_available_token_before: 'token_id
-      ; next_available_token_after: 'token_id
-      ; sok_digest: 'sok_digest }
-    [@@deriving compare, equal, hash, sexp, yojson, hlist]
 
     let typ ledger_hash amount pending_coinbase fee_excess token_id sok_digest
         =
@@ -230,16 +195,6 @@ module Statement = struct
     end
   end]
 
-  type t =
-    ( Frozen_ledger_hash.t
-    , Currency.Amount.t
-    , Pending_coinbase_stack_state.t
-    , Fee_excess.t
-    , Token_id.t
-    , unit )
-    Poly.t
-  [@@deriving sexp, hash, compare, yojson]
-
   module With_sok = struct
     [%%versioned
     module Stable = struct
@@ -257,8 +212,6 @@ module Statement = struct
         let to_latest = Fn.id
       end
     end]
-
-    type t = Stable.Latest.t [@@deriving sexp, hash, compare, to_yojson]
 
     type var =
       ( Frozen_ledger_hash.var
@@ -447,8 +400,6 @@ module Proof = struct
       let to_latest = Fn.id
     end
   end]
-
-  type t = Stable.Latest.t [@@deriving yojson, compare, sexp]
 end
 
 [%%versioned
@@ -461,9 +412,6 @@ module Stable = struct
     let to_latest = Fn.id
   end
 end]
-
-type t = Stable.Latest.t = {statement: Statement.With_sok.t; proof: Proof.t}
-[@@deriving sexp, to_yojson]
 
 let proof t = t.proof
 
@@ -1418,7 +1366,8 @@ module Base = struct
              ; receipt_chain_hash
              ; delegate
              ; voting_for= account.voting_for
-             ; timing } ))
+             ; timing
+             ; snapp= account.snapp } ))
     in
     let%bind receiver_increase =
       (* - payments:         payload.body.amount
@@ -1579,7 +1528,8 @@ module Base = struct
              ; receipt_chain_hash= account.receipt_chain_hash
              ; delegate
              ; voting_for= account.voting_for
-             ; timing= account.timing } ))
+             ; timing= account.timing
+             ; snapp= account.snapp } ))
     in
     let%bind fee_payer_is_source = Account_id.Checked.equal fee_payer source in
     let%bind root_after_source_update =
@@ -1719,7 +1669,8 @@ module Base = struct
              ; receipt_chain_hash= account.receipt_chain_hash
              ; delegate
              ; voting_for= account.voting_for
-             ; timing } ))
+             ; timing
+             ; snapp= account.snapp } ))
     in
     let%bind fee_excess =
       (* - payments:         payload.common.fee
@@ -2307,7 +2258,7 @@ let%test_module "transaction_snark" =
       let payload : User_command.Payload.t =
         User_command.Payload.create ~fee ~fee_token
           ~fee_payer_pk:(Account.public_key fee_payer.account)
-          ~nonce ~memo ~valid_until:Global_slot.max_value
+          ~nonce ~memo ~valid_until:None
           ~body:
             (Payment
                { source_pk
@@ -2962,8 +2913,7 @@ let%test_module "transaction_snark" =
       Account.create (Account_id.create pk token) (Balance.of_int balance)
 
     let test_user_command_with_accounts ~constraint_constants ~ledger ~accounts
-        ~signer ~fee ~fee_payer_pk ~fee_token ?memo
-        ?(valid_until = Global_slot.max_value) ?nonce body =
+        ~signer ~fee ~fee_payer_pk ~fee_token ?memo ?valid_until ?nonce body =
       let memo =
         match memo with
         | Some memo ->

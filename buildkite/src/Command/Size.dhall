@@ -1,1 +1,1 @@
-<Large|Small|Experimental>
+<XLarge|Large|Medium|Small>

@@ -20,15 +20,6 @@ module Snark_tables : sig
       [@@deriving sexp]
     end
   end]
-
-  type t = Stable.Latest.t =
-    { all:
-        Ledger_proof.t One_or_two.t Priced_proof.t
-        Transaction_snark_work.Statement.Stable.V1.Table.t
-    ; rebroadcastable:
-        ( Ledger_proof.t One_or_two.t Priced_proof.t
-        * Core.Time.Stable.With_utc_sexp.V2.t )
-        Transaction_snark_work.Statement.Table.t }
 end
 
 module type S = sig
@@ -111,9 +102,4 @@ module Diff_versioned : sig
       [@@deriving compare, sexp]
     end
   end]
-
-  type t = Stable.Latest.t =
-    | Add_solved_work of
-        Transaction_snark_work.Statement.t
-        * Ledger_proof.t One_or_two.t Priced_proof.t
 end

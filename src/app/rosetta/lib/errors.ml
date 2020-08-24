@@ -1,6 +1,19 @@
 open Core_kernel
 open Async
 
+module Partial_reason = struct
+  type t =
+    | Length_mismatch
+    | Fee_payer_and_source_mismatch
+    | Amount_not_some
+    | Account_not_some
+    | Incorrect_token_id
+    | Amount_inc_dec_mismatch
+    | Status_not_pending
+    | Can't_find_kind of string
+  [@@deriving yojson, sexp, show, eq]
+end
+
 module Variant = struct
   (* DO NOT change the order of this variant, the generated error code relies
    * on it and we want that to remain stable *)
@@ -14,7 +27,11 @@ module Variant = struct
     | `Invariant_violation
     | `Transaction_not_found of string
     | `Block_missing
-    | `Malformed_public_key ]
+    | `Malformed_public_key
+    | `Operations_not_valid of Partial_reason.t list
+    | `Unsupported_operation_for_construction
+    | `Signature_missing
+    | `Public_key_format_not_valid ]
   [@@deriving yojson, show, eq, to_enum, to_representatives]
 end
 
@@ -66,6 +83,14 @@ end = struct
         "Block not found"
     | `Malformed_public_key ->
         "Malformed public key"
+    | `Operations_not_valid _ ->
+        "Cannot convert operations to valid transaction"
+    | `Public_key_format_not_valid ->
+        "Invalid public key format"
+    | `Unsupported_operation_for_construction ->
+        "Unsupported operation for construction"
+    | `Signature_missing ->
+        "Signature missing"
 
   let context = function
     | `Sql msg ->
@@ -106,6 +131,18 @@ end = struct
         None
     | `Malformed_public_key ->
         None
+    | `Operations_not_valid reasons ->
+        Some
+          (sprintf
+             !"Cannot recover transaction for the following reasons: %{sexp: \
+               Partial_reason.t list}"
+             reasons)
+    | `Public_key_format_not_valid ->
+        None
+    | `Unsupported_operation_for_construction ->
+        None
+    | `Signature_missing ->
+        None
 
   let retriable = function
     | `Sql _ ->
@@ -127,6 +164,14 @@ end = struct
     | `Block_missing ->
         true
     | `Malformed_public_key ->
+        false
+    | `Operations_not_valid _ ->
+        false
+    | `Public_key_format_not_valid ->
+        false
+    | `Unsupported_operation_for_construction ->
+        false
+    | `Signature_missing ->
         false
 
   let create ?context kind = {extra_context= context; kind}

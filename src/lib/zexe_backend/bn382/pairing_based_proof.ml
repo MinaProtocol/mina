@@ -12,13 +12,10 @@ module Stable = struct
         , Fp.Stable.V1.t )
         Pairing_marlin_types.Openings.Stable.V1.t )
       Pairing_marlin_types.Proof.Stable.V1.t
-    [@@deriving version, bin_io]
 
     let to_latest = Fn.id
   end
 end]
-
-include Stable.Latest
 
 let to_backend primary_input
     ({ messages=

@@ -17,10 +17,6 @@ module Stable = struct
   end
 end]
 
-type t = Stable.Latest.t =
-  {receiver_pk: Public_key.Compressed.t; fee: Currency.Fee.t}
-[@@deriving sexp, compare, yojson, hash]
-
 let create ~receiver_pk ~fee = {receiver_pk; fee}
 
 include Comparable.Make (Stable.Latest)

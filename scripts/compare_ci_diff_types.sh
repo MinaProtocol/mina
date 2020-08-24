@@ -16,4 +16,4 @@ rm -rf base
 
 source ~/.profile && \
     (dune build --profile=dev src/external/ppx_version/src/print_versioned_types.exe) && \
-    ./scripts/compare_pr_diff_types.py ${BASE_BRANCH_NAME}
+    ./scripts/compare_pr_diff_types.py ${BASE_BRANCH_NAME:-develop}

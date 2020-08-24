@@ -10,8 +10,6 @@ module Stable : sig
   end
 end]
 
-type t = Stable.Latest.t [@@deriving sexp]
-
 module Transaction_with_witness : sig
   (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)
   type t =

@@ -11,14 +11,9 @@ module Poly = struct
     module V1 = struct
       type ('slot_number, 'slots_per_epoch) t =
         {slot_number: 'slot_number; slots_per_epoch: 'slots_per_epoch}
-      [@@deriving sexp, eq, compare, hash, yojson]
+      [@@deriving sexp, eq, compare, hash, yojson, hlist]
     end
   end]
-
-  type ('slot_number, 'slots_per_epoch) t =
-        ('slot_number, 'slots_per_epoch) Stable.Latest.t =
-    {slot_number: 'slot_number; slots_per_epoch: 'slots_per_epoch}
-  [@@deriving sexp, eq, compare, hash, yojson, hlist]
 end
 
 [%%versioned
@@ -30,8 +25,6 @@ module Stable = struct
     let to_latest = Fn.id
   end
 end]
-
-type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash, yojson]
 
 type value = t [@@deriving sexp, eq, compare, hash, yojson]
 

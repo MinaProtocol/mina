@@ -661,13 +661,17 @@ module Side_loaded = struct
     let of_compiled tag =
       let d = Types_map.lookup_compiled tag.Tag.id in
       { Side_loaded_verification_key.wrap_vk= Lazy.force d.wrap_vk
-      ; wrap_index= Lazy.force d.wrap_key
+      ; wrap_index=
+          Lazy.force d.wrap_key
+          |> Matrix_evals.map ~f:(Abc.map ~f:Array.to_list)
       ; max_width= Width.of_int_exn (Nat.to_int (Nat.Add.n d.max_branching))
       ; step_data=
           At_most.of_vector
             (Vector.map2 d.branchings d.step_domains ~f:(fun width ds ->
                  ({Domains.h= ds.h; k= ds.k}, Width.of_int_exn width) ))
             (Nat.lte_exn (Vector.length d.step_domains) Max_branches.n) }
+
+    module Max_width = Width.Max
   end
 
   let in_circuit tag vk = Types_map.set_ephemeral tag {index= `In_circuit vk}
@@ -682,6 +686,21 @@ module Side_loaded = struct
       ; var_to_field_elements
       ; typ
       ; branches= Verification_key.Max_branches.n }
+
+  module Proof = struct
+    module T =
+      Proof.Make (Verification_key.Width.Max) (Verification_key.Width.Max)
+
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = T.t
+        [@@deriving version {asserted}, sexp, eq, yojson, hash, compare]
+
+        let to_latest = Fn.id
+      end
+    end]
+  end
 end
 
 let compile

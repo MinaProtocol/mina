@@ -1,0 +1,4 @@
+(library
+  (name bash_colors)
+  (public_name bash_colors)
+  (preprocess (pps ppx_version)))
