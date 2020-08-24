@@ -30,11 +30,10 @@ module Get_nonce =
 module Send_payment =
 [%graphql
 {|
-  mutation send($from: PublicKey!, $to_: PublicKey!, $amount: UInt64, $fee: UInt64, $nonce: UInt32!, $signature: String!) {
-    sendPayment(signature: {rawSignature: $signature}, input: {from: $from, to:$to_, amount:$amount, fee:$fee, nonce:$nonce}) {
+  mutation send($from: PublicKey!, $to_: PublicKey!, $token: UInt64, $amount: UInt64, $fee: UInt64, $validUntil: UInt64, $memo: String, $nonce: UInt32!, $signature: String!) {
+    sendPayment(signature: {rawSignature: $signature}, input: {from: $from, to:$to_, token:$token, amount:$amount, fee:$fee, validUntil: $validUntil, memo: $memo, nonce:$nonce}) {
       payment {
-        id
-        to_: to @bsDecoder(fn: "Graphql.Decoders.publicKey")
+        hash
       }
   }}
   |}]
@@ -493,11 +492,11 @@ module Submit = struct
     module T (M : Monad_fail.S) = struct
       type 'gql t =
         { gql:
-               ?token_id:Unsigned.UInt64.t
-            -> address:Public_key.Compressed.t
+               payment:Transaction.Unsigned.Rendered.Payment.t
+            -> signature:string
             -> unit
             -> ('gql, Errors.t) M.t
-        ; validate_network_choice: 'gql Network.Validate_choice.Impl(M).t
+              (* TODO: Validate network choice with separate query *)
         ; lift: 'a 'e. ('a, 'e) Result.t -> ('a, 'e) M.t }
     end
 
@@ -505,59 +504,56 @@ module Submit = struct
     module Mock = T (Result)
 
     let real : graphql_uri:Uri.t -> 'gql Real.t =
-     fun ~graphql_uri ->
-      { gql=
-          (fun ?token_id ~address () ->
-            Graphql.query
-              (Get_nonce.make
-                 ~public_key:
-                   (`String (Public_key.Compressed.to_base58_check address))
-                 ~token_id:
-                   ( match token_id with
-                   | Some x ->
-                       `String (Unsigned.UInt64.to_string x)
-                   | None ->
-                       `Null )
-                 ())
-              graphql_uri )
-      ; validate_network_choice= Network.Validate_choice.Real.validate
-      ; lift= Deferred.return }
+      let uint64 x = `String (Unsigned.UInt64.to_string x) in
+      let uint32 x = `String (Unsigned.UInt32.to_string x) in
+      fun ~graphql_uri ->
+        { gql=
+            (fun ~payment ~signature () ->
+              Graphql.query
+                (Send_payment.make ~from:(`String payment.from)
+                   ~to_:(`String payment.to_) ~token:(uint64 payment.token)
+                   ~amount:(uint64 payment.amount) ~fee:(uint64 payment.fee)
+                   ?validUntil:(Option.map ~f:uint32 payment.valid_until)
+                   ?memo:payment.memo ~nonce:(uint32 payment.nonce) ~signature
+                   ())
+                graphql_uri )
+        ; lift= Deferred.return }
   end
 
   module Impl (M : Monad_fail.S) = struct
-    let handle ~(env : 'gql Env.T(M).t) (req : Construction_metadata_request.t)
-        =
+    let handle ~(env : 'gql Env.T(M).t) (req : Construction_submit_request.t) =
       let open M.Let_syntax in
-      let%bind options = Options.of_json req.options |> env.lift in
-      let%bind res =
-        env.gql ~token_id:options.token_id ~address:options.sender ()
+      let%bind json =
+        try M.return (Yojson.Safe.from_string req.signed_transaction)
+        with _ -> M.fail (Errors.create (`Json_parse None))
       in
-      let%bind () =
-        env.validate_network_choice ~network_identifier:req.network_identifier
-          ~gql_response:res
+      let%bind signed_transaction =
+        Transaction.Signed.Rendered.of_yojson json
+        |> Result.map_error ~f:(fun e -> Errors.create (`Json_parse (Some e)))
+        |> env.lift
       in
-      let%map account =
-        match res#account with
-        | None ->
+      let%bind payment =
+        match
+          (signed_transaction.payment, signed_transaction.stake_delegation)
+        with
+        | Some payment, _ ->
+            M.return payment (* TODO: Support stake delegation *)
+        | _ ->
             M.fail
               (Errors.create
-                 (`Account_not_found
-                   (Public_key.Compressed.to_base58_check options.sender)))
-        | Some account ->
-            M.return account
+                 ~context:"Must have one of payment or stakeDelegation"
+                 (`Json_parse None))
       in
-      let nonce =
-        Option.map
-          ~f:(fun nonce -> Unsigned.UInt32.(of_string nonce |> add one))
-          account#nonce
-        |> Option.value ~default:Unsigned.UInt32.one
+      let%map res =
+        env.gql ~payment ~signature:signed_transaction.signature ()
       in
-      { Construction_metadata_response.metadata=
-          Metadata_data.create ~sender:options.Options.sender
-            ~token_id:options.Options.token_id ~nonce
-          |> Metadata_data.to_yojson
-          (* TODO: Set this to our default fee, assuming it is fixed when we launch *)
-      ; suggested_fee= [Amount_of.coda (Unsigned.UInt64.of_int 100_000_000)] }
+      let hash =
+        let (`UserCommand payment) = (res#sendPayment)#payment in
+        payment#hash
+      in
+      { Construction_submit_response.transaction_identifier=
+          Transaction_identifier.create hash
+      ; metadata= None }
   end
 
   module Real = Impl (Deferred.Result)
