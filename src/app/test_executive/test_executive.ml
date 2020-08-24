@@ -65,8 +65,8 @@ let main inputs =
       ~images
   in
   (* resources which require additional cleanup at end of test *)
-  let net_manager_ref = ref None in
-  let log_engine_ref = ref None in
+  let net_manager_ref : Engine.Network_manager.t option ref = ref None in
+  let log_engine_ref : Engine.Log_engine.t option ref = ref None in
   let cleanup_deferred_ref = ref None in
   let dispatch_cleanup reason test_error =
     let open Deferred.Let_syntax in
@@ -80,13 +80,13 @@ let main inputs =
       in
       let%bind log_engine_error_set =
         Option.value_map !log_engine_ref
-          ~default:(Deferred.return Test_error.Set.empty)
-          ~f:
-            (Deferred.map ~f:(function
-              | Ok errors ->
-                  errors
-              | Error err ->
-                  Test_error.Set.hard_singleton err ))
+          ~default:(Deferred.return Test_error.Set.empty) ~f:(fun log_engine ->
+            match%map Engine.Log_engine.destroy log_engine with
+            | Ok errors ->
+                errors
+            | Error err ->
+                Test_error.Set.hard_singleton (Test_error.internal_error err)
+        )
       in
       let%bind () =
         Option.value_map !net_manager_ref ~default:Deferred.unit

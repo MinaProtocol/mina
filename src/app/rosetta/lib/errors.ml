@@ -29,6 +29,8 @@ module Variant = struct
     | `Block_missing
     | `Malformed_public_key
     | `Operations_not_valid of Partial_reason.t list
+    | `Unsupported_operation_for_construction
+    | `Signature_missing
     | `Public_key_format_not_valid ]
   [@@deriving yojson, show, eq, to_enum, to_representatives]
 end
@@ -85,6 +87,10 @@ end = struct
         "Cannot convert operations to valid transaction"
     | `Public_key_format_not_valid ->
         "Invalid public key format"
+    | `Unsupported_operation_for_construction ->
+        "Unsupported operation for construction"
+    | `Signature_missing ->
+        "Signature missing"
 
   let context = function
     | `Sql msg ->
@@ -133,6 +139,10 @@ end = struct
              reasons)
     | `Public_key_format_not_valid ->
         None
+    | `Unsupported_operation_for_construction ->
+        None
+    | `Signature_missing ->
+        None
 
   let retriable = function
     | `Sql _ ->
@@ -158,6 +168,10 @@ end = struct
     | `Operations_not_valid _ ->
         false
     | `Public_key_format_not_valid ->
+        false
+    | `Unsupported_operation_for_construction ->
+        false
+    | `Signature_missing ->
         false
 
   let create ?context kind = {extra_context= context; kind}

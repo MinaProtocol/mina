@@ -1,5 +1,17 @@
 open Core_kernel
+module Fee_currency = Currency.Fee
+module Amount_currency = Currency.Amount
 open Models
+module User_command = Coda_base.User_command
+module Token_id = Coda_base.Token_id
+module Public_key = Signature_lib.Public_key
+module User_command_memo = Coda_base.User_command_memo
+module Payment_payload = Coda_base.Payment_payload
+
+let pk_to_public_key ~context (`Pk pk) =
+  Public_key.Compressed.of_base58_check pk
+  |> Result.map_error ~f:(fun _ ->
+         Errors.create ~context `Public_key_format_not_valid )
 
 let account_id (`Pk pk) token_id =
   { Account_identifier.address= pk
@@ -79,6 +91,46 @@ module Partial = struct
   [@@deriving to_yojson, sexp, compare]
 
   module Reason = Errors.Partial_reason
+
+  let to_user_command_payload :
+         t
+      -> nonce:Unsigned_extended.UInt32.t
+      -> (User_command.Payload.t, Errors.t) Result.t =
+   fun t ~nonce ->
+    let open Result.Let_syntax in
+    let%bind fee_payer_pk =
+      pk_to_public_key ~context:"Fee payer" t.fee_payer
+    in
+    let%bind receiver_pk = pk_to_public_key ~context:"Receiver" t.receiver in
+    let%map body =
+      match t.kind with
+      | `Payment ->
+          let%bind source_pk = pk_to_public_key ~context:"Source" t.receiver in
+          let%map amount =
+            Result.of_option t.amount
+              ~error:
+                (Errors.create
+                   (`Operations_not_valid
+                     [Errors.Partial_reason.Amount_not_some]))
+          in
+          let payload =
+            { Payment_payload.Poly.source_pk
+            ; receiver_pk
+            ; token_id= Token_id.of_uint64 t.token
+            ; amount= Amount_currency.of_uint64 amount }
+          in
+          User_command.Payload.Body.Payment payload
+      | `Delegation ->
+          (* TODO: for #5666 *)
+          Result.fail (Errors.create `Unsupported_operation_for_construction)
+      | _ ->
+          Result.fail (Errors.create `Unsupported_operation_for_construction)
+    in
+    User_command.Payload.create
+      ~fee:(Fee_currency.of_uint64 t.fee)
+      ~fee_token:(Token_id.of_uint64 t.fee_token)
+      ~fee_payer_pk ~nonce ~body ~memo:User_command_memo.empty
+      ~valid_until:None
 end
 
 let forget (t : t) : Partial.t =
@@ -90,6 +142,19 @@ let forget (t : t) : Partial.t =
   ; token= t.token
   ; fee= t.fee
   ; amount= t.amount }
+
+let remember ~nonce ~hash t =
+  { kind= t.kind
+  ; fee_payer= t.fee_payer
+  ; source= t.source
+  ; receiver= t.receiver
+  ; fee_token= t.fee_token
+  ; token= t.token
+  ; fee= t.fee
+  ; amount= t.amount
+  ; hash
+  ; nonce
+  ; failure_status= None }
 
 let of_operations (ops : Operation.t list) :
     (Partial.t, Partial.Reason.t) Validation.t =
@@ -191,7 +256,7 @@ let of_operations (ops : Operation.t list) :
   (* TODO: Handle all other  transactions *)
   payment
 
-let to_operations (t : t) : Operation.t list =
+let to_operations ~failure_status (t : Partial.t) : Operation.t list =
   (* First build a plan. The plan specifies all operations ahead of time so
      * we can later compute indices and relations when we're building the full
      * models.
@@ -205,7 +270,7 @@ let to_operations (t : t) : Operation.t list =
     ( if not Unsigned.UInt64.(equal t.fee zero) then
       [{Op.label= `Fee_payer_dec; related_to= None}]
     else [] )
-    @ ( match t.failure_status with
+    @ ( match failure_status with
       | Some (`Applied (Account_creation_fees_paid.By_receiver amount)) ->
           [ { Op.label= `Account_creation_fee_via_payment amount
             ; related_to= None } ]
@@ -247,7 +312,7 @@ let to_operations (t : t) : Operation.t list =
         | `Payment_receiver_inc of Unsigned.UInt64.t ]] ~plan
     ~f:(fun ~related_operations ~operation_identifier op ->
       let status, metadata =
-        match (op.label, t.failure_status) with
+        match (op.label, failure_status) with
         (* If we're looking at mempool transactions, it's always pending *)
         | _, None ->
             (Operation_statuses.name `Pending, None)
@@ -359,6 +424,9 @@ let to_operations (t : t) : Operation.t list =
                            (let (`Pk r) = t.source in
                             r) ) ])) } )
 
+let to_operations' (t : t) : Operation.t list =
+  to_operations ~failure_status:t.failure_status (forget t)
+
 let%test_unit "payment_round_trip" =
   let start =
     { kind= `Payment (* default token *)
@@ -373,7 +441,7 @@ let%test_unit "payment_round_trip" =
     ; failure_status= None
     ; hash= "TXN_1_HASH" }
   in
-  let ops = to_operations start in
+  let ops = to_operations' start in
   match of_operations ops with
   | Ok partial ->
       [%test_eq: Partial.t] partial (forget start)

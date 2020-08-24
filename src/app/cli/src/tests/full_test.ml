@@ -279,8 +279,7 @@ let run_test () : unit Deferred.t =
                 "A memo created in full-test"
             in
             User_command_input.create ?nonce ~signer ~fee ~fee_payer_pk:signer
-              ~fee_token:Token_id.default ~memo
-              ~valid_until:Coda_numbers.Global_slot.max_value
+              ~fee_token:Token_id.default ~memo ~valid_until:None
               ~body:
                 (Payment
                    { source_pk= signer
