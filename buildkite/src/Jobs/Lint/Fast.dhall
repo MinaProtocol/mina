@@ -44,7 +44,7 @@ Pipeline.build
         Command.Config::{
           commands = OpamInit.andThenRunInDocker
                           (["CI=false", "BASE_BRANCH_NAME=$BUILDKITE_PULL_REQUEST_BASE_BRANCH" ])
-                          ("./scripts/compare_ci_diff_types.sh")
+                          ("exit 1 && ./scripts/compare_ci_diff_types.sh")
           , label = "Optional fast lint steps; versions compatability changes"
           , key = "lint-optional-types"
           , target = Size.Medium
