@@ -1,6 +1,6 @@
-#!/bin/sh
+#!/bin/bash
 
-set -e
+set -eo pipefail
 
 # run client SDK tests in node
 
