@@ -771,7 +771,9 @@ func (ap *addPeerMsg) run(app *app) (interface{}, error) {
 	}
 
 	app.AddedPeers = append(app.AddedPeers, *info)
-	app.Bootstrapper.Close()
+	if app.Bootstrapper != nil {
+		app.Bootstrapper.Close()
+	}
 	app.Bootstrapper, err = bootstrap.Bootstrap(app.P2p.Me, app.P2p.Host, app.P2p.Dht, bootstrap.BootstrapConfigWithPeers(app.AddedPeers))
 
 	if err != nil {
