@@ -210,23 +210,29 @@ module T = struct
     in
     target
 
-  let verify_scan_state_after_apply ~constraint_constants
-      ~next_available_token_before ~next_available_token_after ledger
-      (scan_state : Scan_state.t) =
+  let verify_scan_state_after_apply ~constraint_constants ~next_available_token
+      ledger (scan_state : Scan_state.t) =
     let error_prefix =
       "Error verifying the parallel scan state after applying the diff."
+    in
+    let next_available_token_begin ((proof, _), _) =
+      let {Transaction_snark.Statement.next_available_token_after; _} =
+        Ledger_proof.statement proof
+      in
+      next_available_token_after
     in
     match Scan_state.latest_ledger_proof scan_state with
     | None ->
         Statement_scanner.check_invariants ~constraint_constants scan_state
           ~verifier:() ~error_prefix ~ledger_hash_end:ledger
-          ~ledger_hash_begin:None ~next_available_token_before
-          ~next_available_token_after
+          ~ledger_hash_begin:None ~next_available_token_begin:None
+          ~next_available_token_end:next_available_token
     | Some proof ->
         Statement_scanner.check_invariants ~constraint_constants scan_state
           ~verifier:() ~error_prefix ~ledger_hash_end:ledger
           ~ledger_hash_begin:(Some (get_target proof))
-          ~next_available_token_before ~next_available_token_after
+          ~next_available_token_begin:(Some (next_available_token_begin proof))
+          ~next_available_token_end:next_available_token
 
   let statement_exn ~constraint_constants t =
     let open Deferred.Let_syntax in
@@ -262,8 +268,8 @@ module T = struct
         ~ledger_hash_end:
           (Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root ledger))
         ~ledger_hash_begin:(Some snarked_ledger_hash)
-        ~next_available_token_before:snarked_next_available_token
-        ~next_available_token_after:(Ledger.next_available_token ledger)
+        ~next_available_token_begin:(Some snarked_next_available_token)
+        ~next_available_token_end:(Ledger.next_available_token ledger)
     in
     return t
 
@@ -281,8 +287,8 @@ module T = struct
         ~ledger_hash_end:
           (Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root ledger))
         ~ledger_hash_begin:(Some snarked_ledger_hash)
-        ~next_available_token_before:snarked_next_available_token
-        ~next_available_token_after:(Ledger.next_available_token ledger)
+        ~next_available_token_begin:(Some snarked_next_available_token)
+        ~next_available_token_end:(Ledger.next_available_token ledger)
     in
     return t
 
@@ -743,7 +749,6 @@ module T = struct
       ( Int.min (Scan_state.free_space t.scan_state) max_throughput
       , List.length jobs )
     in
-    let next_available_token_before = Ledger.next_available_token t.ledger in
     let new_mask = Ledger.Mask.create ~depth:(Ledger.depth t.ledger) () in
     let new_ledger = Ledger.register_mask t.ledger new_mask in
     let transactions, works, user_commands_count, coinbases = pre_diff_info in
@@ -809,8 +814,7 @@ module T = struct
     let%map () =
       Deferred.(
         verify_scan_state_after_apply ~constraint_constants
-          ~next_available_token_before
-          ~next_available_token_after:(Ledger.next_available_token new_ledger)
+          ~next_available_token:(Ledger.next_available_token new_ledger)
           (Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root new_ledger))
           scan_state'
         >>| to_staged_ledger_or_error)
