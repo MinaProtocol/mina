@@ -128,7 +128,8 @@ let check_new_account_payment ~logger ~rosetta_uri ~graphql_uri =
         in
         match
           Result.map block_r ~f:(fun block ->
-              block.Block_response.block.block_identifier.index )
+              (Option.value_exn block.Block_response.block).block_identifier
+                .index )
         with
         | Error _ ->
             `Failed
@@ -151,8 +152,9 @@ let check_new_account_payment ~logger ~rosetta_uri ~graphql_uri =
           Result.map block_r ~f:(fun block ->
               if
                 Int64.(
-                  block.Block_response.block.block_identifier.index
-                  > last_block_index)
+                  (Option.value_exn block.Block_response.block)
+                    .block_identifier
+                    .index > last_block_index)
               then Some block
               else None )
         with
@@ -182,7 +184,8 @@ let check_new_account_payment ~logger ~rosetta_uri ~graphql_uri =
               ; status= "Success"
               ; _type= "coinbase_inc" } ] )
       ~actual:
-        ( List.map block.block.transactions ~f:(fun txn -> txn.operations)
+        ( List.map (Option.value_exn block.block).transactions ~f:(fun txn ->
+              txn.operations )
         |> List.join )
       ~situation:"block"
   in
