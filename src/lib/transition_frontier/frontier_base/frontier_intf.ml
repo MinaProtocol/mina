@@ -6,6 +6,8 @@ open Coda_base
 module type S = sig
   type t
 
+  type Structured_log_events.t += Added_breadcrumb_user_commands
+
   val find_exn : t -> State_hash.t -> Breadcrumb.t
 
   val max_length : t -> int

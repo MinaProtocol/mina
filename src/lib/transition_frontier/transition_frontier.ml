@@ -29,6 +29,9 @@ type t =
   ; extensions: Extensions.t
   ; genesis_state_hash: State_hash.t }
 
+type Structured_log_events.t += Added_breadcrumb_user_commands
+  [@@deriving register_event]
+
 let genesis_root_data ~precomputed_values =
   let open Root_data.Limited in
   let transition = External_transition.genesis ~precomputed_values in
@@ -305,13 +308,12 @@ let add_breadcrumb_exn t breadcrumb =
     Breadcrumb.user_commands @@ Full_frontier.best_tip t.full_frontier
   in
   if not (List.is_empty user_cmds) then
-    [%log' trace t.logger]
+    [%str_log' trace t.logger] Added_breadcrumb_user_commands
       ~metadata:
         [ ( "user_commands"
           , `List
               (List.map user_cmds
-                 ~f:(With_status.to_yojson User_command.to_yojson)) ) ]
-      "Added breadcrumb user commands" ;
+                 ~f:(With_status.to_yojson User_command.to_yojson)) ) ] ;
   let lite_diffs =
     List.map diffs ~f:Diff.(fun (Full.E.E diff) -> Lite.E.E (to_lite diff))
   in

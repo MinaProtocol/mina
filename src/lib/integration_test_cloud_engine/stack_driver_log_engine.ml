@@ -438,7 +438,9 @@ module Breadcrumb_added_query = struct
     String.concat ~sep:"\n"
       [ testnet_log_filter
       ; coda_container_filter
-      ; "\"Added breadcrumb user commands\"" ]
+      ; Structured_log_events.id_to_string
+          Transition_frontier
+          .added_breadcrumb_user_commands_structured_events_id ]
 
   let parse js : Result.t Or_error.t =
     let open Json_parsing in
