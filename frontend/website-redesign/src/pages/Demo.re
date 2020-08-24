@@ -44,19 +44,35 @@ let make = () => {
         {React.string("Error message")}
       </div>
       <div className=Theme.Type.pageSubhead>
-        {React.string("Page subhead")}
+        {React.string(
+           "Page subhead / Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod temporus incididunt ut labore et dolore.",
+         )}
       </div>
       <div className=Theme.Type.sectionSubhead>
-        {React.string("Section Subhead")}
+        {React.string(
+           "Section Subhead / Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod temporus incididunt ut labore et.",
+         )}
       </div>
-      <p className=Theme.Type.paragraph> {React.string("Paragraph")} </p>
+      <p className=Theme.Type.paragraph>
+        {React.string(
+           "Paragraph (Grotesk) / Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+         )}
+      </p>
       <p className=Theme.Type.paragraphSmall>
-        {React.string("Paragraph Small")}
+        {React.string(
+           "Paragraph Small (Grotesk) / Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+         )}
       </p>
       <p className=Theme.Type.paragraphMono>
-        {React.string("Paragraph Mono")}
+        {React.string(
+           "Paragraph (Mono) / Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmodorus temporus incididunt ut labore et dolore.",
+         )}
       </p>
-      <p className=Theme.Type.quote> {React.string("Quote")} </p>
+      <p className=Theme.Type.quote>
+        {React.string(
+           "Quote / Lorem ipsum dolor sit amet, consectetur amet adipiscing elit, sed do eiusmod tempor.",
+         )}
+      </p>
     </div>
   </Page>;
 };

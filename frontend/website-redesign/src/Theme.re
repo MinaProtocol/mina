@@ -307,7 +307,3 @@ module Type = {
       ),
     ]);
 };
-
-/** sets both paddingLeft and paddingRight, or paddingTop and paddingBottom as one should */
-let paddingX = m => Css.[paddingLeft(m), paddingRight(m)];
-let paddingY = m => Css.[paddingTop(m), paddingBottom(m)];
