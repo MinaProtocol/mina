@@ -15,6 +15,7 @@ open Js_of_ocaml
 open Snark_params_nonconsensus
 open Signature_lib_nonconsensus
 open Coda_base_nonconsensus
+open Rosetta_lib_nonconsensus
 open Js_util
 
 let _ =
@@ -45,7 +46,7 @@ let _ =
          let sk =
            Js.to_string sk_base58_check_js |> Private_key.of_base58_check_exn
          in
-         Public_key.of_private_key_exn sk |> Raw.of_public_key
+         Public_key.of_private_key_exn sk |> Coding.of_public_key |> Js.string
 
        (** return public key in raw hex format for Rosetta *)
        method rawPublicKeyOfPublicKey (pk_base58_check_js : string_js) =
@@ -53,12 +54,12 @@ let _ =
            Js.to_string pk_base58_check_js
            |> Public_key.Compressed.of_base58_check_exn
          in
-         Raw.of_public_key_compressed pk
+         Coding.of_public_key_compressed pk |> Js.string
 
        (** return public key, given that key in raw hex format for Rosetta *)
        method publicKeyOfRawPublicKey (pk_raw_js : string_js) =
          let pk_raw_str = Js.to_string pk_raw_js in
-         Raw.to_public_key_compressed pk_raw_str
+         Coding.to_public_key_compressed pk_raw_str
          |> Public_key.Compressed.to_base58_check |> Js.string
 
        (** sign arbitrary string with private key *)
@@ -158,5 +159,5 @@ let _ =
          let signed = User_command.Poly.{payload; signer; signature} in
          User_command.check_signature signed
 
-       method runUnitTests () : bool Js.t = Raw.run_unit_tests () ; Js._true
+       method runUnitTests () : bool Js.t = Coding.run_unit_tests () ; Js._true
     end)

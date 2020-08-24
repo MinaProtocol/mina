@@ -91,9 +91,14 @@ module Derive = struct
       let open M.Let_syntax in
       (* TODO: Verify curve-type is tweedle *)
       let%map pk =
-        Public_key.Hex.decode req.public_key.hex_bytes
-        |> Result.map_error ~f:(fun _ -> Errors.create `Malformed_public_key)
-        |> env.lift
+        let pk_or_error =
+          try Ok (Rosetta_lib.Coding.to_public_key req.public_key.hex_bytes)
+          with exn -> Error (Core_kernel.Error.of_exn exn)
+        in
+        env.lift
+        @@ Result.map_error
+             ~f:(fun _ -> Errors.create `Malformed_public_key)
+             pk_or_error
       in
       { Construction_derive_response.address=
           Public_key.(compress pk |> Compressed.to_base58_check)
@@ -272,7 +277,7 @@ module Payloads = struct
                  ~error:
                    (Errors.create ~context:"decompression"
                       `Public_key_format_not_valid) )
-        |> Result.map ~f:Public_key.Hex.encode
+        |> Result.map ~f:Rosetta_lib.Coding.of_public_key
         |> env.lift
       in
       let%bind user_command_payload =
@@ -452,6 +457,7 @@ module Hash = struct
                  ~error:
                    (Errors.create ~context:"decompression"
                       `Public_key_format_not_valid) )
+        |> Result.map_error ~f:(fun _ -> Errors.create `Malformed_public_key)
         |> env.lift
       in
       let%map payload =

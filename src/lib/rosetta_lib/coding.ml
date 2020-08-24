@@ -1,6 +1,22 @@
-(* raw.ml -- raw hex encoding for Rosetta *)
+(* coding.ml -- hex encoding/decoding for Rosetta *)
+
+[%%import
+"/src/config.mlh"]
 
 open Core_kernel
+
+[%%ifdef
+consensus_mechanism]
+
+module Field = Snark_params.Tick.Field
+open Signature_lib
+
+[%%else]
+
+module Field = Snark_params_nonconsensus.Field
+open Signature_lib_nonconsensus
+
+[%%endif]
 
 (* see RFC 0038, section "marshal-keys" for a specification *)
 
@@ -48,7 +64,7 @@ let bits4_to_hex_char bits =
   s.[0]
 
 let of_field field =
-  let bits0 = Snark_params_nonconsensus.Field.unpack field |> List.rev in
+  let bits0 = Field.unpack field |> List.rev in
   assert (Int.equal (List.length bits0) 255) ;
   (* field elements are 255 bits, left-pad to get 32 bytes *)
   let bits = false :: bits0 in
@@ -72,15 +88,13 @@ let to_field raw =
   in
   (* remove padding bit *)
   let bits = List.tl_exn bits0 |> List.rev in
-  Option.value_exn (Snark_params_nonconsensus.Field.of_bits bits)
+  Field.project bits
 
 let of_public_key pk =
   let field1, field2 = pk in
   of_field field1 ^ of_field field2
 
-let of_public_key_compressed pk =
-  let open Signature_lib_nonconsensus in
-  Public_key.decompress_exn pk |> of_public_key
+let of_public_key_compressed pk = Public_key.decompress_exn pk |> of_public_key
 
 let to_public_key raw =
   let len = String.length raw in
@@ -89,15 +103,12 @@ let to_public_key raw =
   let raw2 = String.sub raw ~pos:field_len ~len:field_len in
   (to_field raw1, to_field raw2)
 
-let to_public_key_compressed raw =
-  let open Signature_lib_nonconsensus in
-  to_public_key raw |> Public_key.compress
+let to_public_key_compressed raw = to_public_key raw |> Public_key.compress
 
 (* inline tests hard-to-impossible to setup with JS *)
 
 let field_example_test () =
   (* from RFC 0038 *)
-  let open Snark_params_nonconsensus in
   let field = Field.of_int 123123 in
   let hex = of_field field in
   let last_part = "01E0F3" in
@@ -106,20 +117,28 @@ let field_example_test () =
   String.equal hex expected
 
 let field_hex_roundtrip_test () =
-  let open Snark_params_nonconsensus in
   let field0 = Field.of_int 123123 in
   let hex = of_field field0 in
   let field1 = to_field hex in
   Field.equal field0 field1
 
 let pk_roundtrip_test () =
-  let open Snark_params_nonconsensus in
-  let open Signature_lib_nonconsensus in
   let field0 = Field.of_int 123123 in
   let field1 = Field.of_int 234234 in
   let hex = of_public_key (field0, field1) in
   let field0', field1' = to_public_key hex in
   Public_key.equal (field0, field1) (field0', field1')
+
+let%test "field_example" = field_example_test ()
+
+let%test "field_hex round-trip" = field_hex_roundtrip_test ()
+
+let%test "public key round-trip" = pk_roundtrip_test ()
+
+[%%ifndef
+consensus_mechanism]
+
+(* for running tests from JS *)
 
 let unit_tests =
   [ ("field example", field_example_test)
@@ -130,3 +149,5 @@ let run_unit_tests () =
   List.iter unit_tests ~f:(fun (name, test) ->
       printf "Running %s test\n%!" name ;
       assert (test ()) )
+
+[%%endif]
