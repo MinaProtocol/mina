@@ -62,8 +62,8 @@ module Network_config = struct
     in
     assoc
 
-  let expand ~logger ~test_name ~(test_config : Test_config.t)
-      ~(images : Container_images.t) =
+  let expand ~logger ~test_name ~(cli_inputs : Cli_inputs.t)
+      ~(test_config : Test_config.t) ~(images : Container_images.t) =
     let { Test_config.k
         ; delta
         ; proof_level
@@ -76,7 +76,6 @@ module Network_config = struct
     in
     let testnet_name = "integration-test-" ^ test_name in
     (* HARD CODED NETWORK VALUES *)
-    let coda_automation_location = "../automation" in
     let project_id = "o1labs-192920" in
     let cluster_id = "gke_o1labs-192920_us-east1_coda-infra-east" in
     let cluster_name = "coda-infra-east" in
@@ -162,7 +161,7 @@ module Network_config = struct
       ; run_with_bots= false }
     in
     (* NETWORK CONFIG *)
-    { coda_automation_location
+    { coda_automation_location= cli_inputs.coda_automation_location
     ; project_id
     ; cluster_id
     ; keypairs= block_producer_keypairs
