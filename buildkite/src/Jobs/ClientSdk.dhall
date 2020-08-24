@@ -26,22 +26,6 @@ Pipeline.build
     steps = [
       Command.build
         Command.Config::{
-          commands = OpamInit.andThenRunInDocker ([] : List Text) "./scripts/client_sdk_unit_tests.sh",
-          label = "Client SDK unit-tests",
-          key = "client-sdk-unittests",
-          target = Size.Medium,
-          docker = None Docker.Type
-        },
-      Command.build
-        Command.Config::{
-          commands = OpamInit.andThenRunInDocker ([] : List Text) "cd frontend/client_sdk && yarn prepublishOnly",
-          label = "Build And Test Client SDK",
-          key = "build-client-sdk",
-          target = Size.Medium,
-          docker = None Docker.Type
-        },
-      Command.build
-        Command.Config::{
           commands = [ 
             Cmd.runInDocker
               Cmd.Docker::{image = (../Constants/ContainerImages.dhall).codaToolchain}
@@ -51,6 +35,22 @@ Pipeline.build
           , key = "install-yarn-deps"
           , target = Size.Small
           , docker = None Docker.Type
+        },
+      Command.build
+        Command.Config::{
+          commands = OpamInit.andThenRunInDocker ([] : List Text) "./scripts/client_sdk_unit_tests.sh",
+          label = "Build and Test Client SDK",
+          key = "client-sdk-unittests",
+          target = Size.Medium,
+          docker = None Docker.Type
+        },
+      Command.build
+        Command.Config::{
+          commands = OpamInit.andThenRunInDocker ([] : List Text) "cd frontend/client_sdk && yarn prepublishOnly",
+          label = "Prepublish Client SDK packages",
+          key = "prepublish-client-sdk",
+          target = Size.Medium,
+          docker = None Docker.Type
         }
     ]
   }
