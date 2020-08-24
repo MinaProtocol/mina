@@ -1,4 +1,7 @@
 let Prelude = ../../External/Prelude.dhall
+let B = ../../External/Buildkite.dhall
+
+let B/Skip = B.definitions/commandStep/properties/skip/Type
 
 let S = ../../Lib/SelectFiles.dhall
 
@@ -56,7 +59,7 @@ Pipeline.build
           , label = "Optional fast lint steps; binable compatability changes"
           , key = "lint-optional-binable"
           , target = Size.Medium
-          , skip = Some (Command.Skip.String "https://github.com/CodaProtocol/coda/pull/5748")
+          , skip = Some (B/Skip.String "https://github.com/CodaProtocol/coda/pull/5748")
           , docker = None Docker.Type
         }
     ]
