@@ -4,8 +4,6 @@ set -eo pipefail
 
 # run client SDK tests in node
 
-export PATH=/home/opam/.cargo/bin:/usr/lib/go/bin:$PATH
-
 echo "Building client SDK..."
 source ~/.profile
 make client_sdk

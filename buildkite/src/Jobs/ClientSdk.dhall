@@ -40,15 +40,15 @@ Pipeline.build
       Command.build
         Command.Config::{
           commands = OpamInit.andThenRunInDocker ([] : List Text) "./scripts/client_sdk_unit_tests.sh",
-          label = "Build and Test Client SDK",
-          key = "client-sdk-unittests",
+          label = "Build client SDK, run unit tests",
+          key = "client-sdk-build-unittests",
           target = Size.Medium,
           docker = None Docker.Type
         },
       Command.build
         Command.Config::{
-          commands = OpamInit.andThenRunInDocker ([] : List Text) "source ~/.profile && cd frontend/client_sdk && yarn prepublishOnly",
-          label = "Prepublish Client SDK packages",
+          commands = OpamInit.andThenRunInDocker ([] : List Text) "bash source ~/.profile && cd frontend/client_sdk && yarn prepublishOnly",
+          label = "Prepublish client SDK packages",
           key = "prepublish-client-sdk",
           target = Size.Medium,
           docker = None Docker.Type
