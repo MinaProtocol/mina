@@ -1029,6 +1029,7 @@ func main() {
 		Streams:        make(map[int]net.Stream),
 		OutChan:        make(chan interface{}, 4096),
 		Out:            out,
+		AddedPeers:     make([]peer.AddrInfo, 512),
 	}
 
 	go func() {
