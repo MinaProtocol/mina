@@ -56,7 +56,7 @@ Pipeline.build
           , label = "Optional fast lint steps; binable compatability changes"
           , key = "lint-optional-binable"
           , target = Size.Medium
-          , soft_fail = Some (Command.SoftFail.Boolean True)
+          , skip = Some (Command.Skip.String "https://github.com/CodaProtocol/coda/pull/5748")
           , docker = None Docker.Type
         }
     ]
