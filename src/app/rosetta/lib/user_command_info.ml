@@ -143,6 +143,19 @@ let forget (t : t) : Partial.t =
   ; fee= t.fee
   ; amount= t.amount }
 
+let remember ~nonce ~hash t =
+  { kind= t.kind
+  ; fee_payer= t.fee_payer
+  ; source= t.source
+  ; receiver= t.receiver
+  ; fee_token= t.fee_token
+  ; token= t.token
+  ; fee= t.fee
+  ; amount= t.amount
+  ; hash
+  ; nonce
+  ; failure_status= None }
+
 let of_operations (ops : Operation.t list) :
     (Partial.t, Partial.Reason.t) Validation.t =
   (* TODO: If we care about DoS attacks, break early if length too large *)
@@ -243,7 +256,7 @@ let of_operations (ops : Operation.t list) :
   (* TODO: Handle all other  transactions *)
   payment
 
-let to_operations (t : t) : Operation.t list =
+let to_operations ~failure_status (t : Partial.t) : Operation.t list =
   (* First build a plan. The plan specifies all operations ahead of time so
      * we can later compute indices and relations when we're building the full
      * models.
@@ -257,7 +270,7 @@ let to_operations (t : t) : Operation.t list =
     ( if not Unsigned.UInt64.(equal t.fee zero) then
       [{Op.label= `Fee_payer_dec; related_to= None}]
     else [] )
-    @ ( match t.failure_status with
+    @ ( match failure_status with
       | Some (`Applied (Account_creation_fees_paid.By_receiver amount)) ->
           [ { Op.label= `Account_creation_fee_via_payment amount
             ; related_to= None } ]
@@ -299,7 +312,7 @@ let to_operations (t : t) : Operation.t list =
         | `Payment_receiver_inc of Unsigned.UInt64.t ]] ~plan
     ~f:(fun ~related_operations ~operation_identifier op ->
       let status, metadata =
-        match (op.label, t.failure_status) with
+        match (op.label, failure_status) with
         (* If we're looking at mempool transactions, it's always pending *)
         | _, None ->
             (Operation_statuses.name `Pending, None)
@@ -411,6 +424,9 @@ let to_operations (t : t) : Operation.t list =
                            (let (`Pk r) = t.source in
                             r) ) ])) } )
 
+let to_operations' (t : t) : Operation.t list =
+  to_operations ~failure_status:t.failure_status (forget t)
+
 let%test_unit "payment_round_trip" =
   let start =
     { kind= `Payment (* default token *)
@@ -425,7 +441,7 @@ let%test_unit "payment_round_trip" =
     ; failure_status= None
     ; hash= "TXN_1_HASH" }
   in
-  let ops = to_operations start in
+  let ops = to_operations' start in
   match of_operations ops with
   | Ok partial ->
       [%test_eq: Partial.t] partial (forget start)
