@@ -26,7 +26,8 @@ Pipeline.build
     steps = [
       Command.build
         Command.Config::{
-          commands = [ 
+          commands = [
+            Cmd.run "chmod -R 777 frontend/client_sdk",
             Cmd.runInDocker
               Cmd.Docker::{image = (../Constants/ContainerImages.dhall).codaToolchain}
               "cd frontend/client_sdk && yarn install"
