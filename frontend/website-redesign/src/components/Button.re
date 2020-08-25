@@ -4,6 +4,9 @@ module Styles = {
     merge([
       Theme.Type.buttonLabel,
       style([
+        display(`flex),
+        justifyContent(`spaceBetween),
+        alignItems(`center),
         width(`rem(10.9)),
         height(`rem(3.25)),
         border(`px(1), `solid, black),
@@ -20,7 +23,7 @@ module Styles = {
             bgColor === Theme.Colors.white ? black : white;
           },
         ),
-        padding2(~v=`rem(1.), ~h=`rem(1.)),
+        padding2(~v=`rem(1.), ~h=`rem(1.5)),
         textAlign(`center),
         alignSelf(`center),
         hover([
