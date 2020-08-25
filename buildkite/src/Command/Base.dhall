@@ -208,5 +208,5 @@ let build : Config.Type -> B/Command.Type = \(c : Config.Type) ->
       if Prelude.List.null (Map.Entry Text Plugins) allPlugins then None B/Plugins else Some (B/Plugins.Plugins/Type allPlugins)
   }
 
-in {Config = Config, build = build, Type = B/Command.Type, TaggedKey = TaggedKey, SoftFail = B/SoftFail}
+in {Config = Config, build = build, Type = B/Command.Type, TaggedKey = TaggedKey}
 

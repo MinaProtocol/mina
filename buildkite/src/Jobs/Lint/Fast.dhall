@@ -2,6 +2,8 @@ let Prelude = ../../External/Prelude.dhall
 let B = ../../External/Buildkite.dhall
 
 let B/Skip = B.definitions/commandStep/properties/skip/Type
+let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
+let B/SoftFail/ExitStatus = B.definitions/commandStep/properties/soft_fail/union/properties/exit_status/Type
 
 let S = ../../Lib/SelectFiles.dhall
 
@@ -38,6 +40,7 @@ Pipeline.build
           , label = "Fast lint steps; CODEOWNERs, RFCs, Check Snarky Submodule, Preprocessor Deps"
           , key = "lint"
           , target = Size.Small
+          , soft_fail = Some (B/SoftFail.Boolean True)
           , docker = Some Docker::{ image = (../../Constants/ContainerImages.dhall).toolchainBase }
         },
       Command.build
@@ -48,7 +51,7 @@ Pipeline.build
           , label = "Optional fast lint steps; versions compatability changes"
           , key = "lint-optional-types"
           , target = Size.Medium
-          , soft_fail = Some (Command.SoftFail.Boolean True)
+          , soft_fail = Some (B/SoftFail.ListSoft_fail/Type [{ exit_status = Some (B/SoftFail/ExitStatus.Number 1) }])
           , docker = None Docker.Type
         },
       Command.build
