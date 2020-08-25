@@ -15,6 +15,7 @@
     logger
     models
     ppx_deriving_yojson.runtime
+    rosetta_lib
     yojson
     archive_lib
     signature_lib
