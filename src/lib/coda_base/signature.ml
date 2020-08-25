@@ -12,6 +12,7 @@ open Snark_params.Tick
 
 open Snark_params_nonconsensus
 module Hex = Hex_nonconsensus.Hex
+module Rosetta_lib = Rosetta_lib_nonconsensus
 
 [%%endif]
 
