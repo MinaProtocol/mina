@@ -49,7 +49,7 @@ module Styles = {
 };
 
 [@react.component]
-let make = (~kind, ~size=`px(24)) => {
+let make = (~kind, ~size=`rem(1.5)) => {
   <svg
     width="24"
     height="24"
