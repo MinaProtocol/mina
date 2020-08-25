@@ -32,6 +32,7 @@
     quickcheck_lib
     random_oracle
     rocksdb
+    rosetta_lib
     sexp_diff_kernel
     signature_lib
     snark_bits
