@@ -819,17 +819,19 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 	app.P2p.DiscoveredPeers = discovered
 
 	foundPeer := func(who peer.ID) {
-		addrs := app.P2p.Host.Peerstore().Addrs(who)
-		addrStrings := make([]string, len(addrs))
-		for i, a := range addrs {
-			addrStrings[i] = a.String()
-		}
+		if who.Validate() == nil {
+			addrs := app.P2p.Host.Peerstore().Addrs(who)
+			addrStrings := make([]string, len(addrs))
+			for i, a := range addrs {
+				addrStrings[i] = a.String()
+			}
 
-		app.writeMsg(discoveredPeerUpcall{
-			ID:     peer.IDB58Encode(who),
-			Addrs:  addrStrings,
-			Upcall: "discoveredPeer",
-		})
+			app.writeMsg(discoveredPeerUpcall{
+				ID:     peer.IDB58Encode(who),
+				Addrs:  addrStrings,
+				Upcall: "discoveredPeer",
+			})
+		}
 	}
 
 	app.Bootstrapper, err = bootstrap.Bootstrap(app.P2p.Me, app.P2p.Host, app.P2p.Dht, bootstrap.BootstrapConfigWithPeers(app.AddedPeers))
