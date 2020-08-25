@@ -771,7 +771,9 @@ func (ap *addPeerMsg) run(app *app) (interface{}, error) {
 	}
 
 	app.AddedPeers = append(app.AddedPeers, *info)
-	app.Bootstrapper.Close()
+	if app.Bootstrapper != nil {
+		app.Bootstrapper.Close()
+	}
 	app.Bootstrapper, err = bootstrap.Bootstrap(app.P2p.Me, app.P2p.Host, app.P2p.Dht, bootstrap.BootstrapConfigWithPeers(app.AddedPeers))
 
 	if err != nil {
@@ -817,17 +819,19 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 	app.P2p.DiscoveredPeers = discovered
 
 	foundPeer := func(who peer.ID) {
-		addrs := app.P2p.Host.Peerstore().Addrs(who)
-		addrStrings := make([]string, len(addrs))
-		for i, a := range addrs {
-			addrStrings[i] = a.String()
-		}
+		if who.Validate() == nil {
+			addrs := app.P2p.Host.Peerstore().Addrs(who)
+			addrStrings := make([]string, len(addrs))
+			for i, a := range addrs {
+				addrStrings[i] = a.String()
+			}
 
-		app.writeMsg(discoveredPeerUpcall{
-			ID:     peer.IDB58Encode(who),
-			Addrs:  addrStrings,
-			Upcall: "discoveredPeer",
-		})
+			app.writeMsg(discoveredPeerUpcall{
+				ID:     peer.IDB58Encode(who),
+				Addrs:  addrStrings,
+				Upcall: "discoveredPeer",
+			})
+		}
 	}
 
 	app.Bootstrapper, err = bootstrap.Bootstrap(app.P2p.Me, app.P2p.Host, app.P2p.Dht, bootstrap.BootstrapConfigWithPeers(app.AddedPeers))
@@ -1029,6 +1033,7 @@ func main() {
 		Streams:        make(map[int]net.Stream),
 		OutChan:        make(chan interface{}, 4096),
 		Out:            out,
+		AddedPeers:     make([]peer.AddrInfo, 512),
 	}
 
 	go func() {
@@ -1058,7 +1063,7 @@ func main() {
 
 	defer func() {
 		if r := recover(); r != nil {
-			helperLog.Error("While handling RPC:", line, "\nThe following panic occurred: ", r, "\nstack:\n", debug.Stack())
+			helperLog.Error("While handling RPC:", line, "\nThe following panic occurred: ", r, "\nstack:\n", string(debug.Stack()))
 		}
 	}()
 
