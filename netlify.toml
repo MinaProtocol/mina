@@ -1,6 +1,5 @@
 [build]
   command = "yarn export"
-  base = "frontend/website"
   publish = "out"
   ignore = "git diff --quiet HEAD^ HEAD -- . || git diff --quiet origin/develop HEAD -- ."
 
