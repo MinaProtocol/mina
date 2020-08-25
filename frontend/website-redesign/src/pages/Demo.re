@@ -17,7 +17,32 @@ module Styles = {
 let make = () => {
   <Page title="Demo page of components">
     <div className=Styles.page>
-      <Button buttonLabel="Button Label" />
+      <Button bgColor=Theme.Colors.orange>
+        {React.string("Button orange on light background")}
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 16 16"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg">
+          <rect x="3" y="7" width="10" height="1" fill="white" />
+          <rect x="11" y="6" width="1" height="1" fill="white" />
+          <rect x="10" y="5" width="1" height="1" fill="white" />
+          <rect x="9" y="4" width="1" height="1" fill="white" />
+          <rect x="10" y="9" width="1" height="1" fill="white" />
+          <rect x="9" y="10" width="1" height="1" fill="white" />
+          <rect x="11" y="8" width="1" height="1" fill="white" />
+        </svg>
+      </Button>
+      <Button bgColor=Theme.Colors.mint>
+        {React.string("Button mint on light background")}
+      </Button>
+      <Button bgColor=Theme.Colors.black>
+        {React.string("Button black on light background")}
+      </Button>
+      <Button bgColor=Theme.Colors.white>
+        {React.string("Button white on light background")}
+      </Button>
       <h1 className=Theme.Type.h1jumbo> {React.string("H1 Jumbo")} </h1>
       <h1 className=Theme.Type.h1> {React.string("H1")} </h1>
       <h2 className=Theme.Type.h2> {React.string("H2")} </h2>
