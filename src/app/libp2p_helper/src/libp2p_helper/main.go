@@ -33,6 +33,38 @@ import (
 	"github.com/multiformats/go-multiaddr"
 )
 
+// a grow-only dynamically sized peer set (because generics are for nerds)
+type peerSet struct {
+	size  int
+	slice []peer.AddrInfo
+}
+
+func newPeerSet(initialCapacity int) peerSet {
+	return peerSet{
+		size:  0,
+		slice: make([]peer.AddrInfo, initialCapacity),
+	}
+}
+
+func (set *peerSet) expand() {
+	newSlice := make([]peer.AddrInfo, len(set.slice)*2)
+	copy(newSlice, set.slice)
+	set.slice = newSlice
+}
+
+func (set *peerSet) add(info peer.AddrInfo) {
+	if set.size >= len(set.slice) {
+		set.expand()
+	}
+
+	set.slice[set.size] = info
+	set.size++
+}
+
+func (set *peerSet) toSlice() []peer.AddrInfo {
+	return set.slice[:set.size]
+}
+
 type subscription struct {
 	Sub    *pubsub.Subscription
 	Idx    int
@@ -56,7 +88,7 @@ type app struct {
 	Out             *bufio.Writer
 	OutChan         chan interface{}
 	Bootstrapper    io.Closer
-	AddedPeers      []peer.AddrInfo
+	AddedPeers      peerSet
 	UnsafeNoTrustIP bool
 }
 
@@ -770,11 +802,11 @@ func (ap *addPeerMsg) run(app *app) (interface{}, error) {
 		return nil, badRPC(err)
 	}
 
-	app.AddedPeers = append(app.AddedPeers, *info)
+	app.AddedPeers.add(*info)
 	if app.Bootstrapper != nil {
 		app.Bootstrapper.Close()
 	}
-	app.Bootstrapper, err = bootstrap.Bootstrap(app.P2p.Me, app.P2p.Host, app.P2p.Dht, bootstrap.BootstrapConfigWithPeers(app.AddedPeers))
+	app.Bootstrapper, err = bootstrap.Bootstrap(app.P2p.Me, app.P2p.Host, app.P2p.Dht, bootstrap.BootstrapConfigWithPeers(app.AddedPeers.toSlice()))
 
 	if err != nil {
 		return nil, badp2p(err)
@@ -819,22 +851,25 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 	app.P2p.DiscoveredPeers = discovered
 
 	foundPeer := func(who peer.ID) {
-		if who.Validate() == nil {
+		if who.Validate() == nil && who != app.P2p.Me {
 			addrs := app.P2p.Host.Peerstore().Addrs(who)
-			addrStrings := make([]string, len(addrs))
-			for i, a := range addrs {
-				addrStrings[i] = a.String()
-			}
 
-			app.writeMsg(discoveredPeerUpcall{
-				ID:     peer.IDB58Encode(who),
-				Addrs:  addrStrings,
-				Upcall: "discoveredPeer",
-			})
+			if len(addrs) > 0 {
+				addrStrings := make([]string, len(addrs))
+				for i, a := range addrs {
+					addrStrings[i] = a.String()
+				}
+
+				app.writeMsg(discoveredPeerUpcall{
+					ID:     peer.IDB58Encode(who),
+					Addrs:  addrStrings,
+					Upcall: "discoveredPeer",
+				})
+			}
 		}
 	}
 
-	app.Bootstrapper, err = bootstrap.Bootstrap(app.P2p.Me, app.P2p.Host, app.P2p.Dht, bootstrap.BootstrapConfigWithPeers(app.AddedPeers))
+	app.Bootstrapper, err = bootstrap.Bootstrap(app.P2p.Me, app.P2p.Host, app.P2p.Dht, bootstrap.BootstrapConfigWithPeers(app.AddedPeers.toSlice()))
 	if err != nil {
 		return nil, badp2p(err)
 	}
@@ -1033,7 +1068,7 @@ func main() {
 		Streams:        make(map[int]net.Stream),
 		OutChan:        make(chan interface{}, 4096),
 		Out:            out,
-		AddedPeers:     make([]peer.AddrInfo, 512),
+		AddedPeers:     newPeerSet(512),
 	}
 
 	go func() {
