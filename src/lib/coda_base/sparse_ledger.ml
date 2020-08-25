@@ -137,8 +137,7 @@ let get_or_initialize_exn account_id t idx =
     let token_id = Account_id.token_id account_id in
     let delegate =
       (* Only allow delegation if this account is for the default token. *)
-      if Token_id.(equal default) token_id then public_key
-      else Public_key.Compressed.empty
+      if Token_id.(equal default) token_id then Some public_key else None
     in
     ( `Added
     , { account with
@@ -266,7 +265,9 @@ let apply_user_command_exn
             @@ Transaction_logic.validate_timing ~txn_amount:Amount.zero
                  ~txn_global_slot:current_global_slot ~account:source_account
           in
-          {source_account with delegate= Account_id.public_key receiver; timing}
+          { source_account with
+            delegate= Some (Account_id.public_key receiver)
+          ; timing }
         in
         [(source_idx, source_account)]
     | Payment {amount; token_id= token; _} ->
