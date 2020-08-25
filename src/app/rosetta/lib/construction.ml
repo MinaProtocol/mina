@@ -1,6 +1,7 @@
 open Core_kernel
 open Async
 module Transaction' = Transaction
+module Signature' = Coda_base.Signature
 open Models
 module Transaction = Transaction'
 module Public_key = Signature_lib.Public_key
@@ -460,13 +461,18 @@ module Hash = struct
         |> Result.map_error ~f:(fun _ -> Errors.create `Malformed_public_key)
         |> env.lift
       in
-      let%map payload =
+      let%bind payload =
         User_command_info.Partial.to_user_command_payload
           ~nonce:signed_transaction.nonce signed_transaction.command
         |> env.lift
       in
       (* TODO: Implement signature coding *)
-      let signature = failwith "Implement signature coding" in
+      let%map signature =
+        Result.of_option
+          (Signature'.Raw.decode signed_transaction.signature)
+          ~error:(Errors.create `Signature_missing)
+        |> env.lift
+      in
       let full_command = {User_command.Poly.payload; signature; signer} in
       let hash = Transaction_hash.hash_user_command full_command in
       Construction_hash_response.create (Transaction_hash.to_base58_check hash)
