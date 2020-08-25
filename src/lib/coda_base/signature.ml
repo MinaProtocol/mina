@@ -11,6 +11,7 @@ open Snark_params.Tick
 [%%else]
 
 open Snark_params_nonconsensus
+module Hex = Hex_nonconsensus.Hex
 
 [%%endif]
 
@@ -62,6 +63,26 @@ module Stable = struct
 end]
 
 let dummy = (Field.one, Inner_curve.Scalar.one)
+
+(* TODO: Encode/decode to spec *)
+module Raw = struct
+  let encode (field, scalar) =
+    Field.to_string field ^ "," ^ Inner_curve.Scalar.to_string scalar
+    |> Hex.Safe.to_hex
+
+  let decode raw =
+    let open Option.Let_syntax in
+    let%bind unhex = Hex.Safe.of_hex raw in
+    match String.split ~on:',' unhex with
+    | [a; b] ->
+        Some (Field.of_string a, Inner_curve.Scalar.of_string b)
+    | _ ->
+        None
+
+  let%test_unit "partial isomorphism" =
+    Quickcheck.test ~trials:300 Stable.V1.gen ~f:(fun signature ->
+        [%test_eq: t option] (Some signature) (encode signature |> decode) )
+end
 
 [%%ifdef
 consensus_mechanism]

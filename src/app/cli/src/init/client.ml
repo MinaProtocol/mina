@@ -450,10 +450,7 @@ let batch_send_payments =
           let signer_pk = Public_key.compress keypair.public_key in
           User_command_input.create ~signer:signer_pk ~fee
             ~fee_token:Token_id.default (* TODO: Multiple tokens. *)
-            ~fee_payer_pk:signer_pk ~memo:User_command_memo.empty
-            ~valid_until:
-              (Option.value valid_until
-                 ~default:Coda_numbers.Global_slot.max_value)
+            ~fee_payer_pk:signer_pk ~memo:User_command_memo.empty ~valid_until
             ~body:
               (Payment
                  { source_pk= signer_pk
@@ -567,7 +564,7 @@ let create_new_token_graphql =
                   ?memo ()))
              graphql_endpoint
          in
-         printf "Dispatched create new token command with ID %s\n"
+         printf "Dispatched create new token command with TRANSACTION_ID %s\n"
            ((response#createToken)#createNewToken)#id ))
 
 let create_new_account_graphql =
@@ -634,7 +631,8 @@ let create_new_account_graphql =
                   ?memo ()))
              graphql_endpoint
          in
-         printf "Dispatched create new token command with ID %s\n"
+         printf
+           "Dispatched create new token account command with TRANSACTION_ID %s\n"
            ((response#createTokenAccount)#createNewTokenAccount)#id ))
 
 let mint_tokens_graphql =
@@ -676,7 +674,7 @@ let mint_tokens_graphql =
                   ?memo ()))
              graphql_endpoint
          in
-         printf "Dispatched create new token command with ID %s\n"
+         printf "Dispatched mint token command with TRANSACTION_ID %s\n"
            ((response#mintTokens)#mintTokens)#id ))
 
 let cancel_transaction_graphql =
