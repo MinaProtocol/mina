@@ -11,6 +11,7 @@ open Snark_params.Tick
 [%%else]
 
 open Snark_params_nonconsensus
+module Hex = Hex_nonconsensus.Hex
 
 [%%endif]
 
