@@ -15,11 +15,16 @@ module Styles = {
         borderBottomLeftRadius(`px(1)),
         textDecoration(`none),
         fontSize(`px(12)),
-        color(white),
+        color(
+          {
+            bgColor === Theme.Colors.white ? black : white;
+          },
+        ),
         padding2(~v=`rem(1.), ~h=`rem(1.)),
         textAlign(`center),
         alignSelf(`center),
         hover([
+          color(white),
           boxShadow(~x=`px(0), ~y=`px(0), black),
           unsafe(
             "transition",
@@ -45,10 +50,8 @@ module Styles = {
  *
  */
 [@react.component]
-let make = (~href="", ~buttonLabel, ~bgColor=Theme.Colors.orange, ~dark=false) => {
+let make = (~href="", ~children, ~bgColor=Theme.Colors.orange, ~dark=false) => {
   <Next.Link href>
-    <button className={Styles.button(bgColor, dark)}>
-      {React.string(buttonLabel)}
-    </button>
+    <button className={Styles.button(bgColor, dark)}> children </button>
   </Next.Link>;
 };
