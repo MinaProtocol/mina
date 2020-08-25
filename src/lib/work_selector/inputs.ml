@@ -29,6 +29,8 @@ module Test_inputs = struct
   module Snark_pool = struct
     [%%versioned
     module Stable = struct
+      [@@@no_toplevel_latest_type]
+
       module V1 = struct
         type t = Transaction_snark.Statement.Stable.V1.t One_or_two.Stable.V1.t
         [@@deriving hash, compare, sexp]
@@ -61,10 +63,24 @@ module Test_inputs = struct
     let work = Fn.id
 
     let all_work_pairs t ~get_state:_ = Ok (One_or_two.group_list t)
+  end
 
-    let all_work_statements_exn t =
-      List.map (One_or_two.group_list t)
-        ~f:(One_or_two.map ~f:Snark_work_lib.Work.Single.Spec.statement)
+  module Transition_frontier = struct
+    type t = Staged_ledger.t
+
+    type best_tip_view = unit
+
+    let best_tip_pipe : t -> best_tip_view Pipe_lib.Broadcast_pipe.Reader.t =
+     fun _t ->
+      let reader, _writer = Pipe_lib.Broadcast_pipe.create () in
+      reader
+
+    let best_tip_staged_ledger = Fn.id
+
+    let get_protocol_state _t _hash =
+      Ok
+        (Lazy.force Precomputed_values.for_unit_tests).protocol_state_with_hash
+          .data
   end
 end
 
@@ -79,4 +95,28 @@ module Implementation_inputs = struct
   module Snark_pool = Network_pool.Snark_pool
   module Staged_ledger = Staged_ledger
   module Transaction_protocol_state = Transaction_protocol_state
+
+  module Transition_frontier = struct
+    type t = Transition_frontier.t
+
+    type best_tip_view = Extensions.Best_tip_diff.view
+
+    let best_tip_pipe : t -> best_tip_view Pipe_lib.Broadcast_pipe.Reader.t =
+     fun t ->
+      let open Transition_frontier.Extensions in
+      let extensions = Transition_frontier.extensions t in
+      get_view_pipe extensions Best_tip_diff
+
+    let best_tip_staged_ledger t =
+      Transition_frontier.(best_tip t |> Breadcrumb.staged_ledger)
+
+    let get_protocol_state t state_hash =
+      match Transition_frontier.find_protocol_state t state_hash with
+      | Some p ->
+          Ok p
+      | None ->
+          Or_error.errorf
+            !"Protocol state with hash %{sexp: State_hash.t} not found"
+            state_hash
+  end
 end

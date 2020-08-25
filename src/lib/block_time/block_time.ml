@@ -26,6 +26,10 @@ module Time = struct
     end
   end]
 
+  let max_value = UInt64.max_int
+
+  let zero = UInt64.zero
+
   module Controller = struct
     [%%if
     time_offsets]
@@ -59,8 +63,6 @@ module Time = struct
     [%%endif]
   end
 
-  type t = Stable.Latest.t [@@deriving sexp, compare, hash, yojson]
-
   module B = Bits
   module Bits = Bits.UInt64
   include B.Snarkable.UInt64 (Tick)
@@ -75,8 +77,6 @@ module Time = struct
         let to_latest = Fn.id
       end
     end]
-
-    type t = Stable.Latest.t [@@deriving sexp, compare, hash, yojson]
 
     module Bits = B.UInt64
     include B.Snarkable.UInt64 (Tick)
@@ -203,4 +203,4 @@ module Time = struct
 end
 
 include Time
-module Timeout = Timeout.Make (Time)
+module Timeout = Timeout_lib.Make (Time)

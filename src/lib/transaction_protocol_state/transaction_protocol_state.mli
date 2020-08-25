@@ -13,8 +13,6 @@ module Block_data : sig
     end
   end]
 
-  type t = Stable.Latest.t [@@deriving sexp]
-
   type var
 
   val typ :
@@ -30,9 +28,6 @@ module Poly : sig
       [@@deriving sexp]
     end
   end]
-
-  type 'a t = 'a Stable.Latest.t = {transaction: 'a; block_data: Block_data.t}
-  [@@deriving sexp]
 end
 
 [%%versioned:
@@ -46,8 +41,6 @@ module Stable : sig
       ('a -> ('b, 'err) Result.t) -> 'a t -> ('b t, 'err) Result.t
   end
 end]
-
-type 'a t = 'a Stable.Latest.t [@@deriving sexp]
 
 val transaction : 'a t -> 'a
 

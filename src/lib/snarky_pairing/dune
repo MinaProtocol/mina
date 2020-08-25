@@ -5,6 +5,6 @@
   (libraries
     sgn_type
     snarky_field_extensions
-    snarky
+    snarky.backendless
     snarkette
     core_kernel ))

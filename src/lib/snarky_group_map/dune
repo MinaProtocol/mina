@@ -5,5 +5,5 @@
   (inline_tests)
   (libraries
     group_map
-    snarky
+    snarky.backendless
     core_kernel ))

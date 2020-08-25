@@ -20,8 +20,6 @@ module Stable : sig
   end
 end]
 
-type t = Stable.Latest.t [@@deriving sexp, equal, compare, hash, yojson]
-
 val create : Public_key.Compressed.t -> Token_id.t -> t
 
 val empty : t

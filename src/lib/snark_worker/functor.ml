@@ -48,11 +48,15 @@ module Make (Inputs : Intf.Inputs_intf) :
           , Ledger_proof.t )
           Work.Single.Spec.t
         [@@deriving sexp, to_yojson]
+
+        let statement = Work.Single.Spec.statement
       end
     end
 
     module Spec = struct
       type t = Single.Spec.t Work.Spec.t [@@deriving sexp, to_yojson]
+
+      let instances = Work.Spec.instances
     end
 
     module Result = struct
@@ -87,8 +91,18 @@ module Make (Inputs : Intf.Inputs_intf) :
   let dispatch rpc shutdown_on_disconnect query address =
     let%map res =
       Rpc.Connection.with_client
-        (Tcp.Where_to_connect.of_host_and_port address) (fun conn ->
-          Rpc.Rpc.dispatch rpc conn query )
+        ~handshake_timeout:
+          (Time.Span.of_sec Coda_compile_config.rpc_handshake_timeout_sec)
+        ~heartbeat_config:
+          (Rpc.Connection.Heartbeat_config.create
+             ~timeout:
+               (Time_ns.Span.of_sec
+                  Coda_compile_config.rpc_heartbeat_timeout_sec)
+             ~send_every:
+               (Time_ns.Span.of_sec
+                  Coda_compile_config.rpc_heartbeat_send_every_sec))
+        (Tcp.Where_to_connect.of_host_and_port address)
+        (fun conn -> Rpc.Rpc.dispatch rpc conn query)
     in
     match res with
     | Error exn ->
@@ -156,13 +170,20 @@ module Make (Inputs : Intf.Inputs_intf) :
             +. (0.5 *. Random.float Worker_state.worker_wait_time)
           in
           (* No work to be done -- quietly take a brief nap *)
+          [%log info] "No jobs available. Napping for $time seconds"
+            ~metadata:[("time", `Float random_delay)] ;
           let%bind () = wait ~sec:random_delay () in
           go ()
       | Ok (Some (work, public_key)) -> (
           [%log info]
-            "SNARK work received from $address. Starting proof generation"
+            "SNARK work $work_ids received from $address. Starting proof \
+             generation"
             ~metadata:
-              [("address", `String (Host_and_port.to_string daemon_address))] ;
+              [ ("address", `String (Host_and_port.to_string daemon_address))
+              ; ( "work_ids"
+                , Transaction_snark_work.Statement.compact_json
+                    (One_or_two.map (Work.Spec.instances work)
+                       ~f:Work.Single.Spec.statement) ) ] ;
           let%bind () = wait () in
           (* Pause to wait for stdout to flush *)
           match perform state public_key work with
@@ -170,10 +191,15 @@ module Make (Inputs : Intf.Inputs_intf) :
               log_and_retry "performing work" e (retry_pause 10.) go
           | Ok result ->
               emit_proof_metrics result.metrics logger ;
-              [%log info] "Submitted completed SNARK work to $address"
+              [%log info]
+                "Submitted completed SNARK work $work_ids to $address"
                 ~metadata:
                   [ ( "address"
-                    , `String (Host_and_port.to_string daemon_address) ) ] ;
+                    , `String (Host_and_port.to_string daemon_address) )
+                  ; ( "work_ids"
+                    , Transaction_snark_work.Statement.compact_json
+                        (One_or_two.map (Work.Spec.instances work)
+                           ~f:Work.Single.Spec.statement) ) ] ;
               let rec submit_work () =
                 match%bind
                   dispatch Rpcs_versioned.Submit_work.Latest.rpc

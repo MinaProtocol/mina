@@ -26,11 +26,6 @@ module Poly = struct
       [@@deriving compare, sexp, hash, yojson, eq]
     end
   end]
-
-  type ('payload, 'pk, 'signature) t =
-        ('payload, 'pk, 'signature) Stable.Latest.t =
-    {payload: 'payload; signer: 'pk; signature: 'signature}
-  [@@deriving compare, eq, sexp, hash, yojson]
 end
 
 [%%versioned
@@ -63,8 +58,6 @@ module Stable = struct
       Payload.accounts_accessed ~next_available_token payload
   end
 end]
-
-type t = Stable.Latest.t [@@deriving sexp, yojson, hash]
 
 type _unused = unit
   constraint (Payload.t, Public_key.t, Signature.t) Poly.t = t
@@ -176,7 +169,7 @@ module Gen = struct
     let payload : Payload.t =
       Payload.create ~fee ~fee_token
         ~fee_payer_pk:(Public_key.compress signer.public_key)
-        ~nonce ~valid_until:Global_slot.max_value
+        ~nonce ~valid_until:None
         ~memo:(User_command_memo.create_by_digesting_string_exn memo)
         ~body
     in
@@ -329,8 +322,7 @@ module Gen = struct
           let payload =
             let sender_pk = Public_key.compress sender_pk.public_key in
             Payload.create ~fee ~fee_token:Token_id.default
-              ~fee_payer_pk:sender_pk ~valid_until:Global_slot.max_value ~nonce
-              ~memo
+              ~fee_payer_pk:sender_pk ~valid_until:None ~nonce ~memo
               ~body:
                 (Payment
                    { source_pk= sender_pk
@@ -357,8 +349,6 @@ module With_valid_signature = struct
       module Gen = Gen
     end
   end]
-
-  type t = Stable.Latest.t [@@deriving sexp, yojson, hash]
 
   module Gen = Stable.Latest.Gen
   include Comparable.Make (Stable.Latest)

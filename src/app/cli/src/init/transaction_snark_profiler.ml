@@ -30,7 +30,7 @@ let create_ledger_and_transactions num_transitions =
     let payload : User_command.Payload.t =
       User_command.Payload.create ~fee ~fee_token:Token_id.default
         ~fee_payer_pk:from_pk ~nonce ~memo:User_command_memo.dummy
-        ~valid_until:Coda_numbers.Global_slot.max_value
+        ~valid_until:None
         ~body:
           (Payment
              { source_pk= from_pk
@@ -307,8 +307,6 @@ let run profiler num_transactions repeats preeval =
   exit 0
 
 let main num_transactions repeats preeval () =
-  Snarky.Libsnark.set_no_profiling false ;
-  Snarky.Libsnark.set_printing_off () ;
   Test_util.with_randomness 123456789 (fun () ->
       let module T = Transaction_snark.Make () in
       run (profile (module T)) num_transactions repeats preeval )

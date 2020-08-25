@@ -72,11 +72,13 @@ let rec pack : type t v env.
 type ('f, 'env) typ =
   { typ:
       'var 'value.    ('value, 'var, 'env) Basic.t
-      -> ('var, 'value, 'f) Snarky.Typ.t }
+      -> ('var, 'value, 'f) Snarky_backendless.Typ.t }
 
 let rec typ : type f var value env.
-    (f, env) typ -> (value, var, env) T.t -> (var, value, f) Snarky.Typ.t =
-  let open Snarky.Typ in
+       (f, env) typ
+    -> (value, var, env) T.t
+    -> (var, value, f) Snarky_backendless.Typ.t =
+  let open Snarky_backendless.Typ in
   fun t spec ->
     match spec with
     | B spec ->
@@ -108,7 +110,7 @@ type generic_spec = {spec: 'env. 'env exists}
 module ETyp = struct
   type ('var, 'value, 'f) t =
     | T :
-        ('inner, 'value, 'f) Snarky.Typ.t * ('inner -> 'var)
+        ('inner, 'value, 'f) Snarky_backendless.Typ.t * ('inner -> 'var)
         -> ('var, 'value, 'f) t
 end
 
@@ -117,7 +119,7 @@ type ('f, 'env) etyp =
 
 let rec etyp : type f var value env.
     (f, env) etyp -> (value, var, env) T.t -> (var, value, f) ETyp.t =
-  let open Snarky.Typ in
+  let open Snarky_backendless.Typ in
   fun e spec ->
     match spec with
     | B spec ->
@@ -149,7 +151,7 @@ let rec etyp : type f var value env.
                  ~back:(fun (x, xs) -> x :: xs)
           , fun (x, xs) -> f1 x :: f2 xs )
 
-module Common (Impl : Snarky.Snark_intf.Run) = struct
+module Common (Impl : Snarky_backendless.Snark_intf.Run) = struct
   module Digest = D.Make (Impl)
   module Challenge = Limb_vector.Challenge.Make (Impl)
   open Impl
@@ -177,7 +179,7 @@ module Common (Impl : Snarky.Snark_intf.Run) = struct
 end
 
 let pack_basic (type field other_field other_field_var)
-    (module Impl : Snarky.Snark_intf.Run with type field = field)
+    (module Impl : Snarky_backendless.Snark_intf.Run with type field = field)
     (field : other_field_var -> Impl.Boolean.var list array) =
   let open Impl in
   let module C = Common (Impl) in
@@ -209,7 +211,7 @@ let pack_basic (type field other_field other_field_var)
 let pack impl field t = pack (pack_basic impl field) t
 
 let typ_basic (type field other_field other_field_var)
-    (module Impl : Snarky.Snark_intf.Run with type field = field)
+    (module Impl : Snarky_backendless.Snark_intf.Run with type field = field)
     (field : (other_field_var, other_field) Impl.Typ.t) =
   let open Impl in
   let module C = Common (Impl) in
@@ -239,7 +241,7 @@ let typ_basic (type field other_field other_field_var)
 let typ impl field t = typ (typ_basic impl field) t
 
 let packed_typ_basic (type field other_field other_field_var)
-    (module Impl : Snarky.Snark_intf.Run with type field = field)
+    (module Impl : Snarky_backendless.Snark_intf.Run with type field = field)
     (field : (other_field_var, other_field, field) ETyp.t) =
   let open Impl in
   let module Digest = D.Make (Impl) in

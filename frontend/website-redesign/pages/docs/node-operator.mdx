@@ -1,0 +1,182 @@
+import Page from '@reason/pages/Docs';
+export default Page({title: "Become a Node Operator"});
+
+# Become a Node Operator
+
+Now that we've set up our Coda node and sent our first transaction, let's turn our attention to the other ways we can interact with the Coda network - namely, participating in consensus, and helping compress data by generating zk-SNARKs. By operating a node that helps secure the network, you can receive coda for your efforts.
+
+## Participating in Consensus
+
+The Coda network is secured by [Proof-of-Stake consensus](/docs/glossary/#proof-of-stake). With this model of consensus, you don't need to have complex equipment like in Bitcoin mining. By simply having coda in our wallet, we can choose to either stake it ourselves, or delegate it to another node. Let's first see how to stake coda ourselves:
+
+### Staking coda
+
+Normally we'd want to have more funds before staking, but since we have some funds in our wallet from [the previous step](/docs/my-first-transaction), we can try out staking its coda by issuing the following command:
+
+    coda client set-staking -public-key $CODA_PUBLIC_KEY
+
+Alternatively, you can restart the daemon with the `-block-producer-pubkey` flag:
+
+<DaemonCommandExample args={[
+ "-block-producer-pubkey $CODA_PUBLIC_KEY",
+]}/>
+
+We can always check which accounts we're currently staking with, by using the `coda client status` command:
+
+```
+coda client status
+
+Coda daemon status
+-----------------------------------
+
+Global number of accounts:  372
+Block height:               20
+Max observed block length:  20
+Local uptime:               1m48s
+Ledger Merkle root:         ...
+Protocol state hash:        ...
+Staged Hash:                ...
+Git SHA-1:                  ...
+Configuration directory:    ...
+Peers:                      5 (...)
+User_commands sent:         0
+SNARK worker:               None
+SNARK work fee:             1
+Sync status:                Synced
+Block producers running:    1 (...)
+Best tip consensus time:    epoch=0, slot=133
+Next proposal:              None this epoch… checking at in 5.284h
+Consensus time now:         epoch=0, slot=134
+Consensus mechanism:        proof_of_stake
+Consensus configuration:    ...
+Addresses and ports:        ...
+Libp2p PeerID:              ...
+```
+
+The `Block producers running` field in the response above returns the number of accounts currently staking, with the associated key.
+
+<Alert kind="warning">
+
+  Keep in mind that if you are staking independently with funds in a account, you'll need to remain connected to the network at all times to succesfully produce blocks. If you need to go offline frequently, it may be better to delegate your stake.
+
+</Alert>
+
+If you'd like to send your coinbase to an account other than the one that is staking, you can use the `-coinbase-receiver` flag when you start your daemon. You can even point the coinbase at a cold wallet!
+
+
+
+
+### Delegating coda
+
+Delegating coda is an alternative option to staking it directly, with the benefit of not having to maintain a node that is always connected to the network.
+
+First make sure you've unlocked your account:
+
+    coda account unlock -public-key $CODA_PUBLIC_KEY
+
+And then run this command to delegate your stake:
+
+    coda client delegate-stake \
+        -receiver <DELEGATE-PUBLIC-KEY> \
+        -sender $CODA_PUBLIC_KEY \
+        -fee 0.1
+
+The fields in this command:
+
+- The `receiver` flag is the public key of the receiver of your stake delegation
+- `sender` is the public key of the account from which you want to delegate
+- `fee` is the transaction fee to record your transaction on the blockchain
+
+You'll notice that this command looks suspiciously like a [payment](/docs/my-first-transaction#make-a-payment) transaction. That's because a stake delegation is also a transaction! This is why we have to pay a small transaction fee in order to change this setting.
+
+Delegating your stake might be useful if you're interested in:
+
+- Running your own staking node that uses funds from a "cold wallet"
+- Delegating to a "staking pool" which will provide token payouts periodically
+- Or if you don't have enough tokens to make managing a block producer full-time worthwhile
+
+<Alert>
+
+There is a waiting period of a day or two before your new stake delegation comes into effect to prevent abuse of the network
+
+</Alert>
+
+## Compressing data in the Coda network 
+
+The Coda protocol is unique in that it doesn't require nodes to maintain the full history of the blockchain like other cryptocurrency protocols. By recursively using cryptographic proofs, the Coda protocol effectively compresses the blockchain to constant size. We call this compression, because it reduces terabytes of data to a few kilobytes.
+
+However, this isn't data encoding or compression in the traditional sense - rather nodes "compress" data in the network by generating cryptographic proofs. Node operators play a crucial role in this process by designating themselves as "snark-workers" that generate zk-SNARKs for transactions that have been added to blocks.
+
+You can start a snark-worker using these commands:
+
+    coda client set-snark-work-fee <FEE>
+    coda client set-snark-worker -address $CODA_PUBLIC_KEY
+
+Alternatively, you can restart the daemon with these flags:
+
+<DaemonCommandExample args={[
+  "-run-snark-worker $CODA_PUBLIC_KEY",
+  "-snark-worker-fee <fee>",
+]}/>
+
+As a snark worker, you get to share some of the block reward for each block your compressed transactions make it in to. The block producer is responsible for gathering compressed transactions before including them into a block, and will be incentivized by the protocol to reward snark-workers.
+
+Snark workers can be fairly compute intensive, so if you need to limit their CPU usage, you can specify the number of threads snark workers use with the `-snark-worker-parallelism` flag. This can be especially useful if you're trying to run a block producer and snark worker on the same machine and having issues producing blocks in time.
+
+That about covers the roles and responsibilities as a Code node operator. Since Coda is a permissionless peer-to-peer network, everything is managed and run in a decentralized manner by nodes all over the world. Similarly, the Coda project is also distributed and permissionless to join. The code is all open source, and there is much work to be done, both technical and non-technical. To learn more about how you can get involved with Coda, please check out the [Contributing to Coda section](./contributing).
+
+## Running coda as a service
+
+You might want to run the coda daemon in the background. You have a couple of options:
+
+- Use the `-background` flag to `coda daemon`. This will not autorestart the daemon for you.
+- Use your OS service manager to run it for you, and get the ability to have it restart automatically and other features.
+
+Either way, your logs will be saved to `~/.coda-config/coda.log` and configuration can be specified in the [`daemon.json`](#using-daemonjson-to-configure-your-coda-daemon) file.
+
+### macOS
+
+- [Install coda](/docs/getting-started#macOS) as usual.
+- You can then start the coda service like this:
+```
+brew services start coda
+```
+
+### Ubuntu 18.04 / Debian 9
+
+- [Install coda](/docs/getting-started#ubuntu-1804--debian-9) as usual.
+- Now you can check [here](https://github.com/jkrauska/coda-systemd) and [here](https://forums.codaprotocol.com/t/autodeploy-kinda-coda-node-and-systemd-integration-script/284) for some community-provided solutions to running coda as a service using systemd.
+
+<Alert>
+
+Interested in making it easier to use coda with systemd? [Help us](https://github.com/CodaProtocol/coda/issues/4493) to make the experience on Linux better!
+
+</Alert>
+
+### Using daemon.json to configure your coda daemon
+
+By creating a file at `~/.coda-config/daemon.json`, you can configure your coda daemon without needing to provide options on the commandline. This can be useful for running coda as a service as well as just for avoiding repetitive typing!
+
+Most of the options that can be passed to `coda daemon` on the commandline can also be provided as options in the config file. See `coda daemon -help` for more documentation of the options. Below is an example of usage of all the usable configuration parameters (in your file, you only need to specify the ones you want to change):
+
+```json
+{
+  "client-port": 1000,
+  "libp2p-port": 1001,
+  "rest-port": 1002,
+  "block-producer-key": "/path/to/privkey-file",
+  "block-producer-password": "mypassword",
+  "block-producer-pubkey": "<MY PUBLICKEY>",
+  "coinbase-receiver": "<MY PUBLICKEY>",
+  "log-block-creation": false,
+  "log-received-blocks": false,
+  "log-snark-work-gossip": false,
+  "log-txn-pool-gossip": false,
+  "peers": ["seed-one.o1test.net", "seed-two.o1test.net"],
+  "run-snark-worker": "<MY PUBLICKEY>",
+  "snark-worker-fee": 10,
+  "snark-worker-parallelism": 1,
+  "work-reassignment-wait": 420000,
+  "work-selection": "seq"
+}
+```

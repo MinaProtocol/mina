@@ -14,8 +14,6 @@ module Stable : sig
   end
 end]
 
-type t = Stable.Latest.t [@@deriving to_yojson, sexp]
-
 val merkle_root : t -> Ledger_hash.t
 
 val next_available_token : t -> Token_id.t
