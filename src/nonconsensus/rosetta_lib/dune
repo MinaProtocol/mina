@@ -1,0 +1,9 @@
+(library
+ (name rosetta_lib_nonconsensus)
+ (public_name rosetta_lib_nonconsensus)
+ (library_flags -linkall)
+ (inline_tests)
+ (libraries core_kernel snark_params_nonconsensus signature_lib_nonconsensus)
+ (preprocessor_deps ../../config.mlh)
+ (preprocess (pps ppx_version ppx_optcomp ppx_inline_test))
+ (synopsis "Rosetta-related support code for nonconsensus"))
