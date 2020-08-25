@@ -24,17 +24,17 @@ module Styles = {
       justifyContent(`spaceBetween),
       display(`flex),
       width(`percent(100.)),
-      background(Theme.Colors.slateAlpha(0.8)),
+      background(Theme.Colors.gray),
     ]);
 
-  let content = merge([Theme.Body.basic_semibold, style([color(white)])]);
+  let content = merge([Theme.Type.paragraph, style([color(white)])]);
 
   let button =
     merge([
-      Theme.Body.small,
+      Theme.Type.paragraph,
       style([
         opacity(1.),
-        color(Theme.Colors.slate),
+        color(Theme.Colors.gray),
         background(white),
         borderRadius(px(3)),
         padding2(~v=`rem(0.75), ~h=`rem(1.5)),
