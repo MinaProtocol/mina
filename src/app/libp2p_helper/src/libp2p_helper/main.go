@@ -784,8 +784,6 @@ type addPeerMsg struct {
 }
 
 func (ap *addPeerMsg) run(app *app) (interface{}, error) {
-	log := logging.Logger("addPeerMsg.run")
-
 	if app.P2p == nil {
 		return nil, needsConfigure()
 	}
@@ -804,7 +802,6 @@ func (ap *addPeerMsg) run(app *app) (interface{}, error) {
 		return nil, badRPC(err)
 	}
 
-	log.Warn("adding peer -- me: ", app.P2p.Me, ", who: ", info.ID)
 	app.AddedPeers.add(*info)
 	if app.Bootstrapper != nil {
 		app.Bootstrapper.Close()
@@ -830,8 +827,6 @@ func (l *mdnsListener) HandlePeerFound(info peer.AddrInfo) {
 }
 
 func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
-	log := logging.Logger("beginAdvertisingMsg.run")
-
 	if app.P2p == nil {
 		return nil, needsConfigure()
 	}
@@ -857,10 +852,7 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 
 	foundPeer := func(who peer.ID) {
 		if who.Validate() == nil && who != app.P2p.Me {
-			log.Warn("found peer -- me: ", app.P2p.Me, ", who: ", who)
 			addrs := app.P2p.Host.Peerstore().Addrs(who)
-
-			log.Warn("addrs: ", addrs)
 
 			if len(addrs) > 0 {
 				addrStrings := make([]string, len(addrs))
@@ -868,7 +860,6 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 					addrStrings[i] = a.String()
 				}
 
-				log.Warn("sending \"discoveredPeer\" upcall with ", len(addrStrings), " addresses")
 				app.writeMsg(discoveredPeerUpcall{
 					ID:     peer.IDB58Encode(who),
 					Addrs:  addrStrings,
@@ -878,7 +869,6 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 		}
 	}
 
-	log.Warn("bootstrapping to: ", app.AddedPeers.toSlice())
 	app.Bootstrapper, err = bootstrap.Bootstrap(app.P2p.Me, app.P2p.Host, app.P2p.Dht, bootstrap.BootstrapConfigWithPeers(app.AddedPeers.toSlice()))
 	if err != nil {
 		return nil, badp2p(err)
@@ -887,7 +877,6 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 	// report local discovery peers
 	go func() {
 		for info := range l.FoundPeer {
-			log.Warn("local peer found")
 			foundPeer(info.ID)
 		}
 	}()
@@ -904,7 +893,6 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 
 		for evt := range sub.Out() {
 			e := evt.(event.EvtPeerConnectednessChanged)
-			log.Warn("new peer found")
 			foundPeer(e.Peer)
 		}
 	}()
@@ -1051,7 +1039,7 @@ func main() {
 		Format: logging.JSONOutput,
 		Stderr: true,
 		Stdout: false,
-		Level:  logging.LevelDebug,
+		Level:  logging.LevelInfo,
 		File:   "",
 	})
 	helperLog := logging.Logger("helper top-level JSON handling")
