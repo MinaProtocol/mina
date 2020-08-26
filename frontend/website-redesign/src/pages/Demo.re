@@ -11,28 +11,49 @@ module Styles = {
       alignContent(`spaceAround),
       media(Theme.MediaQuery.tablet, [maxWidth(`rem(68.))]),
     ]);
+
+  let container =
+    style([
+      height(`rem(40.)),
+      display(`flex),
+      flexDirection(`column),
+      justifyContent(`spaceBetween),
+    ]);
+  let documentationButton =
+    style([textAlign(`left), height(`rem(2.)), width(`rem(7.18))]);
 };
 
 [@react.component]
 let make = () => {
   <Page title="Demo page of components">
     <div className=Styles.page>
-      <Button bgColor=Theme.Colors.orange>
-        {React.string("Button Label")}
-        <Icon kind=Icon.ArrowRightMedium />
-      </Button>
-      <Button bgColor=Theme.Colors.mint>
-        {React.string("Button label ")}
-        <Icon kind=Icon.ArrowRightMedium />
-      </Button>
-      <Button bgColor=Theme.Colors.black>
-        {React.string("Button label")}
-        <Icon kind=Icon.ArrowRightMedium />
-      </Button>
-      <Button bgColor=Theme.Colors.white>
-        {React.string("Button label")}
-        <Icon kind=Icon.ArrowRightMedium />
-      </Button>
+      <div className=Styles.container>
+        /*** Regular buttons */
+
+          <Button bgColor=Theme.Colors.orange>
+            {React.string("Button Label")}
+            <Icon kind=Icon.ArrowRightMedium />
+          </Button>
+          <Button bgColor=Theme.Colors.mint>
+            {React.string("Button label ")}
+            <Icon kind=Icon.ArrowRightMedium />
+          </Button>
+          <Button bgColor=Theme.Colors.black>
+            {React.string("Button label")}
+            <Icon kind=Icon.ArrowRightMedium />
+          </Button>
+          <Button bgColor=Theme.Colors.white>
+            {React.string("Button label")}
+            <Icon kind=Icon.ArrowRightMedium />
+          </Button>
+          /*** Documentation Button */
+          <PromoButton bgColor=Theme.Colors.orange>
+            <Icon kind=Icon.Documentation size="40" />
+            <span className=Styles.documentationButton>
+              {React.string("Go To Documentation")}
+            </span>
+          </PromoButton>
+        </div>
       <h1 className=Theme.Type.h1jumbo> {React.string("H1 Jumbo")} </h1>
       <h1 className=Theme.Type.h1> {React.string("H1")} </h1>
       <h2 className=Theme.Type.h2> {React.string("H2")} </h2>

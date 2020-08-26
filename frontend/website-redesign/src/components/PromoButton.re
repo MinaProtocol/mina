@@ -1,14 +1,15 @@
 module Styles = {
   open Css;
-  let button = (bgColor, dark, buttonHeight, buttonWidth) =>
+  let button = (bgColor, dark) =>
     merge([
       Theme.Type.buttonLabel,
       style([
         display(`flex),
         justifyContent(`spaceBetween),
         alignItems(`center),
-        width(buttonWidth),
-        height(buttonHeight),
+        textAlign(`left),
+        width(`rem(12.7)),
+        height(`rem(4.5)),
         border(`px(1), `solid, black),
         boxShadow(~x=`px(4), ~y=`px(4), black),
         backgroundColor(bgColor),
@@ -23,7 +24,7 @@ module Styles = {
             bgColor === Theme.Colors.white ? black : white;
           },
         ),
-        padding2(~v=`rem(1.), ~h=`rem(1.5)),
+        padding2(~v=`rem(1.), ~h=`rem(1.)),
         textAlign(`center),
         alignSelf(`center),
         hover([
@@ -57,18 +58,8 @@ module Styles = {
  * You can add any children inside the Button component and it will render it accordingly.
  */
 [@react.component]
-let make =
-    (
-      ~href="",
-      ~children,
-      ~height=`rem(3.25),
-      ~width=`rem(10.9),
-      ~bgColor=Theme.Colors.orange,
-      ~dark=false,
-    ) => {
+let make = (~href="", ~children, ~bgColor=Theme.Colors.orange, ~dark=false) => {
   <Next.Link href>
-    <button className={Styles.button(bgColor, dark, height, width)}>
-      children
-    </button>
+    <button className={Styles.button(bgColor, dark)}> children </button>
   </Next.Link>;
 };

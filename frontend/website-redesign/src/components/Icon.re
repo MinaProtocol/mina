@@ -48,14 +48,29 @@ module Styles = {
   };
 };
 
+/**
+ * Icon component
+ *
+ * - Specify size of
+ *
+ *
+ *
+ */
 [@react.component]
-let make = (~kind, ~size=`rem(1.5)) => {
+let make = (~kind, ~size="24") => {
   <svg
-    width="24"
-    height="24"
-    viewBox="0 0 24 24"
-    fill="currentColor"
-    className={Styles.svg(size)}>
+    width={size ++ "px"}
+    height={size ++ "px"}
+    viewBox={
+      "0 0 "
+      ++ {
+        size;
+      }
+      ++ {
+        size;
+      }
+    }
+    fill="currentColor">
     {switch (kind) {
      | World =>
        <path
@@ -644,44 +659,41 @@ let make = (~kind, ~size=`rem(1.5)) => {
          />
        </svg>
      | Documentation =>
-       <svg
-         width="24"
-         height="24"
-         viewBox="0 0 24 24"
-         fill="none"
-         xmlns="http://www.w3.org/2000/svg">
-         <g>
-           <rect
-             x="2.90002"
-             y="2.90002"
-             width="20.6"
-             height="20.6"
-             rx="0.5"
-             fill="white"
-             stroke="#2D2D2D"
-           />
-           <rect
-             x="0.5"
-             y="0.5"
-             width="20.6"
-             height="20.6"
-             rx="0.5"
-             fill="white"
-             stroke="#2D2D2D"
-           />
-           <path
-             fillRule="evenodd"
-             clipRule="evenodd"
-             d="M16.8 4.80005H4.79999V5.70005H16.8V4.80005ZM15 8.40005H4.79999V9.30005H15V8.40005ZM4.79999 12H16.8V12.9H4.79999V12ZM12.6 15.6H4.79999V16.5H12.6V15.6Z"
-             fill="currentColor"
-           />
-         </g>
-         <defs>
-           <clipPath id="clip0">
-             <rect width="24" height="24" fill="white" />
-           </clipPath>
-         </defs>
-       </svg>
+       <>
+         <mask id="path-1-inside-1" fill="white">
+           <rect x="4" y="4" width="36" height="36" rx="1" />
+         </mask>
+         <rect
+           x="4"
+           y="4"
+           width="36"
+           height="36"
+           rx="1"
+           fill="#FF603B"
+           stroke="white"
+           strokeWidth="3"
+           mask="url(#path-1-inside-1)"
+         />
+         <mask id="path-2-inside-2" fill="white">
+           <rect width="36" height="36" rx="1" />
+         </mask>
+         <rect
+           width="36"
+           height="36"
+           rx="1"
+           fill="#FF603B"
+           stroke="white"
+           strokeWidth="3"
+           mask="url(#path-2-inside-2)"
+         />
+         <path
+           fillRule="evenodd"
+           clipRule="evenodd"
+           d="M28 8H8V9.5H28V8ZM25 14H8V15.5H25V14ZM8 20H28V21.5H8V20ZM21 26H8V27.5H21V26Z"
+           fill="white"
+         />
+     </>
+
      | GenesisProgram =>
        <svg>
          <g>
