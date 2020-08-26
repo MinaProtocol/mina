@@ -33,38 +33,6 @@ import (
 	"github.com/multiformats/go-multiaddr"
 )
 
-// a grow-only dynamically sized peer set (because generics are for nerds)
-type peerSet struct {
-	size  int
-	slice []peer.AddrInfo
-}
-
-func newPeerSet(initialCapacity int) peerSet {
-	return peerSet{
-		size:  0,
-		slice: make([]peer.AddrInfo, initialCapacity),
-	}
-}
-
-func (set *peerSet) expand() {
-	newSlice := make([]peer.AddrInfo, len(set.slice)*2)
-	copy(newSlice, set.slice)
-	set.slice = newSlice
-}
-
-func (set *peerSet) add(info peer.AddrInfo) {
-	if set.size >= len(set.slice) {
-		set.expand()
-	}
-
-	set.slice[set.size] = info
-	set.size++
-}
-
-func (set *peerSet) toSlice() []peer.AddrInfo {
-	return set.slice[:set.size]
-}
-
 type subscription struct {
 	Sub    *pubsub.Subscription
 	Idx    int
@@ -88,7 +56,7 @@ type app struct {
 	Out             *bufio.Writer
 	OutChan         chan interface{}
 	Bootstrapper    io.Closer
-	AddedPeers      peerSet
+	AddedPeers      []peer.AddrInfo
 	UnsafeNoTrustIP bool
 }
 
@@ -802,11 +770,11 @@ func (ap *addPeerMsg) run(app *app) (interface{}, error) {
 		return nil, badRPC(err)
 	}
 
-	app.AddedPeers.add(*info)
+	app.AddedPeers = append(app.AddedPeers, *info)
 	if app.Bootstrapper != nil {
 		app.Bootstrapper.Close()
 	}
-	app.Bootstrapper, err = bootstrap.Bootstrap(app.P2p.Me, app.P2p.Host, app.P2p.Dht, bootstrap.BootstrapConfigWithPeers(app.AddedPeers.toSlice()))
+	app.Bootstrapper, err = bootstrap.Bootstrap(app.P2p.Me, app.P2p.Host, app.P2p.Dht, bootstrap.BootstrapConfigWithPeers(app.AddedPeers))
 
 	if err != nil {
 		return nil, badp2p(err)
@@ -869,9 +837,11 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 		}
 	}
 
-	app.Bootstrapper, err = bootstrap.Bootstrap(app.P2p.Me, app.P2p.Host, app.P2p.Dht, bootstrap.BootstrapConfigWithPeers(app.AddedPeers.toSlice()))
-	if err != nil {
-		return nil, badp2p(err)
+	if len(app.AddedPeers) > 0 {
+		app.Bootstrapper, err = bootstrap.Bootstrap(app.P2p.Me, app.P2p.Host, app.P2p.Dht, bootstrap.BootstrapConfigWithPeers(app.AddedPeers))
+		if err != nil {
+			return nil, badp2p(err)
+		}
 	}
 
 	// report local discovery peers
@@ -929,7 +899,7 @@ func (lp *listPeersMsg) run(app *app) (interface{}, error) {
 
 	connsHere := app.P2p.Host.Network().Conns()
 
-	peerInfos := make([]codaPeerInfo, len(connsHere))
+	peerInfos := make([]codaPeerInfo, 0, len(connsHere))
 
 	for _, conn := range connsHere {
 		maybePeer, err := parseMultiaddrWithID(conn.RemoteMultiaddr(), conn.RemotePeer())
@@ -1068,7 +1038,7 @@ func main() {
 		Streams:        make(map[int]net.Stream),
 		OutChan:        make(chan interface{}, 4096),
 		Out:            out,
-		AddedPeers:     newPeerSet(512),
+		AddedPeers:     make([]peer.AddrInfo, 0, 512),
 	}
 
 	go func() {
