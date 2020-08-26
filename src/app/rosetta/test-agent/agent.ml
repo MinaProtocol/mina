@@ -97,6 +97,12 @@ let check_new_account_payment ~logger ~rosetta_uri ~graphql_uri =
   let%bind mempool_res =
     Peek.Mempool.transaction ~rosetta_uri ~network_response ~logger ~hash
   in
+  [%log debug]
+    ~metadata:
+      [ ( "operations"
+        , mempool_res.transaction.operations |> [%to_yojson: Operation.t list]
+        ) ]
+    "Mempool operations: $operations" ;
   let expected_mempool_ops =
     Operation_expectation.
       [ { amount= Some (-5_000_000_000)
