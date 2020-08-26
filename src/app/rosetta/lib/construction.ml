@@ -27,6 +27,17 @@ module Get_nonce =
      }
 |}]
 
+module Send_payment =
+[%graphql
+{|
+  mutation send($from: PublicKey!, $to_: PublicKey!, $token: UInt64, $amount: UInt64, $fee: UInt64, $validUntil: UInt64, $memo: String, $nonce: UInt32!, $signature: String!) {
+    sendPayment(signature: {rawSignature: $signature}, input: {from: $from, to:$to_, token:$token, amount:$amount, fee:$fee, validUntil: $validUntil, memo: $memo, nonce:$nonce}) {
+      payment {
+        hash
+      }
+  }}
+  |}]
+
 module Options = struct
   type t = {sender: Public_key.Compressed.t; token_id: Unsigned.UInt64.t}
 
@@ -482,6 +493,79 @@ module Hash = struct
   module Mock = Impl (Result)
 end
 
+module Submit = struct
+  module Env = struct
+    module T (M : Monad_fail.S) = struct
+      type 'gql t =
+        { gql:
+               payment:Transaction.Unsigned.Rendered.Payment.t
+            -> signature:string
+            -> unit
+            -> ('gql, Errors.t) M.t
+              (* TODO: Validate network choice with separate query *)
+        ; lift: 'a 'e. ('a, 'e) Result.t -> ('a, 'e) M.t }
+    end
+
+    module Real = T (Deferred.Result)
+    module Mock = T (Result)
+
+    let real : graphql_uri:Uri.t -> 'gql Real.t =
+      let uint64 x = `String (Unsigned.UInt64.to_string x) in
+      let uint32 x = `String (Unsigned.UInt32.to_string x) in
+      fun ~graphql_uri ->
+        { gql=
+            (fun ~payment ~signature () ->
+              Graphql.query
+                (Send_payment.make ~from:(`String payment.from)
+                   ~to_:(`String payment.to_) ~token:(uint64 payment.token)
+                   ~amount:(uint64 payment.amount) ~fee:(uint64 payment.fee)
+                   ?validUntil:(Option.map ~f:uint32 payment.valid_until)
+                   ?memo:payment.memo ~nonce:(uint32 payment.nonce) ~signature
+                   ())
+                graphql_uri )
+        ; lift= Deferred.return }
+  end
+
+  module Impl (M : Monad_fail.S) = struct
+    let handle ~(env : 'gql Env.T(M).t) (req : Construction_submit_request.t) =
+      let open M.Let_syntax in
+      let%bind json =
+        try M.return (Yojson.Safe.from_string req.signed_transaction)
+        with _ -> M.fail (Errors.create (`Json_parse None))
+      in
+      let%bind signed_transaction =
+        Transaction.Signed.Rendered.of_yojson json
+        |> Result.map_error ~f:(fun e -> Errors.create (`Json_parse (Some e)))
+        |> env.lift
+      in
+      let%bind payment =
+        match
+          (signed_transaction.payment, signed_transaction.stake_delegation)
+        with
+        | Some payment, _ ->
+            M.return payment (* TODO: Support stake delegation *)
+        | _ ->
+            M.fail
+              (Errors.create
+                 ~context:"Must have one of payment or stakeDelegation"
+                 (`Json_parse None))
+      in
+      let%map res =
+        env.gql ~payment ~signature:signed_transaction.signature ()
+      in
+      let hash =
+        let (`UserCommand payment) = (res#sendPayment)#payment in
+        payment#hash
+      in
+      { Construction_submit_response.transaction_identifier=
+          Transaction_identifier.create hash
+      ; metadata= None }
+  end
+
+  module Real = Impl (Deferred.Result)
+  module Mock = Impl (Result)
+end
+
 let router ~graphql_uri ~logger (route : string list) body =
   [%log debug] "Handling /construction/ $route"
     ~metadata:[("route", `List (List.map route ~f:(fun s -> `String s)))] ;
@@ -558,5 +642,16 @@ let router ~graphql_uri ~logger (route : string list) body =
         Hash.Real.handle ~env:Hash.Env.real req |> Errors.Lift.wrap
       in
       Construction_hash_response.to_yojson res
+  | ["submit"] ->
+      let%bind req =
+        Errors.Lift.parse ~context:"Request"
+        @@ Construction_submit_request.of_yojson body
+        |> Errors.Lift.wrap
+      in
+      let%map res =
+        Submit.Real.handle ~env:(Submit.Env.real ~graphql_uri) req
+        |> Errors.Lift.wrap
+      in
+      Construction_submit_response.to_yojson res
   | _ ->
       Deferred.Result.fail `Page_not_found
