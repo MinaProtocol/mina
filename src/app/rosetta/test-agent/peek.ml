@@ -138,4 +138,17 @@ module Construction = struct
     in
     Lift.res ~logger res ~of_yojson:Construction_metadata_response.of_yojson
     |> Lift.successfully
+
+  (* This is really a poke, but collocating it here because it goes through rosetta *)
+  let submit ~rosetta_uri ~network_response ~logger ~signed_transaction =
+    let%bind res =
+      post ~rosetta_uri ~logger
+        ~body:
+          Construction_submit_request.(
+            {network_identifier= net_id network_response; signed_transaction}
+            |> to_yojson)
+        ~path:"construction/submit"
+    in
+    Lift.res ~logger res ~of_yojson:Construction_submit_response.of_yojson
+    |> Lift.successfully
 end
