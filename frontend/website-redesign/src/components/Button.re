@@ -1,14 +1,14 @@
 module Styles = {
   open Css;
-  let button = (bgColor, dark) =>
+  let button = (bgColor, dark, buttonHeight, buttonWidth) =>
     merge([
       Theme.Type.buttonLabel,
       style([
         display(`flex),
         justifyContent(`spaceBetween),
         alignItems(`center),
-        width(`rem(10.9)),
-        height(`rem(3.25)),
+        width(buttonWidth),
+        height(buttonHeight),
         border(`px(1), `solid, black),
         boxShadow(~x=`px(4), ~y=`px(4), black),
         backgroundColor(bgColor),
@@ -51,10 +51,24 @@ module Styles = {
  * They all have the same hover state.
  * There are some differences (mostly just border box color) between each button color depending on if it's on a light or dark background.
  *
+ * 1) Regular buttons: use with default height and width.
+ * 2) Promo button for "Go to documentation": use with width=`rem(13.) and height=`rem(4.75).
+ *
+ * You can add any children inside the Button component and it will render it accordingly.
  */
 [@react.component]
-let make = (~href="", ~children, ~bgColor=Theme.Colors.orange, ~dark=false) => {
+let make =
+    (
+      ~href="",
+      ~children,
+      ~height=`rem(10.9),
+      ~width=`rem(3.25),
+      ~bgColor=Theme.Colors.orange,
+      ~dark=false,
+    ) => {
   <Next.Link href>
-    <button className={Styles.button(bgColor, dark)}> children </button>
+    <button className={Styles.button(bgColor, dark, height, width)}>
+      children
+    </button>
   </Next.Link>;
 };
