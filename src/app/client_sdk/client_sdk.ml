@@ -16,6 +16,7 @@ open Snark_params_nonconsensus
 open Signature_lib_nonconsensus
 open Coda_base_nonconsensus
 open Rosetta_lib_nonconsensus
+open Rosetta_coding_nonconsensus
 open Js_util
 
 let _ =
