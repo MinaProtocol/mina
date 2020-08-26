@@ -46,17 +46,6 @@ module Styles = {
     ]);
 };
 
-/**
- * Button is light by default, and setting dark to true as a prop will make the background image change accordingly.
- * Buttons have four different colors: orange, mint, black, and white.
- * They all have the same hover state.
- * There are some differences (mostly just border box color) between each button color depending on if it's on a light or dark background.
- *
- * 1) Regular buttons: use with default height and width.
- * 2) Promo button for "Go to documentation": use with width=`rem(13.) and height=`rem(4.75).
- *
- * You can add any children inside the Button component and it will render it accordingly.
- */
 [@react.component]
 let make = (~href="", ~children, ~bgColor=Theme.Colors.orange, ~dark=false) => {
   <Next.Link href>
