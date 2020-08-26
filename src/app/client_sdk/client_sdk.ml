@@ -166,6 +166,10 @@ let _ =
          let unsigned_txn_json =
            Js.to_string unsignedRosettaTxn |> Yojson.Safe.from_string
          in
+         let make_error err =
+           let json = `Assoc [("error", `String err)] in
+           Js.string (Yojson.Safe.to_string json)
+         in
          match Transaction.Unsigned.Rendered.of_yojson unsigned_txn_json with
          | Ok
              { random_oracle_input= _
@@ -189,19 +193,17 @@ let _ =
                  match Transaction.Signed.render signed_txn with
                  | Ok signed ->
                      let json = Transaction.Signed.Rendered.to_yojson signed in
-                     Js.string (Yojson.Safe.to_string json)
+                     let json' = `Assoc [("data", json)] in
+                     Js.string (Yojson.Safe.to_string json')
                  | Error errs ->
-                     Js.string @@ "Error: "
-                     ^ Rosetta_lib_nonconsensus.Errors.show errs )
+                     make_error (Rosetta_lib_nonconsensus.Errors.show errs) )
              | Error errs ->
-                 Js.string @@ "Error: "
-                 ^ Rosetta_lib_nonconsensus.Errors.show errs )
+                 make_error (Rosetta_lib_nonconsensus.Errors.show errs) )
          | Ok _ ->
              (* TODO: handle delegations *)
-             Js.string
-               "Error: unsigned transaction must contain just a payment"
+             make_error "Unsigned transaction must contain just a payment"
          | Error msg ->
-             Js.string ("JSON error: " ^ msg)
+             make_error msg
 
        method runUnitTests () : bool Js.t = Coding.run_unit_tests () ; Js._true
     end)
