@@ -1,4 +1,4 @@
-(* sign_js.ml *)
+(* client_sdk.ml *)
 
 [%%import
 "/src/config.mlh"]
@@ -7,7 +7,7 @@
 consensus_mechanism]
 
 [%%error
-"Client_sdk cannot be built if \"consensus_mechanism\" is defined"]
+"Client SDK cannot be built if \"consensus_mechanism\" is defined"]
 
 [%%endif]
 
@@ -158,6 +158,50 @@ let _ =
          in
          let signed = User_command.Poly.{payload; signer; signature} in
          User_command.check_signature signed
+
+       method signRosettaTransaction (sk_base58_check_js : string_js)
+           (unsignedRosettaTxn : string_js) =
+         let sk_base58_check = Js.to_string sk_base58_check_js in
+         let sk = Private_key.of_base58_check_exn sk_base58_check in
+         let unsigned_txn_json =
+           Js.to_string unsignedRosettaTxn |> Yojson.Safe.from_string
+         in
+         match Transaction.Unsigned.Rendered.of_yojson unsigned_txn_json with
+         | Ok
+             { random_oracle_input= _
+             ; payment= Some payment
+             ; stake_delegation= None } -> (
+             let command = Transaction.Unsigned.of_rendered_payment payment in
+             let payload_or_err =
+               command
+               |> Rosetta_lib_nonconsensus.User_command_info.Partial
+                  .to_user_command_payload ~nonce:payment.nonce
+             in
+             match payload_or_err with
+             | Ok payload -> (
+                 let signature =
+                   User_command.sign_payload sk payload |> Signature.Raw.encode
+                 in
+                 let signed_txn =
+                   Transaction.Signed.
+                     {command; nonce= payment.nonce; signature}
+                 in
+                 match Transaction.Signed.render signed_txn with
+                 | Ok signed ->
+                     let json = Transaction.Signed.Rendered.to_yojson signed in
+                     Js.string (Yojson.Safe.to_string json)
+                 | Error errs ->
+                     Js.string @@ "Error: "
+                     ^ Rosetta_lib_nonconsensus.Errors.show errs )
+             | Error errs ->
+                 Js.string @@ "Error: "
+                 ^ Rosetta_lib_nonconsensus.Errors.show errs )
+         | Ok _ ->
+             (* TODO: handle delegations *)
+             Js.string
+               "Error: unsigned transaction must contain just a payment"
+         | Error msg ->
+             Js.string ("JSON error: " ^ msg)
 
        method runUnitTests () : bool Js.t = Coding.run_unit_tests () ; Js._true
     end)

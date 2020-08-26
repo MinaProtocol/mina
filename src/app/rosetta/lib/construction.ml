@@ -1,9 +1,9 @@
 open Core_kernel
 open Async
-module Transaction' = Transaction
-module Signature' = Coda_base.Signature
-open Models
-module Transaction = Transaction'
+open Rosetta_lib
+open Rosetta_models
+module Signature = Coda_base.Signature
+module Transaction = Rosetta_lib.Transaction
 module Public_key = Signature_lib.Public_key
 module User_command_payload = Coda_base.User_command_payload
 module User_command = Coda_base.User_command
@@ -480,7 +480,7 @@ module Hash = struct
       (* TODO: Implement signature coding *)
       let%map signature =
         Result.of_option
-          (Signature'.Raw.decode signed_transaction.signature)
+          (Signature.Raw.decode signed_transaction.signature)
           ~error:(Errors.create `Signature_missing)
         |> env.lift
       in
