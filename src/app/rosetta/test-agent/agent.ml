@@ -5,6 +5,12 @@ open Lib
 open Async
 open Models
 
+module Error = struct
+  include Error
+
+  let equal e1 e2 = Yojson.Safe.equal (Error.to_yojson e1) (Error.to_yojson e2)
+end
+
 let other_pk = "B62qoDWfBZUxKpaoQCoFqr12wkaY84FrhxXNXzgBkMUi2Tz4K8kBDiv"
 
 let wait span = Async.after span |> Deferred.map ~f:Result.return
@@ -27,41 +33,10 @@ let keep_trying ~step ~retry_count ~initial_delay ~each_delay ~failure_reason =
   let%bind () = wait initial_delay in
   go retry_count
 
-(* TODO: Break up this function in the next PR *)
-let check_new_account_payment ~logger ~rosetta_uri ~graphql_uri =
+let direct_graphql_payment_through_block ~logger ~rosetta_uri ~graphql_uri
+    ~network_response =
   let open Core.Time in
   let open Deferred.Result.Let_syntax in
-  let module Error = struct
-    include Error
-
-    let equal e1 e2 =
-      Yojson.Safe.equal (Error.to_yojson e1) (Error.to_yojson e2)
-  end in
-  (* Stop staking so we can rely on things being in the mempool *)
-  let%bind _res = Poke.Staking.disable ~graphql_uri in
-  (* Figure out our network identifier *)
-  let%bind network_response = Peek.Network.list ~rosetta_uri ~logger in
-  (* Wait until we are "synced" -- on debug nets this is when block production begins *)
-  let%bind () =
-    keep_trying
-      ~step:(fun () ->
-        let status_r_dr =
-          Peek.Network.status ~rosetta_uri ~network_response ~logger
-        in
-        let%map status_r = status_r_dr in
-        if
-          [%eq: (string option, Error.t) result]
-            (Result.map status_r ~f:(fun status ->
-                 Option.bind status.Network_status_response.sync_status
-                   ~f:(fun sync_status -> sync_status.stage) ))
-            (Ok (Some "Synced"))
-        then `Succeeded ()
-        else `Failed )
-      ~retry_count:15 ~initial_delay:(Span.of_sec 0.5)
-      ~each_delay:(Span.of_sec 1.0) ~failure_reason:"Took too long to sync"
-  in
-  (* Unlock the account *)
-  let%bind _ = Poke.Account.unlock ~graphql_uri in
   (* Unlock the account *)
   let%bind _ = Poke.Account.unlock ~graphql_uri in
   (* Send a payment *)
@@ -179,21 +154,92 @@ let check_new_account_payment ~logger ~rosetta_uri ~graphql_uri =
   let succesful (x : Operation_expectation.t) = {x with status= "Success"} in
   Logger.info logger "GOT BLOCK $block" ~module_:__MODULE__ ~location:__LOC__
     ~metadata:[("block", Block_response.to_yojson block)] ;
+  Operation_expectation.assert_similar_operations
+    ~expected:
+      ( List.map ~f:succesful expected_mempool_ops
+      @ Operation_expectation.
+          [ { amount= Some 20_000_000_000
+            ; account=
+                Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
+            ; status= "Success"
+            ; _type= "coinbase_inc" } ] )
+    ~actual:
+      ( List.map (Option.value_exn block.block).transactions ~f:(fun txn ->
+            txn.operations )
+      |> List.join )
+    ~situation:"block"
+
+let construction_api_payment_through_mempool ~logger ~rosetta_uri
+    ~graphql_uri:_ ~network_response =
+  let open Deferred.Result.Let_syntax in
+  let keys =
+    Signer.Keys.of_private_key_box
+      {| {"box_primitive":"xsalsa20poly1305","pw_primitive":"argon2i","nonce":"8jGuTAxw3zxtWasVqcD1H6rEojHLS1yJmG3aHHd","pwsalt":"AiUCrMJ6243h3TBmZ2rqt3Voim1Y","pwdiff":[134217728,6],"ciphertext":"DbAy736GqEKWe9NQWT4yaejiZUo9dJ6rsK7cpS43APuEf5AH1Qw6xb1s35z8D2akyLJBrUr6m"} |}
+  in
+  let%bind derive_res =
+    Offline.Derive.req ~logger ~rosetta_uri ~network_response
+      ~public_key_hex_bytes:keys.public_key_hex_bytes
+  in
+  let operations =
+    Poke.SendTransaction.payment_operations ~from:derive_res.address
+      ~fee:(Unsigned.UInt64.of_int 3_000_000_000)
+      ~amount:(Unsigned.UInt64.of_int 10_000_000_000)
+      ~to_:other_pk
+  in
+  let%bind preprocess_res =
+    Offline.Preprocess.req ~logger ~rosetta_uri ~network_response
+      ~max_fee:(Unsigned.UInt64.of_int 100_000_000_000)
+      ~operations
+  in
+  let%bind metadata_res =
+    Peek.Construction.metadata ~rosetta_uri ~network_response ~logger
+      ~options:(Option.value_exn preprocess_res.options)
+  in
+  [%log debug]
+    ~metadata:[("res", Construction_metadata_response.to_yojson metadata_res)]
+    "Construction_metadata result $res" ;
+  return ()
+
+(* TODO: Break up this function in the next PR *)
+let check_new_account_payment ~logger ~rosetta_uri ~graphql_uri =
+  let open Core.Time in
+  let open Deferred.Result.Let_syntax in
+  (* Stop staking so we can rely on things being in the mempool *)
+  let%bind _res = Poke.Staking.disable ~graphql_uri in
+  (* Figure out our network identifier *)
+  let%bind network_response = Peek.Network.list ~rosetta_uri ~logger in
+  (* Wait until we are "synced" -- on debug nets this is when block production begins *)
   let%bind () =
-    Operation_expectation.assert_similar_operations
-      ~expected:
-        ( List.map ~f:succesful expected_mempool_ops
-        @ Operation_expectation.
-            [ { amount= Some 20_000_000_000
-              ; account=
-                  Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
-              ; status= "Success"
-              ; _type= "coinbase_inc" } ] )
-      ~actual:
-        ( List.map (Option.value_exn block.block).transactions ~f:(fun txn ->
-              txn.operations )
-        |> List.join )
-      ~situation:"block"
+    keep_trying
+      ~step:(fun () ->
+        let status_r_dr =
+          Peek.Network.status ~rosetta_uri ~network_response ~logger
+        in
+        let%map status_r = status_r_dr in
+        if
+          [%eq: (string option, Error.t) result]
+            (Result.map status_r ~f:(fun status ->
+                 Option.bind status.Network_status_response.sync_status
+                   ~f:(fun sync_status -> sync_status.stage) ))
+            (Ok (Some "Synced"))
+        then `Succeeded ()
+        else `Failed )
+      ~retry_count:15 ~initial_delay:(Span.of_sec 0.5)
+      ~each_delay:(Span.of_sec 1.0) ~failure_reason:"Took too long to sync"
+  in
+  (* Directly create a payment in graphql and make sure it's in the mempool
+       * properly, and then in a block properly *)
+  let%bind () =
+    direct_graphql_payment_through_block ~logger ~rosetta_uri ~graphql_uri
+      ~network_response
+  in
+  (* Stop staking so we can rely on things being in the mempool again *)
+  let%bind _res = Poke.Staking.disable ~graphql_uri in
+  (* Follow the full construction API flow and make sure the submitted
+       * transaction appears in the mempool *)
+  let%bind () =
+    construction_api_payment_through_mempool ~logger ~rosetta_uri ~graphql_uri
+      ~network_response
   in
   (* Succeed! (for now) *)
   return ()
