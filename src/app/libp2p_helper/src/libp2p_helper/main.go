@@ -25,6 +25,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/event"
 	net "github.com/libp2p/go-libp2p-core/network"
 	peer "github.com/libp2p/go-libp2p-core/peer"
+	peerstore "github.com/libp2p/go-libp2p-core/peerstore"
 	protocol "github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/libp2p/go-libp2p-discovery"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -847,6 +848,7 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 	// report local discovery peers
 	go func() {
 		for info := range l.FoundPeer {
+			app.P2p.Host.Peerstore().AddAddrs(info.ID, info.Addrs, peerstore.ConnectedAddrTTL)
 			foundPeer(info.ID)
 		}
 	}()
