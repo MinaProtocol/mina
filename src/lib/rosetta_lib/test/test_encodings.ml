@@ -9,12 +9,12 @@ open Core_kernel
 consensus_mechanism]
 
 open Signature_lib
-open Rosetta_lib
+open Rosetta_coding
 
 [%%else]
 
 open Signature_lib_nonconsensus
-open Rosetta_lib_nonconsensus
+open Rosetta_coding_nonconsensus
 
 [%%endif]
 
