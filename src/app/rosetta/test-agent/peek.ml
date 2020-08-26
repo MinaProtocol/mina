@@ -25,7 +25,7 @@ module Lift = struct
           (Errors.create ~context:(Models.Error.show e) `Invariant_violation)
 
   let req ~logger:_ req :
-      (('a, Models.Error.t) result, Errors.t) Deferred.Result.t =
+      ((Yojson.Safe.t, Models.Error.t) result, Errors.t) Deferred.Result.t =
     let open Deferred.Let_syntax in
     let%bind response, body = req in
     let%bind str = Cohttp_async.Body.to_string body in
@@ -52,6 +52,9 @@ module Lift = struct
                (`Json_parse (Some err))) )
 end
 
+let net_id network_response =
+  List.hd_exn network_response.Network_list_response.network_identifiers
+
 let post ~logger ~rosetta_uri ~body ~path =
   Cohttp_async.Client.post
     ~headers:
@@ -75,12 +78,7 @@ module Network = struct
   let status ~rosetta_uri ~network_response ~logger =
     let%map res =
       post ~rosetta_uri ~logger
-        ~body:
-          Network_request.(
-            create
-              (List.hd_exn
-                 network_response.Network_list_response.network_identifiers)
-            |> to_yojson)
+        ~body:Network_request.(create (net_id network_response) |> to_yojson)
         ~path:"network/status"
     in
     Lift.res ~logger res ~of_yojson:Network_status_response.of_yojson
@@ -92,12 +90,7 @@ module Mempool = struct
   let mempool ~rosetta_uri ~network_response ~logger =
     let%map res =
       post ~rosetta_uri ~logger
-        ~body:
-          Network_request.(
-            create
-              (List.hd_exn
-                 network_response.Network_list_response.network_identifiers)
-            |> to_yojson)
+        ~body:Network_request.(create (net_id network_response) |> to_yojson)
         ~path:"mempool/"
     in
     Lift.res ~logger res ~of_yojson:Mempool_response.of_yojson
@@ -107,9 +100,7 @@ module Mempool = struct
       post ~rosetta_uri ~logger
         ~body:
           Mempool_transaction_request.(
-            { network_identifier=
-                List.hd_exn
-                  network_response.Network_list_response.network_identifiers
+            { network_identifier= net_id network_response
             ; transaction_identifier= {Transaction_identifier.hash} }
             |> to_yojson)
         ~path:"mempool/transaction"
@@ -126,12 +117,25 @@ module Block = struct
       post ~rosetta_uri ~logger
         ~body:
           Block_request.(
-            create
-              (List.hd_exn
-                 network_response.Network_list_response.network_identifiers)
+            create (net_id network_response)
               (Partial_block_identifier.create ())
             |> to_yojson)
         ~path:"block/"
     in
     Lift.res ~logger res ~of_yojson:Block_response.of_yojson
+end
+
+module Construction = struct
+  open Deferred.Result.Let_syntax
+
+  let metadata ~rosetta_uri ~network_response ~logger ~options =
+    let%bind res =
+      post ~rosetta_uri ~logger
+        ~body:
+          Construction_metadata_request.(
+            {network_identifier= net_id network_response; options} |> to_yojson)
+        ~path:"construction/metadata"
+    in
+    Lift.res ~logger res ~of_yojson:Construction_metadata_response.of_yojson
+    |> Lift.successfully
 end

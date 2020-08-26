@@ -9,11 +9,13 @@ open Core_kernel
 consensus_mechanism]
 
 module Field = Snark_params.Tick.Field
+module Scalar = Snark_params.Tick.Inner_curve.Scalar
 open Signature_lib
 
 [%%else]
 
 module Field = Snark_params_nonconsensus.Field
+module Scalar = Snark_params_nonconsensus.Inner_curve.Scalar
 open Signature_lib_nonconsensus
 
 [%%endif]
@@ -63,8 +65,14 @@ let bits4_to_hex_char bits =
   let s = sprintf "%0X" n in
   s.[0]
 
-let of_field field =
-  let bits0 = Field.unpack field |> List.rev in
+module type Packed = sig
+  type t
+
+  val unpack : t -> bool list
+end
+
+let of_unpackable (type t) (module M : Packed with type t = t) (packed : t) =
+  let bits0 = M.unpack packed |> List.rev in
   assert (Int.equal (List.length bits0) 255) ;
   (* field elements are 255 bits, left-pad to get 32 bytes *)
   let bits = false :: bits0 in
@@ -80,7 +88,17 @@ let of_field field =
   let cs = List.map bits_by_4s ~f:bits4_to_hex_char in
   String.of_char_list cs
 
-let to_field raw =
+let of_field = of_unpackable (module Field)
+
+let of_scalar = of_unpackable (module Scalar)
+
+module type Unpacked = sig
+  type t
+
+  val project : bool list -> t
+end
+
+let pack (type t) (module M : Unpacked with type t = t) raw =
   (* 256 bits = 64 hex chars *)
   assert (Int.equal (String.length raw) 64) ;
   let bits0 =
@@ -88,7 +106,11 @@ let to_field raw =
   in
   (* remove padding bit *)
   let bits = List.tl_exn bits0 |> List.rev in
-  Field.project bits
+  M.project bits
+
+let to_field = pack (module Field)
+
+let to_scalar = pack (module Scalar)
 
 let of_public_key pk =
   let field1, field2 = pk in
