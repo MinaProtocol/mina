@@ -38,10 +38,36 @@ module Sender = struct
         failwith "Sender.remote_exn of Local sender"
     | Remote x ->
         x
+
+  let gen : t Quickcheck.Generator.t =
+    let open Quickcheck.Generator.Let_syntax in
+    let%bind ip =
+      match%map
+        Quickcheck.Generator.(
+          variant2
+            (list_with_length 4 (Int.gen_incl 0 255))
+            (list_with_length 8 (Int.gen_incl 0 65535)))
+      with
+      | `A octets ->
+          String.concat ~sep:"." (List.map ~f:Int.to_string octets)
+      | `B segments ->
+          String.concat ~sep:":" (List.map ~f:(Printf.sprintf "%x") segments)
+    in
+    let remote =
+      let inet = Unix.Inet_addr.of_string ip in
+      let%map peerid = String.gen_nonempty in
+      (inet, peerid)
+    in
+    match%map Option.quickcheck_generator remote with
+    | None ->
+        Local
+    | Some remote ->
+        Remote remote
 end
 
 module Incoming = struct
-  type 'a t = {data: 'a; sender: Sender.t} [@@deriving eq, sexp, yojson]
+  type 'a t = {data: 'a; sender: Sender.t}
+  [@@deriving eq, sexp, yojson, compare]
 
   let sender t = t.sender
 
@@ -63,4 +89,10 @@ module Incoming = struct
         failwith "Incoming.sender_sender_exn of Local envelope"
     | Remote x ->
         x
+
+  let gen gen_a =
+    let open Quickcheck.Generator.Let_syntax in
+    let%bind data = gen_a in
+    let%map sender = Sender.gen in
+    {data; sender}
 end

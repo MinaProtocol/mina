@@ -38,13 +38,11 @@ module Unsigned = struct
 
   let string_of_field field =
     assert (Snark_params.Tick.Field.size_in_bits = 255) ;
-    Snark_params.Tick.Field.unpack field
-    |> Random_oracle_input.Coding.string_of_field
+    Rosetta_lib.Coding.of_field field |> Hex.Safe.of_hex |> Option.value_exn
 
   let field_of_string s =
     assert (Snark_params.Tick.Field.size_in_bits = 255) ;
-    Random_oracle_input.Coding.field_of_string s ~size_in_bits:255
-    |> Result.map ~f:(fun bits -> Snark_params.Tick.Field.project bits)
+    Hex.Safe.to_hex s |> Rosetta_lib.Coding.to_field
 
   let un_pk (`Pk pk) = pk
 
