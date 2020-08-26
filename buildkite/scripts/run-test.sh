@@ -23,25 +23,25 @@ echo "image: ${coda_daemon_image}"
 #     sleep 60
 # done
 
-# Building test-executive
+echo "--- Building test-executive"
 
 dune build --profile=testnet_postake_medium_curves src/app/test_executive/test_executive.exe
 
-# Clone coda-automation repo (this would be changed in future. Nathan is suggesting linking coda-automation in coda repo)
+echo "--- Clone coda-automation repo (this would be changed in future. Nathan is suggesting linking coda-automation in coda repo)"
 
 git clone https://github.com/CodaProtocol/coda-automation.git
 
-# Set the credential for gcloud
+echo "--- Set the credential for gcloud"
 
 echo $BUILDKITE_GS_APPLICATION_CREDENTIALS_JSON > /tmp/credential.json
 
 export GOOGLE_APPLICATION_CREDENTIALS="/tmp/credential.json"
 
-# Set default region for AWS
+echo "--- Set default region for AWS"
 
 export AWS_DEFAULT_REGION=$AWS_REGION
 
-# Run test executive
+echo "--- Run test executive"
 
 ./_build/default/src/app/test_executive/test_executive.exe --coda-image "$coda_daemon_image" block-production
 
