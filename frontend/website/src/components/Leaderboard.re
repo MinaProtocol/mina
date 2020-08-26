@@ -166,7 +166,8 @@ module Styles = {
       alignItems(`center),
       gridColumnGap(rem(1.5)),
       width(`percent(100.)),
-      gridTemplateColumns([rem(3.5), `auto, rem(9.)]),
+      gridTemplateColumns([`rem(3.5), `rem(6.), `auto, `rem(9.)]),
+      hover([backgroundColor(`hex("E0E0E0"))]),
       media(
         Theme.MediaQuery.tablet,
         [
@@ -224,6 +225,7 @@ module Styles = {
         letterSpacing(`rem(0.125)),
         borderBottom(`px(1), `solid, Theme.Colors.leaderboardMidnight),
         media(Theme.MediaQuery.notMobile, [display(`grid)]),
+        hover([backgroundColor(white), cursor(`default)]),
       ]),
     ]);
 
@@ -409,6 +411,10 @@ module LeaderboardRow = {
     ++ member.releasePoints->string_of_int
     ++ "&genesisMember="
     ++ member.genesisMember->string_of_bool
+    ++ "&communityMVP="
+    ++ member.communityMVP->string_of_bool
+    ++ "&technicalMVP="
+    ++ member.technicalMVP->string_of_bool
     ++ "&name="
     ++ member.name
     |> Js.String.replaceByRe([%re "/#/g"], "%23"); /* replace "#" with percent encoding for the URL to properly parse */
@@ -521,8 +527,8 @@ module LeaderboardRow = {
           <span className=Styles.username> {React.string(member.name)} </span>
           {Array.map(column => {renderPoints(sort, column, member)}, filters)
            |> React.array}
-        </div>;
-        // </Next.Link>;
+        </div>
+      </Next.Link>;
     };
   };
 
@@ -550,14 +556,14 @@ module LeaderboardRow = {
           <span>
             {React.string(string_of_int(getPoints(sort, member)))}
           </span>
-        </div>;
-        //</Next.Link>;
+        </div>
+      </Next.Link>;
     };
   };
 
   [@react.component]
   let make = (~sort, ~member) => {
-    let _userSlug = getUserSlug(member);
+    let userSlug = getUserSlug(member);
     let rank = getRank(sort, member);
 
     <div>
@@ -658,7 +664,9 @@ let make =
     <div id="testnet-leaderboard" className=Styles.leaderboard>
       <div className=Styles.headerRow>
         <span className=Styles.flexEnd> {React.string("Rank")} </span>
-        <span> {React.string("Name")} </span>
+        <span className=Css.(style([gridColumn(3, 4)]))>
+          {React.string("Name")}
+        </span>
         {Array.map(renderColumnHeader, Filter.filters) |> React.array}
       </div>
       {if (state.loading) {

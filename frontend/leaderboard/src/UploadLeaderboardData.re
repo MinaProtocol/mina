@@ -216,7 +216,7 @@ let uploadUserProfileData = spreadsheetId => {
                       spreadsheetId,
                       Sheets.getSheet(Sheets.MemberProfileData).range,
                       "USER_ENTERED",
-                      data,
+                      encodeGoogleSheets(data),
                     ),
                     result => {
                     switch (result) {
