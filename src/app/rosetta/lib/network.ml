@@ -1,6 +1,7 @@
 open Core_kernel
 open Async
-open Models
+open Rosetta_lib
+open Rosetta_models
 
 module Get_status =
 [%graphql

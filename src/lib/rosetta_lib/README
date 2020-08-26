@@ -1,0 +1,5 @@
+The Rosetta_lib library contains code that's needed both by the Rosetta app in src/app/rosetta
+and other code outside that app.
+
+Because this code is built for Javascript in the client SDK, there can be no dependencies
+on Jane Street Core or Async.

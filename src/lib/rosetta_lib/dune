@@ -3,7 +3,9 @@
  (public_name rosetta_lib)
  (library_flags -linkall)
  (inline_tests)
- (libraries core_kernel snark_params signature_lib)
+ (libraries core_kernel caqti coda_base rosetta_models snark_params signature_lib)
  (preprocessor_deps ../../config.mlh)
- (preprocess (pps ppx_version ppx_optcomp ppx_inline_test))
+ (preprocess (pps ppx_coda ppx_version ppx_optcomp ppx_assert ppx_let ppx_sexp_conv
+                  ppx_compare ppx_deriving.std ppx_custom_printf
+                  ppx_deriving_yojson ppx_inline_test))
  (synopsis "Rosetta-related support code"))

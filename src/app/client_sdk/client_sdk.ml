@@ -1,4 +1,4 @@
-(* sign_js.ml *)
+(* client_sdk.ml *)
 
 [%%import
 "/src/config.mlh"]
@@ -7,7 +7,7 @@
 consensus_mechanism]
 
 [%%error
-"Client_sdk cannot be built if \"consensus_mechanism\" is defined"]
+"Client SDK cannot be built if \"consensus_mechanism\" is defined"]
 
 [%%endif]
 
@@ -16,6 +16,7 @@ open Snark_params_nonconsensus
 open Signature_lib_nonconsensus
 open Coda_base_nonconsensus
 open Rosetta_lib_nonconsensus
+open Rosetta_coding_nonconsensus
 open Js_util
 
 let _ =
@@ -158,6 +159,52 @@ let _ =
          in
          let signed = User_command.Poly.{payload; signer; signature} in
          User_command.check_signature signed
+
+       method signRosettaTransaction (sk_base58_check_js : string_js)
+           (unsignedRosettaTxn : string_js) =
+         let sk_base58_check = Js.to_string sk_base58_check_js in
+         let sk = Private_key.of_base58_check_exn sk_base58_check in
+         let unsigned_txn_json =
+           Js.to_string unsignedRosettaTxn |> Yojson.Safe.from_string
+         in
+         let make_error err =
+           let json = `Assoc [("error", `String err)] in
+           Js.string (Yojson.Safe.to_string json)
+         in
+         match Transaction.Unsigned.Rendered.of_yojson unsigned_txn_json with
+         | Ok
+             { random_oracle_input= _
+             ; payment= Some payment
+             ; stake_delegation= None } -> (
+             let command = Transaction.Unsigned.of_rendered_payment payment in
+             let payload_or_err =
+               command
+               |> Rosetta_lib_nonconsensus.User_command_info.Partial
+                  .to_user_command_payload ~nonce:payment.nonce
+             in
+             match payload_or_err with
+             | Ok payload -> (
+                 let signature =
+                   User_command.sign_payload sk payload |> Signature.Raw.encode
+                 in
+                 let signed_txn =
+                   Transaction.Signed.
+                     {command; nonce= payment.nonce; signature}
+                 in
+                 match Transaction.Signed.render signed_txn with
+                 | Ok signed ->
+                     let json = Transaction.Signed.Rendered.to_yojson signed in
+                     let json' = `Assoc [("data", json)] in
+                     Js.string (Yojson.Safe.to_string json')
+                 | Error errs ->
+                     make_error (Rosetta_lib_nonconsensus.Errors.show errs) )
+             | Error errs ->
+                 make_error (Rosetta_lib_nonconsensus.Errors.show errs) )
+         | Ok _ ->
+             (* TODO: handle delegations *)
+             make_error "Unsigned transaction must contain just a payment"
+         | Error msg ->
+             make_error msg
 
        method runUnitTests () : bool Js.t = Coding.run_unit_tests () ; Js._true
     end)
