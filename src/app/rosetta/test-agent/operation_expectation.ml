@@ -5,7 +5,14 @@ open Lib
 open Async
 
 module Reason = struct
-  type t = Amount | Account | Account_pk | Account_token_id | Status | Type
+  type t =
+    | Amount
+    | Account
+    | Account_pk
+    | Account_token_id
+    | Status
+    | Target
+    | Type
   [@@deriving eq, sexp, show]
 end
 
@@ -14,7 +21,11 @@ module Account = struct
 end
 
 type t =
-  {amount: int option; account: Account.t option; status: string; _type: string}
+  { amount: int option
+  ; account: Account.t option
+  ; status: string
+  ; _type: string
+  ; target: string option }
 
 (** Returns a validation of the reasons it is not similar or unit if it is *)
 let similar t (op : Operation.t) =
@@ -51,6 +62,13 @@ let similar t (op : Operation.t) =
         in
         () )
   and _ = test String.(equal t.status op.status) Status
+  and _ =
+    opt_eq t.target op.metadata ~err:Target ~f:(fun target metadata ->
+        match metadata with
+        | `Assoc [("delegation_change_target", `String y)] ->
+            test String.(equal y target) Target
+        | _ ->
+            fail Target )
   and _ = test String.(equal t._type op._type) Type in
   ()
 
