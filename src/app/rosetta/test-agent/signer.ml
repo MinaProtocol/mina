@@ -10,7 +10,9 @@ module Keys = struct
   type t = {keypair: Keypair.t; public_key_hex_bytes: string}
 
   let of_keypair keypair =
-    {keypair; public_key_hex_bytes= Public_key.Hex.encode keypair.public_key}
+    { keypair
+    ; public_key_hex_bytes=
+        Rosetta_coding.Coding.of_public_key keypair.public_key }
 
   let of_private_key_box secret_box_string =
     let json = Yojson.Safe.from_string secret_box_string in

@@ -254,7 +254,7 @@ let construction_api_payment_through_mempool ~logger ~rosetta_uri
   assert (
     String.equal hash_res.Construction_hash_response.transaction_hash
       submit_res.transaction_identifier.hash ) ;
-  [%log debug] "Construction_submit is finalize" ;
+  [%log debug] "Construction_submit is finalized" ;
   return ()
 
 (* TODO: Break up this function in the next PR *)
