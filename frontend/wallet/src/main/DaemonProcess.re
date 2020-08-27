@@ -148,9 +148,9 @@ module CodaProcess = {
   let port = 0xc0d;
 
   let defaultPeers = [
-    "/dns4/peer1-rising-phoenix.o1test.net/tcp/8303/p2p/12D3KooWHMmfuS9DmmK9eH4GC31arDhbtHEBQzX6PwPtQftxzwJs",
-    "/dns4/peer2-rising-phoenix.o1test.net/tcp/8303/p2p/12D3KooWAux9MAW1yAdD8gsDbYHmgVjRvdfYkpkfX7AnyGvQaRPF",
-    "/dns4/peer3-rising-phoenix.o1test.net/tcp/8303/p2p/12D3KooWCZA4pPWmDAkQf6riDQ3XMRN5k99tCsiRhBAPZCkA8re7",
+    "/dns4/peer1-rising-phoenix.o1test.net/tcp/8303/ipfs/12D3KooWHMmfuS9DmmK9eH4GC31arDhbtHEBQzX6PwPtQftxzwJs",
+    "/dns4/peer2-rising-phoenix.o1test.net/tcp/8303/ipfs/12D3KooWAux9MAW1yAdD8gsDbYHmgVjRvdfYkpkfX7AnyGvQaRPF",
+    "/dns4/peer3-rising-phoenix.o1test.net/tcp/8303/ipfs/12D3KooWCZA4pPWmDAkQf6riDQ3XMRN5k99tCsiRhBAPZCkA8re7",
   ];
 
   let defaultArgs =

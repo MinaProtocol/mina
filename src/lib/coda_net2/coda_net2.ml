@@ -59,13 +59,14 @@ module Go_log = struct
   let ours_of_go lvl =
     let open Logger.Level in
     match lvl with
-    | "error" | "panic" | "fatal" ->
+    | 0 (* Critical gets mapped to error *) | 1 ->
         Error
-    | "warn" ->
+    | 2 ->
         Warn
-    | "info" ->
+    | 3 (* Notice gets mapped to info (I can't find any use of notice?) *) | 4
+      ->
         Info
-    | "debug" ->
+    | 5 ->
         Debug
     | _ ->
         Spam
@@ -73,27 +74,25 @@ module Go_log = struct
   (* there should be no other levels. *)
 
   type record =
-    { ts: string
-    ; module_: string [@key "logger"]
-    ; level: string
-    ; msg: string
-    ; error: string [@default ""] }
+    { id: int64
+    ; time: string
+    ; module_: string [@key "module"]
+    ; level: int
+    ; message: string }
   [@@deriving of_yojson]
 
   let record_to_message r =
     Logger.Message.
-      { timestamp= Time.of_string r.ts
+      { timestamp= Time.of_string r.time
       ; level= ours_of_go r.level
       ; source=
           Some
             (Logger.Source.create
                ~module_:(sprintf "Libp2p_helper.Go.%s" r.module_)
                ~location:"(not tracked)")
-      ; message= r.msg
+      ; message= r.message
       ; metadata=
-          ( if r.error <> "" then
-            String.Map.singleton "go_error" (`String r.error)
-          else String.Map.empty )
+          String.Map.singleton "go_message_id" (`String (Int64.to_string r.id))
       ; event_id= None }
 end
 
@@ -1362,22 +1361,8 @@ let create ~logger ~conf_dir =
       Strict_pipe.Reader.iter (Child_processes.stderr_lines subprocess)
         ~f:(fun line ->
           ( match Go_log.record_of_yojson (Yojson.Safe.from_string line) with
-          | Ok record -> (
-              let r = Go_log.(record_to_message record) in
-              let r =
-                if
-                  String.( = ) r.message "failed when refreshing routing table"
-                then {r with level= Info}
-                else r
-              in
-              try Logger.raw logger r
-              with _exn ->
-                Logger.raw logger
-                  { r with
-                    message=
-                      "(go log message was not valid for logger; see $line)"
-                  ; metadata= String.Map.singleton "line" (`String r.message)
-                  } )
+          | Ok record ->
+              Logger.raw logger Go_log.(record_to_message record)
           | Error err ->
               [%log error]
                 ~metadata:[("line", `String line); ("error", `String err)]

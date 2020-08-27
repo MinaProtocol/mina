@@ -48,7 +48,7 @@ let to_multiaddr (t : t) =
   match t.peer with
   | Some peer ->
       Some
-        (sprintf "/ip4/%s/tcp/%d/p2p/%s"
+        (sprintf "/ip4/%s/tcp/%d/ipfs/%s"
            (Unix.Inet_addr.to_string t.external_ip)
            t.libp2p_port peer.peer_id)
   | None ->
