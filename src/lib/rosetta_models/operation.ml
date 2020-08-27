@@ -18,7 +18,7 @@ type t =
   ; amount: Amount.t option [@default None]
   ; coin_change: Coin_change.t option [@default None]
   ; metadata: Yojson.Safe.t option [@default None] }
-[@@deriving yojson {strict= false}, show]
+[@@deriving yojson {strict= false}, show, eq]
 
 (** Operations contain all balance-changing information within a transaction. They are always one-sided (only affect 1 AccountIdentifier) and can succeed or fail independently from a Transaction. *)
 let create (operation_identifier : Operation_identifier.t) (_type : string)
