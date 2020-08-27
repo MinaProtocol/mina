@@ -1,0 +1,74 @@
+import Page from '@reason/pages/Docs';
+export default Page({title: "Consensus Mechanism Abstraction"});
+
+# Consensus Mechanism Abstraction
+
+Consensus refers to the process by which the network determines which information will be retained in the blockchain. In a system such as a blockchain, the responsibility of extending the blockchain with new information is distributed across participating nodes throughout the network. These nodes cannot be assumed to be "honest" nodes on the network, and thus, "honest" participants of the network must work together in order to select which information proposed by various nodes will be kept. There are many different ways of achieving distributed consensus, which we refer to as consensus mechanisms. In our code base, we have built a single interface by which a consensus mechanism informs the rest of the protocol. Through this interface, various implementations of consensus mechanisms can be swapped out at compile time to allow us to write the rest of the protocol inedependent of the consensus mechanism being selected. As such, one can think about a consensus mechanism as something that, once defined, the rest of the protocol can be built on top of.
+
+A consensus mechanism controls many aspects in a protocol which is built on top of it. For the purpose of this discussion, we will separate the provisions of a consensus mechanism into two parts: the data (data structures made available and the interactions available with them) and hooks (specific top level hooks called by the protocol built on top of the consensus mechanism). Data structures provided by the consensus mechanism are kept abstract to the outside system interacting with them and are instead primarily consumed by the consensus mechanism's hooks.
+
+!!! note
+    This document only covers the generalized consensus mechanism abstraction in Coda. For information on the implementation of Proof of Stake in Coda, [see the relevant documentation](../proof-of-stake).
+
+## Data
+
+### Local\_state
+
+`Local_state` is consensus related state which is only stored locally on the machine. It provides a place for consensus to track some information on the local node across points of finality in the protocol state. See the `frontier_root_transition` hook for more details on how
+
+### Consensus\_transition\_data
+
+`Consensus_transition_data` is a piece of state that is included into the `Snark_transition`. It provides a place for consensus to add extra information which gets proved to the snark to prove a transition. Unlike `Consensus_state`, the information in `Consensus_transition_data` is only used by the node that creates a transition and is not made available to other nodes.
+
+### Consensus\_state
+
+`Consensus_state` is included in the `Protocol_state` of the protocol. It provides a place for the consensus mechanism to store information that is available at every state of the protocol and can be proven in the snark. Since it is included in `Protocol_state`, this information is inspectable by other nodes on the network.
+
+### Prover\_state
+
+**TODO**
+
+### Proposal\_data
+
+**TODO**
+
+#### Other Instantiated Data
+
+- `Blockchain_state`
+- `Protocol_state`
+- `Snark_transition`
+
+## Hooks
+[hooks]: #hooks
+
+<!-- ![](res/consensus_hooks.dot.png) -->
+
+### generate\_transition
+
+The `generate_transition` hook fully generates a new protocol state and consensus transition data as an extension of a previous protocol state on the blockchain. The new blockchain state is provided to this function, along with the transactions to include in the staged ledger diff and the relevant proposal data. This hook is intended to be called by the proposer, with the best tip in the frontier at the time being passed in as the `previous_protocol_state`. The proposer should interact with the `next_proposal` hook in order to determine when this hook should be called.
+
+### next\_proposal
+
+The `next_proposal` hook informs the protocol when it is valid to generate and propose the next transition. This hook may either return a time to propose a transition at, or a time to check the hook again. This allows a consensus mechanism to space out proposals, as well as control more advanced scheduling of proposals based on other information in the protocol.
+
+<!-- <sup>_For more information on how the `next_proposal` hook interacts the `Proposer`, see the [`Proposer` documentation](proposer.md#proposal-scheduling)._</sup> -->
+
+### next\_state\_checked
+
+The `next_state_checked` hook returns a checked computation which calculates/constrains the next consensus state in a blockchain sequence given its predecessor's transition. This hook is included into the checked computation which makes up the blockchain snark constraint system. As such, this is the primary function in which validation is performed on consensus states.
+
+### select
+
+The `select` hook informs the protocol that, given two states, which state is "better" in the eyes of the consensus mechanism. This hook plays a vital role in how consensus is achieved, as it is the primary operation which determines, between two chains, which should be kept. When called, it will inform the caller to either `Keep` the existing state, or to `Take` the candidate state.
+
+### received\_at\_valid\_time
+
+The `received_at_valid_time` hook is a predicate on whether or not a given consensus state is valid at a given time. This lets the consensus mechanism optionally control temporal properties of when a consensus state was valid to generate, rejecting the received protocol state if it was recieved out of band. The implementation of the protocol should call this hook whenever a transition is received from the network, before processing the transition and adding it to the frontier.
+
+### frontier\_root\_transition
+
+The `frontier_root_transition` hook needs to be called whenever a transition occurs at the point of finality (in coda, this is the root of the transition frontier). This provides a chance for the consensus mechanism to update its local state in accordance with the network's finalized state.
+
+### should\_bootstrap
+
+The `should_bootstrap` hook informs the protocol whether or not a transition received over the network requires the node to begin bootstrapping its state to the current network state. The consensus mechanism determines how long it will take until state finalization, and whether or not a node should bootstrap is also connected to this concept. This hook should be called whenever a transition is received from the network and initial validation is performed successfully.
