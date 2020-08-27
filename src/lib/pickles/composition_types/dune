@@ -4,6 +4,7 @@
   (flags -warn-error -27)
   (preprocess (pps ppx_version ppx_coda ppx_jane ppx_deriving.std ppx_deriving_yojson h_list.ppx ))
   (libraries
+    random_oracle_input
     limb_vector
     zexe_backend
     pickles_types

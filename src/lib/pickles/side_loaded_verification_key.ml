@@ -221,7 +221,7 @@ module Stable = struct
       ; wrap_index:
           Backend.Tock.Curve.Affine.Stable.V1.t list Abc.Stable.V1.t
           Matrix_evals.Stable.V1.t
-      ; wrap_vk: Vk.t }
+      ; wrap_vk: Vk.t option }
     [@@deriving sexp, eq, compare, hash, yojson]
 
     let to_latest = Fn.id
@@ -261,7 +261,7 @@ module Stable = struct
                        in
                        Caml.Gc.finalise
                          Snarky_bn382.Tweedle.Dee.Field_verifier_index.delete t ;
-                       t) }
+                       Some t) }
               end)
   end
 end]
@@ -271,6 +271,15 @@ let dummy_domains =
   ; k= Pow_2_roots_of_unity 0 }
 
 let dummy_width = Width.zero
+
+let dummy : t =
+  { step_data= At_most.[]
+  ; max_width= Width.zero
+  ; wrap_index=
+      (let g = [Backend.Tock.Curve.(to_affine_exn one)] in
+       let t : _ Abc.t = {a= g; b= g; c= g} in
+       {row= t; col= t; value= t; rc= t})
+  ; wrap_vk= None }
 
 let to_input =
   let open Random_oracle_input in

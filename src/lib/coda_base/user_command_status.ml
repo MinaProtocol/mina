@@ -17,6 +17,8 @@ module Failure = struct
         | Overflow
         | User_command_on_snapp_account
         | Snapp_account_not_present
+        | Update_not_permitted
+        | Incorrect_nonce
       [@@deriving sexp, yojson, eq, compare]
 
       let to_latest = Fn.id
@@ -50,6 +52,10 @@ module Failure = struct
         "User_command_on_snapp_account"
     | Snapp_account_not_present ->
         "Snapp_account_not_present"
+    | Update_not_permitted ->
+        "Update_not_permitted"
+    | Incorrect_nonce ->
+        "Incorrect_nonce"
 
   let of_string = function
     | "Predicate" ->
@@ -74,6 +80,8 @@ module Failure = struct
         Ok Overflow
     | "Snapp_account_not_present" ->
         Ok Snapp_account_not_present
+    | "Incorrect_nonce" ->
+        Ok Incorrect_nonce
     | _ ->
         Error "User_command_status.Failure.of_string: Unknown value"
 
@@ -104,6 +112,10 @@ module Failure = struct
         "The source of a user command cannot be a snapp account"
     | Snapp_account_not_present ->
         "A snapp account does not exist"
+    | Update_not_permitted ->
+        "An account is not permitted to make the given update"
+    | Incorrect_nonce ->
+        "Incorrect nonce"
 end
 
 module Auxiliary_data = struct

@@ -131,7 +131,7 @@ module Undo : sig
   module Snapp_command_undo : sig
     module Per_snapp : sig
       type t = Undo.Snapp_command_undo.Per_snapp.t =
-        { previous_state: Snapp_state.Value.Stable.Latest.t
+        { previous_state: Snapp_state.Value.Stable.Latest.t option
         ; previous_delegate: Public_key.Compressed.t
         ; previous_receipt_chain_hash: Receipt.Chain_hash.t }
     end

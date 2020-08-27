@@ -35,7 +35,7 @@ let fee_excess : t -> Fee_excess.t Or_error.t = function
   | Command (User_command t) ->
       Ok (User_command.fee_excess (User_command.forget_check t))
   | Command (Snapp_command t) ->
-      Ok Snapp_command.(fee_excess (t :> t))
+      Snapp_command.(fee_excess (t :> t))
   | Fee_transfer t ->
       Fee_transfer.fee_excess t
   | Coinbase t ->

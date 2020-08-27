@@ -108,6 +108,8 @@ module Side_loaded : sig
       end
     end]
 
+    val dummy : t
+
     open Impls.Step
 
     val to_input : t -> (Field.Constant.t, bool) Random_oracle_input.t
@@ -147,14 +149,11 @@ module Side_loaded : sig
   (* Must be called in the inductive rule snarky function defining a
    rule for which this tag is used as a predecessor. *)
   val in_circuit :
-       ('var, 'value, 'n1, 'n2) Tag.t
-    -> Side_loaded_verification_key.Checked.t
-    -> unit
+    ('var, 'value, 'n1, 'n2) Tag.t -> Verification_key.Checked.t -> unit
 
   (* Must be called immediately before calling the prover for the inductive rule
     for which this tag is used as a predecessor. *)
-  val in_prover :
-    ('var, 'value, 'n1, 'n2) Tag.t -> Side_loaded_verification_key.t -> unit
+  val in_prover : ('var, 'value, 'n1, 'n2) Tag.t -> Verification_key.t -> unit
 end
 
 (** This compiles a series of inductive rules defining a set into a proof
