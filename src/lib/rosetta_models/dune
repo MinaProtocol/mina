@@ -1,13 +1,13 @@
 (library
-  (name models)
-  (public_name models)
+  (name rosetta_models)
+  (public_name rosetta_models)
   (libraries
     ppx_deriving_yojson.runtime
     yojson
     )
   (preprocess (pps
     ppx_deriving_yojson
+    ppx_deriving.eq
     ppx_deriving.show
     ppx_version
-    ppx_deriving.eq
   )))

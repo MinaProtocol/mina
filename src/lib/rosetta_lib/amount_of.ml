@@ -1,5 +1,5 @@
 open Core_kernel
-open Models
+open Rosetta_models
 
 module Token_id = struct
   let default = Unsigned.UInt64.one
