@@ -47,3 +47,46 @@ module Preprocess = struct
     Lift.res r ~logger ~of_yojson:Construction_preprocess_response.of_yojson
     |> Lift.successfully
 end
+
+module Payloads = struct
+  let req ~rosetta_uri ~logger ~operations ~metadata ~network_response =
+    let%bind r =
+      post ~rosetta_uri ~logger
+        ~body:
+          Construction_payloads_request.(
+            { network_identifier=
+                List.hd_exn
+                  network_response.Network_list_response.network_identifiers
+            ; operations
+            ; metadata= Some metadata }
+            |> to_yojson)
+        ~path:"construction/payloads"
+    in
+    Lift.res r ~logger ~of_yojson:Construction_payloads_response.of_yojson
+    |> Lift.successfully
+end
+
+module Parse = struct
+  let req ~rosetta_uri ~logger ~transaction ~network_response =
+    let signed, transaction =
+      match transaction with
+      | `Unsigned txn ->
+          (false, txn)
+      | `Signed txn ->
+          (true, txn)
+    in
+    let%bind r =
+      post ~rosetta_uri ~logger
+        ~body:
+          Construction_parse_request.(
+            { network_identifier=
+                List.hd_exn
+                  network_response.Network_list_response.network_identifiers
+            ; transaction
+            ; signed }
+            |> to_yojson)
+        ~path:"construction/parse"
+    in
+    Lift.res r ~logger ~of_yojson:Construction_parse_response.of_yojson
+    |> Lift.successfully
+end
