@@ -50,6 +50,10 @@ coda-daemon)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-coda-daemon"
   DOCKER_CONTEXT="."
   ;;
+coda-daemon-puppeteered)
+  DOCKERFILE_PATH="dockerfiles/Dockerfile-coda-daemon-puppeteered"
+  DOCKER_CONTEXT="."
+  ;;
 coda-demo)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-coda-demo"
   DOCKER_CONTEXT="."
