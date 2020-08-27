@@ -1,10 +1,27 @@
+[%%import
+"/src/config.mlh"]
+
 open Core_kernel
+
+[%%ifdef
+consensus_mechanism]
+
+module Field = Snark_params.Tick.Field
+
+[%%else]
+
+module Field = Snark_params_nonconsensus.Field
+module Coda_base = Coda_base_nonconsensus
+module Hex = Hex_nonconsensus.Hex
+module Unsigned_extended = Unsigned_extended_nonconsensus.Unsigned_extended
+
+[%%endif]
+
 module Token_id = Coda_base.Token_id
 
 module Unsigned = struct
   type t =
-    { random_oracle_input:
-        (Snark_params.Tick0.field, bool) Random_oracle_input.t
+    { random_oracle_input: (Field.t, bool) Random_oracle_input.t
     ; command: User_command_info.Partial.t
     ; nonce: Unsigned_extended.UInt32.t }
 
@@ -37,14 +54,14 @@ module Unsigned = struct
   end
 
   let string_of_field field =
-    assert (Snark_params.Tick.Field.size_in_bits = 255) ;
-    Snark_params.Tick.Field.unpack field
+    assert (Field.size_in_bits = 255) ;
+    Field.unpack field |> List.rev
     |> Random_oracle_input.Coding.string_of_field
 
   let field_of_string s =
-    assert (Snark_params.Tick.Field.size_in_bits = 255) ;
+    assert (Field.size_in_bits = 255) ;
     Random_oracle_input.Coding.field_of_string s ~size_in_bits:255
-    |> Result.map ~f:(fun bits -> Snark_params.Tick.Field.project bits)
+    |> Result.map ~f:(fun bits -> List.rev bits |> Field.project)
 
   let un_pk (`Pk pk) = pk
 

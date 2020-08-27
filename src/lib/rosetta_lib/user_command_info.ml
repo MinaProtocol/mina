@@ -1,7 +1,21 @@
+[%%import
+"/src/config.mlh"]
+
 open Core_kernel
+
+[%%ifndef
+consensus_mechanism]
+
+module Coda_base = Coda_base_nonconsensus
+module Currency = Currency_nonconsensus.Currency
+module Signature_lib = Signature_lib_nonconsensus
+module Unsigned_extended = Unsigned_extended_nonconsensus.Unsigned_extended
+
+[%%endif]
+
 module Fee_currency = Currency.Fee
 module Amount_currency = Currency.Amount
-open Models
+open Rosetta_models
 module User_command = Coda_base.User_command
 module Token_id = Coda_base.Token_id
 module Public_key = Signature_lib.Public_key
@@ -437,7 +451,7 @@ let%test_unit "payment_round_trip" =
     ; receiver= `Pk "Bob"
     ; fee_token= Unsigned.UInt64.of_int 1
     ; nonce= Unsigned.UInt32.of_int 3
-    ; amount= Some (Unsigned.UInt64.of_int 5_000_000_000)
+    ; amount= Some (Unsigned.UInt64.of_int 2_000_000_000)
     ; failure_status= None
     ; hash= "TXN_1_HASH" }
   in
