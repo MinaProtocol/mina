@@ -50,6 +50,7 @@ Pipeline.build
           , label = "Optional fast lint steps; versions compatability changes"
           , key = "lint-optional-types"
           , target = Size.Medium
+          , soft_fail = Some (B/SoftFail.Boolean True)
           , docker = None Docker.Type
         },
       Command.build
@@ -60,6 +61,7 @@ Pipeline.build
           , label = "Optional fast lint steps; binable compatability changes"
           , key = "lint-optional-binable"
           , target = Size.Medium
+          , soft_fail = Some (B/SoftFail.Boolean True)
           , docker = None Docker.Type
         }
     ]
