@@ -1361,8 +1361,22 @@ let create ~logger ~conf_dir =
       Strict_pipe.Reader.iter (Child_processes.stderr_lines subprocess)
         ~f:(fun line ->
           ( match Go_log.record_of_yojson (Yojson.Safe.from_string line) with
-          | Ok record ->
-              Logger.raw logger Go_log.(record_to_message record)
+          | Ok record -> (
+              let r = Go_log.(record_to_message record) in
+              let r =
+                if
+                  String.( = ) r.message "failed when refreshing routing table"
+                then {r with level= Info}
+                else r
+              in
+              let shortline = String.split_lines r.message |> List.hd_exn in
+              try Logger.raw logger r
+              with _exn ->
+                Logger.raw logger
+                  { r with
+                    message= sprintf "%s (see metadata for details)" shortline
+                  ; metadata= String.Map.singleton "line" (`String r.message)
+                  } )
           | Error err ->
               [%log error]
                 ~metadata:[("line", `String line); ("error", `String err)]
