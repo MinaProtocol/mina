@@ -83,6 +83,26 @@ let get_balance_graphql =
          | None ->
              printf "There are no funds in this account\n" ))
 
+let get_tokens_graphql =
+  let open Command.Param in
+  let pk_flag =
+    flag "public-key" ~doc:"KEY Public key for which you want to find accounts"
+      (required Cli_lib.Arg_type.public_key_compressed)
+  in
+  Command.async ~summary:"Get all token IDs that a public key has accounts for"
+    (Cli_lib.Background_daemon.graphql_init pk_flag
+       ~f:(fun graphql_endpoint public_key ->
+         let%map response =
+           Graphql_client.query_exn
+             (Graphql_queries.Get_all_accounts.make
+                ~public_key:(Graphql_client.Encoders.public_key public_key)
+                ())
+             graphql_endpoint
+         in
+         printf "Accounts are held for token IDs:\n" ;
+         Array.iter response#accounts ~f:(fun account ->
+             printf "%s " (Token_id.to_string account#token) ) ))
+
 let print_trust_status status json =
   if json then
     printf "%s\n"
@@ -1577,6 +1597,7 @@ let client =
   Command.group ~summary:"Lightweight client commands"
     ~preserve_subcommand_order:()
     [ ("get-balance", get_balance_graphql)
+    ; ("get-tokens", get_tokens_graphql)
     ; ("send-payment", send_payment_graphql)
     ; ("delegate-stake", delegate_stake_graphql)
     ; ("create-token", create_new_token_graphql)
