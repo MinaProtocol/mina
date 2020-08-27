@@ -21,6 +21,8 @@ module Styles = {
     ]);
   let documentationButton =
     style([textAlign(`left), height(`rem(2.)), width(`rem(7.18))]);
+  let joinGenesisButton =
+    style([color(white), width(`rem(5.75)), height(`rem(2.))]);
 };
 
 [@react.component]
@@ -53,6 +55,13 @@ let make = () => {
               {React.string("Go To Documentation")}
             </span>
           </PromoButton>
+          /***Join Genesis Button */
+          <Button bgColor=Theme.Colors.orange paddingX=1. paddingY=0.5>
+            <Icon kind=Icon.CoreProtocolLarge size="40" />
+            <span className=Styles.joinGenesisButton>
+              {React.string("Join Genesis + Earn Mina")}
+            </span>
+          </Button>
         </div>
       <h1 className=Theme.Type.h1jumbo> {React.string("H1 Jumbo")} </h1>
       <h1 className=Theme.Type.h1> {React.string("H1")} </h1>
