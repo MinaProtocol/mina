@@ -50,14 +50,14 @@ let make = () => {
           </Button>
           /*** Documentation Button */
           <PromoButton bgColor=Theme.Colors.orange>
-            <Icon kind=Icon.Documentation size="40" />
+            <Icon kind=Icon.Documentation size=2.5 />
             <span className=Styles.documentationButton>
               {React.string("Go To Documentation")}
             </span>
           </PromoButton>
-          /***Join Genesis Button */
+          /***Join Genesis Button, uses the CoreProtocolLarge icon */
           <Button bgColor=Theme.Colors.orange paddingX=1. paddingY=0.5>
-            <Icon kind=Icon.CoreProtocolLarge size="40" />
+            <Icon kind=Icon.CoreProtocolLarge size=2.5 />
             <span className=Styles.joinGenesisButton>
               {React.string("Join Genesis + Earn Mina")}
             </span>
