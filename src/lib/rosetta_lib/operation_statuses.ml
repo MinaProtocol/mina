@@ -1,5 +1,5 @@
 open Core_kernel
-open Models
+open Rosetta_models
 
 type t = [`Success | `Pending | `Failed] [@@deriving to_representatives]
 

@@ -1,5 +1,5 @@
 open Core_kernel
-open Async
+open Async_kernel
 
 module Partial_reason = struct
   type t =
@@ -40,9 +40,9 @@ module T : sig
 
   val create : ?context:string -> Variant.t -> t
 
-  val erase : t -> Models.Error.t
+  val erase : t -> Rosetta_models.Error.t
 
-  val all_errors : Models.Error.t list lazy_t
+  val all_errors : Rosetta_models.Error.t list lazy_t
 
   module Lift : sig
     val parse :
@@ -177,7 +177,7 @@ end = struct
   let create ?context kind = {extra_context= context; kind}
 
   let erase (t : t) =
-    { Models.Error.code= Int32.of_int_exn (code t.kind)
+    { Rosetta_models.Error.code= Int32.of_int_exn (code t.kind)
     ; message= message t.kind
     ; retriable= retriable t.kind
     ; details=

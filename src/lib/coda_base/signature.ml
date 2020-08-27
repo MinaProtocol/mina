@@ -12,7 +12,7 @@ open Snark_params.Tick
 
 open Snark_params_nonconsensus
 module Hex = Hex_nonconsensus.Hex
-module Rosetta_lib = Rosetta_lib_nonconsensus
+module Rosetta_coding = Rosetta_coding_nonconsensus
 
 [%%endif]
 
@@ -66,7 +66,7 @@ end]
 let dummy = (Field.one, Inner_curve.Scalar.one)
 
 module Raw = struct
-  open Rosetta_lib.Coding
+  open Rosetta_coding.Coding
 
   let encode (field, scalar) = of_field field ^ of_scalar scalar
 

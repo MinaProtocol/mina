@@ -13,9 +13,9 @@
     cohttp-async
     core_kernel
     logger
-    models
     ppx_deriving_yojson.runtime
     rosetta_lib
+    rosetta_models
     yojson
     archive_lib
     signature_lib
