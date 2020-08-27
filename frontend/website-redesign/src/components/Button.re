@@ -5,7 +5,7 @@ module Styles = {
       Theme.Type.buttonLabel,
       style([
         display(`flex),
-        justifyContent(`spaceBetween),
+        justifyContent(`center),
         alignItems(`center),
         width(buttonWidth),
         height(buttonHeight),
@@ -54,16 +54,18 @@ module Styles = {
 let make =
     (
       ~href="",
-      ~children,
+      ~children=?,
       ~height=`rem(3.25),
       ~width=`rem(10.9),
       ~paddingX=1.5,
       ~paddingY=1.,
       ~bgColor=Theme.Colors.orange,
       ~dark=false,
+      ~onClick=?,
     ) => {
   <Next.Link href>
     <button
+      ?onClick
       className={Styles.button(
         bgColor,
         dark,
@@ -72,7 +74,10 @@ let make =
         paddingX,
         paddingY,
       )}>
-      children
+      {switch (children) {
+       | Some(children) => children
+       | None => React.null
+       }}
     </button>
   </Next.Link>;
 };
