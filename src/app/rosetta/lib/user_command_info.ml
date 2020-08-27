@@ -105,7 +105,7 @@ module Partial = struct
     let%map body =
       match t.kind with
       | `Payment ->
-          let%bind source_pk = pk_to_public_key ~context:"Source" t.receiver in
+          let%bind source_pk = pk_to_public_key ~context:"Source" t.source in
           let%map amount =
             Result.of_option t.amount
               ~error:
