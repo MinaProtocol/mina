@@ -15,7 +15,11 @@
     logger
     models
     ppx_deriving_yojson.runtime
+    rosetta_lib
     yojson
+    archive_lib
+    signature_lib
+    unsigned_extended
     )
   (preprocess (pps
     graphql_ppx

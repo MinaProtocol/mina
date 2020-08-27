@@ -33,6 +33,9 @@ module Transaction_with_witness = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
+      (* TODO: The statement is redundant here - it can be computed from the
+         witness and the transaction
+      *)
       type t =
         { transaction_with_info: Transaction_logic.Undo.Stable.V1.t
         ; state_hash: State_hash.Stable.V1.t * State_body_hash.Stable.V1.t
@@ -46,15 +49,6 @@ module Transaction_with_witness = struct
       let to_latest = Fn.id
     end
   end]
-
-  (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)
-  type t = Stable.Latest.t =
-    { transaction_with_info: Ledger.Undo.t
-    ; state_hash: State_hash.t * State_body_hash.t
-    ; statement: Transaction_snark.Statement.t
-    ; init_stack: Transaction_snark.Pending_coinbase_stack_state.Init_stack.t
-    ; ledger_witness: Coda_base.Sparse_ledger.t sexp_opaque }
-  [@@deriving sexp]
 end
 
 module Ledger_proof_with_sok_message = struct
@@ -62,13 +56,11 @@ module Ledger_proof_with_sok_message = struct
   module Stable = struct
     module V1 = struct
       type t = Ledger_proof.Stable.V1.t * Sok_message.Stable.V1.t
-      [@@deriving sexp, bin_io, version]
+      [@@deriving sexp]
 
       let to_latest = Fn.id
     end
   end]
-
-  type t = Ledger_proof.t * Sok_message.t [@@deriving sexp]
 end
 
 module Available_job = struct
@@ -168,8 +160,6 @@ module Stable = struct
   end
 end]
 
-type t = Stable.Latest.t [@@deriving sexp]
-
 [%%define_locally
 Stable.Latest.(hash)]
 
@@ -189,7 +179,9 @@ let create_expected_statement ~constraint_constants
   let next_available_token_before =
     Sparse_ledger.next_available_token ledger_witness
   in
-  let%bind transaction = Ledger.Undo.transaction transaction_with_info in
+  let%bind {data= transaction; status= _} =
+    Ledger.Undo.transaction transaction_with_info
+  in
   let txn_global_slot =
     (* TODO: Get from protocol state. *)
     Coda_numbers.Global_slot.zero
@@ -234,7 +226,6 @@ let create_expected_statement ~constraint_constants
   ; pending_coinbase_stack_state=
       { statement.pending_coinbase_stack_state with
         target= pending_coinbase_after }
-  ; proof_type= `Base
   ; sok_digest= () }
 
 let completed_work_to_scanable_work (job : job) (fee, current_proof, prover) :
@@ -277,7 +268,6 @@ let completed_work_to_scanable_work (job : job) (fee, current_proof, prover) :
         ; fee_excess
         ; next_available_token_before= s.next_available_token_before
         ; next_available_token_after= s'.next_available_token_after
-        ; proof_type= `Merge
         ; sok_digest= () }
       in
       ( Ledger_proof.create ~statement ~sok_digest ~proof
@@ -422,7 +412,6 @@ struct
         ; next_available_token_after
         ; supply_increase= _
         ; pending_coinbase_stack_state= _ (*TODO: check pending coinbases?*)
-        ; proof_type= _
         ; sok_digest= () } ->
         let open Or_error.Let_syntax in
         let%map () =
@@ -507,7 +496,6 @@ let statement_of_job : job -> Transaction_snark.Statement.t option = function
         ; fee_excess
         ; next_available_token_before= stmt1.next_available_token_before
         ; next_available_token_after= stmt2.next_available_token_after
-        ; proof_type= `Merge
         ; sok_digest= () }
         : Transaction_snark.Statement.t )
 
@@ -663,7 +651,9 @@ let all_work_pairs t
         , state_hash
         , ledger_witness
         , init_stack ) ->
-        let%bind transaction = Ledger.Undo.transaction transaction_with_info in
+        let%bind {data= transaction; status} =
+          Ledger.Undo.transaction transaction_with_info
+        in
         let%bind protocol_state_body =
           let%map state = get_state (fst state_hash) in
           Coda_state.Protocol_state.body state
@@ -680,7 +670,8 @@ let all_work_pairs t
           , transaction
           , { Transaction_witness.ledger= ledger_witness
             ; protocol_state_body
-            ; init_stack } )
+            ; init_stack
+            ; status } )
     | Second (p1, p2) ->
         let%map merged =
           Transaction_snark.Statement.merge

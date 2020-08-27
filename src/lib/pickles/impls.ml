@@ -1,18 +1,18 @@
 open Pickles_types
 open Core_kernel
 open Import
-open Zexe_backend
+open Backend
 
-module Pairing_based = struct
-  module Impl = Snarky.Snark.Run.Make (Pairing_based) (Unit)
+module Step = struct
+  module Impl = Snarky_backendless.Snark.Run.Make (Tick) (Unit)
   include Impl
   module Fp = Field
 
-  module Fq = struct
+  module Other_field = struct
     let size_in_bits = Fp.size_in_bits
 
     module Constant = struct
-      type t = Fq.t
+      type t = Tock.Field.t
     end
 
     type t = (* Low bits, high bit *)
@@ -22,11 +22,11 @@ module Pairing_based = struct
       Typ.transport
         (Typ.tuple2 Fp.typ Boolean.typ)
         ~there:(fun x ->
-          let low, high = Util.split_last (Fq.to_bits x) in
+          let low, high = Util.split_last (Tock.Field.to_bits x) in
           (Fp.Constant.project low, high) )
         ~back:(fun (low, high) ->
           let low, _ = Util.split_last (Fp.Constant.unpack low) in
-          Fq.of_bits (low @ [high]) )
+          Tock.Field.of_bits (low @ [high]) )
 
     let to_bits (x, b) = Field.unpack x ~length:(Field.size_in_bits - 1) @ [b]
   end
@@ -34,28 +34,31 @@ module Pairing_based = struct
   module Digest = Digest.Make (Impl)
   module Challenge = Challenge.Make (Impl)
 
-  let input ~branching ~bulletproof_log2 =
+  let input ~branching ~wrap_rounds =
     let open Types.Pairing_based.Statement in
-    let spec = spec branching bulletproof_log2 in
+    let spec = spec branching wrap_rounds in
     let (T (typ, f)) =
-      Spec.packed_typ (module Impl) (T (Fq.typ, Fn.id)) spec
+      Spec.packed_typ (module Impl) (T (Other_field.typ, Fn.id)) spec
     in
     let typ = Typ.transport typ ~there:to_data ~back:of_data in
     Spec.ETyp.T (typ, fun x -> of_data (f x))
 end
 
-module Dlog_based = struct
-  module Impl = Snarky.Snark.Run.Make (Dlog_based) (Unit)
+module Wrap = struct
+  module Impl = Snarky_backendless.Snark.Run.Make (Tock) (Unit)
   include Impl
   module Challenge = Challenge.Make (Impl)
   module Digest = Digest.Make (Impl)
-  module Fq = Fq
+  module Wrap_field = Tock.Field
+  module Step_field = Tick.Field
 
   let input () =
-    let fp_as_fq (x : Fp.t) = Fq.of_bigint (Fp.to_bigint x) in
+    let fp_as_fq (x : Step_field.t) =
+      Wrap_field.of_bigint (Step_field.to_bigint x)
+    in
     let fp =
-      Typ.transport Field.typ ~there:fp_as_fq ~back:(fun (x : Fq.t) ->
-          Fp.of_bigint (Fq.to_bigint x) )
+      Typ.transport Field.typ ~there:fp_as_fq ~back:(fun (x : Wrap_field.t) ->
+          Step_field.of_bigint (Wrap_field.to_bigint x) )
     in
     let open Types.Dlog_based.Statement in
     let (T (typ, f)) = Spec.packed_typ (module Impl) (T (fp, Fn.id)) spec in

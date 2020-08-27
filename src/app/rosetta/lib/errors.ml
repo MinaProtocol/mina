@@ -1,17 +1,37 @@
 open Core_kernel
 open Async
 
+module Partial_reason = struct
+  type t =
+    | Length_mismatch
+    | Fee_payer_and_source_mismatch
+    | Amount_not_some
+    | Account_not_some
+    | Incorrect_token_id
+    | Amount_inc_dec_mismatch
+    | Status_not_pending
+    | Can't_find_kind of string
+  [@@deriving yojson, sexp, show, eq]
+end
+
 module Variant = struct
   (* DO NOT change the order of this variant, the generated error code relies
    * on it and we want that to remain stable *)
   type t =
     [ `Sql of string
-    | `Json_parse of string
+    | `Json_parse of string option
     | `Graphql_coda_query of string
     | `Network_doesn't_exist of string * string
     | `Chain_info_missing
     | `Account_not_found of string
-    | `Invariant_violation ]
+    | `Invariant_violation
+    | `Transaction_not_found of string
+    | `Block_missing
+    | `Malformed_public_key
+    | `Operations_not_valid of Partial_reason.t list
+    | `Unsupported_operation_for_construction
+    | `Signature_missing
+    | `Public_key_format_not_valid ]
   [@@deriving yojson, show, eq, to_enum, to_representatives]
 end
 
@@ -57,12 +77,26 @@ end = struct
         "Account not found"
     | `Invariant_violation ->
         "Internal invariant violation (you found a bug)"
+    | `Transaction_not_found _ ->
+        "Transaction not found"
+    | `Block_missing ->
+        "Block not found"
+    | `Malformed_public_key ->
+        "Malformed public key"
+    | `Operations_not_valid _ ->
+        "Cannot convert operations to valid transaction"
+    | `Public_key_format_not_valid ->
+        "Invalid public key format"
+    | `Unsupported_operation_for_construction ->
+        "Unsupported operation for construction"
+    | `Signature_missing ->
+        "Signature missing"
 
   let context = function
     | `Sql msg ->
         Some msg
-    | `Json_parse msg ->
-        Some msg
+    | `Json_parse optional_msg ->
+        optional_msg
     | `Graphql_coda_query msg ->
         Some msg
     | `Network_doesn't_exist (req, conn) ->
@@ -84,6 +118,31 @@ end = struct
              addr)
     | `Invariant_violation ->
         None
+    | `Transaction_not_found hash ->
+        Some
+          (sprintf
+             !"You attempt to lookup %s but it is missing from the mempool. \
+               This may be due to it's inclusion in a block -- try looking \
+               for this transaction in a recent block. It also could be due \
+               to the transaction being evicted from the mempool."
+             hash)
+    | `Block_missing ->
+        (* TODO: Add context around the query made *)
+        None
+    | `Malformed_public_key ->
+        None
+    | `Operations_not_valid reasons ->
+        Some
+          (sprintf
+             !"Cannot recover transaction for the following reasons: %{sexp: \
+               Partial_reason.t list}"
+             reasons)
+    | `Public_key_format_not_valid ->
+        None
+    | `Unsupported_operation_for_construction ->
+        None
+    | `Signature_missing ->
+        None
 
   let retriable = function
     | `Sql _ ->
@@ -99,6 +158,20 @@ end = struct
     | `Account_not_found _ ->
         true
     | `Invariant_violation ->
+        false
+    | `Transaction_not_found _ ->
+        true
+    | `Block_missing ->
+        true
+    | `Malformed_public_key ->
+        false
+    | `Operations_not_valid _ ->
+        false
+    | `Public_key_format_not_valid ->
+        false
+    | `Unsupported_operation_for_construction ->
+        false
+    | `Signature_missing ->
         false
 
   let create ?context kind = {extra_context= context; kind}
@@ -129,7 +202,9 @@ end = struct
   module Lift = struct
     let parse ?context res =
       Deferred.return
-        (Result.map_error ~f:(fun s -> create ?context (`Json_parse s)) res)
+        (Result.map_error
+           ~f:(fun s -> create ?context (`Json_parse (Some s)))
+           res)
 
     let sql ?context res =
       Deferred.Result.map_error

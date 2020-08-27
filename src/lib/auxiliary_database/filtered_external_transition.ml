@@ -8,7 +8,11 @@ module Transactions = struct
   module Stable = struct
     module V1 = struct
       type t =
-        { user_commands: User_command.Stable.V1.t list
+        { user_commands:
+            ( User_command.Stable.V1.t
+            , Transaction_hash.Stable.V1.t )
+            With_hash.Stable.V1.t
+            list
         ; fee_transfers: Fee_transfer.Single.Stable.V1.t list
         ; coinbase: Currency.Amount.Stable.V1.t
         ; coinbase_receiver: Public_key.Compressed.Stable.V1.t option }
@@ -16,12 +20,6 @@ module Transactions = struct
       let to_latest = Fn.id
     end
   end]
-
-  type t = Stable.Latest.t =
-    { user_commands: User_command.t list
-    ; fee_transfers: Fee_transfer.Single.t list
-    ; coinbase: Currency.Amount.t
-    ; coinbase_receiver: Public_key.Compressed.t option }
 end
 
 module Protocol_state = struct
@@ -36,11 +34,6 @@ module Protocol_state = struct
       let to_latest = Fn.id
     end
   end]
-
-  type t = Stable.Latest.t =
-    { previous_state_hash: State_hash.t
-    ; blockchain_state: Coda_state.Blockchain_state.Value.t
-    ; consensus_state: Consensus.Data.Consensus_state.Value.t }
 end
 
 [%%versioned
@@ -57,24 +50,18 @@ module Stable = struct
   end
 end]
 
-type t = Stable.Latest.t =
-  { creator: Public_key.Compressed.t
-  ; protocol_state: Protocol_state.t
-  ; transactions: Transactions.t
-  ; snark_jobs: Transaction_snark_work.Info.t list
-  ; proof: Proof.t }
-
 let participants ~next_available_token
     {transactions= {user_commands; fee_transfers; _}; creator; _} =
   let open Account_id.Set in
   let _next_available_token, user_command_set =
     List.fold user_commands ~init:(next_available_token, empty)
       ~f:(fun (next_available_token, set) user_command ->
-        ( User_command.next_available_token user_command next_available_token
+        ( User_command.next_available_token user_command.data
+            next_available_token
         , union set
             ( of_list
             @@ User_command.accounts_accessed ~next_available_token
-                 user_command ) ) )
+                 user_command.data ) ) )
   in
   let fee_transfer_participants =
     List.fold fee_transfers ~init:empty ~f:(fun set ft ->
@@ -92,7 +79,7 @@ let participant_pks
         union set @@ of_list
         @@ List.map ~f:Account_id.public_key
         @@ User_command.accounts_accessed
-             ~next_available_token:Token_id.invalid user_command )
+             ~next_available_token:Token_id.invalid user_command.data )
   in
   let fee_transfer_participants =
     List.fold fee_transfers ~init:empty ~f:(fun set ft ->
@@ -110,7 +97,7 @@ let validate_transactions external_transition =
   Staged_ledger.Pre_diff_info.get_transactions staged_ledger_diff
 
 let of_transition external_transition tracked_participants
-    (calculated_transactions : Transaction.t list) =
+    (calculated_transactions : Transaction.t With_status.t list) =
   let open External_transition.Validated in
   let creator = block_producer external_transition in
   let protocol_state =
@@ -132,7 +119,7 @@ let of_transition external_transition tracked_participants
           ; coinbase_receiver= None }
         , next_available_token )
       ~f:(fun (acc_transactions, next_available_token) -> function
-        | User_command checked_user_command -> (
+        | {data= User_command checked_user_command; _} -> (
             let user_command =
               User_command.forget_check checked_user_command
             in
@@ -155,9 +142,13 @@ let of_transition external_transition tracked_participants
                 (* Should include this command. *)
                 ( { acc_transactions with
                     user_commands=
-                      user_command :: acc_transactions.user_commands }
+                      { With_hash.data= user_command
+                      ; hash= Transaction_hash.hash_user_command user_command
+                      }
+                      :: acc_transactions.user_commands }
                 , User_command.next_available_token user_command
-                    next_available_token ) ) | Fee_transfer fee_transfer ->
+                    next_available_token ) )
+        | {data= Fee_transfer fee_transfer; _} ->
             let fee_transfer_list =
               Coda_base.Fee_transfer.to_list fee_transfer
             in
@@ -176,7 +167,7 @@ let of_transition external_transition tracked_participants
                 fee_transfers= fee_transfers @ acc_transactions.fee_transfers
               }
             , next_available_token )
-        | Coinbase {Coinbase.amount; fee_transfer; receiver} ->
+        | {data= Coinbase {Coinbase.amount; fee_transfer; receiver}; _} ->
             let fee_transfer =
               Option.map ~f:Coinbase_fee_transfer.to_fee_transfer fee_transfer
             in

@@ -343,9 +343,11 @@ module Styles = {
       textAlign(`left),
     ]);
 
+  let firstColumn = style([textAlign(`right), color(`hex("757575"))]);
+
   let mobilePointStar =
     merge([
-      mobileFirstColumn,
+      firstColumn,
       style([
         before([
           contentRule("*"),

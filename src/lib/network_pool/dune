@@ -5,6 +5,6 @@
  (library_flags -linkall)
  (libraries async core one_or_two pipe_lib quickcheck_lib verifier coda_base ledger_proof transaction_snark transition_frontier)
  (preprocessor_deps "../../config.mlh")
- (preprocess (pps ppx_base ppx_version ppx_let ppx_assert ppx_pipebang ppx_deriving.std ppx_sexp_conv ppx_bin_prot ppx_custom_printf ppx_inline_test ppx_optcomp ppx_snarky ppx_deriving_yojson ppx_fields_conv bisect_ppx -conditional))
+ (preprocess (pps ppx_base ppx_coda ppx_version ppx_let ppx_assert ppx_pipebang ppx_deriving.std ppx_sexp_conv ppx_bin_prot ppx_custom_printf ppx_inline_test ppx_optcomp ppx_snarky ppx_deriving_yojson ppx_fields_conv bisect_ppx -conditional))
  (synopsis
    "Network pool is an interface that processes incoming diffs and then broadcasts them"))

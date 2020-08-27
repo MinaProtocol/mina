@@ -101,7 +101,7 @@ module Stable = struct
 
     let payments external_transition =
       List.filter (user_commands external_transition) ~f:(function
-        | {payload= {body= Payment _; _}; _} ->
+        | {data= {payload= {body= Payment _; _}; _}; _} ->
             true
         | _ ->
             false )
@@ -111,16 +111,6 @@ module Stable = struct
         ~f:consensus_state
   end
 end]
-
-type t = Stable.Latest.t =
-  { protocol_state: Protocol_state.Value.t
-  ; protocol_state_proof: Proof.t sexp_opaque
-  ; staged_ledger_diff: Staged_ledger_diff.t
-  ; delta_transition_chain_proof: State_hash.t * State_body_hash.t list
-  ; current_protocol_version: Protocol_version.t
-  ; proposed_protocol_version_opt: Protocol_version.t option
-  ; mutable validation_callback: Validate_content.t }
-[@@deriving sexp]
 
 (* another name, so we can avoid cyclic type below *)
 type t_ = t
@@ -856,8 +846,6 @@ module Validated = struct
       include With_validation
     end
   end]
-
-  type t = Stable.Latest.t
 
   type nonrec protocol_version_status = protocol_version_status =
     {valid_current: bool; valid_next: bool; matches_daemon: bool}

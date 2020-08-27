@@ -13,8 +13,6 @@ module Proof_level = struct
     end
   end]
 
-  type t = Stable.Latest.t = Full | Check | None [@@deriving eq]
-
   let to_string = function Full -> "full" | Check -> "check" | None -> "none"
 
   let of_string = function
@@ -55,21 +53,11 @@ module Constraint_constants = struct
         ; pending_coinbase_depth: int
         ; coinbase_amount: Currency.Amount.Stable.V1.t
         ; account_creation_fee: Currency.Fee.Stable.V1.t }
+      [@@deriving sexp, eq, yojson]
 
       let to_latest = Fn.id
     end
   end]
-
-  type t = Stable.Latest.t =
-    { c: int
-    ; ledger_depth: int
-    ; work_delay: int
-    ; block_window_duration_ms: int
-    ; transaction_capacity_log_2: int
-    ; pending_coinbase_depth: int
-    ; coinbase_amount: Currency.Amount.t
-    ; account_creation_fee: Currency.Fee.t }
-  [@@deriving sexp, eq]
 
   (* Generate the compile-time constraint constants, using a signature to hide
      the optcomp constants that we import.
@@ -203,14 +191,9 @@ module Protocol = struct
           { k: 'k
           ; delta: 'delta
           ; genesis_state_timestamp: 'genesis_state_timestamp }
-        [@@deriving eq, ord, hash, sexp, yojson]
+        [@@deriving eq, ord, hash, sexp, yojson, hlist]
       end
     end]
-
-    type ('k, 'delta, 'genesis_state_timestamp) t =
-          ('k, 'delta, 'genesis_state_timestamp) Stable.Latest.t =
-      {k: 'k; delta: 'delta; genesis_state_timestamp: 'genesis_state_timestamp}
-    [@@deriving eq, hlist]
   end
 
   [%%versioned_asserted
@@ -268,13 +251,14 @@ module Protocol = struct
         in
         (*from the print statement in Serialization.check_serialization*)
         let known_good_digest = "2b1a964e0fea8c31fdf76e7f5bebcdd6" in
-        Ppx_version.Serialization.check_serialization
+        Ppx_version_runtime.Serialization.check_serialization
           (module V1)
           t known_good_digest
     end
   end]
 
-  type t = Stable.Latest.t [@@deriving eq, to_yojson]
+  [%%define_locally
+  Stable.Latest.(to_yojson)]
 end
 
 module T = struct

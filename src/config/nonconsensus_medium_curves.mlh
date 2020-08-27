@@ -10,7 +10,6 @@
 [%%import "/src/config/protocol_version/current.mlh"]
 
 [%%define time_offsets true]
-[%%define fake_hash false]
 
 [%%define genesis_ledger "test"]
 [%%define genesis_state_timestamp "2019-01-30 12:00:00-08:00"]
@@ -22,6 +21,8 @@
 [%%define mock_frontend_data false]
 
 [%%define print_versioned_types false]
+
+[%%define download_snark_keys true]
 
 [%%define daemon_expiry "never"]
 [%%define test_full_epoch false]

@@ -6,15 +6,11 @@ module Stable = struct
   module V1 = struct
     type t =
       {fee: Currency.Fee.Stable.V1.t; prover: Public_key.Compressed.Stable.V1.t}
-    [@@deriving sexp, yojson]
+    [@@deriving sexp, yojson, eq, compare]
 
     let to_latest = Fn.id
   end
 end]
-
-type t = Stable.Latest.t =
-  {fee: Currency.Fee.t; prover: Public_key.Compressed.t}
-[@@deriving sexp, yojson]
 
 let create ~fee ~prover = Stable.Latest.{fee; prover}
 
@@ -29,7 +25,7 @@ module Digest = struct
       let to_latest = Fn.id
 
       include Binable.Of_binable
-                (String)
+                (Core_kernel.String.Stable.V1)
                 (struct
                   type nonrec t = t
 
@@ -50,8 +46,6 @@ module Digest = struct
              ~back:Blake2.bits_to_string
     end
   end]
-
-  type t = Stable.Latest.t [@@deriving sexp, eq, yojson]
 
   module Checked = struct
     open Snark_params.Tick

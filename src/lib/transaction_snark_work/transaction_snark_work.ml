@@ -17,6 +17,8 @@ module Statement = struct
 
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t = Transaction_snark.Statement.Stable.V1.t One_or_two.Stable.V1.t
       [@@deriving eq, compare, hash, sexp, yojson]
@@ -47,6 +49,8 @@ end
 module Info = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t =
         { statements: Statement.Stable.V1.t
@@ -70,6 +74,8 @@ end
 module T = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t =
         { fee: Fee.Stable.V1.t

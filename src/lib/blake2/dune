@@ -5,6 +5,6 @@
   (inline_tests)
   (libraries
     core_kernel
-    coda_digestif
-    ppx_version
+    digestif
+    ppx_version.runtime
   ))

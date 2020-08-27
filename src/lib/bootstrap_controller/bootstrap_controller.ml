@@ -96,7 +96,7 @@ let on_transition t ~sender:(host, peer_id) ~root_sync_ledger
       Coda_networking.get_ancestry t.network peer_id candidate_state
     with
     | Error e ->
-        Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__
+        [%log' error t.logger]
           ~metadata:[("error", `String (Error.to_string_hum e))]
           !"Could not get the proof of the root transition from the network: \
             $error" ;
@@ -132,9 +132,8 @@ let sync_ledger t ~root_sync_ledger ~transition_graph ~sync_ledger_reader
       (* TODO: Efficiently limiting the number of green threads in #1337 *)
       if worth_getting_root t (External_transition.consensus_state transition)
       then (
-        Logger.trace t.logger
-          !"Added the transition from sync_ledger_reader into cache"
-          ~location:__LOC__ ~module_:__MODULE__
+        [%log' trace t.logger]
+          "Added the transition from sync_ledger_reader into cache"
           ~metadata:
             [ ("state_hash", State_hash.to_yojson hash)
             ; ("external_transition", External_transition.to_yojson transition)
@@ -227,7 +226,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
           (Staged_ledger.Scan_state.hash scan_state)
           expected_merkle_root pending_coinbases
       in
-      Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+      [%log debug]
         ~metadata:
           [ ( "expected_staged_ledger_hash"
             , Staged_ledger_hash.to_yojson expected_staged_ledger_hash )
@@ -254,7 +253,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
         match Map.find protocol_states_map hash with
         | None ->
             let new_state_hash = (fst new_root).hash in
-            Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+            [%log error]
               ~metadata:
                 [ ("new_root", State_hash.to_yojson new_state_hash)
                 ; ("state_hash", State_hash.to_yojson hash) ]
@@ -299,7 +298,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
                        scan state from the peer."
                     , [] ) ))
         in
-        Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+        [%log error]
           ~metadata:
             [ ("error", `String (Error.to_string_hum e))
             ; ("state_hash", State_hash.to_yojson hash)
@@ -330,7 +329,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
               ~consensus_state ~local_state:consensus_local_state
           with
           | None ->
-              Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+              [%log debug]
                 ~metadata:
                   [ ( "local_state"
                     , Consensus.Data.Local_state.to_yojson
@@ -341,8 +340,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
                 "Not synchronizing consensus local state" ;
               Deferred.return @@ Ok ()
           | Some sync_jobs ->
-              Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-                "Synchronizing consensus local state" ;
+              [%log info] "Synchronizing consensus local state" ;
               Consensus.Hooks.sync_local_state
                 ~local_state:consensus_local_state ~logger ~trust_system
                 ~random_peers:(fun n ->
@@ -360,7 +358,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
                 sync_jobs
         with
         | Error e ->
-            Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+            [%log error]
               ~metadata:[("error", `String (Error.to_string_hum e))]
               "Local state sync failed: $error. Retry bootstrap" ;
             Writer.close sync_ledger_writer ;
@@ -402,8 +400,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
               | Error `Persistent_frontier_malformed ->
                   fail "persistent frontier was malformed"
             in
-            Logger.Structured.info logger ~module_:__MODULE__ ~location:__LOC__
-              Bootstrap_complete ;
+            [%str_log info] Bootstrap_complete ;
             let collected_transitions =
               Transition_cache.data transition_graph
             in
@@ -428,9 +425,8 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
                         (External_transition.consensus_state transition)
                       ~logger )
             in
-            Logger.debug logger
-              "Sorting filtered transitions by consensus state" ~metadata:[]
-              ~location:__LOC__ ~module_:__MODULE__ ;
+            [%log debug] "Sorting filtered transitions by consensus state"
+              ~metadata:[] ;
             let sorted_filtered_collected_transitins =
               List.sort filtered_collected_transitions
                 ~compare:
@@ -605,8 +601,7 @@ let%test_module "Bootstrap_controller tests" =
           Breadcrumb.validated_transition (root my_net.state.frontier))
       in
       let%bind () = Transition_frontier.close my_net.state.frontier in
-      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-        "bootstrap begin" ;
+      [%log info] "bootstrap begin" ;
       Block_time.Timeout.await_exn time_controller ~timeout_duration
         (run ~logger ~trust_system ~verifier ~network:my_net.network
            ~consensus_local_state:my_net.state.consensus_local_state

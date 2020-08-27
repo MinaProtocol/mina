@@ -3,15 +3,19 @@ open Async
 
 let name = "coda-transitive-peers-test"
 
+let runtime_config = Runtime_config.Test_configs.split_snarkless
+
 let main () =
-  let precomputed_values =
-    (* TODO: Load for this specific test. *)
-    Lazy.force Precomputed_values.compiled
+  let logger = Logger.create () in
+  let%bind precomputed_values, _runtime_config =
+    Genesis_ledger_helper.init_from_config_file ~logger ~may_generate:false
+      ~proof_level:None
+      (Lazy.force runtime_config)
+    >>| Or_error.ok_exn
   in
   let consensus_constants = precomputed_values.consensus_constants in
   let%bind program_dir = Unix.getcwd () in
   let n = 3 in
-  let logger = Logger.create () in
   let block_production_interval =
     consensus_constants.block_window_duration_ms |> Block_time.Span.to_ms
     |> Int64.to_int_exn
@@ -33,6 +37,7 @@ let main () =
       ~acceptable_delay ~chain_id:name ~snark_worker_public_keys:None
       ~block_production_keys:(Fn.const None) ~work_selection_method ~trace_dir
       ~max_concurrent_connections
+      ~runtime_config:precomputed_values.runtime_config
   in
   let%bind workers = Coda_processes.spawn_local_processes_exn configs in
   let%bind net_configs = Coda_processes.net_configs (n + 1) in
@@ -47,9 +52,7 @@ let main () =
     |> fst |> Node_addrs_and_ports.to_display
   in
   let libp2p_keypair = List.nth_exn addrs_and_ports_list n |> snd in
-  Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-    !"connecting to peers %{sexp: string list}\n"
-    peers ;
+  [%log debug] !"connecting to peers %{sexp: string list}\n" peers ;
   let config =
     Coda_process.local_config ~is_seed:true ~peers ~addrs_and_ports
       ~acceptable_delay ~chain_id:name ~libp2p_keypair ~net_configs
@@ -57,11 +60,12 @@ let main () =
       ~work_selection_method ~trace_dir ~offset:Time.Span.zero ()
       ~max_concurrent_connections ~is_archive_rocksdb:false
       ~archive_process_location:None
+      ~runtime_config:precomputed_values.runtime_config
   in
   let%bind worker = Coda_process.spawn_exn config in
   let%bind _ = after (Time.Span.of_sec 10.) in
   let%bind peers = Coda_process.peers_exn worker in
-  Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+  [%log debug]
     !"got peers %{sexp: Network_peer.Peer.t list} %{sexp: \
       Node_addrs_and_ports.t list}\n"
     peers expected_peers ;

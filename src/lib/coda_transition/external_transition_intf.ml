@@ -35,11 +35,11 @@ module type External_transition_common_intf = sig
   val transactions :
        constraint_constants:Genesis_constants.Constraint_constants.t
     -> t
-    -> Transaction.t list
+    -> Transaction.t With_status.t list
 
-  val user_commands : t -> User_command.t list
+  val user_commands : t -> User_command.t With_status.t list
 
-  val payments : t -> User_command.t list
+  val payments : t -> User_command.t With_status.t list
 
   val delta_transition_chain_proof : t -> State_hash.t * State_body_hash.t list
 
@@ -59,6 +59,8 @@ module type External_transition_base_intf = sig
 
   [%%versioned:
   module Stable : sig
+    [@@@no_toplevel_latest_type]
+
     module V1 : sig
       type nonrec t = t [@@deriving sexp, to_yojson]
     end

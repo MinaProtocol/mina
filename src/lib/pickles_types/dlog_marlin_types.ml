@@ -1,5 +1,19 @@
 open Core_kernel
 
+module Pc_array = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type 'a t = 'a array [@@deriving compare, sexp, yojson, eq]
+
+      let hash_fold_t f s a = List.hash_fold_t f s (Array.to_list a)
+    end
+  end]
+
+  [%%define_locally
+  Stable.Latest.(hash_fold_t)]
+end
+
 module Evals = struct
   [%%versioned
   module Stable = struct
@@ -18,25 +32,9 @@ module Evals = struct
         ; g_1: 'a
         ; g_2: 'a
         ; g_3: 'a }
-      [@@deriving fields, sexp, compare, yojson]
+      [@@deriving fields, sexp, compare, yojson, hash, eq]
     end
   end]
-
-  type 'a t = 'a Stable.Latest.t =
-    { w_hat: 'a
-    ; z_hat_a: 'a
-    ; z_hat_b: 'a
-    ; h_1: 'a
-    ; h_2: 'a
-    ; h_3: 'a
-    ; row: 'a Abc.t
-    ; col: 'a Abc.t
-    ; value: 'a Abc.t
-    ; rc: 'a Abc.t
-    ; g_1: 'a
-    ; g_2: 'a
-    ; g_3: 'a }
-  [@@deriving fields, sexp, compare, yojson]
 
   let map (type a b)
       ({ w_hat
@@ -152,15 +150,25 @@ module Evals = struct
     ; g_2
     ; g_3 }
 
-  let typ (lengths : int t) (g : ('a, 'b, 'f) Snarky.Typ.t) :
-      ('a array t, 'b array t, 'f) Snarky.Typ.t =
-    let v ls = Vector.map ls ~f:(fun length -> Snarky.Typ.array ~length g) in
+  let typ (lengths : int t) (g : ('a, 'b, 'f) Snarky_backendless.Typ.t)
+      ~default : ('a array t, 'b array t, 'f) Snarky_backendless.Typ.t =
+    let v ls =
+      Vector.map ls ~f:(fun length ->
+          let t = Snarky_backendless.Typ.array ~length g in
+          { t with
+            store=
+              (fun arr ->
+                t.store
+                  (Array.append arr
+                     (Array.create ~len:(length - Array.length arr) default))
+                ) } )
+    in
     let t =
       let l1, l2 = to_vectors lengths in
-      Snarky.Typ.tuple2 (Vector.typ' (v l1)) (Vector.typ' (v l2))
+      Snarky_backendless.Typ.tuple2 (Vector.typ' (v l1)) (Vector.typ' (v l2))
     in
-    Snarky.Typ.transport t ~there:to_vectors ~back:of_vectors
-    |> Snarky.Typ.transport_var ~there:to_vectors ~back:of_vectors
+    Snarky_backendless.Typ.transport t ~there:to_vectors ~back:of_vectors
+    |> Snarky_backendless.Typ.transport_var ~there:to_vectors ~back:of_vectors
 end
 
 module Openings = struct
@@ -169,17 +177,17 @@ module Openings = struct
     module Stable = struct
       module V1 = struct
         type ('g, 'fq) t =
-          {lr: ('g * 'g) array; z_1: 'fq; z_2: 'fq; delta: 'g; sg: 'g}
-        [@@deriving bin_io, version, sexp, compare, yojson]
+          { lr: ('g * 'g) Pc_array.Stable.V1.t
+          ; z_1: 'fq
+          ; z_2: 'fq
+          ; delta: 'g
+          ; sg: 'g }
+        [@@deriving sexp, compare, yojson, hash, eq, hlist]
       end
     end]
 
-    type ('g, 'fq) t = ('g, 'fq) Stable.Latest.t =
-      {lr: ('g * 'g) array; z_1: 'fq; z_2: 'fq; delta: 'g; sg: 'g}
-    [@@deriving sexp, compare, yojson, hlist]
-
     let typ fq g ~length =
-      let open Snarky.Typ in
+      let open Snarky_backendless.Typ in
       of_hlistable
         [array ~length (g * g); fq; fq; g; g]
         ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
@@ -195,22 +203,17 @@ module Openings = struct
             'fqv Evals.Stable.V1.t
             * 'fqv Evals.Stable.V1.t
             * 'fqv Evals.Stable.V1.t }
-      [@@deriving bin_io, version, sexp, compare, yojson]
+      [@@deriving sexp, compare, yojson, hash, eq, hlist]
     end
   end]
 
-  type ('g, 'fq, 'fqv) t = ('g, 'fq, 'fqv) Stable.Latest.t =
-    { proof: ('g, 'fq) Bulletproof.t
-    ; evals: 'fqv Evals.t * 'fqv Evals.t * 'fqv Evals.t }
-  [@@deriving sexp, compare, yojson, hlist]
-
-  let typ (type g gv) (g : (gv, g, 'f) Snarky.Typ.t) fq ~bulletproof_rounds
-      ~commitment_lengths =
-    let open Snarky.Typ in
+  let typ (type g gv) (g : (gv, g, 'f) Snarky_backendless.Typ.t) fq
+      ~bulletproof_rounds ~commitment_lengths ~dummy_group_element =
+    let open Snarky_backendless.Typ in
     let triple x = tuple3 x x x in
     of_hlistable
       [ Bulletproof.typ fq g ~length:bulletproof_rounds
-      ; triple (Evals.typ commitment_lengths g) ]
+      ; triple (Evals.typ ~default:dummy_group_element commitment_lengths g) ]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
 end
@@ -220,18 +223,14 @@ module Poly_comm = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type 'g t = {unshifted: 'g array; shifted: 'g}
-        [@@deriving bin_io, version, sexp, compare, yojson]
+        type 'g t = {unshifted: 'g Pc_array.Stable.V1.t; shifted: 'g}
+        [@@deriving sexp, compare, yojson, hlist, hash, eq]
       end
     end]
 
-    type 'g t = 'g Stable.Latest.t = {unshifted: 'g array; shifted: 'g}
-    [@@deriving sexp, compare, yojson, hlist]
-
-    let typ g ~length =
-      let open Snarky.Typ in
-      of_hlistable [array ~length g; g] ~var_to_hlist:to_hlist
-        ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
+    let typ ?(array = Snarky_backendless.Typ.array) g ~length =
+      Snarky_backendless.Typ.of_hlistable [array ~length g; g]
+        ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
         ~value_of_hlist:of_hlist
   end
 
@@ -239,14 +238,12 @@ module Poly_comm = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type 'g t = 'g array
-        [@@deriving bin_io, version, sexp, compare, yojson]
+        type 'g t = 'g Pc_array.Stable.V1.t
+        [@@deriving sexp, compare, yojson, hash, eq]
       end
     end]
 
-    type 'g t = 'g Stable.Latest.t [@@deriving sexp, compare, yojson]
-
-    let typ g ~length = Snarky.Typ.array ~length g
+    let typ g ~length = Snarky_backendless.Typ.array ~length g
   end
 end
 
@@ -271,26 +268,30 @@ module Messages = struct
             'fq
             * ( 'g With_degree_bound.Stable.V1.t
               * 'g Without_degree_bound.Stable.V1.t ) }
-      [@@deriving bin_io, version, sexp, compare, yojson, fields]
+      [@@deriving sexp, compare, yojson, fields, hash, eq, hlist]
     end
   end]
 
-  type ('g, 'fq) t = ('g, 'fq) Stable.Latest.t =
-    { w_hat: 'g Without_degree_bound.t
-    ; z_hat_a: 'g Without_degree_bound.t
-    ; z_hat_b: 'g Without_degree_bound.t
-    ; gh_1: 'g With_degree_bound.t * 'g Without_degree_bound.t
-    ; sigma_gh_2: 'fq * ('g With_degree_bound.t * 'g Without_degree_bound.t)
-    ; sigma_gh_3: 'fq * ('g With_degree_bound.t * 'g Without_degree_bound.t) }
-  [@@deriving sexp, compare, yojson, fields, hlist]
-
-  let typ fq g ~(commitment_lengths : int Evals.t) =
-    let open Snarky.Typ in
+  let typ (type n) fq g ~dummy
+      ~(commitment_lengths : (int, n) Vector.t Evals.t) =
+    let open Snarky_backendless.Typ in
     let {Evals.w_hat; z_hat_a; z_hat_b; h_1; h_2; h_3; g_1; g_2; g_3; _} =
       commitment_lengths
     in
-    let wo n = Without_degree_bound.typ g ~length:n in
-    let w n = With_degree_bound.typ g ~length:n in
+    let array ~length elt =
+      let typ = Snarky_backendless.Typ.array ~length elt in
+      { typ with
+        store=
+          (fun a ->
+            let n = Array.length a in
+            if n > length then failwithf "Expected %d <= %d" n length () ;
+            typ.store (Array.append a (Array.create ~len:(length - n) dummy))
+            ) }
+    in
+    let wo n = array ~length:(Vector.reduce_exn n ~f:Int.max) g in
+    let w n =
+      With_degree_bound.typ ~array g ~length:(Vector.reduce_exn n ~f:Int.max)
+    in
     of_hlistable
       [ wo w_hat
       ; wo z_hat_a
@@ -309,18 +310,7 @@ module Proof = struct
       type ('g, 'fq, 'fqv) t =
         { messages: ('g, 'fq) Messages.Stable.V1.t
         ; openings: ('g, 'fq, 'fqv) Openings.Stable.V1.t }
-      [@@deriving bin_io, version, sexp, compare, yojson]
+      [@@deriving sexp, compare, yojson, hash, eq]
     end
   end]
-
-  type ('g, 'fq, 'fqv) t = ('g, 'fq, 'fqv) Stable.Latest.t =
-    {messages: ('g, 'fq) Messages.t; openings: ('g, 'fq, 'fqv) Openings.t}
-  [@@deriving sexp, compare, yojson, hlist]
-
-  let typ g fq ~bulletproof_rounds ~commitment_lengths =
-    Snarky.Typ.of_hlistable
-      [ Messages.typ g fq ~commitment_lengths
-      ; Openings.typ g fq ~bulletproof_rounds ~commitment_lengths ]
-      ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
-      ~value_of_hlist:of_hlist
 end

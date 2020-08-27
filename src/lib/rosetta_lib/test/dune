@@ -1,0 +1,9 @@
+(executable
+  (package rosetta_lib)
+  (name test_encodings)
+  (public_name test_encodings)
+  (modes native)
+  (modules test_encodings)
+  (libraries core_kernel signature_lib rosetta_lib)
+  (preprocessor_deps ../../../config.mlh)
+  (preprocess (pps ppx_version ppx_optcomp)))

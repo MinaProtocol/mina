@@ -38,7 +38,7 @@ let with_check = false
 [%%endif]
 
 [%%if
-curve_size = 753]
+curve_size = 255]
 
 let medium_curves = true
 
@@ -74,8 +74,7 @@ let heartbeat_flag = ref true
 let print_heartbeat logger =
   let rec loop () =
     if !heartbeat_flag then (
-      Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
-        "Heartbeat for CI" ;
+      [%log warn] "Heartbeat for CI" ;
       let%bind () = after (Time.Span.of_min 1.) in
       loop () )
     else return ()
@@ -104,6 +103,7 @@ let run_test () : unit Deferred.t =
             Deferred.unit
       in
       let trace_database_initialization typ location =
+        (* can't use %log here, using passed-in location *)
         Logger.trace logger "Creating %s at %s" ~module_:__MODULE__ ~location
           typ
       in
@@ -150,7 +150,7 @@ let run_test () : unit Deferred.t =
           ; logger
           ; initial_peers= []
           ; unsafe_no_trust_ip= true
-          ; flood= false
+          ; gossip_type= `Gossipsub
           ; conf_dir= temp_conf_dir
           ; chain_id= "bogus chain id for testing"
           ; addrs_and_ports=
@@ -279,8 +279,7 @@ let run_test () : unit Deferred.t =
                 "A memo created in full-test"
             in
             User_command_input.create ?nonce ~signer ~fee ~fee_payer_pk:signer
-              ~fee_token:Token_id.default ~memo
-              ~valid_until:Coda_numbers.Global_slot.max_value
+              ~fee_token:Token_id.default ~memo ~valid_until:None
               ~body:
                 (Payment
                    { source_pk= signer

@@ -1,6 +1,6 @@
 open Core_kernel
 open Import
-open Snarky
+open Snarky_backendless
 module Coda_base_util = Util
 open Snark_params
 open Snark_params.Tick
@@ -29,8 +29,6 @@ module Coinbase_data = struct
       let to_latest = Fn.id
     end
   end]
-
-  type t = Stable.Latest.t
 
   let of_coinbase (cb : Coinbase.t) : t = (cb.receiver, cb.amount)
 
@@ -111,8 +109,6 @@ end = struct
       let to_latest = Fn.id
     end
   end]
-
-  type t = Stable.Latest.t [@@deriving sexp, compare, to_yojson]
 
   [%%define_locally
   Int.(( > ), to_string, zero, to_int, of_int, equal)]
@@ -242,13 +238,9 @@ module State_stack = struct
     module Stable = struct
       module V1 = struct
         type 'stack_hash t = {init: 'stack_hash; curr: 'stack_hash}
-        [@@deriving sexp, eq, compare, hash, yojson]
+        [@@deriving sexp, eq, compare, hash, yojson, hlist]
       end
     end]
-
-    type 'stack_hash t = 'stack_hash Stable.Latest.t =
-      {init: 'stack_hash; curr: 'stack_hash}
-    [@@deriving sexp, compare, hash, yojson, hlist]
   end
 
   [%%versioned
@@ -260,8 +252,6 @@ module State_stack = struct
       let to_latest = Fn.id
     end
   end]
-
-  type t = Stable.Latest.t [@@deriving sexp, compare, yojson, hash, eq]
 
   type var = Stack_hash.var Poly.t
 
@@ -361,6 +351,8 @@ module Hash_builder = struct
 
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       module T = struct
         type t = Field.t [@@deriving sexp, compare, hash, version {asserted}]
@@ -407,13 +399,6 @@ module Update = struct
         let to_latest = Fn.id
       end
     end]
-
-    type t = Stable.Latest.t =
-      | Update_none
-      | Update_one
-      | Update_two_coinbase_in_first
-      | Update_two_coinbase_in_second
-    [@@deriving sexp]
 
     type var = Boolean.var * Boolean.var
 
@@ -469,8 +454,6 @@ module Update = struct
     end
   end]
 
-  type t = Stable.Latest.t
-
   type var = Action.var * Coinbase_data.var * State_body_hash.var
 
   let var_of_t (a, c, s) =
@@ -494,11 +477,6 @@ module Stack_versioned = struct
         [@@deriving eq, yojson, hash, sexp, compare]
       end
     end]
-
-    type ('data_stack, 'state_stack) t =
-          ('data_stack, 'state_stack) Stable.Latest.t =
-      {data: 'data_stack; state: 'state_stack}
-    [@@deriving yojson, hash, sexp, compare]
   end
 
   [%%versioned
@@ -511,8 +489,6 @@ module Stack_versioned = struct
       let to_latest = Fn.id
     end
   end]
-
-  type t = Stable.Latest.t [@@deriving yojson, eq, compare, sexp, hash]
 end
 
 module Hash_versioned = struct
@@ -525,8 +501,6 @@ module Hash_versioned = struct
       let to_latest = Fn.id
     end
   end]
-
-  type t = Stable.Latest.t [@@deriving eq, compare, sexp, yojson, hash]
 end
 
 module Merkle_tree_versioned = struct
@@ -544,8 +518,6 @@ module Merkle_tree_versioned = struct
       let to_latest = Fn.id
     end
   end]
-
-  type t = Stable.Latest.t [@@deriving sexp, to_yojson]
 
   type _unused = unit
     constraint
@@ -759,7 +731,7 @@ module T = struct
     type var = Hash.var
 
     module Merkle_tree =
-      Snarky.Merkle_tree.Checked
+      Snarky_backendless.Merkle_tree.Checked
         (Tick)
         (struct
           type value = Field.t
@@ -1225,6 +1197,8 @@ end
 
 [%%versioned
 module Stable = struct
+  [@@@no_toplevel_latest_type]
+
   module V1 = struct
     type t =
       ( Merkle_tree_versioned.Stable.V1.t

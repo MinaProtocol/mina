@@ -1,7 +1,7 @@
 open Core_kernel
 
 module type Inputs_intf = sig
-  module Impl : Snarky.Snark_intf.S
+  module Impl : Snarky_backendless.Snark_intf.S
 
   module Fqk : sig
     include Snarky_field_extensions.Intf.S with module Impl = Impl

@@ -1,6 +1,6 @@
 open Core_kernel
 
-module Aux (Impl : Snarky.Snark_intf.Run) = struct
+module Aux (Impl : Snarky_backendless.Snark_intf.Run) = struct
   open Impl
 
   let non_residue : Field.Constant.t Lazy.t =
@@ -38,8 +38,8 @@ module Aux (Impl : Snarky.Snark_intf.Run) = struct
     , is_square )
 end
 
-let wrap (type f) ((module Impl) : f Snarky.Snark0.m) ~potential_xs ~y_squared
-    =
+let wrap (type f) ((module Impl) : f Snarky_backendless.Snark0.m) ~potential_xs
+    ~y_squared =
   let open Impl in
   let module A = Aux (Impl) in
   let open A in
@@ -57,7 +57,7 @@ let wrap (type f) ((module Impl) : f Snarky.Snark0.m) ~potential_xs ~y_squared
   )
 
 module Make
-    (M : Snarky.Snark_intf.Run) (P : sig
+    (M : Snarky_backendless.Snark_intf.Run) (P : sig
         val params : M.field Group_map.Params.t
     end) =
 struct

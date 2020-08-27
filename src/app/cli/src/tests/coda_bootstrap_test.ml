@@ -3,9 +3,16 @@ open Async
 
 let name = "coda-bootstrap-test"
 
+let runtime_config = Runtime_config.Test_configs.bootstrap
+
 let main () =
   let logger = Logger.create () in
-  let precomputed_values = Lazy.force Precomputed_values.compiled in
+  let%bind precomputed_values, _runtime_config =
+    Genesis_ledger_helper.init_from_config_file ~logger ~may_generate:false
+      ~proof_level:None
+      (Lazy.force runtime_config)
+    >>| Or_error.ok_exn
+  in
   let n = 2 in
   let block_production_keys i = Some i in
   let snark_work_public_keys i =
@@ -16,7 +23,7 @@ let main () =
   let%bind testnet =
     Coda_worker_testnet.test ~name logger n block_production_keys
       snark_work_public_keys Cli_lib.Arg_type.Work_selection_method.Sequence
-      ~max_concurrent_connections:None
+      ~max_concurrent_connections:None ~precomputed_values
   in
   let previous_status = Sync_status.Hash_set.create () in
   let bootstrapping_node = 1 in
@@ -25,7 +32,7 @@ let main () =
    in
    Pipe_lib.Linear_pipe.iter (Option.value_exn sync_status_pipe_opt)
      ~f:(fun sync_status ->
-       Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+       [%log trace]
          ~metadata:[("status", Sync_status.to_yojson sync_status)]
          "Bootstrap node received status: $status" ;
        Hash_set.add previous_status sync_status ;

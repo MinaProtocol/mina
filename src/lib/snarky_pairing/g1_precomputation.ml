@@ -1,5 +1,5 @@
 module type S = sig
-  module Impl : Snarky.Snark_intf.S
+  module Impl : Snarky_backendless.Snark_intf.S
 
   module Fqe : Snarky_field_extensions.Intf.S with module Impl = Impl
 
@@ -11,7 +11,7 @@ module type S = sig
 end
 
 module Make
-    (Impl : Snarky.Snark_intf.S)
+    (Impl : Snarky_backendless.Snark_intf.S)
     (Fqe : Snarky_field_extensions.Intf.S with module Impl = Impl)
                                                                  (Params : sig
         val twist : Fqe.Unchecked.t
