@@ -1,5 +1,6 @@
 open Core_kernel
 open Async
+open Rosetta_lib
 
 let router ~graphql_uri ~db ~logger route body =
   match route with
@@ -40,11 +41,11 @@ let server_handler ~db ~graphql_uri ~logger ~body _ req =
       Cohttp_async.Server.respond (Cohttp.Code.status_of_code 404)
   | Error (`App app_error) ->
       let error = Errors.erase app_error in
-      let metadata = [("error", Models.Error.to_yojson error)] in
+      let metadata = [("error", Rosetta_models.Error.to_yojson error)] in
       [%log warn] ~metadata "Error response: $error" ;
       Cohttp_async.Server.respond_string
         ~status:(Cohttp.Code.status_of_code 500)
-        (Yojson.Safe.to_string (Models.Error.to_yojson error))
+        (Yojson.Safe.to_string (Rosetta_models.Error.to_yojson error))
         ~headers:(Cohttp.Header.of_list [("Content-Type", "application/json")])
 
 let command =
