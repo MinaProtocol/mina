@@ -42,7 +42,16 @@ module Unsigned = struct
     end
 
     module Delegation = struct
-      type t = Todo [@@deriving yojson]
+      type public_key = string [@@deriving yojson]
+
+      type t =
+        { delegator: public_key
+        ; new_delegate: public_key
+        ; fee: Unsigned_extended.UInt64.t
+        ; nonce: Unsigned_extended.UInt32.t
+        ; memo: string option
+        ; valid_until: Unsigned_extended.UInt32.t option }
+      [@@deriving yojson]
     end
 
     type t =
@@ -86,6 +95,16 @@ module Unsigned = struct
           ; valid_until= None }
         in
         Result.return (`Payment payment)
+    | `Delegation ->
+        let delegation =
+          { Rendered.Delegation.delegator= un_pk command.source
+          ; new_delegate= un_pk command.receiver
+          ; fee= command.fee
+          ; nonce
+          ; memo= None
+          ; valid_until= None }
+        in
+        Result.return (`Delegation delegation)
     | _ ->
         Result.fail
           (Errors.create ~context:"Unsigned transaction rendering"
@@ -97,10 +116,15 @@ module Unsigned = struct
       Random_oracle_input.Coding.serialize ~string_of_field ~to_bool:Fn.id
         ~of_bool:Fn.id t.random_oracle_input
     in
-    let%map (`Payment payment) = render_command ~nonce:t.nonce t.command in
-    { Rendered.random_oracle_input
-    ; payment= Some payment
-    ; stake_delegation= None }
+    match%map render_command ~nonce:t.nonce t.command with
+    | `Payment payment ->
+        { Rendered.random_oracle_input
+        ; payment= Some payment
+        ; stake_delegation= None }
+    | `Delegation delegation ->
+        { Rendered.random_oracle_input
+        ; payment= None
+        ; stake_delegation= Some delegation }
 
   let of_rendered_payment (r : Rendered.Payment.t) :
       User_command_info.Partial.t =
@@ -112,6 +136,17 @@ module Unsigned = struct
     ; token= r.token
     ; fee= r.fee
     ; amount= Some r.amount }
+
+  let of_rendered_delegation (r : Rendered.Delegation.t) :
+      User_command_info.Partial.t =
+    { User_command_info.Partial.receiver= `Pk r.new_delegate
+    ; source= `Pk r.delegator
+    ; kind= `Delegation
+    ; fee_payer= `Pk r.delegator (* TODO: reviewer, please check! *)
+    ; fee_token= Coda_base.Token_id.(default |> to_uint64)
+    ; token= Coda_base.Token_id.(default |> to_uint64)
+    ; fee= r.fee
+    ; amount= None }
 
   let of_rendered (r : Rendered.t) : (t, Errors.t) Result.t =
     let open Result.Let_syntax in
@@ -160,12 +195,15 @@ module Signed = struct
 
   let render (t : t) =
     let open Result.Let_syntax in
-    let%map (`Payment payment) =
-      Unsigned.render_command ~nonce:t.nonce t.command
-    in
-    { Rendered.signature= t.signature
-    ; payment= Some payment
-    ; stake_delegation= None }
+    match%map Unsigned.render_command ~nonce:t.nonce t.command with
+    | `Payment payment ->
+        { Rendered.signature= t.signature
+        ; payment= Some payment
+        ; stake_delegation= None }
+    | `Delegation delegation ->
+        { Rendered.signature= t.signature
+        ; payment= None
+        ; stake_delegation= Some delegation }
 
   let of_rendered (r : Rendered.t) : (t, Errors.t) Result.t =
     match (r.payment, r.stake_delegation) with
@@ -173,6 +211,11 @@ module Signed = struct
         Result.return
           { command= Unsigned.of_rendered_payment payment
           ; nonce= payment.nonce
+          ; signature= r.signature }
+    | None, Some delegation ->
+        Result.return
+          { command= Unsigned.of_rendered_delegation delegation
+          ; nonce= delegation.nonce
           ; signature= r.signature }
     | _ ->
         Result.fail

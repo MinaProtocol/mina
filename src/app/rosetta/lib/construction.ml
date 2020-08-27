@@ -38,6 +38,24 @@ module Send_payment =
   }}
   |}]
 
+module Send_delegation =
+[%graphql
+{|
+mutation ($sender: PublicKey!,
+          $receiver: PublicKey!,
+          $fee: UInt64!,
+          $nonce: UInt32!,
+          $memo: String,
+          $signature: String!) {
+  sendDelegation(signature: {rawSignature: $signature}, input:
+    {from: $sender, to: $receiver, fee: $fee, memo: $memo, nonce: $nonce}) {
+    delegation {
+      hash
+    }
+  }
+}
+|}]
+
 module Options = struct
   type t = {sender: Public_key.Compressed.t; token_id: Unsigned.UInt64.t}
 
@@ -497,24 +515,29 @@ end
 module Submit = struct
   module Env = struct
     module T (M : Monad_fail.S) = struct
-      type 'gql t =
-        { gql:
+      type ('gql_payment, 'gql_delegation) t =
+        { gql_payment:
                payment:Transaction.Unsigned.Rendered.Payment.t
             -> signature:string
             -> unit
-            -> ('gql, Errors.t) M.t
+            -> ('gql_payment, Errors.t) M.t
               (* TODO: Validate network choice with separate query *)
+        ; gql_delegation:
+               delegation:Transaction.Unsigned.Rendered.Delegation.t
+            -> signature:string
+            -> unit
+            -> ('gql_delegation, Errors.t) M.t
         ; lift: 'a 'e. ('a, 'e) Result.t -> ('a, 'e) M.t }
     end
 
     module Real = T (Deferred.Result)
     module Mock = T (Result)
 
-    let real : graphql_uri:Uri.t -> 'gql Real.t =
+    let real : graphql_uri:Uri.t -> ('gql_payment, 'gql_delegation) Real.t =
       let uint64 x = `String (Unsigned.UInt64.to_string x) in
       let uint32 x = `String (Unsigned.UInt32.to_string x) in
       fun ~graphql_uri ->
-        { gql=
+        { gql_payment=
             (fun ~payment ~signature () ->
               Graphql.query
                 (Send_payment.make ~from:(`String payment.from)
@@ -524,11 +547,23 @@ module Submit = struct
                    ?memo:payment.memo ~nonce:(uint32 payment.nonce) ~signature
                    ())
                 graphql_uri )
+        ; gql_delegation=
+            (fun ~delegation ~signature () ->
+              Graphql.query
+                (Send_delegation.make ~sender:(`String delegation.delegator)
+                   ~receiver:(`String delegation.new_delegate)
+                   ~fee:
+                     (uint64 delegation.fee)
+                     (*                   ?validUntil:(Option.map ~f:uint32 delegation.valid_until) *)
+                   ?memo:delegation.memo ~nonce:(uint32 delegation.nonce)
+                   ~signature ())
+                graphql_uri )
         ; lift= Deferred.return }
   end
 
   module Impl (M : Monad_fail.S) = struct
-    let handle ~(env : 'gql Env.T(M).t) (req : Construction_submit_request.t) =
+    let handle ~(env : ('gql_payment, 'gql_delegation) Env.T(M).t)
+        (req : Construction_submit_request.t) =
       let open M.Let_syntax in
       let%bind json =
         try M.return (Yojson.Safe.from_string req.signed_transaction)
@@ -539,24 +574,30 @@ module Submit = struct
         |> Result.map_error ~f:(fun e -> Errors.create (`Json_parse (Some e)))
         |> env.lift
       in
-      let%bind payment =
+      let open M.Let_syntax in
+      let%map hash =
         match
           (signed_transaction.payment, signed_transaction.stake_delegation)
         with
-        | Some payment, _ ->
-            M.return payment (* TODO: Support stake delegation *)
+        | Some payment, None ->
+            let%map res =
+              env.gql_payment ~payment ~signature:signed_transaction.signature
+                ()
+            in
+            let (`UserCommand payment) = (res#sendPayment)#payment in
+            payment#hash
+        | None, Some delegation ->
+            let%map res =
+              env.gql_delegation ~delegation
+                ~signature:signed_transaction.signature ()
+            in
+            let (`UserCommand delegation) = (res#sendDelegation)#delegation in
+            delegation#hash
         | _ ->
             M.fail
               (Errors.create
                  ~context:"Must have one of payment or stakeDelegation"
                  (`Json_parse None))
-      in
-      let%map res =
-        env.gql ~payment ~signature:signed_transaction.signature ()
-      in
-      let hash =
-        let (`UserCommand payment) = (res#sendPayment)#payment in
-        payment#hash
       in
       { Construction_submit_response.transaction_identifier=
           Transaction_identifier.create hash
