@@ -34,17 +34,10 @@ let keep_trying ~step ~retry_count ~initial_delay ~each_delay ~failure_reason =
   let%bind () = wait initial_delay in
   go retry_count
 
-let direct_graphql_payment_through_block ~logger ~rosetta_uri ~graphql_uri
-    ~network_response =
+let verify_in_mempool_and_block ~logger ~rosetta_uri ~graphql_uri
+    ~network_response ~txn_hash ~operation_expectations =
   let open Core.Time in
   let open Deferred.Result.Let_syntax in
-  (* Unlock the account *)
-  let%bind _ = Poke.Account.unlock ~graphql_uri in
-  (* Send a payment *)
-  let%bind hash =
-    Poke.SendTransaction.payment ~fee:(`Int 2_000_000_000)
-      ~amount:(`Int 5_000_000_000) ~to_:(`String other_pk) ~graphql_uri ()
-  in
   let%bind () = wait (Span.of_sec 1.0) in
   (* Grab the mempool and find the payment inside *)
   let%bind () =
@@ -57,7 +50,7 @@ let direct_graphql_payment_through_block ~logger ~rosetta_uri ~graphql_uri
           Result.map mempool_r ~f:(fun mempool ->
               List.find mempool.Mempool_response.transaction_identifiers
                 ~f:(fun ident ->
-                  String.equal ident.Transaction_identifier.hash hash ) )
+                  String.equal ident.Transaction_identifier.hash txn_hash ) )
         with
         | Error _ ->
             `Failed
@@ -71,7 +64,8 @@ let direct_graphql_payment_through_block ~logger ~rosetta_uri ~graphql_uri
   in
   (* Pull specific account out of mempool *)
   let%bind mempool_res =
-    Peek.Mempool.transaction ~rosetta_uri ~network_response ~logger ~hash
+    Peek.Mempool.transaction ~rosetta_uri ~network_response ~logger
+      ~hash:txn_hash
   in
   [%log debug]
     ~metadata:
@@ -79,28 +73,10 @@ let direct_graphql_payment_through_block ~logger ~rosetta_uri ~graphql_uri
         , mempool_res.transaction.operations |> [%to_yojson: Operation.t list]
         ) ]
     "Mempool operations: $operations" ;
-  let expected_mempool_ops =
-    Operation_expectation.
-      [ { amount= Some (-5_000_000_000)
-        ; account=
-            Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
-        ; status= "Pending"
-        ; _type= "payment_source_dec" }
-      ; { amount= Some (-2_000_000_000)
-        ; account=
-            Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
-        ; status= "Pending"
-        ; _type= "fee_payer_dec" }
-      ; { amount= Some 5_000_000_000
-        ; account=
-            Some {Account.pk= other_pk; token_id= Unsigned.UInt64.of_int 1}
-        ; status= "Pending"
-        ; _type= "payment_receiver_inc" } ]
-  in
   let%bind () =
     Operation_expectation.assert_similar_operations
-      ~expected:expected_mempool_ops ~actual:mempool_res.transaction.operations
-      ~situation:"mempool"
+      ~expected:operation_expectations
+      ~actual:mempool_res.transaction.operations ~situation:"mempool"
   in
   let%bind last_block_index =
     keep_trying
@@ -157,7 +133,7 @@ let direct_graphql_payment_through_block ~logger ~rosetta_uri ~graphql_uri
     ~metadata:[("block", Block_response.to_yojson block)] ;
   Operation_expectation.assert_similar_operations
     ~expected:
-      ( List.map ~f:succesful expected_mempool_ops
+      ( List.map ~f:succesful operation_expectations
       @ Operation_expectation.
           [ { amount= Some 20_000_000_000
             ; account=
@@ -170,8 +146,38 @@ let direct_graphql_payment_through_block ~logger ~rosetta_uri ~graphql_uri
       |> List.join )
     ~situation:"block"
 
-let construction_api_payment_through_mempool ~logger ~rosetta_uri
-    ~graphql_uri:_ ~network_response =
+let direct_graphql_payment_through_block ~logger ~rosetta_uri ~graphql_uri
+    ~network_response =
+  let open Deferred.Result.Let_syntax in
+  (* Unlock the account *)
+  let%bind _ = Poke.Account.unlock ~graphql_uri in
+  (* Send a payment *)
+  let%bind hash =
+    Poke.SendTransaction.payment ~fee:(`Int 2_000_000_000)
+      ~amount:(`Int 5_000_000_000) ~to_:(`String other_pk) ~graphql_uri ()
+  in
+  verify_in_mempool_and_block ~logger ~rosetta_uri ~graphql_uri ~txn_hash:hash
+    ~network_response
+    ~operation_expectations:
+      Operation_expectation.
+        [ { amount= Some (-5_000_000_000)
+          ; account=
+              Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
+          ; status= "Pending"
+          ; _type= "payment_source_dec" }
+        ; { amount= Some (-2_000_000_000)
+          ; account=
+              Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
+          ; status= "Pending"
+          ; _type= "fee_payer_dec" }
+        ; { amount= Some 5_000_000_000
+          ; account=
+              Some {Account.pk= other_pk; token_id= Unsigned.UInt64.of_int 1}
+          ; status= "Pending"
+          ; _type= "payment_receiver_inc" } ]
+
+let construction_api_payment_through_mempool ~logger ~rosetta_uri ~graphql_uri
+    ~network_response =
   let open Deferred.Result.Let_syntax in
   let keys =
     Signer.Keys.of_private_key_box
@@ -255,9 +261,26 @@ let construction_api_payment_through_mempool ~logger ~rosetta_uri
     String.equal hash_res.Construction_hash_response.transaction_hash
       submit_res.transaction_identifier.hash ) ;
   [%log debug] "Construction_submit is finalized" ;
-  return ()
+  verify_in_mempool_and_block ~logger ~rosetta_uri ~graphql_uri
+    ~txn_hash:hash_res.transaction_hash ~network_response
+    ~operation_expectations:
+      Operation_expectation.
+        [ { amount= Some (-10_000_000_000)
+          ; account=
+              Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
+          ; status= "Pending"
+          ; _type= "payment_source_dec" }
+        ; { amount= Some (-3_000_000_000)
+          ; account=
+              Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
+          ; status= "Pending"
+          ; _type= "fee_payer_dec" }
+        ; { amount= Some 10_000_000_000
+          ; account=
+              Some {Account.pk= other_pk; token_id= Unsigned.UInt64.of_int 1}
+          ; status= "Pending"
+          ; _type= "payment_receiver_inc" } ]
 
-(* TODO: Break up this function in the next PR *)
 let check_new_account_payment ~logger ~rosetta_uri ~graphql_uri =
   let open Core.Time in
   let open Deferred.Result.Let_syntax in
