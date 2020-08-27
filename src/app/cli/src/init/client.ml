@@ -57,20 +57,29 @@ let get_balance_graphql =
       ~doc:"KEY Public key for which you want to check the balance"
       (required Cli_lib.Arg_type.public_key_compressed)
   in
+  let token_flag =
+    flag "token" ~doc:"TOKEN_ID The token ID for the account"
+      (optional_with_default Token_id.default Cli_lib.Arg_type.token_id)
+  in
   Command.async ~summary:"Get balance associated with a public key"
-    (Cli_lib.Background_daemon.graphql_init pk_flag
-       ~f:(fun graphql_endpoint public_key ->
+    (Cli_lib.Background_daemon.graphql_init (Args.zip2 pk_flag token_flag)
+       ~f:(fun graphql_endpoint (public_key, token) ->
          let%map response =
            Graphql_client.query_exn
              (Graphql_queries.Get_tracked_account.make
                 ~public_key:(Graphql_client.Encoders.public_key public_key)
+                ~token:(Graphql_client.Encoders.token token)
                 ())
              graphql_endpoint
          in
          match response#account with
          | Some account ->
-             printf "Balance: %s coda\n"
-               (Currency.Balance.to_formatted_string (account#balance)#total)
+             if Token_id.(equal default) token then
+               printf "Balance: %s coda\n"
+                 (Currency.Balance.to_formatted_string (account#balance)#total)
+             else
+               printf "Balance: %s tokens\n"
+                 (Currency.Balance.to_formatted_string (account#balance)#total)
          | None ->
              printf "There are no funds in this account\n" ))
 
