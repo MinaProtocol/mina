@@ -3,7 +3,7 @@
 set -eo pipefail
 
 # execute pre-processing steps like zexe-standardize.sh if set
-$ if [ -n "${PREPROCESSOR}" ]; then ${PREPROCESSOR}; fi
+if [ -n "${PREPROCESSOR}" ]; then ${PREPROCESSOR}; fi
 
 eval `opam config env`
 export PATH=/home/opam/.cargo/bin:/usr/lib/go/bin:$PATH
