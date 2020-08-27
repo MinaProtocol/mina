@@ -315,7 +315,14 @@ module Stable = struct
 end]
 
 let create ~fee ~fee_token ~fee_payer_pk ~nonce ~valid_until ~memo ~body : t =
-  {common= {fee; fee_token; fee_payer_pk; nonce; valid_until; memo}; body}
+  { common=
+      { fee
+      ; fee_token
+      ; fee_payer_pk
+      ; nonce
+      ; valid_until= Option.value valid_until ~default:Global_slot.max_value
+      ; memo }
+  ; body }
 
 let fee (t : t) = t.common.fee
 

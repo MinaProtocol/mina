@@ -85,4 +85,20 @@ module SendTransaction = struct
     in
     let (`UserCommand x) = (res#sendPayment)#payment in
     x#hash
+
+  let payment_operations ~from ~fee ~amount ~to_ =
+    (* Note: This is intentionally constructed from a templated string rather
+     * than using a structured User_command_info to serve as living, tested,
+     * documentation for a valid operation list for a payment *)
+    assert (String.equal from pk) ;
+    let amount_str = Unsigned.UInt64.to_string amount in
+    let operations =
+      sprintf
+        {| [{"operation_identifier":{"index":0},"related_operations":[],"_type":"fee_payer_dec","status":"Pending","account":{"address":"%s","metadata":{"token_id":"1"}},"amount":{"value":"-%s","currency":{"symbol":"CODA","decimals":9}}},{"operation_identifier":{"index":1},"related_operations":[],"_type":"payment_source_dec","status":"Pending","account":{"address":"%s","metadata":{"token_id":"1"}},"amount":{"value":"-%s","currency":{"symbol":"CODA","decimals":9}}},{"operation_identifier":{"index":2},"related_operations":[{"index":1}],"_type":"payment_receiver_inc","status":"Pending","account":{"address":"%s","metadata":{"token_id":"1"}},"amount":{"value":"%s","currency":{"symbol":"CODA","decimals":9}}}] |}
+        from
+        (Unsigned.UInt64.to_string fee)
+        from amount_str to_ amount_str
+    in
+    let json = Yojson.Safe.from_string operations in
+    [%of_yojson: Models.Operation.t list] json |> Result.ok |> Option.value_exn
 end

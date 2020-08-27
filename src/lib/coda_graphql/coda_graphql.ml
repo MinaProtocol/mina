@@ -1434,15 +1434,27 @@ module Types = struct
 
     let signature_arg =
       obj "SignatureInput"
-        ~coerce:(fun field scalar ->
+        ~coerce:(fun field scalar rawSignature ->
           let open Snark_params.Tick in
-          (Field.of_string field, Inner_curve.Scalar.of_string scalar) )
-        ~doc:"A cryptographic signature"
+          match rawSignature with
+          | Some signature ->
+              Result.of_option
+                (Signature.Raw.decode signature)
+                ~error:"rawSignature decoding error"
+          | None -> (
+            match (field, scalar) with
+            | Some field, Some scalar ->
+                Ok (Field.of_string field, Inner_curve.Scalar.of_string scalar)
+            | _ ->
+                Error "Either field+scalar or rawSignature must by non-null" )
+          )
+        ~doc:
+          "A cryptographic signature -- you must provide either field+scalar \
+           or rawSignature"
         ~fields:
-          [ arg "field" ~typ:(non_null string)
-              ~doc:"Field component of signature"
-          ; arg "scalar" ~typ:(non_null string)
-              ~doc:"Scalar component of signature" ]
+          [ arg "field" ~typ:string ~doc:"Field component of signature"
+          ; arg "scalar" ~typ:string ~doc:"Scalar component of signature"
+          ; arg "rawSignature" ~typ:string ~doc:"Raw encoded signature" ]
 
     module Fields = struct
       let from ~doc = arg "from" ~typ:(non_null public_key_arg) ~doc
@@ -1983,8 +1995,7 @@ module Mutations = struct
     let open Result.Let_syntax in
     (* TODO: We should put a more sensible default here. *)
     let valid_until =
-      Option.value_map ~default:Coda_numbers.Global_slot.max_value
-        ~f:Coda_numbers.Global_slot.of_uint32 valid_until
+      Option.map ~f:Coda_numbers.Global_slot.of_uint32 valid_until
     in
     let%bind fee =
       result_of_exn Currency.Fee.of_uint64 fee
@@ -2011,6 +2022,7 @@ module Mutations = struct
   let send_signed_user_command ~signature ~coda ~nonce_opt ~signer ~memo ~fee
       ~fee_token ~fee_payer_pk ~valid_until ~body =
     let open Deferred.Result.Let_syntax in
+    let%bind signature = signature |> Deferred.return in
     let%bind user_command_input =
       create_user_command_input ~nonce_opt ~signer ~memo ~fee ~fee_token
         ~fee_payer_pk ~valid_until ~body
@@ -2061,6 +2073,7 @@ module Mutations = struct
               ~fee_token ~fee_payer_pk:from ~valid_until ~body
             |> Deferred.Result.map ~f:Types.UserCommand.mk_user_command
         | Some signature ->
+            let%bind signature = signature |> Deferred.return in
             send_signed_user_command ~coda ~nonce_opt ~signer:from ~memo ~fee
               ~fee_token ~fee_payer_pk:from ~valid_until ~body ~signature
             |> Deferred.Result.map ~f:Types.UserCommand.mk_user_command )

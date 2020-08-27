@@ -109,7 +109,11 @@ module Inner_curve = struct
 
     let gen_uniform = gen_uniform_incl one (zero - one)
 
+    let unpack t = Tock.Field.unpack t
+
     let of_bits bits = Tock.Field.project bits
+
+    let project = of_bits
   end
 
   let scale t (scalar : Scalar.t) = Tweedle.Dee.scale t (scalar :> Nat.t)
