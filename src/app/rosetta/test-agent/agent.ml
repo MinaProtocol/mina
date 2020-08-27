@@ -198,6 +198,23 @@ let construction_api_payment_through_mempool ~logger ~rosetta_uri
   [%log debug]
     ~metadata:[("res", Construction_metadata_response.to_yojson metadata_res)]
     "Construction_metadata result $res" ;
+  let%bind payloads_res =
+    Offline.Payloads.req ~logger ~rosetta_uri ~network_response ~operations
+      ~metadata:metadata_res.metadata
+  in
+  let%bind parse_res =
+    Offline.Parse.req ~logger ~rosetta_uri ~network_response
+      ~transaction:
+        (`Unsigned
+          payloads_res.Construction_payloads_response.unsigned_transaction)
+  in
+  if not ([%equal: Operation.t list] operations parse_res.operations) then (
+    [%log debug]
+      ~metadata:
+        [ ("expected", [%to_yojson: Operation.t list] operations)
+        ; ("actual", [%to_yojson: Operation.t list] parse_res.operations) ]
+      "Construction_parse : Expected $expected, after payloads+parse $actual" ;
+    failwith "Operations are not equal before and after payloads+parse" ) ;
   return ()
 
 (* TODO: Break up this function in the next PR *)
