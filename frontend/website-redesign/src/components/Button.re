@@ -1,6 +1,6 @@
 module Styles = {
   open Css;
-  let button = (bgColor, dark, buttonHeight, buttonWidth) =>
+  let button = (bgColor, dark, buttonHeight, buttonWidth, paddingX, paddingY) =>
     merge([
       Theme.Type.buttonLabel,
       style([
@@ -23,7 +23,7 @@ module Styles = {
             bgColor === Theme.Colors.white ? black : white;
           },
         ),
-        padding2(~v=`rem(1.), ~h=`rem(1.5)),
+        padding2(~v=`rem(paddingY), ~h=`rem(paddingX)),
         textAlign(`center),
         alignSelf(`center),
         hover([
@@ -57,11 +57,21 @@ let make =
       ~children,
       ~height=`rem(3.25),
       ~width=`rem(10.9),
+      ~paddingX=1.5,
+      ~paddingY=1.,
       ~bgColor=Theme.Colors.orange,
       ~dark=false,
     ) => {
   <Next.Link href>
-    <button className={Styles.button(bgColor, dark, height, width)}>
+    <button
+      className={Styles.button(
+        bgColor,
+        dark,
+        height,
+        width,
+        paddingX,
+        paddingY,
+      )}>
       children
     </button>
   </Next.Link>;
