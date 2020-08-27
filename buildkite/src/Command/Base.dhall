@@ -1,18 +1,24 @@
 -- Commands are the individual command steps that CI runs
 
 let Prelude = ../External/Prelude.dhall
+let B = ../External/Buildkite.dhall
+
+let Map = Prelude.Map
 let List/map = Prelude.List.map
 let List/concat = Prelude.List.concat
 let Optional/map = Prelude.Optional.map
 let Optional/toList = Prelude.Optional.toList
-let B = ../External/Buildkite.dhall
+
 let B/Plugins/Partial = B.definitions/commandStep/properties/plugins/Type
 -- Retry bits
 let B/ExitStatus = B.definitions/automaticRetry/properties/exit_status/Type
 let B/AutoRetryChunk = B.definitions/automaticRetry/Type.Type
 let B/Retry = B.definitions/commandStep/properties/retry/properties/automatic/Type
 let B/Manual = B.definitions/commandStep/properties/retry/properties/manual/Type
-let Map = Prelude.Map
+
+-- Job requirement/flake mgmt bits
+let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
+let B/Skip = B.definitions/commandStep/properties/skip/Type
 
 let Cmd = ../Lib/Cmds.dhall
 let Decorate = ../Lib/Decorate.dhall
@@ -89,6 +95,8 @@ let Config =
       , docker_login : Optional DockerLogin.Type
       , summon : Optional Summon.Type
       , retries : List Retry.Type
+      , soft_fail : Optional B/SoftFail
+      , skip: Optional B/Skip
       }
   , default =
     { depends_on = [] : List TaggedKey.Type
@@ -97,6 +105,8 @@ let Config =
     , summon = None Summon.Type
     , artifact_paths = [] : List SelectFiles.Type
     , retries = [] : List Retry.Type
+    , soft_fail = None B/SoftFail
+    , skip = None B/Skip
     }
   }
 
@@ -161,6 +171,8 @@ let build : Config.Type -> B/Command.Type = \(c : Config.Type) ->
                 B/Retry.ListAutomaticRetry/Type xs),
               manual = None B/Manual
           },
+    soft_fail = c.soft_fail,
+    skip = c.skip,
     plugins =
       let dockerPart =
         Optional/toList

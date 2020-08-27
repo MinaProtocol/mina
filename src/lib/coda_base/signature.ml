@@ -11,6 +11,8 @@ open Snark_params.Tick
 [%%else]
 
 open Snark_params_nonconsensus
+module Hex = Hex_nonconsensus.Hex
+module Rosetta_coding = Rosetta_coding_nonconsensus
 
 [%%endif]
 
@@ -62,6 +64,23 @@ module Stable = struct
 end]
 
 let dummy = (Field.one, Inner_curve.Scalar.one)
+
+module Raw = struct
+  open Rosetta_coding.Coding
+
+  let encode (field, scalar) = of_field field ^ of_scalar scalar
+
+  let decode raw =
+    let len = String.length raw in
+    let field_len = len / 2 in
+    let field_enc = String.sub raw ~pos:0 ~len:field_len in
+    let scalar_enc = String.sub raw ~pos:field_len ~len:field_len in
+    try Some (to_field field_enc, to_scalar scalar_enc) with _ -> None
+
+  let%test_unit "partial isomorphism" =
+    Quickcheck.test ~trials:300 Stable.Latest.gen ~f:(fun signature ->
+        [%test_eq: t option] (Some signature) (encode signature |> decode) )
+end
 
 [%%ifdef
 consensus_mechanism]
