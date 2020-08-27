@@ -90,9 +90,8 @@ module Go_log = struct
             (Logger.Source.create
                ~module_:(sprintf "Libp2p_helper.Go.%s" r.module_)
                ~location:"(not tracked)")
-      ; message= r.message
-      ; metadata=
-          String.Map.singleton "go_message_id" (`String (Int64.to_string r.id))
+      ; message= r.msg
+      ; metadata= String.Map.empty
       ; event_id= None }
 end
 
