@@ -234,9 +234,8 @@ let generate_receipt =
       (required public_key_compressed)
   in
   let token_flag =
-    (*flag "token" ~doc:"TOKEN_ID The token ID for the account"
-      (optional_with_default Token_id.default Cli_lib.Arg_type.token_id)*)
-    Command.Param.return Token_id.default
+    flag "token" ~doc:"TOKEN_ID The token ID for the account"
+      (optional_with_default Token_id.default Cli_lib.Arg_type.token_id)
   in
   Command.async ~summary:"Generate a receipt for a sent payment"
     (Cli_lib.Background_daemon.rpc_init
@@ -281,9 +280,8 @@ let verify_receipt =
       (required public_key_compressed)
   in
   let token_flag =
-    (*flag "token" ~doc:"TOKEN_ID The token ID for the account"
-      (optional_with_default Token_id.default Cli_lib.Arg_type.token_id)*)
-    Command.Param.return Token_id.default
+    flag "token" ~doc:"TOKEN_ID The token ID for the account"
+      (optional_with_default Token_id.default Cli_lib.Arg_type.token_id)
   in
   Command.async ~summary:"Verify a receipt of a sent payment"
     (Cli_lib.Background_daemon.rpc_init
@@ -349,9 +347,8 @@ let get_nonce_cmd =
       (required Cli_lib.Arg_type.public_key_compressed)
   in
   let token_flag =
-    (*flag "token" ~doc:"TOKEN_ID The token ID for the account"
-      (optional_with_default Token_id.default Cli_lib.Arg_type.token_id)*)
-    Command.Param.return Token_id.default
+    flag "token" ~doc:"TOKEN_ID The token ID for the account"
+      (optional_with_default Token_id.default Cli_lib.Arg_type.token_id)
   in
   let flags = Args.zip2 address_flag token_flag in
   Command.async ~summary:"Get the current nonce for an account"
