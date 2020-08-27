@@ -84,7 +84,7 @@ module Make (Inputs : Inputs_intf) = struct
 
   type t = Index.t
 
-  let name = sprintf "%s_%d" name (Pickles_types.Nat.to_int Rounds.n)
+  let name = sprintf "%s_%d_v2" name (Pickles_types.Nat.to_int Rounds.n)
 
   let set_urs_info, load_urs =
     let urs_info = Set_once.create () in
