@@ -1,9 +1,10 @@
 (** An agent that pokes at Coda and peeks at Rosetta to see if things look alright *)
 
 open Core_kernel
-open Lib
 open Async
-open Models
+open Rosetta_models
+open Rosetta_lib
+open Lib
 
 module Error = struct
   include Error
@@ -202,19 +203,58 @@ let construction_api_payment_through_mempool ~logger ~rosetta_uri
     Offline.Payloads.req ~logger ~rosetta_uri ~network_response ~operations
       ~metadata:metadata_res.metadata
   in
-  let%bind parse_res =
+  let%bind payloads_parse_res =
     Offline.Parse.req ~logger ~rosetta_uri ~network_response
       ~transaction:
         (`Unsigned
           payloads_res.Construction_payloads_response.unsigned_transaction)
   in
-  if not ([%equal: Operation.t list] operations parse_res.operations) then (
+  if not ([%equal: Operation.t list] operations payloads_parse_res.operations)
+  then (
     [%log debug]
       ~metadata:
         [ ("expected", [%to_yojson: Operation.t list] operations)
-        ; ("actual", [%to_yojson: Operation.t list] parse_res.operations) ]
+        ; ( "actual"
+          , [%to_yojson: Operation.t list] payloads_parse_res.operations ) ]
       "Construction_parse : Expected $expected, after payloads+parse $actual" ;
     failwith "Operations are not equal before and after payloads+parse" ) ;
+  let%bind signature =
+    Signer.sign ~keys
+      ~unsigned_transaction_string:payloads_res.unsigned_transaction
+    |> Deferred.return
+  in
+  let%bind combine_res =
+    Offline.Combine.req ~logger ~rosetta_uri ~network_response ~signature
+      ~unsigned_transaction:payloads_res.unsigned_transaction
+      ~public_key_hex_bytes:keys.public_key_hex_bytes
+      ~address:derive_res.address
+  in
+  let%bind combine_parse_res =
+    Offline.Parse.req ~logger ~rosetta_uri ~network_response
+      ~transaction:
+        (`Signed combine_res.Construction_combine_response.signed_transaction)
+  in
+  if not ([%equal: Operation.t list] operations combine_parse_res.operations)
+  then (
+    [%log debug]
+      ~metadata:
+        [ ("expected", [%to_yojson: Operation.t list] operations)
+        ; ( "actual"
+          , [%to_yojson: Operation.t list] combine_parse_res.operations ) ]
+      "Construction_combine : Expected $expected, after combine+parse $actual" ;
+    failwith "Operations are not equal before and after combine+parse" ) ;
+  let%bind hash_res =
+    Offline.Hash.req ~logger ~rosetta_uri ~network_response
+      ~signed_transaction:combine_res.signed_transaction
+  in
+  let%bind submit_res =
+    Peek.Construction.submit ~logger ~rosetta_uri ~network_response
+      ~signed_transaction:combine_res.signed_transaction
+  in
+  assert (
+    String.equal hash_res.Construction_hash_response.transaction_hash
+      submit_res.transaction_identifier.hash ) ;
+  [%log debug] "Construction_submit is finalized" ;
   return ()
 
 (* TODO: Break up this function in the next PR *)

@@ -199,9 +199,9 @@ module Metadata = struct
       in
       let nonce =
         Option.map
-          ~f:(fun nonce -> Unsigned.UInt32.(of_string nonce |> add one))
+          ~f:(fun nonce -> Unsigned.UInt32.of_string nonce)
           account#nonce
-        |> Option.value ~default:Unsigned.UInt32.one
+        |> Option.value ~default:Unsigned.UInt32.zero
       in
       { Construction_metadata_response.metadata=
           Metadata_data.create ~sender:options.Options.sender
@@ -373,7 +373,7 @@ module Combine = struct
       let%bind signature =
         match req.signatures with
         | s :: _ ->
-            M.return @@ s.signing_payload.hex_bytes
+            M.return @@ s.hex_bytes
         | _ ->
             M.fail (Errors.create `Signature_missing)
       in
