@@ -20,6 +20,7 @@ import (
 	kad "github.com/libp2p/go-libp2p-kad-dht"
 	kadopts "github.com/libp2p/go-libp2p-kad-dht/opts"
 	"github.com/libp2p/go-libp2p-peerstore/pstoreds"
+	pnet "github.com/libp2p/go-libp2p-pnet"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	record "github.com/libp2p/go-libp2p-record"
 	secio "github.com/libp2p/go-libp2p-secio"
@@ -93,6 +94,7 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 	rendezvousString := fmt.Sprintf("/coda/0.0.1/%s", networkID)
 
 	pnetKey := blake2b.Sum256([]byte(rendezvousString))
+	prot, err := pnet.NewV1ProtectorFromBytes(&pnetKey)
 	if err != nil {
 		return nil, err
 	}
@@ -128,7 +130,7 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 				go func() { kadch <- kad }()
 				return kad, err
 			})),
-		p2p.PrivateNetwork(pnetKey[:]))
+		p2p.PrivateNetwork(prot))
 
 	if err != nil {
 		return nil, err

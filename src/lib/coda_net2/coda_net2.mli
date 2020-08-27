@@ -183,6 +183,8 @@ val create : logger:Logger.t -> conf_dir:string -> net Deferred.Or_error.t
   * will be called for each peer we discover. [unsafe_no_trust_ip], if true, will not attempt to
   * report trust actions for the IPs of observed connections.
   *
+  * If [flood] is true, all valid gossip will be forwarded to every node. This is expensive.
+  *
   * This fails if initializing libp2p fails for any reason.
 *)
 val configure :
@@ -193,7 +195,7 @@ val configure :
   -> network_id:string
   -> on_new_peer:(discovered_peer -> unit)
   -> unsafe_no_trust_ip:bool
-  -> gossip_type:[`Gossipsub | `Flood | `Random]
+  -> flood:bool
   -> unit Deferred.Or_error.t
 
 (** The keypair the network was configured with.

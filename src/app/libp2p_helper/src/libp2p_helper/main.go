@@ -21,7 +21,8 @@ import (
 	"encoding/base64"
 
 	"github.com/go-errors/errors"
-	logging "github.com/ipfs/go-log/v2"
+	logging "github.com/ipfs/go-log"
+	logwriter "github.com/ipfs/go-log/writer"
 	crypto "github.com/libp2p/go-libp2p-core/crypto"
 	net "github.com/libp2p/go-libp2p-core/network"
 	peer "github.com/libp2p/go-libp2p-core/peer"
@@ -31,6 +32,7 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	filter "github.com/libp2p/go-maddr-filter"
 	"github.com/multiformats/go-multiaddr"
+	logging2 "github.com/whyrusleeping/go-logging"
 )
 
 type subscription struct {
@@ -195,7 +197,7 @@ type configureMsg struct {
 	ListenOn        []string `json:"ifaces"`
 	External        string   `json:"external_maddr"`
 	UnsafeNoTrustIP bool     `json:"unsafe_no_trust_ip"`
-	GossipType      string   `json:"gossip_type"`
+	Flood           bool     `json:"flood_gossip"`
 }
 
 type discoveredPeerUpcall struct {
@@ -232,20 +234,11 @@ func (m *configureMsg) run(app *app) (interface{}, error) {
 		return nil, badHelper(err)
 	}
 
-	// SOMEDAY:
-	// - stop putting block content on the mesh.
-	// - bigger than 16MiB block size?
-	opts := pubsub.WithMaxMessageSize(1024 * 1024 * 16)
 	var ps *pubsub.PubSub
-	if m.GossipType == "gossipsub" {
-		ps, err = pubsub.NewGossipSub(app.Ctx, helper.Host, opts)
-	} else if m.GossipType == "flood" {
-		ps, err = pubsub.NewFloodSub(app.Ctx, helper.Host, opts)
-	} else if m.GossipType == "random" {
-		// networks of size 100 aren't very large, but we shouldn't be using randomsub!
-		ps, err = pubsub.NewRandomSub(app.Ctx, helper.Host, 10, opts)
+	if m.Flood {
+		ps, err = pubsub.NewFloodSub(app.Ctx, helper.Host, pubsub.WithStrictSignatureVerification(true), pubsub.WithMessageSigning(true))
 	} else {
-		return nil, badHelper(errors.New("unknown gossip type"))
+		ps, err = pubsub.NewRandomSub(app.Ctx, helper.Host, pubsub.WithStrictSignatureVerification(true), pubsub.WithMessageSigning(true))
 	}
 
 	if err != nil {
@@ -1006,13 +999,9 @@ type successResult struct {
 }
 
 func main() {
-	logging.SetupLogging(logging.Config{
-		Format: logging.JSONOutput,
-		Stderr: true,
-		Stdout: false,
-		Level:  logging.LevelInfo,
-		File:   "",
-	})
+	logwriter.Configure(logwriter.Output(os.Stderr), logwriter.LdJSONFormatter)
+	log.SetOutput(os.Stderr)
+	logging.SetAllLoggers(logging2.INFO)
 	helperLog := logging.Logger("helper top-level JSON handling")
 
 	go func() {
