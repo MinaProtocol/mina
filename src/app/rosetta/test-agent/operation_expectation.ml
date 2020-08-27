@@ -1,5 +1,6 @@
 open Core_kernel
-open Models
+open Rosetta_models
+open Rosetta_lib
 open Lib
 open Async
 

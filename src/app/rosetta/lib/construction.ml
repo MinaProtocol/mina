@@ -104,7 +104,7 @@ module Derive = struct
       (* TODO: Verify curve-type is tweedle *)
       let%map pk =
         let pk_or_error =
-          try Ok (Rosetta_lib.Coding.to_public_key req.public_key.hex_bytes)
+          try Ok (Rosetta_coding.Coding.to_public_key req.public_key.hex_bytes)
           with exn -> Error (Core_kernel.Error.of_exn exn)
         in
         env.lift
@@ -290,7 +290,7 @@ module Payloads = struct
                  ~error:
                    (Errors.create ~context:"decompression"
                       `Public_key_format_not_valid) )
-        |> Result.map ~f:Rosetta_lib.Coding.of_public_key
+        |> Result.map ~f:Rosetta_coding.Coding.of_public_key
         |> env.lift
       in
       let%bind user_command_payload =

@@ -2,8 +2,8 @@
 
 open Async
 open Core_kernel
-open Models
-open Lib
+open Rosetta_models
+open Rosetta_lib
 
 module Lift = struct
   let json res =
@@ -22,10 +22,14 @@ module Lift = struct
         Deferred.Result.return x
     | Error e ->
         Deferred.Result.fail
-          (Errors.create ~context:(Models.Error.show e) `Invariant_violation)
+          (Errors.create
+             ~context:(Rosetta_models.Error.show e)
+             `Invariant_violation)
 
   let req ~logger:_ req :
-      ((Yojson.Safe.t, Models.Error.t) result, Errors.t) Deferred.Result.t =
+      ( (Yojson.Safe.t, Rosetta_models.Error.t) result
+      , Errors.t )
+      Deferred.Result.t =
     let open Deferred.Let_syntax in
     let%bind response, body = req in
     let%bind str = Cohttp_async.Body.to_string body in
@@ -41,7 +45,7 @@ module Lift = struct
     | _ -> (
       match Yojson.Safe.from_string str with
       | body -> (
-        match Models.Error.of_yojson body |> json with
+        match Rosetta_models.Error.of_yojson body |> json with
         | Ok err ->
             Deferred.Result.return (Error err)
         | Error e ->

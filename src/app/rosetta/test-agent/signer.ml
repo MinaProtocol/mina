@@ -2,7 +2,7 @@
 
 open Core_kernel
 open Signature_lib
-open Lib
+open Rosetta_lib
 module Signature = Coda_base.Signature
 module User_command = Coda_base.User_command
 

@@ -1,9 +1,10 @@
 (** An agent that pokes at Coda and peeks at Rosetta to see if things look alright *)
 
 open Core_kernel
-open Lib
 open Async
-open Models
+open Rosetta_models
+open Rosetta_lib
+open Lib
 
 module Error = struct
   include Error

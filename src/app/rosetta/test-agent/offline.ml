@@ -1,6 +1,6 @@
 open Async
-open Models
-open Lib
+open Rosetta_models
+open Rosetta_lib
 module Lift = Peek.Lift
 
 let post = Peek.post
