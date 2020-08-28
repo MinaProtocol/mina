@@ -171,11 +171,8 @@ module Party = struct
               ~f:(Set_or_keep.Checked.to_input ~f:field)
           ; Set_or_keep.Checked.to_input delegate
               ~f:Public_key.Compressed.Checked.to_input
-          ; Set_or_keep.Checked.to_input
-              verification_key
-              ~f:field
-          ; Set_or_keep.Checked.to_input 
-              permissions 
+          ; Set_or_keep.Checked.to_input verification_key ~f:field
+          ; Set_or_keep.Checked.to_input permissions
               ~f:Permissions.Checked.to_input ]
     end
 
@@ -282,9 +279,10 @@ module Party = struct
 
     module Digested = struct
       type t = Random_oracle.Digest.t
+
       module Checked = struct
         type t = Random_oracle.Checked.Digest.t
-      end 
+      end
     end
   end
 
@@ -297,6 +295,10 @@ module Party = struct
           [@@deriving hlist, sexp, eq, yojson, hash, compare]
         end
       end]
+
+      let typ spec =
+        Typ.of_hlistable spec ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
+          ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
     end
 
     module Proved = struct
@@ -316,7 +318,7 @@ module Party = struct
 
         module Checked = struct
           type t = (Body.Digested.Checked.t, Field.Var.t) Poly.t
-        end 
+        end
       end
     end
 
@@ -341,8 +343,14 @@ module Party = struct
 
         module Checked = struct
           type t = (Body.Digested.Checked.t, Account_nonce.Checked.t) Poly.t
-        end 
+        end
       end
+
+      module Checked = struct
+        type t = (Body.Checked.t, Account_nonce.Checked.t) Poly.t
+      end
+
+      let typ : (Checked.t, t) Typ.t = Poly.typ [Body.typ (); Account_nonce.typ]
 
       let dummy : t = {body= Body.dummy; predicate= Account_nonce.zero}
     end
@@ -660,9 +668,14 @@ module Payload = struct
         [@@deriving hlist, sexp, eq, yojson, hash, compare]
       end
     end]
+
+    let typ spec =
+      Typ.of_hlistable spec ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
+        ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
   end
 
-        open Snapp_basic
+  open Snapp_basic
+
   module Zero_proved = struct
     [%%versioned
     module Stable = struct
@@ -679,6 +692,30 @@ module Payload = struct
         let to_latest = Fn.id
       end
     end]
+
+    module Checked = struct
+      type t =
+        ( Boolean.var
+        , Token_id.Checked.t
+        , (Boolean.var, Other_fee_payer.Payload.Checked.t) Flagged_option.t
+        , Party.Predicated.Signed.Checked.t
+        , Party.Predicated.Signed.Checked.t )
+        Inner.t
+    end
+
+    let typ : (Checked.t, t) Typ.t =
+      Inner.typ
+        [ Boolean.typ
+        ; Boolean.typ
+        ; Token_id.typ
+        ; Flagged_option.typ Other_fee_payer.Payload.typ
+          |> Typ.transport
+               ~there:
+                 (Flagged_option.of_option
+                    ~default:Other_fee_payer.Payload.dummy)
+               ~back:Flagged_option.to_option
+        ; Party.Predicated.Signed.typ
+        ; Party.Predicated.Signed.typ ]
 
     module Digested = struct
       type t =
@@ -726,6 +763,7 @@ module Payload = struct
         , Party.Predicated.Proved.Digested.t
         , Party.Predicated.Signed.Digested.t )
         Inner.t
+
       module Checked = struct
         type t =
           ( Boolean.var
@@ -734,7 +772,7 @@ module Payload = struct
           , Party.Predicated.Proved.Digested.Checked.t
           , Party.Predicated.Signed.Digested.Checked.t )
           Inner.t
-      end 
+      end
     end
   end
 
@@ -764,15 +802,15 @@ module Payload = struct
         , Party.Predicated.Proved.Digested.t )
         Inner.t
 
-        module Checked = struct
-          type t =
-            ( Boolean.var
-            , Token_id.Checked.t
-            , (Boolean.var, Other_fee_payer.Payload.Checked.t) Flagged_option.t
-            , Party.Predicated.Proved.Digested.Checked.t
-            , Party.Predicated.Proved.Digested.Checked.t )
-            Inner.t
-        end 
+      module Checked = struct
+        type t =
+          ( Boolean.var
+          , Token_id.Checked.t
+          , (Boolean.var, Other_fee_payer.Payload.Checked.t) Flagged_option.t
+          , Party.Predicated.Proved.Digested.Checked.t
+          , Party.Predicated.Proved.Digested.Checked.t )
+          Inner.t
+      end
     end
   end
 
@@ -820,46 +858,42 @@ module Payload = struct
         , Two_proved.Digested.Checked.t )
         Poly.t
 
-    let to_input (t : t) =
-      let open Random_oracle_input in
-      let b = field in
-        let (!) = Impl.run_checked in
-      let inner
-          ({ second_starts_empty
-           ; second_ends_empty
-           ; token_id
-           ; other_fee_payer_opt
-           ; one
-           ; two } :
-            _ Inner.t) ~f1 ~f2 =
-        let p f {Party.Predicated.Poly.body; predicate} =
-          List.reduce_exn ~f:append [b body; f predicate]
+      let to_input (t : t) =
+        let open Random_oracle_input in
+        let b = field in
+        let ( ! ) = Impl.run_checked in
+        let inner
+            ({ second_starts_empty
+             ; second_ends_empty
+             ; token_id
+             ; other_fee_payer_opt
+             ; one
+             ; two } :
+              _ Inner.t) ~f1 ~f2 =
+          let p f {Party.Predicated.Poly.body; predicate} =
+            List.reduce_exn ~f:append [b body; f predicate]
+          in
+          List.reduce_exn ~f:append
+            [ bitstring [second_starts_empty; second_ends_empty]
+            ; !(Token_id.Checked.to_input token_id)
+            ; Snapp_basic.Flagged_option.(
+                to_input' ~f:Other_fee_payer.Payload.Checked.to_input
+                  other_fee_payer_opt)
+            ; p f1 one
+            ; p f2 two ]
         in
-        List.reduce_exn ~f:append
-          [ bitstring [second_starts_empty; second_ends_empty]
-          ; !(Token_id.Checked.to_input token_id)
-          ; 
-              Snapp_basic.Flagged_option.(
-                to_input' 
-                  ~f:Other_fee_payer.Payload.Checked.to_input
-                   other_fee_payer_opt)
-          ; p f1 one
-          ; p f2 two ]
-      in
-      let nonce x =  !(Account_nonce.Checked.to_input x) in
-      match t with
-      | Zero_proved r ->
-        inner r 
-          ~f1:nonce
-          ~f2:nonce
-      | One_proved r ->
-        inner r ~f1:field  ~f2:nonce
-      | Two_proved r ->
-          inner r ~f1:field ~f2:field
+        let nonce x = !(Account_nonce.Checked.to_input x) in
+        match t with
+        | Zero_proved r ->
+            inner r ~f1:nonce ~f2:nonce
+        | One_proved r ->
+            inner r ~f1:field ~f2:nonce
+        | Two_proved r ->
+            inner r ~f1:field ~f2:field
 
-    let digest (t : t) =
-      Random_oracle.Checked.(
-        hash ~init:Hash_prefix.snapp_payload (pack_input (to_input t)))
+      let digest (t : t) =
+        Random_oracle.Checked.(
+          hash ~init:Hash_prefix.snapp_payload (pack_input (to_input t)))
     end
 
     let to_input (t : t) =
@@ -879,11 +913,9 @@ module Payload = struct
         List.reduce_exn ~f:append
           [ bitstring [second_starts_empty; second_ends_empty]
           ; Token_id.to_input token_id
-          ; 
-              Snapp_basic.Flagged_option.(
-                to_input' ~f:Other_fee_payer.Payload.to_input
-                (of_option 
-                    ~default:Other_fee_payer.Payload.dummy
+          ; Snapp_basic.Flagged_option.(
+              to_input' ~f:Other_fee_payer.Payload.to_input
+                (of_option ~default:Other_fee_payer.Payload.dummy
                    other_fee_payer_opt))
           ; p f1 one
           ; p f2 two ]

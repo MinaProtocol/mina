@@ -373,13 +373,29 @@ module Account_state = struct
     end
   end]
 
-  let length = Int.ceil_log2 (1 + max)
+  module Encoding = struct
+    type 'b t = {any: 'b; empty: 'b} [@@deriving hlist]
 
-  let to_bits = Fn.compose (int_to_bits ~length) Stable.Latest.to_enum
+    let to_input {any; empty} = Random_oracle_input.bitstring [any; empty]
+  end
 
-  let of_bits = Fn.compose Stable.Latest.of_enum int_of_bits
+  let encode : t -> bool Encoding.t = function
+    | Empty ->
+        {any= false; empty= true}
+    | Non_empty ->
+        {any= false; empty= false}
+    | Any ->
+        {any= true; empty= false}
 
-  let to_input x = Random_oracle_input.bitstring (to_bits x)
+  let decode : bool Encoding.t -> t = function
+    | {any= false; empty= true} ->
+        Empty
+    | {any= false; empty= false} ->
+        Non_empty
+    | {any= true; empty= false} | {any= true; empty= true} ->
+        Any
+
+  let to_input (x : t) = Encoding.to_input (encode x)
 
   let check (t : t) (x : [`Empty | `Non_empty]) =
     if
@@ -394,14 +410,19 @@ module Account_state = struct
   module Checked = struct
     open Pickles.Impls.Step
 
-    type t = Boolean.var list
+    type t = Boolean.var Encoding.t
 
-    let to_input : t -> _ = Random_oracle_input.bitstring
+    let to_input (t : t) = Encoding.to_input t
+
+    let check (t : t) ~is_empty =
+      Boolean.(any [t.any; t.empty && is_empty; (not t.empty) && not is_empty])
   end
 
   let typ : (Checked.t, t) Typ.t =
-    Typ.transport (Typ.list ~length Boolean.typ) ~there:to_bits ~back:(fun x ->
-        Option.value_exn (of_bits x) )
+    let open Encoding in
+    Typ.of_hlistable [Boolean.typ; Boolean.typ] ~var_to_hlist:to_hlist
+      ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+    |> Typ.transport ~there:encode ~back:decode
 end
 
 module F = Pickles.Backend.Tick.Field

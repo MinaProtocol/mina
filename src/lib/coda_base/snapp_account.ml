@@ -66,12 +66,11 @@ module Checked = struct
     let f mk acc field = mk (Core_kernel.Field.get field t) :: acc in
     let app_state v = Random_oracle.Input.field_elements (Vector.to_array v) in
     Poly.Fields.fold ~init:[] ~app_state:(f app_state)
-      ~verification_key:
-        (f (fun x -> field x))
+      ~verification_key:(f (fun x -> field x))
     |> List.reduce_exn ~f:append
 
   let to_input (t : t) =
-    to_input' { t with verification_key= Lazy.force t.verification_key.hash }
+    to_input' {t with verification_key= Lazy.force t.verification_key.hash}
 
   let digest_vk t =
     Random_oracle.Checked.(
@@ -108,8 +107,8 @@ let typ : (Checked.t, t) Typ.t =
               With_hash.data x )
         ~back:(fun x -> Some (With_hash.of_data x ~hash_data:digest_vk))
       |> Typ.transport_var ~there:With_hash.data
-        ~back:(With_hash.of_data 
-                 ~hash_data:(fun x ->  lazy (Checked.digest_vk x)))
+           ~back:
+             (With_hash.of_data ~hash_data:(fun x -> lazy (Checked.digest_vk x)))
     ]
     ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
     ~value_of_hlist:of_hlist

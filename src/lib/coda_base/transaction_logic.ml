@@ -1067,11 +1067,10 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               Party.Body.t) (a : Account.t) : (Account.t, _) Result.t =
           (* TODO: Make sure that this delta has the right sign. I think
               the Snapp_command.check function does this. *)
-          let%bind balance = 
+          let%bind balance =
             let%bind b = add_signed_amount a.balance delta in
             let fee = constraint_constants.account_creation_fee in
-            if is_new
-            then 
+            if is_new then
               Balance.sub_amount b (Amount.of_fee fee)
               |> opt_fail Amount_insufficient_to_create_account
             else Ok b
@@ -1246,8 +1245,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                         Fn.flip Permissions.Auth_required.check
                           (Control.tag authorization)
                   in
-                  apply_body ~check_auth body acct2
-                    ~is_new:(loc2 = `New)
+                  apply_body ~check_auth body acct2 ~is_new:(loc2 = `New)
                 in
                 Some (loc2, res)
           in
@@ -1268,8 +1266,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           in
           (* Update *)
           let%map acct1' =
-            apply_body
-              ~is_new:false
+            apply_body ~is_new:false
               ~check_auth:
                 (Fn.flip Permissions.Auth_required.check
                    (Control.tag one.authorization))

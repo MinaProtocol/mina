@@ -311,7 +311,7 @@ module Checked = struct
       , Permissions.Checked.t
       , Snapp_account.Checked.t )
       Poly.t
-  end 
+  end
 
   let to_input (t : var) =
     let ( ! ) f x = Run.run_checked (f x) in

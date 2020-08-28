@@ -420,7 +420,7 @@ module Account = struct
 
     let check_nonsnapp
         ({balance; nonce; receipt_chain_hash; public_key; delegate; state= _} :
-          t) (a : Account.var) =
+          t) (a : Account.Checked.Unhashed.t) =
       Boolean.all
         [ Numeric.(Checked.check Tc.balance balance a.balance)
         ; Numeric.(Checked.check Tc.nonce nonce a.nonce)
@@ -1085,15 +1085,77 @@ module Account_type = struct
             Any )
 end
 
+module Other = struct
+  module Poly = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type ('account, 'account_transition, 'vk) t =
+          { predicate: 'account
+          ; account_transition: 'account_transition
+          ; account_vk: 'vk }
+        [@@deriving hlist, sexp, eq, yojson, hash, compare]
+      end
+    end]
+  end
+
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t =
+        ( Account.Stable.V1.t
+        , Account_state.Stable.V1.t Transition.Stable.V1.t
+        , F.Stable.V1.t Hash.Stable.V1.t )
+        Poly.Stable.V1.t
+      [@@deriving sexp, eq, yojson, hash, compare]
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  module Checked = struct
+    type t =
+      ( Account.Checked.t
+      , Account_state.Checked.t Transition.t
+      , Field.Var.t Or_ignore.Checked.t )
+      Poly.Stable.Latest.t
+
+    let to_input ({predicate; account_transition; account_vk} : t) =
+      let open Random_oracle_input in
+      List.reduce_exn ~f:append
+        [ Account.Checked.to_input predicate
+        ; Transition.to_input ~f:Account_state.Checked.to_input
+            account_transition
+        ; Hash.(to_input_checked Tc.field) account_vk ]
+  end
+
+  let to_input ({predicate; account_transition; account_vk} : t) =
+    let open Random_oracle_input in
+    List.reduce_exn ~f:append
+      [ Account.to_input predicate
+      ; Transition.to_input ~f:Account_state.to_input account_transition
+      ; Hash.(to_input Tc.field) account_vk ]
+
+  let typ () =
+    let open Poly in
+    Typ.of_hlistable
+      [Account.typ (); Transition.typ Account_state.typ; Hash.(typ Tc.field)]
+      ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
+      ~value_of_hlist:of_hlist
+
+  let accept : t =
+    { predicate= Account.accept
+    ; account_transition= {prev= Any; next= Any}
+    ; account_vk= Ignore }
+end
+
 module Poly = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type ('account, 'protocol_state, 'account_transition, 'vk, 'pk) t =
+      type ('account, 'protocol_state, 'other, 'pk) t =
         { self_predicate: 'account
-        ; other_predicate: 'account
-        ; other_account_transition: 'account_transition
-        ; other_account_vk: 'vk
+        ; other: 'other
         ; fee_payer: 'pk
         ; protocol_state_predicate: 'protocol_state }
       [@@deriving hlist, sexp, eq, yojson, hash, compare]
@@ -1114,8 +1176,7 @@ module Stable = struct
     type t =
       ( Account.Stable.V1.t
       , Protocol_state.Stable.V1.t
-      , Account_state.Stable.V1.t Transition.Stable.V1.t
-      , F.Stable.V1.t Hash.Stable.V1.t
+      , Other.Stable.V1.t
       , Public_key.Compressed.Stable.V1.t Eq_data.Stable.V1.t )
       Poly.Stable.V1.t
     [@@deriving sexp, eq, yojson, hash, compare]
@@ -1126,20 +1187,12 @@ end]
 
 module Digested = F
 
-let to_input
-    ({ self_predicate
-     ; other_predicate
-     ; other_account_transition
-     ; other_account_vk
-     ; fee_payer
-     ; protocol_state_predicate } :
-      t) =
+let to_input ({self_predicate; other; fee_payer; protocol_state_predicate} : t)
+    =
   let open Random_oracle_input in
   List.reduce_exn ~f:append
     [ Account.to_input self_predicate
-    ; Account.to_input other_predicate
-    ; Transition.to_input ~f:Account_state.to_input other_account_transition
-    ; Hash.(to_input Tc.field) other_account_vk
+    ; Other.to_input other
     ; Eq_data.(to_input_explicit (Tc.public_key ())) fee_payer
     ; Protocol_state.to_input protocol_state_predicate ]
 
@@ -1147,15 +1200,9 @@ let digest t =
   Random_oracle.(
     hash ~init:Hash_prefix.snapp_predicate (pack_input (to_input t)))
 
-let check
-    ({ self_predicate
-     ; other_predicate
-     ; other_account_transition
-     ; other_account_vk
-     ; fee_payer
-     ; protocol_state_predicate } :
-      t) ~state_view ~self ~(other_prev : A.t option)
-    ~(other_next : unit option) ~fee_payer_pk =
+let check ({self_predicate; other; fee_payer; protocol_state_predicate} : t)
+    ~state_view ~self ~(other_prev : A.t option) ~(other_next : unit option)
+    ~fee_payer_pk =
   let open Or_error.Let_syntax in
   let%bind () = Protocol_state.check protocol_state_predicate state_view in
   let%bind () = Account.check self_predicate self in
@@ -1171,21 +1218,21 @@ let check
       | _ ->
           Or_error.error_string "Bad account state"
     in
-    let%bind () = check other_account_transition.prev other_prev
-    and () = check other_account_transition.next other_next in
+    let%bind () = check other.account_transition.prev other_prev
+    and () = check other.account_transition.next other_next in
     match other_prev with
     | None ->
         return ()
-    | Some other -> (
-        let%bind () = Account.check other_predicate other in
-        match other.snapp with
+    | Some other_account -> (
+        let%bind () = Account.check other.predicate other_account in
+        match other_account.snapp with
         | None ->
             assert_
-              (other_account_vk = Ignore)
+              (other.account_vk = Ignore)
               "other_account_vk must be ignore for user account"
         | Some snapp ->
             Hash.(check ~label:"other_account_vk" Tc.field)
-              other_account_vk
+              other.account_vk
               (Option.value_map ~f:With_hash.hash snapp.verification_key
                  ~default:Field.zero) )
   in
@@ -1193,9 +1240,7 @@ let check
 
 let accept : t =
   { self_predicate= Account.accept
-  ; other_predicate= Account.accept
-  ; other_account_transition= {prev= Any; next= Any}
-  ; other_account_vk= Ignore
+  ; other= Other.accept
   ; fee_payer= Ignore
   ; protocol_state_predicate= Protocol_state.accept }
 
@@ -1203,26 +1248,16 @@ module Checked = struct
   type t =
     ( Account.Checked.t
     , Protocol_state.Checked.t
-    , Account_state.Checked.t Transition.t
-    , Field.Var.t Or_ignore.Checked.t
+    , Other.Checked.t
     , Public_key.Compressed.var Or_ignore.Checked.t )
     Poly.Stable.Latest.t
 
   let to_input
-      ({ self_predicate
-       ; other_predicate
-       ; other_account_transition
-       ; other_account_vk
-       ; fee_payer
-       ; protocol_state_predicate } :
-        t) =
+      ({self_predicate; other; fee_payer; protocol_state_predicate} : t) =
     let open Random_oracle_input in
     List.reduce_exn ~f:append
       [ Account.Checked.to_input self_predicate
-      ; Account.Checked.to_input other_predicate
-      ; Transition.to_input ~f:Account_state.Checked.to_input
-          other_account_transition
-      ; Hash.(to_input_checked Tc.field) other_account_vk
+      ; Other.Checked.to_input other
       ; Eq_data.(to_input_checked (Tc.public_key ())) fee_payer
       ; Protocol_state.Checked.to_input protocol_state_predicate ]
 
@@ -1234,9 +1269,7 @@ end
 let typ () : (Checked.t, Stable.Latest.t) Typ.t =
   Poly.typ
     [ Account.typ ()
-    ; Account.typ ()
-    ; Transition.typ Account_state.typ
-    ; Hash.(typ Tc.field)
+    ; Other.typ ()
     ; Eq_data.(typ_explicit (Tc.public_key ()))
     ; Protocol_state.typ ]
 

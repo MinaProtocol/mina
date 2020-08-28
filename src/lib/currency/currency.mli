@@ -157,7 +157,9 @@ module Balance : sig
       var -> Amount.var -> (var * [`Overflow of Boolean.var], _) Checked.t
 
     val add_signed_amount_flagged :
-      var -> Amount.Signed.var -> (var * [`Overflow of Boolean.var], _) Checked.t
+         var
+      -> Amount.Signed.var
+      -> (var * [`Overflow of Boolean.var], _) Checked.t
 
     val ( + ) : var -> Amount.var -> (var, _) Checked.t
 

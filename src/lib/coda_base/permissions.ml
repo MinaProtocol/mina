@@ -125,9 +125,12 @@ module Auth_required = struct
 
     let if_ b ~then_:t ~else_:e =
       { constant= Boolean.if_ b ~then_:t.constant ~else_:e.constant
-      ; signature_necessary= Boolean.if_ b ~then_:t.signature_necessary ~else_:e.signature_necessary
-      ; signature_sufficient= Boolean.if_ b ~then_:t.signature_sufficient ~else_:e.signature_sufficient
-      }
+      ; signature_necessary=
+          Boolean.if_ b ~then_:t.signature_necessary
+            ~else_:e.signature_necessary
+      ; signature_sufficient=
+          Boolean.if_ b ~then_:t.signature_sufficient
+            ~else_:e.signature_sufficient }
   end
 
   let encode : t -> bool Encoding.t = function
@@ -181,18 +184,34 @@ module Auth_required = struct
 
     let constant t = Encoding.map (encode t) ~f:Boolean.var_of_value
 
-    let spec_eval ( { constant; signature_necessary; signature_sufficient } : t) ~signature_verifies =
+    let eval_no_proof
+        ({constant; signature_necessary= _; signature_sufficient} : t)
+        ~signature_verifies =
+      (* ways authorization can succeed when no proof is present:
+         - None
+           {constant= true; signature_necessary= _; signature_sufficient= true}
+         - Either && signature_verifies
+           {constant= false; signature_necessary= false; signature_sufficient= true}
+         - Signature && signature_verifies
+           {constant= false; signature_necessary= true; signature_sufficient= true}
+      *)
       let open Pickles.Impls.Step.Boolean in
-      let impossible = (constant && not signature_sufficient) in
+      signature_sufficient
+      && (constant || ((not constant) && signature_verifies))
+
+    let spec_eval ({constant; signature_necessary; signature_sufficient} : t)
+        ~signature_verifies =
+      let open Pickles.Impls.Step.Boolean in
+      let impossible = constant && not signature_sufficient in
       let result =
-        not impossible && 
-        ( (signature_verifies && signature_sufficient )
-          || not signature_necessary )
+        (not impossible)
+        && ( (signature_verifies && signature_sufficient)
+           || not signature_necessary )
       in
       let didn't_fail_yet = result in
       (* If the transaction already failed to verify, we don't need to assert
          that the proof should verify. *)
-      ( result,  `proof_must_verify (didn't_fail_yet && not signature_sufficient) )
+      (result, `proof_must_verify (didn't_fail_yet && not signature_sufficient))
   end
 
   let typ =
@@ -276,20 +295,14 @@ module Checked = struct
   open Pickles.Impls.Step
 
   let if_ b ~then_ ~else_ =
-    let g cond f = 
+    let g cond f =
       cond b
         ~then_:(Core_kernel.Field.get f then_)
         ~else_:(Core_kernel.Field.get f else_)
     in
     let c = g Auth_required.Checked.if_ in
-    Poly.Fields.map
-      ~stake:(g Boolean.if_)
-      ~edit_state:c
-      ~send:c
-      ~receive:c
-      ~set_delegate:c
-      ~set_permissions:c
-      ~set_verification_key:c
+    Poly.Fields.map ~stake:(g Boolean.if_) ~edit_state:c ~send:c ~receive:c
+      ~set_delegate:c ~set_permissions:c ~set_verification_key:c
 
   let constant (t : Stable.Latest.t) : t =
     let open Core_kernel.Field in

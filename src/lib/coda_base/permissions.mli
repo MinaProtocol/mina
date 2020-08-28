@@ -20,9 +20,12 @@ module Auth_required : sig
 
     val to_input : t -> (_, Boolean.var) Random_oracle_input.t
 
-    val spec_eval
-      : t -> signature_verifies:Boolean.var
-      -> (Boolean.var * [`proof_must_verify of Boolean.var])
+    val eval_no_proof : t -> signature_verifies:Boolean.var -> Boolean.var
+
+    val spec_eval :
+         t
+      -> signature_verifies:Boolean.var
+      -> Boolean.var * [`proof_must_verify of Boolean.var]
   end
 
   val typ : (Checked.t, t) Typ.t

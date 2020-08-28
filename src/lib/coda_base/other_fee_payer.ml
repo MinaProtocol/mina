@@ -45,33 +45,33 @@ module Payload = struct
 
   module Checked = struct
     type t =
-      ( Public_key.Compressed.var, Token_id.Checked.t, Coda_numbers.Account_nonce.Checked.t
-      , Currency.Fee.Checked.t)
+      ( Public_key.Compressed.var
+      , Token_id.Checked.t
+      , Coda_numbers.Account_nonce.Checked.t
+      , Currency.Fee.Checked.t )
       Poly.t
 
     let to_input ({pk; token_id; nonce; fee} : t) =
-      let (!) = Impl.run_checked in
+      let ( ! ) = Impl.run_checked in
       let open Random_oracle_input in
       List.reduce_exn ~f:append
         [ Public_key.Compressed.Checked.to_input pk
         ; !(Token_id.Checked.to_input token_id)
         ; !(Coda_numbers.Account_nonce.Checked.to_input nonce)
-        ; (Currency.Fee.var_to_input fee)
-        ]
-  end 
+        ; Currency.Fee.var_to_input fee ]
+  end
 
   open Pickles.Impls.Step
 
   let typ : (Checked.t, t) Typ.t =
     let open Poly in
-    Typ.of_hlistable 
+    Typ.of_hlistable
       [ Public_key.Compressed.typ
       ; Token_id.typ
       ; Coda_numbers.Account_nonce.typ
-      ; Currency.Fee.typ
-      ]
-      ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
-      ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+      ; Currency.Fee.typ ]
+      ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
+      ~value_of_hlist:of_hlist
 
   let dummy : t =
     { pk= Public_key.Compressed.empty
