@@ -3,6 +3,9 @@ open Async
 open Rosetta_lib
 open Rosetta_models
 
+(* TODO: Also change this to zero when #5361 finishes *)
+let genesis_block_height = Int64.one
+
 module Get_status =
 [%graphql
 {|
@@ -280,8 +283,7 @@ module Status = struct
       ; current_block_timestamp=
           ((latest_block#protocolState)#blockchainState)#utcDate
       ; genesis_block_identifier=
-          (* TODO: Also change this to zero when #5361 finishes *)
-          Block_identifier.create Int64.one genesis_block_state_hash
+          Block_identifier.create genesis_block_height genesis_block_state_hash
       ; oldest_block_identifier=
           ( if String.equal (snd oldest_block) genesis_block_state_hash then
             None
