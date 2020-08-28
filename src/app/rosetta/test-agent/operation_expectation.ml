@@ -27,7 +27,7 @@ type t =
   ; target: string option }
 
 (** Returns a validation of the reasons it is not similar or unit if it is *)
-let similar t (op : Operation.t) =
+let similar ~logger:_ t (op : Operation.t) =
   let open Validation in
   let open Validation.Let_syntax in
   let open Reason in
@@ -64,7 +64,7 @@ let similar t (op : Operation.t) =
   and _ =
     opt_eq t.target op.metadata ~err:Target ~f:(fun target metadata ->
         match metadata with
-        | `Assoc [("delegation_change_target", `String y)] ->
+        | `Assoc [("delegate_change_target", `String y)] ->
             test String.(equal y target) Target
         | _ ->
             fail Target )
@@ -73,13 +73,13 @@ let similar t (op : Operation.t) =
 
 (** Result of the first expected operation that is wrong. Shows the "closest"
  * match by selecting the one with minimal error reasons *)
-let assert_similar_operations ~situation ~expected ~actual =
+let assert_similar_operations ~logger ~situation ~expected ~actual =
   let rec choose_similar t least_bad_err rest = function
     | [] ->
         (* TODO: This may raise if we are expecting more ops than we get *)
         Error (fst (Option.value_exn least_bad_err))
     | op :: ops -> (
-      match similar t op with
+      match similar ~logger t op with
       | Ok _ ->
           (* Return the operations with this one removed *)
           Ok (rest @ ops)

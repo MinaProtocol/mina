@@ -74,7 +74,7 @@ let verify_in_mempool_and_block ~logger ~rosetta_uri ~graphql_uri
         ) ]
     "Mempool operations: $operations" ;
   let%bind () =
-    Operation_expectation.assert_similar_operations
+    Operation_expectation.assert_similar_operations ~logger
       ~expected:operation_expectations
       ~actual:mempool_res.transaction.operations ~situation:"mempool"
   in
@@ -131,7 +131,7 @@ let verify_in_mempool_and_block ~logger ~rosetta_uri ~graphql_uri
   let succesful (x : Operation_expectation.t) = {x with status= "Success"} in
   Logger.info logger "GOT BLOCK $block" ~module_:__MODULE__ ~location:__LOC__
     ~metadata:[("block", Block_response.to_yojson block)] ;
-  Operation_expectation.assert_similar_operations
+  Operation_expectation.assert_similar_operations ~logger
     ~expected:
       ( List.map ~f:succesful operation_expectations
       @ Operation_expectation.
@@ -300,7 +300,7 @@ let construction_api_delegation_through_mempool =
         ~to_:other_pk )
     ~operation_expectations:
       Operation_expectation.
-        [ { amount= Some (-3_000_000_000)
+        [ { amount= Some (-5_000_000_000)
           ; account=
               Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
           ; status= "Pending"
