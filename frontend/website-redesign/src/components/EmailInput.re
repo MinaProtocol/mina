@@ -33,7 +33,14 @@ module Styles = {
       width(`rem(4.68)),
     ]);
 
-  let successText = merge([Theme.Type.h4, style([color(white)])]);
+  let successText = merge([Theme.Type.paragraph, style([color(white)])]);
+  let successState =
+    style([
+      width(`rem(8.)),
+      height(`rem(1.5)),
+      padding2(~v=`rem(0.875), ~h=`rem(1.)),
+      border(px(1), `solid, Theme.Colors.orange),
+    ]);
 };
 
 [@bs.new]
@@ -41,7 +48,7 @@ external urlSearchParams: Js.t('a) => Fetch.urlSearchParams =
   "URLSearchParams";
 
 [@react.component]
-let make = (~center as centerText=false) => {
+let make = () => {
   let (successState, showSuccess) = React.useState(() => false);
   let (email, setEmail) = React.useState(() => "");
   let submitForm = e => {
@@ -64,9 +71,11 @@ let make = (~center as centerText=false) => {
   <>
     <div> {React.string("Enter Email")} </div>
     {successState
-       ? <h4 className=Styles.successText>
-           {React.string({js|✓ Check your email|js})}
-         </h4>
+       ? <div className=Styles.successState>
+           <span className=Styles.successText>
+             {React.string({js|Check your email!|js})}
+           </span>
+         </div>
        : <div>
            <input
              type_="email"
