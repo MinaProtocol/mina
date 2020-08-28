@@ -21,6 +21,7 @@ module Token_id = Coda_base.Token_id
 module Public_key = Signature_lib.Public_key
 module User_command_memo = Coda_base.User_command_memo
 module Payment_payload = Coda_base.Payment_payload
+module Stake_delegation = Coda_base.Stake_delegation
 
 let pk_to_public_key ~context (`Pk pk) =
   Public_key.Compressed.of_base58_check pk
@@ -115,11 +116,11 @@ module Partial = struct
     let%bind fee_payer_pk =
       pk_to_public_key ~context:"Fee payer" t.fee_payer
     in
+    let%bind source_pk = pk_to_public_key ~context:"Source" t.source in
     let%bind receiver_pk = pk_to_public_key ~context:"Receiver" t.receiver in
     let%map body =
       match t.kind with
       | `Payment ->
-          let%bind source_pk = pk_to_public_key ~context:"Source" t.receiver in
           let%map amount =
             Result.of_option t.amount
               ~error:
@@ -135,8 +136,11 @@ module Partial = struct
           in
           User_command.Payload.Body.Payment payload
       | `Delegation ->
-          (* TODO: for #5666 *)
-          Result.fail (Errors.create `Unsupported_operation_for_construction)
+          let payload =
+            Stake_delegation.Set_delegate
+              {delegator= source_pk; new_delegate= receiver_pk}
+          in
+          Result.return @@ User_command.Payload.Body.Stake_delegation payload
       | _ ->
           Result.fail (Errors.create `Unsupported_operation_for_construction)
     in
@@ -173,9 +177,15 @@ let remember ~nonce ~hash t =
 let of_operations (ops : Operation.t list) :
     (Partial.t, Partial.Reason.t) Validation.t =
   (* TODO: If we care about DoS attacks, break early if length too large *)
+  (* Note: It's better to have nice errors with the validation than micro-optimize searching through a small list a minimal number of times. *)
+  let find_kind k (ops : Operation.t list) =
+    let name = Operation_types.name k in
+    List.find ops ~f:(fun op -> String.equal op.Operation._type name)
+    |> Result.of_option ~error:[Partial.Reason.Can't_find_kind name]
+  in
   (* For a payment we demand:
     *
-    * ops = exactly 3
+    * ops = length exactly 3
     *
     * payment_source_dec with account 'a, some amount 'x, status="Pending"
     * fee_payer_dec with account 'a, some amount 'y, status="Pending"
@@ -185,12 +195,6 @@ let of_operations (ops : Operation.t list) :
     let open Validation.Let_syntax in
     let open Partial.Reason in
     let module V = Validation in
-    (* Note: It's better to have nice errors with the validation than micro-optimize searching through a small list a minimal number of times. *)
-    let find_kind k (ops : Operation.t list) =
-      let name = Operation_types.name k in
-      List.find ops ~f:(fun op -> String.equal op.Operation._type name)
-      |> Result.of_option ~error:[Can't_find_kind name]
-    in
     let%map () =
       if Int.equal (List.length ops) 3 then V.return ()
       else V.fail Length_mismatch
@@ -266,9 +270,81 @@ let of_operations (ops : Operation.t list) :
     ; fee= Unsigned.UInt64.of_string payment_amount_y.Amount.value
     ; amount= Some (Unsigned.UInt64.of_string payment_amount_x.Amount.value) }
   in
-  (* TODO: Handle delegation transactions *)
-  (* TODO: Handle all other  transactions *)
-  payment
+  (* For a delegation we demand:
+    *
+    * ops = length exactly 2
+    *
+    * fee_payer_dec with account 'a, some amount 'y, status="Pending"
+    * delegate_change with account 'a, metadata:{delegate_change_target:'b}, status="Pending"
+  *)
+  let delegation =
+    let open Validation.Let_syntax in
+    let open Partial.Reason in
+    let module V = Validation in
+    let%map () =
+      if Int.equal (List.length ops) 2 then V.return ()
+      else V.fail Length_mismatch
+    and account_a =
+      let open Result.Let_syntax in
+      let%bind {account; _} = find_kind `Fee_payer_dec ops in
+      Option.value_map account ~default:(V.fail Account_not_some) ~f:V.return
+    and fee_token =
+      let open Result.Let_syntax in
+      let%bind {account; _} = find_kind `Fee_payer_dec ops in
+      match account with
+      | Some account -> (
+        match token_id_of_account account with
+        | Some token_id ->
+            V.return token_id
+        | None ->
+            V.fail Incorrect_token_id )
+      | None ->
+          V.fail Account_not_some
+    and account_b =
+      let open Result.Let_syntax in
+      let%bind {metadata; _} = find_kind `Delegate_change ops in
+      match metadata with
+      | Some metadata -> (
+        match metadata with
+        | `Assoc [("delegate_change_target", `String s)] ->
+            return s
+        | _ ->
+            V.fail Invalid_metadata )
+      | None ->
+          V.fail Account_not_some
+    and () =
+      if List.for_all ops ~f:(fun op -> String.equal op.status "Pending") then
+        V.return ()
+      else V.fail Status_not_pending
+    and payment_amount_y =
+      let open Result.Let_syntax in
+      let%bind {amount; _} = find_kind `Fee_payer_dec ops in
+      match amount with
+      | Some x ->
+          V.return (Amount_of.negated x)
+      | None ->
+          V.fail Amount_not_some
+    in
+    { Partial.kind= `Delegation
+    ; fee_payer= `Pk account_a.address
+    ; source= `Pk account_a.address
+    ; receiver= `Pk account_b
+    ; fee_token
+    ; token=
+        Token_id.(default |> to_uint64)
+        (* only default token can be delegated *)
+    ; fee= Unsigned.UInt64.of_string payment_amount_y.Amount.value
+    ; amount= None }
+  in
+  match (payment, delegation) with
+  | Ok _, Error _ ->
+      payment
+  | Error _, Ok _ ->
+      delegation
+  | Ok _, Ok _ ->
+      failwith "Operations can't represent both a payment and delegation"
+  | Error payment_errs, Error delegation_errs ->
+      Error (payment_errs @ delegation_errs)
 
 let to_operations ~failure_status (t : Partial.t) : Operation.t list =
   (* First build a plan. The plan specifies all operations ahead of time so
@@ -454,6 +530,27 @@ let%test_unit "payment_round_trip" =
     ; amount= Some (Unsigned.UInt64.of_int 2_000_000_000)
     ; failure_status= None
     ; hash= "TXN_1_HASH" }
+  in
+  let ops = to_operations' start in
+  match of_operations ops with
+  | Ok partial ->
+      [%test_eq: Partial.t] partial (forget start)
+  | Error e ->
+      failwithf !"Mismatch because %{sexp: Partial.Reason.t list}" e ()
+
+let%test_unit "delegation_round_trip" =
+  let start =
+    { kind= `Delegation
+    ; fee_payer= `Pk "Alice"
+    ; source= `Pk "Alice"
+    ; token= Unsigned.UInt64.of_int 1
+    ; fee= Unsigned.UInt64.of_int 1_000_000_000
+    ; receiver= `Pk "Bob"
+    ; fee_token= Unsigned.UInt64.of_int 1
+    ; nonce= Unsigned.UInt32.of_int 42
+    ; amount= None
+    ; failure_status= None
+    ; hash= "TXN_2_HASH" }
   in
   let ops = to_operations' start in
   match of_operations ops with

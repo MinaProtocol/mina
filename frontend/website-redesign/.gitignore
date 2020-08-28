@@ -7,3 +7,4 @@ contentfulData/
 .bsb.lock
 yarn-error.log
 /public/graphql-docs
+/public/static/font

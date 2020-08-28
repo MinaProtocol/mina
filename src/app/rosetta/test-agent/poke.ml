@@ -86,10 +86,12 @@ module SendTransaction = struct
     let (`UserCommand x) = (res#sendPayment)#payment in
     x#hash
 
+  (* Note: These operations below are intentionally constructed from a templated
+   * string rather
+   * than using a structured User_command_info to serve as living, tested,
+   * documentation for a valid operation list for a payment *)
+
   let payment_operations ~from ~fee ~amount ~to_ =
-    (* Note: This is intentionally constructed from a templated string rather
-     * than using a structured User_command_info to serve as living, tested,
-     * documentation for a valid operation list for a payment *)
     assert (String.equal from pk) ;
     let amount_str = Unsigned.UInt64.to_string amount in
     let operations =
@@ -100,5 +102,19 @@ module SendTransaction = struct
         from amount_str to_ amount_str
     in
     let json = Yojson.Safe.from_string operations in
-    [%of_yojson: Models.Operation.t list] json |> Result.ok |> Option.value_exn
+    [%of_yojson: Rosetta_models.Operation.t list] json
+    |> Result.ok |> Option.value_exn
+
+  let delegation_operations ~from ~fee ~to_ =
+    assert (String.equal from pk) ;
+    let operations =
+      sprintf
+        {| [{"operation_identifier":{"index":0},"related_operations":[],"_type":"fee_payer_dec","status":"Pending","account":{"address":"%s","metadata":{"token_id":"1"}},"amount":{"value":"-%s","currency":{"symbol":"CODA","decimals":9}}},{"operation_identifier":{"index":1},"related_operations":[],"_type":"delegate_change","status":"Pending","account":{"address":"%s","metadata":{"token_id":"1"}},"amount":null, "metadata": { "delegate_change_target": "%s"} }] |}
+        from
+        (Unsigned.UInt64.to_string fee)
+        from to_
+    in
+    let json = Yojson.Safe.from_string operations in
+    [%of_yojson: Rosetta_models.Operation.t list] json
+    |> Result.ok |> Option.value_exn
 end
