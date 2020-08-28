@@ -6,12 +6,10 @@ import (
 	"fmt"
 	"log"
 	"path"
-	"time"
 
 	dsb "github.com/ipfs/go-ds-badger"
 	logging "github.com/ipfs/go-log"
 	p2p "github.com/libp2p/go-libp2p"
-	connmgr "github.com/libp2p/go-libp2p-connmgr"
 	crypto "github.com/libp2p/go-libp2p-core/crypto"
 	host "github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -20,6 +18,7 @@ import (
 	kad "github.com/libp2p/go-libp2p-kad-dht"
 	kadopts "github.com/libp2p/go-libp2p-kad-dht/opts"
 	"github.com/libp2p/go-libp2p-peerstore/pstoreds"
+	pnet "github.com/libp2p/go-libp2p-pnet"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	record "github.com/libp2p/go-libp2p-record"
 	secio "github.com/libp2p/go-libp2p-secio"
@@ -93,6 +92,7 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 	rendezvousString := fmt.Sprintf("/coda/0.0.1/%s", networkID)
 
 	pnetKey := blake2b.Sum256([]byte(rendezvousString))
+	prot, err := pnet.NewV1ProtectorFromBytes(&pnetKey)
 	if err != nil {
 		return nil, err
 	}
@@ -114,7 +114,6 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 		p2p.Identity(pk),
 		p2p.Peerstore(ps),
 		p2p.DisableRelay(),
-		p2p.ConnectionManager(connmgr.NewConnManager(15, 50, time.Duration(20*time.Second))),
 		p2p.ListenAddrs(listenOn...),
 		p2p.AddrsFactory(func(as []ma.Multiaddr) []ma.Multiaddr {
 			as = append(as, externalAddr)
@@ -124,11 +123,11 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 		p2p.NATPortMap(),
 		p2p.Routing(
 			p2pconfig.RoutingC(func(host host.Host) (routing.PeerRouting, error) {
-				kad, err := kad.New(ctx, host, kadopts.Datastore(dsDht), kadopts.Validator(rv), kad.ProtocolPrefix("/coda"))
+				kad, err := kad.New(ctx, host, kadopts.Datastore(dsDht), kadopts.Validator(rv))
 				go func() { kadch <- kad }()
 				return kad, err
 			})),
-		p2p.PrivateNetwork(pnetKey[:]))
+		p2p.PrivateNetwork(prot))
 
 	if err != nil {
 		return nil, err

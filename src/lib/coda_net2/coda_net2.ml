@@ -61,13 +61,14 @@ module Go_log = struct
   let ours_of_go lvl =
     let open Logger.Level in
     match lvl with
-    | "error" | "panic" | "fatal" ->
+    | 0 (* Critical gets mapped to error *) | 1 ->
         Error
-    | "warn" ->
+    | 2 ->
         Warn
-    | "info" ->
+    | 3 (* Notice gets mapped to info (I can't find any use of notice?) *) | 4
+      ->
         Info
-    | "debug" ->
+    | 5 ->
         Debug
     | _ ->
         Spam
@@ -75,27 +76,25 @@ module Go_log = struct
   (* there should be no other levels. *)
 
   type record =
-    { ts: string
-    ; module_: string [@key "logger"]
-    ; level: string
-    ; msg: string
-    ; error: string [@default ""] }
+    { id: int64
+    ; time: string
+    ; module_: string [@key "module"]
+    ; level: int
+    ; message: string }
   [@@deriving of_yojson]
 
   let record_to_message r =
     Logger.Message.
-      { timestamp= Time.of_string r.ts
+      { timestamp= Time.of_string r.time
       ; level= ours_of_go r.level
       ; source=
           Some
             (Logger.Source.create
                ~module_:(sprintf "Libp2p_helper.Go.%s" r.module_)
                ~location:"(not tracked)")
-      ; message= r.msg
+      ; message= r.message
       ; metadata=
-          ( if r.error <> "" then
-            String.Map.singleton "go_error" (`String r.error)
-          else String.Map.empty )
+          String.Map.singleton "go_message_id" (`String (Int64.to_string r.id))
       ; event_id= None }
 end
 
@@ -274,7 +273,7 @@ module Helper = struct
         ; external_maddr: string
         ; network_id: string
         ; unsafe_no_trust_ip: bool
-        ; gossip_type: string }
+        ; flood: bool }
       [@@deriving yojson]
 
       type output = string [@@deriving yojson]
@@ -1093,7 +1092,7 @@ let list_peers net =
       []
 
 let configure net ~me ~external_maddr ~maddrs ~network_id ~on_new_peer
-    ~unsafe_no_trust_ip ~gossip_type =
+    ~unsafe_no_trust_ip ~flood =
   match%map
     Helper.do_rpc net
       (module Helper.Rpcs.Configure)
@@ -1103,14 +1102,7 @@ let configure net ~me ~external_maddr ~maddrs ~network_id ~on_new_peer
       ; external_maddr= Multiaddr.to_string external_maddr
       ; network_id
       ; unsafe_no_trust_ip
-      ; gossip_type=
-          ( match gossip_type with
-          | `Gossipsub ->
-              "gossipsub"
-          | `Flood ->
-              "flood"
-          | `Random ->
-              "random" ) }
+      ; flood }
   with
   | Ok "configure success" ->
       Ivar.fill net.me_keypair me ;
@@ -1364,22 +1356,8 @@ let create ~logger ~conf_dir =
       Strict_pipe.Reader.iter (Child_processes.stderr_lines subprocess)
         ~f:(fun line ->
           ( match Go_log.record_of_yojson (Yojson.Safe.from_string line) with
-          | Ok record -> (
-              let r = Go_log.(record_to_message record) in
-              let r =
-                if
-                  String.( = ) r.message "failed when refreshing routing table"
-                then {r with level= Info}
-                else r
-              in
-              try Logger.raw logger r
-              with _exn ->
-                Logger.raw logger
-                  { r with
-                    message=
-                      "(go log message was not valid for logger; see $line)"
-                  ; metadata= String.Map.singleton "line" (`String r.message)
-                  } )
+          | Ok record ->
+              Logger.raw logger Go_log.(record_to_message record)
           | Error err ->
               [%log error]
                 ~metadata:[("line", `String line); ("error", `String err)]
@@ -1432,14 +1410,12 @@ let%test_module "coda network tests" =
       let%bind kp_b = Keypair.random a in
       let maddrs = ["/ip4/127.0.0.1/tcp/0"] in
       let%bind () =
-        configure a ~gossip_type:`Gossipsub
-          ~external_maddr:(List.hd_exn maddrs) ~me:kp_a ~maddrs ~network_id
-          ~on_new_peer:Fn.ignore ~unsafe_no_trust_ip:true
+        configure a ~flood:false ~external_maddr:(List.hd_exn maddrs) ~me:kp_a
+          ~maddrs ~network_id ~on_new_peer:Fn.ignore ~unsafe_no_trust_ip:true
         >>| Or_error.ok_exn
       and () =
-        configure b ~gossip_type:`Gossipsub
-          ~external_maddr:(List.hd_exn maddrs) ~me:kp_b ~maddrs ~network_id
-          ~on_new_peer:Fn.ignore ~unsafe_no_trust_ip:true
+        configure b ~flood:false ~external_maddr:(List.hd_exn maddrs) ~me:kp_b
+          ~maddrs ~network_id ~on_new_peer:Fn.ignore ~unsafe_no_trust_ip:true
         >>| Or_error.ok_exn
       in
       let%bind a_advert = begin_advertising a
