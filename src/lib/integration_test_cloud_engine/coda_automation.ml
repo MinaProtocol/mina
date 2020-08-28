@@ -76,7 +76,7 @@ module Network_config = struct
     in
     let testnet_name = "integration-test-" ^ test_name in
     (* HARD CODED NETWORK VALUES *)
-    let coda_automation_location = "../automation" in
+    let coda_automation_location = "coda-automation" in
     let project_id = "o1labs-192920" in
     let cluster_id = "gke_o1labs-192920_us-east1_coda-infra-east" in
     let cluster_name = "coda-infra-east" in

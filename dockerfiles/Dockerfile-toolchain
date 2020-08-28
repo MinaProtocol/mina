@@ -1,3 +1,4 @@
+
 FROM ocaml/opam2:debian-9-ocaml-4.08
 
 # if updated, also change in Dockerfile
@@ -64,14 +65,21 @@ RUN export CLOUD_SDK_REPO="cloud-sdk-$(lsb_release -c -s)" && \
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs -o /tmp/rust_install.sh
 RUN chmod +x /tmp/rust_install.sh
 RUN /tmp/rust_install.sh -y
-RUN export PATH="$PATH:$HOME/.cargo/bin"
-RUN echo 'export PATH="$PATH:$HOME/.cargo/bin"' >> /home/opam/.bashrc
+ENV PATH "$PATH:/home/opam/.cargo/bin"
+RUN echo 'export PATH="$PATH:/home/opam/.cargo/bin"' >> /home/opam/.bashrc
 
 # Get yarn + nodejs
 RUN curl -sL https://deb.nodesource.com/setup_14.x | sudo -E bash -
 RUN curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add -
 RUN echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list
 RUN sudo apt update && sudo apt install nodejs yarn
+
+# Get terraform
+RUN curl -sL \
+  "https://releases.hashicorp.com/terraform/0.12.29/terraform_0.12.29_linux_amd64.zip" \
+  -o /tmp/terraform.zip \
+  && sudo unzip /tmp/terraform.zip -d /usr/bin \
+  && rm /tmp/terraform.zip
 
 # Source copy of rocksdb
 RUN sudo git clone https://github.com/facebook/rocksdb -b v5.17.2 /rocksdb
