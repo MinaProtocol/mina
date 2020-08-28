@@ -7,6 +7,7 @@ module Partial_reason = struct
     | Fee_payer_and_source_mismatch
     | Amount_not_some
     | Account_not_some
+    | Invalid_metadata
     | Incorrect_token_id
     | Amount_inc_dec_mismatch
     | Status_not_pending
