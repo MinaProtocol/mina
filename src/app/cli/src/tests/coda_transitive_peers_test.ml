@@ -40,26 +40,34 @@ let main () =
       ~runtime_config:precomputed_values.runtime_config
   in
   let%bind workers = Coda_processes.spawn_local_processes_exn configs in
-  let%bind net_configs = Coda_processes.net_configs (n + 1) in
-  let addrs_and_ports_list, peers = net_configs in
-  let expected_peers = List.nth_exn peers n in
-  let peers =
-    List.map ~f:Node_addrs_and_ports.to_multiaddr_exn
-      [List.hd_exn expected_peers]
+  let%bind new_node_net_config = Coda_processes.net_configs 1 in
+  let new_node_addrs_and_ports_list, _ = new_node_net_config in
+  let expected_peers_addrs_keypairs =
+    List.map configs ~f:(fun c ->
+        (Node_addrs_and_ports.of_display c.addrs_and_ports, c.libp2p_keypair)
+    )
+  in
+  let expected_peers_addr, expected_peers =
+    List.fold ~init:([], []) expected_peers_addrs_keypairs
+      ~f:(fun (peer_addrs, peers) p ->
+        ( Node_addrs_and_ports.to_multiaddr_exn (fst p) :: peer_addrs
+        , fst p :: peers ) )
   in
   let addrs_and_ports =
-    List.nth_exn addrs_and_ports_list n
+    List.nth_exn new_node_addrs_and_ports_list n
     |> fst |> Node_addrs_and_ports.to_display
   in
-  let libp2p_keypair = List.nth_exn addrs_and_ports_list n |> snd in
-  [%log debug] !"connecting to peers %{sexp: string list}\n" peers ;
+  let libp2p_keypair = List.nth_exn new_node_addrs_and_ports_list n |> snd in
+  [%log debug]
+    !"connecting to peers %{sexp: string list}\n"
+    expected_peers_addr ;
   let config =
-    Coda_process.local_config ~is_seed:true ~peers ~addrs_and_ports
-      ~acceptable_delay ~chain_id:name ~libp2p_keypair ~net_configs
-      ~snark_worker_key:None ~block_production_key:None ~program_dir
-      ~work_selection_method ~trace_dir ~offset:Time.Span.zero ()
-      ~max_concurrent_connections ~is_archive_rocksdb:false
-      ~archive_process_location:None
+    Coda_process.local_config ~is_seed:true ~peers:expected_peers_addr
+      ~addrs_and_ports ~acceptable_delay ~chain_id:name ~libp2p_keypair
+      ~net_configs:new_node_net_config ~snark_worker_key:None
+      ~block_production_key:None ~program_dir ~work_selection_method ~trace_dir
+      ~offset:Time.Span.zero () ~max_concurrent_connections
+      ~is_archive_rocksdb:false ~archive_process_location:None
       ~runtime_config:precomputed_values.runtime_config
   in
   let%bind worker = Coda_process.spawn_exn config in
