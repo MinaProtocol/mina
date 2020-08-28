@@ -76,14 +76,15 @@ module Unsigned = struct
 
   let render_command ~nonce (command : User_command_info.Partial.t) =
     let open Result.Let_syntax in
-    let%bind amount =
-      Result.of_option command.amount
-        ~error:
-          (Errors.create
-             (`Operations_not_valid [Errors.Partial_reason.Amount_not_some]))
-    in
     match command.kind with
     | `Payment ->
+        let%bind amount =
+          Result.of_option command.amount
+            ~error:
+              (Errors.create
+                 (`Operations_not_valid
+                   [Errors.Partial_reason.Amount_not_some]))
+        in
         let payment =
           { Rendered.Payment.to_= un_pk command.receiver
           ; from= un_pk command.source
@@ -173,6 +174,11 @@ module Unsigned = struct
           { command= of_rendered_payment payment
           ; random_oracle_input
           ; nonce= payment.nonce }
+    | None, Some delegation ->
+        Result.return
+          { command= of_rendered_delegation delegation
+          ; random_oracle_input
+          ; nonce= delegation.nonce }
     | _ ->
         Result.fail
           (Errors.create ~context:"Unsigned transaction un-rendering"
