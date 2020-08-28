@@ -964,8 +964,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     apply_user_command_unchecked ~constraint_constants ~txn_global_slot ledger
       (User_command.forget_check user_command)
 
-  (* Fee must get charged regardless of whether predicate verifies *)
-  let apply_snapp_command_unchecked ledger ~constraint_constants:_
+  let apply_snapp_command_unchecked ledger
+      ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ~(state_view : Snapp_predicate.Protocol_state.View.t)
       (c : Snapp_command.t) =
     let open Pickles_types in
@@ -1060,14 +1060,22 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               Balance.sub_amount b a.magnitude )
           |> opt_fail Overflow
         in
-        let apply_body ~check_auth
+        let apply_body ~check_auth ~is_new
             ({ pk= _
              ; update= {app_state; delegate; verification_key; permissions}
              ; delta } :
               Party.Body.t) (a : Account.t) : (Account.t, _) Result.t =
           (* TODO: Make sure that this delta has the right sign. I think
               the Snapp_command.check function does this. *)
-          let%bind balance = add_signed_amount a.balance delta in
+          let%bind balance = 
+            let%bind b = add_signed_amount a.balance delta in
+            let fee = constraint_constants.account_creation_fee in
+            if is_new
+            then 
+              Balance.sub_amount b (Amount.of_fee fee)
+              |> opt_fail Amount_insufficient_to_create_account
+            else Ok b
+          in
           (* Check send/receive permissions *)
           let%bind () =
             check Update_not_permitted
@@ -1239,6 +1247,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                           (Control.tag authorization)
                   in
                   apply_body ~check_auth body acct2
+                    ~is_new:(loc2 = `New)
                 in
                 Some (loc2, res)
           in
@@ -1260,6 +1269,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           (* Update *)
           let%map acct1' =
             apply_body
+              ~is_new:false
               ~check_auth:
                 (Fn.flip Permissions.Auth_required.check
                    (Control.tag one.authorization))

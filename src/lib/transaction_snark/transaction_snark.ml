@@ -989,12 +989,11 @@ module Base = struct
     (`Min_balance curr_min_balance, timing)
 
   let side_loaded i =
-    let open Snapp_statement.Digested in
+    let open Snapp_statement in
     Pickles.Side_loaded.create ~typ ~name:(sprintf "snapp_%d" i)
       ~max_branching:(module Nat.N2)
-      ~value_to_field_elements:(Fn.compose Random_oracle.pack_input to_input)
-      ~var_to_field_elements:
-        (Fn.compose Random_oracle.Checked.pack_input Checked.to_input)
+      ~value_to_field_elements:to_field_elements
+      ~var_to_field_elements:Checked.to_field_elements
 
   module Impl = Pickles.Impls.Step
 
@@ -1003,311 +1002,256 @@ module Base = struct
       open Snarky_backendless.Request
 
       type _ t +=
-        | Transaction : Snapp_command.Payload.Two_snapp.t t
         | State_body : Coda_state.Protocol_state.Body.Value.t t
         | Snapp_account : [`One | `Two] -> Snapp_account.t t
-        | Signature : [`One | `Two | `User] -> Signature.t t
-        | Fee_payer_signature : Signature.t t
     end
 
-    module Account_info = struct
-      type snapp =
-        ( Coda_base.Snapp_command.Predicate.Checked.t
-        , Public_key.Compressed.var
-        , Coda_base.Snapp_command.Per_account.Checked.t
-        , Amount.Signed.var )
-        Snapp_command.Payload.Per_snapp.t
+    open Snapp_basic
 
-      type init =
-        { create_account: Boolean.var
-        ; create_snapp_account: Boolean.var
-        ; init: Snapp_command.Payload.Snapp_init.Checked.t }
+    let snapp0 = side_loaded 0
+    let snapp1 = side_loaded 1
 
-      type _ t =
-        | User :
-            { snapp_delta: Amount.Signed.var
-            ; is_present: Boolean.var
-            ; other: snapp }
-            -> unit t
-        | Snapp :
-            { snapp: snapp
-            ; init: init option
-            ; which: [`One | `Two]
-            ; other: [`Snapp of snapp | `User_or_none] }
-            -> [`Proof_should_verify of Boolean.var] t
+    let unhash_snapp_account ~which (a : Account.var) : Account.Checked.Unhashed.t =
+      let open Impl in
+      let s =
+        exists Snapp_account.typ ~request:(fun () -> Snapp_account which)
+      in
+      Field.Assert.equal a.snapp (Snapp_account.Checked.digest s) ;
+      { a with snapp= s }
 
-      let is_present_in_transaction : type a. a t -> _ = function
-        | User {is_present; _} ->
-            `Maybe is_present
-        | Snapp _ ->
-            `Yes
-
-      let which (type a) (t : a t) : [`One | `Two | `User] =
-        match t with
-        | User _ ->
-            `User
-        | Snapp {which; _} ->
-            (which :> [`One | `Two | `User])
-
-      let is_receiver : type a. a t -> Boolean.var = function
-        | Snapp {snapp= {delta; _}; _} ->
-            Sgn.Checked.is_pos delta.sgn
-        | User {snapp_delta; _} ->
-            Sgn.Checked.is_neg snapp_delta.sgn
-
-      (* user_delta + snapp_delta + fee = 0 *)
-      (* snapp_delta = (snapp_is_fee_payer ? - fee : 0) + snapp_delta_after_fee_payment *)
-      (* user_delta = (user_is_fee_payer ? - fee : 0) + snapp_delta_after_fee_payment *)
-
-      (* snapp_delta_after_fee_payment
-   = snapp_delta - (snapp_is_fee_payer ? - fee : 0)
-   = snapp_delta + (snapp_is_fee_payer ? + fee : 0) *)
-      (* user_delta_after_fee_payment
-   = user_delta + (user_is_fee_payer ? + fee : 0) 
-   = -(snapp_delta + fee) + (user_is_fee_payer ? + fee : 0) 
-*)
-      let delta_after_fee_payment (type a) ~fee ~self_is_fee_payer (t : a t) =
-        let open Amount.Signed.Checked in
-        let fee = of_unsigned (Amount.Checked.of_fee fee) in
-        let%bind delta =
-          match t with
-          | Snapp {snapp= {delta; _}; _} ->
-              return delta
-          | User {snapp_delta; _} ->
-              add snapp_delta fee >>| negate
+    let apply_body 
+      ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+        ~(is_new : [`No | `Maybe of Boolean.var])
+        ?tag
+        ~txn_global_slot
+        ~add_check ~check_auth
+        ({ pk= _
+          ; update= {app_state; delegate; verification_key; permissions}
+          ; delta } :
+            Snapp_command.Party.Body.Checked.t) (a : Account.Checked.Unhashed.t)  =
+      let open Impl in
+      let r = ref [] in
+      let update_authorized (type a) perm ~is_keep ~(updated : [`Ok of a | `Flagged of (a * Boolean.var)]) =
+        let (speculative_success, `proof_must_verify x) = check_auth perm in
+        r := lazy Boolean.(not is_keep && x) :: !r ;
+        match updated with
+        | `Ok res ->
+          add_check Boolean.(speculative_success || is_keep) ;
+          res
+        | `Flagged (res, failed) ->
+          add_check Boolean.( (not failed && speculative_success) || is_keep ) ;
+          res
+      in
+      let proof_must_verify () =  Boolean.any (List.map !r ~f:Lazy.force) in
+      let ( ! ) = run_checked in
+      let is_receiver = Sgn.Checked.is_pos delta.sgn in
+      let `Min_balance _, timing =
+        !([%with_label "Check snapp timing"]
+            (let open Tick in
+              let balance_check ok =
+                [%with_label "Check snapp balance"]
+                  (Boolean.Assert.any [ok; is_receiver])
+              in
+              let timed_balance_check ok =
+                [%with_label "Check snapp timed balance"]
+                  (Boolean.Assert.any [ok; is_receiver])
+              in
+              check_timing ~balance_check ~timed_balance_check
+                ~account:a 
+                ~txn_amount:delta.magnitude
+                ~txn_global_slot))
+      in
+      let timing =
+        !(Account.Timing.if_ is_receiver ~then_:a.timing
+            ~else_:timing)
+      in
+      (* Check send/receive permissions *)
+      let balance =
+        update_authorized
+          (Permissions.Auth_required.Checked.if_
+            is_receiver
+            ~then_:a.permissions.receive
+            ~else_:a.permissions.send)
+          ~is_keep:(!Amount.Signed.(Checked.(equal (constant zero) delta)))
+          ~updated:(
+            let (balance, `Overflow failed1) =
+              !(Balance.Checked.add_signed_amount_flagged a.balance delta)
+            in
+            match is_new with
+            | `No -> `Flagged (balance, failed1)
+            | `Maybe is_new ->
+              let fee = Amount.Checked.of_fee (Fee.var_of_t constraint_constants.account_creation_fee) in
+              let (balance_when_new, `Underflow failed2) =
+                !(Balance.Checked.sub_amount_flagged balance fee)
+              in
+              let res = !(Balance.Checked.if_ is_new ~then_:balance_when_new ~else_:balance) in
+              let failed = Boolean.(failed1 || (is_new && failed2)) in
+              `Flagged (res, failed)  )
+      in
+      let snapp =
+        let app_state =
+          update_authorized a.permissions.edit_state
+            ~is_keep:(
+              Boolean.all 
+                (List.map (Vector.to_list app_state) ~f:Set_or_keep.Checked.is_keep))
+            ~updated:(
+              `Ok (
+              Vector.map2 app_state a.snapp.app_state ~f:(Set_or_keep.Checked.set_or_keep ~if_:Field.if_)))
         in
-        let%bind delta_plus_fee = add delta fee in
-        if_ self_is_fee_payer ~then_:delta_plus_fee ~else_:delta
-
-      open Snapp_basic
-      open Impl
-
-      let shouldn't_update_nonce_and_rch (type a) ~self_is_fee_payer (t : a t)
-          =
-        match t with
-        | User _ ->
-            self_is_fee_payer
-        | Snapp {init= None; _} ->
-            self_is_fee_payer
-        | Snapp {init= Some {create_account; _}; _} ->
-            Boolean.(self_is_fee_payer || create_account)
-
-      let is_potentially_new : type a. a t -> bool = function
-        | User _ ->
-            true
-        | Snapp {init= Some _; _} ->
-            true
-        | Snapp {init= None; _} ->
-            false
-
-      let ( ! ) = run_checked
-
-      let updated_nonce_and_rch ~payload_digest ~self_is_fee_payer
-          ~(account : Account.var) t =
-        let updated =
-          !(Receipt.Chain_hash.Checked.cons (Snapp_command payload_digest)
-              account.receipt_chain_hash)
+        Option.iter tag ~f:(fun t ->
+          Pickles.Side_loaded.in_circuit t
+            a.snapp.verification_key.data ) ;
+        let verification_key =
+          update_authorized a.permissions.set_verification_key
+            ~is_keep:(Set_or_keep.Checked.is_keep verification_key)
+            ~updated:(
+              `Ok (
+                Set_or_keep.Checked.set_or_keep
+                  ~if_:Field.if_
+                  verification_key
+                  (Lazy.force a.snapp.verification_key.hash)))
         in
-        let shouldn't_update =
-          shouldn't_update_nonce_and_rch ~self_is_fee_payer t
-        in
-        let should_update = Boolean.not shouldn't_update in
-        ( !(Account.Nonce.Checked.succ_if account.nonce should_update)
-        , !(Receipt.Chain_hash.Checked.if_ shouldn't_update
-              ~then_:account.receipt_chain_hash ~else_:updated) )
+        Snapp_account.Checked.digest'
+          { verification_key; app_state }
+      in
+      let delegate =
+        update_authorized a.permissions.set_delegate
+          ~is_keep:(Set_or_keep.Checked.is_keep delegate)
+          ~updated:(
+            `Ok (
+              Set_or_keep.Checked.set_or_keep
+                ~if_:(fun b ~then_ ~else_ ->
+                   !(Public_key.Compressed.Checked.if_ b ~then_ ~else_))
+                delegate
+                a.delegate))
+      in
+      let permissions =
+        update_authorized a.permissions.set_permissions
+          ~is_keep:(Set_or_keep.Checked.is_keep permissions)
+          ~updated:(
+            `Ok (
+              Set_or_keep.Checked.set_or_keep
+                ~if_:Permissions.Checked.if_
+                permissions
+                a.permissions))
+      in
+      ({a with balance; snapp; delegate; permissions; timing}, `proof_must_verify proof_must_verify )
 
-      (* - checks the other snapp's predicate on this account
-         - checks the signature verification if the user was the sender!
-      *)
-      let user_update ~self_is_fee_payer ~fee_payer_nonce
-          ~fee_payer_receipt_chain_hash ~add_check ~(account : Account.var)
-          ~(other : snapp) =
-        let acct =
-          (* Have to reset the nonce and receipt chain hash to the unmodified form
-              if self was the fee payer *)
-          { account with
-            nonce=
-              !(Account.Nonce.Checked.if_ self_is_fee_payer
-                  ~then_:fee_payer_nonce ~else_:account.nonce)
-          ; receipt_chain_hash=
-              !(Receipt.Chain_hash.Checked.if_ self_is_fee_payer
-                  ~then_:fee_payer_receipt_chain_hash
-                  ~else_:account.receipt_chain_hash) }
-        in
-        add_check
-          (Snapp_predicate.Account_type.Checked.user_allowed
-             other.predicate.other_account_type) ;
-        add_check
-          (Snapp_predicate.Account.Checked.check_nonsnapp
-             other.predicate.other_predicate acct) ;
-        (account.snapp, account.delegate)
-
-      (* - sets the side loaded verification key
-           - determines whether the corresponding snapp's proof must verify
-           - checks the other snapp's predicate on this snapp
-           - updates the snapp's state and delegate *)
-      let snapp_update ~proof_must_verify ~signature_verified ~tag
-          ~self_is_fee_payer ~fee_payer_nonce ~fee_payer_receipt_chain_hash
-          ~add_check ~(account : Account.var)
-          ~(other :
-             [`Snapp of _ Snapp_command.Payload.Per_snapp.t | `User_or_none])
-          ~(snapp : snapp) ~which ~init =
+    module Two_proved = struct
+      let main 
+        ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+          (s1 : Snapp_statement.Checked.t)
+          (s2 : Snapp_statement.Checked.t)
+          (s : Statement.With_sok.Checked.t)
+        =
+        let open Impl in
         let ( ! ) = run_checked in
-        let snapp_account =
-          exists Snapp_account.typ ~request:(fun () -> Snapp_account which)
+        (* Kind of a hack...
+           We must have
+           s1.body2 = s2.body1
+           and
+           s2.body2 = s1.body1
+           so to save on hashing, we just throw away the bodies in s2 and replace them. *)
+        let s2 =
+          let _ = Snapp_statement.Checked.to_field_elements s1 in
+          (* pickles uses these values to hash the statement  *)
+          let (:=) x2 x1 = 
+            Set_once.set_exn x2 [%here] (Set_once.get_exn x1 [%here])
+          in
+          s2.body1.hash := s1.body2.hash ;
+          s2.body2.hash := s1.body1.hash ;
+          { s2 with body1= s1.body2; body2= s1.body1 }
         in
-        let snapp_account_digest =
-          Snapp_account.Checked.digest snapp_account
+        let excess =
+          !(Amount.Signed.Checked.add
+            s1.body1.data.delta
+            s1.body2.data.delta)
         in
-        ( match init with
-        | Some {create_snapp_account; _} ->
-            add_check
-              Boolean.(
-                Field.equal account.snapp snapp_account_digest
-                || create_snapp_account)
-        | None ->
-            add_check
-              (Field.equal account.snapp
-                 (Snapp_account.Checked.digest snapp_account)) ) ;
-        Set_once.set_exn proof_must_verify [%here]
-          (let must_verify something_changed
-               (c : Snapp_account.Permissions.Controller.Checked.t) =
-             let verify_necessary = c.verification_key in
-             let signature_necessary = c.private_key in
-             add_check
-               Boolean.(
-                 any
-                   [ not something_changed
-                   ; signature_verified
-                   ; not signature_necessary ]) ;
-             Boolean.(
-               if_ verify_necessary ~then_:true_
-                 ~else_:
-                   (if_ something_changed
-                      ~then_:
-                        (if_ (not signature_verified) ~then_:true_
-                           ~else_:false_)
-                      ~else_:false_))
-           in
-           let { Snapp_account.Permissions.Poly.set_delegate
-               ; edit_state
-               ; send
-               ; stake= _ } =
-             snapp_account.permissions
-           in
-           let edited_state =
-             Boolean.any
-               Vector.(
-                 to_list (map snapp.update.state ~f:Set_or_keep.Checked.is_set))
-           in
-           let self_is_sender = Sgn.Checked.is_neg snapp.delta.sgn in
-           let res =
-             Boolean.any
-               [ must_verify edited_state edit_state
-               ; must_verify
-                   (Set_or_keep.Checked.is_set snapp.update.delegate)
-                   set_delegate
-               ; must_verify self_is_sender send ]
-           in
-           match init with
-           | None ->
-               res
-           | Some {create_snapp_account; _} ->
-               Boolean.((not create_snapp_account) && res)) ;
+        let {token_id; other_fee_payer_opt } : _ Snapp_statement.Complement.Two_proved.Poly.t =
+          exists Snapp_statement.Complement.Two_proved.typ
+            ~request:(fun () -> assert false)
+        in
+        (* Check fee *)
         let () =
-          let {With_hash.data; hash} = snapp_account.verification_key in
-          Pickles.Side_loaded.in_circuit tag data ;
-          Set_once.set_exn hash [%here] (Snapp_account.Checked.digest_vk data)
+          (* Either
+             (other_fee_payment_opt = None AND token_id = default AND excess <= 0)
+             OR
+             (other_fee_payment_opt = Some AND fee_token_id = default AND excess = 0)
+          *)
+          let is_default x = !(Token_id.(Checked.equal (var_of_t default) x)) in
+          let token_is_default = is_default token_id in
+          let fee_token_is_default = is_default other_fee_payer_opt.data.token_id in
+          let open Boolean in
+          let excess_is_zero = !(Amount.(Checked.equal (var_of_t zero)) excess.magnitude) in
+          Assert.any
+            [ all
+                [ not other_fee_payer_opt.is_some
+                ; token_is_default
+                ; any [ Sgn.Checked.is_neg excess.sgn; excess_is_zero ]
+                ]
+            ; all
+                [ other_fee_payer_opt.is_some
+                ; fee_token_is_default
+                ; excess_is_zero
+                ]
+            ]
         in
-        (* Check predicates *)
-        let () =
-          let acct =
-            (* Have to reset the nonce and receipt chain hash to the unmodified form
-                if self was the fee payer *)
-            { account with
-              nonce=
-                !(Account.Nonce.Checked.if_ self_is_fee_payer
-                    ~then_:fee_payer_nonce ~else_:account.nonce)
-            ; receipt_chain_hash=
-                !(Receipt.Chain_hash.Checked.if_ self_is_fee_payer
-                    ~then_:fee_payer_receipt_chain_hash
-                    ~else_:account.receipt_chain_hash) }
-          in
-          ( match other with
-          | `Snapp other ->
-              add_check
-                (Snapp_predicate.Account_type.Checked.snapp_allowed
-                   other.predicate.Snapp_predicate.Poly.other_account_type) ;
-              add_check
-                Snapp_predicate.Hash.(
-                  check_checked Tc.field other.predicate.other_account_vk
-                    (Set_once.get_exn snapp_account.verification_key.hash
-                       [%here])) ;
-              List.iter ~f:add_check
-                [ Snapp_predicate.Account.Checked.check_nonsnapp
-                    other.predicate.other_predicate acct
-                ; Snapp_predicate.Account.Checked.check_snapp
-                    other.predicate.other_predicate snapp_account ]
-          | `User_or_none ->
-              () ) ;
-          List.iter ~f:add_check
-            [ Snapp_predicate.Account.Checked.check_nonsnapp
-                snapp.predicate.Snapp_predicate.Poly.self_predicate acct
-            ; Snapp_predicate.Account.Checked.check_snapp
-                snapp.predicate.self_predicate snapp_account ]
+        let root = s.source in
+        let fee_payer_id =
+          let account1_is_sender = Sgn.Checked.is_neg s1.body1.data.delta.sgn in
+          !(Account_id.Checked.if_ other_fee_payer_opt.is_some
+            ~then_:(Account_id.Checked.create 
+                      other_fee_payer_opt.data.pk
+                      other_fee_payer_opt.data.token_id)
+            ~else_:(
+              Account_id.Checked.create
+                !(Public_key.Compressed.Checked.if_
+                   account1_is_sender
+                   ~then_:s1.body1.data.pk
+                   ~else_:s2.body1.data.pk)
+                token_id))
         in
-        let delegate =
-          Set_or_keep.Checked.set_or_keep
-            ~if_:(fun b ~then_ ~else_ ->
-              !(Public_key.Compressed.Checked.if_ b ~then_ ~else_) )
-            snapp.update.delegate account.delegate
+        (* By here, we know that excess is either zero or negative, so we can throw away the sign. *)
+        let excess = excess.magnitude in
+        let payload : Snapp_command.Payload.Digested.Checked.t =
+          (* TODO: Do this properly. This is for the side effect of
+          computing s2.predicate.hash *)
+          let _ = Snapp_statement.Checked.to_field_elements s2 in
+          Two_proved
+            { second_starts_empty=Boolean.false_
+            ; second_ends_empty=Boolean.false_
+            ; token_id
+            ; other_fee_payer_opt
+            ; one={ predicate= Set_once.get_exn s1.predicate.hash [%here]
+                  ; body=Set_once.get_exn s1.body1.hash [%here]
+                  }
+            ; two={ predicate= Set_once.get_exn s2.predicate.hash [%here]
+                  ; body=Set_once.get_exn s1.body2.hash [%here]
+                  }
+            }
         in
-        let snapp_account =
-          let a =
-            { snapp_account with
-              app_state=
-                Vector.map2
-                  ~f:(Set_or_keep.Checked.set_or_keep ~if_:Field.if_)
-                  snapp.update.state snapp_account.app_state }
-          in
-          ( match init with
-          | None ->
-              a
-          | Some {init; _} ->
-              (* TODO: Check account was empty.
-                TODO: vk digest doesn't need to hash to the right thing fpor initializaon
-                TODO: Make it possible for a snapp to change its vk
-            *)
-              { verification_key= a.verification_key
-              ; app_state= a.app_state
-              ; permissions= init.permissions } )
-          |> Snapp_account.Checked.digest
+        let payload_digest =
+          Snapp_command.Payload.Digested.Checked.digest payload
         in
-        (snapp_account, delegate)
-
-      let updated_snapp_and_delegate (type a) ~shifted ~payload_digest
-          ~proof_must_verify ~tag ~self_id (t : a t) =
-        let signature_verified =
-          (* TODO: Must verify the signature if the account was non-empty! *)
-          let signature =
-            (* TODO: The user signature should be able to come through here. *)
-            exists Schnorr.Signature.typ ~request:(fun () ->
-                Signature (which t) )
-          in
-          (* Is it possible this decompression will fail if the user does not already exist? *)
-          let pk =
-            !(Public_key.decompress_var (Account_id.Checked.public_key self_id))
-          in
-          !(Schnorr.Checked.verifies shifted signature pk
-              (Random_oracle.Input.field payload_digest))
-        in
-        match t with
-        | User {other; _} ->
-            user_update ~other
-        | Snapp {snapp; init; which; other} ->
-            snapp_update ~proof_must_verify ~signature_verified ~tag ~other
-              ~snapp ~which ~init
-    end
+        let open Tick in
+        Frozen_ledger_hash.modify_account 
+          root
+          fee_payer_id
+          ~depth:constraint_constants.ledger_depth
+          ~filter:(fun acct ->
+            let%bind account_not_there =
+              Public_key.Compressed.Checked.equal acct.public_key
+                Public_key.Compressed.(var_of_t empty)
+            in
+            Boolean.(Assert.is_true (not account_not_there)) )
+          ~f:(fun () acct ->
+        (*
+           Do the fee payer modify
+           Do the account1 modify, call apply_body, save the unhashed snapp account in a ref
+           Do the account2 modify, call apply_body, save the unhashed account in a ref
+           Run both predicates
+        *)
+    end 
 
     let check_account_presence (type a) (acct : Account.var) ~self_id
         ~(self : a Account_info.t) =
@@ -1333,18 +1277,10 @@ module Base = struct
 
     (* TODO: Handle creation, check token permissions *)
     let modify_account (type a)
-        ~
-        (*         ~(account_type : [ `User of Boolean.var | `Snapp | `Snapp_init of _ ]) *)
-        (self : a Account_info.t)
+        ~(self : a Account_info.t)
         ~(constraint_constants : Genesis_constants.Constraint_constants.t)
         ~shifted ~payload_digest ~root ~self_id ~self_is_fee_payer
-        ~(*
-        ~(self: 
-            [ `Snapp of
-            | `User of Amount.Signed.var ]
-         ) *)
-         (*         ~(other : [ `Snapp of _ Snapp_command.Payload.Per_snapp.t | `User ]) *)
-        fee ~fee_payer_nonce ~fee_payer_receipt_chain_hash ~txn_global_slot
+        ~fee ~fee_payer_nonce ~fee_payer_receipt_chain_hash ~txn_global_slot
         ~add_check ~tag : (Ledger_hash.var * a, _) Checked.t =
       let proof_must_verify = Set_once.create () in
       let open Snapp_basic in
@@ -1531,6 +1467,17 @@ module Base = struct
       (root, Set_once.get_exn actual_fee_payer_nonce_and_rch [%here])
 
     module One_snapp = struct
+      include struct
+        open Snarky_backendless.Request
+
+        type _ t +=
+          | Transaction : Snapp_command.Payload.Two_snapp.t t
+          | State_body : Coda_state.Protocol_state.Body.Value.t t
+          | Snapp_account : [`One | `Two] -> Snapp_account.t t
+          | Signature : [`One | `Two | `User] -> Signature.t t
+          | Fee_payer_signature : Signature.t t
+      end
+
       let snapp_tag = side_loaded 0
 
       (* TODO: I think snapp_init_opt is not fully used. *)

@@ -298,6 +298,21 @@ let var_of_t
   ; snapp= Field.Var.constant (hash_snapp_account_opt snapp) }
 
 module Checked = struct
+  module Unhashed = struct
+    type t =
+      ( Public_key.Compressed.var
+      , Token_id.var
+      , Token_permissions.var
+      , Balance.var
+      , Nonce.Checked.t
+      , Receipt.Chain_hash.var
+      , State_hash.var
+      , Timing.var
+      , Permissions.Checked.t
+      , Snapp_account.Checked.t )
+      Poly.t
+  end 
+
   let to_input (t : var) =
     let ( ! ) f x = Run.run_checked (f x) in
     let f mk acc field = mk (Core_kernel.Field.get field t) :: acc in

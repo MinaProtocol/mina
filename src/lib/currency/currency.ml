@@ -698,6 +698,8 @@ module Balance = struct
 
     let add_amount_flagged = add_flagged
 
+    let add_signed_amount_flagged = add_signed_flagged
+
     let sub_amount_flagged = sub_flagged
 
     let ( + ) = add_amount

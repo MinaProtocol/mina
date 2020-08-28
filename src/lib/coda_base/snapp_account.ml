@@ -57,18 +57,21 @@ module Checked = struct
   type t =
     ( Pickles.Impls.Step.Field.t Snapp_state.t
     , ( Pickles.Side_loaded.Verification_key.Checked.t
-      , Pickles.Impls.Step.Field.t Set_once.t )
+      , Pickles.Impls.Step.Field.t Lazy.t )
       With_hash.t )
     Poly.t
 
-  let to_input (t : t) =
+  let to_input' (t : _ Poly.t) =
     let open Random_oracle.Input in
     let f mk acc field = mk (Core_kernel.Field.get field t) :: acc in
     let app_state v = Random_oracle.Input.field_elements (Vector.to_array v) in
     Poly.Fields.fold ~init:[] ~app_state:(f app_state)
       ~verification_key:
-        (f (fun x -> field (Option.value_exn (Set_once.get (With_hash.hash x)))))
+        (f (fun x -> field x))
     |> List.reduce_exn ~f:append
+
+  let to_input (t : t) =
+    to_input' { t with verification_key= Lazy.force t.verification_key.hash }
 
   let digest_vk t =
     Random_oracle.Checked.(
@@ -78,12 +81,20 @@ module Checked = struct
   let digest t =
     Random_oracle.Checked.(
       hash ~init:Hash_prefix_states.snapp_account (pack_input (to_input t)))
+
+  let digest' t =
+    Random_oracle.Checked.(
+      hash ~init:Hash_prefix_states.snapp_account (pack_input (to_input' t)))
 end
 
 let digest_vk t =
   Random_oracle.(
     hash ~init:Hash_prefix.side_loaded_vk
       (pack_input (Pickles.Side_loaded.Verification_key.to_input t)))
+
+let dummy_vk_hash =
+  let x = lazy (digest_vk Pickles.Side_loaded.Verification_key.dummy) in
+  fun () -> Lazy.force x
 
 let typ : (Checked.t, t) Typ.t =
   let open Poly in
@@ -97,7 +108,8 @@ let typ : (Checked.t, t) Typ.t =
               With_hash.data x )
         ~back:(fun x -> Some (With_hash.of_data x ~hash_data:digest_vk))
       |> Typ.transport_var ~there:With_hash.data
-           ~back:(With_hash.of_data ~hash_data:(fun _ -> Set_once.create ()))
+        ~back:(With_hash.of_data 
+                 ~hash_data:(fun x ->  lazy (Checked.digest_vk x)))
     ]
     ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
     ~value_of_hlist:of_hlist
@@ -110,7 +122,7 @@ let to_input (t : t) =
     ~verification_key:
       (f
          (Fn.compose field
-            (Option.value_map ~default:Field.zero ~f:With_hash.hash)))
+            (Option.value_map ~default:(dummy_vk_hash ()) ~f:With_hash.hash)))
   |> List.reduce_exn ~f:append
 
 let default : _ Poly.t =

@@ -63,7 +63,34 @@ module Checked = struct
     ( (Predicate.Checked.t, Field.t Set_once.t) With_hash.t
     , (Snapp_command.Party.Body.Checked.t, Field.t Set_once.t) With_hash.t )
     Poly.Stable.Latest.t
+
+  let to_field_elements ( { predicate; body1; body2 } : t) : Field.t array =
+    let f hash x =
+      let s = With_hash.hash x in
+      match Set_once.get s with
+      | None ->
+        let h = hash (With_hash.data x) in
+        Set_once.set_exn s [%here] h ;
+        h
+      | Some h -> h
+    in
+    let predicate = f Snapp_predicate.Checked.digest predicate in
+    let body1 = f Snapp_command.Party.Body.Checked.digest body1 in
+    let body2 = f Snapp_command.Party.Body.Checked.digest body2 in
+    [| predicate
+     ; body1
+     ; body2
+    |]
 end
+
+let to_field_elements ( { predicate; body1; body2 } : t) : Field.t array =
+  let predicate = Snapp_predicate.digest predicate in
+  let body1 = Snapp_command.Party.Body.digest body1 in
+  let body2 = Snapp_command.Party.Body.digest body2 in
+  [| predicate
+    ; body1
+    ; body2
+  |]
 
 let typ : (Checked.t, t) Typ.t =
   Poly.typ
@@ -78,6 +105,154 @@ let typ : (Checked.t, t) Typ.t =
        ~back:(fun ({predicate; body1; body2} : _ Poly.t) ->
          let f = With_hash.of_data ~hash_data:(fun _ -> Set_once.create ()) in
          {Poly.predicate= f predicate; body1= f body1; body2= f body2} )
+
+open Snapp_basic
+
+module Complement = struct
+  module Poly = struct
+    type ('bool, 'token_id, 'fee_payer_opt) t =
+      { second_starts_empty:'bool
+      ; second_ends_empty:'bool
+      ; token_id: 'token_id
+      ; other_fee_payer_opt: 'fee_payer_opt
+      }
+    [@@deriving hlist, sexp, eq, yojson, hash, compare]
+  end 
+
+  module Zero_proved = struct
+    module Checked = struct
+      type t = (Boolean.var, Token_id.Checked.t, (Boolean.var, Other_fee_payer.Payload.Checked.t ) Flagged_option.t) Poly.t
+    end 
+
+    type t = (bool, Token_id.t, Other_fee_payer.Payload.t option) Poly.t
+
+    let typ : (Checked.t, t) Typ.t =
+      let open Poly in
+      Typ.of_hlistable
+        [ Boolean.typ
+        ; Boolean.typ
+        ; Token_id.typ
+        ; Flagged_option.typ
+            Other_fee_payer.Payload.typ
+          |> Typ.transport
+            ~there:(Flagged_option.of_option ~default:Other_fee_payer.Payload.dummy)
+            ~back:Flagged_option.to_option
+        ]
+        ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
+        ~value_of_hlist:of_hlist
+
+    let complete
+        ({ second_starts_empty
+         ; second_ends_empty
+         ; token_id
+         ; other_fee_payer_opt }
+          : t) 
+        ~body1
+        ~body2
+        ~one_nonce
+        ~two_nonce
+      : Snapp_command.Payload.Zero_proved.t
+      =
+      { Snapp_command.Payload.Inner.
+        second_starts_empty
+      ; second_ends_empty
+      ; token_id
+      ; other_fee_payer_opt
+      ; one={ predicate= one_nonce; body=body1}
+      ; two={ predicate= two_nonce; body=body2}
+      }
+  end
+
+  module One_proved = struct
+    module Checked = struct
+      type t = (Boolean.var, Token_id.Checked.t, (Boolean.var, Other_fee_payer.Payload.Checked.t ) Flagged_option.t) Poly.t
+    end 
+
+    type t = (bool, Token_id.t, Other_fee_payer.Payload.t option) Poly.t
+
+    let typ : (Checked.t, t) Typ.t =
+      let open Poly in
+      Typ.of_hlistable
+        [ Boolean.typ
+        ; Boolean.typ
+        ; Token_id.typ
+        ; Flagged_option.typ
+            Other_fee_payer.Payload.typ
+          |> Typ.transport
+            ~there:(Flagged_option.of_option ~default:Other_fee_payer.Payload.dummy)
+            ~back:Flagged_option.to_option
+        ]
+        ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
+        ~value_of_hlist:of_hlist
+
+    let complete
+        ({ second_starts_empty
+         ; second_ends_empty
+         ; token_id
+         ; other_fee_payer_opt }
+          : t) 
+        ~one:( { predicate; body1; body2 } : Stable.Latest.t)
+        ~two_nonce
+      : Snapp_command.Payload.One_proved.t
+      =
+      { Snapp_command.Payload.Inner.
+        second_starts_empty
+      ; second_ends_empty
+      ; token_id
+      ; other_fee_payer_opt
+      ; one={ predicate; body=body1}
+      ; two={ predicate= two_nonce; body=body2}
+      }
+  end
+
+  module Two_proved = struct
+    module Poly = struct
+      type ('token_id, 'fee_payer_opt) t =
+        { token_id: 'token_id
+        ; other_fee_payer_opt: 'fee_payer_opt
+        }
+      [@@deriving hlist, sexp, eq, yojson, hash, compare]
+    end 
+
+    type t = (Token_id.t, Other_fee_payer.Payload.t option) Poly.t
+
+    module Checked = struct
+      type t = (Token_id.Checked.t, (Boolean.var, Other_fee_payer.Payload.Checked.t ) Flagged_option.t) Poly.t
+    end 
+
+    let typ : (Checked.t, t) Typ.t =
+      let open Poly in
+      Typ.of_hlistable
+        [ Token_id.typ
+        ; Flagged_option.typ
+            Other_fee_payer.Payload.typ
+          |> Typ.transport
+            ~there:(Flagged_option.of_option ~default:Other_fee_payer.Payload.dummy)
+            ~back:Flagged_option.to_option
+        ]
+        ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
+        ~value_of_hlist:of_hlist
+
+    let complete
+        ({ token_id
+         ; other_fee_payer_opt }
+          : t) 
+        ~(one: Stable.Latest.t)
+        ~(two : Stable.Latest.t)
+      : Snapp_command.Payload.Two_proved.t
+      =
+      { Snapp_command.Payload.Inner.
+        second_starts_empty=false
+      ; second_ends_empty=false
+      ; token_id
+      ; other_fee_payer_opt
+(* one.body2 = two.body1
+   two.body2 = one.body1 *)
+      ; one= { predicate= one.predicate; body= one.body1 }
+      ; two= { predicate= one.predicate; body= two.body1 }
+      }
+  end
+end
 
 (*
 module Digested = struct

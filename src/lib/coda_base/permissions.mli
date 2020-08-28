@@ -16,7 +16,13 @@ module Auth_required : sig
   module Checked : sig
     type t
 
+    val if_ : Boolean.var -> then_:t -> else_:t -> t
+
     val to_input : t -> (_, Boolean.var) Random_oracle_input.t
+
+    val spec_eval
+      : t -> signature_verifies:Boolean.var
+      -> (Boolean.var * [`proof_must_verify of Boolean.var])
   end
 
   val typ : (Checked.t, t) Typ.t
@@ -55,6 +61,8 @@ module Checked : sig
   val to_input : t -> (_, Boolean.var) Random_oracle_input.t
 
   val constant : Stable.Latest.t -> t
+
+  val if_ : Boolean.var -> then_:t -> else_:t -> t
 end
 
 val typ : (Checked.t, t) Typ.t

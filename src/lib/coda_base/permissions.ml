@@ -122,6 +122,12 @@ module Auth_required = struct
       { constant= f t.constant
       ; signature_necessary= f t.signature_necessary
       ; signature_sufficient= f t.signature_sufficient }
+
+    let if_ b ~then_:t ~else_:e =
+      { constant= Boolean.if_ b ~then_:t.constant ~else_:e.constant
+      ; signature_necessary= Boolean.if_ b ~then_:t.signature_necessary ~else_:e.signature_necessary
+      ; signature_sufficient= Boolean.if_ b ~then_:t.signature_sufficient ~else_:e.signature_sufficient
+      }
   end
 
   let encode : t -> bool Encoding.t = function
@@ -169,9 +175,24 @@ module Auth_required = struct
   module Checked = struct
     type t = Boolean.var Encoding.t
 
+    let if_ = Encoding.if_
+
     let to_input : t -> _ = Encoding.to_input
 
     let constant t = Encoding.map (encode t) ~f:Boolean.var_of_value
+
+    let spec_eval ( { constant; signature_necessary; signature_sufficient } : t) ~signature_verifies =
+      let open Pickles.Impls.Step.Boolean in
+      let impossible = (constant && not signature_sufficient) in
+      let result =
+        not impossible && 
+        ( (signature_verifies && signature_sufficient )
+          || not signature_necessary )
+      in
+      let didn't_fail_yet = result in
+      (* If the transaction already failed to verify, we don't need to assert
+         that the proof should verify. *)
+      ( result,  `proof_must_verify (didn't_fail_yet && not signature_sufficient) )
   end
 
   let typ =
@@ -251,6 +272,24 @@ module Checked = struct
   type t = (Boolean.var, Auth_required.Checked.t) Poly.Stable.Latest.t
 
   let to_input = Poly.to_input Auth_required.Checked.to_input
+
+  open Pickles.Impls.Step
+
+  let if_ b ~then_ ~else_ =
+    let g cond f = 
+      cond b
+        ~then_:(Core_kernel.Field.get f then_)
+        ~else_:(Core_kernel.Field.get f else_)
+    in
+    let c = g Auth_required.Checked.if_ in
+    Poly.Fields.map
+      ~stake:(g Boolean.if_)
+      ~edit_state:c
+      ~send:c
+      ~receive:c
+      ~set_delegate:c
+      ~set_permissions:c
+      ~set_verification_key:c
 
   let constant (t : Stable.Latest.t) : t =
     let open Core_kernel.Field in
