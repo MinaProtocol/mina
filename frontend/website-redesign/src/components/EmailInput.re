@@ -14,15 +14,16 @@ module Styles = {
         outline(px(0), `solid, `transparent),
         padding(px(11)),
         borderWidth(px(2)),
-        borderColor(Theme.Colors.orange),
+        borderColor(Theme.Colors.purple),
       ]),
       focus([
+        boxShadow(~x=px(0), ~y=px(2), ~blur=px(4), `rgba((0, 0, 0, 0.2))),
         outline(px(0), `solid, `transparent),
         padding(px(11)),
         borderWidth(px(2)),
-        borderColor(Theme.Colors.orange),
+        borderColor(Theme.Colors.purple),
       ]),
-      hover([borderColor(Theme.Colors.orange)]),
+      hover([borderColor(Theme.Colors.purple)]),
     ]);
   let submitButton =
     style([
@@ -81,7 +82,8 @@ let make = (~center as centerText=false) => {
            <Button
              height={`rem(3.25)}
              width={`rem(7.93)}
-             onClick={e => submitForm(e)}>
+             onClick={e => submitForm(e)}
+             dark=true>
              <span className=Styles.submitButton>
                {React.string("Submit")}
                <Icon kind=Icon.ArrowRightMedium />

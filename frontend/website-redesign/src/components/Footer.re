@@ -8,7 +8,7 @@ module Styles = {
       display(`flex),
       backgroundColor(black),
       flexDirection(`column),
-      padding2(~v=`rem(3.4), ~h=`rem(1.25)),
+      padding2(~v=`rem(4.), ~h=`rem(1.25)),
     ]);
   let logo = style([height(`rem(3.1)), width(`rem(11.))]);
   let label = merge([Theme.Type.h4, style([color(white)])]);

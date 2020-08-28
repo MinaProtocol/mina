@@ -6,6 +6,7 @@ module Colors = {
   let gray = `hex("d9d9d9");
   let white = Css.white;
   let black = Css.black;
+  let purple = `hex("5362C8");
 };
 
 module Typeface = {
