@@ -100,5 +100,6 @@ module SendTransaction = struct
         from amount_str to_ amount_str
     in
     let json = Yojson.Safe.from_string operations in
-    [%of_yojson: Models.Operation.t list] json |> Result.ok |> Option.value_exn
+    [%of_yojson: Rosetta_models.Operation.t list] json
+    |> Result.ok |> Option.value_exn
 end
