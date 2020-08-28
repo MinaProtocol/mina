@@ -1,7 +1,6 @@
 open Core_kernel
 open Rosetta_models
 open Rosetta_lib
-open Lib
 open Async
 
 module Reason = struct
