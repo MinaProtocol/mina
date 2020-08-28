@@ -4,6 +4,9 @@ set -euo pipefail
 
 eval $(opam env)
 
+export PATH=/home/opam/.cargo/bin:/usr/lib/go/bin:$PATH
+export GO=/usr/lib/go/bin/go
+
 # Waiting for the coda-daemon image to be built by CircleCI (this is redundent once build-artifacts works in buildkite)
 
 git_tag=$(git describe --abbrev=0)
