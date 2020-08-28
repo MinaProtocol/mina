@@ -53,6 +53,7 @@ module Styles = {
     style([
       display(`flex),
       flexDirection(`column),
+<<<<<<< HEAD
       media(Theme.MediaQuery.desktop, [flexDirection(`row)]),
     ]);
   let leftSide =
@@ -70,6 +71,9 @@ module Styles = {
       height(`rem(3.1)),
       width(`rem(11.)),
       marginBottom(`rem(4.)),
+=======
+      padding2(~v=`rem(4.), ~h=`rem(1.25)),
+>>>>>>> add purple focused states for the submit button
     ]);
   let label = merge([Theme.Type.h4, style([color(white)])]);
   let connectLabel =
