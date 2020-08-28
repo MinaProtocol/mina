@@ -19,8 +19,8 @@ import (
 	"encoding/base64"
 
 	"github.com/go-errors/errors"
-	"github.com/ipfs/go-ipfs/core/bootstrap"
-	logging "github.com/ipfs/go-log/v2"
+	logging "github.com/ipfs/go-log"
+	logwriter "github.com/ipfs/go-log/writer"
 	crypto "github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/event"
 	net "github.com/libp2p/go-libp2p-core/network"
@@ -32,6 +32,7 @@ import (
 	mdns "github.com/libp2p/go-libp2p/p2p/discovery"
 	filter "github.com/libp2p/go-maddr-filter"
 	"github.com/multiformats/go-multiaddr"
+	logging2 "github.com/whyrusleeping/go-logging"
 )
 
 type subscription struct {
@@ -198,7 +199,7 @@ type configureMsg struct {
 	ListenOn        []string `json:"ifaces"`
 	External        string   `json:"external_maddr"`
 	UnsafeNoTrustIP bool     `json:"unsafe_no_trust_ip"`
-	GossipType      string   `json:"gossip_type"`
+	Flood           bool     `json:"flood_gossip"`
 }
 
 type discoveredPeerUpcall struct {
@@ -235,20 +236,11 @@ func (m *configureMsg) run(app *app) (interface{}, error) {
 		return nil, badHelper(err)
 	}
 
-	// SOMEDAY:
-	// - stop putting block content on the mesh.
-	// - bigger than 16MiB block size?
-	opts := pubsub.WithMaxMessageSize(1024 * 1024 * 16)
 	var ps *pubsub.PubSub
-	if m.GossipType == "gossipsub" {
-		ps, err = pubsub.NewGossipSub(app.Ctx, helper.Host, opts)
-	} else if m.GossipType == "flood" {
-		ps, err = pubsub.NewFloodSub(app.Ctx, helper.Host, opts)
-	} else if m.GossipType == "random" {
-		// networks of size 100 aren't very large, but we shouldn't be using randomsub!
-		ps, err = pubsub.NewRandomSub(app.Ctx, helper.Host, 10, opts)
+	if m.Flood {
+		ps, err = pubsub.NewFloodSub(app.Ctx, helper.Host, pubsub.WithStrictSignatureVerification(true), pubsub.WithMessageSigning(true))
 	} else {
-		return nil, badHelper(errors.New("unknown gossip type"))
+		ps, err = pubsub.NewRandomSub(app.Ctx, helper.Host, pubsub.WithStrictSignatureVerification(true), pubsub.WithMessageSigning(true))
 	}
 
 	if err != nil {
@@ -342,7 +334,6 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 	if app.P2p.Dht == nil {
 		return nil, needsDHT()
 	}
-	app.P2p.Pubsub.Join(s.Topic)
 	err := app.P2p.Pubsub.RegisterTopicValidator(s.Topic, func(ctx context.Context, id peer.ID, msg *pubsub.Message) bool {
 		if id == app.P2p.Me {
 			// messages from ourself are valid.
@@ -401,7 +392,7 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 			return false
 		case res := <-ch:
 			if !res {
-				app.P2p.Logger.Info("why u fail to validate :(")
+				app.P2p.Logger.Error("why u fail to validate :(")
 			} else {
 				app.P2p.Logger.Info("validated!")
 			}
@@ -819,13 +810,17 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 	discovered := make(chan peer.AddrInfo)
 	app.P2p.DiscoveredPeers = discovered
 
-	foundPeer := func(who peer.ID) {
-		if who.Validate() == nil && who != app.P2p.Me {
-			addrs := app.P2p.Host.Peerstore().Addrs(who)
-
-			if len(addrs) > 0 {
-				addrStrings := make([]string, len(addrs))
-				for i, a := range addrs {
+	foundPeer := func(info peer.AddrInfo, source string) {
+		if info.ID != "" && len(info.Addrs) != 0 {
+			ctx, cancel := context.WithTimeout(app.Ctx, 15*time.Second)
+			defer cancel()
+			if err := app.P2p.Host.Connect(ctx, info); err != nil {
+				app.P2p.Logger.Warningf("couldn't connect to %s peer %v (maybe the network ID mismatched?): %v", source, info.Loggable(), err)
+			} else {
+				app.P2p.Logger.Infof("Found a %s peer: %s", source, info.Loggable())
+				app.P2p.Host.Peerstore().AddAddrs(info.ID, info.Addrs, peerstore.ConnectedAddrTTL)
+				addrStrings := make([]string, len(info.Addrs))
+				for i, a := range info.Addrs {
 					addrStrings[i] = a.String()
 				}
 
@@ -863,9 +858,18 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 			panic(err)
 		}
 
-		for evt := range sub.Out() {
-			e := evt.(event.EvtPeerConnectednessChanged)
-			foundPeer(e.Peer)
+		for {
+			// default is to yield only 100 peers at a time. for now, always be
+			// looking... TODO: Is there a better way to use discovery? Should we only
+			// have to explicitly search once at startup?
+			dhtpeers, err := routingDiscovery.FindPeers(app.Ctx, app.P2p.Rendezvous)
+			if err != nil {
+				app.P2p.Logger.Error("failed to find DHT peers: ", err)
+			}
+			for info := range dhtpeers {
+				foundPeer(info, "dht")
+			}
+			time.Sleep(30 * time.Second)
 		}
 	}()
 
@@ -1007,13 +1011,9 @@ type successResult struct {
 }
 
 func main() {
-	logging.SetupLogging(logging.Config{
-		Format: logging.JSONOutput,
-		Stderr: true,
-		Stdout: false,
-		Level:  logging.LevelInfo,
-		File:   "",
-	})
+	logwriter.Configure(logwriter.Output(os.Stderr), logwriter.LdJSONFormatter)
+	log.SetOutput(os.Stderr)
+	logging.SetAllLoggers(logging2.INFO)
 	helperLog := logging.Logger("helper top-level JSON handling")
 
 	go func() {
