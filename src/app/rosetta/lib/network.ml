@@ -438,7 +438,7 @@ module Options = struct
           ~network_identifier:network.network_identifier
       in
       { Network_options_response.version=
-          Version.create "1.4.1" (Option.value ~default:"unknown" res#version)
+          Version.create "1.4.2" (Option.value ~default:"unknown" res#version)
       ; allow=
           { Allow.operation_statuses= Lazy.force Operation_statuses.all
           ; operation_types= Lazy.force Operation_types.all
