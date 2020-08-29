@@ -69,7 +69,6 @@ let make = () => {
     ();
   };
   <>
-    <div> {React.string("Enter Email")} </div>
     {successState
        ? <div className=Styles.successState>
            <span className=Styles.successText>
