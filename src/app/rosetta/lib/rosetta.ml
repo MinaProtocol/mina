@@ -1,5 +1,6 @@
 open Core_kernel
 open Async
+open Rosetta_lib
 
 let router ~graphql_uri ~db ~logger route body =
   match route with
@@ -16,7 +17,7 @@ let router ~graphql_uri ~db ~logger route body =
   | _ ->
       Deferred.return (Error `Page_not_found)
 
-let server_handler ~db ~graphql_uri ~logger ~body _ req =
+let server_handler ~db ~graphql_uri ~logger ~body _sock req =
   let uri = Cohttp_async.Request.uri req in
   let%bind body = Cohttp_async.Body.to_string body in
   let route = List.tl_exn (String.split ~on:'/' (Uri.path uri)) in
@@ -31,21 +32,24 @@ let server_handler ~db ~graphql_uri ~logger ~body _ req =
           (`Json_parse (Some err))
         |> Deferred.Result.fail |> Errors.Lift.wrap
   in
+  let lift x = `Response x in
   match result with
   | Ok json ->
       Cohttp_async.Server.respond_string
         (Yojson.Safe.to_string json)
         ~headers:(Cohttp.Header.of_list [("Content-Type", "application/json")])
+      >>| lift
   | Error `Page_not_found ->
-      Cohttp_async.Server.respond (Cohttp.Code.status_of_code 404)
+      Cohttp_async.Server.respond (Cohttp.Code.status_of_code 404) >>| lift
   | Error (`App app_error) ->
       let error = Errors.erase app_error in
-      let metadata = [("error", Models.Error.to_yojson error)] in
+      let metadata = [("error", Rosetta_models.Error.to_yojson error)] in
       [%log warn] ~metadata "Error response: $error" ;
       Cohttp_async.Server.respond_string
         ~status:(Cohttp.Code.status_of_code 500)
-        (Yojson.Safe.to_string (Models.Error.to_yojson error))
+        (Yojson.Safe.to_string (Rosetta_models.Error.to_yojson error))
         ~headers:(Cohttp.Header.of_list [("Content-Type", "application/json")])
+      >>| lift
 
 let command =
   let open Command.Let_syntax in
@@ -74,7 +78,15 @@ let command =
         Deferred.unit
     | Ok db ->
         let%bind server =
-          Cohttp_async.Server.create ~on_handler_error:`Raise
+          Cohttp_async.Server.create_expert ~max_connections:128
+            ~on_handler_error:
+              (`Call
+                (fun _net exn ->
+                  [%log error]
+                    "Exception while handling Rosetta server request: $error"
+                    ~metadata:
+                      [ ("error", `String (Exn.to_string_mach exn))
+                      ; ("context", `String "rest_server") ] ))
             (Async.Tcp.Where_to_listen.bind_to All_addresses (On_port port))
             (server_handler ~db ~graphql_uri ~logger)
         in
