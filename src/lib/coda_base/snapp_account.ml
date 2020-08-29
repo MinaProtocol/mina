@@ -8,18 +8,20 @@ consensus_mechanism]
 
 open Snark_params.Tick
 module Coda_numbers = Coda_numbers
+module F = Pickles.Backend.Tick.Field
 
 [%%else]
 
 module Coda_numbers = Coda_numbers_nonconsensus.Coda_numbers
 module Currency = Currency_nonconsensus.Currency
 module Random_oracle = Random_oracle_nonconsensus.Random_oracle
+open Snark_params_nonconsensus
+module F = Field
 
 [%%endif]
 
 module Frozen_ledger_hash = Frozen_ledger_hash0
 module Ledger_hash = Ledger_hash0
-module F = Pickles.Backend.Tick.Field
 open Snapp_basic
 
 module Permissions = struct
@@ -41,15 +43,6 @@ module Permissions = struct
       end
     end]
 
-    module Checked = struct
-      type t = {verification_key: Boolean.var; private_key: Boolean.var}
-      [@@deriving hlist]
-
-      let to_input t =
-        let [x; y] = to_hlist t in
-        Random_oracle.Input.bitstring [x; y]
-    end
-
     let to_bits : t -> (unit, _) H_list.t = function
       | Either ->
           [false; false]
@@ -59,6 +52,22 @@ module Permissions = struct
           [true; false]
       | Both ->
           [true; true]
+
+    let to_input t =
+      let [x; y] = to_bits t in
+      Random_oracle.Input.bitstring [x; y]
+
+    [%%ifdef
+    consensus_mechanism]
+
+    module Checked = struct
+      type t = {verification_key: Boolean.var; private_key: Boolean.var}
+      [@@deriving hlist]
+
+      let to_input t =
+        let [x; y] = to_hlist t in
+        Random_oracle.Input.bitstring [x; y]
+    end
 
     let typ =
       let t =
@@ -76,9 +85,7 @@ module Permissions = struct
         | [true; true] ->
             Both )
 
-    let to_input t =
-      let [x; y] = to_bits t in
-      Random_oracle.Input.bitstring [x; y]
+    [%%endif]
   end
 
   module Poly = struct
@@ -113,13 +120,16 @@ module Permissions = struct
     end
   end]
 
+  let to_input = Poly.to_input Controller.to_input
+
+  [%%ifdef
+  consensus_mechanism]
+
   module Checked = struct
     type t = (Boolean.var, Controller.Checked.t) Poly.Stable.Latest.t
 
     let to_input = Poly.to_input Controller.Checked.to_input
   end
-
-  let to_input = Poly.to_input Controller.to_input
 
   let typ =
     let open Poly.Stable.Latest in
@@ -127,6 +137,8 @@ module Permissions = struct
       [Boolean.typ; Controller.typ; Controller.typ; Controller.typ]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
+
+  [%%endif]
 end
 
 module Poly = struct
@@ -149,7 +161,7 @@ module Stable = struct
     type t =
       ( F.Stable.V1.t Snapp_state.Stable.V1.t
       , Permissions.Stable.V1.t
-      , ( Pickles.Side_loaded.Verification_key.Stable.V1.t
+      , ( Side_loaded_verification_key.Stable.V1.t
         , F.Stable.V1.t )
         With_hash.Stable.V1.t )
       Poly.Stable.V1.t
@@ -160,6 +172,9 @@ module Stable = struct
 end]
 
 open Pickles_types
+
+[%%ifdef
+consensus_mechanism]
 
 module Checked = struct
   type t =
@@ -182,11 +197,6 @@ module Checked = struct
     |> List.reduce_exn ~f:append
 end
 
-let digest_vk t =
-  Random_oracle.(
-    hash ~init:Hash_prefix.side_loaded_vk
-      (pack_input (Pickles.Side_loaded.Verification_key.to_input t)))
-
 let typ : (Checked.t, t) Typ.t =
   let open Poly in
   Typ.of_hlistable
@@ -200,6 +210,13 @@ let typ : (Checked.t, t) Typ.t =
     ]
     ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
     ~value_of_hlist:of_hlist
+
+[%%endif]
+
+let digest_vk (t : Side_loaded_verification_key.t) =
+  Random_oracle.(
+    hash ~init:Hash_prefix.side_loaded_vk
+      (pack_input (Pickles_base.Side_loaded_verification_key.to_input t)))
 
 let to_input (t : t) =
   let open Random_oracle.Input in

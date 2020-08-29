@@ -1,5 +1,4 @@
 open Core_kernel
-open Import
 
 [%%versioned
 module Stable = struct

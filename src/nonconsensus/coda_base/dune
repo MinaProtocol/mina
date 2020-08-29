@@ -13,6 +13,9 @@
     snark_params_nonconsensus
     quickcheck_lib_nonconsensus
     random_oracle_nonconsensus
+    pickles_types
+    pickles_base
+    with_hash
     yojson
     )
  (preprocessor_deps ../../config.mlh)

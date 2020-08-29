@@ -9,18 +9,10 @@ consensus_mechanism]
 open Snark_params.Tick
 open Signature_lib
 
-[%%else]
-
-open Signature_lib_nonconsensus
-
 [%%endif]
 
 module Flagged_option = struct
   type ('bool, 'a) t = {is_some: 'bool; data: 'a} [@@deriving hlist, fields]
-
-  let typ t =
-    Typ.of_hlistable [Boolean.typ; t] ~var_to_hlist:to_hlist
-      ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
   let to_input' {is_some; data} ~f =
     Random_oracle_input.(append (bitstring [is_some]) (f data))
@@ -38,8 +30,17 @@ module Flagged_option = struct
 
   let to_option {is_some; data} = Option.some_if is_some data
 
+  [%%ifdef
+  consensus_mechanism]
+
+  let typ t =
+    Typ.of_hlistable [Boolean.typ; t] ~var_to_hlist:to_hlist
+      ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+
   let option_typ ~default t =
     Typ.transport (typ t) ~there:(of_option ~default) ~back:to_option
+
+  [%%endif]
 end
 
 module Set_or_keep = struct
@@ -56,6 +57,13 @@ module Set_or_keep = struct
   let of_option = function Some x -> Set x | None -> Keep
 
   let set_or_keep t x = match t with Keep -> x | Set y -> y
+
+  let to_input t ~dummy:default ~f =
+    Flagged_option.to_input ~default ~f
+      (Flagged_option.of_option ~default (to_option t))
+
+  [%%ifdef
+  consensus_mechanism]
 
   module Checked : sig
     type 'a t
@@ -92,9 +100,7 @@ module Set_or_keep = struct
 
   let typ = Checked.typ
 
-  let to_input t ~dummy:default ~f =
-    Flagged_option.to_input ~default ~f
-      (Flagged_option.of_option ~default (to_option t))
+  [%%endif]
 end
 
 module Or_ignore = struct
@@ -105,6 +111,9 @@ module Or_ignore = struct
       [@@deriving sexp, eq, compare, hash, yojson]
     end
   end]
+
+  [%%ifdef
+  consensus_mechanism]
 
   module Checked : sig
     type 'a t
@@ -156,17 +165,17 @@ module Or_ignore = struct
   let typ_implicit = Checked.typ_implicit
 
   let typ_explicit = Checked.typ_explicit
+
+  [%%endif]
 end
+
+[%%ifdef
+consensus_mechanism]
 
 module F = Pickles.Backend.Tick.Field
 
-let invalid_public_key : Public_key.Compressed.t Lazy.t =
-  let open F in
-  let f x =
-    let open Pickles.Backend.Tick.Inner_curve.Params in
-    b + (x * (a + square x))
-  in
-  let rec go i : Public_key.Compressed.t =
-    if not (is_square (f i)) then {x= i; is_odd= false} else go (i + one)
-  in
-  lazy (go zero)
+[%%else]
+
+module F = Snark_params_nonconsensus.Field
+
+[%%endif]

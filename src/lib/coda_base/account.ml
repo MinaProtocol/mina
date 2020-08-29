@@ -202,6 +202,7 @@ let initialize ?snapp account_id : t =
 
 let hash_snapp_account_opt = function
   | None ->
+      (* TODO: Should be the hash of a real snapp account *)
       Field.zero
   | Some a ->
       Random_oracle.hash ~init:Hash_prefix_states.snapp_account

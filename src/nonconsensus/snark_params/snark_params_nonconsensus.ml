@@ -33,6 +33,21 @@ curve_size]
 "ledger_depth", ledger_depth]
 
 module Field = struct
+  open Core_kernel
+
+  [%%versioned_asserted
+  module Stable = struct
+    [@@@no_toplevel_latest_type]
+
+    module V1 = struct
+      type t = Tweedle.Fq.t [@@deriving eq, compare, yojson, sexp, hash]
+
+      let to_latest x = x
+    end
+
+    module Tests = struct end
+  end]
+
   include Tweedle.Fq
 
   let size = order |> Snarkette.Nat.to_string |> Bigint.of_string
