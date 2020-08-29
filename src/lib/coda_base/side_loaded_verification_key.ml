@@ -34,4 +34,6 @@ include Pickles_base.Side_loaded_verification_key.Make
             let of_repr = ignore
           end)
 
+let to_input = Pickles_base.Side_loaded_verification_key.to_input
+
 [%%endif]

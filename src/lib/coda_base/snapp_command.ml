@@ -64,8 +64,7 @@ module Per_account = struct
     List.reduce_exn ~f:append
       ( List.map (Vector.to_list state)
           ~f:(Set_or_keep.to_input ~dummy:F.zero ~f:field)
-      @ [ Set_or_keep.to_input
-            ~dummy:(Lazy.force invalid_public_key)
+      @ [ Set_or_keep.to_input ~dummy:Public_key.Compressed.empty
             ~f:Public_key.Compressed.to_input delegate ] )
 
   module Checked = struct
@@ -87,8 +86,7 @@ module Per_account = struct
     let open Poly.Stable.Latest in
     Typ.of_hlistable
       [ Snapp_state.typ (Set_or_keep.Checked.typ ~dummy:Field.zero Field.typ)
-      ; Set_or_keep.typ
-          ~dummy:(Lazy.force invalid_public_key)
+      ; Set_or_keep.typ ~dummy:Public_key.Compressed.empty
           Public_key.Compressed.typ ]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
@@ -562,8 +560,7 @@ module Payload = struct
           ; From_user.to_input
               (Option.value user_opt
                  ~default:
-                   { pk= Lazy.force invalid_public_key
-                   ; nonce= Account_nonce.zero })
+                   {pk= Public_key.Compressed.empty; nonce= Account_nonce.zero})
           ; Per_snapp.to_input ~delta:Amount.to_input (s snapp)
           ; Snapp_init.to_input
               (Option.value snapp_init_opt ~default:Snapp_init.dummy)
