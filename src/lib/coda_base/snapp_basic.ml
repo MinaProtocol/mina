@@ -7,7 +7,6 @@ open Core_kernel
 consensus_mechanism]
 
 open Snark_params.Tick
-open Signature_lib
 
 [%%endif]
 

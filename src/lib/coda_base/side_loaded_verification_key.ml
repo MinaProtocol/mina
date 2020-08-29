@@ -1,14 +1,14 @@
 [%%import
 "/src/config.mlh"]
 
-open Core_kernel
-
 [%%ifdef
 consensus_mechanism]
 
 include Pickles.Side_loaded.Verification_key
 
 [%%else]
+
+open Core_kernel
 
 module G = struct
   open Snark_params_nonconsensus
