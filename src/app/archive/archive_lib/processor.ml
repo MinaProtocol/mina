@@ -7,6 +7,7 @@ open Coda_state
 open Coda_transition
 open Pipe_lib
 open Signature_lib
+open Pickles_types
 
 module Caqti_type_spec = struct
   type (_, _) t =
@@ -42,6 +43,20 @@ module Caqti_type_spec = struct
      | _ :: spec, (x, t) ->
          x :: tuple_to_hlist spec t
 end
+
+let rec vector : type t n.
+    n Nat.t -> t Caqti_type.t -> (t, n) Vector.t Caqti_type.t =
+ fun n t ->
+  match n with
+  | Z ->
+      Caqti_type.(custom unit)
+        ~encode:(fun Vector.[] -> Ok ())
+        ~decode:(fun () -> Ok Vector.[])
+  | S n ->
+      let r = vector n t in
+      Caqti_type.(custom (tup2 t r))
+        ~encode:(fun Vector.(x :: xs) -> Ok (x, xs))
+        ~decode:(fun (x, xs) -> Ok (x :: xs))
 
 let rec deferred_result_list_fold ls ~init ~f =
   let open Deferred.Result.Let_syntax in
@@ -90,6 +105,241 @@ module Snarked_ledger_hash = struct
           (Caqti_request.find Caqti_type.string Caqti_type.int
              "INSERT INTO snarked_ledger_hashes (value) VALUES (?) RETURNING id")
           hash
+end
+
+module Snapp_command = struct
+  let hlist_typ ~to_hlist ~of_hlist spec =
+    let open Caqti_type_spec in
+    let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
+    let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
+    Caqti_type.custom ~encode ~decode (to_rep spec)
+
+  module Other_fee_payer_payload = struct
+    type t = (int, int, int, int) Other_fee_payer.Payload.Poly.t
+
+    let typ =
+      let open Other_fee_payer.Payload.Poly in
+      hlist_typ ~to_hlist ~of_hlist Caqti_type.[int; int; int; int]
+  end
+
+  module Signed_amount = struct
+    type t = int
+
+    let spec = Caqti_type.int
+  end
+
+  module Permissions = struct
+    type t = (bool, string) Permissions.Poly.t
+
+    let typ : t Caqti_type.t =
+      let open Permissions.Poly in
+      hlist_typ ~to_hlist ~of_hlist
+        Caqti_type.[bool; string; string; string; string; string; string]
+  end
+
+  open Snapp_basic
+
+  module Or_ignore = struct
+    type 'a t = 'a Or_ignore.t
+
+    let encode (t : _ t) = t |> Or_ignore.to_option |> Result.return
+
+    let decode x = x |> Or_ignore.of_option |> Result.return
+
+    let typ t = Caqti_type.custom ~encode ~decode (Caqti_type.option t)
+  end
+
+  module Set_or_keep = struct
+    type 'a t = 'a Set_or_keep.t
+
+    let encode (t : _ t) = t |> Set_or_keep.to_option |> Result.return
+
+    let decode x = x |> Set_or_keep.of_option |> Result.return
+
+    let typ t = Caqti_type.custom ~encode ~decode (Caqti_type.option t)
+  end
+
+  module Party = struct
+    open Snapp_command.Party
+
+    module Update = struct
+      (* TODO: This should have the actual verification key in it. *)
+      type t =
+        ( string Set_or_keep.t
+        , int Set_or_keep.t
+        , string Set_or_keep.t
+        , Permissions.t Set_or_keep.t )
+        Update.Poly.t
+
+      let typ : t Caqti_type.t =
+        let open Update.Poly in
+        hlist_typ ~to_hlist ~of_hlist
+          Caqti_type.
+            [ vector Snapp_state.Max_state_size.n (Set_or_keep.typ string)
+            ; Set_or_keep.typ int
+            ; Set_or_keep.typ string
+            ; Set_or_keep.typ Permissions.typ ]
+    end
+
+    module Predicate = struct
+      open Snapp_predicate
+
+      module Numeric = struct
+        type 'a t = 'a Numeric.t
+
+        let interval_typ t =
+          let open Closed_interval in
+          hlist_typ ~to_hlist ~of_hlist [t; t]
+
+        let typ t = Or_ignore.typ (interval_typ t)
+      end
+
+      module Hash = struct
+        type 'a t = 'a Or_ignore.t
+
+        let typ = Or_ignore.typ
+      end
+
+      module Protocol_state = struct
+        module Epoch_data = struct
+          module Epoch_ledger = struct
+            type t = (string Hash.t, int Numeric.t) Epoch_ledger.Poly.t
+
+            let typ : t Caqti_type.t =
+              let open Epoch_ledger.Poly in
+              hlist_typ ~to_hlist ~of_hlist
+                Caqti_type.[Hash.typ string; Numeric.typ int]
+          end
+
+          type t =
+            ( Epoch_ledger.t
+            , string Hash.t
+            , string Hash.t
+            , string Hash.t
+            , int Numeric.t )
+            Epoch_data.Poly.t
+
+          let typ : t Caqti_type.t =
+            let open Epoch_data.Poly in
+            hlist_typ ~to_hlist ~of_hlist
+              Caqti_type.
+                [ Epoch_ledger.typ
+                ; Hash.typ string
+                ; Hash.typ string
+                ; Hash.typ string
+                ; Numeric.typ int ]
+        end
+
+        type t =
+          ( string Hash.t
+          , int Numeric.t
+          , int Numeric.t
+          , int Numeric.t
+          , unit
+          , int Numeric.t
+          , int Numeric.t
+          , Epoch_data.t )
+          Protocol_state.Poly.t
+
+        let typ : t Caqti_type.t =
+          let open Protocol_state.Poly in
+          hlist_typ ~to_hlist ~of_hlist
+            Caqti_type.
+              [ Hash.typ string
+              ; Numeric.typ int
+              ; Numeric.typ int
+              ; Numeric.typ int
+              ; Numeric.typ int
+              ; unit
+              ; Numeric.typ int
+              ; Numeric.typ int
+              ; Epoch_data.typ
+              ; Epoch_data.typ ]
+      end
+
+      module Account = struct
+        type t =
+          ( int Numeric.t
+          , int Numeric.t
+          , string Hash.t
+          , string Hash.t
+          , string Or_ignore.t )
+          Account.Poly.t
+
+        let typ : t Caqti_type.t =
+          let open Account.Poly in
+          hlist_typ ~to_hlist ~of_hlist
+            Caqti_type.
+              [ Numeric.typ int
+              ; Numeric.typ int
+              ; Hash.typ string
+              ; Hash.typ string
+              ; Hash.typ string
+              ; vector Snapp_state.Max_state_size.n (Hash.typ string) ]
+      end
+
+      module Account_state = struct
+        type t = string
+
+        let typ = Caqti_type.string
+      end
+
+      module Transition = struct
+        type 'a t = 'a Transition.t
+
+        let typ t =
+          let open Transition in
+          hlist_typ ~to_hlist ~of_hlist [t; t]
+      end
+
+      module Other = struct
+        type t =
+          (Account.t, Account_state.t Transition.t, string Hash.t) Other.Poly.t
+
+        let typ : t Caqti_type.t =
+          let open Other.Poly in
+          hlist_typ ~to_hlist ~of_hlist
+            [ Account.typ
+            ; Transition.typ Account_state.typ
+            ; Hash.typ Caqti_type.string ]
+      end
+
+      type t = (Account.t, Protocol_state.t, Other.t, string Hash.t) Poly.t
+
+      let typ : t Caqti_type.t =
+        let open Poly in
+        hlist_typ ~to_hlist ~of_hlist
+          Caqti_type.
+            [Account.typ; Other.typ; Hash.typ string; Protocol_state.typ]
+    end
+
+    module Body = struct
+      type nonrec t = (int, Update.t, Signed_amount.t) Body.Poly.t
+
+      let typ : t Caqti_type.t =
+        let open Body.Poly in
+        hlist_typ ~to_hlist ~of_hlist
+          Caqti_type.[int; Update.typ; Signed_amount.spec]
+    end
+
+    type t = (Body.t, Predicate.t) Predicated.Poly.t
+
+    let typ =
+      let open Predicated.Poly in
+      hlist_typ ~to_hlist ~of_hlist [Body.typ; Predicate.typ]
+  end
+
+  type t =
+    { token_id: int
+    ; fee_payment: Other_fee_payer_payload.t option
+    ; one: Party.t
+    ; two: Party.t option }
+  [@@deriving hlist]
+
+  let typ =
+    hlist_typ ~to_hlist ~of_hlist
+      Caqti_type.
+        [int; option Other_fee_payer_payload.typ; Party.typ; option Party.typ]
 end
 
 module User_command = struct
@@ -470,15 +720,24 @@ module Block = struct
         let transactions =
           External_transition.transactions ~constraint_constants t
         in
-        let user_commands, fee_transfers, coinbases =
-          Core.List.fold transactions ~init:([], [], [])
-            ~f:(fun (acc_user_commands, acc_fee_transfers, acc_coinbases) ->
-            function
-            | { Coda_base.With_status.status= _
+        let snapp_commands, user_commands, fee_transfers, coinbases =
+          Core.List.fold transactions ~init:([], [], [], [])
+            ~f:(fun ( acc_snapp_commands
+                    , acc_user_commands
+                    , acc_fee_transfers
+                    , acc_coinbases )
+               -> function
+            | { Coda_base.With_status.status
               ; data=
-                  Coda_base.Transaction.Command
-                    (Snapp_command user_command_checked) } ->
-                failwith "Not implemented"
+                  Coda_base.Transaction.Command (Snapp_command snapp_command)
+              } ->
+                let snapp_command =
+                  {Coda_base.With_status.status; data= snapp_command}
+                in
+                ( snapp_command :: acc_snapp_commands
+                , acc_user_commands
+                , acc_fee_transfers
+                , acc_coinbases )
             | { Coda_base.With_status.status
               ; data=
                   Coda_base.Transaction.Command
@@ -489,29 +748,34 @@ module Block = struct
                       Coda_base.User_command.forget_check user_command_checked
                   }
                 in
-                ( user_command :: acc_user_commands
+                ( acc_snapp_commands
+                , user_command :: acc_user_commands
                 , acc_fee_transfers
                 , acc_coinbases )
             | {data= Fee_transfer fee_transfer_bundled; status= _} ->
                 let fee_transfers =
                   Coda_base.Fee_transfer.to_list fee_transfer_bundled
                 in
-                ( acc_user_commands
+                ( acc_snapp_commands
+                , acc_user_commands
                 , fee_transfers @ acc_fee_transfers
                 , acc_coinbases )
             | {data= Coinbase coinbase; status= _} -> (
               match Coda_base.Coinbase.fee_transfer coinbase with
               | None ->
-                  ( acc_user_commands
+                  ( acc_snapp_commands
+                  , acc_user_commands
                   , acc_fee_transfers
                   , coinbase :: acc_coinbases )
               | Some {receiver_pk; fee} ->
-                  ( acc_user_commands
+                  ( acc_snapp_commands
+                  , acc_user_commands
                   , Coda_base.Fee_transfer.Single.create ~receiver_pk ~fee
                       ~fee_token:Token_id.default
                     :: acc_fee_transfers
                   , coinbase :: acc_coinbases ) ) )
         in
+        (match snapp_commands with [] -> () | _ :: _ -> failwith "TODO") ;
         let%bind user_command_ids =
           deferred_result_list_fold user_commands ~init:[]
             ~f:(fun acc user_command ->

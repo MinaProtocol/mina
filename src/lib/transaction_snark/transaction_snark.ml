@@ -1558,14 +1558,13 @@ module Base = struct
                 s.next_available_token_before ]) ;
         (proof1_must_verify (), proof2_must_verify ())
 
-      let rule ~constraint_constants : _ Pickles.Inductive_rule.t =
+      let _rule ~constraint_constants : _ Pickles.Inductive_rule.t =
         { prevs= [snapp1_tag; snapp2_tag]
         ; main=
             (fun [t1; t2] x ->
               let s1, s2 = main t1 t2 ~constraint_constants x in
               [s1; s2] )
-        ; main_value= (* TODO *)
-                      (fun _ _ -> [true; true]) }
+        ; main_value= (fun _ _ -> [true; true]) }
     end
 
     module One_proved = struct
@@ -1699,14 +1698,13 @@ module Base = struct
                 s.next_available_token_before ]) ;
         proof1_must_verify ()
 
-      let rule ~constraint_constants : _ Pickles.Inductive_rule.t =
+      let _rule ~constraint_constants : _ Pickles.Inductive_rule.t =
         { prevs= [snapp1_tag]
         ; main=
             (fun [t1] x ->
               let s1 = main t1 ~constraint_constants x in
               [s1] )
-        ; main_value= (* TODO *)
-                      (fun _ _ -> [true]) }
+        ; main_value= (fun _ _ -> [true]) }
     end
 
     module Zero_proved = struct
@@ -1828,14 +1826,13 @@ module Base = struct
             ; Token_id.Checked.Assert.equal s.next_available_token_after
                 s.next_available_token_before ])
 
-      let rule ~constraint_constants : _ Pickles.Inductive_rule.t =
+      let _rule ~constraint_constants : _ Pickles.Inductive_rule.t =
         { prevs= []
         ; main=
             (fun [] x ->
               let () = main ~constraint_constants x in
               [] )
-        ; main_value= (* TODO *)
-                      (fun _ _ -> []) }
+        ; main_value= (fun _ _ -> []) }
     end
   end
 

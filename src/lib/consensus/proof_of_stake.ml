@@ -2021,6 +2021,17 @@ module Data = struct
 
     let curr_slot = curr_ Global_slot.slot
 
+    let blockchain_length_var (t : var) = t.blockchain_length
+
+    let min_window_density_var (t : var) = t.min_window_density
+
+    let total_currency_var (t : var) = t.total_currency
+
+    let staking_epoch_data_var (t : var) : Epoch_data.var =
+      t.staking_epoch_data
+
+    let next_epoch_data_var (t : var) : Epoch_data.var = t.next_epoch_data
+
     let curr_global_slot_var (t : var) =
       Global_slot.slot_number t.curr_global_slot
 

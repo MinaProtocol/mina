@@ -434,7 +434,7 @@ module Inner = struct
         ; fee_payment: Other_fee_payer.Stable.V1.t option
         ; one: 'one
         ; two: 'two }
-      [@@deriving sexp, eq, yojson, hash, compare, fields]
+      [@@deriving sexp, eq, yojson, hash, compare, fields, hlist]
     end
   end]
 end

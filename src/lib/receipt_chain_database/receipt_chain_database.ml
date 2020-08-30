@@ -45,7 +45,7 @@ struct
           Receipt.Elt.User_command (User_command.payload c)
       | Snapp_command x ->
           Receipt.Elt.Snapp_command
-            Snapp_command.(Payload.digest (Option.value_exn (to_payload x)))
+            Snapp_command.(Payload.(Digested.digest (digested (to_payload x))))
     in
     Receipt.Chain_hash.cons p parent_hash
 

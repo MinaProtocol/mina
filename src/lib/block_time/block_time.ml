@@ -72,7 +72,19 @@ module Time = struct
 
     module N = Coda_numbers.Nat.Make_checked (UInt64) (Bits)
 
-    include (N : module type of N with type t := N.t)
+    let op f (x : t) (y : t) : (Boolean.var, 'a) Checked.t =
+      let g = Fn.compose N.of_bits Unpacked.var_to_bits in
+      f (g x) (g y)
+
+    let ( = ) x = op N.( = ) x
+
+    let ( <= ) x = op N.( <= ) x
+
+    let ( >= ) x = op N.( >= ) x
+
+    let ( < ) x = op N.( < ) x
+
+    let ( > ) x = op N.( > ) x
   end
 
   module Span = struct

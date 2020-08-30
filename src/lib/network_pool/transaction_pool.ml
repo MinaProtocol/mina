@@ -1243,6 +1243,7 @@ let%test_module _ =
             Quickcheck.random_value ~seed:(`Deterministic "constant")
               State_hash.gen
         ; timing= Account.Timing.Untimed
+        ; permissions= Permissions.user_default
         ; snapp= None } )
 
     let%test_unit "Transactions are removed and added back in fork changes" =

@@ -124,6 +124,7 @@ module Auth_required = struct
       ; signature_sufficient= f t.signature_sufficient }
 
     let if_ b ~then_:t ~else_:e =
+      let open Pickles.Impls.Step in
       { constant= Boolean.if_ b ~then_:t.constant ~else_:e.constant
       ; signature_necessary=
           Boolean.if_ b ~then_:t.signature_necessary
@@ -290,7 +291,7 @@ end]
 module Checked = struct
   type t = (Boolean.var, Auth_required.Checked.t) Poly.Stable.Latest.t
 
-  let to_input = Poly.to_input Auth_required.Checked.to_input
+  let to_input x = Poly.to_input Auth_required.Checked.to_input x
 
   open Pickles.Impls.Step
 
@@ -313,7 +314,7 @@ module Checked = struct
       ~set_verification_key:a
 end
 
-let to_input = Poly.to_input Auth_required.to_input
+let to_input x = Poly.to_input Auth_required.to_input x
 
 let typ =
   let open Poly.Stable.Latest in

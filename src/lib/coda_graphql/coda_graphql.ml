@@ -508,6 +508,7 @@ module Types = struct
           ; delegate
           ; voting_for
           ; timing
+          ; permissions
           ; snapp } =
         let open Option.Let_syntax in
         let%bind public_key = public_key in
@@ -517,6 +518,7 @@ module Types = struct
         let%bind delegate = delegate in
         let%bind voting_for = voting_for in
         let%bind timing = timing in
+        let%bind permissions = permissions in
         let%map snapp = snapp in
         { Account.Poly.public_key
         ; token_id
@@ -527,6 +529,7 @@ module Types = struct
         ; delegate
         ; voting_for
         ; timing
+        ; permissions
         ; snapp }
 
       let of_full_account ?breadcrumb
@@ -539,6 +542,7 @@ module Types = struct
           ; delegate
           ; voting_for
           ; timing
+          ; permissions
           ; snapp } =
         { Account.Poly.public_key= Some public_key
         ; token_id
@@ -549,6 +553,7 @@ module Types = struct
         ; receipt_chain_hash= Some receipt_chain_hash
         ; delegate= Some delegate
         ; voting_for= Some voting_for
+        ; permissions= Some permissions
         ; timing
         ; snapp }
 
@@ -580,6 +585,7 @@ module Types = struct
                   ; breadcrumb= None }
               ; receipt_chain_hash= None
               ; voting_for= None
+              ; permissions= None
               ; timing= Timing.Untimed
               ; snapp= None }
 
@@ -602,7 +608,8 @@ module Types = struct
           , Receipt.Chain_hash.t option
           , State_hash.t option
           , Account.Timing.t
-          , Account.Snapp_account.t option )
+          , Permissions.t option
+          , Snapp_account.t option )
           Account.Poly.t
       ; locked: bool option
       ; is_actively_staking: bool

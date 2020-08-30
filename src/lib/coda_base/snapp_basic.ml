@@ -301,6 +301,10 @@ module Or_ignore = struct
     end
   end]
 
+  let to_option = function Ignore -> None | Check x -> Some x
+
+  let of_option = function None -> Ignore | Some x -> Check x
+
   module Checked : sig
     type 'a t
 
@@ -352,9 +356,7 @@ module Or_ignore = struct
         (Flagged_option.option_typ ~default:ignore t)
         ~there:(function Implicit _ -> assert false | Explicit t -> t)
         ~back:(fun t -> Explicit t)
-      |> Typ.transport
-           ~there:(function Ignore -> None | Check x -> Some x)
-           ~back:(function None -> Ignore | Some x -> Check x)
+      |> Typ.transport ~there:to_option ~back:of_option
   end
 
   let typ_implicit = Checked.typ_implicit
