@@ -24,9 +24,17 @@ let server_handler ~pool ~graphql_uri ~logger ~body _sock req =
   let%bind result =
     let with_db f =
       Caqti_async.Pool.use (fun db -> f ~db) pool
-      |> Deferred.Result.map_error ~f:(fun _ ->
-             (* TODO: format this properly *)
-             `App (Errors.create `Invariant_violation) )
+      |> Deferred.Result.map_error ~f:(function
+           | `App e ->
+               `App e
+           | `Page_not_found ->
+               `Page_not_found
+           | `Connect_failed _e ->
+               `App (Errors.create (`Sql "Connect failed"))
+           | `Connect_rejected _e ->
+               `App (Errors.create (`Sql "Connect rejected"))
+           | `Post_connect _e ->
+               `App (Errors.create (`Sql "Post connect error")) )
     in
     match Yojson.Safe.from_string body with
     | body ->
