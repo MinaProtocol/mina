@@ -26,8 +26,10 @@ module Accumulator = struct
   [@@deriving eq, sexp_of, compare]
 end
 
-module ErrorReporting = Monad.Make (struct
-  type 'a t = ('a Accumulator.t, Hard_fail.t) Deferred.Result.t
+type 'a t = ('a Accumulator.t, Hard_fail.t) Deferred.Result.t
+
+module T = Monad.Make (struct
+  type nonrec 'a t = 'a t
 
   let return a =
     Deferred.return (Ok {Accumulator.computation_result= a; soft_errors= []})
@@ -56,11 +58,16 @@ module ErrorReporting = Monad.Make (struct
   let map = `Define_using_bind
 end)
 
+include T
+
+let ok_exn res =
+  match res with Ok x -> Deferred.return x | Error err -> Error.raise err
+
 let%test_unit "error_monad_unit_test_1" =
   Async.Thread_safe.block_on_async_exn (fun () ->
       let open Deferred.Let_syntax in
       let%map test1 =
-        let open ErrorReporting.Let_syntax in
+        let open T.Let_syntax in
         let f nm =
           let%bind n = nm in
           Deferred.return
@@ -75,7 +82,7 @@ let%test_unit "error_monad_unit_test_2" =
   Async.Thread_safe.block_on_async_exn (fun () ->
       let open Deferred.Let_syntax in
       let%map test2 =
-        let open ErrorReporting.Let_syntax in
+        let open T.Let_syntax in
         let%bind () =
           Deferred.return
             (Ok {Accumulator.computation_result= (); soft_errors= []})
@@ -90,7 +97,7 @@ let%test_unit "error_monad_unit_test_3" =
   Async.Thread_safe.block_on_async_exn (fun () ->
       let open Deferred.Let_syntax in
       let%map test3 =
-        let open ErrorReporting.Let_syntax in
+        let open T.Let_syntax in
         let%bind () =
           Deferred.return
             (Ok
@@ -111,7 +118,7 @@ let%test_unit "error_monad_unit_test_4" =
   Async.Thread_safe.block_on_async_exn (fun () ->
       let open Deferred.Let_syntax in
       let%map test4 =
-        let open ErrorReporting.Let_syntax in
+        let open T.Let_syntax in
         let%bind () =
           Deferred.return
             (Ok {Accumulator.computation_result= (); soft_errors= []})
@@ -127,7 +134,7 @@ let%test_unit "error_monad_unit_test_5" =
   Async.Thread_safe.block_on_async_exn (fun () ->
       let open Deferred.Let_syntax in
       let%map test5 =
-        let open ErrorReporting.Let_syntax in
+        let open T.Let_syntax in
         let%bind () =
           Deferred.return
             (Ok
@@ -146,7 +153,7 @@ let%test_unit "error_monad_unit_test_6" =
   Async.Thread_safe.block_on_async_exn (fun () ->
       let open Deferred.Let_syntax in
       let%map test6 =
-        let open ErrorReporting.Let_syntax in
+        let open T.Let_syntax in
         let%bind () =
           Deferred.return
             (Ok
