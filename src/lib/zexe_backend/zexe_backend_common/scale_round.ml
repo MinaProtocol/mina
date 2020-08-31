@@ -9,7 +9,7 @@ module Scale_round = struct
             xt: 'a; b: 'a; yt: 'a; 
             xp: 'a; l1: 'a; yp: 'a; 
             xs: 'a; ys: 'a
-          } [@@deriving sexp, fields]
+          } [@@deriving sexp, fields, hlist]
       end
     end]
 

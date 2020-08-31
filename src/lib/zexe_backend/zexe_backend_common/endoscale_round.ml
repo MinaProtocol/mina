@@ -11,7 +11,7 @@ module Endoscale_round = struct
             b2i: 'a; xq: 'a; yt: 'a; 
             xp: 'a; l1: 'a; yp: 'a; 
             xs: 'a; ys: 'a
-          } [@@deriving sexp, fields]
+          } [@@deriving sexp, fields, hlist]
       end
     end]
 

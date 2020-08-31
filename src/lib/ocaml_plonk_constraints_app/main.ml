@@ -1,12 +1,15 @@
+open Snarky_bn382.Tweedle
 let%test_module "backend test" =
+
   ( module struct
     let () =
       Zexe_backend.Tweedle.Dee_based.Keypair.set_urs_info
         [On_disk {directory= "/tmp/"; should_write= true}]
 
     module ComputationExample
-        (Impl : Snarky.Snark_intf.Run with type prover_state = unit) =
-    struct
+        (Impl : Snarky.Snark_intf.Run with type prover_state = unit and type field = Dee.Field.t)
+        (Params : sig val params : Impl.field Sponge.Params.t end)
+    = struct
       open Core
       open Impl
 
@@ -27,7 +30,7 @@ let%test_module "backend test" =
         assert_ (Snarky.Constraint.boolean k1);
         assert_ (Snarky.Constraint.equal k2 zero);
 
-        let module Poseidon = Plonk.Poseidon.Constraints (Impl) in
+        let module Poseidon = Plonk.Poseidon.Constraints (Impl) (Params) in
         let perm = Poseidon.permute [|j1 ; k1 ; k2|] 63 in
 
         (* constraints below are not satisfiable only for testing *)
@@ -49,5 +52,7 @@ let%test_module "backend test" =
         assert (Impl.verify proof (Impl.Keypair.vk keys) (input ()) statement)
     end
 
-    include ComputationExample (Snarky.Snark.Run.Make(Zexe_backend.Tweedle.Dee_based) (Core.Unit))
+    module Impl = Snarky.Snark.Run.Make(Zexe_backend.Tweedle.Dee_based) (Core.Unit)
+    module Params = struct let params = Sponge.Params.(map tweedle_p ~f:Impl.Field.Constant.of_string) end
+    include ComputationExample (Impl) (Params) 
   end )

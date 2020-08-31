@@ -70,13 +70,13 @@ module V = struct
     type t =
       | External of int
       | Internal of Internal_var.Unstable.t
-      [@@deriving compare, hash, sexp]
+    [@@deriving compare, hash, sexp]
   end
   include T
   include Comparable.Make(T)
   include Hashable.Make(T)
 
-  let create_internal () = Internal (Internal_var.create ())
+  let create_internal () = Internal (Uuid_unix.create ())
 end
 
 module type Constraint_matrix_intf = sig
@@ -92,7 +92,7 @@ end
 type 'a abc = {a: 'a; b: 'a; c: 'a} [@@deriving sexp]
 
 module Weight = struct
-  open Core
+  open Core_kernel
 
   type t = int abc [@@deriving sexp]
 
@@ -120,11 +120,11 @@ module Hash = Core.Md5
 let digest (t : _ t) = Hash_state.digest t.hash
 
 module Make (Fp : sig
-  include Field.S
+    include Field.S
 
-  val to_bigint_raw_noalloc : t -> Bigint.t
-end)
-(Mat : Constraint_matrix_intf with type field_vector := Fp.Vector.t) =
+    val to_bigint_raw_noalloc : t -> Bigint.t
+  end)
+    (Mat : Constraint_matrix_intf with type field_vector := Fp.Vector.t) =
 struct
   open Core
 
@@ -174,55 +174,39 @@ struct
     let terms = match c with None -> terms | Some c -> (c, 0) :: terms in
     match terms with
     | [] ->
-        Some ([], 0, false)
+      Some ([], 0, false)
     | (c0, i0) :: terms ->
-        let acc, i, ts, n =
-          Sequence.of_list terms
-          |> Sequence.fold ~init:(c0, i0, [], 0)
-                ~f:(fun (acc, i, ts, n) (c, j) ->
-                  if Int.equal i j then (Fp.add acc c, i, ts, n)
-                  else (c, j, (acc, i) :: ts, n + 1) )
-        in
-        Some (List.rev ((acc, i) :: ts), n + 1, has_constant_term)
+      let acc, i, ts, n =
+        Sequence.of_list terms
+        |> Sequence.fold ~init:(c0, i0, [], 0)
+          ~f:(fun (acc, i, ts, n) (c, j) ->
+              if Int.equal i j then (Fp.add acc c, i, ts, n)
+              else (c, j, (acc, i) :: ts, n + 1) )
+      in
+      Some (List.rev ((acc, i) :: ts), n + 1, has_constant_term)
 
   let neg_one = Fp.(negate one)
 
-  let add_generic_constraint sys ?mul ?constant ?output ((s1: Fp.t), (x1: V.t)) ((s2 : Fp.t), (x2: V.t)) : unit =
+  let add_generic_constraint sys ?m ?c ?o ?r ((ls : Fp.t), (lx: V.t)) : unit =
 
-    let deb = Sexp.to_string ([%sexp_of: Fp.t] s1) in
-    print_endline deb;
-    let deb = Sexp.to_string ([%sexp_of: V.t] x1) in
-    print_endline deb;
-    let deb = Sexp.to_string ([%sexp_of: Fp.t] s2) in
-    print_endline deb;
-    let deb = Sexp.to_string ([%sexp_of: V.t] x2) in
-    print_endline deb;
-    print_endline "";
-
-
-    let row = sys.next_row in
-    sys.next_row <- row + 1 ;
-    V.Table.add_multi sys.equivalence_classes ~key:x1
-      ~data:{ row; col= 0 } ;
-    V.Table.add_multi sys.equivalence_classes ~key:x2
-      ~data:{ row; col= 1 } ;
-    Option.iter output ~f:(fun (_, x3) ->
-    V.Table.add_multi sys.equivalence_classes ~key:x3
-        ~data:{ row; col= 2 } ) (*;
-    Backend.add_generic_constraint
-      sys.backend
-      ([ s1; s2 ] @ Option.to_list (Option.map ~f:fst output) @ Option.to_list mul @ Option.to_list constant ) *)
+    let row = sys.next_row in sys.next_row <- row + 1 ;
+    V.Table.add_multi sys.equivalence_classes ~key:lx ~data:{ row; col= 0 } ;
+    Option.iter r ~f:(fun (_, xr) -> V.Table.add_multi sys.equivalence_classes ~key:xr ~data:{ row; col= 1 }) ;
+    Option.iter o ~f:(fun (_, xo) -> V.Table.add_multi sys.equivalence_classes ~key:xo ~data:{ row; col= 2 })
+  (*;
+    Backend.add_generic_constraint sys.backend
+    ([ sl; sr ] @ Option.to_list (Option.map ~f:fst o) @ Option.to_list m @ Option.to_list c )
+  *)
 
   let completely_reduce sys (terms : (Fp.t * int) list) = (* just adding constrained variables without values *)
     let rec go = function
       | [] -> assert false
       | [ (s, x) ] -> (s, V.External x)
-      | (s1, x1) :: t ->
-        let x1 = V.External x1 in
-        let (s2, x2) = go t in
+      | (ls, lx) :: t ->
+        let lx = V.External lx in
+        let (rs, rx) = go t in
         let s1x1_plus_s2x2 = V.create_internal () in
-        add_generic_constraint sys
-          (s1, x1) (s2, x2) ~output:(neg_one, s1x1_plus_s2x2) ;
+        add_generic_constraint sys (ls, lx) ~r:(rs, rx) ~o:(neg_one, s1x1_plus_s2x2) ;
         (Fp.one, s1x1_plus_s2x2)
     in
     go terms
@@ -234,11 +218,6 @@ struct
           ~one:(of_int 1))
         x
     in
-
-
-    (*print_endline (Sexplib.Sexp.to_string ([%sexp_of: (Fp.t * int) list] terms));*)
-
-
     let terms =
       List.sort terms ~compare:(fun (_, i) (_, j) -> Int.compare i j)
     in
@@ -250,20 +229,19 @@ struct
         let acc, i, ts, _ =
           Sequence.of_list terms
           |> Sequence.fold ~init:(c0, i0, [], 0)
-                ~f:(fun (acc, i, ts, n) (c, j) ->
-                  if Int.equal i j then (Fp.add acc c, i, ts, n)
-                  else (c, j, (acc, i) :: ts, n + 1) )
+            ~f:(fun (acc, i, ts, n) (c, j) ->
+                if Int.equal i j then (Fp.add acc c, i, ts, n)
+                else (c, j, (acc, i) :: ts, n + 1) )
         in
         List.rev ((acc, i) :: ts)
       in
       match terms with
       | [] -> assert false
       | [(x, i)] -> (x, `Var (V.External i))
-      | (s1, x1) :: tl ->
-        let (s2, x2) = completely_reduce sys tl in
+      | (ls, lx) :: tl ->
+        let (rs, rx) = completely_reduce sys tl in
         let res = V.create_internal () in
-        add_generic_constraint sys ?constant
-          (s1, External x1) (s2, x2) ~output:(neg_one, res) ;
+        add_generic_constraint sys ?c:constant (ls, External lx) ~r:(rs, rx) ~o:(neg_one, res) ;
         (Fp.one, `Var res)
   ;;
 
@@ -271,46 +249,79 @@ struct
       (constr : (Fp.t Snarky_backendless.Cvar.t, Fp.t) Snarky_backendless.Constraint.basic) =
 
     let red = reduce_lincom sys in
+    let reduce_to_v (x : Fp.t Snarky_backendless.Cvar.t) : V.t =
+      let (s, x) = red x in
+      match x with
+      | `Var x ->
+        if Fp.equal s Fp.one then x
+        else let sx = V.create_internal () in
+          add_generic_constraint sys ~o:(Fp.(negate one), sx) (s, x);
+          x
+      | `Constant ->
+        let x = V.create_internal () in
+        add_generic_constraint sys ~c:(Fp.negate s) (Fp.one, x);
+        x
+    in
     match constr with
 
-    | Snarky_backendless.Constraint.Boolean x ->
-      let (s, x) = red x in
+    | Snarky_backendless.Constraint.Boolean v ->
+      let (s, x) = red v in
       ( 
         match x with
-        | `Var x -> add_generic_constraint sys ~mul:Fp.(negate (square s)) (s, x) (s, x)
-        | `Constant ->  ()
+        | `Var x -> add_generic_constraint sys ~m:Fp.(negate (square s)) (s, x) ~r:(s, x)
+        | `Constant -> assert Fp.(equal s (s * s))
       )
 
-    | Snarky_backendless.Constraint.Equal (x, y) ->
-      let (sx, xx), (sy, xy) = red x, red y in
+    | Snarky_backendless.Constraint.Equal (v1, v2) ->
+      let (s1, x1), (s2, x2) = red v1, red v2 in
       ( 
-        match xx, xy with
-        | `Var xx, `Var xy -> add_generic_constraint sys (Fp.negate sx, xx) (sy, xy)
+        match x1, x2 with
+        | `Var x1, `Var x2 ->
+          if s1 <> s2 then add_generic_constraint sys (Fp.negate s1, x1) ~r:(s2, x2)
+          (* TODO: optimize by not adding generic costraint but rather permuting the vars *)
+          else add_generic_constraint sys (Fp.negate s1, x1) ~r:(s2, x2)
+        | `Var x1, `Constant -> add_generic_constraint sys (Fp.negate s1, x1) ~c:s2
+        | `Constant, `Var x2 -> add_generic_constraint sys (Fp.negate s2, x2) ~c:s1
         | _, _ ->  ()
       )
 
-    | Snarky_backendless.Constraint.Square (x, y) ->
-      let (sx, xx), (sy, xy) = red x, red y in
+    | Snarky_backendless.Constraint.Square (v1, v2) ->
+      let (s1, x1), (s2, x2) = red v1, red v2 in
       ( 
-        match xx, xy with
-        | `Var xx, `Var xy -> add_generic_constraint sys ~mul:Fp.(sx * sx) ~output:(Fp.negate sy, xy) (sx, xx) (sx, xx)
+        match x1, x2 with
+        | `Var x1, `Var x2 -> add_generic_constraint sys ~m:Fp.(s1 * s1) ~o:(Fp.negate s2, x2) (s1, x1) ~r:(s1, x1)
+        | `Var x1, `Constant -> add_generic_constraint sys ~m:Fp.(s1 * s1) ~c:s2 (s1, x1) ~r:(s1, x1)
+        | `Constant, `Var x2 -> add_generic_constraint sys (Fp.negate s2, x2) ~c:(Fp.square s1)
         | _, _ ->  ()
       )
 
-    | Snarky_backendless.Constraint.R1CS (x, y, z) ->
-      let (sx, xx), (sy, xy), (sz, xz) = red x, red y, red z in
+    | Snarky_backendless.Constraint.R1CS (v1, v2, v3) ->
+      let (s1, x1), (s2, x2), (s3, x3) = red v1, red v2, red v3 in
       ( 
-        match xx, xy, xz with
-        | `Var xx, `Var xy, `Var xz -> add_generic_constraint sys ~mul:Fp.(sx * sy) ~output:(Fp.negate sz, xz) (sx, xx) (sy, xy)
+        match x1, x2, x3 with
+        | `Var x1, `Var x2, `Var x3 -> add_generic_constraint sys ~m:Fp.(s1 * s2) ~o:(Fp.negate s3, x3) (s1, x1) ~r:(s2, x2)
+        | `Var x1, `Var x2, `Constant -> add_generic_constraint sys ~m:Fp.(s1 * s2) ~c:(Fp.negate s3) (s1, x1) ~r:(s2, x2)
+        | `Var x1, `Constant, `Var x3 -> add_generic_constraint sys ~o:(Fp.negate s3, x3) (Fp.(s1 * s2), x1)
+        | `Constant, `Var x2, `Var x3 -> add_generic_constraint sys ~o:(Fp.negate s3, x3) (Fp.(s1 * s2), x2)
+        | `Var x1, `Constant, `Constant -> add_generic_constraint sys ~c:(Fp.negate s3) (Fp.(s1 * s2), x1)
+        | `Constant, `Var x2, `Constant -> add_generic_constraint sys ~c:(Fp.negate s3) (Fp.(s1 * s2), x2)
+        | `Constant, `Constant, `Var x3 -> add_generic_constraint sys ~c:Fp.(negate s1 * s2) (s3, x3)
+        | `Constant, `Constant, `Constant -> assert Fp.(equal s3 Fp.(s1 * s2))
         | _, _, _ ->  ()
       )
 
     | Plonk_constraint.T (Poseidon { start; state }) ->
+
+      let reduce_state sys (s : Fp.t Snarky_backendless.Cvar.t array array) : V.t array array =
+        Array.map ~f:(Array.map ~f:reduce_to_v) s
+      in
+
+      let start = (reduce_state sys [|start|]).(0) in
+      let state = reduce_state sys state in
+
       let add_round_state array = Array.iteri ~f:
           (
-            fun i x -> match snd (red x) with
-              | `Var x -> V.Table.add_multi sys.equivalence_classes ~key:x ~data:{ row= sys.next_row; col= i } ;
-              | _ ->  ()
+            fun i x -> V.Table.add_multi sys.equivalence_classes ~key:x ~data:{ row= sys.next_row; col= i } ;
           ) array;
         sys.next_row <- sys.next_row + 1
       in
@@ -326,11 +337,10 @@ struct
     | Plonk_constraint.T (EC_add { p1; p2; p3 }) ->
       Array.iteri ~f:
         (
-          fun i (x, y) -> match snd (red x), snd (red y) with
-            | `Var x, `Var y ->
-              V.Table.add_multi sys.equivalence_classes ~key:y ~data:{ row= sys.next_row; col= i } ;
-              V.Table.add_multi sys.equivalence_classes ~key:x ~data:{ row= sys.next_row + 1; col= i } ;
-            | _, _ ->  ()
+          fun i (px, py) ->
+            let (x, y) = reduce_to_v px, reduce_to_v py in
+            V.Table.add_multi sys.equivalence_classes ~key:y ~data:{ row= sys.next_row; col= i } ;
+            V.Table.add_multi sys.equivalence_classes ~key:x ~data:{ row= sys.next_row + 1; col= i } ;
         ) [|p1; p2; p3|];
       (* Backend.add_ecadd_constraint sys.backend sys.next_row *)
       sys.next_row <- sys.next_row + 2;
@@ -338,27 +348,15 @@ struct
 
     | Plonk_constraint.T (EC_scale { state }) ->
       let add_ecscale_round (round: Fp.t Snarky_backendless.Cvar.t Scale_round.t) =
-        match
-          snd (red round.xt),
-          snd (red round.b),
-          snd (red round.yt),
-          snd (red round.xp),
-          snd (red round.l1),
-          snd (red round.yp),
-          snd (red round.xs),
-          snd (red round.ys)
-        with
-        | `Var xt, `Var b, `Var yt, `Var xp, `Var l1, `Var yp, `Var xs, `Var ys ->
-          V.Table.add_multi sys.equivalence_classes ~key:xt ~data:{ row= sys.next_row; col= 0 } ;
-          V.Table.add_multi sys.equivalence_classes ~key:b ~data:{ row= sys.next_row; col= 1 } ;
-          V.Table.add_multi sys.equivalence_classes ~key:yt ~data:{ row= sys.next_row; col= 2 } ;
-          V.Table.add_multi sys.equivalence_classes ~key:xp ~data:{ row= sys.next_row+1; col= 0 } ;
-          V.Table.add_multi sys.equivalence_classes ~key:l1 ~data:{ row= sys.next_row+1; col= 1 } ;
-          V.Table.add_multi sys.equivalence_classes ~key:yp ~data:{ row= sys.next_row+1; col= 2 } ;
-          V.Table.add_multi sys.equivalence_classes ~key:xs ~data:{ row= sys.next_row+2; col= 0 } ;
-          V.Table.add_multi sys.equivalence_classes ~key:xs ~data:{ row= sys.next_row+2; col= 1 } ;
-          sys.next_row <- sys.next_row + 3 ;
-        | _, _, _, _, _, _, _, _  ->  ()
+        V.Table.add_multi sys.equivalence_classes ~key:(reduce_to_v round.xt) ~data:{ row= sys.next_row; col= 0 } ;
+        V.Table.add_multi sys.equivalence_classes ~key:(reduce_to_v round.b) ~data:{ row= sys.next_row; col= 1 } ;
+        V.Table.add_multi sys.equivalence_classes ~key:(reduce_to_v round.yt) ~data:{ row= sys.next_row; col= 2 } ;
+        V.Table.add_multi sys.equivalence_classes ~key:(reduce_to_v round.xp) ~data:{ row= sys.next_row+1; col= 0 } ;
+        V.Table.add_multi sys.equivalence_classes ~key:(reduce_to_v round.l1) ~data:{ row= sys.next_row+1; col= 1 } ;
+        V.Table.add_multi sys.equivalence_classes ~key:(reduce_to_v round.yp) ~data:{ row= sys.next_row+1; col= 2 } ;
+        V.Table.add_multi sys.equivalence_classes ~key:(reduce_to_v round.xs) ~data:{ row= sys.next_row+2; col= 0 } ;
+        V.Table.add_multi sys.equivalence_classes ~key:(reduce_to_v round.xs) ~data:{ row= sys.next_row+2; col= 1 } ;
+        sys.next_row <- sys.next_row + 3 ;
       in
       Array.iter ~f:
         (
@@ -369,7 +367,25 @@ struct
       ()
 
     | Plonk_constraint.T (EC_endoscale { state }) ->
-      sys.next_row <- sys.next_row + 3;
+      let add_endoscale_round (round: Fp.t Snarky_backendless.Cvar.t Endoscale_round.t) =
+        V.Table.add_multi sys.equivalence_classes ~key:(reduce_to_v round.b2i1) ~data:{ row= sys.next_row; col= 0 } ;
+        V.Table.add_multi sys.equivalence_classes ~key:(reduce_to_v round.xt) ~data:{ row= sys.next_row; col= 1 } ;
+        V.Table.add_multi sys.equivalence_classes ~key:(reduce_to_v round.b2i) ~data:{ row= sys.next_row+1; col= 0 } ;
+        V.Table.add_multi sys.equivalence_classes ~key:(reduce_to_v round.xq) ~data:{ row= sys.next_row+1; col= 1 } ;
+        V.Table.add_multi sys.equivalence_classes ~key:(reduce_to_v round.yt) ~data:{ row= sys.next_row+1; col= 2 } ;
+        V.Table.add_multi sys.equivalence_classes ~key:(reduce_to_v round.xp) ~data:{ row= sys.next_row+2; col= 0 } ;
+        V.Table.add_multi sys.equivalence_classes ~key:(reduce_to_v round.l1) ~data:{ row= sys.next_row+2; col= 1 } ;
+        V.Table.add_multi sys.equivalence_classes ~key:(reduce_to_v round.yp) ~data:{ row= sys.next_row+2; col= 2 } ;
+        V.Table.add_multi sys.equivalence_classes ~key:(reduce_to_v round.xs) ~data:{ row= sys.next_row+3; col= 0 } ;
+        V.Table.add_multi sys.equivalence_classes ~key:(reduce_to_v round.xs) ~data:{ row= sys.next_row+3; col= 1 } ;
+        sys.next_row <- sys.next_row + 4 ;
+      in
+      Array.iter ~f:
+        (
+          fun round ->
+            (* Backend.add_endocscale_constraint sys.backend sys.next_row *)
+            add_endoscale_round round
+        ) state;
       ()
 
     | constr ->
