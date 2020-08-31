@@ -12,7 +12,6 @@ module Get_coinbase_and_genesis =
         publicKey @bsDecoder(fn: "Decoders.public_key")
       }
       protocolState {
-        previousStateHash
         blockchainState {
           utcDate
         }
@@ -521,13 +520,15 @@ module Specific = struct
       let genesisBlock = res#genesisBlock in
       let%map block_info =
         if Query.is_genesis ~hash:genesisBlock#stateHash query then
+          let genesis_block_identifier =
+            { Block_identifier.index= Network.genesis_block_height
+            ; hash= genesisBlock#stateHash }
+          in
           M.return
             { Block_info.block_identifier=
-                { Block_identifier.index= Network.genesis_block_height
-                ; hash= genesisBlock#stateHash }
-            ; parent_block_identifier=
-                { Block_identifier.index= Int64.zero
-                ; hash= (genesisBlock#protocolState)#previousStateHash }
+                genesis_block_identifier
+                (* parent_block_identifier for genesis block should be the same as block identifier as described https://www.rosetta-api.org/docs/common_mistakes.html#correct-example *)
+            ; parent_block_identifier= genesis_block_identifier
             ; creator= `Pk (genesisBlock#creatorAccount)#publicKey
             ; timestamp=
                 Int64.of_string
