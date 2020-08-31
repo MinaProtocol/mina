@@ -4,11 +4,13 @@ module Styles = {
     style([
       display(`inlineFlex),
       alignItems(`center),
-      height(px(40)),
+      height(`rem(1.3)),
       borderRadius(px(4)),
-      width(`rem(21.)),
+      width(`rem(14.5)),
       fontSize(rem(1.)),
-      padding(px(12)),
+      paddingLeft(`rem(1.)),
+      paddingTop(`rem(0.875)),
+      paddingBottom(`rem(0.875)),
       border(px(1), `solid, Theme.Colors.white),
       active([
         outline(px(0), `solid, `transparent),
@@ -30,8 +32,11 @@ module Styles = {
       display(`flex),
       alignItems(`center),
       justifyContent(center),
-      width(`rem(4.68)),
+      marginLeft(`rem(0.5)),
     ]);
+
+  let inputContainer =
+    style([display(`flex), flexDirection(`row), alignContent(`center)]);
 
   let successText = merge([Theme.Type.paragraph, style([color(white)])]);
   let successState =
@@ -75,7 +80,7 @@ let make = () => {
              {React.string({js|Check your email!|js})}
            </span>
          </div>
-       : <div>
+       : <div className=Styles.inputContainer>
            <input
              type_="email"
              value=email
@@ -86,17 +91,16 @@ let make = () => {
              }}
              className=Styles.textField
            />
-           <Spacer height=1. />
-           <Button
-             height={`rem(3.25)}
-             width={`rem(7.93)}
-             onClick={e => submitForm(e)}
-             dark=true>
-             <span className=Styles.submitButton>
+           <div className=Styles.submitButton>
+             <Button
+               height={`rem(3.25)}
+               width={`rem(7.93)}
+               onClick={e => submitForm(e)}
+               dark=true>
                {React.string("Submit")}
                <Icon kind=Icon.ArrowRightMedium />
-             </span>
-           </Button>
+             </Button>
+           </div>
          </div>}
   </>;
 };
