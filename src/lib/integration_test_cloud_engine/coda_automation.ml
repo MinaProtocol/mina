@@ -372,7 +372,7 @@ module Network_manager = struct
     if t.deployed then failwith "network already deployed" ;
     let testnet_dir =
       t.network_config.coda_automation_location ^/ "terraform/testnets"
-      ^/ network_config.terraform.testnet_name in
+      ^/ t.network_config.terraform.testnet_name in
     let%bind () = run_cmd_exn t "terraform" ["apply"; "-auto-approve"] in
     let%map () =
       Deferred.List.iter t.keypair_secrets ~f:(fun secret ->
