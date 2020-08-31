@@ -376,7 +376,7 @@ module Network_manager = struct
             [ "create"
             ; "secret"
             ; "generic"
-            ; (testnet_dir ^/ secret)
+            ; t.testnet_dir ^/ secret
             ; "--cluster=" ^ t.cluster
             ; "--namespace=" ^ t.namespace
             ; "--from-file=key=" ^ secret
