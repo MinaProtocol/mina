@@ -485,8 +485,16 @@ jobs:
 
     {%- for profile in build_artifact_profiles %}
     {%- if profile in medium_curve_profiles %}
-    {%- for docker_images in [['coda-daemon', 'coda-daemon-puppeteered'], ['coda-demo']] %}
-    build-artifacts-docker--{{profile}}--{{docker_images[0]}}:
+    {%- for docker_image_set in [
+        {
+          'coda-daemon': '--build-arg coda_deb_version=$CODA_DEB_VERSION --build-arg deb_repo=$CODA_DEB_REPO',
+          'coda-daemon-puppeteered': '--build-arg coda_version=$CODA_GIT_TAG-$CODA_GIT_BRANCH-$CODA_GIT_HASH --build-arg deb_repo=$CODA_DEB_REPO'
+        },
+        {
+          'coda-demo': '--build-arg coda_deb_version=$CODA_DEB_VERSION --build-arg deb_repo=$CODA_DEB_REPO'
+        }
+    ] %}
+    build-artifacts-docker--{{profile}}--{{docker_image_set.keys() | first}}:
         resource_class: xlarge
         docker:
             - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
@@ -507,11 +515,11 @@ jobs:
                         set -x
                         if [[ "$CODA_WAS_PUBLISHED" = true  ]]; then
                               echo "$DOCKER_PASSWORD" | docker login --username $DOCKER_USERNAME --password-stdin
-                              {%- for docker_image in docker_images %}
+                              {%- for docker_image, extra_args in docker_image_set.items() %}
                               scripts/release-docker.sh \
                                 -s {{docker_image}} \
                                 -v $CODA_GIT_TAG-$CODA_GIT_BRANCH-$CODA_GIT_HASH \
-                                --extra-args "--build-arg coda_deb_version=$CODA_DEB_VERSION --build-arg coda_version=$CODA_GIT_TAG-$CODA_GIT_BRANCH-$CODA_GIT_HASH --build-arg deb_repo=$CODA_DEB_REPO"
+                                --extra-args "{{extra_args}}"
                               {%- endfor %}
                         fi
                     fi
