@@ -369,6 +369,9 @@ module Network_manager = struct
 
   let deploy t =
     if t.deployed then failwith "network already deployed" ;
+    let testnet_dir =
+      t.network_config.coda_automation_location ^/ "terraform/testnets"
+      ^/ network_config.terraform.testnet_name
     let%bind () = run_cmd_exn t "terraform" ["apply"; "-auto-approve"] in
     let%map () =
       Deferred.List.iter t.keypair_secrets ~f:(fun secret ->
@@ -376,11 +379,11 @@ module Network_manager = struct
             [ "create"
             ; "secret"
             ; "generic"
-            ; t.testnet_dir ^/ secret
+            ; secret
             ; "--cluster=" ^ t.cluster
             ; "--namespace=" ^ t.namespace
-            ; "--from-file=key=" ^ secret
-            ; "--from-file=pub=" ^ secret ^ ".pub" ] )
+            ; "--from-file=key=" ^ (testnet_dir ^/ secret)
+            ; "--from-file=pub=" ^ (testnet_dir ^/ secret) ^ ".pub" ] )
     in
     t.deployed <- true ;
     { Kubernetes_network.constraint_constants= t.constraint_constants
