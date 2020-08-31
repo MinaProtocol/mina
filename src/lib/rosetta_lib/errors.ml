@@ -7,6 +7,7 @@ module Partial_reason = struct
     | Fee_payer_and_source_mismatch
     | Amount_not_some
     | Account_not_some
+    | Invalid_metadata
     | Incorrect_token_id
     | Amount_inc_dec_mismatch
     | Status_not_pending
@@ -183,7 +184,7 @@ end = struct
     ; details=
         ( match (context t.kind, t.extra_context) with
         | None, None ->
-            Some (Variant.to_yojson t.kind)
+            Some (`Assoc [("body", Variant.to_yojson t.kind)])
         | None, Some context | Some context, None ->
             Some
               (`Assoc

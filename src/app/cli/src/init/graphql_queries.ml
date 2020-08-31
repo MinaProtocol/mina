@@ -17,12 +17,21 @@ query {
 module Get_tracked_account =
 [%graphql
 {|
-query ($public_key: PublicKey) {
-  account(publicKey: $public_key) {
-    public_key: publicKey @bsDecoder(fn: "Decoders.public_key")
+query ($public_key: PublicKey, $token: UInt64) {
+  account(publicKey: $public_key, token: $token) {
     balance {
       total @bsDecoder(fn: "Decoders.balance")
     }
+  }
+}
+|}]
+
+module Get_all_accounts =
+[%graphql
+{|
+query ($public_key: PublicKey) {
+  accounts(publicKey: $public_key) {
+    token @bsDecoder(fn: "Decoders.token")
   }
 }
 |}]
