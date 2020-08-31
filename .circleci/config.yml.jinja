@@ -511,7 +511,7 @@ jobs:
                               scripts/release-docker.sh \
                                 -s {{docker_image}} \
                                 -v $CODA_GIT_TAG-$CODA_GIT_BRANCH-$CODA_GIT_HASH \
-                                --extra-args "--build-arg coda_version=$CODA_DEB_VERSION --build-arg deb_repo=$CODA_DEB_REPO"
+                                --extra-args "--build-arg coda_deb_version=$CODA_DEB_VERSION --build-arg coda_version=$CODA_GIT_TAG-$CODA_GIT_BRANCH-$CODA_GIT_HASH --build-arg deb_repo=$CODA_DEB_REPO"
                               {%- endfor %}
                         fi
                     fi
