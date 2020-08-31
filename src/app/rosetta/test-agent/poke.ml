@@ -105,6 +105,29 @@ module SendTransaction = struct
     [%of_yojson: Rosetta_models.Operation.t list] json
     |> Result.ok |> Option.value_exn
 
+  module Delegation =
+  [%graphql
+  {|
+
+       mutation sendDelegation($fee : UInt64!, $to_: PublicKey!, $from: PublicKey!) {
+         sendDelegation(input: {fee: $fee, to: $to_, from: $from}, signature: null) {
+           delegation {
+             hash
+           }
+         }
+       }
+    |}]
+
+  let delegation ~fee ~to_ ~graphql_uri () =
+    let open Deferred.Result.Let_syntax in
+    let%map res =
+      Graphql.query
+        (Delegation.make ~fee ~to_ ~from:(`String pk) ())
+        graphql_uri
+    in
+    let (`UserCommand cmd) = (res#sendDelegation)#delegation in
+    cmd#hash
+
   let delegation_operations ~from ~fee ~to_ =
     assert (String.equal from pk) ;
     let operations =

@@ -180,6 +180,33 @@ let direct_graphql_payment_through_block ~logger ~rosetta_uri ~graphql_uri
           ; _type= "payment_receiver_inc"
           ; target= None } ]
 
+let direct_graphql_delegation_through_block ~logger ~rosetta_uri ~graphql_uri
+    ~network_response =
+  let open Deferred.Result.Let_syntax in
+  (* Unlock the account *)
+  let%bind _ = Poke.Account.unlock ~graphql_uri in
+  (* Delegate stake *)
+  let%bind hash =
+    Poke.SendTransaction.delegation ~fee:(`Int 2_000_000_000)
+      ~to_:(`String other_pk) ~graphql_uri ()
+  in
+  verify_in_mempool_and_block ~logger ~rosetta_uri ~graphql_uri ~txn_hash:hash
+    ~network_response
+    ~operation_expectations:
+      Operation_expectation.
+        [ { amount= Some (-2_000_000_000)
+          ; account=
+              Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
+          ; status= "Pending"
+          ; _type= "fee_payer_dec"
+          ; target= None }
+        ; { amount= None
+          ; account=
+              Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
+          ; status= "Pending"
+          ; _type= "delegate_change"
+          ; target= Some other_pk } ]
+
 let construction_api_transaction_through_mempool ~logger ~rosetta_uri
     ~graphql_uri ~network_response ~operation_expectations ~operations =
   let open Deferred.Result.Let_syntax in
@@ -313,7 +340,10 @@ let construction_api_delegation_through_mempool =
           ; _type= "delegate_change"
           ; target= Some other_pk } ]
 
-let check_new_account_payment ~logger ~rosetta_uri ~graphql_uri =
+(* for each possible user command, run the command via GraphQL, check that
+    the command is in the transaction pool
+*)
+let check_new_account_user_commands ~logger ~rosetta_uri ~graphql_uri =
   let open Core.Time in
   let open Deferred.Result.Let_syntax in
   (* Stop staking so we can rely on things being in the mempool *)
@@ -348,12 +378,18 @@ let check_new_account_payment ~logger ~rosetta_uri ~graphql_uri =
   (* Stop staking so we can rely on things being in the mempool again *)
   let%bind _res = Poke.Staking.disable ~graphql_uri in
   (* Follow the full construction API flow and make sure the submitted
-       * transaction appears in the mempool *)
+   * transaction appears in the mempool *)
   let%bind () =
     construction_api_payment_through_mempool ~logger ~rosetta_uri ~graphql_uri
       ~network_response
   in
-  (* Stop staking so we can rely on things being in the mempool again *)
+  (* Stop staking *)
+  let%bind _res = Poke.Staking.disable ~graphql_uri in
+  let%bind () =
+    direct_graphql_delegation_through_block ~logger ~rosetta_uri ~graphql_uri
+      ~network_response
+  in
+  (* Stop staking *)
   let%bind _res = Poke.Staking.disable ~graphql_uri in
   let%bind () =
     construction_api_delegation_through_mempool ~logger ~rosetta_uri
@@ -364,7 +400,9 @@ let check_new_account_payment ~logger ~rosetta_uri ~graphql_uri =
 
 let run ~logger ~rosetta_uri ~graphql_uri =
   let open Deferred.Result.Let_syntax in
-  let%bind () = check_new_account_payment ~logger ~rosetta_uri ~graphql_uri in
+  let%bind () =
+    check_new_account_user_commands ~logger ~rosetta_uri ~graphql_uri
+  in
   [%log info] "Finished running test-agent" ;
   return ()
 
