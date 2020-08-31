@@ -2,14 +2,17 @@
 
 open Core_kernel
 open Signature_lib
-open Lib
+open Rosetta_lib
 module Signature = Coda_base.Signature
+module User_command = Coda_base.User_command
 
 module Keys = struct
   type t = {keypair: Keypair.t; public_key_hex_bytes: string}
 
   let of_keypair keypair =
-    {keypair; public_key_hex_bytes= Public_key.Hex.encode keypair.public_key}
+    { keypair
+    ; public_key_hex_bytes=
+        Rosetta_coding.Coding.of_public_key keypair.public_key }
 
   let of_private_key_box secret_box_string =
     let json = Yojson.Safe.from_string secret_box_string in
@@ -32,23 +35,23 @@ let sign ~(keys : Keys.t) ~unsigned_transaction_string =
     try return (Yojson.Safe.from_string unsigned_transaction_string)
     with _ -> Result.fail (Errors.create (`Json_parse None))
   in
-  let%bind unsigned_transaction =
+  let%map unsigned_transaction =
     Transaction.Unsigned.Rendered.of_yojson json
     |> Result.map_error ~f:(fun e -> Errors.create (`Json_parse (Some e)))
     |> Result.bind ~f:Transaction.Unsigned.of_rendered
+  in
+  let user_command_payload =
+    User_command_info.Partial.to_user_command_payload
+      ~nonce:unsigned_transaction.nonce
+      unsigned_transaction.Transaction.Unsigned.command
+    |> Result.ok |> Option.value_exn
   in
   let signature =
     Schnorr.sign keys.keypair.private_key
       unsigned_transaction.random_oracle_input
   in
-  let encoded_signature = Signature.Raw.encode signature in
-  let signed_transaction =
-    { Transaction.Signed.nonce= unsigned_transaction.nonce
-    ; signature= encoded_signature
-    ; command= unsigned_transaction.command }
+  let signature' =
+    User_command.sign_payload keys.keypair.private_key user_command_payload
   in
-  let%map rendered_signed_transaction =
-    Transaction.Signed.render signed_transaction
-  in
-  Transaction.Signed.Rendered.to_yojson rendered_signed_transaction
-  |> Yojson.Safe.to_string
+  [%test_eq: Signature.t] signature signature' ;
+  signature |> Signature.Raw.encode

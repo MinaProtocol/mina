@@ -16,6 +16,7 @@
     ppx_deriving_yojson.runtime
     rosetta_lib
     rosetta_models
+    rosetta_coding
     yojson
     archive_lib
     signature_lib
