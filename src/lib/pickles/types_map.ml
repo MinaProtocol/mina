@@ -1,5 +1,6 @@
 open Core_kernel
 open Pickles_types
+open Import
 open Backend
 
 (* TODO: max_branching is a terrible name. It should be max_width. *)
