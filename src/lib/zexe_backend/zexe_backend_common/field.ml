@@ -38,7 +38,7 @@ module type Input_intf = sig
 
   val square : t -> t
 
-  val sqrt : t -> t
+  val det_sqrt : t -> t
 
   val is_square : t -> bool
 

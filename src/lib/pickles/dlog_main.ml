@@ -608,7 +608,7 @@ struct
           Field.if_ is_square ~then_:pre ~else_:Field.(nonresidue * pre)
         in
         (* TODO: Make deterministic *)
-        Field.sqrt sq )
+        DetSquareRootField.det_sqrt sq )
 
   let b_poly = Field.(b_poly ~add ~mul ~inv)
 
@@ -830,3 +830,7 @@ struct
              (Scalar_challenge t2 : Scalar_challenge.t) ->
         Field.Assert.equal t1 (Field.project t2) )
 end
+
+
+
+

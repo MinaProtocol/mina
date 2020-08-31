@@ -105,7 +105,7 @@ module Ipa = struct
     let nonresidue = Field.of_int 5 in
     (* TODO: Don't actually need to transmit the "is_square" bit on the wire *)
     [%test_eq: bool] is_square (Field.is_square x) ;
-    Field.sqrt (if is_square then x else Field.(nonresidue * x))
+    DetSquareRootField.det_sqrt (if is_square then x else Field.(nonresidue * x))
 
   let compute_challenges ~endo_to_field field chals =
     Vector.map chals ~f:(fun {Bulletproof_challenge.prechallenge; is_square} ->
