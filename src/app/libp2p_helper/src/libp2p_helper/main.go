@@ -847,7 +847,7 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 		}
 	}
 
-	log.Warn("bootstrapping to: ", app.AddedPeers.toSlice())
+	log.Warn("bootstrapping to: ", app.AddedPeers)
 	if len(app.AddedPeers) > 0 {
 		app.Bootstrapper, err = bootstrap.Bootstrap(app.P2p.Me, app.P2p.Host, app.P2p.Dht, bootstrap.BootstrapConfigWithPeers(app.AddedPeers))
 		if err != nil {
