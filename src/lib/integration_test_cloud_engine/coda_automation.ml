@@ -354,6 +354,7 @@ module Network_manager = struct
     let t =
       { cluster= network_config.cluster_id
       ; namespace= network_config.terraform.testnet_name
+      ; network_config= network_config
       ; testnet_dir
       ; testnet_log_filter
       ; constraint_constants= network_config.constraint_constants
