@@ -295,27 +295,12 @@ end = struct
       let ( + ) = add
 
       let equal (t1 : var) (t2 : var) =
-        let seal x =
-          let%bind y = exists Field.typ ~compute:As_prover.(read_var x) in
-          let%map () = Field.Checked.Assert.equal x y in
-          y
-        in
-        let%bind v1 = seal (pack_var t1.magnitude) in
-        let v2 = pack_var t1.magnitude in
-        let%bind v1_equal_v2 = Field.Checked.equal v1 v2
-        and sgns_equal =
-          Field.Checked.equal (t1.sgn :> Field.Var.t) (t2.sgn :> Field.Var.t)
-        in
-        let%bind v1_is_zero =
-          Field.Checked.equal v1 (Field.Var.constant Field.zero)
-        in
-        let%bind v1_zero_or_sgns_equal =
-          Boolean.any [v1_is_zero; sgns_equal]
-        in
-        Boolean.all [v1_equal_v2; v1_zero_or_sgns_equal]
+        let%bind t1 = to_field_var t1 and t2 = to_field_var t2 in
+        Field.Checked.equal t1 t2
 
       let assert_equal (t1 : var) (t2 : var) =
-        equal t1 t2 >>= Boolean.Assert.is_true
+        let%bind t1 = to_field_var t1 and t2 = to_field_var t2 in
+        Field.Checked.Assert.equal t1 t2
 
       let cswap_field (b : Boolean.var) (x, y) =
         (* (x + b(y - x), y + b(x - y)) *)
