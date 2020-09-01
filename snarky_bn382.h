@@ -1216,7 +1216,7 @@ void *zexe_tweedle_plonk_fp_proof_create(
 
 bool zexe_tweedle_plonk_fp_proof_verify(void *index, void *proof);
 
-bool zexe_tweedle_plonk_fp_proof_batch_verify(void *index, void *proofs) -> bool;
+bool zexe_tweedle_plonk_fp_proof_batch_verify(void *index, void *proofs);
 
 void *zexe_tweedle_plonk_fp_proof_make(
     void *primary_input,
@@ -1506,7 +1506,7 @@ void *zexe_tweedle_plonk_fq_proof_create(
 
 bool zexe_tweedle_plonk_fq_proof_verify(void *index, void *proof);
 
-bool zexe_tweedle_plonk_fq_proof_batch_verify(void *index, void *proofs) -> bool;
+bool zexe_tweedle_plonk_fq_proof_batch_verify(void *index, void *proofs);
 
 void *zexe_tweedle_plonk_fq_proof_make(
     void *primary_input,
