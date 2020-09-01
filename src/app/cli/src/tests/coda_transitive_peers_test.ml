@@ -53,11 +53,10 @@ let main () =
         ( Node_addrs_and_ports.to_multiaddr_exn (fst p) :: peer_addrs
         , fst p :: peers ) )
   in
-  let addrs_and_ports =
-    List.nth_exn new_node_addrs_and_ports_list n
-    |> fst |> Node_addrs_and_ports.to_display
+  let addrs_and_ports, libp2p_keypair =
+    let addr_and_ports, k = List.nth_exn new_node_addrs_and_ports_list 0 in
+    (Node_addrs_and_ports.to_display addr_and_ports, k)
   in
-  let libp2p_keypair = List.nth_exn new_node_addrs_and_ports_list n |> snd in
   [%log debug]
     !"connecting to peers %{sexp: string list}\n"
     expected_peers_addr ;
@@ -74,7 +73,7 @@ let main () =
   let%bind _ = after (Time.Span.of_sec 10.) in
   let%bind peers = Coda_process.peers_exn worker in
   [%log debug]
-    !"got peers %{sexp: Network_peer.Peer.t list} %{sexp: \
+    !"got peers %{sexp: Network_peer.Peer.t list} expected: %{sexp: \
       Node_addrs_and_ports.t list}\n"
     peers expected_peers ;
   let module S = Host_and_port.Set in
