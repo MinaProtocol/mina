@@ -1,11 +1,24 @@
 open Core_kernel
 open Async
-open Models
+open Rosetta_lib
+open Rosetta_models
 
-module Get_coinbase =
+module Get_coinbase_and_genesis =
 [%graphql
 {|
   query {
+    genesisBlock {
+      creatorAccount {
+        publicKey @bsDecoder(fn: "Decoders.public_key")
+      }
+      protocolState {
+        previousStateHash
+        blockchainState {
+          utcDate
+        }
+      }
+      stateHash
+    }
     daemonStatus {
       peers
     }
@@ -32,6 +45,17 @@ module Block_query = struct
           M.return (Some (`That (`Hash hash)))
       | Some index, Some hash ->
           M.return (Some (`Those (`Height index, `Hash hash)))
+
+    let is_genesis ~hash = function
+      | Some (`This (`Height index)) ->
+          Int64.equal index Network.genesis_block_height
+      | Some (`That (`Hash hash')) ->
+          String.equal hash hash'
+      | Some (`Those (`Height index, `Hash hash')) ->
+          Int64.equal index Network.genesis_block_height
+          && String.equal hash hash'
+      | None ->
+          false
   end
 end
 
@@ -456,7 +480,9 @@ module Specific = struct
         -> graphql_uri:Uri.t
         -> 'gql Real.t =
      fun ~logger ~db ~graphql_uri ->
-      { gql= (fun () -> Graphql.query (Get_coinbase.make ()) graphql_uri)
+      { gql=
+          (fun () ->
+            Graphql.query (Get_coinbase_and_genesis.make ()) graphql_uri )
       ; logger
       ; db_block=
           (fun query ->
@@ -470,6 +496,11 @@ module Specific = struct
           (fun () ->
             Result.return
             @@ object
+                 method genesisBlock =
+                   object
+                     method stateHash = "STATE_HASH_GENESIS"
+                   end
+
                  method genesisConstants =
                    object
                      method coinbase = Unsigned.UInt64.of_int 20_000_000_000
@@ -497,8 +528,25 @@ module Specific = struct
         env.validate_network_choice ~network_identifier:req.network_identifier
           ~gql_response:res
       in
+      let genesisBlock = res#genesisBlock in
+      let%map block_info =
+        if Query.is_genesis ~hash:genesisBlock#stateHash query then
+          M.return
+            { Block_info.block_identifier=
+                { Block_identifier.index= Network.genesis_block_height
+                ; hash= genesisBlock#stateHash }
+            ; parent_block_identifier=
+                { Block_identifier.index= Int64.zero
+                ; hash= (genesisBlock#protocolState)#previousStateHash }
+            ; creator= `Pk (genesisBlock#creatorAccount)#publicKey
+            ; timestamp=
+                Int64.of_string
+                  ((genesisBlock#protocolState)#blockchainState)#utcDate
+            ; internal_info= []
+            ; user_commands= [] }
+        else env.db_block query
+      in
       let coinbase = (res#genesisConstants)#coinbase in
-      let%map block_info = env.db_block query in
       { Block_response.block=
           Some
             { Block.block_identifier= block_info.block_identifier

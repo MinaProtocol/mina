@@ -137,7 +137,7 @@ describe("Points functions", () => {
   describe("addPointsToAtleastN", () => {
     describe("adds correct number of points with atleast 1", () => {
       let blockPoints =
-        Challenges.addPointsToUsersWithAtleastN(
+        Points.addPointsToUsersWithAtleastN(
           (metricRecord: Types.Metrics.t) => metricRecord.blocksCreated,
           1,
           1000,
@@ -162,7 +162,7 @@ describe("Points functions", () => {
     });
     describe("adds correct number of points with atleast 3", () => {
       let blockPoints =
-        Challenges.addPointsToUsersWithAtleastN(
+        Points.addPointsToUsersWithAtleastN(
           (metricRecord: Types.Metrics.t) => metricRecord.blocksCreated,
           3,
           1000,
@@ -185,7 +185,7 @@ describe("Points functions", () => {
   describe("applyTopNPoints", () => {
     describe("adds correct number of points to top 3", () => {
       let blockPoints =
-        Challenges.applyTopNPoints(
+        Points.applyTopNPoints(
           [|(2, 1000)|],
           blockMetrics,
           (metricRecord: Types.Metrics.t) => metricRecord.blocksCreated,
@@ -209,7 +209,7 @@ describe("Points functions", () => {
     });
     describe("adds correct number of points to 1st place and 2-3 place", () => {
       let blockPoints =
-        Challenges.applyTopNPoints(
+        Points.applyTopNPoints(
           [|(0, 2000), (2, 1000)|],
           blockMetrics,
           (metricRecord: Types.Metrics.t) => metricRecord.blocksCreated,
@@ -234,7 +234,7 @@ describe("Points functions", () => {
     describe(
       "adds correct number of points to 1st and 2nd place and 3-4 place", () => {
       let blockPoints =
-        Challenges.applyTopNPoints(
+        Points.applyTopNPoints(
           [|(0, 3000), (1, 2000), (5, 1000)|],
           blockMetrics,
           (metricRecord: Types.Metrics.t) => metricRecord.blocksCreated,
