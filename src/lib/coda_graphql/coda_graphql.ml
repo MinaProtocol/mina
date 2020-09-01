@@ -540,7 +540,7 @@ module Types = struct
           ; voting_for
           ; timing
           ; snapp } =
-        { Account.Poly.public_key= Some public_key
+        { Account.Poly.public_key
         ; token_id
         ; token_permissions= Some token_permissions
         ; nonce= Some nonce
@@ -569,7 +569,7 @@ module Types = struct
             of_full_account ~breadcrumb account
         | None ->
             Account.
-              { Poly.public_key= Some (Account_id.public_key account_id)
+              { Poly.public_key= Account_id.public_key account_id
               ; token_id= Account_id.token_id account_id
               ; token_permissions= None
               ; nonce= None
@@ -587,14 +587,9 @@ module Types = struct
         of_account_id coda (Account_id.create pk Token_id.default)
     end
 
-    (** Hack: Account.Poly.t is only parameterized over 'pk once and so, in
-        order for delegate to be optional, we must also make account
-        public_key optional even though it's always Some. In an attempt to
-        avoid a large refactoring, and also avoid making a new record, we'll
-        deal with a value_exn here and be sad. *)
     type t =
       { account:
-          ( Public_key.Compressed.t option
+          ( Public_key.Compressed.t
           , Token_id.t
           , Token_permissions.t option
           , AnnotatedBalance.t
@@ -630,7 +625,7 @@ module Types = struct
       lift coda pk (Partial_account.of_pk coda pk)
 
     let account_id {Account.Poly.public_key; token_id; _} =
-      Account_id.create (Option.value_exn public_key) token_id
+      Account_id.create public_key token_id
 
     let rec account =
       lazy
@@ -640,7 +635,7 @@ module Types = struct
                  ~doc:"The public identity of the account"
                  ~args:Arg.[]
                  ~resolve:(fun _ {account; _} ->
-                   Option.value_exn account.Account.Poly.public_key )
+                   account.Account.Poly.public_key )
              ; field "token" ~typ:(non_null token_id)
                  ~doc:"The token associated with this account"
                  ~args:Arg.[]
@@ -731,7 +726,7 @@ module Types = struct
                  ~args:Arg.[]
                  ~resolve:(fun {ctx= coda; _} {account; _} ->
                    let open Option.Let_syntax in
-                   let%bind pk = account.Account.Poly.public_key in
+                   let pk = account.Account.Poly.public_key in
                    let%map delegators =
                      Coda_lib.current_epoch_delegators coda ~pk
                    in
@@ -752,7 +747,7 @@ module Types = struct
                  ~args:Arg.[]
                  ~resolve:(fun {ctx= coda; _} {account; _} ->
                    let open Option.Let_syntax in
-                   let%bind pk = account.Account.Poly.public_key in
+                   let pk = account.Account.Poly.public_key in
                    let%map delegators =
                      Coda_lib.last_epoch_delegators coda ~pk
                    in
