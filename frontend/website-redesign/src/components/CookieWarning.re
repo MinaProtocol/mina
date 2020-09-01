@@ -64,34 +64,38 @@ module Styles = {
       style([
         color(Theme.Colors.black),
         marginRight(`auto),
-        media(
-          Theme.MediaQuery.notMobile,
-          [marginLeft(`rem(4.)), marginRight(`rem(2.))],
-        ),
+        media(Theme.MediaQuery.tablet, [marginRight(`rem(2.))]),
+        media(Theme.MediaQuery.desktop, [marginRight(`rem(4.))]),
       ]),
     ]);
+
+  let text =
+    style([
+      display(`block),
+      marginRight(`rem(2.)),
+      media(
+        Theme.MediaQuery.tablet,
+        [display(`flex), flexDirection(`column)],
+      ),
+    ]);
+
+  let buttonText =
+    style([
+      display(`flex),
+      justifyContent(`spaceAround),
+      alignItems(`center),
+    ]);
+
+  let buttonIcon =
+    style([display(`flex), alignItems(`center), marginLeft(`rem(0.5))]);
 };
 
 [@react.component]
 let make = () => {
   let buttonText =
-    <div
-      className=Css.(
-        style([
-          display(`flex),
-          justifyContent(`spaceAround),
-          alignItems(`center),
-        ])
-      )>
+    <div className=Styles.buttonText>
       <span> {React.string("Accept")} </span>
-      <span
-        className=Css.(
-          style([
-            display(`flex),
-            alignItems(`center),
-            marginLeft(`rem(0.5)),
-          ])
-        )>
+      <span className=Styles.buttonIcon>
         <Icon kind=Icon.ArrowRightMedium />
       </span>
     </div>;
@@ -103,16 +107,7 @@ let make = () => {
     contentClasses=Styles.content
     buttonText
     buttonClasses=Styles.button>
-    <div
-      className=Css.(
-        style([
-          display(`block),
-          media(
-            Theme.MediaQuery.tablet,
-            [display(`flex), flexDirection(`column)],
-          ),
-        ])
-      )>
+    <div className=Styles.text>
       <span>
         {React.string(
            "We use cookies to improve your experience on our site.",
@@ -120,6 +115,7 @@ let make = () => {
       </span>
       <span>
         <span> {React.string(" Read our")} </span>
+        //TODO: Link to privacy policy
         <Next.Link href="/">
           <span
             className=Css.(
