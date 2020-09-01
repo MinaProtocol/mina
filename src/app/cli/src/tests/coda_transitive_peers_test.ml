@@ -40,7 +40,8 @@ let main () =
       ~runtime_config:precomputed_values.runtime_config
   in
   let%bind workers = Coda_processes.spawn_local_processes_exn configs in
-  let%bind new_node_net_config = Coda_processes.net_configs 1 in
+  (*generating n+1 configs because the first three will have the same ports as the previous nodes*)
+  let%bind new_node_net_config = Coda_processes.net_configs (n + 1) in
   let new_node_addrs_and_ports_list, _ = new_node_net_config in
   let expected_peers_addrs_keypairs =
     List.map configs ~f:(fun c ->
@@ -49,12 +50,14 @@ let main () =
   in
   let expected_peers_addr, expected_peers =
     List.fold ~init:([], []) expected_peers_addrs_keypairs
-      ~f:(fun (peer_addrs, peers) p ->
-        ( Node_addrs_and_ports.to_multiaddr_exn (fst p) :: peer_addrs
-        , fst p :: peers ) )
+      ~f:(fun (peer_addrs, peers) (p, k) ->
+        ( Node_addrs_and_ports.to_multiaddr_exn p :: peer_addrs
+        , Network_peer.Peer.create p.external_ip ~libp2p_port:p.libp2p_port
+            ~peer_id:(Coda_net2.Keypair.to_peer_id k)
+          :: peers ) )
   in
   let addrs_and_ports, libp2p_keypair =
-    let addr_and_ports, k = List.nth_exn new_node_addrs_and_ports_list 0 in
+    let addr_and_ports, k = List.nth_exn new_node_addrs_and_ports_list n in
     (Node_addrs_and_ports.to_display addr_and_ports, k)
   in
   [%log debug]
@@ -74,24 +77,10 @@ let main () =
   let%bind peers = Coda_process.peers_exn worker in
   [%log debug]
     !"got peers %{sexp: Network_peer.Peer.t list} expected: %{sexp: \
-      Node_addrs_and_ports.t list}\n"
+      Network_peer.Peer.t list}\n"
     peers expected_peers ;
-  let module S = Host_and_port.Set in
-  assert (
-    S.equal
-      (S.of_list
-         ( peers
-         |> List.map ~f:(fun p ->
-                Host_and_port.create
-                  ~host:(Unix.Inet_addr.to_string p.Network_peer.Peer.host)
-                  ~port:p.libp2p_port ) ))
-      (S.of_list
-         (List.map
-            ~f:(fun p ->
-              Host_and_port.create
-                ~host:(Unix.Inet_addr.to_string p.external_ip)
-                ~port:p.libp2p_port )
-            expected_peers)) ) ;
+  let module S = Network_peer.Peer.Set in
+  assert (S.equal (S.of_list peers) (S.of_list expected_peers)) ;
   let%bind () = Coda_process.disconnect worker ~logger in
   Deferred.List.iter workers ~f:(Coda_process.disconnect ~logger)
 
