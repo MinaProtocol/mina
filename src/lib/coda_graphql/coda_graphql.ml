@@ -2640,6 +2640,20 @@ module Queries = struct
       ~typ:(non_null Types.genesis_constants)
       ~resolve:(fun _ () -> ())
 
+  let next_available_token =
+    field "nextAvailableToken"
+      ~doc:
+        "The next token ID that has not been allocated. Token IDs are \
+         allocated sequentially, so all lower token IDs have been allocated"
+      ~args:Arg.[]
+      ~typ:(non_null Types.token_id)
+      ~resolve:(fun {ctx= coda; _} () ->
+        coda |> Coda_lib.best_tip |> Participating_state.active
+        |> Option.map ~f:(fun tip ->
+               Transition_frontier.Breadcrumb.staged_ledger tip
+               |> Staged_ledger.ledger |> Ledger.next_available_token )
+        |> Option.value ~default:Token_id.(next default) )
+
   let commands =
     [ sync_state
     ; daemon_status
@@ -2662,7 +2676,8 @@ module Queries = struct
     ; trust_status_all
     ; snark_pool
     ; pending_snark_work
-    ; genesis_constants ]
+    ; genesis_constants
+    ; next_available_token ]
 end
 
 let schema =
