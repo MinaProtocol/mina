@@ -22,8 +22,6 @@ module Stable : sig
   end
 end]
 
-type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash]
-
 include Codable.S with type t := t
 
 [%%ifdef consensus_mechanism]
@@ -35,3 +33,10 @@ type var = Field.Var.t * Inner_curve.Scalar.var
 include Codable.Base58_check_base_intf with type t := t
 
 val dummy : t
+
+(** Coding reflecting the RFC0038 spec (eventually) *)
+module Raw : sig
+  val encode : t -> string
+
+  val decode : string -> t option
+end

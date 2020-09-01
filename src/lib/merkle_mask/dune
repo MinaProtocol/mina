@@ -3,7 +3,7 @@
  (public_name merkle_mask)
  (library_flags -linkall)
  (libraries core debug_assert bitstring integers immutable_array
-   dyn_array merkle_ledger merkle_address yojson visualization)
+   merkle_ledger merkle_address yojson visualization)
  (preprocess
   (pps
    ppx_deriving.eq

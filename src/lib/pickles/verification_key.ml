@@ -1,5 +1,6 @@
 open Core
 open Pickles_types
+open Import
 open Zexe_backend.Tweedle
 
 module Data = struct
@@ -12,18 +13,10 @@ module Data = struct
         ; constraints: int
         ; nonzero_entries: int
         ; max_degree: int }
-      [@@deriving version, bin_io]
 
       let to_latest = Fn.id
     end
   end]
-
-  type t = Stable.Latest.t =
-    { public_inputs: int
-    ; variables: int
-    ; constraints: int
-    ; nonzero_entries: int
-    ; max_degree: int }
 end
 
 module Repr = struct
@@ -36,16 +29,10 @@ module Repr = struct
             Matrix_evals.Stable.V1.t
         ; step_domains: Domains.Stable.V1.t array
         ; data: Data.Stable.V1.t }
-      [@@deriving version, bin_io]
 
       let to_latest = Fn.id
     end
   end]
-
-  type t = Stable.Latest.t =
-    { commitments: Dee.Affine.t array Abc.t Matrix_evals.t
-    ; step_domains: Domains.t array
-    ; data: Data.t }
 end
 
 type t =

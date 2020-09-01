@@ -50,7 +50,7 @@ in Pipeline.build Pipeline.Config::{
       commands = prefixCommands # commands,
       label = "Monorepo triage",
       key = "cmds",
-      target = Size.Large,
+      target = Size.Small,
       docker = Some Docker::{ image = (./Constants/ContainerImages.dhall).toolchainBase }
     }
   ]

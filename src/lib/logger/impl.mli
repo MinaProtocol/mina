@@ -107,6 +107,7 @@ type 'a log_function =
      t
   -> module_:string
   -> location:string
+  -> ?tags:Tags.t list
   -> ?metadata:(string, Yojson.Safe.t) List.Assoc.t
   -> ?event_id:Structured_log_events.id
   -> ('a, unit, string, unit) format4
@@ -136,6 +137,7 @@ val error : _ log_function
 (** spam is a special log level that omits location information *)
 val spam :
      t
+  -> ?tags:Tags.t list
   -> ?metadata:(string, Yojson.Safe.t) List.Assoc.t
   -> ('a, unit, string, unit) format4
   -> 'a
@@ -155,6 +157,7 @@ module Structured : sig
        t
     -> module_:string
     -> location:string
+    -> ?tags:Tags.t list
     -> ?metadata:(string, Yojson.Safe.t) List.Assoc.t
     -> Structured_log_events.t
     -> unit

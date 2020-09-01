@@ -117,9 +117,6 @@ module Compressed = struct
 
   let compress (x, y) = {Poly.x; is_odd= parity y}
 
-  (* sexp operations written manually, don't derive them *)
-  type t = (Field.t, bool) Poly.t [@@deriving eq, compare, hash]
-
   let empty = Poly.{x= Field.zero; is_odd= false}
 
   let to_input {Poly.x; is_odd} =
@@ -231,11 +228,6 @@ module Uncompressed = struct
         Option.value_exn (decompress @@ Compressed.t_of_sexp sexp)
     end
   end]
-
-  type t =
-    Field.t * Field.t
-    (* sexp operations written manually, don't derive them *)
-  [@@deriving compare, hash]
 
   (* so we can make sets of public keys *)
   include Comparable.Make_binable (Stable.Latest)

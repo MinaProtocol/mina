@@ -50,8 +50,6 @@ module Send_payment_input = struct
       let to_latest = Fn.id
     end
   end]
-
-  type t = Stable.Latest.t
 end
 
 module T = struct
@@ -619,7 +617,7 @@ module T = struct
               let sender_pk = pk_of_sk sender_sk in
               User_command_input.create ~fee ~fee_token:Token_id.default
                 ~fee_payer_pk:sender_pk ~signer:sender_pk ~memo
-                ~valid_until:Coda_numbers.Global_slot.max_value
+                ~valid_until:None
                 ~body:
                   (Payment
                      { source_pk= sender_pk

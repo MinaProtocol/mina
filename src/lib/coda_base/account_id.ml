@@ -14,8 +14,6 @@ module Stable = struct
   end
 end]
 
-type t = Stable.Latest.t [@@deriving sexp, equal, compare, hash, yojson]
-
 let create key tid = (key, tid)
 
 let empty = (Public_key.Compressed.empty, Token_id.default)

@@ -13,16 +13,15 @@ let getEnvOrFail = name =>
   | None => failwith({j|Couldn't find env var: `$name`"|j})
   };
 
-let credentials = getEnvOrFail("GOOGLE_APPLICATION_CREDENTIALS");
-let spreadsheetId = getEnvOrFail("SPREADSHEET_ID");
-let pgConnection = getEnvOrFail("PGCONN");
-
 /* The Google Sheets API expects the credentials to be a local file instead of a parameter */
-Node.Fs.writeFileAsUtf8Sync("./google_sheets_credentials.json", credentials);
 Node.Process.putEnvVar(
   "GOOGLE_APPLICATION_CREDENTIALS",
   "./google_sheets_credentials.json",
 );
+
+let credentials = getEnvOrFail("GOOGLE_APPLICATION_CREDENTIALS");
+let spreadsheetId = getEnvOrFail("SPREADSHEET_ID");
+let pgConnection = getEnvOrFail("PGCONN");
 
 let main = () => {
   let pool = Postgres.createPool(pgConnection);

@@ -1,9 +1,10 @@
 (library
   (name marlin_checks)
   (public_name pickles.marlin_checks)
-  (preprocess (pps ppx_version ppx_jane ppx_deriving.std))
+  (preprocess (pps ppx_coda ppx_version ppx_jane ppx_deriving.std ppx_deriving_yojson))
   (libraries
     composition_types
+    pickles_base
 
     zexe_backend
     pickles_types

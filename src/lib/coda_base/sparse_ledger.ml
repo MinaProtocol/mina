@@ -17,8 +17,6 @@ module Stable = struct
   end
 end]
 
-type t = Stable.Latest.t [@@deriving sexp]
-
 module Hash = struct
   include Ledger_hash
 
@@ -136,9 +134,14 @@ let get_or_initialize_exn account_id t idx =
   let account = get_exn t idx in
   if Public_key.Compressed.(equal empty account.public_key) then
     let public_key = Account_id.public_key account_id in
+    let token_id = Account_id.token_id account_id in
+    let delegate =
+      (* Only allow delegation if this account is for the default token. *)
+      if Token_id.(equal default) token_id then Some public_key else None
+    in
     ( `Added
     , { account with
-        delegate= public_key
+        delegate
       ; public_key
       ; token_id= Account_id.token_id account_id } )
   else (`Existed, account)
@@ -262,7 +265,9 @@ let apply_user_command_exn
             @@ Transaction_logic.validate_timing ~txn_amount:Amount.zero
                  ~txn_global_slot:current_global_slot ~account:source_account
           in
-          {source_account with delegate= Account_id.public_key receiver; timing}
+          { source_account with
+            delegate= Some (Account_id.public_key receiver)
+          ; timing }
         in
         [(source_idx, source_account)]
     | Payment {amount; token_id= token; _} ->

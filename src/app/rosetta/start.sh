@@ -63,24 +63,30 @@ sleep 3
 # wait for it to settle
 sleep 3
 
-# test agent
-../../../_build/default/src/app/rosetta/test-agent/agent.exe \
-  -graphql-uri http://localhost:3085/graphql \
-  -rosetta-uri http://localhost:3087/ \
-  -log-level Trace \
-  -log-json &
+ARG=${1:-NONE}
+if [[ "$ARG" == "CURL" ]]; then
+  echo "Running for curl mode, no agent present"
+  sleep infinity
+else
+  # test agent
+  ../../../_build/default/src/app/rosetta/test-agent/agent.exe \
+    -graphql-uri http://localhost:3085/graphql \
+    -rosetta-uri http://localhost:3087/ \
+    -log-level Trace \
+    -log-json &
 
-# wait for test agent to exit (asynchronously)
-AGENT_PID=$!
-while $(kill -0 $AGENT_PID 2> /dev/null); do
-  sleep 2
-done
-set +e
-wait $AGENT_PID
-AGENT_STATUS=$?
-set -e
-echo "Test finished with code $AGENT_STATUS"
+  # wait for test agent to exit (asynchronously)
+  AGENT_PID=$!
+  while $(kill -0 $AGENT_PID 2> /dev/null); do
+    sleep 2
+  done
+  set +e
+  wait $AGENT_PID
+  AGENT_STATUS=$?
+  set -e
+  echo "Test finished with code $AGENT_STATUS"
 
-# then cleanup and forward the status
-cleanup $AGENT_STATUS
+  # then cleanup and forward the status
+  cleanup $AGENT_STATUS
+fi
 

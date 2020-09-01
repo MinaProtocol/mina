@@ -30,7 +30,7 @@ let create_ledger_and_transactions num_transitions =
     let payload : User_command.Payload.t =
       User_command.Payload.create ~fee ~fee_token:Token_id.default
         ~fee_payer_pk:from_pk ~nonce ~memo:User_command_memo.dummy
-        ~valid_until:Coda_numbers.Global_slot.max_value
+        ~valid_until:None
         ~body:
           (Payment
              { source_pk= from_pk

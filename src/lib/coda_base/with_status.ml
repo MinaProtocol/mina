@@ -8,9 +8,6 @@ module Stable = struct
   end
 end]
 
-type 'a t = 'a Stable.Latest.t = {data: 'a; status: User_command_status.t}
-[@@deriving sexp, yojson, eq, compare]
-
 let map ~f {data; status} = {data= f data; status}
 
 let map_opt ~f {data; status} =

@@ -29,7 +29,7 @@ unit_test_profiles_medium_curves = ['dev_medium_curves']
 
 simple_tests = [
     'full-test',
-    'transaction-snark-profiler -k 2',
+    'transaction-snark-profiler -k 1',
 ]
 
 compile_config_agnostic_tests = [
@@ -109,7 +109,7 @@ extra_required_status_checks = [
     "ci/circleci: tracetool",
     "ci/circleci: build-wallet",
     "ci/circleci: compare-test-signatures",
-    "ci/circleci: build-client-sdk",
+    "ci/circleci: client-sdk-unit-tests",
     "ci/circleci: test-unit--nonconsensus_medium_curves",
 ]
 

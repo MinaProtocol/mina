@@ -40,12 +40,13 @@ let compute_delegatee_table keys ~iter_accounts =
   let outer_table = Public_key.Compressed.Table.create () in
   iter_accounts (fun i (acct : Account.t) ->
       if
-        Public_key.Compressed.Set.mem keys acct.delegate
+        Option.is_some acct.delegate
         (* Only default tokens may delegate. *)
         && Token_id.equal acct.token_id Token_id.default
+        && Public_key.Compressed.Set.mem keys (Option.value_exn acct.delegate)
       then
-        Public_key.Compressed.Table.update outer_table acct.delegate
-          ~f:(function
+        Public_key.Compressed.Table.update outer_table
+          (Option.value_exn acct.delegate) ~f:(function
           | None ->
               Account.Index.Table.of_alist_exn [(i, acct)]
           | Some table ->
@@ -92,18 +93,6 @@ module Configuration = struct
       let to_latest = Fn.id
     end
   end]
-
-  type t = Stable.Latest.t =
-    { delta: int
-    ; k: int
-    ; c: int
-    ; c_times_k: int
-    ; slots_per_epoch: int
-    ; slot_duration: int
-    ; epoch_duration: int
-    ; genesis_state_timestamp: Block_time.t
-    ; acceptable_network_delay: int }
-  [@@deriving yojson, fields]
 
   let t ~constraint_constants ~protocol_constants =
     let constants =
@@ -372,38 +361,11 @@ module Data = struct
   end
 
   module Epoch_ledger = struct
-    module Poly = struct
-      [%%versioned
-      module Stable = struct
-        module V1 = struct
-          type ('ledger_hash, 'amount) t =
-            {hash: 'ledger_hash; total_currency: 'amount}
-          [@@deriving sexp, eq, compare, hash, to_yojson]
-        end
-      end]
+    include Coda_base.Epoch_ledger
 
-      type ('ledger_hash, 'amount) t =
-            ('ledger_hash, 'amount) Stable.Latest.t =
-        {hash: 'ledger_hash; total_currency: 'amount}
-      [@@deriving sexp, eq, compare, hash, to_yojson, hlist]
-    end
-
-    module Value = struct
-      [%%versioned
-      module Stable = struct
-        module V1 = struct
-          type t =
-            ( Coda_base.Frozen_ledger_hash.Stable.V1.t
-            , Amount.Stable.V1.t )
-            Poly.Stable.V1.t
-          [@@deriving sexp, eq, compare, hash, to_yojson]
-
-          let to_latest = Fn.id
-        end
-      end]
-
-      type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash, to_yojson]
-    end
+    let genesis ~ledger =
+      { Poly.hash= genesis_ledger_hash ~ledger
+      ; total_currency= genesis_ledger_total_currency ~ledger }
 
     let graphql_type () : ('ctx, Value.t option) Graphql_async.Schema.typ =
       let open Graphql_async in
@@ -418,45 +380,6 @@ module Data = struct
               ~args:Arg.[]
               ~resolve:(fun _ {Poly.total_currency; _} ->
                 Amount.to_uint64 total_currency ) ] )
-
-    let to_input ({hash; total_currency} : Value.t) =
-      let open Snark_params.Tick in
-      { Random_oracle.Input.field_elements= [|(hash :> Field.t)|]
-      ; bitstrings= [|Amount.to_bits total_currency|] }
-
-    type var = (Coda_base.Frozen_ledger_hash.var, Amount.var) Poly.t
-
-    let data_spec =
-      Tick.Data_spec.[Coda_base.Frozen_ledger_hash.typ; Amount.typ]
-
-    let typ : (var, Value.t) Typ.t =
-      Tick.Typ.of_hlistable data_spec ~var_to_hlist:Poly.to_hlist
-        ~var_of_hlist:Poly.of_hlist ~value_to_hlist:Poly.to_hlist
-        ~value_of_hlist:Poly.of_hlist
-
-    let var_to_input ({Poly.hash; total_currency} : var) =
-      { Random_oracle.Input.field_elements=
-          [|Coda_base.Frozen_ledger_hash.var_to_hash_packed hash|]
-      ; bitstrings=
-          [|Bitstring.Lsb_first.to_list (Amount.var_to_bits total_currency)|]
-      }
-
-    let if_ cond
-        ~(then_ : (Coda_base.Frozen_ledger_hash.var, Amount.var) Poly.t)
-        ~(else_ : (Coda_base.Frozen_ledger_hash.var, Amount.var) Poly.t) =
-      let open Tick.Checked.Let_syntax in
-      let%map hash =
-        Coda_base.Frozen_ledger_hash.if_ cond ~then_:then_.hash
-          ~else_:else_.hash
-      and total_currency =
-        Amount.Checked.if_ cond ~then_:then_.total_currency
-          ~else_:else_.total_currency
-      in
-      {Poly.hash; total_currency}
-
-    let genesis ~ledger =
-      { Poly.hash= genesis_ledger_hash ~ledger
-      ; total_currency= genesis_ledger_total_currency ~ledger }
   end
 
   module Vrf = struct
@@ -572,8 +495,6 @@ module Data = struct
             let to_latest = Fn.id
           end
         end]
-
-        type t = Stable.Latest.t [@@deriving sexp, compare, hash, yojson]
 
         include Codable.Make_base58_check (struct
           type t = Stable.Latest.t [@@deriving bin_io_unversioned]
@@ -935,8 +856,6 @@ module Data = struct
         let to_latest = Fn.id
       end
     end]
-
-    type t = Stable.Latest.t [@@deriving sexp, compare, hash, to_yojson]
   end
 
   module Epoch_data = struct
@@ -957,28 +876,9 @@ module Data = struct
                  the current state. *)
             ; lock_checkpoint: 'lock_checkpoint
             ; epoch_length: 'length }
-          [@@deriving sexp, eq, compare, hash, to_yojson, fields]
+          [@@deriving sexp, eq, compare, hash, to_yojson, fields, hlist]
         end
       end]
-
-      type ( 'epoch_ledger
-           , 'epoch_seed
-           , 'start_checkpoint
-           , 'lock_checkpoint
-           , 'length )
-           t =
-            ( 'epoch_ledger
-            , 'epoch_seed
-            , 'start_checkpoint
-            , 'lock_checkpoint
-            , 'length )
-            Stable.Latest.t =
-        { ledger: 'epoch_ledger
-        ; seed: 'epoch_seed
-        ; start_checkpoint: 'start_checkpoint
-        ; lock_checkpoint: 'lock_checkpoint
-        ; epoch_length: 'length }
-      [@@deriving sexp, compare, hash, to_yojson, fields, hlist]
     end
 
     type var =
@@ -1722,38 +1622,9 @@ module Data = struct
             ; staking_epoch_data: 'staking_epoch_data
             ; next_epoch_data: 'next_epoch_data
             ; has_ancestor_in_same_checkpoint_window: 'bool }
-          [@@deriving
-            sexp, bin_io, eq, compare, hash, to_yojson, version, fields]
+          [@@deriving sexp, eq, compare, hash, to_yojson, fields, hlist]
         end
       end]
-
-      type ( 'length
-           , 'vrf_output
-           , 'amount
-           , 'global_slot
-           , 'staking_epoch_data
-           , 'next_epoch_data
-           , 'bool )
-           t =
-            ( 'length
-            , 'vrf_output
-            , 'amount
-            , 'global_slot
-            , 'staking_epoch_data
-            , 'next_epoch_data
-            , 'bool )
-            Stable.Latest.t =
-        { blockchain_length: 'length
-        ; epoch_count: 'length
-        ; min_window_density: 'length
-        ; sub_window_densities: 'length list
-        ; last_vrf_output: 'vrf_output
-        ; total_currency: 'amount
-        ; curr_global_slot: 'global_slot
-        ; staking_epoch_data: 'staking_epoch_data
-        ; next_epoch_data: 'next_epoch_data
-        ; has_ancestor_in_same_checkpoint_window: 'bool }
-      [@@deriving sexp, compare, hash, to_yojson, fields, hlist]
     end
 
     module Value = struct
@@ -1792,8 +1663,6 @@ module Data = struct
                 , `Bool t.has_ancestor_in_same_checkpoint_window ) ]
         end
       end]
-
-      type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash]
 
       let to_yojson = Stable.Latest.to_yojson
 

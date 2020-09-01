@@ -1,5 +1,6 @@
 #!/bin/bash
-set -o pipefail
+
+set -eo pipefail
 
 if [[ $# -ne 2 ]]; then
     echo "Usage: $0 <dune-profile> <path-to-source-tests>"
@@ -18,6 +19,7 @@ cat /proc/cpuinfo
 source ~/.profile
 
 echo "--- Make build"
+export LIBP2P_NIXLESS=1 PATH=/usr/lib/go/bin:$PATH GO=/usr/lib/go/bin/go 
 time make build
 
 echo "--- Run unit tests"

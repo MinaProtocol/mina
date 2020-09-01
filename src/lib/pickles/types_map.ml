@@ -1,5 +1,6 @@
 open Core_kernel
 open Pickles_types
+open Import
 open Backend
 
 (* TODO: max_branching is a terrible name. It should be max_width. *)
@@ -75,7 +76,7 @@ module Side_loaded = struct
     ; typ
     ; branches
     ; wrap_domains= Common.wrap_domains
-    ; wrap_key }
+    ; wrap_key= Matrix_evals.map ~f:(Abc.map ~f:Array.of_list) wrap_key }
 end
 
 module Compiled = struct

@@ -11,10 +11,3 @@ module Stable : sig
     [@@deriving sexp, to_yojson]
   end
 end]
-
-type t = Stable.Latest.t =
-  { ledger: Coda_base.Sparse_ledger.t
-  ; protocol_state_body: Coda_state.Protocol_state.Body.Value.t
-  ; init_stack: Coda_base.Pending_coinbase.Stack_versioned.t
-  ; status: Coda_base.User_command_status.t }
-[@@deriving sexp, to_yojson]

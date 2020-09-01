@@ -33,6 +33,9 @@ module Transaction_with_witness = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
+      (* TODO: The statement is redundant here - it can be computed from the
+         witness and the transaction
+      *)
       type t =
         { transaction_with_info: Transaction_logic.Undo.Stable.V1.t
         ; state_hash: State_hash.Stable.V1.t * State_body_hash.Stable.V1.t
@@ -46,15 +49,6 @@ module Transaction_with_witness = struct
       let to_latest = Fn.id
     end
   end]
-
-  (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)
-  type t = Stable.Latest.t =
-    { transaction_with_info: Ledger.Undo.t
-    ; state_hash: State_hash.t * State_body_hash.t
-    ; statement: Transaction_snark.Statement.t
-    ; init_stack: Transaction_snark.Pending_coinbase_stack_state.Init_stack.t
-    ; ledger_witness: Coda_base.Sparse_ledger.t sexp_opaque }
-  [@@deriving sexp]
 end
 
 module Ledger_proof_with_sok_message = struct
@@ -62,13 +56,11 @@ module Ledger_proof_with_sok_message = struct
   module Stable = struct
     module V1 = struct
       type t = Ledger_proof.Stable.V1.t * Sok_message.Stable.V1.t
-      [@@deriving sexp, bin_io, version]
+      [@@deriving sexp]
 
       let to_latest = Fn.id
     end
   end]
-
-  type t = Ledger_proof.t * Sok_message.t [@@deriving sexp]
 end
 
 module Available_job = struct
@@ -167,8 +159,6 @@ module Stable = struct
         (state_hash |> Digestif.SHA256.to_raw_string)
   end
 end]
-
-type t = Stable.Latest.t [@@deriving sexp]
 
 [%%define_locally
 Stable.Latest.(hash)]
@@ -399,8 +389,8 @@ struct
   let check_invariants t ~constraint_constants ~verifier ~error_prefix
       ~ledger_hash_end:current_ledger_hash
       ~ledger_hash_begin:snarked_ledger_hash
-      ~next_available_token_before:next_tkn1
-      ~next_available_token_after:next_tkn2 =
+      ~next_available_token_begin:snarked_ledger_next_available_token
+      ~next_available_token_end:current_ledger_next_available_token =
     let clarify_error cond err =
       if not cond then Or_error.errorf "%s : %s" error_prefix err else Ok ()
     in
@@ -450,13 +440,16 @@ struct
             (Token_id.equal Token_id.default fee_token_r)
             "nondefault fee token"
         and () =
-          clarify_error
-            Token_id.(next_available_token_before = next_tkn1)
-            "next available token before does not match"
+          Option.value_map ~default:(Ok ()) snarked_ledger_next_available_token
+            ~f:(fun next_tkn ->
+              clarify_error
+                Token_id.(next_available_token_before = next_tkn)
+                "next available token from snarked ledger does not match" )
         and () =
           clarify_error
-            Token_id.(next_available_token_after = next_tkn2)
-            "next available token after does not match"
+            Token_id.(
+              next_available_token_after = current_ledger_next_available_token)
+            "next available token from staged ledger does not match"
         in
         ()
 end

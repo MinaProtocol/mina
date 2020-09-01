@@ -1,7 +1,7 @@
 open Core_kernel
 open Async
-module User_command_info = Block.User_command_info
-open Models
+open Rosetta_lib
+open Rosetta_models
 
 module Get_all_transactions =
 [%graphql
@@ -92,7 +92,6 @@ module All = struct
         -> (Mempool_response.t, Errors.t) M.t =
      fun ~env req ->
       let open M.Let_syntax in
-      (* TODO: Support alternate tokens *)
       let%bind res = env.gql () in
       let%map () =
         env.validate_network_choice ~network_identifier:req.network_identifier
@@ -283,7 +282,7 @@ module Transaction = struct
       { Mempool_transaction_response.transaction=
           { Transaction.transaction_identifier=
               {Transaction_identifier.hash= req.transaction_identifier.hash}
-          ; operations= user_command_info |> User_command_info.to_operations
+          ; operations= user_command_info |> User_command_info.to_operations'
           ; metadata= None }
       ; metadata= None }
   end

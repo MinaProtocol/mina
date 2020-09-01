@@ -294,24 +294,13 @@ end = struct
 
       let ( + ) = add
 
-      let assert_equal (t1 : var) (t2 : var) =
-        let%map () =
-          Field.Checked.Assert.equal (pack_var t1.magnitude)
-            (pack_var t2.magnitude)
-        and () =
-          Field.Checked.Assert.equal
-            (t1.sgn :> Field.Var.t)
-            (t2.sgn :> Field.Var.t)
-        in
-        ()
-
       let equal (t1 : var) (t2 : var) =
-        let%bind b1 =
-          Field.Checked.equal (pack_var t1.magnitude) (pack_var t2.magnitude)
-        and b2 =
-          Field.Checked.equal (t1.sgn :> Field.Var.t) (t2.sgn :> Field.Var.t)
-        in
-        Boolean.all [b1; b2]
+        let%bind t1 = to_field_var t1 and t2 = to_field_var t2 in
+        Field.Checked.equal t1 t2
+
+      let assert_equal (t1 : var) (t2 : var) =
+        let%bind t1 = to_field_var t1 and t2 = to_field_var t2 in
+        Field.Checked.Assert.equal t1 t2
 
       let cswap_field (b : Boolean.var) (x, y) =
         (* (x + b(y - x), y + b(x - y)) *)
@@ -543,6 +532,8 @@ module Fee = struct
 
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t = Unsigned_extended.UInt64.Stable.V1.t
       [@@deriving sexp, compare, hash, eq]
@@ -583,6 +574,8 @@ module Amount = struct
 
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t = Unsigned_extended.UInt64.Stable.V1.t
       [@@deriving sexp, compare, hash, eq, yojson]
@@ -633,11 +626,11 @@ module Balance = struct
   [%%ifdef
   consensus_mechanism]
 
-  include (Amount : Basic with type t = Amount.t with type var = Amount.var)
+  include (Amount : Basic with type t := t with type var = Amount.var)
 
   [%%else]
 
-  include (Amount : Basic with type t = Amount.t)
+  include (Amount : Basic with type t := t)
 
   [%%endif]
 
