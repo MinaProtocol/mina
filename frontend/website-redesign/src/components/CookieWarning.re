@@ -26,8 +26,9 @@ module Styles = {
       display(`flex),
       flexDirection(`column),
       width(`percent(100.)),
-      background(Theme.Colors.black),
+      background(Theme.Colors.digitalBlack),
       boxSizing(`borderBox),
+      boxShadow(~x=`px(0), ~y=`px(1), `hex("e5e5e5e5")),
       media(
         Theme.MediaQuery.notMobile,
         [
