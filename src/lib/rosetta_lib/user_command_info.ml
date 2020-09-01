@@ -21,6 +21,7 @@ module Token_id = Coda_base.Token_id
 module Public_key = Signature_lib.Public_key
 module User_command_memo = Coda_base.User_command_memo
 module Payment_payload = Coda_base.Payment_payload
+module Stake_delegation = Coda_base.Stake_delegation
 
 let pk_to_public_key ~context (`Pk pk) =
   Public_key.Compressed.of_base58_check pk
@@ -115,11 +116,11 @@ module Partial = struct
     let%bind fee_payer_pk =
       pk_to_public_key ~context:"Fee payer" t.fee_payer
     in
+    let%bind source_pk = pk_to_public_key ~context:"Source" t.source in
     let%bind receiver_pk = pk_to_public_key ~context:"Receiver" t.receiver in
     let%map body =
       match t.kind with
       | `Payment ->
-          let%bind source_pk = pk_to_public_key ~context:"Source" t.source in
           let%map amount =
             Result.of_option t.amount
               ~error:
@@ -135,8 +136,11 @@ module Partial = struct
           in
           User_command.Payload.Body.Payment payload
       | `Delegation ->
-          (* TODO: for #5666 *)
-          Result.fail (Errors.create `Unsupported_operation_for_construction)
+          let payload =
+            Stake_delegation.Set_delegate
+              {delegator= source_pk; new_delegate= receiver_pk}
+          in
+          Result.return @@ User_command.Payload.Body.Stake_delegation payload
       | _ ->
           Result.fail (Errors.create `Unsupported_operation_for_construction)
     in

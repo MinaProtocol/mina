@@ -184,7 +184,7 @@ end = struct
     ; details=
         ( match (context t.kind, t.extra_context) with
         | None, None ->
-            Some (Variant.to_yojson t.kind)
+            Some (`Assoc [("body", Variant.to_yojson t.kind)])
         | None, Some context | Some context, None ->
             Some
               (`Assoc
