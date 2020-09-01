@@ -8,6 +8,8 @@ use algebra::{
 
 use plonk_circuits::scalars::{ProofEvaluations as DlogProofEvaluations};
 use plonk_circuits::constraints::ConstraintSystem;
+use plonk_circuits::gate::{CircuitGate, GateType, GateType::{*}};
+use plonk_circuits::wires::GateWires;
 
 use ff_fft::{EvaluationDomain, Radix2EvaluationDomain as Domain};
 
@@ -824,4 +826,231 @@ pub extern "C" fn zexe_tweedle_plonk_fp_oracles_u(oracles: *const FpOracles) -> 
 #[no_mangle]
 pub extern "C" fn zexe_tweedle_plonk_fp_oracles_delete(x: *mut FpOracles) {
     let _box = unsafe { Box::from_raw(x) };
+}
+
+// Fp circuit gate vector
+#[no_mangle]
+pub extern "C" fn zexe_tweedle_plonk_fp_circuit_gate_vector_create() -> *mut Vec<CircuitGate<Fp>> {
+    return Box::into_raw(Box::new(Vec::new()));
+}
+
+#[no_mangle]
+pub extern "C" fn zexe_tweedle_plonk_fp_circuit_gate_vector_length(v: *const Vec<CircuitGate<Fp>>) -> i32 {
+    let v_ = unsafe { &(*v) };
+    return v_.len() as i32;
+}
+
+fn push_gate(
+    typ: GateType,
+    v: *mut Vec<CircuitGate<Fp>>,
+    l_index: usize,
+    l_permutation: usize,
+    r_index: usize,
+    r_permutation: usize,
+    o_index: usize,
+    o_permutation: usize,
+    c: *const Vec<Fp>,
+) {
+    let v_ = unsafe { &mut (*v) };
+    let c_ = unsafe { &(*c) };
+    v_.push(
+        CircuitGate::<Fp> {
+            typ,
+            wires:
+                GateWires {
+                    l: (l_index, l_permutation),
+                    r: (r_index, r_permutation),
+                    o: (o_index, o_permutation),
+                },
+            c: c_.clone(),
+        });
+}
+
+#[no_mangle]
+pub extern "C" fn zexe_tweedle_plonk_fp_circuit_gate_vector_push_zero(
+    v: *mut Vec<CircuitGate<Fp>>,
+    l_index: usize,
+    l_permutation: usize,
+    r_index: usize,
+    r_permutation: usize,
+    o_index: usize,
+    o_permutation: usize,
+    c: *const Vec<Fp>,
+) {
+    push_gate(Zero, v, l_index, l_permutation, r_index, r_permutation, o_index, o_permutation, c);
+}
+
+#[no_mangle]
+pub extern "C" fn zexe_tweedle_plonk_fp_circuit_gate_vector_push_generic(
+    v: *mut Vec<CircuitGate<Fp>>,
+    l_index: usize,
+    l_permutation: usize,
+    r_index: usize,
+    r_permutation: usize,
+    o_index: usize,
+    o_permutation: usize,
+    c: *const Vec<Fp>,
+) {
+    push_gate(Generic, v, l_index, l_permutation, r_index, r_permutation, o_index, o_permutation, c);
+}
+
+#[no_mangle]
+pub extern "C" fn zexe_tweedle_plonk_fp_circuit_gate_vector_push_poseidon(
+    v: *mut Vec<CircuitGate<Fp>>,
+    l_index: usize,
+    l_permutation: usize,
+    r_index: usize,
+    r_permutation: usize,
+    o_index: usize,
+    o_permutation: usize,
+    c: *const Vec<Fp>,
+) {
+    push_gate(Poseidon, v, l_index, l_permutation, r_index, r_permutation, o_index, o_permutation, c);
+}
+
+#[no_mangle]
+pub extern "C" fn zexe_tweedle_plonk_fp_circuit_gate_vector_push_add1(
+    v: *mut Vec<CircuitGate<Fp>>,
+    l_index: usize,
+    l_permutation: usize,
+    r_index: usize,
+    r_permutation: usize,
+    o_index: usize,
+    o_permutation: usize,
+    c: *const Vec<Fp>,
+) {
+    push_gate(Add1, v, l_index, l_permutation, r_index, r_permutation, o_index, o_permutation, c);
+}
+
+#[no_mangle]
+pub extern "C" fn zexe_tweedle_plonk_fp_circuit_gate_vector_push_add2(
+    v: *mut Vec<CircuitGate<Fp>>,
+    l_index: usize,
+    l_permutation: usize,
+    r_index: usize,
+    r_permutation: usize,
+    o_index: usize,
+    o_permutation: usize,
+    c: *const Vec<Fp>,
+) {
+    push_gate(Add2, v, l_index, l_permutation, r_index, r_permutation, o_index, o_permutation, c);
+}
+
+#[no_mangle]
+pub extern "C" fn zexe_tweedle_plonk_fp_circuit_gate_vector_push_vbmul1(
+    v: *mut Vec<CircuitGate<Fp>>,
+    l_index: usize,
+    l_permutation: usize,
+    r_index: usize,
+    r_permutation: usize,
+    o_index: usize,
+    o_permutation: usize,
+    c: *const Vec<Fp>,
+) {
+    push_gate(Vbmul1, v, l_index, l_permutation, r_index, r_permutation, o_index, o_permutation, c);
+}
+
+#[no_mangle]
+pub extern "C" fn zexe_tweedle_plonk_fp_circuit_gate_vector_push_vbmul2(
+    v: *mut Vec<CircuitGate<Fp>>,
+    l_index: usize,
+    l_permutation: usize,
+    r_index: usize,
+    r_permutation: usize,
+    o_index: usize,
+    o_permutation: usize,
+    c: *const Vec<Fp>,
+) {
+    push_gate(Vbmul2, v, l_index, l_permutation, r_index, r_permutation, o_index, o_permutation, c);
+}
+
+#[no_mangle]
+pub extern "C" fn zexe_tweedle_plonk_fp_circuit_gate_vector_push_vbmul3(
+    v: *mut Vec<CircuitGate<Fp>>,
+    l_index: usize,
+    l_permutation: usize,
+    r_index: usize,
+    r_permutation: usize,
+    o_index: usize,
+    o_permutation: usize,
+    c: *const Vec<Fp>,
+) {
+    push_gate(Vbmul3, v, l_index, l_permutation, r_index, r_permutation, o_index, o_permutation, c);
+}
+
+#[no_mangle]
+pub extern "C" fn zexe_tweedle_plonk_fp_circuit_gate_vector_push_endomul1(
+    v: *mut Vec<CircuitGate<Fp>>,
+    l_index: usize,
+    l_permutation: usize,
+    r_index: usize,
+    r_permutation: usize,
+    o_index: usize,
+    o_permutation: usize,
+    c: *const Vec<Fp>,
+) {
+    push_gate(Endomul1, v, l_index, l_permutation, r_index, r_permutation, o_index, o_permutation, c);
+}
+
+#[no_mangle]
+pub extern "C" fn zexe_tweedle_plonk_fp_circuit_gate_vector_push_endomul2(
+    v: *mut Vec<CircuitGate<Fp>>,
+    l_index: usize,
+    l_permutation: usize,
+    r_index: usize,
+    r_permutation: usize,
+    o_index: usize,
+    o_permutation: usize,
+    c: *const Vec<Fp>,
+) {
+    push_gate(Endomul2, v, l_index, l_permutation, r_index, r_permutation, o_index, o_permutation, c);
+}
+
+#[no_mangle]
+pub extern "C" fn zexe_tweedle_plonk_fp_circuit_gate_vector_push_endomul3(
+    v: *mut Vec<CircuitGate<Fp>>,
+    l_index: usize,
+    l_permutation: usize,
+    r_index: usize,
+    r_permutation: usize,
+    o_index: usize,
+    o_permutation: usize,
+    c: *const Vec<Fp>,
+) {
+    push_gate(Endomul3, v, l_index, l_permutation, r_index, r_permutation, o_index, o_permutation, c);
+}
+
+#[no_mangle]
+pub extern "C" fn zexe_tweedle_plonk_fp_circuit_gate_vector_push_endomul4(
+    v: *mut Vec<CircuitGate<Fp>>,
+    l_index: usize,
+    l_permutation: usize,
+    r_index: usize,
+    r_permutation: usize,
+    o_index: usize,
+    o_permutation: usize,
+    c: *const Vec<Fp>,
+) {
+    push_gate(Endomul4, v, l_index, l_permutation, r_index, r_permutation, o_index, o_permutation, c);
+}
+
+#[no_mangle]
+pub extern "C" fn zexe_tweedle_plonk_fp_circuit_gate_vector_delete(v: *mut Vec<CircuitGate<Fp>>) {
+    // Deallocation happens automatically when a box variable goes out of
+    // scope.
+    let _box = unsafe { Box::from_raw(v) };
+}
+
+// Fp constraint system
+#[no_mangle]
+pub extern "C" fn zexe_tweedle_plonk_fp_constraint_system_create(v: *mut Vec<CircuitGate<Fp>>, public: usize) -> *mut ConstraintSystem<Fp> {
+    let v_ = unsafe { &mut (*v) };
+    return Box::into_raw(Box::new(ConstraintSystem::<Fp>::create(v_.clone(), public).unwrap()));
+}
+
+#[no_mangle]
+pub extern "C" fn zexe_tweedle_plonk_fp_constraint_system_delete(v: *mut ConstraintSystem<Fp>) {
+    // Deallocation happens automatically when a box variable goes out of
+    // scope.
+    let _box = unsafe { Box::from_raw(v) };
 }
