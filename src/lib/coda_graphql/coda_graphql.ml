@@ -547,7 +547,7 @@ module Types = struct
         ; balance=
             {AnnotatedBalance.total= balance; unknown= balance; breadcrumb}
         ; receipt_chain_hash= Some receipt_chain_hash
-        ; delegate= Some delegate
+        ; delegate
         ; voting_for= Some voting_for
         ; timing
         ; snapp }
@@ -600,6 +600,7 @@ module Types = struct
           , AnnotatedBalance.t
           , Account.Nonce.t option
           , Receipt.Chain_hash.t option
+          , Public_key.Compressed.t option
           , State_hash.t option
           , Account.Timing.t
           , Snapp_account.t option )
