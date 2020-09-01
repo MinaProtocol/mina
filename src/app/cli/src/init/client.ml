@@ -1539,6 +1539,21 @@ let telemetry =
              printf "Failed to get telemetry data: %s\n%!"
                (Error.to_string_hum err) ))
 
+let next_available_token_cmd =
+  Command.async
+    ~summary:
+      "The next token ID that has not been allocated. Token IDs are allocated \
+       sequentially, so all lower token IDs have been allocated"
+    (Cli_lib.Background_daemon.graphql_init (Command.Param.return ())
+       ~f:(fun graphql_endpoint () ->
+         let%map response =
+           Graphql_client.query_exn
+             (Graphql_queries.Next_available_token.make ())
+             graphql_endpoint
+         in
+         printf "Next available token ID: %s\n"
+           (Token_id.to_string response#nextAvailableToken) ))
+
 module Visualization = struct
   let create_command (type rpc_response) ~name ~f
       (rpc : (string, rpc_response) Rpc.Rpc.t) =
@@ -1643,4 +1658,5 @@ let advanced =
     ; ("visualization", Visualization.command_group)
     ; ("generate-receipt", generate_receipt)
     ; ("verify-receipt", verify_receipt)
-    ; ("generate-keypair", Cli_lib.Commands.generate_keypair) ]
+    ; ("generate-keypair", Cli_lib.Commands.generate_keypair)
+    ; ("next-available-token", next_available_token_cmd) ]
