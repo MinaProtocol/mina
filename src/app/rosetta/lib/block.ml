@@ -1,11 +1,23 @@
 open Core_kernel
 open Async
-open Models
+open Rosetta_lib
+open Rosetta_models
 
-module Get_coinbase =
+module Get_coinbase_and_genesis =
 [%graphql
 {|
   query {
+    genesisBlock {
+      creatorAccount {
+        publicKey @bsDecoder(fn: "Decoders.public_key")
+      }
+      protocolState {
+        blockchainState {
+          utcDate
+        }
+      }
+      stateHash
+    }
     daemonStatus {
       peers
     }
@@ -32,6 +44,17 @@ module Block_query = struct
           M.return (Some (`That (`Hash hash)))
       | Some index, Some hash ->
           M.return (Some (`Those (`Height index, `Hash hash)))
+
+    let is_genesis ~hash = function
+      | Some (`This (`Height index)) ->
+          Int64.equal index Network.genesis_block_height
+      | Some (`That (`Hash hash')) ->
+          String.equal hash hash'
+      | Some (`Those (`Height index, `Hash hash')) ->
+          Int64.equal index Network.genesis_block_height
+          && String.equal hash hash'
+      | None ->
+          false
   end
 end
 
@@ -61,14 +84,13 @@ module Internal_command_info = struct
       match t.kind with
       | `Coinbase ->
           (* The coinbase transaction is really incrementing by the coinbase
-         * amount and then decrementing by the fees paid. *)
-          [ {Op.label= `Coinbase_inc; related_to= None}
-          ; {Op.label= `Fee_payer_dec; related_to= Some `Coinbase_inc} ]
+         * amount  *)
+          [{Op.label= `Coinbase_inc; related_to= None}]
       | `Fee_transfer ->
           [{Op.label= `Fee_receiver_inc; related_to= None}]
     in
-    Op.build ~a_eq:[%eq: [`Coinbase_inc | `Fee_payer_dec | `Fee_receiver_inc]]
-      ~plan ~f:(fun ~related_operations ~operation_identifier op ->
+    Op.build ~a_eq:[%eq: [`Coinbase_inc | `Fee_receiver_inc]] ~plan
+      ~f:(fun ~related_operations ~operation_identifier op ->
         (* All internal commands succeed if they're in blocks *)
         let status = Operation_statuses.name `Success in
         match op.label with
@@ -79,15 +101,6 @@ module Internal_command_info = struct
             ; account= Some (account_id t.receiver Amount_of.Token_id.default)
             ; _type= Operation_types.name `Coinbase_inc
             ; amount= Some (Amount_of.coda coinbase)
-            ; coin_change= None
-            ; metadata= None }
-        | `Fee_payer_dec ->
-            { Operation.operation_identifier
-            ; related_operations
-            ; status
-            ; account= Some (account_id t.receiver Amount_of.Token_id.default)
-            ; _type= Operation_types.name `Fee_payer_dec
-            ; amount= Some Amount_of.(negated (coda t.fee))
             ; coin_change= None
             ; metadata= None }
         | `Fee_receiver_inc ->
@@ -456,7 +469,9 @@ module Specific = struct
         -> graphql_uri:Uri.t
         -> 'gql Real.t =
      fun ~logger ~db ~graphql_uri ->
-      { gql= (fun () -> Graphql.query (Get_coinbase.make ()) graphql_uri)
+      { gql=
+          (fun () ->
+            Graphql.query (Get_coinbase_and_genesis.make ()) graphql_uri )
       ; logger
       ; db_block=
           (fun query ->
@@ -470,6 +485,11 @@ module Specific = struct
           (fun () ->
             Result.return
             @@ object
+                 method genesisBlock =
+                   object
+                     method stateHash = "STATE_HASH_GENESIS"
+                   end
+
                  method genesisConstants =
                    object
                      method coinbase = Unsigned.UInt64.of_int 20_000_000_000
@@ -497,8 +517,27 @@ module Specific = struct
         env.validate_network_choice ~network_identifier:req.network_identifier
           ~gql_response:res
       in
+      let genesisBlock = res#genesisBlock in
+      let%map block_info =
+        if Query.is_genesis ~hash:genesisBlock#stateHash query then
+          let genesis_block_identifier =
+            { Block_identifier.index= Network.genesis_block_height
+            ; hash= genesisBlock#stateHash }
+          in
+          M.return
+            { Block_info.block_identifier=
+                genesis_block_identifier
+                (* parent_block_identifier for genesis block should be the same as block identifier as described https://www.rosetta-api.org/docs/common_mistakes.html#correct-example *)
+            ; parent_block_identifier= genesis_block_identifier
+            ; creator= `Pk (genesisBlock#creatorAccount)#publicKey
+            ; timestamp=
+                Int64.of_string
+                  ((genesisBlock#protocolState)#blockchainState)#utcDate
+            ; internal_info= []
+            ; user_commands= [] }
+        else env.db_block query
+      in
       let coinbase = (res#genesisConstants)#coinbase in
-      let%map block_info = env.db_block query in
       { Block_response.block=
           Some
             { Block.block_identifier= block_info.block_identifier

@@ -1,6 +1,10 @@
 open Core_kernel
 open Async
-open Models
+open Rosetta_lib
+open Rosetta_models
+
+(* TODO: Also change this to zero when #5361 finishes *)
+let genesis_block_height = Int64.one
 
 module Get_status =
 [%graphql
@@ -279,8 +283,7 @@ module Status = struct
       ; current_block_timestamp=
           ((latest_block#protocolState)#blockchainState)#utcDate
       ; genesis_block_identifier=
-          (* TODO: Also change this to zero when #5361 finishes *)
-          Block_identifier.create Int64.one genesis_block_state_hash
+          Block_identifier.create genesis_block_height genesis_block_state_hash
       ; oldest_block_identifier=
           ( if String.equal (snd oldest_block) genesis_block_state_hash then
             None
@@ -437,7 +440,7 @@ module Options = struct
           ~network_identifier:network.network_identifier
       in
       { Network_options_response.version=
-          Version.create "1.4.1" (Option.value ~default:"unknown" res#version)
+          Version.create "1.4.2" (Option.value ~default:"unknown" res#version)
       ; allow=
           { Allow.operation_statuses= Lazy.force Operation_statuses.all
           ; operation_types= Lazy.force Operation_types.all

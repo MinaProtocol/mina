@@ -598,7 +598,7 @@ module Types = struct
           , Public_key.Compressed.t option
           , State_hash.t option
           , Account.Timing.t
-          , Account.Snapp_account.t option )
+          , Snapp_account.t option )
           Account.Poly.t
       ; locked: bool option
       ; is_actively_staking: bool
@@ -1430,15 +1430,27 @@ module Types = struct
 
     let signature_arg =
       obj "SignatureInput"
-        ~coerce:(fun field scalar ->
+        ~coerce:(fun field scalar rawSignature ->
           let open Snark_params.Tick in
-          (Field.of_string field, Inner_curve.Scalar.of_string scalar) )
-        ~doc:"A cryptographic signature"
+          match rawSignature with
+          | Some signature ->
+              Result.of_option
+                (Signature.Raw.decode signature)
+                ~error:"rawSignature decoding error"
+          | None -> (
+            match (field, scalar) with
+            | Some field, Some scalar ->
+                Ok (Field.of_string field, Inner_curve.Scalar.of_string scalar)
+            | _ ->
+                Error "Either field+scalar or rawSignature must by non-null" )
+          )
+        ~doc:
+          "A cryptographic signature -- you must provide either field+scalar \
+           or rawSignature"
         ~fields:
-          [ arg "field" ~typ:(non_null string)
-              ~doc:"Field component of signature"
-          ; arg "scalar" ~typ:(non_null string)
-              ~doc:"Scalar component of signature" ]
+          [ arg "field" ~typ:string ~doc:"Field component of signature"
+          ; arg "scalar" ~typ:string ~doc:"Scalar component of signature"
+          ; arg "rawSignature" ~typ:string ~doc:"Raw encoded signature" ]
 
     module Fields = struct
       let from ~doc = arg "from" ~typ:(non_null public_key_arg) ~doc
@@ -2006,6 +2018,7 @@ module Mutations = struct
   let send_signed_user_command ~signature ~coda ~nonce_opt ~signer ~memo ~fee
       ~fee_token ~fee_payer_pk ~valid_until ~body =
     let open Deferred.Result.Let_syntax in
+    let%bind signature = signature |> Deferred.return in
     let%bind user_command_input =
       create_user_command_input ~nonce_opt ~signer ~memo ~fee ~fee_token
         ~fee_payer_pk ~valid_until ~body
@@ -2056,6 +2069,7 @@ module Mutations = struct
               ~fee_token ~fee_payer_pk:from ~valid_until ~body
             |> Deferred.Result.map ~f:Types.UserCommand.mk_user_command
         | Some signature ->
+            let%bind signature = signature |> Deferred.return in
             send_signed_user_command ~coda ~nonce_opt ~signer:from ~memo ~fee
               ~fee_token ~fee_payer_pk:from ~valid_until ~body ~signature
             |> Deferred.Result.map ~f:Types.UserCommand.mk_user_command )
@@ -2642,6 +2656,20 @@ module Queries = struct
       ~typ:(non_null Types.genesis_constants)
       ~resolve:(fun _ () -> ())
 
+  let next_available_token =
+    field "nextAvailableToken"
+      ~doc:
+        "The next token ID that has not been allocated. Token IDs are \
+         allocated sequentially, so all lower token IDs have been allocated"
+      ~args:Arg.[]
+      ~typ:(non_null Types.token_id)
+      ~resolve:(fun {ctx= coda; _} () ->
+        coda |> Coda_lib.best_tip |> Participating_state.active
+        |> Option.map ~f:(fun tip ->
+               Transition_frontier.Breadcrumb.staged_ledger tip
+               |> Staged_ledger.ledger |> Ledger.next_available_token )
+        |> Option.value ~default:Token_id.(next default) )
+
   let commands =
     [ sync_state
     ; daemon_status
@@ -2664,7 +2692,8 @@ module Queries = struct
     ; trust_status_all
     ; snark_pool
     ; pending_snark_work
-    ; genesis_constants ]
+    ; genesis_constants
+    ; next_available_token ]
 end
 
 let schema =
