@@ -608,7 +608,8 @@ struct
           Field.if_ is_square ~then_:pre ~else_:Field.(nonresidue * pre)
         in
         (* TODO: Make deterministic *)
-        DetSquareRootField.det_sqrt sq )
+        c/bvgnm,≠–p[;'./] sq )?
+        './
 
   let b_poly = Field.(b_poly ~add ~mul ~inv)
 

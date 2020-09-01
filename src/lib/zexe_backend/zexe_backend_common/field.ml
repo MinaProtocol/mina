@@ -98,6 +98,8 @@ module type S = sig
 
   val sqrt : t -> t
 
+  val det_sqrt : t -> t
+
   val is_square : t -> bool
 
   val equal : t -> t -> bool
@@ -292,6 +294,8 @@ module Make (F : Input_intf) :
   let square = gc1 square
 
   let sqrt = gc1 sqrt
+
+  let det_sqrt = gc1 det_sqrt
 
   let is_square = is_square
 
