@@ -87,10 +87,12 @@ module Internal_command_info = struct
          * amount  *)
           [{Op.label= `Coinbase_inc; related_to= None}]
       | `Fee_transfer ->
-          [{Op.label= `Fee_receiver_inc; related_to= None}]
+          [ {Op.label= `Fee_receiver_inc; related_to= None}
+            (* we use the fee_payer_dec from here instead of the user command when we have internal commands (ie in a block) for more accuracy w.r.t. the protocol *)
+          ; {Op.label= `Fee_payer_dec; related_to= Some `Fee_receiver_inc} ]
     in
-    Op.build ~a_eq:[%eq: [`Coinbase_inc | `Fee_receiver_inc]] ~plan
-      ~f:(fun ~related_operations ~operation_identifier op ->
+    Op.build ~a_eq:[%eq: [`Coinbase_inc | `Fee_payer_dec | `Fee_receiver_inc]]
+      ~plan ~f:(fun ~related_operations ~operation_identifier op ->
         (* All internal commands succeed if they're in blocks *)
         let status = Operation_statuses.name `Success in
         match op.label with
@@ -110,6 +112,15 @@ module Internal_command_info = struct
             ; account= Some (account_id t.receiver t.token)
             ; _type= Operation_types.name `Fee_receiver_inc
             ; amount= Some (Amount_of.token t.token t.fee)
+            ; coin_change= None
+            ; metadata= None }
+        | `Fee_payer_dec ->
+            { Operation.operation_identifier
+            ; related_operations
+            ; status
+            ; account= Some (account_id t.receiver Amount_of.Token_id.default)
+            ; _type= Operation_types.name `Fee_payer_dec
+            ; amount= Some Amount_of.(negated (coda t.fee))
             ; coin_change= None
             ; metadata= None } )
 
@@ -254,10 +265,11 @@ SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, 
     let query =
       Caqti_request.collect Caqti_type.int typ
         {| SELECT DISTINCT ON (u.hash) u.id, u.type, u.fee_payer_id, u.source_id, u.receiver_id, u.fee_token, u.token, u.nonce, u.amount, u.fee, u.memo, u.hash, u.status, u.failure_reason, u.fee_payer_account_creation_fee_paid, u.receiver_account_creation_fee_paid, u.created_token, pk1.value as fee_payer, pk2.value as source, pk3.value as receiver FROM user_commands u
-        LEFT JOIN blocks_user_commands ON blocks_user_commands.block_id = ?
+        INNER JOIN blocks_user_commands ON blocks_user_commands.user_command_id = u.id
         INNER JOIN public_keys pk1 ON pk1.id = u.fee_payer_id
         INNER JOIN public_keys pk2 ON pk2.id = u.source_id
         INNER JOIN public_keys pk3 ON pk3.id = u.receiver_id
+        WHERE blocks_user_commands.block_id = ?
       |}
 
     let run (module Conn : Caqti_async.CONNECTION) id =
@@ -278,8 +290,9 @@ SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, 
     let query =
       Caqti_request.collect Caqti_type.int typ
         {| SELECT DISTINCT ON (i.hash) i.id, i.type, i.receiver_id, i.fee, i.token, i.hash, pk.value as receiver FROM internal_commands i
-        LEFT JOIN blocks_internal_commands ON blocks_internal_commands.block_id = ?
+        INNER JOIN blocks_internal_commands ON blocks_internal_commands.internal_command_id = i.id
         INNER JOIN public_keys pk ON pk.id = i.receiver_id
+        WHERE blocks_internal_commands.block_id = ?
       |}
 
     let run (module Conn : Caqti_async.CONNECTION) id =
