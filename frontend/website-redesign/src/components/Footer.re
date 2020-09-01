@@ -6,15 +6,23 @@ module Styles = {
       bottom(`zero),
       height(`rem(106.)),
       padding2(~v=`rem(4.), ~h=`rem(1.25)),
-      backgroundImage(`url("/static/img/FooterBackground.png")),
+      backgroundImage(`url("/static/img/Small.png")),
       backgroundSize(`cover),
       media(
         Theme.MediaQuery.tablet,
-        [padding2(~v=`rem(4.), ~h=`rem(2.68)), height(`rem(75.))],
+        [
+          padding2(~v=`rem(4.), ~h=`rem(2.68)),
+          height(`rem(75.)),
+          backgroundImage(`url("/static/img/Medium.png")),
+        ],
       ),
       media(
         Theme.MediaQuery.desktop,
-        [padding2(~v=`rem(5.5), ~h=`rem(9.5)), height(`rem(48.))],
+        [
+          padding2(~v=`rem(5.5), ~h=`rem(9.5)),
+          height(`rem(48.)),
+          backgroundImage(`url("/static/img/Large.png")),
+        ],
       ),
     ]);
   let innerContainer =
@@ -85,7 +93,7 @@ module FooterLinks = {
         gridTemplateColumns([
           `repeat((`num(2), `minmax((`rem(11.), `rem(11.5))))),
         ]),
-        gridColumnGap(`rem(1.75)),
+        gridColumnGap(`rem(0.5)),
         gridRowGap(`rem(3.1)),
         marginTop(`rem(4.)),
         media(
