@@ -4,18 +4,17 @@ module Styles = {
     style([
       left(`zero),
       bottom(`zero),
-      width(`percent(100.)),
       height(`rem(106.)),
       padding2(~v=`rem(4.), ~h=`rem(1.25)),
       backgroundImage(`url("/static/img/FooterBackground.png")),
       backgroundSize(`cover),
       media(
         Theme.MediaQuery.tablet,
-        [padding2(~v=`rem(5.5), ~h=`rem(9.5)), height(`rem(75.))],
+        [padding2(~v=`rem(4.), ~h=`rem(2.68)), height(`rem(75.))],
       ),
       media(
         Theme.MediaQuery.desktop,
-        [padding2(~v=`rem(5.5), ~h=`rem(9.5)), height(`rem(49.))],
+        [padding2(~v=`rem(5.5), ~h=`rem(9.5)), height(`rem(48.))],
       ),
     ]);
   let innerContainer =
@@ -47,7 +46,7 @@ module Styles = {
   let emailSubtext =
     merge([
       Theme.Type.paragraph,
-      style([color(white), marginTop(`zero), marginBottom(`px(8))]),
+      style([color(white), marginTop(`zero), marginBottom(`rem(1.))]),
     ]);
 };
 
@@ -94,6 +93,7 @@ module FooterLinks = {
           [
             marginTop(`rem(5.8)),
             gridRowGap(`rem(3.)),
+            gridColumnGap(`rem(5.)),
             gridTemplateColumns([
               `repeat((`num(3), `minmax((`rem(11.), `rem(11.5))))),
             ]),
@@ -111,16 +111,9 @@ module FooterLinks = {
         alignContent(`flexStart),
         flexWrap(`wrap),
       ]);
-    let linksContainer =
-      style([
-        media(
-          Theme.MediaQuery.tablet,
-          [display(`flex), flexDirection(`row), flexWrap(`wrap)],
-        ),
-      ]);
     let linksHeader =
       merge([
-        Theme.Type.h4,
+        Theme.Type.footerHeaderLink,
         style([
           marginTop(`zero),
           marginBottom(`zero),
@@ -128,6 +121,7 @@ module FooterLinks = {
           opacity(0.4),
         ]),
       ]);
+
     let linkStyle =
       merge([
         Theme.Type.sidebarLink,
@@ -312,16 +306,14 @@ module Subfooter = {
         flexDirection(`column),
         width(`rem(21.)),
         height(`rem(14.4)),
-        media(
-          Theme.MediaQuery.tablet,
-          [width(`rem(34.5)), height(`rem(3.75)), flexDirection(`row)],
-        ),
+        media(Theme.MediaQuery.tablet, [height(`rem(3.75))]),
         media(
           Theme.MediaQuery.desktop,
           [
             justifyContent(`spaceBetween),
             width(`rem(71.)),
             height(`rem(1.4)),
+            marginTop(`rem(1.5)),
             flexDirection(`rowReverse),
           ],
         ),
@@ -342,7 +334,7 @@ module Subfooter = {
         display(`flex),
         flexDirection(`column),
         media(
-          Theme.MediaQuery.desktop,
+          Theme.MediaQuery.tablet,
           [
             flexDirection(`row),
             justifyContent(`spaceBetween),
@@ -358,7 +350,8 @@ module Subfooter = {
           color(white),
           margin2(~v=`rem(1.5), ~h=`zero),
           opacity(0.6),
-          media(Theme.MediaQuery.desktop, [ margin2(~v=`zero, ~h=`zero),])
+          media(Theme.MediaQuery.tablet, [marginBottom(`rem(0.))]),
+          media(Theme.MediaQuery.desktop, [margin2(~v=`zero, ~h=`zero)]),
         ]),
       ]);
   };
@@ -384,6 +377,11 @@ module Subfooter = {
             {React.string("Privacy Policy")}
           </a>
         </Next.Link>
+        <Next.Link href="">
+          <a className=Styles.smallLinks>
+            {React.string("Terms of Service")}
+          </a>
+        </Next.Link>
       </div>
       <p className=Styles.copyright>
         {React.string({js|©|js} ++ "2020 Mina. Started by O(1) Labs.")}
@@ -399,9 +397,9 @@ module WhiteLine = {
       style([
         border(`px(1), `solid, white),
         marginTop(`rem(3.0)),
-        marginBottom(`rem(1.68)),
         width(`percent(100.)),
         opacity(0.2),
+        marginBottom(`rem(0.)),
       ]);
   };
   [@react.component]

@@ -119,6 +119,15 @@ module Type = {
       ),
     ]);
 
+  let footerHeaderLink =
+    style([
+      Typeface.monumentGroteskMono,
+      fontSize(`px(14)),
+      lineHeight(`rem(1.)),
+      textTransform(`uppercase),
+      letterSpacing(`em(0.03)),
+    ]);
+
   let h5 =
     style([
       Typeface.monumentGrotesk,
