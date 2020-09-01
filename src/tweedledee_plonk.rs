@@ -122,7 +122,6 @@ pub extern "C" fn zexe_tweedle_plonk_fp_verifier_index_urs<'a>(
 
 #[no_mangle]
 pub extern "C" fn zexe_tweedle_plonk_fp_verifier_index_make<'a>(
-    domain: *const Domain<Fp>,
     max_poly_size: usize,
     max_quot_size: usize,
     urs: *const SRS<GAffine>,
@@ -149,7 +148,7 @@ pub extern "C" fn zexe_tweedle_plonk_fp_verifier_index_make<'a>(
 ) -> *const DlogVerifierIndex<'a, GAffine> {
     let srs = unsafe { &*urs };
     let index = DlogVerifierIndex::<GAffine> {
-        domain: Domain<Fp>::new(max_poly_size),
+        domain: Domain::<Fp>::new(max_poly_size).unwrap(),
         max_poly_size,
         max_quot_size,
         srs: SRSValue::Ref(srs),
