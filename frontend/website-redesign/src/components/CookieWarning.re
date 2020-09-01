@@ -7,7 +7,7 @@ module CookieConsent = {
       ~containerClasses: string=?,
       ~buttonClasses: string=?,
       ~contentClasses: string=?,
-      ~buttonText: React.element=?, //TODO: make this take either react element or string
+      ~buttonText: React.element=?,
       ~children: React.element
     ) =>
     React.element =
