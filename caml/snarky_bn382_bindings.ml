@@ -1253,6 +1253,86 @@ struct
   end
 end
 
+module Plonk_gate_vector
+    (P : Prefix)
+    (Field_vector : Type)
+    (F : Ctypes.FOREIGN) =
+struct
+  open F
+
+  include (
+    struct
+        type t = unit ptr
+
+        let typ = ptr void
+      end :
+      Type )
+
+  let prefix = with_prefix (P.prefix "circuit_gate_vector")
+
+  let create = foreign (prefix "create") (void @-> returning typ)
+
+  let delete = foreign (prefix "delete") (typ @-> returning void)
+
+  let length = foreign (prefix "length") (typ @-> returning int)
+
+  let push_gate gate_name =
+    foreign
+      (prefix (Printf.sprintf "push_%s" gate_name))
+      ( typ @-> size_t (* l_index *) @-> size_t (* l_permutation *)
+      @-> size_t (* r_index *) @-> size_t (* r_permutation *)
+      @-> size_t (* o_index *) @-> size_t (* o_permutation *)
+      @-> Field_vector.typ (* constraints vector *) @-> returning void )
+
+  let push_zero = push_gate "zero"
+
+  let push_generic = push_gate "generic"
+
+  let push_poseidon = push_gate "poseidon"
+
+  let push_add1 = push_gate "add1"
+
+  let push_add2 = push_gate "add2"
+
+  let push_vbmul1 = push_gate "vbmul1"
+
+  let push_vbmul2 = push_gate "vbmul2"
+
+  let push_vbmul3 = push_gate "vbmul3"
+
+  let push_endomul1 = push_gate "endomul1"
+
+  let push_endomul2 = push_gate "endomul2"
+
+  let push_endomul3 = push_gate "endomul3"
+
+  let push_endomul4 = push_gate "endomul4"
+end
+
+module Plonk_constraint_system
+    (P : Prefix)
+    (Plonk_gate_vector : Type)
+    (F : Ctypes.FOREIGN) =
+struct
+  open F
+
+  include (
+    struct
+        type t = unit ptr
+
+        let typ = ptr void
+      end :
+      Type )
+
+  let prefix = with_prefix (P.prefix "constraint_system")
+
+  let create =
+    foreign (prefix "create")
+      (Plonk_gate_vector.typ @-> size_t @-> returning typ)
+
+  let delete = foreign (prefix "delete") (typ @-> returning void)
+end
+
 module Full (F : Ctypes.FOREIGN) = struct
   let zexe = with_prefix "zexe"
 
@@ -1513,11 +1593,8 @@ module Full (F : Ctypes.FOREIGN) = struct
           (typ @-> Field.Vector.typ @-> returning Field_poly_comm.typ)
     end
 
-    module Constraint_system : Type = struct
-      type t = unit ptr
-
-      let typ = ptr void
-    end
+    module Gate_vector = Plonk_gate_vector (P) (Field.Vector) (F)
+    module Constraint_system = Plonk_constraint_system (P) (Gate_vector) (F)
 
     module Field_index =
       Plonk_index (struct
