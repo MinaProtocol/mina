@@ -8,9 +8,14 @@ module Styles = {
       height(`rem(106.)),
       padding2(~v=`rem(4.), ~h=`rem(1.25)),
       backgroundImage(`url("/static/img/FooterBackground.png")),
+      backgroundSize(`cover),
       media(
         Theme.MediaQuery.tablet,
-        [padding2(~v=`rem(5.5), ~h=`rem(9.5))],
+        [padding2(~v=`rem(5.5), ~h=`rem(9.5)), height(`rem(75.))],
+      ),
+      media(
+        Theme.MediaQuery.desktop,
+        [padding2(~v=`rem(5.5), ~h=`rem(9.5)), height(`rem(49.))],
       ),
     ]);
   let innerContainer =
@@ -297,9 +302,118 @@ module LeftSide = {
     </div>;
   };
 };
+
+module Subfooter = {
+  module Styles = {
+    open Css;
+    let column =
+      style([
+        display(`flex),
+        flexDirection(`column),
+        width(`rem(21.)),
+        height(`rem(14.4)),
+        media(
+          Theme.MediaQuery.tablet,
+          [width(`rem(34.5)), height(`rem(3.75)), flexDirection(`row)],
+        ),
+        media(
+          Theme.MediaQuery.desktop,
+          [
+            justifyContent(`spaceBetween),
+            width(`rem(71.)),
+            height(`rem(1.4)),
+            flexDirection(`rowReverse),
+          ],
+        ),
+      ]);
+    let smallLinks =
+      merge([
+        Theme.Type.navLink,
+        style([
+          fontSize(`px(14)),
+          color(white),
+          textDecoration(`none),
+          marginTop(`rem(1.5)),
+          media(Theme.MediaQuery.desktop, [marginTop(`zero)]),
+        ]),
+      ]);
+    let linksContainer =
+      style([
+        display(`flex),
+        flexDirection(`column),
+        media(
+          Theme.MediaQuery.desktop,
+          [
+            flexDirection(`row),
+            justifyContent(`spaceBetween),
+            alignContent(`center),
+            width(`rem(36.5)),
+          ],
+        ),
+      ]);
+    let copyright =
+      merge([
+        Theme.Type.paragraphSmall,
+        style([
+          color(white),
+          margin2(~v=`rem(1.5), ~h=`zero),
+          opacity(0.6),
+          media(Theme.MediaQuery.desktop, [ margin2(~v=`zero, ~h=`zero),])
+        ]),
+      ]);
+  };
+  [@react.component]
+  let make = () => {
+    <div className=Styles.column>
+      <div className=Styles.linksContainer>
+        <Next.Link href="">
+          <a className=Styles.smallLinks>
+            {React.string("Mina Foundation")}
+          </a>
+        </Next.Link>
+        <Next.Link href="">
+          <a className=Styles.smallLinks> {React.string("O(1) Labs")} </a>
+        </Next.Link>
+        <Next.Link href="">
+          <a className=Styles.smallLinks>
+            {React.string("Code of Conduct")}
+          </a>
+        </Next.Link>
+        <Next.Link href="">
+          <a className=Styles.smallLinks>
+            {React.string("Privacy Policy")}
+          </a>
+        </Next.Link>
+      </div>
+      <p className=Styles.copyright>
+        {React.string({js|©|js} ++ "2020 Mina. Started by O(1) Labs.")}
+      </p>
+    </div>;
+  };
+};
+
+module WhiteLine = {
+  module Styles = {
+    open Css;
+    let whiteLine =
+      style([
+        border(`px(1), `solid, white),
+        marginTop(`rem(3.0)),
+        marginBottom(`rem(1.68)),
+        width(`percent(100.)),
+        opacity(0.2),
+      ]);
+  };
+  [@react.component]
+  let make = () => {
+    <hr className=Styles.whiteLine />;
+  };
+};
 [@react.component]
 let make = () => {
   <div className=Styles.footerContainer>
     <div className=Styles.innerContainer> <LeftSide /> <FooterLinks /> </div>
+    <WhiteLine />
+    <Subfooter />
   </div>;
 };
