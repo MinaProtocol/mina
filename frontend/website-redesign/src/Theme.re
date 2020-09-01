@@ -237,7 +237,7 @@ module Type = {
     style([
       Typeface.monumentGrotesk,
       fontWeight(`num(500)),
-      fontSize(`px(14)),
+      fontSize(`px(16)),
       lineHeight(`rem(1.5)),
     ]);
 

@@ -10,8 +10,7 @@ module Pc_array = struct
     end
   end]
 
-  [%%define_locally
-  Stable.Latest.(hash_fold_t)]
+  let hash_fold_t f s a = List.hash_fold_t f s (Array.to_list a)
 end
 
 module Evals = struct
