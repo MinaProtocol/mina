@@ -270,3 +270,11 @@ query user_commands($public_key: PublicKey) {
   }
 }
 |}]
+
+module Next_available_token =
+[%graphql
+{|
+query next_available_token {
+  nextAvailableToken @bsDecoder(fn: "Decoders.token")
+}
+|}]

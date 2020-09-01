@@ -180,6 +180,33 @@ let direct_graphql_payment_through_block ~logger ~rosetta_uri ~graphql_uri
           ; _type= "payment_receiver_inc"
           ; target= None } ]
 
+let direct_graphql_delegation_through_block ~logger ~rosetta_uri ~graphql_uri
+    ~network_response =
+  let open Deferred.Result.Let_syntax in
+  (* Unlock the account *)
+  let%bind _ = Poke.Account.unlock ~graphql_uri in
+  (* Delegate stake *)
+  let%bind hash =
+    Poke.SendTransaction.delegation ~fee:(`Int 2_000_000_000)
+      ~to_:(`String other_pk) ~graphql_uri ()
+  in
+  verify_in_mempool_and_block ~logger ~rosetta_uri ~graphql_uri ~txn_hash:hash
+    ~network_response
+    ~operation_expectations:
+      Operation_expectation.
+        [ { amount= Some (-2_000_000_000)
+          ; account=
+              Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
+          ; status= "Pending"
+          ; _type= "fee_payer_dec"
+          ; target= None }
+        ; { amount= None
+          ; account=
+              Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
+          ; status= "Pending"
+          ; _type= "delegate_change"
+          ; target= Some other_pk } ]
+
 let construction_api_transaction_through_mempool ~logger ~rosetta_uri
     ~graphql_uri ~network_response ~operation_expectations ~operations =
   let open Deferred.Result.Let_syntax in
@@ -313,7 +340,10 @@ let construction_api_delegation_through_mempool =
           ; _type= "delegate_change"
           ; target= Some other_pk } ]
 
-let check_new_account_payment ~logger ~rosetta_uri ~graphql_uri =
+(* for each possible user command, run the command via GraphQL, check that
+    the command is in the transaction pool
+*)
+let check_new_account_user_commands ~logger ~rosetta_uri ~graphql_uri =
   let open Core.Time in
   let open Deferred.Result.Let_syntax in
   (* Stop staking so we can rely on things being in the mempool *)
@@ -345,28 +375,51 @@ let check_new_account_payment ~logger ~rosetta_uri ~graphql_uri =
     direct_graphql_payment_through_block ~logger ~rosetta_uri ~graphql_uri
       ~network_response
   in
+  [%log info] "Created payment and waited" ;
   (* Stop staking so we can rely on things being in the mempool again *)
   let%bind _res = Poke.Staking.disable ~graphql_uri in
   (* Follow the full construction API flow and make sure the submitted
-       * transaction appears in the mempool *)
+   * transaction appears in the mempool *)
   let%bind () =
     construction_api_payment_through_mempool ~logger ~rosetta_uri ~graphql_uri
       ~network_response
   in
+  [%log info] "Created construction payment and waited" ;
   (* Stop staking so we can rely on things being in the mempool again *)
+  let%bind _res = Poke.Staking.disable ~graphql_uri in
+  let%bind () =
+    direct_graphql_delegation_through_block ~logger ~rosetta_uri ~graphql_uri
+      ~network_response
+  in
+  [%log info] "Created graphql delegation and waited" ;
+  (* Stop staking *)
   let%bind _res = Poke.Staking.disable ~graphql_uri in
   let%bind () =
     construction_api_delegation_through_mempool ~logger ~rosetta_uri
       ~graphql_uri ~network_response
   in
+  [%log info] "Created construction delegation and waited" ;
   (* Succeed! (for now) *)
   return ()
 
-let run ~logger ~rosetta_uri ~graphql_uri =
+let run ~logger ~rosetta_uri ~graphql_uri ~don't_exit =
+  let open Core.Time in
   let open Deferred.Result.Let_syntax in
-  let%bind () = check_new_account_payment ~logger ~rosetta_uri ~graphql_uri in
+  let%bind () =
+    check_new_account_user_commands ~logger ~rosetta_uri ~graphql_uri
+  in
   [%log info] "Finished running test-agent" ;
-  return ()
+  if don't_exit then (
+    let%bind _res = Poke.Staking.enable ~graphql_uri in
+    [%log info] "Running forever with more blocks" ;
+    let rec go () =
+      let%bind () = wait (Span.of_sec 1.0) in
+      go ()
+    in
+    go () )
+  else (
+    [%log info] "Exiting" ;
+    return () )
 
 let command =
   let open Command.Let_syntax in
@@ -381,13 +434,16 @@ let command =
       no_arg
   and log_level =
     flag "log-level" ~doc:"Set log level (default: Info)" Cli.log_level
+  and don't_exit =
+    flag "dont-exit" ~doc:"Don't exit after tests finish (default: do exit)"
+      no_arg
   in
   let open Deferred.Let_syntax in
   fun () ->
     let logger = Logger.create () in
     Cli.logger_setup log_json log_level ;
     [%log info] "Rosetta test-agent starting" ;
-    match%bind run ~logger ~rosetta_uri ~graphql_uri with
+    match%bind run ~logger ~rosetta_uri ~graphql_uri ~don't_exit with
     | Ok () ->
         [%log info] "Rosetta test-agent stopping successfully" ;
         return ()
