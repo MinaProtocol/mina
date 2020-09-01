@@ -136,6 +136,87 @@ struct
     map3 mats (fun m -> map4 polys (fun p -> m_poly_comm m p))
 end
 
+module PlonkVerifierIndex
+    (P : Prefix)
+    (Index : Type)
+    (Urs : Type)
+    (PolyComm : Type)
+    (ScalarField : Type)
+    (F : Ctypes.FOREIGN) =
+struct
+  include (
+    struct
+        type t = unit ptr
+
+        let typ = ptr void
+      end :
+      Type )
+
+  open F
+
+  let prefix = P.prefix
+
+  let create = foreign (prefix "create") (Index.typ @-> returning typ)
+
+  let delete = foreign (prefix "delete") (typ @-> returning void)
+
+  let urs = foreign (prefix "urs") (typ @-> returning Urs.typ)
+
+  let make =
+    foreign (prefix "make")
+      ( size_t @-> size_t @-> Urs.typ @-> PolyComm.typ @-> PolyComm.typ
+      @-> PolyComm.typ @-> PolyComm.typ @-> PolyComm.typ @-> PolyComm.typ
+      @-> PolyComm.typ @-> PolyComm.typ @-> PolyComm.typ @-> PolyComm.typ
+      @-> PolyComm.typ @-> PolyComm.typ @-> PolyComm.typ @-> PolyComm.typ
+      @-> PolyComm.typ @-> PolyComm.typ @-> PolyComm.typ @-> PolyComm.typ
+      @-> ScalarField.typ @-> ScalarField.typ @-> returning typ )
+
+  let sigma_comm_0 =
+    foreign (prefix "sigma_comm_0") (typ @-> returning PolyComm.typ)
+
+  let sigma_comm_1 =
+    foreign (prefix "sigma_comm_1") (typ @-> returning PolyComm.typ)
+
+  let sigma_comm_2 =
+    foreign (prefix "sigma_comm_2") (typ @-> returning PolyComm.typ)
+
+  let ql_comm = foreign (prefix "ql_comm") (typ @-> returning PolyComm.typ)
+
+  let qr_comm = foreign (prefix "qr_comm") (typ @-> returning PolyComm.typ)
+
+  let qo_comm = foreign (prefix "qo_comm") (typ @-> returning PolyComm.typ)
+
+  let qm_comm = foreign (prefix "qm_comm") (typ @-> returning PolyComm.typ)
+
+  let rcm_comm_0 =
+    foreign (prefix "rcm_comm_0") (typ @-> returning PolyComm.typ)
+
+  let rcm_comm_1 =
+    foreign (prefix "rcm_comm_1") (typ @-> returning PolyComm.typ)
+
+  let rcm_comm_2 =
+    foreign (prefix "rcm_comm_2") (typ @-> returning PolyComm.typ)
+
+  let add_comm = foreign (prefix "add_comm") (typ @-> returning PolyComm.typ)
+
+  let mul1_comm = foreign (prefix "mul1_comm") (typ @-> returning PolyComm.typ)
+
+  let mul2_comm = foreign (prefix "mul2_comm") (typ @-> returning PolyComm.typ)
+
+  let emul1_comm =
+    foreign (prefix "emul1_comm") (typ @-> returning PolyComm.typ)
+
+  let emul2_comm =
+    foreign (prefix "emul2_comm") (typ @-> returning PolyComm.typ)
+
+  let emul3_comm =
+    foreign (prefix "emul3_comm") (typ @-> returning PolyComm.typ)
+
+  let r = foreign (prefix "r") (typ @-> returning PolyComm.typ)
+
+  let o = foreign (prefix "o") (typ @-> returning PolyComm.typ)
+end
+
 module URS
     (P : Prefix)
     (G1Affine : Type)
@@ -220,6 +301,47 @@ struct
   let nonzero_entries = metadata "nonzero_entries"
 
   let max_degree = metadata "max_degree"
+end
+
+module Plonk_index
+    (P : Prefix)
+    (Constraint_system : Type)
+    (PlolyComm : Type)
+    (URS : Type)
+    (F : Ctypes.FOREIGN) =
+struct
+  open F
+
+  include (
+    struct
+        type t = unit ptr
+
+        let typ = ptr void
+      end :
+      Type )
+
+  let prefix = P.prefix
+
+  let delete = foreign (prefix "delete") (typ @-> returning void)
+
+  let domain_d1_size =
+    foreign (prefix "domain_d1_size") (typ @-> returning size_t)
+
+  let domain_d4_size =
+    foreign (prefix "domain_d4_size") (typ @-> returning size_t)
+
+  let domain_d8_size =
+    foreign (prefix "domain_d8_size") (typ @-> returning size_t)
+
+  let create =
+    foreign (prefix "create")
+      (Constraint_system.typ @-> size_t @-> URS.typ @-> returning typ)
+
+  let metadata s = foreign (prefix s) (typ @-> returning size_t)
+
+  let num_variables = metadata "num_variables"
+
+  let public_inputs = metadata "public_inputs"
 end
 
 module Vector (P : Prefix) (E : Type) (F : Ctypes.FOREIGN) = struct
@@ -578,6 +700,8 @@ struct
 
   open F
 
+  let delete = foreign (prefix "delete") (typ @-> returning void)
+
   let lr = foreign (prefix "lr") (typ @-> returning AffineCurve.Pair.Vector.typ)
 
   let z1 = foreign (prefix "z1") (typ @-> returning ScalarField.typ)
@@ -739,6 +863,119 @@ struct
   let sigma3 = f "sigma3" ScalarField.typ
 end
 
+module Dlog_plonk_proof
+    (P : Prefix) (AffineCurve : sig
+        include Type
+
+        module Vector : Type
+
+        module Pair : sig
+          include Type
+
+          module Vector : Type
+        end
+    end)
+    (ScalarField : Type)
+    (Index : Type)
+    (VerifierIndex : Type)
+    (ScalarFieldVector : Type)
+    (FieldVectorPair : Type)
+    (OpeningProof : Type)
+    (PolyComm : Type)
+    (F : Ctypes.FOREIGN) =
+struct
+  open F
+
+  module T : Type = struct
+    type t = unit ptr
+
+    let typ = ptr void
+  end
+
+  include T
+  module Vector = Vector (P) (T) (F)
+
+  module Evaluations = struct
+    module T : Type = struct
+      type t = unit ptr
+
+      let typ = ptr void
+    end
+
+    include T
+
+    let prefix = with_prefix (P.prefix "evaluations")
+
+    let f s = foreign (prefix s) (typ @-> returning ScalarField.typ)
+
+    let w = f "l"
+
+    let za = f "r"
+
+    let zb = f "o"
+
+    let h1 = f "z"
+
+    let g1 = f "t"
+
+    let h2 = f "f"
+
+    let g2 = f "sigma1"
+
+    let h3 = f "sigma2"
+
+    module Pair =
+      Pair (struct
+          let prefix = prefix
+        end)
+        (T)
+        (F)
+
+    let make =
+      foreign (prefix "make")
+        ( ScalarField.typ @-> ScalarField.typ @-> ScalarField.typ
+        @-> ScalarField.typ @-> ScalarField.typ @-> ScalarField.typ
+        @-> ScalarField.typ @-> ScalarField.typ @-> returning typ )
+  end
+
+  let prefix = P.prefix
+
+  let make =
+    foreign (prefix "make")
+      ( ScalarFieldVector.typ @-> PolyComm.typ @-> PolyComm.typ @-> PolyComm.typ
+      @-> PolyComm.typ @-> PolyComm.typ @-> AffineCurve.Pair.Vector.typ
+      @-> PolyComm.typ @-> PolyComm.typ @-> AffineCurve.typ @-> AffineCurve.typ
+      @-> Evaluations.typ @-> Evaluations.typ @-> returning typ )
+
+  let create =
+    foreign (prefix "create")
+      ( Index.typ @-> ScalarFieldVector.typ @-> ScalarFieldVector.typ
+      @-> returning typ )
+
+  let verify =
+    foreign (prefix "verify") (VerifierIndex.typ @-> typ @-> returning bool)
+
+  let batch_verify =
+    foreign (prefix "batch_verify")
+      (VerifierIndex.typ @-> Vector.typ @-> returning bool)
+
+  let delete = foreign (prefix "delete") (typ @-> returning void)
+
+  let f name f_typ = foreign (prefix name) (typ @-> returning f_typ)
+
+  let l_comm = f "l_comm" PolyComm.typ
+
+  let r_comm = f "r_comm" PolyComm.typ
+
+  let o_comm = f "o_comm" PolyComm.typ
+
+  let z_comm = f "z_comm" PolyComm.typ
+
+  let t_comm = f "t_comm" PolyComm.typ
+
+  let proof_comm = f "proof" OpeningProof.typ
+end
+
 module Pairing_oracles
     (P : Prefix)
     (Field : Type)
@@ -849,6 +1086,59 @@ struct
     foreign (prefix "x_hat_nocopy") (typ @-> returning FieldVectorTriple.typ)
 
   let digest_before_evaluations = element "digest_before_evaluations"
+end
+
+module Dlog_plonk_oracles
+    (P : Prefix) (Field : sig
+        include Type
+
+        module Vector : Type
+    end)
+    (VerifierIndex : Type)
+    (Proof : Type)
+    (FieldVectorTriple : Type)
+    (F : Ctypes.FOREIGN) =
+struct
+  include (
+    struct
+        type t = unit ptr
+
+        let typ = ptr void
+      end :
+      Type )
+
+  open F
+
+  let prefix = P.prefix
+
+  let delete = foreign (prefix "delete") (typ @-> returning void)
+
+  let create =
+    foreign (prefix "create")
+      (VerifierIndex.typ @-> Proof.typ @-> returning typ)
+
+  let element name = foreign (prefix name) (typ @-> returning Field.typ)
+
+  let opening_prechallenges =
+    foreign
+      (prefix "opening_prechallenges")
+      (typ @-> returning Field.Vector.typ)
+
+  let alpha = element "alpha"
+
+  let beta = element "beta"
+
+  let gamma = element "gamma"
+
+  let zeta = element "zeta"
+
+  let v = element "v"
+
+  let u = element "u"
+
+  let p_eval_1 = element "p_eval1"
+
+  let p_eval_2 = element "p_eval2"
 end
 
 module Field
@@ -1131,6 +1421,154 @@ module Full (F : Ctypes.FOREIGN) = struct
         (F)
   end
 
+  module Plonk_dlog_proof_system
+      (P : Prefix) (Field : sig
+          include Prefix_type
+
+          module Vector : sig
+            include Prefix_type
+
+            module Triple : Type
+          end
+      end) (Curve : sig
+        include Prefix_type
+
+        module Affine : sig
+          module Underlying : Type
+
+          include Type with type t = Underlying.t ptr
+
+          module Vector : Type
+
+          module Pair : sig
+            include Type
+
+            module Vector : Type
+          end
+        end
+      end) =
+  struct
+    let prefix = Field.prefix
+
+    module Field_triple = Triple (Field) (Field) (F)
+
+    module Field_opening_proof =
+      Dlog_opening_proof (struct
+          let prefix = with_prefix (P.prefix "opening_proof")
+        end)
+        (Field)
+        (Curve.Affine)
+        (F)
+
+    module Field_poly_comm =
+      Dlog_poly_comm (struct
+          let prefix = with_prefix (prefix "poly_comm")
+        end)
+        (Curve.Affine)
+        (F)
+
+    module Field_urs = struct
+      let prefix = with_prefix (prefix "urs")
+
+      include (
+        struct
+            type t = unit ptr
+
+            let typ = ptr void
+          end :
+          Type )
+
+      open F
+
+      let create =
+        foreign (prefix "create")
+          (size_t @-> size_t @-> size_t @-> returning typ)
+
+      let read = foreign (prefix "read") (string @-> returning typ)
+
+      let write = foreign (prefix "write") (typ @-> string @-> returning void)
+
+      let lagrange_commitment =
+        foreign
+          (prefix "lagrange_commitment")
+          (typ @-> size_t @-> size_t @-> returning Field_poly_comm.typ)
+
+      let commit_evaluations =
+        foreign
+          (prefix "commit_evaluations")
+          ( typ @-> size_t @-> Field.Vector.typ
+          @-> returning Field_poly_comm.typ )
+
+      let h = foreign (prefix "h") (typ @-> returning Curve.Affine.typ)
+
+      let batch_accumulator_check =
+        foreign
+          (prefix "batch_accumulator_check")
+          ( typ @-> Curve.Affine.Vector.typ @-> Field.Vector.typ
+          @-> returning bool )
+
+      let b_poly_commitment =
+        foreign
+          (prefix "b_poly_commitment")
+          (typ @-> Field.Vector.typ @-> returning Field_poly_comm.typ)
+    end
+
+    module Constraint_system : Type = struct
+      type t = unit ptr
+
+      let typ = ptr void
+    end
+
+    module Field_index =
+      Plonk_index (struct
+          let prefix = with_prefix (P.prefix "index")
+        end)
+        (Constraint_system)
+        (Field_poly_comm)
+        (Field_urs)
+        (F)
+
+    module Field_verifier_index = struct
+      include PlonkVerifierIndex (struct
+                  let prefix = with_prefix (P.prefix "verifier_index")
+                end)
+                (Field_index)
+                (Field_urs)
+                (Field_poly_comm)
+                (Field)
+                (F)
+
+      open F
+
+      let read =
+        foreign (prefix "read") (Field_urs.typ @-> string @-> returning typ)
+    end
+
+    module Field_proof =
+      Dlog_plonk_proof (struct
+          let prefix = with_prefix (P.prefix "proof")
+        end)
+        (Curve.Affine)
+        (Field)
+        (Field_index)
+        (Field_verifier_index)
+        (Field.Vector)
+        (Field.Vector.Triple)
+        (Field_opening_proof)
+        (Field_poly_comm)
+        (F)
+
+    module Field_oracles =
+      Dlog_oracles (struct
+          let prefix = with_prefix (prefix "oracles")
+        end)
+        (Field)
+        (Field_verifier_index)
+        (Field_proof)
+        (Field.Vector.Triple)
+        (F)
+  end
+
   module Tweedle = struct
     let prefix = with_prefix (zexe "tweedle")
 
@@ -1162,6 +1600,13 @@ module Full (F : Ctypes.FOREIGN) = struct
           (F)
 
       include Dlog_proof_system (Field) (Curve)
+
+      module Plonk =
+        Plonk_dlog_proof_system (struct
+            let prefix = with_prefix (prefix "plonk_fq")
+          end)
+          (Field)
+          (Curve)
     end
 
     module Dee = struct
@@ -1176,6 +1621,13 @@ module Full (F : Ctypes.FOREIGN) = struct
           (F)
 
       include Dlog_proof_system (Field) (Curve)
+
+      module Plonk =
+        Plonk_dlog_proof_system (struct
+            let prefix = with_prefix (prefix "plonk_fp")
+          end)
+          (Field)
+          (Curve)
     end
 
     module Endo = struct

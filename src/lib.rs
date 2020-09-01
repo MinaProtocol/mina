@@ -1,10 +1,13 @@
+#![allow(non_snake_case)]
 extern crate libc;
 
 pub mod bn382_dlog;
 pub mod bn382_pairing;
-mod common;
+pub mod common;
 pub mod tweedledee;
 pub mod tweedledum;
+pub mod tweedledee_plonk;
+pub mod tweedledum_plonk;
 
 use algebra::{
     biginteger::{BigInteger, BigInteger256, BigInteger384},

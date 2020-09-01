@@ -26,12 +26,14 @@ rayon = { version = "1" }
 
 oracle = { path = "../../marlin/oracle" }
 marlin_circuits = { path = "../../marlin/circuits/marlin" }
+plonk_circuits = { path = "../../marlin/circuits/plonk" }
 
 commitment_pairing = { path = "../../marlin/pairing/commitment" }
 marlin_protocol_pairing = { path = "../../marlin/pairing/marlin" }
 
 commitment_dlog = { path = "../../marlin/dlog/commitment" }
 marlin_protocol_dlog = { path = "../../marlin/dlog/marlin/" }
+plonk_protocol_dlog = { path = "../../marlin/dlog/plonk" }
 
 #circuits = { git = "https://github.com/o1-labs/marlin/" }
 #oracle = { git = "https://github.com/o1-labs/marlin/" }

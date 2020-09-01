@@ -397,6 +397,20 @@ pub fn prepare_witness<F: PrimeField>(
     witness
 }
 
+pub fn prepare_plonk_witness<F: PrimeField>(
+    primary_input: &Vec<F>,
+    auxiliary_input: &Vec<F>,
+) -> Vec<F> {
+    // TODO: Check that this is correct.
+    let mut witness: Vec<F> = Vec::with_capacity(primary_input.len() + auxiliary_input.len() + 1);
+
+    witness.push(F::one());
+    witness.extend_from_slice(primary_input.as_slice());
+    witness.extend_from_slice(auxiliary_input.as_slice());
+
+    witness
+}
+
 // NOTE: We always 'box' these values as pointers, since the FFI doesn't know
 // the size of the target type, and annotating them with (void *) on the other
 // side of the FFI would cause only the first 64 bits to be copied.
