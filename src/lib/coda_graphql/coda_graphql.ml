@@ -540,14 +540,14 @@ module Types = struct
           ; voting_for
           ; timing
           ; snapp } =
-        { Account.Poly.public_key= Some public_key
+        { Account.Poly.public_key
         ; token_id
         ; token_permissions= Some token_permissions
         ; nonce= Some nonce
         ; balance=
             {AnnotatedBalance.total= balance; unknown= balance; breadcrumb}
         ; receipt_chain_hash= Some receipt_chain_hash
-        ; delegate= Some delegate
+        ; delegate
         ; voting_for= Some voting_for
         ; timing
         ; snapp }
@@ -569,7 +569,7 @@ module Types = struct
             of_full_account ~breadcrumb account
         | None ->
             Account.
-              { Poly.public_key= Some (Account_id.public_key account_id)
+              { Poly.public_key= Account_id.public_key account_id
               ; token_id= Account_id.token_id account_id
               ; token_permissions= None
               ; nonce= None
@@ -587,19 +587,15 @@ module Types = struct
         of_account_id coda (Account_id.create pk Token_id.default)
     end
 
-    (** Hack: Account.Poly.t is only parameterized over 'pk once and so, in
-        order for delegate to be optional, we must also make account
-        public_key optional even though it's always Some. In an attempt to
-        avoid a large refactoring, and also avoid making a new record, we'll
-        deal with a value_exn here and be sad. *)
     type t =
       { account:
-          ( Public_key.Compressed.t option
+          ( Public_key.Compressed.t
           , Token_id.t
           , Token_permissions.t option
           , AnnotatedBalance.t
           , Account.Nonce.t option
           , Receipt.Chain_hash.t option
+          , Public_key.Compressed.t option
           , State_hash.t option
           , Account.Timing.t
           , Snapp_account.t option )
@@ -629,7 +625,7 @@ module Types = struct
       lift coda pk (Partial_account.of_pk coda pk)
 
     let account_id {Account.Poly.public_key; token_id; _} =
-      Account_id.create (Option.value_exn public_key) token_id
+      Account_id.create public_key token_id
 
     let rec account =
       lazy
@@ -639,7 +635,7 @@ module Types = struct
                  ~doc:"The public identity of the account"
                  ~args:Arg.[]
                  ~resolve:(fun _ {account; _} ->
-                   Option.value_exn account.Account.Poly.public_key )
+                   account.Account.Poly.public_key )
              ; field "token" ~typ:(non_null token_id)
                  ~doc:"The token associated with this account"
                  ~args:Arg.[]
@@ -730,7 +726,7 @@ module Types = struct
                  ~args:Arg.[]
                  ~resolve:(fun {ctx= coda; _} {account; _} ->
                    let open Option.Let_syntax in
-                   let%bind pk = account.Account.Poly.public_key in
+                   let pk = account.Account.Poly.public_key in
                    let%map delegators =
                      Coda_lib.current_epoch_delegators coda ~pk
                    in
@@ -751,7 +747,7 @@ module Types = struct
                  ~args:Arg.[]
                  ~resolve:(fun {ctx= coda; _} {account; _} ->
                    let open Option.Let_syntax in
-                   let%bind pk = account.Account.Poly.public_key in
+                   let pk = account.Account.Poly.public_key in
                    let%map delegators =
                      Coda_lib.last_epoch_delegators coda ~pk
                    in
@@ -2660,6 +2656,20 @@ module Queries = struct
       ~typ:(non_null Types.genesis_constants)
       ~resolve:(fun _ () -> ())
 
+  let next_available_token =
+    field "nextAvailableToken"
+      ~doc:
+        "The next token ID that has not been allocated. Token IDs are \
+         allocated sequentially, so all lower token IDs have been allocated"
+      ~args:Arg.[]
+      ~typ:(non_null Types.token_id)
+      ~resolve:(fun {ctx= coda; _} () ->
+        coda |> Coda_lib.best_tip |> Participating_state.active
+        |> Option.map ~f:(fun tip ->
+               Transition_frontier.Breadcrumb.staged_ledger tip
+               |> Staged_ledger.ledger |> Ledger.next_available_token )
+        |> Option.value ~default:Token_id.(next default) )
+
   let commands =
     [ sync_state
     ; daemon_status
@@ -2682,7 +2692,8 @@ module Queries = struct
     ; trust_status_all
     ; snark_pool
     ; pending_snark_work
-    ; genesis_constants ]
+    ; genesis_constants
+    ; next_available_token ]
 end
 
 let schema =
