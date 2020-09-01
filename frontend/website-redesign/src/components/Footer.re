@@ -25,6 +25,15 @@ module Styles = {
         ],
       ),
     ]);
+  let backToTopButtonContent =
+    style([
+      display(`flex),
+      height(`rem(2.62)),
+      flexDirection(`column),
+      alignContent(`center),
+      justifyContent(`spaceBetween),
+      color(white),
+    ]);
   let innerContainer =
     style([
       display(`flex),
@@ -56,6 +65,8 @@ module Styles = {
       Theme.Type.paragraph,
       style([color(white), marginTop(`zero), marginBottom(`rem(1.))]),
     ]);
+  let backToTopButton =
+    style([position(`absolute), right(`rem(1.)), bottom(`rem(2.))]);
 };
 
 module SocialIcons = {
@@ -415,11 +426,25 @@ module WhiteLine = {
     <hr className=Styles.whiteLine />;
   };
 };
+
 [@react.component]
 let make = () => {
   <div className=Styles.footerContainer>
     <div className=Styles.innerContainer> <LeftSide /> <FooterLinks /> </div>
     <WhiteLine />
     <Subfooter />
+    <Button
+      height={`rem(4.125)}
+      width={`rem(3.75)}
+      bgColor=Theme.Colors.black
+      borderColor=Theme.Colors.white
+      paddingX=1.1
+      paddingY=0.75
+      dark=true>
+      <span className=Styles.backToTopButtonContent>
+        <Icon kind=Icon.ArrowUpMedium size=1. />
+        {React.string("Top")}
+      </span>
+    </Button>
   </div>;
 };

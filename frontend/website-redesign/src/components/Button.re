@@ -1,6 +1,15 @@
 module Styles = {
   open Css;
-  let button = (bgColor, dark, buttonHeight, buttonWidth, paddingX, paddingY) =>
+  let button =
+      (
+        bgColor,
+        borderColor,
+        dark,
+        buttonHeight,
+        buttonWidth,
+        paddingX,
+        paddingY,
+      ) =>
     merge([
       Theme.Type.buttonLabel,
       style([
@@ -9,7 +18,7 @@ module Styles = {
         alignItems(`center),
         width(buttonWidth),
         height(buttonHeight),
-        border(`px(1), `solid, black),
+        border(`px(1), `solid, borderColor),
         boxShadow(~x=`px(4), ~y=`px(4), black),
         backgroundColor(bgColor),
         borderTopLeftRadius(`px(4)),
@@ -57,6 +66,7 @@ let make =
       ~children=?,
       ~height=`rem(3.25),
       ~width=`rem(10.9),
+      ~borderColor=Theme.Colors.black,
       ~paddingX=1.5,
       ~paddingY=1.,
       ~bgColor=Theme.Colors.orange,
@@ -68,6 +78,7 @@ let make =
       ?onClick
       className={Styles.button(
         bgColor,
+        borderColor,
         dark,
         height,
         width,
