@@ -1,3 +1,5 @@
+-- trigger
+
 let Prelude = ../External/Prelude.dhall
 let Cmd = ../Lib/Cmds.dhall
 let S = ../Lib/SelectFiles.dhall
