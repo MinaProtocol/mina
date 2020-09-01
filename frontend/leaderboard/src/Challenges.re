@@ -50,7 +50,8 @@ let bonusBlocksChallenge = metricsMap => {
       (2, 3000), // 3rd place: 3000 pts
       (11, 2000), // Top 10: 2000 pts.
       (26, 1500), // Top 25: 1500 pts
-      (101, 1000) // Top 100: 1000 pts
+      (101, 1000), // Top 100: 1000 pts
+      (201, 500) // Top 200: 500 pts
     |],
     metricsMap,
     (metricRecord: Types.Metrics.t) => metricRecord.blocksCreated,
@@ -94,7 +95,8 @@ let bonusSendCodaChallenge = metricsMap => {
       (2, 3000), // 3rd place: 3000 pts
       (11, 2000), // Top 10: 2000 pts.
       (26, 1500), // Top 25: 1500 pts
-      (101, 1000) // Top 100: 1000 pts
+      (101, 1000), // Top 100: 1000 pts
+      (201, 1000) // Top 200: 500 pts
     |],
     metricsMap,
     (metricRecord: Types.Metrics.t) => metricRecord.transactionSent,

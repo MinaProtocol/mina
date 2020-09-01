@@ -99,6 +99,7 @@ module Poly = struct
            , 'amount
            , 'nonce
            , 'receipt_chain_hash
+           , 'delegate
            , 'state_hash
            , 'timing
            , 'snapp_opt )
@@ -109,7 +110,7 @@ module Poly = struct
         ; balance: 'amount
         ; nonce: 'nonce
         ; receipt_chain_hash: 'receipt_chain_hash
-        ; delegate: 'pk
+        ; delegate: 'delegate
         ; voting_for: 'state_hash
         ; timing: 'timing
         ; snapp: 'snapp_opt }
@@ -136,19 +137,6 @@ type key = Key.t [@@deriving sexp, eq, hash, compare, yojson]
 
 module Timing = Account_timing
 
-module Snapp_account = struct
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type t = unit [@@deriving sexp, eq, hash, compare, yojson]
-
-      let to_latest = Fn.id
-    end
-  end]
-
-  let to_input _ = assert false
-end
-
 [%%versioned
 module Stable = struct
   module V1 = struct
@@ -159,6 +147,7 @@ module Stable = struct
       , Balance.Stable.V1.t
       , Nonce.Stable.V1.t
       , Receipt.Chain_hash.Stable.V1.t
+      , Public_key.Compressed.Stable.V1.t option
       , State_hash.Stable.V1.t
       , Timing.Stable.V1.t
       , Snapp_account.Stable.V1.t option )
@@ -186,6 +175,7 @@ type value =
   , Balance.t
   , Nonce.t
   , Receipt.Chain_hash.t
+  , Public_key.Compressed.t option
   , State_hash.t
   , Timing.t
   , Snapp_account.t option )
@@ -199,8 +189,7 @@ let initialize ?snapp account_id : t =
   let token_id = Account_id.token_id account_id in
   let delegate =
     (* Only allow delegation if this account is for the default token. *)
-    if Token_id.(equal default) token_id then public_key
-    else Public_key.Compressed.empty
+    if Token_id.(equal default token_id) then Some public_key else None
   in
   { public_key
   ; token_id
@@ -215,10 +204,13 @@ let initialize ?snapp account_id : t =
 
 let hash_snapp_account_opt = function
   | None ->
+      (* TODO: Should be the hash of a real snapp account *)
       Field.zero
   | Some a ->
       Random_oracle.hash ~init:Hash_prefix_states.snapp_account
         (Random_oracle.pack_input (Snapp_account.to_input a))
+
+let delegate_opt = Option.value ~default:Public_key.Compressed.empty
 
 let to_input (t : t) =
   let open Random_oracle.Input in
@@ -230,7 +222,7 @@ let to_input (t : t) =
     ~token_permissions:(f Token_permissions.to_input)
     ~nonce:(bits Nonce.Bits.to_bits)
     ~receipt_chain_hash:(f Receipt.Chain_hash.to_input)
-    ~delegate:(f Public_key.Compressed.to_input)
+    ~delegate:(f (Fn.compose Public_key.Compressed.to_input delegate_opt))
     ~voting_for:(f State_hash.to_input) ~timing:(bits Timing.to_bits)
     ~snapp:(f (Fn.compose field hash_snapp_account_opt))
   |> List.reduce_exn ~f:append
@@ -251,6 +243,7 @@ type var =
   , Balance.var
   , Nonce.Checked.t
   , Receipt.Chain_hash.var
+  , Public_key.Compressed.var
   , State_hash.var
   , Timing.var
   , Field.Var.t )
@@ -268,7 +261,10 @@ let typ : (var, value) Typ.t =
       ; Balance.typ
       ; Nonce.typ
       ; Receipt.Chain_hash.typ
-      ; Public_key.Compressed.typ
+      ; Typ.transport Public_key.Compressed.typ ~there:delegate_opt
+          ~back:(fun delegate ->
+            if Public_key.Compressed.(equal empty) delegate then None
+            else Some delegate )
       ; State_hash.typ
       ; Timing.typ
       ; Typ.transport Field.typ ~there:hash_snapp_account_opt ~back:(fun fld ->
@@ -296,7 +292,7 @@ let var_of_t
   ; balance= Balance.var_of_t balance
   ; nonce= Nonce.Checked.constant nonce
   ; receipt_chain_hash= Receipt.Chain_hash.var_of_t receipt_chain_hash
-  ; delegate= Public_key.Compressed.var_of_t delegate
+  ; delegate= Public_key.Compressed.var_of_t (delegate_opt delegate)
   ; voting_for= State_hash.var_of_t voting_for
   ; timing= Timing.var_of_t timing
   ; snapp= Field.Var.constant (hash_snapp_account_opt snapp) }
@@ -345,7 +341,7 @@ let empty =
   ; balance= Balance.zero
   ; nonce= Nonce.zero
   ; receipt_chain_hash= Receipt.Chain_hash.empty
-  ; delegate= Public_key.Compressed.empty
+  ; delegate= None
   ; voting_for= State_hash.dummy
   ; timing= Timing.Untimed
   ; snapp= None }
@@ -357,8 +353,7 @@ let create account_id balance =
   let token_id = Account_id.token_id account_id in
   let delegate =
     (* Only allow delegation if this account is for the default token. *)
-    if Token_id.(equal default) token_id then public_key
-    else Public_key.Compressed.empty
+    if Token_id.(equal default) token_id then Some public_key else None
   in
   { Poly.public_key
   ; token_id
@@ -389,8 +384,7 @@ let create_timed account_id balance ~initial_minimum_balance ~cliff_time
     let token_id = Account_id.token_id account_id in
     let delegate =
       (* Only allow delegation if this account is for the default token. *)
-      if Token_id.(equal default) token_id then public_key
-      else Public_key.Compressed.empty
+      if Token_id.(equal default) token_id then Some public_key else None
     in
     Or_error.return
       { Poly.public_key
