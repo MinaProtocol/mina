@@ -732,6 +732,9 @@ let make_constraint_constants
   ; pending_coinbase_depth
   ; coinbase_amount=
       Option.value ~default:default.coinbase_amount config.coinbase_amount
+  ; supercharged_coinbase_factor=
+      Option.value ~default:default.supercharged_coinbase_factor
+        config.supercharged_coinbase_factor
   ; account_creation_fee=
       Option.value ~default:default.account_creation_fee
         config.account_creation_fee }
@@ -987,6 +990,8 @@ let inferred_runtime_config (precomputed_values : Precomputed_values.t) :
         ; transaction_capacity=
             Some (Log_2 constraint_constants.transaction_capacity_log_2)
         ; coinbase_amount= Some constraint_constants.coinbase_amount
+        ; supercharged_coinbase_factor=
+            Some constraint_constants.supercharged_coinbase_factor
         ; account_creation_fee= Some constraint_constants.account_creation_fee
         }
   ; ledger=

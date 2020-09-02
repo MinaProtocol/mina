@@ -421,6 +421,30 @@ module T = struct
       ; init_stack: Pending_coinbase.Stack.t }
   end
 
+  let coinbase_amount ~supercharge_coinbase
+      ~(constraint_constants : Genesis_constants.Constraint_constants.t) =
+    if supercharge_coinbase then
+      Currency.Amount.scale constraint_constants.coinbase_amount
+        constraint_constants.supercharged_coinbase_factor
+    else Some constraint_constants.coinbase_amount
+
+  let _coinbase_amount_or_error ~supercharge_coinbase
+      ~(constraint_constants : Genesis_constants.Constraint_constants.t) =
+    if supercharge_coinbase then
+      Option.value_map
+        ~default:
+          (Error
+             (Pre_diff_info.Error.Coinbase_error
+                (sprintf
+                   !"Overflow when calculating coinbase amount: Supercharged \
+                     coinbase factor (%d) x coinbase amount (%{sexp: \
+                     Currency.Amount.t})"
+                   constraint_constants.supercharged_coinbase_factor
+                   constraint_constants.coinbase_amount)))
+        (coinbase_amount ~supercharge_coinbase ~constraint_constants)
+        ~f:(fun x -> Ok x)
+    else Ok constraint_constants.coinbase_amount
+
   let apply_transaction_and_get_statement ~constraint_constants ledger
       (pending_coinbase_stack_state : Stack_state_with_init_stack.t) s
       txn_state_view =
@@ -865,11 +889,39 @@ module T = struct
              (List.length (Scan_state.all_work_statements_exn t.scan_state)))
     )
 
+  let validate_supercharged_rewards ~current_global_slot ~(ledger : Ledger.t)
+      (staged_ledger_diff : Staged_ledger_diff.t) =
+    let creator = staged_ledger_diff.creator in
+    let account_id = Account_id.create creator Token_id.default in
+    match
+      Ledger.has_locked_tokens ledger ~txn_global_slot:current_global_slot
+        ~account_id
+    with
+    | Ok true when not staged_ledger_diff.supercharge_coinbase ->
+        Ok ()
+    | Ok false when staged_ledger_diff.supercharge_coinbase ->
+        Ok ()
+    | Ok b ->
+        Error
+          (Staged_ledger_error.Pre_diff
+             (Pre_diff_info.Error.Coinbase_error
+                (sprintf
+                   !"Invalid coinbase amount: Block creator has unlocked \
+                     tokens: %b Supercharge coinbase: %b"
+                   b staged_ledger_diff.supercharge_coinbase)))
+    | Error e ->
+        Error (Staged_ledger_error.Unexpected e)
+
   let apply ~constraint_constants t witness ~logger ~verifier
       ~current_state_view ~state_and_body_hash =
     let open Deferred.Result.Let_syntax in
     let work = Staged_ledger_diff.completed_works witness in
     let%bind () = check_completed_works ~logger ~verifier t.scan_state work in
+    let%bind () =
+      validate_supercharged_rewards ~current_global_slot ~ledger:t.ledger
+        witness
+      |> Deferred.return
+    in
     let%bind prediff =
       Result.map_error ~f:(fun error -> Staged_ledger_error.Pre_diff error)
       @@ Pre_diff_info.get ~constraint_constants witness
@@ -930,6 +982,7 @@ module T = struct
       ; fee_transfers: Fee.t Public_key.Compressed.Map.t
       ; add_coinbase: bool
       ; coinbase: Coinbase.Fee_transfer.t Staged_ledger_diff.At_most_two.t
+      ; supercharge_coinbase: bool
       ; receiver_pk: Public_key.Compressed.t
       ; budget: Fee.t Or_error.t
       ; discarded: Discarded.t
@@ -961,7 +1014,7 @@ module T = struct
     let coinbase_work
         ~(constraint_constants : Genesis_constants.Constraint_constants.t)
         ?(is_two = false) (works : Transaction_snark_work.Checked.t Sequence.t)
-        ~is_coinbase_reciever_new =
+        ~is_coinbase_reciever_new ~supercharge_coinbase =
       let open Option.Let_syntax in
       let min1, min2 = cheapest_two_work works in
       let diff ws ws' =
@@ -971,7 +1024,9 @@ module T = struct
               ~equal:Transaction_snark_work.Statement.equal
             |> not )
       in
-      let coinbase_amount = constraint_constants.coinbase_amount in
+      let%bind coinbase_amount =
+        coinbase_amount ~supercharge_coinbase ~constraint_constants
+      in
       let%bind budget =
         (*if the coinbase receiver is new then the account creation fee will be deducted from the reward*)
         if is_coinbase_reciever_new then
@@ -1030,7 +1085,8 @@ module T = struct
               (cb, works) )
 
     let init_coinbase_and_fee_transfers ~constraint_constants cw_seq
-        ~add_coinbase ~job_count ~slots ~is_coinbase_reciever_new =
+        ~add_coinbase ~job_count ~slots ~is_coinbase_reciever_new
+        ~supercharge_coinbase =
       let cw_unchecked work =
         Sequence.map work ~f:Transaction_snark_work.forget
       in
@@ -1038,7 +1094,7 @@ module T = struct
         match
           ( add_coinbase
           , coinbase_work ~constraint_constants cw_seq
-              ~is_coinbase_reciever_new )
+              ~is_coinbase_reciever_new ~supercharge_coinbase )
         with
         | true, Some (ft, rem_cw) ->
             (ft, rem_cw)
@@ -1063,8 +1119,8 @@ module T = struct
     let init ~constraint_constants
         (uc_seq : User_command.With_valid_signature.t With_status.t Sequence.t)
         (cw_seq : Transaction_snark_work.Checked.t Sequence.t)
-        (slots, job_count) ~receiver_pk ~add_coinbase logger
-        ~is_coinbase_reciever_new =
+        (slots, job_count) ~receiver_pk ~add_coinbase ~supercharge_coinbase
+        logger ~is_coinbase_reciever_new =
       let seq_rev seq =
         let rec go seq rev_seq =
           match Sequence.next seq with
@@ -1078,6 +1134,7 @@ module T = struct
       let coinbase, singles =
         init_coinbase_and_fee_transfers ~constraint_constants cw_seq
           ~add_coinbase ~job_count ~slots ~is_coinbase_reciever_new
+          ~supercharge_coinbase
       in
       let fee_transfers =
         Public_key.Compressed.Map.of_alist_reduce singles ~f:(fun f1 f2 ->
@@ -1108,6 +1165,7 @@ module T = struct
       ; completed_work_rev= seq_rev cw_seq
       ; fee_transfers
       ; add_coinbase
+      ; supercharge_coinbase
       ; receiver_pk
       ; coinbase
       ; budget
@@ -1127,6 +1185,7 @@ module T = struct
           match
             coinbase_work ~constraint_constants t.completed_work_rev
               ~is_coinbase_reciever_new:t.is_coinbase_reciever_new
+              ~supercharge_coinbase:t.supercharge_coinbase
           with
           | None ->
               (One None, t.completed_work_rev)
@@ -1136,6 +1195,7 @@ module T = struct
           match
             coinbase_work ~constraint_constants t.completed_work_rev
               ~is_two:true ~is_coinbase_reciever_new:t.is_coinbase_reciever_new
+              ~supercharge_coinbase:t.supercharge_coinbase
           with
           | None ->
               (Two None, t.completed_work_rev)
@@ -1401,12 +1461,13 @@ module T = struct
                log ))
 
   let one_prediff ~constraint_constants cw_seq ts_seq ~receiver ~add_coinbase
-      slot_job_count logger ~is_coinbase_reciever_new partition =
+      slot_job_count logger ~is_coinbase_reciever_new partition
+      ~supercharge_coinbase =
     O1trace.measure "one_prediff" (fun () ->
         let init_resources =
           Resources.init ~constraint_constants ts_seq cw_seq slot_job_count
             ~receiver_pk:receiver ~add_coinbase logger
-            ~is_coinbase_reciever_new
+            ~is_coinbase_reciever_new ~supercharge_coinbase
         in
         let log =
           Diff_creation_log.init
@@ -1420,7 +1481,8 @@ module T = struct
     )
 
   let generate ~constraint_constants logger cw_seq ts_seq ~receiver
-      ~is_coinbase_reciever_new (partitions : Scan_state.Space_partition.t) =
+      ~is_coinbase_reciever_new ~supercharge_coinbase
+      (partitions : Scan_state.Space_partition.t) =
     let pre_diff_with_one (res : Resources.t) :
         Staged_ledger_diff.With_valid_signatures_and_proofs
         .pre_diff_with_at_most_one_coinbase =
@@ -1467,7 +1529,7 @@ module T = struct
     let second_pre_diff (res : Resources.t) partition ~add_coinbase work =
       one_prediff ~constraint_constants work res.discarded.user_commands_rev
         ~receiver partition ~add_coinbase logger ~is_coinbase_reciever_new
-        `Second
+        ~supercharge_coinbase `Second
     in
     let isEmpty (res : Resources.t) =
       has_no_user_commands res && Resources.coinbase_added res = 0
@@ -1478,7 +1540,7 @@ module T = struct
         let res, log =
           one_prediff ~constraint_constants cw_seq ts_seq ~receiver
             partitions.first ~add_coinbase:true logger
-            ~is_coinbase_reciever_new `First
+            ~is_coinbase_reciever_new ~supercharge_coinbase `First
         in
         make_diff (res, log) None
     | Some y ->
@@ -1488,7 +1550,7 @@ module T = struct
         let res, log1 =
           one_prediff ~constraint_constants cw_seq_1 ts_seq ~receiver
             partitions.first ~add_coinbase:false logger
-            ~is_coinbase_reciever_new `First
+            ~is_coinbase_reciever_new ~supercharge_coinbase `First
         in
         let incr_coinbase_and_compute res count =
           let new_res =
@@ -1498,7 +1560,7 @@ module T = struct
             (*All slots could not be filled either because of budget constraints or not enough work done. Don't create the second prediff instead recompute first diff with just once coinbase*)
             ( one_prediff ~constraint_constants cw_seq_1 ts_seq ~receiver
                 partitions.first ~add_coinbase:true logger
-                ~is_coinbase_reciever_new `First
+                ~is_coinbase_reciever_new ~supercharge_coinbase `First
             , None )
           else
             let res2, log2 =
@@ -1508,14 +1570,14 @@ module T = struct
               (*Don't create the second prediff instead recompute first diff with just once coinbase*)
               ( one_prediff ~constraint_constants cw_seq_1 ts_seq ~receiver
                   partitions.first ~add_coinbase:true logger
-                  ~is_coinbase_reciever_new `First
+                  ~is_coinbase_reciever_new ~supercharge_coinbase `First
               , None )
             else ((new_res, log1), Some (res2, log2))
         in
         let try_with_coinbase () =
           one_prediff ~constraint_constants cw_seq_1 ts_seq ~receiver
             partitions.first ~add_coinbase:true logger
-            ~is_coinbase_reciever_new `First
+            ~is_coinbase_reciever_new ~supercharge_coinbase `First
         in
         let res1, res2 =
           if Sequence.is_empty res.user_commands_rev then
@@ -1570,6 +1632,13 @@ module T = struct
       |> Option.is_none
     in
     let is_coinbase_reciever_new = is_new_account coinbase_receiver in
+    let supercharge_coinbase =
+      Transaction_validator.has_locked_tokens
+        ~txn_global_slot:current_global_slot
+        ~account_id:(Account_id.create self Token_id.default)
+        validating_ledger
+      |> Or_error.ok_exn
+    in
     O1trace.trace_event "done mask" ;
     let partitions = Scan_state.partition_if_overflowing t.scan_state in
     O1trace.trace_event "partitioned" ;
@@ -1659,7 +1728,7 @@ module T = struct
       O1trace.measure "generate diff" (fun () ->
           generate ~constraint_constants logger completed_works_seq
             valid_on_this_ledger ~receiver:coinbase_receiver
-            ~is_coinbase_reciever_new partitions )
+            ~is_coinbase_reciever_new ~supercharge_coinbase partitions )
     in
     let summaries, detailed = List.unzip log in
     [%log debug]
@@ -1678,7 +1747,8 @@ module T = struct
     trace_event "prediffs done" ;
     { Staged_ledger_diff.With_valid_signatures_and_proofs.diff
     ; creator= self
-    ; coinbase_receiver }
+    ; coinbase_receiver
+    ; supercharge_coinbase }
 end
 
 include T
@@ -2211,7 +2281,8 @@ let%test_module "test" =
                   ; coinbase= Zero }
                 , None )
             ; creator= self_pk
-            ; coinbase_receiver }
+            ; coinbase_receiver
+            ; supercharge_coinbase= false }
         | Some (_, _) ->
             let txns_in_second_diff = List.drop txns slots in
             let diff : Staged_ledger_diff.Diff.t =
@@ -2225,7 +2296,10 @@ let%test_module "test" =
                   ; user_commands= txns_in_second_diff
                   ; coinbase= Zero } )
             in
-            {diff; creator= self_pk; coinbase_receiver}
+            { diff
+            ; creator= self_pk
+            ; coinbase_receiver
+            ; supercharge_coinbase= false }
       in
       let empty_diff : Staged_ledger_diff.t =
         { diff=
@@ -2234,7 +2308,8 @@ let%test_module "test" =
               ; coinbase= Staged_ledger_diff.At_most_two.Zero }
             , None )
         ; coinbase_receiver
-        ; creator= self_pk }
+        ; creator= self_pk
+        ; supercharge_coinbase= false }
       in
       Quickcheck.test (gen_below_capacity ())
         ~sexp_of:

@@ -197,12 +197,12 @@ val undo :
   -> Undo.t
   -> unit Or_error.t
 
-val merkle_root_after_snapp_command_exn :
-     constraint_constants:Genesis_constants.Constraint_constants.t
-  -> txn_state_view:Snapp_predicate.Protocol_state.View.t
+
+val has_locked_tokens :
+     txn_global_slot:Coda_numbers.Global_slot.t
+  -> account_id:Account_id.t
   -> t
-  -> Snapp_command.Valid.t
-  -> Ledger_hash.t * [`Next_available_token of Token_id.t]
+  -> bool Or_error.t
 
 val merkle_root_after_user_command_exn :
      constraint_constants:Genesis_constants.Constraint_constants.t

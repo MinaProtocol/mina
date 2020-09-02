@@ -96,9 +96,8 @@ type t =
   *)
 let create_coinbase
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-    coinbase_parts ~(receiver : Public_key.Compressed.t) =
+    coinbase_parts ~(receiver : Public_key.Compressed.t) ~coinbase_amount =
   let open Result.Let_syntax in
-  let coinbase = constraint_constants.coinbase_amount in
   let coinbase_or_error = function
     | Ok x ->
         Ok x
@@ -118,7 +117,7 @@ let create_coinbase
       ~f:(fun x -> Ok x)
   in
   let two_parts amt ft1 (ft2 : Coinbase.Fee_transfer.t option) =
-    let%bind rem_coinbase = underflow_err coinbase amt in
+    let%bind rem_coinbase = underflow_err coinbase_amount amt in
     let%bind _ =
       underflow_err rem_coinbase
         (Option.value_map ~default:Currency.Amount.zero ft2 ~f:(fun {fee; _} ->
@@ -139,7 +138,7 @@ let create_coinbase
       return []
   | `One x ->
       let%map cb =
-        Coinbase.create ~amount:coinbase ~receiver ~fee_transfer:x
+        Coinbase.create ~amount:coinbase_amount ~receiver ~fee_transfer:x
         |> coinbase_or_error
       in
       [cb]
@@ -240,11 +239,12 @@ let create_fee_transfers completed_works delta public_key coinbase_fts =
   |> Or_error.join |> to_staged_ledger_or_error
 
 let get_individual_info ~constraint_constants coinbase_parts ~receiver
-    user_commands completed_works =
+    ~coinbase_amount user_commands completed_works =
   let open Result.Let_syntax in
   let%bind coinbase_parts =
     O1trace.measure "create_coinbase" (fun () ->
-        create_coinbase ~constraint_constants coinbase_parts ~receiver )
+        create_coinbase ~constraint_constants coinbase_parts ~receiver
+          ~coinbase_amount )
   in
   let coinbase_fts =
     List.concat_map coinbase_parts ~f:(fun cb -> Option.to_list cb.fee_transfer)
@@ -298,6 +298,22 @@ let check_coinbase (diff : With_valid_signatures.diff) =
               x y))
 
 let get' ~constraint_constants (t : With_valid_signatures.t) =
+  let open Result.Let_syntax in
+  let%bind coinbase_amount =
+    Option.value_map
+      ~default:
+        (Error
+           (Error.Coinbase_error
+              (sprintf
+                 !"Overflow when calculating coinbase amount: Supercharged \
+                   coinbase factor (%d) x coinbase amount (%{sexp: \
+                   Currency.Amount.t})"
+                 constraint_constants.supercharged_coinbase_factor
+                 constraint_constants.coinbase_amount)))
+      (Staged_ledger_diff.With_valid_signatures.coinbase ~constraint_constants
+         t)
+      ~f:(fun x -> Ok x)
+  in
   let apply_pre_diff_with_at_most_two
       (t1 : With_valid_signatures.pre_diff_with_at_most_two_coinbase) =
     let coinbase_parts =
@@ -310,7 +326,7 @@ let get' ~constraint_constants (t : With_valid_signatures.t) =
           `Two x
     in
     get_individual_info coinbase_parts ~receiver:t.coinbase_receiver
-      t1.user_commands t1.completed_works
+      t1.user_commands t1.completed_works ~coinbase_amount
   in
   let apply_pre_diff_with_at_most_one
       (t2 : With_valid_signatures.pre_diff_with_at_most_one_coinbase) =
@@ -318,9 +334,8 @@ let get' ~constraint_constants (t : With_valid_signatures.t) =
       match t2.coinbase with Zero -> `Zero | One x -> `One x
     in
     get_individual_info coinbase_added ~receiver:t.coinbase_receiver
-      t2.user_commands t2.completed_works
+      t2.user_commands t2.completed_works ~coinbase_amount
   in
-  let open Result.Let_syntax in
   let%bind () = check_coinbase t.diff in
   let%bind p1 =
     apply_pre_diff_with_at_most_two ~constraint_constants (fst t.diff)

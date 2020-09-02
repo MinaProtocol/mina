@@ -901,7 +901,8 @@ let genesis ~precomputed_values =
           ; coinbase= Staged_ledger_diff.At_most_two.Zero }
         , None )
     ; creator
-    ; coinbase_receiver= creator }
+    ; coinbase_receiver= creator
+    ; supercharge_coinbase= false }
   in
   (* the genesis transition is assumed to be valid *)
   let (`I_swear_this_is_safe_see_my_comment transition) =
