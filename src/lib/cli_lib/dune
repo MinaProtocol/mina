@@ -4,7 +4,7 @@
  (library_flags -linkall)
  (inline_tests)
  (libraries core async_unix sodium ppx_deriving_yojson.runtime yojson
-   coda_base secrets work_selector graphql_lib)
+   coda_base secrets work_selector graphql_lib rosetta_coding)
  (preprocess
   (pps ppx_version ppx_jane ppx_deriving_yojson ppx_deriving.make bisect_ppx --
     -conditional))
