@@ -207,6 +207,32 @@ let direct_graphql_delegation_through_block ~logger ~rosetta_uri ~graphql_uri
           ; _type= "fee_payer_dec"
           ; target= None } ]
 
+let direct_graphql_create_token_through_block ~logger ~rosetta_uri ~graphql_uri
+    ~network_response =
+  let open Deferred.Result.Let_syntax in
+  (* Unlock the sender account *)
+  let%bind _ = Poke.Account.unlock ~graphql_uri in
+  (* create token *)
+  let%bind hash =
+    Poke.SendTransaction.create_token ~fee:(`Int 2_000_000_000)
+      ~receiver:(`String other_pk) ~graphql_uri ()
+  in
+  verify_in_mempool_and_block ~logger ~rosetta_uri ~graphql_uri ~txn_hash:hash
+    ~network_response
+    ~operation_expectations:
+      Operation_expectation.
+        [ { amount= Some (-2_000_000_000)
+          ; account=
+              Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
+          ; status= "Pending"
+          ; _type= "fee_payer_dec"
+          ; target= None }
+        ; { amount= None
+          ; account= None
+          ; status= "Pending"
+          ; _type= "create_token"
+          ; target= None } ]
+
 let construction_api_transaction_through_mempool ~logger ~rosetta_uri
     ~graphql_uri ~network_response ~operation_expectations ~operations =
   let open Deferred.Result.Let_syntax in
@@ -340,6 +366,25 @@ let construction_api_delegation_through_mempool =
           ; _type= "fee_payer_dec"
           ; target= None } ]
 
+let construction_api_create_token_through_mempool =
+  construction_api_transaction_through_mempool
+    ~operations:(fun address ->
+      Poke.SendTransaction.create_token_operations ~sender:address
+        ~fee:(Unsigned.UInt64.of_int 5_000_000_000) )
+    ~operation_expectations:
+      Operation_expectation.
+        [ { amount= Some (-5_000_000_000)
+          ; account=
+              Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
+          ; status= "Pending"
+          ; _type= "fee_payer_dec"
+          ; target= None }
+        ; { amount= None
+          ; account= None
+          ; status= "Pending"
+          ; _type= "create_token"
+          ; target= None } ]
+
 (* for each possible user command, run the command via GraphQL, check that
     the command is in the transaction pool
 *)
@@ -385,7 +430,7 @@ let check_new_account_user_commands ~logger ~rosetta_uri ~graphql_uri =
       ~network_response
   in
   [%log info] "Created construction payment and waited" ;
-  (* Stop staking so we can rely on things being in the mempool again *)
+  (* Stop staking *)
   let%bind _res = Poke.Staking.disable ~graphql_uri in
   let%bind () =
     direct_graphql_delegation_through_block ~logger ~rosetta_uri ~graphql_uri
@@ -399,6 +444,18 @@ let check_new_account_user_commands ~logger ~rosetta_uri ~graphql_uri =
       ~graphql_uri ~network_response
   in
   [%log info] "Created construction delegation and waited" ;
+  (* Stop staking *)
+  let%bind _res = Poke.Staking.disable ~graphql_uri in
+  let%bind () =
+    direct_graphql_create_token_through_block ~logger ~rosetta_uri ~graphql_uri
+      ~network_response
+  in
+  [%log info] "Created token via graphql and waited" ;
+  let%bind () =
+    construction_api_create_token_through_mempool ~logger ~rosetta_uri
+      ~graphql_uri ~network_response
+  in
+  [%log info] "Created token using construction and waited" ;
   (* Succeed! (for now) *)
   return ()
 
