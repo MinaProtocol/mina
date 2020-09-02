@@ -1229,16 +1229,16 @@ let%test_module _ =
           map
 
     let mk_account i balance nonce =
+      let public_key = Public_key.compress @@ test_keys.(i).public_key in
       ( i
-      , { Account.Poly.Stable.Latest.public_key=
-            Public_key.compress @@ test_keys.(i).public_key
+      , { Account.Poly.Stable.Latest.public_key
         ; token_id= Token_id.default
         ; token_permissions=
             Token_permissions.Not_owned {account_disabled= false}
         ; balance= Currency.Balance.of_int balance
         ; nonce= Account.Nonce.of_int nonce
         ; receipt_chain_hash= Receipt.Chain_hash.empty
-        ; delegate= Public_key.Compressed.empty
+        ; delegate= Some public_key
         ; voting_for=
             Quickcheck.random_value ~seed:(`Deterministic "constant")
               State_hash.gen

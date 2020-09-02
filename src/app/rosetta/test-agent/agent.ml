@@ -1,9 +1,10 @@
 (** An agent that pokes at Coda and peeks at Rosetta to see if things look alright *)
 
 open Core_kernel
-open Lib
 open Async
-open Models
+open Rosetta_models
+open Rosetta_lib
+open Lib
 
 module Error = struct
   include Error
@@ -33,17 +34,10 @@ let keep_trying ~step ~retry_count ~initial_delay ~each_delay ~failure_reason =
   let%bind () = wait initial_delay in
   go retry_count
 
-let direct_graphql_payment_through_block ~logger ~rosetta_uri ~graphql_uri
-    ~network_response =
+let verify_in_mempool_and_block ~logger ~rosetta_uri ~graphql_uri
+    ~network_response ~txn_hash ~operation_expectations =
   let open Core.Time in
   let open Deferred.Result.Let_syntax in
-  (* Unlock the account *)
-  let%bind _ = Poke.Account.unlock ~graphql_uri in
-  (* Send a payment *)
-  let%bind hash =
-    Poke.SendTransaction.payment ~fee:(`Int 2_000_000_000)
-      ~amount:(`Int 5_000_000_000) ~to_:(`String other_pk) ~graphql_uri ()
-  in
   let%bind () = wait (Span.of_sec 1.0) in
   (* Grab the mempool and find the payment inside *)
   let%bind () =
@@ -56,7 +50,7 @@ let direct_graphql_payment_through_block ~logger ~rosetta_uri ~graphql_uri
           Result.map mempool_r ~f:(fun mempool ->
               List.find mempool.Mempool_response.transaction_identifiers
                 ~f:(fun ident ->
-                  String.equal ident.Transaction_identifier.hash hash ) )
+                  String.equal ident.Transaction_identifier.hash txn_hash ) )
         with
         | Error _ ->
             `Failed
@@ -70,7 +64,8 @@ let direct_graphql_payment_through_block ~logger ~rosetta_uri ~graphql_uri
   in
   (* Pull specific account out of mempool *)
   let%bind mempool_res =
-    Peek.Mempool.transaction ~rosetta_uri ~network_response ~logger ~hash
+    Peek.Mempool.transaction ~rosetta_uri ~network_response ~logger
+      ~hash:txn_hash
   in
   [%log debug]
     ~metadata:
@@ -78,28 +73,10 @@ let direct_graphql_payment_through_block ~logger ~rosetta_uri ~graphql_uri
         , mempool_res.transaction.operations |> [%to_yojson: Operation.t list]
         ) ]
     "Mempool operations: $operations" ;
-  let expected_mempool_ops =
-    Operation_expectation.
-      [ { amount= Some (-5_000_000_000)
-        ; account=
-            Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
-        ; status= "Pending"
-        ; _type= "payment_source_dec" }
-      ; { amount= Some (-2_000_000_000)
-        ; account=
-            Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
-        ; status= "Pending"
-        ; _type= "fee_payer_dec" }
-      ; { amount= Some 5_000_000_000
-        ; account=
-            Some {Account.pk= other_pk; token_id= Unsigned.UInt64.of_int 1}
-        ; status= "Pending"
-        ; _type= "payment_receiver_inc" } ]
-  in
   let%bind () =
-    Operation_expectation.assert_similar_operations
-      ~expected:expected_mempool_ops ~actual:mempool_res.transaction.operations
-      ~situation:"mempool"
+    Operation_expectation.assert_similar_operations ~logger
+      ~expected:operation_expectations
+      ~actual:mempool_res.transaction.operations ~situation:"mempool"
   in
   let%bind last_block_index =
     keep_trying
@@ -154,23 +131,84 @@ let direct_graphql_payment_through_block ~logger ~rosetta_uri ~graphql_uri
   let succesful (x : Operation_expectation.t) = {x with status= "Success"} in
   Logger.info logger "GOT BLOCK $block" ~module_:__MODULE__ ~location:__LOC__
     ~metadata:[("block", Block_response.to_yojson block)] ;
-  Operation_expectation.assert_similar_operations
+  Operation_expectation.assert_similar_operations ~logger
     ~expected:
-      ( List.map ~f:succesful expected_mempool_ops
+      ( List.map ~f:succesful operation_expectations
       @ Operation_expectation.
           [ { amount= Some 20_000_000_000
             ; account=
                 Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
             ; status= "Success"
-            ; _type= "coinbase_inc" } ] )
+            ; _type= "coinbase_inc"
+            ; target= None } ] )
     ~actual:
       ( List.map (Option.value_exn block.block).transactions ~f:(fun txn ->
             txn.operations )
       |> List.join )
     ~situation:"block"
 
-let construction_api_payment_through_mempool ~logger ~rosetta_uri
-    ~graphql_uri:_ ~network_response =
+let direct_graphql_payment_through_block ~logger ~rosetta_uri ~graphql_uri
+    ~network_response =
+  let open Deferred.Result.Let_syntax in
+  (* Unlock the account *)
+  let%bind _ = Poke.Account.unlock ~graphql_uri in
+  (* Send a payment *)
+  let%bind hash =
+    Poke.SendTransaction.payment ~fee:(`Int 2_000_000_000)
+      ~amount:(`Int 5_000_000_000) ~to_:(`String other_pk) ~graphql_uri ()
+  in
+  verify_in_mempool_and_block ~logger ~rosetta_uri ~graphql_uri ~txn_hash:hash
+    ~network_response
+    ~operation_expectations:
+      Operation_expectation.
+        [ { amount= Some (-5_000_000_000)
+          ; account=
+              Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
+          ; status= "Pending"
+          ; _type= "payment_source_dec"
+          ; target= None }
+        ; { amount= Some (-2_000_000_000)
+          ; account=
+              Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
+          ; status= "Pending"
+          ; _type= "fee_payer_dec"
+          ; target= None }
+        ; { amount= Some 5_000_000_000
+          ; account=
+              Some {Account.pk= other_pk; token_id= Unsigned.UInt64.of_int 1}
+          ; status= "Pending"
+          ; _type= "payment_receiver_inc"
+          ; target= None } ]
+
+let direct_graphql_delegation_through_block ~logger ~rosetta_uri ~graphql_uri
+    ~network_response =
+  let open Deferred.Result.Let_syntax in
+  (* Unlock the account *)
+  let%bind _ = Poke.Account.unlock ~graphql_uri in
+  (* Delegate stake *)
+  let%bind hash =
+    Poke.SendTransaction.delegation ~fee:(`Int 2_000_000_000)
+      ~to_:(`String other_pk) ~graphql_uri ()
+  in
+  verify_in_mempool_and_block ~logger ~rosetta_uri ~graphql_uri ~txn_hash:hash
+    ~network_response
+    ~operation_expectations:
+      Operation_expectation.
+        [ { amount= Some (-2_000_000_000)
+          ; account=
+              Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
+          ; status= "Pending"
+          ; _type= "fee_payer_dec"
+          ; target= None }
+        ; { amount= None
+          ; account=
+              Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
+          ; status= "Pending"
+          ; _type= "delegate_change"
+          ; target= Some other_pk } ]
+
+let construction_api_transaction_through_mempool ~logger ~rosetta_uri
+    ~graphql_uri ~network_response ~operation_expectations ~operations =
   let open Deferred.Result.Let_syntax in
   let keys =
     Signer.Keys.of_private_key_box
@@ -180,12 +218,7 @@ let construction_api_payment_through_mempool ~logger ~rosetta_uri
     Offline.Derive.req ~logger ~rosetta_uri ~network_response
       ~public_key_hex_bytes:keys.public_key_hex_bytes
   in
-  let operations =
-    Poke.SendTransaction.payment_operations ~from:derive_res.address
-      ~fee:(Unsigned.UInt64.of_int 3_000_000_000)
-      ~amount:(Unsigned.UInt64.of_int 10_000_000_000)
-      ~to_:other_pk
-  in
+  let operations = operations derive_res.address in
   let%bind preprocess_res =
     Offline.Preprocess.req ~logger ~rosetta_uri ~network_response
       ~max_fee:(Unsigned.UInt64.of_int 100_000_000_000)
@@ -202,23 +235,115 @@ let construction_api_payment_through_mempool ~logger ~rosetta_uri
     Offline.Payloads.req ~logger ~rosetta_uri ~network_response ~operations
       ~metadata:metadata_res.metadata
   in
-  let%bind parse_res =
+  let%bind payloads_parse_res =
     Offline.Parse.req ~logger ~rosetta_uri ~network_response
       ~transaction:
         (`Unsigned
           payloads_res.Construction_payloads_response.unsigned_transaction)
   in
-  if not ([%equal: Operation.t list] operations parse_res.operations) then (
+  if not ([%equal: Operation.t list] operations payloads_parse_res.operations)
+  then (
     [%log debug]
       ~metadata:
         [ ("expected", [%to_yojson: Operation.t list] operations)
-        ; ("actual", [%to_yojson: Operation.t list] parse_res.operations) ]
+        ; ( "actual"
+          , [%to_yojson: Operation.t list] payloads_parse_res.operations ) ]
       "Construction_parse : Expected $expected, after payloads+parse $actual" ;
     failwith "Operations are not equal before and after payloads+parse" ) ;
-  return ()
+  let%bind signature =
+    Signer.sign ~keys
+      ~unsigned_transaction_string:payloads_res.unsigned_transaction
+    |> Deferred.return
+  in
+  let%bind combine_res =
+    Offline.Combine.req ~logger ~rosetta_uri ~network_response ~signature
+      ~unsigned_transaction:payloads_res.unsigned_transaction
+      ~public_key_hex_bytes:keys.public_key_hex_bytes
+      ~address:derive_res.address
+  in
+  let%bind combine_parse_res =
+    Offline.Parse.req ~logger ~rosetta_uri ~network_response
+      ~transaction:
+        (`Signed combine_res.Construction_combine_response.signed_transaction)
+  in
+  if not ([%equal: Operation.t list] operations combine_parse_res.operations)
+  then (
+    [%log debug]
+      ~metadata:
+        [ ("expected", [%to_yojson: Operation.t list] operations)
+        ; ( "actual"
+          , [%to_yojson: Operation.t list] combine_parse_res.operations ) ]
+      "Construction_combine : Expected $expected, after combine+parse $actual" ;
+    failwith "Operations are not equal before and after combine+parse" ) ;
+  let%bind hash_res =
+    Offline.Hash.req ~logger ~rosetta_uri ~network_response
+      ~signed_transaction:combine_res.signed_transaction
+  in
+  let%bind submit_res =
+    Peek.Construction.submit ~logger ~rosetta_uri ~network_response
+      ~signed_transaction:combine_res.signed_transaction
+  in
+  assert (
+    String.equal hash_res.Construction_hash_response.transaction_hash
+      submit_res.transaction_identifier.hash ) ;
+  [%log debug] "Construction_submit is finalized" ;
+  verify_in_mempool_and_block ~logger ~rosetta_uri ~graphql_uri
+    ~txn_hash:hash_res.transaction_hash ~network_response
+    ~operation_expectations
 
-(* TODO: Break up this function in the next PR *)
-let check_new_account_payment ~logger ~rosetta_uri ~graphql_uri =
+let construction_api_payment_through_mempool =
+  construction_api_transaction_through_mempool
+    ~operations:(fun address ->
+      Poke.SendTransaction.payment_operations ~from:address
+        ~fee:(Unsigned.UInt64.of_int 3_000_000_000)
+        ~amount:(Unsigned.UInt64.of_int 10_000_000_000)
+        ~to_:other_pk )
+    ~operation_expectations:
+      Operation_expectation.
+        [ { amount= Some (-10_000_000_000)
+          ; account=
+              Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
+          ; status= "Pending"
+          ; _type= "payment_source_dec"
+          ; target= None }
+        ; { amount= Some (-3_000_000_000)
+          ; account=
+              Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
+          ; status= "Pending"
+          ; _type= "fee_payer_dec"
+          ; target= None }
+        ; { amount= Some 10_000_000_000
+          ; account=
+              Some {Account.pk= other_pk; token_id= Unsigned.UInt64.of_int 1}
+          ; status= "Pending"
+          ; _type= "payment_receiver_inc"
+          ; target= None } ]
+
+let construction_api_delegation_through_mempool =
+  construction_api_transaction_through_mempool
+    ~operations:(fun address ->
+      Poke.SendTransaction.delegation_operations ~from:address
+        ~fee:(Unsigned.UInt64.of_int 5_000_000_000)
+        ~to_:other_pk )
+    ~operation_expectations:
+      Operation_expectation.
+        [ { amount= Some (-5_000_000_000)
+          ; account=
+              Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
+          ; status= "Pending"
+          ; _type= "fee_payer_dec"
+          ; target= None }
+        ; { amount= None
+          ; account=
+              Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
+          ; status= "Pending"
+          ; _type= "delegate_change"
+          ; target= Some other_pk } ]
+
+(* for each possible user command, run the command via GraphQL, check that
+    the command is in the transaction pool
+*)
+let check_new_account_user_commands ~logger ~rosetta_uri ~graphql_uri =
   let open Core.Time in
   let open Deferred.Result.Let_syntax in
   (* Stop staking so we can rely on things being in the mempool *)
@@ -250,22 +375,51 @@ let check_new_account_payment ~logger ~rosetta_uri ~graphql_uri =
     direct_graphql_payment_through_block ~logger ~rosetta_uri ~graphql_uri
       ~network_response
   in
+  [%log info] "Created payment and waited" ;
   (* Stop staking so we can rely on things being in the mempool again *)
   let%bind _res = Poke.Staking.disable ~graphql_uri in
   (* Follow the full construction API flow and make sure the submitted
-       * transaction appears in the mempool *)
+   * transaction appears in the mempool *)
   let%bind () =
     construction_api_payment_through_mempool ~logger ~rosetta_uri ~graphql_uri
       ~network_response
   in
+  [%log info] "Created construction payment and waited" ;
+  (* Stop staking so we can rely on things being in the mempool again *)
+  let%bind _res = Poke.Staking.disable ~graphql_uri in
+  let%bind () =
+    direct_graphql_delegation_through_block ~logger ~rosetta_uri ~graphql_uri
+      ~network_response
+  in
+  [%log info] "Created graphql delegation and waited" ;
+  (* Stop staking *)
+  let%bind _res = Poke.Staking.disable ~graphql_uri in
+  let%bind () =
+    construction_api_delegation_through_mempool ~logger ~rosetta_uri
+      ~graphql_uri ~network_response
+  in
+  [%log info] "Created construction delegation and waited" ;
   (* Succeed! (for now) *)
   return ()
 
-let run ~logger ~rosetta_uri ~graphql_uri =
+let run ~logger ~rosetta_uri ~graphql_uri ~don't_exit =
+  let open Core.Time in
   let open Deferred.Result.Let_syntax in
-  let%bind () = check_new_account_payment ~logger ~rosetta_uri ~graphql_uri in
+  let%bind () =
+    check_new_account_user_commands ~logger ~rosetta_uri ~graphql_uri
+  in
   [%log info] "Finished running test-agent" ;
-  return ()
+  if don't_exit then (
+    let%bind _res = Poke.Staking.enable ~graphql_uri in
+    [%log info] "Running forever with more blocks" ;
+    let rec go () =
+      let%bind () = wait (Span.of_sec 1.0) in
+      go ()
+    in
+    go () )
+  else (
+    [%log info] "Exiting" ;
+    return () )
 
 let command =
   let open Command.Let_syntax in
@@ -280,13 +434,16 @@ let command =
       no_arg
   and log_level =
     flag "log-level" ~doc:"Set log level (default: Info)" Cli.log_level
+  and don't_exit =
+    flag "dont-exit" ~doc:"Don't exit after tests finish (default: do exit)"
+      no_arg
   in
   let open Deferred.Let_syntax in
   fun () ->
     let logger = Logger.create () in
     Cli.logger_setup log_json log_level ;
     [%log info] "Rosetta test-agent starting" ;
-    match%bind run ~logger ~rosetta_uri ~graphql_uri with
+    match%bind run ~logger ~rosetta_uri ~graphql_uri ~don't_exit with
     | Ok () ->
         [%log info] "Rosetta test-agent stopping successfully" ;
         return ()

@@ -4,6 +4,7 @@
   (preprocess (pps ppx_coda ppx_version ppx_jane ppx_deriving.std ppx_deriving_yojson))
   (libraries
     composition_types
+    pickles_base
 
     zexe_backend
     pickles_types
