@@ -144,6 +144,7 @@ let run_test () : unit Deferred.t =
       in
       let client_port = 8123 in
       let libp2p_port = 8002 in
+      let chain_id = "bogus chain id for testing" in
       let gossip_net_params =
         Gossip_net.Libp2p.Config.
           { timeout= Time.Span.of_sec 3.
@@ -152,7 +153,7 @@ let run_test () : unit Deferred.t =
           ; unsafe_no_trust_ip= true
           ; gossip_type= `Gossipsub
           ; conf_dir= temp_conf_dir
-          ; chain_id= "bogus chain id for testing"
+          ; chain_id
           ; addrs_and_ports=
               { external_ip= Unix.Inet_addr.localhost
               ; bind_ip= Unix.Inet_addr.localhost
@@ -193,7 +194,7 @@ let run_test () : unit Deferred.t =
       let%bind coda =
         Coda_lib.create
           (Coda_lib.Config.make ~logger ~pids ~trust_system ~net_config
-             ~coinbase_receiver:`Producer ~conf_dir:temp_conf_dir
+             ~chain_id ~coinbase_receiver:`Producer ~conf_dir:temp_conf_dir
              ~gossip_net_params ~is_seed:true ~disable_telemetry:true
              ~initial_protocol_version:Protocol_version.zero
              ~proposed_protocol_version_opt:None
