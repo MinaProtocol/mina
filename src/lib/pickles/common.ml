@@ -207,3 +207,44 @@ let tick_public_input_of_statement ~max_branching
 
 let index_commitment_length k =
   Int.round_up ~to_multiple_of:crs_max_degree (Domain.size k) / crs_max_degree
+
+
+  module Sqrt_witness = struct
+    type t = Field.Constant.t * Field.Constant.t * int
+  
+    module Checked = struct
+      type t = Field.Constant.t * Field.t * Boolean.var list
+    end
+    
+    let typ : (Checked.t, t) = Typ.tuple3 Field.typ Field.typ (Typ.list ~length:64 Boolean.typ)
+  end
+
+
+
+  
+  let det_sqrt x =
+    let (res, c, c_witness, d) = exists Sqrt_witness.typ ~compute:(fun () -> 
+    let res = det_sqrt(x) in
+    let (c,d, c_witness) = witness_det_sqrt(res) in
+    (res, c, c_witness, d)
+    ) in
+    assert_r1cs res res x ; (* assert it's a square root *)  
+    assert_r1cs  (compute_det_sqrt k x (c, c_witness, d)) Field.one  res; (*  Check c_witness and d *)
+
+(*let res = sqrt x in
+let exponent = pow 2 k in 
+let t_component = Field.Constant.pow res exponent in
+let c =  Field.Constant.pow t_component two_adicity_inv in 
+let 2_to_k_component = Field.Constant.( * ) (Field.Constant.invert c) res in
+*)
+
+let compute_det_sqrt k x (c, c_witness, d) =
+  let rec pow2pow acc i =
+    if i = 0 then acc else pow2pow Field.(acc * acc) (i - 1)
+  in
+  Field.Assert.equal (pow2pow c_witness k) c ;
+  let result = Field.( * ) (pow domain_generator d) c in
+  assert_r1cs result result x ;
+  Boolean.Assert.(equal false_ d.(0));
+  result
+

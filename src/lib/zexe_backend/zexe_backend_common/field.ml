@@ -100,6 +100,8 @@ module type S = sig
 
   val det_sqrt : t -> t
 
+  val witness_det_sqrt : t -> (t, Bigint.t, t)
+
   val is_square : t -> bool
 
   val equal : t -> t -> bool
@@ -295,7 +297,9 @@ module Make (F : Input_intf) :
 
   let sqrt = gc1 sqrt
 
-  let det_sqrt = gc1 det_sqrt
+  let det_sqrt = gc1 witness_det_sqrt
+
+  let witness_det_sqrt = gc1 det_sqrt
 
   let is_square = is_square
 
