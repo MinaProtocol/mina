@@ -141,6 +141,12 @@ module Partial = struct
               {delegator= source_pk; new_delegate= receiver_pk}
           in
           Result.return @@ User_command.Payload.Body.Stake_delegation payload
+      | `Create_token ->
+          let payload =
+            { Coda_base.New_token_payload.token_owner_pk= receiver_pk
+            ; disable_new_accounts= false }
+          in
+          Result.return @@ User_command.Payload.Body.Create_new_token payload
       | _ ->
           Result.fail (Errors.create `Unsupported_operation_for_construction)
     in
@@ -183,6 +189,9 @@ let of_operations (ops : Operation.t list) :
     List.find ops ~f:(fun op -> String.equal op.Operation._type name)
     |> Result.of_option ~error:[Partial.Reason.Can't_find_kind name]
   in
+  let module V = Validation in
+  let open V.Let_syntax in
+  let open Partial.Reason in
   (* For a payment we demand:
     *
     * ops = length exactly 3
@@ -192,9 +201,6 @@ let of_operations (ops : Operation.t list) :
     * payment_receiver_inc with account 'b, some amount 'x, status="Pending"
   *)
   let payment =
-    let open Validation.Let_syntax in
-    let open Partial.Reason in
-    let module V = Validation in
     let%map () =
       if Int.equal (List.length ops) 3 then V.return ()
       else V.fail Length_mismatch
@@ -278,9 +284,6 @@ let of_operations (ops : Operation.t list) :
     * delegate_change with account 'a, metadata:{delegate_change_target:'b}, status="Pending"
   *)
   let delegation =
-    let open Validation.Let_syntax in
-    let open Partial.Reason in
-    let module V = Validation in
     let%map () =
       if Int.equal (List.length ops) 2 then V.return ()
       else V.fail Length_mismatch
@@ -336,15 +339,74 @@ let of_operations (ops : Operation.t list) :
     ; fee= Unsigned.UInt64.of_string payment_amount_y.Amount.value
     ; amount= None }
   in
-  match (payment, delegation) with
-  | Ok _, Error _ ->
+  (* For token creation, we demand:
+    *
+    * ops = length exactly 2
+    *
+    * fee_payer_dec with account 'a, some amount 'y, status="Pending"
+    * create_token with account=None, status="Pending"
+  *)
+  let create_token =
+    let%map () =
+      if Int.equal (List.length ops) 2 then V.return ()
+      else V.fail Length_mismatch
+    and account_a =
+      let open Result.Let_syntax in
+      let%bind {account; _} = find_kind `Fee_payer_dec ops in
+      Option.value_map account ~default:(V.fail Account_not_some) ~f:V.return
+    and fee_token =
+      let open Result.Let_syntax in
+      let%bind {account; _} = find_kind `Fee_payer_dec ops in
+      match account with
+      | Some account -> (
+        match token_id_of_account account with
+        | Some token_id ->
+            V.return token_id
+        | None ->
+            V.fail Incorrect_token_id )
+      | None ->
+          V.fail Account_not_some
+    and () =
+      if List.for_all ops ~f:(fun op -> String.equal op.status "Pending") then
+        V.return ()
+      else V.fail Status_not_pending
+    and payment_amount_y =
+      let open Result.Let_syntax in
+      let%bind {amount; _} = find_kind `Fee_payer_dec ops in
+      match amount with
+      | Some x ->
+          V.return (Amount_of.negated x)
+      | None ->
+          V.fail Amount_not_some
+    (* distinguish create token ops from delegation ops *)
+    and () =
+      match find_kind `Delegate_change ops with
+      | Ok _ ->
+          V.fail Invalid_metadata
+      | Error _ ->
+          V.return ()
+    in
+    { Partial.kind= `Create_token
+    ; fee_payer= `Pk account_a.address
+    ; source= `Pk account_a.address
+    ; receiver= `Pk account_a.address (* reviewer: is this sane? *)
+    ; fee_token
+    ; token= Token_id.(default |> to_uint64)
+    ; fee= Unsigned.UInt64.of_string payment_amount_y.Amount.value
+    ; amount= None }
+  in
+  match (payment, delegation, create_token) with
+  | Ok _, Error _, Error _ ->
       payment
-  | Error _, Ok _ ->
+  | Error _, Ok _, Error _ ->
       delegation
-  | Ok _, Ok _ ->
-      failwith "Operations can't represent both a payment and delegation"
-  | Error payment_errs, Error delegation_errs ->
-      Error (payment_errs @ delegation_errs)
+  | Error _, Error _, Ok _ ->
+      create_token
+  | Error err1, Error err2, Error err3 ->
+      Error (err1 @ err2 @ err3)
+  | _ ->
+      failwith
+        "A sequence of operations must represent exactly one user command"
 
 let to_operations ~failure_status (t : Partial.t) : Operation.t list =
   (* First build a plan. The plan specifies all operations ahead of time so

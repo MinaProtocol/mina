@@ -39,7 +39,7 @@ let make = () => {
             {React.string("Button Label")}
             <Icon kind=Icon.ArrowRightMedium />
           </Button>
-          <Button bgColor=Theme.Colors.mint>
+          <Button bgColor=Theme.Colors.mint dark=true>
             {React.string("Button label ")}
             <Icon kind=Icon.ArrowRightMedium />
           </Button>

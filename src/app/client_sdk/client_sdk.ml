@@ -200,13 +200,15 @@ let _ =
          | Ok
              { random_oracle_input= _
              ; payment= Some payment
-             ; stake_delegation= None } ->
+             ; stake_delegation= None
+             ; create_token= None } ->
              let command = Transaction.Unsigned.of_rendered_payment payment in
              make_signed_transaction command payment.nonce
          | Ok
              { random_oracle_input= _
              ; payment= None
-             ; stake_delegation= Some delegation } ->
+             ; stake_delegation= Some delegation
+             ; create_token= None } ->
              let command =
                Transaction.Unsigned.of_rendered_delegation delegation
              in
