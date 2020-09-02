@@ -285,6 +285,18 @@ let construction_api_transaction_through_mempool ~logger ~rosetta_uri
     Offline.Hash.req ~logger ~rosetta_uri ~network_response
       ~signed_transaction:combine_res.signed_transaction
   in
+  let%bind verified_bool =
+    Signer.verify ~public_key_hex_bytes:keys.public_key_hex_bytes
+      ~signed_transaction_string:combine_res.signed_transaction
+    |> Deferred.return
+  in
+  let%bind () =
+    if verified_bool then return ()
+    else
+      Deferred.Result.fail
+        (Errors.create ~context:"Bad signature created during construction"
+           `Invariant_violation)
+  in
   let%bind submit_res =
     Peek.Construction.submit ~logger ~rosetta_uri ~network_response
       ~signed_transaction:combine_res.signed_transaction
