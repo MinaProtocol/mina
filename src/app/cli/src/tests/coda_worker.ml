@@ -545,8 +545,8 @@ module T = struct
           let coda_deferred () =
             Coda_lib.create
               (Coda_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
-                 ~is_seed ~disable_telemetry:true ~coinbase_receiver:`Producer
-                 ~net_config ~gossip_net_params
+                 ~chain_id ~is_seed ~disable_telemetry:true
+                 ~coinbase_receiver:`Producer ~net_config ~gossip_net_params
                  ~initial_protocol_version:Protocol_version.zero
                  ~proposed_protocol_version_opt:None
                  ~work_selection_method:
