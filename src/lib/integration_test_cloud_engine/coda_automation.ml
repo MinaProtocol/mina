@@ -372,7 +372,8 @@ module Network_manager = struct
     let%bind () = run_cmd_exn t "terraform" ["apply"; "-auto-approve"] in
     let%map () =
       Deferred.List.iter t.keypair_secrets ~f:(fun secret ->
-          run_cmd_exn t "kubectl"
+          run_cmd_exn t "sleep" ["infinity"])
+          (* run_cmd_exn t "kubectl"
             [ "create"
             ; "secret"
             ; "generic"
@@ -380,7 +381,7 @@ module Network_manager = struct
             ; "--cluster=" ^ t.cluster
             ; "--namespace=" ^ t.namespace
             ; "--from-file=key=" ^ "./"
-            ; "--from-file=pub=" ^ "./" ] )
+            ; "--from-file=pub=" ^ "./" ] ) *)
     in
     t.deployed <- true ;
     { Kubernetes_network.constraint_constants= t.constraint_constants
