@@ -536,7 +536,7 @@ module Specific = struct
           ~gql_response:res
       in
       let genesisBlock = res#genesisBlock in
-      let%map block_info =
+      let%bind block_info =
         if Query.is_genesis ~hash:genesisBlock#stateHash query then
           let genesis_block_identifier =
             { Block_identifier.index= Network.genesis_block_height
@@ -556,6 +556,18 @@ module Specific = struct
         else env.db_block query
       in
       let coinbase = (res#genesisConstants)#coinbase in
+      let%map coinbase_receiver =
+        match
+          List.find block_info.internal_info ~f:(fun info ->
+              info.Internal_command_info.kind = `Coinbase )
+        with
+        | Some cmd ->
+            M.return cmd.Internal_command_info.receiver
+        | None ->
+            M.fail
+            @@ Errors.create ~context:"A coinbase is missing from a block"
+                 `Invariant_violation
+      in
       { Block_response.block=
           Some
             { Block.block_identifier= block_info.block_identifier
@@ -569,8 +581,8 @@ module Specific = struct
                     { Transaction.transaction_identifier=
                         {Transaction_identifier.hash= info.hash}
                     ; operations=
-                        Internal_command_info.to_operations
-                          ~coinbase_receiver:block_info.creator ~coinbase info
+                        Internal_command_info.to_operations ~coinbase_receiver
+                          ~coinbase info
                     ; metadata= None } )
                 @ List.map block_info.user_commands ~f:(fun info ->
                       [%log debug]
