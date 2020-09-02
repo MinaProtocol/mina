@@ -33,11 +33,16 @@ module Pair (P : Prefix) (Elt : Type) (F : Ctypes.FOREIGN) = struct
 
   let f i = foreign (prefix i) (typ @-> returning Elt.typ)
 
-  let make = foreign (prefix "make") (Elt.typ @-> Elt.typ @-> returning typ)
-
   let f0 = f "0"
 
   let f1 = f "1"
+end
+
+module Pair_with_make (P : Prefix) (Elt : Type) (F : Ctypes.FOREIGN) = struct
+  open F
+  include Pair (P) (Elt) (F)
+
+  let make = foreign (prefix "make") (Elt.typ @-> Elt.typ @-> returning typ)
 end
 
 module Bigint (P : Prefix) (F : Ctypes.FOREIGN) = struct
@@ -339,8 +344,6 @@ struct
 
   let metadata s = foreign (prefix s) (typ @-> returning size_t)
 
-  let num_variables = metadata "num_variables"
-
   let public_inputs = metadata "public_inputs"
 end
 
@@ -409,7 +412,7 @@ struct
     end
 
     module Pair = struct
-      module T = Pair (Prefix) (T) (F)
+      module T = Pair_with_make (Prefix) (T) (F)
       include T
 
       module Vector =
@@ -1605,21 +1608,15 @@ module Full (F : Ctypes.FOREIGN) = struct
         (Field_urs)
         (F)
 
-    module Field_verifier_index = struct
-      include PlonkVerifierIndex (struct
-                  let prefix = with_prefix (P.prefix "verifier_index")
-                end)
-                (Field_index)
-                (Field_urs)
-                (Field_poly_comm)
-                (Field)
-                (F)
-
-      open F
-
-      let read =
-        foreign (prefix "read") (Field_urs.typ @-> string @-> returning typ)
-    end
+    module Field_verifier_index =
+      PlonkVerifierIndex (struct
+          let prefix = with_prefix (P.prefix "verifier_index")
+        end)
+        (Field_index)
+        (Field_urs)
+        (Field_poly_comm)
+        (Field)
+        (F)
 
     module Field_proof =
       Dlog_plonk_proof (struct
@@ -1676,14 +1673,14 @@ module Full (F : Ctypes.FOREIGN) = struct
           (Fq)
           (F)
 
-      include Dlog_proof_system (Field) (Curve)
-
       module Plonk =
         Plonk_dlog_proof_system (struct
             let prefix = with_prefix (prefix "plonk_fq")
           end)
           (Field)
           (Curve)
+
+      include Dlog_proof_system (Field) (Curve)
     end
 
     module Dee = struct
@@ -1697,14 +1694,14 @@ module Full (F : Ctypes.FOREIGN) = struct
           (Fp)
           (F)
 
-      include Dlog_proof_system (Field) (Curve)
-
       module Plonk =
         Plonk_dlog_proof_system (struct
             let prefix = with_prefix (prefix "plonk_fp")
           end)
           (Field)
           (Curve)
+
+      include Dlog_proof_system (Field) (Curve)
     end
 
     module Endo = struct

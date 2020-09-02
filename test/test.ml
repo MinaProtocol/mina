@@ -3,7 +3,7 @@ open Snarky_bn382
 let () =
   let () =
     Format.printf "Testing Bigint@." ;
-    let open Bigint in
+    let open Bigint384 in
     Format.printf "%i limbs of %i bytes@." (num_limbs ()) (bytes_per_limb ()) ;
     Format.printf "x = parse \"1\"@." ;
     let x = of_decimal_string "1" in
@@ -54,15 +54,15 @@ let () =
     Format.printf "size(bits): %i@." (size_in_bits ()) ;
     Format.printf "size:@." ;
     let s = size () in
-    Bigint.print s ;
+    Bigint384.print s ;
     let s_ = of_bigint s in
     print s_ ;
     Format.printf "x = of_int 1@." ;
-    let x = of_int 1 in
+    let x = of_int (Unsigned.UInt64.of_int 1) in
     print x ;
     Format.printf "is_square x = %b@." (is_square x) ;
     Format.printf "y = of_int 1@." ;
-    let y = of_int 2 in
+    let y = of_int (Unsigned.UInt64.of_int 2) in
     print y ;
     Format.printf "is_square y = %b@." (is_square y) ;
     Format.printf "z = random ()@." ;
@@ -108,11 +108,11 @@ let () =
     print h ;
     Format.printf "i = to_bigint a@." ;
     let i = to_bigint a in
-    Bigint.print i ;
+    Bigint384.print i ;
     Format.printf "j = of_bigint i@." ;
     let j = of_bigint i in
     print j ;
-    List.iter Bigint.delete [i; s] ;
+    List.iter Bigint384.delete [i; s] ;
     List.iter delete [x; y; z; a; b; c; d; e; f; g; h; j; s_]
   in
   let () =
@@ -121,15 +121,15 @@ let () =
     Format.printf "size(bits): %i@." (size_in_bits ()) ;
     Format.printf "size:@." ;
     let s = size () in
-    Bigint.print s ;
+    Bigint384.print s ;
     let s_ = of_bigint s in
     print s_ ;
     Format.printf "x = of_int 1@." ;
-    let x = of_int 1 in
+    let x = of_int (Unsigned.UInt64.of_int 1) in
     print x ;
     Format.printf "is_square x = %b@." (is_square x) ;
     Format.printf "y = of_int 1@." ;
-    let y = of_int 2 in
+    let y = of_int (Unsigned.UInt64.of_int 2) in
     print y ;
     Format.printf "is_square y = %b@." (is_square y) ;
     Format.printf "z = random ()@." ;
@@ -175,11 +175,11 @@ let () =
     print h ;
     Format.printf "i = to_bigint a@." ;
     let i = to_bigint a in
-    Bigint.print i ;
+    Bigint384.print i ;
     Format.printf "j = of_bigint i@." ;
     let j = of_bigint i in
     print j ;
-    List.iter Bigint.delete [i; s] ;
+    List.iter Bigint384.delete [i; s] ;
     List.iter delete [x; y; z; a; b; c; d; e; f; g; h; j; s_]
   in
   ()
