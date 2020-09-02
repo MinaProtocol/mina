@@ -9,32 +9,9 @@ module Colors = {
 };
 
 module Typeface = {
-  let _ = {
-    [
-      fontFace(
-        ~fontFamily="Monument Grotesk",
-        ~src=[
-          `url("fonts/IBMPlexSans-Regular-Latin1.woff2"),
-          `url("fonts/IBMPlexSans-Regular-Latin1.woff"),
-        ],
-        ~fontStyle=`normal,
-        ~fontWeight=`normal,
-        (),
-      ),
-      fontFace(
-        ~fontFamily="Monument Grotesk mono",
-        ~src=[
-          `url("fonts/IBMPlexSans-Regular-Latin1.woff2"),
-          `url("fonts/IBMPlexSans-Regular-Latin1.woff"),
-        ],
-        ~fontStyle=`normal,
-        ~fontWeight=`normal,
-        (),
-      ),
-    ];
-  };
   let monumentGrotesk = fontFamily("Monument Grotesk, serif");
   let monumentGroteskMono = fontFamily("Monument Grotesk mono, serif");
+  let ibmplexsans = fontFamily("IBM Plex Sans, sans-serif");
 };
 
 module MediaQuery = {
