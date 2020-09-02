@@ -52,6 +52,7 @@ module Constraint_constants = struct
         ; transaction_capacity_log_2: int
         ; pending_coinbase_depth: int
         ; coinbase_amount: Currency.Amount.Stable.V1.t
+        ; supercharged_coinbase_factor: int
         ; account_creation_fee: Currency.Fee.Stable.V1.t }
       [@@deriving sexp, eq, yojson]
 
@@ -136,6 +137,8 @@ module Constraint_constants = struct
 
         [%%endif]
 
+        let supercharged_coinbase_factor = 2 (*TODO: in mlh files*)
+
         let pending_coinbase_depth =
           Core_kernel.Int.ceil_log2
             (((transaction_capacity_log_2 + 1) * (work_delay + 1)) + 1)
@@ -149,6 +152,7 @@ module Constraint_constants = struct
           ; pending_coinbase_depth
           ; coinbase_amount=
               Currency.Amount.of_formatted_string coinbase_amount_string
+          ; supercharged_coinbase_factor
           ; account_creation_fee=
               Currency.Fee.of_formatted_string account_creation_fee_string }
       end :

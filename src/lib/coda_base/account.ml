@@ -410,6 +410,40 @@ let create_time_locked public_key balance ~initial_minimum_balance ~cliff_time
     ~vesting_period:Global_slot.(succ zero)
     ~vesting_increment:initial_minimum_balance
 
+let min_balance_at_slot ~txn_global_slot ~cliff_time ~vesting_period
+    ~vesting_increment ~initial_minimum_balance =
+  let open Unsigned in
+  if Global_slot.(txn_global_slot < cliff_time) then initial_minimum_balance
+  else
+    (* take advantage of fact that global slots are uint32's *)
+    let num_periods =
+      UInt32.(
+        Infix.((txn_global_slot - cliff_time) / vesting_period)
+        |> to_int64 |> UInt64.of_int64)
+    in
+    let min_balance_decrement =
+      UInt64.Infix.(num_periods * Amount.to_uint64 vesting_increment)
+      |> Amount.of_uint64
+    in
+    match Balance.(initial_minimum_balance - min_balance_decrement) with
+    | None ->
+        Balance.zero
+    | Some amt ->
+        amt
+
+let has_locked_tokens ~txn_global_slot (account : t) =
+  match account.timing with
+  | Untimed ->
+      false
+  | Timed
+      {initial_minimum_balance; cliff_time; vesting_period; vesting_increment}
+    ->
+      let curr_min_balance =
+        min_balance_at_slot ~txn_global_slot ~cliff_time ~vesting_period
+          ~vesting_increment ~initial_minimum_balance
+      in
+      Balance.(curr_min_balance > zero)
+
 let gen =
   let open Quickcheck.Let_syntax in
   let%bind public_key = Public_key.Compressed.gen in

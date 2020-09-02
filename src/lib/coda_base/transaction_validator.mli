@@ -18,6 +18,12 @@ val apply_transaction :
   -> Transaction.t
   -> User_command_status.t Or_error.t
 
+val has_locked_tokens :
+     txn_global_slot:Coda_numbers.Global_slot.t
+  -> account_id:Account_id.t
+  -> Hashless_ledger.t
+  -> bool Or_error.t
+
 module For_tests : sig
   open Currency
   open Coda_numbers

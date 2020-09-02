@@ -179,6 +179,12 @@ val undo :
   -> Undo.t
   -> unit Or_error.t
 
+val has_locked_tokens :
+     txn_global_slot:Coda_numbers.Global_slot.t
+  -> account_id:Account_id.t
+  -> t
+  -> bool Or_error.t
+
 val merkle_root_after_user_command_exn :
      constraint_constants:Genesis_constants.Constraint_constants.t
   -> txn_global_slot:Coda_numbers.Global_slot.t
