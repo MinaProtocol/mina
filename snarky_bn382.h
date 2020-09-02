@@ -1234,7 +1234,7 @@ void *zexe_tweedle_plonk_fp_proof_make(
     void *sg,
 
     void *evals0,
-    void *evals1)
+    void *evals1);
 
 void *zexe_tweedle_plonk_fp_proof_delete(void *);
 
@@ -1434,7 +1434,7 @@ void zexe_tweedle_plonk_fp_circuit_gate_vector_delete(void *);
 void *zexe_tweedle_plonk_fp_constraint_system_create(void *, size_t);
 void zexe_tweedle_plonk_fp_constraint_system_delete(void *);
 
-// Fp index stubs
+// Fq index stubs
 size_t zexe_tweedle_plonk_fq_index_domain_d1_size(void *);
 size_t zexe_tweedle_plonk_fq_index_domain_d4_size(void *);
 size_t zexe_tweedle_plonk_fq_index_domain_d8_size(void *);
@@ -1445,7 +1445,7 @@ void zexe_tweedle_plonk_fq_index_delete(void *);
 size_t zexe_tweedle_plonk_fq_index_max_degree(void *);
 size_t zexe_tweedle_plonk_fq_index_public_inputs(void *);
 
-// Fp verifier index stubs
+// Fq verifier index stubs
 void *zexe_tweedle_plonk_fq_verifier_index_create(void *);
 
 void *zexe_tweedle_plonk_fq_verifier_index_urs(void *);
@@ -1498,7 +1498,7 @@ void *zexe_tweedle_plonk_fq_verifier_index_emul3_comm(void *);
 void *zexe_tweedle_plonk_fq_verifier_index_r(void *);
 void *zexe_tweedle_plonk_fq_verifier_index_o(void *);
 
-// Fp proof
+// Fq proof
 void *zexe_tweedle_plonk_fq_proof_create(
     void *index,
     void *primary_input,
@@ -1524,7 +1524,7 @@ void *zexe_tweedle_plonk_fq_proof_make(
     void *sg,
 
     void *evals0,
-    void *evals1)
+    void *evals1);
 
 void *zexe_tweedle_plonk_fq_proof_delete(void *);
 
@@ -1536,7 +1536,7 @@ void *zexe_tweedle_plonk_fq_proof_t_comm(void *);
 void *zexe_tweedle_plonk_fq_proof_proof(void *);
 void *zexe_tweedle_plonk_fq_proof_evals_nocopy(void *);
 
-// Fp proof vector
+// Fq proof vector
 
 void *zexe_tweedle_plonk_fq_proof_vector_create(void);
 int *zexe_tweedle_plonk_fq_proof_vector_length(void *);
@@ -1544,7 +1544,7 @@ void zexe_tweedle_plonk_fq_proof_vector_emplace_back(void *v, void *x);
 void *zexe_tweedle_plonk_fq_proof_vector_get(void *v, void *i);
 void zexe_tweedle_plonk_fq_proof_vector_delete(void *);
 
-// Fp opening proof
+// Fq opening proof
 void zexe_tweedle_plonk_fq_opening_proof_delete(void *);
 
 void *zexe_tweedle_plonk_fq_opening_proof_sg(void *);
@@ -1553,7 +1553,7 @@ void *zexe_tweedle_plonk_fq_opening_proof_z1(void *);
 void *zexe_tweedle_plonk_fq_opening_proof_z2(void *);
 void *zexe_tweedle_plonk_fq_opening_proof_delta(void *);
 
-// Fp proof evaluations
+// Fq proof evaluations
 
 void *zexe_tweedle_plonk_fq_proof_evaluations_l(void *);
 void *zexe_tweedle_plonk_fq_proof_evaluations_r(void *);
@@ -1577,7 +1577,7 @@ void *zexe_tweedle_plonk_fq_proof_evaluations_make(
 void *zexe_tweedle_plonk_fq_proof_evaluations_pair_0(void *);
 void *zexe_tweedle_plonk_fq_proof_evaluations_pair_1(void *);
 
-// Fp oracles
+// Fq oracles
 
 void *zexe_tweedle_plonk_fq_oracles_create(void *index, void *proof);
 
@@ -1593,7 +1593,7 @@ void *zexe_tweedle_plonk_fq_oracles_u(void *);
 
 void zexe_tweedle_plonk_fq_oracles_delete(void *);
 
-// Fp circuit gate vector
+// Fq circuit gate vector
 void *zexe_tweedle_plonk_fq_circuit_gate_vector_create(void);
 
 int zexe_tweedle_plonk_fq_circuit_gate_vector_length(void *);
@@ -1720,6 +1720,6 @@ void zexe_tweedle_plonk_fq_circuit_gate_vector_push_endomul4(
 
 void zexe_tweedle_plonk_fq_circuit_gate_vector_delete(void *);
 
-// Fp constraint system
+// Fq constraint system
 void *zexe_tweedle_plonk_fq_constraint_system_create(void *, size_t);
 void zexe_tweedle_plonk_fq_constraint_system_delete(void *);
