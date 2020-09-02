@@ -7,7 +7,7 @@ module Stable : sig
   module V1 : sig
     type t =
       {fee: Currency.Fee.Stable.V1.t; prover: Public_key.Compressed.Stable.V1.t}
-    [@@deriving bin_io, sexp, yojson, version]
+    [@@deriving bin_io, sexp, yojson, version, compare]
   end
 
   module Latest = V1
@@ -15,12 +15,12 @@ end
 
 type t = Stable.Latest.t =
   {fee: Currency.Fee.Stable.V1.t; prover: Public_key.Compressed.Stable.V1.t}
-[@@deriving sexp, yojson]
+[@@deriving sexp, yojson, compare]
 
 val create : fee:Currency.Fee.t -> prover:Public_key.Compressed.t -> t
 
 module Digest : sig
-  type t [@@deriving sexp, eq, yojson]
+  type t [@@deriving sexp, eq, yojson, compare]
 
   module Stable : sig
     module V1 : sig

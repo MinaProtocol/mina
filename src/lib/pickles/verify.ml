@@ -7,13 +7,32 @@ open Types
 open Backend
 open Tuple_lib
 
-let verify (type a n) (module Max_branching : Nat.Intf with type n = n)
+module Instance = struct
+  type t =
+    | T :
+        (module Nat.Intf with type n = 'n)
+        * (module Intf.Statement_value with type t = 'a)
+        * Verification_key.t
+        * 'a
+        * ('n, 'n) Proof.t
+        -> t
+end
+
+(*
+let verify (type a n) 
+    (module Max_branching : Nat.Intf with type n = n)
     (module A_value : Intf.Statement_value with type t = a)
-    (key : Verification_key.t) (ts : (A_value.t * (n, n) Proof.t) list) =
+    (key : Verification_key.t) 
+    (ts : (A_value.t * (n, n) Proof.t) list) =
+*)
+
+let verify_heterogenous (ts : Instance.t list) =
   let module Marlin = Types.Dlog_based.Proof_state.Deferred_values.Marlin in
+  (*
   let module Max_local_max_branching = Max_branching in
   let module Max_branching_vec = Vector.With_length (Max_branching) in
   let module MLMB_vec = Vector.With_length (Max_local_max_branching) in
+*)
   let module Tick_field = Backend.Tick.Field in
   let tick_field : _ Marlin_checks.field = (module Tick_field) in
   let check, result =
@@ -31,11 +50,17 @@ let verify (type a n) (module Max_branching : Nat.Intf with type n = n)
   in
   let _finalized =
     List.iter ts
-      ~f:(fun ( app_state
-              , T
-                  { statement
-                  ; prev_x_hat= (x_hat_beta_1, _, _) as prev_x_hat
-                  ; prev_evals= evals } )
+      ~f:(fun (T
+                ( _
+                (* (module Max_branching) *)
+                , _
+                (* (module A_value) *)
+                , key
+                , app_state
+                , T
+                    { statement
+                    ; prev_x_hat= (x_hat_beta_1, _, _) as prev_x_hat
+                    ; prev_evals= evals } ))
          ->
         Timer.start __LOC__ ;
         let statement =
@@ -139,7 +164,7 @@ let verify (type a n) (module Max_branching : Nat.Intf with type n = n)
       check
         ( lazy "batch_step_dlog_check"
         , Ipa.Step.accumulator_check
-            (List.map ts ~f:(fun (_, T t) ->
+            (List.map ts ~f:(fun (T (_, _, _, _, T t)) ->
                  ( t.statement.proof_state.me_only.sg
                  , Ipa.Step.compute_challenges
                      t.statement.proof_state.deferred_values
@@ -148,7 +173,16 @@ let verify (type a n) (module Max_branching : Nat.Intf with type n = n)
       check
         ( lazy "dlog_check"
         , batch_verify
-            (List.map ts ~f:(fun (app_state, T t) ->
+            (List.map ts
+               ~f:(fun (T
+                         ( ( module
+                         Max_branching )
+                         , ( module
+                         A_value )
+                         , key
+                         , app_state
+                         , T t ))
+                  ->
                  let prepared_statement : _ Types.Dlog_based.Statement.t =
                    { pass_through=
                        Common.hash_pairing_me_only
@@ -166,7 +200,8 @@ let verify (type a n) (module Max_branching : Nat.Intf with type n = n)
                  let input =
                    tock_unpadded_public_input_of_statement prepared_statement
                  in
-                 ( t.proof
+                 ( key.index
+                 , t.proof
                  , input
                  , Some
                      (Vector.to_list
@@ -180,11 +215,17 @@ let verify (type a n) (module Max_branching : Nat.Intf with type n = n)
                               Max_branching.n
                               (Lazy.force Dummy.Ipa.Wrap.sg))
                            t.statement.proof_state.me_only
-                             .old_bulletproof_challenges)) ) ))
-            key.index ) ) ;
+                             .old_bulletproof_challenges)) ) )) ) ) ;
   match result () with
   | Ok () ->
       true
   | Error e ->
       eprintf !"bad verify: %s\n%!" e ;
       false
+
+let verify (type a n) (max_branching : (module Nat.Intf with type n = n))
+    (a_value : (module Intf.Statement_value with type t = a))
+    (key : Verification_key.t) (ts : (a * (n, n) Proof.t) list) =
+  verify_heterogenous
+    (List.map ts ~f:(fun (x, p) ->
+         Instance.T (max_branching, a_value, key, x, p) ))

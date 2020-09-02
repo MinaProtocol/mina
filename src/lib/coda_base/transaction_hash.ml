@@ -27,14 +27,14 @@ let of_yojson = function
   | _ ->
       Error "Transaction_hash.of_yojson: Expected a string"
 
-let hash_user_command = Fn.compose digest_string User_command.to_base58_check
+let hash_command = Fn.compose digest_string Command_transaction.to_base58_check
 
 let hash_fee_transfer =
   Fn.compose digest_string Fee_transfer.Single.to_base58_check
 
 let hash_coinbase = Fn.compose digest_string Coinbase.to_base58_check
 
-module User_command_with_valid_signature = struct
+module Command_transaction_with_valid_signature = struct
   type hash = T.t [@@deriving sexp, compare, hash]
 
   let hash_to_yojson = to_yojson
@@ -45,7 +45,7 @@ module User_command_with_valid_signature = struct
   module Stable = struct
     module V1 = struct
       type t =
-        ( (User_command.With_valid_signature.Stable.V1.t[@hash.ignore])
+        ( (Command_transaction.Valid.Stable.V1.t[@hash.ignore])
         , (T.Stable.V1.t[@to_yojson hash_to_yojson]) )
         With_hash.Stable.V1.t
       [@@deriving sexp, hash, to_yojson]
@@ -59,17 +59,53 @@ module User_command_with_valid_signature = struct
     end
   end]
 
-  let create (uc : User_command.With_valid_signature.t) : t =
-    {data= uc; hash= hash_user_command (User_command.forget_check uc)}
+  let create (c : Command_transaction.Valid.t) : t =
+    {data= c; hash= hash_command (Command_transaction.forget_check c)}
 
   let data ({data; _} : t) = data
 
-  let command ({data; _} : t) = User_command.forget_check data
+  let command ({data; _} : t) = Command_transaction.forget_check data
 
   let hash ({hash; _} : t) = hash
 
   let forget_check ({data; hash} : t) =
-    {With_hash.data= User_command.forget_check data; hash}
+    {With_hash.data= Command_transaction.forget_check data; hash}
+
+  include Comparable.Make (Stable.Latest)
+end
+
+module Command_transaction = struct
+  type hash = T.t [@@deriving sexp, compare, hash]
+
+  let hash_to_yojson = to_yojson
+
+  let hash_of_yojson = of_yojson
+
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t =
+        ( (Command_transaction.Stable.V1.t[@hash.ignore])
+        , (T.Stable.V1.t[@to_yojson hash_to_yojson]) )
+        With_hash.Stable.V1.t
+      [@@deriving sexp, hash, to_yojson]
+
+      let to_latest = Fn.id
+
+      (* Compare only on hashes, comparing on the data too would be slower and
+         add no value.
+      *)
+      let compare (x : t) (y : t) = T.compare x.hash y.hash
+    end
+  end]
+
+  let create (c : Command_transaction.t) : t = {data= c; hash= hash_command c}
+
+  let data ({data; _} : t) = data
+
+  let command ({data; _} : t) = data
+
+  let hash ({hash; _} : t) = hash
 
   include Comparable.Make (Stable.Latest)
 end

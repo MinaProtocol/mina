@@ -7,8 +7,8 @@ module Stable = struct
       | Proof of Pickles.Side_loaded.Proof.Stable.V1.t
       | Signature of Signature.Stable.V1.t
       | Both of
-          { signature: Pickles.Side_loaded.Proof.Stable.V1.t
-          ; proof: Signature.Stable.V1.t }
+          { signature: Signature.Stable.V1.t
+          ; proof: Pickles.Side_loaded.Proof.Stable.V1.t }
       | None_given
     [@@deriving sexp, eq, yojson, hash, compare]
 

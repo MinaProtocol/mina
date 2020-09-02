@@ -655,6 +655,8 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
 end
 
 module Side_loaded = struct
+  module V = Verification_key
+
   module Verification_key = struct
     include Side_loaded_verification_key
 
@@ -701,6 +703,44 @@ module Side_loaded = struct
       end
     end]
   end
+
+  let verify (type t) ~(value_to_field_elements : t -> _)
+      (ts : (Verification_key.t * t * Proof.t) list) =
+    let m =
+      ( module struct
+        type nonrec t = t
+
+        let to_field_elements = value_to_field_elements
+      end
+      : Intf.Statement_value
+        with type t = t )
+    in
+    (* TODO: This should be the actual max width on a per proof basis *)
+    let max_branching =
+      (module Verification_key.Max_width
+      : Nat.Intf
+        with type n = Verification_key.Max_width.n )
+    in
+    with_return (fun {return} ->
+        List.map ts ~f:(fun (vk, x, p) ->
+            let vk : V.t =
+              { commitments=
+                  Matrix_evals.map ~f:(Abc.map ~f:Array.of_list) vk.wrap_index
+              ; step_domains=
+                  Array.map (At_most.to_array vk.step_data) ~f:(fun (d, w) ->
+                      failwith "TODO" )
+              ; index=
+                  (match vk.wrap_vk with None -> return false | Some x -> x)
+              ; data=
+                  (* This isn't used in verify_heterogeneous, so we can leave this dummy *)
+                  { variables= 0
+                  ; public_inputs= 0
+                  ; constraints= 0
+                  ; nonzero_entries= 0
+                  ; max_degree= 0 } }
+            in
+            Verify.Instance.T (max_branching, m, vk, x, p) )
+        |> Verify.verify_heterogenous )
 end
 
 let compile

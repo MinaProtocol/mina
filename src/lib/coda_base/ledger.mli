@@ -165,7 +165,7 @@ module Undo : sig
   type t = Undo.t = {previous_hash: Ledger_hash.t; varying: Varying.t}
   [@@deriving sexp]
 
-  val transaction : t -> Transaction.t With_status.t Or_error.t
+  val transaction : t -> Transaction.t With_status.t
 
   val user_command_status : t -> User_command_status.t
 end

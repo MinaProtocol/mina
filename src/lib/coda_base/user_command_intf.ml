@@ -180,6 +180,11 @@ module type S = sig
 
   val check : t -> With_valid_signature.t option
 
+  val to_valid_unsafe :
+       t
+    -> [ `If_this_is_used_it_should_have_a_comment_justifying_it of
+         With_valid_signature.t ]
+
   (** Forget the signature check. *)
   val forget_check : With_valid_signature.t -> t
 

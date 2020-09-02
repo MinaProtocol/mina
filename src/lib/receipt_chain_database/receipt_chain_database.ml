@@ -152,7 +152,7 @@ let%test_module "receipt_database" =
           (Array.init 5 ~f:(fun (_ : int) -> Signature_lib.Keypair.create ()))
         ~max_amount:10000 ~max_fee:1000 ()
 
-    let ucs = List.map ~f:(fun x -> Command_transaction.User_command x)
+    let ucs = List.map ~f:(fun x -> Command_transaction.Poly.User_command x)
 
     (* HACK: Limited tirals because tests were taking too long *)
     let%test_unit "Recording a sequence of user commands can generate a valid \

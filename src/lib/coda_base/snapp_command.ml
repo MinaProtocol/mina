@@ -36,88 +36,6 @@ let typ_optional typ ~default =
    If the fee payer is `Other { pk; _ }, this account should in fact
    be distinct from the other accounts.  *)
 
-(*
-module Per_account = struct
-  module Poly = struct
-    [%%versioned
-    module Stable = struct
-      module V1 = struct
-        type ('field, 'pk) t =
-          {state: 'field Snapp_state.Stable.V1.t; delegate: 'pk}
-        [@@deriving compare, eq, sexp, hash, yojson, hlist]
-      end
-    end]
-  end
-
-  type ('field, 'pk) t_ = {state: 'field Snapp_state.t; delegate: 'pk}
-
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type t =
-        ( F.Stable.V1.t Set_or_keep.Stable.V1.t
-        , Public_key.Compressed.Stable.V1.t Set_or_keep.Stable.V1.t )
-        Poly.Stable.V1.t
-      [@@deriving compare, eq, sexp, hash, yojson]
-
-      let to_latest = Fn.id
-    end
-  end]
-
-  let to_input ({state; delegate} : t) =
-    let open Random_oracle_input in
-    List.reduce_exn ~f:append
-      ( List.map (Vector.to_list state)
-          ~f:(Set_or_keep.to_input ~dummy:F.zero ~f:field)
-      @ [ Set_or_keep.to_input
-            ~dummy:(Lazy.force invalid_public_key)
-            ~f:Public_key.Compressed.to_input delegate ] )
-
-  module Checked = struct
-    type t =
-      ( Field.Var.t Set_or_keep.Checked.t
-      , Public_key.Compressed.var Set_or_keep.Checked.t )
-      Poly.Stable.Latest.t
-
-    let to_input ({state; delegate} : t) =
-      let open Random_oracle_input in
-      List.reduce_exn ~f:append
-        ( List.map (Vector.to_list state)
-            ~f:(Set_or_keep.Checked.to_input ~f:field)
-        @ [ Set_or_keep.Checked.to_input
-              ~f:Public_key.Compressed.Checked.to_input delegate ] )
-  end
-
-  let dummy : t  =
-    { state= Vector.init Snapp_state.Max_state_size.n
-          ~f:(fun _ -> Set_or_keep.Keep)
-    ; delegate= Keep
-    }
-
-  let typ () : (Checked.t, t) Typ.t =
-    let open Poly.Stable.Latest in
-    Typ.of_hlistable
-      [ Snapp_state.typ (Set_or_keep.Checked.typ ~dummy:Field.zero Field.typ)
-      ; Set_or_keep.typ
-          ~dummy:(Lazy.force invalid_public_key)
-          Public_key.Compressed.typ ]
-      ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
-      ~value_of_hlist:of_hlist
-end
-
-*)
-
-(*
-module Fee_payment = struct
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type 'a t = {fee: Fee.Stable.V1.t; payer: 'a}
-      [@@deriving sexp, eq, yojson, hash, compare]
-    end
-  end]
-end *)
-
 module Party = struct
   module Update = struct
     module Poly = struct
@@ -466,6 +384,10 @@ module Stable = struct
     [@@deriving sexp, eq, yojson, hash, compare]
 
     let to_latest = Fn.id
+
+    let description = "Snapp command"
+
+    let version_byte = Base58_check.Version_bytes.snapp_command
   end
 end]
 
@@ -510,6 +432,27 @@ let fee_token (t : t) : Token_id.t =
   | Signed_empty r ->
       f r
 
+let check_tokens (t : t) =
+  let f (r : _ Inner.t) =
+    let valid x = not (Token_id.(equal invalid) x) in
+    Option.value_map r.fee_payment ~default:true ~f:(fun x ->
+        valid x.payload.token_id )
+    && valid r.token_id
+  in
+  match t with
+  | Proved_empty r ->
+      f r
+  | Proved_signed r ->
+      f r
+  | Proved_proved r ->
+      f r
+  | Signed_signed r ->
+      f r
+  | Signed_empty r ->
+      f r
+
+(* TODO: Add unit test that this never throws on a value which passes
+   "check" *)
 let native_excess_exn (t : t) =
   let open Party in
   let f1
@@ -547,8 +490,51 @@ let native_excess_exn (t : t) =
   | Signed_empty r ->
       f1 r
 
+let fee_payer (t : t) =
+  let f (r : _ Inner.t) =
+    match r.fee_payment with
+    | Some p ->
+        Account_id.create p.payload.pk p.payload.token_id
+    | None ->
+        let id, _ = native_excess_exn t in
+        id
+  in
+  match t with
+  | Proved_empty r ->
+      f r
+  | Proved_signed r ->
+      f r
+  | Proved_proved r ->
+      f r
+  | Signed_signed r ->
+      f r
+  | Signed_empty r ->
+      f r
+
+let fee_exn (t : t) =
+  let f (r : _ Inner.t) =
+    let _, e = native_excess_exn t in
+    match r.fee_payment with
+    | Some p ->
+        p.payload.fee
+    | None ->
+        Amount.to_fee e
+  in
+  match t with
+  | Proved_empty r ->
+      f r
+  | Proved_signed r ->
+      f r
+  | Proved_proved r ->
+      f r
+  | Signed_signed r ->
+      f r
+  | Signed_empty r ->
+      f r
+
 let native_excess t = Option.try_with (fun () -> native_excess_exn t)
 
+(* TODO: Make sure this matches the snark. I don't think it does right now. *)
 let fee_excess (t : t) : Fee_excess.t Or_error.t =
   let opt =
     Option.value_map ~f:Or_error.return ~default:(Or_error.error_string "None")
@@ -950,6 +936,62 @@ module Payload = struct
         Two_proved {r with one= s r.one; two= s r.two}
 end
 
+(* In order to be compatible with the transaction pool (where transactions are stored in
+   order according to the nonce of the fee payer) we maintain the invariant that
+   one must be able to unambiguously determine the nonce of the fee payer of a snapp
+   command. *)
+let nonce (t : t) =
+  let open Party in
+  let module E = struct
+    type t =
+      | T :
+          ((Body.t, 'p) Predicated.Poly.t, _) Authorized.Poly.t
+          * ('p -> Account_nonce.t option)
+          -> t
+  end in
+  let open E in
+  let f (T (p, nonce)) =
+    match p.data.body.delta.sgn with
+    | Pos ->
+        None
+    | Neg ->
+        nonce p.data.predicate
+  in
+  let pred (p : Predicate.t) =
+    match p.self_predicate.nonce with
+    | Ignore ->
+        None
+    | Check {lower; upper} ->
+        if Account_nonce.equal lower upper then Some lower else None
+  in
+  let p x = T (x, pred) in
+  let n x = T (x, Option.return) in
+  let nonce (r : _ Inner.t) xs =
+    match r.fee_payment with
+    | Some x ->
+        Some x.payload.nonce
+    | None ->
+        List.find_map ~f xs
+  in
+  match t with
+  | Proved_proved r ->
+      nonce r [p r.one; p r.two]
+  | Proved_signed r ->
+      nonce r [p r.one; n r.two]
+  | Proved_empty r ->
+      nonce r [p r.one]
+  | Signed_signed r ->
+      nonce r [n r.one; n r.two]
+  | Signed_empty r ->
+      nonce r [n r.one]
+
+let nonce_invariant t =
+  match nonce t with
+  | None ->
+      Or_error.error_string "Cannot determine nonce"
+  | Some _ ->
+      Ok ()
+
 (* Check that the deltas are consistent with each other. *)
 (* TODO: Check that predicates are consistent. *)
 (* TODO: Check the predicates that can be checked (e.g., on fee_payment) *)
@@ -962,6 +1004,7 @@ let check (t : t) : unit Or_error.t =
   in
   let open Or_error.Let_syntax in
   let open Party in
+  let%bind () = nonce_invariant t in
   let fee_checks ~excess ~token_id ~(fee_payment : Other_fee_payer.t option) =
     match fee_payment with
     | None ->
@@ -1113,3 +1156,8 @@ let to_payload (t : t) : Payload.t =
         ; other_fee_payer_opt=
             Option.map fee_payment ~f:(fun {payload; signature= _} -> payload)
         }
+
+module Base58_check = Codable.Make_base58_check (Stable.Latest)
+
+[%%define_locally
+Base58_check.(to_base58_check, of_base58_check, of_base58_check_exn)]

@@ -114,7 +114,7 @@ val hash : t -> Staged_ledger_hash.Aux_hash.t
 val target_merkle_root : t -> Frozen_ledger_hash.t option
 
 (** All the transactions in the order in which they were applied*)
-val staged_transactions : t -> Transaction.t With_status.t list Or_error.t
+val staged_transactions : t -> Transaction.t With_status.t list
 
 (** All the transactions with parent protocol state of the block in which they were included in the order in which they were applied*)
 val staged_transactions_with_protocol_states :

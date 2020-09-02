@@ -29,6 +29,8 @@ module Make
     | Add_solved_work of Work.t * Ledger_proof.t One_or_two.t Priced_proof.t
   [@@deriving compare, sexp, to_yojson]
 
+  type verified = t [@@deriving compare, sexp, to_yojson]
+
   type rejected = Rejected.t [@@deriving sexp, yojson]
 
   type compact =
@@ -64,8 +66,13 @@ module Make
       , {proof= res.proofs; fee= {fee= res.spec.fee; prover= res.prover}} )
 
   let verify pool
-      ({data= Add_solved_work (work, p); sender} : t Envelope.Incoming.t) =
-    Pool.verify_and_act pool ~work:(work, p) ~sender
+      ({data= Add_solved_work (work, p); sender} as t : t Envelope.Incoming.t)
+      =
+    match%map Pool.verify_and_act pool ~work:(work, p) ~sender with
+    | false ->
+        None
+    | true ->
+        Some t
 
   (* This is called after verification has occurred. *)
   let unsafe_apply (pool : Pool.t) (t : t Envelope.Incoming.t) =

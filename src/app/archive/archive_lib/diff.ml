@@ -56,13 +56,12 @@ module Builder = struct
     let ((block, _) as validated_block) =
       Breadcrumb.validated_transition breadcrumb
     in
-    let user_commands =
-      External_transition.Validated.user_commands validated_block
-    in
+    let commands = External_transition.Validated.commands validated_block in
     let sender_receipt_chains_from_parent_ledger =
       let senders =
-        user_commands
-        |> List.map ~f:(fun {data; _} -> User_command.fee_payer data)
+        commands
+        |> List.map ~f:(fun {data; _} ->
+               Command_transaction.(fee_payer (forget_check data)) )
         |> Account_id.Set.of_list
       in
       let ledger =

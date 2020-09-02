@@ -124,7 +124,7 @@ let blockchain_length = lift External_transition.Validated.blockchain_length
 
 let block_producer = lift External_transition.Validated.block_producer
 
-let user_commands = lift External_transition.Validated.user_commands
+let commands = lift External_transition.Validated.commands
 
 let payments = lift External_transition.Validated.payments
 

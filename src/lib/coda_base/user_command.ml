@@ -355,6 +355,9 @@ module With_valid_signature = struct
   include Comparable.Make (Stable.Latest)
 end
 
+let to_valid_unsafe t =
+  `If_this_is_used_it_should_have_a_comment_justifying_it t
+
 module Base58_check = Codable.Make_base58_check (Stable.Latest)
 
 [%%define_locally

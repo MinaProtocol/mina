@@ -15,6 +15,13 @@ let create ~logger:_ ~proof_level ~pids:_ ~conf_dir:_ =
 
 let verify_blockchain_snark _ _ = Deferred.Or_error.return true
 
+let verify_commands _ (cs : Command_transaction.Verifiable.t list) :
+    (Command_transaction.Valid.t list, Verification_failure.t) Result.t
+    Deferred.Or_error.t =
+  Or_error.try_with (fun () -> Common.check_exn cs)
+  |> Result.map_error ~f:(fun e -> Verification_failure.Verification_failed e)
+  |> Deferred.Or_error.return
+
 let verify_transaction_snarks _ ts =
   (*Don't check if the proof has default sok becasue they were probably not
   intended to be checked. If it has something value then check that against the

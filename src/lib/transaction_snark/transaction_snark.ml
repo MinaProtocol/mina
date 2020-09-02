@@ -2789,7 +2789,7 @@ module type S = sig
     -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
     -> next_available_token_before:Token_id.t
     -> next_available_token_after:Token_id.t
-    -> Transaction.t Transaction_protocol_state.t
+    -> Transaction.Valid.t Transaction_protocol_state.t
     -> Tick.Handler.t
     -> t
 
@@ -2855,8 +2855,8 @@ let check_transaction_union ?(preeval = false) ~constraint_constants
 let check_transaction ?preeval ~constraint_constants ~sok_message ~source
     ~target ~init_stack ~pending_coinbase_stack_state
     ~next_available_token_before ~next_available_token_after
-    (transaction_in_block : Transaction.t Transaction_protocol_state.t) handler
-    =
+    (transaction_in_block : Transaction.Valid.t Transaction_protocol_state.t)
+    handler =
   let transaction =
     Transaction_protocol_state.transaction transaction_in_block
   in
@@ -2866,7 +2866,7 @@ let check_transaction ?preeval ~constraint_constants ~sok_message ~source
   check_transaction_union ?preeval ~constraint_constants sok_message source
     target init_stack pending_coinbase_stack_state next_available_token_before
     next_available_token_after
-    (Transaction_union.of_transaction transaction)
+    (Transaction_union.of_transaction (transaction :> Transaction.t))
     state_body handler
 
 let check_user_command ~constraint_constants ~sok_message ~source ~target
@@ -2911,15 +2911,16 @@ let generate_transaction_union_witness ?(preeval = false) ~constraint_constants
 let generate_transaction_witness ?preeval ~constraint_constants ~sok_message
     ~source ~target ~init_stack ~pending_coinbase_stack_state
     ~next_available_token_before ~next_available_token_after
-    (transaction_in_block : Transaction.t Transaction_protocol_state.t) handler
-    =
+    (transaction_in_block : Transaction.Valid.t Transaction_protocol_state.t)
+    handler =
   let transaction =
     Transaction_protocol_state.transaction transaction_in_block
   in
   generate_transaction_union_witness ?preeval ~constraint_constants sok_message
     source target
     { transaction_in_block with
-      transaction= Transaction_union.of_transaction transaction }
+      transaction=
+        Transaction_union.of_transaction (transaction :> Transaction.t) }
     init_stack next_available_token_before next_available_token_after
     pending_coinbase_stack_state handler
 
@@ -2979,7 +2980,7 @@ module Make () = struct
   let of_transaction ~sok_digest ~source ~target ~init_stack
       ~pending_coinbase_stack_state ~next_available_token_before
       ~next_available_token_after transaction_in_block handler =
-    let transaction =
+    let transaction : Transaction.Valid.t =
       Transaction_protocol_state.transaction transaction_in_block
     in
     let state_body =
@@ -2988,7 +2989,7 @@ module Make () = struct
     of_transaction_union sok_digest source target ~init_stack
       ~pending_coinbase_stack_state ~next_available_token_before
       ~next_available_token_after
-      (Transaction_union.of_transaction transaction)
+      (Transaction_union.of_transaction (transaction :> Transaction.t))
       state_body handler
 
   let of_user_command ~sok_digest ~source ~target ~init_stack
@@ -3156,8 +3157,8 @@ let%test_module "transaction_snark" =
 
     let state_body_hash = Coda_state.Protocol_state.Body.hash state_body
 
-    let pending_coinbase_stack_target (t : Transaction.t) state_body_hash stack
-        =
+    let pending_coinbase_stack_target (t : Transaction.Valid.t) state_body_hash
+        stack =
       let stack_with_state =
         Pending_coinbase.Stack.(push_state state_body_hash stack)
       in
@@ -3172,7 +3173,8 @@ let%test_module "transaction_snark" =
       let acc = Ledger.get ledger loc |> Option.value_exn in
       [%test_eq: Balance.t] acc.balance (Balance.of_int balance)
 
-    let of_user_command' sok_digest ledger user_command init_stack
+    let of_user_command' sok_digest ledger
+        (user_command : User_command.With_valid_signature.t) init_stack
         pending_coinbase_stack_state state_body handler =
       let source = Ledger.merkle_root ledger in
       let current_global_slot =
@@ -3388,8 +3390,8 @@ let%test_module "transaction_snark" =
           Pending_coinbase.Stack.push_state state_body_hash
             pending_coinbase_stack
         in
-        match txn with
-        | Transaction.Command (User_command uc) ->
+        match (txn : Transaction.Valid.t) with
+        | Command (User_command uc) ->
             ( User_command.accounts_accessed ~next_available_token
                 (uc :> User_command.t)
             , pending_coinbase_stack )
@@ -3402,7 +3404,9 @@ let%test_module "transaction_snark" =
             , Pending_coinbase.Stack.push_coinbase cb pending_coinbase_stack )
       in
       let signer =
-        let txn_union = Transaction_union.of_transaction txn in
+        let txn_union =
+          Transaction_union.of_transaction (txn :> Transaction.t)
+        in
         txn_union.signer |> Public_key.compress
       in
       let sparse_ledger =
@@ -3411,7 +3415,8 @@ let%test_module "transaction_snark" =
       let _undo =
         Or_error.ok_exn
         @@ Ledger.apply_transaction ledger ~constraint_constants
-             ~txn_state_view txn
+             ~txn_state_view
+             (txn :> Transaction.t)
       in
       let target = Ledger.merkle_root ledger in
       let sok_message = Sok_message.create ~fee:Fee.zero ~prover:signer in

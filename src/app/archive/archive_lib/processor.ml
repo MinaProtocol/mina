@@ -390,7 +390,7 @@ module User_command = struct
 
   let add_if_doesn't_exist (module Conn : CONNECTION) (t : User_command.t) =
     let open Deferred.Result.Let_syntax in
-    let transaction_hash = Transaction_hash.hash_user_command t in
+    let transaction_hash = Transaction_hash.hash_command (User_command t) in
     match%bind find (module Conn) ~transaction_hash with
     | Some user_command_id ->
         return user_command_id
@@ -743,10 +743,7 @@ module Block = struct
                   Coda_base.Transaction.Command
                     (User_command user_command_checked) } ->
                 let user_command =
-                  { Coda_base.With_status.status
-                  ; data=
-                      Coda_base.User_command.forget_check user_command_checked
-                  }
+                  {Coda_base.With_status.status; data= user_command_checked}
                 in
                 ( acc_snapp_commands
                 , user_command :: acc_user_commands

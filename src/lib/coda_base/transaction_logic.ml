@@ -231,7 +231,7 @@ module type S = sig
     type t = Undo.t = {previous_hash: Ledger_hash.t; varying: Varying.t}
     [@@deriving sexp]
 
-    val transaction : t -> Transaction.t With_status.t Or_error.t
+    val transaction : t -> Transaction.t With_status.t
 
     val user_command_status : t -> User_command_status.t
   end
@@ -417,25 +417,21 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
   module Undo = struct
     include Undo
 
-    let transaction : t -> Transaction.t With_status.t Or_error.t =
+    let transaction : t -> Transaction.t With_status.t =
      fun {varying; _} ->
       match varying with
       | Command (User_command uc) ->
-          With_status.map_result uc.common.user_command ~f:(fun cmd ->
-              Option.value_map ~default:(Or_error.error_string "Bad signature")
-                (UC.check cmd) ~f:(fun cmd ->
-                  Ok (Transaction.Command (User_command cmd)) ) )
+          With_status.map uc.common.user_command ~f:(fun cmd ->
+              Transaction.Command (Command_transaction.User_command cmd) )
       | Command (Snapp_command s) ->
-          With_status.map_result s.command ~f:(fun c ->
-              Ok (Transaction.Command (Snapp_command c)) )
+          With_status.map s.command ~f:(fun c ->
+              Transaction.Command (Command_transaction.Snapp_command c) )
       | Fee_transfer f ->
-          Ok
-            { data= Fee_transfer f.fee_transfer
-            ; status= Applied User_command_status.Auxiliary_data.empty }
+          { data= Fee_transfer f.fee_transfer
+          ; status= Applied User_command_status.Auxiliary_data.empty }
       | Coinbase c ->
-          Ok
-            { data= Coinbase c.coinbase
-            ; status= Applied User_command_status.Auxiliary_data.empty }
+          { data= Coinbase c.coinbase
+          ; status= Applied User_command_status.Auxiliary_data.empty }
 
     let user_command_status : t -> User_command_status.t =
      fun {varying; _} ->
@@ -1750,8 +1746,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           ( match t with
           | Command (User_command txn) ->
               Or_error.map
-                (apply_user_command ~constraint_constants ~txn_global_slot
-                   ledger txn) ~f:(fun undo ->
+                (apply_user_command_unchecked ~constraint_constants
+                   ~txn_global_slot ledger txn) ~f:(fun undo ->
                   Undo.Varying.Command (User_command undo) )
           | Command (Snapp_command txn) ->
               Or_error.map
