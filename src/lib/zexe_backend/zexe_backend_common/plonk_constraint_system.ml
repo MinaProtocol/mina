@@ -283,7 +283,6 @@ struct
         | `Var x1, `Constant -> add_generic_constraint sys (Fp.negate s1, x1) ~c:s2
         | `Constant, `Var x2 -> add_generic_constraint sys (Fp.negate s2, x2) ~c:s1
         | `Constant, `Constant -> assert Fp.(equal s1 s2)
-        | _, _ ->  ()
       )
 
     | Snarky_backendless.Constraint.Square (v1, v2) ->
@@ -294,7 +293,6 @@ struct
         | `Var x1, `Constant -> add_generic_constraint sys ~m:Fp.(s1 * s1) ~c:s2 (s1, x1) ~r:(s1, x1)
         | `Constant, `Var x2 -> add_generic_constraint sys (Fp.negate s2, x2) ~c:(Fp.square s1)
         | `Constant, `Constant -> assert Fp.(equal (square s1) s2)
-        | _, _ ->  ()
       )
 
     | Snarky_backendless.Constraint.R1CS (v1, v2, v3) ->
@@ -309,7 +307,6 @@ struct
         | `Constant, `Var x2, `Constant -> add_generic_constraint sys ~c:(Fp.negate s3) (Fp.(s1 * s2), x2)
         | `Constant, `Constant, `Var x3 -> add_generic_constraint sys ~c:Fp.(negate s1 * s2) (s3, x3)
         | `Constant, `Constant, `Constant -> assert Fp.(equal s3 Fp.(s1 * s2))
-        | _, _, _ ->  ()
       )
 
     | Plonk_constraint.T (Poseidon { start; state }) ->
