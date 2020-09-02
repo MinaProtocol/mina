@@ -513,6 +513,7 @@ void *zexe_bn382_fq_proof_evaluations_triple_1(void *);
 void *zexe_bn382_fq_proof_evaluations_triple_2(void *);
 
 // Fq opening proof
+void zexe_bn382_fq_opening_proof_delete(void *);
 void *zexe_bn382_fq_opening_proof_lr(void *);
 void *zexe_bn382_fq_opening_proof_z1(void *);
 void *zexe_bn382_fq_opening_proof_z2(void *);
@@ -824,6 +825,7 @@ void *zexe_tweedle_fq_proof_evaluations_triple_1(void *);
 void *zexe_tweedle_fq_proof_evaluations_triple_2(void *);
 
 // Fq opening proof
+void zexe_tweedle_fq_opening_proof_delete(void *);
 void *zexe_tweedle_fq_opening_proof_lr(void *);
 void *zexe_tweedle_fq_opening_proof_z1(void *);
 void *zexe_tweedle_fq_opening_proof_z2(void *);
@@ -1088,6 +1090,7 @@ void *zexe_tweedle_fp_proof_evaluations_triple_1(void *);
 void *zexe_tweedle_fp_proof_evaluations_triple_2(void *);
 
 // Fq opening proof
+void zexe_tweedle_fp_opening_proof_delete(void *);
 void *zexe_tweedle_fp_opening_proof_lr(void *);
 void *zexe_tweedle_fp_opening_proof_z1(void *);
 void *zexe_tweedle_fp_opening_proof_z2(void *);
@@ -1249,9 +1252,9 @@ void *zexe_tweedle_plonk_fp_proof_evals_nocopy(void *);
 // Fp proof vector
 
 void *zexe_tweedle_plonk_fp_proof_vector_create(void);
-int *zexe_tweedle_plonk_fp_proof_vector_length(void *);
+int zexe_tweedle_plonk_fp_proof_vector_length(void *);
 void zexe_tweedle_plonk_fp_proof_vector_emplace_back(void *v, void *x);
-void *zexe_tweedle_plonk_fp_proof_vector_get(void *v, void *i);
+void *zexe_tweedle_plonk_fp_proof_vector_get(void *v, int i);
 void zexe_tweedle_plonk_fp_proof_vector_delete(void *);
 
 // Fp opening proof
@@ -1539,9 +1542,9 @@ void *zexe_tweedle_plonk_fq_proof_evals_nocopy(void *);
 // Fq proof vector
 
 void *zexe_tweedle_plonk_fq_proof_vector_create(void);
-int *zexe_tweedle_plonk_fq_proof_vector_length(void *);
+int zexe_tweedle_plonk_fq_proof_vector_length(void *);
 void zexe_tweedle_plonk_fq_proof_vector_emplace_back(void *v, void *x);
-void *zexe_tweedle_plonk_fq_proof_vector_get(void *v, void *i);
+void *zexe_tweedle_plonk_fq_proof_vector_get(void *v, int i);
 void zexe_tweedle_plonk_fq_proof_vector_delete(void *);
 
 // Fq opening proof
