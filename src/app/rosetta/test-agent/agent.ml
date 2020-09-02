@@ -231,8 +231,10 @@ let direct_graphql_delegation_through_block ~logger ~rosetta_uri ~graphql_uri
               Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
           ; status= "Pending"
           ; _type= "delegate_change"
-          ; target= Some other_pk }
-        ; { amount= Some (-2_000_000_000)
+          ; target= Some other_pk } ]
+    ~plus_further_mempool_expecations:
+      Operation_expectation.
+        [ { amount= Some (-2_000_000_000)
           ; account=
               Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
           ; status= "Pending"
