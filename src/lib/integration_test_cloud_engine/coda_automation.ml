@@ -379,8 +379,8 @@ module Network_manager = struct
             ; secret
             ; "--cluster=" ^ t.cluster
             ; "--namespace=" ^ t.namespace
-            ; "--from-file=key=" ^ "."
-            ; "--from-file=pub=" ^ "." ] )
+            ; "--from-file=key=" ^ "./"
+            ; "--from-file=pub=" ^ "./" ] )
     in
     t.deployed <- true ;
     { Kubernetes_network.constraint_constants= t.constraint_constants
