@@ -50,7 +50,6 @@ type kind =
 let make = (~kind, ~size=1.5, ~currentColor="black") => {
   let iconSize = Js.Float.toString(size *. 16.) ++ "px";
   let sizeValue = Js.Float.toString(size *. 16.);
-
   <svg
     width=iconSize
     height=iconSize
