@@ -164,6 +164,8 @@ module FooterLinks = {
         ]),
       ]);
   };
+
+  // TODO: Add links to footer
   [@react.component]
   let make = () => {
     <div className=Styles.linksGrid>
