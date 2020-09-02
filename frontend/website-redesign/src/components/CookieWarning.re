@@ -89,6 +89,8 @@ module Styles = {
 
   let buttonIcon =
     style([display(`flex), alignItems(`center), marginLeft(`rem(0.5))]);
+
+  let privacyText = style([color(Theme.Colors.orange), cursor(`pointer)]);
 };
 
 [@react.component]
@@ -118,10 +120,7 @@ let make = () => {
         <span> {React.string(" Read our")} </span>
         //TODO: Link to privacy policy
         <Next.Link href="/">
-          <span
-            className=Css.(
-              style([color(Theme.Colors.orange), cursor(`pointer)])
-            )>
+          <span className=Styles.privacyText>
             {React.string(" privacy policy ")}
           </span>
         </Next.Link>
