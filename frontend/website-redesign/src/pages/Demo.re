@@ -5,7 +5,7 @@ module Styles = {
       marginLeft(`auto),
       marginRight(`auto),
       display(`flex),
-      width(`rem(50.)),
+      width(`percent(100.)),
       flexDirection(`column),
       justifyContent(`spaceBetween),
       alignContent(`spaceAround),
