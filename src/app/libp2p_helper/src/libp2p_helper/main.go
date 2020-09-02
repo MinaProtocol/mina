@@ -835,22 +835,24 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 	discovered := make(chan peer.AddrInfo)
 	app.P2p.DiscoveredPeers = discovered
 
+	validPeer := func(who peer.ID) bool {
+		return who.Validate() == nil && who != app.P2p.Me
+	}
+
 	foundPeer := func(who peer.ID) {
-		if who.Validate() == nil && who != app.P2p.Me {
-			addrs := app.P2p.Host.Peerstore().Addrs(who)
+		addrs := app.P2p.Host.Peerstore().Addrs(who)
 
-			if len(addrs) > 0 {
-				addrStrings := make([]string, len(addrs))
-				for i, a := range addrs {
-					addrStrings[i] = a.String()
-				}
-
-				app.writeMsg(discoveredPeerUpcall{
-					ID:     peer.IDB58Encode(who),
-					Addrs:  addrStrings,
-					Upcall: "discoveredPeer",
-				})
+		if len(addrs) > 0 {
+			addrStrings := make([]string, len(addrs))
+			for i, a := range addrs {
+				addrStrings[i] = a.String()
 			}
+
+			app.writeMsg(discoveredPeerUpcall{
+				ID:     peer.IDB58Encode(who),
+				Addrs:  addrStrings,
+				Upcall: "discoveredPeer",
+			})
 		}
 	}
 
@@ -864,8 +866,10 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 	// report local discovery peers
 	go func() {
 		for info := range l.FoundPeer {
-			app.P2p.Host.Peerstore().AddAddrs(info.ID, info.Addrs, peerstore.ConnectedAddrTTL)
-			foundPeer(info.ID)
+			if validPeer(info.ID) {
+				app.P2p.Host.Peerstore().AddAddrs(info.ID, info.Addrs, peerstore.ConnectedAddrTTL)
+				foundPeer(info.ID)
+			}
 		}
 	}()
 
@@ -881,7 +885,9 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 
 		for evt := range sub.Out() {
 			e := evt.(event.EvtPeerConnectednessChanged)
-			foundPeer(e.Peer)
+			if validPeer(e.Peer) {
+				foundPeer(e.Peer)
+			}
 		}
 	}()
 
