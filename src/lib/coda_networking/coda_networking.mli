@@ -8,6 +8,20 @@ open Network_peer
 
 exception No_initial_peers
 
+type Structured_log_events.t +=
+  | Block_received of {state_hash: State_hash.t; sender: Envelope.Sender.t}
+  | Snark_work_received of
+      { work: Snark_pool.Resource_pool.Diff.compact
+      ; sender: Envelope.Sender.t }
+  | Transactions_received of
+      { txns: Transaction_pool.Resource_pool.Diff.t
+      ; sender: Envelope.Sender.t }
+  | Gossip_new_state of {state_hash: State_hash.t}
+  | Gossip_transaction_pool_diff of
+      { txns: Transaction_pool.Resource_pool.Diff.t }
+  | Gossip_snark_pool_diff of {work: Snark_pool.Resource_pool.Diff.compact}
+  [@@deriving register_event]
+
 val refused_answer_query_string : string
 
 module Rpcs : sig
