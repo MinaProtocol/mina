@@ -62,7 +62,11 @@ end
 
 module Kind = struct
   type t =
-    [`Payment | `Delegation | `Create_token | `Create_account | `Mint_tokens]
+    [ `Payment
+    | `Delegation
+    | `Create_token
+    | `Create_token_account
+    | `Mint_tokens ]
   [@@deriving yojson, eq, sexp, compare]
 end
 
@@ -446,7 +450,7 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
         [{Op.label= `Delegate_change; related_to= None}]
     | `Create_token ->
         [{Op.label= `Create_token; related_to= None}]
-    | `Create_account ->
+    | `Create_token_account ->
         [] (* Covered by account creation fee *)
     | `Mint_tokens -> (
       (* When amount is not none, the amount goes to receiver's account *)
@@ -718,7 +722,7 @@ let dummies =
             (Account_creation_fees_paid.By_fee_payer
                (Unsigned.UInt64.of_int 3_000)))
     ; hash= "TXN_3b_HASH" }
-  ; { kind= `Create_account
+  ; { kind= `Create_token_account
     ; fee_payer= `Pk "Alice"
     ; source= `Pk "Alice"
     ; token= Unsigned.UInt64.of_int 1
