@@ -478,7 +478,10 @@ module Account = struct
           receipt_chain_hash a.receipt_chain_hash)
     in
     let%bind () =
-      Eq_data.(check ~label:"delegate" (Tc.public_key ()) delegate a.delegate)
+      let tc = Eq_data.Tc.public_key () in
+      Eq_data.(
+        check ~label:"delegate" tc delegate
+          (Option.value ~default:tc.default a.delegate))
     in
     let%bind () =
       Eq_data.(
