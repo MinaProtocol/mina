@@ -36,6 +36,10 @@ let make =
         sizes="16x16"
       />
       <link
+        href="/static/css/monument-grotesk.css"
+        rel="stylesheet"
+      />
+      <link
         href="https://cdn.jsdelivr.net/npm/@ibm/plex@4.0.2/css/ibm-plex.min.css"
         rel="stylesheet"
       />

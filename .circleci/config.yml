@@ -113,6 +113,7 @@ jobs:
             - run:
                   name: Set Up Database
                   command: |
+                    sudo apt-get update
                     sudo apt-get install -y postgresql
                     PGPASSWORD=codarules psql -h localhost -p 5432 -U admin -d archiver -a -f src/app/archive/create_schema.sql
             - run:
@@ -192,6 +193,7 @@ jobs:
             - run:
                   name: Set Up Database
                   command: |
+                    sudo apt-get update
                     sudo apt-get install -y postgresql
                     PGPASSWORD=codarules psql -h localhost -p 5432 -U admin -d archiver -a -f src/app/archive/create_schema.sql
             - run:
@@ -1200,8 +1202,8 @@ jobs:
                   name: Running test -- test_postake_snarkless:full-test
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_snarkless:full-test"'
             - run:
-                  name: Running test -- test_postake_snarkless:transaction-snark-profiler -k 2
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_snarkless:transaction-snark-profiler -k 2"'
+                  name: Running test -- test_postake_snarkless:transaction-snark-profiler -k 1
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_snarkless:transaction-snark-profiler -k 1"'
             - store_artifacts:
                   path: test_output/artifacts
     test--test_postake_split:
@@ -1360,8 +1362,8 @@ jobs:
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_medium_curves:full-test"'
                   no_output_timeout: 20m
             - run:
-                  name: Running test -- test_postake_medium_curves:transaction-snark-profiler -k 2
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_medium_curves:transaction-snark-profiler -k 2"'
+                  name: Running test -- test_postake_medium_curves:transaction-snark-profiler -k 1
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_medium_curves:transaction-snark-profiler -k 1"'
                   no_output_timeout: 20m
             - store_artifacts:
                   path: test_output/artifacts
@@ -1403,8 +1405,8 @@ jobs:
                   name: Running test -- test_postake_snarkless_medium_curves:full-test
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_snarkless_medium_curves:full-test"'
             - run:
-                  name: Running test -- test_postake_snarkless_medium_curves:transaction-snark-profiler -k 2
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_snarkless_medium_curves:transaction-snark-profiler -k 2"'
+                  name: Running test -- test_postake_snarkless_medium_curves:transaction-snark-profiler -k 1
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_snarkless_medium_curves:transaction-snark-profiler -k 1"'
             - store_artifacts:
                   path: test_output/artifacts
     test--test_postake_split_medium_curves:

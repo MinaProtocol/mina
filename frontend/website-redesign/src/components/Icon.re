@@ -31,6 +31,7 @@ type kind =
   | Testnet
   | InstallSDK
   | CoreProtocol
+  | CoreProtocolLarge
   | Community
   | TechnicalGrants
   | SubmitYourOwn
@@ -41,91 +42,103 @@ type kind =
   | CloseMenu
   | Box;
 
-module Styles = {
-  open Css;
-  let svg = size => {
-    style([height(size), width(size)]);
-  };
-};
-
+/**
+ *  Optionally specify size of the icon in rems. Default is 24px, or 1.5rems.
+ *  Some icons have not been edited for currentColor properties. TODO is to come back and clean them up when needed.
+ */
 [@react.component]
-let make = (~kind, ~size=`px(24)) => {
-  <svg className={Styles.svg(size)}>
+let make = (~kind, ~size=1.5, ~currentColor="black") => {
+  let iconSize = Js.Float.toString(size *. 16.) ++ "px";
+  let sizeValue = Js.Float.toString(size *. 16.);
+
+  <svg
+    width=iconSize
+    height=iconSize
+    viewBox={
+      "0 0 "
+      ++ {
+        sizeValue;
+      }
+      ++ {
+        sizeValue;
+      }
+    }
+    fill=currentColor>
     {switch (kind) {
      | World =>
        <path
          d="M12 0C5.37306 0 0 5.37306 0 12C0 18.6269 5.37306 24 12 24C18.6269 24 24 18.6269 24 12C24 5.37306 18.6269 0 12 0ZM12.4898 22.9176C12.4653 22.9176 12.4359 22.9176 12.4114 22.9224V18.2547H16.2269C15.3698 20.7967 14.018 22.5747 12.4898 22.9176ZM7.6702 18.2547H11.3927V22.9127C11.3878 22.9127 11.3878 22.9127 11.3829 22.9127C9.86449 22.5551 8.52245 20.782 7.6702 18.2547ZM1.08245 12.5094H5.70122C5.73551 14.209 5.94612 15.8057 6.29878 17.2359H2.4049C1.63102 15.8204 1.16082 14.2139 1.08245 12.5094ZM16.2269 5.74531H12.4114V1.07755C12.4359 1.07755 12.4653 1.07755 12.4898 1.08245C14.018 1.42531 15.3698 3.20327 16.2269 5.74531ZM16.5306 6.76408C16.9078 8.18939 17.138 9.79592 17.1771 11.4906H12.4065V6.76408H16.5306ZM11.3829 1.08735C11.3878 1.08735 11.3878 1.08735 11.3927 1.08735V5.74531H7.6702C8.52245 3.21796 9.86449 1.4449 11.3829 1.08735ZM11.3927 6.76408V11.4906H6.72C6.75918 9.79592 6.98939 8.18449 7.36653 6.76408H11.3927ZM5.70122 11.4906H1.08245C1.16082 9.78122 1.63102 8.17959 2.4049 6.76408H6.29878C5.94612 8.19429 5.73551 9.79102 5.70122 11.4906ZM6.72 12.5094H11.3927V17.2359H7.36653C6.98939 15.8106 6.75918 14.2041 6.72 12.5094ZM12.4114 17.2359V12.5094H17.182C17.1429 14.2041 16.9127 15.8155 16.5355 17.2359H12.4114ZM18.1959 12.5094H22.9176C22.8392 14.2188 22.369 15.8204 21.5951 17.2359H17.5984C17.951 15.8057 18.1616 14.209 18.1959 12.5094ZM18.1959 11.4906C18.1616 9.79102 17.951 8.19429 17.5984 6.76408H21.5951C22.369 8.17959 22.8392 9.78612 22.9176 11.4906H18.1959ZM20.9633 5.74531H17.3143C16.7608 3.96245 15.9673 2.49796 15.0171 1.49388C17.4563 2.19429 19.5478 3.71755 20.9633 5.74531ZM8.84082 1.53306C7.9102 2.53714 7.13143 3.98694 6.58286 5.74531H3.03673C4.42775 3.75673 6.46531 2.25306 8.84082 1.53306ZM3.03673 18.2547H6.58286C7.13143 20.0131 7.9102 21.4629 8.84082 22.4669C6.46531 21.7469 4.42775 20.2433 3.03673 18.2547ZM15.0171 22.5061C15.9673 21.502 16.7608 20.0327 17.3143 18.2498H20.9633C19.5478 20.2824 17.4563 21.8106 15.0171 22.5061Z"
-         fill="#2D2D2D"
+         fill=currentColor
        />
      | Discord =>
        <path
          d="M20.7273 6.125C20.7273 6.125 18.2258 4.21781 15.2727 4L15.0065 4.51903C17.676 5.156 18.9011 6.06656 20.1818 7.1875C17.9744 6.08994 15.7964 5.0625 12 5.0625C8.20364 5.0625 6.02564 6.08994 3.81818 7.1875C5.09891 6.06656 6.55636 5.054 8.99345 4.51903L8.72727 4C5.62909 4.28422 3.27273 6.125 3.27273 6.125C3.27273 6.125 0.479455 10.0701 0 17.8125C2.81455 20.975 7.09091 21 7.09091 21L7.98545 19.8397C6.46691 19.3255 4.75418 18.408 3.27273 16.75C5.03891 18.0516 7.70455 19.4062 12 19.4062C16.2955 19.4062 18.9611 18.0516 20.7273 16.75C19.2464 18.408 17.5336 19.3255 16.0145 19.8397L16.9091 21C16.9091 21 21.1855 20.975 24 17.8125C23.5205 10.0701 20.7273 6.125 20.7273 6.125ZM8.45455 15.6875C7.39964 15.6875 6.54545 14.7366 6.54545 13.5625C6.54545 12.3884 7.39964 11.4375 8.45455 11.4375C9.50945 11.4375 10.3636 12.3884 10.3636 13.5625C10.3636 14.7366 9.50945 15.6875 8.45455 15.6875ZM15.5455 15.6875C14.4905 15.6875 13.6364 14.7366 13.6364 13.5625C13.6364 12.3884 14.4905 11.4375 15.5455 11.4375C16.6004 11.4375 17.4545 12.3884 17.4545 13.5625C17.4545 14.7366 16.6004 15.6875 15.5455 15.6875Z"
-         fill="#2D2D2D"
+         fill=currentColor
        />
      | Twitter =>
        <path
          d="M22.2857 5.80545C21.5207 6.13586 20.7056 6.35487 19.8557 6.4612C20.73 5.94723 21.3973 5.13957 21.711 4.16607C20.8959 4.64459 19.9959 4.98259 19.0367 5.17122C18.2627 4.35975 17.1596 3.85718 15.9562 3.85718C13.6213 3.85718 11.7416 5.72316 11.7416 8.01071C11.7416 8.33985 11.7699 8.65633 11.8393 8.95763C8.33315 8.78926 5.23072 7.13468 3.14658 4.61421C2.78272 5.23578 2.56929 5.94723 2.56929 6.71312C2.56929 8.15123 3.32144 9.42602 4.44258 10.1641C3.76501 10.1514 3.10029 9.95771 2.53715 9.65262C2.53715 9.66528 2.53715 9.68174 2.53715 9.6982C2.53715 11.7161 3.99901 13.3922 5.91601 13.7783C5.57272 13.8707 5.19858 13.915 4.81029 13.915C4.54029 13.915 4.26772 13.8998 4.01187 13.8441C4.55829 15.4886 6.10887 16.6975 7.95258 16.7368C6.51772 17.842 4.69587 18.5078 2.72358 18.5078C2.37772 18.5078 2.04601 18.4926 1.71429 18.4509C3.58244 19.637 5.79644 20.3143 8.18401 20.3143C15.9446 20.3143 20.1874 13.9846 20.1874 8.49809C20.1874 8.31453 20.181 8.1373 20.172 7.96134C21.009 7.37647 21.7123 6.64603 22.2857 5.80545Z"
-         fill="#2D2D2D"
+         fill=currentColor
        />
      | Facebook =>
        <path
          d="M9.42854 8.57138H6.85712V11.9999H9.42854V22.2857H13.7143V11.9999H16.836L17.1428 8.57138H13.7143V7.14252C13.7143 6.32395 13.8788 5.99995 14.67 5.99995H17.1428V1.71423H13.8788C10.7965 1.71423 9.42854 3.07109 9.42854 5.66995V8.57138Z"
-         fill="#2D2D2D"
+         fill=currentColor
        />
      | Telegram =>
        <path
          d="M9.78635 15.0864L9.44606 20.3881C9.93293 20.3881 10.1438 20.1565 10.3967 19.8783L12.6793 17.462L17.4091 21.2987C18.2766 21.8342 18.8877 21.5522 19.1217 20.4147L22.2264 4.30074L22.2272 4.29979C22.5024 2.87942 21.7635 2.32399 20.9183 2.67244L2.66933 10.4114C1.42387 10.9469 1.44273 11.7159 2.45761 12.0644L7.12315 13.6718L17.9603 6.1607C18.4703 5.78662 18.934 5.9936 18.5526 6.36768L9.78635 15.0864Z"
-         fill="#2D2D2D"
+         fill=currentColor
        />
      | WeChat =>
        <path
          fillRule="evenodd"
          clipRule="evenodd"
          d="M11.0884 10.9858C12.4365 9.72179 14.097 9.16233 16.0066 9.06591C15.8982 7.94485 15.4879 6.99697 14.8187 6.15244C12.9659 3.81444 9.54162 2.83325 6.49452 3.79515C4.26211 4.49997 2.61916 5.85205 1.95013 8.08152C1.227 10.4915 2.19328 12.8323 4.48562 14.3964C4.84265 14.6405 4.89667 14.8489 4.78003 15.2234C4.67054 15.5752 4.59394 15.9366 4.51147 16.3258C4.47447 16.5004 4.43629 16.6805 4.39343 16.8679C4.60892 16.7377 4.81479 16.6113 5.01442 16.4888C5.51366 16.1824 5.97388 15.8999 6.44814 15.6413C6.64815 15.5322 6.92836 15.5049 7.16449 15.5241C7.65173 15.5638 8.13701 15.6251 8.64582 15.6894C8.85097 15.7153 9.05994 15.7417 9.27442 15.7674C9.10454 13.8276 9.72624 12.2628 11.0884 10.9858ZM6.37093 7.46382C6.84035 7.47708 7.23555 7.87419 7.21796 8.31498C7.20022 8.76667 6.79792 9.12208 6.31801 9.11035C5.83393 9.09846 5.4668 8.72673 5.481 8.26285C5.49504 7.80514 5.89032 7.45018 6.37093 7.46382ZM10.9424 8.30225C10.9341 7.85971 11.3322 7.4719 11.8034 7.46352C12.2828 7.45506 12.6716 7.81772 12.6755 8.27748C12.6802 8.74586 12.3118 9.10852 11.8261 9.11416C11.3416 9.1198 10.951 8.76095 10.9424 8.30225ZM19.7491 20.3071C19.9286 20.3986 20.1104 20.4912 20.2969 20.5715C20.2838 20.5212 20.2741 20.4709 20.2646 20.4217C20.2448 20.319 20.2259 20.2209 20.1788 20.1379C19.8011 19.4724 20.0129 19.057 20.6015 18.5522C22.6358 16.8079 22.8316 14.0518 21.1653 11.9755C19.2557 9.59612 15.2838 9.02447 12.5754 10.7393C9.52806 12.6687 9.15171 16.2788 11.7856 18.6333C13.1705 19.8711 14.8501 20.3761 16.7248 20.1907C16.9788 20.1656 17.2334 20.095 17.486 20.0249C17.8456 19.9251 18.2015 19.8264 18.547 19.8613C18.9554 19.9025 19.3466 20.1019 19.7491 20.3071ZM14.1303 13.4726C14.1157 13.8401 13.7988 14.1313 13.4138 14.1309C13.0316 14.1304 12.7125 13.8342 12.6994 13.4681C12.6854 13.0848 13.0197 12.754 13.4189 12.7557C13.822 12.7573 14.1457 13.0836 14.1303 13.4726ZM17.1449 13.4149C17.1601 13.0502 17.4775 12.7547 17.851 12.7572C18.2484 12.7599 18.5623 13.0827 18.5473 13.4736C18.5333 13.8451 18.228 14.1275 17.8417 14.1262C17.4423 14.1253 17.1287 13.805 17.1449 13.4149Z"
-         fill="#2D2D2D"
+         fill=currentColor
        />
      | Forums =>
        <path
          d="M6.34629 22.0893L10.1433 18.3338H15.7429C20.3013 18.3338 24 14.6755 24 10.1669C24 5.65835 20.3062 2 15.7429 2H8.25706C3.69382 2 0 5.65835 0 10.1669C0 13.7767 2.36758 16.8326 5.64879 17.9112V21.8027C5.64879 22.1671 6.08596 22.3468 6.34629 22.0893ZM15.3942 9.15638C15.9591 9.15638 16.4159 9.6082 16.4159 10.1669C16.4159 10.7256 15.9591 11.1775 15.3942 11.1775C14.8293 11.1775 14.3725 10.7256 14.3725 10.1669C14.3725 9.6082 14.8293 9.15638 15.3942 9.15638ZM12 9.15638C12.5649 9.15638 13.0217 9.6082 13.0217 10.1669C13.0217 10.7256 12.5649 11.1775 12 11.1775C11.4351 11.1775 10.9783 10.7256 10.9783 10.1669C10.9783 9.6082 11.4351 9.15638 12 9.15638ZM8.60581 9.15638C9.17069 9.15638 9.62751 9.6082 9.62751 10.1669C9.62751 10.7256 9.17069 11.1775 8.60581 11.1775C8.04093 11.1775 7.58412 10.7256 7.58412 10.1669C7.58412 9.6082 8.04093 9.15638 8.60581 9.15638Z"
-         fill="#2D2D2D"
+         fill=currentColor
        />
      | Github =>
        <path
          fillRule="evenodd"
          clipRule="evenodd"
          d="M12.0001 0C5.37349 0 0 5.50832 0 12.3037C0 17.7399 3.4384 22.352 8.20642 23.9789C8.80613 24.0928 9.02633 23.7119 9.02633 23.387C9.02633 23.0936 9.01515 22.1243 9.00998 21.0962C5.67157 21.8405 4.96712 19.6445 4.96712 19.6445C4.42124 18.2224 3.63473 17.8442 3.63473 17.8442C2.54596 17.0806 3.7168 17.0963 3.7168 17.0963C4.92181 17.1829 5.55631 18.3642 5.55631 18.3642C6.6266 20.2452 8.36355 19.7014 9.04838 19.387C9.15607 18.592 9.46702 18.0488 9.81023 17.7417C7.14485 17.4306 4.34295 16.3756 4.34295 11.6611C4.34295 10.3178 4.81172 9.22021 5.57937 8.35853C5.45477 8.04848 5.04403 6.79723 5.69561 5.10246C5.69561 5.10246 6.70331 4.77177 8.99648 6.36366C9.9537 6.09104 10.9803 5.95432 12.0001 5.94964C13.0199 5.95432 14.0473 6.09104 15.0063 6.36366C17.2967 4.77177 18.303 5.10246 18.303 5.10246C18.9562 6.79723 18.5452 8.04848 18.4206 8.35853C19.1901 9.22021 19.6556 10.3178 19.6556 11.6611C19.6556 16.3868 16.8484 17.4274 14.1763 17.732C14.6067 18.1138 14.9902 18.8626 14.9902 20.0105C14.9902 21.6566 14.9763 22.9815 14.9763 23.387C14.9763 23.7144 15.1923 24.098 15.8006 23.9772C20.566 22.3485 24 17.7381 24 12.3037C24 5.50832 18.6273 0 12.0001 0Z"
-         fill="#2D2D2D"
+         fill=currentColor
        />
      | Wiki =>
        <path
          fillRule="evenodd"
          clipRule="evenodd"
          d="M24 4.96632C24 5.05173 23.9726 5.12882 23.9198 5.19965C23.8649 5.2684 23.8079 5.30382 23.7425 5.30382C23.2169 5.35382 22.7842 5.52048 22.4507 5.8059C22.115 6.08923 21.771 6.63298 21.4142 7.43298L15.9683 19.5455C15.9325 19.658 15.8332 19.7142 15.6686 19.7142C15.5398 19.7142 15.4406 19.658 15.3689 19.5455L12.3145 13.2413L8.80211 19.5455C8.73034 19.658 8.63113 19.7142 8.50237 19.7142C8.34617 19.7142 8.24274 19.658 8.19208 19.5455L2.84116 7.43298C2.50765 6.6809 2.15515 6.1559 1.78364 5.85798C1.41425 5.56007 0.897098 5.37465 0.236412 5.30382C0.17942 5.30382 0.124538 5.27465 0.0759895 5.21423C0.0253298 5.1559 0 5.08715 0 5.01007C0 4.81215 0.0569921 4.71423 0.170976 4.71423C0.648021 4.71423 1.14617 4.73507 1.66755 4.77673C2.15092 4.82048 2.60686 4.84132 3.03325 4.84132C3.46807 4.84132 3.981 4.82048 4.57203 4.77673C5.1905 4.73507 5.73931 4.71423 6.21636 4.71423C6.33034 4.71423 6.38734 4.81215 6.38734 5.01007C6.38734 5.2059 6.35145 5.30382 6.28179 5.30382C5.80475 5.33923 5.42902 5.46007 5.15462 5.66215C4.88021 5.86632 4.74301 6.13298 4.74301 6.46423C4.74301 6.63298 4.8 6.8434 4.91398 7.09548L9.33615 16.9517L11.8459 12.2726L9.50712 7.43298C9.08707 6.57048 8.7409 6.01215 8.47071 5.76215C8.20053 5.51423 7.79103 5.36007 7.24222 5.30382C7.19156 5.30382 7.14512 5.27465 7.09868 5.21423C7.05224 5.1559 7.02902 5.08715 7.02902 5.01007C7.02902 4.81215 7.07757 4.71423 7.17889 4.71423C7.65594 4.71423 8.09288 4.73507 8.49182 4.77673C8.87599 4.82048 9.28549 4.84132 9.72032 4.84132C10.1467 4.84132 10.5984 4.82048 11.0755 4.77673C11.5673 4.73507 12.0507 4.71423 12.5277 4.71423C12.6417 4.71423 12.6987 4.81215 12.6987 5.01007C12.6987 5.2059 12.6649 5.30382 12.5931 5.30382C11.639 5.3684 11.162 5.63507 11.162 6.1059C11.162 6.31632 11.2718 6.6434 11.4934 7.08507L13.0406 10.1851L14.5794 7.34965C14.7926 6.94965 14.9003 6.61215 14.9003 6.33715C14.9003 5.69132 14.4232 5.34757 13.4691 5.30382C13.3826 5.30382 13.3404 5.2059 13.3404 5.01007C13.3404 4.93923 13.3615 4.87257 13.4037 4.81007C13.448 4.74548 13.4902 4.71423 13.5325 4.71423C13.8744 4.71423 14.2945 4.73507 14.7926 4.77673C15.2697 4.82048 15.6623 4.84132 15.9683 4.84132C16.1879 4.84132 16.5129 4.82257 16.9393 4.78715C17.4797 4.73923 17.9335 4.71423 18.2966 4.71423C18.381 4.71423 18.4232 4.79757 18.4232 4.96632C18.4232 5.19132 18.3451 5.30382 18.1889 5.30382C17.6338 5.36007 17.1863 5.51215 16.8485 5.75798C16.5108 6.00382 16.0887 6.56215 15.5842 7.43298L13.5325 11.1767L16.3103 16.7622L20.4116 7.34965C20.553 7.0059 20.6248 6.68923 20.6248 6.40173C20.6248 5.71215 20.1478 5.34757 19.1937 5.30382C19.1071 5.30382 19.0649 5.2059 19.0649 5.01007C19.0649 4.81215 19.1282 4.71423 19.257 4.71423C19.6053 4.71423 20.019 4.73507 20.496 4.77673C20.9372 4.82048 21.3087 4.84132 21.6063 4.84132C21.9208 4.84132 22.2839 4.82048 22.6955 4.77673C23.124 4.73507 23.5082 4.71423 23.8501 4.71423C23.9493 4.71423 24 4.79757 24 4.96632Z"
-         fill="#2D2D2D"
+         fill=currentColor
        />
      | Email =>
        <path
          d="M1.56785 6.6355C2.17204 6.93961 10.5416 11.1553 10.8536 11.312C11.1656 11.4687 11.5692 11.543 11.9753 11.543C12.3814 11.543 12.785 11.4687 13.097 11.312C13.409 11.1553 21.7785 6.93961 22.3827 6.6355C22.9881 6.33023 23.5601 5.14282 22.4496 5.14282H1.50223C0.391656 5.14282 0.963656 6.33023 1.56785 6.6355ZM22.6637 9.19255C21.9766 9.528 13.5179 13.6601 13.097 13.8668C12.676 14.0734 12.3814 14.0977 11.9753 14.0977C11.5692 14.0977 11.2745 14.0734 10.8536 13.8668C10.4326 13.6601 2.02223 9.52684 1.33508 9.19139C0.852227 8.95461 0.85718 9.23202 0.85718 9.44559C0.85718 9.65916 0.85718 17.9107 0.85718 17.9107C0.85718 18.3982 1.55794 19.0714 2.09527 19.0714H21.9048C22.4421 19.0714 23.1429 18.3982 23.1429 17.9107C23.1429 17.9107 23.1429 9.66032 23.1429 9.44675C23.1429 9.23318 23.1478 8.95577 22.6637 9.19255Z"
-         fill="#2D2D2D"
+         fill=currentColor
        />
      | Location =>
        <path
          d="M11.7958 0C7.41843 0 3.85718 3.56125 3.85718 7.93857C3.85718 9.7016 4.983 12.5759 7.29878 16.7259C8.93687 19.6611 10.548 22.1085 10.6157 22.2112L11.7958 24L12.9758 22.2113C13.0436 22.1085 14.6548 19.6612 16.2927 16.726C18.6086 12.5759 19.7343 9.70165 19.7343 7.93862C19.7344 3.56125 16.1731 0 11.7958 0ZM11.7958 12C9.52316 12 7.68076 10.1576 7.68076 7.88497C7.68076 5.61229 9.52316 3.76994 11.7958 3.76994C14.0684 3.76994 15.9108 5.61229 15.9108 7.88497C15.9108 10.1576 14.0684 12 11.7958 12Z"
-         fill="#2D2D2D"
+         fill=currentColor
        />
      | ArrowUpMedium =>
        <svg>
-         <rect x="11" y="4" width="1" height="16" fill="#2D2D2D" />
-         <rect x="12" y="5" width="1" height="1" fill="#2D2D2D" />
-         <rect x="13" y="6" width="1" height="1" fill="#2D2D2D" />
-         <rect x="14" y="7" width="1" height="1" fill="#2D2D2D" />
-         <rect x="15" y="8" width="1" height="1" fill="#2D2D2D" />
-         <rect x="16" y="9" width="1" height="1" fill="#2D2D2D" />
-         <rect x="6" y="9" width="1" height="1" fill="#2D2D2D" />
-         <rect x="7" y="8" width="1" height="1" fill="#2D2D2D" />
-         <rect x="8" y="7" width="1" height="1" fill="#2D2D2D" />
-         <rect x="9" y="6" width="1" height="1" fill="#2D2D2D" />
-         <rect x="10" y="5" width="1" height="1" fill="#2D2D2D" />
+         <rect x="11" y="4" width="1" height="16" fill=currentColor />
+         <rect x="12" y="5" width="1" height="1" fill=currentColor />
+         <rect x="13" y="6" width="1" height="1" fill=currentColor />
+         <rect x="14" y="7" width="1" height="1" fill=currentColor />
+         <rect x="15" y="8" width="1" height="1" fill=currentColor />
+         <rect x="16" y="9" width="1" height="1" fill=currentColor />
+         <rect x="6" y="9" width="1" height="1" fill=currentColor />
+         <rect x="7" y="8" width="1" height="1" fill=currentColor />
+         <rect x="8" y="7" width="1" height="1" fill=currentColor />
+         <rect x="9" y="6" width="1" height="1" fill=currentColor />
+         <rect x="10" y="5" width="1" height="1" fill=currentColor />
        </svg>
      | ArrowLeftLarge =>
        <svg>
@@ -133,139 +146,116 @@ let make = (~kind, ~size=`px(24)) => {
            width="24"
            height="1"
            transform="matrix(-1 0 0 1 24 11)"
-           fill="#2D2D2D"
+           fill=currentColor
          />
          <rect
            width="1"
            height="1"
            transform="matrix(-1 0 0 1 2 12)"
-           fill="#2D2D2D"
+           fill=currentColor
          />
          <rect
            width="1"
            height="1"
            transform="matrix(-1 0 0 1 2 10)"
-           fill="#2D2D2D"
+           fill=currentColor
          />
          <rect
            width="1"
            height="1"
            transform="matrix(-1 0 0 1 3 9)"
-           fill="#2D2D2D"
+           fill=currentColor
          />
          <rect
            width="1"
            height="1"
            transform="matrix(-1 0 0 1 4 8)"
-           fill="#2D2D2D"
+           fill=currentColor
          />
          <rect
            width="1"
            height="1"
            transform="matrix(-1 0 0 1 5 7)"
-           fill="#2D2D2D"
+           fill=currentColor
          />
          <rect
            width="1"
            height="1"
            transform="matrix(-1 0 0 1 6 6)"
-           fill="#2D2D2D"
+           fill=currentColor
          />
          <rect
            width="1"
            height="1"
            transform="matrix(-1 0 0 1 7 5)"
-           fill="#2D2D2D"
+           fill=currentColor
          />
          <rect
            width="1"
            height="1"
            transform="matrix(-1 0 0 1 8 4)"
-           fill="#2D2D2D"
+           fill=currentColor
          />
          <rect
            width="1"
            height="1"
            transform="matrix(-1 0 0 1 9 3)"
-           fill="#2D2D2D"
+           fill=currentColor
          />
          <rect
            width="1"
            height="1"
            transform="matrix(-1 0 0 1 10 2)"
-           fill="#2D2D2D"
+           fill=currentColor
          />
          <rect
            width="1"
            height="1"
            transform="matrix(-1 0 0 1 3 13)"
-           fill="#2D2D2D"
+           fill=currentColor
          />
          <rect
            width="1"
            height="1"
            transform="matrix(-1 0 0 1 4 14)"
-           fill="#2D2D2D"
+           fill=currentColor
          />
          <rect
            width="1"
            height="1"
            transform="matrix(-1 0 0 1 5 15)"
-           fill="#2D2D2D"
+           fill=currentColor
          />
          <rect
            width="1"
            height="1"
            transform="matrix(-1 0 0 1 6 16)"
-           fill="#2D2D2D"
+           fill=currentColor
          />
          <rect
            width="1"
            height="1"
            transform="matrix(-1 0 0 1 7 17)"
-           fill="#2D2D2D"
+           fill=currentColor
          />
          <rect
            width="1"
            height="1"
            transform="matrix(-1 0 0 1 8 18)"
-           fill="#2D2D2D"
+           fill=currentColor
          />
          <rect
            width="1"
            height="1"
            transform="matrix(-1 0 0 1 9 19)"
-           fill="#2D2D2D"
+           fill=currentColor
          />
          <rect
            width="1"
            height="1"
            transform="matrix(-1 0 0 1 10 20)"
-           fill="#2D2D2D"
+           fill=currentColor
          />
-       </svg>
-
-     | ArrowRightLarge =>
-       <svg>
-         <rect y="11" width="24" height="1" fill="#2D2D2D" />
-         <rect x="22" y="12" width="1" height="1" fill="#2D2D2D" />
-         <rect x="22" y="10" width="1" height="1" fill="#2D2D2D" />
-         <rect x="21" y="9" width="1" height="1" fill="#2D2D2D" />
-         <rect x="20" y="8" width="1" height="1" fill="#2D2D2D" />
-         <rect x="19" y="7" width="1" height="1" fill="#2D2D2D" />
-         <rect x="18" y="6" width="1" height="1" fill="#2D2D2D" />
-         <rect x="17" y="5" width="1" height="1" fill="#2D2D2D" />
-         <rect x="16" y="4" width="1" height="1" fill="#2D2D2D" />
-         <rect x="15" y="3" width="1" height="1" fill="#2D2D2D" />
-         <rect x="14" y="2" width="1" height="1" fill="#2D2D2D" />
-         <rect x="21" y="13" width="1" height="1" fill="#2D2D2D" />
-         <rect x="20" y="14" width="1" height="1" fill="#2D2D2D" />
-         <rect x="19" y="15" width="1" height="1" fill="#2D2D2D" />
-         <rect x="18" y="16" width="1" height="1" fill="#2D2D2D" />
-         <rect x="17" y="17" width="1" height="1" fill="#2D2D2D" />
-         <rect x="16" y="18" width="1" height="1" fill="#2D2D2D" />
-         <rect x="15" y="19" width="1" height="1" fill="#2D2D2D" />
-         <rect x="14" y="20" width="1" height="1" fill="#2D2D2D" />
        </svg>
      | ArrowRightMedium =>
        <svg>
@@ -275,7 +265,7 @@ let make = (~kind, ~size=`px(24)) => {
            width="1"
            height="16"
            transform="rotate(90 20 11)"
-           fill="#2D2D2D"
+           fill=currentColor
          />
          <rect
            x="19"
@@ -283,7 +273,7 @@ let make = (~kind, ~size=`px(24)) => {
            width="1"
            height="1"
            transform="rotate(90 19 12)"
-           fill="#2D2D2D"
+           fill=currentColor
          />
          <rect
            x="18"
@@ -291,7 +281,7 @@ let make = (~kind, ~size=`px(24)) => {
            width="1"
            height="1"
            transform="rotate(90 18 13)"
-           fill="#2D2D2D"
+           fill=currentColor
          />
          <rect
            x="17"
@@ -299,7 +289,7 @@ let make = (~kind, ~size=`px(24)) => {
            width="1"
            height="1"
            transform="rotate(90 17 14)"
-           fill="#2D2D2D"
+           fill=currentColor
          />
          <rect
            x="16"
@@ -307,7 +297,7 @@ let make = (~kind, ~size=`px(24)) => {
            width="1"
            height="1"
            transform="rotate(90 16 15)"
-           fill="#2D2D2D"
+           fill=currentColor
          />
          <rect
            x="15"
@@ -315,7 +305,7 @@ let make = (~kind, ~size=`px(24)) => {
            width="1"
            height="1"
            transform="rotate(90 15 16)"
-           fill="#2D2D2D"
+           fill=currentColor
          />
          <rect
            x="15"
@@ -323,7 +313,7 @@ let make = (~kind, ~size=`px(24)) => {
            width="1"
            height="1"
            transform="rotate(90 15 6)"
-           fill="#2D2D2D"
+           fill=currentColor
          />
          <rect
            x="16"
@@ -331,7 +321,7 @@ let make = (~kind, ~size=`px(24)) => {
            width="1"
            height="1"
            transform="rotate(90 16 7)"
-           fill="#2D2D2D"
+           fill=currentColor
          />
          <rect
            x="17"
@@ -339,7 +329,7 @@ let make = (~kind, ~size=`px(24)) => {
            width="1"
            height="1"
            transform="rotate(90 17 8)"
-           fill="#2D2D2D"
+           fill=currentColor
          />
          <rect
            x="18"
@@ -347,7 +337,7 @@ let make = (~kind, ~size=`px(24)) => {
            width="1"
            height="1"
            transform="rotate(90 18 9)"
-           fill="#2D2D2D"
+           fill=currentColor
          />
          <rect
            x="19"
@@ -355,44 +345,44 @@ let make = (~kind, ~size=`px(24)) => {
            width="1"
            height="1"
            transform="rotate(90 19 10)"
-           fill="#2D2D2D"
+           fill=currentColor
          />
        </svg>
      | ChevronDownLarge =>
        <svg>
-         <rect x="3" y="8" width="1" height="1" fill="#2D2D2D" />
-         <rect x="4" y="9" width="1" height="1" fill="#2D2D2D" />
-         <rect x="5" y="10" width="1" height="1" fill="#2D2D2D" />
-         <rect x="6" y="11" width="1" height="1" fill="#2D2D2D" />
-         <rect x="7" y="12" width="1" height="1" fill="#2D2D2D" />
-         <rect x="8" y="13" width="1" height="1" fill="#2D2D2D" />
-         <rect x="9" y="14" width="1" height="1" fill="#2D2D2D" />
-         <rect x="10" y="15" width="1" height="1" fill="#2D2D2D" />
-         <rect x="11" y="16" width="1" height="1" fill="#2D2D2D" />
-         <rect x="12" y="17" width="1" height="1" fill="#2D2D2D" />
-         <rect x="13" y="16" width="1" height="1" fill="#2D2D2D" />
-         <rect x="14" y="15" width="1" height="1" fill="#2D2D2D" />
-         <rect x="15" y="14" width="1" height="1" fill="#2D2D2D" />
-         <rect x="16" y="13" width="1" height="1" fill="#2D2D2D" />
-         <rect x="17" y="12" width="1" height="1" fill="#2D2D2D" />
-         <rect x="18" y="11" width="1" height="1" fill="#2D2D2D" />
-         <rect x="19" y="10" width="1" height="1" fill="#2D2D2D" />
-         <rect x="20" y="9" width="1" height="1" fill="#2D2D2D" />
-         <rect x="21" y="8" width="1" height="1" fill="#2D2D2D" />
+         <rect x="3" y="8" width="1" height="1" fill=currentColor />
+         <rect x="4" y="9" width="1" height="1" fill=currentColor />
+         <rect x="5" y="10" width="1" height="1" fill=currentColor />
+         <rect x="6" y="11" width="1" height="1" fill=currentColor />
+         <rect x="7" y="12" width="1" height="1" fill=currentColor />
+         <rect x="8" y="13" width="1" height="1" fill=currentColor />
+         <rect x="9" y="14" width="1" height="1" fill=currentColor />
+         <rect x="10" y="15" width="1" height="1" fill=currentColor />
+         <rect x="11" y="16" width="1" height="1" fill=currentColor />
+         <rect x="12" y="17" width="1" height="1" fill=currentColor />
+         <rect x="13" y="16" width="1" height="1" fill=currentColor />
+         <rect x="14" y="15" width="1" height="1" fill=currentColor />
+         <rect x="15" y="14" width="1" height="1" fill=currentColor />
+         <rect x="16" y="13" width="1" height="1" fill=currentColor />
+         <rect x="17" y="12" width="1" height="1" fill=currentColor />
+         <rect x="18" y="11" width="1" height="1" fill=currentColor />
+         <rect x="19" y="10" width="1" height="1" fill=currentColor />
+         <rect x="20" y="9" width="1" height="1" fill=currentColor />
+         <rect x="21" y="8" width="1" height="1" fill=currentColor />
        </svg>
      | ChevronDown =>
        <svg>
-         <rect x="14.5" y="11" width="1" height="1" fill="#2D2D2D" />
-         <rect x="13.5" y="12" width="1" height="1" fill="#2D2D2D" />
-         <rect x="15.5" y="10" width="1" height="1" fill="#2D2D2D" />
-         <rect x="8.5" y="11" width="1" height="1" fill="#2D2D2D" />
-         <rect x="7.5" y="10" width="1" height="1" fill="#2D2D2D" />
-         <rect x="6.5" y="9" width="1" height="1" fill="#2D2D2D" />
-         <rect x="16.5" y="9" width="1" height="1" fill="#2D2D2D" />
-         <rect x="9.5" y="12" width="1" height="1" fill="#2D2D2D" />
-         <rect x="10.5" y="13" width="1" height="1" fill="#2D2D2D" />
-         <rect x="12.5" y="13" width="1" height="1" fill="#2D2D2D" />
-         <rect x="11.5" y="14" width="1" height="1" fill="#2D2D2D" />
+         <rect x="14.5" y="11" width="1" height="1" fill=currentColor />
+         <rect x="13.5" y="12" width="1" height="1" fill=currentColor />
+         <rect x="15.5" y="10" width="1" height="1" fill=currentColor />
+         <rect x="8.5" y="11" width="1" height="1" fill=currentColor />
+         <rect x="7.5" y="10" width="1" height="1" fill=currentColor />
+         <rect x="6.5" y="9" width="1" height="1" fill=currentColor />
+         <rect x="16.5" y="9" width="1" height="1" fill=currentColor />
+         <rect x="9.5" y="12" width="1" height="1" fill=currentColor />
+         <rect x="10.5" y="13" width="1" height="1" fill=currentColor />
+         <rect x="12.5" y="13" width="1" height="1" fill=currentColor />
+         <rect x="11.5" y="14" width="1" height="1" fill=currentColor />
        </svg>
      | ChevronUp =>
        <svg>
@@ -402,7 +392,7 @@ let make = (~kind, ~size=`px(24)) => {
            width="1"
            height="1"
            transform="rotate(180 9.5 13)"
-           fill="#2D2D2D"
+           fill=currentColor
          />
          <rect
            x="10.5"
@@ -410,7 +400,7 @@ let make = (~kind, ~size=`px(24)) => {
            width="1"
            height="1"
            transform="rotate(180 10.5 12)"
-           fill="#2D2D2D"
+           fill=currentColor
          />
          <rect
            x="8.5"
@@ -418,7 +408,7 @@ let make = (~kind, ~size=`px(24)) => {
            width="1"
            height="1"
            transform="rotate(180 8.5 14)"
-           fill="#2D2D2D"
+           fill=currentColor
          />
          <rect
            x="15.5"
@@ -426,7 +416,7 @@ let make = (~kind, ~size=`px(24)) => {
            width="1"
            height="1"
            transform="rotate(180 15.5 13)"
-           fill="#2D2D2D"
+           fill=currentColor
          />
          <rect
            x="16.5"
@@ -434,7 +424,7 @@ let make = (~kind, ~size=`px(24)) => {
            width="1"
            height="1"
            transform="rotate(180 16.5 14)"
-           fill="#2D2D2D"
+           fill=currentColor
          />
          <rect
            x="17.5"
@@ -442,7 +432,7 @@ let make = (~kind, ~size=`px(24)) => {
            width="1"
            height="1"
            transform="rotate(180 17.5 15)"
-           fill="#2D2D2D"
+           fill=currentColor
          />
          <rect
            x="7.5"
@@ -450,7 +440,7 @@ let make = (~kind, ~size=`px(24)) => {
            width="1"
            height="1"
            transform="rotate(180 7.5 15)"
-           fill="#2D2D2D"
+           fill=currentColor
          />
          <rect
            x="14.5"
@@ -458,7 +448,7 @@ let make = (~kind, ~size=`px(24)) => {
            width="1"
            height="1"
            transform="rotate(180 14.5 12)"
-           fill="#2D2D2D"
+           fill=currentColor
          />
          <rect
            x="13.5"
@@ -466,7 +456,7 @@ let make = (~kind, ~size=`px(24)) => {
            width="1"
            height="1"
            transform="rotate(180 13.5 11)"
-           fill="#2D2D2D"
+           fill=currentColor
          />
          <rect
            x="11.5"
@@ -474,7 +464,7 @@ let make = (~kind, ~size=`px(24)) => {
            width="1"
            height="1"
            transform="rotate(180 11.5 11)"
-           fill="#2D2D2D"
+           fill=currentColor
          />
          <rect
            x="12.5"
@@ -482,7 +472,7 @@ let make = (~kind, ~size=`px(24)) => {
            width="1"
            height="1"
            transform="rotate(180 12.5 10)"
-           fill="#2D2D2D"
+           fill=currentColor
          />
        </svg>
      | ChevronRight =>
@@ -493,7 +483,7 @@ let make = (~kind, ~size=`px(24)) => {
            width="1"
            height="1"
            transform="rotate(-90 11 9.5)"
-           fill="#2D2D2D"
+           fill=currentColor
          />
          <rect
            x="12"
@@ -501,7 +491,7 @@ let make = (~kind, ~size=`px(24)) => {
            width="1"
            height="1"
            transform="rotate(-90 12 10.5)"
-           fill="#2D2D2D"
+           fill=currentColor
          />
          <rect
            x="10"
@@ -509,7 +499,7 @@ let make = (~kind, ~size=`px(24)) => {
            width="1"
            height="1"
            transform="rotate(-90 10 8.5)"
-           fill="#2D2D2D"
+           fill=currentColor
          />
          <rect
            x="11"
@@ -517,7 +507,7 @@ let make = (~kind, ~size=`px(24)) => {
            width="1"
            height="1"
            transform="rotate(-90 11 15.5)"
-           fill="#2D2D2D"
+           fill=currentColor
          />
          <rect
            x="10"
@@ -525,7 +515,7 @@ let make = (~kind, ~size=`px(24)) => {
            width="1"
            height="1"
            transform="rotate(-90 10 16.5)"
-           fill="#2D2D2D"
+           fill=currentColor
          />
          <rect
            x="9"
@@ -533,7 +523,7 @@ let make = (~kind, ~size=`px(24)) => {
            width="1"
            height="1"
            transform="rotate(-90 9 17.5)"
-           fill="#2D2D2D"
+           fill=currentColor
          />
          <rect
            x="9"
@@ -541,7 +531,7 @@ let make = (~kind, ~size=`px(24)) => {
            width="1"
            height="1"
            transform="rotate(-90 9 7.5)"
-           fill="#2D2D2D"
+           fill=currentColor
          />
          <rect
            x="12"
@@ -549,7 +539,7 @@ let make = (~kind, ~size=`px(24)) => {
            width="1"
            height="1"
            transform="rotate(-90 12 14.5)"
-           fill="#2D2D2D"
+           fill=currentColor
          />
          <rect
            x="13"
@@ -557,7 +547,7 @@ let make = (~kind, ~size=`px(24)) => {
            width="1"
            height="1"
            transform="rotate(-90 13 13.5)"
-           fill="#2D2D2D"
+           fill=currentColor
          />
          <rect
            x="13"
@@ -565,7 +555,7 @@ let make = (~kind, ~size=`px(24)) => {
            width="1"
            height="1"
            transform="rotate(-90 13 11.5)"
-           fill="#2D2D2D"
+           fill=currentColor
          />
          <rect
            x="14"
@@ -573,64 +563,64 @@ let make = (~kind, ~size=`px(24)) => {
            width="1"
            height="1"
            transform="rotate(-90 14 12.5)"
-           fill="#2D2D2D"
+           fill=currentColor
          />
        </svg>
      | Info =>
        <svg>
          <circle cx="12" cy="12" r="11.5" stroke="#2D2D2D" />
-         <rect x="10.5" y="10.5" width="3" height="7.5" fill="#2D2D2D" />
-         <rect x="10.5" y="6" width="3" height="3" fill="#2D2D2D" />
+         <rect x="10.5" y="10.5" width="3" height="7.5" fill=currentColor />
+         <rect x="10.5" y="6" width="3" height="3" fill=currentColor />
        </svg>
      | Plus =>
        <path
          fillRule="evenodd"
          clipRule="evenodd"
          d="M12.5 4.5H11.5V11.5H4.5V12.5H11.5V19.5H12.5V12.5H19.5V11.5H12.5V4.5Z"
-         fill="#2D2D2D"
+         fill=currentColor
        />
      | ExternalLink =>
        <path
          fillRule="evenodd"
          clipRule="evenodd"
          d="M17 7H16H15H14H13V8H14H15V9H14V10H13V11H12V12H11V13H10V14H11V13H12V12H13V11H14V10H15V9H16V10V11H17V10V9V8V7ZM7 9H8H11V10H8V16H14V13H15V16V17H14H8H7V16V10V9Z"
-         fill="#2D2D2D"
+         fill=currentColor
        />
      | BulletPoint =>
        <svg>
-         <rect x="9" y="9" width="6" height="6" rx="3" fill="#2D2D2D" />
+         <rect x="9" y="9" width="6" height="6" rx="3" fill=currentColor />
        </svg>
      | ArrowRightLarge =>
-       <svg>
-         <rect y="11" width="24" height="1" fill="#2D2D2D" />
-         <rect x="22" y="12" width="1" height="1" fill="#2D2D2D" />
-         <rect x="22" y="10" width="1" height="1" fill="#2D2D2D" />
-         <rect x="21" y="9" width="1" height="1" fill="#2D2D2D" />
-         <rect x="20" y="8" width="1" height="1" fill="#2D2D2D" />
-         <rect x="19" y="7" width="1" height="1" fill="#2D2D2D" />
-         <rect x="18" y="6" width="1" height="1" fill="#2D2D2D" />
-         <rect x="17" y="5" width="1" height="1" fill="#2D2D2D" />
-         <rect x="16" y="4" width="1" height="1" fill="#2D2D2D" />
-         <rect x="15" y="3" width="1" height="1" fill="#2D2D2D" />
-         <rect x="14" y="2" width="1" height="1" fill="#2D2D2D" />
-         <rect x="21" y="13" width="1" height="1" fill="#2D2D2D" />
-         <rect x="20" y="14" width="1" height="1" fill="#2D2D2D" />
-         <rect x="19" y="15" width="1" height="1" fill="#2D2D2D" />
-         <rect x="18" y="16" width="1" height="1" fill="#2D2D2D" />
-         <rect x="17" y="17" width="1" height="1" fill="#2D2D2D" />
-         <rect x="16" y="18" width="1" height="1" fill="#2D2D2D" />
-         <rect x="15" y="19" width="1" height="1" fill="#2D2D2D" />
-         <rect x="14" y="20" width="1" height="1" fill="#2D2D2D" />
-       </svg>
+       <>
+         <rect y="11" width="24" height="1" fill=currentColor />
+         <rect x="22" y="12" width="1" height="1" fill=currentColor />
+         <rect x="22" y="10" width="1" height="1" fill=currentColor />
+         <rect x="21" y="9" width="1" height="1" fill=currentColor />
+         <rect x="20" y="8" width="1" height="1" fill=currentColor />
+         <rect x="19" y="7" width="1" height="1" fill=currentColor />
+         <rect x="18" y="6" width="1" height="1" fill=currentColor />
+         <rect x="17" y="5" width="1" height="1" fill=currentColor />
+         <rect x="16" y="4" width="1" height="1" fill=currentColor />
+         <rect x="15" y="3" width="1" height="1" fill=currentColor />
+         <rect x="14" y="2" width="1" height="1" fill=currentColor />
+         <rect x="21" y="13" width="1" height="1" fill=currentColor />
+         <rect x="20" y="14" width="1" height="1" fill=currentColor />
+         <rect x="19" y="15" width="1" height="1" fill=currentColor />
+         <rect x="18" y="16" width="1" height="1" fill=currentColor />
+         <rect x="17" y="17" width="1" height="1" fill=currentColor />
+         <rect x="16" y="18" width="1" height="1" fill=currentColor />
+         <rect x="15" y="19" width="1" height="1" fill=currentColor />
+         <rect x="14" y="20" width="1" height="1" fill=currentColor />
+       </>
      | Copy =>
        <svg>
          <rect x="9.5" y="6.5" width="9" height="13" stroke="#2D2D2D" />
-         <rect x="7" y="3" width="10" height="1" fill="#2D2D2D" />
+         <rect x="7" y="3" width="10" height="1" fill=currentColor />
          <rect
            width="1"
            height="15"
            transform="matrix(1 0 0 -1 6 18)"
-           fill="#2D2D2D"
+           fill=currentColor
          />
        </svg>
      | NodeOperators =>
@@ -662,44 +652,41 @@ let make = (~kind, ~size=`px(24)) => {
          />
        </svg>
      | Documentation =>
-       <svg
-         width="24"
-         height="24"
-         viewBox="0 0 24 24"
-         fill="none"
-         xmlns="http://www.w3.org/2000/svg">
-         <g>
-           <rect
-             x="2.90002"
-             y="2.90002"
-             width="20.6"
-             height="20.6"
-             rx="0.5"
-             fill="white"
-             stroke="#2D2D2D"
-           />
-           <rect
-             x="0.5"
-             y="0.5"
-             width="20.6"
-             height="20.6"
-             rx="0.5"
-             fill="white"
-             stroke="#2D2D2D"
-           />
-           <path
-             fillRule="evenodd"
-             clipRule="evenodd"
-             d="M16.8 4.80005H4.79999V5.70005H16.8V4.80005ZM15 8.40005H4.79999V9.30005H15V8.40005ZM4.79999 12H16.8V12.9H4.79999V12ZM12.6 15.6H4.79999V16.5H12.6V15.6Z"
-             fill="#2D2D2D"
-           />
-         </g>
-         <defs>
-           <clipPath id="clip0">
-             <rect width="24" height="24" fill="white" />
-           </clipPath>
-         </defs>
-       </svg>
+       <>
+         <mask id="path-1-inside-1" fill="white">
+           <rect x="4" y="4" width="36" height="36" rx="1" />
+         </mask>
+         <rect
+           x="4"
+           y="4"
+           width="36"
+           height="36"
+           rx="1"
+           fill="#FF603B"
+           stroke="white"
+           strokeWidth="3"
+           mask="url(#path-1-inside-1)"
+         />
+         <mask id="path-2-inside-2" fill="white">
+           <rect width="36" height="36" rx="1" />
+         </mask>
+         <rect
+           width="36"
+           height="36"
+           rx="1"
+           fill="#FF603B"
+           stroke="white"
+           strokeWidth="3"
+           mask="url(#path-2-inside-2)"
+         />
+         <path
+           fillRule="evenodd"
+           clipRule="evenodd"
+           d="M28 8H8V9.5H28V8ZM25 14H8V15.5H25V14ZM8 20H28V21.5H8V20ZM21 26H8V27.5H21V26Z"
+           fill="white"
+         />
+       </>
+
      | GenesisProgram =>
        <svg>
          <g>
@@ -717,17 +704,43 @@ let make = (~kind, ~size=`px(24)) => {
              cy="3.91768"
              rx="1.8"
              ry="1.8"
-             fill="#2D2D2D"
+             fill=currentColor
            />
-           <circle cx="22.2" cy="16.8" r="1.8" fill="#2D2D2D" />
-           <ellipse cx="1.8" cy="6.74116" rx="1.8" ry="1.8" fill="#2D2D2D" />
+           <circle cx="22.2" cy="16.8" r="1.8" fill=currentColor />
+           <ellipse
+             cx="1.8"
+             cy="6.74116"
+             rx="1.8"
+             ry="1.8"
+             fill=currentColor
+           />
+           <circle cx="22.2" cy="16.8" r="1.8" fill=currentColor />
+           <ellipse
+             cx="1.8"
+             cy="6.74116"
+             rx="1.8"
+             ry="1.8"
+             fill=currentColor
+           />
            <path
              d="M11.4 1.8C11.4 2.79411 10.5941 3.6 9.59999 3.6C8.60588 3.6 7.79999 2.79411 7.79999 1.8C7.79999 0.805887 8.60588 0 9.59999 0C10.5941 0 11.4 0.805887 11.4 1.8Z"
-             fill="#2D2D2D"
+             fill=currentColor
            />
-           <ellipse cx="13.8" cy="22.2" rx="1.8" ry="1.8" fill="#2D2D2D" />
-           <ellipse cx="3.00001" cy="18.6" rx="1.8" ry="1.8" fill="#2D2D2D" />
-           <ellipse cx="12" cy="11.4" rx="1.8" ry="1.8" fill="#2D2D2D" />
+           <ellipse
+             cx="13.8"
+             cy="22.2"
+             rx="1.8"
+             ry="1.8"
+             fill=currentColor
+           />
+           <ellipse
+             cx="3.00001"
+             cy="18.6"
+             rx="1.8"
+             ry="1.8"
+             fill=currentColor
+           />
+           <ellipse cx="12" cy="11.4" rx="1.8" ry="1.8" fill=currentColor />
          </g>
          <defs>
            <clipPath id="clip0">
@@ -747,7 +760,7 @@ let make = (~kind, ~size=`px(24)) => {
          />
          <path
            d="M12 18.0136C12.1916 18.0246 12.3798 17.959 12.5231 17.8314C12.6664 17.7037 12.7532 17.5243 12.7643 17.3327L12.8842 16.421C12.3024 16.5558 11.6975 16.5558 11.1158 16.421L11.2317 17.3347C11.2461 17.5256 11.3344 17.7034 11.4779 17.8302C11.6214 17.957 11.8087 18.0228 12 18.0136ZM17.1834 17.8171H18.6119V9.66269C18.6119 8.54957 18.0971 7.80192 17.1834 7.51995V17.8171ZM5.38806 17.8171H6.81655V7.51504C5.90876 7.79701 5.38806 8.54466 5.38806 9.65778V17.8171ZM12.8842 16.421C13.8146 16.1882 14.4296 15.524 14.5789 14.3578L15.4759 7.43055C14.4424 7.67715 13.8775 8.46311 13.7114 9.7403L12.8842 16.421ZM11.1158 16.421L10.2895 9.7403C10.1225 8.46311 9.55761 7.67715 8.52799 7.43055L9.42497 14.3578C9.57431 15.5211 10.1726 16.1852 11.1197 16.421H11.1158ZM17.1834 7.51701V6.86859C17.1834 6.30367 16.8514 5.98438 16.4024 5.98438C15.9534 5.98438 15.638 6.25062 15.5555 6.83125L15.472 7.42957C16.0408 7.31775 16.6282 7.34641 17.1834 7.51308V7.51701ZM6.81655 7.51308C7.13864 7.40939 7.47541 7.35862 7.81375 7.36276C8.05359 7.35778 8.29323 7.3802 8.52799 7.42957L8.44547 6.83125C8.36196 6.25062 8.04659 5.98438 7.59761 5.98438C7.14862 5.98438 6.81655 6.29974 6.81655 6.86859V7.51308Z"
-           fill="#2D2D2D"
+           fill=currentColor
          />
        </svg>
      | Testnet =>
@@ -804,19 +817,24 @@ let make = (~kind, ~size=`px(24)) => {
      | CoreProtocol =>
        <path
          d="M12 20.1614C12.2601 20.1763 12.5154 20.0874 12.7099 19.9141C12.9045 19.7409 13.0222 19.4974 13.0373 19.2374L13.2 18.0001C12.4105 18.1831 11.5895 18.1831 10.8 18.0001L10.9573 19.2401C10.9768 19.4992 11.0967 19.7405 11.2915 19.9126C11.4862 20.0847 11.7404 20.1739 12 20.1614ZM19.0347 19.8947H20.9733V8.82806C20.9733 7.31739 20.2747 6.30273 19.0347 5.92006V19.8947ZM3.02667 19.8947H4.96534V5.91339C3.73334 6.29606 3.02667 7.31073 3.02667 8.82139V19.8947ZM13.2 18.0001C14.4627 17.6841 15.2973 16.7827 15.5 15.2001L16.7173 5.79873C15.3147 6.13339 14.548 7.20006 14.3227 8.93339L13.2 18.0001ZM10.8 18.0001L9.67867 8.93339C9.45201 7.20006 8.68534 6.13339 7.28801 5.79873L8.50534 15.2001C8.70801 16.7787 9.52001 17.6801 10.8053 18.0001H10.8ZM19.0347 5.91606V5.03606C19.0347 4.26939 18.584 3.83606 17.9747 3.83606C17.3653 3.83606 16.9373 4.19739 16.8253 4.98539L16.712 5.79739C17.4839 5.64564 18.2812 5.68454 19.0347 5.91073V5.91606ZM4.96534 5.91073C5.40245 5.77 5.8595 5.70111 6.31867 5.70673C6.64418 5.69997 6.9694 5.73039 7.28801 5.79739L7.17601 4.98539C7.06267 4.19739 6.63467 3.83606 6.02534 3.83606C5.41601 3.83606 4.96534 4.26406 4.96534 5.03606V5.91073Z"
-         fill="#2D2D2D"
+         fill=currentColor
+       />
+     | CoreProtocolLarge =>
+       <path
+         d="M20.0001 33.9422C19.4837 33.9578 18.981 33.7751 18.595 33.4317C18.2091 33.0883 17.9692 32.6102 17.9246 32.0955L17.7023 30.2667C15.4801 29.6333 14.1779 27.9889 13.8423 25.3778L11.8423 9.96888C11.4126 9.89985 10.9776 9.86861 10.5423 9.87555C9.89996 9.87026 9.25991 9.95326 8.64012 10.1222V33.4911H4.70679V14.7067C4.70679 12.1578 5.84901 10.3578 7.93568 9.60888V8.39777C7.93568 6.99777 8.78457 6.05777 10.049 6.05777C11.3135 6.05777 12.1068 6.84444 12.3112 8.27999L12.4668 9.40221C14.7446 10.0467 16.0935 11.88 16.4801 14.8555L18.3268 29.7089C19.4321 29.9222 20.5681 29.9222 21.6735 29.7089L23.5201 14.8578C23.9068 11.88 25.2557 10.0467 27.5335 9.40221L27.689 8.27999C27.8935 6.8511 28.6957 6.05777 29.9512 6.05777C31.2068 6.05777 32.0646 6.99777 32.0646 8.39777V9.60888C34.1512 10.3578 35.2935 12.1578 35.2935 14.7067V33.4911H31.3646V10.12C30.7448 9.9512 30.1047 9.86821 29.4623 9.87333C29.0271 9.86639 28.5921 9.89762 28.1623 9.96666L26.1623 25.3778C25.8335 27.9422 24.5001 29.6267 22.3023 30.2667L22.0801 32.1C22.0458 32.6191 21.8081 33.1036 21.4187 33.4486C21.0293 33.7935 20.5195 33.9708 20.0001 33.9422V33.9422ZM18.4201 30.4444L18.6201 32.02C18.6441 32.3639 18.8022 32.6847 19.0603 32.9132C19.3183 33.1418 19.6558 33.2599 20.0001 33.2422C20.1721 33.2546 20.3449 33.2323 20.5081 33.1766C20.6713 33.121 20.8217 33.0332 20.9504 32.9184C21.0791 32.8036 21.1834 32.6642 21.2572 32.5083C21.331 32.3525 21.3728 32.1834 21.3801 32.0111L21.5801 30.4333C20.5338 30.6052 19.4664 30.6052 18.4201 30.4333V30.4444ZM32.0646 32.8022H34.5935V14.7067C34.5935 12.5467 33.7223 11.0555 32.0646 10.36V32.8022ZM5.3979 32.8022H7.93568V10.36C6.2779 11.0555 5.40679 12.5467 5.40679 14.7067L5.3979 32.8022ZM12.569 10.16L14.5268 25.2867C14.809 27.4755 15.8401 28.8911 17.5979 29.5089L15.7779 14.9355C15.4512 12.3667 14.3979 10.7978 12.569 10.16ZM27.4312 10.16C25.6023 10.7978 24.5423 12.3667 24.2157 14.9378L22.4046 29.5C24.1601 28.8822 25.1935 27.4667 25.4735 25.2778L27.4312 10.16ZM8.63568 9.38666C9.2583 9.23519 9.89713 9.16056 10.5379 9.16444C10.9398 9.16023 11.3415 9.184 11.7401 9.23555L11.6179 8.36221C11.4646 7.2911 10.9379 6.74888 10.049 6.74888C9.16012 6.74888 8.63568 7.37777 8.63568 8.38888V9.38666ZM29.4623 9.16444C30.1031 9.16056 30.7419 9.23519 31.3646 9.38666V8.39777C31.3646 7.38666 30.8223 6.75777 29.9512 6.75777C29.0801 6.75777 28.5357 7.29999 28.3823 8.3711L28.2601 9.24444C28.6587 9.19288 29.0604 9.16912 29.4623 9.17332V9.16444Z"
+         fill=currentColor
        />
      | Community =>
        <svg>
          <path
            d="M22.9 12C22.9 18.0199 18.0199 22.9 12 22.9C5.98007 22.9 1.09998 18.0199 1.09998 12C1.09998 5.98007 5.98007 1.09998 12 1.09998C18.0199 1.09998 22.9 5.98007 22.9 12Z"
-           stroke="#2D2D2D"
+           stroke=currentColor
          />
          <path
            d="M17.3941 12C17.3941 15.0879 16.773 17.8587 15.7921 19.8391C14.7956 21.8507 13.5126 22.9 12.247 22.9C10.9815 22.9 9.69846 21.8507 8.702 19.8391C7.72103 17.8587 7.09998 15.0879 7.09998 12C7.09998 8.9121 7.72103 6.14124 8.702 4.1609C9.69846 2.1493 10.9815 1.09998 12.247 1.09998C13.5126 1.09998 14.7956 2.1493 15.7921 4.1609C16.773 6.14124 17.3941 8.9121 17.3941 12Z"
-           stroke="#2D2D2D"
+           stroke=currentColor
          />
-         <line x1="1" y1="12.5" x2="23" y2="12.5" stroke="#2D2D2D" />
+         <line x1="1" y1="12.5" x2="23" y2="12.5" stroke=currentColor />
        </svg>
      | TechnicalGrants =>
        <svg>
@@ -909,7 +927,7 @@ let make = (~kind, ~size=`px(24)) => {
            rx="0.5"
            stroke="#2D2D2D"
          />
-         <rect y="4.19995" width="24" height="1" fill="#2D2D2D" />
+         <rect y="4.19995" width="24" height="1" fill=currentColor />
          <path
            d="M18.1 14.1C18.1 17.6346 15.2347 20.5 11.7 20.5C8.16543 20.5 5.30005 17.6346 5.30005 14.1C5.30005 10.5653 8.16543 7.69995 11.7 7.69995C15.2347 7.69995 18.1 10.5653 18.1 14.1Z"
            stroke="#2D2D2D"
@@ -919,7 +937,7 @@ let make = (~kind, ~size=`px(24)) => {
            y="13.7999"
            width="13.8"
            height="1"
-           fill="#2D2D2D"
+           fill=currentColor
          />
          <path
            d="M14.5 14.1C14.5 15.9475 14.1408 17.5957 13.5824 18.7633C13.0065 19.9674 12.3081 20.5 11.7 20.5C11.0919 20.5 10.3936 19.9674 9.81764 18.7633C9.25923 17.5957 8.90002 15.9475 8.90002 14.1C8.90002 12.2524 9.25923 10.6042 9.81764 9.43664C10.3936 8.23246 11.0919 7.69995 11.7 7.69995C12.3081 7.69995 13.0065 8.23246 13.5824 9.43664C14.1408 10.6042 14.5 12.2524 14.5 14.1Z"
@@ -933,10 +951,22 @@ let make = (~kind, ~size=`px(24)) => {
            y="7.19995"
            width="19.2"
            height="1"
-           fill="#2D2D2D"
+           fill=currentColor
          />
-         <rect x="2.40002" y="11.4" width="19.2" height="1" fill="#2D2D2D" />
-         <rect x="2.40002" y="15.6" width="19.2" height="1" fill="#2D2D2D" />
+         <rect
+           x="2.40002"
+           y="11.4"
+           width="19.2"
+           height="1"
+           fill=currentColor
+         />
+         <rect
+           x="2.40002"
+           y="15.6"
+           width="19.2"
+           height="1"
+           fill=currentColor
+         />
        </svg>
      | CloseMenu =>
        <svg>
@@ -944,7 +974,7 @@ let make = (~kind, ~size=`px(24)) => {
            fillRule="evenodd"
            clipRule="evenodd"
            d="M12.2309 11.3823L7.44854 6.59998L6.74143 7.30708L11.5238 12.0894L6.71545 16.8978L7.42256 17.6049L12.2309 12.7965L16.9238 17.4894L17.6309 16.7823L12.938 12.0894L17.6049 7.42252L16.8978 6.71542L12.2309 11.3823Z"
-           fill="#2D2D2D"
+           fill=currentColor
          />
        </svg>
      | Box =>

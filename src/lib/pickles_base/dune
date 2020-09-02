@@ -1,0 +1,20 @@
+(library
+  (inline_tests)
+  (name pickles_base)
+  (public_name pickles_base)
+  (flags -warn-error -22)
+  (preprocess (pps h_list.ppx ppx_version ppx_coda ppx_jane ppx_deriving.std ppx_deriving_yojson h_list.ppx))
+  (libraries
+    random_oracle_input
+    pickles_types
+;    pickles.limb_vector
+;    pickles.marlin_checks
+;    pickles.one_hot_vector
+;    pickles.pseudo
+;    snarky_log
+;    sponge
+;    group_map
+;    snarky_group_map
+;    snarky_curve
+    core_kernel ))
+

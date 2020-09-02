@@ -6,14 +6,13 @@ module Colors = {
   let gray = `hex("d9d9d9");
   let white = Css.white;
   let black = Css.black;
+  let digitalBlack = `hex("2d2d2d");
 };
 
 module Typeface = {
   let monumentGrotesk = fontFamily("Monument Grotesk, serif");
   let monumentGroteskMono = fontFamily("Monument Grotesk mono, serif");
-  let ibmplexsans =
-    fontFamily("IBM Plex Sans, Helvetica Neue, Arial, sans-serif");
-  let ibmplexmono = fontFamily("IBM Plex Mono, Menlo, monospace");
+  let ibmplexsans = fontFamily("IBM Plex Sans, sans-serif");
 };
 
 module MediaQuery = {
@@ -216,7 +215,7 @@ module Type = {
     style([
       Typeface.monumentGrotesk,
       fontWeight(`num(500)),
-      fontSize(`px(14)),
+      fontSize(`px(16)),
       lineHeight(`rem(1.5)),
     ]);
 

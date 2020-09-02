@@ -29,7 +29,7 @@ unit_test_profiles_medium_curves = ['dev_medium_curves']
 
 simple_tests = [
     'full-test',
-    'transaction-snark-profiler -k 2',
+    'transaction-snark-profiler -k 1',
 ]
 
 compile_config_agnostic_tests = [
