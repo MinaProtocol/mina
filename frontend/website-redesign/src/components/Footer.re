@@ -2,6 +2,7 @@ module Styles = {
   open Css;
   let footerContainer =
     style([
+      position(`relative),
       left(`zero),
       bottom(`zero),
       height(`rem(106.)),
@@ -23,6 +24,20 @@ module Styles = {
           height(`rem(48.)),
           backgroundImage(`url("/static/img/Large.png")),
         ],
+      ),
+    ]);
+  let backToTopButton =
+    style([
+      position(`absolute),
+      right(`rem(1.2)),
+      bottom(`rem(1.2)),
+      media(
+        Theme.MediaQuery.tablet,
+        [right(`rem(2.5)), bottom(`rem(3.375))],
+      ),
+      media(
+        Theme.MediaQuery.desktop,
+        [right(`rem(1.75)), bottom(`rem(1.75))],
       ),
     ]);
   let backToTopButtonContent =
@@ -65,8 +80,6 @@ module Styles = {
       Theme.Type.paragraph,
       style([color(white), marginTop(`zero), marginBottom(`rem(1.))]),
     ]);
-  let backToTopButton =
-    style([position(`absolute), right(`rem(1.)), bottom(`rem(2.))]);
 };
 
 module SocialIcons = {
@@ -433,18 +446,20 @@ let make = () => {
     <div className=Styles.innerContainer> <LeftSide /> <FooterLinks /> </div>
     <WhiteLine />
     <Subfooter />
-    <Button
-      height={`rem(4.125)}
-      width={`rem(3.75)}
-      bgColor=Theme.Colors.black
-      borderColor=Theme.Colors.white
-      paddingX=1.1
-      paddingY=0.75
-      dark=true>
-      <span className=Styles.backToTopButtonContent>
-        <Icon kind=Icon.ArrowUpMedium size=1. />
-        {React.string("Top")}
-      </span>
-    </Button>
+    <div className=Styles.backToTopButton>
+      <Button
+        height={`rem(4.125)}
+        width={`rem(3.75)}
+        bgColor=Theme.Colors.black
+        borderColor=Theme.Colors.white
+        paddingX=1.1
+        paddingY=0.75
+        dark=true>
+        <span className=Styles.backToTopButtonContent>
+          <Icon kind=Icon.ArrowUpMedium size=1. />
+          {React.string("Top")}
+        </span>
+      </Button>
+    </div>
   </div>;
 };
