@@ -31,7 +31,7 @@ module Styles = {
     style([
       display(`flex),
       alignItems(`center),
-      justifyContent(center),
+      justifyContent(`center),
       marginLeft(`rem(0.5)),
     ]);
 
@@ -77,7 +77,7 @@ let make = () => {
     {successState
        ? <div className=Styles.successState>
            <span className=Styles.successText>
-             {React.string({js|Check your email!|js})}
+             {React.string({"Check your email!"})}
            </span>
          </div>
        : <div className=Styles.inputContainer>
