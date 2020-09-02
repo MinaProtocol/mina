@@ -76,56 +76,80 @@ module Internal_command_info = struct
     ; hash: string }
   [@@deriving to_yojson]
 
-  let to_operations ~coinbase_receiver ~coinbase (t : t) : Operation.t list =
-    (* We choose to represent the dec-side of fee transfers from txns from the
-     * canonical user command that created them so we are able consistently
-     * produce more balance changing operations in the mempool or a block.
-     * *)
-    let plan : 'a Op.t list =
-      match t.kind with
-      | `Coinbase ->
-          (* The coinbase transaction is really incrementing by the coinbase
+  module T (M : Monad_fail.S) = struct
+    module Op_build = Op.T (M)
+
+    let to_operations ~coinbase_receiver ~coinbase (t : t) :
+        (Operation.t list, Errors.t) M.t =
+      (* We choose to represent the dec-side of fee transfers from txns from the
+       * canonical user command that created them so we are able consistently
+       * produce more balance changing operations in the mempool or a block.
+       * *)
+      let plan : 'a Op.t list =
+        match t.kind with
+        | `Coinbase ->
+            (* The coinbase transaction is really incrementing by the coinbase
            * amount  *)
-          [{Op.label= `Coinbase_inc; related_to= None}]
-      | `Fee_transfer ->
-          [{Op.label= `Fee_receiver_inc; related_to= None}]
-      | `Fee_transfer_via_coinbase ->
-          [ {Op.label= `Fee_receiver_inc; related_to= None}
-          ; {Op.label= `Fee_payer_dec; related_to= Some `Fee_receiver_inc} ]
-    in
-    Op.build ~a_eq:[%eq: [`Coinbase_inc | `Fee_payer_dec | `Fee_receiver_inc]]
-      ~plan ~f:(fun ~related_operations ~operation_identifier op ->
-        (* All internal commands succeed if they're in blocks *)
-        let status = Operation_statuses.name `Success in
-        match op.label with
-        | `Coinbase_inc ->
-            { Operation.operation_identifier
-            ; related_operations
-            ; status
-            ; account= Some (account_id t.receiver Amount_of.Token_id.default)
-            ; _type= Operation_types.name `Coinbase_inc
-            ; amount= Some (Amount_of.coda coinbase)
-            ; coin_change= None
-            ; metadata= None }
-        | `Fee_receiver_inc ->
-            { Operation.operation_identifier
-            ; related_operations
-            ; status
-            ; account= Some (account_id t.receiver t.token)
-            ; _type= Operation_types.name `Fee_receiver_inc
-            ; amount= Some (Amount_of.token t.token t.fee)
-            ; coin_change= None
-            ; metadata= None }
-        | `Fee_payer_dec ->
-            { Operation.operation_identifier
-            ; related_operations
-            ; status
-            ; account=
-                Some (account_id coinbase_receiver Amount_of.Token_id.default)
-            ; _type= Operation_types.name `Fee_payer_dec
-            ; amount= Some Amount_of.(negated (coda t.fee))
-            ; coin_change= None
-            ; metadata= None } )
+            [{Op.label= `Coinbase_inc; related_to= None}]
+        | `Fee_transfer ->
+            [{Op.label= `Fee_receiver_inc; related_to= None}]
+        | `Fee_transfer_via_coinbase ->
+            [ {Op.label= `Fee_receiver_inc; related_to= None}
+            ; {Op.label= `Fee_payer_dec; related_to= Some `Fee_receiver_inc} ]
+      in
+      Op_build.build
+        ~a_eq:[%eq: [`Coinbase_inc | `Fee_payer_dec | `Fee_receiver_inc]] ~plan
+        ~f:(fun ~related_operations ~operation_identifier op ->
+          (* All internal commands succeed if they're in blocks *)
+          let status = Operation_statuses.name `Success in
+          match op.label with
+          | `Coinbase_inc ->
+              M.return
+                { Operation.operation_identifier
+                ; related_operations
+                ; status
+                ; account=
+                    Some (account_id t.receiver Amount_of.Token_id.default)
+                ; _type= Operation_types.name `Coinbase_inc
+                ; amount= Some (Amount_of.coda coinbase)
+                ; coin_change= None
+                ; metadata= None }
+          | `Fee_receiver_inc ->
+              M.return
+                { Operation.operation_identifier
+                ; related_operations
+                ; status
+                ; account= Some (account_id t.receiver t.token)
+                ; _type= Operation_types.name `Fee_receiver_inc
+                ; amount= Some (Amount_of.token t.token t.fee)
+                ; coin_change= None
+                ; metadata= None }
+          | `Fee_payer_dec ->
+              let open M.Let_syntax in
+              let%map coinbase_receiver =
+                match coinbase_receiver with
+                | Some r ->
+                    M.return r
+                | None ->
+                    M.fail
+                      (Errors.create
+                         ~context:
+                           "This operation existing (fee payer dec within \
+                            Internal_command) demands a coinbase receiver to \
+                            exist. Please report this bug."
+                         `Invariant_violation)
+              in
+              { Operation.operation_identifier
+              ; related_operations
+              ; status
+              ; account=
+                  Some
+                    (account_id coinbase_receiver Amount_of.Token_id.default)
+              ; _type= Operation_types.name `Fee_payer_dec
+              ; amount= Some Amount_of.(negated (coda t.fee))
+              ; coin_change= None
+              ; metadata= None } )
+  end
 
   let dummies =
     [ { kind= `Coinbase
@@ -521,6 +545,7 @@ module Specific = struct
 
   module Impl (M : Monad_fail.S) = struct
     module Query = Block_query.T (M)
+    module Internal_command_info_ops = Internal_command_info.T (M)
 
     let handle :
            env:'gql Env.T(M).t
@@ -556,17 +581,28 @@ module Specific = struct
         else env.db_block query
       in
       let coinbase = (res#genesisConstants)#coinbase in
-      let%map coinbase_receiver =
-        match
-          List.find block_info.internal_info ~f:(fun info ->
-              info.Internal_command_info.kind = `Coinbase )
-        with
-        | Some cmd ->
-            M.return cmd.Internal_command_info.receiver
-        | None ->
-            M.fail
-            @@ Errors.create ~context:"A coinbase is missing from a block"
-                 `Invariant_violation
+      let coinbase_receiver =
+        List.find block_info.internal_info ~f:(fun info ->
+            info.Internal_command_info.kind = `Coinbase )
+        |> Option.map ~f:(fun cmd -> cmd.Internal_command_info.receiver)
+      in
+      let%map internal_transactions =
+        List.fold block_info.internal_info ~init:(M.return [])
+          ~f:(fun macc info ->
+            let%bind acc = macc in
+            let%map operations =
+              Internal_command_info_ops.to_operations ~coinbase_receiver
+                ~coinbase info
+            in
+            [%log debug]
+              ~metadata:[("info", Internal_command_info.to_yojson info)]
+              "Block internal received $info" ;
+            { Transaction.transaction_identifier=
+                {Transaction_identifier.hash= info.hash}
+            ; operations
+            ; metadata= None }
+            :: acc )
+        |> M.map ~f:List.rev
       in
       { Block_response.block=
           Some
@@ -574,16 +610,7 @@ module Specific = struct
             ; parent_block_identifier= block_info.parent_block_identifier
             ; timestamp= block_info.timestamp
             ; transactions=
-                List.map block_info.internal_info ~f:(fun info ->
-                    [%log debug]
-                      ~metadata:[("info", Internal_command_info.to_yojson info)]
-                      "Block internal received $info" ;
-                    { Transaction.transaction_identifier=
-                        {Transaction_identifier.hash= info.hash}
-                    ; operations=
-                        Internal_command_info.to_operations ~coinbase_receiver
-                          ~coinbase info
-                    ; metadata= None } )
+                internal_transactions
                 @ List.map block_info.user_commands ~f:(fun info ->
                       [%log debug]
                         ~metadata:[("info", User_command_info.to_yojson info)]
