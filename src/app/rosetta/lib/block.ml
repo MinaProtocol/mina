@@ -64,7 +64,8 @@ module Op = User_command_info.Op
 
 module Internal_command_info = struct
   module Kind = struct
-    type t = [`Coinbase | `Fee_transfer] [@@deriving eq, to_yojson]
+    type t = [`Coinbase | `Fee_transfer | `Fee_transfer_via_coinbase]
+    [@@deriving eq, to_yojson]
   end
 
   type t =
@@ -75,7 +76,7 @@ module Internal_command_info = struct
     ; hash: string }
   [@@deriving to_yojson]
 
-  let to_operations ~coinbase (t : t) : Operation.t list =
+  let to_operations ~coinbase_receiver ~coinbase (t : t) : Operation.t list =
     (* We choose to represent the dec-side of fee transfers from txns from the
      * canonical user command that created them so we are able consistently
      * produce more balance changing operations in the mempool or a block.
@@ -84,11 +85,12 @@ module Internal_command_info = struct
       match t.kind with
       | `Coinbase ->
           (* The coinbase transaction is really incrementing by the coinbase
-         * amount  *)
+           * amount  *)
           [{Op.label= `Coinbase_inc; related_to= None}]
       | `Fee_transfer ->
+          [{Op.label= `Fee_receiver_inc; related_to= None}]
+      | `Fee_transfer_via_coinbase ->
           [ {Op.label= `Fee_receiver_inc; related_to= None}
-            (* we use the fee_payer_dec from here instead of the user command when we have internal commands (ie in a block) for more accuracy w.r.t. the protocol *)
           ; {Op.label= `Fee_payer_dec; related_to= Some `Fee_receiver_inc} ]
     in
     Op.build ~a_eq:[%eq: [`Coinbase_inc | `Fee_payer_dec | `Fee_receiver_inc]]
@@ -118,7 +120,8 @@ module Internal_command_info = struct
             { Operation.operation_identifier
             ; related_operations
             ; status
-            ; account= Some (account_id t.receiver Amount_of.Token_id.default)
+            ; account=
+                Some (account_id coinbase_receiver Amount_of.Token_id.default)
             ; _type= Operation_types.name `Fee_payer_dec
             ; amount= Some Amount_of.(negated (coda t.fee))
             ; coin_change= None
@@ -358,14 +361,16 @@ SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, 
                 M.return `Fee_transfer
             | "coinbase" ->
                 M.return `Coinbase
+            | "fee_transfer_via_coinbase" ->
+                M.return `Fee_transfer_via_coinbase
             | other ->
                 M.fail
                   (Errors.create
                      ~context:
                        (sprintf
                           "The archive database is storing internal commands \
-                           with %s; this is neither fee_transfer nor \
-                           coinbase. Please report a bug!"
+                           with %s; this is neither fee_transfer nor coinbase \
+                           not fee_transfer_via_coinbase. Please report a bug!"
                           other)
                      `Invariant_violation)
           in
@@ -564,7 +569,8 @@ module Specific = struct
                     { Transaction.transaction_identifier=
                         {Transaction_identifier.hash= info.hash}
                     ; operations=
-                        Internal_command_info.to_operations ~coinbase info
+                        Internal_command_info.to_operations
+                          ~coinbase_receiver:block_info.creator ~coinbase info
                     ; metadata= None } )
                 @ List.map block_info.user_commands ~f:(fun info ->
                       [%log debug]

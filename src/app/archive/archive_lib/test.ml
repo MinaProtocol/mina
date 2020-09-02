@@ -82,6 +82,7 @@ let%test_module "Archive node unit tests" =
             let open Deferred.Result.Let_syntax in
             let%bind fee_transfer_id =
               Processor.Fee_transfer.add_if_doesn't_exist conn fee_transfer
+                `Normal
             in
             let%map result =
               Processor.Internal_command.find conn ~transaction_hash

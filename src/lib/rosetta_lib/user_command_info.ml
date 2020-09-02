@@ -355,20 +355,18 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
      * transfer. ie. Source decreases, and receiver increases.
   *)
   let plan : 'a Op.t list =
-    ( match failure_status with
-    | Some (`Applied (Account_creation_fees_paid.By_receiver amount)) ->
-        [{Op.label= `Account_creation_fee_via_payment amount; related_to= None}]
-    | Some (`Applied (Account_creation_fees_paid.By_fee_payer amount)) ->
-        [ { Op.label= `Account_creation_fee_via_fee_payer amount
-          ; related_to= None } ]
-    | None ->
-        (* mempool *)
-        (* The dec side of a user command's fee transfer is here ONLY when requested from mempool. When loaded from a block, we pull the fee_payer_dec from one side of side of a fee_transfer *)
-        if not Unsigned.UInt64.(equal t.fee zero) then
-          [{Op.label= `Fee_payer_dec; related_to= None}]
-        else []
-    | Some _ ->
-        [] )
+    ( if not Unsigned.UInt64.(equal t.fee zero) then
+      [{Op.label= `Fee_payer_dec; related_to= None}]
+    else [] )
+    @ ( match failure_status with
+      | Some (`Applied (Account_creation_fees_paid.By_receiver amount)) ->
+          [ { Op.label= `Account_creation_fee_via_payment amount
+            ; related_to= None } ]
+      | Some (`Applied (Account_creation_fees_paid.By_fee_payer amount)) ->
+          [ { Op.label= `Account_creation_fee_via_fee_payer amount
+            ; related_to= None } ]
+      | _ ->
+          [] )
     @
     match t.kind with
     | `Payment -> (
