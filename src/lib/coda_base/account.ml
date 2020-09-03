@@ -313,6 +313,7 @@ module Checked = struct
       , Balance.var
       , Nonce.Checked.t
       , Receipt.Chain_hash.var
+      , Public_key.Compressed.var
       , State_hash.var
       , Timing.var
       , Permissions.Checked.t
