@@ -167,17 +167,17 @@ let direct_graphql_payment_through_block ~logger ~rosetta_uri ~graphql_uri
           ; status= "Pending"
           ; _type= "payment_source_dec"
           ; target= None }
-        ; { amount= Some (-2_000_000_000)
-          ; account=
-              Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
-          ; status= "Pending"
-          ; _type= "fee_payer_dec"
-          ; target= None }
         ; { amount= Some 5_000_000_000
           ; account=
               Some {Account.pk= other_pk; token_id= Unsigned.UInt64.of_int 1}
           ; status= "Pending"
           ; _type= "payment_receiver_inc"
+          ; target= None }
+        ; { amount= Some (-2_000_000_000)
+          ; account=
+              Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
+          ; status= "Pending"
+          ; _type= "fee_payer_dec"
           ; target= None } ]
 
 let direct_graphql_delegation_through_block ~logger ~rosetta_uri ~graphql_uri
@@ -194,18 +194,18 @@ let direct_graphql_delegation_through_block ~logger ~rosetta_uri ~graphql_uri
     ~network_response
     ~operation_expectations:
       Operation_expectation.
-        [ { amount= Some (-2_000_000_000)
-          ; account=
-              Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
-          ; status= "Pending"
-          ; _type= "fee_payer_dec"
-          ; target= None }
-        ; { amount= None
+        [ { amount= None
           ; account=
               Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
           ; status= "Pending"
           ; _type= "delegate_change"
-          ; target= Some other_pk } ]
+          ; target= Some other_pk }
+        ; { amount= Some (-2_000_000_000)
+          ; account=
+              Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
+          ; status= "Pending"
+          ; _type= "fee_payer_dec"
+          ; target= None } ]
 
 let direct_graphql_create_token_through_block ~logger ~rosetta_uri ~graphql_uri
     ~network_response =
@@ -305,6 +305,18 @@ let construction_api_transaction_through_mempool ~logger ~rosetta_uri
     Offline.Hash.req ~logger ~rosetta_uri ~network_response
       ~signed_transaction:combine_res.signed_transaction
   in
+  let%bind verified_bool =
+    Signer.verify ~public_key_hex_bytes:keys.public_key_hex_bytes
+      ~signed_transaction_string:combine_res.signed_transaction
+    |> Deferred.return
+  in
+  let%bind () =
+    if verified_bool then return ()
+    else
+      Deferred.Result.fail
+        (Errors.create ~context:"Bad signature created during construction"
+           `Invariant_violation)
+  in
   let%bind submit_res =
     Peek.Construction.submit ~logger ~rosetta_uri ~network_response
       ~signed_transaction:combine_res.signed_transaction
@@ -332,17 +344,17 @@ let construction_api_payment_through_mempool =
           ; status= "Pending"
           ; _type= "payment_source_dec"
           ; target= None }
-        ; { amount= Some (-3_000_000_000)
-          ; account=
-              Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
-          ; status= "Pending"
-          ; _type= "fee_payer_dec"
-          ; target= None }
         ; { amount= Some 10_000_000_000
           ; account=
               Some {Account.pk= other_pk; token_id= Unsigned.UInt64.of_int 1}
           ; status= "Pending"
           ; _type= "payment_receiver_inc"
+          ; target= None }
+        ; { amount= Some (-3_000_000_000)
+          ; account=
+              Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
+          ; status= "Pending"
+          ; _type= "fee_payer_dec"
           ; target= None } ]
 
 let construction_api_delegation_through_mempool =
@@ -353,18 +365,18 @@ let construction_api_delegation_through_mempool =
         ~to_:other_pk )
     ~operation_expectations:
       Operation_expectation.
-        [ { amount= Some (-5_000_000_000)
-          ; account=
-              Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
-          ; status= "Pending"
-          ; _type= "fee_payer_dec"
-          ; target= None }
-        ; { amount= None
+        [ { amount= None
           ; account=
               Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
           ; status= "Pending"
           ; _type= "delegate_change"
-          ; target= Some other_pk } ]
+          ; target= Some other_pk }
+        ; { amount= Some (-5_000_000_000)
+          ; account=
+              Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
+          ; status= "Pending"
+          ; _type= "fee_payer_dec"
+          ; target= None } ]
 
 let construction_api_create_token_through_mempool =
   construction_api_transaction_through_mempool
