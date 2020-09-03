@@ -137,8 +137,9 @@ end = struct
       else Infix.(v land lognot (one lsl i))
   end
 
-  include (
-    Bits.Vector.Make (Vector) : Bits_intf.Convertible_bits with type t := t)
+  module B = Bits.Vector.Make (Vector)
+
+  include (B : Bits_intf.Convertible_bits with type t := t)
 
   [%%ifdef
   consensus_mechanism]
@@ -255,6 +256,8 @@ end = struct
         ~value_of_hlist:typ_of_hlist
 
     module Checked = struct
+      type t = var
+
       let to_bits {magnitude; sgn} =
         Sgn.Checked.is_pos sgn :: (var_to_bits magnitude :> Boolean.var list)
 
@@ -344,6 +347,10 @@ end = struct
   consensus_mechanism]
 
   module Checked = struct
+    module N = Coda_numbers.Nat.Make_checked (Unsigned) (B)
+
+    type t = var
+
     let if_ = if_
 
     let if_value cond ~then_ ~else_ : var =
@@ -372,6 +379,20 @@ end = struct
     let assert_equal x y = Field.Checked.Assert.equal (pack_var x) (pack_var y)
 
     let equal x y = Field.Checked.equal (pack_var x) (pack_var y)
+
+    let ( = ) = equal
+
+    let op f (x : var) (y : var) : (Boolean.var, 'a) Checked.t =
+      let g = Fn.compose N.of_bits var_to_bits in
+      f (g x) (g y)
+
+    let ( <= ) x = op N.( <= ) x
+
+    let ( >= ) x = op N.( >= ) x
+
+    let ( < ) x = op N.( < ) x
+
+    let ( > ) x = op N.( > ) x
 
     (* Unpacking protects against overflow *)
     let add (x : Unpacked.var) (y : Unpacked.var) =
@@ -482,7 +503,7 @@ end = struct
           qc_test_fast generator ~shrinker ~f:(fun num ->
               match of_formatted_string (to_formatted_string num) with
               | after_format ->
-                  if after_format = num then ()
+                  if Unsigned.equal after_format num then ()
                   else
                     Error.(
                       raise
