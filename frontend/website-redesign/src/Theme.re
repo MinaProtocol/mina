@@ -145,18 +145,18 @@ module Type = {
         [fontSize(`rem(1.25)), lineHeight(`rem(1.875))],
       ),
     ]);
-
+  /** some styles have not been perfected, but all can be added and adjusted as needed! */
   let label =
     style([
-      Typeface.monumentGrotesk,
+      Typeface.monumentGroteskMono,
       fontSize(`rem(0.75)),
       lineHeight(`rem(1.)),
       color(Colors.digitalBlack),
       textTransform(`uppercase),
-      letterSpacing(`em(0.03)),
+      letterSpacing(`em(0.02)),
       media(
         MediaQuery.tablet,
-        [fontSize(`rem(0.88)), lineHeight(`rem(1.))],
+        [fontSize(`rem(1.25)), lineHeight(`rem(1.875))],
       ),
     ]);
 
@@ -239,7 +239,7 @@ module Type = {
 
   let pageSubhead =
     style([
-      Typeface.monumentGrotesk,
+      Typeface.monumentGroteskMono,
       fontSize(`rem(1.125)),
       lineHeight(`rem(1.68)),
       color(Colors.digitalBlack),
