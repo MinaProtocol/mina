@@ -42,22 +42,54 @@ let token_id_of_account (account : Account_identifier.t) =
 module Op = struct
   type 'a t = {label: 'a; related_to: 'a option} [@@deriving eq]
 
-  let build ~a_eq ~plan ~f =
-    List.mapi plan ~f:(fun i op ->
-        let operation_identifier i =
-          {Operation_identifier.index= Int64.of_int_exn i; network_index= None}
-        in
-        let related_operations =
-          match op.related_to with
-          | Some relate ->
-              List.findi plan ~f:(fun _ a -> a_eq relate a.label)
-              |> Option.map ~f:(fun (i, _) -> operation_identifier i)
-              |> Option.to_list
-          | None ->
-              []
-        in
-        f ~related_operations ~operation_identifier:(operation_identifier i) op
-    )
+  module T (M : Monad.S2) = struct
+    let build ~a_eq ~plan ~f =
+      let open M.Let_syntax in
+      let%map _, rev_data =
+        List.fold plan
+          ~init:(M.return (0, []))
+          ~f:(fun macc op ->
+            let open M.Let_syntax in
+            let%bind i, acc = macc in
+            let operation_identifier i =
+              { Operation_identifier.index= Int64.of_int_exn i
+              ; network_index= None }
+            in
+            let related_operations =
+              match op.related_to with
+              | Some relate ->
+                  List.findi plan ~f:(fun _ a -> a_eq relate a.label)
+                  |> Option.map ~f:(fun (i, _) -> operation_identifier i)
+                  |> Option.to_list
+              | None ->
+                  []
+            in
+            let%map a =
+              f ~related_operations
+                ~operation_identifier:(operation_identifier i) op
+            in
+            (i + 1, a :: acc) )
+      in
+      List.rev rev_data
+  end
+
+  module Ident2 = struct
+    type ('a, 'e) t = 'a
+
+    module T = struct
+      type ('a, 'e) t = 'a
+
+      let map = `Define_using_bind
+
+      let return a = a
+
+      let bind a ~f = f a
+    end
+
+    include Monad.Make2 (T)
+  end
+
+  include T (Ident2)
 end
 
 module Kind = struct
@@ -471,8 +503,6 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
      * transfer. ie. Source decreases, and receiver increases.
   *)
   let plan : 'a Op.t list =
-    (* The dec side of a user command's fee transfer is here *)
-    (* TODO: Relate fee_payer_dec here with fee_receiver_inc in internal commands *)
     ( if not Unsigned.UInt64.(equal t.fee zero) then
       [{Op.label= `Fee_payer_dec; related_to= None}]
     else [] )
@@ -522,9 +552,6 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
         (* If we're looking at mempool transactions, it's always pending *)
         | _, None ->
             (Operation_statuses.name `Pending, None)
-        (* Fee transfers always succeed even if the command fails, if it's in a block. *)
-        | `Fee_payer_dec, _ ->
-            (Operation_statuses.name `Success, None)
         | _, Some (`Applied _) ->
             (Operation_statuses.name `Success, None)
         | _, Some (`Failed reason) ->

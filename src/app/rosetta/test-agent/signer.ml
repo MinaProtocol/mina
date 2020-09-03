@@ -3,6 +3,7 @@
 open Core_kernel
 open Signature_lib
 open Rosetta_lib
+open Rosetta_coding
 module Signature = Coda_base.Signature
 module User_command = Coda_base.User_command
 
@@ -55,3 +56,32 @@ let sign ~(keys : Keys.t) ~unsigned_transaction_string =
   in
   [%test_eq: Signature.t] signature signature' ;
   signature |> Signature.Raw.encode
+
+let verify ~public_key_hex_bytes ~signed_transaction_string =
+  let open Result.Let_syntax in
+  let%bind json =
+    try return (Yojson.Safe.from_string signed_transaction_string)
+    with _ -> Result.fail (Errors.create (`Json_parse None))
+  in
+  let%bind signed_transaction =
+    Transaction.Signed.Rendered.of_yojson json
+    |> Result.map_error ~f:(fun e -> Errors.create (`Json_parse (Some e)))
+    |> Result.bind ~f:Transaction.Signed.of_rendered
+  in
+  let public_key : Public_key.t = Coding.to_public_key public_key_hex_bytes in
+  let%map signature =
+    Signature.Raw.decode signed_transaction.signature
+    |> Result.of_option
+         ~error:
+           (Errors.create ~context:"Signature malformed" (`Json_parse None))
+  in
+  let user_command_payload =
+    User_command_info.Partial.to_user_command_payload
+      ~nonce:signed_transaction.nonce
+      signed_transaction.Transaction.Signed.command
+    |> Result.ok |> Option.value_exn
+  in
+  let message = User_command.to_input user_command_payload in
+  Schnorr.verify signature
+    (Snark_params.Tick.Inner_curve.of_affine public_key)
+    message
