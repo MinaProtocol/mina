@@ -372,7 +372,7 @@ module Network_manager = struct
     let%bind () = run_cmd_exn t "terraform" ["apply"; "-auto-approve"] in
     let%map () =
       Deferred.List.iter t.keypair_secrets ~f:(fun secret ->
-          run_cmd_exn t "sleep" [ "infinity", "&& echo " ^ secret ])
+          run_cmd_exn t "sleep" [ "infinity"; "&& echo "; secret ])
           (* run_cmd_exn t "kubectl"
             [ "create"
             ; "secret"
