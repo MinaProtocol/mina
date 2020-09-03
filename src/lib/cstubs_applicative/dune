@@ -1,0 +1,4 @@
+(library
+ (name cstubs_applicative)
+ (public_name cstubs_applicative)
+ (libraries base ctypes ctypes.stubs))
