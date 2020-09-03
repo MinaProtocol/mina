@@ -43,7 +43,7 @@ module Inputs = struct
   end
 
   type single_spec =
-    ( Transaction.t
+    ( Transaction.Valid.t
     , Transaction_witness.t
     , Transaction_snark.t )
     Snark_work_lib.Work.Single.Spec.t
@@ -89,7 +89,8 @@ module Inputs = struct
                         M.of_transaction ~sok_digest
                           ~source:input.Transaction_snark.Statement.source
                           ~target:input.target
-                          { Transaction_protocol_state.Poly.transaction= t
+                          { Transaction_protocol_state.Poly.transaction= 
+                              t
                           ; block_data= w.protocol_state_body }
                           ~init_stack:w.init_stack
                           ~next_available_token_before:

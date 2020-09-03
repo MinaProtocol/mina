@@ -877,7 +877,19 @@ module T = struct
     | Error e ->
         Deferred.return (Error e)
     | Ok cs ->
-        Verifier.verify_commands verifier cs
+      let open Deferred.Or_error.Let_syntax in
+      let%map xs = Verifier.verify_commands verifier cs in
+      Result.all
+        (List.map xs ~f:(function
+             | `Valid x -> Ok x
+             | `Invalid -> 
+               Error (
+               Verifier.Failure.Verification_failed
+                 (Error.of_string "verification failed on command") )
+             | `Valid_assuming _ ->
+               Error (
+               Verifier.Failure.Verification_failed
+                 (Error.of_string "batch verification failed") ) ) )
 
   let apply ~constraint_constants t (witness : Staged_ledger_diff.t) ~logger
       ~verifier ~current_state_view ~state_and_body_hash =

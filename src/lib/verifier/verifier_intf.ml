@@ -7,17 +7,18 @@ module Base = struct
 
     type ledger_proof
 
-    (* TODO: For the future, this interface is a bit coarse and could really stand to be optimized.
-   It should return a pair of commands that are definitely invalid and a list of commands that are
-   potentially invalid because they failed in a batch. *)
     val verify_commands :
          t
       -> Coda_base.Command_transaction.Verifiable.t list
          (* The first level of error represents failure to verify, the second a failure in
    communicating with the verifier. *)
-      -> ( Coda_base.Command_transaction.Valid.t list
-         , Verification_failure.t )
-         Result.t
+      -> [ `Valid of Coda_base.Command_transaction.Valid.t
+         | `Invalid
+         | `Valid_assuming of
+            (Pickles.Side_loaded.Verification_key.t * Coda_base.Snapp_statement.t * Pickles.Side_loaded.Proof.t)
+            list
+         ]
+        list
          Deferred.Or_error.t
 
     val verify_blockchain_snark :

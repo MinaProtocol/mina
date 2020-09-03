@@ -317,22 +317,14 @@ module Make (Transition_frontier : Transition_frontier_intf) :
                     (One_or_two.map proofs ~f:fst, message)
                 ; sender }
               in
-              match%bind Batcher.Snark_pool.verify t.batcher [proof_env] with
-              | Ok (`Invalid set) when Set.is_empty set ->
+              match%bind Batcher.Snark_pool.verify t.batcher proof_env with
+              | Ok true ->
                   return true
-              | Ok (`Invalid set) ->
-                  let work_key =
-                    Envelope.Incoming.map proof_env ~f:(fun (ps, m) ->
-                        ( One_or_two.map ps ~f:(fun p ->
-                              Ledger_proof.statement p )
-                        , m ) )
-                  in
-                  if Set.mem set work_key then
-                    (* if this proof is in the set of invalid proofs*)
-                    let e = Error.of_string "Invalid proof" in
-                    let%map () = log e in
-                    false
-                  else return true
+              | Ok false ->
+                  (* if this proof is in the set of invalid proofs*)
+                  let e = Error.of_string "Invalid proof" in
+                  let%map () = log e in
+                  false
               | Error e ->
                   (* Verifier crashed or other errors at our end. Don't punish the peer*)
                   let%map () = log ~punish:false e in

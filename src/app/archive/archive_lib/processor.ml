@@ -342,153 +342,194 @@ module Snapp_command = struct
         [int; option Other_fee_payer_payload.typ; Party.typ; option Party.typ]
 end
 
-module User_command = struct
-  type t =
-    { typ: string
-    ; fee_payer_id: int
-    ; source_id: int
-    ; receiver_id: int
-    ; fee_token: int
-    ; token: int
-    ; nonce: int
-    ; amount: int option
-    ; fee: int
-    ; memo: string
-    ; hash: string
-    ; status: string option
-    ; failure_reason: string option }
-  [@@deriving hlist]
+module Command_transaction = struct
+  module User_command = struct
+    type t =
+      { typ: string
+      ; fee_payer_id: int
+      ; source_id: int
+      ; receiver_id: int
+      ; fee_token: int
+      ; token: int
+      ; nonce: int
+      ; amount: int option
+      ; fee: int
+      ; memo: string
+      ; hash: string
+      ; status: string option
+      ; failure_reason: string option }
+    [@@deriving hlist]
 
-  let typ =
-    let open Caqti_type_spec in
-    let spec =
-      Caqti_type.
-        [ string
-        ; int
-        ; int
-        ; int
-        ; int
-        ; int
-        ; int
-        ; option int
-        ; int
-        ; string
-        ; string
-        ; option string
-        ; option string ]
-    in
-    let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
-    let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
-    Caqti_type.custom ~encode ~decode (to_rep spec)
+    let typ =
+      let open Caqti_type_spec in
+      let spec =
+        Caqti_type.
+          [ string
+          ; int
+          ; int
+          ; int
+          ; int
+          ; int
+          ; int
+          ; option int
+          ; int
+          ; string
+          ; string
+          ; option string
+          ; option string ]
+      in
+      let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
+      let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
+      Caqti_type.custom ~encode ~decode (to_rep spec)
 
-  let find (module Conn : CONNECTION) ~(transaction_hash : Transaction_hash.t)
-      =
-    Conn.find_opt
-      (Caqti_request.find_opt Caqti_type.string Caqti_type.int
-         "SELECT id FROM user_commands WHERE hash = ?")
-      (Transaction_hash.to_base58_check transaction_hash)
+    let find (module Conn : CONNECTION) ~(transaction_hash : Transaction_hash.t)
+        =
+      Conn.find_opt
+        (Caqti_request.find_opt Caqti_type.string Caqti_type.int
+          "SELECT id FROM user_commands WHERE hash = ?")
+        (Transaction_hash.to_base58_check transaction_hash)
 
-  let add_if_doesn't_exist (module Conn : CONNECTION) (t : User_command.t) =
-    let open Deferred.Result.Let_syntax in
-    let transaction_hash = Transaction_hash.hash_command (User_command t) in
-    match%bind find (module Conn) ~transaction_hash with
-    | Some user_command_id ->
-        return user_command_id
-    | None ->
-        let%bind fee_payer_id =
-          Public_key.add_if_doesn't_exist
-            (module Conn)
-            (User_command.fee_payer_pk t)
-        in
-        let%bind source_id =
-          Public_key.add_if_doesn't_exist
-            (module Conn)
-            (User_command.source_pk t)
-        in
-        let%bind receiver_id =
-          Public_key.add_if_doesn't_exist
-            (module Conn)
-            (User_command.receiver_pk t)
-        in
-        (* TODO: Converting these uint64s to int can overflow; see #5419 *)
-        Conn.find
-          (Caqti_request.find typ Caqti_type.int
-             "INSERT INTO user_commands (type, fee_payer_id, source_id, \
-              receiver_id, fee_token, token, nonce, amount, fee, memo, hash, \
-              status, failure_reason) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, \
-              ?, ?, ?) RETURNING id")
-          { typ= User_command.tag_string t
-          ; fee_payer_id
-          ; source_id
-          ; receiver_id
-          ; fee_token=
-              User_command.fee_token t |> Token_id.to_uint64
-              |> Unsigned.UInt64.to_int
-          ; token=
-              User_command.token t |> Token_id.to_uint64
-              |> Unsigned.UInt64.to_int
-          ; nonce= User_command.nonce t |> Unsigned.UInt32.to_int
-          ; amount=
-              User_command.amount t
-              |> Core.Option.map ~f:Currency.Amount.to_int
-          ; fee= User_command.fee t |> Currency.Fee.to_int
-          ; memo= User_command.memo t |> User_command_memo.to_string
-          ; hash= transaction_hash |> Transaction_hash.to_base58_check
-          ; status= None
-          ; failure_reason= None }
-
-  let add_with_status (module Conn : CONNECTION) (t : User_command.t)
-      (status : User_command_status.t) =
-    let open Deferred.Result.Let_syntax in
-    let%bind user_command_id = add_if_doesn't_exist (module Conn) t in
-    let ( status_str
-        , failure_reason
-        , fee_payer_account_creation_fee_paid
-        , receiver_account_creation_fee_paid
-        , created_token ) =
-      match status with
-      | Applied
-          { fee_payer_account_creation_fee_paid
-          ; receiver_account_creation_fee_paid
-          ; created_token } ->
-          let amount_to_int64 x =
-            Unsigned.UInt64.to_int64 (Currency.Amount.to_uint64 x)
+    let add_if_doesn't_exist (module Conn : CONNECTION) (t : User_command.t) =
+      let open Deferred.Result.Let_syntax in
+      let transaction_hash = Transaction_hash.hash_command (User_command t) in
+      match%bind find (module Conn) ~transaction_hash with
+      | Some user_command_id ->
+          return user_command_id
+      | None ->
+          let%bind fee_payer_id =
+            Public_key.add_if_doesn't_exist
+              (module Conn)
+              (User_command.fee_payer_pk t)
           in
-          ( "applied"
-          , None
-          , Option.map ~f:amount_to_int64 fee_payer_account_creation_fee_paid
-          , Option.map ~f:amount_to_int64 receiver_account_creation_fee_paid
-          , Option.map created_token ~f:(fun tid ->
-                Unsigned.UInt64.to_int64 (Token_id.to_uint64 tid) ) )
-      | Failed failure ->
-          ( "failed"
-          , Some (User_command_status.Failure.to_string failure)
-          , None
-          , None
-          , None )
-    in
-    let%map () =
-      Conn.exec
-        (Caqti_request.exec
-           Caqti_type.(
-             tup3
-               (tup2 (option string) (option string))
-               (tup3 (option int64) (option int64) (option int64))
-               int)
-           "UPDATE user_commands \n\
-            SET status = ?, \n\
-           \    failure_reason = ?, \n\
-           \    fee_payer_account_creation_fee_paid = ?, \n\
-           \    receiver_account_creation_fee_paid = ?, \n\
-           \    created_token = ? \n\
-            WHERE id = ?")
-        ( (Some status_str, failure_reason)
-        , ( fee_payer_account_creation_fee_paid
+          let%bind source_id =
+            Public_key.add_if_doesn't_exist
+              (module Conn)
+              (User_command.source_pk t)
+          in
+          let%bind receiver_id =
+            Public_key.add_if_doesn't_exist
+              (module Conn)
+              (User_command.receiver_pk t)
+          in
+          (* TODO: Converting these uint64s to int can overflow; see #5419 *)
+          Conn.find
+            (Caqti_request.find typ Caqti_type.int
+              "INSERT INTO user_commands (type, fee_payer_id, source_id, \
+                receiver_id, fee_token, token, nonce, amount, fee, memo, hash, \
+                status, failure_reason) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, \
+                ?, ?, ?) RETURNING id")
+            { typ= User_command.tag_string t
+            ; fee_payer_id
+            ; source_id
+            ; receiver_id
+            ; fee_token=
+                User_command.fee_token t |> Token_id.to_uint64
+                |> Unsigned.UInt64.to_int
+            ; token=
+                User_command.token t |> Token_id.to_uint64
+                |> Unsigned.UInt64.to_int
+            ; nonce= User_command.nonce t |> Unsigned.UInt32.to_int
+            ; amount=
+                User_command.amount t
+                |> Core.Option.map ~f:Currency.Amount.to_int
+            ; fee= User_command.fee t |> Currency.Fee.to_int
+            ; memo= User_command.memo t |> User_command_memo.to_string
+            ; hash= transaction_hash |> Transaction_hash.to_base58_check
+            ; status= None
+            ; failure_reason= None }
+
+    let add_with_status (module Conn : CONNECTION) (t : User_command.t)
+        (status : User_command_status.t) =
+      let open Deferred.Result.Let_syntax in
+      let%bind user_command_id = add_if_doesn't_exist (module Conn) t in
+      let ( status_str
+          , failure_reason
+          , fee_payer_account_creation_fee_paid
           , receiver_account_creation_fee_paid
-          , created_token )
-        , user_command_id )
-    in
-    user_command_id
+          , created_token ) =
+        match status with
+        | Applied
+            { fee_payer_account_creation_fee_paid
+            ; receiver_account_creation_fee_paid
+            ; created_token } ->
+            let amount_to_int64 x =
+              Unsigned.UInt64.to_int64 (Currency.Amount.to_uint64 x)
+            in
+            ( "applied"
+            , None
+            , Option.map ~f:amount_to_int64 fee_payer_account_creation_fee_paid
+            , Option.map ~f:amount_to_int64 receiver_account_creation_fee_paid
+            , Option.map created_token ~f:(fun tid ->
+                  Unsigned.UInt64.to_int64 (Token_id.to_uint64 tid) ) )
+        | Failed failure ->
+            ( "failed"
+            , Some (User_command_status.Failure.to_string failure)
+            , None
+            , None
+            , None )
+      in
+      let%map () =
+        Conn.exec
+          (Caqti_request.exec
+            Caqti_type.(
+              tup3
+                (tup2 (option string) (option string))
+                (tup3 (option int64) (option int64) (option int64))
+                int)
+            "UPDATE user_commands \n\
+              SET status = ?, \n\
+            \    failure_reason = ?, \n\
+            \    fee_payer_account_creation_fee_paid = ?, \n\
+            \    receiver_account_creation_fee_paid = ?, \n\
+            \    created_token = ? \n\
+              WHERE id = ?")
+          ( (Some status_str, failure_reason)
+          , ( fee_payer_account_creation_fee_paid
+            , receiver_account_creation_fee_paid
+            , created_token )
+          , user_command_id )
+      in
+      user_command_id
+  end
+
+  let add_with_status conn
+      (t : Command_transaction.t)
+      (status : User_command_status.t)
+    =
+    match t with
+    | User_command c -> 
+      User_command.add_with_status conn c status
+    | Snapp_command c ->
+      let module S = Coda_base.Snapp_command in
+      (* For now we just smush a snapp command into a user command. *)
+      let uc : Coda_base.User_command.t =
+        let fee_payer = S.fee_payer c in
+        { signature= Signature.dummy
+        ; signer= Snark_params.Tick.Field.(zero, zero)
+        ; payload=
+            { common=
+              { fee= S.fee_exn c
+              ; fee_token=
+                  Account_id.token_id fee_payer
+              ; fee_payer_pk=
+                  Account_id.public_key fee_payer
+              ; nonce= Option.value (S.nonce c) ~default:Coda_numbers.Account_nonce.zero
+              ; valid_until= Coda_numbers.Global_slot.max_value
+              ; memo= User_command_memo.create_from_bytes_exn "snapp"
+              }
+            ; body=
+                Payment
+                  { source_pk
+                  ; receiver_pk
+                  ; token_id= S.token_id c
+                  ; amount
+                  }
+            }
+        }
+      in 
+      User_command.add_with_status conn
+        uc
+        status
 end
 
 module Internal_command = struct
@@ -720,64 +761,47 @@ module Block = struct
         let transactions =
           External_transition.transactions ~constraint_constants t
         in
-        let snapp_commands, user_commands, fee_transfers, coinbases =
-          Core.List.fold transactions ~init:([], [], [], [])
-            ~f:(fun ( acc_snapp_commands
-                    , acc_user_commands
+        let commands, fee_transfers, coinbases =
+          Core.List.fold transactions ~init:([], [], [])
+            ~f:(fun ( acc_commands
                     , acc_fee_transfers
                     , acc_coinbases )
                -> function
             | { Coda_base.With_status.status
               ; data=
-                  Coda_base.Transaction.Command (Snapp_command snapp_command)
+                  Coda_base.Transaction.Command command
               } ->
-                let snapp_command =
-                  {Coda_base.With_status.status; data= snapp_command}
+                let command =
+                  {Coda_base.With_status.status; data= command}
                 in
-                ( snapp_command :: acc_snapp_commands
-                , acc_user_commands
-                , acc_fee_transfers
-                , acc_coinbases )
-            | { Coda_base.With_status.status
-              ; data=
-                  Coda_base.Transaction.Command
-                    (User_command user_command_checked) } ->
-                let user_command =
-                  {Coda_base.With_status.status; data= user_command_checked}
-                in
-                ( acc_snapp_commands
-                , user_command :: acc_user_commands
+                ( command :: acc_commands
                 , acc_fee_transfers
                 , acc_coinbases )
             | {data= Fee_transfer fee_transfer_bundled; status= _} ->
                 let fee_transfers =
                   Coda_base.Fee_transfer.to_list fee_transfer_bundled
                 in
-                ( acc_snapp_commands
-                , acc_user_commands
+                ( acc_commands
                 , fee_transfers @ acc_fee_transfers
                 , acc_coinbases )
             | {data= Coinbase coinbase; status= _} -> (
               match Coda_base.Coinbase.fee_transfer coinbase with
               | None ->
-                  ( acc_snapp_commands
-                  , acc_user_commands
+                  ( acc_commands
                   , acc_fee_transfers
                   , coinbase :: acc_coinbases )
               | Some {receiver_pk; fee} ->
-                  ( acc_snapp_commands
-                  , acc_user_commands
+                  ( acc_commands
                   , Coda_base.Fee_transfer.Single.create ~receiver_pk ~fee
                       ~fee_token:Token_id.default
                     :: acc_fee_transfers
                   , coinbase :: acc_coinbases ) ) )
         in
-        (match snapp_commands with [] -> () | _ :: _ -> failwith "TODO") ;
-        let%bind user_command_ids =
-          deferred_result_list_fold user_commands ~init:[]
-            ~f:(fun acc user_command ->
+        let%bind command_ids =
+          deferred_result_list_fold commands ~init:[]
+            ~f:(fun acc command ->
               let%map id =
-                User_command.add_with_status
+                Command_transaction.add_with_status
                   (module Conn)
                   user_command.data user_command.status
               in

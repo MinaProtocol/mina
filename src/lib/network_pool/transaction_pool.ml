@@ -45,6 +45,9 @@ module Diff_versioned = struct
     end
   end]
 
+  type verified = Command_transaction.Valid.t list
+  [@@deriving sexp, yojson]
+
   type t = Command_transaction.t list [@@deriving sexp, yojson]
 
   module Diff_error = struct
@@ -131,6 +134,7 @@ module type S = sig
     with type resource_pool := Resource_pool.t
      and type transition_frontier := transition_frontier
      and type resource_pool_diff := Diff_versioned.t
+     and type resource_pool_diff_verified := Diff_versioned.verified
      and type config := Resource_pool.Config.t
      and type transition_frontier_diff :=
                 Resource_pool.transition_frontier_diff
@@ -705,15 +709,29 @@ struct
             Deferred.return None
         | Some v -> (
             let open Deferred.Let_syntax in
-            match%bind Batcher.verify t.batcher [v] with
+            match%bind Batcher.verify t.batcher v with
             | Error e ->
                 (* Verifier crashed or other errors at our end. Don't punish the peer*)
                 let%map () = log_and_punish ~punish:false t d e in
                 None
-            | Ok {invalid= []; valid} ->
-                valid )
+            | Ok (Ok valid) ->
+              Deferred.return (Some { Envelope.Incoming.sender=d.sender; data= valid} ) 
+            | Ok (Error ()) ->
+              let trust_record =
+                Trust_system.record_envelope_sender t.config.trust_system
+                  t.logger d.sender
+              in
+              let%map () =
+              (* that's an insta-ban *)
+                trust_record
+                  ( Trust_system.Actions.Sent_invalid_signature
+                  , Some
+                      ( "diff was: $diff"
+                      , [("diff",  to_yojson d.data )] ) )
+              in
+              None )
 
-      let apply t env =
+      let apply t (env : verified Envelope.Incoming.t) =
         let txs = Envelope.Incoming.data env in
         let sender = Envelope.Incoming.sender env in
         let is_sender_local = Envelope.Sender.(equal sender Local) in
@@ -734,25 +752,11 @@ struct
                   t.pool <- pool ;
                   Deferred.Or_error.return
                   @@ (List.rev accepted, List.rev rejected)
-              | tx :: txs'' -> (
-                match Command_transaction.check tx with
-                | None ->
-                    let%bind _ =
-                      trust_record
-                        ( Trust_system.Actions.Sent_invalid_signature
-                        , Some
-                            ( "command was: $cmd"
-                            , [("cmd", Command_transaction.to_yojson tx)] ) )
-                    in
-                    (* that's an insta-ban, so ignore the rest of the diff. *)
-                    t.pool <- pool ;
-                    Deferred.Or_error.error_string
-                      (sprintf !"invalid signature %s"
-                         (Yojson.Safe.to_string
-                            (Command_transaction.to_yojson tx)))
-                | Some tx' -> (
+              | tx' :: txs'' -> (
+                (
+                  let tx = Command_transaction.forget_check tx' in
                     let tx' =
-                      Transaction_hash.User_command_with_valid_signature.create
+                      Transaction_hash.Command_transaction_with_valid_signature.create
                         tx'
                     in
                     if Indexed_pool.member pool tx' then
@@ -1011,7 +1015,8 @@ struct
                             go txs'' pool
                               ( accepted
                               , (tx, Diff_versioned.Diff_error.Insufficient_fee)
-                                :: rejected ) ) )
+                                :: rejected ) ) 
+              )
             in
             go txs t.pool ([], [])
 
@@ -1192,6 +1197,8 @@ let%test_module _ =
       in
       ()
 
+    let proof_level = Genesis_constants.Proof_level.for_unit_tests
+
     let setup_test () =
       let tf, best_tip_diff_w = Mock_transition_frontier.create () in
       let tf_pipe_r, _tf_pipe_w = Broadcast_pipe.create @@ Some tf in
@@ -1203,8 +1210,14 @@ let%test_module _ =
       in
       let trust_system = Trust_system.null () in
       let logger = Logger.null () in
-      let config =
+      let%bind config =
+        let%map verifier =
+          Verifier.create ~logger ~proof_level
+            ~pids:(Child_processes.Termination.create_pid_table ())
+            ~conf_dir:None
+        in
         Test.Resource_pool.make_config ~trust_system ~pool_max_size
+          ~verifier
       in
       let pool =
         Test.create ~config ~logger ~constraint_constants
@@ -1277,9 +1290,7 @@ let%test_module _ =
           assert_pool_txs [] ;
           let%bind apply_res =
             Test.Resource_pool.Diff.unsafe_apply pool
-              (Envelope.Incoming.map
-                 (Envelope.Incoming.local independent_cmds)
-                 ~f:(List.map ~f:Command_transaction.forget_check))
+                (Envelope.Incoming.local independent_cmds)
           in
           [%test_eq: pool_apply]
             (accepted_commands apply_res)
@@ -1341,8 +1352,8 @@ let%test_module _ =
           let%bind apply_res =
             Test.Resource_pool.Diff.unsafe_apply pool
               ( Envelope.Incoming.local
-              @@ List.hd_exn independent_cmds'
-                 :: List.drop independent_cmds' 2 )
+              @@ List.hd_exn independent_cmds
+                 :: List.drop independent_cmds 2 )
           in
           [%test_eq: pool_apply]
             (accepted_commands apply_res)
@@ -1377,7 +1388,7 @@ let%test_module _ =
           in
           let%bind apply_res =
             Test.Resource_pool.Diff.unsafe_apply pool
-            @@ Envelope.Incoming.local independent_cmds'
+            @@ Envelope.Incoming.local independent_cmds
           in
           [%test_eq: pool_apply]
             (Ok (List.drop independent_cmds' 2))
@@ -1424,7 +1435,7 @@ let%test_module _ =
           let cmd1 =
             let sender = test_keys.(0) in
             Quickcheck.random_value
-              (Command_transaction.Gen.payment ~sign_type:`Real
+              (Command_transaction.Valid.Gen.payment ~sign_type:`Real
                  ~key_gen:
                    Quickcheck.Generator.(
                      tuple2 (return sender) (Quickcheck_lib.of_array test_keys))
@@ -1435,8 +1446,8 @@ let%test_module _ =
             Test.Resource_pool.Diff.unsafe_apply pool
             @@ Envelope.Incoming.local [cmd1]
           in
-          [%test_eq: pool_apply] (accepted_commands apply_res) (Ok [cmd1]) ;
-          assert_pool_txs [cmd1] ;
+          [%test_eq: pool_apply] (accepted_commands apply_res) (Ok [Command_transaction.forget_check cmd1]) ;
+          assert_pool_txs [Command_transaction.forget_check cmd1] ;
           let cmd2 = mk_payment 0 1_000_000_000 0 5 999_000_000_000 in
           best_tip_ref := map_set_multi !best_tip_ref [mk_account 0 0 1] ;
           let%bind _ =
@@ -1464,8 +1475,14 @@ let%test_module _ =
           in
           let logger = Logger.null () in
           let trust_system = Trust_system.null () in
-          let config =
+          let%bind config =
+            let%map verifier =
+              Verifier.create ~logger ~proof_level
+                ~pids:(Child_processes.Termination.create_pid_table ())
+                ~conf_dir:None
+            in
             Test.Resource_pool.make_config ~trust_system ~pool_max_size
+              ~verifier
           in
           let pool =
             Test.create ~config ~logger ~constraint_constants
@@ -1493,7 +1510,7 @@ let%test_module _ =
           in
           let%bind _ =
             Test.Resource_pool.Diff.unsafe_apply pool
-              (Envelope.Incoming.local independent_cmds')
+              (Envelope.Incoming.local independent_cmds)
           in
           assert_pool_txs @@ independent_cmds' ;
           (* Destroy initial frontier *)
@@ -1541,17 +1558,17 @@ let%test_module _ =
               {common= {common with fee_payer_pk= sender_pk}; body}
         in
         Command_transaction.User_command
-          (User_command.forget_check (User_command.sign sender_kp payload))
+          ((User_command.sign sender_kp payload))
       in
       let txs0 =
-        List.map ~f:User_command.forget_check
-          [ mk_payment' 0 1_000_000_000 0 9 20_000_000_000
-          ; mk_payment' 0 1_000_000_000 1 9 12_000_000_000
-          ; mk_payment' 0 1_000_000_000 2 9 500_000_000_000 ]
+        [ mk_payment' 0 1_000_000_000 0 9 20_000_000_000
+        ; mk_payment' 0 1_000_000_000 1 9 12_000_000_000
+        ; mk_payment' 0 1_000_000_000 2 9 500_000_000_000 ]
       in
-      let txs1 = List.map ~f:(set_sender 1) txs0 in
-      let txs2 = List.map ~f:(set_sender 2) txs0 in
-      let txs3 = List.map ~f:(set_sender 3) txs0 in
+      let txs0' = List.map txs0 ~f:User_command.forget_check in 
+      let txs1 = List.map ~f:(set_sender 1) txs0' in
+      let txs2 = List.map ~f:(set_sender 2) txs0' in
+      let txs3 = List.map ~f:(set_sender 3) txs0' in
       let txs_all =
         List.map ~f:(fun x -> Command_transaction.User_command x) txs0
         @ txs1 @ txs2 @ txs3
@@ -1560,6 +1577,7 @@ let%test_module _ =
         Test.Resource_pool.Diff.unsafe_apply pool
           (Envelope.Incoming.local txs_all)
       in
+      let txs_all = List.map txs_all ~f:Command_transaction.forget_check in
       [%test_eq: pool_apply] (Ok txs_all) (accepted_commands apply_res) ;
       assert_pool_txs @@ txs_all ;
       let replace_txs =
@@ -1571,11 +1589,13 @@ let%test_module _ =
           mk_payment 2 20_000_000_000 1 4 721_000_000_000
         ; (* insufficient *)
           mk_payment 3 10_000_000_000 1 4 927_000_000_000 ]
-        |> List.map ~f:Command_transaction.forget_check
       in
       let%bind apply_res_2 =
         Test.Resource_pool.Diff.unsafe_apply pool
           (Envelope.Incoming.local replace_txs)
+      in
+      let replace_txs = 
+        List.map replace_txs ~f:Command_transaction.forget_check
       in
       [%test_eq: pool_apply]
         (Ok [List.nth_exn replace_txs 0; List.nth_exn replace_txs 2])
@@ -1593,13 +1613,13 @@ let%test_module _ =
         [ mk_payment 0 5_000_000_000 0 9 20_000_000_000
         ; mk_payment 0 6_000_000_000 1 5 77_000_000_000
         ; mk_payment 0 1_000_000_000 2 3 891_000_000_000 ]
-        |> List.map ~f:Command_transaction.forget_check
       in
       let committed_tx = mk_payment 0 5_000_000_000 0 2 25_000_000_000 in
       let%bind apply_res =
         Test.Resource_pool.Diff.unsafe_apply pool
         @@ Envelope.Incoming.local txs
       in
+      let txs = txs |> List.map ~f:Command_transaction.forget_check in
       [%test_eq: pool_apply] (Ok txs) (accepted_commands apply_res) ;
       assert_pool_txs @@ txs ;
       best_tip_ref :=
@@ -1619,7 +1639,7 @@ let%test_module _ =
         let%bind init_ledger_state = Ledger.gen_initial_ledger_state in
         let%bind cmds_count = Int.gen_incl pool_max_size (pool_max_size * 2) in
         let%bind cmds =
-          Command_transaction.Gen.sequence ~sign_type:`Real ~length:cmds_count
+          Command_transaction.Valid.Gen.sequence ~sign_type:`Real ~length:cmds_count
             init_ledger_state
         in
         return (init_ledger_state, cmds))
@@ -1704,7 +1724,7 @@ let%test_module _ =
           (* Locally generated transactions are rebroadcastable *)
           let%bind apply_res_1 =
             Test.Resource_pool.Diff.unsafe_apply pool
-              (Envelope.Incoming.local local_cmds')
+              (Envelope.Incoming.local local_cmds)
           in
           [%test_eq: pool_apply]
             (accepted_commands apply_res_1)
@@ -1715,7 +1735,7 @@ let%test_module _ =
              rebroadcastable pool *)
           let%bind apply_res_2 =
             Test.Resource_pool.Diff.unsafe_apply pool
-              (Envelope.Incoming.wrap ~data:remote_cmds' ~sender:mock_sender)
+              (Envelope.Incoming.wrap ~data:remote_cmds ~sender:mock_sender)
           in
           [%test_eq: pool_apply]
             (accepted_commands apply_res_2)

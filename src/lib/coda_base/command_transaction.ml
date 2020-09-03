@@ -151,6 +151,11 @@ let fee_exn : t -> Currency.Fee.t = function
   | Snapp_command x ->
       Snapp_command.fee_exn x
 
+(* for filtering *)
+let minimum_fee = Coda_compile_config.minimum_user_command_fee
+
+let has_insufficient_fee t = Currency.Fee.(fee_exn t < minimum_fee)
+
 let accounts_accessed (t : t) ~next_available_token =
   match t with
   | User_command x ->

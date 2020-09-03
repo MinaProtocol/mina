@@ -1035,12 +1035,12 @@ let create (config : Config.t)
                    {txns= diff; sender= Envelope.Incoming.sender envelope}) ;
             let diff' =
               List.filter diff ~f:(fun cmd ->
-                  if User_command.has_insufficient_fee cmd then (
+                  if Command_transaction.has_insufficient_fee cmd then (
                     [%log debug]
                       "Filtering user command with insufficient fee from \
                        transaction-pool diff $cmd from $sender"
                       ~metadata:
-                        [ ("cmd", User_command.to_yojson cmd)
+                        [ ("cmd", Command_transaction.to_yojson cmd)
                         ; ( "sender"
                           , Envelope.(
                               Sender.to_yojson (Incoming.sender envelope)) ) ] ;

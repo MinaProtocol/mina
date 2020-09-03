@@ -14,7 +14,11 @@ module Worker_state = struct
 
     val verify_commands :
          Coda_base.Command_transaction.Verifiable.t list
-      -> Coda_base.Command_transaction.Valid.t list Or_error.t
+      -> [ `Valid of Coda_base.Command_transaction.Valid.t
+         | `Invalid
+         | `Valid_assuming of
+            (Pickles.Side_loaded.Verification_key.t * Coda_base.Snapp_statement.t * Pickles.Side_loaded.Proof.t)
+            list] list
 
     val verify_transaction_snarks :
       (Transaction_snark.t * Sok_message.t) list -> bool
@@ -37,44 +41,99 @@ module Worker_state = struct
           (let bc_vk = Precomputed_values.blockchain_verification ()
            and tx_vk = Precomputed_values.transaction_verification () in
            let module M = struct
-             let verify_commands (cs : Command_transaction.Verifiable.t list) =
-               let check_signature c s pk =
-                 if
-                   not
-                     (Signature_lib.Schnorr.verify s
-                        (Backend.Tick.Inner_curve.of_affine
-                           (Signature_lib.Public_key.decompress_exn pk))
-                        (Random_oracle_input.field
-                           Snapp_command.(
-                             Payload.(
-                               Digested.digest (digested (to_payload c))))))
-                 then failwith "Snapp signature failed"
-                 else ()
-               in
+             let verify_commands (cs : Command_transaction.Verifiable.t list)
+                 : _ list
+               =
+               let cs = List.map cs ~f:Common.check in 
+               let to_verify =
+                 List.concat_map cs ~f:(function
+                     | `Valid _ -> []
+                     | `Invalid  -> []
+                     | `Valid_assuming (_, xs) -> xs )
+               in 
+               let all_verified =
+                  Pickles.Side_loaded.verify
+                    ~value_to_field_elements:
+                      Snapp_statement.to_field_elements
+                    to_verify
+               in 
+               List.map cs ~f:(function
+                | `Valid c -> `Valid c
+                | `Invalid -> `Invalid
+                | `Valid_assuming (c, xs) -> 
+                  if all_verified
+                  then `Valid c
+                  else `Valid_assuming xs )
+
+               (*
+               let to_verify =
+                  let check c
+                      ( vk
+                      , (p : Snapp_command.Party.Authorized.Proved.t)
+                      , (other : Snapp_command.Party.Body.t) ) =
+                    let statement : Snapp_statement.t =
+                      { predicate= p.data.predicate
+                      ; body1= p.data.body
+                      ; body2= other }
+                    in
+                    match p.authorization with
+                    | Signature s ->
+                        check_signature c s p.data.body.pk ;
+                        None
+                    | Both {signature; proof} ->
+                        check_signature c signature p.data.body.pk ;
+                        Some (vk, statement, proof)
+                    | Proof p ->
+                        Some (vk, statement, p)
+                    | None_given ->
+                        (* TODO: This should probably be an error. *)
+                        None
+                  in
+                 List.concat_map cs ~f:(fun cmd ->
+                    match cmd with
+                    | User_command _ ->
+                        []
+                    | Snapp_command (c, vks) ->
+                        List.filter_map ~f:(check c)
+                          ( match (c, vks) with
+                          | Proved_proved r, `Two (vk1, vk2) ->
+                              [ (vk1, r.one, r.two.data.body)
+                              ; (vk2, r.two, r.one.data.body) ]
+                          | Proved_signed r, `One vk1 ->
+                              check_signature c r.two.authorization
+                                r.two.data.body.pk ;
+                              [(vk1, r.one, r.two.data.body)]
+                          | Proved_empty r, `One vk1 ->
+                              let two =
+                                Option.value_map r.two
+                                  ~default:
+                                    Snapp_command.Party.Body.dummy
+                                  ~f:(fun two -> two.data.body)
+                              in
+                              [(vk1, r.one, two)]
+                          | Signed_signed r, `Zero ->
+                              check_signature c r.one.authorization
+                                r.one.data.body.pk ;
+                              check_signature c r.two.authorization
+                                r.two.data.body.pk ;
+                              []
+                          | Signed_empty r, `Zero ->
+                              check_signature c r.one.authorization
+                                r.one.data.body.pk ;
+                              []
+                          | Proved_proved _, (`Zero | `One _)
+                          | ( (Proved_signed _ | Proved_empty _)
+                            , (`Zero | `Two _) )
+                          | ( (Signed_signed _ | Signed_empty _)
+                            , (`One _ | `Two _) ) ->
+                              failwith "Wrong number of vks" ) )
+               in 
+                     Pickles.Side_loaded.verify
+                       ~value_to_field_elements:
+                         Snapp_statement.to_field_elements
+                       ()
                Or_error.try_with (fun () ->
                    let res = Common.check_exn cs in
-                   let check c
-                       ( vk
-                       , (p : Snapp_command.Party.Authorized.Proved.t)
-                       , (other : Snapp_command.Party.Body.t) ) =
-                     let statement : Snapp_statement.t =
-                       { predicate= p.data.predicate
-                       ; body1= p.data.body
-                       ; body2= other }
-                     in
-                     match p.authorization with
-                     | Signature s ->
-                         check_signature c s p.data.body.pk ;
-                         None
-                     | Both {signature; proof} ->
-                         check_signature c signature p.data.body.pk ;
-                         Some (vk, statement, proof)
-                     | Proof p ->
-                         Some (vk, statement, p)
-                     | None_given ->
-                         (* TODO: This should probably be an error. *)
-                         None
-                   in
                    (* TODO: Cache the hashing across the call to digest in check signature *)
                    if
                      Pickles.Side_loaded.verify
@@ -119,7 +178,7 @@ module Worker_state = struct
                                     , (`One _ | `Two _) ) ->
                                       failwith "Wrong number of vks" ) ))
                    then res
-                   else failwith "Proofs failed to verify" )
+                   else failwith "Proofs failed to verify" ) *)
 
              let verify_blockchain_snark state proof =
                Blockchain_snark.Blockchain_snark_state.verify state proof
@@ -144,7 +203,12 @@ module Worker_state = struct
         Deferred.return
         @@ ( module struct
              let verify_commands cs =
-               Or_error.try_with (fun () -> Common.check_exn cs)
+              List.map cs ~f:(fun c ->
+                match Common.check c with
+                  | `Valid c -> `Valid c
+                  | `Invalid  -> `Invalid 
+                  | `Valid_assuming (c, _) -> `Valid c
+                )
 
              let verify_blockchain_snark _ _ = true
 
@@ -166,7 +230,12 @@ module Worker = struct
       ; verify_commands:
           ( 'w
           , Command_transaction.Verifiable.t list
-          , Command_transaction.Valid.t list Or_error.t )
+          , [ `Valid of Command_transaction.Valid.t 
+            | `Invalid 
+            | `Valid_assuming  of
+              (Pickles.Side_loaded.Verification_key.t * Coda_base.Snapp_statement.t * Pickles.Side_loaded.Proof.t)
+              list
+            ] list )
           F.t }
 
     module Worker_state = Worker_state
@@ -216,7 +285,15 @@ module Worker = struct
               ( [%bin_type_class:
                   Command_transaction.Verifiable.Stable.Latest.t list]
               , [%bin_type_class:
-                  Command_transaction.Valid.Stable.Latest.t list Or_error.t]
+                [ `Valid of Command_transaction.Valid.Stable.Latest.t
+                | `Invalid
+              | `Valid_assuming of
+                  (Pickles.Side_loaded.Verification_key.Stable.Latest.t 
+                   * Coda_base.Snapp_statement.Stable.Latest.t
+                   * Pickles.Side_loaded.Proof.Stable.Latest.t)
+                  list
+                ] list 
+              ]
               , verify_commands ) }
 
       let init_worker_state Worker_state.{conf_dir; logger; proof_level} =
@@ -284,7 +361,4 @@ let verify_transaction_snarks t ts =
   Worker.Connection.run t ~f:Worker.functions.verify_transaction_snarks ~arg:ts
 
 let verify_commands t ts =
-  Deferred.Or_error.map
-    ~f:
-      (Result.map_error ~f:(fun e -> Verification_failure.Verification_failed e))
     (Worker.Connection.run t ~f:Worker.functions.verify_commands ~arg:ts)

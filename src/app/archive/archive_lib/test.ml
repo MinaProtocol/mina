@@ -31,7 +31,7 @@ let%test_module "Archive node unit tests" =
     let keys = Array.init 5 ~f:(fun _ -> Keypair.create ())
 
     let user_command_gen =
-      User_command.Gen.payment_with_random_participants ~keys ~max_amount:1000
+      Command_transaction.Gen.payment_with_random_participants ~keys ~max_amount:1000
         ~max_fee:10 ()
 
     let fee_transfer_gen =
@@ -48,10 +48,10 @@ let%test_module "Archive node unit tests" =
       let conn = Lazy.force conn_lazy in
       Thread_safe.block_on_async_exn
       @@ fun () ->
-      Async.Quickcheck.async_test ~sexp_of:[%sexp_of: User_command.t]
+      Async.Quickcheck.async_test ~sexp_of:[%sexp_of: Command_transaction.t]
         user_command_gen ~f:(fun user_command ->
           let transaction_hash =
-            Transaction_hash.hash_user_command user_command
+            Transaction_hash.hash_command user_command
           in
           match%map
             let open Deferred.Result.Let_syntax in

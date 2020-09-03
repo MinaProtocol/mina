@@ -391,6 +391,27 @@ module Stable = struct
   end
 end]
 
+type transfer = 
+  { source: Public_key.Compressed.t
+  ; receiver: Public_key.Compressed.t
+  ; amount: Amount.t
+  }
+
+let as_transfer (t : t) : transfer Or_error.t =
+  match t with
+  | Proved_empty {one; two; fee_payment; _} ->
+    let open Or_error.Let_syntax in
+    let%map res =
+      match two with
+      | None -> 
+        begin match 
+        end 
+        Ok { source= one.data.body.pk
+           ; receiver=one.data.body.pk
+      | Neg, Some two ->
+        Ok { source= one.data.body.pk
+           ; receiver= two.
+
 let token_id (t : t) : Token_id.t =
   match t with
   | Proved_empty {token_id; _}

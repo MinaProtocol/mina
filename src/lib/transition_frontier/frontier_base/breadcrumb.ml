@@ -92,8 +92,8 @@ let build ~logger ~precomputed_values ~verifier ~trust_system ~parent
                   match staged_ledger_error with
                   | Invalid_proofs _ ->
                       make_actions Sent_invalid_proof
-                  | Pre_diff (Bad_signature _) ->
-                      make_actions Sent_invalid_signature
+                  | Pre_diff (Verification_failed _) ->
+                      make_actions Sent_invalid_signature_or_proof
                   | Pre_diff _ | Non_zero_fee_excess _ | Insufficient_work _ ->
                       make_actions Gossiped_invalid_transition
                   | Unexpected _ ->
@@ -164,8 +164,12 @@ let display t =
 let all_user_commands breadcrumbs =
   Sequence.fold (Sequence.of_list breadcrumbs) ~init:User_command.Set.empty
     ~f:(fun acc_set breadcrumb ->
-      breadcrumb |> user_commands
-      |> List.map ~f:(fun {data; _} -> data)
+      breadcrumb 
+      |> commands
+      |> List.filter_map ~f:(fun {data; _} -> 
+          match  data with
+          | Snapp_command _ -> None
+          | User_command c -> Some (User_command.forget_check c))
       |> User_command.Set.of_list |> Set.union acc_set )
 
 module For_tests = struct
@@ -251,6 +255,7 @@ module For_tests = struct
       let parent_staged_ledger = parent_breadcrumb.staged_ledger in
       let transactions =
         gen_payments parent_staged_ledger accounts_with_secret_keys
+        |> Sequence.map ~f:(fun x -> Command_transaction.User_command x)
       in
       let _, largest_account =
         List.max_elt accounts_with_secret_keys
