@@ -67,12 +67,29 @@ module Unsigned = struct
       [@@deriving yojson]
     end
 
+    module Create_token_account = struct
+      type public_key = string [@@deriving yojson]
+
+      type t =
+        { token_owner: public_key
+        ; receiver: public_key
+        ; token: Token_id.t
+        ; account_disabled: bool
+        ; fee: Unsigned_extended.UInt64.t
+        ; nonce: Unsigned_extended.UInt32.t
+        ; memo: string option
+        ; valid_until: Unsigned_extended.UInt32.t option }
+      [@@deriving yojson]
+    end
+
     type t =
       { random_oracle_input: string (* serialize |> to_hex *)
             [@key "randomOracleInput"]
       ; payment: Payment.t option
       ; stake_delegation: Delegation.t option [@key "stakeDelegation"]
-      ; create_token: Create_token.t option [@key "createToken"] }
+      ; create_token: Create_token.t option [@key "createToken"]
+      ; create_token_account: Create_token_account.t option
+            [@key "createTokenAccount"] }
     [@@deriving yojson]
   end
 
@@ -130,6 +147,18 @@ module Unsigned = struct
           ; valid_until= None }
         in
         Result.return (`Create_token create_token)
+    | `Create_token_account ->
+        let create_token_account =
+          { Rendered.Create_token_account.token_owner= un_pk command.source
+          ; receiver= un_pk command.receiver
+          ; token= command.token |> Token_id.of_uint64
+          ; account_disabled= false
+          ; fee= command.fee
+          ; nonce
+          ; memo= None
+          ; valid_until= None }
+        in
+        Result.return (`Create_token_account create_token_account)
     | _ ->
         Result.fail
           (Errors.create ~context:"Unsigned transaction rendering"
@@ -146,17 +175,26 @@ module Unsigned = struct
         { Rendered.random_oracle_input
         ; payment= Some payment
         ; stake_delegation= None
-        ; create_token= None }
+        ; create_token= None
+        ; create_token_account= None }
     | `Delegation delegation ->
         { Rendered.random_oracle_input
         ; payment= None
         ; stake_delegation= Some delegation
-        ; create_token= None }
+        ; create_token= None
+        ; create_token_account= None }
     | `Create_token create_token ->
         { Rendered.random_oracle_input
         ; payment= None
         ; stake_delegation= None
-        ; create_token= Some create_token }
+        ; create_token= Some create_token
+        ; create_token_account= None }
+    | `Create_token_account create_token_account ->
+        { Rendered.random_oracle_input
+        ; payment= None
+        ; stake_delegation= None
+        ; create_token= None
+        ; create_token_account= Some create_token_account }
 
   let of_rendered_payment (r : Rendered.Payment.t) :
       User_command_info.Partial.t =
@@ -243,7 +281,9 @@ module Signed = struct
       { signature: string
       ; payment: Unsigned.Rendered.Payment.t option
       ; stake_delegation: Unsigned.Rendered.Delegation.t option
-      ; create_token: Unsigned.Rendered.Create_token.t option }
+      ; create_token: Unsigned.Rendered.Create_token.t option
+      ; create_token_account: Unsigned.Rendered.Create_token_account.t option
+      }
     [@@deriving yojson]
   end
 
@@ -254,17 +294,26 @@ module Signed = struct
         { Rendered.signature= t.signature
         ; payment= Some payment
         ; stake_delegation= None
-        ; create_token= None }
+        ; create_token= None
+        ; create_token_account= None }
     | `Delegation delegation ->
         { Rendered.signature= t.signature
         ; payment= None
         ; stake_delegation= Some delegation
-        ; create_token= None }
+        ; create_token= None
+        ; create_token_account= None }
     | `Create_token create_token ->
         { Rendered.signature= t.signature
         ; payment= None
         ; stake_delegation= None
-        ; create_token= Some create_token }
+        ; create_token= Some create_token
+        ; create_token_account= None }
+    | `Create_token_account create_token_account ->
+        { Rendered.signature= t.signature
+        ; payment= None
+        ; stake_delegation= None
+        ; create_token= None
+        ; create_token_account= Some create_token_account }
 
   let of_rendered (r : Rendered.t) : (t, Errors.t) Result.t =
     match (r.payment, r.stake_delegation, r.create_token) with
