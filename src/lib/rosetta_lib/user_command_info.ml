@@ -94,7 +94,11 @@ end
 
 module Kind = struct
   type t =
-    [`Payment | `Delegation | `Create_token | `Create_account | `Mint_tokens]
+    [ `Payment
+    | `Delegation
+    | `Create_token
+    | `Create_token_account
+    | `Mint_tokens ]
   [@@deriving yojson, eq, sexp, compare]
 end
 
@@ -427,15 +431,65 @@ let of_operations (ops : Operation.t list) :
     ; fee= Unsigned.UInt64.of_string payment_amount_y.Amount.value
     ; amount= None }
   in
-  match (payment, delegation, create_token) with
-  | Ok _, Error _, Error _ ->
+  (* For token account creation, we demand:
+    *
+    * ops = length exactly 1
+    *
+    * fee_payer_dec with account 'a, some amount 'y, status="Pending"
+  *)
+  let create_token_account =
+    let%map () =
+      if Int.equal (List.length ops) 1 then V.return ()
+      else V.fail Length_mismatch
+    and account_a =
+      let open Result.Let_syntax in
+      let%bind {account; _} = find_kind `Fee_payer_dec ops in
+      Option.value_map account ~default:(V.fail Account_not_some) ~f:V.return
+    and fee_token =
+      let open Result.Let_syntax in
+      let%bind {account; _} = find_kind `Fee_payer_dec ops in
+      match account with
+      | Some account -> (
+        match token_id_of_account account with
+        | Some token_id ->
+            V.return token_id
+        | None ->
+            V.fail Incorrect_token_id )
+      | None ->
+          V.fail Account_not_some
+    and () =
+      if List.for_all ops ~f:(fun op -> String.equal op.status "Pending") then
+        V.return ()
+      else V.fail Status_not_pending
+    and payment_amount_y =
+      let open Result.Let_syntax in
+      let%bind {amount; _} = find_kind `Fee_payer_dec ops in
+      match amount with
+      | Some x ->
+          V.return (Amount_of.negated x)
+      | None ->
+          V.fail Amount_not_some
+    in
+    { Partial.kind= `Create_token_account
+    ; fee_payer= `Pk account_a.address
+    ; source= `Pk account_a.address
+    ; receiver= `Pk account_a.address
+    ; fee_token
+    ; token= Token_id.(default |> to_uint64)
+    ; fee= Unsigned.UInt64.of_string payment_amount_y.Amount.value
+    ; amount= None }
+  in
+  match (payment, delegation, create_token, create_token_account) with
+  | Ok _, Error _, Error _, Error _ ->
       payment
-  | Error _, Ok _, Error _ ->
+  | Error _, Ok _, Error _, Error _ ->
       delegation
-  | Error _, Error _, Ok _ ->
+  | Error _, Error _, Ok _, Error _ ->
       create_token
-  | Error err1, Error err2, Error err3 ->
-      Error (err1 @ err2 @ err3)
+  | Error _, Error _, Error _, Ok _ ->
+      create_token_account
+  | Error err1, Error err2, Error err3, Error err4 ->
+      Error (err1 @ err2 @ err3 @ err4)
   | _ ->
       failwith
         "A sequence of operations must represent exactly one user command"
@@ -476,7 +530,7 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
         [{Op.label= `Delegate_change; related_to= None}]
     | `Create_token ->
         [{Op.label= `Create_token; related_to= None}]
-    | `Create_account ->
+    | `Create_token_account ->
         [] (* Covered by account creation fee *)
     | `Mint_tokens -> (
       (* When amount is not none, the amount goes to receiver's account *)
@@ -745,7 +799,7 @@ let dummies =
             (Account_creation_fees_paid.By_fee_payer
                (Unsigned.UInt64.of_int 3_000)))
     ; hash= "TXN_3b_HASH" }
-  ; { kind= `Create_account
+  ; { kind= `Create_token_account
     ; fee_payer= `Pk "Alice"
     ; source= `Pk "Alice"
     ; token= Unsigned.UInt64.of_int 1

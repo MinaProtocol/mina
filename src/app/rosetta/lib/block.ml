@@ -416,7 +416,8 @@ SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, 
             | "create_token" ->
                 M.return `Create_token
             | "create_account" ->
-                M.return `Create_account
+                (* N.B.: not create_token_account *)
+                M.return `Create_token_account
             | "mint_tokens" ->
                 M.return `Mint_tokens
             | other ->
