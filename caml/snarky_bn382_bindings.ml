@@ -911,21 +911,21 @@ struct
 
     let f s = foreign (prefix s) (typ @-> returning ScalarField.typ)
 
-    let w = f "l"
+    let l = f "l"
 
-    let za = f "r"
+    let r = f "r"
 
-    let zb = f "o"
+    let o = f "o"
 
-    let h1 = f "z"
+    let z = f "z"
 
-    let g1 = f "t"
+    let t = f "t"
 
-    let h2 = f "f"
+    let f = f "f"
 
-    let g2 = f "sigma1"
+    let sigma1 = f "sigma1"
 
-    let h3 = f "sigma2"
+    let sigma2 = f "sigma2"
 
     module Pair =
       Pair (struct
