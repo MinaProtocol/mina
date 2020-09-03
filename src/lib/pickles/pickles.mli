@@ -24,7 +24,7 @@ module type Statement_value_intf =
 module Verification_key : sig
   include Binable.S
 
-  val dummy : t
+  val dummy : t Lazy.t
 
   module Id : sig
     type t [@@deriving sexp, eq]

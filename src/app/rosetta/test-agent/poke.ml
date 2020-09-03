@@ -140,4 +140,40 @@ module SendTransaction = struct
     let json = Yojson.Safe.from_string operations in
     [%of_yojson: Rosetta_models.Operation.t list] json
     |> Result.ok |> Option.value_exn
+
+  module Create_token =
+  [%graphql
+  {|
+       mutation ($sender: PublicKey!,
+                 $receiver: PublicKey!,
+                 $fee: UInt64!) {
+          createToken(input: {feePayer: $sender, tokenOwner: $receiver, fee: $fee}, signature: null) {
+           createNewToken {
+             hash
+           }
+       }
+     }
+   |}]
+
+  let create_token ~fee ~receiver:_ ~graphql_uri () =
+    let open Deferred.Result.Let_syntax in
+    let%map res =
+      Graphql.query
+        (Create_token.make ~fee ~sender:(`String pk) ~receiver:(`String pk) ())
+        graphql_uri
+    in
+    let cmd = (res#createToken)#createNewToken in
+    cmd#hash
+
+  let create_token_operations ~fee ~sender =
+    assert (String.equal sender pk) ;
+    let operations =
+      sprintf
+        {| [{"operation_identifier":{"index":0},"related_operations":[],"type":"fee_payer_dec","status":"Pending","account":{"address":"%s","metadata":{"token_id":"1"}},"amount":{"value":"-%s","currency":{"symbol":"CODA","decimals":9}}},{"operation_identifier":{"index":1},"related_operations":[],"type":"create_token","status":"Pending"}] |}
+        sender
+        (Unsigned.UInt64.to_string fee)
+    in
+    let json = Yojson.Safe.from_string operations in
+    [%of_yojson: Rosetta_models.Operation.t list] json
+    |> Result.ok |> Option.value_exn
 end
