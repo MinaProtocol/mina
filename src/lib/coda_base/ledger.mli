@@ -219,12 +219,18 @@ val num_accounts : t -> int
     generator for this type because you need to detach a mask from it's parent
     when you're done with it - the GC doesn't take care of that. *)
 val gen_initial_ledger_state :
-  (Signature_lib.Keypair.t * Currency.Amount.t * Coda_numbers.Account_nonce.t)
+  ( Signature_lib.Keypair.t
+  * Currency.Balance.t
+  * Coda_numbers.Account_nonce.t
+  * Account_timing.t )
   array
   Quickcheck.Generator.t
 
 type init_state =
-  (Signature_lib.Keypair.t * Currency.Amount.t * Coda_numbers.Account_nonce.t)
+  ( Signature_lib.Keypair.t
+  * Currency.Balance.t
+  * Coda_numbers.Account_nonce.t
+  * Account_timing.t )
   array
 [@@deriving sexp_of]
 
