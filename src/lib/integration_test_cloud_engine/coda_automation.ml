@@ -371,8 +371,8 @@ module Network_manager = struct
     if t.deployed then failwith "network already deployed" ;
     let%bind () = run_cmd_exn t "terraform" ["apply"; "-auto-approve"] in
     let%map () =
-      Deferred.List.iter t.keypair_secrets ~f:(fun secret ->
-          run_cmd_exn t "sleep" [ "infinity"; "&& echo "; secret ])
+      Deferred.List.iter t.keypair_secrets ~f:(fun ->
+          run_cmd_exn t "sleep" [ "infinity" ])
           (* run_cmd_exn t "kubectl"
             [ "create"
             ; "secret"
