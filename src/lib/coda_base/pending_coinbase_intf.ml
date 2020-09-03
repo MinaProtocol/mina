@@ -184,21 +184,32 @@ module type S = sig
       val var_of_t : t -> var
     end
 
+    module Poly : sig
+      [%%versioned:
+      module Stable : sig
+        module V1 : sig
+          type ('action, 'coinbase_data, 'supercharge_coinbase) t =
+            { action: 'action
+            ; coinbase_data: 'coinbase_data
+            ; supercharge_coinbase: 'supercharge_coinbase }
+          [@@deriving sexp]
+        end
+      end]
+    end
+
+    [%%versioned:
     module Stable : sig
       module V1 : sig
         type t =
-          Action.Stable.V1.t
-          * Coinbase_data.Stable.V1.t
-          * State_body_hash.Stable.V1.t
+          ( Action.Stable.V1.t
+          , Coinbase_data.Stable.V1.t
+          , bool )
+          Poly.Stable.V1.t
         [@@deriving sexp]
       end
+    end]
 
-      module Latest = V1
-    end
-
-    type t = Stable.Latest.t
-
-    type var = Action.var * Coinbase_data.var * State_body_hash.var
+    type var = (Action.var, Coinbase_data.var, Boolean.var) Poly.t
 
     val var_of_t : t -> var
   end
@@ -263,6 +274,7 @@ module type S = sig
          constraint_constants:Genesis_constants.Constraint_constants.t
       -> var
       -> Update.var
+      -> State_body_hash.var
       -> (var, 's) Tick.Checked.t
 
     (**

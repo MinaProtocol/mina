@@ -143,10 +143,13 @@ let%snarkydef step ~(logger : Logger.t)
         with_label __LOC__
           (Pending_coinbase.Checked.add_coinbase ~constraint_constants
              root_after_delete
-             ( Snark_transition.pending_coinbase_action transition
-             , ( Snark_transition.coinbase_receiver transition
-               , Snark_transition.coinbase_amount transition )
-             , previous_state_body_hash ))
+             { Pending_coinbase.Update.Poly.action=
+                 Snark_transition.pending_coinbase_action transition
+             ; coinbase_data=
+                 ( Snark_transition.coinbase_receiver transition
+                 , Snark_transition.coinbase_amount transition )
+             ; supercharge_coinbase= Boolean.false_ }
+             previous_state_body_hash)
       in
       (new_root, deleted_stack, no_coinbases_popped)
     in
