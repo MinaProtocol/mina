@@ -171,12 +171,7 @@ module type Snark_transition = sig
   type consensus_transition_var
 
   module Poly : sig
-    type ( 'blockchain_state
-         , 'consensus_transition
-         , 'amount
-         , 'public_key
-         , 'pending_coinbase_action )
-         t
+    type ('blockchain_state, 'consensus_transition, 'pending_coinbase_update) t
     [@@deriving sexp]
   end
 
@@ -187,16 +182,13 @@ module type Snark_transition = sig
   type var =
     ( blockchain_state_var
     , consensus_transition_var
-    , Amount.var
-    , Public_key.Compressed.var
-    , Pending_coinbase.Update.Action.var )
+    , Pending_coinbase.Update.var )
     Poly.t
 
   val consensus_transition :
-    (_, 'consensus_transition, _, _, _) Poly.t -> 'consensus_transition
+    (_, 'consensus_transition, _) Poly.t -> 'consensus_transition
 
-  val blockchain_state :
-    ('blockchain_state, _, _, _, _) Poly.t -> 'blockchain_state
+  val blockchain_state : ('blockchain_state, _, _) Poly.t -> 'blockchain_state
 end
 
 module type State_hooks = sig

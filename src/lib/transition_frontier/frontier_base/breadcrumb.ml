@@ -296,7 +296,7 @@ module For_tests = struct
       let%bind ( `Hash_after_applying next_staged_ledger_hash
                , `Ledger_proof ledger_proof_opt
                , `Staged_ledger _
-               , `Pending_coinbase_data _ ) =
+               , `Pending_coinbase_update _ ) =
         match%bind
           Staged_ledger.apply_diff_unchecked parent_staged_ledger ~logger
             staged_ledger_diff

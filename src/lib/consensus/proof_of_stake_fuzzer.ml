@@ -401,8 +401,8 @@ let propose_block_onto_chain ~logger ~keys
   let%map ( `Hash_after_applying next_staged_ledger_hash
           , `Ledger_proof ledger_proof_opt
           , `Staged_ledger staged_ledger
-          , `Pending_coinbase_data
-              (is_new_stack, coinbase_amount, pending_coinbase_action) ) =
+          , `Pending_coinbase_update (is_new_stack, pending_coinbase_update) )
+      =
     let%map res =
       Staged_ledger.apply_diff_unchecked previous_staged_ledger ~logger
         staged_ledger_diff ~state_body_hash:previous_protocol_state_body_hash
@@ -452,8 +452,7 @@ let propose_block_onto_chain ~logger ~keys
            ~f:(fun (proof, _) -> (Ledger_proof.statement proof).supply_increase)
            ledger_proof_opt)
       ~blockchain_state:(Protocol_state.blockchain_state protocol_state)
-      ~consensus_transition ~coinbase_receiver:proposer_pk ~coinbase_amount
-      ~pending_coinbase_action ()
+      ~consensus_transition ~pending_coinbase_update ()
   in
   let internal_transition =
     Internal_transition.create ~snark_transition

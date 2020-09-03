@@ -763,7 +763,8 @@ module T = struct
              (Pre_diff_info.Error.Coinbase_error "More than two coinbase parts"))
 
   let apply_diff ~logger ~constraint_constants t pre_diff_info
-      ~current_global_slot ~state_and_body_hash ~log_prefix =
+      ~current_global_slot ~state_and_body_hash ~log_prefix ~coinbase_receiver
+      ~supercharge_coinbase =
     let open Deferred.Result.Let_syntax in
     let max_throughput =
       Int.pow 2 t.constraint_constants.transaction_capacity_log_2
@@ -865,8 +866,11 @@ module T = struct
     ( `Hash_after_applying (hash new_staged_ledger)
     , `Ledger_proof res_opt
     , `Staged_ledger new_staged_ledger
-    , `Pending_coinbase_data
-        (is_new_stack, coinbase_amount, stack_update_in_snark) )
+    , `Pending_coinbase_update
+        ( is_new_stack
+        , { Pending_coinbase.Update.Poly.action= stack_update_in_snark
+          ; coinbase_data= (coinbase_receiver, coinbase_amount)
+          ; supercharge_coinbase } ) )
 
   let update_metrics (t : t) (witness : Staged_ledger_diff.t) =
     let open Or_error.Let_syntax in
@@ -931,6 +935,8 @@ module T = struct
     let%map ((_, _, `Staged_ledger new_staged_ledger, _) as res) =
       apply_diff ~constraint_constants t prediff ~logger ~current_global_slot
         ~state_and_body_hash ~log_prefix:"apply_diff"
+        ~coinbase_receiver:witness.coinbase_receiver
+        ~supercharge_coinbase:witness.supercharge_coinbase
     in
     let () =
       Or_error.iter_error (update_metrics new_staged_ledger witness)
@@ -953,6 +959,8 @@ module T = struct
     in
     apply_diff t prediff ~constraint_constants ~logger ~current_global_slot
       ~state_and_body_hash ~log_prefix:"apply_diff_unchecked"
+      ~coinbase_receiver:sl_diff.coinbase_receiver
+      ~supercharge_coinbase:sl_diff.supercharge_coinbase
 
   module Resources = struct
     module Discarded = struct
@@ -1638,7 +1646,7 @@ module T = struct
         ~txn_global_slot:current_global_slot
         ~account_id:(Account_id.create self Token_id.default)
         validating_ledger
-      |> Or_error.ok_exn
+      |> Or_error.ok_exn |> not
     in
     O1trace.trace_event "done mask" ;
     let partitions = Scan_state.partition_if_overflowing t.scan_state in
@@ -1788,8 +1796,7 @@ let%test_module "test" =
       let%map ( `Hash_after_applying hash
               , `Ledger_proof ledger_proof
               , `Staged_ledger sl'
-              , `Pending_coinbase_data
-                  (is_new_stack, coinbase_amount, pc_action) ) =
+              , `Pending_coinbase_update (is_new_stack, pc_update) ) =
         match%map
           Sl.apply ~constraint_constants !sl diff' ~logger ~verifier
             ~current_global_slot ~state_and_body_hash
@@ -1801,11 +1808,11 @@ let%test_module "test" =
       in
       assert (Staged_ledger_hash.equal hash (Sl.hash sl')) ;
       sl := sl' ;
-      (ledger_proof, diff', coinbase_amount, is_new_stack, pc_action)
+      (ledger_proof, diff', is_new_stack, pc_update)
 
     let create_and_apply sl logger pids txns stmt_to_work =
       let open Deferred.Let_syntax in
-      let%map ledger_proof, diff, _, _, _ =
+      let%map ledger_proof, diff, _, _ =
         create_and_apply_with_state_body_hash Coda_numbers.Global_slot.zero
           (State_hash.dummy, State_body_hash.dummy)
           sl logger pids txns stmt_to_work
@@ -2265,7 +2272,7 @@ let%test_module "test" =
                 , None )
             ; creator= self_pk
             ; coinbase_receiver
-            ; supercharge_coinbase= false }
+            ; supercharge_coinbase= true }
         | Some (_, _) ->
             let txns_in_second_diff = List.drop txns slots in
             let diff : Staged_ledger_diff.Diff.t =
@@ -2282,7 +2289,7 @@ let%test_module "test" =
             { diff
             ; creator= self_pk
             ; coinbase_receiver
-            ; supercharge_coinbase= false }
+            ; supercharge_coinbase= true }
       in
       let empty_diff : Staged_ledger_diff.t =
         { diff=
@@ -2292,7 +2299,7 @@ let%test_module "test" =
             , None )
         ; coinbase_receiver
         ; creator= self_pk
-        ; supercharge_coinbase= false }
+        ; supercharge_coinbase= true }
       in
       Quickcheck.test (gen_below_capacity ())
         ~sexp_of:
@@ -2351,13 +2358,14 @@ let%test_module "test" =
                       | Error err ->
                           failwith
                           @@ sprintf
-                               !"Wrong error: %{sexp: Sl.Staged_ledger_error.t}"
+                               !"Expecting Non-zero-fee-excess error, got \
+                                 %{sexp: Sl.Staged_ledger_error.t}"
                                err
                       | Ok
                           ( `Hash_after_applying _hash
                           , `Ledger_proof _ledger_proof
                           , `Staged_ledger sl'
-                          , `Pending_coinbase_data _ ) ->
+                          , `Pending_coinbase_update _ ) ->
                           sl := sl' ;
                           (false, diff)
                     in
@@ -2744,23 +2752,12 @@ let%test_module "test" =
               test_random_proof_fee ledger_init_state cmds iters
                 proofs_available sl test_mask `Many_provers ) )
 
-    let check_pending_coinbase proof diff ~sl_before ~sl_after
-        (_state_hash, state_body_hash) pc_action ~coinbase_amount
-        ~supercharge_coinbase ~is_new_stack =
+    let check_pending_coinbase proof ~sl_before ~sl_after
+        (_state_hash, state_body_hash) pc_update ~is_new_stack =
       let pending_coinbase_before = Sl.pending_coinbase_collection sl_before in
       let root_before = Pending_coinbase.merkle_root pending_coinbase_before in
       let unchecked_root_after =
         Pending_coinbase.merkle_root (Sl.pending_coinbase_collection sl_after)
-      in
-      let coinbase_data =
-        let create amount fee_transfer =
-          Coinbase.create ~amount
-            ~receiver:(Staged_ledger_diff.coinbase_receiver diff)
-            ~fee_transfer
-          |> Or_error.ok_exn
-        in
-        Pending_coinbase.Coinbase_data.of_coinbase
-          (create coinbase_amount None)
       in
       let f_pop_and_add =
         let open Snark_params.Tick in
@@ -2773,18 +2770,10 @@ let%test_module "test" =
             ~proof_emitted
             (Hash.var_of_t root_before)
         in
-        let action_var = Update.Action.var_of_t pc_action in
-        let coinbase_var = Coinbase_data.(var_of_t coinbase_data) in
-        let supercharge_coinbase_var =
-          Boolean.var_of_value supercharge_coinbase
-        in
+        let pc_update_var = Update.var_of_t pc_update in
         let state_body_hash_var = State_body_hash.var_of_t state_body_hash in
         Pending_coinbase.Checked.add_coinbase ~constraint_constants
-          root_after_popping
-          { Pending_coinbase.Update.Poly.action= action_var
-          ; coinbase_data= coinbase_var
-          ; supercharge_coinbase= supercharge_coinbase_var }
-          state_body_hash_var
+          root_after_popping pc_update_var state_body_hash_var
       in
       let checked_root_after_update =
         let open Snark_params.Tick in
@@ -2834,7 +2823,7 @@ let%test_module "test" =
             in
             let sl_before = !sl in
             let state_body_hash = List.hd_exn state_body_hashes in
-            let%map proof, diff, coinbase_amount, is_new_stack, pc_action =
+            let%map proof, diff, is_new_stack, pc_update =
               create_and_apply_with_state_body_hash current_global_slot
                 state_body_hash sl logger pids cmds_this_iter
                 (stmt_to_work_restricted
@@ -2842,9 +2831,8 @@ let%test_module "test" =
                    provers)
             in
             (*TODO Deepthi: ledger with timed/untimed accounts*)
-            check_pending_coinbase proof diff ~sl_before ~sl_after:!sl
-              state_body_hash pc_action ~coinbase_amount ~is_new_stack
-              ~supercharge_coinbase:true ;
+            check_pending_coinbase proof ~sl_before ~sl_after:!sl
+              state_body_hash pc_update ~is_new_stack ;
             assert_fee_excess proof ;
             let cmds_applied_this_iter =
               List.length @@ Staged_ledger_diff.user_commands diff

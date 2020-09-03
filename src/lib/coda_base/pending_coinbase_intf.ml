@@ -32,19 +32,17 @@ module type S = sig
     module Stable : sig
       module V1 : sig
         type t = Public_key.Compressed.Stable.V1.t * Amount.Stable.V1.t
-        [@@deriving sexp, bin_io]
+        [@@deriving sexp, bin_io, to_yojson]
       end
 
       module Latest = V1
     end
 
-    type t = Stable.Latest.t
-
-    type value [@@deriving sexp]
+    type t = Stable.Latest.t [@@deriving sexp, to_yojson]
 
     type var = Public_key.Compressed.var * Amount.var
 
-    val typ : (var, value) Typ.t
+    val typ : (var, t) Typ.t
 
     val empty : t
 
@@ -205,11 +203,15 @@ module type S = sig
           , Coinbase_data.Stable.V1.t
           , bool )
           Poly.Stable.V1.t
-        [@@deriving sexp]
+        [@@deriving sexp, to_yojson]
       end
     end]
 
     type var = (Action.var, Coinbase_data.var, Boolean.var) Poly.t
+
+    val genesis : t
+
+    val typ : (var, t) Typ.t
 
     val var_of_t : t -> var
   end
