@@ -2745,8 +2745,8 @@ let%test_module "test" =
                 proofs_available sl test_mask `Many_provers ) )
 
     let check_pending_coinbase proof diff ~sl_before ~sl_after
-        (_state_hash, state_body_hash) pc_action ~coinbase_amount ~is_new_stack
-        =
+        (_state_hash, state_body_hash) pc_action ~coinbase_amount
+        ~supercharge_coinbase ~is_new_stack =
       let pending_coinbase_before = Sl.pending_coinbase_collection sl_before in
       let root_before = Pending_coinbase.merkle_root pending_coinbase_before in
       let unchecked_root_after =
@@ -2773,12 +2773,18 @@ let%test_module "test" =
             ~proof_emitted
             (Hash.var_of_t root_before)
         in
-        let action = Update.Action.var_of_t pc_action in
+        let action_var = Update.Action.var_of_t pc_action in
         let coinbase_var = Coinbase_data.(var_of_t coinbase_data) in
+        let supercharge_coinbase_var =
+          Boolean.var_of_value supercharge_coinbase
+        in
         let state_body_hash_var = State_body_hash.var_of_t state_body_hash in
         Pending_coinbase.Checked.add_coinbase ~constraint_constants
           root_after_popping
-          (action, coinbase_var, state_body_hash_var)
+          { Pending_coinbase.Update.Poly.action= action_var
+          ; coinbase_data= coinbase_var
+          ; supercharge_coinbase= supercharge_coinbase_var }
+          state_body_hash_var
       in
       let checked_root_after_update =
         let open Snark_params.Tick in
@@ -2835,8 +2841,10 @@ let%test_module "test" =
                    (List.take work_list proofs_available_this_iter)
                    provers)
             in
+            (*TODO Deepthi: ledger with timed/untimed accounts*)
             check_pending_coinbase proof diff ~sl_before ~sl_after:!sl
-              state_body_hash pc_action ~coinbase_amount ~is_new_stack ;
+              state_body_hash pc_action ~coinbase_amount ~is_new_stack
+              ~supercharge_coinbase:true ;
             assert_fee_excess proof ;
             let cmds_applied_this_iter =
               List.length @@ Staged_ledger_diff.user_commands diff
