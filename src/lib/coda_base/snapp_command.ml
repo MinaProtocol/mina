@@ -391,26 +391,10 @@ module Stable = struct
   end
 end]
 
-type transfer = 
+type transfer =
   { source: Public_key.Compressed.t
   ; receiver: Public_key.Compressed.t
-  ; amount: Amount.t
-  }
-
-let as_transfer (t : t) : transfer Or_error.t =
-  match t with
-  | Proved_empty {one; two; fee_payment; _} ->
-    let open Or_error.Let_syntax in
-    let%map res =
-      match two with
-      | None -> 
-        begin match 
-        end 
-        Ok { source= one.data.body.pk
-           ; receiver=one.data.body.pk
-      | Neg, Some two ->
-        Ok { source= one.data.body.pk
-           ; receiver= two.
+  ; amount: Amount.t }
 
 let token_id (t : t) : Token_id.t =
   match t with
@@ -431,7 +415,12 @@ let is_non_pos (x : Amount.Signed.t) : bool =
 
 let is_neg x = not (is_non_neg x)
 
-let check_neg x = assert_ (is_neg x) "expected negative"
+let check_non_positive x = assert_ (is_non_pos x) "expected non positive"
+
+let signed_to_non_positive (t : Amount.Signed.t) =
+  let open Or_error.Let_syntax in
+  let%map () = check_non_positive t in
+  t.magnitude
 
 let fee_token (t : t) : Token_id.t =
   let f (x : _ Inner.t) =
@@ -483,7 +472,7 @@ let native_excess_exn (t : t) =
       ; _ } =
     match two with
     | None ->
-        assert (is_neg one.data.body.delta) ;
+        assert (is_non_pos one.data.body.delta) ;
         ( Account_id.create one.data.body.pk token_id
         , one.data.body.delta.magnitude )
     | Some two ->
@@ -491,9 +480,9 @@ let native_excess_exn (t : t) =
           Option.value_exn
             (Amount.Signed.add one.data.body.delta two.data.body.delta)
         in
-        assert (is_neg x) ;
+        assert (is_non_pos x) ;
         let pk =
-          if is_neg one.data.body.delta then one.data.body.pk
+          if is_non_pos one.data.body.delta then one.data.body.pk
           else two.data.body.pk
         in
         (Account_id.create pk token_id, x.magnitude)
@@ -553,6 +542,41 @@ let fee_exn (t : t) =
   | Signed_empty r ->
       f r
 
+(* TODO: Add unit test that this never throws on a value which passes
+   "check" *)
+let as_transfer (t : t) : transfer =
+  let open Party in
+  let f1
+      { Inner.one: ((Body.t, _) Predicated.Poly.t, _) Authorized.Poly.t
+      ; two: ((Body.t, _) Predicated.Poly.t, _) Authorized.Poly.t option
+      ; _ } : transfer =
+    match two with
+    | None ->
+        { source= one.data.body.pk
+        ; receiver= one.data.body.pk
+        ; amount= Amount.zero }
+    | Some two ->
+        let sender, receiver =
+          if is_non_pos one.data.body.delta then (one.data.body, two.data.body)
+          else (two.data.body, one.data.body)
+        in
+        { source= sender.pk
+        ; receiver= receiver.pk
+        ; amount= receiver.delta.magnitude }
+  in
+  let f2 r = f1 {r with two= Some r.Inner.two} in
+  match t with
+  | Proved_empty r ->
+      f1 r
+  | Proved_signed r ->
+      f2 r
+  | Proved_proved r ->
+      f2 r
+  | Signed_signed r ->
+      f2 r
+  | Signed_empty r ->
+      f1 r
+
 let native_excess t = Option.try_with (fun () -> native_excess_exn t)
 
 (* TODO: Make sure this matches the snark. I don't think it does right now. *)
@@ -562,8 +586,7 @@ let fee_excess (t : t) : Fee_excess.t Or_error.t =
   in
   let open Or_error.Let_syntax in
   let finish r token_id fee_payment =
-    let%bind () = check_neg r in
-    let r = r.magnitude in
+    let%bind r = signed_to_non_positive r in
     let one = (token_id, Fee.Signed.of_unsigned (Amount.to_fee r)) in
     Fee_excess.of_one_or_two
       ( match fee_payment with
@@ -1025,6 +1048,7 @@ let check (t : t) : unit Or_error.t =
   in
   let open Or_error.Let_syntax in
   let open Party in
+  let%bind _ = Or_error.try_with (fun () -> fee_exn t) in
   let%bind () = nonce_invariant t in
   let fee_checks ~excess ~token_id ~(fee_payment : Other_fee_payer.t option) =
     match fee_payment with

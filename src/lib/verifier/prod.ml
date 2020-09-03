@@ -17,8 +17,11 @@ module Worker_state = struct
       -> [ `Valid of Coda_base.Command_transaction.Valid.t
          | `Invalid
          | `Valid_assuming of
-            (Pickles.Side_loaded.Verification_key.t * Coda_base.Snapp_statement.t * Pickles.Side_loaded.Proof.t)
-            list] list
+           ( Pickles.Side_loaded.Verification_key.t
+           * Coda_base.Snapp_statement.t
+           * Pickles.Side_loaded.Proof.t )
+           list ]
+         list
 
     val verify_transaction_snarks :
       (Transaction_snark.t * Sok_message.t) list -> bool
@@ -41,31 +44,32 @@ module Worker_state = struct
           (let bc_vk = Precomputed_values.blockchain_verification ()
            and tx_vk = Precomputed_values.transaction_verification () in
            let module M = struct
-             let verify_commands (cs : Command_transaction.Verifiable.t list)
-                 : _ list
-               =
-               let cs = List.map cs ~f:Common.check in 
+             let verify_commands (cs : Command_transaction.Verifiable.t list) :
+                 _ list =
+               let cs = List.map cs ~f:Common.check in
                let to_verify =
                  List.concat_map cs ~f:(function
-                     | `Valid _ -> []
-                     | `Invalid  -> []
-                     | `Valid_assuming (_, xs) -> xs )
-               in 
+                   | `Valid _ ->
+                       []
+                   | `Invalid ->
+                       []
+                   | `Valid_assuming (_, xs) ->
+                       xs )
+               in
                let all_verified =
-                  Pickles.Side_loaded.verify
-                    ~value_to_field_elements:
-                      Snapp_statement.to_field_elements
-                    to_verify
-               in 
+                 Pickles.Side_loaded.verify
+                   ~value_to_field_elements:Snapp_statement.to_field_elements
+                   to_verify
+               in
                List.map cs ~f:(function
-                | `Valid c -> `Valid c
-                | `Invalid -> `Invalid
-                | `Valid_assuming (c, xs) -> 
-                  if all_verified
-                  then `Valid c
-                  else `Valid_assuming xs )
+                 | `Valid c ->
+                     `Valid c
+                 | `Invalid ->
+                     `Invalid
+                 | `Valid_assuming (c, xs) ->
+                     if all_verified then `Valid c else `Valid_assuming xs )
 
-               (*
+             (*
                let to_verify =
                   let check c
                       ( vk
@@ -203,12 +207,14 @@ module Worker_state = struct
         Deferred.return
         @@ ( module struct
              let verify_commands cs =
-              List.map cs ~f:(fun c ->
-                match Common.check c with
-                  | `Valid c -> `Valid c
-                  | `Invalid  -> `Invalid 
-                  | `Valid_assuming (c, _) -> `Valid c
-                )
+               List.map cs ~f:(fun c ->
+                   match Common.check c with
+                   | `Valid c ->
+                       `Valid c
+                   | `Invalid ->
+                       `Invalid
+                   | `Valid_assuming (c, _) ->
+                       `Valid c )
 
              let verify_blockchain_snark _ _ = true
 
@@ -230,12 +236,14 @@ module Worker = struct
       ; verify_commands:
           ( 'w
           , Command_transaction.Verifiable.t list
-          , [ `Valid of Command_transaction.Valid.t 
-            | `Invalid 
-            | `Valid_assuming  of
-              (Pickles.Side_loaded.Verification_key.t * Coda_base.Snapp_statement.t * Pickles.Side_loaded.Proof.t)
-              list
-            ] list )
+          , [ `Valid of Command_transaction.Valid.t
+            | `Invalid
+            | `Valid_assuming of
+              ( Pickles.Side_loaded.Verification_key.t
+              * Coda_base.Snapp_statement.t
+              * Pickles.Side_loaded.Proof.t )
+              list ]
+            list )
           F.t }
 
     module Worker_state = Worker_state
@@ -285,15 +293,14 @@ module Worker = struct
               ( [%bin_type_class:
                   Command_transaction.Verifiable.Stable.Latest.t list]
               , [%bin_type_class:
-                [ `Valid of Command_transaction.Valid.Stable.Latest.t
-                | `Invalid
-              | `Valid_assuming of
-                  (Pickles.Side_loaded.Verification_key.Stable.Latest.t 
-                   * Coda_base.Snapp_statement.Stable.Latest.t
-                   * Pickles.Side_loaded.Proof.Stable.Latest.t)
-                  list
-                ] list 
-              ]
+                  [ `Valid of Command_transaction.Valid.Stable.Latest.t
+                  | `Invalid
+                  | `Valid_assuming of
+                    ( Pickles.Side_loaded.Verification_key.Stable.Latest.t
+                    * Coda_base.Snapp_statement.Stable.Latest.t
+                    * Pickles.Side_loaded.Proof.Stable.Latest.t )
+                    list ]
+                  list]
               , verify_commands ) }
 
       let init_worker_state Worker_state.{conf_dir; logger; proof_level} =
@@ -361,4 +368,4 @@ let verify_transaction_snarks t ts =
   Worker.Connection.run t ~f:Worker.functions.verify_transaction_snarks ~arg:ts
 
 let verify_commands t ts =
-    (Worker.Connection.run t ~f:Worker.functions.verify_commands ~arg:ts)
+  Worker.Connection.run t ~f:Worker.functions.verify_commands ~arg:ts

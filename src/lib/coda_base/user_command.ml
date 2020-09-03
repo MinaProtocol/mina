@@ -70,6 +70,11 @@ let fee = Fn.compose Payload.fee payload
 
 let nonce = Fn.compose Payload.nonce payload
 
+(* for filtering *)
+let minimum_fee = Coda_compile_config.minimum_user_command_fee
+
+let has_insufficient_fee t = Currency.Fee.(fee t < minimum_fee)
+
 let signer {Poly.signer; _} = signer
 
 let fee_token ({payload; _} : t) = Payload.fee_token payload

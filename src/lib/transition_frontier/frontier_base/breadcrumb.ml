@@ -164,12 +164,13 @@ let display t =
 let all_user_commands breadcrumbs =
   Sequence.fold (Sequence.of_list breadcrumbs) ~init:User_command.Set.empty
     ~f:(fun acc_set breadcrumb ->
-      breadcrumb 
-      |> commands
-      |> List.filter_map ~f:(fun {data; _} -> 
-          match  data with
-          | Snapp_command _ -> None
-          | User_command c -> Some (User_command.forget_check c))
+      breadcrumb |> commands
+      |> List.filter_map ~f:(fun {data; _} ->
+             match data with
+             | Snapp_command _ ->
+                 None
+             | User_command c ->
+                 Some (User_command.forget_check c) )
       |> User_command.Set.of_list |> Set.union acc_set )
 
 module For_tests = struct

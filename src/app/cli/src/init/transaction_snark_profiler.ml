@@ -82,7 +82,8 @@ let create_ledger_and_transactions num_transitions =
         |> Or_error.ok_exn
       in
       let transitions =
-        List.map transactions ~f:(fun t -> Transaction.Command (User_command t))
+        List.map transactions ~f:(fun t ->
+            Transaction.Command (Command_transaction.User_command t) )
         @ [Coinbase coinbase; Fee_transfer fee_transfer]
       in
       (ledger, transitions)
@@ -145,7 +146,7 @@ let pending_coinbase_stack_target (t : Transaction.t) stack =
 (* This gives the "wall-clock time" to snarkify the given list of transactions, assuming
    unbounded parallelism. *)
 let profile (module T : Transaction_snark.S) sparse_ledger0
-    (transitions : Transaction.t list) _ =
+    (transitions : Transaction.Valid.t list) _ =
   let constraint_constants = Genesis_constants.Constraint_constants.compiled in
   let txn_global_slot = Lazy.force curr_global_slot in
   let (base_proof_time, _, _), base_proofs =
@@ -157,13 +158,14 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
         in
         let sparse_ledger' =
           Sparse_ledger.apply_transaction_exn ~constraint_constants
-            ~txn_global_slot sparse_ledger t
+            ~txn_global_slot sparse_ledger (Transaction.forget t)
         in
         let next_available_token_after =
           Sparse_ledger.next_available_token sparse_ledger'
         in
         let coinbase_stack_target =
-          pending_coinbase_stack_target t coinbase_stack_source
+          pending_coinbase_stack_target (Transaction.forget t)
+            coinbase_stack_source
         in
         let span, proof =
           time (fun () ->
@@ -201,8 +203,8 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
   let total_time = merge_all base_proof_time base_proofs in
   Printf.sprintf !"Total time was: %{Time.Span}" total_time
 
-let check_base_snarks sparse_ledger0 (transitions : Transaction.t list) preeval
-    =
+let check_base_snarks sparse_ledger0 (transitions : Transaction.Valid.t list)
+    preeval =
   let constraint_constants = Genesis_constants.Constraint_constants.compiled in
   let _ =
     let sok_message =
@@ -217,13 +219,14 @@ let check_base_snarks sparse_ledger0 (transitions : Transaction.t list) preeval
         in
         let sparse_ledger' =
           Sparse_ledger.apply_transaction_exn ~constraint_constants
-            ~txn_global_slot sparse_ledger t
+            ~txn_global_slot sparse_ledger (Transaction.forget t)
         in
         let next_available_token_after =
           Sparse_ledger.next_available_token sparse_ledger'
         in
         let coinbase_stack_target =
-          pending_coinbase_stack_target t Pending_coinbase.Stack.empty
+          pending_coinbase_stack_target (Transaction.forget t)
+            Pending_coinbase.Stack.empty
         in
         let () =
           Transaction_snark.check_transaction ?preeval ~constraint_constants
@@ -244,7 +247,7 @@ let check_base_snarks sparse_ledger0 (transitions : Transaction.t list) preeval
   "Base constraint system satisfied"
 
 let generate_base_snarks_witness sparse_ledger0
-    (transitions : Transaction.t list) preeval =
+    (transitions : Transaction.Valid.t list) preeval =
   let constraint_constants = Genesis_constants.Constraint_constants.compiled in
   let _ =
     let sok_message =
@@ -259,13 +262,14 @@ let generate_base_snarks_witness sparse_ledger0
         in
         let sparse_ledger' =
           Sparse_ledger.apply_transaction_exn ~constraint_constants
-            ~txn_global_slot sparse_ledger t
+            ~txn_global_slot sparse_ledger (Transaction.forget t)
         in
         let next_available_token_after =
           Sparse_ledger.next_available_token sparse_ledger'
         in
         let coinbase_stack_target =
-          pending_coinbase_stack_target t Pending_coinbase.Stack.empty
+          pending_coinbase_stack_target (Transaction.forget t)
+            Pending_coinbase.Stack.empty
         in
         let () =
           Transaction_snark.generate_transaction_witness ?preeval
@@ -296,9 +300,11 @@ let run profiler num_transactions repeats preeval =
            transactions
            ~f:(fun (participants, next_available_token) t ->
              ( List.rev_append
-                 (Transaction.accounts_accessed ~next_available_token t)
+                 (Transaction.accounts_accessed ~next_available_token
+                    (Transaction.forget t))
                  participants
-             , Transaction.next_available_token t next_available_token ) ) )
+             , Transaction.next_available_token (Transaction.forget t)
+                 next_available_token ) ) )
   in
   for i = 1 to repeats do
     let message = profiler sparse_ledger transactions preeval in

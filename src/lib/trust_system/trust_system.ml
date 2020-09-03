@@ -22,7 +22,8 @@ module Actions = struct
     | Sent_invalid_signature
         (** Peer sent us something with a signature that doesn't check *)
     | Sent_invalid_proof  (** Peer sent us a proof that does not verify. *)
-    | Sent_invalid_signature_or_proof (** Peer either sent us a proof or a signature that does not verify. *)
+    | Sent_invalid_signature_or_proof
+        (** Peer either sent us a proof or a signature that does not verify. *)
     | Sent_invalid_protocol_version
         (** Peer sent block with invalid protocol version *)
     | Sent_mismatched_protocol_version

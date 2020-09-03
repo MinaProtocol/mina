@@ -550,8 +550,7 @@ let update_metrics_with_diff (type mutant) t
           Int.to_float (1 + List.length garbage_breadcrumbs)
         in
         let num_finalized_staged_txns =
-          Int.to_float
-            (List.length (Breadcrumb.commands new_root_breadcrumb))
+          Int.to_float (List.length (Breadcrumb.commands new_root_breadcrumb))
         in
         Gauge.dec Transition_frontier.active_breadcrumbs
           num_breadcrumbs_removed ;

@@ -122,6 +122,11 @@ module type S = sig
 
   val valid_until : t -> Global_slot.t
 
+  (* for filtering *)
+  val minimum_fee : Currency.Fee.t
+
+  val has_insufficient_fee : t -> bool
+
   val tag : t -> Transaction_union_tag.t
 
   val tag_string : t -> string

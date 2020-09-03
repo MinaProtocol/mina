@@ -31,8 +31,8 @@ let%test_module "Archive node unit tests" =
     let keys = Array.init 5 ~f:(fun _ -> Keypair.create ())
 
     let user_command_gen =
-      Command_transaction.Gen.payment_with_random_participants ~keys ~max_amount:1000
-        ~max_fee:10 ()
+      Command_transaction.Gen.payment_with_random_participants ~keys
+        ~max_amount:1000 ~max_fee:10 ()
 
     let fee_transfer_gen =
       Fee_transfer.Single.Gen.with_random_receivers ~keys ~max_fee:10
@@ -50,16 +50,15 @@ let%test_module "Archive node unit tests" =
       @@ fun () ->
       Async.Quickcheck.async_test ~sexp_of:[%sexp_of: Command_transaction.t]
         user_command_gen ~f:(fun user_command ->
-          let transaction_hash =
-            Transaction_hash.hash_command user_command
-          in
+          let transaction_hash = Transaction_hash.hash_command user_command in
           match%map
             let open Deferred.Result.Let_syntax in
             let%bind user_command_id =
-              Processor.User_command.add_if_doesn't_exist conn user_command
+              Processor.Command_transaction.add_if_doesn't_exist conn
+                user_command
             in
             let%map result =
-              Processor.User_command.find conn ~transaction_hash
+              Processor.Command_transaction.find conn ~transaction_hash
             in
             [%test_result: int] ~expect:user_command_id
               (Option.value_exn result)
@@ -252,12 +251,13 @@ let%test_module "Archive node unit tests" =
                     else
                       let%map.Async () =
                         Deferred.List.iter
-                          (Transition_frontier.Breadcrumb.user_commands
-                             breadcrumb) ~f:(fun cmd ->
+                          (Transition_frontier.Breadcrumb.commands breadcrumb)
+                          ~f:(fun cmd ->
                             match%map.Async
-                              Processor.User_command.find conn
+                              Processor.Command_transaction.find conn
                                 ~transaction_hash:
-                                  (Transaction_hash.hash_user_command cmd.data)
+                                  (Transaction_hash.hash_command
+                                     (Command_transaction.forget_check cmd.data))
                             with
                             | Ok (Some _) ->
                                 ()
@@ -265,9 +265,9 @@ let%test_module "Archive node unit tests" =
                                 Error.raise
                                   (Error.createf
                                      !"The user command %{sexp: \
-                                       User_command.t} was pruned when it \
-                                       should not have been"
-                                     cmd.data)
+                                       Command_transaction.t} was pruned when \
+                                       it should not have been"
+                                     (Command_transaction.forget_check cmd.data))
                             | Error e ->
                                 failwith @@ Caqti_error.show e )
                       in
@@ -287,12 +287,13 @@ let%test_module "Archive node unit tests" =
                     else
                       let%map.Async () =
                         Deferred.List.iter
-                          (Transition_frontier.Breadcrumb.user_commands
-                             breadcrumb) ~f:(fun cmd ->
+                          (Transition_frontier.Breadcrumb.commands breadcrumb)
+                          ~f:(fun cmd ->
                             match%map.Async
-                              Processor.User_command.find conn
+                              Processor.Command_transaction.find conn
                                 ~transaction_hash:
-                                  (Transaction_hash.hash_user_command cmd.data)
+                                  (Transaction_hash.hash_command
+                                     (Command_transaction.forget_check cmd.data))
                             with
                             | Ok None ->
                                 ()
@@ -300,9 +301,9 @@ let%test_module "Archive node unit tests" =
                                 Error.raise
                                   (Error.createf
                                      !"The user command %{sexp: \
-                                       User_command.t} was not pruned when it \
-                                       should have been"
-                                     cmd.data)
+                                       Command_transaction.t} was not pruned \
+                                       when it should have been"
+                                     (Command_transaction.forget_check cmd.data))
                             | Error e ->
                                 failwith @@ Caqti_error.show e )
                       in

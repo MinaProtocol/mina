@@ -29,8 +29,8 @@ let get_status ~frontier_broadcast_pipe ~transaction_pool cmd =
     Result.of_option (User_command.check cmd)
       ~error:(Error.of_string "Invalid signature")
     |> Result.map ~f:(fun x ->
-        Transaction_hash.Command_transaction_with_valid_signature.create
-          (User_command x) )
+           Transaction_hash.Command_transaction_with_valid_signature.create
+             (User_command x) )
   in
   let resource_pool = Transaction_pool.resource_pool transaction_pool in
   match Broadcast_pipe.Reader.peek frontier_broadcast_pipe with
@@ -42,12 +42,12 @@ let get_status ~frontier_broadcast_pipe ~transaction_pool cmd =
             Transition_frontier.best_tip_path transition_frontier
           in
           let in_breadcrumb breadcrumb =
-            List.exists
-              (Transition_frontier.Breadcrumb.commands breadcrumb)
-              ~f:(fun {data= cmd'; _} -> 
-                  match cmd' with
-                  | Snapp_command _ -> false
-                  | User_command cmd' ->
+            List.exists (Transition_frontier.Breadcrumb.commands breadcrumb)
+              ~f:(fun {data= cmd'; _} ->
+                match cmd' with
+                | Snapp_command _ ->
+                    false
+                | User_command cmd' ->
                     User_command.equal cmd (User_command.forget_check cmd') )
           in
           if List.exists ~f:in_breadcrumb best_tip_path then
@@ -112,7 +112,8 @@ let%test_module "transaction_status" =
             ~pids:(Child_processes.Termination.create_pid_table ())
             ~conf_dir:None
         in
-        Transaction_pool.Resource_pool.make_config ~trust_system ~pool_max_size ~verifier
+        Transaction_pool.Resource_pool.make_config ~trust_system ~pool_max_size
+          ~verifier
       in
       let transaction_pool =
         Transaction_pool.create ~config
@@ -206,7 +207,9 @@ let%test_module "transaction_status" =
               in
               let%bind () =
                 Strict_pipe.Writer.write local_diffs_writer
-                  (List.map pool_user_commands ~f:(fun x -> Command_transaction.User_command x), Fn.const ())
+                  ( List.map pool_user_commands ~f:(fun x ->
+                        Command_transaction.User_command x )
+                  , Fn.const () )
               in
               let%map () = Async.Scheduler.yield_until_no_jobs_remain () in
               [%log info] "Computing status" ;

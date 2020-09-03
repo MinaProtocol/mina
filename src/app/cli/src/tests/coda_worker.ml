@@ -761,9 +761,14 @@ module T = struct
             Fn.compose Deferred.return
             @@ Coda_commands.For_tests.Subscriptions.new_user_commands coda
           in
-          let coda_get_all_user_commands =
-            Fn.compose Deferred.return
-            @@ Coda_commands.For_tests.get_all_user_commands coda
+          let coda_get_all_user_commands t =
+            Deferred.return
+              (List.filter_map
+                 (Coda_commands.For_tests.get_all_commands coda t) ~f:(function
+                | User_command c ->
+                    Some c
+                | Snapp_command _ ->
+                    None ))
           in
           { coda_peers= with_monitor coda_peers
           ; coda_verified_transitions= with_monitor coda_verified_transitions

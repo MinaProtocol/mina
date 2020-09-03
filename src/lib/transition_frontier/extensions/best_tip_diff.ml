@@ -12,8 +12,7 @@ module T = struct
 
   let create ~logger frontier =
     ( {logger}
-    , { new_commands=
-          Breadcrumb.commands (Full_frontier.root frontier)
+    , { new_commands= Breadcrumb.commands (Full_frontier.root frontier)
       ; removed_commands= []
       ; reorg_best_tip= false } )
 
@@ -43,13 +42,10 @@ module T = struct
     let view, should_broadcast =
       List.fold diffs_with_mutants
         ~init:
-          ( { new_commands= []
-            ; removed_commands= []
-            ; reorg_best_tip= false }
+          ( {new_commands= []; removed_commands= []; reorg_best_tip= false}
           , false )
         ~f:
-          (fun ( ( {new_commands; removed_commands; reorg_best_tip= _}
-                 as acc )
+          (fun ( ({new_commands; removed_commands; reorg_best_tip= _} as acc)
                , should_broadcast ) -> function
           | E (Best_tip_changed new_best_tip, old_best_tip_hash) ->
               let new_best_tip_breadcrumb =
@@ -81,8 +77,7 @@ module T = struct
                 @ new_commands
               in
               let removed_commands =
-                List.bind removed_from_best_tip_path
-                  ~f:Breadcrumb.commands
+                List.bind removed_from_best_tip_path ~f:Breadcrumb.commands
                 @ removed_commands
               in
               let reorg_best_tip =

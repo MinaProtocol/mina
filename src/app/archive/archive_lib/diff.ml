@@ -32,8 +32,8 @@ module Transaction_pool = struct
   module Stable = struct
     module V1 = struct
       type t =
-        { added: User_command.Stable.V1.t list
-        ; removed: User_command.Stable.V1.t list }
+        { added: Command_transaction.Stable.V1.t list
+        ; removed: Command_transaction.Stable.V1.t list }
 
       let to_latest = Fn.id
     end

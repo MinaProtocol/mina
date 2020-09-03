@@ -1127,8 +1127,13 @@ module Types = struct
                included in this block"
             ~typ:(non_null @@ list @@ non_null user_command)
             ~args:Arg.[]
-            ~resolve:(fun _ {user_commands; _} ->
-              List.map ~f:UserCommand.mk_user_command user_commands )
+            ~resolve:(fun _ {commands; _} ->
+              List.filter_map commands ~f:(fun t ->
+                  match t.data with
+                  | User_command c ->
+                      Some (UserCommand.mk_user_command {t with data= c})
+                  | Snapp_command _ ->
+                      None ) )
         ; field "feeTransfer"
             ~doc:"List of fee transfers included in this block"
             ~typ:(non_null @@ list @@ non_null fee_transfer)
@@ -1711,7 +1716,8 @@ module Types = struct
               ~error:(Option.value error ~default:"Invalid cursor")
             |> Result.map ~f:(fun cmd ->
                    { With_hash.data= cmd
-                   ; hash= Transaction_hash.hash_user_command cmd } )
+                   ; hash= Transaction_hash.hash_command (User_command cmd) }
+               )
 
           let doc = Doc.bin_prot "Opaque pagination cursor for a user command"
         end
@@ -2025,7 +2031,8 @@ module Mutations = struct
       |> Deferred.return
     in
     let%map cmd = send_user_command coda user_command_input in
-    {With_hash.data= cmd; hash= Transaction_hash.hash_user_command cmd}
+    { With_hash.data= cmd
+    ; hash= Transaction_hash.hash_command (User_command cmd) }
 
   let send_unsigned_user_command ~coda ~nonce_opt ~signer ~memo ~fee ~fee_token
       ~fee_payer_pk ~valid_until ~body =
@@ -2044,7 +2051,8 @@ module Mutations = struct
       |> Deferred.return
     in
     let%map cmd = send_user_command coda user_command_input in
-    {With_hash.data= cmd; hash= Transaction_hash.hash_user_command cmd}
+    { With_hash.data= cmd
+    ; hash= Transaction_hash.hash_command (User_command cmd) }
 
   let send_delegation =
     io_field "sendDelegation"
@@ -2345,8 +2353,10 @@ module Queries = struct
                     (* Filter by fee-payer pk. *)
                     if
                       txn
-                      |> Transaction_hash.User_command_with_valid_signature
-                         .command |> User_command.fee_payer_pk
+                      |> Transaction_hash
+                         .Command_transaction_with_valid_signature
+                         .command |> Command_transaction.fee_payer
+                      |> Account_id.public_key
                       |> Public_key.Compressed.equal pk
                     then Some txn
                     else None
@@ -2354,11 +2364,16 @@ module Queries = struct
                     Some txn
                 | _ ->
                     None ) )
-        |> List.map
-             ~f:
-               (Fn.compose Types.UserCommand.mk_user_command
-                  Transaction_hash.User_command_with_valid_signature
-                  .forget_check) )
+        |> List.filter_map ~f:(fun x ->
+               let x =
+                 Transaction_hash.Command_transaction_with_valid_signature
+                 .forget_check x
+               in
+               match x.data with
+               | User_command data ->
+                   Some (Types.UserCommand.mk_user_command {x with data})
+               | Snapp_command _ ->
+                   None ) )
 
   let sync_state =
     result_field_no_inputs "syncStatus" ~doc:"Network sync status" ~args:[]
@@ -2577,7 +2592,7 @@ module Queries = struct
                 ; consensus_state= Protocol_state.consensus_state genesis_state
                 }
             ; transactions=
-                { user_commands= []
+                { commands= []
                 ; fee_transfers= []
                 ; coinbase= constraint_constants.coinbase_amount
                 ; coinbase_receiver=

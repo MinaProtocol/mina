@@ -7,7 +7,8 @@ open Pipe_lib
 module Api = struct
   type user_cmd_status = {expected_deadline: int; passed_root: unit Ivar.t}
 
-  type user_cmds_under_inspection = (User_command.t, user_cmd_status) Hashtbl.t
+  type user_cmds_under_inspection =
+    (Command_transaction.t, user_cmd_status) Hashtbl.t
 
   type restart_type = [`Catchup | `Bootstrap]
 
@@ -33,7 +34,7 @@ module Api = struct
     let status =
       Array.init (Array.length workers) ~f:(fun _ ->
           let user_cmds_under_inspection =
-            Hashtbl.create (module User_command)
+            Hashtbl.create (module Command_transaction)
           in
           `On (`Synced user_cmds_under_inspection) )
     in
@@ -115,7 +116,7 @@ module Api = struct
       , (fun () -> t.status.(i) <- `On `Catchup)
       , fun () ->
           let user_cmds_under_inspection =
-            Hashtbl.create (module User_command)
+            Hashtbl.create (module Command_transaction)
           in
           t.status.(i) <- `On (`Synced user_cmds_under_inspection) )
 
@@ -333,8 +334,7 @@ type user_cmd_status =
 let start_payment_check logger root_pipe (testnet : Api.t) =
   don't_wait_for
     (Linear_pipe.iter root_pipe ~f:(function
-         | `Root
-             (worker_id, ({user_commands; root_length} : Coda_lib.Root_diff.t))
+         | `Root (worker_id, ({commands; root_length} : Coda_lib.Root_diff.t))
          ->
          ( match testnet.status.(worker_id) with
          | `On (`Synced user_cmds_under_inspection) ->
@@ -379,19 +379,21 @@ let start_payment_check logger root_pipe (testnet : Api.t) =
                    [%log fatal]
                      ~metadata:
                        [ ("worker_id", `Int worker_id)
-                       ; ("user_cmd", User_command.to_yojson user_cmd) ]
+                       ; ("user_cmd", Command_transaction.to_yojson user_cmd)
+                       ]
                      "Transaction $user_cmd took too long to get into the \
                       root of node $worker_id. Length expected: %d got: %d"
                      expected_deadline root_length ;
                    exit 9 |> ignore ) ) ;
-             List.iter user_commands ~f:(fun user_cmd ->
+             List.iter commands ~f:(fun user_cmd ->
                  Hashtbl.change user_cmds_under_inspection user_cmd.data
                    ~f:(function
                    | Some {passed_root; _} ->
                        Ivar.fill passed_root () ;
                        [%log info]
                          ~metadata:
-                           [ ("user_cmd", User_command.to_yojson user_cmd.data)
+                           [ ( "user_cmd"
+                             , Command_transaction.to_yojson user_cmd.data )
                            ; ("worker_id", `Int worker_id)
                            ; ("length", `Int root_length) ]
                          "Transaction $user_cmd finally gets into the root of \
@@ -525,7 +527,8 @@ end = struct
           | `On (`Synced user_cmds_under_inspection) ->
               let%map root_length = Coda_process.root_length_exn worker in
               let passed_root = Ivar.create () in
-              Hashtbl.add_exn user_cmds_under_inspection ~key:user_cmd
+              Hashtbl.add_exn user_cmds_under_inspection
+                ~key:(User_command user_cmd)
                 ~data:
                   { expected_deadline=
                       root_length
@@ -598,7 +601,8 @@ end = struct
                            might have duplicate commands if there are key duplicates
                         *)
                         ignore
-                          (Hashtbl.add user_cmds_under_inspection ~key:user_cmd
+                          (Hashtbl.add user_cmds_under_inspection
+                             ~key:(User_command user_cmd)
                              ~data:
                                { expected_deadline=
                                    root_length

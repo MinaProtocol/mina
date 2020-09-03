@@ -16,18 +16,23 @@ let create ~logger:_ ~proof_level ~pids:_ ~conf_dir:_ =
 let verify_blockchain_snark _ _ = Deferred.Or_error.return true
 
 let verify_commands _ (cs : Command_transaction.Verifiable.t list) :
-      [ `Valid of Coda_base.Command_transaction.Valid.t
-      | `Invalid
-         | `Valid_assuming of
-            (Pickles.Side_loaded.Verification_key.t * Coda_base.Snapp_statement.t * Pickles.Side_loaded.Proof.t)
-            list ] list
+    [ `Valid of Coda_base.Command_transaction.Valid.t
+    | `Invalid
+    | `Valid_assuming of
+      ( Pickles.Side_loaded.Verification_key.t
+      * Coda_base.Snapp_statement.t
+      * Pickles.Side_loaded.Proof.t )
+      list ]
+    list
     Deferred.Or_error.t =
   List.map cs ~f:(fun c ->
-    match Common.check c with
-      | `Valid c -> `Valid c
-      | `Invalid  -> `Invalid 
-      | `Valid_assuming (c, _) -> `Valid c
-    )
+      match Common.check c with
+      | `Valid c ->
+          `Valid c
+      | `Invalid ->
+          `Invalid
+      | `Valid_assuming (c, _) ->
+          `Valid c )
   |> Deferred.Or_error.return
 
 let verify_transaction_snarks _ ts =

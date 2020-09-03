@@ -11,23 +11,18 @@ module Snark_pool : sig
 
   val create : Verifier.t -> t
 
-  val verify :
-       t
-    -> proof_envelope
-    -> bool Deferred.Or_error.t
+  val verify : t -> proof_envelope -> bool Deferred.Or_error.t
 end
 
 module Transaction_pool : sig
   open Coda_base
 
-  type t
-  [@@deriving sexp]
+  type t [@@deriving sexp]
 
   val create : Verifier.t -> t
 
   val verify :
        t
     -> Command_transaction.Verifiable.t list Envelope.Incoming.t
-      -> (Command_transaction.Valid.t list, unit) Result.t
-       Deferred.Or_error.t
+    -> (Command_transaction.Valid.t list, unit) Result.t Deferred.Or_error.t
 end
