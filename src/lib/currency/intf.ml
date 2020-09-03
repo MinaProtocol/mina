@@ -159,6 +159,8 @@ module type Signed_intf = sig
       -> (magnitude_var, Sgn.t) Signed_poly.t
          * (magnitude_var, Sgn.t) Signed_poly.t
       -> (var * var, _) Checked.t
+
+    type t = var
   end
 
   [%%endif]
@@ -168,15 +170,17 @@ end
 consensus_mechanism]
 
 module type Checked_arithmetic_intf = sig
-  type t
+  type value
 
   type var
+
+  type t = var
 
   type signed_var
 
   val if_ : Boolean.var -> then_:var -> else_:var -> (var, _) Checked.t
 
-  val if_value : Boolean.var -> then_:t -> else_:t -> var
+  val if_value : Boolean.var -> then_:value -> else_:value -> var
 
   val add : var -> var -> (var, _) Checked.t
 
@@ -198,6 +202,16 @@ module type Checked_arithmetic_intf = sig
 
   val equal : var -> var -> (Boolean.var, _) Checked.t
 
+  val ( = ) : t -> t -> (Boolean.var, _) Checked.t
+
+  val ( < ) : t -> t -> (Boolean.var, _) Checked.t
+
+  val ( > ) : t -> t -> (Boolean.var, _) Checked.t
+
+  val ( <= ) : t -> t -> (Boolean.var, _) Checked.t
+
+  val ( >= ) : t -> t -> (Boolean.var, _) Checked.t
+
   val scale : Field.Var.t -> var -> (var, _) Checked.t
 end
 
@@ -217,7 +231,7 @@ module type S = sig
     Checked_arithmetic_intf
     with type var := var
      and type signed_var := Signed.var
-     and type t := t
+     and type value := t
 
   [%%else]
 
