@@ -1648,6 +1648,10 @@ module T = struct
         validating_ledger
       |> Or_error.ok_exn |> not
     in
+    if supercharge_coinbase then
+      [%log info]
+        "No locked tokens in the producer account, applying supercharged \
+         coinbase" ;
     O1trace.trace_event "done mask" ;
     let partitions = Scan_state.partition_if_overflowing t.scan_state in
     O1trace.trace_event "partitioned" ;
@@ -1780,11 +1784,12 @@ let%test_module "test" =
       Genesis_constants.Constraint_constants.for_unit_tests
 
     (* Functor for testing with different instantiated staged ledger modules. *)
-    let create_and_apply_with_state_body_hash current_global_slot
-        state_and_body_hash sl logger pids txns stmt_to_work =
+    let create_and_apply_with_state_body_hash ?(self = self_pk)
+        ?(coinbase_receiver = coinbase_receiver) ~current_global_slot
+        ~state_and_body_hash sl logger pids txns stmt_to_work =
       let open Deferred.Let_syntax in
       let diff =
-        Sl.create_diff ~constraint_constants !sl ~self:self_pk ~logger
+        Sl.create_diff ~constraint_constants !sl ~self ~logger
           ~current_global_slot ~transactions_by_fee:txns
           ~get_completed_work:stmt_to_work
           ~coinbase_receiver:(`Other coinbase_receiver)
@@ -1810,11 +1815,14 @@ let%test_module "test" =
       sl := sl' ;
       (ledger_proof, diff', is_new_stack, pc_update)
 
-    let create_and_apply sl logger pids txns stmt_to_work =
+    let create_and_apply ?(self = self_pk)
+        ?(coinbase_receiver = coinbase_receiver) sl logger pids txns
+        stmt_to_work =
       let open Deferred.Let_syntax in
       let%map ledger_proof, diff, _, _ =
-        create_and_apply_with_state_body_hash Coda_numbers.Global_slot.zero
-          (State_hash.dummy, State_body_hash.dummy)
+        create_and_apply_with_state_body_hash ~self ~coinbase_receiver
+          ~current_global_slot:Coda_numbers.Global_slot.zero
+          ~state_and_body_hash:(State_hash.dummy, State_body_hash.dummy)
           sl logger pids txns stmt_to_work
       in
       (ledger_proof, diff)
@@ -1940,6 +1948,14 @@ let%test_module "test" =
         ; proofs= proofs stmts
         ; prover }
 
+    let stmt_to_work_zero_fee ~prover
+        (stmts : Transaction_snark_work.Statement.t) :
+        Transaction_snark_work.Checked.t option =
+      Some
+        { Transaction_snark_work.Checked.fee= Currency.Fee.zero
+        ; proofs= proofs stmts
+        ; prover }
+
     (* Fixed public key for when there is only one snark worker. *)
     let snark_worker_pk =
       Quickcheck.random_value ~seed:(`Deterministic "snark worker")
@@ -1995,14 +2011,9 @@ let%test_module "test" =
     *)
 
     (* Get the public keys from a ledger init state. *)
-    let init_pks
-        (init :
-          ( Signature_lib.Keypair.t
-          * Currency.Amount.t
-          * Coda_numbers.Account_nonce.t )
-          array) =
+    let init_pks (init : Ledger.init_state) =
       Array.to_sequence init
-      |> Sequence.map ~f:(fun (kp, _, _) ->
+      |> Sequence.map ~f:(fun (kp, _, _, _) ->
              Account_id.create
                (Public_key.compress kp.public_key)
                Token_id.default )
@@ -2824,13 +2835,13 @@ let%test_module "test" =
             let sl_before = !sl in
             let state_body_hash = List.hd_exn state_body_hashes in
             let%map proof, diff, is_new_stack, pc_update =
-              create_and_apply_with_state_body_hash current_global_slot
-                state_body_hash sl logger pids cmds_this_iter
+              create_and_apply_with_state_body_hash ~current_global_slot
+                ~state_and_body_hash:state_body_hash sl logger pids
+                cmds_this_iter
                 (stmt_to_work_restricted
                    (List.take work_list proofs_available_this_iter)
                    provers)
             in
-            (*TODO Deepthi: ledger with timed/untimed accounts*)
             check_pending_coinbase proof ~sl_before ~sl_after:!sl
               state_body_hash pc_update ~is_new_stack ;
             assert_fee_excess proof ;
@@ -2890,4 +2901,97 @@ let%test_module "test" =
     let%test_unit "Validate pending coinbase for random number of \
                    user_commands-random number of proofs-many provers)" =
       pending_coinbase_test `Many_provers
+
+    let supercharge_coinbase_test () =
+      let g = Ledger.gen_initial_ledger_state in
+      let keypair, locked_account =
+        let keypair =
+          Quickcheck.random_value ~seed:(`Deterministic "locked_account")
+            Keypair.gen
+        in
+        let account_id =
+          Account_id.create
+            (Public_key.compress keypair.public_key)
+            Token_id.default
+        in
+        let balance = Balance.of_int 100_000_000_000 in
+        (*Should fully vest by slot = 6*)
+        let acc =
+          Account.create_timed account_id balance
+            ~initial_minimum_balance:balance
+            ~cliff_time:(Coda_numbers.Global_slot.of_int 4)
+            ~vesting_period:(Coda_numbers.Global_slot.of_int 2)
+            ~vesting_increment:(Amount.of_int 50_000_000_000)
+          |> Or_error.ok_exn
+        in
+        (keypair, acc)
+      in
+      let slots_with_locked_tokens = 7 in
+      let test sl =
+        let init_balance = locked_account.balance in
+        let check_locked_account sl count =
+          let normal_coinbase = constraint_constants.coinbase_amount in
+          let supercharged_coinbase =
+            Amount.scale constraint_constants.coinbase_amount
+              constraint_constants.supercharged_coinbase_factor
+            |> Option.value_exn
+          in
+          let location =
+            Ledger.location_of_account (Sl.ledger sl)
+              (Account.identifier locked_account)
+            |> Option.value_exn
+          in
+          let account =
+            Ledger.get (Sl.ledger sl) location |> Option.value_exn
+          in
+          let scale_exn amt i = Amount.scale amt i |> Option.value_exn in
+          let expected_balance =
+            if count <= slots_with_locked_tokens then
+              Balance.add_amount init_balance (scale_exn normal_coinbase count)
+              |> Option.value_exn
+            else
+              (* init balance +
+                (normal_coinbase * slots_with_locked_tokens) +
+                (supercharged_coinbase * remaining slots))*)
+              Balance.add_amount
+                ( Balance.add_amount init_balance
+                    (scale_exn normal_coinbase slots_with_locked_tokens)
+                |> Option.value_exn )
+                (scale_exn supercharged_coinbase
+                   (count - slots_with_locked_tokens))
+              |> Option.value_exn
+          in
+          [%test_eq: Balance.t] expected_balance account.balance
+        in
+        let logger = Logger.null () in
+        let pids = Child_processes.Termination.create_pid_table () in
+        Deferred.List.iter
+          (List.init (slots_with_locked_tokens + 5) ~f:(( + ) 1))
+          ~f:(fun block_count ->
+            let%bind _ =
+              create_and_apply_with_state_body_hash
+                ~self:locked_account.public_key
+                ~coinbase_receiver:locked_account.public_key sl logger pids
+                ~current_global_slot:
+                  (Coda_numbers.Global_slot.of_int block_count)
+                ~state_and_body_hash:(State_hash.dummy, State_body_hash.dummy)
+                Sequence.empty
+                (stmt_to_work_zero_fee ~prover:locked_account.public_key)
+            in
+            check_locked_account !sl block_count ;
+            return () )
+      in
+      Quickcheck.test g ~trials:5 ~f:(fun ledger_init_state ->
+          let ledger_init_state =
+            Array.append
+              [| ( keypair
+                 , locked_account.balance
+                 , locked_account.nonce
+                 , locked_account.timing ) |]
+              ledger_init_state
+          in
+          async_with_ledgers ledger_init_state (fun sl _test_mask -> test sl)
+      )
+
+    let%test_unit "Supercharged coinbase" = supercharge_coinbase_test ()
   end )
