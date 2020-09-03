@@ -911,6 +911,10 @@ struct
 
     let f s = foreign (prefix s) (typ @-> returning ScalarField.typ)
 
+    let sigma1 = f "sigma1"
+
+    let sigma2 = f "sigma2"
+
     let l = f "l"
 
     let r = f "r"
@@ -922,10 +926,6 @@ struct
     let t = f "t"
 
     let f = f "f"
-
-    let sigma1 = f "sigma1"
-
-    let sigma2 = f "sigma2"
 
     module Pair =
       Pair (struct
