@@ -7,9 +7,23 @@ module Hero = {
         flexDirection(`column),
         justifyContent(`flexStart),
         alignContent(`spaceBetween),
-        backgroundImage(`url("/static/02_About_1_2880x1504.jpg")),
+        backgroundImage(`url("/static/img/02_About_1_750x1056_mobile.jpg")),
         backgroundSize(`cover),
-        media(Theme.MediaQuery.desktop, [height(`rem(47.))]),
+        media(
+          Theme.MediaQuery.tablet,
+          [
+            backgroundImage(
+              `url("/static/img/02_About_1_1536x1504_tablet.jpg"),
+            ),
+          ],
+        ),
+        media(
+          Theme.MediaQuery.desktop,
+          [
+            height(`rem(47.)),
+            backgroundImage(`url("/static/img/02_About_1_2880x1504.jpg")),
+          ],
+        ),
       ]);
     let heroContent =
       style([
