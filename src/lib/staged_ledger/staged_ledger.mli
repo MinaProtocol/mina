@@ -124,8 +124,7 @@ val apply :
            (Ledger_proof.t * (Transaction.t With_status.t * State_hash.t) list)
            option ]
        * [`Staged_ledger of t]
-       * [ `Pending_coinbase_data of
-           bool * Currency.Amount.t * Pending_coinbase.Update.Action.t ]
+       * [`Pending_coinbase_update of bool * Pending_coinbase.Update.t]
      , Staged_ledger_error.t )
      Deferred.Result.t
 
@@ -141,8 +140,7 @@ val apply_diff_unchecked :
            (Ledger_proof.t * (Transaction.t With_status.t * State_hash.t) list)
            option ]
        * [`Staged_ledger of t]
-       * [ `Pending_coinbase_data of
-           bool * Currency.Amount.t * Pending_coinbase.Update.Action.t ]
+       * [`Pending_coinbase_update of bool * Pending_coinbase.Update.t]
      , Staged_ledger_error.t )
      Deferred.Result.t
 

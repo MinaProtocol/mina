@@ -458,7 +458,6 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
 
   let previous_empty_accounts action pk = if action = `Added then [pk] else []
 
-<<<<<<< HEAD
   let get_user_account_with_location ledger account_id =
     let open Or_error.Let_syntax in
     let%bind ((_, acct) as r) = get_with_location ledger account_id in

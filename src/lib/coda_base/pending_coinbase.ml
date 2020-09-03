@@ -24,7 +24,7 @@ module Coinbase_data = struct
   module Stable = struct
     module V1 = struct
       type t = Public_key.Compressed.Stable.V1.t * Amount.Stable.V1.t
-      [@@deriving sexp]
+      [@@deriving sexp, to_yojson]
 
       let to_latest = Fn.id
     end
@@ -34,9 +34,7 @@ module Coinbase_data = struct
 
   type var = Public_key.Compressed.var * Amount.var
 
-  type value = Stable.Latest.t [@@deriving sexp]
-
-  let var_of_t ((public_key, amount) : value) =
+  let var_of_t ((public_key, amount) : t) =
     (Public_key.Compressed.var_of_t public_key, Amount.var_of_t amount)
 
   let to_input (pk, amount) =
@@ -54,7 +52,7 @@ module Coinbase_data = struct
                (Amount.var_to_bits amount)) ]
   end
 
-  let typ : (var, value) Typ.t =
+  let typ : (var, t) Typ.t =
     let spec =
       let open Data_spec in
       [Public_key.Compressed.typ; Amount.typ]
@@ -449,7 +447,7 @@ module Update = struct
           { action: 'action
           ; coinbase_data: 'coinbase_data
           ; supercharge_coinbase: 'supercharge_coinbase }
-        [@@deriving sexp]
+        [@@deriving sexp, to_yojson, hlist]
       end
     end]
   end
@@ -459,15 +457,30 @@ module Update = struct
     module V1 = struct
       type t =
         (Action.Stable.V1.t, Coinbase_data.Stable.V1.t, bool) Poly.Stable.V1.t
-      [@@deriving sexp]
+      [@@deriving sexp, to_yojson]
 
       let to_latest = Fn.id
     end
   end]
 
+  [%%define_locally
+  Poly.(to_hlist, of_hlist)]
+
   type var = (Action.var, Coinbase_data.var, Boolean.var) Poly.t
 
+  let typ =
+    let open Snark_params.Tick.Typ in
+    of_hlistable ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
+      ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+      [Action.typ; Coinbase_data.typ; Boolean.typ]
+
   (* State_body_hash.var*)
+
+  let genesis : t =
+    { coinbase_data=
+        (Signature_lib.Public_key.Compressed.empty, Currency.Amount.zero)
+    ; action= Action.Update_none
+    ; supercharge_coinbase= true }
 
   let var_of_t (t : t) : var =
     { action= Action.var_of_t t.action

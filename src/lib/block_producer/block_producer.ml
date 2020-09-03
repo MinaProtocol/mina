@@ -142,8 +142,8 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
           ( `Hash_after_applying next_staged_ledger_hash
           , `Ledger_proof ledger_proof_opt
           , `Staged_ledger transitioned_staged_ledger
-          , `Pending_coinbase_data
-              (is_new_stack, coinbase_amount, pending_coinbase_action) ) ->
+          , `Pending_coinbase_update (is_new_stack, pending_coinbase_update) )
+        ->
           (*staged_ledger remains unchanged and transitioned_staged_ledger is discarded because the external transtion created out of this diff will be applied in Transition_frontier*)
           ignore
           @@ Ledger.unregister_mask_exn
@@ -153,8 +153,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
             , next_staged_ledger_hash
             , ledger_proof_opt
             , is_new_stack
-            , coinbase_amount
-            , pending_coinbase_action )
+            , pending_coinbase_update )
       | Error (Staged_ledger.Staged_ledger_error.Unexpected e) ->
           raise (Error.to_exn e)
       | Error e ->
@@ -176,8 +175,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
       , next_staged_ledger_hash
       , ledger_proof_opt
       , is_new_stack
-      , coinbase_amount
-      , pending_coinbase_action ) ->
+      , pending_coinbase_update ) ->
       let%bind protocol_state, consensus_transition_data =
         lift_sync (fun () ->
             let previous_ledger_hash =
@@ -236,13 +234,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
                   ~blockchain_state:
                     (Protocol_state.blockchain_state protocol_state)
                   ~consensus_transition:consensus_transition_data
-                  ~coinbase_receiver:
-                    ( match coinbase_receiver with
-                    | `Producer ->
-                        self
-                    | `Other pk ->
-                        pk )
-                  ~coinbase_amount ~pending_coinbase_action ()
+                  ~pending_coinbase_update ()
               in
               let internal_transition =
                 Internal_transition.create ~snark_transition
