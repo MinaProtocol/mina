@@ -53,27 +53,7 @@ module Styles = {
     style([
       display(`flex),
       flexDirection(`column),
-<<<<<<< HEAD
-      media(Theme.MediaQuery.desktop, [flexDirection(`row)]),
-    ]);
-  let leftSide =
-    style([
-      display(`flex),
-      flexDirection(`column),
-      justifyContent(`flexStart),
-      alignContent(`spaceBetween),
-      media(Theme.MediaQuery.desktop, [marginRight(`rem(10.6))]),
-    ]);
-  let emailInputSection =
-    style([media(Theme.MediaQuery.desktop, [marginTop(`rem(10.5))])]);
-  let logo =
-    style([
-      height(`rem(3.1)),
-      width(`rem(11.)),
-      marginBottom(`rem(4.)),
-=======
       padding2(~v=`rem(4.), ~h=`rem(1.25)),
->>>>>>> add purple focused states for the submit button
     ]);
   let label = merge([Theme.Type.h4, style([color(white)])]);
   let connectLabel =
@@ -84,6 +64,8 @@ module Styles = {
       Theme.Type.paragraph,
       style([color(white), marginTop(`zero), marginBottom(`rem(1.))]),
     ]);
+  let backToTopButton =
+    style([position(`absolute), right(`rem(1.)), bottom(`rem(2.))]);
 };
 
 module SocialIcons = {
@@ -452,6 +434,7 @@ let make = () => {
     <div className=Styles.innerContainer> <LeftSide /> <FooterLinks /> </div>
     <WhiteLine />
     <Subfooter />
+<<<<<<< HEAD
     <div className=Styles.backToTopButton>
       <Button
         height={`rem(4.125)}
@@ -467,5 +450,20 @@ let make = () => {
         </span>
       </Button>
     </div>
+=======
+    <Button
+      height={`rem(4.125)}
+      width={`rem(3.75)}
+      bgColor=Theme.Colors.black
+      borderColor=Theme.Colors.white
+      paddingX=1.1
+      paddingY=0.75
+      dark=true>
+      <span className=Styles.backToTopButtonContent>
+        <Icon kind=Icon.ArrowUpMedium size=1. />
+        {React.string("Top")}
+      </span>
+    </Button>
+>>>>>>> rebase
   </div>;
 };
