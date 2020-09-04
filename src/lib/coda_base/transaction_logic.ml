@@ -1688,9 +1688,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     | _, _ ->
         failwith "Undo/command mismatch"
 
-  let undo_snapp_command
-      ~(constraint_constants : Genesis_constants.Constraint_constants.t) ledger
-      {Undo.Snapp_command_undo.accounts; command} =
+  let undo_snapp_command ~constraint_constants:_ ledger
+      {Undo.Snapp_command_undo.accounts; command= _} =
     let to_update, to_delete =
       List.partition_map accounts ~f:(fun (id, a) ->
           match a with Some a -> `Fst (id, a) | None -> `Snd id )
