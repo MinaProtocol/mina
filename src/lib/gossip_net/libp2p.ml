@@ -294,7 +294,8 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                       (Option.value_exn config.addrs_and_ports.peer)
                         .libp2p_port))
             in
-            Coda_net2.begin_advertising net2 |> don't_wait_for ;
+            Coda_net2.begin_advertising net2
+            |> Deferred.ignore |> don't_wait_for ;
             (subscription, message_reader)
           in
           match%map initializing_libp2p_result with
