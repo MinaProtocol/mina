@@ -183,8 +183,30 @@ module Partial = struct
             ; disable_new_accounts= false }
           in
           Result.return @@ User_command.Payload.Body.Create_new_token payload
-      | _ ->
-          Result.fail (Errors.create `Unsupported_operation_for_construction)
+      | `Create_token_account ->
+          let payload =
+            { Coda_base.New_account_payload.token_id= Token_id.of_uint64 t.token
+            ; token_owner_pk= source_pk
+            ; receiver_pk
+            ; account_disabled= false }
+          in
+          Result.return
+          @@ User_command.Payload.Body.Create_token_account payload
+      | `Mint_tokens ->
+          let%map amount =
+            Result.of_option t.amount
+              ~error:
+                (Errors.create
+                   (`Operations_not_valid
+                     [Errors.Partial_reason.Amount_not_some]))
+          in
+          let payload =
+            { Coda_base.Minting_payload.token_id= Token_id.of_uint64 t.token
+            ; token_owner_pk= source_pk
+            ; receiver_pk
+            ; amount= Amount_currency.of_uint64 amount }
+          in
+          User_command.Payload.Body.Mint_tokens payload
     in
     User_command.Payload.create
       ~fee:(Fee_currency.of_uint64 t.fee)
@@ -421,6 +443,13 @@ let of_operations (ops : Operation.t list) :
           V.fail Invalid_metadata
       | Error _ ->
           V.return ()
+    (* distinguish from mint tokens ops *)
+    and () =
+      match find_kind `Mint_tokens ops with
+      | Ok _ ->
+          V.fail Invalid_metadata
+      | Error _ ->
+          V.return ()
     in
     { Partial.kind= `Create_token
     ; fee_payer= `Pk account_a.address
@@ -479,18 +508,95 @@ let of_operations (ops : Operation.t list) :
     ; fee= Unsigned.UInt64.of_string payment_amount_y.Amount.value
     ; amount= None }
   in
-  match (payment, delegation, create_token, create_token_account) with
-  | Ok _, Error _, Error _, Error _ ->
-      payment
-  | Error _, Ok _, Error _, Error _ ->
-      delegation
-  | Error _, Error _, Ok _, Error _ ->
-      create_token
-  | Error _, Error _, Error _, Ok _ ->
-      create_token_account
-  | Error err1, Error err2, Error err3, Error err4 ->
-      Error (err1 @ err2 @ err3 @ err4)
-  | _ ->
+  (* For token minting, we demand:
+    *
+    * ops = length exactly 2
+    *
+    * fee_payer_dec with account 'a, some amount 'y, status="Pending"
+    * mint_tokens with account 'a, some amount 'y with the minted token id, metadata={token_owner_pk:'b}, status=Pending
+  *)
+  let mint_tokens =
+    let%map () =
+      if Int.equal (List.length ops) 2 then V.return ()
+      else V.fail Length_mismatch
+    and account_a =
+      let open Result.Let_syntax in
+      let%bind {account; _} = find_kind `Fee_payer_dec ops in
+      Option.value_map account ~default:(V.fail Account_not_some) ~f:V.return
+    and fee_token =
+      let open Result.Let_syntax in
+      let%bind {account; _} = find_kind `Fee_payer_dec ops in
+      match account with
+      | Some account -> (
+        match token_id_of_account account with
+        | Some token_id ->
+            V.return token_id
+        | None ->
+            V.fail Incorrect_token_id )
+      | None ->
+          V.fail Account_not_some
+    and () =
+      if List.for_all ops ~f:(fun op -> String.equal op.status "Pending") then
+        V.return ()
+      else V.fail Status_not_pending
+    and payment_amount_y =
+      let open Result.Let_syntax in
+      let%bind {amount; _} = find_kind `Fee_payer_dec ops in
+      match amount with
+      | Some x ->
+          V.return (Amount_of.negated x)
+      | None ->
+          V.fail Amount_not_some
+    and account_b =
+      let open Result.Let_syntax in
+      let%bind {account; _} = find_kind `Mint_tokens ops in
+      Option.value_map account ~default:(V.fail Account_not_some) ~f:V.return
+    and amount_b =
+      let open Result.Let_syntax in
+      let%bind {amount; _} = find_kind `Mint_tokens ops in
+      Option.value_map amount ~default:(V.fail Amount_not_some) ~f:V.return
+    and account_c =
+      let open Result.Let_syntax in
+      let%bind {metadata; _} = find_kind `Mint_tokens ops in
+      match metadata with
+      | Some metadata -> (
+        match metadata with
+        | `Assoc [("token_owner_pk", `String s)] ->
+            return s
+        | _ ->
+            V.fail Invalid_metadata )
+      | None ->
+          V.fail Account_not_some
+    and token =
+      let open Result.Let_syntax in
+      let%bind {amount; _} = find_kind `Mint_tokens ops in
+      (* check for Amount_not_some already done for amount_b *)
+      let Amount.{currency= {symbol; _}; _} = Option.value_exn amount in
+      if String.equal symbol "CODA+" then return (Unsigned.UInt64.of_int 2)
+      else V.fail Incorrect_token_id
+    in
+    { Partial.kind= `Mint_tokens
+    ; fee_payer= `Pk account_a.address
+    ; source= `Pk account_c
+    ; receiver= `Pk account_b.address
+    ; fee_token
+    ; token
+    ; fee= Unsigned.UInt64.of_string payment_amount_y.Amount.value
+    ; amount= Some (amount_b.Amount.value |> Unsigned.UInt64.of_string) }
+  in
+  let partials =
+    [payment; delegation; create_token; create_token_account; mint_tokens]
+  in
+  let oks, errs = List.partition_map partials ~f:Result.ok_fst in
+  match (oks, errs) with
+  | [], errs ->
+      (* no Oks *)
+      Error (List.concat errs)
+  | [partial], _ ->
+      (* exactly one Ok *)
+      Ok partial
+  | _, _ ->
+      (* more than one Ok, a bug in our implementation *)
       failwith
         "A sequence of operations must represent exactly one user command"
 

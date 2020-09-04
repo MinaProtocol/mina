@@ -84,11 +84,30 @@ mutation ($sender: PublicKey,
           $fee: UInt64!,
           $nonce: UInt32,
           $memo: String,
-          $signature: String!
-) {
+          $signature: String!) {
   createTokenAccount(signature: {rawSignature: $signature}, input:
     {feePayer: $sender, tokenOwner: $tokenOwner, receiver: $receiver, token: $token, fee: $fee, nonce: $nonce, memo: $memo}) {
     createNewTokenAccount {
+      hash
+    }
+  }
+}
+|}]
+
+module Send_mint_tokens =
+[%graphql
+{|
+mutation ($sender: PublicKey!,
+          $receiver: PublicKey,
+          $token: TokenId!,
+          $amount: UInt64!,
+          $fee: UInt64!,
+          $nonce: UInt32,
+          $memo: String,
+          $signature: String!) {
+  mintTokens(signature: {rawSignature: $signature}, input:
+    {tokenOwner: $sender, receiver: $receiver, token: $token, amount: $amount, fee: $fee, nonce: $nonce, memo: $memo}) {
+    mintTokens {
       hash
     }
   }
@@ -197,17 +216,22 @@ module Metadata = struct
     let real : graphql_uri:Uri.t -> 'gql Real.t =
      fun ~graphql_uri ->
       { gql=
-          (fun ?token_id ~address () ->
+          (fun ?token_id:_ ~address () ->
             Graphql.query
               (Get_nonce.make
                  ~public_key:
                    (`String (Public_key.Compressed.to_base58_check address))
-                 ~token_id:
+                   (* for now, nonce is based on the fee payer's account using the default token,
+                    per @mrmr1993
+                 *)
+                 ~token_id:(`String Coda_base.Token_id.(default |> to_string))
+                 (* WAS:
                    ( match token_id with
                    | Some x ->
                        `String (Unsigned.UInt64.to_string x)
                    | None ->
                        `Null )
+                 *)
                  ())
               graphql_uri )
       ; validate_network_choice= Network.Validate_choice.Real.validate
@@ -557,7 +581,8 @@ module Submit = struct
       type ( 'gql_payment
            , 'gql_delegation
            , 'gql_create_token
-           , 'gql_create_token_account )
+           , 'gql_create_token_account
+           , 'gql_mint_tokens )
            t =
         { gql_payment:
                payment:Transaction.Unsigned.Rendered.Payment.t
@@ -582,6 +607,11 @@ module Submit = struct
             -> signature:string
             -> unit
             -> ('gql_create_token_account, Errors.t) M.t
+        ; gql_mint_tokens:
+               mint_tokens:Transaction.Unsigned.Rendered.Mint_tokens.t
+            -> signature:string
+            -> unit
+            -> ('gql_mint_tokens, Errors.t) M.t
         ; lift: 'a 'e. ('a, 'e) Result.t -> ('a, 'e) M.t }
     end
 
@@ -593,7 +623,8 @@ module Submit = struct
         -> ( 'gql_payment
            , 'gql_delegation
            , 'gql_create_token
-           , 'gql_create_token_account )
+           , 'gql_create_token_account
+           , 'gql_mint_tokens )
            Real.t =
       let uint64 x = `String (Unsigned.UInt64.to_string x) in
       let uint32 x = `String (Unsigned.UInt32.to_string x) in
@@ -641,6 +672,17 @@ module Submit = struct
                    ~nonce:(uint32 create_token_account.nonce)
                    ~signature ())
                 graphql_uri )
+        ; gql_mint_tokens=
+            (fun ~mint_tokens ~signature () ->
+              Graphql.query
+                (Send_mint_tokens.make
+                   ~sender:(`String mint_tokens.token_owner)
+                   ~receiver:(`String mint_tokens.receiver)
+                   ~token:(token_id mint_tokens.token)
+                   ~amount:(uint64 mint_tokens.amount)
+                   ~fee:(uint64 mint_tokens.fee) ?memo:mint_tokens.memo
+                   ~nonce:(uint32 mint_tokens.nonce) ~signature ())
+                graphql_uri )
         ; lift= Deferred.return }
   end
 
@@ -650,7 +692,8 @@ module Submit = struct
            ( 'gql_payment
            , 'gql_delegation
            , 'gql_create_token
-           , 'gql_create_token_account )
+           , 'gql_create_token_account
+           , 'gql_mint_tokens )
            Env.T(M).t) (req : Construction_submit_request.t) =
       let open M.Let_syntax in
       let%bind json =
@@ -668,40 +711,47 @@ module Submit = struct
           ( signed_transaction.payment
           , signed_transaction.stake_delegation
           , signed_transaction.create_token
-          , signed_transaction.create_token_account )
+          , signed_transaction.create_token_account
+          , signed_transaction.mint_tokens )
         with
-        | Some payment, None, None, None ->
+        | Some payment, None, None, None, None ->
             let%map res =
               env.gql_payment ~payment ~signature:signed_transaction.signature
                 ()
             in
             let (`UserCommand payment) = (res#sendPayment)#payment in
             payment#hash
-        | None, Some delegation, None, None ->
+        | None, Some delegation, None, None, None ->
             let%map res =
               env.gql_delegation ~delegation
                 ~signature:signed_transaction.signature ()
             in
             let (`UserCommand delegation) = (res#sendDelegation)#delegation in
             delegation#hash
-        | None, None, Some create_token, None ->
+        | None, None, Some create_token, None, None ->
             let%map res =
               env.gql_create_token ~create_token
                 ~signature:signed_transaction.signature ()
             in
             ((res#createToken)#createNewToken)#hash
-        | None, None, None, Some create_token_account ->
+        | None, None, None, Some create_token_account, None ->
             let%map res =
               env.gql_create_token_account ~create_token_account
                 ~signature:signed_transaction.signature ()
             in
             ((res#createTokenAccount)#createNewTokenAccount)#hash
+        | None, None, None, None, Some mint_tokens ->
+            let%map res =
+              env.gql_mint_tokens ~mint_tokens
+                ~signature:signed_transaction.signature ()
+            in
+            ((res#mintTokens)#mintTokens)#hash
         | _ ->
             M.fail
               (Errors.create
                  ~context:
                    "Must have one of payment, stakeDelegation, createToken, \
-                    or createTokenAccount"
+                    createTokenAccount, or mintTokens"
                  (`Json_parse None))
       in
       { Construction_submit_response.transaction_identifier=
