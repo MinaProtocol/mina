@@ -199,6 +199,7 @@ type configureMsg struct {
 	External        string   `json:"external_maddr"`
 	UnsafeNoTrustIP bool     `json:"unsafe_no_trust_ip"`
 	GossipType      string   `json:"gossip_type"`
+	SeedPeers       []string `json:"seed_peers"`
 }
 
 type discoveredPeerUpcall struct {
@@ -226,11 +227,24 @@ func (m *configureMsg) run(app *app) (interface{}, error) {
 		maddrs[i] = res
 	}
 
+	seeds := make([]peer.AddrInfo, len(m.SeedPeers))
+	for i, v := range m.SeedPeers {
+		addr, err := addrInfoOfString(v)
+		if err != nil {
+			// TODO: this isn't necessarily an RPC error. Perhaps the encoded multiaddr
+			// isn't supported by this version of libp2p.
+			// But more likely, it is an RPC error.
+			return nil, badRPC(err)
+		}
+		seeds[i] = *addr
+	}
+
 	externalMaddr, err := multiaddr.NewMultiaddr(m.External)
 	if err != nil {
 		return nil, badAddr(err)
 	}
-	helper, err := codanet.MakeHelper(app.Ctx, maddrs, externalMaddr, m.Statedir, privk, m.NetworkID)
+
+	helper, err := codanet.MakeHelper(app.Ctx, maddrs, externalMaddr, m.Statedir, privk, m.NetworkID, seeds)
 	if err != nil {
 		return nil, badHelper(err)
 	}
@@ -257,6 +271,8 @@ func (m *configureMsg) run(app *app) (interface{}, error) {
 
 	helper.Pubsub = ps
 	app.P2p = helper
+
+  app.P2p.Logger.Infof("here are the seeds: %v", seeds)
 
 	return "configure success", nil
 }
@@ -752,23 +768,26 @@ type addPeerMsg struct {
 	Multiaddr string `json:"multiaddr"`
 }
 
+func addrInfoOfString(maddr string) (*peer.AddrInfo, error) {
+	multiaddr, err := multiaddr.NewMultiaddr(maddr)
+	if err != nil {
+		return nil, err
+	}
+	info, err := peer.AddrInfoFromP2pAddr(multiaddr)
+	if err != nil {
+		return nil, err
+	}
+
+	return info, nil
+}
+
 func (ap *addPeerMsg) run(app *app) (interface{}, error) {
 	if app.P2p == nil {
 		return nil, needsConfigure()
 	}
-	multiaddr, err := multiaddr.NewMultiaddr(ap.Multiaddr)
+	info, err := addrInfoOfString(ap.Multiaddr)
 	if err != nil {
-		// TODO: this isn't necessarily an RPC error. Perhaps the encoded multiaddr
-		// isn't supported by this version of libp2p.
-		// But more likely, it is an RPC error.
-		return nil, badRPC(err)
-	}
-	info, err := peer.AddrInfoFromP2pAddr(multiaddr)
-	if err != nil {
-		// TODO: this isn't necessarily an RPC error. Perhaps the contained peer ID
-		// isn't supported by this version of libp2p.
-		// But more likely, it is an RPC error.
-		return nil, badRPC(err)
+		return nil, err
 	}
 
 	app.AddedPeers = append(app.AddedPeers, *info)
@@ -819,22 +838,24 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 	discovered := make(chan peer.AddrInfo)
 	app.P2p.DiscoveredPeers = discovered
 
+	validPeer := func(who peer.ID) bool {
+		return who.Validate() == nil && who != app.P2p.Me
+	}
+
 	foundPeer := func(who peer.ID) {
-		if who.Validate() == nil && who != app.P2p.Me {
-			addrs := app.P2p.Host.Peerstore().Addrs(who)
+		addrs := app.P2p.Host.Peerstore().Addrs(who)
 
-			if len(addrs) > 0 {
-				addrStrings := make([]string, len(addrs))
-				for i, a := range addrs {
-					addrStrings[i] = a.String()
-				}
-
-				app.writeMsg(discoveredPeerUpcall{
-					ID:     peer.IDB58Encode(who),
-					Addrs:  addrStrings,
-					Upcall: "discoveredPeer",
-				})
+		if len(addrs) > 0 {
+			addrStrings := make([]string, len(addrs))
+			for i, a := range addrs {
+				addrStrings[i] = a.String()
 			}
+
+			app.writeMsg(discoveredPeerUpcall{
+				ID:     peer.IDB58Encode(who),
+				Addrs:  addrStrings,
+				Upcall: "discoveredPeer",
+			})
 		}
 	}
 
@@ -848,8 +869,10 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 	// report local discovery peers
 	go func() {
 		for info := range l.FoundPeer {
-			app.P2p.Host.Peerstore().AddAddrs(info.ID, info.Addrs, peerstore.ConnectedAddrTTL)
-			foundPeer(info.ID)
+			if validPeer(info.ID) {
+				app.P2p.Host.Peerstore().AddAddrs(info.ID, info.Addrs, peerstore.ConnectedAddrTTL)
+				foundPeer(info.ID)
+			}
 		}
 	}()
 
@@ -865,7 +888,9 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 
 		for evt := range sub.Out() {
 			e := evt.(event.EvtPeerConnectednessChanged)
-			foundPeer(e.Peer)
+			if validPeer(e.Peer) {
+				foundPeer(e.Peer)
+			}
 		}
 	}()
 

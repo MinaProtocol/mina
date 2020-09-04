@@ -17,17 +17,14 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	routing "github.com/libp2p/go-libp2p-core/routing"
 	discovery "github.com/libp2p/go-libp2p-discovery"
-	kad "github.com/libp2p/go-libp2p-kad-dht"
-	kadopts "github.com/libp2p/go-libp2p-kad-dht/opts"
+	dht "github.com/libp2p/go-libp2p-kad-dht"
+	"github.com/libp2p/go-libp2p-kad-dht/dual"
 	"github.com/libp2p/go-libp2p-peerstore/pstoreds"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	record "github.com/libp2p/go-libp2p-record"
-	secio "github.com/libp2p/go-libp2p-secio"
 	p2pconfig "github.com/libp2p/go-libp2p/config"
 	mdns "github.com/libp2p/go-libp2p/p2p/discovery"
 	filters "github.com/libp2p/go-maddr-filter"
-	tcp "github.com/libp2p/go-tcp-transport"
-	ws "github.com/libp2p/go-ws-transport"
 	ma "github.com/multiformats/go-multiaddr"
 	"golang.org/x/crypto/blake2b"
 )
@@ -36,7 +33,7 @@ import (
 type Helper struct {
 	Host            host.Host
 	Mdns            *mdns.Service
-	Dht             *kad.IpfsDHT
+	Dht             *dual.DHT
 	Ctx             context.Context
 	Pubsub          *pubsub.PubSub
 	Logger          logging.EventLogger
@@ -64,7 +61,7 @@ func (cv customValidator) Select(key string, values [][]byte) (int, error) {
 // TODO: just put this into main.go?
 
 // MakeHelper does all the initialization to run one host
-func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Multiaddr, statedir string, pk crypto.PrivKey, networkID string) (*Helper, error) {
+func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Multiaddr, statedir string, pk crypto.PrivKey, networkID string, seeds []peer.AddrInfo) (*Helper, error) {
 	logger := logging.Logger("codanet.Helper")
 
 	me, err := peer.IDFromPrivateKey(pk)
@@ -94,18 +91,17 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 
 	pnetKey := blake2b.Sum256([]byte(rendezvousString))
 
+	// custom validator to omit the ipns validation.
+
 	rv := customValidator{Base: record.NamespacedValidator{"pk": record.PublicKeyValidator{}}}
 
 	// gross hack to exfiltrate the DHT from the side effect of option evaluation
-	kadch := make(chan *kad.IpfsDHT)
+	kadch := make(chan *dual.DHT)
 
 	filters := filters.NewFilters()
 
 	host, err := p2p.New(ctx,
-		p2p.Transport(tcp.NewTCPTransport),
-		p2p.Transport(ws.New),
 		p2p.Muxer("/coda/mplex/1.0.0", DefaultMplexTransport),
-		p2p.Security(secio.ID, secio.New),
 		p2p.Identity(pk),
 		p2p.Peerstore(ps),
 		p2p.DisableRelay(),
@@ -119,7 +115,7 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 		p2p.NATPortMap(),
 		p2p.Routing(
 			p2pconfig.RoutingC(func(host host.Host) (routing.PeerRouting, error) {
-				kad, err := kad.New(ctx, host, kadopts.Datastore(dsDht), kadopts.Validator(rv), kad.ProtocolPrefix("/coda"))
+				kad, err := dual.New(ctx, host, dual.WanDHTOption(dht.Datastore(dsDht)), dual.DHTOption(dht.Validator(rv)), dual.WanDHTOption(dht.BootstrapPeers(seeds...)), dual.DHTOption(dht.ProtocolPrefix("/coda")))
 				go func() { kadch <- kad }()
 				return kad, err
 			})),
