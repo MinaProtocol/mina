@@ -116,8 +116,7 @@ let typ : (Checked.t, t) Typ.t =
 [%%endif]
 
 let dummy_vk_hash =
-  let x = lazy (digest_vk Side_loaded_verification_key.dummy) in
-  fun () -> Lazy.force x
+  Memo.unit (fun () -> digest_vk Side_loaded_verification_key.dummy)
 
 let to_input (t : t) =
   let open Random_oracle.Input in

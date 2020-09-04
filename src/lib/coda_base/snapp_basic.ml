@@ -266,14 +266,11 @@ module Account_state = struct
   let to_input (x : t) = Encoding.to_input (encode x)
 
   let check (t : t) (x : [`Empty | `Non_empty]) =
-    if
-      match (t, x) with
-      | Any, _ | Non_empty, `Non_empty | Empty, `Empty ->
-          true
-      | _ ->
-          false
-    then Ok ()
-    else Or_error.error_string "Bad account_type"
+    match (t, x) with
+    | Any, _ | Non_empty, `Non_empty | Empty, `Empty ->
+        Ok ()
+    | _ ->
+        Or_error.error_string "Bad account_type"
 
   [%%ifdef
   consensus_mechanism]

@@ -14,15 +14,6 @@ open Snark_bits
 let zero_checked =
   Snarky_integer.Integer.constant ~m:Snark_params.Tick.m Bigint.zero
 
-[%%else]
-
-open Snark_bits_nonconsensus
-
-[%%endif]
-
-[%%ifdef
-consensus_mechanism]
-
 module Make_checked
     (N : Unsigned_extended.S)
     (Bits : Bits_intf.Convertible_bits with type t := N.t) =
@@ -119,6 +110,10 @@ struct
 
   let zero = zero_checked
 end
+
+[%%else]
+
+open Snark_bits_nonconsensus
 
 [%%endif]
 

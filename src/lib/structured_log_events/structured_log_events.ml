@@ -6,6 +6,8 @@ type id = string [@@deriving eq, yojson, sexp]
 
 let id_of_string s = s
 
+let string_of_id s = s
+
 type repr =
   { id: id
   ; event_name: string

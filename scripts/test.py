@@ -29,7 +29,7 @@ unit_test_profiles_medium_curves = ['dev_medium_curves']
 
 simple_tests = [
     'full-test',
-    'transaction-snark-profiler -k 2',
+    'transaction-snark-profiler -k 1',
 ]
 
 compile_config_agnostic_tests = [
@@ -97,6 +97,7 @@ ci_excludes = [
 
 # of all the generated CI jobs, allow these specific ones to fail (extra excludes on top of ci_excludes)
 required_excludes = [
+    'test_postake_five_even_txns:*',
     'test_postake_catchup:*',
     'test_postake_three_producers:*',
     'test_postake_split_snarkless:*',
@@ -116,6 +117,7 @@ extra_required_status_checks = [
 # these are full status check names. they will not be required to succeed.
 not_required_status_checks = [
     "ci/circleci: build-macos",
+    "ci/circleci: test--dev--coda-batch-payment-test"
 ]
 
 
