@@ -202,7 +202,8 @@ let _ =
              ; payment= Some payment
              ; stake_delegation= None
              ; create_token= None
-             ; create_token_account= None } ->
+             ; create_token_account= None
+             ; mint_tokens= None } ->
              let command = Transaction.Unsigned.of_rendered_payment payment in
              make_signed_transaction command payment.nonce
          | Ok
@@ -210,7 +211,8 @@ let _ =
              ; payment= None
              ; stake_delegation= Some delegation
              ; create_token= None
-             ; create_token_account= None } ->
+             ; create_token_account= None
+             ; mint_tokens= None } ->
              let command =
                Transaction.Unsigned.of_rendered_delegation delegation
              in
