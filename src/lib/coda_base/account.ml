@@ -250,13 +250,32 @@ type var =
   , State_hash.var
   , Timing.var
   , Permissions.Checked.t
-  , Field.Var.t )
+  , Field.Var.t * Snapp_account.t option
+  (* TODO: This is a hack that lets us avoid unhashing snapp accounts when we don't need to *)
+  )
   Poly.t
 
 let identifier_of_var ({public_key; token_id; _} : var) =
   Account_id.Checked.create public_key token_id
 
 let typ : (var, value) Typ.t =
+  let snapp :
+      (Field.Var.t * Snapp_account.t option, Snapp_account.t option) Typ.t =
+    let alloc =
+      let open Typ.Alloc in
+      let%map x = Typ.field.alloc in
+      (x, None)
+    in
+    let read (_, y) = Typ.Read.return y in
+    let store y =
+      let open Typ.Store in
+      let x = hash_snapp_account_opt y in
+      let%map x = Typ.field.store x in
+      (x, y)
+    in
+    let check (x, _) = Typ.field.check x in
+    {alloc; read; store; check}
+  in
   let spec =
     Data_spec.
       [ Public_key.Compressed.typ
@@ -272,9 +291,7 @@ let typ : (var, value) Typ.t =
       ; State_hash.typ
       ; Timing.typ
       ; Permissions.typ
-      ; Typ.transport Field.typ ~there:hash_snapp_account_opt ~back:(fun fld ->
-            if Field.(equal zero) fld then None else failwith "unimplemented"
-        ) ]
+      ; snapp ]
   in
   Typ.of_hlistable spec ~var_to_hlist:Poly.to_hlist ~var_of_hlist:Poly.of_hlist
     ~value_to_hlist:Poly.to_hlist ~value_of_hlist:Poly.of_hlist
@@ -331,7 +348,8 @@ module Checked = struct
     in
     make_checked (fun () ->
         List.reduce_exn ~f:append
-          (Poly.Fields.fold ~init:[] ~snapp:(f field)
+          (Poly.Fields.fold ~init:[]
+             ~snapp:(f (fun (x, _) -> field x))
              ~permissions:(f Permissions.Checked.to_input)
              ~public_key:(f Public_key.Compressed.Checked.to_input)
              ~token_id:
