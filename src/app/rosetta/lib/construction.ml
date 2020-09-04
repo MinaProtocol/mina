@@ -1,8 +1,9 @@
 open Core_kernel
 open Async
-module Transaction' = Transaction
-open Models
-module Transaction = Transaction'
+open Rosetta_lib
+open Rosetta_models
+module Signature = Coda_base.Signature
+module Transaction = Rosetta_lib.Transaction
 module Public_key = Signature_lib.Public_key
 module User_command_payload = Coda_base.User_command_payload
 module User_command = Coda_base.User_command
@@ -24,6 +25,74 @@ module Get_nonce =
       }
       initialPeers
      }
+|}]
+
+module Send_payment =
+[%graphql
+{|
+  mutation send($from: PublicKey!, $to_: PublicKey!, $token: UInt64, $amount: UInt64, $fee: UInt64, $validUntil: UInt64, $memo: String, $nonce: UInt32!, $signature: String!) {
+    sendPayment(signature: {rawSignature: $signature}, input: {from: $from, to:$to_, token:$token, amount:$amount, fee:$fee, validUntil: $validUntil, memo: $memo, nonce:$nonce}) {
+      payment {
+        hash
+      }
+  }}
+  |}]
+
+module Send_delegation =
+[%graphql
+{|
+mutation ($sender: PublicKey!,
+          $receiver: PublicKey!,
+          $fee: UInt64!,
+          $nonce: UInt32!,
+          $memo: String,
+          $signature: String!) {
+  sendDelegation(signature: {rawSignature: $signature}, input:
+    {from: $sender, to: $receiver, fee: $fee, memo: $memo, nonce: $nonce}) {
+    delegation {
+      hash
+    }
+  }
+}
+|}]
+
+module Send_create_token =
+[%graphql
+{|
+mutation ($sender: PublicKey,
+          $receiver: PublicKey!,
+          $fee: UInt64!,
+          $nonce: UInt32,
+          $memo: String,
+          $signature: String!) {
+  createToken(signature: {rawSignature: $signature}, input:
+    {feePayer: $sender, tokenOwner: $receiver, fee: $fee, nonce: $nonce, memo: $memo}) {
+    createNewToken {
+      hash
+    }
+  }
+}
+|}]
+
+module Send_create_token_account =
+[%graphql
+{|
+mutation ($sender: PublicKey,
+          $tokenOwner: PublicKey!,
+          $receiver: PublicKey!,
+          $token: TokenId!,
+          $fee: UInt64!,
+          $nonce: UInt32,
+          $memo: String,
+          $signature: String!
+) {
+  createTokenAccount(signature: {rawSignature: $signature}, input:
+    {feePayer: $sender, tokenOwner: $tokenOwner, receiver: $receiver, token: $token, fee: $fee, nonce: $nonce, memo: $memo}) {
+    createNewTokenAccount {
+      hash
+    }
+  }
+}
 |}]
 
 module Options = struct
@@ -91,9 +160,14 @@ module Derive = struct
       let open M.Let_syntax in
       (* TODO: Verify curve-type is tweedle *)
       let%map pk =
-        Public_key.Hex.decode req.public_key.hex_bytes
-        |> Result.map_error ~f:(fun _ -> Errors.create `Malformed_public_key)
-        |> env.lift
+        let pk_or_error =
+          try Ok (Rosetta_coding.Coding.to_public_key req.public_key.hex_bytes)
+          with exn -> Error (Core_kernel.Error.of_exn exn)
+        in
+        env.lift
+        @@ Result.map_error
+             ~f:(fun _ -> Errors.create `Malformed_public_key)
+             pk_or_error
       in
       { Construction_derive_response.address=
           Public_key.(compress pk |> Compressed.to_base58_check)
@@ -164,16 +238,17 @@ module Metadata = struct
       in
       let nonce =
         Option.map
-          ~f:(fun nonce -> Unsigned.UInt32.(of_string nonce |> add one))
+          ~f:(fun nonce -> Unsigned.UInt32.of_string nonce)
           account#nonce
-        |> Option.value ~default:Unsigned.UInt32.one
+        |> Option.value ~default:Unsigned.UInt32.zero
       in
       { Construction_metadata_response.metadata=
           Metadata_data.create ~sender:options.Options.sender
             ~token_id:options.Options.token_id ~nonce
           |> Metadata_data.to_yojson
           (* TODO: Set this to our default fee, assuming it is fixed when we launch *)
-      ; suggested_fee= [Amount_of.coda (Unsigned.UInt64.of_int 100_000_000)] }
+      ; suggested_fee= [Amount_of.coda (Unsigned.UInt64.of_int 2_000_000_000)]
+      }
   end
 
   module Real = Impl (Deferred.Result)
@@ -272,7 +347,7 @@ module Payloads = struct
                  ~error:
                    (Errors.create ~context:"decompression"
                       `Public_key_format_not_valid) )
-        |> Result.map ~f:Public_key.Hex.encode
+        |> Result.map ~f:Rosetta_coding.Coding.of_public_key
         |> env.lift
       in
       let%bind user_command_payload =
@@ -337,7 +412,7 @@ module Combine = struct
       let%bind signature =
         match req.signatures with
         | s :: _ ->
-            M.return @@ s.signing_payload.hex_bytes
+            M.return @@ s.hex_bytes
         | _ ->
             M.fail (Errors.create `Signature_missing)
       in
@@ -452,18 +527,186 @@ module Hash = struct
                  ~error:
                    (Errors.create ~context:"decompression"
                       `Public_key_format_not_valid) )
+        |> Result.map_error ~f:(fun _ -> Errors.create `Malformed_public_key)
         |> env.lift
       in
-      let%map payload =
+      let%bind payload =
         User_command_info.Partial.to_user_command_payload
           ~nonce:signed_transaction.nonce signed_transaction.command
         |> env.lift
       in
       (* TODO: Implement signature coding *)
-      let signature = failwith "Implement signature coding" in
+      let%map signature =
+        Result.of_option
+          (Signature.Raw.decode signed_transaction.signature)
+          ~error:(Errors.create `Signature_missing)
+        |> env.lift
+      in
       let full_command = {User_command.Poly.payload; signature; signer} in
       let hash = Transaction_hash.hash_user_command full_command in
       Construction_hash_response.create (Transaction_hash.to_base58_check hash)
+  end
+
+  module Real = Impl (Deferred.Result)
+  module Mock = Impl (Result)
+end
+
+module Submit = struct
+  module Env = struct
+    module T (M : Monad_fail.S) = struct
+      type ( 'gql_payment
+           , 'gql_delegation
+           , 'gql_create_token
+           , 'gql_create_token_account )
+           t =
+        { gql_payment:
+               payment:Transaction.Unsigned.Rendered.Payment.t
+            -> signature:string
+            -> unit
+            -> ('gql_payment, Errors.t) M.t
+              (* TODO: Validate network choice with separate query *)
+        ; gql_delegation:
+               delegation:Transaction.Unsigned.Rendered.Delegation.t
+            -> signature:string
+            -> unit
+            -> ('gql_delegation, Errors.t) M.t
+        ; gql_create_token:
+               create_token:Transaction.Unsigned.Rendered.Create_token.t
+            -> signature:string
+            -> unit
+            -> ('gql_create_token, Errors.t) M.t
+        ; gql_create_token_account:
+               create_token_account:Transaction.Unsigned.Rendered
+                                    .Create_token_account
+                                    .t
+            -> signature:string
+            -> unit
+            -> ('gql_create_token_account, Errors.t) M.t
+        ; lift: 'a 'e. ('a, 'e) Result.t -> ('a, 'e) M.t }
+    end
+
+    module Real = T (Deferred.Result)
+    module Mock = T (Result)
+
+    let real :
+           graphql_uri:Uri.t
+        -> ( 'gql_payment
+           , 'gql_delegation
+           , 'gql_create_token
+           , 'gql_create_token_account )
+           Real.t =
+      let uint64 x = `String (Unsigned.UInt64.to_string x) in
+      let uint32 x = `String (Unsigned.UInt32.to_string x) in
+      let token_id x = `String (Coda_base.Token_id.to_string x) in
+      fun ~graphql_uri ->
+        { gql_payment=
+            (fun ~payment ~signature () ->
+              Graphql.query
+                (Send_payment.make ~from:(`String payment.from)
+                   ~to_:(`String payment.to_) ~token:(uint64 payment.token)
+                   ~amount:(uint64 payment.amount) ~fee:(uint64 payment.fee)
+                   ?validUntil:(Option.map ~f:uint32 payment.valid_until)
+                   ?memo:payment.memo ~nonce:(uint32 payment.nonce) ~signature
+                   ())
+                graphql_uri )
+        ; gql_delegation=
+            (fun ~delegation ~signature () ->
+              Graphql.query
+                (Send_delegation.make ~sender:(`String delegation.delegator)
+                   ~receiver:(`String delegation.new_delegate)
+                   ~fee:
+                     (uint64 delegation.fee)
+                     (*                   ?validUntil:(Option.map ~f:uint32 delegation.valid_until) *)
+                   ?memo:delegation.memo ~nonce:(uint32 delegation.nonce)
+                   ~signature ())
+                graphql_uri )
+        ; gql_create_token=
+            (fun ~create_token ~signature () ->
+              Graphql.query
+                (Send_create_token.make
+                   ~receiver:(`String create_token.receiver)
+                   ~fee:(uint64 create_token.fee) ?memo:create_token.memo
+                   ~nonce:(uint32 create_token.nonce)
+                   ~signature ())
+                graphql_uri )
+        ; gql_create_token_account=
+            (fun ~create_token_account ~signature () ->
+              Graphql.query
+                (Send_create_token_account.make
+                   ~tokenOwner:(`String create_token_account.token_owner)
+                   ~receiver:(`String create_token_account.receiver)
+                   ~token:(token_id create_token_account.token)
+                   ~fee:(uint64 create_token_account.fee)
+                   ?memo:create_token_account.memo
+                   ~nonce:(uint32 create_token_account.nonce)
+                   ~signature ())
+                graphql_uri )
+        ; lift= Deferred.return }
+  end
+
+  module Impl (M : Monad_fail.S) = struct
+    let handle
+        ~(env :
+           ( 'gql_payment
+           , 'gql_delegation
+           , 'gql_create_token
+           , 'gql_create_token_account )
+           Env.T(M).t) (req : Construction_submit_request.t) =
+      let open M.Let_syntax in
+      let%bind json =
+        try M.return (Yojson.Safe.from_string req.signed_transaction)
+        with _ -> M.fail (Errors.create (`Json_parse None))
+      in
+      let%bind signed_transaction =
+        Transaction.Signed.Rendered.of_yojson json
+        |> Result.map_error ~f:(fun e -> Errors.create (`Json_parse (Some e)))
+        |> env.lift
+      in
+      let open M.Let_syntax in
+      let%map hash =
+        match
+          ( signed_transaction.payment
+          , signed_transaction.stake_delegation
+          , signed_transaction.create_token
+          , signed_transaction.create_token_account )
+        with
+        | Some payment, None, None, None ->
+            let%map res =
+              env.gql_payment ~payment ~signature:signed_transaction.signature
+                ()
+            in
+            let (`UserCommand payment) = (res#sendPayment)#payment in
+            payment#hash
+        | None, Some delegation, None, None ->
+            let%map res =
+              env.gql_delegation ~delegation
+                ~signature:signed_transaction.signature ()
+            in
+            let (`UserCommand delegation) = (res#sendDelegation)#delegation in
+            delegation#hash
+        | None, None, Some create_token, None ->
+            let%map res =
+              env.gql_create_token ~create_token
+                ~signature:signed_transaction.signature ()
+            in
+            ((res#createToken)#createNewToken)#hash
+        | None, None, None, Some create_token_account ->
+            let%map res =
+              env.gql_create_token_account ~create_token_account
+                ~signature:signed_transaction.signature ()
+            in
+            ((res#createTokenAccount)#createNewTokenAccount)#hash
+        | _ ->
+            M.fail
+              (Errors.create
+                 ~context:
+                   "Must have one of payment, stakeDelegation, createToken, \
+                    or createTokenAccount"
+                 (`Json_parse None))
+      in
+      { Construction_submit_response.transaction_identifier=
+          Transaction_identifier.create hash
+      ; metadata= None }
   end
 
   module Real = Impl (Deferred.Result)
@@ -546,5 +789,16 @@ let router ~graphql_uri ~logger (route : string list) body =
         Hash.Real.handle ~env:Hash.Env.real req |> Errors.Lift.wrap
       in
       Construction_hash_response.to_yojson res
+  | ["submit"] ->
+      let%bind req =
+        Errors.Lift.parse ~context:"Request"
+        @@ Construction_submit_request.of_yojson body
+        |> Errors.Lift.wrap
+      in
+      let%map res =
+        Submit.Real.handle ~env:(Submit.Env.real ~graphql_uri) req
+        |> Errors.Lift.wrap
+      in
+      Construction_submit_response.to_yojson res
   | _ ->
       Deferred.Result.fail `Page_not_found

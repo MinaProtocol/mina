@@ -1,0 +1,15 @@
+[
+  {
+    "account_identifier": {
+      "address": "B62qrPN5Y5yq8kGE3FbVKbGTdTAJNdtNtB5sNVpxyRwWGcDEhpMzc8g",
+      "metadata": {
+        "token_id": "1"
+      }
+    },
+    "currency": {
+      "symbol": "CODA",
+      "decimals": 9
+    },
+    "value": "66000000000000"
+  }
+]

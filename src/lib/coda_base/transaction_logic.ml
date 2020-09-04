@@ -58,7 +58,8 @@ module Undo = struct
           type t =
             | Payment of {previous_empty_accounts: Account_id.Stable.V1.t list}
             | Stake_delegation of
-                { previous_delegate: Public_key.Compressed.Stable.V1.t }
+                { previous_delegate: Public_key.Compressed.Stable.V1.t option
+                }
             | Create_new_token of {created_token: Token_id.Stable.V1.t}
             | Create_token_account
             | Mint_tokens
@@ -153,7 +154,8 @@ module type S = sig
       module Body : sig
         type t = Undo.User_command_undo.Body.t =
           | Payment of {previous_empty_accounts: Account_id.t list}
-          | Stake_delegation of {previous_delegate: Public_key.Compressed.t}
+          | Stake_delegation of
+              { previous_delegate: Public_key.Compressed.t option }
           | Create_new_token of {created_token: Token_id.t}
           | Create_token_account
           | Mint_tokens
@@ -567,7 +569,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           in
           let source_account =
             { source_account with
-              delegate= Account_id.public_key receiver
+              delegate= Some (Account_id.public_key receiver)
             ; timing }
           in
           ( [(source_location, source_account)]

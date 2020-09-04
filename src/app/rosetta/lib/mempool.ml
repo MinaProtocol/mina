@@ -1,6 +1,7 @@
 open Core_kernel
 open Async
-open Models
+open Rosetta_lib
+open Rosetta_models
 
 module Get_all_transactions =
 [%graphql
@@ -156,7 +157,7 @@ module Transaction = struct
               `String "STAKE_DELEGATION"
           | `Create_token ->
               `String "CREATE_NEW_TOKEN"
-          | `Create_account ->
+          | `Create_token_account ->
               `String "CREATE_TOKEN_ACCOUNT"
           | `Mint_tokens ->
               `String "MINT_TOKENS"
@@ -229,7 +230,7 @@ module Transaction = struct
         | `String "CREATE_NEW_TOKEN" ->
             M.return `Create_token
         | `String "CREATE_TOKEN_ACCOUNT" ->
-            M.return `Create_account
+            M.return `Create_token_account
         | `String "MINT_TOKENS" ->
             M.return `Mint_tokens
         | kind ->

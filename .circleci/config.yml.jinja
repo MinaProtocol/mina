@@ -106,6 +106,7 @@ jobs:
             - run:
                   name: Set Up Database
                   command: |
+                    sudo apt-get update
                     sudo apt-get install -y postgresql
                     PGPASSWORD=codarules psql -h localhost -p 5432 -U admin -d archiver -a -f src/app/archive/create_schema.sql
             - run:
@@ -161,6 +162,7 @@ jobs:
             - run:
                   name: Set Up Database
                   command: |
+                    sudo apt-get update
                     sudo apt-get install -y postgresql
                     PGPASSWORD=codarules psql -h localhost -p 5432 -U admin -d archiver -a -f src/app/archive/create_schema.sql
             - run:
@@ -225,6 +227,22 @@ jobs:
             - run:
                   name: Compare test signatures for consensus, nonconsensus code
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'eval `opam config env` && export PATH="$HOME/.cargo/bin:$PATH" && ./scripts/compare_test_signatures.sh'
+    client-sdk-unit-tests:
+        docker:
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
+        steps:
+            {{ checkout_no_lfs }}
+            {{ opam_init_linux }}
+            - run:
+                  name: Build client SDK, run unit tests
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'eval `opam config env` && export PATH="$HOME/.cargo/bin:$PATH" && ./scripts/client-sdk-unit-tests.sh'
+            - run:
+                  name: Yarn deps
+                  command: cd frontend/client_sdk && yarn install
+            - run:
+                  name: Prepublish client SDK packages
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; eval `opam config env` && cd frontend/client_sdk && yarn prepublishOnly'
+
     update-branch-protection:
         docker:
             - image: python:3
@@ -387,30 +405,6 @@ jobs:
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh scripts/artifacts.sh
             - store_artifacts:
                   path: package
-
-    build-client-sdk:
-        resource_class: large
-        docker:
-            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
-        steps:
-            {{ checkout_no_lfs }}
-            - run:
-                  name: Artifacts Path
-                  command: |
-                      mkdir -p /tmp/artifacts
-            {{ opam_init_linux }}
-            - run:
-                  name: Build client SDK for Javascript
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; eval `opam config env` && make client_sdk 2>&1 | tee /tmp/artifacts/buildclientsdk.log'
-                  environment:
-                    DUNE_PROFILE: nonconsensus_medium_curves
-                  no_output_timeout: 10m
-            - run:
-                  name: Yarn deps
-                  command: cd frontend/client_sdk && yarn install
-            - run:
-                  name: Build And Test Client SDK
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; eval `opam config env` && cd frontend/client_sdk && yarn prepublishOnly'
 
     {%- for profile in build_artifact_profiles %}
     build-artifacts--{{profile}}:
@@ -704,6 +698,7 @@ workflows:
             - lint
             - lint-opt
             - compare-test-signatures
+            - client-sdk-unit-tests
             - update-branch-protection:
                 filters:
                   branches:
@@ -713,7 +708,6 @@ workflows:
             - test-archive
             - build-archive
             - build-macos
-            - build-client-sdk
             {%- for profile in build_artifact_profiles %}
             - build-artifacts--{{profile}}
             {%- endfor %}

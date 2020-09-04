@@ -1367,6 +1367,7 @@ module Base = struct
              ; delegate
              ; voting_for= account.voting_for
              ; timing
+             ; permissions= account.permissions
              ; snapp= account.snapp } ))
     in
     let%bind receiver_increase =
@@ -1529,6 +1530,7 @@ module Base = struct
              ; delegate
              ; voting_for= account.voting_for
              ; timing= account.timing
+             ; permissions= account.permissions
              ; snapp= account.snapp } ))
     in
     let%bind fee_payer_is_source = Account_id.Checked.equal fee_payer source in
@@ -1670,6 +1672,7 @@ module Base = struct
              ; delegate
              ; voting_for= account.voting_for
              ; timing
+             ; permissions= account.permissions
              ; snapp= account.snapp } ))
     in
     let%bind fee_excess =
@@ -3247,8 +3250,9 @@ let%test_module "transaction_snark" =
                 Balance.equal fee_payer_account.balance
                   expected_fee_payer_balance ) ;
               assert (
-                Public_key.Compressed.equal source_account.delegate source_pk
-              ) ;
+                Public_key.Compressed.equal
+                  (Option.value_exn source_account.delegate)
+                  source_pk ) ;
               assert (Option.is_some receiver_account) ) )
 
     let%test_unit "delegation delegatee does not exist" =
@@ -3282,8 +3286,9 @@ let%test_module "transaction_snark" =
                 Balance.equal fee_payer_account.balance
                   expected_fee_payer_balance ) ;
               assert (
-                Public_key.Compressed.equal source_account.delegate source_pk
-              ) ;
+                Public_key.Compressed.equal
+                  (Option.value_exn source_account.delegate)
+                  source_pk ) ;
               assert (Option.is_none receiver_account) ) )
 
     let%test_unit "delegation delegator does not exist" =
@@ -3418,9 +3423,7 @@ let%test_module "transaction_snark" =
                 Balance.equal fee_payer_account.balance
                   expected_fee_payer_balance ) ;
               assert (Balance.(equal zero) token_owner_account.balance) ;
-              assert (
-                Public_key.Compressed.(equal empty)
-                  token_owner_account.delegate ) ;
+              assert (Option.is_none token_owner_account.delegate) ;
               assert (
                 token_owner_account.token_permissions
                 = Token_owned {disable_new_accounts= false} ) ) )
@@ -3456,9 +3459,7 @@ let%test_module "transaction_snark" =
                 Balance.equal fee_payer_account.balance
                   expected_fee_payer_balance ) ;
               assert (Balance.(equal zero) token_owner_account.balance) ;
-              assert (
-                Public_key.Compressed.(equal empty)
-                  token_owner_account.delegate ) ;
+              assert (Option.is_none token_owner_account.delegate) ;
               assert (
                 token_owner_account.token_permissions
                 = Token_owned {disable_new_accounts= false} ) ) )
@@ -3493,9 +3494,7 @@ let%test_module "transaction_snark" =
                 Balance.equal fee_payer_account.balance
                   expected_fee_payer_balance ) ;
               assert (Balance.(equal zero) token_owner_account.balance) ;
-              assert (
-                Public_key.Compressed.(equal empty)
-                  token_owner_account.delegate ) ;
+              assert (Option.is_none token_owner_account.delegate) ;
               assert (
                 token_owner_account.token_permissions
                 = Token_owned {disable_new_accounts= true} ) ) )
@@ -3543,9 +3542,7 @@ let%test_module "transaction_snark" =
                   expected_fee_payer_balance ) ;
               assert (Balance.(equal zero) token_owner_account.balance) ;
               assert (Balance.(equal zero) receiver_account.balance) ;
-              assert (
-                Public_key.Compressed.(equal empty) receiver_account.delegate
-              ) ;
+              assert (Option.is_none receiver_account.delegate) ;
               assert (
                 receiver_account.token_permissions
                 = Not_owned {account_disabled= false} ) ) )
@@ -3593,9 +3590,7 @@ let%test_module "transaction_snark" =
                   expected_fee_payer_balance ) ;
               assert (Balance.(equal zero) token_owner_account.balance) ;
               assert (Balance.(equal zero) receiver_account.balance) ;
-              assert (
-                Public_key.Compressed.(equal empty) receiver_account.delegate
-              ) ;
+              assert (Option.is_none receiver_account.delegate) ;
               assert (
                 receiver_account.token_permissions
                 = Not_owned {account_disabled= false} ) ) )
@@ -3644,9 +3639,7 @@ let%test_module "transaction_snark" =
                   expected_fee_payer_balance ) ;
               assert (Balance.(equal zero) token_owner_account.balance) ;
               assert (Balance.(equal zero) receiver_account.balance) ;
-              assert (
-                Public_key.Compressed.(equal empty) receiver_account.delegate
-              ) ;
+              assert (Option.is_none receiver_account.delegate) ;
               assert (
                 receiver_account.token_permissions
                 = Not_owned {account_disabled= false} ) ) )
@@ -3694,9 +3687,7 @@ let%test_module "transaction_snark" =
                   expected_fee_payer_balance ) ;
               assert (Balance.(equal zero) token_owner_account.balance) ;
               assert (Balance.(equal zero) receiver_account.balance) ;
-              assert (
-                Public_key.Compressed.(equal empty) receiver_account.delegate
-              ) ;
+              assert (Option.is_none receiver_account.delegate) ;
               assert (
                 receiver_account.token_permissions
                 = Not_owned {account_disabled= true} ) ) )
@@ -3956,7 +3947,7 @@ let%test_module "transaction_snark" =
               assert (Balance.(equal zero) receiver_account.balance) ;
               assert (
                 Public_key.Compressed.equal receiver_pk
-                  receiver_account.delegate ) ;
+                  (Option.value_exn receiver_account.delegate) ) ;
               assert (
                 receiver_account.token_permissions
                 = Not_owned {account_disabled= false} ) ) )
