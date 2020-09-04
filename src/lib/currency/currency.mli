@@ -51,7 +51,7 @@ module Fee : sig
       Checked_arithmetic_intf
       with type var := var
        and type signed_var := Signed.var
-       and type t := t
+       and type value := t
 
     val add_signed : var -> Signed.var -> (var, _) Checked.t
   end
@@ -102,7 +102,7 @@ module Amount : sig
       Checked_arithmetic_intf
       with type var := var
        and type signed_var := Signed.var
-       and type t := t
+       and type value := t
 
     val add_signed : var -> Signed.var -> (var, _) Checked.t
 

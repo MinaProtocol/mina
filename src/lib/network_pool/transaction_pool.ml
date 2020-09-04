@@ -1229,16 +1229,16 @@ let%test_module _ =
           map
 
     let mk_account i balance nonce =
+      let public_key = Public_key.compress @@ test_keys.(i).public_key in
       ( i
-      , { Account.Poly.Stable.Latest.public_key=
-            Public_key.compress @@ test_keys.(i).public_key
+      , { Account.Poly.Stable.Latest.public_key
         ; token_id= Token_id.default
         ; token_permissions=
             Token_permissions.Not_owned {account_disabled= false}
         ; balance= Currency.Balance.of_int balance
         ; nonce= Account.Nonce.of_int nonce
         ; receipt_chain_hash= Receipt.Chain_hash.empty
-        ; delegate= Public_key.Compressed.empty
+        ; delegate= Some public_key
         ; voting_for=
             Quickcheck.random_value ~seed:(`Deterministic "constant")
               State_hash.gen
@@ -1306,7 +1306,7 @@ let%test_module _ =
       @@ User_command.sign test_keys.(sender_idx)
            (User_command_payload.create ~fee:(Currency.Fee.of_int fee)
               ~fee_token:Token_id.default ~fee_payer_pk:(get_pk sender_idx)
-              ~valid_until:Coda_numbers.Global_slot.max_value
+              ~valid_until:None
               ~nonce:(Account.Nonce.of_int nonce)
               ~memo:(User_command_memo.create_by_digesting_string_exn "foo")
               ~body:

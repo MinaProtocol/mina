@@ -6,7 +6,7 @@ module Style = {
       listStyleType(`none),
       firstChild([marginLeft(`zero)]),
       media(
-        Theme.MediaQuery.somewhatLarge,
+        Theme.MediaQuery.tablet,
         [
           marginRight(rem(2.)),
           marginTop(rem(2.)),
@@ -18,7 +18,7 @@ module Style = {
 
   let page =
     merge([
-      Theme.Link.basic,
+      Theme.Type.paragraph,
       style([
         display(`inlineBlock),
         marginBottom(`rem(0.5)),
@@ -53,7 +53,7 @@ module Style = {
           cursor(`pointer),
           textDecoration(`none),
           Theme.Typeface.ibmplexsans,
-          hover([color(Theme.Colors.hyperlinkHover)]),
+          hover([color(Theme.Colors.black)]),
         ],
       ),
     ]);
@@ -61,7 +61,7 @@ module Style = {
     style([
       display(`flex),
       justifyContent(`spaceBetween),
-      color(Theme.Colors.marine),
+      color(Theme.Colors.black),
     ]);
   let childPage = style([marginLeft(`rem(1.)), listStyleType(`none)]);
   let flip = style([transform(rotate(`deg(180.)))]);
@@ -185,6 +185,7 @@ let make = (~currentSlug) => {
         </Folder>
         <Page title="Snapps" slug="snapps" />
         <Page title="CLI Reference" slug="cli-reference" />
+        <Page title="Tokens" slug="tokens" />
         <Page title="Troubleshooting" slug="troubleshooting" />
         <Page title="FAQ" slug="faq" />
         <Page title="Glossary" slug="glossary" />

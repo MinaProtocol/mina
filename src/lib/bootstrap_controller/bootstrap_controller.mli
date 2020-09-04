@@ -3,6 +3,9 @@ open Coda_transition
 open Pipe_lib
 open Network_peer
 
+type Structured_log_events.t += Bootstrap_complete
+  [@@deriving register_event]
+
 val run :
      logger:Logger.t
   -> trust_system:Trust_system.t
