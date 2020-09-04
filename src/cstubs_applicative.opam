@@ -13,6 +13,7 @@ depends: [
   "base"
   "ctypes"
   "dune"                {build & >= "2.0"}
+  "ppx_version"         {build}
 ]
 synopsis: "Cstubs extended with applicative interface"
 description: "
