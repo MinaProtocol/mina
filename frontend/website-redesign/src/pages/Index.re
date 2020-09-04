@@ -1,16 +1,23 @@
 module Styles = {
   open Css;
   let page =
-    style([display(`block), justifyContent(`center), overflowX(`hidden)]);
+    style([
+      display(`flex),
+      flexDirection(`column),
+      overflowX(`hidden),
+      height(`percent(100.)),
+      height(`percent(100.)),
+    ]);
 };
 
 [@react.component]
 let make = () => {
   <Page title="Coda Cryptocurrency Protocol" footerColor=Theme.Colors.orange>
     <div className=Styles.page>
-      <h1 className=Theme.Type.h1jumbo>
-        {React.string("This is the homepage")}
-      </h1>
+      <AnnouncementBanner>
+        {React.string("Mainnet is live!")}
+      </AnnouncementBanner>
     </div>
+    <HomepageHero />
   </Page>;
 };

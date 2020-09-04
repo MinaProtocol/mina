@@ -28,9 +28,6 @@ module Styles = {
 [@react.component]
 let make = () => {
   <Page title="Demo page of components">
-    <AnnouncementBanner>
-      {React.string("Mainnet is live!")}
-    </AnnouncementBanner>
     <div className=Styles.page>
       <div className=Styles.container>
         /*** Regular buttons */

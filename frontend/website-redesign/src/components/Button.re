@@ -20,7 +20,7 @@ module Styles = {
         fontSize(`px(12)),
         color(
           {
-            bgColor === Theme.Colors.white ? black : white;
+            bgColor === Theme.Colors.white ? Theme.Colors.digitalBlack : white;
           },
         ),
         padding2(~v=`rem(paddingY), ~h=`rem(paddingX)),
