@@ -490,7 +490,7 @@ jobs:
     {%- for docker_image_set in [
         {
           'coda-daemon': '--build-arg coda_deb_version=$CODA_DEB_VERSION --build-arg deb_repo=$CODA_DEB_REPO',
-          'coda-daemon-puppeteered': '--build-arg coda_version=$CODA_GIT_TAG-$CODA_GIT_BRANCH-$CODA_GIT_HASH --build-arg deb_repo=$CODA_DEB_REPO'
+          'coda-daemon-puppeteered': '--build-arg coda_version=$CODA_GIT_TAG-$CODA_GIT_BRANCH-$CODA_GIT_HASH'
         },
         {
           'coda-demo': '--build-arg coda_deb_version=$CODA_DEB_VERSION --build-arg deb_repo=$CODA_DEB_REPO'

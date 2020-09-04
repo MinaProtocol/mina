@@ -679,7 +679,7 @@ jobs:
                               scripts/release-docker.sh \
                                 -s coda-daemon-puppeteered \
                                 -v $CODA_GIT_TAG-$CODA_GIT_BRANCH-$CODA_GIT_HASH \
-                                --extra-args "--build-arg coda_version=$CODA_GIT_TAG-$CODA_GIT_BRANCH-$CODA_GIT_HASH --build-arg deb_repo=$CODA_DEB_REPO"
+                                --extra-args "--build-arg coda_version=$CODA_GIT_TAG-$CODA_GIT_BRANCH-$CODA_GIT_HASH"
                         fi
                     fi
             - store_artifacts:
