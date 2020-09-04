@@ -42,27 +42,63 @@ let token_id_of_account (account : Account_identifier.t) =
 module Op = struct
   type 'a t = {label: 'a; related_to: 'a option} [@@deriving eq]
 
-  let build ~a_eq ~plan ~f =
-    List.mapi plan ~f:(fun i op ->
-        let operation_identifier i =
-          {Operation_identifier.index= Int64.of_int_exn i; network_index= None}
-        in
-        let related_operations =
-          match op.related_to with
-          | Some relate ->
-              List.findi plan ~f:(fun _ a -> a_eq relate a.label)
-              |> Option.map ~f:(fun (i, _) -> operation_identifier i)
-              |> Option.to_list
-          | None ->
-              []
-        in
-        f ~related_operations ~operation_identifier:(operation_identifier i) op
-    )
+  module T (M : Monad.S2) = struct
+    let build ~a_eq ~plan ~f =
+      let open M.Let_syntax in
+      let%map _, rev_data =
+        List.fold plan
+          ~init:(M.return (0, []))
+          ~f:(fun macc op ->
+            let open M.Let_syntax in
+            let%bind i, acc = macc in
+            let operation_identifier i =
+              { Operation_identifier.index= Int64.of_int_exn i
+              ; network_index= None }
+            in
+            let related_operations =
+              match op.related_to with
+              | Some relate ->
+                  List.findi plan ~f:(fun _ a -> a_eq relate a.label)
+                  |> Option.map ~f:(fun (i, _) -> operation_identifier i)
+                  |> Option.to_list
+              | None ->
+                  []
+            in
+            let%map a =
+              f ~related_operations
+                ~operation_identifier:(operation_identifier i) op
+            in
+            (i + 1, a :: acc) )
+      in
+      List.rev rev_data
+  end
+
+  module Ident2 = struct
+    type ('a, 'e) t = 'a
+
+    module T = struct
+      type ('a, 'e) t = 'a
+
+      let map = `Define_using_bind
+
+      let return a = a
+
+      let bind a ~f = f a
+    end
+
+    include Monad.Make2 (T)
+  end
+
+  include T (Ident2)
 end
 
 module Kind = struct
   type t =
-    [`Payment | `Delegation | `Create_token | `Create_account | `Mint_tokens]
+    [ `Payment
+    | `Delegation
+    | `Create_token
+    | `Create_token_account
+    | `Mint_tokens ]
   [@@deriving yojson, eq, sexp, compare]
 end
 
@@ -141,6 +177,12 @@ module Partial = struct
               {delegator= source_pk; new_delegate= receiver_pk}
           in
           Result.return @@ User_command.Payload.Body.Stake_delegation payload
+      | `Create_token ->
+          let payload =
+            { Coda_base.New_token_payload.token_owner_pk= receiver_pk
+            ; disable_new_accounts= false }
+          in
+          Result.return @@ User_command.Payload.Body.Create_new_token payload
       | _ ->
           Result.fail (Errors.create `Unsupported_operation_for_construction)
     in
@@ -183,6 +225,9 @@ let of_operations (ops : Operation.t list) :
     List.find ops ~f:(fun op -> String.equal op.Operation._type name)
     |> Result.of_option ~error:[Partial.Reason.Can't_find_kind name]
   in
+  let module V = Validation in
+  let open V.Let_syntax in
+  let open Partial.Reason in
   (* For a payment we demand:
     *
     * ops = length exactly 3
@@ -192,9 +237,6 @@ let of_operations (ops : Operation.t list) :
     * payment_receiver_inc with account 'b, some amount 'x, status="Pending"
   *)
   let payment =
-    let open Validation.Let_syntax in
-    let open Partial.Reason in
-    let module V = Validation in
     let%map () =
       if Int.equal (List.length ops) 3 then V.return ()
       else V.fail Length_mismatch
@@ -278,9 +320,6 @@ let of_operations (ops : Operation.t list) :
     * delegate_change with account 'a, metadata:{delegate_change_target:'b}, status="Pending"
   *)
   let delegation =
-    let open Validation.Let_syntax in
-    let open Partial.Reason in
-    let module V = Validation in
     let%map () =
       if Int.equal (List.length ops) 2 then V.return ()
       else V.fail Length_mismatch
@@ -336,15 +375,124 @@ let of_operations (ops : Operation.t list) :
     ; fee= Unsigned.UInt64.of_string payment_amount_y.Amount.value
     ; amount= None }
   in
-  match (payment, delegation) with
-  | Ok _, Error _ ->
+  (* For token creation, we demand:
+    *
+    * ops = length exactly 2
+    *
+    * fee_payer_dec with account 'a, some amount 'y, status="Pending"
+    * create_token with account=None, status="Pending"
+  *)
+  let create_token =
+    let%map () =
+      if Int.equal (List.length ops) 2 then V.return ()
+      else V.fail Length_mismatch
+    and account_a =
+      let open Result.Let_syntax in
+      let%bind {account; _} = find_kind `Fee_payer_dec ops in
+      Option.value_map account ~default:(V.fail Account_not_some) ~f:V.return
+    and fee_token =
+      let open Result.Let_syntax in
+      let%bind {account; _} = find_kind `Fee_payer_dec ops in
+      match account with
+      | Some account -> (
+        match token_id_of_account account with
+        | Some token_id ->
+            V.return token_id
+        | None ->
+            V.fail Incorrect_token_id )
+      | None ->
+          V.fail Account_not_some
+    and () =
+      if List.for_all ops ~f:(fun op -> String.equal op.status "Pending") then
+        V.return ()
+      else V.fail Status_not_pending
+    and payment_amount_y =
+      let open Result.Let_syntax in
+      let%bind {amount; _} = find_kind `Fee_payer_dec ops in
+      match amount with
+      | Some x ->
+          V.return (Amount_of.negated x)
+      | None ->
+          V.fail Amount_not_some
+    (* distinguish create token ops from delegation ops *)
+    and () =
+      match find_kind `Delegate_change ops with
+      | Ok _ ->
+          V.fail Invalid_metadata
+      | Error _ ->
+          V.return ()
+    in
+    { Partial.kind= `Create_token
+    ; fee_payer= `Pk account_a.address
+    ; source= `Pk account_a.address
+    ; receiver= `Pk account_a.address (* reviewer: is this sane? *)
+    ; fee_token
+    ; token= Token_id.(default |> to_uint64)
+    ; fee= Unsigned.UInt64.of_string payment_amount_y.Amount.value
+    ; amount= None }
+  in
+  (* For token account creation, we demand:
+    *
+    * ops = length exactly 1
+    *
+    * fee_payer_dec with account 'a, some amount 'y, status="Pending"
+  *)
+  let create_token_account =
+    let%map () =
+      if Int.equal (List.length ops) 1 then V.return ()
+      else V.fail Length_mismatch
+    and account_a =
+      let open Result.Let_syntax in
+      let%bind {account; _} = find_kind `Fee_payer_dec ops in
+      Option.value_map account ~default:(V.fail Account_not_some) ~f:V.return
+    and fee_token =
+      let open Result.Let_syntax in
+      let%bind {account; _} = find_kind `Fee_payer_dec ops in
+      match account with
+      | Some account -> (
+        match token_id_of_account account with
+        | Some token_id ->
+            V.return token_id
+        | None ->
+            V.fail Incorrect_token_id )
+      | None ->
+          V.fail Account_not_some
+    and () =
+      if List.for_all ops ~f:(fun op -> String.equal op.status "Pending") then
+        V.return ()
+      else V.fail Status_not_pending
+    and payment_amount_y =
+      let open Result.Let_syntax in
+      let%bind {amount; _} = find_kind `Fee_payer_dec ops in
+      match amount with
+      | Some x ->
+          V.return (Amount_of.negated x)
+      | None ->
+          V.fail Amount_not_some
+    in
+    { Partial.kind= `Create_token_account
+    ; fee_payer= `Pk account_a.address
+    ; source= `Pk account_a.address
+    ; receiver= `Pk account_a.address
+    ; fee_token
+    ; token= Token_id.(default |> to_uint64)
+    ; fee= Unsigned.UInt64.of_string payment_amount_y.Amount.value
+    ; amount= None }
+  in
+  match (payment, delegation, create_token, create_token_account) with
+  | Ok _, Error _, Error _, Error _ ->
       payment
-  | Error _, Ok _ ->
+  | Error _, Ok _, Error _, Error _ ->
       delegation
-  | Ok _, Ok _ ->
-      failwith "Operations can't represent both a payment and delegation"
-  | Error payment_errs, Error delegation_errs ->
-      Error (payment_errs @ delegation_errs)
+  | Error _, Error _, Ok _, Error _ ->
+      create_token
+  | Error _, Error _, Error _, Ok _ ->
+      create_token_account
+  | Error err1, Error err2, Error err3, Error err4 ->
+      Error (err1 @ err2 @ err3 @ err4)
+  | _ ->
+      failwith
+        "A sequence of operations must represent exactly one user command"
 
 let to_operations ~failure_status (t : Partial.t) : Operation.t list =
   (* First build a plan. The plan specifies all operations ahead of time so
@@ -355,8 +503,6 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
      * transfer. ie. Source decreases, and receiver increases.
   *)
   let plan : 'a Op.t list =
-    (* The dec side of a user command's fee transfer is here *)
-    (* TODO: Relate fee_payer_dec here with fee_receiver_inc in internal commands *)
     ( if not Unsigned.UInt64.(equal t.fee zero) then
       [{Op.label= `Fee_payer_dec; related_to= None}]
     else [] )
@@ -384,7 +530,7 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
         [{Op.label= `Delegate_change; related_to= None}]
     | `Create_token ->
         [{Op.label= `Create_token; related_to= None}]
-    | `Create_account ->
+    | `Create_token_account ->
         [] (* Covered by account creation fee *)
     | `Mint_tokens -> (
       (* When amount is not none, the amount goes to receiver's account *)
@@ -406,9 +552,6 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
         (* If we're looking at mempool transactions, it's always pending *)
         | _, None ->
             (Operation_statuses.name `Pending, None)
-        (* Fee transfers always succeed even if the command fails, if it's in a block. *)
-        | `Fee_payer_dec, _ ->
-            (Operation_statuses.name `Success, None)
         | _, Some (`Applied _) ->
             (Operation_statuses.name `Success, None)
         | _, Some (`Failed reason) ->
@@ -656,7 +799,7 @@ let dummies =
             (Account_creation_fees_paid.By_fee_payer
                (Unsigned.UInt64.of_int 3_000)))
     ; hash= "TXN_3b_HASH" }
-  ; { kind= `Create_account
+  ; { kind= `Create_token_account
     ; fee_payer= `Pk "Alice"
     ; source= `Pk "Alice"
     ; token= Unsigned.UInt64.of_int 1

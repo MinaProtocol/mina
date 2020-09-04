@@ -56,6 +56,7 @@ module Styles = {
     merge([
       Button.Styles.button(
         Theme.Colors.mint,
+        Theme.Colors.black,
         true,
         `rem(3.25),
         `rem(7.75),

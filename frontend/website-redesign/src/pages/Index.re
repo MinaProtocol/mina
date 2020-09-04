@@ -17,7 +17,7 @@ let make = () => {
       <AnnouncementBanner>
         {React.string("Mainnet is live!")}
       </AnnouncementBanner>
+      <HomepageHero />
     </div>
-    <HomepageHero />
   </Page>;
 };

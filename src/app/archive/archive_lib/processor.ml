@@ -261,20 +261,42 @@ module Internal_command = struct
 end
 
 module Fee_transfer = struct
-  type t = {receiver_id: int; fee: int; token: int64; hash: string}
+  type t =
+    { kind: [`Normal | `Via_coinbase]
+    ; receiver_id: int
+    ; fee: int
+    ; token: int64
+    ; hash: string }
 
   let typ =
     let encode t =
-      Ok (("fee_transfer", t.receiver_id, t.fee, t.token), t.hash)
+      let kind =
+        match t.kind with
+        | `Normal ->
+            "fee_transfer"
+        | `Via_coinbase ->
+            "fee_transfer_via_coinbase"
+      in
+      Ok ((kind, t.receiver_id, t.fee, t.token), t.hash)
     in
-    let decode ((_, receiver_id, fee, token), hash) =
-      Ok {receiver_id; fee; token; hash}
+    let decode ((kind, receiver_id, fee, token), hash) =
+      let open Result.Let_syntax in
+      let%bind kind =
+        match kind with
+        | "fee_transfer" ->
+            return `Normal
+        | "fee_transfer_via_coinbase" ->
+            return `Via_coinbase
+        | s ->
+            Result.fail (sprintf "Bad kind %s in decode attempt" s)
+      in
+      Ok {kind; receiver_id; fee; token; hash}
     in
     let rep = Caqti_type.(tup2 (tup4 string int int int64) string) in
     Caqti_type.custom ~encode ~decode rep
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
-      (t : Fee_transfer.Single.t) =
+      (t : Fee_transfer.Single.t) (kind : [`Normal | `Via_coinbase]) =
     let open Deferred.Result.Let_syntax in
     let transaction_hash = Transaction_hash.hash_fee_transfer t in
     match%bind Internal_command.find (module Conn) ~transaction_hash with
@@ -290,7 +312,8 @@ module Fee_transfer = struct
           (Caqti_request.find typ Caqti_type.int
              "INSERT INTO internal_commands (type, receiver_id, fee, token, \
               hash) VALUES (?, ?, ?, ?, ?) RETURNING id")
-          { receiver_id
+          { kind
+          ; receiver_id
           ; fee= Fee_transfer.Single.fee t |> Currency.Fee.to_int
           ; token= Token_id.to_string t.fee_token |> Int64.of_string
           ; hash= transaction_hash |> Transaction_hash.to_base58_check }
@@ -489,6 +512,7 @@ module Block = struct
             | {data= Fee_transfer fee_transfer_bundled; status= _} ->
                 let fee_transfers =
                   Coda_base.Fee_transfer.to_list fee_transfer_bundled
+                  |> List.map ~f:(fun x -> (`Normal, x))
                 in
                 ( acc_user_commands
                 , fee_transfers @ acc_fee_transfers
@@ -501,8 +525,9 @@ module Block = struct
                   , coinbase :: acc_coinbases )
               | Some {receiver_pk; fee} ->
                   ( acc_user_commands
-                  , Coda_base.Fee_transfer.Single.create ~receiver_pk ~fee
-                      ~fee_token:Token_id.default
+                  , ( `Via_coinbase
+                    , Coda_base.Fee_transfer.Single.create ~receiver_pk ~fee
+                        ~fee_token:Token_id.default )
                     :: acc_fee_transfers
                   , coinbase :: acc_coinbases ) ) )
         in
@@ -524,33 +549,13 @@ module Block = struct
                 ~block_id ~user_command_id
               >>| ignore )
         in
-        (* For technique reasons, there might be multiple fee transfers for
-         one receiver. As suggested by deepthi, I combine all the fee transfer
-         that goes to one public key here *)
-        let fee_transfer_table = Core.Hashtbl.create (module Account_id) in
-        let () =
-          let open Coda_base in
-          Core.List.iter fee_transfers ~f:(fun fee_transfer ->
-              let receiver = Fee_transfer.Single.receiver fee_transfer in
-              Base.Hashtbl.update fee_transfer_table receiver ~f:(function
-                | None ->
-                    fee_transfer
-                | Some acc ->
-                    Fee_transfer.Single.create
-                      ~receiver_pk:fee_transfer.receiver_pk
-                      ~fee_token:fee_transfer.fee_token
-                      ~fee:
-                        ( Currency.Fee.add
-                            (Fee_transfer.Single.fee acc)
-                            (Fee_transfer.Single.fee fee_transfer)
-                        |> Core.Option.value_exn ) ) )
-        in
-        let combined_fee_transfers = Core.Hashtbl.data fee_transfer_table in
         let%bind fee_transfer_ids =
-          deferred_result_list_fold combined_fee_transfers ~init:[]
-            ~f:(fun acc fee_transfer ->
+          deferred_result_list_fold fee_transfers ~init:[]
+            ~f:(fun acc (kind, fee_transfer) ->
               let%map id =
-                Fee_transfer.add_if_doesn't_exist (module Conn) fee_transfer
+                Fee_transfer.add_if_doesn't_exist
+                  (module Conn)
+                  fee_transfer kind
               in
               id :: acc )
         in
