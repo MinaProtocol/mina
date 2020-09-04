@@ -74,6 +74,8 @@ module Styles = {
 
   let heroButton = style([marginTop(`rem(2.))]);
 
+  let buttonIcon = style([marginLeft(`rem(0.5))]);
+
   let heroText =
     merge([
       Theme.Type.pageSubhead,
@@ -124,9 +126,15 @@ let make = () => {
             <span className=Styles.heroButton>
               //TODO: Add link to tech
 
-                <Button href="/" bgColor=Theme.Colors.white width={`rem(13.5)}>
+                <Button
+                  href="/"
+                  bgColor=Theme.Colors.white
+                  paddingX=1.
+                  width={`rem(13.5)}>
                   {React.string("See Behind The Tech")}
-                  <Icon kind=Icon.ArrowRightMedium currentColor="orange" />
+                  <span className=Styles.buttonIcon>
+                    <Icon kind=Icon.ArrowRightMedium currentColor="orange" />
+                  </span>
                 </Button>
               </span>
           </div>
