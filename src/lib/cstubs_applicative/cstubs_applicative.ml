@@ -1,10 +1,54 @@
 open Base
 include Cstubs
 
+module type Applicative_with_let = sig
+  include Applicative.S
+
+  include Applicative.Let_syntax with type 'a t := 'a t
+end
+
+module Make_applicative_with_let (X : Applicative.Basic) :
+  Applicative_with_let with type 'a t := 'a X.t = struct
+  module A = struct
+    type 'a t = unit
+
+    include Applicative.Make (X)
+  end
+
+  include A
+
+  include Applicative.Make_let_syntax
+            (A)
+            (struct
+              module type S = sig end
+            end)
+            ()
+end
+
+module Applicative_unit = Make_applicative_with_let (struct
+  type 'a t = unit
+
+  let apply () () = ()
+
+  let map = `Custom (fun () ~f:_ -> ())
+
+  let return _ = ()
+end)
+
+module Applicative_id = Make_applicative_with_let (struct
+  type 'a t = 'a result
+
+  let apply = Fn.id
+
+  let map = `Custom (fun x ~f -> f x)
+
+  let return = Fn.id
+end)
+
 module type Foreign_applicative = sig
   include FOREIGN
 
-  include Applicative.S with type 'a t := 'a result
+  include Applicative_with_let with type 'a t := 'a result
 end
 
 module type Bindings_with_applicative = functor
@@ -14,31 +58,13 @@ module type Bindings_with_applicative = functor
 module Make_applicative_unit (F : FOREIGN with type 'a result = unit) :
   Foreign_applicative with type 'a result = unit = struct
   include F
-
-  include Applicative.Make (struct
-    type 'a t = 'a result
-
-    let apply () () = ()
-
-    let map = `Define_using_apply
-
-    let return _ = ()
-  end)
+  include Applicative_unit
 end
 
-module Make_applicative_transparent (F : FOREIGN with type 'a result = 'a) :
+module Make_applicative_id (F : FOREIGN with type 'a result = 'a) :
   Foreign_applicative with type 'a result = 'a = struct
   include F
-
-  include Applicative.Make (struct
-    type 'a t = 'a result
-
-    let apply = Fn.id
-
-    let map = `Define_using_apply
-
-    let return x = x
-  end)
+  include Applicative_id
 end
 
 module Make_cstubs_bindings
@@ -57,43 +83,5 @@ let write_ml ?concurrency ?errno fmt ~prefix b =
   (* Append the applicative interface instance to the end of the file. *)
   Stdlib.Format.fprintf fmt "%s@."
     {ocaml|
-include (struct
-  let return x = x
-  let map x ~f = f x
-  let both x y = (x, y)
-  let apply f x = f x
-  let map2 x y ~f = f x y
-  let map3 x y z ~f = f x y z
-  let all l = l
-  let all_unit _ = ()
-  let all_ignore _ = ()
-  module Applicative_infix = struct
-    let ( <*> ) f x = f x
-    let ( <* ) x () = x
-    let ( *> ) () x = x
-    let ( >>| ) x f = f x
-  end
-  include Applicative_infix
-end : sig
-  val return : 'a -> 'a return
-  val map : 'a return -> f:('a -> 'b) -> 'b return
-  val both : 'a return -> 'b return -> ('a * 'b) return
-  val ( <*> ) : ('a -> 'b) return -> 'a return -> 'b return
-  val ( <* ) : 'a return -> unit return -> 'a return
-  val ( *> ) : unit return -> 'a return -> 'a return
-  val ( >>| ) : 'a return -> ('a -> 'b) -> 'b return
-  val apply : ('a -> 'b) return -> 'a return -> 'b return
-  val map2 : 'a return -> 'b return -> f:('a -> 'b -> 'c) -> 'c return
-  val map3 : 'a return -> 'b return -> 'c return -> f:('a -> 'b -> 'c -> 'd) -> 'd return
-  val all : 'a return list -> 'a list return
-  val all_unit : unit return list -> unit return
-  val all_ignore : unit return list -> unit return
-  module Applicative_infix :
-    sig
-      val ( <*> ) : ('a -> 'b) return -> 'a return -> 'b return
-      val ( <* ) : 'a return -> unit return -> 'a return
-      val ( *> ) : unit return -> 'a return -> 'a return
-      val ( >>| ) : 'a return -> ('a -> 'b) -> 'b return
-    end
-end)
+include Cstubs_applicative.Applicative_id
 |ocaml}
