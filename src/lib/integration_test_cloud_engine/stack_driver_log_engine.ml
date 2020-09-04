@@ -438,7 +438,7 @@ module Breadcrumb_added_query = struct
     String.concat ~sep:"\n"
       [ testnet_log_filter
       ; coda_container_filter
-      ; Structured_log_events.id_to_string
+      ; Structured_log_events.string_of_id
           Transition_frontier
           .added_breadcrumb_user_commands_structured_events_id ]
 
