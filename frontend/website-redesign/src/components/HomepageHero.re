@@ -74,7 +74,7 @@ module Styles = {
 
   let heroButton = style([marginTop(`rem(2.))]);
 
-  let buttonIcon = style([marginLeft(`rem(0.5))]);
+  let buttonIcon = style([marginTop(`rem(0.65)), marginLeft(`rem(0.5))]);
 
   let heroText =
     merge([
@@ -131,9 +131,9 @@ let make = () => {
                   bgColor=Theme.Colors.white
                   paddingX=1.
                   width={`rem(13.5)}>
-                  {React.string("See Behind The Tech")}
+                  <span> {React.string("See Behind The Tech")} </span>
                   <span className=Styles.buttonIcon>
-                    <Icon kind=Icon.ArrowRightMedium currentColor="orange" />
+                    <Icon kind=Icon.ArrowRightSmall currentColor="#FF603B" />
                   </span>
                 </Button>
               </span>
