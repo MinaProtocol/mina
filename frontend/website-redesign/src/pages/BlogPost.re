@@ -2,7 +2,7 @@ module Style = {
   open Css;
   let title =
     style([
-      color(Theme.Colors.saville),
+      color(Theme.Colors.black),
       fontSize(`rem(3.)),
       letterSpacing(`rem(-0.01)),
       fontWeight(`bold),
@@ -38,7 +38,7 @@ module Style = {
       selector(
         "h2",
         [
-          Theme.Typeface.ddinexp,
+          Theme.Typeface.monumentGrotesk,
           fontSize(`rem(1.125)),
           letterSpacing(`em(0.1666)),
           textTransform(`uppercase),
@@ -69,11 +69,11 @@ module Style = {
           marginBottom(`rem(2.)),
         ],
       ),
-      color(Theme.Colors.saville),
+      color(Theme.Colors.black),
       Theme.Typeface.ibmplexsans,
       /* selector(".side-footnote-container", [height(`zero)]), */
       selector(".footnotes", [mediaLarge([display(`none)])]),
-      selector("a", Theme.Link.basicStyles),
+      selector("a", []),
       selector("a.footnote-ref", [fontSize(`rem(0.5))]),
       selector(
         ".side-footnote",

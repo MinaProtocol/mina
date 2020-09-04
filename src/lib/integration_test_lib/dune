@@ -2,5 +2,5 @@
   (public_name integration_test_lib)
   (name integration_test_lib)
   (inline_tests)
-  (preprocess (pps ppx_coda ppx_version ppx_optcomp ppx_let ppx_inline_test ppx_custom_printf))
+  (preprocess (pps ppx_coda ppx_version ppx_jane ppx_deriving.std))
   (libraries core async coda_base runtime_config genesis_constants transition_frontier user_command_input))

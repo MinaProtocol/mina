@@ -118,6 +118,7 @@ let fee_payer ({payload; _} : t) = Payload.fee_payer payload
 
 let create ?nonce ~fee ~fee_token ~fee_payer_pk ~valid_until ~memo ~body
     ~signer ~sign_choice () : t =
+  let valid_until = Option.value valid_until ~default:Global_slot.max_value in
   let payload =
     Payload.create ~fee ~fee_token ~fee_payer_pk ?nonce ~valid_until ~memo
       ~body

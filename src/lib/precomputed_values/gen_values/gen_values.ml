@@ -53,10 +53,10 @@ module Dummy = struct
     [%expr fun () -> Pickles.Verification_key.Id.dummy ()]
 
   let transaction_verification =
-    [%expr fun () -> Pickles.Verification_key.dummy]
+    [%expr fun () -> Lazy.force Pickles.Verification_key.dummy]
 
   let blockchain_verification =
-    [%expr fun () -> Pickles.Verification_key.dummy]
+    [%expr fun () -> Lazy.force Pickles.Verification_key.dummy]
 
   let key_hashes = hashes
 end

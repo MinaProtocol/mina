@@ -12,7 +12,7 @@ module Style = {
         [
           boxSizing(`borderBox),
           padding2(~v=`px(2), ~h=`px(6)),
-          backgroundColor(Theme.Colors.slateAlpha(0.05)),
+          backgroundColor(Theme.Colors.black),
           borderRadius(`px(4)),
         ],
       ),
@@ -25,7 +25,7 @@ module Style = {
       margin(`auto),
       marginTop(`rem(4.)),
       padding2(~v=`zero, ~h=`rem(2.)),
-      media(Theme.MediaQuery.full, [display(`flex)]),
+      media(Theme.MediaQuery.desktop, [display(`flex)]),
       media(Theme.MediaQuery.notMobile, [padding2(~v=`zero, ~h=`rem(3.))]),
     ]);
 
@@ -36,8 +36,7 @@ module Style = {
       alignItems(`center),
       marginTop(`rem(3.25)),
       marginBottom(`rem(0.5)),
-      hover([color(Theme.Colors.hyperlinkHover)]),
-      ...Theme.Link.basicStyles,
+      hover([color(Theme.Colors.black)]),
     ]);
 };
 
@@ -85,7 +84,8 @@ let make = (~metadata, ~children) => {
       <DocsSideNav currentSlug />
       <div className=Style.content>
         <EditLink route={router.route} />
-        <Next.MDXProvider components={DocsComponents.allComponents()}>
+        // <Next.MDXProvider components={DocsComponents.allComponents()}>
+        <Next.MDXProvider>
           children
         </Next.MDXProvider>
       </div>

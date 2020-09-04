@@ -14,5 +14,5 @@ let generate_keypair =
     printf "Keypair generated\nPublic key: %s\nRaw public key: %s"
       ( kp.public_key |> Public_key.compress
       |> Public_key.Compressed.to_base58_check )
-      (Public_key.Hex.encode kp.public_key) ;
+      (Rosetta_coding.Coding.of_public_key kp.public_key) ;
     exit 0)

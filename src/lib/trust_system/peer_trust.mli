@@ -36,6 +36,13 @@ end
     peer does no good things) in actions/second. *)
 val max_rate : float -> float
 
+type Structured_log_events.t +=
+  | Peer_banned of
+      { peer_id: Unix.Inet_addr.t
+      ; expiration: Time.t
+      ; action: string }
+  [@@deriving register_event]
+
 (* FIXME The parameter docs don't render :( *)
 
 (** Instantiate the module.

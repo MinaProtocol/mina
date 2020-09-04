@@ -103,7 +103,9 @@ module Accounts = struct
         in
         ( sk
         , { account with
-            delegate= Option.value ~default:account.delegate delegate } ) )
+            delegate=
+              (if Option.is_some delegate then delegate else account.delegate)
+          } ) )
 
   let gen : (Private_key.t option * Account.t) Quickcheck.Generator.t =
     let open Quickcheck.Generator.Let_syntax in
@@ -1012,7 +1014,8 @@ let inferred_runtime_config (precomputed_values : Precomputed_values.t) :
                    ; sk= Option.map ~f:Private_key.to_base58_check sk
                    ; balance
                    ; delegate=
-                       Some (Public_key.Compressed.to_base58_check delegate)
+                       Option.map ~f:Public_key.Compressed.to_base58_check
+                         delegate
                    ; timing } ))
         ; name= None
         ; num_accounts= genesis_constants.num_accounts
