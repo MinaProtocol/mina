@@ -5,7 +5,7 @@ module Styles = {
       marginLeft(`auto),
       marginRight(`auto),
       display(`flex),
-      width(`rem(50.)),
+      width(`percent(100.)),
       flexDirection(`column),
       justifyContent(`spaceBetween),
       alignContent(`spaceAround),
@@ -39,7 +39,7 @@ let make = () => {
             {React.string("Button Label")}
             <Icon kind=Icon.ArrowRightMedium />
           </Button>
-          <Button bgColor=Theme.Colors.mint>
+          <Button bgColor=Theme.Colors.mint dark=true>
             {React.string("Button label ")}
             <Icon kind=Icon.ArrowRightMedium />
           </Button>

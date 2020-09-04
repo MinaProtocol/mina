@@ -44,14 +44,12 @@ let make =
         rel="stylesheet"
       />
       <link href="https://use.typekit.net/mta7mwm.css" rel="stylesheet" />
-      // On recent versions of firefox, the browser will do a "flash of
-      // unstyled content" for images by displaying the alt text(!) before the
-      // image loads. Of course, we must disable this.
       <style>
         {React.string("img:-moz-loading { visibility: hidden; }")}
       </style>
     </Next.Head>
     <div> children </div>
     <CookieWarning />
+    <Footer />
   </>;
 };
