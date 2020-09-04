@@ -108,6 +108,8 @@ module Side_loaded : sig
       end
     end]
 
+    val dummy : t
+
     open Impls.Step
 
     val to_input : t -> (Field.Constant.t, bool) Random_oracle_input.t

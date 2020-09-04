@@ -69,6 +69,7 @@ module Side_loaded = struct
       | _ ->
           failwithf "Side_loaded.to_basic: Expected `In_prover (%s)" __LOC__ ()
     in
+    let wrap_vk = Option.value_exn ~here:[%here] wrap_vk in
     { Basic.max_branching
     ; wrap_vk
     ; value_to_field_elements
