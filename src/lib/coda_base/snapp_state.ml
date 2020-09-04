@@ -1,5 +1,5 @@
 open Pickles_types
-module Max_state_size = Nat.N4
+module Max_state_size = Nat.N8
 include Vector.With_length (Max_state_size)
 
 let typ t = Vector.typ t Max_state_size.n
@@ -17,3 +17,6 @@ module Value = struct
     end
   end]
 end
+
+let to_input (t : _ t) ~f =
+  Vector.(reduce_exn (map t ~f) ~f:Random_oracle_input.append)
