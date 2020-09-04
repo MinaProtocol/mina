@@ -1436,12 +1436,12 @@ let%test_module "coda network tests" =
       let%bind () =
         configure a ~gossip_type:`Gossipsub
           ~external_maddr:(List.hd_exn maddrs) ~me:kp_a ~maddrs ~network_id
-          ~on_new_peer:Fn.ignore ~unsafe_no_trust_ip:true
+          ~seed_peers:[] ~on_new_peer:Fn.ignore ~unsafe_no_trust_ip:true
         >>| Or_error.ok_exn
       and () =
         configure b ~gossip_type:`Gossipsub
           ~external_maddr:(List.hd_exn maddrs) ~me:kp_b ~maddrs ~network_id
-          ~on_new_peer:Fn.ignore ~unsafe_no_trust_ip:true
+          ~seed_peers:[] ~on_new_peer:Fn.ignore ~unsafe_no_trust_ip:true
         >>| Or_error.ok_exn
       in
       let%bind a_advert = begin_advertising a
