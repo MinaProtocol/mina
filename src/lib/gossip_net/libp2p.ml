@@ -143,6 +143,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                           .libp2p_port))
                 ~network_id:config.chain_id
                 ~unsafe_no_trust_ip:config.unsafe_no_trust_ip
+                ~seed_peers:config.initial_peers
                 ~on_new_peer:(fun _ ->
                   Ivar.fill_if_empty first_peer_ivar () ;
                   if !ctr < 4 then incr ctr
@@ -293,13 +294,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                       (Option.value_exn config.addrs_and_ports.peer)
                         .libp2p_port))
             in
-            Deferred.ignore
-              (Deferred.bind
-                 ~f:(fun _ -> Coda_net2.begin_advertising net2)
-                 (* TODO: timeouts here in addition to the libp2p side? *)
-                 (Deferred.all
-                    (List.map ~f:(Coda_net2.add_peer net2) config.initial_peers)))
-            |> don't_wait_for ;
+            Coda_net2.begin_advertising net2 |> don't_wait_for ;
             (subscription, message_reader)
           in
           match%map initializing_libp2p_result with

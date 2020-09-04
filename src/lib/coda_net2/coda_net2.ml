@@ -274,7 +274,8 @@ module Helper = struct
         ; external_maddr: string
         ; network_id: string
         ; unsafe_no_trust_ip: bool
-        ; gossip_type: string }
+        ; gossip_type: string
+        ; seed_peers: string list }
       [@@deriving yojson]
 
       type output = string [@@deriving yojson]
@@ -1093,7 +1094,7 @@ let list_peers net =
       []
 
 let configure net ~me ~external_maddr ~maddrs ~network_id ~on_new_peer
-    ~unsafe_no_trust_ip ~gossip_type =
+    ~unsafe_no_trust_ip ~gossip_type ~seed_peers =
   match%map
     Helper.do_rpc net
       (module Helper.Rpcs.Configure)
@@ -1103,6 +1104,7 @@ let configure net ~me ~external_maddr ~maddrs ~network_id ~on_new_peer
       ; external_maddr= Multiaddr.to_string external_maddr
       ; network_id
       ; unsafe_no_trust_ip
+      ; seed_peers= List.map ~f:Multiaddr.to_string seed_peers
       ; gossip_type=
           ( match gossip_type with
           | `Gossipsub ->

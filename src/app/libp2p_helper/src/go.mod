@@ -15,23 +15,21 @@ require (
 	github.com/ipfs/go-log v1.0.4
 	github.com/ipfs/go-log/v2 v2.1.1
 	github.com/libp2p/go-buffer-pool v0.0.2
-	github.com/libp2p/go-libp2p v0.10.3
+	github.com/libp2p/go-libp2p v0.11.0
 	github.com/libp2p/go-libp2p-connmgr v0.2.4
 	github.com/libp2p/go-libp2p-core v0.6.1
 	github.com/libp2p/go-libp2p-discovery v0.5.0
-	github.com/libp2p/go-libp2p-kad-dht v0.8.3
+	github.com/libp2p/go-libp2p-kad-dht v0.10.0
 	github.com/libp2p/go-libp2p-peerstore v0.2.6
 	github.com/libp2p/go-libp2p-pubsub v0.3.4
 	github.com/libp2p/go-libp2p-record v0.1.3
-	github.com/libp2p/go-libp2p-secio v0.2.2
 	github.com/libp2p/go-maddr-filter v0.1.0
 	github.com/libp2p/go-mplex v0.1.3 // indirect
 	github.com/libp2p/go-stream-muxer v0.1.0
-	github.com/libp2p/go-tcp-transport v0.2.1
-	github.com/libp2p/go-ws-transport v0.3.1
+	github.com/libp2p/go-tcp-transport v0.2.1 // indirect
 	github.com/libp2p/go-yamux v1.3.8 // indirect
 	github.com/miekg/dns v1.1.31 // indirect
-	github.com/multiformats/go-multiaddr v0.3.0
+	github.com/multiformats/go-multiaddr v0.3.1
 	github.com/multiformats/go-multiaddr-net v0.2.0 // indirect
 	github.com/multiformats/go-varint v0.0.6
 	golang.org/x/crypto v0.0.0-20200820211705-5c72a883971a
