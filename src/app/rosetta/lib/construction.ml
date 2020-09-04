@@ -374,7 +374,7 @@ module Payloads = struct
                  in
                  pk)
             ; hex_bytes= pk
-            ; signature_type= Some "schnorr" } ] }
+            ; signature_type= Some "schnorr_poseidon" } ] }
   end
 
   module Real = Impl (Deferred.Result)
