@@ -68,8 +68,7 @@ let get_balance_graphql =
            Graphql_client.query_exn
              (Graphql_queries.Get_tracked_account.make
                 ~public_key:(Graphql_lib.Encoders.public_key public_key)
-                ~token:(Graphql_lib token)
-                ())
+                ~token:(Graphql_lib token) ())
              graphql_endpoint
          in
          match response#account with
