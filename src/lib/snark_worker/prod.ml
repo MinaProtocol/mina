@@ -85,8 +85,33 @@ module Inputs = struct
             | Work.Single.Spec.Transition
                 (input, t, (w : Transaction_witness.t)) ->
                 process (fun () ->
+                    let snapp_account1, snapp_account2 =
+                      let t = Transaction.forget t in
+                      match t with
+                      | Command (User_command _) | Fee_transfer _ | Coinbase _
+                        ->
+                          (None, None)
+                      | Command (Snapp_command c) -> (
+                          let token_id = Snapp_command.token_id c in
+                          let get pk =
+                            Option.try_with (fun () ->
+                                ( Sparse_ledger.find_index_exn w.ledger
+                                    (Account_id.create pk token_id)
+                                |> Sparse_ledger.get_exn w.ledger )
+                                  .snapp )
+                            |> Option.join
+                          in
+                          match Snapp_command.to_payload c with
+                          | Zero_proved p ->
+                              (get p.one.body.pk, get p.two.body.pk)
+                          | One_proved p ->
+                              (get p.one.body.pk, get p.two.body.pk)
+                          | Two_proved p ->
+                              (get p.one.body.pk, get p.two.body.pk) )
+                    in
                     Or_error.try_with (fun () ->
-                        M.of_transaction ~sok_digest
+                        M.of_transaction ~sok_digest ~snapp_account1
+                          ~snapp_account2
                           ~source:input.Transaction_snark.Statement.source
                           ~target:input.target
                           { Transaction_protocol_state.Poly.transaction= t

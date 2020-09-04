@@ -258,6 +258,8 @@ val check_transaction :
   -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
   -> next_available_token_before:Token_id.t
   -> next_available_token_after:Token_id.t
+  -> snapp_account1:Snapp_account.t option
+  -> snapp_account2:Snapp_account.t option
   -> Transaction.Valid.t Transaction_protocol_state.t
   -> Tick.Handler.t
   -> unit
@@ -285,6 +287,8 @@ val generate_transaction_witness :
   -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
   -> next_available_token_before:Token_id.t
   -> next_available_token_after:Token_id.t
+  -> snapp_account1:Snapp_account.t option
+  -> snapp_account2:Snapp_account.t option
   -> Transaction.Valid.t Transaction_protocol_state.t
   -> Tick.Handler.t
   -> unit
@@ -302,6 +306,8 @@ module type S = sig
     -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
     -> next_available_token_before:Token_id.t
     -> next_available_token_after:Token_id.t
+    -> snapp_account1:Snapp_account.t option
+    -> snapp_account2:Snapp_account.t option
     -> Transaction.Valid.t Transaction_protocol_state.t
     -> Tick.Handler.t
     -> t

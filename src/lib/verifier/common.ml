@@ -29,6 +29,7 @@ let check :
             then return `Invalid
             else ()
           in
+          (* TODO: Unify this computation of statement with the code Snapp_statement.of_payload. *)
           let statement_to_check
               ( vk
               , (p : Snapp_command.Party.Authorized.Proved.t)

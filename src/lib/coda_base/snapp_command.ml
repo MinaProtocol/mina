@@ -521,6 +521,20 @@ let fee_payer (t : t) =
   | Signed_empty r ->
       f r
 
+let fee_payment t =
+  let f (r : _ Inner.t) = r.fee_payment in
+  match t with
+  | Proved_empty r ->
+      f r
+  | Proved_signed r ->
+      f r
+  | Proved_proved r ->
+      f r
+  | Signed_signed r ->
+      f r
+  | Signed_empty r ->
+      f r
+
 let fee_exn (t : t) =
   let f (r : _ Inner.t) =
     let _, e = native_excess_exn t in
@@ -579,59 +593,16 @@ let as_transfer (t : t) : transfer =
 
 let native_excess t = Option.try_with (fun () -> native_excess_exn t)
 
-(* TODO: Make sure this matches the snark. I don't think it does right now. *)
+(* Currently we ensure that 
+
+   other fee payer is present => native excess is zero 
+
+   so that there is only one token involved in the fee.
+*)
 let fee_excess (t : t) : Fee_excess.t Or_error.t =
-  let opt =
-    Option.value_map ~f:Or_error.return ~default:(Or_error.error_string "None")
-  in
   let open Or_error.Let_syntax in
-  let finish r token_id fee_payment =
-    let%bind r = signed_to_non_positive r in
-    let one = (token_id, Fee.Signed.of_unsigned (Amount.to_fee r)) in
-    Fee_excess.of_one_or_two
-      ( match fee_payment with
-      | None ->
-          `One one
-      | Some (p : Other_fee_payer.t) ->
-          `Two (one, (p.payload.token_id, Fee.Signed.of_unsigned p.payload.fee))
-      )
-  in
-  let open Party in
-  let f1
-      { Inner.token_id
-      ; fee_payment
-      ; one: ((Body.t, _) Predicated.Poly.t, _) Authorized.Poly.t
-      ; two: ((Body.t, _) Predicated.Poly.t, _) Authorized.Poly.t option } =
-    let%bind r =
-      match two with
-      | None ->
-          return one.data.body.delta
-      | Some two ->
-          Amount.Signed.add one.data.body.delta two.data.body.delta |> opt
-    in
-    finish r token_id fee_payment
-  in
-  let f2
-      { Inner.token_id
-      ; fee_payment
-      ; one: ((Body.t, _) Predicated.Poly.t, _) Authorized.Poly.t
-      ; two: ((Body.t, _) Predicated.Poly.t, _) Authorized.Poly.t } =
-    let%bind r =
-      Amount.Signed.add one.data.body.delta two.data.body.delta |> opt
-    in
-    finish r token_id fee_payment
-  in
-  match t with
-  | Proved_empty r ->
-      f1 r
-  | Proved_signed r ->
-      f2 r
-  | Proved_proved r ->
-      f2 r
-  | Signed_signed r ->
-      f2 r
-  | Signed_empty r ->
-      f1 r
+  let%map f = Or_error.try_with (fun () -> fee_exn t) in
+  Fee_excess.of_single (fee_token t, Fee.Signed.of_unsigned f)
 
 let accounts_accessed (t : t) : Account_id.t list =
   let open Party in

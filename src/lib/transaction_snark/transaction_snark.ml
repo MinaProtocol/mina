@@ -5,8 +5,20 @@ open Snark_params
 module Global_slot = Coda_numbers.Global_slot
 open Currency
 open Pickles_types
+module Impl = Pickles.Impls.Step
 
 let top_hash_logging_enabled = ref false
+
+let to_preunion (t : Transaction.t) =
+  match t with
+  | Command (User_command x) ->
+      `Transaction (Transaction.Command x)
+  | Fee_transfer x ->
+      `Transaction (Fee_transfer x)
+  | Coinbase x ->
+      `Transaction (Coinbase x)
+  | Command (Snapp_command x) ->
+      `Snapp_command x
 
 let with_top_hash_logging f =
   let old = !top_hash_logging_enabled in
@@ -991,11 +1003,9 @@ module Base = struct
   let side_loaded i =
     let open Snapp_statement in
     Pickles.Side_loaded.create ~typ ~name:(sprintf "snapp_%d" i)
-      ~max_branching:(module Nat.N2)
+      ~max_branching:(module Pickles.Side_loaded.Verification_key.Max_width)
       ~value_to_field_elements:to_field_elements
       ~var_to_field_elements:Checked.to_field_elements
-
-  module Impl = Pickles.Impls.Step
 
   module Snapp_command = struct
     include struct
@@ -1009,6 +1019,77 @@ module Base = struct
         | One_complement : Snapp_statement.Complement.One_proved.t t
         | Two_complement : Snapp_statement.Complement.Two_proved.t t
     end
+
+    let handler ~(state_body : Coda_state.Protocol_state.Body.Value.t)
+        ~(snapp_account1 : Snapp_account.t option)
+        ~(snapp_account2 : Snapp_account.t option) (c : Snapp_command.t)
+        handler : request -> response =
+     fun (With {request; respond} as r) ->
+      let Vector.[snapp_account1; snapp_account2] =
+        Vector.map
+          ~f:(Option.value ~default:Snapp_account.default)
+          [snapp_account1; snapp_account2]
+      in
+      let sig1, sig2 =
+        let control : Control.t -> Signature.t = function
+          | Signature x ->
+              x
+          | Both {signature; _} ->
+              signature
+          | Proof _ | None_given ->
+              Signature.dummy
+        in
+        let opt_dummy f x = Option.value_map x ~f ~default:Signature.dummy in
+        let empty (p : Snapp_command.Party.Authorized.Empty.t) =
+          let () = p.authorization in
+          Signature.dummy
+        in
+        let signed (p : Snapp_command.Party.Authorized.Signed.t) =
+          p.authorization
+        in
+        match c with
+        | Proved_empty r ->
+            (control r.one.authorization, opt_dummy empty r.two)
+        | Proved_signed r ->
+            (control r.one.authorization, signed r.two)
+        | Proved_proved r ->
+            (control r.one.authorization, control r.two.authorization)
+        | Signed_signed r ->
+            (signed r.one, signed r.two)
+        | Signed_empty r ->
+            (signed r.one, opt_dummy empty r.two)
+      in
+      let payload = Snapp_command.to_payload c in
+      match request with
+      | State_body ->
+          respond (Provide state_body)
+      | Snapp_account `One ->
+          respond (Provide snapp_account1)
+      | Snapp_account `Two ->
+          respond (Provide snapp_account2)
+      | Fee_payer_signature ->
+          respond
+            (Provide
+               (Option.value_map (Snapp_command.fee_payment c)
+                  ~default:Signature.dummy ~f:(fun p -> p.signature)))
+      | Account_signature `One ->
+          respond (Provide sig1)
+      | Account_signature `Two ->
+          respond (Provide sig2)
+      | One_complement -> (
+        match payload with
+        | One_proved x ->
+            respond (Provide (Snapp_statement.Complement.One_proved.create x))
+        | _ ->
+            unhandled )
+      | Two_complement -> (
+        match payload with
+        | Two_proved x ->
+            respond (Provide (Snapp_statement.Complement.Two_proved.create x))
+        | _ ->
+            unhandled )
+      | _ ->
+          handler r
 
     open Snapp_basic
 
@@ -1558,7 +1639,7 @@ module Base = struct
                 s.next_available_token_before ]) ;
         (proof1_must_verify (), proof2_must_verify ())
 
-      let _rule ~constraint_constants : _ Pickles.Inductive_rule.t =
+      let rule ~constraint_constants : _ Pickles.Inductive_rule.t =
         { prevs= [snapp1_tag; snapp2_tag]
         ; main=
             (fun [t1; t2] x ->
@@ -1698,7 +1779,7 @@ module Base = struct
                 s.next_available_token_before ]) ;
         proof1_must_verify ()
 
-      let _rule ~constraint_constants : _ Pickles.Inductive_rule.t =
+      let rule ~constraint_constants : _ Pickles.Inductive_rule.t =
         { prevs= [snapp1_tag]
         ; main=
             (fun [t1] x ->
@@ -1826,7 +1907,7 @@ module Base = struct
             ; Token_id.Checked.Assert.equal s.next_available_token_after
                 s.next_available_token_before ])
 
-      let _rule ~constraint_constants : _ Pickles.Inductive_rule.t =
+      let rule ~constraint_constants : _ Pickles.Inductive_rule.t =
         { prevs= []
         ; main=
             (fun [] x ->
@@ -2760,7 +2841,11 @@ let system ~constraint_constants =
         ~max_branching:(module Nat.N2)
         ~name:"transaction-snark"
         ~choices:(fun ~self ->
-          [Base.rule ~constraint_constants; Merge.rule self] ) )
+          [ Base.rule ~constraint_constants
+          ; Base.Snapp_command.Zero_proved.rule ~constraint_constants
+          ; Base.Snapp_command.One_proved.rule ~constraint_constants
+          ; Base.Snapp_command.Two_proved.rule ~constraint_constants
+          ; Merge.rule self ] ) )
 
 module Verification = struct
   module type S = sig
@@ -2789,6 +2874,8 @@ module type S = sig
     -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
     -> next_available_token_before:Token_id.t
     -> next_available_token_after:Token_id.t
+    -> snapp_account1:Snapp_account.t option
+    -> snapp_account2:Snapp_account.t option
     -> Transaction.Valid.t Transaction_protocol_state.t
     -> Tick.Handler.t
     -> t
@@ -2852,9 +2939,95 @@ let check_transaction_union ?(preeval = false) ~constraint_constants
        ())
   |> ignore
 
+let command_to_proofs (p : Snapp_command.t) :
+    (Snapp_statement.t * Pickles.Side_loaded.Proof.t, Nat.N2.n) At_most.t =
+  let proof_exn (c : Control.t) =
+    match c with
+    | Proof p ->
+        p
+    | Both {proof; _} ->
+        proof
+    | _ ->
+        failwith "proof_exn"
+  in
+  let f (ps : (Snapp_command.Party.Authorized.Proved.t, _) At_most.t) =
+    At_most.map ps ~f:(fun p ->
+        ( { Snapp_statement.Poly.predicate= p.data.predicate
+          ; body1= p.data.body
+          ; body2= Snapp_command.Party.Body.dummy }
+        , proof_exn p.authorization ) )
+  in
+  match p with
+  | Signed_empty _ ->
+      []
+  | Signed_signed _ ->
+      []
+  | Proved_empty p ->
+      f [p.one]
+  | Proved_signed p ->
+      f [p.one]
+  | Proved_proved p ->
+      f [p.one; p.two]
+
+let command_to_statements c = At_most.map (command_to_proofs c) ~f:fst
+
+(* TODO: Use init_stack. *)
+let check_snapp_command ?(preeval = false) ~constraint_constants ~sok_message
+    ~source ~target ~init_stack:_ ~pending_coinbase_stack_state
+    ~next_available_token_before ~next_available_token_after ~state_body
+    ~snapp_account1 ~snapp_account2 (t : Snapp_command.t) handler =
+  if preeval then failwith "preeval currently disabled" ;
+  let sok_digest = Sok_message.digest sok_message in
+  let handler =
+    Base.Snapp_command.handler ~state_body ~snapp_account1 ~snapp_account2 t
+      handler
+  in
+  let statement : Statement.With_sok.t =
+    { source
+    ; target
+    ; supply_increase= Currency.Amount.zero
+    ; pending_coinbase_stack_state
+    ; fee_excess= Or_error.ok_exn (Snapp_command.fee_excess t)
+    ; next_available_token_before
+    ; next_available_token_after
+    ; sok_digest }
+  in
+  let open Tick in
+  let comp =
+    let open Checked in
+    let%bind s =
+      exists Statement.With_sok.typ ~compute:(As_prover.return statement)
+    in
+    match command_to_statements t with
+    | [] ->
+        Impl.make_checked (fun () ->
+            Base.Snapp_command.Zero_proved.main ~constraint_constants s )
+    | [s1] ->
+        let%bind s1 =
+          exists Snapp_statement.typ ~compute:(As_prover.return s1)
+        in
+        Impl.make_checked (fun () ->
+            let (_ : Boolean.var) =
+              Base.Snapp_command.One_proved.main ~constraint_constants s1 s
+            in
+            () )
+    | [s1; s2] ->
+        let%bind s1 = exists Snapp_statement.typ ~compute:(As_prover.return s1)
+        and s2 = exists Snapp_statement.typ ~compute:(As_prover.return s2) in
+        Impl.make_checked (fun () ->
+            let (_ : Boolean.var * Boolean.var) =
+              Base.Snapp_command.Two_proved.main ~constraint_constants s1 s2 s
+            in
+            () )
+  in
+  Or_error.ok_exn
+    (run_and_check (handle (Checked.map ~f:As_prover.return comp) handler) ())
+  |> ignore
+
 let check_transaction ?preeval ~constraint_constants ~sok_message ~source
     ~target ~init_stack ~pending_coinbase_stack_state
-    ~next_available_token_before ~next_available_token_after
+    ~next_available_token_before ~next_available_token_after ~snapp_account1
+    ~snapp_account2
     (transaction_in_block : Transaction.Valid.t Transaction_protocol_state.t)
     handler =
   let transaction =
@@ -2863,11 +3036,18 @@ let check_transaction ?preeval ~constraint_constants ~sok_message ~source
   let state_body =
     Transaction_protocol_state.block_data transaction_in_block
   in
-  check_transaction_union ?preeval ~constraint_constants sok_message source
-    target init_stack pending_coinbase_stack_state next_available_token_before
-    next_available_token_after
-    (Transaction_union.of_transaction (transaction :> Transaction.t))
-    state_body handler
+  match to_preunion (transaction :> Transaction.t) with
+  | `Snapp_command c ->
+      check_snapp_command ?preeval ~constraint_constants ~sok_message ~source
+        ~target ~init_stack ~pending_coinbase_stack_state
+        ~next_available_token_before ~next_available_token_after ~state_body
+        ~snapp_account1 ~snapp_account2 c handler
+  | `Transaction t ->
+      check_transaction_union ?preeval ~constraint_constants sok_message source
+        target init_stack pending_coinbase_stack_state
+        next_available_token_before next_available_token_after
+        (Transaction_union.of_transaction t)
+        state_body handler
 
 let check_user_command ~constraint_constants ~sok_message ~source ~target
     ~init_stack ~pending_coinbase_stack_state ~next_available_token_before
@@ -2875,7 +3055,7 @@ let check_user_command ~constraint_constants ~sok_message ~source ~target
   let user_command = Transaction_protocol_state.transaction t_in_block in
   check_transaction ~constraint_constants ~sok_message ~source ~target
     ~init_stack ~pending_coinbase_stack_state ~next_available_token_before
-    ~next_available_token_after
+    ~next_available_token_after ~snapp_account1:None ~snapp_account2:None
     {t_in_block with transaction= Command (User_command user_command)}
     handler
 
@@ -2908,21 +3088,94 @@ let generate_transaction_union_witness ?(preeval = false) ~constraint_constants
   let main x = handle (Base.main ~constraint_constants x) handler in
   generate_auxiliary_input [Statement.With_sok.typ] () main statement
 
-let generate_transaction_witness ?preeval ~constraint_constants ~sok_message
-    ~source ~target ~init_stack ~pending_coinbase_stack_state
-    ~next_available_token_before ~next_available_token_after
-    (transaction_in_block : Transaction.Valid.t Transaction_protocol_state.t)
-    handler =
-  let transaction =
+let generate_snapp_command_witness ?(preeval = false) ~constraint_constants
+    ~sok_message ~source ~target ~init_stack:_ ~pending_coinbase_stack_state
+    ~next_available_token_before ~next_available_token_after ~snapp_account1
+    ~snapp_account2 transaction_in_block handler =
+  if preeval then failwith "preeval currently disabled" ;
+  let transaction : Snapp_command.t =
     Transaction_protocol_state.transaction transaction_in_block
   in
-  generate_transaction_union_witness ?preeval ~constraint_constants sok_message
-    source target
-    { transaction_in_block with
-      transaction=
-        Transaction_union.of_transaction (transaction :> Transaction.t) }
-    init_stack next_available_token_before next_available_token_after
-    pending_coinbase_stack_state handler
+  let state_body =
+    Transaction_protocol_state.block_data transaction_in_block
+  in
+  let sok_digest = Sok_message.digest sok_message in
+  let handler =
+    Base.Snapp_command.handler ~state_body ~snapp_account1 ~snapp_account2
+      transaction handler
+  in
+  let statement : Statement.With_sok.t =
+    { source
+    ; target
+    ; supply_increase= Currency.Amount.zero
+    ; pending_coinbase_stack_state
+    ; fee_excess= Or_error.ok_exn (Snapp_command.fee_excess transaction)
+    ; next_available_token_before
+    ; next_available_token_after
+    ; sok_digest }
+  in
+  let open Tick in
+  match command_to_statements transaction with
+  | [] ->
+      let main x =
+        handle
+          (make_checked (fun () ->
+               Base.Snapp_command.Zero_proved.main ~constraint_constants x ))
+          handler
+      in
+      generate_auxiliary_input [Statement.With_sok.typ] () main statement
+  | [s1] ->
+      let main x =
+        handle
+          (let%bind s1 =
+             exists Snapp_statement.typ ~compute:(As_prover.return s1)
+           in
+           make_checked (fun () ->
+               Base.Snapp_command.One_proved.main s1 ~constraint_constants x ))
+          handler
+      in
+      generate_auxiliary_input [Statement.With_sok.typ] () main statement
+  | [s1; s2] ->
+      let main x =
+        handle
+          (let%bind s1 =
+             exists Snapp_statement.typ ~compute:(As_prover.return s1)
+           in
+           let%bind s2 =
+             exists Snapp_statement.typ ~compute:(As_prover.return s2)
+           in
+           make_checked (fun () ->
+               Base.Snapp_command.Two_proved.main s1 s2 ~constraint_constants x
+           ))
+          handler
+      in
+      generate_auxiliary_input [Statement.With_sok.typ] () main statement
+
+let generate_transaction_witness ?preeval ~constraint_constants ~sok_message
+    ~source ~target ~init_stack ~pending_coinbase_stack_state
+    ~next_available_token_before ~next_available_token_after ~snapp_account1
+    ~snapp_account2
+    (transaction_in_block : Transaction.Valid.t Transaction_protocol_state.t)
+    handler =
+  match
+    to_preunion
+      ( Transaction_protocol_state.transaction transaction_in_block
+        :> Transaction.t )
+  with
+  | `Snapp_command c ->
+      generate_snapp_command_witness ?preeval ~constraint_constants
+        ~sok_message ~source ~target ~init_stack ~pending_coinbase_stack_state
+        ~next_available_token_before ~next_available_token_after
+        ~snapp_account1 ~snapp_account2
+        {transaction_in_block with transaction= c}
+        handler
+  | `Transaction t ->
+      generate_transaction_union_witness ?preeval ~constraint_constants
+        sok_message source target
+        { transaction_in_block with
+          transaction= Transaction_union.of_transaction t }
+        init_stack next_available_token_before next_available_token_after
+        pending_coinbase_stack_state handler
 
 let verify (ts : (t * _) list) ~key =
   List.for_all ts ~f:(fun ({statement; _}, message) ->
@@ -2936,7 +3189,10 @@ let verify (ts : (t * _) list) ~key =
        (List.map ts ~f:(fun ({statement; proof}, _) -> (statement, proof)))
 
 module Make () = struct
-  let tag, cache_handle, p, Pickles.Provers.[base; merge] =
+  let ( tag
+      , cache_handle
+      , p
+      , Pickles.Provers.[base; zero_proved; one_proved; two_proved; merge] ) =
     system
       ~constraint_constants:Genesis_constants.Constraint_constants.compiled
 
@@ -2977,27 +3233,65 @@ module Make () = struct
                init_stack)
           s }
 
+  let of_snapp_command ~sok_digest ~source ~target ~init_stack:_
+      ~pending_coinbase_stack_state ~next_available_token_before
+      ~next_available_token_after ~snapp_account1 ~snapp_account2 ~state_body t
+      handler =
+    let handler =
+      Base.Snapp_command.handler ~state_body ~snapp_account1 ~snapp_account2 t
+        handler
+    in
+    let statement : Statement.With_sok.t =
+      { source
+      ; target
+      ; supply_increase= Currency.Amount.zero
+      ; pending_coinbase_stack_state
+      ; fee_excess= Or_error.ok_exn (Snapp_command.fee_excess t)
+      ; next_available_token_before
+      ; next_available_token_after
+      ; sok_digest }
+    in
+    let proof =
+      match command_to_proofs t with
+      | [] ->
+          zero_proved [] statement ~handler
+      | [s1] ->
+          one_proved [s1] statement ~handler
+      | [s1; s2] ->
+          two_proved [s1; s2] statement ~handler
+    in
+    {statement; proof}
+
   let of_transaction ~sok_digest ~source ~target ~init_stack
       ~pending_coinbase_stack_state ~next_available_token_before
-      ~next_available_token_after transaction_in_block handler =
-    let transaction : Transaction.Valid.t =
-      Transaction_protocol_state.transaction transaction_in_block
+      ~next_available_token_after ~snapp_account1 ~snapp_account2
+      transaction_in_block handler =
+    let transaction : Transaction.t =
+      Transaction.forget
+        (Transaction_protocol_state.transaction transaction_in_block)
     in
     let state_body =
       Transaction_protocol_state.block_data transaction_in_block
     in
-    of_transaction_union sok_digest source target ~init_stack
-      ~pending_coinbase_stack_state ~next_available_token_before
-      ~next_available_token_after
-      (Transaction_union.of_transaction (transaction :> Transaction.t))
-      state_body handler
+    match to_preunion transaction with
+    | `Snapp_command t ->
+        of_snapp_command ~sok_digest ~source ~target ~init_stack
+          ~pending_coinbase_stack_state ~next_available_token_before
+          ~next_available_token_after ~snapp_account1 ~snapp_account2
+          ~state_body t handler
+    | `Transaction t ->
+        of_transaction_union sok_digest source target ~init_stack
+          ~pending_coinbase_stack_state ~next_available_token_before
+          ~next_available_token_after
+          (Transaction_union.of_transaction t)
+          state_body handler
 
   let of_user_command ~sok_digest ~source ~target ~init_stack
       ~pending_coinbase_stack_state ~next_available_token_before
       ~next_available_token_after user_command_in_block handler =
     of_transaction ~sok_digest ~source ~target ~init_stack
       ~pending_coinbase_stack_state ~next_available_token_before
-      ~next_available_token_after
+      ~next_available_token_after ~snapp_account1:None ~snapp_account2:None
       { user_command_in_block with
         transaction=
           Command
@@ -3011,7 +3305,7 @@ module Make () = struct
       ~next_available_token_after transfer_in_block handler =
     of_transaction ~sok_digest ~source ~target ~init_stack
       ~pending_coinbase_stack_state ~next_available_token_before
-      ~next_available_token_after
+      ~next_available_token_after ~snapp_account1:None ~snapp_account2:None
       { transfer_in_block with
         transaction=
           Fee_transfer
@@ -3273,7 +3567,8 @@ let%test_module "transaction_snark" =
               (Sparse_ledger.next_available_token sparse_ledger_after)
             ~init_stack:pending_coinbase_init
             ~pending_coinbase_stack_state:
-              {source= source_stack; target= pending_coinbase_stack_target} )
+              {source= source_stack; target= pending_coinbase_stack_target}
+            ~snapp_account1:None ~snapp_account2:None )
 
     let%test_unit "coinbase with new state body hash" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -3403,11 +3698,12 @@ let%test_module "transaction_snark" =
             ( Coinbase.accounts_accessed cb
             , Pending_coinbase.Stack.push_coinbase cb pending_coinbase_stack )
       in
-      let signer =
-        let txn_union =
-          Transaction_union.of_transaction (txn :> Transaction.t)
-        in
-        txn_union.signer |> Public_key.compress
+      let sok_signer =
+        match to_preunion (txn :> Transaction.t) with
+        | `Transaction t ->
+            (Transaction_union.of_transaction t).signer |> Public_key.compress
+        | `Snapp_command c ->
+            Account_id.public_key (Snapp_command.fee_payer c)
       in
       let sparse_ledger =
         Sparse_ledger.of_ledger_subset_exn ledger mentioned_keys
@@ -3419,7 +3715,7 @@ let%test_module "transaction_snark" =
              (txn :> Transaction.t)
       in
       let target = Ledger.merkle_root ledger in
-      let sok_message = Sok_message.create ~fee:Fee.zero ~prover:signer in
+      let sok_message = Sok_message.create ~fee:Fee.zero ~prover:sok_signer in
       check_transaction ~constraint_constants ~sok_message ~source ~target
         ~init_stack:pending_coinbase_stack
         ~pending_coinbase_stack_state:
@@ -3427,6 +3723,7 @@ let%test_module "transaction_snark" =
           ; target= pending_coinbase_stack_target }
         ~next_available_token_before:next_available_token
         ~next_available_token_after:(Ledger.next_available_token ledger)
+        ~snapp_account1:None ~snapp_account2:None
         {transaction= txn; block_data= state_body}
         (unstage @@ Sparse_ledger.handler sparse_ledger)
 

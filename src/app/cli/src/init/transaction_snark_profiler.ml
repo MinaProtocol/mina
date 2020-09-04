@@ -176,6 +176,7 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
                 ~next_available_token_after
                 ~pending_coinbase_stack_state:
                   {source= coinbase_stack_source; target= coinbase_stack_target}
+                ~snapp_account1:None ~snapp_account2:None
                 { Transaction_protocol_state.Poly.transaction= t
                 ; block_data= Lazy.force state_body }
                 (unstage (Sparse_ledger.handler sparse_ledger)) )
@@ -238,6 +239,7 @@ let check_base_snarks sparse_ledger0 (transitions : Transaction.Valid.t list)
             ~pending_coinbase_stack_state:
               { source= Pending_coinbase.Stack.empty
               ; target= coinbase_stack_target }
+            ~snapp_account1:None ~snapp_account2:None
             { Transaction_protocol_state.Poly.block_data= Lazy.force state_body
             ; transaction= t }
             (unstage (Sparse_ledger.handler sparse_ledger))
@@ -282,6 +284,7 @@ let generate_base_snarks_witness sparse_ledger0
               { Transaction_snark.Pending_coinbase_stack_state.source=
                   Pending_coinbase.Stack.empty
               ; target= coinbase_stack_target }
+            ~snapp_account1:None ~snapp_account2:None
             { Transaction_protocol_state.Poly.transaction= t
             ; block_data= Lazy.force state_body }
             (unstage (Sparse_ledger.handler sparse_ledger))

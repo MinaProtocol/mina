@@ -105,62 +105,6 @@ let typ : (Checked.t, t) Typ.t =
 open Snapp_basic
 
 module Complement = struct
-  (*
-  module Poly = struct
-    type ('bool, 'token_id, 'fee_payer_opt) t =
-      { second_starts_empty:'bool
-      ; second_ends_empty:'bool
-      ; token_id: 'token_id
-      ; other_fee_payer_opt: 'fee_payer_opt
-      }
-    [@@deriving hlist, sexp, eq, yojson, hash, compare]
-  end 
-
-  module Zero_proved = struct
-    module Checked = struct
-      type t = (Boolean.var, Token_id.Checked.t, (Boolean.var, Other_fee_payer.Payload.Checked.t ) Flagged_option.t) Poly.t
-    end 
-
-    type t = (bool, Token_id.t, Other_fee_payer.Payload.t option) Poly.t
-
-    let typ : (Checked.t, t) Typ.t =
-      let open Poly in
-      Typ.of_hlistable
-        [ Boolean.typ
-        ; Boolean.typ
-        ; Token_id.typ
-        ; Flagged_option.typ
-            Other_fee_payer.Payload.typ
-          |> Typ.transport
-            ~there:(Flagged_option.of_option ~default:Other_fee_payer.Payload.dummy)
-            ~back:Flagged_option.to_option
-        ]
-        ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
-        ~value_of_hlist:of_hlist
-
-    let complete
-        ({ second_starts_empty
-         ; second_ends_empty
-         ; token_id
-         ; other_fee_payer_opt }
-          : t) 
-        ~body1
-        ~body2
-        ~one_nonce
-        ~two_nonce
-      : Snapp_command.Payload.Zero_proved.t
-      =
-      { Snapp_command.Payload.Inner.
-        second_starts_empty
-      ; second_ends_empty
-      ; token_id
-      ; other_fee_payer_opt
-      ; one={ predicate= one_nonce; body=body1}
-      ; two={ predicate= two_nonce; body=body2}
-      }
-  end
-*)
-
   module One_proved = struct
     module Poly = struct
       type ('bool, 'token_id, 'fee_payer_opt, 'nonce) t =
@@ -223,6 +167,20 @@ module Complement = struct
         ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
         ~value_of_hlist:of_hlist
 
+    let create
+        ({ second_starts_empty
+         ; second_ends_empty
+         ; token_id
+         ; other_fee_payer_opt
+         ; one= _
+         ; two } :
+          Snapp_command.Payload.One_proved.t) : t =
+      { second_starts_empty
+      ; second_ends_empty
+      ; token_id
+      ; account2_nonce= two.predicate
+      ; other_fee_payer_opt }
+
     let complete
         ({ second_starts_empty
          ; second_ends_empty
@@ -247,6 +205,16 @@ module Complement = struct
     end
 
     type t = (Token_id.t, Other_fee_payer.Payload.t option) Poly.t
+
+    let create
+        ({ second_starts_empty= _
+         ; second_ends_empty= _
+         ; token_id
+         ; other_fee_payer_opt
+         ; one= _
+         ; two= _ } :
+          Snapp_command.Payload.Two_proved.t) : t =
+      {token_id; other_fee_payer_opt}
 
     module Checked = struct
       type t =
@@ -295,35 +263,3 @@ module Complement = struct
       ; two= {predicate= one.predicate; body= two.body1} }
   end
 end
-
-(*
-module Digested = struct
-  type t =
-    ( Predicate.Digested.t
-    , Snapp_command.Party.Body.Digested.t
-    )
-    Poly.Stable.Latest.t
-
-  let to_input ({ predicate; body1; body2 } : t) =
-    let open Random_oracle_input in
-    List.reduce_exn ~f:append
-      [ predicate
-      ; body1
-      ; body2
-      ]
-
-  module Checked = struct
-    type t =
-      ( Predicate.Digested.Checked.t
-      , Snapp_command.Payload.Digest.Checked.t )
-      Poly.Stable.Latest.t
-
-  let to_input ({ predicate; updates } : t) =
-    Random_oracle_input.(append
-      (Predicate.Digested.Checked.to_input predicate)
-      (field updates) )
-  end
-
-  let typ : (Checked.t, t) Typ.t =
-    Poly.typ [ Predicate.Digested.typ; Snapp_command.Payload.Digest.typ ]
-end *)
