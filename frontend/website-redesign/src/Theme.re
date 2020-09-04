@@ -6,35 +6,15 @@ module Colors = {
   let gray = `hex("d9d9d9");
   let white = Css.white;
   let black = Css.black;
+  let purple = `hex("5362C8");
+  let digitalBlack = `hex("2d2d2d");
+
 };
 
 module Typeface = {
-  let _ = {
-    [
-      fontFace(
-        ~fontFamily="Monument Grotesk",
-        ~src=[
-          `url("fonts/IBMPlexSans-Regular-Latin1.woff2"),
-          `url("fonts/IBMPlexSans-Regular-Latin1.woff"),
-        ],
-        ~fontStyle=`normal,
-        ~fontWeight=`normal,
-        (),
-      ),
-      fontFace(
-        ~fontFamily="Monument Grotesk mono",
-        ~src=[
-          `url("fonts/IBMPlexSans-Regular-Latin1.woff2"),
-          `url("fonts/IBMPlexSans-Regular-Latin1.woff"),
-        ],
-        ~fontStyle=`normal,
-        ~fontWeight=`normal,
-        (),
-      ),
-    ];
-  };
   let monumentGrotesk = fontFamily("Monument Grotesk, serif");
   let monumentGroteskMono = fontFamily("Monument Grotesk mono, serif");
+  let ibmplexsans = fontFamily("IBM Plex Sans, sans-serif");
 };
 
 module MediaQuery = {
@@ -107,16 +87,24 @@ module Type = {
    */
   let h4 =
     style([
-      Typeface.monumentGrotesk,
+      Typeface.monumentGroteskMono,
       fontSize(`rem(1.125)),
       lineHeight(`rem(1.7)),
       textTransform(`uppercase),
       letterSpacing(`em(0.02)),
-      color(black),
       media(
         MediaQuery.tablet,
         [fontSize(`rem(1.25)), lineHeight(`rem(1.9))],
       ),
+    ]);
+
+  let footerHeaderLink =
+    style([
+      Typeface.monumentGroteskMono,
+      fontSize(`px(14)),
+      lineHeight(`rem(1.)),
+      textTransform(`uppercase),
+      letterSpacing(`em(0.03)),
     ]);
 
   let h5 =

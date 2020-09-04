@@ -36,7 +36,7 @@ CREATE TABLE user_commands
 , created_token  bigint
 );
 
-CREATE TYPE internal_command_type AS ENUM ('fee_transfer', 'coinbase');
+CREATE TYPE internal_command_type AS ENUM ('fee_transfer_via_coinbase', 'fee_transfer', 'coinbase');
 
 CREATE TABLE internal_commands
 ( id          serial                PRIMARY KEY

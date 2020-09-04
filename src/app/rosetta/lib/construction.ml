@@ -56,6 +56,45 @@ mutation ($sender: PublicKey!,
 }
 |}]
 
+module Send_create_token =
+[%graphql
+{|
+mutation ($sender: PublicKey,
+          $receiver: PublicKey!,
+          $fee: UInt64!,
+          $nonce: UInt32,
+          $memo: String,
+          $signature: String!) {
+  createToken(signature: {rawSignature: $signature}, input:
+    {feePayer: $sender, tokenOwner: $receiver, fee: $fee, nonce: $nonce, memo: $memo}) {
+    createNewToken {
+      hash
+    }
+  }
+}
+|}]
+
+module Send_create_token_account =
+[%graphql
+{|
+mutation ($sender: PublicKey,
+          $tokenOwner: PublicKey!,
+          $receiver: PublicKey!,
+          $token: TokenId!,
+          $fee: UInt64!,
+          $nonce: UInt32,
+          $memo: String,
+          $signature: String!
+) {
+  createTokenAccount(signature: {rawSignature: $signature}, input:
+    {feePayer: $sender, tokenOwner: $tokenOwner, receiver: $receiver, token: $token, fee: $fee, nonce: $nonce, memo: $memo}) {
+    createNewTokenAccount {
+      hash
+    }
+  }
+}
+|}]
+
 module Options = struct
   type t = {sender: Public_key.Compressed.t; token_id: Unsigned.UInt64.t}
 
@@ -515,7 +554,11 @@ end
 module Submit = struct
   module Env = struct
     module T (M : Monad_fail.S) = struct
-      type ('gql_payment, 'gql_delegation) t =
+      type ( 'gql_payment
+           , 'gql_delegation
+           , 'gql_create_token
+           , 'gql_create_token_account )
+           t =
         { gql_payment:
                payment:Transaction.Unsigned.Rendered.Payment.t
             -> signature:string
@@ -527,15 +570,34 @@ module Submit = struct
             -> signature:string
             -> unit
             -> ('gql_delegation, Errors.t) M.t
+        ; gql_create_token:
+               create_token:Transaction.Unsigned.Rendered.Create_token.t
+            -> signature:string
+            -> unit
+            -> ('gql_create_token, Errors.t) M.t
+        ; gql_create_token_account:
+               create_token_account:Transaction.Unsigned.Rendered
+                                    .Create_token_account
+                                    .t
+            -> signature:string
+            -> unit
+            -> ('gql_create_token_account, Errors.t) M.t
         ; lift: 'a 'e. ('a, 'e) Result.t -> ('a, 'e) M.t }
     end
 
     module Real = T (Deferred.Result)
     module Mock = T (Result)
 
-    let real : graphql_uri:Uri.t -> ('gql_payment, 'gql_delegation) Real.t =
+    let real :
+           graphql_uri:Uri.t
+        -> ( 'gql_payment
+           , 'gql_delegation
+           , 'gql_create_token
+           , 'gql_create_token_account )
+           Real.t =
       let uint64 x = `String (Unsigned.UInt64.to_string x) in
       let uint32 x = `String (Unsigned.UInt32.to_string x) in
+      let token_id x = `String (Coda_base.Token_id.to_string x) in
       fun ~graphql_uri ->
         { gql_payment=
             (fun ~payment ~signature () ->
@@ -558,12 +620,38 @@ module Submit = struct
                    ?memo:delegation.memo ~nonce:(uint32 delegation.nonce)
                    ~signature ())
                 graphql_uri )
+        ; gql_create_token=
+            (fun ~create_token ~signature () ->
+              Graphql.query
+                (Send_create_token.make
+                   ~receiver:(`String create_token.receiver)
+                   ~fee:(uint64 create_token.fee) ?memo:create_token.memo
+                   ~nonce:(uint32 create_token.nonce)
+                   ~signature ())
+                graphql_uri )
+        ; gql_create_token_account=
+            (fun ~create_token_account ~signature () ->
+              Graphql.query
+                (Send_create_token_account.make
+                   ~tokenOwner:(`String create_token_account.token_owner)
+                   ~receiver:(`String create_token_account.receiver)
+                   ~token:(token_id create_token_account.token)
+                   ~fee:(uint64 create_token_account.fee)
+                   ?memo:create_token_account.memo
+                   ~nonce:(uint32 create_token_account.nonce)
+                   ~signature ())
+                graphql_uri )
         ; lift= Deferred.return }
   end
 
   module Impl (M : Monad_fail.S) = struct
-    let handle ~(env : ('gql_payment, 'gql_delegation) Env.T(M).t)
-        (req : Construction_submit_request.t) =
+    let handle
+        ~(env :
+           ( 'gql_payment
+           , 'gql_delegation
+           , 'gql_create_token
+           , 'gql_create_token_account )
+           Env.T(M).t) (req : Construction_submit_request.t) =
       let open M.Let_syntax in
       let%bind json =
         try M.return (Yojson.Safe.from_string req.signed_transaction)
@@ -577,26 +665,43 @@ module Submit = struct
       let open M.Let_syntax in
       let%map hash =
         match
-          (signed_transaction.payment, signed_transaction.stake_delegation)
+          ( signed_transaction.payment
+          , signed_transaction.stake_delegation
+          , signed_transaction.create_token
+          , signed_transaction.create_token_account )
         with
-        | Some payment, None ->
+        | Some payment, None, None, None ->
             let%map res =
               env.gql_payment ~payment ~signature:signed_transaction.signature
                 ()
             in
             let (`UserCommand payment) = (res#sendPayment)#payment in
             payment#hash
-        | None, Some delegation ->
+        | None, Some delegation, None, None ->
             let%map res =
               env.gql_delegation ~delegation
                 ~signature:signed_transaction.signature ()
             in
             let (`UserCommand delegation) = (res#sendDelegation)#delegation in
             delegation#hash
+        | None, None, Some create_token, None ->
+            let%map res =
+              env.gql_create_token ~create_token
+                ~signature:signed_transaction.signature ()
+            in
+            ((res#createToken)#createNewToken)#hash
+        | None, None, None, Some create_token_account ->
+            let%map res =
+              env.gql_create_token_account ~create_token_account
+                ~signature:signed_transaction.signature ()
+            in
+            ((res#createTokenAccount)#createNewTokenAccount)#hash
         | _ ->
             M.fail
               (Errors.create
-                 ~context:"Must have one of payment or stakeDelegation"
+                 ~context:
+                   "Must have one of payment, stakeDelegation, createToken, \
+                    or createTokenAccount"
                  (`Json_parse None))
       in
       { Construction_submit_response.transaction_identifier=
