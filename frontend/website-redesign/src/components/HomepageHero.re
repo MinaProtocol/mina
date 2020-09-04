@@ -2,8 +2,6 @@ module Styles = {
   open Css;
   let heroBackgroundImage =
     style([
-      margin(`zero),
-      //position(`absolute),
       height(`px(1924)),
       width(`percent(100.)),
       important(backgroundSize(`cover)),
