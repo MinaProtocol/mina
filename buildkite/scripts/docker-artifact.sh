@@ -18,5 +18,5 @@ if [[ -n $CODA_BUILD_ROSETTA ]]; then
   # Also build with the standard DUNE_PROFILE, and use the dev profile as a cache.
   # This means it will use the opam-deps stage from the previous step, but make a new builder stage because the DUNE_PROFILE arg changed
   scripts/release-docker.sh --service "coda-rosetta" --version "${CODA_VERSION}"\
-    --extra-args "--build-arg --build-arg CODA_BRANCH=${CODA_GIT_BRANCH} --cache-from codaprotocol/coda-rosetta:dev-${CODA_VERSION}"
+    --extra-args "--build-arg CODA_BRANCH=${CODA_GIT_BRANCH} --cache-from codaprotocol/coda-rosetta:dev-${CODA_VERSION}"
 fi
