@@ -80,12 +80,7 @@ let main inputs =
       let%bind log_engine_error_set =
         Option.value_map !log_engine_ref
           ~default:(Deferred.return Test_error.Set.empty) ~f:(fun log_engine ->
-            match%map Engine.Log_engine.destroy log_engine with
-            | Ok errors ->
-                errors
-            | Error err ->
-                Test_error.Set.hard_singleton (Test_error.internal_error err)
-        )
+            Engine.Log_engine.destroy log_engine )
       in
       let%bind () =
         Option.value_map !net_manager_ref ~default:Deferred.unit
