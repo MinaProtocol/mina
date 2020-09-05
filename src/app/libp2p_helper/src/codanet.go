@@ -100,8 +100,6 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 
 	filters := filters.NewFilters()
 
-  app.P2p.Logger.Infof("here are the seeds: %v", seeds)
-
 	host, err := p2p.New(ctx,
 		p2p.Muxer("/coda/mplex/1.0.0", DefaultMplexTransport),
 		p2p.Identity(pk),

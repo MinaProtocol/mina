@@ -243,6 +243,9 @@ func (m *configureMsg) run(app *app) (interface{}, error) {
 	if err != nil {
 		return nil, badAddr(err)
 	}
+
+  app.P2p.Logger.Infof("here are the seeds: %v", seeds)
+
 	helper, err := codanet.MakeHelper(app.Ctx, maddrs, externalMaddr, m.Statedir, privk, m.NetworkID, seeds)
 	if err != nil {
 		return nil, badHelper(err)
