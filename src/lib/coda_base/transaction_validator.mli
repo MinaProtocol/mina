@@ -19,7 +19,7 @@ val apply_transaction :
   -> User_command_status.t Or_error.t
 
 val has_locked_tokens :
-     txn_global_slot:Coda_numbers.Global_slot.t
+     global_slot:Coda_numbers.Global_slot.t
   -> account_id:Account_id.t
   -> Hashless_ledger.t
   -> bool Or_error.t

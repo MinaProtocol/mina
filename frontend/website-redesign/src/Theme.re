@@ -268,7 +268,6 @@ module Type = {
       lineHeight(`rem(1.5)),
       letterSpacing(`px(-1)),
       color(Colors.digitalBlack),
-      fontWeight(`light),
       media(
         MediaQuery.tablet,
         [fontSize(`rem(1.25)), lineHeight(`rem(1.875))],

@@ -285,7 +285,7 @@ module type S = sig
     -> unit Or_error.t
 
   val has_locked_tokens :
-       txn_global_slot:Global_slot.t
+       global_slot:Global_slot.t
     -> account_id:Account_id.t
     -> ledger
     -> bool Or_error.t
@@ -336,8 +336,9 @@ let validate_timing ~account ~txn_amount ~txn_global_slot =
             nsf_error ()
         | Some proposed_new_balance ->
             let curr_min_balance =
-              Account.min_balance_at_slot ~txn_global_slot ~cliff_time
-                ~vesting_period ~vesting_increment ~initial_minimum_balance
+              Account.min_balance_at_slot ~global_slot:txn_global_slot
+                ~cliff_time ~vesting_period ~vesting_increment
+                ~initial_minimum_balance
             in
             if Balance.(proposed_new_balance < curr_min_balance) then
               min_balance_error curr_min_balance
@@ -458,6 +459,11 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
 
   let previous_empty_accounts action pk = if action = `Added then [pk] else []
 
+  let has_locked_tokens ~global_slot ~account_id ledger =
+    let open Or_error.Let_syntax in
+    let%map _, account = get_with_location ledger account_id in
+    Account.has_locked_tokens ~global_slot account
+
   let get_user_account_with_location ledger account_id =
     let open Or_error.Let_syntax in
     let%bind ((_, acct) as r) = get_with_location ledger account_id in
@@ -560,11 +566,6 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       ; source_timing= None }
     in
     (loc, account', undo_common)
-
-  let has_locked_tokens ~txn_global_slot ~account_id ledger =
-    let open Or_error.Let_syntax in
-    let%map _, account = get_with_location ledger account_id in
-    Account.has_locked_tokens ~txn_global_slot account
 
   (* someday: It would probably be better if we didn't modify the receipt chain hash
   in the case that the sender is equal to the receiver, but it complicates the SNARK, so

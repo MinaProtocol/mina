@@ -276,6 +276,7 @@ module type S = sig
          constraint_constants:Genesis_constants.Constraint_constants.t
       -> var
       -> Update.var
+      -> supercharge_coinbase:Boolean.var
       -> State_body_hash.var
       -> (var, 's) Tick.Checked.t
 

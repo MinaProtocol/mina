@@ -235,7 +235,9 @@ module type State_hooks = sig
     -> prev_state_hash:Coda_base.State_hash.var
     -> snark_transition_var
     -> Currency.Amount.var
-    -> ( [`Success of Snark_params.Tick.Boolean.var] * consensus_state_var
+    -> ( [`Success of Snark_params.Tick.Boolean.var]
+         * Snark_params.Tick.Boolean.var
+         * consensus_state_var
        , _ )
        Snark_params.Tick.Checked.t
 
@@ -473,6 +475,10 @@ module type S = sig
     module Block_data : sig
       type t
 
+      val epoch_ledger : t -> Coda_base.Sparse_ledger.t
+
+      val global_slot : t -> Coda_numbers.Global_slot.t
+
       val prover_state : t -> Prover_state.t
     end
   end
@@ -521,9 +527,13 @@ module type S = sig
 
     type block_producer_timing =
       [ `Check_again of Unix_timestamp.t
-      | `Produce_now of Signature_lib.Keypair.t * Block_data.t
-      | `Produce of Unix_timestamp.t * Signature_lib.Keypair.t * Block_data.t
-      ]
+      | `Produce_now of
+        Signature_lib.Keypair.t * Block_data.t * Public_key.Compressed.t
+      | `Produce of
+        Unix_timestamp.t
+        * Signature_lib.Keypair.t
+        * Block_data.t
+        * Public_key.Compressed.t ]
 
     (**
      * Determine if and when to next produce a block. Either informs the callee

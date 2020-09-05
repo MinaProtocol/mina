@@ -159,7 +159,15 @@ val create_diff :
   -> transactions_by_fee:User_command.With_valid_signature.t Sequence.t
   -> get_completed_work:(   Transaction_snark_work.Statement.t
                          -> Transaction_snark_work.Checked.t option)
+  -> supercharge_coinbase:bool
   -> Staged_ledger_diff.With_valid_signatures_and_proofs.t
+
+val can_apply_supercharged_coinbase_exn :
+     delegator:Public_key.Compressed.t
+  -> self:Public_key.Compressed.t
+  -> epoch_ledger:Coda_base.Sparse_ledger.t
+  -> global_slot:Coda_numbers.Global_slot.t
+  -> bool
 
 val statement_exn :
      constraint_constants:Genesis_constants.Constraint_constants.t

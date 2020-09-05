@@ -377,6 +377,65 @@ module Checked = struct
         Random_oracle.Checked.(
           hash ~init:crypto_hash_prefix
             (pack_input (Run.run_checked (to_input t)))) )
+
+  let min_balance_at_slot ~global_slot ~cliff_time ~vesting_period
+      ~vesting_increment ~initial_minimum_balance =
+    let%bind before_or_at_cliff =
+      Global_slot.Checked.(global_slot <= cliff_time)
+    in
+    let balance_to_int balance =
+      Snarky_integer.Integer.of_bits ~m @@ Balance.var_to_bits balance
+    in
+    let open Snarky_integer.Integer in
+    let initial_minimum_balance_int = balance_to_int initial_minimum_balance in
+    make_checked (fun () ->
+        if_ ~m before_or_at_cliff ~then_:initial_minimum_balance_int
+          ~else_:
+            (let global_slot_int =
+               Global_slot.Checked.to_integer global_slot
+             in
+             let cliff_time_int = Global_slot.Checked.to_integer cliff_time in
+             let _, slot_diff =
+               subtract_unpacking_or_zero ~m global_slot_int cliff_time_int
+             in
+             let vesting_period_int =
+               Global_slot.Checked.to_integer vesting_period
+             in
+             let num_periods, _ = div_mod ~m slot_diff vesting_period_int in
+             let vesting_increment_int =
+               Amount.var_to_bits vesting_increment |> of_bits ~m
+             in
+             let min_balance_decrement =
+               mul ~m num_periods vesting_increment_int
+             in
+             let _, min_balance_less_decrement =
+               subtract_unpacking_or_zero ~m initial_minimum_balance_int
+                 min_balance_decrement
+             in
+             min_balance_less_decrement) )
+
+  let has_locked_tokens ~global_slot (t : var) =
+    let open Timing.As_record in
+    let { is_timed
+        ; initial_minimum_balance
+        ; cliff_time
+        ; vesting_period
+        ; vesting_increment } =
+      t.timing
+    in
+    let%bind cur_min_balance =
+      min_balance_at_slot ~global_slot ~initial_minimum_balance ~cliff_time
+        ~vesting_period ~vesting_increment
+    in
+    let%bind min_balance_gt_zero =
+      let zero_int =
+        Snarky_integer.Integer.constant ~m
+          (Bigint.of_field Field.zero |> Bigint.to_bignum_bigint)
+      in
+      make_checked (fun () ->
+          Snarky_integer.Integer.(gt ~m cur_min_balance zero_int) )
+    in
+    Boolean.(is_timed && min_balance_gt_zero)
 end
 
 [%%endif]
@@ -464,15 +523,15 @@ let create_time_locked public_key balance ~initial_minimum_balance ~cliff_time
     ~vesting_period:Global_slot.(succ zero)
     ~vesting_increment:initial_minimum_balance
 
-let min_balance_at_slot ~txn_global_slot ~cliff_time ~vesting_period
+let min_balance_at_slot ~global_slot ~cliff_time ~vesting_period
     ~vesting_increment ~initial_minimum_balance =
   let open Unsigned in
-  if Global_slot.(txn_global_slot < cliff_time) then initial_minimum_balance
+  if Global_slot.(global_slot < cliff_time) then initial_minimum_balance
   else
     (* take advantage of fact that global slots are uint32's *)
     let num_periods =
       UInt32.(
-        Infix.((txn_global_slot - cliff_time) / vesting_period)
+        Infix.((global_slot - cliff_time) / vesting_period)
         |> to_int64 |> UInt64.of_int64)
     in
     let min_balance_decrement =
@@ -485,7 +544,7 @@ let min_balance_at_slot ~txn_global_slot ~cliff_time ~vesting_period
     | Some amt ->
         amt
 
-let has_locked_tokens ~txn_global_slot (account : t) =
+let has_locked_tokens ~global_slot (account : t) =
   match account.timing with
   | Untimed ->
       false
@@ -493,7 +552,7 @@ let has_locked_tokens ~txn_global_slot (account : t) =
       {initial_minimum_balance; cliff_time; vesting_period; vesting_increment}
     ->
       let curr_min_balance =
-        min_balance_at_slot ~txn_global_slot ~cliff_time ~vesting_period
+        min_balance_at_slot ~global_slot ~cliff_time ~vesting_period
           ~vesting_increment ~initial_minimum_balance
       in
       Balance.(curr_min_balance > zero)
