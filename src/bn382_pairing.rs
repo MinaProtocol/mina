@@ -1200,6 +1200,41 @@ pub extern "C" fn zexe_bn382_fp_verifier_index_c_rc_comm(
     ))
 }
 
+// verifier index vector stubs
+#[no_mangle]
+pub extern "C" fn zexe_bn382_fp_verifier_index_vector_create<'a>() -> *const Vec<*const VerifierIndex<Bn_382>> {
+    return Box::into_raw(Box::new(Vec::new()));
+}
+
+#[no_mangle]
+pub extern "C" fn zexe_bn382_fp_verifier_index_vector_length(v: *const Vec<*const VerifierIndex<Bn_382>>) -> i32 {
+    let v_ = unsafe { &(*v) };
+    return v_.len() as i32;
+}
+
+#[no_mangle]
+pub extern "C" fn zexe_bn382_fp_verifier_index_vector_emplace_back<'a>(
+    v: *mut Vec<*const VerifierIndex<Bn_382>>,
+    x: *const VerifierIndex<Bn_382>,
+) {
+    let v_ = unsafe { &mut (*v) };
+    v_.push(x);
+}
+
+#[no_mangle]
+pub extern "C" fn zexe_bn382_fp_verifier_index_vector_get<'a>(v: *mut Vec<*const VerifierIndex<Bn_382>>, i: u32)
+-> *const VerifierIndex<Bn_382> {
+    let v_ = unsafe { &mut (*v) };
+    return v_[i as usize];
+}
+
+#[no_mangle]
+pub extern "C" fn zexe_bn382_fp_verifier_index_vector_delete(v: *mut Vec<*const VerifierIndex<Bn_382>>) {
+    // Deallocation happens automatically when a box variable goes out of
+    // scope.
+    let _box = unsafe { Box::from_raw(v) };
+}
+
 // Fp URS stubs
 #[no_mangle]
 pub extern "C" fn zexe_bn382_fp_urs_create(depth: usize) -> *const URS<Bn_382> {

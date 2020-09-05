@@ -92,13 +92,13 @@ module Bigint (P : Prefix) (F : Ctypes.FOREIGN) = struct
     foreign (prefix "find_wnaf") (size_t @-> typ @-> returning (ptr void))
 end
 
-module VerifierIndex
-    (P : Prefix)
-    (Index : Type)
-    (Urs : Type)
-    (PolyComm : Type)
-    (F : Ctypes.FOREIGN) =
-struct
+module Vector (P : Prefix) (E : Type) (F : Ctypes.FOREIGN) = struct
+  open F
+
+  type elt = E.t
+
+  let prefix = with_prefix (P.prefix "vector")
+
   include (
     struct
         type t = unit ptr
@@ -106,6 +106,40 @@ struct
         let typ = ptr void
       end :
       Type )
+
+  let create = foreign (prefix "create") (void @-> returning typ)
+
+  let length = foreign (prefix "length") (typ @-> returning int)
+
+  let emplace_back =
+    foreign (prefix "emplace_back") (typ @-> E.typ @-> returning void)
+
+  let get = foreign (prefix "get") (typ @-> int @-> returning E.typ)
+
+  let delete = foreign (prefix "delete") (typ @-> returning void)
+end
+
+module VerifierIndex
+    (P : Prefix)
+    (Index : Type)
+    (Urs : Type)
+    (PolyComm : Type)
+    (F : Ctypes.FOREIGN) =
+struct
+  module T : Type = struct
+    type t = unit ptr
+
+    let typ = ptr void
+  end
+
+  include T
+
+  module Vector =
+    Vector (struct
+        let prefix = P.prefix
+      end)
+      (T)
+      (F)
 
   open F
 
@@ -729,8 +763,11 @@ module Dlog_marlin_proof
         end
     end)
     (ScalarField : Type)
-    (Index : Type)
-    (VerifierIndex : Type)
+    (Index : Type) (VerifierIndex : sig
+        include Type
+
+        module Vector : Type
+    end)
     (ScalarFieldVector : Type)
     (FieldVectorTriple : Type)
     (OpeningProof : Type)
@@ -833,7 +870,7 @@ struct
 
   let batch_verify =
     foreign (prefix "batch_verify")
-      (VerifierIndex.typ @-> Vector.typ @-> returning bool)
+      (VerifierIndex.Vector.typ @-> Vector.typ @-> returning bool)
 
   let delete = foreign (prefix "delete") (typ @-> returning void)
 
