@@ -39,7 +39,7 @@ let verify_in_mempool_and_block ~logger ~rosetta_uri ~graphql_uri
   let open Core.Time in
   let open Deferred.Result.Let_syntax in
   let%bind () = wait (Span.of_sec 1.0) in
-  (* Grab the mempool and find the payment inside *)
+  (* Grab the mempool and find the user command inside *)
   let%bind () =
     keep_trying
       ~step:(fun () ->
@@ -238,10 +238,10 @@ let direct_graphql_create_token_account_through_block ~logger ~rosetta_uri
   let open Deferred.Result.Let_syntax in
   (* Unlock the account *)
   let%bind _ = Poke.Account.unlock ~graphql_uri in
-  (* Delegate stake *)
+  (* Create token account *)
   let%bind hash =
     Poke.SendTransaction.create_token_account ~fee:(`Int 2_000_000_000)
-      ~receiver:other_pk ~token:(`String "42") ~graphql_uri ()
+      ~receiver:other_pk ~token:(`String "2") ~graphql_uri ()
   in
   verify_in_mempool_and_block ~logger ~rosetta_uri ~graphql_uri ~txn_hash:hash
     ~network_response
@@ -253,6 +253,34 @@ let direct_graphql_create_token_account_through_block ~logger ~rosetta_uri
           ; status= "Pending"
           ; _type= "fee_payer_dec"
           ; target= None } ]
+
+let direct_graphql_mint_tokens_through_block ~logger ~rosetta_uri ~graphql_uri
+    ~network_response =
+  let open Deferred.Result.Let_syntax in
+  (* Unlock the sender account *)
+  let%bind _ = Poke.Account.unlock ~graphql_uri in
+  (* mint tokens; relies on earlier create_tokens so we have a valid token id *)
+  let%bind hash =
+    Poke.SendTransaction.mint_tokens ~fee:(`Int 2_000_000_000)
+      ~receiver:Poke.pk ~token:(`String "2") ~amount:(`Int 1_000_000_000)
+      ~graphql_uri ()
+  in
+  verify_in_mempool_and_block ~logger ~rosetta_uri ~graphql_uri ~txn_hash:hash
+    ~network_response
+    ~operation_expectations:
+      Operation_expectation.
+        [ { amount= Some (-2_000_000_000)
+          ; account=
+              Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
+          ; status= "Pending"
+          ; _type= "fee_payer_dec"
+          ; target= None }
+        ; { amount= Some 1_000_000_000
+          ; account=
+              Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 2}
+          ; status= "Pending"
+          ; _type= "mint_tokens"
+          ; target= Some Poke.pk } ]
 
 let construction_api_transaction_through_mempool ~logger ~rosetta_uri
     ~graphql_uri ~network_response ~operation_expectations ~operations =
@@ -432,6 +460,28 @@ let construction_api_create_token_account_through_mempool =
           ; _type= "fee_payer_dec"
           ; target= None } ]
 
+let construction_api_mint_tokens_through_mempool =
+  construction_api_transaction_through_mempool
+    ~operations:(fun address ->
+      Poke.SendTransaction.mint_tokens_operations ~sender:address
+        ~receiver:address
+        ~amount:(Unsigned.UInt64.of_int 1_000_000_000)
+        ~fee:(Unsigned.UInt64.of_int 3_000_000_000) )
+    ~operation_expectations:
+      Operation_expectation.
+        [ { amount= Some (-3_000_000_000)
+          ; account=
+              Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
+          ; status= "Pending"
+          ; _type= "fee_payer_dec"
+          ; target= None }
+        ; { amount= Some 1_000_000_000
+          ; account=
+              Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 2}
+          ; status= "Pending"
+          ; _type= "mint_tokens"
+          ; target= Some Poke.pk } ]
+
 (* for each possible user command, run the command via GraphQL, check that
     the command is in the transaction pool
 *)
@@ -515,7 +565,19 @@ let check_new_account_user_commands ~logger ~rosetta_uri ~graphql_uri =
       ~graphql_uri ~network_response
   in
   [%log info] "Created token account using construction and waited" ;
-  (* Succeed! (for now) *)
+  (* Stop staking *)
+  let%bind _res = Poke.Staking.disable ~graphql_uri in
+  let%bind () =
+    direct_graphql_mint_tokens_through_block ~logger ~rosetta_uri ~graphql_uri
+      ~network_response
+  in
+  [%log info] "Minted tokens and waited" ;
+  let%bind () =
+    construction_api_mint_tokens_through_mempool ~logger ~rosetta_uri
+      ~graphql_uri ~network_response
+  in
+  [%log info] "Minted tokens using construction and waited" ;
+  (* Success *)
   return ()
 
 let run ~logger ~rosetta_uri ~graphql_uri ~don't_exit =
