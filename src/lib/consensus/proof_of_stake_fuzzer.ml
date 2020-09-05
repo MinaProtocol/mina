@@ -98,11 +98,11 @@ module Vrf_distribution = struct
                  with
                  | `Check_again _ ->
                      None
-                 | `Produce_now (_, proposal_data) ->
+                 | `Produce_now (_, proposal_data, _) ->
                      let slot_span = constants.block_window_duration_ms in
                      let proposal_time = Block_time.add curr_time slot_span in
                      Some (proposal_time, proposal_data)
-                 | `Produce (proposal_time, _, proposal_data) ->
+                 | `Produce (proposal_time, _, proposal_data, _) ->
                      Some
                        ( Block_time.(
                            of_span_since_epoch @@ Span.of_ms proposal_time)

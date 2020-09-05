@@ -894,7 +894,7 @@ module T = struct
              (List.length (Scan_state.all_work_statements_exn t.scan_state)))
     )
 
-  let validate_supercharged_rewards ~current_global_slot ~(ledger : Ledger.t)
+  (*let validate_supercharged_rewards ~current_global_slot ~(ledger : Ledger.t)
       (staged_ledger_diff : Staged_ledger_diff.t) =
     let creator = staged_ledger_diff.creator in
     let account_id = Account_id.create creator Token_id.default in
@@ -911,22 +911,17 @@ module T = struct
           (Staged_ledger_error.Pre_diff
              (Pre_diff_info.Error.Coinbase_error
                 (sprintf
-                   !"Invalid coinbase amount: Block creator has unlocked \
+                   !"Invalid coinbase amount: Block creator has locked \
                      tokens: %b Supercharge coinbase: %b"
                    b staged_ledger_diff.supercharge_coinbase)))
     | Error e ->
-        Error (Staged_ledger_error.Unexpected e)
+        Error (Staged_ledger_error.Unexpected e)*)
 
   let apply ~constraint_constants t witness ~logger ~verifier
       ~current_global_slot ~state_and_body_hash =
     let open Deferred.Result.Let_syntax in
     let work = Staged_ledger_diff.completed_works witness in
     let%bind () = check_completed_works ~logger ~verifier t.scan_state work in
-    let%bind () =
-      validate_supercharged_rewards ~current_global_slot ~ledger:t.ledger
-        witness
-      |> Deferred.return
-    in
     let%bind prediff =
       Result.map_error ~f:(fun error -> Staged_ledger_error.Pre_diff error)
       @@ Pre_diff_info.get ~constraint_constants witness
@@ -1621,6 +1616,22 @@ module T = struct
           let res = try_with_coinbase () in
           make_diff res None
 
+  let can_apply_supercharged_coinbase_exn ~delegator ~self ~epoch_ledger
+      ~global_slot =
+    let delegatee_unlocked =
+      Sparse_ledger.has_locked_tokens_exn ~global_slot
+        ~account_id:(Account_id.create self Token_id.default)
+        epoch_ledger
+      |> not
+    in
+    if Public_key.Compressed.equal self delegator || delegatee_unlocked then
+      delegatee_unlocked
+    else
+      Sparse_ledger.has_locked_tokens_exn ~global_slot
+        ~account_id:(Account_id.create delegator Token_id.default)
+        epoch_ledger
+      |> not
+
   let create_diff
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ?(log_block_creation = false) t ~self ~coinbase_receiver ~logger
@@ -1628,7 +1639,7 @@ module T = struct
       ~(transactions_by_fee : User_command.With_valid_signature.t Sequence.t)
       ~(get_completed_work :
             Transaction_snark_work.Statement.t
-         -> Transaction_snark_work.Checked.t option) =
+         -> Transaction_snark_work.Checked.t option) ~supercharge_coinbase =
     let coinbase_receiver =
       match coinbase_receiver with `Producer -> self | `Other pk -> pk
     in
@@ -1641,17 +1652,10 @@ module T = struct
       |> Option.is_none
     in
     let is_coinbase_reciever_new = is_new_account coinbase_receiver in
-    let supercharge_coinbase =
-      Transaction_validator.has_locked_tokens
-        ~txn_global_slot:current_global_slot
-        ~account_id:(Account_id.create self Token_id.default)
-        validating_ledger
-      |> Or_error.ok_exn |> not
-    in
     if supercharge_coinbase then
       [%log info]
-        "No locked tokens in the producer account, applying supercharged \
-         coinbase" ;
+        "No locked tokens in the delegator/delegatee account, applying \
+         supercharged coinbase" ;
     O1trace.trace_event "done mask" ;
     let partitions = Scan_state.partition_if_overflowing t.scan_state in
     O1trace.trace_event "partitioned" ;
@@ -1783,15 +1787,30 @@ let%test_module "test" =
     let constraint_constants =
       Genesis_constants.Constraint_constants.for_unit_tests
 
+    let supercharge_coinbase ~ledger ~delegator ~self ~global_slot =
+      (*using staged ledger to confirm coinbase amount is correctly generated*)
+      let epoch_ledger =
+        Sparse_ledger.of_ledger_subset_exn ledger
+          (List.map [delegator; self] ~f:(fun k ->
+               Account_id.create k Token_id.default ))
+      in
+      Sl.can_apply_supercharged_coinbase_exn ~delegator ~self ~global_slot
+        ~epoch_ledger
+
     (* Functor for testing with different instantiated staged ledger modules. *)
     let create_and_apply_with_state_body_hash ?(self = self_pk)
-        ?(coinbase_receiver = coinbase_receiver) ~current_global_slot
-        ~state_and_body_hash sl logger pids txns stmt_to_work =
+        ?(coinbase_receiver = coinbase_receiver) ?(delegator = self_pk)
+        ~current_global_slot ~state_and_body_hash sl logger pids txns
+        stmt_to_work =
       let open Deferred.Let_syntax in
+      let supercharge_coinbase =
+        supercharge_coinbase ~ledger:(Sl.ledger !sl) ~self ~delegator
+          ~global_slot:current_global_slot
+      in
       let diff =
         Sl.create_diff ~constraint_constants !sl ~self ~logger
           ~current_global_slot ~transactions_by_fee:txns
-          ~get_completed_work:stmt_to_work
+          ~get_completed_work:stmt_to_work ~supercharge_coinbase
           ~coinbase_receiver:(`Other coinbase_receiver)
       in
       let diff' = Staged_ledger_diff.forget diff in
@@ -1816,12 +1835,12 @@ let%test_module "test" =
       (ledger_proof, diff', is_new_stack, pc_update)
 
     let create_and_apply ?(self = self_pk)
-        ?(coinbase_receiver = coinbase_receiver) sl logger pids txns
-        stmt_to_work =
+        ?(coinbase_receiver = coinbase_receiver) ?(delegator = self_pk) sl
+        logger pids txns stmt_to_work =
       let open Deferred.Let_syntax in
       let%map ledger_proof, diff, _, _ =
         create_and_apply_with_state_body_hash ~self ~coinbase_receiver
-          ~current_global_slot:Coda_numbers.Global_slot.zero
+          ~delegator ~current_global_slot:Coda_numbers.Global_slot.zero
           ~state_and_body_hash:(State_hash.dummy, State_body_hash.dummy)
           sl logger pids txns stmt_to_work
       in
@@ -2424,6 +2443,7 @@ let%test_module "test" =
                       ~transactions_by_fee:cmds_this_iter
                       ~get_completed_work:stmt_to_work
                       ~coinbase_receiver:(`Other coinbase_receiver)
+                      ~supercharge_coinbase:true
                     |> Staged_ledger_diff.forget
                   in
                   (*No proofs were purchased since the fee for the proofs are not sufficient to pay for account creation*)
@@ -2784,7 +2804,9 @@ let%test_module "test" =
         let pc_update_var = Update.var_of_t pc_update in
         let state_body_hash_var = State_body_hash.var_of_t state_body_hash in
         Pending_coinbase.Checked.add_coinbase ~constraint_constants
-          root_after_popping pc_update_var state_body_hash_var
+          root_after_popping pc_update_var
+          ~supercharge_coinbase:pc_update_var.supercharge_coinbase
+          state_body_hash_var
       in
       let checked_root_after_update =
         let open Snark_params.Tick in
@@ -2902,43 +2924,89 @@ let%test_module "test" =
                    user_commands-random number of proofs-many provers)" =
       pending_coinbase_test `Many_provers
 
-    let supercharge_coinbase_test () =
+    let timed_account n =
+      let keypair =
+        Quickcheck.random_value
+          ~seed:(`Deterministic (sprintf "timed_account_%d" n))
+          Keypair.gen
+      in
+      let account_id =
+        Account_id.create
+          (Public_key.compress keypair.public_key)
+          Token_id.default
+      in
+      let balance = Balance.of_int 100_000_000_000 in
+      (*Should fully vest by slot = 7*)
+      let acc =
+        Account.create_timed account_id balance
+          ~initial_minimum_balance:balance
+          ~cliff_time:(Coda_numbers.Global_slot.of_int 4)
+          ~vesting_period:(Coda_numbers.Global_slot.of_int 2)
+          ~vesting_increment:(Amount.of_int 50_000_000_000)
+        |> Or_error.ok_exn
+      in
+      (keypair, acc)
+
+    let untimed_account n =
+      let keypair =
+        Quickcheck.random_value
+          ~seed:(`Deterministic (sprintf "untimed_account_%d" n))
+          Keypair.gen
+      in
+      let account_id =
+        Account_id.create
+          (Public_key.compress keypair.public_key)
+          Token_id.default
+      in
+      let balance = Balance.of_int 100_000_000_000 in
+      let acc = Account.create account_id balance in
+      (keypair, acc)
+
+    let supercharge_coinbase_test ~(self : Account.t) ~(delegator : Account.t)
+        ~block_count f_expected_balance sl =
+      let coinbase_receiver = self in
+      let init_balance = coinbase_receiver.balance in
+      let check_receiver_account sl count =
+        let location =
+          Ledger.location_of_account (Sl.ledger sl)
+            (Account.identifier coinbase_receiver)
+          |> Option.value_exn
+        in
+        let account = Ledger.get (Sl.ledger sl) location |> Option.value_exn in
+        [%test_eq: Balance.t]
+          (f_expected_balance count init_balance)
+          account.balance
+      in
+      let logger = Logger.null () in
+      let pids = Child_processes.Termination.create_pid_table () in
+      Deferred.List.iter
+        (List.init block_count ~f:(( + ) 1))
+        ~f:(fun block_count ->
+          let%bind _ =
+            create_and_apply_with_state_body_hash ~self:self.public_key
+              ~delegator:delegator.public_key
+              ~coinbase_receiver:coinbase_receiver.public_key sl logger pids
+              ~current_global_slot:
+                (Coda_numbers.Global_slot.of_int block_count)
+              ~state_and_body_hash:(State_hash.dummy, State_body_hash.dummy)
+              Sequence.empty
+              (stmt_to_work_zero_fee ~prover:self.public_key)
+          in
+          check_receiver_account !sl block_count ;
+          return () )
+
+    (*let _supercharge_coinbase_test timed_account =
       let g = Ledger.gen_initial_ledger_state in
-      let keypair, locked_account =
-        let keypair =
-          Quickcheck.random_value ~seed:(`Deterministic "locked_account")
-            Keypair.gen
-        in
-        let account_id =
-          Account_id.create
-            (Public_key.compress keypair.public_key)
-            Token_id.default
-        in
-        let balance = Balance.of_int 100_000_000_000 in
-        (*Should fully vest by slot = 6*)
-        let acc =
-          Account.create_timed account_id balance
-            ~initial_minimum_balance:balance
-            ~cliff_time:(Coda_numbers.Global_slot.of_int 4)
-            ~vesting_period:(Coda_numbers.Global_slot.of_int 2)
-            ~vesting_increment:(Amount.of_int 50_000_000_000)
-          |> Or_error.ok_exn
-        in
-        (keypair, acc)
+      let keypair, timed_account = timed_account
       in
       let slots_with_locked_tokens = 7 in
       let test sl =
-        let init_balance = locked_account.balance in
-        let check_locked_account sl count =
-          let normal_coinbase = constraint_constants.coinbase_amount in
-          let supercharged_coinbase =
-            Amount.scale constraint_constants.coinbase_amount
-              constraint_constants.supercharged_coinbase_factor
-            |> Option.value_exn
+        let init_balance = timed_account.balance in
+        let check_timed_account sl count =
           in
           let location =
             Ledger.location_of_account (Sl.ledger sl)
-              (Account.identifier locked_account)
+              (Account.identifier timed_account)
             |> Option.value_exn
           in
           let account =
@@ -2946,20 +3014,7 @@ let%test_module "test" =
           in
           let scale_exn amt i = Amount.scale amt i |> Option.value_exn in
           let expected_balance =
-            if count <= slots_with_locked_tokens then
-              Balance.add_amount init_balance (scale_exn normal_coinbase count)
-              |> Option.value_exn
-            else
-              (* init balance +
-                (normal_coinbase * slots_with_locked_tokens) +
-                (supercharged_coinbase * remaining slots))*)
-              Balance.add_amount
-                ( Balance.add_amount init_balance
-                    (scale_exn normal_coinbase slots_with_locked_tokens)
-                |> Option.value_exn )
-                (scale_exn supercharged_coinbase
-                   (count - slots_with_locked_tokens))
-              |> Option.value_exn
+            
           in
           [%test_eq: Balance.t] expected_balance account.balance
         in
@@ -2970,28 +3025,165 @@ let%test_module "test" =
           ~f:(fun block_count ->
             let%bind _ =
               create_and_apply_with_state_body_hash
-                ~self:locked_account.public_key
-                ~coinbase_receiver:locked_account.public_key sl logger pids
+                ~self:timed_account.public_key
+                ~coinbase_receiver:timed_account.public_key sl logger pids
                 ~current_global_slot:
                   (Coda_numbers.Global_slot.of_int block_count)
                 ~state_and_body_hash:(State_hash.dummy, State_body_hash.dummy)
                 Sequence.empty
-                (stmt_to_work_zero_fee ~prover:locked_account.public_key)
+                (stmt_to_work_zero_fee ~prover:timed_account.public_key)
             in
-            check_locked_account !sl block_count ;
+            check_timed_account !sl block_count ;
             return () )
       in
       Quickcheck.test g ~trials:5 ~f:(fun ledger_init_state ->
           let ledger_init_state =
             Array.append
               [| ( keypair
-                 , locked_account.balance
-                 , locked_account.nonce
-                 , locked_account.timing ) |]
+                 , timed_account.balance
+                 , timed_account.nonce
+                 , timed_account.timing ) |]
               ledger_init_state
           in
           async_with_ledgers ledger_init_state (fun sl _test_mask -> test sl)
-      )
+      )*)
 
-    let%test_unit "Supercharged coinbase" = supercharge_coinbase_test ()
+    let normal_coinbase = constraint_constants.coinbase_amount
+
+    let scale_exn amt i = Amount.scale amt i |> Option.value_exn
+
+    let supercharged_coinbase =
+      scale_exn constraint_constants.coinbase_amount
+        constraint_constants.supercharged_coinbase_factor
+
+    let g = Ledger.gen_initial_ledger_state
+
+    let%test_unit "Supercharged coinbase - staking" =
+      let keypair_self, self = timed_account 1 in
+      let slots_with_locked_tokens =
+        7
+        (*calculated from the timing values for timed_accounts*)
+      in
+      let block_count = slots_with_locked_tokens + 5 in
+      let f_expected_balance block_no init_balance =
+        if block_no <= slots_with_locked_tokens then
+          Balance.add_amount init_balance (scale_exn normal_coinbase block_no)
+          |> Option.value_exn
+        else
+          (* init balance +
+                (normal_coinbase * slots_with_locked_tokens) +
+                (supercharged_coinbase * remaining slots))*)
+          Balance.add_amount
+            ( Balance.add_amount init_balance
+                (scale_exn normal_coinbase slots_with_locked_tokens)
+            |> Option.value_exn )
+            (scale_exn supercharged_coinbase
+               (block_no - slots_with_locked_tokens))
+          |> Option.value_exn
+      in
+      Quickcheck.test g ~trials:1 ~f:(fun ledger_init_state ->
+          let ledger_init_state =
+            Array.append
+              [|(keypair_self, self.balance, self.nonce, self.timing)|]
+              ledger_init_state
+          in
+          async_with_ledgers ledger_init_state (fun sl _test_mask ->
+              supercharge_coinbase_test ~self ~delegator:self ~block_count
+                f_expected_balance sl ) )
+
+    let%test_unit "Supercharged coinbase - unlocked account delegating to \
+                   locked account" =
+      let keypair_self, locked_self = timed_account 1 in
+      let keypair_delegator, unlocked_delegator = untimed_account 1 in
+      let slots_with_locked_tokens =
+        7
+        (*calculated from the timing values for timed_accounts*)
+      in
+      let block_count = slots_with_locked_tokens + 2 in
+      let f_expected_balance block_no init_balance =
+        Balance.add_amount init_balance
+          (scale_exn supercharged_coinbase block_no)
+        |> Option.value_exn
+      in
+      Quickcheck.test g ~trials:1 ~f:(fun ledger_init_state ->
+          let ledger_init_state =
+            Array.append
+              [| ( keypair_self
+                 , locked_self.balance
+                 , locked_self.nonce
+                 , locked_self.timing )
+               ; ( keypair_delegator
+                 , unlocked_delegator.balance
+                 , unlocked_delegator.nonce
+                 , unlocked_delegator.timing ) |]
+              ledger_init_state
+          in
+          async_with_ledgers ledger_init_state (fun sl _test_mask ->
+              supercharge_coinbase_test ~self:locked_self
+                ~delegator:unlocked_delegator ~block_count f_expected_balance
+                sl ) )
+
+    let%test_unit "Supercharged coinbase - locked account delegating to \
+                   unlocked account" =
+      let keypair_self, unlocked_self = untimed_account 1 in
+      let keypair_delegator, locked_delegator = timed_account 1 in
+      let slots_with_locked_tokens =
+        7
+        (*calculated from the timing values for timed_accounts*)
+      in
+      let block_count = slots_with_locked_tokens + 2 in
+      let f_expected_balance block_no init_balance =
+        Balance.add_amount init_balance
+          (scale_exn supercharged_coinbase block_no)
+        |> Option.value_exn
+      in
+      Quickcheck.test g ~trials:1 ~f:(fun ledger_init_state ->
+          let ledger_init_state =
+            Array.append
+              [| ( keypair_self
+                 , unlocked_self.balance
+                 , unlocked_self.nonce
+                 , unlocked_self.timing )
+               ; ( keypair_delegator
+                 , locked_delegator.balance
+                 , locked_delegator.nonce
+                 , locked_delegator.timing ) |]
+              ledger_init_state
+          in
+          async_with_ledgers ledger_init_state (fun sl _test_mask ->
+              supercharge_coinbase_test ~self:unlocked_self
+                ~delegator:locked_delegator ~block_count f_expected_balance sl
+          ) )
+
+    let%test_unit "Supercharged coinbase - locked account delegating to \
+                   locked account" =
+      let keypair_self, locked_self = timed_account 1 in
+      let keypair_delegator, locked_delegator = timed_account 2 in
+      let slots_with_locked_tokens =
+        7
+        (*calculated from the timing values for timed_accounts*)
+      in
+      let block_count = slots_with_locked_tokens in
+      let f_expected_balance block_no init_balance =
+        (*running the test as long as both the accounts remain locked and hence normal coinbase in all the blocks*)
+        Balance.add_amount init_balance (scale_exn normal_coinbase block_no)
+        |> Option.value_exn
+      in
+      Quickcheck.test g ~trials:1 ~f:(fun ledger_init_state ->
+          let ledger_init_state =
+            Array.append
+              [| ( keypair_self
+                 , locked_self.balance
+                 , locked_self.nonce
+                 , locked_self.timing )
+               ; ( keypair_delegator
+                 , locked_delegator.balance
+                 , locked_delegator.nonce
+                 , locked_delegator.timing ) |]
+              ledger_init_state
+          in
+          async_with_ledgers ledger_init_state (fun sl _test_mask ->
+              supercharge_coinbase_test ~self:locked_self
+                ~delegator:locked_delegator ~block_count f_expected_balance sl
+          ) )
   end )

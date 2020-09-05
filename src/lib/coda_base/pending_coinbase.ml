@@ -474,8 +474,6 @@ module Update = struct
       ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
       [Action.typ; Coinbase_data.typ; Boolean.typ]
 
-  (* State_body_hash.var*)
-
   let genesis : t =
     { coinbase_data=
         (Signature_lib.Public_key.Compressed.empty, Currency.Amount.zero)
@@ -823,8 +821,8 @@ module T = struct
 
     let%snarkydef add_coinbase
         ~(constraint_constants : Genesis_constants.Constraint_constants.t) t
-        ({action; coinbase_data= pk, amount; supercharge_coinbase} :
-          Update.var) state_body_hash =
+        ({action; coinbase_data= pk, amount; _} : Update.var)
+        ~supercharge_coinbase state_body_hash =
       let depth = constraint_constants.pending_coinbase_depth in
       let%bind addr1, addr2 =
         request_witness
@@ -1389,6 +1387,7 @@ let%test_unit "Checked_tree = Unchecked_tree" =
                  { Update.Poly.action= action_var
                  ; coinbase_data= coinbase_var
                  ; supercharge_coinbase= supercharge_coinbase_var }
+                 ~supercharge_coinbase:supercharge_coinbase_var
                  state_body_hash_var)
               (unstage (handler ~depth pending_coinbases ~is_new_stack))
           in
@@ -1441,6 +1440,7 @@ let%test_unit "Checked_tree = Unchecked_tree after pop" =
                  { Update.Poly.action= action_var
                  ; coinbase_data= coinbase_var
                  ; supercharge_coinbase= supercharge_coinbase_var }
+                 ~supercharge_coinbase:supercharge_coinbase_var
                  state_body_hash_var)
               (unstage (handler ~depth pending_coinbases ~is_new_stack:true))
           in
