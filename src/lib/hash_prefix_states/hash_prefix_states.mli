@@ -45,6 +45,10 @@ val snapp_account : Field.t State.t
 
 val snapp_payload : Field.t State.t
 
+val snapp_body : Field.t State.t
+
+val snapp_predicate : Field.t State.t
+
 val snapp_predicate_account : Field.t State.t
 
 val snapp_predicate_protocol_state : Field.t State.t

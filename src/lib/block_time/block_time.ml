@@ -67,6 +67,26 @@ module Time = struct
   module Bits = Bits.UInt64
   include B.Snarkable.UInt64 (Tick)
 
+  module Checked = struct
+    type t = Unpacked.var
+
+    module N = Coda_numbers.Nat.Make_checked (UInt64) (Bits)
+
+    let op f (x : t) (y : t) : (Boolean.var, 'a) Checked.t =
+      let g = Fn.compose N.of_bits Unpacked.var_to_bits in
+      f (g x) (g y)
+
+    let ( = ) x = op N.( = ) x
+
+    let ( <= ) x = op N.( <= ) x
+
+    let ( >= ) x = op N.( >= ) x
+
+    let ( < ) x = op N.( < ) x
+
+    let ( > ) x = op N.( > ) x
+  end
+
   module Span = struct
     [%%versioned
     module Stable = struct

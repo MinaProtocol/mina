@@ -161,7 +161,9 @@ let str ~loc =
 [%%else]
 
 let str ~loc =
-  let e = [%expr Async.Deferred.return Pickles.Verification_key.dummy] in
+  let e =
+    [%expr Async.Deferred.return (Lazy.force Pickles.Verification_key.dummy)]
+  in
   return
     (str ~loc
        ~blockchain_verification_key_id:

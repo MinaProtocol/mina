@@ -64,7 +64,8 @@ module Op = User_command_info.Op
 
 module Internal_command_info = struct
   module Kind = struct
-    type t = [`Coinbase | `Fee_transfer] [@@deriving eq, to_yojson]
+    type t = [`Coinbase | `Fee_transfer | `Fee_transfer_via_coinbase]
+    [@@deriving eq, to_yojson]
   end
 
   type t =
@@ -75,43 +76,80 @@ module Internal_command_info = struct
     ; hash: string }
   [@@deriving to_yojson]
 
-  let to_operations ~coinbase (t : t) : Operation.t list =
-    (* We choose to represent the dec-side of fee transfers from txns from the
-     * canonical user command that created them so we are able consistently
-     * produce more balance changing operations in the mempool or a block.
-     * *)
-    let plan : 'a Op.t list =
-      match t.kind with
-      | `Coinbase ->
-          (* The coinbase transaction is really incrementing by the coinbase
-         * amount  *)
-          [{Op.label= `Coinbase_inc; related_to= None}]
-      | `Fee_transfer ->
-          [{Op.label= `Fee_receiver_inc; related_to= None}]
-    in
-    Op.build ~a_eq:[%eq: [`Coinbase_inc | `Fee_receiver_inc]] ~plan
-      ~f:(fun ~related_operations ~operation_identifier op ->
-        (* All internal commands succeed if they're in blocks *)
-        let status = Operation_statuses.name `Success in
-        match op.label with
-        | `Coinbase_inc ->
-            { Operation.operation_identifier
-            ; related_operations
-            ; status
-            ; account= Some (account_id t.receiver Amount_of.Token_id.default)
-            ; _type= Operation_types.name `Coinbase_inc
-            ; amount= Some (Amount_of.coda coinbase)
-            ; coin_change= None
-            ; metadata= None }
-        | `Fee_receiver_inc ->
-            { Operation.operation_identifier
-            ; related_operations
-            ; status
-            ; account= Some (account_id t.receiver t.token)
-            ; _type= Operation_types.name `Fee_receiver_inc
-            ; amount= Some (Amount_of.token t.token t.fee)
-            ; coin_change= None
-            ; metadata= None } )
+  module T (M : Monad_fail.S) = struct
+    module Op_build = Op.T (M)
+
+    let to_operations ~coinbase_receiver ~coinbase (t : t) :
+        (Operation.t list, Errors.t) M.t =
+      (* We choose to represent the dec-side of fee transfers from txns from the
+       * canonical user command that created them so we are able consistently
+       * produce more balance changing operations in the mempool or a block.
+       * *)
+      let plan : 'a Op.t list =
+        match t.kind with
+        | `Coinbase ->
+            (* The coinbase transaction is really incrementing by the coinbase
+           * amount  *)
+            [{Op.label= `Coinbase_inc; related_to= None}]
+        | `Fee_transfer ->
+            [{Op.label= `Fee_receiver_inc; related_to= None}]
+        | `Fee_transfer_via_coinbase ->
+            [ {Op.label= `Fee_receiver_inc; related_to= None}
+            ; {Op.label= `Fee_payer_dec; related_to= Some `Fee_receiver_inc} ]
+      in
+      Op_build.build
+        ~a_eq:[%eq: [`Coinbase_inc | `Fee_payer_dec | `Fee_receiver_inc]] ~plan
+        ~f:(fun ~related_operations ~operation_identifier op ->
+          (* All internal commands succeed if they're in blocks *)
+          let status = Operation_statuses.name `Success in
+          match op.label with
+          | `Coinbase_inc ->
+              M.return
+                { Operation.operation_identifier
+                ; related_operations
+                ; status
+                ; account=
+                    Some (account_id t.receiver Amount_of.Token_id.default)
+                ; _type= Operation_types.name `Coinbase_inc
+                ; amount= Some (Amount_of.coda coinbase)
+                ; coin_change= None
+                ; metadata= None }
+          | `Fee_receiver_inc ->
+              M.return
+                { Operation.operation_identifier
+                ; related_operations
+                ; status
+                ; account= Some (account_id t.receiver t.token)
+                ; _type= Operation_types.name `Fee_receiver_inc
+                ; amount= Some (Amount_of.token t.token t.fee)
+                ; coin_change= None
+                ; metadata= None }
+          | `Fee_payer_dec ->
+              let open M.Let_syntax in
+              let%map coinbase_receiver =
+                match coinbase_receiver with
+                | Some r ->
+                    M.return r
+                | None ->
+                    M.fail
+                      (Errors.create
+                         ~context:
+                           "This operation existing (fee payer dec within \
+                            Internal_command) demands a coinbase receiver to \
+                            exist. Please report this bug."
+                         `Invariant_violation)
+              in
+              { Operation.operation_identifier
+              ; related_operations
+              ; status
+              ; account=
+                  Some
+                    (account_id coinbase_receiver Amount_of.Token_id.default)
+              ; _type= Operation_types.name `Fee_payer_dec
+              ; amount= Some Amount_of.(negated (coda t.fee))
+              ; coin_change= None
+              ; metadata= None } )
+  end
 
   let dummies =
     [ { kind= `Coinbase
@@ -253,11 +291,12 @@ SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, 
 
     let query =
       Caqti_request.collect Caqti_type.int typ
-        {| SELECT u.id, u.type, u.fee_payer_id, u.source_id, u.receiver_id, u.fee_token, u.token, u.nonce, u.amount, u.fee, u.memo, u.hash, u.status, u.failure_reason, u.fee_payer_account_creation_fee_paid, u.receiver_account_creation_fee_paid, u.created_token, pk1.value as fee_payer, pk2.value as source, pk3.value as receiver FROM user_commands u
-        LEFT JOIN blocks_user_commands ON blocks_user_commands.block_id = ?
+        {| SELECT DISTINCT ON (u.hash) u.id, u.type, u.fee_payer_id, u.source_id, u.receiver_id, u.fee_token, u.token, u.nonce, u.amount, u.fee, u.memo, u.hash, u.status, u.failure_reason, u.fee_payer_account_creation_fee_paid, u.receiver_account_creation_fee_paid, u.created_token, pk1.value as fee_payer, pk2.value as source, pk3.value as receiver FROM user_commands u
+        INNER JOIN blocks_user_commands ON blocks_user_commands.user_command_id = u.id
         INNER JOIN public_keys pk1 ON pk1.id = u.fee_payer_id
         INNER JOIN public_keys pk2 ON pk2.id = u.source_id
         INNER JOIN public_keys pk3 ON pk3.id = u.receiver_id
+        WHERE blocks_user_commands.block_id = ?
       |}
 
     let run (module Conn : Caqti_async.CONNECTION) id =
@@ -277,9 +316,10 @@ SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, 
 
     let query =
       Caqti_request.collect Caqti_type.int typ
-        {| SELECT i.id, i.type, i.receiver_id, i.fee, i.token, i.hash, pk.value as receiver FROM internal_commands i
-        LEFT JOIN blocks_internal_commands ON blocks_internal_commands.block_id = ?
+        {| SELECT DISTINCT ON (i.hash) i.id, i.type, i.receiver_id, i.fee, i.token, i.hash, pk.value as receiver FROM internal_commands i
+        INNER JOIN blocks_internal_commands ON blocks_internal_commands.internal_command_id = i.id
         INNER JOIN public_keys pk ON pk.id = i.receiver_id
+        WHERE blocks_internal_commands.block_id = ?
       |}
 
     let run (module Conn : Caqti_async.CONNECTION) id =
@@ -345,14 +385,16 @@ SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, 
                 M.return `Fee_transfer
             | "coinbase" ->
                 M.return `Coinbase
+            | "fee_transfer_via_coinbase" ->
+                M.return `Fee_transfer_via_coinbase
             | other ->
                 M.fail
                   (Errors.create
                      ~context:
                        (sprintf
                           "The archive database is storing internal commands \
-                           with %s; this is neither fee_transfer nor \
-                           coinbase. Please report a bug!"
+                           with %s; this is neither fee_transfer nor coinbase \
+                           not fee_transfer_via_coinbase. Please report a bug!"
                           other)
                      `Invariant_violation)
           in
@@ -374,7 +416,8 @@ SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, 
             | "create_token" ->
                 M.return `Create_token
             | "create_account" ->
-                M.return `Create_account
+                (* N.B.: not create_token_account *)
+                M.return `Create_token_account
             | "mint_tokens" ->
                 M.return `Mint_tokens
             | other ->
@@ -503,6 +546,7 @@ module Specific = struct
 
   module Impl (M : Monad_fail.S) = struct
     module Query = Block_query.T (M)
+    module Internal_command_info_ops = Internal_command_info.T (M)
 
     let handle :
            env:'gql Env.T(M).t
@@ -518,7 +562,7 @@ module Specific = struct
           ~gql_response:res
       in
       let genesisBlock = res#genesisBlock in
-      let%map block_info =
+      let%bind block_info =
         if Query.is_genesis ~hash:genesisBlock#stateHash query then
           let genesis_block_identifier =
             { Block_identifier.index= Network.genesis_block_height
@@ -538,21 +582,36 @@ module Specific = struct
         else env.db_block query
       in
       let coinbase = (res#genesisConstants)#coinbase in
+      let coinbase_receiver =
+        List.find block_info.internal_info ~f:(fun info ->
+            info.Internal_command_info.kind = `Coinbase )
+        |> Option.map ~f:(fun cmd -> cmd.Internal_command_info.receiver)
+      in
+      let%map internal_transactions =
+        List.fold block_info.internal_info ~init:(M.return [])
+          ~f:(fun macc info ->
+            let%bind acc = macc in
+            let%map operations =
+              Internal_command_info_ops.to_operations ~coinbase_receiver
+                ~coinbase info
+            in
+            [%log debug]
+              ~metadata:[("info", Internal_command_info.to_yojson info)]
+              "Block internal received $info" ;
+            { Transaction.transaction_identifier=
+                {Transaction_identifier.hash= info.hash}
+            ; operations
+            ; metadata= None }
+            :: acc )
+        |> M.map ~f:List.rev
+      in
       { Block_response.block=
           Some
             { Block.block_identifier= block_info.block_identifier
             ; parent_block_identifier= block_info.parent_block_identifier
             ; timestamp= block_info.timestamp
             ; transactions=
-                List.map block_info.internal_info ~f:(fun info ->
-                    [%log debug]
-                      ~metadata:[("info", Internal_command_info.to_yojson info)]
-                      "Block internal received $info" ;
-                    { Transaction.transaction_identifier=
-                        {Transaction_identifier.hash= info.hash}
-                    ; operations=
-                        Internal_command_info.to_operations ~coinbase info
-                    ; metadata= None } )
+                internal_transactions
                 @ List.map block_info.user_commands ~f:(fun info ->
                       [%log debug]
                         ~metadata:[("info", User_command_info.to_yojson info)]

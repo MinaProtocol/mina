@@ -109,7 +109,7 @@ module Poly = struct
             Max_branches_vec.T.t
         ; max_width: Width.Stable.V1.t
         ; wrap_index: 'g list Abc.Stable.V1.t Matrix_evals.Stable.V1.t
-        ; wrap_vk: 'vk }
+        ; wrap_vk: 'vk option }
       [@@deriving sexp, eq, compare, hash, yojson]
     end
   end]
@@ -200,7 +200,7 @@ end = struct
                     { Poly.step_data
                     ; max_width
                     ; wrap_index= c
-                    ; wrap_vk= Vk.of_repr t }
+                    ; wrap_vk= Some (Vk.of_repr t) }
                 end)
     end
   end]
