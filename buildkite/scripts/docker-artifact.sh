@@ -10,6 +10,7 @@ scripts/release-docker.sh --service "${CODA_SERVICE}" --version "${CODA_VERSION}
 
 if [[ -n $CODA_BUILD_ROSETTA ]]; then
   echo "--- Build/Release coda-rosetta to docker hub"
+  docker pull gcr.io/o1labs-192920/coda-rosetta-build-deps:develop
   # Could also cache-from opam-deps but we would need to get that automatically building nightly or at least when src/opam.export changes
   # build-deps is updated by manually running scripts/build-rosetta-stages.sh which always builds + pushes each stage
   scripts/release-docker.sh --service "coda-rosetta" --version "dev-${CODA_VERSION}"\
