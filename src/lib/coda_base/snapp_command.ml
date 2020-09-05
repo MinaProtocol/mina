@@ -285,6 +285,8 @@ module Party = struct
       end]
 
       let dummy : t = {body= Body.dummy; predicate= ()}
+
+      let create body : t = {body; predicate= ()}
     end
   end
 
@@ -694,30 +696,6 @@ module Payload = struct
       end
     end]
 
-    module Checked = struct
-      type t =
-        ( Boolean.var
-        , Token_id.Checked.t
-        , (Boolean.var, Other_fee_payer.Payload.Checked.t) Flagged_option.t
-        , Party.Predicated.Signed.Checked.t
-        , Party.Predicated.Signed.Checked.t )
-        Inner.t
-    end
-
-    let typ : (Checked.t, t) Typ.t =
-      Inner.typ
-        [ Boolean.typ
-        ; Boolean.typ
-        ; Token_id.typ
-        ; Flagged_option.typ Other_fee_payer.Payload.typ
-          |> Typ.transport
-               ~there:
-                 (Flagged_option.of_option
-                    ~default:Other_fee_payer.Payload.dummy)
-               ~back:Flagged_option.to_option
-        ; Party.Predicated.Signed.typ
-        ; Party.Predicated.Signed.typ ]
-
     module Digested = struct
       type t =
         ( bool
@@ -737,6 +715,36 @@ module Payload = struct
           Inner.t
       end
     end
+
+    module Checked = struct
+      type t =
+        ( Boolean.var
+        , Token_id.Checked.t
+        , (Boolean.var, Other_fee_payer.Payload.Checked.t) Flagged_option.t
+        , Party.Predicated.Signed.Checked.t
+        , Party.Predicated.Signed.Checked.t )
+        Inner.t
+
+      let digested (r : t) : Digested.Checked.t =
+        let b (x : _ Party.Predicated.Poly.t) =
+          {x with body= Party.Body.Checked.digest x.body}
+        in
+        {r with one= b r.one; two= b r.two}
+    end
+
+    let typ : (Checked.t, t) Typ.t =
+      Inner.typ
+        [ Boolean.typ
+        ; Boolean.typ
+        ; Token_id.typ
+        ; Flagged_option.typ Other_fee_payer.Payload.typ
+          |> Typ.transport
+               ~there:
+                 (Flagged_option.of_option
+                    ~default:Other_fee_payer.Payload.dummy)
+               ~back:Flagged_option.to_option
+        ; Party.Predicated.Signed.typ
+        ; Party.Predicated.Signed.typ ]
   end
 
   module One_proved = struct
@@ -1172,6 +1180,58 @@ let to_payload (t : t) : Payload.t =
         ; other_fee_payer_opt=
             Option.map fee_payment ~f:(fun {payload; signature= _} -> payload)
         }
+
+let signed_signed ?fee_payment ~token_id (signer1, data1) (signer2, data2) : t
+    =
+  let r : _ Inner.t =
+    { one= {Party.Authorized.Poly.data= data1; authorization= Signature.dummy}
+    ; two= {Party.Authorized.Poly.data= data2; authorization= Signature.dummy}
+    ; token_id
+    ; fee_payment=
+        Option.map fee_payment ~f:(fun (_priv_key, payload) ->
+            {Other_fee_payer.payload; signature= Signature.dummy} ) }
+  in
+  let sign =
+    let msg =
+      to_payload (Signed_signed r)
+      |> Payload.digested |> Payload.Digested.digest
+      |> Random_oracle_input.field
+    in
+    fun sk -> Schnorr.sign sk msg
+  in
+  Signed_signed
+    { r with
+      one= {r.one with authorization= sign signer1}
+    ; two= {r.two with authorization= sign signer2}
+    ; fee_payment=
+        Option.map2 fee_payment r.fee_payment ~f:(fun (sk, _) x ->
+            {x with signature= sign sk} ) }
+
+let signed_empty ?fee_payment ?data2 ~token_id (signer1, data1) : t =
+  let r : _ Inner.t =
+    { one= {Party.Authorized.Poly.data= data1; authorization= Signature.dummy}
+    ; two=
+        Option.map data2 ~f:(fun data ->
+            {Party.Authorized.Poly.data; authorization= ()} )
+    ; token_id
+    ; fee_payment=
+        Option.map fee_payment ~f:(fun (_priv_key, payload) ->
+            {Other_fee_payer.payload; signature= Signature.dummy} ) }
+  in
+  let sign =
+    let msg =
+      to_payload (Signed_empty r)
+      |> Payload.digested |> Payload.Digested.digest
+      |> Random_oracle_input.field
+    in
+    fun sk -> Schnorr.sign sk msg
+  in
+  Signed_empty
+    { r with
+      one= {r.one with authorization= sign signer1}
+    ; fee_payment=
+        Option.map2 fee_payment r.fee_payment ~f:(fun (sk, _) x ->
+            {x with signature= sign sk} ) }
 
 module Base58_check = Codable.Make_base58_check (Stable.Latest)
 

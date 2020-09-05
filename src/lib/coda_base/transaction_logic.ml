@@ -250,6 +250,13 @@ module type S = sig
     -> Transaction.t
     -> Undo.t Or_error.t
 
+  val merkle_root_after_snapp_command_exn :
+       constraint_constants:Genesis_constants.Constraint_constants.t
+    -> txn_state_view:Snapp_predicate.Protocol_state.View.t
+    -> ledger
+    -> Snapp_command.Valid.t
+    -> Ledger_hash.t * [`Next_available_token of Token_id.t]
+
   val merkle_root_after_user_command_exn :
        constraint_constants:Genesis_constants.Constraint_constants.t
     -> txn_global_slot:Global_slot.t
@@ -960,12 +967,96 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     apply_user_command_unchecked ~constraint_constants ~txn_global_slot ledger
       (User_command.forget_check user_command)
 
+  let opt_fail e = function Some x -> Ok x | None -> Error (failure e)
+
+  let add_signed_amount b (a : Amount.Signed.t) =
+    ( match a.sgn with
+    | Pos ->
+        Balance.add_amount b a.magnitude
+    | Neg ->
+        Balance.sub_amount b a.magnitude )
+    |> opt_fail Overflow
+
+  let check e b = if b then Ok () else Error (failure e)
+
+  open Pickles_types
+
+  let apply_body
+      ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+      ~(state_view : Snapp_predicate.Protocol_state.View.t) ~check_auth ~is_new
+      ({ pk= _
+       ; update= {app_state; delegate; verification_key; permissions}
+       ; delta } :
+        Snapp_command.Party.Body.t) (a : Account.t) : (Account.t, _) Result.t =
+    let open Snapp_basic in
+    let open Result.Let_syntax in
+    let%bind balance =
+      let%bind b = add_signed_amount a.balance delta in
+      let fee = constraint_constants.account_creation_fee in
+      if is_new then
+        Balance.sub_amount b (Amount.of_fee fee)
+        |> opt_fail Amount_insufficient_to_create_account
+      else Ok b
+    in
+    (* Check send/receive permissions *)
+    let%bind () =
+      check Update_not_permitted
+        (check_auth
+           ( match delta.sgn with
+           | Pos ->
+               a.permissions.receive
+           | Neg ->
+               a.permissions.send ))
+    in
+    (* Check timing. *)
+    let%bind timing =
+      match delta.sgn with
+      | Pos ->
+          Ok a.timing
+      | Neg ->
+          validate_timing ~txn_amount:delta.magnitude
+            ~txn_global_slot:state_view.curr_global_slot ~account:a
+          |> with_err Source_insufficient_balance
+    in
+    let init =
+      match a.snapp with None -> Snapp_account.default | Some a -> a
+    in
+    let update perm u curr ~is_keep ~update =
+      match check_auth perm with
+      | false ->
+          let%map () = check Update_not_permitted (is_keep u) in
+          curr
+      | true ->
+          Ok (update u curr)
+    in
+    let%bind delegate =
+      update a.permissions.set_delegate delegate a.delegate
+        ~is_keep:(( = ) Set_or_keep.Keep) ~update:Set_or_keep.set_or_keep
+    in
+    let%bind snapp =
+      let%map app_state =
+        update a.permissions.edit_state app_state init.app_state
+          ~is_keep:(Vector.for_all ~f:(( = ) Set_or_keep.Keep))
+          ~update:(Vector.map2 ~f:Set_or_keep.set_or_keep)
+      and verification_key =
+        update a.permissions.set_verification_key verification_key
+          init.verification_key ~is_keep:(( = ) Set_or_keep.Keep)
+          ~update:(fun u x ->
+            match (u, x) with Keep, _ -> x | Set x, _ -> Some x )
+      in
+      let t : Snapp_account.t = {app_state; verification_key} in
+      if Snapp_account.(equal default t) then None else Some t
+    in
+    let%bind permissions =
+      update a.permissions.set_delegate permissions a.permissions
+        ~is_keep:(( = ) Set_or_keep.Keep) ~update:Set_or_keep.set_or_keep
+    in
+    Ok {a with balance; snapp; delegate; permissions; timing}
+
   let apply_snapp_command_unchecked ledger
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ~(state_view : Snapp_predicate.Protocol_state.View.t)
       (c : Snapp_command.t) =
-    let open Pickles_types in
-    let open Snapp_basic in
     let open Snapp_command in
     let current_global_slot = state_view.curr_global_slot in
     let open Result.Let_syntax in
@@ -982,13 +1073,6 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           | None ->
               return (Or_error.error_string err)
         in
-        let opt_fail e = function
-          | Some x ->
-              Ok x
-          | None ->
-              Error (failure e)
-        in
-        let check e b = if b then Ok () else Error (failure e) in
         let fee_token_id = Snapp_command.fee_token c in
         let fee_payer_account = Set_once.create () in
         let finish res =
@@ -1048,83 +1132,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           set_with_location ledger loc acct' ;
           info
         in
-        let add_signed_amount b (a : Amount.Signed.t) =
-          ( match a.sgn with
-          | Pos ->
-              Balance.add_amount b a.magnitude
-          | Neg ->
-              Balance.sub_amount b a.magnitude )
-          |> opt_fail Overflow
-        in
-        let apply_body ~check_auth ~is_new
-            ({ pk= _
-             ; update= {app_state; delegate; verification_key; permissions}
-             ; delta } :
-              Party.Body.t) (a : Account.t) : (Account.t, _) Result.t =
-          (* TODO: Make sure that this delta has the right sign. I think
-              the Snapp_command.check function does this. *)
-          let%bind balance =
-            let%bind b = add_signed_amount a.balance delta in
-            let fee = constraint_constants.account_creation_fee in
-            if is_new then
-              Balance.sub_amount b (Amount.of_fee fee)
-              |> opt_fail Amount_insufficient_to_create_account
-            else Ok b
-          in
-          (* Check send/receive permissions *)
-          let%bind () =
-            check Update_not_permitted
-              (check_auth
-                 ( match delta.sgn with
-                 | Pos ->
-                     a.permissions.receive
-                 | Neg ->
-                     a.permissions.send ))
-          in
-          (* Check timing. *)
-          let%bind timing =
-            match delta.sgn with
-            | Pos ->
-                Ok a.timing
-            | Neg ->
-                validate_timing a delta.magnitude
-                |> with_err Source_insufficient_balance
-          in
-          let init =
-            match a.snapp with None -> Snapp_account.default | Some a -> a
-          in
-          let update perm u curr ~is_keep ~update =
-            match check_auth perm with
-            | false ->
-                let%map () = check Update_not_permitted (is_keep u) in
-                curr
-            | true ->
-                Ok (update u curr)
-          in
-          let%bind delegate =
-            update a.permissions.set_delegate delegate a.delegate
-              ~is_keep:(( = ) Set_or_keep.Keep) ~update:Set_or_keep.set_or_keep
-          in
-          let%bind snapp =
-            let%map app_state =
-              update a.permissions.edit_state app_state init.app_state
-                ~is_keep:(Vector.for_all ~f:(( = ) Set_or_keep.Keep))
-                ~update:(Vector.map2 ~f:Set_or_keep.set_or_keep)
-            and verification_key =
-              update a.permissions.set_verification_key verification_key
-                init.verification_key ~is_keep:(( = ) Set_or_keep.Keep)
-                ~update:(fun u x ->
-                  match (u, x) with Keep, _ -> x | Set x, _ -> Some x )
-            in
-            let t : Snapp_account.t = {app_state; verification_key} in
-            if Snapp_account.(equal default t) then None else Some t
-          in
-          let%bind permissions =
-            update a.permissions.set_delegate permissions a.permissions
-              ~is_keep:(( = ) Set_or_keep.Keep) ~update:Set_or_keep.set_or_keep
-          in
-          Ok {a with balance; snapp; delegate; permissions; timing}
-        in
+        let apply_body = apply_body ~constraint_constants ~state_view in
         let open Party in
         let set_delta
             (r : ((Body.t, _) Predicated.Poly.t, _) Authorized.Poly.t) delta =
@@ -1713,6 +1721,29 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     | _, _ ->
         failwith "Undo/command mismatch"
 
+  let undo_snapp_command ~constraint_constants:_ ledger
+      {Undo.Snapp_command_undo.accounts; command= _} =
+    let to_update, to_delete =
+      List.partition_map accounts ~f:(fun (id, a) ->
+          match a with Some a -> `Fst (id, a) | None -> `Snd id )
+    in
+    let to_update =
+      List.dedup_and_sort
+        ~compare:(fun (x, _) (y, _) -> Account_id.compare x y)
+        to_update
+    in
+    let open Or_error.Let_syntax in
+    let%map to_update =
+      List.map to_update ~f:(fun (id, a) ->
+          let%map loc =
+            location_of_account' ledger (sprintf !"%{sexp:Account_id.t}" id) id
+          in
+          (`Existing loc, a) )
+      |> Or_error.all
+    in
+    remove_accounts_exn ledger to_delete ;
+    List.iter to_update ~f:(Tuple2.uncurry (set_with_location ledger))
+
   let undo :
          constraint_constants:Genesis_constants.Constraint_constants.t
       -> t
@@ -1761,6 +1792,18 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               Or_error.map (apply_coinbase ~constraint_constants ledger t)
                 ~f:(fun undo -> Undo.Varying.Coinbase undo) )
           ~f:(fun varying -> {Undo.previous_hash; varying}) )
+
+  let merkle_root_after_snapp_command_exn ~constraint_constants ~txn_state_view
+      ledger payment =
+    let undo =
+      Or_error.ok_exn
+        (apply_snapp_command_unchecked ~constraint_constants
+           ~state_view:txn_state_view ledger payment)
+    in
+    let root = merkle_root ledger in
+    let next_available_token = next_available_token ledger in
+    Or_error.ok_exn (undo_snapp_command ~constraint_constants ledger undo) ;
+    (root, `Next_available_token next_available_token)
 
   let merkle_root_after_user_command_exn ~constraint_constants ~txn_global_slot
       ledger payment =

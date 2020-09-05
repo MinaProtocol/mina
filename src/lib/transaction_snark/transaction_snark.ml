@@ -1016,6 +1016,7 @@ module Base = struct
         | Snapp_account : [`One | `Two] -> Snapp_account.t t
         | Fee_payer_signature : Signature.t t
         | Account_signature : [`One | `Two] -> Signature.t t
+        | Zero_complement : Snapp_command.Payload.Zero_proved.t t
         | One_complement : Snapp_statement.Complement.One_proved.t t
         | Two_complement : Snapp_statement.Complement.Two_proved.t t
     end
@@ -1794,7 +1795,10 @@ module Base = struct
           (s : Statement.With_sok.Checked.t) =
         let open Impl in
         let ( ! ) = run_checked in
-        let payload = exists Snapp_command.Payload.Zero_proved.typ in
+        let payload =
+          exists Snapp_command.Payload.Zero_proved.typ ~request:(fun () ->
+              Zero_complement )
+        in
         let ({ token_id
              ; other_fee_payer_opt
              ; one
@@ -1831,11 +1835,10 @@ module Base = struct
               ~then_:other_fee_payer_opt.data.fee
               ~else_:(Amount.Checked.to_fee excess))
         in
-        let payload : Snapp_command.Payload.Digested.Checked.t =
-          failwith "TODO"
-        in
         let payload_digest =
-          Snapp_command.Payload.Digested.Checked.digest payload
+          Snapp_command.Payload.(
+            Digested.Checked.digest
+              (Zero_proved (Zero_proved.Checked.digested payload)))
         in
         let (module S) = !(Tick.Inner_curve.Checked.Shifted.create ()) in
         let txn_global_slot = curr_state.curr_global_slot in
@@ -2821,7 +2824,7 @@ type tag =
   ( Statement.With_sok.Checked.t
   , Statement.With_sok.t
   , Nat.N2.n
-  , Nat.N2.n )
+  , Nat.N5.n )
   Pickles.Tag.t
 
 let time lab f =
@@ -2837,7 +2840,7 @@ let system ~constraint_constants =
         (module Statement.With_sok.Checked)
         (module Statement.With_sok)
         ~typ:Statement.With_sok.typ
-        ~branches:(module Nat.N2)
+        ~branches:(module Nat.N5)
         ~max_branching:(module Nat.N2)
         ~name:"transaction-snark"
         ~choices:(fun ~self ->
@@ -3374,6 +3377,13 @@ let%test_module "transaction_snark" =
 
       let merkle_root t = Frozen_ledger_hash.of_ledger_hash @@ merkle_root t
 
+      let merkle_root_after_snapp_command_exn t ~txn_state_view txn =
+        let hash, `Next_available_token tid =
+          merkle_root_after_snapp_command_exn ~constraint_constants
+            ~txn_state_view t txn
+        in
+        (Frozen_ledger_hash.of_ledger_hash hash, `Next_available_token tid)
+
       let merkle_root_after_user_command_exn t ~txn_global_slot txn =
         let hash, `Next_available_token tid =
           merkle_root_after_user_command_exn ~constraint_constants
@@ -3548,10 +3558,8 @@ let%test_module "transaction_snark" =
           let sparse_ledger_after =
             Sparse_ledger.apply_transaction_exn ~constraint_constants
               sparse_ledger
-              ~txn_global_slot:
-                ( txn_in_block.block_data
-                |> Coda_state.Protocol_state.Body.consensus_state
-                |> Consensus.Data.Consensus_state.curr_global_slot )
+              ~txn_state_view:
+                (txn_in_block.block_data |> Coda_state.Protocol_state.Body.view)
               txn_in_block.transaction
           in
           check_transaction txn_in_block
@@ -3636,6 +3644,124 @@ let%test_module "transaction_snark" =
                 ~pending_coinbase_stack_state ~next_available_token_before
                 ~next_available_token_after
                 {transaction= t1; block_data= state_body}
+                (unstage @@ Sparse_ledger.handler sparse_ledger) ) )
+
+    let snapp_accounts ledger t =
+      let t = Transaction.forget t in
+      match t with
+      | Command (User_command _) | Fee_transfer _ | Coinbase _ ->
+          (None, None)
+      | Command (Snapp_command c) -> (
+          let token_id = Snapp_command.token_id c in
+          let get pk =
+            Option.try_with (fun () ->
+                ( Sparse_ledger.find_index_exn ledger
+                    (Account_id.create pk token_id)
+                |> Sparse_ledger.get_exn ledger )
+                  .snapp )
+            |> Option.join
+          in
+          match Snapp_command.to_payload c with
+          | Zero_proved p ->
+              (get p.one.body.pk, get p.two.body.pk)
+          | One_proved p ->
+              (get p.one.body.pk, get p.two.body.pk)
+          | Two_proved p ->
+              (get p.one.body.pk, get p.two.body.pk) )
+
+    let%test_unit "signed_signed" =
+      Test_util.with_randomness 123456789 (fun () ->
+          let wallets = random_wallets () in
+          Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
+              Array.iter
+                (Array.sub wallets ~pos:1 ~len:(Array.length wallets - 1))
+                ~f:(fun {account; private_key= _} ->
+                  Ledger.create_new_account_exn ledger
+                    (Account.identifier account)
+                    account ) ;
+              let full_amount = 8_000_000_000 in
+              let fee = Fee.of_int (Random.int full_amount) in
+              let receiver_amount =
+                Amount.sub (Amount.of_int full_amount) (Amount.of_fee fee)
+                |> Option.value_exn
+              in
+              let t1 =
+                let i, j = (1, 2) in
+                let acct1 = wallets.(i) in
+                let acct2 = wallets.(j) in
+                let open Snapp_command in
+                let open Snapp_basic in
+                let new_state : _ Snapp_state.t =
+                  Vector.init Snapp_state.Max_state_size.n ~f:Field.of_int
+                in
+                let data1 : Party.Predicated.Signed.t =
+                  { predicate= Account.Nonce.zero
+                  ; body=
+                      { pk= acct1.account.public_key
+                      ; update=
+                          { app_state=
+                              Vector.map new_state ~f:(fun x ->
+                                  Set_or_keep.Set x )
+                          ; delegate= Keep
+                          ; verification_key= Keep
+                          ; permissions= Keep }
+                      ; delta=
+                          Amount.Signed.(
+                            negate (of_unsigned (Amount.of_int full_amount)))
+                      } }
+                in
+                let data2 : Party.Predicated.Signed.t =
+                  { predicate= Account.Nonce.zero
+                  ; body=
+                      { pk= acct2.account.public_key
+                      ; update=
+                          { app_state=
+                              Vector.map new_state ~f:(fun _ ->
+                                  Set_or_keep.Keep )
+                          ; delegate= Keep
+                          ; verification_key= Keep
+                          ; permissions= Keep }
+                      ; delta= Amount.Signed.of_unsigned receiver_amount } }
+                in
+                Snapp_command.signed_signed ~token_id:Token_id.default
+                  (acct1.private_key, data1) (acct2.private_key, data2)
+              in
+              let txn_state_view =
+                Coda_state.Protocol_state.Body.view state_body
+              in
+              let next_available_token_before =
+                Ledger.next_available_token ledger
+              in
+              let target, `Next_available_token next_available_token_after =
+                Ledger.merkle_root_after_snapp_command_exn ledger
+                  ~txn_state_view t1
+              in
+              let mentioned_keys = Snapp_command.accounts_accessed t1 in
+              let sparse_ledger =
+                Sparse_ledger.of_ledger_subset_exn ledger mentioned_keys
+              in
+              let sok_message =
+                Sok_message.create ~fee:Fee.zero
+                  ~prover:wallets.(1).account.public_key
+              in
+              let pending_coinbase_stack = Pending_coinbase.Stack.empty in
+              let pending_coinbase_stack_target =
+                pending_coinbase_stack_target (Command (Snapp_command t1))
+                  state_body_hash pending_coinbase_stack
+              in
+              let pending_coinbase_stack_state =
+                { Pending_coinbase_stack_state.source= pending_coinbase_stack
+                ; target= pending_coinbase_stack_target }
+              in
+              let snapp_account1, snapp_account2 =
+                snapp_accounts sparse_ledger (Command (Snapp_command t1))
+              in
+              check_snapp_command ~constraint_constants ~sok_message
+                ~state_body
+                ~source:(Ledger.merkle_root ledger)
+                ~target ~init_stack:pending_coinbase_stack
+                ~pending_coinbase_stack_state ~next_available_token_before
+                ~next_available_token_after ~snapp_account1 ~snapp_account2 t1
                 (unstage @@ Sparse_ledger.handler sparse_ledger) ) )
 
     let account_fee = Fee.to_int constraint_constants.account_creation_fee
