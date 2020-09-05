@@ -23,7 +23,7 @@ PG_CONN=postgres://$USER:$USER@localhost:5432/archiver
 
 # rebuild
 pushd ../../../
-PATH=/usr/local/bin:$PATH dune b src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe src/app/cli/src/coda.exe src/app/archive/archive.exe src/app/rosetta/rosetta.exe src/app/rosetta/test-agent/agent.exe
+PATH=/usr/local/bin:$PATH dune b src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe src/app/cli/src/coda.exe src/app/archive/archive.exe src/app/rosetta/rosetta.exe src/app/rosetta/test-agent/agent.exe src/app/rosetta/ocaml-signer/signer.exe
 popd
 
 # make genesis (synchronously)
