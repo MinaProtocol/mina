@@ -294,8 +294,35 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                       (Option.value_exn config.addrs_and_ports.peer)
                         .libp2p_port))
             in
-            Coda_net2.begin_advertising net2
-            |> Deferred.ignore |> don't_wait_for ;
+            [%log' info config.logger] "hacking peers: $peers"
+              ~metadata:
+                [ ( "peers"
+                  , `String
+                      (sprintf !"%{sexp: string list}"
+                         (List.map config.initial_peers ~f:Multiaddr.to_string))
+                  ) ] ;
+            don't_wait_for
+              (Deferred.map
+                 (let%bind () = Coda_net2.begin_advertising net2 in
+                  let%bind () =
+                    Deferred.map
+                      (Deferred.all_unit
+                         (List.map
+                            ~f:(fun x ->
+                              let open Deferred.Let_syntax in
+                              Coda_net2.add_peer net2 x >>| ignore )
+                            config.initial_peers))
+                      ~f:(fun () -> Ok ())
+                  in
+                  return ())
+                 ~f:(function
+                   | Ok () ->
+                       ()
+                   | Error e ->
+                       [%log' info config.logger]
+                         "starting libp2p up failed: $error"
+                         ~metadata:[("error", `String (Error.to_string_hum e))]
+                   )) ;
             (subscription, message_reader)
           in
           match%map initializing_libp2p_result with
