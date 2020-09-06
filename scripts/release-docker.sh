@@ -56,7 +56,7 @@ coda-demo)
   ;;
 coda-rosetta)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-rosetta"
-  mkdir some_empty_dir
+  mkdir -p some_empty_dir
   DOCKER_CONTEXT="./some_empty_dir"
   ;;
 leaderboard)

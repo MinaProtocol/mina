@@ -1,17 +1,11 @@
 (executable
-  (package agent)
-  (name agent)
-  (public_name agent)
+  (package signer)
+  (name signer)
+  (public_name signer)
   (modes native)
   (libraries
     async
     async_ssl
-    caqti
-    caqti-async
-    caqti-driver-postgresql
-    cohttp
-    ctypes
-    cohttp-async
     core_kernel
     logger
     rosetta_models
