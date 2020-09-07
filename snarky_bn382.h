@@ -321,6 +321,7 @@ void *zexe_bn382_fq_verifier_index_c_rc_comm(void*);
 
 // Fp URS
 void *zexe_bn382_fp_urs_create(size_t);
+void zexe_bn382_fp_urs_delete(void*);
 void zexe_bn382_fp_urs_write(void*, char*);
 void* zexe_bn382_fp_urs_read(char*);
 void* zexe_bn382_fp_urs_lagrange_commitment(void*, size_t, size_t);
@@ -330,6 +331,7 @@ void* zexe_bn382_fp_urs_dummy_degree_bound_checks(void*, void*);
 
 // Fq URS
 void *zexe_bn382_fq_urs_create(size_t);
+void zexe_bn382_fq_urs_delete(void *);
 void zexe_bn382_fq_urs_write(void*, char*);
 void* zexe_bn382_fq_urs_read(char*);
 void* zexe_bn382_fq_urs_lagrange_commitment(void*, size_t, size_t);
@@ -392,6 +394,7 @@ void *zexe_bn382_fp_proof_g3_comm_nocopy(void *);
 
 void *zexe_bn382_fp_proof_commitment_with_degree_bound_0(void *);
 void *zexe_bn382_fp_proof_commitment_with_degree_bound_1(void *);
+void zexe_bn382_fp_proof_commitment_with_degree_bound_delete(void *);
 
 void *zexe_bn382_fp_proof_proof1(void *);
 void *zexe_bn382_fp_proof_proof2(void *);
@@ -417,6 +420,7 @@ void *zexe_bn382_fp_proof_rc_evals_nocopy(void *);
 void *zexe_bn382_fp_proof_evals_0(void *);
 void *zexe_bn382_fp_proof_evals_1(void *);
 void *zexe_bn382_fp_proof_evals_2(void *);
+void zexe_bn382_fp_proof_evals_delete(void *);
 
 // Fp proof vector
 
@@ -511,6 +515,7 @@ void *zexe_bn382_fq_proof_evaluations_rc_nocopy(void *);
 void *zexe_bn382_fq_proof_evaluations_triple_0(void *);
 void *zexe_bn382_fq_proof_evaluations_triple_1(void *);
 void *zexe_bn382_fq_proof_evaluations_triple_2(void *);
+void *zexe_bn382_fq_proof_evaluations_triple_delete(void *);
 
 // Fq opening proof
 void *zexe_bn382_fq_opening_proof_lr(void *);
@@ -518,6 +523,7 @@ void *zexe_bn382_fq_opening_proof_z1(void *);
 void *zexe_bn382_fq_opening_proof_z2(void *);
 void *zexe_bn382_fq_opening_proof_delta(void *);
 void *zexe_bn382_fq_opening_proof_sg(void *);
+void zexe_bn382_fq_opening_proof_delete(void *);
 
 // G
 void *zexe_bn382_g_one();
@@ -546,6 +552,7 @@ void zexe_bn382_g_affine_vector_delete(void *);
 void *zexe_bn382_g_affine_pair_0(void *);
 void *zexe_bn382_g_affine_pair_1(void *);
 void *zexe_bn382_g_affine_pair_make(void *, void*);
+void zexe_bn382_g_affine_pair_delete(void *);
 
 void *zexe_bn382_g_affine_pair_vector_create();
 int zexe_bn382_g_affine_pair_vector_length(void *);
@@ -580,6 +587,7 @@ void zexe_bn382_g1_affine_vector_delete(void *);
 void *zexe_bn382_g1_affine_pair_0(void *);
 void *zexe_bn382_g1_affine_pair_1(void *);
 void *zexe_bn382_g1_affine_pair_make(void *, void *);
+void zexe_bn382_g1_affine_pair_delete(void *);
 
 void *zexe_bn382_g1_affine_pair_vector_create();
 int zexe_bn382_g1_affine_pair_vector_length(void *);
@@ -591,17 +599,21 @@ void zexe_bn382_g1_affine_pair_vector_delete(void *);
 void *zexe_bn382_fp_triple_0(void *);
 void *zexe_bn382_fp_triple_1(void *);
 void *zexe_bn382_fp_triple_2(void *);
+void zexe_bn382_fp_triple_delete(void *);
 void *zexe_bn382_fp_vector_triple_0(void *);
 void *zexe_bn382_fp_vector_triple_1(void *);
 void *zexe_bn382_fp_vector_triple_2(void *);
+void zexe_bn382_fp_vector_triple_delete(void *);
 
 // Fq triple
 void *zexe_bn382_fq_triple_0(void *);
 void *zexe_bn382_fq_triple_1(void *);
 void *zexe_bn382_fq_triple_2(void *);
+void zexe_bn382_fq_triple_delete(void *);
 void *zexe_bn382_fq_vector_triple_0(void *);
 void *zexe_bn382_fq_vector_triple_1(void *);
 void *zexe_bn382_fq_vector_triple_2(void *);
+void zexe_bn382_fq_vector_triple_delete(void *);
 
 // Fq poly comm
 void *zexe_bn382_fq_poly_comm_shifted(void *);
@@ -716,6 +728,7 @@ void *zexe_tweedle_fq_verifier_index_c_rc_comm(void*);
 
 // Fq URS
 void *zexe_tweedle_fq_urs_create(size_t);
+void zexe_tweedle_fq_urs_delete(void*);
 void zexe_tweedle_fq_urs_write(void*, char*);
 void* zexe_tweedle_fq_urs_read(char*);
 void* zexe_tweedle_fq_urs_lagrange_commitment(void*, size_t, size_t);
@@ -822,6 +835,7 @@ void *zexe_tweedle_fq_proof_evaluations_rc_nocopy(void *);
 void *zexe_tweedle_fq_proof_evaluations_triple_0(void *);
 void *zexe_tweedle_fq_proof_evaluations_triple_1(void *);
 void *zexe_tweedle_fq_proof_evaluations_triple_2(void *);
+void zexe_tweedle_fq_proof_evaluations_triple_delete(void *);
 
 // Fq opening proof
 void *zexe_tweedle_fq_opening_proof_lr(void *);
@@ -829,14 +843,17 @@ void *zexe_tweedle_fq_opening_proof_z1(void *);
 void *zexe_tweedle_fq_opening_proof_z2(void *);
 void *zexe_tweedle_fq_opening_proof_delta(void *);
 void *zexe_tweedle_fq_opening_proof_sg(void *);
+void zexe_tweedle_fq_opening_proof_delete(void *);
 
 // Fq triple
 void *zexe_tweedle_fq_triple_0(void *);
 void *zexe_tweedle_fq_triple_1(void *);
 void *zexe_tweedle_fq_triple_2(void *);
+void zexe_tweedle_fq_triple_delete(void *);
 void *zexe_tweedle_fq_vector_triple_0(void *);
 void *zexe_tweedle_fq_vector_triple_1(void *);
 void *zexe_tweedle_fq_vector_triple_2(void *);
+void zexe_tweedle_fq_vector_triple_delete(void *);
 
 // Fq poly comm
 void *zexe_tweedle_fq_poly_comm_shifted(void *);
@@ -871,6 +888,7 @@ void zexe_tweedle_dum_affine_vector_delete(void *);
 void *zexe_tweedle_dum_affine_pair_0(void *);
 void *zexe_tweedle_dum_affine_pair_1(void *);
 void *zexe_tweedle_dum_affine_pair_make(void *, void*);
+void zexe_tweedle_dum_affine_pair_delete(void *);
 
 void *zexe_tweedle_dum_affine_pair_vector_create();
 int zexe_tweedle_dum_affine_pair_vector_length(void *);
@@ -980,6 +998,7 @@ void *zexe_tweedle_fp_verifier_index_c_rc_comm(void*);
 
 // Fq URS
 void *zexe_tweedle_fp_urs_create(size_t);
+void zexe_tweedle_fp_urs_delete(void*);
 void zexe_tweedle_fp_urs_write(void*, char*);
 void* zexe_tweedle_fp_urs_read(char*);
 void* zexe_tweedle_fp_urs_lagrange_commitment(void*, size_t, size_t);
@@ -1086,6 +1105,7 @@ void *zexe_tweedle_fp_proof_evaluations_rc_nocopy(void *);
 void *zexe_tweedle_fp_proof_evaluations_triple_0(void *);
 void *zexe_tweedle_fp_proof_evaluations_triple_1(void *);
 void *zexe_tweedle_fp_proof_evaluations_triple_2(void *);
+void zexe_tweedle_fp_proof_evaluations_triple_delete(void *);
 
 // Fq opening proof
 void *zexe_tweedle_fp_opening_proof_lr(void *);
@@ -1093,14 +1113,17 @@ void *zexe_tweedle_fp_opening_proof_z1(void *);
 void *zexe_tweedle_fp_opening_proof_z2(void *);
 void *zexe_tweedle_fp_opening_proof_delta(void *);
 void *zexe_tweedle_fp_opening_proof_sg(void *);
+void zexe_tweedle_fp_opening_proof_delete(void *);
 
 // Fq triple
 void *zexe_tweedle_fp_triple_0(void *);
 void *zexe_tweedle_fp_triple_1(void *);
 void *zexe_tweedle_fp_triple_2(void *);
+void *zexe_tweedle_fp_triple_delete(void *);
 void *zexe_tweedle_fp_vector_triple_0(void *);
 void *zexe_tweedle_fp_vector_triple_1(void *);
 void *zexe_tweedle_fp_vector_triple_2(void *);
+void zexe_tweedle_fp_vector_triple_delete(void *);
 
 // Fq poly comm
 void *zexe_tweedle_fp_poly_comm_shifted(void *);
@@ -1135,6 +1158,7 @@ void zexe_tweedle_dee_affine_vector_delete(void *);
 void *zexe_tweedle_dee_affine_pair_0(void *);
 void *zexe_tweedle_dee_affine_pair_1(void *);
 void *zexe_tweedle_dee_affine_pair_make(void *, void*);
+void zexe_tweedle_dee_affine_pair_delete(void *);
 
 void *zexe_tweedle_dee_affine_pair_vector_create();
 int zexe_tweedle_dee_affine_pair_vector_length(void *);

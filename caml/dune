@@ -1,4 +1,5 @@
 (library
  (name snarky_bn382_bindings)
- (libraries ctypes ctypes.foreign)
- (public_name snarky_bn382.bindings))
+ (libraries ctypes ctypes.foreign cstubs_applicative)
+ (public_name snarky_bn382.bindings)
+ (preprocess (pps ppx_let)))
