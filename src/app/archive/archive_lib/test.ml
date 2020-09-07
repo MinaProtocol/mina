@@ -69,11 +69,19 @@ let%test_module "Archive node unit tests" =
               failwith @@ Caqti_error.show e )
 
     let%test_unit "Fee_transfer: read and write" =
+      let kind_gen =
+        let open Quickcheck.Generator in
+        let open Quickcheck.Generator.Let_syntax in
+        let%map b = bool in
+        if b then `Normal else `Via_coinbase
+      in
       let conn = Lazy.force conn_lazy in
       Thread_safe.block_on_async_exn
       @@ fun () ->
-      Async.Quickcheck.async_test ~sexp_of:[%sexp_of: Fee_transfer.Single.t]
-        fee_transfer_gen ~f:(fun fee_transfer ->
+      Async.Quickcheck.async_test
+        ~sexp_of:[%sexp_of: [`Normal | `Via_coinbase] * Fee_transfer.Single.t]
+        (Quickcheck.Generator.tuple2 kind_gen fee_transfer_gen)
+        ~f:(fun (kind, fee_transfer) ->
           let transaction_hash =
             Transaction_hash.hash_fee_transfer fee_transfer
           in
@@ -81,6 +89,7 @@ let%test_module "Archive node unit tests" =
             let open Deferred.Result.Let_syntax in
             let%bind fee_transfer_id =
               Processor.Fee_transfer.add_if_doesn't_exist conn fee_transfer
+                kind
             in
             let%map result =
               Processor.Internal_command.find conn ~transaction_hash

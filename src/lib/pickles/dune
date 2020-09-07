@@ -9,6 +9,7 @@
     digestif
     zexe_backend
     random_oracle_input
+    pickles_base
     pickles.composition_types
     pickles.limb_vector
     pickles.marlin_checks

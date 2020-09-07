@@ -254,6 +254,11 @@ module Ledger_inner = struct
 
   (* shadows definition in MaskedLedger, extra assurance hash is of right type  *)
   let merkle_root t =
+    Core.printf
+      !"accounts:\n\n\n\n\n %{sexp:Account.t list}\n%!"
+      (List.map
+         (Set.to_list (accounts t))
+         ~f:(fun id -> get_at_index_exn t (index_of_account_exn t id))) ;
     Ledger_hash.of_hash (merkle_root t :> Random_oracle.Digest.t)
 
   let get_or_create ledger account_id =

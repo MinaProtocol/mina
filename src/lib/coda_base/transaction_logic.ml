@@ -58,7 +58,8 @@ module Undo = struct
           type t =
             | Payment of {previous_empty_accounts: Account_id.Stable.V1.t list}
             | Stake_delegation of
-                { previous_delegate: Public_key.Compressed.Stable.V1.t }
+                { previous_delegate: Public_key.Compressed.Stable.V1.t option
+                }
             | Create_new_token of {created_token: Token_id.Stable.V1.t}
             | Create_token_account
             | Mint_tokens
@@ -181,7 +182,8 @@ module type S = sig
       module Body : sig
         type t = Undo.User_command_undo.Body.t =
           | Payment of {previous_empty_accounts: Account_id.t list}
-          | Stake_delegation of {previous_delegate: Public_key.Compressed.t}
+          | Stake_delegation of
+              { previous_delegate: Public_key.Compressed.t option }
           | Create_new_token of {created_token: Token_id.t}
           | Create_token_account
           | Mint_tokens
@@ -669,7 +671,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           in
           let source_account =
             { source_account with
-              delegate= Account_id.public_key receiver
+              delegate= Some (Account_id.public_key receiver)
             ; timing }
           in
           ( [(source_location, source_account)]
@@ -1030,8 +1032,11 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           Ok (update u curr)
     in
     let%bind delegate =
-      update a.permissions.set_delegate delegate a.delegate
-        ~is_keep:(( = ) Set_or_keep.Keep) ~update:Set_or_keep.set_or_keep
+      if Token_id.(equal default) a.token_id then
+        update a.permissions.set_delegate delegate a.delegate
+          ~is_keep:(( = ) Set_or_keep.Keep) ~update:(fun u x ->
+            match u with Keep -> x | Set y -> Some y )
+      else return a.delegate
     in
     let%bind snapp =
       let%map app_state =
@@ -1184,9 +1189,9 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               match one.data.body.delta.sgn with
               | Neg ->
                   (* Account 1 is the sender. *)
-                  let acct1, one = party_fee_payer loc1 acct1 one in
                   Set_once.set_exn fee_payer_account [%here]
                     (account_id1, Some acct1) ;
+                  let acct1, one = party_fee_payer loc1 acct1 one in
                   ( acct1
                   , Option.map lacct2 ~f:(fun (_, a) ->
                         if account2_should_step then step a else a )
@@ -1218,17 +1223,12 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                 , payload.pk )
           in
           let%bind lacct2' =
-            let lacct2' =
-              Option.map2 lacct2 acct2' ~f:(fun (l, _) a -> (l, a))
-            in
-            (* TODO: Step *)
-            match (lacct2', two) with
-            | None, None ->
+            match (lacct2, acct2', two) with
+            | None, None, None ->
                 Ok None
-            | Some _, None | None, Some _ ->
-                assert false
-            | Some (loc2, acct2), Some {data= {body; predicate}; authorization}
-              ->
+            | ( Some (loc2, acct2)
+              , Some acct2'
+              , Some {data= {body; predicate}; authorization} ) ->
                 (* TODO: Make sure that body.delta is positive. I think
                  the Snapp_command.check function does this. *)
                 (* Check the predicate *)
@@ -1249,9 +1249,11 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                         Fn.flip Permissions.Auth_required.check
                           (Control.tag authorization)
                   in
-                  apply_body ~check_auth body acct2 ~is_new:(loc2 = `New)
+                  apply_body ~check_auth body acct2' ~is_new:(loc2 = `New)
                 in
                 Some (loc2, res)
+            | _ ->
+                assert false
           in
           (* Check the predicate *)
           let%bind () =
@@ -1800,6 +1802,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         (apply_snapp_command_unchecked ~constraint_constants
            ~state_view:txn_state_view ledger payment)
     in
+    Core.printf "root after\n%!" ;
     let root = merkle_root ledger in
     let next_available_token = next_available_token ledger in
     Or_error.ok_exn (undo_snapp_command ~constraint_constants ledger undo) ;

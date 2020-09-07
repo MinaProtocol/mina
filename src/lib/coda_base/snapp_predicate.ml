@@ -478,7 +478,10 @@ module Account = struct
           receipt_chain_hash a.receipt_chain_hash)
     in
     let%bind () =
-      Eq_data.(check ~label:"delegate" (Tc.public_key ()) delegate a.delegate)
+      let tc = Eq_data.Tc.public_key () in
+      Eq_data.(
+        check ~label:"delegate" tc delegate
+          (Option.value ~default:tc.default a.delegate))
     in
     let%bind () =
       Eq_data.(
@@ -1272,81 +1275,3 @@ let typ () : (Checked.t, Stable.Latest.t) Typ.t =
     ; Other.typ ()
     ; Eq_data.(typ_explicit (Tc.public_key ()))
     ; Protocol_state.typ ]
-
-(*
-module Digested = struct
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type t =
-        ( F.Stable.V1.t
-        , F.Stable.V1.t
-        , Account_state.Stable.V1.t Transition.Stable.V1.t
-        , F.Stable.V1.t Hash.Stable.V1.t 
-        , Public_key.Compressed.Stable.V1.t Eq_data.Stable.V1.t
-        )
-        Poly.Stable.V1.t
-      [@@deriving sexp, eq, yojson, hash, compare]
-
-      let to_latest = Fn.id
-    end
-  end]
-
-  let to_input
-      ({ self_predicate
-       ; other_predicate
-       ; other_account_vk
-       ; other_account_transition
-       ; fee_payer
-       ; protocol_state_predicate 
-       } :
-        t) =
-    let open Random_oracle.Input in
-    List.reduce_exn ~f:append
-      [ field self_predicate
-      ; field other_predicate
-      ; Hash.(to_input Tc.field) other_account_vk
-      ; Transition.to_input other_account_transition ~f:Account_state.to_input
-      ; Eq_data.(to_input_explicit (Tc.public_key ())) fee_payer
-      ; field protocol_state_predicate 
-      ]
-
-  module Checked = struct
-    type t =
-      ( Field.Var.t
-      , Field.Var.t
-      , Account_state.Checked.t Transition.t
-      , Field.Var.t Hash.Checked.t 
-      , Public_key.Compressed.var Eq_data.Checked.t
-      )
-      Poly.Stable.Latest.t
-
-    let to_input
-        ({ self_predicate
-         ; other_predicate
-         ; other_account_vk
-         ; other_account_transition
-         ; fee_payer
-         ; protocol_state_predicate } :
-          t) =
-      let open Random_oracle.Input in
-      List.reduce_exn ~f:append
-        [ field self_predicate
-        ; field other_predicate
-        ; Hash.Checked.to_input other_account_vk ~f:field
-        ; Transition.to_input ~f:Account_state.Checked.to_input 
-            other_account_transition
-        ; Eq_data.(to_input_checked (Tc.public_key ())) fee_payer
-        ; field protocol_state_predicate ]
-  end
-
-  let typ : (Checked.t, Stable.Latest.t) Typ.t =
-    Poly.typ
-      [ Field.typ
-      ; Field.typ
-      ; Transition.typ Account_state.typ
-      ; Hash.(typ Tc.field)
-      ; Eq_data.(typ_explicit (Tc.public_key ()))
-      ; Field.typ
-      ]
-end *)

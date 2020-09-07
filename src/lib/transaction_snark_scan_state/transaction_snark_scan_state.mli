@@ -70,8 +70,8 @@ module Make_statement_scanner
     -> error_prefix:string
     -> ledger_hash_end:Frozen_ledger_hash.t
     -> ledger_hash_begin:Frozen_ledger_hash.t option
-    -> next_available_token_before:Token_id.t
-    -> next_available_token_after:Token_id.t
+    -> next_available_token_begin:Token_id.t option
+    -> next_available_token_end:Token_id.t
     -> (unit, Error.t) result M.t
 end
 

@@ -123,6 +123,11 @@ module Auth_required = struct
       ; signature_necessary= f t.signature_necessary
       ; signature_sufficient= f t.signature_sufficient }
 
+    let _ = map
+
+    [%%ifdef
+    consensus_mechanism]
+
     let if_ b ~then_:t ~else_:e =
       let open Pickles.Impls.Step in
       { constant= Boolean.if_ b ~then_:t.constant ~else_:e.constant
@@ -132,6 +137,8 @@ module Auth_required = struct
       ; signature_sufficient=
           Boolean.if_ b ~then_:t.signature_sufficient
             ~else_:e.signature_sufficient }
+
+    [%%endif]
   end
 
   let encode : t -> bool Encoding.t = function
@@ -175,6 +182,9 @@ module Auth_required = struct
   let%test_unit "decode encode" =
     List.iter [Impossible; Proof; Signature; Either; Both] ~f:(fun t ->
         [%test_eq: t] t (decode (encode t)) )
+
+  [%%ifdef
+  consensus_mechanism]
 
   module Checked = struct
     type t = Boolean.var Encoding.t
@@ -224,6 +234,8 @@ module Auth_required = struct
         ~value_of_hlist:of_hlist
     in
     Typ.transport t ~there:encode ~back:decode
+
+  [%%endif]
 
   let to_input x = Encoding.to_input (encode x)
 
@@ -288,6 +300,9 @@ module Stable = struct
   end
 end]
 
+[%%ifdef
+consensus_mechanism]
+
 module Checked = struct
   type t = (Boolean.var, Auth_required.Checked.t) Poly.Stable.Latest.t
 
@@ -314,8 +329,6 @@ module Checked = struct
       ~set_verification_key:a
 end
 
-let to_input x = Poly.to_input Auth_required.to_input x
-
 let typ =
   let open Poly.Stable.Latest in
   Typ.of_hlistable
@@ -328,6 +341,10 @@ let typ =
     ; Auth_required.typ ]
     ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
     ~value_of_hlist:of_hlist
+
+[%%endif]
+
+let to_input x = Poly.to_input Auth_required.to_input x
 
 let user_default : t =
   { stake= true

@@ -55,7 +55,7 @@ module L = struct
       let public_key = Account_id.public_key id in
       let account' : Account.t =
         { account with
-          delegate= public_key
+          delegate= Some public_key
         ; public_key
         ; token_id= Account_id.token_id id }
       in
@@ -192,9 +192,14 @@ let get_or_initialize_exn account_id t idx =
   let account = get_exn t idx in
   if Public_key.Compressed.(equal empty account.public_key) then
     let public_key = Account_id.public_key account_id in
+    let token_id = Account_id.token_id account_id in
+    let delegate =
+      (* Only allow delegation if this account is for the default token. *)
+      if Token_id.(equal default) token_id then Some public_key else None
+    in
     ( `Added
     , { account with
-        delegate= public_key
+        delegate
       ; public_key
       ; token_id= Account_id.token_id account_id } )
   else (`Existed, account)
@@ -319,7 +324,9 @@ let apply_user_command_exn
             @@ Transaction_logic.validate_timing ~txn_amount:Amount.zero
                  ~txn_global_slot:current_global_slot ~account:source_account
           in
-          {source_account with delegate= Account_id.public_key receiver; timing}
+          { source_account with
+            delegate= Some (Account_id.public_key receiver)
+          ; timing }
         in
         [(source_idx, source_account)]
     | Payment {amount; token_id= token; _} ->
@@ -588,18 +595,25 @@ let handler t =
     List.map (path_exn !ledger idx) ~f:(function `Left h -> h | `Right h -> h)
   in
   stage (fun (With {request; respond}) ->
+      let f s =
+        Core.printf !"%s: %{sexp:Account.t list}\n%!" s (M.accounts !ledger)
+      in
       match request with
       | Ledger_hash.Get_element idx ->
+          f "Get_element" ;
           let elt = get_exn !ledger idx in
           let path = (path_exn idx :> Random_oracle.Digest.t list) in
           respond (Provide (elt, path))
       | Ledger_hash.Get_path idx ->
+          f "Get_path" ;
           let path = (path_exn idx :> Random_oracle.Digest.t list) in
           respond (Provide path)
       | Ledger_hash.Set (idx, account) ->
+          f "Set" ;
           ledger := set_exn !ledger idx account ;
           respond (Provide ())
       | Ledger_hash.Find_index pk ->
+          ksprintf f !"Find_index %{sexp:Account_id.t}" pk ;
           let index = find_index_exn !ledger pk in
           respond (Provide index)
       | _ ->

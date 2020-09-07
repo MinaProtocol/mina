@@ -1,6 +1,7 @@
 module Style = {
   open Css;
-  let title = merge([Theme.H1.hero, style([color(Theme.Colors.saville)])]);
+  let title =
+    merge([Theme.Type.h1jumbo, style([color(Theme.Colors.black)])]);
 
   let wrapper =
     style([
@@ -47,16 +48,9 @@ module Style = {
           marginBottom(`rem(2.)),
         ],
       ),
-      color(Theme.Colors.saville),
+      color(Theme.Colors.black),
       Theme.Typeface.ibmplexsans,
-      selector(
-        "a",
-        [
-          fontSize(`rem(1.125)),
-          lineHeight(`rem(1.875)),
-          ...Theme.Link.basicStyles,
-        ],
-      ),
+      selector("a", [fontSize(`rem(1.125)), lineHeight(`rem(1.875))]),
       selector(
         "ul",
         [

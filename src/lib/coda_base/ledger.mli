@@ -116,7 +116,8 @@ module Undo : sig
     module Body : sig
       type t = Undo.User_command_undo.Body.t =
         | Payment of {previous_empty_accounts: Account_id.t list}
-        | Stake_delegation of {previous_delegate: Public_key.Compressed.t}
+        | Stake_delegation of
+            { previous_delegate: Public_key.Compressed.t option }
         | Create_new_token of {created_token: Token_id.t}
         | Create_token_account
         | Mint_tokens

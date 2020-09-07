@@ -8,18 +8,19 @@ consensus_mechanism]
 
 open Snark_params.Tick
 module Coda_numbers = Coda_numbers
+module Hash_prefix_states = Hash_prefix_states
 
 [%%else]
 
 module Coda_numbers = Coda_numbers_nonconsensus.Coda_numbers
 module Currency = Currency_nonconsensus.Currency
 module Random_oracle = Random_oracle_nonconsensus.Random_oracle
+module Hash_prefix_states = Hash_prefix_states_nonconsensus.Hash_prefix_states
 
 [%%endif]
 
 module Frozen_ledger_hash = Frozen_ledger_hash0
 module Ledger_hash = Ledger_hash0
-module F = Pickles.Backend.Tick.Field
 open Snapp_basic
 
 module Poly = struct
@@ -40,7 +41,7 @@ module Stable = struct
   module V1 = struct
     type t =
       ( F.Stable.V1.t Snapp_state.Stable.V1.t
-      , ( Pickles.Side_loaded.Verification_key.Stable.V1.t
+      , ( Side_loaded_verification_key.Stable.V1.t
         , F.Stable.V1.t )
         With_hash.Stable.V1.t
         option )
@@ -52,6 +53,14 @@ module Stable = struct
 end]
 
 open Pickles_types
+
+let digest_vk (t : Side_loaded_verification_key.t) =
+  Random_oracle.(
+    hash ~init:Hash_prefix.side_loaded_vk
+      (pack_input (Side_loaded_verification_key.to_input t)))
+
+[%%ifdef
+consensus_mechanism]
 
 module Checked = struct
   type t =
@@ -86,15 +95,6 @@ module Checked = struct
       hash ~init:Hash_prefix_states.snapp_account (pack_input (to_input' t)))
 end
 
-let digest_vk t =
-  Random_oracle.(
-    hash ~init:Hash_prefix.side_loaded_vk
-      (pack_input (Pickles.Side_loaded.Verification_key.to_input t)))
-
-let dummy_vk_hash =
-  let x = lazy (digest_vk Pickles.Side_loaded.Verification_key.dummy) in
-  fun () -> Lazy.force x
-
 let typ : (Checked.t, t) Typ.t =
   let open Poly in
   Typ.of_hlistable
@@ -113,6 +113,11 @@ let typ : (Checked.t, t) Typ.t =
     ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
     ~value_of_hlist:of_hlist
 
+[%%endif]
+
+let dummy_vk_hash =
+  Memo.unit (fun () -> digest_vk Side_loaded_verification_key.dummy)
+
 let to_input (t : t) =
   let open Random_oracle.Input in
   let f mk acc field = mk (Core_kernel.Field.get field t) :: acc in
@@ -126,7 +131,7 @@ let to_input (t : t) =
 
 let default : _ Poly.t =
   (* These are the permissions of a "user"/"non snapp" account. *)
-  { app_state= Vector.init Snapp_state.Max_state_size.n ~f:(fun _ -> Field.zero)
+  { app_state= Vector.init Snapp_state.Max_state_size.n ~f:(fun _ -> F.zero)
   ; verification_key= None }
 
 let digest (t : t) =

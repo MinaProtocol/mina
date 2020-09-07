@@ -660,9 +660,9 @@ module Side_loaded = struct
   module Verification_key = struct
     include Side_loaded_verification_key
 
-    let of_compiled tag =
+    let of_compiled tag : t =
       let d = Types_map.lookup_compiled tag.Tag.id in
-      { Side_loaded_verification_key.wrap_vk= Some (Lazy.force d.wrap_vk)
+      { wrap_vk= Some (Lazy.force d.wrap_vk)
       ; wrap_index=
           Lazy.force d.wrap_key
           |> Matrix_evals.map ~f:(Abc.map ~f:Array.to_list)

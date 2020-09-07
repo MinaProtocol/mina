@@ -138,7 +138,7 @@ val create :
   -> fee_token:Token_id.t
   -> fee_payer_pk:Public_key.Compressed.t
   -> nonce:Coda_numbers.Account_nonce.t
-  -> valid_until:Coda_numbers.Global_slot.t
+  -> valid_until:Coda_numbers.Global_slot.t option
   -> memo:User_command_memo.t
   -> body:Body.t
   -> t

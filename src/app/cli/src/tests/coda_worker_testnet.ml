@@ -513,7 +513,7 @@ module Delegation : sig
 end = struct
   let delegate_stake ?acceptable_delay:(delay = 7) (testnet : Api.t) ~node
       ~delegator ~delegatee =
-    let valid_until = Coda_numbers.Global_slot.max_value in
+    let valid_until = None in
     let fee = User_command.minimum_fee in
     let worker = testnet.workers.(node) in
     let%bind _ =
@@ -569,7 +569,7 @@ end = struct
   let send_several_payments ?acceptable_delay:(delay = 7) (testnet : Api.t)
       ~node ~keypairs ~n =
     let amount = Currency.Amount.of_int 10 in
-    let valid_until = Coda_numbers.Global_slot.max_value in
+    let valid_until = None in
     let fee = User_command.minimum_fee in
     let%bind (_ : unit option list) =
       Deferred.List.init n ~f:(fun _ ->
@@ -632,7 +632,7 @@ end = struct
       ~(keypairs : Keypair.t list) ~n =
     let amount = Currency.Amount.of_int 10 in
     let fee = User_command.minimum_fee in
-    let valid_until = Coda_numbers.Global_slot.max_value in
+    let valid_until = None in
     let%bind new_payment_readers =
       Deferred.List.init (Array.length testnet.workers) ~f:(fun i ->
           let pk = Public_key.(compress @@ of_private_key_exn sender) in

@@ -8,6 +8,10 @@ module Block = {
       | MintTokens
       | Unknown;
 
+    type userCommandStatus =
+      | Applied
+      | Failed;
+
     let userCommandTypeOfString = s => {
       switch (s) {
       | "payment" => Payment
@@ -19,13 +23,26 @@ module Block = {
       };
     };
 
+    let userCommandStatusOfString = s => {
+      Belt.Option.mapWithDefault(s, None, status => {
+        switch (status) {
+        | "applied" => Some(Applied)
+        | "failed" => Some(Failed)
+        | _ => None
+        }
+      });
+    };
+
     type t = {
       id: int,
       type_: userCommandType,
+      status: option(userCommandStatus),
       fromAccount: string,
       toAccount: string,
+      feePayerAccount: string,
       fee: string,
       amount: option(string),
+      token: string,
     };
 
     module Decode = {
@@ -39,10 +56,17 @@ module Block = {
               json
               |> field("usercommandtype", string)
               |> userCommandTypeOfString,
+            status:
+              json
+              |> optional(field("usercommandstatus", string))
+              |> userCommandStatusOfString,
             fromAccount: json |> field("usercommandfromaccount", string),
             toAccount: json |> field("usercommandtoaccount", string),
+            feePayerAccount:
+              json |> field("usercommandfeepayeraccount", string),
             fee: json |> field("usercommandfee", string),
             amount: json |> optional(field("usercommandamount", string)),
+            token: json |> field("usercommandtoken", string),
           }
           ->Some
         | exception (DecodeError(_)) => None
@@ -185,7 +209,9 @@ module Metrics = {
     | SnarkFeesCollected
     | HighestSnarkFeeCollected
     | TransactionsReceivedByEcho
-    | CoinbaseReceiver;
+    | CoinbaseReceiver
+    | CreateAndSendToken
+    | ReceiveToken;
 
   type t = {
     blocksCreated: option(int),
@@ -194,5 +220,6 @@ module Metrics = {
     highestSnarkFeeCollected: option(int64),
     transactionsReceivedByEcho: option(int),
     coinbaseReceiver: option(bool),
+    createAndSendToken: option(int),
   };
 };

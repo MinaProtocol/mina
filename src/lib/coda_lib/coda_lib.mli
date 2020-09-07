@@ -10,6 +10,15 @@ module Subscriptions = Coda_subscriptions
 
 type t
 
+type Structured_log_events.t +=
+  | Connecting
+  | Listening
+  | Bootstrapping
+  | Ledger_catchup
+  | Synced
+  | Rebroadcast_transition of {state_hash: State_hash.t}
+  [@@deriving register_event]
+
 exception Snark_worker_error of int
 
 exception Snark_worker_signal_interrupt of Signal.t

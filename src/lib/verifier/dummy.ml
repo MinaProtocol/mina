@@ -37,12 +37,11 @@ let verify_commands _ (cs : Command_transaction.Verifiable.t list) :
 
 let verify_transaction_snarks _ ts =
   (*Don't check if the proof has default sok becasue they were probably not
-  intended to be checked. If it has something value then check that against the
+  intended to be checked. If it has some value then check that against the
   message passed. This is particularly used to test that invalid proofs are not
   added to the snark pool*)
   List.for_all ts ~f:(fun (proof, message) ->
-      if Sok_message.Digest.(equal (snd proof) default) then true
-      else
-        let msg_digest = Sok_message.digest message in
-        Coda_base.Sok_message.Digest.equal (snd proof) msg_digest )
+      let msg_digest = Sok_message.digest message in
+      Sok_message.Digest.(equal (snd proof) default)
+      || Coda_base.Sok_message.Digest.equal (snd proof) msg_digest )
   |> Deferred.Or_error.return

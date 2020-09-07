@@ -19,6 +19,18 @@ module Tree = struct
     | Hash of 'hash
     | Node of 'hash * ('hash, 'account) t * ('hash, 'account) t
   [@@deriving eq, sexp, to_yojson]
+
+  let accounts (t : (_, 'account) t) : 'account list =
+    let rec go acc t =
+      match t with
+      | Hash _ ->
+          acc
+      | Account a ->
+          a :: acc
+      | Node (_, l, r) ->
+          go (go acc l) r
+    in
+    go [] t
 end
 
 module T = struct
@@ -43,6 +55,8 @@ module T = struct
     ; tree: ('hash, 'account) Tree.t
     ; next_available_token: 'token_id }
   [@@deriving sexp, to_yojson]
+
+  let accounts t = Tree.accounts t.tree
 end
 
 module type S = sig
@@ -56,6 +70,8 @@ module type S = sig
 
   type t = (hash, account_id, account, token_id) T.t
   [@@deriving sexp, to_yojson]
+
+  val accounts : t -> account list
 
   val of_hash : depth:int -> next_available_token:token_id -> hash -> t
 
@@ -123,6 +139,8 @@ end = struct
         h
     | Node (h, _, _) ->
         h
+
+  let accounts = T.accounts
 
   type index = int [@@deriving sexp, to_yojson]
 

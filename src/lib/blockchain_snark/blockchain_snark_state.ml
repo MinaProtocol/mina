@@ -339,7 +339,7 @@ module type S = sig
     -> ( Protocol_state.Value.t
          * (Transaction_snark.Statement.With_sok.t * unit)
        , N2.n * (N2.n * unit)
-       , N1.n * (N2.n * unit)
+       , N1.n * (N5.n * unit)
        , Protocol_state.Value.t
        , Proof.t )
        Pickles.Prover.t
@@ -350,8 +350,7 @@ let verify state proof ~key =
 
 module Make (T : sig
   val tag : Transaction_snark.tag
-end) =
-struct
+end) : S = struct
   let proof_level = Genesis_constants.Proof_level.compiled
 
   let constraint_constants = Genesis_constants.Constraint_constants.compiled

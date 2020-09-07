@@ -35,10 +35,10 @@ module Style = {
   let text = style([maxWidth(`rem(50.)), margin(`auto)]);
   let h2 =
     merge([
-      Theme.H2.basic,
+      Theme.Type.h2,
       style([
         fontWeight(`light),
-        color(Theme.Colors.teal),
+        color(Theme.Colors.black),
         fontSize(`rem(1.5)),
         lineHeight(`rem(2.25)),
         media(
@@ -57,16 +57,16 @@ module Style = {
     ]);
   let heading =
     merge([
-      Theme.H2.basic,
+      Theme.Type.h2,
       style([
-        color(Theme.Colors.teal),
+        color(Theme.Colors.black),
         marginTop(`zero),
         marginBottom(`zero),
       ]),
     ]);
   let headingItemText =
     merge([
-      Theme.Body.basic,
+      Theme.Type.paragraph,
       style([
         marginTop(`rem(1.)),
         marginBottom(`zero),
@@ -97,9 +97,9 @@ module Style = {
   let benefitsList = style([marginTop(`rem(1.0)), flexDirection(`column)]);
   let benefitTitle =
     merge([
-      Theme.H3.basic,
+      Theme.Type.h3,
       style([
-        color(Theme.Colors.saville),
+        color(Theme.Colors.black),
         marginTop(`zero),
         marginBottom(`zero),
         width(`percent(30.)),
@@ -112,7 +112,7 @@ module Style = {
     style([listStyleType(`none), width(`percent(70.))]);
   let benefitDetails =
     merge([
-      Theme.Body.basic,
+      Theme.Type.paragraph,
       style([marginTop(`zero), marginBottom(`zero)]),
     ]);
   let jobsList =
@@ -186,7 +186,7 @@ module HeadingItem = {
         {React.string(p)}
         {switch (linkText, url) {
          | (Some(linkText), Some(url)) =>
-           <a href=url className=Theme.Link.basic>
+           <a href=url className=Theme.Type.paragraph>
              {React.string(" " ++ linkText)}
            </a>
          | _ => React.null
@@ -311,7 +311,7 @@ module ApplySection = {
                    href="/jobs/[slug]"
                    _as={"/jobs/" ++ post.slug}
                    passHref=true>
-                   <a className=Theme.Link.basic>
+                   <a className=Theme.Type.paragraph>
                      {React.string(post.title)}
                    </a>
                  </Next.Link>
@@ -340,7 +340,7 @@ module CareersSpacer = {
 let make = (~posts) => {
   <Page title="Work with us!">
     <div className=Style.page>
-      <h1 className=Theme.H3.wings> {React.string("Work with us!")} </h1>
+      <h1 className=Theme.Type.h3> {React.string("Work with us!")} </h1>
       <Spacer height=2.0 />
       <ImageGallery />
       <div className=Style.text>

@@ -182,7 +182,7 @@ module Openings = struct
           ; z_2: 'fq
           ; delta: 'g
           ; sg: 'g }
-        [@@deriving hlist, bin_io, version, sexp, compare, yojson, hash, eq]
+        [@@deriving sexp, compare, yojson, hash, eq, hlist]
       end
     end]
 
@@ -203,7 +203,7 @@ module Openings = struct
             'fqv Evals.Stable.V1.t
             * 'fqv Evals.Stable.V1.t
             * 'fqv Evals.Stable.V1.t }
-      [@@deriving hlist, bin_io, version, sexp, compare, yojson, hash, eq]
+      [@@deriving sexp, compare, yojson, hash, eq, hlist]
     end
   end]
 
@@ -224,7 +224,7 @@ module Poly_comm = struct
     module Stable = struct
       module V1 = struct
         type 'g t = {unshifted: 'g Pc_array.Stable.V1.t; shifted: 'g}
-        [@@deriving hlist, bin_io, version, sexp, compare, yojson, hash, eq]
+        [@@deriving sexp, compare, yojson, hlist, hash, eq]
       end
     end]
 
@@ -239,7 +239,7 @@ module Poly_comm = struct
     module Stable = struct
       module V1 = struct
         type 'g t = 'g Pc_array.Stable.V1.t
-        [@@deriving bin_io, version, sexp, compare, yojson, hash, eq]
+        [@@deriving sexp, compare, yojson, hash, eq]
       end
     end]
 
@@ -268,8 +268,7 @@ module Messages = struct
             'fq
             * ( 'g With_degree_bound.Stable.V1.t
               * 'g Without_degree_bound.Stable.V1.t ) }
-      [@@deriving
-        hlist, bin_io, version, sexp, compare, yojson, fields, hash, eq]
+      [@@deriving sexp, compare, yojson, fields, hash, eq, hlist]
     end
   end]
 
@@ -311,7 +310,7 @@ module Proof = struct
       type ('g, 'fq, 'fqv) t =
         { messages: ('g, 'fq) Messages.Stable.V1.t
         ; openings: ('g, 'fq, 'fqv) Openings.Stable.V1.t }
-      [@@deriving bin_io, version, sexp, compare, yojson, hash, eq]
+      [@@deriving sexp, compare, yojson, hash, eq]
     end
   end]
 end

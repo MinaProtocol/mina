@@ -9,7 +9,7 @@ open Pipe_lib
 
 let refused_answer_query_string = "Refused to answer_query"
 
-type exn += No_initial_peers
+exception No_initial_peers
 
 type Structured_log_events.t +=
   | Block_received of {state_hash: State_hash.t; sender: Envelope.Sender.t}

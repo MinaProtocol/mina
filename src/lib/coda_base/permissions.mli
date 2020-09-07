@@ -1,4 +1,10 @@
+[%%import "/src/config.mlh"]
+
+[%%ifdef consensus_mechanism]
+
 open Pickles.Impls.Step
+
+[%%endif]
 
 module Auth_required : sig
   [%%versioned:
@@ -12,6 +18,8 @@ module Auth_required : sig
   val to_input : t -> (_, bool) Random_oracle_input.t
 
   val check : t -> Control.Tag.t -> bool
+
+  [%%ifdef consensus_mechanism]
 
   module Checked : sig
     type t
@@ -29,6 +37,8 @@ module Auth_required : sig
   end
 
   val typ : (Checked.t, t) Typ.t
+
+  [%%endif]
 end
 
 module Poly : sig
@@ -58,6 +68,8 @@ end]
 
 val to_input : t -> (_, bool) Random_oracle_input.t
 
+[%%ifdef consensus_mechanism]
+
 module Checked : sig
   type t = (Boolean.var, Auth_required.Checked.t) Poly.Stable.Latest.t
 
@@ -69,6 +81,8 @@ module Checked : sig
 end
 
 val typ : (Checked.t, t) Typ.t
+
+[%%endif]
 
 val user_default : t
 
