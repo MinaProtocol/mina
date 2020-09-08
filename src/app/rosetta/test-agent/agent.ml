@@ -78,6 +78,7 @@ let verify_in_mempool_and_block ~logger ~rosetta_uri ~graphql_uri
       ~expected:operation_expectations
       ~actual:mempool_res.transaction.operations ~situation:"mempool"
   in
+  [%log info] "Verified mempool operations" ;
   let%bind last_block_index =
     keep_trying
       ~step:(fun () ->
@@ -97,9 +98,12 @@ let verify_in_mempool_and_block ~logger ~rosetta_uri ~graphql_uri
       ~each_delay:(Span.of_ms 250.0)
       ~failure_reason:"Took too long for the last block to be fetched"
   in
+  [%log debug]
+    ~metadata:[("index", `Intlit (Int64.to_string last_block_index))]
+    "Found block index $index" ;
   (* Start staking so we get blocks *)
   let%bind _res = Poke.Staking.enable ~graphql_uri in
-  (* Wait until the newest-block is at least index>last_block_index *)
+  (* Wait until the newest-block is at least index>last_block_index and there is at least not a coinbase *)
   let%bind block =
     keep_trying
       ~step:(fun () ->
@@ -108,12 +112,19 @@ let verify_in_mempool_and_block ~logger ~rosetta_uri ~graphql_uri
         in
         match
           Result.map block_r ~f:(fun block ->
-              if
+              let newer_block : bool =
                 Int64.(
                   (Option.value_exn block.Block_response.block)
                     .block_identifier
                     .index > last_block_index)
-              then Some block
+              in
+              let at_least_txn_not_coinbase : bool =
+                Int.(
+                  List.length
+                    (Option.value_exn block.Block_response.block).transactions
+                  > 1)
+              in
+              if newer_block && at_least_txn_not_coinbase then Some block
               else None )
         with
         | Error _ ->
@@ -126,11 +137,23 @@ let verify_in_mempool_and_block ~logger ~rosetta_uri ~graphql_uri
       ~each_delay:(Span.of_ms 250.0)
       ~failure_reason:"Took too long for a block to be created"
   in
+  [%log debug]
+    ~metadata:
+      [ ( "index"
+        , `Intlit
+            (Int64.to_string
+               (Option.value_exn block.Block_response.block).block_identifier
+                 .index) ) ]
+    "Waited for the next block index $index" ;
   (* Stop noisy block production *)
   let%bind _res = Poke.Staking.disable ~graphql_uri in
   let succesful (x : Operation_expectation.t) = {x with status= "Success"} in
-  Logger.info logger "GOT BLOCK $block" ~module_:__MODULE__ ~location:__LOC__
-    ~metadata:[("block", Block_response.to_yojson block)] ;
+  [%log debug]
+    ~metadata:
+      [ ( "transactions"
+        , [%to_yojson: Rosetta_models.Transaction.t list]
+            (Option.value_exn block.block).transactions ) ]
+    "Asserting that operations are similar in block. Transactions $transactions" ;
   Operation_expectation.assert_similar_operations ~logger
     ~expected:
       ( List.map ~f:succesful operation_expectations
@@ -513,6 +536,7 @@ let check_new_account_user_commands ~logger ~rosetta_uri ~graphql_uri =
   in
   (* Directly create a payment in graphql and make sure it's in the mempool
        * properly, and then in a block properly *)
+  [%log info] "Starting payment check" ;
   let%bind () =
     direct_graphql_payment_through_block ~logger ~rosetta_uri ~graphql_uri
       ~network_response
@@ -522,12 +546,14 @@ let check_new_account_user_commands ~logger ~rosetta_uri ~graphql_uri =
   let%bind _res = Poke.Staking.disable ~graphql_uri in
   (* Follow the full construction API flow and make sure the submitted
    * transaction appears in the mempool *)
+  [%log info] "Starting construction payment check" ;
   let%bind () =
     construction_api_payment_through_mempool ~logger ~rosetta_uri ~graphql_uri
       ~network_response
   in
   [%log info] "Created construction payment and waited" ;
   (* Stop staking *)
+  [%log info] "Starting delegation check" ;
   let%bind _res = Poke.Staking.disable ~graphql_uri in
   let%bind () =
     direct_graphql_delegation_through_block ~logger ~rosetta_uri ~graphql_uri
@@ -535,6 +561,7 @@ let check_new_account_user_commands ~logger ~rosetta_uri ~graphql_uri =
   in
   [%log info] "Created graphql delegation and waited" ;
   (* Stop staking *)
+  [%log info] "Starting construction delegation check" ;
   let%bind _res = Poke.Staking.disable ~graphql_uri in
   let%bind () =
     construction_api_delegation_through_mempool ~logger ~rosetta_uri
@@ -542,36 +569,42 @@ let check_new_account_user_commands ~logger ~rosetta_uri ~graphql_uri =
   in
   [%log info] "Created construction delegation and waited" ;
   (* Stop staking *)
+  [%log info] "Starting create token check" ;
   let%bind _res = Poke.Staking.disable ~graphql_uri in
   let%bind () =
     direct_graphql_create_token_through_block ~logger ~rosetta_uri ~graphql_uri
       ~network_response
   in
   [%log info] "Created token via graphql and waited" ;
+  [%log info] "Starting create token construction check" ;
   let%bind () =
     construction_api_create_token_through_mempool ~logger ~rosetta_uri
       ~graphql_uri ~network_response
   in
   [%log info] "Created token using construction and waited" ;
   (* Stop staking *)
+  [%log info] "Starting create token account check" ;
   let%bind _res = Poke.Staking.disable ~graphql_uri in
   let%bind () =
     direct_graphql_create_token_account_through_block ~logger ~rosetta_uri
       ~graphql_uri ~network_response
   in
   [%log info] "Created token account and waited" ;
+  [%log info] "Starting construction create token account check" ;
   let%bind () =
     construction_api_create_token_account_through_mempool ~logger ~rosetta_uri
       ~graphql_uri ~network_response
   in
   [%log info] "Created token account using construction and waited" ;
   (* Stop staking *)
+  [%log info] "Starting mint tokens check" ;
   let%bind _res = Poke.Staking.disable ~graphql_uri in
   let%bind () =
     direct_graphql_mint_tokens_through_block ~logger ~rosetta_uri ~graphql_uri
       ~network_response
   in
   [%log info] "Minted tokens and waited" ;
+  [%log info] "Starting construction mint tokens check" ;
   let%bind () =
     construction_api_mint_tokens_through_mempool ~logger ~rosetta_uri
       ~graphql_uri ~network_response
