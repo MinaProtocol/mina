@@ -79,8 +79,8 @@ module Pair_with_make
     (F : Cstubs_applicative.Foreign_applicative)
     (P : Prefix)
     (Elt : Type_with_finalizer
-               with type 'a result := 'a F.result
-                           and type 'a return := 'a F.return) =
+           with type 'a result := 'a F.result
+            and type 'a return := 'a F.return) =
 struct
   open F
   open F.Let_syntax
@@ -247,14 +247,14 @@ module PlonkVerifierIndex
     (P : Prefix)
     (Index : Type)
     (Urs : Type_with_finalizer
-               with type 'a result := 'a F.result
-                           and type 'a return := 'a F.return)
+           with type 'a result := 'a F.result
+            and type 'a return := 'a F.return)
     (PolyComm : Type_with_finalizer
-               with type 'a result := 'a F.result
-                           and type 'a return := 'a F.return)
+                with type 'a result := 'a F.result
+                 and type 'a return := 'a F.return)
     (ScalarField : Type_with_finalizer
-               with type 'a result := 'a F.result
-                           and type 'a return := 'a F.return) =
+                   with type 'a result := 'a F.result
+                    and type 'a return := 'a F.return) =
 struct
   include (
     struct
@@ -1378,11 +1378,11 @@ module Dlog_plonk_proof
     (ScalarFieldVector : Type)
     (FieldVectorPair : Type)
     (OpeningProof : Type_with_finalizer
-               with type 'a result := 'a F.result
-                           and type 'a return := 'a F.return)
+                    with type 'a result := 'a F.result
+                     and type 'a return := 'a F.return)
     (PolyComm : Type_with_finalizer
-               with type 'a result := 'a F.result
-                           and type 'a return := 'a F.return) =
+                with type 'a result := 'a F.result
+                 and type 'a return := 'a F.return) =
 struct
   open F
   open F.Let_syntax
@@ -1404,6 +1404,7 @@ struct
           Caml.Gc.finalise (bind_return ~f:delete) x ;
           x )
   end
+
   include T
 
   (* Stub out delete to make sure we don't attempt to double-free. *)
@@ -1684,13 +1685,15 @@ end
 module Dlog_plonk_oracles
     (F : Cstubs_applicative.Foreign_applicative)
     (P : Prefix) (Field : sig
-        include Type_with_finalizer
-                   with type 'a result := 'a F.result
-                               and type 'a return := 'a F.return
+        include
+          Type_with_finalizer
+          with type 'a result := 'a F.result
+           and type 'a return := 'a F.return
 
-        module Vector : Type_with_finalizer
-                   with type 'a result := 'a F.result
-                               and type 'a return := 'a F.return
+        module Vector :
+          Type_with_finalizer
+          with type 'a result := 'a F.result
+           and type 'a return := 'a F.return
     end)
     (VerifierIndex : Type)
     (Proof : Type)
@@ -2305,18 +2308,21 @@ module Full (F : Cstubs_applicative.Foreign_applicative) = struct
 
   module Plonk_dlog_proof_system
       (P : Prefix) (Field : sig
-          include Prefix_type_with_finalizer
-                             with type 'a result := 'a F.result
-                                                            and type 'a return := 'a F.return
+          include
+            Prefix_type_with_finalizer
+            with type 'a result := 'a F.result
+             and type 'a return := 'a F.return
 
           module Vector : sig
-            include Prefix_type_with_finalizer
-                               with type 'a result := 'a F.result
-                                                              and type 'a return := 'a F.return
+            include
+              Prefix_type_with_finalizer
+              with type 'a result := 'a F.result
+               and type 'a return := 'a F.return
 
-            module Triple : Type_with_finalizer
-                               with type 'a result := 'a F.result
-                                                              and type 'a return := 'a F.return
+            module Triple :
+              Type_with_finalizer
+              with type 'a result := 'a F.result
+               and type 'a return := 'a F.return
           end
       end) (Curve : sig
         include Prefix_type
@@ -2324,22 +2330,27 @@ module Full (F : Cstubs_applicative.Foreign_applicative) = struct
         module Affine : sig
           module Underlying : Type
 
-          include Type_with_finalizer
-                             with type 'a result := 'a F.result
-                                                            and type 'a return := 'a F.return and type t = Underlying.t ptr
+          include
+            Type_with_finalizer
+            with type 'a result := 'a F.result
+             and type 'a return := 'a F.return
+             and type t = Underlying.t ptr
 
-          module Vector : Type_with_finalizer
-                             with type 'a result := 'a F.result
-                                                            and type 'a return := 'a F.return
+          module Vector :
+            Type_with_finalizer
+            with type 'a result := 'a F.result
+             and type 'a return := 'a F.return
 
           module Pair : sig
-            include Type_with_finalizer
-                               with type 'a result := 'a F.result
-                                                              and type 'a return := 'a F.return
+            include
+              Type_with_finalizer
+              with type 'a result := 'a F.result
+               and type 'a return := 'a F.return
 
-            module Vector : Type_with_finalizer
-                               with type 'a result := 'a F.result
-                                                              and type 'a return := 'a F.return
+            module Vector :
+              Type_with_finalizer
+              with type 'a result := 'a F.result
+               and type 'a return := 'a F.return
           end
         end
       end) =
@@ -2349,14 +2360,18 @@ module Full (F : Cstubs_applicative.Foreign_applicative) = struct
     module Field_triple = Triple (F) (Field) (Field)
 
     module Field_opening_proof =
-      Dlog_opening_proof (F) (struct
+      Dlog_opening_proof
+        (F)
+        (struct
           let prefix = with_prefix (P.prefix "opening_proof")
         end)
         (Field)
         (Curve.Affine)
 
     module Field_poly_comm =
-      Dlog_poly_comm (F) (struct
+      Dlog_poly_comm
+        (F)
+        (struct
           let prefix = with_prefix (prefix "poly_comm")
         end)
         (Curve.Affine)
@@ -2438,11 +2453,13 @@ module Full (F : Cstubs_applicative.Foreign_applicative) = struct
         fun urs chals -> add_finalizer (b_poly_commitment urs chals)
     end
 
-    module Gate_vector = Plonk_gate_vector  (F)(P) (Field.Vector)
-    module Constraint_system = Plonk_constraint_system  (F)(P) (Gate_vector)
+    module Gate_vector = Plonk_gate_vector (F) (P) (Field.Vector)
+    module Constraint_system = Plonk_constraint_system (F) (P) (Gate_vector)
 
     module Field_index =
-      Plonk_index (F)(struct
+      Plonk_index
+        (F)
+        (struct
           let prefix = with_prefix (P.prefix "index")
         end)
         (Constraint_system)
@@ -2450,17 +2467,20 @@ module Full (F : Cstubs_applicative.Foreign_applicative) = struct
         (Field_urs)
 
     module Field_verifier_index =
-      PlonkVerifierIndex (F)(struct
+      PlonkVerifierIndex
+        (F)
+        (struct
           let prefix = with_prefix (P.prefix "verifier_index")
         end)
         (Field_index)
         (Field_urs)
         (Field_poly_comm)
         (Field)
-        
 
     module Field_proof =
-      Dlog_plonk_proof (F)(struct
+      Dlog_plonk_proof
+        (F)
+        (struct
           let prefix = with_prefix (P.prefix "proof")
         end)
         (Curve.Affine)
@@ -2471,17 +2491,17 @@ module Full (F : Cstubs_applicative.Foreign_applicative) = struct
         (Field.Vector.Triple)
         (Field_opening_proof)
         (Field_poly_comm)
-        
 
     module Field_oracles =
-      Dlog_oracles (F)(struct
+      Dlog_oracles
+        (F)
+        (struct
           let prefix = with_prefix (prefix "oracles")
         end)
         (Field)
         (Field_verifier_index)
         (Field_proof)
         (Field.Vector.Triple)
-        
   end
 
   module Tweedle = struct
