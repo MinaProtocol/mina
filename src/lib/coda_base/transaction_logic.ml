@@ -1278,6 +1278,10 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                    (Control.tag one.authorization))
               one.data.body acct1'
           in
+          let undo_per_account loc (a : Account.t) =
+            ( Account_id.create a.public_key fee_token_id
+            , match loc with `New -> None | `Existing _ -> Some a )
+          in
           ( ( [(loc1, acct1')] @ Option.to_list lacct2'
             @ Option.(
                 to_list
@@ -1287,13 +1291,11 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               ( (account_id1, Some acct1)
                 :: Option.(
                      to_list
-                       (map lacct2 ~f:(fun (_, x) ->
-                            (Account_id.create x.public_key token_id, None) )))
+                       (map lacct2 ~f:(fun (loc, a) -> undo_per_account loc a)))
               @ Option.(
                   to_list
                     (map fee_payer_info ~f:(fun (loc, a, _) ->
-                         ( Account_id.create a.public_key fee_token_id
-                         , match loc with `New -> None | _ -> Some a ) ))) ) )
+                         undo_per_account loc a ))) ) )
         in
         let check_nonce nonce ~state_view:_ ~(self : Account.t) ~other_prev:_
             ~other_next:_ ~fee_payer_pk:_ =
@@ -1802,7 +1804,6 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         (apply_snapp_command_unchecked ~constraint_constants
            ~state_view:txn_state_view ledger payment)
     in
-    Core.printf "root after\n%!" ;
     let root = merkle_root ledger in
     let next_available_token = next_available_token ledger in
     Or_error.ok_exn (undo_snapp_command ~constraint_constants ledger undo) ;

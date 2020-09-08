@@ -595,25 +595,18 @@ let handler t =
     List.map (path_exn !ledger idx) ~f:(function `Left h -> h | `Right h -> h)
   in
   stage (fun (With {request; respond}) ->
-      let f s =
-        Core.printf !"%s: %{sexp:Account.t list}\n%!" s (M.accounts !ledger)
-      in
       match request with
       | Ledger_hash.Get_element idx ->
-          f "Get_element" ;
           let elt = get_exn !ledger idx in
           let path = (path_exn idx :> Random_oracle.Digest.t list) in
           respond (Provide (elt, path))
       | Ledger_hash.Get_path idx ->
-          f "Get_path" ;
           let path = (path_exn idx :> Random_oracle.Digest.t list) in
           respond (Provide path)
       | Ledger_hash.Set (idx, account) ->
-          f "Set" ;
           ledger := set_exn !ledger idx account ;
           respond (Provide ())
       | Ledger_hash.Find_index pk ->
-          ksprintf f !"Find_index %{sexp:Account_id.t}" pk ;
           let index = find_index_exn !ledger pk in
           respond (Provide index)
       | _ ->
