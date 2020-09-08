@@ -7,6 +7,21 @@ module Base = struct
 
     type ledger_proof
 
+    val verify_commands :
+         t
+      -> Coda_base.Command_transaction.Verifiable.t list
+         (* The first level of error represents failure to verify, the second a failure in
+   communicating with the verifier. *)
+      -> [ `Valid of Coda_base.Command_transaction.Valid.t
+         | `Invalid
+         | `Valid_assuming of
+           ( Pickles.Side_loaded.Verification_key.t
+           * Coda_base.Snapp_statement.t
+           * Pickles.Side_loaded.Proof.t )
+           list ]
+         list
+         Deferred.Or_error.t
+
     val verify_blockchain_snark :
       t -> Blockchain_snark.Blockchain.t -> bool Or_error.t Deferred.t
 

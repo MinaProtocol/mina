@@ -12,6 +12,17 @@ module Worker_state = struct
   module type S = sig
     val verify_blockchain_snark : Protocol_state.Value.t -> Proof.t -> bool
 
+    val verify_commands :
+         Coda_base.Command_transaction.Verifiable.t list
+      -> [ `Valid of Coda_base.Command_transaction.Valid.t
+         | `Invalid
+         | `Valid_assuming of
+           ( Pickles.Side_loaded.Verification_key.t
+           * Coda_base.Snapp_statement.t
+           * Pickles.Side_loaded.Proof.t )
+           list ]
+         list
+
     val verify_transaction_snarks :
       (Transaction_snark.t * Sok_message.t) list -> bool
   end
@@ -33,6 +44,10 @@ module Worker_state = struct
           (let bc_vk = Precomputed_values.blockchain_verification ()
            and tx_vk = Precomputed_values.transaction_verification () in
            let module M = struct
+             let verify_commands (_cs : Command_transaction.Verifiable.t list)
+                 : _ list =
+               failwith "unimplemented"
+
              let verify_blockchain_snark state proof =
                Blockchain_snark.Blockchain_snark_state.verify state proof
                  ~key:bc_vk
@@ -55,6 +70,16 @@ module Worker_state = struct
     | Check | None ->
         Deferred.return
         @@ ( module struct
+             let verify_commands cs =
+               List.map cs ~f:(fun c ->
+                   match Common.check c with
+                   | `Valid c ->
+                       `Valid c
+                   | `Invalid ->
+                       `Invalid
+                   | `Valid_assuming (c, _) ->
+                       `Valid c )
+
              let verify_blockchain_snark _ _ = true
 
              let verify_transaction_snarks _ = true
@@ -71,7 +96,19 @@ module Worker = struct
     type 'w functions =
       { verify_blockchain: ('w, Blockchain.t, bool) F.t
       ; verify_transaction_snarks:
-          ('w, (Transaction_snark.t * Sok_message.t) list, bool) F.t }
+          ('w, (Transaction_snark.t * Sok_message.t) list, bool) F.t
+      ; verify_commands:
+          ( 'w
+          , Command_transaction.Verifiable.t list
+          , [ `Valid of Command_transaction.Valid.t
+            | `Invalid
+            | `Valid_assuming of
+              ( Pickles.Side_loaded.Verification_key.t
+              * Coda_base.Snapp_statement.t
+              * Pickles.Side_loaded.Proof.t )
+              list ]
+            list )
+          F.t }
 
     module Worker_state = Worker_state
 
@@ -95,6 +132,10 @@ module Worker = struct
         let (module M) = Worker_state.get w in
         Deferred.return (M.verify_transaction_snarks ts)
 
+      let verify_commands (w : Worker_state.t) ts =
+        let (module M) = Worker_state.get w in
+        Deferred.return (M.verify_commands ts)
+
       let functions =
         let f (i, o, f) =
           C.create_rpc
@@ -110,7 +151,21 @@ module Worker = struct
                   * Sok_message.Stable.Latest.t )
                   list]
               , Bool.bin_t
-              , verify_transaction_snarks ) }
+              , verify_transaction_snarks )
+        ; verify_commands=
+            f
+              ( [%bin_type_class:
+                  Command_transaction.Verifiable.Stable.Latest.t list]
+              , [%bin_type_class:
+                  [ `Valid of Command_transaction.Valid.Stable.Latest.t
+                  | `Invalid
+                  | `Valid_assuming of
+                    ( Pickles.Side_loaded.Verification_key.Stable.Latest.t
+                    * Coda_base.Snapp_statement.Stable.Latest.t
+                    * Pickles.Side_loaded.Proof.Stable.Latest.t )
+                    list ]
+                  list]
+              , verify_commands ) }
 
       let init_worker_state Worker_state.{conf_dir; logger; proof_level} =
         ( if Option.is_some conf_dir then
@@ -175,3 +230,6 @@ let verify_blockchain_snark t chain =
 
 let verify_transaction_snarks t ts =
   Worker.Connection.run t ~f:Worker.functions.verify_transaction_snarks ~arg:ts
+
+let verify_commands t ts =
+  Worker.Connection.run t ~f:Worker.functions.verify_commands ~arg:ts
