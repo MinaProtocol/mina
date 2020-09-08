@@ -151,7 +151,7 @@ ARG CODA_DIR=coda
 # can also be a tagged release
 # TODO: change this to two distinct variables, one for opam/dependency clone
 #       and a distinct one for the coda codebase in the next stage
-ARG CODA_BRANCH=develop
+ARG OPAM_BRANCH=develop
 
 # location of external packages
 ARG EXTERNAL_PKG_DIR=$CODA_DIR/src/external
@@ -163,7 +163,7 @@ ENV OPAMREUSEBUILDDIR false
 
 # git will clone into an empty dir, but this also helps us set the workdir in advance
 RUN git clone \
-  -b "${CODA_BRANCH}" \
+  -b "${OPAM_BRANCH}" \
   --depth 1 \
   --shallow-submodules \
   --recurse-submodules \
@@ -215,7 +215,16 @@ FROM opam-deps AS builder
 # Use --build-arg "DUNE_PROFILE=dev" to build a dev image or for CI
 ARG DUNE_PROFILE=testnet_postake_medium_curves
 
+# branch to checkout on first clone (this will be the only availible branch in the container)
+# can also be a tagged release
+# TODO: change this to two distinct variables, one for opam/dependency clone
+#       and a distinct one for the coda codebase in the next stage
+ARG CODA_BRANCH=develop
+
 ENV PATH "$PATH:/usr/lib/go/bin:$HOME/.cargo/bin"
+
+RUN git checkout "${CODA_BRANCH}" \
+  --recurse-submodules
 
 # Build libp2p_helper and clear go module caches
 # Could maybe also delete go during this step / build it as part of the deps stage?
@@ -230,7 +239,6 @@ RUN git pull \
 
 # Make rosetta-crucial components and the generate_keypair tool
 RUN eval $(opam config env) \
-  && git pull \
   && dune build --profile=${DUNE_PROFILE} \
     src/app/generate_keypair/generate_keypair.exe \
     src/app/cli/src/coda.exe \
