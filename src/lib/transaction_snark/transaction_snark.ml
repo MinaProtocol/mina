@@ -1281,7 +1281,9 @@ module Base = struct
              in
              let%bind receipt_chain_hash =
                let current = account.receipt_chain_hash in
-               let%bind r = Receipt.Chain_hash.Checked.cons ~payload current in
+               let%bind r =
+                 Receipt.Chain_hash.Checked.cons (User_command payload) current
+               in
                Receipt.Chain_hash.Checked.if_ is_user_command ~then_:r
                  ~else_:current
              in
@@ -1367,6 +1369,7 @@ module Base = struct
              ; delegate
              ; voting_for= account.voting_for
              ; timing
+             ; permissions= account.permissions
              ; snapp= account.snapp } ))
     in
     let%bind receiver_increase =
@@ -1529,6 +1532,7 @@ module Base = struct
              ; delegate
              ; voting_for= account.voting_for
              ; timing= account.timing
+             ; permissions= account.permissions
              ; snapp= account.snapp } ))
     in
     let%bind fee_payer_is_source = Account_id.Checked.equal fee_payer source in
@@ -1670,6 +1674,7 @@ module Base = struct
              ; delegate
              ; voting_for= account.voting_for
              ; timing
+             ; permissions= account.permissions
              ; snapp= account.snapp } ))
     in
     let%bind fee_excess =

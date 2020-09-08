@@ -58,13 +58,17 @@ module Numeric = struct
       ; typ: ('var, 'a) Typ.t
       ; to_input: 'a -> (F.t, bool) Random_oracle_input.t
       ; to_input_checked:
-          'var -> (Field.Var.t, Boolean.var) Random_oracle_input.t }
+          'var -> (Field.Var.t, Boolean.var) Random_oracle_input.t
+      ; lte_checked: 'var -> 'var -> Boolean.var }
+
+    let run f x y = Impl.run_checked (f x y)
 
     let length =
       Length.
         { zero
         ; max_value
         ; compare
+        ; lte_checked= run Checked.( <= )
         ; equal
         ; typ
         ; to_input
@@ -75,6 +79,7 @@ module Numeric = struct
         { zero
         ; max_value= max_int
         ; compare
+        ; lte_checked= run Checked.( <= )
         ; equal
         ; typ
         ; to_input
@@ -85,6 +90,7 @@ module Numeric = struct
         { zero
         ; max_value= max_int
         ; compare
+        ; lte_checked= run Checked.( <= )
         ; equal
         ; typ
         ; to_input
@@ -95,6 +101,7 @@ module Numeric = struct
         { zero
         ; max_value
         ; compare
+        ; lte_checked= run Checked.( <= )
         ; equal
         ; typ
         ; to_input
@@ -105,6 +112,7 @@ module Numeric = struct
         { zero
         ; max_value
         ; compare
+        ; lte_checked= run Checked.( <= )
         ; equal
         ; typ
         ; to_input
@@ -116,6 +124,7 @@ module Numeric = struct
         ; max_value= of_uint64 Unsigned.UInt64.max_int
         ; equal
         ; compare
+        ; lte_checked= run Checked.( <= )
         ; typ
         ; to_input
         ; to_input_checked= Fn.compose Impl.run_checked Checked.to_input }
@@ -124,6 +133,7 @@ module Numeric = struct
       Block_time.
         { equal
         ; compare
+        ; lte_checked= run Checked.( <= )
         ; zero
         ; max_value
         ; typ= Unpacked.typ
@@ -150,6 +160,16 @@ module Numeric = struct
 
   module Checked = struct
     type 'a t = 'a Closed_interval.t Or_ignore.Checked.t
+
+    let to_input {to_input_checked; _} (t : 'a t) =
+      Or_ignore.Checked.to_input t
+        ~f:(Closed_interval.to_input ~f:to_input_checked)
+
+    open Impl
+
+    let check {lte_checked= ( <= ); _} (t : 'a t) (x : 'a) =
+      Or_ignore.Checked.check t ~f:(fun {lower; upper} ->
+          Boolean.all [lower <= x; x <= upper] )
   end
 
   let typ {equal= eq; zero; max_value; typ; _} =
@@ -172,42 +192,92 @@ module Eq_data = struct
   module Tc = struct
     type ('var, 'a) t =
       { equal: 'a -> 'a -> bool
+      ; equal_checked: 'var -> 'var -> Boolean.var
       ; default: 'a
       ; typ: ('var, 'a) Typ.t
       ; to_input: 'a -> (F.t, bool) Random_oracle_input.t
       ; to_input_checked:
           'var -> (Field.Var.t, Boolean.var) Random_oracle_input.t }
 
+    let run f x y = Impl.run_checked (f x y)
+
     let field =
       let open Random_oracle_input in
       Field.
-        {typ; equal; default= zero; to_input= field; to_input_checked= field}
+        { typ
+        ; equal
+        ; equal_checked= run Checked.equal
+        ; default= zero
+        ; to_input= field
+        ; to_input_checked= field }
 
     let receipt_chain_hash =
       Receipt.Chain_hash.
-        {field with to_input_checked= var_to_input; typ; equal}
+        { field with
+          to_input_checked= var_to_input
+        ; typ
+        ; equal
+        ; equal_checked= run equal_var }
 
     let ledger_hash =
-      Ledger_hash.{field with to_input_checked= var_to_input; typ; equal}
+      Ledger_hash.
+        { field with
+          to_input_checked= var_to_input
+        ; typ
+        ; equal
+        ; equal_checked= run equal_var }
 
     let frozen_ledger_hash =
       Frozen_ledger_hash.
-        {field with to_input_checked= var_to_input; typ; equal}
+        { field with
+          to_input_checked= var_to_input
+        ; typ
+        ; equal
+        ; equal_checked= run equal_var }
 
     let state_hash =
-      State_hash.{field with to_input_checked= var_to_input; typ; equal}
+      State_hash.
+        { field with
+          to_input_checked= var_to_input
+        ; typ
+        ; equal
+        ; equal_checked= run equal_var }
+
+    let epoch_seed =
+      Epoch_seed.
+        { field with
+          to_input_checked= var_to_input
+        ; typ
+        ; equal
+        ; equal_checked= run equal_var }
 
     let public_key () =
       Public_key.Compressed.
-        { default= Public_key.Compressed.empty
-        ; to_input= Public_key.Compressed.to_input
-        ; to_input_checked= Public_key.Compressed.Checked.to_input
+        { default= Lazy.force invalid_public_key
+        ; to_input
+        ; to_input_checked= Checked.to_input
+        ; equal_checked= run Checked.equal
         ; typ
         ; equal }
   end
 
-  let to_input {Tc.default; to_input; _} (t : _ t) =
-    to_input (match t with Ignore -> default | Check x -> x)
+  let to_input ~explicit {Tc.default; to_input; _} (t : _ t) =
+    if explicit then
+      Flagged_option.to_input' ~f:to_input
+        ( match t with
+        | Ignore ->
+            {is_some= false; data= default}
+        | Check data ->
+            {is_some= true; data} )
+    else to_input (match t with Ignore -> default | Check x -> x)
+
+  let to_input_explicit tc = to_input ~explicit:true tc
+
+  let to_input_checked {Tc.to_input_checked; _} (t : _ Checked.t) =
+    Checked.to_input t ~f:to_input_checked
+
+  let check_checked {Tc.equal_checked; _} (t : 'a Checked.t) (x : 'a) =
+    Checked.check t ~f:(equal_checked x)
 
   let check ~label {Tc.equal; _} (t : 'a t) (x : 'a) =
     match t with
@@ -226,13 +296,15 @@ end
 module Hash = struct
   include Eq_data
 
-  let typ = typ_implicit
+  let to_input tc = to_input ~explicit:true tc
+
+  let typ = typ_explicit
 end
 
 module Leaf_typs = struct
   let public_key () =
     Public_key.Compressed.(
-      Or_ignore.typ_implicit ~ignore:Public_key.Compressed.empty ~equal typ)
+      Or_ignore.typ_explicit ~ignore:(Lazy.force invalid_public_key) typ)
 
   open Eq_data.Tc
 
@@ -313,10 +385,10 @@ module Account = struct
       [ Numeric.(to_input Tc.balance balance)
       ; Numeric.(to_input Tc.nonce nonce)
       ; Hash.(to_input Tc.receipt_chain_hash receipt_chain_hash)
-      ; Eq_data.(to_input (Tc.public_key ()) public_key)
-      ; Eq_data.(to_input (Tc.public_key ()) delegate)
+      ; Eq_data.(to_input_explicit (Tc.public_key ()) public_key)
+      ; Eq_data.(to_input_explicit (Tc.public_key ()) delegate)
       ; Vector.reduce_exn ~f:append
-          (Vector.map state ~f:Eq_data.(to_input Tc.field)) ]
+          (Vector.map state ~f:Eq_data.(to_input_explicit Tc.field)) ]
 
   let digest t =
     Random_oracle.(
@@ -330,6 +402,51 @@ module Account = struct
       , Public_key.Compressed.var Eq_data.Checked.t
       , Field.Var.t Eq_data.Checked.t )
       Poly.Stable.Latest.t
+
+    let to_input
+        ({balance; nonce; receipt_chain_hash; public_key; delegate; state} : t)
+        =
+      let open Random_oracle_input in
+      List.reduce_exn ~f:append
+        [ Numeric.(Checked.to_input Tc.balance balance)
+        ; Numeric.(Checked.to_input Tc.nonce nonce)
+        ; Hash.(to_input_checked Tc.receipt_chain_hash receipt_chain_hash)
+        ; Eq_data.(to_input_checked (Tc.public_key ()) public_key)
+        ; Eq_data.(to_input_checked (Tc.public_key ()) delegate)
+        ; Vector.reduce_exn ~f:append
+            (Vector.map state ~f:Eq_data.(to_input_checked Tc.field)) ]
+
+    open Impl
+
+    let check_nonsnapp
+        ({balance; nonce; receipt_chain_hash; public_key; delegate; state= _} :
+          t) (a : Account.Checked.Unhashed.t) =
+      Boolean.all
+        [ Numeric.(Checked.check Tc.balance balance a.balance)
+        ; Numeric.(Checked.check Tc.nonce nonce a.nonce)
+        ; Eq_data.(
+            check_checked Tc.receipt_chain_hash receipt_chain_hash
+              a.receipt_chain_hash)
+        ; Eq_data.(check_checked (Tc.public_key ()) delegate a.delegate)
+        ; Eq_data.(check_checked (Tc.public_key ()) public_key a.public_key) ]
+
+    let check_snapp
+        ({ balance= _
+         ; nonce= _
+         ; receipt_chain_hash= _
+         ; public_key= _
+         ; delegate= _
+         ; state } :
+          t) (snapp : Snapp_account.Checked.t) =
+      Boolean.all
+        Vector.(
+          to_list
+            (map2 state snapp.app_state ~f:Eq_data.(check_checked Tc.field)))
+
+    let digest (t : t) =
+      Random_oracle.Checked.(
+        hash ~init:Hash_prefix.snapp_predicate_account
+          (pack_input (to_input t)))
   end
 
   let typ () : (Checked.t, Stable.Latest.t) Typ.t =
@@ -393,25 +510,7 @@ module Protocol_state = struct
     *)
 
   module Epoch_data = struct
-    module Poly = struct
-      [%%versioned
-      module Stable = struct
-        module V1 = struct
-          type ( 'epoch_ledger
-               , 'epoch_seed
-               , 'start_checkpoint
-               , 'lock_checkpoint
-               , 'length )
-               t =
-            { ledger: 'epoch_ledger
-            ; seed: 'epoch_seed
-            ; start_checkpoint: 'start_checkpoint
-            ; lock_checkpoint: 'lock_checkpoint
-            ; epoch_length: 'length }
-          [@@deriving hlist, sexp, eq, yojson, hash, compare]
-        end
-      end]
-    end
+    module Poly = Epoch_data.Poly
 
     [%%versioned
     module Stable = struct
@@ -421,7 +520,7 @@ module Protocol_state = struct
           ( ( Frozen_ledger_hash.Stable.V1.t Hash.Stable.V1.t
             , Currency.Amount.Stable.V1.t Numeric.Stable.V1.t )
             Epoch_ledger.Poly.Stable.V1.t
-          , unit (* TODO *)
+          , Epoch_seed.Stable.V1.t Hash.Stable.V1.t
           , State_hash.Stable.V1.t Hash.Stable.V1.t
           , State_hash.Stable.V1.t Hash.Stable.V1.t
           , Length.Stable.V1.t Numeric.Stable.V1.t )
@@ -434,7 +533,7 @@ module Protocol_state = struct
 
     let to_input
         ({ ledger= {hash; total_currency}
-         ; seed= ()
+         ; seed
          ; start_checkpoint
          ; lock_checkpoint
          ; epoch_length } :
@@ -443,6 +542,7 @@ module Protocol_state = struct
       List.reduce_exn ~f:append
         [ Hash.(to_input Tc.frozen_ledger_hash hash)
         ; Numeric.(to_input Tc.amount total_currency)
+        ; Hash.(to_input Tc.epoch_seed seed)
         ; Hash.(to_input Tc.state_hash start_checkpoint)
         ; Hash.(to_input Tc.state_hash lock_checkpoint)
         ; Numeric.(to_input Tc.length epoch_length) ]
@@ -452,11 +552,27 @@ module Protocol_state = struct
         ( ( Frozen_ledger_hash.var Hash.Checked.t
           , Currency.Amount.var Numeric.Checked.t )
           Epoch_ledger.Poly.t
-        , unit (* TODO *)
+        , Epoch_seed.var Hash.Checked.t
         , State_hash.var Hash.Checked.t
         , State_hash.var Hash.Checked.t
         , Length.Checked.t Numeric.Checked.t )
         Poly.t
+
+      let to_input
+          ({ ledger= {hash; total_currency}
+           ; seed
+           ; start_checkpoint
+           ; lock_checkpoint
+           ; epoch_length } :
+            t) =
+        let open Random_oracle.Input in
+        List.reduce_exn ~f:append
+          [ Hash.(to_input_checked Tc.frozen_ledger_hash hash)
+          ; Numeric.(Checked.to_input Tc.amount total_currency)
+          ; Hash.(to_input_checked Tc.epoch_seed seed)
+          ; Hash.(to_input_checked Tc.state_hash start_checkpoint)
+          ; Hash.(to_input_checked Tc.state_hash lock_checkpoint)
+          ; Numeric.(Checked.to_input Tc.length epoch_length) ]
     end
   end
 
@@ -464,8 +580,7 @@ module Protocol_state = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type ( 'staged_ledger_hash_ledger_hash
-             , 'snarked_ledger_hash
+        type ( 'snarked_ledger_hash
              , 'token_id
              , 'time
              , 'length
@@ -474,12 +589,22 @@ module Protocol_state = struct
              , 'amount
              , 'epoch_data )
              t =
-          { staged_ledger_hash_ledger_hash: 'staged_ledger_hash_ledger_hash
-          ; snarked_ledger_hash: 'snarked_ledger_hash
+          { (* TODO: 
+             We should include staged ledger hash again! It only changes once per
+             block. *)
+            snarked_ledger_hash: 'snarked_ledger_hash
           ; snarked_next_available_token: 'token_id
           ; timestamp: 'time
           ; blockchain_length: 'length
-          ; epoch_count: 'length
+                (* TODO: This previously had epoch_count but I removed it as I believe it is redundant
+   with curr_global_slot.
+
+   epoch_count in [a, b]
+
+   should be equivalent to
+
+   curr_global_slot in [slots_per_epoch * a, slots_per_epoch * b]
+*)
           ; min_window_density: 'length
           ; last_vrf_output: 'vrf_output
           ; total_currency: 'amount
@@ -495,8 +620,7 @@ module Protocol_state = struct
   module Stable = struct
     module V1 = struct
       type t =
-        ( Ledger_hash.Stable.V1.t Hash.Stable.V1.t
-        , Frozen_ledger_hash.Stable.V1.t Hash.Stable.V1.t
+        ( Frozen_ledger_hash.Stable.V1.t Hash.Stable.V1.t
         , Token_id.Stable.V1.t Numeric.Stable.V1.t
         , Block_time.Stable.V1.t Numeric.Stable.V1.t
         , Length.Stable.V1.t Numeric.Stable.V1.t
@@ -512,12 +636,10 @@ module Protocol_state = struct
   end]
 
   let to_input
-      ({ staged_ledger_hash_ledger_hash
-       ; snarked_ledger_hash
+      ({ snarked_ledger_hash
        ; snarked_next_available_token
        ; timestamp
        ; blockchain_length
-       ; epoch_count
        ; min_window_density
        ; last_vrf_output
        ; total_currency
@@ -529,12 +651,10 @@ module Protocol_state = struct
     let () = last_vrf_output in
     let length = Numeric.(to_input Tc.length) in
     List.reduce_exn ~f:append
-      [ Hash.(to_input Tc.field staged_ledger_hash_ledger_hash)
-      ; Hash.(to_input Tc.field snarked_ledger_hash)
+      [ Hash.(to_input Tc.field snarked_ledger_hash)
       ; Numeric.(to_input Tc.token_id snarked_next_available_token)
       ; Numeric.(to_input Tc.time timestamp)
       ; length blockchain_length
-      ; length epoch_count
       ; length min_window_density
       ; Numeric.(to_input Tc.amount total_currency)
       ; Numeric.(to_input Tc.global_slot curr_global_slot)
@@ -546,10 +666,55 @@ module Protocol_state = struct
       hash ~init:Hash_prefix.snapp_predicate_protocol_state
         (pack_input (to_input t)))
 
+  module View = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t =
+          ( Frozen_ledger_hash.Stable.V1.t
+          , Token_id.Stable.V1.t
+          , Block_time.Stable.V1.t
+          , Length.Stable.V1.t
+          , unit (* TODO *)
+          , Global_slot.Stable.V1.t
+          , Currency.Amount.Stable.V1.t
+          , ( ( Frozen_ledger_hash.Stable.V1.t
+              , Currency.Amount.Stable.V1.t )
+              Epoch_ledger.Poly.Stable.V1.t
+            , Epoch_seed.Stable.V1.t
+            , State_hash.Stable.V1.t
+            , State_hash.Stable.V1.t
+            , Length.Stable.V1.t )
+            Epoch_data.Poly.Stable.V1.t )
+          Poly.Stable.V1.t
+        [@@deriving sexp, eq, yojson, hash, compare]
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    module Checked = struct
+      type t =
+        ( Frozen_ledger_hash.var
+        , Token_id.var
+        , Block_time.Unpacked.var
+        , Length.Checked.t
+        , unit (* TODO *)
+        , Global_slot.Checked.t
+        , Currency.Amount.var
+        , ( (Frozen_ledger_hash.var, Currency.Amount.var) Epoch_ledger.Poly.t
+          , Epoch_seed.var
+          , State_hash.var
+          , State_hash.var
+          , Length.Checked.t )
+          Epoch_data.Poly.t )
+        Poly.t
+    end
+  end
+
   module Checked = struct
     type t =
-      ( Ledger_hash.var Hash.Checked.t
-      , Frozen_ledger_hash.var Hash.Checked.t
+      ( Frozen_ledger_hash.var Hash.Checked.t
       , Token_id.var Numeric.Checked.t
       , Block_time.Unpacked.var Numeric.Checked.t
       , Length.Checked.t Numeric.Checked.t
@@ -558,13 +723,91 @@ module Protocol_state = struct
       , Currency.Amount.var Numeric.Checked.t
       , Epoch_data.Checked.t )
       Poly.Stable.Latest.t
+
+    let to_input
+        ({ snarked_ledger_hash
+         ; snarked_next_available_token
+         ; timestamp
+         ; blockchain_length
+         ; min_window_density
+         ; last_vrf_output
+         ; total_currency
+         ; curr_global_slot
+         ; staking_epoch_data
+         ; next_epoch_data } :
+          t) =
+      let open Random_oracle.Input in
+      let () = last_vrf_output in
+      let length = Numeric.(Checked.to_input Tc.length) in
+      List.reduce_exn ~f:append
+        [ Hash.(to_input_checked Tc.frozen_ledger_hash snarked_ledger_hash)
+        ; Numeric.(Checked.to_input Tc.token_id snarked_next_available_token)
+        ; Numeric.(Checked.to_input Tc.time timestamp)
+        ; length blockchain_length
+        ; length min_window_density
+        ; Numeric.(Checked.to_input Tc.amount total_currency)
+        ; Numeric.(Checked.to_input Tc.global_slot curr_global_slot)
+        ; Epoch_data.Checked.to_input staking_epoch_data
+        ; Epoch_data.Checked.to_input next_epoch_data ]
+
+    let digest t =
+      Random_oracle.Checked.(
+        hash ~init:Hash_prefix.snapp_predicate_protocol_state
+          (pack_input (to_input t)))
+
+    let check
+        (* Bind all the fields explicity so we make sure they are all used. *)
+        ({ snarked_ledger_hash
+         ; snarked_next_available_token
+         ; timestamp
+         ; blockchain_length
+         ; min_window_density
+         ; last_vrf_output
+         ; total_currency
+         ; curr_global_slot
+         ; staking_epoch_data
+         ; next_epoch_data } :
+          t) (s : View.Checked.t) =
+      let open Impl in
+      let epoch_ledger ({hash; total_currency} : _ Epoch_ledger.Poly.t)
+          (t : Epoch_ledger.var) =
+        [ Hash.(check_checked Tc.frozen_ledger_hash) hash t.hash
+        ; Numeric.(Checked.check Tc.amount) total_currency t.total_currency ]
+      in
+      let epoch_data
+          ({ledger; seed; start_checkpoint; lock_checkpoint; epoch_length} :
+            _ Epoch_data.Poly.t) (t : _ Epoch_data.Poly.t) =
+        ignore seed ;
+        epoch_ledger ledger t.ledger
+        @ [ Hash.(check_checked Tc.state_hash)
+              start_checkpoint t.start_checkpoint
+          ; Hash.(check_checked Tc.state_hash)
+              lock_checkpoint t.lock_checkpoint
+          ; Numeric.(Checked.check Tc.length) epoch_length t.epoch_length ]
+      in
+      ignore last_vrf_output ;
+      Boolean.all
+        ( [ Hash.(check_checked Tc.ledger_hash)
+              snarked_ledger_hash s.snarked_ledger_hash
+          ; Numeric.(Checked.check Tc.token_id)
+              snarked_next_available_token s.snarked_next_available_token
+          ; Numeric.(Checked.check Tc.time) timestamp s.timestamp
+          ; Numeric.(Checked.check Tc.length)
+              blockchain_length s.blockchain_length
+          ; Numeric.(Checked.check Tc.length)
+              min_window_density s.min_window_density
+          ; Numeric.(Checked.check Tc.amount) total_currency s.total_currency
+          ; Numeric.(Checked.check Tc.global_slot)
+              curr_global_slot s.curr_global_slot ]
+        @ epoch_data staking_epoch_data s.staking_epoch_data
+        @ epoch_data next_epoch_data s.next_epoch_data )
   end
 
   let typ : (Checked.t, Stable.Latest.t) Typ.t =
     let open Poly.Stable.Latest in
-    let ledger_hash = Hash.(typ Tc.ledger_hash) in
     let frozen_ledger_hash = Hash.(typ Tc.frozen_ledger_hash) in
     let state_hash = Hash.(typ Tc.state_hash) in
+    let epoch_seed = Hash.(typ Tc.epoch_seed) in
     let length = Numeric.(typ Tc.length) in
     let time = Numeric.(typ Tc.time) in
     let amount = Numeric.(typ Tc.amount) in
@@ -580,16 +823,14 @@ module Protocol_state = struct
       in
       let open Epoch_data.Poly in
       Typ.of_hlistable
-        [epoch_ledger; Typ.unit; state_hash; state_hash; length]
+        [epoch_ledger; epoch_seed; state_hash; state_hash; length]
         ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
         ~value_of_hlist:of_hlist
     in
     Typ.of_hlistable
-      [ ledger_hash
-      ; frozen_ledger_hash
+      [ frozen_ledger_hash
       ; token_id
       ; time
-      ; length
       ; length
       ; length
       ; Typ.unit
@@ -600,49 +841,18 @@ module Protocol_state = struct
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
 
-  module View = struct
-    [%%versioned
-    module Stable = struct
-      module V1 = struct
-        type t =
-          ( Ledger_hash.Stable.V1.t
-          , Frozen_ledger_hash.Stable.V1.t
-          , Token_id.Stable.V1.t
-          , Block_time.Stable.V1.t
-          , Length.Stable.V1.t
-          , unit (* TODO *)
-          , Global_slot.Stable.V1.t
-          , Currency.Amount.Stable.V1.t
-          , ( ( Frozen_ledger_hash.Stable.V1.t
-              , Currency.Amount.Stable.V1.t )
-              Epoch_ledger.Poly.Stable.V1.t
-            , unit (* TODO *)
-            , State_hash.Stable.V1.t
-            , State_hash.Stable.V1.t
-            , Length.Stable.V1.t )
-            Epoch_data.Poly.Stable.V1.t )
-          Poly.Stable.V1.t
-        [@@deriving sexp, eq, yojson, hash, compare]
-
-        let to_latest = Fn.id
-      end
-    end]
-  end
-
   let accept : t =
     let epoch_data : Epoch_data.t =
       { ledger= {hash= Ignore; total_currency= Ignore}
-      ; seed= ()
+      ; seed= Ignore
       ; start_checkpoint= Ignore
       ; lock_checkpoint= Ignore
       ; epoch_length= Ignore }
     in
-    { staged_ledger_hash_ledger_hash= Ignore
-    ; snarked_ledger_hash= Ignore
+    { snarked_ledger_hash= Ignore
     ; snarked_next_available_token= Ignore
     ; timestamp= Ignore
     ; blockchain_length= Ignore
-    ; epoch_count= Ignore
     ; min_window_density= Ignore
     ; last_vrf_output= ()
     ; total_currency= Ignore
@@ -652,12 +862,10 @@ module Protocol_state = struct
 
   let check
       (* Bind all the fields explicity so we make sure they are all used. *)
-      ({ staged_ledger_hash_ledger_hash
-       ; snarked_ledger_hash
+      ({ snarked_ledger_hash
        ; snarked_next_available_token
        ; timestamp
        ; blockchain_length
-       ; epoch_count
        ; min_window_density
        ; last_vrf_output
        ; total_currency
@@ -699,10 +907,6 @@ module Protocol_state = struct
       ()
     in
     let%bind () =
-      Hash.(check ~label:"staged_ledger_hash_ledger_hash" Tc.ledger_hash)
-        staged_ledger_hash_ledger_hash s.staged_ledger_hash_ledger_hash
-    in
-    let%bind () =
       Hash.(check ~label:"snarked_ledger_hash" Tc.ledger_hash)
         snarked_ledger_hash s.snarked_ledger_hash
     in
@@ -716,9 +920,6 @@ module Protocol_state = struct
     let%bind () =
       Numeric.(check ~label:"blockchain_length" Tc.length)
         blockchain_length s.blockchain_length
-    in
-    let%bind () =
-      Numeric.(check ~label:"epoch_count" Tc.length) epoch_count s.epoch_count
     in
     let%bind () =
       Numeric.(check ~label:"min_window_density" Tc.length)
@@ -793,12 +994,29 @@ module Account_type = struct
     | _ ->
         assert false
 
-  let to_input = Fn.compose Random_oracle_input.bitstring to_bits
+  let to_input x = Random_oracle_input.bitstring (to_bits x)
 
   module Checked = struct
     type t = {user: Boolean.var; snapp: Boolean.var} [@@deriving hlist]
 
     let to_input {user; snapp} = Random_oracle_input.bitstring [user; snapp]
+
+    let constant =
+      let open Boolean in
+      function
+      | User ->
+          {user= true_; snapp= false_}
+      | Snapp ->
+          {user= false_; snapp= true_}
+      | None ->
+          {user= false_; snapp= false_}
+      | Any ->
+          {user= true_; snapp= true_}
+
+    (* TODO: Write a unit test for these. *)
+    let snapp_allowed t = t.snapp
+
+    let user_allowed t = t.user
   end
 
   let typ =
@@ -826,15 +1044,78 @@ module Account_type = struct
             Any )
 end
 
+module Other = struct
+  module Poly = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type ('account, 'account_transition, 'vk) t =
+          { predicate: 'account
+          ; account_transition: 'account_transition
+          ; account_vk: 'vk }
+        [@@deriving hlist, sexp, eq, yojson, hash, compare]
+      end
+    end]
+  end
+
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t =
+        ( Account.Stable.V1.t
+        , Account_state.Stable.V1.t Transition.Stable.V1.t
+        , F.Stable.V1.t Hash.Stable.V1.t )
+        Poly.Stable.V1.t
+      [@@deriving sexp, eq, yojson, hash, compare]
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  module Checked = struct
+    type t =
+      ( Account.Checked.t
+      , Account_state.Checked.t Transition.t
+      , Field.Var.t Or_ignore.Checked.t )
+      Poly.Stable.Latest.t
+
+    let to_input ({predicate; account_transition; account_vk} : t) =
+      let open Random_oracle_input in
+      List.reduce_exn ~f:append
+        [ Account.Checked.to_input predicate
+        ; Transition.to_input ~f:Account_state.Checked.to_input
+            account_transition
+        ; Hash.(to_input_checked Tc.field) account_vk ]
+  end
+
+  let to_input ({predicate; account_transition; account_vk} : t) =
+    let open Random_oracle_input in
+    List.reduce_exn ~f:append
+      [ Account.to_input predicate
+      ; Transition.to_input ~f:Account_state.to_input account_transition
+      ; Hash.(to_input Tc.field) account_vk ]
+
+  let typ () =
+    let open Poly in
+    Typ.of_hlistable
+      [Account.typ (); Transition.typ Account_state.typ; Hash.(typ Tc.field)]
+      ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
+      ~value_of_hlist:of_hlist
+
+  let accept : t =
+    { predicate= Account.accept
+    ; account_transition= {prev= Any; next= Any}
+    ; account_vk= Ignore }
+end
+
 module Poly = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type ('account, 'protocol_state, 'account_type, 'vk) t =
+      type ('account, 'protocol_state, 'other, 'pk) t =
         { self_predicate: 'account
-        ; other_predicate: 'account
-        ; other_account_type: 'account_type
-        ; other_account_vk: 'vk
+        ; other: 'other
+        ; fee_payer: 'pk
         ; protocol_state_predicate: 'protocol_state }
       [@@deriving hlist, sexp, eq, yojson, hash, compare]
 
@@ -854,8 +1135,8 @@ module Stable = struct
     type t =
       ( Account.Stable.V1.t
       , Protocol_state.Stable.V1.t
-      , Account_type.Stable.V1.t
-      , F.Stable.V1.t Hash.Stable.V1.t )
+      , Other.Stable.V1.t
+      , Public_key.Compressed.Stable.V1.t Eq_data.Stable.V1.t )
       Poly.Stable.V1.t
     [@@deriving sexp, eq, yojson, hash, compare]
 
@@ -863,123 +1144,90 @@ module Stable = struct
   end
 end]
 
-module Digested = struct
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type t =
-        ( F.Stable.V1.t
-        , F.Stable.V1.t
-        , Account_type.Stable.V1.t
-        , F.Stable.V1.t Hash.Stable.V1.t )
-        Poly.Stable.V1.t
-      [@@deriving sexp, eq, yojson, hash, compare]
+module Digested = F
 
-      let to_latest = Fn.id
-    end
-  end]
+let to_input ({self_predicate; other; fee_payer; protocol_state_predicate} : t)
+    =
+  let open Random_oracle_input in
+  List.reduce_exn ~f:append
+    [ Account.to_input self_predicate
+    ; Other.to_input other
+    ; Eq_data.(to_input_explicit (Tc.public_key ())) fee_payer
+    ; Protocol_state.to_input protocol_state_predicate ]
 
-  let to_input
-      ({ self_predicate
-       ; other_predicate
-       ; other_account_type
-       ; other_account_vk
-       ; protocol_state_predicate } :
-        t) =
-    let open Random_oracle.Input in
-    List.reduce_exn ~f:append
-      [ field self_predicate
-      ; field other_predicate
-      ; Hash.(to_input Tc.field) other_account_vk
-      ; Account_type.to_input other_account_type
-      ; field protocol_state_predicate ]
+let digest t =
+  Random_oracle.(
+    hash ~init:Hash_prefix.snapp_predicate (pack_input (to_input t)))
 
-  module Checked = struct
-    type t =
-      ( Field.Var.t
-      , Field.Var.t
-      , Account_type.Checked.t
-      , Field.Var.t Hash.Checked.t )
-      Poly.Stable.Latest.t
-
-    let to_input
-        ({ self_predicate
-         ; other_predicate
-         ; other_account_type
-         ; other_account_vk
-         ; protocol_state_predicate } :
-          t) =
-      let open Random_oracle.Input in
-      List.reduce_exn ~f:append
-        [ field self_predicate
-        ; field other_predicate
-        ; Hash.Checked.to_input other_account_vk ~f:field
-        ; Account_type.Checked.to_input other_account_type
-        ; field protocol_state_predicate ]
-  end
-end
-
-let digest
-    ({ self_predicate
-     ; other_predicate
-     ; other_account_type
-     ; other_account_vk
-     ; protocol_state_predicate } :
-      t) : Digested.t =
-  { self_predicate= Account.digest self_predicate
-  ; other_predicate= Account.digest other_predicate
-  ; other_account_type
-  ; other_account_vk
-  ; protocol_state_predicate= Protocol_state.digest protocol_state_predicate }
-
-let check
-    ({ self_predicate
-     ; other_predicate
-     ; other_account_type
-     ; other_account_vk
-     ; protocol_state_predicate } :
-      t) ~state_view ~self ~(other : _ option) =
+let check ({self_predicate; other; fee_payer; protocol_state_predicate} : t)
+    ~state_view ~self ~(other_prev : A.t option) ~(other_next : unit option)
+    ~fee_payer_pk =
   let open Or_error.Let_syntax in
   let%bind () = Protocol_state.check protocol_state_predicate state_view in
   let%bind () = Account.check self_predicate self in
-  let%bind () = Account_type.check other_account_type other in
   let%bind () =
-    match other with
+    Eq_data.(check (Tc.public_key ()))
+      ~label:"fee_payer" fee_payer fee_payer_pk
+  in
+  let%bind () =
+    let check (s : Account_state.t) (a : _ option) =
+      match (s, a) with
+      | Any, _ | Empty, None | Non_empty, Some _ ->
+          return ()
+      | _ ->
+          Or_error.error_string "Bad account state"
+    in
+    let%bind () = check other.account_transition.prev other_prev
+    and () = check other.account_transition.next other_next in
+    match other_prev with
     | None ->
         return ()
-    | Some other -> (
-        let%bind () = Account.check other_predicate other in
-        match other.snapp with
+    | Some other_account -> (
+        let%bind () = Account.check other.predicate other_account in
+        match other_account.snapp with
         | None ->
             assert_
-              (other_account_vk = Ignore)
+              (other.account_vk = Ignore)
               "other_account_vk must be ignore for user account"
         | Some snapp ->
             Hash.(check ~label:"other_account_vk" Tc.field)
-              other_account_vk snapp.verification_key.hash )
+              other.account_vk
+              (Option.value_map ~f:With_hash.hash snapp.verification_key
+                 ~default:Field.zero) )
   in
   return ()
 
 let accept : t =
   { self_predicate= Account.accept
-  ; other_predicate= Account.accept
-  ; other_account_type= Any
-  ; other_account_vk= Ignore
+  ; other= Other.accept
+  ; fee_payer= Ignore
   ; protocol_state_predicate= Protocol_state.accept }
 
 module Checked = struct
   type t =
     ( Account.Checked.t
     , Protocol_state.Checked.t
-    , Account_type.Checked.t
-    , Field.Var.t Or_ignore.Checked.t )
+    , Other.Checked.t
+    , Public_key.Compressed.var Or_ignore.Checked.t )
     Poly.Stable.Latest.t
+
+  let to_input
+      ({self_predicate; other; fee_payer; protocol_state_predicate} : t) =
+    let open Random_oracle_input in
+    List.reduce_exn ~f:append
+      [ Account.Checked.to_input self_predicate
+      ; Other.Checked.to_input other
+      ; Eq_data.(to_input_checked (Tc.public_key ())) fee_payer
+      ; Protocol_state.Checked.to_input protocol_state_predicate ]
+
+  let digest t =
+    Random_oracle.Checked.(
+      hash ~init:Hash_prefix.snapp_predicate (pack_input (to_input t)))
 end
 
 let typ () : (Checked.t, Stable.Latest.t) Typ.t =
   Poly.typ
     [ Account.typ ()
-    ; Account.typ ()
-    ; Account_type.typ
-    ; Hash.(typ Tc.field)
+    ; Other.typ ()
+    ; Eq_data.(typ_explicit (Tc.public_key ()))
     ; Protocol_state.typ ]

@@ -100,7 +100,7 @@ module Combine = struct
                   ; public_key=
                       { Public_key.hex_bytes= public_key_hex_bytes
                       ; curve_type= "tweedle" }
-                  ; signature_type= "schnorr"
+                  ; signature_type= "schnorr_poseidon"
                   ; hex_bytes= signature } ] }
             |> to_yojson)
         ~path:"construction/combine"

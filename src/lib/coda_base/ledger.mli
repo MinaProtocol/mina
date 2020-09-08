@@ -141,9 +141,23 @@ module Undo : sig
     [@@deriving sexp]
   end
 
+  module Snapp_command_undo : sig
+    type t = Undo.Snapp_command_undo.t =
+      { accounts: (Account_id.t * Account.t option) list
+      ; command: Snapp_command.t With_status.t }
+    [@@deriving sexp]
+  end
+
+  module Command_undo : sig
+    type t = Undo.Command_undo.t =
+      | User_command of User_command_undo.t
+      | Snapp_command of Snapp_command_undo.t
+    [@@deriving sexp]
+  end
+
   module Varying : sig
     type t = Undo.Varying.t =
-      | User_command of User_command_undo.t
+      | Command of Command_undo.t
       | Fee_transfer of Fee_transfer_undo.t
       | Coinbase of Coinbase_undo.t
     [@@deriving sexp]
