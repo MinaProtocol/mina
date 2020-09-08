@@ -722,6 +722,11 @@ pub extern "C" fn zexe_tweedle_plonk_fp_proof_evaluations_make(
 }
 
 #[no_mangle]
+pub extern "C" fn zexe_tweedle_plonk_fp_proof_evaluations_delete(x: *mut DlogProofEvaluations<Fp>) {
+    let _box = unsafe { Box::from_raw(x) };
+}
+
+#[no_mangle]
 pub extern "C" fn zexe_tweedle_plonk_fp_proof_evaluations_pair_0(
     e: *const [DlogProofEvaluations<Fp>; 2],
 ) -> *const DlogProofEvaluations<Fp> {
@@ -735,6 +740,11 @@ pub extern "C" fn zexe_tweedle_plonk_fp_proof_evaluations_pair_1(
 ) -> *const DlogProofEvaluations<Fp> {
     let x = (unsafe { &(*e)[1] }).clone();
     return Box::into_raw(Box::new(x));
+}
+
+#[no_mangle]
+pub extern "C" fn zexe_tweedle_plonk_fp_proof_evaluations_pair_delete(x: *mut [DlogProofEvaluations<Fp>; 2]) {
+    let _box = unsafe { Box::from_raw(x) };
 }
 
 // Fp oracles

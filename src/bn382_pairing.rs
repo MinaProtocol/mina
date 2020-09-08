@@ -339,6 +339,11 @@ pub extern "C" fn zexe_bn382_fp_vector_triple_2(evals: *const [Vec<Fp>; 3]) -> *
 }
 
 #[no_mangle]
+pub extern "C" fn zexe_bn382_fp_vector_triple_delete(x: *mut [Fp; 3]) {
+    let _box = unsafe { Box::from_raw(x) };
+}
+
+#[no_mangle]
 pub extern "C" fn zexe_bn382_batch_pairing_check(
     // Pardon the tortured encoding. It's this way because we have to add
     // additional OCaml bindings for each specialized vector type.
@@ -690,6 +695,11 @@ pub extern "C" fn zexe_bn382_fp_proof_commitment_with_degree_bound_1(
 }
 
 #[no_mangle]
+pub extern "C" fn zexe_bn382_fp_proof_commitment_with_degree_bound_delete(x: *mut G1Affine) {
+    let _box = unsafe { Box::from_raw(x) };
+}
+
+#[no_mangle]
 pub extern "C" fn zexe_bn382_fp_proof_proof1(p: *mut ProverProof<Bn_382>) -> *const G1Affine {
     let x = (unsafe { (*p).proof1 }).clone();
     return Box::into_raw(Box::new(x));
@@ -821,6 +831,11 @@ pub extern "C" fn zexe_bn382_fp_proof_evals_1(evals: *const [Fp; 3]) -> *const F
 pub extern "C" fn zexe_bn382_fp_proof_evals_2(evals: *const [Fp; 3]) -> *const Fp {
     let x = (unsafe { *evals })[2].clone();
     return Box::into_raw(Box::new(x));
+}
+
+#[no_mangle]
+pub extern "C" fn zexe_bn382_fp_proof_evals_delete(x: *mut [Fp; 3]) {
+    let _box = unsafe { Box::from_raw(x) };
 }
 
 // Fp proof vector
@@ -1208,6 +1223,11 @@ pub extern "C" fn zexe_bn382_fp_urs_create(depth: usize) -> *const URS<Bn_382> {
         (0..depth).collect(),
         &mut rand_core::OsRng,
     )))
+}
+
+#[no_mangle]
+pub extern "C" fn zexe_bn382_fp_urs_delete(x: *mut URS<Bn_382>) {
+    let _box = unsafe { Box::from_raw(x) };
 }
 
 #[no_mangle]
@@ -1776,6 +1796,11 @@ pub extern "C" fn zexe_bn382_g1_affine_pair_make(
 ) -> *const (G1Affine, G1Affine) {
     let res = ((unsafe { *x0 }), (unsafe { *x1 }));
     return Box::into_raw(Box::new(res));
+}
+
+#[no_mangle]
+pub extern "C" fn zexe_bn382_g1_affine_pair_delete(x: *mut (G1Affine, G1Affine)) {
+    let _box = unsafe { Box::from_raw(x) };
 }
 
 #[no_mangle]
