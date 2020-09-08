@@ -9,8 +9,5 @@ let () =
     Format.formatter_of_out_channel
       (open_out "snarky_bn382_generated_stubs.ml")
   in
-  Format.pp_print_string fmt {c|
-[@@@warning "-11"]
-|c} ;
   Cstubs_applicative.write_ml ~prefix:"snarky_bn382" fmt
     (module Snarky_bn382_bindings.Full)

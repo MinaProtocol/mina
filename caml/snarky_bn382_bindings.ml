@@ -1021,6 +1021,8 @@ struct
   module Vector = Vector (F) (P) (T)
 
   module Evaluations = struct
+    let prefix = with_prefix (prefix "evaluations")
+
     module T :
       Type_with_finalizer
       with type 'a result := 'a F.result
@@ -1041,8 +1043,6 @@ struct
     let delete : t -> unit = ignore
 
     include T
-
-    let prefix = with_prefix (prefix "evaluations")
 
     let f s =
       let%map f = foreign (prefix s) (typ @-> returning ScalarFieldVector.typ)

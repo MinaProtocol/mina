@@ -826,6 +826,7 @@ void *zexe_tweedle_fq_proof_evaluations_make(
     void *, void *, void *,
     void *, void *, void *
 );
+void zexe_tweedle_fq_proof_evaluations_delete(void *);
 
 void *zexe_tweedle_fq_proof_evaluations_row_nocopy(void *);
 void *zexe_tweedle_fq_proof_evaluations_col_nocopy(void *);
@@ -1096,6 +1097,7 @@ void *zexe_tweedle_fp_proof_evaluations_make(
     void *, void *, void *,
     void *, void *, void *
 );
+void zexe_tweedle_fp_proof_evaluations_delete(void *);
 
 void *zexe_tweedle_fp_proof_evaluations_row_nocopy(void *);
 void *zexe_tweedle_fp_proof_evaluations_col_nocopy(void *);

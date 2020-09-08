@@ -1820,6 +1820,11 @@ pub extern "C" fn zexe_tweedle_fp_proof_evaluations_make(
     return Box::into_raw(Box::new(res));
 }
 
+#[no_mangle]
+pub extern "C" fn zexe_tweedle_fp_proof_evaluations_delete(x: *mut DlogProofEvaluations<Fp>) {
+    let _box = unsafe { Box::from_raw(x) };
+}
+
 // fq poly comm
 #[no_mangle]
 pub extern "C" fn zexe_tweedle_fp_poly_comm_unshifted(
