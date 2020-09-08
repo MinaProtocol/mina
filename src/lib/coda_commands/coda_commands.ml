@@ -8,7 +8,7 @@ open Coda_state
 (** For status *)
 let txn_count = ref 0
 
-let record_payment t (txn : User_command.t) account =
+let record_payment t (txn : Command_transaction.t) account =
   let logger =
     Logger.extend
       (Coda_lib.top_level_logger t)
@@ -20,7 +20,7 @@ let record_payment t (txn : User_command.t) account =
   | `Ok hash ->
       [%log debug]
         ~metadata:
-          [ ("user_command", User_command.to_yojson txn)
+          [ ("command", Command_transaction.to_yojson txn)
           ; ("receipt_chain_hash", Receipt.Chain_hash.to_yojson hash) ]
         "Added  payment $user_command into receipt_chain database. You should \
          wait for a bit to see your account's receipt chain hash update as \
@@ -28,7 +28,7 @@ let record_payment t (txn : User_command.t) account =
       hash
   | `Duplicate hash ->
       [%log warn]
-        ~metadata:[("user_command", User_command.to_yojson txn)]
+        ~metadata:[("command", Command_transaction.to_yojson txn)]
         "Already sent transaction $user_command" ;
       hash
   | `Error_multiple_previous_receipts parent_hash ->
@@ -126,11 +126,14 @@ let setup_and_submit_user_command t (user_command_input : User_command_input.t)
               ( Network_pool.Transaction_pool.Resource_pool.Diff.Diff_error
                 .to_yojson (snd failed_txn)
               |> Yojson.Safe.to_string )))
-  | Ok ([txn], []) ->
+  | Ok ([User_command txn], []) ->
       [%log' info (Coda_lib.top_level_logger t)]
-        ~metadata:[("user_command", User_command.to_yojson txn)]
-        "Scheduled payment $user_command" ;
-      Ok (txn, record_payment t txn (Option.value_exn account_opt))
+        ~metadata:
+          [("command", Command_transaction.to_yojson (User_command txn))]
+        "Scheduled payment $command" ;
+      Ok
+        ( txn
+        , record_payment t (User_command txn) (Option.value_exn account_opt) )
   | Ok _ ->
       Error (Error.of_string "Invalid result from scheduling a payment")
   | Error e ->
@@ -153,8 +156,8 @@ module Receipt_chain_hash = struct
   Receipt.Chain_hash.(cons, empty)]
 end
 
-let verify_payment t (addr : Account_id.t) (verifying_txn : User_command.t)
-    (init_receipt, proof) =
+let verify_payment t (addr : Account_id.t)
+    (verifying_txn : Command_transaction.t) (init_receipt, proof) =
   let open Participating_state.Let_syntax in
   let%map account = get_account t addr in
   let account = Option.value_exn account in
@@ -165,11 +168,14 @@ let verify_payment t (addr : Account_id.t) (verifying_txn : User_command.t)
       (Receipt_chain_database.verify ~init:init_receipt proof resulting_receipt)
       ~error:(Error.createf "Merkle list proof of payment is invalid")
   in
-  if List.exists proof ~f:(fun txn -> User_command.equal verifying_txn txn)
+  if
+    List.exists proof ~f:(fun txn ->
+        Command_transaction.equal verifying_txn txn )
   then Ok ()
   else
     Or_error.errorf
-      !"Merkle list proof does not contain payment %{sexp:User_command.t}"
+      !"Merkle list proof does not contain payment \
+        %{sexp:Command_transaction.t}"
       verifying_txn
 
 let prove_receipt t ~proving_receipt ~resulting_receipt =
@@ -379,24 +385,24 @@ module Subscriptions = struct
 end
 
 module For_tests = struct
-  let get_all_user_commands coda public_key =
+  let get_all_commands coda public_key =
     let account_id = Account_id.create public_key Token_id.default in
     let external_transition_database =
       Coda_lib.external_transition_database coda
     in
-    let user_commands =
+    let commands =
       List.concat_map ~f:(fun transition ->
           transition |> With_hash.data
-          |> Auxiliary_database.Filtered_external_transition.user_commands
+          |> Auxiliary_database.Filtered_external_transition.commands
           |> List.map ~f:With_hash.data )
       @@ Auxiliary_database.External_transition_database.get_all_values
            external_transition_database (Some account_id)
     in
-    let participants_user_commands =
-      User_command.filter_by_participant user_commands public_key
+    let participants_commands =
+      Command_transaction.filter_by_participant commands public_key
     in
-    List.dedup_and_sort participants_user_commands
-      ~compare:User_command.compare
+    List.dedup_and_sort participants_commands
+      ~compare:Command_transaction.compare
 
   module Subscriptions = struct
     let new_user_commands coda public_key =

@@ -63,8 +63,13 @@ let create ~logger ~constraint_constants ~wallets ~time_controller
           ~if_not_found:ignore ~if_found:(fun (_, writer) ->
             let user_commands =
               filtered_external_transition
-              |> Filtered_external_transition.user_commands
+              |> Filtered_external_transition.commands
               |> List.map ~f:(fun {With_hash.data; _} -> data)
+              |> List.filter_map ~f:(function
+                   | Command_transaction.User_command c ->
+                       Some c
+                   | Snapp_command _ ->
+                       None )
               |> Fn.flip User_command.filter_by_participant participant
             in
             List.iter user_commands ~f:(fun user_command ->

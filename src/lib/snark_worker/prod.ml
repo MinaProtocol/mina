@@ -43,7 +43,7 @@ module Inputs = struct
   end
 
   type single_spec =
-    ( Transaction.t
+    ( Transaction.Valid.t
     , Transaction_witness.t
     , Transaction_snark.t )
     Snark_work_lib.Work.Single.Spec.t
@@ -85,7 +85,10 @@ module Inputs = struct
             | Work.Single.Spec.Transition
                 (input, t, (w : Transaction_witness.t)) ->
                 process (fun () ->
-                    let snapp_account1, snapp_account2 = (None, None) in
+                    let snapp_account1, snapp_account2 =
+                      Sparse_ledger.snapp_accounts w.ledger
+                        (Transaction.forget t)
+                    in
                     Or_error.try_with (fun () ->
                         M.of_transaction ~sok_digest ~snapp_account1
                           ~snapp_account2
