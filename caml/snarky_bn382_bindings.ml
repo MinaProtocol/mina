@@ -381,33 +381,6 @@ struct
   let public_inputs = metadata "public_inputs"
 end
 
-module Vector (P : Prefix) (E : Type) (F : Ctypes.FOREIGN) = struct
-  open F
-
-  type elt = E.t
-
-  let prefix = with_prefix (P.prefix "vector")
-
-  include (
-    struct
-        type t = unit ptr
-
-        let typ = ptr void
-      end :
-      Type )
-
-  let create = foreign (prefix "create") (void @-> returning typ)
-
-  let length = foreign (prefix "length") (typ @-> returning int)
-
-  let emplace_back =
-    foreign (prefix "emplace_back") (typ @-> E.typ @-> returning void)
-
-  let get = foreign (prefix "get") (typ @-> int @-> returning E.typ)
-
-  let delete = foreign (prefix "delete") (typ @-> returning void)
-end
-
 module Curve
     (P : Prefix)
     (BaseField : Type)
