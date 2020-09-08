@@ -135,12 +135,13 @@ module Type = {
   /** the following are specific component names, but use some styles already defined  */
   let pageLabel =
     style([
-      Typeface.monumentGrotesk,
+      Typeface.monumentGroteskMono,
       fontSize(`rem(0.9)),
       lineHeight(`rem(1.37)),
       textTransform(`uppercase),
       letterSpacing(`em(0.02)),
       color(Colors.digitalBlack),
+      margin(`zero),
       media(
         MediaQuery.tablet,
         [fontSize(`rem(1.25)), lineHeight(`rem(1.875))],
@@ -174,11 +175,12 @@ module Type = {
 
   let contributorLabel =
     style([
-      Typeface.monumentGrotesk,
+      Typeface.monumentGroteskMono,
       fontSize(`rem(0.75)),
       fontWeight(`num(500)),
       lineHeight(`rem(1.)),
       color(black),
+      margin(`zero),
     ]);
 
   let link =
@@ -315,7 +317,7 @@ module Type = {
 
   let quote =
     style([
-      Typeface.monumentGrotesk,
+      Typeface.monumentGroteskMono,
       fontSize(`rem(1.31)),
       lineHeight(`rem(1.875)),
       letterSpacing(`em(-0.03)),

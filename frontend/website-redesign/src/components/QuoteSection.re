@@ -22,6 +22,10 @@ module Styles = {
         [background(`url("/static/img/SectionQuoteDesktop.png"))],
       ),
     ]);
+  let headshot = style([height(`rem(5.5))]);
+  /**
+   * This is the actual white box of the quote section
+   */
   let quoteContainer =
     style([
       position(`absolute),
@@ -43,7 +47,8 @@ module Styles = {
         [
           marginLeft(`rem(33.5)),
           marginTop(`rem(8.75)),
-          width(`rem(41.)),
+          width(`rem(47.)),
+          height(`rem(25.)),
         ],
       ),
     ]);
@@ -67,35 +72,43 @@ module Styles = {
     ]);
   let attribute =
     style([
+      position(`absolute),
       display(`flex),
       flexDirection(`row),
       justifyContent(`spaceBetween),
-      width(`rem(15.68)),
+      media(
+        Theme.MediaQuery.desktop,
+        [left(`rem(4.56)), top(`rem(16.5))],
+      ),
     ]);
-  let column =
-    style([display(`flex), flexDirection(`column), width(`rem(11.18))]);
+  let name = style([marginLeft(`rem(1.5)), marginTop(`rem(1.))]);
 };
 
 [@react.component]
 let make = () => {
   <div className=Styles.container>
-    <div className=Styles.quoteContainer>
-      <p className=Styles.quote>
-        {React.string(
-           "\"What attracted me was a small, scalable blockchain that's still independently verifiable on small nodes.\"",
-         )}
-      </p>
-      <span className=Styles.attribute>
-        <img src="/static/img/headshots/naval.png" />
-        <span className=Styles.column>
-          <p className=Theme.Type.pageLabel>
-            {React.string("Naval Ravikant")}
-          </p>
-          <p className=Theme.Type.contributorLabel>
-            {React.string("AngelList Co-Founder")}
-          </p>
-        </span>
-      </span>
-    </div>
-  </div>;
+    /*** This is the actual white box */
+
+      <div className=Styles.quoteContainer>
+        <p className=Styles.quote>
+          {React.string(
+             "\"What attracted me was a small, scalable blockchain that's still independently verifiable on small nodes.\"",
+           )}
+        </p>
+        <div className=Styles.attribute>
+          <img
+            className=Styles.headshot
+            src="/static/img/headshots/naval.jpg"
+          />
+          <div className=Styles.name>
+            <p className=Theme.Type.pageLabel>
+              {React.string("Naval Ravikant")}
+            </p>
+            <p className=Theme.Type.contributorLabel>
+              {React.string("AngelList Co-Founder")}
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>;
 };
