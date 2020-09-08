@@ -221,6 +221,9 @@ ARG DUNE_PROFILE=testnet_postake_medium_curves
 #       and a distinct one for the coda codebase in the next stage
 ARG CODA_BRANCH=develop
 
+# location of repo used for pins and external package commits
+ARG CODA_DIR=coda
+
 ENV PATH "$PATH:/usr/lib/go/bin:$HOME/.cargo/bin"
 
 # git will clone into an empty dir, but this also helps us set the workdir in advance
