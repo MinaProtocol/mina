@@ -1267,7 +1267,7 @@ let%test_unit "add stack + remove stack = initial tree " =
           let is_new_stack = ref true in
           let init = merkle_root !pending_coinbases in
           let after_adding =
-            List.fold cbs ~init:!pending_coinbases ~f:(fun acc coinbase ->
+            List.fold cbs ~init:!pending_coinbases ~f:(fun acc (coinbase, _) ->
                 let t =
                   add_coinbase ~depth acc ~coinbase ~is_new_stack:!is_new_stack
                   |> Or_error.ok_exn
@@ -1295,16 +1295,21 @@ end
 let add_coinbase_with_zero_checks (type t)
     (module T : Pending_coinbase_intf with type t = t) (t : t)
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-    ~coinbase ~state_body_hash ~is_new_stack =
+    ~coinbase ~supercharged_coinbase ~state_body_hash ~is_new_stack =
   let depth = constraint_constants.pending_coinbase_depth in
   if Amount.equal coinbase.Coinbase.amount Amount.zero then t
   else
-    let max_coinbase_amount = constraint_constants.coinbase_amount in
+    let max_coinbase_amount =
+      if supercharged_coinbase then
+        Option.value_exn
+          (Currency.Amount.scale constraint_constants.coinbase_amount
+             constraint_constants.supercharged_coinbase_factor)
+      else constraint_constants.coinbase_amount
+    in
     let coinbase' =
       Coinbase.create
         ~amount:
-          ( Amount.sub max_coinbase_amount coinbase.amount
-          |> Option.value_exn ?here:None ?message:None ?error:None )
+          (Option.value_exn (Amount.sub max_coinbase_amount coinbase.amount))
         ~receiver:coinbase.receiver ~fee_transfer:None
       |> Or_error.ok_exn
     in
@@ -1329,7 +1334,7 @@ let%test_unit "Checked_stack = Unchecked_stack" =
   in
   test ~trials:20
     (Generator.tuple2 Stack.gen (Coinbase.Gen.gen ~constraint_constants))
-    ~f:(fun (base, cb) ->
+    ~f:(fun (base, (cb, _supercharged_coinbase)) ->
       let coinbase_data = Coinbase_data.of_coinbase cb in
       let unchecked = Stack.push_coinbase cb base in
       let checked =
@@ -1354,10 +1359,10 @@ let%test_unit "Checked_tree = Unchecked_tree" =
   let depth = constraint_constants.pending_coinbase_depth in
   let pending_coinbases = create ~depth () |> Or_error.ok_exn in
   test ~trials:20
-    (Generator.tuple3
+    (Generator.tuple2
        (Coinbase.Gen.gen ~constraint_constants)
-       State_body_hash.gen Quickcheck.Generator.bool)
-    ~f:(fun (coinbase, state_body_hash, supercharge_coinbase) ->
+       State_body_hash.gen)
+    ~f:(fun ((coinbase, supercharged_coinbase), state_body_hash) ->
       let coinbase_data = Coinbase_data.of_coinbase coinbase in
       let is_new_stack, action =
         Currency.Amount.(
@@ -1368,6 +1373,7 @@ let%test_unit "Checked_tree = Unchecked_tree" =
         add_coinbase_with_zero_checks ~constraint_constants
           (module T)
           pending_coinbases ~coinbase ~is_new_stack ~state_body_hash
+          ~supercharged_coinbase
       in
       (* inside the `open' below, Checked means something else, so define this function *)
       let f_add_coinbase = Checked.add_coinbase ~constraint_constants in
@@ -1377,7 +1383,7 @@ let%test_unit "Checked_tree = Unchecked_tree" =
           let coinbase_var = Coinbase_data.(var_of_t coinbase_data) in
           let action_var = Update.Action.var_of_t action in
           let supercharge_coinbase_var =
-            Boolean.var_of_value supercharge_coinbase
+            Boolean.var_of_value supercharged_coinbase
           in
           let state_body_hash_var = State_body_hash.var_of_t state_body_hash in
           let%map result =
@@ -1405,10 +1411,10 @@ let%test_unit "Checked_tree = Unchecked_tree after pop" =
   in
   let depth = constraint_constants.pending_coinbase_depth in
   test ~trials:20
-    (Generator.tuple3
+    (Generator.tuple2
        (Coinbase.Gen.gen ~constraint_constants)
-       State_body_hash.gen Quickcheck.Generator.bool)
-    ~f:(fun (coinbase, state_body_hash, supercharge_coinbase) ->
+       State_body_hash.gen)
+    ~f:(fun ((coinbase, supercharged_coinbase), state_body_hash) ->
       let pending_coinbases = create ~depth () |> Or_error.ok_exn in
       let coinbase_data = Coinbase_data.of_coinbase coinbase in
       let action =
@@ -1420,6 +1426,7 @@ let%test_unit "Checked_tree = Unchecked_tree after pop" =
         add_coinbase_with_zero_checks ~constraint_constants
           (module T)
           pending_coinbases ~coinbase ~is_new_stack:true ~state_body_hash
+          ~supercharged_coinbase
       in
       (* inside the `open' below, Checked means something else, so define these functions *)
       let f_add_coinbase = Checked.add_coinbase ~constraint_constants in
@@ -1430,7 +1437,7 @@ let%test_unit "Checked_tree = Unchecked_tree after pop" =
           let coinbase_var = Coinbase_data.(var_of_t coinbase_data) in
           let action_var = Update.Action.(var_of_t action) in
           let supercharge_coinbase_var =
-            Boolean.var_of_value supercharge_coinbase
+            Boolean.var_of_value supercharged_coinbase
           in
           let state_body_hash_var = State_body_hash.var_of_t state_body_hash in
           let%map result =
@@ -1491,7 +1498,8 @@ let%test_unit "push and pop multiple stacks" =
           |> Or_error.ok_exn
         in
         (Pending_coinbase.Stack.empty, t')
-    | (initial_coinbase, state_body_hash) :: coinbases ->
+    | ((initial_coinbase, _supercharged_coinbase), state_body_hash)
+      :: coinbases ->
         let t' =
           Pending_coinbase.add_state ~depth t state_body_hash
             ~is_new_stack:true
@@ -1502,11 +1510,13 @@ let%test_unit "push and pop multiple stacks" =
         in
         let updated =
           List.fold coinbases ~init:t'
-            ~f:(fun pending_coinbases (coinbase, state_body_hash) ->
+            ~f:(fun pending_coinbases
+               ((coinbase, supercharged_coinbase), state_body_hash)
+               ->
               add_coinbase_with_zero_checks ~constraint_constants
                 (module Pending_coinbase)
                 pending_coinbases ~coinbase ~is_new_stack:false
-                ~state_body_hash )
+                ~state_body_hash ~supercharged_coinbase )
         in
         let new_stack =
           Or_error.ok_exn
