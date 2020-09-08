@@ -1,6 +1,7 @@
+open Css;
+
 module Hero = {
   module Styles = {
-    open Css;
     let heroContainer =
       style([
         display(`flex),
@@ -20,7 +21,7 @@ module Hero = {
         media(
           Theme.MediaQuery.desktop,
           [
-            height(`rem(47.)),
+            height(`rem(41.)),
             backgroundImage(`url("/static/img/02_About_1_2880x1504.jpg")),
           ],
         ),
@@ -105,9 +106,11 @@ module Hero = {
 /** Section for alternating rows */
 module HeroRows = {
   module Styles = {
-    open Css;
+    let rowsSection =
+      style([backgroundImage(`url("/static/img/BackgroundAbout.png"))]);
     let container =
       style([
+        backgroundSize(`cover),
         display(`flex),
         flexDirection(`column),
         padding2(~v=`rem(3.), ~h=`rem(3.)),
@@ -155,7 +158,7 @@ module HeroRows = {
 
   [@react.component]
   let make = () => {
-    <>
+    <div className=Styles.rowsSection>
       <Row>
         <div className=Styles.column>
           <h2 className=Styles.header>
@@ -225,16 +228,19 @@ module HeroRows = {
           </p>
         </div>
       </Row>
-    </>;
+    </div>;
   };
 };
 
 // TODO: Change title
 [@react.component]
 let make = () => {
-  <Page title="Coda Cryptocurrency Protocol" footerColor=Theme.Colors.orange>
-    <Hero />
-    <Spacer height=1. />
-    <HeroRows />
-  </Page>;
+  <div className=Styles.page>
+    <Page title="Coda Cryptocurrency Protocol" footerColor=Theme.Colors.orange>
+      <Hero />
+      <Spacer height=1. />
+      <HeroRows />
+      <QuoteSection />
+    </Page>
+  </div>;
 };

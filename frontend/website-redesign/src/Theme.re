@@ -172,6 +172,15 @@ module Type = {
       letterSpacing(`px(1)),
     ]);
 
+  let contributorLabel =
+    style([
+      Typeface.monumentGrotesk,
+      fontSize(`rem(0.75)),
+      fontWeight(`num(500)),
+      lineHeight(`rem(1.)),
+      color(black),
+    ]);
+
   let link =
     style([
       Typeface.monumentGrotesk,
