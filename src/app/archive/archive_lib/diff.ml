@@ -32,8 +32,8 @@ module Transaction_pool = struct
   module Stable = struct
     module V1 = struct
       type t =
-        { added: User_command.Stable.V1.t list
-        ; removed: User_command.Stable.V1.t list }
+        { added: Command_transaction.Stable.V1.t list
+        ; removed: Command_transaction.Stable.V1.t list }
 
       let to_latest = Fn.id
     end
@@ -56,13 +56,12 @@ module Builder = struct
     let ((block, _) as validated_block) =
       Breadcrumb.validated_transition breadcrumb
     in
-    let user_commands =
-      External_transition.Validated.user_commands validated_block
-    in
+    let commands = External_transition.Validated.commands validated_block in
     let sender_receipt_chains_from_parent_ledger =
       let senders =
-        user_commands
-        |> List.map ~f:(fun {data; _} -> User_command.fee_payer data)
+        commands
+        |> List.map ~f:(fun {data; _} ->
+               Command_transaction.(fee_payer (forget_check data)) )
         |> Account_id.Set.of_list
       in
       let ledger =
