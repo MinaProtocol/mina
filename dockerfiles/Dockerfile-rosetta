@@ -227,14 +227,15 @@ ARG CODA_DIR=coda
 ENV PATH "$PATH:/usr/lib/go/bin:$HOME/.cargo/bin"
 
 # git will clone into an empty dir, but this also helps us set the workdir in advance
-RUN rm -rf $HOME/${CODA_DIR} \
-  && mkdir $HOME/${CODA_DIR} \
+RUN cd $HOME && rm -rf $HOME/${CODA_DIR} \
   && git clone \
   -b "${CODA_BRANCH}" \
   --depth 1 \
   --shallow-submodules \
   --recurse-submodules \
   https://github.com/CodaProtocol/coda ${HOME}/${CODA_DIR}
+
+WORKDIR $HOME/${CODA_DIR}
 
 # Build libp2p_helper and clear go module caches
 # Could maybe also delete go during this step / build it as part of the deps stage?
