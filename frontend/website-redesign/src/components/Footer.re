@@ -331,7 +331,7 @@ module Subfooter = {
           Theme.MediaQuery.desktop,
           [
             justifyContent(`spaceBetween),
-            width(`rem(71.)),
+            width(`percent(100.)),
             height(`rem(1.4)),
             marginTop(`rem(1.5)),
             flexDirection(`rowReverse),
