@@ -96,15 +96,16 @@ module Stable = struct
       | Error e ->
           Core.Error.raise (Error.to_error e)
 
-    let user_commands {staged_ledger_diff; _} =
-      Staged_ledger_diff.user_commands staged_ledger_diff
+    let commands {staged_ledger_diff; _} =
+      Staged_ledger_diff.commands staged_ledger_diff
 
     let payments external_transition =
-      List.filter (user_commands external_transition) ~f:(function
-        | {data= {payload= {body= Payment _; _}; _}; _} ->
-            true
+      List.filter_map (commands external_transition) ~f:(function
+        | {data= User_command ({payload= {body= Payment _; _}; _} as c); status}
+          ->
+            Some {With_status.data= c; status}
         | _ ->
-            false )
+            None )
 
     let equal =
       Comparable.lift Consensus.Data.Consensus_state.Value.equal
@@ -139,7 +140,7 @@ Stable.Latest.
   , consensus_time_produced_at
   , block_producer
   , transactions
-  , user_commands
+  , commands
   , payments
   , to_yojson )]
 
@@ -709,7 +710,7 @@ module With_validation = struct
 
   let block_producer t = lift block_producer t
 
-  let user_commands t = lift user_commands t
+  let commands t = lift commands t
 
   let transactions ~constraint_constants t =
     lift (transactions ~constraint_constants) t
@@ -874,7 +875,7 @@ module Validated = struct
     , consensus_time_produced_at
     , block_producer
     , transactions
-    , user_commands
+    , commands
     , payments
     , erase
     , to_yojson )]
@@ -884,6 +885,15 @@ module Validated = struct
   let to_initial_validated t =
     t |> Validation.reset_frontier_dependencies_validation
     |> Validation.reset_staged_ledger_diff_validation
+
+  let commands (t : t) =
+    List.map (commands t) ~f:(fun x ->
+        (* This is safe because at this point the stage ledger diff has been
+             applied successfully. *)
+        let (`If_this_is_used_it_should_have_a_comment_justifying_it c) =
+          Command_transaction.to_valid_unsafe x.data
+        in
+        {x with data= c} )
 end
 
 let genesis ~precomputed_values =
@@ -897,7 +907,7 @@ let genesis ~precomputed_values =
   let empty_diff =
     { Staged_ledger_diff.diff=
         ( { completed_works= []
-          ; user_commands= []
+          ; commands= []
           ; coinbase= Staged_ledger_diff.At_most_two.Zero }
         , None )
     ; creator
