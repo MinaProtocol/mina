@@ -10,19 +10,18 @@ end
 module Make_applicative_with_let (X : Applicative.Basic) :
   Applicative_with_let with type 'a t := 'a X.t = struct
   module A = struct
-    type 'a t = unit
+    type 'a t = 'a X.t
 
     include Applicative.Make (X)
   end
 
   include A
 
-  include Applicative.Make_let_syntax
-            (A)
-            (struct
-              module type S = sig end
-            end)
-            ()
+  module Open_on_rhs_intf = struct
+    module type S = sig end
+  end
+
+  include Applicative.Make_let_syntax (A) (Open_on_rhs_intf) ()
 end
 
 module Applicative_unit = Make_applicative_with_let (struct
@@ -36,7 +35,7 @@ module Applicative_unit = Make_applicative_with_let (struct
 end)
 
 module Applicative_id = Make_applicative_with_let (struct
-  type 'a t = 'a result
+  type 'a t = 'a
 
   let apply = Fn.id
 
@@ -49,6 +48,15 @@ module type Foreign_applicative = sig
   include FOREIGN
 
   include Applicative_with_let with type 'a t := 'a result
+
+  (* NB: These types aren't ideal, since they're not satisfiable for the cstubs
+     foreign interface, but making a full monad adds complexity for no actual
+     benefit.
+  *)
+
+  val map_return : 'a return -> f:('a -> 'b) -> 'b return
+
+  val bind_return : 'a return -> f:('a -> 'b return) -> 'b
 end
 
 module type Bindings_with_applicative = functor
@@ -59,12 +67,26 @@ module Make_applicative_unit (F : FOREIGN with type 'a result = unit) :
   Foreign_applicative with type 'a result = unit = struct
   include F
   include Applicative_unit
+
+  (* We assume here that it is impossible to create a value of type [return],
+     in accordance with the cstubs foreign interface. *)
+
+  let map_return _x ~f:_ =
+    failwith "Cstubs_applicative: This should be impossible"
+
+  let bind_return _x ~f:_ =
+    failwith "Cstubs_applicative: This should be impossible"
 end
 
-module Make_applicative_id (F : FOREIGN with type 'a result = 'a) :
-  Foreign_applicative with type 'a result = 'a = struct
+module Make_applicative_id
+    (F : FOREIGN with type 'a result = 'a and type 'a return = 'a) :
+  Foreign_applicative with type 'a result = 'a and type 'a return = 'a = struct
   include F
   include Applicative_id
+
+  let map_return x ~f = f x
+
+  let bind_return x ~f = f x
 end
 
 module Make_cstubs_bindings
@@ -84,4 +106,8 @@ let write_ml ?concurrency ?errno fmt ~prefix b =
   Stdlib.Format.fprintf fmt "%s@."
     {ocaml|
 include Cstubs_applicative.Applicative_id
+
+let map_return x ~f = f x
+
+let bind_return x ~f = f x
 |ocaml}
