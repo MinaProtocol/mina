@@ -260,7 +260,7 @@ val check_transaction :
   -> next_available_token_after:Token_id.t
   -> snapp_account1:Snapp_account.t option
   -> snapp_account2:Snapp_account.t option
-  -> Transaction.t Transaction_protocol_state.t
+  -> Transaction.Valid.t Transaction_protocol_state.t
   -> Tick.Handler.t
   -> unit
 
@@ -289,7 +289,7 @@ val generate_transaction_witness :
   -> next_available_token_after:Token_id.t
   -> snapp_account1:Snapp_account.t option
   -> snapp_account2:Snapp_account.t option
-  -> Transaction.t Transaction_protocol_state.t
+  -> Transaction.Valid.t Transaction_protocol_state.t
   -> Tick.Handler.t
   -> unit
 
@@ -308,7 +308,7 @@ module type S = sig
     -> next_available_token_after:Token_id.t
     -> snapp_account1:Snapp_account.t option
     -> snapp_account2:Snapp_account.t option
-    -> Transaction.t Transaction_protocol_state.t
+    -> Transaction.Valid.t Transaction_protocol_state.t
     -> Tick.Handler.t
     -> t
 

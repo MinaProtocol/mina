@@ -611,3 +611,24 @@ let handler t =
           respond (Provide index)
       | _ ->
           unhandled )
+
+let snapp_accounts (ledger : t) (t : Transaction.t) =
+  match t with
+  | Command (User_command _) | Fee_transfer _ | Coinbase _ ->
+      (None, None)
+  | Command (Snapp_command c) -> (
+      let token_id = Snapp_command.token_id c in
+      let get pk =
+        Option.try_with (fun () ->
+            ( find_index_exn ledger (Account_id.create pk token_id)
+            |> get_exn ledger )
+              .snapp )
+        |> Option.join
+      in
+      match Snapp_command.to_payload c with
+      | Zero_proved p ->
+          (get p.one.body.pk, get p.two.body.pk)
+      | One_proved p ->
+          (get p.one.body.pk, get p.two.body.pk)
+      | Two_proved p ->
+          (get p.one.body.pk, get p.two.body.pk) )
