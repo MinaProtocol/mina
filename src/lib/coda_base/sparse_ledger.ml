@@ -186,7 +186,8 @@ let apply_user_command_exn
           Balance.sub_amount account.balance (Amount.of_fee fee)
           |> Option.value_exn ?here:None ?error:None ?message:None
       ; receipt_chain_hash=
-          Receipt.Chain_hash.cons payload account.receipt_chain_hash
+          Receipt.Chain_hash.cons (User_command payload)
+            account.receipt_chain_hash
       ; timing } )
   in
   (* Charge the fee. *)
