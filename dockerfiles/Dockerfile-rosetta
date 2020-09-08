@@ -223,7 +223,8 @@ ARG CODA_BRANCH=develop
 
 ENV PATH "$PATH:/usr/lib/go/bin:$HOME/.cargo/bin"
 
-RUN git checkout "${CODA_BRANCH}" \
+RUN git fetch && \
+  git checkout "origin/${CODA_BRANCH}" \
   --recurse-submodules
 
 # Build libp2p_helper and clear go module caches
