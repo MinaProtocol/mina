@@ -17,12 +17,21 @@ query {
 module Get_tracked_account =
 [%graphql
 {|
-query ($public_key: PublicKey) {
-  account(publicKey: $public_key) {
-    public_key: publicKey @bsDecoder(fn: "Decoders.public_key")
+query ($public_key: PublicKey, $token: UInt64) {
+  account(publicKey: $public_key, token: $token) {
     balance {
       total @bsDecoder(fn: "Decoders.balance")
     }
+  }
+}
+|}]
+
+module Get_all_accounts =
+[%graphql
+{|
+query ($public_key: PublicKey) {
+  accounts(publicKey: $public_key) {
+    token @bsDecoder(fn: "Decoders.token")
   }
 }
 |}]
@@ -259,5 +268,13 @@ query user_commands($public_key: PublicKey) {
     fee @bsDecoder(fn: "Decoders.fee")
     memo @bsDecoder(fn: "Coda_base.User_command_memo.of_string")
   }
+}
+|}]
+
+module Next_available_token =
+[%graphql
+{|
+query next_available_token {
+  nextAvailableToken @bsDecoder(fn: "Decoders.token")
 }
 |}]
