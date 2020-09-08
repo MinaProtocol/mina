@@ -1,5 +1,7 @@
 module Styles = {
   open Css;
+  
+  // TODO: Fix background sizes once wrapper is merged in 
   let container =
     style([
       display(`flex),
@@ -7,7 +9,7 @@ module Styles = {
       justifyContent(`flexStart),
       alignContent(`spaceAround),
       position(`relative),
-      backgroundSize(`cover),
+      backgroundSize(`auto),
       background(`url("/static/img/SectionQuoteMobile.png")),
       height(`rem(27.25)),
       media(
@@ -22,20 +24,26 @@ module Styles = {
         [background(`url("/static/img/SectionQuoteDesktop.png"))],
       ),
     ]);
-  let headshot = style([height(`rem(5.5))]);
+  let headshot =
+    style([
+      height(`rem(3.5)),
+      media(Theme.MediaQuery.desktop, [height(`rem(5.5))]),
+    ]);
   /**
    * This is the actual white box of the quote section
    */
   let quoteContainer =
     style([
       position(`absolute),
+      top(`rem(4.)),
+      left(`rem(1.25)),
       background(white),
       width(`rem(21.)),
       height(`rem(19.25)),
       media(
         Theme.MediaQuery.tablet,
         [
-          width(`rem(38.)),
+          width(`rem(43.)),
           marginTop(`rem(7.18)),
           marginLeft(`rem(2.5)),
           marginRight(`rem(2.5)),
@@ -56,7 +64,8 @@ module Styles = {
     merge([
       Theme.Type.quote,
       style([
-        paddingLeft(`rem(2.375)),
+        fontSize(`rem(1.3)),
+        paddingLeft(`rem(1.25)),
         paddingTop(`rem(1.5)),
         media(
           Theme.MediaQuery.tablet,
@@ -76,12 +85,22 @@ module Styles = {
       display(`flex),
       flexDirection(`row),
       justifyContent(`spaceBetween),
+      marginLeft(`rem(1.25)),
+      media(
+        Theme.MediaQuery.tablet,
+        [marginLeft(`zero), left(`rem(4.56)), top(`rem(19.6))],
+      ),
       media(
         Theme.MediaQuery.desktop,
         [left(`rem(4.56)), top(`rem(16.5))],
       ),
     ]);
-  let name = style([marginLeft(`rem(1.5)), marginTop(`rem(1.))]);
+  let name =
+    style([
+      marginLeft(`rem(1.5)),
+      marginTop(`rem(1.)),
+      media(Theme.MediaQuery.tablet, [marginTop(`zero)]),
+    ]);
 };
 
 [@react.component]

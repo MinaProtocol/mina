@@ -235,8 +235,8 @@ module HeroRows = {
 // TODO: Change title
 [@react.component]
 let make = () => {
-  <div className=Styles.page>
-    <Page title="Coda Cryptocurrency Protocol" footerColor=Theme.Colors.orange>
+  <div>
+    <Page title="Mina Cryptocurrency Protocol" footerColor=Theme.Colors.orange>
       <Hero />
       <Spacer height=1. />
       <HeroRows />
