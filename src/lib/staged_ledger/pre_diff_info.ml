@@ -5,7 +5,7 @@ open Signature_lib
 module type S = sig
   module Error : sig
     type t =
-      | Bad_signature of User_command.t
+      | Verification_failed of Verifier.Failure.t
       | Coinbase_error of string
       | Insufficient_fee of Currency.Fee.t * Currency.Fee.t
       | Unexpected of Error.t
@@ -16,6 +16,7 @@ module type S = sig
     val to_error : t -> Error.t
   end
 
+  (*
   val get :
        constraint_constants:Genesis_constants.Constraint_constants.t
     -> Staged_ledger_diff.t
@@ -26,10 +27,11 @@ module type S = sig
        , Error.t )
        result
 
+*)
   val get_unchecked :
        constraint_constants:Genesis_constants.Constraint_constants.t
     -> Staged_ledger_diff.With_valid_signatures_and_proofs.t
-    -> ( Transaction.t With_status.t list
+    -> ( Transaction.Valid.t With_status.t list
          * Transaction_snark_work.t list
          * int
          * Currency.Amount.t list
@@ -44,17 +46,15 @@ end
 
 module Error = struct
   type t =
-    | Bad_signature of User_command.t
+    | Verification_failed of Verifier.Failure.t
     | Coinbase_error of string
     | Insufficient_fee of Currency.Fee.t * Currency.Fee.t
     | Unexpected of Error.t
   [@@deriving sexp]
 
   let to_string = function
-    | Bad_signature t ->
-        Format.asprintf
-          !"Bad signature of the user command: %{sexp: Sexp.t} \n"
-          (User_command.sexp_of_t t)
+    | Verification_failed t ->
+        Format.asprintf !"Failed to verify: %{sexp: Verifier.Failure.t} \n" t
     | Coinbase_error err ->
         Format.asprintf !"Coinbase error: %s \n" err
     | Insufficient_fee (f1, f2) ->
@@ -68,10 +68,10 @@ module Error = struct
   let to_error = Fn.compose Error.of_string to_string
 end
 
-type t =
-  { transactions: Transaction.t With_status.t list
+type 't t =
+  { transactions: 't With_status.t list
   ; work: Transaction_snark_work.t list
-  ; user_commands_count: int
+  ; commands_count: int
   ; coinbases: Currency.Amount.t list }
 
 (*A Coinbase is a single transaction that accommodates the coinbase amount
@@ -179,13 +179,12 @@ let sum_fees xs ~f =
 let to_staged_ledger_or_error =
   Result.map_error ~f:(fun error -> Error.Unexpected error)
 
-let fee_remainder
-    (user_commands : User_command.With_valid_signature.t With_status.t list)
-    completed_works coinbase_fee =
+let fee_remainder (type c) (commands : c With_status.t list) completed_works
+    coinbase_fee ~forget =
   let open Result.Let_syntax in
   let%bind budget =
-    sum_fees user_commands ~f:(fun {data= t; _} ->
-        User_command.fee (t :> User_command.t) )
+    sum_fees commands ~f:(fun {data= t; _} ->
+        Command_transaction.fee_exn (forget t) )
     |> to_staged_ledger_or_error
   in
   let%bind work_fee =
@@ -239,8 +238,8 @@ let create_fee_transfers completed_works delta public_key coinbase_fts =
       |> Or_error.all )
   |> Or_error.join |> to_staged_ledger_or_error
 
-let get_individual_info ~constraint_constants coinbase_parts ~receiver
-    user_commands completed_works =
+let get_individual_info (type c) ~constraint_constants coinbase_parts ~receiver
+    commands completed_works ~(forget : c -> _) =
   let open Result.Let_syntax in
   let%bind coinbase_parts =
     O1trace.measure "create_coinbase" (fun () ->
@@ -257,14 +256,13 @@ let get_individual_info ~constraint_constants coinbase_parts ~receiver
         not (Public_key.Compressed.equal receiver prover) )
   in
   let%bind delta =
-    fee_remainder user_commands txn_works_others coinbase_work_fees
+    fee_remainder commands txn_works_others coinbase_work_fees ~forget
   in
   let%map fee_transfers =
     create_fee_transfers txn_works_others delta receiver coinbase_fts
   in
   let transactions =
-    List.map user_commands
-      ~f:(With_status.map ~f:(fun t -> Transaction.User_command t))
+    List.map commands ~f:(With_status.map ~f:(fun t -> Transaction.Command t))
     @ List.map coinbase_parts ~f:(fun t ->
           { With_status.data= Transaction.Coinbase t
           ; status= Applied User_command_status.Auxiliary_data.empty } )
@@ -274,13 +272,13 @@ let get_individual_info ~constraint_constants coinbase_parts ~receiver
   in
   { transactions
   ; work= completed_works
-  ; user_commands_count= List.length user_commands
+  ; commands_count= List.length commands
   ; coinbases= List.map coinbase_parts ~f:(fun Coinbase.{amount; _} -> amount)
   }
 
 open Staged_ledger_diff
 
-let check_coinbase (diff : With_valid_signatures.diff) =
+let check_coinbase (diff : _ Pre_diff_two.t * _ Pre_diff_one.t option) =
   match
     ( (fst diff).coinbase
     , Option.value_map ~default:At_most_one.Zero (snd diff) ~f:(fun d ->
@@ -297,9 +295,10 @@ let check_coinbase (diff : With_valid_signatures.diff) =
                 %{sexp:Coinbase.Fee_transfer.t At_most_one.t}"
               x y))
 
-let get' ~constraint_constants (t : With_valid_signatures.t) =
+let get' (type c) ~constraint_constants ~diff ~coinbase_receiver
+    ~(forget : c -> _) =
   let apply_pre_diff_with_at_most_two
-      (t1 : With_valid_signatures.pre_diff_with_at_most_two_coinbase) =
+      (t1 : (_, c With_status.t) Pre_diff_two.t) =
     let coinbase_parts =
       match t1.coinbase with
       | Zero ->
@@ -309,47 +308,57 @@ let get' ~constraint_constants (t : With_valid_signatures.t) =
       | Two x ->
           `Two x
     in
-    get_individual_info coinbase_parts ~receiver:t.coinbase_receiver
-      t1.user_commands t1.completed_works
+    get_individual_info coinbase_parts ~receiver:coinbase_receiver t1.commands
+      t1.completed_works ~forget
   in
   let apply_pre_diff_with_at_most_one
-      (t2 : With_valid_signatures.pre_diff_with_at_most_one_coinbase) =
+      (t2 : (_, c With_status.t) Pre_diff_one.t) =
     let coinbase_added =
       match t2.coinbase with Zero -> `Zero | One x -> `One x
     in
-    get_individual_info coinbase_added ~receiver:t.coinbase_receiver
-      t2.user_commands t2.completed_works
+    get_individual_info coinbase_added ~receiver:coinbase_receiver ~forget
+      t2.commands t2.completed_works
   in
   let open Result.Let_syntax in
-  let%bind () = check_coinbase t.diff in
+  let%bind () = check_coinbase diff in
   let%bind p1 =
-    apply_pre_diff_with_at_most_two ~constraint_constants (fst t.diff)
+    apply_pre_diff_with_at_most_two ~constraint_constants (fst diff)
   in
   let%map p2 =
     Option.value_map
       ~f:(fun d -> apply_pre_diff_with_at_most_one ~constraint_constants d)
-      (snd t.diff)
+      (snd diff)
       ~default:
-        (Ok {transactions= []; work= []; user_commands_count= 0; coinbases= []})
+        (Ok {transactions= []; work= []; commands_count= 0; coinbases= []})
   in
   ( p1.transactions @ p2.transactions
   , p1.work @ p2.work
-  , p1.user_commands_count + p2.user_commands_count
+  , p1.commands_count + p2.commands_count
   , p1.coinbases @ p2.coinbases )
 
-let get ~constraint_constants t =
-  match validate_user_commands t ~check:User_command.check with
-  | Ok diff ->
-      get' ~constraint_constants diff
-  | Error uc ->
-      Error (Error.Bad_signature uc.data)
+(* TODO: This is important *)
+let get ~check ~constraint_constants t =
+  let open Async in
+  match%map validate_commands t ~check with
+  | Error e ->
+      Error (Error.Unexpected e)
+  | Ok (Error e) ->
+      Error (Error.Verification_failed e)
+  | Ok (Ok diff) ->
+      get' ~constraint_constants ~forget:Command_transaction.forget_check
+        ~diff:diff.diff ~coinbase_receiver:diff.coinbase_receiver
 
 let get_unchecked ~constraint_constants
     (t : With_valid_signatures_and_proofs.t) =
   let t = forget_proof_checks t in
-  get' ~constraint_constants t
+  get' ~constraint_constants ~diff:t.diff
+    ~coinbase_receiver:t.coinbase_receiver
+    ~forget:Command_transaction.forget_check
 
 let get_transactions ~constraint_constants (sl_diff : t) =
   let open Result.Let_syntax in
-  let%map transactions, _, _, _ = get ~constraint_constants sl_diff in
+  let%map transactions, _, _, _ =
+    get' ~constraint_constants ~diff:sl_diff.diff
+      ~coinbase_receiver:sl_diff.coinbase_receiver ~forget:Fn.id
+  in
   transactions
