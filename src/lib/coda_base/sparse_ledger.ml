@@ -515,11 +515,12 @@ let apply_user_command_exn
       (* Not able to apply the user command successfully, charge fee only. *)
       t
 
-let _apply_snapp_command_exn
+let apply_snapp_command_exn
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     ~txn_state_view t (c : Snapp_command.t) =
   let t = ref t in
-  T.apply_snapp_command ~constraint_constants ~txn_state_view t c
+  T.apply_transaction ~constraint_constants ~txn_state_view t
+    (Command (Snapp_command c))
   |> Or_error.ok_exn |> ignore ;
   !t
 
@@ -577,9 +578,11 @@ let apply_transaction_exn ~constraint_constants
   match transition with
   | Fee_transfer tr ->
       apply_fee_transfer_exn ~constraint_constants t tr
-  | User_command cmd ->
+  | Command (User_command cmd) ->
       apply_user_command_exn ~constraint_constants ~txn_global_slot t
         (cmd :> User_command.t)
+  | Command (Snapp_command cmd) ->
+      apply_snapp_command_exn ~constraint_constants ~txn_state_view t cmd
   | Coinbase c ->
       apply_coinbase_exn ~constraint_constants t c
 

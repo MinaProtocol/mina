@@ -73,7 +73,7 @@ let nonce = Fn.compose Payload.nonce payload
 (* for filtering *)
 let minimum_fee = Coda_compile_config.minimum_user_command_fee
 
-let has_insufficient_fee t = Fee.(fee t < minimum_fee)
+let has_insufficient_fee t = Currency.Fee.(fee t < minimum_fee)
 
 let signer {Poly.signer; _} = signer
 
@@ -353,6 +353,9 @@ module With_valid_signature = struct
   module Gen = Stable.Latest.Gen
   include Comparable.Make (Stable.Latest)
 end
+
+let to_valid_unsafe t =
+  `If_this_is_used_it_should_have_a_comment_justifying_it t
 
 module Base58_check = Codable.Make_base58_check (Stable.Latest)
 

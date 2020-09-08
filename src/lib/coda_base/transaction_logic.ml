@@ -233,7 +233,7 @@ module type S = sig
     type t = Undo.t = {previous_hash: Ledger_hash.t; varying: Varying.t}
     [@@deriving sexp]
 
-    val transaction : t -> Transaction.t With_status.t Or_error.t
+    val transaction : t -> Transaction.t With_status.t
 
     val user_command_status : t -> User_command_status.t
   end
@@ -244,13 +244,6 @@ module type S = sig
     -> ledger
     -> User_command.With_valid_signature.t
     -> Undo.User_command_undo.t Or_error.t
-
-  val apply_snapp_command :
-       constraint_constants:Genesis_constants.Constraint_constants.t
-    -> txn_state_view:Snapp_predicate.Protocol_state.View.t
-    -> ledger
-    -> Snapp_command.Valid.t
-    -> Undo.Snapp_command_undo.t Or_error.t
 
   val apply_transaction :
        constraint_constants:Genesis_constants.Constraint_constants.t
@@ -433,24 +426,21 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
   module Undo = struct
     include Undo
 
-    let transaction : t -> Transaction.t With_status.t Or_error.t =
+    let transaction : t -> Transaction.t With_status.t =
      fun {varying; _} ->
       match varying with
-      | Command (Snapp_command _s) ->
-          failwith "not implemented"
       | Command (User_command uc) ->
-          With_status.map_result uc.common.user_command ~f:(fun cmd ->
-              Option.value_map ~default:(Or_error.error_string "Bad signature")
-                (UC.check cmd) ~f:(fun cmd -> Ok (Transaction.User_command cmd))
-          )
+          With_status.map uc.common.user_command ~f:(fun cmd ->
+              Transaction.Command (Command_transaction.User_command cmd) )
+      | Command (Snapp_command s) ->
+          With_status.map s.command ~f:(fun c ->
+              Transaction.Command (Command_transaction.Snapp_command c) )
       | Fee_transfer f ->
-          Ok
-            { data= Fee_transfer f.fee_transfer
-            ; status= Applied User_command_status.Auxiliary_data.empty }
+          { data= Fee_transfer f.fee_transfer
+          ; status= Applied User_command_status.Auxiliary_data.empty }
       | Coinbase c ->
-          Ok
-            { data= Coinbase c.coinbase
-            ; status= Applied User_command_status.Auxiliary_data.empty }
+          { data= Coinbase c.coinbase
+          ; status= Applied User_command_status.Auxiliary_data.empty }
 
     let user_command_status : t -> User_command_status.t =
      fun {varying; _} ->
@@ -1068,12 +1058,11 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     in
     Ok {a with balance; snapp; delegate; permissions; timing}
 
-  let apply_snapp_command
+  let apply_snapp_command_unchecked ledger
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-      ~(txn_state_view : Snapp_predicate.Protocol_state.View.t) ledger
+      ~(state_view : Snapp_predicate.Protocol_state.View.t)
       (c : Snapp_command.t) =
     let open Snapp_command in
-    let state_view = txn_state_view in
     let current_global_slot = state_view.curr_global_slot in
     let open Result.Let_syntax in
     with_return (fun ({return} : _ Result.t return) ->
@@ -1362,6 +1351,9 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               ~check_predicate1:check_nonce ~check_predicate2:check_nonce
               ~account2_should_step:true )
         |> finish )
+
+  (* TODO: Use this function *)
+  let _ = apply_snapp_command_unchecked
 
   let process_fee_transfer t (transfer : Fee_transfer.t) ~modify_balance =
     let open Or_error.Let_syntax in
@@ -1787,11 +1779,16 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         let txn_global_slot = txn_state_view.curr_global_slot in
         Or_error.map
           ( match t with
-          | User_command txn ->
+          | Command (User_command txn) ->
               Or_error.map
-                (apply_user_command ~constraint_constants ~txn_global_slot
-                   ledger txn) ~f:(fun undo ->
+                (apply_user_command_unchecked ~constraint_constants
+                   ~txn_global_slot ledger txn) ~f:(fun undo ->
                   Undo.Varying.Command (User_command undo) )
+          | Command (Snapp_command txn) ->
+              Or_error.map
+                (apply_snapp_command_unchecked ~state_view:txn_state_view
+                   ~constraint_constants ledger txn) ~f:(fun undo ->
+                  Undo.Varying.Command (Snapp_command undo) )
           | Fee_transfer t ->
               Or_error.map (apply_fee_transfer ~constraint_constants ledger t)
                 ~f:(fun undo -> Undo.Varying.Fee_transfer undo)
@@ -1804,8 +1801,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       ledger payment =
     let undo =
       Or_error.ok_exn
-        (apply_snapp_command ~constraint_constants ~txn_state_view ledger
-           payment)
+        (apply_snapp_command_unchecked ~constraint_constants
+           ~state_view:txn_state_view ledger payment)
     in
     let root = merkle_root ledger in
     let next_available_token = next_available_token ledger in

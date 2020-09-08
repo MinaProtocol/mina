@@ -27,8 +27,8 @@ let typ : (var, t) Typ.t =
     [payload.body.public_key] is interpreted as the recipient of a payment, the new delegate of a stake
     delegation command, and a fee transfer recipient for both coinbases and fee-transfers.
 *)
-let of_transaction : Transaction.t -> t = function
-  | User_command cmd ->
+let of_transaction : User_command.t Transaction.Poly.t -> t = function
+  | Command cmd ->
       let User_command.Poly.{payload; signer; signature} =
         (cmd :> User_command.t)
       in

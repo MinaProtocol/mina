@@ -129,18 +129,6 @@ module Undo : sig
     [@@deriving sexp]
   end
 
-  module Fee_transfer_undo : sig
-    type t = Undo.Fee_transfer_undo.t =
-      {fee_transfer: Fee_transfer.t; previous_empty_accounts: Account_id.t list}
-    [@@deriving sexp]
-  end
-
-  module Coinbase_undo : sig
-    type t = Undo.Coinbase_undo.t =
-      {coinbase: Coinbase.t; previous_empty_accounts: Account_id.t list}
-    [@@deriving sexp]
-  end
-
   module Snapp_command_undo : sig
     type t = Undo.Snapp_command_undo.t =
       { accounts: (Account_id.t * Account.t option) list
@@ -155,6 +143,18 @@ module Undo : sig
     [@@deriving sexp]
   end
 
+  module Fee_transfer_undo : sig
+    type t = Undo.Fee_transfer_undo.t =
+      {fee_transfer: Fee_transfer.t; previous_empty_accounts: Account_id.t list}
+    [@@deriving sexp]
+  end
+
+  module Coinbase_undo : sig
+    type t = Undo.Coinbase_undo.t =
+      {coinbase: Coinbase.t; previous_empty_accounts: Account_id.t list}
+    [@@deriving sexp]
+  end
+
   module Varying : sig
     type t = Undo.Varying.t =
       | Command of Command_undo.t
@@ -166,7 +166,7 @@ module Undo : sig
   type t = Undo.t = {previous_hash: Ledger_hash.t; varying: Varying.t}
   [@@deriving sexp]
 
-  val transaction : t -> Transaction.t With_status.t Or_error.t
+  val transaction : t -> Transaction.t With_status.t
 
   val user_command_status : t -> User_command_status.t
 end
