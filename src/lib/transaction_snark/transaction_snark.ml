@@ -1281,7 +1281,9 @@ module Base = struct
              in
              let%bind receipt_chain_hash =
                let current = account.receipt_chain_hash in
-               let%bind r = Receipt.Chain_hash.Checked.cons ~payload current in
+               let%bind r =
+                 Receipt.Chain_hash.Checked.cons (User_command payload) current
+               in
                Receipt.Chain_hash.Checked.if_ is_user_command ~then_:r
                  ~else_:current
              in
