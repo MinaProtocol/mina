@@ -46,7 +46,7 @@ val fee_excess : t -> Fee_excess.t Or_error.t
 module Gen : sig
   val gen :
        constraint_constants:Genesis_constants.Constraint_constants.t
-    -> t Quickcheck.Generator.t
+    -> (t * bool) Quickcheck.Generator.t
 
   val with_random_receivers :
        keys:Signature_keypair.t array
