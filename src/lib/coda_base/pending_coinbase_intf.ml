@@ -186,10 +186,8 @@ module type S = sig
       [%%versioned:
       module Stable : sig
         module V1 : sig
-          type ('action, 'coinbase_data, 'supercharge_coinbase) t =
-            { action: 'action
-            ; coinbase_data: 'coinbase_data
-            ; supercharge_coinbase: 'supercharge_coinbase }
+          type ('action, 'coinbase_data) t =
+            {action: 'action; coinbase_data: 'coinbase_data}
           [@@deriving sexp]
         end
       end]
@@ -199,15 +197,12 @@ module type S = sig
     module Stable : sig
       module V1 : sig
         type t =
-          ( Action.Stable.V1.t
-          , Coinbase_data.Stable.V1.t
-          , bool )
-          Poly.Stable.V1.t
+          (Action.Stable.V1.t, Coinbase_data.Stable.V1.t) Poly.Stable.V1.t
         [@@deriving sexp, to_yojson]
       end
     end]
 
-    type var = (Action.var, Coinbase_data.var, Boolean.var) Poly.t
+    type var = (Action.var, Coinbase_data.var) Poly.t
 
     val genesis : t
 

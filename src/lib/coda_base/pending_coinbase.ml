@@ -443,10 +443,8 @@ module Update = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type ('action, 'coinbase_data, 'supercharge_coinbase) t =
-          { action: 'action
-          ; coinbase_data: 'coinbase_data
-          ; supercharge_coinbase: 'supercharge_coinbase }
+        type ('action, 'coinbase_data) t =
+          {action: 'action; coinbase_data: 'coinbase_data}
         [@@deriving sexp, to_yojson, hlist]
       end
     end]
@@ -455,8 +453,7 @@ module Update = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t =
-        (Action.Stable.V1.t, Coinbase_data.Stable.V1.t, bool) Poly.Stable.V1.t
+      type t = (Action.Stable.V1.t, Coinbase_data.Stable.V1.t) Poly.Stable.V1.t
       [@@deriving sexp, to_yojson]
 
       let to_latest = Fn.id
@@ -466,24 +463,22 @@ module Update = struct
   [%%define_locally
   Poly.(to_hlist, of_hlist)]
 
-  type var = (Action.var, Coinbase_data.var, Boolean.var) Poly.t
+  type var = (Action.var, Coinbase_data.var) Poly.t
 
   let typ =
     let open Snark_params.Tick.Typ in
     of_hlistable ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
       ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
-      [Action.typ; Coinbase_data.typ; Boolean.typ]
+      [Action.typ; Coinbase_data.typ]
 
   let genesis : t =
     { coinbase_data=
         (Signature_lib.Public_key.Compressed.empty, Currency.Amount.zero)
-    ; action= Action.Update_none
-    ; supercharge_coinbase= true }
+    ; action= Action.Update_none }
 
   let var_of_t (t : t) : var =
     { action= Action.var_of_t t.action
-    ; coinbase_data= Coinbase_data.var_of_t t.coinbase_data
-    ; supercharge_coinbase= Boolean.var_of_value t.supercharge_coinbase }
+    ; coinbase_data= Coinbase_data.var_of_t t.coinbase_data }
 end
 
 (* Sparse_ledger.Make is applied more than once in the code, so
@@ -821,7 +816,7 @@ module T = struct
 
     let%snarkydef add_coinbase
         ~(constraint_constants : Genesis_constants.Constraint_constants.t) t
-        ({action; coinbase_data= pk, amount; _} : Update.var)
+        ({action; coinbase_data= pk, amount} : Update.var)
         ~supercharge_coinbase state_body_hash =
       let depth = constraint_constants.pending_coinbase_depth in
       let%bind addr1, addr2 =
@@ -1390,9 +1385,7 @@ let%test_unit "Checked_tree = Unchecked_tree" =
             handle
               (f_add_coinbase
                  (Hash.var_of_t (merkle_root pending_coinbases))
-                 { Update.Poly.action= action_var
-                 ; coinbase_data= coinbase_var
-                 ; supercharge_coinbase= supercharge_coinbase_var }
+                 {Update.Poly.action= action_var; coinbase_data= coinbase_var}
                  ~supercharge_coinbase:supercharge_coinbase_var
                  state_body_hash_var)
               (unstage (handler ~depth pending_coinbases ~is_new_stack))
@@ -1444,9 +1437,7 @@ let%test_unit "Checked_tree = Unchecked_tree after pop" =
             handle
               (f_add_coinbase
                  (Hash.var_of_t (merkle_root pending_coinbases))
-                 { Update.Poly.action= action_var
-                 ; coinbase_data= coinbase_var
-                 ; supercharge_coinbase= supercharge_coinbase_var }
+                 {Update.Poly.action= action_var; coinbase_data= coinbase_var}
                  ~supercharge_coinbase:supercharge_coinbase_var
                  state_body_hash_var)
               (unstage (handler ~depth pending_coinbases ~is_new_stack:true))
