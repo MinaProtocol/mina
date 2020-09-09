@@ -56,6 +56,7 @@ module Styles = {
     merge([
       Button.Styles.button(
         Theme.Colors.mint,
+        Theme.Colors.digitalBlack,
         true,
         `rem(3.25),
         `rem(7.75),
@@ -63,7 +64,7 @@ module Styles = {
         1.,
       ),
       style([
-        color(Theme.Colors.black),
+        color(Theme.Colors.digitalBlack),
         marginRight(`auto),
         media(Theme.MediaQuery.tablet, [marginRight(`rem(2.))]),
         media(Theme.MediaQuery.desktop, [marginRight(`rem(4.))]),
