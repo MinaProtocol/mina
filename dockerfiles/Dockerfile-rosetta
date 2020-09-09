@@ -239,6 +239,7 @@ RUN eval $(opam config env) \
     src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe \
     src/app/generate_keypair/generate_keypair.exe \
     src/app/rosetta/test-agent/agent.exe \
+    src/app/rosetta/ocaml-signer/signer.exe \
   && _build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe \
     --config-file src/app/rosetta/demo-config.json \
     --genesis-dir ${HOME}/demo-genesis \

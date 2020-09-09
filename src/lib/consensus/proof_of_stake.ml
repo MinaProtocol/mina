@@ -115,33 +115,7 @@ module Constants = Constants
 
 module Data = struct
   module Epoch_seed = struct
-    include Coda_base.Data_hash.Make_full_size (struct
-      let version_byte = Base58_check.Version_bytes.epoch_seed
-
-      let description = "Epoch Seed"
-    end)
-
-    (* Data hash versioned boilerplate below *)
-
-    [%%versioned
-    module Stable = struct
-      module V1 = struct
-        module T = struct
-          type t = Snark_params.Tick.Field.t
-          [@@deriving sexp, compare, hash, version {asserted}]
-        end
-
-        include T
-
-        let to_latest = Core.Fn.id
-
-        [%%define_from_scope
-        to_yojson, of_yojson]
-
-        include Comparable.Make (T)
-        include Hashable.Make_binable (T)
-      end
-    end]
+    include Coda_base.Epoch_seed
 
     type _unused = unit constraint t = Stable.Latest.t
 
@@ -518,7 +492,10 @@ module Data = struct
                  )
                ~back:Blake2.bits_to_string
 
-        let dummy = String.init 32 ~f:(fun _ -> '\000')
+        let dummy =
+          String.init
+            (Base.Int.round ~dir:`Up ~to_multiple_of:8 length_in_bits / 8)
+            ~f:(fun _ -> '\000')
 
         let to_bits t =
           Fold.(to_list (string_bits t)) |> Fn.flip List.take length_in_bits
@@ -859,52 +836,7 @@ module Data = struct
   end
 
   module Epoch_data = struct
-    module Poly = struct
-      [%%versioned
-      module Stable = struct
-        module V1 = struct
-          type ( 'epoch_ledger
-               , 'epoch_seed
-               , 'start_checkpoint
-               , 'lock_checkpoint
-               , 'length )
-               t =
-            { ledger: 'epoch_ledger
-            ; seed: 'epoch_seed
-            ; start_checkpoint: 'start_checkpoint
-                  (* The lock checkpoint is the hash of the latest state in the seed update range, not including
-                 the current state. *)
-            ; lock_checkpoint: 'lock_checkpoint
-            ; epoch_length: 'length }
-          [@@deriving sexp, eq, compare, hash, to_yojson, fields, hlist]
-        end
-      end]
-    end
-
-    type var =
-      ( Epoch_ledger.var
-      , Epoch_seed.var
-      , Coda_base.State_hash.var
-      , Coda_base.State_hash.var
-      , Length.Checked.t )
-      Poly.t
-
-    let if_ cond ~(then_ : var) ~(else_ : var) =
-      let open Snark_params.Tick.Checked.Let_syntax in
-      let%map ledger =
-        Epoch_ledger.if_ cond ~then_:then_.ledger ~else_:else_.ledger
-      and seed = Epoch_seed.if_ cond ~then_:then_.seed ~else_:else_.seed
-      and start_checkpoint =
-        Coda_base.State_hash.if_ cond ~then_:then_.start_checkpoint
-          ~else_:else_.start_checkpoint
-      and lock_checkpoint =
-        Coda_base.State_hash.if_ cond ~then_:then_.lock_checkpoint
-          ~else_:else_.lock_checkpoint
-      and epoch_length =
-        Length.Checked.if_ cond ~then_:then_.epoch_length
-          ~else_:else_.epoch_length
-      in
-      {Poly.ledger; seed; start_checkpoint; lock_checkpoint; epoch_length}
+    include Coda_base.Epoch_data
 
     module Make (Lock_checkpoint : sig
       type t [@@deriving sexp, compare, hash, to_yojson]
@@ -2089,6 +2021,17 @@ module Data = struct
     let curr_epoch = curr_ Global_slot.epoch
 
     let curr_slot = curr_ Global_slot.slot
+
+    let blockchain_length_var (t : var) = t.blockchain_length
+
+    let min_window_density_var (t : var) = t.min_window_density
+
+    let total_currency_var (t : var) = t.total_currency
+
+    let staking_epoch_data_var (t : var) : Epoch_data.var =
+      t.staking_epoch_data
+
+    let next_epoch_data_var (t : var) : Epoch_data.var = t.next_epoch_data
 
     let curr_global_slot_var (t : var) =
       Global_slot.slot_number t.curr_global_slot

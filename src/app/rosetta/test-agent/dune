@@ -18,7 +18,6 @@
     lib
     ppx_deriving_yojson.runtime
     yojson
-    secrets
     )
   (preprocess (pps
     graphql_ppx

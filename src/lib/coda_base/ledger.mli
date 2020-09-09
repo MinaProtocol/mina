@@ -141,9 +141,23 @@ module Undo : sig
     [@@deriving sexp]
   end
 
+  module Snapp_command_undo : sig
+    type t = Undo.Snapp_command_undo.t =
+      { accounts: (Account_id.t * Account.t option) list
+      ; command: Snapp_command.t With_status.t }
+    [@@deriving sexp]
+  end
+
+  module Command_undo : sig
+    type t = Undo.Command_undo.t =
+      | User_command of User_command_undo.t
+      | Snapp_command of Snapp_command_undo.t
+    [@@deriving sexp]
+  end
+
   module Varying : sig
     type t = Undo.Varying.t =
-      | User_command of User_command_undo.t
+      | Command of Command_undo.t
       | Fee_transfer of Fee_transfer_undo.t
       | Coinbase of Coinbase_undo.t
     [@@deriving sexp]
@@ -168,7 +182,7 @@ val apply_user_command :
 
 val apply_transaction :
      constraint_constants:Genesis_constants.Constraint_constants.t
-  -> txn_global_slot:Coda_numbers.Global_slot.t
+  -> txn_state_view:Snapp_predicate.Protocol_state.View.t
   -> t
   -> Transaction.t
   -> Undo.t Or_error.t
@@ -178,6 +192,13 @@ val undo :
   -> t
   -> Undo.t
   -> unit Or_error.t
+
+val merkle_root_after_snapp_command_exn :
+     constraint_constants:Genesis_constants.Constraint_constants.t
+  -> txn_state_view:Snapp_predicate.Protocol_state.View.t
+  -> t
+  -> Snapp_command.Valid.t
+  -> Ledger_hash.t * [`Next_available_token of Token_id.t]
 
 val merkle_root_after_user_command_exn :
      constraint_constants:Genesis_constants.Constraint_constants.t

@@ -39,6 +39,8 @@ module Transaction_with_witness = struct
       type t =
         { transaction_with_info: Transaction_logic.Undo.Stable.V1.t
         ; state_hash: State_hash.Stable.V1.t * State_body_hash.Stable.V1.t
+              (* TODO: It's inefficient to store this here. Optimize it someday. *)
+        ; state_view: Coda_base.Snapp_predicate.Protocol_state.View.Stable.V1.t
         ; statement: Transaction_snark.Statement.Stable.V1.t
         ; init_stack:
             Transaction_snark.Pending_coinbase_stack_state.Init_stack.Stable.V1
@@ -168,6 +170,7 @@ Stable.Latest.(hash)]
 let create_expected_statement ~constraint_constants
     { Transaction_with_witness.transaction_with_info
     ; state_hash
+    ; state_view
     ; ledger_witness
     ; init_stack
     ; statement } =
@@ -182,14 +185,10 @@ let create_expected_statement ~constraint_constants
   let%bind {data= transaction; status= _} =
     Ledger.Undo.transaction transaction_with_info
   in
-  let txn_global_slot =
-    (* TODO: Get from protocol state. *)
-    Coda_numbers.Global_slot.zero
-  in
   let%bind after =
     Or_error.try_with (fun () ->
         Sparse_ledger.apply_transaction_exn ~constraint_constants
-          ~txn_global_slot ledger_witness transaction )
+          ~txn_state_view:state_view ledger_witness transaction )
   in
   let target =
     Frozen_ledger_hash.of_ledger_hash @@ Sparse_ledger.merkle_root after

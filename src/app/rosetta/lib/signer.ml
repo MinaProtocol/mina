@@ -11,9 +11,12 @@ module Keys = struct
   type t = {keypair: Keypair.t; public_key_hex_bytes: string}
 
   let of_keypair keypair =
-    { keypair
-    ; public_key_hex_bytes=
-        Rosetta_coding.Coding.of_public_key keypair.public_key }
+    {keypair; public_key_hex_bytes= Coding.of_public_key keypair.public_key}
+
+  let to_private_key_bytes t = Coding.of_scalar t.keypair.private_key
+
+  let of_private_key_bytes s =
+    Coding.to_scalar s |> Keypair.of_private_key_exn |> of_keypair
 
   let of_private_key_box secret_box_string =
     let json = Yojson.Safe.from_string secret_box_string in
@@ -26,6 +29,7 @@ module Keys = struct
       |> Result.ok |> Option.value_exn
     in
     let sk = output |> Bigstring.of_bytes |> Private_key.of_bigstring_exn in
+    (*printf !"Secret key hex bytes is: %s\n" (Coding.of_scalar sk) ;*)
     of_keypair (Keypair.of_private_key_exn sk)
 end
 
@@ -43,8 +47,8 @@ let sign ~(keys : Keys.t) ~unsigned_transaction_string =
   in
   let user_command_payload =
     User_command_info.Partial.to_user_command_payload
-      ~nonce:unsigned_transaction.nonce
-      unsigned_transaction.Transaction.Unsigned.command
+      ~nonce:unsigned_transaction.Transaction.Unsigned.nonce
+      unsigned_transaction.command
     |> Result.ok |> Option.value_exn
   in
   let signature =

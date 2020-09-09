@@ -65,7 +65,8 @@ let similar ~logger:_ t (op : Operation.t) =
   and () =
     opt_eq t.target op.metadata ~err:Target ~f:(fun target metadata ->
         match metadata with
-        | `Assoc [("delegate_change_target", `String y)] ->
+        | `Assoc [("delegate_change_target", `String y)]
+        | `Assoc [("token_owner_pk", `String y)] ->
             test String.(equal y target) Target
         | _ ->
             fail Target )
