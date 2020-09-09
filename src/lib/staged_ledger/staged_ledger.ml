@@ -490,6 +490,7 @@ module T = struct
     let%map undo, statement, updated_pending_coinbase_stack_state = r in
     ( { Scan_state.Transaction_with_witness.transaction_with_info= undo
       ; state_hash= state_and_body_hash
+      ; state_view= txn_state_view
       ; ledger_witness
       ; init_stack= Base pending_coinbase_stack_state.init_stack
       ; statement }
