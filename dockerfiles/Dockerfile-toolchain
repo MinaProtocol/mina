@@ -80,6 +80,11 @@ RUN curl -sL \
   && sudo unzip /tmp/terraform.zip -d /usr/bin \
   && rm /tmp/terraform.zip
 
+# Get kubectl
+Run curl -LO "https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl"
+  && chmod +x ./kubectl
+  && sudo mv ./kubectl /usr/local/bin/kubectl
+
 # Source copy of rocksdb
 RUN sudo git clone https://github.com/facebook/rocksdb -b v5.17.2 /rocksdb
 # This builds and installs just the static lib for us
