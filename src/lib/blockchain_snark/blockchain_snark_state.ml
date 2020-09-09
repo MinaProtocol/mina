@@ -45,51 +45,6 @@ let with_handler k w ?handler =
   let h = wrap_handler handler w in
   k ?handler:(Some h)
 
-(*let supercharge_coinbase
-    ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-    ~delegator_account ~slot =
-  let open Snark_params.Tick in
-  let%bind winner_addr =
-    request_witness
-      (Coda_base.Account.Index.Unpacked.typ
-         ~ledger_depth:constraint_constants.ledger_depth)
-      (As_prover.return Vrf.Winner_address)
-  in
-  let%bind public_key =
-    request_witness Public_key.typ (As_prover.return Vrf.Public_key)
-  in
-  let%bind delegator_account =
-    with_label __LOC__
-      (Frozen_ledger_hash.get ~depth:constraint_constants.ledger_depth ledger
-         winner_addr)
-  in
-  let%bind delegate_account =
-    let%bind delegate_key =
-      Public_key.decompress_var delegator_account.public_key
-    in
-    let%bind staking = Public_key.Checked.equal_var public_key winner_key in
-    let%bind delegate_account_id =
-      Account_id.Checked.create delegator_account.delegate
-        Token_id.(var_of_t default)
-    in
-    let%bind delegate_addr =
-      request_witness
-        (Coda_base.Account.Index.Unpacked.typ
-           ~ledger_depth:constraint_constants.ledger_depth)
-        (As_prover.return (Ledger_hash.Find_index delegate_account_id))
-    in
-    with_label __LOC__
-      (Frozen_ledger_hash.get ~depth:constraint_constants.ledger_depth ledger
-         delegate_addr)
-  in
-  let%bind delegator_locked =
-    Account.Checked.has_locked_tokens ~global_slot delegator_account
-  in
-  let%bind delegate_locked =
-    Account.Checked.has_locked_tokens ~global_slot delegate_account
-  in
-  Boolean.(delegate_locked || delegator_locked) >>= Boolean.not
-*)
 (* Blockchain_snark ~old ~nonce ~ledger_snark ~ledger_hash ~timestamp ~new_hash
       Input:
         old : Blockchain.t
@@ -134,10 +89,6 @@ let%snarkydef step ~(logger : Logger.t)
     in
     (t, body)
   in
-  let _global_slot =
-    previous_state |> Protocol_state.consensus_state
-    |> Consensus.Data.Consensus_state.curr_global_slot_var
-  in
   let%bind ( `Success updated_consensus_state
            , supercharge_coinbase
            , consensus_state ) =
@@ -145,12 +96,6 @@ let%snarkydef step ~(logger : Logger.t)
       (Consensus_state_hooks.next_state_checked ~constraint_constants
          ~prev_state:previous_state ~prev_state_hash:previous_state_hash
          transition txn_snark.supply_increase)
-  in
-  let%bind () =
-    Boolean.Assert.(
-      supercharge_coinbase
-      = (Snark_transition.pending_coinbase_update transition)
-          .supercharge_coinbase)
   in
   let prev_pending_coinbase_root =
     previous_state |> Protocol_state.blockchain_state
