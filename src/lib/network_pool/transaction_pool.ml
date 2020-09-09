@@ -181,6 +181,8 @@ struct
 
     let make_config = Config.make
 
+    module Batcher = Batcher.Transaction_pool
+
     type t =
       { mutable pool: Indexed_pool.t
       ; locally_generated_uncommitted:
@@ -196,6 +198,7 @@ struct
             (** Ones that are included in the current best tip. *)
       ; config: Config.t
       ; logger: Logger.t sexp_opaque
+      ; batcher: Batcher.t
       ; mutable best_tip_diff_relay: unit Deferred.t sexp_opaque Option.t
       ; mutable best_tip_ledger: Base_ledger.t sexp_opaque option }
     [@@deriving sexp_of]
@@ -523,6 +526,7 @@ struct
                        .Latest )
         ; config
         ; logger
+        ; batcher= Batcher.create config.verifier
         ; best_tip_diff_relay= None
         ; best_tip_ledger= None }
       in
@@ -689,33 +693,41 @@ struct
       (* Transaction verification currently happens in apply. In the future we could batch it. *)
       let verify (t : pool) (d : t Envelope.Incoming.t) :
           verified Envelope.Incoming.t option Deferred.t =
-        let res =
+        match
           Option.try_with (fun () ->
+              let open Base_ledger in
+              let ledger = Option.value_exn t.best_tip_ledger in
               Envelope.Incoming.map d
                 ~f:
-                  (List.map ~f:(function
-                    | Command_transaction.Snapp_command c ->
-                        Command_transaction.Snapp_command c
-                    | User_command c ->
-                        User_command (Option.value_exn (User_command.check c)) ))
-          )
-        in
-        let open Deferred.Let_syntax in
-        match res with
-        | Some _ ->
-            Deferred.return res
+                  (List.map
+                     ~f:
+                       (Command_transaction.to_verifiable_exn ~ledger ~get
+                          ~location_of_account)) )
+        with
         | None ->
-            let trust_record =
-              Trust_system.record_envelope_sender t.config.trust_system
-                t.logger d.sender
-            in
-            let%map () =
-              (* that's an insta-ban *)
-              trust_record
-                ( Trust_system.Actions.Sent_invalid_signature
-                , Some ("diff was: $diff", [("diff", to_yojson d.data)]) )
-            in
-            None
+            Deferred.return None
+        | Some v -> (
+            let open Deferred.Let_syntax in
+            match%bind Batcher.verify t.batcher v with
+            | Error e ->
+                (* Verifier crashed or other errors at our end. Don't punish the peer*)
+                let%map () = log_and_punish ~punish:false t d e in
+                None
+            | Ok (Ok valid) ->
+                Deferred.return
+                  (Some {Envelope.Incoming.sender= d.sender; data= valid})
+            | Ok (Error ()) ->
+                let trust_record =
+                  Trust_system.record_envelope_sender t.config.trust_system
+                    t.logger d.sender
+                in
+                let%map () =
+                  (* that's an insta-ban *)
+                  trust_record
+                    ( Trust_system.Actions.Sent_invalid_signature
+                    , Some ("diff was: $diff", [("diff", to_yojson d.data)]) )
+                in
+                None )
 
       let apply t (env : verified Envelope.Incoming.t) =
         let txs = Envelope.Incoming.data env in
