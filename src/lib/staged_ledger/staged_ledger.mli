@@ -117,7 +117,7 @@ val apply :
   -> Staged_ledger_diff.t
   -> logger:Logger.t
   -> verifier:Verifier.t
-  -> current_global_slot:Coda_numbers.Global_slot.t
+  -> current_state_view:Snapp_predicate.Protocol_state.View.t
   -> state_and_body_hash:State_hash.t * State_body_hash.t
   -> ( [`Hash_after_applying of Staged_ledger_hash.t]
        * [ `Ledger_proof of
@@ -134,7 +134,7 @@ val apply_diff_unchecked :
   -> t
   -> Staged_ledger_diff.With_valid_signatures_and_proofs.t
   -> logger:Logger.t
-  -> current_global_slot:Coda_numbers.Global_slot.t
+  -> current_state_view:Snapp_predicate.Protocol_state.View.t
   -> state_and_body_hash:State_hash.t * State_body_hash.t
   -> ( [`Hash_after_applying of Staged_ledger_hash.t]
        * [ `Ledger_proof of
@@ -157,7 +157,7 @@ val create_diff :
   -> self:Public_key.Compressed.t
   -> coinbase_receiver:[`Producer | `Other of Public_key.Compressed.t]
   -> logger:Logger.t
-  -> current_global_slot:Coda_numbers.Global_slot.t
+  -> current_state_view:Snapp_predicate.Protocol_state.View.t
   -> transactions_by_fee:User_command.With_valid_signature.t Sequence.t
   -> get_completed_work:(   Transaction_snark_work.Statement.t
                          -> Transaction_snark_work.Checked.t option)
