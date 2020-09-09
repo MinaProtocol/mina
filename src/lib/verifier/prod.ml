@@ -132,12 +132,7 @@ module Worker = struct
   include Rpc_parallel.Make (T)
 end
 
-type t =
-  < verify_blockchain_snark:
-      Blockchain_snark.Blockchain.t -> bool Or_error.t Deferred.t
-  ; verify_transaction_snarks:
-         (ledger_proof * Coda_base.Sok_message.t) list
-      -> bool Or_error.t Deferred.t >
+type t = ledger_proof Generic.t
 
 (* TODO: investigate why conf_dir wasn't being used *)
 let create ~logger ~proof_level ~pids ~conf_dir : t Deferred.t =
@@ -174,20 +169,19 @@ let create ~logger ~proof_level ~pids ~conf_dir : t Deferred.t =
          @@ [%log error] "Verifier stderr: $stderr"
               ~metadata:[("stderr", `String stderr)] ) ;
   let res : t =
-    object
-      method verify_blockchain_snark chain =
-        Worker.Connection.run connection ~f:Worker.functions.verify_blockchain
-          ~arg:chain
-
-      method verify_transaction_snarks ts =
-        Worker.Connection.run connection
-          ~f:Worker.functions.verify_transaction_snarks ~arg:ts
-    end
+    { verify_blockchain_snark=
+        (fun chain ->
+          Worker.Connection.run connection
+            ~f:Worker.functions.verify_blockchain ~arg:chain )
+    ; verify_transaction_snarks=
+        (fun ts ->
+          Worker.Connection.run connection
+            ~f:Worker.functions.verify_transaction_snarks ~arg:ts ) }
   in
   res
 
-let verify_blockchain_snark (t : t) chain = t#verify_blockchain_snark chain
+let verify_blockchain_snark (t : t) chain = t.verify_blockchain_snark chain
 
-let verify_transaction_snarks (t : t) ts = t#verify_transaction_snarks ts
+let verify_transaction_snarks (t : t) ts = t.verify_transaction_snarks ts
 
 let of_generic t : t = t

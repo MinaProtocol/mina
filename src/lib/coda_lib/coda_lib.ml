@@ -768,14 +768,11 @@ let create (config : Config.t) =
             with
             | Some T ->
                 Verifier.of_generic
-                  (object
-                     method verify_blockchain_snark chain =
-                       Prover.verify_blockchain_snark prover chain
-
-                     method verify_transaction_snarks
-                           (ts : (Ledger_proof.Prod.t * Sok_message.t) list) =
-                       Prover.verify_transaction_snarks prover ts
-                  end)
+                  { verify_blockchain_snark=
+                      (fun chain -> Prover.verify_blockchain_snark prover chain)
+                  ; verify_transaction_snarks=
+                      (fun (ts : (Ledger_proof.Prod.t * Sok_message.t) list) ->
+                        Prover.verify_transaction_snarks prover ts ) }
                 |> Deferred.return
             | None ->
                 Monitor.try_with
