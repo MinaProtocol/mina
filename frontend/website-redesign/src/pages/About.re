@@ -195,14 +195,12 @@ module HeroRows = {
       merge([
         heroRowImage,
         style([
+          position(`absolute),
+          left(`zero),
           backgroundImage(`url("/static/img/triangle_mobile.png")),
           media(
             Theme.MediaQuery.tablet,
-            [
-              position(`absolute),
-              left(`zero),
-              backgroundImage(`url("/static/img/triangle_tablet.png")),
-            ],
+            [backgroundImage(`url("/static/img/triangle_tablet.png"))],
           ),
           media(
             Theme.MediaQuery.desktop,
@@ -261,6 +259,10 @@ module HeroRows = {
         />
       </div>
       <div className=Styles.container>
+<<<<<<< HEAD
+=======
+        <div className=Styles.secondImage />
+>>>>>>> 5f7d54b99... Add images for second row
         <div className=Styles.secondColumn>
           <p className=Styles.subhead>
             {React.string("That's why we created Mina.")}
