@@ -20,10 +20,7 @@ module Hero = {
         ),
         media(
           Theme.MediaQuery.desktop,
-          [
-            height(`rem(41.)),
-            backgroundImage(`url("/static/img/02_About_1_2880x1504.jpg")),
-          ],
+          [backgroundImage(`url("/static/img/02_About_1_2880x1504.jpg"))],
         ),
       ]);
     let heroContent =
@@ -64,7 +61,7 @@ module Hero = {
           padding2(~v=`rem(1.3), ~h=`rem(1.3)),
           media(
             Theme.MediaQuery.desktop,
-            [padding2(~v=`rem(1.5), ~h=`rem(1.5)), width(`rem(27.))],
+            [padding2(~v=`rem(1.5), ~h=`rem(1.5))],
           ),
           marginTop(`rem(1.)),
           marginBottom(`rem(1.5)),
@@ -106,24 +103,28 @@ module Hero = {
 /** Section for alternating rows */
 module HeroRows = {
   module Styles = {
-    let rowsSection =
-      style([backgroundImage(`url("/static/img/BackgroundAbout.png"))]);
+    let rowBackgroundImage =
+      style([
+        height(`px(1924)),
+        width(`percent(100.)),
+        important(backgroundSize(`cover)),
+        backgroundImage(`url("/static/img/BackgroundGlowCluster01.png")),
+      ]);
     let container =
       style([
-        backgroundSize(`cover),
         display(`flex),
         flexDirection(`column),
-        padding2(~v=`rem(3.), ~h=`rem(3.)),
         media(
           Theme.MediaQuery.desktop,
           [
+            position(`relative),
             flexDirection(`row),
-            justifyContent(`spaceBetween),
-            width(`rem(80.5)),
-            padding2(~v=`rem(3.), ~h=`rem(9.2)),
+            padding2(~h=`rem(9.5), ~v=`rem(11.6)),
           ],
         ),
       ]);
+
+    /** Can reuse and extract into a reusable component in the future */
     let column =
       style([
         display(`flex),
@@ -131,9 +132,21 @@ module HeroRows = {
         justifyContent(`flexStart),
         media(Theme.MediaQuery.desktop, [width(`rem(35.))]),
       ]);
-    let header = Theme.Type.h2;
+
+    /* First and second rows  */
+    let firstColumn = merge([column, style([marginRight(`rem(7.))])]);
+    let secondColumn = merge([column, style([marginLeft(`rem(35.))])]);
+
+    let header = merge([Theme.Type.h2, style([width(`rem(18.2))])]);
     let subhead =
-      merge([Theme.Type.sectionSubhead, style([letterSpacing(`px(-1))])]);
+      merge([
+        Theme.Type.sectionSubhead,
+        style([
+          marginTop(`rem(1.5)),
+          letterSpacing(`px(-1)),
+          marginBottom(`rem(1.5)),
+        ]),
+      ]);
     let heroRowImage =
       style([
         height(`rem(21.)),
@@ -144,23 +157,29 @@ module HeroRows = {
         ),
         unsafe("object-fit", "cover"),
       ]);
+    let firstImage =
+      merge([heroRowImage, style([position(`absolute), right(`zero)])]);
+    let secondImage =
+      merge([heroRowImage, style([position(`absolute), left(`zero)])]);
     let imageContainer = style([position(`relative)]);
 
     let copy = Theme.Type.paragraph;
-  };
-
-  module Row = {
-    [@react.component]
-    let make = (~children) => {
-      <div className=Styles.container> children </div>;
-    };
+    let rule =
+      style([
+        width(`percent(100.)),
+        color(Theme.Colors.digitalBlack),
+        border(`px(1), `solid, black),
+      ]);
+    let orange =
+      merge([copy, style([display(`inlineBlock), color(orange)])]);
   };
 
   [@react.component]
   let make = () => {
-    <div className=Styles.rowsSection>
-      <Row>
-        <div className=Styles.column>
+    <div className=Styles.rowBackgroundImage>
+      <div className=Styles.container>
+        <div className=Styles.firstColumn>
+          <hr className=Styles.rule />
           <h2 className=Styles.header>
             {React.string("It's Time to Own Our Future")}
           </h2>
@@ -174,11 +193,13 @@ module HeroRows = {
                "Every day, we give up control of intimate data to large tech companies to use online services. We give up control of our finances to banks and unaccountable credit bureaus. We give up control of our elections to voting system companies who run opaque and unauditable elections. ",
              )}
           </p>
+          <Spacer height=1.75 />
           <p className=Styles.copy>
             {React.string(
                "Even when we try to escape this power imbalance and participate in blockchains, most of us give up control and trust to third parties to verify transactions. Why? Because running a full node requires expensive hardware, unsustainable amounts of electricity and tons of time to sync increasingly heavier and heavier chains.",
              )}
           </p>
+          <Spacer height=1.75 />
           <p className=Styles.copy>
             <strong>
               {React.string("But it doesn't have to be this way. ")}
@@ -186,17 +207,17 @@ module HeroRows = {
           </p>
         </div>
         <img
-          className=Styles.heroRowImage
+          className=Styles.firstImage
           src="/static/img/02_About_2_1232x1232.jpg"
         />
-      </Row>
+      </div>
       <Spacer height=7.93 />
-      <Row>
+      <div className=Styles.container>
         <img
-          className=Styles.heroRowImage
+          className=Styles.secondImage
           src="/static/img/02_About_3_1232x1364.jpg"
         />
-        <div className=Styles.column>
+        <div className=Styles.secondColumn>
           <p className=Styles.subhead>
             {React.string("That's why we created Mina.")}
           </p>
@@ -208,17 +229,36 @@ module HeroRows = {
                - true decentralization, scale and security.
                Rather than apply brute computing force, Mina offers
                an elegant solution using advanced cryptography
-               and recursive zk-SNARKs. Over the past three years,
+               and recursive zk-SNARKs. ",
+             )}
+          </p>
+          <Spacer height=1. />
+          <p className=Styles.copy>
+            {React.string(
+               "Over the past three years,
                our team together with our incredible
                community have launched and learned through several
                testnet phases. And now, at long last, we are proud
                to introduce Mina to the wider world. Here, developers
-               can build powerful applications like Snapps (SNARK-powered apps)
+               can build ",
+             )}
+            <span className=Styles.orange>
+              {React.string("powerful applications ")}
+            </span>
+            {React.string(
+               " like Snapps (SNARK-powered apps)
                to offer financial services without compromising data privacy
-               and programmable money that anyone can access trustlessly from their phones. And that's just the beginning.
-               While there will still be challenges to come, the world's lightest, most accessible blockchain is ready to be powered by a whole new generation of participants. Here's to a more efficient, elegant and fair future - for all of us.",
+               and programmable money that anyone can access trustlessly from their phones.
+               And that's just the beginning.",
              )}
           </p>
+          <Spacer height=1. />
+          <p className=Styles.copy>
+            {React.string(
+               "While there will still be challenges to come, the world's lightest, most accessible blockchain is ready to be powered by a whole new generation of participants.",
+             )}
+          </p>
+          <Spacer height=1. />
           <p className=Styles.copy>
             <strong>
               {React.string(
@@ -227,7 +267,7 @@ module HeroRows = {
             </strong>
           </p>
         </div>
-      </Row>
+      </div>
     </div>;
   };
 };
@@ -235,12 +275,9 @@ module HeroRows = {
 // TODO: Change title
 [@react.component]
 let make = () => {
-  <div>
-    <Page title="Mina Cryptocurrency Protocol" footerColor=Theme.Colors.orange>
-      <Hero />
-      <Spacer height=1. />
-      <HeroRows />
-      <QuoteSection />
-    </Page>
-  </div>;
+  <Page title="Mina Cryptocurrency Protocol" footerColor=Theme.Colors.orange>
+    <Hero />
+    <HeroRows />
+    <QuoteSection />
+  </Page>;
 };

@@ -1,7 +1,7 @@
 module Styles = {
   open Css;
-  
-  // TODO: Fix background sizes once wrapper is merged in 
+
+  // TODO: Fix background sizes once wrapper is merged in
   let container =
     style([
       display(`flex),
@@ -9,7 +9,7 @@ module Styles = {
       justifyContent(`flexStart),
       alignContent(`spaceAround),
       position(`relative),
-      backgroundSize(`auto),
+      important(backgroundSize(`cover)),
       background(`url("/static/img/SectionQuoteMobile.png")),
       height(`rem(27.25)),
       media(
@@ -106,7 +106,6 @@ module Styles = {
 [@react.component]
 let make = () => {
   <div className=Styles.container>
-    /*** This is the actual white box */
 
       <div className=Styles.quoteContainer>
         <p className=Styles.quote>
@@ -130,4 +129,5 @@ let make = () => {
         </div>
       </div>
     </div>;
+    /*** This is the actual white box */
 };
