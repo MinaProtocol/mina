@@ -137,7 +137,8 @@ module Constraint_constants = struct
 
         [%%endif]
 
-        let supercharged_coinbase_factor = 2 (*TODO: in mlh files*)
+        [%%inject
+        "supercharged_coinbase_factor", supercharged_coinbase_factor]
 
         let pending_coinbase_depth =
           Core_kernel.Int.ceil_log2
