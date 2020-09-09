@@ -41,6 +41,12 @@ echo "--- Set default region for AWS"
 
 export AWS_DEFAULT_REGION=$AWS_REGION
 
+echo "-- testing if kubectl is available"
+
+kubectl get pods
+
+echo "kubectl is there"
+
 echo "--- Run test executive"
 
 ./_build/default/src/app/test_executive/test_executive.exe --coda-image "$coda_daemon_image" block-production
