@@ -468,7 +468,7 @@ module Options = struct
           ~actual:(Mock.handle ~env dummy_network_request)
           ~expected:
             ( Result.return
-            @@ { Network_options_response.version= Version.create "1.4.1" "v1.0"
+            @@ { Network_options_response.version= Version.create "1.4.2" "v1.0"
                ; allow=
                    { Allow.operation_statuses= Lazy.force Operation_statuses.all
                    ; operation_types= Lazy.force Operation_types.all

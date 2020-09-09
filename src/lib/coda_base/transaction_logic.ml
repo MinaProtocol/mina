@@ -245,6 +245,13 @@ module type S = sig
     -> User_command.With_valid_signature.t
     -> Undo.User_command_undo.t Or_error.t
 
+  val apply_snapp_command :
+       constraint_constants:Genesis_constants.Constraint_constants.t
+    -> txn_state_view:Snapp_predicate.Protocol_state.View.t
+    -> ledger
+    -> Snapp_command.Valid.t
+    -> Undo.Snapp_command_undo.t Or_error.t
+
   val apply_transaction :
        constraint_constants:Genesis_constants.Constraint_constants.t
     -> txn_state_view:Snapp_predicate.Protocol_state.View.t
@@ -1061,11 +1068,12 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     in
     Ok {a with balance; snapp; delegate; permissions; timing}
 
-  let apply_snapp_command_unchecked ledger
+  let apply_snapp_command
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-      ~(state_view : Snapp_predicate.Protocol_state.View.t)
+      ~(txn_state_view : Snapp_predicate.Protocol_state.View.t) ledger
       (c : Snapp_command.t) =
     let open Snapp_command in
+    let state_view = txn_state_view in
     let current_global_slot = state_view.curr_global_slot in
     let open Result.Let_syntax in
     with_return (fun ({return} : _ Result.t return) ->
@@ -1354,9 +1362,6 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               ~check_predicate1:check_nonce ~check_predicate2:check_nonce
               ~account2_should_step:true )
         |> finish )
-
-  (* TODO: Use this function *)
-  let _ = apply_snapp_command_unchecked
 
   let process_fee_transfer t (transfer : Fee_transfer.t) ~modify_balance =
     let open Or_error.Let_syntax in
@@ -1799,8 +1804,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       ledger payment =
     let undo =
       Or_error.ok_exn
-        (apply_snapp_command_unchecked ~constraint_constants
-           ~state_view:txn_state_view ledger payment)
+        (apply_snapp_command ~constraint_constants ~txn_state_view ledger
+           payment)
     in
     let root = merkle_root ledger in
     let next_available_token = next_available_token ledger in
