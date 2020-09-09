@@ -32,7 +32,7 @@ module Poly = struct
     module V1 = struct
       type ('predicate, 'body) t =
         {predicate: 'predicate; body1: 'body; body2: 'body}
-      [@@deriving hlist]
+      [@@deriving hlist, sexp]
 
       let to_latest = Fn.id
     end
@@ -51,6 +51,7 @@ module Stable = struct
       ( Predicate.Stable.V1.t
       , Snapp_command.Party.Body.Stable.V1.t )
       Poly.Stable.V1.t
+    [@@deriving sexp]
 
     let to_latest = Fn.id
   end
@@ -166,6 +167,20 @@ module Complement = struct
         ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
         ~value_of_hlist:of_hlist
 
+    let create
+        ({ second_starts_empty
+         ; second_ends_empty
+         ; token_id
+         ; other_fee_payer_opt
+         ; one= _
+         ; two } :
+          Snapp_command.Payload.One_proved.t) : t =
+      { second_starts_empty
+      ; second_ends_empty
+      ; token_id
+      ; account2_nonce= two.predicate
+      ; other_fee_payer_opt }
+
     let complete
         ({ second_starts_empty
          ; second_ends_empty
@@ -190,6 +205,16 @@ module Complement = struct
     end
 
     type t = (Token_id.t, Other_fee_payer.Payload.t option) Poly.t
+
+    let create
+        ({ second_starts_empty= _
+         ; second_ends_empty= _
+         ; token_id
+         ; other_fee_payer_opt
+         ; one= _
+         ; two= _ } :
+          Snapp_command.Payload.Two_proved.t) : t =
+      {token_id; other_fee_payer_opt}
 
     module Checked = struct
       type t =
