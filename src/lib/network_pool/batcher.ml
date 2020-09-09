@@ -6,6 +6,13 @@ open Pickles_types
 module Id = Unique_id.Int ()
 
 module Outcome = struct
+  (* The final result of a batch verification. For each proof, a determination of
+     whether or not it is valid.
+
+     We allow valid proofs to carry data of type 'result, rather than just being
+     propositional. This is to support, e.g., Command_transaction.t's getting
+     verified into a result of type Command_transaction.Valid.t.
+  *)
   type ('proof, 'result) t = [`Valid of 'result | `Invalid of 'proof] Id.Map.t
   [@@deriving sexp]
 
@@ -20,6 +27,8 @@ module Outcome = struct
 
   let empty : _ t = Id.Map.empty
 
+  (* Merge the outcomes for two batches. Used to recombine results of
+     recursive splitting *)
   let append (type p r) (t1 : (p, r) t) (t2 : (p, r) t) : (p, r) t =
     Id.Map.merge t1 t2 ~f:(fun ~key:_ d ->
         match d with

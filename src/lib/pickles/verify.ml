@@ -18,7 +18,6 @@ module Instance = struct
         -> t
 end
 
-
 let verify_heterogenous (ts : Instance.t list) =
   let module Marlin = Types.Dlog_based.Proof_state.Deferred_values.Marlin in
   let module Tick_field = Backend.Tick.Field in
