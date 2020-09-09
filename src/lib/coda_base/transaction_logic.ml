@@ -247,7 +247,7 @@ module type S = sig
 
   val apply_transaction :
        constraint_constants:Genesis_constants.Constraint_constants.t
-    -> txn_global_slot:Global_slot.t
+    -> txn_state_view:Snapp_predicate.Protocol_state.View.t
     -> ledger
     -> Transaction.t
     -> Undo.t Or_error.t
@@ -1774,10 +1774,12 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         [%test_eq: Ledger_hash.t] undo.previous_hash (merkle_root ledger) ) ;
     res
 
-  let apply_transaction ~constraint_constants ~txn_global_slot ledger
+  let apply_transaction ~constraint_constants
+      ~(txn_state_view : Snapp_predicate.Protocol_state.View.t) ledger
       (t : Transaction.t) =
     O1trace.measure "apply_transaction" (fun () ->
         let previous_hash = merkle_root ledger in
+        let txn_global_slot = txn_state_view.curr_global_slot in
         Or_error.map
           ( match t with
           | User_command txn ->

@@ -2494,14 +2494,10 @@ let%test_module "transaction_snark" =
       let source = Ledger.merkle_root ledger in
       let pending_coinbase_stack = Pending_coinbase.Stack.empty in
       let next_available_token = Ledger.next_available_token ledger in
-      let state_body, state_body_hash, txn_global_slot =
+      let state_body, state_body_hash =
         match txn_global_slot with
         | None ->
-            let txn_global_slot =
-              state_body |> Coda_state.Protocol_state.Body.consensus_state
-              |> Consensus.Data.Consensus_state.curr_slot
-            in
-            (state_body, state_body_hash, txn_global_slot)
+            (state_body, state_body_hash)
         | Some txn_global_slot ->
             let state_body =
               let state =
@@ -2529,7 +2525,10 @@ let%test_module "transaction_snark" =
             let state_body_hash =
               Coda_state.Protocol_state.Body.hash state_body
             in
-            (state_body, state_body_hash, txn_global_slot)
+            (state_body, state_body_hash)
+      in
+      let txn_state_view : Snapp_predicate.Protocol_state.View.t =
+        Coda_state.Protocol_state.Body.view state_body
       in
       let mentioned_keys, pending_coinbase_stack_target =
         let pending_coinbase_stack =
@@ -2557,7 +2556,7 @@ let%test_module "transaction_snark" =
       let _undo =
         Or_error.ok_exn
         @@ Ledger.apply_transaction ledger ~constraint_constants
-             ~txn_global_slot txn
+             ~txn_state_view txn
       in
       let target = Ledger.merkle_root ledger in
       let sok_message = Sok_message.create ~fee:Fee.zero ~prover:signer in
