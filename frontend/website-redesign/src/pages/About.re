@@ -160,7 +160,22 @@ module HeroRows = {
     let firstImage =
       merge([heroRowImage, style([position(`absolute), right(`zero)])]);
     let secondImage =
-      merge([heroRowImage, style([position(`absolute), left(`zero)])]);
+      merge([
+        heroRowImage,
+        style([
+          position(`absolute),
+          left(`zero),
+          backgroundImage(`url("/static/img/triangle_mobile.png")),
+          media(
+            Theme.MediaQuery.tablet,
+            [backgroundImage(`url("/static/img/triangle_tablet.png"))],
+          ),
+          media(
+            Theme.MediaQuery.desktop,
+            [backgroundImage(`url("/static/img/triangle_desktop.png"))],
+          ),
+        ]),
+      ]);
     let imageContainer = style([position(`relative)]);
 
     let copy = Theme.Type.paragraph;
@@ -213,10 +228,7 @@ module HeroRows = {
       </div>
       <Spacer height=7.93 />
       <div className=Styles.container>
-        <img
-          className=Styles.secondImage
-          src="/static/img/02_About_3_1232x1364.jpg"
-        />
+        <div className=Styles.secondImage />
         <div className=Styles.secondColumn>
           <p className=Styles.subhead>
             {React.string("That's why we created Mina.")}
@@ -272,7 +284,6 @@ module HeroRows = {
   };
 };
 
-// TODO: Change title
 [@react.component]
 let make = () => {
   <Page title="Mina Cryptocurrency Protocol" footerColor=Theme.Colors.orange>
