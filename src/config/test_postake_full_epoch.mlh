@@ -16,7 +16,7 @@
 
 [%%define genesis_ledger "test"]
 [%%define genesis_state_timestamp "2019-01-30 12:00:00-08:00"]
-[%%define block_window_duration 15000]
+[%%define block_window_duration 180000]
 
 [%%define integration_tests true]
 [%%define force_updates false]
