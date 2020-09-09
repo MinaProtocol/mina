@@ -12,13 +12,13 @@
     "bsc-stdlib-polyfill",
     "bs-fetch"
   ],
-  "suffix": ".js",
   "reason": {
     "react-jsx": 3
   },
   "package-specs": {
-    "module": "commonjs"
+    "module": "es6"
   },
+  "suffix": ".bs.js",
   "bsc-flags": [
     "-bs-super-errors",
     "-open BscStdlibPolyfill"
