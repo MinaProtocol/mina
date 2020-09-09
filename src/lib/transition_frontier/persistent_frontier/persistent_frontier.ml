@@ -59,9 +59,7 @@ let construct_staged_ledger_at_root
              Ledger.apply_transaction
                ~constraint_constants:precomputed_values.constraint_constants
                mask
-               ~txn_global_slot:
-                 ( Protocol_state.consensus_state protocol_state
-                 |> Consensus.Data.Consensus_state.curr_global_slot )
+               ~txn_state_view:(Protocol_state.Body.view protocol_state.body)
                txn.data
            in
            let computed_status =
