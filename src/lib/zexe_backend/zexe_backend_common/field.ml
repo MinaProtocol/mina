@@ -65,6 +65,7 @@ module type Input_intf = sig
 
     val delete : t -> unit
 
+    module Double : Intf.Double with type elt := t
     module Triple : Intf.Triple with type elt := t
   end
 end
@@ -155,6 +156,7 @@ module type S = sig
 
     val of_array : elt array -> t
 
+    module Double : Intf.Double with type elt := t
     module Triple : Intf.Triple with type elt := t
   end
 end
@@ -176,6 +178,7 @@ module Make (F : Input_intf) :
   with type Stable.V1.t = F.t
    and module Bigint = F.Bigint
    and type Vector.t = F.Vector.t
+   and type Vector.Double.t = F.Vector.Double.t
    and type Vector.Triple.t = F.Vector.Triple.t = struct
   open F
   module Bigint = Bigint
