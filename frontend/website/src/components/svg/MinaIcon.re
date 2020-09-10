@@ -1,3 +1,9 @@
+/*
+   TODO: This file was copied from the website-redesign. It was copied over to use the styles
+          that the new website uses. The components that use this component should be updated
+          when they are ported over to the website-redesign.
+ */
+
 type kind =
   | World
   | Discord
