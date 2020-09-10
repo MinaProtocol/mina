@@ -1352,9 +1352,6 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               ~account2_should_step:true )
         |> finish )
 
-  (* TODO: Use this function *)
-  let _ = apply_snapp_command_unchecked
-
   let process_fee_transfer t (transfer : Fee_transfer.t) ~modify_balance =
     let open Or_error.Let_syntax in
     (* TODO(#4555): Allow token_id to vary from default. *)

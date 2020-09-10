@@ -1129,6 +1129,7 @@ module Types = struct
                   | User_command c ->
                       Some (UserCommand.mk_user_command {t with data= c})
                   | Snapp_command _ ->
+                      (* TODO: This should be supported in some graph QL query *)
                       None ) )
         ; field "feeTransfer"
             ~doc:"List of fee transfers included in this block"
