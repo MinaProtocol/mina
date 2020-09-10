@@ -844,15 +844,16 @@ module T = struct
       let update_stack1 stack =
         let%bind stack = update_state_stack stack in
         let%bind total_coinbase_amount =
-          let supercharge_factor =
-            Tick0.Field.Var.constant
-              (Field.of_int constraint_constants.supercharged_coinbase_factor)
-          in
           let coinbase_amount =
             Currency.Amount.var_of_t constraint_constants.coinbase_amount
           in
-          let%bind supercharged_coinbase =
-            Currency.Amount.Checked.scale supercharge_factor coinbase_amount
+          let supercharged_coinbase =
+            let amt =
+              Option.value_exn
+                (Currency.Amount.scale constraint_constants.coinbase_amount
+                   constraint_constants.supercharged_coinbase_factor)
+            in
+            Currency.Amount.var_of_t amt
           in
           Currency.Amount.Checked.if_ supercharge_coinbase
             ~then_:supercharged_coinbase ~else_:coinbase_amount
@@ -1357,7 +1358,9 @@ let%test_unit "Checked_tree = Unchecked_tree" =
     (Generator.tuple2
        (Coinbase.Gen.gen ~constraint_constants)
        State_body_hash.gen)
-    ~f:(fun ((coinbase, supercharged_coinbase), state_body_hash) ->
+    ~f:
+      (fun ( (coinbase, `Supercharged_coinbase supercharged_coinbase)
+           , state_body_hash ) ->
       let coinbase_data = Coinbase_data.of_coinbase coinbase in
       let is_new_stack, action =
         Currency.Amount.(
@@ -1407,7 +1410,9 @@ let%test_unit "Checked_tree = Unchecked_tree after pop" =
     (Generator.tuple2
        (Coinbase.Gen.gen ~constraint_constants)
        State_body_hash.gen)
-    ~f:(fun ((coinbase, supercharged_coinbase), state_body_hash) ->
+    ~f:
+      (fun ( (coinbase, `Supercharged_coinbase supercharged_coinbase)
+           , state_body_hash ) ->
       let pending_coinbases = create ~depth () |> Or_error.ok_exn in
       let coinbase_data = Coinbase_data.of_coinbase coinbase in
       let action =
@@ -1502,7 +1507,8 @@ let%test_unit "push and pop multiple stacks" =
         let updated =
           List.fold coinbases ~init:t'
             ~f:(fun pending_coinbases
-               ((coinbase, supercharged_coinbase), state_body_hash)
+               ( (coinbase, `Supercharged_coinbase supercharged_coinbase)
+               , state_body_hash )
                ->
               add_coinbase_with_zero_checks ~constraint_constants
                 (module Pending_coinbase)

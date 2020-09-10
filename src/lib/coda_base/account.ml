@@ -416,7 +416,7 @@ module Checked = struct
 
   let has_locked_tokens ~global_slot (t : var) =
     let open Timing.As_record in
-    let { is_timed
+    let { is_timed= _
         ; initial_minimum_balance
         ; cliff_time
         ; vesting_period
@@ -427,15 +427,16 @@ module Checked = struct
       min_balance_at_slot ~global_slot ~initial_minimum_balance ~cliff_time
         ~vesting_period ~vesting_increment
     in
-    let%bind min_balance_gt_zero =
+    let%map zero_min_balance =
       let zero_int =
         Snarky_integer.Integer.constant ~m
           (Bigint.of_field Field.zero |> Bigint.to_bignum_bigint)
       in
       make_checked (fun () ->
-          Snarky_integer.Integer.(gt ~m cur_min_balance zero_int) )
+          Snarky_integer.Integer.equal ~m cur_min_balance zero_int )
     in
-    Boolean.(is_timed && min_balance_gt_zero)
+    (*Note: Untimed accounts will always have zero min balance*)
+    Boolean.not zero_min_balance
 end
 
 [%%endif]

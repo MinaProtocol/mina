@@ -1884,24 +1884,12 @@ module Data = struct
         ~(constraint_constants : Genesis_constants.Constraint_constants.t)
         ~(delegator_account : Coda_base.Account.var) ~ledger ~global_slot =
       let open Snark_params.Tick in
-      (*let%bind winner_addr =
-          request_witness
-            (Coda_base.Account.Index.Unpacked.typ
-               ~ledger_depth:constraint_constants.ledger_depth)
-            (As_prover.return Winner_address)
-        in*)
       let%bind public_key =
         request_witness Public_key.typ (As_prover.return Vrf.Public_key)
       in
-      (*let%bind delegator_account =
-          with_label __LOC__
-            (Coda_base.Frozen_ledger_hash.get
-               ~depth:constraint_constants.ledger_depth ledger winner_addr)
-        in*)
       let%bind delegate_account =
         let delegate_account_id =
-          Coda_base.Account_id.Checked.create delegator_account.delegate
-            Coda_base.Token_id.(var_of_t default)
+          Coda_base.Account.identifier_of_var delegator_account
         in
         let%bind delegate_addr =
           request_witness
@@ -2041,7 +2029,7 @@ module Data = struct
       in
       Checked.return
         ( `Success threshold_satisfied
-        , supercharge_coinbase
+        , `Supercharge_coinbase supercharge_coinbase
         , { Poly.blockchain_length
           ; epoch_count
           ; min_window_density
