@@ -450,6 +450,16 @@ module type S = sig
 
       val curr_global_slot_var : var -> Global_slot.Checked.t
 
+      val blockchain_length_var : var -> Length.Checked.t
+
+      val min_window_density_var : var -> Length.Checked.t
+
+      val total_currency_var : var -> Amount.Checked.t
+
+      val staking_epoch_data_var : var -> Coda_base.Epoch_data.var
+
+      val next_epoch_data_var : var -> Coda_base.Epoch_data.var
+
       val graphql_type :
         unit -> ('ctx, Value.t option) Graphql_async.Schema.typ
 

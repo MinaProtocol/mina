@@ -118,10 +118,9 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
     Protocol_state.hash_with_body ~body_hash:previous_protocol_state_body_hash
       previous_protocol_state
   in
-  let previous_global_slot =
+  let previous_state_view =
     Protocol_state.body previous_protocol_state
-    |> Coda_state.Protocol_state.Body.consensus_state
-    |> Consensus.Data.Consensus_state.curr_slot
+    |> Coda_state.Protocol_state.Body.view
   in
   let%bind res =
     Interruptible.uninterruptible
@@ -136,13 +135,13 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
         measure "create_diff" (fun () ->
             Staged_ledger.create_diff ~constraint_constants staged_ledger ~self
               ~coinbase_receiver ~logger
-              ~current_global_slot:previous_global_slot
+              ~current_state_view:previous_state_view
               ~transactions_by_fee:transactions ~get_completed_work
               ~log_block_creation ~supercharge_coinbase )
       in
       match%map
         Staged_ledger.apply_diff_unchecked staged_ledger ~constraint_constants
-          diff ~logger ~current_global_slot:previous_global_slot
+          diff ~logger ~current_state_view:previous_state_view
           ~state_and_body_hash:
             (previous_protocol_state_hash, previous_protocol_state_body_hash)
       with

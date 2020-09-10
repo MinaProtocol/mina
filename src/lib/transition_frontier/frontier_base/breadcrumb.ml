@@ -270,27 +270,25 @@ module For_tests = struct
                       ~proof:Proof.transaction_dummy )
             ; prover }
       in
-      let current_global_slot, state_and_body_hash =
+      let current_state_view, state_and_body_hash =
         let prev_state =
           validated_transition parent_breadcrumb
           |> External_transition.Validated.protocol_state
         in
-        let current_global_slot =
-          Protocol_state.body prev_state
-          |> Protocol_state.Body.consensus_state
-          |> Consensus.Data.Consensus_state.curr_slot
+        let current_state_view =
+          Protocol_state.body prev_state |> Protocol_state.Body.view
         in
         let body_hash =
           Protocol_state.body prev_state |> Protocol_state.Body.hash
         in
-        ( current_global_slot
+        ( current_state_view
         , (Protocol_state.hash_with_body ~body_hash prev_state, body_hash) )
       in
       let staged_ledger_diff =
         Staged_ledger.create_diff parent_staged_ledger ~logger
           ~constraint_constants:precomputed_values.constraint_constants
           ~coinbase_receiver:`Producer ~self:largest_account_public_key
-          ~current_global_slot ~supercharge_coinbase:true
+          ~current_state_view ~supercharge_coinbase:true
           ~transactions_by_fee:transactions ~get_completed_work
       in
       let%bind ( `Hash_after_applying next_staged_ledger_hash
@@ -301,7 +299,7 @@ module For_tests = struct
           Staged_ledger.apply_diff_unchecked parent_staged_ledger ~logger
             staged_ledger_diff
             ~constraint_constants:precomputed_values.constraint_constants
-            ~current_global_slot ~state_and_body_hash
+            ~current_state_view ~state_and_body_hash
         with
         | Ok r ->
             return r

@@ -182,7 +182,7 @@ val apply_user_command :
 
 val apply_transaction :
      constraint_constants:Genesis_constants.Constraint_constants.t
-  -> txn_global_slot:Coda_numbers.Global_slot.t
+  -> txn_state_view:Snapp_predicate.Protocol_state.View.t
   -> t
   -> Transaction.t
   -> Undo.t Or_error.t
@@ -198,6 +198,13 @@ val has_locked_tokens :
   -> account_id:Account_id.t
   -> t
   -> bool Or_error.t
+
+val merkle_root_after_snapp_command_exn :
+     constraint_constants:Genesis_constants.Constraint_constants.t
+  -> txn_state_view:Snapp_predicate.Protocol_state.View.t
+  -> t
+  -> Snapp_command.Valid.t
+  -> Ledger_hash.t * [`Next_available_token of Token_id.t]
 
 val merkle_root_after_user_command_exn :
      constraint_constants:Genesis_constants.Constraint_constants.t

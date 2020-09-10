@@ -250,7 +250,7 @@ type var =
   , State_hash.var
   , Timing.var
   , Permissions.Checked.t
-  , Field.Var.t * Snapp_account.t option
+  , Field.Var.t * Snapp_account.t option As_prover.Ref.t
   (* TODO: This is a hack that lets us avoid unhashing snapp accounts when we don't need to *)
   )
   Poly.t
@@ -260,17 +260,24 @@ let identifier_of_var ({public_key; token_id; _} : var) =
 
 let typ : (var, value) Typ.t =
   let snapp :
-      (Field.Var.t * Snapp_account.t option, Snapp_account.t option) Typ.t =
+      ( Field.Var.t * Snapp_account.t option As_prover.Ref.t
+      , Snapp_account.t option )
+      Typ.t =
+    let account :
+        (Snapp_account.t option As_prover.Ref.t, Snapp_account.t option) Typ.t
+        =
+      Typ.Internal.ref ()
+    in
     let alloc =
       let open Typ.Alloc in
-      let%map x = Typ.field.alloc in
-      (x, None)
+      let%map x = Typ.field.alloc and y = account.alloc in
+      (x, y)
     in
-    let read (_, y) = Typ.Read.return y in
+    let read (_, y) = account.read y in
     let store y =
       let open Typ.Store in
       let x = hash_snapp_account_opt y in
-      let%map x = Typ.field.store x in
+      let%map x = Typ.field.store x and y = account.store y in
       (x, y)
     in
     let check (x, _) = Typ.field.check x in

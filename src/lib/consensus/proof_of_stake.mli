@@ -16,8 +16,17 @@ module Exported : sig
     include
       module type of Data.Consensus_state
       with type Value.Stable.V1.t = Data.Consensus_state.Value.Stable.V1.t
+       and type var = Data.Consensus_state.var
 
     val global_slot : Value.t -> Global_slot.t
+
+    val total_currency : Value.t -> Currency.Amount.t
+
+    val min_window_density : Value.t -> Coda_numbers.Length.t
+
+    val staking_epoch_data : Value.t -> Coda_base.Epoch_data.Value.t
+
+    val next_epoch_data : Value.t -> Coda_base.Epoch_data.Value.t
 
     (* unsafe modules for creating dummy states when doing vrf evaluations *)
     (* TODO: refactor code so that [Hooks.next_proposal] does not require a full [Consensus_state] *)
