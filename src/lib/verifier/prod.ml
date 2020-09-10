@@ -208,12 +208,28 @@ let create ~logger ~proof_level ~pids ~conf_dir : t Deferred.t =
   in
   on_worker worker ; {worker= worker_ref}
 
+let with_retry f =
+  let pause = Time.Span.of_sec 5. in
+  let rec go attempts_remaining =
+    match%bind f () with
+    | Ok x ->
+        return (Ok x)
+    | Error e ->
+        if attempts_remaining = 0 then return (Error e)
+        else
+          let%bind () = after pause in
+          go (attempts_remaining - 1)
+  in
+  go 4
+
 let verify_blockchain_snark {worker} chain =
-  let%bind {connection; _} = !worker in
-  Worker.Connection.run connection ~f:Worker.functions.verify_blockchain
-    ~arg:chain
+  with_retry (fun () ->
+      let%bind {connection; _} = !worker in
+      Worker.Connection.run connection ~f:Worker.functions.verify_blockchain
+        ~arg:chain )
 
 let verify_transaction_snarks {worker} ts =
-  let%bind {connection; _} = !worker in
-  Worker.Connection.run connection
-    ~f:Worker.functions.verify_transaction_snarks ~arg:ts
+  with_retry (fun () ->
+      let%bind {connection; _} = !worker in
+      Worker.Connection.run connection
+        ~f:Worker.functions.verify_transaction_snarks ~arg:ts )
