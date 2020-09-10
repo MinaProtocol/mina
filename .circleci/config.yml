@@ -610,7 +610,7 @@ jobs:
             # See https://bkase.dev/posts/ocaml-writer#fn-3 for rationale
             - run:
                   name: Generate PV keys
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; ./scripts/zexe-standardize.sh &&  eval `opam config env` && PATH="$HOME/.cargo/bin:$PATH" LIBP2PNIXLESS=1 make build_or_download_pv_keys 2>&1 | tee /tmp/artifacts/buildocaml.log'
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; ./scripts/zexe-standardize.sh &&  eval `opam config env` && PATH="$HOME/.cargo/bin:$PATH" LIBP2PNIXLESS=1 make build_pv_keys 2>&1 | tee /tmp/artifacts/buildocaml.log'
                   environment:
                     DUNE_PROFILE: testnet_postake_medium_curves
                     EXTRA_NIX_ARGS: --option sandbox false
