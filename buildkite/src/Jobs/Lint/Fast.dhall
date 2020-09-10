@@ -40,18 +40,17 @@ Pipeline.build
           , label = "Fast lint steps; CODEOWNERs, RFCs, Check Snarky Submodule, Preprocessor Deps"
           , key = "lint"
           , target = Size.Small
-          , soft_fail = Some (B/SoftFail.Boolean True)
           , docker = Some Docker::{ image = (../../Constants/ContainerImages.dhall).toolchainBase }
         },
       Command.build
         Command.Config::{
           commands = OpamInit.andThenRunInDocker
-                          (["CI=false", "BASE_BRANCH_NAME=$BUILDKITE_PULL_REQUEST_BASE_BRANCH" ])
-                          ("exit 1 && ./scripts/compare_ci_diff_types.sh")
+                          (["CI=true", "BASE_BRANCH_NAME=$BUILDKITE_PULL_REQUEST_BASE_BRANCH" ])
+                          ("./scripts/compare_ci_diff_types.sh")
           , label = "Optional fast lint steps; versions compatability changes"
           , key = "lint-optional-types"
           , target = Size.Medium
-          , soft_fail = Some (B/SoftFail.ListSoft_fail/Type [{ exit_status = Some (B/SoftFail/ExitStatus.Number 1) }])
+          , soft_fail = Some (B/SoftFail.Boolean True)
           , docker = None Docker.Type
         },
       Command.build
@@ -62,7 +61,7 @@ Pipeline.build
           , label = "Optional fast lint steps; binable compatability changes"
           , key = "lint-optional-binable"
           , target = Size.Medium
-          , skip = Some (B/Skip.String "https://github.com/CodaProtocol/coda/pull/5748")
+          , soft_fail = Some (B/SoftFail.Boolean True)
           , docker = None Docker.Type
         }
     ]
