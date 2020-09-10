@@ -44,6 +44,7 @@ let compute_delegatee_table keys ~iter_accounts =
         (* Only default tokens may delegate. *)
         && Token_id.equal acct.token_id Token_id.default
         && Public_key.Compressed.Set.mem keys (Option.value_exn acct.delegate)
+        && acct.permissions.stake
       then
         Public_key.Compressed.Table.update outer_table
           (Option.value_exn acct.delegate) ~f:(function
@@ -690,6 +691,9 @@ module Data = struct
       in
       let%bind () =
         with_label __LOC__ (Public_key.assert_equal public_key delegate)
+      in
+      let%bind () =
+        with_label __LOC__ (Boolean.Assert.is_true account.permissions.stake)
       in
       let%map evaluation =
         with_label __LOC__
