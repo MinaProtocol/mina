@@ -168,7 +168,6 @@ module Make (Transition_frontier : Transition_frontier_intf) :
     We need to implement the trusted/untrusted batches from the snark pool batching RFC #4882 to avoid possible DoS/DDoS here*)
     let find_invalid_proofs ps verifier =
       let open Deferred.Or_error.Let_syntax in
-      let length = List.length ps in
       let rec go ps set =
         match ps with
         | [] ->
@@ -176,6 +175,7 @@ module Make (Transition_frontier : Transition_frontier_intf) :
         | [p] ->
             return Work_key.(Set.add set (of_proof_envelope p))
         | ps -> (
+            let length = List.length ps in
             let left = List.take ps (length / 2) in
             let right = List.drop ps (length / 2) in
             let%bind res_l = call_verifier verifier left in

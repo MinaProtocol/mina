@@ -88,7 +88,7 @@ build_archive: git_hooks reformat-diff
 
 build_rosetta:
 	$(info Starting Build)
-	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/rosetta/rosetta.exe --profile=$(DUNE_PROFILE)
+	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/archive/archive.exe src/app/rosetta/rosetta.exe src/app/rosetta/ocaml-signer/signer.exe --profile=$(DUNE_PROFILE)
 	$(info Build complete)
 
 client_sdk :
@@ -104,6 +104,16 @@ client_sdk_test_sigs :
 client_sdk_test_sigs_nonconsensus :
 	$(info Starting Build)
 	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/client_sdk/tests/test_signatures_nonconsensus.exe --profile=nonconsensus_medium_curves
+	$(info Build complete)
+
+rosetta_lib_encodings :
+	$(info Starting Build)
+	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/lib/rosetta_lib/test/test_encodings.exe --profile=testnet_postake_medium_curves
+	$(info Build complete)
+
+rosetta_lib_encodings_nonconsensus :
+	$(info Starting Build)
+	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/nonconsensus/rosetta_lib/test/test_encodings.exe --profile=nonconsensus_medium_curves
 	$(info Build complete)
 
 dhall_types :

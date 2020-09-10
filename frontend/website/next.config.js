@@ -50,10 +50,10 @@ module.exports = withTM(withBundleAnalyzer(withMDX({
 
     return pages;
   },
-  pageExtensions: ['jsx', 'js', 'mdx'],
+  pageExtensions: ['jsx', 'js', 'mdx', 'bs.js'],
   transpileModules: ['bs-platform', 'bs-css', 'bsc-stdlib-polyfill', 'bs-fetch'],
   webpack(config, options) {
-    config.resolve.alias['@reason'] = path.join(__dirname, 'lib', 'es6', 'src');
+    config.resolve.alias['@reason'] = path.resolve(__dirname, 'lib', 'es6', 'src');
     config.resolve.extensions.push('.bs.js');
     return config
   },
