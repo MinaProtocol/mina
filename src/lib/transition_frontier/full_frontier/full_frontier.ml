@@ -416,16 +416,16 @@ let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
               (Breadcrumb.staged_ledger new_root_node.breadcrumb)))
         ~f:(fun (txn, state_hash) ->
           (*Validate transactions against the protocol state associated with the transaction*)
-          let txn_global_slot =
+          let txn_state_view =
             find_protocol_state t state_hash
-            |> Option.value_exn |> Protocol_state.consensus_state
-            |> Consensus.Data.Consensus_state.curr_global_slot
+            |> Option.value_exn |> Protocol_state.body
+            |> Protocol_state.Body.view
           in
           ignore
             (Or_error.ok_exn
                (Ledger.apply_transaction
                   ~constraint_constants:
-                    t.precomputed_values.constraint_constants ~txn_global_slot
+                    t.precomputed_values.constraint_constants ~txn_state_view
                   mt txn.data)) ) ;
       (* STEP 6 *)
       Ledger.commit mt ;

@@ -35,19 +35,18 @@ let make =
         href="/static/favicon-16x16.png"
         sizes="16x16"
       />
+      <link href="/static/css/monument-grotesk.css" rel="stylesheet" />
       <link
         href="https://cdn.jsdelivr.net/npm/@ibm/plex@4.0.2/css/ibm-plex.min.css"
         rel="stylesheet"
       />
       <link href="https://use.typekit.net/mta7mwm.css" rel="stylesheet" />
-      // On recent versions of firefox, the browser will do a "flash of
-      // unstyled content" for images by displaying the alt text(!) before the
-      // image loads. Of course, we must disable this.
       <style>
         {React.string("img:-moz-loading { visibility: hidden; }")}
       </style>
     </Next.Head>
     <div> children </div>
     <CookieWarning />
+    <Footer />
   </>;
 };

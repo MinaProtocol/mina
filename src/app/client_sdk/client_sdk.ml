@@ -160,6 +160,7 @@ let _ =
          let signed = User_command.Poly.{payload; signer; signature} in
          User_command.check_signature signed
 
+       (** sign a transaction in Rosetta rendered format *)
        method signRosettaTransaction (sk_base58_check_js : string_js)
            (unsignedRosettaTxn : string_js) =
          let sk_base58_check = Js.to_string sk_base58_check_js in
@@ -171,38 +172,55 @@ let _ =
            let json = `Assoc [("error", `String err)] in
            Js.string (Yojson.Safe.to_string json)
          in
+         let make_signed_transaction command nonce =
+           let payload_or_err =
+             command
+             |> Rosetta_lib_nonconsensus.User_command_info.Partial
+                .to_user_command_payload ~nonce
+           in
+           match payload_or_err with
+           | Ok payload -> (
+               let signature =
+                 User_command.sign_payload sk payload |> Signature.Raw.encode
+               in
+               let signed_txn =
+                 Transaction.Signed.{command; nonce; signature}
+               in
+               match Transaction.Signed.render signed_txn with
+               | Ok signed ->
+                   let json = Transaction.Signed.Rendered.to_yojson signed in
+                   let json' = `Assoc [("data", json)] in
+                   Js.string (Yojson.Safe.to_string json')
+               | Error errs ->
+                   make_error (Rosetta_lib_nonconsensus.Errors.show errs) )
+           | Error errs ->
+               make_error (Rosetta_lib_nonconsensus.Errors.show errs)
+         in
          match Transaction.Unsigned.Rendered.of_yojson unsigned_txn_json with
          | Ok
              { random_oracle_input= _
              ; payment= Some payment
-             ; stake_delegation= None } -> (
+             ; stake_delegation= None
+             ; create_token= None
+             ; create_token_account= None
+             ; mint_tokens= None } ->
              let command = Transaction.Unsigned.of_rendered_payment payment in
-             let payload_or_err =
-               command
-               |> Rosetta_lib_nonconsensus.User_command_info.Partial
-                  .to_user_command_payload ~nonce:payment.nonce
+             make_signed_transaction command payment.nonce
+         | Ok
+             { random_oracle_input= _
+             ; payment= None
+             ; stake_delegation= Some delegation
+             ; create_token= None
+             ; create_token_account= None
+             ; mint_tokens= None } ->
+             let command =
+               Transaction.Unsigned.of_rendered_delegation delegation
              in
-             match payload_or_err with
-             | Ok payload -> (
-                 let signature =
-                   User_command.sign_payload sk payload |> Signature.Raw.encode
-                 in
-                 let signed_txn =
-                   Transaction.Signed.
-                     {command; nonce= payment.nonce; signature}
-                 in
-                 match Transaction.Signed.render signed_txn with
-                 | Ok signed ->
-                     let json = Transaction.Signed.Rendered.to_yojson signed in
-                     let json' = `Assoc [("data", json)] in
-                     Js.string (Yojson.Safe.to_string json')
-                 | Error errs ->
-                     make_error (Rosetta_lib_nonconsensus.Errors.show errs) )
-             | Error errs ->
-                 make_error (Rosetta_lib_nonconsensus.Errors.show errs) )
+             make_signed_transaction command delegation.nonce
          | Ok _ ->
-             (* TODO: handle delegations *)
-             make_error "Unsigned transaction must contain just a payment"
+             make_error
+               "Unsigned transaction must contain a payment or a delegation, \
+                exclusively"
          | Error msg ->
              make_error msg
 

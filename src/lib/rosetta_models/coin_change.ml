@@ -7,7 +7,7 @@
  *)
 
 type t = {coin_identifier: Coin_identifier.t; coin_action: Enums.coinaction}
-[@@deriving yojson {strict= false}, show]
+[@@deriving yojson {strict= false}, show, eq]
 
 (** CoinChange is used to represent a change in state of a some coin identified by a coin_identifier. This object is part of the Operation model and must be populated for UTXO-based blockchains. Coincidentally, this abstraction of UTXOs allows for supporting both account-based transfers and UTXO-based transfers on the same blockchain (when a transfer is account-based, don't populate this model). *)
 let create (coin_identifier : Coin_identifier.t)

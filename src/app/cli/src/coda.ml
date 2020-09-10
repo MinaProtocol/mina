@@ -714,14 +714,16 @@ let daemon logger =
          if is_seed then [%log info] "Starting node as a seed node"
          else if List.is_empty initial_peers then
            failwith "no seed or initial peer flags passed" ;
+         let chain_id =
+           chain_id ~genesis_state_hash
+             ~genesis_constants:precomputed_values.genesis_constants
+         in
          let gossip_net_params =
            Gossip_net.Libp2p.Config.
              { timeout= Time.Span.of_sec 3.
              ; logger
              ; conf_dir
-             ; chain_id=
-                 chain_id ~genesis_state_hash
-                   ~genesis_constants:precomputed_values.genesis_constants
+             ; chain_id
              ; unsafe_no_trust_ip= false
              ; initial_peers
              ; addrs_and_ports
@@ -836,8 +838,8 @@ let daemon logger =
          let%map coda =
            Coda_lib.create
              (Coda_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
-                ~is_seed ~disable_telemetry ~demo_mode ~coinbase_receiver
-                ~net_config ~gossip_net_params
+                ~chain_id ~is_seed ~disable_telemetry ~demo_mode
+                ~coinbase_receiver ~net_config ~gossip_net_params
                 ~initial_protocol_version:current_protocol_version
                 ~proposed_protocol_version_opt
                 ~work_selection_method:
