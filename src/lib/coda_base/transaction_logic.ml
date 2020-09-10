@@ -486,7 +486,6 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
 
   let with_err e = Result.map_error ~f:(fun _ -> failure e)
 
-  (* TODO: Check send permission *)
   (* Helper function for [apply_user_command_unchecked] *)
   let pay_fee' ~command ~nonce ~fee_payer ~fee ~ledger ~current_global_slot =
     let open Or_error.Let_syntax in
@@ -504,9 +503,14 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     let fee = Amount.of_fee fee in
     let%bind balance = sub_amount account.balance fee in
     let%bind () = validate_nonces nonce account.nonce in
-    let%map timing =
+    let%bind timing =
       validate_timing ~txn_amount:fee ~txn_global_slot:current_global_slot
         ~account
+    in
+    let%map () =
+      if Permissions.Auth_required.check account.permissions.send Signature
+      then Ok ()
+      else Or_error.error_string "fee payer not authorized to send"
     in
     ( location
     , account
