@@ -20,14 +20,17 @@ module Styles = {
       alignItems(`center),
       width(`percent(100.)),
       height(`percent(100.)),
-      margin2(~h=`rem(3.), ~v=`zero),
+      margin(`auto),
+      padding2(~h=`rem(3.), ~v=`zero),
+      paddingBottom(`rem(3.)),
     ]);
 
   let textContainer =
     merge([
       flexCenter,
       style([
-        width(`rem(34.)),
+        width(`percent(100.)),
+        maxWidth(`rem(34.)),
         marginTop(`rem(6.25)),
         selector(
           "p,li,span",
@@ -47,7 +50,8 @@ module Styles = {
       backgroundImage(`url("/static/img/spectrum_primary.png")),
     ]);
 
-  let logo = style([marginTop(`rem(6.))]);
+  let logo =
+    style([width(`percent(100.)), height(`auto), marginTop(`rem(6.))]);
 
   let link = style([color(Theme.Colors.minaOrange), cursor(`pointer)]);
 
@@ -82,7 +86,7 @@ module Styles = {
       marginTop(`rem(0.7)),
       marginBottom(`rem(0.25)),
       before([
-        contentRule("\25CF"),
+        contentRule("\\25CF"),
         position(`absolute),
         display(`flex),
         alignItems(`center),
@@ -90,7 +94,7 @@ module Styles = {
         left(`px(-2)),
       ]),
       after([
-        contentRule("\25CF"),
+        contentRule("\\25CF"),
         position(`absolute),
         display(`flex),
         alignItems(`center),
