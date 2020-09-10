@@ -85,5 +85,3 @@ val typ : (Checked.t, t) Typ.t
 [%%endif]
 
 val user_default : t
-
-val empty : t

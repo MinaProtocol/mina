@@ -354,12 +354,3 @@ let user_default : t =
   ; set_delegate= Signature
   ; set_permissions= Signature
   ; set_verification_key= Signature }
-
-let empty : t =
-  { stake= false
-  ; edit_state= None
-  ; send= None
-  ; receive= None
-  ; set_delegate= None
-  ; set_permissions= None
-  ; set_verification_key= None }
