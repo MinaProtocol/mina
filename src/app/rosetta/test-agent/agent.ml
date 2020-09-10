@@ -316,7 +316,9 @@ let construction_api_transaction_through_mempool ~logger ~rosetta_uri
     Offline.Derive.req ~logger ~rosetta_uri ~network_response
       ~public_key_hex_bytes:keys.public_key_hex_bytes
   in
-  let operations = operations derive_res.address in
+  let operations =
+    operations (Option.value_exn derive_res.account_identifier)
+  in
   let%bind preprocess_res =
     Offline.Preprocess.req ~logger ~rosetta_uri ~network_response
       ~max_fee:(Unsigned.UInt64.of_int 100_000_000_000)
@@ -357,7 +359,7 @@ let construction_api_transaction_through_mempool ~logger ~rosetta_uri
     Offline.Combine.req ~logger ~rosetta_uri ~network_response ~signature
       ~unsigned_transaction:payloads_res.unsigned_transaction
       ~public_key_hex_bytes:keys.public_key_hex_bytes
-      ~address:derive_res.address
+      ~account_id:(Option.value_exn derive_res.account_identifier)
   in
   let%bind combine_parse_res =
     Offline.Parse.req ~logger ~rosetta_uri ~network_response
@@ -403,8 +405,8 @@ let construction_api_transaction_through_mempool ~logger ~rosetta_uri
 
 let construction_api_payment_through_mempool =
   construction_api_transaction_through_mempool
-    ~operations:(fun address ->
-      Poke.SendTransaction.payment_operations ~from:address
+    ~operations:(fun account_id ->
+      Poke.SendTransaction.payment_operations ~from:account_id.address
         ~fee:(Unsigned.UInt64.of_int 3_000_000_000)
         ~amount:(Unsigned.UInt64.of_int 10_000_000_000)
         ~to_:other_pk )
@@ -431,8 +433,8 @@ let construction_api_payment_through_mempool =
 
 let construction_api_delegation_through_mempool =
   construction_api_transaction_through_mempool
-    ~operations:(fun address ->
-      Poke.SendTransaction.delegation_operations ~from:address
+    ~operations:(fun account_id ->
+      Poke.SendTransaction.delegation_operations ~from:account_id.address
         ~fee:(Unsigned.UInt64.of_int 5_000_000_000)
         ~to_:other_pk )
     ~operation_expectations:
@@ -452,8 +454,8 @@ let construction_api_delegation_through_mempool =
 
 let construction_api_create_token_through_mempool =
   construction_api_transaction_through_mempool
-    ~operations:(fun address ->
-      Poke.SendTransaction.create_token_operations ~sender:address
+    ~operations:(fun account_id ->
+      Poke.SendTransaction.create_token_operations ~sender:account_id.address
         ~fee:(Unsigned.UInt64.of_int 5_000_000_000) )
     ~operation_expectations:
       Operation_expectation.
@@ -471,8 +473,8 @@ let construction_api_create_token_through_mempool =
 
 let construction_api_create_token_account_through_mempool =
   construction_api_transaction_through_mempool
-    ~operations:(fun address ->
-      Poke.SendTransaction.create_token_operations ~sender:address
+    ~operations:(fun account_id ->
+      Poke.SendTransaction.create_token_operations ~sender:account_id.address
         ~fee:(Unsigned.UInt64.of_int 5_000_000_000) )
     ~operation_expectations:
       Operation_expectation.
@@ -485,9 +487,9 @@ let construction_api_create_token_account_through_mempool =
 
 let construction_api_mint_tokens_through_mempool =
   construction_api_transaction_through_mempool
-    ~operations:(fun address ->
-      Poke.SendTransaction.mint_tokens_operations ~sender:address
-        ~receiver:address
+    ~operations:(fun account_id ->
+      Poke.SendTransaction.mint_tokens_operations ~sender:account_id.address
+        ~receiver:account_id.address
         ~amount:(Unsigned.UInt64.of_int 1_000_000_000)
         ~fee:(Unsigned.UInt64.of_int 3_000_000_000) )
     ~operation_expectations:
