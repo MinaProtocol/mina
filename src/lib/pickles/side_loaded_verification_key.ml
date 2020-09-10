@@ -172,6 +172,15 @@ include Make
               t
           end)
 
+let dummy : t =
+  { step_data= At_most.[]
+  ; max_width= Width.zero
+  ; wrap_index=
+      (let g = [Backend.Tock.Curve.(to_affine_exn one)] in
+       let t : _ Abc.t = {a= g; b= g; c= g} in
+       {row= t; col= t; value= t; rc= t})
+  ; wrap_vk= None }
+
 module Checked = struct
   open Step_main_inputs
   open Impl

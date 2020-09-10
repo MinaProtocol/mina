@@ -260,6 +260,7 @@ module Types = struct
           let open Reflection.Shorthand in
           List.rev
           @@ Daemon_rpcs.Types.Status.Fields.fold ~init:[] ~num_accounts:int
+               ~chain_id:nn_string
                ~next_block_production:(id ~typ:block_producer_timing)
                ~blockchain_length:int ~uptime_secs:nn_int
                ~ledger_merkle_root:string ~state_hash:string
@@ -508,6 +509,7 @@ module Types = struct
           ; delegate
           ; voting_for
           ; timing
+          ; permissions
           ; snapp } =
         let open Option.Let_syntax in
         let%bind public_key = public_key in
@@ -517,6 +519,7 @@ module Types = struct
         let%bind delegate = delegate in
         let%bind voting_for = voting_for in
         let%bind timing = timing in
+        let%bind permissions = permissions in
         let%map snapp = snapp in
         { Account.Poly.public_key
         ; token_id
@@ -527,6 +530,7 @@ module Types = struct
         ; delegate
         ; voting_for
         ; timing
+        ; permissions
         ; snapp }
 
       let of_full_account ?breadcrumb
@@ -539,6 +543,7 @@ module Types = struct
           ; delegate
           ; voting_for
           ; timing
+          ; permissions
           ; snapp } =
         { Account.Poly.public_key
         ; token_id
@@ -550,6 +555,7 @@ module Types = struct
         ; delegate
         ; voting_for= Some voting_for
         ; timing
+        ; permissions= Some permissions
         ; snapp }
 
       let of_account_id coda account_id =
@@ -581,6 +587,7 @@ module Types = struct
               ; receipt_chain_hash= None
               ; voting_for= None
               ; timing= Timing.Untimed
+              ; permissions= None
               ; snapp= None }
 
       let of_pk coda pk =
@@ -598,6 +605,7 @@ module Types = struct
           , Public_key.Compressed.t option
           , State_hash.t option
           , Account.Timing.t
+          , Permissions.t option
           , Snapp_account.t option )
           Account.Poly.t
       ; locked: bool option

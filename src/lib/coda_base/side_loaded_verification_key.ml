@@ -36,4 +36,14 @@ include Pickles_base.Side_loaded_verification_key.Make
 
 let to_input = Pickles_base.Side_loaded_verification_key.to_input
 
+let dummy : t =
+  let open Pickles_types in
+  { step_data= At_most.[]
+  ; max_width= Pickles_base.Side_loaded_verification_key.Width.zero
+  ; wrap_index=
+      (let g : G.t list = [Snarkette.Tweedle.Dee.(to_affine_exn one)] in
+       let t : _ Abc.t = {a= g; b= g; c= g} in
+       {row= t; col= t; value= t; rc= t})
+  ; wrap_vk= None }
+
 [%%endif]

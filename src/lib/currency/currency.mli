@@ -142,6 +142,8 @@ module Balance : sig
   [%%ifdef consensus_mechanism]
 
   module Checked : sig
+    type t = var
+
     val add_signed_amount : var -> Amount.Signed.var -> (var, _) Checked.t
 
     val add_amount : var -> Amount.var -> (var, _) Checked.t
@@ -154,9 +156,26 @@ module Balance : sig
     val add_amount_flagged :
       var -> Amount.var -> (var * [`Overflow of Boolean.var], _) Checked.t
 
+    val add_signed_amount_flagged :
+         var
+      -> Amount.Signed.var
+      -> (var * [`Overflow of Boolean.var], _) Checked.t
+
     val ( + ) : var -> Amount.var -> (var, _) Checked.t
 
     val ( - ) : var -> Amount.var -> (var, _) Checked.t
+
+    val equal : var -> var -> (Boolean.var, _) Checked.t
+
+    val ( = ) : var -> var -> (Boolean.var, _) Checked.t
+
+    val ( < ) : var -> var -> (Boolean.var, _) Checked.t
+
+    val ( > ) : var -> var -> (Boolean.var, _) Checked.t
+
+    val ( <= ) : var -> var -> (Boolean.var, _) Checked.t
+
+    val ( >= ) : var -> var -> (Boolean.var, _) Checked.t
 
     val if_ : Boolean.var -> then_:var -> else_:var -> (var, _) Checked.t
   end
