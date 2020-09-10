@@ -486,6 +486,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
 
   let with_err e = Result.map_error ~f:(fun _ -> failure e)
 
+  (* TODO: Check send permission *)
   (* Helper function for [apply_user_command_unchecked] *)
   let pay_fee' ~command ~nonce ~fee_payer ~fee ~ledger ~current_global_slot =
     let open Or_error.Let_syntax in
@@ -562,6 +563,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       ; source_timing= None }
     in
     (loc, account', undo_common)
+
+  let check e b = if b then Ok () else Error (failure e)
 
   (* someday: It would probably be better if we didn't modify the receipt chain hash
   in the case that the sender is equal to the receiver, but it complicates the SNARK, so
@@ -661,6 +664,11 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             | _, `New ->
                 Result.fail User_command_status.Failure.Receiver_not_present
           in
+          let%bind () =
+            check Update_not_permitted
+              (Permissions.Auth_required.check
+                 source_account.permissions.set_delegate Signature)
+          in
           let previous_delegate = source_account.delegate in
           let source_timing = source_account.timing in
           (* Timing is always valid, but we need to record any switch from
@@ -705,7 +713,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           let%bind receiver_account =
             incr_balance receiver_account receiver_amount
           in
-          let%map source_location, source_timing, source_account =
+          let%bind source_location, source_timing, source_account =
             let ret =
               let%bind location, account =
                 if Account_id.equal source receiver then
@@ -752,6 +760,15 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                        (Error.createf "%s"
                           (User_command_status.Failure.describe failure)))
             else ret
+          in
+          let%map () =
+            check Update_not_permitted
+              (Permissions.Auth_required.check source_account.permissions.send
+                 Signature)
+          and () =
+            check Update_not_permitted
+              (Permissions.Auth_required.check
+                 receiver_account.permissions.receive None_given)
           in
           let previous_empty_accounts, auxiliary_data =
             match receiver_location with
@@ -981,8 +998,6 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     | Neg ->
         Balance.sub_amount b a.magnitude )
     |> opt_fail Overflow
-
-  let check e b = if b then Ok () else Error (failure e)
 
   open Pickles_types
 
