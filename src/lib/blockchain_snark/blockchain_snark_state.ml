@@ -90,7 +90,7 @@ let%snarkydef step ~(logger : Logger.t)
     (t, body)
   in
   let%bind ( `Success updated_consensus_state
-           , supercharge_coinbase
+           , `Supercharge_coinbase supercharge_coinbase
            , consensus_state ) =
     with_label __LOC__
       (Consensus_state_hooks.next_state_checked ~constraint_constants

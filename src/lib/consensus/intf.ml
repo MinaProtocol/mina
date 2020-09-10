@@ -236,7 +236,7 @@ module type State_hooks = sig
     -> snark_transition_var
     -> Currency.Amount.var
     -> ( [`Success of Snark_params.Tick.Boolean.var]
-         * Snark_params.Tick.Boolean.var
+         * [`Supercharge_coinbase of Snark_params.Tick.Boolean.var]
          * consensus_state_var
        , _ )
        Snark_params.Tick.Checked.t

@@ -100,7 +100,8 @@ module Gen = struct
       | _ ->
           fee_transfer
     in
-    ({receiver; amount; fee_transfer}, supercharged_coinbase)
+    ( {receiver; amount; fee_transfer}
+    , `Supercharged_coinbase supercharged_coinbase )
 
   let with_random_receivers ~keys ~min_amount ~max_amount ~fee_transfer =
     let open Quickcheck.Let_syntax in
