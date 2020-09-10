@@ -4,6 +4,7 @@ open Coda_base
 open Snark_params
 module Global_slot = Coda_numbers.Global_slot
 open Currency
+module Impl = Pickles.Impls.Step
 
 let top_hash_logging_enabled = ref false
 
@@ -460,9 +461,11 @@ module Base = struct
       ; source_bad_timing: 'bool (* Payment only *)
       ; receiver_exists: 'bool (* Create_account only *)
       ; not_token_owner: 'bool (* Create_account, Mint_tokens *)
-      ; token_auth: 'bool (* Create_account *) }
+      ; token_auth: 'bool (* Create_account *)
+      ; update_not_permitted: 'bool (* Payment, delegate *) }
+    [@@deriving sexp]
 
-    let num_fields = 10
+    let num_fields = 11
 
     let to_list
         { predicate_failed
@@ -474,7 +477,8 @@ module Base = struct
         ; source_bad_timing
         ; receiver_exists
         ; not_token_owner
-        ; token_auth } =
+        ; token_auth
+        ; update_not_permitted } =
       [ predicate_failed
       ; source_not_present
       ; receiver_not_present
@@ -484,7 +488,8 @@ module Base = struct
       ; source_bad_timing
       ; receiver_exists
       ; not_token_owner
-      ; token_auth ]
+      ; token_auth
+      ; update_not_permitted ]
 
     let of_list = function
       | [ predicate_failed
@@ -496,7 +501,8 @@ module Base = struct
         ; source_bad_timing
         ; receiver_exists
         ; not_token_owner
-        ; token_auth ] ->
+        ; token_auth
+        ; update_not_permitted ] ->
           { predicate_failed
           ; source_not_present
           ; receiver_not_present
@@ -506,7 +512,8 @@ module Base = struct
           ; source_bad_timing
           ; receiver_exists
           ; not_token_owner
-          ; token_auth }
+          ; token_auth
+          ; update_not_permitted }
       | _ ->
           failwith
             "Transaction_snark.Base.User_command_failure.to_list: bad length"
@@ -610,9 +617,15 @@ module Base = struct
                 else if Account_id.equal source id then false
                 else fail "bad source account ID"
               in
+              let update_not_permitted =
+                not
+                  (Permissions.Auth_required.check
+                     source_account.permissions.set_delegate Signature)
+              in
               { predicate_failed
               ; source_not_present
               ; receiver_not_present
+              ; update_not_permitted
               ; amount_insufficient_to_create= false
               ; token_cannot_create= false
               ; source_insufficient_balance= false
@@ -679,6 +692,13 @@ module Base = struct
                            ~txn_amount:payload.body.amount ~txn_global_slot
                            ~account:source_account) )
               in
+              let update_not_permitted =
+                not
+                  ( Permissions.Auth_required.check
+                      source_account.permissions.send Signature
+                  && Permissions.Auth_required.check
+                       receiver_account.permissions.receive None_given )
+              in
               { predicate_failed
               ; source_not_present
               ; receiver_not_present= false
@@ -686,6 +706,7 @@ module Base = struct
               ; token_cannot_create
               ; source_insufficient_balance
               ; source_bad_timing
+              ; update_not_permitted
               ; receiver_exists= false
               ; not_token_owner= false
               ; token_auth= false }
@@ -755,6 +776,7 @@ module Base = struct
               ; token_cannot_create= false
               ; source_insufficient_balance= false
               ; source_bad_timing= false
+              ; update_not_permitted= false
               ; receiver_exists
               ; not_token_owner
               ; token_auth }
@@ -789,6 +811,7 @@ module Base = struct
               ; token_cannot_create= false
               ; source_insufficient_balance= false
               ; source_bad_timing= false
+              ; update_not_permitted= false
               ; receiver_exists= false
               ; not_token_owner
               ; token_auth= false } )
@@ -1133,6 +1156,19 @@ module Base = struct
             current_global_slot <= payload.common.valid_until)
         >>= Boolean.Assert.is_true )
     in
+    let add_permission_check, permitted =
+      let r = ref [] in
+      ( (fun ?label b ->
+          Option.iter label ~f:(fun label ->
+              Impl.(
+                as_prover
+                  As_prover.(
+                    fun () ->
+                      if not (read Boolean.typ b) then
+                        Core.printf "check failed: %s\n%!" label)) ) ;
+          r := b :: !r )
+      , fun () -> Boolean.all !r )
+    in
     (* Check coinbase stack. Protocol state body is pushed into the Pending
        coinbase stack once per block. For example, consider any two
        transactions in a block. Their pending coinbase stacks would be:
@@ -1303,13 +1339,13 @@ module Base = struct
                in
                Boolean.(is_empty_and_writeable || is_create_account)
              in
+             let amount_sgn = Sgn.Checked.neg_if_true is_user_command in
              let%bind amount =
                [%with_label "Compute fee payer amount"]
                  (let fee_payer_amount =
-                    let sgn = Sgn.Checked.neg_if_true is_user_command in
                     Amount.Signed.create
                       ~magnitude:(Amount.Checked.of_fee fee)
-                      ~sgn
+                      ~sgn:amount_sgn
                   in
                   (* Account creation fee for fee transfers/coinbases. *)
                   let%bind account_creation_fee =
@@ -1322,6 +1358,26 @@ module Base = struct
                   in
                   Amount.Signed.Checked.(
                     add fee_payer_amount account_creation_fee))
+             in
+             let%bind () =
+               (* Check permission *)
+               [%with_label "Check fee payer permissions"]
+                 Impl.(
+                   make_checked (fun () ->
+                       let perm =
+                         Permissions.Auth_required.Checked.if_
+                           (Sgn.Checked.is_neg amount_sgn)
+                           ~then_:account.permissions.send
+                           ~else_:account.permissions.receive
+                       in
+                       let ok =
+                         Permissions.Auth_required.Checked.eval_no_proof
+                           ~signature_verifies:is_user_command perm
+                       in
+                       (* If this is a user command, this check must succeed. *)
+                       Boolean.Assert.any [ok; Boolean.not is_user_command] ;
+                       add_permission_check ok ~label:"fee payer permissions"
+                   ))
              in
              let txn_global_slot = current_global_slot in
              let%bind `Min_balance _, timing =
@@ -1428,6 +1484,21 @@ module Base = struct
                   in
                   Boolean.Assert.( = ) is_nonempty_creating
                     user_command_failure.receiver_exists)
+             in
+             let%bind () =
+               [%with_label "Check receiver update permitted"]
+                 Impl.(
+                   make_checked (fun () ->
+                       let permitted =
+                         Boolean.any
+                           [ Permissions.Auth_required.Checked.eval_no_proof
+                               ~signature_verifies:Boolean.false_
+                               account.permissions.receive
+                           ; is_stake_delegation
+                             (* There is no transfer in this case. *) ]
+                       in
+                       add_permission_check ~label:"receiver update" permitted
+                   ))
              in
              let is_empty_and_writeable =
                (* is_empty_and_writable && not is_empty_failure *)
@@ -1578,6 +1649,31 @@ module Base = struct
                   *)
                   assert_r1cs not_fee_payer_is_source num_failures num_failures)
              in
+             let%bind () =
+               [%with_label "Check source update permitted"]
+                 Impl.(
+                   make_checked (fun () ->
+                       let permitted =
+                         let delegate_case =
+                           Boolean.all
+                             [ is_stake_delegation
+                             ; Permissions.Auth_required.Checked.eval_no_proof
+                                 ~signature_verifies:Boolean.true_
+                                 account.permissions.set_delegate ]
+                         and payment_case =
+                           Boolean.all
+                             [ is_payment
+                             ; Permissions.Auth_required.Checked.eval_no_proof
+                                 ~signature_verifies:Boolean.true_
+                                 account.permissions.send ]
+                         in
+                         let other_case =
+                           Boolean.(not (is_stake_delegation || is_payment))
+                         in
+                         Boolean.any [delegate_case; payment_case; other_case]
+                       in
+                       add_permission_check permitted ~label:"source update" ))
+             in
              let%bind amount =
                (* Only payments should affect the balance at this stage. *)
                if_ is_payment ~typ:Amount.typ ~then_:payload.body.amount
@@ -1676,6 +1772,15 @@ module Base = struct
              ; timing
              ; permissions= account.permissions
              ; snapp= account.snapp } ))
+    in
+    let%bind permitted = permitted () in
+    let%bind () =
+      [%with_label "Check update permissions"]
+        (* TODO debugging: What is happening:
+   permitted = true
+      user_command_failure.update_not_permitted = true... *)
+        (Boolean.Assert.( = ) user_command_failure.update_not_permitted
+           (Boolean.not permitted))
     in
     let%bind fee_excess =
       (* - payments:         payload.common.fee
