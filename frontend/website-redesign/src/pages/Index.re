@@ -19,6 +19,7 @@ let make = () => {
       </AnnouncementBanner>
       <HomepageHero />
       <BlockchainComparison />
+      <FeaturedAlternatingSections />
     </div>
   </Page>;
 };
