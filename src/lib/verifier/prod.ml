@@ -134,7 +134,7 @@ end
 
 type worker = {connection: Worker.Connection.t; process: Process.t}
 
-type t = {worker: worker Deferred.t ref}
+type t = {worker: worker Deferred.t ref; logger: Logger.Stable.Latest.t}
 
 let plus_or_minus initial ~delta =
   initial +. (Random.float (2. *. delta) -. delta)
@@ -206,11 +206,14 @@ let create ~logger ~proof_level ~pids ~conf_dir : t Deferred.t =
         in
         worker_ref := new_worker )
   in
-  on_worker worker ; {worker= worker_ref}
+  on_worker worker ;
+  {worker= worker_ref; logger}
 
-let with_retry f =
+let with_retry ~logger f =
   let pause = Time.Span.of_sec 5. in
   let rec go attempts_remaining =
+    [%log trace] "Verifier trying with $attempts_remaining"
+      ~metadata:[("attempts_remaining", `Int attempts_remaining)] ;
     match%bind f () with
     | Ok x ->
         return (Ok x)
@@ -222,14 +225,32 @@ let with_retry f =
   in
   go 4
 
-let verify_blockchain_snark {worker} chain =
-  with_retry (fun () ->
+let verify_blockchain_snark {worker; logger} chain =
+  with_retry ~logger (fun () ->
       let%bind {connection; _} = !worker in
       Worker.Connection.run connection ~f:Worker.functions.verify_blockchain
         ~arg:chain )
 
-let verify_transaction_snarks {worker} ts =
-  with_retry (fun () ->
-      let%bind {connection; _} = !worker in
-      Worker.Connection.run connection
-        ~f:Worker.functions.verify_transaction_snarks ~arg:ts )
+module Id = Unique_id.Int ()
+
+let verify_transaction_snarks {worker; logger} ts =
+  let id = Id.create () in
+  let n = List.length ts in
+  let metadata () =
+    ("id", `String (Id.to_string id))
+    :: ("n", `Int n)
+    :: Memory_stats.(jemalloc_memory_stats () @ ocaml_memory_stats ())
+  in
+  [%log trace] "verify $n transaction_snarks (before)" ~metadata:(metadata ()) ;
+  let res =
+    with_retry ~logger (fun () ->
+        let%bind {connection; _} = !worker in
+        Worker.Connection.run connection
+          ~f:Worker.functions.verify_transaction_snarks ~arg:ts )
+  in
+  upon res (fun x ->
+      [%log trace] "verify $n transaction_snarks (after)"
+        ~metadata:
+          ( ("result", `String (Sexp.to_string ([%sexp_of: bool Or_error.t] x)))
+          :: metadata () ) ) ;
+  res
