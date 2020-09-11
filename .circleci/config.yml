@@ -671,13 +671,15 @@ jobs:
                         echo "Should Publish Docker: $CODA_WAS_PUBLISHED"
                         set -x
                         if [[ "$CODA_WAS_PUBLISHED" = true  ]]; then
-
                               echo "$DOCKER_PASSWORD" | docker login --username $DOCKER_USERNAME --password-stdin
                               scripts/release-docker.sh \
-                              -s coda-daemon \
-                              -v $CODA_GIT_TAG-$CODA_GIT_BRANCH-$CODA_GIT_HASH \
-                              --extra-args "--build-arg coda_version=$CODA_DEB_VERSION --build-arg deb_repo=$CODA_DEB_REPO"
-
+                                -s coda-daemon \
+                                -v $CODA_GIT_TAG-$CODA_GIT_BRANCH-$CODA_GIT_HASH \
+                                --extra-args "--build-arg coda_deb_version=$CODA_DEB_VERSION --build-arg deb_repo=$CODA_DEB_REPO"
+                              scripts/release-docker.sh \
+                                -s coda-daemon-puppeteered \
+                                -v $CODA_GIT_TAG-$CODA_GIT_BRANCH-$CODA_GIT_HASH \
+                                --extra-args "--build-arg coda_version=$CODA_GIT_TAG-$CODA_GIT_BRANCH-$CODA_GIT_HASH"
                         fi
                     fi
             - store_artifacts:
@@ -702,13 +704,11 @@ jobs:
                         echo "Should Publish Docker: $CODA_WAS_PUBLISHED"
                         set -x
                         if [[ "$CODA_WAS_PUBLISHED" = true  ]]; then
-
                               echo "$DOCKER_PASSWORD" | docker login --username $DOCKER_USERNAME --password-stdin
                               scripts/release-docker.sh \
-                              -s coda-demo \
-                              -v $CODA_GIT_TAG-$CODA_GIT_BRANCH-$CODA_GIT_HASH \
-                              --extra-args "--build-arg coda_version=$CODA_DEB_VERSION --build-arg deb_repo=$CODA_DEB_REPO"
-
+                                -s coda-demo \
+                                -v $CODA_GIT_TAG-$CODA_GIT_BRANCH-$CODA_GIT_HASH \
+                                --extra-args "--build-arg coda_deb_version=$CODA_DEB_VERSION --build-arg deb_repo=$CODA_DEB_REPO"
                         fi
                     fi
             - store_artifacts:
