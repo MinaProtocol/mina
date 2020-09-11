@@ -2227,6 +2227,7 @@ module Base = struct
       fee |> Fee.var_to_number |> Number.to_var
       |> Field.(Checked.equal (Var.constant zero))
     in
+    let is_coinbase_or_fee_transfer = Boolean.not is_user_command in
     let%bind can_create_fee_payer_account =
       (* Fee transfers and coinbases may create an account. We check the normal
          invariants to ensure that the account creation fee is paid.
@@ -2237,7 +2238,7 @@ module Base = struct
         *)
         Boolean.(token_default || is_zero_fee)
       in
-      Boolean.((not is_user_command) && fee_may_be_charged)
+      Boolean.(is_coinbase_or_fee_transfer && fee_may_be_charged)
     in
     let%bind root_after_fee_payer_update =
       [%with_label "Update fee payer"]
@@ -2309,24 +2310,29 @@ module Base = struct
                     add fee_payer_amount account_creation_fee))
              in
              let txn_global_slot = current_global_slot in
-             let%bind `Min_balance _, timing =
-               [%with_label "Check fee payer timing"]
-                 (let%bind txn_amount =
-                    Amount.Checked.if_
-                      (Sgn.Checked.is_neg amount.sgn)
-                      ~then_:amount.magnitude
-                      ~else_:Amount.(var_of_t zero)
-                  in
-                  let balance_check ok =
-                    [%with_label "Check fee payer balance"]
-                      (Boolean.Assert.is_true ok)
-                  in
-                  let timed_balance_check ok =
-                    [%with_label "Check fee payer timed balance"]
-                      (Boolean.Assert.is_true ok)
-                  in
-                  check_timing ~balance_check ~timed_balance_check ~account
-                    ~txn_amount ~txn_global_slot)
+             let%bind timing =
+               let%bind `Min_balance _, new_timing =
+                 [%with_label "Check fee payer timing"]
+                   (let%bind txn_amount =
+                      Amount.Checked.if_
+                        (Sgn.Checked.is_neg amount.sgn)
+                        ~then_:amount.magnitude
+                        ~else_:Amount.(var_of_t zero)
+                    in
+                    let balance_check ok =
+                      [%with_label "Check fee payer balance"]
+                        (Boolean.Assert.is_true ok)
+                    in
+                    let timed_balance_check ok =
+                      [%with_label "Check fee payer timed balance"]
+                        (Boolean.Assert.is_true ok)
+                    in
+                    check_timing ~balance_check ~timed_balance_check ~account
+                      ~txn_amount ~txn_global_slot)
+               in
+               (* Like receiver account in payments, coinbase fee transfer account or other fee transfer account don't have the timing field updated *)
+               Account_timing.if_ is_coinbase_or_fee_transfer
+                 ~then_:account.timing ~else_:new_timing
              in
              let%bind balance =
                [%with_label "Check payer balance"]
@@ -2489,7 +2495,7 @@ module Base = struct
                (* Only default tokens may participate in delegation. *)
                Boolean.(is_empty_and_writeable && token_default)
              in
-             let%map delegate =
+             let%bind delegate =
                Public_key.Compressed.Checked.if_ may_delegate
                  ~then_:(Account_id.Checked.public_key receiver)
                  ~else_:account.delegate
@@ -2508,17 +2514,48 @@ module Base = struct
                  ~then_:payload.body.token_locked
                  ~else_:account.token_permissions.token_locked
              in
-             { Account.Poly.balance
-             ; public_key
-             ; token_id
-             ; token_permissions= {Token_permissions.token_owner; token_locked}
-             ; nonce= account.nonce
-             ; receipt_chain_hash= account.receipt_chain_hash
-             ; delegate
-             ; voting_for= account.voting_for
-             ; timing= account.timing
-             ; permissions= account.permissions
-             ; snapp= account.snapp } ))
+             let t =
+               { Account.Poly.balance
+               ; public_key
+               ; token_id
+               ; token_permissions=
+                   {Token_permissions.token_owner; token_locked}
+               ; nonce= account.nonce
+               ; receipt_chain_hash= account.receipt_chain_hash
+               ; delegate
+               ; voting_for= account.voting_for
+               ; timing= account.timing
+               ; permissions= account.permissions
+               ; snapp= account.snapp }
+             in
+             let%bind `Min_balance _, timing =
+               [%with_label "Check fee payer timing"]
+                 (let txn_amount = Amount.(var_of_t zero) in
+                  let balance_check ok =
+                    [%with_label "Check blah1"] (Boolean.Assert.is_true ok)
+                  in
+                  let timed_balance_check ok =
+                    [%with_label "check blah2"] (Boolean.Assert.is_true ok)
+                  in
+                  check_timing ~balance_check ~timed_balance_check ~account
+                    ~txn_amount ~txn_global_slot:current_global_slot)
+             in
+             let%map () =
+               as_prover
+                 As_prover.(
+                   Let_syntax.(
+                     let%bind slot =
+                       read Coda_numbers.Global_slot.typ current_global_slot
+                     in
+                     let%bind timing = read Account_timing.typ timing in
+                     let%map acc = read Account.typ t in
+                     Core.printf
+                       !"Snark: account %{sexp:Account.t} slot: %{sexp: \
+                         Coda_numbers.Global_slot.t} timing: %{sexp: \
+                         Account_timing.t}\n"
+                       acc slot timing))
+             in
+             t ))
     in
     let%bind fee_payer_is_source = Account_id.Checked.equal fee_payer source in
     let%bind root_after_source_update =
@@ -2569,30 +2606,35 @@ module Base = struct
                  ~else_:Amount.(var_of_t zero)
              in
              let txn_global_slot = current_global_slot in
-             let%bind `Min_balance _, timing =
-               [%with_label "Check source timing"]
-                 (let balance_check ok =
-                    [%with_label
-                      "Check source balance failure matches predicted"]
-                      (Boolean.Assert.( = ) ok
-                         (Boolean.not
-                            user_command_failure.source_insufficient_balance))
-                  in
-                  let timed_balance_check ok =
-                    [%with_label
-                      "Check source timed balance failure matches predicted"]
-                      (let%bind ok =
-                         Boolean.(
-                           ok
-                           && not
-                                user_command_failure
-                                  .source_insufficient_balance)
-                       in
-                       Boolean.Assert.( = ) ok
-                         (Boolean.not user_command_failure.source_bad_timing))
-                  in
-                  check_timing ~balance_check ~timed_balance_check ~account
-                    ~txn_amount:amount ~txn_global_slot)
+             let%bind timing =
+               let%bind `Min_balance _, new_timing =
+                 [%with_label "Check source timing"]
+                   (let balance_check ok =
+                      [%with_label
+                        "Check source balance failure matches predicted"]
+                        (Boolean.Assert.( = ) ok
+                           (Boolean.not
+                              user_command_failure.source_insufficient_balance))
+                    in
+                    let timed_balance_check ok =
+                      [%with_label
+                        "Check source timed balance failure matches predicted"]
+                        (let%bind ok =
+                           Boolean.(
+                             ok
+                             && not
+                                  user_command_failure
+                                    .source_insufficient_balance)
+                         in
+                         Boolean.Assert.( = ) ok
+                           (Boolean.not user_command_failure.source_bad_timing))
+                    in
+                    check_timing ~balance_check ~timed_balance_check ~account
+                      ~txn_amount:amount ~txn_global_slot)
+               in
+               (* Like receiver account in payments, coinbase fee transfer account or other fee transfer account don't have the timing field updated *)
+               Account_timing.if_ is_coinbase_or_fee_transfer
+                 ~then_:account.timing ~else_:new_timing
              in
              let%bind balance, `Underflow underflow =
                Balance.Checked.sub_amount_flagged account.balance amount
@@ -2765,13 +2807,30 @@ module Base = struct
       ; fee_token_r= Token_id.(var_of_t default)
       ; fee_excess_r= Fee.Signed.(Checked.constant zero) }
     in
-    Checked.all_unit
+    let%bind () =
+      with_label __LOC__
+        (Frozen_ledger_hash.assert_equal root_after statement.target)
+    in
+    let%bind () =
+      with_label __LOC__
+        (Currency.Amount.Checked.assert_equal supply_increase
+           statement.supply_increase)
+    in
+    let%bind () =
+      with_label __LOC__
+        (Fee_excess.assert_equal_checked fee_excess statement.fee_excess)
+    in
+    with_label __LOC__
+      (Token_id.Checked.Assert.equal next_available_token_after
+         statement.next_available_token_after)
+
+  (*Checked.all_unit
       [ Frozen_ledger_hash.assert_equal root_after statement.target
       ; Currency.Amount.Checked.assert_equal supply_increase
           statement.supply_increase
       ; Fee_excess.assert_equal_checked fee_excess statement.fee_excess
       ; Token_id.Checked.Assert.equal next_available_token_after
-          statement.next_available_token_after ]
+          statement.next_available_token_after ]*)
 
   let rule ~constraint_constants : _ Pickles.Inductive_rule.t =
     { prevs= []
