@@ -9,7 +9,9 @@ type inputs = {test: test; coda_image: string}
 
 let tests : test list =
   [ ( "block-production"
-    , (module Block_production_test.Make : Test_functor_intf) ) ]
+    , (module Block_production_test.Make : Test_functor_intf) )
+  ; ( "bootstrap"
+    , (module Bootstrap_test.Make : Test_functor_intf) ) ]
 
 let to_or_error = Deferred.map ~f:Or_error.return
 
@@ -130,7 +132,7 @@ let main inputs =
     Monitor.try_with_join_or_error ~extract_exn:true (fun () ->
         let open Deferred.Or_error.Let_syntax in
         let%bind net_manager =
-          to_or_error @@ Engine.Network_manager.create network_config
+          to_or_error @@ Engine.Network_manager.create ~logger network_config
         in
         net_manager_ref := Some net_manager ;
         let%bind network =

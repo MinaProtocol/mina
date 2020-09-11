@@ -83,9 +83,9 @@ module type Engine_intf = sig
   module Node : sig
     type t
 
-    val start : t -> unit Deferred.t
+    val start : fresh_state:bool -> t -> unit Deferred.Or_error.t
 
-    val stop : t -> unit Deferred.t
+    val stop : t -> unit Deferred.Or_error.t
 
     val send_payment :
       t -> User_command_input.t -> Coda_base.User_command.t Deferred.t
@@ -116,7 +116,7 @@ module type Engine_intf = sig
   module Network_manager : sig
     type t
 
-    val create : Network_config.t -> t Deferred.t
+    val create : logger:Logger.t -> Network_config.t -> t Deferred.t
 
     val deploy : t -> Network.t Deferred.t
 
@@ -152,6 +152,8 @@ module type Engine_intf = sig
       -> unit Deferred.Or_error.t
 
     val wait_for_init : Node.t -> t -> unit Deferred.Or_error.t
+
+    val wait_for_sync : Node.t list -> timeout:Time.Span.t -> t -> unit Deferred.Or_error.t
   end
 end
 
