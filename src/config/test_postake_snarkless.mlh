@@ -18,7 +18,7 @@
 [%%define genesis_state_timestamp "2019-01-30 12:00:00-08:00"]
 [%%define block_window_duration 10000]
 
-[%%define integration_tests false]
+[%%define integration_tests true]
 [%%define force_updates false]
 
 [%%define download_snark_keys false]
