@@ -1880,39 +1880,13 @@ module Data = struct
 
     let is_genesis_state_var (t : var) = is_genesis t.curr_global_slot
 
-    let supercharge_coinbase
-        ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-        ~(delegator_account : Coda_base.Account.var) ~ledger ~global_slot =
+    let supercharge_coinbase ~(winner_account : Coda_base.Account.var)
+        ~global_slot =
       let open Snark_params.Tick in
-      let%bind public_key =
-        request_witness Public_key.typ (As_prover.return Vrf.Public_key)
+      let%map winner_locked =
+        Coda_base.Account.Checked.has_locked_tokens ~global_slot winner_account
       in
-      let%bind delegate_account =
-        let delegate_account_id =
-          Coda_base.Account.identifier_of_var delegator_account
-        in
-        let%bind delegate_addr =
-          request_witness
-            (Coda_base.Account.Index.Unpacked.typ
-               ~ledger_depth:constraint_constants.ledger_depth)
-            As_prover.(
-              map (read Coda_base.Account_id.typ delegate_account_id)
-                ~f:(fun s -> Coda_base.Ledger_hash.Find_index s))
-        in
-        with_label __LOC__
-          (Coda_base.Frozen_ledger_hash.get
-             ~depth:constraint_constants.ledger_depth ledger delegate_addr)
-      in
-      let%bind delegator_locked =
-        Coda_base.Account.Checked.has_locked_tokens ~global_slot
-          delegator_account
-      in
-      let%bind delegate_locked =
-        Coda_base.Account.Checked.has_locked_tokens ~global_slot
-          delegate_account
-      in
-      let%map is_locked = Boolean.(delegate_locked || delegator_locked) in
-      Boolean.not is_locked
+      Boolean.not winner_locked
 
     let%snarkydef update_var (previous_state : var)
         (transition_data : Consensus_transition.var)
@@ -1958,9 +1932,7 @@ module Data = struct
           ~seed:staking_epoch_data.seed
       in
       let%bind supercharge_coinbase =
-        supercharge_coinbase ~constraint_constants
-          ~delegator_account:winner_account
-          ~ledger:staking_epoch_data.ledger.hash ~global_slot:next_slot_number
+        supercharge_coinbase ~winner_account ~global_slot:next_slot_number
       in
       let%bind new_total_currency =
         Currency.Amount.Checked.add previous_state.total_currency
