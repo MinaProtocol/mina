@@ -84,27 +84,14 @@ module Compressed = struct
        *)
 
       [%%if
-      curve_size = 298]
+      curve_size = 255]
 
       let%test "nonzero_curve_point_compressed v1" =
         let point =
           Quickcheck.random_value
             ~seed:(`Deterministic "nonzero_curve_point_compressed-seed") V1.gen
         in
-        let known_good_digest = "437f5bc6710b6a8fda8f9e8cf697fc2c" in
-        Ppx_version_runtime.Serialization.check_serialization
-          (module V1)
-          point known_good_digest
-
-      [%%elif
-      curve_size = 753]
-
-      let%test "nonzero_curve_point_compressed v1" =
-        let point =
-          Quickcheck.random_value
-            ~seed:(`Deterministic "nonzero_curve_point_compressed-seed") V1.gen
-        in
-        let known_good_digest = "067f8be67e5cc31f5c5ac4be91d5f6db" in
+        let known_good_digest = "951b667e8f1216097665190fc0a7b78a" in
         Ppx_version_runtime.Serialization.check_serialization
           (module V1)
           point known_good_digest
@@ -129,9 +116,6 @@ module Compressed = struct
   Stable.Latest.(sexp_of_t, t_of_sexp, gen)]
 
   let compress (x, y) = {Poly.x; is_odd= parity y}
-
-  (* sexp operations written manually, don't derive them *)
-  type t = (Field.t, bool) Poly.t [@@deriving eq, compare, hash]
 
   let empty = Poly.{x= Field.zero; is_odd= false}
 
@@ -244,11 +228,6 @@ module Uncompressed = struct
         Option.value_exn (decompress @@ Compressed.t_of_sexp sexp)
     end
   end]
-
-  type t =
-    Field.t * Field.t
-    (* sexp operations written manually, don't derive them *)
-  [@@deriving compare, hash]
 
   (* so we can make sets of public keys *)
   include Comparable.Make_binable (Stable.Latest)

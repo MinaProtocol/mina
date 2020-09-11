@@ -13,9 +13,6 @@ module State = struct
     end
   end]
 
-  type t = Stable.Latest.t = Pending | Included | Unknown
-  [@@deriving equal, sexp, compare]
-
   let to_string = function
     | Pending ->
         "PENDING"
@@ -113,10 +110,9 @@ let%test_module "transaction_status" =
       don't_wait_for
       @@ Linear_pipe.iter (Transaction_pool.broadcasts transaction_pool)
            ~f:(fun transactions ->
-             Logger.trace logger
+             [%log trace]
                "Transactions have been applied successfully and is propagated \
                 throughout the 'network'"
-               ~module_:__MODULE__ ~location:__LOC__
                ~metadata:
                  [ ( "transactions"
                    , Transaction_pool.Resource_pool.Diff.to_yojson transactions
@@ -139,8 +135,7 @@ let%test_module "transaction_status" =
                   ([user_command], Fn.const ())
               in
               let%map () = Async.Scheduler.yield_until_no_jobs_remain () in
-              Logger.info logger "Checking status" ~module_:__MODULE__
-                ~location:__LOC__ ;
+              [%log info] "Checking status" ;
               [%test_eq: State.t] ~equal:State.equal State.Unknown
                 ( Or_error.ok_exn
                 @@ get_status ~frontier_broadcast_pipe ~transaction_pool
@@ -169,8 +164,7 @@ let%test_module "transaction_status" =
                 @@ get_status ~frontier_broadcast_pipe ~transaction_pool
                      user_command
               in
-              Logger.info logger "Computing status" ~module_:__MODULE__
-                ~location:__LOC__ ;
+              [%log info] "Computing status" ;
               [%test_eq: State.t] ~equal:State.equal State.Pending status ) )
 
     let%test_unit "An unknown transaction does not appear in the transition \
@@ -202,8 +196,7 @@ let%test_module "transaction_status" =
                   (pool_user_commands, Fn.const ())
               in
               let%map () = Async.Scheduler.yield_until_no_jobs_remain () in
-              Logger.info logger "Computing status" ~module_:__MODULE__
-                ~location:__LOC__ ;
+              [%log info] "Computing status" ;
               [%test_eq: State.t] ~equal:State.equal State.Unknown
                 ( Or_error.ok_exn
                 @@ get_status ~frontier_broadcast_pipe ~transaction_pool

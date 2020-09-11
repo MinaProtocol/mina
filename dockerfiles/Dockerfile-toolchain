@@ -59,7 +59,7 @@ RUN VER="19.03.4" && \
 RUN export CLOUD_SDK_REPO="cloud-sdk-$(lsb_release -c -s)" && \
     echo "deb http://packages.cloud.google.com/apt $CLOUD_SDK_REPO main" | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list && \
     curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add - && \
-    sudo apt-get update -y && sudo apt-get install google-cloud-sdk -y
+    sudo apt-get update -y && sudo apt-get install google-cloud-sdk kubectl -y
 
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs -o /tmp/rust_install.sh
 RUN chmod +x /tmp/rust_install.sh
@@ -78,9 +78,6 @@ RUN sudo git clone https://github.com/facebook/rocksdb -b v5.17.2 /rocksdb
 # This builds and installs just the static lib for us
 RUN cd /rocksdb && sudo make static_lib PORTABLE=1 -j$(nproc) && sudo cp librocksdb.a /usr/local/lib/librocksdb_coda.a && sudo rm -rf /rocksdb && sudo strip -S /usr/local/lib/librocksdb_coda.a
 
-## clone Coda repo for the .nix-keys.gpg.asc
-
-RUN sudo git clone https://github.com/CodaProtocol/coda $CODA_DIR
 
 # OPAM dependencies
 RUN git -C /home/opam/opam-repository pull
@@ -89,19 +86,9 @@ RUN opam update -y && opam upgrade -y
 RUN mkdir --mode=700 /home/opam/.gnupg
 RUN echo "disable-ipv6" >> /home/opam/.gnupg/dirmngr.conf
 
-RUN sudo apt-get install gnupg2 && curl -o install-nix-2.3.2 https://releases.nixos.org/nix/nix-2.3.3/install && \
-    curl -o install-nix-2.3.2.asc https://releases.nixos.org/nix/nix-2.3.3/install.asc && \
-    gpg2 --import < $CODA_DIR/.nix-key.gpg.asc && \
-    gpg2 --keyserver keyserver.ubuntu.com --recv-keys B541D55301270E0BCF15CA5D8170B4726D7198DE && \
-    gpg2 --verify ./install-nix-2.3.2.asc && \
-    sh ./install-nix-2.3.2 && \
-    USER=opam . ~/.nix-profile/etc/profile.d/nix.sh && \
-    nix-env --option sandbox false -iA cachix -f https://cachix.org/api/v1/install
-
 # we used to delete the repo here
 # we now leave it intact, in case updating OPAM in CI requires pinned package sources
 
-# TEMP HACK (for libp2p_helper nixless builds)
 RUN sudo apt-get install --yes wget 
 RUN cd /usr/lib && sudo wget https://dl.google.com/go/go1.13.10.linux-amd64.tar.gz && sudo tar -xvf go1.13.10.linux-amd64.tar.gz && sudo rm go1.13.10.linux-amd64.tar.gz
 RUN echo 'export PATH="$PATH:/usr/lib/go/bin"' >> /home/opam/.bashrc

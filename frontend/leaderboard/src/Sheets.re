@@ -1,30 +1,28 @@
 open Bindings.GoogleSheets;
 
-module Bindings = {
-  let createClient = () => {
-    googleAuth({scopes: [|"https://www.googleapis.com/auth/spreadsheets"|]});
-  };
+let createClient = () => {
+  googleAuth({scopes: [|"https://www.googleapis.com/auth/spreadsheets"|]});
+};
 
-  let getRange = (client, sheetsQuery, cb) => {
-    let sheets = sheets({version: "v4", auth: client});
-    get(sheets, sheetsQuery, (~error, ~res) => {
-      switch (Js.Nullable.toOption(error)) {
-      | None => cb(Ok(res.data.values))
-      | Some(error) => cb(Error(error))
-      }
-    });
-  };
+let getRange = (client, sheetsQuery, cb) => {
+  let sheets = sheets({version: "v4", auth: client});
+  get(sheets, sheetsQuery, (~error, ~res) => {
+    switch (Js.Nullable.toOption(error)) {
+    | None => cb(Ok(res.data.values))
+    | Some(error) => cb(Error(error))
+    }
+  });
+};
 
-  let updateRange = (client, sheetsUpdate, cb) => {
-    let sheets = sheets({version: "v4", auth: client});
+let updateRange = (client, sheetsUpdate, cb) => {
+  let sheets = sheets({version: "v4", auth: client});
 
-    update(sheets, sheetsUpdate, (~error, ~res) => {
-      switch (Js.Nullable.toOption(error)) {
-      | None => cb(Ok(res.data.values))
-      | Some(error) => cb(Error(error))
-      }
-    });
-  };
+  update(sheets, sheetsUpdate, (~error, ~res) => {
+    switch (Js.Nullable.toOption(error)) {
+    | None => cb(Ok(res.data.values))
+    | Some(error) => cb(Error(error))
+    }
+  });
 };
 
 /*
@@ -32,6 +30,43 @@ module Bindings = {
    with the Google Sheets API.
  */
 module Core = {
+  module Sheets = {
+    type t = {
+      name: string,
+      range: string,
+    };
+
+    type sheets =
+      | Main
+      | AllTimeLeaderboard
+      | CurrentPhaseLeaderboard
+      | CurrentReleaseLeaderboard
+      | MemberProfileData
+      | Users
+      | Data;
+
+    let getSheet = sheet => {
+      switch (sheet) {
+      | Main => {name: "main", range: "main!A5:I"}
+      | AllTimeLeaderboard => {
+          name: "All-Time Leaderboard",
+          range: "All-Time Leaderboard!C4:H",
+        }
+      | CurrentPhaseLeaderboard => {
+          name: "Phase 3 Leaderboard",
+          range: "Phase 3 Leaderboard!B4:E",
+        }
+      | CurrentReleaseLeaderboard => {name: "3.3", range: "3.3!A4:C"}
+      | MemberProfileData => {
+          name: "Member_Profile_Data",
+          range: "Member_Profile_Data!A2:Z",
+        }
+      | Users => {name: "Users", range: "Users!A2:B"}
+      | Data => {name: "Data", range: "Data!A1:D"}
+      };
+    };
+  };
+
   let getColumnIndex = (columnToFind, data) => {
     Belt.Array.getIndexBy(data, headerName =>
       switch (headerName) {

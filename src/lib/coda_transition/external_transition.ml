@@ -112,16 +112,6 @@ module Stable = struct
   end
 end]
 
-type t = Stable.Latest.t =
-  { protocol_state: Protocol_state.Value.t
-  ; protocol_state_proof: Proof.t sexp_opaque
-  ; staged_ledger_diff: Staged_ledger_diff.t
-  ; delta_transition_chain_proof: State_hash.t * State_body_hash.t list
-  ; current_protocol_version: Protocol_version.t
-  ; proposed_protocol_version_opt: Protocol_version.t option
-  ; mutable validation_callback: Validate_content.t }
-[@@deriving sexp]
-
 (* another name, so we can avoid cyclic type below *)
 type t_ = t
 
@@ -857,8 +847,6 @@ module Validated = struct
     end
   end]
 
-  type t = Stable.Latest.t
-
   type nonrec protocol_version_status = protocol_version_status =
     {valid_current: bool; valid_next: bool; matches_daemon: bool}
 
@@ -1047,10 +1035,8 @@ module Staged_ledger_validation = struct
       Staged_ledger.apply
         ~constraint_constants:precomputed_values.constraint_constants ~logger
         ~verifier parent_staged_ledger staged_ledger_diff
-        ~current_global_slot:
-          ( Coda_state.Protocol_state.(
-              Body.consensus_state @@ body parent_protocol_state)
-          |> Consensus.Data.Consensus_state.curr_slot )
+        ~current_state_view:
+          Coda_state.Protocol_state.(Body.view @@ body parent_protocol_state)
         ~state_and_body_hash:
           (let body_hash =
              Protocol_state.(Body.hash @@ body parent_protocol_state)

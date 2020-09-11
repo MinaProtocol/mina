@@ -11,6 +11,8 @@ open Snark_params.Tick
 [%%else]
 
 open Snark_params_nonconsensus
+module Hex = Hex_nonconsensus.Hex
+module Rosetta_coding = Rosetta_coding_nonconsensus
 
 [%%endif]
 
@@ -40,27 +42,14 @@ module Stable = struct
 
   module Tests = struct
     [%%if
-    curve_size = 298]
+    curve_size = 255]
 
-    let%test "signature serialization v1 (curve_size=298)" =
+    let%test "signature serialization v1 (curve_size=255)" =
       let signature =
         Quickcheck.random_value
           ~seed:(`Deterministic "signature serialization") V1.gen
       in
-      let known_good_digest = "5581d593702a09f4418fe46bde1ca116" in
-      Ppx_version_runtime.Serialization.check_serialization
-        (module V1)
-        signature known_good_digest
-
-    [%%elif
-    curve_size = 753]
-
-    let%test "signature serialization v1 (curve_size=753)" =
-      let signature =
-        Quickcheck.random_value
-          ~seed:(`Deterministic "signature serialization") V1.gen
-      in
-      let known_good_digest = "7cc56fd93cef313e1eef9fc83f55aedb" in
+      let known_good_digest = "b991865dd2ff76596c470a72a4282cbd" in
       Ppx_version_runtime.Serialization.check_serialization
         (module V1)
         signature known_good_digest
@@ -74,9 +63,24 @@ module Stable = struct
   end
 end]
 
-type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash]
-
 let dummy = (Field.one, Inner_curve.Scalar.one)
+
+module Raw = struct
+  open Rosetta_coding.Coding
+
+  let encode (field, scalar) = of_field field ^ of_scalar scalar
+
+  let decode raw =
+    let len = String.length raw in
+    let field_len = len / 2 in
+    let field_enc = String.sub raw ~pos:0 ~len:field_len in
+    let scalar_enc = String.sub raw ~pos:field_len ~len:field_len in
+    try Some (to_field field_enc, to_scalar scalar_enc) with _ -> None
+
+  let%test_unit "partial isomorphism" =
+    Quickcheck.test ~trials:300 Stable.Latest.gen ~f:(fun signature ->
+        [%test_eq: t option] (Some signature) (encode signature |> decode) )
+end
 
 [%%ifdef
 consensus_mechanism]

@@ -2,21 +2,108 @@ open Jest;
 open Expect;
 module StringMap = Map.Make(String);
 
-let blockChallenge = "Stake your Coda and produce blocks";
-
-let blockDirectory =
-  ([%bs.node __dirname] |> Belt.Option.getExn |> Filename.dirname)
-  ++ "/../../__tests__/blocks/";
-
-let blocks =
-  blockDirectory
-  |> Node.Fs.readdirSync
-  |> Array.map(file => {
-       let fileContents = Node.Fs.readFileAsUtf8Sync(blockDirectory ++ file);
-       let blockData = Js.Json.parseExn(fileContents);
-       let block = Types.NewBlock.unsafeJSONToNewBlock(blockData);
-       block.data.newBlock;
-     });
+let blocks = [|
+  {
+    Types.Block.id: 1,
+    blockchainState: {
+      creatorAccount: "publickey1",
+      timestamp: "0",
+      height: "1",
+    },
+    userCommands: [||],
+    internalCommands: [||],
+  },
+  {
+    id: 2,
+    blockchainState: {
+      creatorAccount: "publickey1",
+      timestamp: "1548878462542",
+      height: "2",
+    },
+    userCommands: [||],
+    internalCommands: [||],
+  },
+  {
+    id: 3,
+    blockchainState: {
+      creatorAccount: "publickey1",
+      timestamp: "1548878464058",
+      height: "3",
+    },
+    userCommands: [||],
+    internalCommands: [||],
+  },
+  {
+    id: 4,
+    blockchainState: {
+      creatorAccount: "publickey1",
+      timestamp: "1548878466000",
+      height: "4",
+    },
+    userCommands: [||],
+    internalCommands: [||],
+  },
+  {
+    id: 5,
+    blockchainState: {
+      creatorAccount: "publickey2",
+      timestamp: "1548878468000",
+      height: "5",
+    },
+    userCommands: [||],
+    internalCommands: [||],
+  },
+  {
+    id: 6,
+    blockchainState: {
+      creatorAccount: "publickey2",
+      timestamp: "1548878470000",
+      height: "6",
+    },
+    userCommands: [||],
+    internalCommands: [||],
+  },
+  {
+    id: 7,
+    blockchainState: {
+      creatorAccount: "publickey2",
+      timestamp: "1548878472000",
+      height: "7",
+    },
+    userCommands: [||],
+    internalCommands: [||],
+  },
+  {
+    id: 8,
+    blockchainState: {
+      creatorAccount: "publickey3",
+      timestamp: "1548878474000",
+      height: "8",
+    },
+    userCommands: [||],
+    internalCommands: [||],
+  },
+  {
+    id: 9,
+    blockchainState: {
+      creatorAccount: "publickey3",
+      timestamp: "1548878476000",
+      height: "9",
+    },
+    userCommands: [||],
+    internalCommands: [||],
+  },
+  {
+    id: 10,
+    blockchainState: {
+      creatorAccount: "publickey4",
+      timestamp: "1548878478000",
+      height: "10",
+    },
+    userCommands: [||],
+    internalCommands: [||],
+  },
+|];
 
 describe("Metrics", () => {
   describe("blocksCreatedMetric", () => {
@@ -50,9 +137,8 @@ describe("Points functions", () => {
   describe("addPointsToAtleastN", () => {
     describe("adds correct number of points with atleast 1", () => {
       let blockPoints =
-        Challenges.addPointsToUsersWithAtleastN(
-          (metricRecord: Types.Metrics.metricRecord) =>
-            metricRecord.blocksCreated,
+        Points.addPointsToUsersWithAtleastN(
+          (metricRecord: Types.Metrics.t) => metricRecord.blocksCreated,
           1,
           1000,
           blockMetrics,
@@ -76,9 +162,8 @@ describe("Points functions", () => {
     });
     describe("adds correct number of points with atleast 3", () => {
       let blockPoints =
-        Challenges.addPointsToUsersWithAtleastN(
-          (metricRecord: Types.Metrics.metricRecord) =>
-            metricRecord.blocksCreated,
+        Points.addPointsToUsersWithAtleastN(
+          (metricRecord: Types.Metrics.t) => metricRecord.blocksCreated,
           3,
           1000,
           blockMetrics,
@@ -100,11 +185,10 @@ describe("Points functions", () => {
   describe("applyTopNPoints", () => {
     describe("adds correct number of points to top 3", () => {
       let blockPoints =
-        Challenges.applyTopNPoints(
+        Points.applyTopNPoints(
           [|(2, 1000)|],
           blockMetrics,
-          (metricRecord: Types.Metrics.metricRecord) =>
-            metricRecord.blocksCreated,
+          (metricRecord: Types.Metrics.t) => metricRecord.blocksCreated,
           compare,
         );
       test("correct number of points given to publickey1", () => {
@@ -125,11 +209,10 @@ describe("Points functions", () => {
     });
     describe("adds correct number of points to 1st place and 2-3 place", () => {
       let blockPoints =
-        Challenges.applyTopNPoints(
+        Points.applyTopNPoints(
           [|(0, 2000), (2, 1000)|],
           blockMetrics,
-          (metricRecord: Types.Metrics.metricRecord) =>
-            metricRecord.blocksCreated,
+          (metricRecord: Types.Metrics.t) => metricRecord.blocksCreated,
           compare,
         );
       test("correct number of points given to publickey1", () => {
@@ -151,11 +234,10 @@ describe("Points functions", () => {
     describe(
       "adds correct number of points to 1st and 2nd place and 3-4 place", () => {
       let blockPoints =
-        Challenges.applyTopNPoints(
+        Points.applyTopNPoints(
           [|(0, 3000), (1, 2000), (5, 1000)|],
           blockMetrics,
-          (metricRecord: Types.Metrics.metricRecord) =>
-            metricRecord.blocksCreated,
+          (metricRecord: Types.Metrics.t) => metricRecord.blocksCreated,
           compare,
         );
       test("correct number of points given to publickey1", () => {

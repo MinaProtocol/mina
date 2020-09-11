@@ -212,8 +212,7 @@ module For_tests = struct
         let sender_pk = Account.public_key sender_account in
         let payload : User_command.Payload.t =
           User_command.Payload.create ~fee:Fee.zero ~fee_token:Token_id.default
-            ~fee_payer_pk:sender_pk ~nonce
-            ~valid_until:Coda_numbers.Global_slot.max_value
+            ~fee_payer_pk:sender_pk ~nonce ~valid_until:None
             ~memo:User_command_memo.dummy
             ~body:
               (Payment
@@ -267,31 +266,29 @@ module For_tests = struct
             ; proofs=
                 One_or_two.map stmts ~f:(fun statement ->
                     Ledger_proof.create ~statement
-                      ~sok_digest:Sok_message.Digest.default ~proof:Proof.dummy
-                )
+                      ~sok_digest:Sok_message.Digest.default
+                      ~proof:Proof.transaction_dummy )
             ; prover }
       in
-      let current_global_slot, state_and_body_hash =
+      let current_state_view, state_and_body_hash =
         let prev_state =
           validated_transition parent_breadcrumb
           |> External_transition.Validated.protocol_state
         in
-        let current_global_slot =
-          Protocol_state.body prev_state
-          |> Protocol_state.Body.consensus_state
-          |> Consensus.Data.Consensus_state.curr_slot
+        let current_state_view =
+          Protocol_state.body prev_state |> Protocol_state.Body.view
         in
         let body_hash =
           Protocol_state.body prev_state |> Protocol_state.Body.hash
         in
-        ( current_global_slot
+        ( current_state_view
         , (Protocol_state.hash_with_body ~body_hash prev_state, body_hash) )
       in
       let staged_ledger_diff =
         Staged_ledger.create_diff parent_staged_ledger ~logger
           ~constraint_constants:precomputed_values.constraint_constants
           ~coinbase_receiver:`Producer ~self:largest_account_public_key
-          ~current_global_slot ~transactions_by_fee:transactions
+          ~current_state_view ~transactions_by_fee:transactions
           ~get_completed_work
       in
       let%bind ( `Hash_after_applying next_staged_ledger_hash
@@ -302,7 +299,7 @@ module For_tests = struct
           Staged_ledger.apply_diff_unchecked parent_staged_ledger ~logger
             staged_ledger_diff
             ~constraint_constants:precomputed_values.constraint_constants
-            ~current_global_slot ~state_and_body_hash
+            ~current_state_view ~state_and_body_hash
         with
         | Ok r ->
             return r
@@ -356,7 +353,7 @@ module For_tests = struct
       Protocol_version.(set_current zero) ;
       let next_external_transition =
         External_transition.For_tests.create ~protocol_state
-          ~protocol_state_proof:Proof.dummy
+          ~protocol_state_proof:Proof.blockchain_dummy
           ~staged_ledger_diff:(Staged_ledger_diff.forget staged_ledger_diff)
           ~validation_callback:Fn.ignore
           ~delta_transition_chain_proof:(previous_state_hash, []) ()
@@ -375,7 +372,7 @@ module For_tests = struct
           ~sender:None
       with
       | Ok new_breadcrumb ->
-          Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+          [%log info]
             ~metadata:
               [ ( "state_hash"
                 , state_hash new_breadcrumb |> State_hash.to_yojson ) ]

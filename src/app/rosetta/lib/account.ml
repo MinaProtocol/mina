@@ -1,6 +1,7 @@
 open Core_kernel
 open Async
-open Models
+open Rosetta_lib
+open Rosetta_models
 
 module Get_balance =
 [%graphql
@@ -179,8 +180,7 @@ end
 let router ~graphql_uri ~logger ~db (route : string list) body =
   let (module Db : Caqti_async.CONNECTION) = db in
   let open Async.Deferred.Result.Let_syntax in
-  Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-    "Handling /account/ $route"
+  [%log debug] "Handling /account/ $route"
     ~metadata:[("route", `List (List.map route ~f:(fun s -> `String s)))] ;
   match route with
   | ["balance"] ->

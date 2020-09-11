@@ -117,10 +117,9 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
     Protocol_state.hash_with_body ~body_hash:previous_protocol_state_body_hash
       previous_protocol_state
   in
-  let previous_global_slot =
+  let previous_state_view =
     Protocol_state.body previous_protocol_state
-    |> Coda_state.Protocol_state.Body.consensus_state
-    |> Consensus.Data.Consensus_state.curr_slot
+    |> Coda_state.Protocol_state.Body.view
   in
   let%bind res =
     Interruptible.uninterruptible
@@ -129,13 +128,13 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
         measure "create_diff" (fun () ->
             Staged_ledger.create_diff ~constraint_constants staged_ledger ~self
               ~coinbase_receiver ~logger
-              ~current_global_slot:previous_global_slot
+              ~current_state_view:previous_state_view
               ~transactions_by_fee:transactions ~get_completed_work
               ~log_block_creation )
       in
       match%map
         Staged_ledger.apply_diff_unchecked staged_ledger ~constraint_constants
-          diff ~logger ~current_global_slot:previous_global_slot
+          diff ~logger ~current_state_view:previous_state_view
           ~state_and_body_hash:
             (previous_protocol_state_hash, previous_protocol_state_body_hash)
       with
@@ -159,7 +158,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
       | Error (Staged_ledger.Staged_ledger_error.Unexpected e) ->
           raise (Error.to_exn e)
       | Error e ->
-          Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+          [%log error]
             ~metadata:
               [ ( "error"
                 , `String (Staged_ledger.Staged_ledger_error.to_string e) )
@@ -234,17 +233,6 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
           measure "making Snark and Internal transitions" (fun () ->
               let snark_transition =
                 Snark_transition.create_value
-                  ?sok_digest:
-                    (Option.map ledger_proof_opt ~f:(fun (proof, _) ->
-                         Ledger_proof.sok_digest proof ))
-                  ?ledger_proof:
-                    (Option.map ledger_proof_opt ~f:(fun (proof, _) ->
-                         Ledger_proof.underlying_proof proof ))
-                  ~supply_increase:
-                    (Option.value_map ~default:Currency.Amount.zero
-                       ~f:(fun (proof, _) ->
-                         (Ledger_proof.statement proof).supply_increase )
-                       ledger_proof_opt)
                   ~blockchain_state:
                     (Protocol_state.blockchain_state protocol_state)
                   ~consensus_transition:consensus_transition_data
@@ -261,6 +249,8 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
                   ~prover_state:
                     (Consensus.Data.Block_data.prover_state block_data)
                   ~staged_ledger_diff:(Staged_ledger_diff.forget diff)
+                  ~ledger_proof:
+                    (Option.map ledger_proof_opt ~f:(fun (proof, _) -> proof))
               in
               let witness =
                 { Pending_coinbase_witness.pending_coinbases=
@@ -278,8 +268,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
       let constraint_constants = precomputed_values.constraint_constants in
       let consensus_constants = precomputed_values.consensus_constants in
       let log_bootstrap_mode () =
-        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-          "Pausing block production while bootstrapping"
+        [%log info] "Pausing block production while bootstrapping"
       in
       let module Breadcrumb = Transition_frontier.Breadcrumb in
       let produce ivar (keypair, scheduled_time, block_data) =
@@ -295,7 +284,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                 Transition_registry
             in
             let crumb = Transition_frontier.best_tip frontier in
-            Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+            [%log trace]
               ~metadata:[("breadcrumb", Breadcrumb.to_yojson crumb)]
               "Producing new block with parent $breadcrumb%!" ;
             let previous_protocol_state, previous_protocol_state_proof =
@@ -369,7 +358,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                           pending_coinbase_witness )
                   with
                   | Error err ->
-                      Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+                      [%log error]
                         "Prover failed to prove freshly generated transition: \
                          $error"
                         ~metadata:
@@ -390,7 +379,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                       return ()
                   | Ok protocol_state_proof -> (
                       let span = Time.diff (Time.now time_controller) t0 in
-                      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                      [%log info]
                         ~metadata:
                           [ ( "proving_time"
                             , `Int (Time.Span.to_ms span |> Int64.to_int_exn)
@@ -455,8 +444,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                             Fn.compose State_hash.to_yojson
                               Protocol_state.genesis_state_hash
                           in
-                          Logger.warn logger ~module_:__MODULE__
-                            ~location:__LOC__
+                          [%log warn]
                             ~metadata:
                               [ ( "expected"
                                 , state_yojson previous_protocol_state )
@@ -470,8 +458,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                             ~consensus_constants
                         with
                         | Error `Already_in_frontier ->
-                            Logger.error logger ~module_:__MODULE__
-                              ~location:__LOC__
+                            [%log error]
                               ~metadata:
                                 [ ( "protocol_state"
                                   , Protocol_state.value_to_yojson
@@ -480,15 +467,13 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                               error_msg_prefix ;
                             return ()
                         | Error `Not_selected_over_frontier_root ->
-                            Logger.warn logger ~module_:__MODULE__
-                              ~location:__LOC__
+                            [%log warn]
                               "%sproduced transition is not selected over the \
                                root of transition frontier.%s"
                               error_msg_prefix reason_for_failure ;
                             return ()
                         | Error `Parent_missing_from_frontier ->
-                            Logger.warn logger ~module_:__MODULE__
-                              ~location:__LOC__
+                            [%log warn]
                               "%sparent of produced transition is missing \
                                from the frontier.%s"
                               error_msg_prefix reason_for_failure ;
@@ -519,8 +504,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                                      (Error.to_string_hum e))
                             | Error (`Invalid_staged_ledger_diff e) ->
                                 (*Unexpected errors from staged_ledger are captured in `Fatal_error*)
-                                Logger.error logger ~module_:__MODULE__
-                                  ~location:__LOC__
+                                [%log error]
                                   ~metadata:
                                     [ ("error", `String (Error.to_string_hum e))
                                     ; ( "diff"
@@ -531,8 +515,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                                     diff: $error" ;
                                 return ()
                             | Ok breadcrumb -> (
-                                Logger.Str.trace logger ~module_:__MODULE__
-                                  ~location:__LOC__
+                                [%str_log trace]
                                   ~metadata:
                                     [ ( "breadcrumb"
                                       , Breadcrumb.to_yojson breadcrumb ) ]
@@ -548,8 +531,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                                   Strict_pipe.Writer.write transition_writer
                                     breadcrumb
                                 in
-                                Logger.debug logger ~module_:__MODULE__
-                                  ~location:__LOC__ ~metadata
+                                [%log debug] ~metadata
                                   "Waiting for block $state_hash to be \
                                    inserted into frontier" ;
                                 Deferred.choose
@@ -568,14 +550,12 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                                       (Fn.const `Timed_out) ]
                                 >>| function
                                 | `Transition_accepted ->
-                                    Logger.info logger ~module_:__MODULE__
-                                      ~location:__LOC__ ~metadata
+                                    [%log info] ~metadata
                                       "Generated transition $state_hash was \
                                        accepted into transition frontier"
                                 | `Timed_out ->
                                     (* FIXME #3167: this should be fatal, and more importantly, shouldn't happen. *)
-                                    Logger.fatal logger ~module_:__MODULE__
-                                      ~location:__LOC__ ~metadata
+                                    [%log fatal] ~metadata
                                       "Timed out waiting for generated \
                                        transition $state_hash to enter \
                                        transition frontier. Continuing to \
@@ -679,7 +659,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
       if Time.( >= ) now genesis_state_timestamp then start ()
       else
         let time_till_genesis = Time.diff genesis_state_timestamp now in
-        Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+        [%log warn]
           ~metadata:
             [ ( "time_till_genesis"
               , `Int (Int64.to_int_exn (Time.Span.to_ms time_till_genesis)) )

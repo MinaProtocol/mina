@@ -48,6 +48,8 @@ let coinbase_stack_hash : t = '\x18'
 
 let pending_coinbase_hash_builder : t = '\x19'
 
+let snapp_command : t = '\x1A'
+
 (* the following version bytes are non-sequential because existing testnet
    user key infrastructure depend on them. don't change them while we 
    care about user keys! *)

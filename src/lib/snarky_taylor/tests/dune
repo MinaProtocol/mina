@@ -1,0 +1,5 @@
+(library
+ (name snarky_taylor_tests)
+ (inline_tests)
+ (libraries snarky_taylor snarky)
+ (preprocess (pps ppx_inline_test ppx_let ppx_version)))

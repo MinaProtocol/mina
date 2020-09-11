@@ -2,7 +2,6 @@
 "/src/config.mlh"]
 
 open Core_kernel
-open Async_kernel
 
 [%%ifdef
 consensus_mechanism]
@@ -32,7 +31,7 @@ module Stable = struct
 
     [%%else]
 
-    let gen = Inner_curve.Scalar.(gen_uniform_incl one (size - one))
+    let gen = Inner_curve.Scalar.(gen_uniform_incl one (zero - one))
 
     [%%endif]
   end
@@ -44,27 +43,14 @@ module Stable = struct
      *)
 
     [%%if
-    curve_size = 298]
+    curve_size = 255]
 
     let%test "private key serialization v1" =
       let pk =
         Quickcheck.random_value ~seed:(`Deterministic "private key seed v1")
           V1.gen
       in
-      let known_good_digest = "4bbc6cd7832cfc67f0fe3abcd7f765df" in
-      Ppx_version_runtime.Serialization.check_serialization
-        (module V1)
-        pk known_good_digest
-
-    [%%elif
-    curve_size = 753]
-
-    let%test "private key serialization v1" =
-      let pk =
-        Quickcheck.random_value ~seed:(`Deterministic "private key seed v1")
-          V1.gen
-      in
-      let known_good_digest = "65c75a7d10b6ce193f0c0e296611a935" in
+      let known_good_digest = "5f4d5a6fee5d45e13ff0ca5c648fe6f1" in
       Ppx_version_runtime.Serialization.check_serialization
         (module V1)
         pk known_good_digest
@@ -77,8 +63,6 @@ module Stable = struct
     [%%endif]
   end
 end]
-
-type t = Stable.Latest.t
 
 [%%define_locally
 Stable.Latest.(gen)]

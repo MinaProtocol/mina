@@ -4,7 +4,7 @@ open Pickles_types
 module type Stable_v1 = sig
   module Stable : sig
     module V1 : sig
-      type t [@@deriving version, bin_io, sexp, compare, yojson]
+      type t [@@deriving version, bin_io, sexp, compare, yojson, hash, eq]
     end
 
     module Latest = V1
@@ -76,27 +76,27 @@ module type Inputs_intf = sig
     type t
 
     val make :
-         Scalar_field.Vector.t
-      -> Scalar_field.Vector.t
-      -> Scalar_field.Vector.t
-      -> Scalar_field.Vector.t
-      -> Scalar_field.Vector.t
-      -> Scalar_field.Vector.t
-      -> Scalar_field.Vector.t
-      -> Scalar_field.Vector.t
-      -> Scalar_field.Vector.t
-      -> Scalar_field.Vector.t
-      -> Scalar_field.Vector.t
-      -> Scalar_field.Vector.t
-      -> Scalar_field.Vector.t
-      -> Scalar_field.Vector.t
-      -> Scalar_field.Vector.t
-      -> Scalar_field.Vector.t
-      -> Scalar_field.Vector.t
-      -> Scalar_field.Vector.t
-      -> Scalar_field.Vector.t
-      -> Scalar_field.Vector.t
-      -> Scalar_field.Vector.t
+         w:Scalar_field.Vector.t
+      -> za:Scalar_field.Vector.t
+      -> zb:Scalar_field.Vector.t
+      -> h1:Scalar_field.Vector.t
+      -> g1:Scalar_field.Vector.t
+      -> h2:Scalar_field.Vector.t
+      -> g2:Scalar_field.Vector.t
+      -> h3:Scalar_field.Vector.t
+      -> g3:Scalar_field.Vector.t
+      -> row_0:Scalar_field.Vector.t
+      -> row_1:Scalar_field.Vector.t
+      -> row_2:Scalar_field.Vector.t
+      -> col_0:Scalar_field.Vector.t
+      -> col_1:Scalar_field.Vector.t
+      -> col_2:Scalar_field.Vector.t
+      -> val_0:Scalar_field.Vector.t
+      -> val_1:Scalar_field.Vector.t
+      -> val_2:Scalar_field.Vector.t
+      -> rc_0:Scalar_field.Vector.t
+      -> rc_1:Scalar_field.Vector.t
+      -> rc_2:Scalar_field.Vector.t
       -> t
 
     val w : t -> Scalar_field.Vector.t
@@ -142,36 +142,36 @@ module type Inputs_intf = sig
     module Vector : Vector with type elt := t
 
     val make :
-         Scalar_field.Vector.t
-      -> Poly_comm.Backend.t
-      -> Poly_comm.Backend.t
-      -> Poly_comm.Backend.t
-      -> Poly_comm.Backend.t
-      -> Poly_comm.Backend.t
-      -> Poly_comm.Backend.t
-      -> Poly_comm.Backend.t
-      -> Poly_comm.Backend.t
-      -> Poly_comm.Backend.t
-      -> Scalar_field.t
-      -> Scalar_field.t
-      -> Curve.Affine.Backend.Pair.Vector.t
-      -> Scalar_field.t
-      -> Scalar_field.t
-      -> Curve.Affine.Backend.t
-      -> Curve.Affine.Backend.t
-      -> Evaluations_backend.t
-      -> Evaluations_backend.t
-      -> Evaluations_backend.t
-      -> Scalar_field.Vector.t
-      -> Curve.Affine.Backend.Vector.t
+         primary_input:Scalar_field.Vector.t
+      -> w_comm:Poly_comm.Backend.t
+      -> za_comm:Poly_comm.Backend.t
+      -> zb_comm:Poly_comm.Backend.t
+      -> h1_comm:Poly_comm.Backend.t
+      -> g1_comm:Poly_comm.Backend.t
+      -> h2_comm:Poly_comm.Backend.t
+      -> g2_comm:Poly_comm.Backend.t
+      -> h3_comm:Poly_comm.Backend.t
+      -> g3_comm:Poly_comm.Backend.t
+      -> sigma2:Scalar_field.t
+      -> sigma3:Scalar_field.t
+      -> lr:Curve.Affine.Backend.Pair.Vector.t
+      -> z1:Scalar_field.t
+      -> z2:Scalar_field.t
+      -> delta:Curve.Affine.Backend.t
+      -> sg:Curve.Affine.Backend.t
+      -> evals0:Evaluations_backend.t
+      -> evals1:Evaluations_backend.t
+      -> evals2:Evaluations_backend.t
+      -> prev_challenges:Scalar_field.Vector.t
+      -> prev_sgs:Curve.Affine.Backend.Vector.t
       -> t
 
     val create :
-         Index.t
-      -> Scalar_field.Vector.t
-      -> Scalar_field.Vector.t
-      -> Scalar_field.Vector.t
-      -> Curve.Affine.Backend.Vector.t
+         index:Index.t
+      -> primary_input:Scalar_field.Vector.t
+      -> auxiliary_input:Scalar_field.Vector.t
+      -> prev_challenges:Scalar_field.Vector.t
+      -> prev_sgs:Curve.Affine.Backend.Vector.t
       -> t
 
     val batch_verify : Verifier_index.t -> Vector.t -> bool
@@ -216,8 +216,6 @@ module Challenge_polynomial = struct
       let to_latest = Fn.id
     end
   end]
-
-  include Stable.Latest
 end
 
 module Make (Inputs : Inputs_intf) = struct
@@ -234,13 +232,11 @@ module Make (Inputs : Inputs_intf) = struct
           ( G.Affine.Stable.V1.t
           , Fq.Stable.V1.t )
           Challenge_polynomial.Stable.V1.t
-        [@@deriving version, bin_io, sexp, compare, yojson]
+        [@@deriving sexp, compare, yojson]
 
         let to_latest = Fn.id
       end
     end]
-
-    include Stable.Latest
 
     type ('g, 'fq) t_ = ('g, 'fq) Challenge_polynomial.t =
       {challenges: 'fq array; commitment: 'g}
@@ -250,13 +246,15 @@ module Make (Inputs : Inputs_intf) = struct
 
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t =
         ( G.Affine.Stable.V1.t
         , Fq.Stable.V1.t
-        , Fq.Stable.V1.t array )
+        , Fq.Stable.V1.t Dlog_marlin_types.Pc_array.Stable.V1.t )
         Dlog_marlin_types.Proof.Stable.V1.t
-      [@@deriving bin_io, version, compare, sexp, yojson]
+      [@@deriving compare, sexp, yojson, hash, eq]
 
       let to_latest = Fn.id
     end

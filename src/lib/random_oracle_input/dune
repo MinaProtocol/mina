@@ -1,0 +1,7 @@
+(library
+  (name random_oracle_input)
+  (public_name random_oracle_input)
+  (preprocess (pps ppx_jane ppx_sexp_conv ppx_inline_test ppx_let ppx_version))
+  (inline_tests)
+  (libraries core_kernel))
+

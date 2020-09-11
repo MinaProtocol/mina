@@ -104,20 +104,21 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
+                name: Install opam dependencies - opam -- make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make setup-opam'
 
             - run:
                 name: Build libp2p_helper
-                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
+                command: GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Set Up Database
                   command: |
+                    sudo apt-get update
                     sudo apt-get install -y postgresql
                     PGPASSWORD=codarules psql -h localhost -p 5432 -U admin -d archiver -a -f src/app/archive/create_schema.sql
             - run:
                   name: Archive node unit tests
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'eval `opam config env`; dune runtest src/app/archive'
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'eval `opam config env`; export PATH="$HOME/.cargo/bin:$PATH" && dune runtest src/app/archive'
                   environment:
                     DUNE_PROFILE: test_archive_processor
             - run:
@@ -172,8 +173,8 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
+                name: Install opam dependencies - opam -- make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make setup-opam'
 
             - save_cache:
                 name: Save cache - opam
@@ -183,7 +184,7 @@ jobs:
                 no_output_timeout: 1h
             - run:
                   name: Build Archive Process
-                  command:  bash -c 'eval `opam config env` && LIBP2P_NIXLESS=1 make build_archive'
+                  command:  bash -c 'eval `opam config env` && export PATH="$HOME/.cargo/bin:$PATH" && make build_archive'
                   environment:
                     DUNE_PROFILE: testnet
             # NOTE: If we were using a machine executor we would be able to mount the sql file in
@@ -192,6 +193,7 @@ jobs:
             - run:
                   name: Set Up Database
                   command: |
+                    sudo apt-get update
                     sudo apt-get install -y postgresql
                     PGPASSWORD=codarules psql -h localhost -p 5432 -U admin -d archiver -a -f src/app/archive/create_schema.sql
             - run:
@@ -228,18 +230,18 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
+                name: Install opam dependencies - opam -- make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make setup-opam'
 
             - run:
                   name: Check circle CI configuration rendering
                   command: ./scripts/test.py render --check .circleci/config.yml.jinja .mergify.yml.jinja
             - run:
                   name: OCamlformat (make check-format)
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'eval `opam config env` && LIBP2P_NIXLESS=1 make check-format'
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'eval `opam config env` && make check-format'
             - run:
                   name: Snarky tracks master (make check-snarky-submodule)
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make check-snarky-submodule'
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make check-snarky-submodule'
             - run:
                   name: Check ppx_optcomp preprocessor_deps
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c './scripts/lint_preprocessor_deps.sh'
@@ -282,8 +284,8 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
+                name: Install opam dependencies - opam -- make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make setup-opam'
 
             - run:
                   name: Compare versioned types in PR
@@ -322,12 +324,52 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
+                name: Install opam dependencies - opam -- make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make setup-opam'
 
             - run:
                   name: Compare test signatures for consensus, nonconsensus code
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'eval `opam config env` && ./scripts/compare_test_signatures.sh'
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'eval `opam config env` && export PATH="$HOME/.cargo/bin:$PATH" && ./scripts/compare_test_signatures.sh'
+    client-sdk-unit-tests:
+        docker:
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
+        steps:
+            
+            - run:
+                name: Disable LFS checkout
+                command: |
+                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                    git config --global lfs.fetchexclude "*"
+            - checkout
+
+            
+            - run:
+                  name: Update Submodules
+                  command: git submodule sync && git submodule update --init --recursive
+            - run:
+                name: Create opam cache signature file including a year/date stamp to ensure occasional rebuilds
+                command: |
+                    cat scripts/setup-opam.sh > opam_ci_cache.sig
+                    cat src/opam.export >> opam_ci_cache.sig
+                    date +%Y-%m >> opam_ci_cache.sig
+            - restore_cache:
+                name: Restore cache - opam
+                keys:
+                    - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
+            - run:
+                name: Install opam dependencies - opam -- make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make setup-opam'
+
+            - run:
+                  name: Build client SDK, run unit tests
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'eval `opam config env` && export PATH="$HOME/.cargo/bin:$PATH" && ./scripts/client-sdk-unit-tests.sh'
+            - run:
+                  name: Yarn deps
+                  command: cd frontend/client_sdk && yarn install
+            - run:
+                  name: Prepublish client SDK packages
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; eval `opam config env` && cd frontend/client_sdk && yarn prepublishOnly'
+
     update-branch-protection:
         docker:
             - image: python:3
@@ -431,8 +473,8 @@ jobs:
                     - opam-v8-{{ checksum "opam_ci_cache.sig" }}-{{ checksum "scripts/Brewfile" }}
 
             - run:
-                name: Install macos dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
+                name: Install macos dependencies - opam -- make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make setup-opam'
             - save_cache:
                 name: Save cache - opam
                 key: opam-v8-{{ checksum "opam_ci_cache.sig" }}-{{ checksum "scripts/Brewfile" }}
@@ -440,19 +482,11 @@ jobs:
                 paths:
                     - "/Users/distiller/.opam"
                 no_output_timeout: 1h
-            ### nix/cachix
-            - run:
-                name: Install nix and cachix
-                command: |
-                    curl -L https://nixos.org/nix/install | sh
-                    . ~/.nix-profile/etc/profile.d/nix.sh
-                    nix-env -iA cachix -f https://cachix.org/api/v1/install
             ### dune
             - run:
                 name: Build ocaml
                 environment:
-                    DUNE_PROFILE: testnet
-                    EXTRA_NIX_ARGS: --option sandbox false
+                    DUNE_PROFILE: testnet_postake_medium_curves
                 command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log'
                 no_output_timeout: 20m
             - run:
@@ -482,7 +516,6 @@ jobs:
                     echo 'libp2p_helper'
                     cp src/app/libp2p_helper/result/bin/libp2p_helper package/coda-libp2p_helper
                     chmod +w package/coda-libp2p_helper
-                    ./scripts/librewrite-macos.sh package/coda-libp2p_helper
                     echo 'coda-logproc'
                     cp _build/default/src/app/logproc/logproc.exe package/coda-logproc
                     chmod +wx package/coda-logproc
@@ -513,61 +546,13 @@ jobs:
             - run:
                 name: Build portable binary
                 command: |
-                    LIBP2P_NIXLESS=1 make macos-portable
+                    make macos-portable
                     cp _build/coda-daemon-macos.zip package/.
             - run:
                   name: Copy artifacts to cloud
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh scripts/artifacts.sh
             - store_artifacts:
                   path: package
-
-    build-client-sdk:
-        resource_class: large
-        docker:
-            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
-        steps:
-            
-            - run:
-                name: Disable LFS checkout
-                command: |
-                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
-                    git config --global lfs.fetchexclude "*"
-            - checkout
-
-            - run:
-                  name: Artifacts Path
-                  command: |
-                      mkdir -p /tmp/artifacts
-            
-            - run:
-                  name: Update Submodules
-                  command: git submodule sync && git submodule update --init --recursive
-            - run:
-                name: Create opam cache signature file including a year/date stamp to ensure occasional rebuilds
-                command: |
-                    cat scripts/setup-opam.sh > opam_ci_cache.sig
-                    cat src/opam.export >> opam_ci_cache.sig
-                    date +%Y-%m >> opam_ci_cache.sig
-            - restore_cache:
-                name: Restore cache - opam
-                keys:
-                    - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
-            - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
-
-            - run:
-                  name: Build client SDK for Javascript
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; eval `opam config env` && LIBP2P_NIXLESS=1 make client_sdk 2>&1 | tee /tmp/artifacts/buildclientsdk.log'
-                  environment:
-                    DUNE_PROFILE: nonconsensus_medium_curves
-                  no_output_timeout: 10m
-            - run:
-                  name: Yarn deps
-                  command: cd frontend/client_sdk && yarn install
-            - run:
-                  name: Build And Test Client SDK
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; eval `opam config env` && cd frontend/client_sdk && yarn prepublishOnly'
     build-artifacts--testnet:
         resource_class: xlarge
         docker:
@@ -600,20 +585,19 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
+                name: Install opam dependencies - opam -- make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make setup-opam'
 
             - run:
                 name: Build libp2p_helper
-                command: GO=/usr/lib/go/bin/go LIBP2P_NIXLESS=1 make libp2p_helper
+                command: GO=/usr/lib/go/bin/go make libp2p_helper
             # Explicitly generate PV-keys and uploading before building
             # See https://bkase.dev/posts/ocaml-writer#fn-3 for rationale
             - run:
                   name: Generate PV keys
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; eval `opam config env` && LIBP2P_NIXLESS=1 make build_pv_keys 2>&1 | tee /tmp/artifacts/buildocaml.log'
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; eval `opam config env` && PATH="$HOME/.cargo/bin:$PATH" make build_or_download_pv_keys 2>&1 | tee /tmp/artifacts/buildocaml.log'
                   environment:
                     DUNE_PROFILE: testnet
-                    EXTRA_NIX_ARGS: --option sandbox false
                   no_output_timeout: 20m
             - run:
                   name: Upload generated PV keys
@@ -621,23 +605,21 @@ jobs:
             - run:
                   name: Rebuild for pvkey changes
                   command: |
-                    ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml2.log'
-                    ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'eval `opam config env` && dune build src/app/generate_keypair/generate_keypair.exe'
+                    ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; eval `opam config env` && export PATH="$HOME/.cargo/bin:$PATH" && make build 2>&1 | tee /tmp/artifacts/buildocaml2.log'
+                    ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'eval `opam config env` && export PATH="$HOME/.cargo/bin:$PATH" && dune build src/app/generate_keypair/generate_keypair.exe'
                   environment:
                     DUNE_PROFILE: testnet
-                    EXTRA_NIX_ARGS: --option sandbox false
                     GO: /usr/lib/go/bin/go
-                    LIBP2P_NIXLESS: 1
 
                   no_output_timeout: 20m
             - run:
                 name: Output compiled ledger and genesis proof
                 command: |
-                  ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'eval `opam config env` && dune exec --profile=testnet src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe'
+                  ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'eval `opam config env` && export PATH="$HOME/.cargo/bin:$PATH" && dune exec --profile=testnet src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe'
             - run:
                 name: Generate runtime ledger with 10k accounts
                 command: |
-                  ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'eval `opam config env` && dune exec --profile=testnet src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -- --config-file genesis_ledgers/phase_three/config.json'
+                  ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'eval `opam config env` && export PATH="$HOME/.cargo/bin:$PATH" && dune exec --profile=testnet src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -- --config-file genesis_ledgers/phase_three/config.json'
                 no_output_timeout: 20m
             - run:
                 name: Upload genesis data
@@ -647,18 +629,15 @@ jobs:
                   command:  ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make deb'
                   environment:
                     DUNE_PROFILE: testnet
-                    LIBP2P_NIXLESS: 1
                   no_output_timeout: 20m
             - run:
                   name: Store genesis public/private keypairs
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make genesiskeys'
                   environment:
-                    LIBP2P_NIXLESS: 1
             - run:
                   name: Upload deb to repo
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make publish_deb'
                   environment:
-                    LIBP2P_NIXLESS: 1
                   no_output_timeout: 20m
             - run:
                   name: Copy artifacts to cloud
@@ -763,18 +742,17 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
+                name: Install opam dependencies - opam -- make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make setup-opam'
 
             - run:
                 name: Build libp2p_helper
-                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
+                command: GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Run unit tests
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && make build && (dune runtest src/lib --profile=dev -j8 || (./scripts/link-coredumps.sh && false))'
                   environment:
                     DUNE_PROFILE: dev
-                    LIBP2P_NIXLESS: 1
                     GO: /usr/lib/go/bin/go
                   no_output_timeout: 30m
             - store_artifacts:
@@ -810,19 +788,18 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
+                name: Install opam dependencies - opam -- make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make setup-opam'
 
             - run:
                 name: Build libp2p_helper
-                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
+                command: GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Run unit tests
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && (dune runtest src/nonconsensus --profile=nonconsensus_medium_curves -j8 || (./scripts/link-coredumps.sh && false))'
                   no_output_timeout: 30m
                   environment:
                     DUNE_PROFILE: nonconsensus_medium_curves
-                    LIBP2P_NIXLESS: 1
                     GO: /usr/lib/go/bin/go
             - store_artifacts:
                 path: core_dumps
@@ -855,18 +832,17 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
+                name: Install opam dependencies - opam -- make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make setup-opam'
 
             - run:
                 name: Build libp2p_helper
-                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
+                command: GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Run unit tests
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && export GO=/usr/lib/go/bin/go && make build && (dune runtest src/lib --profile=dev_medium_curves -j8 || (./scripts/link-coredumps.sh && false))'
                   environment:
                     DUNE_PROFILE: dev_medium_curves
-                    LIBP2P_NIXLESS: 1
                     GO: /usr/lib/go/bin/go
                   no_output_timeout: 1h
             - store_artifacts:
@@ -900,12 +876,12 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
+                name: Install opam dependencies - opam -- make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make setup-opam'
 
             - run:
                 name: Build libp2p_helper
-                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
+                command: GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Build OCaml
                   command: |
@@ -913,7 +889,6 @@ jobs:
                       ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'echo built > should_run_tests'
                   environment:
                     DUNE_PROFILE: dev
-                    LIBP2P_NIXLESS: 1
                     GO: /usr/lib/go/bin/go
             - save_cache:
                 name: Store config-agnostic test binaries
@@ -937,7 +912,6 @@ jobs:
                   name: Running test -- dev:coda-bootstrap-test
                   command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-bootstrap-test"; fi
                   environment:
-                    LIBP2P_NIXLESS: 1
                     CODA_LIBP2P_HELPER_PATH: /home/opam/project/src/app/libp2p_helper/result/bin/libp2p_helper
                     GO: /usr/lib/go/bin/go
             - store_artifacts:
@@ -955,7 +929,6 @@ jobs:
                   name: Running test -- dev:coda-shared-state-test
                   command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-shared-state-test"; fi
                   environment:
-                    LIBP2P_NIXLESS: 1
                     CODA_LIBP2P_HELPER_PATH: /home/opam/project/src/app/libp2p_helper/result/bin/libp2p_helper
                     GO: /usr/lib/go/bin/go
             - store_artifacts:
@@ -973,7 +946,6 @@ jobs:
                   name: Running test -- dev:coda-batch-payment-test
                   command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-batch-payment-test"; fi
                   environment:
-                    LIBP2P_NIXLESS: 1
                     CODA_LIBP2P_HELPER_PATH: /home/opam/project/src/app/libp2p_helper/result/bin/libp2p_helper
                     GO: /usr/lib/go/bin/go
             - store_artifacts:
@@ -991,7 +963,6 @@ jobs:
                   name: Running test -- dev:coda-peers-test
                   command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-peers-test"; fi
                   environment:
-                    LIBP2P_NIXLESS: 1
                     CODA_LIBP2P_HELPER_PATH: /home/opam/project/src/app/libp2p_helper/result/bin/libp2p_helper
                     GO: /usr/lib/go/bin/go
             - store_artifacts:
@@ -1009,7 +980,6 @@ jobs:
                   name: Running test -- dev:coda-transitive-peers-test
                   command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-transitive-peers-test"; fi
                   environment:
-                    LIBP2P_NIXLESS: 1
                     CODA_LIBP2P_HELPER_PATH: /home/opam/project/src/app/libp2p_helper/result/bin/libp2p_helper
                     GO: /usr/lib/go/bin/go
             - store_artifacts:
@@ -1027,7 +997,6 @@ jobs:
                   name: Running test -- dev:coda-block-production-test
                   command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-block-production-test"; fi
                   environment:
-                    LIBP2P_NIXLESS: 1
                     CODA_LIBP2P_HELPER_PATH: /home/opam/project/src/app/libp2p_helper/result/bin/libp2p_helper
                     GO: /usr/lib/go/bin/go
             - store_artifacts:
@@ -1045,7 +1014,6 @@ jobs:
                   name: Running test -- dev:coda-shared-prefix-test -who-produces 0
                   command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-shared-prefix-test -who-produces 0"; fi
                   environment:
-                    LIBP2P_NIXLESS: 1
                     CODA_LIBP2P_HELPER_PATH: /home/opam/project/src/app/libp2p_helper/result/bin/libp2p_helper
                     GO: /usr/lib/go/bin/go
             - store_artifacts:
@@ -1063,7 +1031,6 @@ jobs:
                   name: Running test -- dev:coda-shared-prefix-test -who-produces 1
                   command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-shared-prefix-test -who-produces 1"; fi
                   environment:
-                    LIBP2P_NIXLESS: 1
                     CODA_LIBP2P_HELPER_PATH: /home/opam/project/src/app/libp2p_helper/result/bin/libp2p_helper
                     GO: /usr/lib/go/bin/go
             - store_artifacts:
@@ -1081,7 +1048,6 @@ jobs:
                   name: Running test -- dev:coda-change-snark-worker-test
                   command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-change-snark-worker-test"; fi
                   environment:
-                    LIBP2P_NIXLESS: 1
                     CODA_LIBP2P_HELPER_PATH: /home/opam/project/src/app/libp2p_helper/result/bin/libp2p_helper
                     GO: /usr/lib/go/bin/go
             - store_artifacts:
@@ -1099,7 +1065,6 @@ jobs:
                   name: Running test -- dev:coda-archive-node-test
                   command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-archive-node-test"; fi
                   environment:
-                    LIBP2P_NIXLESS: 1
                     CODA_LIBP2P_HELPER_PATH: /home/opam/project/src/app/libp2p_helper/result/bin/libp2p_helper
                     GO: /usr/lib/go/bin/go
             - store_artifacts:
@@ -1117,90 +1082,8 @@ jobs:
                   name: Running test -- dev:coda-delegation-test
                   command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-delegation-test"; fi
                   environment:
-                    LIBP2P_NIXLESS: 1
                     CODA_LIBP2P_HELPER_PATH: /home/opam/project/src/app/libp2p_helper/result/bin/libp2p_helper
                     GO: /usr/lib/go/bin/go
-            - store_artifacts:
-                  path: test_output/artifacts
-    test--fake_hash:
-        resource_class: large
-        docker:
-            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
-        steps:
-            
-            - run:
-                name: Disable LFS checkout
-                command: |
-                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
-                    git config --global lfs.fetchexclude "*"
-            - checkout
-
-            
-            - run:
-                  name: Update Submodules
-                  command: git submodule sync && git submodule update --init --recursive
-            - run:
-                name: Create opam cache signature file including a year/date stamp to ensure occasional rebuilds
-                command: |
-                    cat scripts/setup-opam.sh > opam_ci_cache.sig
-                    cat src/opam.export >> opam_ci_cache.sig
-                    date +%Y-%m >> opam_ci_cache.sig
-            - restore_cache:
-                name: Restore cache - opam
-                keys:
-                    - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
-            - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
-
-            - run:
-                name: Build libp2p_helper
-                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
-            - run:
-                  name: Running test -- fake_hash:full-test
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "fake_hash:full-test"'
-            - store_artifacts:
-                  path: test_output/artifacts
-    test--test_postake:
-        resource_class: large
-        docker:
-            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
-        steps:
-            
-            - run:
-                name: Disable LFS checkout
-                command: |
-                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
-                    git config --global lfs.fetchexclude "*"
-            - checkout
-
-            
-            - run:
-                  name: Update Submodules
-                  command: git submodule sync && git submodule update --init --recursive
-            - run:
-                name: Create opam cache signature file including a year/date stamp to ensure occasional rebuilds
-                command: |
-                    cat scripts/setup-opam.sh > opam_ci_cache.sig
-                    cat src/opam.export >> opam_ci_cache.sig
-                    date +%Y-%m >> opam_ci_cache.sig
-            - restore_cache:
-                name: Restore cache - opam
-                keys:
-                    - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
-            - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
-
-            - run:
-                name: Build libp2p_helper
-                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
-            - run:
-                  name: Running test -- test_postake:full-test
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake:full-test"'
-            - run:
-                  name: Running test -- test_postake:transaction-snark-profiler -k 2
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake:transaction-snark-profiler -k 2"'
             - store_artifacts:
                   path: test_output/artifacts
     test--test_postake_catchup:
@@ -1231,12 +1114,12 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
+                name: Install opam dependencies - opam -- make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make setup-opam'
 
             - run:
                 name: Build libp2p_helper
-                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
+                command: GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Running test -- test_postake_catchup:coda-restart-node-test
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_catchup:coda-restart-node-test"'
@@ -1270,12 +1153,12 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
+                name: Install opam dependencies - opam -- make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make setup-opam'
 
             - run:
                 name: Build libp2p_helper
-                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
+                command: GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Running test -- test_postake_five_even_txns:coda-shared-prefix-multiproducer-test -num-block-producers 5 -payments
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_five_even_txns:coda-shared-prefix-multiproducer-test -num-block-producers 5 -payments"'
@@ -1309,18 +1192,18 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
+                name: Install opam dependencies - opam -- make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make setup-opam'
 
             - run:
                 name: Build libp2p_helper
-                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
+                command: GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Running test -- test_postake_snarkless:full-test
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_snarkless:full-test"'
             - run:
-                  name: Running test -- test_postake_snarkless:transaction-snark-profiler -k 2
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_snarkless:transaction-snark-profiler -k 2"'
+                  name: Running test -- test_postake_snarkless:transaction-snark-profiler -k 1
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_snarkless:transaction-snark-profiler -k 1"'
             - store_artifacts:
                   path: test_output/artifacts
     test--test_postake_split:
@@ -1351,12 +1234,12 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
+                name: Install opam dependencies - opam -- make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make setup-opam'
 
             - run:
                 name: Build libp2p_helper
-                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
+                command: GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Running test -- test_postake_split:coda-shared-prefix-multiproducer-test -num-block-producers 2
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_split:coda-shared-prefix-multiproducer-test -num-block-producers 2"'
@@ -1390,12 +1273,12 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
+                name: Install opam dependencies - opam -- make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make setup-opam'
 
             - run:
                 name: Build libp2p_helper
-                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
+                command: GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Running test -- test_postake_three_producers:coda-txns-and-restart-non-producers
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_three_producers:coda-txns-and-restart-non-producers"'
@@ -1429,12 +1312,12 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
+                name: Install opam dependencies - opam -- make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make setup-opam'
 
             - run:
                 name: Build libp2p_helper
-                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
+                command: GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Running test -- test_postake_full_epoch:full-test
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_full_epoch:full-test"'
@@ -1468,19 +1351,19 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
+                name: Install opam dependencies - opam -- make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make setup-opam'
 
             - run:
                 name: Build libp2p_helper
-                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
+                command: GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Running test -- test_postake_medium_curves:full-test
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_medium_curves:full-test"'
                   no_output_timeout: 20m
             - run:
-                  name: Running test -- test_postake_medium_curves:transaction-snark-profiler -k 2
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_medium_curves:transaction-snark-profiler -k 2"'
+                  name: Running test -- test_postake_medium_curves:transaction-snark-profiler -k 1
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_medium_curves:transaction-snark-profiler -k 1"'
                   no_output_timeout: 20m
             - store_artifacts:
                   path: test_output/artifacts
@@ -1512,18 +1395,18 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
+                name: Install opam dependencies - opam -- make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make setup-opam'
 
             - run:
                 name: Build libp2p_helper
-                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
+                command: GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Running test -- test_postake_snarkless_medium_curves:full-test
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_snarkless_medium_curves:full-test"'
             - run:
-                  name: Running test -- test_postake_snarkless_medium_curves:transaction-snark-profiler -k 2
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_snarkless_medium_curves:transaction-snark-profiler -k 2"'
+                  name: Running test -- test_postake_snarkless_medium_curves:transaction-snark-profiler -k 1
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_snarkless_medium_curves:transaction-snark-profiler -k 1"'
             - store_artifacts:
                   path: test_output/artifacts
     test--test_postake_split_medium_curves:
@@ -1554,12 +1437,12 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
+                name: Install opam dependencies - opam -- make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make setup-opam'
 
             - run:
                 name: Build libp2p_helper
-                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
+                command: GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Running test -- test_postake_split_medium_curves:coda-shared-prefix-multiproducer-test -num-block-producers 2
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_split_medium_curves:coda-shared-prefix-multiproducer-test -num-block-producers 2"'
@@ -1578,6 +1461,7 @@ workflows:
             - lint
             - lint-opt
             - compare-test-signatures
+            - client-sdk-unit-tests
             - update-branch-protection:
                 filters:
                   branches:
@@ -1587,7 +1471,6 @@ workflows:
             - test-archive
             - build-archive
             - build-macos
-            - build-client-sdk
             - build-artifacts--testnet
             - build-artifacts-docker--testnet--coda-daemon:
                 requires:
@@ -1597,8 +1480,6 @@ workflows:
                   - build-artifacts--testnet
             - test-unit--dev
             - test-unit--nonconsensus_medium_curves
-            - test--fake_hash
-            - test--test_postake
             - test--test_postake_catchup
             - test--test_postake_five_even_txns
             - test--test_postake_snarkless

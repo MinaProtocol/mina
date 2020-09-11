@@ -4,11 +4,12 @@ module Constant : sig
   type t = int
 end
 
-module T (Impl : Snarky.Snark_intf.Run) : sig
+module T (Impl : Snarky_backendless.Snark_intf.Run) : sig
   type 'n t = private (Impl.Boolean.var, 'n) Vector.t
 end
 
-module Make (Impl : Snarky.Snark_intf.Run with type prover_state = unit) : sig
+module Make
+    (Impl : Snarky_backendless.Snark_intf.Run with type prover_state = unit) : sig
   open Impl
   module Constant = Constant
 

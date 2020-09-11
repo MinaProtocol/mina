@@ -265,7 +265,7 @@ let start_prefix_check logger workers events testnet ~acceptable_delay =
              Deferred.Array.map workers ~f:Coda_process.dump_tf
              >>| Array.to_list
            in
-           Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+           [%log fatal]
              "Best paths have diverged completely, network is forked"
              ~metadata:
                [ ("chains", chains_json ())
@@ -273,8 +273,7 @@ let start_prefix_check logger workers events testnet ~acceptable_delay =
            exit 7)
           |> don't_wait_for
         else
-          Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-            "Chains are OK, they have hashes $hashes in common"
+          [%log info] "Chains are OK, they have hashes $hashes in common"
             ~metadata:
               [ ( "hashes"
                 , `List
@@ -286,7 +285,7 @@ let start_prefix_check logger workers events testnet ~acceptable_delay =
                     ( List.map ~f:(fun l -> `Int l)
                     @@ Array.to_list testnet.root_lengths ) ) ]
     | None ->
-        Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+        [%log warn]
           "Empty list of online chains, OK if we're still starting the network"
           ~metadata:[("chains", chains_json ())]
   in
@@ -308,8 +307,7 @@ let start_prefix_check logger workers events testnet ~acceptable_delay =
                          .block_window_duration_ms )
                    /. 1000. )
        then (
-         Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
-           "No recent blocks" ;
+         [%log fatal] "No recent blocks" ;
          ignore (exit 8) ) ;
        let%bind () = after (Time.Span.of_sec 1.0) in
        go ()
@@ -365,8 +363,7 @@ let start_payment_check logger root_pipe (testnet : Api.t) =
                        / 2
                      < root_length - 1
                    then (
-                     Logger.info logger !"Filled catchup ivar"
-                       ~module_:__MODULE__ ~location:__LOC__ ;
+                     [%log info] "Filled catchup ivar" ;
                      Ivar.fill signal () ;
                      testnet.restart_signals.(i) <- None )
                    else () ) ;
@@ -379,7 +376,7 @@ let start_payment_check logger root_pipe (testnet : Api.t) =
              Option.iter earliest_user_cmd
                ~f:(fun (user_cmd, {expected_deadline; _}) ->
                  if expected_deadline < root_length then (
-                   Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+                   [%log fatal]
                      ~metadata:
                        [ ("worker_id", `Int worker_id)
                        ; ("user_cmd", User_command.to_yojson user_cmd) ]
@@ -392,7 +389,7 @@ let start_payment_check logger root_pipe (testnet : Api.t) =
                    ~f:(function
                    | Some {passed_root; _} ->
                        Ivar.fill passed_root () ;
-                       Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                       [%log info]
                          ~metadata:
                            [ ("user_cmd", User_command.to_yojson user_cmd.data)
                            ; ("worker_id", `Int worker_id)
@@ -452,15 +449,13 @@ let start_checks logger (workers : Coda_process.t array) start_reader
     Deferred.Array.map workers ~f:(fun worker ->
         Coda_process.initialization_finish_signal_exn worker )
   in
-  Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-    "downloaded initialization signal" ;
+  [%log info] "downloaded initialization signal" ;
   let%map () =
     Deferred.all_unit
       (List.map (Array.to_list initialization_finish_signals) ~f:(fun p ->
            Linear_pipe.read p >>| ignore ))
   in
-  Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-    "initialization finishes, start check" ;
+  [%log info] "initialization finishes, start check" ;
   don't_wait_for
     (start_prefix_check logger workers event_reader testnet ~acceptable_delay) ;
   start_payment_check logger root_reader testnet
@@ -516,7 +511,7 @@ module Delegation : sig
 end = struct
   let delegate_stake ?acceptable_delay:(delay = 7) (testnet : Api.t) ~node
       ~delegator ~delegatee =
-    let valid_until = Coda_numbers.Global_slot.max_value in
+    let valid_until = None in
     let fee = User_command.minimum_fee in
     let worker = testnet.workers.(node) in
     let%bind _ =
@@ -571,7 +566,7 @@ end = struct
   let send_several_payments ?acceptable_delay:(delay = 7) (testnet : Api.t)
       ~node ~keypairs ~n =
     let amount = Currency.Amount.of_int 10 in
-    let valid_until = Coda_numbers.Global_slot.max_value in
+    let valid_until = None in
     let fee = User_command.minimum_fee in
     let%bind (_ : unit option list) =
       Deferred.List.init n ~f:(fun _ ->
@@ -633,7 +628,7 @@ end = struct
       ~(keypairs : Keypair.t list) ~n =
     let amount = Currency.Amount.of_int 10 in
     let fee = User_command.minimum_fee in
-    let valid_until = Coda_numbers.Global_slot.max_value in
+    let valid_until = None in
     let%bind new_payment_readers =
       Deferred.List.init (Array.length testnet.workers) ~f:(fun i ->
           let pk = Public_key.(compress @@ of_private_key_exn sender) in
@@ -726,33 +721,27 @@ module Restarts : sig
 end = struct
   let restart_node testnet ~logger ~node ~duration =
     let%bind () = after (Time.Span.of_sec 5.) in
-    Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "Stopping node %d"
-      node ;
+    [%log info] "Stopping node %d" node ;
     let%bind () = Api.stop testnet node ~logger in
     let%bind () = after duration in
-    Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-      "Triggering restart on %d" node ;
+    [%log info] "Triggering restart on %d" node ;
     Api.start testnet node
 
   let trigger_catchup testnet ~logger ~node =
     let%bind () = after (Time.Span.of_sec 5.) in
-    Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "Stopping node %d"
-      node ;
+    [%log info] "Stopping node %d" node ;
     let%bind () = Api.stop testnet node ~logger in
     let signal = Api.setup_catchup_signal testnet node in
     let%bind () = Ivar.read signal in
-    Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-      "Triggering catchup on %d" node ;
+    [%log info] "Triggering catchup on %d" node ;
     Api.start testnet node
 
   let trigger_bootstrap testnet ~logger ~node =
     let%bind () = after (Time.Span.of_sec 5.) in
-    Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "Stopping node %d"
-      node ;
+    [%log info] "Stopping node %d" node ;
     let%bind () = Api.stop testnet node ~logger in
     let signal = Api.setup_bootstrap_signal testnet node in
     let%bind () = Ivar.read signal in
-    Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-      "Triggering bootstrap on node %d" node ;
+    [%log info] "Triggering bootstrap on node %d" node ;
     Api.start testnet node
 end

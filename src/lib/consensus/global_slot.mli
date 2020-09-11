@@ -12,10 +12,6 @@ module Poly : sig
       [@@deriving sexp, eq, compare, hash, yojson]
     end
   end]
-
-  type ('slot_number, 'slots_per_epoch) t =
-    ('slot_number, 'slots_per_epoch) Stable.Latest.t
-  [@@deriving sexp, eq, compare, hash, yojson]
 end
 
 [%%versioned:
@@ -28,8 +24,6 @@ module Stable : sig
     [@@deriving compare, eq, sexp, hash, yojson]
   end
 end]
-
-type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash, yojson]
 
 val to_input : t -> (_, bool) Random_oracle.Input.t
 

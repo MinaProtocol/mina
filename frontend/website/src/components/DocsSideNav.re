@@ -183,9 +183,9 @@ let make = (~currentSlug) => {
           <Page title="The snarkyjs-crypto library" slug="snarkyjs-crypto" />
           <Page title="The snarky-universe library" slug="snarky-universe" />
         </Folder>
-        <Page title="GUI Wallet" slug="gui-wallet" />
         <Page title="Snapps" slug="snapps" />
         <Page title="CLI Reference" slug="cli-reference" />
+        <Page title="Tokens" slug="tokens" />
         <Page title="Troubleshooting" slug="troubleshooting" />
         <Page title="FAQ" slug="faq" />
         <Page title="Glossary" slug="glossary" />

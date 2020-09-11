@@ -26,6 +26,9 @@ module type S_unchecked = sig
 
   include Hashable.S with type t := t
 
+  (* not automatically derived *)
+  val dhall_type : Ppx_dhall_type.Dhall_type.t
+
   val max_value : t
 
   val length_in_bits : int
@@ -148,7 +151,7 @@ module type UInt32 = sig
     end
   end]
 
-  include S with type t = Stable.Latest.t
+  include S with type t := t
 
   val to_uint32 : t -> uint32
 
@@ -164,7 +167,7 @@ module type UInt64 = sig
     end
   end]
 
-  include S with type t = Stable.Latest.t
+  include S with type t := Stable.Latest.t
 
   val to_uint64 : t -> uint64
 
@@ -182,3 +185,13 @@ module type F = functor
     end)
   (Bits : Bits_intf.Convertible_bits with type t := N.t)
   -> S with type t := N.t and module Bits := Bits
+
+[%%ifdef
+consensus_mechanism]
+
+module type F_checked = functor
+  (N : Unsigned_extended.S)
+  (Bits : Bits_intf.Convertible_bits with type t := N.t)
+  -> S_checked with type unchecked := N.t
+
+[%%endif]

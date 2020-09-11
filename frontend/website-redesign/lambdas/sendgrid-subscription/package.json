@@ -1,0 +1,13 @@
+{
+  "name": "newsletter-signup",
+  "version": "0.1",
+  "description": "Simple backend to allow users to subscribe to our newsletter.",
+  "main": "handler.js",
+  "license": "MIT",
+  "dependencies": {
+    "@sendgrid/client": "^6.4.0",
+    "@sendgrid/mail": "^6.4.0",
+    "cryptr": "^4.0.2",
+    "querystring": "^0.2.0"
+  }
+}

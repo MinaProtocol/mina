@@ -12,6 +12,9 @@ let OpamInit = ../Command/OpamInit.dhall
 let Summon = ../Command/Summon/Type.dhall
 let Size = ../Command/Size.dhall
 let Libp2p = ../Command/Libp2pHelperBuild.dhall
+let DockerArtifact = ../Command/DockerArtifact.dhall
+
+let dependsOn = [ { name = "Artifact", key = "artifacts-build" } ]
 
 in
 Pipeline.build
@@ -38,7 +41,8 @@ Pipeline.build
           ] "./buildkite/scripts/build-artifact.sh" # [ Cmd.run "buildkite-agent artifact upload ./DOCKER_DEPLOY_ENV" ],
           label = "Build artifacts",
           key = "artifacts-build",
-          target = Size.Large
-        }
+          target = Size.XLarge
+        },
+      DockerArtifact.generateStep dependsOn
     ]
   }

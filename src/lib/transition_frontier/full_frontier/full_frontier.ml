@@ -249,7 +249,7 @@ module Visualizor = struct
             | Some child_node ->
                 add_edge acc_graph node child_node
             | None ->
-                Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
+                [%log' debug t.logger]
                   ~metadata:
                     [ ("state_hash", State_hash.to_yojson successor_state_hash)
                     ; ("error", `String "missing from frontier") ]
@@ -318,7 +318,7 @@ let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
   (* The transition frontier at this point in time has the following mask topology:
    *
    *   (`s` represents a snarked ledger, `m` represents a mask)
-   * 
+   *
    *     garbage
    *     [m...]
    *       ^
@@ -416,16 +416,16 @@ let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
               (Breadcrumb.staged_ledger new_root_node.breadcrumb)))
         ~f:(fun (txn, state_hash) ->
           (*Validate transactions against the protocol state associated with the transaction*)
-          let txn_global_slot =
+          let txn_state_view =
             find_protocol_state t state_hash
-            |> Option.value_exn |> Protocol_state.consensus_state
-            |> Consensus.Data.Consensus_state.curr_global_slot
+            |> Option.value_exn |> Protocol_state.body
+            |> Protocol_state.Body.view
           in
           ignore
             (Or_error.ok_exn
                (Ledger.apply_transaction
                   ~constraint_constants:
-                    t.precomputed_values.constraint_constants ~txn_global_slot
+                    t.precomputed_values.constraint_constants ~txn_state_view
                   mt txn.data)) ) ;
       (* STEP 6 *)
       Ledger.commit mt ;
@@ -587,8 +587,8 @@ let update_metrics_with_diff (type mutant) t
 
 let apply_diffs t diffs ~ignore_consensus_local_state =
   let open Root_identifier.Stable.Latest in
-  Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
-    "Applying %d diffs to full frontier (%s --> ?)" (List.length diffs)
+  [%log' trace t.logger] "Applying %d diffs to full frontier (%s --> ?)"
+    (List.length diffs)
     (Frontier_hash.to_string t.hash) ;
   let consensus_constants = t.precomputed_values.consensus_constants in
   let local_state_was_synced_at_start =
@@ -615,7 +615,7 @@ let apply_diffs t diffs ~ignore_consensus_local_state =
         (new_root, Diff.Full.With_mutant.E (diff, mutant) :: diffs_with_mutants)
     )
   in
-  Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
+  [%log' trace t.logger]
     "Reached state %s after applying diffs to full frontier"
     (Frontier_hash.to_string t.hash) ;
   if not ignore_consensus_local_state then
@@ -631,11 +631,10 @@ let apply_diffs t diffs ~ignore_consensus_local_state =
         | Some jobs ->
             (* But if there wasn't sync work to do when we started, then there shouldn't be now. *)
             if local_state_was_synced_at_start then (
-              Logger.fatal t.logger
+              [%log' fatal t.logger]
                 "after lock transition, the best tip consensus state is out \
                  of sync with the local state -- bug in either \
                  required_local_state_sync or frontier_root_transition."
-                ~module_:__MODULE__ ~location:__LOC__
                 ~metadata:
                   [ ( "sync_jobs"
                     , `List

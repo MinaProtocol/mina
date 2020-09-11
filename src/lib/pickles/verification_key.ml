@@ -1,5 +1,6 @@
 open Core
 open Pickles_types
+open Import
 open Zexe_backend.Tweedle
 
 module Data = struct
@@ -12,18 +13,10 @@ module Data = struct
         ; constraints: int
         ; nonzero_entries: int
         ; max_degree: int }
-      [@@deriving version, bin_io]
 
       let to_latest = Fn.id
     end
   end]
-
-  type t = Stable.Latest.t =
-    { public_inputs: int
-    ; variables: int
-    ; constraints: int
-    ; nonzero_entries: int
-    ; max_degree: int }
 end
 
 module Repr = struct
@@ -36,16 +29,10 @@ module Repr = struct
             Matrix_evals.Stable.V1.t
         ; step_domains: Domains.Stable.V1.t array
         ; data: Data.Stable.V1.t }
-      [@@deriving version, bin_io]
 
       let to_latest = Fn.id
     end
   end]
-
-  type t = Stable.Latest.t =
-    { commitments: Dee.Affine.t array Abc.t Matrix_evals.t
-    ; step_domains: Domains.t array
-    ; data: Data.t }
 end
 
 type t =
@@ -80,15 +67,21 @@ include Binable.Of_binable
           end)
 
 let dummy =
-  let lengths = Commitment_lengths.of_domains Common.wrap_domains in
-  let g = Dee.(to_affine_exn one) in
-  let e = Abc.map lengths.row ~f:(fun len -> Array.create ~len g) in
-  { Repr.commitments= {row= e; col= e; value= e; rc= e}
-  ; step_domains= [||]
-  ; data=
-      { public_inputs= 0
-      ; variables= 0
-      ; constraints= 0
-      ; nonzero_entries= 0
-      ; max_degree= 0 } }
-  |> of_repr (Snarky_bn382.Tweedle.Dee.Field_urs.create Unsigned.Size_t.one)
+  lazy
+    (let lengths =
+       Commitment_lengths.of_domains Common.wrap_domains
+         ~max_degree:Common.Max_degree.wrap
+     in
+     let g = Dee.(to_affine_exn one) in
+     let e = Abc.map lengths.row ~f:(fun len -> Array.create ~len g) in
+     { Repr.commitments= {row= e; col= e; value= e; rc= e}
+     ; step_domains= [||]
+     ; data=
+         { public_inputs= 0
+         ; variables= 0
+         ; constraints= 0
+         ; nonzero_entries= 0
+         ; max_degree= 0 } }
+     |> of_repr
+          (Snarky_bn382.Tweedle.Dee.Field_urs.create Unsigned.Size_t.one
+             Unsigned.Size_t.one Unsigned.Size_t.one))

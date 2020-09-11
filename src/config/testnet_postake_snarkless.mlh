@@ -1,5 +1,5 @@
 [%%import "/src/config/ledger_depth/full.mlh"]
-[%%import "/src/config/curve/small.mlh"]
+[%%import "/src/config/curve/medium.mlh"]
 [%%import "/src/config/coinbase/standard.mlh"]
 [%%import "/src/config/consensus/postake_tiny.mlh"]
 [%%import "/src/config/scan_state/small.mlh"]
@@ -12,7 +12,6 @@
 
 [%%define time_offsets false]
 [%%define cache_exceptions false]
-[%%define fake_hash false]
 
 [%%define plugins false]
 
@@ -22,6 +21,8 @@
 
 [%%define integration_tests false]
 [%%define force_updates false]
+
+[%%define download_snark_keys false]
 
 [%%define mock_frontend_data false]
 

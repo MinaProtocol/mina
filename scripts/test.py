@@ -29,7 +29,7 @@ unit_test_profiles_medium_curves = ['dev_medium_curves']
 
 simple_tests = [
     'full-test',
-    'transaction-snark-profiler -k 2',
+    'transaction-snark-profiler -k 1',
 ]
 
 compile_config_agnostic_tests = [
@@ -61,13 +61,11 @@ required_config_agnostic_tests = {
 
 # dictionary mapping configs to lists of tests
 small_curves_tests = {
-    'fake_hash': ['full-test'],
     'test_postake_snarkless':
     simple_tests,
     'test_postake_split':
     ['coda-shared-prefix-multiproducer-test -num-block-producers 2'],
-    'test_postake':
-    simple_tests,
+    'test_postake': [], # TODO imeckler: Change back to "simple_tests" when PLONK lands
     'test_postake_catchup': ['coda-restart-node-test'],
     'test_postake_three_producers': ['coda-txns-and-restart-non-producers'],
     'test_postake_five_even_txns':
@@ -100,9 +98,11 @@ ci_excludes = [
 
 # of all the generated CI jobs, allow these specific ones to fail (extra excludes on top of ci_excludes)
 required_excludes = [
+    'test_postake_five_even_txns:*',
     'test_postake_catchup:*',
     'test_postake_three_producers:*',
-    'test_postake_split_snarkless:*'
+    'test_postake_split_snarkless:*',
+    'test_postake:*' # TODO: Reenable when plonk lands
 ]
 
 # these extra jobs are not filters, they are full status check names
@@ -111,13 +111,14 @@ extra_required_status_checks = [
     "ci/circleci: tracetool",
     "ci/circleci: build-wallet",
     "ci/circleci: compare-test-signatures",
-    "ci/circleci: build-client-sdk",
+    "ci/circleci: client-sdk-unit-tests",
     "ci/circleci: test-unit--nonconsensus_medium_curves",
 ]
 
 # these are full status check names. they will not be required to succeed.
 not_required_status_checks = [
     "ci/circleci: build-macos",
+    "ci/circleci: test--dev--coda-batch-payment-test"
 ]
 
 

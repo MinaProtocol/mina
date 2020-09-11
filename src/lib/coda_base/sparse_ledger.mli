@@ -14,8 +14,6 @@ module Stable : sig
   end
 end]
 
-type t = Stable.Latest.t [@@deriving to_yojson, sexp]
-
 val merkle_root : t -> Ledger_hash.t
 
 val next_available_token : t -> Token_id.t
@@ -39,7 +37,7 @@ val apply_user_command_exn :
 
 val apply_transaction_exn :
      constraint_constants:Genesis_constants.Constraint_constants.t
-  -> txn_global_slot:Coda_numbers.Global_slot.t
+  -> txn_state_view:Snapp_predicate.Protocol_state.View.t
   -> t
   -> Transaction.t
   -> t
