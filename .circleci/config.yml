@@ -651,7 +651,7 @@ jobs:
                     - "dockerfiles"
             - store_artifacts:
                   path: /tmp/artifacts
-    build-artifacts-docker--testnet_postake_medium_curves--coda-daemon-puppeteered:
+    build-artifacts-docker--testnet_postake_medium_curves--coda-daemon:
         resource_class: xlarge
         docker:
             - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
@@ -673,13 +673,13 @@ jobs:
                         if [[ "$CODA_WAS_PUBLISHED" = true  ]]; then
                               echo "$DOCKER_PASSWORD" | docker login --username $DOCKER_USERNAME --password-stdin
                               scripts/release-docker.sh \
-                                -s coda-daemon-puppeteered \
-                                -v $CODA_GIT_TAG-$CODA_GIT_BRANCH-$CODA_GIT_HASH \
-                                --extra-args "--build-arg coda_version=$CODA_GIT_TAG-$CODA_GIT_BRANCH-$CODA_GIT_HASH"
-                              scripts/release-docker.sh \
                                 -s coda-daemon \
                                 -v $CODA_GIT_TAG-$CODA_GIT_BRANCH-$CODA_GIT_HASH \
                                 --extra-args "--build-arg coda_deb_version=$CODA_DEB_VERSION --build-arg deb_repo=$CODA_DEB_REPO"
+                              scripts/release-docker.sh \
+                                -s coda-daemon-puppeteered \
+                                -v $CODA_GIT_TAG-$CODA_GIT_BRANCH-$CODA_GIT_HASH \
+                                --extra-args "--build-arg coda_version=$CODA_GIT_TAG-$CODA_GIT_BRANCH-$CODA_GIT_HASH"
                         fi
                     fi
             - store_artifacts:

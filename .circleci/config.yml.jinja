@@ -489,14 +489,20 @@ jobs:
     {%- if profile in medium_curve_profiles %}
     {%- for docker_image_set in [
         {
-          'coda-daemon': '--build-arg coda_deb_version=$CODA_DEB_VERSION --build-arg deb_repo=$CODA_DEB_REPO',
-          'coda-daemon-puppeteered': '--build-arg coda_version=$CODA_GIT_TAG-$CODA_GIT_BRANCH-$CODA_GIT_HASH'
+          'images': ['coda-daemon', 'coda-daemon-puppeteered'],
+          'build_args': {
+            'coda-daemon': '--build-arg coda_deb_version=$CODA_DEB_VERSION --build-arg deb_repo=$CODA_DEB_REPO',
+            'coda-daemon-puppeteered': '--build-arg coda_version=$CODA_GIT_TAG-$CODA_GIT_BRANCH-$CODA_GIT_HASH'
+          }
         },
         {
-          'coda-demo': '--build-arg coda_deb_version=$CODA_DEB_VERSION --build-arg deb_repo=$CODA_DEB_REPO'
+          'images': ['coda-demo'],
+          'build_args': {
+            'coda-demo': '--build-arg coda_deb_version=$CODA_DEB_VERSION --build-arg deb_repo=$CODA_DEB_REPO'
+          }
         }
     ] %}
-    build-artifacts-docker--{{profile}}--{{docker_image_set.keys() | first}}:
+    build-artifacts-docker--{{profile}}--{{docker_image_set['images'] | first}}:
         resource_class: xlarge
         docker:
             - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
@@ -517,11 +523,11 @@ jobs:
                         set -x
                         if [[ "$CODA_WAS_PUBLISHED" = true  ]]; then
                               echo "$DOCKER_PASSWORD" | docker login --username $DOCKER_USERNAME --password-stdin
-                              {%- for docker_image, extra_args in docker_image_set.items() %}
+                              {%- for docker_image in docker_image_set['images'] %}
                               scripts/release-docker.sh \
                                 -s {{docker_image}} \
                                 -v $CODA_GIT_TAG-$CODA_GIT_BRANCH-$CODA_GIT_HASH \
-                                --extra-args "{{extra_args}}"
+                                --extra-args "{{docker_image_set['build_args'][docker_image]}}"
                               {%- endfor %}
                         fi
                     fi
