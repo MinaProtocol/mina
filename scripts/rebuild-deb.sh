@@ -33,6 +33,14 @@ echo "export CODA_GIT_HASH=$GITHASH" >> /tmp/DOCKER_DEPLOY_ENV
 echo "export CODA_GIT_BRANCH=$GITBRANCH" >> /tmp/DOCKER_DEPLOY_ENV
 echo "export CODA_GIT_TAG=$GITTAG" >> /tmp/DOCKER_DEPLOY_ENV
 
+if [[ "$1" == "optimized" ]] ; then
+    echo "Optimized deb"
+    VERSION=${VERSION}_optimized
+else
+    echo "Standard deb"
+    VERSION=${VERSION}
+fi
+
 BUILDDIR="deb_build"
 
 mkdir -p "${BUILDDIR}/DEBIAN"

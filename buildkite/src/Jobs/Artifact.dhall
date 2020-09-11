@@ -34,7 +34,9 @@ Pipeline.build
           commands = OpamInit.andThenRunInDocker [
             "DUNE_PROFILE=testnet_postake_medium_curves",
             "AWS_ACCESS_KEY_ID",
-            "AWS_SECRET_ACCESS_KEY"
+            "AWS_SECRET_ACCESS_KEY",
+            -- add zexe standardization preprocessing step (see: https://github.com/CodaProtocol/coda/pull/5777)
+            "PREPROCESSOR=./scripts/zexe-standardize.sh"
           ] "./buildkite/scripts/build-artifact.sh" # [ Cmd.run "buildkite-agent artifact upload ./DOCKER_DEPLOY_ENV" ],
           label = "Build artifacts",
           key = "artifacts-build",
