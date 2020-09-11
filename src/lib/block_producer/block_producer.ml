@@ -107,7 +107,7 @@ end
 let generate_next_state ~constraint_constants ~previous_protocol_state
     ~time_controller ~staged_ledger ~transactions ~get_completed_work ~logger
     ~coinbase_receiver ~(keypair : Keypair.t)
-    ~(block_data : Consensus.Data.Block_data.t) ~delegator_pk ~scheduled_time
+    ~(block_data : Consensus.Data.Block_data.t) ~winner_pk ~scheduled_time
     ~log_block_creation =
   let open Interruptible.Let_syntax in
   let self = Public_key.compress keypair.public_key in
@@ -128,8 +128,8 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
       let supercharge_coinbase =
         let epoch_ledger = Consensus.Data.Block_data.epoch_ledger block_data in
         let global_slot = Consensus.Data.Block_data.global_slot block_data in
-        Staged_ledger.can_apply_supercharged_coinbase_exn
-          ~delegator:delegator_pk ~self ~epoch_ledger ~global_slot
+        Staged_ledger.can_apply_supercharged_coinbase_exn ~winner:winner_pk
+          ~epoch_ledger ~global_slot
       in
       let diff =
         measure "create_diff" (fun () ->
@@ -270,7 +270,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
         [%log info] "Pausing block production while bootstrapping"
       in
       let module Breadcrumb = Transition_frontier.Breadcrumb in
-      let produce ivar (keypair, scheduled_time, block_data, delegator_pk) =
+      let produce ivar (keypair, scheduled_time, block_data, winner_pk) =
         let open Interruptible.Let_syntax in
         match Broadcast_pipe.Reader.peek frontier_reader with
         | None ->
@@ -310,7 +310,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                 ~time_controller
                 ~staged_ledger:(Breadcrumb.staged_ledger crumb)
                 ~transactions ~get_completed_work ~logger ~keypair
-                ~log_block_creation ~delegator_pk
+                ~log_block_creation ~winner_pk
             in
             trace_event "next state generated" ;
             match next_state_opt with
@@ -617,14 +617,14 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                 | `Check_again time ->
                     Singleton_scheduler.schedule scheduler (time_of_ms time)
                       ~f:check_next_block_timing
-                | `Produce_now (keypair, data, delegator_pk) ->
+                | `Produce_now (keypair, data, winner_pk) ->
                     Coda_metrics.(Counter.inc_one Block_producer.slots_won) ;
                     Interruptible.finally
                       (Singleton_supervisor.dispatch production_supervisor
-                         (keypair, now, data, delegator_pk))
+                         (keypair, now, data, winner_pk))
                       ~f:check_next_block_timing
                     |> ignore
-                | `Produce (time, keypair, data, delegator_pk) ->
+                | `Produce (time, keypair, data, winner_pk) ->
                     Coda_metrics.(Counter.inc_one Block_producer.slots_won) ;
                     let scheduled_time = time_of_ms time in
                     Singleton_scheduler.schedule scheduler scheduled_time
@@ -633,7 +633,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                           (Interruptible.finally
                              (Singleton_supervisor.dispatch
                                 production_supervisor
-                                (keypair, scheduled_time, data, delegator_pk))
+                                (keypair, scheduled_time, data, winner_pk))
                              ~f:check_next_block_timing) ) ) )
       in
       let start () =

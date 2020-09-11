@@ -1588,21 +1588,11 @@ module T = struct
           let res = try_with_coinbase () in
           make_diff res None
 
-  let can_apply_supercharged_coinbase_exn ~delegator ~self ~epoch_ledger
-      ~global_slot =
-    let delegatee_unlocked =
-      Sparse_ledger.has_locked_tokens_exn ~global_slot
-        ~account_id:(Account_id.create self Token_id.default)
-        epoch_ledger
-      |> not
-    in
-    if Public_key.Compressed.equal self delegator || delegatee_unlocked then
-      delegatee_unlocked
-    else
-      Sparse_ledger.has_locked_tokens_exn ~global_slot
-        ~account_id:(Account_id.create delegator Token_id.default)
-        epoch_ledger
-      |> not
+  let can_apply_supercharged_coinbase_exn ~winner ~epoch_ledger ~global_slot =
+    Sparse_ledger.has_locked_tokens_exn ~global_slot
+      ~account_id:(Account_id.create winner Token_id.default)
+      epoch_ledger
+    |> not
 
   let create_diff
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
@@ -1759,24 +1749,22 @@ let%test_module "test" =
     let constraint_constants =
       Genesis_constants.Constraint_constants.for_unit_tests
 
-    let supercharge_coinbase ~ledger ~delegator ~self ~global_slot =
+    let supercharge_coinbase ~ledger ~winner ~global_slot =
       (*using staged ledger to confirm coinbase amount is correctly generated*)
       let epoch_ledger =
         Sparse_ledger.of_ledger_subset_exn ledger
-          (List.map [delegator; self] ~f:(fun k ->
-               Account_id.create k Token_id.default ))
+          (List.map [winner] ~f:(fun k -> Account_id.create k Token_id.default))
       in
-      Sl.can_apply_supercharged_coinbase_exn ~delegator ~self ~global_slot
-        ~epoch_ledger
+      Sl.can_apply_supercharged_coinbase_exn ~winner ~global_slot ~epoch_ledger
 
     (* Functor for testing with different instantiated staged ledger modules. *)
     let create_and_apply_with_state_body_hash ?(self = self_pk)
-        ?(coinbase_receiver = coinbase_receiver) ?(delegator = self_pk)
+        ?(coinbase_receiver = coinbase_receiver) ?(winner = self_pk)
         ~(current_state_view : Snapp_predicate.Protocol_state.View.t)
         ~state_and_body_hash sl logger pids txns stmt_to_work =
       let open Deferred.Let_syntax in
       let supercharge_coinbase =
-        supercharge_coinbase ~ledger:(Sl.ledger !sl) ~self ~delegator
+        supercharge_coinbase ~ledger:(Sl.ledger !sl) ~winner
           ~global_slot:current_state_view.curr_global_slot
       in
       let diff =
@@ -1825,12 +1813,12 @@ let%test_module "test" =
         curr_global_slot= slot }
 
     let create_and_apply ?(self = self_pk)
-        ?(coinbase_receiver = coinbase_receiver) ?(delegator = self_pk) sl
-        logger pids txns stmt_to_work =
+        ?(coinbase_receiver = coinbase_receiver) ?(winner = self_pk) sl logger
+        pids txns stmt_to_work =
       let open Deferred.Let_syntax in
       let%map ledger_proof, diff, _, _ =
-        create_and_apply_with_state_body_hash ~self ~coinbase_receiver
-          ~delegator ~current_state_view:(dummy_state_view ())
+        create_and_apply_with_state_body_hash ~self ~coinbase_receiver ~winner
+          ~current_state_view:(dummy_state_view ())
           ~state_and_body_hash:(State_hash.dummy, State_body_hash.dummy)
           sl logger pids txns stmt_to_work
       in
@@ -2975,7 +2963,7 @@ let%test_module "test" =
         ~f:(fun block_count ->
           let%bind _ =
             create_and_apply_with_state_body_hash ~self:self.public_key
-              ~delegator:delegator.public_key
+              ~winner:delegator.public_key
               ~coinbase_receiver:coinbase_receiver.public_key sl logger pids
               ~current_state_view:
                 (dummy_state_view
@@ -3069,13 +3057,24 @@ let%test_module "test" =
       let keypair_delegator, locked_delegator = timed_account 1 in
       let slots_with_locked_tokens =
         7
-        (*calculated from the timing values for timed_accounts*)
+        (*calculated from the timing values for the timed_account*)
       in
       let block_count = slots_with_locked_tokens + 2 in
       let f_expected_balance block_no init_balance =
-        Balance.add_amount init_balance
-          (scale_exn supercharged_coinbase block_no)
-        |> Option.value_exn
+        if block_no <= slots_with_locked_tokens then
+          Balance.add_amount init_balance (scale_exn normal_coinbase block_no)
+          |> Option.value_exn
+        else
+          (* init balance +
+                (normal_coinbase * slots_with_locked_tokens) +
+                (supercharged_coinbase * remaining slots))*)
+          Balance.add_amount
+            ( Balance.add_amount init_balance
+                (scale_exn normal_coinbase slots_with_locked_tokens)
+            |> Option.value_exn )
+            (scale_exn supercharged_coinbase
+               (block_no - slots_with_locked_tokens))
+          |> Option.value_exn
       in
       Quickcheck.test g ~trials:1 ~f:(fun ledger_init_state ->
           let ledger_init_state =

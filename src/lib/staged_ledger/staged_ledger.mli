@@ -163,8 +163,7 @@ val create_diff :
   -> Staged_ledger_diff.With_valid_signatures_and_proofs.t
 
 val can_apply_supercharged_coinbase_exn :
-     delegator:Public_key.Compressed.t
-  -> self:Public_key.Compressed.t
+     winner:Public_key.Compressed.t
   -> epoch_ledger:Coda_base.Sparse_ledger.t
   -> global_slot:Coda_numbers.Global_slot.t
   -> bool
