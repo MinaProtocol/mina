@@ -41,6 +41,22 @@ module Time : sig
      and type Packed.value = t
      and type Packed.var = private Tick.Field.Var.t
 
+  module Checked : sig
+    open Snark_params.Tick
+
+    type t = Unpacked.var
+
+    val ( = ) : t -> t -> (Boolean.var, _) Checked.t
+
+    val ( < ) : t -> t -> (Boolean.var, _) Checked.t
+
+    val ( > ) : t -> t -> (Boolean.var, _) Checked.t
+
+    val ( <= ) : t -> t -> (Boolean.var, _) Checked.t
+
+    val ( >= ) : t -> t -> (Boolean.var, _) Checked.t
+  end
+
   module Span : sig
     type t [@@deriving sexp, compare, yojson]
 

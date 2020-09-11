@@ -85,8 +85,10 @@ module Inputs = struct
             | Work.Single.Spec.Transition
                 (input, t, (w : Transaction_witness.t)) ->
                 process (fun () ->
+                    let snapp_account1, snapp_account2 = (None, None) in
                     Or_error.try_with (fun () ->
-                        M.of_transaction ~sok_digest
+                        M.of_transaction ~sok_digest ~snapp_account1
+                          ~snapp_account2
                           ~source:input.Transaction_snark.Statement.source
                           ~target:input.target
                           { Transaction_protocol_state.Poly.transaction= t
