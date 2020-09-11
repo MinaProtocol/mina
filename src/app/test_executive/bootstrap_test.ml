@@ -14,9 +14,7 @@ module Make (Engine : Engine_intf) = struct
     let open Test_config in
     let open Test_config.Block_producer in
     { default with
-      block_producers=
-        [ {balance= "1000"}
-        ; {balance= "1000"} ]
+      block_producers= [{balance= "1000"}; {balance= "1000"}]
     ; num_snark_workers= 0 }
 
   let run network log_engine =
@@ -27,10 +25,16 @@ module Make (Engine : Engine_intf) = struct
     (* TODO: bulk wait for init *)
     let%bind () = Log_engine.wait_for_init node_a log_engine in
     let%bind () = Log_engine.wait_for_init node_b log_engine in
-    let%bind () = Log_engine.wait_for ~blocks:2 ~timeout:(`Slots 20) log_engine in
+    let%bind () =
+      Log_engine.wait_for ~blocks:2 ~timeout:(`Slots 20) log_engine
+    in
     let%bind () = Node.stop node_b in
-    let%bind () = Log_engine.wait_for ~blocks:1 ~timeout:(`Slots 10) log_engine in
+    let%bind () =
+      Log_engine.wait_for ~blocks:3 ~timeout:(`Slots 10) log_engine
+    in
     let%bind () = Node.start ~fresh_state:true node_b in
     let%bind () = Log_engine.wait_for_init node_b log_engine in
-    Log_engine.wait_for_sync [node_a; node_b] ~timeout:(Time.Span.of_ms (15. *. 60. *. 1000.)) log_engine
+    Log_engine.wait_for_sync [node_a; node_b]
+      ~timeout:(Time.Span.of_ms (15. *. 60. *. 1000.))
+      log_engine
 end

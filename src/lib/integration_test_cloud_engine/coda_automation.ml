@@ -269,21 +269,25 @@ module Network_manager = struct
     (* cleanup old deployment, if it exists; we will need to take good care of this logic when we put this in CI *)
     let%bind () =
       if%bind File_system.dir_exists testnet_dir then (
-        [%log warn] "Old network deployment found; attempting to refresh and cleanup";
-        let%bind () = Cmd_util.run_cmd_exn testnet_dir "terraform" ["refresh"] in
+        [%log warn]
+          "Old network deployment found; attempting to refresh and cleanup" ;
+        let%bind () =
+          Cmd_util.run_cmd_exn testnet_dir "terraform" ["refresh"]
+        in
         let%bind () =
           let open Process.Output in
           let%bind state_output =
             Cmd_util.run_cmd testnet_dir "terraform" ["state"; "list"]
           in
           if not (String.is_empty state_output.stdout) then
-            Cmd_util.run_cmd_exn testnet_dir "terraform" ["destroy"; "-auto-approve"]
+            Cmd_util.run_cmd_exn testnet_dir "terraform"
+              ["destroy"; "-auto-approve"]
           else return ()
         in
-        File_system.remove_dir testnet_dir)
+        File_system.remove_dir testnet_dir )
       else return ()
     in
-    [%log info] "Writing network configuration";
+    [%log info] "Writing network configuration" ;
     let%bind () = Unix.mkdir testnet_dir in
     (* TODO: prebuild genesis proof and ledger *)
     (*
@@ -311,12 +315,14 @@ module Network_manager = struct
     let testnet_log_filter =
       Network_config.testnet_log_filter network_config
     in
-    let cons_node pod_id = 
-      {Kubernetes_network.Node.namespace= network_config.terraform.testnet_name; pod_id}
+    let cons_node pod_id =
+      { Kubernetes_network.Node.namespace= network_config.terraform.testnet_name
+      ; pod_id }
     in
     let block_producer_pod_names =
       List.init (List.length network_config.terraform.block_producer_configs)
-        ~f:(fun i -> cons_node @@ Printf.sprintf "test-block-producer-%d" (i + 1))
+        ~f:(fun i ->
+          cons_node @@ Printf.sprintf "test-block-producer-%d" (i + 1) )
     in
     (* we currently only deploy 1 coordinator per deploy (will be configurable later) *)
     let snark_coordinator_pod_names = [cons_node "snark-coordinator-1"] in
@@ -333,16 +339,16 @@ module Network_manager = struct
       ; snark_coordinator_pod_names
       ; deployed= false }
     in
-    [%log info] "Initializing terraform";
+    [%log info] "Initializing terraform" ;
     let%bind () = run_cmd_exn t "terraform" ["init"] in
     let%map () = run_cmd_exn t "terraform" ["validate"] in
     t
 
   let deploy t =
     if t.deployed then failwith "network already deployed" ;
-    [%log' info t.logger] "Deploying network";
+    [%log' info t.logger] "Deploying network" ;
     let%bind () = run_cmd_exn t "terraform" ["apply"; "-auto-approve"] in
-    [%log' info t.logger] "Uploading network secrets";
+    [%log' info t.logger] "Uploading network secrets" ;
     let%map () =
       Deferred.List.iter t.keypair_secrets ~f:(fun secret ->
           run_cmd_exn t "kubectl"
@@ -356,7 +362,7 @@ module Network_manager = struct
             ; "--from-file=pub=" ^ secret ^ ".pub" ] )
     in
     t.deployed <- true ;
-    [%log' info t.logger] "Network successfully deployed";
+    [%log' info t.logger] "Network successfully deployed" ;
     { Kubernetes_network.constraint_constants= t.constraint_constants
     ; genesis_constants= t.genesis_constants
     ; block_producers= t.block_producer_pod_names
@@ -365,15 +371,15 @@ module Network_manager = struct
     ; testnet_log_filter= t.testnet_log_filter }
 
   let destroy t =
-    [%log' info t.logger] "Destroying network";
+    [%log' info t.logger] "Destroying network" ;
     if not t.deployed then failwith "network not deployed" ;
     (* let%map () = run_cmd_exn t "terraform" ["destroy"; "-auto-approve"] in *)
-    t.deployed <- false;
+    t.deployed <- false ;
     Deferred.unit
 
   let cleanup t =
     let%bind () = if t.deployed then destroy t else return () in
-    [%log' info t.logger] "Cleaning up network configuration";
+    [%log' info t.logger] "Cleaning up network configuration" ;
     (* File_system.remove_dir t.testnet_dir *)
     Deferred.unit
 end

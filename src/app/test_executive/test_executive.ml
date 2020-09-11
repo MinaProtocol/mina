@@ -10,8 +10,7 @@ type inputs = {test: test; coda_image: string}
 let tests : test list =
   [ ( "block-production"
     , (module Block_production_test.Make : Test_functor_intf) )
-  ; ( "bootstrap"
-    , (module Bootstrap_test.Make : Test_functor_intf) ) ]
+  ; ("bootstrap", (module Bootstrap_test.Make : Test_functor_intf)) ]
 
 let to_or_error = Deferred.map ~f:Or_error.return
 

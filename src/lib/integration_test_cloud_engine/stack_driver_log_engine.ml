@@ -40,7 +40,8 @@ let rec or_error_list_map ls ~f =
 let rec or_error_list_fold ls ~init ~f =
   let open Or_error.Let_syntax in
   match ls with
-  | [] -> return init
+  | [] ->
+      return init
   | h :: t ->
       let%bind init' = f init h in
       or_error_list_fold t ~init:init' ~f
@@ -245,8 +246,7 @@ module Json_parsing = struct
   let float : float parser =
    fun x -> try to_float x with Type_error _ -> float_of_string (to_string x)
 
-  let list : 'a parser -> 'a list parser =
-    fun f x -> List.map ~f (to_list x)
+  let list : 'a parser -> 'a list parser = fun f x -> List.map ~f (to_list x)
 
   let state_hash : State_hash.t parser =
     Fn.compose Result.ok_or_failwith State_hash.of_yojson
@@ -256,14 +256,14 @@ module Json_parsing = struct
     with exn ->
       Error
         (Error.of_string
-           (Printf.sprintf "failed to parse json value: %s"
-              (Exn.to_string exn))) 
+           (Printf.sprintf "failed to parse json value: %s" (Exn.to_string exn)))
 
   let rec find (parser : 'a parser) (json : Yojson.Safe.t) (path : string list)
       : 'a Or_error.t =
     let open Or_error.Let_syntax in
     match (path, json) with
-    | [], _ -> parse parser json
+    | [], _ ->
+        parse parser json
     | key :: path', `Assoc assoc ->
         let%bind entry =
           or_error_of_option
@@ -335,8 +335,7 @@ end
 module Transition_frontier_diff_application_query = struct
   module Result = struct
     type root_transitioned =
-      { new_root: State_hash.t
-      ; garbage: State_hash.t list }
+      {new_root: State_hash.t; garbage: State_hash.t list}
 
     type t =
       { pod_id: string
@@ -346,15 +345,17 @@ module Transition_frontier_diff_application_query = struct
     [@@deriving lens]
 
     let empty pod_id =
-      { pod_id
-      ; new_node= None
-      ; best_tip_changed= None
-      ; root_transitioned= None }
+      {pod_id; new_node= None; best_tip_changed= None; root_transitioned= None}
 
-    let register (lens : (t, 'a option) Lens.t) (result : t) (x : 'a) : t Or_error.t =
+    let register (lens : (t, 'a option) Lens.t) (result : t) (x : 'a) :
+        t Or_error.t =
       match lens.get result with
-      | Some _ -> Or_error.error_string "same transition frontier diff type unexpectedly encountered twice in single application"
-      | None -> Ok (lens.set (Some x) result)
+      | Some _ ->
+          Or_error.error_string
+            "same transition frontier diff type unexpectedly encountered \
+             twice in single application"
+      | None ->
+          Ok (lens.set (Some x) result)
   end
 
   let name = "transition_frontier_diff_application"
@@ -370,25 +371,31 @@ module Transition_frontier_diff_application_query = struct
     let open Result in
     let open Or_error.Let_syntax in
     let%bind pod_id = find string log ["labels"; "k8s-pod/app"] in
-    let%bind diffs = find (list json) log ["jsonPayload"; "metadata"; "diffs"] in
+    let%bind diffs =
+      find (list json) log ["jsonPayload"; "metadata"; "diffs"]
+    in
     or_error_list_fold diffs ~init:(Result.empty pod_id) ~f:(fun res diff ->
-      match Yojson.Safe.Util.keys diff with
-      | [name] -> (
-          let%bind value = find json diff [name] in
-          match name with
-          | "New_node" ->
-              let%bind state_hash = parse state_hash value in
-              register new_node res state_hash
-          | "Best_tip_changed" -> 
-              let%bind state_hash = parse state_hash value in
-              register best_tip_changed res state_hash
-          | "Root_transitioned" ->
-              let%bind new_root = find state_hash value ["new_root"] in
-              let%bind garbage = find (list state_hash) value ["garbage"] in
-              let data = {new_root; garbage} in
-              register root_transitioned res data
-          | _ -> Or_error.error_string "unexpected transition frontier diff name")
-      | _ -> Or_error.error_string "unexpected transition frontier diff format")
+        match Yojson.Safe.Util.keys diff with
+        | [name] -> (
+            let%bind value = find json diff [name] in
+            match name with
+            | "New_node" ->
+                let%bind state_hash = parse state_hash value in
+                register new_node res state_hash
+            | "Best_tip_changed" ->
+                let%bind state_hash = parse state_hash value in
+                register best_tip_changed res state_hash
+            | "Root_transitioned" ->
+                let%bind new_root = find state_hash value ["new_root"] in
+                let%bind garbage = find (list state_hash) value ["garbage"] in
+                let data = {new_root; garbage} in
+                register root_transitioned res data
+            | _ ->
+                Or_error.error_string
+                  "unexpected transition frontier diff name" )
+        | _ ->
+            Or_error.error_string "unexpected transition frontier diff format"
+    )
 end
 
 module Block_produced_query = struct
@@ -496,7 +503,7 @@ module Block_produced_query = struct
         {|{"insertId":"da1tjxlb148zg2r9m","jsonPayload":{"level":"Trace","message":"Successfully produced a new block: $breadcrumb","metadata":{"breadcrumb":{"just_emitted_a_proof":true,"staged_ledger":"<opaque>","validated_transition":{"data":{"current_protocol_version":"0.1.0","delta_transition_chain_proof":"<opaque>","proposed_protocol_version":"<None>","protocol_state":{"body":{"blockchain_state":{"snarked_ledger_hash":"4mKBT3x4peBudLp8p7ZV8D9qa4hXVu4Mtw8RnjnJUmuYVAmzuMB3qqG76WdN4o1bzBzkWGntjW3fskqGB7qEr14xEHGD23PqW53Pq4pac8vUBv9Wy9sYfNTXXQHUaTKs9Z3SZ4G683vWGiqrPD1CwNL1mfQcE1Y4rZs1PKXYr2Qxd1ysPSBzMdMhHRtCJ8yjL31gy8b5HLEB4TCnvmwcaFjrYqXmZ17iRTouYeAXTwiYa3QwwdLndAFS7Wf1YJwK2WavtqJjL3cHL37UP56bQdiUsDF33iRAX99LJGhFqDD4Ud765rcDrgM1yBdBkyJFAC","staged_ledger_hash":{"non_snark":{"aux_hash":"UDT5mwPQpaazURe2owQEkmhVzs89k5ZT4xiD4nShZ4qV6rPcdi","ledger_hash":"4mKBT3x7o11gxXfS2sukVKACTsUk5HsQUSWH48ycTzAymkW5G6BXLtSVfyFj7q8byjKy24VgLaEstVbke8WC8sQJPot5eBPi6BqTXQn83u2HsrFoYTrRfuC5uExzkvuEHWfg6mFCpsGntcNVvZHBZmCxckP37Ao2X29kWuhvRUjCnJ4zyEGY8Byu7Q5nzf13XXd2uzTwntQFkEUqZ5rVyVdB6KYW14E3vLjZdUF8ijbXkqGHVyLfogfdfBHauiCDsdEKMiQVCQpwVQSmonKxAV14Qvg2yUsCbSru7uLZjLz4rCeZ3A18D8TvUMKqooVEX1","pending_coinbase_aux":"WewbKnjz78S5g6GMgtv5AkaR54HuGAfAX7YHkoMxzZji8dDm82"},"pending_coinbase_hash":"A2UdxEssLAf7MRyLNuccHWj4J9Bsu1XpPVLsenZcQkHto6RkgLBg3kMZemKEaafH4E36sdzvTWQujcADhdMFHMTy2YqFrGWTVzjcQZApLCE91PyFo3Lup5tf3wa7aBTD7x2bSmCRudM93ieGXdASVHDtinSaLAcGMfaA7ioSJEH3nkkXd3zUafThJMcnQvpVR4oHeuYNbAF8dPpKhk3ZGaL6v6FmbyTKVExj3xDx8dr1P3QsAPPrVqhDCM6AU3EpLtvmrLXrzkjh2dvB8TaLgZwg85atjKhbHAX5RUR7395RvMuTLq4ae4gCPJSRhTwuS8"},"timestamp":"1593049680000"},"consensus_state":{"blockchain_length":"3005","curr_global_slot":{"slot_number":"7806","slots_per_epoch":"480"},"epoch_count":"16","has_ancestor_in_same_checkpoint_window":true,"last_vrf_output":"<opaque>","min_window_density":"160","next_epoch_data":{"epoch_length":"38","ledger":{"hash":"4mKBT3x4nFWDa4A67jeH71Jv5UY7xMdekTspnP4AF4rkhxtybgKjrb9dKkYMein6CUBcWTskzZJnZ9RN3HEod9JTWAqwk5CDCBYTVDfUpJRqHsuBZ8ezpCb9oHQfu7eFeGFjY9ijwAZqEwp3gNhNwgS31ed9TcQgEpEPGqRDRYmyCwSTvZHKG2iFqbzzPnkF8ob12R69zYnMcRZmmhpwKeoEHVU23brJmoBTCguZWPKgk7T66kTqB4wiCbrFgb1S8jJtjQynaeocXhV3mqi91hD8fdX6TikxT3YutFBGW92Bn1HfVNYDRybpnrSwH4jEUk","total_currency":"22961500002389927"},"lock_checkpoint":"3j7Fqw9d9wLyNdjTPBSVH3yPDPWMtqUC22L1JSeqnpYMBfHTK7UmtDbYbnCL9mYDccjspNy8vJEnmXMA72qgswFdMocqYWprdWRYCUmhZx2jBKQcjXMjyUm8yFFBU8HfbSHSWfWmFVEXLw15rTR5ELjFy5xQMpgaWWMELu4ArxRc4DBbDebX2ezU4AhXULwsRhgbXw3n8gf6Tfi8GFTMQ8aTfuwmGeLmDAzXY4UvaEFuzcZ4ZFrFHrLZhKXYTbYyKebTBbcYqZScQcBNp1CC76tMP6NJkAaANYMGnRC1atoBwxBx6iCAb8osx12mCYgi9","seed":"3DUfsm6DRo8H9B9evJWxP72s18BAmWbFPMjr1EphFQFF7Fjjas1H8Y3UHGLTCocUKga4Yzh9izSHTvPn7UXN8x87c6soskzRtxjzatt2nPVK7jJ3xB2jMQFKfkmXLh4baiuQkDogz8nzirjbrUDnPsGi85efffcdEdCfV9AazPpZSbJKdvxMY4KZYXmdmtASzyQxeDhfpfCgfuUwfKCdPWi2biXxTrX9GkKLVcJFVCgY1ZggSFGiMn6kB3zxtKqUEJ1KvXnfdsyLsRrQwDKGGfqGSaS2b5baosyBnML27GJUGUDhP7vNipc5EVu1BZUEL","start_checkpoint":"D2rcXVQYc5LPJkNGqsxFSD17vt9o3AkQz3zLhA4mH56MQd1mkbiyMWohyYF6XkraCxLLfrf4G28pkeM2CYCN6Xwu4Sec9jeLigUC25VYZq2N9nLDPtSR9Xrk7SfAVzjpckU9MsYoGXkzzXG6fSKC4DakPFkPy53U2uYhYR963Kypcpjg5qdzu86TzmribmSvf3QEBaxs6svLEodZesaUff8qb2xCswAoZS4FU32kn6ANqXLHZWJZbPomnav9Msmh38rC5o1CGMoYvoEEdkB1qz4PpDLCGxDyNbkJFMC75WVQXbZSMayQ6i6V1hUAsHa9fU"},"staking_epoch_data":{"epoch_length":"184","ledger":{"hash":"4mKBT3x3Jm4wrsafPgLndLRTUBPGStpddFUdyKwKSHLBQh4HfdVon9NsrTbtQBiRLbhyH3uEKgkMbVGTneBSRH1Ub6Rm17FG2JpRHmTEEjaTDFJqk3sfzSzeMA1xxz35gg2czw8Q8SUknoatQ843gkPuEyTiSBXbJTQbXgDmuJXmXSNQ4Xvy5enmAMZfX1Es7wSzjpETmpgSD7sGQXi6yv3F6DsLcHLnHrqoYiipvNvDLM7cr5axY2inWiQboPd2T3rZi2PK2jdJvFu1XRWA5sNMKSciUddq6fn62CzrCTszGm2qdnPWpCrsRLE85heDyz","total_currency":"22924300002389927"},"lock_checkpoint":"D2rcXVQbcpJXNSkH4PtMigWYCwgohjjvR5SzxQ1BXC8TB7aNi722Vd2Rzj4tUWAiZhtzVn4y35R7fJ86XSWign7Nk7uoQAstAuKT9rVsPzWC8tvaWtY21uHVWSFfN6FERmWbR8ESVYcFbMNKeXGeFEXBgiWX7qEQVReqVuapdR72YBitw3Yuh3zHy3TEhRPWecdGYELDXoqGv3H1C8MaWRTUZkXn6TddEfVdtD7SuoH3zQVTcKADBGK7BfJcrd6pU3ScgWBUoaCYND5teWD2fCHGxmjWHiLmgUbqpCaEXYjh6DrwMKdxek2T6XdBpi89Xh","seed":"3DUfsm6FqFmgdfqmKUJbZVWFE1vB3HZQithYfWitucdN24MVAATs2WkmuyLnRmmhAi2Mn7DeqARTCEZz4ZUSK8zP3uvzULWFqxyTR1AeuNwGEReySyDA2KPrTHZiSE6DFBPkxYVhTAxzCxr2s8Hg7DL4VGV36RHJqqzCJuNiur9XTt38zi2T8GEdrowfRgL7e2cKapivbCiVVE1X4XaoKZUHqEbht4YNFTCK6AndB27EvgFHZV3KoR1Ai8DYFasj1YoMw7LxRFn7DqnXnDkgyX3aKNdG2wKJKddB93pWNwgFXg1LnEMvVxjtJmBegyCvk","start_checkpoint":"D2rcXVQd7gciXqjsZrMyQVr2n5AG9vDzQnJMZxb5L8ijvX4iCVggYaaEUVdPALEaxY6uaXT9Jire3qPBb84QBfX8vQX6kV4ojvqxcTqt7gLi2GyupXS2p1u2JN6PMdciLCfmeogLSR2EaH3UdsS1TMoK72UBfFYsD6jvkFSyfNyMMHLJCjNWSwVo6apRtsG1GK7bn4g63zrvn16ezGbmgh8mCFqBzv3KM4c17QZHHEbLS2ya7U6SvtCMDwDaHPgE8Dg2QS1mEqG2DuJ2V9VNnYZshtQUPTLw4fRy4N9fDPLo73LFC1d7y3gMqEoqV2MYFa"},"sub_window_densities":["0","20","20","20","20","20","20","20"],"total_currency":"22969100.002389927"},"constants":{"delta":"3","genesis_state_timestamp":"1591644600000","k":"20"},"genesis_state_hash":"D2rcXVQa8eS14d6EWdpMVoys5aeqjiwJppFQRrdoZLpbsDUoq1a9AVYb1VQtqxPhxT87sQWHWwL7c1z7qWmC72GdedUy7RaqanKpJzCk5B4fMnxDTKFDVc53gZF3Z95pMauhWi12vAvuCK5bstGcAh3ZUJveK6RVmnN6aM2tHjTgcp1uvMfzXTjwBuxX6gGpsFKWZw5gDguQpDqhbMiYJw44Mc2ggKthUnfP2NsxJTkNzfJGknYaarK7wRZNEjHeNtrVfyxZDKyTGg6ZisfPemCYPTyXsvs9MmfmAtNhBAAUFuA1NuxnpfAjbdJ3RacHPW"},"previous_state_hash":"D2rcXVQa7HFVLxWV7V5mktEdnxK22Jp3bhfPtzaGcCmvkiFnxAtUtnfyY3CS1U4Z2qSmW7oNT3jBzGta2mTfGEALMA4NifmmoBJTWeFX1tN2FekYbjpiggBgQuGehoTtnN12w1kNRwm9KsRtqUojCsh4vWxJBk8fedsgvLKhJ8uyUybM3fqN748BTipGSrWZJg1KUgXUWXKK1QZN5xNT2CzgtN1bcDizQQMP16UUCZVgH5zY28RpzBsJYXFZbJK6pShYtiBqfMUTyY3ww2qPUBZAr7AA9buMrBCUXwT1etC5rsNp3iwpDB1feVWDAQgUvx"},"protocol_state_proof":"<opaque>","staged_ledger_diff":"<opaque>"},"hash":"D2rcXVQbc96heSMf2WYXidFqRWbQ1ktQhcjNRV86qm1YQmYGgkd3uSpgrGRb8XAT5JPiR2DdXrnkiYU9t9zpGx77mbe9G8ZW2ABi4X344R68kMamFB6fbnwMoQieVTyXLqXvFqck2cGXQcZYko8gBdusNELVyZxsgRw2pJAiAePADfy2zkxudo4P1iTaDySykXvrSNF8oekts6FcQp6fwCeePGcUm3ktomEjYWTfTwU2YCRgfx5Zn8jADmCbtAhkrX1LAM21EEbygrp2LW12QaZDUE98199UCsyVbJTG4GWswYZbbwR99twkZ3BkjbR98B"}},"host":"35.185.73.134","peer_id":"12D3KooWNqFYDkAseDUAhvTdt73iqex7ooQPKTmRByGiCBgbJvVq","pid":10,"port":10003},"source":{"location":"File \"src/lib/block_producer/block_producer.ml\", line 512, characters 44-51","module":"Block_producer"},"timestamp":"2020-06-25 01:58:02.803079Z"},"labels":{"k8s-pod/app":"whale-block-producer-3","k8s-pod/class":"whale","k8s-pod/pod-template-hash":"6cdf6f4b44","k8s-pod/role":"block-producer","k8s-pod/testnet":"joyous-occasion","k8s-pod/version":"0.0.12-beta-feature-bump-genesis-timestamp-3e9b174"},"logName":"projects/o1labs-192920/logs/stdout","receiveTimestamp":"2020-06-25T01:58:09.007727607Z","resource":{"labels":{"cluster_name":"coda-infra-east","container_name":"coda","location":"us-east1","namespace_name":"joyous-occasion","pod_name":"whale-block-producer-3-6cdf6f4b44-2nlkz","project_id":"o1labs-192920"},"type":"k8s_container"},"severity":"INFO","timestamp":"2020-06-25T01:58:03.766838494Z"}|}
     in
     (* this fixes nathan's editor *)
-    print_endline "\"\"";
+    print_endline "\"\"" ;
     let _ = parse log |> Or_error.ok_exn in
     ()
 end
@@ -534,7 +541,11 @@ type t =
   ; best_tip_map_reader: State_hash.t String.Map.t Broadcast_pipe.Reader.t
   ; best_tip_map_writer: State_hash.t String.Map.t Broadcast_pipe.Writer.t }
 
-let delete_subscriptions {errors; initialization; blocks_produced; transition_frontier_diff_application} =
+let delete_subscriptions
+    { errors
+    ; initialization
+    ; blocks_produced
+    ; transition_frontier_diff_application } =
   Deferred.Or_error.combine_errors
     [ Subscription.delete errors
     ; Subscription.delete initialization
@@ -557,7 +568,9 @@ let rec pull_subscription_in_background ~logger ~subscription_name
     | Error err ->
         Error.raise err
     | Ok res ->
-        uninterruptible @@ Deferred.List.iter res ~f:(fun r -> handle_result r |> Deferred.map ~f:Or_error.ok_exn)
+        uninterruptible
+        @@ Deferred.List.iter res ~f:(fun r ->
+               handle_result r |> Deferred.map ~f:Or_error.ok_exn )
   in
   let%bind () = uninterruptible (after (Time.Span.of_ms 10000.0)) in
   (* this extra bind point allows the interruptible monad to interrupt after the timeout *)
@@ -567,7 +580,8 @@ let rec pull_subscription_in_background ~logger ~subscription_name
 
 let start_background_query (type r)
     (module Query : Query_intf with type Result.t = r) ~logger
-    ~testnet_log_filter ~cancel_ivar ~(handle_result : r -> unit Deferred.Or_error.t) =
+    ~testnet_log_filter ~cancel_ivar
+    ~(handle_result : r -> unit Deferred.Or_error.t) =
   let open Interruptible in
   let open Deferred.Or_error.Let_syntax in
   let finished_ivar = Ivar.create () in
@@ -632,37 +646,52 @@ let create ~logger ~(network : Kubernetes_network.t) ~on_fatal_error =
         let open Initialization_query.Result in
         let open Or_error.Let_syntax in
         [%log info] "Node \"%s\" has initialized" result.pod_id ;
-        Deferred.return (
-          let%bind ivar =
-            or_error_of_option
-              (String.Map.find initialization_table result.pod_id)
-              (Printf.sprintf "Node not found in initialization table: %s"
-                 result.pod_id)
-          in
-          if Ivar.is_empty ivar then ( Ivar.fill ivar () ; return () )
-          else
-            Error
-              (Error.of_string
-                 "Received initialization for node that has already initialized")))
+        Deferred.return
+          (let%bind ivar =
+             or_error_of_option
+               (String.Map.find initialization_table result.pod_id)
+               (Printf.sprintf "Node not found in initialization table: %s"
+                  result.pod_id)
+           in
+           if Ivar.is_empty ivar then ( Ivar.fill ivar () ; return () )
+           else
+             Error
+               (Error.of_string
+                  "Received initialization for node that has already \
+                   initialized")) )
   in
-  let best_tip_map_reader, best_tip_map_writer = Broadcast_pipe.create String.Map.empty in
-  let%map transition_frontier_diff_application, transition_frontier_diff_application_finished =
+  let best_tip_map_reader, best_tip_map_writer =
+    Broadcast_pipe.create String.Map.empty
+  in
+  let%map ( transition_frontier_diff_application
+          , transition_frontier_diff_application_finished ) =
     start_background_query
       (module Transition_frontier_diff_application_query)
       ~logger ~testnet_log_filter:network.testnet_log_filter
       ~cancel_ivar:cancel_background_tasks_ivar
       ~handle_result:(fun result ->
         let open Transition_frontier_diff_application_query.Result in
-        Option.value_map result.best_tip_changed ~default:(Deferred.Or_error.return ())
-          ~f:(fun new_best_tip ->
+        Option.value_map result.best_tip_changed
+          ~default:(Deferred.Or_error.return ()) ~f:(fun new_best_tip ->
             let open Deferred.Let_syntax in
-            let best_tip_map = Broadcast_pipe.Reader.peek best_tip_map_reader in
-            let best_tip_map' = String.Map.set best_tip_map ~key:result.pod_id ~data:new_best_tip in
+            let best_tip_map =
+              Broadcast_pipe.Reader.peek best_tip_map_reader
+            in
+            let best_tip_map' =
+              String.Map.set best_tip_map ~key:result.pod_id ~data:new_best_tip
+            in
             [%log debug]
-              ~metadata:[("best_tip_map", `Assoc (String.Map.to_alist best_tip_map' |> List.map ~f:(fun (k, v) -> (k, State_hash.to_yojson v))))]
-             "Updated best tip map: $best_tip_map" ;
-            let%map () = Broadcast_pipe.Writer.write best_tip_map_writer best_tip_map' in
-            Or_error.return ()))
+              ~metadata:
+                [ ( "best_tip_map"
+                  , `Assoc
+                      ( String.Map.to_alist best_tip_map'
+                      |> List.map ~f:(fun (k, v) -> (k, State_hash.to_yojson v))
+                      ) ) ]
+              "Updated best tip map: $best_tip_map" ;
+            let%map () =
+              Broadcast_pipe.Writer.write best_tip_map_writer best_tip_map'
+            in
+            Or_error.return () ) )
   in
   let cancel_background_tasks () =
     if not (Ivar.is_full cancel_background_tasks_ivar) then
@@ -677,7 +706,11 @@ let create ~logger ~(network : Kubernetes_network.t) ~on_fatal_error =
   ; constants=
       { constraints= network.constraint_constants
       ; genesis= network.genesis_constants }
-  ; subscriptions= {errors; initialization; blocks_produced; transition_frontier_diff_application}
+  ; subscriptions=
+      { errors
+      ; initialization
+      ; blocks_produced
+      ; transition_frontier_diff_application }
   ; cancel_background_tasks
   ; error_accumulator
   ; initialization_table
@@ -711,7 +744,7 @@ let destroy t : Test_error.Set.t Deferred.Or_error.t =
         Ok ()
     *)
   in
-  Broadcast_pipe.Writer.close best_tip_map_writer; 
+  Broadcast_pipe.Writer.close best_tip_map_writer ;
   let lift error_array =
     DynArray.to_list error_array
     |> List.map ~f:(fun {Error_query.Result.pod_id; message} ->
@@ -798,7 +831,7 @@ let wait_for' :
       if Time.( > ) (Time.now ()) timeout_safety then
         Deferred.Or_error.error_string "wait_for took too long to complete"
       else if timed_out aggregated_res then Deferred.Or_error.ok_unit
-      else (
+      else
         let%bind logs = Subscription.pull t.subscriptions.blocks_produced in
         [%log' info t.logger]
           ~metadata:[("n", `Int (List.length logs)); ("logs", `List logs)]
@@ -826,7 +859,7 @@ let wait_for' :
               ~f:Or_error.return
           in
           go aggregated_res'
-        else Deferred.Or_error.return () )
+        else Deferred.Or_error.return ()
     in
     go Block_produced_query.Result.Aggregated.empty
 
@@ -868,7 +901,8 @@ let await_timeout ~waiting_for ~timeout_duration deferred =
   let start_time = Time.now () in
   match%map Timeout.await ~timeout_duration () deferred with
   | `Timeout ->
-      Printf.printf !"fuck... %f%!\n" (Time.Span.to_sec @@ Time.diff (Time.now ()) start_time);
+      Printf.printf !"fuck... %f%!\n"
+        (Time.Span.to_sec @@ Time.diff (Time.now ()) start_time) ;
       failwithf "timeout while waiting for %s" waiting_for ()
   | `Ok x ->
       x
@@ -887,7 +921,8 @@ let wait_for_init (node : Kubernetes_network.Node.t) t =
   if Ivar.is_full init then return ()
   else
     (* TODO: make configurable (or ideally) compute dynamically from network configuration *)
-    await_timeout (Deferred.map (Ivar.read init) ~f:Or_error.return)
+    await_timeout
+      (Deferred.map (Ivar.read init) ~f:Or_error.return)
       ~waiting_for:"initialization"
       ~timeout_duration:(Time.Span.of_ms (15.0 *. 60.0 *. 1000.0))
 
@@ -895,25 +930,24 @@ let wait_for_sync (nodes : Kubernetes_network.Node.t list) ~timeout t =
   let open Deferred.Let_syntax in
   [%log' info t.logger]
     ~metadata:[("nodes", `List (List.map ~f:(fun n -> `String n.pod_id) nodes))]
-    "Waiting for $nodes to synchronize";
+    "Waiting for $nodes to synchronize" ;
   let pod_ids = List.map nodes ~f:(fun node -> node.pod_id) in
   let all_equal ls =
-    Option.value_map (List.hd ls) ~default:true
-      ~f:(fun h -> [h] = List.find_all_dups ~compare:State_hash.compare ls)
+    Option.value_map (List.hd ls) ~default:true ~f:(fun h ->
+        [h] = List.find_all_dups ~compare:State_hash.compare ls )
   in
   let all_nodes_synced best_tip_map =
     if List.for_all pod_ids ~f:(String.Map.mem best_tip_map) then
       (* [lookup_exn] should never throw an exception here *)
       all_equal (List.map pod_ids ~f:(String.Map.find_exn best_tip_map))
-    else
-      false
+    else false
   in
-  [%log' info t.logger] "waiting for %f seconds" (Time.Span.to_sec timeout);
+  [%log' info t.logger] "waiting for %f seconds" (Time.Span.to_sec timeout) ;
   let%map () =
     await_timeout
-      (Broadcast_pipe.Reader.iter_until t.best_tip_map_reader ~f:(Fn.compose Deferred.return all_nodes_synced))
-      ~waiting_for:"synchronization"
-      ~timeout_duration:timeout
+      (Broadcast_pipe.Reader.iter_until t.best_tip_map_reader
+         ~f:(Fn.compose Deferred.return all_nodes_synced))
+      ~waiting_for:"synchronization" ~timeout_duration:timeout
   in
   Or_error.return ()
 

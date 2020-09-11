@@ -153,7 +153,8 @@ module type Engine_intf = sig
 
     val wait_for_init : Node.t -> t -> unit Deferred.Or_error.t
 
-    val wait_for_sync : Node.t list -> timeout:Time.Span.t -> t -> unit Deferred.Or_error.t
+    val wait_for_sync :
+      Node.t list -> timeout:Time.Span.t -> t -> unit Deferred.Or_error.t
   end
 end
 
