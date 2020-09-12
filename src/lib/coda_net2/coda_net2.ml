@@ -101,7 +101,7 @@ end
 
 module Helper = struct
   type t =
-    { subprocess: Child_processes.t
+    { subprocess: Child_processes.t Deferred.t ref
     ; conf_dir: string
     ; outstanding_requests: (int, Yojson.Safe.t Or_error.t Ivar.t) Hashtbl.t
           (**
@@ -124,7 +124,7 @@ module Helper = struct
     ; protocol_handlers: (string, protocol_handler) Hashtbl.t
     ; mutable banned_ips: Unix.Inet_addr.t list
     ; mutable new_peer_callback: (string -> string list -> unit) option
-    ; mutable finished: bool }
+    ; finished: bool ref }
 
   and 'a subscription =
     { net: t
@@ -392,9 +392,10 @@ module Helper = struct
   let do_rpc (type a b) t (rpc : (a, b) rpc) (body : a) : b Deferred.Or_error.t
       =
     let module M = (val rpc) in
+    let%bind subprocess = !(t.subprocess) in
     if
-      (not t.finished)
-      && (not @@ Writer.is_closed (Child_processes.stdin t.subprocess))
+      (not !(t.finished))
+      && (not @@ Writer.is_closed (Child_processes.stdin subprocess))
     then (
       let res = Ivar.create () in
       let seqno = genseq t in
@@ -411,7 +412,7 @@ module Helper = struct
           [ ( "line"
             , `String (String.slice rpc 0 (Int.min (String.length rpc) 2048))
             ) ] ;
-      Writer.write_line (Child_processes.stdin t.subprocess) rpc ;
+      Writer.write_line (Child_processes.stdin subprocess) rpc ;
       let%map res_json = Ivar.read res in
       Or_error.bind res_json
         ~f:
@@ -1148,8 +1149,8 @@ let listening_addrs net =
 (** TODO: graceful shutdown. Reset all our streams, sync the databases, then
 shutdown. Replace kill invocation with an RPC. *)
 let shutdown (net : net) =
-  net.finished <- true ;
-  Deferred.ignore (Child_processes.kill net.subprocess)
+  net.finished := true ;
+  Deferred.ignore (!(net.subprocess) >>= Child_processes.kill)
 
 module Stream = struct
   type t = Helper.stream
@@ -1301,111 +1302,110 @@ let unban_ip net ip =
 
 let banned_ips net = Deferred.return net.Helper.banned_ips
 
-let create ~logger ~conf_dir =
+let create ~logger ~conf_dir : Helper.t Deferred.Or_error.t =
   let outstanding_requests = Hashtbl.create (module Int) in
-  let termination_hack_ref : Helper.t option ref = ref None in
-  match%bind
-    Child_processes.start_custom ~logger ~name:"libp2p_helper"
-      ~git_root_relative_path:"src/app/libp2p_helper/result/bin/libp2p_helper"
-      ~conf_dir ~args:[]
-      ~stdout:(`Log Logger.Level.Spam, `Pipe, `Filter_empty)
-      ~stderr:(`Don't_log, `Pipe, `Filter_empty)
-      ~termination:
-        (`Handler
-          (fun ~killed e ->
-            Hashtbl.iter outstanding_requests ~f:(fun iv ->
-                Ivar.fill iv
-                  (Or_error.error_string
-                     "libp2p_helper process died before answering") ) ;
-            if
-              (not killed)
-              && not
-                   (Option.value_map ~default:false
-                      ~f:(fun t -> t.finished)
-                      !termination_hack_ref)
-            then (
-              match e with
-              | Error (`Exit_non_zero _) | Error (`Signal _) ->
-                  [%log fatal]
-                    !"libp2p_helper process died unexpectedly: %s"
-                    (Unix.Exit_or_signal.to_string_hum e) ;
-                  raise Child_processes.Child_died
-              | Ok () ->
-                  [%log error]
-                    "libp2p helper process exited peacefully but it should \
-                     have been killed by shutdown!" ;
-                  Deferred.unit )
-            else (
-              [%log info]
-                !"libp2p_helper process killed successfully: %s"
-                (Unix.Exit_or_signal.to_string_hum e) ;
-              Deferred.unit ) ))
-  with
-  | Error e ->
-      Deferred.Or_error.error_string
-        ( "Could not start libp2p_helper. If you are a dev, did you forget to \
-           `make libp2p_helper` and set CODA_LIBP2P_HELPER_PATH? Try \
-           CODA_LIBP2P_HELPER_PATH=$PWD/src/app/libp2p_helper/result/bin/libp2p_helper "
-        ^ Error.to_string_hum e )
-  | Ok subprocess ->
-      let t : Helper.t =
-        { subprocess
-        ; conf_dir
-        ; logger
-        ; banned_ips= []
-        ; me_keypair= Ivar.create ()
-        ; outstanding_requests
-        ; subscriptions= Hashtbl.create (module Int)
-        ; streams= Hashtbl.create (module Int)
-        ; new_peer_callback= None
-        ; protocol_handlers= Hashtbl.create (module String)
-        ; seqno= 1
-        ; finished= false }
-      in
-      termination_hack_ref := Some t ;
-      Strict_pipe.Reader.iter (Child_processes.stderr_lines subprocess)
-        ~f:(fun line ->
-          ( match Go_log.record_of_yojson (Yojson.Safe.from_string line) with
-          | Ok record -> (
-              let r = Go_log.(record_to_message record) in
-              let r =
-                if
-                  String.( = ) r.message "failed when refreshing routing table"
-                then {r with level= Info}
-                else r
-              in
-              try Logger.raw logger r
-              with _exn ->
-                Logger.raw logger
-                  { r with
-                    message=
-                      "(go log message was not valid for logger; see $line)"
-                  ; metadata= String.Map.singleton "line" (`String r.message)
-                  } )
-          | Error err ->
-              [%log error]
-                ~metadata:[("line", `String line); ("error", `String err)]
-                "failed to parse log line from helper stderr" ) ;
-          Deferred.unit )
-      |> don't_wait_for ;
-      Strict_pipe.Reader.iter (Child_processes.stdout_lines subprocess)
-        ~f:(fun line ->
-          let open Yojson.Safe.Util in
-          let v = Yojson.Safe.from_string line in
-          ( match
-              if member "upcall" v = `Null then Helper.handle_response t v
-              else Helper.handle_upcall t v
-            with
-          | Ok () ->
-              ()
-          | Error e ->
-              [%log error] "handling line from helper failed! $err"
-                ~metadata:
-                  [ ("line", `String line)
-                  ; ("err", `String (Error.to_string_hum e)) ] ) ;
-          Deferred.unit )
-      |> don't_wait_for ;
-      Deferred.Or_error.return t
+  let finished = ref false in
+  let subprocess = ref (Deferred.never ()) in
+  let t : Helper.t =
+    { subprocess
+    ; conf_dir
+    ; logger
+    ; banned_ips= []
+    ; me_keypair= Ivar.create ()
+    ; outstanding_requests
+    ; subscriptions= Hashtbl.create (module Int)
+    ; streams= Hashtbl.create (module Int)
+    ; new_peer_callback= None
+    ; protocol_handlers= Hashtbl.create (module String)
+    ; seqno= 1
+    ; finished }
+  in
+  let rec create_subprocess () =
+    match%map
+      Child_processes.start_custom ~logger ~name:"libp2p_helper"
+        ~git_root_relative_path:
+          "src/app/libp2p_helper/result/bin/libp2p_helper" ~conf_dir ~args:[]
+        ~stdout:(`Log Logger.Level.Spam, `Pipe, `Filter_empty)
+        ~stderr:(`Don't_log, `Pipe, `Filter_empty)
+        ~termination:
+          (`Handler
+            (fun ~killed e ->
+              Hashtbl.iter outstanding_requests ~f:(fun iv ->
+                  Ivar.fill iv
+                    (Or_error.error_string
+                       "libp2p_helper process died before answering") ) ;
+              if (not killed) && not !finished then
+                match e with
+                | Error (`Exit_non_zero _) | Error (`Signal _) ->
+                    [%log error]
+                      !"libp2p_helper process died unexpectedly: %s"
+                      (Unix.Exit_or_signal.to_string_hum e) ;
+                    t.subprocess := create_subprocess ()
+                | Ok () ->
+                    [%log error]
+                      "libp2p helper process exited peacefully but it should \
+                       have been killed by shutdown!"
+              else
+                [%log info]
+                  !"libp2p_helper process killed successfully: %s"
+                  (Unix.Exit_or_signal.to_string_hum e) ;
+              Deferred.unit ))
+    with
+    | Error e ->
+        failwith
+          ( "Could not start libp2p_helper. If you are a dev, did you forget \
+             to `make libp2p_helper` and set CODA_LIBP2P_HELPER_PATH? Try \
+             CODA_LIBP2P_HELPER_PATH=$PWD/src/app/libp2p_helper/result/bin/libp2p_helper "
+          ^ Error.to_string_hum e )
+    | Ok subprocess ->
+        Strict_pipe.Reader.iter (Child_processes.stderr_lines subprocess)
+          ~f:(fun line ->
+            ( match Go_log.record_of_yojson (Yojson.Safe.from_string line) with
+            | Ok record -> (
+                let r = Go_log.(record_to_message record) in
+                let r =
+                  if
+                    String.( = ) r.message
+                      "failed when refreshing routing table"
+                  then {r with level= Info}
+                  else r
+                in
+                try Logger.raw logger r
+                with _exn ->
+                  Logger.raw logger
+                    { r with
+                      message=
+                        "(go log message was not valid for logger; see $line)"
+                    ; metadata= String.Map.singleton "line" (`String r.message)
+                    } )
+            | Error err ->
+                [%log error]
+                  ~metadata:[("line", `String line); ("error", `String err)]
+                  "failed to parse log line from helper stderr" ) ;
+            Deferred.unit )
+        |> don't_wait_for ;
+        Strict_pipe.Reader.iter (Child_processes.stdout_lines subprocess)
+          ~f:(fun line ->
+            let open Yojson.Safe.Util in
+            let v = Yojson.Safe.from_string line in
+            ( match
+                if member "upcall" v = `Null then Helper.handle_response t v
+                else Helper.handle_upcall t v
+              with
+            | Ok () ->
+                ()
+            | Error e ->
+                [%log error] "handling line from helper failed! $err"
+                  ~metadata:
+                    [ ("line", `String line)
+                    ; ("err", `String (Error.to_string_hum e)) ] ) ;
+            Deferred.unit )
+        |> don't_wait_for ;
+        subprocess
+  in
+  subprocess := create_subprocess () ;
+  let%map _ = !(t.subprocess) in
+  Ok t
 
 let%test_module "coda network tests" =
   ( module struct
