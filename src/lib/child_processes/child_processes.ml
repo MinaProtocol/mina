@@ -20,6 +20,8 @@ type t =
       | `Handler of killed:bool -> Unix.Exit_or_signal.t -> unit Deferred.t
       | `Ignore ] }
 
+let pid : t -> Pid.t = fun t -> Process.pid t.process
+
 let stdout_lines : t -> string Strict_pipe.Reader.t = fun t -> t.stdout_pipe
 
 let stderr_lines : t -> string Strict_pipe.Reader.t = fun t -> t.stderr_pipe

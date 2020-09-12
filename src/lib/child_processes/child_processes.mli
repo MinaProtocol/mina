@@ -17,6 +17,9 @@ val stderr_lines : t -> string Strict_pipe.Reader.t
 (** Writer to process's stdin *)
 val stdin : t -> Writer.t
 
+(** Pid of process *)
+val pid : t -> Core.Pid.t
+
 (** [None] if the process is still running, [Some] when it's exited *)
 val termination_status : t -> Unix.Exit_or_signal.t option
 

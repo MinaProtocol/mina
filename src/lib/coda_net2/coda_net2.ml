@@ -1359,6 +1359,10 @@ let create ~logger ~conf_dir : Helper.t Deferred.Or_error.t =
           ^ Error.to_string_hum e )
     | Ok subprocess ->
         t.subprocess := Deferred.return subprocess ;
+        [%log trace]
+          ~metadata:
+            [("pid", `String (Pid.to_string (Child_processes.pid subprocess)))]
+          "Successfully spawned helper" ;
         Strict_pipe.Reader.iter (Child_processes.stderr_lines subprocess)
           ~f:(fun line ->
             ( match Go_log.record_of_yojson (Yojson.Safe.from_string line) with
