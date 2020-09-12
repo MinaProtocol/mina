@@ -725,8 +725,15 @@ module Helper = struct
                           value here except ignore is UNSOUND because
                           write_pipe has a cast type. We don't remember
                           what the original 'return was. *)
-                  Strict_pipe.Writer.write sub.write_pipe (wrap m.sender data)
-                  |> ignore
+                  if Strict_pipe.Writer.is_closed sub.write_pipe then
+                    [%log' error t.logger]
+                      "subscription writer for $topic unexpectedly closed. \
+                       dropping message."
+                      ~metadata:[("topic", `String sub.topic)]
+                  else
+                    Strict_pipe.Writer.write sub.write_pipe
+                      (wrap m.sender data)
+                    |> ignore
               | Error e ->
                   ( match sub.on_decode_failure with
                   | `Ignore ->
