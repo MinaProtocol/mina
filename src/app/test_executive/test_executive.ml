@@ -71,17 +71,14 @@ let main inputs =
     let cleanup () =
       let cleanup_result =
         let open Malleable_error.Let_syntax in
-        let%bind () = test_error in
+        (* let%bind () = test_error in *)
         let%bind remote_error_set =
           Option.value_map !log_engine_ref
             ~default:(Malleable_error.return Test_error.Set.empty)
             ~f:Engine.Log_engine.destroy
         in
         let%map () =
-          Option.value_map !net_manager_ref
-            ~default:
-              Malleable_error.ok_unit
-              (* ~f:((Engine.Network_manager.cleanup)) *)
+          Option.value_map !net_manager_ref ~default:Malleable_error.ok_unit
             ~f:
               (Fn.compose
                  (Deferred.bind ~f:Malleable_error.return)
