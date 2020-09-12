@@ -37,7 +37,7 @@ module Subscription = struct
     in
     let%bind authorization =
       let%map token =
-        Malleable_error.or_error_to_malleable_error
+        Malleable_error.or_error_to_hard_malleable_error
           (Process.run ~prog ~args:["auth"; "print-access-token"] ())
       in
       let token = String.strip token in
@@ -59,7 +59,7 @@ module Subscription = struct
       |> Yojson.Safe.to_string
     in
     let%bind response =
-      Malleable_error.or_error_to_malleable_error
+      Malleable_error.or_error_to_hard_malleable_error
         (Process.run ~prog:"curl"
            ~args:
              [ "--request"
@@ -103,11 +103,11 @@ module Subscription = struct
             gcloud_key_file_env
     in
     let create_topic name =
-      Malleable_error.or_error_to_malleable_error
+      Malleable_error.or_error_to_hard_malleable_error
         (Process.run ~prog ~args:["pubsub"; "topics"; "create"; name] ())
     in
     let create_subscription name topic =
-      Malleable_error.or_error_to_malleable_error
+      Malleable_error.or_error_to_hard_malleable_error
         (Process.run ~prog
            ~args:
              [ "pubsub"
@@ -129,22 +129,31 @@ module Subscription = struct
 
   let delete t =
     let delete_subscription () =
-      Process.run ~prog
-        ~args:
-          ["pubsub"; "subscriptions"; "delete"; t.name; "--project"; project_id]
-        ()
+      Malleable_error.or_error_to_hard_malleable_error
+        (Process.run ~prog
+           ~args:
+             [ "pubsub"
+             ; "subscriptions"
+             ; "delete"
+             ; t.name
+             ; "--project"
+             ; project_id ]
+           ())
     in
     let delete_sink () =
-      Process.run ~prog
-        ~args:["logging"; "sinks"; "delete"; t.sink; "--project"; project_id]
-        ()
+      Malleable_error.or_error_to_hard_malleable_error
+        (Process.run ~prog
+           ~args:["logging"; "sinks"; "delete"; t.sink; "--project"; project_id]
+           ())
     in
     let delete_topic () =
-      Process.run ~prog
-        ~args:["pubsub"; "topics"; "delete"; t.topic; "--project"; project_id]
-        ()
+      Malleable_error.or_error_to_hard_malleable_error
+        (Process.run ~prog
+           ~args:
+             ["pubsub"; "topics"; "delete"; t.topic; "--project"; project_id]
+           ())
     in
-    Deferred.Or_error.combine_errors
+    Malleable_error.combine_errors
       [delete_subscription (); delete_sink (); delete_topic ()]
 
   let pull t =
@@ -154,7 +163,7 @@ module Subscription = struct
     in
     (* The limit for messages we pull on each interval is currently not configurable. For now, it's set to 5 (which will hopefully be a sane for a while). *)
     let%bind result =
-      Malleable_error.or_error_to_malleable_error
+      Malleable_error.or_error_to_hard_malleable_error
         (Process.run ~prog
            ~args:
              [ "pubsub"
@@ -421,7 +430,7 @@ type t =
   ; initialization_table: unit Ivar.t String.Map.t }
 
 let delete_subscriptions {errors; initialization; blocks_produced} =
-  Deferred.Or_error.combine_errors
+  Malleable_error.combine_errors
     [ Subscription.delete errors
     ; Subscription.delete initialization
     ; Subscription.delete blocks_produced ]
@@ -548,11 +557,11 @@ let create ~logger ~(network : Kubernetes_network.t) ~on_fatal_error =
   ; logger }
 
 (* TODO figure out how much of this {Test_error.Set.soft_errors; hard_errors} struct and the t struct that we still need *)
-let destroy t : 'a Malleable_error.t =
+let destroy t : Test_error.Set.t Malleable_error.t =
   let open Malleable_error.Let_syntax in
   let { testnet_log_filter= _
       ; constants= _
-      ; logger
+      ; logger= _
       ; subscriptions
       ; cancel_background_tasks
       ; initialization_table= _
@@ -560,28 +569,9 @@ let destroy t : 'a Malleable_error.t =
     t
   in
   let%bind () =
-    Deferred.map (cancel_background_tasks ()) ~f:(fun _ ->
-        Malleable_error.return_unit_without_deferred )
+    Deferred.bind (cancel_background_tasks ()) ~f:Malleable_error.return
   in
-  let open Deferred.Let_syntax in
-  match%map delete_subscriptions subscriptions with
-  | Ok _ ->
-      Malleable_error.return_unit_without_deferred
-  | Error e' ->
-      [%log fatal] "Error deleting subscriptions: $error"
-        ~metadata:[("error", `String (Error.to_string_hum e'))] ;
-      Malleable_error.return_unit_without_deferred
-
-(* let%map () =
-    let open Deferred.Let_syntax in
-    match%map delete_subscriptions subscriptions with
-    | Ok _ ->
-        Malleable_error.return_unit_without_deferred
-    | Error e' ->
-        [%log fatal] "Error deleting subscriptions: $error"
-          ~metadata:[("error", `String (Error.to_string_hum e'))] ;
-        Malleable_error.return_unit_without_deferred
-  in
+  let%map _ = delete_subscriptions subscriptions in
   let lift error_array =
     DynArray.to_list error_array
     |> List.map ~f:(fun {Error_query.Result.pod_id; message} ->
@@ -593,7 +583,7 @@ let destroy t : 'a Malleable_error.t =
   let hard_errors =
     lift error_accumulator.error @ lift error_accumulator.fatal
   in
-  {Test_error.Set.soft_errors; hard_errors} *)
+  {Test_error.Set.soft_errors; hard_errors}
 
 (*TODO: Node status. Should that be a part of a node query instead? or we need a new log that has status info and some node identifier*)
 let wait_for' :

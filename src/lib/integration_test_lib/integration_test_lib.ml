@@ -34,8 +34,6 @@ module Test_config = struct
          Signature_lib.Public_key.Compressed.to_string pk) }
 end
 
-(* TODO remove this struct *)
-
 module Test_error = struct
   type t =
     | Remote_error of {node_id: string; error_message: Logger.Message.t}
@@ -67,6 +65,8 @@ module Test_error = struct
     let empty = {soft_errors= []; hard_errors= []}
 
     let soft_singleton err = {empty with soft_errors= [err]}
+
+    let soft_fromList errs = {empty with soft_errors= errs}
 
     let hard_singleton err = {empty with hard_errors= [err]}
 
@@ -137,7 +137,7 @@ module type Engine_intf = sig
       -> on_fatal_error:(unit -> unit)
       -> t Malleable_error.t
 
-    val destroy : t -> 'a Malleable_error.t
+    val destroy : t -> Test_error.Set.t Malleable_error.t
 
     (** waits until a block is produced with at least one of the following conditions being true
       1. Blockchain length = blocks

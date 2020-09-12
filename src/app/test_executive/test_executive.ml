@@ -40,7 +40,7 @@ let report_test_errors error_set =
     ) ;
     Out_channel.(flush stderr) ;
     exit 1 )
-  else Deferred.unit
+  else Malleable_error.ok_unit
 
 let main inputs =
   (* TODO: abstract over which engine is in use, allow engine to be set form CLI *)
@@ -67,48 +67,85 @@ let main inputs =
   let net_manager_ref : Engine.Network_manager.t option ref = ref None in
   let log_engine_ref : Engine.Log_engine.t option ref = ref None in
   let cleanup_deferred_ref = ref None in
-  let dispatch_cleanup reason test_error =
-    let open Deferred.Let_syntax in
-    let cleanup test_error =
-      let test_error_set =
-        match test_error with
-        | None ->
-            Test_error.Set.empty
-        | Some err ->
-            Test_error.Set.hard_singleton (Test_error.internal_error err)
+  let dispatch_cleanup reason (test_error : 'a Malleable_error.t) :
+      unit Malleable_error.t =
+    let open Malleable_error.Let_syntax in
+    let%bind cleanup (test_error : 'a Malleable_error.t) : unit =
+      let%bind test_error_set =
+        match%bind test_error with
+        | Ok
+            { Malleable_error.Accumulator.computation_result= _
+            ; soft_errors= err_list } ->
+            let test_err_list =
+              List.map err_list
+                ~f:Integration_test_lib.Test_error.internal_error
+            in
+            Test_error.Set.soft_fromList test_err_list
+        | Error
+            { Malleable_error.Hard_fail.hard_error= hard_err
+            ; Malleable_error.Hard_fail.soft_errors= soft_list } ->
+            let hardset =
+              Test_error.Set.hard_singleton
+                (Test_error.internal_error hard_err)
+            in
+            let test_err_list =
+              List.map soft_list
+                ~f:Integration_test_lib.Test_error.internal_error
+            in
+            let softset = Test_error.Set.soft_fromList test_err_list in
+            Test_error.Set.merge hardset softset
       in
       let%bind log_engine_error_set =
         Option.value_map !log_engine_ref
-          ~default:(Deferred.return Test_error.Set.empty) ~f:(fun log_engine ->
-            Engine.Log_engine.destroy log_engine )
+          ~default:(Malleable_error.return Test_error.Set.empty)
+          ~f:Engine.Log_engine.destroy
       in
       let%bind () =
-        Option.value_map !net_manager_ref ~default:Deferred.unit
-          ~f:Engine.Network_manager.cleanup
+        Option.value_map !net_manager_ref
+          ~default:
+            Malleable_error.ok_unit (* ~f:((Engine.Network_manager.cleanup)) *)
+          ~f:
+            (Fn.compose
+               (Deferred.bind ~f:Malleable_error.return)
+               Engine.Network_manager.cleanup)
       in
       report_test_errors
         (Test_error.Set.combine [test_error_set; log_engine_error_set])
     in
     match !cleanup_deferred_ref with
     | Some deferred ->
+        let%map test_error_str =
+          match%map test_error with
+          | Ok
+              { Malleable_error.Accumulator.computation_result= _
+              ; soft_errors= _ } ->
+              "<none>"
+          | Error
+              { Malleable_error.Hard_fail.hard_error= hard_err
+              ; Malleable_error.Hard_fail.soft_errors= _ } ->
+              Error.to_string_hum hard_err
+        in
         [%log error]
           "additional call to cleanup testnet while already cleaning up \
            ($reason, $error)"
           ~metadata:
-            [ ("reason", `String reason)
-            ; ( "error"
-              , `String
-                  ( Option.map test_error ~f:Error.to_string_hum
-                  |> Option.value ~default:"<none>" ) ) ] ;
+            [("reason", `String reason); ("error", `String test_error_str)] ;
         deferred
     | None ->
+        let%map test_error_str =
+          match%map test_error with
+          | Ok
+              { Malleable_error.Accumulator.computation_result= _
+              ; soft_errors= _ } ->
+              "<none>"
+          | Error
+              { Malleable_error.Hard_fail.hard_error= hard_err
+              ; Malleable_error.Hard_fail.soft_errors= _ } ->
+              Error.to_string_hum hard_err
+        in
         [%log info] "cleaning up testnet ($reason, $error)"
           ~metadata:
-            [ ("reason", `String reason)
-            ; ( "error"
-              , `String
-                  ( Option.map test_error ~f:Error.to_string_hum
-                  |> Option.value ~default:"<none>" ) ) ] ;
+            [("reason", `String reason); ("error", `String test_error_str)] ;
         let deferred = cleanup test_error in
         cleanup_deferred_ref := Some deferred ;
         deferred
@@ -123,7 +160,7 @@ let main inputs =
       don't_wait_for (dispatch_cleanup "signal received" (Some error)) ) ;
   let%bind test_result =
     Monitor.try_with_join_or_error ~extract_exn:true (fun () ->
-        let open Deferred.Or_error.Let_syntax in
+        let open Malleable_error.Let_syntax in
         let%bind net_manager =
           to_or_error @@ Engine.Network_manager.create network_config
         in
