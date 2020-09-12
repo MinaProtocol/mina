@@ -175,7 +175,11 @@ end
   *
   * This can fail for a variety of reasons related to spawning the subprocess.
 *)
-val create : logger:Logger.t -> conf_dir:string -> net Deferred.Or_error.t
+val create :
+     on_unexpected_termination:(unit -> unit Deferred.t)
+  -> logger:Logger.t
+  -> conf_dir:string
+  -> net Deferred.Or_error.t
 
 (** Configure the network connection.
   *

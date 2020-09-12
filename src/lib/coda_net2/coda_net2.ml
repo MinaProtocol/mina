@@ -1301,7 +1301,7 @@ let unban_ip net ip =
 
 let banned_ips net = Deferred.return net.Helper.banned_ips
 
-let create ~logger ~conf_dir =
+let create ~on_unexpected_termination ~logger ~conf_dir =
   let outstanding_requests = Hashtbl.create (module Int) in
   let termination_hack_ref : Helper.t option ref = ref None in
   match%bind
@@ -1329,7 +1329,9 @@ let create ~logger ~conf_dir =
                   [%log fatal]
                     !"libp2p_helper process died unexpectedly: %s"
                     (Unix.Exit_or_signal.to_string_hum e) ;
-                  raise Child_processes.Child_died
+                  Option.iter !termination_hack_ref ~f:(fun t ->
+                      t.finished <- true ) ;
+                  on_unexpected_termination ()
               | Ok () ->
                   [%log error]
                     "libp2p helper process exited peacefully but it should \
@@ -1422,12 +1424,16 @@ let%test_module "coda network tests" =
         create
           ~logger:(Logger.extend logger [("name", `String "a")])
           ~conf_dir:a_tmp
+          ~on_unexpected_termination:(fun () ->
+            raise Child_processes.Child_died )
         >>| Or_error.ok_exn
       in
       let%bind b =
         create
           ~logger:(Logger.extend logger [("name", `String "b")])
           ~conf_dir:b_tmp
+          ~on_unexpected_termination:(fun () ->
+            raise Child_processes.Child_died )
         >>| Or_error.ok_exn
       in
       let%bind kp_a = Keypair.random a in
