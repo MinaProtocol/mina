@@ -228,7 +228,7 @@ module Json_parsing = struct
         in
         find parser entry path'
     | _ ->
-        Malleable_error.return_of_error
+        Malleable_error.hard_error
           (Error.of_string "expected json object when searching for path")
 end
 
@@ -450,7 +450,7 @@ let rec pull_subscription_in_background ~logger ~subscription_name
     uninterruptible
       ( match results with
       | Error err ->
-          Error.raise err.hard_error
+          Error.raise err.hard_error.error
       | Ok res ->
           Deferred.List.iter res.computation_result
             ~f:(Fn.compose Malleable_error.ok_exn handle_result) )
@@ -536,7 +536,7 @@ let create ~logger ~(network : Kubernetes_network.t) ~on_fatal_error =
         in
         if Ivar.is_empty ivar then ( Ivar.fill ivar () ; return () )
         else
-          Malleable_error.return_of_error
+          Malleable_error.hard_error
             (Error.of_string
                "received initialization for node that has already initialized")
         )
@@ -720,7 +720,7 @@ let wait_for :
       Malleable_error.ok_unit
   | Error {Malleable_error.Hard_fail.hard_error= e; soft_errors= se} ->
       [%log' fatal t.logger] "wait_for failed with error: $error"
-        ~metadata:[("error", `String (Error.to_string_hum e))] ;
+        ~metadata:[("error", `String (Error.to_string_hum e.error))] ;
       Deferred.return
         (Error {Malleable_error.Hard_fail.hard_error= e; soft_errors= se})
 

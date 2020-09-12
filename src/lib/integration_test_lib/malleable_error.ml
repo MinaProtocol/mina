@@ -14,26 +14,14 @@ open Async_kernel
 
 module Hard_fail = struct
   type t =
-    { hard_error: Error.t
-          [@equal
-            fun a b ->
-              String.equal (Error.to_string_hum a) (Error.to_string_hum b)]
-    ; soft_errors: Error.t list
-          [@equal
-            List.equal (fun a b ->
-                String.equal (Error.to_string_hum a) (Error.to_string_hum b) )]
-    }
+    { hard_error: Test_error.internal_error
+    ; soft_errors: Test_error.internal_error list }
   [@@deriving eq, sexp_of, compare]
 end
 
 module Accumulator = struct
   type 'a t =
-    { computation_result: 'a
-    ; soft_errors: Error.t list
-          [@equal
-            List.equal (fun a b ->
-                String.equal (Error.to_string_hum a) (Error.to_string_hum b) )]
-    }
+    {computation_result: 'a; soft_errors: Test_error.internal_error list}
   [@@deriving eq, sexp_of, compare]
 end
 
@@ -92,16 +80,28 @@ let ok_exn (res : 'a t) : 'a Deferred.t =
   | Ok {Accumulator.computation_result= x; soft_errors= _} ->
       Deferred.return x
   | Error {Hard_fail.hard_error= err; Hard_fail.soft_errors= _} ->
-      Error.raise err
+      Error.raise err.error
 
 let error_string message =
   Deferred.return
-    (Error {Hard_fail.hard_error= Error.of_string message; soft_errors= []})
+    (Error
+       { Hard_fail.hard_error=
+           Test_error.raw_internal_error (Error.of_string message)
+       ; soft_errors= [] })
 
 let errorf format = Printf.ksprintf error_string format
 
-let return_of_error a =
-  Deferred.return (Error {Hard_fail.hard_error= a; soft_errors= []})
+let soft_error res err =
+  Deferred.return
+    (Ok
+       { Accumulator.computation_result= res
+       ; soft_errors= [Test_error.raw_internal_error err] })
+
+let hard_error err =
+  Deferred.return
+    (Error
+       { Hard_fail.hard_error= Test_error.raw_internal_error err
+       ; soft_errors= [] })
 
 let or_error_to_hard_malleable_error (or_err : 'a Deferred.Or_error.t) : 'a t =
   let open Deferred.Let_syntax in
@@ -109,7 +109,9 @@ let or_error_to_hard_malleable_error (or_err : 'a Deferred.Or_error.t) : 'a t =
   | Ok x ->
       Ok {Accumulator.computation_result= x; soft_errors= []}
   | Error err ->
-      Error {Hard_fail.hard_error= err; soft_errors= []}
+      Error
+        { Hard_fail.hard_error= Test_error.raw_internal_error err
+        ; soft_errors= [] }
 
 let or_error_to_soft_malleable_error (res : 'a)
     (or_err : 'a Deferred.Or_error.t) : 'a t =
@@ -118,7 +120,9 @@ let or_error_to_soft_malleable_error (res : 'a)
   | Ok x ->
       Ok {Accumulator.computation_result= x; soft_errors= []}
   | Error err ->
-      Ok {Accumulator.computation_result= res; soft_errors= [err]}
+      Ok
+        { Accumulator.computation_result= res
+        ; soft_errors= [Test_error.raw_internal_error err] }
 
 (* 
 'a Malleable_error.t list -> 'a list Malleable_error.t
@@ -149,7 +153,9 @@ let try_with ?(backtrace = false) (f : unit -> 'a) : 'a t =
     Deferred.return
       (Error
          { Hard_fail.hard_error=
-             Error.of_exn exn ?backtrace:(if backtrace then Some `Get else None)
+             Test_error.raw_internal_error
+               (Error.of_exn exn
+                  ?backtrace:(if backtrace then Some `Get else None))
          ; soft_errors= [] })
 
 let rec malleable_error_list_iter ls ~f =
@@ -188,9 +194,24 @@ let malleable_error_of_option opt msg : 'a t =
     ~default:
       (Deferred.return
          (Error
-            { Hard_fail.hard_error= Error.of_string msg
+            { Hard_fail.hard_error=
+                Test_error.raw_internal_error (Error.of_string msg)
             ; Hard_fail.soft_errors= [] }))
     ~f:T.return
+
+let lift_error_set (type a) (m : a t) :
+    (a * Test_error.Set.t, Test_error.Set.t) Deferred.Result.t =
+  let open Deferred.Let_syntax in
+  let internal_error err = Test_error.Internal_error err in
+  let internal_error_set hard_errors soft_errors =
+    { Test_error.Set.hard_errors= List.map hard_errors ~f:internal_error
+    ; soft_errors= List.map soft_errors ~f:internal_error }
+  in
+  match%map m with
+  | Ok {Accumulator.computation_result; soft_errors} ->
+      Ok (computation_result, internal_error_set [] soft_errors)
+  | Error {Hard_fail.hard_error; soft_errors} ->
+      Error (internal_error_set [hard_error] soft_errors)
 
 (* Unit tests to follow *)
 
@@ -233,17 +254,22 @@ let%test_unit "error_monad_unit_test_3" =
           Deferred.return
             (Ok
                { Accumulator.computation_result= ()
-               ; soft_errors= [Error.of_string "a"] })
+               ; soft_errors=
+                   [Test_error.raw_internal_error (Error.of_string "a")] })
         in
         Deferred.return
           (Ok
              { Accumulator.computation_result= "123"
-             ; soft_errors= [Error.of_string "b"] })
+             ; soft_errors=
+                 [Test_error.raw_internal_error (Error.of_string "b")] })
       in
       [%test_eq: (string Accumulator.t, Hard_fail.t) Result.t] test3
         (Ok
            { Accumulator.computation_result= "123"
-           ; soft_errors= List.map ["a"; "b"] ~f:Error.of_string }) )
+           ; soft_errors=
+               List.map ["a"; "b"]
+                 ~f:(Fn.compose Test_error.raw_internal_error Error.of_string)
+           }) )
 
 let%test_unit "error_monad_unit_test_4" =
   Async.Thread_safe.block_on_async_exn (fun () ->
@@ -255,11 +281,16 @@ let%test_unit "error_monad_unit_test_4" =
             (Ok {Accumulator.computation_result= (); soft_errors= []})
         in
         Deferred.return
-          (Error {Hard_fail.hard_error= Error.of_string "xyz"; soft_errors= []})
+          (Error
+             { Hard_fail.hard_error=
+                 Test_error.raw_internal_error (Error.of_string "xyz")
+             ; soft_errors= [] })
       in
       [%test_eq: (string Accumulator.t, Hard_fail.t) Result.t] test4
-        (Error {Hard_fail.hard_error= Error.of_string "xyz"; soft_errors= []})
-  )
+        (Error
+           { Hard_fail.hard_error=
+               Test_error.raw_internal_error (Error.of_string "xyz")
+           ; soft_errors= [] }) )
 
 let%test_unit "error_monad_unit_test_5" =
   Async.Thread_safe.block_on_async_exn (fun () ->
@@ -270,15 +301,21 @@ let%test_unit "error_monad_unit_test_5" =
           Deferred.return
             (Ok
                { Accumulator.computation_result= ()
-               ; soft_errors= [Error.of_string "a"] })
+               ; soft_errors=
+                   [Test_error.raw_internal_error (Error.of_string "a")] })
         in
         Deferred.return
-          (Error {Hard_fail.hard_error= Error.of_string "xyz"; soft_errors= []})
+          (Error
+             { Hard_fail.hard_error=
+                 Test_error.raw_internal_error (Error.of_string "xyz")
+             ; soft_errors= [] })
       in
       [%test_eq: (string Accumulator.t, Hard_fail.t) Result.t] test5
         (Error
-           { Hard_fail.hard_error= Error.of_string "xyz"
-           ; soft_errors= [Error.of_string "a"] }) )
+           { Hard_fail.hard_error=
+               Test_error.raw_internal_error (Error.of_string "xyz")
+           ; soft_errors= [Test_error.raw_internal_error (Error.of_string "a")]
+           }) )
 
 let%test_unit "error_monad_unit_test_6" =
   Async.Thread_safe.block_on_async_exn (fun () ->
@@ -289,14 +326,20 @@ let%test_unit "error_monad_unit_test_6" =
           Deferred.return
             (Ok
                { Accumulator.computation_result= ()
-               ; soft_errors= [Error.of_string "a"] })
+               ; soft_errors=
+                   [Test_error.raw_internal_error (Error.of_string "a")] })
         in
         Deferred.return
           (Error
-             { Hard_fail.hard_error= Error.of_string "xyz"
-             ; soft_errors= [Error.of_string "b"] })
+             { Hard_fail.hard_error=
+                 Test_error.raw_internal_error (Error.of_string "xyz")
+             ; soft_errors=
+                 [Test_error.raw_internal_error (Error.of_string "b")] })
       in
       [%test_eq: (string Accumulator.t, Hard_fail.t) Result.t] test6
         (Error
-           { Hard_fail.hard_error= Error.of_string "xyz"
-           ; soft_errors= [Error.of_string "a"; Error.of_string "b"] }) )
+           { Hard_fail.hard_error=
+               Test_error.raw_internal_error (Error.of_string "xyz")
+           ; soft_errors=
+               [ Test_error.raw_internal_error (Error.of_string "a")
+               ; Test_error.raw_internal_error (Error.of_string "b") ] }) )

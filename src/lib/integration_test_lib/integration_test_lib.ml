@@ -1,6 +1,7 @@
 open Core_kernel
 open Async_kernel
 module Malleable_error = Malleable_error
+module Test_error = Test_error
 
 module Container_images = struct
   type t = {coda: string; user_agent: string; bots: string; points: string}
@@ -32,50 +33,6 @@ module Test_config = struct
     ; snark_worker_public_key=
         (let pk, _ = (Lazy.force Coda_base.Sample_keypairs.keypairs).(0) in
          Signature_lib.Public_key.Compressed.to_string pk) }
-end
-
-module Test_error = struct
-  type t =
-    | Remote_error of {node_id: string; error_message: Logger.Message.t}
-    | Internal_error of {occurrence_time: Time.t; error: Error.t}
-
-  let internal_error error =
-    Internal_error {occurrence_time= Time.now (); error}
-
-  let to_string = function
-    | Remote_error {node_id; error_message} ->
-        Printf.sprintf "[%s] %s: %s"
-          (Time.to_string error_message.timestamp)
-          node_id
-          (Yojson.Safe.to_string (Logger.Message.to_yojson error_message))
-    | Internal_error {occurrence_time; error} ->
-        Printf.sprintf "[%s] test_executive: %s"
-          (Time.to_string occurrence_time)
-          (Error.to_string_hum error)
-
-  let occurrence_time = function
-    | Remote_error {error_message; _} ->
-        error_message.timestamp
-    | Internal_error {occurrence_time; _} ->
-        occurrence_time
-
-  module Set = struct
-    type nonrec t = {soft_errors: t list; hard_errors: t list}
-
-    let empty = {soft_errors= []; hard_errors= []}
-
-    let soft_singleton err = {empty with soft_errors= [err]}
-
-    let soft_fromList errs = {empty with soft_errors= errs}
-
-    let hard_singleton err = {empty with hard_errors= [err]}
-
-    let merge a b =
-      { soft_errors= a.soft_errors @ b.soft_errors
-      ; hard_errors= a.hard_errors @ b.hard_errors }
-
-    let combine = List.fold_left ~init:empty ~f:merge
-  end
 end
 
 (** The signature of integration test engines. An integration test engine
