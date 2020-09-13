@@ -9,7 +9,7 @@ module Styles = {
       width(`percent(100.)),
       important(backgroundSize(`cover)),
       backgroundImage(
-        `url("/static/img/FeaturedAlternatingSectionsBackground.png"),
+        `url("/static/img/HomepageAlternatingSectionsBackground.png"),
       ),
       media(Theme.MediaQuery.tablet, [height(`rem(190.))]),
       media(Theme.MediaQuery.desktop, [height(`rem(230.))]),
@@ -47,16 +47,37 @@ module Styles = {
       borderBottom(`px(1), `solid, Theme.Colors.digitalBlack),
       before([
         contentRule(seperatorNumber),
+        Theme.Typeface.monumentGrotesk,
         color(Theme.Colors.digitalBlack),
+        lineHeight(`rem(1.5)),
+        letterSpacing(`px(-1)),
       ]),
     ]);
 
-  let title = style([marginTop(`rem(1.5))]);
+  let title = merge([Theme.Type.h2, style([marginTop(`rem(1.5))])]);
 
-  let paragraphText = style([marginTop(`rem(1.5))]);
+  let paragraphText =
+    merge([Theme.Type.paragraph, style([marginTop(`rem(1.5))])]);
 
   let linkText =
-    style([marginTop(`rem(1.5)), display(`flex), alignItems(`center)]);
+    merge([
+      Theme.Type.link,
+      style([
+        marginTop(`rem(1.5)),
+        display(`flex),
+        alignItems(`center),
+        cursor(`pointer),
+      ]),
+    ]);
+
+  let icon =
+    style([
+      display(`flex),
+      alignItems(`center),
+      justifyContent(`center),
+      marginLeft(`rem(0.5)),
+      marginTop(`rem(0.2)),
+    ]);
 
   let image =
     style([width(`percent(100.)), height(`auto), maxWidth(`rem(29.))]);
@@ -77,12 +98,16 @@ let make = () => {
                "Other protocols are so heavy they require intermediaries to run nodes, recreating the same old power dynamics. But Mina is light, so anyone can connect peer-to-peer and sync and verify the chain in seconds. Built on a consistent-sized cryptographic proof, the blockchain will stay accessible - even as it scales to millions of users.",
              )}
           </p>
-          <span className=Styles.linkText>
-            <span> {React.string("Explore the Tech")} </span>
-            <Icon kind=Icon.ArrowRightMedium />
-          </span>
+          <Next.Link href="/">
+            <span className=Styles.linkText>
+              <span> {React.string("Explore the Tech")} </span>
+              <span className=Styles.icon>
+                <Icon kind=Icon.ArrowRightMedium currentColor="orange" />
+              </span>
+            </span>
+          </Next.Link>
         </div>
-        <img src="/static/hands.png" className=Styles.image />
+        <img src="/static/img/hands.png" className=Styles.image />
       </div>
       <div className={Styles.rowContainer(~reverse=true, ())}>
         <div className=Styles.textContainer>
@@ -94,15 +119,19 @@ let make = () => {
           </h2>
           <p className=Styles.paragraphText>
             {React.string(
-               "With Mina, anyone who’s syncing the chain is also validating transactions like a full node. Mina’s design means any participant can take part in proof-of-stake consensus, have access to strong censorship-resistance and secure the blockchain.",
+               "With Mina, anyone who's syncing the chain is also validating transactions like a full node. Mina's design means any participant can take part in proof-of-stake consensus, have access to strong censorship-resistance and secure the blockchain.",
              )}
           </p>
           <span className=Styles.linkText>
             <span> {React.string("Run a node")} </span>
-            <Icon kind=Icon.ArrowRightMedium />
+            <Next.Link href="/">
+              <span className=Styles.icon>
+                <Icon kind=Icon.ArrowRightMedium currentColor="orange" />
+              </span>
+            </Next.Link>
           </span>
         </div>
-        <img src="/static/spread.png" />
+        <img src="/static/img/spread.png" className=Styles.image />
       </div>
       <div className={Styles.rowContainer()}>
         <div className=Styles.textContainer>
@@ -112,15 +141,19 @@ let make = () => {
           </h2>
           <p className=Styles.paragraphText>
             {React.string(
-               "Other protocols are weighed down by terabytes of private user data and network congestion. But on Mina’s 22kb chain, apps execute as fast as your bandwidth can carry them — paving the way for a seamless end user experience and mainstream adoption.",
+               "Other protocols are weighed down by terabytes of private user data and network congestion. But on Mina's 22kb chain, apps execute as fast as your bandwidth can carry them - paving the way for a seamless end user experience and mainstream adoption.",
              )}
           </p>
-          <span className=Styles.linkText>
-            <span> {React.string("Explore the Tech")} </span>
-            <Icon kind=Icon.ArrowRightMedium />
-          </span>
+          <Next.Link href="/">
+            <span className=Styles.linkText>
+              <span> {React.string("Explore the Tech")} </span>
+              <span className=Styles.icon>
+                <Icon kind=Icon.ArrowRightMedium currentColor="orange" />
+              </span>
+            </span>
+          </Next.Link>
         </div>
-        <img src="/static/shooting_star.png" />
+        <img src="/static/img/shooting_star.png" className=Styles.image />
       </div>
       <div className={Styles.rowContainer(~reverse=true, ())}>
         <div className=Styles.textContainer>
@@ -130,15 +163,19 @@ let make = () => {
           </h2>
           <p className=Styles.paragraphText>
             {React.string(
-               "Mina enables an entirely new category of applications — Snapps. These SNARK-powered decentralized apps are optimized for efficiency, privacy and scalability. Logic and data are computed off-chain, then verified on-chain by the end user’s device. And information is validated without disclosing specifics, so people stay in control of their personal data.",
+               "Mina enables an entirely new category of applications - Snapps. These SNARK-powered decentralized apps are optimized for efficiency, privacy and scalability. Logic and data are computed off-chain, then verified on-chain by the end user's device. And information is validated without disclosing specifics, so people stay in control of their personal data.",
              )}
           </p>
-          <span className=Styles.linkText>
-            <span> {React.string("Build on Mina")} </span>
-            <Icon kind=Icon.ArrowRightMedium />
-          </span>
+          <Next.Link href="/">
+            <span className=Styles.linkText>
+              <span> {React.string("Build on Mina")} </span>
+              <span className=Styles.icon>
+                <Icon kind=Icon.ArrowRightMedium currentColor="orange" />
+              </span>
+            </span>
+          </Next.Link>
         </div>
-        <img src="/static/parts.png" />
+        <img src="/static/img/parts.png" className=Styles.image />
       </div>
       <div className={Styles.rowContainer()}>
         <div className=Styles.textContainer>
@@ -148,15 +185,19 @@ let make = () => {
           </h2>
           <p className=Styles.paragraphText>
             {React.string(
-               "Mina’s peer-to-peer permissionless network empowers participants to build and interact with tokens directly — without going through a centralized wallet, exchange or intermediary. And payments can be made in Mina’s native asset, stablecoin or in user-generated programmable tokens — opening a real world of possibilities.",
+               "Mina's peer-to-peer permissionless network empowers participants to build and interact with tokens directly - without going through a centralized wallet, exchange or intermediary. And payments can be made in Mina's native asset, stablecoin or in user-generated programmable tokens - opening a real world of possibilities.",
              )}
           </p>
-          <span className=Styles.linkText>
-            <span> {React.string("Build on Mina")} </span>
-            <Icon kind=Icon.ArrowRightMedium />
-          </span>
+          <Next.Link href="/">
+            <span className=Styles.linkText>
+              <span> {React.string("Build on Mina")} </span>
+              <span className=Styles.icon>
+                <Icon kind=Icon.ArrowRightMedium currentColor="orange" />
+              </span>
+            </span>
+          </Next.Link>
         </div>
-        <img src="/static/door.png" />
+        <img src="/static/img/door.png" className=Styles.image />
       </div>
     </Wrapped>
   </div>;
