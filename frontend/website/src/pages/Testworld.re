@@ -112,7 +112,14 @@ module Styles = {
       width(`percent(100.)),
       marginTop(`rem(1.125)),
       letterSpacing(`rem(0.01)),
-      media(Theme.MediaQuery.notMobile, [flexDirection(`row)]),
+      selector("> div:last-child", [marginTop(`rem(2.))]),
+      media(
+        Theme.MediaQuery.notMobile,
+        [
+          flexDirection(`row),
+          selector("> div:last-child", [marginTop(`zero)]),
+        ],
+      ),
     ]);
 
   let release =
@@ -122,7 +129,8 @@ module Styles = {
       flexDirection(`column),
       justifyContent(`center),
       alignItems(`center),
-      width(`percent(40.)),
+      width(`percent(100.)),
+      media(Theme.MediaQuery.notMobile, [width(`percent(40.))]),
     ]);
 
   let releaseDates =
