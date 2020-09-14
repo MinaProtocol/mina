@@ -195,12 +195,14 @@ module HeroRows = {
       merge([
         heroRowImage,
         style([
-          position(`absolute),
-          left(`zero),
           backgroundImage(`url("/static/img/triangle_mobile.png")),
           media(
             Theme.MediaQuery.tablet,
-            [backgroundImage(`url("/static/img/triangle_tablet.png"))],
+            [
+              position(`absolute),
+              left(`zero),
+              backgroundImage(`url("/static/img/triangle_tablet.png")),
+            ],
           ),
           media(
             Theme.MediaQuery.desktop,
@@ -259,10 +261,13 @@ module HeroRows = {
         />
       </div>
       <div className=Styles.container>
-        <p className=Styles.subhead />
-        <p className=Styles.copy>
-          {React.string(
-             "In June of 2017, O(1) Labs kicked off an ambitious
+        <div className=Styles.secondColumn>
+          <p className=Styles.subhead>
+            {React.string("That's why we created Mina.")}
+          </p>
+          <p className=Styles.copy>
+            {React.string(
+               "In June of 2017, O(1) Labs kicked off an ambitious
                new open source project to design a layer one protocol
                that could deliver on the original promise of blockchain
                - true decentralization, scale and security.
@@ -303,12 +308,20 @@ module HeroRows = {
             {React.string(
                "Here's to a more efficient, elegant and fair future - for all of us.",
              )}
-          </strong>
-        </p>
-        <img
-          className=Styles.secondImage
-          src="/static/img/triangle_desktop.png"
-        />
+          </p>
+          <Spacer height=1. />
+          <p className=Styles.copy>
+            <strong>
+              {React.string(
+                 "Here's to a more efficient, elegant and fair future - for all of us.",
+               )}
+            </strong>
+          </p>
+          <img
+            className=Styles.secondImage
+            src="/static/img/triangle_desktop.png"
+          />
+        </div>
       </div>
     </div>;
   };
