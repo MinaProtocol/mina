@@ -14,6 +14,8 @@ end
 
 let other_pk = "B62qoDWfBZUxKpaoQCoFqr12wkaY84FrhxXNXzgBkMUi2Tz4K8kBDiv"
 
+let snark_pk = "B62qiWSQiF5Q9CsAHgjMHoEEyR2kJnnCvN9fxRps2NXULU15EeXbzPf"
+
 let wait span = Async.after span |> Deferred.map ~f:Result.return
 
 (* Keep trying to run `step` `retry_count` many times initially waiting for `initial_delay` and each time waiting `each_delay` *)
@@ -75,7 +77,12 @@ let verify_in_mempool_and_block ~logger ~rosetta_uri ~graphql_uri
     "Mempool operations: $operations" ;
   let%bind () =
     Operation_expectation.assert_similar_operations ~logger
-      ~expected:operation_expectations
+      ~expected:
+        ( operation_expectations
+        |> List.filter ~f:(fun op ->
+               not
+                 (String.equal op.Operation_expectation._type
+                    "fee_receiver_inc") ) )
       ~actual:mempool_res.transaction.operations ~situation:"mempool"
   in
   [%log info] "Verified mempool operations" ;
@@ -133,8 +140,8 @@ let verify_in_mempool_and_block ~logger ~rosetta_uri ~graphql_uri
             `Failed
         | Ok (Some block) ->
             `Succeeded block )
-      ~retry_count:10 ~initial_delay:(Span.of_ms 50.0)
-      ~each_delay:(Span.of_ms 250.0)
+      ~retry_count:20 ~initial_delay:(Span.of_ms 250.0)
+      ~each_delay:(Span.of_ms 500.0)
       ~failure_reason:"Took too long for a block to be created"
   in
   [%log debug]
@@ -163,7 +170,7 @@ let verify_in_mempool_and_block ~logger ~rosetta_uri ~graphql_uri
                 Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
             ; status= "Success"
             ; _type= "coinbase_inc"
-            ; target= None } ] )
+            ; target= `Check None } ] )
     ~actual:
       ( List.map (Option.value_exn block.block).transactions ~f:(fun txn ->
             txn.operations )
@@ -189,19 +196,47 @@ let direct_graphql_payment_through_block ~logger ~rosetta_uri ~graphql_uri
               Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
           ; status= "Pending"
           ; _type= "payment_source_dec"
-          ; target= None }
+          ; target= `Check None }
         ; { amount= Some 5_000_000_000
           ; account=
               Some {Account.pk= other_pk; token_id= Unsigned.UInt64.of_int 1}
           ; status= "Pending"
           ; _type= "payment_receiver_inc"
-          ; target= None }
+          ; target= `Check None }
         ; { amount= Some (-2_000_000_000)
           ; account=
               Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
           ; status= "Pending"
           ; _type= "fee_payer_dec"
-          ; target= None } ]
+          ; target= `Check None }
+        ; { amount= Some 2_000_000_000
+          ; account=
+              Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
+          ; status= "Pending"
+          ; _type= "fee_receiver_inc"
+          ; target= `Check None } ]
+
+let direct_graphql_no_account_fee_through_block ~logger ~rosetta_uri
+    ~graphql_uri ~network_response =
+  let open Deferred.Result.Let_syntax in
+  (* Unlock the account *)
+  let%bind _ = Poke.Account.unlock ~graphql_uri in
+  let fresh_pk = "B62qokqG3ueJmkj7zXaycV31tnG6Bbg3E8tDS5vkukiFic57rgstTbb" in
+  (* Send a payment *)
+  let%bind hash =
+    Poke.SendTransaction.payment ~fee:(`Int 7_000_000_000) ~amount:(`Int 1_000)
+      ~to_:(`String fresh_pk) ~graphql_uri ()
+  in
+  verify_in_mempool_and_block ~logger ~rosetta_uri ~graphql_uri ~txn_hash:hash
+    ~network_response
+    ~operation_expectations:
+      Operation_expectation.
+        [ { amount= Some (-7_000_000_000)
+          ; account=
+              Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
+          ; status= "Pending"
+          ; _type= "fee_payer_dec"
+          ; target= `Ignore } ]
 
 let direct_graphql_delegation_through_block ~logger ~rosetta_uri ~graphql_uri
     ~network_response =
@@ -222,13 +257,13 @@ let direct_graphql_delegation_through_block ~logger ~rosetta_uri ~graphql_uri
               Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
           ; status= "Pending"
           ; _type= "delegate_change"
-          ; target= Some other_pk }
+          ; target= `Check (Some other_pk) }
         ; { amount= Some (-2_000_000_000)
           ; account=
               Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
           ; status= "Pending"
           ; _type= "fee_payer_dec"
-          ; target= None } ]
+          ; target= `Check None } ]
 
 let direct_graphql_create_token_through_block ~logger ~rosetta_uri ~graphql_uri
     ~network_response =
@@ -249,12 +284,12 @@ let direct_graphql_create_token_through_block ~logger ~rosetta_uri ~graphql_uri
               Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
           ; status= "Pending"
           ; _type= "fee_payer_dec"
-          ; target= None }
+          ; target= `Check None }
         ; { amount= None
           ; account= None
           ; status= "Pending"
           ; _type= "create_token"
-          ; target= None } ]
+          ; target= `Check None } ]
 
 let direct_graphql_create_token_account_through_block ~logger ~rosetta_uri
     ~graphql_uri ~network_response =
@@ -275,7 +310,7 @@ let direct_graphql_create_token_account_through_block ~logger ~rosetta_uri
               Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
           ; status= "Pending"
           ; _type= "fee_payer_dec"
-          ; target= None } ]
+          ; target= `Check None } ]
 
 let direct_graphql_mint_tokens_through_block ~logger ~rosetta_uri ~graphql_uri
     ~network_response =
@@ -297,13 +332,13 @@ let direct_graphql_mint_tokens_through_block ~logger ~rosetta_uri ~graphql_uri
               Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
           ; status= "Pending"
           ; _type= "fee_payer_dec"
-          ; target= None }
+          ; target= `Check None }
         ; { amount= Some 1_000_000_000
           ; account=
               Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 2}
           ; status= "Pending"
           ; _type= "mint_tokens"
-          ; target= Some Poke.pk } ]
+          ; target= `Check (Some Poke.pk) } ]
 
 let construction_api_transaction_through_mempool ~logger ~rosetta_uri
     ~graphql_uri ~network_response ~operation_expectations ~operations =
@@ -316,7 +351,9 @@ let construction_api_transaction_through_mempool ~logger ~rosetta_uri
     Offline.Derive.req ~logger ~rosetta_uri ~network_response
       ~public_key_hex_bytes:keys.public_key_hex_bytes
   in
-  let operations = operations derive_res.address in
+  let operations =
+    operations (Option.value_exn derive_res.account_identifier)
+  in
   let%bind preprocess_res =
     Offline.Preprocess.req ~logger ~rosetta_uri ~network_response
       ~max_fee:(Unsigned.UInt64.of_int 100_000_000_000)
@@ -357,7 +394,7 @@ let construction_api_transaction_through_mempool ~logger ~rosetta_uri
     Offline.Combine.req ~logger ~rosetta_uri ~network_response ~signature
       ~unsigned_transaction:payloads_res.unsigned_transaction
       ~public_key_hex_bytes:keys.public_key_hex_bytes
-      ~address:derive_res.address
+      ~account_id:(Option.value_exn derive_res.account_identifier)
   in
   let%bind combine_parse_res =
     Offline.Parse.req ~logger ~rosetta_uri ~network_response
@@ -403,8 +440,8 @@ let construction_api_transaction_through_mempool ~logger ~rosetta_uri
 
 let construction_api_payment_through_mempool =
   construction_api_transaction_through_mempool
-    ~operations:(fun address ->
-      Poke.SendTransaction.payment_operations ~from:address
+    ~operations:(fun account_id ->
+      Poke.SendTransaction.payment_operations ~from:account_id.address
         ~fee:(Unsigned.UInt64.of_int 3_000_000_000)
         ~amount:(Unsigned.UInt64.of_int 10_000_000_000)
         ~to_:other_pk )
@@ -415,24 +452,24 @@ let construction_api_payment_through_mempool =
               Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
           ; status= "Pending"
           ; _type= "payment_source_dec"
-          ; target= None }
+          ; target= `Check None }
         ; { amount= Some 10_000_000_000
           ; account=
               Some {Account.pk= other_pk; token_id= Unsigned.UInt64.of_int 1}
           ; status= "Pending"
           ; _type= "payment_receiver_inc"
-          ; target= None }
+          ; target= `Check None }
         ; { amount= Some (-3_000_000_000)
           ; account=
               Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
           ; status= "Pending"
           ; _type= "fee_payer_dec"
-          ; target= None } ]
+          ; target= `Check None } ]
 
 let construction_api_delegation_through_mempool =
   construction_api_transaction_through_mempool
-    ~operations:(fun address ->
-      Poke.SendTransaction.delegation_operations ~from:address
+    ~operations:(fun account_id ->
+      Poke.SendTransaction.delegation_operations ~from:account_id.address
         ~fee:(Unsigned.UInt64.of_int 5_000_000_000)
         ~to_:other_pk )
     ~operation_expectations:
@@ -442,18 +479,18 @@ let construction_api_delegation_through_mempool =
               Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
           ; status= "Pending"
           ; _type= "delegate_change"
-          ; target= Some other_pk }
+          ; target= `Check (Some other_pk) }
         ; { amount= Some (-5_000_000_000)
           ; account=
               Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
           ; status= "Pending"
           ; _type= "fee_payer_dec"
-          ; target= None } ]
+          ; target= `Check None } ]
 
 let construction_api_create_token_through_mempool =
   construction_api_transaction_through_mempool
-    ~operations:(fun address ->
-      Poke.SendTransaction.create_token_operations ~sender:address
+    ~operations:(fun account_id ->
+      Poke.SendTransaction.create_token_operations ~sender:account_id.address
         ~fee:(Unsigned.UInt64.of_int 5_000_000_000) )
     ~operation_expectations:
       Operation_expectation.
@@ -462,17 +499,17 @@ let construction_api_create_token_through_mempool =
               Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
           ; status= "Pending"
           ; _type= "fee_payer_dec"
-          ; target= None }
+          ; target= `Check None }
         ; { amount= None
           ; account= None
           ; status= "Pending"
           ; _type= "create_token"
-          ; target= None } ]
+          ; target= `Check None } ]
 
 let construction_api_create_token_account_through_mempool =
   construction_api_transaction_through_mempool
-    ~operations:(fun address ->
-      Poke.SendTransaction.create_token_operations ~sender:address
+    ~operations:(fun account_id ->
+      Poke.SendTransaction.create_token_operations ~sender:account_id.address
         ~fee:(Unsigned.UInt64.of_int 5_000_000_000) )
     ~operation_expectations:
       Operation_expectation.
@@ -481,13 +518,13 @@ let construction_api_create_token_account_through_mempool =
               Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
           ; status= "Pending"
           ; _type= "fee_payer_dec"
-          ; target= None } ]
+          ; target= `Check None } ]
 
 let construction_api_mint_tokens_through_mempool =
   construction_api_transaction_through_mempool
-    ~operations:(fun address ->
-      Poke.SendTransaction.mint_tokens_operations ~sender:address
-        ~receiver:address
+    ~operations:(fun account_id ->
+      Poke.SendTransaction.mint_tokens_operations ~sender:account_id.address
+        ~receiver:account_id.address
         ~amount:(Unsigned.UInt64.of_int 1_000_000_000)
         ~fee:(Unsigned.UInt64.of_int 3_000_000_000) )
     ~operation_expectations:
@@ -497,13 +534,13 @@ let construction_api_mint_tokens_through_mempool =
               Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
           ; status= "Pending"
           ; _type= "fee_payer_dec"
-          ; target= None }
+          ; target= `Check None }
         ; { amount= Some 1_000_000_000
           ; account=
               Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 2}
           ; status= "Pending"
           ; _type= "mint_tokens"
-          ; target= Some Poke.pk } ]
+          ; target= `Check (Some Poke.pk) } ]
 
 (* for each possible user command, run the command via GraphQL, check that
     the command is in the transaction pool
@@ -542,6 +579,14 @@ let check_new_account_user_commands ~logger ~rosetta_uri ~graphql_uri =
       ~network_response
   in
   [%log info] "Created payment and waited" ;
+  (* Stop staking so we can rely on things being in the mempool again *)
+  let%bind _res = Poke.Staking.disable ~graphql_uri in
+  [%log info] "Starting payment (no account fee) check" ;
+  let%bind () =
+    direct_graphql_no_account_fee_through_block ~logger ~rosetta_uri
+      ~graphql_uri ~network_response
+  in
+  [%log info] "Created payment (no account fee) and waited" ;
   (* Stop staking so we can rely on things being in the mempool again *)
   let%bind _res = Poke.Staking.disable ~graphql_uri in
   (* Follow the full construction API flow and make sure the submitted

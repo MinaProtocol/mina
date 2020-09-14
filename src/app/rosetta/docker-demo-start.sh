@@ -39,6 +39,7 @@ sleep 3
 
 # Setup and run demo-node
 PK=${PK:-B62qrPN5Y5yq8kGE3FbVKbGTdTAJNdtNtB5sNVpxyRwWGcDEhpMzc8g}
+SNARK_PK=${SNARK_PK:-B62qiWSQiF5Q9CsAHgjMHoEEyR2kJnnCvN9fxRps2NXULU15EeXbzPf}
 genesis_time=$(date -d '2019-01-30 20:00:00.000000Z' '+%s')
 now_time=$(date +%s)
 export CODA_TIME_OFFSET=$(( $now_time - $genesis_time ))
@@ -61,7 +62,7 @@ echo "========================= STARTING DAEMON ==========================="
   -insecure-rest-server \
   -log-level debug \
   -log-json \
-  -run-snark-worker $PK \
+  -run-snark-worker $SNARK_PK \
   -seed \
   $@
 
