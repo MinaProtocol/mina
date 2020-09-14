@@ -2495,7 +2495,7 @@ module Base = struct
                (* Only default tokens may participate in delegation. *)
                Boolean.(is_empty_and_writeable && token_default)
              in
-             let%bind delegate =
+             let%map delegate =
                Public_key.Compressed.Checked.if_ may_delegate
                  ~then_:(Account_id.Checked.public_key receiver)
                  ~else_:account.delegate
@@ -2514,48 +2514,17 @@ module Base = struct
                  ~then_:payload.body.token_locked
                  ~else_:account.token_permissions.token_locked
              in
-             let t =
-               { Account.Poly.balance
-               ; public_key
-               ; token_id
-               ; token_permissions=
-                   {Token_permissions.token_owner; token_locked}
-               ; nonce= account.nonce
-               ; receipt_chain_hash= account.receipt_chain_hash
-               ; delegate
-               ; voting_for= account.voting_for
-               ; timing= account.timing
-               ; permissions= account.permissions
-               ; snapp= account.snapp }
-             in
-             let%bind `Min_balance _, timing =
-               [%with_label "Check fee payer timing"]
-                 (let txn_amount = Amount.(var_of_t zero) in
-                  let balance_check ok =
-                    [%with_label "Check blah1"] (Boolean.Assert.is_true ok)
-                  in
-                  let timed_balance_check ok =
-                    [%with_label "check blah2"] (Boolean.Assert.is_true ok)
-                  in
-                  check_timing ~balance_check ~timed_balance_check ~account
-                    ~txn_amount ~txn_global_slot:current_global_slot)
-             in
-             let%map () =
-               as_prover
-                 As_prover.(
-                   Let_syntax.(
-                     let%bind slot =
-                       read Coda_numbers.Global_slot.typ current_global_slot
-                     in
-                     let%bind timing = read Account_timing.typ timing in
-                     let%map acc = read Account.typ t in
-                     Core.printf
-                       !"Snark: account %{sexp:Account.t} slot: %{sexp: \
-                         Coda_numbers.Global_slot.t} timing: %{sexp: \
-                         Account_timing.t}\n"
-                       acc slot timing))
-             in
-             t ))
+             { Account.Poly.balance
+             ; public_key
+             ; token_id
+             ; token_permissions= {Token_permissions.token_owner; token_locked}
+             ; nonce= account.nonce
+             ; receipt_chain_hash= account.receipt_chain_hash
+             ; delegate
+             ; voting_for= account.voting_for
+             ; timing= account.timing
+             ; permissions= account.permissions
+             ; snapp= account.snapp } ))
     in
     let%bind fee_payer_is_source = Account_id.Checked.equal fee_payer source in
     let%bind root_after_source_update =
@@ -2632,7 +2601,7 @@ module Base = struct
                     check_timing ~balance_check ~timed_balance_check ~account
                       ~txn_amount:amount ~txn_global_slot)
                in
-               (* Like receiver account in payments, coinbase fee transfer account or other fee transfer account don't have the timing field updated *)
+               (* Like the receiver account in payments, coinbase fee transfer account or other fee transfer account don't have the timing field updated *)
                Account_timing.if_ is_coinbase_or_fee_transfer
                  ~then_:account.timing ~else_:new_timing
              in
@@ -2807,30 +2776,13 @@ module Base = struct
       ; fee_token_r= Token_id.(var_of_t default)
       ; fee_excess_r= Fee.Signed.(Checked.constant zero) }
     in
-    let%bind () =
-      with_label __LOC__
-        (Frozen_ledger_hash.assert_equal root_after statement.target)
-    in
-    let%bind () =
-      with_label __LOC__
-        (Currency.Amount.Checked.assert_equal supply_increase
-           statement.supply_increase)
-    in
-    let%bind () =
-      with_label __LOC__
-        (Fee_excess.assert_equal_checked fee_excess statement.fee_excess)
-    in
-    with_label __LOC__
-      (Token_id.Checked.Assert.equal next_available_token_after
-         statement.next_available_token_after)
-
-  (*Checked.all_unit
+    Checked.all_unit
       [ Frozen_ledger_hash.assert_equal root_after statement.target
       ; Currency.Amount.Checked.assert_equal supply_increase
           statement.supply_increase
       ; Fee_excess.assert_equal_checked fee_excess statement.fee_excess
       ; Token_id.Checked.Assert.equal next_available_token_after
-          statement.next_available_token_after ]*)
+          statement.next_available_token_after ]
 
   let rule ~constraint_constants : _ Pickles.Inductive_rule.t =
     { prevs= []
@@ -5592,6 +5544,69 @@ let%test_module "transaction_snark" =
                 Balance.equal accounts.(1).balance token_owner_account.balance
               ) ;
               assert (Option.is_none receiver_account) ) )
+
+    let%test_unit "unchanged timings for fee transfers and coinbase" =
+      Test_util.with_randomness 123456789 (fun () ->
+          let receivers =
+            Array.init 2 ~f:(fun _ ->
+                Public_key.of_private_key_exn (Private_key.create ())
+                |> Public_key.compress )
+          in
+          let timed_account pk =
+            let account_id = Account_id.create pk Token_id.default in
+            let balance = Balance.of_int 100_000_000_000_000 in
+            let initial_minimum_balance = Balance.of_int 80_000_000_000 in
+            let cliff_time = Global_slot.of_int 2 in
+            let vesting_period = Global_slot.of_int 2 in
+            let vesting_increment = Amount.of_int 40_000_000_000 in
+            Or_error.ok_exn
+            @@ Account.create_timed account_id balance ~initial_minimum_balance
+                 ~cliff_time ~vesting_period ~vesting_increment
+          in
+          let timed_account1 = timed_account receivers.(0) in
+          let timed_account2 = timed_account receivers.(1) in
+          let fee = 8_000_000_000 in
+          let ft1, ft2 =
+            let single1 =
+              Fee_transfer.Single.create ~receiver_pk:receivers.(0)
+                ~fee:(Currency.Fee.of_int fee) ~fee_token:Token_id.default
+            in
+            let single2 =
+              Fee_transfer.Single.create ~receiver_pk:receivers.(1)
+                ~fee:(Currency.Fee.of_int fee) ~fee_token:Token_id.default
+            in
+            ( Fee_transfer.create single1 (Some single2) |> Or_error.ok_exn
+            , Fee_transfer.create single1 None |> Or_error.ok_exn )
+          in
+          let coinbase_with_ft, coinbase_wo_ft =
+            let ft =
+              Coinbase.Fee_transfer.create ~receiver_pk:receivers.(0)
+                ~fee:(Currency.Fee.of_int fee)
+            in
+            ( Coinbase.create
+                ~amount:(Currency.Amount.of_int 10_000_000_000)
+                ~receiver:receivers.(1) ~fee_transfer:(Some ft)
+              |> Or_error.ok_exn
+            , Coinbase.create
+                ~amount:(Currency.Amount.of_int 10_000_000_000)
+                ~receiver:receivers.(1) ~fee_transfer:None
+              |> Or_error.ok_exn )
+          in
+          let transactions : Transaction.t list =
+            [ Fee_transfer ft1
+            ; Fee_transfer ft2
+            ; Coinbase coinbase_with_ft
+            ; Coinbase coinbase_wo_ft ]
+          in
+          Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
+              List.iter [timed_account1; timed_account2] ~f:(fun acc ->
+                  Ledger.create_new_account_exn ledger (Account.identifier acc)
+                    acc ) ;
+              (* well over the vesting period, the timing field shouldn't change*)
+              let txn_global_slot = Global_slot.of_int 100 in
+              List.iter transactions ~f:(fun txn ->
+                  test_transaction ~txn_global_slot ~constraint_constants
+                    ledger txn ) ) )
   end )
 
 let%test_module "account timing check" =
