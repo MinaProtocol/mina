@@ -8,6 +8,7 @@ module Colors = {
   let black = Css.black;
   let purple = `hex("5362C8");
   let digitalBlack = `hex("2d2d2d");
+  let purple = `hex("5362C8");
 };
 
 module Typeface = {
@@ -134,29 +135,30 @@ module Type = {
   /** the following are specific component names, but use some styles already defined  */
   let pageLabel =
     style([
-      Typeface.monumentGrotesk,
+      Typeface.monumentGroteskMono,
       fontSize(`rem(0.9)),
       lineHeight(`rem(1.37)),
       textTransform(`uppercase),
       letterSpacing(`em(0.02)),
       color(Colors.digitalBlack),
+      margin(`zero),
       media(
         MediaQuery.tablet,
         [fontSize(`rem(1.25)), lineHeight(`rem(1.875))],
       ),
     ]);
-
+  /** some styles have not been perfected, but all can be added and adjusted as needed! */
   let label =
     style([
-      Typeface.monumentGrotesk,
+      Typeface.monumentGroteskMono,
       fontSize(`rem(0.75)),
       lineHeight(`rem(1.)),
       color(Colors.digitalBlack),
       textTransform(`uppercase),
-      letterSpacing(`em(0.03)),
+      letterSpacing(`em(0.02)),
       media(
         MediaQuery.tablet,
-        [fontSize(`rem(0.88)), lineHeight(`rem(1.))],
+        [fontSize(`rem(1.25)), lineHeight(`rem(1.875))],
       ),
     ]);
 
@@ -169,6 +171,16 @@ module Type = {
       color(Colors.digitalBlack),
       textTransform(`uppercase),
       letterSpacing(`px(1)),
+    ]);
+
+  let contributorLabel =
+    style([
+      Typeface.monumentGroteskMono,
+      fontSize(`rem(0.75)),
+      fontWeight(`num(500)),
+      lineHeight(`rem(1.)),
+      color(black),
+      margin(`zero),
     ]);
 
   let link =
@@ -239,7 +251,7 @@ module Type = {
 
   let pageSubhead =
     style([
-      Typeface.monumentGrotesk,
+      Typeface.monumentGroteskMono,
       fontSize(`rem(1.125)),
       lineHeight(`rem(1.68)),
       color(Colors.digitalBlack),
@@ -251,7 +263,7 @@ module Type = {
 
   let sectionSubhead =
     style([
-      Typeface.monumentGrotesk,
+      Typeface.monumentGroteskMono,
       fontSize(`rem(1.)),
       lineHeight(`rem(1.5)),
       letterSpacing(`px(-1)),
@@ -305,7 +317,7 @@ module Type = {
 
   let quote =
     style([
-      Typeface.monumentGrotesk,
+      Typeface.monumentGroteskMono,
       fontSize(`rem(1.31)),
       lineHeight(`rem(1.875)),
       letterSpacing(`em(-0.03)),
