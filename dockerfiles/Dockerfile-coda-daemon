@@ -32,15 +32,19 @@ RUN echo '#!/bin/bash -x\n\
 mkdir -p .coda-config\n\
 touch .coda-config/coda-prover.log\n\
 touch .coda-config/coda-verifier.log\n\
-coda "$@" 2>&1 >coda.log &\n\
-coda_pid=$!\n\
-tail -q -f coda.log -f .coda-config/coda-prover.log -f .coda-config/coda-verifier.log &\n\
-tail_pid=$!\n\
-wait "$coda_pid"\n\
-echo "Coda process exited with status code $?"\n\
-sleep 10\n\
-kill "$tail_pid"\n\
-exit 0'\
+while true; do\n\
+  coda "$@" 2>&1 >coda.log &\n\
+  coda_pid=$!\n\
+  tail -q -f coda.log -f .coda-config/coda-prover.log -f .coda-config/coda-verifier.log &\n\
+  tail_pid=$!\n\
+  wait "$coda_pid"\n\
+  echo "Coda process exited with status code $?"\n\
+  sleep 10\n\
+  kill "$tail_pid"\n\
+  if [ ! -f stay_alive ]; then\n\
+    exit 0\n\
+  fi\n\
+done'\
 > init_coda.sh
 
 RUN chmod +x init_coda.sh
