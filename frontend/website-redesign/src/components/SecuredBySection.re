@@ -21,7 +21,13 @@ module Styles = {
 
   let gridItem1 = style([unsafe("grid-area", "1 / 1 / 2 / 2")]);
   let gridItem2 = style([unsafe("grid-area", "2 / 1 / 3 / 2")]);
-  let gridItem3 = style([unsafe("grid-area", "1 / 1 / 2 / 2")]);
+  let gridItem3 =
+    style([
+      marginTop(`rem(4.)),
+      backgroundColor(Theme.Colors.digitalBlack),
+      padding2(~v=`rem(2.), ~h=`rem(2.)),
+      unsafe("grid-area", "1 / 1 / 2 / 2"),
+    ]);
 
   let flexRow =
     style([
@@ -52,6 +58,14 @@ module Styles = {
       Theme.Type.h2,
       style([lineHeight(`rem(3.)), fontSize(`rem(2.5))]),
     ]);
+  let h3White =
+    merge([
+      Theme.Type.h3,
+      style([color(white), marginTop(`px(9)), marginBottom(`rem(1.))]),
+    ]);
+  let labelWhite =
+    merge([Theme.Type.sectionSubhead, style([color(white)])]);
+  let dotsImage = style([marginBottom(`rem(3.))]);
 };
 
 [@react.component]
@@ -82,7 +96,7 @@ let make = () => {
           <p className=Theme.Type.label> {React.string("Snark Workers")} </p>
         </span>
       </div>
-      <Spacer height=4./>
+      <Spacer height=4. />
       <div className=Styles.gridItem2>
         <Rule />
         <Spacer height=2. />
@@ -104,6 +118,26 @@ let make = () => {
           />
           <img className=Styles.logo src="/static/img/NonceLogo.png" />
           <img className=Styles.logo src="/static/img/SnarkPoolLogo.png" />
+        </div>
+        <div className=Styles.gridItem3>
+          <img
+            className=Styles.dotsImage
+            src="/static/img/SecuredByDots.png"
+          />
+          <Rule color=Theme.Colors.white />
+          <h3 className=Styles.h3White>
+            {React.string("You Can Run a Node & Secure the Network")}
+          </h3>
+          <p className=Styles.labelWhite>
+            {React.string(
+               "With Mina's uniquely light blockchain, you don’t have to have expensive hardware, or wait days for the blockchain to sync, or use a ton of computing power to stake and participate in consensus.",
+             )}
+          </p>
+          <Spacer height=2. />
+          <Button bgColor=Theme.Colors.orange>
+            {React.string("Get Started")}
+            <Icon kind=Icon.ArrowRightMedium />
+          </Button>
         </div>
       </div>
     </div>
