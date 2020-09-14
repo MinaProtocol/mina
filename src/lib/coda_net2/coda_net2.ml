@@ -361,20 +361,18 @@ module Helper = struct
       let name = "findPeer"
     end
 
-    module Ban_ip = struct
-      type input = {ip: string} [@@deriving yojson]
+    module Set_gater_config = struct
+      type input =
+        { banned_ips: string list
+        ; banned_peers: string list
+        ; trusted_peers: string list
+        ; trusted_ips: string list
+        ; isolate: bool }
+      [@@deriving yojson]
 
       type output = string [@@deriving yojson]
 
-      let name = "banIP"
-    end
-
-    module Unban_ip = struct
-      type input = {ip: string} [@@deriving yojson]
-
-      type output = string [@@deriving yojson]
-
-      let name = "unbanIP"
+      let name = "setGaterConfig"
     end
   end
 
@@ -1273,34 +1271,40 @@ let begin_advertising net =
 
 let lookup_peerid = Helper.lookup_peerid
 
-let ban_ip net ip =
-  match%map
-    Helper.(do_rpc net (module Rpcs.Ban_ip) {ip= Unix.Inet_addr.to_string ip})
-  with
-  | Ok "banIP success" ->
-      net.banned_ips <- ip :: net.banned_ips ;
-      Ok `Ok
-  | Ok "banIP already banned" ->
-      Ok `Already_banned
-  | Ok v ->
-      failwithf "helper broke RPC protocol: banIP got %s" v ()
-  | Error e ->
-      Error e
+type connection_gating =
+  {banned_peers: Peer.t list; trusted_peers: Peer.t list; isolate: bool}
 
-let unban_ip net ip =
+let configure_connection_gating net (config : connection_gating) =
   match%map
+<<<<<<< HEAD
     Helper.(
-      do_rpc net (module Rpcs.Unban_ip) {ip= Unix.Inet_addr.to_string ip})
+      do_rpc net
+        (module Rpcs.Set_gater_config)
+        { banned_ips=
+            List.map
+              ~f:(fun p -> Unix.Inet_addr.to_string p.host)
+              config.banned_peers
+        ; banned_peers= List.map ~f:(fun p -> p.peer_id) config.banned_peers
+        ; trusted_ips=
+            List.map
+              ~f:(fun p -> Unix.Inet_addr.to_string p.host)
+              config.trusted_peers
+        ; trusted_peers= List.map ~f:(fun p -> p.peer_id) config.trusted_peers
+        ; isolate= config.isolate })
+=======
+    Helper.(do_rpc net (module Rpcs.Set_gater_config) {
+      banned_ips= List.map ~f:(fun p -> Unix.Inet_addr.to_string p.host) config.banned_peers ;
+      banned_peers= List.map ~f:(fun p -> p.peer_id) config.banned_peers ;
+      trusted_ips= List.map ~f:(fun p -> Unix.Inet_addr.to_string p.host) config.trusted_peers ;
+      trusted_peers= List.map ~f:(fun p -> p.peer_id) config.trusted_peers ;
+      isolate= config.isolate
+    })
+>>>>>>> 10b31e9ae... support a list of trusted peer IDs
   with
-  | Ok "unbanIP success" ->
-      net.banned_ips
-      <- List.filter net.banned_ips ~f:(fun banned ->
-             not (Unix.Inet_addr.equal banned ip) ) ;
-      Ok `Ok
-  | Ok "unbanIP not banned" ->
-      Ok `Not_banned
+  | Ok "ok" ->
+      Ok ()
   | Ok v ->
-      failwithf "helper broke RPC protocol: unbanIP got %s" v ()
+      failwithf "helper broke RPC protocol: setGaterConfig got %s" v ()
   | Error e ->
       Error e
 

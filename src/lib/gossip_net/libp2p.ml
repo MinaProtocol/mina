@@ -169,8 +169,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
               let handle_unknown_rpc conn_state ~rpc_tag ~version =
                 Deferred.don't_wait_for
                   Trust_system.(
-                    record config.trust_system config.logger
-                      conn_state.Peer.host
+                    record config.trust_system config.logger conn_state
                       Actions.
                         ( Violated_protocol
                         , Some
@@ -205,7 +204,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                       in
                       don't_wait_for (Coda_net2.Stream.reset stream >>| ignore) ;
                       Trust_system.(
-                        record config.trust_system config.logger peer.host
+                        record config.trust_system config.logger peer
                           Actions.
                             ( Incoming_connection_error
                             , Some
@@ -251,8 +250,8 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                   match Envelope.Incoming.sender envelope with
                   | Local ->
                       Deferred.return true
-                  | Remote (_, sender_peer_id) ->
-                      if not (Peer.Id.equal sender_peer_id my_peer_id) then
+                  | Remote sender ->
+                      if not (Peer.Id.equal sender.peer_id my_peer_id) then
                         let valid_ivar = Ivar.create () in
                         Deferred.bind
                           (Strict_pipe.Writer.write message_writer
@@ -263,16 +262,16 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                 ~on_decode_failure:
                   (`Call
                     (fun envelope (err : Error.t) ->
-                      let host, peer_id =
+                      let peer =
                         Envelope.Incoming.sender envelope
                         |> Envelope.Sender.remote_exn
                       in
                       let metadata =
-                        [ ("sender_peer_id", `String peer_id)
+                        [ ("sender_peer_id", `String peer.peer_id)
                         ; ("error", `String (Error.to_string_hum err)) ]
                       in
                       Trust_system.(
-                        record config.trust_system config.logger host
+                        record config.trust_system config.logger peer
                           Actions.
                             ( Violated_protocol
                             , Some ("failed to decode gossip message", metadata)
@@ -369,14 +368,26 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
         let%map _ = res in
         ()
       in
-      let do_ban (addr, expiration) =
+      let ban_configuration =
+        ref {Coda_net2.banned_peers= []; trusted_peers= []; isolate= false}
+      in
+      let do_ban (banned_peer, expiration) =
         don't_wait_for
           ( Clock.at expiration
           >>= fun () ->
           let%bind net2 = !net2_ref in
-          Coda_net2.unban_ip net2 addr |> Deferred.ignore ) ;
+          ban_configuration :=
+            { !ban_configuration with
+              banned_peers=
+                List.filter !ban_configuration.banned_peers ~f:(fun p ->
+                    not (Peer.equal p banned_peer) ) } ;
+          Coda_net2.configure_connection_gating net2 !ban_configuration
+          |> Deferred.ignore ) ;
         (let%bind net2 = !net2_ref in
-         Coda_net2.ban_ip net2 addr)
+         ban_configuration :=
+           { !ban_configuration with
+             banned_peers= banned_peer :: !ban_configuration.banned_peers } ;
+         Coda_net2.configure_connection_gating net2 !ban_configuration)
         |> Deferred.ignore
       in
       let%map () =
@@ -444,7 +455,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                   (fun exn ->
                     let%map () =
                       Trust_system.(
-                        record t.config.trust_system t.config.logger peer.host
+                        record t.config.trust_system t.config.logger peer
                           Actions.
                             ( Outgoing_connection_error
                             , Some
@@ -471,7 +482,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                   ; _rpc_version ] ) ->
                 let%map () =
                   Trust_system.(
-                    record t.config.trust_system t.config.logger peer.host
+                    record t.config.trust_system t.config.logger peer
                       Actions.
                         ( Outgoing_connection_error
                         , Some ("Closed connection", []) ))
@@ -480,7 +491,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
             | _ ->
                 let%map () =
                   Trust_system.(
-                    record t.config.trust_system t.config.logger peer.host
+                    record t.config.trust_system t.config.logger peer
                       Actions.
                         ( Outgoing_connection_error
                         , Some

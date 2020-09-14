@@ -1286,7 +1286,11 @@ module Types = struct
           let open Trust_system.Peer_status in
           [ field "ip_addr" ~typ:(non_null string) ~doc:"IP address"
               ~args:Arg.[]
-              ~resolve:(fun _ (ip_addr, _) -> Unix.Inet_addr.to_string ip_addr)
+              ~resolve:(fun _ (peer, _) ->
+                Unix.Inet_addr.to_string peer.Network_peer.Peer.host )
+          ; field "peer_id" ~typ:(non_null string) ~doc:"libp2p Peer ID"
+              ~args:Arg.[]
+              ~resolve:(fun _ (peer, __) -> peer.Network_peer.Peer.peer_id)
           ; field "trust" ~typ:(non_null float) ~doc:"Trust score"
               ~args:Arg.[]
               ~resolve:(fun _ (_, {trust; _}) -> trust)
@@ -1969,8 +1973,8 @@ module Mutations = struct
 
   let reset_trust_status =
     io_field "resetTrustStatus"
-      ~doc:"Reset trust status for a given IP address"
-      ~typ:(non_null Types.Payload.trust_status)
+      ~doc:"Reset trust status for all peers at a given IP address"
+      ~typ:(list (non_null Types.Payload.trust_status))
       ~args:Arg.[arg "input" ~typ:(non_null Types.Input.reset_trust_status)]
       ~resolve:(fun {ctx= coda; _} () ip_address_input ->
         let open Deferred.Result.Let_syntax in
@@ -1978,7 +1982,7 @@ module Mutations = struct
           Deferred.return
           @@ Types.Arguments.ip_address ~name:"ip_address" ip_address_input
         in
-        (ip_address, Coda_commands.reset_trust_status coda ip_address) )
+        Some (Coda_commands.reset_trust_status coda ip_address) )
 
   let send_user_command coda user_command_input =
     match
@@ -2398,13 +2402,14 @@ module Queries = struct
         Coda_commands.get_status ~flag:`Performance coda >>| Result.return )
 
   let trust_status =
-    field "trustStatus" ~typ:Types.Payload.trust_status
+    field "trustStatus"
+      ~typ:(list (non_null Types.Payload.trust_status))
       ~args:Arg.[arg "ipAddress" ~typ:(non_null string)]
       ~doc:"Trust status for an IPv4 or IPv6 address"
       ~resolve:(fun {ctx= coda; _} () (ip_addr_string : string) ->
         match Types.Arguments.ip_address ~name:"ipAddress" ip_addr_string with
         | Ok ip_addr ->
-            Some (ip_addr, Coda_commands.get_trust_status coda ip_addr)
+            Some (Coda_commands.get_trust_status coda ip_addr)
         | Error _ ->
             None )
 

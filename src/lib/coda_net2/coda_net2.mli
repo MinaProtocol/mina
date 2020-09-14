@@ -326,17 +326,17 @@ val begin_advertising : net -> unit Deferred.Or_error.t
 (** Stop listening, close all connections and subscription pipes, and kill the subprocess. *)
 val shutdown : net -> unit Deferred.t
 
-(** Ban an IP from connecting to the helper.
+(** State for the connection gateway. It will disallow connections from IPs
+    or peer IDs in [banned_peers], except for those listed in [trusted_peers]. If
+    [isolate] is true, only connections to [trusted_peers] are allowed. *)
+type connection_gating =
+  {banned_peers: Peer.t list; trusted_peers: Peer.t list; isolate: bool}
 
-    This ban is in place until [unban_ip] is called or the helper restarts.
-    After the deferred resolves, no new incoming streams will involve that IP.
-    TODO: does this forbid explicitly dialing them? *)
-val ban_ip :
-  net -> Unix.Inet_addr.t -> [`Ok | `Already_banned] Deferred.Or_error.t
+(** Configure the connection gateway. 
 
-(** Unban an IP, allowing connections from it. *)
-val unban_ip :
-  net -> Unix.Inet_addr.t -> [`Ok | `Not_banned] Deferred.Or_error.t
+  This will fail if any of the trusted or banned peers are on IPv6. *)
+val configure_connection_gating :
+  net -> connection_gating -> unit Deferred.Or_error.t
 
 (** List of currently banned IPs. *)
 val banned_ips : net -> Unix.Inet_addr.t list Deferred.t
