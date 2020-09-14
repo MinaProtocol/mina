@@ -11,6 +11,13 @@ module Colors = {
   let purple = `hex("5362C8");
 };
 
+let rule =
+  style([
+    width(`percent(100.)),
+    color(Colors.digitalBlack),
+    border(`px(1), `solid, black),
+  ]);
+
 module Typeface = {
   let monumentGrotesk = fontFamily("Monument Grotesk, serif");
   let monumentGroteskMono = fontFamily("Monument Grotesk mono, serif");
