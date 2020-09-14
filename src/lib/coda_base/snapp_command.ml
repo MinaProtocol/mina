@@ -285,6 +285,8 @@ module Party = struct
       end]
 
       let dummy : t = {body= Body.dummy; predicate= ()}
+
+      let create body : t = {body; predicate= ()}
     end
   end
 
@@ -391,6 +393,11 @@ module Stable = struct
   end
 end]
 
+type transfer =
+  { source: Public_key.Compressed.t
+  ; receiver: Public_key.Compressed.t
+  ; amount: Amount.t }
+
 let token_id (t : t) : Token_id.t =
   match t with
   | Proved_empty {token_id; _}
@@ -410,7 +417,12 @@ let is_non_pos (x : Amount.Signed.t) : bool =
 
 let is_neg x = not (is_non_neg x)
 
-let check_neg x = assert_ (is_neg x) "expected negative"
+let check_non_positive x = assert_ (is_non_pos x) "expected non positive"
+
+let signed_to_non_positive (t : Amount.Signed.t) =
+  let open Or_error.Let_syntax in
+  let%map () = check_non_positive t in
+  t.magnitude
 
 let fee_token (t : t) : Token_id.t =
   let f (x : _ Inner.t) =
@@ -419,6 +431,25 @@ let fee_token (t : t) : Token_id.t =
         x.payload.token_id
     | None ->
         x.token_id
+  in
+  match t with
+  | Proved_empty r ->
+      f r
+  | Proved_signed r ->
+      f r
+  | Proved_proved r ->
+      f r
+  | Signed_signed r ->
+      f r
+  | Signed_empty r ->
+      f r
+
+let check_tokens (t : t) =
+  let f (r : _ Inner.t) =
+    let valid x = not (Token_id.(equal invalid) x) in
+    Option.value_map r.fee_payment ~default:true ~f:(fun x ->
+        valid x.payload.token_id )
+    && valid r.token_id
   in
   match t with
   | Proved_empty r ->
@@ -443,7 +474,7 @@ let native_excess_exn (t : t) =
       ; _ } =
     match two with
     | None ->
-        assert (is_neg one.data.body.delta) ;
+        assert (is_non_pos one.data.body.delta) ;
         ( Account_id.create one.data.body.pk token_id
         , one.data.body.delta.magnitude )
     | Some two ->
@@ -451,9 +482,9 @@ let native_excess_exn (t : t) =
           Option.value_exn
             (Amount.Signed.add one.data.body.delta two.data.body.delta)
         in
-        assert (is_neg x) ;
+        assert (is_non_pos x) ;
         let pk =
-          if is_neg one.data.body.delta then one.data.body.pk
+          if is_non_pos one.data.body.delta then one.data.body.pk
           else two.data.body.pk
         in
         (Account_id.create pk token_id, x.magnitude)
@@ -492,6 +523,20 @@ let fee_payer (t : t) =
   | Signed_empty r ->
       f r
 
+let fee_payment t =
+  let f (r : _ Inner.t) = r.fee_payment in
+  match t with
+  | Proved_empty r ->
+      f r
+  | Proved_signed r ->
+      f r
+  | Proved_proved r ->
+      f r
+  | Signed_signed r ->
+      f r
+  | Signed_empty r ->
+      f r
+
 let fee_exn (t : t) =
   let f (r : _ Inner.t) =
     let _, e = native_excess_exn t in
@@ -513,51 +558,29 @@ let fee_exn (t : t) =
   | Signed_empty r ->
       f r
 
-let native_excess t = Option.try_with (fun () -> native_excess_exn t)
-
-(* TODO: Make sure this matches the snark. I don't think it does right now. *)
-let fee_excess (t : t) : Fee_excess.t Or_error.t =
-  let opt =
-    Option.value_map ~f:Or_error.return ~default:(Or_error.error_string "None")
-  in
-  let open Or_error.Let_syntax in
-  let finish r token_id fee_payment =
-    let%bind () = check_neg r in
-    let r = r.magnitude in
-    let one = (token_id, Fee.Signed.of_unsigned (Amount.to_fee r)) in
-    Fee_excess.of_one_or_two
-      ( match fee_payment with
-      | None ->
-          `One one
-      | Some (p : Other_fee_payer.t) ->
-          `Two (one, (p.payload.token_id, Fee.Signed.of_unsigned p.payload.fee))
-      )
-  in
+(* TODO: Add unit test that this never throws on a value which passes
+   "check" *)
+let as_transfer (t : t) : transfer =
   let open Party in
   let f1
-      { Inner.token_id
-      ; fee_payment
-      ; one: ((Body.t, _) Predicated.Poly.t, _) Authorized.Poly.t
-      ; two: ((Body.t, _) Predicated.Poly.t, _) Authorized.Poly.t option } =
-    let%bind r =
-      match two with
-      | None ->
-          return one.data.body.delta
-      | Some two ->
-          Amount.Signed.add one.data.body.delta two.data.body.delta |> opt
-    in
-    finish r token_id fee_payment
+      { Inner.one: ((Body.t, _) Predicated.Poly.t, _) Authorized.Poly.t
+      ; two: ((Body.t, _) Predicated.Poly.t, _) Authorized.Poly.t option
+      ; _ } : transfer =
+    match two with
+    | None ->
+        { source= one.data.body.pk
+        ; receiver= one.data.body.pk
+        ; amount= Amount.zero }
+    | Some two ->
+        let sender, receiver =
+          if is_non_pos one.data.body.delta then (one.data.body, two.data.body)
+          else (two.data.body, one.data.body)
+        in
+        { source= sender.pk
+        ; receiver= receiver.pk
+        ; amount= receiver.delta.magnitude }
   in
-  let f2
-      { Inner.token_id
-      ; fee_payment
-      ; one: ((Body.t, _) Predicated.Poly.t, _) Authorized.Poly.t
-      ; two: ((Body.t, _) Predicated.Poly.t, _) Authorized.Poly.t } =
-    let%bind r =
-      Amount.Signed.add one.data.body.delta two.data.body.delta |> opt
-    in
-    finish r token_id fee_payment
-  in
+  let f2 r = f1 {r with two= Some r.Inner.two} in
   match t with
   | Proved_empty r ->
       f1 r
@@ -569,6 +592,19 @@ let fee_excess (t : t) : Fee_excess.t Or_error.t =
       f2 r
   | Signed_empty r ->
       f1 r
+
+let native_excess t = Option.try_with (fun () -> native_excess_exn t)
+
+(* Currently we ensure that 
+
+   other fee payer is present => native excess is zero 
+
+   so that there is only one token involved in the fee.
+*)
+let fee_excess (t : t) : Fee_excess.t Or_error.t =
+  let open Or_error.Let_syntax in
+  let%map f = Or_error.try_with (fun () -> fee_exn t) in
+  Fee_excess.of_single (fee_token t, Fee.Signed.of_unsigned f)
 
 let accounts_accessed (t : t) : Account_id.t list =
   let open Party in
@@ -660,30 +696,6 @@ module Payload = struct
       end
     end]
 
-    module Checked = struct
-      type t =
-        ( Boolean.var
-        , Token_id.Checked.t
-        , (Boolean.var, Other_fee_payer.Payload.Checked.t) Flagged_option.t
-        , Party.Predicated.Signed.Checked.t
-        , Party.Predicated.Signed.Checked.t )
-        Inner.t
-    end
-
-    let typ : (Checked.t, t) Typ.t =
-      Inner.typ
-        [ Boolean.typ
-        ; Boolean.typ
-        ; Token_id.typ
-        ; Flagged_option.typ Other_fee_payer.Payload.typ
-          |> Typ.transport
-               ~there:
-                 (Flagged_option.of_option
-                    ~default:Other_fee_payer.Payload.dummy)
-               ~back:Flagged_option.to_option
-        ; Party.Predicated.Signed.typ
-        ; Party.Predicated.Signed.typ ]
-
     module Digested = struct
       type t =
         ( bool
@@ -703,6 +715,36 @@ module Payload = struct
           Inner.t
       end
     end
+
+    module Checked = struct
+      type t =
+        ( Boolean.var
+        , Token_id.Checked.t
+        , (Boolean.var, Other_fee_payer.Payload.Checked.t) Flagged_option.t
+        , Party.Predicated.Signed.Checked.t
+        , Party.Predicated.Signed.Checked.t )
+        Inner.t
+
+      let digested (r : t) : Digested.Checked.t =
+        let b (x : _ Party.Predicated.Poly.t) =
+          {x with body= Party.Body.Checked.digest x.body}
+        in
+        {r with one= b r.one; two= b r.two}
+    end
+
+    let typ : (Checked.t, t) Typ.t =
+      Inner.typ
+        [ Boolean.typ
+        ; Boolean.typ
+        ; Token_id.typ
+        ; Flagged_option.typ Other_fee_payer.Payload.typ
+          |> Typ.transport
+               ~there:
+                 (Flagged_option.of_option
+                    ~default:Other_fee_payer.Payload.dummy)
+               ~back:Flagged_option.to_option
+        ; Party.Predicated.Signed.typ
+        ; Party.Predicated.Signed.typ ]
   end
 
   module One_proved = struct
@@ -917,6 +959,62 @@ module Payload = struct
         Two_proved {r with one= s r.one; two= s r.two}
 end
 
+(* In order to be compatible with the transaction pool (where transactions are stored in
+   order according to the nonce of the fee payer) we maintain the invariant that
+   one must be able to unambiguously determine the nonce of the fee payer of a snapp
+   command. *)
+let nonce (t : t) =
+  let open Party in
+  let module E = struct
+    type t =
+      | T :
+          ((Body.t, 'p) Predicated.Poly.t, _) Authorized.Poly.t
+          * ('p -> Account_nonce.t option)
+          -> t
+  end in
+  let open E in
+  let f (T (p, nonce)) =
+    match p.data.body.delta.sgn with
+    | Pos ->
+        None
+    | Neg ->
+        nonce p.data.predicate
+  in
+  let pred (p : Predicate.t) =
+    match p.self_predicate.nonce with
+    | Ignore ->
+        None
+    | Check {lower; upper} ->
+        if Account_nonce.equal lower upper then Some lower else None
+  in
+  let p x = T (x, pred) in
+  let n x = T (x, Option.return) in
+  let nonce (r : _ Inner.t) xs =
+    match r.fee_payment with
+    | Some x ->
+        Some x.payload.nonce
+    | None ->
+        List.find_map ~f xs
+  in
+  match t with
+  | Proved_proved r ->
+      nonce r [p r.one; p r.two]
+  | Proved_signed r ->
+      nonce r [p r.one; n r.two]
+  | Proved_empty r ->
+      nonce r [p r.one]
+  | Signed_signed r ->
+      nonce r [n r.one; n r.two]
+  | Signed_empty r ->
+      nonce r [n r.one]
+
+let nonce_invariant t =
+  match nonce t with
+  | None ->
+      Or_error.error_string "Cannot determine nonce"
+  | Some _ ->
+      Ok ()
+
 (* Check that the deltas are consistent with each other. *)
 (* TODO: Check that predicates are consistent. *)
 (* TODO: Check the predicates that can be checked (e.g., on fee_payment) *)
@@ -929,6 +1027,8 @@ let check (t : t) : unit Or_error.t =
   in
   let open Or_error.Let_syntax in
   let open Party in
+  let%bind _ = Or_error.try_with (fun () -> fee_exn t) in
+  let%bind () = nonce_invariant t in
   let fee_checks ~excess ~token_id ~(fee_payment : Other_fee_payer.t option) =
     match fee_payment with
     | None ->
@@ -1080,6 +1180,58 @@ let to_payload (t : t) : Payload.t =
         ; other_fee_payer_opt=
             Option.map fee_payment ~f:(fun {payload; signature= _} -> payload)
         }
+
+let signed_signed ?fee_payment ~token_id (signer1, data1) (signer2, data2) : t
+    =
+  let r : _ Inner.t =
+    { one= {Party.Authorized.Poly.data= data1; authorization= Signature.dummy}
+    ; two= {Party.Authorized.Poly.data= data2; authorization= Signature.dummy}
+    ; token_id
+    ; fee_payment=
+        Option.map fee_payment ~f:(fun (_priv_key, payload) ->
+            {Other_fee_payer.payload; signature= Signature.dummy} ) }
+  in
+  let sign =
+    let msg =
+      to_payload (Signed_signed r)
+      |> Payload.digested |> Payload.Digested.digest
+      |> Random_oracle_input.field
+    in
+    fun sk -> Schnorr.sign sk msg
+  in
+  Signed_signed
+    { r with
+      one= {r.one with authorization= sign signer1}
+    ; two= {r.two with authorization= sign signer2}
+    ; fee_payment=
+        Option.map2 fee_payment r.fee_payment ~f:(fun (sk, _) x ->
+            {x with signature= sign sk} ) }
+
+let signed_empty ?fee_payment ?data2 ~token_id (signer1, data1) : t =
+  let r : _ Inner.t =
+    { one= {Party.Authorized.Poly.data= data1; authorization= Signature.dummy}
+    ; two=
+        Option.map data2 ~f:(fun data ->
+            {Party.Authorized.Poly.data; authorization= ()} )
+    ; token_id
+    ; fee_payment=
+        Option.map fee_payment ~f:(fun (_priv_key, payload) ->
+            {Other_fee_payer.payload; signature= Signature.dummy} ) }
+  in
+  let sign =
+    let msg =
+      to_payload (Signed_empty r)
+      |> Payload.digested |> Payload.Digested.digest
+      |> Random_oracle_input.field
+    in
+    fun sk -> Schnorr.sign sk msg
+  in
+  Signed_empty
+    { r with
+      one= {r.one with authorization= sign signer1}
+    ; fee_payment=
+        Option.map2 fee_payment r.fee_payment ~f:(fun (sk, _) x ->
+            {x with signature= sign sk} ) }
 
 module Base58_check = Codable.Make_base58_check (Stable.Latest)
 

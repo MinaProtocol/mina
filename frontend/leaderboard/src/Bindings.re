@@ -1,10 +1,13 @@
 module Postgres = {
   type pool;
-  type connectionString = {connectionString: string};
+  type config = {
+    connectionString: string,
+    connectionTimeoutMillis: int,
+  };
+
   type dbResult = {rows: array(Js.Json.t)};
 
-  [@bs.module "pg"] [@bs.new]
-  external makePool: connectionString => pool = "Pool";
+  [@bs.module "pg"] [@bs.new] external makePool: config => pool = "Pool";
 
   [@bs.send]
   external query:
