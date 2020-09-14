@@ -27,8 +27,8 @@ let create_ledger_and_transactions num_transitions =
       amount fee nonce =
     let to_pk = Public_key.compress to_kp.public_key in
     let from_pk = Public_key.compress from_kp.public_key in
-    let payload : User_command.Payload.t =
-      User_command.Payload.create ~fee ~fee_token:Token_id.default
+    let payload : Signed_command.Payload.t =
+      Signed_command.Payload.create ~fee ~fee_token:Token_id.default
         ~fee_payer_pk:from_pk ~nonce ~memo:User_command_memo.dummy
         ~valid_until:None
         ~body:
@@ -38,14 +38,14 @@ let create_ledger_and_transactions num_transitions =
              ; token_id= Token_id.default
              ; amount })
     in
-    User_command.sign from_kp payload
+    Signed_command.sign from_kp payload
   in
   let nonces =
     Public_key.Compressed.Table.of_alist_exn
       (List.map (Array.to_list keys) ~f:(fun k ->
            (Public_key.compress k.public_key, Account.Nonce.zero) ))
   in
-  let random_transaction () : User_command.With_valid_signature.t =
+  let random_transaction () : Signed_command.With_valid_signature.t =
     let sender_idx = Random.int num_accounts in
     let sender = keys.(sender_idx) in
     let receiver = keys.(Random.int num_accounts) in
@@ -69,7 +69,7 @@ let create_ledger_and_transactions num_transitions =
           List.fold transactions ~init:zero ~f:(fun acc t ->
               Option.value_exn
                 (add acc
-                   (User_command.Payload.fee (t :> User_command.t).payload)) )
+                   (Signed_command.Payload.fee (t :> Signed_command.t).payload)) )
         in
         Fee_transfer.create_single
           ~receiver_pk:(Public_key.compress keys.(0).public_key)

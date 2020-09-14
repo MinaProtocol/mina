@@ -98,7 +98,7 @@ let _ =
          let sk = Private_key.of_base58_check_exn sk_base58_check in
          let payload = payload_of_payment_js payment_js in
          let signature =
-           User_command.sign_payload sk payload |> signature_to_js_object
+           Signed_command.sign_payload sk payload |> signature_to_js_object
          in
          let publicKey = _self##publicKeyOfPrivateKey sk_base58_check_js in
          object%js
@@ -120,8 +120,8 @@ let _ =
            |> Public_key.decompress_exn
          in
          let signature = signature_of_js_object signed_payment##.signature in
-         let signed = User_command.Poly.{payload; signer; signature} in
-         User_command.check_signature signed
+         let signed = Signed_command.Poly.{payload; signer; signature} in
+         Signed_command.check_signature signed
 
        (** sign payment transaction payload with private key *)
        method signStakeDelegation (sk_base58_check_js : string_js)
@@ -131,7 +131,7 @@ let _ =
          let sk = Private_key.of_base58_check_exn sk_base58_check in
          let payload = payload_of_stake_delegation_js stake_delegation_js in
          let signature =
-           User_command.sign_payload sk payload |> signature_to_js_object
+           Signed_command.sign_payload sk payload |> signature_to_js_object
          in
          let publicKey = _self##publicKeyOfPrivateKey sk_base58_check_js in
          object%js
@@ -157,8 +157,8 @@ let _ =
          let signature =
            signature_of_js_object signed_stake_delegation##.signature
          in
-         let signed = User_command.Poly.{payload; signer; signature} in
-         User_command.check_signature signed
+         let signed = Signed_command.Poly.{payload; signer; signature} in
+         Signed_command.check_signature signed
 
        (** sign a transaction in Rosetta rendered format *)
        method signRosettaTransaction (sk_base58_check_js : string_js)
@@ -181,7 +181,7 @@ let _ =
            match payload_or_err with
            | Ok payload -> (
                let signature =
-                 User_command.sign_payload sk payload |> Signature.Raw.encode
+                 Signed_command.sign_payload sk payload |> Signature.Raw.encode
                in
                let signed_txn =
                  Transaction.Signed.{command; nonce; signature}

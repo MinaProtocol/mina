@@ -17,7 +17,7 @@ module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 
 module Elt : sig
   type t =
-    | User_command of User_command.Payload.t
+    | User_command of Signed_command.Payload.t
     | Snapp_command of Random_oracle.Digest.t
 end
 

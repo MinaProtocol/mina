@@ -2942,7 +2942,7 @@ module type S = sig
     -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
     -> next_available_token_before:Token_id.t
     -> next_available_token_after:Token_id.t
-    -> User_command.With_valid_signature.t Transaction_protocol_state.t
+    -> Signed_command.With_valid_signature.t Transaction_protocol_state.t
     -> Tick.Handler.t
     -> t
 
@@ -3462,8 +3462,8 @@ let%test_module "transaction_snark" =
 
     let user_command ~fee_payer ~source_pk ~receiver_pk ~fee_token ~token amt
         fee nonce memo =
-      let payload : User_command.Payload.t =
-        User_command.Payload.create ~fee ~fee_token
+      let payload : Signed_command.Payload.t =
+        Signed_command.Payload.create ~fee ~fee_token
           ~fee_payer_pk:(Account.public_key fee_payer.account)
           ~nonce ~memo ~valid_until:None
           ~body:
@@ -3474,10 +3474,10 @@ let%test_module "transaction_snark" =
                ; amount= Amount.of_int amt })
       in
       let signature =
-        User_command.sign_payload fee_payer.private_key payload
+        Signed_command.sign_payload fee_payer.private_key payload
       in
-      User_command.check
-        User_command.Poly.Stable.Latest.
+      Signed_command.check
+        Signed_command.Poly.Stable.Latest.
           { payload
           ; signer= Public_key.of_private_key_exn fee_payer.private_key
           ; signature }
@@ -3522,7 +3522,7 @@ let%test_module "transaction_snark" =
       [%test_eq: Balance.t] acc.balance (Balance.of_int balance)
 
     let of_user_command' sok_digest ledger
-        (user_command : User_command.With_valid_signature.t) init_stack
+        (user_command : Signed_command.With_valid_signature.t) init_stack
         pending_coinbase_stack_state state_body handler =
       let source = Ledger.merkle_root ledger in
       let current_global_slot =
@@ -3662,9 +3662,9 @@ let%test_module "transaction_snark" =
                   ~txn_global_slot:current_global_slot t1
               in
               let mentioned_keys =
-                User_command.accounts_accessed
+                Signed_command.accounts_accessed
                   ~next_available_token:next_available_token_before
-                  (User_command.forget_check t1)
+                  (Signed_command.forget_check t1)
               in
               let sparse_ledger =
                 Sparse_ledger.of_ledger_subset_exn ledger mentioned_keys
@@ -3856,8 +3856,8 @@ let%test_module "transaction_snark" =
         in
         match (txn : Transaction.Valid.t) with
         | Command (User_command uc) ->
-            ( User_command.accounts_accessed ~next_available_token
-                (uc :> User_command.t)
+            ( Signed_command.accounts_accessed ~next_available_token
+                (uc :> Signed_command.t)
             , pending_coinbase_stack )
         | Command (Snapp_command _) ->
             failwith "Snapp_command not yet supported"
@@ -4080,9 +4080,9 @@ let%test_module "transaction_snark" =
                           for each command normally, but we know statically
                           that these are payments in this test.
                        *)
-                       User_command.accounts_accessed
+                       Signed_command.accounts_accessed
                          ~next_available_token:next_available_token1
-                         (User_command.forget_check t) )
+                         (Signed_command.forget_check t) )
                      [t1; t2])
               in
               let init_stack1 = Pending_coinbase.Stack.empty in
@@ -4119,7 +4119,7 @@ let%test_module "transaction_snark" =
               let sparse_ledger =
                 Sparse_ledger.apply_user_command_exn ~constraint_constants
                   ~txn_global_slot:current_global_slot sparse_ledger
-                  (t1 :> User_command.t)
+                  (t1 :> Signed_command.t)
               in
               let pending_coinbase_stack_state2, state_body2 =
                 let previous_stack = pending_coinbase_stack_state1.pc.target in
@@ -4170,7 +4170,7 @@ let%test_module "transaction_snark" =
               let sparse_ledger =
                 Sparse_ledger.apply_user_command_exn ~constraint_constants
                   ~txn_global_slot:current_global_slot sparse_ledger
-                  (t2 :> User_command.t)
+                  (t2 :> Signed_command.t)
               in
               Ledger.apply_user_command ledger ~constraint_constants
                 ~txn_global_slot:current_global_slot t2
@@ -4276,18 +4276,18 @@ let%test_module "transaction_snark" =
                  explicitly" )
       in
       let payload =
-        User_command.Payload.create ~fee ~fee_payer_pk ~fee_token ~nonce
+        Signed_command.Payload.create ~fee ~fee_payer_pk ~fee_token ~nonce
           ~valid_until ~memo ~body
       in
       let signer = Signature_lib.Keypair.of_private_key_exn signer in
-      let user_command = User_command.sign signer payload in
+      let user_command = Signed_command.sign signer payload in
       let next_available_token = Ledger.next_available_token ledger in
       test_transaction ~constraint_constants ledger
         (Command (User_command user_command)) ;
-      let fee_payer = User_command.Payload.fee_payer payload in
-      let source = User_command.Payload.source ~next_available_token payload in
+      let fee_payer = Signed_command.Payload.fee_payer payload in
+      let source = Signed_command.Payload.source ~next_available_token payload in
       let receiver =
-        User_command.Payload.receiver ~next_available_token payload
+        Signed_command.Payload.receiver ~next_available_token payload
       in
       let fee_payer_account = get_account fee_payer in
       let source_account = get_account source in

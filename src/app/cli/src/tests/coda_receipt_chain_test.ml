@@ -39,7 +39,7 @@ let main () =
   let n = 2 in
   let sender_sk = Option.value_exn sender_sk in
   let send_amount = Currency.Amount.of_int 10 in
-  let fee = User_command.minimum_fee in
+  let fee = Signed_command.minimum_fee in
   let%bind program_dir = Unix.getcwd () in
   let work_selection_method =
     Cli_lib.Arg_type.Work_selection_method.Sequence

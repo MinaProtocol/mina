@@ -379,7 +379,7 @@ module Payloads = struct
           partial_user_command
         |> env.lift
       in
-      let random_oracle_input = User_command.to_input user_command_payload in
+      let random_oracle_input = Signed_command.to_input user_command_payload in
       let%map unsigned_transaction_string =
         { Transaction.Unsigned.random_oracle_input
         ; command= partial_user_command
@@ -566,7 +566,7 @@ module Hash = struct
           ~error:(Errors.create `Signature_missing)
         |> env.lift
       in
-      let full_command = {User_command.Poly.payload; signature; signer} in
+      let full_command = {Signed_command.Poly.payload; signature; signer} in
       let hash = Transaction_hash.hash_user_command full_command in
       Construction_hash_response.create (Transaction_hash.to_base58_check hash)
   end

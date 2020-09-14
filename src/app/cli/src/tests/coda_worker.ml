@@ -72,12 +72,12 @@ module T = struct
     ; send_user_command:
         ( 'worker
         , Send_payment_input.t
-        , (User_command.t * Receipt.Chain_hash.t) Or_error.t )
+        , (Signed_command.t * Receipt.Chain_hash.t) Or_error.t )
         Rpc_parallel.Function.t
     ; process_user_command:
         ( 'worker
         , User_command_input.t
-        , (User_command.t * Receipt.Chain_hash.t) Or_error.t )
+        , (Signed_command.t * Receipt.Chain_hash.t) Or_error.t )
         Rpc_parallel.Function.t
     ; verified_transitions:
         ('worker, unit, state_hashes Pipe.Reader.t) Rpc_parallel.Function.t
@@ -86,7 +86,7 @@ module T = struct
     ; get_all_user_commands:
         ( 'worker
         , Public_key.Compressed.t
-        , User_command.t list )
+        , Signed_command.t list )
         Rpc_parallel.Function.t
     ; get_all_transitions:
         ( 'worker
@@ -99,7 +99,7 @@ module T = struct
     ; new_user_command:
         ( 'worker
         , Public_key.Compressed.t
-        , User_command.t Pipe.Reader.t )
+        , Signed_command.t Pipe.Reader.t )
         Rpc_parallel.Function.t
     ; root_diff:
         ( 'worker
@@ -145,16 +145,16 @@ module T = struct
     ; coda_root_length: unit -> int Deferred.t
     ; coda_send_payment:
            Send_payment_input.t
-        -> (User_command.t * Receipt.Chain_hash.t) Or_error.t Deferred.t
+        -> (Signed_command.t * Receipt.Chain_hash.t) Or_error.t Deferred.t
     ; coda_process_user_command:
            User_command_input.t
-        -> (User_command.t * Receipt.Chain_hash.t) Or_error.t Deferred.t
+        -> (Signed_command.t * Receipt.Chain_hash.t) Or_error.t Deferred.t
     ; coda_verified_transitions: unit -> state_hashes Pipe.Reader.t Deferred.t
     ; coda_sync_status: unit -> Sync_status.t Pipe.Reader.t Deferred.t
     ; coda_new_user_command:
-        Public_key.Compressed.t -> User_command.t Pipe.Reader.t Deferred.t
+        Public_key.Compressed.t -> Signed_command.t Pipe.Reader.t Deferred.t
     ; coda_get_all_user_commands:
-        Public_key.Compressed.t -> User_command.t list Deferred.t
+        Public_key.Compressed.t -> Signed_command.t list Deferred.t
     ; coda_replace_snark_worker_key:
         Public_key.Compressed.t option -> unit Deferred.t
     ; coda_stop_snark_worker: unit -> unit Deferred.t
@@ -321,7 +321,7 @@ module T = struct
         ~bin_input:Send_payment_input.Stable.Latest.bin_t
         ~bin_output:
           [%bin_type_class:
-            (User_command.Stable.Latest.t * Receipt.Chain_hash.Stable.Latest.t)
+            (Signed_command.Stable.Latest.t * Receipt.Chain_hash.Stable.Latest.t)
             Or_error.t] ()
 
     let process_user_command =
@@ -329,7 +329,7 @@ module T = struct
         ~bin_input:User_command_input.Stable.Latest.bin_t
         ~bin_output:
           [%bin_type_class:
-            (User_command.Stable.Latest.t * Receipt.Chain_hash.Stable.Latest.t)
+            (Signed_command.Stable.Latest.t * Receipt.Chain_hash.Stable.Latest.t)
             Or_error.t] ()
 
     let verified_transitions =
@@ -353,12 +353,12 @@ module T = struct
     let new_user_command =
       C.create_pipe ~name:"new_user_command" ~f:new_user_command_impl
         ~bin_input:Public_key.Compressed.Stable.Latest.bin_t
-        ~bin_output:User_command.Stable.Latest.bin_t ()
+        ~bin_output:Signed_command.Stable.Latest.bin_t ()
 
     let get_all_user_commands =
       C.create_rpc ~name:"get_all_user_commands" ~f:get_all_user_commands_impl
         ~bin_input:Public_key.Compressed.Stable.Latest.bin_t
-        ~bin_output:[%bin_type_class: User_command.Stable.Latest.t list] ()
+        ~bin_output:[%bin_type_class: Signed_command.Stable.Latest.t list] ()
 
     let dump_tf =
       C.create_rpc ~name:"dump_tf" ~f:dump_tf_impl ~bin_input:Unit.bin_t

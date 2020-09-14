@@ -54,7 +54,7 @@ val add_block_subscriber :
      With_hash.t
      Pipe.Reader.t
 
-val add_payment_subscriber : t -> Account.key -> User_command.t Pipe.Reader.t
+val add_payment_subscriber : t -> Account.key -> Signed_command.t Pipe.Reader.t
 
 val snark_worker_key : t -> Public_key.Compressed.t option
 

@@ -36,4 +36,4 @@ module Stable : sig
   end
 end]
 
-include User_command_intf.S with type t = Stable.Latest.t
+include Signed_command_intf.S with type t = Stable.Latest.t

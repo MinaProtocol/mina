@@ -32,15 +32,15 @@ module type Ledger_intf = sig
 end
 
 module Undo = struct
-  module UC = User_command
+  module UC = Signed_command
 
-  module User_command_undo = struct
+  module Signed_command_undo = struct
     module Common = struct
       [%%versioned
       module Stable = struct
         module V1 = struct
           type t =
-            { user_command: User_command.Stable.V1.t With_status.Stable.V1.t
+            { user_command: Signed_command.Stable.V1.t With_status.Stable.V1.t
             ; previous_receipt_chain_hash: Receipt.Chain_hash.Stable.V1.t
             ; fee_payer_timing: Account.Timing.Stable.V1.t
             ; source_timing: Account.Timing.Stable.V1.t option }
@@ -101,7 +101,7 @@ module Undo = struct
     module Stable = struct
       module V1 = struct
         type t =
-          | User_command of User_command_undo.Stable.V1.t
+          | Signed_command of Signed_command_undo.Stable.V1.t
           | Snapp_command of Snapp_command_undo.Stable.V1.t
         [@@deriving sexp]
 
@@ -169,10 +169,10 @@ module type S = sig
   type ledger
 
   module Undo : sig
-    module User_command_undo : sig
+    module Signed_command_undo : sig
       module Common : sig
-        type t = Undo.User_command_undo.Common.t =
-          { user_command: User_command.t With_status.t
+        type t = Undo.Signed_command_undo.Common.t =
+          { user_command: Signed_command.t With_status.t
           ; previous_receipt_chain_hash: Receipt.Chain_hash.t
           ; fee_payer_timing: Account.Timing.t
           ; source_timing: Account.Timing.t option }
@@ -180,7 +180,7 @@ module type S = sig
       end
 
       module Body : sig
-        type t = Undo.User_command_undo.Body.t =
+        type t = Undo.Signed_command_undo.Body.t =
           | Payment of {previous_empty_accounts: Account_id.t list}
           | Stake_delegation of
               { previous_delegate: Public_key.Compressed.t option }
@@ -191,7 +191,7 @@ module type S = sig
         [@@deriving sexp]
       end
 
-      type t = Undo.User_command_undo.t = {common: Common.t; body: Body.t}
+      type t = Undo.Signed_command_undo.t = {common: Common.t; body: Body.t}
       [@@deriving sexp]
     end
 
@@ -204,7 +204,7 @@ module type S = sig
 
     module Command_undo : sig
       type t = Undo.Command_undo.t =
-        | User_command of User_command_undo.t
+        | Signed_command of Signed_command_undo.t
         | Snapp_command of Snapp_command_undo.t
       [@@deriving sexp]
     end
@@ -242,8 +242,8 @@ module type S = sig
        constraint_constants:Genesis_constants.Constraint_constants.t
     -> txn_global_slot:Global_slot.t
     -> ledger
-    -> User_command.With_valid_signature.t
-    -> Undo.User_command_undo.t Or_error.t
+    -> Signed_command.With_valid_signature.t
+    -> Undo.Signed_command_undo.t Or_error.t
 
   val apply_transaction :
        constraint_constants:Genesis_constants.Constraint_constants.t
@@ -263,7 +263,7 @@ module type S = sig
        constraint_constants:Genesis_constants.Constraint_constants.t
     -> txn_global_slot:Global_slot.t
     -> ledger
-    -> User_command.With_valid_signature.t
+    -> Signed_command.With_valid_signature.t
     -> Ledger_hash.t * [`Next_available_token of Token_id.t]
 
   val undo :
@@ -429,7 +429,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     let transaction : t -> Transaction.t With_status.t =
      fun {varying; _} ->
       match varying with
-      | Command (User_command uc) ->
+      | Command (Signed_command uc) ->
           With_status.map uc.common.user_command ~f:(fun cmd ->
               Transaction.Command (Command_transaction.User_command cmd) )
       | Command (Snapp_command s) ->
@@ -445,7 +445,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     let user_command_status : t -> User_command_status.t =
      fun {varying; _} ->
       match varying with
-      | Command (User_command {common= {user_command= {status; _}; _}; _}) ->
+      | Command (Signed_command {common= {user_command= {status; _}; _}; _}) ->
           status
       | Command (Snapp_command c) ->
           c.command.status
@@ -517,10 +517,10 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
   let pay_fee ~user_command ~signer_pk ~ledger ~current_global_slot =
     let open Or_error.Let_syntax in
     (* Fee-payer information *)
-    let nonce = User_command.nonce user_command in
-    let fee_payer = User_command.fee_payer user_command in
+    let nonce = Signed_command.nonce user_command in
+    let fee_payer = Signed_command.fee_payer user_command in
     let%bind () =
-      let fee_token = User_command.fee_token user_command in
+      let fee_token = Signed_command.fee_token user_command in
       let%bind () =
         (* TODO: Enable multi-sig. *)
         if
@@ -547,10 +547,10 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     in
     let%map loc, account, account' =
       pay_fee' ~command:(User_command user_command.payload) ~nonce ~fee_payer
-        ~fee:(User_command.fee user_command)
+        ~fee:(Signed_command.fee user_command)
         ~ledger ~current_global_slot
     in
-    let undo_common : Undo.User_command_undo.Common.t =
+    let undo_common : Undo.Signed_command_undo.Common.t =
       { user_command=
           { data= user_command
           ; status= Applied User_command_status.Auxiliary_data.empty }
@@ -566,17 +566,17 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
   let apply_user_command_unchecked
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ~txn_global_slot ledger
-      ({payload; signer; signature= _} as user_command : User_command.t) =
+      ({payload; signer; signature= _} as user_command : Signed_command.t) =
     let open Or_error.Let_syntax in
     let signer_pk = Public_key.compress signer in
     let current_global_slot = txn_global_slot in
     let%bind () =
       validate_time
-        ~valid_until:(User_command.valid_until user_command)
+        ~valid_until:(Signed_command.valid_until user_command)
         ~current_global_slot
     in
     (* Fee-payer information *)
-    let fee_payer = User_command.fee_payer user_command in
+    let fee_payer = Signed_command.fee_payer user_command in
     let%bind fee_payer_location, fee_payer_account, undo_common =
       pay_fee ~user_command ~signer_pk ~ledger ~current_global_slot
     in
@@ -586,8 +586,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     *)
     set_with_location ledger fee_payer_location fee_payer_account ;
     let next_available_token = next_available_token ledger in
-    let source = User_command.source ~next_available_token user_command in
-    let receiver = User_command.receiver ~next_available_token user_command in
+    let source = Signed_command.source ~next_available_token user_command in
+    let receiver = Signed_command.receiver ~next_available_token user_command in
     let exception Reject of Error.t in
     let ok_or_reject = function
       | Ok x ->
@@ -617,8 +617,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       let%bind predicate_passed =
         if
           Public_key.Compressed.equal
-            (User_command.fee_payer_pk user_command)
-            (User_command.source_pk user_command)
+            (Signed_command.fee_payer_pk user_command)
+            (Signed_command.source_pk user_command)
         then return true
         else
           match payload.body with
@@ -677,7 +677,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           ( [(source_location, source_account)]
           , `Source_timing source_timing
           , User_command_status.Auxiliary_data.empty
-          , Undo.User_command_undo.Body.Stake_delegation {previous_delegate} )
+          , Undo.Signed_command_undo.Body.Stake_delegation {previous_delegate} )
       | Payment {amount; token_id= token; _} ->
           let receiver_location, receiver_account =
             get_with_location ledger receiver |> ok_or_reject
@@ -766,7 +766,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             ; (source_location, source_account) ]
           , `Source_timing source_timing
           , auxiliary_data
-          , Undo.User_command_undo.Body.Payment {previous_empty_accounts} )
+          , Undo.Signed_command_undo.Body.Payment {previous_empty_accounts} )
       | Create_new_token {disable_new_accounts; _} ->
           (* NOTE: source and receiver are definitionally equal here. *)
           let fee_payer_account =
@@ -794,7 +794,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                   Some
                     (Amount.of_fee constraint_constants.account_creation_fee)
               ; created_token= Some next_available_token }
-            , Undo.User_command_undo.Body.Create_new_token
+            , Undo.Signed_command_undo.Body.Create_new_token
                 {created_token= next_available_token} )
       | Create_token_account {account_disabled; _} ->
           if
@@ -881,7 +881,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               fee_payer_account_creation_fee_paid=
                 Some (Amount.of_fee constraint_constants.account_creation_fee)
             }
-          , Undo.User_command_undo.Body.Create_token_account )
+          , Undo.Signed_command_undo.Body.Create_token_account )
       | Mint_tokens {token_id= token; amount; _} ->
           let%bind () =
             if Token_id.(equal default) token then
@@ -932,7 +932,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             ; (source_location, source_account) ]
           , `Source_timing source_timing
           , User_command_status.Auxiliary_data.empty
-          , Undo.User_command_undo.Body.Mint_tokens )
+          , Undo.Signed_command_undo.Body.Mint_tokens )
     in
     match compute_updates () with
     | Ok
@@ -950,14 +950,14 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           }
         in
         return
-          ({common= undo_common; body= undo_body} : Undo.User_command_undo.t)
+          ({common= undo_common; body= undo_body} : Undo.Signed_command_undo.t)
     | Error failure ->
         (* Do not update the ledger. *)
         let undo_common =
           { undo_common with
             user_command= {data= user_command; status= Failed failure} }
         in
-        return ({common= undo_common; body= Failed} : Undo.User_command_undo.t)
+        return ({common= undo_common; body= Failed} : Undo.Signed_command_undo.t)
     | exception Reject err ->
         (* TODO: These transactions should never reach this stage, this error
            should be fatal.
@@ -965,9 +965,9 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         Error err
 
   let apply_user_command ~constraint_constants ~txn_global_slot ledger
-      (user_command : User_command.With_valid_signature.t) =
+      (user_command : Signed_command.With_valid_signature.t) =
     apply_user_command_unchecked ~constraint_constants ~txn_global_slot ledger
-      (User_command.forget_check user_command)
+      (Signed_command.forget_check user_command)
 
   let opt_fail e = function Some x -> Ok x | None -> Error (failure e)
 
@@ -1554,7 +1554,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
 
   let undo_user_command
       ~(constraint_constants : Genesis_constants.Constraint_constants.t) ledger
-      { Undo.User_command_undo.common=
+      { Undo.Signed_command_undo.common=
           { user_command=
               { data= {payload; signer= _; signature= _} as user_command
               ; status= _ }
@@ -1564,8 +1564,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       ; body } =
     let open Or_error.Let_syntax in
     (* Fee-payer information *)
-    let fee_payer = User_command.fee_payer user_command in
-    let nonce = User_command.nonce user_command in
+    let fee_payer = Signed_command.fee_payer user_command in
+    let nonce = Signed_command.nonce user_command in
     let%bind fee_payer_location =
       location_of_account' ledger "fee payer" fee_payer
     in
@@ -1575,7 +1575,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       let%bind () = validate_nonces (Account.Nonce.succ nonce) account.nonce in
       let%map balance =
         add_amount account.balance
-          (Amount.of_fee (User_command.fee user_command))
+          (Amount.of_fee (Signed_command.fee user_command))
       in
       { account with
         balance
@@ -1592,7 +1592,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       | _ ->
           next_available_token ledger
     in
-    let source = User_command.source ~next_available_token user_command in
+    let source = Signed_command.source ~next_available_token user_command in
     let source_timing =
       (* Prefer fee-payer original timing when applicable, since it is the
          'true' original.
@@ -1601,7 +1601,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       else source_timing
     in
     (* Reverse any other effects that the user command had. *)
-    match (User_command.Payload.body payload, body) with
+    match (Signed_command.Payload.body payload, body) with
     | _, Failed ->
         (* The user command failed, only the fee was charged. *)
         return ()
@@ -1618,7 +1618,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           }
     | Payment {amount; _}, Payment {previous_empty_accounts} ->
         let receiver =
-          User_command.receiver ~next_available_token user_command
+          Signed_command.receiver ~next_available_token user_command
         in
         let%bind receiver_location, receiver_account =
           let%bind location =
@@ -1676,7 +1676,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           else get' ledger "source" source_location
         in
         let receiver =
-          User_command.receiver ~next_available_token user_command
+          Signed_command.receiver ~next_available_token user_command
         in
         set ledger fee_payer_location fee_payer_account ;
         set ledger source_location
@@ -1690,7 +1690,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         set_next_available_token ledger next_available_token
     | Mint_tokens {amount; _}, Mint_tokens ->
         let receiver =
-          User_command.receiver ~next_available_token user_command
+          Signed_command.receiver ~next_available_token user_command
         in
         let%bind receiver_location, receiver_account =
           let%bind location =
@@ -1756,7 +1756,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       match undo.varying with
       | Fee_transfer u ->
           undo_fee_transfer ~constraint_constants ledger u
-      | Command (User_command u) ->
+      | Command (Signed_command u) ->
           undo_user_command ~constraint_constants ledger u
       | Command (Snapp_command _u) ->
           failwith "Not yet implemented"
@@ -1780,7 +1780,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               Or_error.map
                 (apply_user_command_unchecked ~constraint_constants
                    ~txn_global_slot ledger txn) ~f:(fun undo ->
-                  Undo.Varying.Command (User_command undo) )
+                  Undo.Varying.Command (Signed_command undo) )
           | Command (Snapp_command txn) ->
               Or_error.map
                 (apply_snapp_command_unchecked ~state_view:txn_state_view

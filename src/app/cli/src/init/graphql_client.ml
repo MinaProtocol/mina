@@ -41,7 +41,7 @@ let query query_obj (uri : Uri.t Cli_lib.Flag.Types.with_name) =
 
 let query_exn query_obj port = run_exn ~f:Client.query query_obj port
 
-module User_command = struct
+module Signed_command = struct
   type t =
     { id: string
     ; isDelegation: bool

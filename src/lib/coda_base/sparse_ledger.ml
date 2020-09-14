@@ -216,14 +216,14 @@ let sub_account_creation_fee
 let apply_user_command_exn
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     ~txn_global_slot t
-    ({signer; payload; signature= _} as user_command : User_command.t) =
+    ({signer; payload; signature= _} as user_command : Signed_command.t) =
   let open Currency in
   let signer_pk = Public_key.compress signer in
   let current_global_slot = txn_global_slot in
   (* Fee-payer information *)
-  let fee_token = User_command.fee_token user_command in
-  let fee_payer = User_command.fee_payer user_command in
-  let nonce = User_command.nonce user_command in
+  let fee_token = Signed_command.fee_token user_command in
+  let fee_payer = Signed_command.fee_payer user_command in
+  let nonce = Signed_command.nonce user_command in
   assert (
     Public_key.Compressed.equal (Account_id.public_key fee_payer) signer_pk ) ;
   assert (Token_id.equal fee_token Token_id.default) ;
@@ -231,7 +231,7 @@ let apply_user_command_exn
     let idx = find_index_exn t fee_payer in
     let account = get_exn t idx in
     assert (Account.Nonce.equal account.nonce nonce) ;
-    let fee = User_command.fee user_command in
+    let fee = Signed_command.fee user_command in
     let timing =
       Or_error.ok_exn
       @@ Transaction_logic.validate_timing ~txn_amount:(Amount.of_fee fee)
@@ -251,8 +251,8 @@ let apply_user_command_exn
   (* Charge the fee. *)
   let t = set_exn t fee_payer_idx fee_payer_account in
   let next_available_token = next_available_token t in
-  let source = User_command.source ~next_available_token user_command in
-  let receiver = User_command.receiver ~next_available_token user_command in
+  let source = Signed_command.source ~next_available_token user_command in
+  let receiver = Signed_command.receiver ~next_available_token user_command in
   let exception Reject of exn in
   let charge_account_creation_fee_exn (account : Account.t) =
     let balance =
@@ -278,8 +278,8 @@ let apply_user_command_exn
     let predicate_passed =
       if
         Public_key.Compressed.equal
-          (User_command.fee_payer_pk user_command)
-          (User_command.source_pk user_command)
+          (Signed_command.fee_payer_pk user_command)
+          (Signed_command.source_pk user_command)
       then true
       else
         match payload.body with
@@ -303,7 +303,7 @@ let apply_user_command_exn
               "The fee-payer is not authorised to issue commands for the \
                source account"
     in
-    match User_command.Payload.body payload with
+    match Signed_command.Payload.body payload with
     | Stake_delegation _ ->
         let receiver_account = get_exn t @@ find_index_exn t receiver in
         (* Check that receiver account exists. *)
@@ -580,7 +580,7 @@ let apply_transaction_exn ~constraint_constants
       apply_fee_transfer_exn ~constraint_constants t tr
   | Command (User_command cmd) ->
       apply_user_command_exn ~constraint_constants ~txn_global_slot t
-        (cmd :> User_command.t)
+        (cmd :> Signed_command.t)
   | Command (Snapp_command cmd) ->
       apply_snapp_command_exn ~constraint_constants ~txn_state_view t cmd
   | Coinbase c ->

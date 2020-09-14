@@ -270,13 +270,13 @@ module Log = struct
       ~doc:"Set log level (default: Info)"
 end
 
-type user_command_common =
+type signed_command_common =
   { sender: Signature_lib.Public_key.Compressed.t
   ; fee: Currency.Fee.t
   ; nonce: Coda_base.Account.Nonce.t option
   ; memo: string option }
 
-let user_command_common : user_command_common Command.Param.t =
+let signed_command_common : signed_command_common Command.Param.t =
   let open Command.Let_syntax in
   let open Arg_type in
   let%map_open sender =
@@ -291,7 +291,7 @@ let user_command_common : user_command_common Command.Param.t =
             (default: %s) (minimum: %s)"
            (Currency.Fee.to_formatted_string
               Coda_compile_config.default_transaction_fee)
-           (Currency.Fee.to_formatted_string Coda_base.User_command.minimum_fee))
+           (Currency.Fee.to_formatted_string Coda_base.Signed_command.minimum_fee))
       (optional txn_fee)
   and nonce =
     flag "nonce"
@@ -310,7 +310,7 @@ let user_command_common : user_command_common Command.Param.t =
   ; nonce
   ; memo }
 
-module User_command = struct
+module Signed_command = struct
   open Arg_type
 
   let hd_index =
@@ -337,7 +337,7 @@ module User_command = struct
             (default: %s) (minimum: %s)"
            (Currency.Fee.to_formatted_string
               Coda_compile_config.default_transaction_fee)
-           (Currency.Fee.to_formatted_string Coda_base.User_command.minimum_fee))
+           (Currency.Fee.to_formatted_string Coda_base.Signed_command.minimum_fee))
       (optional txn_fee)
 
   let valid_until =

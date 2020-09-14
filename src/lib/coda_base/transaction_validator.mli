@@ -8,7 +8,7 @@ val apply_user_command :
      constraint_constants:Genesis_constants.Constraint_constants.t
   -> txn_global_slot:Coda_numbers.Global_slot.t
   -> Hashless_ledger.t
-  -> User_command.With_valid_signature.t
+  -> Signed_command.With_valid_signature.t
   -> User_command_status.t Or_error.t
 
 val apply_transaction :

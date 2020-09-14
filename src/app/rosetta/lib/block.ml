@@ -287,7 +287,7 @@ SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, 
     end
 
     let typ =
-      Caqti_type.(tup3 int Archive_lib.Processor.User_command.typ Extras.typ)
+      Caqti_type.(tup3 int Archive_lib.Processor.Signed_command.typ Extras.typ)
 
     let query =
       Caqti_request.collect Caqti_type.int typ
@@ -408,7 +408,7 @@ SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, 
       M.List.map raw_user_commands ~f:(fun (_, uc, extras) ->
           let open M.Let_syntax in
           let%bind kind =
-            match uc.Archive_lib.Processor.User_command.typ with
+            match uc.Archive_lib.Processor.Signed_command.typ with
             | "payment" ->
                 M.return `Payment
             | "delegation" ->

@@ -697,7 +697,7 @@ struct
                     | Command_transaction.Snapp_command c ->
                         Command_transaction.Snapp_command c
                     | User_command c ->
-                        User_command (Option.value_exn (User_command.check c)) ))
+                        User_command (Option.value_exn (Signed_command.check c)) ))
           )
         in
         let open Deferred.Let_syntax in
@@ -1368,7 +1368,7 @@ let%test_module _ =
 
     let mk_payment' sender_idx fee nonce receiver_idx amount =
       let get_pk idx = Public_key.compress test_keys.(idx).public_key in
-      User_command.sign test_keys.(sender_idx)
+      Signed_command.sign test_keys.(sender_idx)
         (User_command_payload.create ~fee:(Currency.Fee.of_int fee)
            ~fee_token:Token_id.default ~fee_payer_pk:(get_pk sender_idx)
            ~valid_until:None
@@ -1510,10 +1510,10 @@ let%test_module _ =
       let%bind assert_pool_txs, pool, _best_tip_diff_w, _frontier =
         setup_test ()
       in
-      let set_sender idx (tx : User_command.t) =
+      let set_sender idx (tx : Signed_command.t) =
         let sender_kp = test_keys.(idx) in
         let sender_pk = Public_key.compress sender_kp.public_key in
-        let payload : User_command.Payload.t =
+        let payload : Signed_command.Payload.t =
           match tx.payload with
           | {common; body= Payment payload} ->
               { common= {common with fee_payer_pk= sender_pk}
@@ -1529,14 +1529,14 @@ let%test_module _ =
                 as body } ->
               {common= {common with fee_payer_pk= sender_pk}; body}
         in
-        Command_transaction.User_command (User_command.sign sender_kp payload)
+        Command_transaction.User_command (Signed_command.sign sender_kp payload)
       in
       let txs0 =
         [ mk_payment' 0 1_000_000_000 0 9 20_000_000_000
         ; mk_payment' 0 1_000_000_000 1 9 12_000_000_000
         ; mk_payment' 0 1_000_000_000 2 9 500_000_000_000 ]
       in
-      let txs0' = List.map txs0 ~f:User_command.forget_check in
+      let txs0' = List.map txs0 ~f:Signed_command.forget_check in
       let txs1 = List.map ~f:(set_sender 1) txs0' in
       let txs2 = List.map ~f:(set_sender 2) txs0' in
       let txs3 = List.map ~f:(set_sender 3) txs0' in

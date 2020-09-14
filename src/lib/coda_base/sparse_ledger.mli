@@ -32,7 +32,7 @@ val apply_user_command_exn :
      constraint_constants:Genesis_constants.Constraint_constants.t
   -> txn_global_slot:Coda_numbers.Global_slot.t
   -> t
-  -> User_command.t
+  -> Signed_command.t
   -> t
 
 val apply_transaction_exn :

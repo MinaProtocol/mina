@@ -7,7 +7,7 @@ let check :
        | `Invalid
        | `Valid_assuming of Command_transaction.Valid.t * _ list ] = function
   | Command_transaction.User_command c -> (
-    match User_command.check c with
+    match Signed_command.check c with
     | None ->
         `Invalid
     | Some c ->

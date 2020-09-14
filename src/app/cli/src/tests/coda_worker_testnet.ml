@@ -514,7 +514,7 @@ end = struct
   let delegate_stake ?acceptable_delay:(delay = 7) (testnet : Api.t) ~node
       ~delegator ~delegatee =
     let valid_until = None in
-    let fee = User_command.minimum_fee in
+    let fee = Signed_command.minimum_fee in
     let worker = testnet.workers.(node) in
     let%bind _ =
       let open Deferred.Option.Let_syntax in
@@ -561,16 +561,16 @@ module Payments : sig
     -> sender:Private_key.t
     -> keypairs:Keypair.t list
     -> n:int
-    -> User_command.t list Deferred.t
+    -> Signed_command.t list Deferred.t
 
   val assert_retrievable_payments :
-    Api.t -> User_command.t list -> unit Deferred.t
+    Api.t -> Signed_command.t list -> unit Deferred.t
 end = struct
   let send_several_payments ?acceptable_delay:(delay = 7) (testnet : Api.t)
       ~node ~keypairs ~n =
     let amount = Currency.Amount.of_int 10 in
     let valid_until = None in
-    let fee = User_command.minimum_fee in
+    let fee = Signed_command.minimum_fee in
     let%bind (_ : unit option list) =
       Deferred.List.init n ~f:(fun _ ->
           let open Deferred.Option.Let_syntax in
@@ -631,7 +631,7 @@ end = struct
   let send_batch_consecutive_payments (testnet : Api.t) ~node ~sender
       ~(keypairs : Keypair.t list) ~n =
     let amount = Currency.Amount.of_int 10 in
-    let fee = User_command.minimum_fee in
+    let fee = Signed_command.minimum_fee in
     let valid_until = None in
     let%bind new_payment_readers =
       Deferred.List.init (Array.length testnet.workers) ~f:(fun i ->
@@ -655,7 +655,7 @@ end = struct
           | `Eof ->
               Deferred.return false
           | `Ok matching_user_command
-            when User_command.equal matching_user_command user_command ->
+            when Signed_command.equal matching_user_command user_command ->
               Deferred.return true
           | `Ok _bad_user_command ->
               read_until_match reader
@@ -672,21 +672,21 @@ end = struct
           Api.get_all_user_commands testnet worker_index public_key
         in
         Option.value_exn payments )
-    >>| User_command.Set.of_list
+    >>| Signed_command.Set.of_list
 
   let check_all_nodes_received_payments (testnet : Api.t) public_keys
-      (expected_payments : User_command.t list) =
+      (expected_payments : Signed_command.t list) =
     Deferred.List.init ~how:`Parallel (Array.length testnet.workers)
       ~f:(fun worker_index ->
         let%map node_payments =
           query_relevant_payments testnet worker_index public_keys
         in
-        List.for_all expected_payments ~f:(User_command.Set.mem node_payments)
+        List.for_all expected_payments ~f:(Signed_command.Set.mem node_payments)
     )
     >>| List.for_all ~f:Fn.id
 
   let assert_retrievable_payments (testnet : Api.t)
-      (expected_payments : User_command.t list) =
+      (expected_payments : Signed_command.t list) =
     let senders, receivers =
       List.map expected_payments ~f:(fun user_command ->
           match user_command.payload.body with

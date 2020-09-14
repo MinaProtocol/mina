@@ -39,7 +39,7 @@ module type External_transition_common_intf = sig
 
   val commands : t -> Command_transaction.t With_status.t list
 
-  val payments : t -> User_command.t With_status.t list
+  val payments : t -> Signed_command.t With_status.t list
 
   val delta_transition_chain_proof : t -> State_hash.t * State_body_hash.t list
 

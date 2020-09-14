@@ -61,11 +61,11 @@ val block_producer : t -> Signature_lib.Public_key.Compressed.t
 
 val commands : t -> Command_transaction.Valid.t With_status.t list
 
-val payments : t -> User_command.t With_status.t list
+val payments : t -> Signed_command.t With_status.t list
 
 val mask : t -> Ledger.Mask.Attached.t
 
-val all_user_commands : t list -> User_command.Set.t
+val all_user_commands : t list -> Signed_command.Set.t
 
 val display : t -> display
 

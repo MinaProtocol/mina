@@ -1041,16 +1041,16 @@ let%test_module _ =
     let%test_unit "replacement" =
       let modify_payment (c : Command_transaction.t) ~sender ~common:fc
           ~body:fb =
-        let modified_payload : User_command.Payload.t =
+        let modified_payload : Signed_command.Payload.t =
           match c with
           | User_command {payload= {body= Payment payment_payload; common}; _}
             ->
               { common= fc common
-              ; body= User_command.Payload.Body.Payment (fb payment_payload) }
+              ; body= Signed_command.Payload.Body.Payment (fb payment_payload) }
           | _ ->
               failwith "generated user command that wasn't a payment"
         in
-        User_command (User_command.For_tests.fake_sign sender modified_payload)
+        User_command (Signed_command.For_tests.fake_sign sender modified_payload)
         |> Transaction_hash.Command_transaction_with_valid_signature.create
       in
       let gen :
