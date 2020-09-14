@@ -39,6 +39,7 @@ module Styles = {
       alignItems(`center),
       flexDirection(`column),
       height(`percent(100.)),
+      width(`percent(100.)),
       media(Theme.MediaQuery.notMobile, [height(`rem(14.))]),
       media(
         Theme.MediaQuery.tablet,
@@ -147,6 +148,7 @@ let make = () => {
             <img
               src="/static/img/MinaBlockchain.png"
               className=Styles.minaBlockChainImage
+              alt="Mina Blockchain Size"
             />
           </div>
         </div>
@@ -175,6 +177,7 @@ let make = () => {
             <img
               src="/static/img/OtherBlockchains.png"
               className=Styles.otherBlockChainImage
+              alt="Other Blockchain Size"
             />
           </div>
         </div>
