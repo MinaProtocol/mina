@@ -48,7 +48,7 @@ let make = () => {
             {React.string("Button label")}
             <Icon kind=Icon.ArrowRightMedium />
           </Button>
-          /*** Documentation Button */
+          /*** Documentation Button TODO: Add link for documentation */
           <PromoButton bgColor=Theme.Colors.orange>
             <Icon kind=Icon.Documentation size=2.5 />
             <span className=Styles.documentationButton>
