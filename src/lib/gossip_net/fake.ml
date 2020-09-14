@@ -77,8 +77,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                 let intf = get_interface node in
                 let msg =
                   Envelope.(
-                    Incoming.wrap ~data:msg
-                      ~sender:(Sender.Remote (sender.host, sender.peer_id)))
+                    Incoming.wrap ~data:msg ~sender:(Sender.Remote sender))
                 in
                 Strict_pipe.Writer.write intf.broadcast_message_writer
                   (msg, Fn.const ()) ) )

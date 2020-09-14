@@ -28,11 +28,11 @@ import (
 	peer "github.com/libp2p/go-libp2p-core/peer"
 	peerstore "github.com/libp2p/go-libp2p-core/peerstore"
 	protocol "github.com/libp2p/go-libp2p-core/protocol"
-	"github.com/libp2p/go-libp2p-discovery"
+	discovery "github.com/libp2p/go-libp2p-discovery"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	mdns "github.com/libp2p/go-libp2p/p2p/discovery"
-	filter "github.com/libp2p/go-maddr-filter"
 	"github.com/multiformats/go-multiaddr"
+	ma "github.com/multiformats/go-multiaddr"
 )
 
 type subscription struct {
@@ -86,8 +86,7 @@ const (
 	beginAdvertising
 	findPeer
 	listPeers
-	banIP
-	unbanIP
+	setGaterConfig
 )
 
 const validationTimeout = 5 * time.Minute
@@ -951,61 +950,68 @@ func (lp *listPeersMsg) run(app *app) (interface{}, error) {
 	return peerInfos, nil
 }
 
-type banIPMsg struct {
-	IP string `json:"ip"`
-}
+func filterIPString(filters *ma.Filters, ip string, action ma.Action) error {
+	realIP := gonet.ParseIP(ip).To4()
 
-func (ban *banIPMsg) run(app *app) (interface{}, error) {
-	if app.P2p == nil {
-		return nil, needsConfigure()
-	}
-
-	ip := gonet.ParseIP(ban.IP).To4()
-
-	if ip == nil {
+	if realIP == nil {
 		// TODO: how to compute mask for IPv6?
-		return nil, badRPC(errors.New("unparsable IP or IPv6"))
+		return badRPC(errors.New("unparsable IP or IPv6"))
 	}
 
-	ipnet := gonet.IPNet{Mask: gonet.IPv4Mask(255, 255, 255, 255), IP: ip}
+	ipnet := gonet.IPNet{Mask: gonet.IPv4Mask(255, 255, 255, 255), IP: realIP}
 
-	currentAction, isFromRule := app.P2p.Filters.ActionForFilter(ipnet)
+	filters.AddFilter(ipnet, action)
 
-	app.P2p.Filters.AddFilter(ipnet, filter.ActionDeny)
-
-	if currentAction == filter.ActionDeny && isFromRule {
-		return "banIP already banned", nil
-	}
-	return "banIP success", nil
+	return nil
 }
 
 type unbanIPMsg struct {
 	IP string `json:"ip"`
 }
 
-func (unban *unbanIPMsg) run(app *app) (interface{}, error) {
-	if app.P2p == nil {
-		return nil, needsConfigure()
+type setGaterConfigMsg struct {
+	BannedIPs     []string `json:"banned_ips"`
+	BannedPeerIDs []string `json:"banned_peers"`
+	TrustedPeerIDs []string `json:"trusted_peers"`
+	TrustedIPs    []string `json:"trusted_ips"`
+	Isolate       bool     `json:"isolate"`
+}
+
+func (gc *setGaterConfigMsg) run(app *app) (interface{}, error) {
+	newFilter := ma.NewFilters()
+	if gc.Isolate {
+		_, ipnet, err := gonet.ParseCIDR("0.0.0.0/0")
+		if err != nil {
+			return nil, err
+		}
+		newFilter.AddFilter(*ipnet, ma.ActionDeny)
+	}
+	for _, ip := range gc.BannedIPs {
+		err := filterIPString(newFilter, ip, ma.ActionDeny)
+		if err != nil {
+			return nil, err
+		}
+	}
+	for _, ip := range gc.TrustedIPs {
+		err := filterIPString(newFilter, ip, ma.ActionAccept)
+		if err != nil {
+			return nil, err
+		}
+	}
+	bannedPeers := peer.NewSet()
+	for _, peerID := range gc.BannedPeerIDs {
+		id, err := peer.IDB58Decode(peerID)
+		if err != nil {
+			app.P2p.Logger.Errorf("error while parsing peer id %s: %v", peerID, err.Error())
+			continue
+		}
+		bannedPeers.Add(id)
 	}
 
-	ip := gonet.ParseIP(unban.IP).To4()
+	app.P2p.GaterState.AddrFilters = newFilter
+	app.P2p.GaterState.DeniedPeers = bannedPeers
 
-	if ip == nil {
-		// TODO: how to compute mask for IPv6?
-		return nil, badRPC(errors.New("unparsable IP or IPv6"))
-	}
-
-	ipnet := gonet.IPNet{Mask: gonet.IPv4Mask(255, 255, 255, 255), IP: ip}
-
-	currentAction, isFromRule := app.P2p.Filters.ActionForFilter(ipnet)
-
-	if !isFromRule || currentAction == filter.ActionAccept {
-		return "unbanIP not banned", nil
-	}
-
-	app.P2p.Filters.RemoveLiteral(ipnet)
-
-	return "unbanIP success", nil
+	return "ok", nil
 }
 
 var msgHandlers = map[methodIdx]func() action{
@@ -1027,8 +1033,7 @@ var msgHandlers = map[methodIdx]func() action{
 	beginAdvertising:    func() action { return &beginAdvertisingMsg{} },
 	findPeer:            func() action { return &findPeerMsg{} },
 	listPeers:           func() action { return &listPeersMsg{} },
-	banIP:               func() action { return &banIPMsg{} },
-	unbanIP:             func() action { return &unbanIPMsg{} },
+	setGaterConfig:      func() action { return &setGaterConfigMsg{} },
 }
 
 type errorResult struct {
