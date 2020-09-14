@@ -31,7 +31,22 @@ module Styles = {
       justifyContent(`spaceBetween),
     ]);
   let imageColumn = style([width(`rem(10.06))]);
-
+  let logoGrid =
+    style([
+      display(`grid),
+      gridRowGap(`rem(1.)),
+      gridColumnGap(`rem(1.)),
+      gridTemplateRows([`rem(5.), `rem(5.)]),
+      gridTemplateColumns([`rem(10.), `rem(10.)]),
+      media(
+        Theme.MediaQuery.desktop,
+        [
+          gridTemplateRows([`rem(8.5), `rem(8.5)]),
+          gridTemplateColumns([`rem(17.), `rem(17.)]),
+        ],
+      ),
+    ]);
+  let logo = style([height(`rem(5.))]);
   let h2 =
     merge([
       Theme.Type.h2,
@@ -66,6 +81,30 @@ let make = () => {
           <h3 className=Theme.Type.h3> {React.string("XXXX")} </h3>
           <p className=Theme.Type.label> {React.string("Snark Workers")} </p>
         </span>
+      </div>
+      <Spacer height=4./>
+      <div className=Styles.gridItem2>
+        <Rule />
+        <Spacer height=2. />
+        <h2 className=Styles.h2>
+          {React.string("Featured Block Producers")}
+        </h2>
+        <Spacer height=1. />
+        <p className=Theme.Type.sectionSubhead>
+          {React.string(
+             "Delegating is an alternative to staking Mina directly, with the benefit of not having to maintain a node that is always connected to the network. Here are some of the professional block producers offering staking services on Mina.",
+           )}
+        </p>
+        <Spacer height=2. />
+        <div className=Styles.logoGrid>
+          <img className=Styles.logo src="/static/img/BisonTrailsLogo.png" />
+          <img
+            className=Styles.logo
+            src="/static/img/FigmentNetworksLogo.png"
+          />
+          <img className=Styles.logo src="/static/img/NonceLogo.png" />
+          <img className=Styles.logo src="/static/img/SnarkPoolLogo.png" />
+        </div>
       </div>
     </div>
   </div>;
