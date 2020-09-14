@@ -15,7 +15,7 @@
 [%%define c 8]
 [%%define delta 3]
 
-[%%define record_async_backtraces true]
+[%%define record_async_backtraces false]
 [%%define time_offsets true]
 [%%define cache_exceptions false]
 
