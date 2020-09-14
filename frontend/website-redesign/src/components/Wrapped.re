@@ -10,7 +10,7 @@ let make = (~overflowHidden=false, ~children) => {
         margin(`auto),
         media(
           Theme.MediaQuery.desktop,
-          [maxWidth(`rem(89.0)), ...paddingX(`rem(9.5))],
+          [maxWidth(`rem(90.0)), ...paddingX(`rem(9.5))],
         ),
         media(
           Theme.MediaQuery.tablet,
