@@ -17,7 +17,7 @@ module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 
 module Elt : sig
   type t =
-    | User_command of Signed_command.Payload.t
+    | Signed_command of Signed_command.Payload.t
     | Snapp_command of Random_oracle.Digest.t
 end
 
@@ -41,7 +41,7 @@ module Chain_hash : sig
   module Checked : sig
     module Elt : sig
       type t =
-        | User_command of Transaction_union_payload.var
+        | Signed_command of Transaction_union_payload.var
         | Snapp_command of Random_oracle.Checked.Digest.t
     end
 

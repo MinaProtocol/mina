@@ -696,8 +696,8 @@ struct
                   (List.map ~f:(function
                     | Command_transaction.Snapp_command c ->
                         Command_transaction.Snapp_command c
-                    | User_command c ->
-                        User_command (Option.value_exn (Signed_command.check c)) ))
+                    | Signed_command c ->
+                        Signed_command (Option.value_exn (Signed_command.check c)) ))
           )
         in
         let open Deferred.Let_syntax in
@@ -1382,7 +1382,7 @@ let%test_module _ =
                 ; amount= Currency.Amount.of_int amount }))
 
     let mk_payment sender_idx fee nonce receiver_idx amount =
-      Command_transaction.User_command
+      Command_transaction.Signed_command
         (mk_payment' sender_idx fee nonce receiver_idx amount)
 
     let%test_unit "Now-invalid transactions are removed from the pool on fork \
@@ -1529,7 +1529,7 @@ let%test_module _ =
                 as body } ->
               {common= {common with fee_payer_pk= sender_pk}; body}
         in
-        Command_transaction.User_command (Signed_command.sign sender_kp payload)
+        Command_transaction.Signed_command (Signed_command.sign sender_kp payload)
       in
       let txs0 =
         [ mk_payment' 0 1_000_000_000 0 9 20_000_000_000
@@ -1541,7 +1541,7 @@ let%test_module _ =
       let txs2 = List.map ~f:(set_sender 2) txs0' in
       let txs3 = List.map ~f:(set_sender 3) txs0' in
       let txs_all =
-        List.map ~f:(fun x -> Command_transaction.User_command x) txs0
+        List.map ~f:(fun x -> Command_transaction.Signed_command x) txs0
         @ txs1 @ txs2 @ txs3
       in
       let%bind apply_res =

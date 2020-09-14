@@ -90,7 +90,7 @@ module Transaction_with_hash = struct
 
   let create cmd =
     { With_hash.data= cmd
-    ; hash= Transaction_hash.hash_command (User_command cmd) }
+    ; hash= Transaction_hash.hash_command (Signed_command cmd) }
 end
 
 module Block_time = Block_time

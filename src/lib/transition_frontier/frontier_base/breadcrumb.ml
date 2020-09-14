@@ -169,7 +169,7 @@ let all_user_commands breadcrumbs =
              match data with
              | Snapp_command _ ->
                  None
-             | User_command c ->
+             | Signed_command c ->
                  Some (Signed_command.forget_check c) )
       |> Signed_command.Set.of_list |> Set.union acc_set )
 
@@ -255,7 +255,7 @@ module For_tests = struct
       let parent_staged_ledger = parent_breadcrumb.staged_ledger in
       let transactions =
         gen_payments parent_staged_ledger accounts_with_secret_keys
-        |> Sequence.map ~f:(fun x -> Command_transaction.User_command x)
+        |> Sequence.map ~f:(fun x -> Command_transaction.Signed_command x)
       in
       let _, largest_account =
         List.max_elt accounts_with_secret_keys

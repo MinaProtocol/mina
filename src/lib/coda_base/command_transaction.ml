@@ -4,7 +4,7 @@ module Poly = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type ('u, 's) t = User_command of 'u | Snapp_command of 's
+      type ('u, 's) t = Signed_command of 'u | Snapp_command of 's
       [@@deriving sexp, compare, eq, hash, yojson]
 
       let to_latest = Fn.id
@@ -13,12 +13,12 @@ module Poly = struct
 end
 
 type ('u, 's) t_ = ('u, 's) Poly.Stable.Latest.t =
-  | User_command of 'u
+  | Signed_command of 'u
   | Snapp_command of 's
 
 (* TODO: For now, we don't generate snapp transactions. *)
 module Gen_make (C : Signed_command_intf.Gen_intf) = struct
-  let f g = Quickcheck.Generator.map g ~f:(fun c -> User_command c)
+  let f g = Quickcheck.Generator.map g ~f:(fun c -> Signed_command c)
 
   open C.Gen
 
@@ -46,7 +46,7 @@ module Gen_make (C : Signed_command_intf.Gen_intf) = struct
   let sequence ?length ?sign_type a =
     Quickcheck.Generator.map
       (sequence ?length ?sign_type a)
-      ~f:(List.map ~f:(fun c -> User_command c))
+      ~f:(List.map ~f:(fun c -> Signed_command c))
 end
 
 module Gen = Gen_make (Signed_command)
@@ -125,8 +125,8 @@ let to_verifiable_exn (t : t) ~ledger ~get ~location_of_account =
         failwith "of_list"
   in
   match t with
-  | User_command c ->
-      User_command c
+  | Signed_command c ->
+      Signed_command c
   | Snapp_command c ->
       let pks =
         match c with
@@ -146,7 +146,7 @@ let to_verifiable t ~ledger ~get ~location_of_account =
       to_verifiable_exn t ~ledger ~get ~location_of_account )
 
 let fee_exn : t -> Currency.Fee.t = function
-  | User_command x ->
+  | Signed_command x ->
       Signed_command.fee x
   | Snapp_command x ->
       Snapp_command.fee_exn x
@@ -158,49 +158,49 @@ let has_insufficient_fee t = Currency.Fee.(fee_exn t < minimum_fee)
 
 let accounts_accessed (t : t) ~next_available_token =
   match t with
-  | User_command x ->
+  | Signed_command x ->
       Signed_command.accounts_accessed x ~next_available_token
   | Snapp_command x ->
       Snapp_command.accounts_accessed x
 
 let next_available_token (t : t) tok =
   match t with
-  | User_command x ->
+  | Signed_command x ->
       Signed_command.next_available_token x tok
   | Snapp_command x ->
       Snapp_command.next_available_token x tok
 
 let to_base58_check (t : t) =
   match t with
-  | User_command x ->
+  | Signed_command x ->
       Signed_command.to_base58_check x
   | Snapp_command x ->
       Snapp_command.to_base58_check x
 
 let fee_payer (t : t) =
   match t with
-  | User_command x ->
+  | Signed_command x ->
       Signed_command.fee_payer x
   | Snapp_command x ->
       Snapp_command.fee_payer x
 
 let nonce_exn (t : t) =
   match t with
-  | User_command x ->
+  | Signed_command x ->
       Signed_command.nonce x
   | Snapp_command x ->
       Option.value_exn (Snapp_command.nonce x)
 
 let check_tokens (t : t) =
   match t with
-  | User_command x ->
+  | Signed_command x ->
       Signed_command.check_tokens x
   | Snapp_command x ->
       Snapp_command.check_tokens x
 
 let fee_token (t : t) =
   match t with
-  | User_command x ->
+  | Signed_command x ->
       Signed_command.fee_token x
   | Snapp_command x ->
       Snapp_command.fee_token x
@@ -212,12 +212,12 @@ let to_valid_unsafe (t : t) =
     ( match t with
     | Snapp_command x ->
         Snapp_command x
-    | User_command x ->
+    | Signed_command x ->
         (* This is safe due to being immediately wrapped again. *)
         let (`If_this_is_used_it_should_have_a_comment_justifying_it x) =
           Signed_command.to_valid_unsafe x
         in
-        User_command x )
+        Signed_command x )
 
 let filter_by_participant (commands : t list) public_key =
   List.filter commands ~f:(fun user_command ->

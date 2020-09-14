@@ -156,7 +156,7 @@ module Command_transaction = struct
 
     let add_if_doesn't_exist (module Conn : CONNECTION) (t : Signed_command.t) =
       let open Deferred.Result.Let_syntax in
-      let transaction_hash = Transaction_hash.hash_command (User_command t) in
+      let transaction_hash = Transaction_hash.hash_command (Signed_command t) in
       match%bind find (module Conn) ~transaction_hash with
       | Some user_command_id ->
           return user_command_id
@@ -259,7 +259,7 @@ module Command_transaction = struct
 
   let as_user_command (t : Command_transaction.t) : Coda_base.Signed_command.t =
     match t with
-    | User_command c ->
+    | Signed_command c ->
         c
     | Snapp_command c ->
         let module S = Coda_base.Snapp_command in

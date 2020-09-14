@@ -51,7 +51,7 @@ type 'command t_ = 'command Poly.t =
 let forget : Valid.t -> t = fun x -> (x :> t)
 
 let fee_excess : t -> Fee_excess.t Or_error.t = function
-  | Command (User_command t) ->
+  | Command (Signed_command t) ->
       Ok (Signed_command.fee_excess t)
   | Command (Snapp_command t) ->
       Snapp_command.(fee_excess (t :> t))
@@ -67,7 +67,7 @@ let supply_increase = function
       Coinbase.supply_increase t
 
 let accounts_accessed ~next_available_token : t -> _ = function
-  | Command (User_command cmd) ->
+  | Command (Signed_command cmd) ->
       Signed_command.accounts_accessed ~next_available_token cmd
   | Command (Snapp_command t) ->
       Snapp_command.(accounts_accessed (t :> t))
@@ -78,7 +78,7 @@ let accounts_accessed ~next_available_token : t -> _ = function
 
 let next_available_token (t : t) next_available_token =
   match t with
-  | Command (User_command cmd) ->
+  | Command (Signed_command cmd) ->
       Signed_command.next_available_token cmd next_available_token
   | Command (Snapp_command t) ->
       Snapp_command.next_available_token t next_available_token

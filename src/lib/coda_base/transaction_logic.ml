@@ -431,7 +431,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       match varying with
       | Command (Signed_command uc) ->
           With_status.map uc.common.user_command ~f:(fun cmd ->
-              Transaction.Command (Command_transaction.User_command cmd) )
+              Transaction.Command (Command_transaction.Signed_command cmd) )
       | Command (Snapp_command s) ->
           With_status.map s.command ~f:(fun c ->
               Transaction.Command (Command_transaction.Snapp_command c) )
@@ -546,7 +546,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       ()
     in
     let%map loc, account, account' =
-      pay_fee' ~command:(User_command user_command.payload) ~nonce ~fee_payer
+      pay_fee' ~command:(Signed_command user_command.payload) ~nonce ~fee_payer
         ~fee:(Signed_command.fee user_command)
         ~ledger ~current_global_slot
     in
@@ -1776,7 +1776,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         let txn_global_slot = txn_state_view.curr_global_slot in
         Or_error.map
           ( match t with
-          | Command (User_command txn) ->
+          | Command (Signed_command txn) ->
               Or_error.map
                 (apply_user_command_unchecked ~constraint_constants
                    ~txn_global_slot ledger txn) ~f:(fun undo ->

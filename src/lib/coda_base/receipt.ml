@@ -20,7 +20,7 @@ module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 
 module Elt = struct
   type t =
-    | User_command of Signed_command.Payload.t
+    | Signed_command of Signed_command.Payload.t
     | Snapp_command of Random_oracle.Digest.t
 end
 
@@ -61,7 +61,7 @@ module Chain_hash = struct
     let init, x =
       let open Hash_prefix in
       match e with
-      | User_command payload ->
+      | Signed_command payload ->
           ( receipt_chain_user_command
           , Transaction_union_payload.(
               to_input (of_user_command_payload payload)) )
@@ -77,7 +77,7 @@ module Chain_hash = struct
   module Checked = struct
     module Elt = struct
       type t =
-        | User_command of Transaction_union_payload.var
+        | Signed_command of Transaction_union_payload.var
         | Snapp_command of Random_oracle.Checked.Digest.t
     end
 
@@ -94,7 +94,7 @@ module Chain_hash = struct
       let open Hash_prefix in
       let%bind init, x =
         match e with
-        | User_command payload ->
+        | Signed_command payload ->
             let%map payload =
               Transaction_union_payload.Checked.to_input payload
             in
@@ -111,7 +111,7 @@ module Chain_hash = struct
     let open Quickcheck in
     test ~trials:20 (Generator.tuple2 gen Signed_command_payload.gen)
       ~f:(fun (base, payload) ->
-        let unchecked = cons (User_command payload) base in
+        let unchecked = cons (Signed_command payload) base in
         let checked =
           let comp =
             let open Snark_params.Tick.Checked.Let_syntax in
@@ -120,7 +120,7 @@ module Chain_hash = struct
                 Checked.constant (of_user_command_payload payload))
             in
             let%map res =
-              Checked.cons (User_command payload) (var_of_t base)
+              Checked.cons (Signed_command payload) (var_of_t base)
             in
             As_prover.read typ res
           in

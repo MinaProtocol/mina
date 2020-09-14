@@ -244,7 +244,7 @@ let apply_user_command_exn
           Balance.sub_amount account.balance (Amount.of_fee fee)
           |> Option.value_exn ?here:None ?error:None ?message:None
       ; receipt_chain_hash=
-          Receipt.Chain_hash.cons (User_command payload)
+          Receipt.Chain_hash.cons (Signed_command payload)
             account.receipt_chain_hash
       ; timing } )
   in
@@ -578,7 +578,7 @@ let apply_transaction_exn ~constraint_constants
   match transition with
   | Fee_transfer tr ->
       apply_fee_transfer_exn ~constraint_constants t tr
-  | Command (User_command cmd) ->
+  | Command (Signed_command cmd) ->
       apply_user_command_exn ~constraint_constants ~txn_global_slot t
         (cmd :> Signed_command.t)
   | Command (Snapp_command cmd) ->
@@ -614,7 +614,7 @@ let handler t =
 
 let snapp_accounts (ledger : t) (t : Transaction.t) =
   match t with
-  | Command (User_command _) | Fee_transfer _ | Coinbase _ ->
+  | Command (Signed_command _) | Fee_transfer _ | Coinbase _ ->
       (None, None)
   | Command (Snapp_command c) -> (
       let token_id = Snapp_command.token_id c in

@@ -30,7 +30,7 @@ let get_status ~frontier_broadcast_pipe ~transaction_pool cmd =
       ~error:(Error.of_string "Invalid signature")
     |> Result.map ~f:(fun x ->
            Transaction_hash.Command_transaction_with_valid_signature.create
-             (User_command x) )
+             (Signed_command x) )
   in
   let resource_pool = Transaction_pool.resource_pool transaction_pool in
   match Broadcast_pipe.Reader.peek frontier_broadcast_pipe with
@@ -47,7 +47,7 @@ let get_status ~frontier_broadcast_pipe ~transaction_pool cmd =
                 match cmd' with
                 | Snapp_command _ ->
                     false
-                | User_command cmd' ->
+                | Signed_command cmd' ->
                     Signed_command.equal cmd (Signed_command.forget_check cmd') )
           in
           if List.exists ~f:in_breadcrumb best_tip_path then
@@ -146,7 +146,7 @@ let%test_module "transaction_status" =
               in
               let%bind () =
                 Strict_pipe.Writer.write local_diffs_writer
-                  ([User_command user_command], Fn.const ())
+                  ([Signed_command user_command], Fn.const ())
               in
               let%map () = Async.Scheduler.yield_until_no_jobs_remain () in
               [%log info] "Checking status" ;
@@ -170,7 +170,7 @@ let%test_module "transaction_status" =
               in
               let%bind () =
                 Strict_pipe.Writer.write local_diffs_writer
-                  ([User_command user_command], Fn.const ())
+                  ([Signed_command user_command], Fn.const ())
               in
               let%map () = Async.Scheduler.yield_until_no_jobs_remain () in
               let status =
@@ -208,7 +208,7 @@ let%test_module "transaction_status" =
               let%bind () =
                 Strict_pipe.Writer.write local_diffs_writer
                   ( List.map pool_user_commands ~f:(fun x ->
-                        Command_transaction.User_command x )
+                        Command_transaction.Signed_command x )
                   , Fn.const () )
               in
               let%map () = Async.Scheduler.yield_until_no_jobs_remain () in

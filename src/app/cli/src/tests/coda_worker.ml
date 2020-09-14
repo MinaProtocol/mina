@@ -765,7 +765,7 @@ module T = struct
             Deferred.return
               (List.filter_map
                  (Coda_commands.For_tests.get_all_commands coda t) ~f:(function
-                | User_command c ->
+                | Signed_command c ->
                     Some c
                 | Snapp_command _ ->
                     None ))

@@ -1126,7 +1126,7 @@ module Types = struct
             ~resolve:(fun _ {commands; _} ->
               List.filter_map commands ~f:(fun t ->
                   match t.data with
-                  | User_command c ->
+                  | Signed_command c ->
                       Some (UserCommand.mk_user_command {t with data= c})
                   | Snapp_command _ ->
                       (* TODO: This should be supported in some graph QL query *)
@@ -1725,7 +1725,7 @@ module Types = struct
               ~error:(Option.value error ~default:"Invalid cursor")
             |> Result.map ~f:(fun cmd ->
                    { With_hash.data= cmd
-                   ; hash= Transaction_hash.hash_command (User_command cmd) }
+                   ; hash= Transaction_hash.hash_command (Signed_command cmd) }
                )
 
           let doc = Doc.bin_prot "Opaque pagination cursor for a user command"
@@ -2041,7 +2041,7 @@ module Mutations = struct
     in
     let%map cmd = send_user_command coda user_command_input in
     { With_hash.data= cmd
-    ; hash= Transaction_hash.hash_command (User_command cmd) }
+    ; hash= Transaction_hash.hash_command (Signed_command cmd) }
 
   let send_unsigned_user_command ~coda ~nonce_opt ~signer ~memo ~fee ~fee_token
       ~fee_payer_pk ~valid_until ~body =
@@ -2061,7 +2061,7 @@ module Mutations = struct
     in
     let%map cmd = send_user_command coda user_command_input in
     { With_hash.data= cmd
-    ; hash= Transaction_hash.hash_command (User_command cmd) }
+    ; hash= Transaction_hash.hash_command (Signed_command cmd) }
 
   let send_delegation =
     io_field "sendDelegation"
@@ -2380,7 +2380,7 @@ module Queries = struct
                  .forget_check x
                in
                match x.data with
-               | User_command data ->
+               | Signed_command data ->
                    Some (Types.UserCommand.mk_user_command {x with data})
                | Snapp_command _ ->
                    None ) )

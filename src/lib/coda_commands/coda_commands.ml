@@ -126,14 +126,14 @@ let setup_and_submit_user_command t (user_command_input : User_command_input.t)
               ( Network_pool.Transaction_pool.Resource_pool.Diff.Diff_error
                 .to_yojson (snd failed_txn)
               |> Yojson.Safe.to_string )))
-  | Ok ([User_command txn], []) ->
+  | Ok ([Signed_command txn], []) ->
       [%log' info (Coda_lib.top_level_logger t)]
         ~metadata:
-          [("command", Command_transaction.to_yojson (User_command txn))]
+          [("command", Command_transaction.to_yojson (Signed_command txn))]
         "Scheduled payment $command" ;
       Ok
         ( txn
-        , record_payment t (User_command txn) (Option.value_exn account_opt) )
+        , record_payment t (Signed_command txn) (Option.value_exn account_opt) )
   | Ok _ ->
       Error (Error.of_string "Invalid result from scheduling a payment")
   | Error e ->

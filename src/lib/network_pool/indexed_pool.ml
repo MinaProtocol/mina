@@ -64,7 +64,7 @@ let currency_consumed :
   let open Currency.Amount in
   let amt =
     match cmd' with
-    | User_command c -> (
+    | Signed_command c -> (
       match c.payload.body with
       | Payment ({amount; _} as payload) ->
           if
@@ -1043,14 +1043,14 @@ let%test_module _ =
           ~body:fb =
         let modified_payload : Signed_command.Payload.t =
           match c with
-          | User_command {payload= {body= Payment payment_payload; common}; _}
+          | Signed_command {payload= {body= Payment payment_payload; common}; _}
             ->
               { common= fc common
               ; body= Signed_command.Payload.Body.Payment (fb payment_payload) }
           | _ ->
               failwith "generated user command that wasn't a payment"
         in
-        User_command (Signed_command.For_tests.fake_sign sender modified_payload)
+        Signed_command (Signed_command.For_tests.fake_sign sender modified_payload)
         |> Transaction_hash.Command_transaction_with_valid_signature.create
       in
       let gen :

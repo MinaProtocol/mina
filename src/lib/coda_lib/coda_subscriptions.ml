@@ -66,7 +66,7 @@ let create ~logger ~constraint_constants ~wallets ~time_controller
               |> Filtered_external_transition.commands
               |> List.map ~f:(fun {With_hash.data; _} -> data)
               |> List.filter_map ~f:(function
-                   | Command_transaction.User_command c ->
+                   | Command_transaction.Signed_command c ->
                        Some c
                    | Snapp_command _ ->
                        None )

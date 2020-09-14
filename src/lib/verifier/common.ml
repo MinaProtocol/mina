@@ -6,12 +6,12 @@ let check :
     -> [ `Valid of Command_transaction.Valid.t
        | `Invalid
        | `Valid_assuming of Command_transaction.Valid.t * _ list ] = function
-  | Command_transaction.User_command c -> (
+  | Command_transaction.Signed_command c -> (
     match Signed_command.check c with
     | None ->
         `Invalid
     | Some c ->
-        `Valid (Command_transaction.User_command c) )
+        `Valid (Command_transaction.Signed_command c) )
   | Snapp_command (cmd, vks) ->
       with_return (fun {return} ->
           let payload =

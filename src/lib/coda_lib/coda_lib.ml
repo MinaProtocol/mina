@@ -1014,7 +1014,7 @@ let create (config : Config.t) =
                     (*callback for the result from transaction_pool.apply_diff*)
                     Strict_pipe.Writer.write local_txns_writer
                       ( List.map user_commands ~f:(fun c ->
-                            Command_transaction.User_command c )
+                            Command_transaction.Signed_command c )
                       , result_cb )
               | Error e ->
                   [%log' error config.logger]

@@ -528,7 +528,7 @@ end = struct
               let%map root_length = Coda_process.root_length_exn worker in
               let passed_root = Ivar.create () in
               Hashtbl.add_exn user_cmds_under_inspection
-                ~key:(User_command user_cmd)
+                ~key:(Signed_command user_cmd)
                 ~data:
                   { expected_deadline=
                       root_length
@@ -602,7 +602,7 @@ end = struct
                         *)
                         ignore
                           (Hashtbl.add user_cmds_under_inspection
-                             ~key:(User_command user_cmd)
+                             ~key:(Signed_command user_cmd)
                              ~data:
                                { expected_deadline=
                                    root_length
