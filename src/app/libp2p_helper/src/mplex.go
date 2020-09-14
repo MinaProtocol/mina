@@ -77,7 +77,7 @@ func (t *MplexTransport) NewConn(nc net.Conn, isServer bool) (smux.Conn, error) 
 // THE SOFTWARE.
 var mplexlog = logging.Logger("mplex")
 
-var MaxMessageSize = 1 << 25
+var MaxMessageSize = 1 << 30
 
 // Max time to block waiting for a slow reader to read from a stream before
 // resetting it. Preferably, we'd have some form of back-pressure mechanism but
