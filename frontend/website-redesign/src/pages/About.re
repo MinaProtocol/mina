@@ -105,7 +105,7 @@ module HeroRows = {
   module Styles = {
     let rowBackgroundImage =
       style([
-        height(`px(1924)),
+        height(`percent(100.)),
         width(`percent(100.)),
         important(backgroundSize(`cover)),
         backgroundImage(`url("/static/img/BackgroundGlowCluster01.png")),
@@ -114,6 +114,7 @@ module HeroRows = {
       style([
         display(`flex),
         flexDirection(`column),
+        padding2(~h=`rem(1.5), ~v=`rem(1.5)),
         media(
           Theme.MediaQuery.desktop,
           [
@@ -130,14 +131,38 @@ module HeroRows = {
         display(`flex),
         flexDirection(`column),
         justifyContent(`flexStart),
+        width(`percent(100.)),
+        media(Theme.MediaQuery.tablet, [width(`rem(21.))]),
         media(Theme.MediaQuery.desktop, [width(`rem(35.))]),
       ]);
 
     /* First and second rows  */
-    let firstColumn = merge([column, style([marginRight(`rem(7.))])]);
-    let secondColumn = merge([column, style([marginLeft(`rem(35.))])]);
+    let firstColumn =
+      merge([
+        column,
+        style([
+          media(Theme.MediaQuery.tablet, [marginRight(`rem(15.))]),
+          media(Theme.MediaQuery.desktop, [marginRight(`rem(7.))]),
+        ]),
+      ]);
+    let secondColumn =
+      merge([
+        column,
+        style([
+          marginLeft(`zero),
+          media(Theme.MediaQuery.tablet, [marginLeft(`rem(23.))]),
+          media(Theme.MediaQuery.desktop, [marginLeft(`rem(35.))]),
+        ]),
+      ]);
 
-    let header = merge([Theme.Type.h2, style([width(`rem(18.2))])]);
+    let header =
+      merge([
+        Theme.Type.h2,
+        style([
+          marginTop(`rem(2.06)),
+          media(Theme.MediaQuery.desktop, [width(`rem(18.2))]),
+        ]),
+      ]);
     let subhead =
       merge([
         Theme.Type.sectionSubhead,
@@ -149,26 +174,35 @@ module HeroRows = {
       ]);
     let heroRowImage =
       style([
-        height(`rem(21.)),
         width(`rem(21.)),
+        marginTop(`rem(1.)),
         media(
           Theme.MediaQuery.desktop,
-          [height(`rem(38.5)), width(`rem(38.5))],
+          [marginTop(`zero), height(`rem(38.5)), width(`rem(38.5))],
         ),
-        unsafe("object-fit", "cover"),
       ]);
     let firstImage =
-      merge([heroRowImage, style([position(`absolute), right(`zero)])]);
+      merge([
+        heroRowImage,
+        style([
+          media(
+            Theme.MediaQuery.tablet,
+            [position(`absolute), right(`zero)],
+          ),
+        ]),
+      ]);
     let secondImage =
       merge([
         heroRowImage,
         style([
-          position(`absolute),
-          left(`zero),
           backgroundImage(`url("/static/img/triangle_mobile.png")),
           media(
             Theme.MediaQuery.tablet,
-            [backgroundImage(`url("/static/img/triangle_tablet.png"))],
+            [
+              position(`absolute),
+              left(`zero),
+              backgroundImage(`url("/static/img/triangle_tablet.png")),
+            ],
           ),
           media(
             Theme.MediaQuery.desktop,
@@ -226,9 +260,7 @@ module HeroRows = {
           src="/static/img/02_About_2_1232x1232.jpg"
         />
       </div>
-      <Spacer height=7.93 />
       <div className=Styles.container>
-        <div className=Styles.secondImage />
         <div className=Styles.secondColumn>
           <p className=Styles.subhead>
             {React.string("That's why we created Mina.")}
@@ -278,6 +310,10 @@ module HeroRows = {
                )}
             </strong>
           </p>
+          <img
+            className=Styles.secondImage
+            src="/static/img/triangle_desktop.png"
+          />
         </div>
       </div>
     </div>;
