@@ -329,13 +329,13 @@ let verify_receipt =
              |> Deferred.return
            in
            let%bind payment =
-             Command_transaction.of_yojson payment_json
+             User_command.of_yojson payment_json
              |> to_deferred_or_error
                   ~error:
                     (sprintf "Payment file %s has invalid json format"
                        payment_path)
            and proof =
-             [%of_yojson: Receipt.Chain_hash.t * Command_transaction.t list]
+             [%of_yojson: Receipt.Chain_hash.t * User_command.t list]
                proof_json
              |> to_deferred_or_error
                   ~error:

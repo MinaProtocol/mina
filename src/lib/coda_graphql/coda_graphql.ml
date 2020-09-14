@@ -2364,8 +2364,8 @@ module Queries = struct
                     if
                       txn
                       |> Transaction_hash
-                         .Command_transaction_with_valid_signature
-                         .command |> Command_transaction.fee_payer
+                         .User_command_with_valid_signature
+                         .command |> User_command.fee_payer
                       |> Account_id.public_key
                       |> Public_key.Compressed.equal pk
                     then Some txn
@@ -2376,7 +2376,7 @@ module Queries = struct
                     None ) )
         |> List.filter_map ~f:(fun x ->
                let x =
-                 Transaction_hash.Command_transaction_with_valid_signature
+                 Transaction_hash.User_command_with_valid_signature
                  .forget_check x
                in
                match x.data with

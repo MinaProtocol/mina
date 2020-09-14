@@ -235,7 +235,7 @@ end
 module type Transaction_pool_diff_intf = sig
   type resource_pool
 
-  type t = Command_transaction.t list [@@deriving sexp, of_yojson]
+  type t = User_command.t list [@@deriving sexp, of_yojson]
 
   module Diff_error : sig
     type t =
@@ -253,7 +253,7 @@ module type Transaction_pool_diff_intf = sig
   end
 
   module Rejected : sig
-    type t = (Command_transaction.t * Diff_error.t) list
+    type t = (User_command.t * Diff_error.t) list
     [@@deriving sexp, yojson]
   end
 
@@ -276,23 +276,23 @@ module type Transaction_resource_pool_intf = sig
     -> Config.t
 
   val member :
-    t -> Transaction_hash.Command_transaction_with_valid_signature.t -> bool
+    t -> Transaction_hash.User_command_with_valid_signature.t -> bool
 
   val transactions :
        logger:Logger.t
     -> t
-    -> Transaction_hash.Command_transaction_with_valid_signature.t Sequence.t
+    -> Transaction_hash.User_command_with_valid_signature.t Sequence.t
 
   val all_from_account :
        t
     -> Account_id.t
-    -> Transaction_hash.Command_transaction_with_valid_signature.t list
+    -> Transaction_hash.User_command_with_valid_signature.t list
 
   val get_all :
-    t -> Transaction_hash.Command_transaction_with_valid_signature.t list
+    t -> Transaction_hash.User_command_with_valid_signature.t list
 
   val find_by_hash :
        t
     -> Transaction_hash.t
-    -> Transaction_hash.Command_transaction_with_valid_signature.t option
+    -> Transaction_hash.User_command_with_valid_signature.t option
 end

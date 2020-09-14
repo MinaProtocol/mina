@@ -38,19 +38,19 @@ module type S = sig
        t
     -> proving_receipt:Receipt.Chain_hash.t
     -> resulting_receipt:Receipt.Chain_hash.t
-    -> (Receipt.Chain_hash.t * Command_transaction.t list) Or_error.t M.t
+    -> (Receipt.Chain_hash.t * User_command.t list) Or_error.t M.t
 
   (** [verify t ~init merkle_list receipt_chain] will verify the proof produced
       by `prove`. Namely, it will verify that a user has sent a series of user
       commands from a `resulting_receipt` to a `proving_receipt`. *)
   val verify :
        init:Receipt.Chain_hash.t
-    -> Command_transaction.t sexp_list
+    -> User_command.t sexp_list
     -> Receipt.Chain_hash.t
     -> Receipt.Chain_hash.t Non_empty_list.t option
 
   val get_payment :
-    t -> receipt:Receipt.Chain_hash.t -> Command_transaction.t option M.t
+    t -> receipt:Receipt.Chain_hash.t -> User_command.t option M.t
 
   (** Add stores a payment into a client's database as a value.
       The key is computed by using the payment payload and the previous receipt_chain_hash.
@@ -59,7 +59,7 @@ module type S = sig
   val add :
        t
     -> previous:Receipt.Chain_hash.t
-    -> Command_transaction.t
+    -> User_command.t
     -> [ `Ok of Receipt.Chain_hash.t
        | `Duplicate of Receipt.Chain_hash.t
        | `Error_multiple_previous_receipts of Receipt.Chain_hash.t ]
@@ -71,7 +71,7 @@ module type Tree_node = sig
     module V1 : sig
       type t =
         { key: Receipt.Chain_hash.Stable.V1.t
-        ; value: Command_transaction.Stable.V1.t
+        ; value: User_command.Stable.V1.t
         ; parent: Receipt.Chain_hash.Stable.V1.t }
       [@@deriving bin_io, sexp, version]
     end
@@ -81,7 +81,7 @@ module type Tree_node = sig
 
   type t = Stable.Latest.t =
     { key: Receipt.Chain_hash.t
-    ; value: Command_transaction.t
+    ; value: User_command.t
     ; parent: Receipt.Chain_hash.t }
   [@@deriving sexp]
 end

@@ -431,10 +431,10 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       match varying with
       | Command (Signed_command uc) ->
           With_status.map uc.common.user_command ~f:(fun cmd ->
-              Transaction.Command (Command_transaction.Signed_command cmd) )
+              Transaction.Command (User_command.Signed_command cmd) )
       | Command (Snapp_command s) ->
           With_status.map s.command ~f:(fun c ->
-              Transaction.Command (Command_transaction.Snapp_command c) )
+              Transaction.Command (User_command.Snapp_command c) )
       | Fee_transfer f ->
           { data= Fee_transfer f.fee_transfer
           ; status= Applied User_command_status.Auxiliary_data.empty }

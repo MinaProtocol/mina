@@ -8,7 +8,7 @@ module Api = struct
   type user_cmd_status = {expected_deadline: int; passed_root: unit Ivar.t}
 
   type user_cmds_under_inspection =
-    (Command_transaction.t, user_cmd_status) Hashtbl.t
+    (User_command.t, user_cmd_status) Hashtbl.t
 
   type restart_type = [`Catchup | `Bootstrap]
 
@@ -34,7 +34,7 @@ module Api = struct
     let status =
       Array.init (Array.length workers) ~f:(fun _ ->
           let user_cmds_under_inspection =
-            Hashtbl.create (module Command_transaction)
+            Hashtbl.create (module User_command)
           in
           `On (`Synced user_cmds_under_inspection) )
     in
@@ -116,7 +116,7 @@ module Api = struct
       , (fun () -> t.status.(i) <- `On `Catchup)
       , fun () ->
           let user_cmds_under_inspection =
-            Hashtbl.create (module Command_transaction)
+            Hashtbl.create (module User_command)
           in
           t.status.(i) <- `On (`Synced user_cmds_under_inspection) )
 
@@ -379,7 +379,7 @@ let start_payment_check logger root_pipe (testnet : Api.t) =
                    [%log fatal]
                      ~metadata:
                        [ ("worker_id", `Int worker_id)
-                       ; ("user_cmd", Command_transaction.to_yojson user_cmd)
+                       ; ("user_cmd", User_command.to_yojson user_cmd)
                        ]
                      "Transaction $user_cmd took too long to get into the \
                       root of node $worker_id. Length expected: %d got: %d"
@@ -393,7 +393,7 @@ let start_payment_check logger root_pipe (testnet : Api.t) =
                        [%log info]
                          ~metadata:
                            [ ( "user_cmd"
-                             , Command_transaction.to_yojson user_cmd.data )
+                             , User_command.to_yojson user_cmd.data )
                            ; ("worker_id", `Int worker_id)
                            ; ("length", `Int root_length) ]
                          "Transaction $user_cmd finally gets into the root of \

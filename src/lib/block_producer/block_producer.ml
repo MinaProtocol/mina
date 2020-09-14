@@ -300,7 +300,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                 transaction_resource_pool
               |> Sequence.map
                    ~f:
-                     Transaction_hash.Command_transaction_with_valid_signature
+                     Transaction_hash.User_command_with_valid_signature
                      .data
             in
             trace_event "waiting for ivar..." ;

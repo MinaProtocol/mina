@@ -59,7 +59,7 @@ val parent_hash : t -> State_hash.t
 
 val block_producer : t -> Signature_lib.Public_key.Compressed.t
 
-val commands : t -> Command_transaction.Valid.t With_status.t list
+val commands : t -> User_command.Valid.t With_status.t list
 
 val payments : t -> Signed_command.t With_status.t list
 

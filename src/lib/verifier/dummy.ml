@@ -15,8 +15,8 @@ let create ~logger:_ ~proof_level ~pids:_ ~conf_dir:_ =
 
 let verify_blockchain_snark _ _ = Deferred.Or_error.return true
 
-let verify_commands _ (cs : Command_transaction.Verifiable.t list) :
-    [ `Valid of Coda_base.Command_transaction.Valid.t
+let verify_commands _ (cs : User_command.Verifiable.t list) :
+    [ `Valid of Coda_base.User_command.Valid.t
     | `Invalid
     | `Valid_assuming of
       ( Pickles.Side_loaded.Verification_key.t

@@ -13,8 +13,8 @@ module Worker_state = struct
     val verify_blockchain_snark : Protocol_state.Value.t -> Proof.t -> bool
 
     val verify_commands :
-         Coda_base.Command_transaction.Verifiable.t list
-      -> [ `Valid of Coda_base.Command_transaction.Valid.t
+         Coda_base.User_command.Verifiable.t list
+      -> [ `Valid of Coda_base.User_command.Valid.t
          | `Invalid
          | `Valid_assuming of
            ( Pickles.Side_loaded.Verification_key.t
@@ -44,7 +44,7 @@ module Worker_state = struct
           (let bc_vk = Precomputed_values.blockchain_verification ()
            and tx_vk = Precomputed_values.transaction_verification () in
            let module M = struct
-             let verify_commands (_cs : Command_transaction.Verifiable.t list)
+             let verify_commands (_cs : User_command.Verifiable.t list)
                  : _ list =
                failwith "unimplemented"
 
@@ -99,8 +99,8 @@ module Worker = struct
           ('w, (Transaction_snark.t * Sok_message.t) list, bool) F.t
       ; verify_commands:
           ( 'w
-          , Command_transaction.Verifiable.t list
-          , [ `Valid of Command_transaction.Valid.t
+          , User_command.Verifiable.t list
+          , [ `Valid of User_command.Valid.t
             | `Invalid
             | `Valid_assuming of
               ( Pickles.Side_loaded.Verification_key.t
@@ -155,9 +155,9 @@ module Worker = struct
         ; verify_commands=
             f
               ( [%bin_type_class:
-                  Command_transaction.Verifiable.Stable.Latest.t list]
+                  User_command.Verifiable.Stable.Latest.t list]
               , [%bin_type_class:
-                  [ `Valid of Command_transaction.Valid.Stable.Latest.t
+                  [ `Valid of User_command.Valid.Stable.Latest.t
                   | `Invalid
                   | `Valid_assuming of
                     ( Pickles.Side_loaded.Verification_key.Stable.Latest.t

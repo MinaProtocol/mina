@@ -8,7 +8,7 @@ open Coda_state
 (** For status *)
 let txn_count = ref 0
 
-let record_payment t (txn : Command_transaction.t) account =
+let record_payment t (txn : User_command.t) account =
   let logger =
     Logger.extend
       (Coda_lib.top_level_logger t)
@@ -20,7 +20,7 @@ let record_payment t (txn : Command_transaction.t) account =
   | `Ok hash ->
       [%log debug]
         ~metadata:
-          [ ("command", Command_transaction.to_yojson txn)
+          [ ("command", User_command.to_yojson txn)
           ; ("receipt_chain_hash", Receipt.Chain_hash.to_yojson hash) ]
         "Added  payment $user_command into receipt_chain database. You should \
          wait for a bit to see your account's receipt chain hash update as \
@@ -28,7 +28,7 @@ let record_payment t (txn : Command_transaction.t) account =
       hash
   | `Duplicate hash ->
       [%log warn]
-        ~metadata:[("command", Command_transaction.to_yojson txn)]
+        ~metadata:[("command", User_command.to_yojson txn)]
         "Already sent transaction $user_command" ;
       hash
   | `Error_multiple_previous_receipts parent_hash ->
@@ -129,7 +129,7 @@ let setup_and_submit_user_command t (user_command_input : User_command_input.t)
   | Ok ([Signed_command txn], []) ->
       [%log' info (Coda_lib.top_level_logger t)]
         ~metadata:
-          [("command", Command_transaction.to_yojson (Signed_command txn))]
+          [("command", User_command.to_yojson (Signed_command txn))]
         "Scheduled payment $command" ;
       Ok
         ( txn
@@ -157,7 +157,7 @@ module Receipt_chain_hash = struct
 end
 
 let verify_payment t (addr : Account_id.t)
-    (verifying_txn : Command_transaction.t) (init_receipt, proof) =
+    (verifying_txn : User_command.t) (init_receipt, proof) =
   let open Participating_state.Let_syntax in
   let%map account = get_account t addr in
   let account = Option.value_exn account in
@@ -170,12 +170,12 @@ let verify_payment t (addr : Account_id.t)
   in
   if
     List.exists proof ~f:(fun txn ->
-        Command_transaction.equal verifying_txn txn )
+        User_command.equal verifying_txn txn )
   then Ok ()
   else
     Or_error.errorf
       !"Merkle list proof does not contain payment \
-        %{sexp:Command_transaction.t}"
+        %{sexp:User_command.t}"
       verifying_txn
 
 let prove_receipt t ~proving_receipt ~resulting_receipt =
@@ -399,10 +399,10 @@ module For_tests = struct
            external_transition_database (Some account_id)
     in
     let participants_commands =
-      Command_transaction.filter_by_participant commands public_key
+      User_command.filter_by_participant commands public_key
     in
     List.dedup_and_sort participants_commands
-      ~compare:Command_transaction.compare
+      ~compare:User_command.compare
 
   module Subscriptions = struct
     let new_user_commands coda public_key =

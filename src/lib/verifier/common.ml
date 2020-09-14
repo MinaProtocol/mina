@@ -2,16 +2,16 @@ open Core_kernel
 open Coda_base
 
 let check :
-       Command_transaction.Verifiable.t
-    -> [ `Valid of Command_transaction.Valid.t
+       User_command.Verifiable.t
+    -> [ `Valid of User_command.Valid.t
        | `Invalid
-       | `Valid_assuming of Command_transaction.Valid.t * _ list ] = function
-  | Command_transaction.Signed_command c -> (
+       | `Valid_assuming of User_command.Valid.t * _ list ] = function
+  | User_command.Signed_command c -> (
     match Signed_command.check c with
     | None ->
         `Invalid
     | Some c ->
-        `Valid (Command_transaction.Signed_command c) )
+        `Valid (User_command.Signed_command c) )
   | Snapp_command (cmd, vks) ->
       with_return (fun {return} ->
           let payload =
@@ -77,7 +77,7 @@ let check :
               | (Signed_signed _ | Signed_empty _), (`One _ | `Two _) ->
                   failwith "Wrong number of vks" )
           in
-          let v = Command_transaction.Snapp_command cmd in
+          let v = User_command.Snapp_command cmd in
           match statements_to_check with
           | [] ->
               `Valid v

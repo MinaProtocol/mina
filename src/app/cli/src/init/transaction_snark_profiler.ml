@@ -83,7 +83,7 @@ let create_ledger_and_transactions num_transitions =
       in
       let transitions =
         List.map transactions ~f:(fun t ->
-            Transaction.Command (Command_transaction.Signed_command t) )
+            Transaction.Command (User_command.Signed_command t) )
         @ [Coinbase coinbase; Fee_transfer fee_transfer]
       in
       (ledger, transitions)

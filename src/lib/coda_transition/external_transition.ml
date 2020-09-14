@@ -891,7 +891,7 @@ module Validated = struct
         (* This is safe because at this point the stage ledger diff has been
              applied successfully. *)
         let (`If_this_is_used_it_should_have_a_comment_justifying_it c) =
-          Command_transaction.to_valid_unsafe x.data
+          User_command.to_valid_unsafe x.data
         in
         {x with data= c} )
 end

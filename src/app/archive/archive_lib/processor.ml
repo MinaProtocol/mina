@@ -107,7 +107,7 @@ module Snarked_ledger_hash = struct
           hash
 end
 
-module Command_transaction = struct
+module User_command = struct
   module Signed_command = struct
     type t =
       { typ: string
@@ -257,7 +257,7 @@ module Command_transaction = struct
       user_command_id
   end
 
-  let as_user_command (t : Command_transaction.t) : Coda_base.Signed_command.t =
+  let as_user_command (t : User_command.t) : Coda_base.Signed_command.t =
     match t with
     | Signed_command c ->
         c
@@ -284,10 +284,10 @@ module Command_transaction = struct
                   ; token_id= S.token_id c
                   ; amount } } }
 
-  let add_if_doesn't_exist conn (t : Command_transaction.t) =
+  let add_if_doesn't_exist conn (t : User_command.t) =
     Signed_command.add_if_doesn't_exist conn (as_user_command t)
 
-  let add_with_status conn (t : Command_transaction.t)
+  let add_with_status conn (t : User_command.t)
       (status : User_command_status.t) =
     Signed_command.add_with_status conn (as_user_command t) status
 
@@ -576,7 +576,7 @@ module Block = struct
         let%bind command_ids =
           deferred_result_list_fold commands ~init:[] ~f:(fun acc command ->
               let%map id =
-                Command_transaction.add_with_status
+                User_command.add_with_status
                   (module Conn)
                   command.data command.status
               in
@@ -761,7 +761,7 @@ let run (module Conn : CONNECTION) reader ~constraint_constants ~logger
         Deferred.return ()
     | Transaction_pool {added; removed= _} ->
         Deferred.List.iter added ~f:(fun command ->
-            Command_transaction.add_if_doesn't_exist (module Conn) command
+            User_command.add_if_doesn't_exist (module Conn) command
             >>| ignore ) )
 
 let setup_server ~constraint_constants ~logger ~postgres_address ~server_port

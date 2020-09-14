@@ -184,7 +184,7 @@ let fee_remainder (type c) (commands : c With_status.t list) completed_works
   let open Result.Let_syntax in
   let%bind budget =
     sum_fees commands ~f:(fun {data= t; _} ->
-        Command_transaction.fee_exn (forget t) )
+        User_command.fee_exn (forget t) )
     |> to_staged_ledger_or_error
   in
   let%bind work_fee =
@@ -345,7 +345,7 @@ let get ~check ~constraint_constants t =
   | Ok (Error e) ->
       Error (Error.Verification_failed e)
   | Ok (Ok diff) ->
-      get' ~constraint_constants ~forget:Command_transaction.forget_check
+      get' ~constraint_constants ~forget:User_command.forget_check
         ~diff:diff.diff ~coinbase_receiver:diff.coinbase_receiver
 
 let get_unchecked ~constraint_constants
@@ -353,7 +353,7 @@ let get_unchecked ~constraint_constants
   let t = forget_proof_checks t in
   get' ~constraint_constants ~diff:t.diff
     ~coinbase_receiver:t.coinbase_receiver
-    ~forget:Command_transaction.forget_check
+    ~forget:User_command.forget_check
 
 let get_transactions ~constraint_constants (sl_diff : t) =
   let open Result.Let_syntax in

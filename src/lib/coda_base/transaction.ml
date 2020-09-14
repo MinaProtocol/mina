@@ -19,7 +19,7 @@ module Valid = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = Command_transaction.Valid.Stable.V1.t Poly.Stable.V1.t
+      type t = User_command.Valid.Stable.V1.t Poly.Stable.V1.t
       [@@deriving sexp, compare, eq, hash, yojson]
 
       let to_latest = Fn.id
@@ -33,7 +33,7 @@ end
 [%%versioned
 module Stable = struct
   module V1 = struct
-    type t = Command_transaction.Stable.V1.t Poly.Stable.V1.t
+    type t = User_command.Stable.V1.t Poly.Stable.V1.t
     [@@deriving sexp, compare, eq, hash, yojson]
 
     let to_latest = Fn.id

@@ -474,8 +474,8 @@ let get_inferred_nonce_from_transaction_pool_and_ledger t
     let nonces =
       List.map pooled_transactions
         ~f:
-          (Fn.compose Command_transaction.nonce_exn
-             Transaction_hash.Command_transaction_with_valid_signature.command)
+          (Fn.compose User_command.nonce_exn
+             Transaction_hash.User_command_with_valid_signature.command)
     in
     (* The last nonce gives us the maximum nonce in the transaction pool *)
     List.last nonces
@@ -537,7 +537,7 @@ module Root_diff = struct
   module Stable = struct
     module V1 = struct
       type t =
-        { commands: Command_transaction.Stable.V1.t With_status.Stable.V1.t list
+        { commands: User_command.Stable.V1.t With_status.Stable.V1.t list
         ; root_length: int }
 
       let to_latest = Fn.id
@@ -572,7 +572,7 @@ let root_diff t =
               { commands=
                   List.map
                     (Transition_frontier.Breadcrumb.commands root)
-                    ~f:(With_status.map ~f:Command_transaction.forget_check)
+                    ~f:(With_status.map ~f:User_command.forget_check)
               ; root_length= length_of_breadcrumb root } ;
             Broadcast_pipe.Reader.iter
               Transition_frontier.(
@@ -600,7 +600,7 @@ let root_diff t =
                             |> List.map
                                  ~f:
                                    (With_status.map
-                                      ~f:Command_transaction.forget_check)
+                                      ~f:User_command.forget_check)
                         ; root_length= length_of_breadcrumb new_root_breadcrumb
                         } ;
                       Deferred.unit )) ) ) ;
@@ -1014,7 +1014,7 @@ let create (config : Config.t) =
                     (*callback for the result from transaction_pool.apply_diff*)
                     Strict_pipe.Writer.write local_txns_writer
                       ( List.map user_commands ~f:(fun c ->
-                            Command_transaction.Signed_command c )
+                            User_command.Signed_command c )
                       , result_cb )
               | Error e ->
                   [%log' error config.logger]

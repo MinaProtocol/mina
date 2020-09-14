@@ -32,8 +32,8 @@ module Transaction_pool = struct
   module Stable = struct
     module V1 = struct
       type t =
-        { added: Command_transaction.Stable.V1.t list
-        ; removed: Command_transaction.Stable.V1.t list }
+        { added: User_command.Stable.V1.t list
+        ; removed: User_command.Stable.V1.t list }
 
       let to_latest = Fn.id
     end
@@ -61,7 +61,7 @@ module Builder = struct
       let senders =
         commands
         |> List.map ~f:(fun {data; _} ->
-               Command_transaction.(fee_payer (forget_check data)) )
+               User_command.(fee_payer (forget_check data)) )
         |> Account_id.Set.of_list
       in
       let ledger =

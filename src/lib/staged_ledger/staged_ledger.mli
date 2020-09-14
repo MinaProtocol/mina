@@ -158,7 +158,7 @@ val create_diff :
   -> coinbase_receiver:[`Producer | `Other of Public_key.Compressed.t]
   -> logger:Logger.t
   -> current_state_view:Snapp_predicate.Protocol_state.View.t
-  -> transactions_by_fee:Command_transaction.Valid.t Sequence.t
+  -> transactions_by_fee:User_command.Valid.t Sequence.t
   -> get_completed_work:(   Transaction_snark_work.Statement.t
                          -> Transaction_snark_work.Checked.t option)
   -> Staged_ledger_diff.With_valid_signatures_and_proofs.t
@@ -195,6 +195,6 @@ val all_work_statements_exn : t -> Transaction_snark_work.Statement.t list
 val check_commands :
      Ledger.t
   -> verifier:Verifier.t
-  -> Command_transaction.t list
-  -> (Command_transaction.Valid.t list, Verifier.Failure.t) Result.t
+  -> User_command.t list
+  -> (User_command.Valid.t list, Verifier.Failure.t) Result.t
      Deferred.Or_error.t

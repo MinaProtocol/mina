@@ -255,7 +255,7 @@ module For_tests = struct
       let parent_staged_ledger = parent_breadcrumb.staged_ledger in
       let transactions =
         gen_payments parent_staged_ledger accounts_with_secret_keys
-        |> Sequence.map ~f:(fun x -> Command_transaction.Signed_command x)
+        |> Sequence.map ~f:(fun x -> User_command.Signed_command x)
       in
       let _, largest_account =
         List.max_elt accounts_with_secret_keys

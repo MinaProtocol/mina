@@ -29,7 +29,7 @@ let get_status ~frontier_broadcast_pipe ~transaction_pool cmd =
     Result.of_option (Signed_command.check cmd)
       ~error:(Error.of_string "Invalid signature")
     |> Result.map ~f:(fun x ->
-           Transaction_hash.Command_transaction_with_valid_signature.create
+           Transaction_hash.User_command_with_valid_signature.create
              (Signed_command x) )
   in
   let resource_pool = Transaction_pool.resource_pool transaction_pool in
@@ -208,7 +208,7 @@ let%test_module "transaction_status" =
               let%bind () =
                 Strict_pipe.Writer.write local_diffs_writer
                   ( List.map pool_user_commands ~f:(fun x ->
-                        Command_transaction.Signed_command x )
+                        User_command.Signed_command x )
                   , Fn.const () )
               in
               let%map () = Async.Scheduler.yield_until_no_jobs_remain () in

@@ -37,7 +37,7 @@ module type External_transition_common_intf = sig
     -> t
     -> Transaction.t With_status.t list
 
-  val commands : t -> Command_transaction.t With_status.t list
+  val commands : t -> User_command.t With_status.t list
 
   val payments : t -> Signed_command.t With_status.t list
 
@@ -273,7 +273,7 @@ module type S = sig
 
     include External_transition_base_intf with type t := t
 
-    val commands : t -> Command_transaction.Valid.t With_status.t list
+    val commands : t -> User_command.Valid.t With_status.t list
 
     val to_initial_validated : t -> Initial_validated.t
   end
