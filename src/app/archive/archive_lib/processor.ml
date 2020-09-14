@@ -198,7 +198,7 @@ module Command_transaction = struct
                 Signed_command.amount t
                 |> Core.Option.map ~f:Currency.Amount.to_int
             ; fee= Signed_command.fee t |> Currency.Fee.to_int
-            ; memo= Signed_command.memo t |> User_command_memo.to_string
+            ; memo= Signed_command.memo t |> Signed_command_memo.to_string
             ; hash= transaction_hash |> Transaction_hash.to_base58_check
             ; status= None
             ; failure_reason= None }
@@ -276,7 +276,7 @@ module Command_transaction = struct
                     Option.value (S.nonce c)
                       ~default:Coda_numbers.Account_nonce.zero
                 ; valid_until= Coda_numbers.Global_slot.max_value
-                ; memo= User_command_memo.create_from_string_exn "snapp" }
+                ; memo= Signed_command_memo.create_from_string_exn "snapp" }
             ; body=
                 Payment
                   { source_pk= source

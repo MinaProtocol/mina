@@ -50,7 +50,7 @@ module Signed_command = struct
     ; to_: Public_key.Compressed.t
     ; amount: Currency.Amount.t
     ; fee: Currency.Fee.t
-    ; memo: User_command_memo.t }
+    ; memo: Signed_command_memo.t }
   [@@deriving yojson]
 
   let of_obj x =

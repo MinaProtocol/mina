@@ -1369,13 +1369,13 @@ let%test_module _ =
     let mk_payment' sender_idx fee nonce receiver_idx amount =
       let get_pk idx = Public_key.compress test_keys.(idx).public_key in
       Signed_command.sign test_keys.(sender_idx)
-        (User_command_payload.create ~fee:(Currency.Fee.of_int fee)
+        (Signed_command_payload.create ~fee:(Currency.Fee.of_int fee)
            ~fee_token:Token_id.default ~fee_payer_pk:(get_pk sender_idx)
            ~valid_until:None
            ~nonce:(Account.Nonce.of_int nonce)
-           ~memo:(User_command_memo.create_by_digesting_string_exn "foo")
+           ~memo:(Signed_command_memo.create_by_digesting_string_exn "foo")
            ~body:
-             (User_command_payload.Body.Payment
+             (Signed_command_payload.Body.Payment
                 { source_pk= get_pk sender_idx
                 ; receiver_pk= get_pk receiver_idx
                 ; token_id= Token_id.default

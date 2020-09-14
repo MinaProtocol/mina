@@ -366,6 +366,6 @@ module Signed_command = struct
       ~doc:
         (sprintf
            "STRING Memo accompanying the transaction (up to %d characters)"
-           Coda_base.User_command_memo.max_input_length)
+           Coda_base.Signed_command_memo.max_input_length)
       (optional string)
 end

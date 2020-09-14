@@ -73,7 +73,7 @@ module Common : sig
         , Token_id.Stable.V1.t
         , Coda_numbers.Account_nonce.Stable.V1.t
         , Coda_numbers.Global_slot.Stable.V1.t
-        , User_command_memo.t )
+        , Signed_command_memo.t )
         Poly.Stable.V1.t
       [@@deriving compare, eq, sexp, hash]
     end
@@ -91,7 +91,7 @@ module Common : sig
     , Token_id.var
     , Coda_numbers.Account_nonce.Checked.t
     , Coda_numbers.Global_slot.Checked.t
-    , User_command_memo.Checked.t )
+    , Signed_command_memo.Checked.t )
     Poly.t
 
   val typ : (var, t) Typ.t
@@ -139,7 +139,7 @@ val create :
   -> fee_payer_pk:Public_key.Compressed.t
   -> nonce:Coda_numbers.Account_nonce.t
   -> valid_until:Coda_numbers.Global_slot.t option
-  -> memo:User_command_memo.t
+  -> memo:Signed_command_memo.t
   -> body:Body.t
   -> t
 
@@ -159,7 +159,7 @@ val nonce : t -> Coda_numbers.Account_nonce.t
 
 val valid_until : t -> Coda_numbers.Global_slot.t
 
-val memo : t -> User_command_memo.t
+val memo : t -> Signed_command_memo.t
 
 val body : t -> Body.t
 

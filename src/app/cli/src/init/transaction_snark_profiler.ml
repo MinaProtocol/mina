@@ -29,7 +29,7 @@ let create_ledger_and_transactions num_transitions =
     let from_pk = Public_key.compress from_kp.public_key in
     let payload : Signed_command.Payload.t =
       Signed_command.Payload.create ~fee ~fee_token:Token_id.default
-        ~fee_payer_pk:from_pk ~nonce ~memo:User_command_memo.dummy
+        ~fee_payer_pk:from_pk ~nonce ~memo:Signed_command_memo.dummy
         ~valid_until:None
         ~body:
           (Payment

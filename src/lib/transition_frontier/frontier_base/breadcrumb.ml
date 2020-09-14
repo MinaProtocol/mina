@@ -218,7 +218,7 @@ module For_tests = struct
         let payload : Signed_command.Payload.t =
           Signed_command.Payload.create ~fee:Fee.zero ~fee_token:Token_id.default
             ~fee_payer_pk:sender_pk ~nonce ~valid_until:None
-            ~memo:User_command_memo.dummy
+            ~memo:Signed_command_memo.dummy
             ~body:
               (Payment
                  { source_pk= sender_pk

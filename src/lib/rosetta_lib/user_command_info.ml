@@ -19,7 +19,7 @@ open Rosetta_models
 module User_command = Coda_base.User_command
 module Token_id = Coda_base.Token_id
 module Public_key = Signature_lib.Public_key
-module User_command_memo = Coda_base.User_command_memo
+module Signed_command_memo = Coda_base.Signed_command_memo
 module Payment_payload = Coda_base.Payment_payload
 module Stake_delegation = Coda_base.Stake_delegation
 
@@ -211,7 +211,7 @@ module Partial = struct
     Signed_command.Payload.create
       ~fee:(Fee_currency.of_uint64 t.fee)
       ~fee_token:(Token_id.of_uint64 t.fee_token)
-      ~fee_payer_pk ~nonce ~body ~memo:User_command_memo.empty
+      ~fee_payer_pk ~nonce ~body ~memo:Signed_command_memo.empty
       ~valid_until:None
 end
 

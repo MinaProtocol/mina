@@ -38,7 +38,7 @@ module Body = struct
   [@@deriving sexp]
 
   let of_user_command_payload_body = function
-    | User_command_payload.Body.Payment
+    | Signed_command_payload.Body.Payment
         {source_pk; receiver_pk; token_id; amount} ->
         { tag= Tag.Payment
         ; source_pk
@@ -195,35 +195,35 @@ module Body = struct
        ; Random_oracle.Input.bitstring [token_locked] |]
 end
 
-type t = (User_command_payload.Common.t, Body.t) User_command_payload.Poly.t
+type t = (Signed_command_payload.Common.t, Body.t) Signed_command_payload.Poly.t
 [@@deriving sexp]
 
 type payload = t [@@deriving sexp]
 
-let of_user_command_payload ({common; body} : User_command_payload.t) : t =
+let of_user_command_payload ({common; body} : Signed_command_payload.t) : t =
   {common; body= Body.of_user_command_payload_body body}
 
 let gen =
   let open Quickcheck.Generator.Let_syntax in
   let%bind common =
-    User_command_payload.Common.gen ~fee_token_id:Token_id.default ()
+    Signed_command_payload.Common.gen ~fee_token_id:Token_id.default ()
   in
   let%map body = Body.gen ~fee:common.fee in
-  User_command_payload.Poly.{common; body}
+  Signed_command_payload.Poly.{common; body}
 
 [%%ifdef
 consensus_mechanism]
 
 type var =
-  (User_command_payload.Common.var, Body.var) User_command_payload.Poly.t
+  (Signed_command_payload.Common.var, Body.var) Signed_command_payload.Poly.t
 
 type payload_var = var
 
 let typ : (var, t) Typ.t =
-  let to_hlist = User_command_payload.Poly.to_hlist in
-  let of_hlist = User_command_payload.Poly.of_hlist in
+  let to_hlist = Signed_command_payload.Poly.to_hlist in
+  let of_hlist = Signed_command_payload.Poly.of_hlist in
   Typ.of_hlistable
-    [User_command_payload.Common.typ; Body.typ]
+    [Signed_command_payload.Common.typ; Body.typ]
     ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
     ~value_of_hlist:of_hlist
 
@@ -231,12 +231,12 @@ let payload_typ = typ
 
 module Checked = struct
   let to_input ({common; body} : var) =
-    let%map common = User_command_payload.Common.Checked.to_input common
+    let%map common = Signed_command_payload.Common.Checked.to_input common
     and body = Body.Checked.to_input body in
     Random_oracle.Input.append common body
 
   let constant ({common; body} : t) : var =
-    { common= User_command_payload.Common.Checked.constant common
+    { common= Signed_command_payload.Common.Checked.constant common
     ; body= Body.Checked.constant body }
 end
 
@@ -244,7 +244,7 @@ end
 
 let to_input ({common; body} : t) =
   Random_oracle.Input.append
-    (User_command_payload.Common.to_input common)
+    (Signed_command_payload.Common.to_input common)
     (Body.to_input body)
 
 let excess (payload : t) : Amount.Signed.t =

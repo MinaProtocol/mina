@@ -3646,9 +3646,9 @@ let%test_module "transaction_snark" =
                   (Fee.of_int (Random.int 20 * 1_000_000_000))
                   ~fee_token:Token_id.default ~token:Token_id.default
                   Account.Nonce.zero
-                  (User_command_memo.create_by_digesting_string_exn
+                  (Signed_command_memo.create_by_digesting_string_exn
                      (Test_util.arbitrary_string
-                        ~len:User_command_memo.max_digestible_string_length))
+                        ~len:Signed_command_memo.max_digestible_string_length))
               in
               let current_global_slot =
                 Coda_state.Protocol_state.Body.consensus_state state_body
@@ -3905,9 +3905,9 @@ let%test_module "transaction_snark" =
           let amount = 8_000_000_000 in
           let txn_fee = 2_000_000_000 in
           let memo =
-            User_command_memo.create_by_digesting_string_exn
+            Signed_command_memo.create_by_digesting_string_exn
               (Test_util.arbitrary_string
-                 ~len:User_command_memo.max_digestible_string_length)
+                 ~len:Signed_command_memo.max_digestible_string_length)
           in
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               let _, ucs =
@@ -4048,9 +4048,9 @@ let%test_module "transaction_snark" =
                     (Account.identifier account)
                     account ) ;
               let memo =
-                User_command_memo.create_by_digesting_string_exn
+                Signed_command_memo.create_by_digesting_string_exn
                   (Test_util.arbitrary_string
-                     ~len:User_command_memo.max_digestible_string_length)
+                     ~len:Signed_command_memo.max_digestible_string_length)
               in
               let t1 =
                 user_command_with_wallet wallets ~sender:0 ~receiver:1
@@ -4249,9 +4249,9 @@ let%test_module "transaction_snark" =
         | Some memo ->
             memo
         | None ->
-            User_command_memo.create_by_digesting_string_exn
+            Signed_command_memo.create_by_digesting_string_exn
               (Test_util.arbitrary_string
-                 ~len:User_command_memo.max_digestible_string_length)
+                 ~len:Signed_command_memo.max_digestible_string_length)
       in
       Array.iter accounts ~f:(fun account ->
           Ledger.create_new_account_exn ledger
@@ -4662,9 +4662,9 @@ let%test_module "transaction_snark" =
           let amount = 8_000_000_000 in
           let txn_fee = 2_000_000_000 in
           let memo =
-            User_command_memo.create_by_digesting_string_exn
+            Signed_command_memo.create_by_digesting_string_exn
               (Test_util.arbitrary_string
-                 ~len:User_command_memo.max_digestible_string_length)
+                 ~len:Signed_command_memo.max_digestible_string_length)
           in
           let balance = Balance.of_int 100_000_000_000_000 in
           let initial_minimum_balance = Balance.of_int 80_000_000_000_000 in

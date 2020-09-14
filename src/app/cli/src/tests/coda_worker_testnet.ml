@@ -160,7 +160,7 @@ module Api = struct
       Public_key.compress @@ Public_key.of_private_key_exn delegator_sk
     in
     run_user_command
-      ~memo:(User_command_memo.create_from_string_exn (sprintf "sd%i" i))
+      ~memo:(Signed_command_memo.create_from_string_exn (sprintf "sd%i" i))
       t i delegator_sk fee valid_until
       ~body:
         (Stake_delegation (Set_delegate {delegator; new_delegate= delegate_pk}))
@@ -170,7 +170,7 @@ module Api = struct
       Public_key.compress @@ Public_key.of_private_key_exn sender_sk
     in
     run_user_command
-      ~memo:(User_command_memo.create_from_string_exn (sprintf "pay%i" i))
+      ~memo:(Signed_command_memo.create_from_string_exn (sprintf "pay%i" i))
       t i sender_sk fee valid_until
       ~body:
         (Payment {source_pk; receiver_pk; token_id= Token_id.default; amount})

@@ -15,8 +15,8 @@ module Payload = struct
           , Token_id.Stable.V1.t
           , Account_nonce.Stable.V1.t option
           , Global_slot.Stable.V1.t
-          , User_command_memo.Stable.V1.t )
-          User_command_payload.Common.Poly.Stable.V1.t
+          , Signed_command_memo.Stable.V1.t )
+          Signed_command_payload.Common.Poly.Stable.V1.t
         [@@deriving sexp, to_yojson]
 
         let to_latest = Fn.id
@@ -27,7 +27,7 @@ module Payload = struct
       {fee; fee_token; fee_payer_pk; nonce; valid_until; memo}
 
     let to_user_command_common (t : t) ~inferred_nonce :
-        (User_command_payload.Common.t, string) Result.t =
+        (Signed_command_payload.Common.t, string) Result.t =
       let open Result.Let_syntax in
       let%map () =
         match t.nonce with
@@ -43,7 +43,7 @@ module Payload = struct
                    (Account_nonce.to_string nonce)
                    (Account_nonce.to_string inferred_nonce))
       in
-      { User_command_payload.Common.Poly.fee= t.fee
+      { Signed_command_payload.Common.Poly.fee= t.fee
       ; fee_token= t.fee_token
       ; fee_payer_pk= t.fee_payer_pk
       ; nonce= inferred_nonce
@@ -59,8 +59,8 @@ module Payload = struct
     module V1 = struct
       type t =
         ( Common.Stable.V1.t
-        , User_command_payload.Body.Stable.V1.t )
-        User_command_payload.Poly.Stable.V1.t
+        , Signed_command_payload.Body.Stable.V1.t )
+        Signed_command_payload.Poly.Stable.V1.t
       [@@deriving sexp, to_yojson]
 
       let to_latest = Fn.id
@@ -74,10 +74,10 @@ module Payload = struct
     ; body }
 
   let to_user_command_payload (t : t) ~inferred_nonce :
-      (User_command_payload.t, string) Result.t =
+      (Signed_command_payload.t, string) Result.t =
     let open Result.Let_syntax in
     let%map common = Common.to_user_command_common t.common ~inferred_nonce in
-    {User_command_payload.Poly.common; body= t.body}
+    {Signed_command_payload.Poly.common; body= t.body}
 
   let fee_payer ({common; _} : t) = Common.fee_payer common
 end
@@ -125,7 +125,7 @@ let create ?nonce ~fee ~fee_token ~fee_payer_pk ~valid_until ~memo ~body
   in
   {payload; signer; signature= sign_choice}
 
-let sign ~signer ~(user_command_payload : User_command_payload.t) = function
+let sign ~signer ~(user_command_payload : Signed_command_payload.t) = function
   | Sign_choice.Signature signature ->
       Option.value_map
         ~default:(Deferred.return (Error "Invalid_signature"))

@@ -15,7 +15,7 @@ module Quickcheck_lib = Quickcheck_lib_nonconsensus.Quickcheck_lib
 
 open Coda_numbers
 module Fee = Currency.Fee
-module Payload = User_command_payload
+module Payload = Signed_command_payload
 
 module Poly = struct
   [%%versioned
@@ -170,7 +170,7 @@ module Gen = struct
       Payload.create ~fee ~fee_token
         ~fee_payer_pk:(Public_key.compress signer.public_key)
         ~nonce ~valid_until:None
-        ~memo:(User_command_memo.create_by_digesting_string_exn memo)
+        ~memo:(Signed_command_memo.create_by_digesting_string_exn memo)
         ~body
     in
     sign' signer payload
@@ -187,7 +187,7 @@ module Gen = struct
       @@ fun {public_key= signer; _} {public_key= receiver; _} ->
       let open Quickcheck.Generator.Let_syntax in
       let%map amount = Int.gen_incl 1 max_amount >>| Currency.Amount.of_int in
-      User_command_payload.Body.Payment
+      Signed_command_payload.Body.Payment
         { receiver_pk= Public_key.compress receiver
         ; source_pk= Public_key.compress signer
         ; token_id= payment_token
@@ -212,7 +212,7 @@ module Gen = struct
       gen_inner For_tests.fake_sign ~key_gen ?nonce ?fee_token ~max_fee
         (fun {public_key= signer; _} {public_key= new_delegate; _} ->
           Quickcheck.Generator.return
-          @@ User_command_payload.Body.Stake_delegation
+          @@ Signed_command_payload.Body.Stake_delegation
                (Set_delegate
                   { delegator= Public_key.compress signer
                   ; new_delegate= Public_key.compress new_delegate }) )
@@ -318,7 +318,7 @@ module Gen = struct
             )
             @@ Int.gen_uniform_incl 0 (n_accounts - 1)
           in
-          let memo = User_command_memo.dummy in
+          let memo = Signed_command_memo.dummy in
           let payload =
             let sender_pk = Public_key.compress sender_pk.public_key in
             Payload.create ~fee ~fee_token:Token_id.default

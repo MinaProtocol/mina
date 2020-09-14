@@ -275,7 +275,7 @@ let run_test () : unit Deferred.t =
         trace_recurring "build_payment" (fun () ->
             let signer = pk_of_sk sender_sk in
             let memo =
-              User_command_memo.create_from_string_exn
+              Signed_command_memo.create_from_string_exn
                 "A memo created in full-test"
             in
             User_command_input.create ?nonce ~signer ~fee ~fee_payer_pk:signer

@@ -45,7 +45,7 @@ module Send_payment_input = struct
         * Public_key.Compressed.Stable.V1.t
         * Currency.Amount.Stable.V1.t
         * Currency.Fee.Stable.V1.t
-        * User_command_memo.Stable.V1.t
+        * Signed_command_memo.Stable.V1.t
 
       let to_latest = Fn.id
     end

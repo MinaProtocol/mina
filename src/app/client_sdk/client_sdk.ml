@@ -111,7 +111,7 @@ let _ =
 
        (** verify signed payments *)
        method verifyPaymentSignature (signed_payment : signed_payment) =
-         let payload : User_command_payload.t =
+         let payload : Signed_command_payload.t =
            payload_of_payment_js signed_payment##.payment
          in
          let signer =
@@ -145,7 +145,7 @@ let _ =
        (** verify signed delegations *)
        method verifyStakeDelegationSignature
              (signed_stake_delegation : signed_stake_delegation) =
-         let payload : User_command_payload.t =
+         let payload : Signed_command_payload.t =
            payload_of_stake_delegation_js
              signed_stake_delegation##.stakeDelegation
          in

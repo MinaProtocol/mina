@@ -5,7 +5,7 @@ open Rosetta_models
 module Signature = Coda_base.Signature
 module Transaction = Rosetta_lib.Transaction
 module Public_key = Signature_lib.Public_key
-module User_command_payload = Coda_base.User_command_payload
+module Signed_command_payload = Coda_base.Signed_command_payload
 module User_command = Coda_base.User_command
 module Transaction_hash = Coda_base.Transaction_hash
 

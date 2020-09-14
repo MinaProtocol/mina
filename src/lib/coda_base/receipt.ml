@@ -109,7 +109,7 @@ module Chain_hash = struct
 
   let%test_unit "checked-unchecked equivalence" =
     let open Quickcheck in
-    test ~trials:20 (Generator.tuple2 gen User_command_payload.gen)
+    test ~trials:20 (Generator.tuple2 gen Signed_command_payload.gen)
       ~f:(fun (base, payload) ->
         let unchecked = cons (User_command payload) base in
         let checked =

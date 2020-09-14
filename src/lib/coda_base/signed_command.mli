@@ -1,6 +1,6 @@
 open Core_kernel
 open Import
-module Payload = User_command_payload
+module Payload = Signed_command_payload
 
 module Poly : sig
   [%%versioned:

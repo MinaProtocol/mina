@@ -839,7 +839,7 @@ module Types = struct
             `String "MINT_TOKENS" )
 
     let to_kind (t : Signed_command.t) =
-      match Signed_command.payload t |> User_command_payload.body with
+      match Signed_command.payload t |> Signed_command_payload.body with
       | Payment _ ->
           `Payment
       | Stake_delegation _ ->
@@ -924,7 +924,7 @@ module Types = struct
       ; field "nonce" ~typ:(non_null int) ~args:[]
           ~doc:"Sequence number of command for the fee-payer's account"
           ~resolve:(fun _ payment ->
-            User_command_payload.nonce
+            Signed_command_payload.nonce
             @@ Signed_command.payload payment.With_hash.data
             |> Account.Nonce.to_int )
       ; field "source" ~typ:(non_null AccountObj.account)
@@ -968,9 +968,9 @@ module Types = struct
       ; field "memo" ~typ:(non_null string) ~args:[]
           ~doc:"Short arbitrary message provided by the sender"
           ~resolve:(fun _ payment ->
-            User_command_payload.memo
+            Signed_command_payload.memo
             @@ Signed_command.payload payment.With_hash.data
-            |> User_command_memo.to_string )
+            |> Signed_command_memo.to_string )
       ; field "isDelegation" ~typ:(non_null bool) ~args:[]
           ~doc:
             "If true, this represents a delegation of stake, otherwise it is \
@@ -1040,7 +1040,7 @@ module Types = struct
                ~doc:"Whether new accounts created in this token are disabled"
                ~resolve:(fun _ cmd ->
                  match
-                   User_command_payload.body
+                   Signed_command_payload.body
                    @@ Signed_command.payload cmd.With_hash.data
                  with
                  | Create_new_token {disable_new_accounts; _} ->
@@ -1069,7 +1069,7 @@ module Types = struct
                   match the 'newAccountsDisabled' property set in the token \
                   owner's account." ~resolve:(fun _ cmd ->
                  match
-                   User_command_payload.body
+                   Signed_command_payload.body
                    @@ Signed_command.payload cmd.With_hash.data
                  with
                  | Create_token_account {account_disabled; _} ->
@@ -1098,7 +1098,7 @@ module Types = struct
 
     let mk_user_command
         (cmd : (Signed_command.t, Transaction_hash.t) With_hash.t) =
-      match User_command_payload.body @@ Signed_command.payload cmd.data with
+      match Signed_command_payload.body @@ Signed_command.payload cmd.data with
       | Payment _ ->
           mk_payment cmd
       | Stake_delegation _ ->
@@ -2021,9 +2021,9 @@ module Mutations = struct
              (Currency.Fee.to_formatted_string Signed_command.minimum_fee))
     in
     let%map memo =
-      Option.value_map memo ~default:(Ok User_command_memo.empty)
+      Option.value_map memo ~default:(Ok Signed_command_memo.empty)
         ~f:(fun memo ->
-          result_of_exn User_command_memo.create_from_string_exn memo
+          result_of_exn Signed_command_memo.create_from_string_exn memo
             ~error:"Invalid `memo` provided." )
     in
     User_command_input.create ~signer ~fee ~fee_token ~fee_payer_pk
@@ -2075,7 +2075,7 @@ module Mutations = struct
         (fun {ctx= coda; _} () (from, to_, fee, valid_until, memo, nonce_opt)
              signature ->
         let body =
-          User_command_payload.Body.Stake_delegation
+          Signed_command_payload.Body.Stake_delegation
             (Set_delegate {delegator= from; new_delegate= to_})
         in
         let fee_token = Token_id.default in
@@ -2102,7 +2102,7 @@ module Mutations = struct
              (from, to_, token_id, amount, fee, valid_until, memo, nonce_opt)
              signature ->
         let body =
-          User_command_payload.Body.Payment
+          Signed_command_payload.Body.Payment
             { source_pk= from
             ; receiver_pk= to_
             ; token_id= Option.value ~default:Token_id.default token_id
@@ -2132,7 +2132,7 @@ module Mutations = struct
              signature ->
         let fee_payer_pk = Option.value ~default:token_owner fee_payer_pk in
         let body =
-          User_command_payload.Body.Create_new_token
+          Signed_command_payload.Body.Create_new_token
             { token_owner_pk= token_owner
             ; disable_new_accounts=
                 (* TODO(5274): Expose when permissions commands are merged. *)
@@ -2165,7 +2165,7 @@ module Mutations = struct
              , memo
              , nonce_opt ) signature ->
         let body =
-          User_command_payload.Body.Create_token_account
+          Signed_command_payload.Body.Create_token_account
             { token_id= token
             ; token_owner_pk= token_owner
             ; receiver_pk= receiver
@@ -2202,7 +2202,7 @@ module Mutations = struct
              , memo
              , nonce_opt ) signature ->
         let body =
-          User_command_payload.Body.Mint_tokens
+          Signed_command_payload.Body.Mint_tokens
             { token_id= token
             ; token_owner_pk= token_owner
             ; receiver_pk= Option.value ~default:token_owner receiver
