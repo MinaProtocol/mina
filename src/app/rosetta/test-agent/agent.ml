@@ -110,7 +110,6 @@ let verify_in_mempool_and_block ~logger ~rosetta_uri ~graphql_uri
     "Found block index $index" ;
   (* Start staking so we get blocks *)
   let%bind _res = Poke.Staking.enable ~graphql_uri in
-  (*let%bind () = wait (Span.of_sec 3.0) in*)
   (* Wait until the newest-block is at least index>last_block_index and there is at least not a coinbase *)
   let%bind block =
     keep_trying
@@ -582,7 +581,6 @@ let check_new_account_user_commands ~logger ~rosetta_uri ~graphql_uri =
   [%log info] "Created payment and waited" ;
   (* Stop staking so we can rely on things being in the mempool again *)
   let%bind _res = Poke.Staking.disable ~graphql_uri in
-  (* TODO: Why does introducing this break everything?? *)
   [%log info] "Starting payment (no account fee) check" ;
   let%bind () =
     direct_graphql_no_account_fee_through_block ~logger ~rosetta_uri
