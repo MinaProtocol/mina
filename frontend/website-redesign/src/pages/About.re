@@ -4,5 +4,6 @@ let make = () => {
     <AboutpageHero />
     <AboutpageRows />
     <QuoteSection />
+    <SecuredBySection/>
   </Page>;
 };
