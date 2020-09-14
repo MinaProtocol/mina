@@ -126,6 +126,9 @@ let curr_global_slot =
       state_body |> Coda_state.Protocol_state.Body.consensus_state
       |> Consensus.Data.Consensus_state.curr_global_slot )
 
+let curr_state_view =
+  Lazy.map state_body ~f:Coda_state.Protocol_state.Body.view
+
 let state_body_hash =
   Lazy.map ~f:Coda_state.Protocol_state.Body.hash state_body
 
@@ -147,7 +150,7 @@ let pending_coinbase_stack_target (t : Transaction.t) stack =
 let profile (module T : Transaction_snark.S) sparse_ledger0
     (transitions : Transaction.t list) _ =
   let constraint_constants = Genesis_constants.Constraint_constants.compiled in
-  let txn_global_slot = Lazy.force curr_global_slot in
+  let txn_state_view = Lazy.force curr_state_view in
   let (base_proof_time, _, _), base_proofs =
     List.fold_map transitions
       ~init:(Time.Span.zero, sparse_ledger0, Pending_coinbase.Stack.empty)
@@ -157,7 +160,7 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
         in
         let sparse_ledger' =
           Sparse_ledger.apply_transaction_exn ~constraint_constants
-            ~txn_global_slot sparse_ledger t
+            ~txn_state_view sparse_ledger t
         in
         let next_available_token_after =
           Sparse_ledger.next_available_token sparse_ledger'
@@ -174,6 +177,7 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
                 ~next_available_token_after
                 ~pending_coinbase_stack_state:
                   {source= coinbase_stack_source; target= coinbase_stack_target}
+                ~snapp_account1:None ~snapp_account2:None
                 { Transaction_protocol_state.Poly.transaction= t
                 ; block_data= Lazy.force state_body }
                 (unstage (Sparse_ledger.handler sparse_ledger)) )
@@ -210,14 +214,14 @@ let check_base_snarks sparse_ledger0 (transitions : Transaction.t list) preeval
         ~prover:
           Public_key.(compress (of_private_key_exn (Private_key.create ())))
     in
-    let txn_global_slot = Lazy.force curr_global_slot in
+    let txn_state_view = Lazy.force curr_state_view in
     List.fold transitions ~init:sparse_ledger0 ~f:(fun sparse_ledger t ->
         let next_available_token_before =
           Sparse_ledger.next_available_token sparse_ledger
         in
         let sparse_ledger' =
           Sparse_ledger.apply_transaction_exn ~constraint_constants
-            ~txn_global_slot sparse_ledger t
+            ~txn_state_view sparse_ledger t
         in
         let next_available_token_after =
           Sparse_ledger.next_available_token sparse_ledger'
@@ -235,6 +239,7 @@ let check_base_snarks sparse_ledger0 (transitions : Transaction.t list) preeval
             ~pending_coinbase_stack_state:
               { source= Pending_coinbase.Stack.empty
               ; target= coinbase_stack_target }
+            ~snapp_account1:None ~snapp_account2:None
             { Transaction_protocol_state.Poly.block_data= Lazy.force state_body
             ; transaction= t }
             (unstage (Sparse_ledger.handler sparse_ledger))
@@ -252,14 +257,14 @@ let generate_base_snarks_witness sparse_ledger0
         ~prover:
           Public_key.(compress (of_private_key_exn (Private_key.create ())))
     in
-    let txn_global_slot = Lazy.force curr_global_slot in
+    let txn_state_view = Lazy.force curr_state_view in
     List.fold transitions ~init:sparse_ledger0 ~f:(fun sparse_ledger t ->
         let next_available_token_before =
           Sparse_ledger.next_available_token sparse_ledger
         in
         let sparse_ledger' =
           Sparse_ledger.apply_transaction_exn ~constraint_constants
-            ~txn_global_slot sparse_ledger t
+            ~txn_state_view sparse_ledger t
         in
         let next_available_token_after =
           Sparse_ledger.next_available_token sparse_ledger'
@@ -278,6 +283,7 @@ let generate_base_snarks_witness sparse_ledger0
               { Transaction_snark.Pending_coinbase_stack_state.source=
                   Pending_coinbase.Stack.empty
               ; target= coinbase_stack_target }
+            ~snapp_account1:None ~snapp_account2:None
             { Transaction_protocol_state.Poly.transaction= t
             ; block_data= Lazy.force state_body }
             (unstage (Sparse_ledger.handler sparse_ledger))

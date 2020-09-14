@@ -1,8 +1,8 @@
 FROM ubuntu:18.04
-# Run with `docker build --build-arg coda_version=<version>`
-ARG coda_version
+# Run with `docker build --build-arg coda_deb_version=<version>`
+ARG coda_deb_version
 ARG deb_repo=stable
-RUN echo "Building image with version $coda_version"
+RUN echo "Building image with version $coda_deb_version"
 
 ADD scripts/run-demo.sh /run-demo.sh
 
@@ -26,7 +26,7 @@ RUN apt-get -y update && \
 # coda package
 RUN echo "deb [trusted=yes] http://packages.o1test.net $deb_repo main" > /etc/apt/sources.list.d/coda.list \
   && apt-get update \
-  && apt-get install --force-yes coda-testnet-postake-medium-curves=$coda_version -y \
+  && apt-get install --force-yes coda-testnet-postake-medium-curves=$coda_deb_version -y \
   && mkdir /root/keys \
   && chmod go-rwx /root/keys \
   && echo '{"box_primitive":"xsalsa20poly1305","pw_primitive":"argon2i","nonce":"8jGuTAxw3zxtWasVqcD1H6rEojHLS1yJmG3aHHd","pwsalt":"AiUCrMJ6243h3TBmZ2rqt3Voim1Y","pwdiff":[134217728,6],"ciphertext":"DbAy736GqEKWe9NQWT4yaejiZUo9dJ6rsK7cpS43APuEf5AH1Qw6xb1s35z8D2akyLJBrUr6m"}' > /root/keys/demo-block-producer \
