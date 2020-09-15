@@ -17,7 +17,6 @@ module Styles = {
       display(`flex),
       flexDirection(`column),
       alignItems(`center),
-      media(Theme.MediaQuery.notMobile, []),
     ]);
 
   let contentBlock =
@@ -75,6 +74,7 @@ module Styles = {
       bottom(`zero),
       width(`percent(100.)),
       height(`percent(100.)),
+      left(`rem(0.)),
       maxWidth(`px(848)),
       media(Theme.MediaQuery.notMobile, [height(`percent(110.))]),
     ]);

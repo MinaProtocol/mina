@@ -6,6 +6,7 @@ module Styles = {
       width(`percent(100.)),
       important(backgroundSize(`cover)),
       backgroundImage(`url("/static/img/HeroSectionBackground.png")),
+      position(`relative),
     ]);
 
   let container =
