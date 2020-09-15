@@ -122,8 +122,14 @@ module Styles = {
     merge([
       Theme.Type.h2,
       style([
-        important(lineHeight(`rem(1.5))),
-        important(fontSize(`rem(2.))),
+        lineHeight(`rem(2.3)),
+        media(
+          Theme.MediaQuery.notMobile,
+          [
+            important(lineHeight(`rem(1.5))),
+            important(fontSize(`rem(2.))),
+          ],
+        ),
       ]),
     ]);
 
