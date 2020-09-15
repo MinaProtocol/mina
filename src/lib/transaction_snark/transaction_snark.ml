@@ -921,9 +921,6 @@ module Base = struct
         ; vesting_increment } =
       account.timing
     in
-    let%bind before_or_at_cliff =
-      Global_slot.Checked.(txn_global_slot <= cliff_time)
-    in
     let int_of_field field =
       Snarky_integer.Integer.constant ~m
         (Bigint.of_field field |> Bigint.to_bignum_bigint)
@@ -937,38 +934,8 @@ module Base = struct
     in
     let balance_int = balance_to_int account.balance in
     let%bind curr_min_balance =
-      let open Snarky_integer.Integer in
-      let initial_minimum_balance_int =
-        balance_to_int initial_minimum_balance
-      in
-      make_checked (fun () ->
-          if_ ~m before_or_at_cliff ~then_:initial_minimum_balance_int
-            ~else_:
-              (let txn_global_slot_int =
-                 Global_slot.Checked.to_integer txn_global_slot
-               in
-               let cliff_time_int =
-                 Global_slot.Checked.to_integer cliff_time
-               in
-               let _, slot_diff =
-                 subtract_unpacking_or_zero ~m txn_global_slot_int
-                   cliff_time_int
-               in
-               let vesting_period_int =
-                 Global_slot.Checked.to_integer vesting_period
-               in
-               let num_periods, _ = div_mod ~m slot_diff vesting_period_int in
-               let vesting_increment_int =
-                 Amount.var_to_bits vesting_increment |> of_bits ~m
-               in
-               let min_balance_decrement =
-                 mul ~m num_periods vesting_increment_int
-               in
-               let _, min_balance_less_decrement =
-                 subtract_unpacking_or_zero ~m initial_minimum_balance_int
-                   min_balance_decrement
-               in
-               min_balance_less_decrement) )
+      Account.Checked.min_balance_at_slot ~global_slot:txn_global_slot
+        ~cliff_time ~vesting_period ~vesting_increment ~initial_minimum_balance
     in
     let%bind `Underflow underflow, proposed_balance_int =
       make_checked (fun () ->
@@ -2227,6 +2194,7 @@ module Base = struct
       fee |> Fee.var_to_number |> Number.to_var
       |> Field.(Checked.equal (Var.constant zero))
     in
+    let is_coinbase_or_fee_transfer = Boolean.not is_user_command in
     let%bind can_create_fee_payer_account =
       (* Fee transfers and coinbases may create an account. We check the normal
          invariants to ensure that the account creation fee is paid.
@@ -2237,7 +2205,7 @@ module Base = struct
         *)
         Boolean.(token_default || is_zero_fee)
       in
-      Boolean.((not is_user_command) && fee_may_be_charged)
+      Boolean.(is_coinbase_or_fee_transfer && fee_may_be_charged)
     in
     let%bind root_after_fee_payer_update =
       [%with_label "Update fee payer"]
@@ -5533,6 +5501,69 @@ let%test_module "transaction_snark" =
                 Balance.equal accounts.(1).balance token_owner_account.balance
               ) ;
               assert (Option.is_none receiver_account) ) )
+
+    let%test_unit "unchanged timings for fee transfers and coinbase" =
+      Test_util.with_randomness 123456789 (fun () ->
+          let receivers =
+            Array.init 2 ~f:(fun _ ->
+                Public_key.of_private_key_exn (Private_key.create ())
+                |> Public_key.compress )
+          in
+          let timed_account pk =
+            let account_id = Account_id.create pk Token_id.default in
+            let balance = Balance.of_int 100_000_000_000_000 in
+            let initial_minimum_balance = Balance.of_int 80_000_000_000 in
+            let cliff_time = Global_slot.of_int 2 in
+            let vesting_period = Global_slot.of_int 2 in
+            let vesting_increment = Amount.of_int 40_000_000_000 in
+            Or_error.ok_exn
+            @@ Account.create_timed account_id balance ~initial_minimum_balance
+                 ~cliff_time ~vesting_period ~vesting_increment
+          in
+          let timed_account1 = timed_account receivers.(0) in
+          let timed_account2 = timed_account receivers.(1) in
+          let fee = 8_000_000_000 in
+          let ft1, ft2 =
+            let single1 =
+              Fee_transfer.Single.create ~receiver_pk:receivers.(0)
+                ~fee:(Currency.Fee.of_int fee) ~fee_token:Token_id.default
+            in
+            let single2 =
+              Fee_transfer.Single.create ~receiver_pk:receivers.(1)
+                ~fee:(Currency.Fee.of_int fee) ~fee_token:Token_id.default
+            in
+            ( Fee_transfer.create single1 (Some single2) |> Or_error.ok_exn
+            , Fee_transfer.create single1 None |> Or_error.ok_exn )
+          in
+          let coinbase_with_ft, coinbase_wo_ft =
+            let ft =
+              Coinbase.Fee_transfer.create ~receiver_pk:receivers.(0)
+                ~fee:(Currency.Fee.of_int fee)
+            in
+            ( Coinbase.create
+                ~amount:(Currency.Amount.of_int 10_000_000_000)
+                ~receiver:receivers.(1) ~fee_transfer:(Some ft)
+              |> Or_error.ok_exn
+            , Coinbase.create
+                ~amount:(Currency.Amount.of_int 10_000_000_000)
+                ~receiver:receivers.(1) ~fee_transfer:None
+              |> Or_error.ok_exn )
+          in
+          let transactions : Transaction.t list =
+            [ Fee_transfer ft1
+            ; Fee_transfer ft2
+            ; Coinbase coinbase_with_ft
+            ; Coinbase coinbase_wo_ft ]
+          in
+          Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
+              List.iter [timed_account1; timed_account2] ~f:(fun acc ->
+                  Ledger.create_new_account_exn ledger (Account.identifier acc)
+                    acc ) ;
+              (* well over the vesting period, the timing field shouldn't change*)
+              let txn_global_slot = Global_slot.of_int 100 in
+              List.iter transactions ~f:(fun txn ->
+                  test_transaction ~txn_global_slot ~constraint_constants
+                    ledger txn ) ) )
   end )
 
 let%test_module "account timing check" =

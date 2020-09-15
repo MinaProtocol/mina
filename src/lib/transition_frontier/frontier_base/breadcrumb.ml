@@ -288,13 +288,13 @@ module For_tests = struct
         Staged_ledger.create_diff parent_staged_ledger ~logger
           ~constraint_constants:precomputed_values.constraint_constants
           ~coinbase_receiver:`Producer ~self:largest_account_public_key
-          ~current_state_view ~transactions_by_fee:transactions
-          ~get_completed_work
+          ~current_state_view ~supercharge_coinbase:true
+          ~transactions_by_fee:transactions ~get_completed_work
       in
       let%bind ( `Hash_after_applying next_staged_ledger_hash
                , `Ledger_proof ledger_proof_opt
                , `Staged_ledger _
-               , `Pending_coinbase_data _ ) =
+               , `Pending_coinbase_update _ ) =
         match%bind
           Staged_ledger.apply_diff_unchecked parent_staged_ledger ~logger
             staged_ledger_diff

@@ -523,41 +523,63 @@ let _apply_snapp_command_exn
   |> Or_error.ok_exn |> ignore ;
   !t
 
-let apply_fee_transfer_exn ~constraint_constants =
-  let apply_single t (ft : Fee_transfer.Single.t) =
+let update_timing_when_no_deduction ~txn_global_slot account =
+  Transaction_logic.validate_timing ~txn_amount:Currency.Amount.zero
+    ~txn_global_slot ~account
+  |> Or_error.ok_exn
+
+let apply_fee_transfer_exn ~constraint_constants ~txn_global_slot =
+  let apply_single ~update_timing t (ft : Fee_transfer.Single.t) =
     let account_id = Fee_transfer.Single.receiver ft in
     let index = find_index_exn t account_id in
     let action, account = get_or_initialize_exn account_id t index in
     let open Currency in
     let amount = Amount.of_fee ft.fee in
+    let timing =
+      if update_timing then
+        update_timing_when_no_deduction ~txn_global_slot account
+      else account.timing
+    in
     let balance =
       let amount' =
         sub_account_creation_fee ~constraint_constants action amount
       in
       Option.value_exn (Balance.add_amount account.balance amount')
     in
-    set_exn t index {account with balance}
+    set_exn t index {account with balance; timing}
   in
-  fun t transfer -> Fee_transfer.fold transfer ~f:apply_single ~init:t
+  fun t transfer ->
+    match Fee_transfer.to_singles transfer with
+    | `One s ->
+        apply_single ~update_timing:true t s
+    | `Two (s1, s2) ->
+        (*Note: Not updating the timing for s1 to avoid additional check in transactions snark (check_timing for "receiver"). This is OK because timing rules will not be violated when balance increases and will be checked whenever an amount is deducted from the account.(#5973)*)
+        let t' = apply_single ~update_timing:false t s1 in
+        apply_single ~update_timing:true t' s2
 
-let apply_coinbase_exn ~constraint_constants t
+let apply_coinbase_exn ~constraint_constants ~txn_global_slot t
     ({receiver; fee_transfer; amount= coinbase_amount} : Coinbase.t) =
   let open Currency in
-  let add_to_balance t pk amount =
+  let add_to_balance ~update_timing t pk amount =
     let idx = find_index_exn t pk in
     let action, a = get_or_initialize_exn pk t idx in
+    let timing =
+      if update_timing then update_timing_when_no_deduction ~txn_global_slot a
+      else a.timing
+    in
     let balance =
       let amount' =
         sub_account_creation_fee ~constraint_constants action amount
       in
       Option.value_exn (Balance.add_amount a.balance amount')
     in
-    set_exn t idx {a with balance}
+    set_exn t idx {a with balance; timing}
   in
-  let receiver_reward, t =
+  (* Note: Updating coinbase receiver timing only if there is no fee transfer. This is so as to not add any extra constraints in transaction snark for checking "receiver" timings. This is OK because timing rules will not be violated when balance increases and will be checked whenever an amount is deducted from the account(#5973)*)
+  let receiver_reward, t, update_coinbase_receiver_timing =
     match fee_transfer with
     | None ->
-        (coinbase_amount, t)
+        (coinbase_amount, t, true)
     | Some ({receiver_pk= _; fee} as ft) ->
         let fee = Amount.of_fee fee in
         let reward =
@@ -565,10 +587,11 @@ let apply_coinbase_exn ~constraint_constants t
           |> Option.value_exn ?here:None ?message:None ?error:None
         in
         let transferee_id = Coinbase.Fee_transfer.receiver ft in
-        (reward, add_to_balance t transferee_id fee)
+        (reward, add_to_balance ~update_timing:true t transferee_id fee, false)
   in
   let receiver_id = Account_id.create receiver Token_id.default in
-  add_to_balance t receiver_id receiver_reward
+  add_to_balance ~update_timing:update_coinbase_receiver_timing t receiver_id
+    receiver_reward
 
 let apply_transaction_exn ~constraint_constants
     ~(txn_state_view : Snapp_predicate.Protocol_state.View.t) t
@@ -576,12 +599,17 @@ let apply_transaction_exn ~constraint_constants
   let txn_global_slot = txn_state_view.curr_global_slot in
   match transition with
   | Fee_transfer tr ->
-      apply_fee_transfer_exn ~constraint_constants t tr
+      apply_fee_transfer_exn ~constraint_constants ~txn_global_slot t tr
   | User_command cmd ->
       apply_user_command_exn ~constraint_constants ~txn_global_slot t
         (cmd :> User_command.t)
   | Coinbase c ->
-      apply_coinbase_exn ~constraint_constants t c
+      apply_coinbase_exn ~constraint_constants ~txn_global_slot t c
+
+let has_locked_tokens_exn ~global_slot ~account_id t =
+  let idx = find_index_exn t account_id in
+  let _, account = get_or_initialize_exn account_id t idx in
+  Account.has_locked_tokens ~global_slot account
 
 let merkle_root t =
   Ledger_hash.of_hash (merkle_root t :> Random_oracle.Digest.t)
