@@ -20,7 +20,7 @@ cat dockerfiles/Dockerfile-rosetta | docker build \
 cat dockerfiles/Dockerfile-rosetta | docker build \
   --force-rm \
   --target builder \
-  --cache-from gcr.io/o1labs-192920/coda-rosetta-opam-deps$TAG \
+  --cache-from gcr.io/o1labs-192920/coda-rosetta-opam-deps:$TAG \
   --build-arg "DUNE_PROFILE=dev" \
   --build-arg "CODA_BRANCH=${GITBRANCH}" -
   -t gcr.io/o1labs-192920/coda-rosetta-builder:dev-$TAG -
@@ -55,12 +55,12 @@ cat dockerfiles/Dockerfile-rosetta | docker build \
   --build-arg "CODA_BRANCH=${GITBRANCH}" \
   -t gcr.io/o1labs-192920/coda-rosetta:medium-curves-$TAG -
 
-#docker push gcr.io/o1labs-192920/coda-rosetta-build-deps:develop
-docker push gcr.io/o1labs-192920/coda-rosetta-opam-deps:master
-# docker push gcr.io/o1labs-192920/coda-rosetta-builder:medium-curves-$TAG
-# docker push gcr.io/o1labs-192920/coda-rosetta-builder:dev-$TAG
+docker push gcr.io/o1labs-192920/coda-rosetta-build-deps:develop
+docker push gcr.io/o1labs-192920/coda-rosetta-opam-deps:$TAG
 
 if [[ $TAG == develop ]]; then
+  # docker push gcr.io/o1labs-192920/coda-rosetta-builder:medium-curves-$TAG
+  # docker push gcr.io/o1labs-192920/coda-rosetta-builder:dev-$TAG
   docker push gcr.io/o1labs-192920/coda-rosetta:dev-$TAG
   docker push gcr.io/o1labs-192920/coda-rosetta:medium-curves-$TAG
 fi
