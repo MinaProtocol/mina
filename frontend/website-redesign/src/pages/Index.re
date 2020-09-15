@@ -18,6 +18,7 @@ let make = () => {
         {React.string("Mainnet is live!")}
       </AnnouncementBanner>
       <HomepageHero />
+      <FeaturedSingleRow />
     </div>
   </Page>;
 };
