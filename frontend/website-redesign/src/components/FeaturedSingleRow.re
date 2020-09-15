@@ -1,104 +1,142 @@
-module Styles = {
-  open Css;
+module Row = {
+  type rowType =
+    | ImageRightCopyLeft
+    | ImageLeftCopyRight;
 
-  let singleRowBackground =
-    style([
-      height(`percent(100.)),
-      width(`percent(100.)),
-      important(backgroundSize(`cover)),
-      backgroundImage(`url("/static/img/FeaturedSingleRowBackground.png")),
-    ]);
+  type backgroundType =
+    | Image(string)
+    | Color(Css.color);
 
-  let container =
-    style([
-      position(`relative),
-      width(`percent(100.)),
-      height(`px(658)),
-      display(`flex),
-      flexDirection(`column),
-      alignItems(`center),
-    ]);
+  type buttonType = {
+    buttonColor: Css.color,
+    buttonTextColor: Css.color,
+    buttonText: string,
+    dark: bool,
+  };
 
-  let contentBlock =
-    style([
-      position(`absolute),
-      width(`percent(90.)),
-      bottom(`percent(6.)),
-      margin2(~h=`rem(5.), ~v=`zero),
-      display(`flex),
-      flexDirection(`column),
-      alignItems(`flexStart),
-      justifyContent(`spaceBetween),
-      padding(`rem(3.)),
-      important(backgroundSize(`cover)),
-      backgroundImage(`url("/static/img/TestnetContentBlockBackground.png")),
-      media(
-        Theme.MediaQuery.tablet,
-        [
-          margin(`zero),
-          right(`zero),
-          bottom(`percent(40.)),
-          height(`rem(20.)),
-          width(`rem(29.)),
-        ],
-      ),
-    ]);
-
-  let copyText =
-    style([
-      display(`flex),
-      flexDirection(`column),
-      alignItems(`flexStart),
-    ]);
-
-  let title = merge([Theme.Type.h2, style([color(Theme.Colors.white)])]);
-
-  let buttonText =
-    style([
-      display(`flex),
-      justifyContent(`spaceBetween),
-      alignItems(`center),
-      width(`percent(100.)),
-      fontSize(`rem(0.7)),
-    ]);
-
-  let description =
-    merge([
-      Theme.Type.sectionSubhead,
-      style([marginTop(`rem(1.)), color(Theme.Colors.white)]),
-    ]);
-
-  let image =
-    style([
-      position(`absolute),
-      bottom(`zero),
-      width(`percent(100.)),
-      height(`percent(100.)),
-      left(`rem(0.)),
-      maxWidth(`px(848)),
-      media(Theme.MediaQuery.notMobile, [height(`percent(110.))]),
-    ]);
+  type t = {
+    rowType,
+    title: string,
+    description: string,
+    textColor: Css.color,
+    image: string,
+    background: backgroundType,
+    contentBackground: backgroundType,
+    button: buttonType,
+  };
 };
 
-[@react.component]
-let make = () => {
-  <div className=Styles.singleRowBackground>
-    <Wrapped>
-      <div className=Styles.container>
-        <img src="/static/img/NodeOpsTestnet.png" className=Styles.image />
-        <div className=Styles.contentBlock>
-          <div className=Styles.copyText>
-            <h2 className=Styles.title> {React.string("Testnet")} </h2>
-            <p className=Styles.description>
-              {React.string(
-                 "Check out what's in beta, take on Testnet challenges and earn Testnet points.",
-               )}
+module SingleRow = {
+  module RowStyles = {
+    open Css;
+
+    let container =
+      style([
+        position(`relative),
+        width(`percent(100.)),
+        height(`px(658)),
+        display(`flex),
+        flexDirection(`column),
+        alignItems(`center),
+      ]);
+
+    let contentBlock = (contentBackground: Row.backgroundType) => {
+      style([
+        position(`absolute),
+        width(`percent(90.)),
+        margin2(~h=`rem(5.), ~v=`zero),
+        display(`flex),
+        flexDirection(`column),
+        alignItems(`flexStart),
+        justifyContent(`spaceBetween),
+        padding(`rem(3.)),
+        important(backgroundSize(`cover)),
+        media(
+          Theme.MediaQuery.notMobile,
+          [margin(`zero), right(`zero), bottom(`percent(35.))],
+        ),
+        switch (contentBackground) {
+        | Image(url) => backgroundImage(`url(url))
+        | Color(color) => backgroundColor(color)
+        },
+      ]);
+    };
+
+    let copyText = textColor => {
+      style([
+        display(`flex),
+        flexDirection(`column),
+        alignItems(`flexStart),
+        selector("h2,p", [color(textColor)]),
+      ]);
+    };
+
+    let buttonText =
+      style([
+        display(`flex),
+        justifyContent(`spaceBetween),
+        alignItems(`center),
+        width(`percent(100.)),
+        fontSize(`rem(0.7)),
+      ]);
+
+    let description =
+      merge([Theme.Type.sectionSubhead, style([marginTop(`rem(1.))])]);
+
+    let image =
+      style([
+        position(`absolute),
+        width(`percent(100.)),
+        height(`percent(60.)),
+        maxWidth(`px(848)),
+        media(
+          Theme.MediaQuery.notMobile,
+          [height(`percent(110.)), width(`percent(80.))],
+        ),
+      ]);
+  };
+  module ImageLeftCopyRight = {
+    module Styles = {
+      open Css;
+
+      let image =
+        merge([
+          RowStyles.image,
+          style([
+            left(`zero),
+            media(Theme.MediaQuery.notMobile, [bottom(`zero)]),
+          ]),
+        ]);
+
+      let contentBlock = backgroundImg => {
+        merge([
+          RowStyles.contentBlock(backgroundImg),
+          style([
+            bottom(`percent(6.)),
+            media(
+              Theme.MediaQuery.tablet,
+              [right(`zero), height(`auto), width(`rem(29.))],
+            ),
+          ]),
+        ]);
+      };
+    };
+
+    [@react.component]
+    let make = (~row: Row.t) => {
+      <div className=RowStyles.container>
+        <img src={row.image} className=Styles.image />
+        <div className={Styles.contentBlock(row.contentBackground)}>
+          <div className={RowStyles.copyText(row.textColor)}>
+            <h2 className=Theme.Type.h2> {React.string(row.title)} </h2>
+            <p className=RowStyles.description>
+              {React.string(row.description)}
             </p>
           </div>
           <div className=Css.(style([marginTop(`rem(1.))]))>
-            <Button bgColor=Theme.Colors.orange dark=true>
-              <span className=Styles.buttonText>
-                {React.string("Go To Testnet")}
+            <Button bgColor={row.button.buttonColor} dark={row.button.dark}>
+              <span className=RowStyles.buttonText>
+                {React.string(row.button.buttonText)}
                 <span className=Css.(style([marginTop(`rem(0.8))]))>
                   <Icon kind=Icon.ArrowRightSmall currentColor="white" />
                 </span>
@@ -106,7 +144,92 @@ let make = () => {
             </Button>
           </div>
         </div>
-      </div>
+      </div>;
+    };
+  };
+
+  module ImageRightCopyLeft = {
+    module Styles = {
+      open Css;
+
+      let image =
+        merge([
+          RowStyles.image,
+          style([
+            right(`zero),
+            bottom(`zero),
+            media(Theme.MediaQuery.notMobile, [bottom(`zero)]),
+          ]),
+        ]);
+
+      let contentBlock = contentBackground => {
+        merge([
+          RowStyles.contentBlock(contentBackground),
+          style([
+            top(`percent(6.)),
+            media(
+              Theme.MediaQuery.tablet,
+              [left(`zero), height(`rem(25.)), width(`rem(32.))],
+            ),
+          ]),
+        ]);
+      };
+
+      let buttonText = buttonColor => {
+        merge([RowStyles.buttonText, style([color(buttonColor)])]);
+      };
+    };
+
+    [@react.component]
+    let make = (~row: Row.t) => {
+      <div className=RowStyles.container>
+        <img src={row.image} className=Styles.image />
+        <div className={Styles.contentBlock(row.contentBackground)}>
+          <div className={RowStyles.copyText(row.textColor)}>
+            <h2 className=Theme.Type.h2> {React.string(row.title)} </h2>
+            <p className=RowStyles.description>
+              {React.string(row.description)}
+            </p>
+          </div>
+          <div className=Css.(style([marginTop(`rem(1.))]))>
+            <Button bgColor={row.button.buttonColor} dark={row.button.dark}>
+              <span className={Styles.buttonText(row.button.buttonTextColor)}>
+                {React.string(row.button.buttonText)}
+                <span className=Css.(style([marginTop(`rem(0.8))]))>
+                  <Icon kind=Icon.ArrowRightSmall currentColor="black" />
+                </span>
+              </span>
+            </Button>
+          </div>
+        </div>
+      </div>;
+    };
+  };
+};
+
+module Styles = {
+  open Css;
+
+  let singleRowBackground = (backgroundImg: Row.backgroundType) =>
+    style([
+      height(`percent(100.)),
+      width(`percent(100.)),
+      important(backgroundSize(`cover)),
+      switch (backgroundImg) {
+      | Image(url) => backgroundImage(`url(url))
+      | Color(color) => backgroundColor(color)
+      },
+    ]);
+};
+
+[@react.component]
+let make = (~row: Row.t) => {
+  <div className={Styles.singleRowBackground(row.background)}>
+    <Wrapped>
+      {switch (row.rowType) {
+       | ImageLeftCopyRight => <SingleRow.ImageLeftCopyRight row />
+       | ImageRightCopyLeft => <SingleRow.ImageRightCopyLeft row />
+       }}
     </Wrapped>
   </div>;
 };
