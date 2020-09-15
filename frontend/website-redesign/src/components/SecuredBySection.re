@@ -27,6 +27,8 @@ module Styles = {
           gridTemplateRows([`rem(31.5), `rem(32.)]),
           gridColumnGap(`rem(6.8)),
           gridRowGap(`rem(6.)),
+          height(`rem(88.)),
+          backgroundSize(`cover),
           backgroundImage(url("/static/img/SecuredByLarge.png")),
         ],
       ),
@@ -106,7 +108,11 @@ module Styles = {
         ],
       ),
     ]);
-  let logo = style([height(`rem(5.))]);
+  let logo =
+    style([
+      height(`rem(5.)),
+      media(Theme.MediaQuery.desktop, [height(`rem(8.5))]),
+    ]);
   let h2 =
     merge([
       Theme.Type.h2,
