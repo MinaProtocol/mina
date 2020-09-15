@@ -2310,29 +2310,24 @@ module Base = struct
                     add fee_payer_amount account_creation_fee))
              in
              let txn_global_slot = current_global_slot in
-             let%bind timing =
-               let%bind `Min_balance _, new_timing =
-                 [%with_label "Check fee payer timing"]
-                   (let%bind txn_amount =
-                      Amount.Checked.if_
-                        (Sgn.Checked.is_neg amount.sgn)
-                        ~then_:amount.magnitude
-                        ~else_:Amount.(var_of_t zero)
-                    in
-                    let balance_check ok =
-                      [%with_label "Check fee payer balance"]
-                        (Boolean.Assert.is_true ok)
-                    in
-                    let timed_balance_check ok =
-                      [%with_label "Check fee payer timed balance"]
-                        (Boolean.Assert.is_true ok)
-                    in
-                    check_timing ~balance_check ~timed_balance_check ~account
-                      ~txn_amount ~txn_global_slot)
-               in
-               (* Like receiver account in payments, coinbase fee transfer account or other fee transfer account don't have the timing field updated *)
-               Account_timing.if_ is_coinbase_or_fee_transfer
-                 ~then_:account.timing ~else_:new_timing
+             let%bind `Min_balance _, timing =
+               [%with_label "Check fee payer timing"]
+                 (let%bind txn_amount =
+                    Amount.Checked.if_
+                      (Sgn.Checked.is_neg amount.sgn)
+                      ~then_:amount.magnitude
+                      ~else_:Amount.(var_of_t zero)
+                  in
+                  let balance_check ok =
+                    [%with_label "Check fee payer balance"]
+                      (Boolean.Assert.is_true ok)
+                  in
+                  let timed_balance_check ok =
+                    [%with_label "Check fee payer timed balance"]
+                      (Boolean.Assert.is_true ok)
+                  in
+                  check_timing ~balance_check ~timed_balance_check ~account
+                    ~txn_amount ~txn_global_slot)
              in
              let%bind balance =
                [%with_label "Check payer balance"]
@@ -2575,35 +2570,30 @@ module Base = struct
                  ~else_:Amount.(var_of_t zero)
              in
              let txn_global_slot = current_global_slot in
-             let%bind timing =
-               let%bind `Min_balance _, new_timing =
-                 [%with_label "Check source timing"]
-                   (let balance_check ok =
-                      [%with_label
-                        "Check source balance failure matches predicted"]
-                        (Boolean.Assert.( = ) ok
-                           (Boolean.not
-                              user_command_failure.source_insufficient_balance))
-                    in
-                    let timed_balance_check ok =
-                      [%with_label
-                        "Check source timed balance failure matches predicted"]
-                        (let%bind ok =
-                           Boolean.(
-                             ok
-                             && not
-                                  user_command_failure
-                                    .source_insufficient_balance)
-                         in
-                         Boolean.Assert.( = ) ok
-                           (Boolean.not user_command_failure.source_bad_timing))
-                    in
-                    check_timing ~balance_check ~timed_balance_check ~account
-                      ~txn_amount:amount ~txn_global_slot)
-               in
-               (* Like the receiver account in payments, coinbase fee transfer account or other fee transfer account don't have the timing field updated *)
-               Account_timing.if_ is_coinbase_or_fee_transfer
-                 ~then_:account.timing ~else_:new_timing
+             let%bind `Min_balance _, timing =
+               [%with_label "Check source timing"]
+                 (let balance_check ok =
+                    [%with_label
+                      "Check source balance failure matches predicted"]
+                      (Boolean.Assert.( = ) ok
+                         (Boolean.not
+                            user_command_failure.source_insufficient_balance))
+                  in
+                  let timed_balance_check ok =
+                    [%with_label
+                      "Check source timed balance failure matches predicted"]
+                      (let%bind ok =
+                         Boolean.(
+                           ok
+                           && not
+                                user_command_failure
+                                  .source_insufficient_balance)
+                       in
+                       Boolean.Assert.( = ) ok
+                         (Boolean.not user_command_failure.source_bad_timing))
+                  in
+                  check_timing ~balance_check ~timed_balance_check ~account
+                    ~txn_amount:amount ~txn_global_slot)
              in
              let%bind balance, `Underflow underflow =
                Balance.Checked.sub_amount_flagged account.balance amount
