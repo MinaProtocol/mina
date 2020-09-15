@@ -66,7 +66,6 @@ CREATE INDEX idx_blocks_height     ON blocks(height);
 CREATE TABLE blocks_user_commands
 ( block_id        int NOT NULL REFERENCES blocks(id) ON DELETE CASCADE
 , user_command_id int NOT NULL REFERENCES user_commands(id) ON DELETE CASCADE
-, sequence_no     int NOT NULL
 , PRIMARY KEY (block_id, user_command_id)
 );
 

@@ -369,13 +369,13 @@ module Block_and_Internal_command = struct
 end
 
 module Block_and_User_command = struct
-  let add (module Conn : CONNECTION) ~block_id ~user_command_id ~sequence_no =
+  let add (module Conn : CONNECTION) ~block_id ~user_command_id =
     Conn.exec
       (Caqti_request.exec
-         Caqti_type.(tup3 int int int)
-         "INSERT INTO blocks_user_commands (block_id, user_command_id, \
-          sequence_no) VALUES (?, ?, ?)")
-      (block_id, user_command_id, sequence_no)
+         Caqti_type.(tup2 int int)
+         "INSERT INTO blocks_user_commands (block_id, user_command_id) VALUES \
+          (?, ?)")
+      (block_id, user_command_id)
 end
 
 module Block = struct
@@ -506,7 +506,7 @@ module Block = struct
                       Coda_base.User_command.forget_check user_command_checked
                   }
                 in
-                ( acc_user_commands @ [user_command]
+                ( user_command :: acc_user_commands
                 , acc_fee_transfers
                 , acc_coinbases )
             | {data= Fee_transfer fee_transfer_bundled; status= _} ->
@@ -541,13 +541,13 @@ module Block = struct
               in
               id :: acc )
         in
-        let%bind (_ : int) =
-          deferred_result_list_fold user_command_ids ~init:0
-            ~f:(fun sequence_no user_command_id ->
+        let%bind () =
+          deferred_result_list_fold user_command_ids ~init:()
+            ~f:(fun () user_command_id ->
               Block_and_User_command.add
                 (module Conn)
-                ~block_id ~user_command_id ~sequence_no
-              >>| fun _ -> sequence_no + 1 )
+                ~block_id ~user_command_id
+              >>| ignore )
         in
         let%bind fee_transfer_ids =
           deferred_result_list_fold fee_transfers ~init:[]
