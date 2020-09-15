@@ -624,7 +624,7 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
     @
     match t.kind with
     | `Payment -> (
-      (* When amount is not none, we move the amount from source to receiver *)
+      (* When amount is not none, we move the amount from source to receiver -- unless it's a failure, we will capture that below *)
       match t.amount with
       | Some amount ->
           [ {Op.label= `Payment_source_dec amount; related_to= None}
@@ -653,16 +653,21 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
         | `Payment_source_dec of Unsigned.UInt64.t
         | `Payment_receiver_inc of Unsigned.UInt64.t ]] ~plan
     ~f:(fun ~related_operations ~operation_identifier op ->
-      let status, metadata =
+      let status, metadata, did_fail =
         match (op.label, failure_status) with
         (* If we're looking at mempool transactions, it's always pending *)
         | _, None ->
-            (Operation_statuses.name `Pending, None)
+            (`Pending, None, false)
         | _, Some (`Applied _) ->
-            (Operation_statuses.name `Success, None)
+            (`Success, None, false)
         | _, Some (`Failed reason) ->
-            ( Operation_statuses.name `Failed
-            , Some (`Assoc [("reason", `String reason)]) )
+            (`Failed, Some (`Assoc [("reason", `String reason)]), true)
+      in
+      let pending_or_success_only = function
+        | `Pending ->
+            `Pending
+        | `Success | `Failed ->
+            `Success
       in
       let merge_metadata m1 m2 =
         match (m1, m2) with
@@ -679,7 +684,8 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
       | `Fee_payer_dec ->
           { Operation.operation_identifier
           ; related_operations
-          ; status
+          ; status=
+              status |> pending_or_success_only |> Operation_statuses.name
           ; account= Some (account_id t.fee_payer t.fee_token)
           ; _type= Operation_types.name `Fee_payer_dec
           ; amount= Some Amount_of.(negated @@ token t.fee_token t.fee)
@@ -688,25 +694,28 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
       | `Payment_source_dec amount ->
           { Operation.operation_identifier
           ; related_operations
-          ; status
+          ; status= Operation_statuses.name status
           ; account= Some (account_id t.source t.token)
           ; _type= Operation_types.name `Payment_source_dec
-          ; amount= Some Amount_of.(negated @@ token t.token amount)
+          ; amount=
+              ( if did_fail then None
+              else Some Amount_of.(negated @@ token t.token amount) )
           ; coin_change= None
           ; metadata }
       | `Payment_receiver_inc amount ->
           { Operation.operation_identifier
           ; related_operations
-          ; status
+          ; status= Operation_statuses.name status
           ; account= Some (account_id t.receiver t.token)
           ; _type= Operation_types.name `Payment_receiver_inc
-          ; amount= Some (Amount_of.token t.token amount)
+          ; amount=
+              (if did_fail then None else Some (Amount_of.token t.token amount))
           ; coin_change= None
           ; metadata }
       | `Account_creation_fee_via_payment account_creation_fee ->
           { Operation.operation_identifier
           ; related_operations
-          ; status
+          ; status= Operation_statuses.name status
           ; account= Some (account_id t.receiver t.token)
           ; _type= Operation_types.name `Account_creation_fee_via_payment
           ; amount= Some Amount_of.(negated @@ coda account_creation_fee)
@@ -715,7 +724,7 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
       | `Account_creation_fee_via_fee_payer account_creation_fee ->
           { Operation.operation_identifier
           ; related_operations
-          ; status
+          ; status= Operation_statuses.name status
           ; account= Some (account_id t.fee_payer t.fee_token)
           ; _type= Operation_types.name `Account_creation_fee_via_fee_payer
           ; amount= Some Amount_of.(negated @@ coda account_creation_fee)
@@ -724,7 +733,7 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
       | `Create_token ->
           { Operation.operation_identifier
           ; related_operations
-          ; status
+          ; status= Operation_statuses.name status
           ; account= None
           ; _type= Operation_types.name `Create_token
           ; amount= None
@@ -733,7 +742,7 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
       | `Delegate_change ->
           { Operation.operation_identifier
           ; related_operations
-          ; status
+          ; status= Operation_statuses.name status
           ; account= Some (account_id t.source Amount_of.Token_id.default)
           ; _type= Operation_types.name `Delegate_change
           ; amount= None
@@ -749,7 +758,7 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
       | `Mint_tokens amount ->
           { Operation.operation_identifier
           ; related_operations
-          ; status
+          ; status= Operation_statuses.name status
           ; account= Some (account_id t.receiver t.token)
           ; _type= Operation_types.name `Mint_tokens
           ; amount= Some (Amount_of.token t.token amount)
