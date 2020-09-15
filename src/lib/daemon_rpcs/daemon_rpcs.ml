@@ -89,8 +89,7 @@ module Verify_proof = struct
   type query =
     Account_id.Stable.Latest.t
     * User_command.Stable.Latest.t
-    * ( Receipt.Chain_hash.Stable.Latest.t
-      * User_command.Stable.Latest.t list )
+    * (Receipt.Chain_hash.Stable.Latest.t * User_command.Stable.Latest.t list)
   [@@deriving bin_io_unversioned]
 
   type response = unit Or_error.t [@@deriving bin_io_unversioned]
@@ -104,8 +103,7 @@ module Prove_receipt = struct
   [@@deriving bin_io_unversioned]
 
   type response =
-    ( Receipt.Chain_hash.Stable.Latest.t
-    * User_command.Stable.Latest.t list )
+    (Receipt.Chain_hash.Stable.Latest.t * User_command.Stable.Latest.t list)
     Or_error.t
   [@@deriving bin_io_unversioned]
 

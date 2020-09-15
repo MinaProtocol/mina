@@ -253,8 +253,7 @@ module type Transaction_pool_diff_intf = sig
   end
 
   module Rejected : sig
-    type t = (User_command.t * Diff_error.t) list
-    [@@deriving sexp, yojson]
+    type t = (User_command.t * Diff_error.t) list [@@deriving sexp, yojson]
   end
 
   include
@@ -288,8 +287,7 @@ module type Transaction_resource_pool_intf = sig
     -> Account_id.t
     -> Transaction_hash.User_command_with_valid_signature.t list
 
-  val get_all :
-    t -> Transaction_hash.User_command_with_valid_signature.t list
+  val get_all : t -> Transaction_hash.User_command_with_valid_signature.t list
 
   val find_by_hash :
        t

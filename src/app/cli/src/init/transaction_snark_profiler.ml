@@ -69,7 +69,8 @@ let create_ledger_and_transactions num_transitions =
           List.fold transactions ~init:zero ~f:(fun acc t ->
               Option.value_exn
                 (add acc
-                   (Signed_command.Payload.fee (t :> Signed_command.t).payload)) )
+                   (Signed_command.Payload.fee (t :> Signed_command.t).payload))
+          )
         in
         Fee_transfer.create_single
           ~receiver_pk:(Public_key.compress keys.(0).public_key)

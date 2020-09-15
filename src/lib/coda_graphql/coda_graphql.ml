@@ -260,6 +260,7 @@ module Types = struct
           let open Reflection.Shorthand in
           List.rev
           @@ Daemon_rpcs.Types.Status.Fields.fold ~init:[] ~num_accounts:int
+               ~chain_id:nn_string
                ~next_block_production:(id ~typ:block_producer_timing)
                ~blockchain_length:int ~uptime_secs:nn_int
                ~ledger_merkle_root:string ~state_hash:string
@@ -1725,8 +1726,8 @@ module Types = struct
               ~error:(Option.value error ~default:"Invalid cursor")
             |> Result.map ~f:(fun cmd ->
                    { With_hash.data= cmd
-                   ; hash= Transaction_hash.hash_command (Signed_command cmd) }
-               )
+                   ; hash= Transaction_hash.hash_command (Signed_command cmd)
+                   } )
 
           let doc = Doc.bin_prot "Opaque pagination cursor for a user command"
         end
@@ -2363,8 +2364,7 @@ module Queries = struct
                     (* Filter by fee-payer pk. *)
                     if
                       txn
-                      |> Transaction_hash
-                         .User_command_with_valid_signature
+                      |> Transaction_hash.User_command_with_valid_signature
                          .command |> User_command.fee_payer
                       |> Account_id.public_key
                       |> Public_key.Compressed.equal pk

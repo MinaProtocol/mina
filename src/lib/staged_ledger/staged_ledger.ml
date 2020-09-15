@@ -848,8 +848,7 @@ module T = struct
     let commands = Staged_ledger_diff.commands witness in
     let work = Staged_ledger_diff.completed_works witness in
     let%bind total_txn_fee =
-      sum_fees commands ~f:(fun {data= cmd; _} ->
-          User_command.fee_exn cmd )
+      sum_fees commands ~f:(fun {data= cmd; _} -> User_command.fee_exn cmd)
     in
     let%bind total_snark_fee = sum_fees work ~f:Transaction_snark_work.fee in
     let%bind () = Scan_state.update_metrics t.scan_state in
@@ -876,8 +875,8 @@ module T = struct
           List.map cs
             ~f:
               (let open Ledger in
-              User_command.to_verifiable_exn ~ledger ~get
-                ~location_of_account) )
+              User_command.to_verifiable_exn ~ledger ~get ~location_of_account)
+      )
     with
     | Error e ->
         Deferred.return (Error e)
@@ -1328,9 +1327,7 @@ module T = struct
             match t.budget with
             | Ok b ->
                 option "Fee insufficient"
-                  (Fee.sub b
-                     (User_command.fee_exn
-                        (uc.data :> User_command.t)))
+                  (Fee.sub b (User_command.fee_exn (uc.data :> User_command.t)))
             | _ ->
                 rebudget new_t
           in
@@ -1678,8 +1675,7 @@ module T = struct
                   (Error.to_string_hum e)
               in
               [%log fatal]
-                ~metadata:
-                  [("user_command", User_command.Valid.to_yojson txn)]
+                ~metadata:[("user_command", User_command.Valid.to_yojson txn)]
                 !"%s" error_message ;
               Stop seq
           | Ok status ->
@@ -2119,8 +2115,8 @@ let%test_module "test" =
       let%bind iters = Int.gen_incl 1 (max_blocks_for_coverage 0) in
       let total_cmds = transaction_capacity * iters in
       let%bind cmds =
-        User_command.Valid.Gen.sequence ~length:total_cmds
-          ~sign_type:`Real ledger_init_state
+        User_command.Valid.Gen.sequence ~length:total_cmds ~sign_type:`Real
+          ledger_init_state
       in
       assert (List.length cmds = total_cmds) ;
       return (ledger_init_state, cmds, List.init iters ~f:(Fn.const None))
@@ -2135,8 +2131,8 @@ let%test_module "test" =
       let iters = max_blocks_for_coverage extra_block_count in
       let total_cmds = transaction_capacity * iters in
       let%bind cmds =
-        User_command.Valid.Gen.sequence ~length:total_cmds
-          ~sign_type:`Real ledger_init_state
+        User_command.Valid.Gen.sequence ~length:total_cmds ~sign_type:`Real
+          ledger_init_state
       in
       assert (List.length cmds = total_cmds) ;
       return (ledger_init_state, cmds, List.init iters ~f:(Fn.const None))
@@ -2160,8 +2156,8 @@ let%test_module "test" =
       in
       let total_cmds = List.sum (module Int) ~f:Fn.id cmds_per_iter in
       let%bind cmds =
-        User_command.Valid.Gen.sequence ~length:total_cmds
-          ~sign_type:`Real ledger_init_state
+        User_command.Valid.Gen.sequence ~length:total_cmds ~sign_type:`Real
+          ledger_init_state
       in
       assert (List.length cmds = total_cmds) ;
       return (ledger_init_state, cmds, List.map ~f:Option.some cmds_per_iter)
@@ -2270,10 +2266,8 @@ let%test_module "test" =
       Quickcheck.test (gen_below_capacity ())
         ~sexp_of:
           [%sexp_of:
-            Ledger.init_state
-            * User_command.Valid.t list
-            * int option list] ~trials:10
-        ~f:(fun (ledger_init_state, cmds, iters) ->
+            Ledger.init_state * User_command.Valid.t list * int option list]
+        ~trials:10 ~f:(fun (ledger_init_state, cmds, iters) ->
           async_with_ledgers ledger_init_state (fun sl _test_mask ->
               let logger = Logger.null () in
               let pids = Child_processes.Termination.create_pid_table () in
@@ -2354,9 +2348,7 @@ let%test_module "test" =
       Quickcheck.test (gen_below_capacity ())
         ~sexp_of:
           [%sexp_of:
-            Ledger.init_state
-            * User_command.Valid.t list
-            * int option list]
+            Ledger.init_state * User_command.Valid.t list * int option list]
         ~shrinker:
           (Quickcheck.Shrinker.create (fun (init_state, cmds, iters) ->
                if List.length iters > 1 then

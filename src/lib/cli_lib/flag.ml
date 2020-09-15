@@ -291,7 +291,8 @@ let signed_command_common : signed_command_common Command.Param.t =
             (default: %s) (minimum: %s)"
            (Currency.Fee.to_formatted_string
               Coda_compile_config.default_transaction_fee)
-           (Currency.Fee.to_formatted_string Coda_base.Signed_command.minimum_fee))
+           (Currency.Fee.to_formatted_string
+              Coda_base.Signed_command.minimum_fee))
       (optional txn_fee)
   and nonce =
     flag "nonce"
@@ -337,7 +338,8 @@ module Signed_command = struct
             (default: %s) (minimum: %s)"
            (Currency.Fee.to_formatted_string
               Coda_compile_config.default_transaction_fee)
-           (Currency.Fee.to_formatted_string Coda_base.Signed_command.minimum_fee))
+           (Currency.Fee.to_formatted_string
+              Coda_base.Signed_command.minimum_fee))
       (optional txn_fee)
 
   let valid_until =

@@ -184,7 +184,8 @@ let%test_module "receipt_database" =
           in
           let proving_receipt =
             Receipt.Chain_hash.cons
-              (Signed_command (Signed_command.payload @@ List.hd_exn user_commands))
+              (Signed_command
+                 (Signed_command.payload @@ List.hd_exn user_commands))
               initial_receipt_chain
           in
           [%test_result: Receipt.Chain_hash.t * User_command.t list]

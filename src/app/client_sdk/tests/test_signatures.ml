@@ -63,7 +63,8 @@ let make_payment ~amount ~fee ~fee_payer_pk ~source_pk ~receiver_pk ~nonce
   let amount = Currency.Amount.of_int amount in
   let token_id = Token_id.default in
   let body =
-    Signed_command_payload.Body.Payment {source_pk; receiver_pk; token_id; amount}
+    Signed_command_payload.Body.Payment
+      {source_pk; receiver_pk; token_id; amount}
   in
   Signed_command_payload.Poly.{common; body}
 

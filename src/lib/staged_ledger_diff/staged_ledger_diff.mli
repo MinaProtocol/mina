@@ -65,9 +65,7 @@ end
 
 module Pre_diff_with_at_most_two_coinbase : sig
   type t =
-    ( Transaction_snark_work.t
-    , User_command.t With_status.t )
-    Pre_diff_two.t
+    (Transaction_snark_work.t, User_command.t With_status.t) Pre_diff_two.t
   [@@deriving sexp, to_yojson]
 
   module Stable :
@@ -81,9 +79,7 @@ end
 
 module Pre_diff_with_at_most_one_coinbase : sig
   type t =
-    ( Transaction_snark_work.t
-    , User_command.t With_status.t )
-    Pre_diff_one.t
+    (Transaction_snark_work.t, User_command.t With_status.t) Pre_diff_one.t
   [@@deriving sexp, to_yojson]
 
   module Stable :

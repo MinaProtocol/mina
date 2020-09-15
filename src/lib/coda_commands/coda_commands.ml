@@ -128,12 +128,12 @@ let setup_and_submit_user_command t (user_command_input : User_command_input.t)
               |> Yojson.Safe.to_string )))
   | Ok ([Signed_command txn], []) ->
       [%log' info (Coda_lib.top_level_logger t)]
-        ~metadata:
-          [("command", User_command.to_yojson (Signed_command txn))]
+        ~metadata:[("command", User_command.to_yojson (Signed_command txn))]
         "Scheduled payment $command" ;
       Ok
         ( txn
-        , record_payment t (Signed_command txn) (Option.value_exn account_opt) )
+        , record_payment t (Signed_command txn) (Option.value_exn account_opt)
+        )
   | Ok _ ->
       Error (Error.of_string "Invalid result from scheduling a payment")
   | Error e ->
@@ -156,8 +156,8 @@ module Receipt_chain_hash = struct
   Receipt.Chain_hash.(cons, empty)]
 end
 
-let verify_payment t (addr : Account_id.t)
-    (verifying_txn : User_command.t) (init_receipt, proof) =
+let verify_payment t (addr : Account_id.t) (verifying_txn : User_command.t)
+    (init_receipt, proof) =
   let open Participating_state.Let_syntax in
   let%map account = get_account t addr in
   let account = Option.value_exn account in
@@ -168,14 +168,11 @@ let verify_payment t (addr : Account_id.t)
       (Receipt_chain_database.verify ~init:init_receipt proof resulting_receipt)
       ~error:(Error.createf "Merkle list proof of payment is invalid")
   in
-  if
-    List.exists proof ~f:(fun txn ->
-        User_command.equal verifying_txn txn )
+  if List.exists proof ~f:(fun txn -> User_command.equal verifying_txn txn)
   then Ok ()
   else
     Or_error.errorf
-      !"Merkle list proof does not contain payment \
-        %{sexp:User_command.t}"
+      !"Merkle list proof does not contain payment %{sexp:User_command.t}"
       verifying_txn
 
 let prove_receipt t ~proving_receipt ~resulting_receipt =
@@ -355,6 +352,7 @@ let get_status ~flag t =
   ; uptime_secs
   ; ledger_merkle_root
   ; state_hash
+  ; chain_id= config.chain_id
   ; consensus_time_best_tip
   ; commit_id
   ; conf_dir
@@ -401,8 +399,7 @@ module For_tests = struct
     let participants_commands =
       User_command.filter_by_participant commands public_key
     in
-    List.dedup_and_sort participants_commands
-      ~compare:User_command.compare
+    List.dedup_and_sort participants_commands ~compare:User_command.compare
 
   module Subscriptions = struct
     let new_user_commands coda public_key =

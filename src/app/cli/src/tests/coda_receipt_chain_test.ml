@@ -62,8 +62,7 @@ let main () =
   in
   let _user_cmd, receipt_chain_hash = Or_error.ok_exn receipt_chain_hash in
   let%bind restarted_worker = restart_node ~config worker ~logger in
-  let%bind (initial_receipt, _)
-             : Receipt.Chain_hash.t * User_command.t list =
+  let%bind (initial_receipt, _) : Receipt.Chain_hash.t * User_command.t list =
     Coda_process.prove_receipt_exn restarted_worker receipt_chain_hash
       receipt_chain_hash
   in

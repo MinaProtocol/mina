@@ -133,7 +133,8 @@ let sign ~signer ~(user_command_payload : Signed_command_payload.t) = function
            user_command_payload)
         ~f:Deferred.Result.return
   | Keypair signer_kp ->
-      Deferred.Result.return (Signed_command.sign signer_kp user_command_payload)
+      Deferred.Result.return
+        (Signed_command.sign signer_kp user_command_payload)
   | Hd_index hd_index ->
       Secrets.Hardware_wallets.sign ~hd_index
         ~public_key:(Public_key.decompress_exn signer)

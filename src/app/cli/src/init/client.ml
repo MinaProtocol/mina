@@ -476,7 +476,8 @@ let batch_send_payments =
           let signer_pk = Public_key.compress keypair.public_key in
           User_command_input.create ~signer:signer_pk ~fee
             ~fee_token:Token_id.default (* TODO: Multiple tokens. *)
-            ~fee_payer_pk:signer_pk ~memo:Signed_command_memo.empty ~valid_until
+            ~fee_payer_pk:signer_pk ~memo:Signed_command_memo.empty
+            ~valid_until
             ~body:
               (Payment
                  { source_pk= signer_pk
@@ -733,7 +734,8 @@ let cancel_transaction_graphql =
            int_of_string nonce
          in
          let cancelled_nonce =
-           Coda_numbers.Account_nonce.to_int (Signed_command.nonce user_command)
+           Coda_numbers.Account_nonce.to_int
+             (Signed_command.nonce user_command)
          in
          let inferred_nonce =
            Option.value maybe_inferred_nonce ~default:cancelled_nonce
@@ -742,7 +744,9 @@ let cancel_transaction_graphql =
            let diff =
              Unsigned.UInt64.of_int (inferred_nonce - cancelled_nonce)
            in
-           let fee = Currency.Fee.to_uint64 (Signed_command.fee user_command) in
+           let fee =
+             Currency.Fee.to_uint64 (Signed_command.fee user_command)
+           in
            let replace_fee =
              Currency.Fee.to_uint64 Network_pool.Indexed_pool.replace_fee
            in
@@ -1263,7 +1267,8 @@ let create_account =
 
 let create_hd_account =
   Command.async ~summary:Secrets.Hardware_wallets.create_hd_account_summary
-    (Cli_lib.Background_daemon.graphql_init Cli_lib.Flag.Signed_command.hd_index
+    (Cli_lib.Background_daemon.graphql_init
+       Cli_lib.Flag.Signed_command.hd_index
        ~f:(fun graphql_endpoint hd_index ->
          let%map response =
            Graphql_client.(

@@ -7,8 +7,7 @@ open Pipe_lib
 module Api = struct
   type user_cmd_status = {expected_deadline: int; passed_root: unit Ivar.t}
 
-  type user_cmds_under_inspection =
-    (User_command.t, user_cmd_status) Hashtbl.t
+  type user_cmds_under_inspection = (User_command.t, user_cmd_status) Hashtbl.t
 
   type restart_type = [`Catchup | `Bootstrap]
 
@@ -379,8 +378,7 @@ let start_payment_check logger root_pipe (testnet : Api.t) =
                    [%log fatal]
                      ~metadata:
                        [ ("worker_id", `Int worker_id)
-                       ; ("user_cmd", User_command.to_yojson user_cmd)
-                       ]
+                       ; ("user_cmd", User_command.to_yojson user_cmd) ]
                      "Transaction $user_cmd took too long to get into the \
                       root of node $worker_id. Length expected: %d got: %d"
                      expected_deadline root_length ;
@@ -392,8 +390,7 @@ let start_payment_check logger root_pipe (testnet : Api.t) =
                        Ivar.fill passed_root () ;
                        [%log info]
                          ~metadata:
-                           [ ( "user_cmd"
-                             , User_command.to_yojson user_cmd.data )
+                           [ ("user_cmd", User_command.to_yojson user_cmd.data)
                            ; ("worker_id", `Int worker_id)
                            ; ("length", `Int root_length) ]
                          "Transaction $user_cmd finally gets into the root of \
@@ -681,8 +678,8 @@ end = struct
         let%map node_payments =
           query_relevant_payments testnet worker_index public_keys
         in
-        List.for_all expected_payments ~f:(Signed_command.Set.mem node_payments)
-    )
+        List.for_all expected_payments
+          ~f:(Signed_command.Set.mem node_payments) )
     >>| List.for_all ~f:Fn.id
 
   let assert_retrievable_payments (testnet : Api.t)

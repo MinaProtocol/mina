@@ -289,8 +289,8 @@ let%test_module "Pagination" =
 
       module Payment = struct
         let same_sender_same_receiver =
-          Signed_command.Gen.payment ~key_gen:key ~max_amount:10000 ~max_fee:1000
-            ()
+          Signed_command.Gen.payment ~key_gen:key ~max_amount:10000
+            ~max_fee:1000 ()
 
         let different_participants =
           let keys = Array.init 10 ~f:(fun _ -> Keypair.create ()) in

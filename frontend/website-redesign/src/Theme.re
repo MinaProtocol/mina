@@ -8,7 +8,7 @@ module Colors = {
   let black = Css.black;
   let purple = `hex("5362C8");
   let digitalBlack = `hex("2d2d2d");
-
+  let purple = `hex("5362C8");
 };
 
 module Typeface = {
@@ -29,7 +29,7 @@ module MediaQuery = {
 };
 
 /** this function is needed to include the font files with the font styles */
-let generateStyles = rules => (Css.style(rules), rules);
+let generateStyles = rules => (style(rules), rules);
 
 module Type = {
   let h1jumbo =
@@ -38,7 +38,7 @@ module Type = {
       fontWeight(`normal),
       fontSize(`rem(3.5)),
       lineHeight(`rem(4.1875)),
-      color(black),
+      color(Colors.digitalBlack),
       media(
         MediaQuery.tablet,
         [fontSize(`rem(4.5)), lineHeight(`rem(5.4))],
@@ -51,7 +51,7 @@ module Type = {
       fontWeight(`normal),
       fontSize(`rem(2.25)),
       lineHeight(`rem(2.7)),
-      color(black),
+      color(Colors.digitalBlack),
       media(
         MediaQuery.tablet,
         [fontSize(`rem(3.0)), lineHeight(`rem(3.6))],
@@ -63,7 +63,7 @@ module Type = {
       Typeface.monumentGrotesk,
       fontSize(`rem(1.875)),
       lineHeight(`rem(2.25)),
-      color(black),
+      color(Colors.digitalBlack),
       media(
         MediaQuery.tablet,
         [fontSize(`rem(2.5)), lineHeight(`rem(3.))],
@@ -75,7 +75,7 @@ module Type = {
       Typeface.monumentGrotesk,
       fontSize(`rem(1.6)),
       lineHeight(`rem(2.1)),
-      color(black),
+      color(Colors.digitalBlack),
       media(
         MediaQuery.tablet,
         [fontSize(`rem(2.0)), lineHeight(`rem(2.375))],
@@ -92,6 +92,7 @@ module Type = {
       lineHeight(`rem(1.7)),
       textTransform(`uppercase),
       letterSpacing(`em(0.02)),
+      color(Colors.digitalBlack),
       media(
         MediaQuery.tablet,
         [fontSize(`rem(1.25)), lineHeight(`rem(1.9))],
@@ -112,7 +113,7 @@ module Type = {
       Typeface.monumentGrotesk,
       fontSize(`rem(1.3)),
       lineHeight(`rem(1.56)),
-      color(black),
+      color(Colors.digitalBlack),
       media(
         MediaQuery.tablet,
         [fontSize(`rem(1.5)), lineHeight(`rem(1.8))],
@@ -124,7 +125,7 @@ module Type = {
       Typeface.monumentGrotesk,
       fontSize(`rem(1.125)),
       lineHeight(`rem(1.375)),
-      color(black),
+      color(Colors.digitalBlack),
       media(
         MediaQuery.tablet,
         [fontSize(`rem(1.125)), lineHeight(`rem(1.4))],
@@ -134,29 +135,30 @@ module Type = {
   /** the following are specific component names, but use some styles already defined  */
   let pageLabel =
     style([
-      Typeface.monumentGrotesk,
+      Typeface.monumentGroteskMono,
       fontSize(`rem(0.9)),
       lineHeight(`rem(1.37)),
       textTransform(`uppercase),
       letterSpacing(`em(0.02)),
-      color(black),
+      color(Colors.digitalBlack),
+      margin(`zero),
       media(
         MediaQuery.tablet,
         [fontSize(`rem(1.25)), lineHeight(`rem(1.875))],
       ),
     ]);
-
+  /** some styles have not been perfected, but all can be added and adjusted as needed! */
   let label =
     style([
-      Typeface.monumentGrotesk,
+      Typeface.monumentGroteskMono,
       fontSize(`rem(0.75)),
       lineHeight(`rem(1.)),
-      color(black),
+      color(Colors.digitalBlack),
       textTransform(`uppercase),
-      letterSpacing(`em(0.03)),
+      letterSpacing(`em(0.02)),
       media(
         MediaQuery.tablet,
-        [fontSize(`rem(0.88)), lineHeight(`rem(1.))],
+        [fontSize(`rem(1.25)), lineHeight(`rem(1.875))],
       ),
     ]);
 
@@ -166,9 +168,19 @@ module Type = {
       fontSize(`rem(0.75)),
       fontWeight(`num(500)),
       lineHeight(`rem(1.)),
-      color(black),
+      color(Colors.digitalBlack),
       textTransform(`uppercase),
       letterSpacing(`px(1)),
+    ]);
+
+  let contributorLabel =
+    style([
+      Typeface.monumentGroteskMono,
+      fontSize(`rem(0.75)),
+      fontWeight(`num(500)),
+      lineHeight(`rem(1.)),
+      color(black),
+      margin(`zero),
     ]);
 
   let link =
@@ -185,7 +197,7 @@ module Type = {
       Typeface.monumentGrotesk,
       fontSize(`rem(1.1)),
       lineHeight(`rem(1.1)),
-      color(black),
+      color(Colors.digitalBlack),
     ]);
 
   let sidebarLink =
@@ -193,7 +205,7 @@ module Type = {
       Typeface.monumentGrotesk,
       fontSize(`rem(1.)),
       lineHeight(`rem(1.5)),
-      color(black),
+      color(Colors.digitalBlack),
     ]);
 
   let tooltip =
@@ -201,7 +213,7 @@ module Type = {
       Typeface.monumentGrotesk,
       fontSize(`px(13)),
       lineHeight(`rem(1.)),
-      color(black),
+      color(Colors.digitalBlack),
     ]);
 
   let creditName =
@@ -239,10 +251,10 @@ module Type = {
 
   let pageSubhead =
     style([
-      Typeface.monumentGrotesk,
+      Typeface.monumentGroteskMono,
       fontSize(`rem(1.125)),
       lineHeight(`rem(1.68)),
-      color(black),
+      color(Colors.digitalBlack),
       media(
         MediaQuery.tablet,
         [fontSize(`rem(1.31)), lineHeight(`rem(1.93))],
@@ -251,11 +263,11 @@ module Type = {
 
   let sectionSubhead =
     style([
-      Typeface.monumentGrotesk,
+      Typeface.monumentGroteskMono,
       fontSize(`rem(1.)),
       lineHeight(`rem(1.5)),
       letterSpacing(`px(-1)),
-      color(black),
+      color(Colors.digitalBlack),
       media(
         MediaQuery.tablet,
         [fontSize(`rem(1.25)), lineHeight(`rem(1.875))],
@@ -267,7 +279,7 @@ module Type = {
       Typeface.monumentGrotesk,
       fontSize(`rem(1.)),
       lineHeight(`rem(1.5)),
-      color(black),
+      color(Colors.digitalBlack),
       media(
         MediaQuery.tablet,
         [fontSize(`rem(1.125)), lineHeight(`rem(1.69))],
@@ -279,7 +291,7 @@ module Type = {
       Typeface.monumentGrotesk,
       fontSize(`rem(0.875)),
       lineHeight(`rem(1.31)),
-      color(black),
+      color(Colors.digitalBlack),
       media(
         MediaQuery.tablet,
         [fontSize(`rem(1.)), lineHeight(`rem(1.5))],
@@ -292,7 +304,7 @@ module Type = {
       fontSize(`rem(1.)),
       lineHeight(`rem(1.5)),
       letterSpacing(`rem(0.03125)),
-      color(black),
+      color(Colors.digitalBlack),
       media(
         MediaQuery.tablet,
         [
@@ -305,14 +317,41 @@ module Type = {
 
   let quote =
     style([
-      Typeface.monumentGrotesk,
+      Typeface.monumentGroteskMono,
       fontSize(`rem(1.31)),
       lineHeight(`rem(1.875)),
       letterSpacing(`em(-0.03)),
-      color(black),
+      color(Colors.digitalBlack),
       media(
         MediaQuery.tablet,
         [fontSize(`rem(2.5)), lineHeight(`rem(3.125))],
       ),
     ]);
 };
+
+// Match Tachyons setting pretty much everything to border-box
+global(
+  "a,article,aside,blockquote,body,code,dd,div,dl,dt,fieldset,figcaption,figure,footer,form,h1,h2,h3,h4,h5,h6,header,html,input[type=email],input[type=number],input[type=password],input[type=tel],input[type=text],input[type=url],legend,li,main,nav,ol,p,pre,section,table,td,textarea,th,tr,ul",
+  [boxSizing(`borderBox)],
+);
+
+// Reset padding that appears only on some browsers
+global(
+  "h1,h2,h3,h4,h5,fieldset,ul,li,p,figure",
+  [
+    unsafe("paddingInlineStart", "0"),
+    unsafe("paddingInlineEnd", "0"),
+    unsafe("paddingBlockStart", "0"),
+    unsafe("paddingBlockEnd", "0"),
+    unsafe("marginInlineStart", "0"),
+    unsafe("marginInlineEnd", "0"),
+    unsafe("marginBlockStart", "0"),
+    unsafe("marginBlockEnd", "0"),
+    unsafe("WebkitPaddingBefore", "0"),
+    unsafe("WebkitPaddingStart", "0"),
+    unsafe("WebkitPaddingEnd", "0"),
+    unsafe("WebkitPaddingAfter", "0"),
+    unsafe("WebkitMarginBefore", "0"),
+    unsafe("WebkitMarginAfter", "0"),
+  ],
+);

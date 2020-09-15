@@ -71,7 +71,7 @@ let of_transaction : Signed_command.t Transaction.Poly.t -> t = function
                 ; valid_until= Coda_numbers.Global_slot.max_value
                 ; memo= Signed_command_memo.empty }
             ; body=
-                { source_pk= pk1
+                { source_pk= pk2
                 ; receiver_pk= pk1
                 ; token_id
                 ; amount= Amount.of_fee fee1

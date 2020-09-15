@@ -321,7 +321,8 @@ module T = struct
         ~bin_input:Send_payment_input.Stable.Latest.bin_t
         ~bin_output:
           [%bin_type_class:
-            (Signed_command.Stable.Latest.t * Receipt.Chain_hash.Stable.Latest.t)
+            ( Signed_command.Stable.Latest.t
+            * Receipt.Chain_hash.Stable.Latest.t )
             Or_error.t] ()
 
     let process_user_command =
@@ -329,7 +330,8 @@ module T = struct
         ~bin_input:User_command_input.Stable.Latest.bin_t
         ~bin_output:
           [%bin_type_class:
-            (Signed_command.Stable.Latest.t * Receipt.Chain_hash.Stable.Latest.t)
+            ( Signed_command.Stable.Latest.t
+            * Receipt.Chain_hash.Stable.Latest.t )
             Or_error.t] ()
 
     let verified_transitions =
@@ -543,8 +545,8 @@ module T = struct
           let coda_deferred () =
             Coda_lib.create
               (Coda_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
-                 ~is_seed ~disable_telemetry:true ~coinbase_receiver:`Producer
-                 ~net_config ~gossip_net_params
+                 ~chain_id ~is_seed ~disable_telemetry:true
+                 ~coinbase_receiver:`Producer ~net_config ~gossip_net_params
                  ~initial_protocol_version:Protocol_version.zero
                  ~proposed_protocol_version_opt:None
                  ~work_selection_method:

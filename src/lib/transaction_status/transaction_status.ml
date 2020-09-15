@@ -48,7 +48,8 @@ let get_status ~frontier_broadcast_pipe ~transaction_pool cmd =
                 | Snapp_command _ ->
                     false
                 | Signed_command cmd' ->
-                    Signed_command.equal cmd (Signed_command.forget_check cmd') )
+                    Signed_command.equal cmd (Signed_command.forget_check cmd')
+            )
           in
           if List.exists ~f:in_breadcrumb best_tip_path then
             return State.Included ;
