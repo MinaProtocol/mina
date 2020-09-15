@@ -72,7 +72,7 @@ The Construction API is _not_ validated using `rosetta-cli` as this would requir
 
 ### Reproduce agent and rosetta-cli validation
 
-`gcr.io/o1labs-192920/coda-rosetta:debug-v1`
+`gcr.io/o1labs-192920/coda-rosetta:debug-v1.1`
 and
 [`rosetta-cli` @ 4bb48b24a794deb3635973e32d1ea806e5b30729](https://github.com/coinbase/rosetta-cli/commit/4bb48b24a794deb3635973e32d1ea806e5b30729)
 using this [`rosetta.conf`](https://github.com/CodaProtocol/coda/blob/e02605429e9a490c14994087ce954e19fc321edc/src/app/rosetta/rosetta.conf)
