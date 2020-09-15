@@ -5605,7 +5605,7 @@ let%test_module "transaction_snark" =
                 ~receiver:receivers.(1) ~fee_transfer:None
               |> Or_error.ok_exn )
           in
-          let transactions : Transaction.t list =
+          let transactions : Transaction.Valid.t list =
             [ Fee_transfer ft1
             ; Fee_transfer ft2
             ; Coinbase coinbase_with_ft
