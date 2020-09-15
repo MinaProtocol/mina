@@ -1482,7 +1482,7 @@ struct
       foreign (prefix "make")
         ( ScalarFieldVector.typ @-> PolyComm.typ @-> PolyComm.typ
         @-> PolyComm.typ @-> PolyComm.typ @-> PolyComm.typ
-        @-> AffineCurve.Pair.Vector.typ @-> PolyComm.typ @-> PolyComm.typ
+        @-> AffineCurve.Pair.Vector.typ @-> ScalarField.typ @-> ScalarField.typ
         @-> AffineCurve.typ @-> AffineCurve.typ @-> Evaluations.typ
         @-> Evaluations.typ @-> returning typ )
     and add_finalizer = add_finalizer in
