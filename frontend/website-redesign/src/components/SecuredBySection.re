@@ -24,7 +24,7 @@ module Styles = {
         [
           padding2(~v=rem(8.9), ~h=`rem(9.56)),
           gridTemplateColumns([`rem(31.5), `rem(29.)]),
-          gridTemplateRows([`rem(31.5), `rem(32.)]),
+          gridTemplateRows([`rem(31.5), `rem(36.)]),
           gridColumnGap(`rem(6.8)),
           gridRowGap(`rem(6.)),
           height(`rem(88.)),
