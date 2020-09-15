@@ -3,19 +3,30 @@ module Styles = {
   let grid =
     style([
       display(`grid),
-      padding2(~v=rem(4.), ~h=`rem(1.25)),
-      gridTemplateColumns([`rem(21.)]),
-      unsafe("grid-template-rows", "637px 495px 868px"),
-      gridRowGap(`rem(4.)),
       backgroundSize(`cover),
       backgroundImage(url("/static/img/SecuredBySmall.png")),
+      padding2(~v=rem(4.), ~h=`rem(1.25)),
+      gridTemplateColumns([`rem(21.)]),
+      gridTemplateRows([`rem(40.), `rem(31.), `rem(54.)]),
+      gridRowGap(`rem(4.)),
       media(
         Theme.MediaQuery.tablet,
-        [backgroundImage(url("/static/img/SecuredByMedium.png"))],
+        [
+          padding2(~v=rem(4.5), ~h=`rem(2.5)),
+          gridTemplateColumns([`rem(43.)]),
+          unsafe("grid-template-rows", "475px 289px 566px"),
+          gridRowGap(`rem(4.)),
+          backgroundImage(url("/static/img/SecuredByMedium.png")),
+        ],
       ),
       media(
         Theme.MediaQuery.desktop,
-        [backgroundImage(url("/static/img/SecuredByLarge.png"))],
+        [
+          padding2(~v=rem(8.9), ~h=`rem(9.56)),
+          gridTemplateColumns([`rem(35.), `rem(29.)]),
+          gridRowGap(`rem(4.)),
+          backgroundImage(url("/static/img/SecuredByLarge.png")),
+        ],
       ),
     ]);
 
@@ -23,20 +34,34 @@ module Styles = {
   let gridItem2 = style([unsafe("grid-area", "2 / 1 / 3 / 2")]);
   let gridItem3 =
     style([
-      marginTop(`rem(4.)),
       backgroundColor(Theme.Colors.digitalBlack),
       padding2(~v=`rem(2.), ~h=`rem(2.)),
       unsafe("grid-area", "1 / 1 / 2 / 2"),
+      media(
+        Theme.MediaQuery.tablet,
+        [display(`flex), flexDirection(`row)],
+      ),
     ]);
-
+  let flexColumn =
+    style([
+      media(
+        Theme.MediaQuery.tablet,
+        [display(`flex), flexDirection(`column), marginLeft(`rem(3.))],
+      ),
+    ]);
   let flexRow =
     style([
       display(`flex),
       width(`percent(100.)),
       flexDirection(`row),
       justifyContent(`spaceBetween),
+      media(Theme.MediaQuery.tablet, [width(`rem(30.))]),
     ]);
-  let imageColumn = style([width(`rem(10.06))]);
+  let imageColumn =
+    style([
+      width(`rem(10.)),
+      media(Theme.MediaQuery.tablet, [width(`rem(13.))]),
+    ]);
   let logoGrid =
     style([
       display(`grid),
@@ -45,10 +70,24 @@ module Styles = {
       gridTemplateRows([`rem(5.), `rem(5.)]),
       gridTemplateColumns([`rem(10.), `rem(10.)]),
       media(
+        Theme.MediaQuery.tablet,
+        [
+          gridTemplateRows([`rem(5.)]),
+          gridTemplateColumns([
+            `rem(10.),
+            `rem(10.),
+            `rem(10.),
+            `rem(10.),
+          ]),
+          marginBottom(`rem(4.)),
+        ],
+      ),
+      media(
         Theme.MediaQuery.desktop,
         [
           gridTemplateRows([`rem(8.5), `rem(8.5)]),
           gridTemplateColumns([`rem(17.), `rem(17.)]),
+          marginBottom(`zero),
         ],
       ),
     ]);
@@ -56,13 +95,17 @@ module Styles = {
   let h2 =
     merge([
       Theme.Type.h2,
-      style([lineHeight(`rem(3.)), fontSize(`rem(2.5))]),
+      style([lineHeight(`rem(3.0)), fontSize(`rem(2.5))]),
     ]);
   let h2Small =
     merge([
       Theme.Type.h2,
-      style([lineHeight(`rem(3.)), fontSize(`rem(2.))]),
+      style([
+        important(lineHeight(`rem(1.5))),
+        important(fontSize(`rem(2.))),
+      ]),
     ]);
+
   let h3White =
     merge([
       Theme.Type.h3,
@@ -70,7 +113,12 @@ module Styles = {
     ]);
   let labelWhite =
     merge([Theme.Type.sectionSubhead, style([color(white)])]);
-  let dotsImage = style([marginBottom(`rem(3.))]);
+  let dotsImage =
+    style([
+      marginBottom(`rem(3.)),
+      media(Theme.MediaQuery.tablet, [marginRight(`rem(3.))]),
+    ]);
+  let button = style([media(Theme.MediaQuery.tablet, [])]);
 };
 
 [@react.component]
@@ -78,7 +126,7 @@ let make = () => {
   <div className=Styles.grid>
     <div className=Styles.gridItem1>
       <Rule />
-      <Spacer height=2. />
+      <Spacer height=1. />
       <h2 className=Styles.h2> {React.string("Secured by Participants")} </h2>
       <Spacer height=1. />
       <p className=Theme.Type.sectionSubhead>
@@ -130,19 +178,23 @@ let make = () => {
             src="/static/img/SecuredByDots.png"
           />
           <Rule color=Theme.Colors.white />
-          <h3 className=Styles.h3White>
-            {React.string("You Can Run a Node & Secure the Network")}
-          </h3>
-          <p className=Styles.labelWhite>
-            {React.string(
-               "With Mina's uniquely light blockchain, you don’t have to have expensive hardware, or wait days for the blockchain to sync, or use a ton of computing power to stake and participate in consensus.",
-             )}
-          </p>
-          <Spacer height=2. />
-          <Button bgColor=Theme.Colors.orange>
-            {React.string("Get Started")}
-            <Icon kind=Icon.ArrowRightMedium />
-          </Button>
+          <span className=Styles.flexColumn>
+            <h3 className=Styles.h3White>
+              {React.string("You Can Run a Node & Secure the Network")}
+            </h3>
+            <p className=Styles.labelWhite>
+              {React.string(
+                 "With Mina's uniquely light blockchain, you don’t have to have expensive hardware, or wait days for the blockchain to sync, or use a ton of computing power to stake and participate in consensus.",
+               )}
+            </p>
+            <Spacer height=2. />
+            <span className=Styles.button>
+              <Button bgColor=Theme.Colors.orange>
+                {React.string("Get Started")}
+                <Icon kind=Icon.ArrowRightMedium />
+              </Button>
+            </span>
+          </span>
         </div>
       </div>
     </div>
