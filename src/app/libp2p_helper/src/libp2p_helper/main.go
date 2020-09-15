@@ -1052,7 +1052,7 @@ func main() {
 	lines := bufio.NewScanner(os.Stdin)
 	// 22MiB buffer size, larger than the 21.33MB minimum for 16MiB to be b64'd
 	// 4 * (2^24/3) / 2^20 = 21.33
-	bufsize := (1024 * 1024) * 22
+	bufsize := (1024 * 1024) * 1024
 	lines.Buffer(make([]byte, bufsize), bufsize)
 	out := bufio.NewWriter(os.Stdout)
 
@@ -1101,6 +1101,7 @@ func main() {
 
 	for lines.Scan() {
 		line = lines.Text()
+		helperLog.Infof("message size is %d", len(line))
 		var raw json.RawMessage
 		env := envelope{
 			Body: &raw,
