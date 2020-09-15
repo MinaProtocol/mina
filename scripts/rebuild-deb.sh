@@ -11,6 +11,14 @@ source "${SCRIPTPATH}/../buildkite/scripts/export-git-env-vars.sh"
 
 cd "${SCRIPTPATH}/../_build"
 
+if [[ "$1" == "optimized" ]] ; then
+    echo "Optimized deb"
+    VERSION=${VERSION}_optimized
+else
+    echo "Standard deb"
+    VERSION=${VERSION}
+fi
+
 BUILDDIR="deb_build"
 
 mkdir -p "${BUILDDIR}/DEBIAN"

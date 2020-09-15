@@ -355,6 +355,7 @@ let get_status ~flag t =
   ; uptime_secs
   ; ledger_merkle_root
   ; state_hash
+  ; chain_id= config.chain_id
   ; consensus_time_best_tip
   ; commit_id
   ; conf_dir

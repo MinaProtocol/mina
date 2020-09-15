@@ -187,49 +187,131 @@ module Worker = struct
   include Rpc_parallel.Make (T)
 end
 
-type t = Worker.Connection.t
+type worker = {connection: Worker.Connection.t; process: Process.t}
+
+type t = {worker: worker Deferred.t ref; logger: Logger.Stable.Latest.t}
+
+let plus_or_minus initial ~delta =
+  initial +. (Random.float (2. *. delta) -. delta)
 
 (* TODO: investigate why conf_dir wasn't being used *)
-let create ~logger ~proof_level ~pids ~conf_dir =
+let create ~logger ~proof_level ~pids ~conf_dir : t Deferred.t =
   let on_failure err =
     [%log error] "Verifier process failed with error $err"
       ~metadata:[("err", `String (Error.to_string_hum err))] ;
     Error.raise err
   in
-  let%map connection, process =
-    Worker.spawn_in_foreground_exn ~connection_timeout:(Time.Span.of_min 1.)
-      ~on_failure ~shutdown_on:Disconnect ~connection_state_init_arg:()
-      {conf_dir; logger; proof_level}
+  let create_worker () =
+    let%map connection, process =
+      Worker.spawn_in_foreground_exn ~connection_timeout:(Time.Span.of_min 1.)
+        ~on_failure ~shutdown_on:Disconnect ~connection_state_init_arg:()
+        {conf_dir; logger; proof_level}
+    in
+    [%log info]
+      "Daemon started process of kind $process_kind with pid $verifier_pid"
+      ~metadata:
+        [ ("verifier_pid", `Int (Process.pid process |> Pid.to_int))
+        ; ( "process_kind"
+          , `String Child_processes.Termination.(show_process_kind Verifier) )
+        ] ;
+    Child_processes.Termination.register_process pids process
+      Child_processes.Termination.Verifier ;
+    don't_wait_for
+    @@ Pipe.iter
+         (Process.stdout process |> Reader.pipe)
+         ~f:(fun stdout ->
+           return
+           @@ [%log debug] "Verifier stdout: $stdout"
+                ~metadata:[("stdout", `String stdout)] ) ;
+    don't_wait_for
+    @@ Pipe.iter
+         (Process.stderr process |> Reader.pipe)
+         ~f:(fun stderr ->
+           return
+           @@ [%log error] "Verifier stderr: $stderr"
+                ~metadata:[("stderr", `String stderr)] ) ;
+    {connection; process}
   in
-  [%log info]
-    "Daemon started process of kind $process_kind with pid $verifier_pid"
-    ~metadata:
-      [ ("verifier_pid", `Int (Process.pid process |> Pid.to_int))
-      ; ( "process_kind"
-        , `String Child_processes.Termination.(show_process_kind Verifier) ) ] ;
-  Child_processes.Termination.register_process pids process
-    Child_processes.Termination.Verifier ;
-  don't_wait_for
-  @@ Pipe.iter
-       (Process.stdout process |> Reader.pipe)
-       ~f:(fun stdout ->
-         return
-         @@ [%log debug] "Verifier stdout: $stdout"
-              ~metadata:[("stdout", `String stdout)] ) ;
-  don't_wait_for
-  @@ Pipe.iter
-       (Process.stderr process |> Reader.pipe)
-       ~f:(fun stderr ->
-         return
-         @@ [%log error] "Verifier stderr: $stderr"
-              ~metadata:[("stderr", `String stderr)] ) ;
-  connection
+  let%map worker = create_worker () in
+  let worker_ref = ref (Deferred.return worker) in
+  let rec on_worker {connection= _; process} =
+    let restart_after = Time.Span.(of_min (15. |> plus_or_minus ~delta:2.5)) in
+    upon (after restart_after) (fun () ->
+        let pid = Process.pid process in
+        Child_processes.Termination.mark_termination_as_expected pids pid ;
+        ( match Signal.send Signal.kill (`Pid pid) with
+        | `No_such_process ->
+            [%log info] "verifier failed to get sigkill (no such process)"
+              ~metadata:
+                [("verifier_pid", `Int (Process.pid process |> Pid.to_int))]
+        | `Ok ->
+            [%log info] "verifier successfully got sigkill"
+              ~metadata:
+                [("verifier_pid", `Int (Process.pid process |> Pid.to_int))] ) ;
+        let new_worker =
+          let%bind res = Process.wait process in
+          [%log info] "prover successfully stopped"
+            ~metadata:
+              [ ("verifier_pid", `Int (Process.pid process |> Pid.to_int))
+              ; ("exit_status", `String (Unix.Exit_or_signal.to_string_hum res))
+              ] ;
+          Child_processes.Termination.remove pids pid ;
+          let%map worker = create_worker () in
+          on_worker worker ; worker
+        in
+        worker_ref := new_worker )
+  in
+  on_worker worker ;
+  {worker= worker_ref; logger}
 
-let verify_blockchain_snark t chain =
-  Worker.Connection.run t ~f:Worker.functions.verify_blockchain ~arg:chain
+let with_retry ~logger f =
+  let pause = Time.Span.of_sec 5. in
+  let rec go attempts_remaining =
+    [%log trace] "Verifier trying with $attempts_remaining"
+      ~metadata:[("attempts_remaining", `Int attempts_remaining)] ;
+    match%bind f () with
+    | Ok x ->
+        return (Ok x)
+    | Error e ->
+        if attempts_remaining = 0 then return (Error e)
+        else
+          let%bind () = after pause in
+          go (attempts_remaining - 1)
+  in
+  go 4
 
-let verify_transaction_snarks t ts =
-  Worker.Connection.run t ~f:Worker.functions.verify_transaction_snarks ~arg:ts
+let verify_blockchain_snark {worker; logger} chain =
+  with_retry ~logger (fun () ->
+      let%bind {connection; _} = !worker in
+      Worker.Connection.run connection ~f:Worker.functions.verify_blockchain
+        ~arg:chain )
 
-let verify_commands t ts =
-  Worker.Connection.run t ~f:Worker.functions.verify_commands ~arg:ts
+module Id = Unique_id.Int ()
+
+let verify_transaction_snarks {worker; logger} ts =
+  let id = Id.create () in
+  let n = List.length ts in
+  let metadata () =
+    ("id", `String (Id.to_string id))
+    :: ("n", `Int n)
+    :: Memory_stats.(jemalloc_memory_stats () @ ocaml_memory_stats ())
+  in
+  [%log trace] "verify $n transaction_snarks (before)" ~metadata:(metadata ()) ;
+  let res =
+    with_retry ~logger (fun () ->
+        let%bind {connection; _} = !worker in
+        Worker.Connection.run connection
+          ~f:Worker.functions.verify_transaction_snarks ~arg:ts )
+  in
+  upon res (fun x ->
+      [%log trace] "verify $n transaction_snarks (after)"
+        ~metadata:
+          ( ("result", `String (Sexp.to_string ([%sexp_of: bool Or_error.t] x)))
+          :: metadata () ) ) ;
+  res
+
+let verify_commands {worker; logger} ts =
+  with_retry ~logger (fun () ->
+    let%bind {connection; _} = !worker in
+    Worker.Connection.run connection ~f:Worker.functions.verify_commands ~arg:ts
+    )

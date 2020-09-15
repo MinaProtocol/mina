@@ -77,7 +77,7 @@ let make = () => {
     {successState
        ? <div className=Styles.successState>
            <span className=Styles.successText>
-             {React.string({"Check your email!"})}
+             {React.string([@reason.preserve_braces] "Check your email!")}
            </span>
          </div>
        : <div className=Styles.inputContainer>
