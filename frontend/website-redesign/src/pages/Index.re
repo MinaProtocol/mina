@@ -75,42 +75,6 @@ let make = () => {
           },
         }
       />
-      <FeaturedSingleRow
-        row={
-          FeaturedSingleRow.Row.rowType: ImageRightCopyLeft,
-          title: "Testnet",
-          description: "Check out what's in beta, take on Testnet challenges and earn Testnet points.",
-          textColor: Theme.Colors.white,
-          image: "/static/img/NodeOpsTestnet.png",
-          background: Image("/static/img/MinaSpectrumPrimarySilver.png"),
-          contentBackground:
-            Image("/static/img/TestnetContentBlockBackground.png"),
-          button: {
-            FeaturedSingleRow.Row.buttonText: "Go To Testnet",
-            buttonColor: Theme.Colors.orange,
-            buttonTextColor: Theme.Colors.white,
-            dark: true,
-          },
-        }
-      />
-      <FeaturedSingleRow
-        row={
-          FeaturedSingleRow.Row.rowType: ImageRightCopyLeft,
-          title: "Genesis Program",
-          description: "Calling all block producers, SNARK producers and community leaders. We're looking for 1,000 participants to join the Genesis token grant program and form the backbone of Mina's decentralized network.",
-          textColor: Theme.Colors.white,
-          image: "/static/img/GetStartedGenesisProgram.png",
-          background: Image("/static/img/MinaSpectrumPrimarySilver.png"),
-          contentBackground:
-            Image("/static/img/TestnetContentBlockBackground.png"),
-          button: {
-            FeaturedSingleRow.Row.buttonText: "Learn More",
-            buttonColor: Theme.Colors.mint,
-            buttonTextColor: Theme.Colors.digitalBlack,
-            dark: true,
-          },
-        }
-      />
     </div>
   </Page>;
 };
