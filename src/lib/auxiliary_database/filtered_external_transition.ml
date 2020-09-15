@@ -122,8 +122,8 @@ let of_transition external_transition tracked_participants
             let command = (command :> User_command.t) in
             let should_include_transaction command participants =
               List.exists
-                (User_command.accounts_accessed ~next_available_token
-                   command) ~f:(fun account_id ->
+                (User_command.accounts_accessed ~next_available_token command)
+                ~f:(fun account_id ->
                   Public_key.Compressed.Set.mem participants
                     (Account_id.public_key account_id) )
             in

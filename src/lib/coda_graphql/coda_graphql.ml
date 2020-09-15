@@ -1726,8 +1726,8 @@ module Types = struct
               ~error:(Option.value error ~default:"Invalid cursor")
             |> Result.map ~f:(fun cmd ->
                    { With_hash.data= cmd
-                   ; hash= Transaction_hash.hash_command (Signed_command cmd) }
-               )
+                   ; hash= Transaction_hash.hash_command (Signed_command cmd)
+                   } )
 
           let doc = Doc.bin_prot "Opaque pagination cursor for a user command"
         end
@@ -2364,8 +2364,7 @@ module Queries = struct
                     (* Filter by fee-payer pk. *)
                     if
                       txn
-                      |> Transaction_hash
-                         .User_command_with_valid_signature
+                      |> Transaction_hash.User_command_with_valid_signature
                          .command |> User_command.fee_payer
                       |> Account_id.public_key
                       |> Public_key.Compressed.equal pk

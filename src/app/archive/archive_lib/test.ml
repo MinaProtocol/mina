@@ -31,8 +31,8 @@ let%test_module "Archive node unit tests" =
     let keys = Array.init 5 ~f:(fun _ -> Keypair.create ())
 
     let user_command_gen =
-      User_command.Gen.payment_with_random_participants ~keys
-        ~max_amount:1000 ~max_fee:10 ()
+      User_command.Gen.payment_with_random_participants ~keys ~max_amount:1000
+        ~max_fee:10 ()
 
     let fee_transfer_gen =
       Fee_transfer.Single.Gen.with_random_receivers ~keys ~max_fee:10
@@ -54,8 +54,7 @@ let%test_module "Archive node unit tests" =
           match%map
             let open Deferred.Result.Let_syntax in
             let%bind user_command_id =
-              Processor.User_command.add_if_doesn't_exist conn
-                user_command
+              Processor.User_command.add_if_doesn't_exist conn user_command
             in
             let%map result =
               Processor.User_command.find conn ~transaction_hash
@@ -274,8 +273,8 @@ let%test_module "Archive node unit tests" =
                                 Error.raise
                                   (Error.createf
                                      !"The user command %{sexp: \
-                                       User_command.t} was pruned when \
-                                       it should not have been"
+                                       User_command.t} was pruned when it \
+                                       should not have been"
                                      (User_command.forget_check cmd.data))
                             | Error e ->
                                 failwith @@ Caqti_error.show e )
@@ -310,8 +309,8 @@ let%test_module "Archive node unit tests" =
                                 Error.raise
                                   (Error.createf
                                      !"The user command %{sexp: \
-                                       User_command.t} was not pruned \
-                                       when it should have been"
+                                       User_command.t} was not pruned when it \
+                                       should have been"
                                      (User_command.forget_check cmd.data))
                             | Error e ->
                                 failwith @@ Caqti_error.show e )

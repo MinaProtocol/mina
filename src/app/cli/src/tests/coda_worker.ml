@@ -321,7 +321,8 @@ module T = struct
         ~bin_input:Send_payment_input.Stable.Latest.bin_t
         ~bin_output:
           [%bin_type_class:
-            (Signed_command.Stable.Latest.t * Receipt.Chain_hash.Stable.Latest.t)
+            ( Signed_command.Stable.Latest.t
+            * Receipt.Chain_hash.Stable.Latest.t )
             Or_error.t] ()
 
     let process_user_command =
@@ -329,7 +330,8 @@ module T = struct
         ~bin_input:User_command_input.Stable.Latest.bin_t
         ~bin_output:
           [%bin_type_class:
-            (Signed_command.Stable.Latest.t * Receipt.Chain_hash.Stable.Latest.t)
+            ( Signed_command.Stable.Latest.t
+            * Receipt.Chain_hash.Stable.Latest.t )
             Or_error.t] ()
 
     let verified_transitions =

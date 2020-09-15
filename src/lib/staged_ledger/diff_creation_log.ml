@@ -67,9 +67,7 @@ module Summary = struct
       , Sequence.sum
           (module Fee_Summable)
           commands
-          ~f:(fun cmd ->
-            User_command.fee_exn (cmd.data :> User_command.t) )
-      )
+          ~f:(fun cmd -> User_command.fee_exn (cmd.data :> User_command.t)) )
     in
     let coinbase_work_fees = coinbase_fees coinbase in
     {completed_work; commands; coinbase_work_fees}

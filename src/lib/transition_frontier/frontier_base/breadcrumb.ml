@@ -216,9 +216,9 @@ module For_tests = struct
         let%map _ = Currency.Amount.sub sender_account_amount send_amount in
         let sender_pk = Account.public_key sender_account in
         let payload : Signed_command.Payload.t =
-          Signed_command.Payload.create ~fee:Fee.zero ~fee_token:Token_id.default
-            ~fee_payer_pk:sender_pk ~nonce ~valid_until:None
-            ~memo:Signed_command_memo.dummy
+          Signed_command.Payload.create ~fee:Fee.zero
+            ~fee_token:Token_id.default ~fee_payer_pk:sender_pk ~nonce
+            ~valid_until:None ~memo:Signed_command_memo.dummy
             ~body:
               (Payment
                  { source_pk= sender_pk

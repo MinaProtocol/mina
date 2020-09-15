@@ -154,9 +154,12 @@ module User_command = struct
            "SELECT id FROM user_commands WHERE hash = ?")
         (Transaction_hash.to_base58_check transaction_hash)
 
-    let add_if_doesn't_exist (module Conn : CONNECTION) (t : Signed_command.t) =
+    let add_if_doesn't_exist (module Conn : CONNECTION) (t : Signed_command.t)
+        =
       let open Deferred.Result.Let_syntax in
-      let transaction_hash = Transaction_hash.hash_command (Signed_command t) in
+      let transaction_hash =
+        Transaction_hash.hash_command (Signed_command t)
+      in
       match%bind find (module Conn) ~transaction_hash with
       | Some user_command_id ->
           return user_command_id
@@ -761,8 +764,8 @@ let run (module Conn : CONNECTION) reader ~constraint_constants ~logger
         Deferred.return ()
     | Transaction_pool {added; removed= _} ->
         Deferred.List.iter added ~f:(fun command ->
-            User_command.add_if_doesn't_exist (module Conn) command
-            >>| ignore ) )
+            User_command.add_if_doesn't_exist (module Conn) command >>| ignore
+        ) )
 
 let setup_server ~constraint_constants ~logger ~postgres_address ~server_port
     ~delete_older_than =

@@ -16,7 +16,7 @@ module Unsigned_extended = Unsigned_extended_nonconsensus.Unsigned_extended
 module Fee_currency = Currency.Fee
 module Amount_currency = Currency.Amount
 open Rosetta_models
-module User_command = Coda_base.User_command
+module Signed_command = Coda_base.Signed_command
 module Token_id = Coda_base.Token_id
 module Public_key = Signature_lib.Public_key
 module Signed_command_memo = Coda_base.Signed_command_memo

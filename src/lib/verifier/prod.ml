@@ -44,8 +44,8 @@ module Worker_state = struct
           (let bc_vk = Precomputed_values.blockchain_verification ()
            and tx_vk = Precomputed_values.transaction_verification () in
            let module M = struct
-             let verify_commands (_cs : User_command.Verifiable.t list)
-                 : _ list =
+             let verify_commands (_cs : User_command.Verifiable.t list) :
+                 _ list =
                failwith "unimplemented"
 
              let verify_blockchain_snark state proof =
@@ -154,8 +154,7 @@ module Worker = struct
               , verify_transaction_snarks )
         ; verify_commands=
             f
-              ( [%bin_type_class:
-                  User_command.Verifiable.Stable.Latest.t list]
+              ( [%bin_type_class: User_command.Verifiable.Stable.Latest.t list]
               , [%bin_type_class:
                   [ `Valid of User_command.Valid.Stable.Latest.t
                   | `Invalid
@@ -312,6 +311,6 @@ let verify_transaction_snarks {worker; logger} ts =
 
 let verify_commands {worker; logger} ts =
   with_retry ~logger (fun () ->
-    let%bind {connection; _} = !worker in
-    Worker.Connection.run connection ~f:Worker.functions.verify_commands ~arg:ts
-    )
+      let%bind {connection; _} = !worker in
+      Worker.Connection.run connection ~f:Worker.functions.verify_commands
+        ~arg:ts )

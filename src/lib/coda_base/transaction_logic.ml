@@ -592,7 +592,9 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     set_with_location ledger fee_payer_location fee_payer_account ;
     let next_available_token = next_available_token ledger in
     let source = Signed_command.source ~next_available_token user_command in
-    let receiver = Signed_command.receiver ~next_available_token user_command in
+    let receiver =
+      Signed_command.receiver ~next_available_token user_command
+    in
     let exception Reject of Error.t in
     let ok_or_reject = function
       | Ok x ->
@@ -682,7 +684,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           ( [(source_location, source_account)]
           , `Source_timing source_timing
           , User_command_status.Auxiliary_data.empty
-          , Undo.Signed_command_undo.Body.Stake_delegation {previous_delegate} )
+          , Undo.Signed_command_undo.Body.Stake_delegation {previous_delegate}
+          )
       | Payment {amount; token_id= token; _} ->
           let receiver_location, receiver_account =
             get_with_location ledger receiver |> ok_or_reject
@@ -962,7 +965,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           { undo_common with
             user_command= {data= user_command; status= Failed failure} }
         in
-        return ({common= undo_common; body= Failed} : Undo.Signed_command_undo.t)
+        return
+          ({common= undo_common; body= Failed} : Undo.Signed_command_undo.t)
     | exception Reject err ->
         (* TODO: These transactions should never reach this stage, this error
            should be fatal.

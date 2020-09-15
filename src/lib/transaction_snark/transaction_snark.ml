@@ -2270,7 +2270,8 @@ module Base = struct
              let%bind receipt_chain_hash =
                let current = account.receipt_chain_hash in
                let%bind r =
-                 Receipt.Chain_hash.Checked.cons (Signed_command payload) current
+                 Receipt.Chain_hash.Checked.cons (Signed_command payload)
+                   current
                in
                Receipt.Chain_hash.Checked.if_ is_user_command ~then_:r
                  ~else_:current
@@ -4286,7 +4287,9 @@ let%test_module "transaction_snark" =
       test_transaction ~constraint_constants ledger
         (Command (Signed_command user_command)) ;
       let fee_payer = Signed_command.Payload.fee_payer payload in
-      let source = Signed_command.Payload.source ~next_available_token payload in
+      let source =
+        Signed_command.Payload.source ~next_available_token payload
+      in
       let receiver =
         Signed_command.Payload.receiver ~next_available_token payload
       in

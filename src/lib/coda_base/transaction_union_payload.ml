@@ -195,7 +195,8 @@ module Body = struct
        ; Random_oracle.Input.bitstring [token_locked] |]
 end
 
-type t = (Signed_command_payload.Common.t, Body.t) Signed_command_payload.Poly.t
+type t =
+  (Signed_command_payload.Common.t, Body.t) Signed_command_payload.Poly.t
 [@@deriving sexp]
 
 type payload = t [@@deriving sexp]

@@ -63,9 +63,7 @@ module User_command : sig
     [@@@no_toplevel_latest_type]
 
     module V1 : sig
-      type t =
-        private
-        (User_command.Stable.V1.t, hash) With_hash.Stable.V1.t
+      type t = private (User_command.Stable.V1.t, hash) With_hash.Stable.V1.t
       [@@deriving sexp, compare, hash, to_yojson]
     end
   end]

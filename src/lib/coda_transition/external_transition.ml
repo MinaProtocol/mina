@@ -101,8 +101,8 @@ module Stable = struct
 
     let payments external_transition =
       List.filter_map (commands external_transition) ~f:(function
-        | {data= Signed_command ({payload= {body= Payment _; _}; _} as c); status}
-          ->
+        | { data= Signed_command ({payload= {body= Payment _; _}; _} as c)
+          ; status } ->
             Some {With_status.data= c; status}
         | _ ->
             None )

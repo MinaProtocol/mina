@@ -299,9 +299,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
               Network_pool.Transaction_pool.Resource_pool.transactions ~logger
                 transaction_resource_pool
               |> Sequence.map
-                   ~f:
-                     Transaction_hash.User_command_with_valid_signature
-                     .data
+                   ~f:Transaction_hash.User_command_with_valid_signature.data
             in
             trace_event "waiting for ivar..." ;
             let%bind () =
