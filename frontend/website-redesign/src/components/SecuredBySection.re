@@ -184,7 +184,7 @@ let make = () => {
             </h3>
             <p className=Styles.labelWhite>
               {React.string(
-                 "With Mina's uniquely light blockchain, you don’t have to have expensive hardware, or wait days for the blockchain to sync, or use a ton of computing power to stake and participate in consensus.",
+                 "With Mina's uniquely light blockchain, you don't have to have expensive hardware, or wait days for the blockchain to sync, or use a ton of computing power to stake and participate in consensus.",
                )}
             </p>
             <Spacer height=2. />
