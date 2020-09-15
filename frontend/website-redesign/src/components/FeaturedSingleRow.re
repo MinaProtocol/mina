@@ -54,6 +54,15 @@ module Styles = {
 
   let title = merge([Theme.Type.h2, style([color(Theme.Colors.white)])]);
 
+  let buttonText =
+    style([
+      display(`flex),
+      justifyContent(`spaceBetween),
+      alignItems(`center),
+      width(`percent(100.)),
+      fontSize(`rem(0.7)),
+    ]);
+
   let description =
     merge([
       Theme.Type.sectionSubhead,
@@ -65,8 +74,9 @@ module Styles = {
       position(`absolute),
       bottom(`zero),
       width(`percent(100.)),
-      height(`percent(110.)),
+      height(`percent(100.)),
       maxWidth(`px(848)),
+      media(Theme.MediaQuery.notMobile, [height(`percent(110.))]),
     ]);
 };
 
@@ -77,20 +87,24 @@ let make = () => {
       <div className=Styles.container>
         <img src="/static/img/NodeOpsTestnet.png" className=Styles.image />
         <div className=Styles.contentBlock>
-          <span className=Styles.copyText>
+          <div className=Styles.copyText>
             <h2 className=Styles.title> {React.string("Testnet")} </h2>
             <p className=Styles.description>
               {React.string(
                  "Check out what's in beta, take on Testnet challenges and earn Testnet points.",
                )}
             </p>
-          </span>
-          <span>
+          </div>
+          <div className=Css.(style([marginTop(`rem(1.))]))>
             <Button bgColor=Theme.Colors.orange dark=true>
-              {React.string("Go To Testnet")}
-              <Icon kind=Icon.ArrowRightMedium />
+              <span className=Styles.buttonText>
+                {React.string("Go To Testnet")}
+                <span className=Css.(style([marginTop(`rem(0.8))]))>
+                  <Icon kind=Icon.ArrowRightSmall currentColor="white" />
+                </span>
+              </span>
             </Button>
-          </span>
+          </div>
         </div>
       </div>
     </Wrapped>

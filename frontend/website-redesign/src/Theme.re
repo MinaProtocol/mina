@@ -263,7 +263,7 @@ module Type = {
 
   let sectionSubhead =
     style([
-      Typeface.monumentGroteskMono,
+      Typeface.monumentGrotesk,
       fontSize(`rem(1.)),
       lineHeight(`rem(1.5)),
       letterSpacing(`px(-1)),
