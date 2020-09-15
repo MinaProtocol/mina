@@ -635,80 +635,80 @@ pub extern "C" fn zexe_tweedle_plonk_fq_opening_proof_delta(
 
 #[no_mangle]
 pub extern "C" fn zexe_tweedle_plonk_fq_proof_evaluations_l(
-    e: *const DlogProofEvaluations<Fq>,
-) -> *const Fq {
+    e: *const DlogProofEvaluations<Vec<Fq>>,
+) -> *const Vec<Fq> {
     let x = (unsafe { &(*e).l }).clone();
     return Box::into_raw(Box::new(x));
 }
 
 #[no_mangle]
 pub extern "C" fn zexe_tweedle_plonk_fq_proof_evaluations_r(
-    e: *const DlogProofEvaluations<Fq>,
-) -> *const Fq {
+    e: *const DlogProofEvaluations<Vec<Fq>>,
+) -> *const Vec<Fq> {
     let x = (unsafe { &(*e).r }).clone();
     return Box::into_raw(Box::new(x));
 }
 
 #[no_mangle]
 pub extern "C" fn zexe_tweedle_plonk_fq_proof_evaluations_o(
-    e: *const DlogProofEvaluations<Fq>,
-) -> *const Fq {
+    e: *const DlogProofEvaluations<Vec<Fq>>,
+) -> *const Vec<Fq> {
     let x = (unsafe { &(*e).o }).clone();
     return Box::into_raw(Box::new(x));
 }
 
 #[no_mangle]
 pub extern "C" fn zexe_tweedle_plonk_fq_proof_evaluations_z(
-    e: *const DlogProofEvaluations<Fq>,
-) -> *const Fq {
+    e: *const DlogProofEvaluations<Vec<Fq>>,
+) -> *const Vec<Fq> {
     let x = (unsafe { &(*e).z }).clone();
     return Box::into_raw(Box::new(x));
 }
 
 #[no_mangle]
 pub extern "C" fn zexe_tweedle_plonk_fq_proof_evaluations_t(
-    e: *const DlogProofEvaluations<Fq>,
-) -> *const Fq {
+    e: *const DlogProofEvaluations<Vec<Fq>>,
+) -> *const Vec<Fq> {
     let x = (unsafe { &(*e).t }).clone();
     return Box::into_raw(Box::new(x));
 }
 
 #[no_mangle]
 pub extern "C" fn zexe_tweedle_plonk_fq_proof_evaluations_f(
-    e: *const DlogProofEvaluations<Fq>,
-) -> *const Fq {
+    e: *const DlogProofEvaluations<Vec<Fq>>,
+) -> *const Vec<Fq> {
     let x = (unsafe { &(*e).f }).clone();
     return Box::into_raw(Box::new(x));
 }
 
 #[no_mangle]
 pub extern "C" fn zexe_tweedle_plonk_fq_proof_evaluations_sigma1(
-    e: *const DlogProofEvaluations<Fq>,
-) -> *const Fq {
+    e: *const DlogProofEvaluations<Vec<Fq>>,
+) -> *const Vec<Fq> {
     let x = (unsafe { &(*e).sigma1 }).clone();
     return Box::into_raw(Box::new(x));
 }
 
 #[no_mangle]
 pub extern "C" fn zexe_tweedle_plonk_fq_proof_evaluations_sigma2(
-    e: *const DlogProofEvaluations<Fq>,
-) -> *const Fq {
+    e: *const DlogProofEvaluations<Vec<Fq>>,
+) -> *const Vec<Fq> {
     let x = (unsafe { &(*e).sigma2 }).clone();
     return Box::into_raw(Box::new(x));
 }
 
 #[no_mangle]
 pub extern "C" fn zexe_tweedle_plonk_fq_proof_evaluations_make(
-    l: *const Fq,
-    r: *const Fq,
-    o: *const Fq,
-    z: *const Fq,
-    t: *const Fq,
-    f: *const Fq,
-    sigma1: *const Fq,
-    sigma2: *const Fq,
-) -> *const DlogProofEvaluations<Fq> {
-    let res: DlogProofEvaluations<Fq> = DlogProofEvaluations {
+    l: *const Vec<Fq>,
+    r: *const Vec<Fq>,
+    o: *const Vec<Fq>,
+    z: *const Vec<Fq>,
+    t: *const Vec<Fq>,
+    f: *const Vec<Fq>,
+    sigma1: *const Vec<Fq>,
+    sigma2: *const Vec<Fq>,
+) -> *const DlogProofEvaluations<Vec<Fq>> {
+    let res: DlogProofEvaluations<Vec<Fq>> = DlogProofEvaluations {
         l: (unsafe { &*l }).clone(),
         r: (unsafe { &*r }).clone(),
         o: (unsafe { &*o }).clone(),
@@ -723,28 +723,28 @@ pub extern "C" fn zexe_tweedle_plonk_fq_proof_evaluations_make(
 }
 
 #[no_mangle]
-pub extern "C" fn zexe_tweedle_plonk_fq_proof_evaluations_delete(x: *mut DlogProofEvaluations<Fq>) {
+pub extern "C" fn zexe_tweedle_plonk_fq_proof_evaluations_delete(x: *mut DlogProofEvaluations<Vec<Fq>>) {
     let _box = unsafe { Box::from_raw(x) };
 }
 
 #[no_mangle]
 pub extern "C" fn zexe_tweedle_plonk_fq_proof_evaluations_pair_0(
-    e: *const [DlogProofEvaluations<Fq>; 2],
-) -> *const DlogProofEvaluations<Fq> {
+    e: *const [DlogProofEvaluations<Vec<Fq>>; 2],
+) -> *const DlogProofEvaluations<Vec<Fq>> {
     let x = (unsafe { &(*e)[0] }).clone();
     return Box::into_raw(Box::new(x));
 }
 
 #[no_mangle]
 pub extern "C" fn zexe_tweedle_plonk_fq_proof_evaluations_pair_1(
-    e: *const [DlogProofEvaluations<Fq>; 2],
-) -> *const DlogProofEvaluations<Fq> {
+    e: *const [DlogProofEvaluations<Vec<Fq>>; 2],
+) -> *const DlogProofEvaluations<Vec<Fq>> {
     let x = (unsafe { &(*e)[1] }).clone();
     return Box::into_raw(Box::new(x));
 }
 
 #[no_mangle]
-pub extern "C" fn zexe_tweedle_plonk_fq_proof_evaluations_pair_delete(x: *mut [DlogProofEvaluations<Fq>; 2]) {
+pub extern "C" fn zexe_tweedle_plonk_fq_proof_evaluations_pair_delete(x: *mut [DlogProofEvaluations<Vec<Fq>>; 2]) {
     let _box = unsafe { Box::from_raw(x) };
 }
 

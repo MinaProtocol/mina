@@ -1375,7 +1375,9 @@ module Dlog_plonk_proof
                     and type 'a return := 'a F.return)
     (Index : Type)
     (VerifierIndex : Type)
-    (ScalarFieldVector : Type)
+    (ScalarFieldVector : Type_with_finalizer
+                         with type 'a result := 'a F.result
+                          and type 'a return := 'a F.return)
     (FieldVectorPair : Type)
     (OpeningProof : Type_with_finalizer
                     with type 'a result := 'a F.result
@@ -1434,8 +1436,8 @@ struct
     include T
 
     let f s =
-      let%map f = foreign (prefix s) (typ @-> returning ScalarField.typ)
-      and add_finalizer = ScalarField.add_finalizer in
+      let%map f = foreign (prefix s) (typ @-> returning ScalarFieldVector.typ)
+      and add_finalizer = ScalarFieldVector.add_finalizer in
       fun t -> add_finalizer (f t)
 
     let sigma1 = f "sigma1"
@@ -1465,9 +1467,11 @@ struct
     let make =
       let%map make =
         foreign (prefix "make")
-          ( ScalarField.typ @-> ScalarField.typ @-> ScalarField.typ
-          @-> ScalarField.typ @-> ScalarField.typ @-> ScalarField.typ
-          @-> ScalarField.typ @-> ScalarField.typ @-> returning typ )
+          ( ScalarFieldVector.typ @-> ScalarFieldVector.typ
+          @-> ScalarFieldVector.typ @-> ScalarFieldVector.typ
+          @-> ScalarFieldVector.typ @-> ScalarFieldVector.typ
+          @-> ScalarFieldVector.typ @-> ScalarFieldVector.typ @-> returning typ
+          )
       and add_finalizer = add_finalizer in
       fun ~l ~r ~o ~z ~t ~f ~sigma1 ~sigma2 ->
         add_finalizer (make l r o z t f sigma1 sigma2)
