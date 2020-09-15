@@ -19,6 +19,6 @@ kill -s SIGUSR1 $(./find_puppeteer.sh)'\
 
 RUN chmod +x find_puppeteer.sh start.sh stop.sh
 
-ADD coda_daemon_puppeteer.py .
+ADD dockerfiles/coda_daemon_puppeteer.py .
 
 ENTRYPOINT ["/usr/bin/dumb-init", "python3", "/root/coda_daemon_puppeteer.py"]
