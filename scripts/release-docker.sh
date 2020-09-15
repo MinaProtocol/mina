@@ -10,7 +10,7 @@ set +x
 CLEAR='\033[0m'
 RED='\033[0;31m'
 # Array of valid service names
-VALID_SERVICES=('coda-daemon' 'bot' 'coda-demo' 'coda-rosetta', 'leaderboard')
+VALID_SERVICES=('coda-daemon' 'coda-daemon-puppeteered' 'bot' 'coda-demo' 'coda-rosetta', 'leaderboard')
 
 function usage() {
   if [ -n "$1" ]; then
@@ -50,13 +50,17 @@ coda-daemon)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-coda-daemon"
   DOCKER_CONTEXT="."
   ;;
+coda-daemon-puppeteered)
+  DOCKERFILE_PATH="dockerfiles/Dockerfile-coda-daemon-puppeteered"
+  DOCKER_CONTEXT="."
+  ;;
 coda-demo)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-coda-demo"
   DOCKER_CONTEXT="."
   ;;
 coda-rosetta)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-rosetta"
-  mkdir some_empty_dir
+  mkdir -p some_empty_dir
   DOCKER_CONTEXT="./some_empty_dir"
   ;;
 leaderboard)

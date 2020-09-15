@@ -35,10 +35,7 @@ let make =
         href="/static/favicon-16x16.png"
         sizes="16x16"
       />
-      <link
-        href="/static/css/monument-grotesk.css"
-        rel="stylesheet"
-      />
+      <link href="/static/css/monument-grotesk.css" rel="stylesheet" />
       <link
         href="https://cdn.jsdelivr.net/npm/@ibm/plex@4.0.2/css/ibm-plex.min.css"
         rel="stylesheet"

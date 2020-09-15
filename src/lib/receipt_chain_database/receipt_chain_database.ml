@@ -44,7 +44,9 @@ struct
     type hash = Receipt.Chain_hash.t [@@deriving eq]
 
     let hash parent_hash proof_elem =
-      Receipt.Chain_hash.cons (User_command.payload proof_elem) parent_hash
+      Receipt.Chain_hash.cons
+        (User_command (User_command.payload proof_elem))
+        parent_hash
   end)
 
   let prove t ~(proving_receipt : Receipt.Chain_hash.t)
@@ -83,7 +85,9 @@ struct
   let add t ~previous (user_command : User_command.t) =
     let open Monad.Let_syntax in
     let payload = User_command.payload user_command in
-    let receipt_chain_hash = Receipt.Chain_hash.cons payload previous in
+    let receipt_chain_hash =
+      Receipt.Chain_hash.cons (User_command payload) previous
+    in
     let%bind tree_node = Key_value_db.get t ~key:receipt_chain_hash in
     let node, status =
       Option.value_map tree_node
@@ -173,7 +177,7 @@ let%test_module "receipt_database" =
           in
           let proving_receipt =
             Receipt.Chain_hash.cons
-              (User_command.payload @@ List.hd_exn user_commands)
+              (User_command (User_command.payload @@ List.hd_exn user_commands))
               initial_receipt_chain
           in
           [%test_result: Receipt.Chain_hash.t * User_command.t list]
@@ -248,7 +252,8 @@ let%test_module "receipt_database" =
               List.find_map receipt_chains ~f:(fun receipt_chain ->
                   let new_receipt_chain =
                     Receipt.Chain_hash.cons
-                      (User_command.payload unrecorded_user_command)
+                      (User_command
+                         (User_command.payload unrecorded_user_command))
                       receipt_chain
                   in
                   Option.some_if
