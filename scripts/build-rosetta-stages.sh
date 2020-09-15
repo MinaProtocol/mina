@@ -6,6 +6,7 @@ GITBRANCH=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD)
 GITCOMMIT=$(git log -1 --pretty=format:%h)
 TAG=$(echo ${GITBRANCH} | sed 's!/!-!; s!_!-!g')
 cat dockerfiles/Dockerfile-rosetta | docker build \
+  --no-cache \
   --force-rm \
   --target build-deps \
   -t gcr.io/o1labs-192920/coda-rosetta-build-deps:develop -
