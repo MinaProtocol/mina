@@ -14,7 +14,7 @@ module Styles = {
         [
           padding2(~v=rem(4.5), ~h=`rem(2.5)),
           gridTemplateColumns([`rem(43.)]),
-          unsafe("grid-template-rows", "475px 289px 566px"),
+          gridTemplateRows([`rem(30.), `rem(18.06), `rem(35.)]),
           gridRowGap(`rem(4.)),
           backgroundImage(url("/static/img/SecuredByMedium.png")),
         ],
@@ -23,8 +23,10 @@ module Styles = {
         Theme.MediaQuery.desktop,
         [
           padding2(~v=rem(8.9), ~h=`rem(9.56)),
-          gridTemplateColumns([`rem(35.), `rem(29.)]),
-          gridRowGap(`rem(4.)),
+          gridTemplateColumns([`rem(31.5), `rem(29.)]),
+          gridTemplateRows([`rem(31.5), `rem(32.)]),
+          gridColumnGap(`rem(6.8)),
+          gridRowGap(`rem(6.)),
           backgroundImage(url("/static/img/SecuredByLarge.png")),
         ],
       ),
@@ -36,10 +38,14 @@ module Styles = {
     style([
       backgroundColor(Theme.Colors.digitalBlack),
       padding2(~v=`rem(2.), ~h=`rem(2.)),
-      unsafe("grid-area", "1 / 1 / 2 / 2"),
+      unsafe("grid-area", "3/1"),
       media(
         Theme.MediaQuery.tablet,
-        [display(`flex), flexDirection(`row)],
+        [display(`flex), flexDirection(`row), unsafe("grid-area", "3/1")],
+      ),
+      media(
+        Theme.MediaQuery.desktop,
+        [unsafe("grid-area", "1 / 2 / 3 / 3"), flexDirection(`column)],
       ),
     ]);
   let flexColumn =
@@ -120,7 +126,6 @@ module Styles = {
     ]);
   let button = style([media(Theme.MediaQuery.tablet, [])]);
 };
-
 [@react.component]
 let make = () => {
   <div className=Styles.grid>
@@ -149,54 +154,48 @@ let make = () => {
           <p className=Theme.Type.label> {React.string("Snark Workers")} </p>
         </span>
       </div>
-      <Spacer height=4. />
-      <div className=Styles.gridItem2>
-        <Rule />
-        <Spacer height=2. />
-        <h2 className=Styles.h2Small>
-          {React.string("Featured Block Producers")}
-        </h2>
-        <Spacer height=1. />
-        <p className=Theme.Type.sectionSubhead>
+    </div>
+    <Spacer height=4. />
+    <div className=Styles.gridItem2>
+      <Rule />
+      <Spacer height=2. />
+      <h2 className=Styles.h2Small>
+        {React.string("Featured Block Producers")}
+      </h2>
+      <Spacer height=1. />
+      <p className=Theme.Type.sectionSubhead>
+        {React.string(
+           "Delegating is an alternative to staking Mina directly, with the benefit of not having to maintain a node that is always connected to the network. Here are some of the professional block producers offering staking services on Mina.",
+         )}
+      </p>
+      <Spacer height=2. />
+      <div className=Styles.logoGrid>
+        <img className=Styles.logo src="/static/img/BisonTrailsLogo.png" />
+        <img className=Styles.logo src="/static/img/FigmentNetworksLogo.png" />
+        <img className=Styles.logo src="/static/img/NonceLogo.png" />
+        <img className=Styles.logo src="/static/img/SnarkPoolLogo.png" />
+      </div>
+    </div>
+    <div className=Styles.gridItem3>
+      <img className=Styles.dotsImage src="/static/img/SecuredByDots.png" />
+      <Rule color=Theme.Colors.white />
+      <span className=Styles.flexColumn>
+        <h3 className=Styles.h3White>
+          {React.string("You Can Run a Node & Secure the Network")}
+        </h3>
+        <p className=Styles.labelWhite>
           {React.string(
-             "Delegating is an alternative to staking Mina directly, with the benefit of not having to maintain a node that is always connected to the network. Here are some of the professional block producers offering staking services on Mina.",
+             "With Mina's uniquely light blockchain, you don't have to have expensive hardware, or wait days for the blockchain to sync, or use a ton of computing power to stake and participate in consensus.",
            )}
         </p>
         <Spacer height=2. />
-        <div className=Styles.logoGrid>
-          <img className=Styles.logo src="/static/img/BisonTrailsLogo.png" />
-          <img
-            className=Styles.logo
-            src="/static/img/FigmentNetworksLogo.png"
-          />
-          <img className=Styles.logo src="/static/img/NonceLogo.png" />
-          <img className=Styles.logo src="/static/img/SnarkPoolLogo.png" />
-        </div>
-        <div className=Styles.gridItem3>
-          <img
-            className=Styles.dotsImage
-            src="/static/img/SecuredByDots.png"
-          />
-          <Rule color=Theme.Colors.white />
-          <span className=Styles.flexColumn>
-            <h3 className=Styles.h3White>
-              {React.string("You Can Run a Node & Secure the Network")}
-            </h3>
-            <p className=Styles.labelWhite>
-              {React.string(
-                 "With Mina's uniquely light blockchain, you don't have to have expensive hardware, or wait days for the blockchain to sync, or use a ton of computing power to stake and participate in consensus.",
-               )}
-            </p>
-            <Spacer height=2. />
-            <span className=Styles.button>
-              <Button bgColor=Theme.Colors.orange>
-                {React.string("Get Started")}
-                <Icon kind=Icon.ArrowRightMedium />
-              </Button>
-            </span>
-          </span>
-        </div>
-      </div>
+        <span className=Styles.button>
+          <Button bgColor=Theme.Colors.orange>
+            {React.string("Get Started")}
+            <Icon kind=Icon.ArrowRightMedium />
+          </Button>
+        </span>
+      </span>
     </div>
   </div>;
 };
