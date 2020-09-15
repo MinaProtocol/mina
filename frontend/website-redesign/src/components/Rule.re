@@ -2,8 +2,10 @@ module Styles = {
   open Css;
   let rule = ruleColor =>
     style([
-      margin(`zero),
-      width(`percent(100.)),
+      marginTop(`zero),
+      marginBottom(`zero),
+      marginLeft(`zero),
+      marginRight(`zero),
       border(`px(1), `solid, ruleColor),
     ]);
 };
