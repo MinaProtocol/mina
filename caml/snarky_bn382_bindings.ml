@@ -2476,10 +2476,10 @@ module Full (F : Cstubs_applicative.Foreign_applicative) = struct
         (Field_poly_comm)
 
     module Field_oracles =
-      Dlog_oracles
+      Dlog_plonk_oracles
         (F)
         (struct
-          let prefix = with_prefix (prefix "oracles")
+          let prefix = with_prefix (P.prefix "oracles")
         end)
         (Field)
         (Field_verifier_index)
