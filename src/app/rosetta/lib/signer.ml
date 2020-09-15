@@ -6,6 +6,7 @@ open Rosetta_lib
 open Rosetta_coding
 module Signature = Coda_base.Signature
 module User_command = Coda_base.User_command
+module Signed_command = Coda_base.Signed_command
 
 module Keys = struct
   type t = {keypair: Keypair.t; public_key_hex_bytes: string}

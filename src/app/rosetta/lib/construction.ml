@@ -7,6 +7,7 @@ module Transaction = Rosetta_lib.Transaction
 module Public_key = Signature_lib.Public_key
 module Signed_command_payload = Coda_base.Signed_command_payload
 module User_command = Coda_base.User_command
+module Signed_command = Coda_base.Signed_command
 module Transaction_hash = Coda_base.Transaction_hash
 
 module Get_nonce =
@@ -567,7 +568,10 @@ module Hash = struct
         |> env.lift
       in
       let full_command = {Signed_command.Poly.payload; signature; signer} in
-      let hash = Transaction_hash.hash_user_command full_command in
+      let hash =
+        Transaction_hash.hash_command
+          (User_command.Signed_command full_command)
+      in
       Construction_hash_response.create (Transaction_hash.to_base58_check hash)
   end
 
