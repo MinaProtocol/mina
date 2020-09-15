@@ -234,8 +234,9 @@ module Gen = struct
          ?length:int
       -> ?sign_type:[`Fake | `Real]
       -> ( Signature_lib.Keypair.t
-         * Currency.Amount.t
-         * Coda_numbers.Account_nonce.t )
+         * Currency.Balance.t
+         * Coda_numbers.Account_nonce.t
+         * Account_timing.t )
          array
       -> t list Quickcheck.Generator.t =
    fun ?length ?(sign_type = `Fake) account_info ->
@@ -265,11 +266,11 @@ module Gen = struct
            Quickcheck_lib.init_gen_array
              ~f:(fun i ->
                let%bind spend_all = bool in
-               let balance = Tuple3.get2 account_info.(i) in
+               let _, balance, _, _ = account_info.(i) in
                let amount_to_spend =
-                 if spend_all then balance
+                 if spend_all then Currency.Balance.to_amount balance
                  else
-                   Currency.Amount.of_int (Currency.Amount.to_int balance / 2)
+                   Currency.Amount.of_int (Currency.Balance.to_int balance / 2)
                in
                Quickcheck_lib.gen_division_currency amount_to_spend
                  command_splits'.(i) )
@@ -287,7 +288,9 @@ module Gen = struct
                    List.for_all split ~f:(fun amt ->
                        Currency.Amount.(amt >= of_int 2_000_000_000) ) ) )
       in
-      let account_nonces = Array.map ~f:Tuple3.get3 account_info in
+      let account_nonces =
+        Array.map ~f:(fun (_, _, nonce, _) -> nonce) account_info
+      in
       let uncons_exn = function
         | [] ->
             failwith "uncons_exn"
@@ -296,7 +299,7 @@ module Gen = struct
       in
       Quickcheck_lib.map_gens command_senders ~f:(fun sender ->
           let this_split, rest_splits = uncons_exn currency_splits.(sender) in
-          let sender_pk = account_info.(sender) |> Tuple3.get1 in
+          let sender_pk, _, _, _ = account_info.(sender) in
           currency_splits.(sender) <- rest_splits ;
           let nonce = account_nonces.(sender) in
           account_nonces.(sender) <- Account_nonce.succ nonce ;
@@ -314,8 +317,8 @@ module Gen = struct
           in
           let%bind receiver =
             map ~f:(fun idx ->
-                Public_key.compress (Tuple3.get1 account_info.(idx)).public_key
-            )
+                let kp, _, _, _ = account_info.(idx) in
+                Public_key.compress kp.public_key )
             @@ Int.gen_uniform_incl 0 (n_accounts - 1)
           in
           let memo = User_command_memo.dummy in
