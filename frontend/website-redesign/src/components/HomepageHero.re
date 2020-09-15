@@ -2,10 +2,11 @@ module Styles = {
   open Css;
   let heroBackgroundImage =
     style([
-      height(`px(1924)),
+      height(`rem(120.)),
       width(`percent(100.)),
       important(backgroundSize(`cover)),
       backgroundImage(`url("/static/img/HeroSectionBackground.png")),
+      media(Theme.MediaQuery.desktop, [height(`rem(180.))]),
     ]);
 
   let container =
@@ -22,8 +23,10 @@ module Styles = {
       flexDirection(`column),
       justifyContent(`spaceBetween),
       alignItems(`center),
-      marginTop(`rem(9.5)),
+      marginTop(`rem(13.)),
       media("(min-width:65rem)", [flexDirection(`row)]),
+      media(Theme.MediaQuery.tablet, [marginTop(`rem(17.))]),
+      media(Theme.MediaQuery.desktop, [marginTop(`rem(50.))]),
     ]);
 
   let heroHeadline =
@@ -33,7 +36,9 @@ module Styles = {
         display(`flex),
         justifyContent(`center),
         alignItems(`center),
-        marginTop(`rem(22.)),
+        marginTop(`rem(23.)),
+        media(Theme.MediaQuery.tablet, [marginTop(`rem(32.))]),
+        media(Theme.MediaQuery.desktop, [marginTop(`rem(37.))]),
       ]),
     ]);
 
