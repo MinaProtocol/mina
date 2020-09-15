@@ -1,7 +1,11 @@
 module Styles = {
   open Css;
   let rule = ruleColor =>
-    style([width(`percent(100.)), border(`px(1), `solid, ruleColor)]);
+    style([
+      margin(`zero),
+      width(`percent(100.)),
+      border(`px(1), `solid, ruleColor),
+    ]);
 };
 
 [@react.component]
