@@ -2,6 +2,14 @@
 
 Implementation of the [Rosetta API](https://www.rosetta-api.org/) for Coda.
 
+## Changelog
+
+9/14:
+
+- Upgrades from Rosetta spec v1.4.2 to v1.4.4
+- Handles case where there are multiple blocks at the same height
+- "Failed transactions" decode into operations and reconcile properly
+
 ## How to Run
 
 As there is not currently a live network, the best way to run Rosetta is to run it against a sandbox node. Rosetta is best run using the official docker images provided here that run the Coda daemon, an archive node, and the rosetta process for you. See [Reproduce agent and rosetta-cli Validation](#reproduce-agent-and-rosetta-cli-validation) below for details.
@@ -67,12 +75,12 @@ The Construction API is _not_ validated using `rosetta-cli` as this would requir
 `gcr.io/o1labs-192920/coda-rosetta:debug-v1`
 and
 [`rosetta-cli` @ 4bb48b24a794deb3635973e32d1ea806e5b30729](https://github.com/coinbase/rosetta-cli/commit/4bb48b24a794deb3635973e32d1ea806e5b30729)
-using this [`rosetta.conf`](https://github.com/CodaProtocol/coda/blob/5625847fa820da3a4d34ef35e013db11fad2ada4/src/app/rosetta/rosetta.conf)
+using this [`rosetta.conf`](https://github.com/CodaProtocol/coda/blob/e02605429e9a490c14994087ce954e19fc321edc/src/app/rosetta/rosetta.conf)
 
 **Create one of each transaction type and exit**
 
 ```
-$ docker run --publish 3087:3087 --publish 3086:3086 --publish 3085:3085 --name coda-rosetta-test --entrypoint ./docker-test-start.sh -d gcr.io/o1labs-192920/coda-rosetta:debug-v1
+$ docker run --publish 3087:3087 --publish 3086:3086 --publish 3085:3085 --name coda-rosetta-test --entrypoint ./docker-test-start.sh -d gcr.io/o1labs-192920/coda-rosetta:debug-v1.1
 
 $ docker logs --follow coda-rosetta-test
 
@@ -88,9 +96,9 @@ $ rosetta-cli --configuration-file rosetta.conf check:data
 **Run a fast sandbox network forever**
 
 ```
-$ docker run --publish 3087:3087 --publish 3086:3086 --publish 3085:3085 --name coda-rosetta --entrypoint ./docker-demo-start.sh -d gcr.io/o1labs-192920/coda-rosetta:debug-v1
+$ docker run --publish 3087:3087 --publish 3086:3086 --publish 3085:3085 --name coda-rosetta --entrypoint ./docker-demo-start.sh -d gcr.io/o1labs-192920/coda-rosetta:debug-v1.1
 
-$ docker logs --follow coda-rosetta-test
+$ docker logs --follow coda-rosetta
 
 # Wait for a message that looks like:
 #
@@ -105,8 +113,6 @@ $ rosetta-cli --configuration-file rosetta.conf check:data
 
 Sorted by priority (highest priority first)
 
-- Supports v1.4.2, will upgrade to v1.4.4 soon
-- "Failed transactions" do not decode into operations properly. If such transactions are crafted, there will be reconcilliation errors for rosetta.
 - Untested on a live network
 - On a live network, you must _bootstrap your archive node_ if you join the network after the genesis block. Instructions will be provided when the network is online.
 - Not fully robust to crashes on adversarial input
