@@ -22,8 +22,8 @@ let record_payment t (txn : User_command.t) account =
         ~metadata:
           [ ("command", User_command.to_yojson txn)
           ; ("receipt_chain_hash", Receipt.Chain_hash.to_yojson hash) ]
-        "Added  payment $user_command into receipt_chain database. You should \
-         wait for a bit to see your account's receipt chain hash update as \
+        "Added  payment $command into receipt_chain database. You should wait \
+         for a bit to see your account's receipt chain hash update as \
          $receipt_chain_hash" ;
       hash
   | `Duplicate hash ->
