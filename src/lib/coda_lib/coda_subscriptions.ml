@@ -68,7 +68,7 @@ let create ~logger ~constraint_constants ~wallets ~time_controller
               |> Fn.flip User_command.filter_by_participant participant
             in
             List.iter user_commands ~f:(fun user_command ->
-                Pipe.write_without_pushback writer user_command ) ) )
+                Pipe.write_without_pushback_if_open writer user_command ) ) )
   in
   let update_block_subscriptions {With_hash.data= external_transition; hash}
       transactions participants =
@@ -82,7 +82,8 @@ let create ~logger ~constraint_constants ~wallets ~time_controller
                     (`Some (Public_key.Compressed.Set.singleton participant))
                     transactions
                 in
-                Pipe.write_without_pushback writer {With_hash.data; hash} ) )
+                Pipe.write_without_pushback_if_open writer
+                  {With_hash.data; hash} ) )
           ~if_not_found:ignore ) ;
     Hashtbl.find_and_call subscribed_block_users None
       ~if_found:(fun pipes ->
