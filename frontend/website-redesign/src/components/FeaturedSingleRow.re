@@ -43,7 +43,7 @@ module SingleRow = {
     let contentBlock = (contentBackground: Row.backgroundType) => {
       style([
         position(`absolute),
-        width(`percent(90.)),
+        width(`rem(21.)),
         margin2(~h=`rem(5.), ~v=`zero),
         display(`flex),
         flexDirection(`column),
@@ -53,7 +53,7 @@ module SingleRow = {
         important(backgroundSize(`cover)),
         media(
           Theme.MediaQuery.notMobile,
-          [margin(`zero), right(`zero), bottom(`percent(35.))],
+          [margin(`zero), bottom(`percent(35.))],
         ),
         switch (contentBackground) {
         | Image(url) => backgroundImage(`url(url))
@@ -169,7 +169,7 @@ module SingleRow = {
             top(`percent(6.)),
             media(
               Theme.MediaQuery.tablet,
-              [left(`zero), height(`rem(25.)), width(`rem(32.))],
+              [left(`zero), height(`auto), width(`rem(32.))],
             ),
           ]),
         ]);
