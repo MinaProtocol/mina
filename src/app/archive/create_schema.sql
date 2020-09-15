@@ -56,7 +56,6 @@ CREATE TABLE blocks
 , ledger_hash            text   NOT NULL
 , height                 bigint NOT NULL
 , timestamp              bigint NOT NULL
-, coinbase_id            int                    REFERENCES internal_commands(id)
 );
 
 CREATE INDEX idx_blocks_state_hash ON blocks(state_hash);
