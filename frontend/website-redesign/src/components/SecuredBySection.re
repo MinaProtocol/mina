@@ -45,14 +45,23 @@ module Styles = {
       ),
       media(
         Theme.MediaQuery.desktop,
-        [unsafe("grid-area", "1 / 2 / 3 / 3"), flexDirection(`column)],
+        [
+          unsafe("grid-area", "1 / 2 / 3 / 3"),
+          flexDirection(`column),
+          padding2(~v=`rem(4.), ~h=`rem(3.5)),
+        ],
       ),
     ]);
-  let flexColumn =
+  // This is the third dark background grid item
+  let textColumn =
     style([
       media(
         Theme.MediaQuery.tablet,
         [display(`flex), flexDirection(`column), marginLeft(`rem(3.))],
+      ),
+      media(
+        Theme.MediaQuery.desktop,
+        [marginTop(`rem(2.)), marginLeft(`zero)],
       ),
     ]);
   let flexRow =
@@ -123,6 +132,10 @@ module Styles = {
     style([
       marginBottom(`rem(3.)),
       media(Theme.MediaQuery.tablet, [marginRight(`rem(3.))]),
+      media(
+        Theme.MediaQuery.desktop,
+        [marginRight(`zero), marginBottom(`zero), height(`rem(35.6))],
+      ),
     ]);
   let button = style([media(Theme.MediaQuery.tablet, [])]);
 };
@@ -179,7 +192,7 @@ let make = () => {
     <div className=Styles.gridItem3>
       <img className=Styles.dotsImage src="/static/img/SecuredByDots.png" />
       <Rule color=Theme.Colors.white />
-      <span className=Styles.flexColumn>
+      <span className=Styles.textColumn>
         <h3 className=Styles.h3White>
           {React.string("You Can Run a Node & Secure the Network")}
         </h3>
