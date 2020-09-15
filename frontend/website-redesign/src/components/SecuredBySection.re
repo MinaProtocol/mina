@@ -59,7 +59,7 @@ module Styles = {
     style([
       media(
         Theme.MediaQuery.tablet,
-        [display(`flex), flexDirection(`column), marginLeft(`rem(3.))],
+        [display(`flex), flexDirection(`column)],
       ),
       media(
         Theme.MediaQuery.desktop,
@@ -197,8 +197,8 @@ let make = () => {
     </div>
     <div className=Styles.gridItem3>
       <img className=Styles.dotsImage src="/static/img/SecuredByDots.png" />
-      <Rule color=Theme.Colors.white />
       <span className=Styles.textColumn>
+        <Rule color=Theme.Colors.white />
         <h3 className=Styles.h3White>
           {React.string("You Can Run a Node & Secure the Network")}
         </h3>
