@@ -176,11 +176,11 @@ RUN mkdir /tmp/s3_cache_dir \
   && curl -sL https://s3-us-west-2.amazonaws.com/snark-keys.o1test.net/tweedledee_19 \
   -o /tmp/s3_cache_dir/tweedledee_19 \
   && curl -sL https://s3-us-west-2.amazonaws.com/snark-keys.o1test.net/tweedledum_19 \
-  -o /tmp/s3_cache_dir/tweedledum_19 \
-  && curl -SL "https://s3-us-west-2.amazonaws.com/snark-keys.o1test.net/tweedledee_19_v2 \
-  -o /tmp/s3_cache_dir/tweedledee_19_v2 \
-  && curl -SL "https://s3-us-west-2.amazonaws.com/snark-keys.o1test.net/tweedledum_19_v2 \
-  -o /tmp/s3_cache_dir/tweedledum_19_v2
+  -o /tmp/s3_cache_dir/tweedledum_19
+  # && curl -SL "https://s3-us-west-2.amazonaws.com/snark-keys.o1test.net/tweedledee_19_v2 \
+  # -o /tmp/s3_cache_dir/tweedledee_19_v2 \
+  # && curl -SL "https://s3-us-west-2.amazonaws.com/snark-keys.o1test.net/tweedledum_19_v2 \
+  # -o /tmp/s3_cache_dir/tweedledum_19_v2
 
 # Download go modules
 RUN cd src/app/libp2p_helper/src \
