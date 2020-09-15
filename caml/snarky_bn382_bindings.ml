@@ -1523,7 +1523,10 @@ struct
 
   let t_comm = f "t_comm" PolyComm.typ PolyComm.add_finalizer
 
-  let proof_comm = f "proof" OpeningProof.typ OpeningProof.add_finalizer
+  let proof = f "proof" OpeningProof.typ OpeningProof.add_finalizer
+
+  let evals_nocopy =
+    f "evals_nocopy" Evaluations.Pair.typ Evaluations.Pair.add_finalizer
 end
 
 module Pairing_oracles
