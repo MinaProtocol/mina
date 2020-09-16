@@ -1,0 +1,6 @@
+[@react.component]
+let make = () => {
+    
+    
+    
+};
