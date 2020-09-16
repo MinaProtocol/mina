@@ -151,7 +151,7 @@ module SignupWidget = {
       merge([
         Theme.Body.basic_semibold,
         style([
-          Theme.Typeface.ddinexp,
+          Theme.Typeface.monumentGrotesk,
           color(Css_Colors.white),
           display(`flex),
           position(`relative),
@@ -199,6 +199,20 @@ module SignupWidget = {
         hover([borderColor(Theme.Colors.minaGrey)]),
         media(Theme.MediaQuery.notMobile, [width(px(272))]),
       ]);
+
+    let button =
+      merge([
+        MinaButton.Styles.button(
+          Theme.Colors.minaOrange,
+          Theme.Colors.minaBlack,
+          true,
+          `rem(3.25),
+          `rem(7.7),
+          1.5,
+          1.,
+        ),
+        style([cursor(`pointer)]),
+      ]);
   };
 
   [@bs.new]
@@ -238,17 +252,7 @@ module SignupWidget = {
                  {React.string("Good to go!")}
                </span>
                <span>
-                 <button
-                   className={MinaButton.Styles.button(
-                     Theme.Colors.minaOrange,
-                     Theme.Colors.minaOrange,
-                     true,
-                     `rem(3.25),
-                     `rem(7.7),
-                     1.5,
-                     1.,
-                   )}
-                   type_="submit">
+                 <button className=Styles.button type_="submit">
                    {React.string("Continue ")}
                    <MinaIcon kind=MinaIcon.ArrowRightMedium />
                  </button>
@@ -270,16 +274,7 @@ module SignupWidget = {
                  className=Styles.textField
                />
                <span className=Css.(style([paddingTop(`px(16))]))>
-                 <button
-                   className={MinaButton.Styles.button(
-                     Theme.Colors.minaOrange,
-                     Theme.Colors.minaOrange,
-                     true,
-                     `rem(3.25),
-                     `rem(7.7),
-                     1.5,
-                     1.,
-                   )}>
+                 <button className=Styles.button>
                    {React.string("Submit")}
                    <MinaIcon kind=MinaIcon.ArrowRightMedium />
                  </button>
@@ -303,7 +298,7 @@ let make = () => {
             <h1> {React.string("Welcome to Testworld")} </h1>
             <p>
               {React.string(
-                 "Get ready to join Coda's adversarial testnet, 'Testworld', starting Tuesday, October 6. In contrast to Coda's regular testnet, Testworld is where you will compete with others to maximize the amount of tokens earned, find critical bugs, and push the boundaries of the network in order to make Coda as secure as possible for mainnet",
+                 "Get ready to join Coda's adversarial testnet, 'Testworld', starting Tuesday, October 13. In contrast to Coda's regular testnet, Testworld is where you will compete with others to maximize the amount of tokens earned, find critical bugs, and push the boundaries of the network in order to make Coda as secure as possible for mainnet.",
                )}
             </p>
           </div>
@@ -324,7 +319,7 @@ let make = () => {
                  )}
               </li>
             </ul>
-            <p>
+            <p className=Css.(style([marginTop(`rem(3.))]))>
               {React.string(
                  "In addition, the Coda Foundation will be delegating tokens reserved for future grants to participants who score top points for reliability and block production once mainnet is live.",
                )}
@@ -336,19 +331,19 @@ let make = () => {
             </div>
             <div className=Styles.releaseContainer>
               <div className=Styles.release>
-                <div> {React.string("Release 1")} </div>
+                <div> {React.string("Level 1")} </div>
                 <div className=Styles.dashedSeperator />
                 <div className=Styles.releaseDates>
-                  <span> {React.string("Oct 8")} </span>
-                  <span> {React.string("Oct 16")} </span>
+                  <span> {React.string("Oct 13")} </span>
+                  <span> {React.string("Oct 23")} </span>
                 </div>
               </div>
               <div className=Styles.release>
-                <div> {React.string("Release 2")} </div>
+                <div> {React.string("Level 2")} </div>
                 <div className=Styles.dashedSeperator />
                 <div className=Styles.releaseDates>
-                  <span> {React.string("Oct 20")} </span>
-                  <span> {React.string("Oct 30")} </span>
+                  <span> {React.string("Oct 27")} </span>
+                  <span> {React.string("Nov 6")} </span>
                 </div>
               </div>
             </div>
@@ -365,17 +360,17 @@ let make = () => {
                 </span>
               </Next.Link>
               {React.string(
-                 "before mainnet launches in Q4 of this year. There are still up to 800 Genesis grants still available, and Genesis grant recipients, otherwise known as Genesis Founding Members (GFMs), will each receive 66,000 tokens. ",
+                 "before mainnet launches in Q4 of this year. There are up to 800 Genesis grants still available, and Genesis grant recipients, otherwise known as Genesis Founding Members (GFMs), will each receive 66,000 tokens. ",
                )}
               <Next.Link href="/">
-                <div className=Styles.link>
+                <span className=Styles.link>
                   {React.string("Apply for Genesis now. ")}
-                </div>
+                </span>
               </Next.Link>
             </span>
-            <span className=Css.(style([marginTop(`rem(1.))]))>
+            <span className=Css.(style([marginTop(`rem(2.))]))>
               {React.string(
-                 "Prepare to engage in Testworld and we'll see you in October",
+                 "Prepare to engage in Testworld and we'll see you in October.",
                )}
             </span>
           </div>

@@ -102,9 +102,12 @@ module Typeface = {
 
   let ddinexp = fontFamily("D-Din-Exp,Helvetica Neue, Arial, sans-serif");
 
-  let monumentGrotesk = fontFamily("Monument Grotesk, serif");
+  let monumentGrotesk =
+    fontFamily("Monument Grotesk, Helvetica Neue, Arial, sans-serif");
 
-  let monumentGroteskMono = fontFamily("Monument Grotesk mono, serif");
+  let monumentGroteskMono =
+    fontFamily("Monument Grotesk mono, Helvetica Neue, Arial, sans-serif");
+
 };
 
 module MediaQuery = {
