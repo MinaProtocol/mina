@@ -48,14 +48,15 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
   module T = struct
     type t =
       { config: Config.t
-      ; net2: Coda_net2.net
+      ; net2: Coda_net2.net Deferred.t ref
       ; first_peer_ivar: unit Ivar.t
       ; high_connectivity_ivar: unit Ivar.t
       ; ban_reader: Intf.ban_notification Linear_pipe.Reader.t
       ; message_reader:
           (Message.msg Envelope.Incoming.t * (bool -> unit))
           Strict_pipe.Reader.t
-      ; subscription: Message.msg Coda_net2.Pubsub.Subscription.t }
+      ; subscription:
+          Message.msg Coda_net2.Pubsub.Subscription.t Deferred.t ref }
 
     let create_rpc_implementations (Rpc_handler (rpc, handler)) =
       let (module Impl) = implementation_of_rpc rpc in
@@ -86,7 +87,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
     (* Creates just the helper, making sure to register everything
       BEFORE we start listening/advertise ourselves for discovery. *)
     let create_libp2p (config : Config.t) rpc_handlers first_peer_ivar
-        high_connectivity_ivar =
+        high_connectivity_ivar ~on_unexpected_termination =
       let fail m =
         failwithf "Failed to connect to libp2p_helper process: %s" m ()
       in
@@ -95,7 +96,8 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
       match%bind
         Monitor.try_with ~rest:`Raise (fun () ->
             trace "coda_net2" (fun () ->
-                Coda_net2.create ~logger:config.logger ~conf_dir ) )
+                Coda_net2.create ~logger:config.logger ~conf_dir
+                  ~on_unexpected_termination ) )
       with
       | Ok (Ok net2) -> (
           let open Coda_net2 in
@@ -335,18 +337,47 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
       | Error e ->
           fail (Exn.to_string e)
 
-    let create config rpc_handlers =
+    let create (config : Config.t) rpc_handlers =
       let first_peer_ivar = Ivar.create () in
       let high_connectivity_ivar = Ivar.create () in
-      let%bind net2, subscription, message_reader =
-        create_libp2p config rpc_handlers first_peer_ivar
-          high_connectivity_ivar
+      let message_reader, message_writer =
+        Strict_pipe.create ~name:"libp2p_messages" Synchronous
+      in
+      let net2_ref = ref (Deferred.never ()) in
+      let subscription_ref = ref (Deferred.never ()) in
+      let%bind () =
+        let on_libp2p_create res =
+          net2_ref := Deferred.map res ~f:(fun (n, _, _) -> n) ;
+          subscription_ref := Deferred.map res ~f:(fun (_, s, _) -> s) ;
+          upon res (fun (_, _, m) ->
+              let logger = config.logger in
+              [%log trace] ~metadata:[] "Successfully restarted libp2p" ;
+              don't_wait_for (Strict_pipe.transfer m message_writer ~f:Fn.id)
+          )
+        in
+        let rec on_unexpected_termination () =
+          on_libp2p_create
+            (create_libp2p config rpc_handlers first_peer_ivar
+               high_connectivity_ivar ~on_unexpected_termination) ;
+          Deferred.unit
+        in
+        let res =
+          create_libp2p config rpc_handlers first_peer_ivar
+            high_connectivity_ivar ~on_unexpected_termination
+        in
+        on_libp2p_create res ;
+        let%map _ = res in
+        ()
       in
       let do_ban (addr, expiration) =
         don't_wait_for
           ( Clock.at expiration
-          >>= fun () -> Coda_net2.unban_ip net2 addr |> Deferred.ignore ) ;
-        Coda_net2.ban_ip net2 addr |> Deferred.ignore
+          >>= fun () ->
+          let%bind net2 = !net2_ref in
+          Coda_net2.unban_ip net2 addr |> Deferred.ignore ) ;
+        (let%bind net2 = !net2_ref in
+         Coda_net2.ban_ip net2 addr)
+        |> Deferred.ignore
       in
       let%map () =
         Deferred.List.iter (Trust_system.peer_statuses config.trust_system)
@@ -367,14 +398,14 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
          in
          Linear_pipe.close ban_writer) ;
       { config
-      ; net2
+      ; net2= net2_ref
       ; first_peer_ivar
       ; high_connectivity_ivar
-      ; subscription
+      ; subscription= subscription_ref
       ; message_reader
       ; ban_reader }
 
-    let peers t = Coda_net2.peers t.net2
+    let peers t = !(t.net2) >>= Coda_net2.peers
 
     let initial_peers t = t.config.initial_peers
 
@@ -483,8 +514,9 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
       try_call_rpc_with_dispatch t peer transport Impl.dispatch_multi query
 
     let query_peer t (peer_id : Peer.Id.t) rpc rpc_input =
+      let%bind net2 = !(t.net2) in
       match%bind
-        Coda_net2.open_stream t.net2 ~protocol:rpc_transport_proto peer_id
+        Coda_net2.open_stream net2 ~protocol:rpc_transport_proto peer_id
       with
       | Ok stream ->
           let peer = Coda_net2.Stream.remote_peer stream in
@@ -503,7 +535,9 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
       List.map peers ~f:(fun peer -> query_peer t peer.peer_id rpc query)
 
     let broadcast t msg =
-      don't_wait_for (Coda_net2.Pubsub.Subscription.publish t.subscription msg)
+      don't_wait_for
+        (let%bind subscription = !(t.subscription) in
+         Coda_net2.Pubsub.Subscription.publish subscription msg)
 
     let on_first_connect t ~f = Deferred.map (Ivar.read t.first_peer_ivar) ~f
 
@@ -515,10 +549,9 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
     let ban_notification_reader t = t.ban_reader
 
     let ip_for_peer t peer_id =
-      Coda_net2.lookup_peerid t.net2 peer_id
+      let%bind net2 = !(t.net2) in
+      Coda_net2.lookup_peerid net2 peer_id
       >>| function Ok p -> Some p | Error _ -> None
-
-    let net2 t = Some t.net2
   end
 
   include T
