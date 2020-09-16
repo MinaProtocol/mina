@@ -39,7 +39,7 @@ module Styles = {
       left(`rem(1.25)),
       background(white),
       width(`rem(21.)),
-      height(`rem(19.25)),
+      height(`rem(16.25)),
       media(
         Theme.MediaQuery.tablet,
         [
