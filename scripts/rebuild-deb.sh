@@ -98,8 +98,8 @@ done
 
 # Genesis Ledger Copy
 for f in /tmp/coda_cache_dir/genesis*; do
-    cp /tmp/coda_cache_dir/genesis_state/genesis* "${BUILDDIR}/var/lib/coda/."
-    cp /tmp/s3_cache_dir/genesis_state/genesis* "${BUILDDIR}/var/lib/coda/."
+    cp /tmp/coda_cache_dir/genesis* "${BUILDDIR}/var/lib/coda/."
+    cp /tmp/s3_cache_dir/genesis* "${BUILDDIR}/var/lib/coda/."
 done
 
 #copy config.json
