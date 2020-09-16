@@ -48,7 +48,7 @@ type kind =
  *  Some icons have not been edited for currentColor properties. TODO is to come back and clean them up when needed.
  */
 [@react.component]
-let make = (~kind, ~size=1.5,) => {
+let make = (~kind, ~size=1.5) => {
   let iconSize = Js.Float.toString(size *. 16.) ++ "px";
   let sizeValue = Js.Float.toString(size *. 16.);
   <svg
@@ -63,8 +63,7 @@ let make = (~kind, ~size=1.5,) => {
         sizeValue;
       }
     }
-    fill=
-    "currentColor">
+    fill="currentColor">
     {switch (kind) {
      | World =>
        <path
@@ -742,7 +741,13 @@ let make = (~kind, ~size=1.5,) => {
              d="M11.4 1.8C11.4 2.79411 10.5941 3.6 9.59999 3.6C8.60588 3.6 7.79999 2.79411 7.79999 1.8C7.79999 0.805887 8.60588 0 9.59999 0C10.5941 0 11.4 0.805887 11.4 1.8Z"
              fill="currentColor"
            />
-           <ellipse cx="13.8" cy="22.2" rx="1.8" ry="1.8" fill="currentColor" />
+           <ellipse
+             cx="13.8"
+             cy="22.2"
+             rx="1.8"
+             ry="1.8"
+             fill="currentColor"
+           />
            <ellipse
              cx="3.00001"
              cy="18.6"
