@@ -1046,7 +1046,7 @@ func main() {
 		Format: logging.JSONOutput,
 		Stderr: true,
 		Stdout: false,
-		Level:  logging.LevelInfo,
+		Level:  logging.LevelDebug,
 		File:   "",
 	})
 	helperLog := logging.Logger("helper top-level JSON handling")
@@ -1111,7 +1111,7 @@ func main() {
 
 	for lines.Scan() {
 		line = lines.Text()
-		helperLog.Infof("message size is %d", len(line))
+		helperLog.Debugf("message size is %d", len(line))
 		var raw json.RawMessage
 		env := envelope{
 			Body: &raw,
