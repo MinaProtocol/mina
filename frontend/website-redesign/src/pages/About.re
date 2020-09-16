@@ -326,5 +326,7 @@ let make = () => {
     <Hero />
     <HeroRows />
     <QuoteSection />
+    <SecuredBySection />
+    <Contributors />
   </Page>;
 };
