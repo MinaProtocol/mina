@@ -4,11 +4,15 @@ type remote_error = {node_id: string; error_message: Logger.Message.t}
 
 (* NB: equality on internal errors ignores timestamp *)
 type internal_error =
-  { occurrence_time: Time.t sexp_opaque [@equal fun _ _ -> true]
+  { occurrence_time: Time.t sexp_opaque
+        [@equal fun _ _ -> true] [@compare fun _ _ -> 0]
   ; error: Error.t
         [@equal
           fun a b ->
-            String.equal (Error.to_string_hum a) (Error.to_string_hum b)] }
+            String.equal (Error.to_string_hum a) (Error.to_string_hum b)]
+        [@compare
+          fun a b ->
+            String.compare (Error.to_string_hum a) (Error.to_string_hum b)] }
 [@@deriving eq, sexp, compare]
 
 type t = Remote_error of remote_error | Internal_error of internal_error

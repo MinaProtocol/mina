@@ -215,6 +215,31 @@ let lift_error_set (type a) (m : a t) :
 
 (* Unit tests to follow *)
 
+(* we derive custom equality and comparisions for our result type, as the
+ * default behavior of ppx_assert is to use polymorphic equality and comparisons
+ * for results (as to why, I have no clue) *)
+type 'a inner = ('a Accumulator.t, Hard_fail.t) Result.t [@@deriving sexp_of]
+
+let equal_inner equal a b =
+  match (a, b) with
+  | Ok a', Ok b' ->
+      Accumulator.equal equal a' b'
+  | Error a', Error b' ->
+      Hard_fail.equal a' b'
+  | _ ->
+      false
+
+let compare_inner compare a b =
+  match (a, b) with
+  | Ok a', Ok b' ->
+      Accumulator.compare compare a' b'
+  | Error a', Error b' ->
+      Hard_fail.compare a' b'
+  | Ok _, Error _ ->
+      -1
+  | Error _, Ok _ ->
+      1
+
 let%test_unit "error_monad_unit_test_1" =
   Async.Thread_safe.block_on_async_exn (fun () ->
       let open Deferred.Let_syntax in
@@ -227,7 +252,7 @@ let%test_unit "error_monad_unit_test_1" =
         in
         f (f (f (f (f (return 0)))))
       in
-      [%test_eq: (int Accumulator.t, Hard_fail.t) Result.t] test1
+      [%test_eq: int inner] ~equal:(equal_inner Int.equal) test1
         (Ok {Accumulator.computation_result= 5; soft_errors= []}) )
 
 let%test_unit "error_monad_unit_test_2" =
@@ -242,7 +267,7 @@ let%test_unit "error_monad_unit_test_2" =
         Deferred.return
           (Ok {Accumulator.computation_result= "123"; soft_errors= []})
       in
-      [%test_eq: (string Accumulator.t, Hard_fail.t) Result.t] test2
+      [%test_eq: string inner] ~equal:(equal_inner String.equal) test2
         (Ok {Accumulator.computation_result= "123"; soft_errors= []}) )
 
 let%test_unit "error_monad_unit_test_3" =
@@ -263,7 +288,7 @@ let%test_unit "error_monad_unit_test_3" =
              ; soft_errors=
                  [Test_error.raw_internal_error (Error.of_string "b")] })
       in
-      [%test_eq: (string Accumulator.t, Hard_fail.t) Result.t] test3
+      [%test_eq: string inner] ~equal:(equal_inner String.equal) test3
         (Ok
            { Accumulator.computation_result= "123"
            ; soft_errors=
@@ -286,7 +311,7 @@ let%test_unit "error_monad_unit_test_4" =
                  Test_error.raw_internal_error (Error.of_string "xyz")
              ; soft_errors= [] })
       in
-      [%test_eq: (string Accumulator.t, Hard_fail.t) Result.t] test4
+      [%test_eq: string inner] ~equal:(equal_inner String.equal) test4
         (Error
            { Hard_fail.hard_error=
                Test_error.raw_internal_error (Error.of_string "xyz")
@@ -310,7 +335,7 @@ let%test_unit "error_monad_unit_test_5" =
                  Test_error.raw_internal_error (Error.of_string "xyz")
              ; soft_errors= [] })
       in
-      [%test_eq: (string Accumulator.t, Hard_fail.t) Result.t] test5
+      [%test_eq: string inner] ~equal:(equal_inner String.equal) test5
         (Error
            { Hard_fail.hard_error=
                Test_error.raw_internal_error (Error.of_string "xyz")
@@ -336,7 +361,7 @@ let%test_unit "error_monad_unit_test_6" =
              ; soft_errors=
                  [Test_error.raw_internal_error (Error.of_string "b")] })
       in
-      [%test_eq: (string Accumulator.t, Hard_fail.t) Result.t] test6
+      [%test_eq: string inner] ~equal:(equal_inner String.equal) test6
         (Error
            { Hard_fail.hard_error=
                Test_error.raw_internal_error (Error.of_string "xyz")
