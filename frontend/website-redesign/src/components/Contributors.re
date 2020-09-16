@@ -14,20 +14,26 @@ module Styles = {
     ]);
 };
 
-module TeamGrid = {
-  module TeamMember = {
-      module Styles = {
+ module TeamMember = {
+    module Styles = {
           open Css;
-          let memberContainer = style([height(`rem(17.)), width(`rem(10.))]);
-      }
+          let memberContainer = style([height(`rem(17.)), width(`rem(11.)), color(orange)]);
+          let image = style([height(`rem(10.5))]);
+          let name = merge([Theme.Type.h5, style([lineHeight(`rem(1.37)), color(black), fontSize(`px(18))])]);
+          let title = merge([Theme.Type.contributorLabel, style([lineHeight(`rem(1.37)), color(black),fontSize(`px(18))])]);
+
+      };
     [@react.component]
-    let make = (~fullName="", ~title="", ~imageUrl="") => {
+    let make = (~fullName="", ~title="", ~src="") => {
       <div className=Styles.memberContainer> 
-      <h5> {React.string(fullName)}</h5> 
-            <p> {React.string(title)}</p>
+        <img className=Styles.image src=src/>
+        <> <h5 className=Styles.name> {React.string(fullName)}</h5> <Icon kind=Icon.Plus/> </>
+        <p className=Styles.title> {React.string(title)}</p>
       </div>;
-    }
+    };
   };
+
+module TeamGrid = {
   module Styles = {
     open Css;
     let grid =
@@ -41,9 +47,12 @@ module TeamGrid = {
   };
   [@react.component]
   let make = () => {
-    <div className=Styles.grid />;
+    <div className=Styles.grid> 
+        <TeamMember fullName="Evan Shapiro" title="CEO, O(1) Labs" src="/static/img/headshots/EvanShapiro.jpg"/>
+    </div>
   };
 };
+
 [@react.component]
 let make = () => {
   <div className=Styles.container>

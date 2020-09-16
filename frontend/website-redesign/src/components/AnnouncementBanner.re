@@ -35,7 +35,7 @@ module Styles = {
 
   let announcementText = style([paddingLeft(`rem(2.))]);
 
-  let link = merge([flexCenter, style([cursor(`pointer)])]);
+  let link = merge([flexCenter, style([cursor(`pointer), color(Theme.Colors.orange)])]);
 
   let learnMoreText =
     merge([
@@ -65,7 +65,7 @@ let make = (~children) => {
           <span className=Styles.learnMoreText>
             {React.string("Learn More")}
           </span>
-          <Icon kind=Icon.ArrowRightMedium currentColor="orange" />
+          <Icon kind=Icon.ArrowRightMedium />
         </div>
       </Next.Link>
     </div>
