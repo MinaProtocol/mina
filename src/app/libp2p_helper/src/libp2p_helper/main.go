@@ -901,6 +901,7 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 			if err != nil {
 				app.P2p.Logger.Warning("error while trying to find some peers: ", err.Error())
 			}
+			time.Sleep(2 * time.Minute)
 		}
 	}()
 

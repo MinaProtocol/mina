@@ -1392,7 +1392,7 @@ let create ~on_unexpected_termination ~logger ~conf_dir =
                   ; metadata= String.Map.singleton "line" (`String r.message)
                   } )
           | Error err ->
-              [%log error]
+              [%log debug]
                 ~metadata:[("line", `String line); ("error", `String err)]
                 "failed to parse log line from helper stderr" ) ;
           Deferred.unit )
