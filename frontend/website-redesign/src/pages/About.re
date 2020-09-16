@@ -259,64 +259,56 @@ module HeroRows = {
         />
       </div>
       <div className=Styles.container>
-<<<<<<< HEAD
-=======
-        <div className=Styles.secondImage />
->>>>>>> 5f7d54b99... Add images for second row
-        <div className=Styles.secondColumn>
-          <p className=Styles.subhead>
-            {React.string("That's why we created Mina.")}
-          </p>
-          <p className=Styles.copy>
-            {React.string(
-               "In June of 2017, O(1) Labs kicked off an ambitious
+        <p className=Styles.subhead />
+        <p className=Styles.copy>
+          {React.string(
+             "In June of 2017, O(1) Labs kicked off an ambitious
                new open source project to design a layer one protocol
                that could deliver on the original promise of blockchain
                - true decentralization, scale and security.
                Rather than apply brute computing force, Mina offers
                an elegant solution using advanced cryptography
                and recursive zk-SNARKs. ",
-             )}
-          </p>
-          <Spacer height=1. />
-          <p className=Styles.copy>
-            {React.string(
-               "Over the past three years,
+           )}
+        </p>
+        <Spacer height=1. />
+        <p className=Styles.copy>
+          {React.string(
+             "Over the past three years,
                our team together with our incredible
                community have launched and learned through several
                testnet phases. And now, at long last, we are proud
                to introduce Mina to the wider world. Here, developers
                can build ",
-             )}
-            <span className=Styles.orange>
-              {React.string("powerful applications ")}
-            </span>
-            {React.string(
-               " like Snapps (SNARK-powered apps)
+           )}
+          <span className=Styles.orange>
+            {React.string("powerful applications ")}
+          </span>
+          {React.string(
+             " like Snapps (SNARK-powered apps)
                to offer financial services without compromising data privacy
                and programmable money that anyone can access trustlessly from their phones.
                And that's just the beginning.",
-             )}
-          </p>
-          <Spacer height=1. />
-          <p className=Styles.copy>
+           )}
+        </p>
+        <Spacer height=1. />
+        <p className=Styles.copy>
+          {React.string(
+             "While there will still be challenges to come, the world's lightest, most accessible blockchain is ready to be powered by a whole new generation of participants.",
+           )}
+        </p>
+        <Spacer height=1. />
+        <p className=Styles.copy>
+          <strong>
             {React.string(
-               "While there will still be challenges to come, the world's lightest, most accessible blockchain is ready to be powered by a whole new generation of participants.",
+               "Here's to a more efficient, elegant and fair future - for all of us.",
              )}
-          </p>
-          <Spacer height=1. />
-          <p className=Styles.copy>
-            <strong>
-              {React.string(
-                 "Here's to a more efficient, elegant and fair future - for all of us.",
-               )}
-            </strong>
-          </p>
-          <img
-            className=Styles.secondImage
-            src="/static/img/triangle_desktop.png"
-          />
-        </div>
+          </strong>
+        </p>
+        <img
+          className=Styles.secondImage
+          src="/static/img/triangle_desktop.png"
+        />
       </div>
     </div>;
   };
