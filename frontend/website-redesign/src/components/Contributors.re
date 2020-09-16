@@ -16,10 +16,17 @@ module Styles = {
 
 module TeamGrid = {
   module TeamMember = {
+      module Styles = {
+          open Css;
+          let memberContainer = style([height(`rem(17.)), width(`rem(10.))]);
+      }
     [@react.component]
-    let make = (~fullName, ~title, ~imageUrl) => {
-      <div />;
-    };
+    let make = (~fullName="", ~title="", ~imageUrl="") => {
+      <div className=Styles.memberContainer> 
+      <h5> {React.string(fullName)}</h5> 
+            <p> {React.string(title)}</p>
+      </div>;
+    }
   };
   module Styles = {
     open Css;
