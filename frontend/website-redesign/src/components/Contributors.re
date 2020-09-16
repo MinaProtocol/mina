@@ -61,10 +61,13 @@ module TeamGrid = {
     let grid =
       style([
         display(`grid),
+        paddingTop(`rem(1.)),
         gridTemplateColumns([`rem(10.), `rem(10.)]),
         gridAutoRows(`rem(17.3)),
         gridColumnGap(`rem(1.)),
         gridRowGap(`rem(1.)),
+        media(Theme.MediaQuery.tablet, [gridTemplateColumns([`rem(10.), `rem(10.), `rem(10.), `rem(10.)]),
+])
       ]);
   };
   [@react.component]
@@ -188,7 +191,7 @@ let make = () => {
          "Mina is an inclusive open source protocol uniting teams and technicians from San Francisco and around the world.",
        )}
     </p>
+    <Rule color=Theme.Colors.black/>
     <TeamGrid />
-    <Rule />
   </div>;
 };
