@@ -7,19 +7,19 @@ module Styles = {
       flexDirection(`column),
       justifyContent(`flexStart),
       alignContent(`spaceBetween),
-      backgroundImage(`url("/static/img/02_About_1_750x1056_mobile.jpg")),
+      backgroundImage(`url("/static/img/AboutHeroMobileBackground.jpg")),
       backgroundSize(`cover),
       media(
         Theme.MediaQuery.tablet,
         [
-          backgroundImage(
-            `url("/static/img/02_About_1_1536x1504_tablet.jpg"),
-          ),
+          backgroundImage(`url("/static/img/AboutHeroTabletBackground.jpg")),
         ],
       ),
       media(
         Theme.MediaQuery.desktop,
-        [backgroundImage(`url("/static/img/02_About_1_2880x1504.jpg"))],
+        [
+          backgroundImage(`url("/static/img/AboutHeroDesktopBackground.jpg")),
+        ],
       ),
     ]);
   let heroContent =
