@@ -383,10 +383,31 @@ let daemon logger =
              match Sys.getenv "CODA_CONFIG_FILE" with
              | Some config_file ->
                  (config_file, false)
-             | None ->
-                 (conf_dir ^/ "daemon.json", false) )
+             | None -> (
+                 (*Check if the config file is installed as part of the deb before resorting to the default*)
+                 let config_file_installed =
+                   let json =
+                     "config_" ^ Coda_version.commit_id_short ^ ".json"
+                   in
+                   List.fold_until ~init:None
+                     (Cache_dir.possible_paths json)
+                     ~f:(fun _acc f ->
+                       match Core.Sys.file_exists f with
+                       | `Yes ->
+                           Stop (Some f)
+                       | _ ->
+                           Continue None )
+                     ~finish:Fn.id
+                 in
+                 match config_file_installed with
+                 | Some config_file ->
+                     (config_file, false)
+                 | None ->
+                     (conf_dir ^/ "daemon.json", false) ) )
          in
          let%bind config_json =
+           [%log info] "Trying to read runtime config from $config_file"
+             ~metadata:[("config_file", `String config_file)] ;
            match%map Genesis_ledger_helper.load_config_json config_file with
            | Ok config ->
                Some config
