@@ -609,6 +609,11 @@ let apply_transaction_exn ~constraint_constants
   | Coinbase c ->
       apply_coinbase_exn ~constraint_constants ~txn_global_slot t c
 
+let has_locked_tokens_exn ~global_slot ~account_id t =
+  let idx = find_index_exn t account_id in
+  let _, account = get_or_initialize_exn account_id t idx in
+  Account.has_locked_tokens ~global_slot account
+
 let merkle_root t =
   Ledger_hash.of_hash (merkle_root t :> Random_oracle.Digest.t)
 

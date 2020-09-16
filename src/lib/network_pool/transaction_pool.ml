@@ -1593,7 +1593,7 @@ let%test_module _ =
               let mock_ledger =
                 Account_id.Map.of_alist_exn
                   ( init_ledger_state |> Array.to_sequence
-                  |> Sequence.map ~f:(fun (kp, bal, nonce) ->
+                  |> Sequence.map ~f:(fun (kp, balance, nonce, timing) ->
                          let public_key = Public_key.compress kp.public_key in
                          let account_id =
                            Account_id.create public_key Token_id.default
@@ -1601,9 +1601,10 @@ let%test_module _ =
                          ( account_id
                          , { (Account.initialize account_id) with
                              balance=
-                               Currency.Balance.of_int
-                                 (Currency.Amount.to_int bal)
-                           ; nonce } ) )
+                               Currency.Balance.of_uint64
+                                 (Currency.Amount.to_uint64 balance)
+                           ; nonce
+                           ; timing } ) )
                   |> Sequence.to_list )
               in
               best_tip_ref := mock_ledger ;

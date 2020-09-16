@@ -923,9 +923,6 @@ module Base = struct
         ; vesting_increment } =
       account.timing
     in
-    let%bind before_or_at_cliff =
-      Global_slot.Checked.(txn_global_slot <= cliff_time)
-    in
     let int_of_field field =
       Snarky_integer.Integer.constant ~m
         (Bigint.of_field field |> Bigint.to_bignum_bigint)
@@ -939,38 +936,8 @@ module Base = struct
     in
     let balance_int = balance_to_int account.balance in
     let%bind curr_min_balance =
-      let open Snarky_integer.Integer in
-      let initial_minimum_balance_int =
-        balance_to_int initial_minimum_balance
-      in
-      make_checked (fun () ->
-          if_ ~m before_or_at_cliff ~then_:initial_minimum_balance_int
-            ~else_:
-              (let txn_global_slot_int =
-                 Global_slot.Checked.to_integer txn_global_slot
-               in
-               let cliff_time_int =
-                 Global_slot.Checked.to_integer cliff_time
-               in
-               let _, slot_diff =
-                 subtract_unpacking_or_zero ~m txn_global_slot_int
-                   cliff_time_int
-               in
-               let vesting_period_int =
-                 Global_slot.Checked.to_integer vesting_period
-               in
-               let num_periods, _ = div_mod ~m slot_diff vesting_period_int in
-               let vesting_increment_int =
-                 Amount.var_to_bits vesting_increment |> of_bits ~m
-               in
-               let min_balance_decrement =
-                 mul ~m num_periods vesting_increment_int
-               in
-               let _, min_balance_less_decrement =
-                 subtract_unpacking_or_zero ~m initial_minimum_balance_int
-                   min_balance_decrement
-               in
-               min_balance_less_decrement) )
+      Account.Checked.min_balance_at_slot ~global_slot:txn_global_slot
+        ~cliff_time ~vesting_period ~vesting_increment ~initial_minimum_balance
     in
     let%bind `Underflow underflow, proposed_balance_int =
       make_checked (fun () ->
