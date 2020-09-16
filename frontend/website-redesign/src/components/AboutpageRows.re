@@ -154,7 +154,7 @@ let make = () => {
       </div>
       <img
         className=Styles.firstImage
-        src="/static/img/02_About_2_1232x1232.jpg"
+        src="/static/img/AboutHeroRow1Image.jpg"
       />
     </div>
     <div className=Styles.container>
