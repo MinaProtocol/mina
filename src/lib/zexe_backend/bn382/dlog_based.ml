@@ -22,7 +22,7 @@ module Mat = struct
     Caml.Gc.finalise delete t ; t
 end
 
-module R1CS_constraint_system = R1cs_constraint_system.Make (Field) (Mat)
+module R1CS_constraint_system = R1cs_constraint_system.Make (Field)
 module Var = Var
 
 module Verification_key = struct

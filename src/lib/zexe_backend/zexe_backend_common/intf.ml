@@ -22,6 +22,16 @@ module type Vector = sig
   val get : t -> int -> elt
 end
 
+module type Double = sig
+  type elt
+
+  type t
+
+  val f0 : t -> elt
+
+  val f1 : t -> elt
+end
+
 module type Triple = sig
   type elt
 

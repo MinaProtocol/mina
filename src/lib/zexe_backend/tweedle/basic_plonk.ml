@@ -17,14 +17,14 @@ module Bigint256 =
       let length_in_bytes = 32
     end)
 
-module Fp = Field.Make (struct
+module Fp = Field_plonk.Make (struct
   module Bigint = Bigint256
-  include Snarky_bn382.Tweedle.Fp
+  include Snarky_bn382.Tweedle.Fp_plonk
 end)
 
-module Fq = Field.Make (struct
+module Fq = Field_plonk.Make (struct
   module Bigint = Bigint256
-  include Snarky_bn382.Tweedle.Fq
+  include Snarky_bn382.Tweedle.Fq_plonk
 end)
 
 module Dee = struct
@@ -36,7 +36,7 @@ module Dee = struct
     let b = of_int 5
   end
 
-  include Curve.Make (Fq) (Fp) (Params) (Snarky_bn382.Tweedle.Dee.Curve)
+  include Curve.Make (Fq) (Fp) (Params) (Snarky_bn382.Tweedle.Dee_plonk.Curve)
 end
 
 module Dum = struct
@@ -48,17 +48,17 @@ module Dum = struct
     let b = of_int 5
   end
 
-  include Curve.Make (Fp) (Fq) (Params) (Snarky_bn382.Tweedle.Dum.Curve)
+  include Curve.Make (Fp) (Fq) (Params) (Snarky_bn382.Tweedle.Dum_plonk.Curve)
 end
 
-module Fq_poly_comm = Zexe_backend_common.Poly_comm.Make (struct
+module Fq_poly_comm = Zexe_backend_common.Plonk_poly_comm.Make (struct
   module Curve = Dum
   module Base_field = Fp
-  module Backend = Snarky_bn382.Tweedle.Dum.Marlin.Field_poly_comm
+  module Backend = Snarky_bn382.Tweedle.Dum_plonk.Plonk.Field_poly_comm
 end)
 
-module Fp_poly_comm = Zexe_backend_common.Poly_comm.Make (struct
+module Fp_poly_comm = Zexe_backend_common.Plonk_poly_comm.Make (struct
   module Curve = Dee
   module Base_field = Fq
-  module Backend = Snarky_bn382.Tweedle.Dee.Marlin.Field_poly_comm
+  module Backend = Snarky_bn382.Tweedle.Dee_plonk.Plonk.Field_poly_comm
 end)
