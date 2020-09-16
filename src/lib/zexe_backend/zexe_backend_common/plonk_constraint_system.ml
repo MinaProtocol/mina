@@ -2,8 +2,10 @@ include Scale_round
 include Endoscale_round
 
 module Gate = struct
-  type g = Zero
+  type g =
+    | Zero
     | Generic
+    | Poseidon
     | EC_add1
     | EC_add2
     | EC_vbmul1
@@ -407,10 +409,11 @@ struct
         (Unsigned.Size_t.of_int (fst prev.(2)).row)
         ((fst prev.(2)).col)
         (Fp.Vector.of_array [||]);
+      sys.next_row <- sys.next_row + 1;
       Gates.add_gate
         sys.gates
         4
-        (Unsigned.Size_t.of_int (sys.next_row + 1))
+        (Unsigned.Size_t.of_int sys.next_row)
         (Unsigned.Size_t.of_int (snd prev.(0)).row)
         ((snd prev.(0)).col)
         (Unsigned.Size_t.of_int (snd prev.(1)).row)
@@ -418,20 +421,74 @@ struct
         (Unsigned.Size_t.of_int (snd prev.(2)).row)
         ((snd prev.(2)).col)
         (Fp.Vector.of_array [||]);
-      sys.next_row <- sys.next_row + 2;
+      sys.next_row <- sys.next_row + 1;
       ()
 
     | Plonk_constraint.T (EC_scale { state }) ->
       let add_ecscale_round (round: Fp.t Snarky_backendless.Cvar.t Scale_round.t) =
-        V.Table.add_multi sys.equivalence_classes ~key:(reduce_to_v round.xt) ~data:{ row= sys.next_row; col= 0 } ;
-        V.Table.add_multi sys.equivalence_classes ~key:(reduce_to_v round.b) ~data:{ row= sys.next_row; col= 1 } ;
-        V.Table.add_multi sys.equivalence_classes ~key:(reduce_to_v round.yt) ~data:{ row= sys.next_row; col= 2 } ;
-        V.Table.add_multi sys.equivalence_classes ~key:(reduce_to_v round.xp) ~data:{ row= sys.next_row+1; col= 0 } ;
-        V.Table.add_multi sys.equivalence_classes ~key:(reduce_to_v round.l1) ~data:{ row= sys.next_row+1; col= 1 } ;
-        V.Table.add_multi sys.equivalence_classes ~key:(reduce_to_v round.yp) ~data:{ row= sys.next_row+1; col= 2 } ;
-        V.Table.add_multi sys.equivalence_classes ~key:(reduce_to_v round.xs) ~data:{ row= sys.next_row+2; col= 0 } ;
-        V.Table.add_multi sys.equivalence_classes ~key:(reduce_to_v round.xs) ~data:{ row= sys.next_row+2; col= 1 } ;
-        sys.next_row <- sys.next_row + 3 ;
+        let xt = reduce_to_v round.xt in
+        let b = reduce_to_v round.b in
+        let yt = reduce_to_v round.yt in
+        let xp = reduce_to_v round.xp in
+        let l1 = reduce_to_v round.l1 in
+        let yp = reduce_to_v round.yp in
+        let xs = reduce_to_v round.xs in
+        let ys = reduce_to_v round.ys in
+
+        V.Table.add_multi sys.equivalence_classes ~key:xt ~data:{ row= sys.next_row; col= 0 } ;
+        V.Table.add_multi sys.equivalence_classes ~key:b ~data:{ row= sys.next_row; col= 1 } ;
+        V.Table.add_multi sys.equivalence_classes ~key:yt ~data:{ row= sys.next_row; col= 2 } ;
+        V.Table.add_multi sys.equivalence_classes ~key:xp ~data:{ row= sys.next_row+1; col= 0 } ;
+        V.Table.add_multi sys.equivalence_classes ~key:l1 ~data:{ row= sys.next_row+1; col= 1 } ;
+        V.Table.add_multi sys.equivalence_classes ~key:yp ~data:{ row= sys.next_row+1; col= 2 } ;
+        V.Table.add_multi sys.equivalence_classes ~key:xs ~data:{ row= sys.next_row+2; col= 0 } ;
+        V.Table.add_multi sys.equivalence_classes ~key:ys ~data:{ row= sys.next_row+2; col= 2 } ;
+
+        let xt = prev sys xt sys.next_row 0 in
+        let b = prev sys b sys.next_row 1 in
+        let yt = prev sys yt sys.next_row 2 in
+        let xp = prev sys xp (sys.next_row + 1) 0 in
+        let l1 = prev sys l1 (sys.next_row + 1) 1 in
+        let yp = prev sys yp (sys.next_row + 1) 2 in
+        let xs = prev sys xs (sys.next_row + 2) 0 in
+        let ys = prev sys ys (sys.next_row + 2) 2 in
+
+        Gates.add_gate
+          sys.gates
+          5
+          (Unsigned.Size_t.of_int sys.next_row)
+          (Unsigned.Size_t.of_int xt.row)
+          (xt.col)
+          (Unsigned.Size_t.of_int b.row)
+          (b.col)
+          (Unsigned.Size_t.of_int yt.row)
+          (yt.col)
+          (Fp.Vector.of_array [||]);
+        sys.next_row <- sys.next_row + 1 ;
+        Gates.add_gate
+          sys.gates
+          7
+          (Unsigned.Size_t.of_int sys.next_row)
+          (Unsigned.Size_t.of_int xp.row)
+          (xp.col)
+          (Unsigned.Size_t.of_int l1.row)
+          (l1.col)
+          (Unsigned.Size_t.of_int yp.row)
+          (yp.col)
+          (Fp.Vector.of_array [||]);
+        sys.next_row <- sys.next_row + 1 ;
+        Gates.add_gate
+          sys.gates
+          7
+          (Unsigned.Size_t.of_int sys.next_row)
+          (Unsigned.Size_t.of_int xs.row)
+          (xs.col)
+          (Unsigned.Size_t.of_int xt.row)
+          (xt.col)
+          (Unsigned.Size_t.of_int ys.row)
+          (ys.col)
+          (Fp.Vector.of_array [||]);
+        sys.next_row <- sys.next_row + 1 ;
       in
       Array.iter ~f:
         (
@@ -443,17 +500,84 @@ struct
 
     | Plonk_constraint.T (EC_endoscale { state }) ->
       let add_endoscale_round (round: Fp.t Snarky_backendless.Cvar.t Endoscale_round.t) =
-        V.Table.add_multi sys.equivalence_classes ~key:(reduce_to_v round.b2i1) ~data:{ row= sys.next_row; col= 0 } ;
-        V.Table.add_multi sys.equivalence_classes ~key:(reduce_to_v round.xt) ~data:{ row= sys.next_row; col= 1 } ;
-        V.Table.add_multi sys.equivalence_classes ~key:(reduce_to_v round.b2i) ~data:{ row= sys.next_row+1; col= 0 } ;
-        V.Table.add_multi sys.equivalence_classes ~key:(reduce_to_v round.xq) ~data:{ row= sys.next_row+1; col= 1 } ;
-        V.Table.add_multi sys.equivalence_classes ~key:(reduce_to_v round.yt) ~data:{ row= sys.next_row+1; col= 2 } ;
-        V.Table.add_multi sys.equivalence_classes ~key:(reduce_to_v round.xp) ~data:{ row= sys.next_row+2; col= 0 } ;
-        V.Table.add_multi sys.equivalence_classes ~key:(reduce_to_v round.l1) ~data:{ row= sys.next_row+2; col= 1 } ;
-        V.Table.add_multi sys.equivalence_classes ~key:(reduce_to_v round.yp) ~data:{ row= sys.next_row+2; col= 2 } ;
-        V.Table.add_multi sys.equivalence_classes ~key:(reduce_to_v round.xs) ~data:{ row= sys.next_row+3; col= 0 } ;
-        V.Table.add_multi sys.equivalence_classes ~key:(reduce_to_v round.xs) ~data:{ row= sys.next_row+3; col= 1 } ;
-        sys.next_row <- sys.next_row + 4 ;
+        let b2i1 = reduce_to_v round.b2i1 in
+        let xt = reduce_to_v round.xt in
+        let b2i = reduce_to_v round.b2i in
+        let xq = reduce_to_v round.xq in
+        let yt = reduce_to_v round.yt in
+        let xp = reduce_to_v round.xp in
+        let l1 = reduce_to_v round.l1 in
+        let yp = reduce_to_v round.yp in
+        let xs = reduce_to_v round.xs in
+        let ys = reduce_to_v round.xs in
+
+        V.Table.add_multi sys.equivalence_classes ~key:b2i1 ~data:{ row= sys.next_row; col= 0 } ;
+        V.Table.add_multi sys.equivalence_classes ~key:xt ~data:{ row= sys.next_row; col= 1 } ;
+        V.Table.add_multi sys.equivalence_classes ~key:b2i ~data:{ row= sys.next_row+1; col= 0 } ;
+        V.Table.add_multi sys.equivalence_classes ~key:xq ~data:{ row= sys.next_row+1; col= 1 } ;
+        V.Table.add_multi sys.equivalence_classes ~key:yt ~data:{ row= sys.next_row+1; col= 2 } ;
+        V.Table.add_multi sys.equivalence_classes ~key:xp ~data:{ row= sys.next_row+2; col= 0 } ;
+        V.Table.add_multi sys.equivalence_classes ~key:l1 ~data:{ row= sys.next_row+2; col= 1 } ;
+        V.Table.add_multi sys.equivalence_classes ~key:yp ~data:{ row= sys.next_row+2; col= 2 } ;
+        V.Table.add_multi sys.equivalence_classes ~key:xs ~data:{ row= sys.next_row+3; col= 0 } ;
+        V.Table.add_multi sys.equivalence_classes ~key:ys ~data:{ row= sys.next_row+3; col= 1 } ;
+
+        let b2i1 = prev sys b2i1 sys.next_row 0 in
+        let xt = prev sys xt sys.next_row 1 in
+        let b2i = prev sys b2i (sys.next_row + 1) 0 in
+        let xq = prev sys xq (sys.next_row + 1) 1 in
+        let yt = prev sys yt (sys.next_row + 1) 2 in
+        let xp = prev sys xp (sys.next_row + 2) 0 in
+        let l1 = prev sys l1 (sys.next_row + 2) 1 in
+        let yp = prev sys yp (sys.next_row + 2) 2 in
+        let xs = prev sys xs (sys.next_row + 3) 0 in
+        let ys = prev sys ys (sys.next_row + 3) 2 in
+
+        Gates.add_gate
+          sys.gates
+          8
+          (Unsigned.Size_t.of_int sys.next_row)
+          (Unsigned.Size_t.of_int b2i1.row)
+          (b2i1.col)
+          (Unsigned.Size_t.of_int xt.row)
+          (xt.col)
+          (Unsigned.Size_t.of_int sys.next_row)
+          (3)
+          (Fp.Vector.of_array [||]);
+        Gates.add_gate
+          sys.gates
+          9
+          (Unsigned.Size_t.of_int sys.next_row)
+          (Unsigned.Size_t.of_int b2i.row)
+          (b2i.col)
+          (Unsigned.Size_t.of_int xq.row)
+          (xq.col)
+          (Unsigned.Size_t.of_int yt.row)
+          (yt.col)
+          (Fp.Vector.of_array [||]);
+        Gates.add_gate
+          sys.gates
+          10
+          (Unsigned.Size_t.of_int sys.next_row)
+          (Unsigned.Size_t.of_int xp.row)
+          (xp.col)
+          (Unsigned.Size_t.of_int l1.row)
+          (l1.col)
+          (Unsigned.Size_t.of_int yp.row)
+          (yp.col)
+          (Fp.Vector.of_array [||]);
+       Gates.add_gate
+          sys.gates
+          11
+          (Unsigned.Size_t.of_int sys.next_row)
+          (Unsigned.Size_t.of_int xs.row)
+          (xs.col)
+          (Unsigned.Size_t.of_int xq.row)
+          (xq.col)
+          (Unsigned.Size_t.of_int ys.row)
+          (ys.col)
+          (Fp.Vector.of_array [||]);
+        sys.next_row <- sys.next_row + 1 ;
       in
       Array.iter ~f:
         (
