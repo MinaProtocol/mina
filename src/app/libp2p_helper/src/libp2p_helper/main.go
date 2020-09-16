@@ -22,6 +22,7 @@ import (
 	"github.com/ipfs/go-ipfs/core/bootstrap"
 	logging "github.com/ipfs/go-log/v2"
 	crypto "github.com/libp2p/go-libp2p-core/crypto"
+	coredisc "github.com/libp2p/go-libp2p-core/discovery"
 	"github.com/libp2p/go-libp2p-core/event"
 	net "github.com/libp2p/go-libp2p-core/network"
 	peer "github.com/libp2p/go-libp2p-core/peer"
@@ -272,7 +273,7 @@ func (m *configureMsg) run(app *app) (interface{}, error) {
 	helper.Pubsub = ps
 	app.P2p = helper
 
-  app.P2p.Logger.Infof("here are the seeds: %v", seeds)
+	app.P2p.Logger.Infof("here are the seeds: %v", seeds)
 
 	return "configure success", nil
 }
@@ -890,6 +891,15 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 			e := evt.(event.EvtPeerConnectednessChanged)
 			if validPeer(e.Peer) {
 				foundPeer(e.Peer)
+			}
+		}
+	}()
+
+	go func() {
+		for {
+			_, err := discovery.FindPeers(app.Ctx, routingDiscovery, app.P2p.Rendezvous, coredisc.Limit(20))
+			if err != nil {
+				app.P2p.Logger.Warning("error while trying to find some peers: ", err.Error())
 			}
 		}
 	}()
