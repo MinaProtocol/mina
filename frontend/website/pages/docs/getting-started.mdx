@@ -75,9 +75,11 @@ Add the Coda Debian repo and install:
 ```
 sudo apt-get remove coda-testnet-postake-medium-curves
 sudo apt-get remove coda-kademlia
-echo "deb [trusted=yes] http://packages.o1test.net unstable main" | sudo tee /etc/apt/sources.list.d/coda.list
+echo "deb [trusted=yes] http://packages.o1test.net release main" | sudo tee /etc/apt/sources.list.d/coda.list
 sudo apt-get update
-sudo apt-get install -t unstable coda-testnet-postake-medium-curves=0.0.12-beta+406048-feature-bump-genesis-timestamp-3e9b174-PV48525e92
+sudo apt-get install coda-testnet-postake-medium-curves
+# optionally, install the archive node
+sudo apt-get install coda-archive
 ```
 
 If you already have `coda` installed from a previous release, running the above commands should automatically uninstall and reinstall the newest version. If you're installing Coda from scratch, you may see this error when you run the first command: `E: Unable to locate package coda-testnet-postake-medium-curves`. You can ignore this - it just means there wasn't a prior release installed.
