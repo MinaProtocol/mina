@@ -904,9 +904,11 @@ let%test_module _ =
           let account_init_states_seq = Array.to_sequence ledger_init in
           let balances = Hashtbl.create (module Public_key.Compressed) in
           let nonces = Hashtbl.create (module Public_key.Compressed) in
-          Sequence.iter account_init_states_seq ~f:(fun (kp, balance, nonce) ->
+          Sequence.iter account_init_states_seq
+            ~f:(fun (kp, balance, nonce, _) ->
               let compressed = Public_key.compress kp.public_key in
-              Hashtbl.add_exn balances ~key:compressed ~data:balance ;
+              Hashtbl.add_exn balances ~key:compressed
+                ~data:(Currency.Balance.to_amount balance) ;
               Hashtbl.add_exn nonces ~key:compressed ~data:nonce ) ;
           let pool = ref empty in
           let rec go cmds_acc =

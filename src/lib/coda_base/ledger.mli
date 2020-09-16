@@ -197,6 +197,12 @@ val undo :
   -> Undo.t
   -> unit Or_error.t
 
+val has_locked_tokens :
+     global_slot:Coda_numbers.Global_slot.t
+  -> account_id:Account_id.t
+  -> t
+  -> bool Or_error.t
+
 val merkle_root_after_snapp_command_exn :
      constraint_constants:Genesis_constants.Constraint_constants.t
   -> txn_state_view:Snapp_predicate.Protocol_state.View.t
@@ -219,12 +225,18 @@ val num_accounts : t -> int
     generator for this type because you need to detach a mask from it's parent
     when you're done with it - the GC doesn't take care of that. *)
 val gen_initial_ledger_state :
-  (Signature_lib.Keypair.t * Currency.Amount.t * Coda_numbers.Account_nonce.t)
+  ( Signature_lib.Keypair.t
+  * Currency.Balance.t
+  * Coda_numbers.Account_nonce.t
+  * Account_timing.t )
   array
   Quickcheck.Generator.t
 
 type init_state =
-  (Signature_lib.Keypair.t * Currency.Amount.t * Coda_numbers.Account_nonce.t)
+  ( Signature_lib.Keypair.t
+  * Currency.Balance.t
+  * Coda_numbers.Account_nonce.t
+  * Account_timing.t )
   array
 [@@deriving sexp_of]
 

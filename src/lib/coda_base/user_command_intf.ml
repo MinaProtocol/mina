@@ -80,7 +80,11 @@ module type Gen_intf = sig
     val sequence :
          ?length:int
       -> ?sign_type:[`Fake | `Real]
-      -> (Signature_lib.Keypair.t * Currency.Amount.t * Account_nonce.t) array
+      -> ( Signature_lib.Keypair.t
+         * Currency.Balance.t
+         * Coda_numbers.Account_nonce.t
+         * Account_timing.t )
+         array
       -> t list Quickcheck.Generator.t
   end
 end
