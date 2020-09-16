@@ -199,9 +199,24 @@ struct
 
   let neg_one = Fp.(negate one)
 
+  open Position
+  let prev sys key row col = match V.Table.find sys.equivalence_classes key with
+    | Some x -> (match List.last x with
+      | Some x -> x
+      | None -> {row= row; col})
+    | None -> {row= row; col}
+
   let add_generic_constraint sys ?m ?c ?o ?r ((ls : Fp.t), (lx: V.t)) : unit =
 
     let row = sys.next_row in sys.next_row <- row + 1 ;
+    let lp = prev sys lx row 0 in
+    let rp = match r with
+      | Some (_, rx) -> prev sys rx row 1
+      | None -> {row= row; col= 1} in
+    let op = match o with
+      | Some (_, ox) -> prev sys ox row 2
+      | None -> {row= row; col= 2} in
+
     V.Table.add_multi sys.equivalence_classes ~key:lx ~data:{ row; col= 0 } ;
     Option.iter r ~f:(fun (_, xr) -> V.Table.add_multi sys.equivalence_classes ~key:xr ~data:{ row; col= 1 }) ;
     Option.iter o ~f:(fun (_, xo) -> V.Table.add_multi sys.equivalence_classes ~key:xo ~data:{ row; col= 2 }) ;
@@ -211,12 +226,12 @@ struct
       sys.gates
       1
       (Unsigned.Size_t.of_int row)
-      (Unsigned.Size_t.of_int row)
-      (1)
-      (Unsigned.Size_t.of_int row)
-      (2)
-      (Unsigned.Size_t.of_int row)
-      (3)
+      (Unsigned.Size_t.of_int lp.row)
+      (lp.col)
+      (Unsigned.Size_t.of_int rp.row)
+      (rp.col)
+      (Unsigned.Size_t.of_int op.row)
+      (op.col)
       (Fp.Vector.of_array [|ls; (ct r); (ct o); (cs m); (cs c)|])
 
   let completely_reduce sys (terms : (Fp.t * int) list) = (* just adding constrained variables without values *)
@@ -239,11 +254,6 @@ struct
           ~one:(of_int 1))
         x
     in
-
-
-    (*print_endline (Sexplib.Sexp.to_string ([%sexp_of: (Fp.t * int) list] terms));*)
-
-
     let terms =
       List.sort terms ~compare:(fun (_, i) (_, j) -> Int.compare i j)
     in
@@ -346,30 +356,68 @@ struct
       let start = (reduce_state sys [|start|]).(0) in
       let state = reduce_state sys state in
 
-      let add_round_state array = Array.iteri ~f:
+      let add_round_state array =
+        let prev = Array.mapi array ~f:
           (
-            fun i x -> V.Table.add_multi sys.equivalence_classes ~key:x ~data:{ row= sys.next_row; col= i } ;
-          ) array;
+            fun i x ->
+            (
+              let p = prev sys x sys.next_row i in
+              V.Table.add_multi sys.equivalence_classes ~key:x ~data:{ row= sys.next_row; col= i } ;
+              p
+            )
+          )
+        in
+        Gates.add_gate
+          sys.gates
+          2
+          (Unsigned.Size_t.of_int sys.next_row)
+          (Unsigned.Size_t.of_int prev.(0).row)
+          (prev.(0).col)
+          (Unsigned.Size_t.of_int prev.(1).row)
+          (prev.(1).col)
+          (Unsigned.Size_t.of_int prev.(2).row)
+          (prev.(2).col)
+          (Fp.Vector.of_array [||]);
         sys.next_row <- sys.next_row + 1
       in
       add_round_state start;
-      Array.iter ~f:
-        (
-          fun state -> 
-            (* Backend.add_poseidon_constraint sys.backend sys.next_row *)
-            add_round_state state
-        ) state;
+      Array.iter ~f:(fun state ->  add_round_state state) state;
       ()
 
     | Plonk_constraint.T (EC_add { p1; p2; p3 }) ->
-      Array.iteri ~f:
+      let prev = Array.mapi ~f:
         (
           fun i (px, py) ->
             let (x, y) = reduce_to_v px, reduce_to_v py in
+            let prevx = prev sys x sys.next_row i in
+            let prevy = prev sys y sys.next_row i in
             V.Table.add_multi sys.equivalence_classes ~key:y ~data:{ row= sys.next_row; col= i } ;
             V.Table.add_multi sys.equivalence_classes ~key:x ~data:{ row= sys.next_row + 1; col= i } ;
-        ) [|p1; p2; p3|];
-      (* Backend.add_ecadd_constraint sys.backend sys.next_row *)
+            (prevx, prevy)
+        ) [|p1; p2; p3|]
+      in
+      Gates.add_gate
+        sys.gates
+        3
+        (Unsigned.Size_t.of_int sys.next_row)
+        (Unsigned.Size_t.of_int (fst prev.(0)).row)
+        ((fst prev.(0)).col)
+        (Unsigned.Size_t.of_int (fst prev.(1)).row)
+        ((fst prev.(1)).col)
+        (Unsigned.Size_t.of_int (fst prev.(2)).row)
+        ((fst prev.(2)).col)
+        (Fp.Vector.of_array [||]);
+      Gates.add_gate
+        sys.gates
+        4
+        (Unsigned.Size_t.of_int (sys.next_row + 1))
+        (Unsigned.Size_t.of_int (snd prev.(0)).row)
+        ((snd prev.(0)).col)
+        (Unsigned.Size_t.of_int (snd prev.(1)).row)
+        ((snd prev.(1)).col)
+        (Unsigned.Size_t.of_int (snd prev.(2)).row)
+        ((snd prev.(2)).col)
+        (Fp.Vector.of_array [||]);
       sys.next_row <- sys.next_row + 2;
       ()
 
