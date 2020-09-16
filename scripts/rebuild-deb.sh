@@ -10,6 +10,7 @@ cd "${SCRIPTPATH}/../_build"
 GITHASH=$(git rev-parse --short=7 HEAD)
 GITBRANCH=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD |  sed 's!/!-!; s!_!-!g' )
 GITTAG=$(git describe --abbrev=0)
+GITHASH_CONFIG=$(git rev-parse --short=8 --verify HEAD)
 
 # Identify All Artifacts by Branch and Git Hash
 set +u
@@ -125,7 +126,7 @@ for f in /tmp/coda_cache_dir/genesis*; do
 done
 
 #copy config.json
-cp ../genesis_ledgers/phase_three/config.json "${BUILDDIR}/var/lib/coda/config_${VERSION}.json"
+cp ../genesis_ledgers/phase_three/config.json "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"
 
 # Bash autocompletion
 # NOTE: We do not list bash-completion as a required package,
