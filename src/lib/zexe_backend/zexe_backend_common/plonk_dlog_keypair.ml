@@ -102,9 +102,9 @@ module Make (Inputs : Inputs_intf) = struct
     let urs = ref None in
     let degree = 1 lsl Pickles_types.Nat.to_int Rounds.n in
     (* TODO *)
-    let public_inputs = Unsigned.Size_t.of_int 0 in
+    let public_inputs = failwith "TODO" in
     (* TODO *)
-    let size = Unsigned.Size_t.of_int 0 in
+    let size = failwith "TODO" in
     let set_urs_info specs =
       Set_once.set_exn urs_info Lexing.dummy_pos specs
     in
