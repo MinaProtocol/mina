@@ -274,39 +274,32 @@ module HeroRows = {
                Rather than apply brute computing force, Mina offers
                an elegant solution using advanced cryptography
                and recursive zk-SNARKs. ",
-           )}
-        </p>
-        <Spacer height=1. />
-        <p className=Styles.copy>
-          {React.string(
-             "Over the past three years,
+             )}
+          </p>
+          <Spacer height=1. />
+          <p className=Styles.copy>
+            {React.string(
+               "Over the past three years,
                our team together with our incredible
                community have launched and learned through several
                testnet phases. And now, at long last, we are proud
                to introduce Mina to the wider world. Here, developers
                can build ",
-           )}
-          <span className=Styles.orange>
-            {React.string("powerful applications ")}
-          </span>
-          {React.string(
-             " like Snapps (SNARK-powered apps)
+             )}
+            <span className=Styles.orange>
+              {React.string("powerful applications ")}
+            </span>
+            {React.string(
+               " like Snapps (SNARK-powered apps)
                to offer financial services without compromising data privacy
                and programmable money that anyone can access trustlessly from their phones.
                And that's just the beginning.",
-           )}
-        </p>
-        <Spacer height=1. />
-        <p className=Styles.copy>
-          {React.string(
-             "While there will still be challenges to come, the world's lightest, most accessible blockchain is ready to be powered by a whole new generation of participants.",
-           )}
-        </p>
-        <Spacer height=1. />
-        <p className=Styles.copy>
-          <strong>
+             )}
+          </p>
+          <Spacer height=1. />
+          <p className=Styles.copy>
             {React.string(
-               "Here's to a more efficient, elegant and fair future - for all of us.",
+               "While there will still be challenges to come, the world's lightest, most accessible blockchain is ready to be powered by a whole new generation of participants.",
              )}
           </p>
           <Spacer height=1. />
