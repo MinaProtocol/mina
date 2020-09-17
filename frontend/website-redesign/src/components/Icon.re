@@ -14,6 +14,7 @@ type kind =
   | ArrowLeftLarge
   | ArrowRightLarge
   | ArrowRightMedium
+  | ArrowRightSmall
   | ChevronDownLarge
   | ChevronDown
   | ChevronUp
@@ -346,6 +347,21 @@ let make = (~kind, ~size=1.5, ~currentColor="black") => {
            transform="rotate(90 19 10)"
            fill=currentColor
          />
+       </svg>
+     | ArrowRightSmall =>
+       <svg
+         width="16"
+         height="16"
+         viewBox="0 0 16 16"
+         fill=currentColor
+         xmlns="http://www.w3.org/2000/svg">
+         <rect x="3" y="7" width="10" height="1" fill=currentColor />
+         <rect x="11" y="6" width="1" height="1" fill=currentColor />
+         <rect x="10" y="5" width="1" height="1" fill=currentColor />
+         <rect x="9" y="4" width="1" height="1" fill=currentColor />
+         <rect x="10" y="9" width="1" height="1" fill=currentColor />
+         <rect x="9" y="10" width="1" height="1" fill=currentColor />
+         <rect x="11" y="8" width="1" height="1" fill=currentColor />
        </svg>
      | ChevronDownLarge =>
        <svg>
@@ -725,13 +741,7 @@ let make = (~kind, ~size=1.5, ~currentColor="black") => {
              d="M11.4 1.8C11.4 2.79411 10.5941 3.6 9.59999 3.6C8.60588 3.6 7.79999 2.79411 7.79999 1.8C7.79999 0.805887 8.60588 0 9.59999 0C10.5941 0 11.4 0.805887 11.4 1.8Z"
              fill=currentColor
            />
-           <ellipse
-             cx="13.8"
-             cy="22.2"
-             rx="1.8"
-             ry="1.8"
-             fill=currentColor
-           />
+           <ellipse cx="13.8" cy="22.2" rx="1.8" ry="1.8" fill=currentColor />
            <ellipse
              cx="3.00001"
              cy="18.6"

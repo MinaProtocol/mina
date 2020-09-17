@@ -7,10 +7,11 @@
  *)
 
 type t =
-  { (* Address in network-specific format. *)
-    address: string
+  { (* [DEPRECATED by `account_identifier` in `v1.4.4`] Address in network-specific format. *)
+    address: string option [@default None]
+  ; account_identifier: Account_identifier.t option [@default None]
   ; metadata: Yojson.Safe.t option [@default None] }
 [@@deriving yojson {strict= false}, show]
 
 (** ConstructionDeriveResponse is returned by the `/construction/derive` endpoint. *)
-let create (address : string) : t = {address; metadata= None}
+let create () : t = {address= None; account_identifier= None; metadata= None}

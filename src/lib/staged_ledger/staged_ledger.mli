@@ -117,15 +117,14 @@ val apply :
   -> Staged_ledger_diff.t
   -> logger:Logger.t
   -> verifier:Verifier.t
-  -> current_global_slot:Coda_numbers.Global_slot.t
+  -> current_state_view:Snapp_predicate.Protocol_state.View.t
   -> state_and_body_hash:State_hash.t * State_body_hash.t
   -> ( [`Hash_after_applying of Staged_ledger_hash.t]
        * [ `Ledger_proof of
            (Ledger_proof.t * (Transaction.t With_status.t * State_hash.t) list)
            option ]
        * [`Staged_ledger of t]
-       * [ `Pending_coinbase_data of
-           bool * Currency.Amount.t * Pending_coinbase.Update.Action.t ]
+       * [`Pending_coinbase_update of bool * Pending_coinbase.Update.t]
      , Staged_ledger_error.t )
      Deferred.Result.t
 
@@ -134,15 +133,14 @@ val apply_diff_unchecked :
   -> t
   -> Staged_ledger_diff.With_valid_signatures_and_proofs.t
   -> logger:Logger.t
-  -> current_global_slot:Coda_numbers.Global_slot.t
+  -> current_state_view:Snapp_predicate.Protocol_state.View.t
   -> state_and_body_hash:State_hash.t * State_body_hash.t
   -> ( [`Hash_after_applying of Staged_ledger_hash.t]
        * [ `Ledger_proof of
            (Ledger_proof.t * (Transaction.t With_status.t * State_hash.t) list)
            option ]
        * [`Staged_ledger of t]
-       * [ `Pending_coinbase_data of
-           bool * Currency.Amount.t * Pending_coinbase.Update.Action.t ]
+       * [`Pending_coinbase_update of bool * Pending_coinbase.Update.t]
      , Staged_ledger_error.t )
      Deferred.Result.t
 
@@ -157,11 +155,18 @@ val create_diff :
   -> self:Public_key.Compressed.t
   -> coinbase_receiver:[`Producer | `Other of Public_key.Compressed.t]
   -> logger:Logger.t
-  -> current_global_slot:Coda_numbers.Global_slot.t
+  -> current_state_view:Snapp_predicate.Protocol_state.View.t
   -> transactions_by_fee:User_command.With_valid_signature.t Sequence.t
   -> get_completed_work:(   Transaction_snark_work.Statement.t
                          -> Transaction_snark_work.Checked.t option)
+  -> supercharge_coinbase:bool
   -> Staged_ledger_diff.With_valid_signatures_and_proofs.t
+
+val can_apply_supercharged_coinbase_exn :
+     winner:Public_key.Compressed.t
+  -> epoch_ledger:Coda_base.Sparse_ledger.t
+  -> global_slot:Coda_numbers.Global_slot.t
+  -> bool
 
 val statement_exn :
      constraint_constants:Genesis_constants.Constraint_constants.t

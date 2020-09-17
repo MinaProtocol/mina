@@ -109,7 +109,8 @@ end
 type t =
   { diff: Diff.t
   ; creator: Public_key.Compressed.t
-  ; coinbase_receiver: Public_key.Compressed.t }
+  ; coinbase_receiver: Public_key.Compressed.t
+  ; supercharge_coinbase: bool }
 [@@deriving sexp, to_yojson, fields]
 
 module Stable :
@@ -118,7 +119,8 @@ module Stable :
       type t =
         { diff: Diff.t
         ; creator: Public_key.Compressed.t
-        ; coinbase_receiver: Public_key.Compressed.t }
+        ; coinbase_receiver: Public_key.Compressed.t
+        ; supercharge_coinbase: bool }
       [@@deriving sexp, to_yojson, bin_io, version]
     end
 
@@ -147,7 +149,8 @@ module With_valid_signatures_and_proofs : sig
   type t =
     { diff: diff
     ; creator: Public_key.Compressed.t
-    ; coinbase_receiver: Public_key.Compressed.t }
+    ; coinbase_receiver: Public_key.Compressed.t
+    ; supercharge_coinbase: bool }
   [@@deriving sexp, to_yojson]
 
   val user_commands :
@@ -175,8 +178,14 @@ module With_valid_signatures : sig
   type t =
     { diff: diff
     ; creator: Public_key.Compressed.t
-    ; coinbase_receiver: Public_key.Compressed.t }
+    ; coinbase_receiver: Public_key.Compressed.t
+    ; supercharge_coinbase: bool }
   [@@deriving sexp, to_yojson]
+
+  val coinbase :
+       constraint_constants:Genesis_constants.Constraint_constants.t
+    -> t
+    -> Currency.Amount.t option
 end
 
 val forget_proof_checks :
@@ -196,4 +205,4 @@ val completed_works : t -> Transaction_snark_work.t list
 val coinbase :
      constraint_constants:Genesis_constants.Constraint_constants.t
   -> t
-  -> Currency.Amount.t
+  -> Currency.Amount.t option
