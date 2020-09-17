@@ -21,6 +21,8 @@ module Styles = {
     ]);
   let headerCopy =
     style([media(Theme.MediaQuery.desktop, [width(`rem(42.))])]);
+  let genesisRule =
+    style([media(Theme.MediaQuery.desktop, [width(`percent(100.))])]);
 };
 
 module TeamMember = {
@@ -28,11 +30,20 @@ module TeamMember = {
     open Css;
     let memberContainer =
       style([height(`rem(17.)), width(`rem(11.)), color(orange)]);
-    let image = style([width(`rem(10.)), marginBottom(`rem(1.))]);
+    let image =
+      style([
+        width(`rem(10.)),
+        marginBottom(`rem(1.)),
+        media(Theme.MediaQuery.desktop, [width(`rem(11.))]),
+      ]);
     let name =
       merge([
         Theme.Type.h5,
-        style([lineHeight(`rem(1.37)), color(black), fontSize(`px(18))]),
+        style([
+          lineHeight(`rem(1.37)),
+          color(black),
+          important(fontSize(`px(18))),
+        ]),
       ]);
     let title =
       merge([
@@ -86,12 +97,12 @@ module TeamGrid = {
           Theme.MediaQuery.desktop,
           [
             gridTemplateColumns([
-              `rem(10.),
-              `rem(10.),
-              `rem(10.),
-              `rem(10.),
-              `rem(10.),
-              `rem(10.),
+              `rem(11.),
+              `rem(11.),
+              `rem(11.),
+              `rem(11.),
+              `rem(11.),
+              `rem(11.),
             ]),
           ],
         ),
@@ -131,7 +142,7 @@ module TeamGrid = {
         src="/static/img/headshots/BijanShahrokhi.jpg"
       />
       <TeamMember
-        fullName="Aneesha Ras"
+        fullName="Aneesha Raines"
         title="Engineering Manager, O(1) Labs"
         src="/static/img/headshots/AneeshaRaines.jpeg"
       />
@@ -209,18 +220,109 @@ module TeamGrid = {
   };
 };
 
+module GenesisMembersGrid = {
+  module Styles = {
+    open Css;
+
+    let genesisHeader = merge([Theme.Type.h2, style([])]);
+    let genesisCopy =
+      style([media(Theme.MediaQuery.tablet, [width(`rem(23.))])]);
+    let sectionSubhead =
+      merge([
+        Theme.Type.sectionSubhead,
+        style([
+          fontSize(`px(19)),
+          lineHeight(`rem(1.75)),
+          marginBottom(`rem(2.93)),
+          letterSpacing(`pxFloat(-0.4)),
+        ]),
+      ]);
+    let grid =
+      style([
+        marginTop(`rem(1.)),
+        display(`grid),
+        paddingTop(`rem(1.)),
+        gridTemplateColumns([`rem(10.), `rem(10.)]),
+        gridAutoRows(`rem(17.3)),
+        gridColumnGap(`rem(1.)),
+        gridRowGap(`rem(1.)),
+        media(
+          Theme.MediaQuery.tablet,
+          [
+            gridTemplateColumns([
+              `rem(21.),
+              `rem(10.),
+              `rem(10.),
+       
+            ]),
+          ],
+        ),
+        media(
+          Theme.MediaQuery.desktop,
+          [
+            gridTemplateColumns([
+              `rem(23.),
+              `rem(11.),
+              `rem(11.),
+              `rem(11.),
+              `rem(11.),
+              `rem(11.),
+            ]),
+          ],
+        ),
+      ]);
+  };
+  [@react.component]
+  let make = () => {
+    <div className=Styles.grid>
+      <div className=Styles.genesisCopy>
+        <h2 className=Styles.genesisHeader>
+          {React.string("Genesis Members")}
+        </h2>
+        <p className=Styles.sectionSubhead>
+          {React.string(
+             "Meet the node operators, developers, and community builders making Mina happen.",
+           )}
+        </p>
+      </div>
+      <TeamMember
+        fullName="Greg | DeFidog"
+        title="Genesis Founding Member"
+        src="/static/img/headshots/Greg.jpg"
+      />
+      <TeamMember
+        fullName="Alexander#4542"
+        title="Genesis Founding Member"
+        src="/static/img/headshots/Alexander.jpg"
+      />
+      <TeamMember
+        fullName="GarethDavies"
+        title="Genesis Founding Member"
+        src="/static/img/headshots/GarethDavies.jpg"
+      />
+    </div>;
+  };
+};
+
 [@react.component]
 let make = () => {
   <div className=Styles.container>
-    <div className=Styles.headerCopy>
-      <h2 className=Styles.header> {React.string("Meet the Team")} </h2>
-      <p className=Styles.sectionSubhead>
-        {React.string(
-           "Mina is an inclusive open source protocol uniting teams and technicians from San Francisco and around the world.",
-         )}
-      </p>
-    </div>
-    <Rule color=Theme.Colors.black />
-    <TeamGrid />
-  </div>;
+    /* O1 Labs Section  */
+
+      <div className=Styles.headerCopy>
+        <h2 className=Styles.header> {React.string("Meet the Team")} </h2>
+        <p className=Styles.sectionSubhead>
+          {React.string(
+             "Mina is an inclusive open source protocol uniting teams and technicians from San Francisco and around the world.",
+           )}
+        </p>
+      </div>
+      <Rule color=Theme.Colors.black />
+      <TeamGrid />
+      /*  Genesis Members Section  */
+      <div className=Styles.genesisRule>
+        <Rule color=Theme.Colors.black />
+      </div>
+      <GenesisMembersGrid />
+    </div>;
 };
