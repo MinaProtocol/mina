@@ -1,35 +1,32 @@
 use algebra::{
-    ToBytes, FromBytes,
-    curves::{
-        AffineCurve,
-    },
-    fields::{
-        Field, PrimeField, FftField,
-    },
+    curves::AffineCurve,
+    fields::{FftField, Field, PrimeField},
+    FromBytes, ToBytes,
 };
 
-use marlin_protocol_pairing::index::MatrixValues;
+use commitment_dlog::commitment::PolyComm;
 use commitment_dlog::{
     commitment::{b_poly_coefficients, CommitmentCurve, PolyComm},
     srs::SRS,
 };
-use marlin_circuits::domains::EvaluationDomains;
 use ff_fft::{
     DensePolynomial, EvaluationDomain, Evaluations, GeneralEvaluationDomain,
     Radix2EvaluationDomain as Domain,
 };
+use marlin_circuits::domains::EvaluationDomains;
+use marlin_protocol_pairing::index::MatrixValues;
 use rayon::prelude::*;
 use sprs::{CsMat, CsVecView, CSR};
 use std::io::{Read, Result as IoResult, Write};
-use commitment_dlog::{commitment::{PolyComm,}};
 
 pub fn evals_from_coeffs<F: FftField>(
-    v : Vec<F>,
-    d : Domain<F>) -> Evaluations<F, GeneralEvaluationDomain<F>> {
+    v: Vec<F>,
+    d: Domain<F>,
+) -> Evaluations<F, GeneralEvaluationDomain<F>> {
     Evaluations::<F>::from_vec_and_domain(v, GeneralEvaluationDomain::Radix2(d))
 }
 
-pub fn ceil_pow2(x : usize) -> usize {
+pub fn ceil_pow2(x: usize) -> usize {
     let mut res = 1;
     while x > res {
         res *= 2;
@@ -37,11 +34,11 @@ pub fn ceil_pow2(x : usize) -> usize {
     res
 }
 
-pub fn write_vec<A: ToBytes, W: Write>(v : & Vec<A>, mut writer: W) -> IoResult<()> {
+pub fn write_vec<A: ToBytes, W: Write>(v: &Vec<A>, mut writer: W) -> IoResult<()> {
     u64::write(&(v.len() as u64), &mut writer)?;
     for x in v {
         x.write(&mut writer)?;
-    };
+    }
     Ok(())
 }
 
@@ -54,7 +51,7 @@ pub fn read_vec<A: FromBytes, R: Read>(mut reader: R) -> IoResult<Vec<A>> {
     Ok(v)
 }
 
-pub fn write_cs_mat<A: ToBytes + Clone, W:Write >(m: &CsMat<A>, mut w: W) -> IoResult<()> {
+pub fn write_cs_mat<A: ToBytes + Clone, W: Write>(m: &CsMat<A>, mut w: W) -> IoResult<()> {
     fn v(s: &[usize]) -> Vec<u64> {
         s.iter().map(|x| *x as u64).collect()
     }
@@ -65,7 +62,7 @@ pub fn write_cs_mat<A: ToBytes + Clone, W:Write >(m: &CsMat<A>, mut w: W) -> IoR
 
     write_vec::<u64, _>(&v(m.indptr()), &mut w)?;
     write_vec(&v(m.indices()), &mut w)?;
-    write_vec(& m.data().to_vec(), &mut w)?;
+    write_vec(&m.data().to_vec(), &mut w)?;
     Ok(())
 }
 
@@ -80,11 +77,11 @@ pub fn read_cs_mat<A: FromBytes + Copy, R: Read>(mut r: R) -> IoResult<CsMat<A>>
 
     let indptr = v(read_vec(&mut r)?);
     let indices = v(read_vec(&mut r)?);
-    let data : Vec<A> = read_vec(&mut r)?;
+    let data: Vec<A> = read_vec(&mut r)?;
     Ok(CsMat::new(shape, indptr, indices, data))
 }
 
-pub fn write_matrix_values<A: ToBytes, W: Write>(m : &MatrixValues<A>, mut w: W) -> IoResult<()> {
+pub fn write_matrix_values<A: ToBytes, W: Write>(m: &MatrixValues<A>, mut w: W) -> IoResult<()> {
     A::write(&m.row, &mut w)?;
     A::write(&m.col, &mut w)?;
     A::write(&m.val, &mut w)?;
@@ -97,35 +94,36 @@ pub fn read_matrix_values<A: FromBytes, R: Read>(mut r: R) -> IoResult<MatrixVal
     let col = A::read(&mut r)?;
     let val = A::read(&mut r)?;
     let rc = A::read(&mut r)?;
-    Ok(MatrixValues {row, col, val, rc})
+    Ok(MatrixValues { row, col, val, rc })
 }
 
-pub fn write_option<A : ToBytes, W: Write>(a : &Option<A>, mut w: W) -> IoResult<()> {
+pub fn write_option<A: ToBytes, W: Write>(a: &Option<A>, mut w: W) -> IoResult<()> {
     match a {
-        None => {
-            u8::write(&0, &mut w)
-        },
+        None => u8::write(&0, &mut w),
         Some(a) => {
             u8::write(&1, &mut w)?;
             A::write(a, &mut w)
-        },
+        }
     }
 }
 
-pub fn read_option<A : FromBytes, R: Read>(mut r : R) -> IoResult<Option<A>> {
+pub fn read_option<A: FromBytes, R: Read>(mut r: R) -> IoResult<Option<A>> {
     match u8::read(&mut r)? {
         0 => Ok(None),
         1 => Ok(Some(A::read(&mut r)?)),
-        _ => panic!("read_option: expected 0 or 1")
+        _ => panic!("read_option: expected 0 or 1"),
     }
 }
 
-pub fn write_poly_comm<A : ToBytes + AffineCurve, W: Write>(p : &PolyComm<A>, mut w: W) -> IoResult<()> {
+pub fn write_poly_comm<A: ToBytes + AffineCurve, W: Write>(
+    p: &PolyComm<A>,
+    mut w: W,
+) -> IoResult<()> {
     write_vec(&p.unshifted, &mut w)?;
     write_option(&p.shifted, &mut w)
 }
 
-pub fn read_poly_comm<A : FromBytes + AffineCurve, R: Read>(mut r : R) -> IoResult<PolyComm<A>> {
+pub fn read_poly_comm<A: FromBytes + AffineCurve, R: Read>(mut r: R) -> IoResult<PolyComm<A>> {
     let unshifted = read_vec(&mut r)?;
     let shifted = read_option(&mut r)?;
     Ok(PolyComm { unshifted, shifted })
@@ -152,7 +150,10 @@ pub fn read_dlog_matrix_values<A: FromBytes + AffineCurve, R: Read>(
     Ok(marlin_protocol_dlog::index::MatrixValues { row, col, val, rc })
 }
 
-pub fn write_dense_polynomial<A: ToBytes + Field, W: Write>(p : &DensePolynomial<A>, w: W) -> IoResult<()> {
+pub fn write_dense_polynomial<A: ToBytes + Field, W: Write>(
+    p: &DensePolynomial<A>,
+    w: W,
+) -> IoResult<()> {
     write_vec(&p.coeffs, w)
 }
 
@@ -161,7 +162,7 @@ pub fn read_dense_polynomial<A: ToBytes + Field, R: Read>(r: R) -> IoResult<Dens
     Ok(DensePolynomial { coeffs })
 }
 
-pub fn write_domain<A: ToBytes + PrimeField, W: Write>(d : &Domain<A>, mut w: W) -> IoResult<()> {
+pub fn write_domain<A: ToBytes + PrimeField, W: Write>(d: &Domain<A>, mut w: W) -> IoResult<()> {
     d.size.write(&mut w)?;
     d.log_size_of_group.write(&mut w)?;
     d.size_as_field_element.write(&mut w)?;
@@ -181,10 +182,21 @@ pub fn read_domain<A: ToBytes + PrimeField, R: Read>(mut r: R) -> IoResult<Domai
     let group_gen = A::read(&mut r)?;
     let group_gen_inv = A::read(&mut r)?;
     let generator_inv = A::read(&mut r)?;
-    Ok(Domain { size, log_size_of_group, size_as_field_element, size_inv, group_gen, group_gen_inv, generator_inv })
+    Ok(Domain {
+        size,
+        log_size_of_group,
+        size_as_field_element,
+        size_inv,
+        group_gen,
+        group_gen_inv,
+        generator_inv,
+    })
 }
 
-pub fn write_evaluations<A: ToBytes + PrimeField, W: Write>(e : &Evaluations<A>, mut w: W) -> IoResult<()> {
+pub fn write_evaluations<A: ToBytes + PrimeField, W: Write>(
+    e: &Evaluations<A>,
+    mut w: W,
+) -> IoResult<()> {
     write_vec(&e.evals, &mut w)?;
     Ok(())
 }
@@ -193,10 +205,13 @@ pub fn read_evaluations<A: ToBytes + PrimeField, R: Read>(mut r: R) -> IoResult<
     let evals = read_vec(&mut r)?;
     let domain = Domain::new(evals.len()).unwrap();
     assert_eq!(evals.len(), domain.size());
-    Ok( evals_from_coeffs(evals, domain) )
+    Ok(evals_from_coeffs(evals, domain))
 }
 
-pub fn write_evaluation_domains<A: PrimeField, W: Write>(d : &EvaluationDomains<A>, mut w: W) -> IoResult<()> {
+pub fn write_evaluation_domains<A: PrimeField, W: Write>(
+    d: &EvaluationDomains<A>,
+    mut w: W,
+) -> IoResult<()> {
     u64::write(&(d.h.size() as u64), &mut w)?;
     u64::write(&(d.k.size() as u64), &mut w)?;
     u64::write(&(d.b.size() as u64), &mut w)?;
@@ -227,8 +242,7 @@ pub fn witness_position_to_index(public_inputs: usize, h_to_x_ratio: usize, w: u
 }
 
 pub fn index_to_witness_position(public_inputs: usize, h_to_x_ratio: usize, i: usize) -> usize {
-    let res =
-    if i < public_inputs {
+    let res = if i < public_inputs {
         i * h_to_x_ratio
     } else {
         // x_0 y_0 y_1     ... y_{k-2}
@@ -247,13 +261,16 @@ pub fn index_to_witness_position(public_inputs: usize, h_to_x_ratio: usize, i: u
         let intra_block = aux_index % m;
         h_to_x_ratio * block + 1 + intra_block
     };
-    assert_eq!(witness_position_to_index(public_inputs, h_to_x_ratio, res), i);
+    assert_eq!(
+        witness_position_to_index(public_inputs, h_to_x_ratio, res),
+        i
+    );
     res
 }
 
 pub fn rows_to_csmat<F: Clone + Copy + std::fmt::Debug>(
     public_inputs: usize,
-    h_group_size : usize,
+    h_group_size: usize,
     h_to_x_ratio: usize,
     v: &Vec<(Vec<usize>, Vec<F>)>,
 ) -> CsMat<F> {
@@ -270,29 +287,33 @@ pub fn rows_to_csmat<F: Clone + Copy + std::fmt::Debug>(
 
         shifted.sort_by(|(i, _), (j, _)| i.cmp(j));
 
-        let shifted_indices : Vec<usize> = shifted.iter().map(|(i, _)| *i).collect();
-        let shifted_coefficients : Vec<F> = shifted.iter().map(|(_, x)| *x).collect();
+        let shifted_indices: Vec<usize> = shifted.iter().map(|(i, _)| *i).collect();
+        let shifted_coefficients: Vec<F> = shifted.iter().map(|(_, x)| *x).collect();
 
         match CsVecView::<F>::new_view(h_group_size, &shifted_indices, &shifted_coefficients) {
             Ok(r) => m = m.append_outer_csvec(r),
-            Err(e) => panic!("new_view failed {} ({:?}, {:?})", e, shifted_indices, shifted_coefficients)
+            Err(e) => panic!(
+                "new_view failed {} ({:?}, {:?})",
+                e, shifted_indices, shifted_coefficients
+            ),
         };
     }
 
     for _ in 0..(h_group_size - v.len()) {
-        match CsVecView::<F>::new_view(h_group_size, & vec![], & vec![]) {
+        match CsVecView::<F>::new_view(h_group_size, &vec![], &vec![]) {
             Ok(v) => m = m.append_outer_csvec(v),
-            Err(e) => panic!("new_view failed {}", e)
+            Err(e) => panic!("new_view failed {}", e),
         };
     }
 
     m
 }
 
-pub fn prepare_witness<F : PrimeField>(
-    domains : EvaluationDomains<F>, 
-    primary_input : &Vec<F>,
-    auxiliary_input : &Vec<F>) -> Vec<F> {
+pub fn prepare_witness<F: PrimeField>(
+    domains: EvaluationDomains<F>,
+    primary_input: &Vec<F>,
+    auxiliary_input: &Vec<F>,
+) -> Vec<F> {
     let mut witness = vec![F::zero(); domains.h.size()];
     let ratio = domains.h.size() / domains.x.size();
 
@@ -361,4 +382,3 @@ pub extern "C" fn zexe_usize_vector_delete(v: *mut Vec<usize>) {
     // scope.
     let _box = unsafe { Box::from_raw(v) };
 }
-
