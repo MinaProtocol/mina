@@ -1,3 +1,4 @@
+open Sponge
 include Scale_round
 include Endoscale_round
 
@@ -139,7 +140,9 @@ module Make (Fp : sig
     include Field_plonk.S
     val to_bigint_raw_noalloc : t -> Bigint.t
   end)
-    (Gates : Gate_vector_intf with type field_vector := Fp.Vector.t) =
+    (Gates : Gate_vector_intf with type field_vector := Fp.Vector.t)
+    (Params : sig val params : Fp.t Params.t end)
+    =
 struct
   open Core
 
@@ -358,7 +361,7 @@ struct
       let start = (reduce_state sys [|start|]).(0) in
       let state = reduce_state sys state in
 
-      let add_round_state array =
+      let add_round_state array ind =
         let prev = Array.mapi array ~f:
           (
             fun i x ->
@@ -379,11 +382,11 @@ struct
           (prev.(1).col)
           (Unsigned.Size_t.of_int prev.(2).row)
           (prev.(2).col)
-          (Fp.Vector.of_array [||]);
+          (Fp.Vector.of_array Params.params.round_constants.(ind));
         sys.next_row <- sys.next_row + 1
       in
-      add_round_state start;
-      Array.iter ~f:(fun state ->  add_round_state state) state;
+      add_round_state start 0;
+      Array.iteri ~f:(fun i state ->  add_round_state state i) state;
       ()
 
     | Plonk_constraint.T (EC_add { p1; p2; p3 }) ->
@@ -467,7 +470,7 @@ struct
         sys.next_row <- sys.next_row + 1 ;
         Gates.add_gate
           sys.gates
-          7
+          6
           (Unsigned.Size_t.of_int sys.next_row)
           (Unsigned.Size_t.of_int xp.row)
           (xp.col)

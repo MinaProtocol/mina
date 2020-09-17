@@ -25,7 +25,10 @@ module Gates = struct
     Caml.Gc.finalise delete t ; t
 end
 
-module R1CS_constraint_system = Plonk_constraint_system.Make (Field) (Gates)
+module Params = struct let params =
+  Sponge.Params.(map tweedle_q ~f:(fun x -> Field.of_bigint (Bigint256.of_decimal_string x))) end
+
+module R1CS_constraint_system = Plonk_constraint_system.Make (Field) (Gates) (Params)
 module Var = Var
 
 module Verification_key = struct
