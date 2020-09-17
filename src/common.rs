@@ -18,6 +18,14 @@ use rayon::prelude::*;
 use sprs::{CsMat, CsVecView, CSR};
 use std::io::{Read, Result as IoResult, Write};
 
+#[repr(C)]
+pub struct DetSqrtWitness<F> {
+    pub c: *mut F,
+    pub d: u64,
+    pub square_root: *mut F,
+    pub success: bool
+}
+
 pub fn batch_dlog_accumulator_check<G: CommitmentCurve>(
     urs: &SRS<G>,
     comms: &Vec<G>,
