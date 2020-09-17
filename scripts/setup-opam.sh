@@ -42,6 +42,7 @@ else
 fi
 
 # FIXME: Manually pin ocamlgraph while their hosting is down
+opam install conf-autoconf
 opam pin ocamlgraph https://github.com/backtracking/ocamlgraph/archive/v1.8.8.tar.gz
 
 # All our ocaml packages
