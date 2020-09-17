@@ -26,9 +26,23 @@ module Styles = {
         Theme.MediaQuery.tablet,
         [gridTemplateColumns([`repeat((`num(4), `rem(10.)))])],
       ),
+      media(
+        Theme.MediaQuery.desktop,
+        [gridTemplateColumns([`repeat((`num(6), `rem(10.)))])],
+      ),
     ]);
   let innerContainer =
-    style([paddingTop(`rem(4.)), paddingLeft(`rem(1.25))]);
+    style([
+      padding2(~v=`rem(4.), ~h=`rem(1.25)),
+      media(
+        Theme.MediaQuery.tablet,
+        [padding2(~v=`rem(4.), ~h=`rem(2.5))],
+      ),
+      media(
+        Theme.MediaQuery.desktop,
+        [padding2(~v=`rem(7.), ~h=`rem(9.5))],
+      ),
+    ]);
   let header = merge([Theme.Type.h2, style([marginBottom(`rem(0.5))])]);
   let subhead =
     merge([Theme.Type.sectionSubhead, style([marginBottom(`rem(4.))])]);
