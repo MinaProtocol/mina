@@ -314,6 +314,32 @@ module SignupWidget = {
 
 [@react.component]
 let make = () => {
+  let renderTimeline = () => {
+    <div className=Styles.textContainer>
+      <div className=Styles.seperator>
+        {React.string("Testworld timeline")}
+      </div>
+      <div className=Styles.releaseContainer>
+        <div className=Styles.release>
+          <div> {React.string("Level 1")} </div>
+          <div className=Styles.dashedSeperator />
+          <div className=Styles.releaseDates>
+            <span> {React.string("Oct 13")} </span>
+            <span> {React.string("Oct 23")} </span>
+          </div>
+        </div>
+        <div className=Styles.release>
+          <div> {React.string("Level 2")} </div>
+          <div className=Styles.dashedSeperator />
+          <div className=Styles.releaseDates>
+            <span> {React.string("Oct 27")} </span>
+            <span> {React.string("Nov 6")} </span>
+          </div>
+        </div>
+      </div>
+    </div>;
+  };
+
   <Page title="Testworld" showFooter=false>
     <div className=Styles.page>
       <div className=Styles.background>
@@ -351,29 +377,6 @@ let make = () => {
                  "In addition, the Coda Foundation will be delegating tokens reserved for future grants to participants who score top points for reliability and block production once mainnet is live.",
                )}
             </p>
-          </div>
-          <div className=Styles.textContainer>
-            <div className=Styles.seperator>
-              {React.string("Testworld timeline")}
-            </div>
-            <div className=Styles.releaseContainer>
-              <div className=Styles.release>
-                <div> {React.string("Level 1")} </div>
-                <div className=Styles.dashedSeperator />
-                <div className=Styles.releaseDates>
-                  <span> {React.string("Oct 13")} </span>
-                  <span> {React.string("Oct 23")} </span>
-                </div>
-              </div>
-              <div className=Styles.release>
-                <div> {React.string("Level 2")} </div>
-                <div className=Styles.dashedSeperator />
-                <div className=Styles.releaseDates>
-                  <span> {React.string("Oct 27")} </span>
-                  <span> {React.string("Nov 6")} </span>
-                </div>
-              </div>
-            </div>
           </div>
           <div className=Styles.textContainer>
             <h2> {React.string("Genesis Token Grant")} </h2>

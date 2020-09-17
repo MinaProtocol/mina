@@ -287,7 +287,7 @@ let make = (~challenges as _, ~testnetName as _) => {
             <br />
             <p className=Theme.Body.basic>
               {React.string(
-                 "Starting October 13, Coda will begin its adversarial testnet, 'Testworld', where users can earn Coda tokens, USD as well as token delegations for participating.",
+                 "Later this year Coda will begin its adversarial testnet, 'Testworld', where users can earn Coda tokens, USD, and token delegations for participating.",
                )}
             </p>
             <div className=Styles.signUpContainer>
