@@ -36,8 +36,22 @@ module Styles = {
           "p,li,span",
           [fontSize(`rem(1.125)), lineHeight(`rem(1.75))],
         ),
-        selector("h1", [fontSize(`rem(3.)), lineHeight(`rem(3.625))]),
-        selector("h2", [fontSize(`rem(2.5)), lineHeight(`rem(3.))]),
+        selector(
+          "h1",
+          [
+            fontWeight(`num(540)),
+            fontSize(`rem(3.)),
+            lineHeight(`rem(3.625)),
+          ],
+        ),
+        selector(
+          "h2",
+          [
+            fontWeight(`num(530)),
+            fontSize(`rem(2.5)),
+            lineHeight(`rem(3.)),
+          ],
+        ),
       ]),
     ]);
 
@@ -47,7 +61,7 @@ module Styles = {
       height(`rem(180.)),
       backgroundColor(Theme.Colors.minaBlack),
       backgroundSize(`cover),
-      backgroundImage(`url("/static/img/spectrum_primary.png")),
+      backgroundImage(`url("/static/img/LeadGenBackground.jpg")),
     ]);
 
   let logo =
@@ -64,6 +78,7 @@ module Styles = {
       width(`percent(100.)),
       marginBottom(`rem(1.)),
       letterSpacing(`rem(0.05)),
+      fontSize(`rem(0.875)),
       selector(
         "::before,::after",
         [
@@ -82,7 +97,8 @@ module Styles = {
       display(`flex),
       alignItems(`center),
       width(`percent(100.)),
-      borderBottom(`px(1), `dashed, white),
+      borderBottom(`px(1), `dashed, Theme.Colors.white),
+      color(Theme.Colors.white),
       marginTop(`rem(0.7)),
       marginBottom(`rem(0.25)),
       before([
@@ -131,6 +147,7 @@ module Styles = {
       alignItems(`center),
       width(`percent(100.)),
       media(Theme.MediaQuery.notMobile, [width(`percent(40.))]),
+      selector("div,span", [fontSize(`rem(0.875))]),
     ]);
 
   let releaseDates =
@@ -167,12 +184,22 @@ module SignupWidget = {
         justifyContent(`spaceBetween),
         alignItems(`center),
         transition("all", ~duration=150),
-        marginLeft(`rem(1.25)),
         marginTop(`rem(1.25)),
+        media(Theme.MediaQuery.notMobile, [marginLeft(`rem(1.25))]),
+        selector(
+          "img",
+          [
+            display(`none),
+            media(Theme.MediaQuery.notMobile, [display(`block)]),
+          ],
+        ),
       ]);
 
     let successText =
-      style([marginLeft(`rem(1.25)), marginRight(`rem(5.))]);
+      style([
+        marginRight(`rem(5.)),
+        media(Theme.MediaQuery.notMobile, [marginLeft(`rem(1.25))]),
+      ]);
 
     let textField =
       style([
@@ -354,7 +381,7 @@ let make = () => {
               {React.string(
                  "Testworld will be the last phase of Coda's testnet for community members to qualify for the ",
                )}
-              <Next.Link href="/">
+              <Next.Link href="/genesis">
                 <span className=Styles.link>
                   {React.string("Genesis token grant ")}
                 </span>
@@ -362,7 +389,7 @@ let make = () => {
               {React.string(
                  "before mainnet launches in Q4 of this year. There are up to 800 Genesis grants still available, and Genesis grant recipients, otherwise known as Genesis Founding Members (GFMs), will each receive 66,000 tokens. ",
                )}
-              <Next.Link href="/">
+              <Next.Link href="/genesis">
                 <span className=Styles.link>
                   {React.string("Apply for Genesis now. ")}
                 </span>
