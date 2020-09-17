@@ -88,21 +88,21 @@ module type Inputs_intf = sig
       -> sigma2:Scalar_field.Vector.t
       -> t
 
-    val l : t -> Scalar_field.Vector.t
+    val l_eval : t -> Scalar_field.Vector.t
 
-    val r : t -> Scalar_field.Vector.t
+    val r_eval : t -> Scalar_field.Vector.t
 
-    val o : t -> Scalar_field.Vector.t
+    val o_eval : t -> Scalar_field.Vector.t
 
-    val z : t -> Scalar_field.Vector.t
+    val z_eval : t -> Scalar_field.Vector.t
 
-    val t : t -> Scalar_field.Vector.t
+    val t_eval : t -> Scalar_field.Vector.t
 
-    val f : t -> Scalar_field.Vector.t
+    val f_eval : t -> Scalar_field.Vector.t
 
-    val sigma1 : t -> Scalar_field.Vector.t
+    val sigma1_eval : t -> Scalar_field.Vector.t
 
-    val sigma2 : t -> Scalar_field.Vector.t
+    val sigma2_eval : t -> Scalar_field.Vector.t
 
     module Pair : Intf.Pair_basic with type elt := t
   end
@@ -247,14 +247,14 @@ module Make (Inputs : Inputs_intf) = struct
       |> Tuple_lib.Double.map ~f:(fun e ->
              let open Evaluations_backend in
              let fqv = fqv e in
-             { Dlog_plonk_types.Evals.l= fqv l
-             ; r= fqv r
-             ; o= fqv o
-             ; z= fqv z
-             ; t= fqv t
-             ; f= fqv f
-             ; sigma1= fqv sigma1
-             ; sigma2= fqv sigma2 } )
+             { Dlog_plonk_types.Evals.l= fqv l_eval
+             ; r= fqv r_eval
+             ; o= fqv o_eval
+             ; z= fqv z_eval
+             ; t= fqv t_eval
+             ; f= fqv f_eval
+             ; sigma1= fqv sigma1_eval
+             ; sigma2= fqv sigma2_eval } )
     in
     let pc f = Poly_comm.of_backend (f t) in
     let wo x =
