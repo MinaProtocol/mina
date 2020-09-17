@@ -1,5 +1,6 @@
 use crate::common::*;
 use algebra::{
+    FftField,
     biginteger::BigInteger256 as BigInteger,
     curves::{AffineCurve, ProjectiveCurve},
     fields::{Field, FpParameters, PrimeField, SquareRootField},
@@ -10,6 +11,7 @@ use algebra::{
     },
     FromBytes, One, ToBytes, UniformRand, Zero,
 };
+use dlog_solver::{DetSquareRootField, decompose};
 
 use marlin_circuits::domains::EvaluationDomains;
 
@@ -653,6 +655,44 @@ pub extern "C" fn zexe_tweedle_fq_sqrt(x: *const Fq) -> *mut Fq {
         None => Fq::zero(),
     };
     return Box::into_raw(Box::new(ret));
+}
+
+#[no_mangle]
+pub extern "C" fn zexe_tweedle_fq_det_sqrt(x: *const Fq) -> *mut Fq {
+    let x_ = unsafe { &(*x) };
+    let ret = match x_.det_sqrt() {
+        Some(x) => x,
+        None => Fq::zero(),
+    };
+    return Box::into_raw(Box::new(ret));
+}
+
+#[no_mangle]
+pub extern "C" fn zexe_tweedle_fq_det_sqrt_witness(x: *const Fq) -> DetSqrtWitness<Fq> {
+    let x_ = unsafe { &(*x) };
+    match x_.det_sqrt() {
+        Some(y) => {
+            let (c, d) = decompose(&y);
+            DetSqrtWitness {
+                c:Box::into_raw(Box::new(c)),
+                d,
+                square_root: Box::into_raw(Box::new(y)),
+                success: true
+            }
+        },
+        None =>
+            DetSqrtWitness {
+                c:Box::into_raw(Box::new(Fq::zero())),
+                d:0,
+                square_root: Box::into_raw(Box::new(Fq::zero())),
+                success: false
+            }
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn zexe_tweedle_fq_two_adic_root_of_unity() -> *mut Fq {
+    Box::into_raw(Box::new(FftField::two_adic_root_of_unity()))
 }
 
 #[no_mangle]

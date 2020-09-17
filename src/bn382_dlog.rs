@@ -1,5 +1,6 @@
 use crate::common::*;
 use algebra::{
+    FftField,
     biginteger::BigInteger384,
     bn_382::{
         fp::Fp,
@@ -10,6 +11,7 @@ use algebra::{
     fields::{Field, FpParameters, PrimeField, SquareRootField},
     FromBytes, One, ToBytes, UniformRand, Zero,
 };
+use dlog_solver::{DetSquareRootField, decompose};
 
 use marlin_circuits::domains::EvaluationDomains;
 
@@ -651,6 +653,44 @@ pub extern "C" fn zexe_bn382_fq_sqrt(x: *const Fq) -> *mut Fq {
         None => Fq::zero(),
     };
     return Box::into_raw(Box::new(ret));
+}
+
+#[no_mangle]
+pub extern "C" fn zexe_bn382_fp_det_sqrt(x: *const Fp) -> *mut Fp {
+    let x_ = unsafe { &(*x) };
+    let ret = match x_.det_sqrt() {
+        Some(x) => x,
+        None => Fp::zero(),
+    };
+    return Box::into_raw(Box::new(ret));
+}
+
+#[no_mangle]
+pub extern "C" fn zexe_bn382_fp_det_sqrt_witness(x: *const Fp) -> DetSqrtWitness<Fp> {
+    let x_ = unsafe { &(*x) };
+    match x_.det_sqrt() {
+        Some(y) => {
+            let (c, d) = decompose(&y);
+            DetSqrtWitness {
+                c:Box::into_raw(Box::new(c)),
+                d,
+                square_root: Box::into_raw(Box::new(y)),
+                success: true
+            }
+        },
+        None =>
+            DetSqrtWitness {
+                c:Box::into_raw(Box::new(Fp::zero())),
+                d:0,
+                square_root: Box::into_raw(Box::new(Fp::zero())),
+                success: false
+            }
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn zexe_bn382_fq_two_adic_root_of_unity() -> *mut Fq {
+    Box::into_raw(Box::new(FftField::two_adic_root_of_unity()))
 }
 
 #[no_mangle]

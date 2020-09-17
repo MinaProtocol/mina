@@ -4,6 +4,13 @@
 // Defines size_t
 #include <stddef.h>
 
+struct det_sqrt_witness {
+ void* c;
+ uint64_t d;
+ void* square_root;
+ bool success;
+};
+
 // usize vector
 
 void *zexe_usize_vector_create();
@@ -82,7 +89,12 @@ bool zexe_bn382_fp_is_square(void *);
 
 void *zexe_bn382_fp_sqrt(void *);
 
+void *zexe_bn382_fp_det_sqrt(void *);
+struct det_sqrt_witness zexe_bn382_fp_det_sqrt_witness(void *);
+
 void *zexe_bn382_fp_random();
+
+void *zexe_bn382_fp_two_adic_root_of_unity();
 
 void *zexe_bn382_fp_of_int(uint64_t);
 
@@ -172,6 +184,7 @@ void *zexe_bn382_fq_size();
 bool zexe_bn382_fq_is_square(void *);
 void *zexe_bn382_fq_sqrt(void *);
 void *zexe_bn382_fq_random();
+void *zexe_bn382_fq_two_adic_root_of_unity();
 void *zexe_bn382_fq_of_int(uint64_t);
 char *zexe_bn382_fq_to_string(void *);
 void *zexe_bn382_fq_inv(void *);
@@ -195,6 +208,9 @@ void *zexe_bn382_fq_of_bigint(void *);
 void *zexe_bn382_fq_to_bigint_raw(void *);
 void *zexe_bn382_fq_to_bigint_raw_noalloc(void *);
 void *zexe_bn382_fq_of_bigint_raw(void *);
+
+void *zexe_bn382_fq_det_sqrt(void *);
+struct det_sqrt_witness zexe_bn382_fq_det_sqrt_witness(void *);
 
 // Fq vector
 
@@ -637,6 +653,7 @@ void *zexe_tweedle_fq_size();
 bool zexe_tweedle_fq_is_square(void *);
 void *zexe_tweedle_fq_sqrt(void *);
 void *zexe_tweedle_fq_random();
+void *zexe_tweedle_fq_two_adic_root_of_unity();
 void *zexe_tweedle_fq_of_int(uint64_t);
 char *zexe_tweedle_fq_to_string(void *);
 void *zexe_tweedle_fq_inv(void *);
@@ -660,6 +677,9 @@ void *zexe_tweedle_fq_of_bigint(void *);
 void *zexe_tweedle_fq_to_bigint_raw(void *);
 void *zexe_tweedle_fq_to_bigint_raw_noalloc(void *);
 void *zexe_tweedle_fq_of_bigint_raw(void *);
+
+void *zexe_tweedle_fq_det_sqrt(void *);
+struct det_sqrt_witness zexe_tweedle_fq_det_sqrt_witness(void *);
 
 // Fq vector
 
@@ -909,6 +929,7 @@ void *zexe_tweedle_fp_size();
 bool zexe_tweedle_fp_is_square(void *);
 void *zexe_tweedle_fp_sqrt(void *);
 void *zexe_tweedle_fp_random();
+void *zexe_tweedle_fp_two_adic_root_of_unity();
 void *zexe_tweedle_fp_of_int(uint64_t);
 char *zexe_tweedle_fp_to_string(void *);
 void *zexe_tweedle_fp_inv(void *);
@@ -932,6 +953,9 @@ void *zexe_tweedle_fp_of_bigint(void *);
 void *zexe_tweedle_fp_to_bigint_raw(void *);
 void *zexe_tweedle_fp_to_bigint_raw_noalloc(void *);
 void *zexe_tweedle_fp_of_bigint_raw(void *);
+
+void *zexe_tweedle_fp_det_sqrt(void *);
+struct det_sqrt_witness zexe_tweedle_fp_det_sqrt_witness(void *);
 
 // Fq vector
 
