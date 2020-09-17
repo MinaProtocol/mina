@@ -1781,10 +1781,14 @@ struct
 
   let prefix = P.prefix
 
-  module T :
-    Type_with_finalizer
-    with type 'a result := 'a F.result
-     and type 'a return := 'a F.return = struct
+  module T : sig
+    include
+      Type_with_finalizer
+      with type 'a result := 'a F.result
+       and type 'a return := 'a F.return
+
+    val delete : (t -> unit F.return) F.result
+  end = struct
     type t = unit ptr
 
     let typ = ptr void
@@ -1797,7 +1801,42 @@ struct
           x )
   end
 
+  module Det_sqrt_witness = struct
+    let field_elt = T.typ
+
+    type det_sqrt_witness
+
+    type t = det_sqrt_witness Ctypes_static.structure
+
+    let typ : t Ctypes.typ = Ctypes.structure "det_sqrt_witness"
+
+    let c = Ctypes.field typ "c" field_elt
+
+    let d = Ctypes.field typ "d" uint64_t
+
+    let sqrt = Ctypes.field typ "square_root" field_elt
+
+    let success = Ctypes.field typ "success" bool
+
+    let () = seal typ
+
+    let accessor f t = getf t f
+
+    let sqrt : t -> T.t = accessor sqrt
+
+    let c : t -> T.t = accessor c
+
+    let d : t -> Unsigned.uint64 = accessor d
+
+    let success : t -> bool = accessor success
+
+    let create =
+      foreign (prefix "det_sqrt_witness") (field_elt @-> returning typ)
+  end
+
   include T
+
+  let really_delete = delete
 
   (* Stub out delete to make sure we don't attempt to double-free. *)
   let delete : t -> unit = ignore
@@ -1815,6 +1854,17 @@ struct
     let%map sqrt = foreign (prefix "sqrt") (typ @-> returning typ)
     and add_finalizer = add_finalizer in
     fun t -> add_finalizer (sqrt t)
+
+  let det_sqrt =
+    let%map det_sqrt = foreign (prefix "det_sqrt") (typ @-> returning typ)
+    and add_finalizer = add_finalizer in
+    fun t -> add_finalizer (det_sqrt t)
+
+  let two_adic_root_of_unity =
+    let%map two_adic_root_of_unity =
+      foreign (prefix "two_adic_root_of_unity") (void @-> returning typ)
+    and add_finalizer = add_finalizer in
+    fun () -> add_finalizer (two_adic_root_of_unity ())
 
   let random =
     let%map random = foreign (prefix "random") (void @-> returning typ)
@@ -2877,4 +2927,4 @@ module Full (F : Cstubs_applicative.Foreign_applicative) = struct
   end
 
   include Bn382
-end
+  end
