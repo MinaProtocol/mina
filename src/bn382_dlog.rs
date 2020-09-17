@@ -4,8 +4,7 @@ use algebra::{
     bn_382::{
         fp::Fp,
         fq::{Fq, FqParameters as Fq_params},
-        g::Bn_382GParameters,
-        g::{Affine as GAffine, Projective as GProjective},
+        g::{Affine as GAffine, Bn_382GParameters, Projective as GProjective},
     },
     curves::{AffineCurve, ProjectiveCurve},
     fields::{Field, FpParameters, PrimeField, SquareRootField},
@@ -26,10 +25,12 @@ use rand::rngs::StdRng;
 use rand_core;
 
 use groupmap::GroupMap;
-use std::ffi::CStr;
-use std::fs::File;
-use std::io::{BufReader, BufWriter, Read, Result as IoResult, Write};
-use std::os::raw::c_char;
+use std::{
+    ffi::CStr,
+    fs::File,
+    io::{BufReader, BufWriter, Read, Result as IoResult, Write},
+    os::raw::c_char,
+};
 
 use commitment_dlog::{
     commitment::{b_poly_coefficients, product, CommitmentCurve, OpeningProof, PolyComm},
@@ -128,6 +129,18 @@ pub extern "C" fn zexe_bn382_fq_urs_b_poly_commitment(
     let g = urs.commit(&p, None);
 
     Box::into_raw(Box::new(g))
+}
+
+#[no_mangle]
+pub extern "C" fn zexe_bn382_fq_urs_batch_accumulator_check(
+    urs: *const SRS<GAffine>,
+    comms: *const Vec<GAffine>,
+    chals: *const Vec<Fq>,
+) -> bool {
+    let urs = unsafe { &*urs };
+    let comms = unsafe { &*comms };
+    let chals = unsafe { &*chals };
+    batch_dlog_accumulator_check(urs, comms, chals)
 }
 
 #[no_mangle]

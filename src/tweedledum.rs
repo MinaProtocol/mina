@@ -4,10 +4,9 @@ use algebra::{
     curves::{AffineCurve, ProjectiveCurve},
     fields::{Field, FpParameters, PrimeField, SquareRootField},
     tweedle::{
-        dum::TweedledumParameters,
-        dum::{Affine as GAffine, Projective as GProjective},
-        fp::{Fp, FpParameters as Fp_params},
-        fq::Fq,
+        dum::{Affine as GAffine, Projective as GProjective, TweedledumParameters},
+        fp::Fp,
+        fq::{Fq, FqParameters as Fq_params},
     },
     FromBytes, One, ToBytes, UniformRand, Zero,
 };
@@ -26,10 +25,12 @@ use rand::rngs::StdRng;
 use rand_core;
 
 use groupmap::GroupMap;
-use std::ffi::CStr;
-use std::fs::File;
-use std::io::{BufReader, BufWriter, Read, Result as IoResult, Write};
-use std::os::raw::c_char;
+use std::{
+    ffi::CStr,
+    fs::File,
+    io::{BufReader, BufWriter, Read, Result as IoResult, Write},
+    os::raw::c_char,
+};
 
 use commitment_dlog::{
     commitment::{b_poly_coefficients, product, CommitmentCurve, OpeningProof, PolyComm},
@@ -126,6 +127,18 @@ pub extern "C" fn zexe_tweedle_fq_urs_b_poly_commitment(
     let g = urs.commit(&p, None);
 
     Box::into_raw(Box::new(g))
+}
+
+#[no_mangle]
+pub extern "C" fn zexe_tweedle_fq_urs_batch_accumulator_check(
+    urs: *const SRS<GAffine>,
+    comms: *const Vec<GAffine>,
+    chals: *const Vec<Fq>,
+) -> bool {
+    let urs = unsafe { &*urs };
+    let comms = unsafe { &*comms };
+    let chals = unsafe { &*chals };
+    batch_dlog_accumulator_check(urs, comms, chals)
 }
 
 #[no_mangle]
@@ -622,19 +635,19 @@ pub extern "C" fn zexe_tweedle_fq_endo_scalar() -> *const Fq {
 
 #[no_mangle]
 pub extern "C" fn zexe_tweedle_fq_size_in_bits() -> i32 {
-    return Fp_params::MODULUS_BITS as i32;
+    return Fq_params::MODULUS_BITS as i32;
 }
 
 #[no_mangle]
 pub extern "C" fn zexe_tweedle_fq_size() -> *mut BigInteger {
-    let ret = Fp_params::MODULUS;
+    let ret = Fq_params::MODULUS;
     return Box::into_raw(Box::new(ret));
 }
 
 #[no_mangle]
 pub extern "C" fn zexe_tweedle_fq_is_square(x: *const Fq) -> bool {
     let x_ = unsafe { &(*x) };
-    let s0 = x_.pow(Fp_params::MODULUS_MINUS_ONE_DIV_TWO);
+    let s0 = x_.pow(Fq_params::MODULUS_MINUS_ONE_DIV_TWO);
     s0.is_zero() || s0.is_one()
 }
 

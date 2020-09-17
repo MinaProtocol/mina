@@ -3,7 +3,6 @@ extern crate libc;
 
 pub mod bn382_dlog;
 pub mod bn382_pairing;
-mod common;
 pub mod common;
 pub mod tweedledee;
 pub mod tweedledee_plonk;

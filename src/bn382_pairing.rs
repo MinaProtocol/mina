@@ -25,10 +25,12 @@ use oracle::{
 use rand::rngs::StdRng;
 use rand_core;
 
-use std::ffi::CStr;
-use std::fs::File;
-use std::io::{BufReader, BufWriter, Read, Result as IoResult, Write};
-use std::os::raw::c_char;
+use std::{
+    ffi::CStr,
+    fs::File,
+    io::{BufReader, BufWriter, Read, Result as IoResult, Write},
+    os::raw::c_char,
+};
 
 // Fp stubs
 
@@ -298,6 +300,43 @@ pub extern "C" fn zexe_bn382_fp_constraint_matrix_delete(x: *mut Vec<(Vec<usize>
     let _box = unsafe { Box::from_raw(x) };
 }
 
+// Fp triple
+#[no_mangle]
+pub extern "C" fn zexe_bn382_fp_triple_0(evals: *const [Fp; 3]) -> *const Fp {
+    let x = (unsafe { *evals })[0].clone();
+    return Box::into_raw(Box::new(x));
+}
+
+#[no_mangle]
+pub extern "C" fn zexe_bn382_fp_triple_1(evals: *const [Fp; 3]) -> *const Fp {
+    let x = (unsafe { *evals })[1].clone();
+    return Box::into_raw(Box::new(x));
+}
+
+#[no_mangle]
+pub extern "C" fn zexe_bn382_fp_triple_2(evals: *const [Fp; 3]) -> *const Fp {
+    let x = (unsafe { *evals })[2].clone();
+    return Box::into_raw(Box::new(x));
+}
+
+#[no_mangle]
+pub extern "C" fn zexe_bn382_fp_vector_triple_0(evals: *const [Vec<Fp>; 3]) -> *const Vec<Fp> {
+    let x = (unsafe { &(*evals) })[0].clone();
+    return Box::into_raw(Box::new(x));
+}
+
+#[no_mangle]
+pub extern "C" fn zexe_bn382_fp_vector_triple_1(evals: *const [Vec<Fp>; 3]) -> *const Vec<Fp> {
+    let x = (unsafe { &(*evals) })[1].clone();
+    return Box::into_raw(Box::new(x));
+}
+
+#[no_mangle]
+pub extern "C" fn zexe_bn382_fp_vector_triple_2(evals: *const [Vec<Fp>; 3]) -> *const Vec<Fp> {
+    let x = (unsafe { &(*evals) })[2].clone();
+    return Box::into_raw(Box::new(x));
+}
+
 #[no_mangle]
 pub extern "C" fn zexe_bn382_fp_vector_triple_delete(x: *mut [Fp; 3]) {
     let _box = unsafe { Box::from_raw(x) };
@@ -367,8 +406,8 @@ pub extern "C" fn zexe_bn382_batch_pairing_check(
 
     // Optimization: Parallelize
     // Optimization:
-    //   Experiment with scalar multiplying the affine point by b^i before adding into the
-    //   accumulator.
+    //   Experiment with scalar multiplying the affine point by b^i before adding
+    //   into the accumulator.
     for ((p_i, (s_i, t_i)), u_i) in p.iter().zip(s.iter().zip(t)).zip(u) {
         acc_beta_h *= b;
         acc_beta_h.add_assign_mixed(p_i);
@@ -1289,13 +1328,11 @@ pub extern "C" fn zexe_bn382_fp_urs_dummy_degree_bound_checks(
 pub extern "C" fn zexe_bn382_fp_urs_dummy_opening_check(
     urs: *const URS<Bn_382>,
 ) -> *const (G1Affine, G1Affine) {
-    /*
-       (f - [v] + z pi, pi)
-
-       for the accumulator for the check
-
-       e(f - [v] + z pi, H) = e(pi, beta*H)
-    */
+    // (f - [v] + z pi, pi)
+    //
+    // for the accumulator for the check
+    //
+    // e(f - [v] + z pi, H) = e(pi, beta*H)
     let urs = unsafe { &*urs };
 
     let z = Fp::one();
