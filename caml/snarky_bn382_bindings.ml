@@ -24,9 +24,7 @@ module type Type_with_finalizer = sig
 end
 
 module type Prefix_type = sig
-  include Prefix
-
-  include Type
+  include Prefix include Type
 end
 
 module type Prefix_type_with_finalizer = sig
@@ -614,7 +612,6 @@ struct
 
     module Underlying : Type = struct
       type t = unit
-
       let typ = void
     end
 
@@ -821,7 +818,8 @@ struct
       add_finalizer (create i primary_input auxiliary_input)
 
   let verify =
-    foreign (prefix "verify") (VerifierIndex.typ @-> typ @-> returning bool)
+    foreign (prefix "verify")
+      (VerifierIndex.typ @-> typ @-> returning bool)
 
   let batch_verify =
     foreign (prefix "batch_verify")
@@ -1318,7 +1316,8 @@ struct
         (create index primary_input auxiliary_input prev_challenges prev_sgs)
 
   let verify =
-    foreign (prefix "verify") (VerifierIndex.typ @-> typ @-> returning bool)
+    foreign (prefix "verify")
+      (VerifierIndex.typ @-> typ @-> returning bool)
 
   let batch_verify =
     foreign (prefix "batch_verify")
@@ -2155,6 +2154,8 @@ module Full (F : Cstubs_applicative.Foreign_applicative) = struct
 
     module Field_triple = Triple (F) (Field) (Field)
 
+    module Field_vector_triple = Triple (Field.Vector) (Field.Vector) (F)
+
     module Field_opening_proof =
       Dlog_opening_proof
         (F)
@@ -2173,6 +2174,7 @@ module Full (F : Cstubs_applicative.Foreign_applicative) = struct
         (Curve.Affine)
 
     module Field_urs = struct
+
       let prefix = with_prefix (prefix "urs")
 
       include (
@@ -2234,12 +2236,6 @@ module Full (F : Cstubs_applicative.Foreign_applicative) = struct
         and add_finalizer = Curve.Affine.add_finalizer in
         fun t -> add_finalizer (h t)
 
-      let batch_accumulator_check =
-        foreign
-          (prefix "batch_accumulator_check")
-          ( typ @-> Curve.Affine.Vector.typ @-> Field.Vector.typ
-          @-> returning bool )
-
       let b_poly_commitment =
         let%map b_poly_commitment =
           foreign
@@ -2290,7 +2286,7 @@ module Full (F : Cstubs_applicative.Foreign_applicative) = struct
         (Field_index)
         (Field_verifier_index)
         (Field.Vector)
-        (Field.Vector.Triple)
+        (Field_vector_triple)
         (Field_opening_proof)
         (Field_poly_comm)
 
@@ -2714,6 +2710,8 @@ module Full (F : Cstubs_applicative.Foreign_applicative) = struct
 
     module Fq_triple = Triple (F) (Fq) (Fq)
 
+    module Fq_vector_triple = Triple (Fq.Vector) (Fq.Vector) (F)
+
     module Fq_opening_proof =
       Dlog_opening_proof
         (F)
@@ -2732,6 +2730,7 @@ module Full (F : Cstubs_applicative.Foreign_applicative) = struct
         (G.Affine)
 
     module Fq_urs = struct
+
       let prefix = with_prefix (prefix "fq_urs")
 
       include (
@@ -2842,7 +2841,7 @@ module Full (F : Cstubs_applicative.Foreign_applicative) = struct
         (Fq_index)
         (Fq_verifier_index)
         (Fq.Vector)
-        (Fq.Vector.Triple)
+        (Fq_vector_triple)
         (Fq_opening_proof)
         (Fq_poly_comm)
 
@@ -2886,6 +2885,5 @@ module Full (F : Cstubs_applicative.Foreign_applicative) = struct
         @-> G1.Affine.Vector.typ @-> G1.Affine.Vector.typ
         @-> G1.Affine.Vector.typ @-> returning bool )
   end
-
   include Bn382
 end
