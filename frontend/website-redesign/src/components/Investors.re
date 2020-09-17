@@ -40,7 +40,7 @@ module Styles = {
       ),
       media(
         Theme.MediaQuery.desktop,
-        [padding2(~v=`rem(7.), ~h=`rem(9.5))],
+        [padding2(~v=`rem(7.), ~h=`rem(9.5)), maxWidth(`rem(84.))],
       ),
     ]);
   let header = merge([Theme.Type.h2, style([marginBottom(`rem(0.5))])]);
@@ -62,6 +62,8 @@ module Styles = {
       background(white),
       padding2(~v=`rem(1.5), ~h=`rem(1.)),
     ]);
+  let rule = style([media(Theme.MediaQuery.desktop, [marginTop(`rem(7.93))])]);
+  let advisorGrid = style([display(`grid), gridColumnGap(`rem(1.)), gridTemplateColumns([`repeat(`num(2),`rem(10.))]), gridAutoRows(`rem(17.3))])
 };
 
 [@react.component]
@@ -72,7 +74,7 @@ let make = () => {
       <p className=Styles.subhead> {React.string("Supporting O(1) Labs")} </p>
       <div className=Styles.investorGrid>
         <img src="/static/img/logos/LogoAccomplice.png" />
-        <div className=Styles.investorGridItem>
+        <div className=Styles.investorGridItemLarge>
           {React.string("Andrew Keys")}
         </div>
         <img src="/static/img/logos/LogoBlockchange.png" />
@@ -115,6 +117,47 @@ let make = () => {
         <img src="/static/img/logos/LogoPolychainCapital.png" />
         <img src="/static/img/logos/LogoScifiVC.png" />
       </div>
+      <div className=Styles.rule>
+
+      <Rule color=Theme.Colors.black/>
+      </div>
+      
+        <h2 className=Theme.Type.h2> {React.string("Advisors")} </h2>
+        <p className=Theme.Type.sectionSubhead>
+          {React.string(
+             "Supporting O(1) Labs",
+           )}
+        </p>
+
+    <div className=Styles.advisorGrid>
+      <TeamMember
+        fullName="Jill Carlson"
+        title="Co-founder, Open Money Initiative"
+        src="/static/img/headshots/EvanShapiro.jpg"
+      />
+      <TeamMember
+        fullName="Paul Davidson"
+        title="CTO, O(1) Labs"
+        src="/static/img/headshots/IzaakMeckler.jpg"
+      />
+      <TeamMember
+        fullName="Joseph Bonneau"
+        title="Head of Product Engineering, O(1) Labs"
+        src="/static/img/headshots/BrandonKase.jpg"
+      />
+      <TeamMember
+        fullName="Akis Kattis"
+        title="Head of Marketing & Community, O(1) Labs"
+        src="/static/img/headshots/ClaireKart.jpg"
+      />
+      <TeamMember
+        fullName="Benedikt Bunz"
+        title="Head of Marketing & Community, O(1) Labs"
+        src="/static/img/headshots/ClaireKart.jpg"
+      />
+    </div>
+        <Rule color=Theme.Colors.black />
+      
     </div>
   </div>;
 };

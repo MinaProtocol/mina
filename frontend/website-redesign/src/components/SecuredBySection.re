@@ -33,7 +33,6 @@ module Styles = {
         Theme.MediaQuery.desktop,
         [
           width(`rem(90.)),
-          margin(`auto),
           padding2(~v=rem(8.9), ~h=`rem(9.5)),
           gridTemplateColumns([`rem(31.5), `rem(29.)]),
           gridTemplateRows([`rem(31.5), `rem(36.)]),
