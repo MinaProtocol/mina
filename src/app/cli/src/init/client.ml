@@ -57,22 +57,51 @@ let get_balance_graphql =
       ~doc:"KEY Public key for which you want to check the balance"
       (required Cli_lib.Arg_type.public_key_compressed)
   in
+  let token_flag =
+    flag "token" ~doc:"TOKEN_ID The token ID for the account"
+      (optional_with_default Token_id.default Cli_lib.Arg_type.token_id)
+  in
   Command.async ~summary:"Get balance associated with a public key"
-    (Cli_lib.Background_daemon.graphql_init pk_flag
-       ~f:(fun graphql_endpoint public_key ->
+    (Cli_lib.Background_daemon.graphql_init (Args.zip2 pk_flag token_flag)
+       ~f:(fun graphql_endpoint (public_key, token) ->
          let%map response =
            Graphql_client.query_exn
              (Graphql_queries.Get_tracked_account.make
                 ~public_key:(Graphql_client.Encoders.public_key public_key)
+                ~token:(Graphql_client.Encoders.token token)
                 ())
              graphql_endpoint
          in
          match response#account with
          | Some account ->
-             printf "Balance: %s coda\n"
-               (Currency.Balance.to_formatted_string (account#balance)#total)
+             if Token_id.(equal default) token then
+               printf "Balance: %s coda\n"
+                 (Currency.Balance.to_formatted_string (account#balance)#total)
+             else
+               printf "Balance: %s tokens\n"
+                 (Currency.Balance.to_formatted_string (account#balance)#total)
          | None ->
              printf "There are no funds in this account\n" ))
+
+let get_tokens_graphql =
+  let open Command.Param in
+  let pk_flag =
+    flag "public-key" ~doc:"KEY Public key for which you want to find accounts"
+      (required Cli_lib.Arg_type.public_key_compressed)
+  in
+  Command.async ~summary:"Get all token IDs that a public key has accounts for"
+    (Cli_lib.Background_daemon.graphql_init pk_flag
+       ~f:(fun graphql_endpoint public_key ->
+         let%map response =
+           Graphql_client.query_exn
+             (Graphql_queries.Get_all_accounts.make
+                ~public_key:(Graphql_client.Encoders.public_key public_key)
+                ())
+             graphql_endpoint
+         in
+         printf "Accounts are held for token IDs:\n" ;
+         Array.iter response#accounts ~f:(fun account ->
+             printf "%s " (Token_id.to_string account#token) ) ))
 
 let print_trust_status status json =
   if json then
@@ -234,9 +263,8 @@ let generate_receipt =
       (required public_key_compressed)
   in
   let token_flag =
-    (*flag "token" ~doc:"TOKEN_ID The token ID for the account"
-      (optional_with_default Token_id.default Cli_lib.Arg_type.token_id)*)
-    Command.Param.return Token_id.default
+    flag "token" ~doc:"TOKEN_ID The token ID for the account"
+      (optional_with_default Token_id.default Cli_lib.Arg_type.token_id)
   in
   Command.async ~summary:"Generate a receipt for a sent payment"
     (Cli_lib.Background_daemon.rpc_init
@@ -281,9 +309,8 @@ let verify_receipt =
       (required public_key_compressed)
   in
   let token_flag =
-    (*flag "token" ~doc:"TOKEN_ID The token ID for the account"
-      (optional_with_default Token_id.default Cli_lib.Arg_type.token_id)*)
-    Command.Param.return Token_id.default
+    flag "token" ~doc:"TOKEN_ID The token ID for the account"
+      (optional_with_default Token_id.default Cli_lib.Arg_type.token_id)
   in
   Command.async ~summary:"Verify a receipt of a sent payment"
     (Cli_lib.Background_daemon.rpc_init
@@ -349,9 +376,8 @@ let get_nonce_cmd =
       (required Cli_lib.Arg_type.public_key_compressed)
   in
   let token_flag =
-    (*flag "token" ~doc:"TOKEN_ID The token ID for the account"
-      (optional_with_default Token_id.default Cli_lib.Arg_type.token_id)*)
-    Command.Param.return Token_id.default
+    flag "token" ~doc:"TOKEN_ID The token ID for the account"
+      (optional_with_default Token_id.default Cli_lib.Arg_type.token_id)
   in
   let flags = Args.zip2 address_flag token_flag in
   Command.async ~summary:"Get the current nonce for an account"
@@ -1325,7 +1351,11 @@ let generate_libp2p_keypair =
       let logger = Logger.null () in
       (* Using the helper only for keypair generation requires no state. *)
       File_system.with_temp_dir "coda-generate-libp2p-keypair" ~f:(fun tmpd ->
-          match%bind Coda_net2.create ~logger ~conf_dir:tmpd with
+          match%bind
+            Coda_net2.create ~logger ~conf_dir:tmpd
+              ~on_unexpected_termination:(fun () ->
+                raise Child_processes.Child_died )
+          with
           | Ok net ->
               let%bind me = Coda_net2.Keypair.random net in
               let%bind () = Coda_net2.shutdown net in
@@ -1513,6 +1543,21 @@ let telemetry =
              printf "Failed to get telemetry data: %s\n%!"
                (Error.to_string_hum err) ))
 
+let next_available_token_cmd =
+  Command.async
+    ~summary:
+      "The next token ID that has not been allocated. Token IDs are allocated \
+       sequentially, so all lower token IDs have been allocated"
+    (Cli_lib.Background_daemon.graphql_init (Command.Param.return ())
+       ~f:(fun graphql_endpoint () ->
+         let%map response =
+           Graphql_client.query_exn
+             (Graphql_queries.Next_available_token.make ())
+             graphql_endpoint
+         in
+         printf "Next available token ID: %s\n"
+           (Token_id.to_string response#nextAvailableToken) ))
+
 module Visualization = struct
   let create_command (type rpc_response) ~name ~f
       (rpc : (string, rpc_response) Rpc.Rpc.t) =
@@ -1571,6 +1616,7 @@ let client =
   Command.group ~summary:"Lightweight client commands"
     ~preserve_subcommand_order:()
     [ ("get-balance", get_balance_graphql)
+    ; ("get-tokens", get_tokens_graphql)
     ; ("send-payment", send_payment_graphql)
     ; ("delegate-stake", delegate_stake_graphql)
     ; ("create-token", create_new_token_graphql)
@@ -1616,4 +1662,5 @@ let advanced =
     ; ("visualization", Visualization.command_group)
     ; ("generate-receipt", generate_receipt)
     ; ("verify-receipt", verify_receipt)
-    ; ("generate-keypair", Cli_lib.Commands.generate_keypair) ]
+    ; ("generate-keypair", Cli_lib.Commands.generate_keypair)
+    ; ("next-available-token", next_available_token_cmd) ]

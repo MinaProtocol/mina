@@ -399,8 +399,8 @@ struct
   let check_invariants t ~constraint_constants ~verifier ~error_prefix
       ~ledger_hash_end:current_ledger_hash
       ~ledger_hash_begin:snarked_ledger_hash
-      ~next_available_token_before:next_tkn1
-      ~next_available_token_after:next_tkn2 =
+      ~next_available_token_begin:snarked_ledger_next_available_token
+      ~next_available_token_end:current_ledger_next_available_token =
     let clarify_error cond err =
       if not cond then Or_error.errorf "%s : %s" error_prefix err else Ok ()
     in
@@ -450,13 +450,16 @@ struct
             (Token_id.equal Token_id.default fee_token_r)
             "nondefault fee token"
         and () =
-          clarify_error
-            Token_id.(next_available_token_before = next_tkn1)
-            "next available token before does not match"
+          Option.value_map ~default:(Ok ()) snarked_ledger_next_available_token
+            ~f:(fun next_tkn ->
+              clarify_error
+                Token_id.(next_available_token_before = next_tkn)
+                "next available token from snarked ledger does not match" )
         and () =
           clarify_error
-            Token_id.(next_available_token_after = next_tkn2)
-            "next available token after does not match"
+            Token_id.(
+              next_available_token_after = current_ledger_next_available_token)
+            "next available token from staged ledger does not match"
         in
         ()
 end

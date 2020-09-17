@@ -136,9 +136,15 @@ let get_or_initialize_exn account_id t idx =
   let account = get_exn t idx in
   if Public_key.Compressed.(equal empty account.public_key) then
     let public_key = Account_id.public_key account_id in
+    let token_id = Account_id.token_id account_id in
+    let delegate =
+      (* Only allow delegation if this account is for the default token. *)
+      if Token_id.(equal default) token_id then public_key
+      else Public_key.Compressed.empty
+    in
     ( `Added
     , { account with
-        delegate= public_key
+        delegate
       ; public_key
       ; token_id= Account_id.token_id account_id } )
   else (`Existed, account)

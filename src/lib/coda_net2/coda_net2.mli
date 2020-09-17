@@ -175,7 +175,11 @@ end
   *
   * This can fail for a variety of reasons related to spawning the subprocess.
 *)
-val create : logger:Logger.t -> conf_dir:string -> net Deferred.Or_error.t
+val create :
+     on_unexpected_termination:(unit -> unit Deferred.t)
+  -> logger:Logger.t
+  -> conf_dir:string
+  -> net Deferred.Or_error.t
 
 (** Configure the network connection.
   *
@@ -184,6 +188,9 @@ val create : logger:Logger.t -> conf_dir:string -> net Deferred.Or_error.t
   * This will only connect to peers that share the same [network_id]. [on_new_peer], if present,
   * will be called for each peer we discover. [unsafe_no_trust_ip], if true, will not attempt to
   * report trust actions for the IPs of observed connections.
+  *
+  * Whenever the connection list gets too small, [seed_peers] will be
+  * candidates for reconnection for peer discovery.
   *
   * This fails if initializing libp2p fails for any reason.
 *)
@@ -196,6 +203,7 @@ val configure :
   -> on_new_peer:(discovered_peer -> unit)
   -> unsafe_no_trust_ip:bool
   -> gossip_type:[`Gossipsub | `Flood | `Random]
+  -> seed_peers:Multiaddr.t list
   -> unit Deferred.Or_error.t
 
 (** The keypair the network was configured with.
