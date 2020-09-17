@@ -1440,21 +1440,21 @@ struct
       and add_finalizer = ScalarFieldVector.add_finalizer in
       fun t -> add_finalizer (f t)
 
-    let sigma1 = f "sigma1"
+    let sigma1_eval = f "sigma1"
 
-    let sigma2 = f "sigma2"
+    let sigma2_eval = f "sigma2"
 
-    let l = f "l"
+    let l_eval = f "l"
 
-    let r = f "r"
+    let r_eval = f "r"
 
-    let o = f "o"
+    let o_eval = f "o"
 
-    let z = f "z"
+    let z_eval = f "z"
 
-    let t = f "t"
+    let t_eval = f "t"
 
-    let f = f "f"
+    let f_eval = f "f"
 
     module Pair =
       Pair
