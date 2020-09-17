@@ -37,7 +37,7 @@ module Subscription = struct
     in
     let%bind authorization =
       let%map token =
-        Malleable_error.or_error_to_hard_malleable_error
+        Malleable_error.of_or_error_hard
           (Process.run ~prog ~args:["auth"; "print-access-token"] ())
       in
       let token = String.strip token in
@@ -59,7 +59,7 @@ module Subscription = struct
       |> Yojson.Safe.to_string
     in
     let%bind response =
-      Malleable_error.or_error_to_hard_malleable_error
+      Malleable_error.of_or_error_hard
         (Process.run ~prog:"curl"
            ~args:
              [ "--request"
@@ -83,7 +83,7 @@ module Subscription = struct
       Yojson.Safe.Util.(to_option Fn.id (member "error" response_json))
     with
     | Some _ ->
-        Malleable_error.errorf !"Error when creating sink: %s" response
+        Malleable_error.hard_errorf !"Error when creating sink: %s" response
     | None ->
         Malleable_error.ok_unit
 
@@ -97,17 +97,17 @@ module Subscription = struct
       | Some key ->
           return key
       | None ->
-          Malleable_error.errorf
+          Malleable_error.hard_errorf
             "Set environment variable %s with the service account key to use \
              Stackdriver logging"
             gcloud_key_file_env
     in
     let create_topic name =
-      Malleable_error.or_error_to_hard_malleable_error
+      Malleable_error.of_or_error_hard
         (Process.run ~prog ~args:["pubsub"; "topics"; "create"; name] ())
     in
     let create_subscription name topic =
-      Malleable_error.or_error_to_hard_malleable_error
+      Malleable_error.of_or_error_hard
         (Process.run ~prog
            ~args:
              [ "pubsub"
@@ -129,7 +129,7 @@ module Subscription = struct
 
   let delete t =
     let delete_subscription () =
-      Malleable_error.or_error_to_hard_malleable_error
+      Malleable_error.of_or_error_hard
         (Process.run ~prog
            ~args:
              [ "pubsub"
@@ -141,13 +141,13 @@ module Subscription = struct
            ())
     in
     let delete_sink () =
-      Malleable_error.or_error_to_hard_malleable_error
+      Malleable_error.of_or_error_hard
         (Process.run ~prog
            ~args:["logging"; "sinks"; "delete"; t.sink; "--project"; project_id]
            ())
     in
     let delete_topic () =
-      Malleable_error.or_error_to_hard_malleable_error
+      Malleable_error.of_or_error_hard
         (Process.run ~prog
            ~args:
              ["pubsub"; "topics"; "delete"; t.topic; "--project"; project_id]
@@ -163,7 +163,7 @@ module Subscription = struct
     in
     (* The limit for messages we pull on each interval is currently not configurable. For now, it's set to 5 (which will hopefully be a sane for a while). *)
     let%bind result =
-      Malleable_error.or_error_to_hard_malleable_error
+      Malleable_error.of_or_error_hard
         (Process.run ~prog
            ~args:
              [ "pubsub"
@@ -183,7 +183,7 @@ module Subscription = struct
     | "DATA" :: data ->
         Malleable_error.malleable_error_list_map data ~f:load_config_json
     | _ ->
-        Malleable_error.error_string
+        Malleable_error.hard_error_string
           (sprintf "Invalid subscription pull result: %s" result)
 end
 
@@ -194,7 +194,7 @@ module Json_parsing = struct
     | Ok x ->
         Malleable_error.return x
     | Error err ->
-        Malleable_error.error_string err
+        Malleable_error.hard_error_string err
 
   type 'a parser = Yojson.Safe.t -> 'a
 
@@ -217,12 +217,12 @@ module Json_parsing = struct
     | [], _ -> (
       try Malleable_error.return (parser json)
       with exn ->
-        Malleable_error.error_string
+        Malleable_error.hard_error_string
           (Printf.sprintf "failed to parse json value: %s" (Exn.to_string exn))
       )
     | key :: path', `Assoc assoc ->
         let%bind entry =
-          Malleable_error.malleable_error_of_option
+          Malleable_error.of_option
             (List.Assoc.find assoc key ~equal:String.equal)
             "failed to find path in json object"
         in
@@ -529,7 +529,7 @@ let create ~logger ~(network : Kubernetes_network.t) ~on_fatal_error =
         let open Malleable_error.Let_syntax in
         [%log info] "Handling initialization log for \"%s\"" result.pod_id ;
         let%bind ivar =
-          Malleable_error.malleable_error_of_option
+          Malleable_error.of_option
             (String.Map.find initialization_table result.pod_id)
             (Printf.sprintf "node not found in initialization table: %s"
                result.pod_id)
@@ -556,7 +556,6 @@ let create ~logger ~(network : Kubernetes_network.t) ~on_fatal_error =
   ; initialization_table
   ; logger }
 
-(* TODO figure out how much of this {Test_error.Set.soft_errors; hard_errors} struct and the t struct that we still need *)
 let destroy t : Test_error.Set.t Malleable_error.t =
   let open Malleable_error.Let_syntax in
   let { testnet_log_filter= _
@@ -656,7 +655,7 @@ let wait_for' :
     let open Malleable_error.Let_syntax in
     let rec go aggregated_res : unit Malleable_error.t =
       if Time.( > ) (Time.now ()) timeout_safety then
-        Malleable_error.error_string "wait_for took too long to complete"
+        Malleable_error.hard_error_string "wait_for took too long to complete"
       else if timed_out aggregated_res then Malleable_error.ok_unit
       else (
         [%log' info t.logger] "Pulling blocks produced subscription" ;
@@ -676,13 +675,13 @@ let wait_for' :
         in
         if not finished then
           let%bind () =
-            Deferred.map
+            Deferred.bind
               (Async.after
                  (Time.Span.of_ms
                     ( Int.to_float
                         t.constants.constraints.block_window_duration_ms
                     /. 2.0 )))
-              ~f:Malleable_error.return_without_deferred
+              ~f:Malleable_error.return
           in
           go aggregated_res'
         else Malleable_error.return () )
@@ -730,7 +729,7 @@ let wait_for_init (node : Kubernetes_network.Node.t) t =
     ~metadata:[("node", `String node)]
     "Waiting for $node to initialize" ;
   let%bind init =
-    Malleable_error.malleable_error_of_option
+    Malleable_error.of_option
       (String.Map.find t.initialization_table node)
       "failed to find node in initialization table"
   in
@@ -740,7 +739,7 @@ let wait_for_init (node : Kubernetes_network.Node.t) t =
     Timeout.await_exn
       ~timeout_duration:(Time.Span.of_ms (15.0 *. 60.0 *. 1000.0))
       ()
-      (Deferred.map (Ivar.read init) ~f:Malleable_error.return_without_deferred)
+      (Deferred.bind (Ivar.read init) ~f:Malleable_error.return)
 
 (*TODO: unit tests without conencting to gcloud. The following test connects to joyous-occasion*)
 (*let%test_module "Log tests" =

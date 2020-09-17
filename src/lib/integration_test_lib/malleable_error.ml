@@ -1,8 +1,6 @@
 open Core_kernel
 open Async_kernel
 
-(* module Test_error = Test_error *)
-
 (** The is a monad which is conceptually similar to `Deferred.Or_error.t`,
  *  except that there are 2 types of errors which can be returned at each bind
  *  point in a computation: soft errors, and hard errors. Soft errors do not
@@ -33,31 +31,21 @@ module T = Monad.Make (struct
   let return a =
     Deferred.return (Ok {Accumulator.computation_result= a; soft_errors= []})
 
-  (* 
-
-('a, 'b) result Deferred.t ->
-f:('c -> ('d, 'e) result Deferred.t) -> 
-('f, 'b) result Deferred.t 
-
-*)
   let bind res ~f =
     match%bind res with
     | Ok {Accumulator.computation_result= prev_result; soft_errors= err_list}
       -> (
-        let execProg = f prev_result in
-        match%bind execProg with
+        match%map f prev_result with
         | Ok {Accumulator.computation_result= comp; soft_errors= next_list} ->
-            Deferred.return
-              (Ok
-                 { Accumulator.computation_result= comp
-                 ; Accumulator.soft_errors= List.append err_list next_list })
+            Ok
+              { Accumulator.computation_result= comp
+              ; Accumulator.soft_errors= List.append err_list next_list }
         | Error
             {Hard_fail.hard_error= hard_err; Hard_fail.soft_errors= next_list}
           ->
-            Deferred.return
-              (Error
-                 { Hard_fail.hard_error= hard_err
-                 ; soft_errors= List.append err_list next_list }) )
+            Error
+              { Hard_fail.hard_error= hard_err
+              ; soft_errors= List.append err_list next_list } )
     | Error _ as error ->
         Deferred.return error
 
@@ -66,11 +54,11 @@ end)
 
 include T
 
-let return_without_deferred a =
+(* let return_without_deferred a =
   Ok {Accumulator.computation_result= a; soft_errors= []}
 
 let return_unit_without_deferred =
-  Ok {Accumulator.computation_result= (); soft_errors= []}
+  Ok {Accumulator.computation_result= (); soft_errors= []} *)
 
 let ok_unit = return ()
 
@@ -82,14 +70,14 @@ let ok_exn (res : 'a t) : 'a Deferred.t =
   | Error {Hard_fail.hard_error= err; Hard_fail.soft_errors= _} ->
       Error.raise err.error
 
-let error_string message =
+let hard_error_string message =
   Deferred.return
     (Error
        { Hard_fail.hard_error=
            Test_error.raw_internal_error (Error.of_string message)
        ; soft_errors= [] })
 
-let errorf format = Printf.ksprintf error_string format
+let hard_errorf format = Printf.ksprintf hard_error_string format
 
 let soft_error res err =
   Deferred.return
@@ -103,7 +91,7 @@ let hard_error err =
        { Hard_fail.hard_error= Test_error.raw_internal_error err
        ; soft_errors= [] })
 
-let or_error_to_hard_malleable_error (or_err : 'a Deferred.Or_error.t) : 'a t =
+let of_or_error_hard (or_err : 'a Deferred.Or_error.t) : 'a t =
   let open Deferred.Let_syntax in
   match%map or_err with
   | Ok x ->
@@ -113,8 +101,7 @@ let or_error_to_hard_malleable_error (or_err : 'a Deferred.Or_error.t) : 'a t =
         { Hard_fail.hard_error= Test_error.raw_internal_error err
         ; soft_errors= [] }
 
-let or_error_to_soft_malleable_error (res : 'a)
-    (or_err : 'a Deferred.Or_error.t) : 'a t =
+let of_or_error_soft (res : 'a) (or_err : 'a Deferred.Or_error.t) : 'a t =
   let open Deferred.Let_syntax in
   match%map or_err with
   | Ok x ->
@@ -123,17 +110,6 @@ let or_error_to_soft_malleable_error (res : 'a)
       Ok
         { Accumulator.computation_result= res
         ; soft_errors= [Test_error.raw_internal_error err] }
-
-(* 
-'a Malleable_error.t list -> 'a list Malleable_error.t
- *)
-(* let combine_errors (error_list : 'a Malleable_error.t list ) : 'a list Malleable_error.t = 
-  Deferred.map (Deferred.all error_list) ~f:(combine_errors_helper)
-
-let combine_errors_helper (error_list : ('a Accumulator.t, Hard_fail.t) Result.t list ) : (('a list Accumulator.t, Hard_fail.t) Result.t) =
-  List.fold_left error_list ~init:(return_without_deferred []) ~f:combine_errors_helper3
-
-let combine_errors_helper3 (fold_acc : ('a list Accumulator.t, Hard_fail.t) Result.t ) (mall_err: 'a Malleable_error.t) = *)
 
 let combine_errors (malleable_errors : 'a t list) : 'a list t =
   let open T.Let_syntax in
@@ -157,6 +133,9 @@ let try_with ?(backtrace = false) (f : unit -> 'a) : 'a t =
                (Error.of_exn exn
                   ?backtrace:(if backtrace then Some `Get else None))
          ; soft_errors= [] })
+
+(* let try_with (type a) ?(backtrace = false) (f : unit -> a) : a t =
+  of_or_error_hard (Deferred.return (Or_error.try_with ?backtrace ~f:f)) *)
 
 let rec malleable_error_list_iter ls ~f =
   let open T.Let_syntax in
@@ -189,7 +168,7 @@ let rec malleable_error_list_fold_left_while ls ~init ~f =
       | `Continue init' ->
           malleable_error_list_fold_left_while t ~init:init' ~f )
 
-let malleable_error_of_option opt msg : 'a t =
+let of_option opt msg : 'a t =
   Option.value_map opt
     ~default:
       (Deferred.return
