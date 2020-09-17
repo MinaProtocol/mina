@@ -46,6 +46,22 @@ module Styles = {
   let header = merge([Theme.Type.h2, style([marginBottom(`rem(0.5))])]);
   let subhead =
     merge([Theme.Type.sectionSubhead, style([marginBottom(`rem(4.))])]);
+  let investorGridItem =
+    style([
+      Theme.Typeface.monumentGroteskMono,
+      fontSize(`rem(1.125)),
+      textAlign(`center),
+      background(white),
+      padding2(~v=`rem(2.), ~h=`rem(1.)),
+    ]);
+    let investorGridItemLarge =
+    style([
+      Theme.Typeface.monumentGroteskMono,
+      fontSize(`rem(1.125)),
+      textAlign(`center),
+      background(white),
+      padding2(~v=`rem(1.5), ~h=`rem(1.)),
+    ]);
 };
 
 [@react.component]
@@ -56,20 +72,44 @@ let make = () => {
       <p className=Styles.subhead> {React.string("Supporting O(1) Labs")} </p>
       <div className=Styles.investorGrid>
         <img src="/static/img/logos/LogoAccomplice.png" />
+        <div className=Styles.investorGridItem>
+          {React.string("Andrew Keys")}
+        </div>
         <img src="/static/img/logos/LogoBlockchange.png" />
+        <div className=Styles.investorGridItemLarge>
+          {React.string("Charlie Noyes")}
+        </div>
         <img src="/static/img/logos/LogoCoinbaseVentures.png" />
         <img src="/static/img/logos/LogoCollaborativeFund.png" />
         <img src="/static/img/logos/LogoCuriousEndeavors.png" />
         <img src="/static/img/logos/LogoDekryptCapital.png" />
         <img src="/static/img/logos/LogoDragonfly.png" />
+        <div className=Styles.investorGridItem>
+          {React.string("Ed Roman")}
+        </div>
+        <div className=Styles.investorGridItem>
+          {React.string("Elad Gil")}
+        </div>
         <img src="/static/img/logos/LogoElectricCapital.png" />
         <img src="/static/img/logos/LogoEvolveVC.png" />
+        <div className=Styles.investorGridItem>
+          {React.string("Fred Ehrsam")}
+        </div>
         <img src="/static/img/logos/LogoGeneralCatalyst.png" />
+        <div className=Styles.investorGridItemLarge>
+          {React.string("Jack Herrick")}
+        </div>
         <img src="/static/img/logos/LogoKilowattCapital.png" />
         <img src="/static/img/logos/LogoKindredVentures.png" />
         <img src="/static/img/logos/LogoLibertusCapital.png" />
+        <div className=Styles.investorGridItem>
+          {React.string("Linda Xie")}
+        </div>
         <img src="/static/img/logos/LogoMetastable.png" />
         <img src="/static/img/logos/LogoMulticoinCapital.png" />
+        <div className=Styles.investorGridItemLarge>
+          {React.string("Naval Ravikant")}
+        </div>
         <img src="/static/img/logos/LogoNimaCapital.png" />
         <img src="/static/img/logos/LogoParadigm.png" />
         <img src="/static/img/logos/LogoPolychainCapital.png" />
