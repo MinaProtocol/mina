@@ -45,7 +45,7 @@ module Styles = {
     style([
       width(`percent(100.)),
       height(`rem(180.)),
-      backgroundColor(Css_Colors.black),
+      backgroundColor(Theme.Colors.minaBlack),
       backgroundSize(`cover),
       backgroundImage(`url("/static/img/spectrum_primary.png")),
     ]);
