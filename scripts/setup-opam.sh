@@ -42,7 +42,7 @@ else
 fi
 
 # FIXME: Manually pin ocamlgraph while their hosting is down
-opam pin https://github.com/backtracking/ocamlgraph.git#v1.8.8
+opam pin ocamlgraph https://github.com/backtracking/ocamlgraph/archive/v1.8.8.tar.gz
 
 # All our ocaml packages
 opam switch import src/opam.export
