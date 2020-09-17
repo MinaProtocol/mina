@@ -48,7 +48,12 @@ module TeamMember = {
     let title =
       merge([
         Theme.Type.contributorLabel,
-        style([lineHeight(`rem(1.37)), color(black), fontSize(`px(12))]),
+        style([
+          lineHeight(`rem(1.37)),
+          color(black),
+          fontSize(`px(12)),
+          maxWidth(`rem(10.)),
+        ]),
       ]);
     let flexRow =
       style([
@@ -226,14 +231,18 @@ module GenesisMembersGrid = {
 
     let genesisHeader = merge([Theme.Type.h2, style([])]);
     let genesisCopy =
-      style([media(Theme.MediaQuery.tablet, [width(`rem(23.))])]);
+      style([
+        unsafe("grid-area", "1 /1 / span 1 / span 2"),
+        media(Theme.MediaQuery.tablet, [width(`rem(23.))]),
+      ]);
     let sectionSubhead =
       merge([
         Theme.Type.sectionSubhead,
         style([
           fontSize(`px(19)),
           lineHeight(`rem(1.75)),
-          marginBottom(`rem(2.93)),
+          marginTop(`rem(0.5)),
+          marginBottom(`rem(2.)),
           letterSpacing(`pxFloat(-0.4)),
         ]),
       ]);
@@ -248,14 +257,7 @@ module GenesisMembersGrid = {
         gridRowGap(`rem(1.)),
         media(
           Theme.MediaQuery.tablet,
-          [
-            gridTemplateColumns([
-              `rem(21.),
-              `rem(10.),
-              `rem(10.),
-       
-            ]),
-          ],
+          [gridTemplateColumns([`rem(21.), `rem(10.), `rem(10.)])],
         ),
         media(
           Theme.MediaQuery.desktop,
@@ -284,6 +286,10 @@ module GenesisMembersGrid = {
              "Meet the node operators, developers, and community builders making Mina happen.",
            )}
         </p>
+        <Button bgColor=Theme.Colors.orange width={`rem(13.5)}>
+          {React.string("See More Members ")}
+          <Icon kind=Icon.ArrowRightSmall size=1. />
+        </Button>
       </div>
       <TeamMember
         fullName="Greg | DeFidog"

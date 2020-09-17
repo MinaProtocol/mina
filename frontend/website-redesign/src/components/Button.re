@@ -14,7 +14,7 @@ module Styles = {
       Theme.Type.buttonLabel,
       style([
         display(`flex),
-        justifyContent(`center),
+        justifyContent(`spaceBetween),
         alignItems(`center),
         width(buttonWidth),
         height(buttonHeight),
