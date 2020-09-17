@@ -13,9 +13,7 @@ module type Type = sig
 end
 
 module type Prefix_type = sig
-  include Prefix
-
-  include Type
+  include Prefix include Type
 end
 
 module Pair (P : Prefix) (Elt : Type) (F : Ctypes.FOREIGN) = struct
@@ -276,7 +274,6 @@ struct
 
     module Underlying : Type = struct
       type t = unit
-
       let typ = void
     end
 
@@ -390,11 +387,11 @@ struct
 
   let create =
     foreign (prefix "create")
-      ( Index.typ @-> ScalarFieldVector.typ @-> ScalarFieldVector.typ
-      @-> returning typ )
+      (Index.typ @-> ScalarFieldVector.typ @-> ScalarFieldVector.typ @-> returning typ)
 
   let verify =
-    foreign (prefix "verify") (VerifierIndex.typ @-> typ @-> returning bool)
+    foreign (prefix "verify")
+      (VerifierIndex.typ @-> typ @-> returning bool)
 
   let batch_verify =
     foreign (prefix "batch_verify")
@@ -517,11 +514,10 @@ module Triple (P : Prefix) (Elt : Type) (F : Ctypes.FOREIGN) = struct
 end
 
 module Dlog_poly_comm
-    (P : Prefix) (AffineCurve : sig
+    (P : Prefix)
+    (AffineCurve : sig
         module Underlying : Type
-
         include Type with type t = Underlying.t ptr
-
         module Vector : Type
     end)
     (F : Ctypes.FOREIGN) =
@@ -538,18 +534,14 @@ struct
 
   open F
 
-  let unshifted =
-    foreign (prefix "unshifted") (typ @-> returning AffineCurve.Vector.typ)
+  let unshifted = foreign (prefix "unshifted") (typ @-> returning AffineCurve.Vector.typ)
 
   let shifted : (t -> AffineCurve.t option return) result =
-    foreign (prefix "shifted")
-      (typ @-> returning (ptr_opt AffineCurve.Underlying.typ))
+    foreign (prefix "shifted") (typ @-> returning (ptr_opt AffineCurve.Underlying.typ))
 
-  let make : (AffineCurve.Vector.t -> AffineCurve.t option -> t return) result
-      =
+  let make : (AffineCurve.Vector.t -> AffineCurve.t option -> t return) result =
     foreign (prefix "make")
-      ( AffineCurve.Vector.typ
-      @-> ptr_opt AffineCurve.Underlying.typ
+      ( AffineCurve.Vector.typ @-> ptr_opt AffineCurve.Underlying.typ
       @-> returning typ )
 
   let delete = foreign (prefix "delete") (typ @-> returning void)
@@ -671,26 +663,24 @@ struct
 
     let make =
       foreign (prefix "make")
-        ( ScalarFieldVector.typ @-> ScalarFieldVector.typ
-        @-> ScalarFieldVector.typ @-> ScalarFieldVector.typ
-        @-> ScalarFieldVector.typ @-> ScalarFieldVector.typ
-        @-> ScalarFieldVector.typ @-> ScalarFieldVector.typ
-        @-> ScalarFieldVector.typ @-> ScalarFieldVector.typ
-        @-> ScalarFieldVector.typ @-> ScalarFieldVector.typ
-        @-> ScalarFieldVector.typ @-> ScalarFieldVector.typ
-        @-> ScalarFieldVector.typ @-> ScalarFieldVector.typ
-        @-> ScalarFieldVector.typ @-> ScalarFieldVector.typ
-        @-> ScalarFieldVector.typ @-> ScalarFieldVector.typ
-        @-> ScalarFieldVector.typ @-> returning typ )
+        ( ScalarFieldVector.typ @-> ScalarFieldVector.typ @-> ScalarFieldVector.typ
+        @-> ScalarFieldVector.typ @-> ScalarFieldVector.typ @-> ScalarFieldVector.typ
+        @-> ScalarFieldVector.typ @-> ScalarFieldVector.typ @-> ScalarFieldVector.typ
+        @-> ScalarFieldVector.typ @-> ScalarFieldVector.typ @-> ScalarFieldVector.typ
+        @-> ScalarFieldVector.typ @-> ScalarFieldVector.typ @-> ScalarFieldVector.typ
+        @-> ScalarFieldVector.typ @-> ScalarFieldVector.typ @-> ScalarFieldVector.typ
+        @-> ScalarFieldVector.typ @-> ScalarFieldVector.typ @-> ScalarFieldVector.typ
+        @-> returning typ )
   end
 
   let prefix = P.prefix
 
   let make =
     foreign (prefix "make")
-      ( ScalarFieldVector.typ @-> PolyComm.typ @-> PolyComm.typ @-> PolyComm.typ
-      @-> PolyComm.typ @-> PolyComm.typ @-> PolyComm.typ @-> PolyComm.typ
-      @-> PolyComm.typ @-> PolyComm.typ @-> ScalarField.typ @-> ScalarField.typ
+      ( ScalarFieldVector.typ @-> PolyComm.typ @-> PolyComm.typ
+      @-> PolyComm.typ @-> PolyComm.typ @-> PolyComm.typ
+      @-> PolyComm.typ @-> PolyComm.typ @-> PolyComm.typ
+      @-> PolyComm.typ @-> ScalarField.typ @-> ScalarField.typ
       @-> AffineCurve.Pair.Vector.typ @-> ScalarField.typ @-> ScalarField.typ
       @-> AffineCurve.typ @-> AffineCurve.typ @-> Evaluations.typ
       @-> Evaluations.typ @-> Evaluations.typ @-> ScalarFieldVector.typ
@@ -702,7 +692,8 @@ struct
       @-> ScalarFieldVector.typ @-> AffineCurve.Vector.typ @-> returning typ )
 
   let verify =
-    foreign (prefix "verify") (VerifierIndex.typ @-> typ @-> returning bool)
+    foreign (prefix "verify")
+      (VerifierIndex.typ @-> typ @-> returning bool)
 
   let batch_verify =
     foreign (prefix "batch_verify")
@@ -928,17 +919,12 @@ struct
   let of_bigint_raw =
     foreign (prefix "of_bigint_raw") (Bigint.typ @-> returning typ)
 
-  module Vector = struct
-    module T =
-      Vector (struct
-          let prefix = prefix
-        end)
-        (T)
-        (F)
-
-    include T
-    module Triple = Triple (T) (T) (F)
-  end
+  module Vector =
+    Vector (struct
+        let prefix = prefix
+      end)
+      (T)
+      (F)
 
   module Constraint_matrix = struct
     open F
@@ -989,37 +975,30 @@ module Full (F : Ctypes.FOREIGN) = struct
       end)
       (F)
 
-  module Dlog_proof_system (Field : sig
-    include Prefix_type
-
-    module Vector : sig
-      include Prefix_type
-
-      module Triple : Type
-    end
-
-    module Constraint_matrix : Type
-  end) (Curve : sig
-    include Prefix_type
-
-    module Affine : sig
-      module Underlying : Type
-
-      include Type with type t = Underlying.t ptr
-
-      module Vector : Type
-
-      module Pair : sig
-        include Type
-
-        module Vector : Type
-      end
-    end
-  end) =
-  struct
-    let prefix = Field.prefix
+  module Dlog_proof_system
+      (Field: sig
+         include Prefix_type
+         module Vector:Prefix_type
+         module Constraint_matrix:Type
+       end)
+      (Curve: sig
+         include Prefix_type
+         module Affine: sig
+            module Underlying : Type
+            include Type with type t = Underlying.t ptr
+            module Vector: Type
+           module Pair : sig
+             include Type
+             module Vector: Type
+           end
+          end
+       end)
+  = struct
+    let prefix = Field.prefix 
 
     module Field_triple = Triple (Field) (Field) (F)
+
+    module Field_vector_triple = Triple (Field.Vector) (Field.Vector) (F)
 
     module Field_opening_proof =
       Dlog_opening_proof (struct
@@ -1037,6 +1016,7 @@ module Full (F : Ctypes.FOREIGN) = struct
         (F)
 
     module Field_urs = struct
+
       let prefix = with_prefix (prefix "urs")
 
       include (
@@ -1065,16 +1045,9 @@ module Full (F : Ctypes.FOREIGN) = struct
       let commit_evaluations =
         foreign
           (prefix "commit_evaluations")
-          ( typ @-> size_t @-> Field.Vector.typ
-          @-> returning Field_poly_comm.typ )
+          (typ @-> size_t @-> Field.Vector.typ @-> returning Field_poly_comm.typ)
 
       let h = foreign (prefix "h") (typ @-> returning Curve.Affine.typ)
-
-      let batch_accumulator_check =
-        foreign
-          (prefix "batch_accumulator_check")
-          ( typ @-> Curve.Affine.Vector.typ @-> Field.Vector.typ
-          @-> returning bool )
 
       let b_poly_commitment =
         foreign
@@ -1093,17 +1066,16 @@ module Full (F : Ctypes.FOREIGN) = struct
 
     module Field_verifier_index = struct
       include VerifierIndex (struct
-                  let prefix = with_prefix (prefix "verifier_index")
-                end)
-                (Field_index)
-                (Field_urs)
-                (Field_poly_comm)
-                (F)
+          let prefix = with_prefix (prefix "verifier_index")
+        end)
+        (Field_index)
+        (Field_urs)
+        (Field_poly_comm)
+        (F)
 
       open F
 
-      let read =
-        foreign (prefix "read") (Field_urs.typ @-> string @-> returning typ)
+      let read = foreign (prefix "read") (Field_urs.typ @-> string @-> returning typ)
     end
 
     module Field_proof =
@@ -1115,7 +1087,7 @@ module Full (F : Ctypes.FOREIGN) = struct
         (Field_index)
         (Field_verifier_index)
         (Field.Vector)
-        (Field.Vector.Triple)
+        (Field_vector_triple)
         (Field_opening_proof)
         (Field_poly_comm)
         (F)
@@ -1127,7 +1099,7 @@ module Full (F : Ctypes.FOREIGN) = struct
         (Field)
         (Field_verifier_index)
         (Field_proof)
-        (Field.Vector.Triple)
+        (Field_vector_triple)
         (F)
   end
 
@@ -1153,29 +1125,25 @@ module Full (F : Ctypes.FOREIGN) = struct
     module Dum = struct
       module Field = Fq
 
-      module Curve =
-        Curve (struct
-            let prefix = with_prefix (prefix "dum")
-          end)
-          (Fp)
-          (Fq)
-          (F)
+      module Curve = Curve (struct
+          let prefix = with_prefix (prefix "dum")
+        end)
+        (Fp)
+        (Fq)
+        (F)
 
-      include Dlog_proof_system (Field) (Curve)
+      include Dlog_proof_system(Field)(Curve)
     end
 
     module Dee = struct
       module Field = Fp
-
-      module Curve =
-        Curve (struct
-            let prefix = with_prefix (prefix "dee")
-          end)
-          (Fq)
-          (Fp)
-          (F)
-
-      include Dlog_proof_system (Field) (Curve)
+      module Curve = Curve (struct
+          let prefix = with_prefix (prefix "dee")
+        end)
+        (Fq)
+        (Fp)
+        (F)
+      include Dlog_proof_system(Field)(Curve)
     end
 
     module Endo = struct
@@ -1185,13 +1153,11 @@ module Full (F : Ctypes.FOREIGN) = struct
 
       module Dee = struct
         let base = endo Fq.typ "fp_endo_base"
-
         let scalar = endo Fp.typ "fp_endo_scalar"
       end
 
       module Dum = struct
         let base = endo Fp.typ "fq_endo_base"
-
         let scalar = endo Fq.typ "fq_endo_scalar"
       end
     end
@@ -1266,12 +1232,12 @@ module Full (F : Ctypes.FOREIGN) = struct
 
     module Fp_verifier_index = struct
       include VerifierIndex (struct
-                  let prefix = with_prefix (prefix "fp_verifier_index")
-                end)
-                (Fp_index)
-                (Fp_urs)
-                (G1.Affine)
-                (F)
+          let prefix = with_prefix (prefix "fp_verifier_index")
+        end)
+        (Fp_index)
+        (Fp_urs)
+        (G1.Affine)
+        (F)
 
       open F
 
@@ -1300,6 +1266,8 @@ module Full (F : Ctypes.FOREIGN) = struct
 
     module Fq_triple = Triple (Fq) (Fq) (F)
 
+    module Fq_vector_triple = Triple (Fq.Vector) (Fq.Vector) (F)
+
     module Fq_opening_proof =
       Dlog_opening_proof (struct
           let prefix = with_prefix (prefix "fq_opening_proof")
@@ -1316,6 +1284,7 @@ module Full (F : Ctypes.FOREIGN) = struct
         (F)
 
     module Fq_urs = struct
+
       let prefix = with_prefix (prefix "fq_urs")
 
       include (
@@ -1365,17 +1334,16 @@ module Full (F : Ctypes.FOREIGN) = struct
 
     module Fq_verifier_index = struct
       include VerifierIndex (struct
-                  let prefix = with_prefix (prefix "fq_verifier_index")
-                end)
-                (Fq_index)
-                (Fq_urs)
-                (Fq_poly_comm)
-                (F)
+          let prefix = with_prefix (prefix "fq_verifier_index")
+        end)
+        (Fq_index)
+        (Fq_urs)
+        (Fq_poly_comm)
+        (F)
 
       open F
 
-      let read =
-        foreign (prefix "read") (Fq_urs.typ @-> string @-> returning typ)
+      let read = foreign (prefix "read") (Fq_urs.typ @-> string @-> returning typ)
     end
 
     module Fq_proof =
@@ -1387,7 +1355,7 @@ module Full (F : Ctypes.FOREIGN) = struct
         (Fq_index)
         (Fq_verifier_index)
         (Fq.Vector)
-        (Fq.Vector.Triple)
+        (Fq_vector_triple)
         (Fq_opening_proof)
         (Fq_poly_comm)
         (F)
@@ -1399,7 +1367,7 @@ module Full (F : Ctypes.FOREIGN) = struct
         (Fq)
         (Fq_verifier_index)
         (Fq_proof)
-        (Fq.Vector.Triple)
+        (Fq_vector_triple)
         (F)
 
     module Endo = struct
@@ -1409,13 +1377,11 @@ module Full (F : Ctypes.FOREIGN) = struct
 
       module Pairing = struct
         let base = endo Fq.typ "fp_endo_base"
-
         let scalar = endo Fp.typ "fp_endo_scalar"
       end
 
       module Dlog = struct
         let base = endo Fp.typ "fq_endo_base"
-
         let scalar = endo Fq.typ "fq_endo_scalar"
       end
     end
@@ -1428,6 +1394,5 @@ module Full (F : Ctypes.FOREIGN) = struct
         @-> G1.Affine.Vector.typ @-> G1.Affine.Vector.typ
         @-> G1.Affine.Vector.typ @-> returning bool )
   end
-
   include Bn382
 end
