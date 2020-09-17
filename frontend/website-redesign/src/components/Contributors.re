@@ -1,6 +1,7 @@
 module Styles = {
   open Css;
-  let container = style([padding2(~v=`rem(4.), ~h=`rem(1.25))]);
+  let container = style([padding2(~v=`rem(4.), ~h=`rem(1.25)), media(Theme.MediaQuery.desktop, [            padding2(~v=`rem(8.), ~h=`rem(9.5)),
+])]);
   let header = merge([Theme.Type.h2, style([marginBottom(`rem(0.5))])]);
   let sectionSubhead =
     merge([
@@ -66,6 +67,19 @@ module TeamGrid = {
           Theme.MediaQuery.tablet,
           [
             gridTemplateColumns([
+              `rem(10.),
+              `rem(10.),
+              `rem(10.),
+              `rem(10.),
+            ]),
+          ],
+        ),
+        media(
+          Theme.MediaQuery.desktop,
+          [
+            gridTemplateColumns([
+              `rem(10.),
+              `rem(10.),
               `rem(10.),
               `rem(10.),
               `rem(10.),
