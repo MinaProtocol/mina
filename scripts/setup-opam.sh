@@ -41,6 +41,9 @@ else
   opam switch $SWITCH
 fi
 
+# FIXME: Manually pin ocamlgraph while their hosting is down
+opam pin https://github.com/backtracking/ocamlgraph.git#v1.8.8
+
 # All our ocaml packages
 opam switch import src/opam.export
 eval $(opam config env)
