@@ -158,9 +158,11 @@ let det_sqrt (type f) ((module Impl) : f Snarky_backendless.Snark.m)
          = g^(2^n + k) h
 
          What we can conclude from this is one of the square roots of t has the top bit = 1, and the other = 0,
-         and their bit representations are otherwise the same.
+         and their bit representations, and h representations are otherwise the same.
 
-         So as a deterministic square root, we choose the one with top bit = 0.
+         So, the h components and lower bits are unique, and the top bit may be 1 or 0.
+
+         As a deterministic square root, we choose the one with top bit = 0.
       *)
       let c, d =
         exists
