@@ -28,11 +28,7 @@ module TeamMember = {
     let title =
       merge([
         Theme.Type.contributorLabel,
-        style([
-          lineHeight(`rem(1.37)),
-          color(black),
-          fontSize(`px(12)),
-        ]),
+        style([lineHeight(`rem(1.37)), color(black), fontSize(`px(12))]),
       ]);
     let flexRow =
       style([
@@ -66,8 +62,17 @@ module TeamGrid = {
         gridAutoRows(`rem(17.3)),
         gridColumnGap(`rem(1.)),
         gridRowGap(`rem(1.)),
-        media(Theme.MediaQuery.tablet, [gridTemplateColumns([`rem(10.), `rem(10.), `rem(10.), `rem(10.)]),
-])
+        media(
+          Theme.MediaQuery.tablet,
+          [
+            gridTemplateColumns([
+              `rem(10.),
+              `rem(10.),
+              `rem(10.),
+              `rem(10.),
+            ]),
+          ],
+        ),
       ]);
   };
   [@react.component]
@@ -98,42 +103,42 @@ module TeamGrid = {
         title="Head of Business Development, O(1) Labs"
         src="/static/img/headshots/EmreTekisalp.jpg"
       />
-       <TeamMember
+      <TeamMember
         fullName="Bijan Shahrokhi"
         title="Product Manager, O(1) Labs"
         src="/static/img/headshots/BijanShahrokhi.jpg"
       />
-       <TeamMember
-        fullName="Aneesha Raines"
+      <TeamMember
+        fullName="Aneesha Ras"
         title="Engineering Manager, O(1) Labs"
-        src="/static/img/headshots/AneeshaRaines.jpg"
+        src="/static/img/headshots/AneeshaRaines.jpeg"
       />
-       <TeamMember
+      <TeamMember
         fullName="Sherry Lin"
         title="Marketing Manager, O(1) Labs"
         src="/static/img/headshots/SherryLin.jpg"
       />
-       <TeamMember
+      <TeamMember
         fullName="Carey Janecka"
         title="Product Engineer, O(1) Labs"
         src="/static/img/headshots/CareyJanecka.jpg"
       />
-       <TeamMember
+      <TeamMember
         fullName="Kate El-Bizri"
         title="Visual Designer,  O(1) Labs"
         src="/static/img/headshots/KateElBizri2.jpg"
       />
-       <TeamMember
+      <TeamMember
         fullName="Deepthi Kumar"
         title="Protocol Engineer,  O(1) Labs"
         src="/static/img/headshots/DeepthiKumar.jpg"
       />
-       <TeamMember
+      <TeamMember
         fullName="Paul Steckler"
         title="Protocol Engineer,   O(1) Labs"
         src="/static/img/headshots/PaulSteckler.jpg"
       />
-       <TeamMember
+      <TeamMember
         fullName="Jiawei Tang"
         title="Protocol Engineer,  O(1) Labs"
         src="/static/img/headshots/JiaweiTang.jpg"
@@ -191,7 +196,7 @@ let make = () => {
          "Mina is an inclusive open source protocol uniting teams and technicians from San Francisco and around the world.",
        )}
     </p>
-    <Rule color=Theme.Colors.black/>
+    <Rule color=Theme.Colors.black />
     <TeamGrid />
   </div>;
 };
