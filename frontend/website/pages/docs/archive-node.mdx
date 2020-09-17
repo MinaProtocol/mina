@@ -55,7 +55,6 @@ createdb -h localhost -p 5432 -e archiver
 
 psql -h localhost -p 5432 -d archiver -f <(curl -Ls https://raw.githubusercontent.com/CodaProtocol/coda/master/src/app/archive/create_schema.sql)
 ```
-TODO: above needs to change to point to the branch of Coda that we ship for 3.3 
 
 3. Start archive process on port 3086, connecting to the postgres database we started on port 5432 in step 1.
 ```
