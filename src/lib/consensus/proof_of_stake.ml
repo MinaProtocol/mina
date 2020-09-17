@@ -570,10 +570,13 @@ module Data = struct
     module Threshold = struct
       open Bignum_bigint
 
-      (* TEMPORARY HACK FOR TESTNETS: c should be 1 (or possibly 2) otherwise *)
-      let c = `Two_to_the 1
+      (* c is a constant factor on vrf-win likelihood *)
+      (* c = 2^0 is production behavior *)
+      (* c > 2^0 is a temporary hack for testnets *)
+      let c = `Two_to_the 0
 
-      let base = Bignum.(one / of_int 2)
+      (* base (or f in the ouroboros paper) determines the fraction of slots that will have blocks if c = 2^0 *)
+      let base = Bignum.(of_int 3 / of_int 4)
 
       let c_bias =
         let (`Two_to_the i) = c in
