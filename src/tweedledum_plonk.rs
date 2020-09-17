@@ -1,34 +1,32 @@
 use crate::common::*;
-use algebra::{
-    tweedle::{
-        dum::{Affine as GAffine, TweedledumParameters},
-        fq::Fq,
-    },
+use algebra::tweedle::{
+    dum::{Affine as GAffine, TweedledumParameters},
+    fq::Fq,
 };
 
-use plonk_circuits::scalars::{ProofEvaluations as DlogProofEvaluations};
 use plonk_circuits::constraints::ConstraintSystem;
-use plonk_circuits::gate::{CircuitGate, Gate, GateType, GateType::{*}};
-use plonk_circuits::wires::{GateWires, Wire, Wires, Col, Col::{*}};
+use plonk_circuits::gate::{CircuitGate, Gate, GateType, GateType::*};
+use plonk_circuits::scalars::ProofEvaluations as DlogProofEvaluations;
+use plonk_circuits::wires::{Col, Col::*, GateWires, Wire, Wires};
 
 use ff_fft::{EvaluationDomain, Radix2EvaluationDomain as Domain};
 
 use oracle::{
     self,
+    poseidon::PlonkSpongeConstants,
     sponge::{DefaultFqSponge, DefaultFrSponge, ScalarChallenge},
-    poseidon::{PlonkSpongeConstants},
 };
 
 use groupmap::GroupMap;
 
-use plonk_protocol_dlog::index::{
-    Index as DlogIndex, SRSSpec, SRSValue, VerifierIndex as DlogVerifierIndex,
-};
 use commitment_dlog::{
     commitment::{CommitmentCurve, OpeningProof, PolyComm},
     srs::SRS,
 };
-use plonk_protocol_dlog::prover::{ProverProof as DlogProof};
+use plonk_protocol_dlog::index::{
+    Index as DlogIndex, SRSSpec, SRSValue, VerifierIndex as DlogVerifierIndex,
+};
+use plonk_protocol_dlog::prover::ProverProof as DlogProof;
 
 // Fq index stubs
 #[no_mangle]
@@ -62,32 +60,33 @@ pub extern "C" fn zexe_tweedle_plonk_fq_index_create<'a>(
     let srs = unsafe { &*srs };
 
     let n = Domain::<Fq>::compute_size_of_domain(gates.len()).unwrap();
-    let wire = |w: Wire| -> usize {match w.col {L => w.row, R => w.row + n, O => w.row + 2*n}};
+    let wire = |w: Wire| -> usize {
+        match w.col {
+            L => w.row,
+            R => w.row + n,
+            O => w.row + 2 * n,
+        }
+    };
 
-    let gates = gates.iter().map
-    (
-        |gate|
-        CircuitGate
-        {
+    let gates = gates
+        .iter()
+        .map(|gate| CircuitGate {
             typ: gate.typ.clone(),
-            wires: GateWires
-            {
+            wires: GateWires {
                 l: (gate.wires.row, wire(gate.wires.l)),
                 r: (gate.wires.row + n, wire(gate.wires.r)),
-                o: (gate.wires.row + 2*n, wire(gate.wires.o)),
+                o: (gate.wires.row + 2 * n, wire(gate.wires.o)),
             },
-            c: gate.c.clone()
-        }
-    ).collect();
+            c: gate.c.clone(),
+        })
+        .collect();
 
-    return Box::into_raw(Box::new(
-        DlogIndex::<GAffine>::create(
-            ConstraintSystem::<Fq>::create(gates, oracle::tweedle::fq::params(), 0).unwrap(),
-            max_poly_size,
-            oracle::tweedle::fp::params(),
-            SRSSpec::Use(srs),
-        )
-    ));
+    return Box::into_raw(Box::new(DlogIndex::<GAffine>::create(
+        ConstraintSystem::<Fq>::create(gates, oracle::tweedle::fq::params(), 0).unwrap(),
+        max_poly_size,
+        oracle::tweedle::fp::params(),
+        SRSSpec::Use(srs),
+    )));
 }
 
 #[no_mangle]
@@ -96,13 +95,17 @@ pub extern "C" fn zexe_tweedle_plonk_fq_index_delete(x: *mut DlogIndex<GAffine>)
 }
 
 #[no_mangle]
-pub extern "C" fn zexe_tweedle_plonk_fq_index_max_degree(index: *const DlogIndex<GAffine>) -> usize {
+pub extern "C" fn zexe_tweedle_plonk_fq_index_max_degree(
+    index: *const DlogIndex<GAffine>,
+) -> usize {
     let index = unsafe { &*index };
     index.srs.get_ref().max_degree()
 }
 
 #[no_mangle]
-pub extern "C" fn zexe_tweedle_plonk_fq_index_public_inputs(index: *const DlogIndex<GAffine>) -> usize {
+pub extern "C" fn zexe_tweedle_plonk_fq_index_public_inputs(
+    index: *const DlogIndex<GAffine>,
+) -> usize {
     let index = unsafe { &*index };
     index.cs.public
 }
@@ -229,180 +232,140 @@ pub extern "C" fn zexe_tweedle_plonk_fq_verifier_index_read<'a>(
 pub extern "C" fn zexe_tweedle_plonk_fq_verifier_index_sigma_comm_0(
     index: *const DlogVerifierIndex<GAffine>,
 ) -> *const PolyComm<GAffine> {
-    Box::into_raw(Box::new(
-        (unsafe { &(*index).sigma_comm[0] }).clone(),
-    ))
+    Box::into_raw(Box::new((unsafe { &(*index).sigma_comm[0] }).clone()))
 }
 
 #[no_mangle]
 pub extern "C" fn zexe_tweedle_plonk_fq_verifier_index_sigma_comm_1(
     index: *const DlogVerifierIndex<GAffine>,
 ) -> *const PolyComm<GAffine> {
-    Box::into_raw(Box::new(
-        (unsafe { &(*index).sigma_comm[1] }).clone(),
-    ))
+    Box::into_raw(Box::new((unsafe { &(*index).sigma_comm[1] }).clone()))
 }
 
 #[no_mangle]
 pub extern "C" fn zexe_tweedle_plonk_fq_verifier_index_sigma_comm_2(
     index: *const DlogVerifierIndex<GAffine>,
 ) -> *const PolyComm<GAffine> {
-    Box::into_raw(Box::new(
-        (unsafe { &(*index).sigma_comm[2] }).clone(),
-    ))
+    Box::into_raw(Box::new((unsafe { &(*index).sigma_comm[2] }).clone()))
 }
 
 #[no_mangle]
 pub extern "C" fn zexe_tweedle_plonk_fq_verifier_index_ql_comm(
     index: *const DlogVerifierIndex<GAffine>,
 ) -> *const PolyComm<GAffine> {
-    Box::into_raw(Box::new(
-        (unsafe { &(*index).ql_comm }).clone(),
-    ))
+    Box::into_raw(Box::new((unsafe { &(*index).ql_comm }).clone()))
 }
 
 #[no_mangle]
 pub extern "C" fn zexe_tweedle_plonk_fq_verifier_index_qr_comm(
     index: *const DlogVerifierIndex<GAffine>,
 ) -> *const PolyComm<GAffine> {
-    Box::into_raw(Box::new(
-        (unsafe { &(*index).qr_comm }).clone(),
-    ))
+    Box::into_raw(Box::new((unsafe { &(*index).qr_comm }).clone()))
 }
 
 #[no_mangle]
 pub extern "C" fn zexe_tweedle_plonk_fq_verifier_index_qo_comm(
     index: *const DlogVerifierIndex<GAffine>,
 ) -> *const PolyComm<GAffine> {
-    Box::into_raw(Box::new(
-        (unsafe { &(*index).qo_comm }).clone(),
-    ))
+    Box::into_raw(Box::new((unsafe { &(*index).qo_comm }).clone()))
 }
 
 #[no_mangle]
 pub extern "C" fn zexe_tweedle_plonk_fq_verifier_index_qm_comm(
     index: *const DlogVerifierIndex<GAffine>,
 ) -> *const PolyComm<GAffine> {
-    Box::into_raw(Box::new(
-        (unsafe { &(*index).qm_comm }).clone(),
-    ))
+    Box::into_raw(Box::new((unsafe { &(*index).qm_comm }).clone()))
 }
 
 #[no_mangle]
 pub extern "C" fn zexe_tweedle_plonk_fq_verifier_index_qc_comm(
     index: *const DlogVerifierIndex<GAffine>,
 ) -> *const PolyComm<GAffine> {
-    Box::into_raw(Box::new(
-        (unsafe { &(*index).qc_comm }).clone(),
-    ))
+    Box::into_raw(Box::new((unsafe { &(*index).qc_comm }).clone()))
 }
 
 #[no_mangle]
 pub extern "C" fn zexe_tweedle_plonk_fq_verifier_index_rcm_comm_0(
     index: *const DlogVerifierIndex<GAffine>,
 ) -> *const PolyComm<GAffine> {
-    Box::into_raw(Box::new(
-        (unsafe { &(*index).rcm_comm[0] }).clone(),
-    ))
+    Box::into_raw(Box::new((unsafe { &(*index).rcm_comm[0] }).clone()))
 }
 
 #[no_mangle]
 pub extern "C" fn zexe_tweedle_plonk_fq_verifier_index_rcm_comm_1(
     index: *const DlogVerifierIndex<GAffine>,
 ) -> *const PolyComm<GAffine> {
-    Box::into_raw(Box::new(
-        (unsafe { &(*index).rcm_comm[1] }).clone(),
-    ))
+    Box::into_raw(Box::new((unsafe { &(*index).rcm_comm[1] }).clone()))
 }
 
 #[no_mangle]
 pub extern "C" fn zexe_tweedle_plonk_fq_verifier_index_rcm_comm_2(
     index: *const DlogVerifierIndex<GAffine>,
 ) -> *const PolyComm<GAffine> {
-    Box::into_raw(Box::new(
-        (unsafe { &(*index).rcm_comm[2] }).clone(),
-    ))
+    Box::into_raw(Box::new((unsafe { &(*index).rcm_comm[2] }).clone()))
 }
 
 #[no_mangle]
 pub extern "C" fn zexe_tweedle_plonk_fq_verifier_index_psm_comm(
     index: *const DlogVerifierIndex<GAffine>,
 ) -> *const PolyComm<GAffine> {
-    Box::into_raw(Box::new(
-        (unsafe { &(*index).psm_comm }).clone(),
-    ))
+    Box::into_raw(Box::new((unsafe { &(*index).psm_comm }).clone()))
 }
 
 #[no_mangle]
 pub extern "C" fn zexe_tweedle_plonk_fq_verifier_index_add_comm(
     index: *const DlogVerifierIndex<GAffine>,
 ) -> *const PolyComm<GAffine> {
-    Box::into_raw(Box::new(
-        (unsafe { &(*index).add_comm }).clone(),
-    ))
+    Box::into_raw(Box::new((unsafe { &(*index).add_comm }).clone()))
 }
 
 #[no_mangle]
 pub extern "C" fn zexe_tweedle_plonk_fq_verifier_index_mul1_comm(
     index: *const DlogVerifierIndex<GAffine>,
 ) -> *const PolyComm<GAffine> {
-    Box::into_raw(Box::new(
-        (unsafe { &(*index).mul1_comm }).clone(),
-    ))
+    Box::into_raw(Box::new((unsafe { &(*index).mul1_comm }).clone()))
 }
 
 #[no_mangle]
 pub extern "C" fn zexe_tweedle_plonk_fq_verifier_index_mul2_comm(
     index: *const DlogVerifierIndex<GAffine>,
 ) -> *const PolyComm<GAffine> {
-    Box::into_raw(Box::new(
-        (unsafe { &(*index).mul2_comm }).clone(),
-    ))
+    Box::into_raw(Box::new((unsafe { &(*index).mul2_comm }).clone()))
 }
 
 #[no_mangle]
 pub extern "C" fn zexe_tweedle_plonk_fq_verifier_index_emul1_comm(
     index: *const DlogVerifierIndex<GAffine>,
 ) -> *const PolyComm<GAffine> {
-    Box::into_raw(Box::new(
-        (unsafe { &(*index).emul1_comm }).clone(),
-    ))
+    Box::into_raw(Box::new((unsafe { &(*index).emul1_comm }).clone()))
 }
 
 #[no_mangle]
 pub extern "C" fn zexe_tweedle_plonk_fq_verifier_index_emul2_comm(
     index: *const DlogVerifierIndex<GAffine>,
 ) -> *const PolyComm<GAffine> {
-    Box::into_raw(Box::new(
-        (unsafe { &(*index).emul2_comm }).clone(),
-    ))
+    Box::into_raw(Box::new((unsafe { &(*index).emul2_comm }).clone()))
 }
 
 #[no_mangle]
 pub extern "C" fn zexe_tweedle_plonk_fq_verifier_index_emul3_comm(
     index: *const DlogVerifierIndex<GAffine>,
 ) -> *const PolyComm<GAffine> {
-    Box::into_raw(Box::new(
-        (unsafe { &(*index).emul3_comm }).clone(),
-    ))
+    Box::into_raw(Box::new((unsafe { &(*index).emul3_comm }).clone()))
 }
 
 #[no_mangle]
 pub extern "C" fn zexe_tweedle_plonk_fq_verifier_index_r(
     index: *const DlogVerifierIndex<GAffine>,
 ) -> *const Fq {
-    Box::into_raw(Box::new(
-        (unsafe { &(*index).r }).clone(),
-    ))
+    Box::into_raw(Box::new((unsafe { &(*index).r }).clone()))
 }
 
 #[no_mangle]
 pub extern "C" fn zexe_tweedle_plonk_fq_verifier_index_o(
     index: *const DlogVerifierIndex<GAffine>,
 ) -> *const Fq {
-    Box::into_raw(Box::new(
-        (unsafe { &(*index).o }).clone(),
-    ))
+    Box::into_raw(Box::new((unsafe { &(*index).o }).clone()))
 }
 
 // Fq proof
@@ -447,9 +410,10 @@ pub extern "C" fn zexe_tweedle_plonk_fq_proof_create(
     };
 
     let map = <GAffine as CommitmentCurve>::Map::setup();
-    let proof = DlogProof::create::<DefaultFqSponge<TweedledumParameters, PlonkSpongeConstants>, DefaultFrSponge<Fq, PlonkSpongeConstants>>(
-        &map, &witness, &index, prev,
-    )
+    let proof = DlogProof::create::<
+        DefaultFqSponge<TweedledumParameters, PlonkSpongeConstants>,
+        DefaultFrSponge<Fq, PlonkSpongeConstants>,
+    >(&map, &witness, &index, prev)
     .unwrap();
 
     return Box::into_raw(Box::new(proof));
@@ -464,11 +428,11 @@ pub extern "C" fn zexe_tweedle_plonk_fq_proof_verify(
     let proof = unsafe { (*proof).clone() };
     let group_map = <GAffine as CommitmentCurve>::Map::setup();
 
-    DlogProof::verify::<DefaultFqSponge<TweedledumParameters, PlonkSpongeConstants>, DefaultFrSponge<Fq, PlonkSpongeConstants>>(
-        &group_map,
-        &[proof].to_vec(),
-        &index,
-    ).is_ok()
+    DlogProof::verify::<
+        DefaultFqSponge<TweedledumParameters, PlonkSpongeConstants>,
+        DefaultFrSponge<Fq, PlonkSpongeConstants>,
+    >(&group_map, &[proof].to_vec(), &index)
+    .is_ok()
 }
 
 // TODO: Batch verify across different indexes
@@ -481,11 +445,11 @@ pub extern "C" fn zexe_tweedle_plonk_fq_proof_batch_verify(
     let proofs = unsafe { &(*proofs) };
     let group_map = <GAffine as CommitmentCurve>::Map::setup();
 
-    DlogProof::<GAffine>::verify::<DefaultFqSponge<TweedledumParameters, PlonkSpongeConstants>, DefaultFrSponge<Fq, PlonkSpongeConstants>>(
-        &group_map,
-        proofs,
-        index,
-    ).is_ok()
+    DlogProof::<GAffine>::verify::<
+        DefaultFqSponge<TweedledumParameters, PlonkSpongeConstants>,
+        DefaultFrSponge<Fq, PlonkSpongeConstants>,
+    >(&group_map, proofs, index)
+    .is_ok()
 }
 
 #[no_mangle]
@@ -555,10 +519,7 @@ pub extern "C" fn zexe_tweedle_plonk_fq_proof_make(
         t_comm: (unsafe { &*t_comm }).clone(),
 
         public,
-        evals: [
-            (unsafe { &*evals0 }).clone(),
-            (unsafe { &*evals1 }).clone(),
-        ],
+        evals: [(unsafe { &*evals0 }).clone(), (unsafe { &*evals1 }).clone()],
     };
     return Box::into_raw(Box::new(res));
 }
@@ -632,7 +593,9 @@ pub extern "C" fn zexe_tweedle_plonk_fq_proof_vector_create() -> *mut Vec<DlogPr
 }
 
 #[no_mangle]
-pub extern "C" fn zexe_tweedle_plonk_fq_proof_vector_length(v: *const Vec<DlogProof<GAffine>>) -> i32 {
+pub extern "C" fn zexe_tweedle_plonk_fq_proof_vector_length(
+    v: *const Vec<DlogProof<GAffine>>,
+) -> i32 {
     let v_ = unsafe { &(*v) };
     return v_.len() as i32;
 }
@@ -688,13 +651,17 @@ pub extern "C" fn zexe_tweedle_plonk_fq_opening_proof_lr(
 }
 
 #[no_mangle]
-pub extern "C" fn zexe_tweedle_plonk_fq_opening_proof_z1(p: *const OpeningProof<GAffine>) -> *const Fq {
+pub extern "C" fn zexe_tweedle_plonk_fq_opening_proof_z1(
+    p: *const OpeningProof<GAffine>,
+) -> *const Fq {
     let x = (unsafe { &(*p).z1 }).clone();
     return Box::into_raw(Box::new(x));
 }
 
 #[no_mangle]
-pub extern "C" fn zexe_tweedle_plonk_fq_opening_proof_z2(p: *const OpeningProof<GAffine>) -> *const Fq {
+pub extern "C" fn zexe_tweedle_plonk_fq_opening_proof_z2(
+    p: *const OpeningProof<GAffine>,
+) -> *const Fq {
     let x = (unsafe { &(*p).z2 }).clone();
     return Box::into_raw(Box::new(x));
 }
@@ -799,7 +766,9 @@ pub extern "C" fn zexe_tweedle_plonk_fq_proof_evaluations_make(
 }
 
 #[no_mangle]
-pub extern "C" fn zexe_tweedle_plonk_fq_proof_evaluations_delete(x: *mut DlogProofEvaluations<Vec<Fq>>) {
+pub extern "C" fn zexe_tweedle_plonk_fq_proof_evaluations_delete(
+    x: *mut DlogProofEvaluations<Vec<Fq>>,
+) {
     let _box = unsafe { Box::from_raw(x) };
 }
 
@@ -820,7 +789,9 @@ pub extern "C" fn zexe_tweedle_plonk_fq_proof_evaluations_pair_1(
 }
 
 #[no_mangle]
-pub extern "C" fn zexe_tweedle_plonk_fq_proof_evaluations_pair_delete(x: *mut [DlogProofEvaluations<Vec<Fq>>; 2]) {
+pub extern "C" fn zexe_tweedle_plonk_fq_proof_evaluations_pair_delete(
+    x: *mut [DlogProofEvaluations<Vec<Fq>>; 2],
+) {
     let _box = unsafe { Box::from_raw(x) };
 }
 
@@ -840,8 +811,10 @@ pub extern "C" fn zexe_tweedle_plonk_fq_oracles_create(
     let index = unsafe { &(*index) };
     let proof = unsafe { &(*proof) };
 
-    let p_comm = PolyComm::<GAffine>::multi_scalar_mul
-      (&index.srs.get_ref().lgr_comm.iter().map(|l| l).collect(), &proof.public.iter().map(|s| -*s).collect());
+    let p_comm = PolyComm::<GAffine>::multi_scalar_mul(
+        &index.srs.get_ref().lgr_comm.iter().map(|l| l).collect(),
+        &proof.public.iter().map(|s| -*s).collect(),
+    );
     let (mut sponge, digest_before_evaluations, o, _, p_eval, _, _) =
         proof.oracles::<DefaultFqSponge<TweedledumParameters, PlonkSpongeConstants>, DefaultFrSponge<Fq, PlonkSpongeConstants>>(index, &p_comm);
 
@@ -876,12 +849,16 @@ pub extern "C" fn zexe_tweedle_plonk_fq_oracles_digest_before_evaluations(
 }
 
 #[no_mangle]
-pub extern "C" fn zexe_tweedle_plonk_fq_oracles_p_eval1(oracles: *const FqOracles) -> *const Vec<Fq> {
+pub extern "C" fn zexe_tweedle_plonk_fq_oracles_p_eval1(
+    oracles: *const FqOracles,
+) -> *const Vec<Fq> {
     return Box::into_raw(Box::new((unsafe { &(*oracles) }).p_eval[0].clone()));
 }
 
 #[no_mangle]
-pub extern "C" fn zexe_tweedle_plonk_fq_oracles_p_eval2(oracles: *const FqOracles) -> *const Vec<Fq> {
+pub extern "C" fn zexe_tweedle_plonk_fq_oracles_p_eval2(
+    oracles: *const FqOracles,
+) -> *const Vec<Fq> {
     return Box::into_raw(Box::new((unsafe { &(*oracles) }).p_eval[1].clone()));
 }
 
@@ -947,21 +924,25 @@ pub extern "C" fn zexe_tweedle_plonk_fq_gate_vector_add(
 ) {
     let v_ = unsafe { &mut (*v) };
     let c_ = unsafe { &(*c) };
-    v_.push
-    (
-        Gate
-        {
-            typ,
-            wires: Wires
-            {
-                row,
-                l: Wire {row: lrow, col: lcol},
-                r: Wire {row: rrow, col: rcol},
-                o: Wire {row: orow, col: ocol},
+    v_.push(Gate {
+        typ,
+        wires: Wires {
+            row,
+            l: Wire {
+                row: lrow,
+                col: lcol,
             },
-            c: c_.clone(),
-        }
-    )
+            r: Wire {
+                row: rrow,
+                col: rcol,
+            },
+            o: Wire {
+                row: orow,
+                col: ocol,
+            },
+        },
+        c: c_.clone(),
+    })
 }
 
 #[no_mangle]
@@ -1153,9 +1134,14 @@ pub extern "C" fn zexe_tweedle_plonk_fq_gate_vector_delete(v: *mut Vec<CircuitGa
 
 // Fq constraint system
 #[no_mangle]
-pub extern "C" fn zexe_tweedle_plonk_fq_constraint_system_create(v: *mut Vec<CircuitGate<Fq>>, public: usize) -> *mut ConstraintSystem<Fq> {
+pub extern "C" fn zexe_tweedle_plonk_fq_constraint_system_create(
+    v: *mut Vec<CircuitGate<Fq>>,
+    public: usize,
+) -> *mut ConstraintSystem<Fq> {
     let v_ = unsafe { &mut (*v) };
-    return Box::into_raw(Box::new(ConstraintSystem::<Fq>::create(v_.clone(), oracle::tweedle::fq::params(), public).unwrap()));
+    return Box::into_raw(Box::new(
+        ConstraintSystem::<Fq>::create(v_.clone(), oracle::tweedle::fq::params(), public).unwrap(),
+    ));
 }
 
 #[no_mangle]

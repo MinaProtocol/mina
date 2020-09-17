@@ -11,18 +11,17 @@ use algebra::{
     fields::{Field, FpParameters, PrimeField, SquareRootField},
     FromBytes, One, ToBytes, UniformRand, Zero,
 };
-use marlin_protocol_pairing::index::{Index, MatrixValues, URSSpec, VerifierIndex};
 use commitment_pairing::urs::URS;
-use marlin_circuits::domains::EvaluationDomains;
 use ff_fft::{DensePolynomial, EvaluationDomain, Evaluations, Radix2EvaluationDomain as Domain};
+use marlin_circuits::domains::EvaluationDomains;
+use marlin_protocol_pairing::index::{Index, MatrixValues, URSSpec, VerifierIndex};
 
-use oracle::{
-    self,
-    sponge::{DefaultFqSponge, DefaultFrSponge},
-    poseidon,
-    poseidon::{Sponge, MarlinSpongeConstants as SC},
-};
 use marlin_protocol_pairing::prover::{ProofEvaluations, ProverProof, RandomOracles};
+use oracle::{
+    self, poseidon,
+    poseidon::{MarlinSpongeConstants as SC, Sponge},
+    sponge::{DefaultFqSponge, DefaultFrSponge},
+};
 use rand::rngs::StdRng;
 use rand_core;
 
@@ -455,9 +454,10 @@ pub extern "C" fn zexe_bn382_fp_proof_create(
 
     let witness = prepare_witness(index.domains, primary_input, auxiliary_input);
 
-    let proof = ProverProof::create::<DefaultFqSponge<Bn_382G1Parameters, SC>, DefaultFrSponge<Fp, SC>>(
-        &witness, &index,
-    )
+    let proof = ProverProof::create::<
+        DefaultFqSponge<Bn_382G1Parameters, SC>,
+        DefaultFrSponge<Fp, SC>,
+    >(&witness, &index)
     .unwrap();
 
     return Box::into_raw(Box::new(proof));
@@ -472,11 +472,11 @@ pub extern "C" fn zexe_bn382_fp_proof_batch_verify(
     let index = unsafe { &(*index) };
     let proofs = unsafe { &(*proofs) };
 
-    match ProverProof::<Bn_382>::verify::<DefaultFqSponge<Bn_382G1Parameters, SC>, DefaultFrSponge<Fp, SC>>(
-        proofs,
-        index,
-        &mut rand_core::OsRng,
-    ) {
+    match ProverProof::<Bn_382>::verify::<
+        DefaultFqSponge<Bn_382G1Parameters, SC>,
+        DefaultFrSponge<Fp, SC>,
+    >(proofs, index, &mut rand_core::OsRng)
+    {
         Ok(_) => true,
         Err(_) => false,
     }
