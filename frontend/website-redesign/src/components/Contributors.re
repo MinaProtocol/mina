@@ -264,11 +264,7 @@ module GenesisMembersGrid = {
           [
             gridTemplateColumns([
               `rem(23.),
-              `rem(11.),
-              `rem(11.),
-              `rem(11.),
-              `rem(11.),
-              `rem(11.),
+              `repeat((`num(5), `rem(11.))),
             ]),
           ],
         ),
